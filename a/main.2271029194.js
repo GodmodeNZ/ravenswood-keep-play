@@ -1,4 +1,4 @@
-const BUILD_TAG = '7a5e723@2026-11-07';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0adcd1a@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -11525,7 +11525,7 @@ const SP_SHAPE = {
   // ---- the Conclave ----
   cc_blinkstrike: 'h2', cc_sigilcleave: 'a', cc_spectral: 'x', cc_barrage: 'a h:n', cc_sparks: 'a', cc_grandorb: 'a', cc_glacialglyph: 'a', cc_rimelance: 'a',
   cc_hoarbloom: 'a', cc_dilation: 'x', cc_quicken: 'x', cc_echo: 'x', cc_fallingstar: 'a', cc_omen: 'a', cc_orrery: 'a h:dur*3', cc_seismic: 'a',
-  cc_tremorglyph: 'a z.4', cc_boulder: 'a', cc_pyresigil: 'a z.6', cc_kindle: 'a L3', cc_flamewave: 'a',
+  cc_tremorglyph: 'a z.4', cc_boulder: 'a', cc_pyresigil: 'a h:dur/.25 b5', cc_kindle: 'a L3', cc_flamewave: 'a h2',
   ch_thousandfold: 'a h24', ch_unravel: 'a', ch_mirrorweave: 'x', ch_stoppedhour: 'a', ch_hourlead: 'x', ch_severing: 'a', ch_riftchain: 'a', ch_unbound: 'a',
   // ---- Ironhold ----
   ih_bulwark: 'a h2', ih_breakerblow: 'a', ih_rollingvolley: 'h:n', ih_slug: 'a', ih_chainnet: 'a', ih_caltropfield: 'a', ih_grapple: 'a h4', ih_runeofpower: 'x', ih_forgeburst: 'a h3',
@@ -12830,7 +12830,7 @@ function ccFireBurst(t, st, x, z, pow, o) {
   if (o.great) { fxExplode(x, z, sp * .8, 1); G.shake = Math.max(G.shake, .1); }
   sfx('fireHit', o.great ? 2 : 0);
 }
-/* the Sunforge Gauntlet: a fireball that lands on one of its own burning glyphs (Pyre Sigil's too) feeds it: the glyph burns
+/* the Sunforge Gauntlet: a fireball that lands on one of its own burning glyphs (Skipping Flame's too) feeds it: the glyph burns
    its full time again and widens 0.2 cells, up to ccSunforgeN times, so a corner it keeps fed becomes a standing fire */
 const ccSunforgeN = k => Math.max(3, Math.round(3 * k));
 function ccSunforge(t, x, z) {
@@ -14180,11 +14180,11 @@ const CC_TALENTS = {
     GT('Glyph Anchor', 'rune', 2, 0, 1, 'Beside a wall, Tremor Glyph comes 25% sooner.', {}, { sp: { ab: 'cc_tremorglyph', at: 'wall', cd: -.25 } }),
   ] },
 
-  /* ---- Pyroclasts (cannon): Pyre Sigil (innate), Kindle (row III), Flame Wave (capstone). Its weave, Ember Heart (Shatter), spends the frost rune ---- */
+  /* ---- Pyroclasts (cannon): Furnace Breath (innate, once Pyre Sigil), Kindle (row III), Flame Wave (capstone); forces_zxc_conclave_cool.js swaps in Skipping Flame and Phoenix. Its weave, Ember Heart (Shatter), spends the frost rune ---- */
   cannon: { name: 'Pyrelore', hue: '#ff8a4a', list: [
     GT('Slow-Burning Ink', 'ember', 0, 2, 2, n => `Its burns last ${n}s longer.`, {}, { cap: 'ccLinger' }),
     GT('Wide Blast', 'burst', 0, 0, 3, n => `Fireballs burst ${6 * n}% wider.`, n => ({ splash: 1 + .06 * n })),
-    GT('Pyre Scribe', 'rune', 3, 0, 1, 'Every 2nd fireball leaves a burning glyph instead of every 3rd, and Pyre Sigil burns 1s longer.', {}, { cap: 'ccPyre2', sp: { ab: 'cc_pyresigil', by: { dur: 1 } } }),
+    GT('Pyre Scribe', 'rune', 3, 0, 1, 'Every 2nd fireball leaves a burning glyph instead of every 3rd, and Furnace Breath pours 0.5s longer.', {}, { cap: 'ccPyre2', sp: { ab: 'cc_pyresigil', by: { dur: .5 } } }),
     GT('Fire Feeds Mana', 'potion', 2, 0, 2, n => `Each foe Kindle's burst slays gives it ${8 * n} mana.`, {}, { sp: n => ({ ab: 'cc_kindle', kill: { mana: 8 * n } }), req: [1, 0] }),
     GT('Firewalk', 'firewall', 3, 3, 2, n => `Its burning glyphs are ${gNf(.15 * n)} cells wider and slow walkers ${10 * n}%, and Flame Wave burns ${gNf(.5 * n)}s longer.`, {}, { cap: 'ccFirewalk', sp: n => ({ ab: 'cc_flamewave', by: { burn: .5 * n } }), req: [2, 3] }),
     GT('Cinder Charge', 'boltplus', 2, 1, 1, 'Kindle hits burning foes 25% harder.', {}, { sp: { ab: 'cc_kindle', vs: ['burning', .25] } }),
@@ -14358,8 +14358,8 @@ const CC_LEGENDS = {
     combo: 'Broad Palms, Shatterground and the Spellblades (a stunned foe is Exposed to them).', fx: (st, k) => ccPwS(st, 'ccTitan', k) },
   cc_l_sunforge: { for: 'cannon', name: 'Sunforge Gauntlet', icon: 'fist', hue: '#ff9a4a',
     twist: 'Pyroclasts tend a forge: fireballs landing on their own burning glyphs rekindle and widen them into a standing fire.',
-    text: k => `A fireball that lands on one of its burning glyphs (Pyre Sigil's too) rekindles it to its full time and widens it 0.2 cells, up to ${ccSunforgeN(k)} times.`,
-    build: 'Pyre Scribe for a glyph every 2nd fireball, Firewalk, Pyre Lord and Pyre Sigil; one tight corner the foes must cross.',
+    text: k => `A fireball that lands on one of its burning glyphs (Skipping Flame's too) rekindles it to its full time and widens it 0.2 cells, up to ${ccSunforgeN(k)} times.`,
+    build: 'Pyre Scribe for a glyph every 2nd fireball, Firewalk, Pyre Lord and Skipping Flame; one tight corner the foes must cross.',
     combo: 'Pyre Scribe, Firewalk and Pyre Lord.', fx: (st, k) => ccPwS(st, 'ccSunforge', k) },
   cc_l_meridian: { for: 'holy', name: 'The Prime Meridian', icon: 'sunburst', hue: '#9ffff2',
     twist: 'Your Champion becomes the ley: each of its spells hands every Conclave unit an Arcane Charge and mana.',
@@ -30881,7 +30881,7 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_caged', { name: 'Caged
      Golem Wardens   Heave (the golem throws the leading walker back up the road onto the column)
                      Living Bulwark (the golem strides onto the road and stands as a wall, pounding what it holds)
      Pyroclasts      Skipping Flame (a fireball that skips back up the road, each skip a burst and a burning patch)
-                     Road of Embers (fire runs along every road cell in reach)
+                     Phoenix (a bird of fire sweeping back up the road; Furnace Breath, the innate, a cone poured from its hands)
      Arcane Severers Returning Crescent (the glaive's edge thrown on a loop, cutting out and back)
                      Rend the Veil (threads hooked into the warded, then torn out: wards broken, the foe Severed)
      Maelis          Sixfold Loom (a wheel of the six schools throws bolts that weave on each other)
@@ -31380,28 +31380,76 @@ ccxSwap('cc_pyroclast', { id: 'cc_kindle', name: 'Skipping Flame', short: 'Skip'
     skip(0, c, hx, hh, hz, T0, c.x, c.y);
     ccxFx(ab.id, t, c, C => v2Wind(C, { wu: .05, rel: 'ember', reln: 4 }));
   } });
-ccxSwap('cc_pyroclast', { id: 'cc_flamewave', name: 'Road of Embers', short: 'Embers', glyph: 'firewall', hue: '#ff6a2a', mana: 120, cd: 15, research: { cost: 120, time: 30 }, pref: 'grouped',
-  by: { dur: [3, 3, 3.5, 3.5, 4, 4] },
-  auto: 'three or more walkers on the road within its reach', none: 'no road and walkers in reach',
-  text: (t, st, ab) => `Every road cell within its reach burns for ${gNf(byT(ab.by.dur, t))}s: walkers on it take ${xDt(st, .3)} every half second, burn and are slowed 25%.`,
+/* Furnace Breath and Phoenix (owner, 7 Nov 2026: "flashier flame spells that fulfill the fantasy of a fire mage", "cast
+   from the pyro and hit the enemy rather than from the sky"), in place of Pyre Sigil and Road of Embers (ids kept, so the
+   trees, sets, items and saves still bind). The look is pyrofire.js (CCX_FX.breath, CCX_FX.phoenix): bright where it
+   strikes, only a small glow in the Pyroclast's hands (owner: never flashy round the caster). */
+Object.assign(CCX, { BR_COS: .8, BR_TICK: .25, BR_STACK: 5, BR_TURN: .12, PHX_SPD: 5, PHX_R: .6, PHX_BOOM: 1.1, PHX_LIFT: .3 });
+// the walker in reach with the most walkers in a cone toward it (and that count)
+function ccxConeBest(t, st, r) {
+  const L = abFoes(t, st, r, abWalker); let best = null, bn = 0;
+  for (const c of L) { const [ux, uz] = abDir(t, c); let n = 0; for (const o of L) { const [vx, vz] = abDir(t, o); if (ux * vx + uz * vz >= CCX.BR_COS) n++; } if (n > bn || (n === bn && best && abBig(c) && !abBig(best))) { bn = n; best = c; } }
+  return { c: best, n: bn };
+}
+ccxSwap('cc_pyroclast', { id: 'cc_pyresigil', name: 'Furnace Breath', short: 'Breath', glyph: 'flame', hue: '#ff8a4a', mana: 100, cd: 12, research: null, pref: 'grouped',
+  by: { dur: [1.5, 1.5, 1.75, 1.75, 2, 2] },
+  auto: 'a cone in front of it holding two or more walkers (or a boss or elite)', none: 'no walkers in reach',
+  text: (t, st, ab) => `Pours a roaring cone of flame from its hands for ${gNf(byT(ab.by.dur, t))}s at the densest group in front, following it: every ground foe in the cone takes ${xD(st, .3)} every quarter second and its burn is stoked, up to ${CCX.BR_STACK} stacks (each ${xDt(st, .06)} a second).`,
+  pick(t, st, ab, man) { const b = ccxConeBest(t, st, abReach(t, st, ab)); return b.c && (man || b.n >= 2 || abBig(b.c)) ? b.c : null; },
+  cast(t, st, c, ab) {
+    const k = ccCast(t, ab), dur = byT(ab.by.dur, t), r = abReach(t, st, ab) + .2, n = Math.max(1, Math.round(dur / CCX.BR_TICK)), [ux, uz] = abDir(t, c);
+    const B = t.ccxBreath = { at: G.time, until: G.time + dur + .1, ux, uz, r };
+    t.ang = Math.atan2(ux, uz); t.cd = Math.max(t.cd, dur + .15); if (t.ab) t.ab.busyT = Math.max(t.ab.busyT || 0, G.time + dur + .1);
+    for (let i = 0; i < n; i++) ccxLater(ab.id, .1 + i * CCX.BR_TICK, () => {
+      if (!abLive(t) || t.ccxBreath !== B) return; const s = t.st || st;
+      // the cone follows its group: turned a little each tick toward the walkers near its edge
+      let sx = 0, sz = 0; for (const o of abFoes(t, s, B.r, abWalker)) { const [vx, vz] = abDir(t, o); if (B.ux * vx + B.uz * vz >= .55) { sx += vx; sz += vz; } }
+      if (sx || sz) { const a0 = Math.atan2(B.uz, B.ux), a1 = Math.atan2(sz, sx); let da = a1 - a0; da -= Math.round(da / TAU) * TAU; const a = a0 + clamp(da, -CCX.BR_TURN, CCX.BR_TURN); B.ux = Math.cos(a); B.uz = Math.sin(a); t.ang = Math.atan2(B.ux, B.uz); }
+      abAoe(() => { for (const o of abCone(t, s, B.ux, B.uz, B.r, CCX.BR_COS, abWalker)) { if (o.ent) continue; ccAb(t, s, o, .3, k, { noWeave: i > 0 }); if (!o.dead) ignite(o, ccAbD(s) * .06, 3, t, false, CCX.BR_STACK); } });
+    });
+    ccxFx(ab.id, t, c, C => CCX_FX.breath && CCX_FX.breath(C, t, B));
+  } });
+// Phoenix's flight: out of its hands to the leading walker, then back up the road (portal-ward) for `cells` cells
+function ccxPhxRoute(t, c, cells) {
+  const P = ccxPathPts(), R = [[t.x, t.y], [c.x, c.y]], i0 = ccxPathIdx(c.x, c.y); let left = cells, x = c.x, z = c.y;
+  for (let j = i0 - 1; i0 > 0 && j >= 1 && left > .05; j--) {
+    const d = Math.hypot(P[j][0] - x, P[j][1] - z); if (d < .05) continue;
+    const m = Math.min(1, left / d); x += (P[j][0] - x) * m; z += (P[j][1] - z) * m; R.push([x, z]); left -= d * m;
+  }
+  if (left > .05) { const [ux, uz] = abDir(t, c); R.push([x + ux * left, z + uz * left]); }   // (no road beyond: on along its line)
+  return R;
+}
+// a point d along route R: [x, z, heading x, heading z, the whole length]
+function ccxAlong(R, d) {
+  let tot = 0; for (let i = 1; i < R.length; i++) tot += Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]);
+  for (let i = 1; i < R.length; i++) {
+    const ax = R[i - 1][0], az = R[i - 1][1], L = Math.hypot(R[i][0] - ax, R[i][1] - az) || 1e-6;
+    if (d <= L || i === R.length - 1) { const u = clamp(d / L, 0, 1); return [ax + (R[i][0] - ax) * u, az + (R[i][1] - az) * u, (R[i][0] - ax) / L, (R[i][1] - az) / L, tot]; }
+    d -= L;
+  }
+  return [R[0][0], R[0][1], 0, 1, 0];
+}
+ccxSwap('cc_pyroclast', { id: 'cc_flamewave', name: 'Phoenix', short: 'Phoenix', glyph: 'flamejump', hue: '#ff6a2a', mana: 120, cd: 15, research: { cost: 120, time: 30 }, pref: 'grouped',
+  by: { mult: [1.5, 1.5, 1.65, 1.65, 1.85, 1.85], boom: [2.5, 2.5, 2.75, 2.75, 3, 3], len: [5, 5, 5.5, 5.5, 6, 6] },
+  auto: 'three or more walkers within reach of its road, or a boss or elite', none: 'no walkers in reach',
+  text: (t, st, ab) => `A phoenix of fire bursts from its hands, strikes the walker nearest the gate and sweeps ${gNf(byT(ab.by.len, t))} cells back up the road through the column: every ground foe it passes takes ${xD(st, byT(ab.by.mult, t))} and burns for 3s. At the end of its flight it dives and explodes: ${xD(st, byT(ab.by.boom, t))} to every ground foe within ${gNf(CCX.PHX_BOOM)} cells.`,
   pick(t, st, ab, man) {
-    const r = abReach(t, st, ab) + .3, cells = ccxPathPts().filter((p, i, A) => i > 0 && i < A.length - 1 && Math.hypot(p[0] - t.x, p[1] - t.y) <= r); if (!cells.length) return null;
-    const n = abFoes(t, st, r + .6, abWalker).filter(c => cells.some(p => Math.hypot(c.x - p[0], c.y - p[1]) <= .6)).length;
-    return n >= (man ? 1 : 3) ? t : null;
+    const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null;
+    const c = L.reduce((b, q) => (q.remain < b.remain ? q : b), L[0]), n = abFoes(t, st, abReach(t, st, ab) + 3, abWalker).length;
+    return man || n >= 3 || abBig(c) ? c : null;
   },
-  cast(t, st, _, ab) {
-    const k = ccCast(t, ab), dur = byT(ab.by.dur, t), r = abReach(t, st, ab) + .3, P = ccxPathPts(), C0 = ccCaps(t);
-    const cells = []; for (let i = 1; i < P.length - 1; i++) if (Math.hypot(P[i][0] - t.x, P[i][1] - t.y) <= r) cells.push([i, P[i][0], P[i][1]]);
-    if (!cells.length) return false;
-    const i0 = cells.reduce((b, q) => Math.hypot(q[1] - t.x, q[2] - t.y) < Math.hypot(b[1] - t.x, b[2] - t.y) ? q : b, cells[0])[0];
-    cells.sort((a, b) => Math.abs(a[0] - i0) - Math.abs(b[0] - i0));
-    cells.slice(0, 10).forEach(([i, x, z]) => ccxLater(ab.id, Math.abs(i - i0) * .07, () => {
-      if (!abLive(t)) return; const s = t.st || st;
-      const g = ccGlyph({ s: 'fire', sub: 'sigil', x, z, r: .55, t: dur, src: t, st: s, every: .5, dmg: ccAbD(s) * .3 * k, burn: ccAbD(s) * .1, slow: .25 + .1 * (C0.ccFirewalk || 0) });
-      if (g) { g._sfx = 1; ccxFx(ab.id, t, null, C => CCX_FX.roadCell(C, g, Math.abs(i - i0))); }
-      if (Math.abs(i - i0) % 2 === 0) sfx('fireHit', 0);
-    }));
-    ccxFx(ab.id, t, null, C => CCX_FX.roadIgnite(C, t)); sfx('fire', 1);
+  cast(t, st, c, ab) {
+    const k = ccCast(t, ab), R = ccxPhxRoute(t, c, byT(ab.by.len, t)), tot = ccxAlong(R, 0)[4], m = byT(ab.by.mult, t), bm = byT(ab.by.boom, t), hit = new Set(), DT = .05;
+    const F = { R, tot, at: G.time + CCX.PHX_LIFT, spd: CCX.PHX_SPD, h0: towerTop(t) * .8 };
+    const step = d => ccxLater(ab.id, DT, () => {
+      if (!G.towers.includes(t) || t.wrecked) return; const s = t.st || st, d2 = Math.min(tot, d + CCX.PHX_SPD * DT), [x, z] = ccxAlong(R, d2);
+      abAoe(() => { for (const q of G.creeps) { if (q.dead || q.ent || hit.has(q) || !abWalker(q) || !canTarget(t, s, q) || Math.hypot(q.x - x, q.y - z) > CCX.PHX_R) continue; hit.add(q); ccAb(t, s, q, m, k, { noWeave: hit.size > 1 }); if (!q.dead) ignite(q, ccAbD(s) * .25, 3, t, false); } });
+      if (d2 < tot) return step(d2);
+      abAoe(() => inSplash(x, z, CCX.PHX_BOOM, true, q => { if (q.ent || !canTarget(t, s, q)) return; ccAb(t, s, q, bm, k, { noWeave: true }); if (!q.dead) ignite(q, ccAbD(s) * .25, 3, t, false); }));
+      G.shake = Math.max(G.shake || 0, .12); ccxFx(ab.id, t, null, C => CCX_FX.phoenixBoom && CCX_FX.phoenixBoom(C, x, z)); if (typeof sfx === 'function') sfx('pyroPhxBoom');
+    });
+    ccxLater(ab.id, CCX.PHX_LIFT, () => { step(0); if (typeof sfx === 'function') sfx('pyroPhxFly'); });
+    ccxFx(ab.id, t, c, C => CCX_FX.phoenix && CCX_FX.phoenix(C, t, F));
   } });
 
 /* =====================================================================================================
@@ -31605,9 +31653,9 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
   // Pyroclasts
   ccxTal(T.cannon.list, 'Fire Feeds Mana', GT('Fire Feeds Mana', 'potion', 2, 0, 2, n => `Each foe Skipping Flame slays gives it ${8 * n} mana.`, {}, { sp: n => ({ ab: 'cc_kindle', kill: { mana: 8 * n } }) }));
   ccxTal(T.cannon.list, 'Cinder Charge', GT('Cinder Charge', 'boltplus', 2, 1, 1, "Skipping Flame hits burning foes 25% harder: its later skips find the foes its first ones lit.", {}, { sp: { ab: 'cc_kindle', vs: ['burning', .25] } }));
-  ccxTal(T.cannon.list, 'Firewalk', GT('Firewalk', 'firewall', 3, 3, 2, n => `Its burning glyphs are ${gNf(.15 * n)} cells wider and slow walkers ${10 * n}% more, and Road of Embers burns ${gNf(.5 * n)}s longer.`, {}, { cap: 'ccFirewalk', sp: n => ({ ab: 'cc_flamewave', by: { dur: .5 * n } }) }));
-  ccxTal(T.cannon.list, 'Rolling Inferno', GT('Rolling Inferno', 'firewall', 3, 2, 2, n => `Road of Embers comes ${10 * n}% sooner, and every walker it burns burns for ${10 * n}% of a fireball a second for 3s.`, {}, { sp: n => ({ ab: 'cc_flamewave', cd: -.1 * n, rider: { burn: .1 * n } }) }));
-  ccxTal(T.cannon.list, 'Searing Tide', GT('Searing Tide', 'ember', 3, 1, 1, 'Every walker Road of Embers burns is slowed 20% more for 2s.', {}, { sp: { ab: 'cc_flamewave', rider: { slow: [.2, 2] } } }));
+  ccxTal(T.cannon.list, 'Firewalk', GT('Firewalk', 'firewall', 3, 3, 2, n => `Its burning glyphs are ${gNf(.15 * n)} cells wider and slow walkers ${10 * n}% more, and Phoenix flies ${n} more road cell${n > 1 ? 's' : ''} before it dives.`, {}, { cap: 'ccFirewalk', sp: n => ({ ab: 'cc_flamewave', by: { len: n } }) }));
+  ccxTal(T.cannon.list, 'Rolling Inferno', GT('Rolling Inferno', 'firewall', 3, 2, 2, n => `Phoenix comes ${10 * n}% sooner, and every walker it passes keeps burning for ${10 * n}% of a fireball a second for 3s.`, {}, { sp: n => ({ ab: 'cc_flamewave', cd: -.1 * n, rider: { burn: .1 * n } }) }));
+  ccxTal(T.cannon.list, 'Searing Tide', GT('Searing Tide', 'ember', 3, 1, 1, 'Every walker Phoenix passes is slowed 20% for 2s: the heat of its wings.', {}, { sp: { ab: 'cc_flamewave', rider: { slow: [.2, 2] } } }));
   // the Arcane Severers
   const S = FORCES.conclave.talents[SPEC_SLOT];
   if (S) {
@@ -31654,11 +31702,20 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
     return undefined;
   });
   wrap('cc_mageling', 'book', t => { if (t.ccxOrbT > G.time) { const bob = .03 * Math.sin(vt * 2.2); return ccCarry(-.3, 1.2, 0, [.2, .42 + bob, -.05]); } return undefined; });
-  // the Pyroclasts: a low sidearm skim for Skipping Flame; both hands driven down and swept out for Road of Embers
+  // the Pyroclasts: a low sidearm skim for Skipping Flame; both hands thrust out, braced, for Furnace Breath (a tremor
+  // as it pours); for Phoenix the orb raised overhead in both hands, then flung forward as the bird bursts from it
   for (const sd of [-1, 1]) wrap('cc_pyroclast', sd > 0 ? 'armR' : 'armL', t => {
-    const sk = ccAge(t, 'cc_kindle'), rd = ccAge(t, 'cc_flamewave');
+    const sk = ccAge(t, 'cc_kindle'), ph = ccAge(t, 'cc_flamewave'), B = t.ccxBreath;
+    if (B && G.time < B.until + .3) { const el = G.time - B.at, on = ccEase(ccIn(el, 0, .12)) * (1 - ccEase(ccIn(G.time - B.until, 0, .3))), q = .03 * Math.sin(G.time * 37 + sd); return [(-1.05 + q) * on, sd * .12 * on, -sd * .1 * on, 0, .03 * on, .1 * on]; }
+    if (ph < 1.1) { const up = ccEase(ccIn(ph, 0, .26)), fl = ccEase(ccIn(ph, .26, .4)), back = ccEase(ccIn(ph, .6, 1.1)); return [(-2.5 * up * (1 - fl) - .85 * fl) * (1 - back), -sd * .35 * up * (1 - fl) * (1 - back), 0, 0, (.05 * up - .02 * fl) * (1 - back), .12 * fl * (1 - back)]; }
     if (sk < .6 && sd > 0) { const v = ccIn(sk, 0, .35); return [.35 * ccPop(sk, 0, .6), 1.1 - 2.2 * ccEase(v), .9 * ccPop(sk, 0, .5), 0, -.04 * ccPop(sk, 0, .6), .08 * ccPop(sk, .1, .4)]; }
-    if (rd < 1) { const dn = ccEase(ccIn(rd, 0, .25)), out = ccEase(ccIn(rd, .25, .7)), back = ccIn(rd, .7, 1); return [(1.3 * dn - .3 * out) * (1 - back), -sd * 1.1 * out * (1 - back), sd * .2 * dn * (1 - back), 0, -.05 * dn * (1 - back), .03 * dn]; }
+    return undefined;
+  });
+  // the orb: thrust out before it through the breath; raised overhead for Phoenix, gone as the bird is born of it, growing back
+  wrap('cc_pyroclast', 'orb', t => {
+    const ph = ccAge(t, 'cc_flamewave'), B = t.ccxBreath;
+    if (B && G.time < B.until + .3) { const on = ccEase(ccIn(G.time - B.at, 0, .12)) * (1 - ccEase(ccIn(G.time - B.until, 0, .3))); return ccCarry(0, vt * 9, 0, [0, .05 * on, .03 + .2 * on]); }
+    if (ph < 1.1) { if (ph >= .28 && ph < .8) return null; const up = ccEase(ccIn(ph, 0, .26)), grow = ccIn(ph, .8, 1.1); return ph < .28 ? ccCarry(0, vt * 6, 0, [0, .42 * up, .03 - .05 * up]) : ccCarry(0, vt * 3, 0, [0, 0, .03 - .12 * (1 - grow)]); }
     return undefined;
   });
   // the Severer: the crescent thrown sidearm and caught; the glaive's butt planted, then wrenched up as the threads tear
@@ -31696,9 +31753,9 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
    ===================================================================================================== */
 SPEC_REG.push(() => {
   if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { cc_sigilcleave: 0, cc_spectral: .3, cc_sparks: .5, cc_grandorb: 0, cc_rimelance: .5, cc_hoarbloom: .8, cc_quicken: .6, cc_omen: .6, cc_orrery: .9,
-    cc_tremorglyph: 0, cc_boulder: 0, cc_kindle: .4, cc_flamewave: .8, cc_shards: .3, cc_nullfield: .4 });
+    cc_tremorglyph: 0, cc_boulder: 0, cc_pyresigil: .3, cc_kindle: .4, cc_flamewave: .5, cc_shards: .3, cc_nullfield: .4 });
   if (typeof LIFE_CAST !== 'undefined' && typeof LF_ARCH !== 'undefined') for (const [id, kind, T] of [['cc_sigilcleave', 'thrust', .6], ['cc_spectral', 'slam', 1], ['cc_grandorb', 'channel', 2.6], ['cc_omen', 'raise', 1],
-    ['cc_tremorglyph', 'thrust', 1], ['cc_boulder', 'raise', 1], ['cc_flamewave', 'stoop', 1.1], ['cc_kindle', 'sweep', .7], ['cc_shards', 'sweep', .7], ['cc_nullfield', 'stoop', 1.1]]) {
+    ['cc_tremorglyph', 'thrust', 1], ['cc_boulder', 'raise', 1], ['cc_pyresigil', 'thrust', 1.6], ['cc_flamewave', 'raise', 1.1], ['cc_kindle', 'sweep', .7], ['cc_shards', 'sweep', .7], ['cc_nullfield', 'stoop', 1.1]]) {
     const A = LF_ARCH[kind]; if (A) LIFE_CAST[id] = { T, k: A.k.map(r => [r[0] * T, ...r.slice(1)]), f: null };
   }
   if (typeof LF_SYNC !== 'undefined') delete LF_SYNC.cc_sigilcleave;
@@ -31712,7 +31769,7 @@ SPEC_REG.push(() => {
    follow vfxFid. Each spell's moments are SFX_DRAW kinds of its own (ccx_*); the recipe's generic layer is switched off
    for these ids (SFX_CUSTOM), as the spells draw themselves.
    ===================================================================================================== */
-const CCX_IDS = ['cc_sigilcleave', 'cc_spectral', 'cc_sparks', 'cc_grandorb', 'cc_rimelance', 'cc_hoarbloom', 'cc_quicken', 'cc_omen', 'cc_orrery', 'cc_tremorglyph', 'cc_boulder', 'cc_kindle', 'cc_flamewave', 'cc_shards', 'cc_nullfield', 'ch_mirrorweave', 'ch_rewind', 'ch_hourlead'];
+const CCX_IDS = ['cc_sigilcleave', 'cc_spectral', 'cc_sparks', 'cc_grandorb', 'cc_rimelance', 'cc_hoarbloom', 'cc_quicken', 'cc_omen', 'cc_orrery', 'cc_tremorglyph', 'cc_boulder', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave', 'cc_shards', 'cc_nullfield', 'ch_mirrorweave', 'ch_rewind', 'ch_hourlead'];
 let CCX_REG = 0;
 const ccxC = (hex, k) => vfxC(hex, k || 1);
 const ccxE = (q, fin, fout) => Math.max(0, Math.min(1, q.age / (fin || .15), (q.life - q.age) / (fout || .3)));
@@ -34291,7 +34348,7 @@ for (const [kind, list] of Object.entries({
   shoot: 'so_sanct 1 sb_galearrow .9 sb_skyshot 1',
   sweep: 'so_hail .8 so_sweep .9 cc_sigilcleave .8 cc_flamewave 1 sb_crosswind 1.1 sb_stormdance 1.3',
   channel: 'so_aegis 1.4 so_smoke 1.1 cc_barrage .9 cc_dilation 1 cc_echo 1 cc_omen 1 cc_orrery 1.2 sb_freezingrain 1.3 sb_hailstorm 1.6 sb_thunderhead 1.4 sb_downpour 1 sb_gather 1.3',
-  stoop: 'so_shackle 1.2 so_hallow 1.4 cc_tremorglyph 1 cc_pyresigil 1 sb_rimetotem 1 sb_stormtotem 1 sb_fissure 1.1',
+  stoop: 'so_shackle 1.2 so_hallow 1.4 cc_tremorglyph 1 sb_rimetotem 1 sb_stormtotem 1 sb_fissure 1.1',
 })) {
   const A = LF_ARCH[kind], w = list.split(' ');
   for (let i = 0; i < w.length; i += 2) { const id = w[i], T = +w[i + 1]; if (LIFE_CAST[id]) continue;
@@ -36560,7 +36617,7 @@ const FSETS = [
     } },
   { id: 'fs_kiln', spells: ['cc_flamewave'], force: 'conclave', unit: 'cannon', name: 'Kiln-Born Regalia',
     pieces: [['fs_cc_mitts', 'Kiln Mitts', 2, 'ember', '#ff9a5a', 'sp splash'], ['fs_cc_monocle', 'Emberglass Monocle', 3, 'lens', '#ff8a4a', 'sp mana regen']],
-    b2: 'Flame Wave spends the frost rune on each foe it strikes: the rime shatters, striking every other foe within 1 cell for half the hit.',
+    b2: 'Phoenix spends the frost rune on each foe it strikes: the rime shatters, striking every other foe within 1 cell for half the hit.',
     hit(t, c, amt, sp) {
       if (sp !== 'cc_flamewave' || !ccTake(c, 'frost')) return;
       const d = amt * .5;
@@ -38287,7 +38344,7 @@ function fshopCats() {
    spells; its (4) changes how the unit plays: a spell that casts another, a state that spreads. Pieces: [id, name, 3, icon,
    hue, 'stat weights']; the fourth is the charm. Loaded after every other forces_* file, so the spells are their final
    selves (forces_zxc_conclave_cool.js: Riposte Stance, Crosscut Sigil, Missile Curtain, Gathering Orb, Hoarfrost Trail,
-   Rime Lattice, Backward Hour, Lodestar, Grand Orrery, Heave, Living Bulwark, Skipping Flame, Road of Embers, Returning
+   Rime Lattice, Backward Hour, Lodestar, Grand Orrery, Heave, Living Bulwark, Skipping Flame, Phoenix, Returning
    Crescent, Rend the Veil). */
 
 if (typeof fsetAdd === 'function') {
@@ -38429,12 +38486,12 @@ if (typeof fsetAdd === 'function') {
       });
     } });
 
-  /* ---------- Pyroclasts: the road burns, the flame skips, the burning burst ---------- */
+  /* ---------- Pyroclasts: the breath, the flame skips, the phoenix, the burning burst ---------- */
   fsetAdd({ id: 'fe_cc_pyre', epic: 1, spells: ['cc_pyresigil', 'cc_kindle', 'cc_flamewave'], force: 'conclave', unit: 'cannon', name: 'The Kilnwright’s Long Road',
     pieces: [['fe_cc_skipcenser', 'Skipping-Stone Censer', 3, 'ember', '#ffb040', 'sp splash'], ['fe_cc_ashmantle', 'Mantle of Warm Ash', 3, 'spores', '#ff8a4a', 'sp mana'],
       ['fe_cc_roadmap', 'Map of Burning Roads', 3, 'flask', '#ff6a2a', 'sp cd splash'], ['fe_cc_cinderjar', 'Jar of Live Cinders', 3, 'potion', '#ffa060', 'regen cd']],
-    b2: 'Each Pyre Sigil brings Road of Embers 3s nearer.',
-    b4: 'Each Road of Embers casts Skipping Flame at once, free, and a burning walker Skipping Flame slays bursts: every walker within 1 cell is struck and set burning (at most once a second).',
+    b2: 'Each Furnace Breath brings Phoenix 3s nearer.',
+    b4: 'Each Phoenix casts Skipping Flame at once, free, and a burning walker Skipping Flame slays bursts: every walker within 1 cell is struck and set burning (at most once a second).',
     cast(t, ab, tg, n) {
       if (ab.id === 'cc_pyresigil') fsReady(t, 'cc_flamewave', 3);
       if (n >= 4 && ab.id === 'cc_flamewave') { const S = this; fsLater(.5, () => { if (fsFreeCast(t, 'cc_kindle')) fsGlint(t, S); }); }
@@ -41712,7 +41769,7 @@ function ccfTal(list, name, nt) {
   ccfTal(T.cannon.list, 'Long Throw', GT('Leaping Cinders', 'bounce', 0, 1, 2, n => `Each burning foe it slays throws its fire on to the nearest walker within ${gNf(.6 + .3 * n)} cells.`, {}, { cap: 'ccfLeap' }));
   ccfTal(T.cannon.list, 'Wardburn', GT('Wardburn', 'shieldbreak', 0, 3, 3, n => `Its fireballs and spells ignore ${5 * n}% of wards, and each fireball that bursts on a burning warded foe cracks its ward open for ${gNf(.4 * n)}s, letting every spell through whole.`, n => ({ magicPen: .05 * n }), { cap: 'ccfWardburn' }));
   ccfTal(T.cannon.list, 'Ember Breath', GT('Ember Breath', 'ember', 1, 3, 2, n => `Each second that ${CCF.BREATH_N} or more walkers in its reach burn from its fire, it draws ${2 * n} mana from the flames.`, {}, { cap: 'ccfBreath' }));
-  ccfTal(T.cannon.list, 'Rolling Inferno', GT('Rolling Inferno', 'firewall', 3, 2, 2, n => `Road of Embers' fire clings: every walker it burns keeps burning for 3s after, for ${10 * n}% of a fireball a second.`, {}, { sp: n => ({ ab: 'cc_flamewave', rider: { burn: .1 * n } }) }));
+  ccfTal(T.cannon.list, 'Rolling Inferno', GT('Rolling Inferno', 'firewall', 3, 2, 2, n => `Phoenix's fire clings: every walker it passes keeps burning for 3s after, for ${10 * n}% of a fireball a second.`, {}, { sp: n => ({ ab: 'cc_flamewave', rider: { burn: .1 * n } }) }));
   // the Arcane Severers: ward-breakers
   if (S) {
     ccfTal(S.list, 'Long Reach', GT('Hunting Crescent', 'lens', 0, 1, 2, n => `A crescent that breaks a shield or tears through a ward flies on to the nearest warded foe within ${gNf(CCF.HUNT_R + .5 * n)} cells, for half.`, {}, { cap: 'ccfHunt' }));
@@ -44952,11 +45009,13 @@ function talNamesOld(force, hero) {
   return o;
 }
 // one tree's saved ranks, moved from the old names to the tree in play (a talent not found by name loses its ranks)
+// a talent renamed in place (the same talent, a new name): its saved ranks follow it
+const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix' };   // (the Pyroclasts' spell row, 8 Nov 2026)
 function talRemapByName(src, oldNames, list) {
   if (!Array.isArray(src) || !Array.isArray(oldNames) || !list) return src;
   if (oldNames.length === list.length && oldNames.every((n, i) => n === list[i].name)) return src;
   const out = new Array(list.length).fill(0);
-  oldNames.forEach((n, i) => { const j = list.findIndex(t => t.name === n); if (j >= 0 && (src[i] | 0) > 0) out[j] = Math.max(out[j], src[i] | 0); });
+  oldNames.forEach((n, i) => { const j = list.findIndex(t => t.name === n || t.name === TAL_ALIAS[n]); if (j >= 0 && (src[i] | 0) > 0) out[j] = Math.max(out[j], src[i] | 0); });
   return out;
 }
 
@@ -52130,10 +52189,12 @@ const AudioSys = (() => {
   // comes down) and bursts; each spell its own takes
   S.pyroCast = (fly) => { firePlay('pyroCast', .07, .3); if (fly != null) firePlay('pyroFly', .06, .5, fly); };
   S.pyroLand = () => firePlay('pyroLand', .1, .25);
-  S.pyroSigil = () => firePlay('pyroSigil', .13, .5);
+  S.pyroBreath = () => { firePlay('pyroBreathCast', .09, .5); firePlay('pyroBreath', .1, 1.2); };   // Furnace Breath: the burst, then the roar of the cone
   S.pyroSkipCast = () => firePlay('pyroSkipCast', .1, .4);
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .11, .2) : firePlay('pyroSkip', .07, .12);
-  S.pyroRoad = () => { firePlay('pyroRoad', .13, .8); firePlay('pyroRoadBurn', .08, .8); };
+  S.pyroPhx = () => firePlay('pyroPhxCast', .09, .6);
+  S.pyroPhxFly = () => firePlay('pyroPhxFly', .08, .8);
+  S.pyroPhxBoom = () => firePlay('pyroPhxBoom', .12, .4);
   S.gatReload = () => {
     gunLoad();
     const R = gunBufs.reload; if (!R) return; const t = now();
@@ -69977,9 +70038,9 @@ const SPELL_BRIEFS = {
   cc_seismic: 'The golem leaps up to 1 cell beyond its reach, dealing {d} to ground enemies within 1 cell and stunning {stun} sec (shorter on bosses).',
   cc_tremorglyph: 'The golem throws it {cells} cells back up the road, stunning it. It lands for {d}; ground enemies there take {d2} and are stunned 0.5 sec.',
   cc_boulder: 'The golem becomes a wall for {dur} sec, holding ground enemies and hitting the 2 nearest for {d} every 0.5 sec. Then it stomps, dealing {d2} and stunning within 1.1 cells for 0.4 sec.',
-  cc_pyresigil: 'Burns a sigil for {dur} sec. Ground enemies on it take {d} a second, catch fire and are slowed 25%.',
+  cc_pyresigil: 'Pours a cone of flame for {dur} sec. Ground enemies in it take {d} every 0.25 sec and their burn stacks, up to 5.',
   cc_kindle: 'A fireball skips {n} times back up the road, each burst hitting ground enemies within 0.75 cells: {d} first, then 70% of the last. Bursts ignite and leave burning ground.',
-  cc_flamewave: 'Sets the road in reach on fire for {dur} sec. Ground enemies on it take {d} every 0.5 sec, catch fire and are slowed 25%.',
+  cc_flamewave: 'A phoenix sweeps {len} cells back up the road, dealing {d} to ground enemies it passes and igniting them, then explodes for {d2} within 1.1 cells.',
   cc_manasurge: 'Nearby allies regain mana; stronger with Arcane Charge. Adds one charge.',
   cc_conduit: 'A nearby Conclave ally casts free for {dur}s and gains Arcane Charge each second.',
   cc_overchannel: 'Nearby Conclave allies reach max Arcane Charge. Cooldowns advance {ready}s.',
@@ -70165,9 +70226,9 @@ const SPELL_TARGETS = {
   cc_seismic: 'the densest group of ground enemies',
   cc_tremorglyph: 'the ground enemy nearest the gate',
   cc_boulder: 'the road ahead of ground enemies',
-  cc_pyresigil: 'the densest group of ground enemies',
+  cc_pyresigil: 'the cone over the most ground enemies',
   cc_kindle: 'the densest group of ground enemies',
-  cc_flamewave: 'the road in range',
+  cc_flamewave: 'the ground enemy nearest the gate',
   cc_sunder: 'the most warded enemy in range',
   cc_shards: 'the farthest warded enemy in range',
   cc_nullfield: 'up to 3 enemies, warded first',
@@ -70453,6 +70514,8 @@ function spellTipShow(btn, html, active) {
 }
 function showSpellHud(btn, k) {
   const sl = card[k].slot;
+  // a locked unit (Renown, a School Key, the Champion's level) and a wall's convert slot show the same unit tooltip (owner)
+  if (sl && !sl.hud && !sl.ut && typeof sl.key === 'string') { const m = /^(?:L|t):([a-z_]+)/.exec(sl.key); if (m && TOWERS[m[1]] && TOWERS[m[1]].unit) sl.ut = m[1]; }
   if (sl && !sl.hud && sl.ut) {
     /* a force unit's build button: its unit tooltip at tier I, with its price */
     const t = unitTipStandIn(sl.ut); if (!t) { hideSpellHud(); return; }
@@ -70514,6 +70577,28 @@ function unitTipRole(t, st) {
   if (d.dmgType && d.dmgType !== 'phys' && x.length < 2) x.push(d.dmgType + ' damage');
   return out.concat(x.slice(0, 2)).join(' · ');
 }
+/* a unit's name colour on its tooltip: the dominant hue of its portrait, at one saturation and lightness for every unit
+   (owner); measured once per portrait when it has loaded, the force's colour until then */
+const UT_NAMECOL = new Map();
+function unitNameCol(t) {
+  let src = ''; try { src = typeof unitArtURL === 'function' ? unitArtURL(t.type) : ''; } catch (e) {}
+  if (!src) return null;
+  if (UT_NAMECOL.has(src)) return UT_NAMECOL.get(src);
+  UT_NAMECOL.set(src, null);
+  const im = new Image(); im.onload = () => { try {
+    const c = document.createElement('canvas'), N = 48; c.width = c.height = N; const x = c.getContext('2d'); x.drawImage(im, 0, 0, N, N);
+    const D = x.getImageData(0, 0, N, N).data, bins = new Float32Array(36);
+    for (let i = 0; i < D.length; i += 4) {
+      const r = D[i] / 255, g = D[i + 1] / 255, b = D[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), dl = mx - mn;
+      if (dl < .12 || mx < .18) continue;
+      let h = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4; h = (h * 60 + 360) % 360;
+      bins[Math.floor(h / 10) % 36] += dl * mx;
+    }
+    let best = -1, bv = 0; for (let k = 0; k < 36; k++) { const v = bins[k] + .5 * (bins[(k + 35) % 36] + bins[(k + 1) % 36]); if (v > bv) { bv = v; best = k; } }
+    if (best >= 0) UT_NAMECOL.set(src, `hsl(${best * 10 + 5}, 70%, 68%)`);
+  } catch (e) {} };
+  im.src = src; return null;
+}
 function unitTipHTML(t, o) {
   o = o || {};
   const d = t.def || {}, live = t.x != null && !!t.ab;
@@ -70524,7 +70609,7 @@ function unitTipHTML(t, o) {
   const rate = st.rate || 0, rg = st.range || 0;
   const row = (a, b) => a || b ? `<div class="wt-r"><i>${stEsc(a)}</i><i>${stEsc(b)}</i></div>` : '';
   const hits = d.air && d.ground !== false ? 'Ground and air' : d.air ? 'Air only' : 'Ground only';
-  let h = `<div class="wt-h"><i class="wt-n" style="color:${hue}">${stEsc(d.name || 'Unit')}</i><i class="wt-k">Tier ${ROMAN[t.tier | 0] || 'I'}</i></div>`
+  let h = `<div class="wt-h"><i class="wt-n" style="color:${unitNameCol(t) || hue}">${stEsc(d.name || 'Unit')}</i><i class="wt-k">Tier ${ROMAN[t.tier | 0] || 'I'}</i></div>`
     + `<div class="wt-role">${stEsc(unitTipRole(t, st))}</div>`
     + row(dps > 0 ? `${Math.round(dps)} damage per second` : st.dmg ? `${Math.round(st.dmg)} damage a hit` : '', rate > 0 ? `Attacks every ${stSec(rate)} sec` : '')
     + row(rg > 0 ? (rg < 2 ? 'Melee range' : `${stSec(rg)} cell range`) : '', hits);
@@ -70573,7 +70658,10 @@ function unitTipFieldShow() {
   const r = { left: UT_FIELD.x - 1, right: UT_FIELD.x + 1, top: UT_FIELD.y - 18, bottom: UT_FIELD.y + 18, width: 2, height: 36 };
   spellTipShow(r, html, { field: true, t }); UT_FIELD.shown = true;
 }
+// no unit tooltips over the field: build buttons only (owner)
+const UT_ON_FIELD = false;
 function unitTipWire() {
+  if (!UT_ON_FIELD) return;
   const cvEl = typeof document !== 'undefined' && document.getElementById('cv'); if (!cvEl || cvEl.dataset.utip) return;
   cvEl.dataset.utip = '1';
   cvEl.addEventListener('pointermove', e => {
@@ -76358,7 +76446,7 @@ function hfReset() { for (const f of HF_RESETS) try { f(); } catch (e) {} }
    run time: each effect is one card facing the camera, its frame for its age (two neighbouring frames cross-faded), over the
    ground where it happens.
      labPlay(name, x, z, w, o)  play bake `name` once with its impact at (x, z), the card w world units across;
-                               o: { k: brightness, a: opacity, seed: which way it is mirrored, speed }
+                               o: { k: brightness, a: opacity, seed: which way it is mirrored, speed, top: drawn over the foes (no depth test) }
    Drawn in the spells' pass (gl.js vfxGL ext, after their depth-tested batch): premultiplied, so the fire glows and its smoke
    darkens what is behind it. Each atlas holds the colour frames above and their coverage below (labfxdata.js says why). */
 const LABF = { list: [], q: [], tex: {}, img: {}, MAX: 24, QMAX: 72 };
@@ -76371,16 +76459,17 @@ function labPlay(name, x, z, w, o) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
   labLoad(name); o = o || {};
   if (LABF.list.length >= LABF.MAX) LABF.list.shift();
-  LABF.list.push({ name, x, z, w, at: labNow(), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, mir: o.seed == null ? Math.random() < .5 : !!(o.seed & 1), sp: o.speed || 1 });
+  LABF.list.push({ name, x, z, w, at: labNow(), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, mir: o.seed == null ? Math.random() < .5 : !!(o.seed & 1), sp: o.speed || 1, top: !!o.top });
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT);
   return true;
 }
 // a looping bake on a card this frame (a jet, a ball in flight): its anchor (the bake's own, labfxdata.js: the jet's root, the
-// ball's centre) at P, its axis (the jet's way, the ball's flight) along dir, len world units along it; o: { k, a, seed, speed }
+// ball's centre) at P, its axis (the jet's way, the ball's flight) along dir, len world units along it; o: { k, a, seed, speed,
+// pull: world units the card is drawn toward the camera, so fire among the foes isn't swallowed by their bodies }
 function labQueue(name, P, dir, len, o) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx || LABF.q.length >= LABF.QMAX) return false;
   labLoad(name); o = o || {}; const sd = o.seed | 0;
-  LABF.q.push({ name, P, dir, len, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, ph: (sd * 7.31) % 1, mir: !!(sd & 1), sp: o.speed || 1 });
+  LABF.q.push({ name, P, dir, len, pull: o.pull || 0, top: !!o.top, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, ph: (sd * 7.31) % 1, mir: !!(sd & 1), sp: o.speed || 1 });
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT); LAB_EXT.n = 1;
   return true;
 }
@@ -76447,12 +76536,12 @@ const LAB_EXT = {
   // never cuts the bottom of a card that leans back with the view
   fill() {
     const r = RD.right, up = RD.up, fw = [RD.view[2], RD.view[6], RD.view[10]], now = labNow();
-    const by = {}; for (const e of LABF.list) (by[e.name] = by[e.name] || []).push(e);
+    const by = {}; for (const e of LABF.list) { const k = e.name + (e.top ? '|' : ''); (by[k] = by[k] || []).push(e); }   // (top: drawn over the foes, no depth test)
     this.groups.length = 0; let o = 0, q = 0;
-    for (const name in by) {
-      const B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
+    for (const key in by) {
+      const name = key.replace('|', ''), top = key !== name, B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
       const q0 = q, fu = 1 / B.cols, fv = .5 / B.rows;
-      for (const e of by[name]) {
+      for (const e of by[key]) {
         if (q >= LAB_MAXQ) break;
         const t = (now - e.at) * e.sp * B.fps; if (t < 0 || t >= B.n) continue;
         const f0 = Math.min(B.n - 1, Math.floor(t)), f1 = Math.min(B.n - 1, f0 + 1), bl = t - f0, life = t / B.n;
@@ -76469,14 +76558,14 @@ const LAB_EXT = {
         };
         corner(-1, -1); corner(1, -1); corner(1, 1); corner(-1, 1); q++;
       }
-      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2]]);
+      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2], top]);
     }
     // the looping cards of this frame: the card's long axis along the effect's way as the screen sees it, its width across
-    const byq = {}; for (const e of LABF.q) (byq[e.name] = byq[e.name] || []).push(e);
-    for (const name in byq) {
-      const B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
+    const byq = {}; for (const e of LABF.q) { const k = e.name + (e.top ? '|' : ''); (byq[k] = byq[k] || []).push(e); }
+    for (const key in byq) {
+      const name = key.replace('|', ''), top = key !== name, B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
       const q0 = q, fu = 1 / B.cols, fv = .5 / B.rows, up_ = B.axis !== 'right', an = B.anchor || [.5, .5];
-      for (const e of byq[name]) {
+      for (const e of byq[key]) {
         if (q >= LAB_MAXQ) break;
         const d = e.dir, dv = d[0] * fw[0] + d[1] * fw[1] + d[2] * fw[2]; let ax = [d[0] - fw[0] * dv, d[1] - fw[1] * dv, d[2] - fw[2] * dv]; const al = Math.hypot(...ax);
         ax = al > 1e-3 ? [ax[0] / al, ax[1] / al, ax[2] / al] : up_ ? up : r;
@@ -76485,7 +76574,8 @@ const LAB_EXT = {
         const L = e.len * Math.max(.35, al), Wd = up_ ? L * B.aspect : L, Ht = up_ ? L : L / B.aspect;
         // the card's own axes: U across the picture (left to right), V up it (bottom to top)
         const U = up_ ? wx : ax, V = up_ ? ax : [-wx[0], -wx[1], -wx[2]];
-        const cu = (an[0] - .5) * Wd, cv = (an[1] - .5) * Ht, C = [e.P[0] - U[0] * cu - V[0] * cv, e.P[1] - U[1] * cu - V[1] * cv, e.P[2] - U[2] * cu - V[2] * cv];
+        const pl = e.pull, P0 = pl ? [e.P[0] + fw[0] * pl, e.P[1] + fw[1] * pl, e.P[2] + fw[2] * pl] : e.P;   // (as the one-shots: +fw is toward the camera)
+        const cu = (an[0] - .5) * Wd, cv = (an[1] - .5) * Ht, C = [P0[0] - U[0] * cu - V[0] * cv, P0[1] - U[1] * cu - V[1] * cv, P0[2] - U[2] * cu - V[2] * cv];
         const t = ((now * B.fps * e.sp + e.ph * B.n) % B.n + B.n) % B.n, f0 = Math.floor(t), f1 = (f0 + 1) % B.n, bl = t - f0;
         const uv = f => { const c = f % B.cols, rr = Math.floor(f / B.cols); return [c * fu, rr * fv, (c + 1) * fu, (rr + 1) * fv]; };
         const A = uv(f0), Bq = uv(f1), m = up_ && e.mir;
@@ -76496,7 +76586,7 @@ const LAB_EXT = {
         };
         corner(-1, -1); corner(1, -1); corner(1, 1); corner(-1, 1); q++;
       }
-      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2]]);
+      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2], top]);
     }
     LABF.q.length = 0;
     return q;
@@ -76509,11 +76599,12 @@ const LAB_EXT = {
     const u = this.P.u; gl.useProgram(this.P.p);
     gl.uniformMatrix4fv(u.uVP, false, R.vp); if (u.uBend) gl.uniform3fv(u.uBend, R.bend);
     const dm = gl.getParameter(gl.DEPTH_WRITEMASK); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    for (const [tex, q0, n, half, grid] of this.groups) {
+    for (const [tex, q0, n, half, grid, top] of this.groups) {
+      if (top) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(u.uT, 0); gl.uniform1f(u.uHalf, half); gl.uniform2f(u.uGrid, grid[0], grid[1]);
       gl.drawElements(gl.TRIANGLES, n * 6, gl.UNSIGNED_SHORT, q0 * 12);
     }
-    gl.bindVertexArray(null); gl.depthMask(dm);
+    gl.bindVertexArray(null); gl.depthMask(dm); gl.enable(gl.DEPTH_TEST);
   },
 };
 
@@ -76526,7 +76617,7 @@ if (typeof hfQueue === 'function' && typeof LAB_FX !== 'undefined' && LAB_FX.jet
   hfQueue = function (x, y, z, s, flare, heat, vx, vy, vz, seed, fade, jet) {
     const fd = fade == null ? 1 : fade, fk = Math.min(jet ? .5 : 1.5, flare || 0), hk = heat || 0;
     let d = jet; if (!d) { const l = Math.hypot(vx || 0, vz || 0); d = [-(vx || 0) * .04, 1, -(vz || 0) * .04]; const dl = Math.hypot(...d); d = [d[0] / dl, d[1] / dl, d[2] / dl]; }
-    const len = s * 9 * (1 + .45 * fk) * (.85 + .3 * hk) * (.55 + .45 * fd) * (jet ? 1.15 : 1);
+    const len = s * (jet ? 5 : 9) * (1 + .45 * fk) * (.85 + .3 * hk) * (.55 + .45 * fd);   // (a jet: a short flame out of the back, owner)
     if (!labQueue('jetloop', [x, y - (jet ? 0 : s * .4), z], d, len, { k: Math.min(1.3, (.75 + .5 * fk) * (.8 + .3 * hk)), a: Math.min(1, fd * (.85 + .3 * fk)), seed })) return _hfQ.apply(this, arguments);
   };
 }
@@ -76629,10 +76720,12 @@ if (typeof SFX_V2_DEF !== 'undefined') SFX_V2_DEF.push(() => {
    - their hands burn: a small flame cupped in the casting hand of every Pyroclast on the field;
    - the fireball (their strike): a soft flame streaming back behind the lobbed ball, a fiery burst and a billow of smoke
      where it lands (ccFireBurst, wrapped);
-   - Pyre Sigil and every fire glyph (the strike's every third ball, Skipping Flame's skips, Road of Embers' cells): the glyph
-     burns, flames licking and smoke rising for as long as the glyph lasts (fewer, bigger flames as the screen fills);
+   - every fire glyph (the strike's every third ball, Skipping Flame's skips): the glyph burns, flames licking and smoke
+     rising for as long as the glyph lasts (fewer, bigger flames as the screen fills);
    - Skipping Flame: the ball streams flame on each hop, a smaller burst at each skip;
-   - Road of Embers: the road catches cell by cell, each cell its own fire.
+   - Furnace Breath: a cone of the lab's jet flame pouring along the ground from just past its hands, out to where it burns;
+   - Phoenix: a bird of the lab's fire (its Fireball loop the body and tail, two of its Gas jets the beating wings) bursting
+     from the orb, sweeping down the road and diving into a blast.
    Their older sprite flames on the skips and road cells are left out, so what burns is the lab's fire; the sigils' runes,
    the rings and the light stay. The Conclave's fire is the same orange (CC_COL.fire), so the lab's colours stand. */
 const PF = { seen: new WeakSet(), hops: [] };
@@ -76674,7 +76767,68 @@ function pfHands() {
 }
 function pfFrame() {
   if (typeof hfPatch !== 'function' || !pfLive()) return;
-  pfGlyphs(); pfBalls(); pfHands();
+  pfGlyphs(); pfBalls(); pfHands(); pfBreaths(); pfPhoenixes();
+}
+/* ---- Furnace Breath: three tongues of jet flame laid along the cone, rooted a little past the hands (only the orb's small
+   glow at the caster: owner, "never flashy around the caster"), brightest and widest out where the foes burn ---- */
+PF.breath = []; PF.phx = [];
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { PF.breath.length = 0; PF.phx.length = 0; });
+function pfBreaths() {
+  const now = G.time;
+  PF.breath = PF.breath.filter(e => now < e.B.until + .35 && G.towers.includes(e.t) && e.t.ccxBreath === e.B);
+  for (const e of PF.breath) {
+    const { t, B } = e, el = now - B.at; if (el < .08) continue;
+    const on = Math.min(1, (el - .08) / .15) * Math.min(1, Math.max(0, (B.until + .35 - now) / .35)), h = ccHand(t, towerTop(t) * .8), busy = hfLoad() > .6;
+    const a0 = Math.atan2(B.uz, B.ux), m = busy ? 0 : 3;
+    // the body of the breath: the lab's fireball bursts rolled out along the cone, one every ~0.1s, each farther and bigger,
+    // so the flame pours outward and billows where the foes stand
+    if (now < B.until - .05 && now >= (e.next || 0) && typeof labPlay === 'function') {
+      const j = e.j = (e.j | 0) + 1, F = j % 3 ? G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= B.r && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS) : [];
+      const c = F.length ? F[j % F.length] : null, f0 = c ? Math.hypot(c.x - t.x, c.y - t.y) / B.r : .3 + .7 * ((j * .37) % 1), f = Math.max(.3, f0), a = c ? Math.atan2(c.y - t.y, c.x - t.x) : a0 + (((j * 5) % 7) / 6 * 2 - 1) * .5 * f;   // (two in three on a foe in the cone)
+      if (labPlay('pyroblast', t.x + Math.cos(a) * B.r * f, t.y + Math.sin(a) * B.r * f, (1.6 + 2 * f) * (B.r / 2.4), { k: 1.05 + .25 * f, a: 1, speed: 1.25, seed: j, top: 1 })) e.next = now + (busy ? .16 : .085);   // (the bake fills about a third of its card)
+    }
+    // a thin core laid along the cone from just past the hands (dim at its root)
+    { const dx = B.ux, dz = B.uz, P = [h[0] + dx * .4, Math.max(.12, h[1] - .1), h[2] + dz * .4], d = [dx, -.1, dz], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
+      if (!labQueue('jetloop', P, u, B.r * .55 * (.6 + .4 * on), { k: .6 * on, a: .7 * on, seed: e.seed, pull: .4 })) hfQueue(P[0], P[1], P[2], B.r * .08, .4, .2, 0, 0, 0, e.seed, on, u); }
+    // the pour: tongues of flame carried out along the cone, each standing taller and brighter the farther it goes
+    for (let j = 0; j < m; j++) {
+      const ph = (now * 2.4 + j / m + (j % 3) * .13) % 1, f = .22 + .78 * ph, side = ((j * 7) % m) / (m - 1) * 2 - 1;
+      const a = a0 + side * .55 * (.4 + .6 * ph) + .05 * Math.sin(now * 5 + j), dx = Math.cos(a), dz = Math.sin(a), x = t.x + dx * B.r * f, z = t.y + dz * B.r * f;
+      const fade = on * Math.min(1, ph / .15) * Math.min(1, (1 - ph) / .2), d = [dx * .7, 1, dz * .7], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
+      const len = (.45 + 1.05 * ph) * (B.r / 2.4) * 1.3;
+      if (!labQueue('jetloop', [x, .03, z], u, len, { k: (.8 + .45 * ph) * fade, a: fade, seed: e.seed + j * 3, pull: .7 })) hfQueue(x, .05, z, len * .14, .4, .2, 0, 0, 0, e.seed + j, fade);
+    }
+    // where it strikes: embers thrown up off the burning foes, and the ground lit
+    if (on > .5 && (e.n = (e.n | 0) + 1) % 3 === 0) {
+      const fx = t.x + B.ux * B.r * .65, fz = t.y + B.uz * B.r * .65;
+      v2Spray(e.C, 'ember', fx, fz, .2, busy ? 2 : 4, { r: B.r * .3, sp: 1.1 });
+      if (e.n % 12 === 0 && G.flashes.length < 4) flashLight(fx, fz, .3, e.C.P.light, 1.3, .25);
+    }
+  }
+}
+/* ---- Phoenix: born from the orb, it rises off the hands, strikes the head of the column and sweeps the road back,
+   wings beating, then dives into a blast (CCX_FX.phoenixBoom) ---- */
+function pfPhoenixes() {
+  const now = G.time, busy = hfLoad() > .6;
+  PF.phx = PF.phx.filter(F => (now - F.at) * F.spd < F.tot + .05);
+  for (const F of PF.phx) {
+    const d = (now - F.at) * F.spd; if (d < 0) continue;
+    const [x, z, hx, hz] = ccxAlong(F.R, d), d1 = Math.hypot(F.R[1][0] - F.R[0][0], F.R[1][1] - F.R[0][1]) || 1, end = F.tot - d;
+    const rise = Math.min(1, d / Math.max(.6, d1 * .7)), dive = end < .9 ? 1 - end / .9 : 0;
+    const y = (F.h0 + (1.15 - F.h0) * (1 - (1 - rise) * (1 - rise))) * (1 - dive) + .2 * dive + .05 * Math.sin(now * 6);   // (over the walkers' heads: the cards are depth-tested)
+    const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), dl = Math.hypot(hx, vh, hz), fwd = [hx / dl, vh / dl, hz / dl];
+    const g = Math.min(1, d / .5) * .55 + .45;   // (small as it leaves the hands, its full span out over the road)
+    // the body and the tail: the lab's Fireball loop streaming back along its flight
+    if (!labQueue('ballloop', [x, y, z], fwd, 4 * g, { k: 1.2, seed: F.seed, pull: .5, top: 1 })) hfBall(x, y, z, .12 * g, hx * 4, vh * 4, hz * 4, F.seed, 1);
+    // the wings: two jets swept out and back from the shoulders, beating
+    const fl = Math.sin(now * 10 + F.seed), px = -hz, pz = hx;
+    for (const sd of busy ? [] : [-1, 1]) {
+      const w = [sd * px * .85 - hx * .45, .25 + .55 * fl, sd * pz * .85 - hz * .45], wl = Math.hypot(...w);
+      labQueue('jetloop', [x + hx * .06, y + .02, z + hz * .06], [w[0] / wl, w[1] / wl, w[2] / wl], 1.3 * g * (.9 + .1 * fl), { k: 1, a: 1, seed: F.seed + (sd > 0 ? 5 : 9), pull: .5, top: 1 });
+    }
+    if ((F.n = (F.n | 0) + 1) % (busy ? 4 : 2) === 0) part({ k: 'ember', x: x - hx * .3, z: z - hz * .3, h: y, vx: -hx * .8 + R(-.4, .4), vz: -hz * .8 + R(-.4, .4), vh: R(.2, .8), drag: 1.2, life: .55, max: .55, size: R(.08, .15), col: F.n % 6 ? '#ff8a2a' : '#ffd27a' });
+    if (F.n % 10 === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2);
+  }
 }
 if (typeof renderView === 'function') {
   const _pfView = renderView;
@@ -76689,8 +76843,16 @@ if (typeof ccFireBurst === 'function') {
     return r;
   };
 }
-// Skipping Flame and Road of Embers: their own fire in place of the older sprite flames (the hits, sparks and light stay)
+// Skipping Flame: its own fire in place of the older sprite flames (the hits, sparks and light stay); Furnace Breath and Phoenix
 if (typeof CCX_FX !== 'undefined') {
+  CCX_FX.breath = function (C, t, B) { if (PF.breath.length < 12) PF.breath.push({ C, t, B, seed: (Math.random() * 97) | 0 }); };
+  CCX_FX.phoenix = function (C, t, F) { if (PF.phx.length < 8) PF.phx.push(Object.assign({ seed: (Math.random() * 97) | 0 }, F)); };
+  CCX_FX.phoenixBoom = function (C, x, z) {
+    const lab = typeof labPlay === 'function' && labPlay('pyroblast', x, z, 3.4, { k: 1, top: 1 });
+    hfBurst(x, z, lab ? .55 : .8, { dur: .5, smoke: true });
+    hfPatch(x, z, .7, 1.4, { flare: 0, at: .25 });
+    v2Hit(C, x, z, .3, C.S * .8, { sp: 'ember', n: 10, light: 1, ring: 1 });
+  };
   const _hop = CCX_FX.skipHop;
   CCX_FX.skipHop = function (C, x0, h0, z0, foe, x, z, T, j) {
     if (PF.hops.length < 24) PF.hops.push({ x0, h0, z0, x, z, T, at: G.time, arc: j ? .35 : .6, s: Math.pow(.88, j), seed: (Math.random() * 97) | 0 });
@@ -76700,10 +76862,6 @@ if (typeof CCX_FX !== 'undefined') {
     const k = Math.pow(.85, j);
     v2Hit(C, x, z, .25, C.S * .65 * k, { sp: 'ember', n: 5, light: j ? 0 : 1, ring: j ? 0 : 1 });
     hfBurst(x, z, .38 * k, { dur: .35, smoke: j === n - 1 }); sfx('pyroSkip', j === n - 1);
-  };
-  CCX_FX.roadCell = function (C, g, d) {
-    v2Spray(C, 'ember', g.x, g.z, .1, 3, { r: .3, sp: .6 });
-    if (d % 6 === 0 && G.flashes.length < 4) flashLight(g.x, g.z, .3, C.P.light, 1, .15);   // (fewer, softer: the road stays readable)
   };
 }
 // their sounds (the owner's Zapsplat fire takes, firesfxdata.js): a whoosh as a fireball is loosed, a burst where it lands
@@ -76717,17 +76875,15 @@ if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_fireball) {
   };
 }
 if (typeof castAbility === 'function') {
-  const _pfCast = castAbility, PF_SND = { cc_pyresigil: 'pyroSigil', cc_flamewave: 'pyroRoad', cc_kindle: 'pyroSkipCast' };
+  const _pfCast = castAbility, PF_SND = { cc_pyresigil: 'pyroBreath', cc_flamewave: 'pyroPhx', cc_kindle: 'pyroSkipCast' };
   castAbility = function (t, ab) { const r = _pfCast.apply(this, arguments); if (r && ab && PF_SND[ab.id] && typeof sfx === 'function') sfx(PF_SND[ab.id]); return r; };
 }
-// the older drawing of the fire glyphs (spellfx.js ccFireZone: sprite tongues round every fire glyph; Pyre Sigil's flame
-// sprites and flame rim) is left out, so the glyphs burn with the lab's fire alone; the runes, embers and rings stay
+// the older drawing of the fire glyphs (spellfx.js ccFireZone: sprite tongues round every fire glyph) is left out, so the glyphs
+// burn with the lab's fire alone; the runes, embers and rings stay
 if (typeof ccFireZone === 'function') ccFireZone = function () {};
-if (typeof SFX_V2_DEF !== 'undefined') SFX_V2_DEF.push(() => {
-  const V = typeof SFX_V2 !== 'undefined' && SFX_V2.cc_pyresigil; if (!V) return;
-  const o = { r: C => (C.ab && C.ab.rr) || 1, area: { sp: 'ember', n: 8, hold: .5 } };   // (vAreaHit's own, without the flame rim and sprite flames)
-  V.hit = (C, k) => vAreaHit(o, C, k);
-});
+// the old spells' paintings (Pyre Sigil's ring, Road of Embers' road) don't show the new ones: the glyph stands in until
+// Furnace Breath and Phoenix are painted (docs/conclave_art.md)
+if (typeof UI_ART !== 'undefined' && typeof MISSING_ART !== 'undefined') for (const id of ['cc_pyresigil', 'cc_flamewave']) if (UI_ART[id] && UI_ART[id] === MISSING_ART.abilities[id]) delete UI_ART[id];
 
 /* The dwarf, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's dwarf (assets/unit-art/dwarf: a white-
    bearded engineer in riveted plate, twin boiler tanks on his back; decimated to 4,429 triangles and rigged on Mixamo's
@@ -80038,9 +80194,9 @@ const SPELL_HELP = {
     cc_boulder: { when: "A road cell within {reach+0.8} cells with two or more walkers within 2 cells of it, or a boss or elite.", aim: "The road cell nearest the golem that the foes are walking toward: it steps onto it and stands as a wall.", tips: ["Post the Golem Warden beside a narrow stretch: while it stands there, the walkers pile up against it.", "Bosses are held only for the first second.", "Its closing stomp stuns every walker near it."] },
 
     // Pyroclasts (cc_pyroclast)
-    cc_pyresigil: { when: "Two or more walkers within 1 cell of one walker in {reach} cells, or a boss or elite at the centre.", aim: "The densest spot: on the walker with the most walkers within 1 cell.", tips: ["Best on a stretch of road the foes cross twice, or on a switchback both lanes of which fall inside its circle.", "Slows from Rimeweavers and Time Dilation keep walkers burning on it for longer.", "Backward Hour turns walkers back onto the sigil a second time."] },
+    cc_pyresigil: { when: "Two or more walkers in a cone toward one walker in {reach} cells, or a boss or elite.", aim: "The densest cone: toward the walker with the most walkers behind it. The cone turns to follow them as it pours.", tips: ["Best where the road runs straight toward the Pyroclasts, so the column walks down the cone.", "Each quarter second stokes their burn one stack higher, up to 5: the longer they stand in it, the hotter they burn.", "Slows from Rimeweavers and Time Dilation keep walkers in the cone for its whole breath."] },
     cc_kindle: { when: "A walker within {reach} cells with another walker near it, or a boss or elite.", aim: "The densest walker: the fireball lands there and skips back up the road onto the walkers behind it.", tips: ["Best on a long straight run: every skip finds the next walker in the column.", "Each skip lights a small fire glyph on the road.", "Each skip is weaker than the last, so the first walker hit takes the most."] },
-    cc_flamewave: { when: "Three or more walkers on the road within {reach} cells.", aim: "Itself: fire runs both ways along every road cell in its reach.", tips: ["The more road in its reach, the longer the column walks through fire: post it inside a bend.", "Walkers on the burning road are slowed, so they stay in the fire longer.", "Each burning cell is a fire glyph for the Conclave's weaves."] },
+    cc_flamewave: { when: "Three or more walkers in or near its reach, or a boss or elite.", aim: "The walker nearest the gate: the phoenix strikes it, then sweeps back up the road through the walkers behind it.", tips: ["Post it where it sees the head of the column on a long run of road: the phoenix flies the road behind its first foe.", "Its dive at the end of the flight hits hardest: Firewalk lengthens the flight.", "Every foe it passes burns for 3s, which Skipping Flame's Cinder Charge hits harder."] },
 
     // Maelis, the Spellweaver (cc_arch)
     ch_thousandfold: { when: "Three or more foes within 1.8 cells of one foe in {reach} cells (its range plus 0.8), or any boss or elite in reach. The area grows to 2 cells at the top tiers.", aim: "The densest spot: on the foe with the most others within the area; the missiles go to the six healthiest foes there in turn.", tips: ["Place Maelis where her reach covers a corner the crowd bunches on, so all 24 missiles stay in the area.", "Its missiles weave with other schools' runes, so cast it after Rimeweavers, Pyroclasts and Astrologers have marked a pack.", "Each missile leaves the arcane rune, setting up Unravel right after."] },
