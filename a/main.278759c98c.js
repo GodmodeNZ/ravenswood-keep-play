@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cbb7293@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'bbfa835@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1808,8 +1808,9 @@ function sell(t) {
 // stacked on top of the current one, for a risk bonus; clearing the field then pays every stacked wave's bonus.
 /* ---- the treasure thief: now and then, at random, a thief dashes through mid-wave with a sack of gold. Each quarter of
    his health spills a tenth of it; kill him for the rest and a fair chance of a relic. If he escapes he takes a tenth of
-   your banked gold (up to a cap). Slows bite him half as hard; after a stun he shrugs off the next for a moment. ---- */
-const THIEF = { from: 3, base: .2, dry: .12, hp: 4, purse: 3, spill: .1, steal: .1, stealCap: 250, relic: .5, stunGuard: 1.5, slowK: .5 };
+   your banked gold (up to a cap). Slows bite him half as hard; after a stun he shrugs off the next for a moment.
+   Only after wave 10 (owner, 8 Nov 2026), at random: likelier each wave without one, never on a boss wave. ---- */
+const THIEF = { from: 11, base: .2, dry: .12, hp: 4, purse: 3, spill: .1, steal: .1, stealCap: 250, relic: .5, stunGuard: 1.5, slowK: .5 };
 function thiefPlan(n, q) {
   if (G.state !== 'play' || G.vs || n < THIEF.from || n % 5 === 0 || !q.length) return;
   G.thiefDry = G.thiefDry || 0;
@@ -77102,7 +77103,7 @@ const LAB_EXT = {
         const t = (now - e.at) * e.sp * B.fps; if (t < 0 || t >= B.n) continue;
         const f0 = Math.min(B.n - 1, Math.floor(t)), f1 = Math.min(B.n - 1, f0 + 1), bl = t - f0, life = t / B.n;
         const fade = Math.min(1, t * 4) * (1 - Math.max(0, (life - .7) / .3)) * e.a;
-        const w = e.w, h = w, cy = (B.target[1] - .025) / B.span * h, k = .35 * h;
+        const w = e.w, h = w / (B.aspect || 1), cy = (B.target[1] - .025) / B.span * h, k = .35 * h;
         const cx = e.x - fw[0] * -k, cyy = cy - fw[1] * -k, cz = e.z - fw[2] * -k;   // (toward the camera: fw points away from it)
         const uv = f => { const c = f % B.cols, rr = Math.floor(f / B.cols); return [c * fu, rr * fv, (c + 1) * fu, (rr + 1) * fv]; };
         const A = uv(f0), Bq = uv(f1), m = e.mir;
@@ -77221,7 +77222,7 @@ if (typeof ihMortarLand === 'function') {
     if (p && p.mfFire && typeof hfPatch === 'function') {
       const st = (G.towers.includes(t) && t.st) || st0, sp = ((st && st.splash) || 1) * (p.big ? 2 : 1), rad = Math.min(1.1, sp * .45), x = p.ax, z = p.az;
       // (the lab's own Fire Bomb, baked from its WebGPU fire: labfx.js; the old burst where the bake is missing)
-      if (!(typeof labPlay === 'function' && labPlay('incblast', x, z, rad * 3.4, { k: .95 }))) hfBurst(x, z, rad, { dur: .45 });
+      if (!(typeof labPlay === 'function' && labPlay('incblast', x, z, rad * 3.2, { k: .95 }))) hfBurst(x, z, rad, { dur: .45 });
       if (typeof sfx === 'function') sfx('incLand');   // (a whoosh into a burst and a heavier impact, over the owner's explosion)
       // (a fire left on the ground under it keeps it burning: the Napalm talent's pitch, a burning hazard)
       hfPatch(x, z, rad * .8, 1.6, { flare: 0, at: 1.1, alive: () => { let l = 0; for (const h of G.hazards || []) if ((h.k === 'fire' || h.k === 'ih_pitch') && h.t > 0 && Math.abs(h.x - x) < .3 && Math.abs(h.z - z) < .3) l = Math.max(l, h.t); return l; } });
@@ -77585,12 +77586,60 @@ function dwDraw(t, tier, sx, sy, sz, wob, opts) {
   M4.trs(_dwS, hw[0], hw[1], hw[2]); FX_PM.root = FX_PM.torso = _dwC; FX_PM.main = FX_PM.hammer = FX_PM.arm = _dwS;
   return true;
 }
+// the hammer on fire (owner: "a live flame that is moving organically with the hammer", "a flame coming from the hammer, not
+// a jet out the back", "the hammer itself is enflamed"; the concept art: flames licking up off the head): small flames of the
+// lab's fire rooted round the hammer head, rising (flames rise whatever the head's angle), swept back off the head's motion,
+// taller with the gauge, leaping on a blow; behind them, tongues left where the head just was, rising and dying, so a swing
+// leaves a smear of fire along its path and a hammer held still leaves none. Never in over his body.
+const DWF = { BALL: 3.6, AGES: [.05, .1, .17], LIFE: .28, RISE: .8, ROOTS: [[0, .35, 0, 1], [.55, .05, .3, .7], [-.5, .1, -.35, .62]] };
+function dwFlame(t, hw, p, hl, fl, heat, seed) {
+  const now = G.time; let tr = t._dwTr;
+  if (!tr || (tr.length && tr[tr.length - 1].at > now + 1e-6)) tr = t._dwTr = [];
+  if (!tr.length || now - tr[tr.length - 1].at > 1 / 120) tr.push({ p: [hw[0], hw[1], hw[2]], at: now });
+  while (tr.length > 2 && now - tr[0].at > DWF.LIFE) tr.shift();
+  const at = age => { let b = tr[tr.length - 1]; for (let k = tr.length - 1; k >= 0; k--) { b = tr[k]; if (now - tr[k].at >= age) break; } return b; };
+  // the head's own motion over the last few hundredths of a second
+  const q = at(.04), qd = Math.max(1e-3, now - q.at), v = [0, 1, 2].map(k => (hw[k] - q.p[k]) / qd), sp = Math.hypot(...v), sw = Math.min(1, sp / 3.5);
+  // the head's frame: along its haft-to-back axis (to the vent) and across it, so the roots sit on the head as it turns
+  let ax = [p[0] - hw[0], p[1] - hw[1], p[2] - hw[2]]; const al = Math.hypot(...ax) || 1; ax = ax.map(c => c / al);
+  let cr = [-ax[2], 0, ax[0]]; const cl = Math.hypot(...cr) || 1; cr = cr.map(c => c / cl);
+  const fk = Math.min(2, fl || 0), busy = typeof hfLoad === 'function' && hfLoad() > .6;
+  const bx = hw[0] - t.x, bz = hw[2] - t.y, bl = Math.hypot(bx, bz) || 1;
+  const lean = (d) => {   // swept behind the motion, never in over his body
+    if (sp > .05) for (let k = 0; k < 3; k++) d[k] -= v[k] / sp * 1.25 * sw;
+    const inn = (d[0] * bx + d[2] * bz) / bl; if (inn < .1) { d[0] += (.1 - inn) * bx / bl; d[2] += (.1 - inn) * bz / bl; }
+    const dl = Math.hypot(...d) || 1; return [d[0] / dl, d[1] / dl, d[2] / dl];
+  };
+  const H = hl * (2.8 + .8 * heat) * (1 + .25 * sw) * (1 + .2 * Math.min(1, fk));   // (about the head's own size: a burning head, not a jet)
+  // the head ablaze: the lab's burning ball (its Fireball held in a wind) sat on the head, its flames streaming up and back
+  // off it (the bake's axis is its flight: pointed down-and-forward, so the fire trails up-and-behind)
+  const up = lean([0, 1, 0]), fli = .9 + .07 * Math.sin(now * 12.3 + seed) + .05 * Math.sin(now * 27.1 + seed * 1.7);
+  if (LAB_FX.ballloop) labQueue('ballloop', [hw[0], hw[1] + hl * .15, hw[2]], [-up[0], -up[1], -up[2]], DWF.BALL * H * fli, { k: Math.min(1.3, .85 + .2 * heat + .3 * fk), a: 1, seed: seed + 1, pull: .1 });
+  DWF.ROOTS.forEach(([ua, uy, uc, sz], n) => {
+    if (busy || !n) return;   // (two small tongues licking off its sides)
+    const r = hl * .55, P0 = [hw[0] + (ax[0] * ua + cr[0] * uc) * r, hw[1] + uy * r + (ax[1] * ua) * r, hw[2] + (ax[2] * ua + cr[2] * uc) * r];
+    const f2 = .85 + .1 * Math.sin(now * (11 + 3 * n) + seed + n * 2.1) + .06 * Math.sin(now * (27 + 5 * n) + seed * 1.7 + n);
+    const d = lean([ax[0] * .18 * ua + .08 * Math.sin(now * 5 + n), 1, ax[2] * .18 * ua + .08 * Math.cos(now * 4.3 + n * 2)]);
+    labQueue('jetloop', P0, d, H * sz * f2, { k: Math.min(1.3, .8 + .2 * heat + .3 * fk), a: .8, seed: seed + 1 + n * 4, pull: .1 });
+  });
+  if (busy) return;
+  // the smear along the swing's path
+  DWF.AGES.forEach((age, n) => {
+    const s0 = at(age), a0 = now - s0.at; if (a0 < age * .6) return;
+    const gap = Math.hypot(hw[0] - s0.p[0], hw[1] - s0.p[1], hw[2] - s0.p[2]), w = Math.min(1, Math.max(0, gap / (hl * 2.5) - .2));
+    if (w < .05) return;
+    const life = 1 - a0 / DWF.LIFE, P0 = [s0.p[0], s0.p[1] + DWF.RISE * hl * 10 * a0 * a0 + .2 * hl, s0.p[2]];
+    labQueue('jetloop', P0, lean([0, 1, 0]), H * (.75 - .5 * a0 / DWF.LIFE), { k: .75 + .2 * heat, a: w * life * .85, seed: seed + 13 + n * 2, pull: .1 });
+  });
+}
 // the fire: out of the claw behind the head (the back vent), leaning out of it, trailing each swing
 function dwFire(t, hw, vw, s, P, heat, live) {
   const hl = .085 * s, fl = P.flare, v = t._dwHV || [0, 0, 0], seed = ((t.i | 0) * 7 + (t.j | 0) * 3) % 97;
   // (the fire comes out of the back only, the claw behind the lava face; the side portholes glow red hot instead: owner,
   // "make fire just come out the back, leave the sides to be more of a red hot animation")
-  if (typeof hfQueue === 'function') vw.forEach((p, j) => {
+  const labOn = typeof labQueue === 'function' && typeof LAB_FX !== 'undefined' && LAB_FX.jetloop;
+  if (labOn && vw[2]) dwFlame(t, hw, vw[2], hl, fl, heat, seed);   // (the hammer on fire: the lab's flames round the head)
+  else if (typeof hfQueue === 'function') vw.forEach((p, j) => {
     if (j !== 2) return;
     let ox = p[0] - hw[0], oy = p[1] - hw[1], oz = p[2] - hw[2]; const l = Math.hypot(ox, oy, oz) || 1; ox /= l; oy /= l; oz /= l;
     // (a hard jet out of the back (owner: "flame should look like its blowing out the back hard"): straight out of the vent,
@@ -77617,6 +77666,9 @@ function dwLand(t, K, big) {
   // gave) when it smashes down": hammerfire.js's smoke, the lab's solver baked once)
   const fp = t._dwFace || [hw[0], 0, hw[2]];
   if (typeof sfx === 'function') sfx('hamBurst', big > 1.2);
+  // the steam gauge's payoff (a vented blow, Pressure Slam): the lab's fire bursting up into a column of smoke and sparks
+  // (labfxdata.js ventplume, baked from its WebGPU fire), over the face that struck, not round him
+  if (big >= 1.5 && typeof labPlay === 'function') labPlay('ventplume', fp[0], fp[2], .62 * K * Math.min(1.8, big), { k: .95 });
   if (typeof hfPuff === 'function') hfPuff(fp[0], fp[2], 1.05 * K * Math.min(1.6, big), ((t.i | 0) * 7 + (t.j | 0) * 3 + (t._dwPuffs = (t._dwPuffs || 0) + 1)) | 0);
   if (typeof flashLight === 'function' && G.flashes.length < 4) flashLight(hw[0], hw[2], hw[1] + .1, [.9, .3, .08], .5 + .15 * big, .18);   // (a short red-orange flash, not white; none on a busy field)
   // sparks thrown off the face as it strikes (owner: "a billow of smoke and sparks")
