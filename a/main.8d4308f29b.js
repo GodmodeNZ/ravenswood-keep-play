@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f2cb944@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b8c87f3@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -102,8 +102,8 @@ for (const ty in TOWERS) { const d = TOWERS[ty]; if (!d.wall && d.tiers.length =
    Internally these are still G.age / AGES so older saves load. */
 const AGES = [
   { name: 'Keep', short: 'I' },
-  { name: 'Castle', short: 'II', cost: 500, wave: 8, text: 'Towers can be upgraded to tier IV.' },
-  { name: 'Fortress', short: 'III', cost: 1300, wave: 18, text: 'Towers can be upgraded to tier V.' },
+  { name: 'Castle', short: 'II', cost: 300, wave: 8, text: 'Towers can be upgraded to tier IV.' },
+  { name: 'Fortress', short: 'III', cost: 600, wave: 18, text: 'Towers can be upgraded to tier V.' },
   { name: 'Citadel', short: 'IV', cost: 3000, wave: 28, text: 'Towers can be upgraded to tier VI.' },
 ];
 const maxTierFor = age => Math.min(5, 2 + (age | 0));
@@ -240,7 +240,7 @@ const CREEPS = {
     trait: 'Leader: darkness shortens your towers\' reach', eco: 'Every 7 seconds she shrouds the two towers nearest her in darkness: their reach falls by 40% for 5 seconds.' },
   abbess: { name: 'The Pale Abbess', title: 'Mother of Wraiths', base: 'wraith', scl: 1.4, hp: 7.5, spd: .9, r: .4, mres: .3, undead: true, weak: { holy: 2 }, cry: 2, yell: 'My daughters hold me here.', kit: [{ s: 'summon', name: 'Call the Pale', type: 'wraith', n: 2 }, { s: 'mend', name: 'Soul Siphon' }], abil: ['Ethereal', 'Calls her wraiths. Arrows, shells and stone do only 60% while one stands within 2 cells of her.'], lead: 'ethereal', flat: 22, life: 3, tint: [1.15, 1.2, 1.4, .3],
     trait: 'Leader: physical blows glance off her near her wraiths', eco: 'Every 13 seconds she calls two wraith daughters. While any wraith stands within 2 cells of her, physical damage (Arrow, Cannon, Earth) does only 60%. Kill her daughters first, or bring magic and Holy.' },
-  arachnara: { name: 'Arachnara', title: 'the Brood Queen', base: 'broodmother', scl: 1.3, hp: 13, spd: .7, r: .5, armor: 2, boss: true, spawn: ['spider', 8, .18], cry: 1, yell: 'Feed, my children. Feed.', kit: [{ s: 'summon', name: 'Endless Brood', type: 'spider', n: 6 }, { s: 'webshot', name: 'Silk Snare' }], abil: ["Mother's Wrath", 'Each spiderling that dies near her hardens her: 3% less damage each, up to 36%.'], lead: 'mother', flat: 90, life: 4, tint: [1.35, .55, .62, .14],
+  arachnara: { name: 'Arachnara', title: 'the Brood Queen', base: 'broodmother', scl: 1.3, hp: 11.7, spd: .7, r: .5, armor: 2, boss: true, spawn: ['spider', 8, .18], cry: 1, yell: 'Feed, my children. Feed.', kit: [{ s: 'summon', name: 'Endless Brood', type: 'spider', n: 6 }, { s: 'webshot', name: 'Silk Snare' }], abil: ["Mother's Wrath", 'Each spiderling that dies near her hardens her: 3% less damage each, up to 36%.'], lead: 'mother', flat: 90, life: 4, tint: [1.35, .55, .62, .14],
     trait: 'Boss: hardens as her brood dies around her', eco: 'Every spiderling that dies within 2.5 cells of her makes her take 3% less damage, up to 36%. She bursts into spiderlings when she dies.' },
   varn: { name: 'Captain Varn', title: 'Shield Commander', base: 'shieldbearer', scl: 1.25, hp: 7, spd: .9, r: .42, armor: 10, cry: 0, yell: 'Shields up! Hold the line!', kit: [{ s: 'summon', name: 'Form Up!', type: 'shieldbearer', n: 3, cd: 16 }, { s: 'harden', name: 'Lock Shields' }], abil: ['Phalanx', 'Calls shieldbearers to march in step around him. While three or more stand within 2 cells, he takes 55% less damage.'], lead: 'phalanx', flat: 22, life: 3, tint: [1.1, 1, .85, .08],
     trait: 'Leader: tough while his shields crowd him', eco: 'Every 16 seconds he calls three shieldbearers, and the troops just ahead of him slow to march in step. While three or more stand within 2 cells of him, he takes 55% less damage. Break the formation with splash before he reaches your killing ground.' },
