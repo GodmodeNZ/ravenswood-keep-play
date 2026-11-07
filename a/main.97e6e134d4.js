@@ -1,4 +1,4 @@
-const BUILD_TAG = '7571669@2026-11-07';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b2bcd94@2026-11-07';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1303,7 +1303,7 @@ function waveSpec(n) {
 }
 // creep health per wave: steep through the first thirty, then a gentler climb to fifty (endless keeps climbing)
 const HP_KNEE = 30;
-let HP_EASE9 = .18;
+let HP_EASE9 = .3;
 // waves 2 to 9 died too easily: extra health there, easing back out by wave 12 (wave 1 stays the gentle opener)
 let HP_E29 = .4, LEAD_E29 = .25, LEAD_HP = .88, MINION_HP = 1.44, BOSS_HP = .81, BOSS_EARLY = .81;   // BOSS_EARLY: leaders and bosses of waves 2 to 10 softer still (two 10% cuts)   // BOSS_HP: every leader and boss 10% softer again, twice   // MINION_HP: the rank and file (not leaders or bosses) were going down too easily   // LEAD_HP: every dungeon leader a touch softer than its numbers (the player found them a bit much)
 // the climb: +40% from wave 2, then steeper with every wave past 9, to +100% by wave 29 (Tower Wars keeps its own pace)
@@ -1319,7 +1319,7 @@ function waveHP(n, diff) {
   const m = DIFFS[diff].hp;
   if (!(typeof G !== 'undefined' && G && G.vs)) h *= HP_ALL * WAVE_TUNE[Math.min(n, MAX_WAVE) - 1];   // every foe in the campaign, summons and bosses too (Tower Wars keeps its own)
   if (!oldRules()) h *= (FORM_TUNE[Math.min(n, MAX_WAVE) - 1] || 1) * (typeof forceHpK === 'function' ? forceHpK(n) : 1);   // the force march's own formations (Classic keeps WAVE_TUNE alone), and its gentler unit tiers (forces_zz_tiers.js)
-  // the climb eased from wave 9: 18% less health by wave 14 and after (owner, 7 Nov 2026: consistently losing from wave 9)
+  // the climb eased from wave 9: 30% less health by wave 14 and after (18% at first; eased again the same day) (owner, 7 Nov 2026: consistently losing from wave 9)
   if (!(typeof G !== 'undefined' && G && G.vs)) h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1);
   return h * (1 + (m - 1) * Math.min(1, (n - 1) / 12)) * (typeof riteHP === 'function' ? riteHP() : 1);   // a Rite of Passage's tougher foes
 }
@@ -5462,7 +5462,7 @@ const RARITY = [
 ];
 // relics are rare on purpose: each one is an event, not a chore. Bosses and (in Classic) dungeon leaders drop one often, elites now
 // and then, and the rank and file once in a long while. Most of a boss's drops (and some of the rest) are school relics.
-const LOOT_CAP = 30, ELITE_HP = 1.75, ELITE_DROP = .025, BOSS_DROP = .35, LEAD_DROP = .12, MINION_DROP = .0015;
+const LOOT_CAP = 30, ELITE_HP = 1.35, ELITE_DROP = .025, BOSS_DROP = .35, LEAD_DROP = .12, MINION_DROP = .0015;
 /* LOOT_RULES: the force campaign's drops by wave type, in one place (the boss-loot screen reads these too).
    boss: the boss of a boss wave (every 5th: the creep with boss; wave 5's is Brakka) always drops, and has leg
      chance that it is a legendary (over the run's legendary pace too). eliteLast: the last elite to fall on an elite wave with
