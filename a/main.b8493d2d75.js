@@ -1,4 +1,4 @@
-const BUILD_TAG = 'bbfa835@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0fda4be@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -11458,7 +11458,7 @@ function itemKindLine(it) {
   const kind = it.shop ? `${shopTierName(it)} · shop` : isCharm(it) ? 'Charm · charm socket' : it.tome ? 'Tome' : `${typeof isSchoolRelic === 'function' && isSchoolRelic(it) ? 'School relic' : (it.leg ? 'Legendary' : RARITY[it.rar | 0].name) + (!it.leg && it.base && GEAR_BASES[it.base] && GEAR_BASES[it.base].fset ? ' set piece' : ' relic')}`;
   const f = gearFor(it);
   if (d.spell && f && typeof ABIL !== 'undefined' && ABIL[d.spell]) return `${kind} · ${gearForText(it)} · ${ABIL[d.spell].name}`;   // an item that reshapes one spell (forces_zzz_procs.js)
-  return kind + (f ? ` · ${gearForText(it)} only` : d.bsig ? ' · any unit · a boss’s own' : it.shop || isCharm(it) ? '' : ' · any unit');
+  return kind + (f ? ` · ${gearForText(it)} only` : d.bsig ? ` · any unit · dropped by ${(typeof CREEPS !== 'undefined' && CREEPS[d.bsig] && CREEPS[d.bsig].name) || 'a boss'}` : it.shop || isCharm(it) ? '' : ' · any unit');
 }
 const itemCol = it => it && it.shop ? RARITY[shopRar(shopDef(it) || { tier: 1 })].col : it && !it.leg && it.base && GEAR_BASES[it.base] && GEAR_BASES[it.base].fset && typeof FSET_COL !== 'undefined' ? (typeof fsetCol === 'function' ? fsetCol(it) : FSET_COL) : RARITY[(it && it.rar) | 0].col;   // (a force set's piece: its own jade, forces_zzzz_sets.js)
 /* The item's card, laid out as an RPG tooltip: the name in its rarity's colour, its kind and slot in grey (and its hone),
