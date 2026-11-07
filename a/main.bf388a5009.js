@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b8c87f3@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a98c82f@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -15389,7 +15389,7 @@ FORCES[IH_ID] = { name: 'Ironhold', title: 'Clanhost of the Iron Peaks', hue: '#
       blurb: 'Axe-and-shield dwarves in riveted plate, very sturdy. They chop the foe beside them, each blow stripping its armour, and every chop heats their war-boilers. At full heat the next chop vents: a crushing blow that stuns its foe for 1s and cracks 2 more armour off it (about every 4th chop). Every 5th chop is a shield shove that throws it back down the path. Cannot reach flyers.',
       tiers: [{ cost: 30, dmg: 35, rate: .9, range: 1.35, hpM: 2.2, armorPen: .2, heat: .34 }, { cost: 55, dmg: 63, rate: .85, range: 1.4, hpM: 2.2, armorPen: .2, heat: .34 }, { cost: 120, dmg: 148, rate: .8, range: 1.5, hpM: 2.2, armorPen: .2, heat: .34 }] },
     arrow: { id: 'thundergun', name: 'Thunderguns', short: 'Guns', key: '2', proj: 'force', attack: 'thundergun', elem: null, dmgType: 'phys', air: true, ground: true, top: [.8, .86, .92],
-      blurb: 'Long-rifle dwarves: one big armour-piercing shot (it widens armour another unit has broken; intact plate still turns it), then a slow reload. The barrel heats with every shot; when it is full the next shot is a Thunderpeal that punches through every foe in a line. Air and ground.',
+      blurb: 'Long-rifle dwarves: one big armour-piercing shot (each one dents the plate, and it widens armour already broken), then a slow reload. The barrel heats with every shot; when it is full the next shot is a Thunderpeal that punches through every foe in a line. Air and ground.',
       tiers: [{ cost: 24, dmg: 28, rate: 1.9, range: 3, armorPen: .5, heat: .25 }, { cost: 50, dmg: 62, rate: 1.8, range: 3.3, armorPen: .5, heat: .25 }, { cost: 110, dmg: 140, rate: 1.7, range: 3.6, armorPen: .5, heat: .25 }] },
     frost: { id: 'chaintrapper', name: 'Chain Trappers', short: 'Trappers', key: '3', proj: 'force', attack: 'chaintrapper', elem: null, dmgType: 'phys', air: true, ground: true, top: [.8, .86, .92],
       blurb: 'Fur-clad trappers with bolas and weighted chain nets. Bolas slow the foe furthest along; every 4th throw is a net that pins it in place (a flyer is dragged down instead). Air and ground.',
@@ -15629,6 +15629,8 @@ FORCE_ATTACK.thundergun = function (t, st, tg, pow, echo) {
   if (C.ihFar && L > 2.5) k *= 1 + .12 * C.ihFar;   // Range-Finder
   const amt = st.dmg * k;
   ihHit(t, st, tg, amt, 'phys');
+  // the ball dents the plate: 1 armour a shot, up to 3 (owner: the gunline must be able to open armour on its own)
+  if (!tg.dead && (tg.armor || 0) > 0) { const cur = tg.shredT > 0 ? tg.shred : 0; tg.shred = Math.max(cur, Math.min(3, cur + 1)); tg.shredT = Math.max(tg.shredT, 5); }
   if (C.ihSilver && st.nth && pow >= (st.nthM || 9) && !tg.dead) ihBrand(tg, .15, 5, t);   // Silver Bullet
   if (C.ihPierce) { const o = ihLine(t, st, tg.x, tg.y, ux, uz, 1.3, .35, q => q !== tg)[0]; if (o) { ihHit(t, st, o, amt * .6, 'phys'); ihSparks(o.x, o.y, hitH(o), 3); } }   // Through and Through
   rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c: tg, col: '#ffe8b0', w: .035, life: .14 });
@@ -45531,6 +45533,47 @@ function forceTipLine(n) {
   return L.length ? `<p class="mut tip" data-d="2">${L.map(s => `<b>${s}</b>`).join(' · ')}</p>` : '';
 }
 { const a0 = applyForce; applyForce = function () { const r = a0.apply(this, arguments); crfRoles(); return r; }; }
+
+/* ================= The Target button, pointed out (owner, 8 Nov 2026) =================
+   "not sure how to target casters": every unit has a Target button on its card (prioSlot, ui.js) that cycles
+   First, Last, Strong, Weak, Cloth, Support, Armoured ... but nothing pointed at it. Now:
+   - the wave card says so in one line when a wave brings cloth casters, supports or armour (any campaign run, any force);
+   - the first such wave, every unit's Target button glows until the player clicks one.
+   Also Ironhold's own tips, like the Conclave's (FORCE_TIPS, forces_zzzzzzzzzzz_rift_conclave.js). */
+const TGT_TIP = { shown: false, done: false };
+function tgtTipLine(n, skipArm) {
+  if (typeof G === 'undefined' || !G || G.vs || (typeof oldRules === 'function' && oldRules())) return '';
+  let w; try { w = describeWave(n); } catch (e) { return ''; }
+  const has = r => w.types.some(ty => CREEPS[ty] && CREEPS[ty].rk && CREEPS[ty].rk[r]);
+  const cast = has('cloth') || has('support'), arm = has('armoured');
+  if (!cast && !arm) return '';
+  const set = name => (G.towers || []).some(t => PRIO[t.prio] === name);   // already set: no need to say it
+  const L = [];
+  if (cast && !set('Cloth') && !set('Support')) L.push(`Casters ahead: set a unit's <b>Target</b> to Cloth or Support`);
+  if (arm && !skipArm && !set('Armoured')) L.push(`Armour ahead: set your plate-breakers' <b>Target</b> to Armoured`);
+  if (!L.length) return '';
+  if (!TGT_TIP.done) { if (!TGT_TIP.shown && typeof markDirty === 'function') setTimeout(markDirty, 0); TGT_TIP.shown = true; }
+  return `<p class="mut tip" data-d="2">${L.join(' · ')}</p>`;
+}
+{
+  const f0 = typeof forceTipLine === 'function' ? forceTipLine : () => '';
+  forceTipLine = function (n) { let a = '', b = ''; try { a = f0(n); } catch (e) { a = ''; } try { b = tgtTipLine(n, /Armour ahead/.test(a)); } catch (e) { b = ''; } return a + b; };
+}
+{
+  const p0 = prioSlot;
+  prioSlot = function (t) {
+    const s = p0(t); if (!s) return s;
+    if (TGT_TIP.shown && !TGT_TIP.done) {
+      s.pulse = true;
+      const act = s.act; s.act = function () { TGT_TIP.done = true; return act.apply(this, arguments); };
+    }
+    return s;
+  };
+}
+if (typeof FORCE_TIPS !== 'undefined') FORCE_TIPS.ironhold = [
+  [w => w.types.some(ty => CREEPS[ty] && CREEPS[ty].rk && CREEPS[ty].rk.armoured), 'Armour ahead: Ironbreakers, Steam Hammers and Thunderguns break plate; set their Target to Armoured'],
+  [w => w.fly, 'Flyers ahead: Flak Cannoneers and Chain Trappers'],
+];
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
