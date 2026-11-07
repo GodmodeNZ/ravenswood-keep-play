@@ -1,4 +1,4 @@
-const BUILD_TAG = '0adcd1a@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '30c4a88@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -11318,7 +11318,7 @@ const ITEM_STATS = {
   cc_c_battery: 'mana|Battery', cc_c_overflow: 'regen|Overflow', cc_c_echo: 'sp cd|Echo',
   cc_l_starblade: 'dmg as pen|Starfall Edge', cc_l_grimoire: 'sp as mana|Motes of Light', cc_l_winter: 'sp mana cd|Long Winter', cc_l_chrono: 'dmg as cd|Unwinding',
   cc_l_heavens: 'range crit as|Eye of Heaven', cc_l_titan: 'dmg as pen|Titan’s Slam', cc_l_sunforge: 'sp splash regen|Sunforge', cc_l_meridian: 'sp mana regen|Prime Meridian',
-  cc_l_codex: 'dmg crit sp|Weaving', cc_l_staff: 'sp as cd|Empowered Strikes', cc_l_moon: 'cd mana regen|Silver Moon', cc_l_lens: 'sp2 crit|Weavemaster',
+  cc_l_codex: 'dmg crit sp|Every Element', cc_l_staff: 'sp as cd|Empowered Strikes', cc_l_moon: 'cd mana regen|Silver Moon', cc_l_lens: 'sp2 crit|Reactor',
   cc_s_robe: 'mana=20|Self-Mending', cc_s_focus: 'sp=14 mpen=6|', cc_s_quill: 'as=20|', cc_s_stone: 'range=0.6|', cc_s_sand: 'cd=20|', cc_s_chalk: 'sp=6|Lasting Runes',
   cc_s_concord: 'sp=10 mana=20 mpen=12|', cc_s_orb: 'sp=18 mana=25 mpen=12|Deep Reservoir',
   // ---- Ironhold ----
@@ -12226,17 +12226,18 @@ function huBlock(g, L, W, bev, col, colE) {
 
 /* ================= THE CONCLAVE: scholars of the Drifting College =================
    An academy of mages whose college floats above the clouds. They come to the keep as scholars defending knowledge:
-   violet and midnight-blue robes, silver runes, floating books, crystals and astrolabes. Their craft is Spell Weaving:
-   - Schools and runes. Every Conclave unit belongs to a school (arcane, frost, chrono, star, stone, fire). Its hits, basic
-     and ability alike, leave that school's rune on the foe for a few seconds (c.ccR[school] = when it fades).
-   - Weaves. A hit that lands on a foe carrying another school's rune can weave with it: the rune is spent and something
-     happens (frost + fire shatters, chrono + arcane echoes ...). Weaves are deterministic and come from the talent trees
-     (one weave per tree) and a few items. Their extra damage is credited as reactions in the report.
+   violet and midnight-blue robes, silver sigils, floating books, crystals and astrolabes. Their craft is the Elements
+   (docs/conclave_elements.md):
+   - Elements. Every Conclave school is one element: Arcane, Frost, Time (the id 'chrono'), Star, Stone, Fire. Its hits,
+     basic and ability alike, mark the foe with that element for a few seconds (c.ccR[element] = when it fades).
+   - Reactions. A second, different element on a marked foe sets off a reaction (CC_RX: Fire + Frost Shatter, Arcane +
+     Fire Overload, Time + any Echo, Star + any Pull ...) and both marks clear. One school alone never reacts. Talents ride
+     on reactions (ccRidersOf); their damage is credited as reactions in the report.
    - Arcane Charge. Every basic attack adds a charge (t.ccQ, up to 5 at first, shown as gold pips over its bars); casting an
      ability spends them all for +12% ability power each. The Leyline Obelisk gains charge as units near it cast.
    - Mana. (The Leyline Obelisk, the old battery, is retired: the Champion's casts and items share mana now); the force's items and charms lean on mana and
      ability modifiers. Basic attacks are weaker than the keep's and the Grove's; the abilities are stronger.
-   Files: _a (this: schools, runes, charge, weaves, projectiles, glyphs, the units' attacks, hooks, world drawing),
+   Files: _a (this: elements, marks, reactions, charge, projectiles, glyphs, the units' attacks, hooks, world drawing),
    _b (bodies and animation), _c (abilities), _d (talent trees), _e (items), _f (commanders). Every global is prefixed
    cc / CC so it can sit beside other forces in the one script. */
 
@@ -12244,7 +12245,8 @@ function huBlock(g, L, W, bev, col, colE) {
 const CC_COL = { arcane: '#b98cff', frost: '#9fe4ff', chrono: '#ffd27a', star: '#eef2ff', stone: '#e0aa6a', fire: '#ff8a4a', ley: '#6ff0e0', magma: '#ff5a2a' };
 const CC_SCHOOLS = ['arcane', 'frost', 'chrono', 'star', 'stone', 'fire'];
 const CC_SCHOOL_NAME = { arcane: 'arcane', frost: 'frost', chrono: 'chrono', star: 'star', stone: 'stone', fire: 'fire' };
-const CC_RUNE_T = 4;          // a rune's life (seconds)
+const CC_MARK_T = 4;          /* an element mark's life (seconds) */
+const CC_RX_CD = 1.5;         /* a foe reacts at most once in this long (its marks still land meanwhile) */
 const CC_Q_MAX = 5, CC_Q_K = .12;   // Arcane Charge: the most a unit holds, and the ability power each charge spent adds
 const CC_LEY_REGEN = [.5, .5, .6, .6, .7, .7];   // mana a second the Obelisk's aura gives, by its tier
 
@@ -12255,39 +12257,39 @@ FORCES.conclave = { name: 'The Conclave', title: 'Scholars of the Drifting Colle
   units: {
     glaive: { id: 'cc_spellblade', name: 'Spellblades', short: 'Spellblade', key: '1', proj: 'force', attack: 'cc_blade', elem: null, dmgType: 'phys', air: false, ground: true, ccSchool: 'arcane', visTiers: 6,
       top: [.95, 1, 1.05, 1.1, 1.16, 1.22],
-      blurb: 'Duelists of the College with rune-etched steel swords: their cuts are steel (the College’s blade against magic-resistant foes), their spells arcane. They cut the foe beside them and blink short hops along the road. Each cut staggers its foe (slowed 10% a stack); the 3rd stack stuns it for 1s and sets the stone rune on it, for another school to weave. Their strikes leave the arcane rune. Cannot reach flyers.',
+      blurb: 'Duelists of the College with starsteel swords: their cuts are steel (the College’s blade against magic-resistant foes). They cut the foe beside them and blink short hops along the road. Each cut staggers its foe (slowed 10% a stack); the 3rd stack stuns it for 1s. Their element is Arcane: an Arcane mark meeting Fire, Frost or Stone Overloads. Cannot reach flyers.',
       tiers: [{ cost: 25, dmg: 21, rate: .8, range: 1.35 }, { cost: 48, dmg: 42, rate: .77, range: 1.4 }, { cost: 105, dmg: 98, rate: .73, range: 1.5 }] },
     arrow: { id: 'cc_mageling', name: 'Magelings', short: 'Mageling', key: '2', proj: 'force', attack: 'cc_missile', elem: null, dmgType: 'arcane', air: true, ground: true, ccSchool: 'arcane', visTiers: 6,
       top: [1.05, 1.1, 1.16, 1.22, 1.28, 1.34],
-      blurb: 'Apprentices in towering hats, a spellbook floating at their side. They loose quick arcane missiles that seek their foe, air or ground (they break a magic ward twice as fast as other spells), and leave the arcane rune.',
+      blurb: 'Apprentices in towering hats, a spellbook floating at their side. They loose quick arcane missiles that seek their foe, air or ground (they break a magic ward twice as fast as other spells), and mark it Arcane.',
       tiers: [{ cost: 14, dmg: 5.5, rate: .6, range: 2.6 }, { cost: 28, dmg: 13, rate: .52, range: 2.9 }, { cost: 66, dmg: 27, rate: .43, range: 3.2 }] },
-    frost: { id: 'cc_rimeweaver', name: 'Rimeweavers', short: 'Rime', key: '3', proj: 'force', attack: 'cc_rime', elem: null, dmgType: 'magic', air: true, ground: true, ccSchool: 'frost', visTiers: 6,
+    frost: { id: 'cc_rimeweaver', name: 'Frostweavers', short: 'Frost', key: '3', proj: 'force', attack: 'cc_rime', elem: null, dmgType: 'magic', air: true, ground: true, ccSchool: 'frost', visTiers: 6,
       top: [1.1, 1.16, 1.22, 1.28, 1.34, 1.4],
-      blurb: 'Frost scholars with crystal staves. Their bolts chill (air or ground), and every third one writes a frost glyph on the road that slows whatever walks it. They leave the frost rune.',
+      blurb: 'Frost scholars with crystal staves. Their bolts chill, air or ground, and their spells are the College’s classic frost: a spear of ice, a coffin of ice that locks one foe in place, and a bloom of ice that bursts when its foe falls. Their element is Frost.',
       tiers: [{ cost: 30, dmg: 6, rate: 1.1, range: 2.5, slow: .25, slowT: 1.5 }, { cost: 55, dmg: 14, rate: 1, range: 2.7, slow: .3, slowT: 1.6 }, { cost: 115, dmg: 32, rate: .9, range: 2.9, slow: .35, slowT: 1.8 }] },
     arcane: { id: 'cc_chronomancer', name: 'Chronomancers', short: 'Chrono', key: '4', proj: 'force', attack: 'cc_chrono', elem: null, dmgType: 'arcane', air: true, ground: true, prio: 2, ccSchool: 'chrono', visTiers: 6,
       top: [1.15, 1.2, 1.26, 1.32, 1.38, 1.44],
-      blurb: 'Keepers of the College clock. Their golden bolts slow time on the strongest foe in reach, and their spells hasten allies and echo what the Conclave casts. They leave the chrono rune.',
+      blurb: 'Keepers of the College clock. Their golden bolts slow time on the strongest foe in reach, and their spells hasten allies and echo what the Conclave casts. Their element is Time: a Time mark meeting another element Echoes it.',
       tiers: [{ cost: 45, dmg: 20, rate: 1.6, range: 2.8, slow: .25, slowT: 1.8 }, { cost: 85, dmg: 48, rate: 1.5, range: 3, slow: .3, slowT: 2 }, { cost: 180, dmg: 115, rate: 1.4, range: 3.3, slow: .35, slowT: 2.2 }] },
     storm: { id: 'cc_astrologer', name: 'Astrologers', short: 'Astro', key: '5', proj: 'force', attack: 'cc_star', elem: null, dmgType: 'magic', air: true, ground: true, ccSchool: 'star', visTiers: 6,
       top: [1.2, 1.26, 1.32, 1.38, 1.44, 1.5],
-      blurb: 'Star-readers with telescope staves and floating orreries. Their star-bolts strike air and ground, twice as hard on flyers, and reach further into the sky. They leave the star rune.',
+      blurb: 'Star-readers with telescope staves and floating orreries. Their star-bolts strike air and ground, twice as hard on flyers, and reach further into the sky. Their element is Star: a Star mark meeting another element Pulls the foe, and a flyer pulled down can be struck by every unit.',
       tiers: [{ cost: 30, dmg: 7, rate: .85, range: 2.6, airR: .8, vsAir: 2 }, { cost: 55, dmg: 17, rate: .8, range: 2.8, airR: .9, vsAir: 2 }, { cost: 115, dmg: 40, rate: .75, range: 3.1, airR: 1, vsAir: 2 }] },
     earth: { id: 'cc_golemwarden', name: 'Golem Wardens', short: 'Golem', key: '6', proj: 'force', attack: 'cc_slam', elem: null, dmgType: 'phys', cracks: true, air: false, ground: true, ccSchool: 'stone', visTiers: 6,
       top: [1, 1.05, 1.1, 1.16, 1.22, 1.28],
-      blurb: 'A warden of the College and the stone golem it woke. The golem slams the road, striking every walker beside it and leaving the stone rune. Its slam cracks armour plate and magic wards open for 3 seconds, so stone, steel and spells bite it whole: the College’s answer to plate and to magic-resistant foes. Cannot reach flyers.',
+      blurb: 'A warden of the College and the stone golem it woke. The golem slams the road, striking every walker beside it and marking it Stone. Its slam cracks armour plate and magic wards open for 3 seconds, so stone, steel and spells bite it whole: the College’s answer to plate and to magic-resistant foes. Cannot reach flyers.',
       tiers: [{ cost: 40, dmg: 24, rate: 1.7, range: 1.5 }, { cost: 72, dmg: 58, rate: 1.6, range: 1.6 }, { cost: 155, dmg: 138, rate: 1.5, range: 1.7 }] },
     cannon: { id: 'cc_pyroclast', name: 'Pyroclasts', short: 'Pyro', key: '7', proj: 'force', attack: 'cc_fireball', elem: null, dmgType: 'magic', air: false, ground: true, ccSchool: 'fire', visTiers: 6,
       top: [1.05, 1.1, 1.16, 1.22, 1.28, 1.34],
-      blurb: 'Fire scholars who lob fireballs: they burst over the crowd and set it burning, and every third one leaves a burning glyph on the road. They leave the fire rune. Cannot hit flyers.',
+      blurb: 'Fire scholars who lob fireballs: they burst over the crowd and set it burning, and every third one leaves a burning glyph on the road. Their element is Fire. Cannot hit flyers.',
       tiers: [{ cost: 30, dmg: 12, rate: 1.6, range: 2.5, splash: .85 }, { cost: 52, dmg: 28, rate: 1.5, range: 2.7, splash: .95 }, { cost: 112, dmg: 68, rate: 1.4, range: 3, splash: 1.1 }] },
     // holy: the run's commander fights in person: their Champion (forces_zx_champ_conclave.js; the Leyline Obelisk is retired)
-    wall: { id: 'cc_runeward', name: 'Runeward Pillars', short: 'Pillar', key: 'b', top: [.5],
-      blurb: 'A rune-carved pillar that hovers over the road\'s edge, cheap to raise for the maze. Tap it later to call a scholar to it.' },
+    wall: { id: 'cc_runeward', name: 'Ward Pillars', short: 'Pillar', key: 'b', top: [.5],
+      blurb: 'A sigil-carved pillar that hovers over the road\'s edge, cheap to raise for the maze. Tap it later to call a scholar to it.' },
   } };
 // the force's heartbeat, told on every scholar's card
 for (const ty in FORCES.conclave.units) if (ty !== 'wall' && ty !== 'holy') FORCES.conclave.units[ty].blurb += ` Each strike adds an Arcane Charge (up to ${CC_Q_MAX}); a spell spends them all, +${Math.round(CC_Q_K * 100)}% ability power each.`;
-// the unit ids by school (for the Prism of Schools and the weave notes)
+// the unit ids by school (for the Prism of Schools and the reaction threads)
 const CC_UNITS = Object.values(FORCES.conclave.units).map(u => u.id);
 const ccUnit = t => !!(t && t.def && t.def.force === 'conclave');
 const ccSchool = t => (t && t.def && t.def.ccSchool) || null;
@@ -12299,63 +12301,128 @@ const ccAlive = t => G.state === 'play' && G.towers.includes(t) && !t.wrecked;
 const ccWalker = c => !c.fly || c.lowT > G.time;
 const ccBig = c => !!(c.def.boss || c.def.lead || c.elite);
 const ccTag = (tag, fn) => tag ? tagged(tag, fn) : fn();
-// evidence for the tests (sim/cc_*_test.py switch G.ccEvOn on): which capstones, weaves and items have fired. A no-op in play
+// evidence for the tests (sim/cc_*_test.py switch G.ccEvOn on): which capstones, reactions and items have fired. A no-op in play
 function ccEv(k) { if (G.ccEvOn) { const E = G.ccEv || (G.ccEv = {}); E[k] = (E[k] || 0) + 1; } }
 
 /* =====================================================================================================
-   RUNES
+   ELEMENTS: each school is one element (docs/conclave_elements.md). Every hit of a Conclave unit marks its foe with
+   its element for CC_MARK_T s (c.ccR[element] = when the mark fades); a second, different element on the foe sets off a
+   reaction (CC_RX) and both marks clear. One school alone never reacts: the player's rule is to mix them.
    ===================================================================================================== */
-function ccRuneT(src) {
+const CC_EL_NAME = { arcane: 'Arcane', frost: 'Frost', chrono: 'Time', star: 'Star', stone: 'Stone', fire: 'Fire' };
+function ccMarkT(src) {
   const st = src && src.st, sh = st && st.sh;
-  return (CC_RUNE_T + ((st && st.pw && st.pw.ccRuneL) || 0) + ((sh && sh.ccRune) || 0)) * (G.hero === 'cc_arch' && !G.vs ? 2 : 1);   // Rune Chalk; Maelis: runes last twice as long
-}
-function ccRune(c, s, src, dur) {
-  if (!s || !c || c.dead) return;
-  const R = c.ccR || (c.ccR = {});
-  R[s] = Math.max(R[s] || 0, G.time + (dur || ccRuneT(src)));
+  return CC_MARK_T + ((st && st.pw && st.pw.ccMarkL) || 0) + ((sh && sh.ccMarkT) || 0);   /* (Marking Chalk; a spell's own) */
 }
 const ccHas = (c, s) => !!(c && c.ccR && c.ccR[s] > G.time);
-const ccRunesOn = c => c && c.ccR ? CC_SCHOOLS.filter(s => c.ccR[s] > G.time) : [];
+const ccMarksOn = c => c && c.ccR ? CC_SCHOOLS.filter(s => c.ccR[s] > G.time) : [];
+const ccMarked = c => ccMarksOn(c).length > 0;
+// a hit of element el about to mark c would set off a reaction (for effects that run before the mark lands: set hooks, amps)
+const ccWillReact = (c, el) => !!(c && !c.dead && !(c.ccRxT > G.time) && ccMarksOn(c).some(s => s !== el));
+// the marks on a foe, and those a reaction cleared in the last w seconds (for effects that read a foe as it reacts)
+const ccMarksRecent = (c, w) => { const L = ccMarksOn(c), S = c && c.ccRSp; if (S) for (const s of CC_SCHOOLS) if (!L.includes(s) && S[s] != null && G.time - S[s] <= w) L.push(s); return L; };
+// a foe that reacted in the last w seconds (the talents and items that read "a foe that just reacted")
+const ccReacted = (c, w) => !!(c && c.ccRxAt != null && G.time - c.ccRxAt <= (w || 2));
 function ccTake(c, s) { if (ccHas(c, s)) { c.ccR[s] = 0; return true; } return false; }
 const ccOthers = s => CC_SCHOOLS.filter(q => q !== s);
-
-/* =====================================================================================================
-   WEAVES: a hit on a foe carrying another school's rune spends it for a deterministic effect (talents, items)
-   ===================================================================================================== */
-const CC_WEAVE = {
-  starsteel: { name: 'Starsteel', col: '#eef2ff', text: 'a Spellblade strike on a star-marked foe draws the star down its blade: +100% and a short stun.' },
-  echo: { name: 'Echo', col: '#ffd27a', text: 'a Mageling missile on a chrono-marked foe echoes: it strikes again a moment later.' },
-  entomb: { name: 'Entomb', col: '#bff0ff', text: 'a Rimeweaver bolt on a stone-marked foe entombs it in ice: frozen 1s and +50%.' },
-  paradox: { name: 'Paradox', col: '#ffe9a8', text: 'a Chronomancer bolt on an arcane-marked foe rewinds it back along the road and strikes +60%.' },
-  comet: { name: 'Comet', col: '#d8f2ff', text: 'an Astrologer star-bolt on a frost-marked foe bursts into a comet of ice around it.' },
-  magma: { name: 'Magma', col: '#ff7a3a', text: 'a golem slam on a fire-marked foe cracks the road into burning magma.' },
-  shatter: { name: 'Shatter', col: '#ffd0b0', text: 'a Pyroclast fireball on a frost-marked foe shatters the rime: double damage and flying shards.' },
-  weave: { name: 'Woven Strike', col: '#d8b8ff', text: 'a hit on a rune-marked foe spends the rune for a stronger strike.' },
-  starfall: { name: 'Star Weave', col: '#eef2ff', text: 'a star falls on a foe bearing two or more runes.' },
-};
-// spend one of the partner runes on c (null if none): the weave fires. id: CC_WEAVE key
-function ccWeave(t, c, partners, id) {
-  if (!c || c.dead || !c.ccR || !partners || !partners.length) return null;
-  for (const s of partners) if (c.ccR[s] > G.time) {
-    c.ccR[s] = 0;
-    const W = CC_WEAVE[id] || CC_WEAVE.weave, col = W.col, h = hitH(c);
-    if (!(typeof sfxWeave === 'function' && sfxWeave(t, c, id, s))) { part({ k: 'flare', x: c.x, z: c.y, h, life: .3, max: .3, size: 1, col }); part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .45, max: .45, size: .55, col: CC_COL[s] });
-    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; part({ k: 'spark', x: c.x, z: c.y, h, vx: Math.cos(a) * 1.6, vz: Math.sin(a) * 1.6, vh: R(.2, 1), g: 2, drag: 2, life: .35, max: .35, size: .05, col: k % 2 ? col : CC_COL[s] }); } }   // (the older look, when the spell effects are off)
-    ccWeaveNote(t, c, id, s); ccEv('weave:' + id + ':' + s);
-    return s;
+/* mark a foe with an element; if it already carries another and may react (once every CC_RX_CD s), the two react and both
+   marks clear. src: the unit whose hit marks it (no src: a mark that cannot react). noRx: it marks without reacting.
+   Returns the reaction's id, or null. */
+function ccMark(c, el, src, dur, noRx) {
+  if (!el || !c || c.dead || !CC_EL_NAME[el]) return null;
+  const M = c.ccR || (c.ccR = {});
+  if (src && !noRx && !(c.ccRxT > G.time)) {
+    let other = null, best = Infinity;
+    for (const e of CC_SCHOOLS) if (e !== el && M[e] > G.time) { const k = (e === 'chrono' ? 0 : e === 'star' ? 1 : 2) * 1e6 + M[e]; if (k < best) { best = k; other = e; } }   /* (Time first, then Star, then the oldest mark) */
+    if (other) { M[other] = 0; M[el] = 0; (c.ccRSp || (c.ccRSp = {}))[other] = G.time; return ccReact(src, c, el, other); }
   }
+  M[el] = Math.max(M[el] || 0, G.time + (dur || ccMarkT(src)));
   return null;
 }
-function ccWeaveNote(t, c, id, s) {
-  G.stats.ccWeaves = (G.stats.ccWeaves || 0) + 1;
-  if (G.ccSeen && !G.ccSeen[id]) G.ccSeen[id] = 1;   // (what a weave is: its name over the foe and, for the run's first, one line saying how it was made: sfxWeave, spellfx.js)
-  else if (!G.ccSeen) G.ccSeen = { [id]: 1 };
+
+/* =====================================================================================================
+   REACTIONS: two different elements on one foe. Each is scaled from the strike of the unit that set it off.
+   ===================================================================================================== */
+const CC_RX = {
+  shatter: { name: 'Shatter', col: '#d8f4ff', pair: ['fire', 'frost'], text: 'the ice bursts: 1.5× the strike, and the foe is slowed 30% for 2s.' },
+  overload: { name: 'Overload', col: '#ff9ad8', any: 'arcane', text: 'an arcane explosion: 1× the strike to every foe within 1 cell.' },
+  encase: { name: 'Encase', col: '#bff0ff', pair: ['frost', 'stone'], text: 'frozen in stone and ice for 1.2s (less on bosses).' },
+  magma: { name: 'Magma', col: '#ff7a3a', pair: ['fire', 'stone'], text: 'molten ground for 3s: walkers in it burn for 15% of the strike every half second.' },
+  pull: { name: 'Pull', col: '#eef2ff', any: 'star', text: 'a flyer is dragged down for 3s, where every unit can strike it; a walker is pulled 0.5 cells back. Either is stunned 0.3s.' },
+  echo: { name: 'Echo', col: '#ffd27a', any: 'chrono', text: "the other element's touch strikes twice, 0.5s apart, each with 0.6× the strike." },
+};
+const CC_RXK = { shatter: 1.5, shatterSlow: .3, overload: 1, overloadR: 1, encase: 1.2, magmaT: 3, magmaR: .8, magma: .15,
+  pullT: 3, pullBack: .5, pullStun: .3, echo: .6, echoGap: .5 };
+// which reaction two elements make (Time first, then Star, then Arcane: Time + Star is an Echo, Star + Arcane a Pull)
+function ccRxOf(a, b) {
+  if (!a || !b || a === b) return null;
+  if (a === 'chrono' || b === 'chrono') return 'echo';
+  if (a === 'star' || b === 'star') return 'pull';
+  if (a === 'arcane' || b === 'arcane') return 'overload';
+  for (const k in CC_RX) { const p = CC_RX[k].pair; if (p && p.includes(a) && p.includes(b)) return k; }
+  return null;
+}
+const ccRxStrike = t => (t && t.st && (t.st.dmg || t.st.ccD)) || 10;
+// an element's touch (what Echo repeats; Weaver's Blade and Maren's seams add it too)
+function ccTouch(t, c, e, S) {
+  if (!c || c.dead) return;
+  S = S || ccRxStrike(t);
+  if (e === 'frost') chill(c, { slow: .3, slowT: 2 }, 'frost', t);
+  else if (e === 'fire') ignite(c, S * .2, 2, t, false);
+  else if (e === 'chrono') chill(c, { slow: .4, slowT: 2 }, null, t);
+  else if (e === 'star') ccPullFoe(t, c);
+  else if (e === 'stone') stun(c, .3, .4, null);
+}
+// Pull: a flyer dragged down (every unit can strike it), a walker pulled back up the road; either stunned briefly
+function ccPullFoe(t, c, T) {
+  if (!c || c.dead) return;
+  if (c.fly) c.lowT = Math.max(c.lowT || 0, G.time + (T || CC_RXK.pullT) * (c.def.boss ? .5 : 1));
+  else { const x0 = c.x, z0 = c.y; shove(c, CC_RXK.pullBack); if (Math.hypot(c.x - x0, c.y - z0) > .05) rfx({ k: 'drag', x0, z0, x1: c.x, z1: c.y, h: .3, col: CC_COL.star, life: .4 }); }
+  if (!c.dead) stun(c, CC_RXK.pullStun, .4, null);
+}
+function ccReact(t, c, el, other) {
+  const id = ccRxOf(el, other); if (!id || !c || c.dead) return null;
+  c.ccRxT = G.time + CC_RX_CD; c.ccRxAt = G.time; c.ccRxId = id;
+  const st = (t && t.st) || {}, S = ccRxStrike(t), K = CC_RXK, x = c.x, z = c.y, h = hitH(c);
+  const hit = (o, m) => { if (o && !o.dead && m > 0) tagged('rx', () => ccHit(t, st, o, S * m, { noMark: true, type: 'magic' })); };
+  // what the reaction does
+  if (id === 'shatter') { hit(c, K.shatter); if (!c.dead) chill(c, { slow: K.shatterSlow, slowT: 2 }, 'frost', t); }
+  else if (id === 'overload') inSplash(x, z, K.overloadR, false, o => { if (!o.ent) hit(o, K.overload); });
+  else if (id === 'encase') { if (t && t.def) ccFreeze(t, c, K.encase); else freezeFoe(c, K.encase, null); }
+  else if (id === 'magma') { if (ccWalker(c)) ccGlyph({ s: 'magma', sub: 'glyph', x, z, r: K.magmaR, t: K.magmaT, src: t, st, every: .5, dmg: S * K.magma, type: 'magic', nomark: true, tag: 'rx' }); }
+  else if (id === 'pull') ccPullFoe(t, c);
+  else if (id === 'echo') { const e = el === 'chrono' ? other : el; for (let k = 0; k < 2; k++) G.delayed.push({ t: k * K.echoGap + .05, fn: () => { if (c.dead) return; ccTouch(t, c, e, S); hit(c, K.echo); } }); }
+  // the unit's own riders on it (talents, Champion gifts): fn(reaction, the other element, foe, strike) -> extra share
+  if (t && t.def) for (const w of ccRidersOf(t, st)) if (w[0] === '*' || w[0].includes(id)) { const b = w[2](id, el === ccSchool(t) ? other : el, c, S) || 0; if (b > 0) hit(c, b); if (c.dead) break; }
+  // its look: spellfx.js draws it and floats its name; the plain look when the spell effects are off
+  if (!(typeof sfxReact === 'function' && sfxReact(t, c, id, el, other))) {
+    const col = CC_RX[id].col;
+    part({ k: 'flare', x, z, h, life: .3, max: .3, size: 1, col }); part({ k: 'ring', x, z, h: .05, life: .45, max: .45, size: .55, col: CC_COL[other] });
+    if (typeof addText === 'function') addText(x, z, h + .6, CC_RX[id].name, col);
+  }
+  ccReactNote(t, c, id, other); ccEv('rx:' + id);
+  return id;
+}
+/* PAIRS: two Conclave units of elements that react, standing within CC_LINK_R cells of each other, are linked: each
+   strikes CC_LINK_AS faster while linked, and a soft glow of its partner's colour lies at its base (ccWorld). Placing or
+   selecting a unit draws the link to each partner with the reaction's icon over it (spellfx.js sfxReactThreads). */
+const CC_LINK_R = 2.05, CC_LINK_AS = .1;
+let _ccLink = { t: -1, g: null, m: new Map() };
+function ccLinkMap() {
+  if (_ccLink.t === G.time && _ccLink.g === G.towers) return _ccLink.m;
+  const m = new Map(), U = G.towers.filter(o => o.def && o.def.ccSchool && !o.def.wall && !o.wrecked && o.build <= .5);
+  for (const a of U) for (const b of U) if (a !== b && ccRxOf(a.def.ccSchool, b.def.ccSchool) && Math.hypot(a.x - b.x, a.y - b.y) <= CC_LINK_R) { const L = m.get(a) || []; L.push(b); m.set(a, L); }
+  _ccLink = { t: G.time, g: G.towers, m }; return m;
+}
+const ccLinksOf = t => (typeof G !== 'undefined' && G.towers ? ccLinkMap().get(t) : null) || null;
+function ccReactNote(t, c, id, s) {
+  G.stats.ccReacts = (G.stats.ccReacts || 0) + 1;
   if (!t || !t.def) return;
   const C = ccCaps(t);
-  if (C.ccStudy && t.ab) gainMana(t, 10 * C.ccStudy);   // Study the Weave
+  if (C.ccStudy && t.ab) gainMana(t, 10 * C.ccStudy);   /* Study the Reaction */
   const ley = ccLeyOf(t);
   if (ley && ley.hs.caps.ccConfl) { gainMana(t, 20); ccGain(t, 1); }   // Confluence
-  if (G.ccLens) for (const o of G.ccLens) if (G.towers.includes(o) && !o.wrecked) { ccGain(o, 1); ccEv('item:cc_l_lens:charge'); }   // the Weavemaster's Lens
+  if (G.ccLens) for (const o of G.ccLens) if (G.towers.includes(o) && !o.wrecked) { ccGain(o, 1); ccEv('item:cc_l_lens:charge'); }   /* the Reactor's Lens */
 }
 
 /* =====================================================================================================
@@ -12415,65 +12482,53 @@ const ccLeyOf = t => (typeof G !== 'undefined' && G.towers ? ccLeyMap().m.get(t)
 const ccFoeInLey = (c, cap) => ccLeyMap().obs.some(o => (!cap || o.hs.caps[cap]) && Math.hypot(c.x - o.h.x, c.y - o.h.y) <= (o.hs.auraR || 1.7) + .05);
 
 /* =====================================================================================================
-   A HIT: every point of Conclave damage goes through here (basic attacks, abilities, glyphs, items), so runes,
-   weaves and item on-hits all see it. o: { type, kb, school, noRune, dot, weave:
-   [[partners, id, fn(bonusK) -> extra multiplier]] }
+   A HIT: every point of Conclave damage goes through here (basic attacks, abilities, glyphs, items), so element marks,
+   reactions and item on-hits all see it. o: { type, kb, school (the element it marks, if not the unit's), noMark, noRx
+   (it marks but never sets off a reaction), dot }
    ===================================================================================================== */
 function ccHit(t, st, c, amt, o) {
   if (!c || c.dead || !(amt > 0) || !t) return 0;
   o = o || {}; st = st || t.st || {};
   const type = o.type || t.def.dmgType || 'magic', s = o.school || ccSchool(t);
-  let bonus = 0;
-  if (!o.dot && !o.noWeave) {
-    for (const w of o.weave || ccWeavesOf(t, st)) { const got = ccWeave(t, c, w[0], w[1]); if (got) bonus += w[2](got, c, amt) || 0; if (c.dead) return 0; }
-    const p = st.pw;
+  if (!o.dot && c.stunT > 0 && c.stunEl === 'frost' && typeof ccFrozenCrit === 'function') {   /* a Frozen foe: the frozen crit (forces_zzzzzzzzzzz_frost_conclave.js) */
+    const ch = ccFrozenCrit(t, st) + (o.crit || 0);
+    if (ch > 0 && Math.random() < ch) { amt *= (st.critM || 2) * (1 + ccFrozenCritK(t, st)); ccEv('frozencrit'); ccrCritFx(t, c, amt); }
   }
   hurt(c, amt, type, t, !!o.dot, o.kb || null);
-  if (bonus > 0 && !c.dead) tagged('rx', () => hurt(c, amt * bonus, type, t, true, null));   // (a weave's extra: credited as a reaction)
   if (!o.dot && !c.dead) onHit(c, st, t, amt);
-  if (!o.noRune && !c.dead) {
-    ccRune(c, s, t);
-    if (st.pw && st.pw.ccPrism && t.ccPrismS) { ccRune(c, t.ccPrismS, t); ccEv('item:cc_prism'); }   // the Prism of Schools
-    if (st.pw && st.pw.ccCodex && t.ccCodexS && t.ccCodexS.length) { for (const s2 of t.ccCodexS) ccRune(c, s2, t); ccEv('item:cc_l_codex'); }   // the Codex of Weaving: every school standing near it
+  if (!o.noMark && !c.dead) {
+    ccMark(c, s, t, 0, o.noRx);
+    if (!c.dead && st.pw && st.pw.ccPrism && t.ccPrismS) { ccMark(c, t.ccPrismS, t); ccEv('item:cc_prism'); }   /* the Prism of Schools */
+    if (!c.dead && st.pw && st.pw.ccCodex && t.ccCodexS && t.ccCodexS.length) { for (const s2 of t.ccCodexS) ccMark(c, s2, t); ccEv('item:cc_l_codex'); }   /* the Codex of Elements: every element standing near it */
   }
-  if (!o.dot && typeof ccItemsOnHit === 'function' && st.pw && st.pw.cc) ccItemsOnHit(t, st, c, amt, o);
+  if (!o.dot && !c.dead && typeof ccItemsOnHit === 'function' && st.pw && st.pw.cc) ccItemsOnHit(t, st, c, amt, o);
   return amt;
 }
 // an ability's hit: m x the unit's damage x the cast's ability power k
 const ccAbD = st => (st && (st.dmg || st.ccD)) || 0;
 const ccAb = (t, st, c, m, k, o) => ccHit(t, st, c, ccAbD(st) * m * (k || 1), o);
-/* the weaves a unit's hits can make (one per talent tree): [partner schools, weave id, fn(school spent, foe, hit) ->
-   extra damage share]. fn runs as the rune is spent, before the hit lands. Used by every hit of the unit (basic and
-   ability alike) unless the hit says noWeave; the capstone of each weave column opens it to every other school. */
-const CC_NOWEAVE = [];
-function ccWeavesOf(t, st) {
-  const C = (st && st.caps) || {}, u = t.def && t.def.unit;
-  if (!u) return CC_NOWEAVE;
-  const any = s => ccOthers(s), out = [];
-  if (u === 'cc_spellblade' && (C.ccStarsteel || C.ccWeaverBlade)) out.push([C.ccWeaverBlade ? any('arcane') : ['star'], C.ccWeaverBlade ? 'weave' : 'starsteel', (s, c) => {   // Starsteel / Weaver's Blade
-    let b = C.ccWeaverBlade ? .6 : 0;
-    if (s === 'star' && C.ccStarsteel) { b += 1; stun(c, .4, .4, null); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .4, life: .3, max: .3, size: 1, col: CC_COL.star }); }
-    else ccTouch(t, c, s);
-    return b; }]);
-  if (u === 'cc_mageling' && (C.ccEcho || C.ccEchoAll)) out.push([C.ccEchoAll ? any('arcane') : ['chrono'], 'echo', (s, c, amt) => {   // Echoing Missiles (Echo Chamber: twice)
-    const n = C.ccEchoAll ? 2 : 1;
-    for (let e = 0; e < n; e++) G.delayed.push({ t: .4 + e * .35, fn: () => { if (!c.dead && ccAlive(t)) { tagged('rx', () => ccHit(t, t.st || st, c, amt * (e ? .5 : .7), { noWeave: true })); part({ k: 'ring', x: c.x, z: c.y, h: hitH(c), life: .3, max: .3, size: .4, col: CC_COL.chrono }); } } });
+/* the reaction riders a unit carries (its talents): [reaction ids or '*', rider id, fn(reaction, the other element, foe,
+   strike) -> extra damage, as a share of the strike]. ccReact runs them when this unit's hit sets the reaction off. */
+const CC_NORIDE = [];
+function ccRidersOf(t, st) {
+  const C = (st && st.caps) || {}, u = t && t.def && t.def.unit;
+  if (!u) return CC_NORIDE;
+  const out = [];
+  if (u === 'cc_spellblade') {
+    if (C.ccStarsteel) out.push([['overload'], 'starsteel', (id, e, c) => { stun(c, .4, .4, null); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .4, life: .3, max: .3, size: 1, col: CC_COL.star }); return 1; }]);   /* Starsteel */
+    if (C.ccWeaverBlade) out.push(['*', 'weaver', (id, e, c, S) => { ccTouch(t, c, e, S); return .6; }]);   /* Weaver's Blade */
+  }
+  if (u === 'cc_mageling' && C.ccEcho) out.push([['echo'], 'echo', (id, e, c, S) => {   /* Echoing Missiles */
+    G.delayed.push({ t: .4, fn: () => { if (!c.dead && ccAlive(t)) { tagged('rx', () => ccHit(t, t.st || st, c, S * .7, { noMark: true })); part({ k: 'ring', x: c.x, z: c.y, h: hitH(c), life: .3, max: .3, size: .4, col: CC_COL.chrono }); } } });
     return 0; }]);
-  if (u === 'cc_rimeweaver' && (C.ccEntomb || C.ccHoar)) out.push([C.ccHoar ? any('frost') : ['stone'], 'entomb', (s, c) => { ccFreeze(t, c, 1); c.ccTombBy = t; return .5; }]);   // Entomb
-  if (u === 'cc_chronomancer' && (C.ccParadox || C.ccLoop)) out.push([C.ccLoop ? any('chrono') : ['arcane'], 'paradox', (s, c, amt) => { ccRewind(t, st, c, .7, amt, C.ccLoop); return .6; }]);   // Paradox
-  if (u === 'cc_astrologer' && (C.ccComet || C.ccCelestial)) out.push([C.ccCelestial ? any('star') : ['frost'], 'comet', (s, c, amt) => { ccComet(t, st, c, amt); return 0; }]);   // Comet
-  if (u === 'cc_golemwarden' && (C.ccMagma || C.ccMolten)) out.push([C.ccMolten ? any('stone') : ['fire'], 'magma', (s, c, amt) => {   // Magma
-    if (!c.fly) ccGlyph({ s: 'magma', sub: 'glyph', x: c.x, z: c.y, r: .8, t: C.ccMolten ? 6 : 3, src: t, st, every: .5, dmg: amt * .15, slow: .15 * (C.ccObsid || 0), type: 'magic', rune: false, tag: 'rx' });
+  if (u === 'cc_rimeweaver' && C.ccEntomb) out.push([['encase'], 'entomb', (id, e, c) => { ccFreeze(t, c, CC_RXK.encase + 1); c.ccTombBy = t; return .5; }]);   /* Entomb */
+  if (u === 'cc_chronomancer' && C.ccParadox) out.push([['echo'], 'paradox', (id, e, c, S) => { ccRewind(t, st, c, .7, S, false); return .6; }]);   /* Paradox */
+  if (u === 'cc_astrologer' && C.ccComet) out.push([['pull'], 'comet', (id, e, c, S) => { ccComet(t, st, c, S); return 0; }]);   /* Comet */
+  if (u === 'cc_golemwarden' && C.ccMagma) out.push([['magma'], 'deepmagma', () => {   /* Deep Magma: the magma it just poured lasts longer and spreads */
+    for (const g of G.hazards) if (g.k === 'cc_glyph' && g.s === 'magma' && g.src === t && g.born === G.time) { g.t += 3; g.T += 3; g.r += .3; }
     return 0; }]);
-  if (u === 'cc_pyroclast' && (C.ccShatter || C.ccShatterAll)) out.push([C.ccShatterAll ? any('fire') : ['frost'], 'shatter', (s, c, amt) => { ccShards(t, st, c, amt); return 1; }]);   // Shatter
+  if (u === 'cc_pyroclast' && C.ccShatter) out.push([['shatter'], 'emberheart', (id, e, c, S) => { ccShards(t, st, c, S); return 0; }]);   /* Ember Heart */
   return out;
-}
-// Weaver's Blade: the spent rune's own touch
-function ccTouch(t, c, s) {
-  if (s === 'frost') freezeFoe(c, .5, t);
-  else if (s === 'fire') ignite(c, ((t.st && t.st.dmg) || 10) * .3, 3, t, false);
-  else if (s === 'chrono') chill(c, { slow: .4, slowT: 2 }, null, t);
-  else if (s === 'star' || s === 'stone') stun(c, .3, .4, null);
 }
 
 /* =====================================================================================================
@@ -12505,12 +12560,12 @@ function ccGlyphTick(z, dt) {
   ccTag(z.tag, () => inSplash(z.x, z.z, z.r, !z.air, c => {
     if (c.ent || (src && !canTarget(src, st, c) && !(c.fly && c.lowT > G.time))) return;
     if (z.slow) chill(c, { slow: z.slow * (c.def.boss && z.s === 'chrono' ? .55 : 1), slowT: z.every + .25 }, z.s === 'frost' ? 'frost' : null, src || null);
-    if (z.dmg > 0 && src) ccHit(src, st, c, z.dmg, { dot: true, school: z.s === 'magma' ? 'fire' : z.s, noRune: true, type: z.type });
+    if (z.dmg > 0 && src) ccHit(src, st, c, z.dmg, { dot: true, school: z.s === 'magma' ? 'fire' : z.s, noMark: true, type: z.type });
     if (z.burn && !c.dead && src) ignite(c, z.burn, 2, src, false);
     if (z.stun && !c.dead) stun(c, z.stun, .4, null);
-    if (!c.dead && z.s !== 'magma' && z.rune !== false) ccRune(c, z.s, src, z.every + .6);
-    if (!c.dead && z.slow && z.s === 'chrono' && c.ccR) for (const s in c.ccR) if (c.ccR[s] > G.time) c.ccR[s] = Math.max(c.ccR[s], G.time + .6);   // Time Dilation: runes don't fade inside it
-    if (z.mark && !c.dead) { ccRune(c, z.mark, src, z.every + .6); ccEv('item:cc_circlet'); }   // the Rime Circlet: the frost rune too
+    if (!c.dead && z.s !== 'magma' && !z.nomark) ccMark(c, z.s, src, z.every + .6);
+    if (!c.dead && z.slow && z.s === 'chrono' && c.ccR) for (const s in c.ccR) if (c.ccR[s] > G.time) c.ccR[s] = Math.max(c.ccR[s], G.time + .6);   /* Time Dilation: marks don't fade inside it */
+    if (z.mark && !c.dead) { ccMark(c, z.mark, src, z.every + .6); ccEv('item:cc_circlet'); }   /* the Rime Circlet: the Frost mark too */
   }));
   if (z.pulse && alive) z.pulse(z);
 }
@@ -12563,7 +12618,7 @@ function ccHand(t, h) { const a = t.ang == null ? 0 : t.ang; return [t.x + Math.
 /* =====================================================================================================
    THE UNITS' ATTACKS (FORCE_ATTACK): fire() in game.js calls them with the strike's power (nth, ramps, relics)
    ===================================================================================================== */
-// ---- Spellblades: a cut at the foe beside it (arcane); talents add blinks, cleaves, afterimages and weaves ----
+// ---- Spellblades: a cut at the foe beside it (arcane); talents add blinks, cleaves, afterimages and reaction riders ----
 FORCE_ATTACK.cc_blade = function (t, st, tg, pow, echo) {
   const C = st.caps, n = t.shots + 1;
   let c = tg, k = pow;
@@ -12575,10 +12630,10 @@ FORCE_ATTACK.cc_blade = function (t, st, tg, pow, echo) {
   const dx = c.x - t.x, dz = c.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
   ccHit(t, st, c, st.dmg * k, { type: 'phys', kb: [ux * .08, uz * .08] });
   if (!c.dead && t.def.unit === 'cc_spellblade') ccStaggerFoe(c, t);
-  if (C.ccChEdge && ccFull(t)) inSplash(c.x, c.y, .8, true, o => { if (o !== c && canTarget(t, st, o)) ccHit(t, st, o, st.dmg * k * .2 * C.ccChEdge, { type: 'phys', noWeave: true }); });   // Charged Edge
+  if (C.ccChEdge && ccFull(t)) inSplash(c.x, c.y, .8, true, o => { if (o !== c && canTarget(t, st, o)) ccHit(t, st, o, st.dmg * k * .2 * C.ccChEdge, { type: 'phys', noRx: true }); });   /* Charged Edge */
   if (C.ccPhase && c !== tg && !tg.dead) G.delayed.push({ t: .2, fn: () => { if (ccAlive(t) && !tg.dead) { ccHit(t, t.st || st, tg, st.dmg * .6, { type: 'phys' }); ccGhostFx(t, tg); } } });   // Phase Dancer's afterimage
   if (C.ccThousand && !echo && n % 6 === 0) {   // Thousand Edges: three afterimages, each through every walker in reach for 40%
-    for (let q = 0; q < 3; q++) G.delayed.push({ t: .12 + q * .12, fn: () => { if (!ccAlive(t)) return; const s2 = t.st || st; inSplash(t.x, t.y, s2.range + .1, true, o => { if (canTarget(t, s2, o) && !o.ent) { ccHit(t, s2, o, s2.dmg * .4, { type: 'phys', noWeave: q > 0 }); if (!o.dead && q === 0) ccStaggerFoe(o, t); } }); ccRingFx(t.x, t.y, s2.range, CC_COL.arcane); } });
+    for (let q = 0; q < 3; q++) G.delayed.push({ t: .12 + q * .12, fn: () => { if (!ccAlive(t)) return; const s2 = t.st || st; inSplash(t.x, t.y, s2.range + .1, true, o => { if (canTarget(t, s2, o) && !o.ent) { ccHit(t, s2, o, s2.dmg * .4, { type: 'phys', noRx: q > 0 }); if (!o.dead && q === 0) ccStaggerFoe(o, t); } }); ccRingFx(t.x, t.y, s2.range, CC_COL.arcane); } });
     t.ccThousandAt = G.time; ccEv('cap:ccThousand');
   }
   if (t.ccSpecT > G.time && !echo) {   // Spectral Edge: a ghost blade at another foe within 3 cells (flyers too)
@@ -12591,15 +12646,13 @@ FORCE_ATTACK.cc_blade = function (t, st, tg, pow, echo) {
   t.recoil = 1; sfx('glaiveHit', 0);
 };
 // Stagger: each Spellblade cut slows its foe a little more (CC_STAGGER.slow a stack, for CC_STAGGER.t s); the 3rd stack
-// stuns it for CC_STAGGER.stun s and clears (stun(): longer on heavy foes, shorter on bosses), and sets the stone rune on
-// it (CC_STAGGER.rune): another school's weave can spend it (the Rimeweavers' Entomb, any weave that takes every school)
-const CC_STAGGER = { n: 3, slow: .1, t: 2, stun: 1, rune: 'stone' };
+// stuns it for CC_STAGGER.stun s and clears (stun(): longer on heavy foes, shorter on bosses)
+const CC_STAGGER = { n: 3, slow: .1, t: 2, stun: 1 };
 function ccStaggerFoe(c, t) {
   if (c.dead) return;
   const n = (c.ccStagT > G.time ? c.ccStagN | 0 : 0) + 1;
   if (n >= CC_STAGGER.n) {
     c.ccStagN = 0; c.ccStagT = 0; stun(c, CC_STAGGER.stun, false, null); fxSpark(c.x, c.y, hitH(c) + .1, '#e8d8ff', 8);
-    if (!c.dead) { ccRune(c, CC_STAGGER.rune, t); fxSpark(c.x, c.y, hitH(c) + .2, CC_COL.stone, 6); }
     // Maren's Riftstep
     if (t && typeof ccRiftstep === 'function') ccRiftstep(t, c);
     return;
@@ -12607,17 +12660,23 @@ function ccStaggerFoe(c, t) {
   c.ccStagN = n; c.ccStagT = G.time + CC_STAGGER.t;
   chill(c, { slow: CC_STAGGER.slow * n, slowT: CC_STAGGER.t }, null, null);
 }
-// a Spellblade's blink: out to the foe in a flash and back (t.chg drawn by chargeAt; t.ccBlink adds the flashes)
+/* the rift cut (owner, 8 Nov 2026, an experiment: "if it doesnt work we can try something else"): before a blink the
+   Spellblade or Maren flicks the blade in a quick diagonal slash that opens a thin glowing seam in the air; they step in,
+   it snaps shut, and a matching seam opens and closes where they come out (ccDrawSeams). One switch: CC_RIFTCUT.on, or
+   localStorage runehold.riftcut = '0' for the plain blink with its flashes. */
+const CC_RIFTCUT = { on: (() => { try { return localStorage.getItem('runehold.riftcut') !== '0'; } catch (e) { return true; } })(), slash: .14, open: .3, len: .36, out: .35 };
+// a Spellblade's blink: out to the foe in a flash and back (t.chg drawn by chargeAt; t.ccBlink adds the flashes or the seams)
 function ccBlinkTo(t, c, T) {
   const dx = c.x - t.x, dz = c.y - t.y, L = Math.hypot(dx, dz) || 1, reach = Math.max(0, L - .38);
-  t.chg = { x: t.x + dx / L * reach, z: t.y + dz / L * reach, at: G.time, T }; t.ccBlink = { at: G.time, x0: t.x, z0: t.y, x1: t.chg.x, z1: t.chg.z, T };
+  t.chg = { x: t.x + dx / L * reach, z: t.y + dz / L * reach, at: G.time, T }; t.ccBlink = { at: G.time, x0: t.x, z0: t.y, x1: t.chg.x, z1: t.chg.z, T, cut: CC_RIFTCUT.on, a: Math.atan2(dx, dz) };
+  if (CC_RIFTCUT.on) { sfx('phase', 0); return; }
   for (const [x, z] of [[t.x, t.y], [t.chg.x, t.chg.z]]) { part({ k: 'flare', x, z, h: .6, life: .22, max: .22, size: .9, col: CC_COL.arcane }); for (let k = 0; k < 6; k++) part({ k: 'spark', x, z, h: R(.3, .9), vx: R(-.8, .8), vz: R(-.8, .8), vh: R(-.2, .6), g: 0, drag: 3, life: .3, max: .3, size: .05, col: '#e8d8ff' }); }
   sfx('phase', 0);
 }
 function ccGhostFx(t, c) { part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .2, max: .2, size: .6, col: '#d8c0ff' }); rfx({ k: 'slash', x: c.x, h: hitH(c), z: c.y, a: R(TAU), r: .3, col: '#d8c0ff', life: .2 }); }
 function ccRingFx(x, z, r, col) { if (typeof sfxCasterRing === 'function' && sfxCasterRing('ring', x, z)) return; part({ k: 'ring', x, z, h: .05, life: .4, max: .4, size: r, col }); }
 
-// ---- Magelings: seeking magic missiles (twin casting, swarms, echoes, homing runes, sparks, torrents) ----
+// ---- Magelings: seeking magic missiles (twin casting, swarms, echoes, homing missiles, sparks, torrents) ----
 function ccMissile(t, st, c, pow, o) {
   o = o || {};
   const [hx, hh, hz] = ccHand(t), side = ((t.ccMisN = (t.ccMisN || 0) + 1) % 2 ? 1 : -1) * (o.spread || 1), a = t.ang || 0;
@@ -12627,11 +12686,11 @@ function ccMissile(t, st, c, pow, o) {
 }
 function ccMissileHit(t, st, c, pow, p, o) {
   const C = st.caps, amt = st.dmg * pow * (o.k || 1), was = !c.dead;
-  const runes = st.pw && st.pw.ccGrimoire && !o.split ? ccRunesOn(c) : null;   // (the First Grimoire reads the runes before the hit can spend one)
-  ccHit(t, st, c, amt, o.noWeave ? { noWeave: true } : {});   // (Echoing Missiles: ccWeavesOf)
-  if (runes && runes.length) ccGrimoire(t, st, c, runes, pow);
+  const marks = st.pw && st.pw.ccGrimoire && !o.split ? ccMarksOn(c) : null;   /* (the First Grimoire reads the marks before the hit can react with one) */
+  ccHit(t, st, c, amt, o.noRx ? { noRx: true } : {});   /* (Echoing Missiles: ccRidersOf) */
+  if (marks && marks.length) ccGrimoire(t, st, c, marks, pow);
   part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .16, max: .16, size: .5, col: CC_COL.arcane });
-  if (was && c.dead && C.ccSeek && (p.kn || 0) < C.ccSeek) {   // Homing Runes: a killing missile flies on
+  if (was && c.dead && C.ccSeek && (p.kn || 0) < C.ccSeek) {   /* Homing Missiles: a killing missile flies on */
     const hit = p.hit || new Set(); hit.add(c);
     const o2 = nearest(c.x, c.y, 2, 1, c, q => !hit.has(q) && canTarget(t, st, q))[0];
     if (o2) ccShoot({ k: 'missile', x: c.x, h: hitH(c), z: c.y, tg: o2, spd: 7, turn: 7, seek: true, col: CC_COL.arcane, sz: .9, kn: (p.kn || 0) + 1, hit, fn: (q, pp) => { if (q) ccMissileHit(t, t.st || st, q, pow, pp, { k: o.k }); } });
@@ -12655,51 +12714,45 @@ FORCE_ATTACK.cc_missile = function (t, st, tg, pow, echo) {
   if (p.ccHat && !echo && n % 4 === 0) for (let q = 0; q < 3; q++) G.delayed.push({ t: .06 * q, fn: () => { if (ccAlive(t) && !tg.dead) tagged('relic', () => ccMissile(t, t.st || st, tg, p.ccHat, { sz: .6, spread: 2.2, spd: 7 })); } });   // the Starry Hat
   t.recoil = 1;
 };
-// the First Grimoire: a missile that strikes a foe bearing another school's rune splits, and each split missile seeks a
-// foe without that rune and writes it there (runes: the rune list taken before the hit, as a weave may spend one)
+// the First Grimoire: a missile that strikes a foe bearing another element's mark splits, and each split missile seeks a
+// foe without that mark and lays it there (marks: the list taken before the hit, as a reaction may clear them)
 const ccGrimoireN = k => k >= 1.4 ? 3 : 2;
-function ccGrimoire(t, st, c, runes, pow) {
-  const L = runes.filter(s => s !== 'arcane'); if (!L.length) return;
+function ccGrimoire(t, st, c, marks, pow) {
+  const L = marks.filter(s => s !== 'arcane'); if (!L.length) return;
   const n = ccGrimoireN(st.pw.ccGrimoire), hit = new Set([c]);
   for (let j = 0; j < n; j++) {
     const s = L[j % L.length], o2 = nearest(c.x, c.y, 1.8, 1, c, q => !hit.has(q) && !ccHas(q, s) && canTarget(t, st, q))[0];
     if (!o2) break;
     hit.add(o2);
-    ccShoot({ k: 'missile', x: c.x, h: hitH(c), z: c.y, tg: o2, spd: 7, turn: 7, seek: true, col: CC_COL[s], sz: .75, fn: (q) => { if (!q || !ccAlive(t)) return; tagged('relic', () => ccMissileHit(t, t.st || st, q, pow, {}, { k: .5, split: 1 })); if (!q.dead) ccRune(q, s, t); } });
+    ccShoot({ k: 'missile', x: c.x, h: hitH(c), z: c.y, tg: o2, spd: 7, turn: 7, seek: true, col: CC_COL[s], sz: .75, fn: (q) => { if (!q || !ccAlive(t)) return; tagged('relic', () => ccMissileHit(t, t.st || st, q, pow, {}, { k: .5, split: 1 })); if (!q.dead) ccMark(q, s, t); } });
   }
   relicGlint(t, 'cc_l_grimoire'); ccEv('item:cc_l_grimoire');
 }
 
-// ---- Rimeweavers: chilling ice bolts; every 3rd writes a frost glyph ----
+// ---- Frostweavers: chilling ice bolts that mark Frost (her spells: forces_zzzzzzzzzzz_frost_conclave.js) ----
 FORCE_ATTACK.cc_rime = function (t, st, tg, pow, echo) {
   const C = st.caps, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t) * .95);
-  const glyph = !echo && (n % (C.ccGlyph2 ? 2 : 3) === 0 || (st.pw && st.pw.ccWinterAll));
   const still = C.ccStill && !echo && n % 3 === 0, flash = C.ccFlash && !echo && n % 4 === 0;
   ccShoot({ k: 'ice', x: hx, h: hh, z: hz, tg, spd: 8, col: CC_COL.frost, sz: still ? 1.5 : 1, fn: c => {
     const s = t.st || st; if (!c) return;
     const amt = s.dmg * pow * (C.ccColdStone && ccHas(c, 'stone') ? 1 + .15 * C.ccColdStone : 1);   // Cold Stone
-    ccHit(t, s, c, amt, {});   // (Entomb: ccWeavesOf)
+    ccHit(t, s, c, amt, {});   /* (Entomb: ccRidersOf) */
     if (c.dead) return;
     chill(c, { slow: s.slow || .25, slowT: s.slowT || 1.5 }, 'frost', t);
     if (flash) ccFreeze(t, c, .25 * C.ccFlash);   // Flash Freeze
     if (still) { ccEv('cap:ccStill'); ccFreeze(t, c, .8); inSplash(c.x, c.y, .8, false, o => { if (o !== c) chill(o, { slow: .5, slowT: 1.5 }, 'frost', t); }); ccRingFx(c.x, c.y, .8, '#dff6ff'); }   // Absolute Stillness
-    if (glyph && ccWalker(c)) ccFrostGlyph(t, s, c.x, c.y, 1);
+    if (!echo && typeof ccrSecond === 'function') ccrSecond(t, s, c);
     fxShards(c.x, c.y, hitH(c), 4);
   } });
   t.recoil = 1;
 };
-// a freeze from a Rimeweaver: Cold Library pays mana for it
+// a freeze from a Frostweaver: Cold Library pays mana for it
 function ccFreeze(t, c, d) {
   const was = c.stunT > 0 && c.stunEl === 'frost';
   freezeFoe(c, d, t);
   if (!was && c.stunT > 0 && c.stunEl === 'frost') { const C = ccCaps(t); if (C.ccColdMana) gainMana(t, 8 * C.ccColdMana); }
 }
-function ccHoarBurst(t, st, c) {   // Hoarfrost Weave: an entombed foe that dies bursts its ice
-  const x = c.x, z = c.y;
-  inSplash(x, z, 1, true, o => { if (!o.dead) freezeFoe(o, .6, t); }); ccEv('cap:ccHoar');
-  fxShards(x, z, .5, 14); ccRingFx(x, z, 1, '#e6fbff'); sfx('shatter', 2);
-}
-// a Rimeweaver's frost glyph (o: { r, t } for an ability's own): Wide Glyphs, Rime Field, Glacier Script and its relics apply
+// a Frostweaver's frost glyph (o: { r, t } for an ability's own): Wide Glyphs, Rime Field, Glacier Script and its relics apply
 function ccFrostGlyph(t, st, x, z, m, o) {
   const C = st.caps || {}, p = st.pw || {}, w = .1 * (C.ccGlyphW || 0);
   if (p.ccWinter) ccEv('item:cc_l_winter');
@@ -12707,7 +12760,7 @@ function ccFrostGlyph(t, st, x, z, m, o) {
     slow: .4 + (p.ccCirclet || 0), dmg: C.ccRimeDmg ? st.dmg * .2 : 0, frz: C.ccGlacier ? .6 : p.ccWinter || 0, mark: p.ccCirclet ? 'frost' : null });
 }
 
-// ---- Chronomancers: golden bolts that slow the strongest foe in reach (weaves: Paradox) ----
+// ---- Chronomancers: golden bolts that slow the strongest foe in reach (riders: Paradox) ----
 FORCE_ATTACK.cc_chrono = function (t, st, tg, pow, echo) {
   const C = st.caps, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t) * .9);
   const moment = C.ccMoment && !echo && n % 4 === 0, bell = C.ccBell && !echo && G.time >= (t.ccBellT || 0);
@@ -12715,7 +12768,7 @@ FORCE_ATTACK.cc_chrono = function (t, st, tg, pow, echo) {
   ccShoot({ k: 'chrono', x: hx, h: hh, z: hz, tg, spd: 6.5, col: CC_COL.chrono, sz: 1, fn: c => {
     const s = t.st || st; if (!c) return;
     const amt = s.dmg * pow * (C.ccClockArc && ccHas(c, 'arcane') ? 1 + .12 * C.ccClockArc : 1);   // Arcane Clockwork
-    ccHit(t, s, c, amt, {});   // (Paradox: ccWeavesOf)
+    ccHit(t, s, c, amt, {});   /* (Paradox: ccRidersOf) */
     if (c.dead) return;
     chill(c, { slow: s.slow || .25, slowT: s.slowT || 1.8 }, null, t);
     if (C.ccStopped) {   // Stopped Clock: slowed by it 3s in a row, the foe stops
@@ -12735,10 +12788,10 @@ function ccRewind(t, st, c, d, amt, again) {
   if (Math.hypot(c.x - x0, c.y - z0) > .05) { rfx({ k: 'drag', x0, z0, x1: c.x, z1: c.y, h: .3, col: CC_COL.chrono, life: .45 }); }
   const C = st && st.caps || {};
   if (C.ccRewound) { c.ccRewT = G.time + 3; c.ccRewK = .08 * C.ccRewound; }   // Rewound Wounds
-  if (again && !c.ccLooped) { c.ccLooped = 1; ccEv('cap:ccLoop'); G.delayed.push({ t: 1.5, fn: () => { if (!c.dead && ccAlive(t)) { const x1 = c.x, z1 = c.y; shove(c, d); rfx({ k: 'drag', x0: x1, z0: z1, x1: c.x, z1: c.y, h: .3, col: CC_COL.chrono, life: .45 }); tagged('rx', () => ccHit(t, t.st || st, c, amt, { noRune: true })); } } }); }   // Causality Loop
+  if (again && !c.ccLooped) { c.ccLooped = 1; ccEv('cap:ccLoop'); G.delayed.push({ t: 1.5, fn: () => { if (!c.dead && ccAlive(t)) { const x1 = c.x, z1 = c.y; shove(c, d); rfx({ k: 'drag', x0: x1, z0: z1, x1: c.x, z1: c.y, h: .3, col: CC_COL.chrono, life: .45 }); tagged('rx', () => ccHit(t, t.st || st, c, amt, { noMark: true })); } } }); }   /* Causality Loop */
 }
 
-// ---- Astrologers: star-bolts, twice as hard on flyers (weaves: Comet) ----
+// ---- Astrologers: star-bolts, twice as hard on flyers (riders: Comet) ----
 FORCE_ATTACK.cc_star = function (t, st, tg, pow, echo) {
   const C = st.caps, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t));
   const bolt = (c, k) => ccShoot({ k: 'star', x: hx, h: hh + .1, z: hz, tg: c, spd: 11, col: CC_COL.star, sz: 1, fn: q => { if (q) ccStarHit(t, t.st || st, q, pow * k); } });
@@ -12752,20 +12805,20 @@ FORCE_ATTACK.cc_star = function (t, st, tg, pow, echo) {
 };
 function ccStarHit(t, st, c, pow) {
   const C = st.caps, amt = st.dmg * pow * (C.ccFrostLens && (ccHas(c, 'frost') || c.frostT > 0) ? 1 + .12 * C.ccFrostLens : 1);   // Frost Lens
-  ccHit(t, st, c, amt, {});   // (Comet: ccWeavesOf)
+  ccHit(t, st, c, amt, {});   /* (Comet: ccRidersOf) */
   part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .15, max: .15, size: .55, col: CC_COL.star });
   if (c.fly && !c.dead && C.ccSkybreak) c.lowT = Math.max(c.lowT || 0, G.time + .6 * C.ccSkybreak);   // Skybreaker
 }
-// Comet: a burst of ice around the foe (Celestial Weave: as strong as the hit; Twinkling Ice: colder, and a small glyph)
+// Comet: a burst of ice around the foe (Twinkling Ice: colder, and a small glyph)
 function ccComet(t, st, c, amt) {
-  const C = st.caps || {}, x = c.x, z = c.y, r = 1 + .1 * (C.ccTwinkle || 0), m = C.ccCelestial ? 1 : .6, sl = .3 + .15 * (C.ccTwinkle || 0);
-  tagged('rx', () => inSplash(x, z, r, false, o => { if (o.ent || o === c) return; ccHit(t, st, o, amt * m, { noWeave: true }); if (!o.dead) chill(o, { slow: sl, slowT: 2 }, 'frost', t); }));
+  const C = st.caps || {}, x = c.x, z = c.y, r = 1 + .1 * (C.ccTwinkle || 0), m = .6, sl = .3 + .15 * (C.ccTwinkle || 0);
+  tagged('rx', () => inSplash(x, z, r, false, o => { if (o.ent || o === c) return; ccHit(t, st, o, amt * m, { noRx: true }); if (!o.dead) chill(o, { slow: sl, slowT: 2 }, 'frost', t); }));
   chill(c, { slow: sl, slowT: 2 }, 'frost', t);
   if (C.ccTwinkle && !c.fly) ccGlyph({ s: 'frost', sub: 'glyph', x, z, r: .5, t: 2, src: t, st, slow: .3 });
   fxShards(x, z, hitH(c), 10); ccRingFx(x, z, r, '#d8f2ff'); part({ k: 'flare', x, z, h: hitH(c), life: .25, max: .25, size: 1.1, col: '#e8f8ff' });
 }
 
-// ---- Golem Wardens: the golem slams every walker beside it (weaves: Magma) ----
+// ---- Golem Wardens: the golem slams every walker beside it (riders: Deep Magma) ----
 FORCE_ATTACK.cc_slam = function (t, st, tg, pow, echo) {
   const C = st.caps, p = st.pw || {}, n = t.shots + 1, r = st.range + (p.ccTitan ? .5 : 0), core = C.ccCore && pow > 1.01;
   const wave = p.ccHeart && !echo && n % 4 === 0, R0 = wave ? r + 1 : r;
@@ -12777,7 +12830,7 @@ FORCE_ATTACK.cc_slam = function (t, st, tg, pow, echo) {
     const amt = st.dmg * pow * mtn * (C.ccEmber && (ccHas(c, 'fire') || c.burnT > 0) ? 1 + .12 * C.ccEmber : 1) * (C.ccShatterG && c.stunT > 0 ? 1 + .15 * C.ccShatterG : 1);   // Ember Stone, Shatterground
     if (typeof isPlate === 'function' && isPlate(c)) { c.shred = Math.max(c.shredT > 0 ? c.shred : 0, c.armor); c.shredT = Math.max(c.shredT, 3); }   // the slam cracks plate open (game.js plateK)
     if (c.mwMax > 0 && typeof epWardOpen === 'function') epWardOpen(c, 1, EP.wardSlam);   // and a ward (enemypools.js): every spell hit goes through while it is open
-    ccHit(t, st, c, amt, { type: 'phys', kb: [(c.x - t.x) / (d || 1) * .08, (c.y - t.y) / (d || 1) * .08] });   // (Magma: ccWeavesOf)
+    ccHit(t, st, c, amt, { type: 'phys', kb: [(c.x - t.x) / (d || 1) * .08, (c.y - t.y) / (d || 1) * .08] });   /* (Magma: ccRidersOf) */
     if (c.dead) continue;
     if (C.ccStagger && c === tg) stun(c, .15 * C.ccStagger, .4, null);   // Staggering Blow
     if (core) shove(c, .3);   // Runic Core
@@ -12803,7 +12856,7 @@ function ccGolemAt(t) {
   return [t.x + (Math.sin(a) * .18 + Math.cos(a) * -.12) * K, 0, t.y + (Math.cos(a) * .18 - Math.sin(a) * -.12) * K];
 }
 
-// ---- Pyroclasts: lobbed fireballs that burst and burn; every 3rd leaves a burning glyph (weaves: Shatter) ----
+// ---- Pyroclasts: lobbed fireballs that burst and burn; every 3rd leaves a burning glyph (riders: Ember Heart) ----
 FORCE_ATTACK.cc_fireball = function (t, st, tg, pow, echo) {
   const C = st.caps, p = st.pw || {}, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t) * .85);
   if (C.ccGreat && pow > 1.01) ccEv('cap:ccGreat');
@@ -12819,7 +12872,7 @@ function ccFireBurst(t, st, x, z, pow, o) {
   inSplash(x, z, sp, true, (c, d) => { if (canTarget(t, st, c) && !c.ent) hit.push([c, d]); });
   for (const [c, d] of hit) {
     const amt = st.dmg * pow * (o.k || 1) * (1 - .4 * d / sp) * (C.ccFrostfire && (ccHas(c, 'frost') || c.frostT > 0) ? 1 + .12 * C.ccFrostfire : 1);   // Frostfire Study
-    ccHit(t, st, c, amt, { kb: [(c.x - x) / (d || 1) * .2, (c.y - z) / (d || 1) * .2] });   // (Shatter: ccWeavesOf)
+    ccHit(t, st, c, amt, { kb: [(c.x - x) / (d || 1) * .2, (c.y - z) / (d || 1) * .2] });   /* (Shatter: ccRidersOf) */
     if (!c.dead) ignite(c, amt * .1, 2 + (C.ccLinger || 0), t, false);
   }
   if (C.ccCinder && hit.length >= 5 - C.ccCinder) ccGain(t, 1);   // Kindled Fingers
@@ -12847,8 +12900,7 @@ function ccShards(t, st, c, amt) {
   const C = st.caps;
   if (C.ccThermal && !c.dead) stun(c, .2 * C.ccThermal, .4, null);   // Thermal Shock
   for (const o of nearest(c.x, c.y, 1.2, 3, c, q => canTarget(t, st, q))) {
-    tagged('rx', () => ccHit(t, st, o, amt * .5, { noRune: !C.ccShatterAll, noWeave: true }));
-    if (C.ccShatterAll && !o.dead) ccRune(o, 'frost', t);
+    tagged('rx', () => ccHit(t, st, o, amt * .5, { noMark: true }));
     G.bolts.push({ pts: [[c.x, hitH(c), c.y], [o.x, hitH(o), o.y]], life: .14, max: .14, col: [.85, .95, 1.2] });
   }
   fxShards(c.x, c.y, hitH(c), 12); sfx('shatter', 2);
@@ -12867,10 +12919,11 @@ FORCE_HOOKS.conclave = {
       if (n === 1) st.rate /= 1 + .15 * C.ccLone;
     }
     if (t.ccBorrowT > G.time && st.rate) st.rate /= 1 + (t.ccBorrowK || 0);   // Borrowed Time (from a Chronomancer near it)
+    if (st.rate && ccLinksOf(t)) st.rate /= 1 + CC_LINK_AS;   /* a linked pair strikes faster */
     if (typeof ccItemsLive === 'function') ccItemsLive(t, st);
     if (G.hero === 'cc_chrono' && !G.vs) sh(st).cdK *= .9;   // Aurel: Conclave abilities recharge 10% faster
   },
-  // damage taken by a foe: Brittle, Grounded Stars, Rewound Wounds, Spellbreaker, Runic Amplifier, Runecutter, items, Stopped Hour
+  // damage taken by a foe: Brittle, Grounded Stars, Rewound Wounds, Spellbreaker, Ley Amplifier, Elementcutter, items, Stopped Hour
   amp(c, src, dot) {
     let a = 0;
     if (c.stunT > 0 && c.stunEl === 'frost') a += .06 * talentHas('frost', 'ccBrittle');
@@ -12878,15 +12931,15 @@ FORCE_HOOKS.conclave = {
     if (c.ccRewT > G.time) a += c.ccRewK || 0;
     if (c.ccStopT > G.time) a += .25;   // Aurel's Stopped Hour
     if (!src || !src.def || !ccUnit(src)) return a;
-    if (G.hero === 'cc_arch' && !G.vs && ccRunesOn(c).length >= 2) a += .1;   // Maelis: a foe woven with two schools' runes
+    if (G.hero === 'cc_arch' && !G.vs && ccReacted(c, 2)) a += .1;   /* Maelis: a foe that reacted in the last 2s */
     const C = (src.st && src.st.caps) || {};
     if (DTAG === 'abil') {
       if (c.ccBrkT > G.time) a += c.ccBrkK || 0;   // Spellbreaker
-      if (ccFoeInLey(c, 'ccAmplify')) a += .08;   // Runic Amplifier
+      if (ccFoeInLey(c, 'ccAmplify')) a += .08;   /* Ley Amplifier */
     }
     if (!dot) {
-      if (C.ccRunecut && ccRunesOn(c).some(s => s !== 'arcane')) a += .1 * C.ccRunecut;   // Runecutter
-      if (C.ccReader && (ccHas(c, 'chrono') || ccHas(c, 'frost'))) a += .12 * C.ccReader;   // Rune Reader
+      if (C.ccRunecut && ccMarksOn(c).some(s => s !== ccSchool(src))) a += .1 * C.ccRunecut;   /* Elementcutter */
+      if (C.ccReader && (ccHas(c, 'chrono') || ccHas(c, 'frost'))) a += .12 * C.ccReader;   /* Element Reader */
       if (C.ccSpellbrk) { c.ccBrkT = G.time + 3; c.ccBrkK = Math.max(c.ccBrkT > G.time ? c.ccBrkK || 0 : 0, .06 * C.ccSpellbrk); }
     }
     if (typeof ccItemsAmp === 'function') a += ccItemsAmp(c, src, dot);
@@ -12896,7 +12949,6 @@ FORCE_HOOKS.conclave = {
     if (G.state !== 'play') return;
     if (c.ccOmen && c.ccOmen.until > G.time && typeof ccOmenFall === 'function') ccOmenFall(c, true);   // Omen: the star falls where it died
     if (c.ccKindle && typeof ccKindleBurst === 'function') ccKindleBurst(c);   // Kindle
-    if (c.ccTombBy && ccCaps(c.ccTombBy).ccHoar && c.stunT > 0 && c.stunEl === 'frost' && G.towers.includes(c.ccTombBy)) ccHoarBurst(c.ccTombBy, c.ccTombBy.st, c);   // Hoarfrost Weave
     if (!src || !ccUnit(src)) return;
     const C = ccCaps(src);
     if (C.ccFeed && c.burnT > 0 && src.ab) gainMana(src, 14);   // Fire Feeds Mana
@@ -12907,9 +12959,9 @@ FORCE_HOOKS.conclave = {
   fire(t, st, tg, pow, echo) {
     if (!ccUnit(t)) return pow;
     if (!echo) { const pd = st.pw && st.pw.ccPend && (t.shots + 1) % st.pw.ccPend === 0; ccGain(t, pd ? 2 : 1); if (pd) ccEv('item:cc_pendulum'); }   // (the Pendulum of Timing)
-    if (t.ccStaffN > 0 && !echo) {   // the Staff of the First Archmage: an empowered strike, its rune on the foes round its foe
+    if (t.ccStaffN > 0 && !echo) {   /* the Staff of the First Archmage: an empowered strike, its mark on the foes round its foe */
       t.ccStaffN--; pow *= 1 + (t.ccStaffK || 1);
-      if (tg && ccSchool(t)) { for (const q of nearest(tg.x, tg.y, 1, 8, null)) ccRune(q, ccSchool(t), t); ccRingFx(tg.x, tg.y, 1, CC_COL[ccSchool(t)]); }
+      if (tg && ccSchool(t)) { for (const q of nearest(tg.x, tg.y, 1, 8, null)) ccMark(q, ccSchool(t), t); ccRingFx(tg.x, tg.y, 1, CC_COL[ccSchool(t)]); }
       part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t), life: .2, max: .2, size: .8, col: '#9a7cff' });
     }
     if (G.champ === t.id && G.hero && !G.vs && typeof ccChampFire === 'function') pow = ccChampFire(t, st, tg, pow, echo);
@@ -12948,7 +13000,7 @@ FORCE_HOOKS.conclave = {
     ccProjTick(dt);
     if (G.ccOmens && G.ccOmens.length) for (const c of G.ccOmens.slice()) if (!c.dead && c.ccOmen && c.ccOmen.until <= G.time && typeof ccOmenFall === 'function') ccOmenFall(c, false);
     if (G.ccKindles && G.ccKindles.length) for (const c of G.ccKindles.slice()) if (!c.dead && c.ccKindle && c.ccKindle.at <= G.time && typeof ccKindleBurst === 'function') ccKindleBurst(c);
-    // Ley Moorings: runes on foes inside an anchoring Obelisk's aura do not fade
+    // Ley Moorings: marks on foes inside an anchoring Obelisk's aura do not fade
     const L = ccLeyMap().obs.filter(o => o.hs.caps.ccAnchor);
     if (L.length) for (const c of G.creeps) if (!c.dead && c.ccR && L.some(o => Math.hypot(c.x - o.h.x, c.y - o.h.y) <= (o.hs.auraR || 1.7) + .05)) for (const s in c.ccR) if (c.ccR[s] > G.time) c.ccR[s] = Math.max(c.ccR[s], G.time + .5);
     if (typeof ccItemsTick === 'function') ccItemsTick(dt);
@@ -12988,7 +13040,7 @@ function ccObelisk(h, hs, dt) {
     h.ccStormT = 6; let n = 0;
     for (const c of G.creeps) {
       if (c.dead || c.ent || Math.hypot(c.x - h.x, c.y - h.y) > r) continue;
-      const rs = ccRunesOn(c); if (rs.length < 2) continue;
+      const rs = ccMarksOn(c); if (rs.length < 2) continue;
       for (const s of rs) c.ccR[s] = 0;
       const d = c.maxHp * (c.def.boss ? .01 : .05) * rs.length;
       tagged('rx', () => hurt(c, d, 'pure', h, false, null)); n++;
@@ -13000,7 +13052,7 @@ function ccObelisk(h, hs, dt) {
 const VLIVE_OK = () => typeof VLIVE === 'undefined' || VLIVE;
 
 /* =====================================================================================================
-   DRAWING the Conclave's world once a frame (called from the units' FORCE_EXTRA): glyphs on the road, runes on foes,
+   DRAWING the Conclave's world once a frame (called from the units' FORCE_EXTRA): glyphs on the road, element marks on foes,
    the projectiles, Omens, Kindles and Conduits. Uses the view's quad batches (QG, QA, QADD).
    ===================================================================================================== */
 let _ccDrawn = -1;
@@ -13011,6 +13063,9 @@ function ccWorld() {
   const nv = typeof sfxBaOn === 'function' && sfxBaOn();   // (the spell effects draw these themselves: spellfx.js)
   for (const z of G.hazards) if (z.k === 'cc_glyph' && !(nv && z.abId && typeof SFX_V2 !== 'undefined' && SFX_V2[z.abId])) ccDrawGlyph(z);   // (a spell's glyph: its zone in spellfx; a basic attack's own glyph keeps this)
   for (const c of G.creeps) if (!c.dead) ccDrawFoe(c);
+  if (CC_RIFTCUT.on && !(typeof sfxBaOn === 'function' && sfxBaOn())) for (const t of G.towers) if (t.ccBlink && t.ccBlink.cut && G.time - t.ccBlink.at < 1.2) ccDrawSeams(t);   /* (the plain look; spellfx.js sfxRiftSeams draws them otherwise) */
+  for (const t of G.towers) { const L = ccLinksOf(t); if (!L) continue;   /* a linked unit: a soft glow of its partner's colour at its base, breathing */
+    const col = c4(CC_COL[L[0].def.ccSchool] || '#b98cff'), f = .75 + .25 * Math.sin(vt * 2.2 + t.x); QADD.ground(t.x, t.y, .028, .42, .42, [col[0], col[1], col[2], .3 * f], 1, 0); }
   for (const p of G.ccP || []) ccDrawProj(p);
   for (const t of G.towers) if (t.ccConduitT > G.time && t.ccConduitBy && G.towers.includes(t.ccConduitBy)) {   // Ley Conduit: the beam from the Obelisk
     const h = t.ccConduitBy, f = .7 + .3 * Math.sin(vt * 9);
@@ -13033,7 +13088,7 @@ function ccDrawGlyph(z) {
     QG.ground(z.x, z.z, .03, r, r, [.3, .22, .14, .45 * a], 2, 0); QADD.ground(z.x, z.z, .04, r, r, ca(.9, .7), 3, .05); QADD.ground(z.x, z.z, .041, r * .9, r * .9, ca(.8, .45), 11, z.x * 3);
     QADD.ground(z.x, z.z, .042, r * .55, r * .55, ca(1, .5), 7, .1, rot); return;
   }
-  // frost, fire and the rest: a rune seal of two squares in a ring, turning
+  // frost, fire and the rest: a seal of two squares in a ring, turning
   const fl = s === 'fire' ? .8 + .2 * Math.sin(vt * 11 + z.x * 5) : 1;
   QG.ground(z.x, z.z, .03, r, r, s === 'fire' ? [.2, .06, .02, .45 * a] : [.7, .85, 1, .22 * a], 2, 0);
   QADD.ground(z.x, z.z, .04, r, r, ca(fl, .85), 3, .07); QADD.ground(z.x, z.z, .041, r * .86, r * .86, ca(fl, .55), 4, .05, rot);
@@ -13044,19 +13099,29 @@ function ccDrawGlyph(z) {
 function ccDrawFoe(c) {
   const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), base = c.fly && !(c.lowT > G.time) ? .9 : .06;
   if (c.ccR) {
-    const rs = ccRunesOn(c);
-    if (rs.length && !(typeof sfxRunes === 'function' && sfxRunes(c, rs, x, z))) {   // (the runes' own glyphs: spellfx.js)
-      const r = .2 + (c.def.r || .3) * .8;
-      rs.forEach((s, i) => { const an = vt * 1.8 + i / rs.length * TAU + c.id, col = c4(CC_COL[s]), left = Math.min(1, (c.ccR[s] - G.time) * 1.5);
-        QADD.ground(x + Math.cos(an) * r, z + Math.sin(an) * r, base + .02, .085, .085, [col[0], col[1], col[2], .95 * left], 7, .25, an);
-        QADD.ground(x + Math.cos(an) * r, z + Math.sin(an) * r, base + .021, .16, .16, [col[0], col[1], col[2], .45 * left], 1, 0); });
-      if (rs.length >= 2) QADD.ground(x, z, base + .015, r * 1.15, r * 1.15, [.85, .7, 1, .35], 4, .05, -vt);
+    const rs = ccMarksOn(c);
+    if (rs.length && !(typeof sfxMarks === 'function' && sfxMarks(c, rs, x, z))) {   /* (the marks' own icons over the health bar: spellfx.js) */
+      const top = (typeof creepBaseY === 'function' ? creepBaseY(c) + creepH(c) : hitH(c) + .3) + .34, n = rs.length;   /* (one small icon a mark, over the health bar) */
+      rs.forEach((s, i) => { const col = c4(CC_COL[s]), left = Math.min(1, (c.ccR[s] - G.time) * 1.5), px = x + (i - (n - 1) / 2) * .17;
+        QADD.bill(RD, px, top, z, .13, .13, [col[0], col[1], col[2], .95 * left], 1, 0); QADD.bill(RD, px, top, z, .07, .07, [1, 1, 1, .9 * left], 1, 0); });
     }
   }
   const nvf = typeof sfxBaOn === 'function' && sfxBaOn();   // (the Omen's and Kindle's signs: under the foe in spellfx, never hanging over it)
   if (c.ccOmen && c.ccOmen.until > G.time && !nvf) { const f = .6 + .4 * Math.sin(vt * 6); QADD.bill(RD, x, hitH(c) + .55, z, .32 * f, .32 * f, [.95, .97, 1, .9], 1, 0); QADD.bill(RD, x, hitH(c) + .55, z, .1, .3, [1, 1, 1, .9], 5, 0, vt); QADD.bill(RD, x, hitH(c) + .55, z, .3, .1, [1, 1, 1, .9], 5, 0, vt); }
   if (c.ccKindle && !c.dead && !nvf) { const u = clamp(1 - (c.ccKindle.at - G.time) / 2, 0, 1), f = .5 + .5 * Math.sin(vt * (8 + 14 * u)); QADD.bill(RD, x, hitH(c), z, .3 + .25 * u * f, .3 + .25 * u * f, [1, .55, .15, .85], 1, 0); }
   if (c.ccStopT > G.time) QADD.ground(x, z, .05, .45, .45, [1, .85, .4, .7], 4, .08, 0);
+}
+// the two seams of a rift cut: one where the blade opens it (it snaps shut as they step in), one where they step out
+function ccDrawSeam(x, z, h, a, u) {
+  if (u <= 0 || u >= 1) return;
+  const o = u < .3 ? u / .3 : 1 - (u - .3) / .7, L = CC_RIFTCUT.len * (.35 + .65 * Math.min(1, u / .3)), ca = Math.cos(a), sa = Math.sin(a);
+  const p0 = [x - L * .55, h + L * .55, z], p1 = [x + L * .55, h - L * .55, z];
+  QA.beam(RD, p0, p1, .075 * o, [.78, .22, .86, .75 * o]); QADD.beam(RD, p0, p1, .13 * o, [.95, .35, .9, .3 * o]); QADD.beam(RD, p0, p1, .03 * o, [1, .9, 1, o]);
+}
+function ccDrawSeams(t) {
+  const B = t.ccBlink, age = G.time - B.at, T = Math.max(.15, B.T || .3), h = towerTop(t) * .6, a = (B.a || 0) + Math.PI / 2;
+  ccDrawSeam(B.x0 + Math.sin(B.a || 0) * .15, B.z0 + Math.cos(B.a || 0) * .15, h, a, age / CC_RIFTCUT.open);
+  ccDrawSeam(B.x1, B.z1, h, a, (age - T * CC_RIFTCUT.out) / CC_RIFTCUT.open);
 }
 function ccDrawProj(p) {
   if (typeof sfxBasicCC === 'function' && sfxBasicCC(p)) return;   // (drawn by spellfx.js)
@@ -13079,11 +13144,24 @@ function ccDrawProj(p) {
   QADD.bill(RD, p.x, p.h, p.z, .2 * s, .2 * s, [col[0], col[1], col[2], .95], 1, 0); QADD.bill(RD, p.x, p.h, p.z, .07 * s, .07 * s, [1, .95, 1, 1], 1, 0);
 }
 
+// the Spellbook (spellbook.js): the unit's element, the rule and the reaction table, under its name
+function ccSpellbookHTML(U, S, f) {
+  if (f !== 'conclave' || !U || !U.def) return '';
+  const el = U.def.ccSchool, esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const own = U.id === 'ch_maelis' ? 'Arcane, Frost and Fire in turn' : (CC_EL_NAME[el] || 'none');
+  const rows = Object.keys(CC_RX).map(id => { const X = CC_RX[id], with_ = X.pair ? X.pair.map(e => CC_EL_NAME[e]).join(' + ') : CC_EL_NAME[X.any] + ' + any';
+    const mine = (U.id === 'ch_maelis' ? ['arcane', 'frost', 'fire'] : [el]).some(m => CC_SCHOOLS.some(e => ccRxOf(m, e) === id));
+    return `<li${mine ? ' style="color:#fff"' : ''}><b style="color:${X.col}">${esc(X.name)}</b> (${esc(with_)}): ${esc(X.text)}</li>`; }).join('');
+  return `<article class="spbk-spell spbk-elements" style="--sc:${(el && CC_COL[el]) || '#b98cff'}"><header class="spbk-sh"><div><h4>Element: ${esc(own)}</h4><small>Every hit marks its foe for ${CC_MARK_T}s · a different element on a marked foe sets off a reaction</small></div></header>
+    <section><h5>The rule</h5><p>Mix your schools so their attacks overlap. Two different elements on one foe react and both marks clear; one school alone never reacts. A foe reacts at most once every ${CC_RX_CD}s. Reactions grow with the strike of the unit that sets them off.</p></section>
+    <section><h5>Reactions</h5><ul style="margin:0;padding-left:1.1em">${rows}</ul></section></article>`;
+}
+
 /* ================= THE CONCLAVE: bodies, poses and what is drawn live round them =================
    Puppets of simple shapes, as the Grove's are, drawn a little larger than life so they read from the top-down camera:
    big heads, big hands, big props, shaped after each unit's card (assets/unit-art), in the cards' violet families
    (Spellblades deep-hooded in violet with a huge rune blade, Magelings white-haired in white and gold with rings of runes
-   at the hand, Rimeweavers hooded in patterned indigo with an ice-crowned dark staff, Chronomancers white-maned in purple
+   at the hand, Frostweavers hooded in patterned indigo with an ice-crowned dark staff, Chronomancers white-maned in purple
    and gold with a blue hourglass and a clock dial, Astrologers silver-haired in violet with a brass telescope-staff and
    orrery, Golem Wardens behind a hulking violet rune-golem, Pyroclasts white-haired in plum round a fireball, the Obelisk
    a teal crystal over a dais). Every unit has a body for each tier I-VI (TOWERS[ty].visTiers = 6): a little bigger each tier
@@ -13285,7 +13363,7 @@ Object.assign(FORCE_BUILD, {
     if (tier >= 2) { ccM(g, 'gilt', () => g.cyl(0, hy + hr * .5, -hr * .05, hr * 1.06, hr * 1.06, .018, 12, CP.trim, { capT: false })); ccEm(g, .9, () => g.ico(0, hy + hr * .6, hr * 1.0, .02, CP.glow)); }   // a gold circlet, a blue stone in it
     if (tier >= 4) ccEm(g, .9, () => g.with(T(0, hy + hr * .2, -hr * 1.5, 0, Math.PI / 2), () => { g.torus(0, 0, 0, hr * 1.7, .008, 20, 3, CP.glow); for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; g.box(Math.cos(a) * hr * 1.7, 0, Math.sin(a) * hr * 1.7, .022, .01, .022, CP.star); } }));   // a rune ring standing behind her head (V+)
   }),
-  // ---- Rimeweaver (card: a hooded, dark-haired sorceress in a deep indigo robe patterned in pale blue, a tall dark
+  // ---- Frostweaver (card: a hooded, dark-haired sorceress in a deep indigo robe patterned in pale blue, a tall dark
   //      staff crowned with ice crystal: a part) ----
   cc_rimeweaver: ccBody0('cc_rimeweaver', (g, tier) => {
     ccBase(g, tier);
@@ -13386,6 +13464,8 @@ const CC_PARTS = {
     }, t => {
       const w = t.windup || 0, s = ccShot(t), u = s < .28 ? s / .28 : 1;
       const blink = ccAge(t, 'cc_blinkstrike'), cleave = ccAge(t, 'cc_sigilcleave'), spec = ccAge(t, 'cc_spectral');
+      const B = t.ccBlink, rc = B && B.cut && typeof G !== 'undefined' ? G.time - B.at : 9;
+      if (rc >= 0 && rc < CC_RIFTCUT.slash) { const e = ccEase(rc / CC_RIFTCUT.slash); return [-1.5 + 1.7 * e, .7 - 1.3 * e, .45 - .9 * e, 0, 0, .06]; }   /* the rift cut: a quick diagonal flick, high to low, opening the seam */
       if (blink < .55) { const e = ccPop(blink, 0, .55); return [-.15 + .1 * e, -.25 * e, 0, 0, 0, .14 * e]; }   // Blinkstrike: a straight thrust, arm out
       if (cleave < .5) { const v = ccEase(ccIn(cleave, .05, .4)); return [-.15 - .45 * ccPop(cleave, 0, .12), 1.5 - 3.1 * v, -.25, 0, .02, .04]; }   // Sigil Cleave: a wide, level sweep from one side to the other
       if (spec < .9) { const v = ccEase(ccIn(spec, 0, .25)) * (1 - ccIn(spec, .7, .9)); return [-.2 - 2.1 * v, 0, .1 * Math.sin(spec * 40) * v, 0, .08 * v, 0]; }   // Spectral Edge: the blade raised to the sky
@@ -13665,7 +13745,7 @@ function ccDrawPips(t) {
 
 /* ================= THE CONCLAVE: abilities (three a unit, as abilities.js describes) =================
    Every ability spends the unit's Arcane Charge when it is cast (ccCast: +12% ability power a charge), and its hits are
-   Conclave hits (ccHit): they leave the unit's rune and can weave with the runes they find. Damage is a multiple of the
+   Conclave hits (ccHit): they mark the unit's element and react with the marks they find. Damage is a multiple of the
    unit's live damage D (abD), so it scales with tier, talents, relics and items. Each ability has its own
    pose (forces_conclave_b.js, read from t.ab.last / lastAt) and light (ccExtra, ccWorld). Ids are prefixed cc_. */
 const ccPt = c => c ? { x: c.x, y: c.y } : null;
@@ -13677,18 +13757,18 @@ Object.assign(UNIT_KITS, {
     { id: 'cc_blinkstrike', name: 'Blinkstrike', short: 'Blink', glyph: 'flash', hue: '#c9a0ff', mana: 65, cd: 8, rAdd: 1.6, busy: .5, research: null,
       by: { after: [.75, .75, .9, .9, 1, 1] },
       auto: 'the toughest walker within reach + 1.6 cells (bosses and elites first)',
-      text: (t, st, ab) => `Blinks to a foe up to 1.6 cells beyond its reach and strikes for ${xD(st, 2)}, leaving the arcane rune on it; its afterimage strikes again a moment later for ${xD(st, byT(ab.by.after, t))}.`,
+      text: (t, st, ab) => `Blinks to a foe up to 1.6 cells beyond its reach and strikes for ${xD(st, 2)}, marking it Arcane; its afterimage strikes again a moment later for ${xD(st, byT(ab.by.after, t))}.`,
       pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
       cast(t, st, c, ab) {
         const k = ccCast(t, ab), af = byT(ab.by.after, t);
         ccBlinkTo(t, c, .5); t.cd = Math.max(t.cd, .5);
-        G.delayed.push({ t: .17, fn: () => { if (c.dead || !abLive(t)) return; const s = t.st || st; ccAb(t, s, c, 2, k, { type: 'arcane' }); ccRune(c, 'arcane', t); fxSpark(c.x, c.y, hitH(c), '#e8d8ff', 10); rfx({ k: 'slash', x: c.x, h: hitH(c), z: c.y, a: (t.ang || 0) + .8, r: .42, col: CC_COL.arcane, life: .3 }); sfx('glaiveHit', 1); } });
+        G.delayed.push({ t: .17, fn: () => { if (c.dead || !abLive(t)) return; const s = t.st || st; ccAb(t, s, c, 2, k, { type: 'arcane' }); ccMark(c, 'arcane', t); fxSpark(c.x, c.y, hitH(c), '#e8d8ff', 10); rfx({ k: 'slash', x: c.x, h: hitH(c), z: c.y, a: (t.ang || 0) + .8, r: .42, col: CC_COL.arcane, life: .3 }); sfx('glaiveHit', 1); } });
         G.delayed.push({ t: .5, fn: () => { if (c.dead || !abLive(t)) return; ccAb(t, t.st || st, c, af, k, { type: 'arcane' }); ccGhostFx(t, c); } });
       } },
     { id: 'cc_sigilcleave', name: 'Sigil Cleave', short: 'Cleave', glyph: 'swords', hue: '#b98cff', mana: 90, cd: 12, research: { cost: 60, time: 20 },
       by: { mult: [1.8, 1.8, 2, 2, 2.2, 2.2] },
       auto: 'three or more walkers in reach, or a boss or elite',
-      text: (t, st, ab) => `A wide crescent of arcane through every walker within its reach + 0.3 cells: ${xD(st, byT(ab.by.mult, t))} each, the arcane rune, and a 30% slow for 1.5s.`,
+      text: (t, st, ab) => `A wide crescent of arcane through every walker within its reach + 0.3 cells: ${xD(st, byT(ab.by.mult, t))} each, the Arcane mark, and a 30% slow for 1.5s.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, (st.range || 1.4) + .3, abWalker); return L.length && (L.length >= (man ? 1 : 3) || L.some(abBig)) ? t : null; },
       cast(t, st, _, ab) {
         const k = ccCast(t, ab), m = byT(ab.by.mult, t), r = (st.range || 1.4) + .3;
@@ -13736,14 +13816,14 @@ Object.assign(UNIT_KITS, {
     { id: 'cc_grandorb', name: 'Grand Orb', short: 'Orb', glyph: 'orbbig', hue: '#e0c8ff', mana: 110, cd: 14, busy: .7, research: { cost: 90, time: 30 },
       by: { mult: [3, 3, 3.25, 3.25, 3.5, 3.5] },
       auto: 'the line from it out to its range + 0.5 through the most foes; ties: over the most path, then a boss or elite',
-      text: (t, st, ab) => `Gathers a great orb over its hat, then rolls it out in a line to ${+(abReach(t, st, ab) + .5).toFixed(1)} cells: every foe it passes through takes ${xD(st, byT(ab.by.mult, t))} and the arcane rune. Place the Magelings facing a long straight run of the path.`,
+      text: (t, st, ab) => `Gathers a great orb over its hat, then rolls it out in a line to ${+(abReach(t, st, ab) + .5).toFixed(1)} cells: every foe it passes through takes ${xD(st, byT(ab.by.mult, t))} and an Arcane mark. Place the Magelings facing a long straight run of the path.`,
       pick(t, st, ab) { const len = abReach(t, st, ab) + .5, b = abBestLine(t, st, abFoes(t, st, len), len, .4); return b ? b.c : null; },
       cast(t, st, c, ab) {
         const k = ccCast(t, ab), m = byT(ab.by.mult, t); t.cd = Math.max(t.cd, .8);
         G.delayed.push({ t: .6, fn: () => {
           if (!abLive(t)) return; const s = t.st || st, len = abReach(t, s, ab) + .5, [ux, uz] = abDir(t, c);
           const tg = { x: t.x + ux * len, y: t.y + uz * len, dead: false, fly: false, def: { r: .3 } };   // (the orb rolls to the line's end)
-          for (const o of abLine(t, s, t.x, t.y, ux, uz, len, .4)) { if (o.ent) continue; G.delayed.push({ t: abDist(t, o) / 4.6, fn: () => { if (!o.dead && abLive(t)) { abAoe(() => ccAb(t, s, o, m, k)); ccRune(o, 'arcane', t); } } }); }
+          for (const o of abLine(t, s, t.x, t.y, ux, uz, len, .4)) { if (o.ent) continue; G.delayed.push({ t: abDist(t, o) / 4.6, fn: () => { if (!o.dead && abLive(t)) { abAoe(() => ccAb(t, s, o, m, k)); ccMark(o, 'arcane', t); } } }); }
           ccShoot({ k: 'orb', x: t.x, h: towerTop(t) + .45, z: t.y, tg, spd: 4.6, turn: 3, seek: false, col: '#e0c8ff', sz: 1, fn: (q, p) => {
             const x = p.x, z = p.z;
             part({ k: 'flare', x, z, h: p.h, life: .3, max: .3, size: 1.6, col: '#e0c8ff' }); ccRingFx(x, z, .8, CC_COL.arcane); for (let j = 0; j < 14; j++) part({ k: 'spark', x, z, h: p.h, vx: R(-2, 2), vz: R(-2, 2), vh: R(-.5, 2), g: 3, drag: 2, life: .45, max: .45, size: .07, col: j % 2 ? '#e0c8ff' : '#ffffff' });
@@ -13753,7 +13833,7 @@ Object.assign(UNIT_KITS, {
       } },
   ] },
 
-  /* ---- Rimeweavers: a glyph that freezes, a lance of ice, every glyph blooming at once ---- */
+  /* ---- Frostweavers: a glyph that freezes, a lance of ice, every glyph blooming at once ---- */
   cc_rimeweaver: { slot: 'frost', mana: { max: 130, regen: 1.65, hit: 0 }, abilities: [
     { id: 'cc_glacialglyph', name: 'Glacial Glyph', short: 'Glyph', glyph: 'snowflake', hue: '#9fe4ff', mana: 100, cd: 12, rr: .9, research: null,
       by: { frz: [1, 1.1, 1.2, 1.3, 1.4, 1.5] },
@@ -13814,7 +13894,7 @@ Object.assign(UNIT_KITS, {
     { id: 'cc_dilation', name: 'Time Dilation', short: 'Dilate', glyph: 'hourglass', hue: '#ffd27a', mana: 100, cd: 12, rr: 1, research: null,
       by: { dur: [3, 3, 3.5, 3.5, 4, 4] },
       auto: 'the spot in range with two or more foes within 1 cell (or a boss or elite)',
-      text: (t, st, ab) => `Slows time in a ${nf1(ab.rr + .15 * ((st.caps && st.caps.ccLongSec) || 0))}-cell circle for ${nf1(byT(ab.by.dur, t) + .5 * ((st.caps && st.caps.ccLongSec) || 0))}s: every foe inside, flyers too, moves 55% slower (bosses 30%), and its runes do not fade.`,
+      text: (t, st, ab) => `Slows time in a ${nf1(ab.rr + .15 * ((st.caps && st.caps.ccLongSec) || 0))}-cell circle for ${nf1(byT(ab.by.dur, t) + .5 * ((st.caps && st.caps.ccLongSec) || 0))}s: every foe inside, flyers too, moves 55% slower (bosses 30%), and its element marks do not fade.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)), k = abCrowd(L, ab.rr); return k && (k.n >= (man ? 1 : 2) || abBig(k.c)) ? ccPt(k.c) : null; },
       cast(t, st, p, ab) {
         const k = ccCast(t, ab), C = st.caps, P = st.pw || {}, ls = C.ccLongSec || 0;
@@ -13837,7 +13917,7 @@ Object.assign(UNIT_KITS, {
         }
         ccRingFx(t.x, t.y, ab.r, ab.hue); sfx('phase', 0);
       } },
-    { id: 'cc_echo', name: 'Echo', short: 'Echo', glyph: 'echo', hue: '#fff0c0', mana: 130, cd: 20, r: 2.5, none: 'no Conclave unit within 2.5 cells cast lately', research: { cost: 140, time: 30 },
+    { id: 'cc_echo', name: 'Recurrence', short: 'Recur', glyph: 'echo', hue: '#fff0c0', mana: 130, cd: 20, r: 2.5, none: 'no Conclave unit within 2.5 cells cast lately', research: { cost: 140, time: 30 },
       by: { k: [.7, .7, .75, .75, .8, .8] },
       auto: 'a Conclave unit within 2.5 cells that cast an ability in the last 8 seconds',
       text: (t, st, ab) => `Recasts the last spell a Conclave unit within 2.5 cells cast, by that unit, at once and free, at ${abPct(byT(ab.by.k, t))} strength.`,
@@ -13928,7 +14008,7 @@ Object.assign(UNIT_KITS, {
         G.delayed.push({ t: .45, fn: () => {
           if (!abLive(t)) return; const s = t.st || st, [gx, , gz] = ccGolemAt(t), ax = c.x, az = c.y, d = Math.hypot(ax - gx, az - gz);
           ccShoot({ k: 'rock', x: gx, h: 1.1, z: gz, sz: 1.3, lob: { x0: gx, z0: gz, h0: 1.1, ax, az, T: .35 + d * .06, arc: .5 + d * .1 }, fn: () => {
-            abAoe(() => inSplash(ax, az, 1, true, q => { if (!canTarget(t, s, q) || q.ent) return; ccAb(t, s, q, q === c ? m : m * .5, k, { type: 'phys', noWeave: q !== c }); if (!q.dead) { const x0 = q.x, z0 = q.y; shove(q, .5); dragFx(q, x0, z0, '#c8a070'); } }));
+            abAoe(() => inSplash(ax, az, 1, true, q => { if (!canTarget(t, s, q) || q.ent) return; ccAb(t, s, q, q === c ? m : m * .5, k, { type: 'phys', noRx: q !== c }); if (!q.dead) { const x0 = q.x, z0 = q.y; shove(q, .5); dragFx(q, x0, z0, '#c8a070'); } }));
             fxQuake(ax, az, .9, .5); fxDust(ax, az, 12); G.shake = Math.max(G.shake, .14); sfx('boom', .8);
             for (let j = 0; j < 10; j++) part({ k: 'chunk', x: ax, z: az, h: .3, vx: R(-2, 2), vz: R(-2, 2), vh: R(1, 2.5), g: 9, life: .6, max: .6, size: R(.05, .09), col: j % 2 ? '#8c867a' : '#6a645a' });
           } });
@@ -13979,7 +14059,7 @@ Object.assign(UNIT_KITS, {
 for (const u of CC_UNITS) if (UNIT_KITS[u]) for (const ab of UNIT_KITS[u].abilities) { if (ABIL[ab.id]) console.warn('conclave: duplicate ability id', ab.id); ab.unit = u; ABIL[ab.id] = ab; }
 
 /* ---------- what the abilities leave running ---------- */
-// cast an ability again, free (Echo, Unstable Charge, the Echo Charm, the Tome): k is its strength (no charge is spent),
+// cast an ability again, free (Recurrence, Unstable Charge, the Echo Charm, the Tome): k is its strength (no charge is spent),
 // its damage is credited to abilities (what it schedules too), and the unit plays the ability's pose
 function ccRecast(o, a2, tg, k, s2) {
   ccEv('recast:' + a2.id);
@@ -14004,9 +14084,9 @@ function ccStarDrop(t, st, c, m, o) {
   G.delayed.push({ t: .3, fn: () => {
     if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || st, x = c.x, z = c.y, h = hitH(c);
     if (!c.dead) { ccHit(t, s, c, ccAbD(s) * m, {}); if (!c.dead && c.fly && o.low) c.lowT = Math.max(c.lowT || 0, G.time + o.low * (c.def.boss ? .4 : 1)); }
-    if (o.splash) abAoe(() => inSplash(x, z, .6, false, q => { if (q !== c && !q.ent && canTarget(t, s, q)) ccHit(t, s, q, ccAbD(s) * m * .5, { noWeave: true }); }));
+    if (o.splash) abAoe(() => inSplash(x, z, .6, false, q => { if (q !== c && !q.ent && canTarget(t, s, q)) ccHit(t, s, q, ccAbD(s) * m * .5, { noRx: true }); }));
     if (o.frag) ccEv('tal:ccFrag');
-    if (o.frag) for (const q of nearest(x, z, 1.6, 3, c, q => canTarget(t, s, q))) { rfx({ k: 'streak', x0: x, h0: h + .3, z0: z, c: q, col: '#eef2ff', w: .04, trav: .15, life: .3 }); ccHit(t, s, q, ccAbD(s) * m * .5, { noWeave: true }); }   // Falling Fragments
+    if (o.frag) for (const q of nearest(x, z, 1.6, 3, c, q => canTarget(t, s, q))) { rfx({ k: 'streak', x0: x, h0: h + .3, z0: z, c: q, col: '#eef2ff', w: .04, trav: .15, life: .3 }); ccHit(t, s, q, ccAbD(s) * m * .5, { noRx: true }); }   /* Falling Fragments */
     part({ k: 'flare', x, z, h, life: .3, max: .3, size: 1.3, col: '#f4f6ff' }); ccRingFx(x, z, .6, '#dfe8ff');
     for (let j = 0; j < 12; j++) part({ k: 'spark', x, z, h, vx: R(-1.8, 1.8), vz: R(-1.8, 1.8), vh: R(.2, 2), g: 4, drag: 2, life: .45, max: .45, size: .06, col: j % 2 ? '#eef2ff' : '#ffe9a8' });
     sfx('boom', .5);
@@ -14020,7 +14100,7 @@ function ccOmenFall(c, died) {
   rfx({ k: 'streak', x0: x + .7, h0: 5, z0: z - .9, x1: x, h1: .4, z1: z, col: '#eef2ff', w: .09, trav: .3, life: .45 });
   G.delayed.push({ t: .3, fn: () => {
     if (!G.towers.includes(t) || G.state !== 'play') return;
-    tagged('abil', () => abAoe(() => inSplash(x, z, 1, false, q => { if (!q.ent && canTarget(t, s, q)) ccHit(t, s, q, ccAbD(s) * m, { noWeave: q !== c }); })));
+    tagged('abil', () => abAoe(() => inSplash(x, z, 1, false, q => { if (!q.ent && canTarget(t, s, q)) ccHit(t, s, q, ccAbD(s) * m, { noRx: q !== c }); })));
     part({ k: 'flare', x, z, h: .5, life: .35, max: .35, size: 1.6, col: '#f4f6ff' }); ccRingFx(x, z, 1, '#eef2ff'); sfx('boom', .6);
   } });
 }
@@ -14030,7 +14110,7 @@ function ccKindleBurst0(c) {
   const o = c.ccKindle; c.ccKindle = null; G.ccKindles = (G.ccKindles || []).filter(q => q !== c);
   if (!o) return; const t = o.src; if (!G.towers.includes(t) || G.state !== 'play') return;
   const s = t.st || o.st, x = c.x, z = c.y;
-  tagged('abil', () => { abAoe(() => inSplash(x, z, 1, true, q => { if (!q.ent && canTarget(t, s, q)) ccHit(t, s, q, ccAbD(s) * o.m * o.k, { noWeave: q !== c }); })); if (!c.fly) ccGlyph({ s: 'fire', sub: 'sigil', x, z, r: .7, t: 3, src: t, st: s, every: .5, dmg: ccAbD(s) * .125, burn: ccAbD(s) * .05 }); });
+  tagged('abil', () => { abAoe(() => inSplash(x, z, 1, true, q => { if (!q.ent && canTarget(t, s, q)) ccHit(t, s, q, ccAbD(s) * o.m * o.k, { noRx: q !== c }); })); if (!c.fly) ccGlyph({ s: 'fire', sub: 'sigil', x, z, r: .7, t: 3, src: t, st: s, every: .5, dmg: ccAbD(s) * .125, burn: ccAbD(s) * .05 }); });
   fxFire(x, z, .3, 1); fxExplode(x, z, .8, 0); ccRingFx(x, z, 1, '#ffb040'); G.shake = Math.max(G.shake, .06); sfx('fireHit', 2);
 }
 // the Orrery's planets: one strikes every third of a second (each planet once a second)
@@ -14047,21 +14127,21 @@ function ccOrreryTick(t, st, dt) {
    One tree per unit slot in the runtime TALENTS shape (GT, from forces.js), swapped in by applyForce('conclave'). The
    spell-talent layout (forces_zy_spells.js): five rows on a 4-column grid, opening at 0/3/6/9/12 points; spell 2 (GS) on
    row II and spell 3 on row III, each under the talent it needs; 2-3 passive capstones, one a tree; no
-   drawbacks, no random procs. Most talents shape the unit's own three spells (sp). Each tree keeps one Spell Weaving
-   talent (a weave with one partner school's rune: frost for the Astrologers' Comet, stone for the Rimeweavers' Entomb,
-   chrono for the Magelings' Echo, arcane for the Chronomancers' Paradox, star for the Spellblades' Starsteel, fire for
-   the golem's Magma); the Pyroclasts' frost weave is gone, their tree is all fire. The caps are read in
-   forces_conclave_a.js (the attacks, ccWeavesOf, the hooks) and _c (the abilities). */
+   drawbacks, no random procs. Most talents shape the unit's own three spells (sp). Each tree keeps one reaction rider
+   (docs/conclave_elements.md: it changes a reaction this unit sets off: the Spellblades' Riftsteel Edge on Overload, the
+   Magelings' Echoing Missiles and the Chronomancers' Paradox on Echo, the Frostweavers' Entomb on Encase, the Astrologers'
+   Comet on Pull, the golem's Deep Magma on Magma, the Pyroclasts' Ember Heart on Shatter). The caps are read in
+   forces_conclave_a.js (the attacks, ccRidersOf, the hooks) and _c (the abilities). */
 
 const CC_TALENTS = {
   /* ---- Spellblades (glaive): Blinkstrike (innate), Sigil Cleave (row III), Spectral Edge (capstone) ---- */
-  glaive: { name: 'Bladeweaving', hue: '#b98cff', list: [
+  glaive: { name: 'Riftsteel Forms', hue: '#b98cff', list: [
     GT('Measured Cuts', 'swords', 0, 3, 2, n => `Each cut at the same foe hits ${5 * n}% harder than the last, up to ${20 * n}%. A new foe starts it over.`, n => ({ rampD: .05 * n, rampDMax: .2 * n })),
     GT('Long Step', 'flash', 0, 0, 2, n => `+${gNf(.15 * n)} reach, and Blinkstrike blinks ${gNf(.25 * n)} cells farther.`, n => ({ range: .15 * n }), { sp: n => ({ ab: 'cc_blinkstrike', reach: .25 * n }) }),
     GT('Lone Duel', 'sword', 0, 2, 2, n => `While only one walker is in its reach, it cuts ${15 * n}% faster.`, {}, { cap: 'ccLone' }),
-    GT('Starsteel', 'stars', 3, 3, 1, 'Weave: a cut on a star-marked foe spends the star rune: it hits twice as hard and stuns 0.4s.', {}, { cap: 'ccStarsteel' }),
+    GT('Starsteel', 'stars', 3, 3, 1, 'Each Overload its cuts set off strikes the foe again, as hard, and stuns it 0.4s.', {}, { cap: 'ccStarsteel' }),
     GS('cc_sigilcleave', 1, 3),
-    GT('Charged Edge', 'boltplus', 2, 3, 2, n => `Sigil Cleave costs ${10 * n}% less and hits foes bearing a rune ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_sigilcleave', cost: -.1 * n, vs: ['runed', .15 * n] }), req: [1, 3] }),
+    GT('Charged Edge', 'boltplus', 2, 3, 2, n => `Sigil Cleave costs ${10 * n}% less and hits marked foes ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_sigilcleave', cost: -.1 * n, vs: ['elmarked', .15 * n] }), req: [1, 3] }),
     GT('Spectral Gift', 'shieldbreak', 4, 0, 2, n => `Each Spectral Edge gives every unit within 1.6 cells ${10 * n} mana.`, {}, { sp: n => ({ ab: 'cc_spectral', ally: 10 * n }), req: [3, 0] }),
     GT('Blinkstep', 'wing', 2, 0, 1, 'Blinkstrike comes 15% sooner, and a foe it slays readies it 2s sooner.', {}, { sp: { ab: 'cc_blinkstrike', cd: -.15, kill: { cd: 2 } } }),
     GT('Thousand Edges', 'glaive2', 3, 1, 1, 'Every 6th cut splits it into three afterimages, each cutting every walker in its reach for 40%; the first also staggers it.', {}, { cap: 'ccThousand' }),
@@ -14069,7 +14149,7 @@ const CC_TALENTS = {
     GT('Fifth Form', 'target', 4, 1, 1, 'Each Sigil Cleave brings Blinkstrike 3s nearer.', {}, { sp: { ab: 'cc_sigilcleave', ready: ['cc_blinkstrike', 3] } }),
     GT('Phase Dancer', 'swirl', 2, 2, 1, 'Every 3rd cut blinks to the walker furthest along and gains an Arcane Charge; its afterimage cuts for 60%.', {}, { cap: 'ccPhase' }),
     GT('Ghostblade Rush', 'glaive2', 4, 3, 1, 'Casting Spectral Edge quickens its cuts: 25% faster for 4s.', {}, { sp: { ab: 'cc_spectral', haste: [.25, 4] } }),
-    GT('Weaver\'s Blade', 'spiral', 4, 2, 1, "Weave: its cuts spend any other school's rune for 60% more and the rune's touch: a freeze, burn, slow or stun.", {}, { cap: 'ccWeaverBlade' }),
+    GT('Weaver\'s Blade', 'spiral', 4, 2, 1, "Every reaction its cuts set off strikes 60% harder and adds the other element's touch: a chill, a burn, a slow, a pull or a stun.", {}, { cap: 'ccWeaverBlade' }),
     GT('Runed Edge', 'quick', 0, 1, 2, n => `Its cuts ignore ${10 * n}% of armour.`, n => ({ armorPen: .1 * n })),
     GT('Binding Cut', 'snail', 1, 0, 2, n => `Its cuts slow foes ${5 * n}% for 1.5s and leave them Wounded for 4s (heals and shields halved).`, n => ({ slowOn: [.05 * n, 1.5], wound: 4 }), { wound: 1 }),
     GT('Swift Recovery', 'flash', 1, 1, 2, n => `Blinkstrike comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_blinkstrike', cd: -.06 * n }) }),
@@ -14080,29 +14160,29 @@ const CC_TALENTS = {
     GT('Twin Casting', 'missiles', 0, 1, 3, n => `Every ${gOrd(6 - n)} cast looses a second missile at the same foe.`, {}, { cap: 'ccTwin' }),
     GT('Scrying Lens', 'spyglass', 0, 0, 2, n => `+${gNf(.2 * n)} range, for its bolts and its spells.`, n => ({ range: .2 * n })),
     GT('Missile Swarm', 'arrows2', 4, 0, 1, 'Arcane Barrage looses two more missiles and costs 30% less.', {}, { sp: { ab: 'cc_barrage', by: { n: 2 }, cost: -.3 } }),
-    GT('Homing Runes', 'orb', 2, 0, 2, n => `Mana Sparks leaps ${n === 1 ? 'once' : n + ' times'} more.`, {}, { sp: n => ({ ab: 'cc_sparks', by: { n } }), req: [1, 0] }),
+    GT('Homing Missiles', 'orb', 2, 0, 2, n => `Mana Sparks leaps ${n === 1 ? 'once' : n + ' times'} more.`, {}, { sp: n => ({ ab: 'cc_sparks', by: { n } }), req: [1, 0] }),
     GT('Apprentice\'s Zeal', 'quick', 3, 3, 2, n => `Grand Orb's burst slows every foe it strikes ${15 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_grandorb', rider: { slow: [.15 * n, 2] } }), req: [2, 3] }),
     GS('cc_sparks', 1, 0),
-    GT('Echoing Missiles', 'echo', 3, 0, 1, 'Weave: a missile on a chrono-marked foe echoes: it strikes again 0.4s later for 70%. The chrono rune is spent.', {}, { cap: 'ccEcho' }),
+    GT('Echoing Missiles', 'echo', 3, 0, 1, 'Each Echo its missiles set off sends the missile again 0.4s later, for 70% of its strike.', {}, { cap: 'ccEcho' }),
     GT('Spark Battery', 'boltup', 2, 2, 1, 'Each Arcane Barrage brings Mana Sparks 2s nearer.', {}, { sp: { ab: 'cc_barrage', ready: ['cc_sparks', 2] } }),
     GS('cc_grandorb', 2, 3),
     GT('Unstable Charge', 'burst', 4, 3, 1, 'When its Arcane Charge fills, it bursts into a free Arcane Barrage at 60% and keeps 2 charges.', {}, { cap: 'ccUnstable' }),
-    GT('Orb Lattice', 'orbbig', 3, 2, 1, 'Grand Orb lays the arcane rune on every foe it strikes, for the Conclave to weave.', {}, { sp: { ab: 'cc_grandorb', rider: { rune: 'arcane' } } }),
-    GT('Study the Weave', 'rune', 1, 3, 2, n => `Each weave it makes gives it ${10 * n} mana.`, {}, { cap: 'ccStudy' }),
-    GT('Rune Reader', 'eye', 1, 1, 2, n => `Its missiles hit chrono- or frost-marked foes ${12 * n}% harder.`, {}, { cap: 'ccReader' }),
+    GT('Orb Lattice', 'orbbig', 3, 2, 1, 'Grand Orb marks every foe it strikes Arcane, for the Conclave to react with.', {}, { sp: { ab: 'cc_grandorb', rider: { element: 'arcane' } } }),
+    GT('Study the Reaction', 'rune', 1, 3, 2, n => `Each reaction it sets off gives it ${10 * n} mana.`, {}, { cap: 'ccStudy' }),
+    GT('Keen Reader', 'eye', 1, 1, 2, n => `Its missiles hit foes marked Time or Frost ${12 * n}% harder.`, {}, { cap: 'ccReader' }),
     GT('Arcane Torrent', 'nova', 4, 1, 1, 'Every 5th cast is a torrent: six missiles fan out over the foes in range at 80% each.', {}, { cap: 'ccTorrent' }),
     GT('Inkwell', 'potion', 0, 3, 2, n => `While it saves for its next spell, its mana flows back ${50 * n}% faster.`, {}, { mana: { saving: .5 } }),
     GT('Barrage Drill', 'missiles', 0, 2, 2, n => `Arcane Barrage comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_barrage', cd: -.06 * n }) }),
     GT('Static Sparks', 'boltup', 3, 1, 2, n => `Mana Sparks stuns each foe it leaps to for ${gNf(.2 * n)}s.`, {}, { sp: n => ({ ab: 'cc_sparks', rider: { stun: .2 * n } }) }),
   ] },
 
-  /* ---- Rimeweavers (frost): Glacial Glyph (innate), Rime Lance (row III), Hoarfrost Bloom (capstone) ---- */
-  frost: { name: 'Rimecraft', hue: '#9fe4ff', list: [
+  /* ---- Frostweavers (frost): Glacial Glyph (innate), Rime Lance (row III), Hoarfrost Bloom (capstone) ---- */
+  frost: { name: 'Frostcraft', hue: '#9fe4ff', list: [
     GT('Biting Cold', 'snowflake', 0, 0, 3, n => `Its bolts slow ${5 * n}% more.`, n => ({ slow: .05 * n })),
     GT('Wide Glyphs', 'ring', 0, 3, 3, n => `Its frost glyphs are ${gNf(.1 * n)} cells wider and last ${gNf(.5 * n)}s longer, and Glacial Glyph freezes ${gNf(.1 * n)}s longer.`, {}, { cap: 'ccGlyphW', sp: n => ({ ab: 'cc_glacialglyph', by: { frz: .1 * n } }) }),
     GT('Flash Freeze', 'iceblock', 4, 0, 2, n => `Hoarfrost Bloom hits frozen foes ${20 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_hoarbloom', vs: ['frozen', .2 * n] }), req: [3, 0] }),
     GT('Scrivener\'s Hand', 'rune', 4, 3, 1, 'Every 2nd bolt writes a frost glyph instead of every 3rd, and Glacial Glyph costs 30% less.', {}, { cap: 'ccGlyph2', sp: { ab: 'cc_glacialglyph', cost: -.3 } }),
-    GT('Entomb', 'tomb', 3, 3, 1, 'Weave: a bolt on a stone-marked foe spends the rune: the foe is frozen 1s and the bolt hits 50% harder.', {}, { cap: 'ccEntomb' }),
+    GT('Entomb', 'tomb', 3, 3, 1, 'Each Encase its bolts set off holds 1s longer, and the bolt strikes again for 50%.', {}, { cap: 'ccEntomb' }),
     GT('Brittle Rime', 'cracked', 2, 3, 2, n => `Frozen foes take ${6 * n}% more damage from every unit, and Rime Lance strikes them ${20 * n}% harder.`, {}, { cap: 'ccBrittle', sp: n => ({ ab: 'cc_rimelance', vs: ['frozen', .2 * n] }), req: [1, 3] }),
     GS('cc_rimelance', 1, 3),
     GT('Glacier Script', 'icepeak', 4, 1, 1, 'Its frost glyphs freeze every walker that steps into them for 0.6s (once each).', {}, { cap: 'ccGlacier' }),
@@ -14124,15 +14204,15 @@ const CC_TALENTS = {
     GT('Borrowed Time', 'wings', 3, 0, 2, n => `Quicken also gives every unit it hastens ${10 * n} mana.`, {}, { sp: n => ({ ab: 'cc_quicken', ally: 10 * n }), req: [2, 0] }),
     GT('Heavy Hours', 'hourglass', 0, 1, 3, n => `Its bolts slow ${5 * n}% more, and the slow lasts ${gNf(.3 * n)}s longer.`, n => ({ slow: .05 * n, slowT: .3 * n })),
     GS('cc_quicken', 2, 0),
-    GT('Paradox', 'swirl', 2, 1, 1, 'Weave: a bolt on an arcane-marked foe spends the rune, rewinds the foe 0.7 cells and hits 60% harder.', {}, { cap: 'ccParadox' }),
+    GT('Paradox', 'swirl', 2, 1, 1, 'Each Echo its bolts set off also rewinds the foe 0.7 cells and strikes it again for 60%.', {}, { cap: 'ccParadox' }),
     GT('Stopped Clock', 'snail', 3, 2, 1, 'Each Quicken brings Time Dilation 3s nearer.', {}, { sp: { ab: 'cc_quicken', ready: ['cc_dilation', 3] } }),
-    GT('Quickening Bell', 'sun', 4, 2, 2, n => `Each Echo quickens its own bolts ${20 * n}% for 4s.`, {}, { sp: n => ({ ab: 'cc_echo', haste: [.2 * n, 4] }) }),
+    GT('Quickening Bell', 'sun', 4, 2, 2, n => `Each Recurrence quickens its own bolts ${20 * n}% for 4s.`, {}, { sp: n => ({ ab: 'cc_echo', haste: [.2 * n, 4] }) }),
     GT('Frozen Moment', 'statue', 4, 0, 1, 'Every 4th bolt stops time round its foe: every walker within 0.8 cells is stunned 0.5s.', {}, { cap: 'ccMoment' }),
     GT('Hourglass Heart', 'heart', 4, 1, 1, 'Every 10s near foes, it turns back the cooldowns of Conclave units within 2 cells by 2s (its own by 4s).', {}, { cap: 'ccHourHeart' }),
     GS('cc_echo', 3, 3),
     GT('Rewound Wounds', 'drop', 1, 0, 2, n => `A foe rewound by Paradox takes ${8 * n}% more from every unit for 3s.`, {}, { cap: 'ccRewound' }),
     GT('Arcane Clockwork', 'gem', 1, 3, 2, n => `Its bolts hit arcane-marked foes ${12 * n}% harder.`, {}, { cap: 'ccClockArc' }),
-    GT('Borrowed Hour', 'hourglass', 4, 3, 2, n => `Each Echo gives every unit within 1.6 cells ${10 * n} mana.`, {}, { sp: n => ({ ab: 'cc_echo', ally: 10 * n }), req: [3, 3] }),
+    GT('Borrowed Hour', 'hourglass', 4, 3, 2, n => `Each Recurrence gives every unit within 1.6 cells ${10 * n} mana.`, {}, { sp: n => ({ ab: 'cc_echo', ally: 10 * n }), req: [3, 3] }),
     GT('Pendulum Swing', 'quick', 0, 2, 3, n => `Its bolts come ${4 * n}% faster.`, n => gHaste(.04 * n)),
     GT('Hourglass Reserve', 'hourglass', 1, 2, 2, n => `Each bolt restores ${n} mana.`, {}, { mana: { strike: [1, 'any'] } }),
     GT('Patient Hours', 'hourglass', 0, 3, 2, n => `Time Dilation comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_dilation', cd: -.06 * n }) }),
@@ -14144,7 +14224,7 @@ const CC_TALENTS = {
     GT('Star-Chart', 'stars', 0, 0, 3, n => `Every ${gOrd(6 - n)} bolt is a shooting star: a second bolt strikes another foe within 1.5 cells.`, {}, { cap: 'ccChart' }),
     GT('Falling Fragments', 'shards', 4, 0, 1, 'Falling Star costs 30% less and scatters fragments onto up to 3 foes within 1.6 cells for half its damage.', {}, { cap: 'ccFrag', sp: { ab: 'cc_fallingstar', cost: -.3 } }),
     GT('Skybreaker', 'wing', 0, 1, 2, n => `Falling Star drags flyers down ${gNf(.5 * n)}s longer.`, {}, { sp: n => ({ ab: 'cc_fallingstar', by: { low: .5 * n } }) }),
-    GT('Comet', 'icebomb', 3, 1, 1, 'Weave: a bolt on a frost-marked foe spends the rune as a comet: 60% and a 30% chill within 1 cell.', {}, { cap: 'ccComet' }),
+    GT('Comet', 'icebomb', 3, 1, 1, 'Each Pull its bolts set off bursts into a comet of ice: 60% and a 30% chill within 1 cell.', {}, { cap: 'ccComet' }),
     GS('cc_omen', 1, 0),
     GT('Grounded Stars', 'snare', 3, 3, 2, n => `Orrery turns ${n}s longer, and its planets strike flyers dragged down out of the sky ${25 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_orrery', by: { dur: n }, vs: ['grounded', .25 * n] }), req: [2, 3] }),
     GT('Zodiac', 'sun', 3, 0, 1, 'Every 12th bolt calls a Falling Star down on its foe, free.', {}, { cap: 'ccZodiac' }),
@@ -14167,8 +14247,8 @@ const CC_TALENTS = {
     GT('Mana Quarry', 'gem', 4, 2, 1, 'Each slam gives it 3 mana for every walker it strikes (up to 5).', {}, { cap: 'ccQuarry' }),
     GS('cc_tremorglyph', 1, 3),
     GT('Shatterground', 'crack', 4, 0, 2, n => `Seismic Slam and Boulder Toss hit stunned foes ${15 * n}% harder.`, {}, { sp: n => [{ ab: 'cc_seismic', vs: ['stunned', .15 * n] }, { ab: 'cc_boulder', vs: ['stunned', .15 * n] }], req: [3, 0] }),
-    GT('Magma', 'firewall', 3, 2, 1, 'Weave: a slam on a fire-marked foe spends the rune and leaves magma for 3s, burning walkers for 30% a second.', {}, { cap: 'ccMagma' }),
-    GT('Runic Core', 'rune', 2, 1, 1, 'Every 5th slam draws on its rune core: ×2.5, and every walker struck is thrown 0.3 cells back.', { nth: 5, nthM: 2.5 }, { cap: 'ccCore' }),
+    GT('Deep Magma', 'firewall', 3, 2, 1, 'Each Magma its slams set off lasts 3s longer and spreads 0.3 cells wider.', {}, { cap: 'ccMagma' }),
+    GT('Golem Core', 'rune', 2, 1, 1, 'Every 5th slam draws on its golem core: ×2.5, and every walker struck is thrown 0.3 cells back.', { nth: 5, nthM: 2.5 }, { cap: 'ccCore' }),
     GS('cc_boulder', 3, 0),
     GT('Fault Line', 'pick', 3, 1, 1, 'Each slam opens a fault: every walker in a 2-cell line beyond its foe takes 50%.', {}, { cap: 'ccFault' }),
     GT('Obsidian', 'shell', 1, 0, 2, n => `Walkers in its magma are slowed ${15 * n}%.`, {}, { cap: 'ccObsid' }),
@@ -14180,7 +14260,7 @@ const CC_TALENTS = {
     GT('Glyph Anchor', 'rune', 2, 0, 1, 'Beside a wall, Tremor Glyph comes 25% sooner.', {}, { sp: { ab: 'cc_tremorglyph', at: 'wall', cd: -.25 } }),
   ] },
 
-  /* ---- Pyroclasts (cannon): Furnace Breath (innate, once Pyre Sigil), Kindle (row III), Flame Wave (capstone); forces_zxc_conclave_cool.js swaps in Skipping Flame and Phoenix. Its weave, Ember Heart (Shatter), spends the frost rune ---- */
+  /* ---- Pyroclasts (cannon): Furnace Breath (innate, once Pyre Sigil), Kindle (row III), Flame Wave (capstone); forces_zxc_conclave_cool.js swaps in Skipping Flame and Phoenix. Its rider, Ember Heart, rides on Shatter ---- */
   cannon: { name: 'Pyrelore', hue: '#ff8a4a', list: [
     GT('Slow-Burning Ink', 'ember', 0, 2, 2, n => `Its burns last ${n}s longer.`, {}, { cap: 'ccLinger' }),
     GT('Wide Blast', 'burst', 0, 0, 3, n => `Fireballs burst ${6 * n}% wider.`, n => ({ splash: 1 + .06 * n })),
@@ -14190,7 +14270,7 @@ const CC_TALENTS = {
     GT('Cinder Charge', 'boltplus', 2, 1, 1, 'Kindle hits burning foes 25% harder.', {}, { sp: { ab: 'cc_kindle', vs: ['burning', .25] } }),
     GS('cc_kindle', 1, 0),
     GS('cc_flamewave', 2, 3),
-    GT('Ember Heart', 'bomb', 4, 2, 1, "Fire meets frost: a fireball's burst on a foe bearing the frost rune spends it to shatter the rime: that foe takes twice the burst, and shards strike up to 3 foes near it for half.", {}, { cap: 'ccShatter' }),
+    GT('Ember Heart', 'bomb', 4, 2, 1, "Each Shatter its fireballs set off throws shards at up to 3 foes near it, for half its strike.", {}, { cap: 'ccShatter' }),
     GT('Pyre Lord', 'firering', 4, 1, 1, 'A foe that dies in one of its burning glyphs lights a new glyph where it fell.', {}, { cap: 'ccPyreLord' }),
     GT('Rolling Inferno', 'firewall', 3, 2, 2, n => `Flame Wave comes ${10 * n}% sooner, and every walker it strikes burns for ${10 * n}% of a fireball a second for 3s.`, {}, { sp: n => ({ ab: 'cc_flamewave', cd: -.1 * n, rider: { burn: .1 * n } }) }),
     GT('Hearthguard', 'flame', 4, 0, 1, 'Beside a wall, Pyre Sigil comes 25% sooner.', {}, { sp: { ab: 'cc_pyresigil', at: 'wall', cd: -.25 } }),
@@ -14218,10 +14298,7 @@ const CC_TAL_FLAVOR = {
   cannon: ['Throw fire, and leave the road burning behind it.', 'Fire is a fine teacher. Few pass twice.'],
 };
 const CC_TAL_EMBLEM = {};
-for (const [k, nm] of Object.entries({ glaive: 'Starsteel', arrow: 'Echoing Missiles', frost: 'Entomb', arcane: 'Paradox', storm: 'Comet', earth: 'Magma', cannon: 'Ember Heart' })) CC_TAL_EMBLEM[k] = CC_TALENTS[k].list.findIndex(t => t.name === nm);
-// the weave talents: the rune they spend and the attacker's own school, shown as two school marks on the talent's card ('*': any other school)
-{ const W = { ccStarsteel: 'star', ccWeaverBlade: '*', ccEcho: 'chrono', ccEchoAll: '*', ccEntomb: 'stone', ccHoar: '*', ccParadox: 'arcane', ccLoop: '*', ccComet: 'frost', ccCelestial: '*', ccMagma: 'fire', ccMolten: '*', ccShatter: 'frost', ccShatterAll: '*' };
-  for (const k in CC_TALENTS) { const u = FORCES.conclave.units[k]; for (const t of CC_TALENTS[k].list) if (t.cap && W[t.cap] && u && u.ccSchool) t.weave = [W[t.cap], u.ccSchool]; } }
+for (const [k, nm] of Object.entries({ glaive: 'Starsteel', arrow: 'Echoing Missiles', frost: 'Entomb', arcane: 'Paradox', storm: 'Comet', earth: 'Deep Magma', cannon: 'Ember Heart' })) CC_TAL_EMBLEM[k] = CC_TALENTS[k].list.findIndex(t => t.name === nm);
 FORCES.conclave.talents = CC_TALENTS; FORCES.conclave.talFlavor = CC_TAL_FLAVOR; FORCES.conclave.talEmblem = CC_TAL_EMBLEM;
 
 // Unstable Charge (the Magelings' capstone): when the charge fills, a free Arcane Barrage at 60%; 2 charges kept
@@ -14241,7 +14318,7 @@ function ccUnstable(t) {
    pool FORCES.conclave.items, which applyForce swaps in while the Conclave leads (only its own items drop and stand on
    the shelf). The same rules: one rule you can say in a sentence and see working; drops start at rare (kx 1.6 / 1.35
    keep the old common and uncommon tiers as bigger numbers); no random stats. The Conclave's items lean on mana,
-   Arcane Charge, runes, weaves and ability modifiers more than other forces'. One has a chance on hit (the Mana Moth).
+   Arcane Charge, element marks, reactions and ability modifiers more than other forces'. One has a chance on hit (the Mana Moth).
    Relics set st.pw.cc (and their own st.pw key); the Conclave's hooks (forces_conclave_a.js) call the functions below:
    ccItemsOnHit (ccHit), ccItemsAmp (amp), ccItemsKill (kill), ccItemsPulse / ccCharmPulse (pulse), ccItemsTick (tick),
    ccItemsCast (a cast seen), ccItemsLive (live), ccCharmQ (ccCast). Paintings come from forceart_conclave.js. */
@@ -14259,8 +14336,8 @@ function ccMotes(x, z, h, n, col) { for (let k = 0; k < n; k++) part({ k: 'spark
 /* ---------- relics ---------- */
 const CC_RELICS = {
   // sharpen (the old commons)
-  cc_quill: { rar: 2, kx: 1.6, name: 'Runed Quill', icon: 'rune', hue: '#a890e0', theme: 'runes',
-    text: k => `Its hits on a foe bearing two or more runes strike +${P_(.25 * k)} harder.`, fx: (st, k) => ccPwS(st, 'ccMulti', .25 * k) },
+  cc_quill: { rar: 2, kx: 1.6, name: 'Reactive Quill', icon: 'rune', hue: '#a890e0', theme: 'runes',
+    text: k => `Its hits strike +${P_(.25 * k)} harder on a foe that reacted in the last 2s.`, fx: (st, k) => ccPwS(st, 'ccMulti', .25 * k) },
   cc_inkwell: { rar: 2, kx: 1.6, name: 'Starlit Inkwell', icon: 'potion', hue: '#5a70c0', theme: 'mana',
     text: k => `Each ability it casts gives back ${P_(Math.min(.5, .12 * k))} of its mana.`, fx: (st, k) => ccPwS(st, 'ccRefund', Math.min(.5, .12 * k)) },
   cc_focus: { rar: 2, kx: 1.6, name: 'Focusing Crystal', icon: 'gem', hue: '#b070e0', theme: 'charge',
@@ -14272,8 +14349,8 @@ const CC_RELICS = {
     text: k => `Every 12s while foes are near, its ability cooldowns turn back ${nf1(2 * k)}s.`, fx: (st, k) => ccPwS(st, 'ccHourg', 2 * k) },
   cc_moth: { rar: 2, kx: 1.35, name: 'Mana Moth', icon: 'wings', hue: '#80b0ff', theme: 'mana',
     text: k => `Each of its hits has a ${P_(Math.min(.5, .1 * k))} chance to give it 10 mana.`, fx: (st, k) => ccPwS(st, 'ccMoth', Math.min(.5, .1 * k)) },
-  cc_wander: { rar: 2, kx: 1.35, name: 'Wandering Rune', icon: 'rune', hue: '#c0a0ff', theme: 'runes',
-    text: k => `Every 6th hit leaves its school's rune on every foe within ${nf1(.8 * k)} cells of its foe.`, fx: (st, k) => ccPwS(st, 'ccWander', .8 * k) },
+  cc_wander: { rar: 2, kx: 1.35, name: 'Wandering Sigil', icon: 'rune', hue: '#c0a0ff', theme: 'runes',
+    text: k => `Every 6th hit marks every foe within ${nf1(.8 * k)} cells of its foe with its element.`, fx: (st, k) => ccPwS(st, 'ccWander', .8 * k) },
   cc_fork: { rar: 2, kx: 1.35, name: 'Chiming Fork', icon: 'echo', hue: '#c8d0e0', theme: 'charge',
     text: k => `Each ability it casts rings out: every Conclave unit within ${nf1(1.2 * k)} cells gains an Arcane Charge.`, fx: (st, k) => ccPwS(st, 'ccFork', 1.2 * k) },
   // bend a rule
@@ -14281,12 +14358,12 @@ const CC_RELICS = {
     text: k => `Its strikes, and its spells, Wound their foe for ${nf1(4 * k)}s: its heals and shields are halved (a quarter on bosses).`,
     fx: (st, k) => { st.wound = Math.max(st.wound || 0, 4 * k); } },
   cc_prism: { rar: 2, name: 'Prism of Schools', icon: 'lens', hue: '#e0a0ff', theme: 'runes', hb: 1,
-    text: () => 'Its hits also leave the rune of the nearest Conclave unit of another school (within 2.5 cells), so it can weave with itself.', fx: st => ccPwS(st, 'ccPrism', 1) },
+    text: () => 'Its hits also mark their foe with the element of the nearest Conclave unit of another school (within 2.5 cells), so it can react on its own.', fx: st => ccPwS(st, 'ccPrism', 1) },
   cc_mirror: { rar: 2, name: 'Mirror of Recursion', icon: 'shieldx', hue: '#a8c8ff', theme: 'charge', hb: 1,
     text: () => 'An ability it casts with a full Arcane Charge does not go on cooldown.', fx: st => ccPwS(st, 'ccMirror', 1) },
   // epic: a moment
   cc_shard: { rar: 3, name: 'Fallen Star Shard', icon: 'stars', hue: '#e8eeff', theme: 'stars', proc: 1,
-    text: k => `Every 8s a star falls on the toughest foe in its reach: ${P_(2.5 * k)} of its damage, and its school's rune.`, fx: (st, k) => ccPwS(st, 'ccShard', 2.5 * k) },
+    text: k => `Every 8s a star falls on the toughest foe in its reach: ${P_(2.5 * k)} of its damage, and its element's mark.`, fx: (st, k) => ccPwS(st, 'ccShard', 2.5 * k) },
   cc_tome: { rar: 3, name: 'Tome of Unwritten Spells', icon: 'spiral', hue: '#9a7cff', theme: 'abilities',
     text: k => `Every ${ccTomeT(k)}s while foes are near, it casts one of its learned abilities free, each in turn.`, fx: (st, k) => ccPwMin(st, 'ccTome', ccTomeT(k)) },
   // made for one unit (inert in any other)
@@ -14299,7 +14376,7 @@ const CC_RELICS = {
   cc_brazier: { rar: 2, for: ['cannon'], name: 'Ember Brazier', icon: 'firering', hue: '#ff8a4a', theme: 'fire', proc: 1,
     text: k => `Every fireball leaves a burning glyph: the ones between its usual glyphs burn at ${P_(Math.min(1, .6 * k))} strength.`, fx: (st, k) => ccPwS(st, 'ccBrazier', Math.min(1, .6 * k)) },
   cc_circlet: { rar: 3, for: ['frost'], name: 'Rime Circlet', icon: 'snowflake', hue: '#9fe4ff', theme: 'frost',
-    text: k => `Its frost glyphs mark every walker in them with the frost rune, and slow ${P_(.15 * k)} more.`, fx: (st, k) => ccPwS(st, 'ccCirclet', .15 * k) },
+    text: k => `Its Frost Spear slows ${P_(.15 * k)} more, and chills every foe within 0.6 cells of its foe as well.`, fx: (st, k) => ccPwS(st, 'ccCirclet', .15 * k) },
   cc_astrolabe: { rar: 3, for: ['storm'], name: 'Brass Astrolabe', icon: 'orb', hue: '#c8a040', theme: 'stars', proc: 1,
     text: k => `Every 6th bolt it also strikes every other flyer in its reach for ${P_(.6 * k)}.`, fx: (st, k) => ccPwS(st, 'ccAstrolabe', .6 * k) },
   cc_heartstone: { rar: 3, for: ['earth'], name: "Golem's Heartstone", icon: 'heart', hue: '#c8a070', theme: 'stone',
@@ -14332,24 +14409,24 @@ const CC_LEGENDS = {
     build: 'Blinkstep, Phase Dancer and Ghostblade Rush; Swift Recovery; a crowded corner of weak foes to chain through.',
     combo: 'Blinkstep, Phase Dancer and a crowded corner.', fx: (st, k) => ccPwS(st, 'ccStarblade', Math.min(1, .5 * k)) },
   cc_l_grimoire: { for: 'arrow', name: 'The First Grimoire', icon: 'spiral', hue: '#c9a0ff', atk: 1,
-    twist: "Magelings become the Conclave's rune-carriers: missiles split on other schools' runes and write them onto fresh foes.",
-    text: k => `A missile that strikes a foe bearing another school's rune splits into ${ccGrimN(k)} half-strength missiles; each seeks a foe without that rune and writes it there.`,
-    build: 'Twin Casting and Missile Swarm for more missiles; Echoing Missiles; units with weave talents beside the Magelings (Starsteel, Entomb, Shatter, Comet).',
+    twist: "Magelings become the Conclave's mark-carriers: missiles split on other elements' marks and carry them to fresh foes.",
+    text: k => `A missile that strikes a foe marked with another element splits into ${ccGrimN(k)} half-strength missiles; each seeks a foe without that mark and lays it there.`,
+    build: 'Twin Casting and Missile Swarm for more missiles; Echoing Missiles; other schools beside the Magelings, so every split sets off a reaction.',
     combo: 'Twin Casting, Missile Swarm and Echoing Missiles.', fx: (st, k) => ccPwS(st, 'ccGrimoire', k) },
   cc_l_winter: { for: 'frost', name: 'Crown of the Long Winter', icon: 'icepeak', hue: '#bff0ff',
-    twist: 'Glacial Glyph turns into a trap line: its frost glyphs last twice as long and freeze every walker that steps in.',
-    text: k => `Its frost glyphs last twice as long and freeze every walker that steps into them for ${nf1(.6 * k)}s (once each).`,
-    build: "Scrivener's Hand, Wide Glyphs and Hoarfrost Bloom; Glacier Script; Pyroclasts behind for Shatter.",
-    combo: "Scrivener's Hand, Wide Glyphs and Hoarfrost Bloom.", fx: (st, k) => ccPwS(st, 'ccWinter', .6 * k) },
+    twist: 'Every bolt is a little winter: each 4th one locks its foe in ice, and Frozen foes are what its spells crit.',
+    text: k => `Every 4th bolt locks its foe in ice for ${nf1(.6 * k)}s (bosses less): it is Frozen.`,
+    build: "Cold Eye and Frozen Lance to crit what it freezes; Second Spear; Pyroclasts beside it for Shatter.",
+    combo: 'Cold Eye, Frozen Lance and Second Spear.', fx: (st, k) => ccPwS(st, 'ccWinter', .6 * k) },
   cc_l_chrono: { for: 'arcane', name: 'The Unwound Chronometer', icon: 'hourglass', hue: '#ffd27a',
     twist: 'The Chronomancer rewinds the road itself: every few seconds the foes in its reach are put back the way they came.',
     text: k => `Every 10s while foes are near, it unwinds ${nf1(Math.min(6, 3 * k))}s: every foe in its range is put back that far along its road (the heavy less; bosses not at all).`,
     build: 'Paradox, Time Dilation and Stopped Clock; Hourglass Heart; a long maze with your killers past it.',
     combo: 'Paradox, Time Dilation and a long maze.', fx: (st, k) => ccPwS(st, 'ccUnwind', Math.min(6, 3 * k)) },
   cc_l_heavens: { for: 'storm', name: 'Eye of the Heavens', icon: 'eye', hue: '#eef2ff',
-    twist: 'Astrologers pull the sky down: flyers in reach fly low for every unit, star-marked for every star weave.',
-    text: k => `Every flyer within its reach flies low, where every unit can strike it, and carries the star rune while it does and for ${Math.round(1 + k)}s after.`,
-    build: 'Skybreaker and Grounded Stars; Spellblades with Starsteel; the Golem Wardens to slam what comes down.',
+    twist: 'Astrologers pull the sky down: flyers in reach fly low for every unit, marked Star for every Pull.',
+    text: k => `Every flyer within its reach flies low, where every unit can strike it, and carries the Star mark while it does and for ${Math.round(1 + k)}s after.`,
+    build: 'Skybreaker and Grounded Stars; Spellblades with Riftsteel Edge; the Golem Wardens to slam what comes down.',
     combo: 'Skybreaker, Grounded Stars and the Golem Wardens.', fx: (st, k) => ccPwS(st, 'ccHeavens', Math.round(1 + k)) },
   cc_l_titan: { for: 'earth', name: 'Heart of the Titan', icon: 'mountain', hue: '#d8b078', atk: 1,
     twist: "The golem's slam becomes a stun: every walker it strikes is held, Exposed to the Spellblades beside it.",
@@ -14367,14 +14444,14 @@ const CC_LEGENDS = {
     build: "Champion talents that make its spells cheaper or sooner; the Magelings' Unstable Charge; the Storm Battery charm.",
     combo: "Champion talents that make its spells cheaper or sooner, and the Magelings' Unstable Charge.", fx: (st, k) => { chPw(st, 'chFieldCharge', 1); chPw(st, 'chFieldMana', Math.round(8 * k)); } },
   // for any unit
-  cc_l_codex: { name: 'Codex of Weaving', icon: 'rune', hue: '#d8b8ff',
-    twist: "Its wielder writes every school's rune: whatever schools stand around it, its hits leave all their runes at once.",
-    text: k => `Its hits leave the rune of every Conclave school standing within ${nf1(ccCodexR(k))} cells of it, as well as its own.`,
-    build: 'a ring of mixed schools round it, each with its weave talent (Starsteel, Echoing Missiles, Entomb, Paradox, Comet, Magma, Shatter); Rune Chalk.',
+  cc_l_codex: { name: 'Codex of Elements', icon: 'rune', hue: '#d8b8ff',
+    twist: "Its wielder writes every element: whatever schools stand around it, its hits mark their elements at once.",
+    text: k => `Its hits mark the element of every Conclave school standing within ${nf1(ccCodexR(k))} cells of it, as well as its own.`,
+    build: 'a ring of mixed schools round it, each with its reaction rider (Riftsteel Edge, Echoing Missiles, Entomb, Paradox, Comet, Deep Magma, Ember Heart); Marking Chalk.',
     combo: 'a lane of mixed schools, and the Prism of Schools.', fx: (st, k) => ccPwS(st, 'ccCodex', k) },
   cc_l_staff: { name: 'Staff of the First Archmage', icon: 'ascend', hue: '#9a7cff', atk: 1,
-    twist: 'Every spell arms its next 3 strikes: each one lands as a rune burst, marking every foe round its target.',
-    text: k => `Each ability it casts empowers its next 3 basic attacks: ×${nf1(1 + k)}, and each leaves its rune on every foe within 1 cell of its foe.`,
+    twist: 'Every spell arms its next 3 strikes: each one lands as an element burst, marking every foe round its target.',
+    text: k => `Each ability it casts empowers its next 3 basic attacks: ×${nf1(1 + k)}, and each marks every foe within 1 cell of its foe with its element.`,
     build: 'quick strikers with cheap abilities: Magelings and Spellblades; Quickquill; the Echo Charm.',
     combo: 'quick strikers with cheap abilities: Magelings and Spellblades.', fx: (st, k) => ccPwS(st, 'ccStaff', k) },
   cc_l_moon: { name: 'Silver Moon Sigil', icon: 'moon', hue: '#dfe8ff',
@@ -14382,21 +14459,21 @@ const CC_LEGENDS = {
     text: k => `Every ${ccMoonT(k)}s while foes are on the field, every Conclave ability on the field is readied at once.`,
     build: 'The Prime Meridian and the Ley Crystal on your Champion to pay for it all; Starwater and Thrift charms; costly spells.',
     combo: 'The Prime Meridian and the Ley Crystal on your Champion to pay for it all.', fx: (st, k) => ccPwMin(st, 'ccMoon', ccMoonT(k)) },
-  cc_l_lens: { name: "Weavemaster's Lens", icon: 'lens', hue: '#e0c8ff',
-    twist: 'Weaves fuel its spells: every weave on the field charges it, and a full-charge cast goes off twice.',
-    text: k => `Every weave made anywhere on the field gives it an Arcane Charge, and an ability it casts with a full charge goes off a second time at ${P_(ccLensK(k))} of its strength.`,
-    build: "Confluence, the Codex of Weaving and every weave talent; the Archmage's Orb or Storm Battery for a deeper charge.",
-    combo: 'Confluence, the Codex of Weaving and every weave talent.', fx: (st, k) => ccPwS(st, 'ccLens', k) },
+  cc_l_lens: { name: "Reactor's Lens", icon: 'lens', hue: '#e0c8ff',
+    twist: 'Reactions fuel its spells: every reaction on the field charges it, and a full-charge cast goes off twice.',
+    text: k => `Every reaction set off anywhere on the field gives it an Arcane Charge, and an ability it casts with a full charge goes off a second time at ${P_(ccLensK(k))} of its strength.`,
+    build: "the Codex of Elements and a mixed army; the Archmage's Orb or Storm Battery for a deeper charge.",
+    combo: 'the Codex of Elements and a mixed army.', fx: (st, k) => ccPwS(st, 'ccLens', k) },
 };
 
 /* ---------- the shelf ---------- */
 const CC_SHOP = {
-  cc_s_robe: { tier: 1, cost: 340, name: 'Starweave Robe', icon: 'shield', hue: '#5a4a9a', text: () => '+100% health, and it heals 2% of its health a second.', fx: st => { st.hpM = (st.hpM || 1) * 2; sh(st).regen = Math.max(sh(st).regen, .02); } },
+  cc_s_robe: { tier: 1, cost: 340, name: 'Starcloth Robe', icon: 'shield', hue: '#5a4a9a', text: () => '+100% health, and it heals 2% of its health a second.', fx: st => { st.hpM = (st.hpM || 1) * 2; sh(st).regen = Math.max(sh(st).regen, .02); } },
   cc_s_focus: { tier: 1, cost: 300, name: 'Amethyst Focus', icon: 'gem', hue: '#9a6ad0', text: () => '', fx: () => {} },
   cc_s_quill: { tier: 1, cost: 300, name: 'Quickquill', icon: 'quick', hue: '#c0a0e0', text: () => '', fx: () => {} },
   cc_s_stone: { tier: 1, cost: 280, name: 'Seeing Stone', icon: 'eye', hue: '#7a8ac0', text: () => '', fx: () => {} },
   cc_s_sand: { tier: 1, cost: 320, name: 'Sand Timer', icon: 'hourglass', hue: '#d8b060', text: () => '', fx: () => {} },
-  cc_s_chalk: { tier: 1, cost: 300, name: 'Rune Chalk', icon: 'rune', hue: '#e8e4f0', text: () => 'Its runes last 3s longer.', fx: st => { sh(st).ccRune = (sh(st).ccRune || 0) + 3; } },
+  cc_s_chalk: { tier: 1, cost: 300, name: 'Marking Chalk', icon: 'rune', hue: '#e8e4f0', text: () => 'Its element marks last 3s longer.', fx: st => { sh(st).ccMarkT = (sh(st).ccMarkT || 0) + 3; } },
   cc_s_concord: { tier: 2, cost: 1250, name: 'Staff of the Concord', icon: 'ascend', hue: '#b98cff', text: () => '', fx: () => {},
     act: { name: 'Concord', cd: 60, text: 'It and every unit within 2.5 cells fill to full mana and full Arcane Charge.', use: t => ccConcordAct(t) } },
   cc_s_orb: { tier: 2, cost: 1500, name: "Archmage's Orb", icon: 'orbbig', hue: '#d8c0ff', text: () => 'Its Arcane Charge holds 2 more.', fx: st => { sh(st).ccQ = (sh(st).ccQ || 0) + 2; } },
@@ -14438,15 +14515,15 @@ function ccItemsLive(t, st) {
 function ccItemsOnHit(t, st, c, amt, o) {
   const p = st.pw;
   if (p.ccMoth && t.ab && Math.random() < p.ccMoth) { gainMana(t, 10); ccEv('item:cc_moth'); ccMotes(t.x, t.y, towerTop(t), 3, CC_MANA_COL); relicGlint(t, 'cc_moth'); }   // Mana Moth (a chance on hit)
-  if (p.ccWander && (t.ccWandN = (t.ccWandN || 0) + 1) % 6 === 0 && ccSchool(t)) {   // Wandering Rune
-    let n = 0; for (const q of nearest(c.x, c.y, p.ccWander, 8, c)) { ccRune(q, ccSchool(t), t); n++; }
+  if (p.ccWander && (t.ccWandN = (t.ccWandN || 0) + 1) % 6 === 0 && ccSchool(t)) {   /* Wandering Sigil */
+    let n = 0; for (const q of nearest(c.x, c.y, p.ccWander, 8, c)) { ccMark(q, ccSchool(t), t); n++; }
     if (n) { ccRingFx(c.x, c.y, p.ccWander, CC_COL[ccSchool(t)]); relicGlint(t, 'cc_wander'); ccEv('item:cc_wander'); }
   }
 }
 function ccItemsAmp(c, src, dot) {
   let a = 0; const p = src.st && src.st.pw;
   if (!p) return a;
-  if (!dot && p.ccMulti && ccRunesOn(c).length >= 2) { a += p.ccMulti; ccEv('item:cc_quill'); }   // Runed Quill
+  if (!dot && p.ccMulti && ccReacted(c, 2)) { a += p.ccMulti; ccEv('item:cc_quill'); }   /* Reactive Quill */
   return a;
 }
 function ccItemsKill(c, src) {
@@ -14462,7 +14539,7 @@ function ccItemsCast(t, st, ab) {
   if (back > 0 && t.ab) G.delayed.push({ t: .01, fn: () => { gainMana(t, ab.mana * Math.min(1, back)); ccMotes(t.x, t.y, towerTop(t), 3, CC_MANA_COL); } });   // Starlit Inkwell, Thrift Sigil, Starfallen Blade
   if (p.ccFork) { ccEv('item:cc_fork'); for (const o of G.towers) if (o !== t && ccUnit(o) && !o.def.wall && Math.hypot(o.x - t.x, o.y - t.y) <= p.ccFork + .05) ccGain(o, 1); ccRingFx(t.x, t.y, p.ccFork, '#e0e4f0'); }   // Chiming Fork
   if (p.ccMirror && t.ab && (t.ccLastQ || 0) >= ccQMax(t) - 1e-6) { t.ab.cd[ab.id] = G.time; relicGlint(t, 'cc_mirror', true); ccEv('item:cc_mirror'); }   // Mirror of Recursion
-  if (p.ccLens && t.ab && !ab.busy && (t.ccLastQ || 0) >= ccQMax(t) - 1e-6)   // the Weavemaster's Lens: a full-charge cast goes off twice
+  if (p.ccLens && t.ab && !ab.busy && (t.ccLastQ || 0) >= ccQMax(t) - 1e-6)   /* the Reactor's Lens: a full-charge cast goes off twice */
     G.delayed.push({ t: .35, fn: () => { if (!ccAlive(t) || t.silT > 0) return; const s = t.st || st, tg = ab.pick(t, s, ab, true); if (tg) { ccRecast(t, ab, tg, ccLensK(p.ccLens), s); relicGlint(t, 'cc_l_lens', true); ccEv('item:cc_l_lens'); } } });
   const ek = ccCharm(t, 'cc_c_echo');
   if (ek && !ab.busy && (t.ccEchoN = (t.ccEchoN || 0) + 1) % ccEchoEvery(ek) === 0)   // Echo Charm: the cast again
@@ -14472,12 +14549,12 @@ function ccItemsCast(t, st, ab) {
 function ccItemsPulse(t, st, dt) {
   const p = st.pw, T = t.ccIT || (t.ccIT = {}), reach = st.range || 2.5;
   const near = r => G.creeps.some(c => !c.dead && !c.ent && Math.hypot(c.x - t.x, c.y - t.y) <= r);
-  if (p.ccPrism && (T.pr = (T.pr || 0) - dt) <= 0) {   // Prism of Schools: the nearest other school's rune
+  if (p.ccPrism && (T.pr = (T.pr || 0) - dt) <= 0) {   /* Prism of Schools: the nearest other school's element */
     T.pr = .5; let best = null, bd = 2.55; const s0 = ccSchool(t);
     for (const o of G.towers) { const s = ccSchool(o); if (!s || s === s0 || o.wrecked) continue; const d = Math.hypot(o.x - t.x, o.y - t.y); if (d < bd) { bd = d; best = s; } }
     t.ccPrismS = best;
   }
-  if (p.ccCodex && (T.cx = (T.cx || 0) - dt) <= 0) {   // the Codex of Weaving: the schools standing within its reach of it
+  if (p.ccCodex && (T.cx = (T.cx || 0) - dt) <= 0) {   /* the Codex of Elements: the schools standing within its reach of it */
     T.cx = .5; const s0 = ccSchool(t), r = ccCodexR(p.ccCodex) + .05, S = [];
     for (const o of G.towers) { const s = ccSchool(o); if (!s || s === s0 || o.wrecked || o.def.wall || S.includes(s) || Math.hypot(o.x - t.x, o.y - t.y) > r) continue; S.push(s); }
     t.ccCodexS = S;
@@ -14506,7 +14583,7 @@ function ccItemsPulse(t, st, dt) {
   }
   if (p.ccHeavens) {   // Eye of the Heavens: flyers in its reach fly low and are marked
     const r = reach + (st.airR || 0) + .2;
-    for (const c of G.creeps) if (!c.dead && c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= r) { if (!(c.lowT > G.time)) part({ k: 'flare', x: c.x, z: c.y, h: .6, life: .25, max: .25, size: .6, col: '#eef2ff' }); c.lowT = Math.max(c.lowT || 0, G.time + .3); if (!c.dead) ccRune(c, 'star', t, p.ccHeavens); }
+    for (const c of G.creeps) if (!c.dead && c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= r) { if (!(c.lowT > G.time)) part({ k: 'flare', x: c.x, z: c.y, h: .6, life: .25, max: .25, size: .6, col: '#eef2ff' }); c.lowT = Math.max(c.lowT || 0, G.time + .3); if (!c.dead) ccMark(c, 'star', t, p.ccHeavens); }
   }
   if (p.ccUnwind && (T.uw = (T.uw == null ? 6 : T.uw) - dt) <= 0) {   // the Unwound Chronometer
     const L = G.creeps.filter(c => !c.dead && !c.ent && canTarget(t, st, c) && inRange(t, st, c) && !c.fly);
@@ -14535,22 +14612,22 @@ function ccItemsTick(dt) {
   for (const c of G.creeps) { if (c.dead || c.fly) continue; const h = c.ccRem || (c.ccRem = []); h.push(c.remain); if (h.length > 7) h.shift(); }
 }
 // the reworked legendaries' passives, renamed for what they do now
-istAdd('cc_l_grimoire', 'sp as mana|Split Runes'); istAdd('cc_l_sunforge', 'sp splash regen|Forge Glyphs'); istAdd('cc_l_codex', 'dmg crit sp|Every School'); istAdd('cc_l_lens', 'sp2 crit|Twinned Cast'); istAdd('cc_l_heavens', 'range crit as|Star-Marked Sky');
+istAdd('cc_l_grimoire', 'sp as mana|Split Marks'); istAdd('cc_l_sunforge', 'sp splash regen|Forge Glyphs'); istAdd('cc_l_codex', 'dmg crit sp|Every School'); istAdd('cc_l_lens', 'sp2 crit|Twinned Cast'); istAdd('cc_l_heavens', 'range crit as|Star-Marked Sky');
 
 /* ================= THE CONCLAVE: its three commanders =================
    Each brings the Conclave to the keep (force: 'conclave'), with a small passive, a spell (spell.cast), a Champion's
    gift (ccChampFire, from the fire hook; the Archmage's extra charge in ccQMax) and a three-chapter saga (FORCE_SAGAS,
    evFn: which kills count). None of the spells is a meteor or a blizzard:
-   - Maelis the Spellweaver: runes last twice as long; Thousandfold Barrage, a storm of seeking missiles that weave.
+   - Maelis the Spellweaver: foes that just reacted take more; Thousandfold Barrage, a storm of seeking missiles that react.
    - Aurel the Timekeeper: the Conclave's abilities recharge faster; Stopped Hour stops time on an area, then rewinds it.
    - Maren Vey, Blade of the Conclave: a Spellblade whose Stagger stuns blinks on and cuts again (Riftstep); Severing Arc
      cuts an area and calls the Spellblades in. (She replaced Ilsabet the Star-Reader, hero id cc_star, on 7 Nov 2026:
      ccMarenMigrate below renames her in saved data.) */
 FORCE_HEROES.push(
-  { id: 'cc_arch', force: 'conclave', name: 'Maelis', title: 'the Spellweaver', hue: '#b98cff', glyph: 'missiles', role: 'The Conclave: every school woven into one spell', quote: 'Every school is a thread. Watch what they make together.',
+  { id: 'cc_arch', force: 'conclave', name: 'Maelis', title: 'the Spellweaver', hue: '#b98cff', glyph: 'missiles', role: 'The Conclave: every element joined in one spell', quote: 'Every school is a thread. Watch what they make together.',
     aff: { cannon: .1, arrow: .05, glaive: .05, earth: -.05, storm: -.05 },
-    passive: 'Runes on foes last twice as long, so the Conclave weaves more often, and a foe bearing two or more runes takes 10% more from every Conclave unit.',
-    spell: { id: 'cc_thousandfold', name: 'Thousandfold Barrage', glyph: 'missiles', cd: 45, aim: true, r: 1.8, t: 'Looses 24 seeking missiles on an area over 2 seconds, each striking a foe for 4% of a foe’s health and leaving the arcane rune. Every 6th missile weaves with any other rune it finds: it spends it and strikes twice as hard.', cast: (p, R, hp, h) => ccArchSpell(p, R, hp, h) },
+    passive: 'A foe that reacted in the last 2 seconds takes 10% more from every Conclave unit, and every Conclave crit on a Frozen foe strikes half again as hard. Her Champion cycles Arcane, Frost and Fire, so she reacts on her own.',
+    spell: { id: 'cc_thousandfold', name: 'Thousandfold Barrage', glyph: 'missiles', cd: 45, aim: true, r: 1.8, t: 'Looses 24 seeking missiles on an area over 2 seconds, each striking a foe for 4% of a foe’s health and marking it Arcane. Every 6th missile reacts with any other mark it finds: it clears the mark and strikes twice as hard.', cast: (p, R, hp, h) => ccArchSpell(p, R, hp, h) },
     champ: 'Archmage’s Mantle: the Champion holds 3 more Arcane Charges, and every 4th basic attack gives it an extra one.',
     tree: [] },
   { id: 'cc_chrono', force: 'conclave', name: 'Aurel', title: 'the Timekeeper', hue: '#ffd27a', glyph: 'hourglass', role: 'The Conclave: time stopped, turned back and borrowed', quote: 'You are late. You were always going to be late.',
@@ -14559,17 +14636,17 @@ FORCE_HEROES.push(
     spell: { id: 'cc_stoppedhour', name: 'Stopped Hour', glyph: 'hourglass', cd: 50, aim: true, r: 1.6, t: 'Stops time on an area for 2.5 seconds (bosses 1 second): the foes there cannot move and take 25% more damage. When time runs on, each is struck for 15% of a foe’s health and turned back a cell along its road (bosses hold their ground).', cast: (p, R, hp, h) => ccChronoSpell(p, R, hp, h) },
     champ: 'Borrowed Moment: the Champion’s abilities recharge 20% faster, and every 4th basic attack slows its foe 40% for 2 seconds.',
     tree: [] },
-  { id: 'cc_maren', force: 'conclave', name: 'Maren Vey', title: 'Blade of the Conclave', hue: '#f070d8', glyph: 'sword', role: 'The Conclave: rune blades that cut and blink', quote: 'Spells are for people who stand still. Keep up.',
+  { id: 'cc_maren', force: 'conclave', name: 'Maren Vey', title: 'Blade of the Conclave', hue: '#f070d8', glyph: 'sword', role: 'The Conclave: riftsteel blades that step through rifts', quote: 'Spells are for people who stand still. Keep up.',
     aff: { glaive: .1, frost: .05, arrow: .05, storm: -.05, cannon: -.05 },
     passive: 'When a Spellblade’s Stagger stuns a foe, the Spellblade blinks on to the walker nearest the gate within 1.6 cells beyond its reach and cuts it (each Spellblade at most once every 3 seconds).',
-    spell: { id: 'cc_severing', name: 'Severing Arc', glyph: 'swords', cd: 45, aim: true, r: 1.6, t: 'Carves an arc of rune-light through an area: each foe there is struck for 10% of a foe’s health and Staggered twice. Every Spellblade within 4 cells blinks in and cuts one of them for twice its strike.', cast: (p, R, hp, h) => ccMarenSpell(p, R, hp, h) },
+    spell: { id: 'cc_severing', name: 'Severing Arc', glyph: 'swords', cd: 45, aim: true, r: 1.6, t: 'Carves an arc of starlight through an area: each foe there is struck for 10% of a foe’s health and Staggered twice. Every Spellblade within 4 cells blinks in and cuts one of them for twice its strike.', cast: (p, R, hp, h) => ccMarenSpell(p, R, hp, h) },
     champ: 'Seamcut: every 4th cut of the Champion opens a seam of light in its foe that tears a second later, striking it again for the cut’s full damage and Staggering it.',
     tree: [] },
 );
 Object.assign(FORCE_SAGAS, {
-  cc_arch: { name: 'The Unwritten Spell', lines: ['A spell is a sentence. Let us write a long one.', 'Frost, fire, stars and stone: weave them tighter.', 'Now, the spell no one has written. Watch.'],
-    trials: ['The First Thread', 'The Woven Hand', 'The Unwritten Spell'], ev: 'ccweave', verb: g => `Slay ${g} foes bearing two or more runes.`, goals: [40, 100, 180],
-    fin: ['Grand Weave', 'Every missile of Thousandfold Barrage weaves with the runes it finds.'], evFn: c => ccRunesOn(c).length >= 2 || c.ccWoven },
+  cc_arch: { name: 'The Unwritten Spell', lines: ['A spell is a sentence. Let us write a long one.', 'Frost, fire, stars and stone: let them meet.', 'Now, the spell no one has written. Watch.'],
+    trials: ['The First Thread', 'The Joined Hand', 'The Unwritten Spell'], ev: 'ccweave', verb: g => `Slay ${g} foes in the 2 seconds after they react.`, goals: [40, 100, 180],
+    fin: ['Grand Reaction', 'Every missile of Thousandfold Barrage reacts with the marks it finds.'], evFn: c => ccReacted(c, 2) || c.ccWoven },
   cc_chrono: { name: 'The Last Hour', lines: ['Time is the one thing they cannot steal from us.', 'Slower. Slower still. There.', 'Let the last hour last forever.'],
     trials: ['A Borrowed Minute', 'The Long Hour', 'The Last Hour'], ev: 'ccslow', verb: g => `Slay ${g} foes that are slowed or stopped.`, goals: [50, 130, 240],
     fin: ['The Second Hour', 'Stopped Hour stops time a second time on the same ground 3 seconds later, half as long.'], evFn: c => c.slowT > 0 || c.stunT > 0 },
@@ -14580,7 +14657,7 @@ Object.assign(FORCE_SAGAS, {
 
 /* ---------- the spells ---------- */
 const ccHeroOK = () => G.state === 'play';
-// Maelis: Thousandfold Barrage. Missiles out of a rune in the sky over the area, each at a foe there (the toughest first)
+// Maelis: Thousandfold Barrage. Missiles out of a sigil in the sky over the area, each at a foe there (the toughest first)
 function ccArchSpell(p, R, hp, h) {
   const all = sagaHas('fin'), dmg = hp * .04;
   part({ k: 'ring', x: p.x, z: p.y, h: .05, life: 2.2, max: 2.2, size: R, col: h.hue }); rfx({ k: 'rune', x: p.x, z: p.y, r: R, col: h.hue, life: 2.2 });
@@ -14590,8 +14667,8 @@ function ccArchSpell(p, R, hp, h) {
     const c = L.sort((a, b) => b.hp - a.hp)[n % Math.min(L.length, 6)], weave = all || n % 6 === 5, a = n * 2.4;
     ccShoot({ k: 'missile', x: p.x + Math.cos(a) * .4, h: 2.6, z: p.y + Math.sin(a) * .4, tg: c, spd: 6.5, turn: 5, seek: true, vx: Math.cos(a) * .6, vz: Math.sin(a) * .6, vh: -.3, col: weave ? '#ffe8ff' : CC_COL.arcane, sz: weave ? 1.3 : 1, tag: null, fn: q => {
       if (!q || q.dead) return; let k = 1;
-      if (weave) { const s = ccRunesOn(q).find(r => r !== 'arcane'); if (s) { q.ccR[s] = 0; k = 2; q.ccWoven = 1; part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .3, max: .3, size: 1, col: CC_COL[s] }); } }
-      hurt(q, dmg * k * (q.def.boss ? .3 : 1), 'magic', HERO_SRC, false, 0, null); if (!q.dead) ccRune(q, 'arcane', null);
+      if (weave) { const s = ccMarksOn(q).find(r => r !== 'arcane'); if (s) { q.ccR[s] = 0; k = 2; q.ccWoven = 1; q.ccRxAt = G.time; part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .3, max: .3, size: 1, col: CC_COL[s] }); } }
+      hurt(q, dmg * k * (q.def.boss ? .3 : 1), 'magic', HERO_SRC, false, 0, null); if (!q.dead) ccMark(q, 'arcane', null);
       part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .15, max: .15, size: .5, col: CC_COL.arcane });
     } });
   } });
@@ -25865,25 +25942,25 @@ function specShare(f, n) {
 }
 
 /* ================= THE CONCLAVE'S SPECIALIST: the Arcane Severers =================
-   Ward-breakers of the College in slate-grey and ley-teal, with crescent rune-glaives: the College's answer to WARDS AND
+   Ward-breakers of the College in slate-grey and ley-teal, with crescent ley-glaives: the College's answer to WARDS AND
    SHIELDS (the magic-resistant rank and file's ward bars, the soak shields of wardens and priests, Spell Ward, a
    Shieldbearer's great shield):
    - the strike: a severing crescent (arcane, air and ground) that seeks warded foes (st.hunt). It breaks a soak shield,
      a Spell Ward and a great shield outright, and tears a quarter of a ward bar's full size off with every hit.
    - Severance: every ward or shield it breaks charges its next spell: the spell's first hit carries extra magic damage,
      the broken ward's size times CCS.STORE_K (at most CCS.CAP times its strike). The info pane shows what is stored.
-   - Sundering Rune (innate): a rune on a warded foe that breaks every ward and shield on it at once (the bar too), and
+   - Sundering Glyph (innate): a glyph on a warded foe that breaks every ward and shield on it at once (the bar too), and
      cracks it open for a few seconds so every spell goes through whole.
    - Shard Volley (row II): shards at several warded foes, each tearing a large share of its ward and cracking it open.
    - Null Field (row IV): a field on the road where no shield takes, Spell Wards fall away and ward bars stand cracked
      open; it hurts what walks in it.
    - Splintering (a talent): a ward it breaks splinters, cracking the wards of foes near it open for a few seconds.
-   It leaves the arcane rune and gains Arcane Charge like every scholar; its hits go through ccHit (weaves, items). */
+   Its element is Arcane and it gains Arcane Charge like every scholar; its hits go through ccHit (marks, reactions, items). */
 const CCS_U = 'cc_severer';
 const CCS = { TEAR: .25, STORE_K: .6, CAP: 8, OPEN: 3, COL: { ley: '#6ff0e0', shard: '#c8fff6', ward: '#b98cff' } };
 specAdd('conclave', { id: CCS_U, name: 'Arcane Severers', short: 'Severers', key: '9', proj: 'force', attack: 'cc_sever', elem: null, dmgType: 'arcane', air: true, ground: true, ccSchool: 'arcane', visTiers: 6,
   top: [1.1, 1.16, 1.22, 1.28, 1.34, 1.4],
-  blurb: `Ward-breakers of the College with crescent rune-glaives. Their severing crescents hunt warded and shielded foes: they break shields and Spell Wards outright and tear ward bars apart, and every ward they break charges their next spell (twice as much on a foe carrying another school's rune: a weave). Air and ground. They leave the arcane rune. Each strike adds an Arcane Charge (up to ${CC_Q_MAX}); a spell spends them all.`,
+  blurb: `Ward-breakers of the College with crescent ley-glaives. Their severing crescents hunt warded and shielded foes: they break shields and Spell Wards outright and tear ward bars apart, and every ward they break charges their next spell (twice as much on a foe marked with another element). Air and ground. Their element is Arcane. Each strike adds an Arcane Charge (up to ${CC_Q_MAX}); a spell spends them all.`,
   tiers: [{ cost: 34, dmg: 7, rate: 1.05, range: 2.6 }, { cost: 62, dmg: 17, rate: 1, range: 2.8 }, { cost: 128, dmg: 39, rate: .95, range: 3 }] });
 FORCE_GLYPH[CCS_U] = 'shieldbreak';
 CC_UNITS.push(CCS_U);
@@ -25903,8 +25980,8 @@ function ccsBreak(t, c, bar) {
 }
 function ccsGain(t, c, size) {
   const st = t.st || effStats(t), was = t.ccsStore || 0;
-  const rs = typeof ccRunesOn === 'function' ? ccRunesOn(c).filter(s => s !== 'arcane') : [];   // a Severance weave: a ward broken on a foe carrying another school's rune spends it, and stores twice as much
-  if (rs.length && c.ccR) { c.ccR[rs[0]] = 0; size *= 2; fxSparkle(c.x, c.y, hitH(c) + .2, CC_COL[rs[0]] || CCS.COL.ley); }
+  const rs = typeof ccMarksOn === 'function' ? ccMarksOn(c).filter(s => s !== 'arcane') : [];   /* a ward broken on a foe marked with another element stores twice as much */
+  if (rs.length && c.ccR) { size *= 2; fxSparkle(c.x, c.y, hitH(c) + .2, CC_COL[rs[0]] || CCS.COL.ley); }
   t.ccsStore = Math.min(ccsCap(t, st), was + size * CCS.STORE_K); t.ccsN = (t.ccsN || 0) + 1;
   fxShards(c.x, c.y, hitH(c), 10); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .3, max: .3, size: .9, col: CCS.COL.shard }); sfx('shieldBreak', 0);
   rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, x1: t.x, h1: towerTop(t), z1: t.y, col: CCS.COL.ley, w: .03, life: .35 });
@@ -25939,7 +26016,7 @@ FORCE_ATTACK.cc_sever = (t, st, tg, pow, echo) => {
 /* ---------- the kit ---------- */
 const CCS_KIT = {
   cc_severer: { slot: SPEC_SLOT, mana: { max: 100, regen: .85, hit: .65 }, abilities: [
-    { id: 'cc_sunder', name: 'Sundering Rune', short: 'Sunder', glyph: 'shieldbreak', hue: '#6ff0e0', mana: 70, cd: 10, research: null,
+    { id: 'cc_sunder', name: 'Sundering Glyph', short: 'Sunder', glyph: 'shieldbreak', hue: '#6ff0e0', mana: 70, cd: 10, research: null,
       by: { open: [3, 3, 3.5, 3.5, 4, 4.5] },
       auto: 'a warded or shielded foe in reach (the biggest ward first)',
       text: (t, st, ab) => `Breaks every ward and shield on a warded foe, then strikes for ${xD(st, 2)}; its ward stays cracked open for ${byT(ab.by.open, t)}s. Carries the stored Severance.`,
@@ -25986,7 +26063,7 @@ const CCS_KIT = {
     { id: 'cc_nullfield', name: 'Null Field', short: 'Null', glyph: 'field', hue: '#8ae8d8', mana: 100, cd: 15, rr: 1.1, research: { cost: 110, time: 30 },
       by: { dur: [4, 4, 5, 5, 6, 6] },
       auto: 'the spot in reach with two or more warded or shielded walkers within 1.1 cells, or three or more walkers (or a boss or elite)',
-      text: (t, st, ab) => `A field of null runes on a ${ab.rr}-cell patch of the road for ${byT(ab.by.dur, t)}s: inside it no shield takes, Spell Wards fall away and ward bars stand cracked open; every half second each walker in it takes ${xDt(st, .25)}.`,
+      text: (t, st, ab) => `A field of null sigils on a ${ab.rr}-cell patch of the road for ${byT(ab.by.dur, t)}s: inside it no shield takes, Spell Wards fall away and ward bars stand cracked open; every half second each walker in it takes ${xDt(st, .25)}.`,
       pick(t, st, ab, man) {
         const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null;
         const kw = abCrowd(L, ab.rr, specWarded); if (kw && kw.n >= 2) return { x: kw.c.x, y: kw.c.y };
@@ -26024,19 +26101,19 @@ SPEC_INFO[CCS_U] = t => { const st = t.st || effStats(t); return `Severance stor
 const CCS_TREE = { name: 'Severance', hue: '#5ad8c8', list: [
   GT('Keen Crescent', 'glaive2', 0, 0, 3, n => `Each crescent tears ${25 + 5 * n}% of a ward bar's full size, not 25%.`, {}, { cap: 'ccs_tear' }),
   GT('Long Reach', 'lens', 0, 1, 2, n => `+${gNf(.25 * n)} range, for its crescents and its spells.`, n => ({ range: .25 * n })),
-  GT('Rune of Undoing', 'rune', 0, 3, 2, n => `Sundering Rune leaves the ward cracked open ${gNf(.5 * n)}s longer.`, {}, { sp: n => ({ ab: 'cc_sunder', by: { open: .5 * n } }) }),
+  GT('Lasting Undoing', 'rune', 0, 3, 2, n => `Sundering Glyph leaves the ward cracked open ${gNf(.5 * n)}s longer.`, {}, { sp: n => ({ ab: 'cc_sunder', by: { open: .5 * n } }) }),
   GT('Quick Severing', 'quick', 1, 0, 3, n => `Its crescents come ${4 * n}% faster.`, n => gHaste(.04 * n)),
   GT('Ward Feedback', 'gem', 1, 2, 1, 'Every ward or shield it breaks gives it 8 mana.', {}, { cap: 'ccs_feedback' }),
   GS('cc_shards', 1, 3),
   GT('Splintering', 'shards', 2, 0, 2, n => `A ward it breaks splinters: the wards of foes within ${gNf(1.5 + .25 * n)} cells crack open for ${2 + n}s, letting every spell through whole.`, {}, { cap: 'ccs_splinter', req: [1, 0] }),
-  GT('Sever the Link', 'cracked', 2, 1, 2, n => `Sundering Rune also slows its foe ${15 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_sunder', rider: { slow: [.15 * n, 2] } }) }),
-  GT('Seeking Shards', 'shards', 2, 3, 1, 'Shard Volley looses one more shard, and each brings Sundering Rune 1s nearer.', {}, { sp: { ab: 'cc_shards', by: { n: 1 }, ready: ['cc_sunder', 1] }, req: [1, 3] }),
+  GT('Sever the Link', 'cracked', 2, 1, 2, n => `Sundering Glyph also slows its foe ${15 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_sunder', rider: { slow: [.15 * n, 2] } }) }),
+  GT('Seeking Shards', 'shards', 2, 3, 1, 'Shard Volley looses one more shard, and each brings Sundering Glyph 1s nearer.', {}, { sp: { ab: 'cc_shards', by: { n: 1 }, ready: ['cc_sunder', 1] }, req: [1, 3] }),
   GT('Arcane Memory', 'spiral', 2, 2, 2, n => `Each foe it slays restores ${7 * n} mana.`, {}, { mana: { slay: 7 } }),
   GS('cc_nullfield', 3, 0),
   GT('Shatterpoint', 'target', 3, 2, 2, n => `Shard Volley slows every foe it strikes ${20 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_shards', rider: { slow: [.2 * n, 2] } }) }),
   GT('Brimming Severance', 'orbbig', 3, 1, 1, 'Severance can store twice as much.', {}, { cap: 'ccs_brim' }),
   GT('Void Ground', 'vortex', 4, 0, 1, 'Null Field lasts 2s longer, and each foe slain in it gives 12 mana back.', {}, { sp: { ab: 'cc_nullfield', by: { dur: 2 }, kill: { mana: 12 } }, req: [3, 0] }),
-  GT('Unravelling Field', 'disint', 4, 1, 1, 'Each Null Field brings Sundering Rune 3s nearer.', {}, { sp: { ab: 'cc_nullfield', ready: ['cc_sunder', 3] } }),
+  GT('Unravelling Field', 'disint', 4, 1, 1, 'Each Null Field brings Sundering Glyph 3s nearer.', {}, { sp: { ab: 'cc_nullfield', ready: ['cc_sunder', 3] } }),
   GT('Wardbreaker', 'shieldx', 4, 3, 1, 'Every third crescent at a warded foe breaks its whole ward bar at once.', {}, { cap: 'ccs_breaker' }),
 ] };
 CCS_TREE.list.forEach((t, i) => t.id = i);
@@ -26055,7 +26132,7 @@ SPEC_REG.push(() => {
   if (typeof LIFE_KIND !== 'undefined') LIFE_KIND[CCS_U] = 'caster';
 });
 
-/* ---------- the body: a slate-grey ward-breaker in a long coat, a crescent rune-glaive ---------- */
+/* ---------- the body: a slate-grey ward-breaker in a long coat, a crescent ley-glaive ---------- */
 CC_PAL[CCS_U] = { robe: '#4a5260', robeD: '#2e343e', robeL: '#626c7c', trim: '#c8d4dc', skin: '#d8b8a0', hair: '#2a2830', glow: '#6ff0e0', legs: '#262a32', boot: '#3a3430', steel: '#8a96a4', shard: '#c8fff6' };
 UNIT_PAL[CCS_U] = { cloak: CC_PAL[CCS_U].robe, cloakD: CC_PAL[CCS_U].robeD, robe: CC_PAL[CCS_U].robe };
 FORCE_BUILD[CCS_U] = ccBody0(CCS_U, (g, tier) => {
@@ -26072,7 +26149,7 @@ FORCE_BUILD[CCS_U] = ccBody0(CCS_U, (g, tier) => {
   ccEm(g, 1, () => g.torus(-.19, y0 + .04, .12, .04, .006, 12, 3, CP.glow));   // a cracked ward ring at the off hand
 });
 const CCS_PARTS = [
-  ccPart('glaive', [.14, .64, 0], (g, tier) => {   // the right arm and the crescent rune-glaive
+  ccPart('glaive', [.14, .64, 0], (g, tier) => {   /* the right arm and the crescent ley-glaive */
     ccArm(g, [.03, -.1, .15], .03);
     const L = .62 + .04 * Math.min(tier, 4);
     ccM(g, 'woodgrain', () => g.seg([.03, -.1 - L * .45, .15], [.03, -.1 + L * .55, .15], .016, '#2a2630'));
@@ -26080,7 +26157,7 @@ const CCS_PARTS = [
     ccEm(g, .8, () => ccM(g, 'leafblade', () => { const c = [.03, -.1 + L * .55, .15]; for (let k = 0; k < 8; k++) { const a0 = .25 + k * .33, a1 = a0 + .33, r = .17 + .012 * Math.min(tier, 3); g.seg([c[0] + Math.cos(a0) * r, c[1] + Math.sin(a0) * r * .9 - .02, c[2] + .02], [c[0] + Math.cos(a1) * r, c[1] + Math.sin(a1) * r * .9 - .02, c[2] + .02], .026 - Math.abs(k - 3.5) * .0035, '#5ad8c8'); } }));   // the crescent blade
   }, t => {
     const s = ccShot(t), w = t.windup || 0, sun = ccAge(t, 'cc_sunder'), sh = ccAge(t, 'cc_shards'), nf = ccAge(t, 'cc_nullfield');
-    if (sun < .6) { const e = ccPop(sun, 0, .6); return [-1.6 * e + 1.9 * ccBump(sun, .2, .45), 0, 0, 0, .05 * e, .1 * e]; }   // Sundering Rune: raised, then hewn down onto the ward
+    if (sun < .6) { const e = ccPop(sun, 0, .6); return [-1.6 * e + 1.9 * ccBump(sun, .2, .45), 0, 0, 0, .05 * e, .1 * e]; }   /* Sundering Glyph: raised, then hewn down onto the ward */
     if (sh < .7) { const v = ccEase(ccIn(sh, .05, .5)); return [-.3, 1.2 - 2.4 * v, -.2, 0, .02, .05]; }   // Shard Volley: a wide sweep that throws the shards
     if (nf < 1) { const e = ccPop(nf, 0, 1); return [.5 * e, 0, .25 * e, 0, -.08 * e, .06 * e]; }   // Null Field: the butt driven down into the road
     if (s < .4) return [-1 + 1.3 * ccEase(Math.min(1, s / .25)), .2, 0, 0, 0, .05 * ccPop(s, 0, .3)];   // the cut that looses a crescent
@@ -26098,8 +26175,8 @@ Object.assign(SPEC_HELP, {
   cc_nullfield: { when: "Two or more warded or shielded foes within {reach} cells, a warded boss or elite, or four or more foes.", aim: "Up to 3 foes in reach, warded and shielded ones first: hooked, held taut a breath, then torn.", tips: ["Cast it on a crowd behind a War Mage: every ward breaks at once.", "Each torn foe is Severed for 4s, so no new shield can take on it.", "Hooked foes are slowed 50% while the threads are taut."] },
 });
 SPEC_KW.push(
-  { key: 'cc:severance', name: 'Severance', alias: [], cat: 'force', force: 'conclave', col: '#6ff0e0', def: () => `The Arcane Severers' store: every ward or shield one breaks charges it with ${Math.round(CCS.STORE_K * 100)} in every hundred points of what it broke, at most ${CCS.CAP}× its strike. Its next spell's first hit carries it all as magic damage. A Severance weave: a ward broken on a foe carrying another school's rune spends that rune and stores twice as much.` },
-  { key: 'cc:cracked', name: 'cracked open', alias: ['Cracked open', 'stands cracked open'], cat: 'status', force: 'conclave', col: '#d0b0ff', def: 'A ward cracked open lets every spell through to health whole while it lasts, though each hit still wears it: a Golem Warden\'s slam, a Severer\'s rune, shards and Null Field do it.' },
+  { key: 'cc:severance', name: 'Severance', alias: [], cat: 'force', force: 'conclave', col: '#6ff0e0', def: () => `The Arcane Severers' store: every ward or shield one breaks charges it with ${Math.round(CCS.STORE_K * 100)} in every hundred points of what it broke, at most ${CCS.CAP}× its strike. Its next spell's first hit carries it all as magic damage. A ward broken on a foe marked with another element stores twice as much.` },
+  { key: 'cc:cracked', name: 'cracked open', alias: ['Cracked open', 'stands cracked open'], cat: 'status', force: 'conclave', col: '#d0b0ff', def: 'A ward cracked open lets every spell through to health whole while it lasts, though each hit still wears it: a Golem Warden\'s slam, a Severer\'s glyph, a Crack, shards and Null Field do it.' },
 );
 SPEC_BUFF.push(['cc_nulled', { name: 'Severed', kw: 'st:severed', kind: 'debuff', pri: 6, icon: 'field', hue: '#3a8a80', f: ['nowardT'],
   def: 'Its wards were torn out (Rend the Veil): no shield takes on it, its Spell Ward falls and its ward bar is cracked open.',
@@ -27354,7 +27431,7 @@ function chAnim(kind, o = {}) {
 
 /* ================= THE CONCLAVE'S CHAMPIONS: Maelis, Aurel and Maren in person =================
    Built on the Grove's template (forces_zx_champ_grove.js; the rules in forces_zw_champions.js). Each is a Conclave unit
-   (ccUnit: its strikes add Arcane Charge and leave its school's rune; its W and E spend the charge, ccCast), carries its
+   (ccUnit: its strikes add Arcane Charge and mark its element; its W and E spend the charge, ccCast), carries its
    commander's old Champion gift as its trait (ccChampFire and ccQMax in forces_conclave_a/f.js read G.champ), and is drawn
    with the Conclave's scholar kit (ccBody, forces_conclave_b.js) larger than the rank and file, on a richer rune-slate.
    The Leyline Obelisk is retired: its battery role lives on in each tree's 'ally' talent and in the two holy-slot items,
@@ -27374,7 +27451,7 @@ function chCcGround(g, tier, more) {
 }
 
 /* ---------- Maelis, the Spellweaver ---------- */
-// her bolt: its rune turns arcane, frost, fire with each shot, so she weaves on her own
+// her bolt: its element turns Arcane, Frost, Fire with each shot, so she reacts on her own
 FORCE_ATTACK.chWeaveBolt = function (t, st, tg, pow) {
   const s = ['arcane', 'frost', 'fire'][(t.chRuneN = ((t.chRuneN || 0) + 1) % 3)], [hx, hh, hz] = ccHand(t, towerTop(t) * .8);
   ccShoot({ k: 'missile', x: hx, h: hh + .05, z: hz, tg, spd: 8, turn: 6, seek: true, vh: .3, col: CC_COL[s], sz: 1.2,
@@ -27383,25 +27460,25 @@ FORCE_ATTACK.chWeaveBolt = function (t, st, tg, pow) {
 };
 champAdd('cc_arch', { force: 'conclave', he: 'she', glyph: 'missiles',
   unit: { id: 'ch_maelis', name: 'Maelis, the Spellweaver', short: 'Maelis', proj: 'force', attack: 'chWeaveBolt', dmgType: 'arcane', ccSchool: 'arcane', air: true, ground: true, top: [1.6, 1.68, 1.76, 1.84, 1.92, 2],
-    blurb: 'The Archmage of the College on a floating dais of books. Her bolt leaves an arcane, a frost, then a fire rune in turn, so she weaves on her own. Each strike adds an Arcane Charge; her spells spend them.',
+    blurb: 'The Archmage of the College on a floating dais of books. Her bolt marks Arcane, then Frost, then Fire in turn, so she sets off reactions on her own. Each strike adds an Arcane Charge; her spells spend them.',
     tiers: [{ dmg: 24, rate: 1.1, range: 3 }, { dmg: 55, rate: 1.05, range: 3.2 }, { dmg: 128, rate: 1, range: 3.4 }] },
   trait: { name: 'Archmage’s Mantle', t: 'She holds 3 more Arcane Charges, and every 4th bolt gives her an extra one.' },   // (ccQMax, ccChampFire)
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
     champQ('cc_arch', { id: 'ch_thousandfold', name: 'Thousandfold Barrage', short: 'Barrage', glyph: 'missiles', hue: '#b98cff', art: 'cc_thousandfold', mana: 90, cd: 16, school: 'arcane', pref: 'grouped', qs: 4, qf: .16,
-      blurb: 'Two dozen seeking missiles rain on an area, leaving arcane runes and weaving with the rest.',
-      text: (t, st, ab) => `Looses 24 seeking missiles over a ${gNf(champQR(t, ab))}-cell area in 2s: ${champQx(t, st, ab, .04)} and the arcane rune each. ${sagaHas('fin') ? 'Every missile' : 'Every 6th missile'} weaves with another rune for double damage.`,
+      blurb: 'Two dozen seeking missiles rain on an area, marking it Arcane and reacting with the rest.',
+      text: (t, st, ab) => `Looses 24 seeking missiles over a ${gNf(champQR(t, ab))}-cell area in 2s: ${champQx(t, st, ab, .04)} and an Arcane mark each. ${sagaHas('fin') ? 'Every missile' : 'Every 6th missile'} reacts with another mark for double damage.`,
       anim: chAnim('channel', { T: 1.2, tip: ['main', [.04, .52, .15]], col: [.8, .6, 1.3], size: .45 }) }),
     { id: 'ch_unravel', name: 'Unravel', short: 'Unravel', glyph: 'rune', hue: '#d8b8ff', mana: 100, cd: 13, research: CH_CC_RS, school: 'arcane', pref: 'afflicted', rr: 1.2,
       by: { mult: [1, 1, 1.2, 1.2, 1.4, 1.4] },
-      auto: 'two or more rune-marked foes bunched in reach, or a rune-marked boss', blurb: 'Tears every rune off the foes in an area: each rune pays out at once.',
-      text: (t, st, ab) => `Tears every rune off the foes within ${ab.rr} cells of a point in her reach: each pays out at once, ${xD(st, byT(ab.by.mult, t))} for every rune the foe wore.`,
-      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => ccRunesOn(c).length > 0); if (!L.length) return null; const c = abCrowd(L, ab.rr); return c && (man || c.n >= 2 || L.some(abBig)) ? { x: c.c.x, y: c.c.y } : null; },
+      auto: 'two or more marked foes bunched in reach, or a marked boss', blurb: 'Tears every element mark off the foes in an area: each mark pays out at once.',
+      text: (t, st, ab) => `Tears every element mark off the foes within ${ab.rr} cells of a point in her reach: each pays out at once, ${xD(st, byT(ab.by.mult, t))} for every mark the foe wore.`,
+      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => ccMarksOn(c).length > 0); if (!L.length) return null; const c = abCrowd(L, ab.rr); return c && (man || c.n >= 2 || L.some(abBig)) ? { x: c.c.x, y: c.c.y } : null; },
       cast(t, st, p, ab) {
         const k = ccCast(t, ab), m = byT(ab.by.mult, t);
         abAoe(() => inSplash(p.x, p.y, ab.rr, false, c => {
-          if (c.ent || !canTarget(t, st, c)) return; const R2 = ccRunesOn(c); if (!R2.length) return;
+          if (c.ent || !canTarget(t, st, c)) return; const R2 = ccMarksOn(c); if (!R2.length) return;
           for (const s of R2) { c.ccR[s] = 0; part({ k: 'spark', x: c.x, z: c.y, h: hitH(c), vx: R(-1.2, 1.2), vz: R(-1.2, 1.2), vh: R(.6, 1.6), g: 2, life: .45, max: .45, size: .07, col: CC_COL[s] }); }
-          ccAb(t, st, c, m * R2.length, k, { noRune: true, noWeave: true }); c.ccWoven = 1;
+          ccAb(t, st, c, m * R2.length, k, { noMark: true, noRx: true }); c.ccWoven = 1;
         }));
         ccRingFx(p.x, p.y, ab.rr, ab.hue); rfx({ k: 'rune', x: p.x, z: p.y, r: ab.rr, col: ab.hue, life: .6 }); sfx('phase', 1);
       },
@@ -27424,13 +27501,13 @@ champAdd('cc_arch', { force: 'conclave', he: 'she', glyph: 'missiles',
       ccRecast(t, ab, tg, 1, s2); part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) + .2, life: .35, max: .35, size: 1, col: '#f0e0ff' });
     } });
   },
-  tree: { name: 'Spellweaving', hue: '#b98cff', list: [
+  tree: { name: 'The Elements', hue: '#b98cff', list: [
     CT('Quick Quill', 'hourglass', 0, 3, 2, n => `Thousandfold Barrage comes ${10 * n}% sooner.`, {}, { sp: n => ({ ab: 'ch_thousandfold', cd: -.1 * n }) }),
     CT('Starlit Reach', 'spyglass', 0, 2, 2, n => `Her bolts reach ${gNf(.15 * n)} cells farther.`, n => ({ range: .15 * n })),
     CT('Wide Barrage', 'missiles', 0, 0, 2, n => `Thousandfold Barrage falls on a ${gNf(.15 * n)}-cell wider area.`, {}, { sp: n => ({ ab: 'ch_thousandfold', by: { area: .15 * n } }) }),
     CT('Library Wall', 'statue', 3, 2, 1, 'Beside a wall, Thousandfold Barrage and Unravel cost 25% less: she reads from the stones.', {}, { sp: [{ ab: 'ch_thousandfold', at: 'wall', cost: -.25 }, { ab: 'ch_unravel', at: 'wall', cost: -.25 }] }),
     GS('ch_unravel', 1, 3),
-    CT('Loose Threads', 'rune', 2, 3, 2, n => `Unravel pays out ${gNf(.25 * n)}× more for each rune it tears off.`, {}, { sp: n => ({ ab: 'ch_unravel', by: { mult: .25 * n } }), req: [1, 3] }),
+    CT('Loose Threads', 'rune', 2, 3, 2, n => `Unravel pays out ${gNf(.25 * n)}× more for each mark it tears off.`, {}, { sp: n => ({ ab: 'ch_unravel', by: { mult: .25 * n } }), req: [1, 3] }),
     CT('Runic Drag', 'snail', 1, 0, 2, n => `Every foe Thousandfold Barrage strikes is slowed ${10 * n}% for 2s.`, {}, { sp: n => ({ ab: 'ch_thousandfold', rider: { slow: [.1 * n, 2] } }) }),
     CT('Shared Lesson', 'potion', 2, 0, 1, 'Each Unravel pours 15 mana into every unit within 1.6 cells of her.', {}, { sp: { ab: 'ch_unravel', ally: 15 } }),
     CT('Deeper Mirror', 'echo', 4, 0, 1, 'Mirror Weave echoes one more spell.', {}, { sp: { ab: 'ch_mirrorweave', by: { n: 1 } }, req: [3, 0] }),
@@ -27479,7 +27556,7 @@ champAdd('cc_chrono', { force: 'conclave', he: 'he', glyph: 'hourglass',
       zone(t, st, z) {
         for (const c of G.creeps) {
           if (c.dead || c.ent || !(c.slowT > 0) || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue;
-          chill(c, { slow: .5, slowT: .7 }, null, t); c.slowT += .25; ccRune(c, 'chrono', t, 1);
+          chill(c, { slow: .5, slowT: .7 }, null, t); c.slowT += .25; ccMark(c, 'chrono', t, 1);
         }
       },
       anim: chAnim('channel', { T: 1.2, tip: ['main', [.04, .5, .15]], col: [1.1, .85, .4], size: .5 }) },
@@ -27511,7 +27588,7 @@ champAdd('cc_chrono', { force: 'conclave', he: 'he', glyph: 'hourglass',
 });
 
 /* ---------- Maren Vey, Blade of the Conclave ---------- */
-// her cut: a flash-step out to a foe beyond arm's reach and back, the rune blade's cut, a stack of Stagger (she is a
+// her cut: a flash-step out to a foe beyond arm's reach and back, the riftsteel blade's cut, a stack of Stagger (she is a
 // Spellblade); while Unbound Blade burns, each cut also cleaves the walkers round its foe
 const CH_VEY = { arm: 1.1, cleave: .8, cleaveK: .6 };
 FORCE_ATTACK.chVeyCut = function (t, st, tg, pow) {
@@ -27519,20 +27596,20 @@ FORCE_ATTACK.chVeyCut = function (t, st, tg, pow) {
   if (d > CH_VEY.arm) ccBlinkTo(t, tg, .32);
   ccHit(t, st, tg, st.dmg * pow, { type: 'phys', kb: [ux * .06, uz * .06] });
   if (!tg.dead) ccStaggerFoe(tg, t);
-  if (t.ccUnbT > G.time) inSplash(tg.x, tg.y, CH_VEY.cleave, true, o => { if (o !== tg && !o.ent && canTarget(t, st, o)) { ccHit(t, st, o, st.dmg * pow * CH_VEY.cleaveK, { type: 'phys', noWeave: true }); if (!o.dead) ccStaggerFoe(o, t); } });
+  if (t.ccUnbT > G.time) inSplash(tg.x, tg.y, CH_VEY.cleave, true, o => { if (o !== tg && !o.ent && canTarget(t, st, o)) { ccHit(t, st, o, st.dmg * pow * CH_VEY.cleaveK, { type: 'phys', noRx: true }); if (!o.dead) ccStaggerFoe(o, t); } });
   if (!(typeof sfxVeyCut === 'function' && sfxVeyCut(t, tg, d > CH_VEY.arm))) rfx({ k: 'slash', x: tg.x, h: hitH(tg), z: tg.y, a: Math.atan2(uz, ux) + ((t.shots | 0) % 2 ? .6 : -.6), r: .42, col: '#f070d8', life: .26 });
   t.recoil = 1; sfx('glaiveHit', 0);
 };
 champAdd('cc_maren', { force: 'conclave', he: 'she', glyph: 'sword',
   unit: { id: 'ch_maren', name: 'Maren Vey, Blade of the Conclave', short: 'Maren', proj: 'force', attack: 'chVeyCut', dmgType: 'phys', ccSchool: 'arcane', air: false, ground: true, top: [1.55, 1.63, 1.71, 1.79, 1.87, 1.95],
-    blurb: 'The Conclave’s duellist, white-haired in a fur mantle, a long violet rune blade in her hands: she flash-steps to her foe and back with every cut, and each cut Staggers. Each strike adds an Arcane Charge; her spells spend them. Cannot reach flyers.',
+    blurb: 'The Conclave’s duellist, white-haired in a fur mantle, a long riftsteel blade in her hands, red at one end and pink at the other. She left the College’s halls to master riftsteel, and the College sends her where spells fail: she steps through the rift her blade opens to her foe and back with every cut, and each cut Staggers. Her element is Arcane. Each strike adds an Arcane Charge; her spells spend them. Cannot reach flyers.',
     tiers: [{ dmg: 30, rate: 1.2, range: 2.2 }, { dmg: 68, rate: 1.15, range: 2.35 }, { dmg: 158, rate: 1.1, range: 2.5 }] },
   // (ccChampFire, ccSeamcut)
   trait: { name: 'Seamcut', t: 'Every 4th cut opens a seam of light in its foe that tears a second later: it is struck again for the cut’s full damage and Staggered.' },
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
     champQ('cc_maren', { id: 'ch_severing', name: 'Severing Arc', short: 'Arc', glyph: 'swords', hue: '#f070d8', art: 'cc_severing', mana: 90, cd: 16, school: 'arcane', pref: 'grouped', qs: 4, qf: .1,
       blurb: 'One sweep of her blade carves an arc through an area; the Spellblades near blink in to cut.',
-      text: (t, st, ab) => `Carves an arc of rune-light through a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} and two stacks of Stagger to each foe there. Every Spellblade within 4 cells blinks in and cuts one of them for twice its strike.${sagaHas('fin') ? ' A second arc crosses the first, half as strong (Crossed Edges).' : ''}`,
+      text: (t, st, ab) => `Carves an arc of starlight through a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} and two stacks of Stagger to each foe there. Every Spellblade within 4 cells blinks in and cuts one of them for twice its strike.${sagaHas('fin') ? ' A second arc crosses the first, half as strong (Crossed Edges).' : ''}`,
       anim: chAnim('sweep', { T: 1.0, tip: ['main', [-.2, .38, .92]], col: [1.5, .45, 1.25], size: .5 }) }),
     { id: 'ch_riftchain', name: 'Rift Chain', short: 'Chain', glyph: 'flash', hue: '#ff8ae0', mana: 90, cd: 12, research: CH_CC_RS, school: 'arcane', pref: 'first', rAdd: 1.2,
       by: { n: [3, 3, 4, 4, 5, 5], mult: [1.6, 1.7, 1.8, 1.9, 2, 2.1] },
@@ -27562,8 +27639,8 @@ champAdd('cc_maren', { force: 'conclave', he: 'she', glyph: 'sword',
       anim: chAnim('thrust', { T: .9, tip: ['main', [-.2, .38, .92]], col: [1.5, .55, 1.3], size: .4 }) },
     { id: 'ch_unbound', name: 'Unbound Blade', short: 'Unbound', glyph: 'swords', hue: '#ffb0f0', mana: 120, cd: 22, research: CH_CC_RS, school: 'arcane', pref: 'grouped',
       by: { dur: [5, 5, 6, 6, 7, 7], mult: [1, 1.05, 1.1, 1.15, 1.2, 1.3] },
-      auto: 'three or more walkers within her reach, or a boss', blurb: 'Her blade bursts its runes: every walker near her is cut, and for a while each cut of hers cleaves.',
-      text: (t, st, ab) => `Her blade bursts its runes: every walker within ${gNf(st.range || 2.2)} cells is cut for ${xD(st, byT(ab.by.mult, t))} and Staggered. For ${byT(ab.by.dur, t)}s after, each cut of hers also cuts every walker within ${CH_VEY.cleave} cells of its foe for ${abPct(CH_VEY.cleaveK)} of it, Staggering them too.`,
+      auto: 'three or more walkers within her reach, or a boss', blurb: 'Her blade bursts its light: every walker near her is cut, and for a while each cut of hers cleaves.',
+      text: (t, st, ab) => `Her blade bursts its light: every walker within ${gNf(st.range || 2.2)} cells is cut for ${xD(st, byT(ab.by.mult, t))} and Staggered. For ${byT(ab.by.dur, t)}s after, each cut of hers also cuts every walker within ${CH_VEY.cleave} cells of its foe for ${abPct(CH_VEY.cleaveK)} of it, Staggering them too.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, st.range || 2.2, abWalker); return L.length && (man || L.length >= 3 || L.some(abBig)) && !(t.ccUnbT > G.time) ? t : null; },
       cast(t, st, _, ab) {
         const k = ccCast(t, ab), m = byT(ab.by.mult, t);
@@ -27592,14 +27669,14 @@ champAdd('cc_maren', { force: 'conclave', he: 'she', glyph: 'sword',
     CT('Steady Breath', 'potion', 1, 1, 2, n => `While she saves for her next spell, her mana flows back ${50 * n}% faster.`, {}, { mana: { saving: .5 } }),
     CT('Chain to Blade', 'chains', 4, 0, 1, 'Each Unbound Blade brings Rift Chain 3s nearer.', {}, { sp: { ab: 'ch_unbound', ready: ['ch_riftchain', 3] } }),
   ] },
-  flavor: ['Maren fights in person: rune blades that cut and blink.', 'Spells are for people who stand still. Keep up.'], emblem: 'Blade of the Conclave',
+  flavor: ['Maren fights in person: riftsteel that steps through rifts and cuts what magic cannot touch.', 'Spells are for people who stand still. Keep up.'], emblem: 'Blade of the Conclave',
   extra(t, tier, x, z, yaw, K) {
     ccExtra(t, tier, x, z, yaw, K);
     if (inIcon || t.wrecked) return;
     const sz = CC_SZ[Math.min(5, tier)], b = t.ccBlink;
     // the afterimage left at her post as she flash-steps (the code-built body's: not under her sculpt, unitmodels_maren.js)
     if (b && G.time - b.at < .3 && t._mvOn !== G.time) { const a = 1 - (G.time - b.at) / .3; M4.trs(_ccM, b.x0, 0, b.z0, yaw, 0, 0, K * sz); item(towerMesh(t.type, tier), _ccM, { alpha: .35 * a, tint: [1.3, .5, 1.1, .5], shadow: false }); }
-    // Unbound Blade: the runes burning round her
+    // Unbound Blade: the light burning round her
     if (t.ccUnbT > G.time) { const a = Math.min(1, t.ccUnbT - G.time, .7 + .3 * Math.sin(vt * 9)); QADD.ground(x, z, .05, .62 * sz, .62 * sz, [1, .35, .85, .3 * a], 4, .05, vt * 2); }   // (the ring on the road; no haze over her sculpt, whose blade burns instead)
   },
 });
@@ -30867,15 +30944,15 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_caged', { name: 'Caged
 /* ================= THE CONCLAVE: the cool-factor pass on the second and third spells =================
    The owner (6 Nov 2026): "do a pass on all second and third spells making each unique and interesting, aim for the cool
    factor like the gattling gun spell. should fulfill some fantasy of the character." Each unit's spell 2 and 3 is now a
-   signature move with one readable mechanic, a hook into the Conclave's pillars (runes and weaves, Arcane Charge, the six
+   signature move with one readable mechanic, a hook into the Conclave's pillars (elements and reactions, Arcane Charge, the six
    schools) and a reason to stand somewhere in the maze. Ids are kept, so the trees, items, sets and saves still bind.
      Spellblades     Riposte Stance (a duellist's stance: every walker that steps into reach is cut, each riposte an
                      Arcane Charge)              Crosscut Sigil (the blade driven into the road: a cross along the grid)
      Magelings       Missile Curtain (missiles hung across the road, each diving at the first foe under it)
                      Gathering Orb (every Mageling missile near it curves into a growing orb, then it is hurled)
-     Rimeweavers     Hoarfrost Trail (a branded walker leaves frost prints that bite those behind it)
+     Frostweavers     Hoarfrost Trail (a branded walker leaves frost prints that bite those behind it)
                      Rime Lattice (every frost glyph in reach erupts, and ice bridges join them)
-     Chronomancers   Backward Hour (walkers entering it walk back up the road, and their lost runes come back)
+     Chronomancers   Backward Hour (walkers entering it walk back up the road, and their lost marks come back)
      Astrologers     Lodestar (a star hung low draws foes and flyers to it, then falls)
                      Grand Orrery (three planets wheel round a spot; when they align, a beam of starlight)
      Golem Wardens   Heave (the golem throws the leading walker back up the road onto the column)
@@ -30884,7 +30961,7 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_caged', { name: 'Caged
                      Phoenix (a bird of fire sweeping back up the road; Furnace Breath, the innate, a cone poured from its hands)
      Arcane Severers Returning Crescent (the glaive's edge thrown on a loop, cutting out and back)
                      Rend the Veil (threads hooked into the warded, then torn out: wards broken, the foe Severed)
-     Maelis          Sixfold Loom (a wheel of the six schools throws bolts that weave on each other)
+     Maelis          Sixfold Loom (a wheel of the six elements throws bolts that react on each other)
      Aurel           Recall (a foe snapped back to its ghost, striking the column it is dragged through)
                      The Hour Strikes (a clock hand sweeps his whole reach, stopping what it passes)
    Kept as they were (already their own): Echo, Unravel, Fixed Star, Conjunction.
@@ -30958,7 +31035,7 @@ function ccxRiposte(t, st, c, z) {
   if (!c.dead) { ccStaggerFoe(c, t); ccStaggerFoe(c, t); }
   ccGain(t, 1);
   if (ccxCap(st, 'ccxFifth') && t.ab && t.ab.cd.cc_blinkstrike > G.time) t.ab.cd.cc_blinkstrike = Math.max(G.time, t.ab.cd.cc_blinkstrike - 1);
-  if (ccxCap(st, 'ccxGhostRip')) ccxLater('cc_sigilcleave', .4, () => { if (!c.dead && abLive(t)) { ccAb(t, t.st || st, c, m * .5, z.ck, { type: 'arcane', noWeave: true }); ccxFx('cc_sigilcleave', t, c, C => CCX_FX.ripCut(C, t, c, 1)); } });
+  if (ccxCap(st, 'ccxGhostRip')) ccxLater('cc_sigilcleave', .4, () => { if (!c.dead && abLive(t)) { ccAb(t, t.st || st, c, m * .5, z.ck, { type: 'arcane', noRx: true }); ccxFx('cc_sigilcleave', t, c, C => CCX_FX.ripCut(C, t, c, 1)); } });
   ccxFx('cc_sigilcleave', t, c, C => CCX_FX.ripCut(C, t, c, 0));
   sfx('glaiveHit', 1);
 }
@@ -31007,7 +31084,7 @@ ccxSwap('cc_spellblade', { id: 'cc_spectral', name: 'Crosscut Sigil', short: 'Cr
   zone(t, st, z) {
     for (const c of G.creeps) {
       if (c.dead || c.ent || !abWalker(c) || !ccxOnCross(c, z.x, z.z, z.arm) || (z.last.get(c) || 0) > G.time) continue;
-      z.last.set(c, G.time + 1); ccStaggerFoe(c, t); ccRune(c, 'arcane', t);
+      z.last.set(c, G.time + 1); ccStaggerFoe(c, t); ccMark(c, 'arcane', t);
     }
   } });
 
@@ -31016,13 +31093,13 @@ ccxSwap('cc_spellblade', { id: 'cc_spectral', name: 'Crosscut Sigil', short: 'Cr
    ===================================================================================================== */
 function ccxCurtainShot(t, st, z, m, c) {
   m.live = 0; const k = z.ck; z.per.set(c, (z.per.get(c) || 0) + 1);
-  const rs = ccRunesOn(c).filter(s => s !== 'arcane');
+  const rs = ccMarksOn(c).filter(s => s !== 'arcane');   /* (read before the dive: its own hit may react with them) */
   ccShoot({ k: 'missile', x: m.x, h: m.h, z: m.z, tg: c, spd: 8.5, turn: 9, seek: true, vx: 0, vz: 0, vh: -.6, col: CC_COL.arcane, sz: 1.1, fn: (q) => {
     if (!q || !abLive(t)) return; const s = t.st || st;
     ccAb(t, s, q, 1.1, k, {});
-    if (rs.length && !q.dead) {   // a missile that lands on another school's rune splits: its twin seeks the next foe
+    if (rs.length && !q.dead) {   /* a missile that lands on another element's mark splits: its twin seeks the next foe */
       const o = nearest(q.x, q.y, 1.6, 1, q, w => canTarget(t, s, w))[0];
-      if (o) ccShoot({ k: 'missile', x: q.x, h: hitH(q), z: q.y, tg: o, spd: 8, turn: 8, seek: true, col: CC_COL[rs[0]] || CC_COL.arcane, sz: .8, fn: w => { if (w && abLive(t)) ccAb(t, t.st || s, w, .66, k, { noWeave: true }); } });
+      if (o) ccShoot({ k: 'missile', x: q.x, h: hitH(q), z: q.y, tg: o, spd: 8, turn: 8, seek: true, col: CC_COL[rs[0]] || CC_COL.arcane, sz: .8, fn: w => { if (w && abLive(t)) ccAb(t, t.st || s, w, .66, k, { noRx: true }); } });
     }
   } });
   ccxFx('cc_sparks', t, c, C => CCX_FX.curtainDive(C, m, c));
@@ -31030,7 +31107,7 @@ function ccxCurtainShot(t, st, z, m, c) {
 ccxSwap('cc_mageling', { id: 'cc_sparks', name: 'Missile Curtain', short: 'Curtain', glyph: 'missiles', hue: '#c9a0ff', mana: 75, cd: 10, research: { cost: 45, time: 20 }, pref: 'grouped',
   by: { n: [4, 4, 5, 5, 6, 6] },
   auto: 'two or more foes in reach, flyers too', none: 'no foes in reach',
-  text: (t, st, ab) => `Hangs ${byT(ab.by.n, t)} arcane missiles across the road for ${CCX.CURT_WAIT}s; each dives at the first foe under it for ${xD(st, 1.1)}. A missile landing on another school's rune splits in two.`,
+  text: (t, st, ab) => `Hangs ${byT(ab.by.n, t)} arcane missiles across the road for ${CCX.CURT_WAIT}s; each dives at the first foe under it for ${xD(st, 1.1)}. A missile landing on a foe marked with another element splits in two.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (L.length < (man ? 1 : 2)) return null; const k = abCrowd(L, 1.6); return k ? k.c : null; },
   cast(t, st, c, ab) {
     const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t))), P = ccxPathPts(), reach = abReach(t, st, ab);
@@ -31078,15 +31155,15 @@ function ccxOrbThrow(orb) {
   const store0 = Math.max(orb.store, (st.dmg || 0) * 1.5) * CCX.ORB_STORE, R0 = CCX.ORB_R + .1 * Math.min(8, orb.n) * ccxCap(st, 'ccxOrbWide');
   t.ang = Math.atan2(x - t.x, z - t.y); t.ccxOrbThrowAt = G.time;
   ccxFx(ab.id, t, c, C => CCX_FX.orbThrow(C, t, orb, x, z, T));
-  const schools = ccxCap(st, 'ccxOrbRunes') ? [...new Set(G.towers.filter(o => ccUnit(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2.05).map(o => ccSchool(o)).filter(Boolean))] : [];
+  const schools = ccxCap(st, 'ccxOrbMarks') ? [...new Set(G.towers.filter(o => ccUnit(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2.05).map(o => ccSchool(o)).filter(Boolean))] : [];
   ccxLater(ab.id, T, () => {
     if (!abLive(t)) return;
     const s = t.st || st, store = store0 / (typeof manaSpellK === 'function' ? manaSpellK(t) || 1 : 1);
     abAoe(() => inSplash(x, z, R0, false, q => {
       if (q.ent || !canTarget(t, s, q)) return;
       const main = q === c || Math.hypot(q.x - x, q.y - z) < .25;
-      ccHit(t, s, q, (ccAbD(s) * m * orb.k + store) * (main ? 1 : CCX.ORB_SHARE), { noWeave: !main });
-      if (q.dead) return; ccRune(q, 'arcane', t); for (const sc of schools) ccRune(q, sc, t);
+      ccHit(t, s, q, (ccAbD(s) * m * orb.k + store) * (main ? 1 : CCX.ORB_SHARE), { noRx: !main });
+      if (q.dead) return; ccMark(q, 'arcane', t); for (const sc of schools) ccMark(q, sc, t);
     }));
     ccxFx(ab.id, t, null, C => CCX_FX.orbBurst(C, x, z, R0, orb));
     G.shake = Math.max(G.shake, .1); sfx('boom', .7);
@@ -31096,7 +31173,7 @@ function ccxOrbThrow(orb) {
 ccxSwap('cc_mageling', { id: 'cc_grandorb', name: 'Gathering Orb', short: 'Orb', glyph: 'orbbig', hue: '#e0c8ff', mana: 110, cd: 14, noLock: 1, research: { cost: 90, time: 30 }, pref: 'grouped',
   by: { mult: [2.8, 2.8, 3, 3, 3.2, 3.2], gather: [2.5, 2.5, 2.5, 2.5, 2.5, 2.5] },
   auto: 'any foe within its reach + 0.5 cells', none: 'no foes in reach',
-  text: (t, st, ab) => `For ${gNf(byT(ab.by.gather, t))}s, missiles of Magelings within 2 cells feed an orb instead. Then it hurls the orb: ${xD(st, byT(ab.by.mult, t))} plus ${Math.round(CCX.ORB_STORE * 100)}% of what it stored, ${Math.round(CCX.ORB_SHARE * 100)}% to foes nearby, each given the arcane rune.`,
+  text: (t, st, ab) => `For ${gNf(byT(ab.by.gather, t))}s, missiles of Magelings within 2 cells feed an orb instead. Then it hurls the orb: ${xD(st, byT(ab.by.mult, t))} plus ${Math.round(CCX.ORB_STORE * 100)}% of what it stored, ${Math.round(CCX.ORB_SHARE * 100)}% to foes nearby, each marked Arcane.`,
   pick(t, st, ab, man) { return abFoes(t, st, abReach(t, st, ab) + .5).length ? t : null; },
   cast(t, st, _, ab) {
     const k = ccCast(t, ab), g = byT(ab.by.gather, t);
@@ -31190,19 +31267,19 @@ ccxSwap('cc_rimeweaver', { id: 'cc_hoarbloom', name: 'Rime Lattice', short: 'Lat
 /* =====================================================================================================
    CHRONOMANCERS: the hour turned back
    ===================================================================================================== */
-// runes a foe lost (spent by a weave, torn off): remembered for 4s, so the Backward Hour can give them back
-{ const w0 = ccWeave, t0 = ccTake;
-  ccWeave = function (t, c, partners, id) { const s = w0.apply(this, arguments); if (s && c) (c.ccRSp || (c.ccRSp = {}))[s] = G.time; return s; };
+// marks a foe lost (cleared by a reaction, torn off): remembered for 4s, so the Backward Hour can give them back (ccMark
+// remembers what a reaction clears)
+{ const t0 = ccTake;
   ccTake = function (c, s) { const r = t0.apply(this, arguments); if (r && c) (c.ccRSp || (c.ccRSp = {}))[s] = G.time; return r; }; }
-function ccxRunesBack(c, t) {
+function ccxMarksBack(c, t) {
   let n = 0; const R = c.ccR || {}, S = c.ccRSp || {};
-  for (const s of CC_SCHOOLS) { const v = R[s] || 0; if (v > G.time) continue; if ((v > 0 && v > G.time - 4) || (S[s] || -9) > G.time - 4) { ccRune(c, s, t, 2); n++; } }
+  for (const s of CC_SCHOOLS) { const v = R[s] || 0; if (v > G.time) continue; if ((v > 0 && v > G.time - 4) || (S[s] || -9) > G.time - 4) { ccMark(c, s, t, 2); n++; } }
   return n;
 }
 ccxSwap('cc_chronomancer', { id: 'cc_quicken', name: 'Backward Hour', short: 'Backward', glyph: 'hourglass', hue: '#ffe9a8', mana: 90, cd: 14, rr: .9, research: { cost: 70, time: 20 }, pref: 'grouped',
   by: { dur: [3, 3, 3.5, 3.5, 4, 4], back: [1.1, 1.1, 1.2, 1.2, 1.3, 1.3] },
   auto: 'two or more walkers bunched in reach (or a boss or elite)', none: 'no walkers in reach',
-  text: (t, st, ab) => `Turns the hour back on a ${ab.rr}-cell patch of road for ${gNf(byT(ab.by.dur, t))}s: each walker entering it walks ${gNf(byT(ab.by.back, t))} cells back up the road, and runes it lost in the last 4s return.`,
+  text: (t, st, ab) => `Turns the hour back on a ${ab.rr}-cell patch of road for ${gNf(byT(ab.by.dur, t))}s: each walker entering it walks ${gNf(byT(ab.by.back, t))} cells back up the road, and the marks it lost in the last 4s return.`,
   pick(t, st, ab, man) {
     const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null;
     const k = abCrowd(L, 1.2); if (!k || !(k.n >= (man ? 1 : 2) || abBig(k.c))) return null;
@@ -31222,7 +31299,7 @@ ccxSwap('cc_chronomancer', { id: 'cc_quicken', name: 'Backward Hour', short: 'Ba
       const d = byT(ABIL.cc_quicken.by.back, t) * ccxWeight(c) * ccDR(c), steps = 10;
       c.ccxBackT = G.time + .85; chill(c, { slow: .6, slowT: .9 }, null, t);
       if (d > .01) for (let j = 1; j <= steps; j++) G.delayed.push({ t: j * .08, fn: () => { if (!c.dead) ccxPush(c, d / steps); } });
-      const n = ccxRunesBack(c, t); ccRune(c, 'chrono', t);
+      const n = ccxMarksBack(c, t); ccMark(c, 'chrono', t);
       ccxFx('cc_quicken', t, c, C => CCX_FX.backTurn(C, c, n));
     }
   } });
@@ -31233,7 +31310,7 @@ ccxSwap('cc_chronomancer', { id: 'cc_quicken', name: 'Backward Hour', short: 'Ba
 ccxSwap('cc_astrologer', { id: 'cc_omen', name: 'Lodestar', short: 'Lodestar', glyph: 'meteor', hue: '#dfe8ff', mana: 75, cd: 12, research: { cost: 70, time: 20 }, pref: 'grouped',
   by: { mult: [1.8, 1.8, 2, 2, 2.2, 2.2] },
   auto: 'two or more foes bunched in reach, flyers too (or a boss or elite)', none: 'no foes in reach',
-  text: (t, st, ab) => `Hangs a star for ${CCX.LODE_T}s: flyers within ${CCX.LODE_R} cells are dragged down and foes past it pulled back, all star-runed. Then it falls: ${xD(st, byT(ab.by.mult, t))} and a 0.4s stun within 1 cell.`,
+  text: (t, st, ab) => `Hangs a star for ${CCX.LODE_T}s: flyers within ${CCX.LODE_R} cells are dragged down and foes past it pulled back, all marked Star. Then it falls: ${xD(st, byT(ab.by.mult, t))} and a 0.4s stun within 1 cell.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const k = abCrowd(L, 1.2); return k && (k.n >= (man ? 1 : 2) || abBig(k.c)) ? { x: k.c.x, y: k.c.y } : null; },
   cast(t, st, p, ab) {
     const k = ccCast(t, ab), i0 = ccxPathIdx(p.x, p.y);
@@ -31250,7 +31327,7 @@ ccxSwap('cc_astrologer', { id: 'cc_omen', name: 'Lodestar', short: 'Lodestar', g
   zone(t, st, z) {
     for (const c of G.creeps) {
       if (c.dead || c.ent || Math.hypot(c.x - z.x, c.y - z.z) > CCX.LODE_R) continue;
-      c.ccxLodeT = G.time + .3; ccRune(c, 'star', t, .6);
+      c.ccxLodeT = G.time + .3; ccMark(c, 'star', t, .6);
       if (c.fly) c.lowT = Math.max(c.lowT || 0, G.time + .35);
       const past = c.fly ? c.y > z.z + .1 : ccxPathIdx(c.x, c.y) > z.i0;
       if (past) ccxPush(c, .13 * ccxWeight(c));
@@ -31294,7 +31371,7 @@ ccxSwap('cc_astrologer', { id: 'cc_orrery', name: 'Grand Orrery', short: 'Orrery
 ccxSwap('cc_golemwarden', { id: 'cc_tremorglyph', name: 'Heave', short: 'Heave', glyph: 'fist', hue: '#d8b078', mana: 90, cd: 14, rAdd: .5, busy: 1, research: { cost: 60, time: 20 }, pref: 'first',
   by: { mult: [2.4, 2.4, 2.6, 2.6, 2.8, 2.8], cells: [1.8, 1.8, 2, 2, 2.2, 2.2] },
   auto: 'the walker nearest the gate within its reach + 0.5 cells, with another walker in reach (or a boss or elite)', none: 'no walkers within its grasp',
-  text: (t, st, ab) => `The golem heaves the walker nearest the gate ${gNf(byT(ab.by.cells, t))} cells back up the road: ${xD(st, byT(ab.by.mult, t))} to it, and ${xD(st, byT(ab.by.mult, t) * .7)}, the stone rune and a 0.5s stun to walkers where it lands.`,
+  text: (t, st, ab) => `The golem heaves the walker nearest the gate ${gNf(byT(ab.by.cells, t))} cells back up the road: ${xD(st, byT(ab.by.mult, t))} to it, and ${xD(st, byT(ab.by.mult, t) * .7)}, the Stone mark and a 0.5s stun to walkers where it lands.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker).filter(c => !c.ent && !(c.liftT > G.time)); if (!L.length) return null; const c = abFurthest(L); return man || L.length >= 2 || abBig(c) ? c : null; },
   cast(t, st, c, ab) {
     const k = ccCast(t, ab), d = byT(ab.by.cells, t), m = byT(ab.by.mult, t); t.cd = Math.max(t.cd, 1);
@@ -31308,7 +31385,7 @@ ccxSwap('cc_golemwarden', { id: 'cc_tremorglyph', name: 'Heave', short: 'Heave',
       ccxLater(ab.id, .62, () => {
         if (!abLive(t)) return; const s = t.st || st, x = c.x, z = c.y;
         if (!c.dead) ccAb(t, s, c, m, k, { type: 'phys' });
-        abAoe(() => inSplash(x, z, 1, true, q => { if (q === c || q.ent || !canTarget(t, s, q)) return; ccAb(t, s, q, m * .7, k, { type: 'phys', noWeave: true }); if (!q.dead) stun(q, .5, .4, null); }));
+        abAoe(() => inSplash(x, z, 1, true, q => { if (q === c || q.ent || !canTarget(t, s, q)) return; ccAb(t, s, q, m * .7, k, { type: 'phys', noRx: true }); if (!q.dead) stun(q, .5, .4, null); }));
         ccxFx(ab.id, t, null, C => CCX_FX.heaveLand(C, x, z)); G.shake = Math.max(G.shake, .12); sfx('boom', .6);
       });
     } });
@@ -31528,8 +31605,8 @@ if (typeof AB_PREF !== 'undefined') { AB_PREF.cc_shards = 'warded'; AB_PREF.cc_n
 const CCX_LOOM = ['arcane', 'frost', 'fire', 'chrono', 'star', 'stone'];
 ccxSwap('ch_maelis', { id: 'ch_mirrorweave', name: 'Sixfold Loom', short: 'Loom', glyph: 'spiral', hue: '#f0e0ff', mana: 120, cd: 26, research: CH_CC_RS, school: 'arcane', pref: 'grouped', rr: 1.4,
   by: { n: [12, 12, 12, 12, 14, 14] },
-  auto: 'two or more foes bunched in reach, or a boss or elite', blurb: 'A wheel of the six schools over the road throws bolts that weave on one another.', none: 'no foes in reach',
-  text: (t, st, ab) => `Over 3s a loom throws ${byT(ab.by.n, t)} bolts of the six schools at foes within ${ab.rr} cells: ${xD(st, .2)} and its rune each. A bolt on another school's rune weaves: double damage and that school's effect.`,
+  auto: 'two or more foes bunched in reach, or a boss or elite', blurb: 'A wheel of the six elements over the road throws bolts that react on one another.', none: 'no foes in reach',
+  text: (t, st, ab) => `Over 3s a loom throws ${byT(ab.by.n, t)} bolts of the six elements at foes within ${ab.rr} cells: ${xD(st, .2)} and its mark each. Its bolts set off reactions on the foes they share.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const k = abCrowd(L, ab.rr); return k && (man || k.n >= 2 || abBig(k.c)) ? { x: k.c.x, y: k.c.y } : null; },
   cast(t, st, p, ab) {
     const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t))), gap = 2.7 / n;
@@ -31537,11 +31614,11 @@ ccxSwap('ch_maelis', { id: 'ch_mirrorweave', name: 'Sixfold Loom', short: 'Loom'
     for (let i = 0; i < n; i++) ccxLater(ab.id, .35 + i * gap, () => {
       if (!abLive(t)) return; const s = t.st || st, sc = CCX_LOOM[i % 6];
       const L = abFoes(t, s, 99).filter(c => !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= ab.rr); if (!L.length) return;
-      const c = L.find(q => !ccHas(q, sc) && ccRunesOn(q).length) || L.find(q => !ccHas(q, sc)) || L[i % L.length];
-      const other = ccRunesOn(c).find(q => q !== sc); let mult = .2;
-      if (other) { c.ccR[other] = 0; (c.ccRSp || (c.ccRSp = {}))[other] = G.time; mult *= 2; ccTouch(t, c, other); ccWeaveNote(t, c, 'weave', other); }
-      ccAb(t, s, c, mult, k, { school: sc, noWeave: true });
-      ccxFx(ab.id, t, c, C => CCX_FX.loomBolt(C, p.x, p.y, c, sc, i, other));
+      const c = L.find(q => !ccHas(q, sc) && ccMarksOn(q).length) || L.find(q => !ccHas(q, sc)) || L[i % L.length];
+      const other = ccMarksOn(c).find(q => q !== sc);
+      ccAb(t, s, c, .2, k, { school: sc });
+      const rx = other && c.ccRxAt === G.time ? other : null;   /* (the bolt set off a reaction: its look adds the other element's burst) */
+      ccxFx(ab.id, t, c, C => CCX_FX.loomBolt(C, p.x, p.y, c, sc, i, rx));
       if (i % 3 === 0) sfx('phase', 0);
     });
     sfx('arcane', 1);
@@ -31554,7 +31631,7 @@ ccxSwap('ch_aurel', { id: 'ch_rewind', name: 'Recall', short: 'Recall', glyph: '
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), ccWalker).filter(c => !(c.chRecT > G.time)); const c = abToughest(L); return c && (man || L.length >= 2 || abBig(c)) ? c : null; },
   cast(t, st, c, ab) {
     const k = ccCast(t, ab), w = byT(ab.by.wait, t);
-    c.chRec = { t, k, r0: c.remain, x: c.x, y: c.y }; c.chRecT = G.time + w; ccRune(c, 'chrono', t, w + 1);
+    c.chRec = { t, k, r0: c.remain, x: c.x, y: c.y }; c.chRecT = G.time + w; ccMark(c, 'chrono', t, w + 1);
     (G.ccxRecalls || (G.ccxRecalls = [])).push(c);
     ccxFx(ab.id, t, c, C => CCX_FX.recallMark(C, c, w));
     sfx('phase', 1);
@@ -31576,7 +31653,7 @@ function ccxRecallTick() {
         if (np >= 3) break;
         if (o === c || o.dead || o.ent || !ccWalker(o) || !canTarget(t, st, o) || !(o.remain >= rem0 - .3 && o.remain <= rem1 + .3)) continue;
         if (!ccxOnSeg(o, { x: x0, z: z0 }, { x: x1, z: z1 }, .9)) continue;
-        np++; ccAb(t, st, o, m * .25, R0.k, { school: 'chrono', noWeave: true }); if (!o.dead) chill(o, { slow: .3, slowT: 1.5 }, null, t);
+        np++; ccAb(t, st, o, m * .25, R0.k, { school: 'chrono', noRx: true }); if (!o.dead) chill(o, { slow: .3, slowT: 1.5 }, null, t);
       } });
       if (!c.dead) { ccAb(t, st, c, m, R0.k, { school: 'chrono' }); if (!c.dead) chill(c, { slow: .3, slowT: 2 }, null, t); }
       ccxFx('ch_rewind', t, c, C => CCX_FX.recallSnap(C, c, x0, z0, R0.x, R0.y));
@@ -31622,17 +31699,17 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
    ===================================================================================================== */
 { const T = CC_TALENTS;
   // Spellblades
-  ccxTal(T.glaive.list, 'Charged Edge', GT('Charged Edge', 'boltplus', 2, 3, 2, n => `Riposte Stance holds ${gNf(.5 * n)}s longer, and its ripostes cut foes bearing a rune ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_sigilcleave', by: { dur: .5 * n }, vs: ['runed', .15 * n] }) }));
+  ccxTal(T.glaive.list, 'Charged Edge', GT('Charged Edge', 'boltplus', 2, 3, 2, n => `Riposte Stance holds ${gNf(.5 * n)}s longer, and its ripostes cut marked foes ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_sigilcleave', by: { dur: .5 * n }, vs: ['elmarked', .15 * n] }) }));
   ccxTal(T.glaive.list, 'Fifth Form', GT('Fifth Form', 'target', 4, 1, 1, 'Each riposte of Riposte Stance brings Blinkstrike 1s nearer, and each Crosscut Sigil brings Riposte Stance 2s nearer.', {}, { cap: 'ccxFifth', sp: { ab: 'cc_spectral', ready: ['cc_sigilcleave', 2] } }));
   ccxTal(T.glaive.list, 'Spectral Gift', GT('Long Sigil', 'cross', 4, 0, 2, n => `Crosscut Sigil's arms reach ${gNf(.5 * n)} cells farther, its cross stays ${n}s longer, and each Crosscut Sigil brings Blinkstrike ${n}s nearer.`, {}, { cap: 'ccxCrossLong', sp: n => ({ ab: 'cc_spectral', by: { arm: .5 * n }, ready: ['cc_blinkstrike', n] }) }));
   ccxTal(T.glaive.list, 'Ghostblade Rush', GT('Ghostblade Rush', 'glaive2', 4, 3, 1, 'Each riposte of Riposte Stance leaves an afterimage that cuts the same foe again 0.4s later, half as hard, and each Riposte Stance brings Crosscut Sigil 1s nearer.', {}, { cap: 'ccxGhostRip', sp: { ab: 'cc_sigilcleave', ready: ['cc_spectral', 1] } }));
   // Magelings
-  ccxTal(T.arrow.list, 'Homing Runes', GT('Homing Runes', 'orb', 2, 0, 2, n => `Missile Curtain hangs ${n === 1 ? 'one more missile' : n + ' more missiles'}.`, {}, { sp: n => ({ ab: 'cc_sparks', by: { n } }) }));
+  ccxTal(T.arrow.list, 'Homing Missiles', GT('Homing Missiles', 'orb', 2, 0, 2, n => `Missile Curtain hangs ${n === 1 ? 'one more missile' : n + ' more missiles'}.`, {}, { sp: n => ({ ab: 'cc_sparks', by: { n } }) }));
   ccxTal(T.arrow.list, 'Static Sparks', GT('Static Sparks', 'boltup', 3, 1, 2, n => `Each Missile Curtain missile stuns the foe it dives on for ${gNf(.2 * n)}s.`, {}, { sp: n => ({ ab: 'cc_sparks', rider: { stun: .2 * n } }) }));
   ccxTal(T.arrow.list, 'Spark Battery', GT('Spark Battery', 'boltup', 2, 2, 1, 'Each Arcane Barrage brings Missile Curtain 2s nearer.', {}, { sp: { ab: 'cc_barrage', ready: ['cc_sparks', 2] } }));
   ccxTal(T.arrow.list, 'Apprentice\'s Zeal', GT('Apprentice\'s Zeal', 'quick', 3, 3, 2, n => `Gathering Orb gathers ${gNf(.5 * n)}s longer, and its burst slows every foe it strikes ${15 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_grandorb', by: { gather: .5 * n }, rider: { slow: [.15 * n, 2] } }) }));
-  ccxTal(T.arrow.list, 'Orb Lattice', GT('Orb Lattice', 'orbbig', 3, 2, 1, "Gathering Orb's burst lays on every foe it strikes the rune of each Conclave school standing within 2 cells of the Mageling, for the Conclave to weave, and each Gathering Orb brings Missile Curtain 2s nearer.", {}, { cap: 'ccxOrbRunes', sp: { ab: 'cc_grandorb', ready: ['cc_sparks', 2] } }));
-  // Rimeweavers
+  ccxTal(T.arrow.list, 'Orb Lattice', GT('Orb Lattice', 'orbbig', 3, 2, 1, "Gathering Orb's burst marks every foe it strikes with the element of each Conclave school standing within 2 cells of the Mageling, setting off their reactions, and each Gathering Orb brings Missile Curtain 2s nearer.", {}, { cap: 'ccxOrbMarks', sp: { ab: 'cc_grandorb', ready: ['cc_sparks', 2] } }));
+  // Frostweavers
   ccxTal(T.frost.list, 'Brittle Rime', GT('Brittle Rime', 'cracked', 2, 3, 2, n => `Frozen foes take ${6 * n}% more damage from every unit, and Hoarfrost Trail's brand and prints strike them ${20 * n}% harder.`, {}, { cap: 'ccBrittle', sp: n => ({ ab: 'cc_rimelance', vs: ['frozen', .2 * n] }) }));
   ccxTal(T.frost.list, 'Splintering Lance', GT('Splintering Rime', 'icicle', 2, 2, 2, n => `Hoarfrost Trail's brand and prints strip ${2 * n} armour from every walker they strike.`, {}, { sp: n => ({ ab: 'cc_rimelance', rider: { shred: [2 * n, 2 * n] } }) }));
   ccxTal(T.frost.list, 'Flash Freeze', GT('Flash Freeze', 'iceblock', 4, 0, 2, n => `Rime Lattice's ice bridges freeze the walkers they cross for ${gNf(.3 * n)}s, and each Rime Lattice brings Glacial Glyph ${n}s nearer, to write new glyphs for it.`, {}, { cap: 'ccxBridgeFrz', sp: n => ({ ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', n] }) }));
@@ -31659,10 +31736,10 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
   // the Arcane Severers
   const S = FORCES.conclave.talents[SPEC_SLOT];
   if (S) {
-    ccxTal(S.list, 'Seeking Shards', GT('Seeking Edge', 'shards', 2, 3, 1, 'Returning Crescent flies a loop 0.3 cells wider, and each throw brings Sundering Rune 1s nearer.', {}, { sp: { ab: 'cc_shards', by: { wide: .3 }, ready: ['cc_sunder', 1] } }));
+    ccxTal(S.list, 'Seeking Shards', GT('Seeking Edge', 'shards', 2, 3, 1, 'Returning Crescent flies a loop 0.3 cells wider, and each throw brings Sundering Glyph 1s nearer.', {}, { sp: { ab: 'cc_shards', by: { wide: .3 }, ready: ['cc_sunder', 1] } }));
     ccxTal(S.list, 'Shatterpoint', GT('Shatterpoint', 'target', 3, 2, 2, n => `Returning Crescent slows every foe it cuts ${20 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_shards', rider: { slow: [.2 * n, 2] } }) }));
     ccxTal(S.list, 'Void Ground', GT('Void Ground', 'vortex', 4, 0, 1, 'Rend the Veil hooks 2 more foes, and each foe it slays gives 12 mana back.', {}, { sp: { ab: 'cc_nullfield', by: { n: 2 }, kill: { mana: 12 } } }));
-    ccxTal(S.list, 'Unravelling Field', GT('Unravelling Veil', 'disint', 4, 1, 1, 'Each Rend the Veil brings Sundering Rune 3s nearer.', {}, { sp: { ab: 'cc_nullfield', ready: ['cc_sunder', 3] } }));
+    ccxTal(S.list, 'Unravelling Field', GT('Unravelling Veil', 'disint', 4, 1, 1, 'Each Rend the Veil brings Sundering Glyph 3s nearer.', {}, { sp: { ab: 'cc_nullfield', ready: ['cc_sunder', 3] } }));
   }
   // the Champions
   const M = CHAMPS.cc_arch && CHAMPS.cc_arch.tree.list, A = CHAMPS.cc_chrono && CHAMPS.cc_chrono.tree.list;
@@ -31786,7 +31863,7 @@ function ccxReg() {
     if (!lite) vfxFan(VX, x, .044, z, r * .55, r, 0, TAU, 28, q.col, q.al * .18 * e, VT.GLOW, 1);
     if (q.ticks) for (let k = 0; k < q.ticks; k++) { const a = k / q.ticks * TAU + q.age * (q.spin || .1); vfxSprite(VX, x + Math.cos(a) * r, .08, z + Math.sin(a) * r, .045, .045, a, q.hot, .8 * e, VT.STAR, 1); }
   };
-  // Crosscut Sigil's cross: four bands of arcane light along the grid, light flowing out along them, a rune at the heart
+  // Crosscut Sigil's cross: four bands of arcane light along the grid, light flowing out along them, a sigil at the heart
   SFX_DRAW.ccx_cross = q => {
     const e = ccxE(q, .08, .5); if (e <= .01) return;
     const g = v2Ease(q.age / .18), lite = vfxLite(), fl = .8 + .2 * Math.sin(q.age * 9 + q.seed);
@@ -31893,14 +31970,14 @@ function ccxReg() {
       if (!rip && !vfxLite()) vfxSprite(VX, x1, h1, z1, .16, .16, q.age * 6 + j, q.hot, .7 * e, VT.STAR, 1);
     }
   };
-  // Sixfold Loom: a wheel of six school runes turning over the road, threads of each school's light let down from it
+  // Sixfold Loom: a wheel of the six element icons turning over the road, threads of each school's light let down from it
   SFX_DRAW.ccx_loom = q => {
     const e = ccxE(q, .3, .4); if (e <= .01) return;
-    const lite = vfxLite(), L = CC_RUNE_L(), h = 1.55, r = .62, spin = q.age * 1.3;
+    const lite = vfxLite(), L = CC_MARK_L(), h = 1.55, r = .62, spin = q.age * 1.3;
     vfxFlat(VX, q.x, q.z, .05, q.rr, q.rr, -spin * .3, q.col, .35 * e, VT.RUNE, 1);
     vfxFan(VX, q.x, .047, q.z, q.rr - .04, q.rr, 0, TAU, lite ? 20 : 40, q.col, .5 * e, VT.FAN, 1, -q.age * .1, 3);
     for (let k = 0; k < 6; k++) {
-      const s = CCX_LOOM[k], a = spin + k / 6 * TAU, x = q.x + Math.cos(a) * r, z = q.z + Math.sin(a) * r, col = ccRuneCol(s), lit = q.lit === k ? 1.4 : 1;
+      const s = CCX_LOOM[k], a = spin + k / 6 * TAU, x = q.x + Math.cos(a) * r, z = q.z + Math.sin(a) * r, col = ccMarkCol(s), lit = q.lit === k ? 1.4 : 1;
       vfxSprite(VX, x, h, z, .2 * lit, .2 * lit, 0, col, .5 * e, VT.GLOW, 1);
       vfxSprite(VX, x, h, z, .13 * lit, .13 * lit, -a, col, .95 * e, L[s] != null ? L[s] : VT.RUNE, 1);
       if (!lite) { vfxRb.begin(VX, VT.ENERGY, 1, 0); vfxRb.pt(x, h, z, .03, col, .35 * e, -q.age); vfxRb.pt(q.x + Math.cos(a) * r * .3, .1, q.z + Math.sin(a) * r * .3, .015, col, .1 * e, 1 - q.age); vfxRb.end(); }
@@ -31988,7 +32065,7 @@ const CCX_FX = {
     v2Hit(C, x, z, .45, C.S * .9 * big, { sp: 'spark', n: 10, sp2: 'wisp', n2: 4 });
   },
   orbFizzle(C, orb) { const t = orb.t; if (t) v2Spray(C, 'wisp', t.x, t.y, towerTop(t) + .55, 6, { sp: .5 }); },
-  // ---- Rimeweavers ----
+  // ---- Frostweavers ----
   trailBrand(C, t, c) {
     const m = sfxMuzzle(t), h = ccxFoeH(c);
     if (m) v2Beam(C, m[0], m[1], m[2], c.x, h, c.y, { foe: c, w: .05, life: .25, grow: .06 });
@@ -32079,11 +32156,11 @@ const CCX_FX = {
   // ---- the Champions ----
   loom(C, x, z, life) { const K = v2K(C); sfxAdd({ k: 'ccx_loom', x, z, rr: 1.4 * C.T.ring, col: K.a, hot: K.hot, life, lit: -1 }); v2Wind(C, { wu: .25, r: .6, n: 9 }); },
   loomBolt(C, x, z, c, sc, i, woven) {
-    const col = ccRuneCol(sc), hot = ccxC(CC_COL[sc] || '#ffffff', 1.5), h = ccxFoeH(c), a = G.time * 1.3 + (i % 6) / 6 * TAU;
+    const col = ccMarkCol(sc), hot = ccxC(CC_COL[sc] || '#ffffff', 1.5), h = ccxFoeH(c), a = G.time * 1.3 + (i % 6) / 6 * TAU;
     for (const q of SFX.list) if (q.k === 'ccx_loom' && Math.abs(q.x - x) < .05 && Math.abs(q.z - z) < .05) q.lit = i % 6;
     v2Proj(C, x + Math.cos(a) * .62, 1.55, z + Math.sin(a) * .62, c.x, h, c.y, .18, { foe: c, head: 5, s: .1, tw: .08, arc: .2, col, hot });
     sfxAdd({ k: 'vstar', delay: .18, x: c.x, z: c.y, h, s: (woven ? .55 : .3) * C.T.glow, life: .2, col: hot, rot: R(TAU) });
-    if (woven) v2Hit(C, c.x, c.y, h, C.S * .55, { col: ccRuneCol(woven), hot: ccxC(CC_COL[woven] || '#ffffff', 1.5), sp: 'rune', n: 4, light: 0 });
+    if (woven) v2Hit(C, c.x, c.y, h, C.S * .55, { col: ccMarkCol(woven), hot: ccxC(CC_COL[woven] || '#ffffff', 1.5), sp: 'rune', n: 4, light: 0 });
   },
   recallMark(C, c, w) { sfxAdd({ k: 'ccx_ghost', foe: c, x: c.x, z: c.y, col: v2K(C).a, hot: v2K(C).hot, life: w + .15 }); v2Hit(C, c.x, c.y, ccxFoeH(c), C.S * .35, { sp: 'gold', n: 4, light: 0, ring: 0 }); },
   recallSnap(C, c, x0, z0) {
@@ -33436,7 +33513,7 @@ const SP_COND = {
   hexed: c => c.sbHexT > G.time,
   branded: c => c.ihBrandT > G.time,
   pinned: c => c.ihHeldT > G.time || c.rootT > G.time,
-  runed: c => typeof ccRunesOn === 'function' && ccRunesOn(c).length > 0,
+  elmarked: c => typeof ccMarksOn === 'function' && ccMarksOn(c).length > 0,   /* (a Conclave element mark) */
   spored: c => !!(c.poison && c.poison.length),
   wounded: c => c.woundT > G.time,
 };
@@ -33462,7 +33539,7 @@ const SP_RIDE = {
   hex: (c, v, s) => { if (typeof sbHex === 'function') sbHex(c, s, v[0], v[1]); },
   brand: (c, v, s) => { if (typeof ihBrand === 'function') ihBrand(c, v[0], v[1], s); },
   pin: (c, v, s) => { if (typeof ihPin === 'function') ihPin(c, v, s); },
-  rune: (c, v, s) => { if (typeof ccRune === 'function') ccRune(c, v, s); },
+  element: (c, v, s) => { if (typeof ccMark === 'function') ccMark(c, v, s); },   /* (a Conclave element mark) */
   spore: (c, v, s) => { if (typeof sporeDose === 'function' && s.st && !isImmune(c, 'poison')) dose(c, sporeDose(s.st), s); },   // the Grove's spores, as a Seedcaster's pod gives them
   wound: (c, v) => woundFoe(c, v),   // Wounded for v s: its heals and shields halved (game.js woundFoe)
 };
@@ -36499,7 +36576,7 @@ if (typeof ABANIM !== 'undefined') for (const id of ['ch_fordstandard', 'ch_lion
      work on every unit wearing a piece (a "wearer").
    A piece is a rare or epic relic with its own modest stat lines (it pays for its passive, the set, out of its budget as
    any relic with a rule does: itempower.js). Its passive names its set; the bonuses at (2) and (3) each interact with
-   the unit's spells or its force's mechanic (roots, Judgement, runes and Arcane Charge, heat and vents, the Storm): no
+   the unit's spells or its force's mechanic (roots, Judgement, elements and Arcane Charge, heat and vents, the Storm): no
    "+X% damage", numbers in whole numbers.
    Drops (the odds are SET_DROP; tools/check_sets.js measures them): set pieces are in no force pool, so nothing rolls
    them by accident. They come from
@@ -36508,8 +36585,8 @@ if (typeof ABANIM !== 'undefined') for (const id of ['ch_fordstandard', 'ch_lion
      rnRollOffer). The legendary slot is never touched, so the legendary pace (loot.js legCap, bossLegP) stands.
    - elites: a rare or epic relic rolled for a drop is sometimes a piece instead, of the same rarity (rollGear, below).
    Hooks (wrappers, the wrapped files are untouched): setStats (effStats: which bonuses a unit has, st.fsB), itemProcHit
-   (a hit landed), castAbility (a cast), forceHook (kill, wave, tick), ihVented (Ironhold's vents), ccWeaveNote (the
-   Conclave's weaves), equipGear (the activation toast at once), rollGear (elite drops). The UI is fsets_ui.js.
+   (a hit landed), castAbility (a cast), forceHook (kill, wave, tick), ihVented (Ironhold's vents), ccReactNote (the
+   Conclave's reactions), equipGear (the activation toast at once), rollGear (elite drops). The UI is fsets_ui.js.
    EPIC SETS (S.epic; the files forces_zzzzzzzz_epic_<force>.js add them through fsetAdd): one a unit, four epic pieces,
    three relics and a charm (the last piece: the unit's charm socket), so a tier IV unit can wear the whole set. Bonuses at
    (2) and (4) (b2, b4); the (4) changes how the unit plays. They are rarer than the blue sets' pieces: SET_DROP.epicW in
@@ -36549,7 +36626,7 @@ function fsFreeCast(t, id) {
    THE SETS. pieces: [id, name, rarity, icon, hue, 'stat weights']. unit: the slot its pieces fit (null: an army set).
    spells: the spell ids its bonuses name (tools/check_sets.js checks they are its unit's).
    Hooks get n, the pieces counted (2, 3 or 4): hit(t, c, amt, spell, n) a hit it landed (spell: the spell's id, or null for
-   a basic strike), cast(t, ab, tg, n), kill(t, c, n) a foe slain by anyone, wave(t, n), vent(t, n), weave(t, n),
+   a basic strike), cast(t, ab, tg, n), kill(t, c, n) a foe slain by anyone, wave(t, n), vent(t, n), react(t, n),
    storm(t, lv, n) the Storm rose to Gale/Rain/Hail, tempest(t, n) the Tempest broke, tick(t, dt, n) every frame of a
    wave, amp(t, c, dot, n) a hit's extra share (game.js hurt's amp: only in tandem with a state, never flat).
    ===================================================================================================== */
@@ -36605,36 +36682,36 @@ const FSETS = [
       soRadiate(t, 3);
     } },
 
-  /* ---------------- the Conclave: runes, weaves, Arcane Charge ---------------- */
+  /* ---------------- the Conclave: elements, reactions, Arcane Charge ---------------- */
   { id: 'fs_folly', spells: ['cc_barrage'], force: 'conclave', unit: 'arrow', name: 'The Apprentice’s Folly',
     pieces: [['fs_cc_primer', 'Dog-Eared Primer', 2, 'rune', '#b98cff', 'sp mana'], ['fs_cc_cuffs', 'Chalk-Dusted Cuffs', 2, 'stars', '#d8c8ff', 'as sp'], ['fs_cc_wand', 'Wand of the Thirteenth Try', 3, 'stars', '#c09aff', 'sp as cd']],
-    b2: 'Arcane Barrage’s missiles also leave the chrono rune.',
-    b3: 'Each Arcane Barrage missile that lands on a foe bearing two or more runes gives it 1 Arcane Charge.',
+    b2: 'Each Arcane Barrage missile that sets off a reaction gives it 1 Arcane Charge.',
+    b3: 'Each Arcane Barrage missile that sets off a reaction looses another at the nearest unmarked foe, half as strong.',
     hit(t, c, amt, sp, n) {
-      if (sp !== 'cc_barrage') return;
-      if (n >= 3 && ccRunesOn(c).length >= 2) ccGain(t, 1);
-      if (!c.dead) ccRune(c, 'chrono', t);
+      if (sp !== 'cc_barrage' || !ccWillReact(c, 'arcane')) return;
+      ccGain(t, 1);
+      if (n >= 3) { const o = nearest(c.x, c.y, 1.8, 1, c, q => !q.dead && !q.ent && !ccMarked(q) && canTarget(t, t.st || {}, q))[0]; if (o) { const S = this; fsLater(.12, () => { if (!o.dead && abLive(t)) { ccMissile(t, t.st || effStats(t), o, .5, { spread: 1.4 }); fsGlint(t, S); } }); } }
     } },
   { id: 'fs_kiln', spells: ['cc_flamewave'], force: 'conclave', unit: 'cannon', name: 'Kiln-Born Regalia',
     pieces: [['fs_cc_mitts', 'Kiln Mitts', 2, 'ember', '#ff9a5a', 'sp splash'], ['fs_cc_monocle', 'Emberglass Monocle', 3, 'lens', '#ff8a4a', 'sp mana regen']],
-    b2: 'Phoenix spends the frost rune on each foe it strikes: the rime shatters, striking every other foe within 1 cell for half the hit.',
+    b2: 'Each foe Phoenix Shatters throws the ice at every other foe within 1 cell, for half the hit.',
     hit(t, c, amt, sp) {
-      if (sp !== 'cc_flamewave' || !ccTake(c, 'frost')) return;
+      if (sp !== 'cc_flamewave' || !ccHas(c, 'frost') || !ccWillReact(c, 'fire')) return;
       const d = amt * .5;
       tagged('relic', () => { for (const o of nearest(c.x, c.y, 1, 8, c, q => !q.dead && !q.phased)) hurt(o, d, 'magic', t, false, null); });
       fxRing(c.x, c.y, 1, '#ffd0b0'); fxSpark(c.x, c.y, hitH(c), '#bff0ff', 8); fsGlint(t, this);
     } },
   { id: 'fs_syllabus', spells: [], force: 'conclave', unit: null, name: 'The Wandering Syllabus',
     pieces: [['fs_cc_syllabus', 'Syllabus of Six Schools', 2, 'rune', '#9a7cff', 'sp regen'], ['fs_cc_bookmark', 'Bookmark of Borrowed Hours', 2, 'hourglass', '#ffd27a', 'mana cd'], ['fs_cc_inkstone', 'College Inkstone', 3, 'drop', '#6a5ad0', 'sp mana cd']],
-    b2: 'Every 4th hit of a wearer also leaves the runes of the other wearers’ schools.',
-    b3: 'Each weave a wearer makes gives every wearer 1 Arcane Charge.',
+    b2: 'Every 4th hit of a wearer also marks its foe with the elements of the other wearers’ schools.',
+    b3: 'Each reaction a wearer sets off gives every wearer 1 Arcane Charge.',
     hit(t, c) {
       if ((t.fsSyN = (t.fsSyN || 0) + 1) % 4 || c.dead) return;
       const mine = t.def.ccSchool; let k = 0;
-      for (const o of fsetWearers(this)) { const s = o.def.ccSchool; if (o !== t && s && s !== mine) { ccRune(c, s, t); k++; } }
+      for (const o of fsetWearers(this)) { const s = o.def.ccSchool; if (o !== t && s && s !== mine) { ccMark(c, s, t); k++; } }
       if (k) fsGlint(t, this);
     },
-    weave(t, n) { if (n < 3) return; for (const o of fsetWearers(this)) ccGain(o, 1); } },
+    react(t, n) { if (n < 3) return; for (const o of fsetWearers(this)) ccGain(o, 1); } },
 
   /* ---------------- Ironhold: heat, vents, runes, held foes ---------------- */
   { id: 'fs_boiler', spells: ['ih_longshot'], force: 'ironhold', unit: 'arrow', name: 'Boilermaker’s Kit',
@@ -36818,9 +36895,9 @@ FS_GL.castAbility = castAbility = function (t, ab, tg, st, manual) {
   if (B && !FS_IN) fsRun(() => { for (const [S, n] of B) if (S.cast) S.cast(t, ab, tg, n); });
   return r;
 };
-// Ironhold's vents and the Conclave's weaves (each defined only when its force's files are in)
+// Ironhold's vents and the Conclave's reactions (each defined only when its force's files are in)
 if (typeof ihVented === 'function') { const _v = ihVented; FS_GL.ihVented = ihVented = function (t, st, noPause) { const r = _v.apply(this, arguments); const B = t && t.st && t.st.fsB; if (B) fsRun(() => { for (const [S, n] of B) if (S.vent) S.vent(t, n); }); return r; }; }
-if (typeof ccWeaveNote === 'function') { const _w = ccWeaveNote; FS_GL.ccWeaveNote = ccWeaveNote = function (t, c, id, s) { const r = _w.apply(this, arguments); const B = t && t.st && t.st.fsB; if (B) fsRun(() => { for (const [S, n] of B) if (S.weave) S.weave(t, n); }); return r; }; }
+if (typeof ccReactNote === 'function') { const _w = ccReactNote; FS_GL.ccReactNote = ccReactNote = function (t, c, id, s) { const r = _w.apply(this, arguments); const B = t && t.st && t.st.fsB; if (B) fsRun(() => { for (const [S, n] of B) if (S.react) S.react(t, n); }); return r; }; }
 // kills, wave starts and the frame tick (forceHook: a force run only)
 const _fsHook = forceHook;
 FS_GL.forceHook = forceHook = function (k, a0, a1, a2) {
@@ -38349,7 +38426,7 @@ function fshopCats() {
 
 if (typeof fsetAdd === 'function') {
 
-  /* a bonus hit as a Conclave hit (m x the unit's strike: its rune, its weaves), quiet to the set hooks and credited to its relics */
+  /* a bonus hit as a Conclave hit (m x the unit's strike: its element mark, its reactions), quiet to the set hooks and credited to its relics */
   const fecHit = (t, c, m, o) => {
     if (!c || c.dead || !t || typeof ccHit !== 'function') return 0;
     let r = 0; fsQuiet(() => tagged('relic', () => { const s = t.st || effStats(t); r = ccHit(t, s, c, ccAbD(s) * m, o || {}); })); return r;
@@ -38381,7 +38458,7 @@ if (typeof fsetAdd === 'function') {
       if (n < 4 || sp !== 'cc_spectral' || c.dead) return;
       fsLater(.15, () => {
         if (c.dead || !abLive(t) || !fsStunned(c)) return;
-        fecHit(t, c, fsBy(t, 'cc_spectral', 'mult', 2), { type: 'arcane', noWeave: true });
+        fecHit(t, c, fsBy(t, 'cc_spectral', 'mult', 2), { type: 'arcane', noRx: true });
         if (typeof ccGhostFx === 'function') ccGhostFx(t, c); sfx('glaiveHit', 0);
       });
     } });
@@ -38390,30 +38467,30 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_cc_orb', epic: 1, spells: ['cc_sparks', 'cc_grandorb'], force: 'conclave', unit: 'arrow', name: 'The Prodigy’s Overflow',
     pieces: [['fe_cc_orbwand', 'Wand of Brimming Light', 3, 'stars', '#c9a0ff', 'sp as'], ['fe_cc_inkcuffs', 'Ink-Starred Cuffs', 3, 'feather', '#d8c8ff', 'sp mana'],
       ['fe_cc_hatband', 'Hatband of Hung Missiles', 3, 'halo', '#e0c8ff', 'sp cd range'], ['fe_cc_marblebag', 'Pouch of Glass Marbles', 3, 'ring', '#b0a0ff', 'mana regen']],
-    b2: 'Missile Curtain’s missiles also leave the chrono rune.',
-    b4: 'When Gathering Orb’s burst strikes, it casts Missile Curtain at once, free, and every foe the burst strikes takes a seeking missile for each rune it bears (up to 3).',
+    b2: 'Each Missile Curtain missile that sets off a reaction brings Gathering Orb 1s nearer.',
+    b4: 'When Gathering Orb’s burst strikes, it casts Missile Curtain at once, free, and every foe the burst strikes takes a seeking missile for each element mark it bears or just lost (up to 3).',
     hit(t, c, amt, sp, n) {
-      if (sp === 'cc_sparks' && !c.dead) ccRune(c, 'chrono', t);
+      if (sp === 'cc_sparks' && !c.dead && ccWillReact(c, 'arcane')) fsReady(t, 'cc_grandorb', 1);
       if (n < 4 || sp !== 'cc_grandorb') return;
       if (!((t.feOrbT || 0) > G.time)) {
         t.feOrbT = G.time + 3; const S = this;
         fsLater(.25, () => { if (fsFreeCast(t, 'cc_sparks')) fsGlint(t, S); });
       }
       if (c.dead) return;
-      const k = Math.min(3, ccRunesOn(c).length);
+      const k = Math.min(3, ccMarksRecent(c, .5).length);
       for (let i = 0; i < k; i++) fsLater(.2 + .12 * i, () => {
         if (c.dead || !abLive(t)) return;
         rfx({ k: 'streak', x0: t.x, h0: towerTop(t) + .3, z0: t.y, c, col: CC_COL.arcane, w: .035, trav: .15, life: .3 });
-        fecHit(t, c, .3, { noWeave: true }); fxSpark(c.x, c.y, hitH(c), '#e0c8ff', 4);
+        fecHit(t, c, .3, { noRx: true }); fxSpark(c.x, c.y, hitH(c), '#e0c8ff', 4);
       });
     } });
 
-  /* ---------- Rimeweavers: the Lattice writes a new glyph, and the frozen shed shards ---------- */
-  fsetAdd({ id: 'fe_cc_rime', epic: 1, spells: ['cc_glacialglyph', 'cc_hoarbloom'], force: 'conclave', unit: 'frost', name: 'The Frostscribe’s Lattice',
+  /* ---------- Frostweavers: the Lattice writes a new glyph, and the frozen shed shards ---------- */
+  fsetAdd({ id: 'fe_cc_rime', epic: 1, spells: ['cc_glacialglyph', 'cc_hoarbloom'], force: 'conclave', unit: 'frost', name: 'The Frostscribe’s Garden',
     pieces: [['fe_cc_iciclequill', 'Icicle Quill', 3, 'drop', '#9fe4ff', 'sp mana'], ['fe_cc_rimestole', 'Stole of Hanging Rime', 3, 'banner', '#c0f0ff', 'sp regen'],
       ['fe_cc_frostlens', 'Frost-Ground Lens', 3, 'lens', '#e6fbff', 'sp cd range'], ['fe_cc_snowvial', 'Vial of First Snow', 3, 'vial', '#bff0ff', 'mana cd']],
-    b2: 'Each foe Glacial Glyph strikes brings Rime Lattice 1s nearer (up to 4s a cast).',
-    b4: 'Each Rime Lattice casts Glacial Glyph at once, free, and every foe the Lattice freezes sheds ice shards at up to 2 walkers within 1 cell: each is struck and frozen 1s (up to 6 foes a cast).',
+    b2: 'Each foe Frost Spear strikes brings Shatterbloom 1s nearer (up to 4s a cast).',
+    b4: 'Each Shatterbloom casts Frost Spear at once, free, and every foe a bloom’s burst freezes sheds ice shards at up to 2 walkers within 1 cell: each is struck and frozen 1s (up to 6 foes a cast).',
     cast(t, ab, tg, n) {
       if (n < 4 || ab.id !== 'cc_hoarbloom') return;
       t.feLatN = 0; const S = this;
@@ -38430,7 +38507,7 @@ if (typeof fsetAdd === 'function') {
         c.feShardAt = t.ab.lastAt; t.feLatN = (t.feLatN || 0) + 1;
         for (const o of fsNear(c, 1.05, 2)) {
           G.bolts.push({ pts: [[c.x, hitH(c), c.y], [o.x, hitH(o), o.y]], life: .14, max: .14, col: [.85, .95, 1.2] });
-          fecHit(t, o, 1, { noWeave: true });
+          fecHit(t, o, 1, { noRx: true });
           if (!o.dead) { if (typeof ccFreeze === 'function') ccFreeze(t, o, 1); else freezeFoe(o, 1, t); }
         }
         fxShards(c.x, c.y, hitH(c), 10); sfx('shatter', 1);
@@ -38458,11 +38535,11 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_cc_star', epic: 1, spells: ['cc_fallingstar', 'cc_omen', 'cc_orrery'], force: 'conclave', unit: 'storm', name: 'The Stargazer’s Plumb Line',
     pieces: [['fe_cc_starchart', 'Chart of Low Stars', 3, 'stars', '#eef2ff', 'dmg crit'], ['fe_cc_plumbline', 'Silver Plumb-Line', 3, 'eye', '#dfe8ff', 'sp range'],
       ['fe_cc_orrerykey', 'Key to the Brass Orrery', 3, 'sunburst', '#c8d0ff', 'sp cd crit'], ['fe_cc_cometbead', 'Comet-Tail Bead', 3, 'drop', '#e8f0ff', 'mana regen']],
-    b2: 'Falling Star crits every foe bearing three or more runes.',
+    b2: 'Falling Star crits every foe it sets off a reaction on.',
     b4: 'When Lodestar falls on a foe, it calls Falling Star at once, free, and Grand Orrery comes 4s nearer.',
-    amp(t, c, dot) { return !dot && fsSpellNow('cc_fallingstar') && ccRunesOn(c).length >= 3 ? ((t.st && t.st.critM) || 2.5) - 1 : 0; },
+    amp(t, c, dot) { return !dot && fsSpellNow('cc_fallingstar') && ccWillReact(c, 'star') ? ((t.st && t.st.critM) || 2.5) - 1 : 0; },
     hit(t, c, amt, sp, n) {
-      if (sp === 'cc_fallingstar' && ccRunesOn(c).length >= 3) fxSpark(c.x, c.y, hitH(c), '#fff6d0', 6);
+      if (sp === 'cc_fallingstar' && ccWillReact(c, 'star')) fxSpark(c.x, c.y, hitH(c), '#fff6d0', 6);
       if (n < 4 || sp !== 'cc_omen' || !fsOnce(t, 'feLode')) return;
       fsReady(t, 'cc_orrery', 4); const S = this;
       fsLater(.35, () => { if (fsFreeCast(t, 'cc_fallingstar')) fsGlint(t, S); });
@@ -38508,7 +38585,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_cc_veil', epic: 1, spells: ['cc_sunder', 'cc_shards', 'cc_nullfield'], force: 'conclave', unit: 'venom', name: 'Vestments of the Torn Veil',
     pieces: [['fe_cc_hookglaive', 'Hooked Crescent-Glaive', 3, 'spikes', '#8ae8d8', 'dmg pen'], ['fe_cc_slategorget', 'Slate Gorget of Breaking', 3, 'crosshair', '#6ff0e0', 'as crit'],
       ['fe_cc_threadspool', 'Spool of Unravelled Thread', 3, 'target', '#c8fff6', 'dmg as pen'], ['fe_cc_wardshard', 'Shard of a Broken Ward', 3, 'rune', '#9af0e0', 'sp cd']],
-    b2: 'Each Sundering Rune brings Rend the Veil 3s nearer.',
+    b2: 'Each Sundering Glyph brings Rend the Veil 3s nearer.',
     b4: 'When Rend the Veil tears, it throws Returning Crescent at once, free, and a foe it Severed that dies spills its ward: every foe within 1 cell has its shields broken and is Severed 2s.',
     cast(t, ab) { if (ab.id === 'cc_sunder') { fsReady(t, 'cc_nullfield', 3); fsGlint(t, this); } },
     hit(t, c, amt, sp, n) {
@@ -39278,10 +39355,10 @@ if (typeof fsetAdd === 'function') {
    The owner (7 Nov 2026): "the capstone talents are also a bit underwhelming, can you audit all capstone talents for all
    units/heroes and ensure they are worthy of a capstone. also shouldnt have more than 3 capstones per unit." The audit is
    docs/capstone_audit.md. Each capstone here transforms a spell, adds a new trigger or ties the unit into the
-   Conclave's runes and weaves; the cooldown and cost nudges are gone. A tree that had four moves its weakest into a free
+   Conclave's elements and reactions; the cooldown and cost nudges are gone. A tree that had four moves its weakest into a free
    cell of row IV (the same talent and save slot). Talents keep their ids (ccxTal), so saved picks still bind.
    Loads after every other forces_* file: it wraps the spells' casts and zones (keeping the original call), the force's
-   hooks and a few Conclave functions (ccxRiposte, ccFallingStar, ccGlyphTick, ccWeaveNote, ccWeavesOf, ccStaggerFoe).
+   hooks and a few Conclave functions (ccxRiposte, ccFallingStar, ccGlyphTick, ccReactNote, ccRidersOf, ccStaggerFoe).
    Every number is in CX. The look reuses the spells' own effects and the light rfx marks: nothing new or bright. */
 const CX = {
   RIP_FAR: 1.2, STREAM_N: 15, STREAM_GAP: .2, HALL_K: .5, BRAND_N: 4, MOMENT_R2: 1.2, TWIN_R: 2, CONST_R: 2, CONST_N: 4,
@@ -39319,30 +39396,30 @@ const cxChamp = (u, cap) => { for (const o of G.towers) if (o.def && o.def.unit 
   // Spellblades: Eightfold Sigil | Weaver's Blade | Ghostblade Rush (Fifth Form to row IV)
   put(T.glaive.list, 'Long Sigil', GT('Eightfold Sigil', 'cross', 4, 0, 1, 'Crosscut Sigil cuts twice: 0.5s after the cross, a second cross splits the road along the diagonals, cutting every walker on it again with two stacks of Stagger. Crosscut Sigil cuts stunned foes 30% harder.', {}, { cap: 'ccxEight', sp: { ab: 'cc_spectral', vs: ['stunned', .3] } }));
   put(T.glaive.list, 'Fifth Form', GT('Fifth Form', 'target', 3, 2, 1, 'Each Riposte Stance brings Blinkstrike 2s nearer, and each of its ripostes 1s more.', {}, { cap: 'ccxFifth', sp: { ab: 'cc_sigilcleave', ready: ['cc_blinkstrike', 2] } }), 3, 2);
-  put(T.glaive.list, "Weaver's Blade", GT("Weaver's Blade", 'spiral', 4, 1, 1, "Weave: its cuts spend any other school's rune for 60% more and the rune's touch: a freeze, burn, slow or stun. Crosscut Sigil leaves the star rune on every walker it cuts, for its blade to spend.", {}, { cap: 'ccWeaverBlade', sp: { ab: 'cc_spectral', rider: { rune: 'star' } } }), 4, 1);
+  put(T.glaive.list, "Weaver's Blade", GT("Weaver's Blade", 'spiral', 4, 1, 1, "Every reaction its cuts set off strikes 60% harder and adds the other element's touch: a chill, a burn, a slow, a pull or a stun. Crosscut Sigil marks every walker it cuts with Stone as well as Arcane, so the sigil Overloads them on its own.", {}, { cap: 'ccWeaverBlade', sp: { ab: 'cc_spectral', rider: { element: 'stone' } } }), 4, 1);
   put(T.glaive.list, 'Ghostblade Rush', GT('Ghostblade Rush', 'glaive2', 4, 3, 1, `Riposte Stance reaches ${CX.RIP_FAR} cells farther: it blinks out to cut each walker there and is back at once. Each riposte leaves an afterimage that cuts the same foe again 0.4s later, half as hard.`, {}, { cap: 'ccxGhostRip' }));
 
   // Magelings: Missile Swarm | Lecture Hall | Unstable Charge
   put(T.arrow.list, 'Missile Swarm', GT('Missile Swarm', 'arrows2', 4, 0, 1, `Arcane Barrage becomes a stream: for 3s it looses a missile every ${CX.STREAM_GAP}s at the toughest foes in range, ${CX.STREAM_N} in all, each as hard as a Barrage missile.`, {}, { cap: 'ccxStream' }));
   put(T.arrow.list, 'Arcane Torrent', GT('Lecture Hall', 'orb', 4, 1, 1, 'Gathering Orb draws on the whole Conclave: while it gathers, every strike of a Conclave unit within 2 cells of the Mageling also pours half its blow into the orb.', {}, { cap: 'ccxHall' }));
 
-  // Rimeweavers: Flash Freeze | Glacier Script | Lingering Rime (Scrivener's Hand to row IV)
+  // Frostweavers: Flash Freeze | Glacier Script | Lingering Rime (Scrivener's Hand to row IV)
   put(T.frost.list, 'Flash Freeze', GT('Flash Freeze', 'iceblock', 4, 0, 1, 'Rime Lattice spends no glyphs: each erupts and stays to erupt again. Its ice bridges freeze the walkers they cross for 0.6s, and each Rime Lattice brings Glacial Glyph 2s nearer.', {}, { cap: 'ccxBridgeFrz', sp: { ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', 2] } })).capK = 2;
   put(T.frost.list, 'Lingering Rime', GT('Lingering Rime', 'frostbite', 4, 2, 1, `Rime Lattice brands up to ${CX.BRAND_N} walkers it freezes, as Hoarfrost Trail does: once the ice lets go, each leaves biting frost prints as it walks on. Every walker it strikes is chilled 40% for 2s.`, {}, { cap: 'ccxRimeBrand', sp: { ab: 'cc_hoarbloom', rider: { chill: [.4, 2] } } }));
   demote(T.frost.list, "Scrivener's Hand", 3, 2);
 
   // Chronomancers: Frozen Moment | Quickening Bell | Borrowed Hour (Hourglass Heart to row IV)
   put(T.arcane.list, 'Frozen Moment', GT('Frozen Moment', 'statue', 4, 0, 1, `Every 4th bolt stops time round its foe: every walker within 0.8 cells is stunned 0.5s, or within ${CX.MOMENT_R2} cells for 1s inside its own Time Dilation.`, {}, { cap: 'ccxMoment' }));
-  put(T.arcane.list, 'Quickening Bell', GT('Quickening Bell', 'sun', 4, 2, 1, 'Echo rings twice: 1s after its recast, the same spell is cast again, free and as strong, and each Echo quickens its own bolts 30% for 4s.', {}, { cap: 'ccxEcho2', sp: { ab: 'cc_echo', haste: [.3, 4] } }));
-  put(T.arcane.list, 'Borrowed Hour', GT('Borrowed Hour', 'hourglass', 4, 3, 1, 'Echo also recasts the last spell of up to 3 more Conclave units within 2.5 cells that cast in the last 8s, each at half its strength, and gives every unit within 1.6 cells 20 mana.', {}, { cap: 'ccxEchoAll', sp: { ab: 'cc_echo', ally: 20 } }));
+  put(T.arcane.list, 'Quickening Bell', GT('Quickening Bell', 'sun', 4, 2, 1, 'Recurrence rings twice: 1s after its recast, the same spell is cast again, free and as strong, and each Recurrence quickens its own bolts 30% for 4s.', {}, { cap: 'ccxEcho2', sp: { ab: 'cc_echo', haste: [.3, 4] } }));
+  put(T.arcane.list, 'Borrowed Hour', GT('Borrowed Hour', 'hourglass', 4, 3, 1, 'Recurrence also recasts the last spell of up to 3 more Conclave units within 2.5 cells that cast in the last 8s, each at half its strength, and gives every unit within 1.6 cells 20 mana.', {}, { cap: 'ccxEchoAll', sp: { ab: 'cc_echo', ally: 20 } }));
   demote(T.arcane.list, 'Hourglass Heart', 3, 1);
 
   // Astrologers: Constellation | Starfall Sky | Twin Stars
-  put(T.storm.list, 'Falling Fragments', GT('Constellation', 'stars', 4, 0, 1, `When Falling Star lands on a foe bearing another school's rune, a star falls on every foe within ${CX.CONST_R} cells bearing that rune too (up to ${CX.CONST_N}), for half.`, {}, { cap: 'ccxConst' }));
+  put(T.storm.list, 'Falling Fragments', GT('Constellation', 'stars', 4, 0, 1, `When Falling Star lands on a foe marked with another element, a star falls on every foe within ${CX.CONST_R} cells bearing that mark too (up to ${CX.CONST_N}), for half.`, {}, { cap: 'ccxConst' }));
   put(T.storm.list, 'Twin Stars', GT('Twin Stars', 'bigflake', 4, 3, 1, `Its Falling Star falls twice: a second star 0.4s later at 70%, on the same foe, or on the toughest foe within ${CX.TWIN_R} cells if it fell.`, {}, { cap: 'ccTwinStar' }));
 
   // Golem Wardens: Shatterground | Living Mountain | Walking Wall (Mana Quarry to row IV)
-  put(T.earth.list, 'Shatterground', GT('Shatterground', 'crack', 4, 0, 1, `Seismic Slam and Living Bulwark's stomp crack the road for ${CX.CRACK_T}s: each walker that steps onto the crack is stunned ${CX.CRACK_STUN}s (once each) and takes the stone rune. Seismic Slam and Living Bulwark hit stunned and held foes 30% harder.`, {}, { cap: 'ccxCrack', sp: [{ ab: 'cc_seismic', vs: ['stunned', .3] }, { ab: 'cc_boulder', vs: ['stunned', .3] }] }));
+  put(T.earth.list, 'Shatterground', GT('Shatterground', 'crack', 4, 0, 1, `Seismic Slam and Living Bulwark's stomp crack the road for ${CX.CRACK_T}s: each walker that steps onto the crack is stunned ${CX.CRACK_STUN}s (once each) and marked Stone. Seismic Slam and Living Bulwark hit stunned and held foes 30% harder.`, {}, { cap: 'ccxCrack', sp: [{ ab: 'cc_seismic', vs: ['stunned', .3] }, { ab: 'cc_boulder', vs: ['stunned', .3] }] }));
   put(T.earth.list, 'Living Mountain', GT('Living Mountain', 'mountain', 4, 1, 1, 'Seismic Slam leaps twice: 1s after it lands, the golem leaps onto the thickest crowd within its reach + 1 cell and slams again, as hard.', {}, { cap: 'ccxLeap2' }));
   put(T.earth.list, 'Avalanche Arm', GT('Walking Wall', 'statue', 4, 2, 1, `Living Bulwark walks: every second the golem strides ${CX.WALK_STEP} cells back up the road, shoving the walkers it holds before it (the heavy less), and every walker it strikes stays slowed 30% for 2s.`, {}, { cap: 'ccxWalk', sp: { ab: 'cc_boulder', rider: { slow: [.3, 2] } } }), 4, 2);
   demote(T.earth.list, 'Mana Quarry', 3, 3);
@@ -39353,14 +39430,14 @@ const cxChamp = (u, cap) => { for (const o of G.towers) if (o.def && o.def.unit 
   // Arcane Severers: Void Ground | Unravelling Veil | Wardbreaker
   if (S) {
     put(S.list, 'Void Ground', GT('Void Ground', 'vortex', 4, 0, 1, `Rend the Veil tears on through the crowd: each foe it tears pulls a thread from the nearest foe within ${CX.REND_R} cells, torn 0.4s later too (up to ${CX.REND_MORE} more), and each foe it slays gives 10 mana back.`, {}, { cap: 'ccxRendChain', sp: { ab: 'cc_nullfield', kill: { mana: 10 } } }));
-    put(S.list, 'Unravelling Veil', GT('Unravelling Veil', 'disint', 4, 1, 1, `Rend the Veil spills runes: each foe it tears sheds every other school's rune it bears onto every foe within ${CX.SPILL_R} cells, and each Rend the Veil brings Sundering Rune 3s nearer.`, {}, { cap: 'ccxRendSpill', sp: { ab: 'cc_nullfield', ready: ['cc_sunder', 3] } }));
+    put(S.list, 'Unravelling Veil', GT('Unravelling Veil', 'disint', 4, 1, 1, `Rend the Veil spills marks: each foe it tears sheds every other element mark it bears onto every foe within ${CX.SPILL_R} cells, and each Rend the Veil brings Sundering Glyph 3s nearer.`, {}, { cap: 'ccxRendSpill', sp: { ab: 'cc_nullfield', ready: ['cc_sunder', 3] } }));
   }
 
   // Maelis: Deeper Loom | Rewoven Threads | Spellweaver
   if (M) {
-    put(M, 'Deeper Loom', CT('Deeper Loom', 'spiral', 4, 0, 1, `Sixfold Loom throws 2 more bolts, and each bolt that weaves throws another (up to ${CX.LOOM_MORE} more a cast).`, {}, { cap: 'ccxLoomOn', sp: { ab: 'ch_mirrorweave', by: { n: 2 } } }));
-    put(M, 'Ley Road', CT('Rewoven Threads', 'rune', 4, 1, 1, `Unravel rethreads: each rune it tears off is thrown on to the nearest foe within ${CX.THREAD_R} cells that lacks it, ready for the next weave.`, {}, { cap: 'ccxRethread' }));
-    put(M, 'Spellweaver', CT('Spellweaver', 'orbbig', 4, 3, 1, 'Every weave a Conclave unit makes within her reach gives her an Arcane Charge and brings Sixfold Loom 1s nearer (at most 4 a second), and each Sixfold Loom brings Unravel 4s nearer.', {}, { cap: 'ccxWeaveCharge', sp: { ab: 'ch_mirrorweave', ready: ['ch_unravel', 4] } }));
+    put(M, 'Deeper Loom', CT('Deeper Loom', 'spiral', 4, 0, 1, `Sixfold Loom throws 2 more bolts, and each bolt that sets off a reaction throws another (up to ${CX.LOOM_MORE} more a cast).`, {}, { cap: 'ccxLoomOn', sp: { ab: 'ch_mirrorweave', by: { n: 2 } } }));
+    put(M, 'Ley Road', CT('Rewoven Threads', 'rune', 4, 1, 1, `Unravel rethreads: each mark it tears off is thrown on to the nearest foe within ${CX.THREAD_R} cells that lacks it, to react there.`, {}, { cap: 'ccxRethread' }));
+    put(M, 'Spellweaver', CT('Spellweaver', 'orbbig', 4, 3, 1, 'Every reaction a Conclave unit sets off within her reach gives her an Arcane Charge and brings Sixfold Loom 1s nearer (at most 4 a second), and each Sixfold Loom brings Unravel 4s nearer.', {}, { cap: 'ccxWeaveCharge', sp: { ab: 'ch_mirrorweave', ready: ['ch_unravel', 4] } }));
   }
   // Aurel: Gathered Ghosts | Twelve Strokes | Timekeeper
   if (A) {
@@ -39371,7 +39448,7 @@ const cxChamp = (u, cap) => { for (const o of G.towers) if (o.def && o.def.unit 
   // Maren: Chain to Blade | Blade of the Conclave | Bursting Seams (Duelling Ground to row IV)
   if (V) {
     put(V, 'Chain to Blade', CT('Chain to Blade', 'chains', 4, 0, 1, 'Rift Chain never stops short: every cut of it that stuns its foe earns one more hop, not just the first, and each Unbound Blade brings Rift Chain 3s nearer.', {}, { cap: 'ccxChainOn', sp: { ab: 'ch_unbound', ready: ['ch_riftchain', 3] } }));
-    put(V, 'Blade of the Conclave', CT('Blade of the Conclave', 'sword', 4, 1, 1, "Weave: her strikes spend any other school's rune on their foe to open a seam: 0.4s later it is struck again for that hit's full damage, with the rune's touch (a freeze, burn, slow or stun).", {}, { cap: 'ccxSeamWeave' }));
+    put(V, 'Blade of the Conclave', CT('Blade of the Conclave', 'sword', 4, 1, 1, "Each reaction her cuts set off opens a seam: 0.4s later the foe is struck again for her full strike, with the other element's touch (a chill, a burn, a slow, a pull or a stun).", {}, { cap: 'ccxSeamWeave' }));
     put(V, 'Long Unbinding', CT('Bursting Seams', 'swords', 4, 3, 1, `While Unbound Blade burns, each foe her Stagger stuns bursts: every walker within ${CX.BURST_R} cell of it is cut for half her strike and Staggered, and Unbound Blade strikes stunned foes 30% harder.`, {}, { cap: 'ccxBurst', sp: { ab: 'ch_unbound', vs: ['stunned', .3] } }));
     demote(V, 'Duelling Ground', 3, 2);
   }
@@ -39379,8 +39456,8 @@ const cxChamp = (u, cap) => { for (const o of G.towers) if (o.def && o.def.unit 
   /* ---- no talent waits on a wall (owner, 7 Nov 2026): each answers to who the unit is ---- */
   // the golem heaves what is already held fast
   put(T.earth.list, 'Glyph Anchor', GT('Glyph Anchor', 'rune', 2, 0, 1, 'While 2 or more stunned or held walkers are in its reach, Heave comes 25% sooner.', {}, { sp: { ab: 'cc_tremorglyph', at: 'foes', foes: { n: 2, cond: 'held' }, cd: -.25 } }));
-  // the Spellweaver reads the runes on the foes round her
-  if (M) put(M, 'Library Wall', CT('Read the Runes', 'rune', 3, 2, 1, 'While 3 or more foes in her reach bear runes, Thousandfold Barrage and Unravel cost 25% less: she reads her spells off them.', {}, { sp: [{ ab: 'ch_thousandfold', at: 'foes', foes: { n: 3, cond: 'runed' }, cost: -.25 }, { ab: 'ch_unravel', at: 'foes', foes: { n: 3, cond: 'runed' }, cost: -.25 }] }));
+  // the Spellweaver reads the marks on the foes round her
+  if (M) put(M, 'Library Wall', CT('Read the Marks', 'rune', 3, 2, 1, 'While 3 or more foes in her reach bear element marks, Thousandfold Barrage and Unravel cost 25% less: she reads her spells off them.', {}, { sp: [{ ab: 'ch_thousandfold', at: 'foes', foes: { n: 3, cond: 'elmarked' }, cost: -.25 }, { ab: 'ch_unravel', at: 'foes', foes: { n: 3, cond: 'elmarked' }, cost: -.25 }] }));
   // the Blade of the Conclave drills her Spellblades as she fights
   if (V) put(V, 'Practice Yard', CT('Practice Yard', 'statue', 3, 1, 1, 'With a Spellblade within 2 cells of her, Severing Arc and Rift Chain cost 25% less: she drills it as she fights.', {}, { sp: [{ ab: 'ch_severing', at: 'near', near: { unit: 'cc_spellblade', n: 1, r: 2 }, cost: -.25 }, { ab: 'ch_riftchain', at: 'near', near: { unit: 'cc_spellblade', n: 1, r: 2 }, cost: -.25 }] }));
 }
@@ -39512,14 +39589,14 @@ cxWrap('cc_echo', (cast0, t, st, e, ab) => {
 /* =====================================================================================================
    ASTROLOGERS
    ===================================================================================================== */
-// Constellation: the stars that follow a rune from the foe the star struck to the foes near it bearing it
+// Constellation: the stars that follow a mark from the foe the star struck to the foes near it bearing it
 function cxConstellation(t, st, c, k) {
   if (!G.towers.includes(t) || G.state !== 'play' || !c) return;
-  const rs = ccRunesOn(c).filter(s => s !== 'star'); if (!rs.length) return;
+  const rs = ccMarksRecent(c, .6).filter(s => s !== 'star'); if (!rs.length) return;   /* (the star's own hit may have reacted with them) */
   const s = t.st || st, L = G.creeps.filter(o => o !== c && !o.dead && !o.ent && canTarget(t, s, o) && Math.hypot(o.x - c.x, o.y - c.y) <= CX.CONST_R && rs.some(q => ccHas(o, q))).sort(abByTough).slice(0, CX.CONST_N);
   for (const o of L) { rfx({ k: 'streak', x0: c.x, h0: hitH(c) + .2, z0: c.y, c: o, col: '#eef2ff', w: .02, trav: .15, life: .35 }); ccStarDrop(t, s, o, 3 * k * .5, {}); }
 }
-// Falling Star (its cast and Zodiac): Twin Stars finds a new foe if the first fell; Constellation reads the runes as it lands
+// Falling Star (its cast and Zodiac): Twin Stars finds a new foe if the first fell; Constellation reads the marks as it lands
 ccFallingStar = function (t, st, c, k, free) {
   const ab = ABIL.cc_fallingstar, C = st.caps || {}, low = byT(ab.by.low, t);
   ccStarDrop(t, st, c, 3 * k, { low, splash: true, frag: C.ccFrag });
@@ -39537,7 +39614,7 @@ ccFallingStar = function (t, st, c, k, free) {
 /* =====================================================================================================
    GOLEM WARDENS
    ===================================================================================================== */
-// Shatterground: a crack in the road (a stone glyph: it stuns each walker stepping onto it once and leaves the stone rune)
+// Shatterground: a crack in the road (a stone glyph: it stuns each walker stepping onto it once and marks it Stone)
 function cxCrack(t, x, z) {
   if (!abLive(t)) return; const s = t.st || effStats(t);
   const g = ccGlyph({ s: 'stone', sub: 'quake', x, z, r: CX.CRACK_R, t: CX.CRACK_T, src: t, st: s, every: .5, type: 'phys', ccxCrack: 1, cseen: new Set() });
@@ -39647,12 +39724,12 @@ function cxRendOn(t, seen, prev, k, m, sev, left) {
   sfx('shieldBreak', 0);
   G.delayed.push({ t: .4, fn: () => cxRendOn(t, seen, next, k, m, sev, left - next.length) });
 }
-// Unravelling Veil: each torn foe's other runes spill onto the foes round it
+// Unravelling Veil: each torn foe's other marks spill onto the foes round it
 function cxSpill(t, F) {
   for (const c of F) {
-    const rs = ccRunesOn(c).filter(s => s !== 'arcane'); if (!rs.length) continue;
+    const rs = ccMarksRecent(c, .8).filter(s => s !== 'arcane'); if (!rs.length) continue;
     let n = 0;
-    for (const o of G.creeps) { if (o === c || o.dead || o.ent || Math.hypot(o.x - c.x, o.y - c.y) > CX.SPILL_R) continue; for (const s of rs) ccRune(o, s, t); n++; }
+    for (const o of G.creeps) { if (o === c || o.dead || o.ent || Math.hypot(o.x - c.x, o.y - c.y) > CX.SPILL_R) continue; for (const s of rs) ccMark(o, s, t); n++; }
     if (n) { const col = CC_COL[rs[0]] || CC_COL.arcane; ccRingFx(c.x, c.y, CX.SPILL_R, col); fxSparkle(c.x, c.y, hitH(c) + .1, col); }
   }
 }
@@ -39667,7 +39744,7 @@ cxWrap('cc_nullfield', (cast0, t, st, L, ab) => {
 /* =====================================================================================================
    MAELIS
    ===================================================================================================== */
-// Deeper Loom: Sixfold Loom (forces_zxc_conclave_cool.js), each woven bolt throwing another
+// Deeper Loom: Sixfold Loom (forces_zxc_conclave_cool.js), each bolt that sets off a reaction throwing another
 cxWrap('ch_mirrorweave', (cast0, t, st, p, ab) => {
   if (!ccxCap(st, 'ccxLoomOn')) return cast0(t, st, p, ab);
   const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t))), gap = 2.7 / n; let more = 0;
@@ -39675,33 +39752,33 @@ cxWrap('ch_mirrorweave', (cast0, t, st, p, ab) => {
   const bolt = i => {
     if (!abLive(t)) return; const s = t.st || st, sc = CCX_LOOM[i % 6];
     const L = abFoes(t, s, 99).filter(c => !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= ab.rr); if (!L.length) return;
-    const c = L.find(q => !ccHas(q, sc) && ccRunesOn(q).length) || L.find(q => !ccHas(q, sc)) || L[i % L.length];
-    const other = ccRunesOn(c).find(q => q !== sc); let mult = .2;
-    if (other) { c.ccR[other] = 0; (c.ccRSp || (c.ccRSp = {}))[other] = G.time; mult *= 2; ccTouch(t, c, other); ccWeaveNote(t, c, 'weave', other); }
-    ccAb(t, s, c, mult, k, { school: sc, noWeave: true });
-    ccxFx(ab.id, t, c, C => CCX_FX.loomBolt(C, p.x, p.y, c, sc, i, other));
+    const c = L.find(q => !ccHas(q, sc) && ccMarksOn(q).length) || L.find(q => !ccHas(q, sc)) || L[i % L.length];
+    const other = ccMarksOn(c).find(q => q !== sc);
+    ccAb(t, s, c, .2, k, { school: sc });
+    const rx = other && c.ccRxAt === G.time ? other : null;
+    ccxFx(ab.id, t, c, C => CCX_FX.loomBolt(C, p.x, p.y, c, sc, i, rx));
     if (i % 3 === 0) sfx('phase', 0);
-    if (other && more < CX.LOOM_MORE) { const j = n + more++; ccxLater(ab.id, gap, () => bolt(j)); }
+    if (rx && more < CX.LOOM_MORE) { const j = n + more++; ccxLater(ab.id, gap, () => bolt(j)); }
   };
   for (let i = 0; i < n; i++) ccxLater(ab.id, .35 + i * gap, () => bolt(i));
   sfx('arcane', 1);
 });
-// Rewoven Threads: the runes Unravel tears off, thrown on to the nearest foe lacking each
+// Rewoven Threads: the marks Unravel tears off, thrown on to the nearest foe lacking each
 cxWrap('ch_unravel', (cast0, t, st, p, ab) => {
-  const snap = p && ccxCap(st, 'ccxRethread') ? G.creeps.filter(c => !c.dead && !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= ab.rr + .05).map(c => [c, ccRunesOn(c)]).filter(e => e[1].length) : null;
+  const snap = p && ccxCap(st, 'ccxRethread') ? G.creeps.filter(c => !c.dead && !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= ab.rr + .05).map(c => [c, ccMarksOn(c)]).filter(e => e[1].length) : null;
   const r = cast0(t, st, p, ab); if (r === false || !snap) return r;
   let n = 0;
   for (const [c, rs] of snap) for (const s of rs) {
     if (n >= CX.THREAD_N) break;
     const o = nearest(c.x, c.y, CX.THREAD_R, 1, c, q => !q.ent && !ccHas(q, s))[0]; if (!o) continue;
-    ccRune(o, s, t); n++;
+    ccMark(o, s, t); n++;
     rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: o, col: CC_COL[s] || '#d8b8ff', w: .02, trav: .15, life: .3 });
   }
   return r;
 });
-// Spellweaver: any Conclave weave within her reach charges her and readies the Loom (at most once every WEAVE_GAP s)
-{ const n0 = ccWeaveNote;
-  ccWeaveNote = function (t, c, id, s) {
+// Spellweaver: any Conclave reaction within her reach charges her and readies the Loom (at most once every WEAVE_GAP s)
+{ const n0 = ccReactNote;
+  ccReactNote = function (t, c, id, s) {
     const r = n0.apply(this, arguments);
     if (c && t && ccUnit(t) && G.state === 'play') {
       const m = cxChamp('ch_maelis', 'ccxWeaveCharge');
@@ -39722,7 +39799,7 @@ cxWrap('ch_rewind', (cast0, t, st, c, ab) => {
   const k = cxK(t), w = byT(ab.by.wait, t);
   const L = abFoes(t, st, abReach(t, st, ab), ccWalker).filter(o => o !== c && !o.ent && !(o.chRecT > G.time)).sort(abByTough).slice(0, CX.GHOSTS - 1);
   for (const o of L) {
-    o.chRec = { t, k, r0: o.remain, x: o.x, y: o.y }; o.chRecT = G.time + w; ccRune(o, 'chrono', t, w + 1);
+    o.chRec = { t, k, r0: o.remain, x: o.x, y: o.y }; o.chRecT = G.time + w; ccMark(o, 'chrono', t, w + 1);
     (G.ccxRecalls || (G.ccxRecalls = [])).push(o);
     ccxFx(ab.id, t, o, C => CCX_FX.recallMark(C, o, w));
   }
@@ -39783,24 +39860,24 @@ cxWrap('ch_riftchain', (cast0, t, st, L, ab) => {
   step(first, null, byT(ab.by.n, t));
   sfx('phase', 0);
 });
-// Blade of the Conclave: her weave, a seam torn open 0.4s after the hit with the spent rune's touch
+// Blade of the Conclave: a seam torn open 0.4s after a reaction she sets off, with the other element's touch
 function cxSeam(t, c, amt, s) {
   G.delayed.push({ t: CX.SEAM_T, fn: () => {
     if (c.dead || !ccAlive(t)) return; const st = t.st || effStats(t);
-    tagged('rx', () => ccHit(t, st, c, amt, { type: 'phys', noWeave: true })); if (!c.dead) ccTouch(t, c, s);
+    tagged('rx', () => ccHit(t, st, c, amt, { type: 'phys', noRx: true })); if (!c.dead) ccTouch(t, c, s);
     rfx({ k: 'slash', x: c.x, h: hitH(c), z: c.y, a: (t.shots | 0) * 1.7, r: .45, col: CC_COL[s] || '#ffb0f0', life: .28 });
   } });
 }
-{ const w0 = ccWeavesOf;
-  ccWeavesOf = function (t, st) {
+{ const w0 = ccRidersOf;
+  ccRidersOf = function (t, st) {
     const out = w0.apply(this, arguments);
     if (!t || !t.def || t.def.unit !== 'ch_maren' || !ccxCap(st, 'ccxSeamWeave')) return out;
-    return out.concat([[ccOthers('arcane'), 'weave', (s, c, amt) => { cxSeam(t, c, amt, s); return 0; }]]);
+    return out.concat([['*', 'seam', (id, e, c, S) => { cxSeam(t, c, S, e); return 0; }]]);
   }; }
 // Bursting Seams: a foe her Stagger stuns while Unbound Blade burns bursts (each foe at most once a second)
 function cxBurst(t, c) {
   if (!ccAlive(t)) return; const st = t.st || effStats(t), x = c.x, z = c.y;
-  abAoe(() => inSplash(x, z, CX.BURST_R, true, o => { if (o === c || o.ent || !canTarget(t, st, o)) return; ccHit(t, st, o, (st.dmg || 0) * .5, { type: 'phys', noWeave: true }); if (!o.dead) ccStaggerFoe(o, t); }));
+  abAoe(() => inSplash(x, z, CX.BURST_R, true, o => { if (o === c || o.ent || !canTarget(t, st, o)) return; ccHit(t, st, o, (st.dmg || 0) * .5, { type: 'phys', noRx: true }); if (!o.dead) ccStaggerFoe(o, t); }));
   ccRingFx(x, z, CX.BURST_R, '#f070d8'); fxSpark(x, z, hitH(c), '#ffb0f0', 6); sfx('glaiveHit', 1);
 }
 { const s0 = ccStaggerFoe;
@@ -41698,12 +41775,12 @@ if (typeof restore === 'function') {
    interesting ... make sure any talents that are samey across talent trees are changed. make sure talents play into the
    fantasy of the unit". And on mana: a mana talent may stay, but HOW the mana comes must fit the unit and never repeat.
    Every flat range, attack speed, cooldown, armour, ward, slow, mana-while-saving and mana-per-hit talent of the
-   Conclave's eight trees and three Champion trees is re-aimed here at the scholar's own craft: runes and weaves, Arcane
+   Conclave's eight trees and three Champion trees is re-aimed here at the scholar's own craft: elements and reactions, Arcane
    Charge, Stagger, the glyphs written on the road, time slowed and stopped, flyers read out of the sky. The table of old
    and new is docs/talent_sameness_audit.md.
    Loads after the capstones (forces_zzzzzzzzz_caps_conclave.js) and before forces_zzzzzzzzzz_talnames.js. Each talent
    keeps its cell, rank count and prerequisite (ccfTal); a renamed one refunds its points (talnames). The mechanics are
-   wrappers that keep the original call: ccHit, ccRune, ccWeaveNote, ccStaggerFoe, ccFrostGlyph, ccGlyphTick, ccFireBurst,
+   wrappers that keep the original call: ccHit, ccMark, ccReactNote, ccStaggerFoe, ccFrostGlyph, ccGlyphTick, ccFireBurst,
    ccOnCast, ccsGain, ccsSpend, the Champions' first spells (ccArchSpell, ccChronoSpell, ccMarenSpell), a few spells'
    casts and zones (cxWrap, cxWrapZone) and the force's hooks. No new look beyond the light marks the spells already use. */
 
@@ -41733,25 +41810,25 @@ function ccfTal(list, name, nt) {
   const M = CHAMPS.cc_arch && CHAMPS.cc_arch.tree.list, A = CHAMPS.cc_chrono && CHAMPS.cc_chrono.tree.list, V = CHAMPS.cc_maren && CHAMPS.cc_maren.tree.list;
   // Spellblades: the duel, its Stagger and its Arcane Charge
   ccfTal(T.glaive.list, 'Long Step', GT('Opening Salute', 'swords', 0, 0, 2, n => `Its first cut at each new foe lays ${ccfStack(n)} of Stagger: the duel opens with a feint.`, {}, { cap: 'ccfSalute' }));
-  ccfTal(T.glaive.list, 'Runed Edge', GT('Press the Opening', 'boltplus', 0, 1, 2, n => `Its rune-etched cuts ignore ${10 * n}% of armour, and each cut on a stunned foe adds ${n === 1 ? 'one more Arcane Charge' : n + ' more Arcane Charges'}.`, n => ({ armorPen: .1 * n }), { cap: 'ccfPress' }));
+  ccfTal(T.glaive.list, 'Runed Edge', GT('Press the Opening', 'boltplus', 0, 1, 2, n => `Its riftsteel cuts ignore ${10 * n}% of armour, and each cut on a stunned foe adds ${n === 1 ? 'one more Arcane Charge' : n + ' more Arcane Charges'}.`, n => ({ armorPen: .1 * n }), { cap: 'ccfPress' }));
   ccfTal(T.glaive.list, 'Swift Recovery', GT('Guard Broken', 'flash', 1, 1, 2, n => `Each time its Stagger breaks a foe's guard into a stun, Blinkstrike is readied ${n}s sooner.`, {}, { cap: 'ccfGuard', sp: { ab: 'cc_blinkstrike' } }));
   ccfTal(T.glaive.list, 'Blinkstep', GT('Unbroken Step', 'wing', 2, 0, 1, `When Blinkstrike slays its foe or strikes a stunned one, it blinks on at once to the walker nearest it within ${CCF.STEP_R} cells and strikes that one for half.`, {}, { cap: 'ccfStep', sp: { ab: 'cc_blinkstrike' } }));
   // Magelings: apprentices who copy, note and recite
-  ccfTal(T.arrow.list, 'Scrying Lens', GT('Copied Lesson', 'rune', 0, 0, 2, n => `When a Conclave unit of another school casts within ${CCF.COPY_R} cells of it, its next ${2 * n} missiles copy that school's rune onto their foes too.`, {}, { cap: 'ccfCopy' }));
-  ccfTal(T.arrow.list, 'Barrage Drill', GT('Recitation', 'missiles', 0, 2, 2, n => `Arcane Barrage recites the runes it sees: one more missile for each other school's rune on the foes in range (up to ${n}).`, {}, { cap: 'ccfRecite', sp: { ab: 'cc_barrage' } }));
-  ccfTal(T.arrow.list, 'Inkwell', GT('Margin Notes', 'potion', 0, 3, 2, n => `Each time another unit weaves an arcane rune its missiles laid, it takes notes: ${6 * n} mana.`, {}, { cap: 'ccfNotes' }));
-  ccfTal(T.arrow.list, 'Spark Battery', GT('Charged Curtain', 'boltup', 2, 2, 1, "Each Missile Curtain missile that dives on a foe bearing another school's rune gives it an Arcane Charge.", {}, { cap: 'ccfCurtain', sp: { ab: 'cc_sparks' } }));
-  // Rimeweavers: cold written on the road
+  ccfTal(T.arrow.list, 'Scrying Lens', GT('Copied Lesson', 'rune', 0, 0, 2, n => `When a Conclave unit of another school casts within ${CCF.COPY_R} cells of it, its next ${2 * n} missiles mark their foes with that school's element too.`, {}, { cap: 'ccfCopy' }));
+  ccfTal(T.arrow.list, 'Barrage Drill', GT('Recitation', 'missiles', 0, 2, 2, n => `Arcane Barrage recites the elements it sees: one more missile for each other element marked on the foes in range (up to ${n}).`, {}, { cap: 'ccfRecite', sp: { ab: 'cc_barrage' } }));
+  ccfTal(T.arrow.list, 'Inkwell', GT('Margin Notes', 'potion', 0, 3, 2, n => `Each time another unit sets off a reaction with an Arcane mark its missiles laid, it takes notes: ${6 * n} mana.`, {}, { cap: 'ccfNotes' }));
+  ccfTal(T.arrow.list, 'Spark Battery', GT('Charged Curtain', 'boltup', 2, 2, 1, "Each Missile Curtain missile that dives on a foe marked with another element gives it an Arcane Charge.", {}, { cap: 'ccfCurtain', sp: { ab: 'cc_sparks' } }));
+  // Frostweavers: cold written on the road
   ccfTal(T.frost.list, 'Biting Cold', GT('Hoar Ink', 'snowflake', 0, 0, 3, n => `Its bolts on a frozen walker write a small frost glyph under it that lasts ${1 + n}s (once a foe every ${CCF.INK_GAP}s).`, {}, { cap: 'ccfInk' }));
   ccfTal(T.frost.list, 'Steady Glyphwork', GT('Practised Hand', 'rune', 0, 1, 2, n => `Each frost glyph it writes brings Glacial Glyph ${gNf(.5 * n)}s nearer.`, {}, { cap: 'ccfHand' }));
   ccfTal(T.frost.list, 'Needle Rime', GT('Needle Rime', 'shieldbreak', 0, 2, 3, n => `Its bolts and spells ignore ${5 * n}% of wards, and on a frozen foe its bolts splinter: shards strike up to ${n === 1 ? 'one other walker' : n + ' other walkers'} within ${CCF.NEEDLE_R} cells for ${Math.round(CCF.NEEDLE_K * 100)}% of the bolt.`, n => ({ magicPen: .05 * n }), { cap: 'ccfNeedle' }));
-  ccfTal(T.frost.list, 'Rimewell', GT('Singing Ice', 'snowflake', 1, 1, 2, n => `While a foe it froze is still frozen, each strike another Conclave unit lands on it gives the Rimeweaver ${3 * n} mana: the ice sings.`, {}, { cap: 'ccfSing' }));
+  ccfTal(T.frost.list, 'Rimewell', GT('Singing Ice', 'snowflake', 1, 1, 2, n => `While a foe it froze is still frozen, each strike another Conclave unit lands on it gives the Frostweaver ${3 * n} mana: the ice sings.`, {}, { cap: 'ccfSing' }));
   { const L = T.frost.list, o = L.find(x => x.name === "Scrivener's Hand"); if (o) ccfTal(L, "Scrivener's Hand", GT("Scrivener's Hand", 'rune', 3, 2, 1, 'Every 2nd bolt writes a frost glyph instead of every 3rd.', {}, { cap: 'ccGlyph2' })); }
   // Chronomancers: the clock's keepers
   ccfTal(T.arcane.list, 'Long Second', GT('Lagging Hour', 'ring', 0, 0, 2, n => `Foes leave Time Dilation still dragging: its slow follows each one out for ${n}s.`, {}, { cap: 'ccfLag', sp: { ab: 'cc_dilation' } }));
   ccfTal(T.arcane.list, 'Heavy Hours', GT('Heavy Hours', 'hourglass', 0, 1, 3, n => `Each bolt on a foe it has already slowed deepens that slow by ${5 * n}%, up to three times.`, {}, { cap: 'ccfHeavy' }));
-  ccfTal(T.arcane.list, 'Pendulum Swing', GT('Pendulum Swing', 'quick', 0, 2, 3, n => `Every ${gOrd(5 - n)} bolt swings on: it lays the chrono rune on the foe nearest its own within ${CCF.SWING_R} cells too.`, {}, { cap: 'ccfSwing' }));
-  ccfTal(T.arcane.list, 'Patient Hours', GT('Patient Hours', 'hourglass', 0, 3, 2, n => `Time Dilation lasts ${gNf(.5 * n)}s longer for each foe inside it that already bears the chrono rune (up to 3).`, {}, { cap: 'ccfPatient', sp: { ab: 'cc_dilation' } }));
+  ccfTal(T.arcane.list, 'Pendulum Swing', GT('Pendulum Swing', 'quick', 0, 2, 3, n => `Every ${gOrd(5 - n)} bolt swings on: it marks the foe nearest its own within ${CCF.SWING_R} cells with Time too.`, {}, { cap: 'ccfSwing' }));
+  ccfTal(T.arcane.list, 'Patient Hours', GT('Patient Hours', 'hourglass', 0, 3, 2, n => `Time Dilation lasts ${gNf(.5 * n)}s longer for each foe inside it already marked Time (up to 3).`, {}, { cap: 'ccfPatient', sp: { ab: 'cc_dilation' } }));
   ccfTal(T.arcane.list, 'Hourglass Reserve', GT('Stolen Sand', 'hourglass', 1, 2, 2, n => `Each time a Conclave spell strikes a foe its bolts have slowed, it gains ${2 * n} mana (once a foe every ${CCF.SAND_GAP}s).`, {}, { cap: 'ccfSand' }));
   ccfTal(T.arcane.list, 'Borrowed Time', GT('Borrowed Time', 'wings', 3, 0, 2, n => `Backward Hour quickens the Chronomancer ${4 * n}% for 3s as it is cast, and each walker it turns back quickens every Conclave unit within ${CCF.BORROW_R} cells of the Chronomancer ${4 * n}% for 3s, up to ${12 * n}%.`, {}, { cap: 'ccfBorrow', sp: n => ({ ab: 'cc_quicken', haste: [.04 * n, 3] }) }));
   ccfTal(T.arcane.list, 'Stopped Clock', GT('Stopped Clock', 'snail', 3, 2, 1, `A walker Backward Hour turns back while inside one of its Time Dilations is stopped in time for ${CCF.CLOCK_STOP}s, and Backward Hour costs 20% less while a Time Dilation of its stands.`, {}, { cap: 'ccfClock', sp: { ab: 'cc_quicken', at: 'ccfDilation', cost: -.2 } }));
@@ -41759,9 +41836,9 @@ function ccfTal(list, name, nt) {
   ccfTal(T.storm.list, 'Wide Heavens', GT('Wide Heavens', 'spyglass', 0, 3, 2, n => `Falling Star cast on a flyer also drags down every flyer within ${gNf(CCF.HEAVENS_R * n)} cells of it.`, {}, { cap: 'ccfHeavens' }));
   ccfTal(T.storm.list, 'Night Sight', GT('Night Sight', 'spyglass', 0, 2, 2, n => `Its first bolt at each flyer marks it for ${CCF.NIGHT_T}s: it takes ${5 * n}% more from every unit.`, {}, { cap: 'ccfNight' }));
   ccfTal(T.storm.list, 'Starwell', GT('Fallen Lights', 'stars', 1, 2, 2, n => `Each flyer that dies within its reach, by any hand, gives it ${6 * n} mana: a falling light, read.`, {}, { cap: 'ccfFallen' }));
-  ccfTal(T.storm.list, 'Ill Omen', GT('Ill Omen', 'eye', 2, 1, 2, n => `Lodestar's fall lays the star rune on every foe it strikes, and Falling Star stuns a foe already bearing the star rune for ${gNf(.2 * n)}s.`, {}, { cap: 'ccfOmen', sp: [{ ab: 'cc_omen', rider: { rune: 'star' } }, { ab: 'cc_fallingstar' }] }));
+  ccfTal(T.storm.list, 'Ill Omen', GT('Ill Omen', 'eye', 2, 1, 2, n => `Falling Star stuns a foe already marked Star for ${gNf(.2 * n)}s, and Lodestar's fall chills every foe it strikes 20% for 2s.`, {}, { cap: 'ccfOmen', sp: [{ ab: 'cc_omen', rider: { chill: [.2, 2] } }, { ab: 'cc_fallingstar' }] }));
   // Golem Wardens: the stone that drinks spells and swats the sky
-  ccfTal(T.earth.list, 'Runic Reservoir', GT('Runic Reservoir', 'gem', 0, 0, 2, n => `A slam that strikes a foe bearing another school's rune drinks the spell: ${3 * n} mana (once a slam).`, {}, { cap: 'ccfRes' }));
+  ccfTal(T.earth.list, 'Runic Reservoir', GT('Ley Reservoir', 'gem', 0, 0, 2, n => `A slam that strikes a foe marked with another element drinks the spell: ${3 * n} mana (once a slam).`, {}, { cap: 'ccfRes' }));
   ccfTal(T.earth.list, 'Granite Fists', GT('Granite Fists', 'fist', 0, 1, 3, n => `Its slams ignore ${6 * n}% of armour, and each slam on a stunned walker grinds ${n} more off for ${CCF.GRIND_T}s, up to ${3 * n}.`, n => ({ armorPen: .06 * n }), { cap: 'ccfGrind' }));
   ccfTal(T.earth.list, 'Broad Palms', GT('Broad Palms', 'quake', 0, 3, 2, n => `Its slams also swat flyers dragged down out of the sky within its reach, for ${30 * n}% of the slam.`, {}, { cap: 'ccfSwat' }));
   // Pyroclasts: fire that feeds itself
@@ -41779,24 +41856,24 @@ function ccfTal(list, name, nt) {
   }
   // Maelis, the Spellweaver: the archmage's book
   if (M) {
-    ccfTal(M, 'Wide Barrage', CT('Marginalia', 'missiles', 0, 0, 2, n => `When Thousandfold Barrage ends, up to ${4 * n} foes in its area bearing two or more runes gain one more, of a school they lack.`, {}, { cap: 'ccfMargin' }));
-    ccfTal(M, 'Flicked Pages', CT('Flicked Pages', 'quick', 0, 1, 3, n => `Every ${gOrd(5 - n)} bolt of hers turns a page: it lays the rune her next bolt will carry too.`, {}, { cap: 'ccfPage' }));
+    ccfTal(M, 'Wide Barrage', CT('Marginalia', 'missiles', 0, 0, 2, n => `When Thousandfold Barrage ends, up to ${4 * n} marked foes in its area gain the mark of an element they lack, setting off its reaction.`, {}, { cap: 'ccfMargin' }));
+    ccfTal(M, 'Flicked Pages', CT('Flicked Pages', 'quick', 0, 1, 3, n => `Every ${gOrd(5 - n)} bolt of hers turns a page: it lays the mark her next bolt will carry too, so the two react.`, {}, { cap: 'ccfPage' }));
     ccfTal(M, 'Starlit Reach', CT('Open Book', 'spyglass', 0, 2, 2, n => `While she holds 5 or more Arcane Charges, each bolt of hers also strikes the foe nearest its own within 1 cell, for ${25 * n}%.`, {}, { cap: 'ccfBook' }));
-    ccfTal(M, 'Quick Quill', CT('Quick Quill', 'hourglass', 0, 3, 2, n => `Thousandfold Barrage cast over 4 or more rune-marked foes comes ${gNf(1.5 * n)}s sooner.`, {}, { cap: 'ccfQuill' }));
-    ccfTal(M, 'Runic Drag', CT('Threads Pulled', 'snail', 1, 0, 2, n => `As Thousandfold Barrage falls, every foe in its area bearing the frost rune is chilled ${15 * n}% for 2s, and every one bearing the fire rune burns.`, {}, { cap: 'ccfThreads' }));
-    ccfTal(M, 'Deep Inkwell', CT('Deep Inkwell', 'potion', 1, 2, 2, n => `Each foe bearing three or more runes that dies within her reach gives her ${5 * n} mana.`, {}, { cap: 'ccfInkwell' }));
+    ccfTal(M, 'Quick Quill', CT('Quick Quill', 'hourglass', 0, 3, 2, n => `Thousandfold Barrage cast over 4 or more marked foes comes ${gNf(1.5 * n)}s sooner.`, {}, { cap: 'ccfQuill' }));
+    ccfTal(M, 'Runic Drag', CT('Threads Pulled', 'snail', 1, 0, 2, n => `As Thousandfold Barrage falls, every foe in its area marked Frost is chilled ${15 * n}% for 2s, and every one marked Fire burns.`, {}, { cap: 'ccfThreads' }));
+    ccfTal(M, 'Deep Inkwell', CT('Deep Inkwell', 'potion', 1, 2, 2, n => `Each foe that dies within her reach less than 2s after it reacted gives her ${5 * n} mana.`, {}, { cap: 'ccfInkwell' }));
     ccfTal(M, 'Shared Lesson', CT('Shared Lesson', 'potion', 2, 0, 1, `Each Thousandfold Barrage gives every other Conclave unit within ${CCF.LESSON_R} cells of her an Arcane Charge: a lesson for their next spell.`, {}, { cap: 'ccfLesson' }));
-    ccfTal(M, 'Charged Hands', CT('Snapping Threads', 'boltup', 3, 3, 2, n => `Each foe Unravel tears 3 or more runes from snaps: every other foe within ${CCF.SNAP_R} cells of it takes ${25 * n}% of its payout.`, {}, { cap: 'ccfSnap' }));
-    const rr = M.find(x => x.name === 'Read the Runes'); if (rr) rr.pro = () => 'With 3 or more rune-marked foes in her reach, Thousandfold Barrage and Unravel cost 25% less: she reads her spells off them.';
+    ccfTal(M, 'Charged Hands', CT('Snapping Threads', 'boltup', 3, 3, 2, n => `Each foe Unravel strikes that reacted in the last 2s snaps: every other foe within ${CCF.SNAP_R} cells of it takes ${25 * n}% of its payout.`, {}, { cap: 'ccfSnap' }));
+    const rr = M.find(x => x.name === 'Read the Marks'); if (rr) rr.pro = () => 'With 3 or more marked foes in her reach, Thousandfold Barrage and Unravel cost 25% less: she reads her spells off them.';
   }
   // Aurel, the Timekeeper: the hour held
   if (A) {
     ccfTal(A, 'Patient Hands', CT('Patient Hands', 'hourglass', 0, 0, 2, n => `Each foe that dies while stopped in time brings Stopped Hour ${n}s nearer.`, {}, { cap: 'ccfHands', sp: { ab: 'ch_stoppedhour' } }));
-    ccfTal(A, 'Wider Hour', CT('Rune-Weighted Hour', 'ring', 0, 1, 2, n => `Stopped Hour holds each foe that already bears the chrono rune ${gNf(.3 * n)}s longer.`, {}, { cap: 'ccfWeighted', sp: { ab: 'ch_stoppedhour' } }));
+    ccfTal(A, 'Wider Hour', CT('Weighted Hour', 'ring', 0, 1, 2, n => `Stopped Hour holds each foe already marked Time ${gNf(.3 * n)}s longer.`, {}, { cap: 'ccfWeighted', sp: { ab: 'ch_stoppedhour' } }));
     ccfTal(A, 'Ticking Hand', CT('Ticking Hand', 'quick', 0, 2, 3, n => `Each bolt of his on a foe stopped in time keeps it stopped ${gNf(.1 * n)}s longer (up to 1s more a foe).`, {}, { cap: 'ccfTick' }));
     ccfTal(A, 'Long Pendulum', CT('Long Pendulum', 'spiral', 0, 3, 2, n => `Every 3rd bolt of his swings back: half a second later it strikes the foe nearest its first within ${CCF.PEND_R} cells for ${20 * n}%, and slows it.`, {}, { cap: 'ccfPend' }));
     ccfTal(A, 'Saved Seconds', CT('Saved Seconds', 'hourglass', 1, 2, 2, n => `Each second a foe within his reach spends stopped in time puts ${n} mana back in his hourglass (up to 4 foes).`, {}, { cap: 'ccfSaved' }));
-    ccfTal(A, 'Leaden Minutes', CT('Leaden Minutes', 'snail', 1, 3, 2, n => `Every rune on the foes Stopped Hour holds stays through the hold and ${2 * n}s after.`, {}, { cap: 'ccfLeaden', sp: { ab: 'ch_stoppedhour' } }));
+    ccfTal(A, 'Leaden Minutes', CT('Leaden Minutes', 'snail', 1, 3, 2, n => `Every mark on the foes Stopped Hour holds stays through the hold and ${2 * n}s after.`, {}, { cap: 'ccfLeaden', sp: { ab: 'ch_stoppedhour' } }));
     ccfTal(A, 'Lent Time', CT('Lent Time', 'potion', 2, 1, 1, `Each Recall lends time: the spell with the longest wait among the Conclave units within ${CCF.LENT_R} cells of him is readied 2s sooner.`, {}, { cap: 'ccfLent', sp: { ab: 'ch_rewind' } }));
     ccfTal(A, 'Second Hand', CT('Second Hand', 'quick', 3, 2, 2, n => `Every foe Recall strikes is stopped in time for ${gNf(.3 * n)}s: the one it snaps back where it lands, and those it passes.`, {}, { cap: 'ccfSecond', sp: n => ({ ab: 'ch_rewind', rider: { stun: .3 * n } }) }));
   }
@@ -41819,16 +41896,16 @@ if (typeof SP_AT !== 'undefined') SP_AT.ccfDilation = t => !!G.hazards && G.haza
 if (typeof SP_COND !== 'undefined') SP_COND.cracked = c => (typeof epWardOpenK === 'function' && epWardOpenK(c) > 0) || c.nowardT > G.time;
 
 /* =====================================================================================================
-   RUNES: who laid each (Margin Notes reads it when another unit weaves it)
+   MARKS: who laid each (Margin Notes reads it when another unit reacts with it)
    ===================================================================================================== */
-{ const r0 = ccRune;
-  ccRune = function (c, s, src, dur) {
+{ const r0 = ccMark;
+  ccMark = function (c, s, src, dur, noRx) {
     const r = r0.apply(this, arguments);
     if (c && !c.dead && s && src && src.def) (c.ccfBy || (c.ccfBy = {}))[s] = src;
     return r;
   }; }
-{ const n0 = ccWeaveNote;
-  ccWeaveNote = function (t, c, id, s) {
+{ const n0 = ccReactNote;
+  ccReactNote = function (t, c, id, s) {
     const r = n0.apply(this, arguments);
     const by = s === 'arcane' && c && c.ccfBy && c.ccfBy.arcane;
     if (by && by !== t && ccfIs(by, 'cc_mageling') && ccfLive(by) && ccfCap(by, 'ccfNotes')) { gainMana(by, 6 * ccfCap(by, 'ccfNotes')); ccEv('tal:ccfNotes'); }   // Margin Notes
@@ -41843,7 +41920,7 @@ let CCF_IN = false;
   ccHit = function (t, st, c, amt, o) {
     if (CCF_IN || (o && o.ccfNo) || !t || !t.def || !c || c.dead || !(amt > 0)) return h0.apply(this, arguments);
     st = st || t.st || {};
-    const pre = { runes: ccRunesOn(c), frozen: c.stunT > 0 && c.stunEl === 'frost', slowed: c.slowT > 0, stopped: c.ccStopT > G.time, stunned: c.stunT > 0, burning: c.burnT > 0, frostSrc: c.frostSrc };
+    const pre = { marks: ccMarksOn(c), frozen: c.stunT > 0 && c.stunEl === 'frost', slowed: c.slowT > 0, stopped: c.ccStopT > G.time, stunned: c.stunT > 0, burning: c.burnT > 0, frostSrc: c.frostSrc };
     const r = h0.call(this, t, st, c, amt, o);
     CCF_IN = true;
     try { ccfAfterHit(t, st, c, amt, o || {}, pre); } catch (e) { console.warn('conclave fresh hit', e && e.message); } finally { CCF_IN = false; }
@@ -41851,18 +41928,18 @@ let CCF_IN = false;
   }; }
 function ccfAfterHit(t, st, c, amt, o, pre) {
   const u = t.def.unit, C = st.caps || {}, basic = !o.dot && !AB_NOW, ab = AB_NOW;
-  // Singing Ice: another unit's strike on a foe the Rimeweaver froze
+  // Singing Ice: another unit's strike on a foe the Frostweaver froze
   const fs = pre.frostSrc;
   if (pre.frozen && !o.dot && fs && fs !== t && ccfIs(fs, 'cc_rimeweaver') && ccUnit(t) && ccfLive(fs) && ccfCap(fs, 'ccfSing') && !((c.ccfSingT || 0) > G.time)) { c.ccfSingT = G.time + CCF.SING_GAP; gainMana(fs, 3 * ccfCap(fs, 'ccfSing')); ccEv('tal:ccfSing'); }
   // Stolen Sand: a Conclave spell on a foe a Chronomancer's bolts slowed
   if (ab && !o.dot && ccUnit(t) && pre.slowed && c.ccfSlowBy && c.ccfSlowByT > G.time && ccfLive(c.ccfSlowBy) && ccfCap(c.ccfSlowBy, 'ccfSand') && !((c.ccfSandT || 0) > G.time)) { c.ccfSandT = G.time + CCF.SAND_GAP; gainMana(c.ccfSlowBy, 2 * ccfCap(c.ccfSlowBy, 'ccfSand')); ccEv('tal:ccfSand'); }
   if (u === 'cc_mageling') {
-    if (basic && t.ccfCopyN > 0 && t.ccfCopyS && !c.dead) { t.ccfCopyN--; ccRune(c, t.ccfCopyS, t); ccEv('tal:ccfCopy'); }   // Copied Lesson
-    if (ab === 'cc_sparks' && C.ccfCurtain && pre.runes.some(s => s !== 'arcane')) { ccGain(t, 1); ccEv('tal:ccfCurtain'); }   // Charged Curtain
+    if (basic && t.ccfCopyN > 0 && t.ccfCopyS && !c.dead) { t.ccfCopyN--; ccMark(c, t.ccfCopyS, t); ccEv('tal:ccfCopy'); }   /* Copied Lesson */
+    if (ab === 'cc_sparks' && C.ccfCurtain && pre.marks.some(s => s !== 'arcane')) { ccGain(t, 1); ccEv('tal:ccfCurtain'); }   /* Charged Curtain */
   } else if (u === 'cc_rimeweaver' && basic) {
     if (C.ccfInk && pre.frozen && ccWalker(c) && !c.dead && !((c.ccfInkT || 0) > G.time)) { c.ccfInkT = G.time + CCF.INK_GAP; ccFrostGlyph(t, st, c.x, c.y, 1, { r: .45, t: 1 + C.ccfInk }); ccEv('tal:ccfInk'); }   // Hoar Ink
     if (C.ccfNeedle && pre.frozen) {   // Needle Rime
-      for (const q of nearest(c.x, c.y, CCF.NEEDLE_R, C.ccfNeedle, c, q => ccWalker(q) && !q.ent && canTarget(t, st, q))) { ccHit(t, st, q, amt * CCF.NEEDLE_K, { noWeave: true }); G.bolts.push({ pts: [[c.x, hitH(c), c.y], [q.x, hitH(q), q.y]], life: .12, max: .12, col: [.85, .95, 1.2] }); }
+      for (const q of nearest(c.x, c.y, CCF.NEEDLE_R, C.ccfNeedle, c, q => ccWalker(q) && !q.ent && canTarget(t, st, q))) { ccHit(t, st, q, amt * CCF.NEEDLE_K, { noRx: true }); G.bolts.push({ pts: [[c.x, hitH(c), c.y], [q.x, hitH(q), q.y]], life: .12, max: .12, col: [.85, .95, 1.2] }); }
       ccEv('tal:ccfNeedle');
     }
   } else if (u === 'cc_chronomancer' && basic) {
@@ -41872,36 +41949,36 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
       c.ccfHvN = again ? Math.min(3, (c.ccfHvN | 0) + 1) : 0; c.ccfHvBy = t; c.ccfHvT = G.time + 2.5;
       if (c.ccfHvN > 0) { chill(c, { slow: Math.min(.8, (st.slow || .25) + .05 * C.ccfHeavy * c.ccfHvN), slowT: st.slowT || 1.8 }, null, t); ccEv('tal:ccfHeavy'); }
     }
-    if (C.ccfSwing && ((t.ccfSwN = (t.ccfSwN | 0) + 1) % (5 - C.ccfSwing) === 0)) { const q = nearest(c.x, c.y, CCF.SWING_R, 1, c)[0]; if (q) { ccRune(q, 'chrono', t); ccEv('tal:ccfSwing'); } }   // Pendulum Swing
+    if (C.ccfSwing && ((t.ccfSwN = (t.ccfSwN | 0) + 1) % (5 - C.ccfSwing) === 0)) { const q = nearest(c.x, c.y, CCF.SWING_R, 1, c)[0]; if (q) { ccMark(q, 'chrono', t); ccEv('tal:ccfSwing'); } }   /* Pendulum Swing */
   } else if (u === 'cc_astrologer') {
     if (basic && C.ccfNight && c.fly && !c.dead) {   // Night Sight
       const S = t.ccfSeen || (t.ccfSeen = new WeakSet());
       if (!S.has(c)) { S.add(c); c.markAmp = Math.max(c.markT > 0 ? c.markAmp || 0 : 0, .05 * C.ccfNight); c.markT = Math.max(c.markT || 0, CCF.NIGHT_T); ccEv('tal:ccfNight'); }
     }
-    if (ab === 'cc_fallingstar' && C.ccfOmen && pre.runes.includes('star') && !c.dead) { stun(c, .2 * C.ccfOmen, .4, null); ccEv('tal:ccfOmen'); }   // Ill Omen
+    if (ab === 'cc_fallingstar' && C.ccfOmen && pre.marks.includes('star') && !c.dead) { stun(c, .2 * C.ccfOmen, .4, null); ccEv('tal:ccfOmen'); }   /* Ill Omen */
   } else if (u === 'cc_golemwarden' && basic) {
-    if (C.ccfRes && t.ccfResAt !== G.time && pre.runes.some(s => s !== 'stone')) { t.ccfResAt = G.time; gainMana(t, 3 * C.ccfRes); ccEv('tal:ccfRes'); }   // Runic Reservoir
+    if (C.ccfRes && t.ccfResAt !== G.time && pre.marks.some(s => s !== 'stone')) { t.ccfResAt = G.time; gainMana(t, 3 * C.ccfRes); ccEv('tal:ccfRes'); }   /* Ley Reservoir */
     if (C.ccfGrind && pre.stunned && !c.fly && !c.dead) { c.shred = Math.min(3 * C.ccfGrind, (c.shredT > 0 ? c.shred || 0 : 0) + C.ccfGrind); c.shredT = Math.max(c.shredT || 0, CCF.GRIND_T); ccEv('tal:ccfGrind'); }   // Granite Fists
   } else if (u === 'cc_pyroclast' && basic) {
     if (C.ccfWardburn && pre.burning && c.mwMax > 0 && !c.dead && typeof epWardOpen === 'function') { epWardOpen(c, 1, .4 * C.ccfWardburn); ccEv('tal:ccfWardburn'); }   // Wardburn
   } else if (u === 'ch_maelis' && basic) {
-    if (C.ccfPage && ((t.ccfPgN = (t.ccfPgN | 0) + 1) % (5 - C.ccfPage) === 0) && !c.dead) { ccRune(c, ['arcane', 'frost', 'fire'][((t.chRuneN || 0) + 1) % 3], t); ccEv('tal:ccfPage'); }   // Flicked Pages
-    if (C.ccfBook && (t.ccQ || 0) >= 5) { const q = nearest(c.x, c.y, 1, 1, c, q => canTarget(t, st, q))[0]; if (q) { ccHit(t, st, q, amt * .25 * C.ccfBook, { noWeave: true }); ccEv('tal:ccfBook'); } }   // Open Book
+    if (C.ccfPage && ((t.ccfPgN = (t.ccfPgN | 0) + 1) % (5 - C.ccfPage) === 0) && !c.dead) { ccMark(c, ['arcane', 'frost', 'fire'][((t.chRuneN || 0) + 1) % 3], t); ccEv('tal:ccfPage'); }   /* Flicked Pages */
+    if (C.ccfBook && (t.ccQ || 0) >= 5) { const q = nearest(c.x, c.y, 1, 1, c, q => canTarget(t, st, q))[0]; if (q) { ccHit(t, st, q, amt * .25 * C.ccfBook, { noRx: true }); ccEv('tal:ccfBook'); } }   /* Open Book */
   } else if (u === 'ch_aurel') {
     if (basic && C.ccfTick && pre.stopped && !c.dead && (c.ccfTkAdd || 0) < 1) { const d = Math.min(.1 * C.ccfTick, 1 - (c.ccfTkAdd || 0)); c.ccfTkAdd = (c.ccfTkAdd || 0) + d; c.ccStopT += d; c.stunT = Math.max(c.stunT, 0) + d; ccEv('tal:ccfTick'); }   // Ticking Hand
     if (basic && C.ccfPend && ((t.ccfPdN = (t.ccfPdN | 0) + 1) % 3 === 0)) {   // Long Pendulum
       const x = c.x, z = c.y, k = .2 * C.ccfPend;
       G.delayed.push({ t: .5, fn: () => {
         if (!ccfLive(t)) return; const s2 = t.st || st, q = nearest(x, z, CCF.PEND_R, 1, c, q => canTarget(t, s2, q) && !q.ent)[0]; if (!q) return;
-        ccHit(t, s2, q, amt * k, { noWeave: true, ccfNo: true }); if (!q.dead) chill(q, { slow: s2.slow || .3, slowT: s2.slowT || 2 }, null, t);
+        ccHit(t, s2, q, amt * k, { noRx: true, ccfNo: true }); if (!q.dead) chill(q, { slow: s2.slow || .3, slowT: s2.slowT || 2 }, null, t);
         rfx({ k: 'drag', x0: x, z0: z, x1: q.x, z1: q.y, h: .4, col: CC_COL.chrono, life: .35 }); ccEv('tal:ccfPend');
       } });
     }
     if (ab === 'ch_rewind' && C.ccfSecond && !o.dot && !c.dead) { const d = .3 * C.ccfSecond; c.ccStopT = Math.max(c.ccStopT || 0, G.time + d * (c.def.boss ? .4 : 1)); ccEv('tal:ccfSecond'); }   // Second Hand
-  } else if (u === 'ch_maren' && ab === 'ch_riftchain' && !o.dot && !o.noWeave) {
+  } else if (u === 'ch_maren' && ab === 'ch_riftchain' && !o.dot && !o.noRx) {
     if (C.ccfShared && c.ccfShAt !== (t.ab && t.ab.lastAt)) { c.ccfShAt = t.ab && t.ab.lastAt; for (const q of G.towers) if (ccfIs(q, 'cc_spellblade') && !q.wrecked && Math.hypot(q.x - c.x, q.y - c.y) <= 2.05) ccfReady(q, 'cc_blinkstrike', 1); ccEv('tal:ccfShared'); }   // Shared Edge
     if (C.ccfFlourish) { t.ccfChX = c.x; t.ccfChZ = c.y; t.ccfChEnd = G.time + .35; }   // Flourish (fired by the pulse once the chain stops)
-    if (C.ccfDuel && ccBig(c) && !c.dead) { const s2 = st; G.delayed.push({ t: .3, fn: () => { if (!c.dead && ccfLive(t)) abRun('ch_riftchain', () => ccHit(t, t.st || s2, c, amt * CCF.DUEL_K, { type: 'arcane', noWeave: true, ccfNo: true })); } }); ccEv('tal:ccfDuel'); }   // Duelling Ground
+    if (C.ccfDuel && ccBig(c) && !c.dead) { const s2 = st; G.delayed.push({ t: .3, fn: () => { if (!c.dead && ccfLive(t)) abRun('ch_riftchain', () => ccHit(t, t.st || s2, c, amt * CCF.DUEL_K, { type: 'arcane', noRx: true, ccfNo: true })); } }); ccEv('tal:ccfDuel'); }   /* Duelling Ground */
   }
 }
 
@@ -41964,7 +42041,7 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
   if (a0) FORCE_ATTACK.chVeyCut = function (t, st, tg, pow) {
     const k = st && st.caps && st.caps.ccfPass, far = !!(k && tg && Math.hypot(tg.x - t.x, tg.y - t.y) > CH_VEY.arm), mx = tg ? (t.x + tg.x) / 2 : 0, mz = tg ? (t.y + tg.y) / 2 : 0;
     const r = a0.apply(this, arguments);
-    if (far) { const q = nearest(mx, mz, .8, 1, tg, q => ccWalker(q) && !q.ent && canTarget(t, st, q))[0]; if (q) { ccHit(t, st, q, st.dmg * pow * .25 * k, { type: 'phys', noWeave: true }); ccGhostFx(t, q); ccEv('tal:ccfPass'); } }
+    if (far) { const q = nearest(mx, mz, .8, 1, tg, q => ccWalker(q) && !q.ent && canTarget(t, st, q))[0]; if (q) { ccHit(t, st, q, st.dmg * pow * .25 * k, { type: 'phys', noRx: true }); ccGhostFx(t, q); ccEv('tal:ccfPass'); } }
     return r;
   }; }
 
@@ -41985,12 +42062,12 @@ cxWrap('cc_blinkstrike', (cast0, t, st, c, ab) => {
   }
   return r;
 });
-// Recitation: one more Barrage missile for each other school's rune on the foes in range
+// Recitation: one more Barrage missile for each other element marked on the foes in range
 cxWrap('cc_barrage', (cast0, t, st, L, ab) => {
   const r = cast0(t, st, L, ab), n = ccfCap(t, 'ccfRecite');
   if (r !== false && n) {
     const foes = abFoes(t, st, abReach(t, st, ab)), S = new Set();
-    for (const c of foes) for (const s of ccRunesOn(c)) if (s !== 'arcane') S.add(s);
+    for (const c of foes) for (const s of ccMarksOn(c)) if (s !== 'arcane') S.add(s);
     const m = Math.min(n, S.size), k = cxK(t), tg = foes.sort(abByTough), b = byT(ab.by.n, t);
     for (let q = 0; q < m && tg.length; q++) { const c = tg[q % tg.length]; G.delayed.push({ t: .1 + (b + q) * .07, fn: () => { if (!c.dead && ccfLive(t)) abRun('cc_barrage', () => ccMissile(t, t.st || st, c, .3 * k, { spread: 1.8 })); } }); }
     if (m) ccEv('tal:ccfRecite');
@@ -42024,13 +42101,13 @@ cxWrap('cc_fallingstar', (cast0, t, st, c, ab) => {
   }
   return r;
 });
-// Snapping Threads: a foe Unravel tears three runes from snaps on the foes beside it
+// Snapping Threads: a foe Unravel strikes that just reacted snaps on the foes beside it
 cxWrap('ch_unravel', (cast0, t, st, p, ab) => {
-  const n = ccfCap(t, 'ccfSnap'), L = n && p ? G.creeps.filter(c => !c.dead && !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= ab.rr && ccRunesOn(c).length >= 3).map(c => [c, ccRunesOn(c).length, c.x, c.y]) : [];
+  const n = ccfCap(t, 'ccfSnap'), L = n && p ? G.creeps.filter(c => !c.dead && !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= ab.rr && ccReacted(c, 2)).map(c => [c, Math.max(1, ccMarksOn(c).length), c.x, c.y]) : [];
   const r = cast0(t, st, p, ab);
   if (r !== false && L.length) {
     const m = byT(ab.by.mult, t), k = cxK(t);
-    for (const [c, R2, x, z] of L) for (const o of G.creeps.slice()) if (o !== c && !o.dead && !o.ent && Math.hypot(o.x - x, o.y - z) <= CCF.SNAP_R && canTarget(t, st, o)) ccAb(t, st, o, m * R2 * .25 * n, k, { noRune: true, noWeave: true });
+    for (const [c, R2, x, z] of L) for (const o of G.creeps.slice()) if (o !== c && !o.dead && !o.ent && Math.hypot(o.x - x, o.y - z) <= CCF.SNAP_R && canTarget(t, st, o)) ccAb(t, st, o, m * R2 * .25 * n, k, { noMark: true, noRx: true });
     ccEv('tal:ccfSnap');
   }
   return r;
@@ -42046,7 +42123,7 @@ const ccfCaster = u => (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER && C
     const t = ccfCaster('ch_maelis');
     if (!t || !t.st || !p) return a0.apply(this, arguments);
     const C = t.st.caps || {}, L = G.creeps.filter(c => !c.dead && !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= R + .2);
-    if (C.ccfQuill && L.filter(c => ccRunesOn(c).length > 0).length >= 4) { const s = 1.5 * C.ccfQuill; G.delayed.push({ t: 0, fn: () => ccfReady(t, 'ch_thousandfold', s) }); ccEv('tal:ccfQuill'); }
+    if (C.ccfQuill && L.filter(c => ccMarksOn(c).length > 0).length >= 4) { const s = 1.5 * C.ccfQuill; G.delayed.push({ t: 0, fn: () => ccfReady(t, 'ch_thousandfold', s) }); ccEv('tal:ccfQuill'); }
     if (C.ccfThreads) for (const c of L) {
       if (ccHas(c, 'frost')) chill(c, { slow: .15 * C.ccfThreads, slowT: 2 }, 'frost', t);
       if (ccHas(c, 'fire')) ignite(c, (t.st.dmg || 0) * .1 * C.ccfThreads, 2, t, false);
@@ -42058,15 +42135,15 @@ const ccfCaster = u => (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER && C
       for (const c of G.creeps) {
         if (k >= 4 * C.ccfMargin) break;
         if (c.dead || Math.hypot(c.x - p.x, c.y - p.y) > R + .2) continue;
-        const on = ccRunesOn(c); if (on.length < 2) continue;
+        const on = ccMarksOn(c); if (!on.length) continue;
         const s = ['arcane', 'frost', 'fire', 'star', 'chrono', 'stone'].find(q => !on.includes(q)); if (!s) continue;
-        ccRune(c, s, t); k++;
+        ccMark(c, s, t); k++;
       }
       if (k) ccEv('tal:ccfMargin');
     } });
     return r;
   }; }
-// Aurel: Rune-Weighted Hour, Leaden Minutes
+// Aurel: Weighted Hour, Leaden Minutes
 { const a0 = ccChronoSpell;
   ccChronoSpell = function (p, R, hp, h, half) {
     const t = ccfCaster('ch_aurel'), C = (t && t.st && t.st.caps) || {};
@@ -42158,8 +42235,8 @@ const ccfCaster = u => (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER && C
     if (G.state !== 'play' || !c) return r;
     // Fallen Lights: a flyer dies within an Astrologer's reach
     if (c.fly) for (const a of G.towers) if (ccfIs(a, 'cc_astrologer') && !a.wrecked && ccfCap(a, 'ccfFallen') && Math.hypot(c.x - a.x, c.y - a.y) <= ((a.st && a.st.range) || 2.6) + ((a.st && a.st.airR) || 0) + .05) { gainMana(a, 6 * ccfCap(a, 'ccfFallen')); ccEv('tal:ccfFallen'); }
-    // Deep Inkwell: a richly woven foe dies within Maelis's reach
-    if (ccRunesOn(c).length >= 3) { const m = ccfUnitWith('ch_maelis', 'ccfInkwell'); if (m && Math.hypot(c.x - m.x, c.y - m.y) <= ((m.st && m.st.range) || 3) + .05) { gainMana(m, 5 * ccfCap(m, 'ccfInkwell')); ccEv('tal:ccfInkwell'); } }
+    // Deep Inkwell: a foe that just reacted dies within Maelis's reach
+    if (ccReacted(c, 2)) { const m = ccfUnitWith('ch_maelis', 'ccfInkwell'); if (m && Math.hypot(c.x - m.x, c.y - m.y) <= ((m.st && m.st.range) || 3) + .05) { gainMana(m, 5 * ccfCap(m, 'ccfInkwell')); ccEv('tal:ccfInkwell'); } }
     // Patient Hands: a foe dies stopped in time
     if (c.ccStopT > G.time) { const a = ccfUnitWith('ch_aurel', 'ccfHands'); if (a) { ccfReady(a, 'ch_stoppedhour', ccfCap(a, 'ccfHands')); ccEv('tal:ccfHands'); } }
     // Leaping Cinders: a burning foe a Pyroclast slays throws its fire on
@@ -45019,6 +45096,374 @@ function talRemapByName(src, oldNames, list) {
   return out;
 }
 
+/* ================= THE RIMEWEAVERS' FROST KIT, AND FROZEN CRITS =================
+   The owner (8 Nov 2026): classic frost-mage spells cast from the staff at foes, no road glyphs, and "mages extra crit %
+   damage against frozen targets feels amazing in wow". Loads after every other forces_* file and replaces the
+   Frostweavers' three spells in place (their ids, saves, talents and sets kept):
+     cc_glacialglyph  Frost Spear (innate)   a fast spear of ice at one foe: a strike, a slow and the Frost mark
+     cc_rimelance     Ice Coffin             one foe locked in a block of ice (bosses held shorter), cold damage while held
+     cc_hoarbloom     Shatterbloom           an ice crystal blooms on a foe; when it dies, or it Shatters, the bloom bursts,
+                                             freezing and slowing the foes round it
+   Frozen (one status, c.stunT with c.stunEl 'frost', freezeFoe in game.js): Ice Coffin, Encase, Shatterbloom's burst and
+   anything that holds a foe in ice. Drawn with an icy crust (ccDrawFoe below). Conclave hits on a Frozen foe can crit
+   (ccFrozenCrit, read by ccHit): the Frostweavers' Cold Eye, the Magelings' Cold Focus, the Pyroclasts' Thermal Crack, the
+   Astrologers' Frost Lens, Frozen Lance and Maelis. A frozen crit cracks the ice: shards and a big icy number.
+   Every number is in CCR. */
+const CCR = {
+  SPEAR_FLY: .16, SPEAR_SLOW: [.4, .4, .42, .42, .45, .45], SPEAR_SLOWT: [2.5, 2.5, 2.5, 2.5, 3, 3],
+  COFFIN_TICK: .5, COFFIN_BOSS: .45, BLOOM_T: 10, BLOOM_R: 1.1, BLOOM_SLOW: .4, BLOOM_MAX: 12,
+  LANCE_HOLD: .5, DEEP_R: .8, HAND_MANA: 10, BURST_R: 1, BURST_FRZ: .6, INK_R: .6, INK_GAP: 3, SECOND_N: 4, THERMAL_R: .8,
+  CRIT_COL: '#bfefff', CRIT_GAP: .08,
+};
+const ccFrozen = c => !!(c && !c.dead && c.stunT > 0 && c.stunEl === 'frost');
+const ccrCap = (st, k) => (st && st.caps && st.caps[k]) || 0;
+// a spell re-aimed in place: the same object (what the talent system set on it at load stays), its old zone gone
+function ccrSpell(id, o) {
+  const ab = ABIL[id]; if (!ab) return console.warn('conclave frost: no spell', id);
+  for (const k of ['zone', 'every', 'rr', 'len', 'r']) delete ab[k];
+  Object.assign(ab, o); if (o.pref && typeof AB_PREF !== 'undefined') AB_PREF[id] = o.pref;
+}
+
+/* =====================================================================================================
+   FROST SPEAR (cc_glacialglyph)
+   ===================================================================================================== */
+// a spear of ice at c (m: its share of the strike, k: the cast's power); Frozen Lance: on a Frozen foe it always crits and
+// holds the ice a little longer
+function ccrSpear(t, st, c, m, k, free) {
+  if (!c || c.dead) return;
+  const [hx, hh, hz] = ccHand(t, towerTop(t) * .95), ab = ABIL.cc_glacialglyph;
+  ccShoot({ k: 'ice', x: hx, h: hh, z: hz, tg: c, spd: 14, col: '#dff6ff', sz: free ? 1.2 : 1.7, tag: 'abil', fn: q => {
+    if (!q || !ccAlive(t)) return; const s = t.st || st, frz = ccFrozen(q), lance = frz && ccrCap(s, 'ccrLance');
+    ccAb(t, s, q, m, k, { crit: lance ? 1 : 0 });
+    if (q.dead) return;
+    const pw = s.pw || {}, sl = byT(ab.by.slow, t) + (pw.ccCirclet || 0);
+    chill(q, { slow: sl, slowT: byT(ab.by.slowT, t) }, 'frost', t);
+    if (pw.ccCirclet) { ccEv('item:cc_circlet'); inSplash(q.x, q.y, .6, false, o => { if (o !== q && !o.ent) chill(o, { slow: sl, slowT: 2 }, 'frost', t); }); }
+    if (lance) { q.stunT += CCR.LANCE_HOLD; ccEv('cap:ccrLance'); }
+    if (frz && ccrCap(s, 'ccrHand') && t.ab) gainMana(t, CCR.HAND_MANA * ccrCap(s, 'ccrHand'));   /* Practised Hand */
+    fxShards(q.x, q.y, hitH(q), free ? 4 : 8);
+  } });
+}
+ccrSpell('cc_glacialglyph', { name: 'Frost Spear', short: 'Spear', glyph: 'icicle', hue: '#dff6ff', mana: 60, cd: 6, pref: 'toughest',
+  by: { mult: [2.6, 2.8, 3, 3.2, 3.4, 3.6], slow: CCR.SPEAR_SLOW, slowT: CCR.SPEAR_SLOWT },
+  auto: 'any foe in reach, the toughest first', none: 'no foes in reach',
+  blurb: 'A fast spear of ice from her staff at one foe: a hard strike, a slow and the Frost mark.',
+  text: (t, st, ab) => `Hurls a spear of ice at the toughest foe in reach, air or ground: ${xD(st, byT(ab.by.mult, t))}, the Frost mark, and a ${abPct(byT(ab.by.slow, t))} slow for ${gNf(byT(ab.by.slowT, t))}s.`,
+  pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); return L.length ? abToughest(L) : null; },
+  cast(t, st, c, ab) { const k = ccCast(t, ab); ccrSpear(t, st, c, byT(ab.by.mult, t), k); sfx('frost', 0); } });
+
+/* =====================================================================================================
+   ICE COFFIN (cc_rimelance)
+   ===================================================================================================== */
+ccrSpell('cc_rimelance', { name: 'Ice Coffin', short: 'Coffin', glyph: 'iceblock', hue: '#c0f0ff', mana: 90, cd: 12, pref: 'toughest',
+  by: { dur: [1.8, 1.8, 2, 2, 2.2, 2.2], mult: [2, 2.2, 2.4, 2.6, 2.8, 3] },
+  auto: 'the toughest foe in reach not already frozen (a boss or elite first)', none: 'no foes in reach',
+  blurb: 'Locks one foe in a block of ice: it cannot move, and the cold bites it while it is held.',
+  text: (t, st, ab) => `Locks the toughest foe in reach in a block of ice for ${gNf(byT(ab.by.dur, t))}s (bosses ${gNf(byT(ab.by.dur, t) * CCR.COFFIN_BOSS)}s): it is Frozen and cannot move, and takes ${xDt(st, byT(ab.by.mult, t))} of cold over the hold.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, abReach(t, st, ab)).filter(c => !ccFrozen(c) && !(c.ccCoffin && c.ccCoffin.until > G.time)); if (!L.length) return null;
+    const big = L.filter(abBig); return abToughest(big.length ? big : L);
+  },
+  cast(t, st, c, ab) {
+    const k = ccCast(t, ab), d = byT(ab.by.dur, t) * (c.def.boss ? CCR.COFFIN_BOSS : 1), m = byT(ab.by.mult, t);
+    freezeFoe(c, d, t); if (c.dead || !ccFrozen(c)) return;
+    const C = st.caps || {}; if (C.ccColdMana && t.ab) gainMana(t, 8 * C.ccColdMana);   /* Cold Library */
+    ccEv('coffin'); c.ccCoffin = { t, k, until: G.time + c.stunT, n: Math.max(1, Math.round(c.stunT / CCR.COFFIN_TICK)), m };
+    (G.ccCoffins || (G.ccCoffins = [])).push(c);
+    ccMark(c, 'frost', t); sfx('frost', 1); fxShards(c.x, c.y, hitH(c), 12);
+  } });
+// the cold while held, and what the ice does as it lets go (Brittle Coffin, Coffin Burst)
+function ccrCoffinTick() {
+  if (!G.ccCoffins || !G.ccCoffins.length) return;
+  for (const c of G.ccCoffins.slice()) {
+    const F = c.ccCoffin, t = F && F.t;
+    if (!F || c.dead || !G.towers.includes(t)) { G.ccCoffins = G.ccCoffins.filter(o => o !== c); if (F && !c.dead) c.ccCoffin = null; continue; }
+    if ((F.nx || 0) <= G.time && F.until > G.time) { F.nx = G.time + CCR.COFFIN_TICK; const s0 = t.st || effStats(t); abRun('cc_rimelance', () => ccAb(t, s0, c, F.m / F.n, F.k, { dot: true, noMark: true }));
+      if (ccrCap(s0, 'ccrDeep')) inSplash(c.x, c.y, CCR.DEEP_R, false, o => { if (o !== c && !o.ent) chill(o, { slow: .3, slowT: CCR.COFFIN_TICK + .3 }, 'frost', t); }); }   /* Deep Chill */
+    if (c.dead || ccFrozen(c) && F.until > G.time) continue;
+    G.ccCoffins = G.ccCoffins.filter(o => o !== c); c.ccCoffin = null;
+    const s = t.st || effStats(t), sh = ccrCap(s, 'ccrShred'), bu = ccrCap(s, 'ccrBurst');
+    if (sh) { c.shred = Math.max(c.shredT > 0 ? c.shred || 0 : 0, 2 * sh); c.shredT = Math.max(c.shredT || 0, 4); ccEv('tal:ccrShred'); }
+    if (bu) { ccEv('cap:ccrBurst'); inSplash(c.x, c.y, CCR.BURST_R, false, o => { if (o !== c && !o.ent) freezeFoe(o, CCR.BURST_FRZ, t); }); ccRingFx(c.x, c.y, CCR.BURST_R, '#dff6ff'); }
+    fxShards(c.x, c.y, hitH(c), 10); sfx('shatter', 0);
+  }
+}
+
+/* =====================================================================================================
+   SHATTERBLOOM (cc_hoarbloom)
+   ===================================================================================================== */
+ccrSpell('cc_hoarbloom', { name: 'Shatterbloom', short: 'Bloom', glyph: 'icepeak', hue: '#e6fbff', mana: 110, cd: 16, pref: 'toughest',
+  by: { mult: [2, 2.2, 2.4, 2.6, 2.8, 3], frz: [.8, .8, 1, 1, 1.2, 1.2], n: [1, 1, 1, 1, 1, 1] },
+  auto: 'the toughest foe in reach without a bloom, with other foes near it', none: 'no foes in reach',
+  blurb: 'An ice crystal blooms on a foe. When it dies, or Fire Shatters it, the bloom bursts and freezes the foes round it.',
+  text: (t, st, ab) => `An ice crystal blooms on the toughest foe in reach for ${CCR.BLOOM_T}s. When that foe dies, or Fire meets its Frost in a Shatter, the bloom bursts: ${xD(st, byT(ab.by.mult, t))} to every foe within ${CCR.BLOOM_R} cells, which are Frozen ${gNf(byT(ab.by.frz, t))}s and slowed ${abPct(CCR.BLOOM_SLOW)} for 2s after.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, abReach(t, st, ab)).filter(c => !(c.ccBloom && c.ccBloom.until > G.time)); if (!L.length) return null;
+    const c = abToughest(L), near = G.creeps.some(o => o !== c && !o.dead && Math.hypot(o.x - c.x, o.y - c.y) <= CCR.BLOOM_R);
+    return man || near || abBig(c) ? c : null;
+  },
+  cast(t, st, c, ab) {
+    const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t)));
+    const L = [c].concat(abFoes(t, st, abReach(t, st, ab)).filter(o => o !== c && !(o.ccBloom && o.ccBloom.until > G.time)).sort(abByTough).slice(0, n - 1));
+    for (const o of L) ccrBloom(t, o, k, 0);
+    sfx('frost', 1);
+  } });
+function ccrBloom(t, c, k, gen) {
+  if (!c || c.dead) return;
+  const B = G.ccBlooms || (G.ccBlooms = []); if (B.length >= CCR.BLOOM_MAX) { const o = B.shift(); if (o) o.ccBloom = null; }
+  c.ccBloom = { t, k, gen, until: G.time + CCR.BLOOM_T, at: G.time }; B.push(c);
+  ccMark(c, 'frost', t); fxShards(c.x, c.y, hitH(c) + .2, 5);
+}
+// the bloom bursts where its foe stands (it died, or it Shattered)
+function ccrBloomBurst(c) {
+  const b = c.ccBloom; if (!b) return; c.ccBloom = null; G.ccBlooms = (G.ccBlooms || []).filter(o => o !== c);
+  const t = b.t; if (!G.towers.includes(t) || t.wrecked) return;
+  ccEv('bloom');
+  const st = t.st || effStats(t), ab = ABIL.cc_hoarbloom, m = byT(ab.by.mult, t), frz = byT(ab.by.frz, t), x = c.x, z = c.y, froze = [];
+  abRun('cc_hoarbloom', () => abAoe(() => inSplash(x, z, CCR.BLOOM_R, false, o => {
+    if (o.ent || o.dead) return;
+    if (o !== c) ccAb(t, st, o, m, b.k, { noRx: true });
+    if (o.dead) return; freezeFoe(o, frz, t); chill(o, { slow: CCR.BLOOM_SLOW, slowT: frz + 2 }, 'frost', t); if (o !== c) froze.push(o);
+  })));
+  ccRingFx(x, z, CCR.BLOOM_R, '#e6fbff'); fxShards(x, z, hitH(c) + .2, 16); part({ k: 'flare', x, z, h: hitH(c), life: .3, max: .3, size: 1.2, col: '#e8fbff' }); sfx('shatter', 2);
+  if (typeof addText === 'function') addText(x, z, hitH(c) + .8, 'Shatterbloom', '#dff6ff');
+  if (ccrCap(st, 'ccrGarden') && (b.gen || 0) < 2 && froze.length) { const o = abToughest(froze.filter(q => !q.dead && !q.ccBloom)); if (o) { ccrBloom(t, o, b.k, (b.gen || 0) + 1); ccEv('cap:ccrGarden'); } }
+}
+// a Shatter (Fire on its Frost) bursts the bloom
+{ const r0 = ccReact;
+  ccReact = function (t, c, el, other) { const id = r0.apply(this, arguments); if (id === 'shatter' && c && c.ccBloom) ccrBloomBurst(c); return id; }; }
+
+/* =====================================================================================================
+   THE BASIC BOLT: a chilling bolt that marks Frost (forces_conclave_a.js FORCE_ATTACK.cc_rime); Second Spear
+   ===================================================================================================== */
+function ccrSecond(t, st, c) {
+  const pw = st.pw || {};
+  if (pw.ccWinter && !c.dead && (t.ccrWinN = (t.ccrWinN | 0) + 1) % 4 === 0) { freezeFoe(c, pw.ccWinter, t); ccEv('item:cc_l_winter'); }   /* the Crown of the Long Winter */
+  if (!ccrCap(st, 'ccrSecond')) return;
+  if ((t.ccrSecN = (t.ccrSecN | 0) + 1) % CCR.SECOND_N) return;
+  ccEv('tal:ccrSecond'); abRun('cc_glacialglyph', () => ccrSpear(t, st, c, byT(ABIL.cc_glacialglyph.by.mult, t) * .5, 1, true));
+}
+
+/* =====================================================================================================
+   FROZEN CRITS (ccHit asks): the chance a Conclave hit on a Frozen foe crits, and how much harder that crit strikes
+   ===================================================================================================== */
+function ccFrozenCrit(t, st) {
+  const C = (st && st.caps) || {};
+  return .25 * (C.ccrEye || 0) + .15 * (C.ccrFocus || 0) + .2 * (C.ccrThermal || 0) + .1 * (C.ccrLens || 0);
+}
+function ccFrozenCritK(t, st) {
+  const C = (st && st.caps) || {};
+  return .5 * (C.ccrLens || 0) + (G.hero === 'cc_arch' && !G.vs ? .5 : 0);
+}
+let _ccrCritAt = -9;
+// the crack of a frozen crit: ice shards, a flash and a big icy number (at most one every CRIT_GAP s)
+function ccrCritFx(t, c, amt) {
+  if (G.time - _ccrCritAt < CCR.CRIT_GAP) return; _ccrCritAt = G.time;
+  const h = hitH(c); fxShards(c.x, c.y, h, 14); part({ k: 'flare', x: c.x, z: c.y, h, life: .22, max: .22, size: 1, col: CCR.CRIT_COL });
+  if (typeof addText === 'function') addText(c.x, c.y, h + .95, Math.round(amt) + '!', CCR.CRIT_COL);
+  sfx('shatter', 1);
+  const C = (t && t.st && t.st.caps) || {};
+  if (C.ccrThermal && t.def.unit === 'cc_pyroclast') { inSplash(c.x, c.y, CCR.THERMAL_R, false, o => { if (o !== c && !o.ent) chill(o, { slow: .3, slowT: 2 }, 'frost', t); }); ccEv('tal:ccrThermal'); }
+}
+
+/* =====================================================================================================
+   THE TREE: the frost talents re-aimed at the new spells (their ids and places kept, so saved picks bind by name where
+   the name stays), and one frozen-crit talent in the Magelings', Pyroclasts' and Astrologers' trees
+   ===================================================================================================== */
+{
+  const T = CC_TALENTS, F = T.frost.list;
+  for (const o of F) if (o.spell && ABIL[o.spell]) o.name = ABIL[o.spell].name;   /* the spell talents carry their spell's new name */
+  const re = (L, name, nt, r, c, req) => { if (!L.find(o => o.name === name)) return console.warn('conclave frost: no talent', name); ccxTal(L, name, nt); if (r != null) { const o = L.find(x => x.name === nt.name); o.r = r; o.c = c; o.req = req || null; o.reqs = null; } };
+  re(F, 'Hoar Ink', GT('Hoar Ink', 'frostbite', 0, 0, 3, n => `Its bolts on a Frozen foe splash frost: every foe within ${CCR.INK_R} cells is chilled ${10 * n}% for 2s (once a foe every ${CCR.INK_GAP}s).`, {}, { cap: 'ccrInk' }));
+  re(F, 'Practised Hand', GT('Practised Hand', 'icicle', 0, 1, 2, n => `Each Frost Spear that strikes a Frozen foe gives back ${10 * n} mana.`, {}, { cap: 'ccrHand' }));
+  re(F, 'Wide Glyphs', GT('Biting Spear', 'snowflake', 0, 3, 3, n => `Frost Spear's slow lasts ${gNf(.5 * n)}s longer.`, {}, { sp: n => ({ ab: 'cc_glacialglyph', by: { slowT: .5 * n } }) }));
+  re(F, 'Brittle Rime', GT('Cold Eye', 'eye', 2, 3, 2, n => `Its bolts and spells crit Frozen foes ${25 * n}% of the time, and each Ice Coffin brings Frost Spear ${n}s nearer.`, {}, { cap: 'ccrEye', sp: n => ({ ab: 'cc_rimelance', ready: ['cc_glacialglyph', n] }) }));
+  re(F, 'Splintering Rime', GT('Brittle Coffin', 'cracked', 2, 2, 2, n => `A foe Ice Coffin lets go of is left brittle: ${2 * n} armour stripped for 4s.`, {}, { cap: 'ccrShred', sp: { ab: 'cc_rimelance' } }));
+  re(F, 'Rime Field', GT('Deep Chill', 'snowflake', 3, 1, 1, `While Ice Coffin holds a foe, its cold chills every other foe within ${CCR.DEEP_R} cells 30%, and a foe that dies in the ice gives 10 mana back.`, {}, { cap: 'ccrDeep', sp: { ab: 'cc_rimelance', kill: { mana: 10 } } }));
+  re(F, "Scrivener's Hand", GT('Second Spear', 'icicle', 3, 2, 1, `Every ${gOrd(CCR.SECOND_N)} bolt is followed by a free Frost Spear at half strength.`, {}, { cap: 'ccrSecond', sp: { ab: 'cc_glacialglyph' } }));
+  re(F, 'Glacier Script', GT("Winter's Garden", 'icepeak', 4, 0, 1, 'Shatterbloom blooms on up to 3 foes at once, and each bloom that bursts plants a new one on the toughest foe it froze (twice down the chain).', {}, { cap: 'ccrGarden', sp: { ab: 'cc_hoarbloom', by: { n: 2 } } }), 4, 0, [3, 0]);
+  re(F, 'Flash Freeze', GT('Frozen Lance', 'icicle', 4, 1, 1, `Frost Spear always crits a Frozen foe and holds its ice ${CCR.LANCE_HOLD}s longer, and each Shatterbloom brings Frost Spear 2s nearer.`, {}, { cap: 'ccrLance', sp: [{ ab: 'cc_glacialglyph' }, { ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', 2] }] }), 4, 1);
+  re(F, 'Lingering Rime', GT('Coffin Burst', 'iceblock', 4, 2, 1, `When Ice Coffin lets go, the ice bursts: every foe within ${CCR.BURST_R} cell of it is Frozen ${CCR.BURST_FRZ}s.`, {}, { cap: 'ccrBurst', sp: { ab: 'cc_rimelance' } }));
+  // the other mages: each reads the Frozen crit its own way
+  re(T.arrow.list, 'Keen Reader', GT('Cold Focus', 'eye', 1, 1, 2, n => `Its missiles crit Frozen foes ${15 * n}% of the time: the ice holds them still for a clean shot.`, {}, { cap: 'ccrFocus' }));
+  re(T.storm.list, 'Fallen Lights', GT('Cold Starlight', 'lens', 1, 2, 2, n => `Against a Frozen foe its star-bolts and spells crit ${10 * n}% of the time, and those crits strike ${abPct(.5 * n)} harder.`, {}, { cap: 'ccrLens' }));
+  if (T.cannon.list.find(o => o.name === 'Ember Breath')) re(T.cannon.list, 'Ember Breath', GT('Thermal Crack', 'firering', 1, 3, 2, n => `Its fireballs crit Frozen foes ${20 * n}% of the time, and each such crit cracks out a cold steam that chills every foe within ${CCR.THERMAL_R} cells 30% for 2s.`, {}, { cap: 'ccrThermal' }));
+}
+
+/* =====================================================================================================
+   HOOKS: the coffin's clock, the bloom on a death, Hoar Ink, the Frozen look
+   ===================================================================================================== */
+{ const H = FORCE_HOOKS.conclave, tk0 = H.tick, k0 = H.kill, w0 = H.wave;
+  H.tick = function (dt) { const r = tk0.apply(this, arguments); ccrCoffinTick(); if (G.ccBlooms && G.ccBlooms.length) for (const c of G.ccBlooms.slice()) if (!c.dead && c.ccBloom && c.ccBloom.until <= G.time) { c.ccBloom = null; G.ccBlooms = G.ccBlooms.filter(o => o !== c); } return r; };
+  H.kill = function (c, src) { if (c && c.ccBloom) ccrBloomBurst(c); return k0.apply(this, arguments); };
+  H.wave = function (n) { G.ccCoffins = []; G.ccBlooms = []; return w0.apply(this, arguments); }; }
+{ const h0 = ccHit;
+  ccHit = function (t, st, c, amt, o) {
+    if (c && !c.dead && t && t.def && t.def.unit === 'cc_rimeweaver' && !(o && o.dot) && !AB_NOW && ccFrozen(c)) {
+      const s = st || t.st || {}, n = ccrCap(s, 'ccrInk');
+      if (n && !((c.ccrInkT || 0) > G.time)) { c.ccrInkT = G.time + CCR.INK_GAP; inSplash(c.x, c.y, CCR.INK_R, false, q => { if (q !== c && !q.ent) chill(q, { slow: .1 * n, slowT: 2 }, 'frost', t); }); ccEv('tal:ccrInk'); }
+    }
+    return h0.apply(this, arguments);
+  }; }
+// the Frozen look: an icy crust round the foe and a pale-blue tint, distinct from a plain chill; Ice Coffin's block of ice;
+// a Shatterbloom's crystal over the foe
+{ const d0 = ccDrawFoe;
+  ccDrawFoe = function (c) {
+    d0.apply(this, arguments);
+    const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), h = hitH(c), r = .2 + (c.def.r || .3) * .9;
+    if (ccFrozen(c)) {
+      const coffin = c.ccCoffin && c.ccCoffin.until > G.time, w = coffin ? r * 2.3 : r * 1.7, hh = coffin ? h * 2.1 + .2 : h * 1.6;
+      QA.bill(RD, x, h * .85, z, w, hh, [.72, .9, 1, coffin ? .5 : .32], 5, 0, 0);
+      QADD.bill(RD, x, h * .85, z, w * 1.05, hh * 1.03, [.85, .97, 1, coffin ? .45 : .25], 3, .06);
+      QADD.ground(x, z, .03, r * 1.6, r * 1.6, [.8, .95, 1, .45], 4, .08, 0);
+    }
+    if (c.ccBloom && c.ccBloom.until > G.time) {
+      const f = .85 + .15 * Math.sin(vt * 4 + c.id), y = h + .55;
+      QA.bill(RD, x, y, z, .14 * f, .24 * f, [.88, .98, 1, .95], 5, 0, vt * .6); QADD.bill(RD, x, y, z, .3 * f, .3 * f, [.6, .9, 1, .35], 1, 0);
+    }
+  }; }
+
+/* ================= THE SPELLBLADES' RIFTSTEEL KIT, ROLE LINES AND WAVE TIPS =================
+   The owner (8 Nov 2026): the blades glow because they are riftsteel (docs/lore.md): College steel quenched in a tear
+   between worlds. The rift in the blade is how a Spellblade blinks, and why it cuts what magic cannot touch: wards and
+   spell shields part along with flesh. Their spells use the blade as more than a blade. Loads after every other forces_*
+   file and re-aims the Spellblades' three spells in place (ids, saves, talents and sets kept):
+     cc_blinkstrike  Rift Lunge (innate)    through a rift to the walker nearest the gate and a cut; a short-lived rift
+                                            stays where it stood and cuts the walkers that pass it
+     cc_sigilcleave  Ward-Splitter          a cut that splits a foe's ward, shield and armour open for a few seconds,
+                                            so the mages' spells and reactions strike it whole: their team role
+     cc_spectral     Thrown Riftblade       a spectral copy of the blade thrown down a line of foes and back through the rift
+   Also: each Conclave unit's role line on its build card (ROLE), and the wave card's one-line tips for a force run's
+   counters (forceTipLine, ui.js). Every number is in CRF. */
+const CRF = { LUNGE_FAR: 1.6, RIFT_R: .4, RIFT_T: 2, STEP_R: 1.5, SPLIT_R: .3, THROW_LEN: 1.5, THROW_W: .4, THROW_BACK: .5, TWIN_GAP: .4, GHOST_FAR: 1.2, GHOST_K: .5 };
+function crfSpell(id, o) {
+  const ab = ABIL[id]; if (!ab) return console.warn('conclave rift: no spell', id);
+  for (const k of ['zone', 'every', 'rr', 'len', 'r']) delete ab[k];
+  Object.assign(ab, o); if (o.pref && typeof AB_PREF !== 'undefined') AB_PREF[id] = o.pref;
+}
+const crfWarded = c => !!(c && (c.mw > 0 || c.shield > 0 || (c.def.rk && c.def.rk.mres) || (typeof isPlate === 'function' && isPlate(c))));
+
+/* ---- Rift Lunge ---- */
+function crfLunge(t, st, c, k, m, step) {
+  const x0 = t.x, z0 = t.y;
+  ccBlinkTo(t, c, .3);
+  G.delayed.push({ t: .17, fn: () => {
+    if (c.dead || !abLive(t)) return; const s = t.st || st, ab = ABIL.cc_blinkstrike;
+    const was = c.stunT > 0;
+    ccAb(t, s, c, m, k, { type: 'phys' }); if (!c.dead) ccStaggerFoe(c, t);
+    fxSpark(c.x, c.y, hitH(c), '#e8d8ff');
+    if (!step) ccGlyph({ s: 'arcane', sub: 'glyph', x: x0, z: z0, r: CRF.RIFT_R, t: CRF.RIFT_T, src: t, st: s, every: .3, dmg: (s.dmg || 0) * byT(ab.by.after, t) * .5, type: 'phys', tag: 'abil' });
+    if (!step && ccrCap(s, 'ccfStep') && (c.dead || was)) {   /* Unbroken Step: on through the rift to the next walker */
+      const o = nearest(c.x, c.y, CRF.STEP_R, 1, c, q => !q.dead && !q.ent && abWalker(q) && canTarget(t, s, q))[0];
+      if (o) { ccEv('tal:ccfStep'); G.delayed.push({ t: .2, fn: () => { if (!o.dead && abLive(t)) crfLunge(t, s, o, k, m * .5, true); } }); }
+    }
+  } });
+}
+crfSpell('cc_blinkstrike', { name: 'Rift Lunge', short: 'Lunge', glyph: 'flash', hue: '#d8b8ff', mana: 65, cd: 8, pref: 'first',
+  by: { mult: [3.6, 3.8, 4, 4.2, 4.4, 4.6], after: [.75, .75, .9, .9, 1, 1] },
+  auto: 'a walker within its reach + 1.6 cells, the one nearest the gate', none: 'no walkers in reach',
+  blurb: 'Steps through a rift its riftsteel opens to the walker nearest the gate and cuts it; the rift it leaves behind cuts what passes.',
+  text: (t, st, ab) => `Steps through a rift to the walker nearest the gate within ${CRF.LUNGE_FAR} cells beyond its reach and cuts it for ${xD(st, byT(ab.by.mult, t))} and a stack of Stagger. The rift it stepped from stays ${CRF.RIFT_T}s and cuts each walker passing it for ${xDt(st, byT(ab.by.after, t) * .5)}.`,
+  pick(t, st, ab, man) { const L = abFoes(t, st, (st.range || 1.4) + CRF.LUNGE_FAR, abWalker); return L.length ? abFurthest(L) : null; },
+  cast(t, st, c, ab) { const k = ccCast(t, ab); crfLunge(t, st, c, k, byT(ab.by.mult, t), false); sfx('phase', 0); } });
+
+/* ---- Ward-Splitter ---- */
+function crfSplit(t, st, c, k, ab) {
+  const d = byT(ab.by.dur, t);
+  ccAb(t, st, c, byT(ab.by.mult, t), k, { type: 'phys' }); if (c.dead) return;
+  ccStaggerFoe(c, t);
+  if (c.mwMax > 0 && typeof epWardOpen === 'function') epWardOpen(c, 1, d);
+  if (c.shield > 0) { c.shield = 0; fxShards(c.x, c.y, hitH(c), 8); }
+  c.shred = Math.max(c.shredT > 0 ? c.shred || 0 : 0, c.armor || 0); c.shredT = Math.max(c.shredT || 0, d);
+  c.ccSplitT = G.time + d; c.ccSplitBy = t;
+  rfx({ k: 'slash', x: c.x, h: hitH(c), z: c.y, a: R(TAU), r: .45, col: '#d8b8ff', life: .3 }); fxShards(c.x, c.y, hitH(c), 6);
+}
+crfSpell('cc_sigilcleave', { name: 'Ward-Splitter', short: 'Split', glyph: 'shieldbreak', hue: '#c9a0ff', mana: 90, cd: 12, pref: 'warded',
+  by: { mult: [2.4, 2.4, 2.6, 2.6, 2.8, 2.8], dur: [3, 3, 3, 3, 3.5, 3.5], n: [1, 1, 1, 1, 1, 1] },
+  auto: 'a warded, shielded, plated or magic-resistant foe in reach, else the toughest walker', none: 'no foes in reach',
+  blurb: 'A riftsteel cut that splits a foe’s ward, shield and armour open, so the mages’ spells and reactions strike it whole.',
+  text: (t, st, ab) => `Cuts a warded, shielded, plated or magic-resistant foe in reach (else the toughest walker) for ${xD(st, byT(ab.by.mult, t))} and a stack of Stagger, and splits it open for ${gNf(byT(ab.by.dur, t))}s: its shield breaks, its ward stands cracked and its armour is stripped, so every spell and reaction strikes it whole.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, (st.range || 1.4) + CRF.SPLIT_R).filter(c => !(c.ccSplitT > G.time)); if (!L.length) return null;
+    const W = L.filter(crfWarded); return W.length ? abToughest(W) : man || L.some(abBig) ? abToughest(L) : null;
+  },
+  cast(t, st, c, ab) {
+    const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t))), ghost = ccrCap(st, 'ccxGhostRip');
+    const L = [c].concat(abFoes(t, st, (st.range || 1.4) + CRF.SPLIT_R + (ghost ? CRF.GHOST_FAR : 0)).filter(o => o !== c && !(o.ccSplitT > G.time)).sort((a, b) => (crfWarded(b) - crfWarded(a)) || abByTough(a, b)).slice(0, n - 1));
+    L.forEach((o, i) => G.delayed.push({ t: i * .18, fn: () => { if (o.dead || !abLive(t)) return; const s = t.st || st; if (i) ccBlinkTo(t, o, .2); abRun(ab.id, () => crfSplit(t, s, o, k, ab));
+      if (ghost) G.delayed.push({ t: .4, fn: () => { if (!o.dead && abLive(t)) { abRun(ab.id, () => ccAb(t, t.st || s, o, byT(ab.by.mult, t) * CRF.GHOST_K, k, { type: 'phys' })); ccGhostFx(t, o); } } }); } }));
+    sfx('glaiveHit', 1);
+  } });
+
+/* ---- Thrown Riftblade ---- */
+function crfThrow(t, st, c, k, ab, twin) {
+  const dx = c.x - t.x, dz = c.y - t.y, D = Math.hypot(dx, dz) || 1, ux = dx / D, uz = dz / D, len = D + CRF.THROW_LEN, m = byT(ab.by.mult, t), h = towerTop(t) * .7;
+  const L = abLine(t, st, t.x, t.y, ux, uz, len, CRF.THROW_W);
+  rfx({ k: 'streak', x0: t.x, h0: h, z0: t.y, x1: t.x + ux * len, h1: .5, z1: t.y + uz * len, col: '#d8b8ff', w: .08, life: .45 });
+  for (const o of L) { if (o.ent) continue; const d = Math.hypot(o.x - t.x, o.y - t.y);
+    G.delayed.push({ t: d / 9, fn: () => { if (o.dead || !abLive(t)) return; const s = t.st || st; abRun(ab.id, () => { abAoe(() => ccAb(t, s, o, m, k, { type: 'phys' })); if (!o.dead) ccStaggerFoe(o, t); }); ccGhostFx(t, o); } });
+    G.delayed.push({ t: len / 9 + .15 + (len - d) / 9, fn: () => { if (o.dead || !abLive(t)) return; const s = t.st || st; abRun(ab.id, () => abAoe(() => ccAb(t, s, o, m * CRF.THROW_BACK, k, { type: 'phys', noRx: true }))); } }); }
+  G.delayed.push({ t: len / 9 + .15, fn: () => { if (abLive(t)) rfx({ k: 'streak', x0: t.x + ux * len, h0: .5, z0: t.y + uz * len, x1: t.x, h1: h, z1: t.y, col: '#ecdcff', w: .06, life: .4 }); } });
+  if (!twin && ccrCap(st, 'ccxEight')) { ccEv('cap:ccxEight'); G.delayed.push({ t: CRF.TWIN_GAP, fn: () => { if (!c.dead && abLive(t)) crfThrow(t, t.st || st, c, k, ab, true); } }); }
+}
+crfSpell('cc_spectral', { name: 'Thrown Riftblade', short: 'Throw', glyph: 'glaive2', hue: '#ecdcff', mana: 110, cd: 16, pref: 'grouped',
+  by: { mult: [2.4, 2.4, 2.6, 2.6, 2.8, 2.8] },
+  auto: 'two or more walkers in a line within its reach + 1.5 cells, or a boss or elite', none: 'no walkers in reach',
+  blurb: 'Hurls a spectral copy of its riftsteel blade through a line of foes; it comes back through the rift, cutting again.',
+  text: (t, st, ab) => `Hurls a spectral copy of its blade at a walker and ${CRF.THROW_LEN} cells beyond: every foe on the line takes ${xD(st, byT(ab.by.mult, t))} and a stack of Stagger, and the blade comes back through the rift, cutting each again for ${xD(st, byT(ab.by.mult, t) * CRF.THROW_BACK)}.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, (st.range || 1.4) + CRF.THROW_LEN, abWalker); if (!L.length) return null;
+    let best = null, bn = 0;
+    for (const c of L) { const dx = c.x - t.x, dz = c.y - t.y, D = Math.hypot(dx, dz) || 1, n = abLine(t, st, t.x, t.y, dx / D, dz / D, D + CRF.THROW_LEN, CRF.THROW_W).length; if (n > bn) { bn = n; best = c; } }
+    return man || bn >= 2 || L.some(abBig) ? best : null;
+  },
+  cast(t, st, c, ab) { const k = ccCast(t, ab); t.ang = Math.atan2(c.x - t.x, c.y - t.y); crfThrow(t, st, c, k, ab, false); sfx('glaiveHit', 0); } });
+
+/* ---- the tree: the talents that named the old spells re-aimed at the new ones ---- */
+{
+  const T = CC_TALENTS.glaive.list;
+  for (const o of T) if (o.spell && ABIL[o.spell]) o.name = ABIL[o.spell].name;
+  const re = (name, nt) => { if (!T.find(o => o.name === name)) return console.warn('conclave rift: no talent', name); ccxTal(T, name, nt); };
+  re('Charged Edge', GT('Charged Edge', 'boltplus', 2, 3, 2, n => `Ward-Splitter holds its split ${gNf(.5 * n)}s longer, and cuts marked foes ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'cc_sigilcleave', by: { dur: .5 * n }, vs: ['elmarked', .15 * n] }) }));
+  re('Fifth Form', GT('Fifth Form', 'target', 3, 2, 1, 'Each Ward-Splitter brings Rift Lunge 2s nearer.', {}, { cap: 'ccxFifth', sp: { ab: 'cc_sigilcleave', ready: ['cc_blinkstrike', 2] } }));
+  re('Ghostblade Rush', GT('Ghostblade Rush', 'glaive2', 4, 3, 1, `Ward-Splitter splits up to 3 foes, stepping through rifts to the warded ones up to ${CRF.GHOST_FAR} cells beyond its reach, and an afterimage cuts each again 0.4s later, half as hard.`, {}, { cap: 'ccxGhostRip', sp: { ab: 'cc_sigilcleave', by: { n: 2 } } }));
+  re('Eightfold Sigil', GT('Twin Riftblades', 'cross', 4, 0, 1, `Thrown Riftblade throws a second blade down the same line ${CRF.TWIN_GAP}s later, and its blades cut stunned foes 30% harder.`, {}, { cap: 'ccxEight', sp: { ab: 'cc_spectral', vs: ['stunned', .3] } }));
+  re("Weaver's Blade", GT("Weaver's Blade", 'spiral', 4, 1, 1, "Every reaction its cuts set off strikes 60% harder and adds the other element's touch: a chill, a burn, a slow, a pull or a stun. Thrown Riftblade marks every walker it cuts Stone as well as Arcane, so the blade Overloads them on its own.", {}, { cap: 'ccWeaverBlade', sp: { ab: 'cc_spectral', rider: { element: 'stone' } } }));
+  re('Guard Broken', GT('Guard Broken', 'cracked', 1, 1, 2, n => `Each time its Stagger breaks a foe's guard into a stun, Rift Lunge is readied ${n}s sooner.`, {}, { cap: 'ccfGuard', sp: { ab: 'cc_blinkstrike' } }));
+  re('Unbroken Step', GT('Unbroken Step', 'flash', 2, 0, 1, `When Rift Lunge slays its foe or strikes a stunned one, it steps on through the rift to the walker nearest it within ${CRF.STEP_R} cells and cuts that one for half.`, {}, { cap: 'ccfStep', sp: { ab: 'cc_blinkstrike' } }));
+  re('Starsteel', GT('Riftsteel Edge', 'stars', 3, 3, 1, 'Each Overload its cuts set off strikes the foe again, as hard, and stuns it 0.4s.', {}, { cap: 'ccStarsteel' }));
+  if (FORCES.conclave.talEmblem) FORCES.conclave.talEmblem.glaive = T.findIndex(o => o.name === 'Riftsteel Edge');
+}
+
+/* ---- the story, where the player reads it ---- */
+{
+  const U = FORCES.conclave.units.glaive;
+  U.blurb = 'The College’s sworn guardians: scholars who chose the blade, sent where spells fail. Their riftsteel is College steel quenched in a tear between worlds, so each blade holds a sliver of the rift: it glows, it lets them step through to a foe, and it cuts wards and spell shields along with flesh. Their element is Arcane. Cannot reach flyers.'
+    + ` Each strike adds an Arcane Charge (up to ${CC_Q_MAX}); a spell spends them all, +${Math.round(CC_Q_K * 100)}% ability power each.`;
+}
+
+/* ---- each Conclave unit's role, on its build card (ui.js reads d.role): its element first ---- */
+const CRF_ROLE = { glaive: 'Steel for warded foes · catches leakers', arrow: 'Arcane · seeking missiles, air and ground', frost: 'Frost · locks foes in ice', arcane: 'Time · slows and echoes', storm: 'Star · drags flyers down', earth: 'Stone · cracks plate', cannon: 'Fire · burns crowds', venom: 'Arcane · breaks wards and shields' };
+function crfRoles() { if (typeof TOWERS === 'undefined' || typeof G === 'undefined' || G.force !== 'conclave') return; for (const ty in CRF_ROLE) if (TOWERS[ty] && TOWERS[ty].force === 'conclave') TOWERS[ty].role = CRF_ROLE[ty]; }
+
+/* ---- the wave card's tips for a force run: one short line, only when the wave calls for it ---- */
+const FORCE_TIPS = {
+  conclave: [
+    [w => w.types.some(ty => CREEPS[ty] && (CREEPS[ty].trait === TRAIT_WARD_F || (CREEPS[ty].rk && CREEPS[ty].rk.mres) || CREEPS[ty].ward || CREEPS[ty].guard)), 'Warded foes ahead: Spellblades cut through wards'],
+    [w => w.fly, 'Flyers ahead: Astrologers drag them down'],
+    [w => w.types.some(ty => CREEPS[ty] && CREEPS[ty].trait === TRAIT_ARM_F), 'Armoured foes ahead: Golem Wardens crack plate'],
+    [w => w.boss, 'A boss ahead: lock it in an Ice Coffin, then crit it while it is Frozen'],
+  ],
+};
+function forceTipLine(n) {
+  if (typeof G === 'undefined' || !G.force || !FORCE_TIPS[G.force] || G.vs) return '';
+  crfRoles();
+  let w; try { w = describeWave(n); } catch (e) { return ''; }
+  const L = FORCE_TIPS[G.force].filter(([f]) => { try { return f(w); } catch (e) { return false; } }).slice(0, 2).map(e => e[1]);
+  return L.length ? `<p class="mut tip" data-d="2">${L.map(s => `<b>${s}</b>`).join(' · ')}</p>` : '';
+}
+{ const a0 = applyForce; applyForce = function () { const r = a0.apply(this, arguments); crfRoles(); return r; }; }
+
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
      cast    on the unit: a sigil at its feet and a glyph rising over it (a caster), or a flash of steel (a fighter)
@@ -45774,7 +46219,7 @@ function sfxThorn(Q, x, z, lx, lz, hh, w, rx, rz, c0, c1, al) {
 let SFX_FRAME = 0;   // (frames drawn: the Conclave's world drawing keys on it)
 function spellFxDraw() {
   SFX_FRAME++;
-  if (typeof vfxReady === 'function' && vfxReady()) { vfxParts(); sfxWeaveThreads(); }   // the atlas particles (vfx.js), live or not; the Conclave's weave partners while one is placed or selected
+  if (typeof vfxReady === 'function' && vfxReady()) { vfxParts(); sfxReactThreads(); sfxRiftSeams(); }   /* the atlas particles (vfx.js), live or not; the Conclave's reaction partners while one is placed or selected */
   const L = SFX.list; if (!L.length || SFX_OFF) return;
   for (const q of L) {
     if (q.delay > 0) continue;
@@ -47142,14 +47587,11 @@ SFX_V2_DEF.push(() => {
   SFX_V2.cc_blinkstrike = vHit({ wind: { wu: .06, r: .5 }, steps: 2, minorK: .7, s: .9, hit: { sp: 'wisp', n: 5, sp2: 'rune', n2: 2 },
     cast: C => { const a = v2Aim(C), t = C.t; if (!a || !t) return; v2Beam(C, t.x, .6, t.y, a[0], v2FoeH(a[3], a[2]), a[1], { w: .07, life: .25, grow: .1, delay: .06 }); },
     fx: (C, x, z, h, ux, uz, k) => { v2Slash(C, x, z, h, ux, uz, (k ? .5 : .65) * C.S, { flip: k ? 1 : -1 }); if (!k) sfxAdd({ k: 'v2disc', x, z, r: .55 * C.T.ring, L: VT.RUNE, col: v2K(C).a, rim: v2K(C).b, spin: 2, seed: R(TAU), fin: .1, fout: .3, life: .5, al: .8, ink: 1 }); } });
-  // Sigil Cleave: the rune circle burns out to the blade's reach and a ring of violet blades sweeps round it
-  SFX_V2.cc_sigilcleave = vArea({ self: 1, wind: { wu: .06, r: .5 }, r: C => v2Range(C) + .3,
-    area: { sp: 'rune', n: 5, rim: 'wisp', rn: 10, hold: .55 },
-    fx: (C, x, z, r) => v2Swirl(C, x, z, r * .85, { n: 14, s: .32, h: .4, rise: .05, spin: 14, life: .35 }) });
-  // Spectral Blades: a rune turns under the mage and three spectral blades rise and wheel round it
-  SFX_V2.cc_spectral = vArea({ self: 1, wind: { wu: .1, r: .5 }, r: .7,
-    area: { sp: 'rune', n: 5, burst: 0, hold: 1 },
-    fx: (C, x, z) => v2Swirl(C, x, z, .55, { n: 3, s: .3, h: 1.3, rise: .25, spin: 5, life: 1.2, ground: 0 }) });
+  // Ward-Splitter: one riftsteel cut on the foe, shards of its broken ward thrown off (forces_zzzzzzzzzzz_rift_conclave.js)
+  SFX_V2.cc_sigilcleave = vHit({ wind: { wu: .05, r: .5 }, s: .9, hit: { sp: 'crys', n: 6, sp2: 'wisp', n2: 4, star: 0 },
+    fx: (C, x, z, h, ux, uz) => v2Slash(C, x, z, h, ux, uz, .7 * C.S, { flip: 1 }) });
+  // Thrown Riftblade: the blade's spectral copy flies down the line and back (its path: rfx streaks in the spell), a cut at each foe
+  SFX_V2.cc_spectral = vHit({ wind: { wu: .06, r: .5 }, s: .7, hit: { sp: 'wisp', n: 4, star: 0 } });
   // Arcane Barrage: each missile leaves the hat in a violet spark and flies on a ribbon of arcana, a small rune-burst where it lands
   SFX_V2.cc_barrage = { cast: C => v2Wind(C, { wu: .08, r: .5 }), steps: 8,
     hit: C => { const t = C.t; if (t) sfxAdd({ k: 'vflash', x: t.x, z: t.y, h: towerTop(t) + .1, s: .25 * C.S, life: .1, col: v2K(C).hot, a: .8 * sfxZk() }); },
@@ -47164,21 +47606,14 @@ SFX_V2_DEF.push(() => {
     travel: C => { const a = v2Aim(C), t = C.t; if (!a || !t) return; const st = t.st || effStats(t), len = (abReach(t, st, C.ab) + .5) * C.T.scale; v2Band(C, t.x, t.y, a[4], a[5], len, .4, { delay: .5, sweep: len / 4.6 + .05, life: len / 4.6 + .5, L: VT.ENERGY, al: .4 }); },
     trail: (C, p, k, cc) => v2Trail(C, p, { w: .22, cc, sp: 'rune', rate: 12 }),
     land: (C, x, z, h) => { v2Area(C, x, z, .8 * C.T.scale, { sp: 'rune', n: 8, sp2: 'wisp', n2: 6, shake: .1, hold: .6 }); } };
-  // Glacial Glyph: a frost rune draws itself over the circle (the warning), then crystals of ice burst up across it and frost
-  // lies there after, snow drifting
-  SFX_V2.cc_glacialglyph = vArea({ wind: { wu: .1 }, r: C => (C.ab && C.ab.rr) || .9, steps: 1,
-    cast: C => { const s = sfxSpots(C)[0]; if (s) sfxAdd({ k: 'v2disc', x: s[0], z: s[1], r: .9 * C.T.scale * C.T.ring, L: VT.RUNE, col: v2K(C).a, rim: v2K(C).b, spin: 1.2, seed: R(TAU), fin: .5, fout: .15, life: .62, al: .6, ink: 1 }); },
-    area: { sp: 'crys', n: 8, rim: 'snow', rn: 10, hold: .8 },
-    fx: (C, x, z, r) => { v2Spikes(C, x, z, r * .85, 10, 0, { ring: 1, h: .55, hold: .9, stag: .012 }); v2Spikes(C, x, z, r * .35, 4, 0, { h: .45, hold: .8, stag: .03 }); },
-    zone: { L: VT.RUNE, al: .4, spin: .15 }, mote: ccFrostMote });
-  // Rime Lance: a lance of ice shoots down the exact line, crystals bursting up in its wake, frost glittering on the ground
-  SFX_V2.cc_rimelance = vLine({ len: C => (C.ab && C.ab.len) || 2.6, w: .4, at: .06, sweep: .14, wind: { wu: .06, r: .5 },
-    band: { L: VT.ENERGY, al: .45, life: .9 },
-    fx: (C, x0, z0, ux, uz, len, w, d0) => { const h = towerTop(C.t) * .7; v2Proj(C, x0, h, z0, x0 + ux * len, .4, z0 + uz * len, .14, { head: 2, s: .2, delay: d0, tw: .14 }); v2Spikes(C, x0 + ux * .2, z0 + uz * .2, w * .7, 10, 0, { len: len - .2, ux, uz, h: .42, hold: .7, stag: .014, delay: d0 + .02 }); },
-    hitO: { sp: 'crys', n: 5, sp2: 'snow', n2: 4 } });
-  // Hoarbloom: every frost glyph in reach blooms at once into a ring of ice crystals and a burst of frost
-  SFX_V2.cc_hoarbloom = { cast: C => v2Wind(C, { wu: .08 }), lead: .06,
-    hit: (C, k) => { if (k) return; const L = Array.isArray(C.tg) ? C.tg : [C.tg]; for (let i = 0; i < L.length && i < 6; i++) { const g = L[i]; if (!g || g.x == null) continue; const r = ((g.z && g.z.r) || .8) * C.T.scale; v2Area(C, g.x, g.y, r, { sp: 'crys', n: 6, rim: 'snow', rn: 6, hold: .6, minor: i > 2 }); v2Spikes(C, g.x, g.y, r * .85, 8, 0, { ring: 1, h: .5, hold: .8, stag: .012 }); } } };
+  // Frost Spear: a spear of ice from her staff; at the foe a crisp burst of ice crystals and snow (forces_zzzzzzzzzzz_frost_conclave.js)
+  SFX_V2.cc_glacialglyph = vHit({ wind: { wu: .05 }, s: .6, hit: { sp: 'crys', n: 6, sp2: 'snow', n2: 4, star: 0 },
+    fx: (C, x, z, h, ux, uz, k, foe) => { const t = C.t; if (t) v2Proj(C, t.x, towerTop(t) * .95, t.y, x, h, z, .14, { foe, head: 2, s: .16, tw: .1 }); } });
+  // Ice Coffin: ice spikes ring the foe as the block closes on it (the block itself: ccDrawFoe, the frost kit)
+  SFX_V2.cc_rimelance = vHit({ wind: { wu: .08 }, s: .8, hit: { sp: 'crys', n: 8, sp2: 'snow', n2: 6, star: 0 },
+    fx: (C, x, z, h, ux, uz, k, foe) => v2Spikes(C, x, z, .32, 7, 0, { ring: 1, h: .5, hold: .9, stag: .012, foe }) });
+  // Shatterbloom: a crystal grows on the foe (drawn over it while it waits: ccDrawFoe), with a puff of snow
+  SFX_V2.cc_hoarbloom = vHit({ wind: { wu: .06 }, s: .6, hit: { sp: 'crys', n: 5, sp2: 'snow', n2: 3, star: 0 } });
   // Dilation: a clock face spreads over the circle, its hands turning back; time lies slowed there, amber motes hanging
   SFX_V2.cc_dilation = vArea({ wind: { wu: .1 }, r: C => (C.ab && C.ab.rr) || 1,
     area: { L: VT.CLOCK, sp: 'gold', n: 6, hold: .3, burst: 0 },
@@ -48119,90 +48554,107 @@ function sfxVeyArc(C, x, z, r, ux, uz, minor) {
   const side = c => (c.x - x) * -uz + (c.y - z) * ux, L = v2Near(x, z, r + .2, 10).slice().sort((p, q) => side(p) - side(q));
   L.forEach((c, i) => v2At(C, .06 + .2 * i / Math.max(1, L.length), () => { if (!c.dead) v2Hit(C, c.x, c.y, v2FoeH(c, .5), C.S * .45 * k, { sp: 'spark', n: 4, light: 0, ring: 0, deep: 0, ux, uz }); }));
 }
-/* ================= THE CONCLAVE'S RUNES, learned by playing =================
-   Runes on foes: each a small glyph of its own shape in its school's colour (arcane a sigil, frost an ice crystal, chrono a
-   dial, star a star, stone a forge-rune, fire a flame tongue), orbiting the foe at mid-height just outside its body, stacked
-   runes spread round the circle, fading as they run out. Weaves: the spent rune flies into the hit and the weave plays its own
-   effect; its name pops over the foe the first 3 times each weave fires in a run; the first weave of the run says, once, which
-   rune and which attack made it. Partners: placing or selecting a Conclave unit threads it to the units near it it can weave
-   with (the talents and items held), in the weave's colour. All cheap: two sprites a rune, nothing per frame allocated. */
-const CC_RUNE_L = () => ({ arcane: VT.GLYPH, frost: VT.CRYS, chrono: VT.CLOCK, star: VT.STAR, stone: VT.COG, fire: VT.FLAME });
+/* ================= THE CONCLAVE'S ELEMENTS, learned by playing (docs/conclave_elements.md) =================
+   Marks on foes: one small icon an element just over the foe's health bar (Arcane a sigil, Frost an ice crystal, Time a
+   dial, Star a star, Stone a forge-cog, Fire a flame tongue), in its element's colour, side by side when it holds two,
+   fading in its last second. Reactions: the other mark flies down into the foe and the reaction's own short burst plays
+   at the foe (never round the unit that set it off); its name floats up over the foe, small and brief (at most 4 names a
+   second across the field); the run's first reaction says once which elements made it. Partners: placing or selecting a
+   Conclave unit threads it to nearby units of another element, in the colour of the reaction they make together. All
+   cheap: two sprites a mark, nothing per frame allocated. */
+const CC_MARK_L = () => ({ arcane: VT.GLYPH, frost: VT.CRYS, chrono: VT.CLOCK, star: VT.STAR, stone: VT.COG, fire: VT.FLAME });
 let _ccRL = null;
-const ccRuneCol = s => baCol(typeof CC_COL !== 'undefined' && CC_COL[s] || '#ffffff', 1.15);
-// the runes on a foe (ccDrawFoe asks; true: drawn here, the older pips skipped)
-function sfxRunes(c, rs, x, z) {
+const ccMarkCol = s => baCol(typeof CC_COL !== 'undefined' && CC_COL[s] || '#ffffff', 1.15);
+// where a foe's marks sit: just over its health bar (view.js draws the bar at creepBaseY + creepH + .18)
+const ccMarkY = c => (typeof creepBaseY === 'function' ? creepBaseY(c) + creepH(c) : hitH(c) + .3) + .32;
+const ccMarkX = (c, i, n) => (i - (n - 1) / 2) * .17;
+// the marks on a foe (ccDrawFoe asks; true: drawn here, the plain dots skipped)
+function sfxMarks(c, rs, x, z) {
   if (!sfxBaOn() || !rs.length) return false;
-  const RL = _ccRL || (_ccRL = CC_RUNE_L()), n = rs.length, r = .24 + (c.def.r || .3) * .95, mid = (c.fly && !(c.lowT > G.time) ? .9 : 0) + (typeof creepH === 'function' ? creepH(c) * .5 : .4);
+  const RL = _ccRL || (_ccRL = CC_MARK_L()), n = rs.length, y = ccMarkY(c);
   for (let i = 0; i < n; i++) {
-    const s = rs[i], an = vt * 1.4 + i / n * TAU + (c.id || 0), left = Math.min(1, (c.ccR[s] - G.time) * 1.2), px = x + Math.cos(an) * r, pz = z + Math.sin(an) * r, col = ccRuneCol(s), L = RL[s] || VT.GLYPH;
-    vfxSprite(VX, px, mid, pz, .075, .075, 0, col, .16 * left, VT.GLOW, 1);   // (a faint glow only: a crowd of runes never fogs its foes)
-    if (L === VT.CRYS) vfxSprite(VXO, px, mid, pz, .09, .13, 0, V3_WHITE, left, VT.CRYS, 0);   // (drawn over the crowd: a rune behind a neighbour's body still reads)
-    else vfxSprite(VXO, px, mid, pz, .13, .13, L === VT.FLAME ? 0 : vt * .8 + i, col, left, L, 1);
+    const s = rs[i], left = Math.min(1, (c.ccR[s] - G.time) * 1.2), px = x + ccMarkX(c, i, n), col = ccMarkCol(s), L = RL[s] || VT.GLYPH;
+    vfxSprite(VXO, px, y, z, .1, .1, 0, col, .22 * left, VT.GLOW, 1);   /* (a faint glow only: a crowd of marks never fogs its foes) */
+    if (L === VT.CRYS) vfxSprite(VXO, px, y, z, .08, .12, 0, V3_WHITE, left, VT.CRYS, 0);
+    else vfxSprite(VXO, px, y, z, .12, .12, 0, col, left, L, 1);
   }
   return true;
 }
-// the rune's place on the foe's circle as last drawn (for the flight into the hit)
-function ccRunePos(c, s) { const rs = typeof ccRunesOn === 'function' ? ccRunesOn(c) : [s], n = Math.max(1, rs.length), i = Math.max(0, rs.indexOf(s)), r = .24 + (c.def.r || .3) * .95, an = vt * 1.4 + i / n * TAU + (c.id || 0); return [c.x + Math.cos(an) * r, (typeof creepH === 'function' ? creepH(c) * .5 : .4), c.y + Math.sin(an) * r]; }
-const CC_ATTACK = { cc_spellblade: 'Spellblade cut', cc_mageling: 'Mageling missile', cc_rimeweaver: 'Rimeweaver bolt', cc_chronomancer: 'Chronomancer bolt', cc_astrologer: 'Astrologer star-bolt', cc_golemwarden: 'Golem slam', cc_pyroclast: 'Pyroclast fireball' };
-const CC_RUNE_NAME = { arcane: 'Arcane', frost: 'Frost', chrono: 'Chrono', star: 'Star', stone: 'Stone', fire: 'Fire' };
-// a weave fired (ccWeave tells): the rune flies in, the weave plays, its name pops (the first 3 times), the first one says how
-function sfxWeave(t, c, id, s) {
-  if (!c) return false; const W = (typeof CC_WEAVE !== 'undefined' && CC_WEAVE[id]) || { name: 'Weave', col: '#d8b8ff' };
-  const N = G.ccWeaveN || (G.ccWeaveN = {}); N[id] = (N[id] || 0) + 1;
-  if (N[id] <= 3 && typeof addText === 'function') addText(c.x, c.y, (typeof creepH === 'function' ? creepH(c) : hitH(c)) + .75, W.name, W.col);
-  if (!G.ccWeaveTold && G.state === 'play') { G.ccWeaveTold = 1; if (typeof onToast === 'function') onToast(`${CC_RUNE_NAME[s] || s} rune + ${CC_ATTACK[t && t.def && t.def.unit] || 'a hit'} = ${W.name}`); }
+// a mark's place over the foe's health bar (for its flight into the reaction)
+function ccMarkPos(c, s) { const rs = typeof ccMarksOn === 'function' ? ccMarksOn(c) : [s], n = Math.max(1, rs.length), i = Math.max(0, rs.indexOf(s)); return [c.x + ccMarkX(c, i, n), ccMarkY(c), c.y]; }
+let _ccRxWords = [];
+// a reaction set off (ccReact tells): the other mark flies in, the reaction's burst plays, its name floats up, the first one says how
+function sfxReact(t, c, id, el, other) {
+  if (!c || typeof CC_RX === 'undefined' || !CC_RX[id]) return false; const X = CC_RX[id];
+  const N = G.ccRxN || (G.ccRxN = {}); N[id] = (N[id] || 0) + 1;
+  _ccRxWords = _ccRxWords.filter(w => G.time - w < 1);
+  if (_ccRxWords.length < 4 && typeof addText === 'function') { _ccRxWords.push(G.time); addText(c.x, c.y, ccMarkY(c) + .25, X.name, X.col); }
+  if (!G.ccRxTold && G.state === 'play') { G.ccRxTold = 1; if (typeof onToast === 'function') onToast(`${CC_EL_NAME[other] || other} + ${CC_EL_NAME[el] || el} = ${X.name}`); }
   if (!sfxBaOn()) return false;
-  const C = sfxCtx('cc_barrage', SFX_R.cc_barrage, t, c), P = ccRunePos(c, s), h = hitH(c), rc = ccRuneCol(s), wc = baCol(W.col, 1.2);
-  sfxAdd({ k: 'v2proj', x0: P[0], h0: P[1], z0: P[2], x1: c.x, h1: h, z1: c.y, foe: c, T: .12, arc: .1, head: 0, s: .08, col: rc, hot: baCol('#ffffff', 1.3), trail: VT.GLOWS, tw: .05, ta: .5, life: .2 });
+  const C = sfxCtx('cc_barrage', SFX_R.cc_barrage, t, c), P = ccMarkPos(c, other), h = hitH(c), rc = ccMarkCol(other), wc = baCol(X.col, 1.2);
+  sfxAdd({ k: 'v2proj', x0: P[0], h0: P[1], z0: P[2], x1: c.x, h1: h, z1: c.y, foe: c, T: .12, arc: .05, head: 0, s: .08, col: rc, hot: baCol('#ffffff', 1.3), trail: VT.GLOWS, tw: .05, ta: .5, life: .2 });
   v2At(C, .12, () => {
     if (c.dead && !c.x) return; const x = c.x, z = c.y;
     sfxAdd({ k: 'vstar', x, z, h, s: .3, life: .14, col: wc, rot: R(TAU) });
     switch (id) {
       case 'shatter': vfxBurst({ x, y: h, z, shape: 'sphere', r: .08, sp: [2, 4], up: [.5, 2], life: [.4, .65], size: [.05, .08], c0: V3_WHITE, grav: 8, drag: .8, layer: VT.CRYS, spin: 14, add: 0 }, 10); sfxAdd({ k: 'vring', x, z, r0: .15, r1: .6, life: .3, col: wc, rot: R(TAU) }); break;
-      case 'echo': if (t) v2Proj(C, t.x, towerTop(t), t.y, x, h, z, .28, { delay: .28, foe: c, head: 0, s: .1, col: baCol('#ffd27a'), hot: baCol('#fff4cc', 1.4), tw: .06 }); break;
-      case 'paradox': v2Clock(C, x, z, .45, { spin: -10, life: .6 }); v3Mesh(C, 'helix', x, z, { foe: c, r: .3, h: .9, tw: -1.4, life: .55, hold: .5, fp: 0, ca0: .7, c0: wc, c1: baCol('#ffd27a'), sv: 2, nl: VT.NOISE2, tu: 1, tv: 2 }); break;
-      case 'entomb': v2Spikes(C, x, z, .3, 6, 0, { ring: 1, h: .5, hold: .9, stag: .01 }); break;
-      case 'comet': v2Proj(C, x + .5, 3.5, z - .6, x, h, z, .22, { head: 2, s: .14, col: baCol('#9fe4ff'), hot: baCol('#f4fcff', 1.4), tw: .1 }); v2At(C, .22, () => v3P(C, 'crys', x, h, z, 8)); break;
+      case 'overload': sfxAdd({ k: 'vring', x, z, r0: .2, r1: (typeof CC_RXK !== 'undefined' ? CC_RXK.overloadR : 1), life: .35, col: wc, rot: R(TAU) }); v3Flash(C, x, h, z, .4, VT.MAGIC); v3P(C, 'spark', x, h, z, 8, { c0: wc, c1: baCol('#ff8a4a') }); break;
+      case 'encase': v2Spikes(C, x, z, .3, 6, 0, { ring: 1, h: .5, hold: .9, stag: .01 }); break;
       case 'magma': v2Flames(C, x, z, .5, 8, { life: .7, col: baCol('#ff5a2a', 1.1) }); break;
-      case 'starsteel': v2Shaft(C, x, z, { foe: c, w: .1, fin: .05, life: .3, h: 3, col: baCol('#eef2ff'), hot: baCol('#ffffff', 1.4) }); break;
-      case 'starfall': v2Proj(C, x + .5, 4, z - .6, x, h, z, .25, { head: 3, s: .14, col: baCol('#eef2ff'), hot: baCol('#ffffff', 1.5), tw: .12 }); break;
+      case 'splinter': v3P(C, 'crys', x, h, z, 6); break;
+      case 'crack': v2Spikes(C, x, z, .25, 5, 0, { ring: 1, h: .3, hold: .4, stag: .02 }); v3P(C, 'spark', x, h, z, 5, { c0: wc, c1: baCol('#c89060') }); break;
+      case 'pull': v2Shaft(C, x, z, { foe: c, w: .08, fin: .05, life: .28, h: 2.4, col: baCol('#eef2ff'), hot: baCol('#ffffff', 1.4) }); break;
+      case 'echo': v2Clock(C, x, z, .4, { spin: -10, life: .5 }); break;
       default: v3Flash(C, x, h, z, .35, VT.MAGIC);
     }
-    v3P(C, 'spark', x, h, z, 5, { c0: wc, c1: rc });
+    v3P(C, 'spark', x, h, z, 4, { c0: wc, c1: rc });
   });
   return true;
 }
-// the units a Conclave unit can weave with: those near whose rune its hits spend, or who spend its rune. [unit, weave id, rune]
+// the units a Conclave unit reacts with: those near it of another element. [unit, reaction id, its element]
 function ccPartners(t, st, x, z, out) {
-  out.length = 0; if (typeof ccWeavesOf !== 'function' || !t || !t.def || !t.def.ccSchool) return out;
-  const mine = ccWeavesOf(t, st), s0 = t.def.ccSchool, r0 = (st && st.range) || 2.5;
+  out.length = 0; if (typeof ccRxOf !== 'function' || !t || !t.def || !t.def.ccSchool) return out;
+  const s0 = t.def.ccSchool, r0 = (st && st.range) || 2.5;
   for (const o of G.towers) {
     if (o === t || !o.def || !o.def.ccSchool || o.wrecked || o.def.wall) continue; const d = Math.hypot(o.x - x, o.y - z); if (d > Math.min(5, r0 + ((o.st && o.st.range) || 2.5)) * .8) continue;
-    const so = o.def.ccSchool; let got = null;
-    for (const w of mine) if (w[0].includes(so)) { got = [o, w[1], so]; break; }
-    if (!got) for (const w of ccWeavesOf(o, o.st || {})) if (w[0].includes(s0)) { got = [o, w[1], s0]; break; }
-    if (got) out.push(got);
+    const id = ccRxOf(s0, o.def.ccSchool); if (id && d <= (typeof CC_LINK_R !== 'undefined' ? CC_LINK_R : 2.05)) out.push([o, id, o.def.ccSchool]);
   }
   return out;
 }
 const _ccPt = [];
 let _ccGhost = null;
-// placing or selecting a Conclave unit: faint threads to its weave partners (spellFxDraw calls this each frame)
-function sfxWeaveThreads() {
+// placing or selecting a Conclave unit: faint threads to the units it reacts with (spellFxDraw calls this each frame)
+function sfxReactThreads() {
   if (!sfxBaOn() || !G || G.force !== 'conclave' || G.state !== 'play') return;
   let t = null, x = 0, z = 0, st = null;
   if (G.sel && G.sel.kind === 'tower' && G.sel.ref && G.sel.ref.def && G.sel.ref.def.ccSchool) { t = G.sel.ref; x = t.x; z = t.y; st = t.st; }
   else if (G.ghost && G.buildType && G.ghost.in) {
-    if (!_ccGhost || _ccGhost.type !== G.buildType || _ccGhost.v !== G.talV) { try { const same = G.towers.find(q => q.type === G.buildType && q.st), o = same || makeTower(G.buildType, 0, 0, 0); _ccGhost = { type: G.buildType, v: G.talV, t: o, st: same ? same.st : effStats(o) }; } /* (one of its kind on the field gives its talents' caps; else a stand-in, once per talent change) */ catch (e) { _ccGhost = { type: G.buildType, v: G.talV, t: null }; } }
+    if (!_ccGhost || _ccGhost.type !== G.buildType || _ccGhost.v !== G.talV) { try { const same = G.towers.find(q => q.type === G.buildType && q.st), o = same || makeTower(G.buildType, 0, 0, 0); _ccGhost = { type: G.buildType, v: G.talV, t: o, st: same ? same.st : effStats(o) }; } /* (one of its kind on the field gives its stats; else a stand-in, once per talent change) */ catch (e) { _ccGhost = { type: G.buildType, v: G.talV, t: null }; } }
     if (!_ccGhost.t || !_ccGhost.t.def || !_ccGhost.t.def.ccSchool) return; t = _ccGhost.t; st = _ccGhost.st; x = G.ghost.i + .5; z = G.ghost.j + .5;
   }
   if (!t) return;
   for (const [o, id, s] of ccPartners(t, st, x, z, _ccPt)) {
-    const W = CC_WEAVE[id] || CC_WEAVE.weave, c = baCol(W.col), dx = o.x - x, dz = o.y - z, L = Math.hypot(dx, dz) || 1;
+    const X = CC_RX[id], c = baCol(X.col), dx = o.x - x, dz = o.y - z, L = Math.hypot(dx, dz) || 1;
     vfxRb.begin(VX, VT.ENERGY, 1, 0, 1); vfxRb.pt(x, .06, z, .12, c, .45, -vt * .6); vfxRb.pt(o.x, .06, o.y, .12, c, .45, L * .8 - vt * .6); vfxRb.end();
-    const mx = (x + o.x) / 2, mz = (z + o.y) / 2, RL = _ccRL || (_ccRL = CC_RUNE_L()), Lr = RL[s] || VT.GLYPH;
-    if (Lr === VT.CRYS) vfxSprite(VX, mx, .25, mz, .07, .1, 0, V3_WHITE, .85, VT.CRYS, 0); else vfxSprite(VX, mx, .25, mz, .09, .09, 0, ccRuneCol(s), .9, Lr, 1);
+    const mx = (x + o.x) / 2, mz = (z + o.y) / 2, RL = _ccRL || (_ccRL = CC_MARK_L()), bob = .42 + .04 * Math.sin(vt * 3);
+    vfxSprite(VXO, mx, bob, mz, .3, .3, 0, c, .35, VT.GLOW, 1);   /* the pair's reaction over the link: its two elements side by side, in its colour */
+    for (const [e, dx2] of [[t.def.ccSchool, -.09], [s, .09]]) { const Lr = RL[e] || VT.GLYPH; if (Lr === VT.CRYS) vfxSprite(VXO, mx + dx2, bob, mz, .1, .14, 0, V3_WHITE, 1, VT.CRYS, 0); else vfxSprite(VXO, mx + dx2, bob, mz, .14, .14, 0, ccMarkCol(e), 1, Lr, 1); }
   }
+}
+// the rift cut's seams (forces_conclave_a.js CC_RIFTCUT, ccBlinkTo): a thin magenta-violet line in the air where the blade
+// opens the rift and another where the unit steps out, each opening and snapping shut in a moment
+function sfxRiftSeam(x, z, h, a, u) {
+  if (u <= 0 || u >= 1) return;
+  const o = u < .3 ? u / .3 : 1 - (u - .3) / .7, L = CC_RIFTCUT.len * (.35 + .65 * Math.min(1, u / .3)), ca = Math.cos(a), sa = Math.sin(a);
+  const x0 = x - L * .55, y0 = h + L * .55, z0 = z, x1 = x + L * .55, y1 = h - L * .55, z1 = z;   /* (a screen diagonal: across the camera's x, high to low) */
+  for (const [w, col, al] of [[.13, baCol('#d050e8', 1.1), .55], [.035, baCol('#fff0ff', 1.4), 1]]) { vfxRb.begin(VXO, VT.ENERGY, 1, 0, 1); vfxRb.pt(x0, y0, z0, w * o, col, al * o, 0); vfxRb.pt(x1, y1, z1, w * o, col, al * o, 1); vfxRb.end(); }
+}
+function sfxRiftSeams() {
+  if (typeof CC_RIFTCUT === 'undefined' || !CC_RIFTCUT.on || !G || G.state !== 'play' || G.force !== 'conclave') return;
+  for (const t of G.towers) { const B = t.ccBlink; if (!B || !B.cut || G.time - B.at > 1.2) continue;
+    const age = G.time - B.at, T = Math.max(.15, B.T || .3), h = towerTop(t) * .6, a = (B.a || 0) + Math.PI / 2;
+    sfxRiftSeam(B.x0 + Math.sin(B.a || 0) * .15, B.z0 + Math.cos(B.a || 0) * .15, h, a, age / CC_RIFTCUT.open);
+    sfxRiftSeam(B.x1, B.z1, h, a, (age - T * CC_RIFTCUT.out) / CC_RIFTCUT.open); }
 }
 /* ---- Rattlegun (ih_rollingvolley): the Thunderguns' burst into one foe, drawn with the toolkit, restrained (nothing round the
    gunner). The cast: the barrels spin up, a forge-orange glow gathering at them that whirls faster (SFX_CUSTOM, below). Each
@@ -48293,7 +48745,7 @@ if (typeof sfxTuneSync === 'function') sfxTuneSync();
    - steel goes straight to health (30% harder, ROLE_K.mresPhys) and cracks the ward on the way, point for point, so steel
      and spells work together, as magic and steel do on armour;
    - ward-breakers (the Conclave's): a Golem Warden's slam cracks it wide open for 3 seconds (every spell hit goes through,
-     still wearing it); every weave tears a share off; Arcane Barrage's missiles tear it;
+     still wearing it); every Conclave reaction tears a share off; Arcane Barrage's missiles tear it;
    - pure damage and venom ignore it.
    Size: maxHp x mres x EP.wardMul (at most EP.wardCap x maxHp). Leaders and bosses keep their resistance as a share
    (1 - mres), which Magic Penetration cuts (mres x (1 - pen)), as Armour Penetration cuts armour on foes with no bar. */
@@ -48311,7 +48763,7 @@ const EP = {
   wardWear: { magic: 1, arcane: 2 },  // ward worn per point of a spell hit (all of the hit, its penetrating share included)
   wardCrack: 1,                       // ward cracked per point of a physical hit (it still goes to health in full)
   wardSlam: 3,                        // seconds a Golem Warden's slam holds a ward cracked open
-  wardWeave: .25,                     // the share of its full ward a weave tears off
+  wardWeave: .25,                     /* the share of its full ward a Conclave reaction tears off */
 };
 const EP_COL = { mana: [.32, .58, 1, 1], manaDry: [.25, .3, .45, 1], armour: [.72, .76, .84, 1], armourTemp: [.92, .86, .62, 1], ward: [.62, .42, 1, 1], wardOpen: [.95, .72, 1, 1] };
 /* ---- the rotations. mp: pool, regen: per s, upkeep: per s while its tie holds. Each spell: s (a SPELLS key, or a native
@@ -48625,7 +49077,7 @@ function epWardWear(c, n) {
   if (c.mw <= 0) { c.mw = 0; epWardBreakFx(c); }
   return a;
 }
-// tear a share of its full ward off (a weave, Arcane Barrage)
+// tear a share of its full ward off (a Conclave reaction, Arcane Barrage)
 function epWardTear(c, share) {
   if (!epOn() || !c || !(c.mwMax > 0) || !(c.mw > 0) || c.dead) return 0;
   const a = epWardWear(c, c.mwMax * share);
@@ -48656,8 +49108,8 @@ function epWardAbsorb(c, amt, type, ss, dot) {
   else if (!dot && a > 0 && (c.wglT || 0) < G.time) { c.wglT = G.time + .35; fxSpark(c.x, c.y, hitH(c), '#c4a4ff', 3); }
   return [amt - a, a];
 }
-// a weave on a warded foe tears a share of its ward (forces_conclave_a.js ccWeaveNote, wrapped)
-if (typeof ccWeaveNote === 'function') { const wn = ccWeaveNote; ccWeaveNote = (t, c, id, s) => { if (c && epOn()) epWardTear(c, EP.wardWeave); return wn(t, c, id, s); }; }
+// a Conclave reaction on a warded foe tears a share of its ward (forces_conclave_a.js ccReactNote, wrapped)
+if (typeof ccReactNote === 'function') { const wn = ccReactNote; ccReactNote = (t, c, id, s) => { if (c && epOn()) epWardTear(c, EP.wardWeave); return wn(t, c, id, s); }; }
 
 /* ---------- drawing (view.js: under the health bar, then the cast's ring) ---------- */
 function epBars(c, x, top, z, w, h) {
@@ -70020,17 +70472,17 @@ const SPELL_BRIEFS = {
   ih_tapkeg: 'Nearby allies attack {hastePct} faster for {dur}s. Warms up their weapons.',
   ih_stouthearts: 'Nearby allies heal 25%, gain {mana} mana and lose silence. Next three strikes hit 40% harder.',
   ih_firewater: 'Nearby heat units vent on their next strike. Other allies strike immediately.',
-  cc_blinkstrike: 'Blinks up to 1.6 cells beyond its reach and strikes for {d}, leaving the arcane rune. An afterimage strikes again 0.5 sec later for {d2}.',
-  cc_sigilcleave: 'Takes a duelling stance for {dur} sec, cutting each ground enemy in reach once for {d} and two stacks of Stagger. Each cut gives an Arcane Charge.',
-  cc_spectral: 'Leaps and cuts a cross into the road, arms {arm} cells long, dealing {d} and two stacks of Stagger to ground enemies on it. For 3 sec it Staggers ground enemies stepping on it.',
+  cc_blinkstrike: 'Steps through a rift to the ground enemy nearest the gate up to 1.6 cells beyond its reach and cuts it for {d}. The rift it stepped from stays 2 sec and cuts each ground enemy passing it.',
+  cc_sigilcleave: 'Cuts a warded, shielded, plated or magic-resistant enemy in reach for {d} and splits it open for {dur} sec: shield broken, ward cracked, armour stripped, so every spell and reaction strikes it whole.',
+  cc_spectral: 'Hurls a spectral copy of its blade through a line of ground enemies for {d} each, with a stack of Stagger; it returns through the rift, cutting each again for half.',
   cc_barrage: 'Fires {n} seeking missiles, {d} each. Each tears 12% off a ward and hits casters up to twice as hard at full mana.',
-  cc_sparks: 'Hangs {n} missiles for 4 sec. Each dives at the first enemy under it for {d} and drains 25 mana from casters. A missile hitting another school\'s rune splits and hits a second enemy.',
-  cc_grandorb: 'For {gather} sec, Magelings\' missiles within 2 cells feed an orb. It then hurls the orb, dealing {d} plus 120% of stored damage, 80% to nearby enemies, leaving the arcane rune.',
-  cc_glacialglyph: 'Writes a glyph erupting after 0.6 sec, dealing {d} to ground enemies within 0.9 cells and freezing {frz} sec. It stays 4 sec as frozen ground slowing 40%.',
-  cc_rimelance: 'Brands for {d} and slows 30%. It leaves {n} frost prints as it walks; each hits the next ground enemy stepping on it for {d2} and freezes 0.35 sec.',
-  cc_hoarbloom: 'Every frost glyph in reach erupts, dealing {d} to ground enemies and freezing {frz} sec. Ice bridges between glyphs up to 2.6 cells apart deal {d2} and slow 50%.',
-  cc_dilation: 'Slows time in a 1-cell circle for {dur} sec. Enemies inside, flying too, move 55% slower (30% for bosses), and their runes do not fade.',
-  cc_quicken: 'Turns back the hour for {dur} sec. Each ground enemy entering walks {back} cells back (less for heavy enemies and bosses), and runes lost in the last 4 sec return.',
+  cc_sparks: 'Hangs {n} missiles for 4 sec. Each dives at the first enemy under it for {d} and drains 25 mana from casters. A missile hitting a foe marked with another element splits and hits a second enemy.',
+  cc_grandorb: 'For {gather} sec, Magelings\' missiles within 2 cells feed an orb. It then hurls the orb, dealing {d} plus 120% of stored damage, 80% to nearby enemies, each marked Arcane.',
+  cc_glacialglyph: 'Hurls a spear of ice at the toughest enemy in range, air or ground, dealing {d}, marking it Frost and slowing it for a few sec.',
+  cc_rimelance: 'Locks the toughest enemy in range in a block of ice for {dur} sec (bosses less): it is Frozen and cannot move, and takes {d} of cold over the hold.',
+  cc_hoarbloom: 'An ice crystal blooms on the toughest enemy in range for 10 sec. When it dies, or Fire Shatters it, the bloom bursts: {d} to enemies within 1.1 cells, Frozen {frz} sec and slowed.',
+  cc_dilation: 'Slows time in a 1-cell circle for {dur} sec. Enemies inside, flying too, move 55% slower (30% for bosses), and their element marks do not fade.',
+  cc_quicken: 'Turns back the hour for {dur} sec. Each ground enemy entering walks {back} cells back (less for heavy enemies and bosses), and element marks lost in the last 4 sec return.',
   cc_echo: 'Recasts that unit\'s last spell from the past 8 sec, free, at {kPct} strength.',
   cc_fallingstar: 'Calls a star down, dealing {d} (double to flying) and half that within 0.6 cells. A flying enemy hit is dragged down for {low} sec.',
   cc_omen: 'Hangs a star for 2.2 sec, dragging down flying enemies within 1.4 cells and pulling back passing enemies. Then it falls, dealing {d} and stunning within 1 cell for 0.4 sec.',
@@ -70099,9 +70551,9 @@ const SPELL_BRIEFS = {
   cc_sunder: 'Breaks every ward and shield, then strikes for {d} plus stored Severance. Its ward stays cracked open {open} sec.',
   cc_shards: 'Throws its glaive out and back, cutting enemies near its path on both passes for {d}. Each cut breaks shields and tears 25% off a ward.',
   cc_nullfield: 'Hooks up to {n} enemies and slows them, then tears them free: wards and shields break, they take {d} and are Severed {sev} sec (no shields, ward cracked open).',
-  ch_thousandfold: ({ d, v }) => `Fires 24 seeking missiles into a ${+(1.8 + (v('area') || 0)).toFixed(2)}-cell area over 2 sec, each dealing ${d(1)} and leaving the arcane rune. Every 6th uses up another rune on its target for double damage.`,
-  ch_unravel: 'Tears every rune off enemies within {rr} cells. Each takes {d} per rune worn.',
-  ch_mirrorweave: 'A loom throws {n} bolts of the six schools at enemies within {rr} cells over 3 sec, each dealing {d} and leaving its rune. A bolt hitting another school\'s rune uses it up for double damage and that weave\'s effect.',
+  ch_thousandfold: ({ d, v }) => `Fires 24 seeking missiles into a ${+(1.8 + (v('area') || 0)).toFixed(2)}-cell area over 2 sec, each dealing ${d(1)} and marking Arcane. Every 6th reacts with another mark on its target for double damage.`,
+  ch_unravel: 'Tears every element mark off enemies within {rr} cells. Each takes {d} per mark worn.',
+  ch_mirrorweave: 'A loom throws {n} bolts of the six elements at enemies within {rr} cells over 3 sec, each dealing {d} and leaving its mark. Its bolts set off reactions on the enemies they share.',
   ch_stoppedhour: ({ d, v }) => `Stops time in a ${+(1.6 + (v('area') || 0)).toFixed(2)}-cell area for 2.5 sec (1 sec on bosses): enemies cannot move and take 25% more damage from all units. Then each takes ${d(1)} and is pushed back 1 cell.`,
   ch_rewind: 'Marks it. After {wait} sec it snaps back toward the marked spot (up to 3 cells), taking {d} and slowed 30%. Up to 3 ground enemies it passes take {d2}.',
   ch_hourlead: 'A clock hand sweeps his reach over 2.4 sec. Each enemy passed takes {d} and is stopped in time {stop} sec (shorter on bosses), taking 25% more damage from all units.',
@@ -70208,15 +70660,15 @@ const SPELL_TARGETS = {
   ch_garden: 'the toughest ground enemies, one moth each',
   ch_fullbloom: 'every spored enemy in range',
   /* conclave */
-  cc_blinkstrike: 'the toughest ground enemy in range',
-  cc_sigilcleave: 'itself',
-  cc_spectral: 'the spot crossing the most ground enemies',
+  cc_blinkstrike: 'the ground enemy nearest the gate',
+  cc_sigilcleave: 'a warded or magic-resistant enemy, else the toughest',
+  cc_spectral: 'the line through the most ground enemies',
   cc_barrage: 'the three toughest enemies in range',
   cc_sparks: 'the densest group of enemies',
   cc_grandorb: 'the densest group of enemies',
-  cc_glacialglyph: 'the densest group of ground enemies',
-  cc_rimelance: 'the ground enemy furthest along',
-  cc_hoarbloom: 'every frost glyph in range',
+  cc_glacialglyph: 'the toughest enemy in range',
+  cc_rimelance: 'the toughest enemy in range not already frozen',
+  cc_hoarbloom: 'the toughest enemy in range',
   cc_dilation: 'the densest group of enemies',
   cc_quicken: 'the road ahead of ground enemies',
   cc_echo: 'the nearby unit that cast last',
@@ -71512,7 +71964,7 @@ const AFF_MODS = {
   hivemother: { fav: 'cannon', sig: { name: 'Spore Harvest', t: 'Each foe that dies carrying spores feeds the nearest Seedcaster, whose next pod strikes half again as hard (it stores up to 3).' },
     up: { arrow: { k: 'range', v: .2 }, frost: { k: 'spore', v: .25 } }, dn: { glaive: { k: 'rate', v: -.05 }, arcane: { k: 'range', v: -.2 } } },
   // ---- the Conclave ----
-  cc_arch: { fav: 'cannon', sig: { name: 'Woven Flame', t: 'A Pyroclast’s fireball strikes a third harder on a foe bearing another school’s rune.' },
+  cc_arch: { fav: 'cannon', sig: { name: 'Mixed Flame', t: 'A Pyroclast’s fireball strikes a third harder on a foe marked with another element.' },
     up: { arrow: { k: 'range', v: .2 }, glaive: { k: 'crit', v: .05 } }, dn: { earth: { k: 'rate', v: -.05 }, storm: { k: 'range', v: -.2 } } },
   cc_chrono: { fav: 'arcane', sig: { name: 'Echoed Moment', t: 'Every 5th Chronomancer strike happens again a quarter-second later.' },
     up: { frost: { k: 'rate', v: .06 }, storm: { k: 'range', v: .2 } }, dn: { cannon: { k: 'range', v: -.2 }, glaive: { k: 'rate', v: -.05 } } },
@@ -71650,8 +72102,8 @@ function heroAffFire(t, st, tg, pow) {
     case 'hivemother':   // Spore Harvest: a stored charge makes this pod a big one
       if (t.affCh > 0) { t.affCh--; pow *= 1.5; affPop(t.x, t.y, towerTop(t) + .1, h.hue, true); }
       break;
-    case 'cc_arch':   // Woven Flame
-      if (typeof ccRunesOn === 'function' && ccRunesOn(tg).some(s => s !== 'fire')) { pow *= 4 / 3; affPop(tg.x, tg.y, hitH(tg), h.hue); }
+    case 'cc_arch':   // Mixed Flame
+      if (typeof ccMarksOn === 'function' && ccMarksOn(tg).some(s => s !== 'fire')) { pow *= 4 / 3; affPop(tg.x, tg.y, hitH(tg), h.hue); }
       break;
     case 'cc_chrono':   // Echoed Moment
       if ((t.affN = (t.affN || 0) + 1) % 5 === 0) G.delayed.push({ t: .25, fn: () => {
@@ -73008,7 +73460,7 @@ function infoHTML() {
     const ty = G.buildType, d = TOWERS[ty], st = d.tiers[0], cap = capTag(ty);
     const m = d.blurb.match(/^(.+?\.)\s+(.+)$/); // second sentence of the blurb goes first when space is short
     const al = typeof heroAffLine === 'function' ? heroAffLine(ty) : '';   // the hero's mark on this unit (heroaff.js)
-    return `<h3>${d.name} <span class="cost">${st.cost}</span></h3><p class="mut">${m ? `${m[1]}<span data-d="1"> ${m[2]}</span>` : d.blurb}</p>` + (al ? `<p class="mut" data-d="2">${esc(al)}</p>` : '')
+    return `<h3>${d.name} <span class="cost">${st.cost}</span></h3>${d.role ? `<p class="mut role"><b>${d.role}</b></p>` : ''}<p class="mut">${m ? `${m[1]}<span data-d="1"> ${m[2]}</span>` : d.blurb}</p>` + (al ? `<p class="mut" data-d="2">${esc(al)}</p>` : '')
       + (d.wall ? '' : `<div class="st">${statLine(ty, 0, talentStats(ty, 0, talentRank(ty)), st)}</div>`) + (typeof druidBuildHTML === 'function' ? druidBuildHTML(ty) : '') + (d.wall ? '' : vsWaveHTML(ty)) + (d.wall ? '' : synSummaryHTML()) + (cap ? `<div class="tags" data-d="3">${cap}</div>` : '');
   }
   const w = describeWave(G.wave);
@@ -73021,6 +73473,7 @@ function infoHTML() {
     + (!TW && !G.vs ? '' : DL ? adviceHTML(G.wave, false).replace('<p class="advt">', '<p class="advt" data-d="1">') : adviceHTML(G.wave, false))   // the weakness line says it outside Tower Wars
     + (waveAdvice(G.wave).best.length ? counterTags({ immune: w.immune, shrug: w.shrug, weak: [] }).replace('<div class="tags">', '<div class="tags" data-d="2">') : counterTags(w))   // the advice already names what it is weak to
     + scoutLines()
+    + (typeof forceTipLine === 'function' ? forceTipLine(G.wave) : '')   /* a force run's one-line counter tips (forces_zzzzzzzzzzz_rift_conclave.js) */
     + (TW ? twLine() : interestLine())
     + `<p class="mut" data-d="2">Maze length <b>${G.path.len}</b> steps${G.ageRes ? ` · Keep upgrading to a ${AGES[G.ageRes.to].name}` : ageCanStart() ? ' · Keep upgrade ready' : ''}${G.wave === 1 && G.towers.length < 3 ? '<span data-d="1"> · Build a maze, then sound the horn</span>' : ''}</p>`;
 }
@@ -77448,6 +77901,8 @@ function mvCtl(t, live, M) {
   if (bu >= 0 && bu < 1.15) {
     if (t._mvBlAt !== B.at) { t._mvBlAt = B.at; t._mvBlN = (t._mvBlN | 0) + 1; mvSnd(t, B.at, 'blink', .9); }
     const tw = t._mvBlN % 2 ? 0 : Math.PI, C = MV_CUT.A;
+    const rc = B.cut && typeof CC_RIFTCUT !== 'undefined' ? now - B.at : 9;
+    if (rc < CC_RIFTCUT.slash) return { f: mvClip(M, 'slash', 9 + 7 * mvE(rc / CC_RIFTCUT.slash)), rate: 400, glow: 1 + unb, spin: 0, tw, act: 1, trail: true };   /* the rift cut: a quick diagonal flick of the clip's cut before she steps in */
     if (bu < .3) return { f: A.lunge[0], rate: 45, glow: .9 + unb, spin: 0, tw, act: 1, trail: true };
     return { f: mvClip(M, 'slash', 10 + 18 * mvE((bu - .3) / .6)), rate: 45, glow: .7 + unb, spin: 0, tw, act: 1, trail: bu < .9 };
   }
@@ -80164,49 +80619,49 @@ const SPELL_HELP = {
 
   /* ---------------- conclave ---------------- */
     // Spellblades (cc_spellblade)
-    cc_blinkstrike: { when: "One foe is enough: a walker within {reach} cells (its strike range plus 1.6).", aim: "The cloth caster nearest the gate in that reach; with none, the toughest walker (bosses and elites first).", tips: ["Stand Spellblades a cell or two from the road so the blink reaches casters hiding behind the front line.", "Its arcane rune and the afterimage's second cut set up Unravel when Maelis is your Champion.", "It cannot reach flyers in the air: a flyer dragged down by Falling Star becomes a walker it can blink to."] },
-    cc_sigilcleave: { when: "Two or more walkers within its reach + 1 cell, or a boss or elite there.", aim: "Itself: it takes the stance where it stands; every walker already in reach is cut at once, and each that steps in later is cut as it does.", tips: ["Post Spellblades where the road wraps round them: every walker that comes into reach is cut on the way in.", "Each riposte gives an Arcane Charge: the next Blinkstrike or Crosscut Sigil hits harder.", "Its two Stagger stacks a cut lead straight into Crosscut Sigil's stun."] },
-    cc_spectral: { when: "A spot within {reach+1.5} cells whose cross (four arms 1.5 cells long, along the grid) holds two or more walkers, or a boss or elite.", aim: "The cell whose cross covers the most walkers; it leaps there and drives the blade in.", tips: ["Best where two corridors meet: both arms of the cross lie along the road.", "The cross stays 3s and staggers every walker that steps onto it once a second.", "Riposte Stance's Stagger plus the cross's two stacks stuns a foe outright."] },
+    cc_blinkstrike: { when: "A walker within {reach+1.6} cells: its reach plus the rift.", aim: "The walker nearest the gate: it catches what slips past.", tips: ["The rift it leaves cuts the next walkers along, so place Spellblades where leakers run.", "Its Arcane mark Overloads any foe the Frostweavers, Pyroclasts or Golem Wardens have marked."] },
+    cc_sigilcleave: { when: "A warded, shielded, plated or magic-resistant foe in its reach, or a boss or elite.", aim: "The toughest warded foe first: wards, spell shields and plate are what riftsteel parts.", tips: ["Split the warded foe first, then let the mages pour their spells and reactions into it.", "Waves of War Mages, wraiths and Ironclads are its work."] },
+    cc_spectral: { when: "Two or more walkers in a line within {reach+1.5} cells, or a boss or elite.", aim: "The walker whose line crosses the most foes.", tips: ["A long straight stretch of road in front of the Spellblades lets the blade cut the most.", "The blade cuts each foe twice, out and back."] },
 
     // Magelings (cc_mageling)
     cc_barrage: { when: "One foe is enough: any foe, flyers too, within {reach} cells.", aim: "Up to three foes share the missiles: armoured foes in reach first, nearest the gate; with no armoured foe, the three toughest (bosses and elites first).", tips: ["Its seeking missiles hit air and ground, so it is a steady answer to flying waves.", "Golem Warden slams crack armour plate open, so the barrage on armoured foes bites harder after a slam.", "Cheap and quick: leave it on alongside Gathering Orb so the Magelings never sit idle."] },
-    cc_sparks: { when: "Two or more foes within {reach} cells, flyers too.", aim: "The road just ahead of the densest crowd: the missiles hang there and dive at the first foes that pass under them.", tips: ["Hang it on the stretch the column is about to walk: every missile finds a foe.", "A missile that lands on a foe with another school's rune splits, and its twin seeks the next foe.", "Missiles left when the curtain falls seek the foes in reach, so none are wasted."] },
-    cc_grandorb: { when: "Any foe within {reach+0.5} cells.", aim: "Itself while it gathers; then the orb is hurled at the thickest knot of foes in reach.", tips: ["Stand Magelings together: every Mageling within 2 cells feeds its missiles into the orb.", "Their strikes stop landing while the orb gathers: cast it as a crowd comes, not as one foe slips past.", "The burst lays the arcane rune on each foe for the Conclave to weave."] },
+    cc_sparks: { when: "Two or more foes within {reach} cells, flyers too.", aim: "The road just ahead of the densest crowd: the missiles hang there and dive at the first foes that pass under them.", tips: ["Hang it on the stretch the column is about to walk: every missile finds a foe.", "A missile that lands on a foe marked with another element splits, and its twin seeks the next foe.", "Missiles left when the curtain falls seek the foes in reach, so none are wasted."] },
+    cc_grandorb: { when: "Any foe within {reach+0.5} cells.", aim: "Itself while it gathers; then the orb is hurled at the thickest knot of foes in reach.", tips: ["Stand Magelings together: every Mageling within 2 cells feeds its missiles into the orb.", "Their strikes stop landing while the orb gathers: cast it as a crowd comes, not as one foe slips past.", "The burst marks each foe Arcane, for the Conclave to react with."] },
 
-    // Rimeweavers (cc_rimeweaver)
-    cc_glacialglyph: { when: "Two or more walkers that can still be frozen (not already stunned, not immune to crowd control) within 0.9 cells of one walker in {reach} cells, or a boss or elite at the centre.", aim: "The densest spot: on the walker with the most freezable walkers within 0.9 cells.", ctl: "Leaves a frost glyph for 4s that Rime Lattice can wake.", tips: ["Aim it over a corner where walkers bunch, so the glyph catches many at once.", "Cast it, then let Rime Lattice freeze the same spot again before the glyph fades.", "A frozen pack is ideal for Seismic Slam, Riposte Stance and Road of Embers."] },
-    cc_rimelance: { when: "A walker within {reach} cells with another walker behind it, or a boss or elite.", aim: "The walker furthest along with company: it is branded and leaves frost prints behind it.", tips: ["Best on a long road the column walks single file: every walker behind steps in the prints.", "Each print bites only once, so the walkers right behind the brand take them.", "The prints are frost glyphs: Rime Lattice wakes them all."] },
-    cc_hoarbloom: { when: "Two or more walkers standing in frost glyphs within {reach} cells, or on the lines between two glyphs.", aim: "Itself: every frost glyph in reach erupts at once, and ice bridges form between glyphs up to 2.6 cells apart.", tips: ["Lay glyphs first: Glacial Glyph, the Rimeweavers' bolts and Hoarfrost Trail's prints all count.", "Spread glyphs along the road so the bridges between them cover the walkers the spires miss.", "It needs glyphs to wake: with none in reach it cannot be cast."] },
+    // Frostweavers (cc_rimeweaver)
+    cc_glacialglyph: { when: "Any foe within {reach} cells, air or ground.", aim: "The toughest foe in reach.", tips: ["A Frozen foe is where Frost Spear lands hardest: with Cold Eye or Frozen Lance it crits.", "Its Frost mark sets up Shatter for the Pyroclasts and Encase for the Golem Wardens."] },
+    cc_rimelance: { when: "A foe within {reach} cells that is not already frozen; a boss or elite first.", aim: "The toughest such foe: a boss or elite before the rest.", tips: ["Lock the boss, then let the whole Conclave crit it while it is Frozen.", "Bosses are held for less than half as long, so time it for their worst moment."] },
+    cc_hoarbloom: { when: "A foe within {reach} cells without a bloom, with other foes near it, or a boss or elite.", aim: "The toughest such foe.", tips: ["Bloom the foe the Pyroclasts are about to burn: their Fire on its Frost Shatters it and bursts the bloom at once.", "The burst freezes the pack round it, ready for frozen crits."] },
 
     // Chronomancers (cc_chronomancer)
-    cc_dilation: { when: "Two or more foes, flyers too, within 1 cell of one foe in {reach} cells, or a boss or elite at the centre.", aim: "The densest spot: on the foe with the most others within 1 cell.", tips: ["Drop it on corners and switchbacks where foes slow down and bunch anyway.", "Runes inside it do not fade, so it keeps marks alive for Maelis's Unravel and for weaving.", "Slowed foes stay longer in Pyre Sigil and under Grand Orrery's planets."] },
-    cc_quicken: { when: "Two or more walkers bunched within {reach} cells, or a boss or elite.", aim: "The road just ahead of the crowd: walkers entering the patch turn back up the road.", tips: ["Each walker it turns gets back the runes it lost in the last 4s: weave them again.", "Cast it just after a big weave so the spent runes come back for a second one.", "Bosses are only turned a third as far."] },
-    cc_echo: { when: "A Conclave unit within 2.5 cells cast one of its own spells (not Echo) in the last 8 seconds, and that spell would still find a target now.", aim: "The unit that cast most recently: it casts that spell again at once, free, on that spell's tap target.", ctl: "Needs a neighbour to cast first: it repeats the last spell of a nearby Conclave unit.", tips: ["Stand Chronomancers beside the units whose spells you most want twice, such as Golem Wardens for Seismic Slam.", "Keep it within 2.5 cells of several casters so a recent cast is almost always there to echo.", "The echo uses a relaxed rule, so it can fire on a single foe: best on big hits, not on area spells with no crowd."] },
+    cc_dilation: { when: "Two or more foes, flyers too, within 1 cell of one foe in {reach} cells, or a boss or elite at the centre.", aim: "The densest spot: on the foe with the most others within 1 cell.", tips: ["Drop it on corners and switchbacks where foes slow down and bunch anyway.", "Element marks inside it do not fade, so it keeps marks alive for Maelis's Unravel and for reactions.", "Slowed foes stay longer in Pyre Sigil and under Grand Orrery's planets."] },
+    cc_quicken: { when: "Two or more walkers bunched within {reach} cells, or a boss or elite.", aim: "The road just ahead of the crowd: walkers entering the patch turn back up the road.", tips: ["Each walker it turns gets back the marks it lost in the last 4s: react with them again.", "Cast it just after a burst of reactions so the cleared marks come back for a second round.", "Bosses are only turned a third as far."] },
+    cc_echo: { when: "A Conclave unit within 2.5 cells cast one of its own spells (not Recurrence) in the last 8 seconds, and that spell would still find a target now.", aim: "The unit that cast most recently: it casts that spell again at once, free, on that spell's tap target.", ctl: "Needs a neighbour to cast first: it repeats the last spell of a nearby Conclave unit.", tips: ["Stand Chronomancers beside the units whose spells you most want twice, such as Golem Wardens for Seismic Slam.", "Keep it within 2.5 cells of several casters so a recent cast is almost always there to echo.", "The echo uses a relaxed rule, so it can fire on a single foe: best on big hits, not on area spells with no crowd."] },
 
     // Astrologers (cc_astrologer)
     cc_fallingstar: { when: "One foe is enough: any foe within {reach} cells (flyers a little further).", aim: "The armoured foe nearest the gate; with none, the toughest flyer still in the air, else the toughest foe.", tips: ["Its double damage and drag-down make it the Conclave's answer to flying waves.", "A dragged-down flyer can be struck by Spellblades, Golem Wardens and Pyroclasts, which cannot reach the sky.", "On armoured waves it turns on the plate first: Golem Warden slams crack that plate open for it."] },
-    cc_omen: { when: "Two or more foes bunched within {reach} cells, flyers too, or a boss or elite.", aim: "The densest spot: the star hangs over it, pulling flyers down and foes that walked past back to it.", tips: ["Hang it at a corner: foes that slipped past are drawn back into the fall.", "Flyers dragged down can be struck by the walkers' units until it falls.", "Every foe it holds carries the star rune for the Conclave to weave."] },
+    cc_omen: { when: "Two or more foes bunched within {reach} cells, flyers too, or a boss or elite.", aim: "The densest spot: the star hangs over it, pulling flyers down and foes that walked past back to it.", tips: ["Hang it at a corner: foes that slipped past are drawn back into the fall.", "Flyers dragged down can be struck by the walkers' units until it falls.", "Every foe it holds is marked Star, so any other element on it Pulls."] },
     cc_orrery: { when: "Two or more foes bunched within {reach} cells, flyers too, or a boss or elite.", aim: "The densest spot: three planets wheel round it for its whole length.", tips: ["Set it over a corner or switchback where the crowd lingers in the planets' rings.", "Every 1.5s the planets align and a beam of starlight runs down their line.", "The planets strike flyers too, slowing each one they pass."] },
 
     // Golem Wardens (cc_golemwarden)
-    cc_seismic: { when: "Two or more walkers within 1 cell of each other in {reach} cells (its strike range plus 1), or a boss or elite there.", aim: "The densest pack: on the walker with the most walkers within 1 cell.", tips: ["Set Golem Wardens a little off a corner so the leap reaches the bunch where walkers turn.", "A stun on a frozen or slowed pack keeps it still for Pyre Sigil and Road of Embers.", "Echo from a nearby Chronomancer can slam the same pack twice."] },
-    cc_tremorglyph: { when: "The walker nearest the gate within {reach+0.5} cells, with another walker in reach, or a boss or elite.", aim: "The walker nearest the gate: it is thrown back up the road onto the column.", tips: ["Post the golem near the end of the road: it throws the lead walker back into the crowd behind it.", "Where it lands, every walker near is stunned and given the stone rune.", "Bosses are thrown only a third as far."] },
+    cc_seismic: { when: "Two or more walkers within 1 cell of each other in {reach} cells (its strike range plus 1), or a boss or elite there.", aim: "The densest pack: on the walker with the most walkers within 1 cell.", tips: ["Set Golem Wardens a little off a corner so the leap reaches the bunch where walkers turn.", "A stun on a frozen or slowed pack keeps it still for Pyre Sigil and Road of Embers.", "Recurrence from a nearby Chronomancer can slam the same pack twice."] },
+    cc_tremorglyph: { when: "The walker nearest the gate within {reach+0.5} cells, with another walker in reach, or a boss or elite.", aim: "The walker nearest the gate: it is thrown back up the road onto the column.", tips: ["Post the golem near the end of the road: it throws the lead walker back into the crowd behind it.", "Where it lands, every walker near is stunned and marked Stone.", "Bosses are thrown only a third as far."] },
     cc_boulder: { when: "A road cell within {reach+0.8} cells with two or more walkers within 2 cells of it, or a boss or elite.", aim: "The road cell nearest the golem that the foes are walking toward: it steps onto it and stands as a wall.", tips: ["Post the Golem Warden beside a narrow stretch: while it stands there, the walkers pile up against it.", "Bosses are held only for the first second.", "Its closing stomp stuns every walker near it."] },
 
     // Pyroclasts (cc_pyroclast)
-    cc_pyresigil: { when: "Two or more walkers in a cone toward one walker in {reach} cells, or a boss or elite.", aim: "The densest cone: toward the walker with the most walkers behind it. The cone turns to follow them as it pours.", tips: ["Best where the road runs straight toward the Pyroclasts, so the column walks down the cone.", "Each quarter second stokes their burn one stack higher, up to 5: the longer they stand in it, the hotter they burn.", "Slows from Rimeweavers and Time Dilation keep walkers in the cone for its whole breath."] },
+    cc_pyresigil: { when: "Two or more walkers in a cone toward one walker in {reach} cells, or a boss or elite.", aim: "The densest cone: toward the walker with the most walkers behind it. The cone turns to follow them as it pours.", tips: ["Best where the road runs straight toward the Pyroclasts, so the column walks down the cone.", "Each quarter second stokes their burn one stack higher, up to 5: the longer they stand in it, the hotter they burn.", "Slows from Frostweavers and Time Dilation keep walkers in the cone for its whole breath."] },
     cc_kindle: { when: "A walker within {reach} cells with another walker near it, or a boss or elite.", aim: "The densest walker: the fireball lands there and skips back up the road onto the walkers behind it.", tips: ["Best on a long straight run: every skip finds the next walker in the column.", "Each skip lights a small fire glyph on the road.", "Each skip is weaker than the last, so the first walker hit takes the most."] },
     cc_flamewave: { when: "Three or more walkers in or near its reach, or a boss or elite.", aim: "The walker nearest the gate: the phoenix strikes it, then sweeps back up the road through the walkers behind it.", tips: ["Post it where it sees the head of the column on a long run of road: the phoenix flies the road behind its first foe.", "Its dive at the end of the flight hits hardest: Firewalk lengthens the flight.", "Every foe it passes burns for 3s, which Skipping Flame's Cinder Charge hits harder."] },
 
     // Maelis, the Spellweaver (cc_arch)
-    ch_thousandfold: { when: "Three or more foes within 1.8 cells of one foe in {reach} cells (its range plus 0.8), or any boss or elite in reach. The area grows to 2 cells at the top tiers.", aim: "The densest spot: on the foe with the most others within the area; the missiles go to the six healthiest foes there in turn.", tips: ["Place Maelis where her reach covers a corner the crowd bunches on, so all 24 missiles stay in the area.", "Its missiles weave with other schools' runes, so cast it after Rimeweavers, Pyroclasts and Astrologers have marked a pack.", "Each missile leaves the arcane rune, setting up Unravel right after."] },
-    ch_unravel: { when: "Two or more rune-marked foes within 1.2 cells of one rune-marked foe in {reach} cells, or a rune-marked boss or elite in reach.", aim: "The densest spot of rune-marked foes; it tears every rune off each foe within 1.2 cells.", tips: ["Foes wearing runes of several schools pay out most, so cover road that units of several schools already strike.", "Time Dilation stops runes fading, letting the marks stack up before she unravels them.", "Thousandfold Barrage first, then Unravel: the barrage marks the whole pack with the arcane rune."] },
-    ch_mirrorweave: { when: "Two or more foes bunched within {reach} cells, or a boss or elite.", aim: "The densest spot: the loom spins over it and throws bolts at every foe within 1.4 cells.", tips: ["Its bolts of six schools weave on each other's runes, striking twice as hard when they do.", "Put it on a crowd your other Conclave units are already marking with runes.", "Cast it where foes bunch, so they stay under the loom for its full 3s."] },
+    ch_thousandfold: { when: "Three or more foes within 1.8 cells of one foe in {reach} cells (its range plus 0.8), or any boss or elite in reach. The area grows to 2 cells at the top tiers.", aim: "The densest spot: on the foe with the most others within the area; the missiles go to the six healthiest foes there in turn.", tips: ["Place Maelis where her reach covers a corner the crowd bunches on, so all 24 missiles stay in the area.", "Its missiles react with other elements' marks, so cast it after Frostweavers, Pyroclasts and Astrologers have marked a pack.", "Each missile marks Arcane, setting up Unravel right after."] },
+    ch_unravel: { when: "Two or more marked foes within 1.2 cells of one marked foe in {reach} cells, or a marked boss or elite in reach.", aim: "The densest spot of marked foes; it tears every element mark off each foe within 1.2 cells.", tips: ["Foes wearing two marks pay out most: they hold both just after a reaction, so cover road that several schools already strike.", "Time Dilation stops marks fading, keeping them alive until she unravels them.", "Thousandfold Barrage first, then Unravel: the barrage marks the whole pack Arcane."] },
+    ch_mirrorweave: { when: "Two or more foes bunched within {reach} cells, or a boss or elite.", aim: "The densest spot: the loom spins over it and throws bolts at every foe within 1.4 cells.", tips: ["Its bolts of six elements set off reactions on the foes they share.", "Put it on a crowd your other Conclave units are already marking.", "Cast it where foes bunch, so they stay under the loom for its full 3s."] },
 
     // Aurel, the Timekeeper (cc_chrono)
     ch_stoppedhour: { when: "Three or more foes within 1.6 cells of one foe in {reach} cells (his range plus 0.8), or any boss or elite in reach. The area grows to 1.8 cells at the top tiers.", aim: "The densest spot: on the foe with the most others within the area.", tips: ["Stop the pack just before the gate, or in front of a Pyre Sigil, so the whole army hits foes that cannot move.", "Stopped foes take 25% more from every unit, so follow with Seismic Slam or Gathering Orb.", "Each foe is turned back a cell when time runs on, onto glyphs and sigils it has already crossed."] },
     ch_rewind: { when: "The toughest walker within {reach} cells, with another foe in reach, or a boss.", aim: "The toughest walker: it is snapped back to its own ghost a moment behind it.", tips: ["Every foe it is dragged through is struck: use it when a column follows the toughest walker.", "Recall the boss just before it reaches the gate to buy the army time.", "Long Way Back lets the ghost wait longer, so the foe is dragged further."] },
-    ch_hourlead: { when: "Three or more foes within {reach} cells, or a boss or elite.", aim: "Himself: a clock hand sweeps once round his whole reach, stopping every foe it passes.", tips: ["Post him where the road wraps round him: the hand sweeps over more of it.", "Stopped foes are easy marks for every spell: cast it before a big weave.", "Bosses are stopped for less time."] },
+    ch_hourlead: { when: "Three or more foes within {reach} cells, or a boss or elite.", aim: "Himself: a clock hand sweeps once round his whole reach, stopping every foe it passes.", tips: ["Post him where the road wraps round him: the hand sweeps over more of it.", "Stopped foes are easy targets for every spell: cast it before a burst of reactions.", "Bosses are stopped for less time."] },
 
     // Maren Vey, Blade of the Conclave (cc_maren)
     ch_severing: { when: "Three or more foes within 1.6 cells of one foe in {reach} cells (her range plus 0.8), or any boss or elite in reach. The area grows to 1.8 cells at the top tiers.", aim: "The densest spot: the arc runs across it from her side, striking every foe in the area.", tips: ["Each foe it strikes takes two stacks of Stagger: one Spellblade cut more stuns it.", "Post Spellblades within 4 cells of where it lands: each blinks in and cuts a walker there for twice its strike.", "Stuns from its Stagger set off Riftstep, so the Spellblades hop on down the road."] },
@@ -80514,6 +80969,7 @@ function sbRender() {
   P.querySelector('.spbk-units').innerHTML = units.map(x => `<button type="button" data-u="${x.id}" aria-pressed="${x.id === U.id}" class="${x.id === U.id ? 'on' : ''}">${sbEsc(x.name)}${x.champ ? '<small>Champion</small>' : ''}</button>`).join('');
   P.querySelector('.spbk-body').innerHTML = `<p class="spbk-unit"><b>${sbEsc(U.name)}</b>${U.def.blurb ? ' · ' + sbEsc(U.def.blurb) : ''} <span>${tierNote}</span></p>`
     + (typeof gwSpellbookHTML === 'function' ? gwSpellbookHTML(U, S, f) : '')
+    + (typeof ccSpellbookHTML === 'function' ? ccSpellbookHTML(U, S, f) : '')
     + kit.abilities.map(ab => sbSpellHTML(ab, S, f)).join('');
   if (body && P.querySelector('.spbk-body') === body) body.scrollTop = scroll;
   for (const b of P.querySelectorAll('.spbk-forces button')) b.onclick = () => { SB_STATE.f = b.dataset.f; SB_STATE.u = null; sfx('click'); sbRender(); P.querySelector('.spbk-body').scrollTop = 0; };
@@ -80664,12 +81120,15 @@ function kwBuild() {
   kwAdd({ key: 'so:verdict', name: 'Verdict', alias: ['Verdicts'], cat: 'force', sub: SV, col: '#fff4cc',
     def: () => `Spends a foe's Judgement on a column of light: magic damage of ${so ? kwPct(so.V_K) : '30%'} of the striker's damage for each stack.` });
 
-  // ---- the Conclave: runes, weaves, Arcane Charge ----
+  // ---- the Conclave: elements, reactions, Arcane Charge ----
   const CC = kwForceName('conclave') || 'The Conclave';
-  kwAdd({ key: 'cc:rune', name: 'Rune', alias: ['rune', 'runes', 'Runes'], cat: 'force', sub: CC, col: '#b98cff',
-    def: () => `Every Conclave hit leaves its school's rune on the foe for ${typeof CC_RUNE_T !== 'undefined' ? CC_RUNE_T : 4}s. The schools: ${typeof CC_SCHOOLS !== 'undefined' ? CC_SCHOOLS.join(', ') : 'arcane, frost, chrono, star, stone, fire'}.` });
-  kwAdd({ key: 'cc:weave', name: 'Weave', alias: ['weave', 'weaves', 'Weaves', 'woven'], cat: 'force', sub: CC, col: '#d8b8ff',
-    def: 'A hit on a foe carrying another school\'s rune can spend that rune for an effect of its own (frost and fire shatter, chrono and arcane echo). Weaves come from the talent trees and a few items, and each tears a quarter off a ward bar.' });
+  kwAdd({ key: 'cc:mark', name: 'Element mark', alias: ['element mark', 'element marks', 'Element marks', 'elements', 'Elements'], cat: 'force', sub: CC, col: '#b98cff',
+    def: () => `Each Conclave school is an element: Frost (Frostweavers), Fire (Pyroclasts), Arcane (Magelings, Spellblades, Arcane Severers), Time (Chronomancers), Star (Astrologers), Stone (Golem Wardens). Every Conclave hit marks its foe with its element for ${typeof CC_MARK_T !== 'undefined' ? CC_MARK_T : 4}s, shown as a small icon over its health bar. A different element on a marked foe sets off a Reaction. Mix your schools so their attacks overlap.` });
+  kwAdd({ key: 'cc:reaction', name: 'Reaction', alias: ['reaction', 'reactions', 'Reactions', 'Reacted', 'reacts', 'reacted', 'sets off a reaction'], cat: 'force', sub: CC, col: '#d8b8ff',
+    def: () => `Two different elements on one foe react, and both marks clear: Fire + Frost Shatter, Frost + Stone Encase, Fire + Stone Magma, Arcane + any Overload, Star + any Pull, Time + any Echo. A foe reacts at most once every ${typeof CC_RX_CD !== 'undefined' ? CC_RX_CD : 1.5}s. One school alone never reacts. Each reaction tears a quarter off a ward bar.` });
+  if (typeof CC_RX !== 'undefined') for (const id in CC_RX) { const X = CC_RX[id];
+    kwAdd({ key: 'cc:rx_' + id, name: X.name, alias: [], cat: 'force', sub: CC + ' reaction', col: X.col,
+      def: () => `${X.pair ? X.pair.map(e => CC_EL_NAME[e]).join(' + ') : CC_EL_NAME[X.any] + ' + any other element'}: ${X.text}` }); }
   kwAdd({ key: 'cc:charge', name: 'Arcane Charge', alias: ['Arcane Charges'], cat: 'force', sub: CC, col: '#b98cff',
     def: () => `Every basic attack adds a charge, up to ${typeof CC_Q_MAX !== 'undefined' ? CC_Q_MAX : 5}, shown as gold pips over its bars. Its next spell spends them all, each one adding ${typeof CC_Q_K !== 'undefined' ? kwPct(CC_Q_K) : '12%'} to the spell's power.` });
 
@@ -80710,7 +81169,7 @@ function kwBuild() {
   ST('pinned', 'Pinned', ['pinned'], '#c8a050', 'Held by Ironhold\'s chains: it can\'t move or act. A pinned flyer is dragged out of the sky instead, for longer.');
   ST('severed', 'Severed', ['severed'], '#8ae8d8', 'Its wards were torn out: no shield takes on it, its Spell Ward falls and its ward bar stands cracked open while it lasts.');
   ST('rimebranded', 'Rime-branded', ['rime-branded', 'branded with rime'], '#c0f0ff', 'Each step it takes leaves a frost print on the road: the next walker to step on one is struck and frozen a moment.');
-  ST('staggered', 'Staggered', ['Stagger', 'stagger', 'staggers', 'staggered'], '#d8c8ff', () => { const S = typeof CC_STAGGER !== 'undefined' ? CC_STAGGER : { n: 3, slow: .1, t: 2, stun: 1 }; return `Each Spellblade cut slows it ${kwPct(S.slow)} more for ${S.t}s; the ${S.n}rd stack stuns it for ${S.stun}s (longer on heavy foes, shorter on bosses), sets the stone rune on it for another school to weave, and clears.`; });
+  ST('staggered', 'Staggered', ['Stagger', 'stagger', 'staggers', 'staggered'], '#d8c8ff', () => { const S = typeof CC_STAGGER !== 'undefined' ? CC_STAGGER : { n: 3, slow: .1, t: 2, stun: 1 }; return `Each Spellblade cut slows it ${kwPct(S.slow)} more for ${S.t}s; the ${S.n}rd stack stuns it for ${S.stun}s (longer on heavy foes, shorter on bosses), and clears.`; });
   ST('slowed', 'Slowed', ['slowed'], '#9fe4ff', 'It moves slower for a short time.');
   ST('chilled', 'Chilled', ['chilled'], '#9fe4ff', 'A frost slow. A chilled foe also carries Stormborn lightning further.');
   ST('frozen', 'Frozen', ['frozen'], '#bff0ff', 'Chilled and stunned at once: it can\'t move or act.');
@@ -81375,8 +81834,8 @@ bfAdd('slowed', { name: 'Slowed', kw: 'st:slowed', kind: 'debuff', pri: 7, icon:
   def: 'It moves slower for a short time.',
   get: c => c.slowT > 0 && !(c.frostT > 0) ? { t: c.slowT, say: `It moves ${bfPct(bfSlowK(c))} slower.` } : null });
 bfAdd('staggered', { name: 'Staggered', kw: 'st:staggered', kind: 'debuff', pri: 5, icon: 'bounce', hue: '#5a4a7a', f: ['ccStagT', 'ccStagN'],
-  def: 'Each Spellblade cut slows it a little more; the 3rd stack stuns it and sets the stone rune on it.',
-  get: c => c.ccStagT > bfNow() && c.ccStagN > 0 ? { t: bfLeft(c.ccStagT), n: bfInt(c.ccStagN), say: `${bfInt(c.ccStagN)} of 3 stacks: the 3rd stuns it and sets the stone rune on it.` } : null });
+  def: 'Each Spellblade cut slows it a little more; the 3rd stack stuns it.',
+  get: c => c.ccStagT > bfNow() && c.ccStagN > 0 ? { t: bfLeft(c.ccStagT), n: bfInt(c.ccStagN), say: `${bfInt(c.ccStagN)} of 3 stacks: the 3rd stuns it.` } : null });
 bfAdd('draggeddown', { name: 'Dragged Down', kind: 'debuff', pri: 2, icon: 'antler', hue: '#2a4a6a', f: ['sbDownT', 'sbDownX'],
   def: 'A Wolfguard\'s spirit wolf holds it down in the wet: lightning that strikes it while it is down and soaked holds it longer.',
   get: c => c.sbDownT > bfNow() && c.stunT > 0 ? { t: bfLeft(c.sbDownT), say: c.sbDownX ? 'Held down in the wet: the lightning already held it longer.' : `Held down in the wet: lightning that strikes it while it is soaked holds it ${typeof SB_WOLF !== 'undefined' ? SB_WOLF.hold : .5}s longer.` } : null });
@@ -81493,14 +81952,23 @@ bfAdd('static', { name: 'Static', kind: 'debuff', pri: 24, icon: 'ion', hue: '#3
 bfAdd('chargedair', { name: 'Charged Air', kind: 'debuff', pri: 24, icon: 'boltplus', hue: '#3a5a8a', f: ['chgT'],
   def: 'The charge of the last lightning strike: the next one on it hits harder.',
   get: c => c.chgT > bfNow() ? { t: bfLeft(c.chgT), say: 'The charge of the last strike clings to it: the next lightning on it hits harder.' } : null });
-bfAdd('runes', { name: 'Runes', kw: 'cc:rune', kind: 'debuff', pri: 12, icon: 'rune', hue: '#5a3a8a', f: ['ccR'],
-  def: 'The Conclave\'s runes on it: another school\'s strike can spend one for a Weave.',
+bfAdd('marks', { name: 'Element marks', kw: 'cc:mark', kind: 'debuff', pri: 12, icon: 'rune', hue: '#5a3a8a', f: ['ccR'],
+  def: 'The Conclave\'s element marks on it: a hit of another element sets off a reaction.',
   get: c => {
-    const R = typeof ccRunesOn === 'function' ? ccRunesOn(c) : []; if (!R.length) return null;
-    return { n: R.length, t: Math.max(...R.map(s => bfLeft(c.ccR[s]))), say: `Runes of ${R.join(', ')}. A hit from another school can spend one for a Weave.` };
+    const R = typeof ccMarksOn === 'function' ? ccMarksOn(c) : []; if (!R.length) return null;
+    return { n: R.length, t: Math.max(...R.map(s => bfLeft(c.ccR[s]))), say: `Marked ${R.map(s => CC_EL_NAME[s] || s).join(' and ')}. A hit of another element sets off a reaction.` };
+  } });
+bfAdd('splitopen', { name: 'Split open', kind: 'debuff', pri: 6, icon: 'shieldbreak', hue: '#5a3a8a', f: ['ccSplitT', 'ccSplitBy'],
+  def: 'A Spellblade’s riftsteel split it open: its shield broken, its ward cracked and its armour stripped, so every spell and reaction strikes it whole.',
+  get: c => c.ccSplitT > bfNow() ? { t: bfLeft(c.ccSplitT), src: bfFrom(c.ccSplitBy), say: 'Split open by riftsteel: its ward stands cracked and its armour is stripped, so every spell strikes it whole.' } : null });
+bfAdd('reacted', { name: 'Reacted', kw: 'cc:reaction', kind: 'debuff', pri: 11, icon: 'spiral', hue: '#6a3a9a', f: ['ccRxAt'],
+  def: 'Two Conclave elements met on it: a reaction. It cannot react again for a moment.',
+  get: c => {
+    if (typeof ccReacted !== 'function' || !ccReacted(c, 1.5) || !CC_RX[c.ccRxId]) return null; const X = CC_RX[c.ccRxId];
+    return { t: Math.max(0, (c.ccRxT || 0) - bfNow()), say: `${X.name}: ${X.text}` };
   } });
 bfAdd('rimebrand', { name: 'Rime-branded', kw: 'st:rimebranded', kind: 'debuff', pri: 8, icon: 'frostbite', hue: '#2a6a8a', f: ['ccxBrandT', 'ccxBrand'],
-  def: 'A Rimeweaver\'s brand: each step it takes leaves a frost print that bites the walker behind it.',
+  def: 'A Frostweaver\'s brand: each step it takes leaves a frost print that bites the walker behind it.',
   get: c => c.ccxBrandT > bfNow() ? { t: bfLeft(c.ccxBrandT), n: c.ccxBrand ? c.ccxBrand.left : 0, src: bfFrom(c.ccxBrand && c.ccxBrand.t), say: 'Each step leaves a frost print: the next walker on it is struck and frozen a moment.' } : null });
 bfAdd('ccfguard', { name: 'Guard Dropped', kind: 'debuff', pri: 6, icon: 'shieldbreak', hue: '#8a3a7a', f: ['ccfGuardT', 'ccfGuardK'],
   def: 'Severing Arc cut through its guard (Opened Guard): the next cut of a Spellblade or hers strikes it harder.',
