@@ -1864,23 +1864,48 @@ button:focus-visible,[role=button]:focus-visible{outline:2px solid #f4d58a;outli
 }
 
 
-/* Effect-first spell HUD: shared tooltip stays inside narrow mobile viewports. */
-#spell-hud-tip {
-  position: fixed; z-index: 100000; box-sizing: border-box; width: 310px;
-  max-width: calc(100vw - 16px); padding: 13px 15px; pointer-events: none;
-  color: #f1ead9; background: linear-gradient(145deg, #163039, #08181e 80%);
-  border: 1px solid #b99a55; border-radius: 10px;
-  box-shadow: 0 8px 28px #000b, inset 0 1px #ffdf9622;
-  font: 13px/1.45 system-ui, sans-serif; text-align: left;
+/* ---------- the spell tooltip, as World of Warcraft writes one (spellhud.js spellTipHTML) ----------
+   The name in gold (a rank, "Spell" or the hotkey small on its right), two white stat rows (mana | range, cast |
+   cooldown), the brief in pale gold, then muted lines under a thin gap. The command card, the gear sheet and the hero
+   spell float it (#spell-hud-tip, .hp-tip); the talent pane and the Spellbook set it in their page. */
+.wtip { box-sizing: border-box; color: #fff; font: 13px/1.38 var(--f-ui, system-ui, sans-serif); text-align: left; }
+#spell-hud-tip, .hp-tip.wtip {
+  width: 300px; max-width: calc(100vw - 16px); padding: 9px 12px 10px;
+  background: rgba(6, 10, 14, .94); border: 1px solid #77705c; border-radius: 4px;
+  box-shadow: 0 0 0 1px #000, 0 8px 24px #000b;
 }
+#spell-hud-tip { position: fixed; z-index: 100000; pointer-events: none; }
 #spell-hud-tip[hidden] { display: none; }
-#spell-hud-tip .sh-heading { display: flex; justify-content: space-between; gap: 12px; color: #ffdc8b; font: 600 17px/1.25 Georgia, serif; margin-bottom: 7px; }
-#spell-hud-tip kbd { font: 11px/1.6 system-ui, sans-serif; color: #bccec9; border: 1px solid #52645c; border-radius: 4px; padding: 0 5px; }
-#spell-hud-tip .sh-effect { color: #fff4de; }
-#spell-hud-tip .sh-stats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-#spell-hud-tip .sh-stats:empty { display: none; }
-#spell-hud-tip .sh-stats span { font-size: 11px; font-weight: 600; color: #aee0ed; border: 1px solid #497073; border-radius: 5px; background: #79bac410; padding: 2px 6px; }
-#spell-hud-tip .sh-state { color: #c1c9bd; border-top: 1px solid #b99a5538; padding-top: 8px; margin-top: 9px; font-size: 11px; }
+.hp-tip.wtip { gap: 0; width: 270px; }
+.wtip i { font-style: normal; }
+.wtip .wt-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 2px; }
+.wtip .wt-n { color: #ffd479; font: 600 16px/1.2 var(--f-display, Georgia, serif); letter-spacing: .01em; }
+.wtip .wt-k { flex: none; color: #b9b5a6; font-size: 11.5px; }
+.wtip kbd { flex: none; font: 600 11px/1.5 var(--f-ui, system-ui, sans-serif); color: #d9d3c2; border: 1px solid #5d5a4d; border-radius: 3px; padding: 0 5px; }
+.wtip .wt-r { display: flex; justify-content: space-between; gap: 12px; color: #fff; font-size: 13px; line-height: 1.32; }
+.wtip .wt-r i:last-child { text-align: right; }
+.wtip .wt-d { margin-top: 4px; color: #f3d98f; }
+.wtip .wt-role { margin: -1px 0 4px; color: #c9c4b4; font-size: 12px; }
+.wtip .wt-s { margin-top: 5px; font-size: 12px; color: #6f6c62; }
+.wtip .wt-s i.on { color: #8fd0ff; }
+.wtip .wt-s b { font-weight: 400; color: #5a574e; }
+.wtip .wt-tag { display: flex; align-items: center; gap: 6px; flex: none; }
+.wtip .wt-lock { width: 11px; height: 13px; fill: #b9b5a6; stroke: #b9b5a6; }
+.wtip .wt-dim .wt-n { color: #a89a78; }
+.wtip .wt-dim .wt-r, .wtip .wt-dim .wt-d, .wtip .wt-dim .wt-t { opacity: .6; }
+/* the talent panel: no side pane; each talent's tooltip floats at its node (ui.js renderTip) */
+.tc-det { display: none !important; }
+.wtip .wt-c { margin-top: 4px; color: #e08a78; font-size: 12px; }
+.wtip .tal-old .td-art, .wtip .tal-old .tc-btn, .wtip .tal-old .td-wait, .wtip .tal-old .td-hint { display: none; }
+.wtip .tal-old h3 { margin: 0 0 2px; color: #ffd479; font: 600 16px/1.2 var(--f-display, Georgia, serif); }
+.wtip .tal-old p, .wtip .tal-old h5 { margin: 3px 0; font-size: 12.5px; }
+.wtip .wt-t { margin-top: 5px; color: #b7b2a2; font-size: 11.5px; }
+.wtip .wt-u { margin-top: 5px; color: #9fd47a; font-size: 12.5px; }
+.wtip .wt-f { margin-top: 7px; color: #9d9a8e; font-size: 11.5px; line-height: 1.35; }
+/* set in a page: the talent pane's spell talents and the Spellbook's spells */
+.td-sec.wtip, .spbk-tip { padding: 9px 12px 10px; background: rgba(6, 10, 14, .82); border: 1px solid #5f5a48; border-radius: 4px; }
+.spbk-tip { flex: 1; min-width: 0; }
+.wtip .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
 
 /* ---------- the item card (itempower.js itemCardHTML) and its floating tooltip (itemtip.js) ----------
    An RPG item tooltip: the name in its rarity's colour, kind and slot in small grey, the stat lines in white with bold
@@ -2133,7 +2158,7 @@ p.mut.ist b { color: #f0f0f0; }
 .spbk-body{overflow-y:auto;min-height:0;padding-right:4px;display:flex;flex-direction:column;gap:10px}
 .spbk-unit{margin:0;font:500 12.5px/1.45 var(--f-ui,system-ui);color:#b9c2bd}.spbk-unit b{color:#ead29a;font-size:14px}.spbk-unit span{display:block;color:#8fa59c;font-size:11.5px}
 .spbk-spell{background:radial-gradient(ellipse at 0 0,color-mix(in srgb,var(--sc,#a98a50) 14%,transparent),transparent 70%),#0c1419;border:1px solid #a98a504a;border-radius:4px;box-shadow:inset 0 0 0 3px #0003;padding:12px 14px;font:13px/1.5 var(--f-ui,system-ui);color:#d7ddd5}
-.spbk-sh{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+.spbk-sh,.spbk-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px}
 .spbk-ic{width:56px;height:56px;flex:none;border-radius:6px;border:1px solid #b69b68;object-fit:cover;background:#0006}
 .spbk-sh h4{margin:0;color:#e7ce99;font:600 20px/1.2 var(--f-display,Georgia,serif)}
 .spbk-sh small{color:#aee0ed;font-size:11.5px;font-weight:600}
@@ -2155,10 +2180,6 @@ p.mut.ist b { color: #f0f0f0; }
   .spbk-how{grid-template-columns:1fr}.spbk-how dd{margin-bottom:4px}
   .panel.spbk{padding:8px 10px 10px}
 }
-#spell-hud-tip .sh-how{margin-top:9px;padding-top:8px;border-top:1px solid #b99a5538;font-size:12px;line-height:1.4;color:#d9dfd2}
-#spell-hud-tip .sh-how-h{font:700 10.5px/1.2 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#c9a96a;margin-bottom:4px}
-#spell-hud-tip .sh-how div+div{margin-top:3px}
-#spell-hud-tip .sh-how b{color:#ffdc8b;font-weight:700}
 .spbk-ic.gw-ic{background:radial-gradient(circle at 50% 50%,#ffd86a 0 9%,transparent 10%),radial-gradient(circle at 50% 28%,#ffc8e0 0 17%,transparent 18%),radial-gradient(circle at 71% 43%,#ffb8d6 0 17%,transparent 18%),radial-gradient(circle at 63% 68%,#ffc8e0 0 17%,transparent 18%),radial-gradient(circle at 37% 68%,#ffb8d6 0 17%,transparent 18%),radial-gradient(circle at 29% 43%,#ffc8e0 0 17%,transparent 18%),radial-gradient(circle at 50% 60%,#2e4a1c,#14200c)}
 /* The Chronicles: the region map, the warband, a location's card and its Hunts (campaign.js, hunts.js). Painted codex surfaces as in uipolish.css. */
 .ov.ov-campaign{background:linear-gradient(rgba(3,9,10,.78),rgba(3,9,10,.9)),var(--t2bg,none) center 40%/cover no-repeat;padding:12px}
@@ -2384,7 +2405,7 @@ var LOGO_URI = 'data:image/webp;base64,UklGRqSTAQBXRUJQVlA4WAoAAAAQAAAASwQA1gEAQ
 </script>
 <script id="assets">
 (function () {
-  var A = [["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/firesfxdata.541a15dac2.js",1218667],["a/labfxdata.f859fba4ed.js",579977],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.3ef9bc4a5c.js",926684],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.962f73bb23.js",3222582],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.f2e171168b.js",959820],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_malgrath.6c12796111.js",735733],["a/model_unit_gladebow.0f1a6cb229.js",531879],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.7606df7f64.js",644113],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.03e54c67e8.js",1106383],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.cfa54dacb2.js",718250],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/main.97e6e134d4.js",8669176]], T = 71647762, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
+  var A = [["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/firesfxdata.541a15dac2.js",1218667],["a/labfxdata.f859fba4ed.js",579977],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.3ef9bc4a5c.js",926684],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.962f73bb23.js",3222582],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.f2e171168b.js",959820],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_malgrath.6c12796111.js",735733],["a/model_unit_gladebow.0f1a6cb229.js",531879],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.7606df7f64.js",644113],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.03e54c67e8.js",1106383],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/main.1110608305.js",8924770]], T = 72062855, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
   function el(id) { return document.getElementById(id); }
   function mark(u) {
     for (var i = 0; i < A.length; i++) if (!done[i] && u.indexOf(A[i][0]) >= 0) { done[i] = 1; nd++; got += A[i][1]; last = Date.now(); if (window.__bootSeen) window.__bootSeen(); }
