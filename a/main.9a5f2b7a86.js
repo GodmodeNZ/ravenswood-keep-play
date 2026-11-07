@@ -1,4 +1,4 @@
-const BUILD_TAG = '46e56a8@2026-11-07';   // the play log's build version (playlog.js)
+const BUILD_TAG = '739f15c@2026-11-07';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -504,6 +504,12 @@ let MH_WALK = [1.12, 2.1], MH_FLY = [1.05, 1.5], MH_CURVE = 1.6;   // gentle ear
 // what each creep shrugs off and what hurts it most, for wave previews and the creep panel
 // armor against physical damage: the share of a hit that gets through (10 armor halves it)
 function armorK(a) { return 10 / (10 + Math.max(0, a)); }
+// armour stripped below zero (owner, 7 Nov 2026): each point under zero makes it take 5% more from physical hits, to -10 (+50%);
+// bosses and leaders stop at -5 (+25%)
+const ARMOR_NEG = { k: .05, cap: 10, capBig: 5 };
+function armorKNeg(a, big) { return a >= 0 ? armorK(a) : 1 + ARMOR_NEG.k * Math.min(-a, big ? ARMOR_NEG.capBig : ARMOR_NEG.cap); }
+// a foe's armour now, stripping included (negative once stripped past zero)
+function armorNow(c) { let br = c.shredT > 0 ? c.shred : 0; if (c.frostT > 0 && typeof talentHas === 'function') br += 2 * talentHas('frost', 'permafrost') + 2 * talentHas('frost', 'brittle'); return (c.armor || 0) - br; }
 // a role's share of a hit of this damage type, before breaks, wards and the moment (the campaign's model of hurt, for the bot and the cards)
 function roleDmgK(d, dt, pen, crack, mpen) {   // crack: the unit breaks plate itself (its own hits come through whole); mpen: Magic Penetration
   const r = d.lead || d.boss ? { armoured: false, mres: false, cloth: !!(d.rk || {}).cloth } : d.rk || {}; let k = 1;   // (leaders and bosses keep their armour and resistance)
@@ -3433,7 +3439,7 @@ function hurt(c, amt, type, src, dot, kb, elem) {
     const pen = Math.min(.9, (ss && ss.armorPen) || 0);
     if (c.apMax > 0 && !oldRules()) { /* the armour bar takes it, below */ }
     else if (plate) { const k = plateK(c, pen); amt *= k; if (k < .6 && !dot && (c.clangT || 0) < G.time) { c.clangT = G.time + .5; immuneText(c); } }   // plate: a quarter through until it is broken
-    else { let br = c.shredT > 0 ? c.shred : 0; if (c.frostT > 0) br += 2 * talentHas('frost', 'permafrost') + 2 * talentHas('frost', 'brittle'); amt *= armorK(Math.max(0, c.armor * (1 - pen) - br)); }   // Permafrost, Bitter Cold   // plate: ROLE_K.plate through, all of it once broken (armour-piercing counts a third)
+    else { let br = c.shredT > 0 ? c.shred : 0; if (c.frostT > 0) br += 2 * talentHas('frost', 'permafrost') + 2 * talentHas('frost', 'brittle'); const ea = c.armor * (1 - pen) - br; amt *= armorKNeg(ea, !!(c.def.boss || c.def.lead)); }   // Permafrost, Bitter Cold   // plate: ROLE_K.plate through, all of it once broken (armour-piercing counts a third)
   }
   else if (type === 'magic' || type === 'arcane') {   // the magic-resistant rank and file: their ward bar takes it, below (enemypools.js); the rest resist a share, which Magic Penetration cuts
     const bar = rward && c.mwMax > 0, mr = rward ? 0 : c.mres * (oldRules() ? 1 : 1 - Math.min(.9, (ss && ss.magicPen) || 0));
@@ -69196,7 +69202,7 @@ function infoHTML() {
       c.rageT > 0 && 'Frenzied', c.panicT > 0 && 'Panicking', c.packT > 0 && 'Running with the pack', c.thawT > 0 && 'Warmed by a torch', c.burT > 0 && 'Burrowed',
       c.shield > 0 && `Shield ${Math.ceil(c.shield)}`, c.def.guard && c.shield <= 0 && 'Shield broken', c.fed > 0 && `Fed ×${c.fed}`, c.charge > 0 && `Charged ×${c.charge}`].filter(Boolean);
     const ct = creepCounters(c.type);
-    return `<h3>${c.elite ? 'Elite ' : ''}${c.def.name}${c.elite ? ' <span class="tier elite">Elite</span>' : ''}</h3><div class="st"><span>Health <b>${Math.ceil(c.hp)}/${Math.ceil(c.maxHp)}</b></span><span>Armor <b>${c.armor}</b></span>${c.mres ? `<span>Magic resist <b>${Math.round(c.mres * 100)}%</b></span>` : ''}<span>Bounty <b>${c.bounty}</b></span></div>` + (typeof epCardHTML === 'function' ? epCardHTML(c) : '')
+    return `<h3>${c.elite ? 'Elite ' : ''}${c.def.name}${c.elite ? ' <span class="tier elite">Elite</span>' : ''}</h3><div class="st"><span>Health <b>${Math.ceil(c.hp)}/${Math.ceil(c.maxHp)}</b></span><span>Armor <b${typeof armorNow === 'function' && armorNow(c) < 0 ? ' style="color:#ff6a5a"' : ''}>${typeof armorNow === 'function' && armorNow(c) !== (c.armor || 0) ? Math.round(armorNow(c)) + ' <small>(' + c.armor + ')</small>' : c.armor}</b></span>${c.mres ? `<span>Magic resist <b>${Math.round(c.mres * 100)}%</b></span>` : ''}<span>Bounty <b>${c.bounty}</b></span></div>` + (typeof epCardHTML === 'function' ? epCardHTML(c) : '')
       + counterTags(ct) + (typeof fcArmNote === 'function' && fcArmNote(c.def) ? `<p class="mut" data-d="1"><b>${fcArmNote(c.def)}</b></p>` : '') + (oldRules() ? '' : `<p class="mut" data-d="1">${c.def.roles.map(r => `<b>${ROLE_NAME[r]}:</b> ${((c.def.lead || c.def.boss) && ROLE_WEAK_BIG[r]) || ROLE_WEAK[r]}`).join(' · ')}</p>`) + (typeof bfRowHTML === 'function' ? bfRowHTML(c) : `<p class="mut" data-d="2">${[!oldRules() && TRAIT_TIP_F[c.def.trait] ? '' : c.def.trait || 'Ground', ...fx, c.elite && (oldRules() ? 'May drop a relic' : 'May drop an item')].filter(Boolean).join(' · ')}</p>`)
       + (c.def.eco ? `<p class="mut eco" data-d="1">${c.def.eco}</p>` : '');
   }
@@ -77551,7 +77557,7 @@ bfAdd('shredded', { name: 'Shredded', kw: 'st:shredded', kind: 'debuff', pri: 4,
   get: c => {
     if (!(c.shredT > 0) || !(c.shred > 0)) return null;
     const plate = typeof isPlate === 'function' && isPlate(c) && typeof plateBroken === 'function';
-    return { t: c.shredT, n: bfInt(c.shred), say: plate ? `${bfInt(c.shred)} cracks: its plate is ${bfPct(plateBroken(c))} broken open, so more of every steel hit gets through.` : `${bfInt(c.shred)} cracks in its armour (${c.armor || 0} armour).` };
+    return { t: c.shredT, n: bfInt(c.shred), say: plate ? `${bfInt(c.shred)} cracks: its plate is ${bfPct(plateBroken(c))} broken open, so more of every steel hit gets through.` : (typeof armorNow === 'function' && armorNow(c) < 0 ? `Armour stripped to ${bfInt(armorNow(c))}: it takes ${bfPct(armorKNeg(armorNow(c), !!(c.def.boss || c.def.lead)) - 1)} more from physical hits.` : `${bfInt(c.shred)} cracks in its armour (${c.armor || 0} armour).`) };
   } });
 bfAdd('burning', { name: 'Burning', kw: 'st:burning', kind: 'debuff', pri: 20, icon: 'flame', hue: '#8a3010', f: ['burnT', 'burnDps', 'burnSrc', 'burnStack'],
   def: 'It takes fire damage every second while it burns.',
