@@ -1,4 +1,4 @@
-const BUILD_TAG = '0c6b3fc@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1bc09e2@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -3701,9 +3701,9 @@ function acquire(t, st, skip) {
   let best = null, bs = -Infinity;
   const hunt = t.ab && t.prio < 4 && !G.vs && typeof abHunt === 'function' ? abHunt(t) : null;   // a spell's preference draws the unit's strikes (abilities.js), unless you gave it its own order
   for (const c of G.creeps) {
-    if ((skip && skip.has(c)) || !canTarget(t, st, c)) continue;
-    const dx = c.x - t.x, dy = c.y - t.y, d2 = dx * dx + dy * dy;
+    const dx = c.x - t.x, dy = c.y - t.y, d2 = dx * dx + dy * dy;   // (the reach first: it rules out most of the field for a few multiplies; the checks are all pure, so the order changes nothing else)
     if ((c.fly && st.airR ? (st.range + st.airR) ** 2 : r2) < d2 || d2 < m2) continue;
+    if ((skip && skip.has(c)) || !canTarget(t, st, c)) continue;
     let s;
     switch (t.prio) { case 0: s = -c.remain; break; case 1: s = c.remain; break; case 2: s = c.hp; break; case 3: s = -c.hp; break; default: s = prefScore(['cloth', 'support', 'armoured', 'grouped', 'afflicted'][t.prio - 4], c); }
     if (hunt) s = prefScore(hunt, c);
@@ -8097,7 +8097,7 @@ function drawForceUnitPlain(t, tier, sx, sy, sz, wob, opts) {
   for (const P of FORCE_PARTS[u] || []) {
     const q = P.pose(t); if (!q) continue;
     M4.trs(_fp, P.piv[0] * K, P.piv[1] * K, P.piv[2] * K, q[1], q[0], q[2]); M4.mul(_ft, _fm, _fp);
-    M4.trs(_fp, q[3] * K, q[4] * K, q[5] * K); M4.mul(_fp, _ft, _fp.slice());
+    M4.trs(_fp, q[3] * K, q[4] * K, q[5] * K); M4.mul(_fp, _ft, _fp);   // (M4.mul works through its own scratch: no copy needed)
     const pit = item(dynMesh('fp_' + u + P.k + tier, g => withPal(u, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => P.build(g, tier)))), _fp, opts); if (FU_DBG) FU_DBG.push([P.k, pit]);
     legWpnMark(t, u, P.k, _fp, K);
     const tp = UNIT_TIP[u]; if (tp && tp.k === P.k && typeof G !== 'undefined' && G && !(typeof inIcon !== 'undefined' && inIcon)) { const p = tp.p(tier); t.tipW = M4.xf(_fp, p[0] * K, p[1] * K, p[2] * K); t.tipYaw = yaw; t.tipAt = G.time; }   // (its launcher's tip as posed: unitTip)
@@ -35462,6 +35462,7 @@ const socC = (C, hex, k = 1) => v2c(C, hex, k);
 // an end of a link: { t } a unit (its weapon tip when tip), { c } a foe, or a point { x, z, h }; false once it is gone
 const _socE = [0, 0, 0], _socE2 = [0, 0, 0];
 function socEnd(e, out) {
+  if (!e) return false;   // (an end that never resolved: the link just ends)
   if (e.t) { const m = e.tip && typeof unitTip === 'function' ? unitTip(e.t) : null; if (m) { out[0] = m[0]; out[1] = m[1]; out[2] = m[2]; } else { out[0] = e.t.x; out[1] = towerTop(e.t) * (e.hk || .75); out[2] = e.t.y; } return G.towers.includes(e.t) && !e.t.wrecked; }
   if (e.c) { if (e.c.dead) return false; out[0] = e.c.x + (e.c.kbx || 0); out[1] = v2FoeH(e.c, hitH(e.c)) * (e.hk || 1); out[2] = e.c.y + (e.c.kbz || 0); return true; }
   out[0] = e.x; out[1] = e.h == null ? .3 : e.h; out[2] = e.z; return true;
@@ -48913,19 +48914,21 @@ function epCastDone(c) {
 }
 // the situation each spell waits for
 function epWhen(c, e) {
-  const d = c.def, r = d.link ? d.link.r : 3, near = (rr, f) => G.creeps.filter(o => !o.dead && !o.def.egg && !o.def.totem && Math.hypot(o.x - c.x, o.y - c.y) <= rr && (!f || f(o)));
+  // near(rr, f, need): are there at least need allies (live, not eggs or totems) within rr passing f? (counts and stops at
+  // need: asked of every caster each frame its spell waits, so no list is built)
+  const d = c.def, r = d.link ? d.link.r : 3, near = (rr, f, need = 1) => { let n = 0; for (const o of G.creeps) { if (o.dead || o.def.egg || o.def.totem || !(Math.hypot(o.x - c.x, o.y - c.y) <= rr) || (f && !f(o))) continue; if (++n >= need) return true; } return false; };
   switch (e.s) {
-    case 'pulse': return near(r, o => o.hp < o.maxHp * .95).length > 0;
-    case 'bulwark': return near(r, o => !(o.ward > o.maxHp * .1)).length > 0;
-    case 'purge': return near(r, o => AFFLICTED(o) && !(o.stunT > 0 && !o.stunEl)).length > 0;
+    case 'pulse': return near(r, o => o.hp < o.maxHp * .95);
+    case 'bulwark': return near(r, o => !(o.ward > o.maxHp * .1));
+    case 'purge': return near(r, o => AFFLICTED(o) && !(o.stunT > 0 && !o.stunEl));
     case 'raisec': return G.corpses.some(k => !k.gone && !k.burned && !k.shattered && Math.hypot(k.x - c.x, k.y - c.y) <= Math.max(d.raiseC[2], 3));
     case 'spores': return epSporeTargets(c).length > 0;
     case 'wail': { const R_ = d.silence ? d.silence[1] : 1.5; return G.towers.some(t => !t.def.wall && !t.wrecked && Math.hypot(t.x - c.x, t.y - c.y) <= R_); }
     case 'raise': return G.creeps.length < 140;
-    case 'harden': { const plate = epPlateOnly(c); return near(3, o => o !== c && (o.apMax > 0 && !o.epTemp ? o.ap < o.apMax * .7 : !plate && !(o.epTempT > G.time))).length >= (plate ? 1 : 2); }
-    case 'mend': return near(3, o => o.hp < o.maxHp * .8).length > 0;
-    case 'shield': return near(3, o => !(o.ward > 0)).length >= 2;
-    case 'ward': return near(3, o => o !== c && !(o.amT > 0) && (d.link && d.link.who === 'armoured' ? o.def.rk.armoured : true)).length > 0;
+    case 'harden': { const plate = epPlateOnly(c); return near(3, o => o !== c && (o.apMax > 0 && !o.epTemp ? o.ap < o.apMax * .7 : !plate && !(o.epTempT > G.time)), plate ? 1 : 2); }
+    case 'mend': return near(3, o => o.hp < o.maxHp * .8);
+    case 'shield': return near(3, o => !(o.ward > 0), 2);
+    case 'ward': return near(3, o => o !== c && !(o.amT > 0) && (d.link && d.link.who === 'armoured' ? o.def.rk.armoured : true));
   }
   const S = SPELLS[e.s]; return S ? S.can(c, e) : false;
 }
@@ -53886,13 +53889,46 @@ function createRenderer(canvas, opt = {}) {
     if (k) gl.bufferSubData(gl.ARRAY_BUFFER, 0, instData, 0, k * IF);
     return out;
   }
+  // point a mesh's vertex array at its instances (its VAO keeps the pointers: set again only when the offset moves, which
+  // saves six GL calls a draw; the bound VAO must be h's)
+  function ptr(h, off) { if (h.ptr === off) return; gl.bindBuffer(gl.ARRAY_BUFFER, instBuf); instPtr(off); h.ptr = off; }
   function drawBatch(groups) {
     let calls = 0;
     for (const [mesh, start, n] of groups) {
-      const h = upload(mesh); gl.bindVertexArray(h.vao); gl.bindBuffer(gl.ARRAY_BUFFER, instBuf); instPtr(start * IB);
+      const h = upload(mesh); gl.bindVertexArray(h.vao); ptr(h, start * IB);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); calls++;
     }
     return calls;
+  }
+  /* the frame's one batch: every item grouped by mesh and packed once, each group ordered not shadowed + opaque, shadowed +
+     opaque, shadowed + see-through, not shadowed + see-through, so the shadow pass (the shadowed) and the opaque pass (the
+     opaque) each draw one contiguous run of it, from the same start whenever every opaque one casts a shadow (the usual case:
+     the pointers stay put). The see-through passes keep their own batch() (their order is their blending). */
+  const FBG = [];
+  let FBN = 0;
+  function frameBatch(list) {
+    const groups = new Map(); let n = 0;
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i]; let g = groups.get(it.mesh);
+      if (!g) { g = FBG[groups.size] || (FBG[groups.size] = { mesh: null, c: [[], [], [], []], s: 0, b: 0 }); g.mesh = it.mesh; g.b = 0; g.c[0].length = g.c[1].length = g.c[2].length = g.c[3].length = 0; groups.set(it.mesh, g); }
+      const op = it.alpha == null || it.alpha >= 1;
+      g.c[op ? (it.shadow ? 1 : 0) : (it.shadow ? 2 : 3)].push(it); n++;
+      if (it.bones) g.b++;   // (a rigged model's items: posed one draw each)
+    }
+    if (instData.length < n * IF) instData = new Float32Array(Math.ceil(n * 1.5) * IF);
+    let k = 0; FBN = groups.size;
+    for (let gi = 0; gi < FBN; gi++) {
+      const g = FBG[gi]; g.s = k;
+      for (let c = 0; c < 4; c++) for (const it of g.c[c]) {
+        const o = k * IF; instData.set(it.m, o); const t = it.tint || ONE_TINT;
+        instData[o + 16] = t[0]; instData[o + 17] = t[1]; instData[o + 18] = t[2]; instData[o + 19] = t[3];
+        instData[o + 20] = it.alpha == null ? 1 : it.alpha; instData[o + 21] = it.ground ? 1 : it.unit ? -(+it.unit) : 0; instData[o + 22] = it.sec ? it.sec[0] : 0; instData[o + 23] = it.sec ? it.sec[1] : 0; k++;
+      }
+    }
+    for (let gi = FBN; gi < FBG.length; gi++) { const g = FBG[gi]; if (!g.mesh) break; g.mesh = null; for (const a of g.c) a.length = 0; }   // (let go of last frame's meshes)
+    gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+    if (k * IF > instCap) { instCap = instData.length; gl.bufferData(gl.ARRAY_BUFFER, instData.byteLength, gl.DYNAMIC_DRAW); }
+    if (k) gl.bufferSubData(gl.ARRAY_BUFFER, 0, instData, 0, k * IF);
   }
   function upload(mesh) {
     let h = mesh.gl.get(gl);
@@ -53915,7 +53951,7 @@ function createRenderer(canvas, opt = {}) {
     for (let l = 4; l <= 9; l++) { gl.enableVertexAttribArray(l); gl.vertexAttribDivisor(l, 1); }
     instPtr(0);
     gl.bindVertexArray(null);
-    h = { vao, count: mesh.count, bufs, ver: mesh.ver }; mesh.gl.set(gl, h); return h;
+    h = { vao, count: mesh.count, bufs, ver: mesh.ver, ptr: 0 }; mesh.gl.set(gl, h); return h;
   }
 
   function b64buf(str) { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
@@ -53997,8 +54033,8 @@ function createRenderer(canvas, opt = {}) {
       gl.uniform3fv(u.uFogCol, this.fogCol); gl.uniform2fv(u.uFog, this.fog); gl.uniform3fv(u.uCam, this.cam); gl.uniform1f(u.uTime, this.time);
       gl.uniform1f(u.uShadowOn, this.shadowOn ? 1 : 0); gl.uniform1f(u.uTexel, 1 / SM);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shTex); gl.uniform1i(u.uShadow, 0);
-      const n = Math.min(6, this.lights.length), pl = new Float32Array(24), pc = new Float32Array(18);
-      for (let i = 0; i < n; i++) { const l = this.lights[i]; pl.set([l[0], l[1], l[2], l[3]], i * 4); pc.set([l[4], l[5], l[6]], i * 3); }
+      const n = Math.min(6, this.lights.length), pl = _litPL.fill(0), pc = _litPC.fill(0);   // (two shared arrays: litUniforms runs a few times a frame)
+      for (let i = 0; i < n; i++) { const l = this.lights[i], a = i * 4, c = i * 3; pl[a] = l[0]; pl[a + 1] = l[1]; pl[a + 2] = l[2]; pl[a + 3] = l[3]; pc[c] = l[4]; pc[c + 1] = l[5]; pc[c + 2] = l[6]; }
       gl.uniform4fv(u.uPL, pl); gl.uniform3fv(u.uPLc, pc); gl.uniform1i(u.uNPL, n);
       const lm = this.lm;
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, lm ? lm.tex : blank); gl.uniform1i(u.uLM, 2); gl.uniform1f(u.uLMOn, lm ? 1 : 0);
@@ -54035,16 +54071,28 @@ function createRenderer(canvas, opt = {}) {
     render(list, passes) {
       gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
       // shadow pass
+      frameBatch(list); this._fbl = list;   // (every item packed once: the shadow, opaque and sculpted passes draw runs of it)
       if (this.shadowOn) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, shFB); gl.viewport(0, 0, SM, SM); gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.useProgram(S.p); gl.uniformMatrix4fv(S.u.uLVP, false, this.lvp); gl.uniform1f(S.u.uTime, this.time);
-        const sb = batch(list, it => it.shadow && !it.bones); this.stats.shadowDraws = drawBatch(sb);
-        if (list.some(it => it.shadow && it.bones)) {   // a rigged model's shadow: posed like the model, one draw each
+        let sd = 0, rig = false;
+        for (let gi = 0; gi < FBN; gi++) {   // the shadowed: the run after the unshadowed opaque ones
+          const g = FBG[gi], c1 = g.c[1], c2 = g.c[2], n = c1.length + c2.length; if (!n) continue;
+          const s = g.s + g.c[0].length, h = upload(g.mesh); gl.bindVertexArray(h.vao);
+          if (!g.b) { ptr(h, s * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); sd++; continue; }
+          for (let q = 0; q < n; q++) { const it = q < c1.length ? c1[q] : c2[q - c1.length]; if (it.bones) { rig = true; continue; } ptr(h, (s + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); sd++; }
+        }
+        this.stats.shadowDraws = sd;
+        if (rig) {   // a rigged model's shadow: posed like the model, one draw each
           let P = null; try { P = sshProg(); } catch (e) {}
           if (P) {
             gl.useProgram(P.p); gl.uniformMatrix4fv(P.u.uLVP, false, this.lvp); gl.uniform1f(P.u.uSkinOn, 1);
-            const g2 = batch(list, it => it.shadow && it.bones);
-            for (const [mesh, start, n, its] of g2) { const h = upload(mesh); gl.bindVertexArray(h.vao); for (let q = 0; q < n; q++) { const it = its[q]; gl.uniform4fv(P.u.uBones, it.bones); gl.bindBuffer(gl.ARRAY_BUFFER, instBuf); instPtr((start + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); this.stats.shadowDraws++; } }
+            for (let gi = 0; gi < FBN; gi++) {
+              const g = FBG[gi]; if (!g.b) continue;
+              const c1 = g.c[1], c2 = g.c[2], n = c1.length + c2.length, s = g.s + g.c[0].length; if (!n) continue;
+              const h = upload(g.mesh); gl.bindVertexArray(h.vao);
+              for (let q = 0; q < n; q++) { const it = q < c1.length ? c1[q] : c2[q - c1.length]; if (!it.bones) continue; gl.uniform4fv(P.u.uBones, it.bones); ptr(h, (s + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); this.stats.shadowDraws++; }
+            }
             gl.useProgram(S.p);
           }
         }
@@ -54059,8 +54107,14 @@ function createRenderer(canvas, opt = {}) {
       this.litUniforms(u);
       gl.disable(gl.BLEND);
       this.stats.items = list.length;
-      this.stats.draws = drawBatch(batch(list, it => (it.alpha == null || it.alpha >= 1) && !it.mesh.tex));
-      if (list.some(it => it.mesh.tex)) this.drawSculpted(list);
+      let dr = 0, anyTex = false;
+      for (let gi = 0; gi < FBN; gi++) {   // the opaque: the first run of each group
+        const g = FBG[gi]; if (g.mesh.tex) { anyTex = true; continue; }
+        const n = g.c[0].length + g.c[1].length; if (!n) continue;
+        const h = upload(g.mesh); gl.bindVertexArray(h.vao); ptr(h, g.s * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); dr++;
+      }
+      this.stats.draws = dr;
+      if (anyTex) this.drawSculpted(list);
       if (this.trees.length) { this.drawTrees(false); gl.useProgram(L.p); }
       if (passes.ground) this.quads(passes.ground, 'alpha', true);
       if (list.some(it => it.alpha != null && it.alpha < 1)) {
@@ -54082,25 +54136,34 @@ function createRenderer(canvas, opt = {}) {
       let P; try { P = styProg(); } catch (e) { if (!this._styErr) { this._styErr = 1; console.warn('Sculpted models: shader failed:', e.message); } return; }
       gl.useProgram(P.p); this.litUniforms(P.u); gl.uniform3fv(P.u.uCamR, this.right); gl.uniform1f(P.u.uSty, this.sty == null ? 1 : this.sty);
       gl.uniform1i(P.u.uTex, 7); gl.uniform1f(P.u.uSkinOn, 0);
+      const fb = this._fbl === list;   // (the opaque ones from the frame's batch, when render packed it; the see-through by their own, in order)
       for (const op of [1, 0]) {
-        const groups = batch(list, it => it.mesh.tex && (op ? it.alpha == null || it.alpha >= 1 : it.alpha != null && it.alpha < 1)); if (!groups.length) continue;
+        let groups;
+        if (op && fb) {
+          groups = _glScG; groups.length = 0;
+          for (let gi = 0; gi < FBN; gi++) { const g = FBG[gi]; if (!g.mesh.tex) continue; const n = g.c[0].length + g.c[1].length; if (!n) continue;
+            const its = g.b ? g.c[0].concat(g.c[1]) : null; groups.push([g.mesh, g.s, n, its]); }
+        } else groups = batch(list, it => it.mesh.tex && (op ? it.alpha == null || it.alpha >= 1 : it.alpha != null && it.alpha < 1));
+        if (!groups.length) continue;
         if (!op) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); }
         for (const [mesh, start, n, its] of groups) {
           const h = upload(mesh);
           if (!h.tex) {   // its texture, once the image has decoded
             const img = mesh.tex; if (!img.complete || !img.naturalWidth) continue;
+            gl.activeTexture(gl.TEXTURE7);   // (made on its own unit: on unit 0 it would push the shadow map out, and the context would refuse every sculpted draw left this frame)
             h.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, h.tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             const af = gl.getExtension('EXT_texture_filter_anisotropic'); if (af) gl.texParameterf(gl.TEXTURE_2D, af.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(4, gl.getParameter(af.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
           }
           gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, h.tex); gl.activeTexture(gl.TEXTURE0);
-          gl.bindVertexArray(h.vao); gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+          gl.bindVertexArray(h.vao);
           if (mesh.bone) {   // a rigged model: each its own pose, one draw each
             gl.uniform1f(P.u.uSkinOn, 1);
-            for (let q = 0; q < n; q++) { const it = its[q]; if (!it.bones) continue; gl.uniform4fv(P.u.uBones, it.bones); instPtr((start + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); this.stats.draws++; }
+            const L = its;
+            for (let q = 0; q < n; q++) { const it = L ? L[q] : null; if (!it || !it.bones) continue; gl.uniform4fv(P.u.uBones, it.bones); ptr(h, (start + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); this.stats.draws++; }
             gl.uniform1f(P.u.uSkinOn, 0);
-          } else { instPtr(start * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); this.stats.draws++; }
+          } else { ptr(h, start * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); this.stats.draws++; }
         }
         if (!op) { gl.depthMask(true); gl.disable(gl.BLEND); }
       }
@@ -54122,9 +54185,11 @@ function createRenderer(canvas, opt = {}) {
   return R;
 }
 const ONE_TINT = new Float32Array([1, 1, 1, 0]);
+const _litPL = new Float32Array(24), _litPC = new Float32Array(18), _glScG = [];
 const OWN_K = [.55, 1.07, .22, 1.02];   // the units' gradient (FS_LIT uOwnK, after the tone curve): the light at the feet and at the head, and the heights (world) between
 
 /* ---- quad batch (CPU side) ---- */
+function qbV(d, k, x, y, z, u, v, c0, c1, c2, c3, s, p) { d[k] = x; d[k + 1] = y; d[k + 2] = z; d[k + 3] = u; d[k + 4] = v; d[k + 5] = c0; d[k + 6] = c1; d[k + 7] = c2; d[k + 8] = c3; d[k + 9] = s; d[k + 10] = p; }
 class QB {
   constructor(max = 6000) { this.d = new Float32Array(max * 6 * 11); this.n = 0; this.max = max; }
   reset() { this.n = 0; }
@@ -54135,23 +54200,32 @@ class QB {
     this._v(o, a, -1, -1, col, shape, prm); this._v(o + 11, b, 1, -1, col, shape, prm); this._v(o + 22, c, 1, 1, col, shape, prm);
     this._v(o + 33, a, -1, -1, col, shape, prm); this._v(o + 44, c, 1, 1, col, shape, prm); this._v(o + 55, d, -1, 1, col, shape, prm);
   }
+  // (bill, barRect and ground write their four corners straight into the batch: the same corners quad() would get, without
+  // the per-quad closure and its four corner arrays, the frame's biggest source of garbage)
+  _q4(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, col, shape, prm) {
+    const d = this.d, o = this.n * 66, c0 = col[0], c1 = col[1], c2 = col[2], c3 = col[3]; this.n++;
+    qbV(d, o, ax, ay, az, -1, -1, c0, c1, c2, c3, shape, prm); qbV(d, o + 11, bx, by, bz, 1, -1, c0, c1, c2, c3, shape, prm); qbV(d, o + 22, cx, cy, cz, 1, 1, c0, c1, c2, c3, shape, prm);
+    qbV(d, o + 33, ax, ay, az, -1, -1, c0, c1, c2, c3, shape, prm); qbV(d, o + 44, cx, cy, cz, 1, 1, c0, c1, c2, c3, shape, prm); qbV(d, o + 55, dx, dy, dz, -1, 1, c0, c1, c2, c3, shape, prm);
+  }
   bill(R, x, y, z, w, h, col, shape, prm, rot = 0) {
+    if (this.n >= this.max) return;
     const cr = Math.cos(rot), sr = Math.sin(rot), r = R.right, u = R.up;
     const ax = (r[0] * cr + u[0] * sr), ay = (r[1] * cr + u[1] * sr), az = (r[2] * cr + u[2] * sr);
     const bx = (-r[0] * sr + u[0] * cr), by = (-r[1] * sr + u[1] * cr), bz = (-r[2] * sr + u[2] * cr);
-    const P = (sx, sy) => [x + ax * w * sx + bx * h * sy, y + ay * w * sx + by * h * sy, z + az * w * sx + bz * h * sy];
-    this.quad(P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), col, shape, prm);
+    const wx = ax * w, wy = ay * w, wz = az * w, hx = bx * h, hy = by * h, hz = bz * h;
+    this._q4(x - wx - hx, y - wy - hy, z - wz - hz, x + wx - hx, y + wy - hy, z + wz - hz, x + wx + hx, y + wy + hy, z + wz + hz, x - wx + hx, y - wy + hy, z - wz + hz, col, shape, prm === undefined ? 0 : prm);
   }
   // screen-aligned rect anchored at left edge (for HP bars)
   barRect(R, x, y, z, left, w, h, col) {
-    const r = R.right, u = R.up;
-    const P = (sx, sy) => [x + r[0] * sx + u[0] * sy, y + r[1] * sx + u[1] * sy, z + r[2] * sx + u[2] * sy];
-    this.quad(P(left, -h), P(left + w, -h), P(left + w, h), P(left, h), col, 10, 0);
+    if (this.n >= this.max) return;
+    const r = R.right, u = R.up, l = left, rr = left + w;
+    this._q4(x + r[0] * l - u[0] * h, y + r[1] * l - u[1] * h, z + r[2] * l - u[2] * h, x + r[0] * rr - u[0] * h, y + r[1] * rr - u[1] * h, z + r[2] * rr - u[2] * h,
+      x + r[0] * rr + u[0] * h, y + r[1] * rr + u[1] * h, z + r[2] * rr + u[2] * h, x + r[0] * l + u[0] * h, y + r[1] * l + u[1] * h, z + r[2] * l + u[2] * h, col, 10, 0);
   }
   ground(x, z, y, w, h, col, shape, prm = 0, rot = 0) {
-    const c = Math.cos(rot), s = Math.sin(rot);
-    const P = (sx, sz) => [x + (sx * w * c - sz * h * s), y, z + (sx * w * s + sz * h * c)];
-    this.quad(P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), col, shape, prm);
+    if (this.n >= this.max) return;
+    const c = Math.cos(rot), s = Math.sin(rot), wc = w * c, ws = w * s, hc = h * c, hs = h * s;
+    this._q4(x + (hs - wc), y, z + (-ws - hc), x + (wc + hs), y, z + (ws - hc), x + (wc - hs), y, z + (ws + hc), x + (-wc - hs), y, z + (hc - ws), col, shape, prm);
   }
   beam(R, a, b, w, col, shape = 6) {
     const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
@@ -66151,6 +66225,9 @@ function item(mesh, m, o) {
   it.sec = null; it.bones = null;   // (bones: a rigged model's pose, set by its caller: unitmodels.js)
   return it;
 }
+// a rigged model's pose for this frame, copied into the draw item's own buffer (kept with the pooled item, so no new array a
+// unit a frame); the renderer reads it in the same frame
+function itemBones(it, src) { let b = it._bb; if (!b || b.length !== src.length) b = it._bb = new Float32Array(src.length); b.set(src); return b; }
 const _m = new Float32Array(16), _m2 = new Float32Array(16), _m3 = new Float32Array(16), _mT = new Float32Array(16), _I = M4.I();
 
 function initView(canvas) {
@@ -66587,7 +66664,8 @@ function renderView(dt) {
   if (TH.shafts === 'moon') drawMoonShafts(); else drawSunShafts();
   const list = DL.slice(0, dlN);
   RD.render(list, { ground: QG, alpha: QA, add: QADD, over: QO });
-  window.__stats = { items: dlN, glDraws: RD.stats.draws, glShadowDraws: RD.stats.shadowDraws, verts: list.reduce((s, i) => s + i.mesh.count, 0), shadowVerts: list.reduce((s, i) => s + (i.shadow ? i.mesh.count : 0), 0), quads: QG.n + QA.n + QADD.n + QO.n };
+  { let v = 0, sv = 0; for (let k = 0; k < dlN; k++) { const it = DL[k], n = it.mesh.count; v += n; if (it.shadow) sv += n; }   // (one object a frame, kept: tests read it)
+    const S = window.__stats || (window.__stats = {}); S.items = dlN; S.glDraws = RD.stats.draws; S.glShadowDraws = RD.stats.shadowDraws; S.verts = v; S.shadowVerts = sv; S.quads = QG.n + QA.n + QADD.n + QO.n; }
 }
 
 function drawPortalFx() {
@@ -68610,18 +68688,23 @@ function drawPadlock(g, W) {
   g.restore();
 }
 function portraitPaint(cv2d, subject) {
-  cv2d._paintToken = (cv2d._paintToken || 0) + 1;
-  cv2d._uiKey = null;
+  // a still painting (unit art, a leader's face) already on this canvas at this size is left as it is: the portrait is
+  // asked for 15 times a second, and only the 3D model below moves
+  const still = (k, ready) => { const sk = k + '@' + cv2d.width + 'x' + cv2d.height + ':' + FORCE_NOW; if (ready && cv2d._ppKey === sk) return true; cv2d._ppKey = ready ? sk : null; return false; };
   if (subject && (subject.kind === 'tower' || subject.kind === 'creep')) {
     const key = subject.kind === 'tower' ? 't:' + subject.ref.type + ':' + subject.ref.tier : 'c:' + subject.type;
     const url = subject.kind === 'tower' ? unitArtURL(subject.ref.type) : UNIT_ART.enemies[subject.type];
-    if (url) { iconPaint(cv2d, key); return; }
+    if (url) { const im = typeof unitIconImages !== 'undefined' && unitIconImages.get(url); if (still(key, !!(im && im.complete && im.naturalWidth))) return; cv2d._paintToken = (cv2d._paintToken || 0) + 1; cv2d._uiKey = null; iconPaint(cv2d, key); return; }
   }
+  cv2d._paintToken = (cv2d._paintToken || 0) + 1;
+  cv2d._uiKey = null;
   const P = subject && subject.kind === 'creep' && typeof BOSS_IMG !== 'undefined' && BOSS_IMG[subject.type] && BOSS_IMG[subject.type].face;
   if (P) {   // a dungeon leader with a painted card: its face
+    if (still('face:' + subject.type, !!(P.complete !== false && (P.naturalWidth || P.width)))) return;
     const g = cv2d.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv2d.width, cv2d.height);
     g.imageSmoothingQuality = 'high'; g.drawImage(P, 0, 0, cv2d.width, cv2d.height); return;
   }
+  cv2d._ppKey = null;
   if (!IR || !subject) return;
   dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
   if (subject.kind === 'tower') {
@@ -75596,8 +75679,8 @@ function umDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   M4.trs(_umB, 0, 0, 0, P ? 0 : B.ry, B.rx * lk, B.rz * lk, s * (1 + sq * .4), s * (1 - sq * .6) * br, s * (1 + sq * .4)); M4.mul(_umC, _umA, _umB);
   const it = item(M.mesh, _umC, opts);
   it.sec = [(tr >= 3 ? .45 * (tr - 2) : 0) + (P ? P.glow * .8 : 0), M.S.trim || 0];   // (VS_STY: the eyes' extra glow, the texture's brightness trim)   // (VS_STY reads it as the eyes' extra glow)
-  if (P) it.bones = umMixPose(R, P).slice();
-  else if (R) { const o = R.out; o.fill(0); for (let b = 0; b < R.nb; b++) { o[b * 12] = o[b * 12 + 5] = o[b * 12 + 10] = 1; } it.bones = o.slice(); }   // (rigged without a clip: its rest pose)
+  if (P) it.bones = itemBones(it, umMixPose(R, P));
+  else if (R) { const o = R.out; o.fill(0); for (let b = 0; b < R.nb; b++) { o[b * 12] = o[b * 12 + 5] = o[b * 12 + 10] = 1; } it.bones = itemBones(it, o); }   // (rigged without a clip: its rest pose)
   FX_PM.root = FX_PM.torso = _umC;
   if (P && !icon && typeof QADD !== 'undefined' && R.eyesW) {   // a faint green halo round each eye (brighter at IV-VI and while a spell is drawn)
     const a = .13 + .05 * Math.max(0, tr - 2) + .18 * P.glow;
@@ -75963,7 +76046,7 @@ if (typeof umDraw === 'function') {
     M4.trs(_uqB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_uqC, _uqA, _uqB);
     const it = item(M.mesh, _uqC, opts);
     it.sec = [(tr >= 3 ? .45 * (tr - 2) : 0) + P.glow * .9, 0];   // (VS_STY reads it as the light's extra glow)
-    it.bones = queenPose(R, P, q).slice();
+    it.bones = itemBones(it, queenPose(R, P, q));
     FX_PM.root = FX_PM.torso = _uqC;
     const ow = M4.xf(_uqC, R.orb[0], R.orb[1], R.orb[2]), pw = M4.xf(_uqC, R.palm[0], R.palm[1], R.palm[2]);
     // the spells' glows (ABANIM tips: 'staff' [0, .56, 0], 'off' [-.02, -.14, .06]) land on the sculpt's light and free hand
@@ -76265,7 +76348,7 @@ if (typeof umDraw === 'function') {
     M4.trs(_wizB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_wizC, _wizA, _wizB);
     const it = item(M.mesh, _wizC, opts);
     it.sec = [(tr >= 3 ? .45 * (tr - 2) : 0) + P.glow * .9, 0];   // (VS_STY reads it as the crystal's extra glow)
-    const bo = wizPose(R, P, q); it.bones = bo.slice();
+    const bo = wizPose(R, P, q); it.bones = itemBones(it, bo);
     // his eyes (the emissive group, the staff light's colour): a soft halo on each, so they carry from 57 degrees; brighter
     // as he casts and at IV-VI
     if (!icon && typeof QADD !== 'undefined') {
@@ -77052,13 +77135,13 @@ const LAB_EXT = {
     gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.vb); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _labV, 0, nq * 44);
     const u = this.P.u; gl.useProgram(this.P.p);
     gl.uniformMatrix4fv(u.uVP, false, R.vp); if (u.uBend) gl.uniform3fv(u.uBend, R.bend);
-    const dm = gl.getParameter(gl.DEPTH_WRITEMASK); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     for (const [tex, q0, n, half, grid, top] of this.groups) {
       if (top) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(u.uT, 0); gl.uniform1f(u.uHalf, half); gl.uniform2f(u.uGrid, grid[0], grid[1]);
       gl.drawElements(gl.TRIANGLES, n * 6, gl.UNSIGNED_SHORT, q0 * 12);
     }
-    gl.bindVertexArray(null); gl.depthMask(dm); gl.enable(gl.DEPTH_TEST);
+    gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);   // (its caller, the VFX pass, keeps depth writes off: no state query, a stall on some browsers)
   },
 };
 
@@ -77454,7 +77537,7 @@ function dwDraw(t, tier, sx, sy, sz, wob, opts) {
   // (the side portholes' red-hot animation: a slow throb with a quicker flicker on it)
   const tv = (typeof vt !== 'undefined' ? vt : 0) + (t.anim || 0) * 3, pulse = .7 * Math.sin(tv * 2.4) + .3 * Math.sin(tv * 7.3);
   it.sec = [.5 + .32 * pulse + .5 * heat + 1.2 * P.flare, 0];
-  it.bones = o.slice();
+  it.bones = itemBones(it, o);
   // the hammer: its head and face in the world, its motion, the fire in it
   const H = dwHead(M, o), hw = M4.xf(_dwC, H.head[0], H.head[1], H.head[2]), fw = M4.xf(_dwC, H.face[0], H.face[1], H.face[2]);
   // the swing's whoosh (a heavy flame take, its loudest moment on the blow): as the wind-up nears its top, and as a cast's
@@ -77770,7 +77853,7 @@ function obDraw(t, tier, sx, sy, sz, wob, opts) {
   const pulse = .85 + .15 * Math.sin((typeof vt !== 'undefined' ? vt : 0) * 2.4 + (t.anim || 0) * 5);
   t._obG = t._obG == null ? P.glow : t._obG + (P.glow - t._obG) * .15;
   it.sec = [(OB_GLOW + t._obG) * pulse, 0];   // (VS_STY: the runes' extra glow)
-  it.bones = o.slice();
+  it.bones = itemBones(it, o);
   if (its) { obRunes(SW, M); its.sec = it.sec; its.bones = it.bones; }
   const tip = obBlade(M, o, 1), tw = M4.xf(_obC, tip[0], tip[1], tip[2]);
   t._obOn = live ? G.time : null; t._obM = M; t._obO2 = o; t._obMat = _obC;
@@ -78038,7 +78121,7 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   const pulse = .88 + .12 * Math.sin((typeof vt !== 'undefined' ? vt : 0) * 2.2 + (t.anim || 0) * 5);   // (the blades' gentle pulse)
   t._mvG = t._mvG == null ? P.glow : t._mvG + (P.glow - t._mvG) * .2;
   it.sec = [(MV_GLOW + .06 * Math.max(0, tr - 2) + .3 * t._mvG) * pulse, 0];   // (VS_STY: the blades' extra glow)
-  it.bones = o.slice();
+  it.bones = itemBones(it, o);
   const SW = umModel(MV_UNIT + '~sword');
   if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, opts); its.sec = it.sec; its.bones = it.bones; }
   const T4 = mvTips(M, o).map(p => M4.xf(_mvC, p[0], p[1], p[2]));
@@ -80502,6 +80585,204 @@ window.PLAYLOG = {
     if (e.key !== '`' || e.repeat || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
     on = !on; make(); if (el) el.hidden = !on; try { localStorage.setItem('runehold.fps', on ? '1' : '0'); } catch (err) {}
   });
+})();
+
+/* ================= Perf stress scene (performance pass, 8 Nov 2026) =================
+   A repeatable busy field to measure the frame against. Open the game with ?perf=1 (every army's units on one field: all
+   the sculpted rigged models), ?perf=<force> (one army, two of each unit, its own rules: conclave, wardbound, ironhold,
+   grove, silver, stormborn), or call perfStress('mix' | force) from the console once the title is up.
+   - the army: every unit at tier VI, every ability learned and on autocast, mana and cooldowns refilled four times a second,
+     so the spells go off as fast as their cast locks allow (Furnace Breath and Phoenix, the Conclave's elements and their
+     reactions, Frost Spear, Ice Coffin, Shatterbloom, the rift-cut blink, the Wardbound's runes, the Grove's spells, the
+     fire hammer ...);
+   - the foes: dense late waves (20-45) kept at about PERF.foes on the field, a third of them elites, up to three bosses,
+     healed when low so the field stays full, the keep's lives never run out;
+   - the readout (top left, under the fps meter): fps, the frame's ms (the whole JS frame) and its parts (update, view,
+     the GL submit, the UI), WebGL draw calls, the particle counts (game particles, spell moments, VFX batch vertices,
+     GPU particles, the shared fire's queue) and the JS heap's growth a second (Chrome).
+   PERF.bench(frames) steps the scene by hand (update + view + a pixel read) and returns the mean, p50 and p95 frame and
+   each section's mean ms: the headless profile (sim/perf_stress.py) calls it. Nothing here runs unless asked for. */
+const PERF = { on: false, mode: null, foes: 110, sec: {}, calls: 0, refillT: 0, spawnT: 0, hud: null, last: null };
+(function () {
+  if (typeof window === 'undefined') return;
+  const q = (() => { try { return new URLSearchParams(location.search).get('perf'); } catch (e) { return null; } })();
+  // --- section timers: wrap the global functions by name (after every other file's wrappers, so they time the whole call)
+  const SECS = ['update', 'updateTowers', 'updateFx', 'updateCreeps', 'renderView', 'drawCreeps', 'drawParts', 'drawProjs', 'drawBolts', 'drawBeams', 'drawHazard',
+    'spellFxDraw', 'drawTower', 'drawAmbient', 'pfFrame', 'flowField', 'hud', 'renderInfo', 'renderCard', 'renderPortrait', 'bossCard', 'forecastTick', 'manaPaneTick', 'tickCardCool', 'drawTexts', 'syncZoomUI', 'empowerTick'];
+  let wrapped = false;
+  function wrapAll() {
+    if (wrapped) return; wrapped = true;
+    for (const n of SECS) {
+      const f = window[n]; if (typeof f !== 'function') continue;
+      const s = PERF.sec[n] = { ms: 0, n: 0, depth: 0 };
+      window[n] = function () { if (s.depth++) { try { return f.apply(this, arguments); } finally { s.depth--; } }
+        const t0 = performance.now(); try { return f.apply(this, arguments); } finally { s.depth--; s.ms += performance.now() - t0; s.n++; } };
+    }
+    if (typeof RD !== 'undefined' && RD) {
+      const s = PERF.sec['RD.render'] = { ms: 0, n: 0 }, r0 = RD.render;
+      RD.render = function () { const t0 = performance.now(); try { return r0.apply(this, arguments); } finally { s.ms += performance.now() - t0; s.n++; } };
+      const gl = RD.gl;   // count every draw call the context makes
+      for (const k of ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced']) { const o = gl[k]; gl[k] = function () { PERF.calls++; return o.apply(gl, arguments); }; }
+    }
+    if (typeof frame === 'function') {   // the whole frame (ui.js main loop): rAF looks the name up each time
+      const f0 = frame, s = PERF.sec.frame = { ms: 0, n: 0 };
+      frame = function (now) { const t0 = performance.now(); try { return f0(now); } finally { s.ms += performance.now() - t0; s.n++; } };
+    }
+  }
+  const resetSecs = () => { for (const k in PERF.sec) { PERF.sec[k].ms = 0; PERF.sec[k].n = 0; } PERF.calls = 0; };
+  PERF.snapshot = frames => { const o = {}; for (const k in PERF.sec) if (PERF.sec[k].n) o[k] = +(PERF.sec[k].ms / frames).toFixed(3); return o; };
+
+  // --- the army
+  const ALL = ['conclave', 'wardbound', 'ironhold', 'grove', 'silver', 'stormborn'];
+  function heroFor(f) { return (FORCE_HEROES || []).find(h => h.force === f); }
+  function cellsByRoad() {   // free cells nearest the road first (where units stand in a real maze)
+    const out = [], P = (G.path && G.path.pts) || [];
+    for (let j = 1; j < ROWS - 1; j++) for (let i = 0; i < COLS; i++) {
+      const k = idx(i, j); if (RES[k] || G.blk[k] || G.tAt[k]) continue;
+      let d = 99; for (const p of P) d = Math.min(d, Math.hypot(p[0] - i - .5, p[1] - j - .5));
+      out.push([d + ((i * 7 + j * 13) % 5) * .01, i, j]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+  function place(ty, cells, tier) {
+    const d = TOWERS[ty]; if (!d) return null;
+    for (let n = 0; n < cells.length; n++) {
+      const [, i, j] = cells[n], ok = canBuild(i, j); if (!ok.ok) continue;
+      cells.splice(n, 1);
+      const t = makeTower(ty, i, j, Math.min(tier, d.tiers.length - 1)); t.build = 0;
+      G.towers.push(t); G.blk[idx(i, j)] = 1; G.tAt[idx(i, j)] = t; G.dist = ok.dist; G.next = nextField(G.dist, G.blk); G.path = tracePath(G.dist, G.next);
+      return t;
+    }
+    return null;
+  }
+  function learnAll(t) {
+    if (typeof abilEnsure !== 'function') return; const A = abilEnsure(t), kit = abilKit(t); if (!A || !kit) return;
+    for (const ab of kit.abilities) { if (!A.learned.includes(ab.id)) A.learned.push(ab.id); A.auto[ab.id] = true; }
+  }
+  function startArmy(mode) {
+    const forces = mode === 'mix' ? ALL.filter(f => FORCES[f]) : [mode];
+    const h = heroFor(forces[0]); if (!h) { console.warn('perf: no commander for', forces[0]); return false; }
+    heroPickId = h.id; beginGame();
+    if (G.state !== 'play') { console.warn('perf: the run did not start'); return false; }
+    try { if (typeof hideOverlay === 'function') hideOverlay(); } catch (e) {}
+    const cells = cellsByRoad(), each = mode === 'mix' ? 1 : 2;
+    for (const f of forces) {
+      if (f !== forces[0]) applyForce(f, (heroFor(f) || {}).id);
+      for (const ty of BUILD_ORDER) { const d = TOWERS[ty]; if (!d || !d.unit || d.wall) continue;
+        for (let r = 0; r < (d.champ ? 1 : each); r++) { const t = place(ty, cells, 5); if (t) learnAll(t); } }
+    }
+    if (forces.length > 1) applyForce(forces[0], h.id);   // the run's own army again (its rules, its card)
+    G.gold = 1e6; G.lives = G.maxLives = 1e6; G.wave = 25; G.phase = 'wave'; G.waveT = 0; G.spawnQ = []; G.waveLeft = 1e9;
+    for (const t of G.towers) { t.st = null; t.hp = t.maxHp = 1e9; }
+    if (forces.length > 1) mixHooks(forces);
+    return true;
+  }
+  // a mixed field: each unit's force hooks answer for it (G.force is the first army's)
+  function mixHooks(forces) {
+    if (typeof forceHook !== 'function' || PERF.mixed) return; PERF.mixed = true;
+    const fh = forceHook, byT = (t, k, a) => { const f = t && t.def && t.def.force, H = f && FORCE_HOOKS[f]; return H && typeof H[k] === 'function' ? H[k](...a) : undefined; };
+    forceHook = function (k, ...a) {
+      if (k === 'live' || k === 'pulse' || k === 'fire') return byT(a[0], k, a);
+      if (k === 'impact') return byT(a[2] && a[2].def ? a[2] : a[3], k, a);
+      if (k === 'kill' || k === 'amp') return byT(a[1], k, a);
+      if (k === 'hazard') return byT(a[0] && a[0].src, k, a) ?? fh(k, ...a);
+      let r; for (const f of forces) { const H = FORCE_HOOKS[f]; if (H && typeof H[k] === 'function') r = H[k](...a); } return r;   // tick, wave: every army
+    };
+  }
+  // --- the foes
+  let bossN = 0;
+  function feed(dt) {
+    if (G.state !== 'play') return;
+    G.lives = G.maxLives = 1e6; G.waveLeft = 1e9; G.phase = 'wave';
+    PERF.refillT -= dt;
+    if (PERF.refillT <= 0) {
+      PERF.refillT = .25;
+      for (const t of G.towers) { t.hp = t.maxHp; t.wounded = false; if (t.ab) { t.ab.mana = typeof abMax === 'function' ? abMax(t) : 999; t.ab.cd = {}; } }
+    }
+    const live = G.creeps.filter(c => !c.dead);
+    for (const c of live) if (c.hp < c.maxHp * .35) c.hp = c.maxHp * .9;
+    bossN = live.filter(c => c.def.boss).length;
+    PERF.spawnT -= dt; if (PERF.spawnT > 0 || live.length >= PERF.foes) return;
+    PERF.spawnT = .35;
+    const n = 20 + ((G.time * 3) | 0) % 26, wave = makeWave(n, G.diff || 0);
+    let k = 0;
+    for (const s of wave) {
+      if (live.length + k >= PERF.foes) break;
+      const def = CREEPS[s.type]; if (!def) continue;
+      if (def.boss && bossN >= 3) continue;
+      if (def.boss) bossN++;
+      if (!def.boss && !def.lead && k % 3 === 0) { s.elite = true; s.hp *= (typeof ELITE_HP !== 'undefined' ? ELITE_HP : 1.6); }
+      try { spawn(s); k++; } catch (e) {}
+    }
+  }
+  // --- the readout
+  let hp0 = 0, fr = 0, acc = 0, lastT = 0, s0 = null;
+  function readout(now) {
+    requestAnimationFrame(readout);
+    if (!PERF.on) return;
+    if (!lastT) { lastT = now; return; }
+    acc += now - lastT; lastT = now; fr++;
+    if (acc < 1000) return;
+    const S = PERF.sec, g = k => S[k] && S[k].n ? S[k].ms / fr : 0, mem = performance.memory ? performance.memory.usedJSHeapSize : 0;
+    const X = typeof RD !== 'undefined' && RD && RD.vfx, gpuP = X && X.stats ? X.stats.parts || 0 : 0;
+    const L = [
+      `PERF ${PERF.mode}  ${Math.round(fr * 1000 / acc)} fps  frame ${g('frame').toFixed(1)} ms`,
+      `update ${g('update').toFixed(1)} (units ${g('updateTowers').toFixed(1)} fx ${g('updateFx').toFixed(1)})  view ${g('renderView').toFixed(1)} (gl ${g('RD.render').toFixed(1)})`,
+      `ui ${(g('hud') + g('renderInfo') + g('renderCard') + g('renderPortrait') + g('bossCard') + g('forecastTick') + g('manaPaneTick') + g('tickCardCool') + g('drawTexts')).toFixed(1)} ms  draws ${Math.round(PERF.calls / fr)}`,
+      `foes ${G.creeps ? G.creeps.filter(c => !c.dead).length : 0}  units ${G.towers ? G.towers.length : 0}  parts ${G.parts ? G.parts.length : 0}  sfx ${typeof SFX !== 'undefined' ? SFX.list.length : 0}`,
+      `vfx verts ${typeof VX !== 'undefined' ? VX.nv : 0}  gpu parts ${gpuP}  fire q ${typeof HF !== 'undefined' ? HF.q.length : 0}` + (mem ? `  heap +${((mem - hp0) / 1048576 / (acc / 1000)).toFixed(1)} MB/s` : ''),
+    ];
+    hp0 = mem;
+    if (PERF.hud) PERF.hud.textContent = L.join('\n');
+    resetSecs(); fr = 0; acc = 0;
+  }
+  function makeHud() {
+    if (PERF.hud || !document.body) return;
+    const el = PERF.hud = document.createElement('div'); el.id = 'perfHud'; el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = 'position:fixed;left:6px;top:calc(76px + env(safe-area-inset-top,0px));z-index:9999;pointer-events:none;font:600 11px/1.35 ui-monospace,Consolas,monospace;'
+      + 'color:#e8f0e0;background:rgba(10,14,12,.78);padding:4px 7px;border-radius:4px;border:1px solid rgba(255,255,255,.12);white-space:pre';
+    document.body.append(el);
+  }
+  // the scene's own tick: after each game update (so it runs at any game speed, and in PERF.bench)
+  function hookUpdate() {
+    if (PERF.upd) return; PERF.upd = true;
+    const u0 = update; update = function (dt) { const r = u0.apply(this, arguments); if (PERF.on) try { feed(dt); } catch (e) { console.warn('perf feed', e); } return r; };
+  }
+  window.perfStress = function (mode, seed) {
+    mode = mode && mode !== '1' && mode !== 'true' ? mode : 'mix';
+    hookUpdate(); wrapAll();   // (feed sits inside the timed update: it is a few hundredths of a ms)
+    if (seed !== 0) {   // the same scene every time: Math.random seeded (the run's foes, units' quirks, sparks), the view's clock from 0
+      let a = (seed || 1) * 7919 | 0;
+      Math.random = function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+      try { vt = 0; } catch (e) {}
+    }
+    if (!startArmy(mode)) return false;
+    PERF.on = true; PERF.mode = mode; PERF.refillT = 0; PERF.spawnT = 0;
+    for (let i = 0; i < 90; i++) update(1 / 60);   // the first foes onto the field
+    makeHud(); resetSecs();
+    if (!PERF.raf) { PERF.raf = 1; requestAnimationFrame(readout); }
+    return { units: G.towers.length, foes: G.creeps.length };
+  };
+  // step the scene by hand: frames of update + renderView + a pixel read (so the GPU work is counted)
+  PERF.bench = async function (frames = 300, warm = 60) {
+    PERF.errs = PERF.errs || [];
+    // a frame: the JS (update, the view and its GL calls, the HUD), then a pixel read that waits for the GPU; cpu is the first part
+    let cpu = 0;
+    const gl = RD.gl, px = new Uint8Array(4), ts = [], cs = [], step = () => { const t0 = performance.now(); try { update(1 / 60); renderView(1 / 60); if (typeof drawTexts === 'function') drawTexts(); hud(); } catch (e) { if (PERF.errs.length < 20) PERF.errs.push(String(e && e.stack || e).slice(0, 400)); } cpu = performance.now() - t0; gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+    for (let i = 0; i < warm; i++) { step(); if (i % 30 === 29) await new Promise(r => setTimeout(r, 0)); }
+    resetSecs(); let parts = 0, verts = 0, foes = 0, sfxN = 0;
+    for (let i = 0; i < frames; i++) {
+      const t0 = performance.now(); step(); ts.push(performance.now() - t0); cs.push(cpu);
+      parts += G.parts.length; verts += typeof VX !== 'undefined' ? VX.nv : 0; foes += G.creeps.length; sfxN += typeof SFX !== 'undefined' ? SFX.list.length : 0;
+      if (i % 30 === 29) await new Promise(r => setTimeout(r, 0));
+    }
+    const sec = PERF.snapshot(frames), draws = PERF.calls / frames; ts.sort((a, b) => a - b); cs.sort((a, b) => a - b);
+    return { mean: ts.reduce((a, b) => a + b, 0) / frames, p50: ts[frames >> 1], p95: ts[Math.floor(frames * .95)], cpu: cs.reduce((a, b) => a + b, 0) / frames, cpu50: cs[frames >> 1], cpu95: cs[Math.floor(frames * .95)], draws, parts: parts / frames, verts: verts / frames, foes: foes / frames, sfx: sfxN / frames, units: G.towers.length, sec, errs: PERF.errs.slice(0, 5) };
+  };
+  if (q) {   // ?perf=...: wait for the title, then build the scene
+    const go = () => { if (!document.getElementById('oNew') || typeof RD === 'undefined' || !RD) return setTimeout(go, 300); setTimeout(() => perfStress(q), 200); };
+    go();
+  }
 })();
 
 /* ================= SPELL HELP: how each force spell decides when and on what to cast, and how best to use it =================
