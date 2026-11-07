@@ -1,4 +1,4 @@
-const BUILD_TAG = '30c4a88@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0c6b3fc@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1304,6 +1304,7 @@ function waveSpec(n) {
 // creep health per wave: steep through the first thirty, then a gentler climb to fifty (endless keeps climbing)
 const HP_KNEE = 30;
 let HP_EASE9 = .3;
+let HP_CUT9 = .05;   // every foe 5% less health from wave 9 on, on top of HP_EASE9 (owner, 8 Nov 2026)
 // waves 2 to 9 died too easily: extra health there, easing back out by wave 12 (wave 1 stays the gentle opener)
 let HP_E29 = .4, LEAD_E29 = .25, LEAD_HP = .88, MINION_HP = 1.44, BOSS_HP = .81, BOSS_EARLY = .81;   // BOSS_EARLY: leaders and bosses of waves 2 to 10 softer still (two 10% cuts)   // BOSS_HP: every leader and boss 10% softer again, twice   // MINION_HP: the rank and file (not leaders or bosses) were going down too easily   // LEAD_HP: every dungeon leader a touch softer than its numbers (the player found them a bit much)
 // the climb: +40% from wave 2, then steeper with every wave past 9, to +100% by wave 29 (Tower Wars keeps its own pace)
@@ -1320,7 +1321,7 @@ function waveHP(n, diff) {
   if (!(typeof G !== 'undefined' && G && G.vs)) h *= HP_ALL * WAVE_TUNE[Math.min(n, MAX_WAVE) - 1];   // every foe in the campaign, summons and bosses too (Tower Wars keeps its own)
   if (!oldRules()) h *= (FORM_TUNE[Math.min(n, MAX_WAVE) - 1] || 1) * (typeof forceHpK === 'function' ? forceHpK(n) : 1);   // the force march's own formations (Classic keeps WAVE_TUNE alone), and its gentler unit tiers (forces_zz_tiers.js)
   // the climb eased from wave 9: 30% less health by wave 14 and after (18% at first; eased again the same day) (owner, 7 Nov 2026: consistently losing from wave 9)
-  if (!(typeof G !== 'undefined' && G && G.vs)) h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1);
+  if (!(typeof G !== 'undefined' && G && G.vs)) { h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1); if (n >= 9) h *= 1 - HP_CUT9; }
   return h * (1 + (m - 1) * Math.min(1, (n - 1) / 12)) * (typeof riteHP === 'function' ? riteHP() : 1);   // a Rite of Passage's tougher foes
 }
 // bosses arrive every 5th wave; early ones are softened so a reasonable maze can bring them down
