@@ -1,4 +1,4 @@
-const BUILD_TAG = '739f15c@2026-11-07';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7571669@2026-11-07';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -68169,7 +68169,7 @@ function gpMana(t) {
    stats, items in): "41 damage", or each hit it names, "41 · 14 damage". With alt (a preview), each number now is struck
    through beside the new one, green or red. */
 // a spell whose text names a flat figure ("2296 damage", as the commander's spell on its Champion) shows that instead (owner: Severing Arc)
-const gpDmgNums = (t, st, ab) => { let s = ''; try { s = abText(t, st, ab); } catch (e) {} const a = [...s.matchAll(/× damage \((\d+)\)/g)].map(m => +m[1]); return a.length ? a : [...s.matchAll(/(?:^|[\s:(])(\d{2,}) damage/g)].map(m => +m[1]); };
+const gpDmgNums = (t, st, ab) => { let s = ''; try { s = abText(t, st, ab); } catch (e) {} const a = [...s.matchAll(/× damage \((\d+)\)/g)].map(m => +m[1]); return a.length ? a : [...s.matchAll(/(?:^|[\s:(])(\d{2,}) damage/g)].map(m => +m[1]); };
 function gpDmgHTML(t, ab, alt) {
   const st = t.st || effStats(t), a = gpDmgNums(t, st, ab); if (!a.length) return '';
   const b = alt ? gpDmgNums(t, alt, ab) : null;
@@ -78589,7 +78589,7 @@ function tutTarget(h) {
 function tutTick() {
   if (!TUT.cur || !G || G.tut !== TUT.cur.ch.id || (G.state !== 'play' && G.state !== 'won' && G.state !== 'lost')) { if (TUT.el && !TUT.cur) tutHide(); return; }
   tutUpdate(); tutRender();
-  { const ovOpen0 = typeof ov !== 'undefined' && ov && !ov.hidden, cls = typeof ovp !== 'undefined' && ovp ? ovp.className : ''; if (TUT.el) TUT.el.hidden = ovOpen0 && /(tutl|spbk|pausep|setp|howp|warp)/.test(cls); }
+  { const ovOpen0 = typeof ov !== 'undefined' && ov && !ov.hidden, cls = typeof ovp !== 'undefined' && ovp ? ovp.className : ''; if (TUT.el) TUT.el.hidden = ovOpen0 && /\b(tutl|spbk|pausep|setp|howp|warp)\b/.test(cls); }
   tutPlaceCoach();
   const r = TUT.ring; if (!r) return;
   const s = tutStep(), ovOpen = typeof ov !== 'undefined' && ov && !ov.hidden;
