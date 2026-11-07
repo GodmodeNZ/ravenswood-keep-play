@@ -1,4 +1,4 @@
-const BUILD_TAG = '1bc09e2@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'cbb7293@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1304,7 +1304,7 @@ function waveSpec(n) {
 // creep health per wave: steep through the first thirty, then a gentler climb to fifty (endless keeps climbing)
 const HP_KNEE = 30;
 let HP_EASE9 = .3;
-let HP_CUT9 = .05;   // every foe 5% less health from wave 9 on, on top of HP_EASE9 (owner, 8 Nov 2026)
+let HP_CUT9 = .145;   // every foe, bosses too, less health from wave 9 on, on top of HP_EASE9: 5%, then 10% more (owner, 8 Nov 2026)
 // waves 2 to 9 died too easily: extra health there, easing back out by wave 12 (wave 1 stays the gentle opener)
 let HP_E29 = .4, LEAD_E29 = .25, LEAD_HP = .88, MINION_HP = 1.44, BOSS_HP = .81, BOSS_EARLY = .81;   // BOSS_EARLY: leaders and bosses of waves 2 to 10 softer still (two 10% cuts)   // BOSS_HP: every leader and boss 10% softer again, twice   // MINION_HP: the rank and file (not leaders or bosses) were going down too easily   // LEAD_HP: every dungeon leader a touch softer than its numbers (the player found them a bit much)
 // the climb: +40% from wave 2, then steeper with every wave past 9, to +100% by wave 29 (Tower Wars keeps its own pace)
@@ -12256,7 +12256,7 @@ FORCES.conclave = { name: 'The Conclave', title: 'Scholars of the Drifting Colle
   order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
   start: ['glaive', 'arrow', 'frost'],
   units: {
-    glaive: { id: 'cc_spellblade', name: 'Spellblades', short: 'Spellblade', key: '1', proj: 'force', attack: 'cc_blade', elem: null, dmgType: 'phys', air: false, ground: true, ccSchool: 'arcane', visTiers: 6,
+    glaive: { id: 'cc_spellblade', name: 'Spellblades', short: 'Spellblade', key: '1', proj: 'force', attack: 'cc_blade', elem: null, dmgType: 'phys', strongVs: ['Magic-resistant', 'Cloth casters'], air: false, ground: true, ccSchool: 'arcane', visTiers: 6,
       top: [.95, 1, 1.05, 1.1, 1.16, 1.22],
       blurb: 'Duelists of the College with starsteel swords: their cuts are steel (the College’s blade against magic-resistant foes). They cut the foe beside them and blink short hops along the road. Each cut staggers its foe (slowed 10% a stack); the 3rd stack stuns it for 1s. Their element is Arcane: an Arcane mark meeting Fire, Frost or Stone Overloads. Cannot reach flyers.',
       tiers: [{ cost: 25, dmg: 21, rate: .8, range: 1.35 }, { cost: 48, dmg: 42, rate: .77, range: 1.4 }, { cost: 105, dmg: 98, rate: .73, range: 1.5 }] },
@@ -70673,7 +70673,7 @@ const SPELL_BRIEFS = {
   /* wardbound */
   wb_swordplant: 'Leaps and drives his greatsword into the road, dealing {d} within 1.3 cells, rooting {root} sec and branding. Carves 4 oath runes.',
   wb_wardflare: 'Cleaves within 1.5 cells for {d}, branding. Ward-lines and runes in reach flare, dealing {d} to ground enemies on them and branding too.',
-  wb_laststand: 'Plants his sword for {dur} sec, branding ground enemies within 1.2 cells. He can\'t be Wounded or attack, and every 0.5 sec pushes them back and slows by 40%.',
+  wb_laststand: 'Plants his sword for {dur} sec. He can\'t attack, but can\'t fall. Every 0.5 sec, ground enemies within 1.2 cells are branded, pushed back and slowed by 40%.',
   wb_runevolley: 'Rains {n} arrows near the target spot, each dealing {d} (a lone enemy takes all) and leaving a shaft rune.',
   wb_piercingshaft: 'Looses an arrow through every enemy in a line for {d} each, removing 3 armour for 5 sec. Leaves 3 shaft runes past the first enemy.',
   wb_wardarrow: 'Drives an arrow under a ground enemy, making a great shaft rune for {dur} sec. Adjacent enemies take {d} and are branded. It links with every rune within 3.2 cells into ward-lines.',
@@ -70688,12 +70688,12 @@ const SPELL_BRIEFS = {
   wb_skyfall: 'Calls lightning onto every storm rune up to 1.5 cells beyond reach. Enemies within 0.85 cells take {d} and are stunned 0.25 sec (at most twice). With no storm rune, first lays one under the toughest enemy.',
   wb_shieldwall: 'Slams its shield, dealing {d} to ground enemies in the cone, stunning {stun} sec and shoving 0.4 cells back. Lays a stone rune.',
   wb_quakeline: 'Slams the nearest ground enemy for {d}, stunning {stun} sec. A quake runs both ways to runes within 3 cells, doing the same to ground enemies passed and laying stone runes. Runes it reaches trigger again.',
-  wb_anvil: 'Braces {dur} sec, can\'t be Wounded. Ground enemies within 1.15 cells take {d}, are shoved 0.6 cells and stunned 0.3 sec, once per sec each.',
+  wb_anvil: 'Braces {dur} sec and can\'t fall. Ground enemies within 1.15 cells take {d}, are shoved 0.6 cells and stunned 0.3 sec, once per sec each.',
   wb_pinbolt: 'Fires a bolt down a line, dealing {d} to the first 3 ground enemies, rooting {pin} sec and laying a pin rune under each.',
   wb_runeshot: 'Every rune within 1.4 cells of the spot bursts, used up, dealing {d} to adjacent enemies (at most twice each) and applying its effects. With no rune, deals {d2} to ground enemies there and lays a pin rune.',
   wb_chainbolt: 'Strikes the 2 enemies nearest the gate for {d}, rooting 0.5 sec and chaining them {dur} sec: half the damage one takes is dealt to the other.',
   wb_censer: ({ full }) => `Fills 1.2 cells with smoke for ${(/for ([\d.]+)s/.exec(String(full)) || [])[1]} sec. Wardbound units heal ${(/mend (\d+) health/.exec(String(full)) || [])[1]} health per sec, enemies are branded once, and siege enemies can't attack.`,
-  wb_vow: 'Heals the most hurt Wardbound unit within 2.5 cells to full; it can\'t be Wounded for {dur} sec. Ground enemies within 1 cell gain 2 brands.',
+  wb_vow: 'Heals the most hurt Wardbound unit within 2.5 cells to full; it can\'t fall for {dur} sec. Ground enemies within 1 cell gain 2 brands.',
   wb_rite: 'Renews every vow and oath rune within 3 cells and adds Vow, making it Bound. Ground enemies on them take {d} and are branded. With no such rune, lays a vow rune at its post.',
   ch_wardensoath: ({ d, full }) => `Strikes ground enemies in ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells for ${d(1)}, brands twice and rings them with 6 oath runes. Deals 50% more if 4+ are hit or any is slowed or held. Roots 2 sec once enemies pass half the road.`,
   ch_holdfast: 'Braces {dur} sec. Every 0.5 sec, deals {d} to ground enemies on a rune or ward-line, rooting 0.6 sec (once per 2 sec).',
@@ -70722,7 +70722,7 @@ const SPELL_TARGETS = {
   heroiccharge: 'the toughest ground enemy in range',
   stampede: 'ground enemies furthest out or over a wall',
   runthrough: 'the toughest ground enemy in range',
-  shift: 'itself',
+  shift: 'its own form',
   wildstrike: 'flying enemies first, then armoured casters',
   wildsurge: 'the toughest enemy in range',
   whirlwind: 'every ground enemy in reach',
@@ -70739,7 +70739,7 @@ const SPELL_TARGETS = {
   ch_oldwood: 'the road ahead of ground enemies',
   ch_thornvolley: 'the densest group of enemies',
   ch_pinarrow: 'the farthest enemy in range',
-  ch_huntermoon: 'itself',
+  ch_huntermoon: 'its own shots',
   ch_sporecloud: 'the densest group of enemies',
   ch_garden: 'the toughest ground enemies, one moth each',
   ch_fullbloom: 'every spored enemy in range',
@@ -70793,8 +70793,8 @@ const SPELL_TARGETS = {
   ih_flakscreen: 'flying enemy flocks first, else the densest group',
   ih_grapnel: 'flying enemies first, else the toughest',
   ih_airburst: 'flying enemy flocks first, else the densest group',
-  ih_pressureslam: 'itself',
-  ih_steamvent: 'itself',
+  ih_pressureslam: 'ground enemies in reach',
+  ih_steamvent: 'ground enemies in reach',
   ih_pistondrive: 'the toughest ground enemy in reach',
   ih_incendiary: 'the densest group of ground enemies',
   ih_shrapnelround: 'the road just ahead of the lead ground enemy',
@@ -70803,7 +70803,7 @@ const SPELL_TARGETS = {
   ih_trench: 'heavy ground enemies near the gate',
   ih_demolish: 'every enemy carrying a charge',
   ch_ironwall: 'the densest group of enemies',
-  ch_anvil: 'itself',
+  ch_anvil: 'Ironhold units nearby',
   ch_oath: 'the cone over the most ground enemies',
   ch_sentry: 'the densest group of enemies',
   ch_coil: 'the spot with the most armoured enemies',
@@ -70814,7 +70814,7 @@ const SPELL_TARGETS = {
   /* silver */
   so_bash: 'the toughest ground enemy in reach',
   so_aegis: 'the road beside it with the most ground enemies',
-  so_rebuke: 'itself',
+  so_rebuke: 'ground enemies around it',
   so_sanct: 'the toughest enemy in range',
   so_hail: 'the densest group of enemies',
   so_witness: 'the toughest enemy, bosses first',
@@ -70823,14 +70823,14 @@ const SPELL_TARGETS = {
   so_shackle: 'nearby Oath-Stones and Order units',
   so_grail: 'the toughest ground enemy in reach',
   so_ridedown: 'the toughest ground enemy in reach',
-  so_vow: 'itself and nearby Order units',
+  so_vow: 'it and Order units nearby',
   so_sunlance: 'flying enemies first, else the longest line',
   so_halo: 'the arc over the most enemies',
   so_dawnfall: 'every flying enemy in reach',
-  so_crush: 'itself',
-  so_hallow: 'itself',
+  so_crush: 'ground enemies around it',
+  so_hallow: 'ground enemies around it',
   so_hammerfall: 'the toughest ground enemy in range',
-  so_sweep: 'itself',
+  so_sweep: 'ground enemies around it',
   so_smoke: 'the stretch of road with the most ground enemies',
   so_embers: 'incense patches, else the densest group',
   so_edict: 'casters first, else the densest group',
@@ -70841,7 +70841,7 @@ const SPELL_TARGETS = {
   ch_lionsdue: 'the most Judged ground enemy',
   ch_dawnbreak: 'the densest group of enemies',
   ch_morningstar: 'Oath-Stones crossing the most enemies',
-  ch_highnoon: 'itself',
+  ch_highnoon: 'Blinded enemies in reach',
   ch_sentence: 'every Judged enemy on the field',
   ch_summons: 'the enemy beside the most Judgement',
   ch_verdict: 'the toughest enemy in the crowd',
@@ -70865,30 +70865,30 @@ const SPELL_TARGETS = {
   sb_fissure: 'nearby stones',
   sb_herd: 'the road under the densest ground enemies',
   sb_thunderhead: 'the densest group of enemies',
-  sb_downpour: 'itself',
+  sb_downpour: 'all enemies',
   sb_stormdance: 'the toughest enemy in range',
   sb_tether: 'the toughest flying enemies',
   sb_downdraft: 'the toughest flying enemy',
   sb_skyfall: 'the toughest flying enemy first',
   ch_gather: 'the densest group of enemies',
   ch_eyestorm: 'the enemy nearest the gate',
-  ch_stormcall: 'itself',
+  ch_stormcall: 'all enemies',
   ch_cyclone: 'the densest group of enemies',
   ch_galewall: 'the cone over the most enemies',
-  ch_updraft: 'itself',
+  ch_updraft: 'all enemies',
   ch_spirithunt: 'the densest group of enemies',
   ch_runwolves: 'the toughest ground enemy in range',
   ch_thunderdive: 'the toughest enemy that is not a boss or leader',
   /* wardbound */
-  wb_swordplant: 'itself',
-  wb_wardflare: 'itself',
-  wb_laststand: 'itself',
+  wb_swordplant: 'ground enemies on the road nearby',
+  wb_wardflare: 'enemies around it and on its runes',
+  wb_laststand: 'ground enemies around it',
   wb_runevolley: 'the densest group of enemies',
   wb_piercingshaft: 'the line through the most enemies',
   wb_wardarrow: 'the ground enemy with the most runes near it',
   wb_rimeline: 'the densest group of ground enemies',
   wb_frostbite: 'branded or chilled ground enemies',
-  wb_winterward: 'itself',
+  wb_winterward: 'enemies stepping on its frost runes',
   wb_etch: 'the toughest enemies in range',
   wb_detonate: 'sigil-carved enemies in range',
   wb_scribe: 'the road under the lead group',
@@ -70897,21 +70897,21 @@ const SPELL_TARGETS = {
   wb_skyfall: 'storm runes, else the toughest enemy',
   wb_shieldwall: 'the cone over the most ground enemies',
   wb_quakeline: 'the ground enemy nearest itself',
-  wb_anvil: 'itself',
+  wb_anvil: 'ground enemies around it',
   wb_pinbolt: 'the line through the most ground enemies',
   wb_runeshot: 'the densest group of ground enemies',
   wb_chainbolt: 'the two enemies nearest the gate',
-  wb_censer: 'itself',
+  wb_censer: 'enemies around it',
   wb_vow: 'the most hurt nearby Wardbound unit',
-  wb_rite: 'itself',
+  wb_rite: 'its runes nearby',
   ch_wardensoath: 'the densest group of enemies',
-  ch_holdfast: 'itself',
+  ch_holdfast: 'ground enemies on its runes',
   ch_lastgate: 'the road nearest the gate',
   ch_sunwheel: 'the densest group of enemies',
   ch_suncharge: 'the line through the most ground enemies',
-  ch_blazeglory: 'itself',
+  ch_blazeglory: 'every enemy in reach',
   ch_oathbind: 'the densest group of enemies',
-  ch_bindsweep: 'itself',
+  ch_bindsweep: 'every ground enemy',
   ch_oathturned: 'the toughest ground enemy in range'
 };
 
@@ -71108,10 +71108,28 @@ function unitTipRole(t, st) {
   if (st.slow || st.ihSlow) x.push('slows');
   if (st.armorPen >= .25) x.push('pierces armour');
   if (st.brand) x.push('brands');
-  if (st.vsAir >= 1 || st.huntAir) x.push('anti-air');
-  if (st.hunt && UT_HUNT[st.hunt]) x.push(UT_HUNT[st.hunt]);
   if (d.dmgType && d.dmgType !== 'phys' && x.length < 2) x.push(d.dmgType + ' damage');
   return out.concat(x.slice(0, 2)).join(' · ');
+}
+/* "Strong vs": the foes a unit is best against, read off what the game's damage rules reward (game.js roleK and hurt):
+   steel bites cloth casters and the magic-resistant, magic and arcane bite armour, area bites swarms, armour-piercing
+   steel bites armour too, anti-air bites flyers, holy bites the undead, roots and slows hold fast foes, a hunt names its
+   prey. A unit's def.strongVs (a list) overrides it. At most three, the strongest reasons first. */
+const UT_HUNT_VS = { flyer: 'Flyers', healerFree: 'Supports', warded: 'Magic-resistant', manaful: 'Cloth casters', plated: 'Armoured' };
+function unitStrongVs(t, st) {
+  const d = t.def || {}, out = [], add = v => { if (v && !out.includes(v)) out.push(v); };
+  if (Array.isArray(d.strongVs)) return d.strongVs.slice(0, 3);
+  const ty = t.type, dt = ty === 'holy' && !d.champ ? 'pure' : d.dmgType || 'phys';
+  if (ty === 'wall' || d.wall) return [];   // a wall holds the road, it fights nothing
+  if (st.hunt && UT_HUNT_VS[st.hunt]) add(UT_HUNT_VS[st.hunt]);
+  if (d.air && d.ground === false || st.vsAir >= 1 || st.huntAir) add('Flyers');
+  if (dt === 'magic' || dt === 'arcane') add('Armoured');
+  if (dt === 'phys' && st.armorPen >= .25) add('Armoured');
+  if (st.chain || st.splash || st.multi || d.proj === 'whirl') add('Swarms');
+  if (dt === 'phys') { add('Cloth casters'); add('Magic-resistant'); }
+  if (dt === 'pure') add('Undead');
+  if (st.root || st.pin || st.slow || st.ihSlow) add('Fast foes');
+  return out.slice(0, 3);
 }
 /* a unit's name colour on its tooltip: the dominant hue of its portrait, at one saturation and lightness for every unit
    (owner); measured once per portrait when it has loaded, the force's colour until then */
@@ -71147,6 +71165,7 @@ function unitTipHTML(t, o) {
   const hits = d.air && d.ground !== false ? 'Ground and air' : d.air ? 'Air only' : 'Ground only';
   let h = `<div class="wt-h"><i class="wt-n" style="color:${unitNameCol(t) || hue}">${stEsc(d.name || 'Unit')}</i><i class="wt-k">Tier ${ROMAN[t.tier | 0] || 'I'}</i></div>`
     + `<div class="wt-role">${stEsc(unitTipRole(t, st))}</div>`
+    + (sv => sv.length ? `<div class="wt-sv">Strong vs <b>${stEsc(sv.join(' · '))}</b></div>` : '')(unitStrongVs(t, st))
     + row(dps > 0 ? `${Math.round(dps)} damage per second` : st.dmg ? `${Math.round(st.dmg)} damage a hit` : '', rate > 0 ? `Attacks every ${stSec(rate)} sec` : '')
     + row(rg > 0 ? (rg < 2 ? 'Melee range' : `${stSec(rg)} cell range`) : '', hits);
   if (live && t.maxHp > 0 && (t.hp < t.maxHp - .5 || t.wrecked)) h += row(t.wrecked ? 'Wrecked' : `Health ${Math.round(t.hp)} / ${Math.round(t.maxHp)}`, '');
