@@ -1,4 +1,4 @@
-const BUILD_TAG = '0fda4be@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f2cb944@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -8065,10 +8065,11 @@ function drawForceUnit(t, tier, sx, sy, sz, wob, opts) {
   const pv = TORSO_PIV[u] || TORSO_DEF;   // the upper body about the waist (lowered with a crouch)
   M4.trs(_ft, pv[0] * K, (pv[1] * (1 - B.sq) + B.dy) * K, pv[2] * K, B.ry, B.rx, B.rz); M4.mul(_fu, _fr, _ft);
   M4.trs(_ft, -pv[0] * K, -pv[1] * K, -pv[2] * K); M4.mul(_fu, _fu, _ft);
-  if (L.up.count) dbg('up', item(L.up, _fu, opts));
+  const away = dr && u === 'druid_hawk' && live && typeof druidAway === 'function' && druidAway(t);   // (a Grove Shifter's hawk out on a sortie: its stump stays, the bird is drawn in flight by druidExtra)
+  if (L.up.count && !away) dbg('up', item(L.up, _fu, opts));
   FX_PM.root = _fr; FX_PM.torso = _fu;
   let n = 0;
-  for (const P of FORCE_PARTS[u] || []) {
+  for (const P of away ? [] : FORCE_PARTS[u] || []) {
     let q = P.pose(t); FX_PM[P.k] = null;
     if (B.parts && P.k in B.parts) q = blendQ(q, B.parts[P.k], B.w * (B.pw[P.k] == null ? 1 : B.pw[P.k]));
     if (!q) continue;
@@ -14879,9 +14880,9 @@ function druidStrike(t, st, tg, pow) {
     return;
   }
   const hawk = f === 'hawk', trav = .1 + d * (hawk ? .035 : .05), tip = !hawk && typeof unitTip === 'function' ? unitTip(t) : null;   // (the sage's bolt leaves the staff's head)
-  if (!hawk && typeof sfxSageBolt === 'function' && sfxSageBolt(t, tg, trav, tip)) {}   // (drawn by the spell effects when they are on: spellfx.js)
-  else rfx({ k: 'streak', x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t) * (hawk ? .8 : 1.1), z0: tip ? tip[2] : t.y, c: tg, col: hawk ? '#f0d090' : '#b8e4ff', w: hawk ? .04 : .055, trav, life: trav + .14 });
-  if (hawk) sfx('hawkStrike');   // the owner's hawk sounds: wingbeats or the cry of taking flight as it stoops
+  if (hawk) { druidSortie(t, tg, trav); sfx('hawkStrike'); }   // the hawk itself flies out and stoops on it (arriving as the talons land), to the owner's hawk sounds: wingbeats or the cry of taking flight
+  else if (typeof sfxSageBolt === 'function' && sfxSageBolt(t, tg, trav, tip)) {}   // (drawn by the spell effects when they are on: spellfx.js)
+  else rfx({ k: 'streak', x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t) * 1.1, z0: tip ? tip[2] : t.y, c: tg, col: '#b8e4ff', w: .055, trav, life: trav + .14 });
   G.delayed.push({ t: trav, fn: () => {
     if (!live()) return;
     if (hawk) {   // talons: a stoop of wind and feathers
@@ -14905,6 +14906,68 @@ function druidStrike(t, st, tg, pow) {
       for (let k = 0; k < 3; k++) part({ k: 'xmote', x: tg.x + R(-.15, .15), z: tg.y + R(-.15, .15), h: hitH(tg), vx: R(-.3, .3), vz: R(-.3, .3), vh: R(.3, .8), drag: 1, life: .5, max: .5, size: .04, col: '#cfeaff', rot: R(TAU), vr: R(-3, 3) });
     }
   } });
+}
+
+/* ---------- the hawk's sortie: in hawk form the Shifter itself takes off from its stump, stoops on the flyer it strikes,
+   mantles over it a moment and flies back to land on the stump (or, when it strikes again before it is home, flies on to
+   the next one from where it is). A look only: the unit's post, cell, strike timing and damage are unchanged (druidStrike
+   and the Hawk Strike still land on their own delays; the flight is timed to arrive with them). Kept off the unit (a
+   WeakMap: saves never see it). druidAway(t): the hawk is off its stump, so the bird on it is not drawn (forces.js
+   drawForceUnit) and druidExtra draws the flying one. ---------- */
+const DSORT = new WeakMap(), DS_HOLD = .14, DS_ABOVE = .12;   // (it strikes from just over its flyer, so the two read apart from above)
+const dsK = t => t._dsK || unitK('druid_hawk', t.tier | 0);
+const dsPerch = t => ({ p: [t.x, DRUID_HAWK_Y * dsK(t), t.y], yaw: t.ang == null ? 0 : t.ang, pitch: -DRUID_HAWK_S });
+function druidSortie(t, tg, out) {   // send it at tg, arriving in out seconds
+  if (typeof G === 'undefined' || G.time == null || !tg) return;
+  const c = (DSORT.get(t) && druidHawkAt(t, G.time)) || dsPerch(t);   // (from where it is: the stump, or mid-air from its last strike)
+  DSORT.set(t, { at: G.time, out: Math.max(.08, out), tg, s: c.p.slice(), syaw: c.yaw, tp: [tg.x, hitH(tg) + DS_ABOVE, tg.y], h: null, back: 0,
+    arc: .25 + .06 * Math.min(6, Math.hypot(tg.x - c.p[0], tg.y - c.p[2])) });
+}
+function druidAway(t) {
+  const S = t && DSORT.get(t); if (!S) return false;
+  if (typeof G === 'undefined' || G.time == null || (typeof inIcon !== 'undefined' && inIcon)) return false;
+  if (druidForm(t) !== 'hawk' || !G.towers.includes(t) || G.time < S.at - .01) { DSORT.delete(t); return false; }   // (a shift, a sale, a new run: home at once)
+  if (S.back && G.time >= S.at + S.out + DS_HOLD + S.back) { DSORT.delete(t); return false; }   // landed
+  return true;
+}
+// where it is along the sortie at time now (its position only)
+function dsPos(t, S, now) {
+  const du = now - S.at, L = (a, b, u) => a + (b - a) * u, T = S.tp;
+  if (du < S.out) {   // up off the stump in a rising arc, then a short steep stoop onto the flyer
+    const u = Math.max(0, du / S.out), e = 1 - (1 - u) * (1 - u), lift = S.arc * Math.sin(Math.PI * Math.min(1, u * 1.3));
+    return [L(S.s[0], T[0], e), L(S.s[1], T[1], u * u) + lift, L(S.s[2], T[2], e)];
+  }
+  if (du < S.out + DS_HOLD) { const q = (du - S.out) / DS_HOLD; return [T[0], T[1] + .06 * Math.sin(Math.PI * q) + .03 * q, T[2]]; }   // mantling over the strike, riding it a moment
+  const H = S.h || [T[0], T[1] + .03, T[2]], P = dsPerch(t).p, q = Math.min(1, (du - S.out - DS_HOLD) / (S.back || 1)), e = ease(q);
+  return [L(H[0], P[0], e), L(H[1], P[1], e) + (S.arc + .1) * Math.sin(Math.PI * q), L(H[2], P[2], e)];   // a wide easy arc home
+}
+// its pose now: position, heading and pitch along its flight, the wing beat; null when it is on its stump
+function druidHawkAt(t, now) {
+  const S = DSORT.get(t); if (!S) return null;
+  const du = now - S.at;
+  if (du < S.out + DS_HOLD && S.tg && !S.tg.dead) S.tp = [S.tg.x, hitH(S.tg) + DS_ABOVE, S.tg.y];   // (it follows its flyer till it has struck)
+  if (du >= S.out + DS_HOLD && !S.h) { S.h = [S.tp[0], S.tp[1] + .03, S.tp[2]]; const P = dsPerch(t).p; S.back = .45 + .09 * Math.min(8, Math.hypot(P[0] - S.h[0], P[2] - S.h[2])); }
+  if (S.back && du >= S.out + DS_HOLD + S.back) return null;
+  const p = dsPos(t, S, now), b = dsPos(t, S, now - .03), vx = p[0] - b[0], vy = p[1] - b[1], vz = p[2] - b[2], hz = Math.hypot(vx, vz);
+  let yaw = hz > 1e-4 ? Math.atan2(vx, vz) : S.syaw, pitch = Math.max(-.7, Math.min(1.1, Math.atan2(-vy, Math.max(hz, 1e-4)) * .9)), open = true, flap;
+  if (du < S.out) { const u = du / S.out; flap = u < .7 ? .85 * Math.sin(du * 30) : .1; open = u < .82; }   // beating hard off the stump, wings tucked for the last of the stoop
+  else if (du < S.out + DS_HOLD) { yaw = Math.atan2(S.tp[0] - S.s[0], S.tp[2] - S.s[2]); pitch = -.35; flap = .7 + .25 * Math.sin(du * 24); }   // mantling: wings flared high over it
+  else {
+    const q = (du - S.out - DS_HOLD) / S.back, land = q > .78 ? (q - .78) / .22 : 0, P = dsPerch(t);
+    flap = land ? .75 - .5 * land + .15 * Math.sin(du * 16) * (1 - land) : .8 * Math.sin(du * 20);   // steady beats home, then the landing flare settling to its mantle
+    if (land) { const d = Math.atan2(Math.sin(P.yaw - yaw), Math.cos(P.yaw - yaw)); yaw += d * ease(land); pitch += (P.pitch - pitch) * ease(land); }
+  }
+  S.syaw = yaw;
+  return { p, yaw, pitch, open, flap };
+}
+// the hawk in flight: the stump's own bird (hawkBody and its wings), at the body's and the wings' own scales
+function druidDrawHawk(h, K) {
+  const p = h.p, hb = K * DRUID_HAWK_BODY, hw = K * DRUID_HAWK_WING;
+  M4.trs(_fm, p[0], p[1], p[2], h.yaw, h.pitch, 0, hb); item(dynMesh('fp_hawkB', hawkBody), _fm);
+  for (const sd of [-1, 1]) {
+    if (h.open) { M4.trs(_fp, p[0], p[1], p[2], h.yaw, h.pitch, sd * h.flap, hw); item(dynMesh('fp_hawkW' + sd, g => hawkWing(g, sd)), _fp); }
+    else item(dynMesh('fp_hawkF' + sd, g => hawkFold(g, sd)), _fm);
+  }
 }
 
 /* ---------- Shift Form ---------- */
@@ -14981,7 +15044,7 @@ function druidWildCast(t, st, c, ab) {
   const f = druidForm(t), m = byT(ab.by.mult, t), h = byT(ab.by.hold, t), [ux, uz] = abDir(t, c);
   const hit = fn => G.delayed.push({ t: f === 'bear' ? .15 : .2, fn: () => { if (c.dead || !abLive(t)) return; fn(t.st || st); } });
   if (f === 'hawk') {
-    rfx({ k: 'streak', x0: t.x, h0: towerTop(t), z0: t.y, c, col: '#f0d090', w: .07, trav: .2, life: .35 });
+    druidSortie(t, c, .2); sfx('hawkStrike');   // the hawk flies out and stoops on it (the strike's own .2s)
     hit(s => { abHit(t, s, c, m, 'phys', [ux * .1, uz * .1]); if (!c.dead && c.fly) { c.lowT = Math.max(c.lowT || 0, G.time + (h + 1) * (c.def.boss ? .4 : 1)); fxRing(c.x, c.y, .6, ab.hue); } abFeatherFx(c.x, c.y, hitH(c), 10); abSfx('thrust', 0); });
   } else if (f === 'bear') {
     hit(s => { abHit(t, s, c, m, 'phys', [ux * .2, uz * .2]); if (!c.dead) stun(c, h * .5, .4); fxDust(c.x, c.y, 4); fxSpark(c.x, c.y, hitH(c), '#e8dcc0', 12); G.shake = Math.max(G.shake || 0, .05); abSfx('thrust', 1); });
@@ -15233,6 +15296,7 @@ function druidPerch(x, z, yaw, t) { const K = unitK('wayfarer', t ? t.tier : 0);
 // drawn live round it: the spirit hawk on a dive, the light of a shift, the sage's staff aglow
 function druidExtra(t, tier, x, z, yaw, K, C) {
   const live = !inIcon && typeof G !== 'undefined' && G.time != null;
+  if (live && druidModel(t) === 'druid_hawk') { t._dsK = K; const h = druidAway(t) && druidHawkAt(t, G.time); if (h) druidDrawHawk(h, K); }   // the Shifter itself out on a sortie
   if (live && t.hawkDive) { const h = hawkState(t, G.time, x, z, yaw); if (!h.perch) drawHawk(h, K * WF_HAWKK(tier), { shadow: false, alpha: .7, tint: [.85, 1, .9, .35] }); }
   const s = live && t.shiftAt != null ? G.time - t.shiftAt : 9;
   if (s >= 0 && s < .7) { const c = druidHex(DRUID_FORMS[druidForm(t)].hue), e = 1 - s / .7; glowB(x, .45 * K, z, (.7 + .9 * s) * K, c, .55 * e); glowB(x, .2 * K, z, .5 * K, [1, 1, .9], .4 * e); }
@@ -15254,6 +15318,7 @@ Object.assign(ABANIM, {
   wildstrike: { T: .8, keys: [.25, .45, .7], f(u, B, t) {
     const f = druidFormNow(t);
     if (f === 'hawk') {   // it drops off the perch at the foe, wings tucked, then flares them wide over the strike
+      if (druidAway(t)) return;   // (out on its sortie: the stump stays still)
       B.z = kf(u, [[0, 0], [.22, -.04], [.42, .32, 'out'], [.65, .28], [1, 0]]); B.rx = kf(u, [[0, 0], [.22, -.15], [.42, .45, 'out'], [.65, .35], [1, 0]]); B.dy = kf(u, [[0, 0], [.22, .05], [.42, -.06], [1, 0]]);
       const w = kf(u, [[0, .3], [.22, 1.1], [.4, -.35, 'in'], [.5, 1.2, 'out'], [.7, .9], [1, .3]]); B.parts.wingL = [0, 0, w, 0, 0, 0]; B.parts.wingR = [0, 0, -w, 0, 0, 0];
     } else if (f === 'bear') {   // it rears up on its haunches, the paw raised high, and slams down with its whole weight
@@ -15267,7 +15332,7 @@ Object.assign(ABANIM, {
     }
   }, fx(t, C, x, z, yaw, K) {
     const f = druidFormNow(t);
-    if (f === 'hawk' && FXLIVE() && C.u > .4 && C.u < .46) abFeatherFx(x + Math.sin(yaw) * .4 * K, z + Math.cos(yaw) * .4 * K, .4 * K, 2);
+    if (f === 'hawk' && FXLIVE() && C.u > .4 && C.u < .46 && !druidAway(t)) abFeatherFx(x + Math.sin(yaw) * .4 * K, z + Math.cos(yaw) * .4 * K, .4 * K, 2);
     if (f === 'bear' && FXLIVE() && C.u > .46 && C.u < .5) fxDust(x + Math.sin(yaw) * .35 * K, z + Math.cos(yaw) * .35 * K, 2);
     if (f === 'sage') { const e = fxEnv(C.u, .3, .8, .08), p = e && fxAt('staff', [0, .55, 0], K); if (p) glowB(p[0], p[1], p[2], .5 * K * e, [.8, .92, 1], .9 * e); }
   } },
