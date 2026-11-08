@@ -1,4 +1,4 @@
-const BUILD_TAG = '7037af5@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '2f94bf6@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -104,7 +104,7 @@ const AGES = [
   { name: 'Keep', short: 'I' },
   { name: 'Castle', short: 'II', cost: 300, wave: 8, text: 'Towers can be upgraded to tier IV.' },
   { name: 'Fortress', short: 'III', cost: 600, wave: 18, text: 'Towers can be upgraded to tier V.' },
-  { name: 'Citadel', short: 'IV', cost: 3000, wave: 28, text: 'Towers can be upgraded to tier VI.' },
+  { name: 'Citadel', short: 'IV', cost: 1200, wave: 28, text: 'Towers can be upgraded to tier VI.' },
 ];
 const maxTierFor = age => Math.min(5, 2 + (age | 0));
 function tierPerk(type, tier, spec) { return typeof specPerk === 'function' ? specPerk(type, spec, tier) : null; }
