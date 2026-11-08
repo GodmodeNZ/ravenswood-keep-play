@@ -1,4 +1,4 @@
-const BUILD_TAG = '6eaf7f0@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd834c6c@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -67387,9 +67387,16 @@ function qxLeak(c, cost) {
   const cur = qxLive(); if (!cur) return cost;
   const n = c.wv || G.wave, live = cur.from <= Math.max(n, G.wave) && cur.until >= Math.min(n, G.wave);
   if (cur.id === 'toll' && live) cost *= 2;
-  if (c.qx || (cur.id === 'twice' && c.def.boss && n === cur.boss)) { qxFail(c.qx === 'hunter' ? 'A Headhunter reached the gate.' : `${c.qName || c.def.name} reached the gate.`); return cost; }
-  if (live && cur.kind === 'hold') { cur.lost += cost; if (cur.lost > cur.lives) qxFail(`${cur.lost} lives lost, more than the ${cur.lives} it allowed.`); }
+  if (c.qx || (cur.id === 'twice' && c.def.boss && n === cur.boss)) { qxFail(qxLeakWhy(cur, c)); return cost; }
+  if (live && cur.kind === 'hold') { cur.lost += cost; if (cur.lost > cur.lives) qxFail(`A foe reached the keep: ${cur.lost} lives lost, more than the ${cur.lives} it allowed${cur.id === 'toll' ? ' (each leak cost double)' : ''}.`); }
   return cost;
+}
+// why a marked foe's leak failed its challenge: the words on the failure notice and the plate
+function qxLeakWhy(cur, c) {
+  if (c.qx === 'hunter') return `A Headhunter reached the gate (${cur.p} of ${cur.dur} slain).`;
+  if (c.qx === 'champ') return `The Champion escaped: ${c.qName || QX_CHAMP[cur.rule].name} reached the gate.`;
+  if (c.qx === 'twice') return `${c.def.name} rose again and reached the gate.`;
+  return `The boss of wave ${cur.boss}, ${c.def.name}, reached the gate before it fell.`;
 }
 // what a twist (or a boon) makes of a hit, ahead of armour
 function qxHurtK(c, type, dot, src) {
@@ -67511,7 +67518,8 @@ function qxWaveEnd(ws, rep) {
   const Q = qxState(), n = Math.max(...ws), cur = Q.cur;
   if (cur && cur.state === 'on' && n >= cur.until) {
     if (cur.kind === 'hold' || cur.id === 'hunter') qxWin();
-    else if (cur.id === 'champ' || cur.id === 'twice') qxFail('Its marked foe never fell.');
+    else if (cur.id === 'champ') qxFail(`Time ran out: ${QX_CHAMP[cur.rule].name} never fell.`);
+    else if (cur.id === 'twice') qxFail(`Time ran out: the boss of wave ${cur.boss} ${cur.p ? 'fell only once' : 'never fell'}.`);
   } else if (cur && cur.state === 'on' && cur.id === 'hunter') cur.mark = qxTopUnit();   // the next Headhunter hunts whoever did most this wave
   // the next offer: the first milestone not yet offered, unless a challenge is still running (the bug where sending a
   // wave early skipped an offer: any milestone at or before the coming wave counts, within the last five waves)
@@ -67534,9 +67542,49 @@ function qxFail(why) {
   const Q = G.qx, cur = Q.cur; if (!cur || cur.state !== 'on') return;
   cur.state = 'failed'; cur.why = why; qxRefresh();
   for (const c of G.creeps) { c.qWard = false; c.qShroud = false; }
-  Q.log.push({ id: cur.id, T: cur.T, at: cur.from, ok: 0 });
-  onBanner(`${QX[cur.id].n}: failed`, `${why} The twist lifts; no reward.`);
+  Q.log.push({ id: cur.id, T: cur.T, at: cur.from, ok: 0, why });
+  const rw = qxRewardSay(cur.reward);
+  cur.lostSay = `${rw ? `Reward forfeited: ${rw}.` : 'No reward.'} No other penalty: the twist lifts.`;
+  chalFailNote(QX[cur.id].n, why, cur.lostSay, QX[cur.id].col);
   sfx('block', 0); onDirty(); onSave();
+}
+// a reward in words, without paying it (the failure notice: what was forfeited)
+function qxRewardSay(rw) {
+  const out = [];
+  for (const r of rw || []) {
+    if (r.k === 'relic') out.push(`a choice of three ${RARITY[r.rar].name.toLowerCase()} relics`);
+    if (r.k === 'talent' && r.n > 0) out.push(`${r.n} talent point${r.n > 1 ? 's' : ''}`);
+    if (r.k === 'gold' && r.n > 0) out.push(`${r.n} gold`);
+    if (r.k === 'writ' && r.n > 0) out.push(`${r.n} free stud${r.n > 1 ? 'ies' : 'y'}`);
+    if (r.k === 'charm' && QX_CHARMS[r.id]) out.push(`the ${QX_CHARMS[r.id].name}`);
+    if (r.k === 'boon' && QX_BOONS[r.id]) out.push(QX_BOONS[r.id].n);
+    if (r.k === 'renown' && r.n > 0) out.push(`${r.n} Renown`);
+    if (r.k === 'lives' && r.n > 0) out.push(`${r.n} li${r.n === 1 ? 'fe' : 'ves'} restored`);
+  }
+  return out.join(', ');
+}
+/* ---- the failure notice: a challenge (or a classic saga quest, heroes.js questWaveEnd) failed ----
+   Its own card, styled like the challenge-won banner but in ember red, near the top of the field (above the wave banner,
+   so neither hides the other), held long enough to read: the challenge's name, why it failed, and what was lost or kept.
+   Never words over units. Every fail path comes here once (qxFail and questWaveEnd guard their own state). */
+const CHAL_FAIL_MS = 6500;
+function chalFailNote(name, why, lost, col) {
+  if (typeof G !== 'undefined' && G) (G.chalFailLog || (G.chalFailLog = [])).push({ name, why, lost, wave: G.wave });
+  chalFailShow(name, why, lost, col);
+}
+function chalFailShow(name, why, lost, col) {
+  if (typeof document === 'undefined' || !document.getElementById || !document.createElement) return;
+  let el = document.getElementById('qxFail');
+  if (!el) {
+    const ban = document.getElementById('banner'), host = (ban && ban.parentNode) || document.body; if (!host) return;
+    el = document.createElement('div'); el.id = 'qxFail'; el.setAttribute('role', 'alert'); el.setAttribute('aria-live', 'assertive');
+    el.innerHTML = '<small>Challenge failed</small><h3></h3><p class="qf-why"></p><p class="qf-lost"></p>';
+    host.appendChild(el);
+  }
+  el.querySelector('h3').textContent = name; el.querySelector('.qf-why').textContent = why || ''; el.querySelector('.qf-lost').textContent = lost || '';
+  if (col) el.style.setProperty('--qc', col);
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  clearTimeout(chalFailShow._t); chalFailShow._t = setTimeout(() => el.classList.remove('show'), CHAL_FAIL_MS);
 }
 // pay a reward: returns the lines for the banner
 function qxPay(rw) {
@@ -67647,7 +67695,7 @@ function qxHudView() {
   if (qxOld() || !G.qx || !G.qx.cur) return null;
   const c = G.qx.cur, D = QX[c.id], nm = D.n.replace(/^The /, '');   // (the bar is narrow: the name and a count; the line under it says the rest)
   if (c.state === 'done') return { t: `${nm}: won`, p: 1, done: true, sub: 'Reward taken' };
-  if (c.state === 'failed') return { t: `${nm}: failed`, p: 0, failed: true, sub: c.why || '' };
+  if (c.state === 'failed') return { t: `${nm}: Failed`, p: 1, failed: true, sub: c.why || '' };   // (a full red bar and the reason under it, until the next wave after its span sets out)
   const span = c.until - c.from + 1, at = Math.max(0, Math.min(span, (G.phase === 'wave' ? G.wave : G.wave - 1) - c.from + 1));
   let t = `${nm} ${at}/${span}`, p = at / span, sub = qxSay(c);
   if (c.kind === 'hold') sub = `${Math.max(0, c.lives - c.lost)} lives spare · ${sub}`;
@@ -67681,10 +67729,10 @@ function qxHud(P, hpEl) {
 // the hero sheet's paragraph
 function qxSheetHTML() {
   const Q = G.qx; if (qxOld() || !Q) return '';
-  const c = Q.cur, sg = SAGAS[G.hero], won = Q.log.filter(l => l.ok).map(l => QX[l.id].n);
+  const c = Q.cur, sg = SAGAS[G.hero], won = Q.log.filter(l => l.ok).map(l => QX[l.id].n), lost = Q.log.filter(l => l.ok === 0 && QX[l.id]).map(l => QX[l.id].n);
   const boons = Object.keys(Q.boons).map(k => `<b>${QX_BOONS[k].n}</b> ${QX_BOONS[k].t}`);
   const nextAt = QX_AT.find(a => !Q.offered.includes(a) && a >= G.wave);
-  return `<p><b>Challenges</b> ${c ? `<b>${QX[c.id].n}</b> (${c.state === 'on' ? 'under way' : c.state === 'done' ? 'won' : 'failed'}): ${qxEsc(QX[c.id].twist(c))} ${qxEsc(qxWinText(c))}` : nextAt ? `The next is offered at wave ${nextAt}.` : 'No more challenges this run.'}${won.length ? ` Won: ${won.join(', ')}.` : ''}</p>`
+  return `<p><b>Challenges</b> ${c ? `<b>${QX[c.id].n}</b> (${c.state === 'on' ? 'under way' : c.state === 'done' ? 'won' : '<b class="qx-fl">failed</b>'}): ${c.state === 'failed' ? `${qxEsc(c.why || '')} ${qxEsc(c.lostSay || '')}` : `${qxEsc(QX[c.id].twist(c))} ${qxEsc(qxWinText(c))}`}` : nextAt ? `The next is offered at wave ${nextAt}.` : 'No more challenges this run.'}${won.length ? ` Won: ${won.join(', ')}.` : ''}${lost.length ? ` Failed: <s class="qx-fl">${lost.join(', ')}</s>.` : ''}</p>`
     + (sg ? `<p><b>${sg.name}</b> ${Q.saga}/3 chapters told; each challenge won tells one. Chapter II brings Swift Spell, chapter III <b>${sg.fin[0]}</b>: ${sg.fin[1]}</p>` : '')
     + (boons.length ? `<p><b>Boons</b> ${boons.join(' · ')}</p>` : '');
 }
@@ -67733,7 +67781,19 @@ if (typeof document !== 'undefined' && document.head) {
 .qx-pick{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:560px){.qx-pick{grid-template-columns:1fr}}
 .qx-pc{align-items:center;text-align:center}.qx-pc img{width:72px;height:72px;border-radius:8px;box-shadow:0 0 0 2px var(--sc);margin-bottom:6px}
 .qx-sub{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-top:2px;font:600 10px/1.2 var(--f-ui);color:#e8dcc0;overflow:hidden;max-width:150px}
-.hp-q.qx-failed i{background:rgba(160,60,50,.5)}
+.hp-q.qx-failed i{background:rgba(190,52,40,.62)!important}.hp-q.qx-failed{box-shadow:inset 0 0 0 1px rgba(255,110,90,.75)!important}.hp-q.qx-failed span{color:#ffd2c8}
+.hp-q.qx-failed ~ .qx-sub{color:#ffb3a6}
+.qx-fl{color:#ff8a76}
+#qxFail{position:absolute;left:50%;top:15%;transform:translateX(-50%);width:max-content;max-width:min(460px,calc(100% - 32px));box-sizing:border-box;padding:9px 18px 11px;border-radius:10px;text-align:center;pointer-events:none;opacity:0;z-index:30;
+  background:rgba(22,6,4,.86);box-shadow:0 0 0 1px #0a0202,inset 0 0 0 1px rgba(255,112,88,.6),inset 0 3px 0 -1px color-mix(in srgb,var(--qc,#ff6a4a) 70%,transparent),0 0 18px rgba(200,50,30,.3)}
+#qxFail.show{animation:qxf 6.5s ease forwards}
+#qxFail small{display:block;font:800 11px/1.2 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;color:#ff8a76}
+#qxFail h3{margin:3px 0 2px;font:700 clamp(22px,6vw,32px)/1.08 var(--f-deco,var(--f-display));letter-spacing:.02em;text-wrap:balance;
+  background:linear-gradient(180deg,#ffe6dc 0%,#ff9a82 42%,#d8442e 64%,#ff8a70 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 0 #1a0302)}
+#qxFail p{margin:3px 0 0;font:700 14px/1.3 var(--f-ui);color:#f6e6dc;text-wrap:balance}
+#qxFail p.qf-lost{font-weight:600;font-size:12.5px;color:#d8bfb4}
+@keyframes qxf{0%{opacity:0;transform:translateX(-50%) scale(1.08)}6%{opacity:1;transform:translateX(-50%) scale(1)}86%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#qxFail.show{animation:qxf 6.5s linear forwards}}
 .prob.qx-tw{border-left:3px solid var(--qc);padding-left:6px}.prob.qx-tw i{color:#c9d8d1}
 em.qx-em{background:color-mix(in srgb,var(--qc) 30%,transparent)!important;color:#fff!important}
 .qx-fc p{margin:2px 0;border-left:3px solid var(--qc);padding-left:6px;font-size:12px}`;
@@ -76239,7 +76299,13 @@ function questWaveEnd(ws, rep, noOffer) {
   if (q && q.done) G.quest = null;   // its reward is already in hand
   else if (q && !q.failed) {
     if (q.id === 'iron') { q.p = rep && rep.leaks ? 0 : q.p + ws.length; if (q.p >= q.goal) questDone(); }
-    if (!q.done && G.wave >= q.until) { q.failed = true; onToast(`Quest failed: ${questInfo(q.ch, q.id === 'trial' ? 'trial' : 'deed').name}.`); }
+    if (!q.done && G.wave >= q.until) {   // time ran out: the failure notice (quests.js chalFailNote), once; the plate keeps "Failed" until the next wave ends
+      const info = questInfo(q.ch, q.id === 'trial' ? 'trial' : 'deed');
+      q.failed = true; q.why = `Time ran out: ${Math.min(q.p, q.goal)} of ${q.goal} by wave ${q.until}.`;
+      q.lostSay = `Reward forfeited: ${info.reward.n}. No other penalty.`;
+      if (typeof chalFailNote === 'function') chalFailNote(info.name, q.why, q.lostSay, '#ff6a4a'); else onToast(`Quest failed: ${info.name}.`);
+      if (typeof sfx === 'function') sfx('block', 0);
+    }
   } else if (q && q.failed) G.quest = null;
   if (noOffer) { G.questOffer = null; return; }
   // the next chapter's offer, on waves 5, 20 and 35 (the wave about to be played). A chapter whose wave went by in a
@@ -76496,10 +76562,11 @@ function heroHud() {
   const q = G.quest;
   if (P.q.hidden !== !q) P.q.hidden = !q;
   if (q) {
-    const nm = questName(q), t = q.done ? `${nm}: complete` : q.failed ? `${nm}: failed` : `${nm} ${Math.min(q.p, q.goal)}/${q.goal} · until wave ${q.until}`;
+    const nm = questName(q), t = q.done ? `${nm}: complete` : q.failed ? `${nm}: Failed` : `${nm} ${Math.min(q.p, q.goal)}/${q.goal} · until wave ${q.until}`;
     if (P.qt.textContent !== t) P.qt.textContent = t;
-    P.qbar.style.width = Math.round(100 * Math.min(1, q.p / q.goal)) + '%';
-    P.q.classList.toggle('done', !!q.done);
+    P.qbar.style.width = Math.round(100 * (q.failed ? 1 : Math.min(1, q.p / q.goal))) + '%';
+    P.q.classList.toggle('done', !!q.done); P.q.classList.toggle('qx-failed', !!q.failed);
+    P.q.title = q.failed ? `${nm}: failed. ${q.why || ''}` : '';
   }
   const qp = q ? (q.done ? 1 : Math.min(1, q.p / q.goal)) : -1;
   if (hpEl._qp !== qp) { hpEl._qp = qp; hpEl.classList.toggle('hasq', qp >= 0); P.face.style.setProperty('--qp', Math.max(0, qp).toFixed(3)); P.face.classList.toggle('qdone', qp >= 1); }
@@ -76515,7 +76582,7 @@ function openHeroSheet() {
   G.paused = true; G.ghost = null; G.cast = null;
   const c = heroChamp();
   const q = G.quest, sg = sagaOf(), qi = q && questInfo(q.ch, q.id === 'trial' ? 'trial' : 'deed');
-  const qHtml = `<p><b>${sg.name}</b> ${q ? `Chapter ${ROMAN3[q.ch]}: <b>${qi.name}</b> ${qi.text} ${q.done ? 'Done.' : q.failed ? 'Failed.' : `${Math.min(q.p, q.goal)} of ${q.goal}, until wave ${q.until}. Reward: ${qi.reward.n}.`}`
+  const qHtml = `<p><b>${sg.name}</b> ${q ? `Chapter ${ROMAN3[q.ch]}: <b>${qi.name}</b> ${qi.text} ${q.done ? 'Done.' : q.failed ? `<b class="qx-fl">Failed.</b> ${q.why || ''}` : `${Math.min(q.p, q.goal)} of ${q.goal}, until wave ${q.until}. Reward: ${qi.reward.n}.`}`
       : `Quests at waves ${QUEST_AT.join(', ')}; the third wins ${sg.fin[0]}.`} ${(G.questsDone || []).length ? `Finished: ${(G.questsDone || []).join(', ')}.` : ''}${sagaHas('fin') ? ` <b>${sg.fin[0]}</b> ${sg.fin[1]}` : ''}</p>`;
   showOverlay(`<div class="bg-head hs-head"><img class="hs-face" alt="" src="${HERO_ART[h.id] || heroFaceURL(h)}"><h2 class="ttl">${h.name}</h2><span>${h.title} · ${h.role}</span><button type="button" class="tx" id="hsClose" aria-label="Close and resume">${X_SVG}</button></div>
     <div class="hs-body" style="--sc:${h.hue}">
