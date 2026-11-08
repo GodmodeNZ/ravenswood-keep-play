@@ -1,4 +1,4 @@
-const BUILD_TAG = 'c135063@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7297165@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16098,7 +16098,7 @@ function ihMortarShell(t, st, x, z, tg, pow, o) {
   const p = { k: 'ball', x: mz[0], z: mz[2], x0: mz[0], z0: mz[2], h0: mz[1], ax: x, az: z, h: mz[1], t: 0, T, arc: 1.5 + d * .28, st, src: t, tg: tg || null, pow, lv, big: !!o.big, fixed: !tg };
   if (o.abil) p.abil = 1;
   G.projs.push(p);
-  G.delayed.push({ t: T + .005, fn: () => { ihMortarLand(t, st, p, o); sfx('mortarBoom', !!o.big); } });   // (p.ax / p.az hold where it came down; the owner's explosion takes)
+  G.delayed.push({ t: T + .005, fn: () => { ihMortarLand(t, st, p, o); if (!p.mfFire) sfx('mortarBoom', !!o.big); } });   // (p.ax / p.az hold where it came down; the owner's explosion takes; an Incendiary Round lands with its own fire bloom, mortarfire.js)
   G.delayed.push({ t: Math.max(0, T - 1), fn: () => sfx('mortarWhistle', 0) });   /* the shell's whistle as it comes down */
   ihFlash(mz[0], mz[2], mz[1] + .1, .7, '#ffb860'); ihSmokePuff(mz[0], mz[2], mz[1] + .1, 5 + lv); t.recoil = 1; t.ihFireAt = G.time;
   sfx('mortarFire', 0, lv);
@@ -55368,10 +55368,14 @@ const AudioSys = (() => {
   }
   S.hamSwing = (peak) => firePlay(Math.random() < .5 ? 'hamSwing' : 'hamSwing2', .13, .25, peak);
   S.hamBurst = (big) => firePlay('hamBurst', big ? .16 : .11, .2);
+  // the Mortar Crew's Incendiary Round: its own sound entirely (owner: "a bit too sharp on the ear"), a soft muffled torch whump
+  // over the tube's launch and a fire whoosh into an explosion where it lands, in place of the Big Bertha explosion (mortarfire.js);
+  // every take cut and low-passed by tools/make_firesfx.py, nothing bright above ~2 kHz; the landing a bigger flame (owner: "id like
+  // a bigger flame sound"): the owner's two fire whooshes into a gasoline explosion, alternated so repeats vary, each started 0.6 s
+  // before the shell lands (mortarfire.js) so the whoosh rises as it comes down and the blast lands on impact
+  let incAlt = 0;
   S.incFire = () => firePlay('incFire', .12, .3);
-  // (softer: "a bit too much and harsh on the ears", owner: the whoosh quieter with its bright top filtered off, the impact a
-  // low thump under the owner's explosion)
-  S.incLand = () => { firePlay('incLand', .08, .3, null, 1500); firePlay(Math.random() < .5 ? 'incImpact' : 'incImpact2', .05, .3, null, 700); };
+  S.incLand = () => { incAlt ^= 1; firePlay(incAlt ? 'incBlast' : 'incBlast2', incAlt ? .53 : .5, .3); };
   // the Pyroclasts (the owner's "fireball and flame whooshes" pack): the strike is loosed, whooshes in flight (its peak as it
   // comes down) and bursts; each spell its own takes
   S.pyroCast = (fly) => { firePlay('pyroCast', .07, .3); if (fly != null) firePlay('pyroFly', .06, .5, fly); };
@@ -82173,12 +82177,15 @@ if (typeof ihMortarShell === 'function') {
   ihMortarShell = function (t, st, x, z, tg, pow, o) {
     const n = G.projs.length, r = _mfShell.apply(this, arguments);
     if (o && o.abil && o.big && !o.shrapnel) {
-      for (let i = n; i < G.projs.length; i++) { const p = G.projs[i]; if (p.k === 'ball' && MF.shells.length < 16) { p.mfFire = 1; MF.shells.push(p); } }
+      let lead = 0;
+      for (let i = n; i < G.projs.length; i++) { const p = G.projs[i]; if (p.k === 'ball' && MF.shells.length < 16) { p.mfFire = 1; MF.shells.push(p); lead = lead || p.T; } }
+      // its landing's fire whoosh into an explosion, started 0.6 s early so the blast (0.6 s into the take) lands on impact
+      if (lead && typeof sfx === 'function') G.delayed.push({ t: Math.max(0, lead - .6), fn: () => sfx('incLand') });
       // the muzzle: flame jetting out of the tube for a moment, a billow of smoke off the crew
       const m = typeof ihMuzzle === 'function' ? ihMuzzle(t) : [t.x, .45, t.y];
       if (MF.muzzles.length < 8) MF.muzzles.push({ x: m[0], y: m[1], z: m[2], at: G.time, seed: (Math.random() * 97) | 0 });
       if (typeof hfPuff === 'function') hfPuff(t.x, t.y, .7, (Math.random() * 97) | 0);
-      if (typeof sfx === 'function') sfx('incFire');   // (a flame take over the owner's own launch recording)
+      if (typeof sfx === 'function') sfx('incFire');   // (a soft torch whump over the owner's own launch recording)
     }
     return r;
   };
@@ -82195,7 +82202,7 @@ if (typeof ihMortarLand === 'function') {
       // from talents and items, owner: "different burst sizes based on talent/item improvements")
       const bn = p.big || sp >= 1.6 ? 'incblast_big' : 'incblast', LB = typeof LAB_FX !== 'undefined' && LAB_FX[bn];
       if (!(LB && typeof labPlay === 'function' && labPlay(bn, x, z, rad * 3 * LB.span / 1.59, { k: .95 }))) hfBurst(x, z, rad, { dur: .45 });
-      if (typeof sfx === 'function') sfx('incLand');   // (a whoosh into a burst and a heavier impact, over the owner's explosion)
+      // (its sound, a fire whoosh into an explosion in place of the mortar's own, was started as the shell came down: above)
       // (a fire left on the ground under it keeps it burning: the Napalm talent's pitch, a burning hazard)
       hfPatch(x, z, rad * .8, 1.6, { flare: 0, at: 1.1, alive: () => { let l = 0; for (const h of G.hazards || []) if ((h.k === 'fire' || h.k === 'ih_pitch') && h.t > 0 && Math.abs(h.x - x) < .3 && Math.abs(h.z - z) < .3) l = Math.max(l, h.t); return l; } });
     }
