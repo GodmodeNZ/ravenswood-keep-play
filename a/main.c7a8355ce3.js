@@ -1,4 +1,4 @@
-const BUILD_TAG = '784e4c3@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ed7ab8d@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -161,7 +161,7 @@ const CREEPS = {
      raiseC (Necromancer): [every s, corpses raised, reach]   fallback: body shown if its own model (models_eco*.js) is missing */
   warcaller: { name: 'Gnoll Banner Captain', fallback: 'gnoll', hp: 1.15, spd: .9, r: .35, armor: 2, warcry: [6, 2.2, 4, .4], link: { kind: 'haste', r: 3.4, k: .6, who: 'all', self: true, col: [1, .45, .25], say: 'drives everyone around it 60% faster' }, trait: 'Hastes the allies around it',
     eco: 'Its banner and horn drive the allies around it 60% faster, for as long as they keep within its reach. Kill it, stun it or split them off and the haste drops.' },
-  shieldbearer: { name: 'Troll Shieldbearer', fallback: 'troll', hp: 1.5, spd: .9, r: .4, armor: 10, guard: [.8, .65], trait: 'Shields the allies behind it',
+  shieldbearer: { name: 'Troll Shieldbearer', fallback: 'troll', hp: 1.5, spd: .9, r: .4, armor: 10, guard: [.5, .65], trait: 'Shields the allies behind it',
     eco: 'Its tower shield catches 65% of every shot at it, and at any ally standing behind it. Break the shield, or go around it with splash and area attacks.' },
   burrower: { name: 'Sand Burrower', fallback: 'beetle', hp: 1.25, spd: .9, r: .37, armor: 6, burrow: [.2, 2.2, 5], trait: 'Burrows when focused',
     eco: 'Dives underground when it takes heavy damage, out of reach of everything except Quake Totems, which shake it back out.' },
@@ -178,7 +178,7 @@ const CREEPS = {
   rotshaman: { name: 'Rot Shaman', base: 'rotfather', scl: 1.05, hp: 2, spd: .85, r: .4, bounty: 2, immune: ['poison'], undead: true, weak: { holy: 1.6 },
     link: { kind: 'heal', r: 3, who: 'wounded', col: [.55, 1, .35], say: 'mends the wounded around it, and its spores make your nearest units attack half as fast. Kill it first, drain its mana or Wound its allies' }, trait: 'Mends allies, spores slow your units',
     eco: 'A heavy moss-caster. It mends the wounded around it, and its Choking Spores make the two units nearest it attack half as fast for 3 seconds. It casts from mana: drain it, stun its wind-up, or Wound its allies to halve the mending. Spells that seek support casters find it first.' },
-  matriarch: { name: 'Mire Matriarch', base: 'mire', scl: .9, hp: 2.6, spd: .7, r: .44, bounty: 2.5, armor: 3, spawn: ['spider', 6, .2], trait: 'Bursts into six spiderlings',
+  matriarch: { name: 'Mire Matriarch', base: 'mire', scl: .9, hp: 2.2, spd: .7, r: .44, bounty: 2.5, armor: 3, spawn: ['spider', 6, .2], trait: 'Bursts into six spiderlings',
     eco: 'A swollen heavy that leaves a slime trail. When it dies it bursts into six spiderlings where it falls, each carrying a share of its health. Kill it early on the road, and keep area damage past the spot where it falls to catch the brood.' },
   /* ---- formations: the rank and file a support caster stands behind. link: the tie a caster keeps to its allies (game.js supportTick, drawn as a tether):
      kind, r: reach in cells, who: which allies it covers, k: its strength, self: covers itself too, col: the tether's colour, say: the wave card's words ---- */
@@ -193,8 +193,11 @@ const CREEPS = {
     eco: 'Slows bite him half as hard, and after a stun he shrugs off the next for a moment. Every quarter of his health spills gold; kill him for the rest. If he escapes he steals a tenth of your gold.' },
   stormwisp: { name: 'Storm Wisp', fallback: 'wraith', hp: .8, spd: 1.1, r: .3, mres: .3, absorb: ['storm', .3, .05], trait: 'Feeds on lightning',
     eco: 'Lightning makes it bigger, tougher and faster, and only bites at 60%. Storm Obelisks can grind it down; anything else does it faster.' },
-  alpha: { name: 'Pack Alpha', fallback: 'wolf', hp: 2.6, spd: 1.85, r: .42, armor: 3, pack: [2.6, .25, 3.5, 3], trait: 'Leads the wolf pack',
+  alpha: { name: 'Pack Alpha', fallback: 'wolf', hp: 2.0, spd: 1.85, r: .42, armor: 3, pack: [2.6, .25, 3.5, 3], trait: 'Leads the wolf pack',
     eco: 'Wolves near it run 25% faster and shrug off more slows. If it dies, nearby wolves panic: they slow down and take 25% more damage.' },
+  // the Champion's Challenge's own foe (quests.js; owner, 9 Nov 2026: 'bring in a unique mob for that challenge, dont make it too tough'): a gilded troll war-chief
+  // in no wave of its own; its health is set when it is sent (QX_CHAMP_K x a typical, median, plain trooper of the wave: qxChampBase), its name and its one rule by the challenge (QX_CHAMP)
+  champion: { name: 'Warband Champion', base: 'troll', scl: 1.3, hp: 1, spd: .8, r: .42, armor: 0, tint: [1.55, 1.2, .5, .22], trait: 'A challenge champion: one rule, named on its card', eco: 'Sent by a Champion\'s Challenge you took: a named war-chief with a few times a trooper\'s health and one rule, shown on its card and the wave card. Slay it before the gate to win the challenge.' },
   stalker:  { name: 'Void Stalker',     base: 'wolf',   hp: .7,  spd: 1.8, r: .33, wolfkin: true, phase: [4, 1.1], tint: [1.05, .55, 1.6, .26], trait: 'Fast, phases out of reach' },
   ogre:     { name: 'Ogre Warlord', title: 'Brakka\'s Brute', abil: ['Siege Club', 'On a siege wave it clubs down whatever tower stands in its way.'],      hp: 16,   spd: .55,   r: .52, armor: 4, boss: true, flat: 60, life: 5, trait: 'Boss' },
   colossus: { name: 'Stone Colossus', title: 'the Walking Wall', abil: ['Stone Hide', 'Armour 18: arrows and shells glance off. Magic and Arcane bite.'],    hp: 14,   spd: .55,  r: .54, armor: 18, boss: true, flat: 110, life: 4, trait: 'Boss, armored' },
@@ -300,7 +303,7 @@ function heavyHoldK(c) { return c && c.def && c.def.rk && c.def.rk.heavy && !c.d
 const ROLE_WEAK_BIG = { armoured: `its armour blunts steel; magic hits it ${moreK(ROLE_K.plateMagic)}`, mres: `it resists magic; steel hits it ${moreK(ROLE_K.mresPhys)}` };
 const ROLES = { gnoll: 'light', wolf: 'light', spider: 'light', bat: 'light', skirmisher: 'light', icewolf: 'light', stormbat: 'light', stalker: 'light', thief: 'light', risen: 'light', sapper: 'light', ghoul: 'light',
   beetle: 'armoured', magma: 'armoured', burrower: 'armoured', ironclad: 'armoured', golem: 'armoured heavy', shieldbearer: 'armoured heavy', wraith: 'mres', shade: 'mres', stormwisp: 'mres', banshee: 'mres cloth', acolyte: 'mres cloth',
-  troll: 'heavy', axe: 'heavy', berserker: 'heavy', bloat: 'heavy', carrion: 'heavy', mender: 'cloth support', warmage: 'cloth support', warcaller: 'cloth support', shaman: 'cloth support', necro: 'cloth support', torchbearer: 'cloth support', warden: 'heavy support', alpha: 'heavy support', rotshaman: 'heavy support', matriarch: 'heavy', eggsac: 'support', hextotem: 'support' };
+  troll: 'heavy', axe: 'heavy', berserker: 'heavy', bloat: 'heavy', carrion: 'heavy', mender: 'cloth support', warmage: 'cloth support', warcaller: 'cloth support', shaman: 'cloth support', necro: 'cloth support', torchbearer: 'cloth support', warden: 'heavy support', alpha: 'heavy support', champion: 'heavy', rotshaman: 'heavy support', matriarch: 'heavy', eggsac: 'support', hextotem: 'support' };
 for (const k in CREEPS) { const d = CREEPS[k]; d.roles = ROLES[k] ? ROLES[k].split(' ') : ['heavy', ...(d.armor >= 6 ? ['armoured'] : []), ...(d.mres >= .3 ? ['mres'] : [])]; d.rk = {}; for (const r of d.roles) d.rk[r] = 1; }
 const isRole = (c, r) => !!c.def.rk[r];
 /* ---- a force run's words for a foe whose Classic words name the keep's towers or elements. A force's units carry no element
@@ -309,7 +312,8 @@ const isRole = (c, r) => !!c.def.rk[r];
 const forceRunNow = () => typeof G !== 'undefined' && !!G && !!G.force && !G.vs;
 /* the armour and ward bars (enemypools.js), as a wave card's tag: a short line, the whole rule in its hover tip (TRAIT_TIP_F).
    What a foe shrugs off is not in its trait: the red "Shrugs off" tag says it, and only for what your army can lay on (armyApplies) */
-const TRAIT_ARM_F = 'Armoured: steel hits its armour first', TRAIT_WARD_F = 'Warded: magic wears its ward first';
+// one foe, one defence (owner, 9 Nov 2026): an armour bar (magic cuts through) or a ward bar (weapons cut through), never both
+const TRAIT_ARM_F = 'Armoured: magic cuts through', TRAIT_WARD_F = 'Warded: weapons cut through';
 const TRAIT_TIP_F = {
   [TRAIT_ARM_F]: 'A grey armour bar under its health: steel and bleeds must break it before its health drops. Magic goes straight through to health; armour penetration sends part of each steel hit through, and shred breaks the bar faster.',
   [TRAIT_WARD_F]: 'A blue ward bar under its health: magic and burns must break it before its health drops. Steel goes straight through to health and cracks it; magic penetration sends part of each spell through.',
@@ -348,6 +352,11 @@ const CREEP_SAY_F = {
 };
 CREEP_SAY_F.grakk.yell = 'Grakk smash little soldiers!';
 for (const k in CREEP_SAY_F) { const d = CREEPS[k]; if (!d) continue; for (const f in CREEP_SAY_F[k]) { let v = d[f]; const fv = CREEP_SAY_F[k][f]; Object.defineProperty(d, f, { enumerable: true, configurable: true, get: () => forceRunNow() ? fv : v, set: x => { v = x; } }); } }
+// every other foe word that says "tower(s)" (a trait, description, ability, yell): a force run reads "unit(s)" (owner: units
+// are never towers). Classic and Tower Wars keep their own words; an explicit CREEP_SAY_F entry wins
+const creepTowerToUnit = s => typeof s === 'string' ? s.replace(/\b([Tt])ower(s?)\b(?! Wars)/g, (m, T, n) => (T === 'T' ? 'Unit' : 'unit') + n).replace(/\bunit shield\b/g, 'great shield') : Array.isArray(s) ? s.map(creepTowerToUnit) : s;
+const creepSaysTower = v => typeof v === 'string' ? /\btowers?\b/i.test(v) : Array.isArray(v) && v.some(creepSaysTower);
+for (const k in CREEPS) { const d = CREEPS[k], F = CREEP_SAY_F[k] || {}; for (const f of ['trait', 'eco', 'yell', 'abil']) { if (f in F) continue; const pd = Object.getOwnPropertyDescriptor(d, f); if (!pd || pd.get) continue;   /* (a getter already words it by the run's rules) */ let v = pd.value; if (!creepSaysTower(v)) continue; Object.defineProperty(d, f, { enumerable: true, configurable: true, get: () => forceRunNow() ? creepTowerToUnit(v) : v, set: x => { v = x; } }); } }
 const AFFLICTED = c => c.slowT > 0 || c.frostT > 0 || c.burnT > 0 || c.poison.length > 0 || c.curseT > 0 || c.bleedT > 0 || c.markT > 0 || c.shredT > 0 || c.stunT > 0 || c.rootT > G.time;
 const GAP = { rotshaman: 1.1, matriarch: 1.2, mender: .95, warcaller: .9, shieldbearer: 1.1, burrower: .95, carrion: 1.0, torchbearer: .9, stormwisp: .7, alpha: .6, shaman: .95, warden: 1.05, shade: .7, berserker: .8, bloat: 1.1, banshee: .9, necro: 1.0, risen: .5, stalker: .5, lich: 3, titan: 3.5, voidwyrm: 3, abyss: 3, axe: 1.0, sapper: .7, gnoll: .85, wolf: .55, beetle: 1.05, bat: .8, spider: .36, wraith: .85, troll: .95, icewolf: .55, magma: 1.05, stormbat: .75, ghoul: .8, golem: 1.25, ogre: 3, colossus: 3.5, broodmother: 3, bonedrake: 3, overlord: 3,
   warmage: .95, ironclad: 1.05, skirmisher: .5, acolyte: .9,
@@ -1700,7 +1709,7 @@ function resetTree(type) {
 
 function makeTower(type, i, j, tier = 0) {
   return { id: ++G.uid, type, def: TOWERS[type], tier, i, j, x: i + .5, y: j + .5, cd: .25, ang: Math.PI,
-    kills: 0, dmg: 0, invested: 0, fresh: 0, prio: TOWERS[type].prio || 0, recoil: 0, build: 1, anim: R(10), sellArm: 0,
+    kills: 0, dmg: 0, invested: 0, fresh: 0, vx: 0, bornW: (typeof G !== 'undefined' && G && G.wave) | 0, prio: TOWERS[type].prio || 0, recoil: 0, build: 1, anim: R(10), sellArm: 0,
     gear: [], shotT: 9, windup: 0, engaged: 0, buffD: 0, buffS: 0, shots: 0, rampN: 0, lastTg: null, hasteT: 0, pulseCD: 4, pulseT: 0, pulseTick: 0, immoT: 1, eyeT: 1,
     hp: type === 'wall' ? WALL_HP : TOWER_HP[Math.min(tier, 2)], maxHp: type === 'wall' ? WALL_HP : TOWER_HP[Math.min(tier, 2)], hitT: 0, wrecked: false };
 }
@@ -1739,6 +1748,7 @@ function tryBuild(type, i, j) {
   G.gold -= cost; chalNoteBuild(type);
   const t = makeTower(type, i, j);
   t.invested = cost; t.fresh = G.phase === 'build' ? cost : 0;
+  if (!t.def.wall) vetSeed(t);   // (a unit raised mid-run starts with some of the army's experience: xp.js; before it joins G.towers, so it is not in its own average)
   G.towers.push(t);
   const k = idx(i, j);
   G.blk[k] = 1; G.tAt[k] = t; if (typeof wallsTouch === 'function') wallsTouch(i, j);   // (an army's walls beside it re-pick their pieces: forces_zz_walls.js)
@@ -1793,6 +1803,7 @@ function convert(t, type) {
   G.gold -= cost; chalNoteBuild(type); t.type = type; t.def = TOWERS[type]; t.tier = 0; t.invested += cost; if (G.phase === 'build') t.fresh += cost;
   t.hp = t.maxHp = TOWER_HP[0]; t.wrecked = false; if (typeof wallsTouch === 'function') wallsTouch(t.i, t.j);   // (a wall turned unit: no longer a wall beside its neighbours)
   t.build = 1; t.cd = .3;
+  t.kills = 0; t.ast = 0; t.bornW = G.wave | 0; vetSeed(t);   // (a wall grown into a unit: a fresh unit, with the army's experience to start)
   fxDust(t.x, t.y, 10);
   sfx('build'); onDirty(); onSave();
   return true;
@@ -2386,7 +2397,7 @@ function updateCreeps(dt) {
    Only the campaign: Tower Wars keeps the old pulses. 'mres' and 'haste' live on the tie; the others show who the caster's spell will reach (creepCast does the spell). ---- */
 const LINK_WHO = { armoured: o => o.def.rk.armoured && !o.def.boss, wounded: o => o.hp < o.maxHp, afflicted: AFFLICTED, all: o => !o.def.egg && !o.def.totem, risen: (o, c) => o.boundBy === c };
 function linkOn(c, o, L) {
-  if (L.kind === 'mres') { (o.mBy = o.mBy || []).push(c); o.auraMres = L.k; }
+  if (L.kind === 'mres') { (o.mBy = o.mBy || []).push(c); o.auraMres = o.apMax > 0 && !oldRules() ? 0 : L.k; }   // (on an armour bar the tie mends the bar instead, enemypools.js epArmourTick: armour stays open to magic, one foe, one bar)
 }
 function linkOff(c, o, L) {
   if (L.kind === 'mres' && o.mBy) { o.mBy = o.mBy.filter(m => m !== c); if (!o.mBy.length) o.auraMres = 0; }
@@ -2429,13 +2440,14 @@ function supportDown(c) {
    (and Frost's brittle talents). Armour-piercing, bleeds and the rooted bonus only work on the broken part: intact plate turns
    all but ROLE_K.plate of a physical hit, a bleed or a rooted foe's bonus. Breaking it is a deliberate choice: a shred
    talent, item or ability, a unit that cracks it (the Conclave's Golem Wardens), or magic, which it never stopped. */
-const isPlate = c => !oldRules() && !!c.def.rk.armoured && !c.def.lead && !c.def.boss;
+const isPlate = c => !oldRules() && !!c.def.rk.armoured && !c.qWardBar && !c.def.lead && !c.def.boss;
 function plateBroken(c) { if (c.apMax > 0 && !oldRules()) return epBroken(c); let br = c.shredT > 0 ? c.shred : 0; if (c.frostT > 0) br += 2 * talentHas('frost', 'permafrost') + 2 * talentHas('frost', 'brittle'); return Math.min(1, br / Math.max(1, c.armor)); }
 function plateK(c, pen) { if (c.apMax > 0 && !oldRules()) return 1; return ROLE_K.plate + (1 - ROLE_K.plate) * Math.min(1, plateBroken(c) * (1 + (pen || 0))); }
 function roleK(c, type, dot) {
   const r = c.def.rk; let k = 1;
-  if (type === 'phys' && !dot && (r.cloth || r.mres)) k *= Math.max(r.cloth ? ROLE_K.clothPhys : 1, r.mres ? ROLE_K.mresPhys : 1);   // (the plate and the magic ward themselves: hurt)
-  if (r.armoured && (type === 'magic' || type === 'arcane')) k *= ROLE_K.plateMagic;
+  const mr = r.mres || !!c.qWardBar;   // (Warded Ranks: armour turned ward, quests.js)
+  if (type === 'phys' && !dot && (r.cloth || mr)) k *= Math.max(r.cloth ? ROLE_K.clothPhys : 1, mr ? ROLE_K.mresPhys : 1);   // (the plate and the magic ward themselves: hurt)
+  if (r.armoured && !c.qWardBar && (type === 'magic' || type === 'arcane')) k *= ROLE_K.plateMagic;
   if (r.light && AOE > 0) k *= ROLE_K.lightAoe;
   if (r.heavy && dot && !G.force) k *= ROLE_K.heavyDot;   /* (Classic: burns and venom; a force run: holds last longer instead, heavyHoldK) */
   if (r.support && c.alone) k *= ROLE_K.alone;
@@ -3454,7 +3466,7 @@ function hurt(c, amt, type, src, dot, kb, elem) {
   if (VET_HIT) vetTouch(c, src);   // (a hit alone as an assist: off, xp.js)
   if (!dot && softImm(c, elem)) { amt *= SOFT_K; immuneText(c); }   // an elemental against its own element (its burns and poisons were cut when they landed)
   if (c.mirTy && src && src.type === c.mirTy) { amt *= .6; if (!dot) immuneText(c); }   // the Mirror Witch turns aside some of what hurts her most
-  if (c.amT > 0 && (type === 'magic' || type === 'arcane')) { wlAside('Spell Ward', amt * .4); amt *= .6; if (!dot) immuneText(c); }   // Spell Ward: some of the magic slides off
+  if (c.amT > 0 && !(c.apMax > 0 && !oldRules()) && (type === 'magic' || type === 'arcane')) { wlAside('Spell Ward', amt * .4); amt *= .6; if (!dot) immuneText(c); }   // Spell Ward: some of the magic slides off
   if (c.etherOn && type === 'phys') { amt *= .6; if (!dot) immuneText(c); }   // the Pale Abbess, held by her wraiths
   if (c.stoneUntil > G.time) { if (elem !== 'earth') { amt *= .4; if (!dot) immuneText(c); } else amt *= 3; }   // Gravelmaw in stone: Earth breaks it, the rest only chips   // Gravelmaw in stone: only Earth breaks it   // The Mirror Witch turns the school that hurt her most
   if (c.def.absorb && elem === c.def.absorb[0]) { absorbHit(c, amt); amt *= SOFT_K; }   // lightning still feeds it, but it hurts too
@@ -3501,7 +3513,7 @@ function hurt(c, amt, type, src, dot, kb, elem) {
     }
   }
   if (!oldRules()) { const rk = roleK(c, type, dot); if (rk !== 1) { amt *= rk; if (!dot && rk > 1 && !c.dnAff) c.dnAff = 1; } }   // cloth, armour, light, heavy: what its role makes of the hit
-  const rank = !oldRules() && !c.def.lead && !c.def.boss, plate = rank && c.def.rk.armoured, rward = rank && c.def.rk.mres;   // the campaign's rank and file: plate and the magic-resistant (core.js ROLE_K; leaders and bosses keep their armour and resistance, and their own rules)
+  const rank = !oldRules() && !c.def.lead && !c.def.boss, plate = rank && c.def.rk.armoured && !c.qWardBar, rward = rank && (c.def.rk.mres || !!c.qWardBar);   // (qWard: Warded Ranks, quests.js: its armour marches as a ward bar instead)   // the campaign's rank and file: plate and the magic-resistant (core.js ROLE_K; leaders and bosses keep their armour and resistance, and their own rules)
   if (type === 'phys') {
     const pen = Math.min(.9, (ss && ss.armorPen) || 0);
     if (c.apMax > 0 && !oldRules()) { /* the armour bar takes it, below */ }
@@ -3628,7 +3640,8 @@ function stun(c, dur, bossF, elem) {
   dur *= ccDR(c) * heavyHoldK(c); if (dur <= .02) return;   // crowd control wears thin on a foe that keeps getting it
   const d = c.def.boss ? dur * Math.min(1, typeof bossF === 'number' ? bossF : bossF ? 1 : .4) : dur * (1 - (c.ten || 0));
   if (d >= c.stunT) c.stunEl = elem || null;
-  c.stunT = Math.max(c.stunT, d); c.stunImm = d + (c.def.slippery ? THIEF.stunGuard : .6);   // the thief shrugs off the next stun for longer
+  c.stunT = Math.max(c.stunT, d); c.stunImm = d + (c.def.slippery ? THIEF.stunGuard : .6);
+  if (VET_ACT) vetTouch(c, VET_ACT);   // (a stun is help: an assist if it dies soon)   // the thief shrugs off the next stun for longer
 }
 function nearest(x, z, r, n, skip, filt) {
   const out = [];
@@ -3817,6 +3830,7 @@ function updateTowers(dt) {
     t.shotT += dt;
     if (t.hitT > 0) t.hitT -= dt;
     if (t.def.wall) continue;
+    VET_ACT = t;   // (veterancy: what this unit's code stuns, wards or feeds is its help, xp.js)
     const st = t.st = effStats(t);
     { const mh = towerMaxHp(t, st); if (mh !== t.maxHp) { if (!t.wrecked && !t.wounded) t.hp = Math.max(1, t.hp * mh / t.maxHp); t.maxHp = mh; } }
     if (t.mendK && !t.wrecked && t.hp < t.maxHp) { t.hp = Math.min(t.maxHp, t.hp + t.maxHp * t.mendK * dt); if (Math.random() < dt * 3) part({ k: 'flare', x: t.x + R(-.2, .2), z: t.y + R(-.2, .2), h: towerTop(t) * R(.3, .9), life: .4, max: .4, size: .25, col: '#fff1b8' }); }
@@ -3980,6 +3994,7 @@ function healFoe(o, amt) {
 function wardFoe(o, w) {
   if (o && o.nowardT > G.time) return false;   // (a Null Field holds it open: no shield takes, forces_zs_conclave.js)
   const k = healMul(o); w *= k;
+  if (typeof epShieldFoe === 'function' && epOn()) { const r = epShieldFoe(o, w); if (r && k < 1) woundCut(o); return r; }   // force runs: into the foe's one bar (armour or ward), capped (enemypools.js)
   if (o.ward < w) { o.ward = w; o.wardMax = w; if (k < 1) woundCut(o); return true; }
   return false;
 }
@@ -4653,6 +4668,7 @@ function chain(t, st, first, sx, sz, sh, m = 1, quiet) {
 }
 const ARROW_IN_LEAD = .17;   // start an arriving arrow's sound this long (real time) before it lands: longer than any take's lead-in
 function updateProjs(dt) {
+  VET_ACT = null;
   for (const p of G.projs) {
     if (p.k === 'ball') {
       p.t += dt;
@@ -4701,6 +4717,7 @@ function inSplash(x, z, r, groundOnly, fn) {
 function impact(p) {
   if (typeof sfxBasicLand === 'function') sfxBasicLand(p);   // (a force unit's shot: a small hit, spellfx.js)
   const st = p.st, src = p.src, tg = p.tg && !p.tg.dead ? p.tg : null, pow = p.pow || 1, lv = p.lv || 0;
+  VET_ACT = src && src.invested !== undefined ? src : null;
   if (src && src.spec) specImpact(p, tg);
   switch (p.k) {
     case 'arrow':
@@ -4850,9 +4867,11 @@ function ignite(c, dps, dur, src, hell, stoke) {
   if (stoke && c.burnT > 0) { c.burnStack = Math.min(stoke, (c.burnStack || 1) + 1); c.burnDps = Math.max(c.burnDps, dps * c.burnStack); c.burnSrc = src; }
   else if (dps >= c.burnDps || c.burnT <= 0) { c.burnDps = dps; c.burnSrc = src; c.burnHell = !!hell; c.burnStack = 1; }
   c.burnT = Math.max(c.burnT, dur);
+  if (src) vetTouch(c, src);
 }
 function dose(c, st, src) {
   if (c.dead || isImmune(c, 'poison')) return;
+  if (src) vetTouch(c, src);
   if (softImm(c, 'poison')) st = Object.assign({}, st, { poison: st.poison * SOFT_K });   // the plague-born take a little of it
   if (c.poison.length < (st.pw && st.pw.unlimited ? 40 : 3 + (st.stacks || 0))) c.poison.push({ dps: st.poison * manaSpellK(src) + spellPowerDot(src, st.poisonT), t: st.poisonT, src });
   if (st.caps && st.caps.potency && st.poison > 0) { hurt(c, st.poison * .25 * st.caps.potency, 'pure', src, true, null, 'poison'); if (c.dead) return; }   // Potency
@@ -4867,7 +4886,7 @@ function hex(c, st, src) {
     stun(c, .6, false, 'shadow');
     if (st.caps.hysteria) { for (const o of nearest(c.x, c.y, 1.2, 8, c)) stun(o, .6, false, 'shadow'); fxRing(c.x, c.y, 1.2, '#8a4cff'); }
   }
-  c.curseAmp = Math.max(c.curseAmp, st.amp); c.curseT = Math.max(c.curseT, st.ampT);
+  c.curseAmp = Math.max(c.curseAmp, st.amp); c.curseT = Math.max(c.curseT, st.ampT); if (src) vetTouch(c, src);
   if (st.pw && st.pw.link) { c.linkSrc = src; c.linkT = G.time + st.ampT; c.linkK = st.pw.link; }   // Hollow King's Grimoire
   if (st.drain >= c.drainDps) { c.drainDps = st.drain; c.drainSrc = src; }
   if (st.caps.doom) c.curseDoom = Math.max(c.curseDoom || 0, st.caps.doom);
@@ -4880,6 +4899,7 @@ function updateHazards(dt) {
   const pnH = AB_NOW, ptH = DTAG;
   for (const z of G.hazards) {
     AB_NOW = z.abId || null; DTAG = z.abId ? AB_TAG : ptH;   // an ability's area ticks as that ability (itempower.js)
+    VET_ACT = z.src && z.src.invested !== undefined ? z.src : null;
     z.t -= dt; z.tick -= dt;
     const st = z.st || z.src.st;
     if (z.k === 'fire' && Math.random() < dt * 14) part({ k: 'ember', x: z.x + R(-z.r, z.r) * .8, z: z.z + R(-z.r, z.r) * .8, h: .05, vh: R(.5, 1.1), life: .5, max: .5, size: R(.08, .15), col: Math.random() < .5 ? '#ff8a2a' : '#ffd27a' });
@@ -5141,7 +5161,7 @@ function updateFx(dt) {
 function serialize() {
   if (!G.towers || (G.state !== 'play') || G.vs) return null;   // a Tower Wars match is not saved over your campaign
   return { v: 8, ftv: 5, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
-    towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0]),
+    towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0, t.def.wall ? 0 : Math.round((t.vx || 0) * 100) / 100, t.bornW | 0, t.vSeed | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
     chal: G.chal || null, trophies: G.trophies || {}, chalSchools: G.chalSchools || [], unlocked: G.unlocked || null, paths: G.paths || {}, pp: G.pp || 0, ppEarned: G.ppEarned || 0, momentum: G.momentum || 0, run: G.run || null, reports: (G.reports || []).slice(-3), plan: G.plan || null, planAuto: G.planAuto !== false,
@@ -5215,13 +5235,13 @@ function restore(s) {
   }
   G.lore = typeof loreLoad === 'function' ? loreLoad(s.lore) : null;   // the abilities studied at the keep (before the units, who learned from it)
   const vetOld = (s.towers || []).length && (s.towers || []).every(r => r[13] === undefined);   // a save from before veterancy: assists are estimated below
-  for (const [type0, tier, i, j, inv, kills, dmg, prio, gear, hpF, spec, ab, charm, ast] of s.towers || []) {
+  for (const [type0, tier, i, j, inv, kills, dmg, prio, gear, hpF, spec, ab, charm, ast, vx, bornW, vSeed] of s.towers || []) {
     const type = type0 === 'shadow' ? 'glaive' : type0;   // the Shadow Obelisk became the Glaive Thrower
     if (oldHoly && type === 'holy') { G.gold += inv | 0; if (Array.isArray(gear)) for (const it of gear) if (it && okGear(it)) G.loot.push(it); if (charm && okGear(charm)) G.loot.push(charm); G.champRefund = (G.champRefund || 0) + (inv | 0); continue; }   // the old support unit: its gold back, its relics to the bag
     if (!TOWERS[type] || !inGrid(i, j) || RES[idx(i, j)] || G.blk[idx(i, j)] || G.tAt[idx(i, j)]) continue;
     const t = makeTower(type, i, j, Math.min(tier, TOWERS[type].tiers.length - 1));
     if (G.hero && s.champAt && s.champAt[0] === i && s.champAt[1] === j && !t.def.wall) G.champ = t.id;   // (before its sockets are counted)
-    Object.assign(t, { invested: inv, kills: kills || 0, dmg: dmg || 0, prio: prio || 0, build: 0, ast: ast | 0 });
+    Object.assign(t, { invested: inv, kills: kills || 0, dmg: dmg || 0, prio: prio || 0, build: 0, ast: ast | 0, vx: vx != null ? +vx || 0 : (kills | 0) + (typeof VET_AST !== 'undefined' ? VET_AST : 1) * (ast | 0), bornW: bornW | 0, vSeed: vSeed | 0 });   // (a save from before the catch-up: what it earned is its kills + assists)
     if (spec && SPEC_BY[type + ':' + spec] && t.tier >= 3) t.spec = spec;   // (a tier IV+ tower from before paths chooses one when tapped)
     if (Array.isArray(gear)) { t.gear = gear.slice(0, gearSlots(t)).map(it => okGear(it) ? it : null); for (const it of gear.slice(gearSlots(t))) if (okGear(it)) G.loot.push(it); }
     if (ab && typeof abilLoad === 'function') abilLoad(t, ab);   // a force unit's learned abilities, autocast, mode and mana
@@ -5232,7 +5252,7 @@ function restore(s) {
   }
   if (vetOld && typeof vetOn === 'function' && vetOn()) {   // before veterancy: each unit's assists are taken as its own kills or the army's average kills, whichever is more
     const U = G.towers.filter(t => !t.def.wall), avg = U.length ? U.reduce((a, t) => a + (t.kills | 0), 0) / U.length : 0;
-    for (const t of U) t.ast = Math.round(Math.max(t.kills | 0, avg));
+    for (const t of U) { t.ast = Math.round(Math.max(t.kills | 0, avg)); t.vx = (t.kills | 0) + VET_AST * t.ast; }
   }
   if (typeof vetSync === 'function') vetSync();   // (what each unit has already opened: no unlock cue for it)
   xpRestore(s);   // the XP bar, or an older run's points turned into its level (after the paths: Scholar ranks pay their own)
@@ -5506,7 +5526,7 @@ const RARITY = [
 ];
 // relics are rare on purpose: each one is an event, not a chore. Bosses and (in Classic) dungeon leaders drop one often, elites now
 // and then, and the rank and file once in a long while. Most of a boss's drops (and some of the rest) are school relics.
-const ELITE_HP_TYPE = { ironclad: .7, troll: .7 };
+const ELITE_HP_TYPE = { ironclad: .7, troll: .7, alpha: .75 };   // (alpha: owner, 9 Nov 2026, with its base health 2.6 -> 2.0; the Matriarch 2.6 -> 2.2 and the Shieldbearer's shield .8 -> .5 of its health, core.js)
 const ELITE_FROM = { ironclad: 15 };   // a kind never made a random elite before this wave (its elite waves still bring elites)   // an elite of this kind is this much softer than other elites (owner: elite Ironclads too hard to kill)
 const LOOT_CAP = 30, ELITE_HP = 1.35, ELITE_DROP = .025, BOSS_DROP = .35, LEAD_DROP = .12, MINION_DROP = .0015;
 /* LOOT_RULES: the force campaign's drops by wave type, in one place (the boss-loot screen reads these too).
@@ -6093,7 +6113,8 @@ const lootPick = a => a[Math.floor(Math.random() * a.length)];
 function eliteCount(wave) { return wave < 3 ? 0 : 1 + Math.floor((wave - 3) / ELITE_EVERY); }
 let ELITE_EVERY = 5;
 function promoteElites(q, wave) {
-  const can = q.filter(s => !CREEPS[s.type].boss && !CREEPS[s.type].lead && !CREEPS[s.type].egg && !(wave < (ELITE_FROM[s.type] || 0)));   // (no random elite of a kind before its wave: owner, elite Ironclads too much for a starting army)
+  // (!s.elite: an elite wave's troops are elites already; promoting one again stacked a hidden x1.35 on top, owner 9 Nov 2026: "elite rock golem has way too much hp for wave 18")
+  const can = q.filter(s => !s.elite && !CREEPS[s.type].boss &&!CREEPS[s.type].lead && !CREEPS[s.type].egg && !(wave < (ELITE_FROM[s.type] || 0)));   // (no random elite of a kind before its wave: owner, elite Ironclads too much for a starting army)
   for (let k = 0, n = Math.min(eliteCount(wave), can.length); k < n; k++) {
     const s = can.splice(Math.floor(Math.random() * can.length), 1)[0];
     s.elite = true; s.eliteX = (s.eliteX || 1) * ELITE_HP * (ELITE_HP_TYPE[s.type] || 1); s.hp *= ELITE_HP * (ELITE_HP_TYPE[s.type] || 1); s.bounty = s.bounty * 3 + 2;
@@ -7082,7 +7103,8 @@ function xpHud() {
    (Ironbreakers 88, Thunderguns 85 by wave 12) and a slowing / rooting unit through its assists (Chain Trappers 8 kills
    + 73 assists = 81, Briarwardens 6 + 82 = 88): at VET_AST 1 they climb at the same pace. So tier IV at 70 comes about
    wave 9-11, V at 125 about wave 16-18, VI at 180 about wave 23-26; the army's lesser units a few waves later. */
-const VET_AST = 1, VET_WIN = 4, VET_HIT = false;
+const VET_AST = 1, VET_WIN = 8, VET_HIT = false;
+let VET_ACT = null, VET_TOUCH = 8;   // VET_TOUCH: how long ago a slow, root, stun, burn ... may have landed and still count (seconds)   // the unit whose code is running (updateTowers, impact, a hazard's tick): stuns, mana and wards it gives count as its help
 const VET_NEED = [70, 125, 180];   // veterancy that opens tier IV, V and VI
 const vetOn = () => typeof G !== 'undefined' && !!G && !G.vs;
 const vetUnit = o => !!o && !!o.def && o.invested !== undefined && !o.def.wall;   // one of your units (not a foe, a hazard or the hero's spell)
@@ -7090,10 +7112,56 @@ const vetNeed = n => n >= 3 ? VET_NEED[Math.min(2, n - 3)] : 0;   // what tier i
 // a playtest that starts at wave W: the army it raises there counts as seasoned (about what a main unit has by then)
 function vetSeason(W) { W = Math.max(0, (W | 0) - 1); return W <= 0 ? 0 : Math.round(VET_PACE * W + VET_PACE2 * W * W); }
 const VET_PACE = 7.5, VET_PACE2 = 0;   // a main unit's veterancy after W waves, roughly (see VET_NEED's note)
+// what it has earned (t.vx: kills and assists, each at the pace it earned it; an older save: kills + assists)
+const vetRaw = t => (t.vx != null ? +t.vx || 0 : (t.kills | 0) + VET_AST * (t.ast | 0)) + (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
 function vetPts(t) {
   if (!t) return 0;
-  const raw = (t.kills | 0) + VET_AST * (t.ast | 0) + (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
-  return Math.floor(Math.max(raw, vetNeed(t.tier | 0)));   // (a unit already at a tier has at least what that tier asks)
+  return Math.floor(Math.max(vetRaw(t), vetNeed(t.tier | 0)));   // (a unit already at a tier has at least what that tier asks)
+}
+/* ---- keeping the army together (owner, 9 Nov 2026: "slows the top unit's veterancy based on the average of your troop") ----
+   A unit's gains are scaled by how far it is ahead of the army's average veterancy: full pace up to VET_AHEAD[0] times the
+   average, then tapering (x0.6 at 2x, x0.3 at 3x, x0.2 from 4x). Behind the average: full pace (no boost). The average
+   counts only units that have fought at least VET_SEASONED waves (a fresh unit doesn't drag it down) and never walls;
+   with fewer than VET_AVG_N such units, or an average under VET_AVG_MIN (the first waves), nobody is slowed, so an early
+   tier IV spike still comes. The card says so ("Ahead of your army: gaining at 60%") and the bars dim while it applies. */
+let VET_AHEAD = [[1.5, 1], [2, .6], [3, .3], [4, .2]], VET_AVG_TOP = .75;   // (owner, 9 Nov 2026: the army's best 75% only, so units idling at the back of the maze don't hold the rest back)
+const VET_SEASONED = 1, VET_AVG_N = 3, VET_AVG_MIN = 25;
+let VET_CATCH = true;   // (tools/check_veterancy.js --nocatch turns it off to compare)
+function vetAvg() {
+  const L = [];
+  for (const o of G.towers || []) if (!o.def.wall && (G.wave | 0) - (o.bornW | 0) >= VET_SEASONED) L.push(vetRaw(o));
+  if (L.length < VET_AVG_N) return 0;
+  const k = Math.max(VET_AVG_N, Math.ceil(L.length * VET_AVG_TOP));   // (VET_AVG_TOP < 1: the army's best share only)
+  if (k < L.length) L.sort((a, b) => b - a).length = k;
+  return L.reduce((a, b) => a + b, 0) / L.length;
+}
+/* ---- a unit raised mid-run starts with some of the army's experience (owner, 9 Nov 2026: "new units more baseline
+   veterancy"): VET_SEED of the fielded average (vetAvg: units that have fought a wave, so not itself), but never closer than
+   VET_SEED_GAP to tier IV, so it still earns its first unlock. No farming: what a sold unit had is gone with it, and its
+   replacement starts from the same average (now without the one sold), never from what the sold one carried. */
+const VET_SEED = .6, VET_SEED_GAP = 10;
+function vetSeed(t) {
+  t.vSeed = 0;
+  if (!vetOn() || G.state !== 'play' || !t || t.def.wall) return;
+  const a = vetAvg(), s = Math.floor(Math.max(0, Math.min(VET_SEED * a, VET_NEED[0] - VET_SEED_GAP)));
+  if (s > 0) { t.vSeed = s; t.vx = (+t.vx || 0) + s; }
+}
+/* a support by its record (owner, 9 Nov 2026: "support units ... aren't gaining veterancy nearly as fast"): a unit whose
+   assists are at least VET_SUP_R times its kills (and VET_SUP_MIN of them) has each assist count VET_SUP_K. A slower or
+   a warder helps with most of the foes its army kills but lands few blows itself; this keeps it level with the units
+   that do the killing (tools/check_veterancy.js: the CC units' tier IV comes within a wave or two of the carry's). */
+const VET_SUP_R = 2, VET_SUP_MIN = 6;
+let VET_SUP_K = 1.5;
+const vetSup = t => (t.ast | 0) >= VET_SUP_MIN && (t.ast | 0) >= VET_SUP_R * (t.kills | 0);
+const vetSupK = t => vetSup(t) ? VET_SUP_K : 1;
+function vetRate(t, avg) {
+  if (!VET_CATCH || !vetOn()) return 1;
+  if (avg === undefined) avg = vetAvg();
+  if (!(avg >= VET_AVG_MIN)) return 1;
+  const r = vetRaw(t) / avg, A = VET_AHEAD;
+  if (r <= A[0][0]) return 1;
+  for (let k = 1; k < A.length; k++) if (r <= A[k][0]) { const [x0, y0] = A[k - 1], [x1, y1] = A[k]; return y0 + (y1 - y0) * (r - x0) / (x1 - x0); }
+  return A[A.length - 1][1];
 }
 // the next tier is there, but this unit has not earned it yet
 function vetLocked(t) { const n = (t.tier | 0) + 1; return n >= 3 && n < t.def.tiers.length && vetPts(t) < vetNeed(n); }
@@ -7116,13 +7184,14 @@ function vetKill(c, src) {
   for (const t of G.towers) {
     if (t === killer || t.def.wall) continue;
     const h = H && H[t.id];
-    if ((h != null && now - h <= VET_WIN) || cap.has(t)) help.add(t);
+    if ((h != null && now - h <= VET_TOUCH) || cap.has(t)) help.add(t);
   }
   const aid = new Set();
   for (const o of killer ? [killer, ...help] : [...help]) if (o.vAid) for (const id in o.vAid) { if (o.vAid[id] + VET_WIN >= now) aid.add(+id); else delete o.vAid[id]; }
   if (aid.size) for (const t of G.towers) if (t !== killer && !t.def.wall && aid.has(t.id)) help.add(t);
-  for (const t of help) { t.ast = (t.ast | 0) + 1; vetCheck(t); }
-  if (killer) vetCheck(killer);
+  const avg = vetAvg(), gain = (t, n) => { if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0) - n; t.vx += n * vetRate(t, avg); };
+  for (const t of help) { t.ast = (t.ast | 0) + 1; gain(t, VET_AST * vetSupK(t)); vetCheck(t); }
+  if (killer) { gain(killer, 1); vetCheck(killer); }
 }
 // a unit's veterancy just opened a new tier: say so (several at once share one toast), and a small ring on it
 let VET_CUE = null;
@@ -7155,14 +7224,32 @@ function vetLockText(t) {
 function vetNext(t) { const last = t.def.tiers.length - 1; for (let n = Math.max(3, (t.tier | 0) + 1); n <= last; n++) if (vetPts(t) < vetNeed(n)) return n; return null; }
 // the bar's fill toward the tier it is locked at (the Upgrade button's foot): veterancy / what that tier asks, as the label reads
 function vetFrac(t) { const n = (t.tier | 0) + 1; return n >= 3 && n < t.def.tiers.length ? clamp(vetPts(t) / vetNeed(n), 0, 1) : 1; }
-// the info pane: a row like the Mana bar, "Veterancy [bar] 64 / 70 · tier IV" (full and "max" once every tier is open)
+// the info pane: a row like the Mana bar, only "Veterancy [bar]" (full once every tier is open); its card on hover or tap
 function vetInfoHTML(t) {
   if (!vetOn() || !t || t.def.wall) return '';
+  const n = vetNext(t), f = n != null ? clamp(vetPts(t) / vetNeed(n), 0, 1) : 1;
+  return `<p class="mut vet-row" data-vet="${t.id}" tabindex="0">Veterancy <span class="mn-bar vt-bar${vetRate(t) < .995 ? ' slow' : ''}"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span></p>`;
+}
+// the hover card (#itip, the item cards' look): the bar with its numbers, the next tier, kills and assists, what an assist is
+const VET_GLYPH = {
+  kill: '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M13.5 2.5 6 10" stroke="#ece4cc" stroke-width="2.2" stroke-linecap="round"/><path d="M4 8.5 7.5 12" stroke="#c9971f" stroke-width="1.8" stroke-linecap="round"/><path d="M5.2 10.8 2.5 13.5" stroke="#8a6a2a" stroke-width="2" stroke-linecap="round"/></svg>',
+  assist: '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.5 9.6 6.2 14.5 6.3 10.6 9.2 12 14 8 11.1 4 14 5.4 9.2 1.5 6.3 6.4 6.2z" fill="#9ad8ff" stroke="#123a52" stroke-width=".8"/></svg>',
+};
+function vetCardHTML(t) {
+  if (!vetOn() || !t || !t.def || t.def.wall) return '';
   const p = vetPts(t), n = vetNext(t), need = n != null ? vetNeed(n) : 0, f = n != null ? clamp(p / need, 0, 1) : 1;
-  const ka = `${t.kills | 0} kill${(t.kills | 0) === 1 ? '' : 's'} + ${t.ast | 0} assist${(t.ast | 0) === 1 ? '' : 's'}`;
-  const tip = `Veterancy ${p} (${ka}): ${VET_AST === 1 ? 'its kills plus its assists' : `1 for every kill, ${VET_AST} for every assist`} (an assist: a foe that dies slowed, rooted, frozen, burning, cursed or branded by it, or one a unit under its aura or haste kills). Tiers IV, V and VI open at ${VET_NEED.join(', ')}; each still costs its gold.${G.playtest && G.playtest.wave ? ` A playtest army starts seasoned (+${vetSeason(G.playtest.wave)}).` : ''}`;
-  const now = n != null ? `${p} / ${need}` : 'max', what = n != null ? ` · tier ${ROMAN[n]}` : (t.tier | 0) < t.def.tiers.length - 1 ? ' · every tier open' : '';
-  return `<p class="mut vet-row" title="${tip}">Veterancy <span class="mn-bar vt-bar"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span> <b class="vt-now">${now}</b>${what}<span class="mn-rw"> · ${ka}</span></p>`;
+  const K = t.kills | 0, A = t.ast | 0, pl = (k, w) => `${w}${k === 1 ? '' : 's'}`;
+  const up = n != null ? `<p class="vtc-up">Tier ${ROMAN[n]} unlocks at <b>${need}</b>${(t.tier | 0) + 1 === n ? ' · it still costs its gold' : ''}</p>`
+    : `<p class="vtc-up">${(t.tier | 0) >= t.def.tiers.length - 1 ? 'Tier VI: the top' : 'Every tier is open'}${(t.tier | 0) < t.def.tiers.length - 1 ? ' · each still costs its gold' : ''}</p>`;
+  const seed = t.vSeed > 0 ? `<p class="vtc-seed">Started with ${t.vSeed} from your army\u2019s experience</p>` : '';
+  const sup = vetSup(t) && VET_SUP_K !== 1 ? `<p class="vtc-seed">A support: its assists count ${VET_SUP_K === 2 ? 'double' : '\u00d7' + VET_SUP_K}</p>` : '';
+  const rt = vetRate(t), slow = rt < .995 ? `<p class="vtc-slow">Ahead of your army: gaining at ${Math.round(rt * 100)}%</p>` : '';
+  const pt = G.playtest && G.playtest.wave ? `<p class="itc-hint">A playtest army starts seasoned: +${vetSeason(G.playtest.wave)}.</p>` : '';
+  return `<div class="itc vtc" data-kw-off><p class="itc-n">Veterancy</p><p class="itc-k">${t.def.name} · tier ${ROMAN[t.tier | 0]}</p>`
+    + `<div class="vtc-bar${rt < .995 ? ' slow' : ''}"><i class="${n == null ? 'full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i><span>${n != null ? `${p} / ${need}` : `${p} · max`}</span></div>`
+    + up + slow + sup + seed
+    + `<ul class="vtc-ka"><li>${VET_GLYPH.kill}<b>${K}</b> ${pl(K, 'kill')}</li><li>${VET_GLYPH.assist}<b>${A}</b> ${pl(A, 'assist')}</li></ul>`
+    + `<p class="itc-hint">An assist: a foe that dies slowed, rooted, frozen, burning, cursed or branded by this ${uw(1)}, or slain by one under its aura or haste.</p>${pt}</div>`;
 }
 
 /* ================= FORCES: who answered the keep's call =================
@@ -10894,7 +10981,7 @@ const gvHoldable = c => !c.fly && !(c.rootT > G.time) && !(c.ccImm > G.time) && 
 const gvBig = c => !!(c.def.boss || c.def.lead || c.elite);
 const gvUnits = (x, z, r, skip) => G.towers.filter(o => o !== skip && !o.def.wall && !o.wrecked && !(o.build > .5) && Math.hypot(o.x - x, o.y - z) <= r);
 const gvAlive = t => G.state === 'play' && G.towers.includes(t) && !t.wrecked;
-function gainMana(o, n) { if (!(n > 0) || typeof abilEnsure !== 'function') return; const A = abilEnsure(o); if (A) A.mana = Math.min(abMax(o), A.mana + n); }
+function gainMana(o, n) { if (!(n > 0) || typeof abilEnsure !== 'function') return; if (VET_ACT && VET_ACT !== o) vetAid(o, VET_ACT, 3); const A = abilEnsure(o); if (A) A.mana = Math.min(abMax(o), A.mana + n); }
 function gvLeaves(x, z, h, n, col) { for (let k = 0; k < n; k++) part({ k: 'spark', x, z, h, vx: R(-1.5, 1.5), vz: R(-1.5, 1.5), vh: R(.3, 1.4), g: 3, drag: 2, life: .5, max: .5, size: R(.04, .07), col: col || (k % 3 ? '#9be05a' : '#d8e890') }); }
 function gvMotes(x, z, h, n, col) { for (let k = 0; k < n; k++) part({ k: 'spark', x: x + R(-.2, .2), z: z + R(-.2, .2), h, vx: 0, vz: 0, vh: R(.5, 1), g: -.2, life: .7, max: .7, size: .04, col }); }
 function gvFeathers(x, z, h, n) { for (let k = 0; k < n; k++) part({ k: 'spark', x, z, h, vx: R(-1.2, 1.2), vz: R(-1.2, 1.2), vh: R(-.2, 1.2), g: 1.5, drag: 2.5, life: .6, max: .6, size: R(.04, .07), col: k % 2 ? '#7a5a3a' : '#e8dcc0' }); }
@@ -16158,7 +16245,8 @@ function ihKegPulse(t, st, dt) {
       t.ihRoundT = G.time + 8; t.ihRoundAt = G.time;
       for (const o of G.towers) {
         if (o === t || o.def.wall || o.wrecked || o.build > .5 || Math.hypot(o.x - t.x, o.y - t.y) > r) continue;
-        if (C.ihRound) { vetAid(o, t, 2); o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, .3); o.drumT = Math.max(o.drumT || 0, G.time + 2); }   // Rowdy Round (the War Drum's haste)
+        vetAid(o, t, 2);
+        if (C.ihRound) { o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, .3); o.drumT = Math.max(o.drumT || 0, G.time + 2); }   // Rowdy Round (the War Drum's haste)
         if (C.ihMend && o.maxHp) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * .08 * C.ihMend);   // Mead of Mending
         if (C.ihStand) { ihHeatAdd(o, o.st, .5); if (o.ab) o.ab.mana = Math.min(abMax(o), o.ab.mana + 30); }   // Keg Stand
         part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .3, max: .3, size: .5, col: IH_COL.ale });
@@ -18442,6 +18530,7 @@ function soRadiate(t, dur, k) {
 const soRadiant = t => t.soRadT > G.time || (t.id === G.champ && G.hero === 'so_lion');
 function soWard(t, dur) {
   if (!t || !t.def || t.def.wall || t.wrecked) return;
+  if (VET_ACT && VET_ACT !== t) vetAid(t, VET_ACT, dur);
   const was = t.soWardT > G.time; t.soWardT = Math.max(t.soWardT || 0, G.time + dur * (G.hero === 'so_dawn' ? 1.5 : 1));
   if (!was) part({ k: 'ring', x: t.x, z: t.y, h: .06, life: .5, max: .5, size: .6, col: SO.COL.ward });
   if (typeof soMartyrWard === 'function' && t.st && t.st.pw && t.st.pw.so_martyr) soMartyrWard(t, dur);   // the Martyr's Seal: a Ward it is given judges the foes round it
@@ -27633,6 +27722,7 @@ function champKill(c, src) {
 // warm up and gain heat), chStorm (the Storm builds), chField* (the same for every unit of the army on the field)
 function champOnCast(t, ab, tg, st) {
   const p = (st && st.pw) || {}, near = abAllies(t, CHAMP_REACH), all = () => G.towers.filter(o => o !== t && !o.def.wall && !o.wrecked && !(o.build > .5));
+  for (const o of near) vetAid(o, t, 4);   // (whatever the cast gives them, it is the Champion's help)
   const lift = (L, col) => { for (const o of L) part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .35, max: .35, size: .55, col }); };
   if (p.chMana) { for (const o of near) if (o.ab) gainMana(o, p.chMana); lift(near, '#8fd0ff'); }
   if (p.chHaste) { for (const o of near) { vetAid(o, t, 4); o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.chHaste); o.drumT = Math.max(o.drumT || 0, G.time + 4); } lift(near, '#ffd76a'); }
@@ -46875,6 +46965,400 @@ if (typeof unsocketAll === 'function') {
   unsocketAll = function (t) { const r = _wpnUns.apply(this, arguments); if (t && t.weapon) { (G.wbag || (G.wbag = [])).push(t.weapon); t.weapon = null; } return r; };
 }
 
+/* ================= BRANCHES: tiers IV, V and VI are a choice (force runs) =================
+   The owner (9 Nov 2026, "Tiers as choices"): tiers I-III stay plain gold purchases, so the early waves stay easy. Tiers IV,
+   V and VI (each opened for a unit by its veterancy, xp.js) each ask, when bought, which of two options this one unit takes,
+   for the tier's gold as before. Every option does something you can read on the field beyond a number: more reach or a
+   wider blast, quicker strikes or a strike that runs through a line, a spell that echoes or holds longer, an armour crack or
+   a mark that the rest of the army cashes in, an aura for the other kinds of unit standing beside it, damage that grows with
+   the road cells in its reach (corners and switchbacks), with distance (long corridors) or with foes already struck by
+   ANOTHER kind of unit. The auras and the crossfire only count other kinds, so a field of one unit gets nothing from them.
+   Classic's towers keep their own tier IV paths (specs.js); this is the force units' counterpart and reuses its picker look.
+
+   Balance: a tier's own step is unchanged except that its strike is tithed BRC.keep (x0.88) for each tier past III, and its
+   spells are given that back (a spell's hit is not tithed). Each option is sized to return about x1.14-1.3 in the place it
+   wants (a corridor, a corner, a crowd, beside other kinds), about x1-1.1 elsewhere: an army placed with sense ends level
+   with the old flat tiers or a little above, a careless one a little below. See BR_DATA's notes and tools/check_branches.js.
+
+   Also here (the owner, 9 Nov 2026):
+   - Mana: every tier upgrade raises the unit's mana pool BRC.mana (10%) of its kit's base (tier VI: x1.5); the purchase adds
+     the same to the mana it holds. Shown as "Mana 120 → 132" on the upgrade's numbers (DIFF_KEYS manaShow).
+   - Casters (BR_CASTER: units whose damage is mostly spells, measured by tools/check_tier_parity.js): where a tier makes a
+     striker attack TIER_RATE faster, a caster's spells come TIER_RATE sooner and its mana regen flows 1/TIER_RATE faster,
+     so its spells keep pace with its strike. Their IV-VI options lean on spells (echoes, longer holds, riders).
+   Saves: s.br = [[i, j, [k4, k5, k6]], ...] and G.brMem (the choice remembered per unit kind and tier); a unit already at
+   IV-VI with no choice (an older save, a playtest army, the stress scene) takes each tier's default (BR_DEF: the option
+   closest to the old flat bonus) the first time its stats are read. */
+const BRC = { keep: .88, mana: .1, crossT: 1.5, coverCap: .5, farAt: .6, zoneEvery: .25 };
+const brOn = () => typeof G !== 'undefined' && !!G && !!G.force && !G.vs && !(typeof oldRules === 'function' && oldRules());
+let BR_IN = 0, BR_ECHO = 0, BR_OFF = 0;   // (BR_OFF: tools measuring the bare tiers)
+
+/* ---------- the mechanics: each option is one or two of these ----------
+   apply(st, a, b, t, x): onto the unit's live stats (x = st.br, read by the hooks below); say(a, b, A, B, t): its line on the
+   card, A the stats without the option and B with it, in plain numbers. plain: how near it is to an old flat bonus (BR_DEF). */
+const brF = v => v >= 20 ? String(Math.round(v)) : String(+(+v).toFixed(1));
+const brR = v => String(+(+v).toFixed(2));
+const brX = v => '×' + (+(+v).toFixed(2));
+const brHit = s => (s && (s.dmg || s.smite)) || 0;
+const brAbName = (t, n) => { const k = typeof abilKit === 'function' && abilKit(t); const ab = k && k.abilities[n || 0]; return ab ? ab.name : 'its spells'; };
+const brAbCd = (t, s) => { const k = typeof abilKit === 'function' && abilKit(t); const ab = k && k.abilities[0]; return ab ? ab.cd * ((s && s.sh && s.sh.cdK) || 1) : 0; };
+const BR_MECH = {
+  reach: { g: 'reach', plain: 3, apply(st, a) { if (st.range != null) st.range += a; }, say: (a, b, A, B) => `Range ${brR(A.range)} → ${brR(B.range)}` },
+  haste: { g: 'haste', plain: 3, apply(st, a) { if (st.rate) st.rate /= 1 + a; }, say: (a, b, A, B) => `Attacks every ${brR(A.rate)}s → ${brR(B.rate)}s` },
+  splash: { g: 'splash', plain: 3, apply(st, a, b, t, x) { if (st.splash) st.splash += a; else x.chain = Math.max(x.chain || 0, .35), x.chainR = 1.4; },
+    say: (a, b, A, B) => A.splash ? `Splash ${brR(A.splash)} → ${brR(B.splash)} cells` : `Each strike splashes a foe within 1.4 cells for ${brF(brHit(B) * .35)}` },
+  crit: { g: 'crit', plain: 2, apply(st, a) { st.crit = Math.min(.9, (st.crit || 0) + a); }, say: (a, b, A, B) => `Crit chance ${Math.round((A.crit || 0) * 100)}% → ${Math.round(B.crit * 100)}% (crits strike ${brX(B.critM || 2.5)})` },
+  nth: { g: 'nth', plain: 2, apply(st, a, b) { if (!st.nth) { st.nth = a; st.nthM = b; } }, say: (a, b, A, B) => `Every ${a === 3 ? '3rd' : a + 'th'} strike hits ${brX(b)}: ${brF(brHit(B))} → ${brF(brHit(B) * b)}` },
+  guard: { g: 'guard', plain: 2, apply(st, a) { st.hpM = (st.hpM || 1) * (1 + a); }, say: (a, b, A, B, t) => `Health ${towerMaxHp(t, A)} → ${towerMaxHp(t, B)} (siege foes take longer to break it)` },
+  stun: { g: 'stun', plain: 0, apply(st, a, b) { st.stunCh = [Math.max(a, st.stunCh ? st.stunCh[0] : 0), Math.max(b, st.stunCh ? st.stunCh[1] : 0)]; }, say: (a, b) => `${Math.round(a * 100)} strikes in 100 stun their foe for ${brR(b)}s` },
+  slow: { g: 'slow', plain: 0, apply(st, a, b) { st.slowOn = [Math.max(a, st.slowOn ? st.slowOn[0] : 0), Math.max(b, st.slowOn ? st.slowOn[1] : 0)]; }, say: (a, b) => `Its strikes slow ${Math.round(a * 100)}% for ${brR(b)}s: foes stay longer in every unit's reach` },
+  shred: { g: 'shred', plain: 0, apply(st, a, b) { st.shredOn = st.shredOn ? [st.shredOn[0] + a, Math.max(st.shredOn[1], b)] : [a, b]; }, say: (a, b) => `Each strike strips ${brF(a)} armour (up to ${b}) for 5s, for every unit's hits` },
+  mark: { g: 'mark', plain: 0, apply(st, a, b) { st.mark = [Math.max(a, st.mark ? st.mark[0] : 0), Math.max(b, st.mark ? st.mark[1] : 0)]; }, say: (a, b) => `Foes it strikes are marked for ${b}s: they take ${brX(1 + a)} from every unit` },
+  bleed: { g: 'bleed', plain: 1, apply(st, a) { st.bleed = (st.bleed || 0) + a; }, say: (a, b, A, B) => `Each strike bleeds its foe: ${brF(brHit(B) * a)} more over 3s` },
+  root: { g: 'root', plain: 1, apply(st, a) { if (st.root) st.root *= 1 + a; else if (st.pin) st.pin *= 1 + a; }, say: (a, b, A, B) => A.root ? `Roots hold ${brR(A.root)}s → ${brR(B.root)}s` : A.pin ? `Pins hold ${brR(A.pin)}s → ${brR(B.pin)}s` : `Its holds last ${brX(1 + a)}` },
+  jump: { g: 'chain', plain: 2, apply(st, a, b, t, x) { if (st.chain) st.chain += a; else if (st.bounce) st.bounce += a; else x.chain = Math.max(x.chain || 0, .45); },
+    say: (a, b, A, B) => A.chain ? `Its lightning jumps ${A.chain} → ${B.chain} foes` : A.bounce ? `Its glaive bounces ${A.bounce} → ${B.bounce} times` : `Each strike leaps to a second foe for ${brF(brHit(B) * .45)}` },
+  near: { g: 'near', plain: 1, apply(st, a, b) { st.near = [a, b, .95]; }, say: (a, b) => `${brX(b)} damage to foes within ${brR(a)} cells (a corner it hugs), ×0.95 farther out` },
+  // the hooks below read these from st.br
+  pierce: { g: 'pierce', plain: 0, apply(st, a, b, t, x) { x.pierce = Math.max(x.pierce || 0, a); x.pierceN = Math.max(x.pierceN || 0, b); },
+    say: (a, b, A, B) => `Each strike runs on through ${b === 1 ? 'the foe' : 'up to ' + b + ' foes'} behind its target in a line (a corridor): ${brF(brHit(B) * a)} each` },
+  chain: { g: 'chain', plain: 0, apply(st, a, b, t, x) { x.chain = Math.max(x.chain || 0, a); x.chainR = b || 1.6; }, say: (a, b, A, B) => `Each strike leaps to a second foe within ${brR(b || 1.6)} cells for ${brF(brHit(B) * a)}` },
+  zone: { g: 'zone', plain: 0, apply(st, a, b, t, x) { x.zoneR = Math.max(x.zoneR || 0, a); x.zoneS = Math.max(x.zoneS || 0, b); }, say: (a, b) => `Foes within ${brR(a)} cells of it are slowed ${Math.round(b * 100)}% (a chokepoint)` },
+  cover: { g: 'cover', plain: 0, apply(st, a, b, t, x) { x.coverK = Math.max(x.coverK || 0, a); },
+    say: (a, b, A, B, t) => { const n = brCells(t, B.range); return `${brX(1 + a)} damage for each road cell in its reach (a corner or a switchback): here ${n} cell${n === 1 ? '' : 's'}, ${brX(1 + Math.min(BRC.coverCap, a * n))}`; } },
+  far: { g: 'far', plain: 0, apply(st, a, b, t, x) { x.far = Math.max(x.far || 0, a); }, say: (a, b, A, B) => `${brX(1 + a)} damage to foes beyond ${brR(B.range * BRC.farAt)} cells, the far end of its reach (a long corridor)` },
+  cross: { g: 'cross', plain: 0, apply(st, a, b, t, x) { x.cross = Math.max(x.cross || 0, a); }, say: a => `${brX(1 + a)} damage to foes another kind of unit struck in the last ${BRC.crossT}s (crossfire)` },
+  exec: { g: 'exec', plain: 0, apply(st, a, b, t, x) { x.exec = Math.max(x.exec || 0, a); x.execAt = Math.max(x.execAt || 0, b); }, say: (a, b) => `${brX(1 + a)} damage to foes under ${Math.round(b * 100)}% health (it finishes what others start)` },
+  aura: { g: 'aura', plain: 0, apply() {}, say: (a, b) => `Other kinds of unit within ${brR(b)} cells attack ${brX(1 + a)} as fast (not its own kind)` },
+  auraD: { g: 'auraD', plain: 0, apply() {}, say: (a, b) => `Other kinds of unit within ${brR(b)} cells strike ${brX(1 + a)} as hard (not its own kind)` },
+  // spells
+  spcd: { g: 'spcd', plain: 1, apply(st, a) { sh(st).cdK *= 1 - a; }, say: (a, b, A, B, t) => `${brAbName(t)} every ${brR(brAbCd(t, A))}s → ${brR(brAbCd(t, B))}s (every spell's cooldown ${brX(1 - a)})` },
+  sppow: { g: 'sppow', plain: 1, apply(st, a, b, t, x) { x.spK = (x.spK || 0) + a; }, say: (a, b, A, B, t) => `Its spells hit ${brX(1 + a)} as hard (${brAbName(t)} and the rest)` },
+  specho: { g: 'echo', plain: 0, apply(st, a, b, t, x) { x.echo = Math.max(x.echo || 0, a); }, say: a => `${Math.round(a * 100)} spells in 100 cast a second time 0.6s later, free (a second cast)` },
+  spctl: { g: 'hold', plain: 0, apply(st, a, b, t, x) { x.ctl = Math.max(x.ctl || 0, a); }, say: a => `Its spells' roots and slows hold ${brX(1 + a)} as long (longer control)` },
+  spslow: { g: 'slow', plain: 0, apply(st, a, b, t, x) { x.spSlow = [a, b]; }, say: (a, b) => `Its spells also slow what they hit ${Math.round(a * 100)}% for ${brR(b)}s` },
+  spshred: { g: 'shred', plain: 0, apply(st, a, b, t, x) { x.spShred = [a, b]; }, say: (a, b) => `Its spells also strip ${a} armour (up to ${b}) for 5s from what they hit` },
+  spmark: { g: 'mark', plain: 0, apply(st, a, b, t, x) { x.spMark = [a, b]; }, say: (a, b) => `Its spells mark what they hit for ${b}s: ${brX(1 + a)} from every unit` },
+  spjump: { g: 'chain', plain: 0, apply(st, a, b, t, x) { x.spJump = Math.max(x.spJump || 0, a); }, say: (a, b, A, B) => `Each spell's hit leaps on to one more foe within 1.6 cells for ${Math.round(a * 100)}% (an extra bounce)` },
+};
+
+/* ---------- every unit's options: [tier IV, V, VI], each [option A, option B]; an option is 'Name|mech a b; mech a b' ----------
+   Sizing (break-even against the x0.88 tithe is ~x1.14): reach .5-.6 (~x1.15-1.2, more time on its foes), haste .2-.22,
+   splash +.3-.35 on a splash unit (~x1.25 in a crowd), pierce .45-.5 through 1-2 (~x1.3-1.5 in a corridor, ~x1.05 in the
+   open), chain .4-.45 (~x1.35 in a pack), nth 4 x2 (x1.25), bleed .3, crit .12, exec x1.6 under 30%, cover .03-.05 a cell
+   (cap x1.5: ~x1.3 at a corner, ~x1.1 on a straight), far x1.3, cross x1.25, the auras x1.1-1.12 on each other kind beside
+   it (two or three neighbours: x1.2-1.35 of a unit), mark x1.1 (every unit's hits), shred 1.5-2 (up to 6-8), spcd .2-.3,
+   specho .25-.3 (~x1.25 its spells), sppow .2-.25. Control options (slow, stun, zone, root) carry a smaller damage part. */
+const BR_DATA = {
+  // ---- the Grove ----
+  thornguard: [['Long Haft|pierce .5 1; reach .25', 'Hedge Wall|guard .7; zone 1.3 .15'], ['Barbed Tips|bleed .3', 'Quickened Lunge|spcd .22; spshred 1.5 6'], ['Spearwall|pierce .55 2', 'Briar Bastion|auraD .1 1.6']],
+  gladebow: [['Longbow|reach .6', 'Quick Nock|haste .22'], ['Thornseed Tips|shred 1.5 6', "Ranger's Mark|mark .1 3"], ['Piercing Shaft|pierce .45 2', 'Crossfire|cross .25']],
+  briarwarden: [['Deep Roots|root .3; sppow .1', 'Grasping Echo|specho .25'], ['Strangling Grip|spmark .12 2; spctl .2', 'Mothcloud Drift|spcd .25'], ['Wither Spread|spjump .5; spshred 2 6', "Grove's Heart|aura .12 1.6; spcd .1"]],
+  staglancer: [['Running Charge|pierce .5 2', 'Antler Gore|bleed .3'], ["White Hart's Pace|haste .2", 'Trample|stun .12 .5; nth 5 1.6'], ['Long Gallop|reach .5; far .2', 'Herd Leader|auraD .1 1.8']],
+  wayfarer: [['Keen Hawk|reach .5', 'Bear Hide|guard .6; near 1.4 1.3'], ['Primal Fury|haste .2', 'Moon Sage|sppow .2; spcd .1'], ["Stalker's Mark|mark .1 3", 'Shapestorm Echo|specho .3']],
+  bladedancer: [['Wide Arc|reach .35; splash .3', 'Quickstep|haste .22'], ['Bloodpetal|bleed .3', 'Encore Tempo|spcd .22; spslow .2 1.2'], ['Corner Dancer|cover .05', 'Duet|cross .25']],
+  seedcaster: [['Wide Sowing|splash .35', 'Far Toss|reach .6'], ['Choking Spores|slow .3 1.5; sppow .1', 'Rotseed|shred 1.5 6'], ['Snapjaw Field|stun .1 .5; nth 5 1.6', 'Spore Mark|mark .1 3']],
+  thornwarden: [["Hunter's Reach|reach .5", 'Severing Edge|exec .6 .3'], ['Snare Line|slow .25 1.2; spcd .12', 'Twin Thorns|chain .45 1.6'], ["Gibbet's Mark|mark .1 3", 'Killing Ground|cover .035']],
+  // ---- the Conclave ----
+  cc_spellblade: [['Riftreach|reach .3; chain .35 1.4', 'Ward-Splitter|shred 1.5 6'], ['Blade Tempo|haste .2', 'Rift Surge|spcd .22; spslow .2 1.2'], ['Spectral Edge|pierce .5 2', "Duelist's Guard|guard .6; near 1.4 1.3"]],
+  cc_mageling: [['Farsight|reach .6', 'Rapid Missiles|haste .22'], ['Splitting Missile|chain .4 1.6', 'Arcane Mark|mark .1 3'], ['Missile Curtain Line|pierce .45 2', 'Focus Lens|cross .25']],
+  cc_rimeweaver: [['Deep Chill|spctl .3; sppow .1', 'Frost Echo|specho .25'], ['Brittle Frost|spshred 2 8; spcd .1', 'Ice Coffin Drill|spcd .25'], ['Shatter Spread|spjump .5; sppow .1', 'Winter Circle|zone 1.6 .15; aura .1 1.6']],
+  cc_chronomancer: [['Long Hour|spctl .3; reach .3', 'Recurrence|specho .25'], ['Quickened Allies|aura .12 1.8', 'Backward Hour|spcd .25'], ['Stopped Moment|spmark .12 3; spctl .2', 'Dilation Field|zone 1.8 .12; sppow .15']],
+  cc_astrologer: [['Far Heavens|reach .5; sppow .1', 'Falling Echo|specho .25'], ['Lodestar Mark|spmark .12 3', 'Orrery Turn|spcd .25'], ['Comet Spread|spjump .5; sppow .1', 'Conjunction|cross .2; spcd .1']],
+  cc_golemwarden: [['Stone Hide|guard .7; zone 1.3 .15', 'Heavy Slam|nth 4 2'], ['Tremor|stun .12 .5; sppow .1', 'Seismic Shred|shred 2 8'], ['Bulwark Aura|auraD .1 1.6', 'Chokepoint Golem|cover .05']],
+  cc_pyroclast: [['Wide Furnace|splash .35', 'Long Flame|reach .5'], ['Lingering Burn|bleed .3', 'Phoenix Drill|spcd .22; spshred 1.5 6'], ['Skipping Flame|chain .4 1.6', 'Melt Armour|shred 2 8']],
+  cc_severer: [['Sundering Edge|shred 2 8', 'Long Crescent|reach .5'], ['Returning Crescent|pierce .45 2', 'Null Mark|mark .1 3'], ['Rending Haste|haste .22', 'Veil Execution|exec .6 .3']],
+  // ---- Ironhold ----
+  ironbreaker: [['Iron Wall|guard .7; zone 1.3 .15', "Breaker's Reach|reach .3; pierce .45 1"], ['Plate Crusher|shred 2 8', 'Shove Drill|spcd .22; spslow .2 1.2'], ['Shield Line|auraD .1 1.6', 'Chokehold|cover .05']],
+  thundergun: [['Long Barrel|reach .6', 'Rattle Action|haste .22'], ['Breaching Round|pierce .5 2', 'Spotter|mark .1 3'], ['Deadeye|nth 4 2', 'Crossfire Nest|cross .25']],
+  chaintrapper: [['Long Chains|reach .5; root .2', 'Snap Trap|stun .1 .5; nth 5 1.6'], ['Barbed Chain|bleed .3', 'Winch Drill|spcd .22; spctl .2'], ['Trap Field|zone 1.6 .15; sppow .1', 'Marked Prey|mark .1 3']],
+  runesmith: [['Far Rune|reach .4; sppow .1', 'Rune Echo|specho .25'], ['Rune of Making|aura .12 1.8', 'Rune of Unmaking|spshred 2 8; spcd .1'], ['Runic Spread|spjump .5; sppow .1', 'Forge Mark|spmark .12 3; spcd .1']],
+  flakgunner: [['Wide Burst|splash .3', 'High Elevation|reach .5'], ['Grapnel Drag|slow .25 1.2; spcd .1', 'Rapid Flak|haste .2'], ['Starshell Mark|mark .1 3', 'Shrapnel|chain .4 1.6']],
+  steamhammer: [['Pressure Reserve|nth 4 2', 'Piston Speed|haste .22'], ['Plate Crack|shred 2 8', 'Uppercut Daze|stun .12 .5; sppow .1'], ['Pile Driver Line|pierce .5 2', 'Corner Forge|cover .05']],
+  mortarcrew: [['Big Shell|splash .35', 'The Long Drop|reach .6'], ['Incendiary|bleed .3', 'Spotter Round|mark .1 3'], ['Skipping Shell|pierce .45 2', 'Barrage Drill|spcd .3']],
+  siegebreaker: [['Wide Charge|chain .4 1.6', 'Powder Trail|slow .25 1.2; sppow .1'], ['Breach Shred|shred 2 8', 'Demolition Drill|spcd .22; spmark .1 2'], ['Trench Line|cover .04', 'Blast Execution|exec .6 .3']],
+  // ---- the Silver Order ----
+  oathsworn: [['Shield Wall|guard .7; zone 1.3 .15', 'Oath of Reach|reach .3; pierce .45 1'], ['Rebuke|stun .12 .5; sppow .1', 'Aegis Drill|spcd .22; spslow .2 1.2'], ['Rampart Aura|auraD .1 1.6', 'Hold the Ford|cover .05']],
+  silverbolt: [['Long Stock|reach .6', 'Quick Crank|haste .22'], ['Consecrated Mark|mark .1 3', 'Piercing Bolt|pierce .5 2'], ['Witness Fire|cross .25', 'Flare Spread|chain .4 1.6']],
+  lightbinder: [['Longer Bind|spctl .3; sppow .1', 'Penance Echo|specho .25'], ['Vigil Aura|aura .12 1.8', 'Binding Drill|spcd .25'], ['Shackle Spread|spjump .5; spctl .1', 'Judged|spmark .12 3; spcd .1']],
+  grailknight: [['Grail Line|pierce .5 2', 'Tourney Lance|reach .5'], ['Vow Strength|nth 3 1.8', 'Ride Down|stun .12 .5; sppow .1'], ['Banner of the Vow|auraD .1 1.8', 'Joust Finish|exec .6 .3']],
+  sunlance: [['Noon Reach|reach .5; sppow .1', 'Lance Echo|specho .25'], ['Sunlance Line|pierce .45 2', 'Dawn Mark|spmark .12 3; spcd .1'], ['Dawnfall Drill|spcd .3', 'Halo|aura .1 1.8; sppow .1']],
+  templar: [['Hammer Fervour|haste .22', 'Heavy Slam|nth 4 2'], ['Crusher|shred 2 8', 'Sanctified Daze|stun .12 .5; sppow .1'], ['Hallowed Ground|zone 1.6 .15; sppow .1', 'Holy Corner|cover .05']],
+  censer: [['Wide Thurible|splash .35', 'Long Chain Swing|reach .5'], ['Incense Slow|slow .25 1.2; sppow .1', 'Kindled|bleed .3'], ['Procession|aura .1 1.6', 'Censer Mark|mark .1 3']],
+  so_inquisitor: [['Edict Reach|reach .5', 'Writ of Seizure|stun .1 .5; nth 5 1.6'], ["Heretic's Brand|mark .1 3", 'Pyre Burn|bleed .3'], ['Writ Drill|spcd .25; spshred 1.5 6', 'Final Judgement|exec .6 .3']],
+  // ---- the Stormborn ----
+  sb_wolfguard: [['Pack Lunge|reach .3; chain .35 1.4', 'Wolf Hide|guard .6; zone 1.3 .15'], ['Rending Fangs|bleed .3', 'Pounce Drill|spcd .22; spslow .2 1.2'], ['Pack Howl|aura .1 1.6', 'Hunt the Wounded|exec .6 .3']],
+  sb_windrunner: [['Gale Reach|reach .6', 'Quick Draw|haste .22'], ['Headwind|slow .2 1.2; sppow .1', 'Gale Line|pierce .45 2'], ['Skyshot Mark|mark .1 3', 'Crossing Winds|cross .25']],
+  sb_hailshaman: [['Wide Hail|splash .3; sppow .1', 'Hail Echo|specho .25'], ['Black Ice|spctl .3; sppow .1', 'Freezing Rain Drill|spcd .25'], ['Brittle Hail|spshred 2 8; spcd .1', 'Storm Circle|zone 1.6 .15; aura .1 1.6']],
+  sb_spiritwalker: [['Far Spirit|reach .4; sppow .1', 'Spirit Echo|specho .25'], ["Ancestors' Due|spmark .12 3", 'Spirit Bond|aura .12 1.8'], ['Chain of Spirits|spjump .5; sppow .1', 'Ghost Walk|spcd .3']],
+  sb_thundercaller: [['Longer Arc|jump 1', 'Rod Reach|reach .5'], ['Charged|stun .1 .5; sppow .1', 'Arc Bridge Drill|spcd .25'], ['Storm Mark|mark .1 3', 'Overcharge|nth 4 2']],
+  sb_earthbinder: [['Stone Ward|guard .6; zone 1.4 .15', 'Fissure Strike|pierce .5 2'], ['Stonewake|stun .12 .5; sppow .1', 'Sinkhole Drill|spcd .22; spctl .2'], ['Earth Aura|auraD .1 1.6', 'Bedrock Corner|cover .05']],
+  sb_clouddancer: [['Wide Cloud|splash .35', 'High Cloud|reach .5'], ['Downpour|slow .25 1.2; sppow .1', 'Rain Dance Drill|spcd .25'], ['Thunderhead Spread|chain .4 1.6', 'Sky Mark|mark .1 3']],
+  sb_skyhunter: [['Long Tether|reach .5', 'Harpoon Barbs|bleed .3'], ['Ground Stake|stun .1 .5; spctl .2', 'Storm Brand|mark .1 3'], ['Skyfall Line|pierce .45 2', "Hunter's Finish|exec .6 .3"]],
+  // ---- the Wardbound ----
+  wb_oathbound: [['Planted Oath|guard .7; zone 1.3 .15', 'Thrust Reach|reach .3; pierce .45 1'], ['Rune Cleave|shred 2 8', 'Oath Drill|spcd .22; spslow .2 1.2'], ['Final Oath|exec .6 .3', 'Oath Circle|auraD .1 1.6']],
+  wb_maskedwarden: [['Long Ricochet|jump 1', 'Glaive Reach|reach .5'], ['Warding Mark|mark .1 3', 'Quick Throw|haste .22'], ['Returning Line|pierce .45 2', 'Crossing Glaives|cross .25']],
+  wb_frostbrand: [['Rimeline Reach|reach .4; spctl .1', 'Deep Frost|slow .35 1.8; sppow .1'], ['Frostbite|bleed .3', 'Winter Drill|spcd .25'], ['Frozen Corner|cover .05', 'Winter Ward|zone 1.6 .15; aura .1 1.6']],
+  wb_runecarver: [['Far Etch|reach .4; sppow .1', 'Etch Echo|specho .25'], ['Detonation Spread|spjump .5', 'Scribe Drill|spcd .25'], ['Road Script|cover .03; sppow .1', 'Etched Mark|spmark .12 3; spcd .1']],
+  wb_stormward: [['Thunder Lance|jump 1', 'Lance Reach|reach .4'], ['Charge Stun|stun .12 .5; sppow .1', 'Storm Pennant|aura .12 1.6'], ['Skyfall Line|pierce .5 2', 'Storm Drill|spcd .3']],
+  wb_anvilguard: [['Shield Wall|guard .7; zone 1.3 .15', 'Anvil Strike|nth 4 2'], ['Quake Line|pierce .5 2', 'Crushing Weight|shred 2 8'], ['Anvil Aura|auraD .1 1.6', 'Hold the Gap|cover .05']],
+  wb_siegewarden: [['Wide Rune|splash .3', 'Long Bolt|reach .6'], ['Pinning Bolt|stun .1 .5; nth 5 1.6', 'Chain Bolt|chain .4 1.6'], ['Rune Mark|mark .1 3', 'Bolt Drill|spcd .3']],
+  wb_vowkeeper: [['Censer Smoke|zone 1.5 .15; sppow .1', 'Sworn Reach|reach .3; chain .35 1.4'], ['Rite of Holding|stun .12 .5; spctl .2', 'Vow Aura|aura .12 1.6'], ['Vow Mark|mark .12 3', 'Holding Corner|cover .05']],
+  // ---- the Champions (one on the field: their options are about the army round them) ----
+  _champ: [["Commander's Reach|reach .4", 'Battle Tempo|haste .2'], ['Rallying Presence|aura .1 1.8', 'Signature Drill|spcd .22; sppow .1'], ["Champion's Mark|mark .1 3", 'The Last Word|exec .6 .3']],
+};
+// the casters: units whose damage is mostly spells (tools/check_tier_parity.js measures the share; 40% and up at tier I)
+const BR_CASTER = new Set(['briarwarden', 'cc_rimeweaver', 'cc_chronomancer', 'cc_astrologer', 'runesmith', 'lightbinder', 'sunlance', 'sb_hailshaman', 'sb_spiritwalker', 'wb_runecarver']);
+const brCaster = t => !!(t && t.def && BR_CASTER.has(t.def.unit));
+const BR_OPTS = {};
+for (const u in BR_DATA) BR_OPTS[u] = BR_DATA[u].map((pair, k) => pair.map((s, i) => {
+  const [name, fx] = s.split('|');
+  return { u, k, i, name, fx: fx.split(';').map(p => { const [m, a, b] = p.trim().split(/\s+/); if (!BR_MECH[m]) console.warn('branches: no mechanic ' + m); return [m, +a, b == null ? undefined : +b]; }) };
+}));
+const brKey = t => t && t.def ? (BR_OPTS[t.def.unit] ? t.def.unit : t.def.champ ? '_champ' : null) : null;
+const brUnitOk = t => !!t && !!t.def && !!t.def.force && !t.def.wall && t.def.tiers && t.def.tiers.length >= 6 && !!brKey(t);
+const brOpts = (t, k) => { const key = brKey(t); return key ? BR_OPTS[key][k] || null : null; };
+// each tier's default: the option nearest the old flat bonus (an old save's units at IV-VI take it)
+const brDef = (t, k) => { const o = brOpts(t, k); if (!o) return 0; const s = q => Math.max(...q.fx.map(f => (BR_MECH[f[0]] || {}).plain || 0)); return s(o[1]) > s(o[0]) ? 1 : 0; };
+const brOpt = (t, k) => { const o = brOpts(t, k), i = t.br && t.br[k]; return o && i != null ? o[i] || null : null; };
+// a unit at IV-VI without its choices (an older save, a playtest army, the stress scene): the remembered or default ones
+function brFill(t) {
+  const n = Math.min(3, (t.tier | 0) - 2); if (n <= 0) return;
+  if (!t.br) t.br = [];
+  for (let k = 0; k < n; k++) if (t.br[k] == null) t.br[k] = brRem(t, k);
+}
+function brRem(t, k) { const m = G.brMem && G.brMem[brKey(t)]; return m && m[k] != null ? m[k] : brDef(t, k); }
+// road cells within r of the unit (its reach), cached by the maze's path
+function brCells(t, r) {
+  const P = G.path && G.path.pts; if (!P || !t) return 0;
+  const key = P.length + ':' + r.toFixed(2);
+  if (t.brCP === P && t.brCK === key) return t.brCN;
+  let n = 0; const seen = new Set();
+  for (const [x, z] of P) { const c = Math.floor(x) + ',' + Math.floor(z); if (seen.has(c)) continue; seen.add(c); if (Math.hypot(x - t.x, z - t.y) <= r + .05) n++; }
+  t.brCP = P; t.brCK = key; t.brCN = n; return n;
+}
+// the auras on the field this frame (from the choices alone: no stats needed)
+let BR_AUR = { t: -1, L: [] };
+function brAuras() {
+  if (BR_AUR.t === G.time && BR_AUR.n === G.towers.length) return BR_AUR.L;
+  const L = [];
+  for (const o of G.towers || []) {
+    if (!brUnitOk(o) || o.tier < 3 || o.wrecked) continue;
+    for (let k = 0; k < Math.min(3, o.tier - 2); k++) { const q = brOpts(o, k)[o.br && o.br[k] != null ? o.br[k] : brRem(o, k)]; if (q) for (const [m, a, b] of q.fx) if (m === 'aura' || m === 'auraD') L.push({ o, m, a, r: b }); }
+  }
+  BR_AUR = { t: G.time, n: (G.towers || []).length, L }; return L;
+}
+
+/* ---------- the stats: effStats, wrapped ---------- */
+function brStats(t, st) {
+  const kit = typeof abilKit === 'function' ? abilKit(t) : null, tier = t.tier | 0;
+  // mana: +BRC.mana of the kit's pool a tier, every tier (the owner)
+  if (kit && kit.mana && kit.mana.max > 0) {
+    st.manaMax = (st.manaMax || 0) + Math.round(kit.mana.max * BRC.mana * tier);
+    const mt = typeof manaTal === 'function' ? manaTal(t) : null;
+    st.manaShow = (mt ? Math.round(kit.mana.max * (1 + mt.pool)) : kit.mana.max) + st.manaMax;
+  }
+  // a caster's spells keep pace with the strike: TIER_RATE sooner and 1/TIER_RATE more regen a tier
+  if (kit && brCaster(t) && tier > 0 && typeof TIER_RATE !== 'undefined') {
+    const q = Math.pow(TIER_RATE, tier);
+    sh(st).cdK *= q;
+    st.manaRegen = (st.manaRegen || 0) + kit.mana.regen * (1 / q - 1);
+  }
+  // the auras of other kinds standing beside it
+  const AL = brAuras();
+  if (AL.length) { let as = 0, ad = 0; for (const A of AL) { if (A.o === t || A.o.type === t.type || Math.hypot(A.o.x - t.x, A.o.y - t.y) > A.r + .05) continue; if (A.m === 'aura') as += A.a; else ad += A.a; }
+    as = Math.min(.3, as); ad = Math.min(.3, ad);
+    if (as && st.rate) st.rate /= 1 + as;
+    if (ad) { if (st.dmg) st.dmg *= 1 + ad; if (st.smite) st.smite *= 1 + ad; }
+    if (as || ad) st.brAura = [as, ad];
+  }
+  if (BR_OFF || !brUnitOk(t) || tier < 3) return st;
+  const n = Math.min(3, tier - 2), K = Math.pow(BRC.keep, n), x = st.br = { spK: 1 / K - 1 };
+  for (const key of ['dmg', 'smite', 'burn', 'poison', 'drain']) if (st[key]) st[key] *= K;
+  for (let k = 0; k < n; k++) {
+    if (t.brSkip === k) continue;
+    const i = t.br && t.br[k] != null ? t.br[k] : brRem(t, k), q = brOpts(t, k) && brOpts(t, k)[i];   // (not written back: a preview at the next tier must not choose for it)
+    if (!q) continue;
+    for (const [m, a, b] of q.fx) BR_MECH[m].apply(st, a, b, t, x);
+  }
+  if (x.coverK) x.cover = Math.min(BRC.coverCap, x.coverK * brCells(t, st.range || 0));
+  if (x.far) x.farAt = (st.range || 0) * BRC.farAt;
+  return st;
+}
+if (typeof effStats === 'function') {
+  const _brEff = effStats;
+  effStats = function (t) { const st = _brEff.apply(this, arguments); if (brOn() && t && t.def && t.def.force && !t.def.wall) brStats(t, st); return st; };
+}
+// the upgrade's numbers show the pool: "Mana 120 → 132" (meta.js gainBits / diffHTML; right after the strike)
+if (typeof DIFF_KEYS !== 'undefined' && !DIFF_KEYS.some(d => d[0] === 'manaShow')) DIFF_KEYS.splice(1, 0, ['manaShow', 'Mana', v => String(Math.round(v))]);
+
+/* ---------- buying a tier: the choice ---------- */
+// t.brPick (the picker's card) or the choice remembered for this kind and tier, else the default
+const brNeedsPick = t => brOn() && brUnitOk(t) && (t.tier | 0) >= 2 && (t.tier | 0) <= 4;
+if (typeof upgrade === 'function') {
+  const _brUp = upgrade;
+  upgrade = function (t) {
+    if (!brOn() || !t || !t.def || !t.def.force || t.def.wall) return _brUp.apply(this, arguments);
+    const pick = brNeedsPick(t), k = (t.tier | 0) - 2, was = t.br ? t.br.slice() : null, mana0 = t.ab ? t.ab.mana : null;
+    if (pick) { brFill(t); t.br = (t.br || []).slice(0, k); t.br[k] = t.brPick != null ? t.brPick : brRem(t, k); }
+    const ok = _brUp.apply(this, arguments);
+    if (!ok) { if (pick) t.br = was; return ok; }
+    if (pick) { const m = G.brMem || (G.brMem = {}), key = brKey(t); (m[key] || (m[key] = []))[k] = t.br[k]; const q = brOpt(t, k); if (q && G.state === 'play' && typeof onToast === 'function') onToast(`${t.def.name} ${ROMAN[t.tier]}: ${q.name}. ${brSayOpt(t, q).join('; ')}.`); }
+    // the mana pool grows with the tier, and so does what it holds
+    const kit = typeof abilKit === 'function' && abilKit(t);
+    if (kit && t.ab && mana0 != null) { t.st = effStats(t); t.ab.mana = Math.min(abMax(t), mana0 + Math.round(kit.mana.max * BRC.mana)); }
+    return ok;
+  };
+}
+// a choice's lines on the card, in plain numbers (A: without it, B: with it, at the tier it is taken)
+function brSayOpt(t, q, A, B) {
+  if (!A || !B) { const p = brPreview(t, q.k, q.i); A = p.A; B = p.B; }
+  return q.fx.map(([m, a, b]) => { try { return BR_MECH[m].say(a, b, A, B, t); } catch (e) { return m; } });
+}
+function brPreview(t, k, i) {
+  const tier0 = t.tier, br0 = t.br, sk0 = t.brSkip;
+  t.tier = Math.max(t.tier, k + 3); t.br = (br0 || []).slice(); brFill(t); t.br[k] = i;
+  let A, B;
+  try { t.brSkip = k; A = effStats(t); t.brSkip = sk0; B = effStats(t); }
+  finally { t.tier = tier0; t.br = br0; t.brSkip = sk0; }
+  return { A, B };
+}
+// retraining: a unit's choices taken again (renown.js's respec price; gold without Renown), between waves
+const brRetrainCost = () => typeof rnOn === 'function' && rnOn() ? { rn: rnCost('respec') } : { gold: 25 };
+function brRetrainPay(t) {
+  if (G.phase !== 'build') { onToast('Retrain between waves.'); return false; }
+  const c = brRetrainCost();
+  if (c.rn != null) { if (!rnSpend('respec', 'branches: ' + t.def.name)) { onToast(`Retraining takes ${c.rn} Renown.`); sfx('nogold'); return false; } }
+  else { if (G.gold < c.gold) { onToast('Not enough gold.'); sfx('nogold'); return false; } G.gold -= c.gold; }
+  return true;
+}
+function brSet(t, k, i) { if (!t.br) t.br = []; t.br[k] = i; t.st = effStats(t); { const m = towerMaxHp(t, t.st); if (!t.wrecked) t.hp = Math.min(m, t.hp + Math.max(0, m - t.maxHp)); t.maxHp = m; t.hp = Math.min(t.hp, m); } onDirty(); onSave(); }
+
+/* ---------- the hooks: strikes that pierce or leap, the auras' assists, slowing ground, the damage riders ---------- */
+const brStrike = () => DTAG !== AB_TAG && DTAG !== 'relic' && DTAG !== 'rx';
+if (typeof onHit === 'function') {
+  const _brHit = onHit;
+  onHit = function (c, st, src, amt) {
+    _brHit.apply(this, arguments);
+    if (BR_IN || !src || !src.def || !src.def.force || src.def.wall || !G.force || G.vs || !brStrike()) return;
+    (c.brT || (c.brT = {}))[src.type] = G.time;   // crossfire: who struck it, and when
+    const x = st && st.br; if (!x || !(amt > 0) || !(x.pierce || x.chain)) return;
+    if ((src.brFxT || 0) > G.time) return;   // once a strike (a whirl that hits five foes pierces once)
+    src.brFxT = G.time + Math.min(.4, (st.rate || 1) * .5);
+    BR_IN = 1;
+    try {
+      const ok = o => o !== c && !o.dead && (typeof canTarget !== 'function' || canTarget(src, st, o));
+      if (x.pierce && typeof foesOnLine === 'function') {
+        const d0 = Math.hypot(c.x - src.x, c.y - src.y), len = 1.8, L = foesOnLine(src.x, src.y, c.x, c.y, d0 + len, .32, ok);
+        const hits = L.list.map(o => [o, (o.x - src.x) * L.ux + (o.y - src.y) * L.uz]).filter(([, a]) => a > d0 + .05).sort((p, q) => p[1] - q[1]).slice(0, x.pierceN || 1);
+        for (const [o] of hits) { hurt(o, amt * x.pierce, 'phys', src); if (!o.dead) fxSpark(o.x, o.y, hitH(o), '#f4ead0', 3); }
+        if (hits.length) rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, x1: hits[hits.length - 1][0].x, h1: hitH(hits[hits.length - 1][0]), z1: hits[hits.length - 1][0].y, col: '#f4ead0', w: .025, life: .2 });
+      }
+      if (x.chain) {
+        let best = null, bd = x.chainR || 1.6;
+        for (const o of G.creeps) { if (!ok(o) || o.phased) continue; const d = Math.hypot(o.x - c.x, o.y - c.y); if (d <= bd) { bd = d; best = o; } }
+        if (best) { hurt(best, amt * x.chain, 'phys', src); rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, x1: best.x, h1: hitH(best), z1: best.y, col: '#cfe8ff', w: .025, life: .2 }); }
+      }
+    } finally { BR_IN = 0; }
+  };
+}
+function brAmp(c, src, dot) {
+  const x = src && src.st && src.st.br; if (!x || !src.def || !src.def.force) return 0;
+  if (DTAG === AB_TAG) return x.spK || 0;   // a spell: given back the strike's tithe, and its own power
+  if (dot || !brStrike()) return 0;
+  let v = x.cover || 0;
+  if (x.far && src.x != null && Math.hypot(c.x - src.x, c.y - src.y) > x.farAt) v += x.far;
+  if (x.cross && c.brT) { for (const ty in c.brT) if (ty !== src.type && G.time - c.brT[ty] <= BRC.crossT) { v += x.cross; break; } }
+  if (x.exec && c.hp < c.maxHp * x.execAt) v += x.exec;
+  return v;
+}
+let BR_ZT = 0;
+function brTick(dt) {
+  if ((BR_ZT -= dt) > 0) return; BR_ZT = BRC.zoneEvery;
+  if (G.phase !== 'wave') return;
+  for (const t of G.towers) {
+    const x = t.st && t.st.br; if (!x || t.wrecked) continue;
+    if (x.zoneR) for (const c of G.creeps) if (!c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= x.zoneR) chill(c, { slow: x.zoneS, slowT: .45 }, elemOf(t), t);
+  }
+  for (const A of brAuras()) for (const o of G.towers) if (o !== A.o && o.type !== A.o.type && !o.def.wall && Math.hypot(A.o.x - o.x, A.o.y - o.y) <= A.r + .05) vetAid(o, A.o, .6);   // (what they kill counts as its assist)
+}
+if (typeof forceHook === 'function') {
+  const _brFH = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = _brFH.apply(this, arguments);
+    if (k === 'amp' && brOn()) { const v = brAmp(a0, a1, a2); return v ? (r || 0) + v : r; }
+    if (k === 'tick' && brOn()) brTick(a0);
+    return r;
+  };
+}
+// a spell's riders and its longer holds
+if (typeof spRider === 'function') {
+  const _brSpR = spRider;
+  spRider = function (c, src) {
+    const r = _brSpR.apply(this, arguments);
+    const x = src && src.st && src.st.br; if (!x || BR_IN || c.dead) return r;
+    if (x.spSlow) chill(c, { slow: x.spSlow[0], slowT: x.spSlow[1] }, elemOf(src), src);
+    if (x.spShred) { const was = c.shredT > 0 ? c.shred : 0; c.shred = Math.min(x.spShred[1], was + x.spShred[0]); c.shredT = 5; }
+    if (x.spMark) { c.markAmp = Math.max(c.markAmp, x.spMark[0]); c.markT = Math.max(c.markT, x.spMark[1]); }
+    if (x.spJump && (src.brJT || 0) <= G.time) {   // one leap a cast's moment (an area spell does not leap from every foe)
+      src.brJT = G.time + .3;
+      let best = null, bd = 1.6; for (const o of G.creeps) { if (o === c || o.dead || o.phased) continue; const d = Math.hypot(o.x - c.x, o.y - c.y); if (d <= bd) { bd = d; best = o; } }
+      if (best) { BR_IN = 1; try { hurt(best, abD(src.st) * x.spJump * spellWeight(src), 'magic', src); } finally { BR_IN = 0; } rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, x1: best.x, h1: hitH(best), z1: best.y, col: '#d8c8ff', w: .025, life: .22 }); }
+    }
+    return r;
+  };
+}
+if (typeof rootFoe === 'function') {
+  const _brRoot = rootFoe;
+  rootFoe = function (c, dur, src) { const x = src && src.st && src.st.br; if (x && x.ctl && DTAG === AB_TAG) dur *= 1 + x.ctl; return _brRoot.call(this, c, dur, src); };
+}
+if (typeof chill === 'function') {
+  const _brChill = chill;
+  chill = function (c, s, elem, src) { const x = src && src.st && src.st.br; if (x && x.ctl && DTAG === AB_TAG && s && s.slowT) s = Object.assign({}, s, { slowT: s.slowT * (1 + x.ctl) }); return _brChill.call(this, c, s, elem, src); };
+}
+// a second cast: the spell again 0.6s later, free, on what its rule picks then (or the same foe)
+if (typeof castAbility === 'function') {
+  const _brCast = castAbility;
+  castAbility = function (t, ab, tg, st, manual) {
+    const r = _brCast.apply(this, arguments);
+    const x = r && !BR_ECHO && t && t.st && t.st.br;
+    if (x && x.echo && Math.random() < x.echo) G.delayed.push({ t: .6, fn: () => {
+      if (!G.towers.includes(t) || t.wrecked || !t.ab) return;
+      const s = t.st || effStats(t); let g = null;
+      try { g = ab.pick ? ab.pick(t, s, ab, false) : null; } catch (e) { g = null; }
+      if (!g && tg && !tg.dead) g = tg; if (!g) return;
+      const A = t.ab, m = A.mana, cd = A.cd[ab.id], cost = abCost(t, ab);
+      BR_ECHO = 1; A.mana = Math.max(m, cost);
+      try { _brCast.call(this, t, ab, g, s, false); } finally { BR_ECHO = 0; A.mana = m; A.cd[ab.id] = cd; }
+    } });
+    return r;
+  };
+}
+
+/* ---------- saves ---------- */
+if (typeof serialize === 'function') {
+  const _brSer = serialize;
+  serialize = function () {
+    const s = _brSer.apply(this, arguments);
+    if (s && G.force && !G.vs) { s.br = (G.towers || []).filter(t => t.br && t.br.length && brUnitOk(t)).map(t => [t.i, t.j, t.br.slice(0, 3)]); s.brMem = G.brMem || {}; }
+    return s;
+  };
+}
+function brRestore(s) {
+  G.brMem = (s && s.brMem && typeof s.brMem === 'object') ? s.brMem : {};
+  for (const t of G.towers || []) t.br = null;
+  for (const [i, j, b] of (s && s.br) || []) { const t = (G.towers || []).find(o => o.i === i && o.j === j); if (t && Array.isArray(b)) t.br = b.map(v => v === 0 || v === 1 ? v : null); }
+  for (const t of G.towers || []) if (brUnitOk(t) && t.tier >= 3) brFill(t);   // an older save: each tier's default (or remembered) branch
+}
+if (typeof restore === 'function') {
+  const _brRes = restore;
+  restore = function (s) { const r = _brRes.apply(this, arguments); try { if (G.force && !G.vs) brRestore(s); } catch (e) { console.error(e); } return r; };
+}
+if (typeof newGame === 'function') {
+  const _brNew = newGame;
+  newGame = function () { const r = _brNew.apply(this, arguments); G.brMem = {}; return r; };
+}
+
 /* ================= NO WEAPONS AMONG THE ITEMS: force items that were weapons become other gear =================
    The owner (9 Nov 2026): "change items that allude to being a weapon/staff". Weapons have their own slot now
    (forces_zzzzzzzzzzzzz_weapons.js), so no relic, set piece, legendary or shop item of a force run is a staff, sword, bow,
@@ -47322,6 +47806,235 @@ function forgeRunSim(o) {
   }
   return { K, drops, spent, n: drops.reduce((a, b) => a + b, 0) };
 }
+
+/* ================= HERO WEAPONS: a Champion keeps its iconic weapon all run, and it grows (force runs) =================
+   The owner (9 Nov 2026) approved hero weapons. A Champion (the commander in person, the holy slot) never takes a dropped
+   weapon: it fights with its ICONIC weapon (the one its model holds: WPN_ISSUED), which
+   1. AWAKENS in four named stages, I to IV (HW[unit].n). The milestone: wave bosses slain while the Champion stands on the
+      field (HW_AT: 1, 3 and 6 of them). Each stage raises its damage (HW_M) and a caster's Spell Damage (HW_SP), re-forges
+      it to the wave's Item Level, adds an effect tied to the hero's own kit (HW[unit].fx: an on-hit effect, a twist on one
+      of its named spells, crit, a mark, a slow), and lights it a step brighter (hwGlow: a colour and a strength 0..1 per
+      stage, which the sculpted models read: Maren's twin blade is tinted by it, every hero's weapon tip glows with it);
+   2. is TEMPERED at the forge (the owner: "Temper", not "melt"; the code's ids keep hwMelt*): a dropped weapon of its class
+      (or, for Maren, Tovin and Grenna, whose weapons no one else holds, any weapon) is tempered into it, lifting its Item
+      Level to the tempering weapon's and passing half of a better roll on (h.tw: the last one, shown on its card); its look
+      never changes;
+   3. may be REFORGED, once a run and very rarely (HW_ULT_P): a wave boss slain while it is at stage III or IV can drop the
+      hero's reforged legendary, its ultimate form (HW[unit].ult: a new name, a stronger effect, a model key for the owner
+      to model; until then the same model at the final stage's glow), announced with a banner.
+   Hero weapons are out of the drop pool (no weapon drops for a Champion), and the rack opens the hero's own page
+   (heroweapons_ui.js). Saves: G.hw (s.hw); an older save's weapon on a Champion becomes its iconic weapon at the stage its
+   rarity matches (uncommon or less I, rare II, epic III, legendary IV) and its Item Level.
+   Balance: a Champion joins near wave 15 (CHAMP_LEVEL), so its stages come about waves 15-20, 30 and 45; its damage then
+   tracks what a unit gains from an ordinary run's drops and forge (tools/check_weapons.js -v prints both), so the foes'
+   health table (WPN_HP_TAB) stands. Art notes for each hero: docs/design/weapons.md (Hero weapons). */
+const HW_AT = [0, 1, 3, 6];                  // wave bosses slain while it stands, to reach stages I-IV
+const HW_M = [1, 1.1, 1.2, 1.32], HW_ULT_M = 1.55;   // its DPS over the Champion's baseline, by stage (x1% an Item Level above 1)
+const HW_SP = [16, 26, 38, 52], HW_ULT_SP = 70;      // a caster's Spell Damage at Item Level 1 (x the strike curve, x the wearer: as weapons)
+const HW_RAR = [2, 3, 3, 4];                 // the frame colour and rune sockets, by stage (rare, epic, epic, legendary)
+const HW_ULT_P = [0, 0, .03, .05];           // its reforged form's chance on a wave boss, by stage
+const HW_MELT_SHARE = .5, HW_MELT_GOLD = 12; // tempering passes half of a better roll on; it costs this x the level's price
+const HW_GLOW = [0, .35, .65, 1];
+// unit -> { n: its four stage names, fx: the effects stages II-IV add, glow, ult: [name, look, [effects]], art: notes }
+const HW = {
+  ch_maelis: { glow: '#a07ae0', n: ['Maelis\'s Crystal Staff', 'Crystal Staff, Kindled', 'Crystal Staff of the Sixfold Loom', 'Loomstar, Staff of Maelis'], fx: [['hit', 'manaburn', 4], ['spell', 'ch_unravel', 'echo'], ['crit']],
+    ult: ['Loomheart, the Weaver Reborn', 'the staff remade as a loom of living starlight', [['spell', 'ch_thousandfold', 'arc'], ['hit', 'arc', 3]]], art: 'the crystal brightens; threads of light spin round its ring; at IV the crystal is a small turning star' },
+  ch_aurel: { glow: '#c09a50', n: ['Aurel\'s Clockwork Staff', 'Clockwork Staff, Wound', 'Clockwork Staff of the Turning Hour', 'Hourhand, Staff of Aurel'], fx: [['hit', 'daze', 4], ['slow'], ['spell', 'ch_stoppedhour', 'freeze']],
+    ult: ['The Last Hour Unwound', 'the staff whose dial runs every way at once', [['spell', 'ch_stoppedhour', 'echo'], ['hit', 'freeze', 4]]], art: 'the dial glows, then its hands turn; at IV gold numerals float round it' },
+  ch_maren: { glow: '#d05a8a', n: ['Maren\'s Twin Rift-Blade', 'Twin Rift-Blade, Awakened', 'Twin Rift-Blade, Unbound', 'Riftsong, the Severing Twin'], fx: [['hit', 'bleed', 3], ['spell', 'ch_riftchain', 'arc'], ['spell', 'ch_severing', 'echo']],
+    ult: ['Riftsong Reforged, Blade of the Conclave', 'the twin blade remade, both edges burning with open rift-light', [['spell', 'ch_severing', 'echo'], ['hit', 'bleed', 2], ['crit']]], art: 'the red and pink edges glow; a rift-light runs along both blades; at IV the crescent at the grip burns' },
+  ch_elowen: { glow: '#4a9a4a', n: ['Elowen\'s Living Staff', 'Living Staff, in Leaf', 'Living Staff, in Bloom', 'Heartbough, Staff of the Wood'], fx: [['hit', 'chill', 3], ['spell', 'ch_entangle', 'bleed'], ['spell', 'ch_rootway', 'echo']],
+    ult: ['The First Bough', 'the staff become a young tree of the first wood', [['spell', 'ch_oldwood', 'echo'], ['hit', 'chill', 2]]], art: 'new leaves, then flowers, then a glowing heartwood knot' },
+  ch_faelan: { glow: '#6a8a3a', n: ['Faelan\'s Thorned Greatbow', 'Thorned Greatbow, Strung Anew', 'Thorned Greatbow of the Long Watch', 'Longwatch, Faelan\'s Greatbow'], fx: [['hit', 'bleed', 4], ['crit'], ['spell', 'ch_pinarrow', 'reset']],
+    ult: ['The Moon-Thorn Bow', 'a greatbow whose thorns glow moon-white', [['spell', 'ch_thornvolley', 'echo'], ['crit']]], art: 'the thorns glow green, then moon-white; the string shines' },
+  ch_nyssa: { glow: '#7aa840', n: ['Nyssa\'s Seedpod Staff', 'Seedpod Staff, Budding', 'Seedpod Staff, Flowering', 'Bloomcrown, Staff of Nyssa'], fx: [['hit', 'burn', 4], ['spell', 'ch_sporecloud', 'bleed'], ['spell', 'ch_fullbloom', 'echo']],
+    ult: ['The Everbloom', 'a staff in endless flower, moths in its crown', [['spell', 'ch_sporecloud', 'echo'], ['hit', 'burn', 2]]], art: 'the pod swells and glows; spores drift; at IV it opens in flower' },
+  ch_haldra: { glow: '#e08040', n: ['Haldra\'s War Hammer', 'War Hammer, Rune-Lit', 'War Hammer of the Hold', 'Peakbreaker, Haldra\'s Hammer'], fx: [['hit', 'daze', 4], ['hit', 'shove', 3], ['spell', 'ch_oath', 'echo']],
+    ult: ['The Mountain\'s Answer', 'a hammer whose head is a living shard of the mountain', [['spell', 'ch_oath', 'echo'], ['hit', 'shred', 2]]], art: 'runes on the head light orange, then the whole head glows like a forge' },
+  ch_tovin: { glow: '#b070ff', n: ['Tovin\'s Copper Gauntlet', 'Copper Gauntlet, Charged', 'Copper Gauntlet, Overwound', 'Stormcoil, Tovin\'s Gauntlet'], fx: [['hit', 'arc', 4], ['spell', 'ch_coil', 'shove'], ['spell', 'ch_barrage', 'echo']],
+    ult: ['The First Engine', 'a gauntlet with a heart of caged violet lightning', [['hit', 'arc', 2], ['spell', 'ch_sentry', 'echo']]], art: 'the coil crackles violet, brighter each stage; at IV sparks run along the fingers' },
+  ch_grenna: { glow: '#ff9a40', n: ['Grenna\'s Great Ladle', 'Great Ladle, Seasoned', 'Great Ladle of the Long Table', 'Last Orders, Grenna\'s Ladle'], fx: [['hit', 'burn', 4], ['spell', 'ch_firebrew', 'burn'], ['spell', 'ch_rollkeg', 'echo']],
+    ult: ['The Bottomless Ladle', 'a ladle that never runs dry, fire-brew dripping from it', [['spell', 'ch_firebrew', 'echo'], ['hit', 'burn', 2]]], art: 'the copper warms, then the bowl holds glowing firebrew; at IV flames lick the rim' },
+  ch_aurelian: { glow: '#ffd060', n: ['Aurelian\'s Lion Sword', 'Lion Sword, Dawn-Lit', 'Lion Sword of the Ford', 'Dawnmane, Aurelian\'s Sword'], fx: [['hit', 'daze', 4], ['spell', 'ch_fordstandard', 'shove'], ['spell', 'ch_lioncharge', 'echo']],
+    ult: ['The Crossing Blade', 'a broad sword blazing gold, a lion\'s head roaring at the guard', [['spell', 'ch_lioncharge', 'echo'], ['hit', 'burn', 3]]], art: 'dawn-gold light along the blade; the lion on the guard glows; at IV the edge blazes' },
+  ch_celestine: { glow: '#ffe08a', n: ['Celestine\'s Sunburst Staff', 'Sunburst Staff, Kindled', 'Sunburst Staff of the High Noon', 'Dawnsong, Staff of Celestine'], fx: [['hit', 'burn', 4], ['mark'], ['spell', 'ch_dawnbreak', 'echo']],
+    ult: ['The Unsetting Sun', 'a staff crowned by a small sun that never sets', [['spell', 'ch_morningstar', 'echo'], ['mark']]], art: 'the sunburst brightens and its rays lengthen; at IV it is a small sun' },
+  ch_morrow: { glow: '#d8e0f0', n: ['Morrow\'s Ashen Lance', 'Ashen Lance, Sworn', 'Ashen Lance of Judgement', 'Verdict, Morrow\'s Lance'], fx: [['hit', 'shred', 3], ['mark'], ['spell', 'ch_sentence', 'echo']],
+    ult: ['The Final Verdict', 'a grey lance whose point burns with white judgement', [['spell', 'ch_verdict', 'echo'], ['mark']]], art: 'pale light along the point; the scales on the guard glow; at IV the point burns white' },
+  ch_tarka: { glow: '#80b8ff', n: ['Tarka\'s Copper-Bound Staff', 'Copper-Bound Staff, Thundering', 'Copper-Bound Staff of the Storm', 'Thunderbrow, Tarka\'s Staff'], fx: [['hit', 'arc', 4], ['spell', 'ch_eyestorm', 'daze'], ['spell', 'ch_gather', 'echo']],
+    ult: ['The Storm-Drum Staff', 'a staff with a thunderhead caught at its crown', [['spell', 'ch_stormcall', 'echo'], ['hit', 'arc', 2]]], art: 'sparks on the copper bands; at IV a small storm cloud hangs at the top' },
+  ch_oshana: { glow: '#c8f0ff', n: ['Oshana\'s Driftwood Staff', 'Driftwood Staff, Chiming', 'Driftwood Staff of the Four Winds', 'Windspeaker, Oshana\'s Staff'], fx: [['hit', 'shove', 4], ['slow'], ['spell', 'ch_cyclone', 'echo']],
+    ult: ['The Speaking Wind', 'a driftwood staff that sings in every wind', [['spell', 'ch_cyclone', 'echo'], ['hit', 'shove', 2]]], art: 'the chimes glow pale teal; at IV a ring of wind circles the head' },
+  ch_huri: { glow: '#a8d0ff', n: ['Huri\'s Bone Spear', 'Bone Spear, Blooded', 'Bone Spear of the Pack', 'Wolfsong, Huri\'s Spear'], fx: [['hit', 'bleed', 4], ['spell', 'ch_runwolves', 'bleed'], ['spell', 'ch_spirithunt', 'echo']],
+    ult: ['The Thunderbird\'s Talon', 'a spear of thunderbird bone, lightning along its edge', [['spell', 'ch_thunderdive', 'echo'], ['hit', 'arc', 3]]], art: 'spirit-blue light in the carvings; at IV lightning along the head' },
+  ch_varic: { glow: '#ffb43a', n: ['Varic\'s Warden Blade', 'Warden Blade, Rune-Lit', 'Warden Blade of the Held Gate', 'Gatekeeper, Varic\'s Blade'], fx: [['hit', 'shred', 3], ['mark'], ['spell', 'ch_lastgate', 'echo']],
+    ult: ['The Last Gate\'s Key', 'a greatsword shaped like the key of the last gate, runes burning gold', [['spell', 'ch_lastgate', 'echo'], ['hit', 'shred', 2]]], art: 'the rune on the cross lights, then runes down the blade; at IV they burn gold' },
+  ch_aedric: { glow: '#fff0b0', n: ['Aedric\'s Sun Lance', 'Sun Lance, Gilded', 'Sun Lance of the Sun-Sworn', 'Solmane, Aedric\'s Lance'], fx: [['hit', 'burn', 4], ['spell', 'ch_suncharge', 'daze'], ['spell', 'ch_sunwheel', 'echo']],
+    ult: ['The Noonday Lance', 'a lance of white gold that blazes like noon', [['spell', 'ch_blazeglory', 'echo'], ['hit', 'burn', 2]]], art: 'the gold point glows; a sun-wheel of light at the guard; at IV it blazes white-gold' },
+  ch_isaura: { glow: '#e4d8ff', n: ['Isaura\'s Veiled Blade', 'Veiled Blade, Unveiled', 'Veiled Blade of the Oath', 'Oathveil, Isaura\'s Blade'], fx: [['mark'], ['spell', 'ch_bindsweep', 'chill'], ['spell', 'ch_oathbind', 'echo']],
+    ult: ['The Oath Unbroken', 'a slim blade wrapped in a veil of living light', [['spell', 'ch_oathturned', 'echo'], ['mark']]], art: 'a pale veil of light along the edge, brighter each stage' },
+};
+let HW_OFF = false;   // (a measuring tool that wants a Champion's bare kit sets it: tools/check_spell_power.js)
+const hwOn = () => !HW_OFF && typeof wpnOn === 'function' && wpnOn();
+const hwIsHero = t => !!(t && t.def && t.def.champ && t.def.unit && HW[t.def.unit]);
+const hwTypeHero = ty => !!(TOWERS[ty] && TOWERS[ty].champ && HW[TOWERS[ty].unit]);
+// the Champion's iconic weapon (made the first time it is asked for: Item Level the wave it first stands)
+function hwState(u) {
+  if (!HW[u] || typeof G === 'undefined' || !G) return null;
+  const S = G.hw || (G.hw = {});
+  if (!S[u]) { const ty = Object.keys(TOWERS).find(k => TOWERS[k].unit === u), c = ty && wpnClassOf(ty); if (!c) return null;
+    S[u] = { hero: 1, u, b: WPN_CLASS[c].bases[0][0], rar: HW_RAR[0], il: Math.max(1, G.wave | 0), q: .5, stage: 0, bosses: 0, ult: false, id: -1 - Object.keys(S).length }; }
+  return S[u];
+}
+const hwStageName = h => ['I', 'II', 'III', 'IV'][h.stage | 0];
+const hwFx = h => { const H = HW[h.u]; if (!H) return []; const fx = H.fx.slice(0, h.stage | 0); return h.ult ? fx.concat(H.ult[2]) : fx; };
+// its numbers (in place of a dropped weapon's: wpnCalc)
+function hwCalc(h) {
+  const L = typeof wpnLv === 'function' ? wpnLv(h) : (h.il || 1), cast = WPN_CLASS[(WPN_BASE[h.b] || {}).cls] && WPN_CLASS[WPN_BASE[h.b].cls].cast, qk = 1 + WPN_Q * ((h.q == null ? .5 : h.q) - .5);
+  const m0 = (h.ult ? HW_ULT_M : HW_M[h.stage | 0]) * (1 + WPN_IL_GROW * (L - 1)) * qk, m = cast ? 1 + (m0 - 1) * WPN_CAST_STRIKE : m0;
+  const sp = cast ? Math.round((h.ult ? HW_ULT_SP : HW_SP[h.stage | 0]) * (typeof ilCurve === 'function' ? ilCurve(L) : 1) * qk) : 0;
+  return { m, sk: 1, dk: m, spr: (WPN_BASE[h.b] || {}).spr || .12, sp, m0 };
+}
+// the glow its stage lights it with (the sculpted models and the tip glow read this): { col: [r,g,b], k: 0..1, hex }
+function hwGlow(t) {
+  if (!hwOn() || !hwIsHero(t)) return null; const h = t.weapon && t.weapon.hero ? t.weapon : null; if (!h) return null;
+  const k = h.ult ? 1 : HW_GLOW[h.stage | 0]; if (!(k > 0)) return null;
+  const hex = HW[h.u].glow, c = [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
+  return { col: c, k, hex, ult: !!h.ult };
+}
+// a sculpted weapon's tint for its stage (Maren's twin blade: unitmodels_maren.js): the draw options with a lifted, glowing tint
+function hwTint(t, opts) {
+  const g = hwGlow(t); if (!g) return opts;
+  const o = Object.assign({}, opts || {}), b = o.tint || [1, 1, 1, 1], k = .55 * g.k;
+  o.tint = [b[0] * (1 + k * (g.col[0] * 1.6 - .3)), b[1] * (1 + k * (g.col[1] * 1.6 - .3)), b[2] * (1 + k * (g.col[2] * 1.6 - .3)), b[3] == null ? 1 : b[3]];
+  return o;
+}
+
+/* ---------- hooks: the hero's slot holds only its iconic weapon ---------- */
+{
+  const _fits = wpnFits;
+  wpnFits = function (w, t) { if (hwIsHero(t)) return !!(w && w.hero && w.u === t.def.unit); if (w && w.hero) return false; return _fits.apply(this, arguments); };
+  const _calc = wpnCalc;
+  wpnCalc = function (w) { return w && w.hero ? hwCalc(w) : _calc.apply(this, arguments); };
+  const _show = wpnShow;
+  wpnShow = function (w) {
+    if (!w || !w.hero || !HW[w.u]) return _show.apply(this, arguments);
+    const H = HW[w.u]; return { name: w.ult ? H.ult[0] : H.n[w.stage | 0], look: w.ult ? H.ult[1] : (WPN_ISSUED[w.u] || [])[2] || '', hue: H.glow };
+  };
+  // the iconic weapon is in its hand from the first strike (effStats reads t.weapon); its stages' effects join the weapon's own
+  const _eff = effStats;
+  effStats = function (t) { if (t && !(t.weapon && t.weapon.hero) && hwIsHero(t) && hwOn()) { const h = hwState(t.def.unit); if (h) t.weapon = h; } return _eff.apply(this, arguments); };
+  const _apply = wpnApply;
+  wpnApply = function (t, st) {
+    const r = _apply.apply(this, arguments);
+    const w = t && t.weapon; if (w && w.hero && st.wpn) for (const fx of hwFx(w)) if (WFX[fx[0]]) WFX[fx[0]](st, fx, 'hw_' + w.u + '_' + fx[0]);
+    return r;
+  };
+  // no weapon drops for a Champion: the drops lean to the other units
+  const _types = wpnTypesW;
+  wpnTypesW = function () { const r = _types.apply(this, arguments).filter(([ty]) => !hwTypeHero(ty)); return r.length ? r : Object.keys(TOWERS).filter(ty => wpnClassOf(ty) && !hwTypeHero(ty)).map(ty => [ty, 1]); };
+  // selling the Champion keeps its weapon (it is the hero's, not the rack's)
+  const _uns = unsocketAll;
+  unsocketAll = function (t) { if (t && t.weapon && t.weapon.hero) t.weapon = null; return _uns.apply(this, arguments); };
+}
+
+/* ---------- awakening and the reforged form: on a wave boss slain while the hero stands ---------- */
+function hwOnBoss(c) {
+  if (!hwOn() || !c || typeof isWaveBoss !== 'function' || !isWaveBoss(c)) return;
+  for (const t of G.towers || []) {
+    if (!hwIsHero(t) || t.wrecked) continue;
+    const h = hwState(t.def.unit); if (!h) continue; t.weapon = h;
+    h.bosses = (h.bosses | 0) + 1;
+    if (h.stage < 3 && h.bosses >= HW_AT[h.stage + 1]) {
+      h.stage++; h.rar = HW_RAR[h.stage]; h.il = Math.max(h.il | 0, G.wave | 0); delete h._c; G.talV = (G.talV || 0) + 1;
+      if (typeof onBanner === 'function') onBanner(`${HW[h.u].n[h.stage]}`, `${t.def.name.split(',')[0]}'s weapon awakens: stage ${hwStageName(h)} of IV`);
+      if (typeof sfx === 'function') sfx('lootDrop', 3);
+    }
+    if (!h.ult && Math.random() < HW_ULT_P[h.stage | 0]) hwReforge(t, h, c);
+  }
+}
+function hwReforge(t, h, c) {
+  h.ult = true; h.rar = 4; h.il = Math.max(h.il | 0, (G.wave | 0) + 3); delete h._c; G.talV = (G.talV || 0) + 1;
+  if (G.stats) G.stats.heroReforged = h.u;
+  if (typeof onBanner === 'function') onBanner(HW[h.u].ult[0], `A reforged legendary: ${t.def.name.split(',')[0]}'s weapon in its ultimate form`);
+  if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .8, HW[h.u].ult[0], RARITY[4].col);
+  if (typeof sfx === 'function') sfx('lootDrop', 4);
+  if (typeof onToast === 'function') onToast(`${HW[h.u].ult[0]}: ${HW[h.u].ult[1]}. Its new rule: ${HW[h.u].ult[2].map(f => wpnRuleText({ fx: f })).join(' ')}`);
+}
+if (typeof kill === 'function') {
+  const _hwKill = kill;
+  kill = function (c) { const was = c && !c.dead, r = _hwKill.apply(this, arguments); if (was && c.dead) { try { hwOnBoss(c); } catch (e) { console.error(e); } } return r; };
+}
+
+/* ---------- tempering a weapon into it (at the forge; ids hwMelt*, the save field 'melted', kept as they were) ---------- */
+const hwUnique = h => { const c = (WPN_BASE[h.b] || {}).cls; return !Object.keys(TOWERS).some(ty => wpnClassOf(ty) === c && !hwTypeHero(ty)); };
+function hwMeltWhy(h, w) {
+  if (!h || !w || w.hero || w.starter) return 'Pick a weapon from the rack';
+  if (!(G.wbag || []).includes(w)) return 'Only a weapon in the rack can be tempered into it';
+  const c = (WPN_BASE[w.b] || WPN_LEG[w.b] || {}).cls;
+  if (!hwUnique(h) && c !== (WPN_BASE[h.b] || {}).cls) return `Only a ${(WPN_BASE[h.b] || {}).cls} can be tempered into it`;
+  return '';
+}
+const hwMeltCost = (h, w) => typeof forgeLvK === 'function' ? Math.max(5, Math.round(HW_MELT_GOLD * forgeLvK(Math.max(h.il | 0, w.il | 0)) / 5) * 5) : 50;
+// what tempering w into it would make of it (a copy, for the preview)
+function hwMeltResult(h, w) { const o = Object.assign({}, h); delete o._c; o.il = Math.max(h.il | 0, w.il | 0); const wq = w.q == null ? .5 : w.q; if (wq > (h.q == null ? .5 : h.q)) o.q = +(o.q + HW_MELT_SHARE * (wq - o.q)).toFixed(3); return o; }
+function hwMelt(h, w) {
+  const why = hwMeltWhy(h, w); if (why) { if (typeof onToast === 'function') onToast(why + '.'); return false; }
+  const cost = hwMeltCost(h, w); if ((G.gold | 0) < cost) { if (typeof onToast === 'function') onToast(`Tempering it costs ${cost} gold.`); if (typeof sfx === 'function') sfx('nogold'); return false; }
+  G.gold -= cost; const r = hwMeltResult(h, w); h.il = r.il; h.q = r.q; h.melted = (h.melted | 0) + 1; h.tw = { n: wpnName(w), il: w.il | 0 }; h.fg = (h.fg | 0) + cost; delete h._c;
+  G.wbag.splice(G.wbag.indexOf(w), 1); G.talV = (G.talV || 0) + 1;
+  if (typeof sfx === 'function') sfx('equip', 3); if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
+  return true;
+}
+
+/* ---------- saves ---------- */
+const hwClean = h => { const o = {}; for (const k of ['hero', 'u', 'b', 'rar', 'il', 'q', 'stage', 'bosses', 'ult', 'id', 'melted', 'fg']) if (h[k] != null) o[k] = h[k]; if (h.tw && h.tw.n) o.tw = { n: String(h.tw.n), il: h.tw.il | 0 }; if (Array.isArray(h.runes)) o.runes = h.runes.slice(); return o; };
+if (typeof serialize === 'function') {
+  const _hwSer = serialize;
+  serialize = function () {
+    const s = _hwSer.apply(this, arguments);
+    if (s && G.force) { s.hw = {}; for (const u in G.hw || {}) s.hw[u] = hwClean(G.hw[u]); const hc = new Set((G.towers || []).filter(hwIsHero).map(t => t.i + ',' + t.j)); if (s.wpn && s.wpn.on) s.wpn.on = s.wpn.on.filter(([i, j]) => !hc.has(i + ',' + j)); }
+    return s;
+  };
+}
+if (typeof restore === 'function') {
+  const _hwRes = restore;
+  restore = function (s) {
+    const r = _hwRes.apply(this, arguments);
+    try { hwRestore(s); } catch (e) { console.error(e); }
+    return r;
+  };
+}
+function hwRestore(s) {
+  G.hw = {};
+  for (const u in (s && s.hw) || {}) { const h = s.hw[u]; if (HW[u] && h && WPN_BASE[h.b]) G.hw[u] = Object.assign({ hero: 1, u, stage: 0, bosses: 0, q: .5, il: 1, rar: 2 }, h, { hero: 1, u, stage: Math.max(0, Math.min(3, h.stage | 0)) }); }
+  // an older save: a weapon its Champion held becomes its iconic weapon at the stage its rarity matches (wpnRestore put it in the rack)
+  for (const [i, j, w] of (s && s.wpn && s.wpn.on) || []) {
+    const t = (G.towers || []).find(o => o.i === i && o.j === j); if (!t || !hwIsHero(t) || !w || w.hero) continue;
+    const h = hwState(t.def.unit); if (!h) continue;
+    const st = (w.rar | 0) >= 4 ? 3 : (w.rar | 0) === 3 ? 2 : (w.rar | 0) === 2 ? 1 : 0;
+    if (st > h.stage) { h.stage = st; h.bosses = Math.max(h.bosses | 0, HW_AT[st]); h.rar = HW_RAR[st]; }
+    h.il = Math.max(h.il | 0, w.il | 0); delete h._c;
+    const k = (G.wbag || []).findIndex(q => q.id === w.id); if (k >= 0) G.wbag.splice(k, 1);
+  }
+  for (const t of G.towers || []) if (hwIsHero(t)) { const h = hwState(t.def.unit); if (h) t.weapon = h; }
+}
+if (typeof newGame === 'function') {
+  const _hwNew = newGame;
+  newGame = function () { const r = _hwNew.apply(this, arguments); if (typeof G !== 'undefined' && G) G.hw = {}; return r; };
+}
+
+/* ---------- balance: a Champion's weapon by wave, beside an ordinary unit's ----------
+   It joins near wave 15 (CHAMP_LEVEL) and sees a wave boss every 5th wave from then: stage II at the first (wave 15-20),
+   III at the third (about 30), IV at the sixth (about 45), each re-forged to its wave; tempering and the forge's re-forge
+   keep its Item Level near the wave between. hwTypical(w): its DPS multiple at wave w on that path (a melee hero). */
+function hwTypical(w, join) {
+  join = join || 15; if (w < join) return 1;
+  const bosses = Math.floor(w / 5) - Math.floor((join - 1) / 5), st = bosses >= HW_AT[3] ? 3 : bosses >= HW_AT[2] ? 2 : bosses >= HW_AT[1] ? 1 : 0;
+  return (st >= 0 ? HW_M[st] : 1) * (1 + WPN_IL_GROW * (w - 1));   // (a melee hero, re-forged or tempered to the wave's level; level sync aside)
+}
+// the reforged form's model key for the owner's model (WEAPON_MDL); until it is there the hero keeps its own model, at full glow
+const hwModel = h => h && h.ult && WEAPON_MDL['hw_ult_' + h.u] ? 'hw_ult_' + h.u : null;
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
@@ -50634,7 +51347,7 @@ const EP = {
   wardSlam: 3,                        // seconds a Golem Warden's slam holds a ward cracked open
   wardWeave: .25,                     /* the share of its full ward a Conclave reaction tears off */
 };
-const EP_COL = { mana: [.32, .58, 1, 1], manaDry: [.25, .3, .45, 1], armour: [.72, .76, .84, 1], armourTemp: [.92, .86, .62, 1], ward: [.62, .42, 1, 1], wardOpen: [.95, .72, 1, 1] };
+const EP_COL = { mana: [.32, .58, 1, 1], manaDry: [.25, .3, .45, 1], armour: [.72, .76, .84, 1], armourTemp: [.92, .86, .62, 1], ward: [.62, .42, 1, 1], wardOpen: [.95, .72, 1, 1], barrier: [.78, .93, 1, 1] };
 /* ---- the rotations. mp: pool, regen: per s, upkeep: per s while its tie holds. Each spell: s (a SPELLS key, or a native
    below), name, cost, cd (s), plus the SPELLS options (k, w, a, n, hp). col/cast for natives. ---- */
 const EP_CASTERS = {
@@ -50723,6 +51436,7 @@ function epInit(c) {
   if ((d.armor || 0) > 0 && (big ? !(d.brule && (d.brule.kind === 'forge' || d.brule.kind === 'laws')) : !!d.rk.armoured)) {
     c.apMax = Math.min(epArmCap(c.wv || G.wave), c.maxHp * Math.min(EP.apCap, d.armor / 10 * (big ? EP.bigK : EP.plateMul)) * epArmWave(c.wv || G.wave)); c.ap = c.apMax;
   }
+  if (c.qWard && c.apMax > 0) { c.mwMax = c.apMax * EP.qWardK; c.mw = c.mwMax; c.apMax = 0; c.ap = 0; c.qWardBar = true; c.armor = 0; }   // Warded Ranks (quests.js): its armour marches as a ward bar instead (one foe, one bar)
   if (c.armor > 0) c.armor = Math.round(c.armor * EP.armK);
   if (!big && d.rk.mres) { c.mwMax = c.maxHp * epWardK(c.mres || d.mres); c.mw = c.mwMax; }   // the ward bar
   const M = EP_CASTERS[c.type];
@@ -50786,7 +51500,7 @@ function epWhen(c, e) {
   const d = c.def, r = d.link ? d.link.r : 3, near = (rr, f, need = 1) => { let n = 0; for (const o of G.creeps) { if (o.dead || o.def.egg || o.def.totem || !(Math.hypot(o.x - c.x, o.y - c.y) <= rr) || (f && !f(o))) continue; if (++n >= need) return true; } return false; };
   switch (e.s) {
     case 'pulse': return near(r, o => o.hp < o.maxHp * .95);
-    case 'bulwark': return near(r, o => !(o.ward > o.maxHp * .1));
+    case 'bulwark': return near(r, o => epShieldWants(o));
     case 'purge': return near(r, o => PURGEABLE(o));
     case 'raisec': return G.corpses.some(k => !k.gone && !k.burned && !k.shattered && Math.hypot(k.x - c.x, k.y - c.y) <= Math.max(d.raiseC[2], 3));
     case 'spores': return epSporeTargets(c).length > 0;
@@ -50794,7 +51508,7 @@ function epWhen(c, e) {
     case 'raise': return G.creeps.length < 140;
     case 'harden': { const plate = epPlateOnly(c); return near(3, o => o !== c && (o.apMax > 0 && !o.epTemp ? o.ap < o.apMax * .7 : !plate && !(o.epTempT > G.time)), plate ? 1 : 2); }
     case 'mend': return near(3, o => o.hp < o.maxHp * .8);
-    case 'shield': return near(3, o => !(o.ward > 0), 2);
+    case 'shield': return near(3, o => epShieldWants(o), 2);
     case 'ward': return near(3, o => o !== c && !(o.amT > 0) && (d.link && d.link.who === 'armoured' ? o.def.rk.armoured : true));
   }
   const S = SPELLS[e.s]; return S ? S.can(c, e) : false;
@@ -50906,6 +51620,7 @@ function epArmourTick(c, dt) {
     fxShards(c.x, c.y, hitH(c), 4);
   }
   c.epSh = sh;
+  if (c.mBy && c.mBy.length && c.ap < c.apMax && !c.epTemp && G.state === 'play') c.ap = Math.min(c.apMax, c.ap + c.apMax * EP.tieMend * Math.min(2, c.mBy.length) * dt);   // a War Mage's tie mends the armour bar (it no longer wards armour against magic: one foe, one bar)
   if (c.epTemp && !(c.epTempT > G.time)) { c.epTemp = false; c.ap = 0; c.apMax = 0; }   // a hardening spell's borrowed armour falls away
 }
 /* a hit about to land on health (game.js hurt, after the ward): what the armour bar takes. Returns [to health, absorbed]. */
@@ -50926,12 +51641,53 @@ function epHarden(c, k) {
   for (const o of leaderAllies(c, 3, true)) {
     if (epPlateOnly(c) && !(o.apMax > 0 && !o.epTemp)) continue;
     if (o.apMax > 0 && !o.epTemp) o.ap = Math.min(o.apMax, o.ap + o.apMax * EP.hardenK * ((k && k.a) ? Math.min(1.5, k.a / 10) : 1));
+    else if (o.mwMax > 0) o.mw = Math.min(o.mwMax, o.mw + o.mwMax * EP.hardenK);   // a warded foe: its ward bar refills instead (one foe, one bar: epShieldFoe)
     else { const v = Math.min(epArmCap(o.wv || G.wave), o.maxHp * EP.hardenTemp); if (!(o.ap > v)) { o.apMax = v; o.ap = v; } o.epTemp = true; o.epTempT = G.time + EP.hardenT; }
     if (o !== c) G.bolts.push({ pts: [[c.x, hitH(c) + .3, c.y], [o.x, hitH(o), o.y]], life: .3, max: .3, col: [.85, .88, .95] });
   }
   fxRing(c.x, c.y, 3, '#d8dce4');
 }
 { const go = SPELLS.harden.go; SPELLS.harden.go = (c, k) => epOn() ? epHarden(c, k) : go(c, k); }
+
+/* ---------- one foe, one bar (owner, 9 Nov 2026: "units should only have 1 type of bar, its either armour --> susceptible to
+   magic. ward --> susceptible to weapons. then can have some more with a clear bar that goes down") ----------
+   A shield cast on a foe in a force run (a Troll Warden's Troll Ward, Spirit Ward, Bone Ward, Frozen Crown, a leader's Static
+   Shield or Twin Ward ...; game.js wardFoe) goes into the one bar it wears: an armoured foe's armour bar refills, a warded foe's
+   ward bar refills, and a foe with neither is lent a ward bar (magic wears it first; steel goes straight through and cracks it).
+   Never above the bar's own size, and at most EP.shieldCap x the wave's armour cap a cast. (It was a separate shield of 25% of
+   health that soaked everything before the armour bar, recast every 6 s, drawn as a thin pale line: on a 119k Champion golem
+   at wave 18, 30k every 6 s, so its health never moved.) Hardening spells follow the same rule (epHarden), and so do the
+   War Mage's ties and Spell Ward on armour (epArmourTick, game.js hurt: they mend the armour bar instead of resisting magic). */
+EP.shieldCap = .5; EP.tieMend = .05; EP.spellWardMend = .2; EP.qWardK = 1.5;
+const epShieldMax = o => epArmCap(o.wv || G.wave) * EP.shieldCap;
+const epBarOf = o => o.apMax > 0 ? 'armour' : o.mwMax > 0 ? 'ward' : null;
+function epShieldWants(o) {
+  if (!epOn()) return !(o.ward > 0);
+  if (o.apMax > 0) return o.ap < o.apMax * .7;
+  if (o.mwMax > 0 && !o.mwLent) return o.mw < o.mwMax * .7;
+  return !(o.mw > epShieldMax(o) * .5);
+}
+function epShieldFoe(o, w) {
+  if (!o || o.dead || !(w > 0)) return false;
+  w = Math.min(w, epShieldMax(o));
+  if (o.apMax > 0) { if (o.ap >= o.apMax - .5) return false; o.ap = Math.min(o.apMax, o.ap + w); return true; }
+  if (o.mwMax > 0 && !o.mwLent) { if (o.mw >= o.mwMax - .5) return false; o.mw = Math.min(o.mwMax, o.mw + w); return true; }
+  if (o.mwLent && o.mw >= w - .5) return false;
+  o.mwLent = true; o.mwMax = Math.max(o.mwMax || 0, w); o.mw = Math.max(o.mw || 0, w);
+  return true;
+}
+// Spell Ward (a War Mage's, a Hexweaver's Hex Ward, a leader's): magic -40% for 4 s, shown as a violet bar over the health;
+// on a foe with an armour bar it mends the bar by EP.spellWardMend instead (armour stays open to magic)
+{ const go = SPELLS.ward.go; SPELLS.ward.go = (c, k) => { if (!epOn()) return go(c, k);
+  for (const o of leaderAllies(c, 3, true)) { if (o.apMax > 0) { if (!o.epTemp) o.ap = Math.min(o.apMax, o.ap + o.apMax * EP.spellWardMend); } else o.amT = 4; } }; }
+// what keeps a foe from losing health, as one list (the check, tools/check_foe_bars.js, reads it): every entry has a bar
+function epDefences(c) {
+  const out = [];
+  if (c.apMax > 0) out.push('armour');
+  if (c.mwMax > 0) out.push('ward');
+  if (c.ward > 0) out.push('shield');
+  return out;
+}
 
 /* ---------- wards (the magic-resistant rank and file) ---------- */
 const epWardK = mres => Math.min(EP.wardCap, Math.max(.3, mres || 0) * EP.wardMul);   // (a magic-resistant foe has at least .3)
@@ -50988,6 +51744,11 @@ function epBars(c, x, top, z, w, h) {
   // barRect is centred on y with half-height h along the camera's up; a world-y step shows at cos(pitch) of its size on screen
   const bh = h * .55, k = 1 / Math.cos(CAM.pitch), gap = h * .3;
   let y = top - (h + bh + gap) * k;
+  if (c.hxShMax > 0 && c.hxSh > 0) {   // a Hunt boss's barrier (hunts.js): pale ice-blue, it takes every hit first
+    QO.barRect(RD, x, y, z, -w / 2 - .02, w + .04, bh + .015, [0, 0, 0, .85]);
+    QO.barRect(RD, x, y, z, -w / 2, w * clamp(c.hxSh / c.hxShMax, 0, 1), bh, EP_COL.barrier);
+    y -= (2 * bh + gap) * k;
+  }
   if (c.apMax > 0 && (c.ap > 0 || !c.epTemp)) {
     QO.barRect(RD, x, y, z, -w / 2 - .02, w + .04, bh + .015, [0, 0, 0, .85]);
     QO.barRect(RD, x, y, z, -w / 2, w * clamp(c.ap / c.apMax, 0, 1), bh, c.epTemp ? EP_COL.armourTemp : EP_COL.armour);
@@ -51011,7 +51772,7 @@ function dfRows(c) {
   const out = [];
   if (c.momDR > 0) out.push(['wrath', c.momDR / (typeof MOM_WRATH !== 'undefined' ? MOM_WRATH.cap : .24)]);
   if (c.drT > 0) out.push(['dusk', c.drT / 5]);
-  if (c.amT > 0) out.push(['spell', c.amT / 4]);
+  if (c.amT > 0 && !(c.apMax > 0 && epOn())) out.push(['spell', c.amT / 4]);
   return out;
 }
 function dfBars(c, x, top, z, w, h) {
@@ -51065,10 +51826,12 @@ function epCardHTML(c) {
   const sp = [];
   if (c.apMax > 0) sp.push(`<span>Armour <b>${Math.ceil(c.ap)}/${Math.ceil(c.apMax)}</b></span>`);
   if (c.mwMax > 0) sp.push(`<span>Ward <b>${Math.ceil(c.mw)}/${Math.ceil(c.mwMax)}</b>${epWardOpenK(c) > 0 ? ' (cracked open)' : ''}</span>`);
+  if (c.hxShMax > 0) sp.push(`<span title="A Hunt barrier: it takes every hit first, steel and spells alike">Barrier <b>${Math.ceil(Math.max(0, c.hxSh))}/${Math.ceil(c.hxShMax)}</b></span>`);
   if (c.mpMax > 0) sp.push(`<span>Mana <b>${Math.floor(c.mp)}/${c.mpMax}</b>${c.epDry ? ' (dry)' : ''}</span>`);
   if (!sp.length) return '';
+  const one = c.apMax > 0 ? `<p class="mut" data-d="1"><b>Armoured: magic cuts through.</b> Steel must break the grey bar first${c.mBy && c.mBy.length ? '; a War Mage\'s tie mends it while it holds' : ''}.</p>` : c.mwMax > 0 ? `<p class="mut" data-d="1"><b>Warded: weapons cut through.</b> Magic must break the violet bar first${c.mwLent ? ' (a shield an ally cast on it)' : ''}.</p>` : '';
   const rot = c.mpMax > 0 ? `<p class="mut" data-d="1"><b>Spells:</b> ${epRotNames(c.type).join(' · ')}${c.epC ? ` · <b>casting ${c.epC.e.name}</b> (stun it)` : ''}${c.epSealT > G.time ? ' · sealed: no mana comes back' : ''}</p>` : '';
-  return `<div class="st">${sp.join('')}</div>${rot}`;
+  return `<div class="st">${sp.join('')}</div>${one}${rot}`;
 }
 // the forecast's advice when a wave brings casters (forecast.js prep)
 function epWaveCasters(groups) {
@@ -51081,7 +51844,11 @@ function epWaveCasters(groups) {
 ROLE_WEAK.armoured = `an armour bar: steel and bleeds must break it before health drops; Armour Penetration sends its share straight to health; shred breaks it off and lets hits leak through; magic goes straight to health (${moreK(ROLE_K.plateMagic)}) and corrodes the bar`;
 ROLE_WEAK_BIG.armoured = 'an armour bar takes steel first (Armour Penetration goes through); magic goes straight to health and corrodes it';
 // (the Ironclad's force-run words are in core.js CREEP_SAY_F: a getter, so Classic keeps its plate text)
-CREEPS.warmage.eco = 'Armoured allies within its reach are warded: magic does only 15% to them and Arcane about half, and you can see the tether. The ward costs it mana every second: drain its blue bar and the ward drops until it recovers. Kill it or stun it and the ward drops at once; root the armour and it walks out of reach. It also casts Spell Ward (35 mana): magic and Arcane do 40% less to its allies within 3 cells for 4 seconds, shown as a violet bar over their health; and Runic Plating (40 mana): the armour bars of its armoured allies within 3 cells refill by 35%.';
+// one foe, one defence (owner, 9 Nov 2026): the War Mage no longer wards armour against magic (armour stays open to it); its tie
+// and spells mend the armour bars instead, which you can watch refill
+CREEPS.warmage.eco = 'It keeps the armour beside it whole: each armoured ally it is tethered to mends 5% of its armour bar a second (you can see the tether and the grey bar refill). The tie costs it mana every second: drain its blue bar and the tie drops until it recovers. Kill it or stun it and the tie drops at once; root the armour and it walks out of reach. Magic still cuts straight through the armour to health. It also casts Spell Ward (35 mana): the armour bars of its allies within 3 cells refill by 20% (an unarmoured ally takes 40% less from spells for 4 seconds instead, a violet bar over its health); and Runic Plating (40 mana): the armour bars of its armoured allies within 3 cells refill by 35%.';
+if (CREEPS.warmage.link) { const L = CREEPS.warmage.link, s0 = L.say; Object.defineProperty(L, 'say', { enumerable: true, configurable: true, get: () => epOn() ? 'mends the armour beside it' : s0 }); }
+{ const d = CREEPS.warmage, t0 = d.trait; Object.defineProperty(d, 'trait', { enumerable: true, configurable: true, get: () => epOn() ? 'Mends armoured allies\' armour bars' : t0 }); }
 // wards: armour's mirror
 ROLE_WEAK.mres = `a ward bar: magic and burns must break it before health drops (Arcane breaks it twice as fast); Magic Penetration sends its share straight to health; steel goes straight to health (${moreK(ROLE_K.mresPhys)}) and cracks it`;
 ROLE_WEAK_BIG.mres = `it resists magic (Magic Penetration cuts through); steel hits it ${moreK(ROLE_K.mresPhys)}`;
@@ -66293,9 +67060,14 @@ const qxNextBoss = from => { for (let n = from; n < from + 6; n++) if (waveSpec(
 /* ---- the champions a Champion's Challenge can bring: one rule each ---- */
 const QX_CHAMP = {
   unbowed: { name: 'Hrolt the Unbowed', rule: 'Unbowed', text: 'slows and stuns are 90% weaker on it' },
-  banner: { name: 'Sefa Bannerborn', rule: 'Bannerborn', text: 'every foe within 3 cells of it takes 30% less damage' },
-  spellproof: { name: 'Old Mirrorhide', rule: 'Spellproof', text: 'your spells do 60% less to it; strikes land in full' },
+  banner: { name: 'Sefa Bannerborn', rule: 'Bannerborn', text: 'every foe within 3 cells of it (the gold ring) takes 30% less damage' },
+  // (one foe, one bar: Spellproof is a ward bar now, not a hidden cut on spells)
+  spellproof: { name: 'Old Mirrorhide', rule: 'Spellproof', text: 'a violet ward bar of 80% of its health: spells must break it first; weapons cut straight through' },
 };
+// the Champion is its own foe (core.js CREEPS.champion), this many times a typical (median) plain trooper of its wave, by the challenge's tier
+// (owner, 9 Nov 2026: "dont make it too tough. maybe test out 5x hp"); was 5 / 7 / 9 x the toughest troop, elites included
+const QX_CHAMP_K = [5, 5, 5, 6], QX_SPELLPROOF_WARD = .8;
+const qxChampK = o => QX_CHAMP_K[o && o.T] || 5;
 
 /* ---- the boons: a rule changed for the rest of the run ---- */
 const QX_BOONS = {
@@ -66344,14 +67116,14 @@ const QX = {
     say: o => `Troops ${Math.round(o.k * 100)}% faster`,
     reward: o => [{ k: 'talent', n: o.T }] },
   champ: { n: "The Champion's Challenge", glyph: 'banner', col: '#ffd76a', tiers: [1, 3], kind: 'slay', dur: () => 1,
-    prep: o => { const ids = o.T === 1 ? ['unbowed', 'banner'] : Object.keys(QX_CHAMP); o.rule = ids[Math.floor(Math.random() * ids.length)]; o.hpK = 3 + 2 * o.T; },
-    twist: o => `${QX_CHAMP[o.rule].name} marches with wave ${o.at}: a named foe with ${o.hpK} times a trooper's health and one rule. ${QX_CHAMP[o.rule].rule}: ${QX_CHAMP[o.rule].text}.`,
+    prep: o => { const ids = o.T === 1 ? ['unbowed', 'banner'] : Object.keys(QX_CHAMP); o.rule = ids[Math.floor(Math.random() * ids.length)]; o.hpK = qxChampK(o); },
+    twist: o => `${QX_CHAMP[o.rule].name} marches with wave ${o.at}: a Warband Champion with ${qxChampK(o)} times a typical trooper's health and one rule. ${QX_CHAMP[o.rule].rule}: ${QX_CHAMP[o.rule].text}.`,
     say: o => `${QX_CHAMP[o.rule].name} (${QX_CHAMP[o.rule].rule})`,
     win: o => `Slay ${QX_CHAMP[o.rule].name} before it reaches the gate.`,
     reward: o => [{ k: 'relic', rar: Math.min(4, 1 + o.T) }].concat(o.T === 1 ? [{ k: 'gold', n: qxGold(1, o.at) }] : []) },
   warded: { n: 'Warded Ranks', glyph: 'shieldx', col: '#b49cff', tiers: [2, 3], kind: 'hold', dur: () => 3, lives: T => QX_LIVES[T],
     can: o => qxTroops(o.at, o.at + 2, d => d.rk && d.rk.armoured) >= 6,
-    twist: o => 'Every armoured troop marches warded, as if a War Mage walked beside it: magic does a third, Arcane 60%. Shred its armour or stun it and the ward breaks for good.',
+    twist: o => 'Every armoured troop marches warded instead: its grey armour bar is a violet ward bar half as big again. Magic and burns must break the ward first; steel goes straight through it to health (and cracks it).',
     say: () => 'Armour warded',
     reward: o => [{ k: 'talent', n: o.T }] },
   mile: { n: 'The Cursed Mile', glyph: 'skullg', col: '#9be05a', tiers: [2, 3], kind: 'hold', dur: () => 3, lives: T => QX_LIVES[T],
@@ -66484,7 +67256,7 @@ function qxSpawn(c, s) {
   if (s.qRose) { c.qRose = 1; c.age = .2; part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .5, max: .5, size: .6, col: '#9dff8a' }); return; }
   if (s.qx) {
     c.qx = s.qx; c.qName = s.qName || null;
-    if (s.qx === 'champ') { c.qRule = s.qRule; if (s.qRule === 'unbowed') c.ten = .9; onBanner(c.qName, `${QX_CHAMP[s.qRule].rule}: ${QX_CHAMP[s.qRule].text}. Slay it before the gate.`); sfx('bossIn', 0); }
+    if (s.qx === 'champ') { c.qRule = s.qRule; if (s.qRule === 'unbowed') c.ten = .9; if (s.qRule === 'spellproof') { c.mwMax = c.maxHp * QX_SPELLPROOF_WARD; c.mw = c.mwMax; } onBanner(c.qName, `${QX_CHAMP[s.qRule].rule}: ${QX_CHAMP[s.qRule].text}. Slay it before the gate.`); sfx('bossIn', 0); }
     if (s.qx === 'hunter') { const t = qxTower(s.qMark); c.qMark = s.qMark; onToastSoft(`The Headhunter is out, after your ${t ? t.def.name : 'best unit'}.`); }
     if (s.qx === 'twice') { onBanner(`${c.def.name} rises again`, 'Twice-Told: bring it down once more.'); sfx('raise', 1); }
     fxRing(c.x, c.y, 1, QX[G.qx.cur ? G.qx.cur.id : 'champ'].col);
@@ -66555,10 +67327,9 @@ function qxHurtK(c, type, dot, src) {
   if (src && src.id != null && (c.def.boss || c.def.lead || c.elite || c.qx)) (c.qHit || (c.qHit = {}))[src.id] = 1;   // (the Headsman's Token remembers who struck)
   if (!cur) return k;
   if (cur.id === 'mile' && cur.zone && qxInZone(c, cur.zone)) k *= .4;
-  if (c.qWard && cur.id === 'warded' && (type === 'magic' || type === 'arcane')) k *= type === 'magic' ? .35 : .6;
+  // (Warded Ranks: no flat cut on top of an armour bar any more; its armour marches as a ward bar instead, enemypools.js epInit)
   if (c.qShroud && cur.id === 'shroud') k *= .3;
   if (cur.id === 'champ') {
-    if (c.qx === 'champ' && c.qRule === 'spellproof' && typeof AB_TAG !== 'undefined' && DTAG === AB_TAG) k *= .4;
     const ch = Q.champRef; if (ch && !ch.dead && ch.qRule === 'banner' && ch !== c && Math.hypot(ch.x - c.x, ch.y - c.y) <= 3) k *= .7;
   }
   return k;
@@ -66597,7 +67368,7 @@ function qxTick(dt) {
   const inWave = G.phase === 'wave' && (G.inFlight || []).some(w => qxIn(cur, w));
   if (cur.id === 'march' && G.phase === 'build' && G.wave > cur.from && G.wave <= cur.until && G.countdown > 3) G.countdown = 3;
   if (cur.id === 'mile' && cur.zone && inWave) for (const c of G.creeps) if (!c.dead && c.hp < c.maxHp && qxInZone(c, cur.zone)) healFoe(c, c.maxHp * .03 * dt);
-  if (cur.id === 'warded') for (const c of G.creeps) if (c.qWard && !c.dead && (c.shredT > 0 || c.stunT > 0)) { c.qWard = false; fxSpark(c.x, c.y, hitH(c), '#b49cff', 8); part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .45, max: .45, size: .8, col: '#b49cff' }); }
+  if (cur.id === 'warded') for (const c of G.creeps) if (c.qWard && !c.dead && c.qWardBar && !(c.mw > 0)) c.qWard = false;   // (its ward bar broken: the ring at its feet goes too)
   if (cur.id === 'shroud' && (Q.shT = (Q.shT || 0) - dt) <= 0) {
     Q.shT = .3;
     for (const c of G.creeps) {
@@ -66640,8 +67411,8 @@ function qxWaveStart(w) {
   if (!cur || cur.state !== 'on' || !qxIn(cur, w)) return;
   const troop = qxTroopHP(w);
   if (cur.id === 'champ' && w === cur.from) {
-    const sp = waveSpec(w).filter(g => !CREEPS[g.type].boss && !CREEPS[g.type].lead && !CREEPS[g.type].fly && !CREEPS[g.type].link), g = sp.sort((a, b) => CREEPS[b.type].hp - CREEPS[a.type].hp)[0];
-    qxInject({ t: G.waveT + 6, wv: w, type: g ? g.type : 'troll', hp: troop * cur.hpK, bounty: 30 + 2 * w, elite: true, qx: 'champ', qName: QX_CHAMP[cur.rule].name, qRule: cur.rule });
+    const K = qxChampK(cur);   // its own foe, K x a plain trooper of the wave (QX_CHAMP_K), its rule its one defence (no elite multiples, no hidden cut)
+    qxInject({ t: G.waveT + 6, wv: w, type: 'champion', hp: qxChampBase(w) * K, bounty: 30 + 2 * w, elite: true, eliteX: K, qx: 'champ', qName: QX_CHAMP[cur.rule].name, qRule: cur.rule });
   }
   if (cur.id === 'hunter') {
     if (!qxTower(cur.mark)) cur.mark = qxTopUnit();
@@ -66649,8 +67420,16 @@ function qxWaveStart(w) {
   }
   if (cur.id === 'hush') { cur.hushT = QX_HUSH.every; cur.hushW = 0; }
 }
+// a plain trooper's health on wave w: the toughest troop queued, as a plain one (an elite's multiple taken off, no challenge foe),
+// so a Champion is hpK x a trooper, never hpK x an elite (owner, 9 Nov 2026: a wave-18 Champion golem had 119k health, 7 x a
+// doubly promoted elite)
+// a typical trooper's health on wave w (the Champion's base): the median of the queued troops, each as a plain one
+function qxChampBase(w) {
+  const a = []; for (const s of G.spawnQ) { const d = CREEPS[s.type]; if (s.wv === w && d && !d.boss && !d.lead && !s.qx) a.push(s.hp / (s.elite ? Math.max(1, s.eliteX || ELITE_HP) : 1)); }
+  a.sort((x, y) => x - y); return a.length ? a[a.length >> 1] : waveHP(w, G.diff);
+}
 function qxTroopHP(w) {
-  let b = 0; for (const s of G.spawnQ) { const d = CREEPS[s.type]; if (s.wv === w && d && !d.boss && !d.lead) b = Math.max(b, s.hp); }
+  let b = 0; for (const s of G.spawnQ) { const d = CREEPS[s.type]; if (s.wv === w && d && !d.boss && !d.lead && !s.qx) b = Math.max(b, s.hp / (s.elite ? Math.max(1, s.eliteX || ELITE_HP) : 1)); }
   return b || waveHP(w, G.diff);
 }
 function qxInject(s) { G.spawnQ.push(s); G.spawnQ.sort((a, b) => a.t - b.t); G.waveLeft = (G.waveLeft || 0) + 1; }
@@ -70539,7 +71318,7 @@ function drawCreeps(dt) {
       if (c.elite) { QO.barRect(RD, c.x + c.ox, top, c.y + c.oy, -w / 2 - .045, w + .09, h + .045, [1, .78, .3, 1]); QADD.bill(RD, c.x + c.ox - w / 2 - .09, top, c.y + c.oy, .07, .07, [1, .85, .35, 1], 1, 0); }
       QO.barRect(RD, c.x + c.ox, top, c.y + c.oy, -w / 2 - .025, w + .05, h + .025, [0, 0, 0, .85]);
       QO.barRect(RD, c.x + c.ox, top, c.y + c.oy, -w / 2, w * f, h, f > .6 ? [.25, .85, .25, 1] : f > .3 ? [.92, .82, .2, 1] : [.9, .25, .18, 1]);
-      if (c.ward > 0) QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2, w * clamp(c.ward / c.wardMax, 0, 1), h * .6, [.45, .75, 1, 1]);
+      if (c.ward > 0) { QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2 - .02, w + .04, h * .6 + .02, [0, 0, 0, .85]); QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2, w * clamp(c.ward / c.wardMax, 0, 1), h * .6, [.45, .75, 1, 1]); }   // a shield (Classic; force runs put shields into the foe's one bar): its own backed bar, so it reads going down
       if (typeof epBars === 'function') epBars(c, c.x + c.ox, top, c.y + c.oy, w, h);   // armour, then mana, under the health bar (enemypools.js)
       if (typeof dfBars === 'function') dfBars(c, c.x + c.ox, top, c.y + c.oy, w, h);   // the timed defences, above it (Mother's Wrath, Wings of Dusk, Spell Ward)
       if (c.shield > 0) { QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2 - .02, w + .04, h * .6 + .02, [0, 0, 0, .8]); QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2, w * clamp(c.shield / c.shieldMax, 0, 1), h * .6, [1, .82, .4, 1]); }
@@ -76384,7 +77163,7 @@ function openGearPanel(t) {
   const S = gpSockets(t), socks = S.rel.concat(S.ch ? [S.ch] : []);
   const acts = typeof towerActs === 'function' ? towerActs(t) : [];
   showOverlay(`<div class="bg-head"><div class="gp-ttl"><div class="gp-tl"><h2 class="ttl">${gpE(t.def.name)}</h2><b class="gp-tier">${ROMAN[t.tier]}</b></div>
-      <span>Kills ${t.kills || 0} · Dealt ${fmt(t.dmg || 0)}${champ ? ` · <b class="gp-champ">${gpE(h.name)}’s Champion</b>` : ''}</span></div>
+      <span>Kills ${t.kills || 0} · Dealt ${fmt(t.dmg || 0)}${champ ? ` · <b class="gp-champ">${gpE(h.name)}’s Champion</b>` : ''}</span>${typeof vetInfoHTML === 'function' ? vetInfoHTML(t).replace('<p class="mut vet-row"', '<p class="mut vet-row gp-vet"') : ''}</div>
       <button type="button" class="tx" id="gpClose" aria-label="Close and resume">${X_SVG}</button></div>
     <div class="gp-body">
       <div class="gp-doll">
@@ -76995,7 +77774,7 @@ function slotsNow() {
         const all = grp.reduce((a, o) => a + (upgradeCost(o) || 0), 0), g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0;
         s[0] = { key: `u:${t.type}:${t.tier + 1}`, cost: all, lbl: `All ${grp.length}`, up: !!pc, on: G.gold >= uc, name: `Upgrade all ${grp.length} to tier ${ROMAN[t.tier + 1]}`, hk: 'U', act: () => upgradeGroup() };
       } else
-      s[0] = ageLocked(t) && vetOn() ? { key: `m:${t.type}:${t.tier + 1}`, lbl: `Vet ${vetPts(t)}/${vetNeed(t.tier + 1)}`, bar: vetFrac(t), on: false, name: vetLockText(t), hk: 'U', act: () => { toast(vetLockText(t) + '. Kills count, and so do assists: foes that die under its slows, roots, burns, curses or aura.'); sfx('nogold'); } }
+      s[0] = ageLocked(t) && vetOn() ? { key: `m:${t.type}:${t.tier + 1}`, lbl: 'Locked', bar: vetFrac(t), vet: t.id, on: false, name: vetLockText(t), hk: 'U', act: () => { sfx('nogold'); const b = document.querySelector(`.cmd[data-vet="${t.id}"]`); if (b && typeof itipShow === 'function') itipShow(vetCardHTML(t), b); } }
            : ageLocked(t) ? { key: `m:${t.type}:${t.tier + 1}`, lbl: AGES[t.tier - 1].name, on: false, name: `Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}`, hk: 'U',
                 act: () => { toast(`Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}. Upgrade your keep.`); select('keep', null); } }
            : uc ? (() => { const g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0; return { key: `u:${t.type}:${t.tier + 1}`, cost: uc, lbl: 'Upgrade', up: !!pc, on: G.gold >= uc, pulse: !!t.vetNew && G.gold >= uc, name: `Upgrade to tier ${ROMAN[t.tier + 1]}` + (g ? (b => b.length ? `: ${b.join(', ')}` : '')(gainBits(t.type, g.a, g.b, 3)) : ''), hk: 'U', act: () => upgrade(t) }; })()
@@ -77070,7 +77849,7 @@ function renderCard() {
     if (!sl) {
       c.btn.className = 'cmd empty'; c.btn.disabled = true; delete c.btn.dataset.iid; c.btn.removeAttribute('aria-label'); c.btn.removeAttribute('title'); c.btn.removeAttribute('aria-describedby');
       if (c.key) { const x = c.cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.cv.width, c.cv.height); c.key = ''; }   // (the relic painter leaves its scale on the canvas: undo it, or only part is cleared)
-      c.lbl.textContent = ''; c.cost.textContent = ''; if (c.vb) c.vb.hidden = true; continue;
+      c.lbl.textContent = ''; c.cost.textContent = ''; if (c.vb) c.vb.hidden = true; delete c.btn.dataset.vet; continue;
     }
     c.btn.disabled = false;
     c.btn.className = 'cmd' + (sl.on ? '' : ' off') + (sl.active ? ' on' : '') + (sl.pulse ? ' pulse' : '') + (sl.warn ? ' warn' : '') + (sl.up ? ' gain' : '') + (sl.auto ? ' auto' : '');   // auto: an ability on autocast
@@ -77082,6 +77861,7 @@ function renderCard() {
     } else if (sl.it || sl.ut) { c.btn.setAttribute('aria-label', al); c.btn.removeAttribute('title'); }   // an item: its card on hover (itemtip.js, data-iid)
     else { c.btn.setAttribute('aria-label', al); c.btn.title = al + (sl.hk ? ` [${sl.hk}]` : ''); }
     if (sl.it) c.btn.dataset.iid = sl.it.id; else delete c.btn.dataset.iid;
+    if (sl.vet) { c.btn.dataset.vet = sl.vet; c.btn.removeAttribute('title'); } else delete c.btn.dataset.vet;   // a locked tier: the Veterancy card on hover, not a title
     c.btn.removeAttribute('aria-describedby');
     if (c.cv.width !== size) { c.cv.width = c.cv.height = size; c.key = ''; }
     if (c.key !== sl.key) { iconPaint(c.cv, sl.key); c.key = sl.key; }
@@ -77242,7 +78022,8 @@ function infoHTML() {
       c.rageT > 0 && 'Frenzied', c.panicT > 0 && 'Panicking', c.packT > 0 && 'Running with the pack', c.thawT > 0 && 'Warmed by a torch', c.burT > 0 && 'Burrowed',
       c.shield > 0 && `Shield ${Math.ceil(c.shield)}`, c.def.guard && c.shield <= 0 && 'Shield broken', c.fed > 0 && `Fed ×${c.fed}`, c.charge > 0 && `Charged ×${c.charge}`].filter(Boolean);
     const ct = creepCounters(c.type);
-    return `<h3>${c.elite ? 'Elite ' : ''}${c.def.name}${c.elite ? ' <span class="tier elite">Elite</span>' : ''}</h3><div class="st"><span>Health <b>${Math.ceil(c.hp)}/${Math.ceil(c.maxHp)}</b></span><span>Armor <b${typeof armorNow === 'function' && armorNow(c) < 0 ? ' style="color:#ff6a5a"' : ''}>${typeof armorNow === 'function' && armorNow(c) !== (c.armor || 0) ? Math.round(armorNow(c)) + ' <small>(' + c.armor + ')</small>' : c.armor}</b></span>${c.mres ? `<span>Magic resist <b>${Math.round(c.mres * 100)}%</b></span>` : ''}<span>Bounty <b>${c.bounty}</b></span></div>` + (typeof epCardHTML === 'function' ? epCardHTML(c) : '')
+    const champ = c.qx === 'champ' && typeof QX_CHAMP !== 'undefined' && QX_CHAMP[c.qRule];   // a challenge's Champion says who it is and its one rule (owner, 9 Nov 2026)
+    return `<h3>${c.qName ? `${c.qName} <small>(${c.def.name})</small>` : `${c.elite ? 'Elite ' : ''}${c.def.name}`}${champ ? ' <span class="tier elite">Champion</span>' : c.elite ? ' <span class="tier elite">Elite</span>' : ''}</h3>${champ ? `<p class="mut" data-d="1"><b>${champ.rule}:</b> ${champ.text}. ${c.eliteX ? `${Math.round(c.eliteX)}× the health of a typical trooper of its wave.` : ''}</p>` : ''}<div class="st"><span>Health <b>${Math.ceil(c.hp)}/${Math.ceil(c.maxHp)}</b></span>${c.ward > 0 ? `<span>Shield <b>${Math.ceil(c.ward)}/${Math.ceil(c.wardMax || c.ward)}</b></span>` : ''}<span>Armor <b${typeof armorNow === 'function' && armorNow(c) < 0 ? ' style="color:#ff6a5a"' : ''}>${typeof armorNow === 'function' && armorNow(c) !== (c.armor || 0) ? Math.round(armorNow(c)) + ' <small>(' + c.armor + ')</small>' : c.armor}</b></span>${c.mres ? `<span>Magic resist <b>${Math.round(c.mres * 100)}%</b></span>` : ''}<span>Bounty <b>${c.bounty}</b></span></div>` + (typeof epCardHTML === 'function' ? epCardHTML(c) : '')
       + counterTags(ct) + (typeof fcArmNote === 'function' && fcArmNote(c.def) ? `<p class="mut" data-d="1"><b>${fcArmNote(c.def)}</b></p>` : '') + (oldRules() ? '' : `<p class="mut" data-d="1">${c.def.roles.map(r => `<b>${ROLE_NAME[r]}:</b> ${((c.def.lead || c.def.boss) && ROLE_WEAK_BIG[r]) || ROLE_WEAK[r]}`).join(' · ')}</p>`) + (typeof bfRowHTML === 'function' ? bfRowHTML(c) : `<p class="mut" data-d="2">${[!oldRules() && TRAIT_TIP_F[c.def.trait] ? '' : c.def.trait || 'Ground', ...fx, c.elite && (oldRules() ? 'May drop a relic' : 'May drop an item')].filter(Boolean).join(' · ')}</p>`)
       + (c.def.eco ? `<p class="mut eco" data-d="1">${c.def.eco}</p>` : '');
   }
@@ -78987,6 +79768,9 @@ function endTipsHTML(won) {
     }
   }
 })();
+
+// the Veterancy card (xp.js vetCardHTML): on the info pane's Veterancy row and a locked Upgrade button; hover, or a tap on touch
+if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '[data-vet]', el => { const t = G && G.towers && G.towers.find(o => o.id === +el.dataset.vet); return t ? vetCardHTML(t) : ''; }, { tap: () => null });
 
 /* ================= ARROWS: the shots of every bow and crossbow, drawn as real arrows =================
    One small arrow mesh, built per variant (ARROW_V, by the shooter's unit id): a thin shaft, a head, and two crossed
@@ -82304,7 +83088,7 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   it.sec = [(MV_GLOW + .06 * Math.max(0, tr - 2) + .3 * t._mvG) * pulse, 0];   // (VS_STY: the blades' extra glow)
   it.bones = itemBones(it, o);
   const SW = umModel(MV_UNIT + '~sword');
-  if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, opts); its.sec = it.sec; its.bones = it.bones; }
+  if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, typeof hwTint === 'function' ? hwTint(t, opts) : opts);   /* (her hero weapon's stage glow: forces_zzzzzzzzzzzzzzzz_heroweapons.js) */ its.sec = it.sec; its.bones = it.bones; }
   const T4 = mvTips(M, o).map(p => M4.xf(_mvC, p[0], p[1], p[2]));
   // the blades' bloom (the concept's, kept tight: the owner's rule, effects never hide a unit or a foe): a soft magenta
   // halo close round each blade narrowing to its point, a brighter line of its own colour at its heart (red on one blade, pink on the other); a gentle pulse, brighter in her spells and while Unbound Blade lasts
@@ -82712,9 +83496,11 @@ if (typeof drawForceUnitPlain === 'function') {
      drawn back by her ear, thrust out on the release), and one for each spell, each a wind-up, a big moment and a recovery:
      Frost Spear (drawn far back over her shoulder, the left hand sighting, hurled), Ice Coffin (both hands thrust out, closed
      into fists as the ice locks), Shatterbloom (low and gathered, a rising sweep flung wide as it bursts).
-   - Her bolt leaves her right palm on the release frame: the wind-up is played as the next shot comes due (t.cd), so the
-     release lands on the shot, and ccHand gives her palm where it is drawn (unitTip). Frost Spear's spear leaves the same
-     palm on the hurl's release frame (the launch held REL.spear frames for her, only while she is drawn sculpted).
+   - Her staff (the owner's ice crystal staff, as authored, its crystal head glowing faintly ice blue) rides its own
+     bone in her right fist in every move: planted upright beside her in the idle, raised, thrust and struck down in her casts.
+   - Her bolt leaves the staff's crystal on the release frame: the wind-up is played as the next shot comes due (t.cd), so the
+     release lands on the shot, and ccHand gives the crystal where it is drawn (unitTip). Frost Spear's spear leaves the same
+     crystal on the hurl's release frame (the launch held REL.spear frames for her, only while she is drawn sculpted).
    - Around her, only brief, faint frost: a few motes drifting from her hands at rest, a small puff on each release.
    - Every frame is checked on the game's skinning for her sleeves, arms and robe (rig.py: no crossings left). */
 const FW_UNIT = 'cc_rimeweaver';
@@ -82749,7 +83535,7 @@ if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_rime) {
   const _fwAtk = FORCE_ATTACK.cc_rime;
   FORCE_ATTACK.cc_rime = function (t) { const r = _fwAtk.apply(this, arguments); try { if (t && t.def && t.def.unit === FW_UNIT) { t._fwShotAt = G.time; t._fwPuffB = 0; } } catch (e) {} return r; };
 }
-// where her spells leave from: her palm as drawn
+// where her spells leave from: her staff's crystal as drawn
 if (typeof ccHand === 'function') {
   const _fwHand = ccHand;
   ccHand = function (t, h) { if (t && t.def && t.def.unit === FW_UNIT && fwDrawn(t) && typeof unitTip === 'function') { const w = unitTip(t); if (w) return w; } return _fwHand.apply(this, arguments); };
@@ -82814,12 +83600,14 @@ function fwDraw(t, tier, sx, sy, sz, wob, opts) {
   const P = fwCtl(t, live, M), o = fwPose(M, t, P, live);
   const it = item(M.mesh, _fwC, opts); it.sec = [0, 0]; it.bones = o.slice();
   FX_PM.root = FX_PM.torso = _fwC;
-  // her palms, where they are this frame: her bolts and spears leave the right one
+  // her palms, where they are this frame
   const mk = UNIT_MDL[M.S.mdl].marks;
   if (live && mk && mk.HandR) {
     const pr = umXf(o, mk.gunBone, mk.HandR), pl = umXf(o, mk.handLBone, mk.HandL), hR = M4.xf(_fwC, pr[0], pr[1], pr[2]), hL = M4.xf(_fwC, pl[0], pl[1], pl[2]);
-    t.tipW = hR; t.tipYaw = yaw; t.tipAt = G.time; t._fwOn = G.time;
-    fwFx(t, P, hR, hL, s * M.h);
+    // her staff's crystal (on its own bone, in her right fist): her bolts and spears leave it, its frost drifts from it
+    const hT = mk.StaffTip ? (q => M4.xf(_fwC, q[0], q[1], q[2]))(umXf(o, mk.staffBone, mk.StaffTip)) : hR;
+    t.tipW = hT; t.tipYaw = yaw; t.tipAt = G.time; t._fwOn = G.time;
+    fwFx(t, P, hT, hL, s * M.h);
   }
   return true;
 }
@@ -82989,6 +83777,100 @@ if (typeof CCX_FX !== 'undefined' && typeof CCX_FX.phoenix === 'function') {
 }
 // (the code-built body's orb and hands' glow would float where its hands stood: the part's own draw is skipped with the body)
 
+/* Sculpted units' size and the bases they stand on: one rule for every sculpted model, not a number a unit (owner: "all
+   the new units (aka better 3d models) should be about 30% bigger by default", "heroes should have bases a bit bigger
+   than normal units and they should be a bit bigger units", "marens base is too big").
+   - UM_SIZE.unit   every sculpted model 1.3x the height it had; each unit's own k in UM_UNITS stays its tweak, relative
+   - UM_SIZE.hero   a hero (a Champion: Maren, Aurelian, Varic, Faelan, Elowen...) a further 1.1x on top
+   - UM_BASE_R      the base's radius across (world units, a cell is 1): a normal unit's .39 (the forces' own slates and
+                    flagstones at tier I, K 1.3 x .3), a hero's 1.18x that (.46). Every base drawn under a sculpted unit
+                    (the Conclave's rune-slate, Ironhold's and the Wardbound's flagstones, the Grove's root base, a
+                    Champion's slate) is fitted to it across; its height is kept, so the model still stands on its top.
+   - towerTop       (the health bar, spell and projectile anchors, crownY, the floating texts) grows with the model.
+   The code-built units (Sculpted units off, or a model whose texture has not decoded yet) keep their own sizes and
+   bases. Loaded after every unitmodels_*.js (it wraps their draws from outside, so no rig file changes) and before
+   the Model Lab, which frames by it. */
+const UM_SIZE = { unit: 1.3, hero: 1.1 };
+const UM_BASE_R = { unit: .39, hero: 1.18 };
+/* the human-sized units evened out (owner: "frostweaver looks a bit bigger than other units"): each one's height, a
+   multiplier on its own k so that at tier I its head (the rig's Head joint, so no staff, hat or raised weapon counts)
+   stands at UM_EVEN_HEAD above the ground, about 1.4 to the top of the head. Measured in game at tier I after the 1.3x:
+   Head joint before -> factor  (target 1.24; lift is the base under it, kept)
+     Blade Dancer 1.127 x1.104   Thornguard 1.284 x.964   Gladebow 1.185 x1.048   Oathbound 1.538 x.798
+     Mageling     1.068 x1.171   Astrologer 1.266 x.978   Pyroclast 1.506 x.816   Frostweaver (Rimeweaver) 1.373 x.899
+   Left as they are: the dwarves (shorter by design), the Briarwarden (a tree), and the heroes (their own 1.1x on top). */
+const UM_EVEN_HEAD = 1.24;
+const UM_EVEN = { bladedancer: 1.104, thornguard: .964, gladebow: 1.048, wb_oathbound: .798, cc_mageling: 1.171, cc_astrologer: .978, cc_pyroclast: .816, cc_rimeweaver: .899 };
+const umIsHero =u => typeof isChampUnit === 'function' ? isChampUnit(u) : /^ch_/.test(u || '');
+const umSizeK = u => UM_SIZE.unit * (umIsHero(u) ? UM_SIZE.hero : 1);
+const umScaleK = u => umSizeK(u) * (UM_EVEN[u] || 1);   // (the whole factor on a unit's k: the 1.3x, a hero's 1.1x, its evening)
+const umBaseR = u => UM_BASE_R.unit * (umIsHero(u) ? UM_BASE_R.hero : 1);
+// is unit u drawn as its sculpted model now (the switch on, the model decoded and its texture ready)?
+function umReady(u) {
+  if (typeof NEWMODELS === 'undefined' || !NEWMODELS || !u || typeof UM_UNITS === 'undefined' || !UM_UNITS[u] || UM_UNITS[u].part) return false;
+  const M = UM[u]; return !!(M && M.mesh && M.mesh.tex && M.mesh.tex.complete && M.mesh.tex.naturalWidth);
+}
+// the model's size: its k scaled once, as it is decoded (every draw path reads M.S.k: s = refH / M.h * M.S.k * ...)
+if (typeof umModel === 'function') {
+  const _uszModel = umModel;
+  umModel = function (u) {
+    const S = typeof UM_UNITS !== 'undefined' && UM_UNITS[u];
+    if (S && !S.part && S._k0 == null) { S._k0 = S.k == null ? 1 : S.k; S.k = S._k0 * umScaleK(u); }
+    const M = _uszModel.apply(this, arguments);
+    if (M && M.mesh) M.mesh._um = 1;   // (told apart from the base and the extras below)
+    return M;
+  };
+}
+// the bases: the forces' slates are built by dynMesh under a '<xx>_base' key; the Grove's is its body's base layer (FSPLIT)
+if (typeof dynMesh === 'function') {
+  const _uszDyn = dynMesh;
+  dynMesh = function (key) { const m = _uszDyn.apply(this, arguments); if (m && m._umBase == null && /^[a-z]{2,3}_base\d*$/.test(key)) m._umBase = 1; return m; };
+}
+function umIsBase(mesh) {
+  if (mesh._umBase != null) return mesh._umBase;
+  let b = 0; if (typeof FSPLIT !== 'undefined') for (const k in FSPLIT) if (FSPLIT[k] && FSPLIT[k].base === mesh) { b = 1; break; }
+  return (mesh._umBase = b);
+}
+let _uszCtx = null;   // while a unit is drawn: { um: a sculpted model was drawn, bases: the base items drawn }
+if (typeof item === 'function') {
+  const _uszItem = item;
+  item = function (mesh) {
+    const it = _uszItem.apply(this, arguments), c = _uszCtx;
+    if (c && mesh) { if (mesh._um) c.um = true; else if (umIsBase(mesh)) c.bases.push(it); }
+    return it;
+  };
+}
+// a base item fitted to the rule across (x, z in its own frame; its height and any build pop or squash kept)
+function umFitBases(u, its) {
+  const R = umBaseR(u);
+  for (const it of its) {
+    const a = it.mesh.min, b = it.mesh.max; if (!a || !b) continue;
+    const r0 = Math.max(-a[0], b[0], -a[2], b[2]); if (!(r0 > .01)) continue;
+    const f = R / r0, m = it.m; for (const i of [0, 1, 2, 8, 9, 10]) m[i] *= f;
+  }
+}
+for (const fn of ['drawForceUnit', 'drawForceUnitPlain']) if (typeof window !== 'undefined' && typeof window[fn] === 'function') {
+  const f0 = window[fn];
+  window[fn] = function (t) {
+    if (_uszCtx) return f0.apply(this, arguments);   // (drawForceUnit hands another force's unit to drawForceUnitPlain)
+    const c = _uszCtx = { um: false, bases: [] };
+    try { return f0.apply(this, arguments); }
+    finally { _uszCtx = null; if (c.um && c.bases.length && t && t.def) umFitBases(t.def.unit, c.bases); }
+  };
+}
+// the crown (health bar, spells, shots, texts) as high as the bigger model. An evened unit's crown is the common height
+// (its head at UM_EVEN_HEAD, the top of the head about UM_EVEN_TOP), growing with the tier as its own did; the rest
+// scale their own by the model's factor
+const UM_EVEN_TOP = 1.4;
+if (typeof towerTop === 'function') {
+  const _uszTop = towerTop;
+  towerTop = function (t) {
+    const v = _uszTop.apply(this, arguments), u = t && t.def && t.def.unit; if (!u || !umReady(u)) return v;
+    if (UM_EVEN[u]) { const a = TOWER_TOP[t.type], v0 = a && a[0]; return v0 > 0 ? UM_EVEN_TOP * v / v0 : v * umScaleK(u); }
+    return v * umScaleK(u);
+  };
+}
+
 /* ================= THE MODEL LAB (runehold.html?lab=1) =================
    The owner's bench for the sculpted units' animations, close up: one unit on its post, a stand-in foe held in front of it,
    the game's own clock run slow, paused or scrubbed, and the real strike and spell effects playing on the foe.
@@ -83146,10 +84028,12 @@ if (typeof CCX_FX !== 'undefined' && typeof CCX_FX.phoenix === 'function') {
     const s0 = setCam;
     setCam = function (tz, oh, aspect) {
       if (!L.ready || !L.t) return s0.apply(this, arguments);
-      const K = typeof UNIT_K === 'function' && L.t.def ? UNIT_K(L.t.def.unit) : 1, f = foeSpot(), fh = L.face ? 1 : 0, x = L.t.x + (f[0] - L.t.x) * .3 * (1 - fh), z = L.t.y, cy = fh ? Math.max(.3, towerMesh(L.t.type, Math.min(2, L.t.tier | 0)).max[1]) * .9 : .45 * K + .1;   // (Face: aimed at the head)
+      const K = typeof UNIT_K === 'function' && L.t.def ? UNIT_K(L.t.def.unit) : 1, f = foeSpot(), fh = L.face ? 1 : 0, x = L.t.x + (f[0] - L.t.x) * .3 * (1 - fh), z = L.t.y;
+      const zk = L.t.def && typeof umReady === 'function' && umReady(L.t.def.unit) ? umScaleK(L.t.def.unit) : 1;   // (the sculpted units drawn bigger, unitmodels_size.js: framed to fit)
+      const cy = (fh ? Math.max(.3, towerMesh(L.t.type, Math.min(2, L.t.tier | 0)).max[1]) * .9 : .45 * K + .1) * zk;   // (Face: aimed at the head)
       const D = 40, cp = Math.cos(L.pitch), sp = Math.sin(L.pitch);
       CAM.tgt = [x, cy, z]; CAM.eye = [x + Math.sin(L.yaw) * cp * D, cy + sp * D, z + Math.cos(L.yaw) * cp * D];
-      RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, L.oh, { z: 1, cx: L.shift, cy: 0 });   // (cx: the view's centre moved clear of the panel)
+      RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, L.oh * zk, { z: 1, cx: L.shift, cy: 0 });   // (cx: the view's centre moved clear of the panel)
     };
   }
 
@@ -84730,7 +85614,7 @@ const HUNT_AFFIX = {
   regen: { name: 'Regenerating', text: 'It mends 1.5% of its health every second. Wounded halves it.' },
   shielded: { name: 'Shielded', text: 'A barrier worth 30% of its health takes every hit first, and forms again once when it falls to half health.' },
   summoner: { name: 'Summoner', text: 'Every 8 seconds it calls two of its escort to its side.' },
-  warded: { name: 'Warded', text: 'Spells (magic and Arcane) do 40% less to it.' },
+  warded: { name: 'Warded', text: 'Spells (magic and Arcane) do 40% less to it (a violet bar over its health). On a boss with an armour bar, the bar is a quarter of its health thicker instead: one defence a foe.' },
   splitting: { name: 'Splitting', text: 'Slain, it splits into two lesser copies with 30% of its health each. Both must fall, and neither may reach the gate.' },
 };
 // each boss's affixes in the order its levels add them (the first is the one Level I brings)
@@ -84828,7 +85712,9 @@ function huntArm(c) {
   if (A.includes('regen')) c.hxRegen = .015;
   if (A.includes('shielded')) { c.hxSh = c.hxShMax = c.maxHp * .3; c.hxShRe = 1; }
   if (A.includes('summoner')) c.hxSumT = 8;
-  if (A.includes('warded')) c.amT = 1e9;
+  // Warded on a boss with an armour bar: one foe, one bar (owner, 9 Nov 2026): no spell cut on top of armour, the bar is a quarter
+  // of its health thicker instead (armour stays open to magic)
+  if (A.includes('warded')) { if (c.apMax > 0) { c.apMax += c.maxHp * .25; c.ap = c.apMax; c.hxWardArm = true; } else c.amT = 1e9; }
   if (A.includes('splitting')) c.hxSplit = true;
   setTimeout(() => { if (G.hunt === H && !c.dead) onBanner(`${c.def.name} · Hunt Level ${CAMP_ROMAN[H.lvl]}`, A.map(a => HUNT_AFFIX[a].name).join(' · ')); }, 1800);
 }
@@ -86745,7 +87631,7 @@ function bfSlowK(c) {
    ===================================================================================================== */
 bfAdd('elite', { name: 'Elite', kind: 'trait', pri: 30, icon: 'gem', hue: '#9a7a1a',
   def: 'An elite foe: far more health than its kind, a gold ring at its feet, and it may drop an item when it falls.',
-  get: c => c.elite ? { say: `${eliteXOf(c)}× the health of a plain ${c.def.name} on this wave. Slain, it may drop an item.` } : null });
+  get: c => c.elite ? { say: c.qx === 'champ' ? `${eliteXOf(c)}× the health of a typical trooper of this wave. Slay it before the gate to win the challenge.` : `${eliteXOf(c)}× the health of a plain ${c.def.name} on this wave. Slain, it may drop an item.` } : null });
 // an elite's real health multiple: its health over a plain troop of its kind on its wave (the elite wave's share, ELITE_HP and its kind's ELITE_HP_TYPE)
 const eliteXOf = c => { const x = c.eliteX || (typeof ELITE_HP !== 'undefined' ? ELITE_HP : 1); return x >= 10 ? Math.round(x) : Math.round(x * 10) / 10; };
 // the Hunt bosses' affixes (hunts.js HUNT_AFFIX): a name keywords.js already holds keeps that entry
@@ -86809,6 +87695,7 @@ bfAdd('exposed', { name: 'Exposed', kind: 'trait', pri: 14, icon: 'eye', hue: '#
 bfAdd('runeward', { name: 'Runeward', kind: 'buff', pri: 10, icon: 'shield', hue: '#5a2a8a', f: ['auraMres', 'mBy'],
   def: 'A Runed War Mage beside it wards its armour: magic does very little to it, Arcane about half. Kill or stun the mage and the ward drops.',
   get: c => {
+    if (!(c.auraMres > 0) && c.apMax > 0 && c.mBy && c.mBy.filter(bfLive).length && typeof EP !== 'undefined') { const M = c.mBy.filter(bfLive); return { src: bfWho(M, c), n: M.length > 1 ? M.length : 0, fill: c.ap / c.apMax, say: `Its armour bar mends ${bfPct(EP.tieMend * Math.min(2, M.length))} a second while the tie holds. Magic still cuts straight through to its health. Kill or stun the mage and the tie drops.` }; }   // a force run: the tie mends armour, it never wards it (one foe, one bar)
     if (!(c.auraMres > 0)) return null;
     const M = (c.mBy || []).filter(bfLive), r = Math.min(.9, (c.mres || 0) + c.auraMres);
     return { src: M.length ? bfWho(M, c) : 'from a War Mage', n: M.length > 1 ? M.length : 0, say: `Magic does only ${bfPct(1 - r)} to it, Arcane ${bfPct(1 - r * .5)}. Steel is untouched. Kill or stun the mage and the ward drops.` };
@@ -88674,6 +89561,414 @@ if (typeof document !== 'undefined' && document.createElement) {
   (document.head || document.documentElement).append(css);
 }
 
+/* ================= WEAPONS, on screen: the weapon slot on the Gear sheet, its rack, its card, the info pane's line =================
+   (the rules: forces_zzzzzzzzzzzzz_weapons.js). Kept to the weapon's own corner of each screen, wrapped in from here:
+   - the Gear sheet (gearpanel.js openGearPanel): a weapon slot heads the right-hand column, and the weapon heads the Gear
+     list. Tapping the slot opens the weapon rack for that unit: what it holds now, and every weapon that fits it with the
+     change in plain numbers ("Damage 10-14 -> 16-21", "Speed 1.1 -> 1.3/s", "DPS 13 -> 24", "Spell Damage 0 -> 120"),
+     Equip, Salvage, and Take off (back to its issued weapon).
+   - the info pane (ui.js infoHTML): one line right under the stats row (never dropped on a crowded pane), the weapon's icon, name, damage, speed and DPS.
+   - the card (wpnCardHTML): the RPG tooltip in the items' style (itemtip.js), on hover anywhere a weapon is shown
+     (data-wid="<id>", or data-wst="<unit id>" for its issued weapon).
+   Icons: the item icon painter's class glyph on the rarity frame; a painting can go in RELIC_IMG['w-<model key>']. */
+const wpE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const wpN = v => v >= 100 ? String(Math.round(v)) : v >= 10 ? String(Math.round(v)) : String(Math.max(1, Math.round(v)));
+const wpS = v => String(+v.toFixed(2));
+const wpRange = n => `${wpN(n.lo)}–${wpN(n.hi)}`;
+function wpKey(w) {
+  const d = wpnDef(w); if (!d) return 'g:empty';
+  const C = WPN_CLASS[d.cls] || {}, art = wpArtKey(w, d);   // (tinted with the unit's or the force's own colours: wpnShow)
+  return `g:${C.icon || 'sword'}:${String(wpnShow(w).hue).slice(1)}:${w.starter ? 0 : Math.max(0, w.rar | 0)}:${art}:${typeof RELIC_IMG !== 'undefined' && RELIC_IMG[art] ? 1 : 0}`;
+}
+const _wpURL = {};
+function wpIconURL(w) {
+  const k = wpKey(w); if (_wpURL[k]) return _wpURL[k];
+  try { const c = document.createElement('canvas'); c.width = c.height = 64; iconPaint(c, k); return (_wpURL[k] = c.toDataURL()); } catch (e) { return ''; }
+}
+const wpTowerById = id => (G.towers || []).find(t => t.id === id) || null;
+function wpById(id) {
+  for (const w of G.wbag || []) if (w.id === id) return w;
+  for (const t of G.towers || []) if (t.weapon && t.weapon.id === id) return t.weapon;
+  return null;
+}
+const wpWearer = w => (G.towers || []).find(t => t.weapon === w) || null;
+// the kind line: "Rare spear · Item Level 14", "Legendary staff · Briarwardens only", "Issued spear · Thornguard Spears"
+function wpKindLine(w) {
+  const d = wpnDef(w); if (!d) return '';
+  const fit = d.leg ? `${(TOWERS[Object.keys(TOWERS).find(ty => TOWERS[ty].unit === d.u)] || {}).name || d.u} only` : (() => {
+    const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty) === d.cls); return tys.length ? 'for ' + tys.map(ty => String(TOWERS[ty].name).split(',')[0]).join(', ') : '';
+  })();
+  return [`${wpnRarName(w)} ${d.cls}`, w.starter ? '' : `Item Level ${w.il || 1}`, fit].filter(Boolean).join(' · ');
+}
+// the weapon's card. t: the unit it is on or would go on (its tier's numbers); vs: the weapon to compare with (what t holds)
+function wpnCardHTML(w, t, o) {
+  o = o || {}; const d = wpnDef(w); if (!d) return '';
+  const ty = t ? t.type : (Object.keys(TOWERS).find(k => d.leg ? TOWERS[k].unit === d.u : wpnClassOf(k) === d.cls) || null);
+  const n = ty ? wpnNums(w, ty) : null, col = wpnCol(w);
+  const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
+  let live = '';
+  if (t && n && t.def) {
+    const st = t.weapon === w || (w.starter && !t.weapon) ? (t.st || effStats(t)) : (() => { const w0 = t.weapon; t.weapon = w.starter ? null : w; try { return effStats(t); } finally { t.weapon = w0; } })();
+    const D = st.dmg || st.smite || 0, spr = (st.wpn && st.wpn.spr) || (wpnCalcOf(w).spr), dps = typeof towerDps === 'function' ? towerDps(t.type, st) : 0;
+    live = `<p class="itc-k">On this ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}, its talents and items on top): ${wpN(D * (1 - spr))}–${wpN(D * (1 + spr))} a strike · ${wpS(1 / (st.rate || 1))} a second · ${wpN(dps)} DPS</p>`;
+  }
+  const rule = d.leg ? wpnRuleText(d) : '';
+  const runes = typeof RUNES !== 'undefined' && !w.starter ? (w.runes || []).slice(0, forgeSlots(w)).filter(k => RUNES[k]).map(k => `<div class="itc-ab"><b style="color:${RUNES[k].hue}">${RUNES[k].name}</b> ${wpE(RUNES[k].text)}</div>`).join('')
+    + (forgeSlots(w) > (w.runes || []).filter(Boolean).length ? `<p class="itc-k">${forgeSlots(w) - (w.runes || []).filter(Boolean).length} empty rune socket${forgeSlots(w) - (w.runes || []).filter(Boolean).length > 1 ? 's' : ''} (the forge)</p>` : '') : '';
+  let cmp = '';
+  if (o.vs !== undefined && ty) {
+    const a = wpnNums(o.vs || wpnStarter(ty), ty), b = n, arrow = (x, y, f, suf) => { const up = y > x + 1e-6, dn = y < x - 1e-6; return `${f(x)}${suf || ''} → <b class="${up ? 'bo' : dn ? 'neg' : ''}">${f(y)}${suf || ''}</b>`; };
+    const rg = (x, y) => `${wpRange(x)} → <b class="${y.avg > x.avg + 1e-6 ? 'bo' : y.avg < x.avg - 1e-6 ? 'neg' : ''}">${wpRange(y)}</b>`;
+    cmp = `<div class="wp-cmp"><p>Damage ${rg(a, b)}</p><p>Speed ${arrow(a.aps, b.aps, wpS, '/s')}</p><p>DPS ${arrow(a.dps, b.dps, wpN)}</p>${a.sp || b.sp ? `<p>Spell Damage ${arrow(a.sp || 0, b.sp || 0, v => String(v))}</p>` : ''}</div>`;
+  }
+  return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${wpE(wpnName(w))}</h5><p class="itc-k">${wpE(wpKindLine(w))}</p>`
+    + (lines.length ? `<ul class="itc-s">${lines.join('')}</ul>` : '') + live
+    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '') + runes
+    + cmp + (w.starter ? `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p><p class="itc-k">Issued weapon. Better ones drop from bosses, elites and the waves' last foes.</p>` : `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p>`)
+    + (o.note || '') + '</div>';
+}
+if (typeof document !== 'undefined' && typeof itipBind === 'function') {
+  itipBind(document, '[data-wid]', el => { const w = wpById(+el.dataset.wid); return w ? wpnCardHTML(w, el.dataset.wt ? wpTowerById(+el.dataset.wt) : wpWearer(w)) : ''; });
+  itipBind(document, '[data-wst]', el => { const t = wpTowerById(+el.dataset.wst); return t ? wpnCardHTML(wpnOf(t), t) : ''; });
+}
+// the attributes that show a weapon's card on hover
+const wpTipAttr = (w, t) => w && !w.starter ? `data-wid="${w.id}"${t ? ` data-wt="${t.id}"` : ''}` : t ? `data-wst="${t.id}"` : '';
+
+/* ---------- the info pane: one line under the stats ---------- */
+function wpInfoLine(t) {
+  if (!wpnOn() || !t || !t.def || !wpnClassOf(t.type)) return '';
+  const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
+  const nw = (G.wbag || []).some(q => q.isNew && wpnFits(q, t)) ? ' <i class="wp-nb">new weapon in rack</i>' : '';
+  return `<p class="wp-ln" tabindex="0" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b>${nw} <span>${wpRange(n)} · ${wpS(n.aps)}/s · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</span></p>`;
+}
+if (typeof infoHTML === 'function') {
+  const _wpInfo = infoHTML;
+  infoHTML = function () {
+    const h = _wpInfo.apply(this, arguments);
+    try {
+      const s = G && G.sel, t = s && s.kind === 'tower' ? s.ref : null, ln = t ? wpInfoLine(t) : '';
+      if (!ln || typeof h !== 'string') return h;
+      // right under the stats row (closed where its divs balance), so a crowded pane drops other lines first
+      const st = h.indexOf('<div class="st">');
+      if (st >= 0) { let d = 0; const re = /<\/?div\b/g; re.lastIndex = st; for (let m; (m = re.exec(h));) { d += m[0][1] === '/' ? -1 : 1; if (!d) { const e = h.indexOf('>', m.index) + 1; return h.slice(0, e) + ln + h.slice(e); } } }
+      const at = h.indexOf('<div class="tags">');
+      return at >= 0 ? h.slice(0, at) + ln + h.slice(at) : h + ln;
+    } catch (e) { return h; }
+  };
+}
+
+/* ---------- the Gear sheet: the weapon slot, and the weapon at the head of its Gear list ---------- */
+function wpSockHTML(t) {
+  const w = wpnOf(t);
+  return `<button type="button" class="gp-sock wp-sock${t.weapon ? '' : ' empty'}${(G.wbag || []).some(q => wpnFits(q, t) && q.isNew) ? ' wp-new' : ''}" ${wpTipAttr(w, t)}><canvas width="112" height="112" data-key="${wpKey(w)}"></canvas><small style="color:${wpnCol(w)}">${wpE(t.weapon ? wpnName(w) : 'Weapon')}</small></button>`;
+}
+function wpGearRow(t) {
+  const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
+  return `<div class="gp-it wp-it" tabindex="0" ${wpTipAttr(w, t)}><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <small>${wpE(wpKindLine(w))}</small><p class="gp-isl">Damage ${wpRange(n)} · ${wpS(n.aps)} attacks a second · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</p>${wpnDef(w).leg ? `<p class="gp-iab">Passive: ${wpE(wpnDef(w).name)}</p>` : ''}</div>`;
+}
+if (typeof openGearPanel === 'function') {
+  const _wpGp = openGearPanel;
+  openGearPanel = function (t) {
+    const r = _wpGp.apply(this, arguments);
+    try {
+      if (!wpnOn() || !t || !wpnClassOf(t.type) || typeof ovp === 'undefined' || !ovp || !ovp.classList.contains('gearp')) return r;
+      const cols = ovp.querySelectorAll('.gp-doll > .gp-col'), col = cols[1] || cols[0];
+      if (col) {
+        col.insertAdjacentHTML('afterbegin', wpSockHTML(t));
+        const b = col.querySelector('.wp-sock'), c = b.querySelector('canvas'); iconPaint(c, c.dataset.key);
+        b.onclick = () => { if (typeof sfx === 'function') sfx('click'); if (typeof itipHide === 'function') itipHide(); wpRack(t); };
+      }
+      const gl = ovp.querySelector('.gp-gear');
+      if (gl) { const none = gl.querySelector('.gp-none'); if (none) none.remove(); gl.insertAdjacentHTML('afterbegin', wpGearRow(t)); }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+
+/* ---------- the rack: the weapons that fit this unit, compared with what it holds ---------- */
+// a spell's hit with it, against now (the sheet's own number, gearpanel.js gpDmgNums): " · Grasping Thicket 56 → 72"
+function wpSpellCmp(t, w) {
+  const kit = typeof abilKit === 'function' && abilKit(t); if (!kit || typeof gpDmgNums !== 'function') return '';
+  const w0 = t.weapon, now = effStats(t); let alt; t.weapon = w; try { alt = effStats(t); } finally { t.weapon = w0; }
+  const learned = (t.ab && t.ab.learned) || [];
+  const abs = kit.abilities.filter(ab => learned.includes(ab.id)).concat(kit.abilities.filter(ab => !learned.includes(ab.id)));
+  for (const ab of abs) {
+    const a = gpDmgNums(t, now, ab)[0], b = gpDmgNums(t, alt, ab)[0]; if (a == null || b == null) continue;
+    return ` · ${wpE(ab.name)} ${a} → <b class="${b > a ? 'bo' : b < a ? 'neg' : ''}">${b}</b>`;
+  }
+  return '';
+}
+function wpRack(t) {
+  if (!ovp) return;
+  const old = ovp.querySelector('.wp-rack'); if (old) old.remove();
+  const cur = wpnOf(t), bag = G.wbag || [];
+  const fit = bag.filter(w => wpnFits(w, t)).sort((a, b) => wpnDpsWith(t, b) - wpnDpsWith(t, a) || b.rar - a.rar);
+  const other = bag.length - fit.length, d0 = wpnDpsWith(t, t.weapon || null);
+  const rows = fit.map(w => {
+    const d1 = wpnDpsWith(t, w), n = wpnNums(w, t.type), c = wpnNums(cur, t.type);
+    const cl = (x, y) => y > x + 1e-6 ? 'bo' : y < x - 1e-6 ? 'neg' : '';
+    return `<div class="wp-row" data-w="${w.id}" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}${w.isNew ? ' <i class="wp-nw">new</i>' : ''}</b><small>${wpE(wpKindLine(w))}</small>
+      <p>Damage ${wpRange(c)} → <b class="${cl(c.avg, n.avg)}">${wpRange(n)}</b> · Speed ${wpS(c.aps)} → <b class="${cl(c.aps, n.aps)}">${wpS(n.aps)}/s</b> · DPS ${wpN(c.dps)} → <b class="${cl(c.dps, n.dps)}">${wpN(n.dps)}</b>${c.sp || n.sp ? ` · Spell Damage ${c.sp || 0} → <b class="${cl(c.sp || 0, n.sp || 0)}">${n.sp || 0}</b>` : ''}</p>
+      <p class="wp-unit">This ${wpE(t.def.name)} at tier ${ROMAN[t.tier]}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS${wpSpellCmp(t, w)}${wpnDef(w).leg ? ` · ${wpE(wpnRuleText(wpnDef(w)))}` : ''}</p></div>
+      <div class="wp-bt"><button type="button" class="pri" data-eq="${w.id}">Equip</button><button type="button" data-fg="${w.id}">Forge</button><button type="button" data-sv="${w.id}">Salvage ${WPN_SALVAGE[w.rar | 0]}g</button></div></div>`;
+  }).join('');
+  const html = `<div class="wp-rack" role="dialog" aria-label="Weapon rack"><div class="wp-hd"><h3>Weapon · ${wpE(t.def.name)} <small>tier ${ROMAN[t.tier]}</small></h3><button type="button" class="tx" id="wpClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
+    <div class="wp-cur"><img src="${wpIconURL(cur)}" alt=""><div>${wpnCardHTML(cur, t)}</div></div>
+    ${t.weapon ? `<p class="wp-off"><button type="button" id="wpOff">Take it off</button> ${typeof forgeSlots === 'function' ? `<button type="button" data-fg="${t.weapon.id}">Forge it</button> ` : ''}<small>back to the rack; the unit fights with its issued weapon</small></p>` : ''}
+    <h4>In your rack, for this unit <small>(${fit.length}${other ? `; ${other} more fit other units` : ''})</small></h4>
+    <div class="wp-list">${rows || `<p class="gp-none">No weapon in your rack fits a ${wpE(t.def.name)} yet. Wave bosses always drop one, the last elite of an elite wave often, and a wave's last foe now and then.</p>`}</div></div>`;
+  ovp.insertAdjacentHTML('beforeend', html);
+  for (const w of fit) w.isNew = false;
+  const box = ovp.querySelector('.wp-rack'), back = () => { box.remove(); openGearPanel(t); };
+  box.querySelector('#wpClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); back(); };
+  const off = box.querySelector('#wpOff'); if (off) off.onclick = () => { wpnEquip(t, null); back(); };
+  for (const b of box.querySelectorAll('[data-eq]')) b.onclick = () => { const w = wpById(+b.dataset.eq); if (w && wpnEquip(t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped.`); back(); } };
+  for (const b of box.querySelectorAll('[data-fg]')) b.onclick = () => { const w = wpById(+b.dataset.fg); if (!w) return; if (typeof sfx === 'function') sfx('click'); box.remove(); wpForge(t, w); };
+  for (const b of box.querySelectorAll('[data-sv]')) b.onclick = () => { const w = wpById(+b.dataset.sv); if (!w) return; const v = wpnSalvage(w); if (typeof onToast === 'function') onToast(`Salvaged ${wpnName(w)} for ${v} gold.`); box.remove(); wpRack(t); };
+}
+
+/* ---------- the FORGE (forces_zzzzzzzzzzzzzzz_forge.js): upgrade, reroll, runes, re-forge, each with its plain numbers ---------- */
+function wpForgeLines(t, a, b) {
+  const x = wpnNums(a, t.type), y = wpnNums(b, t.type), cl = (p, q) => q > p + 1e-6 ? 'bo' : q < p - 1e-6 ? 'neg' : '';
+  const d0 = wpnDpsWith(t, a.starter ? null : a), d1 = wpnDpsWith(t, b);
+  return `Damage ${wpRange(x)} → <b class="${cl(x.avg, y.avg)}">${wpRange(y)}</b> · DPS ${wpN(x.dps)} → <b class="${cl(x.dps, y.dps)}">${wpN(y.dps)}</b>${x.sp || y.sp ? ` · Spell Damage ${x.sp || 0} → <b class="${cl(x.sp || 0, y.sp || 0)}">${y.sp || 0}</b>` : ''} · this ${wpE(t.def.name)}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS`;
+}
+function wpForge(t, w) {
+  if (!ovp || typeof forgeSlots !== 'function') return;
+  const old = ovp.querySelector('.wp-rack'); if (old) old.remove();
+  const gold = G.gold | 0, btn = (act, cost, label, extra) => cost == null ? '' : `<button type="button" class="pri" data-fa="${act}" ${extra || ''}${gold >= cost ? '' : ' disabled'}>${label} · ${cost} gold</button>`;
+  const rows = [];
+  // 1. a rarity up
+  { const c = forgeUpCost(w), nx = RARITY[Math.min(4, (w.rar | 0) + 1)];
+    rows.push(`<div class="wp-fr"><h4>Upgrade to <span style="color:${nx.col}">${nx.name}</span></h4>${c == null ? `<p class="itc-k">${WPN_LEG[w.b] ? 'A legendary is as high as a weapon goes.' : (w.rar | 0) >= 3 ? 'Epic is the forge\'s highest: legendaries only drop.' : ''}</p>` : `<p>${wpForgeLines(t, w, forgePreview(w, 'up'))}</p>${(w.rar | 0) === 1 ? '<p class="itc-k">At rare it opens a rune socket.</p>' : (w.rar | 0) === 2 ? '<p class="itc-k">At epic it opens a second rune socket.</p>' : ''}${btn('up', c, 'Upgrade')}`}</div>`); }
+  // 2. re-forge to the wave's level
+  { const c = forgeRelevelCost(w);
+    rows.push(`<div class="wp-fr"><h4>Re-forge to Item Level ${forgeNow()} <small>now ${forgeLv(w)}</small></h4>${c == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, w, forgePreview(w, 'lv'))}</p>${btn('lv', c, 'Re-forge')}`}</div>`); }
+  // 3. a reroll of its make
+  { const c = forgeRerollCost(w), lo = wpnNums(Object.assign({}, w, { q: 0, _c: null, _k: null }), t.type), hi = wpnNums(Object.assign({}, w, { q: 1, _c: null, _k: null }), t.type), now = wpnNums(w, t.type);
+    rows.push(`<div class="wp-fr"><h4>Reroll its make <small>${w.rr ? `rerolled ${w.rr}×; each one costs more` : 'its roll within its rarity'}</small></h4><p>Damage now ${wpRange(now)}; a reroll lands anywhere from ${wpRange(lo)} to ${wpRange(hi)}${now.sp ? ` (Spell Damage ${lo.sp} to ${hi.sp})` : ''}.</p>${btn('rr', c, 'Reroll')}</div>`); }
+  // 4. runes
+  { const n = forgeSlots(w), c = forgeRuneCost(w), R = w.runes || [];
+    const opts = Object.keys(RUNES).filter(k => runeFits(k, t));
+    let h = `<div class="wp-fr"><h4>Runes <small>${n ? `${n} socket${n > 1 ? 's' : ''}; a rune costs ${c} gold, a new one replaces the old` : 'a socket opens at rare, a second at epic'}</small></h4>`;
+    for (let i = 0; i < n; i++) h += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${wpE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${opts.filter(k => k !== R[i]).map(k => `<button type="button" data-fr="${i}|${k}" title="${wpE(RUNES[k].text)}"${gold >= c ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${wpE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
+    rows.push(h + '</div>'); }
+  ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack wp-forge" role="dialog" aria-label="Weapon forge"><div class="wp-hd"><h3>Forge · <span style="color:${wpnCol(w)}">${wpE(wpnName(w))}</span> <small>${wpE(wpKindLine(w))} · you have ${gold} gold</small></h3><button type="button" class="tx" id="wpFgBack" aria-label="Back to the rack">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
+    <div class="wp-cur"><img src="${wpIconURL(w)}" alt=""><div>${wpnCardHTML(w, t)}</div></div>${rows.join('')}
+    <p class="itc-k">Forging is a late sink for gold: a lucky drop is still the big jump. Gold put into it is not returned on salvage.</p></div>`);
+  const box = ovp.querySelector('.wp-forge'), redo = () => { box.remove(); wpForge(t, w); };
+  box.querySelector('#wpFgBack').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); wpRack(t); };
+  for (const b of box.querySelectorAll('[data-fa]')) b.onclick = () => { const a = b.dataset.fa, ok = a === 'up' ? forgeUpgrade(w) : a === 'lv' ? forgeRelevel(w) : forgeReroll(w); if (ok) { if (typeof onToast === 'function') onToast(`${wpnName(w)}: ${a === 'up' ? 'upgraded to ' + RARITY[w.rar].name : a === 'lv' ? 're-forged to Item Level ' + w.il : 'rerolled'}.`); redo(); } };
+  for (const b of box.querySelectorAll('[data-fr]')) b.onclick = () => { const [i, k] = b.dataset.fr.split('|'); if (forgeRune(w, +i, k, t)) { if (typeof onToast === 'function') onToast(`${RUNES[k].name} set in ${wpnName(w)}.`); redo(); } };
+}
+
+/* ---------- Playtest start (playtest.js): a rack to go with the bag, since the foes' health counts on weapons ----------
+   typical: a weapon for each of the force's units from a few waves back (uncommon, one in three rare: about an ordinary
+   run's); strong: rares and epics, and a legendary for one unit from wave 15 */
+if (typeof ptApply === 'function') {
+  const _wpPt = ptApply;
+  ptApply = function (W, kind) {
+    const r = _wpPt.apply(this, arguments);
+    try {
+      if (wpnOn() && (kind === 'typical' || kind === 'strong') && W > 2) {
+        const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty)), strong = kind === 'strong', src = Math.max(1, W - 3);
+        G.wbag = []; G.wDropW = W - 1;
+        tys.forEach((ty, i) => G.wbag.push(wpnRoll(src, false, strong ? (W >= EPIC_FROM && i % 2 === 0 ? 3 : 2) : i % 3 === 0 ? 2 : 1, ty)));   // (typical: an ordinary run's uncommons, one in three rare)
+        if (strong && W >= 15 && tys.length) G.wbag.push(wpnRoll(src, true, 4, lootPick(tys)));
+        for (const w of G.wbag) w.isNew = true;
+        if (G.playtest) G.playtest.weapons = G.wbag.length;
+      }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+
+/* ---------- the boss-loot screen and the loot tables (renown.js): weapons show there too ----------
+   (owner, 9 Nov 2026: "cant see any weapons in the first bosses loot pool"). The screen shows the weapon the boss just
+   dropped above the relic choices (it is already in the rack: Equip on the unit it lifts most, or later from a Gear sheet);
+   each boss's loot table strip (its card, the forecast, the screen) ends with the weapons it can drop: one for each kind
+   of unit you field, with the odds by rarity on hover. */
+function wpBestFor(w) { let best = null; for (const t of G.towers || []) { if (t.wrecked || !wpnFits(w, t)) continue; const g = wpnDpsWith(t, w) - wpnDpsWith(t, t.weapon || null); if (!best || g > best.g) best = { t, g }; } return best; }
+function wpBossBlock(L) {
+  const D = G.wBossDrop; if (!D || !D.w || D.wave !== L.w || !(G.wbag || []).includes(D.w)) return '';
+  const w = D.w, b = wpBestFor(w), t = b && b.t;
+  return `<div class="wp-boss"><img src="${wpIconURL(w)}" alt=""><div class="wp-bt2"><h4>Weapon dropped <small>already in your rack, as well as the relic you take</small></h4>${wpnCardHTML(w, t || null, t ? { vs: t.weapon || null } : {})}
+    ${t ? `<button type="button" class="pri" id="wpBossEq">Equip on ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}): ${wpN(wpnDpsWith(t, t.weapon || null))} → ${wpN(wpnDpsWith(t, w))} DPS</button>` : '<p class="itc-k">None of your units can hold it yet.</p>'}</div></div>`;
+}
+if (typeof rnLootScreen === 'function') {
+  const _wpRn = rnLootScreen;
+  rnLootScreen = function () {
+    const r = _wpRn.apply(this, arguments);
+    try {
+      const L = typeof rnLootCur === 'function' ? rnLootCur() : null, box = ovp && ovp.querySelector('.rn-three'); if (!L || !box || !wpnOn()) return r;
+      const h = wpBossBlock(L); if (!h) return r;
+      box.insertAdjacentHTML('beforebegin', h);
+      const b = ovp.querySelector('#wpBossEq');
+      if (b) b.onclick = () => { const w = G.wBossDrop && G.wBossDrop.w, bt = w && wpBestFor(w); if (bt && wpnEquip(bt.t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped on ${bt.t.def.name}.`); const el = ovp.querySelector('.wp-boss'); if (el) el.innerHTML = `<p class="itc-k">${wpE(wpnName(w))} is on your ${wpE(bt.t.def.name)}.</p>`; } };
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+// the loot table strip: the weapons a boss can drop (one icon for each kind of unit you field)
+function wpTableHTML(type) {
+  if (!wpnOn()) return '';
+  const seen = new Set(), out = [];
+  for (const t of G.towers || []) { const c = t.def && !t.def.wall ? wpnClassOf(t.type) : null; if (!c || seen.has(c)) continue; seen.add(c); out.push(t); }
+  if (!out.length) for (const ty in TOWERS) { const c = wpnClassOf(ty); if (c && !seen.has(c) && out.length < 4) { seen.add(c); out.push({ type: ty, def: TOWERS[ty], id: 0 }); } }
+  return `<span class="rn-icons wp-icons">${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}</span>`;
+}
+if (typeof rnIconsHTML === 'function') {
+  const _wpIc = rnIconsHTML;
+  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { return h + wpTableHTML(t); } catch (e) { return h; } };
+}
+function wpTableCard(el) {
+  const [ty] = (el.dataset.wbt || '').split('|'); const d = TOWERS[ty]; if (!d) return '';
+  const c = wpnClassOf(ty), O = wpnBossOdds(Math.max(5, G.wave | 0)), names = WPN_CLASS[c].bases.map(b => wpnName({ b: b[0], rar: 2 }));
+  const legs = WPN_LEGS.filter(r => r[0] === d.unit).map(r => r[2]);
+  return `<div class="itc" style="--rc:#d8c08a"><h5 class="itc-n">A weapon for ${wpE(d.name)}</h5><p class="itc-k">Weapon drop · ${Math.round(O.p * 100)}% from this boss · it goes to your rack</p>
+    <ul class="itc-s">${O.rar.map((p, r) => p > .005 ? `<li><b style="color:${RARITY[r].col}">${Math.round(p * 100)}%</b> ${RARITY[r].name}</li>` : '').join('')}</ul>
+    <p class="itc-k">${wpE(names.join(', '))}${legs.length ? `; legendary: ${wpE(legs.join(', '))}` : ''}</p><p class="itc-fl">A boss's weapon is for one of the units you field, made for what that unit holds.</p></div>`;
+}
+if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-wbt]', wpTableCard);
+// the card's Gear button pulses while the rack holds a new weapon this unit can hold
+if (typeof abilitySlots === 'function') {
+  const _wpSl = abilitySlots;
+  abilitySlots = function (t, s) { const r = _wpSl.apply(this, arguments); try { if (s && s[5] && wpnOn() && (G.wbag || []).some(w => w.isNew && wpnFits(w, t))) { s[5].pulse = true; s[5].name = (s[5].name || '') + ' A new weapon in your rack fits it.'; } } catch (e) {} return r; };
+}
+
+/* ---------- the look ---------- */
+if (typeof document !== 'undefined') {
+  const css = `
+  .wp-sock.wp-new::after{content:'';position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#ffd166;box-shadow:0 0 6px #ffd166}
+  .wp-sock{position:relative}
+  .wp-ln{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px;line-height:1.25;cursor:default}
+  .wp-ln img{width:20px;height:20px;border-radius:3px;flex:none}
+  .wp-ln span{color:#cfc6b4}
+  .wp-it{border-left:3px solid #6a5a3a;padding-left:6px}
+  .wp-rack{position:fixed;inset:5% 8%;z-index:9000;background:rgba(18,15,12,.97);border:1px solid #6a5a3a;border-radius:8px;padding:12px 14px;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6);color:#e8dfcc}
+  .wp-hd{display:flex;justify-content:space-between;align-items:center}
+  .wp-hd h3{margin:0;font-size:18px}.wp-hd small{color:#a49c8c;font-weight:400}
+  .wp-rack h4{margin:12px 0 6px;font-size:14px}.wp-rack h4 small{color:#a49c8c;font-weight:400}
+  .wp-cur{display:flex;gap:10px;align-items:flex-start}.wp-cur img{width:56px;height:56px;border-radius:4px}
+  .wp-cur .itc{max-width:520px}
+  .wp-off{margin:6px 0;font-size:12px;color:#a49c8c}
+  .wp-row{display:flex;gap:10px;align-items:flex-start;padding:7px 6px;border-top:1px solid rgba(255,255,255,.08)}
+  .wp-row img{width:44px;height:44px;border-radius:4px;flex:none}
+  .wp-rt{flex:1;min-width:0}.wp-rt small{display:block;color:#a49c8c;font-size:11px}
+  .wp-rt p{margin:3px 0 0;font-size:12.5px}.wp-rt .wp-unit{color:#cfc6b4;font-size:12px}
+  .wp-rt b.bo,.wp-cmp b.bo{color:#7be37b}.wp-rt b.neg,.wp-cmp b.neg{color:#ff7a6a}
+  .wp-nw{font-style:normal;font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px;margin-left:4px}
+  .wp-bt{display:flex;flex-direction:column;gap:4px;flex:none}
+  .wp-bt button{font-size:12px;padding:4px 10px}
+  .wp-cmp{margin:6px 0 2px;font-size:12px}.wp-cmp p{margin:1px 0}
+  .wp-fr{border-top:1px solid rgba(255,255,255,.08);padding:8px 2px}.wp-fr h4{margin:0 0 4px;font-size:14px}.wp-fr h4 small{color:#a49c8c;font-weight:400}
+  .wp-fr p{margin:2px 0 6px;font-size:12.5px}.wp-fr b.bo{color:#7be37b}.wp-fr b.neg{color:#ff7a6a}
+  .wp-rs{margin:4px 0;font-size:12.5px}.wp-ro{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.wp-ro button{font-size:11.5px;padding:3px 7px;text-align:left}.wp-ro small{color:#a49c8c}
+  .wp-boss{display:flex;gap:10px;align-items:flex-start;margin:6px auto 10px;max-width:760px;padding:8px 10px;border:1px solid #d8c08a;border-radius:8px;background:rgba(40,32,18,.85)}
+  .wp-boss img{width:56px;height:56px;border-radius:4px;flex:none}.wp-boss h4{margin:0 0 4px;font-size:14px;color:#f2d27a}.wp-boss h4 small{color:#a49c8c;font-weight:400}
+  .wp-boss .itc{max-width:none}.wp-boss button{margin-top:6px}
+  .wp-icons{margin-left:6px;padding-left:6px;border-left:1px dashed rgba(216,192,138,.5)}.wp-ii img{width:100%;height:100%}
+  .wp-ln .wp-nb{font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px}
+  @media (max-width:640px){.wp-rack{inset:2%;padding:10px}.wp-row{flex-wrap:wrap}.wp-bt{flex-direction:row}}`;
+  const add = () => { const s = document.createElement('style'); s.id = 'wpCss'; s.textContent = css; document.head.append(s); };
+  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+}
+
+/* ================= HERO WEAPONS, on screen (forces_zzzzzzzzzzzzzzzz_heroweapons.js) =================
+   - The weapon rack of a Champion opens the hero's own page: its weapon's card, the four stages (each with its name, the
+     effect it adds and whether it is reached), the progress to the next ("wave bosses slain while it stands: 2 / 3"), the
+     reforged legendary it may become, TEMPERING (each rack weapon that can be tempered into it, with the numbers before and after),
+     re-forging to the wave's level and its runes (the forge's own prices: forces_zzzzzzzzzzzzzzz_forge.js).
+   - Its card (wpnCardHTML) says Hero weapon, its stage, its stage effects and its progress.
+   - The glow: a small light at the weapon's tip in its stage's colour (hwGlow), brighter each stage; Maren's sculpted twin
+     blade is also tinted (unitmodels_maren.js, hwTint). Kept small, at the tip only (the owner's rule: never hide the unit). */
+const hwE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function hwProgress(h) {
+  if (h.stage >= 3) return h.ult ? 'Reforged: its ultimate form.' : `Stage IV reached. Each wave boss slain while it stands may drop its reforged form (very rare).`;
+  return `Wave bosses slain while it stands: ${h.bosses | 0} / ${HW_AT[h.stage + 1]} to stage ${['I', 'II', 'III', 'IV'][h.stage + 1]}`;
+}
+function hwStagesHTML(h) {
+  const H = HW[h.u]; let s = '<ol class="hw-st">';
+  for (let i = 0; i < 4; i++) {
+    const on = (h.stage | 0) >= i, fx = i ? H.fx[i - 1] : null, txt = fx ? wpnRuleText({ fx }) : 'Its damage as issued' + (WPN_CLASS[(WPN_BASE[h.b] || {}).cls] && WPN_CLASS[WPN_BASE[h.b].cls].cast ? ', and its Spell Damage' : '') + '.';
+    s += `<li class="${on ? 'on' : ''}"><b>${['I', 'II', 'III', 'IV'][i]} · ${hwE(H.n[i])}</b> <small>${i ? `at ${HW_AT[i]} wave boss${HW_AT[i] > 1 ? 'es' : ''}` : 'from the start'}</small><p>${hwE(txt)}</p></li>`;
+  }
+  s += `<li class="ult${h.ult ? ' on' : ''}"><b style="color:${RARITY[4].col}">Reforged · ${hwE(H.ult[0])}</b> <small>very rare, from a wave boss once it is at stage III</small><p>${hwE(H.ult[1].charAt(0).toUpperCase() + H.ult[1].slice(1))}. Adds: ${hwE(H.ult[2].map(fx => wpnRuleText({ fx })).join(' '))}</p></li>`;
+  return s + '</ol>';
+}
+// its card wherever a weapon card shows
+if (typeof wpnCardHTML === 'function') {
+  const _hwCard = wpnCardHTML;
+  wpnCardHTML = function (w, t, o) {
+    if (!w || !w.hero || !HW[w.u]) return _hwCard.apply(this, arguments);
+    const ty = t ? t.type : Object.keys(TOWERS).find(k => TOWERS[k].unit === w.u), n = ty ? wpnNums(w, ty) : null, H = HW[w.u], sh = wpnShow(w);
+    const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
+    const fx = hwFx(w).map(f => `<div class="itc-ab"><b>${hwE(f === (H.ult[2] || [])[0] || H.ult[2].includes(f) ? 'Reforged' : 'Awakened')}</b> ${hwE(wpnRuleText({ fx: f }))}</div>`).join('');
+    return `<div class="itc" style="--rc:${H.glow}"><h5 class="itc-n" style="color:${H.glow}">${hwE(sh.name)}</h5><p class="itc-k">Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}</p>
+      <ul class="itc-s">${lines.join('')}</ul>${fx}${w.tw ? `<p class="itc-k">Tempered with: ${hwE(w.tw.n)} (item level ${w.tw.il})</p>` : ''}<p class="itc-k">${hwE(hwProgress(w))}</p><p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${(o && o.note) || ''}</div>`;
+  };
+}
+// its kind line (the Gear sheet's row, the rack): Hero weapon and its stage, not a rarity
+if (typeof wpKindLine === 'function') {
+  const _hwKind = wpKindLine;
+  wpKindLine = function (w) { return w && w.hero && HW[w.u] ? `Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}` : _hwKind.apply(this, arguments); };
+}
+// the rack of a Champion: its hero page
+if (typeof wpRack === 'function') {
+  const _hwRack = wpRack;
+  wpRack = function (t) { if (hwOn() && hwIsHero(t)) return hwPanel(t); return _hwRack.apply(this, arguments); };
+}
+function hwPanel(t) {
+  if (!ovp) return;
+  for (const q of ovp.querySelectorAll('.wp-rack')) q.remove();
+  const h = hwState(t.def.unit); if (!h) return; t.weapon = h;
+  const gold = G.gold | 0, cl = (a, b) => b > a + 1e-6 ? 'bo' : b < a - 1e-6 ? 'neg' : '';
+  const now = wpnNums(h, t.type), d0 = wpnDpsWith(t, h);
+  const melt = (G.wbag || []).filter(w => !hwMeltWhy(h, w)).map(w => {
+    const r = hwMeltResult(h, w), n = wpnNums(r, t.type), d1 = wpnDpsWith(t, r), c = hwMeltCost(h, w);
+    return `<div class="wp-row"><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${hwE(wpnName(w))}</b><small>${hwE(wpKindLine(w))}</small>
+      <p>Item Level ${h.il | 0} → <b class="${cl(h.il, r.il)}">${r.il}</b> · Damage ${wpRange(now)} → <b class="${cl(now.avg, n.avg)}">${wpRange(n)}</b>${now.sp || n.sp ? ` · Spell Damage ${now.sp} → <b class="${cl(now.sp, n.sp)}">${n.sp}</b>` : ''} · DPS on it ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b></p></div>
+      <div class="wp-bt"><button type="button" class="pri" data-hm="${w.id}"${gold >= c ? '' : ' disabled'}>Temper into ${hwE(wpnName(h))} · ${c} gold</button></div></div>`;
+  }).join('');
+  const lc = typeof forgeRelevelCost === 'function' ? forgeRelevelCost(h) : null, rc = typeof forgeRuneCost === 'function' ? forgeRuneCost(h) : null, slots = typeof forgeSlots === 'function' ? forgeSlots(h) : 0, R = h.runes || [];
+  const runeOpts = typeof RUNES !== 'undefined' ? Object.keys(RUNES).filter(k => runeFits(k, t)) : [];
+  let runes = '';
+  for (let i = 0; i < slots; i++) runes += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${hwE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${runeOpts.filter(k => k !== R[i]).map(k => `<button type="button" data-hr="${i}|${k}"${gold >= rc ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${hwE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
+  ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack hw-panel" role="dialog" aria-label="Hero weapon"><div class="wp-hd"><h3>Hero weapon · ${hwE(t.def.name.split(',')[0])} <small>it keeps this weapon all run · you have ${gold} gold</small></h3><button type="button" class="tx" id="hwClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
+    <div class="wp-cur"><img src="${wpIconURL(h)}" alt=""><div>${wpnCardHTML(h, t)}</div></div>
+    <h4>Awakening <small>${hwE(hwProgress(h))}</small></h4>${hwStagesHTML(h)}
+    <h4>Temper <small>${hwUnique(h) ? 'Temper any weapon into the hero\'s weapon (no one else holds its kind)' : `Temper a weapon of its kind (a ${hwE((WPN_BASE[h.b] || {}).cls)}) into the hero's weapon`} to raise its level: it rises to the tempering weapon's Item Level and takes half of a better roll; its look never changes</small></h4>${h.tw ? `<p class="itc-k">Tempered with: ${hwE(h.tw.n)} (item level ${h.tw.il})</p>` : ''}
+    <div class="wp-list">${melt || '<p class="gp-none">Nothing in the rack can be tempered into it yet.</p>'}</div>
+    <div class="wp-fr"><h4>Re-forge to Item Level ${typeof forgeNow === 'function' ? forgeNow() : G.wave} <small>now ${h.il | 0}</small></h4>${lc == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, h, Object.assign({}, h, { il: forgeNow(), _c: null }))}</p><button type="button" class="pri" id="hwLv"${gold >= lc ? '' : ' disabled'}>Re-forge · ${lc} gold</button>`}</div>
+    <div class="wp-fr"><h4>Runes <small>${slots} socket${slots === 1 ? '' : 's'} (more as it awakens); a rune costs ${rc} gold</small></h4>${runes}</div></div>`);
+  const box = ovp.querySelector('.hw-panel'), redo = () => { box.remove(); hwPanel(t); };
+  box.querySelector('#hwClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); openGearPanel(t); };
+  for (const b of box.querySelectorAll('[data-hm]')) b.onclick = () => { const w = (G.wbag || []).find(q => q.id === +b.dataset.hm); if (w && hwMelt(h, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} tempered into ${wpnName(h)}: Item Level ${h.il}.`); redo(); } };
+  const lv = box.querySelector('#hwLv'); if (lv) lv.onclick = () => { if (forgeRelevel(h)) redo(); };
+  for (const b of box.querySelectorAll('[data-hr]')) b.onclick = () => { const [i, k] = b.dataset.hr.split('|'); if (forgeRune(h, +i, k, t)) redo(); };
+}
+// the glow at its tip, a step brighter each stage (small, at the tip only)
+if (typeof drawSchoolMarks === 'function') {
+  const _hwMarks = drawSchoolMarks;
+  drawSchoolMarks = function (t) {
+    const r = _hwMarks.apply(this, arguments);
+    try {
+      const g = hwGlow(t); if (!g || typeof QADD === 'undefined') return r;
+      const tip = t.tipW && t.tipAt != null && G.time - t.tipAt < .5 ? t.tipW : [t.x, towerTop(t) + .05, t.y], vt = G.time || 0;
+      const a = (.18 + .3 * g.k) * (.8 + .2 * Math.sin(vt * 3 + t.x)), s = .12 + .14 * g.k + (g.ult ? .06 : 0);
+      QADD.bill(RD, tip[0], tip[1], tip[2], s, s, [g.col[0], g.col[1], g.col[2], a], 1, 0);
+      if (typeof VLIVE !== 'undefined' && VLIVE && Math.random() < .04 + .1 * g.k) part({ k: 'spark', x: tip[0] + R_(-.06, .06), z: tip[2] + R_(-.06, .06), h: tip[1], vh: R_(.15, .45), drag: 1, life: .45, max: .45, size: .03 + .02 * g.k, col: g.hex });
+    } catch (e) {}
+    return r;
+  };
+}
+if (typeof document !== 'undefined') {
+  const css = `.hw-st{list-style:none;margin:4px 0 8px;padding:0}.hw-st li{padding:5px 8px;margin:3px 0;border-left:3px solid #4a4436;opacity:.6;font-size:12.5px}
+  .hw-st li.on{opacity:1;border-left-color:#f2d27a;background:rgba(242,210,122,.06)}.hw-st li small{color:#a49c8c}.hw-st li p{margin:2px 0 0}.hw-st li.ult{border-left-color:${'#ff8c1a'}}`;
+  const add = () => { const s = document.createElement('style'); s.id = 'hwCss'; s.textContent = css; document.head.append(s); };
+  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+}
+
 /* Issued weapons reflect the unit's visible prop. Paintings live in COMPLETION_ART.weapons.
    The base/class still owns combat numbers and drop compatibility. New model variants only change presentation. */
 const WPN_START_ART = {
@@ -89439,6 +90734,156 @@ if (typeof document !== 'undefined') {
   const add = () => { const s = document.createElement('style'); s.id = 'wpCss'; s.textContent = css; document.head.append(s); };
   if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
 }
+
+/* ================= BRANCHES: the choice cards (force runs; the rules are in forces_zzzzzzzzzzzzzz_branches.js) =================
+   Buying tier IV, V or VI of a force unit (the Upgrade button, U, or a double-tapped set's All) opens two cards: the
+   option's name, its glyph, what it does in plain numbers, and the gold. The choice made is remembered for that kind of
+   unit and tier (G.brMem): its card says "Last time", and anything that upgrades without asking (the bot, a script) takes
+   it. The unit card shows the branches taken (tap them to see both sides of each tier and, between waves, to retrain them
+   for the respec price in Renown, or 25 gold without Renown). Reuses the classic path picker's look (.sp-card, head.html). */
+const BR_FAM = {   // a mechanic's family: the card's colour and its one-word role
+  reach: ['#ffd27a', 'Reach'], far: ['#ffd27a', 'Corridor'], pierce: ['#ffd27a', 'Corridor'], haste: ['#ffb070', 'Speed'], nth: ['#ffb070', 'Power'], crit: ['#ffb070', 'Power'],
+  bleed: ['#ff8a70', 'Wounds'], exec: ['#ff8a70', 'Finisher'], splash: ['#ffa860', 'Crowd'], chain: ['#9ad0ff', 'Crowd'], jump: ['#9ad0ff', 'Crowd'],
+  slow: ['#8fd8ff', 'Control'], stun: ['#8fd8ff', 'Control'], root: ['#8fd8ff', 'Control'], zone: ['#8fd8ff', 'Chokepoint'], guard: ['#b4c0d0', 'Chokepoint'],
+  near: ['#e4c890', 'Corner'], cover: ['#e4c890', 'Corner'], shred: ['#a6ec6a', 'Support'], mark: ['#a6ec6a', 'Support'], cross: ['#a6ec6a', 'Synergy'],
+  aura: ['#7af0d0', 'Support'], auraD: ['#7af0d0', 'Support'], spcd: ['#c8a0ff', 'Spells'], sppow: ['#c8a0ff', 'Spells'], specho: ['#c8a0ff', 'Second cast'],
+  spctl: ['#c8a0ff', 'Control'], spslow: ['#c8a0ff', 'Spells'], spshred: ['#c8a0ff', 'Spells'], spmark: ['#c8a0ff', 'Spells'], spjump: ['#c8a0ff', 'Spells'],
+};
+// small line glyphs, one per mechanic (24 x 24, stroked in the card's colour)
+const BR_GLYPH = {
+  reach: 'M4 12h14M14 7l5 5-5 5M4 8v8', haste: 'M5 6l6 6-6 6M12 6l6 6-6 6', splash: 'M12 4v4M12 16v4M4 12h4M16 12h4M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5L15 9M9 15l-2.5 2.5',
+  crit: 'M12 3l3 9-3 9-3-9z', nth: 'M5 18V9M10 18V6M15 18V9M20 18V3', guard: 'M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z', stun: 'M12 3l2 6h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z',
+  slow: 'M12 3v18M4.5 7.5l15 9M19.5 7.5l-15 9', shred: 'M5 4h14v8c0 4-3 7-7 8-4-1-7-4-7-8zM9 8l3 4-2 3 3 3', mark: 'M12 3a9 9 0 1 0 .01 0M12 8a4 4 0 1 0 .01 0M12 11.5v1',
+  bleed: 'M12 3c3 5 6 8 6 12a6 6 0 0 1-12 0c0-4 3-7 6-12z', root: 'M12 3v10M12 13c-3 0-5 3-7 8M12 13c3 0 5 3 7 8M12 13v8', chain: 'M4 16l5-8 4 6 7-10', near: 'M4 4v16h16M8 12h4v4',
+  pierce: 'M3 12h18M17 8l4 4-4 4M8 8v8M12 8v8', zone: 'M12 4a8 8 0 1 0 .01 0M8 12h8', cover: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14l6 6', far: 'M3 12h4M10 12h4M17 12h4M18 9l3 3-3 3',
+  cross: 'M5 5l14 14M19 5L5 19M12 8v8', exec: 'M6 18L18 6M8 6h10v10', aura: 'M12 2a10 10 0 1 0 .01 0M12 7a5 5 0 1 0 .01 0', auraD: 'M12 2a10 10 0 1 0 .01 0M9 12h6M12 9v6',
+  spcd: 'M12 3a9 9 0 1 0 .01 0M12 7v5l3 3', sppow: 'M12 2l2.5 7H22l-6 4.5 2.5 7.5-6.5-4.5L5.5 21 8 13.5 2 9h7.5z', echo: 'M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5M18 3v4h-4M6 21v-4h4',
+  hold: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z',
+};
+const brGlyph = (g, col) => `<svg class="br-gl" viewBox="0 0 24 24" aria-hidden="true"><path d="${BR_GLYPH[g] || BR_GLYPH.reach}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const brFam = q => BR_FAM[q.fx[0][0]] || ['#ffe08a', 'Upgrade'];
+const brEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+(() => {
+  const st = document.createElement('style');
+  st.textContent = `.br-gl{width:38px;height:38px;flex:none;border-radius:6px;padding:5px;box-sizing:border-box;background:rgba(0,0,0,.45);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sc) 50%,#000)}
+.br-card .sp-role{display:flex;gap:6px;align-items:center}.br-card .br-last{font:700 10.5px/1 var(--f-ui);padding:3px 5px;border-radius:3px;color:#071517;background:var(--sc)}
+.br-card li:before{content:'';flex:none;width:6px;height:6px;margin-top:6px;border-radius:50%;background:var(--sc)}
+.br-card.br-on{box-shadow:inset 0 0 0 1px #000,inset 0 0 0 3px var(--sc),0 0 24px -4px var(--sc)}.br-card.br-dim{opacity:.62}
+.br-card[disabled]{cursor:default}.br-row h5{margin:12px 2px 6px;font:700 13px/1 var(--f-ui);letter-spacing:.06em;color:var(--muted)}
+.br-tag{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}.br-line b{font-weight:700}`;
+  document.head.appendChild(st);
+})();
+function brCardHTML(t, q, opt) {
+  const [col, role] = brFam(q), lines = brSayOpt(t, q);
+  return `<button type="button" class="sp-card br-card${opt.on ? ' br-on' : ''}${opt.dim ? ' br-dim' : ''}" data-k="${q.k}" data-i="${q.i}" style="--sc:${col}"${opt.off ? ' disabled' : ''}>
+    <div class="sp-hd">${brGlyph(BR_MECH[q.fx[0][0]].g, col)}<div><h4>${brEsc(q.name)}</h4><p class="sp-role">${role}${q.fx[1] ? ' · ' + (BR_FAM[q.fx[1][0]] || [, ''])[1] : ''}${opt.last ? '<span class="br-last">Last time</span>' : ''}</p></div></div>
+    <ol>${lines.map(s => `<li><span>${brEsc(s)}</span></li>`).join('')}</ol>${opt.go ? `<span class="sp-go">${opt.go}</span>` : ''}</button>`;
+}
+// buying tier IV, V or VI: the two cards (grp: a double-tapped set of the same kind and tier)
+function openBrPick(t, grp) {
+  if (G.state !== 'play' || !brNeedsPick(t)) return;
+  const k = t.tier - 2, opts = brOpts(t, k); if (!opts) { upgrade(t); return; }
+  const list = grp ? [t].concat(grp.filter(o => o !== t && G.towers.includes(o) && o.tier === t.tier && o.type === t.type)) : [t];
+  const cost = list.reduce((a, o) => a + (upgradeCost(o) || 0), 0), mem = G.brMem && G.brMem[brKey(t)], last = mem ? mem[k] : null;
+  G.paused = true; drag = null; G.ghost = null;
+  let step = '';
+  try { const now = effStats(t), nx = brPreview(t, k, 0).A; step = gainBits(t.type, now, nx, 4).join(' · '); } catch (e) { step = ''; }
+  showOverlay(`<div class="bg-head"><h2 class="ttl">Tier ${ROMAN[t.tier + 1]}: choose one</h2><span>${list.length > 1 ? list.length + ' × ' : ''}${brEsc(t.def.name)}</span><button type="button" class="tx" id="spClose" aria-label="Close and resume">${X_SVG}</button></div>
+    ${step ? `<p class="sp-note br-step">Tier ${ROMAN[t.tier + 1]} itself, either way: ${brEsc(step)}</p>` : ''}
+    <div class="sp-grid">${opts.map(q => brCardHTML(t, q, { last: last === q.i, go: `Choose · ${list.length > 1 ? cost + ' gold for ' + list.length : cost + ' gold'}` })).join('')}</div>
+    <p class="sp-note">${list.length > 1 ? 'Every unit in the set takes this branch.' : 'Only this unit takes it.'} The tier's own step comes with either. You can retrain a unit's branches between waves${typeof rnOn === 'function' && rnOn() ? ` for ${rnCost('respec')} Renown` : ''} (tap its branches on the unit card).</p>`, 'bag');
+  $('#spClose').onclick = () => { sfx('click'); resumeGame(); };
+  for (const b of ovp.querySelectorAll('.br-card')) b.onclick = () => {
+    const i = +b.dataset.i; resumeGame();
+    let n = 0;
+    for (const o of list) { if (G.gold < (upgradeCost(o) || 1e9) || ageLocked(o)) continue; o.brPick = i; try { if (upgrade(o)) n++; } finally { delete o.brPick; } }
+    if (!n) toast('Not enough gold.');
+    else if (n < list.length) toast(`${n} of ${list.length} took ${opts[i].name}. Not enough gold for the rest.`);
+    if (G.sel && G.sel.group) G.sel.group = G.sel.group.filter(o => o.tier === G.sel.ref.tier);
+    markDirty();
+  };
+}
+// a unit's branches: both sides of each tier it has taken; between waves, retrain (paid once each time this opens)
+function openBrView(t) {
+  if (G.state !== 'play' || !brUnitOk(t) || t.tier < 3) return;
+  brFill(t);
+  let paid = false;
+  const draw = () => {
+    const n = Math.min(3, t.tier - 2), c = brRetrainCost(), can = G.phase === 'build';
+    const price = c.rn != null ? `${c.rn} Renown` : `${c.gold} gold`;
+    const rows = [];
+    for (let k = 0; k < n; k++) rows.push(`<div class="br-row"><h5>TIER ${ROMAN[k + 3]}</h5><div class="sp-grid">${brOpts(t, k).map(q => brCardHTML(t, q, { on: t.br[k] === q.i, dim: t.br[k] !== q.i, off: t.br[k] === q.i || !can, go: t.br[k] === q.i ? 'Taken' : can ? (paid ? 'Switch to this' : `Retrain · ${price}`) : 'Between waves' })).join('')}</div></div>`);
+    if (t.tier < 5) rows.push(`<p class="sp-note">Tier ${ROMAN[t.tier + 1]}${t.tier < 4 ? ' and on' : ''}: chosen when you buy it.</p>`);
+    showOverlay(`<div class="bg-head"><h2 class="ttl">Branches</h2><span>${brEsc(t.def.name)} · tier ${ROMAN[t.tier]}</span><button type="button" class="tx" id="spClose" aria-label="Close and resume">${X_SVG}</button></div>${rows.join('')}
+      <p class="sp-note">${paid ? 'Retrained: switch any of its tiers while this is open.' : `Retraining lets you switch any of this unit's tiers, for ${price} once, between waves.`}</p>`, 'bag');
+    $('#spClose').onclick = () => { sfx('click'); resumeGame(); };
+    for (const b of ovp.querySelectorAll('.br-card:not([disabled])')) b.onclick = () => {
+      if (!paid) { if (!brRetrainPay(t)) return; paid = true; }
+      brSet(t, +b.dataset.k, +b.dataset.i); sfx('upgrade'); draw();
+    };
+  };
+  G.paused = true; drag = null; G.ghost = null; draw();
+}
+// the card: Upgrade (and a set's All) opens the cards at tiers III → IV, IV → V and V → VI; Branches on a free slot
+if (typeof slotsNow === 'function') {
+  const _brSlots = slotsNow;
+  slotsNow = function () {
+    const s = _brSlots.apply(this, arguments);
+    const sel = G.sel, t = sel && sel.kind === 'tower' ? sel.ref : null;
+    if (!t || !brOn() || !brUnitOk(t) || sel.page) return s;
+    const grp = sel.group && sel.group.length > 1 ? sel.group : null;
+    if (brNeedsPick(t) && !ageLocked(t) && upgradeCost(t)) {
+      const at = s.findIndex(q => q && q.key && q.key.startsWith('u:'));
+      const o = brOpts(t, t.tier - 2);
+      if (at >= 0 && o) s[at] = Object.assign({}, s[at], { name: `Upgrade to tier ${ROMAN[t.tier + 1]}: choose ${o[0].name} or ${o[1].name}` + (grp ? ` for all ${grp.length}` : ''), act: () => openBrPick(t, grp) });
+    }
+    if (t.tier >= 3) { const at = [7, 9, 3].find(k => !s[k]); const q = brOpt(t, 0);
+      if (at != null && q) s[at] = { key: 'g:gem:' + brFam(q)[0].slice(1) + ':3', lbl: 'Branches', on: true, name: `Its branches: ${[0, 1, 2].map(k => brOpt(t, k)).filter(Boolean).map((b, k) => ROMAN[k + 3] + ' ' + b.name).join(', ')}. Tap to see them or retrain between waves.`, act: () => openBrView(t) }; }
+    return s;
+  };
+}
+if (typeof upgradeGroup === 'function') {
+  const _brGrp = upgradeGroup;
+  upgradeGroup = function () { const S = G.sel; if (S && S.ref && brNeedsPick(S.ref) && !ageLocked(S.ref)) { openBrPick(S.ref, S.group); return; } return _brGrp.apply(this, arguments); };
+}
+// U: the cards, not a silent upgrade (a capturing listener, ahead of ui.js's bindKeys)
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || G.state !== 'play' || G.paused) return;
+  if ((e.key.length === 1 ? e.key.toLowerCase() : e.key) !== 'u' || (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+  const t = G.sel && G.sel.kind === 'tower' ? G.sel.ref : null;
+  if (!t || !brNeedsPick(t) || ageLocked(t) || !upgradeCost(t)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  openBrPick(t, G.sel.group && G.sel.group.length > 1 ? G.sel.group : null);
+}, true);
+// the unit card: the branches taken (tap: openBrView), and what the next tier will ask
+function brInfoLine(t) {
+  if (!brOn() || !brUnitOk(t) || t.tier < 3) return '';
+  brFill(t);
+  const L = [0, 1, 2].map(k => ({ k, q: brOpt(t, k) })).filter(o => o.q);
+  return `<p class="mut br-line" data-d="2">Branches: ${L.map(({ k, q }) => `<span class="br-tag" data-brt="${t.id}" title="${brEsc(brSayOpt(t, q).join('. '))}" style="color:${brFam(q)[0]}">${ROMAN[k + 3]} <b>${brEsc(q.name)}</b></span>`).join(' · ')}</p>`;
+}
+if (typeof infoHTML === 'function') {
+  const _brInfo = infoHTML;
+  infoHTML = function () {
+    const h = _brInfo.apply(this, arguments), s = G.sel, t = s && s.kind === 'tower' ? s.ref : null;
+    if (typeof h !== 'string' || !t || !brOn() || !brUnitOk(t)) return h;
+    const ln = brInfoLine(t); if (!ln) return h;
+    const at = h.indexOf('<p class="up"'); return at >= 0 ? h.slice(0, at) + ln + h.slice(at) : h + ln;
+  };
+}
+if (typeof upgradeLine === 'function') {
+  const _brUL = upgradeLine;
+  upgradeLine = function (t) {
+    const h = _brUL.apply(this, arguments);
+    if (!brNeedsPick(t)) return h;
+    const o = brOpts(t, t.tier - 2); if (!o) return h;
+    return h + `<p class="up perk" data-d="2">Then choose: ${o.map(q => `<b style="color:${brFam(q)[0]}">${brEsc(q.name)}</b> (${brFam(q)[1].toLowerCase()})`).join(' or ')}</p>`;
+  };
+}
+document.addEventListener('click', e => {
+  const el = e.target && e.target.closest && e.target.closest('.br-tag'); if (!el) return;
+  const t = (G.towers || []).find(o => o.id === +el.dataset.brt); if (t) { sfx('click'); openBrView(t); }
+});
 
 /* ================= SHRINES: the card, placing, the info pane and the look =================
    The rules are in forces_zzzzzzzzzzzzzz_shrines.js. Here (all thin wrappers):
