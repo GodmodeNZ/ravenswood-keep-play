@@ -1,4 +1,4 @@
-const BUILD_TAG = '151d951@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5ae9735@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -373,9 +373,9 @@ const WAVES_TW = [   // Tower Wars keeps the old march, plain streams and all
 const WAVES = [
   'gnoll*12+wolf*1', 'wolf*10+spider*1', 'gnoll*5+spider*3', 'gnoll*10+ghoul*2+ironclad*1+acolyte*1', 'gnoll*6+wolf*2+brakka*1+gnoll*5+skirmisher*1+troll*1',
   'troll*3+wolf*3+magma*3', 'troll*5+mender*1+troll*4+wolf*5+bat*1', 'skirmisher*7+warcaller*1+wolf*4+skirmisher*5+skirmisher*2!swift+wraith*1', 'wraith*4+ironclad*3+warmage*2+acolyte*1', 'spider*9+arachnara*1+spider*8+wolf*4+beetle*1',
-  'ironclad*8+warmage*2+ironclad*6+warmage*1+shieldbearer*1+bat*3+stormbat*1', 'shieldbearer*5+ironclad*2+warmage*1', 'bat*7!swift+bat*7!swift', 'wraith*7+mender*2+wraith*6+stormwisp*1+icewolf*1', 'stormbat*2+wraith*2+ossyra*1+necro*1+shaman*1',
-  'shieldbearer*2+mender*2+skirmisher*5+ironclad*3+skirmisher*5+shieldbearer*1+golem*1', 'stormwisp*6+stormwisp*6+stormbat*5+acolyte*2+torchbearer*1', 'golem*4+beetle*2+shaman*1+burrower*1+warden*1', 'icewolf*5+icewolf*5+torchbearer*3+warcaller*2+wraith*3+gnoll*3+stalker*1', 'troll*6+golem*4+gnoll*4+shieldbearer*2+warmage*2+mender*2+malgrath*1',
-  'warden*2+magma*4+icewolf*4+warmage*1', 'burrower*5+beetle*4+mender*2+matriarch*1+beetle*3+burrower*4', 'ghoul*5+shaman*2+wraith*6+rotshaman*1+banshee*1+bloat*1+acolyte*2', 'burrower*6+mender*1+beetle*2', 'stalker*12+stormbat*14+voidwyrm*1',
+  'ironclad*8+warmage*2+ironclad*6+warmage*1+shieldbearer*1+bat*3+stormbat*1', 'shieldbearer*5+ironclad*2+warmage*1', 'bat*4!swift+bat*4!swift', 'wraith*7+mender*2+wraith*6+stormwisp*1+icewolf*1', 'stormbat*2+wraith*2+ossyra*1+necro*1+shaman*1',
+  'shieldbearer*2+mender*2+skirmisher*5+ironclad*3+skirmisher*5+shieldbearer*1+golem*1', 'stormwisp*6+stormwisp*6+stormbat*5+bat*4+acolyte*2+torchbearer*1', 'golem*4+beetle*2+shaman*1+burrower*1+warden*1', 'icewolf*5+icewolf*5+torchbearer*3+warcaller*2+wraith*3+gnoll*3+stalker*1', 'troll*6+golem*4+gnoll*4+shieldbearer*2+warmage*2+mender*2+malgrath*1',
+  'warden*2+magma*4+icewolf*4+warmage*1+bat*8!swift', 'burrower*5+beetle*4+mender*2+matriarch*1+beetle*3+burrower*4', 'ghoul*5+shaman*2+wraith*6+rotshaman*1+banshee*1+bloat*1+acolyte*2', 'burrower*6+mender*1+beetle*2', 'stalker*12+stormbat*14+voidwyrm*1',
   'ghoul*10!swift+ghoul*10!swift+necro*3+rotshaman*1', 'bloat*5+mender*3+matriarch*1+axe*1', 'magma*6+banshee*2+warmage*2+magma*5+banshee*1+stormbat*9', 'wolf*8+alpha*2+icewolf*10+stalker*6+berserker*1', 'troll*2+axe*2+grakk*1+mender*1+sapper*1',
   'shieldbearer*3+mender*3+skirmisher*7+shaman*1+skirmisher*7', 'stalker*14!swift+warcaller*3+shade*1', 'icewolf*5+torchbearer*1+alpha*2+warcaller*1', 'bat*10+stormbat*4+berserker*2', 'banshee*8+wraith*10+necro*2+lich*1',
   'beetle*4+golem*3+warmage*1', 'necro*6+shaman*2+rotshaman*2+ghoul*16', 'stormwisp*12+shade*10+shaman*2', 'banshee*5+necro*2+wraith*3', 'sapper*6+axe*6+kragmor*1+axe*6+mender*2+colossus*1!siege',
@@ -1342,7 +1342,7 @@ let VANGUARD = .4, SPACING = 1.7;   // SPACING: cells between troops in the marc
    (in log terms) from ours toward it, since our talents, relics and paths add late power its towers get from tiers.
    Waves 6 and 8 are cut further: their troops are armoured (Magma 10, Shellbacks 12, so arrows and shells do half or
    less), which made them spikes for the steel schools you start with; they now sit just above the waves around them. */
-const WAVE_TUNE = [2.0, 2.0, 2.0, 1.05, 1.47, 0.62, 0.81, 0.55, 0.95, 0.95, 0.95, 0.9, 0.82, 0.76, 0.73, 0.68, 0.63, 0.58, 0.57, 0.57, 0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.51, 0.5, 0.49, 0.5, 0.5, 0.5, 0.5, 0.49, 0.48, 0.48, 0.46, 0.45, 0.45, 0.45, 0.44, 0.44, 0.43, 0.42, 0.41, 0.4, 0.39, 0.38, 0.37, 0.37];
+const WAVE_TUNE = [2.0, 2.0, 2.0, 1.05, 1.47, 0.62, 0.81, 0.55, 0.95, 0.95, 0.95, 0.9, 0.66, 0.76, 0.73, 0.68, 0.63, 0.58, 0.57, 0.57, 0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.51, 0.5, 0.49, 0.5, 0.5, 0.5, 0.5, 0.49, 0.48, 0.48, 0.46, 0.45, 0.45, 0.45, 0.44, 0.44, 0.43, 0.42, 0.41, 0.4, 0.39, 0.38, 0.37, 0.37];
 /* FORM_TUNE: each force-march wave's health on top of WAVE_TUNE (the build-diversity pass raised waves 4-37 so a maze has to
    grow every wave: one left alone after wave 7 dies by about wave 13; set wave by wave toward an even kill depth for the
    bots that invest every wave, the magic-resistant waves 14, 17 and 23 held lower: they are walls for magic, not for steel), for its own formation (WAVES): the hard counters (plate,
@@ -58066,7 +58066,7 @@ const MAP_MOOD = {
   // Kingsmeadow: a sunlit afternoon over open fields: a soft blue sky, golden sun, grass under foot
   meadow: { top: '#a8c4ff', topK: .12, key: '#ffc27a', keyK: .22, bounce: '#9cb456', bounceK: .18, env: 0 },
   // Sunfall Glade: light, in a bluey-purple haze (owner: lighter, a blue-purple haze; was twilight teal-green)
-  clearing: { top: '#9894ff', topK: .45, key: '#c4d0ff', keyK: .42, bounce: '#8878c0', bounceK: .16, env: 1, grade: '#a8bcc8', gradeK: .34 },   // env 1: the painted ground takes the moonlight too
+  clearing: { top: '#9894ff', topK: .45, key: '#c4d0ff', keyK: .42, bounce: '#8878c0', bounceK: .16, env: 1, grade: '#a8bcc8', gradeK: .18 },   // env 1: the painted ground takes the moonlight too
   // Moonwood: cold moonlight, a teal bounce off the wet moss
   moonwood: { top: '#6c8cff', topK: .24, key: '#b4ccff', keyK: .12, bounce: '#2a7a70', bounceK: .24, env: 0 },
 };
