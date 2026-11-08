@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cfafdca@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c73e3dd@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -81936,10 +81936,10 @@ function rnIconsHTML(t, attr, n) {
     const [, t, a, b] = spec.split(':'), it = rnItem(a === 'L' ? { l: b } : { b: a }, true);
     return `${itemCardHTML(it)}<p class="fcc-weak">From ${rnEsc(rnBossName(t))}${a === 'L' ? `: its signature legendary, a chance on its offer${rnOn() ? ` (or pledge ${rnCost('pledge')} Renown ahead)` : ''}` : GEAR_BASES[a] && GEAR_BASES[a].bsig ? ': its own relic, found nowhere else' : ''}. When it falls it offers ${RN_LOOT.offer} of its table; take one.</p>`;
   });
-  // contracts (quests.js challenges) pay Renown in place of items, gold and points; a boon (a rule, not an item) stays
+  // contracts (quests.js challenges) pay Renown in place of items and points; a boon (a rule, not an item) and the gold stay
   W('qxOpt', f => function () {
     const o = f.apply(this, arguments); if (!rnOn() || !o) return o;
-    o.reward = o.reward.filter(r => r.k === 'boon').concat([{ k: 'renown', n: RN.contract[o.T] || 2 }]); return o;
+    o.reward = o.reward.filter(r => r.k === 'boon' || r.k === 'gold').concat([{ k: 'renown', n: RN.contract[o.T] || 2 }]); return o;   // gold stays too (owner: gold listed as a challenge reward)
   });
   W('qxPay', f => function (rw) { const out = f.apply(this, arguments); for (const r of rw || []) if (r.k === 'renown') { rnGain(r.n, 'contract won'); out.push(`+${r.n} Renown`); } return out; });
   W('qxRewardHTML', f => function (o) { const h = f.apply(this, arguments); const r = (o.reward || []).find(x => x.k === 'renown'); return r ? h + `<div class="qx-rw-r rn-rw"><b>+${r.n} Renown</b><span>Spend it at a boss, on a pledge, a unit, a respec or an awakening.</span></div>` : h; });
