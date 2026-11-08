@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b8a0bd6@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6eaf7f0@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -2236,7 +2236,7 @@ function woundTower(t) {
   G.stats.wounds = (G.stats.wounds || 0) + 1;
   t.hp = 0; t.wounded = true; t.woundAt = G.time;
   fxSpark(t.x, t.y, towerTop(t) * .6, '#d04030', 10); G.shake = Math.max(G.shake, .15); sfx('towerHit', 1.6);
-  if (G.texts && G.texts.length < 90) G.texts.push({ x: t.x, z: t.y, h: towerTop(t) + .75, s: `${t.def.name} wounded`, col: '#ff8a7a', life: 2.2, max: 2.2 });
+  if (FLOAT_WORDS && G.texts && G.texts.length < 90) G.texts.push({ x: t.x, z: t.y, h: towerTop(t) + .75, s: `${t.def.name} wounded`, col: '#ff8a7a', life: 2.2, max: 2.2 });
   if ((G.woundToastWave || 0) !== G.wave) { G.woundToastWave = G.wave; onToast(`${t.def.name} is Wounded. It fights on at ${WOUND_PACE}× attack speed and spell recovery, and recovers when the wave ends.`); }
   onDirty();
 }
@@ -4955,7 +4955,13 @@ function decal(k, x, z, r, col, life = 8) {
   if (G.decals.length > 70) G.decals.shift();
   G.decals.push({ k, x, z, r, col, life, max: life, rot: R(TAU), seed: R(10) });
 }
-function addText(x, z, h, s, col) { if (G.texts.length < 70) G.texts.push({ x, z, h, s, col, life: 1.1, max: 1.1 }); }
+/* FLOAT_WORDS (owner, 9 Nov 2026: "dont like the words showing up during fighting? what is blunderbuss?"): off, nothing but
+   numbers floats over a unit or a foe (damage and crits, gold, XP, income); the words (weapon and upgrade names, reaction
+   names, Shatterbloom, "X wounded", quest callouts) are dropped here, and the ones that matter go to a toast instead
+   (quests.js It will rise again, heroes.js the Quarry's fall). true brings every word back. */
+const FLOAT_WORDS = false;
+const ftIsNum = s => /^[+\-]?\d[\d.,]*k?!?( XP| income)?$/.test(String(s));
+function addText(x, z, h, s, col) { if (!FLOAT_WORDS && !ftIsNum(s)) return; if (G.texts.length < 70) G.texts.push({ x, z, h, s, col, life: 1.1, max: 1.1 }); }
 // damage numbers: each creep gathers the damage it takes and shows it above its head a few times a second
 let DMG_NUMS = true;
 const dmgFmt = v => v >= 100000 ? Math.round(v / 1000) + 'k' : v >= 10000 ? (v / 1000).toFixed(1) + 'k' : String(Math.max(1, Math.round(v)));
@@ -46827,7 +46833,7 @@ function wpnToBag(w, c) {
   if (bag.length >= WPN_BAG) {   // a full rack salvages its weakest
     let lo = 0; for (let i = 1; i < bag.length; i++) if (bag[i].rar < bag[lo].rar) lo = i;
     const old = bag[lo].rar <= w.rar ? bag.splice(lo, 1)[0] : w, v = WPN_SALVAGE[Math.max(0, old.rar | 0)];
-    G.gold += v; if (typeof onToast === 'function') onToast(`Weapon rack full: salvaged ${wpnName(old)} for ${v} gold.`);
+    G.gold += v; if (typeof onToast === 'function') onToast(`Weapon rack full: salvaged ${(typeof FLOAT_WORDS === 'undefined' || FLOAT_WORDS) ? wpnName(old) : 'a ' + RARITY[old.rar].name + ' weapon'} for ${v} gold.`);
     if (old === w) return;
   }
   bag.push(w); G.wNew = (G.wNew || 0) + 1; G.wDropW = G.wave;
@@ -46835,7 +46841,7 @@ function wpnToBag(w, c) {
   if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .5, wpnName(w), wpnCol(w));
   if (typeof sfx === 'function') sfx('lootDrop', Math.max(2, w.rar));
   const fit = (G.towers || []).filter(t => wpnFits(w, t)).length;
-  if (typeof onToast === 'function') onToast(`${RARITY[w.rar].name} weapon: ${wpnName(w)}${fit ? ` (fits ${fit} of your units)` : ''}. ${(G.stats && G.stats.weapons) > 1 ? 'Open a unit\'s Gear sheet to equip it.' : 'Weapons set a unit\'s strike: open a unit\'s Gear sheet (G) and tap its weapon slot.'}`);
+  if (typeof onToast === 'function') onToast(`${RARITY[w.rar].name} weapon${(typeof FLOAT_WORDS === 'undefined' || FLOAT_WORDS) ? ': ' + wpnName(w) : ' dropped'}${fit ? ` (fits ${fit} of your units)` : ''}. ${(G.stats && G.stats.weapons) > 1 ? 'Open a unit\'s Gear sheet to equip it.' : 'Weapons set a unit\'s strike: open a unit\'s Gear sheet (G) and tap its weapon slot.'}`);
   if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
 }
 // a foe fell: the first wave boss always drops a weapon, later ones usually; the last elite of an elite wave now and then;
@@ -48020,7 +48026,7 @@ function hupGive(t, boss, c) {
   hupPouch(u)[g]++; G.hupNew = (G.hupNew || 0) + 1; if (boss) G.hupBossDrop = { u, g, wave: G.wave };
   if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .3, hupName(u, g), HUP[u][2]);
   if (typeof sfx === 'function') sfx('lootDrop', 2 + g);
-  if (typeof onToast === 'function') onToast(`${hupName(u, g)}: an upgrade for ${wpnName(hwState(u))}. Open ${t.def.name.split(',')[0]}'s weapon to add it.`);
+  if (typeof onToast === 'function') onToast(`${hupName(u, g)}: an upgrade for ${(typeof FLOAT_WORDS === 'undefined' || FLOAT_WORDS) ? wpnName(hwState(u)) : t.def.name.split(',')[0] + "'s weapon"}. Open ${t.def.name.split(',')[0]}'s weapon to add it.`);
   return g;
 }
 function hupDropCheck(c) {
@@ -67368,6 +67374,7 @@ function qxKill(c, src, elem) {
     G.spawnQ.push({ t: G.waveT + 4, wv: n, type: c.type, hp: c.maxHp * .75, bounty: 1, qx: 'twice' });
     G.spawnQ.sort((a, b) => a.t - b.t); G.waveLeft = (G.waveLeft || 0) + 1;
     addText(c.x, c.y, hitH(c) + 1, 'It will rise again', '#ffb07a');
+    if (!(typeof FLOAT_WORDS === 'undefined' || FLOAT_WORDS) && typeof onToast === 'function') onToast(`${c.def.name} will rise again at the portal in 4 seconds: it must fall twice.`);   // (the words no longer float over it: game.js FLOAT_WORDS)
   }
 }
 function qxLeak(c, cost) {
@@ -76263,7 +76270,8 @@ function questSpawn(c, s) {
 function questQuarryKill(c) {
   if (!c.quarry) return;
   const g = 20 + 2 * G.wave; G.gold += g; G.stats.gold += g;
-  addText(c.x, c.y, hitH(c) + .9, `${c.quarry} falls · +${g}`, '#ffd76a');
+  if ((typeof FLOAT_WORDS === 'undefined' || FLOAT_WORDS)) addText(c.x, c.y, hitH(c) + .9, `${c.quarry} falls · +${g}`, '#ffd76a');
+  else { addText(c.x, c.y, hitH(c) + .9, '+' + g, '#ffd76a'); onToast(`The Quarry falls: ${c.quarry} is slain, +${g} gold.`); }   // (game.js FLOAT_WORDS: the gold floats, the words go to a toast)
   for (let n = 0; n < 14; n++) part({ k: 'chunk', x: c.x, z: c.y, h: hitH(c), vx: HR_(-1.8, 1.8), vz: HR_(-1.8, 1.8), vh: HR_(2, 4), g: 9, life: .9, max: .9, size: HR_(.04, .07), col: n % 3 ? '#ffd76a' : '#fff2c0', vr: HR_(-12, 12) });
   fxRing(c.x, c.y, 1, '#ffd76a'); sfx('cash');
 }
