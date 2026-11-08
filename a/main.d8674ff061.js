@@ -1,4 +1,4 @@
-const BUILD_TAG = '32bb87b@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1ab512c@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53572,6 +53572,8 @@ flat in vec4 vTint; flat in vec2 vX; uniform float uTime;
 uniform sampler2D uBg; uniform float uBgOn; uniform vec2 uRes; uniform vec4 uFR, uFE; uniform vec2 uFD;
 uniform sampler2D uGT; uniform float uGTOn; uniform vec2 uGTS;   // tiled ground texture: (world units per repeat, gain)
 uniform sampler2D uGPT; uniform float uGPOn, uGPGain; uniform vec4 uGP;   // painted map laid on the ground: (x0, z0, 1/width, 1/depth)
+uniform sampler2D uGLT; uniform float uGLOn; uniform vec4 uGL;   // the ground's glint (glintdata.js): (strength, sharpness, world units a repeat, the blades' relief); mask scale in uGLK
+uniform float uGLK;
 uniform highp sampler2DArray uMT; uniform float uMTOn; uniform vec4 uMTR[${MAT_TEX.length}];
 const float MT_METAL[${MAT_TEX.length}] = float[${MAT_TEX.length}](${MAT_TEX.map(m => (m.metal || 0).toFixed(2)).join(', ')});   // textured materials (MAT_TEX): per layer, its average colour and scale
 uniform vec2 uGPS;   // (on, the painting's mean brightness): towers and foes take the light painted under them
@@ -53699,7 +53701,22 @@ void main(){
     float shp = uShadowOn>.5 ? shadowAt(vL) : 1.;
     vec3 pl = vec3(0.);
     for(int i=0;i<6;i++){ if(i>=uNPL) break; vec3 d=uPL[i].xyz-vW; float l=length(d); float a=clamp(1.-l/uPL[i].w,0.,1.); a*=a; pl += uPLc[i]*a*(.35+.65*max(d.y/l,0.)); }
-    o = vec4((tx*uGPGain*mix(.48, 1., shp) + tx*pl*.6 + pl*.03)*moodOf(vec3(0., 1., 0.), shp*.6, uMoodE), 1.);
+    vec3 gcol = tx*uGPGain*mix(.48, 1., shp) + tx*pl*.6 + pl*.03;
+    if(uGLOn > .5 && od <= 0.){
+      // the owner's terrain glint (its source: a pigment-coloured Blinn-Phong lobe, a soft cut on its dim tail, through an
+      // artistic detail mask, added to the light): the grass blades' own normals (the source's relief option: on this flat
+      // field the geometric normal alone gives no response) tilt the lobe so single blades catch the sun; only on the
+      // painting's grass, out of its painted shade and the units' shadows
+      vec4 gt = texture(uGLT, vW.xz/uGL.z);
+      vec2 nxy = (gt.rg*2. - 1.)*uGL.w; vec3 N = normalize(vec3(nxy.x, sqrt(max(1. - dot(nxy, nxy), .05)), -nxy.y));
+      vec3 L = normalize(uSunDir), V = normalize(uCam - vW), H = L + V; H = dot(H, H) > 1e-8 ? normalize(H) : V;
+      float lobe = pow(max(dot(N, H), 0.), uGL.y); lobe *= smoothstep(.015, .12, lobe)*step(.0001, dot(N, L));
+      float mk = gt.b*uGLK;
+      float grass = smoothstep(.015, .09, tx.g - max(tx.r, tx.b)*.95), sun = smoothstep(.14, .32, dot(tx, vec3(.3, .59, .11)));
+      vec3 pig = max(tx, vec3(0.))/max(.025, max(tx.r, max(tx.g, tx.b)));
+      gcol += pig*uSunCol*lobe*uGL.x*mk*grass*sun*shp;
+    }
+    o = vec4(gcol*moodOf(vec3(0., 1., 0.), shp*.6, uMoodE), 1.);
     o.rgb = mix(o.rgb, dot(o.rgb, vec3(.2126, .7152, .0722))*uGrade.rgb, uGrade.a);   // the map's grade on the painting: toward one tint, as bright
     return;
   }
@@ -54580,6 +54597,13 @@ function createRenderer(canvas, opt = {}) {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.depthMask(true); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.bindVertexArray(null);
     },
+    // the ground's glint (the owner's terrain glint; glintdata.js, a split asset: off until it loads); its settings
+    glint: { strength: 1.4, sharpness: 30, scale: 1.4, relief: .85 }, glintOn: true,   // (the source's native strength; a little sharper, so single blades catch the sun)
+    glintTex() {
+      if (this._glT !== undefined) return this._glT;
+      if (typeof GLINT_TEX === 'undefined') return null;
+      this._glT = null; const im = new Image(); im.onload = () => { this._glT = this.texture(im, true); }; im.src = GLINT_TEX; return null;
+    },
     texture(img, repeat) {
       const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
@@ -54621,6 +54645,7 @@ function createRenderer(canvas, opt = {}) {
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, lm ? lm.tex : blank); gl.uniform1i(u.uLM, 2); gl.uniform1f(u.uLMOn, lm ? 1 : 0);
       if (lm) { gl.uniform4fv(u.uLMR, lm.rect); gl.uniform1f(u.uLMK, lm.k * (this.lmGain == null ? 1 : this.lmGain)); }
       if (u.uGPT) { const gp = this.gpaint; gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, gp ? gp.tex : blank); gl.uniform1i(u.uGPT, 5); gl.uniform1f(u.uGPOn, gp ? 1 : 0); if (gp) { gl.uniform4f(u.uGP, gp.rect[0], gp.rect[1], 1 / gp.rect[2], 1 / gp.rect[3]); gl.uniform1f(u.uGPGain, gp.gain || 1); } if (u.uGPS) gl.uniform2f(u.uGPS, gp && gp.shade ? 1 : 0, gp && gp.shade ? gp.shade : 1); }
+      if (u.uGLT) { const gl_ = this.glintTex(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, gl_ || blank); gl.uniform1i(u.uGLT, 8); gl.uniform1f(u.uGLOn, gl_ && this.glintOn && !(typeof vfxFid === 'function' && vfxFid().name === 'Low') ? 1 : 0); if (gl_) { const g = this.glint; gl.uniform4f(u.uGL, g.strength, g.sharpness, g.scale, g.relief); gl.uniform1f(u.uGLK, typeof GLINT_MASK_K !== 'undefined' ? GLINT_MASK_K : .31); } }
       if (u.uMT) { let mt = null; try { mt = matTexture(); } catch (e) {} gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D_ARRAY, mt || blankA); gl.uniform1i(u.uMT, 6); gl.uniform1f(u.uMTOn, mt ? 1 : 0); if (mt) gl.uniform4fv(u.uMTR, matRef); }
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
       if (u.uUQ) gl.uniform1f(u.uUQ, this.uq == null ? 2 : this.uq); if (u.uCamR) gl.uniform3fv(u.uCamR, this.right); gl.uniform1f(u.uRim, this.rim == null ? .12 : this.rim); gl.uniform1f(u.uExpo, this.expo == null ? 1 : this.expo); gl.uniform1f(u.uFill, this.fill || 0); if (u.uOwn) gl.uniform1f(u.uOwn, this.own == null ? 1 : this.own); if (u.uOwnK) { const k = this.ownK || OWN_K; gl.uniform4f(u.uOwnK, k[0], k[1], k[2], k[3]); }
@@ -79932,6 +79957,79 @@ if (typeof pauseMenu === 'function') {
   };
 }
 
+/* Aurelian, the Lion of the Ford, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's knight with his
+   sword and the lion shield strapped along his left forearm (model_unit_aurelian.js: assets/unit-art/aurelian/scripts/rig.py,
+   tools/make_gunman.py) drawn as the Silver Order's Champion ch_aurelian (AU_UNIT) in place of his code-built rider.
+   - His moves (the clips, 30 fps): idle (regal, the shield at his side, the sword lowered), guard (a foe in reach: the shield
+     up before him, the sword over its rim), swing (his strike: one overhead cut from the combo, landing as the charge's blow
+     lands), and one for each ability: Lion's Charge (the sword raised to the sun, then levelled forward in a lunge), Banner at
+     the Ford (he kneels and drives the sword point-down into the road), The Lion's Due (a shield bash, then a lunging thrust).
+   - Every frame is checked on the game's skinning for the shield, the sword and his body (clip_closeups.py).
+   - His strike rides out on the charge (so_lance: t.chg) as before; every move is eased into from where he was. */
+const AU_UNIT = 'ch_aurelian';
+UM_UNITS[AU_UNIT] = { mdl: 'aurelian', k: .85, rig: 'knight', sink: .5 };
+const AU = { CAST: { ch_lioncharge: 'charge', ch_fordstandard: 'banner', ch_lionsdue: 'due' }, HIT: .26, CUT: 22, RATE: { idle: 4, guard: 9, move: 40 } };
+if (typeof castAbility === 'function') {
+  const _auCast = castAbility;
+  castAbility = function (t, ab) {
+    const r = _auCast.apply(this, arguments);
+    try { if (r && t && t.def && t.def.unit === AU_UNIT && ab && AU.CAST[ab.id] && typeof G !== 'undefined') { t._auCastAt = G.time; t._auCast = AU.CAST[ab.id]; } } catch (e) {}
+    return r;
+  };
+}
+function auClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+function auLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
+// what he does now: { f (the anim's frame), rate (how fast the pose follows) }
+function auCtl(t, live, M) {
+  if (!live) return { f: auClip(M, 'guard', 0), rate: 0 };
+  const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
+  if (t._auCast && t._auCastAt != null) { const u = now - t._auCastAt; if (u >= 0 && u < auLen(M, t._auCast)) return { f: auClip(M, t._auCast, u * 30), rate: AU.RATE.move }; }
+  // the strike: out on the charge, the cut landing with its blow (.26 s in), the follow-through as he comes back
+  const c = t.chg;
+  if (c && c.at != null && c.T) {
+    const s = now - c.at, n = A.swing[1] - 1;
+    if (s >= 0 && s < c.T) return { f: auClip(M, 'swing', s < AU.HIT ? AU.CUT * s / AU.HIT : AU.CUT + (n - AU.CUT) * (s - AU.HIT) / Math.max(.1, c.T - AU.HIT)), rate: AU.RATE.move };
+  }
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead, ph = (now + (t.anim || 0) * 3) * 30;
+  if (fight || (c && c.at != null && now - c.at < 1.5)) return { f: auClip(M, 'guard', ph % A.guard[1]), rate: AU.RATE.guard };
+  return { f: auClip(M, 'idle', ph % A.idle[1]), rate: AU.RATE.idle };
+}
+const _auT = new Float32Array(SKIN_MAX * 12);
+function auPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _auT);
+  const now = G.time, dt = t._auT == null ? 1 : Math.max(0, Math.min(.1, now - t._auT)); t._auT = now;
+  if (!t._auO || t._auO.length !== nb * 12) { t._auO = new Float32Array(nb * 12); t._auO.set(_auT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._auO, _auT, k, t._auO);
+  const o = R.out; o.set(t._auO); return o;
+}
+const _auA = new Float32Array(16), _auB = new Float32Array(16), _auC = new Float32Array(16);
+// in umDraw's place for him (the Champions are drawn by drawForceUnit -> umDraw): his base at the post, him on it
+function auDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+  const M = umModel(AU_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const base = L && L.base && L.base.count ? L.base : null;
+  if (base) { M4.trs(_auA, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _auA, opts); }
+  const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / M.h * M.S.k * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - M.S.sink) : 0;
+  M4.trs(_auA, x, lift * sy, z, ang + wob, 0, 0, sx, sy, sz); M4.trs(_auB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_auC, _auA, _auB);
+  const P = auCtl(t, live, M), o = auPose(M, t, P, live);
+  const it = item(M.mesh, _auC, opts); it.sec = [0, 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _auC;
+  if (live) { const mk = UNIT_MDL[M.S.mdl].marks, p = mk && mk.SwordTip ? umXf(o, mk.gunBone, mk.SwordTip) : [0, .8, .3]; t.tipW = M4.xf(_auC, p[0], p[1], p[2]); t.tipYaw = ang; t.tipAt = G.time; }
+  return true;
+}
+if (typeof umDraw === 'function') {
+  const _auUm = umDraw;
+  umDraw = function (t, u) {
+    if (u === AU_UNIT && NEWMODELS && t && !t.wrecked) return auDraw.apply(this, arguments);
+    return _auUm.apply(this, arguments);
+  };
+}
+
 /* ================= THE MODEL LAB (runehold.html?lab=1) =================
    The owner's bench for the sculpted units' animations, close up: one unit on its post, a stand-in foe held in front of it,
    the game's own clock run slow, paused or scrubbed, and the real strike and spell effects playing on the foe.
@@ -79984,7 +80082,7 @@ if (typeof pauseMenu === 'function') {
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const REC_S = 6;
-  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', bladedancer: 'Blade Dancers', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey' };
+  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', bladedancer: 'Blade Dancers', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey', ch_aurelian: 'Aurelian' };
 
   /* ---- what can be shown ---- */
   function sculpted() { return typeof UM_UNITS === 'undefined' ? [] : Object.keys(UM_UNITS).filter(u => !UM_UNITS[u].part && UNIT_MDL && UNIT_MDL[UM_UNITS[u].mdl]); }   // (part: a piece of another, as Varic's sword)
