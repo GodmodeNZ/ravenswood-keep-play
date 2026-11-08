@@ -1,4 +1,4 @@
-const BUILD_TAG = '5331bff@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0143c1a@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1304,6 +1304,7 @@ function waveSpec(n) {
 // creep health per wave: steep through the first thirty, then a gentler climb to fifty (endless keeps climbing)
 const HP_KNEE = 30;
 let HP_EASE9 = .3;
+let HP_CUT14 = .2;   // and 20% less again from wave 14 on (owner, 8 Nov 2026)
 let HP_CUT9 = .145;   // every foe, bosses too, less health from wave 9 on, on top of HP_EASE9: 5%, then 10% more (owner, 8 Nov 2026)
 // waves 2 to 9 died too easily: extra health there, easing back out by wave 12 (wave 1 stays the gentle opener)
 let HP_E29 = .4, LEAD_E29 = .25, LEAD_HP = .88, MINION_HP = 1.44, BOSS_HP = .81, BOSS_EARLY = .81;   // BOSS_EARLY: leaders and bosses of waves 2 to 10 softer still (two 10% cuts)   // BOSS_HP: every leader and boss 10% softer again, twice   // MINION_HP: the rank and file (not leaders or bosses) were going down too easily   // LEAD_HP: every dungeon leader a touch softer than its numbers (the player found them a bit much)
@@ -1321,7 +1322,7 @@ function waveHP(n, diff) {
   if (!(typeof G !== 'undefined' && G && G.vs)) h *= HP_ALL * WAVE_TUNE[Math.min(n, MAX_WAVE) - 1];   // every foe in the campaign, summons and bosses too (Tower Wars keeps its own)
   if (!oldRules()) h *= (FORM_TUNE[Math.min(n, MAX_WAVE) - 1] || 1) * (typeof forceHpK === 'function' ? forceHpK(n) : 1);   // the force march's own formations (Classic keeps WAVE_TUNE alone), and its gentler unit tiers (forces_zz_tiers.js)
   // the climb eased from wave 9: 30% less health by wave 14 and after (18% at first; eased again the same day) (owner, 7 Nov 2026: consistently losing from wave 9)
-  if (!(typeof G !== 'undefined' && G && G.vs)) { h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1); if (n >= 9) h *= 1 - HP_CUT9; }
+  if (!(typeof G !== 'undefined' && G && G.vs)) { h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1); if (n >= 9) h *= 1 - HP_CUT9; if (n >= 14) h *= 1 - HP_CUT14; }
   return h * (1 + (m - 1) * Math.min(1, (n - 1) / 12)) * (typeof riteHP === 'function' ? riteHP() : 1);   // a Rite of Passage's tougher foes
 }
 // bosses arrive every 5th wave; early ones are softened so a reasonable maze can bring them down
@@ -80384,6 +80385,133 @@ if (typeof umDraw === 'function') {
   umDraw = function (t, u) {
     if (u === AU_UNIT && NEWMODELS && t && !t.wrecked) return auDraw.apply(this, arguments);
     return _auUm.apply(this, arguments);
+  };
+}
+
+/* The Frostweavers, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's hooded sorceress in her indigo robe
+   and bell sleeves (model_unit_frostweaver.js: assets/unit-art/frostweaver/scripts/rig.py, tools/make_gunman.py) drawn as the
+   Conclave's Frostweavers (FW_UNIT) in place of their code-built body, on the Conclave's rune slate.
+   - Her moves (the clips, 30 fps, every one authored; the download's baked idle is not used): idle (calm and regal, the hands
+     before her waist, palms up), ready (a foe in reach: the casting hand raised, palm to the foe), bolt (her strike: the hand
+     drawn back by her ear, thrust out on the release), and one for each spell, each a wind-up, a big moment and a recovery:
+     Frost Spear (drawn far back over her shoulder, the left hand sighting, hurled), Ice Coffin (both hands thrust out, closed
+     into fists as the ice locks), Shatterbloom (low and gathered, a rising sweep flung wide as it bursts).
+   - Her bolt leaves her right palm on the release frame: the wind-up is played as the next shot comes due (t.cd), so the
+     release lands on the shot, and ccHand gives her palm where it is drawn (unitTip). Frost Spear's spear leaves the same
+     palm on the hurl's release frame (the launch held REL.spear frames for her, only while she is drawn sculpted).
+   - Around her, only brief, faint frost: a few motes drifting from her hands at rest, a small puff on each release.
+   - Every frame is checked on the game's skinning for her sleeves, arms and robe (rig.py: no crossings left). */
+const FW_UNIT = 'cc_rimeweaver';
+UM_UNITS[FW_UNIT] = { mdl: 'frostweaver', k: .92, rig: 'frost' };
+const FW = { CAST: { cc_glacialglyph: 'spear', cc_rimelance: 'coffin', cc_hoarbloom: 'bloom' }, RATE: { idle: 4, ready: 8, move: 45 }, COL: '#dff6ff' };
+const fwRel = (M, name) => { const r = UNIT_MDL[M.S.mdl].marks.rel; return (r && r[name]) || 9; };
+// her casts (which move, when), and Frost Spear's launch held to the hurl's release frame
+if (typeof castAbility === 'function') {
+  const _fwCast = castAbility;
+  castAbility = function (t, ab) {
+    const mine = t && t.def && t.def.unit === FW_UNIT;
+    if (mine) t._fwCasting = ab && ab.id;
+    let r; try { r = _fwCast.apply(this, arguments); } finally { if (mine) t._fwCasting = null; }
+    try { if (r && mine && ab && FW.CAST[ab.id] && typeof G !== 'undefined') { t._fwCastAt = G.time; t._fwCast = FW.CAST[ab.id]; t._fwPuff = 0; } } catch (e) {}
+    return r;
+  };
+}
+function fwDrawn(t) { return NEWMODELS && t && t.tipAt != null && typeof G !== 'undefined' && G.time - t.tipAt < .3 && t._fwOn === t.tipAt; }
+if (typeof ccrSpear === 'function') {
+  const _fwSpear = ccrSpear;
+  ccrSpear = function (t, st, c, m, k, free) {
+    if (t && t._fwCasting === 'cc_glacialglyph' && !free && fwDrawn(t) && G.delayed) {
+      const a = arguments, self = this, M = umModel(FW_UNIT);
+      G.delayed.push({ t: (M ? fwRel(M, 'spear') : 10) / 30, abId: 'cc_glacialglyph', fn: () => { if (G.towers.includes(t) && !t.wrecked) _fwSpear.apply(self, a); } });
+      return;
+    }
+    return _fwSpear.apply(this, arguments);
+  };
+}
+// her strike: when it left (the bolt's release)
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_rime) {
+  const _fwAtk = FORCE_ATTACK.cc_rime;
+  FORCE_ATTACK.cc_rime = function (t) { const r = _fwAtk.apply(this, arguments); try { if (t && t.def && t.def.unit === FW_UNIT) { t._fwShotAt = G.time; t._fwPuffB = 0; } } catch (e) {} return r; };
+}
+// where her spells leave from: her palm as drawn
+if (typeof ccHand === 'function') {
+  const _fwHand = ccHand;
+  ccHand = function (t, h) { if (t && t.def && t.def.unit === FW_UNIT && fwDrawn(t) && typeof unitTip === 'function') { const w = unitTip(t); if (w) return w; } return _fwHand.apply(this, arguments); };
+}
+function fwClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+function fwLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
+// what she does now: { f (the anim's frame), rate (how fast the pose follows), clip, u (the frame in the clip) }
+function fwCtl(t, live, M) {
+  if (!live) return { f: fwClip(M, 'ready', 0), rate: 0 };
+  const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
+  if (t._fwCast && t._fwCastAt != null) { const u = now - t._fwCastAt; if (u >= 0 && u < fwLen(M, t._fwCast)) return { f: fwClip(M, t._fwCast, u * 30), rate: FW.RATE.move, clip: t._fwCast, u: u * 30 }; }
+  const rb = fwRel(M, 'bolt'), s = t._fwShotAt == null ? 9 : now - t._fwShotAt, fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+  if (s >= 0 && s < fwLen(M, 'bolt') - rb / 30) return { f: fwClip(M, 'bolt', rb + s * 30), rate: FW.RATE.move, clip: 'bolt', u: rb + s * 30 };
+  // the wind-up as the next bolt comes due: its release lands on the shot
+  const cd = t.cd || 0;
+  if (fight && cd > 0 && cd <= rb / 30) return { f: fwClip(M, 'bolt', rb - cd * 30), rate: FW.RATE.move, clip: 'bolt', u: rb - cd * 30 };
+  const ph = (now + (t.anim || 0) * 3) * 30;
+  if (fight || s < 1.5) return { f: fwClip(M, 'ready', ph % A.ready[1]), rate: FW.RATE.ready, clip: 'ready' };
+  return { f: fwClip(M, 'idle', ph % A.idle[1]), rate: FW.RATE.idle, clip: 'idle' };
+}
+const _fwT = new Float32Array(SKIN_MAX * 12);
+function fwPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _fwT);
+  const now = G.time, dt = t._fwT == null ? 1 : Math.max(0, Math.min(.1, now - t._fwT)); t._fwT = now; t._fwDt = dt;
+  if (!t._fwO || t._fwO.length !== nb * 12) { t._fwO = new Float32Array(nb * 12); t._fwO.set(_fwT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._fwO, _fwT, k, t._fwO);
+  const o = R.out; o.set(t._fwO); return o;
+}
+// the frost about her hands: brief and faint (owner: spells never too flashy; map, foes and units stay visible)
+function fwMote(p, n, sz, up) {
+  for (let i = 0; i < n; i++) part({ k: 'frost', x: p[0] + R(-.03, .03), z: p[2] + R(-.03, .03), h: p[1] + R(-.02, .02), vh: up ? R(.05, .2) : R(-.12, .02), drag: 2.5, life: .7, max: .7, size: sz * R(.8, 1.2), col: FW.COL });
+}
+function fwFx(t, P, hR, hL, s) {
+  if (typeof part !== 'function' || !t._fwDt) return;
+  const dt = t._fwDt;
+  if (P.clip === 'idle' || P.clip === 'ready') { for (const h of [hR, hL]) if (Math.random() < dt * 1.3) fwMote(h, 1, .035 * s, false); return; }
+  const r = P.clip === 'bolt' ? fwRel(umModel(FW_UNIT), 'bolt') : P.clip ? fwRel(umModel(FW_UNIT), P.clip) : 99;
+  if (P.clip === 'bolt') { if (P.u >= r && !t._fwPuffB) { t._fwPuffB = 1; fwMote(hR, 3, .05 * s, true); } return; }
+  if (P.u >= r && !t._fwPuff) {
+    t._fwPuff = 1;
+    if (P.clip === 'spear') fwMote(hR, 3, .05 * s, true);
+    else if (P.clip === 'coffin') { fwMote(hR, 2, .05 * s, false); fwMote(hL, 2, .05 * s, false); }
+    else if (P.clip === 'bloom') { fwMote(hR, 3, .045 * s, true); fwMote(hL, 3, .045 * s, true); }
+  }
+}
+const _fwA = new Float32Array(16), _fwB = new Float32Array(16), _fwC = new Float32Array(16);
+function fwDraw(t, tier, sx, sy, sz, wob, opts) {
+  const M = umModel(FW_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang, tr = Math.min(5, tier | 0);
+  const uk = typeof unitK === 'function' ? unitK(FW_UNIT, tier) : UNIT_K(FW_UNIT), bk = uk * (typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1);
+  const s = Math.max(.3, full.max[1]) / M.h * M.S.k * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+  // the Conclave's round rune slate under her, as under every scholar, and she stands on it
+  const bm = typeof ccBase === 'function' ? dynMesh('fw_base' + tr, g => { unitGeo(g); withPal(FW_UNIT, () => g.with(T(0, 0, 0, 0, 0, 0, uk), () => ccWith(FW_UNIT, () => g.with(T(0, 0, 0, 0, 0, 0, CC_SZ[tr]), () => ccBase(g, tr))))); }) : null;
+  M4.trs(_fwA, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _fwA, opts);
+  M4.trs(_fwA, x, bm ? .045 * bk * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_fwB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_fwC, _fwA, _fwB);
+  const P = fwCtl(t, live, M), o = fwPose(M, t, P, live);
+  const it = item(M.mesh, _fwC, opts); it.sec = [0, 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _fwC;
+  // her palms, where they are this frame: her bolts and spears leave the right one
+  const mk = UNIT_MDL[M.S.mdl].marks;
+  if (live && mk && mk.HandR) {
+    const pr = umXf(o, mk.gunBone, mk.HandR), pl = umXf(o, mk.handLBone, mk.HandL), hR = M4.xf(_fwC, pr[0], pr[1], pr[2]), hL = M4.xf(_fwC, pl[0], pl[1], pl[2]);
+    t.tipW = hR; t.tipYaw = yaw; t.tipAt = G.time; t._fwOn = G.time;
+    fwFx(t, P, hR, hL, s * M.h);
+  }
+  return true;
+}
+if (typeof drawForceUnitPlain === 'function') {
+  const _fwPlain = drawForceUnitPlain;
+  drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+    if (NEWMODELS && t && t.def && t.def.unit === FW_UNIT && !t.wrecked && fwDraw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(FW_UNIT)); return; }
+    return _fwPlain.apply(this, arguments);
   };
 }
 
