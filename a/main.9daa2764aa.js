@@ -1,4 +1,4 @@
-const BUILD_TAG = '6da9920@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0e114ad@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -52821,12 +52821,13 @@ const AudioSys = (() => {
       } catch (e) {}
     }
   }
-  function morPlay(B, at, len, vol) {
+  function morPlay(B, at, len, vol, lp) {   // (lp: a low-pass's cutoff in Hz, softening a take's bright top at play time)
     const t = now(), d = Math.min(len, B.duration - at); if (d <= .05) return;
     const src = C.createBufferSource(), g = gn(1); src.buffer = B;
     g.gain.setValueAtTime(1, t); g.gain.setValueAtTime(1, t + Math.max(0, d - .12)); g.gain.linearRampToValueAtTime(0, t + d);
-    src.connect(g); out(g, vol / (E.trim || 1), { pan: sp(.25) }, t, t + d);
-    src.onended = () => { src.disconnect(); g.disconnect(); }; src.start(t, at, d + .02); track(src, t + d);
+    let f = null; if (lp) { f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = .5; src.connect(f); f.connect(g); } else src.connect(g);
+    out(g, vol / (E.trim || 1), { pan: sp(.25) }, t, t + d);
+    src.onended = () => { src.disconnect(); g.disconnect(); if (f) f.disconnect(); }; src.start(t, at, d + .02); track(src, t + d);
   }
   S.mortarFire = () => { morLoad(); const B = morBufs.set; if (!B) return S.cannon(0); if (!ok('mortarFire', .12)) return; const L = MORTAR_SFX.launch; morPlay(B, L[0], L[1], .2); };
   S.mortarWhistle = () => { morLoad(); const B = morBufs.set; if (!B || !ok('mortarWhistle', .35)) return; const w = MORTAR_SFX.whistles[Math.floor(Math.random() * MORTAR_SFX.whistles.length)]; morPlay(B, w[0], w[1], .09); };
@@ -52849,16 +52850,18 @@ const AudioSys = (() => {
       } catch (e) {}
     }
   }
-  function firePlay(k, vol, gap, peak) {
+  function firePlay(k, vol, gap, peak, lp) {
     fireLoad(); const B = fireBufs[k], F = typeof FIRE_SFX !== 'undefined' && FIRE_SFX[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
     let at = F.at, len = F.len;
     if (peak != null) { const skip = Math.max(0, F.pk - peak); at += skip; len -= skip; }   // (started late enough that its peak lands on time)
-    morPlay(B, at, len, vol); return true;
+    morPlay(B, at, len, vol, lp); return true;
   }
   S.hamSwing = (peak) => firePlay(Math.random() < .5 ? 'hamSwing' : 'hamSwing2', .13, .25, peak);
   S.hamBurst = (big) => firePlay('hamBurst', big ? .16 : .11, .2);
   S.incFire = () => firePlay('incFire', .12, .3);
-  S.incLand = () => { firePlay('incLand', .15, .3); firePlay(Math.random() < .5 ? 'incImpact' : 'incImpact2', .12, .3); };
+  // (softer: "a bit too much and harsh on the ears", owner: the whoosh quieter with its bright top filtered off, the impact a
+  // low thump under the owner's explosion)
+  S.incLand = () => { firePlay('incLand', .08, .3, null, 1500); firePlay(Math.random() < .5 ? 'incImpact' : 'incImpact2', .05, .3, null, 700); };
   // the Pyroclasts (the owner's "fireball and flame whooshes" pack): the strike is loosed, whooshes in flight (its peak as it
   // comes down) and bursts; each spell its own takes
   S.pyroCast = (fly) => { firePlay('pyroCast', .07, .3); if (fly != null) firePlay('pyroFly', .06, .5, fly); };
@@ -77575,7 +77578,7 @@ if (typeof SFX_V2_DEF !== 'undefined') SFX_V2_DEF.push(() => {
 // the Thunderguns' shot: the lab's Muzzle Blast (owner: "each shot should have a spark blast and smoke from the barrel"): a
 // short jet of fire and sparks out of the muzzle along the shot, then a curl of smoke drifting off; a Thunderpeal's bigger
 // (the lab's Thunderpeal Blast). Brief, and drawn out from the muzzle, not round the gunner.
-const MZB = { list: [], FPS: 30, LEN: 2.0, BIG: 2.5 };
+const MZB = { list: [], FPS: 30, LEN: 1.1, BIG: 2.5, A: .55 };   // (owner: the big plume only on a full-gauge shot, not much on the others)
 function mzBlast(t, tg, big) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX.muzzle || MZB.list.length > 24 || typeof ihMuzzle !== 'function') return;
   const m = ihMuzzle(t), a = t.ang || 0, dx = tg ? tg.x - t.x : Math.sin(a), dz = tg ? tg.y - t.y : Math.cos(a), L = Math.hypot(dx, dz) || 1;
@@ -77594,10 +77597,9 @@ if (typeof renderView === 'function') {
   renderView = function () {
     try {
       if (typeof G !== 'undefined' && G && G.towers) {
-        for (const t of G.towers) if (t.def && t.def.unit === 'thundergun' && t.ihCrankAt != null && t._mzCrank !== t.ihCrankAt) { t._mzCrank = t.ihCrankAt; mzBlast(t, null, false); }   // (the Gatling Crank's quick rounds)
         const now = G.time;
         MZB.list = MZB.list.filter(e => now >= e.at - .01 && (now - e.at) * MZB.FPS < (LAB_FX[e.big ? 'muzzle_big' : 'muzzle'] || { n: 0 }).n);
-        for (const e of MZB.list) labQueue(e.big ? 'muzzle_big' : 'muzzle', e.P, e.d, e.big ? MZB.BIG : MZB.LEN, { fr: (now - e.at) * MZB.FPS, k: 1, a: 1, pull: .25 });
+        for (const e of MZB.list) labQueue(e.big ? 'muzzle_big' : 'muzzle', e.P, e.d, e.big ? MZB.BIG : MZB.LEN, { fr: (now - e.at) * MZB.FPS, k: e.big ? 1 : .8, a: e.big ? 1 : MZB.A, pull: .25 });
       }
     } catch (e) {}
     return _mzView.apply(this, arguments);
@@ -78140,6 +78142,81 @@ if (typeof drawForceUnitPlain === 'function') {
       return;
     }
     return _gmPlain.apply(this, arguments);
+  };
+}
+
+/* The Blade Dancer, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's antlered elf in leaf armour with a
+   leaf dagger in each fist (model_unit_bladedancer.js: assets/unit-art/bladedancer/scripts/rig.py, tools/make_gunman.py)
+   drawn as the Grove's Blade Dancers (BD_UNIT) in place of their code-built body.
+   - Her moves (30 fps, all turning in place on her post): idle (poised, her weight shifting, the blades low and out, a blade
+     twirled), ready (a light guard, a foe in reach), three attacks taken in turn so no two in a row are the same (a full spin
+     with both blades out, a cross-slash, a spinning backhand the other way), and a signature move for each ability:
+     Whirlwind the three-spin flurry, Leaf Dance the double spin rising into a leap and a downward cross, Harvest the cross.
+   - Every move is eased into from where she was (a per-unit pose followed at a rate by kind). */
+const BD_UNIT = 'bladedancer';
+UM_UNITS[BD_UNIT] = { mdl: 'bladedancer', k: .95, rig: 'blade', sink: .5 };
+const BD = { ATK: ['spin', 'cross', 'backhand'], CAST: { whirlwind: 'flurry', leafdance: 'leap', harvest: 'cross' }, RATE: { idle: 5, ready: 9, move: 40 } };
+// her attacks (the whirl: each a strike of its own, taken in turn) and her casts
+if (typeof bladeWhirl === 'function') {
+  const _bdW = bladeWhirl;
+  bladeWhirl = function (t, st, pow, sub) {
+    const r = _bdW.apply(this, arguments);
+    try { if (sub == null && t && t.def && t.def.unit === BD_UNIT && typeof G !== 'undefined' && (t._bdAtkAt == null || G.time - t._bdAtkAt > .3)) { t._bdAtkAt = G.time; t._bdAtkN = ((t._bdAtkN | 0) + 1) % BD.ATK.length; } } catch (e) {}
+    return r;
+  };
+}
+if (typeof castAbility === 'function') {
+  const _bdCast = castAbility;
+  castAbility = function (t, ab) {
+    const r = _bdCast.apply(this, arguments);
+    try { if (r && t && t.def && t.def.unit === BD_UNIT && ab && BD.CAST[ab.id] && typeof G !== 'undefined') { t._bdCastAt = G.time; t._bdCast = BD.CAST[ab.id]; } } catch (e) {}
+    return r;
+  };
+}
+function bdClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+function bdLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
+function bdCtl(t, live, M) {
+  if (!live) return { f: bdClip(M, 'ready', 0), rate: 0 };
+  const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
+  if (t._bdCast && t._bdCastAt != null) { const u = now - t._bdCastAt; if (u >= 0 && u < bdLen(M, t._bdCast)) return { f: bdClip(M, t._bdCast, u * 30), rate: BD.RATE.move }; }
+  if (t._bdAtkAt != null) { const mv = BD.ATK[t._bdAtkN | 0], u = now - t._bdAtkAt; if (u >= 0 && u < bdLen(M, mv)) return { f: bdClip(M, mv, u * 30), rate: BD.RATE.move }; }
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead, ph = (now + (t.anim || 0) * 3) * 30;
+  if (fight || (t._bdAtkAt != null && now - t._bdAtkAt < 1.5)) return { f: bdClip(M, 'ready', ph % A.ready[1]), rate: BD.RATE.ready };
+  return { f: bdClip(M, 'idle', ph % A.idle[1]), rate: BD.RATE.idle };
+}
+const _bdT = new Float32Array(SKIN_MAX * 12);
+function bdPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _bdT);
+  const now = G.time, dt = t._bdT == null ? 1 : Math.max(0, Math.min(.1, now - t._bdT)); t._bdT = now;
+  if (!t._bdO || t._bdO.length !== nb * 12) { t._bdO = new Float32Array(nb * 12); t._bdO.set(_bdT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._bdO, _bdT, k, t._bdO);
+  const o = R.out; o.set(t._bdO); return o;
+}
+const _bdA = new Float32Array(16), _bdB = new Float32Array(16), _bdC = new Float32Array(16);
+// in umDraw's place for her (the Grove's units are drawn by drawForceUnit -> umDraw): her root base at the post, her body on it
+function bdDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+  const M = umModel(BD_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const base = L && L.base && L.base.count ? L.base : null;
+  if (base) { M4.trs(_bdA, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _bdA, opts); }
+  const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / M.h * M.S.k * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - M.S.sink) : 0;
+  M4.trs(_bdA, x, lift * sy, z, ang + wob, 0, 0, sx, sy, sz); M4.trs(_bdB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_bdC, _bdA, _bdB);
+  const P = bdCtl(t, live, M), o = bdPose(M, t, P, live);
+  const it = item(M.mesh, _bdC, opts); it.sec = [0, M.S.trim || 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _bdC;
+  if (live) { const mk = UNIT_MDL[M.S.mdl].marks, p = mk && mk.BladeRTip ? umXf(o, mk.gunBone, mk.BladeRTip) : [0, .5, .2]; t.tipW = M4.xf(_bdC, p[0], p[1], p[2]); t.tipYaw = ang; t.tipAt = G.time; }
+  return true;
+}
+if (typeof umDraw === 'function') {
+  const _bdUm = umDraw;
+  umDraw = function (t, u) {
+    if (u === BD_UNIT && NEWMODELS && t && !t.wrecked) return bdDraw.apply(this, arguments);
+    return _bdUm.apply(this, arguments);
   };
 }
 
@@ -78756,7 +78833,7 @@ if (typeof pauseMenu === 'function') {
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const REC_S = 6;
-  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey' };
+  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', bladedancer: 'Blade Dancers', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey' };
 
   /* ---- what can be shown ---- */
   function sculpted() { return typeof UM_UNITS === 'undefined' ? [] : Object.keys(UM_UNITS).filter(u => !UM_UNITS[u].part && UNIT_MDL && UNIT_MDL[UM_UNITS[u].mdl]); }   // (part: a piece of another, as Varic's sword)
