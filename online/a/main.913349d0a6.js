@@ -1,4 +1,4 @@
-const BUILD_TAG = 'c73e3dd@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7037af5@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -203,7 +203,7 @@ const CREEPS = {
   overlord: { name: 'Dread Overlord',   hp: 15,   spd: .55,  r: .56, armor: 8, mres: .35, boss: true, flat: 300, life: 10, trait: 'Boss' },
   lich:     { name: 'Frost Lich', title: 'the Frozen Crown', abil: ['Death Knell', 'Silences towers around it and raises the fallen as Risen Dead. Holy hits it twice as hard.'],        base: 'wraith', scl: 1.55, hp: 15, spd: .55, r: .55, mres: .5, boss: true, undead: true, immune: ['frost'], weak: { holy: 2 }, silence: [6, 2.2, 2.2], raise: [6, 3, 'risen'], flat: 180, life: 6, tint: [.72, 1, 1.55, .2], trait: 'Boss: silences towers, raises the dead' },
   titan:    { name: 'Magma Titan', title: 'the Living Forge', abil: ['Molten Hide', 'Heavily armoured and barely touched by Flame. Frost cracks it (×1.6).'],       base: 'colossus', scl: 1.12, hp: 19, spd: .5, r: .58, armor: 20, boss: true, immune: ['fire'], weak: { frost: 1.6 }, flat: 220, life: 6, tint: [1.55, .82, .55, .22], trait: 'Boss: armored, shrugs off Flame' },
-  voidwyrm: { name: 'Void Wyrm', title: 'Hunger Between the Stars', abil: ['Phase', 'Every 7s it slips out of reach for a moment, and blinks ahead when hurt. Flies over the maze.'],         base: 'bonedrake', hp: 10, spd: .8, r: .5, mres: .45, fly: true, boss: true, blink: .25, blinkD: 2.6, phase: [7, 1.2], flat: 240, life: 6, tint: [.95, .55, 1.45, .25], trait: 'Flying boss: phases and blinks' },
+  voidwyrm: { name: 'Void Wyrm', title: 'Hunger Between the Stars', abil: ['Phase', 'Every 7s it slips out of reach for a moment, and blinks ahead when hurt. Flies over the maze.'],         base: 'bonedrake', hp: 8, spd: .8, r: .5, mres: .45, fly: true, boss: true, blink: .25, blinkD: 2.6, phase: [10, 1], flat: 240, life: 6, tint: [.95, .55, 1.45, .25], trait: 'Flying boss: phases and blinks' },
   abyss:    { name: 'Abyssal King', title: 'Lord of the Last Gate', abil: ['Aegis', 'At two-thirds and one-third health it turns aside all harm for a moment, and calls Shades to its side.'],      base: 'overlord', scl: 1.12, hp: 24, spd: .5, r: .58, armor: 10, mres: .35, boss: true, aegis: [.66, .33], raise: [8, 2, 'shade'], flat: 600, life: 20, tint: [.7, 1.35, .7, .22], trait: 'Final boss: shields itself and summons' },
   /* ---- dungeon leaders: every wave is a dungeon on the march, and its leader brings one rule you have to plan towers for
      (see DUNGEONS). lead: the ability (game.js leaderTick, hurt). They borrow bodies (base) until they get their own. ---- */
@@ -375,7 +375,7 @@ const WAVES = [
   'troll*3+wolf*3+magma*3', 'troll*5+mender*1+troll*4+wolf*5+bat*1', 'skirmisher*7+warcaller*1+wolf*4+skirmisher*5+skirmisher*2!swift+wraith*1', 'wraith*4+ironclad*3+warmage*2+acolyte*1', 'spider*9+arachnara*1+spider*8+wolf*4+beetle*1',
   'ironclad*8+warmage*2+ironclad*6+warmage*1+shieldbearer*1+bat*3+stormbat*1', 'shieldbearer*5+ironclad*2+warmage*1', 'bat*4!swift+bat*4!swift', 'wraith*7+mender*2+wraith*6+stormwisp*1+icewolf*1', 'stormbat*2+wraith*2+ossyra*1+necro*1+shaman*1',
   'shieldbearer*2+mender*2+skirmisher*5+ironclad*3+skirmisher*5+shieldbearer*1+golem*1', 'stormwisp*6+stormwisp*6+stormbat*5+bat*4+acolyte*2+torchbearer*1', 'golem*4+beetle*2+shaman*1+burrower*1+warden*1', 'icewolf*5+icewolf*5+torchbearer*3+warcaller*2+wraith*3+gnoll*3+stalker*1', 'troll*6+golem*4+gnoll*4+shieldbearer*2+warmage*2+mender*2+malgrath*1',
-  'warden*2+magma*4+icewolf*4+warmage*1+bat*8!swift', 'burrower*5+beetle*4+mender*2+matriarch*1+beetle*3+burrower*4', 'ghoul*5+shaman*2+wraith*6+rotshaman*1+banshee*1+bloat*1+acolyte*2', 'burrower*6+mender*1+beetle*2', 'stalker*12+stormbat*14+voidwyrm*1',
+  'warden*2+magma*4+icewolf*4+warmage*1+bat*8!swift', 'burrower*5+beetle*4+mender*2+matriarch*1+beetle*3+burrower*4', 'ghoul*5+shaman*2+wraith*6+rotshaman*1+banshee*1+bloat*1+acolyte*2', 'burrower*6+mender*1+beetle*2', 'stalker*10+stormbat*8+voidwyrm*1',
   'ghoul*10!swift+ghoul*10!swift+necro*3+rotshaman*1', 'bloat*5+mender*3+matriarch*1+axe*1', 'magma*6+banshee*2+warmage*2+magma*5+banshee*1+stormbat*9', 'wolf*8+alpha*2+icewolf*10+stalker*6+berserker*1', 'troll*2+axe*2+grakk*1+mender*1+sapper*1',
   'shieldbearer*3+mender*3+skirmisher*7+shaman*1+skirmisher*7', 'stalker*14!swift+warcaller*3+shade*1', 'icewolf*5+torchbearer*1+alpha*2+warcaller*1', 'bat*10+stormbat*4+berserker*2', 'banshee*8+wraith*10+necro*2+lich*1',
   'beetle*4+golem*3+warmage*1', 'necro*6+shaman*2+rotshaman*2+ghoul*16', 'stormwisp*12+shade*10+shaman*2', 'banshee*5+necro*2+wraith*3', 'sapper*6+axe*6+kragmor*1+axe*6+mender*2+colossus*1!siege',
@@ -5253,7 +5253,7 @@ const SIEGE_SAY_F = {
    stretch that protects it), laws (one of those by health), tell (a warning before an existing rule), none (an older rule, announced). ---- */
 const brOld = () => typeof oldRules === 'function' ? oldRules() : (!G || !!G.vs || !G.force);   // (uses core.js oldRules once main has it)
 const BR = {
-  mawR: 3, castHeal: .15, shellCap: .15, bellyBites: 4, gorgeWind: 2.5, gorgeHeal: .05, gorgeBlink: 2.6, mawShut: 1.5, mawSpoiled: 1.5,   // hunger: every cast within mawR heals castHeal and is one bite; bellyBites fill it
+  mawR: 3, castHeal: .08, shellCap: .1, bellyBites: 4, gorgeWind: 2.5, gorgeHeal: .05, gorgeBlink: 2.6, mawShut: 1.5, mawSpoiled: 1.5,   // hunger: every cast within mawR heals castHeal and is one bite; bellyBites fill it
   knFirst: 7, knEvery: 12, knWind: 2.5, knWash: 4, knBurn: 5, knKeep: .6,   // knell
   forgeEvery: 14, forgeWarn: 3, plateArmor: 20, furnaceMres: .7,   // forge
   groundR: 2, groundAt: .45, groundK: .45, groundCrack: 6,   // ground
@@ -5269,8 +5269,8 @@ const BOSS_RULES = {
     ways: ['Ground units under her road, where the pile lands', 'Burst saved for the fall'] },
   malgrath: { kind: 'tell', name: 'Dread Command', text: 'Every 10 seconds his army hardens against whichever unit type hurt it most. A ring in that colour warns you 3 seconds ahead.',
     ways: ['Share the damage across many unit types', 'Keep a second type ready to carry the 10 seconds'] },
-  voidwyrm: { kind: 'hunger', name: 'The Hollow Maw', text: `Every spell your units cast within 3 cells of it (whatever it aims at) feeds it: a spell that strikes it is swallowed whole, each cast heals it ${Math.round(BR.castHeal * 100)}% of its health (whole, it banks that as a violet shell that soaks your damage), and 4 casts fill its belly. Full, it opens its maw for 2.5 seconds, then heals 5% more and leaps ahead. Basic attacks never feed it. The violet ring shows its reach.`,
-    ways: ['Autocast off on the units it passes; let basic attacks kill it', 'Build your casters more than 3 cells from its road and let them spend there', 'A stun as the maw opens empties the belly'] },
+  voidwyrm: { kind: 'none', name: 'Phase', text: 'Every 10 seconds it slips out of reach for a moment, and it blinks ahead when hurt. It flies over the maze.',
+    ways: ['Units that hit flyers, along its straight line down the middle', 'Save your burst for when it comes back into reach'] },
   lich: { kind: 'knell', name: 'The Winter Toll', text: 'Every 12 seconds, after a 2.5-second wind-up, it washes every debuff off itself and its escort, and burns 40% of the mana of units within 5 cells.',
     ways: ['Leave Rotate on and spend before the toll; do not hoard', 'Direct hits rather than long burns', 'Build casters over 5 cells back', 'A stun in the wind-up breaks the toll'] },
   kragmor: { kind: 'ground', name: 'Unbroken Ground', text: 'The amber circle on his road is marked before the wave. Standing in it he takes 55% less damage.',
