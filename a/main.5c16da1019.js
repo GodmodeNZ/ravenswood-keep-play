@@ -1,4 +1,4 @@
-const BUILD_TAG = '853782e@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'af889d6@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -2113,13 +2113,13 @@ function towerAlive(t) { return !t.wrecked && G.towers.includes(t); }
 const SIEGE_WALL = 2.5;
 const _sf = { key: null, dist: null, next: null };
 function siegeField() {
-  const blk = G.blk; let h = 7; for (let k = 0; k < N; k++) h = (Math.imul(h, 31) + blk[k] + 1) | 0;
+  const blk = G.blk, shb = typeof SHRN_BLK !== 'undefined' && SHRN_BLK instanceof Uint8Array ? SHRN_BLK : null; let h = 7 + (shb ? (G.shrnV | 0) * 7919 : 0); for (let k = 0; k < N; k++) h = (Math.imul(h, 31) + blk[k] + 1) | 0;   // (shb: shrines, forces_zzzzzzzzzzzzzz_shrines.js: solid and unbreakable, so siege troops step around them)
   if (_sf.key === h && _sf.dist) return _sf;
   const dist = new Float64Array(N).fill(Infinity), done = new Uint8Array(N), next = new Int16Array(N).fill(-1);
   // a move from cell p into cell q costs its length, plus SIEGE_WALL if q holds a standing structure; diagonals only over open ground
   const cost = (i, j, d) => {
     const ni = i + d[0], nj = j + d[1]; if (!inGrid(ni, nj)) return Infinity;
-    const q = idx(ni, nj);
+    const q = idx(ni, nj); if (shb && shb[q]) return Infinity;
     if (d[0] && d[1] && (blk[idx(i, j)] || blk[q] || blk[idx(ni, j)] || blk[idx(i, nj)])) return Infinity;
     return d[2] + (blk[q] ? SIEGE_WALL : 0);
   };
@@ -6064,9 +6064,14 @@ function tomeTeaches(type, cap) {
   }
   return 0;
 }
+// retired items an older save may hold, and what each becomes: the same rarity, level and hones, for the same units (owner,
+// 9 Nov 2026: "removes shields as an item type that can drop": the two shield-boss rares, melee damage relics, become the
+// force's own melee damage rare that fits the same units)
+const GEAR_MOVED = { ih_shieldboss: 'ih_holdfast', so_bossshield: 'so_oathring' };
 // an item from an older save: random stats and abilities are gone, the relic keeps its identity
 function migrateGear(it) {
   if (!it || typeof it !== 'object') return null;
+  if (it.base && GEAR_MOVED[it.base] && GEAR_BASES[GEAR_MOVED[it.base]]) it.base = GEAR_MOVED[it.base];
   if (it.shop) { if (!SHOP[it.shop]) return null; it.rar = shopRar(SHOP[it.shop]); it.cdEnd = 0; it.lv = Math.min(SHOP[it.shop].levels || 1, it.lv | 0 || 1); return it; }
   if (it.cat && !it.base) it.base = 'cat_' + it.cat[0];
   // the Shadow Obelisk became the Glaive Thrower: its legendary, tomes and the Blight catalyst carry over
@@ -7145,18 +7150,18 @@ function vetLockText(t) {
   const n = (t.tier | 0) + 1, need = vetNeed(n), p = vetPts(t);
   return `Tier ${ROMAN[n]} opens at ${need} veterancy (kills + assists): ${p} so far, ${need - p} to go`;
 }
-// the unit card: its veterancy, and the bar to the next tier it opens
+// the next tier this unit's veterancy works toward (tier index), or null when it can climb no higher (tier VI, or VI already open)
+function vetNext(t) { const last = t.def.tiers.length - 1; for (let n = Math.max(3, (t.tier | 0) + 1); n <= last; n++) if (vetPts(t) < vetNeed(n)) return n; return null; }
+// the bar's fill toward the tier it is locked at (the Upgrade button's foot): veterancy / what that tier asks, as the label reads
+function vetFrac(t) { const n = (t.tier | 0) + 1; return n >= 3 && n < t.def.tiers.length ? clamp(vetPts(t) / vetNeed(n), 0, 1) : 1; }
+// the info pane: a row like the Mana bar, "Veterancy [bar] 64 / 70 · tier IV" (full and "max" once every tier is open)
 function vetInfoHTML(t) {
   if (!vetOn() || !t || t.def.wall) return '';
-  const p = vetPts(t), last = t.def.tiers.length - 1, n = Math.max(3, (t.tier | 0) + 1);
+  const p = vetPts(t), n = vetNext(t), need = n != null ? vetNeed(n) : 0, f = n != null ? clamp(p / need, 0, 1) : 1;
   const ka = `${t.kills | 0} kill${(t.kills | 0) === 1 ? '' : 's'} + ${t.ast | 0} assist${(t.ast | 0) === 1 ? '' : 's'}`;
-  const tip = `Veterancy: ${VET_AST === 1 ? 'its kills plus its assists' : `1 for every kill, ${VET_AST} for every assist`} (an assist: a foe that dies slowed, rooted, frozen, burning, cursed or branded by it, or one a unit under its aura or haste kills). Tiers IV, V and VI open at ${VET_NEED.join(', ')}; each still costs its gold.${G.playtest && G.playtest.wave ? ` A playtest army starts seasoned (+${vetSeason(G.playtest.wave)}).` : ''}`;
-  let nx;
-  if (n > last) nx = 'every tier open';
-  else if (p >= vetNeed(n)) nx = `<b class="vetok">tier ${ROMAN[n]} open</b>`;
-  else nx = `tier ${ROMAN[n]} at <b>${vetNeed(n)}</b>`;
-  const lo = n > last || n <= 3 ? 0 : vetNeed(n - 1), hi = vetNeed(Math.min(n, last)), f = n > last ? 1 : clamp((p - lo) / Math.max(1, hi - lo), 0, 1);
-  return `<p class="mut vet" data-d="3" title="${tip}">Veterancy <b>${p}</b> <span data-d="2">(${ka})</span> · ${nx}<span class="agebar vetbar"><i style="width:${Math.round(f * 100)}%"></i></span></p>`;   // (data-d 3: kept as long as the upgrade line is)
+  const tip = `Veterancy ${p} (${ka}): ${VET_AST === 1 ? 'its kills plus its assists' : `1 for every kill, ${VET_AST} for every assist`} (an assist: a foe that dies slowed, rooted, frozen, burning, cursed or branded by it, or one a unit under its aura or haste kills). Tiers IV, V and VI open at ${VET_NEED.join(', ')}; each still costs its gold.${G.playtest && G.playtest.wave ? ` A playtest army starts seasoned (+${vetSeason(G.playtest.wave)}).` : ''}`;
+  const now = n != null ? `${p} / ${need}` : 'max', what = n != null ? ` · tier ${ROMAN[n]}` : (t.tier | 0) < t.def.tiers.length - 1 ? ' · every tier open' : '';
+  return `<p class="mut vet-row" title="${tip}">Veterancy <span class="mn-bar vt-bar"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span> <b class="vt-now">${now}</b>${what}<span class="mn-rw"> · ${ka}</span></p>`;
 }
 
 /* ================= FORCES: who answered the keep's call =================
@@ -10996,7 +11001,7 @@ for (const id in GV_CHARMS) Object.assign(GV_CHARMS[id], { charm: 1, fx: () => {
    LEGENDARIES (LEGENDS): a signature one for each unit (for: its slot), and four for any unit.
    ===================================================================================================== */
 const GV_LEGENDS = {
-  gv_aegis: { for: 'glaive', name: 'Thornheart Aegis', icon: 'shield', hue: '#8a7a3a',
+  gv_aegis: { for: 'glaive', name: 'Thornheart Mantle', art: 'gv_thornmantle', icon: 'snare', hue: '#8a7a3a',   // (was the Thornheart Aegis, a shield: owner, 9 Nov 2026, no shields drop; same rule, a mantle of living thorn)
     twist: 'The Spears stop being a damage post and become a living snare: every walker that brushes past is pinned for the line behind.',
     text: k => `Every walker that comes within 1 cell of it is pinned, once: rooted for ${nf1(1.2 * k)}s.`,
     combo: 'the Snaring Vine, Rootbreaker and a long lane of Spears.',
@@ -11280,7 +11285,7 @@ function groveTick(t, st, dt) {
       onToastSoft('The hunt is called!');
     } else T.hu = .5;
   }
-  if (p.aegis && (T.ag = (T.ag || 0) - dt) <= 0) {   // Thornheart Aegis: pinned once each
+  if (p.aegis && (T.ag = (T.ag || 0) - dt) <= 0) {   // the Thornheart Mantle: pinned once each
     T.ag = .1;
     for (const c of gvNear(t.x, t.y, 1.05, gvHoldable)) {
       const s = c.agBy || (c.agBy = new Set()); if (s.has(t.id)) continue; s.add(t.id);
@@ -16842,7 +16847,8 @@ const IH_RELICS = {
     text: k => `Every 15s while foes are near, the ancestors answer: every walker within 2 cells is thrown back ${nf1(.5 * k)} cells and slowed 30% for 2s.`,
     fx: (st, k) => ihPw(st, 'ihOath', .5 * k) },
   // ---- made for one unit ----
-  ih_shieldboss: { rar: 2, for: ['glaive'], name: 'Spiked Shield-Boss', icon: 'shield', hue: '#a05a3a', theme: 'shove', proc: 1,
+  ih_shieldboss: { rar: 2, retired: 1, for: ['glaive'], name: 'Spiked Shield-Boss',   // (retired, owner 9 Nov 2026: no shields drop; old saves: loot.js GEAR_MOVED)
+    icon: 'shield', hue: '#a05a3a', theme: 'shove', proc: 1,
     text: k => `Its shield shoves also strike for ${P_(1.5 * k)} of its damage and strip 2 armour.`,
     fx: (st, k) => ihPw(st, 'ihShieldBoss', k) },
   ih_riflesight: { rar: 2, for: ['arrow'], name: 'Brass Rifle-Sight', icon: 'spyglass', hue: '#c8a050', theme: 'gun',
@@ -16889,7 +16895,8 @@ const ihGrandN = k => Math.max(2, Math.round(2 + k));
 const ihKingN = k => k >= 1.5 ? 2 : 1;
 const ihGrudgeN = k => Math.max(3, Math.round(3 * k));
 const IH_LEGENDS = {
-  ih_unmoving: { for: 'glaive', name: 'Shield of the Unmoving Mountain', icon: 'shieldx', hue: '#a06040',
+  ih_unmoving: { for: 'glaive', name: 'Helm of the Unmoving Mountain', art: 'ih_unmovinghelm', icon: 'mountain',   // (was a shield: owner, no shields drop; same rule)
+    hue: '#a06040',
     twist: 'The Ironbreaker becomes a wall that throws back: no walker can stand beside it without being hurled back down the path.',
     text: k => `Nothing walks past it: a walker that comes onto a cell next to it is thrown ${nf1(.45 * k)} cells back down the path (each one once every 3s).`,
     combo: 'Heavy Shoulders, Hold the Pass and a long lane of Ironbreakers.',
@@ -17072,7 +17079,7 @@ function ihItemsPulse(t, st, dt) {
     else T.oa = .5;
   }
   if (p.ihGrudge) for (const c of G.creeps) if (c.ihGrudge && !c.dead && c.shred > 0 && c.shredT > 0 && c.shredT < .5) c.shredT = .5;   // Ancestral Grudge: the bared armour holds
-  if (p.ihUnmoving && (T.um = (T.um || 0) - dt) <= 0) {   // Shield of the Unmoving Mountain
+  if (p.ihUnmoving && (T.um = (T.um || 0) - dt) <= 0) {   // the Helm of the Unmoving Mountain
     T.um = .1;
     for (const c of G.creeps) {
       if (c.dead || c.fly || c.ent || Math.hypot(c.x - t.x, c.y - t.y) > 1.25) continue;
@@ -18308,7 +18315,7 @@ function shSlamFx(t, K, bigK) {
      Order's strikes on it 4% harder. The markers lay it: Silverbolt Crossbows (every bolt), Sunlance Clerics (beams),
      Lightbinder Sisters (lashes), the Censers' incense.
    - VERDICT: a cash-in. A Verdict consumes a foe's Judgement for a column of light: 30% of the striker's damage per
-     stack (magic). The Grail Knights' charges deliver one; the Hammer Templars' slams deliver a lighter one to every foe
+     stack (magic). The Grail Knights' charges deliver one; the Templars of the Ford' slams deliver a lighter one to every foe
      they strike that carries 2 or more stacks; abilities, talents and the Justicar deliver more.
    - RADIANCE (units): a radiant unit strikes 20% faster and every strike lays one more Judgement.
    - WARD (units): a warded unit hits 10% harder and bosses' silences, hexes and blindness slide off it.
@@ -18338,8 +18345,8 @@ FORCES.silver = { name: 'The Silver Order', title: 'Oathbound Host of the River 
     storm: { id: 'sunlance', name: 'Sunlance Clerics', short: 'Clerics', key: '5', proj: 'force', attack: 'so_beam', elem: null, dmgType: 'magic', air: true, ground: true, top: [1.25, 1.3, 1.35],
       blurb: 'Clerics of the dawn who strike with beams of sunlight from their staves: twice as hard on flyers, and they reach further into the sky. Every second beam lays Judgement.',
       tiers: [{ cost: 30, dmg: 8, rate: .85, range: 2.6, airR: .8, vsAir: 2 }, { cost: 55, dmg: 20, rate: .8, range: 2.8, airR: .9, vsAir: 2 }, { cost: 115, dmg: 46, rate: .75, range: 3.1, airR: 1, vsAir: 2 }] },
-    earth: { id: 'templar', name: 'Hammer Templars', short: 'Templars', key: '6', proj: 'force', attack: 'so_slam', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
-      blurb: 'Templars in heavy plate with great warhammers. They slam the ground, striking every walker around them, and a foe carrying Judgement hears a lighter Verdict. Cannot reach flyers.',
+    earth: { id: 'templar', name: 'Templars of the Ford', short: 'Templars', key: '6', proj: 'force', attack: 'so_slam', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
+      blurb: 'Aurelian\'s own Templars, in heavy plate with greatswords and the shield of the Ford: they bring the blade down and slam the ground, striking every walker around them, and a foe carrying Judgement hears a lighter Verdict. Cannot reach flyers.',
       tiers: [{ cost: 40, dmg: 20, rate: 1.5, range: 1.5 }, { cost: 75, dmg: 48, rate: 1.45, range: 1.55 }, { cost: 160, dmg: 115, rate: 1.4, range: 1.65 }] },
     cannon: { id: 'censer', name: 'Censer Bearers', short: 'Censers', key: '7', proj: 'force', attack: 'so_censer', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.15, 1.2, 1.25],
       blurb: 'Monks who swing great censers and lob burning incense: it bursts in holy fire over everything nearby and smoulders on the road, Judging every foe that walks through the smoke. Cannot hit flyers.',
@@ -18411,7 +18418,7 @@ function soVerdictFx(x, z, h, n, src) {
   if (n >= 4) G.shake = Math.max(G.shake, .07);
   sfx('ward', 0);
 }
-// what a Verdict sets off (talents, relics, the Lion's passive): called after the column falls
+// what a Verdict sets off (talents, relics, Aurelian's passive): called after the column falls
 function soAfterVerdict(c, src, n, x, z, st) {
   const C = (st && st.caps) || {};
   if (n >= 3 && (C.so_verdict_rad || (st && st.pw && st.pw.so_radVerdict))) soRadiate(src, 3, SO.RAD_K);   // talents / relics: the striker shines
@@ -18570,7 +18577,7 @@ function soChainFx(x0, h0, z0, c, big) {
   const L = 6; for (let k = 1; k < L; k++) { const u = k / L; part({ k: 'spark', x: x0 + (c.x - x0) * u, z: z0 + (c.y - z0) * u, h: h0 + (hitH(c) - h0) * u + Math.sin(u * Math.PI) * .15, vx: 0, vz: 0, vh: .2, g: 0, life: .25, max: .25, size: .06, col: k % 2 ? SO.COL.gold : SO.COL.light }); }
 }
 // ---- Grail Knights: a charge out to the strongest foe and back; a Judged foe hears its Verdict ----
-FORCE_ATTACK.so_lance = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, { down: t.def.unit === 'grailknight' });
+FORCE_ATTACK.so_lance = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, { down: t.def.unit === 'grailknight' || t.def.unit === 'ch_morrow' });   // (Morrow leads the Knights' charge with his own lance)
 // o: { vk (Verdict strength), stun, far (reach beyond its range), again (a follow-up charge), T }
 function soCharge(t, st, tg, pow, o) {
   const C = st.caps, dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, reach = Math.max(0, L - .45);
@@ -18606,7 +18613,7 @@ function soCharge(t, st, tg, pow, o) {
       fxRing(mx, mz, 1, SO.COL.gold); G.shake = Math.max(G.shake, .05); soEv('cap:so_glory');
     }
   } });
-  if (G.hero === 'so_lion' && !o.quiet) for (const u of soUnitsNear(t.x, t.y, 1.65, t)) { soRadiate(u, 3, SO.RAD_K); soEv('passive:so_lion'); }   // the Lion's passive: Inspiring Charge
+  if (G.hero === 'so_lion' && !o.quiet && t.id === G.champ) for (const u of soUnitsNear(t.x, t.y, 1.65, t)) { soRadiate(u, 3, SO.RAD_K); soEv('passive:so_lion'); }   // Aurelian's passive, Shield Brothers: his own strikes (the Templars of the Ford's slams: forces_zzzzzzzzzz_shieldline.js)
   if (!o.again && (C.so_second_charge || (C.so_recharge && (t.shots + 1) % 3 === 0))) G.delayed.push({ t: .8, fn: () => {   // Ride Again / Unending Crusade
     if (!soAlive(t)) return; const s2 = t.st || st, q = acquire(t, s2, new Set([tg])) || (!tg.dead && inRange(t, s2, tg) ? tg : null);
     if (q) { t.ang = Math.atan2(q.x - t.x, q.y - t.y); soCharge(t, s2, q, .7, { again: true }); soEv(C.so_second_charge ? 'cap:so_second_charge' : 'tal:so_recharge'); }
@@ -18634,7 +18641,7 @@ function soBeamAt(t, st, c, amt, sh, main) {
   G.beams.push({ k: 'arcane', a: [t.x, sh, t.y], b: [c.x, hitH(c), c.y], hit: [c.x, hitH(c), c.y], life: .28, max: .28, crit: true, lv: Math.min(t.tier, 2) });
   if (main) flashLight(c.x, c.y, hitH(c), [1.6, 1.4, .8], 1.8, .15);
 }
-// ---- Hammer Templars: a slam that strikes every walker around; Judged foes (2+ stacks) hear a lighter Verdict ----
+// ---- Templars of the Ford: a slam that strikes every walker around; Judged foes (2+ stacks) hear a lighter Verdict ----
 FORCE_ATTACK.so_slam = (t, st, tg, pow, echo) => soSlam(t, st, pow, 1, {});
 function soSlam(t, st, pow, mult, o) {
   const C = st.caps, R0 = st.range * (o.rK || 1), cut = [];
@@ -19166,12 +19173,13 @@ Object.assign(FORCE_BUILD, {
     mat(g, 'gilt', () => { g.seg([-.11, y0 + .19, .06], [0, y0 - .02, .12], .014, WE.gold); g.seg([.11, y0 + .19, .06], [0, y0 - .02, .12], .014, WE.gold); });   // a gold stole
     g.with(T(0, y0 - .18, .17, 0, -.12), () => soSun(g, 0, 0, 0, .06 + .006 * tier, WE.gold));   // the sun on the robe's front (the card's)
   }),
-  templar: soScaled((g, tier) => {   // a heavy templar in midnight navy and dark plate, a bucket helm, a book on a chain
+  templar: soScaled((g, tier) => {   // a heavy templar of the Ford in midnight navy and dark plate, a greatsword, the shield slung on his back (the owner's sculpted model will replace it)
     soBase(g); const { y0 } = soBody(g, tier, { helm: 'bare', beard: WE.hair, beardL: .05, shout: true, headK: 1.22, wide: true, cape: true, emblemCol: WE.gold, noPauldrons: true });   // (bare-headed and bearded, the cape from tier I: the card's)
     mat(g, 'gilt', () => { for (const sd of [-1, 1]) { const big = sd < 0, pr = big ? .1 + .01 * tier : .088 + .008 * tier;   // (the right one, where the haft rests, keeps its old size and has no flange)
       huPauldron(g, sd, sd * (big ? .15 : .145), y0 + .215, pr, 3, WE.steel, WE.clothL, { trim: WE.gold }); g.with(T(sd * (big ? .155 : .15), y0 + .25, 0, 0, 0, -sd * .3), () => huTube(g, [[0, 0, pr * .8], [0, .014, 0], [0, 0, -pr * .8]], [.009, .014, .009], WE.gold, 4));
       if (big) g.with(T(sd * .2, y0 + .262, -.005, 0, 0, -sd * .2), () => { huTube(g, [[0, 0, .085], [0, .05 + .008 * tier, .02], [0, .055 + .008 * tier, -.03], [0, 0, -.09]], [.006, .01, .01, .006], WE.gold, 4); g.tri([0, 0, .085], [0, .05 + .008 * tier, .02], [0, 0, -.09], WE.steel); g.tri([0, 0, .085], [0, 0, -.09], [0, .05 + .008 * tier, .02], WE.steel); g.tri([0, .05 + .008 * tier, .02], [0, .055 + .008 * tier, -.03], [0, 0, -.09], WE.steel); g.tri([0, .05 + .008 * tier, .02], [0, 0, -.09], [0, .055 + .008 * tier, -.03], WE.steel); }); } });   // great pauldrons of three lames, a gold ridge on each and a gold-edged flange standing up at the outside
     mat(g, 'leather', () => { g.box(-.11, y0 - .08, .06, .05, .07, .02, WE.leatherD); }); mat(g, 'gilt', () => g.seg([-.08, y0 - .03, .07], [-.11, y0 - .05, .07], .006, WE.gold));   // a prayer book on a chain
+    g.with(T(0, y0 + .05, -.15, Math.PI, .12), () => { const h = .4 + .03 * tier, w = .28 + .02 * tier; soHeater(g, w, h, WE.cloth, WE.gold, WE.steelD); soSun(g, 0, h * .1, .04, .07 + .008 * tier, WE.gold, 12); });   // the shield of the Ford, slung on his back
   }),
   censer: soScaled((g, tier) => {   // a hooded, dark-bearded monk in white robes under a royal-blue mantle, a rope belt, incense at his feet
     soBase(g); const { y0 } = soBody(g, tier, { robe: true, helm: 'hood', hoodCol: WE.clothL, beard: WE.hair, beardL: .08, robeTorso: WE.cloth, robeCol: WE.cloth, tabard: WE.clothL, emblemCol: WE.gold, noPauldrons: true, cape: false });   // (no cape: the censer swings far back behind him)
@@ -19354,7 +19362,17 @@ Object.assign(FORCE_PARTS, {
     soPart('arms', [0, .65, .02], (g, tier) => {   // both hands on the haft: the left low, the right above it (the haft slanting up past the right shoulder)
       const [L, U] = SO_HAMMER_GRIP; g.with(T(-.15, 0, 0), () => soArm(g, [L[0] + .15, L[1], L[2]], { w: .034, sd: -1 })); g.with(T(.15, 0, 0), () => soArm(g, [U[0] - .15, U[1], U[2]], { w: .034, sd: 1 }));
     }, soHammerPose(false)),
-    soPart('hammer', [0, .65, .02], (g, tier) => {   // a great two-handed warhammer, its head banded in gold and stamped with the sun, carried slanting over the right shoulder (clear of the face)
+    soPart('hammer', [0, .65, .02], (g, tier) => {   // a two-handed greatsword (the part keeps its old key, 'hammer': the poses and Sword of Heaven's flight read it), a gold cross and pommel, carried slanting over the right shoulder (clear of the face)
+      if (SO_TEMPLAR_SWORD) {
+        const [L] = SO_HAMMER_GRIP, d = SO_HAMMER_DIR, al = Math.hypot(d[2], d[1]), A = [0, -d[2] / al, d[1] / al], Z = [A[1] * d[2] - A[2] * d[1], A[2] * d[0] - A[0] * d[2], A[0] * d[1] - A[1] * d[0]];
+        g.with(new Float32Array([...A, 0, ...d, 0, ...Z, 0, L[0], L[1], L[2], 1]), () => {   // (x across the guard, y along the blade, z its flat)
+          mat(g, 'gilt', () => { g.ico(0, -.12, 0, .032, WE.gold); g.box(0, .2, 0, .24 + .02 * tier, .03, .034, WE.gold); for (const sd of [-1, 1]) g.ico(sd * (.12 + .01 * tier), .2, 0, .02, WE.gold); });
+          mat(g, 'leather', () => g.box(0, .04, 0, .03, .3, .03, WE.leatherD));   // the long grip
+          mat(g, 'leafblade', () => { const Lb = .62 + .04 * tier; g.box(0, .22 + Lb / 2, 0, .075 + .006 * tier, Lb, .018, WE.steelL); g.cyl(0, .22 + Lb, 0, .038, 0, .1, 4, WE.steelL); });
+          if (tier >= 1) { g.em = .4; mat(g, 'gilt', () => g.box(0, .5, .01, .012, .4, .004, WE.gold)); g.em = 0; }   // a gold fuller (II+)
+        });
+        return;
+      }
       const [L] = SO_HAMMER_GRIP, d = SO_HAMMER_DIR, at = u => [L[0] + d[0] * u, L[1] + d[1] * u, L[2] + d[2] * u], H = SO_HAMMER_HEAD;
       mat(g, 'woodgrain', () => huTube(g, [at(-.1), at(SO_HAMMER_U - .04)], [.022, .026], WE.wood, 6));
       mat(g, 'gilt', () => { g.ico(...at(-.11), .032, WE.gold); huTube(g, [at(-.04), at(.2)], .029, WE.leatherD, 6); huTube(g, [at(SO_HAMMER_U - .16), at(SO_HAMMER_U - .06)], [.026, .032], WE.gold, 6); });   // the pommel, the grip, a gold socket under the head
@@ -19440,6 +19458,7 @@ Object.assign(FORCE_PARTS, {
 // front and the front-right, and stands up over and behind the shoulder), the left hand low on it, the right hand above
 // (up, well out to the right and back: the head stands beside and behind the right shoulder, and the haft rises on the
 // right of the helm, so the hammer never crosses the face from the front; the grip is low, at the belt, on the right)
+let SO_TEMPLAR_SWORD = true;   // (the Templars of the Ford carry greatswords now; false draws the old warhammer)
 const SO_HAMMER_DIR = (() => { const l = Math.hypot(.6, .76, -.3); return [.6 / l, .76 / l, -.3 / l]; })(), SO_HAMMER_U = .66;
 const SO_HAMMER_G0 = [.035, -.21, .16];
 const SO_HAMMER_GRIP = [SO_HAMMER_G0, [SO_HAMMER_G0[0] + SO_HAMMER_DIR[0] * .15, SO_HAMMER_G0[1] + SO_HAMMER_DIR[1] * .15, SO_HAMMER_G0[2] + SO_HAMMER_DIR[2] * .15]];
@@ -19552,7 +19571,7 @@ function soDrawMarks() {
    Bell: Toll of Valor (haste and wards), Peal of Mercy (mana, mending, cleanse), Knell of Judgement (Judge and daze).
    Every unit's second and third spells are reshaped in place by forces_zzz_silver_cool.js (the signature spells: Rampart of
    Dawn, Oath of Challenge, Flare Bolt, Bear Witness, Chain of Penance, Vigil Chains, Tourney Passes, Charge of the Vow, Noon
-   Sweep, Hammer Fervour, Hammer of Heaven, Procession of Incense, Kindle the Censers; Dawnfall gains its crash). What is below
+   Sweep, Shield Fervour, Sword of Heaven, Procession of Incense, Kindle the Censers; Dawnfall gains its crash). What is below
    is their first form. */
 const SO_HAIL_COS = Math.SQRT1_2;   // Hail of Silver's arc: 45 degrees either side
 const soAbHit = (t, st, c, mult, type, kb) => soStrike(t, st, c, abD(st) * mult, type || 'phys', kb);
@@ -19786,7 +19805,7 @@ const SO_KITS = {
       } },
   ] },
 
-  /* ---- Hammer Templars: the cash-in on crowds. ---- */
+  /* ---- Templars of the Ford: the cash-in on crowds. ---- */
   templar: { slot: 'earth', mana: { max: 100, regen: .85, hit: 1.2 }, abilities: [
     { id: 'so_crush', name: 'Sanctified Slam', short: 'Slam', glyph: 'hammer', hue: '#e8ecf4', mana: 100, cd: 12, busy: .8, research: null,
       by: { stun: [.5, .55, .6, .65, .7, .8] },
@@ -19797,7 +19816,7 @@ const SO_KITS = {
     { id: 'so_hallow', name: 'Hallowed Ground', short: 'Hallow', glyph: 'rune', hue: '#ffe8a0', mana: 90, cd: 15, research: { cost: 80, time: 20 },
       by: { dur: [5, 5, 6, 6, 7, 7] },
       auto: 'two or more walkers in reach, or a boss',
-      text: (t, st, ab) => `The hammer brands a sigil into the ground for ${byT(ab.by.dur, t)}s: walkers in reach take ${xDt(st, .2)} every half second and gain a Judgement every second.`,
+      text: (t, st, ab) => `The sword brands a sigil into the ground for ${byT(ab.by.dur, t)}s: walkers in reach take ${xDt(st, .2)} every half second and gain a Judgement every second.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(c => c.def.boss || c.def.lead)) ? t : null; },
       cast(t, st, _, ab) { const d = byT(ab.by.dur, t); abZone(t, { k: 'so_hallow', x: t.x, z: t.y, r: st.range, until: G.time + d, tick: .3, every: .5, n: 0 }); soRune(t.x, t.y, st.range, '#ffe8a0', d); sfx('so_hallow'); },
       zone(t, st, z) {
@@ -19808,7 +19827,7 @@ const SO_KITS = {
     { id: 'so_hammerfall', name: 'Hammerfall', short: 'Hurl', glyph: 'bounce', hue: '#c8d0e0', mana: 75, cd: 10, rAdd: 1.5, busy: 1.6, research: { cost: 130, time: 30 },
       by: { stun: [1, 1, 1.1, 1.1, 1.2, 1.3] },
       auto: 'the toughest walker within reach + 1.5 cells (bosses and elites first)',
-      text: (t, st, ab) => `The hammer is hurled at the toughest walker within reach + 1.5: ${xD(st, 4)}, a ${byT(ab.by.stun, t)}s stun (bosses 40%) and a Verdict half again as strong; then it flies back to the hand.`,
+      text: (t, st, ab) => `A sword of light falls on the toughest walker within reach + 1.5: ${xD(st, 4)}, a ${byT(ab.by.stun, t)}s stun (bosses 40%) and a Verdict half again as strong; then it flies back to the hand.`,
       pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
       cast(t, st, c, ab) {
         t.soThrow = { x: c.x, z: c.y }; t.cd = Math.max(t.cd, 1.6); sfx('so_hammerfall', 0);
@@ -19961,25 +19980,25 @@ const SO_TALENTS = {
     GT('Sun Wheel', 'sunburst', 3, 2, 2, n => `Every foe Noon Sweep crosses is slowed ${10 * n}% for 2s.`, {}, { sp: n => ({ ab: 'so_halo', rider: { slow: [.1 * n, 2] } }) }),
   ] },
 
-  /* ---- Hammer Templars (earth): Sanctified Slam (innate), Hammer Fervour (row II), Hammer of Heaven (row III) ---- */
+  /* ---- Templars of the Ford (earth): Sanctified Slam (innate), Shield Fervour (row II), Sword of Heaven (row III) ---- */
   earth: { name: 'Templar\'s Oath', hue: '#8a9ccc', list: [
     GT('Press of Battle', 'whirl', 0, 1, 3, n => `Each slam that strikes 3 or more walkers makes it Radiant for ${n}s.`, {}, { cap: 'sofPress' }),
     GT('Crushing Weight', 'snail', 0, 0, 2, n => `Slammed foes are slowed ${25 + 15 * n}% (not 25%) for 1s.`, {}, { cap: 'so_crush_slow' }),
     GT('Tremor', 'tremor', 0, 3, 2, n => `Sanctified Slam stuns ${gNf(.1 * n)}s longer.`, {}, { sp: n => ({ ab: 'so_crush', by: { stun: .1 * n } }) }),
-    GT('Anvil', 'scales', 4, 1, 1, 'A foe slain by its Verdict rings the anvil: it slams again at once (at most once a second).', {}, { cap: 'so_anvil_ring' }),
-    GT('Zeal', 'flash', 2, 0, 3, n => `Every walker Hammer Fervour strikes is slowed ${10 * n}% for 1.5s and staggered ${gNf(.1 * n)}s.`, {}, { sp: n => ({ ab: 'so_hallow', rider: { slow: [.1 * n, 1.5], stun: .1 * n } }), req: [1, 0] }),
+    GT('Ringing Steel', 'scales', 4, 1, 1, 'A foe slain by its Verdict rings its blade: it slams again at once (at most once a second).', {}, { cap: 'so_anvil_ring' }),
+    GT('Zeal', 'flash', 2, 0, 3, n => `Every walker Shield Fervour strikes is slowed ${10 * n}% for 1.5s and staggered ${gNf(.1 * n)}s.`, {}, { sp: n => ({ ab: 'so_hallow', rider: { slow: [.1 * n, 1.5], stun: .1 * n } }), req: [1, 0] }),
     GS('so_hallow', 1, 0),
-    GT('Hammer of Judgement', 'hammer', 3, 3, 2, n => `Slam Verdicts strike ${20 * n}% harder, and Hammer of Heaven stuns ${gNf(.15 * n)}s longer and its shock reaches ${gNf(.2 * n)} cells wider.`, {}, { cap: 'so_hammer_judge', sp: n => ({ ab: 'so_hammerfall', by: { stun: .15 * n, wave: .2 * n } }), req: [2, 3] }),
+    GT('Blade of Judgement', 'hammer', 3, 3, 2, n => `Slam Verdicts strike ${20 * n}% harder, and Sword of Heaven stuns ${gNf(.15 * n)}s longer and its shock reaches ${gNf(.2 * n)} cells wider.`, {}, { cap: 'so_hammer_judge', sp: n => ({ ab: 'so_hammerfall', by: { stun: .15 * n, wave: .2 * n } }), req: [2, 3] }),
     GT('Shockwave', 'ripple', 4, 3, 1, 'Each slam rolls a shockwave a cell past its reach: foes there take 50% and gain a Judgement, so the next slam judges them.', {}, { cap: 'so_shockwave' }),
     GT('Final Judgement', 'scales', 4, 0, 1, 'A foe slain by a Verdict bursts in light: every walker within a cell gains 3 Judgement.', {}, { cap: 'so_final' }),
     GS('so_hammerfall', 2, 3),
     GT('Sundering Blow', 'hammer', 3, 0, 1, 'The slam lays a Judgement before it judges.', {}, { cap: 'so_sunder' }),
-    GT('Marked by the Hammer', 'glaive2', 3, 2, 1, 'Hammer of Heaven marks its foe for 4s: it takes 10% more from every unit.', {}, { sp: { ab: 'so_hammerfall', rider: { mark: [.1, 4] } } }),
-    GT('Hurled Verdict', 'hammer', 3, 1, 1, "Hammer of Heaven's foe gains 2 Judgement as the hammer strikes.", {}, { sp: { ab: 'so_hammerfall', rider: { judge: 2 } } }),
+    GT('Marked by the Blade', 'glaive2', 3, 2, 1, 'Sword of Heaven marks its foe for 4s: it takes 10% more from every unit.', {}, { sp: { ab: 'so_hammerfall', rider: { mark: [.1, 4] } } }),
+    GT('Hurled Verdict', 'hammer', 3, 1, 1, "Sword of Heaven's foe gains 2 Judgement as the sword strikes.", {}, { sp: { ab: 'so_hammerfall', rider: { judge: 2 } } }),
     GT('Sundered Plate', 'hammer', 0, 2, 2, n => `Each Verdict it delivers strips ${n} armour from its foe, up to ${2 * n}.`, {}, { cap: 'sofPlate' }),
     GT('Reliquary', 'gem', 1, 3, 2, n => `Each Judged foe that dies within its reach (a Verdict's kill too) leaves a relic: ${2 * n} mana.`, {}, { cap: 'sofRelic' }),
-    GT('Censed Hammer', 'quick', 1, 1, 3, n => `Before each slam, every walker in its reach standing in the Order's incense gains ${n} Judgement.`, {}, { cap: 'sofCensed' }),
-    GT('Consecrated Earth', 'sun', 2, 2, 1, 'Each Hammer Fervour hallows the ground round it for 4s: walkers on it are slowed 20% and Judged every second.', {}, { cap: 'sofHallow', sp: { ab: 'so_hallow', rider: { fresh: 1 } } }),
+    GT('Censed Blade', 'quick', 1, 1, 3, n => `Before each slam, every walker in its reach standing in the Order's incense gains ${n} Judgement.`, {}, { cap: 'sofCensed' }),
+    GT('Consecrated Earth', 'sun', 2, 2, 1, 'Each Shield Fervour hallows the ground round it for 4s: walkers on it are slowed 20% and Judged every second.', {}, { cap: 'sofHallow', sp: { ab: 'so_hallow', rider: { fresh: 1 } } }),
   ] },
 
   /* ---- Censer Bearers (cannon): Thurible Sweep (innate), Procession of Incense (row II), Kindle the Censers (row IV) ---- */
@@ -20015,12 +20034,12 @@ const SO_TAL_FLAVOR = {
   frost: ['Bind them in chains of light and blind them with dawn.', 'Be still. The light has you now.'],
   arcane: ['Couch the lance and ride for the Grail.', 'For the Grail, and for those who cannot ride.'],
   storm: ['Call down the sun and burn the sky clean.', 'Nothing flies higher than the morning.'],
-  earth: ['Bring the hammer down where Judgement has been laid.', 'The verdict is read. The hammer falls.'],
+  earth: ['Bring the blade down where Judgement has been laid.', 'The verdict is read. The sword falls.'],
   cannon: ['Swing the censer and sanctify the road with smoke.', 'Breathe deep. The prayer goes with you.'],
 };
 const SO_TAL_EMBLEM = {};
 for (const [k, nm] of Object.entries({ glaive: 'Wall of Shields', arrow: 'Witnessed', frost: 'Blinding Chains', arcane: 'Echoing Verdict',
-  storm: 'Lance of Heaven', earth: 'Hammer of Judgement', cannon: 'Censing of the Faithful' })) SO_TAL_EMBLEM[k] = SO_TALENTS[k].list.findIndex(t => t.name === nm);
+  storm: 'Lance of Heaven', earth: 'Blade of Judgement', cannon: 'Censing of the Faithful' })) SO_TAL_EMBLEM[k] = SO_TALENTS[k].list.findIndex(t => t.name === nm);
 FORCES.silver.talents = SO_TALENTS; FORCES.silver.talFlavor = SO_TAL_FLAVOR; FORCES.silver.talEmblem = SO_TAL_EMBLEM;
 
 /* ================= THE SILVER ORDER: its own relics, legendaries, charms and shop =================
@@ -20067,7 +20086,8 @@ const SO_RELICS = {
   so_standard: { rar: 3, name: 'Standard of the Ford', icon: 'banner', hue: '#5a7ad0', theme: 'radiance',
     text: k => `Every 15s while foes are near the standard is raised: it and every unit within 2.5 cells are Radiant for ${nf1(4 * k)}s.`, fx: (st, k) => soPw(st, 'so_standard', 4 * k) },
   // ---- made for one unit ----
-  so_bossshield: { rar: 2, for: ['glaive'], name: 'Bossed Great Shield', icon: 'shield', hue: '#6a8ad0', theme: 'bash',
+  so_bossshield: { rar: 2, retired: 1, for: ['glaive'], name: 'Bossed Great Shield',   // (retired, owner 9 Nov 2026: no shields drop; old saves: loot.js GEAR_MOVED)
+    icon: 'shield', hue: '#6a8ad0', theme: 'bash',
     text: k => `Its bashes drive foes ${nf1(.2 * k)} cells farther and stun them 0.3s.`, fx: (st, k) => soPw(st, 'so_bossshield', .2 * k) },
   so_goatsfoot: { rar: 2, for: ['arrow'], name: 'Goat\'s-Foot Lever', icon: 'quick', hue: '#8ab0b8', theme: 'bolt',
     text: k => `Every ${ordN(soEvery(k, 4))} bolt is loosed twice.`, fx: (st, k) => soPwMin(st, 'so_goatsfoot', soEvery(k, 4)) },
@@ -20100,21 +20120,22 @@ for (const id in SO_CHARMS) Object.assign(SO_CHARMS[id], { charm: 1, fx: () => {
 
 /* ---------- legendaries: a signature for each unit, and four for any ---------- */
 const SO_LEGENDS = {
-  so_lionshield: { for: 'glaive', name: 'Aegis of the Lion', icon: 'shield', hue: '#d8b048', atk: 1,
+  so_lionshield: { for: 'glaive', name: 'Mantle of the Lion', art: 'so_lionmantle', icon: 'sun',   // (was the Aegis of the Lion, a shield: owner, no shields drop; same rule, a lion-pelt mantle; its shield painting is not shown)
+    hue: '#d8b048', atk: 1,
     twist: 'Bulwark Bash Condemns: the Shieldbearer becomes the Order\'s well of Judgement, not just its wall.',
     text: k => `Every foe it bashes is Condemned for ${nf1(4 * k)}s, as by Bear Witness: its Judgement can't fade, and it gains another every second.`,
-    build: 'Staggering Bash, Unyielding and Witness the Blow; Grail Knights or Hammer Templars beside it to deliver the Verdicts.',
+    build: 'Staggering Bash, Unyielding and Witness the Blow; Grail Knights or Templars of the Ford beside it to deliver the Verdicts.',
     combo: 'Unyielding, Grail Knights and a boss wave.', fx: (st, k) => soPw(st, 'so_lionshield', 4 * k) },
   so_sunbolt: { for: 'arrow', name: 'The Sunbolt Arbalest', icon: 'arrowhead', hue: '#ffe080', atk: 1,
     twist: 'Consecrated Bolts lay double Judgement, and a bolt on a full foe bursts Judgement over the crowd.',
     text: () => 'Its bolts lay two Judgement, and a bolt on a foe at full Judgement bursts: every foe within a cell gains 2.',
-    build: 'Deep Mark, Witnessed and Flare Bolt, with Hammer Templars or Censer Bearers to cash the crowd in.',
-    combo: 'Deep Mark, Witnessed and the Hammer Templars.', fx: st => soPw(st, 'so_sunbolt', 1) },
+    build: 'Deep Mark, Witnessed and Flare Bolt, with Templars of the Ford or Censer Bearers to cash the crowd in.',
+    combo: 'Deep Mark, Witnessed and the Templars of the Ford.', fx: st => soPw(st, 'so_sunbolt', 1) },
   so_firstchain: { for: 'frost', name: 'The First Chain', icon: 'chains', hue: '#fff0c0', atk: 1,
     twist: 'Binding Light fills a bound foe with Judgement: every bind is a Verdict waiting to fall.',
     text: k => `Every foe its chains strike stays slowed 50% for ${nf1(2 * k)}s, and a foe it binds is filled with Judgement.`,
-    build: 'Quick Binding, Twin Chains and Chain of Judgement, beside Grail Knights or Hammer of Heaven.',
-    combo: 'Quick Binding, Grail Knights and Hammer of Heaven.', fx: (st, k) => soPw(st, 'so_firstchain', 2 * k) },
+    build: 'Quick Binding, Twin Chains and Chain of Judgement, beside Grail Knights or Sword of Heaven.',
+    combo: 'Quick Binding, Grail Knights and Sword of Heaven.', fx: (st, k) => soPw(st, 'so_firstchain', 2 * k) },
   so_truegrail: { for: 'arcane', name: 'The True Grail', icon: 'flask', hue: '#ffd060',
     twist: 'Grail Charge stops spending Judgement: every charge is a full Verdict, and so is the next one.',
     text: () => 'Its Verdicts are never spent: the light strikes, and the Judgement stays on the foe.',
@@ -20128,8 +20149,8 @@ const SO_LEGENDS = {
   so_lasthammer: { for: 'earth', name: 'Hammer of the Last Verdict', icon: 'hammer', hue: '#c8d0e8', atk: 1,
     twist: 'Sanctified Slam judges as it lands: every slam is a Verdict on everything it strikes.',
     text: () => 'Its slams lay two Judgement before they judge: every foe they strike hears a Verdict.',
-    build: 'Hammer of Judgement, Final Judgement, Shockwave and Hammer Fervour, in a crowded corner.',
-    combo: 'Into the Press, Hammer of Judgement and a crowded corner.', fx: st => soPw(st, 'so_lasthammer', 1) },
+    build: 'Blade of Judgement, Final Judgement, Shockwave and Shield Fervour, in a crowded corner.',
+    combo: 'Into the Press, Blade of Judgement and a crowded corner.', fx: st => soPw(st, 'so_lasthammer', 1) },
   so_saintcenser: { for: 'cannon', name: 'Censer of the Saints', icon: 'cloud', hue: '#c0a0f0', atk: 1,
     twist: 'The Censer\'s smoke passes sentence: as each cloud of incense burns out, a Verdict falls on everyone still in it.',
     text: k => `The incense its coals leave lays Judgement every half second, and as each cloud burns out, every Judged foe still standing in it hears a Verdict at ${nf1(.6 * k)} strength.`,
@@ -20144,12 +20165,12 @@ const SO_LEGENDS = {
   so_dawncrown: { name: 'Crown of Dawn', icon: 'halo', hue: '#ffd880',
     twist: 'Every Verdict this unit delivers lights up its neighbours: Radiance follows the Judgement.',
     text: k => `Every Verdict it delivers makes every unit within 2 cells of the foe Radiant for ${nf1(2 * k)}s.`,
-    build: 'Grail Knights or Hammer Templars at the heart of a tight maze, with Echoing Verdict and Censing of the Faithful.',
-    combo: 'Grail Knights, Hammer Templars and a tight maze.', fx: (st, k) => soPw(st, 'so_dawncrown', 2 * k) },
+    build: 'Grail Knights or Templars of the Ford at the heart of a tight maze, with Echoing Verdict and Censing of the Faithful.',
+    combo: 'Grail Knights, Templars of the Ford and a tight maze.', fx: (st, k) => soPw(st, 'so_dawncrown', 2 * k) },
   so_lawbook: { name: 'Book of the Law', icon: 'scales', hue: '#a8a0c0',
     twist: 'Judgement is never wasted: stacks laid on a full foe spill on to the next one.',
     text: k => `While it is on the field, Judgement laid on a foe already full is not lost: it passes to the nearest foe within ${nf1(Math.min(2.5, 1.5 * k))} cells that has room for it.`,
-    build: 'Flare Bolt, the Sunbolt Arbalest and Thick Smoke to flood the column; Echoing Verdict and Hammer of Heaven to cash it in.',
+    build: 'Flare Bolt, the Sunbolt Arbalest and Thick Smoke to flood the column; Echoing Verdict and Sword of Heaven to cash it in.',
     combo: 'Silverbolt Crossbows, Deep Mark and Bear Witness.', fx: (st, k) => soPw(st, 'so_lawbook', Math.min(2.5, 1.5 * k)) },
   so_martyr: { name: 'Martyr\'s Seal', icon: 'heart', hue: '#d06a6a',
     twist: 'Wards become weapons: every Ward this unit is given bursts out as Judgement on the foes around it.',
@@ -20159,8 +20180,8 @@ const SO_LEGENDS = {
   so_oathblade: { name: 'Oathblade of the Ford', icon: 'sword', hue: '#c0c8d8',
     twist: 'Judgement outlives its foe: every kill hands the dead foe\'s stacks to the next in line.',
     text: () => 'Each foe it slays passes its Judgement on to the nearest foe.',
-    build: 'Hammer Templars, Censer Bearers and Final Judgement, along a long Judged column.',
-    combo: 'Hammer Templars, Censer Bearers and a long Judged column.', fx: st => soPw(st, 'so_oathblade', 1) },
+    build: 'Templars of the Ford, Censer Bearers and Final Judgement, along a long Judged column.',
+    combo: 'Templars of the Ford, Censer Bearers and a long Judged column.', fx: st => soPw(st, 'so_oathblade', 1) },
 };
 
 /* ---------- the Order's shelf: kit for its units, and two artifacts with a tap ---------- */
@@ -20339,14 +20360,14 @@ if (typeof istAdd === 'function') { istAdd('so_saintcenser', 'splash sp regen|Pa
 /* ================= THE SILVER ORDER: its three commanders =================
    Each brings the Order (force: 'silver'), with a passive, a spell (spell.cast), a Champion gift and a 3-chapter saga,
    as the Grove's commanders do (heroes.js). Their passives and gifts live in the Order's hooks (forces_silver_a.js):
-   - Aurelian, the Lion of the Ford: Inspiring Charge (soCharge), Lionheart (soRadiant), Lion's Charge.
+   - Aurelian, the Lion of the Ford: Shield Brothers (soCharge, soSlam), Lionheart (soRadiant), Dawnsweep (spell id so_lioncharge).
    - Celestine, the Dawnsinger: Morning Light (live: mana; soWard: longer wards), Halo (soOnHit), Dawnbreak.
-   - Morrow, the Grey Justicar: Long Memory (soJMax, soJDur), Writ (soOnHit, soVerdict), Sentence. */
+   - Morrow, the Grey Justicar (mounted, a lance; he leads the Grail Knights): Long Memory (soJMax, soJDur), Writ (soOnHit, soVerdict), Sentence. */
 FORCE_HEROES.push(
-  { id: 'so_lion', force: SO_ID, name: 'Aurelian', title: 'the Lion of the Ford', hue: '#f0c060', glyph: 'swords', role: 'The Silver Order: the charge, and the host it carries with it', quote: 'Ride with me. The ford is ours.',
+  { id: 'so_lion', force: SO_ID, name: 'Aurelian', title: 'the Lion of the Ford', hue: '#f0c060', glyph: 'swords', role: 'The Silver Order: the shield wall, and the light that holds it', quote: 'Stand with me. The ford is ours.',
     aff: { arcane: .1, glaive: .05, earth: .05, frost: -.05, cannon: -.05 },
-    passive: 'Inspiring Charge: whenever a Grail Knight charges, every unit within 1.6 cells of its post becomes Radiant for 3 seconds (20% faster, and its strikes lay Judgement).',
-    spell: { id: 'so_lioncharge', name: 'Lion\'s Charge', glyph: 'swords', cd: 50, aim: true, r: 1.6, t: 'Knights of light charge through an area: every foe there takes 25% of a foe’s health, is thrown back and is Judged three times, and every unit near it becomes Radiant for 6 seconds.',
+    passive: 'Shield Brothers: whenever Aurelian strikes, every unit within 1.6 cells of him becomes Radiant for 3 seconds, and whenever a Templar of the Ford slams, every unit within 1.6 cells of it becomes Radiant for 2 seconds (20% faster, and its strikes lay Judgement).',
+    spell: { id: 'so_lioncharge', name: 'Dawnsweep', glyph: 'swords', cd: 50, aim: true, r: 1.6, t: 'A wide arc of dawnlight sweeps an area: every foe there takes 25% of a foe’s health, is thrown back and is Judged three times, and every unit the light passes becomes Radiant for 6 seconds.',
       cast: (p, R, hp, h) => soLionCharge(p, R, hp, h) },
     champ: 'Lionheart: the Champion is always Radiant.',
     tree: [] },
@@ -20357,7 +20378,7 @@ FORCE_HEROES.push(
       cast: (p, R, hp, h) => soDawnbreak(p, R, hp, 1) },
     champ: 'Halo: every 4th strike of the Champion Blinds its foe for 2 seconds.',
     tree: [] },
-  { id: 'so_judge', force: SO_ID, name: 'Morrow', title: 'the Grey Justicar', hue: '#c8ccd8', glyph: 'scales', role: 'The Silver Order: Judgement laid, and Judgement delivered', quote: 'Every debt is written. Every debt is paid.',
+  { id: 'so_judge', force: SO_ID, name: 'Morrow', title: 'the Grey Justicar', hue: '#c8ccd8', glyph: 'scales', role: 'The Silver Order: he leads the Grail Knights\' charge; Judgement laid, and Judgement delivered', quote: 'Every debt is written. Every debt is paid.',
     aff: { earth: .1, arrow: .05, storm: .05, frost: -.05, holy: -.05 },
     passive: 'Long Memory: Judgement lasts 3 seconds longer, and a foe can carry one more stack of it (6).',
     spell: { id: 'so_sentence', name: 'Sentence', glyph: 'scales', cd: 45, aim: false, t: 'Every Judged foe on the field hears its Verdict at once: 5% of a foe’s health for each stack of Judgement it carries (bosses 40%).',
@@ -20366,10 +20387,10 @@ FORCE_HEROES.push(
     tree: [] },
 );
 Object.assign(FORCE_SAGAS, {
-  so_lion: { name: 'The Ford of Lions', lines: ['The river runs red where the line breaks. It will not break.', 'Ride, and the whole host rides with you.', 'Let them sing of the ford for a thousand years.'],
-    trials: ['Hold the Ford', 'The Long Charge', 'Pride of Lions'], ev: 'so_radiant', verb: g => `Slay ${g} foes struck by a Radiant unit.`, goals: [40, 100, 180],
+  so_lion: { name: 'The Ford Held', lines: ['The river runs red where the line breaks. It will not break.', 'Lock shields. Not one step back.', 'Let them sing of the ford for a thousand years.'],
+    trials: ['Hold the Ford', 'The Long Stand', 'The Line Unbroken'], ev: 'so_radiant', verb: g => `Slay ${g} foes struck by a Radiant unit.`, goals: [40, 100, 180],
     evFn: c => c.soRadHit != null && G.time - c.soRadHit < 1.5,
-    fin: ['Pride of Lions', 'Lion’s Charge makes every unit of the Order on the field Radiant, not only those near it.'] },
+    fin: ['Dawn over the Ford', 'Dawnsweep makes every unit of the Order on the field Radiant, not only those its light passes.'] },
   so_dawn: { name: 'The Long Dawn', lines: ['Every night ends. I have seen it.', 'Stand in the light, and fear nothing.', 'The morning does not ask permission.'],
     trials: ['First Light', 'The Blinding Hour', 'Endless Morning'], ev: 'so_blind', verb: g => `Slay ${g} blinded foes.`, goals: [30, 80, 150],
     evFn: c => c.soBlindT > G.time,
@@ -20382,12 +20403,18 @@ Object.assign(FORCE_SAGAS, {
 Object.assign(FORCE_GLYPH, { oathsworn: 'shield', silverbolt: 'crosshair', lightbinder: 'chains', grailknight: 'target', sunlance: 'sun', templar: 'hammer', censer: 'cloud', bell: 'echo', oathstone: 'rune' });
 
 /* ---------- the spells ---------- */
+// Dawnsweep (the spell id keeps its old name, so_lioncharge: art, sound and saves): a wide arc of dawnlight from his sword,
+// swept across the area before him. SO_SWEEP_FROM: where the arc is swung from (the Champion casting it; else the keep's side)
+let SO_SWEEP_FROM = null;
 function soLionCharge(p, R, hp, h) {
-  // the spectral knights ride up the road from the keep side, a line of them abreast
-  for (let k = 0; k < 5; k++) {
-    const x = p.x + (k - 2) / 2 * R * .8, z0 = p.y + R * 1.4, z1 = p.y - R * 1.4;
-    G.delayed.push({ t: k * .05, fn: () => { rfx({ k: 'streak', x0: x, h0: .5, z0, x1: x, h1: .5, z1, col: '#ffe8a8', w: .09, trav: .35, life: .6 }); rfx({ k: 'drag', x0: x, z0, x1: x, z1, h: .2, col: '#f0c060', life: .6 }); } });
+  const t = typeof CHAMP_CASTER !== 'undefined' ? CHAMP_CASTER : null;
+  const fx = t ? t.x : p.x, fz = t ? t.y : p.y + R * 1.4; SO_SWEEP_FROM = { x: fx, z: fz };
+  const D = Math.max(.6, Math.hypot(p.x - fx, p.y - fz)), ang = Math.atan2(p.y - fz, p.x - fx), half = Math.min(1.2, Math.atan2(R, D) * 1.15), N = 7;
+  for (let k = 0; k < N; k++) {   // (the plain look under the VFX: the arc drawn in light, segment by segment as the blade crosses)
+    const a0 = ang - half + 2 * half * k / N, a1 = ang - half + 2 * half * (k + 1) / N;
+    G.delayed.push({ t: k * .04, fn: () => rfx({ k: 'streak', x0: fx + Math.cos(a0) * D, h0: .35, z0: fz + Math.sin(a0) * D, x1: fx + Math.cos(a1) * D, h1: .35, z1: fz + Math.sin(a1) * D, col: '#ffe8a8', w: .1, trav: .06, life: .45 }) });
   }
+  sfx('so_lioncharge');
   if (typeof QG_MARK === 'function') QG_MARK(p.x, p.y, R, .3, h.hue);
   G.delayed.push({ t: .25, fn: () => {
     if (G.state !== 'play') return;
@@ -20400,8 +20427,7 @@ function soLionCharge(p, R, hp, h) {
     fxRing(p.x, p.y, R, h.hue); G.shake = Math.max(G.shake, .2);
     const all = sagaHas('fin'), L = G.towers.filter(t => soUnit(t) && !t.def.wall && !t.wrecked && (all || Math.hypot(t.x - p.x, t.y - p.y) <= R + 1.3));
     for (const t of L) soRadiate(t, 6, SO.RAD_K);
-    onBanner('Lion\'s Charge!', `${L.length} unit${L.length === 1 ? '' : 's'} of the Order shine${L.length === 1 ? 's' : ''} with Radiance`);
-    sfx('so_lioncharge');
+    onBanner('Dawnsweep!', `${L.length} unit${L.length === 1 ? '' : 's'} of the Order shine${L.length === 1 ? 's' : ''} with Radiance`);
   } });
 }
 function soDawnbreak(p, R, hp, k, foesOnly) {
@@ -28850,9 +28876,9 @@ FORCE_PARTS.ch_grenna = [
    As the Grove's (forces_zx_champ_grove.js, the template; the rules in forces_zw_champions.js). The Bell of the Order is
    retired: its toll lives on in the Champions' talents (each W gives mana to the units beside it) and in its two items
    (the Gold Clapper and the Bell of Silvermere answer the Champion's casts: forces_silver_e.js). Each Champion strikes
-   with one of the Order's own attacks (FORCE_ATTACK so_lance / so_beam / so_bolt), so Radiance, Judgement, Verdicts and
+   with one of the Order's own attacks (FORCE_ATTACK so_blade (the charge, on foot) / so_beam / so_bolt), so Radiance, Judgement, Verdicts and
    the commanders' gifts (soOnHit, soRadiant, soVerdict: forces_silver_a.js) work on it unchanged. Their bodies are the
-   Order's (soBody, the Knights' destrier) at tier III's detail, scaled as Champions, with more added from tier IV. */
+   Order's (soBody on foot; Morrow on the Knights' destrier) at tier III's detail, scaled as Champions, with more added from tier IV. */
 const CH_SO_RS = { cost: 50, time: 0 };
 const chSoT = tier => Math.min(2, tier | 0);   // the Order's bodies are built for tiers I-III (SO_SCALE)
 // a part in the Order's way (soPart), its scale and pivot clamped to tier III's (the Champion grows by unitK beyond)
@@ -28862,76 +28888,57 @@ const chSoPart = (k, piv, build, pose, more) => Object.assign(soPiv(...piv), { k
 const chSoArmPose = (t, lift = .6) => { const w = t.windup || 0, s = soStrikeK(t); return [-.3 * w + lift * s, 0, 0, 0, .02 * w, 0]; };
 const CH_SO_M = new Float32Array(16);
 
-/* ---------- Aurelian, the Lion of the Ford ---------- */
+/* ---------- Aurelian, the Lion of the Ford: a knight on foot, sword and crest shield, who fights with the shield wall ----------
+   (Owner, 9 Nov 2026: "make him synergise with the shields ... keep lionheart as a name, just need to tone down all the
+   references to a lion". His horse, his cavalry talents and the charge's flavour went to Morrow; his kit is the shield line's:
+   Dawnsweep (ch_lioncharge), Bulwark Slam (ch_fordstandard) and The Crossing (ch_lionsdue). The ids are kept for saves,
+   talents, items and art; the old names follow by TAL_ALIAS (forces_zzzzzzzzzz_talnames.js).) */
+// his strike: on foot, shield-first, out to the strongest foe in reach and back to his post (the Order's charge, soCharge,
+// with no knock-down: a sword, not a lance), so his Verdicts, Radiance and the talents on a charge work unchanged
+FORCE_ATTACK.so_blade = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, {});
 champAdd('so_lion', { force: 'silver', he: 'he', glyph: 'swords', k: 1.45,
-  unit: { id: 'ch_aurelian', name: 'Aurelian, the Lion of the Ford', short: 'Aurelian', proj: 'force', attack: 'so_lance', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
-    blurb: 'The Lion himself, lion-helmed on his destrier: he charges out to the strongest foe and back, his lance hearing Verdicts. He is always Radiant. Cannot reach flyers.',
+  unit: { id: 'ch_aurelian', name: 'Aurelian, the Lion of the Ford', short: 'Aurelian', proj: 'force', attack: 'so_blade', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
+    blurb: 'Aurelian on foot in white and gold, sword in hand and the crest shield on his arm: he steps out shield-first to the strongest foe in reach, cuts, and falls back into the line, every blow hearing a Verdict. He is always Radiant, and his own Templars of the Ford fight best beside him. Cannot reach flyers.',
     tiers: [{ dmg: 64, rate: 2.2, range: 2.8 }, { dmg: 150, rate: 2.1, range: 3 }, { dmg: 350, rate: 2, range: 3.2 }] },
   trait: { name: 'Lionheart', t: 'He is always Radiant: he strikes faster, and every strike lays Judgement.' },   // (soRadiant: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: 1.2 }, abilities: [
-    champQ('so_lion', { id: 'ch_lioncharge', name: "Lion's Charge", short: 'Charge', glyph: 'swords', hue: '#f0c060', art: 'so_lioncharge', mana: 90, cd: 16, school: 'holy', pref: 'grouped', qs: 4, qf: .25,
-      blurb: 'Knights of light charge through an area: foes are thrown back and Judged, and the units near it shine Radiant.',
-      text: (t, st, ab) => `Knights of light charge through a ${gNf(champQR(t, ab))}-cell area: every foe there takes ${champQx(t, st, ab)}, is thrown back and is Judged three times, and every unit of the Order near it becomes Radiant for 6s.`,
-      anim: chAnim('thrust', { T: 1.0, tip: ['main', [.02, -.06, .82]], col: [1, .9, .55] }) }),
-    { id: 'ch_fordstandard', name: 'Banner at the Ford', short: 'Standard', glyph: 'banner', hue: '#e0b050', mana: 100, cd: 15, research: CH_SO_RS, school: 'holy', pref: 'grouped', rr: 1,
-      by: { dur: [6, 6, 6, 7, 7, 7] },
-      auto: 'two or more walkers near the road in reach, or a boss', blurb: 'A banner planted on the road: every foe that passes it is Judged.',
-      text: (t, st, ab) => `He plants his standard on the road in his reach for ${byT(ab.by.dur, t)}s: every second each foe within ${ab.rr} cell of it is Judged and struck for ${xD(st, .3)}.`,
-      pick(t, st, ab, man) { const p = chPathSpot(t, st, abReach(t, st, ab), ab.rr, abWalker); return p && (man || p.n >= 2 || abFoes(t, st, abReach(t, st, ab)).some(abBig)) ? p : null; },
-      cast(t, st, p, ab) { abZone(t, { k: 'ch_fordstandard', x: p.x, z: p.y, r: ab.rr, at: G.time, until: G.time + byT(ab.by.dur, t), tick: 0, every: 1 }); fxRing(p.x, p.y, ab.rr, ab.hue); fxDust(p.x, p.y, 6); abSfx('thrust', 1); },
-      zone(t, st, z) {
-        inSplash(z.x, z.z, z.r, false, c => { if (c.phased || c.ent || !canTarget(t, st, c)) return; abHit(t, st, c, .3, 'magic'); if (!c.dead) soJudge(c, 1, t); });
-        fxRing(z.x, z.z, z.r, SO.COL.gold);
-      },
-      anim: chAnim('slam', { T: 1.1, tip: ['main', [.02, -.06, .82]], col: [1, .85, .45], on: [.45, .9] }) },
-    { id: 'ch_lionsdue', name: "The Lion's Due", short: 'Due', glyph: 'target', hue: '#ffd76a', mana: 130, cd: 22, research: CH_SO_RS, school: 'attack', pref: 'first', len: 3.5, w: .45,
-      by: { mult: [3, 3.4, 3.8, 4.2, 4.6, 5], j: [2, 2, 2, 2, 2, 2] },
-      auto: 'a line through three or more walkers in reach, or a boss', blurb: 'One great charge through a whole line of foes: each struck, Judged and thrown aside.',
-      text: (t, st, ab) => `He rides through every walker in a ${ab.len}-cell line: each takes ${xD(st, byT(ab.by.mult, t))}, gains ${byT(ab.by.j, t)} Judgement and is thrown aside.`,
-      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null; const b = abBestLine(t, st, L, ab.len, ab.w, abWalker); return b && (man || b.n >= 3 || abBig(b.c)) ? b.c : null; },
-      cast(t, st, c, ab) {
-        const [ux, uz] = abDir(t, c), m = byT(ab.by.mult, t), j = byT(ab.by.j, t);
-        t.chg = { x: t.x + ux * Math.min(ab.len, 2.5), z: t.y + uz * Math.min(ab.len, 2.5), at: G.time, T: .9 };   // out along the line and back
-        G.delayed.push({ t: .25, fn: () => { if (G.state !== 'play') return; abAoe(() => { for (const o of abLine(t, st, t.x, t.y, ux, uz, ab.len, ab.w, abWalker)) {
-          abHit(t, st, o, m, 'phys', [ux * .15, uz * .15]); if (o.dead) continue; soJudge(o, j, t);
-          const x0 = o.x, z0 = o.y; shove(o, .4); if (typeof dragFx === 'function') dragFx(o, x0, z0, '#f0c060'); fxSpark(o.x, o.y, hitH(o), '#fff1c0', 6); } }); } });
-        chLine(t.x, t.y, t.x + ux * ab.len, t.y + uz * ab.len, ab.hue, .09, .4); fxDust(t.x, t.y, 6); abSfx('thrust', 1);
-      },
-      anim: chAnim('point', { T: .95, tip: ['main', [.02, -.06, .82]], col: [1, .9, .55] }) },
+    champQ('so_lion', { id: 'ch_lioncharge', name: 'Dawnsweep', short: 'Sweep', glyph: 'swords', hue: '#f0c060', art: 'so_lioncharge', mana: 90, cd: 16, school: 'holy', pref: 'grouped', qs: 4, qf: .25,
+      blurb: 'A wide arc of light from his sword sweeps the ground before him: foes are thrown back and Judged, and the units it passes shine Radiant.',
+      text: (t, st, ab) => `He sweeps his sword and a wide arc of dawnlight crosses a ${gNf(champQR(t, ab))}-cell area before him: every foe there takes ${champQx(t, st, ab)}, is thrown back and is Judged three times, and every unit of the Order the light passes becomes Radiant for 6s.`,
+      anim: chAnim('thrust', { T: 1.0, tip: ['main', [-.02, -.11, .7]], col: [1, .9, .55] }) }),
+    // (reshaped in place by forces_zzz_silver_cool.js: the shield driven into the road, a shockwave down a cone)
+    { id: 'ch_fordstandard', name: 'Bulwark Slam', short: 'Slam', glyph: 'shield', hue: '#e0b050', mana: 90, cd: 14, research: CH_SO_RS, school: 'holy', pref: 'grouped',
+      auto: 'an 80-degree cone in his reach holding two or more walkers, or a boss or elite', blurb: 'He slams his shield into the road: a shockwave runs down the cone before him, throwing walkers back, and the shields beside him are Warded.',
+      text: () => 'He slams his shield into the road and a shockwave runs down the cone before him.',
+      pick() { return null; }, cast() { return false; },
+      anim: chAnim('slam', { T: 1.1, tip: ['off', [.02, -.1, .2]], col: [1, .85, .45], on: [.45, .9] }) },
+    // (reshaped in place by forces_zzz_silver_cool.js: an advance from Judged foe to Judged foe)
+    { id: 'ch_lionsdue', name: 'The Crossing', short: 'Crossing', glyph: 'target', hue: '#ffd76a', mana: 130, cd: 22, research: CH_SO_RS, school: 'attack', pref: 'first',
+      auto: 'three or more walkers in reach, or a boss or elite', blurb: 'He crosses the road shield-first, from Judged foe to Judged foe, a blow at each.',
+      text: () => 'He crosses the road shield-first, from Judged foe to Judged foe.',
+      pick() { return null; }, cast() { return false; },
+      anim: chAnim('thrust', { T: .95, tip: ['main', [-.02, -.11, .7]], col: [1, .9, .55] }) },
   ] },
   tree: { name: 'The Ford', hue: '#f0c060', list: [
-    CT('Ride Abreast', 'hourglass', 0, 0, 2, n => `Each charge of his sends every Grail Knight within 2 cells charging its own foe at once (at most once every ${8 - 2 * n}s a knight).`, {}, { cap: 'sofAbreast' }),
-    CT('Lowered Lance', 'arrowhead', 2, 3, 2, n => `His charges knock a foe carrying 3 or more Judgement down for ${gNf(.25 * n)}s.`, {}, { cap: 'sofLowered' }),
-    CT('Wide Wedge', 'swords', 0, 1, 2, n => `Lion's Charge rides through a ${gNf(.15 * n)}-cell wider area.`, {}, { sp: n => ({ ab: 'ch_lioncharge', by: { area: .15 * n } }) }),
-    CT('Riders of the Ford', 'swords', 3, 2, 1, "With 2 or more Grail Knights or Oathsworn Shieldbearers within 2 cells, Lion's Roar strikes Judged foes 30% harder and the Verdicts his charges deliver strike 20% harder.", {}, { cap: 'sofFord', sp: [{ ab: 'ch_fordstandard', at: 'near', near: { unit: ['grailknight', 'oathsworn'], n: 2, r: 2 }, vs: ['judged', .3] }] }),
+    CT('Shoulder to Shoulder', 'shield', 0, 0, 2, n => `Each strike of his readies the next slam of every Templar of the Ford within 2 cells at once (at most once every ${8 - 2 * n}s a Templar).`, {}, { cap: 'sofShoulder' }),
+    CT('Lowered Shield', 'arrowhead', 2, 3, 2, n => `His shield knocks a foe carrying 3 or more Judgement down for ${gNf(.25 * n)}s as his blow lands.`, {}, { cap: 'sofLowered' }),
+    CT('Wide Sweep', 'swords', 0, 1, 2, n => `Dawnsweep's arc of light crosses a ${gNf(.15 * n)}-cell wider area.`, {}, { sp: n => ({ ab: 'ch_lioncharge', by: { area: .15 * n } }) }),
+    CT('Shield Wall', 'shield', 3, 2, 1, 'With 2 or more Templars of the Ford within 2 cells, every one of them slams with him: as Bulwark Slam\'s shockwave lands, each slams the ground round itself.', {}, { cap: 'sofWall', sp: { ab: 'ch_fordstandard', rider: { fresh: 1 } } }),
     GS('ch_fordstandard', 1, 0),
-    CT('Standard-Bearer', 'banner', 2, 0, 2, n => `Lion's Roar Wards the line ${n}s longer, and each unit it Wards is Radiant for 2s.`, {}, { cap: 'sofStandard', sp: n => ({ ab: 'ch_fordstandard', by: { ward: n } }), req: [1, 0] }),
-    CT('Trampling Host', 'snail', 1, 3, 2, n => `Every foe Lion's Charge strikes is Wounded for ${2 * n}s (its heals and shields halved).`, {}, { cap: 'sofTrample', sp: { ab: 'ch_lioncharge', rider: { fresh: 1 } } }),
-    CT('Rallying Banner', 'heart', 2, 1, 1, "Each Lion's Roar rallies the line: every unit of the Order within 1.6 cells of him readies its next strike at once.", {}, { cap: 'sofRallyB', sp: { ab: 'ch_fordstandard', rider: { fresh: 1 } } }),
-    CT('Royal Due', 'scales', 4, 3, 1, "The Lion's Due rides on to one more foe, and each foe it slays on the ride gives it another charge (3 more at most).", {}, { cap: 'so_royal_due', sp: { ab: 'ch_lionsdue', by: { n: 1 } }, req: [3, 3] }),
-    CT('Debt of Lions', 'crosshair', 4, 1, 1, "Each Verdict the Order delivers within 2 cells of him brings The Lion's Due 1s nearer (at most twice a second), and The Lion's Due strikes Judged foes 20% harder.", {}, { cap: 'so_lion_debt', sp: { ab: 'ch_lionsdue', vs: ['judged', .2] } }),
-    CT('Pride', 'wings', 3, 0, 2, n => `Every walker Lion's Charge throws back that lands within a cell of a unit of the Order is dazed ${gNf(.4 * n)}s at its feet.`, {}, { cap: 'sofPride', sp: { ab: 'ch_lioncharge', rider: { fresh: 1 } } }),
+    CT('Shields Raised', 'shield', 2, 0, 2, n => `Bulwark Slam Wards the line ${n}s longer, and each unit it Wards is Radiant for 2s.`, {}, { cap: 'sofStandard', sp: n => ({ ab: 'ch_fordstandard', by: { ward: n } }), req: [1, 0] }),
+    CT('Burnished Shields', 'sunburst', 1, 3, 2, n => `Each Templar of the Ford Dawnsweep turns Radiant flashes its shield: every walker within its reach is Judged and dazed ${gNf(.3 * n)}s.`, {}, { cap: 'sofBurnish', sp: { ab: 'ch_lioncharge', rider: { fresh: 1 } } }),
+    CT('Rally to the Shield', 'heart', 2, 1, 1, 'Each Bulwark Slam rallies the line: every unit of the Order within 1.6 cells of him readies its next strike at once.', {}, { cap: 'sofRallyB', sp: { ab: 'ch_fordstandard', rider: { fresh: 1 } } }),
+    CT('The Far Bank', 'scales', 4, 3, 1, 'The Crossing goes on to one more foe, and each foe it slays on the way gives it another (3 more at most).', {}, { cap: 'so_royal_due', sp: { ab: 'ch_lionsdue', by: { n: 1 } }, req: [3, 3] }),
+    CT('Debt of Oaths', 'crosshair', 4, 1, 1, 'Each Verdict the Order delivers within 2 cells of him, and each slam of a Templar of the Ford within 2 cells, brings The Crossing 1s nearer (at most twice a second); The Crossing strikes Judged foes 20% harder.', {}, { cap: 'so_lion_debt', sp: { ab: 'ch_lionsdue', vs: ['judged', .2] } }),
+    CT('Unbroken', 'wings', 3, 0, 2, n => `Every walker Dawnsweep throws back that lands within a cell of a Templar of the Ford meets its shield: dazed ${gNf(.4 * n)}s at its feet and Judged.`, {}, { cap: 'sofPride', sp: { ab: 'ch_lioncharge', rider: { fresh: 1 } } }),
     GS('ch_lionsdue', 3, 3),
-    CT('The Ford Itself', 'mountain', 4, 0, 1, "Lion's Roar echoes 0.6s later down the same cone: every walker in it is struck again for 60%, Judged and dazed 0.6s.", {}, { cap: 'so_ford_echo' }),
-    CT('Lion\'s Spring', 'quick', 0, 2, 3, n => `His charges strike a stunned or knocked-down foe ${10 * n}% harder.`, {}, { cap: 'sofSpring' }),
-    CT('Hearts Lifted', 'sun', 1, 2, 2, n => `Each charge restores ${n} mana for every unit of the Order it inspires within 1.6 cells (up to 4).`, {}, { cap: 'sofHearts' }),
+    CT('The Ford Itself', 'mountain', 4, 0, 1, "Bulwark Slam's shockwave rebounds 0.6s later down the same cone: every walker in it is struck again for 60%, Judged and dazed 0.6s.", {}, { cap: 'so_ford_echo' }),
+    CT('Swift Reprisal', 'quick', 0, 2, 3, n => `Each slam of a Templar of the Ford within 2 cells of him that strikes 2 or more walkers draws his next strike at once (at most once every ${gNf(7 - 1.5 * n)}s).`, {}, { cap: 'sofReprisal' }),
+    CT('Hearts Lifted', 'sun', 1, 2, 2, n => `Each strike of his restores ${n} mana for every unit of the Order it inspires within 1.6 cells (up to 4).`, {}, { cap: 'sofHearts' }),
   ] },
-  flavor: ['Aurelian rides in person: the charge, and the host it carries with it.', 'Ride with me. The ford is ours.'], emblem: 'Royal Due',
-  extra(t, tier, x, z, yaw, K) {
-    soExtra(t, chSoT(tier), x, z, yaw, K);
-    if (!t.ab || inIcon) return;
-    for (const zn of t.ab.zones) if (zn.k === 'ch_fordstandard' && zn.until > G.time) {
-      const s = Math.min(1, (G.time - zn.at) * 4, (zn.until - G.time) * 2); M4.trs(CH_SO_M, zn.x, 0, zn.z, zn.at, 0, 0, s, s, s); item(dynMesh('ch_fordbanner', chFordBanner), CH_SO_M, {});
-      QG.ground(zn.x, zn.z, .02, zn.r, zn.r, [1, .8, .4, .2 * s], 5, 0);
-    }
-  },
+  flavor: ['Aurelian fights in person, his Templars of the Ford beside him: the shield wall, and the light that holds it.', 'Stand with me. The ford is ours.'], emblem: 'The Far Bank',
+  extra(t, tier, x, z, yaw, K) { soExtra(t, chSoT(tier), x, z, yaw, K); },
 });
-function chFordBanner(g) {   // the Lion's standard: a tall pole, a crimson banner with a gold lion's head, a gold finial
-  mat(g, 'woodgrain', () => g.seg([0, 0, 0], [0, 1.15, 0], .025, '#6e4e30'));
-  mat(g, 'gilt', () => { g.ico(0, 1.18, 0, .04, '#d2a646'); g.seg([-.02, 1.08, 0], [.36, 1.08, 0], .012, '#d2a646'); });
-  mat(g, 'cloth', () => { for (const z of [-.003, .003]) { const q = [[0, 1.07, z], [.34, 1.07, z], [.34, .62, z], [.17, .52, z], [0, .62, z]]; const f = (a, b, c) => z < 0 ? g.tri(a, b, c, '#8a2a24') : g.tri(a, c, b, '#8a2a24'); f(q[0], q[1], q[2]); f(q[0], q[2], q[4]); f(q[4], q[2], q[3]); } });
-  g.em = .5; mat(g, 'gilt', () => { g.with(T(.17, .86, .006, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .07, .07, .004, 10, '#e0b050')); g.with(T(.17, .86, -.006, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .07, .07, .004, 10, '#e0b050')); }); g.em = 0;
-}
 
 /* ---------- Celestine, the Dawnsinger ---------- */
 champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
@@ -29003,8 +29010,8 @@ champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
 
 /* ---------- Morrow, the Grey Justicar ---------- */
 champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
-  unit: { id: 'ch_morrow', name: 'Morrow, the Grey Justicar', short: 'Morrow', proj: 'force', attack: 'so_bolt', pspd: 15, dmgType: 'phys', air: true, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The Grey Justicar with his great ledger and a heavy crossbow: warrant bolts that lay Judgement, two to a hit, at foes on the ground or in the air.',
+  unit: { id: 'ch_morrow', name: 'Morrow, the Grey Justicar', short: 'Morrow', proj: 'force', attack: 'so_lance', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
+    blurb: 'The Grey Justicar on a grey destrier leads the Grail Knights\' charge, his great ledger on his arm: he rides out with a couched lance at the strongest foe in reach and back, knocking it down and laying Judgement, two to a strike. Cannot reach flyers.',
     tiers: [{ dmg: 34, rate: 1.3, range: 3.2 }, { dmg: 78, rate: 1.25, range: 3.4 }, { dmg: 180, rate: 1.2, range: 3.6 }] },
   trait: { name: 'Writ', t: 'His strikes lay one more Judgement, and his Verdicts strike 25% harder.' },   // (soOnHit, soVerdict: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: .8 }, abilities: [
@@ -29027,7 +29034,7 @@ champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
         if (!c.dead) soJudge(c, Math.max(1, soJ(c)), t);
         soStreak(t.x, towerTop(t) + .2, t.y, c, SO.COL.light, .06, .4); fxRing(c.x, c.y, .5, SO.COL.gold); abSfx('call', 0);
       },
-      anim: chAnim('draw', { T: .95, tip: ['main', [-.13, -.03, .45]], col: [.85, .9, 1.2], on: [.2, .7] }) },
+      anim: chAnim('draw', { T: .95, tip: ['main', [.02, -.06, .82]], col: [.85, .9, 1.2], on: [.2, .7] }) },
     { id: 'ch_verdict', name: 'Final Verdict', short: 'Verdict', glyph: 'skull', hue: '#e8ecf4', mana: 120, cd: 20, research: CH_SO_RS, school: 'holy', pref: 'high',
       by: { r: [1.5, 1.5, 1.5, 1.6, 1.6, 1.6] },
       auto: 'a Judged foe in reach with others near it (the toughest first), or a boss', blurb: 'Marks a foe: when it dies, its Judgement passes to every foe around it.',
@@ -29038,23 +29045,23 @@ champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
   ] },
   tree: { name: 'The Ledger', hue: '#c8ccd8', list: [
     CT('Swift Justice', 'hourglass', 0, 0, 2, n => `Each foe he fills to full Judgement brings Sentence ${n}s nearer.`, {}, { cap: 'sofSwift', sp: { ab: 'ch_sentence', rider: { fresh: 1 } } }),
-    CT('Long Arm of the Law', 'crosshair', 0, 3, 2, n => `His bolts slow a foe carrying 3 or more Judgement ${15 * n}% for 1.5s: it can't outrun its debts.`, {}, { cap: 'sofLongArm' }),
+    CT('Long Arm of the Law', 'crosshair', 0, 3, 2, n => `His charges slow a foe carrying 3 or more Judgement ${15 * n}% for 1.5s: it can't outrun its debts.`, {}, { cap: 'sofLongArm' }),
     CT('Ready Ledger', 'rune', 0, 2, 2, n => `Each foe Sentence strikes that lives on keeps ${n} Judgement in the ledger.`, {}, { cap: 'sofLedger', sp: { ab: 'ch_sentence', rider: { fresh: 1 } } }),
     GS('ch_summons', 1, 0),
     CT('Iron Chains', 'chains', 4, 3, 1, 'When Final Verdict\'s foe dies, each foe its Judgement passes to is written in the ledger in turn, for 5s (one link on, no further). Each Final Verdict brings Debt Collection 4s nearer.', {}, { cap: 'so_iron_chains', sp: { ab: 'ch_verdict', ready: ['ch_summons', 4] }, req: [3, 3] }),
-    CT('Mark of Guilt', 'eye', 2, 3, 2, n => `His bolts Condemn a foe at full Judgement for ${n}s.`, {}, { cap: 'sofGuilt' }),
+    CT('Mark of Guilt', 'eye', 2, 3, 2, n => `His charges Condemn a foe at full Judgement for ${n}s.`, {}, { cap: 'sofGuilt' }),
     CT('Witnesses Called', 'heart', 2, 0, 1, 'Every foe Debt Collection takes Judgement from is dazed 0.5s, and the foe it gathers onto is bound 0.3s longer.', {}, { sp: { ab: 'ch_summons', by: { daze: .5, bind: .3 } }, req: [1, 0] }),
     CT('Wide Reckoning', 'ring', 4, 0, 1, "When Final Verdict's gavel falls, it falls at half on every Judged foe within 1.2 cells of its foe too, and Final Verdict stuns every foe it strikes for 0.5s.", {}, { cap: 'so_wide_reck', sp: { ab: 'ch_verdict', rider: { stun: .5 } } }),
-    CT('Proof', 'scales', 2, 1, 2, n => `Debt Collection strikes foes carrying 3 or more Judgement ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'ch_summons', vs: ['judged3', .15 * n] }) }),
-    CT('Clerk’s Quill', 'wings', 3, 1, 2, n => `After each Debt Collection, his next ${2 * n} bolts each lay one more Judgement.`, {}, { cap: 'sofQuill', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
-    CT('Grey Justicar', 'shield', 4, 2, 1, 'His bolts are warrants: each one also lays a Judgement on every foe within 0.8 cells of its foe, so Sentence finds the whole crowd.', {}, { cap: 'so_grey_warrant' }),
+    CT('Trampling Host', 'snail', 2, 1, 2, n => `He rides each debt down: every walker on the line between him and Debt Collection's foe is trampled, Judged and Wounded for ${2 * n}s (its heals and shields halved).`, {}, { cap: 'sofTrample', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
+    CT('Clerk’s Quill', 'wings', 3, 1, 2, n => `After each Debt Collection, his next ${2 * n} charges each lay one more Judgement.`, {}, { cap: 'sofQuill', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
+    CT('Grey Justicar', 'shield', 4, 2, 1, 'His charges are warrants: each one also lays a Judgement on every foe within 0.8 cells of its foe, so Sentence finds the whole crowd.', {}, { cap: 'so_grey_warrant' }),
     GS('ch_verdict', 3, 3),
-    CT('Witness Bench', 'mountain', 3, 2, 1, 'With 2 or more Silverbolt Crossbows within 2 cells, his witnesses, Debt Collection strikes 30% harder.', {}, { sp: { ab: 'ch_summons', at: 'near', near: { unit: ['silverbolt'], n: 2, r: 2 }, vs: ['any', .3] } }),
-    CT('Bailiff', 'quick', 0, 1, 3, n => `His bolts on a foe dazed, bound or knocked down lay ${n} more Judgement.`, {}, { cap: 'sofBailiff' }),
+    CT('Riders of the Ford', 'swords', 3, 2, 1, 'The Grail Knights ride with him: each Debt Collection sends every Grail Knight within 2 cells charging its foe at once, lances couched: it is knocked down and hears their Verdicts (at most once every 4s a knight).', {}, { cap: 'sofFord', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
+    CT('Ride Them Down', 'quick', 0, 1, 3, n => `His charges strike a foe that is dazed, bound or knocked down ${10 * n}% harder and lay ${n} more Judgement on it.`, {}, { cap: 'sofBailiff' }),
     CT('Court Fines', 'scales', 1, 3, 2, n => `Each foe Sentence strikes pays him ${2 * n} mana in fines.`, {}, { cap: 'sofFines', sp: { ab: 'ch_sentence', rider: { fresh: 1 } } }),
-    CT('Summary Ruling', 'scales', 1, 2, 2, n => `A foe under a quarter of its health that his bolt strikes hears its Verdict at once (at most once every ${8 - 2 * n}s).`, {}, { cap: 'sofSummary' }),
+    CT('Summary Ruling', 'scales', 1, 2, 2, n => `A foe under a quarter of its health that his lance strikes hears its Verdict at once (at most once every ${8 - 2 * n}s).`, {}, { cap: 'sofSummary' }),
   ] },
-  flavor: ['Morrow judges in person: Judgement laid, and Judgement delivered.', 'Every debt is written. Every debt is paid.'], emblem: 'Grey Justicar',
+  flavor: ['Morrow rides in person at the head of the Grail Knights\' charge: Judgement laid, and Judgement delivered.', 'Every debt is written. Every debt is paid.'], emblem: 'Grey Justicar',
   kill(c, src, t) {   // Final Verdict: the marked foe's Judgement passes on
     if (!(c.chVerdictT > G.time) || c.chVerdictBy !== t.id) return;
     c.chVerdictT = 0;
@@ -29071,20 +29078,21 @@ champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
 
 /* ---------- their look ---------- */
 Object.assign(UNIT_PAL, {
-  ch_aurelian: soP({ cloth: '#f2ecdc', clothD: '#cfc6b0', clothL: '#fff8ea', plume: '#d8a038', hair: '#a07c40', steel: '#9aa0ac', steelD: '#5a5f6a', steelL: '#c8ced8', horse: UNIT_PAL.grailknight.horse, horseD: UNIT_PAL.grailknight.horseD, cap: '#ece2c8', capD: '#b8ac90', capB: '#d2a646' }),   // (the portrait: steel plate, a white surcoat with a gold lion, a cream cloak (the Knights' cloak, III+, in his cream), long fair hair and a beard)
+  ch_aurelian: soP({ cloth: '#f2ecdc', clothD: '#cfc6b0', clothL: '#fff8ea', plume: '#d8a038', hair: '#a07c40', steel: '#9aa0ac', steelD: '#5a5f6a', steelL: '#c8ced8', cap: '#ece2c8', capD: '#b8ac90', capB: '#d2a646' }),   // (the portrait: steel plate, a white surcoat with the gold crest, a cream cloak, long fair hair and a beard)
   ch_celestine: soP({ cloth: '#f6f2e6', clothD: '#d8d0bc', clothL: '#fffdf4', plume: '#ffd27a', veil: '#ffd890', hair: '#3a2a20' }),
-  ch_morrow: soP({ cloth: '#6e727c', clothD: '#4a4e56', clothL: '#8e939e', plume: '#c8ccd8', steel: '#a4aab4', steelD: '#62666e', hair: '#b4b2ac' }),
+  ch_morrow: soP({ cloth: '#6e727c', clothD: '#4a4e56', clothL: '#8e939e', plume: '#c8ccd8', steel: '#a4aab4', steelD: '#62666e', steelL: '#c8ccd4', hair: '#b4b2ac', horse: '#8c8a88', horseD: '#565452', cap: '#5e626c', capD: '#3e424a', capB: '#c8ccd8' }),   // (a dapple-grey destrier in a slate caparison edged silver)
 });
-TORSO_PIV.ch_aurelian = [0, .4, -.2];   // (the destrier rears on its hind hips: the whole horse and rider lean together)
+TORSO_PIV.ch_morrow = [0, .4, -.2];   // (and on a charge)   // (the destrier rears on its hind hips: the whole horse and rider lean together)
 const chSoBody = (g, tier, fn) => soMats(g, () => g.with(T(0, 0, 0, 0, 0, 0, SO_SCALE[chSoT(tier)] || 1), () => fn(chSoT(tier))));
-FORCE_BUILD.ch_aurelian = (g, tier, rnd) => {   // the Lion: bare-headed, long fair hair and a beard (his portrait), on the Knights' destrier in a cream caparison edged gold, a gold lion's head on his left pauldron
-  SO_RIDER = { bare: true, hair: WE.hair }; try { FORCE_BUILD.grailknight(g, chSoT(tier), rnd); } finally { SO_RIDER = {}; }
+FORCE_BUILD.ch_aurelian = (g, tier, rnd) => {   // on foot (the code-built stand-in for his sculpted knight): bare-headed, long fair hair and a beard (his portrait), steel plate under a white surcoat, a cream cloak, the gold crest on his left pauldron
+  chDais(g, tier, '#e6dfcc', '#aea690', '#d2a646', '#fff1c0');
   chSoBody(g, tier, s => {
-    mat(g, 'gilt', () => { const c = [-.11, .83, -.005]; g.sphere(c[0], c[1], c[2], .05, .045, .05, 8, 5, '#d2a646');   // the lion pauldron: a gold head ringed by its mane
+    const { y0 } = soBody(g, s, { helm: 'bare', hairLong: WE.hair, beard: WE.hair, beardL: .08, wide: true, cape: true, capeCol: WE.cap, enamel: WE.cloth, emblemCol: WE.gold });
+    mat(g, 'gilt', () => { const c = [-.15, y0 + .22, -.005]; g.sphere(c[0], c[1], c[2], .05, .045, .05, 8, 5, '#d2a646');   // the crest pauldron: a gold head ringed by its mane
       for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; g.with(T(c[0] + Math.cos(a) * .045 - .01, c[1] + Math.sin(a) * .035, c[2], 0, 0, a - Math.PI / 2), () => g.cyl(0, 0, 0, .016, 0, .045, 4, k % 2 ? '#e8c060' : '#b88a34')); }
       g.ico(c[0] - .03, c[1], c[2] + .02, .014, '#9a7430'); });
-    g.with(T(0, .73, .089), () => soSun(g, 0, 0, 0, .045 + .004 * tier, '#d2a646', 10));   // the gold lion-sun on his surcoat
-    if (tier >= 4) mat(g, 'gilt', () => { for (const sd of [-1, 1]) g.with(T(sd * .19, .5, -.02, sd * Math.PI / 2), () => soSun(g, 0, 0, .002, .12, '#ffd060', 12)); });
+    g.with(T(0, y0 + .08, .128), () => soSun(g, 0, 0, 0, .045 + .004 * tier, '#d2a646', 10));   // the gold sun on his surcoat
+    if (tier >= 4) mat(g, 'gilt', () => { for (const sd of [-1, 1]) g.with(T(sd * .19, .3, -.02, sd * Math.PI / 2), () => soSun(g, 0, 0, .002, .1, '#ffd060', 12)); });
   });
 };
 FORCE_BUILD.ch_celestine = (g, tier, rnd) => {   // the Dawn: a priestess in a cream hood and white robes, ornate gold pauldrons, a crown of long gold rays round the hood (her portrait)
@@ -29097,29 +29105,35 @@ FORCE_BUILD.ch_celestine = (g, tier, rnd) => {   // the Dawn: a priestess in a c
     g.em = .4 + .1 * tier; g.with(T(0, hy + .08, -.13), () => soSun(g, 0, 0, 0, .1 + .02 * tier, '#ffe090', 10)); g.em = 0;   // the dawn halo behind it
   });
 };
-FORCE_BUILD.ch_morrow = (g, tier, rnd) => {   // the Grey Justicar: an old knight, bare-headed with long grey hair and a grey beard, dark plate, a white fur mantle over the left shoulder, a grey cape, the scales on his breast (his portrait)
-  chDais(g, tier, '#8a8c94', '#5e6068', '#c8ccd8', '#c8d8ff');
+FORCE_BUILD.ch_morrow = (g, tier, rnd) => {   // the Grey Justicar on a grey destrier: an old knight, bare-headed with long grey hair and a grey beard, dark plate, a slate caparison edged silver, the scales on his breast (his portrait's)
+  SO_RIDER = { bare: true, hair: WE.hair }; try { FORCE_BUILD.grailknight(g, chSoT(tier), rnd); } finally { SO_RIDER = {}; }
   chSoBody(g, tier, s => {
-    const { y0 } = soBody(g, s, { helm: 'bare', hairLong: '#b4b2ac', beard: '#c4c2bc', beardL: .09, wide: true, cape: true, capeCol: '#6a6c72', emblem: false, enamel: '#4a4e56' });
-    mat(g, 'hair', () => { const F = [[-.17, y0 + .24, .0], [-.14, y0 + .27, .06], [-.09, y0 + .28, -.02], [-.18, y0 + .17, .05], [-.2, y0 + .18, -.04], [-.13, y0 + .24, -.08], [-.05, y0 + .26, .05], [-.19, y0 + .1, .0]];   // the white fur mantle over his left shoulder
-      F.forEach((p, k) => g.ico(p[0], p[1], p[2], .055 - .004 * (k % 3), k % 2 ? '#e8e4dc' : '#d4d0c6', .35, .8)); });
-    mat(g, 'gilt', () => { const c = [0, y0 + .08, .128]; g.seg([c[0], c[1] - .04, c[2]], [c[0], c[1] + .04, c[2]], .008, '#c8ccd8'); g.seg([c[0] - .05, c[1] + .035, c[2]], [c[0] + .05, c[1] + .035, c[2]], .007, '#c8ccd8');   // the scales on his breast
-      for (const sd of [-1, 1]) { g.with(T(c[0] + sd * .05, c[1] + .005, c[2] + .004, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .022, .014, .006, 8, '#d8dce6')); g.seg([c[0] + sd * .05, c[1] + .035, c[2]], [c[0] + sd * .05, c[1] + .008, c[2]], .004, '#c8ccd8'); } });
-    mat(g, 'gilt', () => { for (let k = 0; k < 6; k++) g.ico(-.1 + k * .012, y0 - .06 - k * .02, .1 - k * .004, .008, '#c8ccd8'); });   // the chain
-    mat(g, 'leather', () => g.box(-.08, y0 - .16, .1, .07, .09, .03, '#3a2a1e'));   // a writ case
-    if (tier >= 3) mat(g, 'cloth', () => { for (const sd of [-1, 1]) g.seg([sd * .12, y0 + .2, -.1], [sd * .16, .1, -.2], .012, '#c8ccd8'); });   // grey sashes (IV+)
+    mat(g, 'hair', () => { const F = [[-.1, .82, -.01], [-.085, .845, .03], [-.06, .85, -.03], [-.11, .79, .02], [-.12, .8, -.03]];   // the white fur mantle over his left shoulder
+      F.forEach((p, k) => g.ico(p[0], p[1], p[2], .036 - .003 * (k % 3), k % 2 ? '#e8e4dc' : '#d4d0c6', .35, .8)); });
+    mat(g, 'gilt', () => { const c = [0, .73, .092]; g.seg([c[0], c[1] - .03, c[2]], [c[0], c[1] + .03, c[2]], .006, '#c8ccd8'); g.seg([c[0] - .04, c[1] + .026, c[2]], [c[0] + .04, c[1] + .026, c[2]], .005, '#c8ccd8');   // the scales on his breast
+      for (const sd of [-1, 1]) g.with(T(c[0] + sd * .04, c[1] + .004, c[2] + .003, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .017, .011, .005, 8, '#d8dce6')); });
+    mat(g, 'leather', () => g.box(.12, .58, .1, .03, .07, .05, '#3a2a1e'));   // a writ case at the saddle
+    if (tier >= 3) mat(g, 'cloth', () => { for (const sd of [-1, 1]) g.seg([sd * .08, .8, -.06], [sd * .1, .62, -.14], .01, '#c8ccd8'); });   // grey sashes (IV+)
   });
 };
 // the arms: main (the weapon hand), off (the other), the Order's gauntleted arms (soArm) drawn with each
 FORCE_PARTS.ch_aurelian = [
-  chSoPart('main', [.08, .84, -.02], (g, tier) => {   // the lance arm: a long white lance with a gold guard and a crimson pennon
-    soArm(g, [.02, -.06, .1], { w: .028 });
-    mat(g, 'woodgrain', () => g.seg([.02, -.06, -.24], [.02, -.06, .82], .022, WE.white));
-    mat(g, 'gilt', () => { g.with(T(.02, -.06, .06, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .065, .02, .1, 10, WE.gold)); g.with(T(.02, -.06, .82, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .032, 0, .17, 4, WE.steelL)); });
-    mat(g, 'cloth', () => { const f = (a, b, c, col) => { g.tri(a, b, c, col); g.tri(a, c, b, col); }; f([.02, -.06, .7], [.02, .1, .64], [.02, -.04, .52], '#8a2a24'); f([.02, .1, .64], [.02, .06, .48], [.02, -.04, .52], WE.gold); });
-  }, t => { const w = t.windup || 0, out = t.chg ? 1 : 0; return [-1.1 + 1.1 * Math.max(w, out), 0, 0, 0, 0, 0]; }),
-  chSoPart('off', [-.08, .84, -.02], g => soArm(g, [-.02, -.1, .09], { w: .028 }), t => [-.2 * (t.windup || 0), 0, 0, 0, 0, 0]),
-  ...FORCE_PARTS.grailknight.filter(P => /^leg/.test(P.k)).map(P => Object.assign(Object.create(P), { build(g, tier) { P.build(g, chSoT(tier)); } })),   // the destrier's legs (they gallop on a charge)
+  chSoPart('main', [.15, .65, 0], (g, tier) => {   // the sword arm: a broad longsword, a gold cross and pommel
+    soArm(g, [-.02, -.11, .15], { w: .028 });
+    g.with(T(-.02, -.11, .17, 0, -.25), () => {
+      mat(g, 'leather', () => g.seg([0, 0, -.07], [0, 0, .02], .024, WE.leatherD)); mat(g, 'gilt', () => { g.ico(0, 0, -.085, .03, WE.gold); g.box(0, 0, .03, .2, .028, .028, WE.gold); for (const sd of [-1, 1]) g.ico(sd * .1, 0, .03, .02, WE.gold); });
+      mat(g, 'leafblade', () => { g.box(0, 0, .3, .06, .016, .54, WE.steelL); g.with(T(0, 0, .57, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .034, 0, .08, 4, WE.steelL)); });
+      g.em = .4; mat(g, 'gilt', () => g.box(0, .008, .2, .01, .004, .28, WE.gold)); g.em = 0;
+    });
+  }, t => { const w = t.windup || 0, out = t.chg && t.chg.at != null && G.time - t.chg.at < (t.chg.T || .75) ? 1 : 0, s = soStrikeK(t); return [-.25 - .9 * w + 1.1 * s - .1 * out, .1 * w, 0, 0, 0, .04 * s]; }),
+  chSoPart('off', [-.15, .65, 0], (g, tier) => {   // the shield arm: a cream heater shield edged gold, the gold sun and crest on it
+    soArm(g, [.03, -.13, .16], { w: .028 });
+    g.with(T(.05, -.12, .24, -.12), () => {
+      const h = .5, w = .34; soHeater(g, w, h, WE.cloth, WE.gold, WE.steelD);
+      soSun(g, 0, h * .1, .04, .095, WE.gold, 12);
+      mat(g, 'gilt', () => { g.sphere(0, h * .1, .055, .04, .036, .02, 8, 4, '#d2a646'); for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; g.with(T(Math.cos(a) * .045, h * .1 + Math.sin(a) * .04, .05, 0, 0, a - Math.PI / 2), () => g.cyl(0, 0, 0, .012, 0, .035, 4, k % 2 ? '#e8c060' : '#b88a34')); } });   // the crest
+    });
+  }, t => { const w = t.windup || 0, out = t.chg && t.chg.at != null && G.time - t.chg.at < (t.chg.T || .75) ? 1 : 0; return [-.1 * w - .25 * out, -.1 * out, 0, 0, .02 * out, .03 * out]; }),   // the shield brought forward as he steps out
 ];
 FORCE_PARTS.ch_celestine = [
   chSoPart('main', [.13, .64, 0], (g, tier) => {   // the sunburst staff, taller than she is
@@ -29131,21 +29145,18 @@ FORCE_PARTS.ch_celestine = [
   chSoPart('off', [-.13, .64, 0], g => soArm(g, [-.02, -.14, .08], { cloth: WE.cloth, skin: true }), t => { const w = t.windup || 0, s = soStrikeK(t); return [-.4 * w - .9 * s, -.2 * s, 0, 0, 0, 0]; }),
 ];
 FORCE_PARTS.ch_morrow = [
-  chSoPart('main', [.14, .64, 0], (g, tier) => {   // the heavy crossbow at the shoulder
-    soArm(g, [-.1, -.05, .14]);
-    g.with(T(-.13, -.03, .1), () => {
-      mat(g, 'woodgrain', () => g.box(0, 0, .12, .06, .065, .44, '#3a3430'));
-      mat(g, 'gilt', () => { const pr = .3 + .02 * tier, pts = []; for (let k = 0; k <= 8; k++) { const a = -1 + k / 8 * 2; pts.push([Math.sin(a) * pr, .02, .32 - (1 - Math.cos(a)) * .1]); }
-        for (let k = 0; k < 8; k++) g.seg(pts[k], pts[k + 1], .024 - Math.abs(k - 3.5) * .0015, WE.steelL);
-        g.seg(pts[0], [0, .03, .06], .005, '#e8e4d8'); g.seg(pts[8], [0, .03, .06], .005, '#e8e4d8');
-        g.seg([0, .045, .06], [0, .045, .38], .011, '#e8ecf4'); g.with(T(0, .045, .38, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .018, 0, .05, 4, '#e8ecf4')); });
-    });
-  }, t => { const w = t.windup || 0, s = t.shotT == null ? 9 : t.shotT, kick = s < .18 ? 1 - s / .18 : 0; return [-.08 * w + .12 * kick, 0, 0, 0, 0, -.05 * kick]; }),
-  chSoPart('off', [-.14, .64, 0], (g, tier) => {   // the great ledger, open on his forearm
+  chSoPart('main', [.08, .84, -.02], (g, tier) => {   // the lance arm: a long grey-white lance with a silver guard and a slate pennon (he leads the Knights' charge)
+    soArm(g, [.02, -.06, .1], { w: .028 });
+    mat(g, 'woodgrain', () => g.seg([.02, -.06, -.24], [.02, -.06, .82], .022, '#d8d6d0'));
+    mat(g, 'gilt', () => { g.with(T(.02, -.06, .06, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .065, .02, .1, 10, '#c8ccd8')); g.with(T(.02, -.06, .82, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .032, 0, .17, 4, WE.steelL)); });
+    mat(g, 'cloth', () => { const f = (a, b, c, col) => { g.tri(a, b, c, col); g.tri(a, c, b, col); }; f([.02, -.06, .7], [.02, .1, .64], [.02, -.04, .52], '#4a4e56'); f([.02, .1, .64], [.02, .06, .48], [.02, -.04, .52], '#c8ccd8'); });
+  }, t => { const w = t.windup || 0, out = t.chg && t.chg.at != null && G.time - t.chg.at < (t.chg.T || .75) + .3 ? 1 : 0; return [-1.1 + 1.1 * Math.max(w, out), 0, 0, 0, 0, 0]; }),   // (upright at rest, couched on the charge)
+  chSoPart('off', [-.1, .82, -.01], (g, tier) => {   // the great ledger, open on his forearm
     soArm(g, [-.02, -.12, .12]);
     g.with(T(-.02, -.08, .16, 0, -.6), () => { mat(g, 'leather', () => g.box(0, 0, 0, .2 + .01 * tier, .03, .15, '#4a2e1e')); mat(g, 'cloth', () => g.box(0, .018, 0, .19 + .01 * tier, .012, .14, '#efe8d6'));
       mat(g, 'gilt', () => { g.box(0, -.005, .078, .2, .02, .008, WE.gold); if (tier >= 2) g.ico(0, .03, 0, .015, '#c8d8ff'); }); });
   }, t => [-.15 * (t.windup || 0), 0, 0, 0, 0, 0]),
+  ...FORCE_PARTS.grailknight.filter(P => /^leg/.test(P.k)).map(P => Object.assign(Object.create(P), { build(g, tier) { P.build(g, chSoT(tier)); } })),   // the destrier's legs
 ];
 
 /* ================= THE STORMBORN'S CHAMPIONS: Tarka, Oshana and Huri in person =================
@@ -35764,17 +35775,18 @@ manaOnKill = function (src) {
    - Sunlance Clerics, the dawn-priests who burn the sky clean.
        Noon Sweep (so_halo): a channelled beam of noon light swept across a corner of the road; flyers it crosses are
        dazzled down. Dawnfall (so_dawnfall): every flyer slammed out of the sky, and each crash Blinds the walkers under it.
-   - Hammer Templars, the hammer-zealot whose verdict falls.
-       Hammer Fervour (so_hallow): a flurry of slams, each Judging every walker round it, the last delivering their Verdicts.
-       Hammer of Heaven (so_hammerfall): the hammer hurled into the sky, falling on the toughest foe as a star.
+   - Templars of the Ford (Aurelian's own, once the Hammer Templars), the greatsword zealots whose verdict falls.
+       Shield Fervour (so_hallow): a flurry of slams, each Judging every walker round it, the last delivering their Verdicts.
+       Sword of Heaven (so_hammerfall): the sword hurled into the sky, falling on the toughest foe as a star.
    - Censer Bearers, the thurifers who sanctify the road.
        Procession of Incense (so_smoke): incense walked down the road, cell after cell. Kindle the Censers (so_embers):
        every patch of incense on the road flares at once into holy fire (and is spent).
    - Magebane Inquisitors, the silent hunters of heretic mages.
        Writ of Seizure (so_seize): the seized caster's torn spell is turned on the casters round it. Heretic's Stake
        (so_pyre): a stake rises on the road and the first caster to pass is chained to it and burned.
-   - Aurelian, the Lion who charges: Lion's Roar (ch_fordstandard), a roar that throws a corner of the road back and
-       Wards the line; The Lion's Due (ch_lionsdue), a rampage of charges from Judged foe to Judged foe.
+   - Aurelian, the knight of the shield wall: Bulwark Slam (ch_fordstandard), his shield driven into the road, a shockwave
+       that throws a corner of the road back and Wards the shields beside him; The Crossing (ch_lionsdue), an advance
+       shield-first from Judged foe to Judged foe.
    - Celestine, the singing saint of dawn: Prism of Dawn (ch_morningstar), a beam that bounces off the Oath-Stones of the
        maze; High Noon (ch_highnoon), a sun over her that blinds every foe in reach while her beams split.
    - Morrow, the Grey Justicar: Debt Collection (ch_summons), every debt round a foe gathered onto it; Final Verdict
@@ -36388,10 +36400,10 @@ SOC_DRAW.socsweep = q => {
 }
 
 /* =====================================================================================================
-   6. HAMMER TEMPLARS
+   6. TEMPLARS OF THE FORD (once the Hammer Templars)
    ===================================================================================================== */
-// Hammer Fervour: a flurry of slams round it, each Judging every walker it strikes; the last delivers their Verdicts
-socDef('so_hallow', { name: 'Hammer Fervour', short: 'Fervour', glyph: 'hammer', hue: '#ffe8a0', mana: 90, cd: 14,
+// Shield Fervour: a flurry of slams round it, each Judging every walker it strikes; the last delivers their Verdicts
+socDef('so_hallow', { name: 'Shield Fervour', short: 'Fervour', glyph: 'hammer', hue: '#ffe8a0', mana: 90, cd: 14,
   by: { n: [5, 5, 6, 6, 7, 7], reach: [0, 0, 0, 0, 0, 0], vk: [.6, .6, .6, .6, .6, .6] },
   none: 'no walker in reach',
   auto: 'two or more walkers in reach, or a boss or leader',
@@ -36418,12 +36430,12 @@ socDef('so_hallow', { name: 'Hammer Fervour', short: 'Fervour', glyph: 'hammer',
     } });
   } });
 
-// Hammer of Heaven: hurled into the sky; a moment later it falls on its foe as a star
-socDef('so_hammerfall', { name: 'Hammer of Heaven', short: 'Heaven', glyph: 'bounce', hue: '#c8d0e0', mana: 80, cd: 12, rAdd: 1.5,
+// Sword of Heaven: hurled into the sky; a moment later it falls on its foe as a star
+socDef('so_hammerfall', { name: 'Sword of Heaven', short: 'Heaven', glyph: 'bounce', hue: '#c8d0e0', mana: 80, cd: 12, rAdd: 1.5,
   by: { stun: [1, 1, 1.1, 1.1, 1.2, 1.3], wave: [.9, .9, .9, 1, 1, 1] },
   none: 'no walker in reach',
   auto: 'the toughest walker within reach + 1.5 cells (bosses and elites first)',
-  text: (t, st, ab) => `The hammer falls like a star on the toughest walker: ${xD(st, 3.6)}, stunned ${socBy(ab, 'stun', t)}s and a Verdict half again as strong. The shock knocks down and Judges the walkers within ${gNf(socBy(ab, 'wave', t))} cells for ${xD(st, .6)}.`,
+  text: (t, st, ab) => `His sword is hurled into the sky and falls like a star on the toughest walker: ${xD(st, 3.6)}, stunned ${socBy(ab, 'stun', t)}s and a Verdict half again as strong. The shock knocks down and Judges the walkers within ${gNf(socBy(ab, 'wave', t))} cells for ${xD(st, .6)}.`,
   pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
   cast(t, st, c, ab) {
     t.soThrow = { x: c.x, z: c.y }; t.socThrowC = c; t.cd = Math.max(t.cd, 1.6); sfx('so_hammerfall', 0);
@@ -36441,7 +36453,7 @@ socDef('so_hammerfall', { name: 'Hammer of Heaven', short: 'Heaven', glyph: 'bou
     });
   } });
 // the hammer's flight: up out of the hand into the sky, gone, then falling on its foe, and back to the hand (soExtra calls this
-// while Hammer of Heaven is in the air: c.s from 0.3 to 1.35)
+// while Sword of Heaven is in the air: c.s from 0.3 to 1.35)
 soFlyingHammer = function (t, s, K) {
   const c = t.socThrowC, f = t.soThrow; if (c && !c.dead) { f.x = c.x; f.z = c.y; }
   const hs = SO_SCALE[Math.min(2, t.tier | 0)] || 1;
@@ -36602,24 +36614,28 @@ SOC_DRAW.socstake = q => {
 };
 
 /* =====================================================================================================
-   9. AURELIAN, THE LION OF THE FORD
+   9. AURELIAN, THE LION OF THE FORD (on foot, with the shield wall)
    ===================================================================================================== */
+// Bulwark Slam: the shield driven into the road; a shockwave runs down an 80-degree cone (the name is the owner's to change)
 const SOC_ROAR = Math.cos(40 * Math.PI / 180);
-socDef('ch_fordstandard', { name: "Lion's Roar", short: 'Roar', glyph: 'sunburst', hue: '#e0b050', mana: 90, cd: 14,
-  by: { kb: [.5, .5, .55, .6, .65, .7], j: [2, 2, 2, 2, 2, 2], ward: [3, 3, 3, 4, 4, 4] },
+const SOC_SHIELD_R = 2;   // the Templars of the Ford "beside him" for his shield-line spells and talents (his own unit: heroaff.js)
+const socShields = (t, r) => G.towers.filter(o => o !== t && o.def && o.def.unit === 'templar' && !o.wrecked && !(o.build > .5) && Math.hypot(o.x - t.x, o.y - t.y) <= (r || SOC_SHIELD_R));
+socDef('ch_fordstandard', { name: 'Bulwark Slam', short: 'Slam', glyph: 'shield', hue: '#e0b050', mana: 90, cd: 14,
+  by: { kb: [.5, .5, .55, .6, .65, .7], j: [2, 2, 2, 2, 2, 2], ward: [3, 3, 3, 4, 4, 4], wardS: [2, 2, 2, 2, 2, 2] },
   none: 'no walkers before him in reach',
   auto: 'an 80-degree cone in his reach holding two or more walkers, or a boss or elite',
-  text: (t, st, ab) => `Roars down an 80° cone: every walker takes ${xD(st, .9)} and ${socBy(ab, 'j', t)} Judgement and is thrown ${gNf(socBy(ab, 'kb', t))} cells back (bosses stand); flyers are dragged down 1.5s. The Order's units beside him are Warded ${socBy(ab, 'ward', t)}s.`,
+  text: (t, st, ab) => `He slams his shield into the road and a shockwave runs down an 80° cone: every walker takes ${xD(st, .9)} and ${socBy(ab, 'j', t)} Judgement and is thrown ${gNf(socBy(ab, 'kb', t))} cells back (bosses stand); flyers are knocked down for 1.5s. The Order's units beside him are Warded ${socBy(ab, 'ward', t)}s, and Templars of the Ford within ${SOC_SHIELD_R} cells lock shields with him: Warded ${socBy(ab, 'wardS', t)}s longer.`,
   pick(t, st, ab, man) { const b = abBestCone(t, st, abReach(t, st, ab), SOC_ROAR); if (!b) return null; const L = abCone(t, st, b.ux, b.uz, abReach(t, st, ab), SOC_ROAR); return b.n >= (man ? 1 : 2) || L.some(abBig) ? { x: t.x + b.ux, y: t.y + b.uz, ux: b.ux, uz: b.uz } : null; },
   cast(t, st, p, ab) {
     let ux = p && p.ux, uz = p && p.uz; if (ux == null) { const b = abBestCone(t, st, abReach(t, st, ab), SOC_ROAR); if (!b) return false; ux = b.ux; uz = b.uz; }
-    abSfx('bellow', 0);
-    socFx('ch_fordstandard', t, null, C => {
-      const r = abReach(t, st, ab); v2Wedge(C, t.x, t.y, ux, uz, r, Math.acos(SOC_ROAR), { col: socC(C, SOC.gold), al: .55, sweep: .2, life: .55 });
-      for (let k = 0; k < 3; k++) sfxAdd({ k: 'socroar', delay: .05 + k * .09, x: t.x, z: t.y, ang: Math.atan2(uz, ux), half: Math.acos(SOC_ROAR), r, life: .4, col: socC(C, SOC.light, 1.2) });
-      sfxAdd({ k: 'vstar', x: t.x + ux * .3, z: t.y + uz * .3, h: towerTop(t) * .9, s: .45 * C.S, life: .25, col: socC(C, SOC.gold, 1.5), rot: R(TAU) });
-      v2Spray(C, 'dust', t.x + ux * .8, t.y + uz * .8, .1, 8, { r: .6, ux, uz, sp: 1.4 });
+    socFx('ch_fordstandard', t, null, C => {   // (the shockwave leaves his shield's rim at the road, low, and races out over the cone)
+      const r = abReach(t, st, ab), sx = t.x + ux * .35, sz = t.y + uz * .35;
+      v2Wedge(C, sx, sz, ux, uz, r, Math.acos(SOC_ROAR), { col: socC(C, SOC.gold), al: .45, sweep: .2, life: .5, delay: .18 });
+      for (let k = 0; k < 3; k++) sfxAdd({ k: 'socroar', delay: .2 + k * .09, x: sx, z: sz, ang: Math.atan2(uz, ux), half: Math.acos(SOC_ROAR), r, life: .4, col: socC(C, SOC.light, 1.2) });
+      sfxAdd({ k: 'vstar', x: sx, z: sz, h: .12, s: .4 * C.S, life: .22, delay: .18, col: socC(C, SOC.gold, 1.5), rot: R(TAU) });
+      v2Spray(C, 'dust', sx, sz, .05, 10, { r: .7, ux, uz, sp: 1.6 });
     });
+    G.delayed.push({ t: .18, fn: () => { if (G.state === 'play') sfx('so_bash', 0); } });   // (a heavy shield struck into the road: no roar)
     G.delayed.push({ t: .2, fn: () => {
       if (G.state !== 'play') return; const kb = socBy(ab, 'kb', t);
       abAoe(() => { for (const c of abCone(t, st, ux, uz, abReach(t, st, ab), SOC_ROAR)) {
@@ -36627,25 +36643,31 @@ socDef('ch_fordstandard', { name: "Lion's Roar", short: 'Roar', glyph: 'sunburst
         if (c.fly && !(c.lowT > G.time)) c.lowT = G.time + 1.5 * (c.def.boss ? .4 : 1); else { const x0 = c.x, z0 = c.y; shove(c, kb); if (typeof dragFx === 'function') dragFx(c, x0, z0, '#f0c060'); }
       } });
       for (const o of soUnitsNear(t.x, t.y, 1.6, t)) soWard(o, socBy(ab, 'ward', t));
+      const S = socShields(t);
+      for (const o of S) soWard(o, socBy(ab, 'ward', t) + socBy(ab, 'wardS', t));   // the shields beside him lock with his
+      // Shield Wall: with two or more Templars of the Ford beside him, every one of them slams with him
+      if (st.caps && st.caps.sofWall && S.length >= 2) for (const o of S) {
+        const s2 = o.st || effStats(o); o.shotT = 0; soSlam(o, s2, 1, 1, { sub: 1 }); soEv('fresh:sofWall');
+      }
       G.shake = Math.max(G.shake, .07);
     } });
   },
-  anim: chAnim('thrust', { T: 1.0, tip: ['main', [.02, -.06, .82]], col: [1, .9, .55] }) });
-// the roar's shock: an arc of light racing out across the cone
+  anim: chAnim('slam', { T: 1.1, tip: ['off', [.02, -.1, .2]], col: [1, .85, .45], on: [.45, .9] }) });
+// the slam's shock: an arc of light racing out across the cone
 SOC_DRAW.socroar = (q, u, a) => { const r = q.r * v2Ease(u), w = .18 + .1 * u; if (r < .05) return; vfxFan(VX, q.x, .05, q.z, Math.max(0, r - w), r, q.ang - q.half, q.ang + q.half, vfxLite() ? 8 : 16, q.col, .55 * a, VT.FAN, 1); };
 
-// The Lion's Due: a rampage, charge after charge, each to the most-Judged walker near the last
-socDef('ch_lionsdue', { name: "The Lion's Due", short: 'Due', glyph: 'target', hue: '#ffd76a', mana: 130, cd: 22,
+// The Crossing (once The Lion's Due): an advance across the road on foot, shield-first, each stride a blow at the most-Judged walker near the last
+socDef('ch_lionsdue', { name: 'The Crossing', short: 'Crossing', glyph: 'target', hue: '#ffd76a', mana: 130, cd: 22,
   by: { n: [3, 3, 4, 4, 5, 5], mult: [2.6, 2.8, 3.1, 3.4, 3.7, 4], j: [2, 2, 2, 2, 2, 2] },
   none: 'no walker in reach',
   auto: 'three or more walkers in reach, or a boss or elite',
-  text: (t, st, ab) => `Rides ${socBy(ab, 'n', t)} charges from Judged foe to Judged foe, the most-Judged first: ${xD(st, socBy(ab, 'mult', t))} and ${socBy(ab, 'j', t)} Judgement each. A foe left with 3 or more hears its Verdict.`,
+  text: (t, st, ab) => `He crosses the road shield-first, ${socBy(ab, 'n', t)} strides from Judged foe to Judged foe, the most-Judged first, a blow at each: ${xD(st, socBy(ab, 'mult', t))} and ${socBy(ab, 'j', t)} Judgement each. A foe left with 3 or more hears its Verdict.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length || !(man || L.length >= 3 || L.some(abBig))) return null; return L.reduce((b, c) => !b || soJ(c) > soJ(b) || (soJ(c) === soJ(b) && abByTough(c, b) < 0) ? c : b, null); },
   cast(t, st, c, ab) {
     const n = Math.round(socBy(ab, 'n', t)), P = .42, A = t.ab, struck = new Set(); let tg = c, lx = t.x, lz = t.y;
     t.cd = Math.max(t.cd, n * P); if (A) A.busyT = Math.max(A.busyT || 0, G.time + n * P);
     abSfx('thrust', 1);
-    // Royal Due (capstone): each foe slain on the ride gives it one more charge, 3 at most
+    // The Far Bank (capstone, once Royal Due): each foe slain on the way gives it one more stride, 3 at most
     const R0 = { end: G.time + (n - 1) * P, more: 0, royal: !!(st.caps && st.caps.so_royal_due) };
     const more = () => {
       if (!R0.royal || R0.more >= 3 || !G.towers.includes(t)) return;
@@ -36674,7 +36696,7 @@ socDef('ch_lionsdue', { name: "The Lion's Due", short: 'Due', glyph: 'target', h
     };
     for (let k = 0; k < n; k++) G.delayed.push({ t: k * P, fn: () => ride(k) });
   },
-  anim: chAnim('thrust', { T: .95, tip: ['main', [.02, -.06, .82]], col: [1, .9, .55] }) });
+  anim: chAnim('thrust', { T: .95, tip: ['main', [-.02, -.11, .7]], col: [1, .9, .55] }) });
 
 /* =====================================================================================================
    10. CELESTINE, THE DAWNSINGER
@@ -36927,7 +36949,7 @@ function socLife(id, kind, T) {
 }
 socLife('so_aegis', 'thrust', 1); socLife('so_rebuke', 'raise', 1); socLife('so_hail', 'shoot', .9); socLife('so_flare', 'thrust', .8); socLife('so_halo', 'sweep', 1.3);
 socLife('so_hammerfall', 'raise', 1.6); socLife('so_smoke', 'sweep', 1.2); socLife('so_embers', 'raise', 1);
-if (typeof LIFE_CAST !== 'undefined') {   // Hammer Fervour: a crouch and a heave for every slam
+if (typeof LIFE_CAST !== 'undefined') {   // Shield Fervour: a crouch and a heave for every slam
   const k = [[0]], T = 2.2; for (let i = 0; i < 6; i++) { const s = .15 + i * .3; k.push([s - .1, .03, -.05], [s, .12, -.1, .04], [s + .1, .04, -.03]); } k.push([T]);
   LIFE_CAST.so_hallow = { T, k, f: null };
 }
@@ -37059,7 +37081,7 @@ const FSETS = [
     hit(t, c, amt, sp, n) { if (n >= 3 && sp === 'so_hail' && c.hp > 0 && soJ(c) >= soJMax()) soVerdict(c, t, 1); } },
   { id: 'fs_penance', spells: ['so_crush', 'so_hammerfall'], force: 'silver', unit: 'earth', name: 'Penitent’s Anvil',
     pieces: [['fs_so_gauntlet', 'Penitent’s Gauntlet', 2, 'fist', '#9aa8c8', 'dmg pen'], ['fs_so_pauldron', 'Bell-Iron Pauldron', 3, 'shield', '#b0b8c8', 'dmg as crit']],
-    b2: 'Sanctified Slam Blinds every foe it strikes for 1s, and each slam brings Hammer of Heaven 3s nearer.',
+    b2: 'Sanctified Slam Blinds every foe it strikes for 1s, and each slam brings Sword of Heaven 3s nearer.',
     hit(t, c, amt, sp) { if (sp === 'so_crush' && c.hp > 0) soBlind(c, 1, t); },
     cast(t, ab) { if (ab.id === 'so_crush') { fsReady(t, 'so_hammerfall', 3); fsGlint(t, this); } } },
   { id: 'fs_choir', spells: [], force: 'silver', unit: null, name: 'Vestments of the Dawn Choir',
@@ -39152,7 +39174,7 @@ if (typeof fsetAdd === 'function') {
 
   /* ---------- Ironbreakers: the Blow is followed by the shield ---------- */
   fsetAdd({ id: 'fe_ih_door', epic: 1, spells: ['ih_shieldshove', 'ih_breakerblow', 'ih_bulwark'], force: 'ironhold', unit: 'glaive', name: 'Oathplate of the Iron Door',
-    pieces: [['fe_ih_doorhead', 'Doorwarden’s Axe-Head', 3, 'fist', '#b8885a', 'dmg pen'], ['fe_ih_buckler', 'Rivet-Rimmed Buckler', 3, 'shield', '#a0a8b0', 'as crit'],
+    pieces: [['fe_ih_doorhead', 'Doorwarden’s Axe-Head', 3, 'fist', '#b8885a', 'dmg pen'], ['fe_ih_buckler', 'Rivet-Rimmed Bracers', 3, 'fist', '#a0a8b0', 'as crit'],
       ['fe_ih_doorhelm', 'Helm of the Iron Door', 3, 'halo', '#c8a060', 'dmg as pen'], ['fe_ih_oathcoin', 'Anvil-Struck Oath Coin', 3, 'ring', '#d8b070', 'regen cd']],
     b2: 'Shield Shove strips 3 armour from its foe for 5s.',
     b4: 'After each Breaker’s Blow lands, the Ironbreakers throw Spinning Shield at once, free, and that shield stuns for 1s every walker it strikes that has no armour left.',
@@ -39307,7 +39329,7 @@ if (typeof fsetAdd === 'function') {
 
   /* ---------- Oathsworn Shieldbearers: a full Judgement turns the Bash into a Rampart ---------- */
   fsetAdd({ id: 'fe_so_bulwark', epic: 1, spells: ['so_bash', 'so_aegis'], force: 'silver', unit: 'glaive', name: 'Bulwark of the Last Gate',
-    pieces: [['fe_so_gateboss', 'Last-Gate Shield-Boss', 3, 'shield', '#9fb8e8', 'dmg pen'], ['fe_so_oathmail', 'Oathmail Hauberk', 3, 'fist', '#b0bcd0', 'as crit'],
+    pieces: [['fe_so_gateboss', 'Last-Gate Gorget', 3, 'ring', '#9fb8e8', 'dmg pen'], ['fe_so_oathmail', 'Oathmail Hauberk', 3, 'fist', '#b0bcd0', 'as crit'],
       ['fe_so_wardhelm', 'Helm of the Unbroken Line', 3, 'halo', '#c8d8f0', 'dmg as range'], ['fe_so_gatekey', 'Key of the Last Gate', 3, 'ring', '#bfe0ff', 'regen cd']],
     b2: 'Bulwark Bash lays 2 more Judgement on its foe.',
     b4: 'A Bulwark Bash that fills its foe’s Judgement delivers its Verdict at once, and Rampart of Dawn rolls out free (at most once every 10s).',
@@ -39401,12 +39423,12 @@ if (typeof fsetAdd === 'function') {
       fsLater(.3, () => { if (abLive(t) && fsFreeCast(t, 'so_halo')) fsGlint(t, S); });
     } });
 
-  /* ---------- Hammer Templars: the star that falls twice ---------- */
+  /* ---------- Templars of the Ford: the star that falls twice ---------- */
   fsetAdd({ id: 'fe_so_star', epic: 1, spells: ['so_hallow', 'so_hammerfall'], force: 'silver', unit: 'earth', name: 'Regalia of the Falling Star',
     pieces: [['fe_so_starhammer', 'Starfall Maul-Head', 3, 'fist', '#c8d0e0', 'dmg pen'], ['fe_so_zealplate', 'Zealot’s Riveted Plate', 3, 'shield', '#e8ecf4', 'dmg as crit'],
       ['fe_so_skyhelm', 'Helm of the Open Sky', 3, 'stars', '#ffe8a0', 'dmg as range'], ['fe_so_meteorite', 'Shard of the First Star', 3, 'rune', '#dfe6f0', 'cd mana']],
-    b2: 'Each slam of Hammer Fervour lays 1 more Judgement on a Blinded foe.',
-    b4: 'Hammer of Heaven Blinds every foe it strikes for 2s, and when it slays a foe it falls again at once, free (at most once every 10s).',
+    b2: 'Each slam of Shield Fervour lays 1 more Judgement on a Blinded foe.',
+    b4: 'Sword of Heaven Blinds every foe it strikes for 2s, and when it slays a foe it falls again at once, free (at most once every 10s).',
     hit(t, c, amt, sp, n) {
       if (sp === 'so_hallow' && !c.dead && soBlinded(c)) soJudge(c, 1, t);
       if (n < 4 || sp !== 'so_hammerfall') return;
@@ -39702,7 +39724,7 @@ if (typeof fsetAdd === 'function') {
 
   /* ---------- Anvil Guard: the wall sends the quake ---------- */
   fsetAdd({ id: 'fe_wb_hill', epic: 1, spells: ['wb_shieldwall', 'wb_quakeline'], force: 'wardbound', unit: 'earth', name: 'Regalia of the Iron Hill',
-    pieces: [['fe_wb_runeshield', 'Great Rune-Shield', 3, 'shieldx', '#d89a50', 'dmg splash'], ['fe_wb_bronzemail', 'Bronze-Scaled Hauberk', 3, 'shield', '#b8884a', 'dmg as'],
+    pieces: [['fe_wb_runeshield', 'Great Rune-Girdle', 3, 'rune', '#d89a50', 'dmg splash'], ['fe_wb_bronzemail', 'Bronze-Scaled Hauberk', 3, 'shield', '#b8884a', 'dmg as'],
       ['fe_wb_hillcrown', 'Crown of the Iron Hill', 3, 'mountain', '#c8a050', 'dmg pen splash'], ['fe_wb_stonecharm', 'Stone of the Held Road', 3, 'gem', '#d8c098', 'regen cd']],
     b2: 'Shield Wall brands every walker it stuns.',
     b4: 'Each Shield Wall sends a quake 3 cells along the road both ways, laying stone runes, and Quake Line comes 4s nearer.',
@@ -40979,7 +41001,7 @@ ihcWrapCast('ch_onthehouse', (raw, t, st, p, ab, again) => {
    forces_silver_d.js, forces_zs_silver.js and forces_zx_champ_silver.js (each new one carries a cap key, read here as
    st.caps.<key>). Loaded after every other forces_* file, so the spells and hooks it wraps are their final selves; each
    wrapper keeps the original call. Smaller capstones live where their rule already was (forces_silver_a.js: Vigil, Quick
-   Binding, Kindled Faith, Shockwave; forces_zzz_silver_cool.js: Twin Quarrels, Royal Due, Dawnsinger, Cloister Wall, Wide
+   Binding, Kindled Faith, Shockwave; forces_zzz_silver_cool.js: Twin Quarrels, The Far Bank, Dawnsinger, Cloister Wall, Wide
    Reckoning; forces_zs_silver.js: Grand Inquest). The look reuses the spells' own moments: nothing new on screen. */
 const socxCaps = t => (t && t.st && t.st.caps) || {};
 // a throttle on a unit (not a status: nothing shows it): true, and shut for s seconds, if gate k is open
@@ -41064,7 +41086,7 @@ if (ABIL.so_embers) {
   };
 }
 
-/* ---------- Aurelian: The Ford Itself (Lion's Roar echoes down the same cone) ---------- */
+/* ---------- Aurelian: The Ford Itself (Bulwark Slam's shockwave rebounds down the same cone) ---------- */
 if (ABIL.ch_fordstandard) {
   const ab = ABIL.ch_fordstandard, cast0 = ab.cast;
   ab.cast = function (t, st, p, ab2) {
@@ -41075,7 +41097,7 @@ if (ABIL.ch_fordstandard) {
       if (G.state !== 'play' || !abLive(t)) return;
       const s = t.st || st, r = abReach(t, s, ab2); let n = 0;
       abAoe(() => { for (const c of abCone(t, s, ux, uz, r, SOC_ROAR)) { if (!socFoe(c) || !abWalker(c)) continue; abHit(t, s, c, .6, 'magic'); if (c.dead) continue; soJudge(c, 1, t); stun(c, .6, .4, null); n++; } });
-      abSfx('bellow', 0);
+      sfx('so_bash', 1);
       socFx('ch_fordstandard', t, null, C => { for (let k = 0; k < 2; k++) sfxAdd({ k: 'socroar', delay: k * .09, x: t.x, z: t.y, ang: Math.atan2(uz, ux), half: Math.acos(SOC_ROAR), r, life: .4, col: socC(C, SOC.light, 1.2) }); });
       if (n) soEv('cap:so_ford_echo');
     } });
@@ -41083,7 +41105,7 @@ if (ABIL.ch_fordstandard) {
   };
 }
 
-/* ---------- Aurelian: Debt of Lions (the Order's Verdicts near him bring The Lion's Due nearer) ---------- */
+/* ---------- Aurelian: Debt of Oaths (the Order's Verdicts near him bring The Crossing nearer; the Shieldbearers' bashes: forces_zzzzzzzzzz_shieldline.js) ---------- */
 {
   const after0 = soAfterVerdict;
   soAfterVerdict = function (c, src, n, x, z, st) {
@@ -41137,7 +41159,7 @@ if (typeof CHAMPS !== 'undefined' && CHAMPS.so_judge && CHAMPS.so_judge.kill) {
 }
 function socxOnKill(c, src) {
   const C = socxCaps(src);
-  // Hammer Templars' Anvil: a foe slain by its Verdict rings the anvil, and it slams again (once a second at most)
+  // Templars of the Ford's Ringing Steel (once Anvil): a foe slain by its Verdict rings the blade, and it slams again (once a second at most)
   if (C.so_anvil_ring && c.soVK && soUnit(src) && socxGate(src, 'anvil', 1)) {
     G.delayed.push({ t: .15, fn: () => { if (soAlive(src)) { soEv('cap:so_anvil_ring'); soSlam(src, src.st || effStats(src), 1, 1, { sub: 1 }); } } });
   }
@@ -43822,7 +43844,7 @@ if (typeof SPEC_KW !== 'undefined') SPEC_KW.push({ key: 'ih:offbalance', name: '
    its three Champions' trees (mana while saving, mana a hit or a kill, deeper pools, cheaper or sooner spells, faster
    strikes, flat range, armour ignored, slows, texts shared with other trees) became a rule of the unit's own: the shield
    that dazes and holds, the witness bolt, the vigil over the bound, the lance at the gallop, the cleric against the sky,
-   the templar in the press, the censer's smoke, the inquisitor's seizure, the Lion's charge, the Dawnsinger's Halo, the
+   the templar in the press, the censer's smoke, the inquisitor's seizure, Aurelian's shield line, the Dawnsinger's Halo, the
    Justicar's ledger. The list, old and new, is docs/talent_sameness_audit.md. The talents themselves stay where they were
    (forces_silver_d.js, forces_zs_silver.js, forces_zx_champ_silver.js), each with a cap key (sof*) read here as st.caps.
    Loaded after the capstones (forces_zzzzzzzzz_caps_silver.js) and before the talent names (forces_zzzzzzzzzz_talnames.js);
@@ -43840,7 +43862,6 @@ const sofDazedBy = (c, t) => !!c && c.sofBashBy === t && c.stunT > 0 && G.time -
 const sofInIncense = c => G.hazards.some(z => z.k === 'so_incense' && !z.hallow && z.t > 0 && Math.hypot(c.x - z.x, c.y - z.z) <= z.r + .05);
 // a foe already held stays held s seconds longer (bosses 40% of it)
 const sofHoldOn = (c, s) => { if (c && !c.dead && c.stunT > 0) c.stunT += s * (c.def.boss ? .4 : 1); };
-const SOF_FORD = { at: 'near', near: { unit: ['grailknight', 'oathsworn'], n: 2, r: 2 } };   // (Riders of the Ford, as its spell entry)
 
 /* ---------- riders: Ringing Rampart's daze, Mark of the Accused's Condemnation ---------- */
 SP_RIDE.sofDaze = (c, v, s) => { stun(c, v, .4, null); if (c.stunT > 0 && s) { c.sofBashBy = s; c.sofBashAt = G.time; c.sofPom = 0; } };
@@ -43931,14 +43952,13 @@ function sofBoltLanded(p, tg, st, src) {
   };
 }
 
-/* ---------- Verdicts: Full Gallop and Riders of the Ford (stronger), then what one sets off ---------- */
+/* ---------- Verdicts: Full Gallop (stronger), then what one sets off ---------- */
 {
   const v0 = soVerdict;
   soVerdict = function (c, src, k, o) {
     if (c && src && src.def) {
       const C = sofC(src);
       if (C.sofGallop && src.sofGallopT > G.time && src.sofGallopTg === c) { k = (k || 1) * (1 + .15 * C.sofGallop); soEv('fresh:sofGallop'); }
-      if (C.sofFord && sofChamp(src, 'so_lion') && src.sofChargeT > G.time && spAt(src, 'near', SOF_FORD)) { k = (k || 1) * 1.2; soEv('fresh:sofFord'); }
     }
     return v0.call(this, c, src, k, o);
   };
@@ -43957,7 +43977,7 @@ function sofBoltLanded(p, tg, st, src) {
   };
 }
 
-/* ---------- Grail Knights and Aurelian: the charge ---------- */
+/* ---------- Grail Knights and Aurelian: the charge (his on foot, shield-first) ---------- */
 {
   const ch0 = soCharge;
   soCharge = function (t, st, tg, pow, o) {
@@ -43971,11 +43991,11 @@ function sofBoltLanded(p, tg, st, src) {
     const r = ch0.call(this, t, st, tg, pow, o);
     if (knight && C.sofCouch) G.delayed.push({ t: .3, fn: () => { if (G.state === 'play' && tg.stunT > 0 && soBlinded(tg)) { sofHoldOn(tg, .15 * C.sofCouch); soEv('fresh:sofCouch'); } } });   // Couched Lance
     if (lion && !(o && o.quiet)) {
-      if (C.sofAbreast) for (const k of G.towers) {   // Ride Abreast
-        if (!sofU(k, 'grailknight') || k.wrecked || Math.hypot(k.x - t.x, k.y - t.y) > 2 || !socxGate(k, 'sofAbreast', 8 - 2 * C.sofAbreast)) continue;
-        k.cd = 0; soEv('fresh:sofAbreast');
+      if (C.sofShoulder) for (const k of G.towers) {   // Shoulder to Shoulder: the Templars of the Ford beside him slam again at once
+        if (!sofU(k, 'templar') || k.wrecked || Math.hypot(k.x - t.x, k.y - t.y) > 2 || !(k.cd > 0) || !socxGate(k, 'sofShoulder', 8 - 2 * C.sofShoulder)) continue;
+        k.cd = 0; soEv('fresh:sofShoulder');
       }
-      if (C.sofLowered && j3) G.delayed.push({ t: .3, fn: () => { if (G.state === 'play' && !tg.dead) { stun(tg, .25 * C.sofLowered, .4, null); soEv('fresh:sofLowered'); } } });   // Lowered Lance
+      if (C.sofLowered && j3) G.delayed.push({ t: .3, fn: () => { if (G.state === 'play' && !tg.dead) { stun(tg, .25 * C.sofLowered, .4, null); fxSpark(tg.x, tg.y, hitH(tg), SO.COL.silver, 6); soEv('fresh:sofLowered'); } } });   // Lowered Shield
       if (C.sofHearts) { const n = Math.min(4, soUnitsNear(t.x, t.y, 1.65, t).length); if (n) { sofMana(t, C.sofHearts * n); soEv('fresh:sofHearts'); } }   // Hearts Lifted
     }
     return r;
@@ -44086,22 +44106,30 @@ if (ABIL.ch_highnoon) {
   };
 }
 
-/* ---------- Aurelian: Lion's Charge (Trampling Host, Pride), Lion's Roar (Standard-Bearer, Rallying Banner) ---------- */
+/* ---------- Aurelian: Dawnsweep (Burnished Shields, Unbroken), Bulwark Slam (Shields Raised, Rally to the Shield) ---------- */
 {
   const lc0 = soLionCharge;
   soLionCharge = function (p, R, hp, h) {
     const t = typeof CHAMP_CASTER !== 'undefined' ? CHAMP_CASTER : null;
     const r = lc0.call(this, p, R, hp, h);
     if (!t || !t.def || G.hero !== 'so_lion' || !p) return r;
-    const C = sofC(t); if (!C.sofTrample && !C.sofPride) return r;
+    const C = sofC(t); if (!C.sofBurnish && !C.sofPride) return r;
     let S = null;
-    G.delayed.push({ t: .2, fn: () => { S = []; inSplash(p.x, p.y, R, true, c => { if (sofFoe(c)) S.push(c); }); } });   // (the knights strike at .25: who stands in their path)
+    G.delayed.push({ t: .2, fn: () => { S = []; inSplash(p.x, p.y, R, true, c => { if (sofFoe(c)) S.push(c); }); } });   // (the sweep lands at .25: who stands in its arc)
     G.delayed.push({ t: .34, fn: () => {
       if (G.state !== 'play' || !S) return;
-      for (const c of S) {
-        if (c.dead) continue;
-        if (C.sofTrample) { woundFoe(c, 2 * C.sofTrample); soEv('fresh:sofTrample'); }
-        if (C.sofPride && !c.fly && soUnitsNear(c.x, c.y, 1).length) { stun(c, .4 * C.sofPride, .4, null); soEv('fresh:sofPride'); }
+      const shields = G.towers.filter(o => sofU(o, 'templar') && !o.wrecked && !(o.build > .5));
+      // Unbroken: a walker thrown back onto a Templar of the Ford meets its shield
+      if (C.sofPride) for (const c of S) {
+        if (c.dead || c.fly) continue; const o = shields.find(q => Math.hypot(q.x - c.x, q.y - c.y) <= 1); if (!o) continue;
+        stun(c, .4 * C.sofPride, .4, null); soJudge(c, 1, o); o.soBashAt = G.time; fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 6); soEv('fresh:sofPride');
+      }
+      // Burnished Shields: each Templar of the Ford the sweep made Radiant flashes its shield at the walkers in its reach
+      if (C.sofBurnish) for (const o of shields) {
+        if (!(o.soRadT > G.time) || (!sagaHas('fin') && Math.hypot(o.x - p.x, o.y - p.y) > R + 1.3)) continue;
+        const s2 = o.st || effStats(o); let n = 0;
+        for (const c of G.creeps) { if (!sofFoe(c) || c.fly || Math.hypot(c.x - o.x, c.y - o.y) > s2.range || !canTarget(o, s2, c)) continue; soJudge(c, 1, o); stun(c, .3 * C.sofBurnish, .4, null); n++; }
+        if (n) { o.soBashAt = G.time; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) * .6, life: .3, max: .3, size: .7, col: SO.COL.light }); fxRing(o.x, o.y, s2.range, SO.COL.gold); soEv('fresh:sofBurnish'); }
       }
     } });
     return r;
@@ -44146,7 +44174,7 @@ if (ABIL.ch_summons) {
   };
 }
 
-/* ---------- Hammer Templars: Censed Hammer, Press of Battle, Consecrated Earth ---------- */
+/* ---------- Templars of the Ford: Censed Blade, Press of Battle, Consecrated Earth ---------- */
 {
   const sl0 = FORCE_ATTACK.so_slam;
   FORCE_ATTACK.so_slam = function (t, st, tg, pow, echo) {
@@ -44256,7 +44284,6 @@ if (ABIL.so_seize) {
     if (!dot && src && src.def && src.st && src.st.caps) {
       const C = src.st.caps;
       if (C.sofDry && sofU(src, SXS_U) && c.mpMax > 0 && !(c.mp > 0)) a += .15 * C.sofDry;   // Dry Well
-      if (C.sofSpring && src.sofChargeT > G.time && !AB_NOW && c.stunT > 0 && sofChamp(src, 'so_lion')) a += .1 * C.sofSpring;   // Lion's Spring
     }
     return a;
   };
@@ -45455,6 +45482,104 @@ WB_HOOK.kill.push(c => {
   if (n && Math.hypot(c.x - s.x, c.y - s.y) <= ((s.st && s.st.range) || 1.8) + .1) wbfMana(s, 3 * n);
 });
 
+/* ================= THE SILVER ORDER: Aurelian's shield line, and Morrow's riders =================
+   The owner (9 Nov 2026): "make him synergise with the shields, we can make a new hero to have the horse synergies. put some
+   of the talents/spells on another unit, perhaps morrow can be on a horse ... keep lionheart as a name, just need to tone
+   down all the references to a lion." Aurelian now fights on foot beside his own Templars of the Ford (his kit and tree:
+   forces_zx_champ_silver.js; Bulwark Slam and The Crossing: forces_zzz_silver_cool.js); Morrow rides the Knights' destrier
+   and the cavalry talents went with him. This file holds the rules that hang on a Templar's slam and on Morrow's
+   Debt Collection. Loaded after the fresh talents (forces_zzzzzzzzzz_fresh_silver.js); each wrapper keeps the original call.
+   Everything here shows: Radiance and Wards on the units, bashes (the shield's spark and sound), the cooldown on the card. */
+
+const sslChamp = h => (G.hero === h && G.towers.find(o => o.id === G.champ && o.def && !o.wrecked)) || null;
+const sslCaps = t => (t && t.st && t.st.caps) || {};
+
+/* ---------- a Templar of the Ford's slam: Shield Brothers (Aurelian's passive), Locked Shields (his affinity), Debt of Oaths, Swift Reprisal ----------
+   (owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead": the Templars of the Ford are his own unit) */
+{
+  const slam0 = soSlam;
+  soSlam = function (t, st, pow, mult, o) {
+    const n = slam0.call(this, t, st, pow, mult, o);
+    if (G.state !== 'play' || G.hero !== 'so_lion' || !t || !t.def || t.def.unit !== 'templar') return n;
+    // Shield Brothers: every unit beside the slamming Templar turns Radiant for 2s
+    if (!(o && o.sub)) { for (const u of soUnitsNear(t.x, t.y, 1.65, t)) soRadiate(u, 2, SO.RAD_K); soEv('passive:so_lion:slam'); }
+    const L = sslChamp('so_lion'); if (!L || Math.hypot(L.x - t.x, L.y - t.y) > SOC_SHIELD_R) return n;
+    // Locked Shields: each slam Wards it 1.5s; every 3rd is a shield bash on up to 4 of the walkers it struck
+    soWard(t, 1.5); soEv('aff:so_lion');
+    if (!(o && o.sub) && (t.sslN = (t.sslN || 0) + 1) % 3 === 0) {
+      const R0 = st.range; let k = 0;
+      for (const c of G.creeps.slice()) { if (k >= 4) break; if (!socFoe(c) || !abWalker(c) || Math.hypot(c.x - t.x, c.y - t.y) > R0 || !canTarget(t, st, c)) continue; soBash(t, st, c, .6); if (!c.dead) soDaze(c, t); k++; }
+      if (k) { sfx('so_bash', 1); soEv('aff:so_lion:bash'); }
+    }
+    const C = sslCaps(L);
+    // Debt of Oaths: the slam brings The Crossing 1s nearer (shares the Verdicts' gate: twice a second at most)
+    if (C.so_lion_debt && L.ab && L.ab.cd && L.ab.cd.ch_lionsdue > G.time && socxGate(L, 'debt', .5)) { L.ab.cd.ch_lionsdue = Math.max(G.time, L.ab.cd.ch_lionsdue - 1); soEv('cap:so_lion_debt'); }
+    // Swift Reprisal: a slam that strikes 2 or more walkers draws his next strike at once
+    if (C.sofReprisal && n >= 2 && socxGate(L, 'sofReprisal', 7 - 1.5 * C.sofReprisal)) { L.cd = 0; soEv('fresh:sofReprisal'); }
+    return n;
+  };
+}
+
+/* ---------- Morrow: Riders of the Ford, Trampling Host (his Debt Collection, from the saddle) ---------- */
+if (ABIL.ch_summons) {
+  const ab = ABIL.ch_summons, cast0 = ab.cast;
+  ab.cast = function (t, st, c, ab2) {
+    const r0 = cast0.call(this, t, st, c, ab2); if (r0 === false || !c || !c.def) return r0;
+    const C = (st && st.caps) || {};
+    if (C.sofTrample) {   // Trampling Host: every walker on the line between him and its foe is ridden down
+      let n = 0;
+      for (const q of G.creeps) {
+        if (q === c || !socFoe(q) || !abWalker(q) || !canTarget(t, st, q) || socSeg(q.x, q.y, t.x, t.y, c.x, c.y)[0] > .4) continue;
+        soJudge(q, 1, t); woundFoe(q, 2 * C.sofTrample); fxDust(q.x, q.y, 2); n++;
+      }
+      if (typeof rfx === 'function') rfx({ k: 'drag', x0: t.x, z0: t.y, x1: c.x, z1: c.y, h: .15, col: '#c8ccd8', life: .5 });
+      if (n) soEv('fresh:sofTrample');
+    }
+    if (C.sofFord) G.delayed.push({ t: .38, fn: () => {   // Riders of the Ford: the Grail Knights beside him charge its foe
+      if (G.state !== 'play' || c.dead || c.fly) return;
+      for (const k of G.towers) {
+        if (!k.def || k.def.unit !== 'grailknight' || k.wrecked || (k.build > .5) || Math.hypot(k.x - t.x, k.y - t.y) > 2) continue;
+        const s2 = k.st || effStats(k); if (!canTarget(k, s2, c) || Math.hypot(c.x - k.x, c.y - k.y) > s2.range + 1 || !socxGate(k, 'sofFord', 4)) continue;
+        k.ang = Math.atan2(c.x - k.x, c.y - k.y); soCharge(k, s2, c, 1, { down: true }); soEv('fresh:sofFord');
+      }
+    } });
+    return r0;
+  };
+}
+/* ---------- Morrow's lance: Lead the Charge (his affinity), and his strikes as his old bolts landed (the Ledger's talents) ---------- */
+{
+  const ch0 = soCharge;
+  soCharge = function (t, st, tg, pow, o) {
+    const r = ch0.call(this, t, st, tg, pow, o);
+    if (G.state !== 'play' || !t || !t.def || t.def.unit !== 'ch_morrow' || !tg || G.hero !== 'so_judge') return r;
+    if (!(o && (o.quiet || o.again))) for (const k of G.towers) {   // Lead the Charge: the Grail Knights beside him charge with him
+      if (!k.def || k.def.unit !== 'grailknight' || k.wrecked || (k.build > .5) || Math.hypot(k.x - t.x, k.y - t.y) > 2 || !socxGate(k, 'sslLead', 4)) continue;
+      k.cd = 0; soEv('aff:so_judge');
+    }
+    G.delayed.push({ t: .28, fn: () => {   // (as the lance lands: what his bolts did as they landed, forces_zzzzzzzzzz_fresh_silver.js, and Grey Justicar)
+      if (G.state !== 'play' || tg.dead || !G.towers.includes(t)) return; const s = t.st || st;
+      sofBoltLanded({ soBolt: 1, lance: 1 }, tg, s, t);
+      if (s.caps && s.caps.so_grey_warrant) { let n = 0; inSplash(tg.x, tg.y, .8, false, q => { if (q === tg || !socFoe(q)) return; if (soJudge(q, 1, t)) n++; }); if (n) { fxRing(tg.x, tg.y, .8, '#c8ccd8'); soEv('cap:so_grey_warrant'); } }
+    } });
+    return r;
+  };
+}
+// Ride Them Down: his charges strike a dazed, bound or knocked-down foe harder (its Judgement is Bailiff's old rule)
+{
+  const H = FORCE_HOOKS.silver, amp0 = H.amp;
+  H.amp = function (c, src, dot) {
+    let a = amp0 ? amp0.call(this, c, src, dot) || 0 : 0;
+    if (!dot && c && src && src.def && src.def.unit === 'ch_morrow' && G.hero === 'so_judge' && !AB_NOW && c.stunT > 0) { const k = sslCaps(src).sofBailiff; if (k) { a += .1 * k; soEv('fresh:sofBailiff:amp'); } }
+    return a;
+  };
+}
+
+/* ---------- talent paintings: a renamed talent shows its old painting (ui.js talIconOf; keys are force:slot:name) ---------- */
+// (the new shield talents, Shoulder to Shoulder, Shield Wall, Burnished Shields and Swift Reprisal, are drawn until painted)
+const TAL_ART_ALIAS = { 'Lowered Shield': 'Lowered Lance', 'Wide Sweep': 'Wide Wedge', 'Shields Raised': 'Standard-Bearer', 'Rally to the Shield': 'Rallying Banner',
+  'The Far Bank': 'Royal Due', 'Debt of Oaths': 'Debt of Lions', 'Unbroken': 'Pride', 'Ride Them Down': 'Bailiff',
+  'Ringing Steel': 'Anvil', 'Blade of Judgement': 'Hammer of Judgement', 'Marked by the Blade': 'Marked by the Hammer', 'Censed Blade': 'Censed Hammer' };
+
 /* ================= TALENT NAMES: a saved run's talent picks follow their talents by name =================
    Picks are saved by a talent's place in its tree (G.tal[slot][i]). The capstone and wall-talent rework (7 Nov 2026)
    cut and moved talents, so a place no longer means the same talent. Saves now carry each tree's names (taln, ftv 5:
@@ -45479,7 +45604,14 @@ function talNamesOld(force, hero) {
 const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (the Pyroclasts' spell row, 8 Nov 2026)
   // (the Wardbound's Masked Wardens became the Glaive Wardens, 8 Nov 2026: their arrow talents and spells renamed in place)
   'Rune-Etched Heads': 'Rune-Etched Edge', 'Pinning Draw': 'Branding Edge', 'Falling Stars': 'Branding Rite', 'Line Shot': 'Line Cut', 'Long Shaft': 'Dragging Edge',
-  'Nocked Again': 'Caught Again', 'Arrow of Judgement': 'Glaive of Judgement', 'Piercing Shaft': 'Returning Oath', 'Warding Arrow': 'Warding Glaive' };
+  'Nocked Again': 'Caught Again', 'Arrow of Judgement': 'Glaive of Judgement', 'Piercing Shaft': 'Returning Oath', 'Warding Arrow': 'Warding Glaive',
+  // (Aurelian on foot with the shield wall, 9 Nov 2026: his talents renamed in place; Ride Abreast, Riders of the Ford, Trampling
+  // Host and Pride's rule left him (the cavalry went to Morrow), so their points come back, but for Pride, whose place Unbroken keeps)
+  'Lowered Lance': 'Lowered Shield', 'Wide Wedge': 'Wide Sweep', 'Standard-Bearer': 'Shields Raised', 'Rallying Banner': 'Rally to the Shield', 'Royal Due': 'The Far Bank',
+  'Debt of Lions': 'Debt of Oaths', 'Pride': 'Unbroken', 'Bailiff': 'Ride Them Down',
+  // (the Templars of the Ford, once the Hammer Templars: Aurelian's own unit with swords and shields)
+  'Anvil': 'Ringing Steel', 'Hammer of Judgement': 'Blade of Judgement', 'Marked by the Hammer': 'Marked by the Blade', 'Censed Hammer': 'Censed Blade',
+  'Hammer Fervour': 'Shield Fervour', 'Hammer of Heaven': 'Sword of Heaven', "Lion's Spring": 'Swift Reprisal', "Lion's Roar": 'Bulwark Slam', "The Lion's Due": 'The Crossing', 'Banner at the Ford': 'Bulwark Slam' };
 function talRemapByName(src, oldNames, list) {
   if (!Array.isArray(src) || !Array.isArray(oldNames) || !list) return src;
   if (oldNames.length === list.length && oldNames.every((n, i) => n === list[i].name)) return src;
@@ -45882,7 +46014,7 @@ const UNIT_KIND = {
   steamhammer: ['melee', 'hammer'], mortarcrew: ['gun'], siegebreaker: [], ch_haldra: ['melee', 'hammer'],
   // the Silver Order
   oathsworn: ['melee', 'blade'], silverbolt: ['bow'], lightbinder: ['caster'], grailknight: ['melee', 'polearm', 'rider'],
-  sunlance: ['caster'], templar: ['melee', 'hammer'], censer: ['caster'], so_inquisitor: ['caster'], ch_aurelian: ['melee', 'polearm', 'rider'],
+  sunlance: ['caster'], templar: ['melee', 'hammer'], censer: ['caster'], so_inquisitor: ['caster'], ch_aurelian: ['melee', 'blade'], ch_morrow: ['melee', 'polearm', 'rider'],
   // the Stormborn
   sb_wolfguard: ['melee', 'polearm'], sb_windrunner: ['bow'], sb_hailshaman: ['caster'], sb_spiritwalker: ['caster'],
   sb_thundercaller: ['caster'], sb_earthbinder: ['melee', 'hammer'], sb_clouddancer: ['caster'], sb_skyhunter: ['polearm'], ch_tarka: ['caster'],
@@ -45919,7 +46051,7 @@ const CLASS_ITEMS = [
   ['blade', ['cc_hilt', 'wbr_whetrune', 'wbr_sigilstone', 'wbr_pommel', 'so_oathblade']],
   ['polearm', ['gv_ashhaft', 'gv_huntlance', 'sbr_hookedbone', 'wbr_rimehook', 'so_s_lance']],
   ['hammer', ['ih_hammerhead', 'ih_anvilchip']],
-  ['melee', ['ih_shieldboss', 'so_bossshield']],
+  // (melee: the two shield-bosses were retired, owner 9 Nov 2026: no shields drop)
   ['rider', ['so_spur']],
 ];
 for (const [k, ids] of CLASS_ITEMS) for (const id of ids) {
@@ -45989,8 +46121,9 @@ if (typeof FORCE_TIPS !== 'undefined') FORCE_TIPS.ironhold = [
      (attacks a second) and DPS. They drive the unit's basic strike: its tier, talents, items and hero multiply on top
      (wpnApply runs right after talentStats in effStats, so every later multiplier sees it). Each strike rolls inside the
      range (wpnRollPow, through forceHook('fire')); a unit's spells are multiples of its strike, so they follow its average.
-   - A unit with no weapon carries its STARTER weapon ("Worn ..."): exactly its baseline (x1 damage, x1 speed), so nothing
-     changes until a better one drops. Old saves load with every unit on its starter.
+   - A unit with no weapon carries its ISSUED weapon (WPN_ISSUED: its own name for what its model holds, "Thornguard Spear",
+     "Spellblade's Amethyst Edge"): exactly its baseline (x1 damage, x1 speed), so nothing changes until a better one drops.
+     Shared classes are named in each force's own style (WPN_STYLE). Old saves load with every unit on its issued weapon.
    - Caster weapons (staves, wands, orbs, tomes, censers, rattles, fans ...: WPN_CLASS[c].cast) carry less strike and a big
      Spell Damage line (the WoW-style stat: itempower.js SPELL DAMAGE, per-spell coefficients), WSP below, sized to the
      wearer's own strike (wpnSpK): a typical caster drop adds about a third to its spell hits, an epic about half, a
@@ -46037,16 +46170,32 @@ const WPN_CLASS = {
     ['quarter', 'Quarterstaff', 1.1, .1, 'a straight banded staff, worn smooth in two places'],
     ['runestaff', 'Rune Staff', .94, .12, 'a staff carved with glowing runes along its length'],
     ['spirestaff', 'Spire Staff', .88, .14, 'a tall staff ending in a spire of crystal held by claws']] },
-  wand: { icon: 'beam', hue: '#9a6ad0', cast: 1, size: 'a forearm\'s length', bases: [
+  wand: { retired: 'orb', icon: 'beam', hue: '#9a6ad0', cast: 1, size: 'a forearm\'s length', bases: [   // (no unit holds a wand now: old wands load as orbs, WPN_MOVED)
     ['birchwand', 'Birch Wand', 1, .12, 'a short white birch wand, a bead at the tip'],
     ['sparkwand', 'Spark Wand', 1.12, .1, 'a copper-wound wand that spits sparks'],
     ['crystalwand', 'Crystal Wand', .94, .14, 'a wand with a violet crystal point'],
     ['leywand', 'Ley Wand', .9, .14, 'a dark wand inlaid with glowing silver lines']] },
-  orb: { icon: 'orb', hue: '#5a7ad0', cast: 1, size: 'a fist-sized orb or focus, held or floating over the hand', bases: [
+  orb: { icon: 'orb', hue: '#5a7ad0', cast: 1, size: 'a fist-sized orb or focus cupped in the palm or floating just over it (these units cast from the bare hand)', bases: [
     ['glassorb', 'Glass Orb', 1, .1, 'a clear glass sphere with a swirl of light inside'],
     ['emberorb', 'Ember Orb', .92, .14, 'a dark orb with a coal glowing in its heart'],
     ['starorb', 'Star Orb', 1.06, .12, 'a deep blue orb flecked with tiny stars, in a brass cage'],
-    ['hourglass', 'Hour-Glass Focus', 1.1, .1, 'a small hourglass set in a ring of brass dials']] },
+    ['hourglass', 'Hour-Glass Focus', 1.1, .1, 'a small hourglass set in a ring of brass dials'],
+    ['rimeshard', 'Rime Shard', 1.04, .12, 'a shard of blue ice turning slowly over the palm']] },
+  twinblade: { icon: 'swords', hue: '#c04a6a', size: 'a double-bladed sword gripped at its middle, a little longer than the unit is tall', bases: [
+    ['doubleblade', 'Double Blade', 1, .12, 'two straight blades on one leather grip'],
+    ['crescenttwin', 'Crescent Twinblade', 1.08, .1, 'two curved blades turning opposite ways from the grip'],
+    ['rifttwin', 'Rift Twinblade', .92, .14, 'two long blades with violet edges and a small crescent at the grip'],
+    ['wartwin', 'War Twinblade', .86, .16, 'two heavy broad blades on a steel-banded grip']] },
+  gauntlet: { icon: 'fist', hue: '#b0703a', size: 'a great gauntlet over the hand and forearm (a spanner stays in the other hand)', bases: [
+    ['coppergauntlet', 'Copper Gauntlet', 1, .12, 'a big riveted copper gauntlet with a coil on the back'],
+    ['pistonfist', 'Piston Fist', .88, .16, 'a gauntlet with a steam piston along the forearm'],
+    ['coilglove', 'Coil Glove', 1.1, .1, 'a light glove wound with crackling copper wire'],
+    ['lodestone', 'Lodestone Gauntlet', .94, .14, 'a black iron gauntlet with a lodestone set in the palm']] },
+  ladle: { icon: 'potion', hue: '#8a6a3a', size: 'a long brewer\'s ladle or paddle, half the unit\'s height (a jug in the other hand)', bases: [
+    ['brewladle', 'Brewer\'s Ladle', 1, .12, 'a long copper ladle with a deep bowl'],
+    ['mashpaddle', 'Mash Paddle', .9, .16, 'a broad oak paddle with holes through the blade'],
+    ['dipper', 'Copper Dipper', 1.1, .1, 'a small bright dipper on a short handle'],
+    ['caskmallet', 'Cask Mallet', .86, .18, 'a heavy wooden mallet for driving taps']] },
   tome: { icon: 'rune', hue: '#8a5a3a', cast: 1, size: 'a book or scroll case, held in the off hand', bases: [
     ['codex', 'Codex', 1, .1, 'a thick leather codex with iron corners'],
     ['grimoire', 'Grimoire', .92, .14, 'a black-bound grimoire with a clasp and a gem'],
@@ -46176,10 +46325,13 @@ const WPN_CLASS = {
 // each force unit's class (its look; casters' classes carry Spell Damage)
 const WPN_UNIT = {
   thornguard: 'spear', gladebow: 'bow', briarwarden: 'staff', staglancer: 'lance', wayfarer: 'druidbow', bladedancer: 'daggers', seedcaster: 'sling', thornwarden: 'thrower', ch_elowen: 'staff',
-  oathsworn: 'sword', silverbolt: 'xbow', lightbinder: 'staff', grailknight: 'lance', sunlance: 'staff', templar: 'hammer', censer: 'censer', so_inquisitor: 'tome', ch_aurelian: 'lance',
-  cc_spellblade: 'sword', cc_mageling: 'wand', cc_rimeweaver: 'staff', cc_chronomancer: 'orb', cc_astrologer: 'orb', cc_golemwarden: 'golem', cc_pyroclast: 'orb', cc_severer: 'riftglaive', ch_maelis: 'staff',
+  oathsworn: 'sword', silverbolt: 'xbow', lightbinder: 'staff', grailknight: 'lance', sunlance: 'staff', templar: 'sword', censer: 'censer', so_inquisitor: 'tome', ch_aurelian: 'sword',
+  cc_spellblade: 'sword', cc_mageling: 'orb', cc_rimeweaver: 'staff', cc_chronomancer: 'orb', cc_astrologer: 'orb', cc_golemwarden: 'golem', cc_pyroclast: 'orb', cc_severer: 'riftglaive', ch_maelis: 'staff',
   ironbreaker: 'axe', thundergun: 'rifle', chaintrapper: 'chain', runesmith: 'runehammer', flakgunner: 'cannon', steamhammer: 'hammer', mortarcrew: 'mortar', siegebreaker: 'pole', ch_haldra: 'hammer',
   sb_wolfguard: 'spear', sb_windrunner: 'bow', sb_hailshaman: 'staff', sb_spiritwalker: 'rattle', sb_thundercaller: 'staff', sb_earthbinder: 'hammer', sb_clouddancer: 'fans', sb_skyhunter: 'harpoon', ch_tarka: 'staff',
+  // the Champions not leading by default (CHAMPS: one of each force's three stands in its holy slot)
+  ch_aurel: 'staff', ch_maren: 'twinblade', ch_faelan: 'bow', ch_nyssa: 'staff', ch_tovin: 'gauntlet', ch_grenna: 'ladle',
+  ch_celestine: 'staff', ch_morrow: 'lance', ch_oshana: 'staff', ch_huri: 'spear', ch_aedric: 'lance', ch_isaura: 'sword',
   wb_oathbound: 'sword', wb_maskedwarden: 'glaive', wb_frostbrand: 'halberd', wb_runecarver: 'tome', wb_stormward: 'stormlance', wb_anvilguard: 'hammer', wb_siegewarden: 'ballista', wb_vowkeeper: 'sword', ch_varic: 'sword',
 };
 /* ---------- the legendary weapons: [unit, id, name, look, effect] ----------
@@ -46215,20 +46367,21 @@ const WPN_LEGS = [
   ['grailknight', 'wl_vowlance', 'Lance of the Vow', 'a white lance with a blue and gold pennon', ['spell', 'so_vow', 'frenzy']],
   ['sunlance', 'wl_noonspire', 'Noonspire', 'a staff topped by a gold sunburst', ['hit', 'burn', 3]],
   ['sunlance', 'wl_dawnfall', 'Staff of Dawnfall', 'a staff whose crystal holds a falling sun', ['spell', 'so_dawnfall', 'echo']],
-  ['templar', 'wl_swornhour', 'Hammer of the Sworn Hour', 'a gold-chased hammer with a bell in the head', ['hit', 'shred', 3]],
-  ['templar', 'wl_heavenanvil', 'Heaven\'s Anvil', 'a hammer whose head is a small white anvil with wings', ['spell', 'so_hammerfall', 'reset']],
+  ['templar', 'wl_swornhour', 'Blade of the Sworn Hour', 'a gold-chased sword with a small bell set in the pommel',   // (the Templars are sword-and-shield knights now: owner, 9 Nov 2026)
+   ['hit', 'shred', 3]],
+  ['templar', 'wl_heavenanvil', 'Heaven\'s Edge', 'a broad white sword with wings spreading from the cross guard', ['spell', 'so_hammerfall', 'reset']],
   ['censer', 'wl_saints', 'Thurible of Saints', 'a great domed thurible of gold with saints in relief', ['hit', 'burn', 3]],
   ['censer', 'wl_emberchain', 'Ember-Chain Censer', 'a censer on red-hot chains, embers falling from it', ['spell', 'so_embers', 'echo']],
   ['so_inquisitor', 'wl_ashwrit', 'Writ of Ashes', 'a scroll of charred parchment on an iron rod', ['hit', 'manaburn', 3]],
   ['so_inquisitor', 'wl_finaledict', 'The Final Edict', 'a heavy iron-bound book with a lock and chain', ['spell', 'so_pyre', 'echo']],
-  ['ch_aurelian', 'wl_lionmane', 'Lionmane Lance', 'a gold lance with a lion\'s head guard and mane tassels', ['spell', 'ch_lioncharge', 'frenzy']],
+  ['ch_aurelian', 'wl_lionmane', 'Lionmane Blade', 'a broad gold-hilted sword with a lion\'s head pommel and mane-tassel guard', ['spell', 'ch_lioncharge', 'frenzy']],
   // ---- the Conclave ----
   ['cc_spellblade', 'wl_riftedge', 'Riftedge', 'a sword whose blade is torn violet light in a steel frame', ['hit', 'arc', 3]],
   ['cc_spellblade', 'wl_wardsplit', 'Ward-Splitter\'s Brand', 'a long sword with a split blade and a rune between', ['spell', 'cc_sigilcleave', 'echo']],
-  ['cc_mageling', 'wl_sparktongue', 'Spark-Tongue Wand', 'a forked wand that hisses with blue sparks', ['hit', 'manaburn', 4]],
-  ['cc_mageling', 'wl_orbweaver', 'Orbweaver\'s Wand', 'a wand with a small orbit of motes round its tip', ['spell', 'cc_grandorb', 'echo']],
-  ['cc_rimeweaver', 'wl_rimecrown', 'Rimecrown Staff', 'a staff crowned with a ring of icicles', ['hit', 'chill', 3]],
-  ['cc_rimeweaver', 'wl_glacierspine', 'Glacier\'s Spine', 'a long staff of blue ice like a vertebra', ['spell', 'cc_glacialglyph', 'freeze']],
+  ['cc_mageling', 'wl_sparktongue', 'Spark-Tongue Orb', 'a small orb of blue sparks that hisses over her palm', ['hit', 'manaburn', 4]],
+  ['cc_mageling', 'wl_orbweaver', 'Orbweaver\'s Mote', 'a bright mote with a small orbit of lesser motes round it', ['spell', 'cc_grandorb', 'echo']],
+  ['cc_rimeweaver', 'wl_rimecrown', 'Rimecrown Staff', 'a frost-crystal staff crowned with a ring of icicles', ['hit', 'chill', 3]],
+  ['cc_rimeweaver', 'wl_glacierspine', 'Glacier\'s Heart Staff', 'a staff of blue ice holding a heart of glacier ice, cold mist falling from it', ['spell', 'cc_glacialglyph', 'freeze']],
   ['cc_chronomancer', 'wl_hourwarden', 'Hourwarden\'s Glass', 'a tall hourglass whose sand runs upward', ['hit', 'daze', 4]],
   ['cc_chronomancer', 'wl_stoppedclock', 'The Stopped Clock', 'a brass clock face with no hands, ticking', ['slow']],
   ['cc_astrologer', 'wl_starchart', 'Star-Chart Orrery', 'a small orrery of seven silver planets', ['crit']],
@@ -46239,6 +46392,7 @@ const WPN_LEGS = [
   ['cc_pyroclast', 'wl_furnace', 'Furnace Heart', 'a black iron orb with a grille of white fire', ['spell', 'cc_flamewave', 'echo']],
   ['cc_severer', 'wl_unmaking', 'Crescent of Unmaking', 'a black crescent whose edge is a thin violet void', ['hit', 'manaburn', 3]],
   ['cc_severer', 'wl_returnmoon', 'Returning Moon', 'a silver ring blade with a crescent moon inside it', ['spell', 'cc_shards', 'echo']],
+  ['ch_maelis', 'wl_firstarchmage', 'Staff of the First Archmage', 'a tall white staff crowned with a slowly turning star', ['crit']],   // (the relic of that name was a staff: it is the Circlet of the First Archmage now, forces_zzzzzzzzzzzzzz_reskin.js)
   ['ch_maelis', 'wl_loom', 'Loom-Staff of Maelis', 'a staff strung with threads of light like a loom', ['spell', 'ch_unravel', 'echo']],
   // ---- Ironhold ----
   ['ironbreaker', 'wl_grudgebiter', 'Grudgebiter', 'a rune axe with a notched, toothed bit', ['hit', 'bleed', 3]],
@@ -46276,6 +46430,19 @@ const WPN_LEGS = [
   ['sb_skyhunter', 'wl_stormhook', 'Stormhook Harpoon', 'a harpoon with a crackling copper barb and a chain', ['hit', 'arc', 4]],
   ['sb_skyhunter', 'wl_skyfallh', 'Skyfall Harpoon', 'a long harpoon with eagle feathers on the shaft', ['spell', 'sb_skyfall', 'reset']],
   ['ch_tarka', 'wl_drumstaff', 'Drumstaff of Tarka', 'a staff with a small drum and thunder-bird feathers', ['spell', 'ch_gather', 'echo']],
+  // ---- the Champions not leading by default ----
+  ['ch_aurel', 'wl_lasthour', 'Staff of the Last Hour', 'a brass staff whose clock dial runs backward', ['hit', 'daze', 4]],
+  ['ch_maren', 'wl_riftwin', 'Rift-Twin', 'a double blade, one edge red and one pink, a crescent of light at the grip', ['spell', 'ch_severing', 'echo']],
+  ['ch_faelan', 'wl_longwatch', 'Bow of the Long Watch', 'a great thorned bow of black heartwood', ['spell', 'ch_pinarrow', 'reset']],
+  ['ch_nyssa', 'wl_mothbough', 'Mothqueen\'s Bough', 'a gnarled staff in bloom, pale moths resting on it', ['spell', 'ch_sporecloud', 'echo']],
+  ['ch_tovin', 'wl_firstengine', 'Coil of the First Engine', 'a huge copper gauntlet with a glass coil full of violet lightning', ['hit', 'arc', 3]],
+  ['ch_grenna', 'wl_lastorders', 'Ladle of Last Orders', 'a great copper ladle that never runs dry', ['spell', 'ch_rollkeg', 'echo']],
+  ['ch_celestine', 'wl_sunstaff', 'Dawnsinger\'s Sunstaff', 'a tall gold staff crowned with a full sunburst', ['spell', 'ch_dawnbreak', 'echo']],
+  ['ch_morrow', 'wl_justicar', 'Justicar\'s Lance', 'a long ash-grey lance with the scales of judgement worked on its guard', ['crit']],   // (Morrow rides at the head of the Grail Knights' charge now: owner, 9 Nov 2026)
+  ['ch_oshana', 'wl_driftwood', 'Windspeaker\'s Driftwood', 'a pale driftwood staff hung with wind-chimes and white feathers', ['hit', 'shove', 4]],
+  ['ch_huri', 'wl_wolfsong', 'Wolfsong Bone Spear', 'a long spear of carved bone with a wolf-jaw head', ['hit', 'bleed', 3]],
+  ['ch_aedric', 'wl_sunsworn', 'Sun-Sworn Lance', 'a white lance with a gold sun-wheel guard', ['spell', 'ch_suncharge', 'frenzy']],
+  ['ch_isaura', 'wl_veiledoath', 'Veiled Oathblade', 'a slim dark sword with a veil of pale light on its edge', ['mark']],
   // ---- the Wardbound ----
   ['wb_oathbound', 'wl_oathbreaker', 'Oathbreaker', 'a long blade broken off square, still keen', ['hit', 'shred', 3]],
   ['wb_oathbound', 'wl_runecleaver', 'Runecleaver', 'a broad sword with a row of glowing runes', ['spell', 'wb_wardflare', 'echo']],
@@ -46296,10 +46463,101 @@ const WPN_LEGS = [
   ['ch_varic', 'wl_lastgate', 'The Last Gate\'s Blade', 'a great sword with a gate-shaped guard and a cracked blade', ['spell', 'ch_lastgate', 'echo']],
 ];
 const WPN_BASE = {}, WPN_LEG = {};
+// a weapon from an older save whose class no unit holds now (or not this unit): the same rarity, level and roll in the class
+// the unit holds, at the same place in its list (owner, 9 Nov 2026: "make sure the equipped weapon matches what the weapon
+// actually is": Aurelian holds a sword, the Mageling and the Frostweaver cast from the bare hand)
+function wpnRemap(w, cls) {
+  const d = WPN_BASE[w && w.b]; if (!d || d.cls === cls || !WPN_CLASS[cls]) return w;
+  const i = Math.max(0, WPN_CLASS[d.cls].bases.findIndex(b => b[0] === w.b)), B = WPN_CLASS[cls].bases;
+  const pair = { 'rimeshard>staff': 'quarter', 'leywand>orb': 'hourglass', 'repeater>lance': 'lightlance', 'heavyxbow>lance': 'warlance', 'maul>sword': 'bastard', 'mallet>sword': 'falchion', 'greathammer>sword': 'broadsword' }[w.b + '>' + cls];   // (the like for like where the list order is not: a Rime Shard is a Rimecrystal Staff)
+  w.b = pair || B[Math.min(i, B.length - 1)][0]; delete w._c; delete w._k; return w;
+}
 for (const c in WPN_CLASS) for (const [id, name, sk, spr, look] of WPN_CLASS[c].bases) WPN_BASE[id] = { id, cls: c, name, sk, spr, look, mdl: 'w_' + id };
 for (const [u, id, name, look, fx] of WPN_LEGS) {
   const cls = WPN_UNIT[u], b0 = WPN_CLASS[cls] ? WPN_CLASS[cls].bases[0] : null;
   WPN_LEG[id] = { id, u, cls, name, look, fx, sk: 1, spr: b0 ? b0[3] : .12, mdl: id, leg: 1 };
+}
+/* ---------- each unit's ISSUED weapon, and each force's own make of the shared classes ----------
+   The owner (9 Nov 2026): "make the baseline swords etc match the equipped sword. shouldn't be called a worn arming sword,
+   its a spellblade, so should allude to that and starting weapons shouldn't be called worn". A unit with an empty slot
+   fights with its ISSUED weapon: its own name for the weapon its model holds, and the colours it is drawn in (the icon is
+   tinted with them). WPN_ISSUED: unit -> [name, hue, look]. */
+const WPN_ISSUED = {
+  // the Grove
+  thornguard: ['Thornguard Spear', '#6a7a3a', 'her dark heartwood spear, a long thorn for its head'], gladebow: ['Gladebow Longbow', '#7a6a3a', 'a tall pale longbow wound with green cord'],
+  briarwarden: ['Briarwarden\'s Crystal Staff', '#4a9a7a', 'a living staff crowned with a sea-green crystal'], staglancer: ['Stag Lancer\'s Ashwood Lance', '#9a8a5a', 'a white ash lance with an antler guard'],
+  wayfarer: ['Shifter\'s Antler Bow', '#6a8a5a', 'a bow of curved antler and living wood'], bladedancer: ['Blade Dancer\'s Leaf Pair', '#8aa04a', 'two leaf-shaped daggers of green-tinted steel'],
+  seedcaster: ['Seedcaster\'s Pod Sling', '#7a9a4a', 'a woven sling with a pouch of seed pods'], thornwarden: ['Stalker\'s Thorn Darts', '#5a3a2a', 'a bundle of black thorn darts'],
+  ch_elowen: ['Elowen\'s Living Staff', '#4a9a4a', 'a tall living staff in leaf'], ch_faelan: ['Faelan\'s Thorned Greatbow', '#4a4024', 'a great bow of black heartwood, thorns along its back'],
+  ch_nyssa: ['Nyssa\'s Seedpod Staff', '#7aa840', 'a short gnarled staff crowned with a seed pod'],
+  // the Silver Order
+  oathsworn: ['Oathsworn Sword', '#b0b8c8', 'a bright steel sword with a gilt cross'], silverbolt: ['Silverbolt Crossbow', '#c0c4d0', 'a silvered crossbow with a gold-capped stock'],
+  lightbinder: ['Lightbinder\'s Silver Staff', '#d8d0a0', 'a slim silver staff'], grailknight: ['Grail Knight\'s Lance', '#e0c070', 'a white lance with a gold guard'],
+  sunlance: ['Sunlance Staff', '#f0c860', 'a staff with a small sun at its head'], templar: ['Templar\'s Oath-Blade', '#c8a050', 'a broad knight\'s sword with a gilt cross guard'],
+  censer: ['Censer Bearer\'s Thurible', '#c08a3a', 'a brass thurible on chains'], so_inquisitor: ['Inquisitor\'s Writ', '#8a6a5a', 'a sealed writ on an iron rod'],
+  ch_aurelian: ['Aurelian\'s Lion Sword', '#d8b048', 'a broad sword with a gold lion on the guard'], ch_celestine: ['Celestine\'s Sunburst Staff', '#ffd27a', 'a gold staff taller than she is, a sunburst at its head'],
+  ch_morrow: ['Morrow\'s Ashen Lance', '#8e939e', 'a long ash-grey lance with a dark steel point'],
+  // the Conclave
+  cc_spellblade: ['Spellblade\'s Amethyst Edge', '#9a5ad0', 'a blade of glowing violet crystal'], cc_mageling: ['Mageling\'s Spark Focus', '#7a8ae0', 'a glowing mote over her casting hand'],
+  cc_rimeweaver: ['Frostweaver\'s Rimecrystal Staff', '#7ab0e0', 'a pale staff crowned with a frost crystal'], cc_chronomancer: ['Chronomancer\'s Hour-Glass', '#c0a060', 'a brass-ringed hourglass'],
+  cc_astrologer: ['Astrologer\'s Cupped Starlight', '#6a6ad0', 'a little starlight cradled in his palm'], cc_golemwarden: ['Golem Warden\'s Ward Stone', '#8a7a5a', 'a carved ward stone'],
+  cc_pyroclast: ['Pyroclast\'s Ember', '#e0703a', 'an ember cupped in his hands'], cc_severer: ['Severer\'s Rift Crescent', '#8a5ad0', 'a crescent of dark steel with a violet edge'],
+  ch_maelis: ['Maelis\'s Crystal Staff', '#a07ae0', 'a silver staff crowned with an arcane crystal in a ring'], ch_aurel: ['Aurel\'s Clockwork Staff', '#c09a50', 'a brass staff topped with a clock dial'],
+  ch_maren: ['Maren\'s Twin Rift-Blade', '#d05a8a', 'two long blades, red and pink, on one grip'],
+  // Ironhold
+  ironbreaker: ['Ironbreaker\'s Axe', '#9a7a5a', 'a stout dwarf axe'], thundergun: ['Thundergun Rifle', '#8a6a4a', 'a long scoped rifle'], chaintrapper: ['Trapper\'s Chain Net', '#7a7a8a', 'a net of iron rings and a bola'],
+  runesmith: ['Runesmith\'s Forge Hammer', '#6a8ac0', 'a forge hammer with a glowing rune'], flakgunner: ['Flak Cannon', '#7a6a5a', 'a stubby wide-bore gun'],
+  steamhammer: ['Steam Hammer\'s Lava Maul', '#d0602a', 'an iron war hammer with a molten lava face'], mortarcrew: ['Crew Mortar', '#6a5a4a', 'a short fat mortar tube'],
+  siegebreaker: ['Siege Breaker\'s Pole', '#7a6a5a', 'a long breaching pole'], ch_haldra: ['Haldra\'s War Hammer', '#a06040', 'a heavy dwarf war hammer'],
+  ch_tovin: ['Tovin\'s Copper Gauntlet', '#b0703a', 'a great copper gauntlet with a violet coil'], ch_grenna: ['Grenna\'s Great Ladle', '#b08a4a', 'a great copper ladle'],
+  // the Stormborn
+  sb_wolfguard: ['Wolfguard Spear', '#7a8a9a', 'an ash spear with a bone-lashed head'], sb_windrunner: ['Windrunner\'s Bow', '#9aa0a8', 'a grey ash bow with feathers at its tips'],
+  sb_hailshaman: ['Hail Shaman\'s Staff', '#8ab8d8', 'a staff hung with hailstone beads'], sb_spiritwalker: ['Spirit Walker\'s Rattle', '#a08a5a', 'a gourd rattle on a bone handle'],
+  sb_thundercaller: ['Thunder Caller\'s Staff', '#5a8ac0', 'a copper-headed staff that crackles'], sb_earthbinder: ['Earthbinder\'s Stone Maul', '#8a7a6a', 'a stone maul'],
+  sb_clouddancer: ['Cloud Dancer\'s Fans', '#5aa0c0', 'two fans of blue silk'], sb_skyhunter: ['Skyhunter\'s Harpoon', '#5a7a9a', 'a barbed harpoon on a line'],
+  ch_tarka: ['Tarka\'s Copper-Bound Staff', '#d08a40', 'a gnarled staff bound in copper, feathers hung from it'], ch_oshana: ['Oshana\'s Driftwood Staff', '#d8d6d0', 'a pale driftwood staff with wind-chimes'],
+  ch_huri: ['Huri\'s Bone Spear', '#efe4c8', 'a spear of carved bone'],
+  // the Wardbound
+  wb_oathbound: ['Oathbound Rune Greatsword', '#8a8a9a', 'a greatsword with glowing runes down the blade'], wb_maskedwarden: ['Warden\'s Gold Glaive', '#c0a05a', 'a three-bladed glaive with gold inlay'],
+  wb_frostbrand: ['Frostbrand Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
+  wb_stormward: ['Stormward Rune Lance', '#5a8ac0', 'a lance wound with gold rune wire'], wb_anvilguard: ['Anvil Guard\'s Hammer', '#8a8a9a', 'a dark steel war hammer'],
+  wb_siegewarden: ['Siege Warden\'s Ballista', '#8a7a5a', 'a field ballista'], wb_vowkeeper: ['Vowkeeper\'s Blade', '#7a6a8a', 'a short blade with a censer chain'],
+  ch_varic: ['Varic\'s Warden Blade', '#c8963a', 'a dark sword with a gold rune on the cross'], ch_aedric: ['Aedric\'s Sun Lance', '#f0c860', 'a white lance with a gold point'],
+  ch_isaura: ['Isaura\'s Veiled Blade', '#d8a840', 'a slim dark sword with a pale edge'],
+};
+/* a class several forces share is made in each force's own style: WPN_STYLE['<force>:<class>'] = { hue, names: { base id:
+   [name, look] } } (the shape, its model key and its numbers stay the base's; the name, the look and the icon's tint are the
+   force's). A run is one force's, so every sword a Conclave run finds is a Conclave blade. */
+const WPN_STYLE = {
+  'conclave:sword': { hue: '#9a5ad0', names: { arming: ['Riftsteel Blade', 'a straight blade of violet crystal in a steel frame'], broadsword: ['Amethyst Broadblade', 'a wide blade of glowing amethyst'], falchion: ['Ghost-Edge Falchion', 'a falchion whose edge fades into violet light'], bastard: ['Spellforged Longblade', 'a long crystal blade with runes down the fuller'] } },
+  'silver:sword': { hue: '#c8ccd8', names: { arming: ['Knight\'s Sword', 'a bright steel sword with a gilt cross'], broadsword: ['Gilded Broadsword', 'a wide blade, gold on the guard'], falchion: ['Dawn Falchion', 'a falchion with a sunburst etched on the blade'], bastard: ['Crusader\'s Longsword', 'a long hand-and-a-half blade with a white grip'] } },
+  'wardbound:sword': { hue: '#8a8a9a', names: { arming: ['Warden\'s Sword', 'a dark steel sword with a gold rune on the cross'], broadsword: ['Rune Broadsword', 'a wide blade with a row of rune cuts'], falchion: ['Ward Falchion', 'a black falchion edged in gold wire'], bastard: ['Rune Greatsword', 'a long rune-cut greatsword'] } },
+  'grove:spear': { hue: '#6a7a3a', names: { ashspear: ['Thornwood Spear', 'a dark bark shaft with a long thorn head'], leafspear: ['Leaf-Blade Spear', 'a slim spear with a long leaf-shaped blade'], boarspear: ['Briar Boar Spear', 'a thick shaft wound with briar, a broad head'], warpike: ['Heartwood Pike', 'a long pike of heartwood with a thorn-steel spike'] } },
+  'stormborn:spear': { hue: '#7a8a9a', names: { ashspear: ['Hunting Spear', 'an ash spear with a bone-lashed iron head'], leafspear: ['Wolf-Tooth Spear', 'a light spear with a jagged, tooth-like head'], boarspear: ['Bison Spear', 'a heavy spear with fur at the neck'], warpike: ['Storm Pike', 'a long pike with a copper head'] } },
+  'grove:bow': { hue: '#7a6a3a', names: { huntbow: ['Glade Hunting Bow', 'a yew bow wound with green cord'], shortbow: ['Elm Short Bow', 'a small sharply curved elm bow'], recurve: ['Leafwood Recurve', 'a recurve carved with leaves'], longbow: ['Elven Longbow', 'a tall pale longbow'] } },
+  'stormborn:bow': { hue: '#9aa0a8', names: { huntbow: ['Wind Bow', 'a grey ash bow with feathers at its tips'], shortbow: ['Gale Short Bow', 'a small bow wound with blue cord'], recurve: ['Horn Recurve', 'a recurve of horn and sinew'], longbow: ['Sky Longbow', 'a tall pale bow with a thunderbird grip'] } },
+  'grove:staff': { hue: '#4a9a6a', names: { oakstaff: ['Living Branch', 'a staff of living wood, still in leaf'], quarter: ['Briar Quarterstaff', 'a straight staff wound with briar'], runestaff: ['Moss-Rune Staff', 'a staff carved with moss-green runes'], spirestaff: ['Crystal Bough', 'a twisted bough holding a sea-green crystal'] } },
+  'silver:staff': { hue: '#e0c870', names: { oakstaff: ['Silver Staff', 'a straight silver staff'], quarter: ['Pilgrim\'s Staff', 'a plain white staff bound in silver'], runestaff: ['Psalm Staff', 'a staff with prayers etched along it'], spirestaff: ['Sunburst Staff', 'a staff crowned with a gold sunburst'] } },
+  'conclave:staff': { hue: '#8a9ae0', names: { oakstaff: ['College Staff', 'a dark staff with a violet crystal'], quarter: ['Rimecrystal Staff', 'a pale staff crowned with a frost crystal'], runestaff: ['Frost-Rune Staff', 'a staff of blue ice-wood with frost runes along it'], spirestaff: ['Arcane Spire', 'a tall staff ending in a floating crystal spire'] } },   // (the Frostweavers' frost-crystal staves and the College's arcane ones: owner, 9 Nov 2026)
+  'stormborn:staff': { hue: '#5a8ac0', names: { oakstaff: ['Driftwood Staff', 'a pale driftwood staff hung with feathers'], quarter: ['Copper-Bound Staff', 'a staff bound with copper bands'], runestaff: ['Storm-Rune Staff', 'a staff painted with storm marks'], spirestaff: ['Thunderbird Staff', 'a staff with a carved thunderbird at its head'] } },
+  'grove:lance': { hue: '#9a8a5a', names: { ashlance: ['Ashwood Lance', 'a white ash lance with a small steel point'], joust: ['Antler-Guard Lance', 'a lance with an antler guard'], warlance: ['Hart Lance', 'a heavy lance with a long point'], lightlance: ['Leaf Lance', 'a slim lance with a leaf-shaped point'] } },
+  'silver:lance': { hue: '#e0c070', names: { ashlance: ['Knight\'s Lance', 'a white lance with a gold guard'], joust: ['Tourney Lance', 'a fluted lance with a big guard'], warlance: ['Grail Lance', 'a heavy lance with a chalice guard'], lightlance: ['Pennon Lance', 'a slim lance with a crimson pennon'] } },
+  'wardbound:lance': { hue: '#f0c860', names: { ashlance: ['Sun Lance', 'a white lance with a gold point'], joust: ['Sun-Wheel Lance', 'a fluted lance with a sun-wheel guard'], warlance: ['Warden War Lance', 'a heavy dark lance'], lightlance: ['Gold Pennon Lance', 'a slim lance with a gold pennon'] } },
+  'silver:hammer': { hue: '#c8a050', names: { warhammer: ['Templar Hammer', 'a gilt war hammer'], maul: ['Holy Maul', 'a great maul with a sunburst on its face'], mallet: ['Bell Mallet', 'a short hammer with a bell in its head'], greathammer: ['Great Hammer of Dawn', 'a great hammer of white stone and gold'] } },
+  'ironhold:hammer': { hue: '#a06040', names: { warhammer: ['Dwarf War Hammer', 'a square-headed dwarf hammer'], maul: ['Lava Maul', 'an iron maul with a molten face'], mallet: ['Rivet Mallet', 'a short fat mallet banded in brass'], greathammer: ['Forge Great Hammer', 'a great hammer with a rune-cut head'] } },
+  'stormborn:hammer': { hue: '#8a7a6a', names: { warhammer: ['Stone Hammer', 'a stone head lashed to a haft'], maul: ['Earth Maul', 'a great maul of river stone'], mallet: ['River-Stone Mallet', 'a short mallet of smooth stone'], greathammer: ['Mountain Hammer', 'a great hammer shaped like a peak'] } },
+  'wardbound:hammer': { hue: '#8a8a9a', names: { warhammer: ['Warden\'s Hammer', 'a dark steel war hammer'], maul: ['Anvil Maul', 'a maul whose head is a small anvil'], mallet: ['Rune Mallet', 'a short hammer with a gold rune'], greathammer: ['Great Anvil Hammer', 'a great hammer of black iron'] } },
+  'silver:tome': { hue: '#8a6a5a', names: { codex: ['Writ of Judgement', 'a sealed writ on an iron rod'], grimoire: ['Book of Censure', 'a black-bound book with an iron lock'], ledger: ['Ledger of Heresies', 'a tall ledger in a chained cover'], scrollcase: ['Writ Case', 'a brass case of sealed writs'] } },
+  'wardbound:tome': { hue: '#8a5a3a', names: { codex: ['Rune Codex', 'a stone-paged rune book'], grimoire: ['Black Grimoire', 'a black rune book with a gold clasp'], ledger: ['Ledger of Runes', 'a tall book of carved rune plates'], scrollcase: ['Road-Scribe\'s Case', 'a scroll case of road maps and runes'] } },
+};
+const wpnForceNow = () => (typeof G !== 'undefined' && G && G.force) || (typeof FORCE_NOW !== 'undefined' && FORCE_NOW) || null;
+const wpnStyle = (cls, force) => WPN_STYLE[(force || wpnForceNow()) + ':' + cls] || null;
+// its name, look and tint now (a base: in the force's own make; issued: the unit's own; a legendary: its own)
+function wpnShow(w) {
+  const d = wpnDef(w); if (!d) return { name: '', look: '', hue: '#888888' };
+  if (w.starter && WPN_ISSUED[w.u]) { const I = WPN_ISSUED[w.u]; return { name: I[0], look: I[2], hue: I[1] }; }
+  const S = !d.leg && wpnStyle(d.cls), n = S && S.names[d.id];
+  return { name: n ? n[0] : d.name, look: n ? n[1] : d.look, hue: (S && S.hue) || (WPN_CLASS[d.cls] || {}).hue || '#888888' };
 }
 // the owner's weapon models, by model key (filled when they arrive); wpnModel(t): the equipped weapon's, else null (its own prop)
 const WEAPON_MDL = {};
@@ -46316,7 +46574,7 @@ const WSP_REF = 18;                                 // x the wearer's own tier I
 const WPN_HP_FROM = 11, WPN_HP_FULL = 16;           // the foes' health follows an ordinary run's weapons from wave 11 (waves 1-10 stay easy), in full by 16
 const WPN_BAG = 24;                                 // the weapon rack's room
 const WPN_SALVAGE = [4, 8, 14, 24, 45];
-const WPN_STARTER = { name: 'Starter', col: '#a49c8c' };
+const WPN_STARTER = { name: 'Issued', col: '#c8bca4' };
 const wpnOn = () => typeof G !== 'undefined' && !!G && !!G.force && !G.vs && typeof oldRules === 'function' && !oldRules();
 const wpnClassOf = ty => { const d = TOWERS[ty]; return d && d.force && !d.wall && d.unit && WPN_UNIT[d.unit] && d.tiers && d.tiers[0] && (d.tiers[0].dmg || d.tiers[0].smite) ? WPN_UNIT[d.unit] : null; };
 const wpnDef = w => !w ? null : WPN_LEG[w.b] || WPN_BASE[w.b] || null;
@@ -46338,11 +46596,11 @@ function wpnCalc(w) {
   w._k = key; return (w._c = { m, sk, dk: m / sk, spr: d ? d.spr : .12, sp, m0 });
 }
 const WPN_STARTER_CALC = { m: 1, sk: 1, dk: 1, spr: .12, sp: 0, m0: 1 };
-// the starter: the class's first base, worn, exactly the unit's baseline
-function wpnStarter(ty) { const c = wpnClassOf(ty); if (!c) return null; const b = WPN_CLASS[c].bases[0]; return { b: b[0], rar: -1, starter: 1, il: 1 }; }
+// its issued weapon: the class's first base in the unit's own name (WPN_ISSUED), exactly the unit's baseline
+function wpnStarter(ty) { const c = wpnClassOf(ty); if (!c) return null; const b = WPN_CLASS[c].bases[0]; return { b: b[0], rar: -1, starter: 1, il: 1, u: TOWERS[ty].unit }; }
 const wpnSpK = ty => { const t0 = TOWERS[ty] && TOWERS[ty].tiers[0]; return t0 ? clamp((t0.dmg || t0.smite || WSP_REF) / WSP_REF, .25, 2.5) : 1; };
 const wpnCalcOf = w => !w || w.starter ? Object.assign({}, WPN_STARTER_CALC, { spr: (wpnDef(w) || {}).spr || .12 }) : wpnCalc(w);
-const wpnName = w => { const d = wpnDef(w); return !d ? '' : w.starter ? 'Worn ' + d.name : d.name; };
+const wpnName = w => wpnShow(w).name;
 const wpnCol = w => !w || w.starter ? WPN_STARTER.col : RARITY[Math.max(0, Math.min(4, w.rar | 0))].col;
 const wpnRarName = w => !w || w.starter ? WPN_STARTER.name : RARITY[w.rar | 0].name;
 // the numbers a weapon shows for a unit type: its strike's range at tier I, attacks a second, DPS, Spell Damage
@@ -46495,7 +46753,7 @@ const WPN_DROP = { boss: .7, lastElite: .22, elite: .01, last: .04, dry: 7 };
 function wpnDropCheck(c) {
   if (!wpnOn() || G.state !== 'play' || !c || c.splitCopy || c.kid || c.def.egg || c.echo || c.sent || c.type === 'risen' || c.purse || G.chal === 'relicless') return;
   const wv = c.wv || G.wave;
-  if (typeof isWaveBoss === 'function' && isWaveBoss(c)) { if (!G.wBossW || Math.random() < WPN_DROP.boss) { G.wBossW = wv; wpnToBag(wpnRoll(wv, true), c); } return; }
+  if (typeof isWaveBoss === 'function' && isWaveBoss(c)) { if (!G.wBossW || Math.random() < WPN_DROP.boss) { G.wBossW = wv; const w = wpnRoll(wv, true); G.wBossDrop = w ? { w, wave: wv, type: c.type } : null; wpnToBag(w, c); } return; }   // (the boss-loot screen shows it: weapons_ui.js)
   if (typeof isLastElite === 'function' && isLastElite(c)) { if (Math.random() < WPN_DROP.lastElite) wpnToBag(wpnRoll(wv, false), c); return; }
   if (c.elite) { if (Math.random() < WPN_DROP.elite) wpnToBag(wpnRoll(wv, false), c); return; }
   const last = !G.creeps.some(o => o !== c && !o.dead && o.wv === c.wv && !o.kid) && !(G.spawnQ || []).length;
@@ -46504,9 +46762,16 @@ function wpnDropCheck(c) {
   const dry = wv - (G.wDropW | 0);
   if (dry >= WPN_DROP.dry || Math.random() < WPN_DROP.last) wpnToBag(wpnRoll(wv, false), c);
 }
-if (typeof rollDrop === 'function') {
-  const _wpnRoll = rollDrop;
-  rollDrop = function (c) { const r = _wpnRoll.apply(this, arguments); try { wpnDropCheck(c); } catch (e) { console.error(e); } return r; };
+// on every kill (not rollDrop: the boss-loot screen, renown.js, takes a wave boss's rollDrop, and a weapon must still drop:
+// the owner, 9 Nov 2026, "cant see any weapons in the first bosses loot pool")
+if (typeof kill === 'function') {
+  const _wpnKill = kill;
+  kill = function (c) { const was = c && !c.dead, r = _wpnKill.apply(this, arguments); if (was && c.dead) { try { wpnDropCheck(c); } catch (e) { console.error(e); } } return r; };
+}
+// what a wave boss may drop as a weapon, for its loot table: one weapon for a unit you field, these odds by rarity
+function wpnBossOdds(wave) {
+  const W = wpnRarW(Math.max(1, wave | 0), true), S = W.reduce((a, b) => a + b, 0) || 1;
+  return { p: (typeof G !== 'undefined' && G && G.wBossW) ? WPN_DROP.boss : 1, rar: W.map(v => v / S) };
 }
 
 /* ---------- balance: runs of weapon luck, and the foes' health that follows an ordinary one ----------
@@ -46548,13 +46813,17 @@ function wpnRunSim(o) {
   }
   return { K, drops, n: drops.reduce((a, b) => a + b, 0) };
 }
-// the median ordinary run (drops capped at uncommon): the army's damage multiple by wave (tools/check_weapons.js --hp)
-const WPN_HP_TAB = [[1, 1], [10, 1.09], [15, 1.14], [20, 1.18], [25, 1.23], [30, 1.27], [35, 1.31], [40, 1.36], [45, 1.41], [50, 1.45]];
+// the median ordinary run (drops capped at uncommon) WITH a typical forge spend (forces_zzzzzzzzzzzzzzz_forge.js
+// forgeRunSim: FORGE_SPEND of each wave's gold from wave 15): the army's damage multiple by wave (tools/check_weapons.js --hp)
+const WPN_HP_TAB = [[1, 1], [10, 1.1], [15, 1.14], [20, 1.2], [25, 1.26], [30, 1.33], [35, 1.39], [40, 1.45], [45, 1.5], [50, 1.55]];
+// how much of it the foes carry: all of it (the table already counts the forge, so an ordinary run that forges as most do
+// keeps pace, one that forges more or finds better pulls ahead; 9 Nov 2026, with the forge)
+const WPN_HP_SHARE = 1;
 const wpnArmyK = w => wpnLerp(WPN_HP_TAB, Math.max(1, Math.min(50, w | 0)));
 function wpnHpK(n) {
   n = Math.max(1, n | 0); if (n < WPN_HP_FROM) return 1;
   const ramp = Math.min(1, (n - WPN_HP_FROM + 1) / (WPN_HP_FULL - WPN_HP_FROM + 1));
-  return 1 + ramp * (wpnArmyK(n) - 1);
+  return 1 + ramp * WPN_HP_SHARE * (wpnArmyK(n) - 1);
 }
 if (typeof forceHpK === 'function') {
   const _wpnHp = forceHpK;
@@ -46563,7 +46832,9 @@ if (typeof forceHpK === 'function') {
 
 /* ---------- saves: the rack and each unit's weapon (by its cell); an old save loads with every unit on its starter ---------- */
 const wpnOk = w => !!(w && typeof w === 'object' && wpnDef(w) && w.rar >= 0 && w.rar <= 4);
-const wpnClean = w => { const o = { id: w.id, b: w.b, rar: w.rar, q: w.q, il: w.il }; if (w.isNew) o.isNew = true; return o; };
+const wpnClean = w => { const o = { id: w.id, b: w.b, rar: w.rar, q: w.q, il: w.il }; if (w.isNew) o.isNew = true;
+  if (Array.isArray(w.runes) && w.runes.length) o.runes = w.runes.map(k => typeof RUNES !== 'undefined' && RUNES[k] ? k : null); if (w.rr) o.rr = w.rr | 0; if (w.fg) o.fg = w.fg | 0;   // (the forge: forces_zzzzzzzzzzzzzzz_forge.js)
+  return o; };
 if (typeof serialize === 'function') {
   const _wpnSer = serialize;
   serialize = function () {
@@ -46579,10 +46850,12 @@ function wpnRestore(s) {
   for (const t of G.towers || []) t.weapon = null;
   if (!W) return;
   G.wUid = W.uid | 0; G.wLegN = W.legN | 0; G.wBossW = W.bossW | 0; G.wDropW = W.dropW | 0; G.wLastW = W.lastW | 0;
-  G.wbag = (W.bag || []).filter(wpnOk);
+  const moved = w => { const d = WPN_BASE[w.b], r = d && WPN_CLASS[d.cls].retired; return r ? wpnRemap(w, r) : w; };   // (a class no unit holds: its successor)
+  G.wbag = (W.bag || []).filter(wpnOk).map(moved);
   for (const [i, j, w] of W.on || []) {
     if (!wpnOk(w)) continue;
-    const t = (G.towers || []).find(o => o.i === i && o.j === j);
+    const t = (G.towers || []).find(o => o.i === i && o.j === j), c = t && wpnClassOf(t.type);
+    if (t && c && !wpnFits(w, t) && !WPN_LEG[w.b]) wpnRemap(w, c);   // (its unit holds another kind of weapon now)
     if (t && wpnFits(w, t)) t.weapon = w; else G.wbag.push(w);   // (a unit no longer there: back to the rack)
   }
   for (const w of G.wbag.concat((G.towers || []).map(t => t.weapon).filter(Boolean))) G.wUid = Math.max(G.wUid, w.id | 0);
@@ -46599,6 +46872,454 @@ if (typeof newGame === 'function') {
 if (typeof unsocketAll === 'function') {
   const _wpnUns = unsocketAll;
   unsocketAll = function (t) { const r = _wpnUns.apply(this, arguments); if (t && t.weapon) { (G.wbag || (G.wbag = [])).push(t.weapon); t.weapon = null; } return r; };
+}
+
+/* ================= NO WEAPONS AMONG THE ITEMS: force items that were weapons become other gear =================
+   The owner (9 Nov 2026): "change items that allude to being a weapon/staff". Weapons have their own slot now
+   (forces_zzzzzzzzzzzzz_weapons.js), so no relic, set piece, legendary or shop item of a force run is a staff, sword, bow,
+   lance, hammer, wand, orb or a weapon's part: each becomes a ring, circlet, mantle, sigil, charm, banner, brooch ... with
+   the same id (saves load as they were), the same stats and the same rule. Its art key changes (RESKIN_ART: 'rs_<id>'), so
+   a painting that showed the weapon is no longer shown; the icon painter draws its new glyph until the new painting comes
+   (docs/art_needed.md, "Reskinned items"). The Staff of the First Archmage itself went into the weapon pool, as a
+   legendary staff for Maelis (WPN_LEGS); the relic is the Circlet of the First Archmage.
+   Kept as they are: tools and fittings that are not weapons (the tuning forks, the Plumb-Bob Sighting Rod, the Crown of the
+   Forked Bolt), and Classic's keep relics and shop (Classic's towers have no weapon slot).
+   RESKIN: id -> [new name, icon glyph, its look (for the art list)]. Check: node tools/check_no_weapon_items.js -v */
+const RESKIN = {
+  // ---- relics
+  gv_huntlance: ['Huntsman\'s Antler Charm', 'antler', 'a carved antler charm on a leather thong'],
+  gv_longbow: ['Gladewood Bracer', 'leaf', 'an archer\'s bracer of pale gladewood, leaves pressed into it'],
+  gv_motherroot: ['Mother-Root Circlet', 'uproot', 'a circlet of living root, a green bud at the brow'],
+  cc_hilt: ['Blinkstone Brooch', 'gem', 'a brooch set with a stone that flickers in and out of sight'],
+  ih_riflesight: ['Brass Spyglass', 'spyglass', 'a dwarf\'s brass spyglass with ground lenses'],
+  so_scourge: ['Penitent\'s Cord', 'chains', 'a knotted penitent\'s cord with small iron weights'],
+  so_zenith: ['Circlet of the Zenith', 'sun', 'a gold circlet with a sun at its brow'],
+  sbr_knife: ['Carver\'s Totem', 'statue', 'a small carved totem of storm birds'],
+  sbr_rod: ['Copper Lightning Torc', 'thunder', 'a twisted copper torc that crackles'],
+  wbr_whetrune: ['Rune Whetstone', 'rune', 'a whetstone cut with a gold rune'],
+  wbr_pommel: ['Rosette Brooch', 'gem', 'a gold rosette brooch'],
+  wbr_rimehook: ['Rime-Hook Clasp', 'snowflake', 'a cloak clasp shaped like a frosted hook'],
+  wbr_forklance: ['Forked-Bolt Pennant', 'banner', 'a blue pennant with a forked bolt stitched in gold'],
+  wbr_chainheads: ['Chained Rune-Weights', 'chain', 'rune-cut iron weights on a chain'],
+  cc_x_splitbolt: ['Splitting Prism', 'split', 'a prism that splits light in two'],
+  wb_x_flarehilt: ['Gilded Flare-Sigil', 'sunburst', 'a gilded sigil that flares when struck'],
+  wb_x_gaoler: ['Gaoler\'s Keyring', 'chains', 'a heavy ring of gaol keys'],
+  // ---- set pieces
+  fs_gv_quiver: ['Hushwind Cloak', 'feather', 'a grey-green cloak that makes no sound'],
+  fs_cc_wand: ['Ring of the Thirteenth Try', 'ring', 'a scorched silver ring, twelve notches on it'],
+  fs_sb_ferrule: ['Copper Fork-Torc', 'thunder', 'a copper torc whose ends fork like lightning'],
+  fs_wb_hilt: ['Oathsworn Gold Signet', 'ring', 'a gold signet with the Oathsworn\'s mark'],
+  fs_wb_stylus: ['Gold Rune-Stylus', 'rune', 'a gold stylus for cutting runes'],
+  fe_cc_blinkhilt: ['Sash of the Vanishing Step', 'swirl', 'a violet sash that blurs as it moves'],
+  fe_cc_orbwand: ['Circlet of Brimming Light', 'halo', 'a silver circlet brimming with light'],
+  fe_cc_hookglaive: ['Hooked Crescent Amulet', 'moon', 'an amulet shaped like a hooked crescent'],
+  fe_gv_longbow: ['Duskwarden Hood', 'leaf', 'a deep green hood edged in dusk-grey'],
+  fe_gv_rootstaff: ['Rootdeep Torc', 'uproot', 'a torc of braided root'],
+  fe_gv_lancetip: ['Hartsblood Antler-Crown', 'antler', 'a crown of small antlers, red-tipped'],
+  fe_gv_willowglaive: ['Willowcut Sash', 'leaf', 'a sash of willow leaves'],
+  fe_ih_doorhead: ['Doorwarden\'s Helm', 'mountain', 'a heavy dwarf helm with a door-shaped visor'],
+  fe_so_lightstaff: ['Chain of Morning Links', 'chains', 'a chain of bright silver links'],
+  fe_so_grailance: ['Pilgrim\'s Grail-Pennant', 'banner', 'a pilgrim\'s pennant with a gold grail'],
+  fe_so_sunspear: ['Diadem of the High Sun', 'sun', 'a gold diadem with a high sun'],
+  fe_so_starhammer: ['Starfall Gauntlets', 'fist', 'steel gauntlets studded with star-iron'],
+  fe_sb_galebow: ['Gale-Feather Mantle', 'feather', 'a mantle of grey gale feathers'],
+  fe_sb_icestaff: ['Black-Ice Amulet', 'icepeak', 'an amulet of black ice'],
+  fe_sb_quakemaul: ['Quake-Hide Bracers', 'quake', 'bracers of bison hide that shake the ground'],
+  fe_sb_barbhead: ['Storm-Barbed Line-Coil', 'coil', 'a coil of line with copper barbs'],
+  fe_wb_gateblade: ['Black Gate-Seal', 'rune', 'a black iron seal shaped like a gate'],
+  fe_wb_blackbow: ['Gold-and-Ivory Vambraces', 'fist', 'vambraces of gold and ivory'],
+  fe_wb_tealquiver: ['Teal-Rune Baldric', 'rune', 'a baldric stitched with teal runes'],
+  fe_wb_rimehalberd: ['Rime-Gilt Pauldron', 'snowflake', 'a gilt pauldron rimed with frost'],
+  fe_wb_bluelance: ['Blue-Lit War-Pennant', 'banner', 'a war pennant lit blue'],
+  fe_wb_ironbow: ['Black-Iron Winch-Gear', 'coil', 'a black iron winch gear and pawl'],
+  fe_wb_vowblade: ['Censer-Chain of Vows', 'chains', 'a censer chain with vows on its links'],
+  // ---- legendaries
+  gv_rootstring: ['Rootstring Bracer', 'uproot', 'a bracer of braided living root'],
+  cc_l_starblade: ['Starfallen Mantle', 'stars', 'a mantle of night-blue cloth set with falling stars'],
+  cc_l_staff: ['Circlet of the First Archmage', 'halo', 'a white-gold circlet with a slowly turning star'],
+  ih_skybreaker: ['Cloudsplitter Banner', 'banner', 'a dwarf banner with a split cloud in brass'],
+  ih_worldanvil: ['Heart of the World-Anvil', 'gem', 'a glowing heart of anvil-iron'],
+  ih_grandmortar: ['Grandfather\'s Powder Horn', 'horn', 'a great carved powder horn'],
+  so_firstlight: ['Halo of First Light', 'halo', 'a halo of pale first light'],
+  so_lasthammer: ['Seal of the Last Verdict', 'scales', 'a heavy seal with the scales of judgement'],
+  sbl_fourwinds: ['Cloak of the Four Winds', 'wing', 'a cloak of four winds\' feathers'],
+  sbl_raincaller: ['Raincaller\'s Mantle', 'rain', 'a mantle that drips with rain'],
+  wbl_oathkeeper: ['Oathkeeper, Seal of the Held Gate', 'rune', 'a great gold seal of the Held Gate'],
+  wbl_sunbow: ['The Sun-Wheel Amulet', 'sunwheel', 'an amulet of the sun-wheel in gold'],
+  // ---- shop items (force shelves)
+  cc_s_concord: ['Circlet of the Concord', 'halo', 'a circlet of linked silver rings'],
+  cc_s_orb: ['Archmage\'s Phylactery', 'gem', 'a small crystal phylactery on a chain'],
+  so_s_lance: ['Pennant of the Ford', 'banner', 'a crimson pennant of the Ford'],
+  sbs_skystaff: ['Sky-Father\'s Mantle', 'wing', 'a mantle of eagle feathers'],
+  wbs_runeblade: ['Rune-Etched Black Signet', 'ring', 'a black signet etched with runes'],
+  gs_seedquiver: ['Seedburst Pouch', 'spores', 'a pouch of bursting seeds'],
+  gs_rootstaff: ['Rootcaller\'s Circlet', 'leaf', 'a circlet of rootwood'],
+  sbs_gatherstaff: ['Spirit-Gather Totem', 'statue', 'a small spirit totem'],
+  wbs_holdstaff: ['Warden\'s Holding-Sigil', 'rune', 'a gold holding-sigil'],
+};
+const RESKIN_OLD = {};
+{
+  const defOf = id => (typeof GEAR_BASES !== 'undefined' && GEAR_BASES[id]) || (typeof LEGENDS !== 'undefined' && LEGENDS[id]) || (typeof SHOP !== 'undefined' && SHOP[id]) || null;
+  for (const id in RESKIN) {
+    const d = defOf(id); if (!d) { console.warn('reskin: no item', id); continue; }
+    const [name, icon] = RESKIN[id], old = d.name; RESKIN_OLD[id] = old;
+    d.name = name; d.icon = icon; d.art = 'rs_' + id;
+    // its own words follow it (a twist, a build hint, a flavour line that named it)
+  }
+  // every item's own words that name one of them (a twist, a build hint, a flavour line: "the Archmage's Orb or Storm Battery")
+  for (const T of [GEAR_BASES, LEGENDS, typeof SHOP !== 'undefined' ? SHOP : {}]) for (const k0 in T) { const d = T[k0]; if (!d) continue;
+    for (const k of ['twist', 'build', 'flavor', 'combo', 'say']) if (typeof d[k] === 'string') for (const id in RESKIN_OLD) if (d[k].includes(RESKIN_OLD[id])) d[k] = d[k].split(RESKIN_OLD[id]).join(RESKIN[id][0]); }
+}
+
+/* ================= SHRINES: a gold sink placed on the maze (force runs) =================
+   Owner (9 Nov 2026): a shrine bought with gold and raised on a maze cell, empowering every unit within a few cells with one
+   effect, so power becomes a placement puzzle. Shared by every force (Classic and Tower Wars have none: their card is full).
+   The five (SHRN_TYPES), each with three levels (raise it, then upgrade it twice: a wider reach and a stronger effect):
+     Haste Shrine      attack speed x1.12 / x1.16 / x1.20          ("Attack speed 1.18 -> 1.32/s")
+     Wellspring Shrine mana regen x1.30 / x1.45 / x1.60            ("Mana regen 1.00 -> 1.30/s")
+     Breaker Shrine    Armour Penetration +15 / +20 / +25 points   ("Armour Penetration 0% -> 15%": hits pass the armour bar)
+     Warding Shrine    foes' blows on its units 75% / 67% / 60%    ("Blows from foes 100% -> 75%")
+     Farsight Shrine   Range +0.3 / +0.45 / +0.6 cells, and its ranged units (reach 2 cells or more) strike flyers
+   Reach (cell centre to cell centre): 2 / 2.5 / 3 cells. Units only (walls get nothing).
+   Rules:
+   - Same-type shrines never stack: a unit inside two Haste Shrines takes the stronger one only. Different types do combine.
+   - How many: 1 from wave 1, one more every 8 waves (2 at 9, 3 at 17, 4 at 25, 5 at 33 and on: SHRN_CAP).
+   - Cost: 140 for the first, each one more you own +60% of that (140, 220, 310, 390, 480: SHRN_COST); upgrades 160 then
+     260. Sold for 75% of what went in, or all of it in the build phase it was bought (as units).
+   - A shrine is solid: it takes a maze cell and blocks the road like a wall (canBuild: never seals the path or traps a foe).
+     Foes cannot break it: siege troops step around it (game.js siegeField reads SHRN_BLK), sappers' blasts pass it.
+   Balance (the estimate in tools/check_shrines.js): at wave 20 a well-placed set of three level-III shrines lifts the army's
+   damage by about 10-13%. Strikes are ~60% of a force army's damage, a level-III reach covers 20 cells, of which about 8-9
+   are units in a tight maze, out of ~28 units by then. It costs ~1900 gold in all, about 28% of what a run earns by then.
+   Saves: s.shrn = [[type, i, j, lv, invested, fresh, freshW], ...]; an older save loads with none.
+   The UI and the look are in shrines_ui.js (the card's Shrine button, placing, the info pane, the obelisks and rings). */
+const SHRN_TYPES = {
+  haste: { name: 'Haste Shrine', icon: 'quick', hue: '#e0a440', col: [1, .72, .3], say: 'Its units strike faster.',
+    v: [1.12, 1.16, 1.2], line: v => `attack speed ×${v.toFixed(2)}` },
+  well: { name: 'Wellspring Shrine', icon: 'drop', hue: '#9a7ae8', col: [.66, .52, 1], say: 'Its units’ mana flows back faster, so their spells come round sooner.',
+    v: [1.3, 1.45, 1.6], line: v => `mana regen ×${v.toFixed(2)}` },
+  breaker: { name: 'Breaker Shrine', icon: 'shieldbreak', hue: '#d0663c', col: [1, .48, .26], say: 'Its units’ physical hits slip past armour bars.',
+    v: [.15, .2, .25], line: v => `+${Math.round(v * 100)} Armour Penetration` },
+  ward: { name: 'Warding Shrine', icon: 'shield', hue: '#8cbce8', col: [.6, .82, 1], say: 'Blows from foes (siege troops, bosses) land softer on its units.',
+    v: [.25, .33, .4], line: v => `foes’ blows ${Math.round((1 - v) * 100)}%` },
+  far: { name: 'Farsight Shrine', icon: 'spyglass', hue: '#5cc8b0', col: [.4, .95, .8], say: 'Its units reach further, and its ranged units can strike flyers.',
+    v: [.3, .45, .6], line: v => `+${v} range, ranged units strike flyers` },
+};
+const SHRN_ORDER = ['haste', 'well', 'breaker', 'ward', 'far'];
+const SHRN_R = [2, 2.5, 3];   // reach by level
+const SHRN_UP = [160, 260];   // level II, level III
+const SHRN_RULE = { base: 140, step: .6, capFrom: 1, capEvery: 8, capMax: 5, sell: .75, farMin: 2 };
+const SHRN_LV = ['I', 'II', 'III'];
+const shrnOn = () => typeof G !== 'undefined' && G && !!G.force && !G.vs && G.state !== 'demo';
+const shrnList = () => (typeof G !== 'undefined' && G && G.shrines) || [];
+function SHRN_CAP(w) { w = Math.max(1, w == null ? (G.wave | 0) : w | 0); return Math.min(SHRN_RULE.capMax, 1 + Math.floor((w - SHRN_RULE.capFrom) / SHRN_RULE.capEvery)); }
+function SHRN_COST(n) { n = n == null ? shrnList().length : n; return Math.round(SHRN_RULE.base * (1 + SHRN_RULE.step * n) / 10) * 10; }
+const shrnUpCost = s => s.lv < 3 ? SHRN_UP[s.lv - 1] : 0;
+const shrnReach = s => SHRN_R[Math.min(2, (s.lv || 1) - 1)];
+const shrnName = s => `${SHRN_TYPES[s.type].name} ${SHRN_LV[(s.lv || 1) - 1]}`;
+function shrnSellValue(s) {
+  const fresh = G.phase === 'build' && s.freshW === G.wave ? s.fresh | 0 : 0;
+  return fresh + Math.floor(((s.inv | 0) - fresh) * SHRN_RULE.sell);
+}
+
+/* ---------- where they stand, and what each cell gets ---------- */
+let SHRN_BLK = null;   // a cell holding a shrine: 1 (siegeField steps around it)
+const _shrnCov = { v: -1, ref: null, cells: null };
+function shrnTouch() {
+  G.shrnV = (G.shrnV || 0) + 1;
+  SHRN_BLK = null; _shrnCov.v = -1;
+  if (shrnList().length) { SHRN_BLK = new Uint8Array(N); for (const s of G.shrines) SHRN_BLK[idx(s.i, s.j)] = 1; }
+  if (G.towers) for (const t of G.towers) if (!t.def.wall) t.st = effStats(t);
+}
+// cell k -> { type: level } of the strongest shrine of each type that reaches it (null: none)
+function shrnCovAt(i, j) {
+  const L = shrnList(); if (!L.length || !inGrid(i, j)) return null;
+  if (_shrnCov.v !== G.shrnV || _shrnCov.ref !== L) {
+    _shrnCov.v = G.shrnV; _shrnCov.ref = L; _shrnCov.cells = new Array(N).fill(null);
+    for (const s of L) {
+      const r = shrnReach(s), R = Math.ceil(r);
+      for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
+        if (!di && !dj) continue; if (di * di + dj * dj > r * r + 1e-6) continue;
+        const a = s.i + di, b = s.j + dj; if (!inGrid(a, b)) continue;
+        const k = idx(a, b), c = _shrnCov.cells[k] || (_shrnCov.cells[k] = {});
+        if (!(c[s.type] >= s.lv)) c[s.type] = s.lv;   // same type: the strongest only, never stacked
+      }
+    }
+  }
+  return _shrnCov.cells[idx(i, j)];
+}
+const shrnAtCell = (i, j) => shrnList().find(s => s.i === i && s.j === j) || null;
+// the units a shrine at (i, j) of a level reaches
+function shrnUnitsIn(i, j, lv) {
+  const r = SHRN_R[Math.min(2, (lv || 1) - 1)];
+  return (G.towers || []).filter(t => !t.def.wall && !(t.i === i && t.j === j) && (t.i - i) ** 2 + (t.j - j) ** 2 <= r * r + 1e-6);
+}
+
+/* ---------- a unit's stats inside shrines (called at the end of effStats) ---------- */
+const shrnF2 = v => (Math.round(v * 100) / 100).toFixed(2);
+function shrnApply(t, st) {
+  if (!t || !t.def || t.def.wall || !shrnOn()) return;
+  const cov = shrnCovAt(t.i, t.j); if (!cov) return;
+  const out = st.shrn = [];
+  for (const id of SHRN_ORDER) {
+    const lv = cov[id]; if (!lv) continue;
+    const S = SHRN_TYPES[id], v = S.v[lv - 1], by = `${S.name} ${SHRN_LV[lv - 1]}`;
+    if (id === 'haste' && st.rate) { const a = 1 / st.rate; st.rate /= v; out.push({ id, by, stat: 'Attack speed', a: shrnF2(a), b: shrnF2(1 / st.rate) + '/s' }); }
+    else if (id === 'well' && typeof abilKit === 'function' && abilKit(t)) {
+      const kit = abilKit(t), rg = () => kit.mana.regen * (typeof manaRegenK === 'function' ? manaRegenK(t, st) : 1) + (st.manaRegen || 0);
+      const a = rg(), sh0 = typeof sh === 'function' ? sh(st) : (st.sh = st.sh || {}); sh0.manaK = (sh0.manaK || 0) + (v - 1);
+      out.push({ id, by, stat: 'Mana regen', a: shrnF2(a), b: shrnF2(rg()) + '/s' });
+    }
+    else if (id === 'breaker' && (st.dmg || st.smite)) { const a = st.armorPen || 0; st.armorPen = Math.min(.9, a + v); out.push({ id, by, stat: 'Armour Penetration', a: Math.round(a * 100) + '%', b: Math.round(st.armorPen * 100) + '%' }); }
+    else if (id === 'ward') { st.shrnWard = v; out.push({ id, by, stat: 'Blows from foes', a: '100%', b: Math.round((1 - v) * 100) + '%' }); }
+    else if (id === 'far' && st.range) {
+      const a = st.range; st.range += v; out.push({ id, by, stat: 'Range', a: a.toFixed(2), b: st.range.toFixed(2) });
+      if (!t.def.air && a >= SHRN_RULE.farMin) { st.shrnAir = 1; out.push({ id, by, stat: 'Flyers', a: 'no', b: 'strikes them' }); }
+    }
+  }
+  if (!out.length) delete st.shrn;
+}
+if (typeof effStats === 'function' && !effStats._shrn) {
+  const _shrnEff = effStats;
+  effStats = function (t) { const st = _shrnEff.apply(this, arguments); try { if (st && t && G.shrines && G.shrines.length) shrnApply(t, st); } catch (e) { console.error(e); } return st; };
+  effStats._shrn = 1;
+}
+// Warding: a blow on a unit inside one lands softer
+if (typeof damageTower === 'function' && !damageTower._shrn) {
+  const _shrnDmg = damageTower;
+  damageTower = function (t, dmg) {
+    if (t && t.def && !t.def.wall && dmg > 0 && shrnList().length && shrnOn()) { const c = shrnCovAt(t.i, t.j); if (c && c.ward) dmg *= 1 - SHRN_TYPES.ward.v[c.ward - 1]; }
+    return _shrnDmg.call(this, t, dmg);
+  };
+  damageTower._shrn = 1;
+}
+// Farsight: a ranged unit inside one can strike flyers
+if (typeof canTarget === 'function' && !canTarget._shrn) {
+  const _shrnCt = canTarget;
+  canTarget = function (t, st, c) {
+    const r = _shrnCt.apply(this, arguments);
+    if (r || !(st && st.shrnAir && c && c.fly && st.caps)) return r;
+    const u = st.caps.uproot; st.caps.uproot = 1;
+    try { return _shrnCt.apply(this, arguments); } finally { if (u === undefined) delete st.caps.uproot; else st.caps.uproot = u; }
+  };
+  canTarget._shrn = 1;
+}
+
+/* ---------- raise, upgrade, sell ---------- */
+// why a shrine of this type can't go up at (i, j) right now (null: it can), plus the path check's result
+function shrnCanPlace(type, i, j) {
+  if (!shrnOn()) return { ok: false, msg: 'Shrines are raised in a force run.' };
+  if (!SHRN_TYPES[type]) return { ok: false, msg: 'No such shrine.' };
+  const n = shrnList().length, cap = SHRN_CAP();
+  if (n >= cap) { const nx = SHRN_RULE.capFrom + cap * SHRN_RULE.capEvery; return { ok: false, msg: cap >= SHRN_RULE.capMax ? `You have all ${cap} shrines.` : `${n} of ${cap} shrines raised. Another opens at wave ${nx}.` }; }
+  const chk = canBuild(i, j); if (!chk.ok) return chk;
+  if (G.gold < SHRN_COST(n)) return Object.assign({}, chk, { ok: false, gold: true, msg: 'Not enough gold.' });
+  return chk;
+}
+function shrnPlace(type, i, j) {
+  const chk = shrnCanPlace(type, i, j);
+  if (!chk.ok) { onToast(chk.msg); sfx(chk.gold ? 'nogold' : 'error'); return null; }
+  const cost = SHRN_COST();
+  G.gold -= cost;
+  const s = { id: ++G.uid, type, i, j, x: i + .5, y: j + .5, lv: 1, inv: cost, fresh: G.phase === 'build' ? cost : 0, freshW: G.wave, at: G.time || 0 };
+  (G.shrines || (G.shrines = [])).push(s);
+  const k = idx(i, j); G.blk[k] = 1;
+  G.dist = chk.dist; G.next = nextField(G.dist, G.blk); G.path = tracePath(G.dist, G.next);
+  shrnTouch();
+  if (typeof fxDust === 'function') fxDust(s.x, s.y, 10);
+  if (typeof fxSparkle === 'function') fxSparkle(s.x, s.y, 1, SHRN_TYPES[type].hue);
+  sfx('build'); onDirty(); onSave();
+  return s;
+}
+function shrnUpgrade(s) {
+  const c = shrnUpCost(s); if (!c) return false;
+  if (G.gold < c) { onToast('Not enough gold.'); sfx('nogold'); return false; }
+  G.gold -= c; s.lv++; s.inv += c;
+  if (G.phase === 'build') { if (s.freshW !== G.wave) s.fresh = 0; s.fresh += c; s.freshW = G.wave; }
+  shrnTouch();
+  if (typeof fxSparkle === 'function') fxSparkle(s.x, s.y, 1.1, SHRN_TYPES[s.type].hue);
+  if (typeof fxRing === 'function') fxRing(s.x, s.y, shrnReach(s), SHRN_TYPES[s.type].hue);
+  onToast(`${shrnName(s)}: reach ${shrnReach(s)} cells, ${SHRN_TYPES[s.type].line(SHRN_TYPES[s.type].v[s.lv - 1])}.`);
+  sfx('upgrade'); onDirty(); onSave();
+  return true;
+}
+function shrnSell(s) {
+  const L = shrnList(), at = L.indexOf(s); if (at < 0) return 0;
+  const v = shrnSellValue(s);
+  G.gold += v; L.splice(at, 1);
+  G.blk[idx(s.i, s.j)] = 0; refreshField();
+  shrnTouch();
+  if (typeof fxDust === 'function') fxDust(s.x, s.y, 12);
+  if (typeof fxCoins === 'function') fxCoins(s.x, s.y, .6, 6);
+  if (typeof addText === 'function') addText(s.x, s.y, 1.1, '+' + v, '#ffd76a');
+  if (G.sel && G.sel.ref === s) G.sel = null;
+  sfx('sell'); onDirty(); onSave();
+  return v;
+}
+
+/* ---------- a new run, saves ---------- */
+if (typeof newGame === 'function' && !newGame._shrn) {
+  const _shrnNew = newGame;
+  newGame = function () { const r = _shrnNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.shrines = []; G.shrnV = (G.shrnV || 0) + 1; SHRN_BLK = null; _shrnCov.v = -1; } return r; };
+  newGame._shrn = 1;
+}
+function shrnSave() { return shrnList().map(s => [s.type, s.i, s.j, s.lv, s.inv, s.fresh | 0, s.freshW | 0]); }
+// put a save's shrines back (after the units: a cell that is no longer free, or one that would seal the road, gives its gold back)
+function shrnLoad(rows) {
+  G.shrines = []; let back = 0;
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!Array.isArray(r)) continue;
+    const [type, i, j, lv, inv, fresh, freshW] = r, k = inGrid(i, j) ? idx(i, j) : -1;
+    if (!SHRN_TYPES[type] || k < 0) { back += inv | 0; continue; }
+    if (RES[k] || G.blk[k] || G.tAt[k] || G.shrines.length >= SHRN_RULE.capMax) { back += inv | 0; continue; }
+    const blk = G.blk.slice(); blk[k] = 1; if (!isFinite(flowField(blk)[SPAWN_K])) { back += inv | 0; continue; }
+    G.blk[k] = 1;
+    G.shrines.push({ id: ++G.uid, type, i, j, x: i + .5, y: j + .5, lv: clamp(lv | 0, 1, 3), inv: inv | 0, fresh: fresh | 0, freshW: freshW | 0, at: 0 });
+  }
+  if (back) G.gold += back;
+  refreshField(); shrnTouch();
+  return back;
+}
+if (typeof serialize === 'function' && !serialize._shrn) {
+  const _shrnSer = serialize;
+  serialize = function () { const s = _shrnSer.apply(this, arguments); if (s && G.shrines && G.shrines.length) s.shrn = shrnSave(); return s; };
+  serialize._shrn = 1;
+}
+if (typeof restore === 'function' && !restore._shrn) {
+  const _shrnRes = restore;
+  restore = function (s) { const r = _shrnRes.apply(this, arguments); try { if (s && s.shrn && G.force && !G.vs) shrnLoad(s.shrn); else if (G) G.shrines = []; } catch (e) { console.error(e); } return r; };
+  restore._shrn = 1;
+}
+
+/* ================= THE WEAPON FORGE: the late game's gold sink (force runs) =================
+   The owner (9 Nov 2026) approved a forge in the weapon rack (weapons_ui.js shows it). For gold, a weapon can be:
+   1. UPGRADED one rarity: common -> uncommon -> rare -> epic (a legendary only drops). FORGE_UP by rarity x the level's
+      price (forgeLvK), so a late epic costs several waves' income.
+   2. REROLLED: its make rolled again (the roll that sets its damage, speed spread and Spell Damage within its rarity);
+      each reroll on the same weapon costs FORGE_REROLL_STEP times the last.
+   3. RUNED: a rune in a socket (one at rare, two at epic and legendary), each with one readable rule (RUNES): a slow on
+      every hit, a hit that runs on into the foe behind, one more glaive ricochet, mana on every hit, armour cracked.
+   4. RE-FORGED: its Item Level raised to the current wave's, a level at a time (the items' level prices, forgeLvStep).
+   Every result is shown in plain numbers (Damage 24-30 -> 31-38), never as a percentage.
+   The luck stays: forging is priced so a lucky legendary drop is still the big spike (a rare forged to epic at wave 30
+   costs about two waves' income for +24% on one unit; a tier upgrade buys far more). The foes' health (WPN_HP_TAB,
+   forces_zzzzzzzzzzzzz_weapons.js) is the median ordinary run WITH a typical forge spend (FORGE_SPEND of each wave's gold
+   from wave 15: forgeRunSim). Check and table: node tools/check_weapons.js -v. */
+const FORGE_UP = [40, 90, 220];            // common -> uncommon, uncommon -> rare, rare -> epic, x forgeLvK(level)
+const FORGE_REROLL = 25, FORGE_REROLL_STEP = 1.6;
+const FORGE_RUNE = 30;                     // a rune, x forgeLvK(level)
+const FORGE_LV_RAR = [.5, .6, .8, 1.1, 1.5];   // a level's re-forge price, by rarity (x forgeLvStep)
+const forgeLvStep = L => 5 + 2 * L + .05 * L * L;   // (the items' level price: forces_zzzzzzzzz_ilvl.js ilStepCost)
+const forgeLvK = L => forgeLvStep(Math.max(1, L | 0)) / 5;
+const forgeR5 = v => Math.max(5, Math.round(v / 5) * 5);
+const forgeLv = w => Math.max(1, (w && w.il) | 0 || 1);
+const forgeNow = () => Math.max(1, (typeof G !== 'undefined' && G && G.wave) | 0);
+// the costs (null: not possible)
+const forgeUpCost = w => !w || w.starter || (w.rar | 0) >= 3 || WPN_LEG[w.b] ? null : forgeR5(FORGE_UP[w.rar | 0] * forgeLvK(forgeLv(w)));
+const forgeRerollCost = w => !w || w.starter ? null : forgeR5(FORGE_REROLL * forgeLvK(forgeLv(w)) * Math.pow(FORGE_REROLL_STEP, w.rr | 0));
+const forgeRuneCost = w => !w || w.starter ? null : forgeR5(FORGE_RUNE * forgeLvK(forgeLv(w)));
+function forgeRelevelCost(w, to) {
+  if (!w || w.starter) return null; to = to || forgeNow(); const L0 = forgeLv(w); if (L0 >= to) return null;
+  let c = 0; for (let L = L0; L < to; L++) c += forgeLvStep(L) * FORGE_LV_RAR[Math.max(0, Math.min(4, w.rar | 0))];
+  return forgeR5(c);
+}
+const forgeSlots = w => !w || w.starter ? 0 : (w.rar | 0) >= 3 ? 2 : (w.rar | 0) === 2 ? 1 : 0;
+
+/* ---------- the runes ---------- */
+// on-hit kinds of their own (counted like the items' on-hit effects: forces_zzz_procs.js itemProcHit)
+if (typeof IPROC !== 'undefined') {
+  IPROC.wpierce = { say: n => `Every ${ordN(n)} hit runs on into the foe nearest behind it (within 1.2 cells) for 60% of the hit.`, sayS: () => 'run on into the foe behind for 60%',
+    go(c, src, amt) { const o = nearest(c.x, c.y, 1.2, 1, c, q => !q.phased && !q.dead)[0]; if (!o) return; tagged('relic', () => hurt(o, amt * .6, 'phys', src, false, null)); if (typeof fxSpark === 'function') fxSpark(o.x, o.y, hitH(o), '#e8e0c8', 3); } };
+  IPROC.wmana = { say: () => 'Every hit gives it 1.5 mana.', sayS: () => 'give 1.5 mana',
+    go(c, src) { if (typeof gainMana === 'function') gainMana(src, 1.5); } };
+}
+const RUNES = {
+  frost: { name: 'Frost Rune', glyph: 'snowflake', hue: '#8ac8e8', text: 'Every hit slows its foe 20% for 1.2s.',
+    fx: st => { const s = st.slowOn || [0, 0]; st.slowOn = [Math.max(s[0], .2), Math.max(s[1], 1.2)]; } },
+  pierce: { name: 'Piercing Rune', glyph: 'arrowhead', hue: '#e0d0a0', text: 'Every 3rd hit runs on into the foe nearest behind it (within 1.2 cells) for 60% of the hit.',
+    fx: (st, i) => { (st.ipr = st.ipr || []).push({ kind: 'wpierce', n: 3, k: 1, id: 'rune_pierce' + i }); } },
+  ricochet: { name: 'Ricochet Rune', glyph: 'bounce', hue: '#d8b060', text: 'Its glaive ricochets on to 1 more foe.', fits: t => !!(TOWERS[t.type].tiers[0].bounce > 0),
+    fx: st => { st.bounce = (st.bounce != null ? st.bounce : 2) + 1; } },
+  mana: { name: 'Mana Rune', glyph: 'potion', hue: '#6a8ae0', text: 'Every hit gives it 1.5 mana.', fits: t => typeof abilKit === 'function' && !!abilKit(t),
+    fx: (st, i) => { (st.ipr = st.ipr || []).push({ kind: 'wmana', n: 1, k: 1, id: 'rune_mana' + i }); } },
+  sunder: { name: 'Sundering Rune', glyph: 'shieldbreak', hue: '#c8ccd4', text: 'Every 2nd hit cracks its foe\'s armour by 1 for 5s (to 3 at most).',
+    fx: (st, i) => { (st.ipr = st.ipr || []).push({ kind: 'shred', n: 2, k: .75, id: 'rune_sunder' + i }); } },
+};
+const runeFits = (k, t) => !!RUNES[k] && (!RUNES[k].fits || !t || RUNES[k].fits(t));
+// its runes on the strike (wpnApply, after the weapon and its legendary rule)
+if (typeof wpnApply === 'function') {
+  const _fgApply = wpnApply;
+  wpnApply = function (t, st) {
+    const r = _fgApply.apply(this, arguments);
+    const w = t && t.weapon; if (!w || !w.runes || !st.wpn) return r;
+    w.runes.slice(0, forgeSlots(w)).forEach((k, i) => { if (k && runeFits(k, t)) RUNES[k].fx(st, i); });
+    return r;
+  };
+}
+
+/* ---------- the actions (each pays, marks the weapon's stats stale, and saves) ---------- */
+function forgePay(w, cost, what) {
+  if (cost == null) return false;
+  if ((G.gold | 0) < cost) { if (typeof onToast === 'function') onToast(`${what} costs ${cost} gold.`); if (typeof sfx === 'function') sfx('nogold'); return false; }
+  G.gold -= cost; w.fg = (w.fg | 0) + cost; if (G.stats) G.stats.forged = (G.stats.forged || 0) + cost;
+  return true;
+}
+function forgeDone(w) { delete w._c; delete w._k; G.talV = (G.talV || 0) + 1; if (typeof sfx === 'function') sfx('equip', Math.max(0, w.rar | 0)); if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave(); return true; }
+function forgeUpgrade(w) { const c = forgeUpCost(w); if (!forgePay(w, c, 'An upgrade')) return false; w.rar = (w.rar | 0) + 1; return forgeDone(w); }
+function forgeReroll(w) { const c = forgeRerollCost(w); if (!forgePay(w, c, 'A reroll')) return false; w.rr = (w.rr | 0) + 1; w.q = Math.round(Math.random() * 100) / 100; return forgeDone(w); }
+function forgeRune(w, slot, k, t) {
+  if (!RUNES[k] || slot < 0 || slot >= forgeSlots(w) || (t && !runeFits(k, t))) return false;
+  const c = forgeRuneCost(w); if (!forgePay(w, c, 'A rune')) return false;
+  w.runes = (w.runes || []).slice(); w.runes[slot] = k; return forgeDone(w);
+}
+function forgeRelevel(w) { const c = forgeRelevelCost(w); if (!forgePay(w, c, 'Re-forging')) return false; w.il = forgeNow(); return forgeDone(w); }
+// what an action would make of it (a copy, for the plain-number preview)
+function forgePreview(w, act) {
+  const c = Object.assign({}, w); delete c._c; delete c._k;
+  if (act === 'up') c.rar = (c.rar | 0) + 1; else if (act === 'lv') c.il = forgeNow();
+  return c;
+}
+
+/* ---------- balance: a typical forge spend in the runs model ----------
+   The gold a typical run earns by each wave (playtest.js PT_EARNED, the standard march), and the share of each wave's gold an
+   ordinary player puts into the forge (FORGE_SPEND: nothing before wave 15, while units and upgrades come first). The
+   spend goes, a wave at a time, to the action that lifts the army most for its gold: re-forging a weapon to the wave's
+   level, or a rarity upgrade (rerolls and runes are side-grades, not counted). forgeRunSim is wpnRunSim with it. */
+const FORGE_EARNED = [66, 144, 244, 383, 568, 847, 1042, 1292, 1578, 1991, 2224, 2615, 2887, 3212, 3903, 4336, 4723, 5323, 5653, 6790, 7963, 8668, 9555, 10719, 11888, 12730, 13946, 14958, 16280, 18878, 20303, 21920, 23749, 25307, 27806, 29981, 31609, 33224, 35668, 38489, 40244, 41896, 44713, 46833, 49390, 51331, 53616, 56337, 59746, 63998];
+const forgeIncome = w => { w = Math.max(1, Math.min(50, w | 0)); return FORGE_EARNED[w - 1] - (w > 1 ? FORGE_EARNED[w - 2] : 0); };
+const FORGE_SPEND = w => w < 15 ? 0 : w < 25 ? .08 : .12;
+function forgeRunSim(o) {
+  o = o || {}; const rnd = o.rnd || Math.random, pick = W => { let t = W.reduce((a, b) => a + b, 0) * rnd(); for (let i = 0; i < W.length; i++) if ((t -= W[i]) <= 0 && W[i] > 0) return i; return W.length - 1; };
+  const Wt = WPN_SIM.w, N = Wt.length, S = Wt.reduce((a, b) => a + b, 0), isC = u => WPN_SIM.cast.includes(u), held = new Array(N).fill(null), K = [1], drops = [0, 0, 0, 0, 0];
+  let dropW = 0, legN = 0, bossSeen = false, bank = 0, spent = 0;
+  const give = (w, boss) => {
+    let r = pick(wpnRarW(w, boss)); if (r === 4 && legN >= wpnLegCap(w)) r = 3; if (r === 4) legN++;
+    if (o.cap != null) r = Math.min(r, o.cap);
+    drops[r]++; dropW = w;
+    const L = w + (boss ? 3 : 0), u = pick(Wt), cast = isC(u);
+    if (!held[u] || wpnGain(r, L, w, cast) > wpnGain(held[u][0], held[u][1], w, cast)) held[u] = [r, L];
+  };
+  for (let w = 1; w <= 50; w++) {
+    if (bossWave(w)) { if (!bossSeen || rnd() < WPN_DROP.boss) give(w, true); bossSeen = true; }
+    else if (eliteWave(w) && rnd() < WPN_DROP.lastElite) give(w, false);
+    if (w - dropW >= WPN_DROP.dry || rnd() < WPN_DROP.last) give(w, false);
+    if (o.forge !== false) {
+      bank += forgeIncome(w) * (o.spend != null ? o.spend : FORGE_SPEND(w));
+      for (let guard = 0; guard < 20; guard++) {
+        let best = null;
+        for (let u = 0; u < N; u++) { const h = held[u]; if (!h) continue; const g0 = wpnGain(h[0], h[1], w, isC(u));
+          const fake = { rar: h[0], il: h[1], b: 'x' };
+          if (h[1] < w) { const c = (() => { let s = 0; for (let L = h[1]; L < w; L++) s += forgeLvStep(L) * FORGE_LV_RAR[h[0]]; return forgeR5(s); })(), g = Wt[u] * (wpnGain(h[0], w, w, isC(u)) - g0) / c; if (c <= bank && (!best || g > best.g)) best = { u, g, c, to: [h[0], w] }; }
+          if (h[0] < 3) { const c = forgeR5(FORGE_UP[h[0]] * forgeLvK(h[1])), g = Wt[u] * (wpnGain(h[0] + 1, h[1], w, isC(u)) - g0) / c; if (c <= bank && (!best || g > best.g)) best = { u, g, c, to: [h[0] + 1, h[1]] }; }
+          void fake; }
+        if (!best || !(best.g > 0)) break;
+        bank -= best.c; spent += best.c; held[best.u] = best.to;
+      }
+    }
+    let k = 0; for (let u = 0; u < N; u++) k += Wt[u] * (held[u] ? wpnGain(held[u][0], held[u][1], w, isC(u)) : 1);
+    K[w] = k / S;
+  }
+  return { K, drops, spent, n: drops.reduce((a, b) => a + b, 0) };
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
@@ -48019,6 +48740,14 @@ SFX_DRAW.v2wedge = (q, u, a) => {
   for (let sd = -1; sd <= 1; sd += 2) { const an = q.ang + q.half * sd; vfxRb.begin(VX, VT.GLOWS, 1, 0, 1); vfxRb.pt(q.x, .046, q.z, .06 * vfxPx(), q.col, .4 * e, 0); vfxRb.pt(q.x + Math.cos(an) * r, .046, q.z + Math.sin(an) * r, .08 * vfxPx(), q.hot, .8 * e, 1); vfxRb.end(); }
   vfxFan(VX, q.x, .048, q.z, r * .8, r, q.ang - q.half, q.ang + q.half, segs, q.hot, .7 * e * (1 - .5 * g), VT.FAN, 1, 0, 2);
 };
+// a sweep: an arc of light swung round (x, z) from angle a0 to a1 between radii r0 and r1 (Dawnsweep), its leading edge bright,
+// a fading trail behind it on the ground
+SFX_DRAW.v2sweep = (q, u, a) => {
+  const g = v2Ease(Math.min(1, q.age / q.sweep)), e = Math.min(1, (q.life - q.age) / (q.fout || .3)); if (e <= 0) return;
+  const d = q.a1 >= q.a0 ? 1 : -1, aL = q.a0 + (q.a1 - q.a0) * g, tr = Math.min(Math.abs(aL - q.a0), Math.abs(q.a1 - q.a0) * .5), aT = aL - d * tr, segs = vfxLite() ? 6 : 12;
+  if (tr > .01) vfxFan(VX, q.x, .05, q.z, q.r0, q.r1, Math.min(aT, aL), Math.max(aT, aL), segs, q.col, q.al * e, VT.FAN, 1, q.age * .4, 2);
+  if (g < 1) { vfxRb.begin(VX, VT.GLOWS, 1, 0, 1); for (let i = 0; i <= 4; i++) { const r = q.r0 + (q.r1 - q.r0) * i / 4; vfxRb.pt(q.x + Math.cos(aL) * r, .07 + .05 * Math.sin(Math.PI * i / 4), q.z + Math.sin(aL) * r, .07 * vfxPx(), q.hot, .8 * e, i / 4); } vfxRb.end(); }
+};
 function v2Wedge(C, x, z, ux, uz, r, half, o) {
   o = o || V2O; const K = v2K(C);
   return sfxAdd({ k: 'v2wedge', delay: o.delay || 0, x, z, ang: Math.atan2(uz, ux), half, r: r * C.T.ring, col: o.col || K.a, hot: o.hot || K.hot, al: o.al || .6, sweep: (o.sweep || .18) / C.T.speed, life: (o.life || .6) * C.T.dur, fout: o.fout || .3 });
@@ -48692,11 +49421,16 @@ SFX_V2_DEF.push(() => {
   SFX_V2.so_embers = { cast: C => v2Wind(C, { wu: .1 }), hit: () => {}, steps: 6, zoneStart: soLanding, zone: { k: 'so_incense', L: -1, fill: .08, fx: soIncense }, mote: soSmokeMote };
 
   // ---- the Order's commanders ----
-  // Lion's Charge: five lanes of gold thunder down through the circle, shafts of light falling on it, the ground shaken
+  // Dawnsweep (Aurelian; id so_lioncharge): one wide arc of dawnlight swung from his sword across the circle, low on the
+  // ground and translucent (the road and the foes on it read through it), a bright leading edge; gold sparks where it lands
   SFX_V2['hero:so_lioncharge'] = vArea({ wind: 0, steps: 1,
-    cast: C => { const s = sfxSpots(C)[0]; if (!s) return; const R0 = C.r; for (let k = 0; k < 5; k++) { const x = s[0] + (k - 2) * .4 * R0; v2Band(C, x, s[1] + 1.4 * R0, 0, -1, 2.8 * R0, .28, { al: .5, sweep: .32, life: .8, delay: Math.abs(k - 2) * .03, L: VT.ENERGY }); } },
-    area: { sp: 'gold', n: 12, rim: 'dust', rn: 14, shake: .2, hold: 1 },
-    fx: (C, x, z, r) => { for (let k = 0; k < 4; k++) { const an = k / 4 * TAU + .4; v2Shaft(C, x + Math.cos(an) * r * .6, z + Math.sin(an) * r * .6, { w: .18, life: .5, delay: k * .04 }); } } });
+    cast: C => {
+      const s = sfxSpots(C)[0]; if (!s) return; const R0 = C.r, F = typeof SO_SWEEP_FROM !== 'undefined' && SO_SWEEP_FROM;
+      const fx = F ? F.x : s[0], fz = F ? F.z : s[1] + 1.4 * R0, D = Math.max(.6, Math.hypot(s[0] - fx, s[1] - fz)), ang = Math.atan2(s[1] - fz, s[0] - fx), half = Math.min(1.2, Math.atan2(R0, D) * 1.15);
+      sfxAdd({ k: 'v2sweep', x: fx, z: fz, r0: Math.max(.3, D - R0), r1: D + R0, a0: ang - half, a1: ang + half, sweep: .3 / C.T.speed, life: .75 * C.T.dur, fout: .35, col: vfxC('#ffd77a'), hot: vfxC('#fff4cc', 1.5), al: .42 });
+    },
+    area: { sp: 'gold', n: 12, rim: 'dust', rn: 10, shake: .16, hold: 1 },
+    fx: () => {} });
   // Dawnbreak: the sun breaks over the circle: a great sunburst, a wide shaft at its heart and six round it, white-gold rays
   SFX_V2['hero:so_dawnbreak'] = vArea({ wind: 0, steps: 2,
     area: (C, k) => ({ sp: 'gold', n: 14, rim: 'spark', rn: 14, hold: 1.4, shake: .16, minor: k > 0 }),
@@ -49447,11 +50181,11 @@ SFX_V2_DEF.push(() => {
   SFX_V2.ch_onthehouse = { cast: C => v2Wind(C, { wu: .1 }), lead: .05,
     hit: (C, k) => { const t = C.t; if (!t || k) return; const P = t.chPud || []; for (const p of P) { v2Area(C, p.x, p.z, .75, { sp: 'ember', n: 8, rim: 'flame', rn: 6, hold: .3, minor: 1 }); v2Flames(C, p.x, p.z, .55, 9, { life: .9 }); sfxAdd({ k: 'v3haze', x: p.x, z: p.z, r: .7, life: 1.2 }); } if (P.length) sfxShake(C, .12); } };
   // ---- Aurelian (Silver) ----
-  // Banner at the Ford: a shaft of light falls where the banner is planted and a sunburst lies on the ford while it flies
+  // (Bulwark Slam, once Banner at the Ford: drawn by forces_zzz_silver_cool.js now) a shaft of light falls where the banner is planted and a sunburst lies on the ford while it flies
   SFX_V2.ch_fordstandard = vArea({ wind: { wu: .12 }, r: C => (C.ab && C.ab.rr) || 1,
     area: { sp: 'gold', n: 10, rim: 'dust', rn: 8, hold: .6 }, fx: (C, x, z) => v2Shaft(C, x, z, { w: .24, life: .6 }),
     zone: { L: VT.SUN, al: .35, spin: .15 }, mote: (C, x, z) => v3P(C, 'gold', x, .15, z, 1, { sp: .2 }) });
-  // The Lion's Due: the lion rides down its exact line in a gilded band, hooves throwing dust, a shaft where it turns
+  // The Crossing (ch_lionsdue; its own look is drawn in forces_zzz_silver_cool.js): a gilded band down its line, dust where he steps
   SFX_V2.ch_lionsdue = vLine({ len: C => (C.ab && C.ab.len) || 3.5, w: C => (C.ab && C.ab.w) || .45, at: .25, sweep: .25, wind: { wu: .1, L: -1 },
     band: { L: VT.ENERGY, al: .5, life: .9 },
     fx: (C, x0, z0, ux, uz, len, w, d0) => { v3Line(C, x0, z0, x0 + ux * len, z0 + uz * len, 'dust', 20); v2Shaft(C, x0 + ux * Math.min(len, 2.5), z0 + uz * Math.min(len, 2.5), { w: .2, life: .5, delay: d0 + .2 }); },
@@ -53500,11 +54234,12 @@ const AudioSys = (() => {
     // a bare oak mallet on the lowest bell
     so_knell: [2, 5, 1, .72, .08, .36, d => { mxWood(d, 0, rnd(170, 200), .32, .12); mxBell(d, 0, 110, { hard: 1, len: 1.05, clap: .75 }); }],
     /* the commanders */
-    // the whole line of ghost knights: five gallops on top of one another, thundering past as the blow lands
-    so_lioncharge: [2, 2.7, 2, .74, .14, .14, d => {
-      const env = u => Math.min(1, .3 + u * 3.4) * Math.pow(1 - u, .7);
-      for (let k = 0; k < 5; k++) mxGallop(d, rnd(0, .1), 2.1, rnd(.155, .18), .5, env);
-      mxRub(d, 0, 2.5, 60, 260, .55, mxSwell(.2), 22); mxChain(d, .1, 1.7, 26, 680, 1250, .06, 1.1); mxThud(d, .25, 96, 48, .55, 1); mxHit(d, .25, .01, .5, 1000); }],
+    // Dawnsweep (id so_lioncharge): a great blade swung wide and low, the air it moves, the blow landing across the road,
+    // and one low bell under it for the light (no gallop, no roar)
+    so_lioncharge: [2, 2.4, 2, .7, .14, .2, d => {
+      mxRub(d, 0, .5, 90, 520, .5, mxSwell(.7, 2), 34); mxRub(d, .05, .4, 160, 900, .16, mxSwell(.8, 2), 60);
+      mxThud(d, .26, 104, 52, .42, .85); mxHit(d, .26, .008, .35, 1100); mxRub(d, .27, .6, 70, 240, .3, mxDown(.05), 18);
+      mxBell(d, .3, 146.8, { soft: .55, len: .9, clap: .25, a: .6 }); }],
     // first light: a wind getting up, and the two greatest bells struck; a recorded choir comes in under them on an open fifth
     'so_dawnbreak/1': [2, 5, 1, .62, .05, .36, d => { mxRub(d, 0, 3.6, 88, 400, .34, mxSwell(.2), 2.5); mxBell(d, .03, 146.8, { soft: .25, len: 1, clap: .4, a: .85 }); mxBell(d, .3, 220, { soft: .4, len: .85, clap: .3, a: .62 }); }, { choir: [50, 57, 62], cv: .12 }],
     'so_dawnbreak/0': [2, 4, .5, .5, .05, .38, d => { mxRub(d, 0, 2.4, 88, 340, .24, mxSwell(.2), 2.5); mxBell(d, .02, 220, { soft: .6, len: .85, clap: .25, a: .8 }); }],
@@ -53656,9 +54391,9 @@ const AudioSys = (() => {
   // every spell in order, as the game plays it: [id, name, ...[sound arg, seconds after the cast]]
   const MX_LIST = [['so_bash', 'Bulwark Bash'], ['so_aegis', 'Rampart of Dawn'], ['so_rebuke', 'Oath of Challenge'], ['so_sanct', 'Consecrated Bolt'], ['so_hail', 'Flare Bolt', [0, 0], [0, .12], [0, .24], [0, .36]], ['so_witness', 'Bear Witness'],
     ['so_bind', 'Binding Light'], ['so_flare', 'Chain of Penance'], ['so_shackle', 'Vigil Chains'], ['so_grail', 'Grail Charge', [0, 0], [1, .52]], ['so_ridedown', 'Tourney Passes', [0, 0], [1, .3]], ['so_vow', 'Charge of the Vow'],
-    ['so_sunlance', 'Sunlance'], ['so_halo', 'Noon Sweep'], ['so_dawnfall', 'Dawnfall'], ['so_crush', 'Sanctified Slam'], ['so_hallow', 'Hammer Fervour'], ['so_hammerfall', 'Hammer of Heaven', [0, 0], [1, .82]],
+    ['so_sunlance', 'Sunlance'], ['so_halo', 'Noon Sweep'], ['so_dawnfall', 'Dawnfall'], ['so_crush', 'Sanctified Slam'], ['so_hallow', 'Shield Fervour'], ['so_hammerfall', 'Sword of Heaven', [0, 0], [1, .82]],
     ['so_sweep', 'Thurible Sweep'], ['so_smoke', 'Procession of Incense', [0, 0], [1, .9]], ['so_embers', 'Kindle the Censers', [0, 0], [1, .55], [0, .2], [1, .75], [0, .4], [1, .95]], ['so_toll', 'Toll of Valor'], ['so_peal', 'Peal of Mercy'], ['so_knell', 'Knell of Judgement'],
-    ['so_lioncharge', 'Lion\'s Charge (Aurelian)'], ['so_dawnbreak', 'Dawnbreak (Celestine)', [1, 0]], ['so_sentence', 'Sentence (Morrow)']];
+    ['so_lioncharge', 'Dawnsweep (Aurelian)'], ['so_dawnbreak', 'Dawnbreak (Celestine)', [1, 0]], ['so_sentence', 'Sentence (Morrow)']];
   function silverPlay(id) {
     const e = MX_LIST.find(x => x[0] === id); if (!e) return false;
     AudioSys.init();
@@ -73470,7 +74205,7 @@ const SPELL_BRIEFS = {
   so_dawnfall: 'Drags flying enemies down for {dur} sec, dealing {d} and Blinding as long (less on bosses). Each crash deals {d2} to ground enemies beneath, Blinds {crash} sec and adds a Judgement.',
   so_crush: 'After a long wind-up, slams the ground, dealing {d} to ground enemies and stunning {stun} sec. Judged enemies hit hear their full Verdict.',
   so_hallow: 'Slams {n} times in quick succession, each dealing {d} and a Judgement to ground enemies. The last slam delivers each one\'s Verdict at {vkPct} strength.',
-  so_hammerfall: 'Hurls its hammer, landing 1 sec later for {d}, stunning {stun} sec and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2}, a Judgement and a 0.5 sec stun.',
+  so_hammerfall: 'Hurls its sword into the sky, landing 1 sec later for {d}, stunning {stun} sec and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2}, a Judgement and a 0.5 sec stun.',
   so_sweep: 'Swings the censer in a circle, dealing {d} and a Judgement to ground enemies within 1.5 cells. Incense around the bearer for {dur} sec burns enemies every 0.5 sec and Judges them every sec.',
   so_smoke: 'Lays incense along {n} cells of road, dealing {d} and a Judgement to each ground enemy hit. For {dur} sec, ground enemies in it are slowed {slowPct}, burned every 0.5 sec and Judged every sec.',
   so_embers: 'Ignites up to {n} incense patches in range, using them up. Ground enemies in one take {d} and a Judgement; those with 3 or more Judgement first hear a 50% Verdict. With no incense, it first throws a coal.',
@@ -73567,9 +74302,9 @@ const SPELL_BRIEFS = {
   so_edict: 'Brands a sigil of silence, dealing {d} within {rr} cells. Casters in it are silenced {dur} sec (half on bosses and leaders), lose Spell Ward and haste, and gain a Judgement.',
   so_seize: 'Seizes a caster, dealing {d}, stunning {hold} sec, interrupting its spell and draining {drain} mana. Up to 4 other casters within 1.6 cells take {d2} and are silenced {ts} sec.',
   so_pyre: 'Raises a burning stake, dealing {d} to ground enemies within 1 cell, then {d2} every 0.5 sec for {dur} sec. The first caster to reach it (else any ground enemy) is chained {hold} sec and burns twice as hard.',
-  ch_lioncharge: ({ d, full }) => { const m = /([\d.]+)-cell area/.exec(full); return `Knights of light charge through ${m ? m[1] : '1.6'} cells, dealing ${d(1)} to ground enemies (less to bosses), knocking them back and adding 3 Judgement. Nearby Order units turn Radiant 6 sec.`; },
-  ch_fordstandard: 'Roars in an 80° cone, dealing {d} and {j} Judgement. Ground enemies are knocked {kb} cells back (not bosses); flying enemies are dragged down 1.5 sec. Adjacent Order units are Warded {ward} sec.',
-  ch_lionsdue: 'Charges {n} times between enemies, most Judged first, dealing {d} and {j} Judgement to each ground enemy hit. Any left with 3 or more Judgement hears its Verdict.',
+  ch_lioncharge: ({ d, full }) => { const m = /([\d.]+)-cell area/.exec(full); return `An arc of light sweeps ${m ? m[1] : '1.6'} cells, dealing ${d(1)} to ground enemies (less to bosses), knocking them back and adding 3 Judgement. Order units it passes turn Radiant 6 sec.`; },
+  ch_fordstandard: 'Slams his shield into the ground: a shockwave down an 80° cone deals {d} and {j} Judgement. Ground enemies are knocked {kb} cells back (not bosses); flying enemies are knocked down 1.5 sec. Adjacent Order units are Warded {ward} sec, Templars of the Ford within 2 cells 2 sec longer.',
+  ch_lionsdue: 'Advances {n} times between enemies on foot, most Judged first, dealing {d} and {j} Judgement to each ground enemy hit. Any left with 3 or more Judgement hears its Verdict.',
   ch_dawnbreak: ({ d, full }) => { const m = /([\d.]+)-cell area/.exec(full); return `The sun breaks over ${m ? m[1] : '1.7'} cells, dealing ${d(1)} (less to bosses), Blinding 4 sec and adding 2 Judgement.`; },
   ch_morningstar: 'Fires a dawn beam bouncing between up to {n} Oath-Stones, dealing {d}, a Judgement and a {blind} sec Blind to each enemy crossed. With no Oath-Stone, it fires one beam.',
   ch_highnoon: ({ v }) => `For ${v('dur')} sec, a sun Blinds all enemies in range every ${v('pulse') === 1 ? '' : v('pulse') + ' '}sec, and each attack also hits up to 5 other Blinded enemies for 60% damage.`,
@@ -75026,11 +75761,11 @@ const AFF_MODS = {
   ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within a Runesmith’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Runesmiths: Tovin already favours the Mortar Crew)
     up: { glaive: { k: 'rate', v: .06 }, earth: { k: 'reach', v: .1 } }, dn: { arrow: { k: 'range', v: -.2 }, storm: { k: 'rate', v: -.05 } } },
   // ---- the Silver Order ----
-  so_lion: { fav: 'arcane', sig: { name: 'Glory', t: 'A Grail Knight that slays a foe becomes Radiant for 4 seconds.' },
-    up: { glaive: { k: 'reach', v: .1 }, earth: { k: 'rate', v: .06 } }, dn: { frost: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
+  so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its slams Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back, dazes and Judges up to 4 walkers it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
+    up: { glaive: { k: 'reach', v: .1 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
   so_dawn: { fav: 'cannon', sig: { name: 'Dawn Knell', t: 'Every 4th swing of a Censer Bearer rings out like a bell, Blinding every foe it strikes for 1.5 seconds.' },
     up: { frost: { k: 'range', v: .2 }, storm: { k: 'crit', v: .05 } }, dn: { arcane: { k: 'range', v: -.2 }, earth: { k: 'rate', v: -.05 } } },
-  so_judge: { fav: 'earth', sig: { name: 'Gavel', t: 'Every 4th slam of a Hammer Templar delivers the Verdict on each foe it strikes that carries 3 or more Judgement.' },
+  so_judge: { fav: 'arcane', sig: { name: 'Lead the Charge', t: 'Whenever Morrow charges, every Grail Knight within 2 cells charges its own foe at once (at most once every 4 seconds a knight).' },   // (owner, 9 Nov 2026: "morrow changes to the grail knights"; the rule: forces_zzzzzzzzzz_shieldline.js)
     up: { arrow: { k: 'crit', v: .05 }, storm: { k: 'range', v: .2 } }, dn: { frost: { k: 'rate', v: -.05 }, cannon: { k: 'range', v: -.2 } } },
   // ---- the Stormborn ----
   sb_caller: { fav: 'storm', sig: { name: 'Conductor', t: 'Thunder Callers crit one strike in four on a soaked or chilled foe, and every crit feeds the Storm.' },
@@ -75165,9 +75900,6 @@ function heroAffFire(t, st, tg, pow) {
     case 'so_dawn':   // Dawn Knell: every 4th swing opens a moment in which its hits Blind
       if ((t.affN = (t.affN || 0) + 1) % 4 === 0) { t.affProcT = G.time + .6; affPop(t.x, t.y, towerTop(t) + .1, h.hue, true); }
       break;
-    case 'so_judge':   // Gavel: every 4th slam opens a moment in which its hits deliver the Verdict
-      if ((t.affN = (t.affN || 0) + 1) % 4 === 0) { t.affProcT = G.time + .6; affPop(t.x, t.y, .1, h.hue, true); }
-      break;
     // Steady Blade: a cut after a patient wait lands half again as hard, and roots (heroAffHit)
     case 'wb_varic':
       if (!t.affLastT || G.time - t.affLastT >= 2) { pow *= 1.5; t.affProcT = G.time + .5; affPop(t.x, t.y, towerTop(t) + .1, h.hue); }
@@ -75202,9 +75934,6 @@ function heroAffHit(c, st, src, amt) {
       break;
     case 'thornbow':   // Hawk's Stoop
       if (src.affTg === c) { src.affTg = null; if (c.fly) { c.lowT = Math.max(c.lowT || 0, G.time + (c.def.boss ? .6 : 1.5)); affPop(c.x, c.y, hitH(c), h.hue); } }
-      break;
-    case 'so_judge':   // Gavel
-      if (src.affProcT >= G.time && typeof soJ === 'function' && soJ(c) >= 3) soVerdict(c, src, 1, { min: 3 });
       break;
     // Ghost Edge: a cut on a stunned foe comes again a moment later, a ghost of the blade (half the cut)
     case 'cc_maren':
@@ -75252,7 +75981,6 @@ function heroAffKill(c, src) {
     }
   }
   if (!src || !src.def || src.type !== M.fav) return;
-  if (h.id === 'so_lion' && typeof soRadiate === 'function') soRadiate(src, 4);   // Glory
   // Headlong: count the lancer's kills this wave (heroAffStats)
   if (h.id === 'wb_aedric') { if (src.affWave !== G.wave) { src.affWave = G.wave; src.affN = 0; } if (++src.affN % 4 === 0 && src.affN <= 12) affPop(src.x, src.y, towerTop(src) + .1, h.hue); }
   if (h.id === 'sb_beast' && !(src.affCdT > G.time) && typeof sbS === 'function') {   // Pack Call
@@ -75309,7 +76037,7 @@ function missingArtApply() {
     const id = hero.spell && hero.spell.id;
     if (id && UI_ART[id] && !SPELL_ART[id]) SPELL_ART[id] = id;
   }
-  for (const [id, uri] of Object.entries({ ...art.items, ...TALENT_PAINT.items, ...added.items })) {
+  for (const [id, uri] of Object.entries({ ...art.items, ...TALENT_PAINT.items, ...added.items, ...(added.weapons || {}) })) {
     const key = SHOP[id] ? 'shop-' + id : id;
     if (RELICART[key]) continue;
     RELICART[key] = uri;
@@ -75357,6 +76085,7 @@ function gpBounds(t) {
   return (GP_BD[key] = [[-r, 0, -r], [r, Math.min(top, bd[1][1] + .9), r]]);
 }
 // the unit, turned to gpAng, into the sheet's canvas (through the icon renderer's path, on a renderer of its own)
+let gpClock = 0, gpClockAt = 0;
 function gpDraw() {
   const cv = document.getElementById('gpCv'), R = gpRenderer(); if (!cv || !R || !gpT) return;
   const keep = IR; IR = R;
@@ -75369,8 +76098,14 @@ function gpDraw() {
     const z = gpZoom, h = bd[1][1], cy = h / 2 + h * .24 * Math.min(1, (z - 1) / 2);
     const b0 = [bd[0][0] / z, cy - h / 2 / z, bd[0][2] / z], b1 = [bd[1][0] / z, cy + h / 2 / z, bd[1][2] / z], dg2 = Math.hypot(b1[0] - b0[0], b1[1] - b0[1], b1[2] - b0[2]) / 2;
     frameSubject(b0, b1, .45, .18, .5, fr / z / dg2);
+    // the unit lives on the dais (owner: "mageling still doesnt have an idle pose"): the sheet keeps its own clock while the
+    // game is paused under it, and a sculpted unit plays its idle on it, looping (UM_SHOW, unitmodels.js); the hand-built
+    // ones breathe on vt, so vt follows the same clock while the unit is drawn
+    const now = performance.now() / 1000; gpClock += Math.min(.1, Math.max(0, now - (gpClockAt || now))); gpClockAt = now;
+    const keepVt = vt; vt = gpClock;
     dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
-    irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null);
+    try { UM_SHOW = gpClock; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
+    finally { UM_SHOW = null; vt = keepVt; }
     irRender([.03, .045, .04], [.75, 1, .55, .16]);
     const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(R.canvas, 0, 0, cv.width, cv.height);
   } catch (e) {} finally { IR = keep; }
@@ -76270,7 +77005,7 @@ function slotsNow() {
         const all = grp.reduce((a, o) => a + (upgradeCost(o) || 0), 0), g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0;
         s[0] = { key: `u:${t.type}:${t.tier + 1}`, cost: all, lbl: `All ${grp.length}`, up: !!pc, on: G.gold >= uc, name: `Upgrade all ${grp.length} to tier ${ROMAN[t.tier + 1]}`, hk: 'U', act: () => upgradeGroup() };
       } else
-      s[0] = ageLocked(t) && vetOn() ? { key: `m:${t.type}:${t.tier + 1}`, lbl: `Vet ${vetPts(t)}/${vetNeed(t.tier + 1)}`, on: false, name: vetLockText(t), hk: 'U', act: () => { toast(vetLockText(t) + '. Kills count, and so do assists: foes that die under its slows, roots, burns, curses or aura.'); sfx('nogold'); } }
+      s[0] = ageLocked(t) && vetOn() ? { key: `m:${t.type}:${t.tier + 1}`, lbl: `Vet ${vetPts(t)}/${vetNeed(t.tier + 1)}`, bar: vetFrac(t), on: false, name: vetLockText(t), hk: 'U', act: () => { toast(vetLockText(t) + '. Kills count, and so do assists: foes that die under its slows, roots, burns, curses or aura.'); sfx('nogold'); } }
            : ageLocked(t) ? { key: `m:${t.type}:${t.tier + 1}`, lbl: AGES[t.tier - 1].name, on: false, name: `Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}`, hk: 'U',
                 act: () => { toast(`Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}. Upgrade your keep.`); select('keep', null); } }
            : uc ? (() => { const g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0; return { key: `u:${t.type}:${t.tier + 1}`, cost: uc, lbl: 'Upgrade', up: !!pc, on: G.gold >= uc, pulse: !!t.vetNew && G.gold >= uc, name: `Upgrade to tier ${ROMAN[t.tier + 1]}` + (g ? (b => b.length ? `: ${b.join(', ')}` : '')(gainBits(t.type, g.a, g.b, 3)) : ''), hk: 'U', act: () => upgrade(t) }; })()
@@ -76345,7 +77080,7 @@ function renderCard() {
     if (!sl) {
       c.btn.className = 'cmd empty'; c.btn.disabled = true; delete c.btn.dataset.iid; c.btn.removeAttribute('aria-label'); c.btn.removeAttribute('title'); c.btn.removeAttribute('aria-describedby');
       if (c.key) { const x = c.cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.cv.width, c.cv.height); c.key = ''; }   // (the relic painter leaves its scale on the canvas: undo it, or only part is cleared)
-      c.lbl.textContent = ''; c.cost.textContent = ''; continue;
+      c.lbl.textContent = ''; c.cost.textContent = ''; if (c.vb) c.vb.hidden = true; continue;
     }
     c.btn.disabled = false;
     c.btn.className = 'cmd' + (sl.on ? '' : ' off') + (sl.active ? ' on' : '') + (sl.pulse ? ' pulse' : '') + (sl.warn ? ' warn' : '') + (sl.up ? ' gain' : '') + (sl.auto ? ' auto' : '');   // auto: an ability on autocast
@@ -76361,6 +77096,10 @@ function renderCard() {
     if (c.cv.width !== size) { c.cv.width = c.cv.height = size; c.key = ''; }
     if (c.key !== sl.key) { iconPaint(c.cv, sl.key); c.key = sl.key; }
     c.lbl.textContent = sl.lbl || ''; c.cost.textContent = sl.cost != null ? sl.cost : ''; c.cost.className = 'c' + (sl.costCls ? ' ' + sl.costCls : '');
+    if (sl.bar != null) {   // a thin gold bar along the button's foot (a locked tier: the unit's veterancy toward it)
+      if (!c.vb) { c.vb = document.createElement('i'); c.vb.className = 'vbar'; c.btn.appendChild(c.vb); }
+      c.vb.hidden = false; const f = clamp(sl.bar, 0, 1).toFixed(3); if (c.vb.__f !== f) { c.vb.__f = f; c.vb.style.setProperty('--f', f); }
+    } else if (c.vb && !c.vb.hidden) c.vb.hidden = true;
     if (sl.cdOf) { c.btn.classList.toggle('cool', sl.cdOf() > 0); c.btn.style.setProperty('--cd', sl.cdOf().toFixed(3)); } else c.btn.style.removeProperty('--cd');
   }
   cardCool = s.some(q => q && (q.cdOf || q.stale));
@@ -76483,8 +77222,7 @@ function infoHTML() {
     return `<h3>${grp ? `${grp.length} × ` : ''}${d.name} <span class="tier${t.tier >= 3 ? ' asc' : ''}">${ROMAN[t.tier]}</span></h3>`
       + (grp ? `<p class="grp">${gc ? `Upgrade all ${grp.length} for <b>${gc}</b> gold (as many as you can afford).` : 'All at the highest tier.'} Tap any ${uw(1)} to go back to one.</p>` : '')
       + (d.support && !shrineAttacks(t.tier, eff) ? '' : `<p class="mut" data-d="1">Kills <b>${t.kills}</b> · Dealt <b>${fmt(t.dmg)}</b></p>`)
-      + (grp ? '' : vetInfoHTML(t))
-      + `<div class="st">${statLine(t.type, t.tier, eff, tierOf(t))}</div>` + manaInfoHTML(t) + (eff.ist && itemStatSum(eff.ist) ? `<p class="mut ist" data-d="2">Items: <b>${itemStatSum(eff.ist)}</b></p>` : '') + (typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : '') + (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '')
+      + `<div class="st">${statLine(t.type, t.tier, eff, tierOf(t))}</div>` + manaInfoHTML(t) + (grp ? '' : vetInfoHTML(t)) + (eff.ist && itemStatSum(eff.ist) ? `<p class="mut ist" data-d="2">Items: <b>${itemStatSum(eff.ist)}</b></p>` : '') + (typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : '') + (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '')
       + synSummaryHTML()
       + (typeof bfRowHTML === 'function' ? bfRowHTML(t) : '')
       + (tg.length ? `<div class="tags">${tg.join('')}</div>` : '')
@@ -77376,7 +78114,7 @@ function talIconOf(type, t) {
   }
   const force = talForce(type) ? FORCE_NOW : 'classic';
   const k = force + ':' + type + ':' + t.name;
-  const painted = typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents[k];
+  const painted = typeof TALENT_PAINT !== 'undefined' && (TALENT_PAINT.talents[k] || (typeof TAL_ART_ALIAS !== 'undefined' && TAL_ART_ALIAS[t.name] && TALENT_PAINT.talents[force + ':' + type + ':' + TAL_ART_ALIAS[t.name]]));   // (a renamed talent keeps its painting)
   if (painted) return talArt[k] = painted;
   if (talArt[k]) return talArt[k];
   const X = typeof ARTX_TAL !== 'undefined' && ARTX_TAL[type + ':' + t.name];
@@ -78354,6 +79092,20 @@ let NEWMODELS = (() => {
   if (v == null) try { const s = localStorage.getItem('runehold.newmodels'); v = s === '2' ? 2 : s === '0' ? 0 : 1; } catch (e) { v = 1; }
   return v;
 })();
+// the character sheet's turntable (gearpanel.js): while it draws, UM_SHOW is its own running clock (seconds), and a sculpted
+// unit drawn off the field plays its idle, looping and breathing, instead of one still frame of its guard (icons and
+// portraits, UM_SHOW null, keep their still frame). umShowF: the idle clip's frame now (null when not on the sheet or the
+// model has no such clip); umShowBreath: a slow breath through the chest on top of a held rest frame.
+let UM_SHOW = null;
+function umShowF(M, name) {
+  if (UM_SHOW == null) return null;
+  const m = UNIT_MDL[M.S.mdl], c = m && m.anim && m.anim.clips && m.anim.clips[name || 'idle']; if (!c) return null;
+  return c[0] + (UM_SHOW * 30) % Math.max(1, c[1] - 1);
+}
+function umShowBreath(R, o, amt) {
+  if (UM_SHOW == null || !R || !R.bix || R.bix.Spine2 == null || !R.sub || !R.sub.Spine2) return;
+  const c = umXf(o, R.bix.Spine2, R.B[R.bix.Spine2].h); umTurn(o, R.sub.Spine2, UMX.rx((amt || .014) * Math.sin(UM_SHOW * 1.7)), c);
+}
 // per unit: its model's id in UNIT_MDL, where its arrows leave when it has no rig (model space, 0..1 tall), how far it
 // sinks into its base, its size against the code-built body (k: the cloak flares wide, so a little smaller), its moves
 const UM_UNITS = {
@@ -80629,7 +81381,7 @@ function dwCtl(t, live, M) {
     if (t.ihVentAt != null) fl(t.ihVentAt + DW_HIT, 2);
     if (t._dwAt != null && DW_CAST[t._dwId]) fl(t._dwAt + DW_CAST[t._dwId].land, DW_CAST[t._dwId].flare);
   }
-  if (!live) return { f: dwF(M, 'club', 0), rate: 0, flare: 0, act: 0 };
+  if (!live) return UM_SHOW != null ? { f: dwF(M, DW_REST.clip, DW_REST.f), rate: 0, flare: 0, act: 0, rest: 1, yaw: 0 } : { f: dwF(M, 'club', 0), rate: 0, flare: 0, act: 0 };   // (on the character sheet: his rest, the hammer over his shoulder, breathing)
   const C = t._dwAt != null ? DW_CAST[t._dwId] : null, cu = C ? now - t._dwAt : 9;
   if (C && cu >= 0 && cu < C.T) return { f: dwF(M, C.clip, dwKeys(C.keys, cu)), rate: cu < .1 ? 18 : 40, flare, act: 1, yaw: C.yaw || 0 };
   const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, w = t.windup || 0;
@@ -80645,7 +81397,7 @@ const _dwT = new Float32Array(SKIN_MAX * 12);
 // the pose: the clip at f, followed from his last pose at the move's rate; a breath through the chest
 function dwPose(M, t, P, live) {
   const R = M.R, nb = R.anim.nb;
-  if (!live) { umMixFrame(R, P.f, R.out); umTurn(R.out, R.sub.Hips, UMX.ry(DW_YAW.ready), [0, 0, 0]); return R.out; }
+  if (!live) { umMixFrame(R, P.f, R.out); if (!P.rest) umTurn(R.out, R.sub.Hips, UMX.ry(DW_YAW.ready), [0, 0, 0]); umShowBreath(R, R.out); return R.out; }
   umMixFrame(R, P.f, _dwT);
   const now = G.time, dt = t._dwT == null ? 1 : Math.max(0, Math.min(.1, now - t._dwT)); t._dwT = now;
   if (!t._dwO || t._dwO.length !== nb * 12) { t._dwO = new Float32Array(nb * 12); t._dwO.set(_dwT.subarray(0, nb * 12)); }
@@ -80867,7 +81619,7 @@ if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.thundergun) {
 function gmClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
 // what he does now: { f (the anim's frame), rate (how fast the pose follows) }
 function gmCtl(t, live, M) {
-  if (!live) return { f: gmClip(M, 'aim', 0), rate: 0 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : gmClip(M, 'aim', 0), rate: 0 }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t.ihCrankAt != null && t.ihCrankAt > (t._gmShotAt || -9)) t._gmShotAt = t.ihCrankAt;
   const s = t._gmShotAt == null ? 9 : now - t._gmShotAt;
@@ -80955,7 +81707,7 @@ if (typeof castAbility === 'function') {
 function bdClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
 function bdLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
 function bdCtl(t, live, M) {
-  if (!live) return { f: bdClip(M, 'ready', 0), rate: 0, mv: 'ready' };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : bdClip(M, 'ready', 0), rate: 0, mv: sf != null ? 'idle' : 'ready' }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._bdCast && t._bdCastAt != null) { const u = now - t._bdCastAt; if (u >= 0 && u < bdLen(M, t._bdCast)) return { f: bdClip(M, t._bdCast, u * 30), rate: BD.RATE.move, mv: t._bdCast + t._bdCastAt }; }
   if (t._bdAtkAt != null) { const mv = BD.ATK[t._bdAtkN | 0], u = now - t._bdAtkAt; if (u >= 0 && u < bdLen(M, mv)) return { f: bdClip(M, mv, u * 30), rate: BD.RATE.move, mv: mv + t._bdAtkAt }; }
@@ -81037,7 +81789,7 @@ if (typeof castAbility === 'function') {
 function tgClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
 function tgLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
 function tgCtl(t, live, M) {
-  if (!live) return { f: tgClip(M, 'guard', 0), rate: 0 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : tgClip(M, 'guard', 0), rate: 0 }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._tgCast && t._tgCastAt != null) { const u = now - t._tgCastAt; if (u >= 0 && u < tgLen(M, t._tgCast)) return { f: tgClip(M, t._tgCast, u * 30), rate: TG.RATE.move }; }
   if (t._tgAtkAt != null) {
@@ -81204,7 +81956,7 @@ const _obT = new Float32Array(SKIN_MAX * 12);
 // the pose: the frame, followed from his last pose at the move's rate; a breath through the chest
 function obPose(M, t, P, live) {
   const R = M.R, nb = R.anim.nb;
-  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  if (!live) { umMixFrame(R, P.f, R.out); umShowBreath(R, R.out); return R.out; }
   umMixFrame(R, P.f, _obT);
   const now = G.time, dt = t._obTm == null ? 1 : Math.max(0, Math.min(.1, now - t._obTm)); t._obTm = now;
   if (!t._obO || t._obO.length !== nb * 12) { t._obO = new Float32Array(nb * 12); t._obO.set(_obT.subarray(0, nb * 12)); }
@@ -81456,7 +82208,7 @@ const mvWrap = d => d - TAU * Math.round(d / TAU);
 // the pose: the frame, followed from her last pose at the move's rate; the twirl; a breath through the chest
 function mvPose(M, t, P, live) {
   const R = M.R, nb = R.anim.nb, bx = R.bix, o = R.out;
-  if (!live) { umMixFrame(R, P.f, o); return o; }
+  if (!live) { umMixFrame(R, P.f, o); umShowBreath(R, o); return o; }
   umMixFrame(R, P.f, _mvT);
   const now = G.time, dt = t._mvTm == null ? 1 : Math.max(0, Math.min(.1, now - t._mvTm)); t._mvTm = now;
   if (!t._mvO || t._mvO.length !== nb * 12) { t._mvO = new Float32Array(nb * 12); t._mvO.set(_mvT.subarray(0, nb * 12)); }
@@ -81649,8 +82401,9 @@ if (typeof pauseMenu === 'function') {
    (model_unit_mageling.js: assets/unit-art/mageling/scripts/rig.py from three Mixamo clips of the one model,
    tools/make_gunman.py with no prop) drawn as the Conclave's Magelings (ML_UNIT) in place of their code-built body.
    - Her moves (the clips, 30 fps, all on her post: the downloads' travel pinned, her feet planted):
-       idle      the stance eased, breathing, the casting hand turning a slow small circle (it glows faintly)
-       ready     a foe in reach: side-on, the left hand forward, the right cocked
+       idle      standing calm and upright (no foe in reach): feet about hip width, arms relaxed at her sides, breathing,
+                 a slow sway of her weight (the casting hand glows faintly)
+       ready     a foe in reach: the calm stance, the casting hand brought up before her at the waist
        attack    the one-hand cast: the wind-up plays over the game's own wind-up (t.windup), so the release frame (meta.rel)
                  lands on the shot; then the follow-through
        barrage   Arcane Barrage: the step-in push, the right hand held out trembling while the missiles stream from it
@@ -81695,7 +82448,7 @@ function mlClip(M, name, f) { const c = mlClips(M)[name]; return c[0] + Math.max
 function mlLen(M, name) { return (mlClips(M)[name][1] - 1) / 30; }
 // what she does now: { f (the anim's frame), rate (how fast the pose follows), glow (the hand's) }
 function mlCtl(t, live, M) {
-  if (!live) return { f: mlClip(M, 'ready', 0), rate: 0, glow: .2 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : mlClip(M, 'ready', 0), rate: 0, glow: sf != null ? .15 + .1 * Math.sin(UM_SHOW * 1.7) : .2 }; }
   const now = G.time, A = mlClips(M), ph = (now + (t.anim || 0) * 3) * 30;
   // Gathering Orb: the crouch while it gathers, the hurl timed so its release frame lands on the throw
   if (t.ccxOrbT != null) {
@@ -81766,12 +82519,14 @@ if (typeof drawForceUnitPlain === 'function') {
 /* Aurelian, the Lion of the Ford, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's knight with his
    sword and the lion shield strapped along his left forearm (model_unit_aurelian.js: assets/unit-art/aurelian/scripts/rig.py,
    tools/make_gunman.py) drawn as the Silver Order's Champion ch_aurelian (AU_UNIT) in place of his code-built rider.
-   - His moves (the clips, 30 fps): idle (regal, the shield at his side, the sword lowered), guard (a foe in reach: the shield
+   - His moves (the clips, 30 fps): idle (as in his portrait: feet planted, the sword low across his body in his fist,
+     the shield low at his side, its lion upright and facing out; breathing and a slow weight shift), guard (a foe in reach: the shield
      up before him, the sword over its rim), swing (his strike: one overhead cut from the combo, landing as the charge's blow
-     lands), and one for each ability: Lion's Charge (the sword raised to the sun, then levelled forward in a lunge), Banner at
-     the Ford (he kneels and drives the sword point-down into the road), The Lion's Due (a shield bash, then a lunging thrust).
+     lands), and one for each ability: Dawnsweep (the sword raised to the sun, then levelled forward in a lunge), Bulwark
+     Slam (he kneels and drives his weight down into the road; a shield-slam clip would suit it better), The Crossing (a
+     shield bash, then a lunging thrust). (The clips keep their old names: charge, banner, due.)
    - Every frame is checked on the game's skinning for the shield, the sword and his body (clip_closeups.py).
-   - His strike rides out on the charge (so_lance: t.chg) as before; every move is eased into from where he was. */
+   - His strike steps out shield-first on the charge (so_blade: t.chg) as before; every move is eased into from where he was. */
 const AU_UNIT = 'ch_aurelian';
 UM_UNITS[AU_UNIT] = { mdl: 'aurelian', k: .85, rig: 'knight', sink: .5 };
 const AU = { CAST: { ch_lioncharge: 'charge', ch_fordstandard: 'banner', ch_lionsdue: 'due' }, HIT: .26, CUT: 22, RATE: { idle: 4, guard: 9, move: 40 } };
@@ -81787,7 +82542,7 @@ function auClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; retu
 function auLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
 // what he does now: { f (the anim's frame), rate (how fast the pose follows) }
 function auCtl(t, live, M) {
-  if (!live) return { f: auClip(M, 'guard', 0), rate: 0 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : auClip(M, 'guard', 0), rate: 0 }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._auCast && t._auCastAt != null) { const u = now - t._auCastAt; if (u >= 0 && u < auLen(M, t._auCast)) return { f: auClip(M, t._auCast, u * 30), rate: AU.RATE.move }; }
   // the strike: out on the charge, the cut landing with its blow (.26 s in), the follow-through as he comes back
@@ -81889,7 +82644,7 @@ function asRel(M, name) { const r = UNIT_MDL[M.S.mdl].marks.rel; return r && r[n
 // what he does now: { f (the anim's frame), rate (how fast the pose follows), glow (the starlight in his left palm),
 // cast (the glint at his right palm) }
 function asCtl(t, live, M) {
-  if (!live) return { f: asClip(M, 'ready', 0), rate: 0, glow: 0, cast: 0 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : asClip(M, 'ready', 0), rate: 0, glow: 0, cast: 0 }; }
   const now = G.time, A = asClips(M);
   // a spell: its wind-up stretched over the cast bar, its big moment on the release, then the recovery
   const C = t.ab && t.ab.cast, cm = C && AS.CAST[C.id];
@@ -82013,7 +82768,7 @@ function fwClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; retu
 function fwLen(M, name) { return (UNIT_MDL[M.S.mdl].anim.clips[name][1] - 1) / 30; }
 // what she does now: { f (the anim's frame), rate (how fast the pose follows), clip, u (the frame in the clip) }
 function fwCtl(t, live, M) {
-  if (!live) return { f: fwClip(M, 'ready', 0), rate: 0 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : fwClip(M, 'ready', 0), rate: 0 }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._fwCast && t._fwCastAt != null) { const u = now - t._fwCastAt; if (u >= 0 && u < fwLen(M, t._fwCast)) return { f: fwClip(M, t._fwCast, u * 30), rate: FW.RATE.move, clip: t._fwCast, u: u * 30 }; }
   const rb = fwRel(M, 'bolt'), s = t._fwShotAt == null ? 9 : now - t._fwShotAt, fight = G.phase === 'wave' && t.tg && !t.tg.dead;
@@ -82120,7 +82875,7 @@ if (typeof castAbility === 'function') {
 }
 // what he does now: { f (the anim's frame), rate (how fast the pose follows), gl (the casting palm's glow, 0..1) }
 function pyCtl(t, live, M) {
-  if (!live) return { f: pyClip(M, 'idle', 0), rate: 0, gl: 0 };
+  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : pyClip(M, 'idle', 0), rate: 0, gl: 0 }; }
   const now = G.time, mk = pyMk(M), REL = mk.rel, ph = (now + (t.anim || 0) * 3) * 30;
   // a spell's cast bar: its move's start held until the bar ends
   const AC = t.ab && t.ab.cast;
@@ -84904,15 +85659,15 @@ const SPELL_HELP = {
   // Oathsworn Shieldbearers (oathsworn)
   so_bash: { when: "One foe is enough: a walker within {reach} cells (a flyer dragged down counts).", aim: "The support caster walker nearest the gate; with none, the toughest walker (bosses and elites first, then the most health).", tips: ["Healers and banner-bearers are thrown back first, out of reach of the pack they were keeping alive.", "Stand it at the end of a long straight run so each throw sends a foe back down road it must walk again.", "Every hit lays a Judgement, so a Templar's Slam or a Knight's charge right after cashes it in."] },
   so_aegis: { when: "Two or more walkers in the rampart's run, or a boss or leader among them.", aim: "The road cell beside it with the most walkers coming up to it; the rampart rolls up the road from there.", tips: ["Post the Shieldbearers at the bottom of a long straight: the rampart carries the whole column back up it.", "A boss breaks the rampart, so leave it for the crowds in front of the boss, not the boss itself.", "Its Wards land on the units beside it as it breaks: keep the Crossbows and Clerics within 1.6 cells."] },
-  so_rebuke: { when: "Three or more walkers within 1.6 cells, or a boss or leader among them.", aim: "Itself: every walker within its call, up to 12.", tips: ["Post it where the road wraps round it on two or three sides: every walker it calls is slowed and Judged on the beat.", "Its Verdicts land at the end: Crossbows and Censers beside it fill the stacks it spends.", "Pair it with Hammer Templars: their slams cash the Judgement it lays before the oath ends."] },
+  so_rebuke: { when: "Three or more walkers within 1.6 cells, or a boss or leader among them.", aim: "Itself: every walker within its call, up to 12.", tips: ["Post it where the road wraps round it on two or three sides: every walker it calls is slowed and Judged on the beat.", "Its Verdicts land at the end: Crossbows and Censers beside it fill the stacks it spends.", "Pair it with Templars of the Ford: their slams cash the Judgement it lays before the oath ends."] },
 
   // Silverbolt Crossbows (silverbolt)
-  so_sanct: { when: "One foe is enough: any foe within {reach} cells, on the ground or in the air.", aim: "The armoured foe nearest the gate; with none, the toughest (bosses and elites first, then the most health).", tips: ["It ignores all armour, so it shines on armoured foes and bosses the rest of the Order bounces off.", "Its three Judgement fill a big foe fast: follow with Hammerfall or Grail Charge for a heavy Verdict.", "Works on flyers too: a good answer to armoured flyers the Knights and Templars can't reach."] },
+  so_sanct: { when: "One foe is enough: any foe within {reach} cells, on the ground or in the air.", aim: "The armoured foe nearest the gate; with none, the toughest (bosses and elites first, then the most health).", tips: ["It ignores all armour, so it shines on armoured foes and bosses the rest of the Order bounces off.", "Its three Judgement fill a big foe fast: follow with Sword of Heaven or Grail Charge for a heavy Verdict.", "Works on flyers too: a good answer to armoured flyers the Knights and Templars can't reach."] },
   so_hail: { when: "Any foe within {reach} cells with another foe within a cell of it (two in all), or a boss or elite; flyers too.", aim: "The foe with the most foes within a cell of it (bosses and elites win ties).", tips: ["Aim the Crossbows at a chokepoint: the flare sears everything that bunches up round its foe.", "If its foe dies the flare drops to the road and keeps burning there: best where the road is narrow.", "Every second it Judges the crowd, so Templars and Grail Knights behind it cash in."] },
   so_witness: { when: "A boss or elite within {reach} cells not already Condemned; with none, the toughest foe there carrying 3 or more Judgement.", aim: "The foe with the most health it can condemn (usually the boss).", tips: ["Every unit of the Order that strikes the condemned swears as a witness: build several kinds of unit along its road.", "Up to 6 witnesses: the closing Verdict is more than twice as strong with all six.", "Cast it as the boss walks into the middle of your army, not at the end of the road."] },
 
   // Lightbinder Sisters (lightbinder)
-  so_bind: { when: "Two or more foes within {reach} cells that can still be held (not crowd-control immune, not already stunned), or one boss or elite.", aim: "Support casters first (nearest the gate), then the toughest; up to its limit of foes, flyers included.", tips: ["Binds healers and casters first, stopping their spells for a moment while the Order works on the pack.", "Each bound foe is Judged and stands still: a perfect setup for Hammerfall or a Grail Charge.", "Reaches flyers too, so it can hold a flying elite while Clerics drag it down with Dawnfall."] },
+  so_bind: { when: "Two or more foes within {reach} cells that can still be held (not crowd-control immune, not already stunned), or one boss or elite.", aim: "Support casters first (nearest the gate), then the toughest; up to its limit of foes, flyers included.", tips: ["Binds healers and casters first, stopping their spells for a moment while the Order works on the pack.", "Each bound foe is Judged and stands still: a perfect setup for Sword of Heaven or a Grail Charge.", "Reaches flyers too, so it can hold a flying elite while Clerics drag it down with Dawnfall."] },
   so_flare: { when: "The foe furthest along within {reach} cells, with another foe in reach, or a boss or elite.", aim: "The foe nearest the gate that is not already leashed; the chain is made fast to the nearest Oath-Stone or unit of the Order within 1.8 cells of it.", tips: ["Post the Sisters near the gate: the leash holds the foe about to slip through.", "Line the road with Oath-Stones: the leash takes the nearest one, so the foe is held where it is caught.", "A leashed foe is Blinded too, so the whole Order strikes it harder."] },
   so_shackle: { when: "Two or more walkers within {reach} cells (or a boss or leader), and a post within 2.6 cells whose chain would cross the road.", aim: "The posts round her (Oath-Stones and units) whose chains cross the most road.", tips: ["Post the Sisters on one side of the road with Oath-Stones or units on the other: every chain then crosses it.", "Chains strung across a straight catch every walker once each: three chains, three binds.", "Walkers bound by the chains stand Blinded and Judged: a good moment for a Grail Charge or a slam."] },
 
@@ -84926,7 +85681,7 @@ const SPELL_HELP = {
   so_halo: { when: "Three or more foes in one arc within {reach} cells, or two or more flyers in it.", aim: "The arc holding the most foes, then the most road; the beam sweeps it from one side to the other.", tips: ["Post the Clerics on the inside of a corner: the sweep crosses both legs of the road.", "It drags down every flyer it crosses, so Shieldbearers and Templars can reach them.", "It channels for a second: leave it on Rotate with Sunlance between casts."] },
   so_dawnfall: { when: "Two or more flyers still in the air within {reach} cells, or a flying boss or leader.", aim: "Every flyer in reach that is still in the air.", tips: ["Dragged-down flyers can be struck by the walker-only units: post it beside the Templars.", "Each flyer crashes onto the road and Blinds the walkers under it: best when a flock flies over a column.", "Save it for flying waves: it does nothing without flyers."] },
 
-  // Hammer Templars (templar)
+  // Templars of the Ford (templar)
   so_crush: { when: "Two or more walkers within {reach} cells, or a boss or leader walker.", aim: "Itself: every walker within {range} cells.", tips: ["Every stack of Judgement turns into a full Verdict: cast after Rebuke, Hail, Flare or Halo have marked the pack.", "Place it in the middle of a switchback so its slam reaches two stretches of road at once.", "It stuns everything around it, buying a breather near the gate."] },
   so_hallow: { when: "Two or more walkers within {reach} cells, or a boss or leader walker.", aim: "Itself: every walker in its reach, slam after slam.", tips: ["Place it where the road wraps round it, so walkers stay in reach for every slam.", "Each slam lays a Judgement and the last delivers them: five or more stacks give the full Verdict.", "Pair it with Oath of Challenge or Vigil Chains: held walkers take every slam."] },
   so_hammerfall: { when: "One foe is enough: a walker within {reach} cells (a flyer dragged down counts).", aim: "The armoured walker nearest the gate; with none, the toughest walker (bosses and elites first).", tips: ["It falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock knocks every walker round its foe down: aim it at a boss walking in a crowd.", "Its Verdict is half again as strong: Judge the foe before it falls."] },
@@ -84936,10 +85691,10 @@ const SPELL_HELP = {
   so_smoke: { when: "A run of road within {reach} cells with two or more walkers on it or coming up to it, or a boss or elite.", aim: "The run of consecutive road cells in reach with the most walkers on it or near its start.", tips: ["Post the Censers beside a long straight: the procession lays incense the whole length of it.", "Walkers walk through every cell of it, slowed and Judged each second.", "It leaves incense for Kindle the Censers to set alight."] },
   so_embers: { when: "Three or more walkers standing in incense within {reach} cells plus 1 (any Censer's); with no incense, three or more walkers in reach.", aim: "Every patch of incense in reach, the fullest first; with none, it throws a coal at the thickest crowd and kindles it.", tips: ["Lay incense first: Procession of Incense and the Censers' own coals give it something to burn.", "It burns the incense away, so cast it when the walkers are in it, not before.", "Foes with 3 or more Judgement hear their Verdict in the fire: the incense itself Judges them."] },
 
-  // Aurelian, the Lion of the Ford (ch_aurelian)
-  ch_lioncharge: { when: "Three or more walkers within 1.6 cells of one walker in {reach} cells (a little wider at higher tiers), or any boss or elite in reach.", aim: "The densest pack of walkers: the walker with the most others within the charge's area.", tips: ["Every unit of the Order near the charged spot becomes Radiant for 6s: keep your units close to Aurelian's road.", "Judges every walker three times: follow with Sanctified Slam or Grail Charge.", "Place him at a switchback where walkers bunch inside 1.6 cells."] },
-  ch_fordstandard: { when: "An 80-degree cone within {reach} cells holding two or more walkers, or a boss or elite in it.", aim: "The cone toward the walker whose cone holds the most foes, then the most road.", tips: ["Post Aurelian on the outside of a corner: the roar throws both legs of the road back.", "It Wards every unit within 1.6 cells of him: keep the army close to the Lion.", "Bosses stand, but they are Judged twice: a good opening for The Lion's Due."] },
-  ch_lionsdue: { when: "Three or more walkers within {reach} cells, or a boss or elite.", aim: "The most-Judged walker in reach, then each time the most-Judged walker within 2 cells of the last.", tips: ["Judge the crowd first: each charge goes to the most-Judged foe near the last, and Verdicts land on 3 or more.", "Best in a packed corner, where each next foe is within 2 cells.", "Lion's Roar lays 2 Judgement on everything before him: cast it first."] },
+  // Aurelian, the Lion of the Ford (ch_aurelian): on foot with the shield wall
+  ch_lioncharge: { when: "Three or more walkers within 1.6 cells of one walker in {reach} cells (a little wider at higher tiers), or any boss or elite in reach.", aim: "The densest pack of walkers: the walker with the most others within the sweep's area.", tips: ["Every unit of the Order the light passes becomes Radiant for 6s: keep your units close to the road he sweeps.", "Judges every walker three times: follow with Bulwark Slam, whose shockwave Judges them again.", "Templars of the Ford beside the road turn Radiant too, and with Burnished Shields each flashes its shield at the walkers in its reach."] },
+  ch_fordstandard: { when: "An 80-degree cone within {reach} cells holding two or more walkers, or a boss or elite in it.", aim: "The cone toward the walker whose cone holds the most foes, then the most road.", tips: ["Post Aurelian on the outside of a corner: the shockwave throws both legs of the road back.", "It Wards every unit within 1.6 cells of him, and his Templars of the Ford within 2 cells longer still: build the line round him.", "Bosses stand, but they are Judged twice: a good opening for The Crossing."] },
+  ch_lionsdue: { when: "Three or more walkers within {reach} cells, or a boss or elite.", aim: "The most-Judged walker in reach, then each time the most-Judged walker within 2 cells of the last.", tips: ["Judge the crowd first: each stride goes to the most-Judged foe near the last, and Verdicts land on 3 or more.", "Best in a packed corner, where each next foe is within 2 cells.", "Bulwark Slam lays 2 Judgement on everything before him: cast it first."] },
 
   // Celestine, the Dawnsinger (ch_celestine)
   ch_dawnbreak: { when: "Three or more foes within 1.7 cells of one foe in {reach} cells (a little wider at higher tiers), or any boss or elite in reach.", aim: "The densest pack: the foe with the most others within the area; flyers included.", tips: ["Blinds every foe for 4s: cast it just before High Noon so her beam splits to all of them.", "Judges each foe twice and blinded foes take 15% more from the Order: a strong opener for a Slam.", "Hits flyers too: a good answer to a flock over a bend."] },
@@ -87827,15 +88582,468 @@ if (typeof document !== 'undefined' && document.createElement) {
   (document.head || document.documentElement).append(css);
 }
 
+/* Issued weapons reflect the unit's visible prop. Paintings live in COMPLETION_ART.weapons.
+   The base/class still owns combat numbers and drop compatibility. New model variants only change presentation. */
+const WPN_START_ART = {
+  "gladebow": {
+    "name": "Gladebow Longbow",
+    "look": "Long curved dark wooden elven longbow with green bindings and a gold leaf grip.",
+    "mdl": "issued_gladebow",
+    "issued": 1
+  },
+  "seedcaster": {
+    "name": "Seedpod Sling",
+    "look": "Woven green sling cradling a large glowing seedpod, leaf bindings and a small seed pouch.",
+    "mdl": "issued_seedcaster",
+    "issued": 1
+  },
+  "thornguard": {
+    "name": "Thornguard Spear",
+    "look": "Long dark wood spear, silver leaf-shaped point, green leaf ties and restrained gold bands.",
+    "mdl": "issued_thornguard",
+    "issued": 1
+  },
+  "briarwarden": {
+    "name": "Briar Staff",
+    "look": "Crooked living wood staff with antler-like branches and a green glowing gem nestled in moss.",
+    "mdl": "issued_briarwarden",
+    "issued": 1
+  },
+  "wayfarer": {
+    "name": "Shifter's Wildbow",
+    "look": "Living dark wood bow with green leaves, feathers and pale antler tips.",
+    "mdl": "issued_wayfarer",
+    "issued": 1
+  },
+  "thornwarden": {
+    "name": "Thorn Darts",
+    "look": "Three sharp black briar darts in a dark green leather quiver, small poisonous green tips.",
+    "mdl": "issued_thornwarden",
+    "issued": 1
+  },
+  "bladedancer": {
+    "name": "Dancer's Twin Blades",
+    "look": "Pair of long curved elven blades with silver cutting edges and elegant gold leaf hilts.",
+    "mdl": "issued_bladedancer",
+    "issued": 1
+  },
+  "staglancer": {
+    "name": "Stag Lance",
+    "look": "Long elven lance, gold leaf-shaped point, wooden shaft and green pennant.",
+    "mdl": "issued_staglancer",
+    "issued": 1
+  },
+  "ch_elowen": {
+    "name": "Rootmother's Staff",
+    "look": "Thick twisted living root staff with antler branches enclosing a bright turquoise green crystal.",
+    "mdl": "issued_ch_elowen",
+    "issued": 1
+  },
+  "ch_faelan": {
+    "name": "Thornbow",
+    "look": "Great dark thornwood longbow, sharp branch tips, bronze leaf detailing and a taut string.",
+    "mdl": "issued_ch_faelan",
+    "issued": 1
+  },
+  "ch_nyssa": {
+    "name": "Bloom Staff",
+    "look": "Short gnarled wooden staff crowned by a large green seedpod opening with golden light.",
+    "mdl": "issued_ch_nyssa",
+    "issued": 1
+  },
+  "cc_mageling": {
+    "name": "Apprentice's Wand",
+    "look": "Slender dark wand with a violet crystal tip, silver bands and a small curling arcane spark.",
+    "mdl": "issued_cc_mageling",
+    "issued": 1
+  },
+  "cc_pyroclast": {
+    "name": "Living Ember",
+    "look": "A dense orange fire orb with a white-hot core and curling flames against a deep plum background, no pedestal or container.",
+    "mdl": "issued_cc_pyroclast",
+    "issued": 1,
+    "kind": "magic focus"
+  },
+  "cc_spellblade": {
+    "name": "Violet Runeblade",
+    "look": "Long straight broad translucent violet sword, bright pale violet runes down the blade, dark leather grip and small gold crossguard.",
+    "mdl": "issued_cc_spellblade",
+    "issued": 1
+  },
+  "cc_rimeweaver": {
+    "name": "Frost Crystal Staff",
+    "look": "Dark indigo wooden staff topped by a long cyan ice crystal wrapped in silver branches.",
+    "mdl": "issued_cc_rimeweaver",
+    "issued": 1
+  },
+  "cc_astrologer": {
+    "name": "Astrologer's Orrery",
+    "look": "Brass armillary sphere with orbiting concentric rings around a violet-blue star, elegant silver details.",
+    "mdl": "issued_cc_astrologer",
+    "issued": 1
+  },
+  "cc_severer": {
+    "name": "Riftsteel Crescent",
+    "look": "Large dark steel throwing crescent, bright violet cutting edge and silver arcane runes, open center grip.",
+    "mdl": "issued_cc_severer",
+    "issued": 1
+  },
+  "cc_golemwarden": {
+    "name": "Golem Ward Focus",
+    "look": "Rough violet glowing stone core wrapped in bronze runic bands, a heavy magical focus rather than a sword.",
+    "mdl": "issued_cc_golemwarden",
+    "issued": 1
+  },
+  "cc_chronomancer": {
+    "name": "Chronomancer's Hourglass",
+    "look": "Blue luminous sand in a tall hourglass enclosed by ornate antique brass clockwork rings.",
+    "mdl": "issued_cc_chronomancer",
+    "issued": 1
+  },
+  "ch_maelis": {
+    "name": "Spellweaver's Star Staff",
+    "look": "Dark wood staff with golden collar, crowned with an intensely bright gold-white four-point star.",
+    "mdl": "issued_ch_maelis",
+    "issued": 1
+  },
+  "ch_aurel": {
+    "name": "Timekeeper's Dial Staff",
+    "look": "Thin brass staff crowned by a circular gold clock dial with dark hands and soft pale gold magic.",
+    "mdl": "issued_ch_aurel",
+    "issued": 1
+  },
+  "ch_maren": {
+    "name": "Maren's Arcane Blade",
+    "look": "Long violet rune sword with a bright white core, small gilt crossguard and dark brown leather grip.",
+    "mdl": "issued_ch_maren",
+    "issued": 1
+  },
+  "thundergun": {
+    "name": "Ironhold Long Rifle",
+    "look": "Long dwarf rifle with dark wood stock, chunky iron barrel, brass muzzle bands and compact sight.",
+    "mdl": "issued_thundergun",
+    "issued": 1
+  },
+  "mortarcrew": {
+    "name": "Crew Mortar",
+    "look": "Short fat iron mortar tube angled upward on a timber carriage, brass rims and sturdy handles.",
+    "mdl": "issued_mortarcrew",
+    "issued": 1
+  },
+  "ironbreaker": {
+    "name": "Ironbreaker's Axe",
+    "look": "Heavy broad dwarf axe of dark steel, brass geometric trim, short leather-wrapped haft.",
+    "mdl": "issued_ironbreaker",
+    "issued": 1
+  },
+  "chaintrapper": {
+    "name": "Trapper's Chain Net",
+    "look": "Folded iron chain net with hooked metal weights and a stout leather throwing grip.",
+    "mdl": "issued_chaintrapper",
+    "issued": 1
+  },
+  "flakgunner": {
+    "name": "Flak Cannon",
+    "look": "Stubby thick black iron cannon with a wide flared bore and brass sky sight, small wooden stock.",
+    "mdl": "issued_flakgunner",
+    "issued": 1
+  },
+  "siegebreaker": {
+    "name": "Breaching Ram",
+    "look": "Heavy short wooden ram with reinforced dark iron cap, brass rivets and two side grips.",
+    "mdl": "issued_siegebreaker",
+    "issued": 1
+  },
+  "steamhammer": {
+    "name": "Steam Maul",
+    "look": "Huge square dwarf hammer with glowing red-orange furnace vents, black iron head and stout brass-banded haft.",
+    "mdl": "issued_steamhammer",
+    "issued": 1
+  },
+  "runesmith": {
+    "name": "Runesmith's Hammer",
+    "look": "Short heavy forge hammer, dark steel square head with cyan carved runes and copper bindings.",
+    "mdl": "issued_runesmith",
+    "issued": 1
+  },
+  "ch_haldra": {
+    "name": "Thane's Warhammer",
+    "look": "Dwarf war hammer with a broad silver steel head, heavy gold corner plates and leather-wrapped grip.",
+    "mdl": "issued_ch_haldra",
+    "issued": 1
+  },
+  "ch_tovin": {
+    "name": "Gearwright's Coil Gauntlet",
+    "look": "Massive copper mechanical gauntlet with brass ring bands and a violet glowing energy coil projecting above the knuckles.",
+    "mdl": "issued_ch_tovin",
+    "issued": 1,
+    "kind": "coil gauntlet"
+  },
+  "ch_grenna": {
+    "name": "Alewife's Brew",
+    "look": "Stout pale stoneware throwing jug with a loop handle and foaming golden ale, a long brass ladle beside it.",
+    "mdl": "issued_ch_grenna",
+    "issued": 1,
+    "kind": "brew jug"
+  },
+  "silverbolt": {
+    "name": "Silverbolt Crossbow",
+    "look": "Silver steel crossbow with a blue enamel stock, gold fittings and a sturdy bowstring.",
+    "mdl": "issued_silverbolt",
+    "issued": 1
+  },
+  "censer": {
+    "name": "Order's Censer",
+    "look": "Golden sunburst pierced censer suspended on three silver chains, warm amber light and a curl of smoke.",
+    "mdl": "issued_censer",
+    "issued": 1
+  },
+  "oathsworn": {
+    "name": "Oathsworn Sword",
+    "look": "Straight silver arming sword with gold crossguard, dark blue grip and a small gold sun on the pommel.",
+    "mdl": "issued_oathsworn",
+    "issued": 1
+  },
+  "lightbinder": {
+    "name": "Lightbinder's Staff",
+    "look": "Long ivory and silver staff with a golden sunburst crown and warm white central light.",
+    "mdl": "issued_lightbinder",
+    "issued": 1
+  },
+  "sunlance": {
+    "name": "Sunlance Staff",
+    "look": "Tall polished golden staff with a pointed sun-ray crown and narrow shaft, luminous white-gold focus.",
+    "mdl": "issued_sunlance",
+    "issued": 1
+  },
+  "so_inquisitor": {
+    "name": "Inquisitor's Ledger",
+    "look": "Heavy ivory leather book with silver corners, blue binding and a gold scales-of-justice seal.",
+    "mdl": "issued_so_inquisitor",
+    "issued": 1
+  },
+  "templar": {
+    "name": "Templar's Hammer",
+    "look": "Large square silver warhammer with blue enamel panels, gold trim and a sunburst on its head.",
+    "mdl": "issued_templar",
+    "issued": 1
+  },
+  "grailknight": {
+    "name": "Grail Lance",
+    "look": "Long silver cavalry lance with gold vamplate hand guard and blue-and-white pennant.",
+    "mdl": "issued_grailknight",
+    "issued": 1
+  },
+  "ch_aurelian": {
+    "name": "Lion's Lance",
+    "look": "Regal silver cavalry lance with a gold lion head guard and white-gold pennant.",
+    "mdl": "issued_ch_aurelian",
+    "issued": 1
+  },
+  "ch_celestine": {
+    "name": "Dawnsinger's Staff",
+    "look": "Tall gold staff crowned with a many-rayed radiant sunburst, bright white center and silver rays.",
+    "mdl": "issued_ch_celestine",
+    "issued": 1
+  },
+  "ch_morrow": {
+    "name": "Justicar's Crossbow",
+    "look": "Massive ornate silver crossbow, golden scales-of-justice details, dark wood stock and ivory binding.",
+    "mdl": "issued_ch_morrow",
+    "issued": 1
+  },
+  "sb_windrunner": {
+    "name": "Windrunner's Bow",
+    "look": "Pale wood recurve bow with turquoise cord, brown leather grip and grey eagle feathers.",
+    "mdl": "issued_sb_windrunner",
+    "issued": 1
+  },
+  "sb_clouddancer": {
+    "name": "Cloud Dancer's Fans",
+    "look": "Pair of open teal feather fans with dark ribs, cream feather tips and copper handles.",
+    "mdl": "issued_sb_clouddancer",
+    "issued": 1
+  },
+  "sb_wolfguard": {
+    "name": "Wolfguard Spear",
+    "look": "Rugged dark wood spear with bone and iron point, wolf fur wrap and teal bead ties.",
+    "mdl": "issued_sb_wolfguard",
+    "issued": 1
+  },
+  "sb_hailshaman": {
+    "name": "Hail Staff",
+    "look": "Gnarled grey staff with an icy blue crystal and small bone charms, leather lashings.",
+    "mdl": "issued_sb_hailshaman",
+    "issued": 1
+  },
+  "sb_thundercaller": {
+    "name": "Thunder Staff",
+    "look": "Dark branching staff with copper rings, turquoise beads and a crackling blue lightning crown.",
+    "mdl": "issued_sb_thundercaller",
+    "issued": 1
+  },
+  "sb_skyhunter": {
+    "name": "Skyhunter Harpoon",
+    "look": "Long dark iron barbed harpoon with pale wooden shaft, coiled rope and grey feather ties.",
+    "mdl": "issued_sb_skyhunter",
+    "issued": 1
+  },
+  "sb_earthbinder": {
+    "name": "Earthbinder's Maul",
+    "look": "Massive weathered stone hammer head on a thick wooden haft, turquoise cracks and leather straps.",
+    "mdl": "issued_sb_earthbinder",
+    "issued": 1
+  },
+  "sb_spiritwalker": {
+    "name": "Spirit Rattle",
+    "look": "Gourd rattle with a carved bone handle, pale feathers, turquoise beads and a faint blue spirit glow.",
+    "mdl": "issued_sb_spiritwalker",
+    "issued": 1
+  },
+  "ch_tarka": {
+    "name": "Storm Caller's Staff",
+    "look": "Gnarled copper-bound staff branching around vivid blue lightning, feather ties and small copper charms.",
+    "mdl": "issued_ch_tarka",
+    "issued": 1
+  },
+  "ch_oshana": {
+    "name": "Windspeaker's Staff",
+    "look": "Pale driftwood staff crowned with spiraling wind chimes, long grey feathers and blue beads.",
+    "mdl": "issued_ch_oshana",
+    "issued": 1
+  },
+  "ch_huri": {
+    "name": "Beastcaller's Staff",
+    "look": "Dark wooden staff topped by a carved thunderbird spreading its wings, ivory beak and teal spirit light.",
+    "mdl": "issued_ch_huri",
+    "issued": 1
+  },
+  "wb_maskedwarden": {
+    "name": "Warden's Glaive",
+    "look": "Three-bladed black steel throwing glaive with brilliant gold inlay and an ivory central grip.",
+    "mdl": "issued_wb_maskedwarden",
+    "issued": 1
+  },
+  "wb_siegewarden": {
+    "name": "Warden's Ballista",
+    "look": "Heavy dark wood field ballista with black steel arms, gold trim and an ivory bolt, royal military finish.",
+    "mdl": "issued_wb_siegewarden",
+    "issued": 1
+  },
+  "wb_oathbound": {
+    "name": "Oathbound Greatsword",
+    "look": "Broad long blackened steel greatsword, ornate gold guard, ivory grip and gold runes down the fuller.",
+    "mdl": "issued_wb_oathbound",
+    "issued": 1
+  },
+  "wb_frostbrand": {
+    "name": "Frostbrand Halberd",
+    "look": "Dark steel halberd with gold trim, broad axe edge and long spear tip, pale blue frost on the blade.",
+    "mdl": "issued_wb_frostbrand",
+    "issued": 1
+  },
+  "wb_stormward": {
+    "name": "Stormward Lance",
+    "look": "Long midnight blue cavalry lance wound in gold runic wire, pale blue lightning along its tip.",
+    "mdl": "issued_wb_stormward",
+    "issued": 1
+  },
+  "wb_vowkeeper": {
+    "name": "Vowkeeper's Blade",
+    "look": "Slender dark steel sword with ivory grip, gold scrollwork guard and soft pale lavender runes.",
+    "mdl": "issued_wb_vowkeeper",
+    "issued": 1
+  },
+  "wb_anvilguard": {
+    "name": "Anvil Maul",
+    "look": "Massive black iron rectangular hammer, polished gold edge bands and an ivory-wrapped haft.",
+    "mdl": "issued_wb_anvilguard",
+    "issued": 1
+  },
+  "wb_runecarver": {
+    "name": "Runecarver's Tome",
+    "look": "Ivory book with black leather spine, ornate golden oath-runes and gold clasp, calm pale rune glow.",
+    "mdl": "issued_wb_runecarver",
+    "issued": 1
+  },
+  "ch_varic": {
+    "name": "Last Warden's Greatsword",
+    "look": "Long broad steel greatsword with gold runes, large swept gold crossguard, dark grip and gold disc pommel.",
+    "mdl": "issued_ch_varic",
+    "issued": 1
+  },
+  "ch_aedric": {
+    "name": "Sun-Sworn Lance",
+    "look": "Grand dark steel cavalry lance with gold sunburst guard, long ivory-gold pennant and glowing amber tip.",
+    "mdl": "issued_ch_aedric",
+    "issued": 1
+  },
+  "ch_isaura": {
+    "name": "Veiled Oathblade",
+    "look": "Long slender dark blade with lilac-white runes, elegant golden guard and small gold pommel.",
+    "mdl": "issued_ch_isaura",
+    "issued": 1
+  },
+  "cc_mageling_sculpted": {
+    "name": "Arcane Spark",
+    "look": "A small glowing blue-violet arcane sphere with thin concentric silver magical rings, no hand or physical wand.",
+    "mdl": "issued_cc_mageling_sculpted",
+    "issued": 1,
+    "kind": "magic focus"
+  },
+  "cc_rimeweaver_sculpted": {
+    "name": "Living Frost",
+    "look": "A translucent cyan ice shard surrounded by a tight curl of frost magic, no hand or staff.",
+    "mdl": "issued_cc_rimeweaver_sculpted",
+    "issued": 1,
+    "kind": "magic focus"
+  },
+  "cc_astrologer_sculpted": {
+    "name": "Gathered Starlight",
+    "look": "A sharp blue-white star suspended inside a restrained violet celestial swirl, no hand or physical staff.",
+    "mdl": "issued_cc_astrologer_sculpted",
+    "issued": 1,
+    "kind": "magic focus"
+  },
+  "ch_maren_sculpted": {
+    "name": "Maren's Twin Riftblade",
+    "look": "One double-ended sword: TWO long straight red-pink luminous blades extending in opposite directions from ONE central brown leather grip, small gold crescent ornament at the grip. Symmetrical staff-like double sword, not two separate swords.",
+    "mdl": "issued_ch_maren_sculpted",
+    "issued": 1,
+    "kind": "double blade"
+  },
+  "ch_aurelian_sculpted": {
+    "name": "Lion's Sword",
+    "look": "Broad polished silver sword with ornate golden lion-shaped crossguard and dark leather grip, royal white-gold palette.",
+    "mdl": "issued_ch_aurelian_sculpted",
+    "issued": 1,
+    "kind": "sword"
+  },
+  "ch_elowen_sculpted": {
+    "name": "Rootmother's Living Staff",
+    "look": "Tall thick twisted dark root staff with large branching crown holding a turquoise glowing crystal, moss and restrained gold-green leaves.",
+    "mdl": "issued_ch_elowen_sculpted",
+    "issued": 1
+  }
+};
+const WPN_START_MODELS = {"cc_mageling": "mageling", "cc_rimeweaver": "frostweaver", "cc_astrologer": "astrologer", "ch_maren": "maren", "ch_aurelian": "aurelian", "ch_elowen": "elowen"};
+function wpArtKey(w, base) {
+  if (!w.starter || !w.u) return 'w-' + base.mdl;
+  const u = w.u, mdl = WPN_START_MODELS[u];
+  const sculpted = mdl && typeof NEWMODELS !== 'undefined' && NEWMODELS && typeof UNIT_MDL !== 'undefined' && UNIT_MDL[mdl];
+  const art = WPN_START_ART[sculpted ? u + '_sculpted' : u];
+  return 'w-' + (art ? art.mdl : base.mdl);
+}
+
 /* ================= WEAPONS, on screen: the weapon slot on the Gear sheet, its rack, its card, the info pane's line =================
    (the rules: forces_zzzzzzzzzzzzz_weapons.js). Kept to the weapon's own corner of each screen, wrapped in from here:
    - the Gear sheet (gearpanel.js openGearPanel): a weapon slot heads the right-hand column, and the weapon heads the Gear
      list. Tapping the slot opens the weapon rack for that unit: what it holds now, and every weapon that fits it with the
      change in plain numbers ("Damage 10-14 -> 16-21", "Speed 1.1 -> 1.3/s", "DPS 13 -> 24", "Spell Damage 0 -> 120"),
-     Equip, Salvage, and Take off (back to its starter).
+     Equip, Salvage, and Take off (back to its issued weapon).
    - the info pane (ui.js infoHTML): one line right under the stats row (never dropped on a crowded pane), the weapon's icon, name, damage, speed and DPS.
    - the card (wpnCardHTML): the RPG tooltip in the items' style (itemtip.js), on hover anywhere a weapon is shown
-     (data-wid="<id>", or data-wst="<unit id>" for a starter).
+     (data-wid="<id>", or data-wst="<unit id>" for its issued weapon).
    Icons: the item icon painter's class glyph on the rarity frame; a painting can go in RELIC_IMG['w-<model key>']. */
 const wpE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const wpN = v => v >= 100 ? String(Math.round(v)) : v >= 10 ? String(Math.round(v)) : String(Math.max(1, Math.round(v)));
@@ -87843,8 +89051,8 @@ const wpS = v => String(+v.toFixed(2));
 const wpRange = n => `${wpN(n.lo)}–${wpN(n.hi)}`;
 function wpKey(w) {
   const d = wpnDef(w); if (!d) return 'g:empty';
-  const C = WPN_CLASS[d.cls] || {}, art = 'w-' + d.mdl;
-  return `g:${C.icon || 'sword'}:${String(C.hue || '#888888').slice(1)}:${w.starter ? 0 : Math.max(0, w.rar | 0)}:${art}:${typeof RELIC_IMG !== 'undefined' && RELIC_IMG[art] ? 1 : 0}`;
+  const C = WPN_CLASS[d.cls] || {}, art = wpArtKey(w, d);   // (tinted with the unit's or the force's own colours: wpnShow)
+  return `g:${C.icon || 'sword'}:${String(wpnShow(w).hue).slice(1)}:${w.starter ? 0 : Math.max(0, w.rar | 0)}:${art}:${typeof RELIC_IMG !== 'undefined' && RELIC_IMG[art] ? 1 : 0}`;
 }
 const _wpURL = {};
 function wpIconURL(w) {
@@ -87858,13 +89066,13 @@ function wpById(id) {
   return null;
 }
 const wpWearer = w => (G.towers || []).find(t => t.weapon === w) || null;
-// the kind line: "Rare spear · Item Level 14", "Legendary staff · Briarwardens only", "Starter spear · its baseline"
+// the kind line: "Rare spear · Item Level 14", "Legendary staff · Briarwardens only", "Issued spear · Thornguard Spears"
 function wpKindLine(w) {
   const d = wpnDef(w); if (!d) return '';
   const fit = d.leg ? `${(TOWERS[Object.keys(TOWERS).find(ty => TOWERS[ty].unit === d.u)] || {}).name || d.u} only` : (() => {
     const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty) === d.cls); return tys.length ? 'for ' + tys.map(ty => String(TOWERS[ty].name).split(',')[0]).join(', ') : '';
   })();
-  return [`${wpnRarName(w)} ${d.cls}`, w.starter ? 'its baseline' : `Item Level ${w.il || 1}`, fit].filter(Boolean).join(' · ');
+  return [`${wpnRarName(w)} ${d.cls}`, w.starter ? '' : `Item Level ${w.il || 1}`, fit].filter(Boolean).join(' · ');
 }
 // the weapon's card. t: the unit it is on or would go on (its tier's numbers); vs: the weapon to compare with (what t holds)
 function wpnCardHTML(w, t, o) {
@@ -87879,6 +89087,8 @@ function wpnCardHTML(w, t, o) {
     live = `<p class="itc-k">On this ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}, its talents and items on top): ${wpN(D * (1 - spr))}–${wpN(D * (1 + spr))} a strike · ${wpS(1 / (st.rate || 1))} a second · ${wpN(dps)} DPS</p>`;
   }
   const rule = d.leg ? wpnRuleText(d) : '';
+  const runes = typeof RUNES !== 'undefined' && !w.starter ? (w.runes || []).slice(0, forgeSlots(w)).filter(k => RUNES[k]).map(k => `<div class="itc-ab"><b style="color:${RUNES[k].hue}">${RUNES[k].name}</b> ${wpE(RUNES[k].text)}</div>`).join('')
+    + (forgeSlots(w) > (w.runes || []).filter(Boolean).length ? `<p class="itc-k">${forgeSlots(w) - (w.runes || []).filter(Boolean).length} empty rune socket${forgeSlots(w) - (w.runes || []).filter(Boolean).length > 1 ? 's' : ''} (the forge)</p>` : '') : '';
   let cmp = '';
   if (o.vs !== undefined && ty) {
     const a = wpnNums(o.vs || wpnStarter(ty), ty), b = n, arrow = (x, y, f, suf) => { const up = y > x + 1e-6, dn = y < x - 1e-6; return `${f(x)}${suf || ''} → <b class="${up ? 'bo' : dn ? 'neg' : ''}">${f(y)}${suf || ''}</b>`; };
@@ -87887,8 +89097,8 @@ function wpnCardHTML(w, t, o) {
   }
   return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${wpE(wpnName(w))}</h5><p class="itc-k">${wpE(wpKindLine(w))}</p>`
     + (lines.length ? `<ul class="itc-s">${lines.join('')}</ul>` : '') + live
-    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '')
-    + cmp + (w.starter ? '<p class="itc-fl">Its own weapon as it was issued: a better one drops from bosses, elites and the waves\' last foes.</p>' : `<p class="itc-fl">“${wpE(d.look.charAt(0).toUpperCase() + d.look.slice(1))}.”</p>`)
+    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '') + runes
+    + cmp + (w.starter ? `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p><p class="itc-k">Issued weapon. Better ones drop from bosses, elites and the waves' last foes.</p>` : `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p>`)
     + (o.note || '') + '</div>';
 }
 if (typeof document !== 'undefined' && typeof itipBind === 'function') {
@@ -87902,7 +89112,8 @@ const wpTipAttr = (w, t) => w && !w.starter ? `data-wid="${w.id}"${t ? ` data-wt
 function wpInfoLine(t) {
   if (!wpnOn() || !t || !t.def || !wpnClassOf(t.type)) return '';
   const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
-  return `<p class="wp-ln" tabindex="0" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <span>${wpRange(n)} · ${wpS(n.aps)}/s · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</span></p>`;
+  const nw = (G.wbag || []).some(q => q.isNew && wpnFits(q, t)) ? ' <i class="wp-nb">new weapon in rack</i>' : '';
+  return `<p class="wp-ln" tabindex="0" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b>${nw} <span>${wpRange(n)} · ${wpS(n.aps)}/s · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</span></p>`;
 }
 if (typeof infoHTML === 'function') {
   const _wpInfo = infoHTML;
@@ -87973,11 +89184,11 @@ function wpRack(t) {
     return `<div class="wp-row" data-w="${w.id}" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}${w.isNew ? ' <i class="wp-nw">new</i>' : ''}</b><small>${wpE(wpKindLine(w))}</small>
       <p>Damage ${wpRange(c)} → <b class="${cl(c.avg, n.avg)}">${wpRange(n)}</b> · Speed ${wpS(c.aps)} → <b class="${cl(c.aps, n.aps)}">${wpS(n.aps)}/s</b> · DPS ${wpN(c.dps)} → <b class="${cl(c.dps, n.dps)}">${wpN(n.dps)}</b>${c.sp || n.sp ? ` · Spell Damage ${c.sp || 0} → <b class="${cl(c.sp || 0, n.sp || 0)}">${n.sp || 0}</b>` : ''}</p>
       <p class="wp-unit">This ${wpE(t.def.name)} at tier ${ROMAN[t.tier]}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS${wpSpellCmp(t, w)}${wpnDef(w).leg ? ` · ${wpE(wpnRuleText(wpnDef(w)))}` : ''}</p></div>
-      <div class="wp-bt"><button type="button" class="pri" data-eq="${w.id}">Equip</button><button type="button" data-sv="${w.id}">Salvage ${WPN_SALVAGE[w.rar | 0]}g</button></div></div>`;
+      <div class="wp-bt"><button type="button" class="pri" data-eq="${w.id}">Equip</button><button type="button" data-fg="${w.id}">Forge</button><button type="button" data-sv="${w.id}">Salvage ${WPN_SALVAGE[w.rar | 0]}g</button></div></div>`;
   }).join('');
   const html = `<div class="wp-rack" role="dialog" aria-label="Weapon rack"><div class="wp-hd"><h3>Weapon · ${wpE(t.def.name)} <small>tier ${ROMAN[t.tier]}</small></h3><button type="button" class="tx" id="wpClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
     <div class="wp-cur"><img src="${wpIconURL(cur)}" alt=""><div>${wpnCardHTML(cur, t)}</div></div>
-    ${t.weapon ? '<p class="wp-off"><button type="button" id="wpOff">Take it off</button> <small>back to the rack; the unit fights with its starter</small></p>' : ''}
+    ${t.weapon ? `<p class="wp-off"><button type="button" id="wpOff">Take it off</button> ${typeof forgeSlots === 'function' ? `<button type="button" data-fg="${t.weapon.id}">Forge it</button> ` : ''}<small>back to the rack; the unit fights with its issued weapon</small></p>` : ''}
     <h4>In your rack, for this unit <small>(${fit.length}${other ? `; ${other} more fit other units` : ''})</small></h4>
     <div class="wp-list">${rows || `<p class="gp-none">No weapon in your rack fits a ${wpE(t.def.name)} yet. Wave bosses always drop one, the last elite of an elite wave often, and a wave's last foe now and then.</p>`}</div></div>`;
   ovp.insertAdjacentHTML('beforeend', html);
@@ -87986,7 +89197,43 @@ function wpRack(t) {
   box.querySelector('#wpClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); back(); };
   const off = box.querySelector('#wpOff'); if (off) off.onclick = () => { wpnEquip(t, null); back(); };
   for (const b of box.querySelectorAll('[data-eq]')) b.onclick = () => { const w = wpById(+b.dataset.eq); if (w && wpnEquip(t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped.`); back(); } };
+  for (const b of box.querySelectorAll('[data-fg]')) b.onclick = () => { const w = wpById(+b.dataset.fg); if (!w) return; if (typeof sfx === 'function') sfx('click'); box.remove(); wpForge(t, w); };
   for (const b of box.querySelectorAll('[data-sv]')) b.onclick = () => { const w = wpById(+b.dataset.sv); if (!w) return; const v = wpnSalvage(w); if (typeof onToast === 'function') onToast(`Salvaged ${wpnName(w)} for ${v} gold.`); box.remove(); wpRack(t); };
+}
+
+/* ---------- the FORGE (forces_zzzzzzzzzzzzzzz_forge.js): upgrade, reroll, runes, re-forge, each with its plain numbers ---------- */
+function wpForgeLines(t, a, b) {
+  const x = wpnNums(a, t.type), y = wpnNums(b, t.type), cl = (p, q) => q > p + 1e-6 ? 'bo' : q < p - 1e-6 ? 'neg' : '';
+  const d0 = wpnDpsWith(t, a.starter ? null : a), d1 = wpnDpsWith(t, b);
+  return `Damage ${wpRange(x)} → <b class="${cl(x.avg, y.avg)}">${wpRange(y)}</b> · DPS ${wpN(x.dps)} → <b class="${cl(x.dps, y.dps)}">${wpN(y.dps)}</b>${x.sp || y.sp ? ` · Spell Damage ${x.sp || 0} → <b class="${cl(x.sp || 0, y.sp || 0)}">${y.sp || 0}</b>` : ''} · this ${wpE(t.def.name)}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS`;
+}
+function wpForge(t, w) {
+  if (!ovp || typeof forgeSlots !== 'function') return;
+  const old = ovp.querySelector('.wp-rack'); if (old) old.remove();
+  const gold = G.gold | 0, btn = (act, cost, label, extra) => cost == null ? '' : `<button type="button" class="pri" data-fa="${act}" ${extra || ''}${gold >= cost ? '' : ' disabled'}>${label} · ${cost} gold</button>`;
+  const rows = [];
+  // 1. a rarity up
+  { const c = forgeUpCost(w), nx = RARITY[Math.min(4, (w.rar | 0) + 1)];
+    rows.push(`<div class="wp-fr"><h4>Upgrade to <span style="color:${nx.col}">${nx.name}</span></h4>${c == null ? `<p class="itc-k">${WPN_LEG[w.b] ? 'A legendary is as high as a weapon goes.' : (w.rar | 0) >= 3 ? 'Epic is the forge\'s highest: legendaries only drop.' : ''}</p>` : `<p>${wpForgeLines(t, w, forgePreview(w, 'up'))}</p>${(w.rar | 0) === 1 ? '<p class="itc-k">At rare it opens a rune socket.</p>' : (w.rar | 0) === 2 ? '<p class="itc-k">At epic it opens a second rune socket.</p>' : ''}${btn('up', c, 'Upgrade')}`}</div>`); }
+  // 2. re-forge to the wave's level
+  { const c = forgeRelevelCost(w);
+    rows.push(`<div class="wp-fr"><h4>Re-forge to Item Level ${forgeNow()} <small>now ${forgeLv(w)}</small></h4>${c == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, w, forgePreview(w, 'lv'))}</p>${btn('lv', c, 'Re-forge')}`}</div>`); }
+  // 3. a reroll of its make
+  { const c = forgeRerollCost(w), lo = wpnNums(Object.assign({}, w, { q: 0, _c: null, _k: null }), t.type), hi = wpnNums(Object.assign({}, w, { q: 1, _c: null, _k: null }), t.type), now = wpnNums(w, t.type);
+    rows.push(`<div class="wp-fr"><h4>Reroll its make <small>${w.rr ? `rerolled ${w.rr}×; each one costs more` : 'its roll within its rarity'}</small></h4><p>Damage now ${wpRange(now)}; a reroll lands anywhere from ${wpRange(lo)} to ${wpRange(hi)}${now.sp ? ` (Spell Damage ${lo.sp} to ${hi.sp})` : ''}.</p>${btn('rr', c, 'Reroll')}</div>`); }
+  // 4. runes
+  { const n = forgeSlots(w), c = forgeRuneCost(w), R = w.runes || [];
+    const opts = Object.keys(RUNES).filter(k => runeFits(k, t));
+    let h = `<div class="wp-fr"><h4>Runes <small>${n ? `${n} socket${n > 1 ? 's' : ''}; a rune costs ${c} gold, a new one replaces the old` : 'a socket opens at rare, a second at epic'}</small></h4>`;
+    for (let i = 0; i < n; i++) h += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${wpE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${opts.filter(k => k !== R[i]).map(k => `<button type="button" data-fr="${i}|${k}" title="${wpE(RUNES[k].text)}"${gold >= c ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${wpE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
+    rows.push(h + '</div>'); }
+  ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack wp-forge" role="dialog" aria-label="Weapon forge"><div class="wp-hd"><h3>Forge · <span style="color:${wpnCol(w)}">${wpE(wpnName(w))}</span> <small>${wpE(wpKindLine(w))} · you have ${gold} gold</small></h3><button type="button" class="tx" id="wpFgBack" aria-label="Back to the rack">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
+    <div class="wp-cur"><img src="${wpIconURL(w)}" alt=""><div>${wpnCardHTML(w, t)}</div></div>${rows.join('')}
+    <p class="itc-k">Forging is a late sink for gold: a lucky drop is still the big jump. Gold put into it is not returned on salvage.</p></div>`);
+  const box = ovp.querySelector('.wp-forge'), redo = () => { box.remove(); wpForge(t, w); };
+  box.querySelector('#wpFgBack').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); wpRack(t); };
+  for (const b of box.querySelectorAll('[data-fa]')) b.onclick = () => { const a = b.dataset.fa, ok = a === 'up' ? forgeUpgrade(w) : a === 'lv' ? forgeRelevel(w) : forgeReroll(w); if (ok) { if (typeof onToast === 'function') onToast(`${wpnName(w)}: ${a === 'up' ? 'upgraded to ' + RARITY[w.rar].name : a === 'lv' ? 're-forged to Item Level ' + w.il : 'rerolled'}.`); redo(); } };
+  for (const b of box.querySelectorAll('[data-fr]')) b.onclick = () => { const [i, k] = b.dataset.fr.split('|'); if (forgeRune(w, +i, k, t)) { if (typeof onToast === 'function') onToast(`${RUNES[k].name} set in ${wpnName(w)}.`); redo(); } };
 }
 
 /* ---------- Playtest start (playtest.js): a rack to go with the bag, since the foes' health counts on weapons ----------
@@ -88008,6 +89255,59 @@ if (typeof ptApply === 'function') {
     } catch (e) { console.error(e); }
     return r;
   };
+}
+
+/* ---------- the boss-loot screen and the loot tables (renown.js): weapons show there too ----------
+   (owner, 9 Nov 2026: "cant see any weapons in the first bosses loot pool"). The screen shows the weapon the boss just
+   dropped above the relic choices (it is already in the rack: Equip on the unit it lifts most, or later from a Gear sheet);
+   each boss's loot table strip (its card, the forecast, the screen) ends with the weapons it can drop: one for each kind
+   of unit you field, with the odds by rarity on hover. */
+function wpBestFor(w) { let best = null; for (const t of G.towers || []) { if (t.wrecked || !wpnFits(w, t)) continue; const g = wpnDpsWith(t, w) - wpnDpsWith(t, t.weapon || null); if (!best || g > best.g) best = { t, g }; } return best; }
+function wpBossBlock(L) {
+  const D = G.wBossDrop; if (!D || !D.w || D.wave !== L.w || !(G.wbag || []).includes(D.w)) return '';
+  const w = D.w, b = wpBestFor(w), t = b && b.t;
+  return `<div class="wp-boss"><img src="${wpIconURL(w)}" alt=""><div class="wp-bt2"><h4>Weapon dropped <small>already in your rack, as well as the relic you take</small></h4>${wpnCardHTML(w, t || null, t ? { vs: t.weapon || null } : {})}
+    ${t ? `<button type="button" class="pri" id="wpBossEq">Equip on ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}): ${wpN(wpnDpsWith(t, t.weapon || null))} → ${wpN(wpnDpsWith(t, w))} DPS</button>` : '<p class="itc-k">None of your units can hold it yet.</p>'}</div></div>`;
+}
+if (typeof rnLootScreen === 'function') {
+  const _wpRn = rnLootScreen;
+  rnLootScreen = function () {
+    const r = _wpRn.apply(this, arguments);
+    try {
+      const L = typeof rnLootCur === 'function' ? rnLootCur() : null, box = ovp && ovp.querySelector('.rn-three'); if (!L || !box || !wpnOn()) return r;
+      const h = wpBossBlock(L); if (!h) return r;
+      box.insertAdjacentHTML('beforebegin', h);
+      const b = ovp.querySelector('#wpBossEq');
+      if (b) b.onclick = () => { const w = G.wBossDrop && G.wBossDrop.w, bt = w && wpBestFor(w); if (bt && wpnEquip(bt.t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped on ${bt.t.def.name}.`); const el = ovp.querySelector('.wp-boss'); if (el) el.innerHTML = `<p class="itc-k">${wpE(wpnName(w))} is on your ${wpE(bt.t.def.name)}.</p>`; } };
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+// the loot table strip: the weapons a boss can drop (one icon for each kind of unit you field)
+function wpTableHTML(type) {
+  if (!wpnOn()) return '';
+  const seen = new Set(), out = [];
+  for (const t of G.towers || []) { const c = t.def && !t.def.wall ? wpnClassOf(t.type) : null; if (!c || seen.has(c)) continue; seen.add(c); out.push(t); }
+  if (!out.length) for (const ty in TOWERS) { const c = wpnClassOf(ty); if (c && !seen.has(c) && out.length < 4) { seen.add(c); out.push({ type: ty, def: TOWERS[ty], id: 0 }); } }
+  return `<span class="rn-icons wp-icons">${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}</span>`;
+}
+if (typeof rnIconsHTML === 'function') {
+  const _wpIc = rnIconsHTML;
+  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { return h + wpTableHTML(t); } catch (e) { return h; } };
+}
+function wpTableCard(el) {
+  const [ty] = (el.dataset.wbt || '').split('|'); const d = TOWERS[ty]; if (!d) return '';
+  const c = wpnClassOf(ty), O = wpnBossOdds(Math.max(5, G.wave | 0)), names = WPN_CLASS[c].bases.map(b => wpnName({ b: b[0], rar: 2 }));
+  const legs = WPN_LEGS.filter(r => r[0] === d.unit).map(r => r[2]);
+  return `<div class="itc" style="--rc:#d8c08a"><h5 class="itc-n">A weapon for ${wpE(d.name)}</h5><p class="itc-k">Weapon drop · ${Math.round(O.p * 100)}% from this boss · it goes to your rack</p>
+    <ul class="itc-s">${O.rar.map((p, r) => p > .005 ? `<li><b style="color:${RARITY[r].col}">${Math.round(p * 100)}%</b> ${RARITY[r].name}</li>` : '').join('')}</ul>
+    <p class="itc-k">${wpE(names.join(', '))}${legs.length ? `; legendary: ${wpE(legs.join(', '))}` : ''}</p><p class="itc-fl">A boss's weapon is for one of the units you field, made for what that unit holds.</p></div>`;
+}
+if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-wbt]', wpTableCard);
+// the card's Gear button pulses while the rack holds a new weapon this unit can hold
+if (typeof abilitySlots === 'function') {
+  const _wpSl = abilitySlots;
+  abilitySlots = function (t, s) { const r = _wpSl.apply(this, arguments); try { if (s && s[5] && wpnOn() && (G.wbag || []).some(w => w.isNew && wpnFits(w, t))) { s[5].pulse = true; s[5].name = (s[5].name || '') + ' A new weapon in your rack fits it.'; } } catch (e) {} return r; };
 }
 
 /* ---------- the look ---------- */
@@ -88035,8 +89335,238 @@ if (typeof document !== 'undefined') {
   .wp-bt{display:flex;flex-direction:column;gap:4px;flex:none}
   .wp-bt button{font-size:12px;padding:4px 10px}
   .wp-cmp{margin:6px 0 2px;font-size:12px}.wp-cmp p{margin:1px 0}
+  .wp-fr{border-top:1px solid rgba(255,255,255,.08);padding:8px 2px}.wp-fr h4{margin:0 0 4px;font-size:14px}.wp-fr h4 small{color:#a49c8c;font-weight:400}
+  .wp-fr p{margin:2px 0 6px;font-size:12.5px}.wp-fr b.bo{color:#7be37b}.wp-fr b.neg{color:#ff7a6a}
+  .wp-rs{margin:4px 0;font-size:12.5px}.wp-ro{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.wp-ro button{font-size:11.5px;padding:3px 7px;text-align:left}.wp-ro small{color:#a49c8c}
+  .wp-boss{display:flex;gap:10px;align-items:flex-start;margin:6px auto 10px;max-width:760px;padding:8px 10px;border:1px solid #d8c08a;border-radius:8px;background:rgba(40,32,18,.85)}
+  .wp-boss img{width:56px;height:56px;border-radius:4px;flex:none}.wp-boss h4{margin:0 0 4px;font-size:14px;color:#f2d27a}.wp-boss h4 small{color:#a49c8c;font-weight:400}
+  .wp-boss .itc{max-width:none}.wp-boss button{margin-top:6px}
+  .wp-icons{margin-left:6px;padding-left:6px;border-left:1px dashed rgba(216,192,138,.5)}.wp-ii img{width:100%;height:100%}
+  .wp-ln .wp-nb{font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px}
   @media (max-width:640px){.wp-rack{inset:2%;padding:10px}.wp-row{flex-wrap:wrap}.wp-bt{flex-direction:row}}`;
   const add = () => { const s = document.createElement('style'); s.id = 'wpCss'; s.textContent = css; document.head.append(s); };
   if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+}
+
+/* ================= SHRINES: the card, placing, the info pane and the look =================
+   The rules are in forces_zzzzzzzzzzzzzz_shrines.js. Here (all thin wrappers):
+   - the build card's Shrine button (slot 10, beside the wall) opens the shrine page: the five shrines with their cost; pick
+     one, then tap a free cell (on a phone: tap to see its reach, tap the same cell again to raise it; with a mouse the
+     reach follows the pointer and a click raises it). Back / Esc / right-click leave.
+   - tapping a shrine selects it: Upgrade (twice), Sell (tap twice), Back; its reach ring and the units it reaches light up.
+   - the info pane: the shrine page, a shrine, and a unit's lines ("Attack speed 1.18 -> 1.32/s (Haste Shrine II)").
+   - the look: a small stone obelisk a type, a gem of its colour turning over it and a soft pool of light at its foot; the
+     units a shrine reaches carry a small pip of its colour at their feet. Nothing bright: the field stays readable. On the
+     painted-only maps (maplite.js) the same obelisk is drawn, without the drifting motes. */
+let SHRN_PTR = 'mouse', SHRN_HOVER = null, _shrnBound = false;
+const shrnHex = h => h.slice(1);
+const shrnKey = id => `g:${SHRN_TYPES[id].icon}:${shrnHex(SHRN_TYPES[id].hue)}:3`;
+function shrnBind() {
+  if (_shrnBound || typeof cv === 'undefined' || !cv || !cv.addEventListener) return;
+  _shrnBound = true;
+  cv.addEventListener('pointerdown', e => { SHRN_PTR = e.pointerType || 'mouse'; }, true);
+  cv.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse' || !(G && G.sel && G.sel.kind === 'shrines' && G.sel.place)) { SHRN_HOVER = null; return; }
+    const p = pickGround(e.clientX, e.clientY), i = Math.floor(p.x), j = Math.floor(p.y);
+    SHRN_HOVER = inGrid(i, j) ? [i, j] : null;
+  });
+  cv.addEventListener('pointerleave', () => { SHRN_HOVER = null; });
+}
+// the cell a shrine being placed would go on: the mouse's, or the tapped one (touch)
+function shrnGhostCell() { const s = G.sel; if (!(s && s.kind === 'shrines' && s.place)) return null; return SHRN_PTR === 'mouse' ? SHRN_HOVER || s.at || null : s.at || null; }
+function shrnOpenPage(place) { G.sel = { kind: 'shrines', ref: null, place: place || null, at: null }; G.buildType = null; G.ghost = null; sfx('click'); markDirty(); }
+function shrnSelect(s) { G.sel = { kind: 'shrine', ref: s }; G.buildType = null; G.ghost = null; sfx('select'); markDirty(); }
+
+/* ---------- the card ---------- */
+if (typeof slotsNow === 'function' && !slotsNow._shrn) {
+  const _shrnSlots = slotsNow;
+  slotsNow = function () {
+    const s = _shrnSlots.apply(this, arguments);
+    try {
+      if (!shrnOn() || G.state !== 'play' || !G.towers) return s;
+      const sel = G.sel, n = shrnList().length, cap = SHRN_CAP(), cost = SHRN_COST();
+      const back = { key: 'x', lbl: 'Back', on: true, name: 'Back', hk: 'Esc', act: deselect };
+      if (sel && sel.kind === 'shrines') {
+        const out = Array(12).fill(null); out[11] = s[11];
+        SHRN_ORDER.forEach((id, k) => {
+          const S = SHRN_TYPES[id], on = n < cap && G.gold >= cost, act = sel.place === id;
+          out[k] = { key: shrnKey(id), cost, lbl: S.name.replace(' Shrine', ''), on, active: act,
+            name: `${act ? 'Stop placing' : 'Raise'} a ${S.name}: ${S.say} Reach ${SHRN_R[0]} cells.`,
+            act: () => {
+              if (sel.place === id) { sel.place = null; sel.at = null; sfx('click'); return; }
+              if (n >= cap) { const nx = SHRN_RULE.capFrom + cap * SHRN_RULE.capEvery; toast(cap >= SHRN_RULE.capMax ? `You have all ${cap} shrines.` : `${n} of ${cap} shrines raised. Another opens at wave ${nx}.`); sfx('nogold'); return; }
+              if (G.gold < cost) { toast('Not enough gold.'); sfx('nogold'); return; }
+              sel.place = id; sel.at = null; sfx('click');
+              toast(`${S.name} (${cost} gold): ${SHRN_PTR === 'mouse' ? 'click a free cell to raise it.' : 'tap a free cell to see its reach, tap it again to raise it.'}`);
+            } };
+        });
+        out[10] = back;
+        return out;
+      }
+      if (sel && sel.kind === 'shrine') {
+        const sh = sel.ref, out = Array(12).fill(null); out[11] = s[11];
+        if (!shrnList().includes(sh)) { G.sel = null; return s; }
+        const uc = shrnUpCost(sh), S = SHRN_TYPES[sh.type];
+        out[0] = uc ? { key: shrnKey(sh.type), cost: uc, lbl: 'Upgrade', up: true, on: G.gold >= uc, name: `Upgrade to ${S.name} ${SHRN_LV[sh.lv]}: reach ${SHRN_R[sh.lv]} cells, ${S.line(S.v[sh.lv])}`, hk: 'U', act: () => shrnUpgrade(sh) }
+          : { key: shrnKey(sh.type), lbl: 'Max', on: false, name: 'Fully upgraded', act: () => toast(`This ${S.name} is fully upgraded.`) };
+        const armed = sel.arm > performance.now(), v = shrnSellValue(sh);
+        out[8] = { key: 'sell', lbl: armed ? 'Sure?' : 'Sell', cost: v, on: true, warn: armed, name: 'Sell for ' + v, hk: 'S',
+          act: () => { if (sel.arm > performance.now()) shrnSell(sh); else { sel.arm = performance.now() + 2500; sfx('click'); toast(`Tap again to sell for ${v} gold.`); setTimeout(markDirty, 2600); } } };
+        out[10] = { key: 'x', lbl: 'Back', on: true, name: 'Deselect', hk: 'Esc', act: deselect };
+        return out;
+      }
+      if (!sel && !G.buildType && !s[9] && !(typeof TW !== 'undefined' && TW)) {
+        s[9] = { key: 'g:auraring:d8c08a:2', lbl: `Shrine ${n}/${cap}`, cost: n < cap ? cost : null, on: n < cap && G.gold >= cost,
+          name: n < cap ? `Shrines: raise one on the maze to empower the units around it (${n} of ${cap})` : `Shrines: ${n} of ${cap} raised${cap < SHRN_RULE.capMax ? `, another opens at wave ${SHRN_RULE.capFrom + cap * SHRN_RULE.capEvery}` : ''}`,
+          act: () => shrnOpenPage() };
+      }
+    } catch (e) { console.error(e); }
+    return s;
+  };
+  slotsNow._shrn = 1;
+}
+if (typeof deselect === 'function' && !deselect._shrn) { const _d = deselect; deselect = function () { SHRN_HOVER = null; return _d.apply(this, arguments); }; deselect._shrn = 1; }
+
+/* ---------- taps on the field ---------- */
+if (typeof tapSelect === 'function' && !tapSelect._shrn) {
+  const _shrnTap = tapSelect;
+  tapSelect = function (p, e) {
+    try {
+      if (shrnOn() && !G.cast && !G.moveT && p) {
+        const i = Math.floor(p.x), j = Math.floor(p.y), sel = G.sel, here = inGrid(i, j) ? shrnAtCell(i, j) : null;
+        if (sel && sel.kind === 'shrines' && sel.place) {
+          if (here) { shrnSelect(here); return; }
+          if (!inGrid(i, j) || G.tAt[idx(i, j)]) return _shrnTap.apply(this, arguments);   // a unit, the keep, off the field: as ever
+          const chk = shrnCanPlace(sel.place, i, j);
+          if (!chk.ok) { toast(chk.msg); sfx(chk.gold ? 'nogold' : 'error'); sel.at = [i, j]; markDirty(); return; }
+          if (SHRN_PTR !== 'mouse' && !(sel.at && sel.at[0] === i && sel.at[1] === j)) {
+            sel.at = [i, j]; const u = shrnUnitsIn(i, j, 1).length; sfx('click');
+            toast(`Reaches ${u} unit${u === 1 ? '' : 's'} here. Tap again to raise it.`); markDirty(); return;
+          }
+          const s = shrnPlace(sel.place, i, j);
+          if (s) { shrnSelect(s); toast(`${shrnName(s)} raised: ${shrnUnitsIn(s.i, s.j, s.lv).length} units in its reach.`); }
+          markDirty(); return;
+        }
+        if (here) { if (sel && sel.ref === here) deselect(); else shrnSelect(here); return; }
+      }
+    } catch (er) { console.error(er); }
+    return _shrnTap.apply(this, arguments);
+  };
+  tapSelect._shrn = 1;
+}
+if (typeof rightClickOff === 'function' && !rightClickOff._shrn) {
+  const _rc = rightClickOff;
+  rightClickOff = function () { if (G && G.sel && G.sel.kind === 'shrines' && G.sel.place) { G.sel.place = null; G.sel.at = null; SHRN_HOVER = null; sfx('click'); markDirty(); return; } return _rc.apply(this, arguments); };
+  rightClickOff._shrn = 1;
+}
+
+/* ---------- the info pane ---------- */
+const shrnSpan = (id, txt) => `<b style="color:${SHRN_TYPES[id].hue}">${txt}</b>`;
+function shrnPageHTML(sel) {
+  const n = shrnList().length, cap = SHRN_CAP(), cost = SHRN_COST();
+  let h = `<h3>Shrines <span class="tier">${n}/${cap}</span></h3>`;
+  h += `<p class="mut" data-d="2">A shrine takes a maze cell like a wall and empowers every unit within its reach. Two of one kind don't add up: a unit takes the stronger. ${cap < SHRN_RULE.capMax ? `Another shrine opens at wave ${SHRN_RULE.capFrom + cap * SHRN_RULE.capEvery}.` : ''}</p>`;
+  if (sel.place) {
+    const S = SHRN_TYPES[sel.place], c = shrnGhostCell();
+    h += `<p class="up">${shrnSpan(sel.place, S.name)} · <b>${cost}</b> gold · reach ${SHRN_R[0]} cells</p><p class="up perk">${S.say} Level I: ${S.line(S.v[0])}; II: ${S.line(S.v[1])}; III: ${S.line(S.v[2])}.</p>`;
+    h += c ? `<p class="mut">Here it reaches <b>${shrnUnitsIn(c[0], c[1], 1).length}</b> units.</p>` : `<p class="mut">${SHRN_PTR === 'mouse' ? 'Click a free cell to raise it.' : 'Tap a free cell to see its reach.'}</p>`;
+  } else for (const id of SHRN_ORDER) { const S = SHRN_TYPES[id]; h += `<p class="mut" data-d="1">${shrnSpan(id, S.name)}: ${S.say} (${S.line(S.v[0])})</p>`; }
+  return h;
+}
+function shrnInfoHTML(s) {
+  const S = SHRN_TYPES[s.type], u = shrnUnitsIn(s.i, s.j, s.lv).length;
+  let h = `<h3>${S.name} <span class="tier">${SHRN_LV[s.lv - 1]}</span></h3>`;
+  h += `<p class="up">${S.say}</p><div class="st"><span>Reach <b>${shrnReach(s)}</b> cells</span><span>Units <b>${u}</b></span><span>Effect <b>${S.line(S.v[s.lv - 1])}</b></span></div>`;
+  if (s.lv < 3) h += `<p class="up perk" data-d="1">${SHRN_LV[s.lv]}: reach ${SHRN_R[s.lv]} cells, ${S.line(S.v[s.lv])} · <b>${shrnUpCost(s)}</b> gold</p>`;
+  h += `<p class="mut" data-d="2">It blocks the road like a wall. Foes can't break it; siege troops go around it. Another ${S.name} reaching the same unit doesn't add to it.</p>`;
+  return h;
+}
+function shrnUnitLines(t) {
+  const L = t && t.st && t.st.shrn; if (!L || !L.length) return '';
+  return `<p class="mut shrn-ln" data-d="1">${L.map(o => `${o.stat} ${o.a} → <b>${o.b}</b> <span style="color:${SHRN_TYPES[o.id].hue}">(${o.by})</span>`).join('<br>')}</p>`;
+}
+if (typeof infoHTML === 'function' && !infoHTML._shrn) {
+  const _shrnInfo = infoHTML;
+  infoHTML = function () {
+    try {
+      const s = G && G.sel;
+      if (s && s.kind === 'shrines' && shrnOn()) return shrnPageHTML(s);
+      if (s && s.kind === 'shrine' && shrnOn() && shrnList().includes(s.ref)) return shrnInfoHTML(s.ref);
+    } catch (e) { console.error(e); }
+    const h = _shrnInfo.apply(this, arguments);
+    try {
+      const s = G && G.sel, t = s && s.kind === 'tower' ? s.ref : null, ln = t && shrnOn() ? shrnUnitLines(t) : '';
+      if (!ln || typeof h !== 'string') return h;
+      const st = h.indexOf('<div class="st">');   // right under the stats row
+      if (st >= 0) { let d = 0; const re = /<\/?div\b/g; re.lastIndex = st; for (let m; (m = re.exec(h));) { d += m[0][1] === '/' ? -1 : 1; if (!d) { const e = h.indexOf('>', m.index) + 1; return h.slice(0, e) + ln + h.slice(e); } } }
+      return h + ln;
+    } catch (e) { return h; }
+  };
+  infoHTML._shrn = 1;
+}
+
+/* ---------- the look ---------- */
+const SHRN_M = new Float32Array(16);
+const shrnH = lv => .52 + .12 * lv;   // the obelisk's height by level
+function shrnMesh(type, lv) {
+  return dynMesh('shrn_' + type + lv, g => {
+    const S = SHRN_TYPES[type], h = shrnH(lv), y0 = .2;
+    g.mat = 'stone';
+    g.box(0, .05, 0, .72, .1, .72, '#6c6862', { taper: [.92, .92] });
+    g.box(0, .15, 0, .5, .1, .5, '#7a766e');
+    g.box(0, y0 + h / 2, 0, .26, h, .26, '#8c877d', { taper: [.58, .58] });
+    g.mat = null;
+    g.cyl(0, y0 + h, 0, .085, 0, .1, 4, '#9c968a', { rot: Math.PI / 4 });
+    g.em = .85;   // a rune down each face, in the shrine's colour
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2, r = .13 * (1 - .42 * .45) + .006; g.with(T(Math.sin(a) * r, y0 + h * .45, Math.cos(a) * r, a), () => g.box(0, 0, 0, .045, .2 + .04 * lv, .012, S.hue)); }
+    for (let k = 0; k < lv; k++) g.box(-.12 + k * .12, .21, .251, .06, .03, .01, S.hue);   // its level: studs on the step's front
+    g.em = 0;
+  });
+}
+const shrnGem = type => dynMesh('shrn_gem_' + type, g => { g.em = 1; g.ico(0, 0, 0, .07, SHRN_TYPES[type].hue, 0, 1.35); g.em = 0; });
+function shrnDrawOne(s, ghost, ok) {
+  const S = SHRN_TYPES[s.type], c = S.col, x = s.x, z = s.y, h = shrnH(s.lv), top = .2 + h + .2, lite = mapLite(), ph = (s.id || 0) * 1.7;
+  M4.trs(SHRN_M, x, 0, z); item(shrnMesh(s.type, s.lv), SHRN_M, ghost ? { alpha: .55, shadow: false, tint: ok ? [.9, 1.15, .9, .05] : [1.3, .6, .55, .05] } : null);
+  M4.trs(SHRN_M, x, top + .05 * Math.sin(vt * 1.4 + ph), z, vt * .7 + ph); item(shrnGem(s.type), SHRN_M, { shadow: false, alpha: ghost ? .6 : null });
+  if (ghost) return;
+  const p = .5 + .5 * Math.sin(vt * 1.1 + ph);
+  QADD.ground(x, z, .03, .78, .78, [c[0], c[1], c[2], .1 + .04 * p], 1, 0);   // a soft pool of its light at its foot
+  if (!lite) {
+    QADD.bill(RD, x, top, z, .18, .18, [c[0], c[1], c[2], .22 + .08 * p], 1, 0);
+    for (let k = 0; k < 2; k++) { const u = (vt * .22 + k * .5 + ph) % 1, a = ph + k * 3.1 + vt * .4, r = .3 - .12 * u; QADD.bill(RD, x + Math.cos(a) * r, .25 + u * (h + .3), z + Math.sin(a) * r, .035, .035, [c[0], c[1], c[2], .5 * Math.sin(u * Math.PI)], 1, 0); }
+  }
+}
+function shrnReachFx(type, x, z, lv, bright) {
+  const c = SHRN_TYPES[type].col, r = SHRN_R[lv - 1] + .3;
+  QG.ground(x, z, .03, r, r, [c[0], c[1], c[2], .05], 5, 0);
+  QG.ground(x, z, .035, r, r, [c[0], c[1], c[2], bright ? .85 : .55], 4, .022);
+  for (const o of shrnUnitsIn(Math.floor(x), Math.floor(z), lv)) QADD.ground(o.x, o.y, .036, .5, .5, [c[0], c[1], c[2], .3 + .12 * Math.sin(vt * 4)], 3, .1);
+}
+function shrnDraw() {
+  shrnBind();
+  if (!G || !G.towers || !shrnOn()) return;
+  const L = shrnList(), sel = G.sel;
+  for (const s of L) shrnDrawOne(s, false);
+  if (L.length) for (const t of G.towers) {   // the units a shrine reaches: a small pip of its colour at their feet
+    const a = t.st && t.st.shrn; if (!a || t.def.wall) continue;
+    const ids = [...new Set(a.map(o => o.id))];
+    ids.forEach((id, k) => { const c = SHRN_TYPES[id].col; QADD.ground(t.x - .34 + k * .1, t.y + .38, .04, .045, .045, [c[0], c[1], c[2], .7], 1, 0); });
+  }
+  if (sel && sel.kind === 'shrine' && L.includes(sel.ref)) { const s = sel.ref; QG.ground(s.x, s.y, .04, .62, .62, [1, .88, .5, .95], 3, .1); shrnReachFx(s.type, s.x, s.y, s.lv, true); }
+  if (sel && sel.kind === 'shrines') {
+    for (const s of L) if (!sel.place || s.type === sel.place) shrnReachFx(s.type, s.x, s.y, s.lv, false);   // the shrines already up (of the kind being placed)
+    const cell = shrnGhostCell();
+    if (sel.place && cell) {
+      const [i, j] = cell, ok = shrnCanPlace(sel.place, i, j).ok, x = i + .5, z = j + .5;
+      QG.ground(x, z, .04, .5, .5, ok ? [.4, 1, .45, .55] : [1, .3, .25, .6], 7, 0);
+      shrnDrawOne({ type: sel.place, x, y: z, lv: 1, id: 0 }, true, ok);
+      shrnReachFx(sel.place, x, z, 1, true);
+    }
+  }
+}
+if (typeof drawSelection === 'function' && !drawSelection._shrn) {
+  const _shrnDS = drawSelection;
+  drawSelection = function () { const r = _shrnDS.apply(this, arguments); try { shrnDraw(); } catch (e) { if (!shrnDraw._err) { shrnDraw._err = 1; console.error(e); } } return r; };
+  drawSelection._shrn = 1;
 }
 
