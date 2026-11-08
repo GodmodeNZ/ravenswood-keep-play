@@ -1,4 +1,4 @@
-const BUILD_TAG = '7c63539@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1497cec+@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -57534,7 +57534,7 @@ const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[
 /* Tunable light schemes. Colours are sRGB hex, strengths multiply them in linear light. The Lighting panel edits a copy per map. */
 const LIGHT_DEF = {
   meadow: { sun: '#ffdeb2', sunI: 1.6, az: -68, el: 35, rim: .12, fill: 0, ground: 1, paint: 1, sky: '#b2c9ff', skyI: .44, gnd: '#ffdaaa', gndI: .17, fog: '#2e2c48', fogNear: .9, woods: 0, lamps: 1, expo: 1, rays: 0, ray: '#9ec4ff' },
-  clearing: { sun: '#ffe2b8', sunI: 1.55, az: 165, el: 44, rim: .14, fill: .1, ground: 1, paint: 1, sky: '#b8caf0', skyI: .42, gnd: '#d9c79a', gndI: .18, fog: '#26302a', fogNear: .9, woods: 0, lamps: 1, expo: 1, rays: 0, ray: '#ffe0a0' },
+  clearing: { sun: '#c8d2ff', sunI: 1.45, az: 165, el: 50, rim: .24, fill: .12, ground: 1, paint: 1, sky: '#a4a0f0', skyI: .6, gnd: '#6c6890', gndI: .2, fog: '#4a4478', fogNear: .9, woods: 0, lamps: 1, expo: 1.1, rays: 1, ray: '#c8d8ff' },   // a full moon's night: silver-blue moonlight, bright enough to play by, a bluey-purple haze (owner)
   moonwood: { sun: '#b8cbf2', sunI: 1.35, az: 153, el: 48, rim: .65, fill: .95, ground: .85, paint: 1, sky: '#4a6290', skyI: .45, gnd: '#1c2636', gndI: .8, fog: '#0e1828', fogNear: .9, woods: .8, lamps: 1.5, expo: .95, rays: 2, ray: '#68b4f0' },
 };
 /* Each map's mood: the light every model on it takes (units, foes, bosses, props, missiles), so a unit stands in its place
@@ -57546,8 +57546,8 @@ const LIGHT_DEF = {
 const MAP_MOOD = {
   // Kingsmeadow: a sunlit afternoon over open fields: a soft blue sky, golden sun, grass under foot
   meadow: { top: '#a8c4ff', topK: .12, key: '#ffc27a', keyK: .22, bounce: '#9cb456', bounceK: .18, env: 0 },
-  // Sunfall Glade: twilight in the deep wood (the title painting): cool teal-green from the canopy, dark moss below, a low peach sun
-  clearing: { top: '#4cb8a4', topK: .36, key: '#ffb47c', keyK: .28, bounce: '#2c5a26', bounceK: .36, env: 0 },
+  // Sunfall Glade: light, in a bluey-purple haze (owner: lighter, a blue-purple haze; was twilight teal-green)
+  clearing: { top: '#9c9cff', topK: .3, key: '#dde6ff', keyK: .12, bounce: '#8878c0', bounceK: .16, env: 0 },
   // Moonwood: cold moonlight, a teal bounce off the wet moss
   moonwood: { top: '#6c8cff', topK: .24, key: '#b4ccff', keyK: .12, bounce: '#2a7a70', bounceK: .24, env: 0 },
 };
@@ -57909,7 +57909,7 @@ const THEMES = {
     id: 'clearing', sunDir: nrm3([.24, .7, -.67]), sunCol: [1.55, 1.2, .78], sky: [.2, .26, .44], gnd: [.17, .14, .09], fogHex: '#26302a',
     // no keep here: foes walk off down the path at the foot, so the view reaches from the trees at the head (fitTop) to
     // just past the last row (fitBot)
-    pitch: 57, fitTop: -6.5, fitBot: ROWS + .65, noKeep: true, h: () => 0, shafts: 'sun', fly: [.85, 1, .45],
+    pitch: 57, fitTop: -6.5, fitBot: ROWS + .65, noKeep: true, h: () => 0, shafts: 'moon', fly: [.85, 1, .45],
     painted: typeof CL_PAINT !== 'undefined' ? { src: CL_PAINT, rect: CL_PAINT_RECT, shade: CL_SHADE_REF } : null,
     build: () => buildClearingPainted(),
   },
