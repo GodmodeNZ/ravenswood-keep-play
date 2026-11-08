@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd386479@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b8a0bd6@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47815,10 +47815,12 @@ function forgeRunSim(o) {
       it to the wave's Item Level, adds an effect tied to the hero's own kit (HW[unit].fx: an on-hit effect, a twist on one
       of its named spells, crit, a mark, a slow), and lights it a step brighter (hwGlow: a colour and a strength 0..1 per
       stage, which the sculpted models read: Maren's twin blade is tinted by it, every hero's weapon tip glows with it);
-   2. is TEMPERED at the forge (the owner: "Temper", not "melt"; the code's ids keep hwMelt*): a dropped weapon of its class
-      (or, for Maren, Tovin and Grenna, whose weapons no one else holds, any weapon) is tempered into it, lifting its Item
-      Level to the tempering weapon's and passing half of a better roll on (h.tw: the last one, shown on its card); its look
-      never changes;
+   2. is UPGRADED by its own drops (the owner, 9 Nov 2026: "should get items that drop that upgrade the weapon, they can be
+      anything"; no borrowed terms): each hero has an upgrade item of its own (HUP: a Rift Shard for Maren, Sunsteel Ingots
+      for Aurelian ...), in three grades (plain, Gleaming, Flawless: HUP_STEP), dropped by wave bosses, elites and now and
+      then a wave's last foe while the hero is fielded (hupDropCheck). "Add to <its weapon>" raises its Item Level (up to
+      the wave's level sync) and its roll; its look never changes. (An older save's tempering record, 'melted' and 'tw',
+      is kept and does nothing.)
    3. may be REFORGED, once a run and very rarely (HW_ULT_P): a wave boss slain while it is at stage III or IV can drop the
       hero's reforged legendary, its ultimate form (HW[unit].ult: a new name, a stronger effect, a model key for the owner
       to model; until then the same model at the final stage's glow), announced with a banner.
@@ -47833,7 +47835,7 @@ const HW_M = [1, 1.1, 1.2, 1.32], HW_ULT_M = 1.55;   // its DPS over the Champio
 const HW_SP = [16, 26, 38, 52], HW_ULT_SP = 70;      // a caster's Spell Damage at Item Level 1 (x the strike curve, x the wearer: as weapons)
 const HW_RAR = [2, 3, 3, 4];                 // the frame colour and rune sockets, by stage (rare, epic, epic, legendary)
 const HW_ULT_P = [0, 0, .03, .05];           // its reforged form's chance on a wave boss, by stage
-const HW_MELT_SHARE = .5, HW_MELT_GOLD = 12; // tempering passes half of a better roll on; it costs this x the level's price
+
 const HW_GLOW = [0, .35, .65, 1];
 // unit -> { n: its four stage names, fx: the effects stages II-IV add, glow, ult: [name, look, [effects]], art: notes }
 const HW = {
@@ -47963,37 +47965,97 @@ function hwReforge(t, h, c) {
 }
 if (typeof kill === 'function') {
   const _hwKill = kill;
-  kill = function (c) { const was = c && !c.dead, r = _hwKill.apply(this, arguments); if (was && c.dead) { try { hwOnBoss(c); } catch (e) { console.error(e); } } return r; };
+  kill = function (c) { const was = c && !c.dead, r = _hwKill.apply(this, arguments); if (was && c.dead) { try { hwOnBoss(c); hupDropCheck(c); } catch (e) { console.error(e); } } return r; };
 }
 
-/* ---------- tempering a weapon into it (at the forge; ids hwMelt*, the save field 'melted', kept as they were) ---------- */
-const hwUnique = h => { const c = (WPN_BASE[h.b] || {}).cls; return !Object.keys(TOWERS).some(ty => wpnClassOf(ty) === c && !hwTypeHero(ty)); };
-function hwMeltWhy(h, w) {
-  if (!h || !w || w.hero || w.starter) return 'Pick a weapon from the rack';
-  if (!(G.wbag || []).includes(w)) return 'Only a weapon in the rack can be tempered into it';
-  const c = (WPN_BASE[w.b] || WPN_LEG[w.b] || {}).cls;
-  if (!hwUnique(h) && c !== (WPN_BASE[h.b] || {}).cls) return `Only a ${(WPN_BASE[h.b] || {}).cls} can be tempered into it`;
-  return '';
+/* ---------- the hero's upgrade items: their own drops, added to its weapon ----------
+   HUP: unit -> [name, glyph, hue, flavour]. A grade's step (HUP_STEP: Item Levels and roll) and its odds (HUP_GRADE: a
+   wave boss rolls better). Drops while the hero stands: a wave boss always, the last elite of an elite wave 40%, any other
+   elite 3%, a wave's last foe 20% (about 2-3 every 5 waves: the hero's Item Level keeps near the wave, as an ordinary unit's
+   weapons and forge do: hupRunSim, tools/check_weapons.js). They go to the hero's pouch (G.hup[unit]: counts by grade). */
+const HUP = {
+  ch_maelis: ['Starweave Thread', 'spiral', '#a07ae0', 'A thread of starlight spun on the Sixfold Loom.'],
+  ch_aurel: ['Clockwork Gear', 'hourglass', '#c09a50', 'A brass gear that turns backward.'],
+  ch_maren: ['Rift Shard', 'shards', '#d05a8a', 'A splinter of an open rift, still humming.'],
+  ch_elowen: ['Heartwood Sliver', 'leaf', '#4a9a4a', 'A sliver of the first wood\'s heart.'],
+  ch_faelan: ['Moon-Thorn', 'spikes', '#6a8a3a', 'A thorn that grew under the hunter\'s moon.'],
+  ch_nyssa: ['Bloom Seed', 'acorn', '#7aa840', 'A seed that flowers in the hand.'],
+  ch_haldra: ['Deep-Hold Ore', 'rocks', '#e08040', 'Ore from the deepest hold, warm to the touch.'],
+  ch_tovin: ['Sparking Coil-Spring', 'coil', '#b070ff', 'A spring wound so tight it sparks.'],
+  ch_grenna: ['Firebrew Dregs', 'flask', '#ff9a40', 'The last and strongest drops of the barrel.'],
+  ch_aurelian: ['Sunsteel Ingot', 'sun', '#ffd060', 'Steel quenched at dawn in the Ford.'],
+  ch_celestine: ['Dawnglass', 'sunburst', '#ffe08a', 'Glass that holds the first light of morning.'],
+  ch_morrow: ['Grail Ash', 'scales', '#d8e0f0', 'Ash from the grail\'s altar, cold and white.'],
+  ch_tarka: ['Thunderstone', 'thunder', '#80b8ff', 'A stone that fell with the lightning.'],
+  ch_oshana: ['Wind-Chime Bone', 'feather', '#c8f0ff', 'A bone chime that rings in still air.'],
+  ch_huri: ['Spirit Fang', 'antler', '#a8d0ff', 'A wolf\'s fang, carried back by its spirit.'],
+  ch_varic: ['Gate-Rune Ember', 'rune', '#ffb43a', 'A rune cut from the last gate, still glowing.'],
+  ch_aedric: ['Star-Iron', 'stars', '#fff0b0', 'Iron from a fallen star, bright as noon.'],
+  ch_isaura: ['Veil-Silk', 'swirl', '#e4d8ff', 'A strand of the veil that binds an oath.'],
+};
+const HUP_GRADE = ['', 'Gleaming ', 'Flawless '];
+const HUP_STEP = [{ il: 1, q: 0 }, { il: 3, q: .1 }, { il: 5, q: .25 }];
+const HUP_ODDS = { plain: [.72, .24, .04], boss: [.5, .38, .12] };
+const HUP_DROP = { lastElite: .4, elite: .03, last: .2 };
+const hupName = (u, g) => HUP[u] ? HUP_GRADE[g | 0] + HUP[u][0] : '';
+const hupFielded = () => (G.towers || []).filter(t => hwIsHero(t) && !t.wrecked);
+const hupPouch = u => { const P = G.hup || (G.hup = {}); return P[u] || (P[u] = [0, 0, 0]); };
+// what adding one of grade g makes of its weapon (a copy, for the preview)
+function hupResult(h, g) {
+  const o = Object.assign({}, h); delete o._c; const S = HUP_STEP[g | 0], cap = typeof ilCap === 'function' ? ilCap() : 60;
+  o.il = Math.max(h.il | 0, Math.min(cap, (h.il | 0) + S.il)); o.q = +Math.min(1, (h.q == null ? .5 : h.q) + S.q).toFixed(3);
+  return o;
 }
-const hwMeltCost = (h, w) => typeof forgeLvK === 'function' ? Math.max(5, Math.round(HW_MELT_GOLD * forgeLvK(Math.max(h.il | 0, w.il | 0)) / 5) * 5) : 50;
-// what tempering w into it would make of it (a copy, for the preview)
-function hwMeltResult(h, w) { const o = Object.assign({}, h); delete o._c; o.il = Math.max(h.il | 0, w.il | 0); const wq = w.q == null ? .5 : w.q; if (wq > (h.q == null ? .5 : h.q)) o.q = +(o.q + HW_MELT_SHARE * (wq - o.q)).toFixed(3); return o; }
-function hwMelt(h, w) {
-  const why = hwMeltWhy(h, w); if (why) { if (typeof onToast === 'function') onToast(why + '.'); return false; }
-  const cost = hwMeltCost(h, w); if ((G.gold | 0) < cost) { if (typeof onToast === 'function') onToast(`Tempering it costs ${cost} gold.`); if (typeof sfx === 'function') sfx('nogold'); return false; }
-  G.gold -= cost; const r = hwMeltResult(h, w); h.il = r.il; h.q = r.q; h.melted = (h.melted | 0) + 1; h.tw = { n: wpnName(w), il: w.il | 0 }; h.fg = (h.fg | 0) + cost; delete h._c;
-  G.wbag.splice(G.wbag.indexOf(w), 1); G.talV = (G.talV || 0) + 1;
-  if (typeof sfx === 'function') sfx('equip', 3); if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
+const hupUseless = (h, g) => { const r = hupResult(h, g); return r.il === (h.il | 0) && r.q === (h.q == null ? .5 : h.q); };
+function hupUse(h, g) {
+  const P = hupPouch(h.u); if (!(P[g | 0] > 0)) return false;
+  if (hupUseless(h, g)) { if (typeof onToast === 'function') onToast(`${wpnName(h)} is at the wave's level: keep the ${hupName(h.u, g)} for later waves.`); return false; }
+  const r = hupResult(h, g); h.il = r.il; h.q = r.q; h.ups = (h.ups | 0) + 1; delete h._c; P[g | 0]--; G.talV = (G.talV || 0) + 1;
+  if (typeof sfx === 'function') sfx('equip', 3 + (g | 0) * .5); if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
   return true;
+}
+function hupGive(t, boss, c) {
+  const u = t.def.unit; if (!HUP[u]) return null;
+  const O = boss ? HUP_ODDS.boss : HUP_ODDS.plain; let x = Math.random(), g = 0; while (g < 2 && x > O[g]) { x -= O[g]; g++; }
+  hupPouch(u)[g]++; G.hupNew = (G.hupNew || 0) + 1; if (boss) G.hupBossDrop = { u, g, wave: G.wave };
+  if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .3, hupName(u, g), HUP[u][2]);
+  if (typeof sfx === 'function') sfx('lootDrop', 2 + g);
+  if (typeof onToast === 'function') onToast(`${hupName(u, g)}: an upgrade for ${wpnName(hwState(u))}. Open ${t.def.name.split(',')[0]}'s weapon to add it.`);
+  return g;
+}
+function hupDropCheck(c) {
+  if (!hwOn() || G.state !== 'play' || !c || c.splitCopy || c.kid || (c.def && c.def.egg) || c.echo || c.sent || c.type === 'risen' || c.purse) return;
+  const H = hupFielded(); if (!H.length) return;
+  const wv = c.wv || G.wave, boss = typeof isWaveBoss === 'function' && isWaveBoss(c);
+  let p = 0;
+  if (boss) p = 1; else if (typeof isLastElite === 'function' && isLastElite(c)) p = HUP_DROP.lastElite; else if (c.elite) p = HUP_DROP.elite;
+  else { const last = !G.creeps.some(o => o !== c && !o.dead && o.wv === c.wv && !o.kid) && !(G.spawnQ || []).length; if (last && G.hupLastW !== wv) { G.hupLastW = wv; p = HUP_DROP.last; } }
+  if (p && Math.random() < p) for (const t of H) hupGive(t, boss, c);
+}
+// the hero's Item Level over a run with these drops (from the wave it joins): awakenings re-forge it, upgrades add up
+function hupRunSim(join, rnd) {
+  rnd = rnd || Math.random; let il = join, stage = 0, bosses = 0; const IL = [];
+  const pick = O => { let x = rnd(), g = 0; while (g < 2 && x > O[g]) { x -= O[g]; g++; } return g; };
+  for (let w = 1; w <= 50; w++) {
+    if (w >= join) {
+      const got = [];
+      if (bossWave(w)) { bosses++; if (stage < 3 && bosses >= HW_AT[stage + 1]) { stage++; il = Math.max(il, w); } got.push(pick(HUP_ODDS.boss)); }
+      else if (eliteWave(w) && rnd() < HUP_DROP.lastElite) got.push(pick(HUP_ODDS.plain));
+      if (rnd() < HUP_DROP.last) got.push(pick(HUP_ODDS.plain));
+      for (const g of got) il = Math.max(il, Math.min(w + 3, il + HUP_STEP[g].il));
+    }
+    IL[w] = il;
+  }
+  return IL;
 }
 
 /* ---------- saves ---------- */
-const hwClean = h => { const o = {}; for (const k of ['hero', 'u', 'b', 'rar', 'il', 'q', 'stage', 'bosses', 'ult', 'id', 'melted', 'fg']) if (h[k] != null) o[k] = h[k]; if (h.tw && h.tw.n) o.tw = { n: String(h.tw.n), il: h.tw.il | 0 }; if (Array.isArray(h.runes)) o.runes = h.runes.slice(); return o; };
+const hwClean = h => { const o = {}; for (const k of ['hero', 'u', 'b', 'rar', 'il', 'q', 'stage', 'bosses', 'ult', 'id', 'melted', 'fg', 'ups']) if (h[k] != null) o[k] = h[k]; if (h.tw && h.tw.n) o.tw = { n: String(h.tw.n), il: h.tw.il | 0 }; if (Array.isArray(h.runes)) o.runes = h.runes.slice(); return o; };
 if (typeof serialize === 'function') {
   const _hwSer = serialize;
   serialize = function () {
     const s = _hwSer.apply(this, arguments);
-    if (s && G.force) { s.hw = {}; for (const u in G.hw || {}) s.hw[u] = hwClean(G.hw[u]); const hc = new Set((G.towers || []).filter(hwIsHero).map(t => t.i + ',' + t.j)); if (s.wpn && s.wpn.on) s.wpn.on = s.wpn.on.filter(([i, j]) => !hc.has(i + ',' + j)); }
+    if (s && G.force) { s.hup = G.hup || {}; s.hw = {}; for (const u in G.hw || {}) s.hw[u] = hwClean(G.hw[u]); const hc = new Set((G.towers || []).filter(hwIsHero).map(t => t.i + ',' + t.j)); if (s.wpn && s.wpn.on) s.wpn.on = s.wpn.on.filter(([i, j]) => !hc.has(i + ',' + j)); }
     return s;
   };
 }
@@ -48006,7 +48068,8 @@ if (typeof restore === 'function') {
   };
 }
 function hwRestore(s) {
-  G.hw = {};
+  G.hw = {}; G.hup = {};
+  for (const u in (s && s.hup) || {}) if (HUP[u] && Array.isArray(s.hup[u])) G.hup[u] = [0, 1, 2].map(g => Math.max(0, s.hup[u][g] | 0));
   for (const u in (s && s.hw) || {}) { const h = s.hw[u]; if (HW[u] && h && WPN_BASE[h.b]) G.hw[u] = Object.assign({ hero: 1, u, stage: 0, bosses: 0, q: .5, il: 1, rar: 2 }, h, { hero: 1, u, stage: Math.max(0, Math.min(3, h.stage | 0)) }); }
   // an older save: a weapon its Champion held becomes its iconic weapon at the stage its rarity matches (wpnRestore put it in the rack)
   for (const [i, j, w] of (s && s.wpn && s.wpn.on) || []) {
@@ -48021,17 +48084,17 @@ function hwRestore(s) {
 }
 if (typeof newGame === 'function') {
   const _hwNew = newGame;
-  newGame = function () { const r = _hwNew.apply(this, arguments); if (typeof G !== 'undefined' && G) G.hw = {}; return r; };
+  newGame = function () { const r = _hwNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.hw = {}; G.hup = {}; } return r; };
 }
 
 /* ---------- balance: a Champion's weapon by wave, beside an ordinary unit's ----------
    It joins near wave 15 (CHAMP_LEVEL) and sees a wave boss every 5th wave from then: stage II at the first (wave 15-20),
-   III at the third (about 30), IV at the sixth (about 45), each re-forged to its wave; tempering and the forge's re-forge
+   III at the third (about 30), IV at the sixth (about 45), each re-forged to its wave; its upgrade drops and the forge's re-forge
    keep its Item Level near the wave between. hwTypical(w): its DPS multiple at wave w on that path (a melee hero). */
 function hwTypical(w, join) {
   join = join || 15; if (w < join) return 1;
   const bosses = Math.floor(w / 5) - Math.floor((join - 1) / 5), st = bosses >= HW_AT[3] ? 3 : bosses >= HW_AT[2] ? 2 : bosses >= HW_AT[1] ? 1 : 0;
-  return (st >= 0 ? HW_M[st] : 1) * (1 + WPN_IL_GROW * (w - 1));   // (a melee hero, re-forged or tempered to the wave's level; level sync aside)
+  return (st >= 0 ? HW_M[st] : 1) * (1 + WPN_IL_GROW * (w - 1));   // (a melee hero, kept near the wave's level by its upgrades; level sync aside)
 }
 // the reforged form's model key for the owner's model (WEAPON_MDL); until it is there the hero keeps its own model, at full glow
 const hwModel = h => h && h.ult && WEAPON_MDL['hw_ult_' + h.u] ? 'hw_ult_' + h.u : null;
@@ -77488,194 +77551,87 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    try { BOARD.rows[diff] = await q('rite,'); } catch (e) { if (e.status !== 400) throw e; BOARD.rows[diff] = await q(''); }   // a server not yet given the rites column
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush(); }
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best}${res.rite ? ' on ' + riteName(res.rite) : ''}${res.rank ? ` (#${res.rank})` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -77684,206 +77640,74 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.rite ? riteName(x.rite | 0) : '—'; rt.title = x.rite ? RITES[(x.rite | 0) - 1].name : 'No rite';
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.e.r ? riteName(x.e.r | 0) : '—'; rt.title = x.e.r ? RITES[(x.e.r | 0) - 1].name : 'No rite';
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave}${mine.rite ? ' on ' + riteName(mine.rite | 0) : ''}, #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)}${e.r ? ' on ' + riteName(e.r | 0) : ''}, #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${x.rite ? esc(RITES[(x.rite | 0) - 1].name) : 'No rite'}">${x.rite ? 'Rite ' + RITE_ROMAN[x.rite | 0] : '—'}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${x.e.r ? esc(RITES[(x.e.r | 0) - 1].name) : 'No rite'}">${x.e.r ? 'Rite ' + RITE_ROMAN[x.e.r | 0] : '—'}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -90582,7 +90406,7 @@ if (typeof document !== 'undefined') {
 /* ================= HERO WEAPONS, on screen (forces_zzzzzzzzzzzzzzzz_heroweapons.js) =================
    - The weapon rack of a Champion opens the hero's own page: its weapon's card, the four stages (each with its name, the
      effect it adds and whether it is reached), the progress to the next ("wave bosses slain while it stands: 2 / 3"), the
-     reforged legendary it may become, TEMPERING (each rack weapon that can be tempered into it, with the numbers before and after),
+     reforged legendary it may become, its UPGRADES (its own drops in the pouch: "Add to <its weapon>", with the numbers before and after),
      re-forging to the wave's level and its runes (the forge's own prices: forces_zzzzzzzzzzzzzzz_forge.js).
    - Its card (wpnCardHTML) says Hero weapon, its stage, its stage effects and its progress.
    - The glow: a small light at the weapon's tip in its stage's colour (hwGlow), brighter each stage; Maren's sculpted twin
@@ -90610,7 +90434,7 @@ if (typeof wpnCardHTML === 'function') {
     const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
     const fx = hwFx(w).map(f => `<div class="itc-ab"><b>${hwE(f === (H.ult[2] || [])[0] || H.ult[2].includes(f) ? 'Reforged' : 'Awakened')}</b> ${hwE(wpnRuleText({ fx: f }))}</div>`).join('');
     return `<div class="itc" style="--rc:${H.glow}"><h5 class="itc-n" style="color:${H.glow}">${hwE(sh.name)}</h5><p class="itc-k">Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}</p>
-      <ul class="itc-s">${lines.join('')}</ul>${fx}${w.tw ? `<p class="itc-k">Tempered with: ${hwE(w.tw.n)} (item level ${w.tw.il})</p>` : ''}<p class="itc-k">${hwE(hwProgress(w))}</p><p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${(o && o.note) || ''}</div>`;
+      <ul class="itc-s">${lines.join('')}</ul>${fx}<p class="itc-k">${hwE(hwProgress(w))}</p><p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${(o && o.note) || ''}</div>`;
   };
 }
 // its kind line (the Gear sheet's row, the rack): Hero weapon and its stage, not a rarity
@@ -90629,11 +90453,12 @@ function hwPanel(t) {
   const h = hwState(t.def.unit); if (!h) return; t.weapon = h;
   const gold = G.gold | 0, cl = (a, b) => b > a + 1e-6 ? 'bo' : b < a - 1e-6 ? 'neg' : '';
   const now = wpnNums(h, t.type), d0 = wpnDpsWith(t, h);
-  const melt = (G.wbag || []).filter(w => !hwMeltWhy(h, w)).map(w => {
-    const r = hwMeltResult(h, w), n = wpnNums(r, t.type), d1 = wpnDpsWith(t, r), c = hwMeltCost(h, w);
-    return `<div class="wp-row"><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${hwE(wpnName(w))}</b><small>${hwE(wpKindLine(w))}</small>
-      <p>Item Level ${h.il | 0} → <b class="${cl(h.il, r.il)}">${r.il}</b> · Damage ${wpRange(now)} → <b class="${cl(now.avg, n.avg)}">${wpRange(n)}</b>${now.sp || n.sp ? ` · Spell Damage ${now.sp} → <b class="${cl(now.sp, n.sp)}">${n.sp}</b>` : ''} · DPS on it ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b></p></div>
-      <div class="wp-bt"><button type="button" class="pri" data-hm="${w.id}"${gold >= c ? '' : ' disabled'}>Temper into ${hwE(wpnName(h))} · ${c} gold</button></div></div>`;
+  const P = hupPouch(h.u), I = HUP[h.u];
+  const ups = [0, 1, 2].filter(g => P[g] > 0).map(g => {
+    const r = hupResult(h, g), n = wpnNums(r, t.type), d1 = wpnDpsWith(t, r), no = hupUseless(h, g);
+    return `<div class="wp-row"><img src="${hupIconURL(h.u, g)}" alt=""><div class="wp-rt"><b style="color:${RARITY[2 + g].col}">${hwE(hupName(h.u, g))} × ${P[g]}</b><small>${hwE(I[3])}</small>
+      <p>${no ? 'It is at the wave\'s level: keep it for later waves.' : `Item Level ${h.il | 0} → <b class="${cl(h.il, r.il)}">${r.il}</b> · Damage ${wpRange(now)} → <b class="${cl(now.avg, n.avg)}">${wpRange(n)}</b>${now.sp || n.sp ? ` · Spell Damage ${now.sp} → <b class="${cl(now.sp, n.sp)}">${n.sp}</b>` : ''} · DPS on it ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b>`}</p></div>
+      <div class="wp-bt"><button type="button" class="pri" data-hu="${g}"${no ? ' disabled' : ''}>Add to ${hwE(wpnName(h))}</button></div></div>`;
   }).join('');
   const lc = typeof forgeRelevelCost === 'function' ? forgeRelevelCost(h) : null, rc = typeof forgeRuneCost === 'function' ? forgeRuneCost(h) : null, slots = typeof forgeSlots === 'function' ? forgeSlots(h) : 0, R = h.runes || [];
   const runeOpts = typeof RUNES !== 'undefined' ? Object.keys(RUNES).filter(k => runeFits(k, t)) : [];
@@ -90642,15 +90467,59 @@ function hwPanel(t) {
   ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack hw-panel" role="dialog" aria-label="Hero weapon"><div class="wp-hd"><h3>Hero weapon · ${hwE(t.def.name.split(',')[0])} <small>it keeps this weapon all run · you have ${gold} gold</small></h3><button type="button" class="tx" id="hwClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
     <div class="wp-cur"><img src="${wpIconURL(h)}" alt=""><div>${wpnCardHTML(h, t)}</div></div>
     <h4>Awakening <small>${hwE(hwProgress(h))}</small></h4>${hwStagesHTML(h)}
-    <h4>Temper <small>${hwUnique(h) ? 'Temper any weapon into the hero\'s weapon (no one else holds its kind)' : `Temper a weapon of its kind (a ${hwE((WPN_BASE[h.b] || {}).cls)}) into the hero's weapon`} to raise its level: it rises to the tempering weapon's Item Level and takes half of a better roll; its look never changes</small></h4>${h.tw ? `<p class="itc-k">Tempered with: ${hwE(h.tw.n)} (item level ${h.tw.il})</p>` : ''}
-    <div class="wp-list">${melt || '<p class="gp-none">Nothing in the rack can be tempered into it yet.</p>'}</div>
+    <h4>Upgrades <small>${hwE(I[0])}s drop from wave bosses, elites and now and then a wave's last foe while ${hwE(t.def.name.split(',')[0])} stands; each one adds Item Levels (a Gleaming one more, a Flawless one most) and a better roll</small></h4>
+    <div class="wp-list">${ups || `<p class="gp-none">No ${hwE(I[0])}s yet.</p>`}</div>
     <div class="wp-fr"><h4>Re-forge to Item Level ${typeof forgeNow === 'function' ? forgeNow() : G.wave} <small>now ${h.il | 0}</small></h4>${lc == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, h, Object.assign({}, h, { il: forgeNow(), _c: null }))}</p><button type="button" class="pri" id="hwLv"${gold >= lc ? '' : ' disabled'}>Re-forge · ${lc} gold</button>`}</div>
     <div class="wp-fr"><h4>Runes <small>${slots} socket${slots === 1 ? '' : 's'} (more as it awakens); a rune costs ${rc} gold</small></h4>${runes}</div></div>`);
   const box = ovp.querySelector('.hw-panel'), redo = () => { box.remove(); hwPanel(t); };
   box.querySelector('#hwClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); openGearPanel(t); };
-  for (const b of box.querySelectorAll('[data-hm]')) b.onclick = () => { const w = (G.wbag || []).find(q => q.id === +b.dataset.hm); if (w && hwMelt(h, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} tempered into ${wpnName(h)}: Item Level ${h.il}.`); redo(); } };
+  for (const b of box.querySelectorAll('[data-hu]')) b.onclick = () => { const g = +b.dataset.hu, nm = hupName(h.u, g); if (hupUse(h, g)) { if (typeof onToast === 'function') onToast(`${nm} added to ${wpnName(h)}: Item Level ${h.il}.`); redo(); } };
   const lv = box.querySelector('#hwLv'); if (lv) lv.onclick = () => { if (forgeRelevel(h)) redo(); };
   for (const b of box.querySelectorAll('[data-hr]')) b.onclick = () => { const [i, k] = b.dataset.hr.split('|'); if (forgeRune(h, +i, k, t)) redo(); };
+}
+/* ---------- the upgrade items: icons, cards, the boss's loot screen and tables, the Gear button ---------- */
+const hupKey = (u, g) => `g:${HUP[u][1]}:${HUP[u][2].slice(1)}:${2 + (g | 0)}:hup-${u}:0`;
+const _hupURL = {};
+function hupIconURL(u, g) { const k = hupKey(u, g); if (_hupURL[k]) return _hupURL[k]; try { const c = document.createElement('canvas'); c.width = c.height = 64; iconPaint(c, k); return (_hupURL[k] = c.toDataURL()); } catch (e) { return ''; } }
+function hupCardHTML(u, g, note) {
+  const I = HUP[u], S = HUP_STEP[g | 0], h = hwState(u);
+  return `<div class="itc" style="--rc:${RARITY[2 + (g | 0)].col}"><h5 class="itc-n">${hwE(hupName(u, g))}</h5><p class="itc-k">Hero weapon upgrade · for ${hwE(h ? wpnName(h) : u)}</p>
+    <ul class="itc-s"><li><b>+${S.il}</b> Item Levels (to the wave's level at most)</li>${S.q ? `<li>a better roll</li>` : ''}</ul><p class="itc-fl">“${hwE(I[3])}”</p>${note || ''}</div>`;
+}
+if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-hup]', el => { const [u, g] = (el.dataset.hup || '').split('|'); return HUP[u] ? hupCardHTML(u, +g, el.dataset.hupn ? `<p class="itc-k">${hwE(el.dataset.hupn)}</p>` : '') : ''; });
+// the boss's loot screen: the upgrade it just dropped, with Add
+if (typeof rnLootScreen === 'function') {
+  const _hupRn = rnLootScreen;
+  rnLootScreen = function () {
+    const r = _hupRn.apply(this, arguments);
+    try {
+      const L = typeof rnLootCur === 'function' ? rnLootCur() : null, D = G.hupBossDrop, box = ovp && ovp.querySelector('.rn-three');
+      if (!L || !D || D.wave !== L.w || !box || !HUP[D.u]) return r;
+      const h = hwState(D.u), P = hupPouch(D.u);
+      box.insertAdjacentHTML('beforebegin', `<div class="wp-boss"><img src="${hupIconURL(D.u, D.g)}" alt=""><div class="wp-bt2"><h4>Hero weapon upgrade dropped <small>in the hero's pouch, as well as the relic you take</small></h4>${hupCardHTML(D.u, D.g)}
+        ${P[D.g] > 0 && !hupUseless(h, D.g) ? `<button type="button" class="pri" id="hupBossAdd">Add to ${hwE(wpnName(h))}: Item Level ${h.il | 0} → ${hupResult(h, D.g).il}</button>` : ''}</div></div>`);
+      const b = ovp.querySelector('#hupBossAdd');
+      if (b) b.onclick = () => { if (hupUse(h, D.g)) { const el = ovp.querySelector('.wp-boss .wp-bt2'); if (el) el.insertAdjacentHTML('beforeend', `<p class="itc-k">Added: ${hwE(wpnName(h))} is at Item Level ${h.il}.</p>`); b.remove(); } };
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+// the loot tables (the boss card, the forecast, the screen): the fielded heroes' upgrades, with their odds from a boss
+if (typeof rnIconsHTML === 'function') {
+  const _hupIc = rnIconsHTML;
+  rnIconsHTML = function () {
+    const h = _hupIc.apply(this, arguments);
+    try {
+      const H = hwOn() ? hupFielded() : []; if (!H.length) return h;
+      const O = HUP_ODDS.boss.map(v => Math.round(v * 100)).join(' / ');
+      return h + `<span class="rn-icons wp-icons">${H.map(t => `<button type="button" class="rn-ii wp-ii" style="--rc:${HUP[t.def.unit][2]}" data-hup="${t.def.unit}|0" data-hupn="Every wave boss drops one while ${t.def.name.split(',')[0]} stands: plain / Gleaming / Flawless ${O}%" aria-label="${hwE(HUP[t.def.unit][0])}"><img alt="" src="${hupIconURL(t.def.unit, 0)}"></button>`).join('')}</span>`;
+    } catch (e) { return h; }
+  };
+}
+// the Gear button pulses while the hero's pouch holds an upgrade it can use
+if (typeof abilitySlots === 'function') {
+  const _hupSl = abilitySlots;
+  abilitySlots = function (t, s) { const r = _hupSl.apply(this, arguments); try { if (s && s[5] && hwOn() && hwIsHero(t)) { const h = hwState(t.def.unit), P = hupPouch(t.def.unit); if (h && [0, 1, 2].some(g => P[g] > 0 && !hupUseless(h, g))) { s[5].pulse = true; s[5].name = (s[5].name || '') + ` A ${HUP[t.def.unit][0]} can be added to its weapon.`; } } } catch (e) {} return r; };
 }
 // the glow at its tip, a step brighter each stage (small, at the tip only)
 if (typeof drawSchoolMarks === 'function') {
