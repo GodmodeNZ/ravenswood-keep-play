@@ -1,4 +1,4 @@
-const BUILD_TAG = '0fdd949@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd386479@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -56391,14 +56391,16 @@ void main(){
   // glow (vX.z). (Was its light alone, unlit: owner, "it looks flat".)
   if(vEm < -1.5 && vEm > -3.5){   // (-2 and -3 only: -4 is Varic's runes, below)
     bool red = vEm < -2.5;
-    vec3 hue = red ? vec3(1., .04, .16) : vec3(.95, .2, .82);
+    vec3 hue = red ? vec3(1., .03, .08) : vec3(.95, .2, .82);
     float bl = dot(tx, vec3(.3, .59, .11)), bmx = max(tx.r, max(tx.g, tx.b)), bmn = min(tx.r, min(tx.g, tx.b));
     float rune = smoothstep(.3, .6, bl)*smoothstep(.55, .25, (bmx - bmn)/max(bmx, .01));
     float shim = .88 + .12*sin(uTime*6.5 - vOP.z*38. + vOP.x*20.);
-    vec3 pb = mix(base, hue*(.3 + .9*bl), red ? .6 : .3);
+    vec3 pb = mix(base, hue*(.3 + .9*bl), red ? .85 : .3);
     vec3 lit = (pb*light*grad)*mood + mix(pb, vec3(1., .8, .95), .4)*pow(max(dot(n, Hh), 0.), 28.)*.8*key;
     float facet = .45 + .55*abs(dot(n, V));
-    vec3 fb = finish(lit, vW) + (hue*(.22 + .3*vX.z)*facet + mix(hue, vec3(1., .72, .94), .5)*rune*(.3 + .35*vX.z))*shim;
+    float fa = clamp(((red ? -3. : -2.) - vEm)/.4, 0., 1.), core = (1. - fa)*(1. - fa);   // (how far along the blade: 0 at its base by the grip; owner: "a lighter light coming from the base of each end")
+    vec3 fb = finish(lit, vW) + (hue*(.3 + .35*vX.z + .25*core)*facet + mix(hue, vec3(1., .72, .94), .5)*rune*(.3 + .35*vX.z))*shim
+            + mix(hue, red ? vec3(1., .8, .72) : vec3(1., .9, .96), .55)*core*(.45 + .35*vX.z)*shim;   // (the white-hot light at each blade's base, fading toward the point)
     o = vec4(fb, vX.x); return;
   }
   // runes painted into the texture (a mesh's triangles marked ext -1: the Oathbound's blade; -4: Varic's dark blade, a higher threshold): its bright, saturated texels
@@ -83295,7 +83297,7 @@ const MV_BASE_H = .05;   // (chCcGround's slate, before K)
 // and no yellow light: the white-hot cores read yellow through the tone curve): blade A (away from the hooked guard) red,
 // blade B (by the guard) pink-violet; [halo, glow, heart (line, trail head), mist, ember]
 const MV_BLADE = [
-  { halo: [.9, .08, .32], glow: [1, .12, .36], heart: [1, .3, .5], mist: ['#9c1240', '#c01858'], ember: ['#ff3a70', '#ff5a8a'] },   // (crimson leaning to magenta: a plain red blooms to orange)
+  { halo: [1, .05, .14], glow: [1, .1, .2], heart: [1, .32, .34], mist: ['#a01028', '#c8183c'], ember: ['#ff3a4a', '#ff6a5a'] },   // (crimson leaning to magenta: a plain red blooms to orange)
   { halo: [.85, .2, .95], glow: [1, .3, .85], heart: [1, .58, .9], mist: ['#b44cff', '#ff5ad8'], ember: ['#ff7ac8', '#ffa0dc'] },
 ];
 // the blades' triangles (make_maren.py's emissive group) marked for FS_STY's blade of light (ext -3 blade A, red; -2 blade B, pink)
@@ -83303,7 +83305,12 @@ function mvBladeMark(M) {
   if (M._mvBl) return; M._mvBl = 1;
   const m = M.mesh, em = UNIT_MDL[M.S.mdl].em;
   const gz = UNIT_MDL[M.S.mdl].marks.gripR[2];   // (blade A lies on the +z side of the grip in her rest, blade B on the -z side)
-  for (let k = em[0]; k < em[0] + em[1] && k < m.count; k += 3) { const z = (m.pos[k * 3 + 2] + m.pos[k * 3 + 5] + m.pos[k * 3 + 8]) / 3, e = z > gz ? -3 : -2; for (let j = 0; j < 3; j++) m.ext[(k + j) * 2] = e; }
+  /* each vertex also carries how far along its blade it lies (0 at the base by the grip, 1 at the point), packed into the mark
+     (-3 - .4 f red, -2 - .4 f pink): the shader burns the base white-hot and fades to the blade's own colour at the point */
+  const lo = [1e9, 1e9], hi = [0, 0], side = [];
+  for (let k = em[0]; k < em[0] + em[1] && k < m.count; k += 3) { const z = (m.pos[k * 3 + 2] + m.pos[k * 3 + 5] + m.pos[k * 3 + 8]) / 3, b = z > gz ? 0 : 1; side.push(b); for (let j = 0; j < 3; j++) { const d = Math.abs(m.pos[(k + j) * 3 + 2] - gz); lo[b] = Math.min(lo[b], d); hi[b] = Math.max(hi[b], d); } }
+  let q = 0;
+  for (let k = em[0]; k < em[0] + em[1] && k < m.count; k += 3, q++) { const b = side[q]; for (let j = 0; j < 3; j++) { const d = Math.abs(m.pos[(k + j) * 3 + 2] - gz), f = Math.max(0, Math.min(1, (d - lo[b]) / Math.max(1e-4, hi[b] - lo[b]))); m.ext[(k + j) * 2] = (b ? -2 : -3) - .4 * f; } }
   if (m.gl && m.gl.clear) m.gl.clear();   // (re-uploaded with the marks, should it have been drawn already)
 }
 const _mvA = new Float32Array(16), _mvB = new Float32Array(16), _mvC = new Float32Array(16), _mvS = new Float32Array(16);
@@ -83342,6 +83349,7 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
         QADD.bill(RD, p[0], p[1], p[2], w * (1.1 + .2 * g) * nar, w * (1.1 + .2 * g) * nar, [...C.glow, Math.min(.26, .16 * g) * pulse], 1, 0);
       }
       QADD.beam(RD, at(.04), at(.9), w * .6, [...C.heart, Math.min(.7, .45 * g) * pulse], 6);   // (the hot line at its heart, its ends under the glows)
+      for (const [f, k] of [[.03, 1], [.12, .6]]) { const p = at(f); QADD.bill(RD, p[0], p[1], p[2], w * 1.5 * k, w * 1.5 * k, [1, .82, .94, Math.min(.42, .3 * g) * pulse * k], 1, 0); }   /* a paler, hotter light at the blade's base (the reference) */
     }
     if (live) mvMist(t, T4, s, g);
   }
@@ -84167,6 +84175,7 @@ if (typeof towerTop === 'function') {
   /* ---- what can be shown ---- */
   function sculpted() { return typeof UM_UNITS === 'undefined' ? [] : Object.keys(UM_UNITS).filter(u => !UM_UNITS[u].part && UNIT_MDL && UNIT_MDL[UM_UNITS[u].mdl]); }   // (part: a piece of another, as Varic's sword)
   function forceOf(u) {   // [force, slot, hero]: the unit's post, and a commander who fields it
+    if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h] && CHAMPS[h].unit && CHAMPS[h].unit.id === u && CHAMPS[h].force) { try { applyForce(CHAMPS[h].force, h); } catch (e) {} return [CHAMPS[h].force, 'holy', h]; }   /* (a commander's own Champion: its own force, first) */
     for (const f of Object.keys(FORCES)) {
       const F = FORCES[f]; if (!F || !F.units) continue;
       const heroes = HEROES.filter(h => h.force === f);
@@ -84186,8 +84195,10 @@ if (typeof towerTop === 'function') {
   function build() {
     const P = forceOf(L.unit); if (!P) { L.errs.push('no post for ' + L.unit); return; }
     const [f, slot, hero] = P;
+    L.post = P;
     try { setMap('meadow'); } catch (e) {}
     newGame('normal', null, hero, 0);
+    if (G.force !== f) { try { applyForce(f, hero); G.force = f; G.hero = hero; } catch (e) { L.errs.push(e.message); } }   /* (a commander missing from HERO_BY: its own force all the same) */
     Object.assign(G, { paused: false, hold: false, lives: 1e6, maxLives: 1e6, gold: 1e9, phase: 'build', countdown: 0 });
     const t = makeTower(slot, CELL[0], CELL[1], L.tier); t.build = 0; G.towers.push(t); G.blk[idx(CELL[0], CELL[1])] = 1; G.tAt[idx(CELL[0], CELL[1])] = t;
     t.st = effStats(t); t.ang = Math.PI / 2;
@@ -84306,7 +84317,8 @@ if (typeof towerTop === 'function') {
 #mlab button.on{background:#5a4a1e;border-color:#e6c46a;color:#fff6d8}#mlab button:hover{border-color:#c8a85a}
 #mlab .note{color:#a89c80;font-size:11.5px}#mlab canvas{width:100%;height:64px;background:#0b0f0c;border:1px solid #3a3326;border-radius:6px;display:block}
 #mlab input[type=range]{width:100%}#mlab .err{color:#ff9a80;font-size:11px;white-space:pre-wrap}`;
-  function panel() {
+  function panel() { panel0(); if (L.post && G.force !== L.post[0]) { try { applyForce(L.post[0], L.post[2]); G.force = L.post[0]; G.hero = L.post[2]; } catch (e) {} } }   /* (the unit list's names apply each force in turn: the shown unit's force back after) */
+  function panel0() {
     const el = $('#mlab'); if (!el || !L.t) return;
     const t = L.t, kit = kitOf(t), b = (id, lab, on, tip) => `<button data-a="${esc(id)}" class="${on ? 'on' : ''}" title="${esc(tip || '')}">${esc(lab)}</button>`;
     const anims = [['rest', 'Rest'], ['ready', 'Ready'], ['attack', 'Attack']].concat(kit.map(a => ['ab:' + a.id, a.name]));
@@ -84379,7 +84391,8 @@ if (typeof towerTop === 'function') {
 
   /* ---- start, once the game has loaded ---- */
   function boot() {
-    if (typeof G === 'undefined' || !G || G.state !== 'title' || typeof UNIT_KITS === 'undefined' || typeof renderView !== 'function' || typeof layoutAll !== 'function' || typeof UNIT_MDL === 'undefined' || !UNIT_MDL.oathbound) { setTimeout(boot, 200); return; }
+    if (typeof G === 'undefined' || !G || G.state !== 'title' || typeof UNIT_KITS === 'undefined' || typeof renderView !== 'function' || typeof layoutAll !== 'function' || typeof UNIT_MDL === 'undefined' || !UNIT_MDL.oathbound
+      || (L.unit && typeof UM_UNITS !== 'undefined' && UM_UNITS[L.unit] && !UNIT_MDL[UM_UNITS[L.unit].mdl] && (boot.n = (boot.n || 0) + 1) < 150)) { setTimeout(boot, 200); return; }   /* (the asked-for unit's model may come in a later asset script: wait up to 30s for it) */
     try { if (typeof hideOverlay === 'function') hideOverlay(); } catch (e) {}
     try { if (typeof AudioSys !== 'undefined' && AudioSys.pref) AudioSys.pref.music = false; } catch (e) {}
     if (typeof NEWMODELS !== 'undefined') NEWMODELS = 1;
