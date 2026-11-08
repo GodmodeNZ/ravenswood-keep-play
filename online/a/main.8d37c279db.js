@@ -1,4 +1,4 @@
-const BUILD_TAG = '094765e@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6461ab4@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1606,6 +1606,7 @@ function tierOf(t) { return t.def.tiers[t.tier]; }
 const FORCE_AIR_R = .5;
 function effStats(t) {
   const st = talentStats(t.type, t.tier, talPicks(t.type), t.spec);
+  if (t.weapon && typeof wpnApply === 'function') wpnApply(t, st);   // its weapon sets the strike and the speed; everything below multiplies on top (forces_zzzzzzzzzzzzz_weapons.js)
   if (t.gear && t.gear.length) gearStats(st, t.gear, t);
   schoolRelicStats(t, st);   // a school relic socketed in any tower of this school
   if (t.def.force || t.charm) itemStatsApply(t, st);   // a force item's flat stat lines: Damage, Attack Speed, Spell Damage, Mana ... (itempower.js)
@@ -1757,10 +1758,11 @@ function upgradeCost(t) {
 // tower toughness: the tier's base, scaled by talents that cost durability
 function towerMaxHp(t, st) { return Math.max(20, Math.round((t.def.wall ? WALL_HP : TOWER_HP[Math.min(t.tier, TOWER_HP.length - 1)]) * ((st && st.hpM) || 1))); }
 // the next tier is there but the keep hasn't been upgraded far enough for it yet
-function ageLocked(t) { return !t.def.wall && t.tier < t.def.tiers.length - 1 && t.tier + 1 > maxTierFor(G.age); }
+// (outside Tower Wars the gate is the unit's own veterancy: xp.js vetLocked; the name stays for the callers)
+function ageLocked(t) { if (t.def.wall || t.tier >= t.def.tiers.length - 1) return false; return typeof vetOn === 'function' && vetOn() ? vetLocked(t) : t.tier + 1 > maxTierFor(G.age); }
 function upgrade(t) {
   if (t.wrecked) { onToast('Rebuild it first.'); sfx('error'); return false; }
-  if (ageLocked(t)) { onToast(`Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}. Tap your keep to upgrade it.`); sfx('error'); return false; }
+  if (ageLocked(t)) { onToast(typeof vetOn === 'function' && vetOn() ? vetLockText(t) + '.' : `Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}. Tap your keep to upgrade it.`); sfx('error'); return false; }
   const cost = upgradeCost(t);
   if (!cost) return false;
   if (t.tier === 2 && SPECS[t.type] && !t.spec) {   // tier IV: the tower takes a path (the AI keep in Tower Wars picks one at random)
@@ -1769,7 +1771,7 @@ function upgrade(t) {
   }
   if (G.gold < cost) { onToast('Not enough gold.'); sfx('nogold'); if (t.tier === 2) t.spec = null; return false; }
   const gain = typeof upgradeGain === 'function' ? upgradeGain(t) : null;
-  G.gold -= cost; t.tier++; t.invested += cost; if (G.phase === 'build') t.fresh += cost;
+  G.gold -= cost; t.tier++; t.invested += cost; if (G.phase === 'build') t.fresh += cost; t.vetNew = 0;
   { const m = towerMaxHp(t, effStats(t)); t.hp = t.wrecked ? t.hp : t.hp + (m - t.maxHp); t.maxHp = m; }
   t.build = .6;
   fxSparkle(t.x, t.y, towerTop(t), t.tier > 1 ? '#ffd76a' : '#dfe8ff');
@@ -1970,7 +1972,8 @@ function waveCleared() {
   onDirty(); onSave();
 }
 /* ---- Keep upgrades (Keep → Castle → Fortress → Citadel) ---- */
-function ageNext() { const a = AGES[G.age + 1]; if (!a) return null; const k = (pathOn('war', 1) ? .65 : 1) * (G.hero === 'marshal' && !G.vs ? .8 : 1); return k < 1 ? Object.assign({}, a, { cost: Math.round(a.cost * k) }) : a; }   // Master Builder; the Marshal
+function ageNext() { const a = AGES[G.age + 1]; if (!a || (typeof vetOn === 'function' && vetOn())) return null;   // (veterancy opens the tiers now: the keep upgrades are Tower Wars only)
+  const k = (pathOn('war', 1) ? .65 : 1) * (G.hero === 'marshal' && !G.vs ? .8 : 1); return k < 1 ? Object.assign({}, a, { cost: Math.round(a.cost * k) }) : a; }   // Master Builder; the Marshal
 function ageCanStart() { const a = ageNext(); return !!a && !G.ageRes && G.wave >= a.wave && G.gold >= a.cost && G.state === 'play'; }
 function advanceAge() {
   const a = ageNext();
@@ -3448,6 +3451,7 @@ function hurt(c, amt, type, src, dot, kb, elem) {
   { const vr = ((src && src.def && src.def.vsRooted) || 0) + ((src && src.st && src.st.vsRooted) || 0); if (vr && c.rootT > G.time && !dot) amt *= 1 + vr * (isPlate(c) ? plateBroken(c) : 1); }   // (on plate, only once it is broken)   // a Gladebow on a rooted foe (and the Grove's vs-rooted talents)
   if (c.burT > 0 && !dot) { if (elem !== 'earth' && !ts) return; burrowUp(c, true); if (elem === 'earth') amt *= 1.5; }   // below ground: only a quake reaches it (or a Truesight Lens)
   if (isImmune(c, elem)) { if (!dot) immuneText(c); return; }
+  if (VET_HIT) vetTouch(c, src);   // (a hit alone as an assist: off, xp.js)
   if (!dot && softImm(c, elem)) { amt *= SOFT_K; immuneText(c); }   // an elemental against its own element (its burns and poisons were cut when they landed)
   if (c.mirTy && src && src.type === c.mirTy) { amt *= .6; if (!dot) immuneText(c); }   // the Mirror Witch turns aside some of what hurts her most
   if (c.amT > 0 && (type === 'magic' || type === 'arcane')) { wlAside('Spell Ward', amt * .4); amt *= .6; if (!dot) immuneText(c); }   // Spell Ward: some of the magic slides off
@@ -3727,6 +3731,7 @@ function kill(c, src, elem) {
     fxCurse(c.x, c.y, hitH(c));
   }
   if (src) { src.kills++; creditKill(src); }
+  vetKill(c, src);   // veterancy: the kill and the assists (xp.js)
   if (G.sel && G.sel.ref === c) G.sel = null;
   c.dieFx = dieFxOf(c, src, elem);
   fxDeath(c);
@@ -3795,7 +3800,7 @@ function updateTowers(dt) {
     for (const t of G.towers) {
       if (t === h || t.def.wall || t.type === 'holy') continue;
       if (Math.hypot(t.x - h.x, t.y - h.y) > hs.auraR + .05) continue;
-      t.buffD = Math.max(t.buffD, hs.auraD); t.buffS = Math.max(t.buffS, hs.auraS + ferv);
+      t.buffD = Math.max(t.buffD, hs.auraD); t.buffS = Math.max(t.buffS, hs.auraS + ferv); vetAid(t, h);
       if (hs.caps.mend) t.mendK = .02;   // Mending Light
       if (hs.caps.blessmend) t.mendK = Math.max(t.mendK || 0, .01 * hs.caps.blessmend);   // Blessing
       if (hs.caps.benediction) t.blessR = .4;
@@ -4130,7 +4135,7 @@ function relicOnKill(c, src) {
   }
   if (p.bloodspray && c.bleedT > 0) { for (const o of nearest(c.x, c.y, 1, 6, c)) { o.bleedDps = Math.max(o.bleedT > 0 ? o.bleedDps : 0, c.bleedDps); o.bleedT = 3; o.bleedSrc = src; } fxSpark(c.x, c.y, hitH(c), '#c0201a', 14); fxRing(c.x, c.y, 1, '#a01a14'); relicGlint(src, 'fang'); }   // Serrated Fang
   if (p.drum && (src.drumFx || 0) < G.time) {   // War Drum: the towers around take up the beat
-    for (const o of G.towers) if (!o.def.wall && Math.hypot(o.x - src.x, o.y - src.y) <= 2.05) { o.drumT = G.time + 3; o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.drum); }
+    for (const o of G.towers) if (!o.def.wall && Math.hypot(o.x - src.x, o.y - src.y) <= 2.05) { vetAid(o, src, 3); o.drumT = G.time + 3; o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.drum); }
     src.drumFx = G.time + .5; fxRing(src.x, src.y, 2, '#ff8a4a'); part({ k: 'flare', x: src.x, z: src.y, h: towerTop(src), life: .2, max: .2, size: .7, col: '#ff9a5a' }); relicGlint(src, 'totem');
   }
   if (p.philo && G.state === 'play' && Math.random() < p.philo) {   // Philosopher's Stone: the foe turns to gold
@@ -4833,6 +4838,7 @@ function chill(c, st, elem, src) {
   if (softImm(c, elem)) st = { slow: (st.slow || 0) * SOFT_K, slowT: st.slowT };   // the frost-born barely slow
   if (c.def.slippery) st = { slow: (st.slow || 0) * THIEF.slowK, slowT: st.slowT };   // the thief: slows bite half as hard
   if (st.slow >= c.slowF || c.slowT <= 0) c.slowF = st.slow;
+  if (src) vetTouch(c, src);
   c.slowT = Math.max(c.slowT, st.slowT);
   if (elem === 'frost') { c.frostT = Math.max(c.frostT, st.slowT); if (src) c.frostSrc = src; }
 }
@@ -5135,7 +5141,7 @@ function updateFx(dt) {
 function serialize() {
   if (!G.towers || (G.state !== 'play') || G.vs) return null;   // a Tower Wars match is not saved over your campaign
   return { v: 8, ftv: 5, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
-    towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0]),
+    towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
     chal: G.chal || null, trophies: G.trophies || {}, chalSchools: G.chalSchools || [], unlocked: G.unlocked || null, paths: G.paths || {}, pp: G.pp || 0, ppEarned: G.ppEarned || 0, momentum: G.momentum || 0, run: G.run || null, reports: (G.reports || []).slice(-3), plan: G.plan || null, planAuto: G.planAuto !== false,
@@ -5208,13 +5214,14 @@ function restore(s) {
     G.questOffered = Array.isArray(s.questOffered) ? s.questOffered : []; G.questsDone = Array.isArray(s.questsDone) ? s.questsDone : [];
   }
   G.lore = typeof loreLoad === 'function' ? loreLoad(s.lore) : null;   // the abilities studied at the keep (before the units, who learned from it)
-  for (const [type0, tier, i, j, inv, kills, dmg, prio, gear, hpF, spec, ab, charm] of s.towers || []) {
+  const vetOld = (s.towers || []).length && (s.towers || []).every(r => r[13] === undefined);   // a save from before veterancy: assists are estimated below
+  for (const [type0, tier, i, j, inv, kills, dmg, prio, gear, hpF, spec, ab, charm, ast] of s.towers || []) {
     const type = type0 === 'shadow' ? 'glaive' : type0;   // the Shadow Obelisk became the Glaive Thrower
     if (oldHoly && type === 'holy') { G.gold += inv | 0; if (Array.isArray(gear)) for (const it of gear) if (it && okGear(it)) G.loot.push(it); if (charm && okGear(charm)) G.loot.push(charm); G.champRefund = (G.champRefund || 0) + (inv | 0); continue; }   // the old support unit: its gold back, its relics to the bag
     if (!TOWERS[type] || !inGrid(i, j) || RES[idx(i, j)] || G.blk[idx(i, j)] || G.tAt[idx(i, j)]) continue;
     const t = makeTower(type, i, j, Math.min(tier, TOWERS[type].tiers.length - 1));
     if (G.hero && s.champAt && s.champAt[0] === i && s.champAt[1] === j && !t.def.wall) G.champ = t.id;   // (before its sockets are counted)
-    Object.assign(t, { invested: inv, kills: kills || 0, dmg: dmg || 0, prio: prio || 0, build: 0 });
+    Object.assign(t, { invested: inv, kills: kills || 0, dmg: dmg || 0, prio: prio || 0, build: 0, ast: ast | 0 });
     if (spec && SPEC_BY[type + ':' + spec] && t.tier >= 3) t.spec = spec;   // (a tier IV+ tower from before paths chooses one when tapped)
     if (Array.isArray(gear)) { t.gear = gear.slice(0, gearSlots(t)).map(it => okGear(it) ? it : null); for (const it of gear.slice(gearSlots(t))) if (okGear(it)) G.loot.push(it); }
     if (ab && typeof abilLoad === 'function') abilLoad(t, ab);   // a force unit's learned abilities, autocast, mode and mana
@@ -5223,6 +5230,11 @@ function restore(s) {
     if (!t.def.wall && !G.unlocked.includes(type)) G.unlocked.push(type);
     if (hpF === 0 && !unitWoundable(t)) { t.hp = 0; t.wrecked = true; } else { G.blk[idx(i, j)] = 1; if (hpF > 0 && hpF < 1) t.hp = Math.max(1, t.maxHp * hpF); }   // wrecks stay open rubble
   }
+  if (vetOld && typeof vetOn === 'function' && vetOn()) {   // before veterancy: each unit's assists are taken as its own kills or the army's average kills, whichever is more
+    const U = G.towers.filter(t => !t.def.wall), avg = U.length ? U.reduce((a, t) => a + (t.kills | 0), 0) / U.length : 0;
+    for (const t of U) t.ast = Math.round(Math.max(t.kills | 0, avg));
+  }
+  if (typeof vetSync === 'function') vetSync();   // (what each unit has already opened: no unlock cue for it)
   xpRestore(s);   // the XP bar, or an older run's points turned into its level (after the paths: Scholar ranks pay their own)
   refreshField();
   if (!isFinite(G.dist[SPAWN_K])) { G.towers = []; G.blk.fill(0); G.tAt.fill(null); refreshField(); }
@@ -7047,6 +7059,106 @@ function xpHud() {
   }
 }
 
+/* ---- Veterancy: a unit earns its top tiers (IV, V, VI) in the field (owner, 8 Nov 2026) ----
+   Every unit counts its kills and its assists. An assist: a foe dies while it carries this unit's work: slowed or rooted
+   by it within the last VET_WIN seconds, or still under one of its statuses (frozen, burning, venom, curse, brand, mark,
+   armour crack ...: read through buffs.js's registry, bfCapture), or killed by a unit this one's aura or haste was on
+   (or by a unit whose assist it helped: vetAid). A plain hit is not an assist (VET_HIT: off), so the damage dealers'
+   count stays their kills and the support units' their help. The killer gets the whole kill; every other unit that
+   helped gets one assist, worth VET_AST of a kill (nobody's credit is split, so the damage dealers are never slowed).
+   Veterancy = kills + VET_AST x assists. Tiers IV, V and VI each open for that unit at VET_NEED (it still pays its gold);
+   tiers I-III are open from the start. No wave gate: a unit that works hard early spikes early.
+   This replaces the keep upgrades (Castle, Fortress, Citadel) as the gate on unit tiers in every mode but Tower Wars,
+   which keeps them (its rival keep's AI plays the keep upgrades: versus.js).
+   The pacing (tools/check_veterancy.js plays it: 8 units, the run's own gold, no items or talents): a wave sends ~26 foes
+   (~6 on a boss wave; ~1.17x that are slain, with what they summon), so ~200 slain by wave 8, ~275 by 12, ~470 by 20,
+   ~650 by 28. A main unit ends up with ~0.32 veterancy per foe slain on the field, a damage dealer through its kills
+   (Ironbreakers 88, Thunderguns 85 by wave 12) and a slowing / rooting unit through its assists (Chain Trappers 8 kills
+   + 73 assists = 81, Briarwardens 6 + 82 = 88): at VET_AST 1 they climb at the same pace. So tier IV at 70 comes about
+   wave 9-11, V at 125 about wave 16-18, VI at 180 about wave 23-26; the army's lesser units a few waves later. */
+const VET_AST = 1, VET_WIN = 4, VET_HIT = false;
+const VET_NEED = [70, 125, 180];   // veterancy that opens tier IV, V and VI
+const vetOn = () => typeof G !== 'undefined' && !!G && !G.vs;
+const vetUnit = o => !!o && !!o.def && o.invested !== undefined && !o.def.wall;   // one of your units (not a foe, a hazard or the hero's spell)
+const vetNeed = n => n >= 3 ? VET_NEED[Math.min(2, n - 3)] : 0;   // what tier index n (0-based: 3 is tier IV) asks for
+// a playtest that starts at wave W: the army it raises there counts as seasoned (about what a main unit has by then)
+function vetSeason(W) { W = Math.max(0, (W | 0) - 1); return W <= 0 ? 0 : Math.round(VET_PACE * W + VET_PACE2 * W * W); }
+const VET_PACE = 7.5, VET_PACE2 = 0;   // a main unit's veterancy after W waves, roughly (see VET_NEED's note)
+function vetPts(t) {
+  if (!t) return 0;
+  const raw = (t.kills | 0) + VET_AST * (t.ast | 0) + (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
+  return Math.floor(Math.max(raw, vetNeed(t.tier | 0)));   // (a unit already at a tier has at least what that tier asks)
+}
+// the next tier is there, but this unit has not earned it yet
+function vetLocked(t) { const n = (t.tier | 0) + 1; return n >= 3 && n < t.def.tiers.length && vetPts(t) < vetNeed(n); }
+// the highest tier index this unit's veterancy opens (for the unlock cue)
+function vetOpenTo(t) { const p = vetPts(t); let n = 2; while (n < 5 && p >= vetNeed(n + 1)) n++; return Math.min(n, t.def.tiers.length - 1); }
+// an ally's aura or haste on unit o (by: the unit giving it, for dur seconds): by shares the credit for what o kills
+function vetAid(o, by, dur) {
+  if (!o || !by || o === by || by.invested === undefined || o.invested === undefined || !by.id) return;
+  const A = o.vAid || (o.vAid = {}), e = G.time + (dur || .5);
+  if (!(A[by.id] >= e)) A[by.id] = e;
+}
+// hurt, chill, rootFoe: unit src touched foe c just now
+function vetTouch(c, src) { if (src && src.invested !== undefined && src.id && src.def && !src.def.wall) (c.vHit || (c.vHit = {}))[src.id] = G.time; }
+// kill (after the killer's kills++): the assists, and the unlock cues
+function vetKill(c, src) {
+  if (!vetOn() || G.state !== 'play' || !G.towers) return;
+  const now = G.time, killer = vetUnit(src) ? src : null, H = c.vHit, cap = new Set();
+  if (typeof bfCapture === 'function') for (const o of bfCapture(c)) cap.add(o);
+  const help = new Set();
+  for (const t of G.towers) {
+    if (t === killer || t.def.wall) continue;
+    const h = H && H[t.id];
+    if ((h != null && now - h <= VET_WIN) || cap.has(t)) help.add(t);
+  }
+  const aid = new Set();
+  for (const o of killer ? [killer, ...help] : [...help]) if (o.vAid) for (const id in o.vAid) { if (o.vAid[id] + VET_WIN >= now) aid.add(+id); else delete o.vAid[id]; }
+  if (aid.size) for (const t of G.towers) if (t !== killer && !t.def.wall && aid.has(t.id)) help.add(t);
+  for (const t of help) { t.ast = (t.ast | 0) + 1; vetCheck(t); }
+  if (killer) vetCheck(killer);
+}
+// a unit's veterancy just opened a new tier: say so (several at once share one toast), and a small ring on it
+let VET_CUE = null;
+function vetCheck(t) {
+  const n = vetOpenTo(t), was = t.vetOk == null ? n : t.vetOk;
+  t.vetOk = n;
+  if (n <= was || n < 3 || t.tier >= t.def.tiers.length - 1) return;
+  t.vetNew = n;   // its Upgrade button pulses until it is bought
+  if (typeof fxRing === 'function') fxRing(t.x, t.y, .75, '#ffe08a');
+  if (VET_CUE) { VET_CUE.L.push(t); return; }
+  VET_CUE = { L: [t] };
+  const go = () => {
+    const L = VET_CUE ? VET_CUE.L : [t]; VET_CUE = null;
+    const nm = [...new Set(L.map(o => o.def.name))], top = Math.max(...L.map(o => o.vetOk));
+    if (typeof sfx === 'function') sfx('talent');
+    if (typeof onToast === 'function') onToast(L.length === 1 ? `${L[0].def.name}: veterancy ${vetPts(L[0])}. Tier ${ROMAN[top]} is open for it (it still costs gold).`
+      : `Veterancy: tier ${ROMAN[top]} is open for ${L.length} ${uw(L.length)} (${nm.slice(0, 3).join(', ')}${nm.length > 3 ? ' ...' : ''}). Each still costs gold.`);
+    if (typeof onDirty === 'function') onDirty();
+  };
+  if (G.delayed) G.delayed.push({ t: .6, fn: go }); else go();
+}
+// after a load or a playtest start: what each unit has already opened (no cue for it)
+function vetSync() { for (const t of G.towers || []) if (!t.def.wall) t.vetOk = vetOpenTo(t); }
+// the line for a locked tier (the Upgrade button, a toast)
+function vetLockText(t) {
+  const n = (t.tier | 0) + 1, need = vetNeed(n), p = vetPts(t);
+  return `Tier ${ROMAN[n]} opens at ${need} veterancy (kills + assists): ${p} so far, ${need - p} to go`;
+}
+// the unit card: its veterancy, and the bar to the next tier it opens
+function vetInfoHTML(t) {
+  if (!vetOn() || !t || t.def.wall) return '';
+  const p = vetPts(t), last = t.def.tiers.length - 1, n = Math.max(3, (t.tier | 0) + 1);
+  const ka = `${t.kills | 0} kill${(t.kills | 0) === 1 ? '' : 's'} + ${t.ast | 0} assist${(t.ast | 0) === 1 ? '' : 's'}`;
+  const tip = `Veterancy: ${VET_AST === 1 ? 'its kills plus its assists' : `1 for every kill, ${VET_AST} for every assist`} (an assist: a foe that dies slowed, rooted, frozen, burning, cursed or branded by it, or one a unit under its aura or haste kills). Tiers IV, V and VI open at ${VET_NEED.join(', ')}; each still costs its gold.${G.playtest && G.playtest.wave ? ` A playtest army starts seasoned (+${vetSeason(G.playtest.wave)}).` : ''}`;
+  let nx;
+  if (n > last) nx = 'every tier open';
+  else if (p >= vetNeed(n)) nx = `<b class="vetok">tier ${ROMAN[n]} open</b>`;
+  else nx = `tier ${ROMAN[n]} at <b>${vetNeed(n)}</b>`;
+  const lo = n > last || n <= 3 ? 0 : vetNeed(n - 1), hi = vetNeed(Math.min(n, last)), f = n > last ? 1 : clamp((p - lo) / Math.max(1, hi - lo), 0, 1);
+  return `<p class="mut vet" data-d="3" title="${tip}">Veterancy <b>${p}</b> <span data-d="2">(${ka})</span> · ${nx}<span class="agebar vetbar"><i style="width:${Math.round(f * 100)}%"></i></span></p>`;   // (data-d 3: kept as long as the upgrade line is)
+}
+
 /* ================= FORCES: who answered the keep's call =================
    The keep is under siege and has called for aid. A commander (a hero with a `force`) brings their own people: for that
    run the force's units take the place of the keep's towers. For this first test the Grove's units ride on the towers'
@@ -7144,7 +7256,7 @@ function rootFoe(c, dur, src) {   // held in place (its own hold, not a stun: a 
   const dc = src && src.st && src.st.pw && src.st.pw.deepcrown && !c.def.boss && !c.def.lead;   // Crown of the Deep Wood: its roots never wear thin on the rank and file
   let d = dur * heroRootK() * heavyHoldK(c) * (dc ? 1 + .3 * src.st.pw.deepcrown : ccDR(c)); d = c.def.boss ? d * .45 : d * (1 - (c.ten || 0)); if (d <= .05) return;
   c.stunT = Math.max(c.stunT, d); c.stunEl = 'root';
-  c.rootT = Math.max(c.rootT || 0, G.time + d); c.rootDur = d; c.rootAt = G.time; c.rootBy = src;
+  c.rootT = Math.max(c.rootT || 0, G.time + d); c.rootDur = d; c.rootAt = G.time; c.rootBy = src; if (src) vetTouch(c, src);
 }
 function rootStrike(t, st, tg, pow) {   // the Rootweaver: vines out of the ground under the foe furthest along that is not yet held
   const C = st.caps;
@@ -8988,7 +9100,7 @@ function specTick(t, st, dt) {
     t.plT = (t.plT == null ? 5 : t.plT) - dt;
     if (t.plT <= 0 && wave && G.creeps.some(o => !o.dead)) {
       t.plT = 20; t.pillarT = G.time + 3;
-      for (const o of G.towers) if (o !== t && !o.def.wall && Math.hypot(o.x - t.x, o.y - t.y) <= st.auraR + .05) { o.lightT = G.time + 3; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .4, max: .4, size: .9, col: '#fff1b8' }); }
+      for (const o of G.towers) if (o !== t && !o.def.wall && Math.hypot(o.x - t.x, o.y - t.y) <= st.auraR + .05) { vetAid(o, t, 3); o.lightT = G.time + 3; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .4, max: .4, size: .9, col: '#fff1b8' }); }
       fxRing(t.x, t.y, st.auraR, '#fff1b8'); flashLight(t.x, t.y, 3, [2, 1.8, 1.1], 5, .5); sfx('holy', 3); onToastSoft('Pillar of light!');
     }
   }
@@ -9415,7 +9527,7 @@ function shopTick(t, st, dt) {
   if (s.aura && (t.auTk = (t.auTk || 0) - dt) <= 0) {
     t.auTk = .25;
     for (const o of G.towers) if (!o.def.wall && Math.hypot(o.x - t.x, o.y - t.y) <= s.auraR + .05) {
-      o.auraS = Math.max(o.auraT > G.time ? o.auraS || 0 : 0, s.aura); o.auraT = G.time + .35;
+      vetAid(o, t); o.auraS = Math.max(o.auraT > G.time ? o.auraS || 0 : 0, s.aura); o.auraT = G.time + .35;
       if (s.ward) { if (o.silT > 0) o.silT = 0; if (o.hexUntil > G.time) o.hexUntil = 0; }
     }
     for (const c of G.creeps) if (!c.dead && Math.hypot(c.x - t.x, c.y - t.y) <= s.auraR + .05) { c.shred = Math.max(c.shredT > 0 ? c.shred : 0, s.auraArm); c.shredT = Math.max(c.shredT, .4); }
@@ -11150,7 +11262,7 @@ function groveTick(t, st, dt) {
   }
   if (p.pennant && (T.pe = (T.pe || 0) - dt) <= 0) {   // Herald's Pennant
     T.pe = .25;
-    for (const o of [t].concat(gvUnits(t.x, t.y, 1.55, t))) { o.pennK = Math.max(o.pennT > now ? o.pennK || 0 : 0, p.pennant); o.pennT = now + .4; }
+    for (const o of [t].concat(gvUnits(t.x, t.y, 1.55, t))) { vetAid(o, t); o.pennK = Math.max(o.pennT > now ? o.pennK || 0 : 0, p.pennant); o.pennT = now + .4; }
   }
   if (p.wake && (T.wk = (T.wk == null ? 3 : T.wk) - dt) <= 0) {   // Wakening Root
     const L = gvNear(t.x, t.y, reach, gvWalks);
@@ -11163,7 +11275,7 @@ function groveTick(t, st, dt) {
   if (p.hunt && (T.hu = (T.hu == null ? 4 : T.hu) - dt) <= 0) {   // Huntmaster's Horn
     if (foesNear(reach + 1)) {
       T.hu = 15;
-      for (const o of [t].concat(gvUnits(t.x, t.y, 2.55, t))) { o.drumK = Math.max(o.drumT > now ? o.drumK || 0 : 0, p.hunt); o.drumT = Math.max(o.drumT || 0, now + 4); }
+      for (const o of [t].concat(gvUnits(t.x, t.y, 2.55, t))) { vetAid(o, t, 4); o.drumK = Math.max(o.drumT > now ? o.drumK || 0 : 0, p.hunt); o.drumT = Math.max(o.drumT || 0, now + 4); }
       fxRing(t.x, t.y, 2.5, '#e0a040'); part({ k: 'ring', x: t.x, z: t.y, h: .06, life: .8, max: .8, size: 2.5, col: '#ffe08a' }); relicGlint(t, 'gv_huntmaster', true); sfx('empower', 1);
       onToastSoft('The hunt is called!');
     } else T.hu = .5;
@@ -13034,7 +13146,7 @@ FORCE_HOOKS.conclave = {
     const A = t.ab;
     if (A && A.lastAt != null && A.lastAt !== t.ccSeenAt) { t.ccSeenAt = A.lastAt; if (t.ccEchoAt !== A.lastAt) ccOnCast(t, st, ABIL[A.last]); }
     if (t.def.unit === 'cc_obelisk') ccObelisk(t, st, dt);
-    if (t.def.unit === 'cc_chronomancer' && st.caps.ccBorrow) for (const o of G.towers) if (o !== t && ccUnit(o) && !o.def.wall && Math.hypot(o.x - t.x, o.y - t.y) <= 1.55) { o.ccBorrowK = Math.max(o.ccBorrowT > G.time ? o.ccBorrowK || 0 : 0, .05 * st.caps.ccBorrow); o.ccBorrowT = G.time + .3; }   // Borrowed Time
+    if (t.def.unit === 'cc_chronomancer' && st.caps.ccBorrow) for (const o of G.towers) if (o !== t && ccUnit(o) && !o.def.wall && Math.hypot(o.x - t.x, o.y - t.y) <= 1.55) { vetAid(o, t); o.ccBorrowK = Math.max(o.ccBorrowT > G.time ? o.ccBorrowK || 0 : 0, .05 * st.caps.ccBorrow); o.ccBorrowT = G.time + .3; }   // Borrowed Time
     if (st.caps.ccHourHeart && (t.ccHhT = (t.ccHhT == null ? 4 : t.ccHhT) - dt) <= 0) {   // Hourglass Heart
       if (G.creeps.some(c => !c.dead && Math.hypot(c.x - t.x, c.y - t.y) <= st.range + 1)) {
         t.ccHhT = 10; ccEv('cap:ccHourHeart');
@@ -13967,7 +14079,7 @@ Object.assign(UNIT_KITS, {
       cast(t, st, _, ab) {
         const k = ccCast(t, ab), h = byT(ab.by.haste, t) * (1 + (k - 1) * .5);
         for (const o of abAllies(t, ab.r).concat(t)) {
-          o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, h); o.drumT = Math.max(o.drumT || 0, G.time + 4);   // (the War Drum's haste: updateTowers reads it)
+          vetAid(o, t, 4); o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, h); o.drumT = Math.max(o.drumT || 0, G.time + 4);   // (the War Drum's haste: updateTowers reads it)
           if (o.ab && ccUnit(o)) for (const id in o.ab.cd) if (id !== ab.id) o.ab.cd[id] -= 2;
           part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .35, max: .35, size: .7, col: ab.hue });
         }
@@ -16025,7 +16137,7 @@ function ihKegPulse(t, st, dt) {
     t.ihAleT = .25;
     const bk = .2 + (C.ihBrewHeat ? .2 : 0);
     for (const o of G.towers) if (o !== t && ihIs(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= r) {
-      o.ihWarm = 1; o.ihBrewK = Math.max(o.ihBrewT > G.time ? o.ihBrewK || 0 : 0, bk); o.ihBrewT = G.time + .4;
+      vetAid(o, t); o.ihWarm = 1; o.ihBrewK = Math.max(o.ihBrewT > G.time ? o.ihBrewK || 0 : 0, bk); o.ihBrewT = G.time + .4;
       if (C.ihManaMead && o.ab) o.ab.mana = Math.min(abMax(o), o.ab.mana + .25);   // Mana Mead (1 a second)
       if (C.ihDragon) { o.ihDragonT = G.time + .4; }
     }
@@ -16040,7 +16152,7 @@ function ihKegPulse(t, st, dt) {
       t.ihRoundT = G.time + 8; t.ihRoundAt = G.time;
       for (const o of G.towers) {
         if (o === t || o.def.wall || o.wrecked || o.build > .5 || Math.hypot(o.x - t.x, o.y - t.y) > r) continue;
-        if (C.ihRound) { o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, .3); o.drumT = Math.max(o.drumT || 0, G.time + 2); }   // Rowdy Round (the War Drum's haste)
+        if (C.ihRound) { vetAid(o, t, 2); o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, .3); o.drumT = Math.max(o.drumT || 0, G.time + 2); }   // Rowdy Round (the War Drum's haste)
         if (C.ihMend && o.maxHp) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * .08 * C.ihMend);   // Mead of Mending
         if (C.ihStand) { ihHeatAdd(o, o.st, .5); if (o.ab) o.ab.mana = Math.min(abMax(o), o.ab.mana + 30); }   // Keg Stand
         part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .3, max: .3, size: .5, col: IH_COL.ale });
@@ -16977,7 +17089,7 @@ function ihItemsPulse(t, st, dt) {
     if (G.phase === 'wave') { T.bk = 10; for (const o of G.towers) if (ihIs(o) && !o.def.wall && !o.wrecked) { ihWarm(o, 1); ihHeatAdd(o, o.st, .3); if (o.ab) o.ab.mana = Math.min(abMax(o), o.ab.mana + p.ihBottomless); part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .3, max: .3, size: .45, col: '#ffc050' }); } ihAleSplash(t.x, t.y, towerTop(t), 14); relicGlint(t, 'ih_bottomless', true); sfx('boom', .6); }
     else T.bk = 1;
   }
-  if (p.ihTap && t.def.unit === 'brewkeg') { const r = (st.auraR || 1.6) + .05; for (const o of G.towers) if (o !== t && ihIs(o) && Math.hypot(o.x - t.x, o.y - t.y) <= r) { o.ihTapK = p.ihTap; o.ihTapT = now + .4; o.ihTapBy = t; } }   // Silver Tap
+  if (p.ihTap && t.def.unit === 'brewkeg') { const r = (st.auraR || 1.6) + .05; for (const o of G.towers) if (o !== t && ihIs(o) && Math.hypot(o.x - t.x, o.y - t.y) <= r) { vetAid(o, t); o.ihTapK = p.ihTap; o.ihTapT = now + .4; o.ihTapBy = t; } }   // Silver Tap
 }
 // the clockwork sentry (the Gear-Engine Core's)
 IH_HAZ.ih_sentrygun = (z, dt) => {
@@ -21156,7 +21268,7 @@ function sbPulse(t, st, dt) {
       const d = Math.hypot(o.x - t.x, o.y - t.y);
       if (d > r && !first) continue;
       if (o.ab && max !== undefined) o.ab.mana = Math.min(abMax(o), o.ab.mana + mana * (d > r ? .5 : 1));
-      if (ff && d <= r) { o.sbFeedAura = G.time + .3; o.sbFeedAuraK = Math.max(o.sbFeedAura > G.time ? o.sbFeedAuraK || 0 : 0, ff); }
+      if (ff && d <= r) { vetAid(o, t); o.sbFeedAura = G.time + .3; o.sbFeedAuraK = Math.max(o.sbFeedAura > G.time ? o.sbFeedAuraK || 0 : 0, ff); }
     }
     if (st.caps.sbThunderTotem && (t.sbTtT = (t.sbTtT == null ? 3 : t.sbTtT) - dt) <= 0) {   // Thunder Totem: lightning on every foe in its aura
       t.sbTtT = 8; let best = 0; for (const o of G.towers) if (sbUnit(o) && !o.wrecked && o !== t && Math.hypot(o.x - t.x, o.y - t.y) <= r && o.st) best = Math.max(best, o.st.dmg || 0);
@@ -21167,7 +21279,7 @@ function sbPulse(t, st, dt) {
     if (st.pw && st.pw.sbFirst && (t.sbFirstT = (t.sbFirstT == null ? 4 : t.sbFirstT) - dt) <= 0) {   // The First Totem: its howl carries over the whole field
       if (G.creeps.some(c => !c.dead && !c.ent)) {
         t.sbFirstT = 8; t.callAt = G.time;
-        for (const o of G.towers) if (sbUnit(o) && !o.wrecked && o !== t) { if (o.ab) o.ab.mana = Math.min(abMax(o), o.ab.mana + 8 * st.pw.sbFirst); o.sbHowlT = G.time + 3; o.sbHowlK = Math.max(o.sbHowlK || 0, .2); }
+        for (const o of G.towers) if (sbUnit(o) && !o.wrecked && o !== t) { if (o.ab) o.ab.mana = Math.min(abMax(o), o.ab.mana + 8 * st.pw.sbFirst); vetAid(o, t, 3); o.sbHowlT = G.time + 3; o.sbHowlK = Math.max(o.sbHowlK || 0, .2); }
         fxRing(t.x, t.y, 2.5, '#ffe0a0'); relicGlint(t, 'sbl_firsttotem', true); sfx('warcry', 0);
       } else t.sbFirstT = .5;
     }
@@ -24071,7 +24183,7 @@ const WB_KITS = {
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? abToughest(L) : null; },
       cast(t, st, c, ab) {
         const until = G.time + byT(ab.by.dur, t);
-        for (const o of G.towers) if (wbUnit(o) && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= WBC.pennant.r) { o.wbPennT = Math.max(o.wbPennT || 0, until); fxSpark(o.x, o.y, towerTop(o) + .2, WB_COL.storm, 4); }
+        for (const o of G.towers) if (wbUnit(o) && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= WBC.pennant.r) { vetAid(o, t, until - G.time); o.wbPennT = Math.max(o.wbPennT || 0, until); fxSpark(o.x, o.y, towerTop(o) + .2, WB_COL.storm, 4); }
         wbChain(t, st, c, byT(ab.by.mult, t), { jumps: WBC.pennant.jumps, from: [t.x, towerTop(t) + .8, t.y] });
         wbcSkyBolt(t.x, t.y, towerTop(t) + .8, 1.2); sfx('zap', 1);
       } },
@@ -27496,7 +27608,7 @@ function champOnCast(t, ab, tg, st) {
   const p = (st && st.pw) || {}, near = abAllies(t, CHAMP_REACH), all = () => G.towers.filter(o => o !== t && !o.def.wall && !o.wrecked && !(o.build > .5));
   const lift = (L, col) => { for (const o of L) part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .35, max: .35, size: .55, col }); };
   if (p.chMana) { for (const o of near) if (o.ab) gainMana(o, p.chMana); lift(near, '#8fd0ff'); }
-  if (p.chHaste) { for (const o of near) { o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.chHaste); o.drumT = Math.max(o.drumT || 0, G.time + 4); } lift(near, '#ffd76a'); }
+  if (p.chHaste) { for (const o of near) { vetAid(o, t, 4); o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.chHaste); o.drumT = Math.max(o.drumT || 0, G.time + 4); } lift(near, '#ffd76a'); }
   if (p.chReady) for (const o of near) if (o.ab) for (const id in o.ab.cd) if (o.ab.cd[id] > G.time) o.ab.cd[id] = Math.max(G.time, o.ab.cd[id] - p.chReady);
   if (p.chJudge && typeof soJudge === 'function') inSplash(t.x, t.y, CHAMP_REACH, false, c => { if (!c.ent) soJudge(c, p.chJudge, t); });
   if (p.chWarm && typeof ihWarm === 'function') for (const o of near) { ihWarm(o, 1); ihHeatAdd(o, o.st || effStats(o), p.chWarm); }
@@ -27505,7 +27617,7 @@ function champOnCast(t, ab, tg, st) {
     const L = all();
     for (const o of L) {
       if (p.chFieldMana && o.ab) gainMana(o, p.chFieldMana);
-      if (p.chFieldHaste) { o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.chFieldHaste); o.drumT = Math.max(o.drumT || 0, G.time + 3); }
+      if (p.chFieldHaste) { vetAid(o, t, 3); o.drumK = Math.max(o.drumT > G.time ? o.drumK || 0 : 0, p.chFieldHaste); o.drumT = Math.max(o.drumT || 0, G.time + 3); }
       if (p.chFieldWard && typeof soWard === 'function') soWard(o, p.chFieldWard);
       if (p.chFieldCharge && typeof ccGain === 'function') ccGain(o, p.chFieldCharge);
       if (p.chFieldWarm && typeof ihWarm === 'function') { ihWarm(o, 1); ihHeatAdd(o, o.st || effStats(o), p.chFieldWarm); }
@@ -38605,7 +38717,7 @@ function fsRootAct(t) {   // Rootcaller's Staff
 }
 function fsGearboxAct(t) {   // Overdrive Gearbox
   let n = 0;
-  for (const o of G.towers) if (!o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2.05) { o.frenzyT = Math.max(o.frenzyT || 0, G.time + 5); fxRing(o.x, o.y, .6, '#ff9a4a'); n++; }
+  for (const o of G.towers) if (!o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2.05) { vetAid(o, t, 5); o.frenzyT = Math.max(o.frenzyT || 0, G.time + 5); fxRing(o.x, o.y, .6, '#ff9a4a'); n++; }
   fxRing(t.x, t.y, 2, '#e08a3a'); part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) + .2, life: .4, max: .4, size: 1.4, col: '#ffb060' }); sfx('empower', 2);
   onToastSoft(`Overdrive: ${n} unit${n === 1 ? '' : 's'} strike twice as fast.`);
   return true;
@@ -42364,7 +42476,7 @@ cxWrapZone('cc_quicken', (zone0, t, st, z) => {
   const B = ccfCap(t, 'ccfBorrow'), K = ccfCap(t, 'ccfClock');
   if ((B || K) && z.seen) for (const c of z.seen) {
     if (seen0.has(c) || c.dead) continue;
-    if (B) { for (const o of G.towers) if (ccUnit(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= CCF.BORROW_R + .05) { o.ccBorrowK = Math.min(.12 * B, (o.ccBorrowT > G.time ? o.ccBorrowK || 0 : 0) + .04 * B); o.ccBorrowT = G.time + 3; } ccEv('tal:ccfBorrow'); }
+    if (B) { for (const o of G.towers) if (ccUnit(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= CCF.BORROW_R + .05) { vetAid(o, t, 3); o.ccBorrowK = Math.min(.12 * B, (o.ccBorrowT > G.time ? o.ccBorrowK || 0 : 0) + .04 * B); o.ccBorrowT = G.time + 3; } ccEv('tal:ccfBorrow'); }
     if (K && G.hazards.some(g => g.k === 'cc_glyph' && g.s === 'chrono' && g.src === t && g.t > 0 && Math.hypot(c.x - g.x, c.y - g.z) <= g.r)) { stun(c, CCF.CLOCK_STOP, .4, null); c.ccStopT = Math.max(c.ccStopT || 0, G.time + CCF.CLOCK_STOP * (c.def.boss ? .4 : 1)); ccEv('tal:ccfClock'); }
   }
   return r;
@@ -45866,6 +45978,628 @@ if (typeof FORCE_TIPS !== 'undefined') FORCE_TIPS.ironhold = [
   [w => w.types.some(ty => CREEPS[ty] && CREEPS[ty].rk && CREEPS[ty].rk.armoured), 'Armour ahead: Ironbreakers, Steam Hammers and Thunderguns break plate; set their Target to Armoured'],
   [w => w.fly, 'Flyers ahead: Flak Cannoneers and Chain Trappers'],
 ];
+
+/* ================= WEAPONS: every force unit has a weapon slot (force runs) =================
+   The owner (8 Nov 2026): "Add a weapon slot and give the weapon attack speed and damage. This then affects the units
+   damage", and "magic damage boosts aren't impactful enough", and "add plenty of weapon items as well as legendary versions
+   for each unit. Will make them their own 3d models as well".
+   - A unit's weapon sits in a slot of its own (t.weapon), beside its item sockets and its charm. A weapon fits a CLASS
+     (WPN_UNIT: the unit's look: spears, bows, staves, rifles ...), a legendary weapon fits its one unit.
+   - A weapon has plain ARPG numbers, shown for the unit that wears it: Damage (a range, its strike at tier I), Speed
+     (attacks a second) and DPS. They drive the unit's basic strike: its tier, talents, items and hero multiply on top
+     (wpnApply runs right after talentStats in effStats, so every later multiplier sees it). Each strike rolls inside the
+     range (wpnRollPow, through forceHook('fire')); a unit's spells are multiples of its strike, so they follow its average.
+   - A unit with no weapon carries its STARTER weapon ("Worn ..."): exactly its baseline (x1 damage, x1 speed), so nothing
+     changes until a better one drops. Old saves load with every unit on its starter.
+   - Caster weapons (staves, wands, orbs, tomes, censers, rattles, fans ...: WPN_CLASS[c].cast) carry less strike and a big
+     Spell Damage line (the WoW-style stat: itempower.js SPELL DAMAGE, per-spell coefficients), WSP below, sized to the
+     wearer's own strike (wpnSpK): a typical caster drop adds about a third to its spell hits, an epic about half, a
+     legendary two thirds, the jump the owner asked for.
+   - Rarity: common to legendary. Numbers grow with the weapon's Item Level (the wave it dropped on; level sync as items:
+     forces_zzzzzzzzz_ilvl.js). Each unit has two legendary weapons (one for a Champion) with a rule of their own: an on-hit
+     effect (IPROC, forces_zzz_procs.js), a twist on one of its named spells (ITWIST / a hit kind on that spell), more crit,
+     a mark, a slow, extra glaive bounces.
+   - Drops, rarer but bigger (owner, 9 Nov 2026): about a dozen a run. The first wave boss always drops one, later wave bosses
+     usually, the last elite of an elite wave now and then, a wave's last foe rarely (sure after WPN_DROP.dry dry waves);
+     leaning to the units you field (wpnRoll). Wide steps between rarities (WPN_RAR_M), so a new weapon is a spike. They go
+     to the weapon rack (G.wbag), equipped from a unit's Gear sheet (weapons_ui.js).
+   - Balance (owner: "increase the difficulty curve so it scales better with weapons added ... it's fun to defeat a level
+     easier with a better weapon than the last play through"): the foes' health (wpnHpK, through forceHpK) follows an
+     ORDINARY run's weapons (WPN_HP_TAB: the median run whose drops are common or uncommon, wpnRunSim), from wave 11 (the
+     first ten waves stay easy), in full by 16. A run that finds a rare, an epic or a legendary out-paces it; an unlucky one
+     falls a little behind. node tools/check_weapons.js -v prints unlucky / ordinary / lucky armies against it.
+   - Models: every base and legendary has a model key (mdl). WEAPON_MDL (empty until the owner's models arrive) registers
+     them; wpnModel(t) gives the key of the equipped weapon's model, or null for the unit's own prop. docs/design/weapons.md
+     lists every weapon to model (tools/check_weapons.js --doc writes it).
+   Classic and Tower Wars (oldRules) never come here. */
+
+/* ---------- the classes: their bases [id, name, speed x, damage spread +-, look] ---------- */
+// sk: attacks a second against the unit's own (the first base is 1: the starter's), the damage a strike is DPS / sk;
+// spr: the range's half-width (a 0.15 weapon rolls 85%-115% of its average)
+const WPN_CLASS = {
+  spear: { icon: 'arrowhead', hue: '#7a8a4a', size: 'about the unit\'s height, held in one hand', bases: [
+    ['ashspear', 'Ash Spear', 1, .12, 'a plain ash shaft with a leaf-shaped iron head'],
+    ['leafspear', 'Leaf-Blade Spear', 1.12, .1, 'a slim spear with a long narrow leaf blade, light and quick'],
+    ['boarspear', 'Boar Spear', .9, .16, 'a thick shaft, a broad head and a crossbar under it'],
+    ['warpike', 'War Pike', .84, .18, 'a long heavy pike with a square-section spike and iron langets']] },
+  bow: { icon: 'bow', hue: '#8a6a3a', size: 'about two thirds of the unit\'s height', bases: [
+    ['huntbow', 'Hunting Bow', 1, .14, 'a simple self bow of yew, a leather grip'],
+    ['shortbow', 'Short Bow', 1.16, .1, 'a small, sharply curved bow for quick shots'],
+    ['recurve', 'Recurve Bow', 1.06, .14, 'limbs that curl forward at the tips, horn and sinew backing'],
+    ['longbow', 'Longbow', .86, .18, 'a tall straight longbow, as tall as the unit']] },
+  druidbow: { icon: 'bow', hue: '#5a8a5a', cast: 1, size: 'about two thirds of the unit\'s height', bases: [
+    ['wildbow', 'Wildwood Bow', 1, .14, 'a living branch bent into a bow, leaves still on it'],
+    ['antlerbow', 'Antler Bow', .92, .16, 'a bow of two curved antlers bound at the grip'],
+    ['moonbow', 'Moonwood Bow', 1.08, .12, 'pale silvery wood, a crescent carved at the grip'],
+    ['fetishbow', 'Shifter\'s Bow', 1.04, .14, 'a bow hung with feathers, claws and a bear tooth']] },
+  staff: { icon: 'rune', hue: '#6a5aa0', cast: 1, size: 'a little taller than the unit', bases: [
+    ['oakstaff', 'Oak Staff', 1, .1, 'a plain oak staff, iron-shod, a knot at the top'],
+    ['quarter', 'Quarterstaff', 1.1, .1, 'a straight banded staff, worn smooth in two places'],
+    ['runestaff', 'Rune Staff', .94, .12, 'a staff carved with glowing runes along its length'],
+    ['spirestaff', 'Spire Staff', .88, .14, 'a tall staff ending in a spire of crystal held by claws']] },
+  wand: { icon: 'beam', hue: '#9a6ad0', cast: 1, size: 'a forearm\'s length', bases: [
+    ['birchwand', 'Birch Wand', 1, .12, 'a short white birch wand, a bead at the tip'],
+    ['sparkwand', 'Spark Wand', 1.12, .1, 'a copper-wound wand that spits sparks'],
+    ['crystalwand', 'Crystal Wand', .94, .14, 'a wand with a violet crystal point'],
+    ['leywand', 'Ley Wand', .9, .14, 'a dark wand inlaid with glowing silver lines']] },
+  orb: { icon: 'orb', hue: '#5a7ad0', cast: 1, size: 'a fist-sized orb or focus, held or floating over the hand', bases: [
+    ['glassorb', 'Glass Orb', 1, .1, 'a clear glass sphere with a swirl of light inside'],
+    ['emberorb', 'Ember Orb', .92, .14, 'a dark orb with a coal glowing in its heart'],
+    ['starorb', 'Star Orb', 1.06, .12, 'a deep blue orb flecked with tiny stars, in a brass cage'],
+    ['hourglass', 'Hour-Glass Focus', 1.1, .1, 'a small hourglass set in a ring of brass dials']] },
+  tome: { icon: 'rune', hue: '#8a5a3a', cast: 1, size: 'a book or scroll case, held in the off hand', bases: [
+    ['codex', 'Codex', 1, .1, 'a thick leather codex with iron corners'],
+    ['grimoire', 'Grimoire', .92, .14, 'a black-bound grimoire with a clasp and a gem'],
+    ['ledger', 'Ledger of Runes', 1.08, .1, 'a tall narrow book of carved rune plates'],
+    ['scrollcase', 'Scroll Case', 1.12, .1, 'a brass scroll case, a seal hanging from it']] },
+  censer: { icon: 'flame', hue: '#c08a3a', cast: 1, size: 'a censer on a chain about the unit\'s arm length', bases: [
+    ['censer', 'Censer', 1, .12, 'a brass censer on three chains, smoke curling out'],
+    ['thurible', 'Thurible', .92, .14, 'a large domed thurible with pierced sunbursts'],
+    ['lamp', 'Vigil Lamp', 1.08, .1, 'a small hanging lamp with a steady flame'],
+    ['brazier', 'Hand Brazier', .88, .16, 'a heavy iron bowl of coals on a short chain']] },
+  rattle: { icon: 'echo', hue: '#a08a5a', cast: 1, size: 'a forearm\'s length', bases: [
+    ['bonerattle', 'Bone Rattle', 1, .12, 'a gourd rattle on a bone handle, beads tied on'],
+    ['spiritdrum', 'Spirit Drum', .9, .14, 'a small round hand drum painted with a bear'],
+    ['shellrattle', 'Shell Rattle', 1.1, .1, 'a ring of shells on a carved stick'],
+    ['totemrod', 'Totem Rod', .94, .14, 'a short totem pole rod with an eagle head']] },
+  fans: { icon: 'feather', hue: '#5aa0c0', cast: 1, size: 'a pair of fans, each a forearm\'s length open', bases: [
+    ['silkfans', 'Silk Fans', 1, .12, 'two painted silk fans on bamboo ribs'],
+    ['warfans', 'War Fans', .92, .14, 'two iron-ribbed fans with sharpened edges'],
+    ['featherfans', 'Feather Fans', 1.1, .1, 'two fans of long grey storm feathers'],
+    ['stormfans', 'Storm Fans', .96, .14, 'two fans of blue silk with silver lightning']] },
+  sling: { icon: 'bombs', hue: '#7a9a4a', cast: 1, size: 'a sling or staff-sling about the unit\'s height', bases: [
+    ['sling', 'Seed Sling', 1, .14, 'a woven sling with a seed pouch'],
+    ['staffsling', 'Staff Sling', .9, .16, 'a sling on the end of a short staff'],
+    ['podthrower', 'Pod Thrower', .86, .18, 'a hollow gourd launcher on a strap'],
+    ['reedsling', 'Reed Sling', 1.12, .1, 'a light sling of plaited reeds']] },
+  thrower: { icon: 'spikes', hue: '#6a4a3a', size: 'a quiver or bundle of darts at the hip, one in hand', bases: [
+    ['darts', 'Thorn Darts', 1, .12, 'a bundle of black thorn darts'],
+    ['javelins', 'Short Javelins', .88, .16, 'three short barbed javelins in a sling'],
+    ['knives', 'Throwing Knives', 1.14, .1, 'a bandolier of leaf-bladed knives'],
+    ['hooks', 'Hooked Thorns', .96, .14, 'curved, hooked thorns like small sickles']] },
+  lance: { icon: 'arrowhead', hue: '#c0a05a', size: 'a long lance, about one and a half times the unit\'s height', bases: [
+    ['ashlance', 'Ash Lance', 1, .12, 'a straight ash lance with a small steel point'],
+    ['joust', 'Jousting Lance', .86, .18, 'a fluted lance with a big vamplate guard'],
+    ['warlance', 'War Lance', .92, .16, 'a heavy lance with a long square point'],
+    ['lightlance', 'Light Lance', 1.12, .1, 'a slim lance with a pennant tied under the point']] },
+  stormlance: { icon: 'thunder', hue: '#5a8ac0', cast: 1, size: 'a long lance, about one and a half times the unit\'s height', bases: [
+    ['runelance', 'Rune Lance', 1, .12, 'a lance whose shaft is wound with runed gold wire'],
+    ['pennonlance', 'Pennon Lance', 1.1, .1, 'a light lance with a long blue pennon'],
+    ['thunderlance', 'Thunder Lance', .9, .16, 'a heavy lance with a copper point that crackles'],
+    ['skylance', 'Sky Lance', .96, .14, 'a white lance with feathered wings at the guard']] },
+  daggers: { icon: 'swords', hue: '#8aa04a', size: 'a pair of blades, each about a forearm\'s length', bases: [
+    ['twinknives', 'Twin Knives', 1, .12, 'two plain long knives with leather grips'],
+    ['leafdaggers', 'Leaf Daggers', 1.12, .1, 'two leaf-shaped daggers, green-tinted steel'],
+    ['crescents', 'Crescent Blades', .94, .14, 'two curved crescent blades held by a middle grip'],
+    ['sabres', 'Wind Sabres', .88, .16, 'two long thin curved sabres']] },
+  sword: { icon: 'sword', hue: '#9aa0b0', size: 'a one-handed sword, about half the unit\'s height', bases: [
+    ['arming', 'Arming Sword', 1, .12, 'a plain straight arming sword, a cross guard'],
+    ['broadsword', 'Broadsword', .92, .14, 'a wide heavy blade with a basket of steel'],
+    ['falchion', 'Falchion', 1.08, .12, 'a single-edged blade that widens toward the tip'],
+    ['bastard', 'Bastard Sword', .86, .16, 'a long blade, a long grip for one or two hands']] },
+  riftglaive: { icon: 'glaive', hue: '#8a5ad0', cast: 1, size: 'a thrown crescent about the size of the unit\'s torso', bases: [
+    ['riftcrescent', 'Rift Crescent', 1, .12, 'a crescent of dark steel with a violet edge'],
+    ['voidring', 'Void Ring', 1.08, .1, 'a ring blade with a hollow, glowing centre'],
+    ['starglaive', 'Star Glaive', .94, .14, 'a four-pointed glaive like a star'],
+    ['wardcutter', 'Ward-Cutter', .9, .16, 'a heavy crescent with runes etched along both edges']] },
+  glaive: { icon: 'glaive', hue: '#c0a05a', size: 'a thrown crescent about the size of the unit\'s torso', bases: [
+    ['throwglaive', 'Throwing Glaive', 1, .12, 'a three-bladed throwing glaive, gold inlay'],
+    ['crescentg', 'Crescent Glaive', 1.08, .1, 'a single wide crescent with a grip in the middle'],
+    ['warglaive', 'War Glaive', .9, .16, 'a heavy five-bladed glaive with a hub boss'],
+    ['moonglaive', 'Moon Glaive', .96, .14, 'a thin silver crescent like a new moon']] },
+  axe: { icon: 'axe', hue: '#9a7a5a', size: 'a one-handed axe, about half the unit\'s height', bases: [
+    ['handaxe', 'Hand Axe', 1, .12, 'a stout dwarf hand axe with a straight bit'],
+    ['bearded', 'Bearded Axe', .94, .14, 'a long-bearded head with a hooked lower edge'],
+    ['broadaxe', 'Broad Axe', .86, .18, 'a wide flat axe head, a short haft'],
+    ['runeaxe', 'Rune Axe', 1.06, .12, 'a bright axe with a rune burned into the cheek']] },
+  hammer: { icon: 'hammer', hue: '#8a8a9a', size: 'a war hammer or maul, two thirds of the unit\'s height', bases: [
+    ['warhammer', 'War Hammer', 1, .12, 'a square-headed war hammer with a back spike'],
+    ['maul', 'Maul', .86, .18, 'a big two-handed maul with a plain iron block'],
+    ['mallet', 'Mallet', 1.1, .1, 'a short fat mallet banded in brass'],
+    ['greathammer', 'Great Hammer', .9, .16, 'a great hammer with a carved stone head']] },
+  runehammer: { icon: 'hammer', hue: '#6a8ac0', cast: 1, size: 'a forge hammer, half the unit\'s height', bases: [
+    ['forgehammer', 'Forge Hammer', 1, .12, 'a smith\'s hammer with a rune on each face'],
+    ['rivet', 'Riveting Hammer', 1.1, .1, 'a small hammer with a long thin peen'],
+    ['sledge', 'Rune Sledge', .88, .16, 'a heavy sledge with glowing runes round the head'],
+    ['anvilhead', 'Anvil-Head', .92, .14, 'a hammer whose head is a small anvil']] },
+  golem: { icon: 'gem', hue: '#8a7a5a', cast: 1, size: 'a fist-sized focus stone in the hand (the golem stays the golem)', bases: [
+    ['wardstone', 'Ward Stone', 1, .12, 'a flat river stone carved with a ward'],
+    ['heartstone', 'Golem Heart', .9, .16, 'a rough red stone that beats with light'],
+    ['keystone', 'Keystone', .94, .14, 'a wedge-shaped keystone with a glowing seam'],
+    ['geode', 'Geode Focus', 1.08, .1, 'a split geode full of violet crystal']] },
+  rifle: { icon: 'barrel', hue: '#8a6a4a', size: 'a long gun, about the unit\'s height', bases: [
+    ['longrifle', 'Long Rifle', 1, .12, 'a long brass-bound rifle with a wooden stock'],
+    ['blunder', 'Blunderbuss', .84, .2, 'a short gun with a wide flared muzzle'],
+    ['musket', 'Musket', 1.08, .12, 'a plain iron musket, a ramrod under the barrel'],
+    ['runerifle', 'Rune Rifle', .92, .14, 'a rifle with glowing runes on the barrel and a scope']] },
+  cannon: { icon: 'mortar', hue: '#7a6a5a', size: 'a hand or swivel cannon, half the unit\'s height long', bases: [
+    ['swivel', 'Swivel Gun', 1, .14, 'a small bronze gun on a swivel fork'],
+    ['flak', 'Flak Cannon', .92, .16, 'a stubby wide-bore gun with a skyward sight'],
+    ['handcannon', 'Hand Cannon', 1.1, .12, 'a short iron tube on a wooden tiller'],
+    ['bronzegun', 'Bronze Gun', .88, .18, 'a long bronze barrel with a lion muzzle']] },
+  mortar: { icon: 'mortar', hue: '#6a5a4a', size: 'a mortar tube about half the unit\'s height', bases: [
+    ['fieldmortar', 'Field Mortar', 1, .14, 'a short fat iron tube on a wooden bed'],
+    ['coehorn', 'Coehorn', 1.12, .1, 'a light carried mortar with handles'],
+    ['siegemortar', 'Siege Mortar', .86, .18, 'a huge thick-walled mortar'],
+    ['bombard', 'Bombard', .9, .16, 'a long-barrelled bombard bound with hoops']] },
+  chain: { icon: 'chain', hue: '#7a7a8a', size: 'a coil of chain or a bola in hand', bases: [
+    ['chainnet', 'Chain Net', 1, .12, 'a folded net of small iron rings'],
+    ['bola', 'Iron Bola', 1.1, .1, 'three iron balls on chains'],
+    ['hookchain', 'Hook Chain', .92, .14, 'a long chain with a hook at the end'],
+    ['weighted', 'Weighted Chain', .88, .16, 'a heavy chain with a spiked weight']] },
+  pole: { icon: 'pick', hue: '#7a6a5a', size: 'a long pole or ram, the unit\'s height', bases: [
+    ['breachpole', 'Breaching Pole', 1, .14, 'a long pole with an iron hook and spike'],
+    ['petard', 'Petard Pole', .88, .18, 'a pole with a powder bell at the end'],
+    ['pick', 'War Pick', 1.08, .12, 'a long-hafted pick with a heavy spike'],
+    ['ram', 'Hand Ram', .86, .18, 'a short iron-capped log with grips']] },
+  harpoon: { icon: 'arrowhead', hue: '#5a7a9a', size: 'a harpoon about the unit\'s height, a line coiled at the butt', bases: [
+    ['harpoon', 'Harpoon', 1, .14, 'a barbed iron harpoon with a coiled line'],
+    ['stormhook', 'Storm Hook', 1.1, .1, 'a light harpoon with a copper barb'],
+    ['whaler', 'Whaling Harpoon', .86, .18, 'a heavy two-barbed harpoon'],
+    ['skyspike', 'Sky Spike', .96, .14, 'a slim spike with feathers on the shaft']] },
+  halberd: { icon: 'scythe', hue: '#7aa0c0', cast: 1, size: 'a halberd a little taller than the unit', bases: [
+    ['halberd', 'Halberd', 1, .14, 'an axe blade and a spike on a long haft'],
+    ['poleaxe', 'Poleaxe', .9, .16, 'a heavy axe head with a hammer back'],
+    ['guisarme', 'Guisarme', 1.08, .12, 'a long hooked blade on a pole'],
+    ['rimehalberd', 'Rime Halberd', .94, .14, 'a halberd whose blade is rimed with frost']] },
+  xbow: { icon: 'crosshair', hue: '#b0b0c0', size: 'a crossbow, half the unit\'s height', bases: [
+    ['lightxbow', 'Light Crossbow', 1, .12, 'a small crossbow with a steel prod'],
+    ['arbalest', 'Arbalest', .84, .18, 'a heavy arbalest with a crank on the stock'],
+    ['repeater', 'Repeating Crossbow', 1.16, .1, 'a crossbow with a bolt magazine on top'],
+    ['heavyxbow', 'Heavy Crossbow', .9, .16, 'a long crossbow with a stirrup']] },
+  ballista: { icon: 'crosshair', hue: '#8a7a5a', size: 'a field ballista on a stand, a little taller than the crew', bases: [
+    ['fieldballista', 'Field Ballista', 1, .14, 'a wooden ballista on a tripod'],
+    ['scorpion', 'Scorpion', 1.1, .12, 'a light bolt-thrower with a curved arm'],
+    ['greatballista', 'Great Ballista', .86, .18, 'a big two-armed ballista bound in iron'],
+    ['boltthrower', 'Bolt-Thrower', .94, .14, 'a squat ballista with a crank and a bolt rack']] },
+};
+// each force unit's class (its look; casters' classes carry Spell Damage)
+const WPN_UNIT = {
+  thornguard: 'spear', gladebow: 'bow', briarwarden: 'staff', staglancer: 'lance', wayfarer: 'druidbow', bladedancer: 'daggers', seedcaster: 'sling', thornwarden: 'thrower', ch_elowen: 'staff',
+  oathsworn: 'sword', silverbolt: 'xbow', lightbinder: 'staff', grailknight: 'lance', sunlance: 'staff', templar: 'hammer', censer: 'censer', so_inquisitor: 'tome', ch_aurelian: 'lance',
+  cc_spellblade: 'sword', cc_mageling: 'wand', cc_rimeweaver: 'staff', cc_chronomancer: 'orb', cc_astrologer: 'orb', cc_golemwarden: 'golem', cc_pyroclast: 'orb', cc_severer: 'riftglaive', ch_maelis: 'staff',
+  ironbreaker: 'axe', thundergun: 'rifle', chaintrapper: 'chain', runesmith: 'runehammer', flakgunner: 'cannon', steamhammer: 'hammer', mortarcrew: 'mortar', siegebreaker: 'pole', ch_haldra: 'hammer',
+  sb_wolfguard: 'spear', sb_windrunner: 'bow', sb_hailshaman: 'staff', sb_spiritwalker: 'rattle', sb_thundercaller: 'staff', sb_earthbinder: 'hammer', sb_clouddancer: 'fans', sb_skyhunter: 'harpoon', ch_tarka: 'staff',
+  wb_oathbound: 'sword', wb_maskedwarden: 'glaive', wb_frostbrand: 'halberd', wb_runecarver: 'tome', wb_stormward: 'stormlance', wb_anvilguard: 'hammer', wb_siegewarden: 'ballista', wb_vowkeeper: 'sword', ch_varic: 'sword',
+};
+/* ---------- the legendary weapons: [unit, id, name, look, effect] ----------
+   effect: ['hit', IPROC kind, every Nth hit] | ['spell', spell id, ITWIST kind or IPROC kind] | ['crit'] (+15% crit chance,
+   crits x3) | ['mark'] (foes it strikes take 12% more for 3s) | ['slow'] (every hit slows 25% for 1.5s) | ['bounce', n] */
+const WPN_LEGS = [
+  // ---- the Grove ----
+  ['thornguard', 'wl_briarpike', 'Briarheart Pike', 'a black thorn pike wound with living briar, red sap at the tip', ['hit', 'bleed', 3]],
+  ['thornguard', 'wl_firstthorn', 'The First Thorn', 'a pale heartwood spear whose head is one great curved thorn', ['spell', 'sunder', 'echo']],
+  ['gladebow', 'wl_dawnstring', 'Dawnstring', 'a white ash longbow with a string of spun gold light', ['crit']],
+  ['gladebow', 'wl_nailwood', 'Nailwood Recurve', 'a dark recurve studded with iron nails along the back', ['spell', 'arrowrain', 'freeze']],
+  ['briarwarden', 'wl_mossfather', 'Mossfather\'s Crook', 'a gnarled crook staff with a beard of moss and a glowing seed', ['hit', 'chill', 3]],
+  ['briarwarden', 'wl_thicketheart', 'Staff of the Grasping Wood', 'a staff of knotted roots that still writhe at the top', ['spell', 'thicket', 'echo']],
+  ['staglancer', 'wl_whitehart', 'White Hart Lance', 'an ivory lance with an antler guard', ['hit', 'daze', 3]],
+  ['staglancer', 'wl_longhunt', 'Lance of the Long Hunt', 'a green-gold lance with a long streaming pennant', ['spell', 'heroiccharge', 'frenzy']],
+  ['wayfarer', 'wl_moonclaw', 'Moonclaw Bow', 'a bow of curved white antler with a crescent grip', ['hit', 'arc', 4]],
+  ['wayfarer', 'wl_manyshapes', 'Bow of Many Shapes', 'limbs carved as a hawk, a bear and an owl, one into the next', ['spell', 'wildsurge', 'echo']],
+  ['bladedancer', 'wl_willowsong', 'Willowsong Pair', 'twin curved leaf blades of silver-green steel', ['hit', 'bleed', 2]],
+  ['bladedancer', 'wl_encore', 'Encore Blades', 'two thin blades with ribbons that trail as they turn', ['spell', 'harvest', 'frenzy']],
+  ['seedcaster', 'wl_puffcap', 'Puffcap Sling', 'a sling whose pouch is a giant mushroom cap', ['hit', 'splash', 3]],
+  ['seedcaster', 'wl_snapjaw', 'Snapjaw Launcher', 'a staff-sling with a toothed seed pod at the end', ['spell', 'bindseed', 'echo']],
+  ['thornwarden', 'wl_gibbet', 'Gibbet Darts', 'a bundle of long black thorns bound with red cord', ['hit', 'shred', 3]],
+  ['thornwarden', 'wl_severquill', 'Severing Quill-Case', 'a quiver of hooked thorns like small sickles', ['spell', 'gv_sever', 'reset']],
+  ['ch_elowen', 'wl_heartwood', 'Heartwood Staff of Elowen', 'a tall living staff in leaf, a heartwood glow in its knot', ['spell', 'ch_rootway', 'echo']],
+  // ---- the Silver Order ----
+  ['oathsworn', 'wl_dawnbrand', 'Dawnbrand', 'a broad holy sword with a sunburst cross guard', ['hit', 'daze', 4]],
+  ['oathsworn', 'wl_rampart', 'Rampart Blade', 'a heavy sword with a shield-shaped guard and a gold fuller', ['spell', 'so_bash', 'shove']],
+  ['silverbolt', 'wl_sunwrit', 'Sunwrit Arbalest', 'a white-gold arbalest with scripture burned into the stock', ['crit']],
+  ['silverbolt', 'wl_witness', 'Witness-Bow', 'a crossbow with a glass eye set in its stock', ['spell', 'so_witness', 'reset']],
+  ['lightbinder', 'wl_vigil', 'Staff of the Kept Vigil', 'a silver staff with a caged lantern at the top', ['mark']],
+  ['lightbinder', 'wl_penance', 'Penance Rod', 'a rod wound with fine silver chain ending in a hook', ['spell', 'so_flare', 'echo']],
+  ['grailknight', 'wl_grailward', 'Grailward Lance', 'a gilded lance with a chalice-shaped guard', ['hit', 'shove', 4]],
+  ['grailknight', 'wl_vowlance', 'Lance of the Vow', 'a white lance with a blue and gold pennon', ['spell', 'so_vow', 'frenzy']],
+  ['sunlance', 'wl_noonspire', 'Noonspire', 'a staff topped by a gold sunburst', ['hit', 'burn', 3]],
+  ['sunlance', 'wl_dawnfall', 'Staff of Dawnfall', 'a staff whose crystal holds a falling sun', ['spell', 'so_dawnfall', 'echo']],
+  ['templar', 'wl_swornhour', 'Hammer of the Sworn Hour', 'a gold-chased hammer with a bell in the head', ['hit', 'shred', 3]],
+  ['templar', 'wl_heavenanvil', 'Heaven\'s Anvil', 'a hammer whose head is a small white anvil with wings', ['spell', 'so_hammerfall', 'reset']],
+  ['censer', 'wl_saints', 'Thurible of Saints', 'a great domed thurible of gold with saints in relief', ['hit', 'burn', 3]],
+  ['censer', 'wl_emberchain', 'Ember-Chain Censer', 'a censer on red-hot chains, embers falling from it', ['spell', 'so_embers', 'echo']],
+  ['so_inquisitor', 'wl_ashwrit', 'Writ of Ashes', 'a scroll of charred parchment on an iron rod', ['hit', 'manaburn', 3]],
+  ['so_inquisitor', 'wl_finaledict', 'The Final Edict', 'a heavy iron-bound book with a lock and chain', ['spell', 'so_pyre', 'echo']],
+  ['ch_aurelian', 'wl_lionmane', 'Lionmane Lance', 'a gold lance with a lion\'s head guard and mane tassels', ['spell', 'ch_lioncharge', 'frenzy']],
+  // ---- the Conclave ----
+  ['cc_spellblade', 'wl_riftedge', 'Riftedge', 'a sword whose blade is torn violet light in a steel frame', ['hit', 'arc', 3]],
+  ['cc_spellblade', 'wl_wardsplit', 'Ward-Splitter\'s Brand', 'a long sword with a split blade and a rune between', ['spell', 'cc_sigilcleave', 'echo']],
+  ['cc_mageling', 'wl_sparktongue', 'Spark-Tongue Wand', 'a forked wand that hisses with blue sparks', ['hit', 'manaburn', 4]],
+  ['cc_mageling', 'wl_orbweaver', 'Orbweaver\'s Wand', 'a wand with a small orbit of motes round its tip', ['spell', 'cc_grandorb', 'echo']],
+  ['cc_rimeweaver', 'wl_rimecrown', 'Rimecrown Staff', 'a staff crowned with a ring of icicles', ['hit', 'chill', 3]],
+  ['cc_rimeweaver', 'wl_glacierspine', 'Glacier\'s Spine', 'a long staff of blue ice like a vertebra', ['spell', 'cc_glacialglyph', 'freeze']],
+  ['cc_chronomancer', 'wl_hourwarden', 'Hourwarden\'s Glass', 'a tall hourglass whose sand runs upward', ['hit', 'daze', 4]],
+  ['cc_chronomancer', 'wl_stoppedclock', 'The Stopped Clock', 'a brass clock face with no hands, ticking', ['slow']],
+  ['cc_astrologer', 'wl_starchart', 'Star-Chart Orrery', 'a small orrery of seven silver planets', ['crit']],
+  ['cc_astrologer', 'wl_lodestar', 'Lodestar Lens', 'a great lens that holds one bright star', ['spell', 'cc_fallingstar', 'echo']],
+  ['cc_golemwarden', 'wl_mountainheart', 'Heart of the Mountain', 'a big rough heart of granite veined with gold', ['hit', 'shove', 3]],
+  ['cc_golemwarden', 'wl_heaving', 'Keystone of Heaving', 'a keystone that floats over the palm, cracks glowing', ['spell', 'cc_seismic', 'echo']],
+  ['cc_pyroclast', 'wl_phoenixegg', 'Phoenix-Egg Orb', 'a red and gold orb like an egg, a flame inside', ['hit', 'burn', 3]],
+  ['cc_pyroclast', 'wl_furnace', 'Furnace Heart', 'a black iron orb with a grille of white fire', ['spell', 'cc_flamewave', 'echo']],
+  ['cc_severer', 'wl_unmaking', 'Crescent of Unmaking', 'a black crescent whose edge is a thin violet void', ['hit', 'manaburn', 3]],
+  ['cc_severer', 'wl_returnmoon', 'Returning Moon', 'a silver ring blade with a crescent moon inside it', ['spell', 'cc_shards', 'echo']],
+  ['ch_maelis', 'wl_loom', 'Loom-Staff of Maelis', 'a staff strung with threads of light like a loom', ['spell', 'ch_unravel', 'echo']],
+  // ---- Ironhold ----
+  ['ironbreaker', 'wl_grudgebiter', 'Grudgebiter', 'a rune axe with a notched, toothed bit', ['hit', 'bleed', 3]],
+  ['ironbreaker', 'wl_breakersdue', 'Breaker\'s Due', 'a heavy axe with a hammer back and a gold rune', ['spell', 'ih_breakerblow', 'reset']],
+  ['thundergun', 'wl_oldthunder', 'Old Thunder', 'a very long brass rifle with a flared muzzle and a dragon on the lock', ['crit']],
+  ['thundergun', 'wl_slugmaker', 'The Breacher', 'a short huge-bore rifle with a steel drum', ['spell', 'ih_slug', 'echo']],
+  ['chaintrapper', 'wl_deepmine', 'Deep-Mine Chain', 'a black chain with hooked links, wet with mine water', ['hit', 'chill', 3]],
+  ['chaintrapper', 'wl_winch', 'Winch of the Drowned', 'a hand winch on a long hooked chain', ['spell', 'ih_grapple', 'reset']],
+  ['runesmith', 'wl_anvilsong', 'Anvilsong Hammer', 'a forge hammer that rings blue when it strikes', ['hit', 'arc', 3]],
+  ['runesmith', 'wl_unmakinghammer', 'Hammer of Unmaking', 'a hammer whose rune burns red and cracks the head', ['spell', 'ih_forgeburst', 'echo']],
+  ['flakgunner', 'wl_skyrender', 'Skyrender', 'a wide flak cannon with three barrels', ['hit', 'splash', 3]],
+  ['flakgunner', 'wl_starshell', 'Starshell Gun', 'a long bronze gun with stars stamped on the barrel', ['spell', 'ih_airburst', 'echo']],
+  ['steamhammer', 'wl_boilerheart', 'Boilerheart Maul', 'a maul with a small boiler in its head, venting steam', ['hit', 'shove', 3]],
+  ['steamhammer', 'wl_piledriver', 'The Pile-Driver', 'a hammer with a piston that drives its face out', ['spell', 'ih_pistondrive', 'frenzy']],
+  ['mortarcrew', 'wl_grandmother', 'Grandmother Mortar', 'a huge squat mortar with a carved dwarf face', ['hit', 'burn', 2]],
+  ['mortarcrew', 'wl_longdrop', 'The Long Drop', 'a tall mortar with a long sighting quadrant', ['spell', 'ih_bombard', 'echo']],
+  ['siegebreaker', 'wl_gateeater', 'Gate-Eater Ram', 'an iron-capped ram with a beast\'s head', ['hit', 'shred', 2]],
+  ['siegebreaker', 'wl_powderkeg', 'Powderkeg Pole', 'a pole with a small keg strapped on, fuse lit', ['spell', 'ih_demolish', 'echo']],
+  ['ch_haldra', 'wl_stonebrace', 'Stonebrace Hammer', 'a great hammer of grey stone bound in gold', ['spell', 'ch_oath', 'echo']],
+  // ---- the Stormborn ----
+  ['sb_wolfguard', 'wl_packfang', 'Fang of the Pack', 'a spear with a wolf-jaw head and fur at the neck', ['hit', 'bleed', 3]],
+  ['sb_wolfguard', 'wl_stormpin', 'Stormpin Spear', 'a spear with a copper head that crackles', ['spell', 'sb_stormspear', 'arc']],
+  ['sb_windrunner', 'wl_galewing', 'Galewing Bow', 'a bow whose limbs are two grey wings', ['hit', 'shove', 4]],
+  ['sb_windrunner', 'wl_skyward', 'Skyward Recurve', 'a pale recurve wound with blue cord', ['spell', 'sb_skyshot', 'echo']],
+  ['sb_hailshaman', 'wl_hailcaller', 'Hailcaller Staff', 'a staff topped by a ball of hail in a claw', ['hit', 'freeze', 5]],
+  ['sb_hailshaman', 'wl_blackice', 'Staff of Black Ice', 'a staff of dark ice, black at the heart', ['spell', 'sb_hailstorm', 'echo']],
+  ['sb_spiritwalker', 'wl_ancestor', 'Ancestor Rattle', 'a skull rattle with spirit feathers', ['hit', 'manaburn', 3]],
+  ['sb_spiritwalker', 'wl_tollrattle', 'Rattle of the Toll', 'a long rattle with a bell and bones', ['spell', 'sb_reckoning', 'reset']],
+  ['sb_thundercaller', 'wl_thunderhead', 'Thunderhead Staff', 'a staff with a small storm cloud at the top', ['hit', 'arc', 3]],
+  ['sb_thundercaller', 'wl_arcbridge', 'Rod of the Arc Bridge', 'a forked copper rod, a spark between the tines', ['spell', 'sb_calllightning', 'echo']],
+  ['sb_earthbinder', 'wl_mountainmaul', 'Mountain\'s Maul', 'a stone maul shaped like a mountain peak', ['hit', 'daze', 3]],
+  ['sb_earthbinder', 'wl_stonewake', 'Stonewake Maul', 'a maul whose head is cracked and glowing', ['spell', 'sb_fissure', 'echo']],
+  ['sb_clouddancer', 'wl_squall', 'Squall Fans', 'two fans of white feathers that frost the air', ['hit', 'chill', 3]],
+  ['sb_clouddancer', 'wl_skyleap', 'Fans of the Skyleap', 'two fans of blue silk with gold storm birds', ['spell', 'sb_stormdance', 'frenzy']],
+  ['sb_skyhunter', 'wl_stormhook', 'Stormhook Harpoon', 'a harpoon with a crackling copper barb and a chain', ['hit', 'arc', 4]],
+  ['sb_skyhunter', 'wl_skyfallh', 'Skyfall Harpoon', 'a long harpoon with eagle feathers on the shaft', ['spell', 'sb_skyfall', 'reset']],
+  ['ch_tarka', 'wl_drumstaff', 'Drumstaff of Tarka', 'a staff with a small drum and thunder-bird feathers', ['spell', 'ch_gather', 'echo']],
+  // ---- the Wardbound ----
+  ['wb_oathbound', 'wl_oathbreaker', 'Oathbreaker', 'a long blade broken off square, still keen', ['hit', 'shred', 3]],
+  ['wb_oathbound', 'wl_runecleaver', 'Runecleaver', 'a broad sword with a row of glowing runes', ['spell', 'wb_wardflare', 'echo']],
+  ['wb_maskedwarden', 'wl_everreturn', 'Ever-Returning Glaive', 'a gold three-bladed glaive with a sun-wheel hub', ['bounce', 2]],
+  ['wb_maskedwarden', 'wl_ricocrown', 'Ricochet Crown', 'a ring glaive set with seven small blades like a crown', ['spell', 'wb_runevolley', 'echo']],
+  ['wb_frostbrand', 'wl_winterhall', 'Winterhall Halberd', 'a halberd with a blade of blue ice and a frost-rimed haft', ['hit', 'chill', 3]],
+  ['wb_frostbrand', 'wl_rimeline', 'Rimeline Poleaxe', 'a poleaxe that leaves a line of frost in the air', ['spell', 'wb_rimeline', 'freeze']],
+  ['wb_runecarver', 'wl_everyrune', 'Codex of Every Rune', 'a stone-paged book whose runes float off the page', ['hit', 'arc', 3]],
+  ['wb_runecarver', 'wl_detonator', 'Detonator\'s Ledger', 'a red ledger with a burning rune on the cover', ['spell', 'wb_detonate', 'echo']],
+  ['wb_stormward', 'wl_thunderpennon', 'Thunder-Pennon Lance', 'a lance with a pennon of living lightning', ['hit', 'daze', 4]],
+  ['wb_stormward', 'wl_skyfalllance', 'Skyfall Lance', 'a white lance with a sun-wheel at the guard', ['spell', 'wb_skyfall', 'echo']],
+  ['wb_anvilguard', 'wl_anvilfall', 'Anvilfall Hammer', 'a hammer with an anvil-shaped head of black iron', ['hit', 'shove', 3]],
+  ['wb_anvilguard', 'wl_quakemaul', 'Quakeline Maul', 'a long maul whose head is a slab of runed stone', ['spell', 'wb_quakeline', 'echo']],
+  ['wb_siegewarden', 'wl_gatewarden', 'Gatewarden Ballista', 'a ballista with gold arms and a gate-shaped frame', ['hit', 'splash', 3]],
+  ['wb_siegewarden', 'wl_chainengine', 'Chainbolt Engine', 'a ballista that throws two bolts on one chain', ['spell', 'wb_chainbolt', 'echo']],
+  ['wb_vowkeeper', 'wl_vowblade', 'Vowblade', 'a thin blade with a vow written down the fuller', ['mark']],
+  ['wb_vowkeeper', 'wl_holdingrite', 'Blade of the Holding Rite', 'a short sword with a censer-cage pommel', ['spell', 'wb_rite', 'reset']],
+  ['ch_varic', 'wl_lastgate', 'The Last Gate\'s Blade', 'a great sword with a gate-shaped guard and a cracked blade', ['spell', 'ch_lastgate', 'echo']],
+];
+const WPN_BASE = {}, WPN_LEG = {};
+for (const c in WPN_CLASS) for (const [id, name, sk, spr, look] of WPN_CLASS[c].bases) WPN_BASE[id] = { id, cls: c, name, sk, spr, look, mdl: 'w_' + id };
+for (const [u, id, name, look, fx] of WPN_LEGS) {
+  const cls = WPN_UNIT[u], b0 = WPN_CLASS[cls] ? WPN_CLASS[cls].bases[0] : null;
+  WPN_LEG[id] = { id, u, cls, name, look, fx, sk: 1, spr: b0 ? b0[3] : .12, mdl: id, leg: 1 };
+}
+// the owner's weapon models, by model key (filled when they arrive); wpnModel(t): the equipped weapon's, else null (its own prop)
+const WEAPON_MDL = {};
+
+/* ---------- the numbers ---------- */
+// RARER BUT BIGGER (owner, 9 Nov 2026: "players remember damage spike increases so I'd like to design for that although it
+// should be rarer"): about a dozen weapons a run, and wide steps between rarities, so each new one is a spike you feel
+const WPN_RAR_M = [1.08, 1.2, 1.45, 1.8, 2.25];        // a weapon's DPS over the unit's starter, by rarity, at Item Level 1
+const WPN_IL_GROW = .01;                            // and 1% more for each Item Level above 1 (x1.49 at 50)
+const WPN_Q = .08;                                  // two weapons of a rarity and level differ by up to this much (the roll)
+const WPN_CAST_STRIKE = .5;                         // a caster weapon keeps this share of the strike's growth ...
+const WSP = [10, 18, 32, 50, 75];                // ... and carries Spell Damage: this many at Item Level 1, by rarity, x the strike curve (ilCurve, as items' Spell Damage),
+const WSP_REF = 18;                                 // x the wearer's own tier I strike over a typical one's (wpnSpK): a unit whose spells are multiples of a small strike gets less, so the jump is about the same share of every caster's spells
+const WPN_HP_FROM = 11, WPN_HP_FULL = 16;           // the foes' health follows an ordinary run's weapons from wave 11 (waves 1-10 stay easy), in full by 16
+const WPN_BAG = 24;                                 // the weapon rack's room
+const WPN_SALVAGE = [4, 8, 14, 24, 45];
+const WPN_STARTER = { name: 'Starter', col: '#a49c8c' };
+const wpnOn = () => typeof G !== 'undefined' && !!G && !!G.force && !G.vs && typeof oldRules === 'function' && !oldRules();
+const wpnClassOf = ty => { const d = TOWERS[ty]; return d && d.force && !d.wall && d.unit && WPN_UNIT[d.unit] && d.tiers && d.tiers[0] && (d.tiers[0].dmg || d.tiers[0].smite) ? WPN_UNIT[d.unit] : null; };
+const wpnDef = w => !w ? null : WPN_LEG[w.b] || WPN_BASE[w.b] || null;
+const wpnIsCast = w => { const d = wpnDef(w); return !!(d && WPN_CLASS[d.cls] && WPN_CLASS[d.cls].cast); };
+function wpnFits(w, t) {
+  const d = wpnDef(w); if (!d || !t || !t.def) return false;
+  if (d.leg) return t.def.unit === d.u;
+  return wpnClassOf(t.type) === d.cls;
+}
+const wpnLv = w => typeof ilClampL === 'function' ? Math.min(ilClampL(w.il || 1), wpnOn() && typeof ilCap === 'function' ? ilCap() : 60) : (w.il || 1);   // level sync, as items
+// its DPS multiple, its speed multiple and its Spell Damage, at the level it works at now (cached on it)
+function wpnCalc(w) {
+  const L = wpnLv(w), key = L + ':' + w.rar + ':' + w.q + ':' + w.b;
+  if (w._c && w._k === key) return w._c;
+  const d = wpnDef(w), r = Math.max(0, Math.min(4, w.rar | 0)), cast = wpnIsCast(w);
+  const m0 = WPN_RAR_M[r] * (1 + WPN_IL_GROW * (L - 1)) * (1 + WPN_Q * ((w.q == null ? .5 : w.q) - .5));
+  const m = cast ? 1 + (m0 - 1) * WPN_CAST_STRIKE : m0, sk = d ? d.sk : 1;
+  const sp = cast ? Math.round(WSP[r] * (typeof ilCurve === 'function' ? ilCurve(L) : 1) * (1 + WPN_Q * ((w.q == null ? .5 : w.q) - .5))) : 0;
+  w._k = key; return (w._c = { m, sk, dk: m / sk, spr: d ? d.spr : .12, sp, m0 });
+}
+const WPN_STARTER_CALC = { m: 1, sk: 1, dk: 1, spr: .12, sp: 0, m0: 1 };
+// the starter: the class's first base, worn, exactly the unit's baseline
+function wpnStarter(ty) { const c = wpnClassOf(ty); if (!c) return null; const b = WPN_CLASS[c].bases[0]; return { b: b[0], rar: -1, starter: 1, il: 1 }; }
+const wpnSpK = ty => { const t0 = TOWERS[ty] && TOWERS[ty].tiers[0]; return t0 ? clamp((t0.dmg || t0.smite || WSP_REF) / WSP_REF, .25, 2.5) : 1; };
+const wpnCalcOf = w => !w || w.starter ? Object.assign({}, WPN_STARTER_CALC, { spr: (wpnDef(w) || {}).spr || .12 }) : wpnCalc(w);
+const wpnName = w => { const d = wpnDef(w); return !d ? '' : w.starter ? 'Worn ' + d.name : d.name; };
+const wpnCol = w => !w || w.starter ? WPN_STARTER.col : RARITY[Math.max(0, Math.min(4, w.rar | 0))].col;
+const wpnRarName = w => !w || w.starter ? WPN_STARTER.name : RARITY[w.rar | 0].name;
+// the numbers a weapon shows for a unit type: its strike's range at tier I, attacks a second, DPS, Spell Damage
+function wpnNums(w, ty) {
+  const t0 = TOWERS[ty] && TOWERS[ty].tiers[0]; if (!t0) return null;
+  const S = wpnCalcOf(w), D = (t0.dmg || t0.smite || 0) * S.dk, aps = (t0.rate ? 1 / t0.rate : 1) * S.sk;
+  return { lo: D * (1 - S.spr), hi: D * (1 + S.spr), avg: D, aps, dps: D * aps, sp: Math.round(S.sp * wpnSpK(ty)), m: S.m };
+}
+// the weapon a unit fights with now (its starter when its slot is empty)
+const wpnOf = t => (t && t.weapon) || (t ? wpnStarter(t.type) : null);
+
+/* ---------- the legendaries' rules ---------- */
+const WFX = {
+  hit: (st, fx, id) => { (st.ipr = st.ipr || []).push({ kind: fx[1], n: fx[2], k: 1, id }); },
+  spell: (st, fx, id) => { (st.itw = st.itw || {})[fx[1]] = { kind: fx[2], k: 1, id, ch: 0 }; },
+  crit: st => { st.crit = Math.min(.9, (st.crit || 0) + .15); st.critM = Math.max(st.critM || 2.5, 3); },
+  mark: st => { const m = st.mark || [0, 0]; st.mark = [Math.max(m[0], .12), Math.max(m[1], 3)]; },
+  slow: st => { const s = st.slowOn || [0, 0]; st.slowOn = [Math.max(s[0], .25), Math.max(s[1], 1.5)]; },
+  bounce: (st, fx) => { st.bounce = (st.bounce != null ? st.bounce : 2) + fx[1]; },
+};
+const wpnSpellName = id => (typeof ABIL !== 'undefined' && ABIL[id] && ABIL[id].name) || id;
+function wpnRuleText(d) {
+  if (!d || !d.fx) return '';
+  const fx = d.fx, k = fx[0];
+  if (k === 'hit') return typeof IPROC !== 'undefined' && IPROC[fx[1]] ? IPROC[fx[1]].say(fx[2], 1) : '';
+  if (k === 'spell') { const sp = wpnSpellName(fx[1]); return typeof IPROC !== 'undefined' && IPROC[fx[2]] ? `${sp}'s hits ${IPROC[fx[2]].sayS(1)}.` : typeof ITWIST !== 'undefined' && ITWIST[fx[2]] ? ITWIST[fx[2]].say(sp, 1) : ''; }
+  if (k === 'crit') return '15% more chance to crit, and its crits strike x3.';
+  if (k === 'mark') return 'Foes it strikes are marked for 3s: they take 12% more from every unit.';
+  if (k === 'slow') return 'Every hit slows its foe 25% for 1.5s.';
+  if (k === 'bounce') return `Its glaive ricochets on to ${fx[1]} more foes.`;
+  return '';
+}
+
+/* ---------- in play ---------- */
+// effStats (game.js), right after talentStats: the weapon sets the strike and the speed, so everything after multiplies it
+function wpnApply(t, st) {
+  if (!t || !t.weapon || !t.def || !t.def.force || t.def.wall || !wpnOn()) return;
+  const w = t.weapon; if (!wpnFits(w, t)) return;
+  const S = wpnCalc(w);
+  if (st.dmg) st.dmg *= S.dk; else if (st.smite) st.smite *= S.dk;
+  for (const k of ['burn', 'poison', 'drain']) if (st[k]) st[k] *= S.m;   // (a strike's own burn or spores: by its DPS)
+  if (st.rate) st.rate /= S.sk;
+  if (S.sp) st.spDmg = (st.spDmg || 0) + Math.round(S.sp * wpnSpK(t.type));
+  st.wpn = S;
+  const d = wpnDef(w); if (d && d.leg && d.fx && WFX[d.fx[0]]) WFX[d.fx[0]](st, d.fx, d.id);
+}
+// each basic strike rolls inside its weapon's range (the starter's too: its range is the unit's baseline's)
+if (typeof forceHook === 'function') {
+  const _wpnHook = forceHook;
+  forceHook = function (k, ...a) {
+    const r = _wpnHook.apply(this, arguments);
+    if (k !== 'fire' || !wpnOn()) return r;
+    const t = a[0], st = a[1]; if (!t || !t.def || !t.def.force || t.def.wall || !wpnClassOf(t.type)) return r;
+    const p = typeof r === 'number' ? r : a[3];
+    const spr = st && st.wpn ? st.wpn.spr : (wpnDef(wpnStarter(t.type)) || {}).spr || .12;
+    return p * (1 + spr * (2 * Math.random() - 1));
+  };
+}
+function wpnEquip(t, w) {
+  if (!t || !G.towers.includes(t)) return false;
+  if (w && !wpnFits(w, t)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} doesn't fit a ${t.def.name.replace(/s$/, '')}.`); return false; }
+  const bag = G.wbag || (G.wbag = []);
+  if (w) { const i = bag.indexOf(w); if (i < 0) return false; bag.splice(i, 1); w.isNew = false; }
+  if (t.weapon) bag.push(t.weapon);
+  t.weapon = w || null;
+  if (w && typeof empower === 'function') empower([t], wpnCol(w));
+  if (typeof sfx === 'function') sfx('equip', w ? Math.max(0, w.rar) : 0);
+  G.talV = (G.talV || 0) + 1; if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
+  return true;
+}
+function wpnSalvage(w) {
+  const bag = G.wbag || [], i = bag.indexOf(w); if (i < 0) return 0;
+  bag.splice(i, 1); const v = WPN_SALVAGE[Math.max(0, Math.min(4, w.rar | 0))];
+  G.gold += v; if (G.stats) G.stats.gold = (G.stats.gold || 0) + v;
+  if (typeof sfx === 'function') sfx('sell'); if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
+  return v;
+}
+// a unit's DPS with a weapon in its slot (the stats engine's own number)
+function wpnDpsWith(t, w) {
+  const w0 = t.weapon; t.weapon = w && !w.starter ? w : null;
+  try { const st = effStats(t); return typeof towerDps === 'function' ? towerDps(t.type, st) : (st.dmg || st.smite || 0) / (st.rate || 1); } finally { t.weapon = w0; }
+}
+// the bot and a quick button: each weapon in the rack to the fitting unit it lifts most (higher tiers first), if it beats theirs
+function wpnAutoEquip() {
+  if (!wpnOn() || !G.wbag || !G.wbag.length) return 0;
+  let n = 0;
+  for (let guard = 0; guard < 40; guard++) {
+    let best = null;
+    for (const w of G.wbag) for (const t of G.towers) {
+      if (t.wrecked || !wpnFits(w, t)) continue;
+      const g = wpnDpsWith(t, w) - wpnDpsWith(t, t.weapon || null);
+      if (g > 0 && (!best || g > best.g)) best = { w, t, g };
+    }
+    if (!best) break;
+    wpnEquip(best.t, best.w); n++;
+  }
+  return n;
+}
+const wpnModel = t => { const w = t && t.weapon, d = wpnDef(w); return d && WEAPON_MDL[d.mdl] ? d.mdl : null; };
+
+/* ---------- drops ---------- */
+function wpnRarW(w, boss) {
+  // mostly common and uncommon; a rare is a good find, an epic a great one, a legendary a story (from LEG_FROM, paced)
+  const L = clamp((w - 1) / 34, 0, 1);
+  const W = [44 - 26 * L, 34 - 4 * L, 14 + 16 * L, w < EPIC_FROM ? 0 : (4 + 10 * L) * Math.min(1, .4 + .6 * (w - EPIC_FROM) / 5), w < LEG_FROM ? 0 : (.8 + 3.2 * L) * Math.min(1, .4 + .6 * (w - LEG_FROM) / 5)];
+  if (boss) { W[0] *= .5; W[3] *= 1.5; W[4] *= 2; }
+  return W;
+}
+const wpnLegCap = w => w < LEG_FROM ? 0 : 1 + Math.floor((w - LEG_FROM) / 12);
+// the unit types it may be made for: those you field, by count and tier (else any of the force's)
+function wpnTypesW() {
+  const W = typeof fieldWeights === 'function' ? fieldWeights() : {}, out = [];
+  for (const ty in W) if (wpnClassOf(ty)) out.push([ty, W[ty]]);
+  if (!out.length) for (const ty in TOWERS) if (wpnClassOf(ty)) out.push([ty, 1]);
+  return out;
+}
+function wpnRoll(wave, boss, rar, ty) {
+  wave = Math.max(1, wave | 0);
+  if (rar == null) rar = pickW(wpnRarW(wave, boss).map((v, i) => [i, v]));
+  if (rar === 4 && (G.wLegN | 0) >= wpnLegCap(wave)) rar = 3;   // legendaries are paced, as relics are
+  ty = ty || pickW(wpnTypesW()); if (!ty) return null;
+  const c = wpnClassOf(ty), u = TOWERS[ty].unit;
+  let b;
+  if (rar === 4) { const L = WPN_LEGS.filter(r => r[0] === u).map(r => r[1]); b = L.length ? lootPick(L) : null; if (!b) rar = 3; else G.wLegN = (G.wLegN | 0) + 1; }
+  if (!b) b = lootPick(WPN_CLASS[c].bases)[0];
+  const w = { id: G.wUid = (G.wUid | 0) + 1, b, rar, q: Math.round(Math.random() * 100) / 100, isNew: true };
+  w.il = typeof ilClampL === 'function' ? ilClampL(wave + (boss && typeof IL !== 'undefined' ? IL.boss : 0)) : wave;
+  return w;
+}
+function wpnToBag(w, c) {
+  if (!w) return;
+  const bag = G.wbag || (G.wbag = []);
+  if (bag.length >= WPN_BAG) {   // a full rack salvages its weakest
+    let lo = 0; for (let i = 1; i < bag.length; i++) if (bag[i].rar < bag[lo].rar) lo = i;
+    const old = bag[lo].rar <= w.rar ? bag.splice(lo, 1)[0] : w, v = WPN_SALVAGE[Math.max(0, old.rar | 0)];
+    G.gold += v; if (typeof onToast === 'function') onToast(`Weapon rack full: salvaged ${wpnName(old)} for ${v} gold.`);
+    if (old === w) return;
+  }
+  bag.push(w); G.wNew = (G.wNew || 0) + 1; G.wDropW = G.wave;
+  if (G.stats) G.stats.weapons = (G.stats.weapons || 0) + 1;
+  if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .5, wpnName(w), wpnCol(w));
+  if (typeof sfx === 'function') sfx('lootDrop', Math.max(2, w.rar));
+  const fit = (G.towers || []).filter(t => wpnFits(w, t)).length;
+  if (typeof onToast === 'function') onToast(`${RARITY[w.rar].name} weapon: ${wpnName(w)}${fit ? ` (fits ${fit} of your units)` : ''}. ${(G.stats && G.stats.weapons) > 1 ? 'Open a unit\'s Gear sheet to equip it.' : 'Weapons set a unit\'s strike: open a unit\'s Gear sheet (G) and tap its weapon slot.'}`);
+  if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
+}
+// a foe fell: the first wave boss always drops a weapon, later ones usually; the last elite of an elite wave now and then;
+// a wave's last foe rarely (sure after WPN_DROP.dry waves without one); any other elite hardly ever. About a dozen a run.
+const WPN_DROP = { boss: .7, lastElite: .22, elite: .01, last: .04, dry: 7 };
+function wpnDropCheck(c) {
+  if (!wpnOn() || G.state !== 'play' || !c || c.splitCopy || c.kid || c.def.egg || c.echo || c.sent || c.type === 'risen' || c.purse || G.chal === 'relicless') return;
+  const wv = c.wv || G.wave;
+  if (typeof isWaveBoss === 'function' && isWaveBoss(c)) { if (!G.wBossW || Math.random() < WPN_DROP.boss) { G.wBossW = wv; wpnToBag(wpnRoll(wv, true), c); } return; }
+  if (typeof isLastElite === 'function' && isLastElite(c)) { if (Math.random() < WPN_DROP.lastElite) wpnToBag(wpnRoll(wv, false), c); return; }
+  if (c.elite) { if (Math.random() < WPN_DROP.elite) wpnToBag(wpnRoll(wv, false), c); return; }
+  const last = !G.creeps.some(o => o !== c && !o.dead && o.wv === c.wv && !o.kid) && !(G.spawnQ || []).length;
+  if (!last || G.wLastW === wv) return;
+  G.wLastW = wv;
+  const dry = wv - (G.wDropW | 0);
+  if (dry >= WPN_DROP.dry || Math.random() < WPN_DROP.last) wpnToBag(wpnRoll(wv, false), c);
+}
+if (typeof rollDrop === 'function') {
+  const _wpnRoll = rollDrop;
+  rollDrop = function (c) { const r = _wpnRoll.apply(this, arguments); try { wpnDropCheck(c); } catch (e) { console.error(e); } return r; };
+}
+
+/* ---------- balance: runs of weapon luck, and the foes' health that follows an ordinary one ----------
+   wpnGain(r, L, w, cast): what a weapon of rarity r and Item Level L does to a unit at wave w: its DPS multiple, and for a
+   caster its spells' too (Spell Damage at a typical coefficient, 0.5, against a typical spell hit: twice a typical strike,
+   ilCurve; about 55% of a caster's damage is spells).
+   wpnRunSim(o): one run's weapons, drawn with the drop odds above, on an army of damage dealers weighted by the share of
+   its damage each carries (WPN_SIM.w: a run leans on a few upgraded units; WPN_SIM.cast says which are casters); a weapon
+   lands on one of them in proportion (drops lean to what you field, by count and tier) and is kept if it beats what that
+   one holds; o.cap caps the rarity (1: an ordinary run's commons and uncommons). It returns the army's damage multiple by
+   wave (weighted) and the drops it found.
+   WPN_HP_TAB is the median of 4000 capped runs (tools/check_weapons.js --hp rebuilds it). */
+const WPN_SIM = { w: [3, 2, 1.5, 1.2, 1, .8, .6, .4], cast: [1, 3, 5], spells: .55, coef: .5 };
+const wpnLerp = (A, x) => { if (x <= A[0][0]) return A[0][1]; for (let i = 1; i < A.length; i++) if (x <= A[i][0]) { const [a, va] = A[i - 1], [b, vb] = A[i]; return va + (vb - va) * (x - a) / (b - a); } return A[A.length - 1][1]; };
+function wpnGain(r, L, w, cast) {
+  L = Math.min(L, w + 3);
+  const m = WPN_RAR_M[r] * (1 + WPN_IL_GROW * (L - 1)); if (!cast) return m;
+  const mc = 1 + (m - 1) * WPN_CAST_STRIKE, ic = typeof ilCurve === 'function' ? ilCurve : () => 1;
+  const sp = WSP[r] * ic(L), spGain = sp * WPN_SIM.coef / (2 * WSP_REF * ic(w));
+  return mc + WPN_SIM.spells * spGain;
+}
+function wpnRunSim(o) {
+  o = o || {}; const rnd = o.rnd || Math.random, pick = W => { let t = W.reduce((a, b) => a + b, 0) * rnd(); for (let i = 0; i < W.length; i++) if ((t -= W[i]) <= 0 && W[i] > 0) return i; return W.length - 1; };
+  const Wt = WPN_SIM.w, N = Wt.length, S = Wt.reduce((a, b) => a + b, 0), isC = u => WPN_SIM.cast.includes(u), held = new Array(N).fill(null), K = [1], drops = [0, 0, 0, 0, 0];
+  let dropW = 0, legN = 0, bossSeen = false;
+  const give = (w, boss) => {
+    let r = pick(wpnRarW(w, boss)); if (r === 4 && legN >= wpnLegCap(w)) r = 3; if (r === 4) legN++;
+    if (o.cap != null) r = Math.min(r, o.cap);
+    drops[r]++; dropW = w;
+    const L = w + (boss ? 3 : 0), u = pick(Wt), cast = isC(u);
+    if (!held[u] || wpnGain(r, L, w, cast) > wpnGain(held[u][0], held[u][1], w, cast)) held[u] = [r, L];
+  };
+  for (let w = 1; w <= 50; w++) {
+    if (bossWave(w)) { if (!bossSeen || rnd() < WPN_DROP.boss) give(w, true); bossSeen = true; }
+    else if (eliteWave(w) && rnd() < WPN_DROP.lastElite) give(w, false);
+    if (w - dropW >= WPN_DROP.dry || rnd() < WPN_DROP.last) give(w, false);
+    let k = 0; for (let u = 0; u < N; u++) k += Wt[u] * (held[u] ? wpnGain(held[u][0], held[u][1], w, isC(u)) : 1);
+    K[w] = k / S;
+  }
+  return { K, drops, n: drops.reduce((a, b) => a + b, 0) };
+}
+// the median ordinary run (drops capped at uncommon): the army's damage multiple by wave (tools/check_weapons.js --hp)
+const WPN_HP_TAB = [[1, 1], [10, 1.09], [15, 1.14], [20, 1.18], [25, 1.23], [30, 1.27], [35, 1.31], [40, 1.36], [45, 1.41], [50, 1.45]];
+const wpnArmyK = w => wpnLerp(WPN_HP_TAB, Math.max(1, Math.min(50, w | 0)));
+function wpnHpK(n) {
+  n = Math.max(1, n | 0); if (n < WPN_HP_FROM) return 1;
+  const ramp = Math.min(1, (n - WPN_HP_FROM + 1) / (WPN_HP_FULL - WPN_HP_FROM + 1));
+  return 1 + ramp * (wpnArmyK(n) - 1);
+}
+if (typeof forceHpK === 'function') {
+  const _wpnHp = forceHpK;
+  forceHpK = function (n) { const k = _wpnHp.apply(this, arguments); return typeof oldRules === 'function' && oldRules() ? k : k * wpnHpK(n); };
+}
+
+/* ---------- saves: the rack and each unit's weapon (by its cell); an old save loads with every unit on its starter ---------- */
+const wpnOk = w => !!(w && typeof w === 'object' && wpnDef(w) && w.rar >= 0 && w.rar <= 4);
+const wpnClean = w => { const o = { id: w.id, b: w.b, rar: w.rar, q: w.q, il: w.il }; if (w.isNew) o.isNew = true; return o; };
+if (typeof serialize === 'function') {
+  const _wpnSer = serialize;
+  serialize = function () {
+    const s = _wpnSer.apply(this, arguments);
+    if (s && G.force) s.wpn = { uid: G.wUid | 0, legN: G.wLegN | 0, bossW: G.wBossW | 0, dropW: G.wDropW | 0, lastW: G.wLastW | 0, bag: (G.wbag || []).filter(wpnOk).map(wpnClean),
+      on: (G.towers || []).filter(t => t.weapon && wpnOk(t.weapon)).map(t => [t.i, t.j, wpnClean(t.weapon)]) };
+    return s;
+  };
+}
+function wpnRestore(s) {
+  const W = s && s.wpn;
+  G.wbag = []; G.wUid = 0; G.wLegN = 0; G.wDropW = 0; G.wLastW = 0; G.wBossW = s && s.wave > 5 ? 5 : 0;   // (an old save past wave 5: its first boss is behind it)
+  for (const t of G.towers || []) t.weapon = null;
+  if (!W) return;
+  G.wUid = W.uid | 0; G.wLegN = W.legN | 0; G.wBossW = W.bossW | 0; G.wDropW = W.dropW | 0; G.wLastW = W.lastW | 0;
+  G.wbag = (W.bag || []).filter(wpnOk);
+  for (const [i, j, w] of W.on || []) {
+    if (!wpnOk(w)) continue;
+    const t = (G.towers || []).find(o => o.i === i && o.j === j);
+    if (t && wpnFits(w, t)) t.weapon = w; else G.wbag.push(w);   // (a unit no longer there: back to the rack)
+  }
+  for (const w of G.wbag.concat((G.towers || []).map(t => t.weapon).filter(Boolean))) G.wUid = Math.max(G.wUid, w.id | 0);
+}
+if (typeof restore === 'function') {
+  const _wpnRes = restore;
+  restore = function (s) { const r = _wpnRes.apply(this, arguments); try { wpnRestore(s); } catch (e) { console.error(e); } return r; };
+}
+if (typeof newGame === 'function') {
+  const _wpnNew = newGame;
+  newGame = function () { const r = _wpnNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.wbag = []; G.wUid = 0; G.wLegN = 0; G.wDropW = 0; G.wLastW = 0; G.wBossW = 0; } return r; };
+}
+// selling a unit hands its weapon back to the rack (unsocketAll is called when a unit is sold or its sockets go)
+if (typeof unsocketAll === 'function') {
+  const _wpnUns = unsocketAll;
+  unsocketAll = function (t) { const r = _wpnUns.apply(this, arguments); if (t && t.weapon) { (G.wbag || (G.wbag = [])).push(t.weapon); t.weapon = null; } return r; };
+}
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
@@ -74137,10 +74871,10 @@ function heroKeepHud(P) {
   const a = typeof ageNext === 'function' ? ageNext() : null, r = G.ageRes, can = typeof ageCanStart === 'function' && ageCanStart();
   const key = typeof UI_ART !== 'undefined' && UI_ART.keepup ? 'a:keepup:' + (a || r ? 1 : 0) : 'g:ascend:' + (a || r ? 'c9971f' : '4e4e46') + ':4';
   if (P.kcv._k !== key) { P.kcv._k = key; iconPaint(P.kcv, key); }
-  const txt = r ? Math.ceil(r.T - r.t) + 's' : a ? String(a.cost) : 'Max';
+  const vo = typeof vetOn === 'function' && vetOn(), txt = r ? Math.ceil(r.T - r.t) + 's' : a ? String(a.cost) : vo ? '' : 'Max';
   if (P.kc.textContent !== txt) P.kc.textContent = txt;
   P.keep.classList.toggle('can', can); P.keep.classList.toggle('busy', !!r); P.keep.classList.toggle('sel', !!(G.sel && G.sel.kind === 'keep'));
-  const tip = r ? `The keep: becoming a ${AGES[r.to].name}, ${Math.ceil(r.T - r.t)}s left` : a ? `Upgrade the keep to a ${a.name} (${a.cost} gold${G.wave < a.wave ? `, from wave ${a.wave}` : ''}) · its research and the units still to open` : 'The keep is fully upgraded · its research and the units still to open';
+  const tip = r ? `The keep: becoming a ${AGES[r.to].name}, ${Math.ceil(r.T - r.t)}s left` : a ? `Upgrade the keep to a ${a.name} (${a.cost} gold${G.wave < a.wave ? `, from wave ${a.wave}` : ''}) · its research and the units still to open` : vo ? 'The keep · the units still to open (tiers IV-VI come from each unit’s veterancy)' : 'The keep is fully upgraded · its research and the units still to open';
   if (P.keep.title !== tip) { P.keep.title = tip; P.keep.setAttribute('aria-label', tip); }
 }
 function heroHud() {
@@ -75234,87 +75968,194 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best}${res.rite ? ' on ' + riteName(res.rite) : ''}${res.rank ? ` (#${res.rank})` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    try { BOARD.rows[diff] = await q('rite,'); } catch (e) { if (e.status !== 400) throw e; BOARD.rows[diff] = await q(''); }   // a server not yet given the rites column
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush(); }
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -75323,74 +76164,206 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.e.r ? riteName(x.e.r | 0) : '—'; rt.title = x.e.r ? RITES[(x.e.r | 0) - 1].name : 'No rite';
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.rite ? riteName(x.rite | 0) : '—'; rt.title = x.rite ? RITES[(x.rite | 0) - 1].name : 'No rite';
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)}${e.r ? ' on ' + riteName(e.r | 0) : ''}, #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave}${mine.rite ? ' on ' + riteName(mine.rite | 0) : ''}, #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${x.e.r ? esc(RITES[(x.e.r | 0) - 1].name) : 'No rite'}">${x.e.r ? 'Rite ' + RITE_ROMAN[x.e.r | 0] : '—'}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${x.rite ? esc(RITES[(x.rite | 0) - 1].name) : 'No rite'}">${x.rite ? 'Rite ' + RITE_ROMAN[x.rite | 0] : '—'}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -75522,16 +76495,17 @@ function slotsNow() {
         const all = grp.reduce((a, o) => a + (upgradeCost(o) || 0), 0), g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0;
         s[0] = { key: `u:${t.type}:${t.tier + 1}`, cost: all, lbl: `All ${grp.length}`, up: !!pc, on: G.gold >= uc, name: `Upgrade all ${grp.length} to tier ${ROMAN[t.tier + 1]}`, hk: 'U', act: () => upgradeGroup() };
       } else
-      s[0] = ageLocked(t) ? { key: `m:${t.type}:${t.tier + 1}`, lbl: AGES[t.tier - 1].name, on: false, name: `Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}`, hk: 'U',
+      s[0] = ageLocked(t) && vetOn() ? { key: `m:${t.type}:${t.tier + 1}`, lbl: `Vet ${vetPts(t)}/${vetNeed(t.tier + 1)}`, on: false, name: vetLockText(t), hk: 'U', act: () => { toast(vetLockText(t) + '. Kills count, and so do assists: foes that die under its slows, roots, burns, curses or aura.'); sfx('nogold'); } }
+           : ageLocked(t) ? { key: `m:${t.type}:${t.tier + 1}`, lbl: AGES[t.tier - 1].name, on: false, name: `Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}`, hk: 'U',
                 act: () => { toast(`Tier ${ROMAN[t.tier + 1]} needs a ${AGES[t.tier - 1].name}. Upgrade your keep.`); select('keep', null); } }
-           : uc ? (() => { const g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0; return { key: `u:${t.type}:${t.tier + 1}`, cost: uc, lbl: 'Upgrade', up: !!pc, on: G.gold >= uc, name: `Upgrade to tier ${ROMAN[t.tier + 1]}` + (g ? (b => b.length ? `: ${b.join(', ')}` : '')(gainBits(t.type, g.a, g.b, 3)) : ''), hk: 'U', act: () => upgrade(t) }; })()
+           : uc ? (() => { const g = upgradeGain(t), pc = g && g.pct > 0 ? g.pct : 0; return { key: `u:${t.type}:${t.tier + 1}`, cost: uc, lbl: 'Upgrade', up: !!pc, on: G.gold >= uc, pulse: !!t.vetNew && G.gold >= uc, name: `Upgrade to tier ${ROMAN[t.tier + 1]}` + (g ? (b => b.length ? `: ${b.join(', ')}` : '')(gainBits(t.type, g.a, g.b, 3)) : ''), hk: 'U', act: () => upgrade(t) }; })()
                 : { key: `m:${t.type}:${t.tier}`, lbl: 'Max', on: false, name: 'Fully upgraded', act: () => toast(`This ${uw(1)} is fully upgraded.`) };
       if (specNeedsChoice(t)) s[3] = { key: `u:${t.type}:3`, lbl: 'Path', up: true, on: true, pulse: true, name: `Choose a path for this ${uw(1)} (free)`, act: () => openSpecPick(t, null, true) };
       const rc = repairCost(t);
       if (rc) s[2] = { key: `t:${t.type}:${t.tier}`, cost: rc, lbl: t.wrecked ? 'Rebuild' : 'Repair', on: G.gold >= rc, pulse: t.wrecked, name: t.wrecked ? `Rebuild this wrecked ${uw(1)}` : `Repair this ${uw(1)}`, hk: 'R', act: () => repairTower(t) };
       // a force's unit: its abilities on 4-6 (Q/W/E), the mode on 7, Gear on 3; its sockets and item powers on the Gear page
       const abMain = t.def.force && typeof abilKit === 'function' && abilKit(t) && sel.page !== 'gear';
-      if (t.def.force && ageLocked(t) && s[0] && s[0].key.startsWith('m:'))   // a force's unit doesn't send you to the keep: its next tier just waits on it
+      if (t.def.force && ageLocked(t) && !vetOn() && s[0] && s[0].key.startsWith('m:'))   // a force's unit doesn't send you to the keep: its next tier just waits on it
         s[0] = { key: s[0].key, lbl: 'Tier ' + ROMAN[t.tier + 1], on: false, name: `Tier ${ROMAN[t.tier + 1]} opens when the keep is a ${AGES[t.tier - 1].name} (the castle above your hero)`, hk: 'U',
           act: () => toast(`Tier ${ROMAN[t.tier + 1]} opens when the keep is a ${AGES[t.tier - 1].name}: upgrade it from the castle above your hero.`) };
       if (abMain) { const up = s[0], rp = s[2]; s[0] = s[2] = null; abilitySlots(t, s); s[4] = up; if (rp) s[6] = rp; }
@@ -75568,6 +76542,7 @@ function slotsNow() {
     const a = ageNext(), r = G.ageRes;
     if (r) s[0] = { key: 'g:ascend:c9971f:4', lbl: Math.ceil(r.T - r.t) + 's', on: false, name: `Upgrading to a ${AGES[r.to].name}`, act: () => toast(`Your ${AGES[r.to].name} is finished in ${Math.ceil(r.T - r.t)} seconds.`) };
     else if (a) s[0] = { key: 'g:ascend:c9971f:4', cost: a.cost, lbl: a.name, on: ageCanStart(), pulse: ageCanStart(), name: `Upgrade to a ${a.name}`, hk: 'U', act: advanceAge };
+    else if (vetOn()) s[0] = null;   // (no keep upgrades: veterancy opens unit tiers IV-VI)
     else s[0] = { key: 'g:ascend:c9971f:4', lbl: 'Max', on: false, name: 'Your keep is fully upgraded', act: () => toast('Your keep is already a Citadel.') };
     const lore = G.force && typeof loreKeepSlot === 'function' && !(typeof spNew === 'function' && spNew());   // (force runs learn spells through talents, not keep research)
     lockedSchools().slice(0, lore ? 8 : 9).forEach((ty, k) => { s[k + 1] = schoolSlot(ty); });   // the schools still to open
@@ -75733,6 +76708,7 @@ function infoHTML() {
     return `<h3>${grp ? `${grp.length} × ` : ''}${d.name} <span class="tier${t.tier >= 3 ? ' asc' : ''}">${ROMAN[t.tier]}</span></h3>`
       + (grp ? `<p class="grp">${gc ? `Upgrade all ${grp.length} for <b>${gc}</b> gold (as many as you can afford).` : 'All at the highest tier.'} Tap any ${uw(1)} to go back to one.</p>` : '')
       + (d.support && !shrineAttacks(t.tier, eff) ? '' : `<p class="mut" data-d="1">Kills <b>${t.kills}</b> · Dealt <b>${fmt(t.dmg)}</b></p>`)
+      + (grp ? '' : vetInfoHTML(t))
       + `<div class="st">${statLine(t.type, t.tier, eff, tierOf(t))}</div>` + manaInfoHTML(t) + (eff.ist && itemStatSum(eff.ist) ? `<p class="mut ist" data-d="2">Items: <b>${itemStatSum(eff.ist)}</b></p>` : '') + (typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : '') + (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '')
       + synSummaryHTML()
       + (typeof bfRowHTML === 'function' ? bfRowHTML(t) : '')
@@ -75744,10 +76720,11 @@ function infoHTML() {
   if (s && s.kind === 'keep') {
     const a = ageNext(), r = G.ageRes, cur = AGES[G.age], top = ROMAN[maxTierFor(G.age)];
     const fk = !!G.force && !G.vs;   // a force run: units, and Renown opens them (Classic: schools and School Keys)
-    let h = `<h3>${cur.name} <span class="tier asc">${cur.short}</span></h3><p class="mut" data-d="2">${fk ? 'Units' : 'Towers'} can climb to tier ${top}. Upgrade the keep to open the next tier.</p>`;
+    let h = vetOn() ? `<h3>Your keep</h3><p class="mut" data-d="2">${uw(2, true)} open tiers I to III here. Tiers IV, V and VI each ${uw(1)} earns with veterancy: its kills and assists (${VET_NEED.join(', ')}). Its card shows how far it has to go.</p>`
+      : `<h3>${cur.name} <span class="tier asc">${cur.short}</span></h3><p class="mut" data-d="2">${fk ? 'Units' : 'Towers'} can climb to tier ${top}. Upgrade the keep to open the next tier.</p>`;
     if (r) { const f = clamp(r.t / r.T, 0, 1); h += `<p class="up">Upgrading to a ${AGES[r.to].name}: ${Math.ceil(r.T - r.t)}s left</p><div class="agebar"><i style="width:${Math.round(f * 100)}%"></i></div>`; }
     else if (a) h += `<p class="up">Next: ${a.name} · <b>${a.cost}</b> gold${G.wave < a.wave ? ` · from wave ${a.wave}` : ''}</p><p class="up perk" data-d="1">${fk ? a.text.replace(/^Towers/, 'Units') : a.text}</p>`;
-    else h += `<p class="up">Your keep is fully upgraded.</p>`;
+    else if (!vetOn()) h += `<p class="up">Your keep is fully upgraded.</p>`;
     const L = lockedSchools();
     const nk = keysHeld(), nx = nextKeyWave();
     if (fk && typeof rnOn === 'function' && rnOn() && !nk) h += L.length ? `<p class="up">Units: <b>${COMBAT_TYPES.length - L.length}</b> of ${COMBAT_TYPES.length} open</p><p class="mut" data-d="2">Open locked units with Renown (${rnCost('unit')}): tap the Renown bar.</p>` : `<p class="up" data-d="1">Every unit is open.</p>`;
@@ -77441,7 +78418,10 @@ function endTips(won) {
     const n = Math.max(1, G.wave);
     if (G.path && G.path.len < 28 && n >= 6) add(6, `Your maze was only ${G.path.len} steps long. Wind the road back and forth past your ${uw(2)} with barricades: every extra step is more time under fire.`);
     const fk = !!G.force && !G.vs;
-    if (n >= 12 && (G.age | 0) === 0) add(5, fk ? `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV units hit far harder.` : `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV towers hit far harder and take a path.`);
+    if (vetOn()) { const U = G.towers.filter(t => !t.def.wall), top = U.reduce((m, t) => Math.max(m, t.tier | 0), 0), up = U.filter(t => t.tier === 2 && !vetLocked(t) && upgradeCost(t)).length;
+      if (n >= 12 && up) add(5, `${up} of your ${uw(2)} had earned tier IV with veterancy but were still at tier III. Their Upgrade button pulses when it opens: tier IV hits far harder.`);
+      else if (n >= 14 && top < 3) add(4, `No ${uw(1)} reached tier IV. Veterancy (kills + assists) opens it: put your strongest ${uw(2)} where the most foes walk past them.`); }
+    else if (n >= 12 && (G.age | 0) === 0) add(5, fk ? `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV units hit far harder.` : `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV towers hit far harder and take a path.`);
     else if (n >= 22 && (G.age | 0) < 2) add(5, `Your keep wasn't a Fortress by wave ${n}. Tier V ${fk ? 'units' : 'towers'} open there, with a third socket.`);
     if ((G.tp | 0) >= 3) add(4, `You fell with ${G.tp} talent points unspent. Spend them in Talents between waves: every point helps.`);
     if (keysHeld() > 0) add(4, `You fell holding ${keysHeld() > 1 ? keysHeld() + ' School Keys' : 'a School Key'}. ${oldRules() ? 'Tap a locked tower in the build bar to open a new school as soon as a key drops.' : 'Tap a locked unit in the build bar to open it with a key.'}`);
@@ -85194,7 +86174,15 @@ function bfSrcName(s) {
   if (typeof s === 'string') return s;
   return '';
 }
-const bfFrom = s => { const n = bfSrcName(s); return n ? 'from ' + n : ''; };
+let BF_CAP = null;   // bfCapture: the units the foe's statuses name
+const bfFrom = s => { if (BF_CAP && s && typeof s === 'object') BF_CAP.push(s); const n = bfSrcName(s); return n ? 'from ' + n : ''; };
+// veterancy (xp.js vetKill): every source object a foe's debuffs name right now (read through the same get() the cards use)
+function bfCapture(c) {
+  const out = BF_CAP = [];
+  try { for (const e of BUFF) if (e.who === 'foe' && e.kind === 'debuff') { try { e.get(c); } catch (err) { /* (a status that can't read this foe) */ } } }
+  finally { BF_CAP = null; }
+  return out;
+}
 // the support casters covering each foe, by the kind of tie (heal, ward, mres, haste, cleanse, raise): worked out once a step
 let BF_COVER = null, BF_COVER_AT = -1;
 function bfCover() {
@@ -86667,6 +87655,7 @@ const PT_EARNED = [66, 144, 244, 383, 568, 847, 1042, 1292, 1578, 1991, 2224, 26
 function ptKeep(W) {
   let age = 0, cost = 0;
   if (typeof AGES !== 'undefined') for (let k = 1; k < AGES.length; k++) if (AGES[k].wave != null && W >= AGES[k].wave) { age = k; cost += AGES[k].cost | 0; }
+  if (typeof vetOn === 'function' && vetOn()) cost = 0;   // (the keep upgrades no longer gate tiers or cost gold: veterancy does, and a playtest army starts seasoned, xp.js vetSeason)
   return { age, cost };
 }
 // after newGame (G.gold is the run's starting purse): PT.gold of the purse and the income through wave W-1, less the keep
@@ -87053,5 +88042,218 @@ if (typeof document !== 'undefined' && document.createElement) {
 .gp-infq{margin:4px 0 6px;padding:6px 8px;border-radius:4px;background:rgba(127,214,255,.08);box-shadow:inset 0 0 0 1px rgba(127,214,255,.4)}
 .gp-infq p{margin:0 0 5px;font-size:12.5px;color:#cfe8f5}.gp-infq button{margin-right:6px}`;
   (document.head || document.documentElement).append(css);
+}
+
+/* ================= WEAPONS, on screen: the weapon slot on the Gear sheet, its rack, its card, the info pane's line =================
+   (the rules: forces_zzzzzzzzzzzzz_weapons.js). Kept to the weapon's own corner of each screen, wrapped in from here:
+   - the Gear sheet (gearpanel.js openGearPanel): a weapon slot heads the right-hand column, and the weapon heads the Gear
+     list. Tapping the slot opens the weapon rack for that unit: what it holds now, and every weapon that fits it with the
+     change in plain numbers ("Damage 10-14 -> 16-21", "Speed 1.1 -> 1.3/s", "DPS 13 -> 24", "Spell Damage 0 -> 120"),
+     Equip, Salvage, and Take off (back to its starter).
+   - the info pane (ui.js infoHTML): one line right under the stats row (never dropped on a crowded pane), the weapon's icon, name, damage, speed and DPS.
+   - the card (wpnCardHTML): the RPG tooltip in the items' style (itemtip.js), on hover anywhere a weapon is shown
+     (data-wid="<id>", or data-wst="<unit id>" for a starter).
+   Icons: the item icon painter's class glyph on the rarity frame; a painting can go in RELIC_IMG['w-<model key>']. */
+const wpE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const wpN = v => v >= 100 ? String(Math.round(v)) : v >= 10 ? String(Math.round(v)) : String(Math.max(1, Math.round(v)));
+const wpS = v => String(+v.toFixed(2));
+const wpRange = n => `${wpN(n.lo)}–${wpN(n.hi)}`;
+function wpKey(w) {
+  const d = wpnDef(w); if (!d) return 'g:empty';
+  const C = WPN_CLASS[d.cls] || {}, art = 'w-' + d.mdl;
+  return `g:${C.icon || 'sword'}:${String(C.hue || '#888888').slice(1)}:${w.starter ? 0 : Math.max(0, w.rar | 0)}:${art}:${typeof RELIC_IMG !== 'undefined' && RELIC_IMG[art] ? 1 : 0}`;
+}
+const _wpURL = {};
+function wpIconURL(w) {
+  const k = wpKey(w); if (_wpURL[k]) return _wpURL[k];
+  try { const c = document.createElement('canvas'); c.width = c.height = 64; iconPaint(c, k); return (_wpURL[k] = c.toDataURL()); } catch (e) { return ''; }
+}
+const wpTowerById = id => (G.towers || []).find(t => t.id === id) || null;
+function wpById(id) {
+  for (const w of G.wbag || []) if (w.id === id) return w;
+  for (const t of G.towers || []) if (t.weapon && t.weapon.id === id) return t.weapon;
+  return null;
+}
+const wpWearer = w => (G.towers || []).find(t => t.weapon === w) || null;
+// the kind line: "Rare spear · Item Level 14", "Legendary staff · Briarwardens only", "Starter spear · its baseline"
+function wpKindLine(w) {
+  const d = wpnDef(w); if (!d) return '';
+  const fit = d.leg ? `${(TOWERS[Object.keys(TOWERS).find(ty => TOWERS[ty].unit === d.u)] || {}).name || d.u} only` : (() => {
+    const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty) === d.cls); return tys.length ? 'for ' + tys.map(ty => String(TOWERS[ty].name).split(',')[0]).join(', ') : '';
+  })();
+  return [`${wpnRarName(w)} ${d.cls}`, w.starter ? 'its baseline' : `Item Level ${w.il || 1}`, fit].filter(Boolean).join(' · ');
+}
+// the weapon's card. t: the unit it is on or would go on (its tier's numbers); vs: the weapon to compare with (what t holds)
+function wpnCardHTML(w, t, o) {
+  o = o || {}; const d = wpnDef(w); if (!d) return '';
+  const ty = t ? t.type : (Object.keys(TOWERS).find(k => d.leg ? TOWERS[k].unit === d.u : wpnClassOf(k) === d.cls) || null);
+  const n = ty ? wpnNums(w, ty) : null, col = wpnCol(w);
+  const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
+  let live = '';
+  if (t && n && t.def) {
+    const st = t.weapon === w || (w.starter && !t.weapon) ? (t.st || effStats(t)) : (() => { const w0 = t.weapon; t.weapon = w.starter ? null : w; try { return effStats(t); } finally { t.weapon = w0; } })();
+    const D = st.dmg || st.smite || 0, spr = (st.wpn && st.wpn.spr) || (wpnCalcOf(w).spr), dps = typeof towerDps === 'function' ? towerDps(t.type, st) : 0;
+    live = `<p class="itc-k">On this ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}, its talents and items on top): ${wpN(D * (1 - spr))}–${wpN(D * (1 + spr))} a strike · ${wpS(1 / (st.rate || 1))} a second · ${wpN(dps)} DPS</p>`;
+  }
+  const rule = d.leg ? wpnRuleText(d) : '';
+  let cmp = '';
+  if (o.vs !== undefined && ty) {
+    const a = wpnNums(o.vs || wpnStarter(ty), ty), b = n, arrow = (x, y, f, suf) => { const up = y > x + 1e-6, dn = y < x - 1e-6; return `${f(x)}${suf || ''} → <b class="${up ? 'bo' : dn ? 'neg' : ''}">${f(y)}${suf || ''}</b>`; };
+    const rg = (x, y) => `${wpRange(x)} → <b class="${y.avg > x.avg + 1e-6 ? 'bo' : y.avg < x.avg - 1e-6 ? 'neg' : ''}">${wpRange(y)}</b>`;
+    cmp = `<div class="wp-cmp"><p>Damage ${rg(a, b)}</p><p>Speed ${arrow(a.aps, b.aps, wpS, '/s')}</p><p>DPS ${arrow(a.dps, b.dps, wpN)}</p>${a.sp || b.sp ? `<p>Spell Damage ${arrow(a.sp || 0, b.sp || 0, v => String(v))}</p>` : ''}</div>`;
+  }
+  return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${wpE(wpnName(w))}</h5><p class="itc-k">${wpE(wpKindLine(w))}</p>`
+    + (lines.length ? `<ul class="itc-s">${lines.join('')}</ul>` : '') + live
+    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '')
+    + cmp + (w.starter ? '<p class="itc-fl">Its own weapon as it was issued: a better one drops from bosses, elites and the waves\' last foes.</p>' : `<p class="itc-fl">“${wpE(d.look.charAt(0).toUpperCase() + d.look.slice(1))}.”</p>`)
+    + (o.note || '') + '</div>';
+}
+if (typeof document !== 'undefined' && typeof itipBind === 'function') {
+  itipBind(document, '[data-wid]', el => { const w = wpById(+el.dataset.wid); return w ? wpnCardHTML(w, el.dataset.wt ? wpTowerById(+el.dataset.wt) : wpWearer(w)) : ''; });
+  itipBind(document, '[data-wst]', el => { const t = wpTowerById(+el.dataset.wst); return t ? wpnCardHTML(wpnOf(t), t) : ''; });
+}
+// the attributes that show a weapon's card on hover
+const wpTipAttr = (w, t) => w && !w.starter ? `data-wid="${w.id}"${t ? ` data-wt="${t.id}"` : ''}` : t ? `data-wst="${t.id}"` : '';
+
+/* ---------- the info pane: one line under the stats ---------- */
+function wpInfoLine(t) {
+  if (!wpnOn() || !t || !t.def || !wpnClassOf(t.type)) return '';
+  const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
+  return `<p class="wp-ln" tabindex="0" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <span>${wpRange(n)} · ${wpS(n.aps)}/s · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</span></p>`;
+}
+if (typeof infoHTML === 'function') {
+  const _wpInfo = infoHTML;
+  infoHTML = function () {
+    const h = _wpInfo.apply(this, arguments);
+    try {
+      const s = G && G.sel, t = s && s.kind === 'tower' ? s.ref : null, ln = t ? wpInfoLine(t) : '';
+      if (!ln || typeof h !== 'string') return h;
+      // right under the stats row (closed where its divs balance), so a crowded pane drops other lines first
+      const st = h.indexOf('<div class="st">');
+      if (st >= 0) { let d = 0; const re = /<\/?div\b/g; re.lastIndex = st; for (let m; (m = re.exec(h));) { d += m[0][1] === '/' ? -1 : 1; if (!d) { const e = h.indexOf('>', m.index) + 1; return h.slice(0, e) + ln + h.slice(e); } } }
+      const at = h.indexOf('<div class="tags">');
+      return at >= 0 ? h.slice(0, at) + ln + h.slice(at) : h + ln;
+    } catch (e) { return h; }
+  };
+}
+
+/* ---------- the Gear sheet: the weapon slot, and the weapon at the head of its Gear list ---------- */
+function wpSockHTML(t) {
+  const w = wpnOf(t);
+  return `<button type="button" class="gp-sock wp-sock${t.weapon ? '' : ' empty'}${(G.wbag || []).some(q => wpnFits(q, t) && q.isNew) ? ' wp-new' : ''}" ${wpTipAttr(w, t)}><canvas width="112" height="112" data-key="${wpKey(w)}"></canvas><small style="color:${wpnCol(w)}">${wpE(t.weapon ? wpnName(w) : 'Weapon')}</small></button>`;
+}
+function wpGearRow(t) {
+  const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
+  return `<div class="gp-it wp-it" tabindex="0" ${wpTipAttr(w, t)}><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <small>${wpE(wpKindLine(w))}</small><p class="gp-isl">Damage ${wpRange(n)} · ${wpS(n.aps)} attacks a second · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</p>${wpnDef(w).leg ? `<p class="gp-iab">Passive: ${wpE(wpnDef(w).name)}</p>` : ''}</div>`;
+}
+if (typeof openGearPanel === 'function') {
+  const _wpGp = openGearPanel;
+  openGearPanel = function (t) {
+    const r = _wpGp.apply(this, arguments);
+    try {
+      if (!wpnOn() || !t || !wpnClassOf(t.type) || typeof ovp === 'undefined' || !ovp || !ovp.classList.contains('gearp')) return r;
+      const cols = ovp.querySelectorAll('.gp-doll > .gp-col'), col = cols[1] || cols[0];
+      if (col) {
+        col.insertAdjacentHTML('afterbegin', wpSockHTML(t));
+        const b = col.querySelector('.wp-sock'), c = b.querySelector('canvas'); iconPaint(c, c.dataset.key);
+        b.onclick = () => { if (typeof sfx === 'function') sfx('click'); if (typeof itipHide === 'function') itipHide(); wpRack(t); };
+      }
+      const gl = ovp.querySelector('.gp-gear');
+      if (gl) { const none = gl.querySelector('.gp-none'); if (none) none.remove(); gl.insertAdjacentHTML('afterbegin', wpGearRow(t)); }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+
+/* ---------- the rack: the weapons that fit this unit, compared with what it holds ---------- */
+// a spell's hit with it, against now (the sheet's own number, gearpanel.js gpDmgNums): " · Grasping Thicket 56 → 72"
+function wpSpellCmp(t, w) {
+  const kit = typeof abilKit === 'function' && abilKit(t); if (!kit || typeof gpDmgNums !== 'function') return '';
+  const w0 = t.weapon, now = effStats(t); let alt; t.weapon = w; try { alt = effStats(t); } finally { t.weapon = w0; }
+  const learned = (t.ab && t.ab.learned) || [];
+  const abs = kit.abilities.filter(ab => learned.includes(ab.id)).concat(kit.abilities.filter(ab => !learned.includes(ab.id)));
+  for (const ab of abs) {
+    const a = gpDmgNums(t, now, ab)[0], b = gpDmgNums(t, alt, ab)[0]; if (a == null || b == null) continue;
+    return ` · ${wpE(ab.name)} ${a} → <b class="${b > a ? 'bo' : b < a ? 'neg' : ''}">${b}</b>`;
+  }
+  return '';
+}
+function wpRack(t) {
+  if (!ovp) return;
+  const old = ovp.querySelector('.wp-rack'); if (old) old.remove();
+  const cur = wpnOf(t), bag = G.wbag || [];
+  const fit = bag.filter(w => wpnFits(w, t)).sort((a, b) => wpnDpsWith(t, b) - wpnDpsWith(t, a) || b.rar - a.rar);
+  const other = bag.length - fit.length, d0 = wpnDpsWith(t, t.weapon || null);
+  const rows = fit.map(w => {
+    const d1 = wpnDpsWith(t, w), n = wpnNums(w, t.type), c = wpnNums(cur, t.type);
+    const cl = (x, y) => y > x + 1e-6 ? 'bo' : y < x - 1e-6 ? 'neg' : '';
+    return `<div class="wp-row" data-w="${w.id}" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}${w.isNew ? ' <i class="wp-nw">new</i>' : ''}</b><small>${wpE(wpKindLine(w))}</small>
+      <p>Damage ${wpRange(c)} → <b class="${cl(c.avg, n.avg)}">${wpRange(n)}</b> · Speed ${wpS(c.aps)} → <b class="${cl(c.aps, n.aps)}">${wpS(n.aps)}/s</b> · DPS ${wpN(c.dps)} → <b class="${cl(c.dps, n.dps)}">${wpN(n.dps)}</b>${c.sp || n.sp ? ` · Spell Damage ${c.sp || 0} → <b class="${cl(c.sp || 0, n.sp || 0)}">${n.sp || 0}</b>` : ''}</p>
+      <p class="wp-unit">This ${wpE(t.def.name)} at tier ${ROMAN[t.tier]}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS${wpSpellCmp(t, w)}${wpnDef(w).leg ? ` · ${wpE(wpnRuleText(wpnDef(w)))}` : ''}</p></div>
+      <div class="wp-bt"><button type="button" class="pri" data-eq="${w.id}">Equip</button><button type="button" data-sv="${w.id}">Salvage ${WPN_SALVAGE[w.rar | 0]}g</button></div></div>`;
+  }).join('');
+  const html = `<div class="wp-rack" role="dialog" aria-label="Weapon rack"><div class="wp-hd"><h3>Weapon · ${wpE(t.def.name)} <small>tier ${ROMAN[t.tier]}</small></h3><button type="button" class="tx" id="wpClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
+    <div class="wp-cur"><img src="${wpIconURL(cur)}" alt=""><div>${wpnCardHTML(cur, t)}</div></div>
+    ${t.weapon ? '<p class="wp-off"><button type="button" id="wpOff">Take it off</button> <small>back to the rack; the unit fights with its starter</small></p>' : ''}
+    <h4>In your rack, for this unit <small>(${fit.length}${other ? `; ${other} more fit other units` : ''})</small></h4>
+    <div class="wp-list">${rows || `<p class="gp-none">No weapon in your rack fits a ${wpE(t.def.name)} yet. Wave bosses always drop one, the last elite of an elite wave often, and a wave's last foe now and then.</p>`}</div></div>`;
+  ovp.insertAdjacentHTML('beforeend', html);
+  for (const w of fit) w.isNew = false;
+  const box = ovp.querySelector('.wp-rack'), back = () => { box.remove(); openGearPanel(t); };
+  box.querySelector('#wpClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); back(); };
+  const off = box.querySelector('#wpOff'); if (off) off.onclick = () => { wpnEquip(t, null); back(); };
+  for (const b of box.querySelectorAll('[data-eq]')) b.onclick = () => { const w = wpById(+b.dataset.eq); if (w && wpnEquip(t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped.`); back(); } };
+  for (const b of box.querySelectorAll('[data-sv]')) b.onclick = () => { const w = wpById(+b.dataset.sv); if (!w) return; const v = wpnSalvage(w); if (typeof onToast === 'function') onToast(`Salvaged ${wpnName(w)} for ${v} gold.`); box.remove(); wpRack(t); };
+}
+
+/* ---------- Playtest start (playtest.js): a rack to go with the bag, since the foes' health counts on weapons ----------
+   typical: a weapon for each of the force's units from a few waves back (uncommon, one in three rare: about an ordinary
+   run's); strong: rares and epics, and a legendary for one unit from wave 15 */
+if (typeof ptApply === 'function') {
+  const _wpPt = ptApply;
+  ptApply = function (W, kind) {
+    const r = _wpPt.apply(this, arguments);
+    try {
+      if (wpnOn() && (kind === 'typical' || kind === 'strong') && W > 2) {
+        const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty)), strong = kind === 'strong', src = Math.max(1, W - 3);
+        G.wbag = []; G.wDropW = W - 1;
+        tys.forEach((ty, i) => G.wbag.push(wpnRoll(src, false, strong ? (W >= EPIC_FROM && i % 2 === 0 ? 3 : 2) : i % 3 === 0 ? 2 : 1, ty)));   // (typical: an ordinary run's uncommons, one in three rare)
+        if (strong && W >= 15 && tys.length) G.wbag.push(wpnRoll(src, true, 4, lootPick(tys)));
+        for (const w of G.wbag) w.isNew = true;
+        if (G.playtest) G.playtest.weapons = G.wbag.length;
+      }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+
+/* ---------- the look ---------- */
+if (typeof document !== 'undefined') {
+  const css = `
+  .wp-sock.wp-new::after{content:'';position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#ffd166;box-shadow:0 0 6px #ffd166}
+  .wp-sock{position:relative}
+  .wp-ln{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px;line-height:1.25;cursor:default}
+  .wp-ln img{width:20px;height:20px;border-radius:3px;flex:none}
+  .wp-ln span{color:#cfc6b4}
+  .wp-it{border-left:3px solid #6a5a3a;padding-left:6px}
+  .wp-rack{position:fixed;inset:5% 8%;z-index:9000;background:rgba(18,15,12,.97);border:1px solid #6a5a3a;border-radius:8px;padding:12px 14px;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6);color:#e8dfcc}
+  .wp-hd{display:flex;justify-content:space-between;align-items:center}
+  .wp-hd h3{margin:0;font-size:18px}.wp-hd small{color:#a49c8c;font-weight:400}
+  .wp-rack h4{margin:12px 0 6px;font-size:14px}.wp-rack h4 small{color:#a49c8c;font-weight:400}
+  .wp-cur{display:flex;gap:10px;align-items:flex-start}.wp-cur img{width:56px;height:56px;border-radius:4px}
+  .wp-cur .itc{max-width:520px}
+  .wp-off{margin:6px 0;font-size:12px;color:#a49c8c}
+  .wp-row{display:flex;gap:10px;align-items:flex-start;padding:7px 6px;border-top:1px solid rgba(255,255,255,.08)}
+  .wp-row img{width:44px;height:44px;border-radius:4px;flex:none}
+  .wp-rt{flex:1;min-width:0}.wp-rt small{display:block;color:#a49c8c;font-size:11px}
+  .wp-rt p{margin:3px 0 0;font-size:12.5px}.wp-rt .wp-unit{color:#cfc6b4;font-size:12px}
+  .wp-rt b.bo,.wp-cmp b.bo{color:#7be37b}.wp-rt b.neg,.wp-cmp b.neg{color:#ff7a6a}
+  .wp-nw{font-style:normal;font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px;margin-left:4px}
+  .wp-bt{display:flex;flex-direction:column;gap:4px;flex:none}
+  .wp-bt button{font-size:12px;padding:4px 10px}
+  .wp-cmp{margin:6px 0 2px;font-size:12px}.wp-cmp p{margin:1px 0}
+  @media (max-width:640px){.wp-rack{inset:2%;padding:10px}.wp-row{flex-wrap:wrap}.wp-bt{flex-direction:row}}`;
+  const add = () => { const s = document.createElement('style'); s.id = 'wpCss'; s.textContent = css; document.head.append(s); };
+  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
 }
 
