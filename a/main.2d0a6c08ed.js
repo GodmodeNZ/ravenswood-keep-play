@@ -1,4 +1,4 @@
-const BUILD_TAG = '3593a5e@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b95575b@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -77297,11 +77297,12 @@ function labPlay(name, x, z, w, o) {
 }
 // a looping bake on a card this frame (a jet, a ball in flight): its anchor (the bake's own, labfxdata.js: the jet's root, the
 // ball's centre) at P, its axis (the jet's way, the ball's flight) along dir, len world units along it; o: { k, a, seed, speed,
-// pull: world units the card is drawn toward the camera, so fire among the foes isn't swallowed by their bodies }
+// pull: world units the card is drawn toward the camera, so fire among the foes isn't swallowed by their bodies; fr: a one-shot
+// bake's frame instead of the loop's clock (the muzzle blast, played along its shot) }
 function labQueue(name, P, dir, len, o) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx || LABF.q.length >= LABF.QMAX) return false;
   labLoad(name); o = o || {}; const sd = o.seed | 0;
-  LABF.q.push({ name, P, dir, len, pull: o.pull || 0, top: !!o.top, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, ph: (sd * 7.31) % 1, mir: !!(sd & 1), sp: o.speed || 1 });
+  LABF.q.push({ name, P, dir, len, pull: o.pull || 0, top: !!o.top, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, ph: (sd * 7.31) % 1, mir: !!(sd & 1), sp: o.speed || 1, fr: o.fr });
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT); LAB_EXT.n = 1;
   return true;
 }
@@ -77417,7 +77418,7 @@ const LAB_EXT = {
         const U = up_ ? wx : ax, V = up_ ? ax : [-wx[0], -wx[1], -wx[2]];
         const pl = e.pull, P0 = pl ? [e.P[0] + fw[0] * pl, e.P[1] + fw[1] * pl, e.P[2] + fw[2] * pl] : e.P;   // (as the one-shots: +fw is toward the camera)
         const cu = (an[0] - .5) * Wd, cv = (an[1] - .5) * Ht, C = [P0[0] - U[0] * cu - V[0] * cv, P0[1] - U[1] * cu - V[1] * cv, P0[2] - U[2] * cu - V[2] * cv];
-        const t = ((now * B.fps * e.sp + e.ph * B.n) % B.n + B.n) % B.n, f0 = Math.floor(t), f1 = (f0 + 1) % B.n, bl = t - f0;
+        const t = e.fr != null ? Math.min(B.n - 1.001, Math.max(0, e.fr)) : ((now * B.fps * e.sp + e.ph * B.n) % B.n + B.n) % B.n, f0 = Math.floor(t), f1 = e.fr != null ? Math.min(B.n - 1, f0 + 1) : (f0 + 1) % B.n, bl = t - f0;
         const uv = f => { const c = f % B.cols, rr = Math.floor(f / B.cols); return [c * fu, rr * fv, (c + 1) * fu, (rr + 1) * fv]; };
         const A = uv(f0), Bq = uv(f1), m = up_ && e.mir;
         const corner = (sx, sy) => {
@@ -77557,6 +77558,38 @@ if (typeof SFX_V2_DEF !== 'undefined') SFX_V2_DEF.push(() => {
   V.mote = null;
   if (V.zone) V.zone = { ...V.zone, fx: null };
 });
+
+// the Thunderguns' shot: the lab's Muzzle Blast (owner: "each shot should have a spark blast and smoke from the barrel"): a
+// short jet of fire and sparks out of the muzzle along the shot, then a curl of smoke drifting off; a Thunderpeal's bigger
+// (the lab's Thunderpeal Blast). Brief, and drawn out from the muzzle, not round the gunner.
+const MZB = { list: [], FPS: 30, LEN: 2.0, BIG: 2.5 };
+function mzBlast(t, tg, big) {
+  if (typeof LAB_FX === 'undefined' || !LAB_FX.muzzle || MZB.list.length > 24 || typeof ihMuzzle !== 'function') return;
+  const m = ihMuzzle(t), a = t.ang || 0, dx = tg ? tg.x - t.x : Math.sin(a), dz = tg ? tg.y - t.y : Math.cos(a), L = Math.hypot(dx, dz) || 1;
+  MZB.list.push({ P: m, d: [dx / L, 0, dz / L], at: G.time, big: !!big });
+}
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.thundergun) {
+  const _mzAtk = FORCE_ATTACK.thundergun;
+  FORCE_ATTACK.thundergun = function (t, st, tg, pow, echo) {
+    const r = _mzAtk.apply(this, arguments);
+    try { mzBlast(t, tg, t.ihClapAt === G.time); t._mzCrank = t.ihCrankAt; } catch (e) {}
+    return r;
+  };
+}
+if (typeof renderView === 'function') {
+  const _mzView = renderView;
+  renderView = function () {
+    try {
+      if (typeof G !== 'undefined' && G && G.towers) {
+        for (const t of G.towers) if (t.def && t.def.unit === 'thundergun' && t.ihCrankAt != null && t._mzCrank !== t.ihCrankAt) { t._mzCrank = t.ihCrankAt; mzBlast(t, null, false); }   // (the Gatling Crank's quick rounds)
+        const now = G.time;
+        MZB.list = MZB.list.filter(e => now >= e.at - .01 && (now - e.at) * MZB.FPS < (LAB_FX[e.big ? 'muzzle_big' : 'muzzle'] || { n: 0 }).n);
+        for (const e of MZB.list) labQueue(e.big ? 'muzzle_big' : 'muzzle', e.P, e.d, e.big ? MZB.BIG : MZB.LEN, { fr: (now - e.at) * MZB.FPS, k: 1, a: 1, pull: .25 });
+      }
+    } catch (e) {}
+    return _mzView.apply(this, arguments);
+  };
+}
 
 /* The Conclave's Pyroclasts burn with the lab's fire (hammerfire.js: the owner's reference fire, one shared solver and its
    API, the same as the Steam Hammers' and the Mortar Crew's incendiary; owner: "improve ... the pyro unit ... using the same
@@ -77807,8 +77840,9 @@ function dwCtl(t, live, M) {
   if (C && cu >= 0 && cu < C.T) return { f: dwF(M, C.clip, dwKeys(C.keys, cu)), rate: cu < .1 ? 18 : 40, flare, act: 1, yaw: C.yaw || 0 };
   const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, w = t.windup || 0;
   if (s >= 0 && s < .5) return { f: dwF(M, 'club', dwKeys(DW_SLAM, s)), rate: 60, flare, act: 1, yaw: DW_YAW.strike };
-  if (w > 0 && t.tg) { const e = w * w * (3 - 2 * w); return { f: dwF(M, 'club', DW_WIND * e), rate: w < .15 ? 12 : 40, flare: Math.max(flare, w > .8 ? .25 * (w - .8) / .2 : 0), act: 1, yaw: DW_YAW.ready + (DW_YAW.strike - DW_YAW.ready) * e }; }
-  const engaged = t.tg || (t.engaged || 0) > 0 || s < 1.2;
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead;   // (between waves the towers aren't updated: a stale target or wind-up must not hold the guard)
+  if (w > 0 && fight) { const e = w * w * (3 - 2 * w); return { f: dwF(M, 'club', DW_WIND * e), rate: w < .15 ? 12 : 40, flare: Math.max(flare, w > .8 ? .25 * (w - .8) / .2 : 0), act: 1, yaw: DW_YAW.ready + (DW_YAW.strike - DW_YAW.ready) * e }; }
+  const engaged = fight || (G.phase === 'wave' && (t.engaged || 0) > 0) || s < 1.2;
   if (engaged) t._dwIdleAt = now;
   const restW = now - (t._dwIdleAt == null ? -9 : t._dwIdleAt) > .8;
   return restW ? { f: dwF(M, DW_REST.clip, DW_REST.f), rate: 3.5, flare, act: 0, rest: 1, yaw: 0 } : { f: dwF(M, 'club', 0), rate: 9, flare, act: 0, yaw: DW_YAW.ready };
@@ -77876,13 +77910,8 @@ function dwDraw(t, tier, sx, sy, sz, wob, opts) {
   }
   const vw = H.vents.map(p => M4.xf(_dwC, p[0], p[1], p[2]));
   if (!icon) dwFire(t, hw, vw, s, P, heat, live);
-  else if (typeof QADD !== 'undefined') {   // (the gear sheet and the card's portraits draw no spells: flickering flame-tongues from each vent there instead)
-    const hl = .085 * s, v = typeof vt !== 'undefined' ? vt : 0;
-    QADD.bill(RD, hw[0], hw[1], hw[2], hl * 1.8, hl * 1.8, [1, .45, .12, .45 + .1 * pulse], 1, 0);
-    vw.forEach((p, j) => { if (j !== 2) return; const ox = p[0] - hw[0], oy = p[1] - hw[1], oz = p[2] - hw[2];
-      for (let k = 0; k < 3; k++) { const q = k / 2, f = .85 + .15 * Math.sin(v * 9 + k * 1.7 + j);
-        QADD.bill(RD, p[0] + ox * q * .9, p[1] + oy * q * .9 + hl * .5 * q * f, p[2] + oz * q * .9, hl * (.7 - .35 * q), hl * (.8 - .3 * q), [1, .45 + .45 * (1 - q), .12 + .3 * (1 - q), .9 - .4 * q], 9, (v * 1.3 + k * .37 + j * .2) % 1); } });
-  }
+  // (the gear sheet and the card's portraits draw no spells: there the hammer's red-hot lava face and iron alone show its heat;
+  // the sprite flame-tongues that stood in for the fire looked strange there, owner)
   M4.trs(_dwS, hw[0], hw[1], hw[2]); FX_PM.root = FX_PM.torso = _dwC; FX_PM.main = FX_PM.hammer = FX_PM.arm = _dwS;
   return true;
 }
@@ -77903,7 +77932,7 @@ function dwMoveNow(t) {
   if (C && cu >= 0 && cu < C.T) return [DWB.CAST[t._dwId], cu];
   const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, w = t.windup || 0;
   if (s >= 0 && s < .5) return [t._dwVent === t.ihSlamAt ? 'vstrike' : 'strike', .6 + s];
-  if (w > 0 && t.tg) return ['strike', .6 * w];
+  if (w > 0 && G.phase === 'wave' && t.tg && !t.tg.dead) return ['strike', .6 * w];
   return [t._dwIdleAt != null && now - t._dwIdleAt <= .8 ? 'ready' : 'rest', -1];
 }
 function dwBakedFlame(t, hw, hl, heat) {
@@ -77911,7 +77940,7 @@ function dwBakedFlame(t, hw, hl, heat) {
   const [mv, u] = dwMoveNow(t), yaw = t.ang == null ? 0 : t.ang, yi = ((Math.round(yaw / (Math.PI / 2)) % 4) + 4) % 4;
   const B = LAB_FX['ham_' + mv + '_' + yi]; if (!B) return false;
   const loop = u < 0, f = loop ? ((G.time + (t.anim || 0) * 3) * DWB.FPS) % B.n : Math.min(B.n - 1, u * DWB.FPS);
-  const sk = (hl / .085) / DWB.TRACK_S / DWB.SCALE, w = B.span * (B.aspect || 1) * sk;
+  const sk = (hl / .085) / DWB.TRACK_S / DWB.SCALE, w = B.span * (B.aspect || 1) * sk * (mv === 'rest' ? .72 : mv === 'ready' ? .85 : 1);   // (smaller at rest, owner)
   return labPin('ham_' + mv + '_' + yi, f, [hw[0], hw[1] + DWB.UP * sk, hw[2]], w, { loop, k: .95 + .1 * heat, pull: .12 * w });
 }
 function dwFlame(t, hw, p, hl, fl, heat, seed) {
@@ -78020,6 +78049,84 @@ if (typeof pauseMenu === 'function') {
     const r = _dwPm.apply(this, arguments);
     try { const b = document.getElementById('pNewM'); if (b) b.title = 'A preview: the Gladebow Rangers, the Briarwardens, Elowen, Heart of the Wood, and Ironhold\'s Steam Hammers, drawn from sculpted models, to compare with the units built in code'; } catch (e) {}
     return r;
+  };
+}
+
+/* The dwarf gunman, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's hooded dwarf and his scoped rifle
+   (model_unit_thundergun.js: assets/unit-art/gunman/scripts/rig.py, tools/make_gunman.py) drawn as Ironhold's Thunderguns
+   (GM_UNIT) in place of their code-built body.
+   - His moves (the clips, 30 fps): idle (port arms, the rifle across his body, breathing), aim (shouldered, his cheek to the
+     stock, a slight sway), fire (the kick: the rifle driven back and its muzzle up, the chest rocked back, and the recovery),
+     reload (the rifle lowered and rolled, the right hand to the bolt, back, forward, to the grip, and up to the aim).
+   - Out of the fight he holds it at port arms; a foe in reach (in a wave), he aims; each shot kicks; when the next shot is a
+     while off he works the bolt. Every move is eased into from where he was (a per-unit pose followed at a rate by kind).
+   - The shot leaves the rifle's muzzle where it is this frame (the Gun bone carries the mark; unitTip -> ihMuzzle), so the
+     muzzle blast (mortarfire.js) and the tracer start there. */
+const GM_UNIT = 'thundergun';   // which unit the gunman draws
+UM_UNITS[GM_UNIT] = { mdl: 'thundergun', k: 1.0, rig: 'gunman' };
+const GM = { FIRE: .45, RELOAD: 1.5, RATE: { idle: 4, aim: 10, fire: 60, reload: 24 } };
+// his last shot: every shot and each of the Gatling Crank's quick rounds
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.thundergun) {
+  const _gmAtk = FORCE_ATTACK.thundergun;
+  FORCE_ATTACK.thundergun = function (t) { const r = _gmAtk.apply(this, arguments); try { t._gmShotAt = G.time; t._gmBig = t.ihClapAt === G.time; } catch (e) {} return r; };
+}
+function gmClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+// what he does now: { f (the anim's frame), rate (how fast the pose follows) }
+function gmCtl(t, live, M) {
+  if (!live) return { f: gmClip(M, 'aim', 0), rate: 0 };
+  const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
+  if (t.ihCrankAt != null && t.ihCrankAt > (t._gmShotAt || -9)) t._gmShotAt = t.ihCrankAt;
+  const s = t._gmShotAt == null ? 9 : now - t._gmShotAt;
+  if (s >= 0 && s < GM.FIRE) return { f: gmClip(M, 'fire', s * 30 * (t._gmBig ? .8 : 1)), rate: GM.RATE.fire };
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+  // the bolt worked between shots, when the next is far enough off
+  const ru = s - GM.FIRE;
+  if (ru >= 0 && ru < GM.RELOAD && (t.cd || 0) >= (GM.RELOAD - ru) * .7) return { f: gmClip(M, 'reload', ru * 30), rate: GM.RATE.reload };
+  if (fight || s < 1.6 || (t.ihAimAt != null && now - t.ihAimAt < 1)) return { f: gmClip(M, 'aim', ((now + (t.anim || 0) * 3) * 30) % A.aim[1]), rate: GM.RATE.aim };
+  return { f: gmClip(M, 'idle', ((now + (t.anim || 0) * 3) * 30) % A.idle[1]), rate: GM.RATE.idle };
+}
+const _gmT = new Float32Array(SKIN_MAX * 12);
+function gmPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _gmT);
+  const now = G.time, dt = t._gmT == null ? 1 : Math.max(0, Math.min(.1, now - t._gmT)); t._gmT = now;
+  if (!t._gmO || t._gmO.length !== nb * 12) { t._gmO = new Float32Array(nb * 12); t._gmO.set(_gmT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._gmO, _gmT, k, t._gmO);
+  const o = R.out; o.set(t._gmO); return o;
+}
+const GM_BASE_H = .05;
+const _gmA = new Float32Array(16), _gmB = new Float32Array(16), _gmC = new Float32Array(16);
+function gmDraw(t, tier, sx, sy, sz, wob, opts) {
+  const M = umModel(GM_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const K = UNIT_K(GM_UNIT), full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+  const s = Math.max(.3, full.max[1]) / M.h * M.S.k * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+  // the clan's hexagonal flagstone under him, as under every Ironhold unit, and he stands on it
+  const bm = typeof ihBase === 'function' ? dynMesh('gm_base', g => withPal(GM_UNIT, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ihPal(GM_UNIT, () => ihBase(g))))) : null;
+  M4.trs(_gmA, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _gmA, opts);
+  M4.trs(_gmA, x, bm ? GM_BASE_H * K * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_gmB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_gmC, _gmA, _gmB);
+  const P = gmCtl(t, live, M), o = gmPose(M, t, P, live);
+  const it = item(M.mesh, _gmC, opts); it.sec = [0, 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _gmC;
+  // the muzzle, where it is this frame: the shot, its tracer and its blast leave from it
+  const mk = UNIT_MDL[M.S.mdl].marks;
+  if (live && mk && mk.muzzle) { const p = umXf(o, mk.gunBone, mk.muzzle); t.tipW = M4.xf(_gmC, p[0], p[1], p[2]); t.tipYaw = yaw; t.tipAt = G.time; }
+  return true;
+}
+if (typeof drawForceUnitPlain === 'function') {
+  const _gmPlain = drawForceUnitPlain;
+  drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+    if (NEWMODELS && t && t.def && t.def.unit === GM_UNIT && !t.wrecked && gmDraw(t, tier, sx, sy, sz, wob, opts)) {
+      // (the code-built gun's heat glow would float where its barrel stood)
+      const h = t.ihHeat; t.ihHeat = 0;
+      try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(GM_UNIT)); } finally { t.ihHeat = h; }
+      return;
+    }
+    return _gmPlain.apply(this, arguments);
   };
 }
 
@@ -78636,7 +78743,7 @@ if (typeof pauseMenu === 'function') {
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const REC_S = 6;
-  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey' };
+  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey' };
 
   /* ---- what can be shown ---- */
   function sculpted() { return typeof UM_UNITS === 'undefined' ? [] : Object.keys(UM_UNITS).filter(u => !UM_UNITS[u].part && UNIT_MDL && UNIT_MDL[UM_UNITS[u].mdl]); }   // (part: a piece of another, as Varic's sword)
