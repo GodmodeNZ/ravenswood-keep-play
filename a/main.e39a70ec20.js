@@ -1,4 +1,4 @@
-const BUILD_TAG = '8dba521@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '550b5fd@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -22713,7 +22713,7 @@ function sbDrawField(S) {
      WB_RUNE.arm s after it is laid (the foes standing on it then never spring it), and the next walker to step on it
      springs it: every walker within WB_RUNE.burst takes its kind's touch at WB_RUNE.pow, and the rune is spent (owner:
      "appear, flash, affect the unit stepping on it, then disappear"). Vow runes (for the knights, not the foes) and the
-     abilities' great runes (Warding Arrow's beacon, Scribe the Road) are not traps: they touch the foes on them once per
+     abilities' great runes (Warding Glaive's beacon, Scribe the Road) are not traps: they touch the foes on them once per
      WB_RUNE.again s while they last.
    - A rune laid within WB_RUNE.merge of another refreshes it and adds its kind: a rune of two or more kinds is BOUND; it
      springs with all its kinds at once, over a wider burst.
@@ -22733,9 +22733,9 @@ FORCES.wardbound = { name: 'The Wardbound', title: 'Rune-Knights of the Last Roa
     glaive: { id: 'wb_oathbound', name: 'Oathbound', short: 'Oathbound', key: '1', proj: 'force', attack: 'wbOath', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
       blurb: 'Hooded veterans in black plate, sworn to hold. A heavy greatsword cut on the walker beside it carves an oath rune into the road: the next walker to step on it springs it and is slowed, and runes near each other link into ward-lines that brand the foes who cross them. Cannot reach flyers.',
       tiers: [{ cost: 25, dmg: 20, rate: .95, range: 1.4 }, { cost: 48, dmg: 48, rate: .92, range: 1.45 }, { cost: 105, dmg: 112, rate: .88, range: 1.55 }] },
-    arrow: { id: 'wb_maskedwarden', name: 'Masked Wardens', short: 'Masked', key: '2', proj: 'force', attack: 'wbArrow', elem: null, dmgType: 'phys', air: true, ground: true, top: [1.25, 1.3, 1.35],
-      blurb: 'Tall archers in sculpted black-and-gold armour behind golden masks, drawing great black longbows whose runes glow pale teal. Each arrow strikes its foe and pins a shaft rune into the road beneath it: the next walker to step on it loses armour. Air and ground.',
-      tiers: [{ cost: 14, dmg: 7, rate: .8, range: 2.6 }, { cost: 28, dmg: 18, rate: .72, range: 2.9 }, { cost: 68, dmg: 38, rate: .62, range: 3.2 }] },
+    arrow: { id: 'wb_maskedwarden', name: 'Glaive Wardens', short: 'Glaive', key: '2', proj: 'force', attack: 'wbArrow', elem: null, dmgType: 'phys', air: true, ground: true, top: [1.25, 1.3, 1.35],
+      blurb: 'Tall rune-knights in sculpted black-and-gold armour behind golden masks, each with a spinning glaive of gold and ivory. The glaive strikes its foe, carves a shaft rune into the road beneath it and ricochets on to the nearest foes, a little weaker each bounce, before it flies back to the hand. A bounce that leaps over a rune flares it and brands the next foe. Air and ground.',
+      tiers: [{ cost: 14, dmg: 4, rate: .8, range: 2.6, bounce: 2, bounceR: 1.8 }, { cost: 28, dmg: 11, rate: .72, range: 2.9, bounce: 2, bounceR: 1.9 }, { cost: 68, dmg: 21, rate: .62, range: 3.2, bounce: 3, bounceR: 2 }] },
     frost: { id: 'wb_frostbrand', name: 'Frostbrand Sentries', short: 'Frostbrand', key: '3', proj: 'force', attack: 'wbFrost', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.1, 1.15, 1.2],
       blurb: 'Halberdiers in pale steel and white fur. Each sweep cuts up to three walkers in reach and chills them; every second sweep rimes the road with a frost rune. Cannot reach flyers.',
       tiers: [{ cost: 30, dmg: 9, rate: 1.2, range: 1.7, slow: .3, slowT: 2 }, { cost: 55, dmg: 21, rate: 1.15, range: 1.8, slow: .33, slowT: 2.2 }, { cost: 115, dmg: 48, rate: 1.1, range: 1.9, slow: .36, slowT: 2.4 }] },
@@ -22755,7 +22755,7 @@ FORCES.wardbound = { name: 'The Wardbound', title: 'Rune-Knights of the Last Roa
     wall: { id: 'wb_oathstone', name: 'Oathstones', short: 'Oathstone', key: 'b', top: [.7],
       blurb: 'Carved, mossy standing stones. Their gold runes glow when foes press against them, and they hold the ward-lines: each stands for an oath rune, linking to the runes near it. Cheap maze blockers: tap one later to raise a unit from it.' },
   } };
-for (const [s, g] of Object.entries({ glaive: 'sword', arrow: 'bow', frost: 'snowflake', arcane: 'rune', storm: 'thunder', earth: 'shield', cannon: 'target', wall: 'statue' })) FORCE_GLYPH[FORCES.wardbound.units[s].id] = g;
+for (const [s, g] of Object.entries({ glaive: 'sword', arrow: 'glaive', frost: 'snowflake', arcane: 'rune', storm: 'thunder', earth: 'shield', cannon: 'target', wall: 'statue' })) FORCE_GLYPH[FORCES.wardbound.units[s].id] = g;
 
 /* ---------- small helpers ---------- */
 const wbOn = () => typeof G !== 'undefined' && !!G && G.force === WB_ID;
@@ -22982,6 +22982,7 @@ function wbFlightsTick(dt) {
   for (const p of S.P) {
     p.age += dt;
     if (p.k === 'glaive') wbGlaiveStep(p, dt);
+    else if (p.k === 'rglaive') wbRicoStep(p, dt);
     else if (p.k === 'bolt' || p.k === 'arrow') wbBoltStep(p, dt);
     else if (p.k === 'quake') wbQuakeStep(p, dt);
     else if (p.step) p.step(p, dt);
@@ -23001,17 +23002,77 @@ FORCE_ATTACK.wbOath = (t, st, tg, pow) => {
   t.recoil = 1; sfx('glaiveHit', 0);
   return n;
 };
-// Masked Wardens: a rune-arrow at the foe; it pins a shaft rune into the road beneath it
+/* Glaive Wardens: a rune-etched glaive thrown at the foe (flight k 'rglaive'). It strikes its foe and carves a shaft rune
+   under it, then ricochets on to the nearest foe it has not struck within st.bounceR, st.bounce times, each strike
+   WB_RICO.fall weaker (p.pow carries it, so every rider on a strike scales with it), and flies back to the thrower's hand.
+   A leap that passes over a rune flares it, and the foe it reaches is branded. Each strike calls p.land(p, foe) with
+   p.tx/p.tz under that foe, as the old arrow did, so the riders the later files hang on land/onLand run on every strike. */
+const WB_RICO = { spd: 12, back: 14, fall: .7, reach: 1.8 };
 FORCE_ATTACK.wbArrow = (t, st, tg, pow) => {
   const h = towerTop(t) * .8;
-  wbFly({ k: 'arrow', t, st, tg, pow, x: t.x, z: t.y, h, x0: t.x, z0: t.y, h0: h, tx: tg.x, tz: tg.y, spd: 13, land: (p, c) => {
+  wbFly({ k: 'rglaive', t, st, tg, pow, pow0: pow, x: t.x, z: t.y, h, x0: t.x, z0: t.y, h0: h, tx: tg.x, tz: tg.y, spd: WB_RICO.spd, legT: G.time,
+    left: st.bounce != null ? st.bounce : 2, reach: st.bounceR || WB_RICO.reach, n: 0, spin: 0, pts: [[t.x, h, t.y, G.time]], land: (p, c) => {
     const s = (p.t && p.t.st) || p.st;
-    if (c) wbHit(p.t, s, c, s.dmg * p.pow, 'phys');
+    if (c) wbHit(p.t, s, c, s.dmg * p.pow, 'phys', p.kb || null);
     if (!p.noRune) wbRune(p.t, s, p.tx, p.tz, 'shaft');
     if (p.onLand) p.onLand(p, c);
   } });
-  t.recoil = 1; sfx('arrow', .6);
+  t.wbgOut = G.time; t.recoil = 1; sfx('glaive', 2, 0);
 };
+// the nearest foe the glaive has not struck within its reach of (x, z), flyers only for a unit that reaches them
+function wbRicoNext(p, x, z) {
+  const t = p.t, st = (t && t.st) || p.st; let best = null, bd = (p.reach || WB_RICO.reach) ** 2;
+  for (const c of G.creeps) {
+    if (c.dead || c.ent || c.phased || p.hit.has(c) || (c.fly && !(t && t.def.air)) || (t && st && !canTarget(t, st, c))) continue;
+    const d = (c.x - x) ** 2 + (c.y - z) ** 2; if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+function wbRicoStep(p, dt) {
+  const t = p.t, st = (t && t.st) || p.st, alive = t && G.towers.includes(t) && !t.wrecked;
+  p.spin += dt * 24;
+  if (p.home) {   // back to the hand: caught, and the unit may throw again
+    const tx = alive ? t.x : p.x0, tz = alive ? t.y : p.z0, th = alive ? towerTop(t) * .8 : p.h0;
+    const dx = tx - p.x, dz = tz - p.z, dh = th - p.h, D = Math.hypot(dx, dz, dh) || 1e-6, step = WB_RICO.back * (p.spd / WB_RICO.spd) * dt;
+    if (D <= step + .05 || G.time - p.legT > 2.5) { p.done = true; if (alive && t.wbgOut) { t.wbgOut = 0; t.wbgCatch = G.time; } return; }
+    p.x += dx / D * step; p.z += dz / D * step; p.h += dh / D * step;
+    return;
+  }
+  const c = p.tg && !p.tg.dead && !p.tg.phased ? p.tg : null;
+  if (c) { p.tx = c.x; p.tz = c.y; }
+  if (c && p.circ > G.time) { const a = (p.circ - G.time) / .22 * TAU; p.x = c.x + Math.cos(a) * .42; p.z = c.y + Math.sin(a) * .42; p.legT = G.time; return; }
+  const th = c ? hitH(c) + .3 : .5, dx = p.tx - p.x, dz = p.tz - p.z, dh = th - p.h, D = Math.hypot(dx, dz) || 1e-6, step = p.spd * dt;
+  if (D <= step + .05 || G.time - p.legT > 2) {
+    p.x = p.tx; p.z = p.tz; p.h = th;
+    p.pow = p.pow0 * Math.pow(p.fall || WB_RICO.fall, p.n); p.noRune = p.n > 0 && !p.allRunes;
+    if (c) {
+      p.hit.add(c);
+      if (p.kindle && !c.dead) wbBrand(c, 1, t);
+      const L = Math.hypot(p.x - (p.lx != null ? p.lx : p.x0), p.z - (p.lz != null ? p.lz : p.z0)) || 1;
+      p.kb = [(p.x - (p.lx != null ? p.lx : p.x0)) / L * .05, (p.z - (p.lz != null ? p.lz : p.z0)) / L * .05];
+    }
+    p.kindle = 0;
+    if (st) p.land(p, c);
+    p.pts.push([p.x, p.h, p.z, G.time]); if (p.pts.length > 8) p.pts.shift();
+    p.n++; p.lx = p.x; p.lz = p.z;
+    if (c && G.state === 'play') sfx('glaiveHit', { n: p.n - 1, kill: c.dead }, 0);
+    let o = p.left > 0 ? wbRicoNext(p, p.x, p.z) : null;
+    // (p.again, Ricochet Rite: with every foe in reach struck the round starts over; a lone foe takes every strike, the glaive looping round it)
+    if (!o && p.left > 0 && p.again) { p.hit = new Set(c ? [c] : []); o = wbRicoNext(p, p.x, p.z) || (c && !c.dead ? c : null); }
+    if (o === c && o) p.circ = G.time + .22;
+    if (o) {
+      p.left--; p.tg = o; p.tx = o.x; p.tz = o.y; p.legT = G.time; p.spd *= 1.04;
+      // a leap over a rune flares it: the foe it reaches is branded
+      const a = { x: p.x, z: p.z }, b = { x: o.x, z: o.y };
+      for (const z of wbRunes()) if (wbSegD(z.x, z.z, a, b) <= (z.r || WB_RUNE.r) * .8 && Math.hypot(z.x - a.x, z.z - a.z) > .45 && Math.hypot(z.x - b.x, z.z - b.z) > .45) {   // (between the two foes, not the rune under either)
+        p.kindle = 1; z.wbKindleAt = G.time; if (G.state === 'play') fxSpark(z.x, z.z, .12, WB_COL.goldL, 3); break; }
+      return;
+    }
+    p.home = true; p.tg = null; p.legT = G.time;
+    return;
+  }
+  p.x += dx / D * step; p.z += dz / D * step; p.h += dh / D * step;
+}
 /* (kept for the abilities: a thrown blade out to the foe and back, the return at half, cutting any foe within .3 of its
    path once a leg) */
 const WB_GLV = { spd: 7.5, back: .5, path: .5, near: .3 };
@@ -23224,23 +23285,23 @@ const WB_TALENTS = {
     GT('Shared Oath', 'halo', 4, 2, 1, 'Final Oath is sworn for the line: while it holds, every unit within 1.6 cells of him can\'t be Wounded either, and each gains 20 mana as he plants the sword.', {}, { sp: { ab: 'wb_laststand', ally: 20 }, cap: 'wbkSharedOath' }),
   ] },
 
-  /* ---- Masked Wardens (arrow): Rune Volley (innate), Piercing Shaft (row III), Warding Arrow (row IV) ---- */
+  /* ---- Glaive Wardens (arrow): Ricochet Rite (innate), Returning Oath (row III), Warding Glaive (row IV) ---- */
   arrow: { name: 'Wardensight', hue: '#9fe0d8', list: [
-    GT('The Long Watch', 'bow', 0, 1, 2, n => `While no foe is in its reach it gathers its draw: up to ${gNf(.25 * n)} cells more reach over 3s, spent on the next arrow it looses.`, {}, { cap: 'wbfWatch' }),
-    GT('Masked Sight', 'spyglass', 0, 2, 2, n => `Its arrows drag a flyer they strike down to the road for ${gNf(.5 * n)}s (once every 4s each): held low, it walks the runes and ward-lines.`, {}, { cap: 'wbfDrag' }),
-    GT('Rune-Etched Heads', 'arrowhead', 0, 3, 3, n => `Its arrows ignore ${5 * n}% of armour, and walkers its shaft runes spring on lose ${n} more armour.`, n => ({ armorPen: .05 * n }), { cap: 'wbKeenShaft' }),
-    GT('Pinning Draw', 'target', 1, 0, 2, n => `${n >= 2 ? 'Each arrow' : 'Every 2nd arrow'} brands the foe it strikes.`, {}, { cap: 'wbShaftBrand' }),
-    GT('Mask\'s Tally', 'feather', 1, 2, 2, n => `An arrow that slays its foe restores ${4 * n} mana, twice that if the foe was branded.`, {}, { cap: 'wbfTally' }),
-    GT('Mark the Fallen', 'arrows2', 1, 3, 2, n => `Each foe Rune Volley slays leaves a shaft rune where it fell${n >= 2 ? ', Bound with oath' : ''}.`, {}, { sp: { ab: 'wb_runevolley', rider: { wbf: 1 } }, cap: 'wbfFallen' }),
+    GT('The Long Watch', 'hourglass', 0, 1, 2, n => `While no foe is in its reach it winds up its throw: up to ${gNf(.25 * n)} cells more reach over 3s, spent on the next glaive it throws.`, {}, { cap: 'wbfWatch' }),
+    GT('Masked Sight', 'spyglass', 0, 2, 2, n => `Its glaive drags each flyer it strikes down to the road for ${gNf(.5 * n)}s (once every 4s each): held low, it walks the runes and ward-lines.`, {}, { cap: 'wbfDrag' }),
+    GT('Rune-Etched Edge', 'shieldbreak', 0, 3, 3, n => `Its glaive ignores ${5 * n}% of armour, and walkers its shaft runes spring on lose ${n} more armour.`, n => ({ armorPen: .05 * n }), { cap: 'wbKeenShaft' }),
+    GT('Branding Edge', 'target', 1, 0, 2, n => `${n >= 2 ? 'Each foe' : 'Every 2nd foe'} its glaive strikes is branded, bounces included.`, {}, { cap: 'wbShaftBrand' }),
+    GT('Mask\'s Tally', 'feather', 1, 2, 2, n => `A strike of its glaive that slays its foe restores ${3 * n} mana, twice that if the foe was branded.`, {}, { cap: 'wbfTally' }),
+    GT('Mark the Fallen', 'bounce', 1, 3, 2, n => `Each foe Ricochet Rite slays leaves a shaft rune where it fell${n >= 2 ? ', Bound with oath' : ''}.`, {}, { sp: { ab: 'wb_runevolley', rider: { wbf: 1 } }, cap: 'wbfFallen' }),
     GS('wb_piercingshaft', 2, 0),
-    GT('Falling Stars', 'stars', 2, 1, 1, 'Rune Volley brands every foe it strikes.', {}, { sp: { ab: 'wb_runevolley', rider: { wbBrand: 1 } } }),
-    GT('Line Shot', 'chain', 2, 3, 1, 'An arrow that strikes a foe standing on a ward-line strikes it again for half.', {}, { cap: 'wbLineShot' }),
-    GT('Long Shaft', 'snail', 3, 0, 2, n => `Piercing Shaft slows every foe it pierces ${15 * n}% for 1.5s.`, {}, { sp: n => ({ ab: 'wb_piercingshaft', rider: { slow: [.15 * n, 1.5] } }), req: [2, 0] }),
-    GT('Nocked Again', 'quick', 3, 2, 1, 'A Piercing Shaft that pierces 3 or more foes gives back half its mana.', {}, { sp: { ab: 'wb_piercingshaft', rider: { wbf: 1 } }, cap: 'wbfNock' }),
+    GT('Branding Rite', 'stars', 2, 1, 1, 'Ricochet Rite brands every foe it strikes.', {}, { sp: { ab: 'wb_runevolley', rider: { wbBrand: 1 } } }),
+    GT('Line Cut', 'chain', 2, 3, 1, 'A strike of its glaive on a foe standing on a ward-line cuts it again for half.', {}, { cap: 'wbLineShot' }),
+    GT('Dragging Edge', 'snail', 3, 0, 2, n => `Returning Oath slows every foe it strikes ${15 * n}% for 1.5s.`, {}, { sp: n => ({ ab: 'wb_piercingshaft', rider: { slow: [.15 * n, 1.5] } }), req: [2, 0] }),
+    GT('Caught Again', 'quick', 3, 2, 1, 'A Returning Oath that strikes 3 or more foes gives back half its mana.', {}, { sp: { ab: 'wb_piercingshaft', rider: { wbf: 1 } }, cap: 'wbfNock' }),
     GS('wb_wardarrow', 3, 3),
-    GT('Arrow of Judgement', 'scales', 4, 1, 1, 'An arrow that strikes a foe branded three times spends the brands in judgement: the foe is pinned 0.8s and struck again for the arrow\'s full blow, and the three brands pass to the nearest walker within 1.5 cells.', {}, { cap: 'wbJudgeArrow' }),
-    GT('Twin Wards', 'arrows2', 4, 2, 1, 'Warding Arrow brands twice and is loosed with a second, under the next walker furthest along (at least 1.5 cells from the first); the two great runes link to each other at any distance.', {}, { sp: { ab: 'wb_wardarrow', rider: { wbBrand: 1 } }, cap: 'wbkTwinWard' }),
-    GT('Lodestar', 'sun', 4, 3, 1, 'Warding Arrow pins every foe it strikes 0.5s, and while its great rune stands it pulses every 2s: each walker on a ward-line linked to it is struck for 60% of an arrow and branded.', {}, { sp: { ab: 'wb_wardarrow', rider: { root: .5 } }, cap: 'wbkLodestar', req: [3, 3] }),
+    GT('Glaive of Judgement', 'scales', 4, 1, 1, 'A strike of its glaive on a foe branded three times spends the brands in judgement: the foe is pinned 0.8s and struck again for that strike\'s full blow, and the three brands pass to the nearest walker within 1.5 cells.', {}, { cap: 'wbJudgeArrow' }),
+    GT('Twin Wards', 'glaive2', 4, 2, 1, 'Warding Glaive brands twice and is thrown with a second, under the next walker furthest along (at least 1.5 cells from the first); the two great runes link to each other at any distance.', {}, { sp: { ab: 'wb_wardarrow', rider: { wbBrand: 1 } }, cap: 'wbkTwinWard' }),
+    GT('Lodestar', 'sun', 4, 3, 1, 'Warding Glaive pins every foe it strikes 0.5s, and while its great rune stands it pulses every 2s: each walker on a ward-line linked to it is struck for a full glaive strike and branded.', {}, { sp: { ab: 'wb_wardarrow', rider: { root: .5 } }, cap: 'wbkLodestar', req: [3, 3] }),
   ] },
 
   /* ---- Frostbrand Sentries (frost): Rimeline (innate), Frostbite (row II), Winter Ward (row III) ---- */
@@ -23327,7 +23388,7 @@ const WB_TALENTS = {
 
   /* ---- Siege Wardens (cannon): Pinning Bolt (innate), Rune Shot (row II), Chain Bolt (row III) ---- */
   cannon: { name: 'Siegecraft', hue: '#ff9a5a', list: [
-    GT('Spotter', 'spyglass', 0, 0, 2, n => `While a Masked Warden stands within 2 cells of it, calling the shots, it has ${gNf(.25 * n)} more range.`, {}, { cap: 'wbfSpotter' }),
+    GT('Spotter', 'spyglass', 0, 0, 2, n => `While a Glaive Warden stands within 2 cells of it, calling the shots, it has ${gNf(.25 * n)} more range.`, {}, { cap: 'wbfSpotter' }),
     GT('Wide Blast', 'burst', 0, 1, 2, n => `When its bolt lands on a walker standing on a rune, the blast reaches ${8 * n}% wider.`, {}, { cap: 'wbfWideBlast' }),
     GT('Heavy Bolts', 'shieldbreak', 0, 2, 2, n => `Its bolts ignore ${15 * n}% of armour on a boss, a leader or an elite.`, {}, { cap: 'wbfHeavy' }),
     GT('Long Pin', 'snare', 0, 3, 3, n => `Its bolts pin their foe ${gNf(.15 * n)}s longer.`, {}, { cap: 'wbPinLong' }),
@@ -23449,7 +23510,7 @@ WB_HOOK.pulse.push((t, st, dt) => {
   for (const c of G.creeps) if (!c.dead && c.rootT > G.time && Math.hypot(c.x - t.x, c.y - t.y) <= r) wbBrand(c, 1, t);
 });
 
-/* ---------- Masked Wardens ---------- */
+/* ---------- Glaive Wardens (each strike of the glaive, every bounce included) ---------- */
 {
   const a0 = FORCE_ATTACK.wbArrow;
   const land = (t, st) => (p, c) => {
@@ -23458,7 +23519,7 @@ WB_HOOK.pulse.push((t, st, dt) => {
     const B = wbCap(s, 'wbShaftBrand');
     if (B && (B >= 2 || (t.wbTalB = (t.wbTalB || 0) + 1) % 2 === 0)) wbBrand(c, 1, t);
     if (wbCap(s, 'wbLineShot') && wbOnLine(c, .3)) wbHit(t, s, c, s.dmg * p.pow * .5, 'phys');
-    // Arrow of Judgement: three brands spent: pinned, struck again in full, the brands passed to the nearest walker
+    // Glaive of Judgement: three brands spent: pinned, struck again in full, the brands passed to the nearest walker
     if (!c.dead && wbCap(s, 'wbJudgeArrow') && wbBrandOf(c) >= 3) {
       const n = wbBrandOf(c), x = c.x, z = c.y; c.wbBrand = 0; c.wbBrandT = 0;
       rootFoe(c, .8, t); wbHit(t, s, c, s.dmg * p.pow, 'phys');
@@ -23469,12 +23530,12 @@ WB_HOOK.pulse.push((t, st, dt) => {
   };
   const shoot = (t, st, tg, pow, echo) => {
     const r = a0(t, st, tg, pow, echo), P = wbS().P, p = P[P.length - 1];
-    if (p && p.t === t && p.k === 'arrow' && !p.onLand) p.onLand = land(t, st);
+    if (p && p.t === t && (p.k === 'rglaive' || p.k === 'arrow') && !p.onLand) p.onLand = land(t, st);
     return r;
   };
   FORCE_ATTACK.wbArrow = (t, st, tg, pow, echo) => {
     const r = shoot(t, st, tg, pow, echo);
-    // Twin Shafts: every 4th arrow loosed with a second at another foe in reach
+    // (Twin Shafts, cut from the tree: every 4th throw a second glaive at another foe in reach)
     if (wbCap(st, 'wbTwinShaft') && (t.wbTalN = (t.wbTalN || 0) + 1) % 4 === 0) {
       const o = G.creeps.filter(c => c !== tg && !c.dead && !c.ent && !c.phased && Math.hypot(c.x - t.x, c.y - t.y) <= st.range && canTarget(t, st, c)).sort((a, b) => (a.remain || 0) - (b.remain || 0))[0];
       if (o) shoot(t, st, o, pow, echo);
@@ -23703,9 +23764,9 @@ const WBC = {
   plant: { r: 1.3, m: 1.5, runes: 4, at: .42 },   // (at: the blade's landing after the cast)
   flare: { cut: .35, at: .4, r: 1.5 },   // (Rune Cleave: at, the sweep crossing his front; r, its reach)
   stand: { r: 1.2, push: .22, slow: .4, at: .3 },   // (Final Oath: reach, push a half second, slow, the first after the plant)
-  volley: { m: .8, fall: .45, gap: .07 },
-  pierce: { m: 1.9, w: .4, more: 1.5, shred: 3 },
-  ward: { r: .55, m: 1.2 },
+  volley: { m: 1.3, at: .32, reach: 1.8, spd: 10 },   // (Ricochet Rite: each strike, the throw's release, the leap's reach)
+  pierce: { w: .4, more: 1.5, shred: 3, back: .5, spd: 11, at: .35 },   // (Returning Oath: the way back cuts for back x the way out)
+  ward: { r: .55, m: 2 },
   rime: { m: 1.2, cells: 4, w: .55, slowT: 3 },
   bite: { m: 1.4 },
   winter: { r: 3, m: 1.2 },
@@ -23749,6 +23810,15 @@ function wbcCone(t, st, ux, uz, R, half) {
 const wbcOnRune = (c, kinds) => wbRunes().some(z => (!kinds || z.kinds.some(k => kinds.includes(k))) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r * (z.bound ? 1.25 : 1) + .1);
 // a rune laid only where the road is (a spell's trail across open ground lays none)
 function wbcRoadRune(t, st, x, z, kind, o) { const p = wbRoadCell(x, z); if (p[2] < 0 || Math.hypot(p[0] - x, p[1] - z) > .7) return null; return wbRune(t, st, p[0], p[1], kind, o); }
+// Returning Oath's glaive in flight (drawing only: the hits are timed by the cast): out along the line to (ex, ez), back to the hand
+function wbcLineGlaive(p, dt) {
+  const t = p.t, home = p.leg === 1, alive = t && G.towers.includes(t);
+  const tx = home ? (alive ? t.x : p.x0) : p.ex, tz = home ? (alive ? t.y : p.z0) : p.ez, th = home ? p.h0 : .55;
+  const dx = tx - p.x, dz = tz - p.z, D = Math.hypot(dx, dz) || 1e-6, step = p.spd * dt;
+  p.spin += dt * 26;
+  if (D <= step + .03 || p.age > 6) { if (home || p.age > 6) { p.done = true; if (alive && t.wbgOut) { t.wbgOut = 0; t.wbgCatch = G.time; } return; } p.x = tx; p.z = tz; p.leg = 1; p.pts.push([p.x, p.h, p.z, G.time]); return; }
+  p.x += dx / D * step; p.z += dz / D * step; p.h += (th - p.h) * Math.min(1, dt * 6);
+}
 // a lingering area on the field (hazard 'wb_zone'), ticked by its ability's zone()
 function wbcZone(t, st, id, x, z, r, dur, every, more) {
   const L = G.hazards.filter(h => h.k === 'wb_zone'); if (L.length >= 20) L[0].t = 0;
@@ -23824,51 +23894,55 @@ const WB_KITS = {
       } },
   ] },
 
-  /* ---- Masked Wardens: the rune-arrows ---- */
+  /* ---- Glaive Wardens: the rune-etched glaives ---- */
   wb_maskedwarden: { slot: 'arrow', mana: { max: 90, regen: .75, hit: .2 }, abilities: [
-    { id: 'wb_runevolley', name: 'Rune Volley', short: 'Volley', glyph: 'arrows3', hue: '#bff4ec', mana: 70, cd: 9, rr: 1.1, research: null,
+    { id: 'wb_runevolley', name: 'Ricochet Rite', short: 'Ricochet', glyph: 'bounce', hue: '#ffe8a8', mana: 70, cd: 9, rr: 1.1, research: null,
       by: { n: [5, 5, 6, 6, 7, 8] },
       auto: 'the spot in range with two or more foes within 1.1 cells, or a boss or elite',
-      text: (t, st, ab) => `Looses ${byT(ab.by.n, t)} rune-arrows skyward; they rain on a ${ab.rr}-cell spot, each striking a foe there for ${xD(st, WBC.volley.m)} (a lone foe takes them all) and pinning a shaft rune under it.`,
+      text: (t, st, ab) => `Hurls the great glaive at the toughest foe there: it strikes ${byT(ab.by.n, t)} times, ricocheting from foe to foe within ${WBC.volley.reach} cells and never weakening, each strike ${xD(st, WBC.volley.m)} with a shaft rune carved under its foe (a lone foe takes every strike), then flies home.`,
       pick: (t, st, ab, man) => wbcCrowd(t, st, ab, ab.rr, 2, man),
       cast(t, st, p, ab) {
         const n = byT(ab.by.n, t), x = p.x, z = p.y, rr = ab.rr;
-        for (let k = 0; k < 3; k++) part({ k: 'spark', x: t.x + R(-.1, .1), z: t.y + R(-.1, .1), h: towerTop(t) + .2, vx: R(-.3, .3), vz: R(-.3, .3), vh: 9, g: 0, life: .35, max: .35, size: .05, col: WB_COL.teal });
-        for (let i = 0; i < n; i++) G.delayed.push({ t: WBC.volley.fall + i * WBC.volley.gap, fn: () => {
+        G.delayed.push({ t: WBC.volley.at, fn: () => {
           if (!wbcLive(t)) return; const s = t.st || st;
-          const F = G.creeps.filter(c => !c.dead && !c.phased && !c.ent && canTarget(t, s, c) && Math.hypot(c.x - x, c.y - z) <= rr).sort(abByTough);
-          const c = F.length ? F[i % F.length] : null, a = R(TAU), d = Math.sqrt(Math.random()) * rr * .8;
-          const tx = c ? c.x : x + Math.cos(a) * d, tz = c ? c.y : z + Math.sin(a) * d, [ux, uz] = abDir(t, { x: tx, y: tz });
-          wbFly({ k: 'arrow', t, st: s, tg: c, pow: WBC.volley.m, x: tx - ux * 1.4, z: tz - uz * 1.4, h: 3.2, x0: t.x, z0: t.y, h0: 3.2, tx, tz, spd: 11, land: (q, f) => {
+          const F = G.creeps.filter(c => !c.dead && !c.phased && !c.ent && canTarget(t, s, c) && Math.hypot(c.x - x, c.y - z) <= rr + .4).sort(abByTough);
+          const c = (p.c && !p.c.dead ? p.c : null) || F[0]; if (!c) return;
+          const h = towerTop(t) * .85;
+          wbFly({ k: 'rglaive', t, st: s, tg: c, pow: WBC.volley.m, pow0: WBC.volley.m, fall: 1, x: t.x, z: t.y, h, x0: t.x, z0: t.y, h0: h, tx: c.x, tz: c.y, spd: WBC.volley.spd, legT: G.time,
+            left: n - 1, reach: WBC.volley.reach, again: 1, allRunes: 1, big: 1, n: 0, spin: 0, pts: [[t.x, h, t.y, G.time]], land: (q, f) => {
             const s2 = (q.t && q.t.st) || q.st; if (!s2) return;
-            if (f) wbHit(q.t, s2, f, s2.dmg * q.pow, 'phys');
+            if (f) wbHit(q.t, s2, f, s2.dmg * q.pow, 'phys', q.kb || null);
             wbRune(q.t, s2, q.tx, q.tz, 'shaft');
-            if (G.state === 'play') fxSpark(q.tx, q.tz, f ? hitH(f) : .1, WB_COL.teal, 3);
+            if (G.state === 'play') fxSpark(q.tx, q.tz, f ? hitH(f) : .1, WB_COL.goldL, 3);
           } });
+          t.wbgOut = G.time; sfx('glaive', 2, 1);
         } });
-        sfx('arrow', 1);
       } },
-    { id: 'wb_piercingshaft', name: 'Piercing Shaft', short: 'Shaft', glyph: 'arrowhead', hue: '#e0fff8', mana: 80, cd: 11, research: { cost: 60, time: 20 },
-      by: { mult: [1.9, 1.9, 2.1, 2.1, 2.4, 2.4] },
+    { id: 'wb_piercingshaft', name: 'Returning Oath', short: 'Return', glyph: 'glaive', hue: '#fff2c8', mana: 80, cd: 11, research: { cost: 60, time: 20 },
+      by: { mult: [2.1, 2.1, 2.3, 2.3, 2.7, 2.7] },
       auto: 'the line through two or more foes in reach (flyers too), or a boss or elite',
-      text: (t, st, ab) => `A full draw, held, then one long arrow loosed level: it flies through every foe on a line ${WBC.pierce.more} cells past its reach, ${xD(st, byT(ab.by.mult, t))} each and ${WBC.pierce.shred} armour off for 5s, and pins a shaft rune into each of the 3 road cells past its first foe.`,
+      text: (t, st, ab) => `The glaive is flung level down a line ${WBC.pierce.more} cells past its reach: every foe on it takes ${xD(st, byT(ab.by.mult, t))} and loses ${WBC.pierce.shred} armour for 5s. At the end it turns and sweeps back along the line to the hand, cutting each foe on it again for ${xD(st, byT(ab.by.mult, t) * WBC.pierce.back)}. Shaft runes are carved into the 3 road cells past its first foe.`,
       pick: (t, st, ab, man) => wbcBestLine(t, st, abReach(t, st, ab), abReach(t, st, ab) + WBC.pierce.more, WBC.pierce.w, 2, man),
       cast(t, st, c, ab) {
-        const [ux, uz] = abDir(t, c), len = abReach(t, st, ab) + WBC.pierce.more, m = byT(ab.by.mult, t), spd = 18;
-        G.delayed.push({ t: .35, fn: () => {
+        const [ux, uz] = abDir(t, c), len = abReach(t, st, ab) + WBC.pierce.more, m = byT(ab.by.mult, t), spd = WBC.pierce.spd, T1 = len / spd, x0 = t.x, z0 = t.y;
+        G.delayed.push({ t: WBC.pierce.at, fn: () => {
           if (!wbcLive(t)) return; const s = t.st || st, h = towerTop(t) * .8;
-          const L = abLine(t, s, t.x, t.y, ux, uz, len, WBC.pierce.w).sort((a, b) => abDist(t, a) - abDist(t, b));
-          for (const o of L) { const d = abDist(t, o); G.delayed.push({ t: d / spd, fn: () => { if (o.dead) return; const s2 = t.st || s; wbHit(t, s2, o, s2.dmg * m, 'phys', [ux * .08, uz * .08]); if (!o.dead) { o.shred = Math.max(o.shred || 0, WBC.pierce.shred); o.shredT = Math.max(o.shredT || 0, 5); } fxSpark(o.x, o.y, hitH(o), WB_COL.teal, 4); } }); }
+          const L = abLine(t, s, x0, z0, ux, uz, len, WBC.pierce.w).sort((a, b) => abDist(t, a) - abDist(t, b));
+          for (const o of L) { const d = abDist(t, o); G.delayed.push({ t: d / spd, fn: () => { if (o.dead) return; const s2 = t.st || s; wbHit(t, s2, o, s2.dmg * m, 'phys', [ux * .08, uz * .08]); if (!o.dead) { o.shred = Math.max(o.shred || 0, WBC.pierce.shred); o.shredT = Math.max(o.shredT || 0, 5); } fxSpark(o.x, o.y, hitH(o), WB_COL.goldL, 4); } }); }
           const f = L[0]; if (f) for (let k = 0; k < 3; k++) wbcRoadRune(t, s, f.x + ux * k, f.y + uz * k, 'shaft');
-          wbFly({ k: 'arrow', t, st: s, tg: null, pow: 0, x: t.x, z: t.y, h, x0: t.x, z0: t.y, h0: h, tx: t.x + ux * len, tz: t.y + uz * len, spd, noRune: true, big: 1, land: () => {} });
-          rfx({ k: 'streak', x0: t.x, h0: h, z0: t.y, x1: t.x + ux * len, h1: .6, z1: t.y + uz * len, col: ab.hue, w: .06, trav: len / spd, life: .4 });
-          sfx('arrow', .3); sfx('thwack', 0);
+          // the way back: whoever stands on the line as the glaive turns, nearest the far end first
+          G.delayed.push({ t: T1, fn: () => {
+            if (!G.towers.includes(t)) return; const s2 = t.st || s;
+            for (const o of abLine(t, s2, x0, z0, ux, uz, len, WBC.pierce.w)) { const d = len - abDist(t, o); G.delayed.push({ t: Math.max(0, d) / spd, fn: () => { if (o.dead) return; const s3 = t.st || s2; wbHit(t, s3, o, s3.dmg * m * WBC.pierce.back, 'phys', [-ux * .05, -uz * .05]); fxSpark(o.x, o.y, hitH(o), WB_COL.goldL, 3); } }); }
+          } });
+          wbFly({ k: 'rglaiveL', t, st: s, tg: null, pow: 0, x: x0, z: z0, h, x0, z0, h0: h, ex: x0 + ux * len, ez: z0 + uz * len, spd, big: 1, spin: 0, leg: 0, pts: [[x0, h, z0, G.time]], step: wbcLineGlaive });
+          t.wbgOut = G.time; sfx('glaive', 2, 1);
         } });
       } },
-    { id: 'wb_wardarrow', name: 'Warding Arrow', short: 'Ward', glyph: 'statue', hue: '#9ee8dc', mana: 90, cd: 16, research: { cost: 110, time: 30 },
+    { id: 'wb_wardarrow', name: 'Warding Glaive', short: 'Ward', glyph: 'glaive2', hue: '#9ee8dc', mana: 90, cd: 16, research: { cost: 110, time: 30 },
       by: { dur: [8, 8, 9, 9, 10, 10] },
       auto: 'a walker in reach with two or more runes within 3.2 cells of it',
-      text: (t, st, ab) => `An arrow driven into the road under a walker stands as a great rune for ${byT(ab.by.dur, t)}s: foes beside it take ${xD(st, WBC.ward.m)} and are branded, and it links into a ward-line with every rune within ${gNf(WB_RUNE.link * 2)} cells (twice the usual reach).`,
+      text: (t, st, ab) => `A glaive hurled down into the road under a walker stands there spinning, a great rune for ${byT(ab.by.dur, t)}s: foes beside it take ${xD(st, WBC.ward.m)} and are branded, and it links into a ward-line with every rune within ${gNf(WB_RUNE.link * 2)} cells (twice the usual reach).`,
       pick(t, st, ab, man) {
         const L = abFoes(t, st, abReach(t, st, ab), abWalker).sort((a, b) => a.remain - b.remain), R0 = wbRunes(), lk = WB_RUNE.link * 2;
         let best = null, bn = -1;
@@ -23878,9 +23952,9 @@ const WB_KITS = {
       cast(t, st, p, ab) {
         const q = wbRoadCell(p.x, p.y), x = q[2] >= 0 ? q[0] : p.x, z = q[2] >= 0 ? q[1] : p.y, dur = byT(ab.by.dur, t);
         const rn = wbRune(t, st, x, z, 'shaft', { life: dur, noMerge: true });
-        if (rn) { rn.wbBeacon = G.time + dur; rn.r = WBC.ward.r; wbS().linesAt = -1; }
+        if (rn) { rn.wbBeacon = G.time + dur; rn.r = WBC.ward.r; rn.wbGlv = G.time; wbS().linesAt = -1; }
         abAoe(() => inSplash(x, z, WBC.ward.r + .1, false, c => { if (c.ent || c.phased || !canTarget(t, st, c)) return; wbHit(t, st, c, st.dmg * WBC.ward.m, 'phys'); if (!c.dead) wbBrand(c, 1, t); }));
-        fxRing(x, z, WBC.ward.r, WB_COL.teal); flashLight(x, z, .8, [.8, 1.6, 1.5], 2, .25); sfx('thwack', 0);
+        fxRing(x, z, WBC.ward.r, WB_COL.teal); flashLight(x, z, .8, [1.4, 1.3, .9], 2, .25); sfx('thwack', 0);
       } },
   ] },
 
@@ -24240,7 +24314,7 @@ Object.assign(AB_PREF, {
 });
 Object.assign(SP_SHAPE, {
   wb_swordplant: 'a', wb_wardflare: 'a', wb_laststand: 'x',
-  wb_runevolley: 'a h:n', wb_piercingshaft: 'a', wb_wardarrow: 'a',
+  wb_runevolley: 'a h:n', wb_piercingshaft: 'a h2', wb_wardarrow: 'a',
   wb_rimeline: 'a', wb_frostbite: 'a', wb_winterward: 'a h2',
   wb_etch: 'a', wb_detonate: 'a', wb_scribe: 'a',
   wb_charge: 'a h2', wb_stormbanner: 'a', wb_skyfall: 'a h2',
@@ -24278,17 +24352,17 @@ WB_HOOK.tick.push(() => {
 const wbTethers = () => wbcS().tethers.filter(L => L.until > G.time).map(L => ({ a: L.foes[0], b: L.foes[1], at: L.at, until: L.until }));
 
 /* ---------- wrappers on the core (the core's file is left as it is; these could move into it) ----------
-   - flights launched while a spell casts (Rune Volley's arrows, Quake Line's quake, Rune Shot's bolt) remember the spell
+   - flights launched while a spell casts (Ricochet Rite's glaive, Quake Line's quake, Rune Shot's bolt) remember the spell
      (p.ab) and step under its tag, so their hits are the spell's (Brand bonus, Spell Damage, the damage report);
    - a ground rune is never a spell's own area: abRun would tag one laid by a spell, and its touches would count as the
      spell's hits for its whole life (and take Spell Damage), so runes refuse the tag;
-   - Warding Arrow's great rune links to every rune within twice the usual reach (the beacon lines added to the lines);
+   - Warding Glaive's great rune links to every rune within twice the usual reach (the beacon lines added to the lines);
    - "can't be Wounded" (Final Oath, Anvil Stance, Sworn Vow: t.wbNoWoundT) holds at the blow itself, at 1 health. */
 {
   const fly0 = wbFly;
   wbFly = function (p) { if (p && !p.ab && typeof AB_NOW !== 'undefined' && AB_NOW) p.ab = AB_NOW; return fly0(p); };
   const tagStep = f => function (p, dt) { return p.ab ? abRun(p.ab, () => f(p, dt)) : f(p, dt); };
-  wbGlaiveStep = tagStep(wbGlaiveStep); wbBoltStep = tagStep(wbBoltStep); wbQuakeStep = tagStep(wbQuakeStep);
+  wbGlaiveStep = tagStep(wbGlaiveStep); wbRicoStep = tagStep(wbRicoStep); wbBoltStep = tagStep(wbBoltStep); wbQuakeStep = tagStep(wbQuakeStep);
   const rune0 = wbRune;
   wbRune = function () { const z = rune0.apply(this, arguments); if (z && !Object.getOwnPropertyDescriptor(z, 'abId')) Object.defineProperty(z, 'abId', { get: () => null, set() {}, configurable: true, enumerable: false }); return z; };
   const lines0 = wbLinesNow;
@@ -24389,8 +24463,8 @@ const WB_RELICS = {
   // ---- made for one unit (inert in any other) ----
   wbr_pommel: { rar: 2, for: ['glaive'], name: 'Rosette Pommel', icon: 'fist', hue: '#c8a050', theme: 'oaths',
     text: k => `Every 3rd cut is a pommel-blow: its foe is staggered ${nf1(.3 * k)}s.`, fx: (st, k) => wbPw(st, 'wbPommel', .3 * k) },
-  wbr_fletch: { rar: 2, for: ['arrow'], name: 'Ivory-Fletched Shafts', icon: 'feather', hue: '#efe6d0', theme: 'arrows',
-    text: k => `Its arrows fly ${P_(.3 * k)} faster, and an arrow that strikes a branded foe brands it once more.`, fx: (st, k) => wbPw(st, 'wbFletch', .3 * k) },
+  wbr_fletch: { rar: 2, for: ['arrow'], name: 'Ivory-Wrapped Grip', icon: 'feather', hue: '#efe6d0', theme: 'glaives',
+    text: k => `Its glaive flies ${P_(.3 * k)} faster, and each strike of its glaive on a branded foe brands it once more.`, fx: (st, k) => wbPw(st, 'wbFletch', .3 * k) },
   wbr_rimehook: { rar: 2, for: ['frost'], name: 'Rime-Hook Halberd-Head', icon: 'snowflake', hue: '#bfe6ff', theme: 'frost',
     text: k => `Every sweep lays a frost rune, not every 2nd, and its frost runes chill ${P_(.1 * k)} more.`, fx: (st, k) => wbPw(st, 'wbRime', .1 * k) },
   wbr_inkhorn: { rar: 2, for: ['arcane'], name: 'Black Inkhorn', icon: 'vial', hue: '#d8b8ff', theme: 'sigils',
@@ -24429,11 +24503,11 @@ const WB_LEGENDS = {
     text: k => `Every ${ordN(wbdPlantN(k))} cut plants the sword: every walker within 1.3 cells is rooted ${nf1(.6 * k)}s and branded, and oath runes ring the blade.`,
     build: 'Oathbreaker Thrust and Rune Cleave, Oathstones beside the road to link the oath runes, and Varic Dunmoor.',
     combo: 'Oathbreaker Thrust, Rune Cleave and Oathstones beside the road.', fx: (st, k) => { pwMin(st, 'wbPlant', wbdPlantN(k)); wbPw(st, 'wbPlantT', .6 * k); } },
-  wbl_sunbow: { for: 'arrow', name: 'The Sun-Wheel Longbow', icon: 'bow', hue: '#ffe8a8',
-    twist: 'Every Masked Warden arrow splits where it lands: more shafts fly on to the foes beside it, each pinning its own rune.',
-    text: k => `Each arrow that lands splits: ${wbdSplitN(k)} shafts fly on to the foes nearest it within 2 cells, each for ${P_(.4 + .2 * k)} of the arrow and pinning a shaft rune.`,
-    build: 'Rune Volley and Piercing Shaft, a crowded stretch of road, and Runecarvers to link the shaft runes.',
-    combo: 'Rune Volley, a crowded stretch of road and Runecarvers.', fx: (st, k) => { wbPw(st, 'wbSplit', wbdSplitN(k)); wbPw(st, 'wbSplitK', .4 + .2 * k); } },
+  wbl_sunbow: { for: 'arrow', name: 'The Sun-Wheel Glaive', icon: 'sun', hue: '#ffe8a8',
+    twist: 'Every Glaive Warden glaive runs a longer circuit: it ricochets on to more foes and carves a shaft rune under every one it strikes.',
+    text: k => `Its glaive ricochets ${wbdSplitN(k)} more times, and every foe it strikes, not only the first, gets a shaft rune carved under it.`,
+    build: 'Ricochet Rite and Returning Oath, a crowded stretch of road, and Runecarvers to link the shaft runes.',
+    combo: 'Ricochet Rite, a crowded stretch of road and Runecarvers.', fx: (st, k) => wbPw(st, 'wbSplit', wbdSplitN(k)) },
   wbl_winterhall: { for: 'frost', name: 'Crown of the Winter Hall', icon: 'blizzard', hue: '#e8f6ff',
     twist: 'Every Frostbrand sweep rimes the road under each walker it cuts, and Bound frost runes freeze.',
     text: k => `Every walker its sweeps cut gets a frost rune under it, and a Bound rune holding frost freezes the walkers it touches for ${nf1(.4 * k)}s (each once every 4s).`,
@@ -24483,7 +24557,7 @@ const WB_LEGENDS = {
   wbl_roadscribe: { name: 'Gauntlet of the Road-Scribe', icon: 'rune', hue: '#efe6d0',
     twist: 'Every ability it casts writes the road: each foe it strikes has a rune of its own kind laid under it.',
     text: () => 'Each foe its abilities strike gets a rune of its own kind laid under it, once a cast.',
-    build: 'abilities that strike many foes (Rune Volley, Rimeline, Quake Line) and units of other kinds beside it.',
+    build: 'abilities that strike many foes (Ricochet Rite, Rimeline, Quake Line) and units of other kinds beside it.',
     combo: 'abilities that strike many foes, and units of other kinds beside it.', fx: st => wbPw(st, 'wbScribe', 1) },
 };
 
@@ -24657,15 +24731,18 @@ wbDetonate = function (t, st, c, per, o) {
   return n;
 };
 
-/* ---------- things in flight: the Ivory-Fletched Shafts, the Sun-Wheel Longbow, the Long-Oath Ballista ---------- */
+/* ---------- things in flight: the Ivory-Wrapped Grip, the Sun-Wheel Glaive, the Long-Oath Ballista ---------- */
 WB_HOOK.tick.push(dt => {
   const S = wbS(); if (!S.P.length) return;
   for (const f of S.P) {
     const t = f.t, p = wbdP(t); if (!p || f.done) continue;
-    if (f.k === 'arrow' && !f.wbdSeen) {
+    if (f.k === 'rglaive' && !f.wbdSeen && t && t.type === 'arrow') {
       f.wbdSeen = 1;
       if (p.wbFletch) f.spd *= 1 + p.wbFletch;
-      if (p.wbSplit && !f.wbdSplit) { const on = f.onLand; f.onLand = (q, c) => { if (on) on(q, c); wbdSplitArrow(q, c, p); }; }
+      if (p.wbSplit && !f.ab) { f.left += p.wbSplit; f.allRunes = 1; if ((t.wbdSunN = (t.wbdSunN || 0) + 1) % 4 === 0) wbdGlint(t, 'wbl_sunbow'); }
+    } else if (f.k === 'arrow' && !f.wbdSeen) {
+      f.wbdSeen = 1;
+      if (p.wbFletch) f.spd *= 1 + p.wbFletch;
     }
     // the gold chain behind the bolt
     if (f.k === 'bolt' && p.wbLongOath && f.land == null) {
@@ -24679,14 +24756,6 @@ WB_HOOK.tick.push(dt => {
     }
   }
 });
-// the Sun-Wheel Longbow: an arrow that lands splits on to the foes nearest it
-function wbdSplitArrow(q, c, p) {
-  const t = q.t; if (!t || !G.towers.includes(t)) return;
-  const L = nearest(q.tx, q.tz, 2, p.wbSplit, c, o => !o.phased && !o.ent && (!o.fly || t.def.air));
-  for (const o of L) wbFly({ k: 'arrow', t, st: q.st, tg: o, pow: q.pow * (p.wbSplitK || .6), x: q.tx, z: q.tz, h: c ? hitH(c) : .4, x0: q.tx, z0: q.tz, h0: .4, tx: o.x, tz: o.y, spd: 13, wbdSplit: 1, wbdSeen: 1,
-    land: (r, cc) => { const s = (r.t && r.t.st) || r.st; if (cc) wbProc(() => tagged('relic', () => wbHit(r.t, s, cc, s.dmg * r.pow, 'phys'))); wbRune(r.t, s, r.tx, r.tz, 'shaft'); } });
-  if (L.length) wbdGlint(t, 'wbl_sunbow');
-}
 
 /* ---------- a foe falls: the Notched Gold Tally, the Unwritten Lexicon ---------- */
 WB_HOOK.kill.push((c, src) => {
@@ -24983,8 +25052,8 @@ function wbeHeroStats() { if (!wbeHeroIs('wb_aedric')) return null; const M = wb
    dark plate under black mantles patterned with gold rosettes and leaves, long ivory under-robes, gold-emblem
    pauldrons, dark blades whose runes glow gold, shaven-headed bearded knights, banners with the gold sun-wheel. Built
    from the humanoid kit (forces_body.js) big-headed and broad so they read from the 57° camera, each unit its own accent:
-   the Oathbound black and gold, hooded, a greatsword held point-down; the Masked Wardens tall and slender, gold masks
-   under pointed helms, great black longbows with pale teal runes; the Frostbrand pale steel and white fur, an icy
+   the Oathbound black and gold, hooded, a greatsword held point-down; the Glaive Wardens tall and slender, gold masks
+   under pointed helms, a spinning glaive of gold and ivory with faint teal runes; the Frostbrand pale steel and white fur, an icy
    halberd; the Runecarvers ink-violet robes over mail, a stylus-blade and a chained tome; the Stormward Lancers black
    plate and winged helms on grey horses, a blue-lit lance; the Anvil Guard bronze, stocky, a huge rune shield; the
    Siege Wardens a black-iron ballista with gold runes and two crew; the Vowkeepers grey robes over mail, a smoking
@@ -24995,14 +25064,14 @@ function wbeHeroStats() { if (!wbeHeroIs('wb_aedric')) return null; const M = wb
    Poses: the strike from t.windup / t.shotT, each ability its own move from t.ab.last / t.ab.lastAt over WB_ANIM_T
    (forces_wardbound_c.js; WB_AT below until it says otherwise). Two-handed weapons are their own part, carried where
    the arms' pose puts the hands (wbWield), so a blade can turn point-down while the hands stay on the hilt.
-   Named anchors for sculpted replacements: the parts' keys (arms, sword, bow, draw, arrow, halberd, stylus, tome, lance,
+   Named anchors for sculpted replacements: the parts' keys (arms, sword, glaive, off, halberd, stylus, tome, lance,
    reins, shield, hammer, ballista, crank, loader, censer, thurible, blade), WB_ANCH (shoulders, head) and WB_HAND. */
 const WB_P0 = { plate: '#26262e', plateD: '#17171d', plateL: '#4c4c5a', trim: '#d8a840', trimD: '#a07a2c', cloak: '#141218', cloakIn: '#3a2c18',
   robe: '#e6dcc4', robeD: '#c2b694', cloth: '#16141a', skin: '#d2a684', beard: '#3a2a20', leather: '#3a2a1e', blade: '#2a2a34', glow: '#ffd870' };
 const wbPal = o => Object.assign({}, WB_P0, o);
 const WBP = {
   wb_oathbound: wbPal({}),
-  wb_maskedwarden: wbPal({ plate: '#1e1c24', plateD: '#121016', plateL: '#403a4a', robeD: '#221e2a', cloak: '#16131c', glow: '#b8fff2', bow: '#141216' }),
+  wb_maskedwarden: wbPal({ plate: '#1e1c24', plateD: '#121016', plateL: '#403a4a', robeD: '#221e2a', cloak: '#16131c', glow: '#b8fff2', ivory: '#efe6d0', ivoryD: '#c8bc9c' }),
   wb_frostbrand: wbPal({ plate: '#a8b4c2', plateD: '#6a7686', plateL: '#dce6f0', helm: '#7c8898', fur: '#f0ece4', furD: '#c8c2b8', beard: '#e8e4dc', glow: '#cfeeff', ice: '#bfe6ff', skin: '#d8b090' }),
   wb_runecarver: wbPal({ plate: '#4a4656', plateD: '#2e2a38', plateL: '#6a6478', robeV: '#3a2858', cloak: '#1c1428', cloakIn: '#2c1e46', cloth: '#2c1e46', glow: '#dcc0ff', skin: '#d8ae8c', beard: '#4a3428' }),
   wb_stormward: wbPal({ plate: '#1c1c24', plateD: '#101016', plateL: '#3e3e4c', horse: '#8c8c94', horseD: '#5c5c66', mane: '#26262c', glow: '#9cc4ff' }),
@@ -25055,7 +25124,7 @@ function wbRotV(r, v, inv) {
 // share one pivot): the part's pose [rx, ry, rz, offset]
 function wbWield(a, w, H, o) { const p = wbRotV(a, H), l = wbRotV(w, o ? [p[0] + o[0], p[1] + o[1], p[2] + o[2]] : p, true); return [w[0], w[1], w[2], l[0], l[1], l[2]]; }
 // the hands' grips in each arm part's frame (before the tier's scale): where a sculpted model's hands go
-const WB_HAND = { oath: [0, -.15, .2], frost: [0, -.14, .2], bow: [0, -.02, .28], nock: [-.26, -.02, -.02], stylus: [-.02, -.12, .18], tome: [.03, -.12, .2],
+const WB_HAND = { oath: [0, -.15, .2], frost: [0, -.14, .2], glaive: [0, -.02, .28], off: [0, -.02, .26], stylus: [-.02, -.12, .18], tome: [.03, -.12, .2],
   lance: [-.02, -.16, .1], reins: [.06, -.2, .18], shield: [.07, -.14, .17], hammer: [-.03, -.13, .15], censer: [.04, -.1, .2], blade: [-.02, -.12, .16] };
 
 /* ---------- small builders ---------- */
@@ -25196,14 +25265,35 @@ function wbHalberd(g, tier, P) {
   wbSlab(g, [[-.015, y - .02], [-.09, y + .0], [-.06, y - .04], [-.015, y - .08]], .007, P.plateL, P.plate);
   g.em = .6; for (let k = 0; k < 2 + tier; k++) g.box(.06 + k * .03, y - .06 + (k % 2) * .03, .009, .012, .03, .003, '#ffffff'); g.em = 0;
 }
-// the Masked Wardens' great recurved longbow, vertical at the bow hand H; limbs black, runes pale teal
-function wbLongbow(g, tier, P, H) {
-  const len = .66 + .05 * tier, pts = [];
-  for (let k = 0; k <= 12; k++) { const u = k / 12, a = -1.25 + u * 2.5, rc = Math.abs(u - .5) > .42 ? .06 : 0; pts.push([H[0], H[1] + Math.sin(a) * len, H[2] + Math.cos(a) * .12 - .12 + rc]); }
-  mat(g, 'woodgrain', () => { for (let k = 0; k < 12; k++) if (k !== 5 && k !== 6) huTube(g, [pts[k], pts[k + 1]], .027 - Math.abs(k - 5.5) * .0018, P.bow, 5); });
-  mat(g, 'gilt', () => { huTube(g, [pts[5], pts[7]], .021, P.trim, 6); for (const k of [2, 10]) g.ico(...pts[k], .02, P.trim, .1); });
-  g.seg(pts[0], pts[12], .004, '#e8e6dc');
-  g.em = .85; for (const k of [1, 2, 3, 4, 8, 9, 10, 11].slice(0, 6 + tier)) { const p = huLerp(pts[k], pts[k + 1], .5); g.box(p[0] + .02, p[1], p[2], .008, .03, .016, P.glow); g.box(p[0] - .02, p[1], p[2], .008, .03, .016, P.glow); } g.em = 0;
+// the Glaive Wardens' glaive, lying in the x-z plane at radius 1 (scaled where it is used): a gold hub round a pale teal
+// rune-gem, three swept ivory blades with gilt inner bevels, a faint teal rune line down each cutting edge and gold
+// rune ticks on each blade (lvl: 0-2, one more tick a level). The thrown glaive (forces_wardbound_g.js) is this mesh.
+function wbGlaiveGeo(g, lvl = 0) {
+  const P = WBP.wb_maskedwarden, hub = .22, ridge = .07;
+  mat(g, 'gilt', () => { g.cyl(0, -.055, 0, hub, hub * .92, .11, 10, P.trimD, { top: P.trim, capB: true, bot: P.trimD }); g.torus(0, .058, 0, hub * .78, .025, 12, 3, P.trim); });
+  g.em = .8; g.cyl(0, .055, 0, hub * .5, hub * .22, .07, 6, P.glow); g.em = 0;
+  for (let b = 0; b < 3; b++) {
+    const th = b * TAU / 3, N = 7, L = [], Rr = [], C = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, r0 = hub * .8, r = r0 + (1 - r0) * u, a = th + 1.05 * u;
+      const tx = -Math.sin(a) * r * 1.05 + Math.cos(a) * (1 - r0), tz = Math.cos(a) * r * 1.05 + Math.sin(a) * (1 - r0), tl = Math.hypot(tx, tz) || 1;
+      const nx = tz / tl, nz = -tx / tl, w = (.11 + .14 * Math.sin(Math.PI * Math.min(1, u * 1.15))) * Math.pow(1 - u, .55);
+      const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
+      L.push([cx - nx * w * .45, 0, cz - nz * w * .45]); Rr.push([cx + nx * w, 0, cz + nz * w]); C.push([cx, ridge * (1 - u * .7), cz]);
+    }
+    // (each bevel a two-sided quad: the glaive tumbles, so both faces show)
+    const q2 = (A, B, Cc, D, col) => { wbTri2(g, A, B, Cc, col); wbTri2(g, A, Cc, D, col); };
+    mat(g, 'gilt', () => { for (let i = 0; i < N; i++) {
+      const Cb = [C[i][0], -C[i][1], C[i][2]], Cb1 = [C[i + 1][0], -C[i + 1][1], C[i + 1][2]];
+      q2(L[i], C[i], C[i + 1], L[i + 1], P.trimD); q2(L[i], Cb, Cb1, L[i + 1], P.trimD);
+    } });
+    for (let i = 0; i < N; i++) {
+      const Cb = [C[i][0], -C[i][1], C[i][2]], Cb1 = [C[i + 1][0], -C[i + 1][1], C[i + 1][2]];
+      q2(C[i], Rr[i], Rr[i + 1], C[i + 1], i % 2 ? P.ivoryD : P.ivory); q2(Cb, Rr[i], Rr[i + 1], Cb1, P.ivoryD);
+    }
+    g.em = .45; for (let i = 1; i < N - 1; i++) g.seg([Rr[i][0] * .96, .014, Rr[i][2] * .96], [Rr[i + 1][0] * .96, .014, Rr[i + 1][2] * .96], .026, P.glow); g.em = 0;
+    g.em = .7; for (let k = 0; k < 2 + lvl; k++) { const c = C[2 + k]; g.box(c[0], c[1] + .006, c[2], .05, .012, .05, '#ffd870'); } g.em = 0;
+  }
 }
 
 /* =====================================================================================================
@@ -25246,9 +25336,9 @@ Object.assign(FORCE_BUILD, {
   }); },
   wb_maskedwarden(g, tier) { const P = WBP.wb_maskedwarden; wbGrow(g, tier, () => {
     wbBase(g, .28); const { y0 } = wbKnight(g, tier, P, { y0: .5, bulk: .9, head: 'mask', longRobe: true, robeCol: P.robeD, tabCol: P.robe, capeTo: .04, headK: 1.12 });
-    // a quiver of teal-fletched arrows at the hip, clear of the mantle
-    g.with(T(.13, y0 - .02, -.04, 0, .2, .25), () => { mat(g, 'leather', () => g.cyl(0, -.12, 0, .032, .036, .22, 8, P.plateD, { top: P.plate })); mat(g, 'gilt', () => g.cyl(0, .08, 0, .038, .038, .016, 8, P.trim, { capT: false }));
-      g.em = .5; for (let k = 0; k < 4 + tier; k++) { const a = k * 1.5; g.seg([Math.cos(a) * .014, .09, Math.sin(a) * .014], [Math.cos(a) * .018, .15, Math.sin(a) * .018], .009, P.glow); } g.em = 0; });
+    // a second glaive slung on a gold-buckled baldric at the hip, clear of the mantle
+    mat(g, 'leather', () => huTube(g, [[-.11, y0 + .2, .06], [0, y0 + .05, .1], [.12, y0 - .06, .05]], .012, P.leather, 4));
+    g.with(T(.15, y0 - .1, -.02, .25, 0, Math.PI / 2 - .2, .1 + .006 * tier), () => wbGlaiveGeo(g, Math.min(2, tier)));
   }); },
   wb_frostbrand(g, tier) { const P = WBP.wb_frostbrand; wbGrow(g, tier, () => {
     wbBase(g); wbKnight(g, tier, P, { head: 'frost', fur: true, capeTo: .1, bulk: 1.08 });
@@ -25315,16 +25405,46 @@ function wbOathPose(t, a) {
   }
   return { A: [lfSwing(t, -.5, -1.55, .5), 0, 0], W: [lfSwing(t, Math.PI - .2, -.75, 1.7), 0, 0] };
 }
-// --- the Masked Wardens: the bow lowered at ease, raised level to draw; the string hand swings back to the cheek
-function wbMaskPose(t, a) {
-  const w = lfE(t.windup || 0), s = lfShot(t), after = s < .9 ? 1 - lfE(s / .9) : 0, aim = Math.max(w, after);
-  let rx = .22 * (1 - aim), draw = s < .05 ? 0 : w, kick = s < .6 ? lfKick(s, 10, 18) : 0, drop = 0, cant = -.3 * (1 - aim) - .32 * aim;
+// --- the Glaive Wardens: the glaive held low at the side, tipped flat so it reads from above; the throw a backhand sweep: the arm
+// swings across the chest, snaps out on the release and stays reaching until the glaive comes
+// home; the catch a small give of the arm. The glaive in the hand is hidden while it flies (t.wbgOut: forces_wardbound_a.js),
+// until it is caught or the next throw's wind-up starts (the Warden draws the second from its baldric).
+const WB_GLV_REST = [1.05, .12, 0];
+function wbGlvPose(t, a) {
+  const w = lfE(t.windup || 0), s = lfShot(t), now = typeof G !== 'undefined' && G && G.time != null ? G.time : 0;
+  const out = t.wbgOut > 0 && now - t.wbgOut < 1.6, cAt = t.wbgCatch != null ? now - t.wbgCatch : 9, R0 = WB_GLV_REST;
+  let rx = R0[0], ry = R0[1], rz = R0[2], hide = out && w < .05;
+  // the wind-up: raised level and swung across the chest, the wrist turned a little
+  rx = rx + (.08 - rx) * w; ry = ry + (-1.25 - ry) * w; rz = -.3 * w;
+  // the release: a snap out across the front, then reaching while it flies
+  if (s < 1.2 && w < .05) { const k = lfE(Math.min(1, s / .12)), back = s > .45 ? lfE(Math.min(1, (s - .45) / .7)) : 0, reach = out ? 0 : back;
+    rx = .08 + (.3 - .08) * k; ry = -1.25 + (.45 + 1.25) * k; rz = -.3 * (1 - k);
+    rx += (R0[0] - rx) * reach; ry += (R0[1] - ry) * reach; }
+  else if (out && w < .05) { rx = .3; ry = .45; rz = 0; }
+  // the catch: the arm gives a little, then settles
+  if (cAt < .45 && w < .05) { const k = Math.sin(Math.PI * cAt / .45); rx = R0[0] * lfE(cAt / .45) + .2 * (1 - lfE(cAt / .45)) - .25 * k; ry = R0[1] + .3 * (1 - cAt / .45); rz = 0; }
   if (a) { const u = a.u;
-    if (a.id === 'wb_runevolley') { const k = wbPop(u, .25, .75); rx = .22 * (1 - k) - 1.05 * k; draw = u < .55 ? wbWin(u, .1, .45) : 0; kick = u >= .55 ? lfKick((u - .55) * wbAnimT(a.id), 10, 18) : 0; cant *= 1 - k; }
-    else if (a.id === 'wb_piercingshaft') { const k = wbPop(u, .15, .8); rx = .22 * (1 - k); draw = u < .7 ? 1.15 * wbWin(u, .08, .35) : 0; kick = u >= .7 ? 1.4 * lfKick((u - .7) * wbAnimT(a.id), 10, 18) : 0; cant *= 1 - k; }
-    else if (a.id === 'wb_wardarrow') { const k = wbPop(u, .15, .8); rx = .22 * (1 - k) + .62 * k; draw = u < .58 ? wbWin(u, .1, .4) : 0; drop = u >= .58 ? .06 * wbPop((u - .58) / .42, .15, .6) : 0; cant *= 1 - k; }
+    if (a.id === 'wb_runevolley') {   // an overhead sidearm heave: raised high and back, then flung out round
+      const up = wbWin(u, .02, .26), go = wbWin(u, .27, .38), back = wbWin(u, .75, 1);
+      rx = wbMix([R0[0]], [-.85], up)[0]; ry = R0[1] - 1.45 * up; rz = -.3 * up;
+      if (go > 0) { rx = -.85 + (.25 + .85) * go; ry = -1.33 + (.6 + 1.33) * go; rz = -.3 * (1 - go); }
+      if (back > 0) { rx += (R0[0] - rx) * back; ry += (R0[1] - ry) * back; }
+      hide = u > .3 && t.wbgOut > 0;
+    } else if (a.id === 'wb_piercingshaft') {   // a level backhand: the arm far across the chest, then straight out down the line
+      const up = wbWin(u, .02, .26), go = wbWin(u, .27, .34), back = wbWin(u, .85, 1);
+      rx = R0[0] + (0 - R0[0]) * up; ry = R0[1] + (-1.55 - R0[1]) * up; rz = -.3 * up;
+      if (go > 0) { rx = 0; ry = -1.55 + 1.55 * go; rz = -.3 * (1 - go); }
+      if (back > 0) { rx += (R0[0] - rx) * back; ry += (R0[1] - ry) * back; rz *= 1 - back; }
+      hide = u > .3 && t.wbgOut > 0;
+    } else if (a.id === 'wb_wardarrow') {   // an overhand hurl down into the road before it
+      const up = wbWin(u, .02, .3), dn = wbWin(u, .32, .42), back = wbWin(u, .7, 1);
+      rx = R0[0] + (-1.9 - R0[0]) * up; ry = R0[1] * (1 - up); rz = 0;
+      if (dn > 0) rx = -1.9 + (1.25 + 1.9) * dn;
+      if (back > 0) rx += (R0[0] - rx) * back;
+      hide = u > .4 && u < .8;
+    }
   }
-  return { rx, draw: Math.min(1.15, draw), kick, drop, cant };
+  return { rx, ry, rz, hide, k: a ? wbPop(a.u, .1, .8) : 0 };
 }
 // --- the Frostbrand: the halberd canted before it; a sweep across from one side to the other
 const WB_FROST_REST = { A: [-.25, 0, 0], W: [-.1, 0, .3] };
@@ -25368,15 +25488,13 @@ Object.assign(FORCE_PARTS, {
     wbPart([0, WB_SH, .02], 'arms', (g) => wbTwoArms(g, WBP.wb_oathbound, WB_HAND.oath, .135, .034), (t, a) => wbOathPose(t, a).A),
     wbPart([0, WB_SH, .02], 'sword', (g, tier) => wbGreatsword(g, tier, WBP.wb_oathbound), (t, a) => { const p = wbOathPose(t, a); return wbWield(p.A, p.W, WB_HAND.oath); }) ],
   wb_maskedwarden: [
-    wbPart([-.14, .7, .02], 'bow', (g, tier) => { const P = WBP.wb_maskedwarden; wbArm1(g, P, WB_HAND.bow, { w: .028 }); wbLongbow(g, tier, P, WB_HAND.bow); }, (t, a) => {
-      const p = wbMaskPose(t, a); return [p.rx - .05 * p.kick, 0, p.cant, 0, -p.drop, .012 * p.kick]; }),
-    wbPart([.14, .7, .02], 'draw', (g) => wbArm1(g, WBP.wb_maskedwarden, WB_HAND.nock, { w: .028 }), (t, a) => {
-      const p = wbMaskPose(t, a), back = p.kick > 0 && p.draw < .05 ? .12 * Math.max(0, p.kick) : 0; return [p.rx, 1.05 * (1 - Math.min(1, p.draw)) - back, 0, 0, -p.drop, -.04 * Math.max(0, p.draw - 1) * 4]; }),
-    wbPart([-.14, .7, .02], 'arrow', (g, tier) => { const P = WBP.wb_maskedwarden, y = WB_HAND.bow[1];
-      mat(g, 'woodgrain', () => huTube(g, [[0, y, -.02], [0, y, .42]], .006, '#1c1a1e', 4));
-      g.em = .9; g.with(T(0, y, .42, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .016, 0, .07, 4, P.glow)); g.em = 0;
-      g.em = .4; for (const sd of [-1, 1]) wbTri2(g, [0, y, -.01], [sd * .02, y + .01, .04], [0, y, .07], P.glow); g.em = 0; }, (t, a) => {
-      const p = wbMaskPose(t, a); if (p.draw < .2) return null; return [p.rx, 0, p.cant, 0, -p.drop, .26 * (1 - Math.min(1, p.draw)) - .05 * Math.max(0, p.draw - 1) * 4]; }) ],
+    wbPart([.14, .7, .02], 'glaive', (g, tier) => { const P = WBP.wb_maskedwarden; wbArm1(g, P, WB_HAND.glaive, { w: .028 }); }, (t, a) => {
+      const p = wbGlvPose(t, a); return [p.rx, p.ry, p.rz]; }),
+    wbPart([.14, .7, .02], 'glaivehand', (g, tier) => { const H = WB_HAND.glaive;
+      g.with(T(H[0] + .06, H[1] - .01, H[2] + .03, 0, -1, 0, .16 + .008 * tier), () => wbGlaiveGeo(g, tier)); }, (t, a) => {
+      const p = wbGlvPose(t, a); return p.hide ? null : [p.rx, p.ry, p.rz]; }),
+    wbPart([-.14, .7, .02], 'off', (g) => wbArm1(g, WBP.wb_maskedwarden, WB_HAND.off, { w: .028 }), (t, a) => {
+      const p = wbGlvPose(t, a); return [.95 - .25 * Math.max(0, -p.ry) / 1.5, -.15 - .35 * Math.max(0, p.ry), 0]; }) ],
   wb_frostbrand: [
     wbPart([0, WB_SH, .02], 'halberd', (g, tier) => wbHalberd(g, tier, WBP.wb_frostbrand), (t, a) => { const p = wbFrostPose(t, a); return wbWield(p.A, p.W, WB_HAND.frost); }),
     wbPart([0, WB_SH, .02], 'arms', (g) => wbTwoArms(g, WBP.wb_frostbrand, WB_HAND.frost, .14, .034), (t, a) => wbFrostPose(t, a).A) ],
@@ -25472,8 +25590,8 @@ Object.assign(FORCE_PARTS, {
       g.with(T(0, 0, 0), () => mat(g, 'gilt', () => huTube(g, [at(.04), at(.24 + .02 * tier), at(.3 + .02 * tier)], [.022, .016, 0], '#c8ccd6', 4, { flat: .25 })));
       g.em = .7; g.ico(...at(.12), .008, P.glow); g.em = 0; }, (t, a) => wbVowPose(t, a).B) ],
 });
-// where shots leave the launchers (forces.js unitTip): the bow's grip, the ballista's bolt head
-UNIT_TIP.wb_maskedwarden = { k: 'bow', p: tr => { const s = wbS3(tr); return [WB_HAND.bow[0] * s, WB_HAND.bow[1] * s, (WB_HAND.bow[2] + .06) * s]; } };
+// where shots leave the launchers (forces.js unitTip): the glaive hand, the ballista's bolt head
+UNIT_TIP.wb_maskedwarden = { k: 'glaive', p: tr => { const s = wbS3(tr); return [WB_HAND.glaive[0] * s, WB_HAND.glaive[1] * s, (WB_HAND.glaive[2] + .03) * s]; } };
 UNIT_TIP.wb_siegewarden = { k: 'ballista', p: tr => { const s = wbS3(tr), b = 1 + .06 * Math.min(2, tr | 0); return [0, .05 * s, (.44 * b + .08) * s]; } };
 
 /* =====================================================================================================
@@ -25532,8 +25650,9 @@ function wbExtra(t, tier, x, z, yaw, K) {
     for (const y of [.2, .38]) wbGlow(wbPartAt(t, 'sword', [0, y + .02 * tier, 0], K, x, z, yaw), .12 + .2 * fl, WB_GOLDC, (.18 + .55 * fl) * pulse);
     if (st || (a && a.id === 'wb_laststand')) QADD.ground(x, z, .04, .55, .55, [1, .8, .35, .35 + .1 * Math.sin(n * 8)], 3, .05, n);
   } else if (u === 'wb_maskedwarden') {
-    const p = wbMaskPose(t, a), k = Math.min(1, p.draw);
-    if (k > .1) { for (const y of [-.36, .32]) wbGlow(wbPartAt(t, 'bow', [0, y, WB_HAND.bow[2] - .08], K, x, z, yaw), .14, WB_TEALC, .45 * k); wbGlow(wbPartAt(t, 'arrow', [0, WB_HAND.bow[1], .45], K, x, z, yaw), .12, WB_TEALC, .6 * k); }
+    // the held glaive's rune-gem glows faintly as a spell winds up (subtle: no light round the Warden itself)
+    const p = wbGlvPose(t, a);
+    if (p.k > .1 && !p.hide) wbGlow(wbPartAt(t, 'glaivehand', [WB_HAND.glaive[0] + .015, WB_HAND.glaive[1] - .01, WB_HAND.glaive[2] + .03], K, x, z, yaw), .1, WB_GOLDC, .3 * p.k);
   } else if (u === 'wb_frostbrand') {
     wbGlow(wbPartAt(t, 'halberd', [.11, .58, 0], K, x, z, yaw), .2, WB_ICEC, (.16 + (a ? .35 * wbPop(a.u, .15, .8) : 0)) * pulse);
   } else if (u === 'wb_runecarver') {
@@ -25590,7 +25709,8 @@ const WB_MODEL_UNITS = ['wb_oathbound', 'wb_maskedwarden', 'wb_frostbrand', 'wb_
      no glow; when a foe springs it the glyph flashes up (a Bound rune flashes both its kinds' glyphs) and fades away;
    - ward-lines (wbLinesNow): thin, faint gold lines on the road that pulse only when a walker crosses them;
    - brands (wbBrandOf): 1-3 small gold slashes floating over the foe; sigils (wbSigOf): 1-3 violet glyphs turning round it;
-   - the things in flight (wbS().P): the Masked Wardens' arrow (a dark shaft, a pale teal trail), the thrown blade, the
+   - the things in flight (wbS().P): the Glaive Wardens' glaive (the gold-and-ivory mesh of forces_wardbound_f.js
+     spinning flat, a faint rune glow, fading gold threads between the foes it ricochets through), the thrown blade, the
      ballista bolt (black iron, an ember trail), the quake's crack running along the road;
    - the abilities' zones (hazards k 'wb_zone', by z.ab): a turning rune-ring in the ability's colour, censer smoke;
    - the moments the core asks for: wbFxRune, wbFxBound, wbFxFlare, wbFxDetonate.
@@ -25667,10 +25787,10 @@ function wbgRune(z, now) {
   wbgGlyphs(QA, z, sc, .024, (k, aa) => wbgA(wbgKindCol(k), aa, .95), Math.min(.9, a * 1.8));
   // (a brief light only while it etches in)
   if (age < WBG_RUNE.settle) wbgGlyphs(QADD, z, sc, .018, (k, aa) => wbgA(wbgKindCol(k), aa, 1.1), .5 * Math.max(0, 1 - age / WBG_RUNE.settle) * fade);
-  // a Warding Arrow's beacon (z.wbBeacon): the arrow standing in it, a thin teal column of light, a pale ring
+  // a Warding Glaive's beacon (z.wbBeacon): the glaive standing in it (wbgStanding), a thin teal column of light, a pale ring
   if (z.wbBeacon > G.time) {
     const e = Math.min(1, (z.wbBeacon - G.time) / .5) * fade;
-    QA.beam(RD, [x + .03, .02, q], [x - .02, .55, q], .03, wbgA('#141016', e), 10);
+    if (!z.wbGlv) QA.beam(RD, [x + .03, .02, q], [x - .02, .55, q], .03, wbgA('#141016', e), 10);   // (an old arrow beacon; the Warding Glaive's own glaive stands there instead)
     QADD.beam(RD, [x, .05, q], [x, 1.2, q], .06, wbgA(WB_COL.teal, .18 * e));
     QA.ground(x, q, .046, r * 2.2, r * 2.2, wbgA(WB_COL.teal, .3 * e), 4, .03, now * .3);
   }
@@ -25734,11 +25854,45 @@ function wbgMarks(now) {
 }
 
 /* ---------- things in flight ---------- */
+// the Glaive Wardens' glaive: its mesh (built once), drawn spinning flat and tipped a little into its flight
+const _wbgG1 = new Float32Array(16), _wbgG2 = new Float32Array(16), _wbgG3 = new Float32Array(16);
+const wbgGlvMesh = () => typeof dynMesh === 'function' && typeof wbGlaiveGeo === 'function' ? dynMesh('wb_glaive_proj', g => wbGlaiveGeo(g, 2)) : null;
+const WBG_TRAIL = .45;   // (how long a bounce's thread lingers, s)
+function wbgGlaive(p, now) {
+  const h = p.h || .6, big = p.big ? 1.35 : 1, tr = Math.min(2, (p.t && p.t.tier | 0) || 0), S = .28 * big * (1 + .06 * tr), M = wbgGlvMesh();
+  if (M) { M4.trs(_wbgG1, p.x, h, p.z, 0, .3 + .08 * Math.sin(p.spin * .2), 0); M4.mul(_wbgG2, _wbgG1, M4.trs(_wbgG3, 0, 0, 0, p.spin, 0, 0, S, S, S)); item(M, _wbgG2, { shadow: false }); }
+  else QA.ground(p.x, p.z, h, S, S, wbgA(WB_COL.ivory, .95), 3, .32, p.spin);
+  // a faint rune glow and the whirl of its blades (small: the foes stay in view)
+  QADD.bill(RD, p.x, h, p.z, .28 * big, .28 * big, wbgA(WB_COL.goldL, .14), 1, 0);
+  QADD.bill(RD, p.x, h, p.z, .4 * big, .4 * big, wbgA(WB_COL.teal, .08), 3, p.spin * .2);
+  QG.ground(p.x, p.z, .03, .13 * big, .13 * big, [0, 0, 0, .28], 2, 0);
+  // the bounce trail: a thin gold-ivory thread from strike to strike, each fading a moment after the glaive leaves it
+  const T = p.pts; if (!T || !T.length) return;
+  for (let i = 0; i + 1 < T.length; i++) {
+    const a = 1 - (G.time - T[i + 1][3]) / WBG_TRAIL; if (a <= 0) continue;
+    QADD.beam(RD, [T[i][0], T[i][1], T[i][2]], [T[i + 1][0], T[i + 1][1], T[i + 1][2]], .065 * big, wbgA(WB_COL.goldL, .5 * a));
+    QADD.beam(RD, [T[i][0], T[i][1], T[i][2]], [T[i + 1][0], T[i + 1][1], T[i + 1][2]], .02 * big, wbgA(WB_COL.ivory, .9 * a, 1.3));
+  }
+  const L = T[T.length - 1], dx = p.x - L[0], dz = p.z - L[2], D = Math.hypot(dx, dz);
+  if (D > .05) { const k = Math.min(1, .7 / D); QADD.beam(RD, [p.x - dx * k, h + (L[1] - h) * k, p.z - dz * k], [p.x, h, p.z], .04 * big, wbgA(WB_COL.goldL, p.home ? .18 : .32)); }
+}
+// Warding Glaive: the glaive standing in its great rune, upright, half sunk in the road, turning slowly
+function wbgStanding(now) {
+  const M = wbgGlvMesh(); if (!M) return;
+  for (const z of G.hazards) {
+    if (z.k !== 'wb_rune' || !z.wbGlv || !(z.wbBeacon > G.time) || !(z.t > 0)) continue;
+    const e = Math.min(1, (G.time - z.wbGlv) / .12, (z.wbBeacon - G.time) / .4), S = .2 * Math.max(.05, e);
+    M4.trs(_wbgG1, z.x, .1 + .04 * Math.sin(now * 2 + z.seed), z.z, z.seed, 0, Math.PI / 2); M4.mul(_wbgG2, _wbgG1, M4.trs(_wbgG3, 0, 0, 0, now * 2.2, 0, 0, S, S, S)); item(M, _wbgG2, { shadow: false });
+    QADD.bill(RD, z.x, .15, z.z, .3, .3, wbgA(WB_COL.teal, .12 * e), 1, 0);
+  }
+}
 function wbgFlights(now) {
   const P = wbS().P; let n = 0;
+  wbgStanding(now);
   for (const p of P) {
     if (p.done || ++n > WBG.flights || p.x == null) continue;
-    if (p.k === 'arrow') {
+    if (p.k === 'rglaive' || p.k === 'rglaiveL') wbgGlaive(p, now);
+    else if (p.k === 'arrow') {
       // a dark shaft along its flight, a pale teal light trailing it, a glint at its head
       const dx = (p.tx != null ? p.tx : p.x) - (p.x0 != null ? p.x0 : p.x), dz = (p.tz != null ? p.tz : p.z) - (p.z0 != null ? p.z0 : p.z), D = Math.hypot(dx, dz) || 1, ux = dx / D, uz = dz / D;
       const h = p.h || .6;
@@ -34435,7 +34589,7 @@ const LIFE_KIND = {
   cc_spellblade: 'melee', cc_mageling: 'caster', cc_rimeweaver: 'caster', cc_chronomancer: 'caster', cc_astrologer: 'caster', cc_golemwarden: 'heavy', cc_pyroclast: 'caster', cc_obelisk: 'still',
   ironbreaker: 'melee', thundergun: 'gun', chaintrapper: 'throw', runesmith: 'heavy', flakgunner: 'cannon', steamhammer: 'hammer', mortarcrew: 'cannon', brewkeg: 'caster', ironbarricade: 'still',
   sb_wolfguard: 'melee', sb_windrunner: 'bow', sb_hailshaman: 'caster', sb_spiritwalker: 'caster', sb_thundercaller: 'caster', sb_earthbinder: 'heavy', sb_clouddancer: 'caster', sb_ancestortotem: 'still', sb_standingstone: 'still',
-  wb_oathbound: 'melee', wb_maskedwarden: 'bow', wb_frostbrand: 'melee', wb_runecarver: 'caster', wb_stormward: 'rider', wb_anvilguard: 'heavy', wb_siegewarden: 'cannon', wb_vowkeeper: 'melee', wb_oathstone: 'still',
+  wb_oathbound: 'melee', wb_maskedwarden: 'throw', wb_frostbrand: 'melee', wb_runecarver: 'caster', wb_stormward: 'rider', wb_anvilguard: 'heavy', wb_siegewarden: 'cannon', wb_vowkeeper: 'melee', wb_oathstone: 'still',
 };
 // per kind: wl/ws the wind-up's lean (+ forward) and stretch (+ taller), hl/hs the blow's lean and squash (the strike
 // curve), kick the gun's recoil lean, br the breath's stretch, rate its pace, cast the heave of a cast
@@ -35250,7 +35404,7 @@ const IPROC_ITEMS = [
   ['wardbound', 'wb_x_brandfire', 'Brand-Fire Vambrace', 'ember', '#e0a040', 'brands', 'dmg as|Brand-Fire', ['hit', 'burn', 4]],
   ['wardbound', 'wb_x_blacksteel', 'Black-Steel Knuckles', 'fist', '#3a3a44', 'black steel', 'dmg pen|Black Steel', ['hit', 'shred', 3]],
   ['wardbound', 'wb_x_flarehilt', 'Gilded Flare-Hilt', 'sun', '#f0c050', 'ward-lines', 'sp cd|Gilded Flare', ['spell', 'glaive', 'wb_wardflare', 'echo']],
-  ['wardbound', 'wb_x_tealstring', 'Teal-Rune Bowstring', 'bow', '#bff4ec', 'arrows', 'as crit|Teal Rune', ['spell', 'arrow', 'wb_runevolley', 'arc', .3]],
+  ['wardbound', 'wb_x_tealstring', 'Teal-Rune Grip-Wrap', 'glaive', '#bff4ec', 'glaives', 'as crit|Teal Rune', ['spell', 'arrow', 'wb_runevolley', 'arc', .3]],
   ['wardbound', 'wb_x_gaoler', "Gaoler's Bolt-Case", 'arrowhead', '#ff9a5a', 'pins', 'dmg pen|Gaoler', ['spell', 'cannon', 'wb_pinbolt', 'reset']],
 ];
 for (const [force, id, name, icon, hue, theme, stats, fx] of IPROC_ITEMS) {
@@ -39379,12 +39533,12 @@ if (typeof fsetAdd === 'function') {
       }
     } });
 
-  /* ---------- Masked Wardens: a volley calls the long shot ---------- */
+  /* ---------- Glaive Wardens: a long ricochet calls the glaive back down the line ---------- */
   fsetAdd({ id: 'fe_wb_mask', epic: 1, spells: ['wb_runevolley', 'wb_piercingshaft'], force: 'wardbound', unit: 'arrow', name: 'Raiment of the Golden Mask',
-    pieces: [['fe_wb_blackbow', 'Great Black Longbow', 3, 'bow', '#16141a', 'dmg crit'], ['fe_wb_goldmask', 'Golden Face-Mask', 3, 'eye', '#f0c050', 'as range'],
-      ['fe_wb_tealquiver', 'Teal-Rune Quiver', 3, 'arrowhead', '#bff4ec', 'dmg as pen'], ['fe_wb_fletchcharm', 'Ivory Fletching-Charm', 3, 'feather', '#efe6d0', 'regen mana']],
-    b2: 'Rune Volley brands every foe it strikes.',
-    b4: 'A Rune Volley that strikes 4 or more foes casts Piercing Shaft at once, free (at most once every 10s).',
+    pieces: [['fe_wb_blackbow', 'Gold-and-Ivory War-Glaive', 3, 'glaive', '#ffe8a8', 'dmg crit'], ['fe_wb_goldmask', 'Golden Face-Mask', 3, 'eye', '#f0c050', 'as range'],
+      ['fe_wb_tealquiver', 'Teal-Rune Glaive-Baldric', 3, 'glaive2', '#bff4ec', 'dmg as pen'], ['fe_wb_fletchcharm', 'Ivory Grip-Charm', 3, 'feather', '#efe6d0', 'regen mana']],
+    b2: 'Ricochet Rite brands every foe it strikes.',
+    b4: 'A Ricochet Rite that strikes 4 or more foes casts Returning Oath at once, free (at most once every 10s).',
     hit(t, c, amt, sp, n) {
       if (sp !== 'wb_runevolley' || c.dead) return;
       wbBrand(c, 1, t);
@@ -41335,7 +41489,7 @@ function sbcHuntOn(t) {
    holds the code the spell-mod system (sp) can't express. It loads after every other forces_* file, so the spells are
    their final selves; each wrap keeps the original and calls it. Every cap is prefixed wbk and read through talentHas.
    - Oathbound: Oath Fulfilled (Final Oath ends in a flare of the oath runes), Shared Oath (the line can't be Wounded)
-   - Masked Wardens: Twin Wards (a second Warding Arrow, the two linked), Lodestar (the great rune pulses down its lines)
+   - Glaive Wardens: Twin Wards (a second Warding Glaive, the two linked), Lodestar (the great rune pulses down its lines)
    - Frostbrand: Hoarfrost (Frostbite reaches every frost rune near it)
    - Runecarvers: The Last Word (the great sigil rune detonates the carved as it fades)
    - Lancers: Second Thunder (Skyfall strikes again; its kills leave storm runes)
@@ -41345,7 +41499,7 @@ function sbcHuntOn(t) {
    - Varic: The Gate Holds (the Gate flares again), Last Warden (his Oathbound strike with it), The Road Remembers
    - Aedric: Undying Blaze (kills keep it going, a second burst), Sun-Sworn (charges while it blazes), Open Road (a fire trail)
    - Isaura: Turned Twice (a second turning), Veiled Oath (the rooted are bound and pay again), Sworn Road (oath runes)
-   Arrow of Judgement, Oathfire and Mountain's Weight are read in forces_wardbound_b.js, Runesight there too. */
+   Glaive of Judgement, Oathfire and Mountain's Weight are read in forces_wardbound_b.js, Runesight there too. */
 
 const wbkHas = (t, cap) => !!(t && t.def && wbOn() && typeof talentHas === 'function' && talentHas(t.type, cap));
 // the clock s seconds from now (the capstones' own guards and clocks: never a status a foe or unit shows)
@@ -41366,8 +41520,8 @@ wbkWrap('wb_laststand', 'cast', function (c0, t, st, tg, ab) {
   return r;
 });
 
-/* ---------- Masked Wardens: Twin Wards, Lodestar ---------- */
-// the great rune a Warding Arrow has just driven in nearest (x, z)
+/* ---------- Glaive Wardens: Twin Wards, Lodestar ---------- */
+// the great rune a Warding Glaive has just driven in nearest (x, z)
 const wbkGreat = (x, z) => wbRunes().filter(q => q.wbBeacon > G.time && q.born === G.time).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0] || null;
 wbkWrap('wb_wardarrow', 'cast', function (c0, t, st, p, ab) {
   const r = c0.call(this, t, st, p, ab); if (r === false || !p) return r;
@@ -41410,7 +41564,7 @@ WB_HOOK.tick.push(() => {
     abRun('wb_wardarrow', () => abAoe(() => {
       for (const c of G.creeps) {
         if (c.dead || c.ent || c.phased || !wbWalks(c) || !L.some(l => wbSegD(c.x, c.y, l.a, l.b) <= .35)) continue;
-        wbHit(t, s, c, s.dmg * .6, 'phys'); if (!c.dead) wbBrand(c, 1, t);
+        wbHit(t, s, c, s.dmg, 'phys'); if (!c.dead) wbBrand(c, 1, t);
       }
     }));
     if (typeof wbFxFlare === 'function') wbFxFlare(L, [z], WB_COL.teal);
@@ -44708,14 +44862,14 @@ WB_LINE_HOOK.push(c => { c.wbfLineAt = G.time; });
 // Unbroken Line: Rune Cleave carves an oath rune under the walkers it strikes that stand on no rune
 wbfWrap('wb_wardflare', function (c0, t, st, tg, ab) { t.wbfLineN = 2 * wbCap(st, 'wbfLineCarve'); return c0.call(this, t, st, tg, ab); });
 
-/* ---------- Masked Wardens ---------- */
+/* ---------- Glaive Wardens ---------- */
 {
   const a0 = FORCE_ATTACK.wbArrow;
   FORCE_ATTACK.wbArrow = (t, st, tg, pow, echo) => {
     const r = a0(t, st, tg, pow, echo), P = wbS().P;
     t.wbfDraw = 0;   // (The Long Watch: the gathered draw is spent)
     for (let i = Math.max(0, P.length - 4); i < P.length; i++) {
-      const p = P[i]; if (!p || p.t !== t || p.k !== 'arrow' || p.wbfW || p.age > 0 || typeof p.land !== 'function') continue;
+      const p = P[i]; if (!p || p.t !== t || (p.k !== 'rglaive' && p.k !== 'arrow') || p.wbfW || p.age > 0 || typeof p.land !== 'function') continue;
       p.wbfW = 1; const l0 = p.land;
       p.land = (q, c) => {
         const alive = !!c && !c.dead, br = c ? wbBrandOf(c) : 0;
@@ -44740,7 +44894,7 @@ WB_HOOK.pulse.push((t, st, dt) => {
   if (G.creeps.some(c => !c.dead && !c.ent && Math.hypot(c.x - t.x, c.y - t.y) <= base && canTarget(t, st, c))) return;
   t.wbfDraw = Math.min(mx, (t.wbfDraw || 0) + dt * mx / 3);
 });
-// Nocked Again: a Piercing Shaft through 3 or more foes gives half its mana back
+// Caught Again: a Returning Oath through 3 or more foes gives half its mana back
 wbfWrap('wb_piercingshaft', function (c0, t, st, tg, ab) {
   const r = c0.call(this, t, st, tg, ab); if (r === false) return r;
   if (wbCap(st, 'wbfNock')) t.wbfNk = { at: G.time, set: new Set(), paid: false, cost: typeof abCost === 'function' ? abCost(t, ab) : ab.mana };
@@ -44890,7 +45044,7 @@ wbfWrap('wb_quakeline', function (c0, t, st, c, ab) {
     return R.r;
   };
 }
-// Spotter: a Masked Warden near it calls the shots
+// Spotter: a Glaive Warden near it calls the shots
 WB_HOOK.live.push((t, st) => {
   const n = wbCap(st, 'wbfSpotter'); if (!n) return;
   if (G.towers.some(o => o !== t && !o.wrecked && wbfType(o, 'arrow') && Math.hypot(o.x - t.x, o.y - t.y) <= 2)) st.range = (st.range || 0) + .25 * n;
@@ -44997,7 +45151,7 @@ WB_ONHIT.push((c, st, t) => {
     case 'wb_wardflare':   // Unbroken Line
       if (t.wbfLineN > 0 && !c.fly && !wbfOnRune(c)) { t.wbfLineN--; wbRune(t, st, c.x, c.y, 'oath'); }
       break;
-    case 'wb_piercingshaft': {   // Nocked Again
+    case 'wb_piercingshaft': {   // Caught Again
       const N = t.wbfNk; if (!N || N.paid || G.time - N.at > 3) break;
       N.set.add(c); if (N.set.size >= 3) { N.paid = true; const m = N.cost / 2; G.delayed.push({ t: 0, fn: () => wbfMana(t, m) }); if (G.state === 'play') fxSparkle(t.x, t.y, towerTop(t), WB_COL.teal); }
       break;
@@ -45043,7 +45197,7 @@ WB_ONHIT.push((c, st, t) => {
 });
 WB_HOOK.kill.push((c, src) => {
   if (!src || !wbUnit(src) || !G.towers.includes(src)) return;
-  // Mark the Fallen: a foe Rune Volley slays leaves a shaft rune
+  // Mark the Fallen: a foe Ricochet Rite slays leaves a shaft rune
   const n = wbfNow('wb_runevolley') ? wbfC(src, 'wbfFallen') : 0;
   if (n) { const z = wbRune(src, src.st, c.x, c.y, 'shaft'); if (z && n >= 2) wbRuneAdd(z, 'oath'); }
 });
@@ -45210,7 +45364,10 @@ function talNamesOld(force, hero) {
 }
 // one tree's saved ranks, moved from the old names to the tree in play (a talent not found by name loses its ranks)
 // a talent renamed in place (the same talent, a new name): its saved ranks follow it
-const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix' };   // (the Pyroclasts' spell row, 8 Nov 2026)
+const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (the Pyroclasts' spell row, 8 Nov 2026)
+  // (the Wardbound's Masked Wardens became the Glaive Wardens, 8 Nov 2026: their arrow talents and spells renamed in place)
+  'Rune-Etched Heads': 'Rune-Etched Edge', 'Pinning Draw': 'Branding Edge', 'Falling Stars': 'Branding Rite', 'Line Shot': 'Line Cut', 'Long Shaft': 'Dragging Edge',
+  'Nocked Again': 'Caught Again', 'Arrow of Judgement': 'Glaive of Judgement', 'Piercing Shaft': 'Returning Oath', 'Warding Arrow': 'Warding Glaive' };
 function talRemapByName(src, oldNames, list) {
   if (!Array.isArray(src) || !Array.isArray(oldNames) || !list) return src;
   if (oldNames.length === list.length && oldNames.every((n, i) => n === list[i].name)) return src;
@@ -45618,7 +45775,7 @@ const UNIT_KIND = {
   sb_wolfguard: ['melee', 'polearm'], sb_windrunner: ['bow'], sb_hailshaman: ['caster'], sb_spiritwalker: ['caster'],
   sb_thundercaller: ['caster'], sb_earthbinder: ['melee', 'hammer'], sb_clouddancer: ['caster'], sb_skyhunter: ['polearm'], ch_tarka: ['caster'],
   // the Wardbound
-  wb_oathbound: ['melee', 'blade'], wb_maskedwarden: ['bow'], wb_frostbrand: ['melee', 'polearm', 'caster'], wb_runecarver: ['caster'],
+  wb_oathbound: ['melee', 'blade'], wb_maskedwarden: ['blade'], wb_frostbrand: ['melee', 'polearm', 'caster'], wb_runecarver: ['caster'],
   wb_stormward: ['melee', 'polearm', 'rider', 'caster'], wb_anvilguard: ['melee', 'hammer'], wb_siegewarden: ['bow'],
   wb_vowkeeper: ['melee', 'blade'], ch_varic: ['melee', 'blade'],
 };
@@ -45812,7 +45969,7 @@ const SFX_SCHOOL = {
   wind:   { a: '#aee8dc', b: '#f4fffc', c: '#4a9a8a', d: '#dff4ee', light: [.9, 1.6, 1.5] },
   ale:    { a: '#ffc050', b: '#fff2c0', c: '#a8661a', d: '#fff8e0', light: [2, 1.4, .5] },
   // the Wardbound: ward (deep amber-gold: the knights' runes, Varic), sun (white-gold sunlight: Aedric), veil (gold threads
-  // over black: Isaura), shaft (the Masked Wardens' pale teal bow-runes), sigil (the Runecarvers' violet-white)
+  // over black: Isaura), shaft (the Glaive Wardens' pale teal glaive-runes), sigil (the Runecarvers' violet-white)
   ward:   { a: '#e8b040', b: '#fff0c0', c: '#7a5410', d: '#16141a', light: [1.9, 1.4, .6] },
   sun:    { a: '#ffe9a0', b: '#ffffff', c: '#e0a830', d: '#fff4d8', light: [2.2, 2, 1.4] },
   veil:   { a: '#e8c868', b: '#fff6dc', c: '#2a2030', d: '#0e0c12', light: [1.6, 1.3, .8] },
@@ -45993,7 +46150,7 @@ const SFX_R = {};
     wb_swordplant: T('ward', 'none', 'none', 'none', 1, { self: 1, shake: .1 }),   // (no flourish: its own ring and dust on the landing; owner: no flashy spells)
     wb_wardflare: T('ward', 'none', 'none', 'none', 1),   // (no cast flourish: owner, "ward flare is too flashy")
     wb_laststand: T('ward', 'none', 'none', 'none', 1, { self: 1 }),   // (Final Oath: stoic, no column of light)
-    wb_runevolley: T('shaft', 'strike', 'fall', 'nova', 1, { rain: 1 }),
+    wb_runevolley: T('shaft', 'strike', 'none', 'nova', 1),
     wb_piercingshaft: T('shaft', 'strike', 'line', 'burst', 2, { len: 3 }),
     wb_wardarrow: T('shaft', 'strike', 'fall', 'pillar', 3),
     wb_rimeline: T('frost', 'strike', 'line', 'nova', 1, { spike: 1, len: 2.4 }),
@@ -48233,20 +48390,17 @@ SFX_V2_DEF.push(() => {
   // Last Stand: dust thrown up round planted feet, a gold light rising up him
   SFX_V2.wb_laststand = { cast: C => v2Wind(C, { wu: .12, hk: .7 }), lead: .1,
     hit: (C, k) => { const t = C.t; if (!t || k) return; v2Halos(C, .1, { sp: 'gold', n: 6 }); v2Spray(C, 'dust', t.x, t.y, .05, 8, { r: .3, sp: .7 }); sfxShake(C, .06); } };
-  // ---- Masked Wardens ----
-  // Rune Volley: arrows loosed high, then pale teal rune-arrows raining over the area
-  SFX_V2.wb_runevolley = vArea({ wind: { wu: .2, L: -1 }, r: C => (C.ab && (C.ab.rr || C.ab.r)) || 1.2,
-    cast: C => { const t = C.t; if (t) for (let k = 0; k < 3; k++) v2Proj(C, t.x, towerTop(t), t.y, t.x + R(-.3, .3), 5, t.y + R(-.3, .3), .25, { delay: .1 + k * .03, head: 5, s: .08, tw: .06, col: teal(C) }); },
-    area: { sp: 'spark', n: 8, rim: 'gold', rn: 6, hold: .6 },
-    fx: (C, x, z, r) => v2Rain(C, x, z, r, { n: 24, life: .7, top: 2.8, spd: 4, col: teal(C) }) });
-  // Piercing Shaft: the full draw, then one long arrow down the exact line, a teal band left behind it
-  SFX_V2.wb_piercingshaft = vLine({ len: C => (C.ab && C.ab.len) || 3, w: .3, at: .22, wind: { wu: .25, L: -1 },
-    band: { L: VT.ENERGY, al: .45, life: .5 },
-    fx: (C, x0, z0, ux, uz, len, w, d0) => { const m = sfxMuzzle(C.t); v2Proj(C, m[0], m[1], m[2], x0 + ux * len, .5, z0 + uz * len, .14, { delay: d0, head: 5, s: .11, tw: .2, col: teal(C) }); },
+  // ---- Glaive Wardens (the glaives themselves and their bounce trails are drawn by forces_wardbound_g.js) ----
+  // Ricochet Rite: no flourish at the thrower; small gold sparks on the spot it opens on
+  SFX_V2.wb_runevolley = vArea({ wind: 0, r: C => (C.ab && (C.ab.rr || C.ab.r)) || 1.2,
+    area: { sp: 'spark', n: 6, rim: 'gold', rn: 4, hold: .4 } });
+  // Returning Oath: a faint gold band left down the exact line the glaive runs out and back
+  SFX_V2.wb_piercingshaft = vLine({ len: C => (C.ab && C.ab.len) || 3, w: .3, at: .3, wind: 0,
+    band: { L: VT.ENERGY, al: .3, life: .9 },
     hitO: { sp: 'spark', n: 4 } });
-  // Warding Arrow: an arrow falls and stands in the road, a column of teal light on it, a great rune opening under it
-  SFX_V2.wb_wardarrow = vHit({ wind: { wu: .18, L: -1 }, s: .9, hit: { sp: 'spark', n: 6, ring: 0 },
-    fx: (C, x, z) => { v2Shaft(C, x, z, { w: .1, life: .55, h: 2.2 }); wbSfxRune(C, { x, z, r: .5 }, teal(C), 1.6); } });
+  // Warding Glaive: it strikes down into the road, a thin column of teal light, a great rune opening under it
+  SFX_V2.wb_wardarrow = vHit({ wind: 0, s: .9, hit: { sp: 'spark', n: 6, ring: 0 },
+    fx: (C, x, z) => { v2Shaft(C, x, z, { w: .08, life: .45, h: 1.6 }); wbSfxRune(C, { x, z, r: .5 }, teal(C), 1.6); } });
   // ---- Frostbrand Sentries ----
   // Rimeline: the halberd dragged low: a line of frost crystals thrust up along the exact line
   SFX_V2.wb_rimeline = vLine({ len: C => (C.ab && C.ab.len) || 2.4, w: .4, at: .2, wind: { wu: .15 },
@@ -72671,9 +72825,9 @@ const SPELL_BRIEFS = {
   wb_swordplant: 'Leaps and drives his greatsword into the road, dealing {d} within 1.3 cells, rooting {root} sec and branding. Carves 4 oath runes.',
   wb_wardflare: 'Cleaves within 1.5 cells for {d}, branding. Ward-lines and runes in reach flare, dealing {d} to ground enemies on them and branding too.',
   wb_laststand: 'Plants his sword for {dur} sec. He can\'t attack, but can\'t fall. Every 0.5 sec, ground enemies within 1.2 cells are branded, pushed back and slowed by 40%.',
-  wb_runevolley: 'Rains {n} arrows near the target spot, each dealing {d} (a lone enemy takes all) and leaving a shaft rune.',
-  wb_piercingshaft: 'Looses an arrow through every enemy in a line for {d} each, removing 3 armour for 5 sec. Leaves 3 shaft runes past the first enemy.',
-  wb_wardarrow: 'Drives an arrow under a ground enemy, making a great shaft rune for {dur} sec. Adjacent enemies take {d} and are branded. It links with every rune within 3.2 cells into ward-lines.',
+  wb_runevolley: 'Hurls a great glaive that strikes {n} times, ricocheting between enemies within 1.8 cells without weakening. Each strike deals {d} and carves a shaft rune (a lone enemy takes every strike).',
+  wb_piercingshaft: 'Flings the glaive down a line: every enemy on it takes {d} and loses 3 armour for 5 sec. It sweeps back along the line to the hand, dealing {d2} to each enemy on it. Leaves 3 shaft runes past the first enemy.',
+  wb_wardarrow: 'Hurls a glaive into the road under a ground enemy, where it stands spinning as a great shaft rune for {dur} sec. Adjacent enemies take {d} and are branded. It links with every rune within 3.2 cells into ward-lines.',
   wb_rimeline: 'Drags frost along 4 road cells, dealing {d} and chilling, slowing by {slowPct} for 3 sec. Lays a frost rune per cell.',
   wb_frostbite: 'Freezes every branded or chilled ground enemy for {frz} sec (shorter on bosses) and deals {d} each.',
   wb_winterward: 'For {dur} sec, each frost rune within 3 cells freezes the first enemy stepping on it {frz} sec, dealing {d}. Also lays a frost rune under the ground enemy furthest along.',
@@ -75034,194 +75188,87 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    try { BOARD.rows[diff] = await q('rite,'); } catch (e) { if (e.status !== 400) throw e; BOARD.rows[diff] = await q(''); }   // a server not yet given the rites column
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush(); }
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best}${res.rite ? ' on ' + riteName(res.rite) : ''}${res.rank ? ` (#${res.rank})` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -75230,206 +75277,74 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.rite ? riteName(x.rite | 0) : '—'; rt.title = x.rite ? RITES[(x.rite | 0) - 1].name : 'No rite';
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.e.r ? riteName(x.e.r | 0) : '—'; rt.title = x.e.r ? RITES[(x.e.r | 0) - 1].name : 'No rite';
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave}${mine.rite ? ' on ' + riteName(mine.rite | 0) : ''}, #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)}${e.r ? ' on ' + riteName(e.r | 0) : ''}, #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${x.rite ? esc(RITES[(x.rite | 0) - 1].name) : 'No rite'}">${x.rite ? 'Rite ' + RITE_ROMAN[x.rite | 0] : '—'}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${x.e.r ? esc(RITES[(x.e.r | 0) - 1].name) : 'No rite'}">${x.e.r ? 'Rite ' + RITE_ROMAN[x.e.r | 0] : '—'}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -77550,7 +77465,7 @@ function endTipsHTML(won) {
    the shot's own height, and its hit, are unchanged). Behind it at most a faint thin trail in its colour (the owner's
    rule: spells and shots never too flashy; nothing hides the units or the foes).
    Used by view.js drawProjs (G.projs), spellfx.js sfxBasicProj (the force units' trails, now faint) and
-   forces_wardbound_g.js (the Masked Wardens' flights). */
+   forces_wardbound_g.js (the Wardbound's arrow flights; the Glaive Wardens now throw glaives). */
 const ARROW_V = {
   def: { len: .5, r: .011, shaft: '#9a7448', head: '#b4b4ac', fl: '#e8e0cc', hl: .07, hr: .022, flL: .11, flW: .028, trail: [1, .92, .75], ta: .14 },
   gladebow: { len: .52, r: .0095, shaft: '#8a6a42', head: '#c8c8b8', fl: '#45722a', hl: .075, hr: .02, flL: .12, flW: .036, trail: [.75, .9, .55], ta: .14 },
@@ -84372,10 +84287,10 @@ const SPELL_HELP = {
   wb_swordplant: { when: "Two or more walkers within {reach} cells, or a boss or elite there.", aim: "Itself: every walker round its post is rooted and branded.", tips: ["Post Oathbound where the road wraps round them: every walker in the bend is held at once.", "The four oath runes it carves link into ward-lines with the runes and Oathstones near it.", "Branded foes take more from every Wardbound spell: follow it with Rune Cleave or a Detonate."] },
   wb_wardflare: { when: "Two or more walkers within {reach} cells, or a boss or elite there.", aim: "Around itself: a spinning cleave strikes every walker in reach, and the ward-lines and runes within reach flare.", tips: ["Post Oathbound where ward-lines cross the road beside them: the arc flares each line it crosses.", "Oathstones beside the road count as oath runes: wall the road to bring the lines into reach.", "Each foe it strikes is branded, so the spells after it bite deeper."] },
   wb_laststand: { when: "Walkers within {reach} cells while the leading foe is in the last third of the road, three or more walkers there, or a boss or elite.", aim: "Itself: it plants its sword and holds; walkers that reach it are pushed back and slowed.", tips: ["Post an Oathbound by the gate: walkers that reach it are pushed back down the road while it stands.", "Siege troops can't take it down while it holds, but it doesn't strike: let its neighbours do the cutting.", "Pushed foes walk back over the runes behind them: lay runes before the gate."] },
-  // Masked Wardens (wb_maskedwarden)
-  wb_runevolley: { when: "Two or more foes within 1.1 cells of one foe within {reach} cells, or a boss or elite there.", aim: "The densest spot in range: each arrow falls on a foe there, the toughest first.", tips: ["A lone boss takes every arrow: cast it on one walking alone.", "Each arrow pins a shaft rune: a volley over a bend lays a chain of them that links into ward-lines.", "Shaft runes strip armour: follow it with the Oathbound or the Siege Wardens."] },
-  wb_piercingshaft: { when: "The line from the unit through two or more foes within {reach} cells, or a boss or elite there.", aim: "The line through the most foes, then the one whose first foe is nearest the gate.", tips: ["Post the Wardens at the end of a long straight run: one arrow passes the whole column.", "It strips 3 armour from each foe it passes: armoured columns melt under the units behind it.", "Its three shaft runes run along the road and link to each other."] },
-  wb_wardarrow: { when: "A walker within {reach} cells with two or more runes within 3.2 cells of it.", aim: "The spot under the walker with the most runes near it, nearest the gate first.", tips: ["Plant it between scattered runes: it links them all into one net of ward-lines.", "Every line to it brands the foes that cross it; woven lines brand twice.", "Cast Rune Cleave while it stands: every one of its lines flares."] },
+  // Glaive Wardens (wb_maskedwarden)
+  wb_runevolley: { when: "Two or more foes within 1.1 cells of one foe within {reach} cells, or a boss or elite there.", aim: "The densest spot in range: the glaive is thrown at the toughest foe there, then ricochets to the nearest foes it has not struck.", tips: ["A lone boss takes every strike: the glaive loops round it and strikes again.", "Each strike carves a shaft rune: a ricochet through a bend lays a chain of them that links into ward-lines.", "Shaft runes strip armour: follow it with the Oathbound or the Siege Wardens."] },
+  wb_piercingshaft: { when: "The line from the unit through two or more foes within {reach} cells, or a boss or elite there.", aim: "The line through the most foes, then the one whose first foe is nearest the gate.", tips: ["Post the Wardens at the end of a long straight run: the glaive cuts the whole column going out and again coming back.", "Foes that walk into the line while the glaive is out are cut on its way back.", "It strips 3 armour from each foe it passes, and its three shaft runes run along the road and link to each other."] },
+  wb_wardarrow: { when: "A walker within {reach} cells with two or more runes within 3.2 cells of it.", aim: "The spot under the walker with the most runes near it, nearest the gate first: the glaive stands there spinning.", tips: ["Plant it between scattered runes: it links them all into one net of ward-lines.", "Every line to it brands the foes that cross it; woven lines brand twice.", "Cast Rune Cleave while it stands: every one of its lines flares."] },
   // Frostbrand Sentries (wb_frostbrand)
   wb_rimeline: { when: "A walker within {reach} cells with another walker within 1.5 cells of it, or a boss or elite.", aim: "The densest spot of walkers: the line runs along the road from there.", tips: ["Post Frostbrand beside a long stretch of road: the line rimes four cells of it.", "Its frost runes set up Frostbite and Winter Ward.", "Frost runes beside other runes make woven lines that chill as well as brand."] },
   wb_frostbite: { when: "Two or more branded or chilled walkers within {reach} cells, or one boss or elite.", aim: "Every branded or chilled walker in reach.", tips: ["Cast it after Rimeline or a Frostbrand sweep: everything in reach is already chilled.", "Frozen foes stand still on the runes and lines under them, taking their touches again.", "Bosses are frozen only briefly: use it to stop the escort round one."] },
