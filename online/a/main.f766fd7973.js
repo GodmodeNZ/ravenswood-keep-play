@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd834c6c@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c135063@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -80262,9 +80262,9 @@ function umShowBreath(R, o, amt) {
 // per unit: its model's id in UNIT_MDL, where its arrows leave when it has no rig (model space, 0..1 tall), how far it
 // sinks into its base, its size against the code-built body (k: the cloak flares wide, so a little smaller), its moves
 const UM_UNITS = {
-  // (her rest: the clip's own first frame, the bow held low and the string hand at the quiver, as the owner first saw it;
-  // the upright draw and the stance fade in as the bow comes up)
-  gladebow: { mdl: 'gladebow', tip: [.02, .45, .2], sink: .55, k: .86, rig: 'archer', upright: .9, stance: [.11, .1], lineUp: 1, trim: .36, idleF: 0, formFrom: [4, 17], spells: { arrowrain: {}, aimedshot: { draw: .5, glow: 1.2 } } },
+  // (her rest: as Faelan's (owner: "make it like faelan"), standing tall, the bow held low across her body in both hands,
+  // breathing; ci: the grip moved onto her own body, which stands a little further back and higher in its model)
+  gladebow: { mdl: 'gladebow', tip: [.02, .45, .2], sink: .55, k: .86, rig: 'archer', upright: .9, stance: [.11, .1], lineUp: 1, trim: .36, idle: 'concept', ci: { grip: [.085, .5, .075], hand: [-.01, .61, .105] }, spells: { arrowrain: {}, aimedshot: { draw: .5, glow: 1.2 } } },
   // Faelan, Warden of the Long Watch (the Grove's archer Champion): the owner's male elf archer (assets/unit-art/faelan/),
   // on his Champion's platform; at rest as in his concept art (idle: 'concept': the bow held low across his body in both
   // hands); Thorn Volley drawn high, Pinning Arrow a long steady hold, Hunter's Moon held and brightest
@@ -80402,16 +80402,17 @@ function umIK(R, o, up, fo, ha, T, pole) {
   const W2 = umXf(o, ha, B[ha].h), T2 = UMX.add(S, UMX.sc(dir, d));
   umTurn(o, sub[n(fo)], UMX.arc(UMX.sub(W2, E2), UMX.sub(T2, E2)), E2);
 }
-// Faelan's rest (the owner's reference render, faelan_rest_pose_ref.webp): standing tall and square, the bow held
-// diagonally across his waist (its upper limb out to his right, the lower down to his left) in both hands just before the
-// belt: the left hand closed on its grip, the right hand a hand's width up the upper limb, closed over it from above and
-// pinching an arrow whose nock is at that hand and whose point angles down toward the ground past the bow's front; the
-// left wrist kept in line with the forearm (wristK);
-// elbows bent and close in (the IK poles down and back), shoulders relaxed. The arrow is kept in the bow hand's frame
-// (R.idleArrow), so it stays seated on the bow however the pose is blended.
-const UM_CI = { grip: [.085, .48, .125], upLimb: .13, fd: [.35, -.75, .55], palm: [-.2, -.85, -.5], arrowOut: .03, arrowBack: .035, arrowDip: .7, arrowLen: .72, wristK: .8, bowAx: [-1, .5, .05] };
+// Faelan's rest (his portrait; the Gladebow Rangers share it): standing tall and square, shoulders level, the head level,
+// only a touch lowered (headDip); the bow held across the front of his body at the hip by the left hand on its grip, its
+// upper limb out past his right hip, the lower past his left side, the string toward him (bowAx: a shallow slope); the
+// right hand drawn back off the bow toward his body, at the middle of his stomach (hand: where its fingers close), holding
+// an arrow whose point angles steeply down and a little out to his left side, clear of the bow hand (arrowDir); the
+// left wrist kept in line with the forearm (wristK); elbows bent and close in (the IK poles down and back). The arrow is kept
+// in the bow hand's frame (R.idleArrow), so it stays in place however the pose is blended. (owner: "hand is held back from
+// the bow a bit towards his body, arrow held roughly in the middle of his stomach and aimed down to the side")
+const UM_CI = { grip: [.085, .48, .125], hand: [-.01, .58, .15], fd: [.55, -.25, .6], palm: [-.1, .3, -.9], arrowDir: [.18, -.92, .3], arrowOff: [.015, 0, .018], arrowBack: .035, arrowLen: .72, wristK: .8, bowAx: [-1, .38, .05], headDip: .06 };
 function umConceptIdle(R, o) {
-  const { B, bix, sub, mk } = R, C = UM_CI;
+  const { B, bix, sub, mk } = R, C = R.S && R.S.ci ? Object.assign({}, UM_CI, R.S.ci) : UM_CI;   // (S.ci: a unit's own adjustments)
   umIK(R, o, bix.LeftArm, bix.LeftForeArm, bix.LeftHand, C.grip, [.35, -1, -.55]);
   const L = bix.LeftHand, w = umXf(o, L, B[L].h), tA = umXf(o, L, mk.bowTipA), tB = umXf(o, L, mk.bowTipB), g = umXf(o, L, mk.LeftHandMiddle1), nk = umXf(o, L, mk.nock);
   const ax = UMX.sub(tA, tB), belly = UMX.sub(g, nk), tax = UMX.nrm(C.bowAx), tbelly = [0, -.15, 1];
@@ -80419,16 +80420,12 @@ function umConceptIdle(R, o) {
   // the wrist kept natural: the hand (wrist to knuckles) turned most of the way back into the forearm's line, the bow with it
   const fa = UMX.nrm(UMX.sub(w, umXf(o, bix.LeftForeArm, B[bix.LeftForeArm].h))), dh = UMX.nrm(UMX.sub(umXf(o, L, mk.LeftHandMiddle1), w));
   umTurn(o, sub[B[L].n], UMX.blend(UMX.I(), UMX.arc(dh, fa), C.wristK), w);
-  // the bow as it now lies: its grip, the upper limb's direction (to his right), the belly's (forward)
-  const G2 = umXf(o, L, mk.LeftHandMiddle1), u = UMX.nrm(UMX.sub(umXf(o, L, mk.bowTipB), umXf(o, L, mk.bowTipA)));
-  const bn = UMX.nrm(UMX.sub(UMX.sub(G2, umXf(o, L, mk.nock)), UMX.sc(u, UMX.dot(UMX.sub(G2, umXf(o, L, mk.nock)), u))));
-  const F = UMX.add(G2, UMX.sc(u, C.upLimb));   // where the right hand closes on the upper limb
-  // its fingers curled as in the clip's nocked frame (each finger's turn relative to the hand), then the hand turned so
-  // they wrap the limb from above (fd: knuckles toward the fingertips; palm: the palm's facing) and the arm reaching so
-  // the curled fingers sit on the limb
+  const F = C.hand;   // where the right hand's fingers close on the arrow, at the middle of the stomach
+  // its fingers curled as in the clip's nocked frame (each finger's turn relative to the hand), then the hand turned
+  // (fd: knuckles toward the fingertips; palm: the palm's facing) and the arm reaching so the curled fingers sit at F
   const H = bix.RightHand, hk = H * 12, wr = () => umXf(o, H, B[H].h);
   const fb = n => bix[n] != null ? bix[n] : H, fing = () => UMX.lerp(umXf(o, fb('RightHandIndex1'), mk.RightHandIndex2), umXf(o, fb('RightHandMiddle1'), mk.RightHandMiddle2), .5);
-  const dF = UMX.nrm(UMX.sub(C.fd, UMX.sc(u, UMX.dot(C.fd, u) * .6))), dT = UMX.cross(dF, UMX.nrm(C.palm));
+  const dF = UMX.nrm(C.fd), dT = UMX.cross(dF, UMX.nrm(C.palm));
   const pole = [-.35, -1, -.55];
   let Wt = UMX.sub(F, UMX.sc(dF, .06));
   umIK(R, o, bix.RightArm, bix.RightForeArm, H, Wt, pole);
@@ -80446,8 +80443,12 @@ function umConceptIdle(R, o) {
   const orient = () => { const W0 = wr(); umTurn(o, sub[B[H].n], UMX.frame(UMX.sub(fing(), W0), UMX.sub(umXf(o, fb('RightHandThumb1'), mk.RightHandThumb2), W0), dF, dT), W0); };
   for (let i = 0; i < 4; i++) { orient(); Wt = UMX.add(Wt, UMX.sub(F, fing())); umIK(R, o, bix.RightArm, bix.RightForeArm, H, Wt, pole); }
   orient();
-  // the arrow: its nock just behind the right hand's grip, pointing down toward the ground past the bow's front (arrowDip)
-  const ad = UMX.nrm(UMX.add(UMX.sc(u, -1), [0, -C.arrowDip, 0])), ap = UMX.add(UMX.add(fing(), UMX.sc(bn, C.arrowOut)), UMX.sc(ad, -C.arrowBack));
+  // the head a little lowered
+  if (C.headDip) umTurn(o, sub.Head, UMX.rx(C.headDip), umXf(o, bix.Head, B[bix.Head].h));
+  // the arrow: its nock just above the right hand's fist, held just in front of the hand's inner side (arrowOff), its point
+  // steeply down and a little out to his left side (arrowDir), clear of the bow hand (owner: "the arrow should face a little
+  // bit more down ... it should sit just in front of the inside of the hand")
+  const ad = UMX.nrm(C.arrowDir), ap = UMX.add(UMX.add(fing(), C.arrowOff), UMX.sc(ad, -C.arrowBack));
   const k = L * 12, Rt = [o[k], o[k + 4], o[k + 8], o[k + 1], o[k + 5], o[k + 9], o[k + 2], o[k + 6], o[k + 10]];   // (the bow hand's turn, inverted)
   R.idleArrow = { p: UMX.mv(Rt, UMX.sub(ap, [o[k + 3], o[k + 7], o[k + 11]])), d: UMX.mv(Rt, ad), len: C.arrowLen };
 }
