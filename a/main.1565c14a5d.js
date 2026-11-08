@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a98c82f@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd51bbe7@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -5879,18 +5879,35 @@ const catRx = it => { const d = it && GEAR_BASES[it.base]; return d && d.rx ? RE
 // which towers a relic fits: signature relics and tomes fit one tower type, reaction relics either school of the reaction
 function gearFor(it) {
   if (!it) return null;
+  const c = gearCls(it); if (c) return typeof unitsOfKind === 'function' ? unitsOfKind(c) : [];   // a class item: the units of its kind (forces_zzzzzzzzzzzz_classfit.js)
   if (it.leg) return LEGENDS[it.leg] && LEGENDS[it.leg].for ? [LEGENDS[it.leg].for] : null;
   if (it.tome) return [it.tome[0]];
   if (it.shop) return null;
   if (typeof statOnly === 'function' && statOnly(it)) return null;   // a stats-only rare fits any unit (itempower.js)
   const d = GEAR_BASES[it.base]; return d && d.for ? d.for.slice() : null;
 }
+// the kind of unit a class item is made for ('gun', 'bow', ...), or null
+function gearCls(it) {
+  if (!it || it.tome) return null;
+  const d = it.leg ? LEGENDS[it.leg] : it.shop ? (typeof SHOP !== 'undefined' && SHOP[it.shop]) : GEAR_BASES[it.base];
+  return (d && d.cls) || null;
+}
+// how a drop suits the units on the field (W: fieldWeights): 1.6 made for a unit you field, .15 made only for units you
+// don't field, 0 fits no unit of this force at all, 1 fits any unit (a stats-only rare still leans to the unit it was
+// themed for, as before)
+function fieldFitW(it, W) {
+  let f = gearFor(it);
+  if (!f && it.base && GEAR_BASES[it.base] && GEAR_BASES[it.base].for) f = GEAR_BASES[it.base].for;
+  if (!f) return 1;
+  if (!f.length) return 0;
+  return f.some(ty => W[ty]) ? 1.6 : .15;
+}
 // a charm (a force unit's mana and abilities: groveitems.js) sits in its own socket, never a relic socket
 const isCharm = it => !!(it && it.base && GEAR_BASES[it.base] && GEAR_BASES[it.base].charm);
 const gearFits = (it, t) => { if (isCharm(it)) return false; const f = gearFor(it); return !f || (!!t && f.includes(t.type)); };
-const gearForText = it => { const f = gearFor(it); return f ? f.map(ty => TOWERS[ty].name).join(' or ') : ''; };
+const gearForText = it => { const c = gearCls(it); if (c) return typeof kindLabel === 'function' ? kindLabel(c) : c; const f = gearFor(it); return f ? f.map(ty => TOWERS[ty].name).join(' or ') : ''; };
 const anA = w => (/^[AEIOU]/i.test(w) ? 'an ' : 'a ') + w;
-const gearForA = it => { const f = gearFor(it); return f && f.every(ty => TOWERS[ty] && TOWERS[ty].force) ? gearForText(it) : anA(gearForText(it)); };   // (a force's units go by plural names: "Briarwardens")
+const gearForA = it => { if (gearCls(it)) return gearForText(it); const f = gearFor(it); return f && f.every(ty => TOWERS[ty] && TOWERS[ty].force) ? gearForText(it) : anA(gearForText(it)); };   // (a force's units go by plural names: "Briarwardens")
 const gearBase = it => gearDef(it) || GEAR_BASES.whet;
 // the painted icon, when there is one
 const gearArt = it => { const d = gearDef(it); return (d && d.art) || it.leg || it.base || (it.shop ? 'shop-' + it.shop : ''); };
@@ -5945,7 +5962,7 @@ function rollGear(wave, boss, forceRar, kind) {
   const it = { id: ++G.gearUid, rar, hone: 0, isNew: true };
   if (rar === 4) {   // half of all legendaries are signature relics for a tower type you field
     const sigs = Object.keys(LEGENDS).filter(k => LEGENDS[k].for && !LEGENDS[k].school && W[LEGENDS[k].for] && inPool('legends', k));
-    it.leg = sigs.length && (kind === 'sig' || (kind == null && Math.random() < .5)) ? pickW(sigs.map(k => [k, W[LEGENDS[k].for] * (ownedRelic(k) ? .12 : 1)])) : pickW(Object.keys(LEGENDS).filter(k => !LEGENDS[k].for && !LEGENDS[k].school && inPool('legends', k)).map(k => [k, ownedRelic(k) ? .12 : 1]));
+    it.leg = sigs.length && (kind === 'sig' || (kind == null && Math.random() < .5)) ? pickW(sigs.map(k => [k, W[LEGENDS[k].for] * (ownedRelic(k) ? .12 : 1)])) : pickW(Object.keys(LEGENDS).filter(k => !LEGENDS[k].for && !LEGENDS[k].school && inPool('legends', k)).map(k => [k, (ownedRelic(k) ? .12 : 1) * fieldFitW({ leg: k }, W)]));
     return it;
   }
   if (rar >= 2 && rar <= 3 && poolHas('charms') && (kind === 'charm' || (kind == null && Math.random() < (rar === 3 ? CHARM_SHARE * .5 : CHARM_SHARE)))) {   // a force's charms (groveitems.js)
@@ -5962,7 +5979,7 @@ function rollGear(wave, boss, forceRar, kind) {
     const id = pickW(opts); if (id) { it.base = id; return it; }
   }
   const opts = Object.keys(GEAR_BASES).filter(id => { const d = GEAR_BASES[id]; return d.rar === rar && !d.rx && !d.retired && !d.charm && inPool('bases', id); });
-  it.base = pickW(opts.map(id => { const f = GEAR_BASES[id].for; return [id, (ownedRelic(id) ? .12 : 1) * (!f ? 1 : f.some(ty => W[ty]) ? 1.6 : .15)]; })) || lootPick(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].rar === rar && !GEAR_BASES[id].retired && !GEAR_BASES[id].charm && inPool('bases', id)));
+  it.base = pickW(opts.map(id => [id, (ownedRelic(id) ? .12 : 1) * fieldFitW({ base: id, rar }, W)])) || lootPick(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].rar === rar && !GEAR_BASES[id].retired && !GEAR_BASES[id].charm && inPool('bases', id)));
   return it;
 }
 // stats with a tower's relics applied (called from effStats). t: the tower, so relics made for another tower stay inert.
@@ -11475,10 +11492,16 @@ function itemCardHTML(it, o) {
   const fl = d.flavor || (it.leg && d.combo && !d.build ? `Try it with ${d.combo}` : '');
   // a force legendary: the way it changes its unit (twist), then what to build round it (build)
   const tw = it.leg && d.twist ? `<p class="itc-tw">${iEsc(d.twist)}</p>` : '', bd = it.leg && d.build ? `<p class="itc-bd"><b>Build around it:</b> ${iEsc(d.build)}</p>` : '';
-  return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${iEsc(gearName(it))}${typeof rnAwkMark === 'function' ? rnAwkMark(it) : ''}</h5><p class="itc-k">${iEsc(sub)}</p>`
+  return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${iEsc(gearName(it))}${typeof rnAwkMark === 'function' ? rnAwkMark(it) : ''}</h5><p class="itc-k">${iEsc(sub)}</p>${clsCardLine(it)}`
     + (st.length || old ? `<ul class="itc-s">${old}${st.map(([k, v]) => `<li>${statHTML(k, v)}</li>`).join('')}</ul>` : '')
     + tw + abl + bd + (d.tome ? `<div class="itc-ab">${iEsc(tomeText(it))}</div>` : '')
     + (fl ? `<p class="itc-fl">“${iEsc(fl)}”</p>` : '') + (o.note || '') + (o.price ? `<p class="itc-pr">${o.price}</p>` : '') + '</div>';
+}
+// a class item's wearers, under its kind line: the force's units of its kind, and a warning when you field none of them
+function clsCardLine(it) {
+  const w = typeof clsWearers === 'function' ? clsWearers(it) : ''; if (!w) return '';
+  const f = gearFor(it) || [], has = typeof G !== 'undefined' && G && (G.towers || []).some(t => t.def && !t.def.wall && f.includes(t.type));
+  return `<p class="itc-k">For ${iEsc(w)}${has ? '' : ' (you field none yet)'}</p>`;
 }
 // a shop item on the shelf (not yet bought)
 const shopCardHTML = (id, o) => itemCardHTML(typeof fshopItem === 'function' ? fshopItem(id) : { shop: id, lv: 1, rar: shopRar(SHOP[id]) }, o);   // (a charm on a force's shelf shows as its relic)
@@ -45534,6 +45557,88 @@ function forceTipLine(n) {
 }
 { const a0 = applyForce; applyForce = function () { const r = a0.apply(this, arguments); crfRoles(); return r; }; }
 
+/* ================= CLASS ITEMS: an item that looks made for one kind of unit fits only that kind =================
+   The owner (8 Nov 2026): "make items that look class specific, class specific" (a Brass Rifle-Sight said "any unit").
+   Each force unit has KINDS (UNIT_KIND below; a unit not listed gets them from its weapon parts and its damage type, so
+   a new unit fits on its own). An item with cls: '<kind>' fits the slots whose unit is of that kind, in any force
+   (gearFor in loot.js), and its card says "Rare relic · gunners only" (KIND_LABEL). This overrides a stats-only rare's
+   "fits any unit" (itempower.js statOnly), and stays out of the set pieces (they already fit one unit, or are an army
+   set that must spread over different units) and the bosses' own relics (the same for every force).
+   Drops lean to what you field: rollGear weighs a class item by the units you have (loot.js), a boss's offer puts the
+   items that fit nothing you field last and leaves out a legendary that fits nothing you field (renown.js), and the
+   card names who wears it. Stats are unchanged. Check: node tools/check_class_items.js -v */
+const KIND_LABEL = {
+  gun: 'gunners', bow: 'archers', caster: 'spellcasters', blade: 'blade fighters', polearm: 'spear and lance units',
+  hammer: 'hammer units', melee: 'melee units', rider: 'riders',
+};
+const UNIT_KIND = {
+  // the Grove
+  thornguard: ['melee', 'polearm'], gladebow: ['bow'], briarwarden: ['caster'], staglancer: ['melee', 'polearm', 'rider'],
+  wayfarer: ['caster'], bladedancer: ['melee', 'blade'], seedcaster: ['caster'], thornwarden: [], ch_elowen: ['caster'],
+  // the Conclave (the Golem Warden is a College mage; the Spellblade fights with steel)
+  cc_spellblade: ['melee', 'blade'], cc_mageling: ['caster'], cc_rimeweaver: ['caster'], cc_chronomancer: ['caster'],
+  cc_astrologer: ['caster'], cc_golemwarden: ['caster', 'melee'], cc_pyroclast: ['caster'], cc_severer: ['caster'], ch_maelis: ['caster'],
+  // Ironhold
+  ironbreaker: ['melee', 'blade'], thundergun: ['gun'], chaintrapper: [], runesmith: ['caster', 'hammer'], flakgunner: ['gun'],
+  steamhammer: ['melee', 'hammer'], mortarcrew: ['gun'], siegebreaker: [], ch_haldra: ['melee', 'hammer'],
+  // the Silver Order
+  oathsworn: ['melee', 'blade'], silverbolt: ['bow'], lightbinder: ['caster'], grailknight: ['melee', 'polearm', 'rider'],
+  sunlance: ['caster'], templar: ['melee', 'hammer'], censer: ['caster'], so_inquisitor: ['caster'], ch_aurelian: ['melee', 'polearm', 'rider'],
+  // the Stormborn
+  sb_wolfguard: ['melee', 'polearm'], sb_windrunner: ['bow'], sb_hailshaman: ['caster'], sb_spiritwalker: ['caster'],
+  sb_thundercaller: ['caster'], sb_earthbinder: ['melee', 'hammer'], sb_clouddancer: ['caster'], sb_skyhunter: ['polearm'], ch_tarka: ['caster'],
+  // the Wardbound
+  wb_oathbound: ['melee', 'blade'], wb_maskedwarden: ['bow'], wb_frostbrand: ['melee', 'polearm', 'caster'], wb_runecarver: ['caster'],
+  wb_stormward: ['melee', 'polearm', 'rider', 'caster'], wb_anvilguard: ['melee', 'hammer'], wb_siegewarden: ['bow'],
+  wb_vowkeeper: ['melee', 'blade'], ch_varic: ['melee', 'blade'],
+};
+// a unit not in the table: its weapon part and its damage type say what it is
+const KIND_PARTS = { gun: ['rifle', 'cannon', 'tube'], bow: ['bow', 'xbow', 'ballista'], blade: ['sword', 'bladeR', 'bladeL', 'axe'],
+  polearm: ['spear', 'lance', 'halberd', 'harpoon'], hammer: ['hammer', 'maul', 'mallet'] };
+const _kindOf = {};
+function unitKinds(def) {
+  const u = def && def.unit; if (!u) return [];
+  if (def.kind) return def.kind;
+  if (UNIT_KIND[u]) return UNIT_KIND[u];
+  if (_kindOf[u]) return _kindOf[u];
+  const ks = (typeof FORCE_PARTS !== 'undefined' && FORCE_PARTS[u] || []).map(P => P.k), out = [];
+  for (const k in KIND_PARTS) if (KIND_PARTS[k].some(p => ks.includes(p))) out.push(k);
+  if (def.dmgType === 'magic' || def.dmgType === 'arcane') out.push('caster');
+  if (def.air === false && !out.includes('gun') && !out.includes('bow')) out.push('melee');
+  return (_kindOf[u] = out);
+}
+// the slot types (TOWERS keys) of the force now leading whose unit is of kind k
+const unitsOfKind = k => Object.keys(TOWERS).filter(ty => { const d = TOWERS[ty]; return d && d.force && !d.wall && unitKinds(d).includes(k); });
+const kindLabel = k => KIND_LABEL[k] || k + ' units';
+
+/* ---------- the items, by kind: [kind, ids] ---------- */
+const CLASS_ITEMS = [
+  ['gun', ['ih_riflesight', 'ih_barbshot', 'ih_thunderhead', 'ihs_buttplate']],
+  ['bow', ['sbr_petrel', 'wbr_fletch', 'gs_seedquiver']],
+  ['caster', ['cc_hat', 'cc_focus', 'cc_tome', 'cc_l_staff', 'cc_l_codex', 'cc_s_concord', 'cc_s_orb', 'sbr_rattle', 'sbl_raincaller',
+    'sbs_gatherstaff', 'wbs_holdstaff', 'gs_rootstaff']],
+  ['blade', ['cc_hilt', 'wbr_whetrune', 'wbr_sigilstone', 'wbr_pommel', 'so_oathblade']],
+  ['polearm', ['gv_ashhaft', 'gv_huntlance', 'sbr_hookedbone', 'wbr_rimehook', 'so_s_lance']],
+  ['hammer', ['ih_hammerhead', 'ih_anvilchip']],
+  ['melee', ['ih_shieldboss', 'so_bossshield']],
+  ['rider', ['so_spur']],
+];
+for (const [k, ids] of CLASS_ITEMS) for (const id of ids) {
+  const d = (typeof GEAR_BASES !== 'undefined' && GEAR_BASES[id]) || (typeof LEGENDS !== 'undefined' && LEGENDS[id]) || (typeof SHOP !== 'undefined' && SHOP[id]);
+  if (d) d.cls = k; else console.warn('class items: no item', id);
+}
+// the force's units that wear a class item, by name in the bar's order ("Thunderguns, Flak Cannoneers and Mortar Crew";
+// "every unit but Spellblades" when that is shorter; a Champion by its first name), or ''
+const clsName = ty => String(TOWERS[ty].name).split(',')[0];
+const clsList = n => n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : n[0] || '';
+function clsWearers(it) {
+  const d = typeof gearDef === 'function' && gearDef(it); if (!d || !d.cls) return '';
+  const all = (typeof BUILD_ORDER !== 'undefined' && BUILD_ORDER.length ? BUILD_ORDER : Object.keys(TOWERS)).filter(ty => TOWERS[ty] && TOWERS[ty].force && !TOWERS[ty].wall);
+  const f = unitsOfKind(d.cls), yes = all.filter(ty => f.includes(ty)), no = all.filter(ty => !f.includes(ty));
+  if (yes.length > 4 && no.length && no.length <= 2) return 'every unit but ' + clsList(no.map(clsName));
+  return clsList(yes.map(clsName));
+}
+
 /* ================= The Target button, pointed out (owner, 8 Nov 2026) =================
    "not sure how to target casters": every unit has a Target button on its card (prioSlot, ui.js) that cycles
    First, Last, Strong, Weak, Cloth, Support, Armoured ... but nothing pointed at it. Now:
@@ -45559,7 +45664,7 @@ function tgtTipLine(n, skipArm) {
   const f0 = typeof forceTipLine === 'function' ? forceTipLine : () => '';
   forceTipLine = function (n) { let a = '', b = ''; try { a = f0(n); } catch (e) { a = ''; } try { b = tgtTipLine(n, /Armour ahead/.test(a)); } catch (e) { b = ''; } return a + b; };
 }
-{
+if (typeof prioSlot === 'function') {   // (the node checks load the game without ui.js)
   const p0 = prioSlot;
   prioSlot = function (t) {
     const s = p0(t); if (!s) return s;
@@ -74499,7 +74604,14 @@ function talIconOf(type, t) {
 }
 function talIconURL(type, i) { return talIconOf(type, TALENTS[type].list[i]); }
 // the painted art itself by its painting index (school emblems and path icons use it whatever the talent there is now)
-function talArtURL(type, i) { const A = typeof TALART !== 'undefined' && TALART[type], tl = TALENTS[type]; return A && A.icons[i] ? A.icons[i] : talIconOf(type, (tl.art || tl.list)[i] || tl.list[0]); }
+function talArtURL(type, i) {
+  // Paths and Fusions reference the original painting index, even while a faction tree is active.
+  const base = TALENTS_BASE[type], original = base && (base.art || base.list)[i];
+  const refreshed = original && typeof ARTX_TAL !== 'undefined' && ARTX_TAL[type + ':' + original.name];
+  if (refreshed) return refreshed;
+  const A = typeof TALART !== 'undefined' && TALART[type], tl = TALENTS[type];
+  return A && A.icons[i] ? A.icons[i] : talIconOf(type, (tl.art || tl.list)[i] || tl.list[0]);
+}
 // the force whose own tree stands in a slot now (the Grove's), or null: its trees have their own flavour, emblems and scenes
 function talForce(type) { const F = typeof FORCE_NOW !== 'undefined' && FORCE_NOW && typeof FORCES !== 'undefined' && FORCES[FORCE_NOW]; return F && F.talents && F.talents[type] && TALENTS[type] === F.talents[type] ? F : null; }
 const talFlavor = type => { const F = talForce(type); return (F && F.talFlavor && F.talFlavor[type]) || TAL_FLAVOR[type] || ['', '']; };
@@ -78907,11 +79019,18 @@ function rnShapeGap(a, b) {
   const A = L(a), B = L(b), both = [...A].filter(k => B.has(k)).length, all = new Set([...A, ...B]).size || 1;
   return (pa !== pb ? 1 : 0) + (1 - both / all);
 }
+// an offer entry fits a unit you field, or fits any unit (a class item made only for units you don't field does not; with
+// nothing on the field yet, everything fits)
+function rnFits(e, W) {
+  if (typeof fieldFitW !== 'function' || !Object.keys(W).length) return true;
+  const it = String(e).startsWith('L:') ? { leg: String(e).slice(2), rar: 4 } : { base: e, rar: GEAR_BASES[e].rar | 0 };
+  return !gearCls(it) || fieldFitW(it, W) > 1;
+}
 function rnRollOffer(type, n, k, seen, noLeg) {
-  const T = rnTable(type), pool = rnPool(type, n), out = [];
-  if (!noLeg && T.leg && Math.random() < bossLegP(n)) out.push('L:' + T.leg);
+  const T = rnTable(type), pool = rnPool(type, n), out = [], W = typeof fieldWeights === 'function' ? fieldWeights() : {};
+  if (!noLeg && T.leg && rnFits('L:' + T.leg, W) && Math.random() < bossLegP(n)) out.push('L:' + T.leg);   // (its legendary, unless it fits nothing you field)
   const fresh = rnShuffle(pool.filter(b => !seen.includes(b))), old = rnShuffle(pool.filter(b => seen.includes(b)));
-  const left = fresh.concat(old), first = left.find(b => !GEAR_BASES[b].charm) || left[0];
+  const left = fresh.concat(old), first = left.find(b => !GEAR_BASES[b].charm && rnFits(b, W)) || left.find(b => !GEAR_BASES[b].charm) || left[0];
   if (first && out.length < k) { out.push(first); left.splice(left.indexOf(first), 1); }
   while (out.length < k && left.length) {
     const mine = out.filter(x => !String(x).startsWith('L:')), w0 = mine.length ? rnWorthOf(mine[0]) : null, ch0 = mine.length && !!GEAR_BASES[mine[0]].charm;
@@ -78919,7 +79038,7 @@ function rnRollOffer(type, n, k, seen, noLeg) {
     left.forEach((b, i) => {
       const same = w0 == null || (Math.abs(rnWorthOf(b) - w0) <= .1 * w0 && !!GEAR_BASES[b].charm === ch0);
       const gap = mine.reduce((m, x) => Math.min(m, rnShapeGap(x, b)), 9);
-      const sc = (same ? 100 : 0) + (seen.includes(b) ? -1000 : 0) + (gap === 9 ? 0 : gap * 10) - i * .01;   // (ties: the shuffled order)
+      const sc = (same ? 100 : 0) + (seen.includes(b) ? -1000 : 0) + (rnFits(b, W) ? 0 : -500) + (gap === 9 ? 0 : gap * 10) - i * .01;   // (a class item for units you don't field: last but a reroll's repeats)   // (ties: the shuffled order)
       if (sc > bs) { bs = sc; best = b; }
     });
     out.push(best); left.splice(left.indexOf(best), 1);
