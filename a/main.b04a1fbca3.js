@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd51bbe7@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'aab6c25@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1897,7 +1897,11 @@ function holdChiefs(q) {
 function chiefTick(dt) {
   if (!G.spawnQ.length || !G.spawnQ[0].hold) { G.chiefT = null; return; }
   if (G.creeps.some(c => !c.dead && !c.purse)) { G.chiefT = null; return; }   // (the treasure thief doesn't hold them up)
-  if (G.chiefT == null) G.chiefT = CHIEF_DELAY;
+  if (G.chiefT == null) {
+    G.chiefT = CHIEF_DELAY;
+    // the last minion has fallen and a boss is about to step out: every unit's mana refills first, as at a wave's end (owner)
+    if (!G.vs && G.spawnQ.some(s => s.hold && CREEPS[s.type] && CREEPS[s.type].boss) && typeof manaWaveEnd === 'function') manaWaveEnd();
+  }
   if ((G.chiefT -= dt) > 0) return;
   G.chiefT = null; let k = 0;
   for (const s of G.spawnQ) if (s.hold) { s.hold = false; s.t = G.waveT + .9 * k++; }
@@ -31615,7 +31619,7 @@ ccxSwap('cc_pyroclast', { id: 'cc_flamewave', name: 'Phoenix', short: 'Phoenix',
       abAoe(() => { for (const q of G.creeps) { if (q.dead || q.ent || hit.has(q) || !abWalker(q) || !canTarget(t, s, q) || Math.hypot(q.x - x, q.y - z) > CCX.PHX_R) continue; hit.add(q); ccAb(t, s, q, m, k, { noWeave: hit.size > 1 }); if (!q.dead) ignite(q, ccAbD(s) * .25, 3, t, false); } });
       if (d2 < tot) return step(d2);
       abAoe(() => inSplash(x, z, CCX.PHX_BOOM, true, q => { if (q.ent || !canTarget(t, s, q)) return; ccAb(t, s, q, bm, k, { noWeave: true }); if (!q.dead) ignite(q, ccAbD(s) * .25, 3, t, false); }));
-      G.shake = Math.max(G.shake || 0, .12); ccxFx(ab.id, t, null, C => CCX_FX.phoenixBoom && CCX_FX.phoenixBoom(C, x, z)); if (typeof sfx === 'function') sfx('pyroPhxBoom');
+      G.shake = Math.max(G.shake || 0, .12); ccxFx(ab.id, t, null, C => CCX_FX.phoenixBoom && CCX_FX.phoenixBoom(C, x, z, bm)); if (typeof sfx === 'function') sfx('pyroPhxBoom');
     });
     ccxLater(ab.id, CCX.PHX_LIFT, () => { step(0); if (typeof sfx === 'function') sfx('pyroPhxFly'); });
     ccxFx(ab.id, t, c, C => CCX_FX.phoenix && CCX_FX.phoenix(C, t, F));
@@ -62976,6 +62980,10 @@ function qxOpt(id, T, at) {
   o.dur = o.dur || D.dur(T, at); o.until = at + o.dur - 1;
   o.kind = D.kind; if (D.kind === 'hold') o.lives = D.lives(T);
   o.reward = D.reward(o);
+  {   // every challenge also pays gold on top of its reward (owner, 8 Nov 2026): added to a gold reward it already has
+    const add = Math.round(qxGold(1, at) / 20) * 10, g = o.reward.find(r => r.k === 'gold');   // (halved: owner, more than a wave gave)
+    if (g) g.n += add; else o.reward.push({ k: 'gold', n: add });
+  }
   for (const r of o.reward) if (r.k === 'relic') {   // three different relics, rolled now so the card can show them
     r.items = []; const key = it => it.base || it.leg || (it.tome || []).join(':');
     for (let k = 0, guard = 0; k < 3 && guard < 40; guard++) { const it = rollGear(Math.max(at, 6), true, r.rar); if (guard < 30 && r.items.some(x => key(x) === key(it))) continue; r.items.push(it); k++; }
@@ -77250,6 +77258,15 @@ function labQueue(name, P, dir, len, o) {
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT); LAB_EXT.n = 1;
   return true;
 }
+// one frame of a bake, this frame only, its card's centre at P (a bake made following a thing: the burning hammer's head),
+// f the frame (a fraction cross-fades to the next); o: { k, a, top, loop (the last frame runs on into the first), pull }
+function labPin(name, f, P, w, o) {
+  if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
+  labLoad(name); o = o || {}; if (LABF.list.length >= LABF.MAX * 2) return false;
+  LABF.list.push({ name, x: P[0], y: P[1], z: P[2], w, fr: f, pin: 1, loop: !!o.loop, pull: o.pull, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, mir: false, sp: 1, top: !!o.top, at: labNow() });
+  const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT); LAB_EXT.n = LABF.list.length;
+  return true;
+}
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { LABF.list.length = 0; LABF.q.length = 0; });
 // (flipbooks outlive the frame that started them: kept in the spells' pass until they are done)
 if (typeof renderView === 'function') {
@@ -77257,7 +77274,7 @@ if (typeof renderView === 'function') {
   renderView = function () {
     if (LABF.list.length && typeof RD !== 'undefined' && RD && RD.vfx) {
       const now = labNow();
-      LABF.list = LABF.list.filter(e => { const B = LAB_FX[e.name]; return now >= e.at - .05 && (now - e.at) * e.sp * B.fps < B.n; });
+      LABF.list = LABF.list.filter(e => { if (e.pin) return false; const B = LAB_FX[e.name]; return now >= e.at - .05 && (now - e.at) * e.sp * B.fps < B.n; });
       if (LABF.list.length && !RD.vfx.ext.includes(LAB_EXT)) RD.vfx.ext.push(LAB_EXT);
       LAB_EXT.n = LABF.list.length;   // (gl.js clears every drawer's count after each frame)
     }
@@ -77320,10 +77337,10 @@ const LAB_EXT = {
       const q0 = q, fu = 1 / B.cols, fv = .5 / B.rows;
       for (const e of by[key]) {
         if (q >= LAB_MAXQ) break;
-        const t = (now - e.at) * e.sp * B.fps; if (t < 0 || t >= B.n) continue;
-        const f0 = Math.min(B.n - 1, Math.floor(t)), f1 = Math.min(B.n - 1, f0 + 1), bl = t - f0, life = t / B.n;
-        const fade = Math.min(1, t * 4) * (1 - Math.max(0, (life - .7) / .3)) * e.a;
-        const w = e.w, h = w / (B.aspect || 1), cy = (B.target[1] - .025) / B.span * h, k = .35 * h;
+        const t = e.fr != null ? e.fr : (now - e.at) * e.sp * B.fps; if (t < 0 || t >= B.n) continue;
+        const f0 = Math.min(B.n - 1, Math.floor(t)), f1 = e.loop ? (f0 + 1) % B.n : Math.min(B.n - 1, f0 + 1), bl = t - f0, life = t / B.n;
+        const fade = e.pin ? e.a : Math.min(1, t * 4) * (1 - Math.max(0, (life - .7) / .3)) * e.a;
+        const w = e.w, h = w / (B.aspect || 1), cy = e.y != null ? e.y : (B.target[1] - .025) / B.span * h, k = e.pull != null ? e.pull : .35 * h;
         const cx = e.x - fw[0] * -k, cyy = cy - fw[1] * -k, cz = e.z - fw[2] * -k;   // (toward the camera: fw points away from it)
         const uv = f => { const c = f % B.cols, rr = Math.floor(f / B.cols); return [c * fu, rr * fv, (c + 1) * fu, (rr + 1) * fv]; };
         const A = uv(f0), Bq = uv(f1), m = e.mir;
@@ -77442,7 +77459,10 @@ if (typeof ihMortarLand === 'function') {
     if (p && p.mfFire && typeof hfPatch === 'function') {
       const st = (G.towers.includes(t) && t.st) || st0, sp = ((st && st.splash) || 1) * (p.big ? 2 : 1), rad = Math.min(1.1, sp * .45), x = p.ax, z = p.az;
       // (the lab's own Fire Bomb, baked from its WebGPU fire: labfx.js; the old burst where the bake is missing)
-      if (!(typeof labPlay === 'function' && labPlay('incblast', x, z, rad * 3.2, { k: .95 }))) hfBurst(x, z, rad, { dur: .45 });
+      // (the lab's Mortar Shell landing, the owner's tuning; a bigger blast for a stronger round: a vented shot or a wide splash
+      // from talents and items, owner: "different burst sizes based on talent/item improvements")
+      const bn = p.big || sp >= 1.6 ? 'incblast_big' : 'incblast', LB = typeof LAB_FX !== 'undefined' && LAB_FX[bn];
+      if (!(LB && typeof labPlay === 'function' && labPlay(bn, x, z, rad * 3 * LB.span / 1.59, { k: .95 }))) hfBurst(x, z, rad, { dur: .45 });
       if (typeof sfx === 'function') sfx('incLand');   // (a whoosh into a burst and a heavier impact, over the owner's explosion)
       // (a fire left on the ground under it keeps it burning: the Napalm talent's pitch, a burning hazard)
       hfPatch(x, z, rad * .8, 1.6, { flare: 0, at: 1.1, alive: () => { let l = 0; for (const h of G.hazards || []) if ((h.k === 'fire' || h.k === 'ih_pitch') && h.t > 0 && Math.abs(h.x - x) < .3 && Math.abs(h.z - z) < .3) l = Math.max(l, h.t); return l; } });
@@ -77553,6 +77573,7 @@ if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { PF.breath.length = 
 function pfBreaths() {
   const now = G.time;
   PF.breath = PF.breath.filter(e => now < e.B.until + .35 && G.towers.includes(e.t) && e.t.ccxBreath === e.B);
+  const BLON = typeof LAB_FX !== 'undefined' && !!LAB_FX.breathloop;
   for (const e of PF.breath) {
     const { t, B } = e, el = now - B.at; if (el < .08) continue;
     const on = Math.min(1, (el - .08) / .15) * Math.min(1, Math.max(0, (B.until + .35 - now) / .35)), h = ccHand(t, towerTop(t) * .8), busy = hfLoad() > .6;
@@ -77562,13 +77583,15 @@ function pfBreaths() {
     if (now < B.until - .05 && now >= (e.next || 0) && typeof labPlay === 'function') {
       const j = e.j = (e.j | 0) + 1, F = j % 3 ? G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= B.r && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS) : [];
       const c = F.length ? F[j % F.length] : null, f0 = c ? Math.hypot(c.x - t.x, c.y - t.y) / B.r : .3 + .7 * ((j * .37) % 1), f = Math.max(.3, f0), a = c ? Math.atan2(c.y - t.y, c.x - t.x) : a0 + (((j * 5) % 7) / 6 * 2 - 1) * .5 * f;   // (two in three on a foe in the cone)
-      if (labPlay('pyroblast', t.x + Math.cos(a) * B.r * f, t.y + Math.sin(a) * B.r * f, (1.6 + 2 * f) * (B.r / 2.4), { k: 1.05 + .25 * f, a: 1, speed: 1.25, seed: j, top: 1 })) e.next = now + (busy ? .16 : .085);   // (the bake fills about a third of its card)
+      if (labPlay('pyroblast', t.x + Math.cos(a) * B.r * f, t.y + Math.sin(a) * B.r * f, (1.6 + 2 * f) * (B.r / 2.4), { k: 1.05 + .25 * f, a: 1, speed: 1.25, seed: j, top: 1 })) e.next = now + (busy ? .2 : BLON ? .15 : .085);   // (the bake fills about a third of its card)
     }
-    // a thin core laid along the cone from just past the hands (dim at its root)
-    { const dx = B.ux, dz = B.uz, P = [h[0] + dx * .4, Math.max(.12, h[1] - .1), h[2] + dz * .4], d = [dx, -.1, dz], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
+    // the pour itself: the lab's Furnace Breath (the owner's tuning) streaming out of the hands along the cone; where the bake
+    // is missing, a thin core and tongues of flame carried out along it
+    const bd = [B.ux, -.12, B.uz], bdl = Math.hypot(...bd), BL = typeof LAB_FX !== 'undefined' && LAB_FX.breathloop && labQueue('breathloop', [h[0] + B.ux * .15, Math.max(.15, h[1] - .05), h[2] + B.uz * .15], [bd[0] / bdl, bd[1] / bdl, bd[2] / bdl], B.r * 2.7 * (.55 + .45 * on), { k: .85 * on, a: on, seed: e.seed, pull: .4 });
+    if (!BL) { const dx = B.ux, dz = B.uz, P = [h[0] + dx * .4, Math.max(.12, h[1] - .1), h[2] + dz * .4], d = [dx, -.1, dz], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
       if (!labQueue('jetloop', P, u, B.r * .55 * (.6 + .4 * on), { k: .6 * on, a: .7 * on, seed: e.seed, pull: .4 })) hfQueue(P[0], P[1], P[2], B.r * .08, .4, .2, 0, 0, 0, e.seed, on, u); }
     // the pour: tongues of flame carried out along the cone, each standing taller and brighter the farther it goes
-    for (let j = 0; j < m; j++) {
+    for (let j = 0; j < (BL ? 0 : m); j++) {
       const ph = (now * 2.4 + j / m + (j % 3) * .13) % 1, f = .22 + .78 * ph, side = ((j * 7) % m) / (m - 1) * 2 - 1;
       const a = a0 + side * .55 * (.4 + .6 * ph) + .05 * Math.sin(now * 5 + j), dx = Math.cos(a), dz = Math.sin(a), x = t.x + dx * B.r * f, z = t.y + dz * B.r * f;
       const fade = on * Math.min(1, ph / .15) * Math.min(1, (1 - ph) / .2), d = [dx * .7, 1, dz * .7], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
@@ -77595,6 +77618,8 @@ function pfPhoenixes() {
     const y = (F.h0 + (1.15 - F.h0) * (1 - (1 - rise) * (1 - rise))) * (1 - dive) + .2 * dive + .05 * Math.sin(now * 6);   // (over the walkers' heads: the cards are depth-tested)
     const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), dl = Math.hypot(hx, vh, hz), fwd = [hx / dl, vh / dl, hz / dl];
     const g = Math.min(1, d / .5) * .55 + .45;   // (small as it leaves the hands, its full span out over the road)
+    // the bird: the lab's Phoenix (the owner's tuning) held in a headwind, wings beating, drawn along its flight
+    if (typeof LAB_FX !== 'undefined' && LAB_FX.phxloop && labQueue('phxloop', [x, y, z], fwd, 7.4 * g, { k: 1.15, seed: F.seed, pull: .5, top: 1 })) { if ((F.n = (F.n | 0) + 1) % 10 === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2); continue; }
     // the body and the tail: the lab's Fireball loop streaming back along its flight
     if (!labQueue('ballloop', [x, y, z], fwd, 4 * g, { k: 1.2, seed: F.seed, pull: .5, top: 1 })) hfBall(x, y, z, .12 * g, hx * 4, vh * 4, hz * 4, F.seed, 1);
     // the wings: two jets swept out and back from the shoulders, beating
@@ -77624,8 +77649,11 @@ if (typeof ccFireBurst === 'function') {
 if (typeof CCX_FX !== 'undefined') {
   CCX_FX.breath = function (C, t, B) { if (PF.breath.length < 12) PF.breath.push({ C, t, B, seed: (Math.random() * 97) | 0 }); };
   CCX_FX.phoenix = function (C, t, F) { if (PF.phx.length < 8) PF.phx.push(Object.assign({ seed: (Math.random() * 97) | 0 }, F)); };
-  CCX_FX.phoenixBoom = function (C, x, z) {
-    const lab = typeof labPlay === 'function' && labPlay('pyroblast', x, z, 3.4, { k: 1, top: 1 });
+  CCX_FX.phoenixBoom = function (C, x, z, bm) {
+    // (the lab's Phoenix blast, the owner's tuning; a bigger one as its blast grows with tier and talents, owner: "different
+    // burst sizes based on talent/item improvements")
+    const LF = typeof LAB_FX !== 'undefined' ? LAB_FX : {}, bn = (bm || 0) >= 2.85 && LF.phxboom_big ? 'phxboom_big' : LF.phxboom ? 'phxboom' : 'pyroblast', LB = LF[bn] || { span: 1.41 };
+    const lab = typeof labPlay === 'function' && labPlay(bn, x, z, 3.4 * LB.span / 1.41, { k: 1, top: 1 });
     hfBurst(x, z, lab ? .55 : .8, { dur: .5, smoke: true });
     hfPatch(x, z, .7, 1.4, { flare: 0, at: .25 });
     v2Hit(C, x, z, .3, C.S * .8, { sp: 'ember', n: 10, light: 1, ring: 1 });
@@ -77638,7 +77666,9 @@ if (typeof CCX_FX !== 'undefined') {
   CCX_FX.skipLand = function (C, x, z, j, n) {
     const k = Math.pow(.85, j);
     v2Hit(C, x, z, .25, C.S * .65 * k, { sp: 'ember', n: 5, light: j ? 0 : 1, ring: j ? 0 : 1 });
-    hfBurst(x, z, .38 * k, { dur: .35, smoke: j === n - 1 }); sfx('pyroSkip', j === n - 1);
+    // (the lab's Skipping Flame hop; the old burst where the bake is missing)
+    if (!(typeof labPlay === 'function' && typeof LAB_FX !== 'undefined' && LAB_FX.skiphop && labPlay('skiphop', x, z, 4.4 * k * (j === n - 1 ? 1.25 : 1), { k: 1, top: 1 }))) hfBurst(x, z, .38 * k, { dur: .35, smoke: j === n - 1 });
+    sfx('pyroSkip', j === n - 1);
   };
 }
 // their sounds (the owner's Zapsplat fire takes, firesfxdata.js): a whoosh as a fireball is loosed, a burst where it lands
@@ -77670,7 +77700,7 @@ if (typeof UI_ART !== 'undefined' && typeof MISSING_ART !== 'undefined') for (co
    under his right fist, his left fist kept on the haft by IK wherever the clip has both hands on it); the fire coming out
    of it is hammerfire.js.
    - His moves (DW_CAST, the clips' own frames at 30 fps; the clip named, then [seconds, frame] keys):
-       rest           out of the fight: leaning on the hammer, its head on the road before him, fists stacked on the haft
+       rest           out of the fight: the hammer over his right shoulder, its head behind his back (DW_REST, owner)
        ready          a foe near: the club clip's guard, the hammer up by his shoulder, breathing
        the strike     (his slam on every walker round him) the club clip's first blow: over the wind-up the hammer swings
                       down behind him and up over his head (frames 0-47), on the shot it comes down (47-51 in 0.075s, when
@@ -77698,6 +77728,9 @@ const DW_WIND = 47, DW_HIT = .075, DW_SLAM = [[0, 47], [DW_HIT, 51], [.22, 52], 
 // (yaw: the body turned about the vertical, radians toward his left, so the blow lands before him, on his target: the clips
 // strike off to his right; eased like the pose)
 const DW_YAW = { strike: .4, ready: .15 };
+// at rest, out of the fight: the hammer over his right shoulder, its head behind him (owner: "rest the hammer on their back
+// during idle like their concept art", "over their shoulder"): a frame of the club clip's wind-up, held, breathing
+const DW_REST = { clip: 'club', f: 18 };
 function dwKeys(K, u) {   // seconds -> the clip's frame, straight between keys (the clip keeps its own timing)
   if (u <= K[0][0]) return K[0][1];
   for (let i = 1; i < K.length; i++) if (u <= K[i][0]) { const a = K[i - 1], b = K[i]; return a[1] + (b[1] - a[1]) * (u - a[0]) / (b[0] - a[0]); }
@@ -77731,7 +77764,7 @@ function dwCtl(t, live, M) {
   const engaged = t.tg || (t.engaged || 0) > 0 || s < 1.2;
   if (engaged) t._dwIdleAt = now;
   const restW = now - (t._dwIdleAt == null ? -9 : t._dwIdleAt) > .8;
-  return restW ? { f: A.rest[0], rate: 3.5, flare, act: 0, rest: 1, yaw: 0 } : { f: dwF(M, 'club', 0), rate: 9, flare, act: 0, yaw: DW_YAW.ready };
+  return restW ? { f: dwF(M, DW_REST.clip, DW_REST.f), rate: 3.5, flare, act: 0, rest: 1, yaw: 0 } : { f: dwF(M, 'club', 0), rate: 9, flare, act: 0, yaw: DW_YAW.ready };
 }
 const _dwT = new Float32Array(SKIN_MAX * 12);
 // the pose: the clip at f, followed from his last pose at the move's rate; a breath through the chest
@@ -77807,50 +77840,57 @@ function dwDraw(t, tier, sx, sy, sz, wob, opts) {
   return true;
 }
 // the hammer on fire (owner: "a live flame that is moving organically with the hammer", "a flame coming from the hammer, not
-// a jet out the back", "the hammer itself is enflamed"; the concept art: flames licking up off the head): small flames of the
-// lab's fire rooted round the hammer head, rising (flames rise whatever the head's angle), swept back off the head's motion,
-// taller with the gauge, leaping on a blow; behind them, tongues left where the head just was, rising and dying, so a swing
-// leaves a smear of fire along its path and a hammer held still leaves none. Never in over his body.
-const DWF = { BALL: 3.6, AGES: [.05, .1, .17], LIFE: .28, RISE: .8, ROOTS: [[0, .35, 0, 1], [.55, .05, .3, .7], [-.5, .1, -.35, .62]] };
+// a jet out the back", "the hammer itself is enflamed"; not "a small sprite that adjusts size as it moves"; the concept art:
+// flames licking up off the head): flames born every frame on the head's surface, each a flame puff living its own short life
+// in the world (vfx.js's GPU particles, the FIRE flipbook: white-hot, licking up into tongues, thinning to wisps), rising and
+// curling as it dies. Left where they were born, they stream off the head behind each swing on their own; a fast swing lays
+// them along the whole arc the head swept that frame. Hotter with the gauge, a gout on each blow; a little smoke off the top.
+const DWF = { RATE: 70, HEAT: 45, FLARE: 160, BALL: 3.6 };
+// the lab's own burning hammer (owner: "the hammer should look engulfed in flame": the lab's Burning Hammer, the owner's tuning,
+// baked swinging through each of his moves from 4 facings with the camera following the head: labfxdata.js ham_<move>_<facing>,
+// tools/labbake/make_hammer_jobs.py): the frame for where he is in his move, pinned on his hammer's head. Rest and ready loop.
+// The move's own clock, as the bake recorded it (sim/dw_tracks.py): a blow's wind-up is 0.6 s, the head lands at 0.6 s.
+const DWB = { FPS: 20, SCALE: .36, TRACK_S: 1.557, UP: .05, CAST: { ih_pressureslam: 'pressure', ih_steamvent: 'vent', ih_pistondrive: 'piston' } };
+function dwMoveNow(t) {
+  const now = G.time, C = t._dwAt != null ? DW_CAST[t._dwId] : null, cu = C ? now - t._dwAt : 9;
+  if (C && cu >= 0 && cu < C.T) return [DWB.CAST[t._dwId], cu];
+  const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, w = t.windup || 0;
+  if (s >= 0 && s < .5) return [t._dwVent === t.ihSlamAt ? 'vstrike' : 'strike', .6 + s];
+  if (w > 0 && t.tg) return ['strike', .6 * w];
+  return [t._dwIdleAt != null && now - t._dwIdleAt <= .8 ? 'ready' : 'rest', -1];
+}
+function dwBakedFlame(t, hw, hl, heat) {
+  if (typeof labPin !== 'function' || typeof LAB_FX === 'undefined' || !LAB_FX.ham_rest_0) return false;
+  const [mv, u] = dwMoveNow(t), yaw = t.ang == null ? 0 : t.ang, yi = ((Math.round(yaw / (Math.PI / 2)) % 4) + 4) % 4;
+  const B = LAB_FX['ham_' + mv + '_' + yi]; if (!B) return false;
+  const loop = u < 0, f = loop ? ((G.time + (t.anim || 0) * 3) * DWB.FPS) % B.n : Math.min(B.n - 1, u * DWB.FPS);
+  const sk = (hl / .085) / DWB.TRACK_S / DWB.SCALE, w = B.span * (B.aspect || 1) * sk;
+  return labPin('ham_' + mv + '_' + yi, f, [hw[0], hw[1] + DWB.UP * sk, hw[2]], w, { loop, k: .95 + .1 * heat, pull: .12 * w });
+}
 function dwFlame(t, hw, p, hl, fl, heat, seed) {
-  const now = G.time; let tr = t._dwTr;
-  if (!tr || (tr.length && tr[tr.length - 1].at > now + 1e-6)) tr = t._dwTr = [];
-  if (!tr.length || now - tr[tr.length - 1].at > 1 / 120) tr.push({ p: [hw[0], hw[1], hw[2]], at: now });
-  while (tr.length > 2 && now - tr[0].at > DWF.LIFE) tr.shift();
-  const at = age => { let b = tr[tr.length - 1]; for (let k = tr.length - 1; k >= 0; k--) { b = tr[k]; if (now - tr[k].at >= age) break; } return b; };
-  // the head's own motion over the last few hundredths of a second
-  const q = at(.04), qd = Math.max(1e-3, now - q.at), v = [0, 1, 2].map(k => (hw[k] - q.p[k]) / qd), sp = Math.hypot(...v), sw = Math.min(1, sp / 3.5);
-  // the head's frame: along its haft-to-back axis (to the vent) and across it, so the roots sit on the head as it turns
-  let ax = [p[0] - hw[0], p[1] - hw[1], p[2] - hw[2]]; const al = Math.hypot(...ax) || 1; ax = ax.map(c => c / al);
-  let cr = [-ax[2], 0, ax[0]]; const cl = Math.hypot(...cr) || 1; cr = cr.map(c => c / cl);
+  if (typeof DW_NOFIRE !== 'undefined' && DW_NOFIRE) return;   // (pose captures)
+  if (dwBakedFlame(t, hw, hl, heat)) return;
+  const now = G.time, pv = t._dwFP, dt = t._dwFT == null ? 0 : now - t._dwFT; t._dwFP = [hw[0], hw[1], hw[2]]; t._dwFT = now;
+  const F = typeof vfxFid === 'function' ? vfxFid() : null;
+  if (!F || !F.gpu || typeof vfxBurst !== 'function') {   // (no GPU particles at this Graphics setting: the lab's burning ball)
+    if (LAB_FX.ballloop) labQueue('ballloop', [hw[0], hw[1] + hl * .15, hw[2]], [0, -1, 0], DWF.BALL * hl * (2.8 + .8 * heat), { k: .9, a: 1, seed: seed + 1, pull: .1 });
+    return;
+  }
+  if (!(dt > 0) || dt > .2) return;
   const fk = Math.min(2, fl || 0), busy = typeof hfLoad === 'function' && hfLoad() > .6;
-  const bx = hw[0] - t.x, bz = hw[2] - t.y, bl = Math.hypot(bx, bz) || 1;
-  const lean = (d) => {   // swept behind the motion, never in over his body
-    if (sp > .05) for (let k = 0; k < 3; k++) d[k] -= v[k] / sp * 1.25 * sw;
-    const inn = (d[0] * bx + d[2] * bz) / bl; if (inn < .1) { d[0] += (.1 - inn) * bx / bl; d[2] += (.1 - inn) * bz / bl; }
-    const dl = Math.hypot(...d) || 1; return [d[0] / dl, d[1] / dl, d[2] / dl];
-  };
-  const H = hl * (2.8 + .8 * heat) * (1 + .25 * sw) * (1 + .2 * Math.min(1, fk));   // (about the head's own size: a burning head, not a jet)
-  // the head ablaze: the lab's burning ball (its Fireball held in a wind) sat on the head, its flames streaming up and back
-  // off it (the bake's axis is its flight: pointed down-and-forward, so the fire trails up-and-behind)
-  const up = lean([0, 1, 0]), fli = .9 + .07 * Math.sin(now * 12.3 + seed) + .05 * Math.sin(now * 27.1 + seed * 1.7);
-  if (LAB_FX.ballloop) labQueue('ballloop', [hw[0], hw[1] + hl * .15, hw[2]], [-up[0], -up[1], -up[2]], DWF.BALL * H * fli, { k: Math.min(1.3, .85 + .2 * heat + .3 * fk), a: 1, seed: seed + 1, pull: .1 });
-  DWF.ROOTS.forEach(([ua, uy, uc, sz], n) => {
-    if (busy || !n) return;   // (two small tongues licking off its sides)
-    const r = hl * .55, P0 = [hw[0] + (ax[0] * ua + cr[0] * uc) * r, hw[1] + uy * r + (ax[1] * ua) * r, hw[2] + (ax[2] * ua + cr[2] * uc) * r];
-    const f2 = .85 + .1 * Math.sin(now * (11 + 3 * n) + seed + n * 2.1) + .06 * Math.sin(now * (27 + 5 * n) + seed * 1.7 + n);
-    const d = lean([ax[0] * .18 * ua + .08 * Math.sin(now * 5 + n), 1, ax[2] * .18 * ua + .08 * Math.cos(now * 4.3 + n * 2)]);
-    labQueue('jetloop', P0, d, H * sz * f2, { k: Math.min(1.3, .8 + .2 * heat + .3 * fk), a: .8, seed: seed + 1 + n * 4, pull: .1 });
-  });
-  if (busy) return;
-  // the smear along the swing's path
-  DWF.AGES.forEach((age, n) => {
-    const s0 = at(age), a0 = now - s0.at; if (a0 < age * .6) return;
-    const gap = Math.hypot(hw[0] - s0.p[0], hw[1] - s0.p[1], hw[2] - s0.p[2]), w = Math.min(1, Math.max(0, gap / (hl * 2.5) - .2));
-    if (w < .05) return;
-    const life = 1 - a0 / DWF.LIFE, P0 = [s0.p[0], s0.p[1] + DWF.RISE * hl * 10 * a0 * a0 + .2 * hl, s0.p[2]];
-    labQueue('jetloop', P0, lean([0, 1, 0]), H * (.75 - .5 * a0 / DWF.LIFE), { k: .75 + .2 * heat, a: w * life * .85, seed: seed + 13 + n * 2, pull: .1 });
-  });
+  let n = dt * (DWF.RATE + DWF.HEAT * heat + DWF.FLARE * fk) * (busy ? .45 : 1); n = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0); if (n <= 0) return;
+  const r = hl * .5, mv = pv ? Math.hypot(hw[0] - pv[0], hw[1] - pv[1], hw[2] - pv[2]) : 0;
+  const spec = { y: hw[1], shape: 'sphere', r, sp: [0, .12 + .25 * fk], up: [.35, .75 + .4 * heat], life: [.32, .55 + .15 * heat], size: [hl * .95, hl * 1.4], grow: 1.25,
+    c0: vfxC('#fff2c0', 1.45), c1: vfxC('#c8300a'), a0: 1, a1: 0, drag: 1.4, grav: -1.1, curl: 1.2, layer: VT.FIRE, frames: VT_FB, ramp: 1, add: 1 };
+  // (a fast swing: spread along the arc since the last frame, so the trail is a stream, not beads)
+  const split = pv && mv > r ? Math.min(4, Math.ceil(mv / r)) : 1;
+  for (let k = 0; k < split; k++) {
+    const f = split > 1 ? (k + Math.random()) / split : 1, m = Math.max(1, Math.round(n / split));
+    spec.x = pv ? pv[0] + (hw[0] - pv[0]) * f : hw[0]; spec.y = pv ? pv[1] + (hw[1] - pv[1]) * f : hw[1]; spec.z = pv ? pv[2] + (hw[2] - pv[2]) * f : hw[2];
+    vfxBurst(spec, m);
+  }
+  // (a thread of smoke off the flames' tops; none on a busy field)
+  if (!busy && Math.random() < dt * (6 + 10 * heat)) vfxBurst({ x: hw[0], y: hw[1] + hl * 1.2, z: hw[2], shape: 'sphere', r: r * .6, sp: [0, .08], up: [.25, .45], life: [.6, .9], size: [hl * .9, hl * 1.2], grow: 2.2, c0: [.22, .2, .19], a0: .32, a1: 0, layer: VT.SMOKEF, frames: VT_FB, add: 0, drag: .8, curl: .8 }, 1);
 }
 // the fire: out of the claw behind the head (the back vent), leaning out of it, trailing each swing
 function dwFire(t, hw, vw, s, P, heat, live) {
