@@ -1,4 +1,4 @@
-const BUILD_TAG = '6461ab4@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9898419@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -59434,7 +59434,7 @@ const MW_TORCHES = [[213, 205, 1], [190, 733, 1], [1222, 177, 1], [1290, 708, 1]
 function buildMoonwoodPainted() {
   const rnd = mulberry32(2718), g = new Geo(71), FX = { lights: [], flames: [], glows: [], fires: [] }, [x0, z0, wx, wz] = MW_PAINT_RECT;
   g.jit = .06;
-  for (const s of [-1, 1]) {
+  for (const s of (typeof MAP_LITE !== 'undefined' && MAP_LITE) ? [] : [-1, 1]) {   // (the rune stones by the way in: none on painted-only maps, maplite.js)
     const x = PORTAL.x + s * 2.35, z = PORTAL.y - .6;
     g.with(T(x, 0, z, s * .3, 0, s * .06), () => { g.rockMat = true; g.box(0, .42, 0, .3, .84, .2, '#56605a', { taper: [.7, .75], top: '#6a756e' }); g.rockMat = false;
       g.em = .9; g.box(0, .5, .102, .04, .22, .01, '#6fe3c8'); g.box(0, .58, .102, .14, .03, .01, '#6fe3c8'); g.box(.03, .4, .102, .09, .03, .01, '#6fe3c8'); g.em = 0; });
@@ -59524,7 +59524,8 @@ function buildClearingPainted() {
   for (let z = Math.floor(z0 - 6); z < z0 + wz + 6; z += 1) for (let x = Math.floor(x0 - 6); x < x0 + wx + 6; x += 1.5) gr.quad([x, 0, z], [x, 0, z + 1], [x + 1.5, 0, z + 1], [x + 1.5, 0, z], '#2f4a1f');   // grass until the painting has decoded
   // its trunks in 3D, rising out of view, with boughs and bushes at the frame's edges (edgetrees.js; owner: the trunks going
   // up past the viewpoint, with some foliage)
-  const et = typeof buildClearingTrees === 'function' && typeof TF_FORGE !== 'undefined' ? buildClearingTrees() : { groups: [], giants: null };
+  const lite = typeof MAP_LITE !== 'undefined' && MAP_LITE;   // (painted-only maps on phones and tablets: maplite.js)
+  const et = !lite && typeof buildClearingTrees === 'function' && typeof TF_FORGE !== 'undefined' ? buildClearingTrees() : { groups: [], giants: null };
   return { ground: gr.finish(), wild: [], deco: d.finish(), trees: et.groups, edgeGiants: et.giants, fx: null };
 }
 
@@ -59901,7 +59902,7 @@ function paintMoonwoodFG(cv, C, rnd, sky, M) {
 
    Bakeable (docs/design/map3d.md): the terrain's colour and occlusion, the props and the near trees' shadows are all
    static; only the path wear, the units' shadows, the point lights, the water and the mist move. */
-const M3D_FORCE = (() => { try { const q = new URLSearchParams(location.search).get('map3d'); return q == null ? null : q === 'pass' ? 'pass3d' : 'grove3d'; } catch (e) { return null; } })();
+const M3D_FORCE = (() => { try { const q = new URLSearchParams(location.search).get('map3d'); return q == null || (typeof MAP_LITE !== 'undefined' && MAP_LITE) ? null : q === 'pass' ? 'pass3d' : 'grove3d'; } catch (e) { return null; } })();   // (painted-only maps, maplite.js: the painted map instead)
 const M3D_RECT = { x0: -.45, x1: COLS + .45, z0: -TOPM - .75, z1: ROWS + .75 };   // flat ground: the field and its edge
 // the painting's way in (CL_ENTRY): out of the trees at the head, down to the field (the clearing map's own)
 const M3D_ENTRY = typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : [[5.593, -5.439], [5.315, -4.188], [4.99, -3.029], [4.759, -1.987]];
@@ -69103,6 +69104,8 @@ const GFX_NEXT = { auto: 'high', high: 'medium', medium: 'low', low: 'auto' };
 let GFX = 'auto'; try { GFX = localStorage.getItem('runehold.gfx') || 'auto'; } catch (e) {} if (!GFX_LV[GFX]) GFX = 'auto';
 qScale = GFX_LV[GFX].q;
 const gfxParts = () => GFX_LV[GFX].parts;
+// painted-only maps on phones and tablets (maplite.js, set in the page head): no 3D map dressing, its data never loaded
+const mapLite = () => typeof MAP_LITE !== 'undefined' && !!MAP_LITE;
 function gfxSet(k) { GFX = GFX_LV[k] ? k : 'auto'; try { localStorage.setItem('runehold.gfx', GFX); } catch (e) {} qScale = GFX_LV[GFX].q; if (RD) { RD.shadowOn = GFX_LV[GFX].sh; RD.uq = GFX_LV[GFX].uq; } if (typeof huLodFlush === 'function') huLodFlush(); if (typeof layoutAll === 'function') layoutAll(); return GFX; }
 const ENV = {};
 const QG = new QB(4000), QA = new QB(1600), QADD = new QB(3200), QO = new QB(900);
@@ -69143,12 +69146,14 @@ const _m = new Float32Array(16), _m2 = new Float32Array(16), _m3 = new Float32Ar
 function initView(canvas) {
   cv = canvas;
   const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ''));
-  try { RD = createRenderer(cv, { shadowSize: mobile ? 1024 : 2048, trees: true }); RD.shadowOn = GFX_LV[GFX].sh; RD.uq = GFX_LV[GFX].uq; }
+  try { RD = createRenderer(cv, { shadowSize: mobile ? 1024 : 2048, trees: !mapLite() });   // (painted-only maps: no tree shaders)
+    RD.shadowOn = GFX_LV[GFX].sh; RD.uq = GFX_LV[GFX].uq; }
   catch (e) { RD = null; if (window.__showErr) window.__showErr('Graphics setup failed: ' + (e && e.message || e)); }
   if (!RD) return false;
   // if the phone drops the GPU context (memory pressure), offer a reload rather than freezing on a black screen
   cv.addEventListener('webglcontextlost', e => { e.preventDefault(); if (window.__showErr) window.__showErr('The graphics context was lost (the device ran low on memory). Your game is saved between waves; reload the page to continue.'); }, false);
   RD.bend = BEND;
+  if (mapLite()) RD.glintOn = false;   // (painted-only maps: the painting as painted, no glint on the ground)
   if (typeof TERRAIN_TEX !== 'undefined' && RD.terrainArrays) RD.terrainArrays(TERRAIN_TEX);   // (the painted terrain textures: terraintex.js)
   RD.trees = [];
   applyTheme(typeof G !== 'undefined' && G.map ? G.map : 'meadow');
@@ -69169,6 +69174,7 @@ function initView(canvas) {
 let TH = THEMES.meadow, LS = Object.assign({}, LIGHT_DEF.meadow); const THENV = {}, BGC = {};
 function buildThemeEnv(th) {
   const b = th.build(), E = { ground: b.ground, wild: b.wild, deco: b.deco, fx: b.fx, treeGroups: [], treeHs: [], lm: null, terrain: b.terrain || null, edgeGiants: b.edgeGiants || null };   // (terrain: a 3D map's heightfield, drawn by gl.js drawTerrain: map3d.js)
+  if (mapLite()) { b.trees = []; E.terrain = null; E.edgeGiants = null; }   // (painted-only maps: the painting alone)
   const keep = RD.trees; RD.trees = [];
   for (const t of b.trees) {
     const a = t.asset;
@@ -69226,7 +69232,7 @@ const PROP_LIGHT = {
 };
 function applyLight() {
   const L = LS;
-  RD.propLight = PROP_LIGHT[TH.id] || null;
+  RD.propLight = mapLite() ? null : PROP_LIGHT[TH.id] || null;
   RD.sunDir = lightDir(L.az, L.el); RD.sunCol = linMul(L.sun, L.sunI); RD.sky = linMul(L.sky, L.skyI); RD.gnd = linMul(L.gnd, L.gndI);
   RD.fogCol = lin3(L.fog); RD.rim = L.rim; RD.expo = L.expo; RD.lmGain = L.lamps; RD.fill = L.fill;
   RD.mood = moodGet(TH.id);   // the map's mood on every model (maps.js MAP_MOOD)
@@ -71474,7 +71480,7 @@ function drawMapFx() {
     if (VLIVE && Math.random() < .3) amb.push({ k: 'ember', x: x + R_(-.1, .1), z: z + R_(-.1, .1), h: y + .25, vh: R_(.5, 1.2), vx: R_(-.18, .18), t: 0, life: R_(.8, 1.6) });
   }
   // slow banks of mist drifting along the edges of the clearing and pooling in the glade
-  const wd = LS.woods, mc = c4(hexMix(hexMix(LS.fog, LS.sun, .4), '#ffffff', .15)), nM = Math.round(10 + 22 * wd);
+  const wd = LS.woods, mc = c4(hexMix(hexMix(LS.fog, LS.sun, .4), '#ffffff', .15)), nM = mapLite() ? 0 : Math.round(10 + 22 * wd);   // (painted-only maps: no mist banks)
   for (let k = 0; k < nM; k++) {
     const side = k % 2 ? 1 : -1, ph = vt * .03 + k * 1.7, z = ((k * .618 + vt * .012) % 1) * (ROWS + 5) - 3, x = side < 0 ? -.8 + Math.sin(ph) * .6 : COLS + .8 + Math.sin(ph) * .6;
     QA.bill(RD, x, .28, z, 2.1, .6, [mc[0], mc[1], mc[2], (.05 + .03 * Math.sin(ph * 2)) * (.4 + wd)], 1, 0);
@@ -77256,6 +77262,8 @@ function openHow(back) {
   $('#hwBack').onclick = () => { sfx('click'); (back || titleScreen)(); };
 }
 // Settings: sound, music and the battlefield's numbers (the same switches as the pause menu)
+// Settings > Map detail: painted-only maps (maplite.js) or the full 3D dressing; (auto) when the device chose it, (link) for ?maplite=
+function mapDetailName() { const src = typeof MAP_LITE_SRC !== 'undefined' ? MAP_LITE_SRC : 'auto'; return (mapLite() ? 'Painted' : 'Full 3D') + (src === 'auto' ? ' (auto)' : src === 'url' ? ' (link)' : ''); }
 function openSettings(back) {
   const pr = AudioSys.pref;
   showOverlay(`<h2 class="ttl">Settings</h2>
@@ -77267,6 +77275,7 @@ function openSettings(back) {
     <div class="seg" role="group" aria-label="Display">
       <button type="button" id="sDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
       <button type="button" id="sGfx" aria-pressed="true" title="Lower it if the game runs slowly: Low halves the render size, turns off shadows and thins the particles">Graphics<small>${GFX_LV[GFX].name}</small></button>
+      <button type="button" id="sMap" aria-pressed="true" title="Painted: the map's painting alone, without its 3D trees, props and magic (faster; the default on phones and tablets). Changing it reloads the game">Map detail<small>${mapDetailName()}</small></button>
     </div>
     <div class="seg" role="group" aria-label="Chronicles">
       <button type="button" id="sSaves">Saved Games<small>${(n => n ? n + ' in progress' : 'None yet')(savesGet().length)}</small></button>
@@ -77275,6 +77284,11 @@ function openSettings(back) {
     </div>
     <button class="btn ghost" id="sBack">Back</button>`, 'setp');
   $('#sGfx').onclick = () => { const k = gfxSet(GFX_NEXT[GFX]); $('#sGfx').querySelector('small').textContent = GFX_LV[k].name; sfx('click'); };
+  // map detail (maplite.js): the 3D dressing's data is loaded or not at startup, so a change reloads (from the title: no run is lost)
+  $('#sMap').onclick = () => { sfx('click'); const lite = !mapLite(); lsSet('runehold.maplite', lite ? '1' : '0');
+    $('#sMap').querySelector('small').textContent = (lite ? 'Painted' : 'Full 3D') + ' · reloading';
+    let href = location.href; try { const u = new URL(href); u.searchParams.delete('maplite'); href = u.href; } catch (e) {}
+    setTimeout(() => location.replace(href), 150); };
   $('#sHow').onclick = () => { sfx('click'); openHow(() => openSettings(back)); };
   $('#sSaves').onclick = () => { sfx('click'); openSaves(() => openSettings(back)); };
   $('#sScores').onclick = () => { sfx('click'); openBoard(() => openSettings(back)); };
