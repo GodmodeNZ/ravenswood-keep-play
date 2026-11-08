@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b65ec1c@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7682255@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -57855,11 +57855,11 @@ function buildClearingTrees() {
     if (edgeClear(bx, bz, rc, by + sz * .7, CL_EDGE.road)) put(bough, 'bough', bx, by - sz * .35, bz, sz, 0, { noShadow: true });
   }
   // undergrowth by the painted stones and round the giants' feet
-  const kinds = ['bush', 'fbush', 'fbush'];
+  const kinds = ['gbush', 'fbush', 'gshrub'];   // (gbush, gshrub: the owner's sculpted bush and leafy shrub)
   const spots = CL_EDGE.bushes.slice(); for (const g of giants) for (let k = 0; k < 3; k++) { const a = rnd() * TAU, r = 2 + rnd() * 1.6; spots.push([g.x + Math.cos(a) * r, g.z + Math.sin(a) * r]); }
   for (const [x, z] of spots) for (let k = 0; k < 1; k++) {
-    const tr = edgeAsset(kinds[(k + (rnd() * 3 | 0)) % 3]); if (!tr) continue;
-    const H = (tr.wantH || 1) * .6 * (.8 + rnd() * .5), px = x + (rnd() - .5) * .8, pz = z + (rnd() - .5) * .8;
+    const tr = edgeAsset(kinds[(k + (rnd() * 3 | 0)) % 3]) || edgeAsset('bush'); if (!tr) continue;
+    const H = (tr.wantH || 1) * .6 * (.75 + rnd() * .7), px = x + (rnd() - .5) * .8, pz = z + (rnd() - .5) * .8;
     if (edgeClear(px, pz, H * .45, H, CL_EDGE.road)) put(tr, 'u_' + tr.name, px, 0, pz, H, 0, { noShadow: true });
   }
   return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade, noShadow: v.noShadow })), giants };
@@ -58634,7 +58634,7 @@ const M3D_DEFS = {
     boughs: { sp: 'oak', per: 2, h: [7, 15], size: [2, 3.2] },
     // undergrowth (tfforge.js: bushes, flowering shrubs and ferns from the TreeForge oak's cards; saplings: small TreeForge
     // trees) round the edges and between the giants, never on the grid or the road
-    under: { n: 170, mix: [['bush', .26], ['fbush', .22], ['fern', .38], ['sapling', .14]], sapling: ['oak', 'sprig'], k: .6 },
+    under: { n: 170, mix: [['gbush', .2], ['gshrub', .2], ['fbush', .18], ['fern', .3], ['sapling', .12]], sapling: ['oak', 'sprig'], k: .6 },   // (gbush, gshrub: the owner's sculpted bush and leafy shrub)
     giantFade: [16, 60, .9],
     // streams: points [x, z, width]; falls: [point index, drop]
     streams: [
@@ -58899,9 +58899,21 @@ function m3dTrees(D, rnd) {
     const U = D.under, pickU = () => { let r = rnd(), acc = 0; for (const [n, w] of U.mix) { acc += w; if (r < acc) return n; } return U.mix[0][0]; };
     let tries = 0, made = 0;
     const put = (tr, x, z, H, lod) => { const key = tr.name + '|u' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [] }); inst.get(key).arr.push(x, m3dH(x, z) - .03, z, H / tr.height, rnd() * TAU, rnd() * 10); };
+    const gbs = ['gbush', 'gshrub'].map(n => pool.find(t => t.name === n)).filter(Boolean);
+    if (gbs.length) {   // the owner's sculpted bush between the boulders and along the stream banks, its size and turn varied
+      const spots = [];
+      for (const [x, z, r] of D.stones) for (let k = 0; k < 2; k++) { const a = rnd() * TAU, d = r * 1.3 + .3 + rnd() * .6; spots.push([x + Math.cos(a) * d, z + Math.sin(a) * d]); }
+      for (const st of M3D.streamsB) for (let i = 6; i < st.smp.length; i += 9) { const sm = st.smp[i], sd = rnd() < .5 ? -1 : 1, d = sm.w + .45 + rnd() * .5; spots.push([sm.x - sm.dz * sd * d, sm.z + sm.dx * sd * d]); }
+      for (const [x, z] of spots) {
+        const gb = gbs[rnd() * gbs.length | 0], H = (gb.wantH || 1) * (D.under.k || 1) * (.75 + rnd() * .8);
+        if (m3dOut(x, z) < 1 || !m3dClear(x, z, H * .5, H) || blocked(x, z, .05)) continue;
+        if (z < -1.6 && Math.abs(x - m3dRoadX(z)) < M3D_RAV.w + .6) continue;
+        put(gb, x, z, H, m3dOut(x, z) < 5 ? 0 : 1);
+      }
+    }
     for (const g of giants) for (let k = 0; k < 6; k++) {   // foliage gathered round each giant's foot
       const a = rnd() * TAU, r = edgeTrunkR(g) * (1.4 + rnd() * 1.6), x = g.x + Math.cos(a) * r, z = g.z + Math.sin(a) * r;
-      const tr = pool.find(t => t.name === ['bush', 'fbush', 'fern'][k % 3]); if (!tr) continue;
+      const tr = pool.find(t => t.name === ['gbush', 'fbush', 'gshrub', 'fern', 'gbush', 'gshrub'][k % 6]) || pool.find(t => t.name === 'bush'); if (!tr) continue;
       const H = (tr.wantH || 1) * (D.under.k || 1) * (.9 + rnd() * .6);
       if (m3dOut(x, z) < 1 || !m3dClear(x, z, H * .45, H) || blocked(x, z, .1)) continue;
       put(tr, x, z, H, 0);
