@@ -1,4 +1,4 @@
-const BUILD_TAG = '9898419@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ab7130a@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -59035,32 +59035,40 @@ function edgeMagic(giants, title) {
   }
 }
 
-// Sunfall's trunk magic (owner: "add magic circling around a trunk or two"), in the title screen's way (titlefx.js): no
-// ribbon, a wisp of soft blue-green smoke puffs left by an emitter that circles the trunk; each puff rises and curls on
-// round the bole, swelling and fading, a rare bright spark among them. Faint (additive, low alpha), kept to the bark: the
-// map, foes and units read through it. Stateless: each puff's place comes from the clock.
+// Sunfall's trunk magic (owner: "add magic circling around a trunk or two"; then "make it look more saturated, using more
+// little particles that move organically"): a swarm of small saturated glowing motes, as on the title screen (titlefx.js):
+// teal and cyan with a little violet and gold, each spiralling up round the bole on its own path (layered sine drift in
+// its angle, height and distance, its own speed and size), some drifting off outward (away from the battle map) and
+// fading, a few brighter sparks, a gentle twinkle; a faint halo on a share of them and a soft glow at the roots. Stateless
+// (each mote's place comes from the clock and its index): EW_N motes a trunk, two additive billboards each (the mote and
+// its halo), so two trunks cost about 570 quads. On the two trunks the game camera sees whole: the left edge's front one and the right side's.
+const EW_N = 140;
+const EW_COL = [[.15, 1, .82], [.2, .78, 1], [.3, .95, 1], [.68, .4, 1], [1, .78, .32]];   // teal, cyan, pale cyan, violet, gold
+const ewH = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };   // (a mote's fixed random numbers)
 function edgeWisps(giants) {
   for (const g of giants || []) {
     if (!g.magic) continue;
-    const r = edgeTrunkR(g), top = g.mh || 5.2;
-    QADD.ground(g.x, g.z, g.y + .04, r * 2.2, r * 2.2, [.3, .8, .9, .1 + .03 * Math.sin(vt * 1.3 + g.x)], 1, 0);   // (a soft glow at the roots)
-    for (let w = 0; w < 2; w++) {   // two wisps, on opposite sides, one circling each way round
-      const dir = w ? -1 : 1, a0 = w * Math.PI + g.x;
-      for (let i = 0; i < 56; i++) {
-        const life = 5.5 + (i % 4) * .6, k = ((vt / life + i * .618 + w * .31) % 1 + 1) % 1, age = k * life, born = vt - age;
-        const th = a0 + dir * (born * .4 + age * 2 + Math.sin(born * .37 + i) * .15);   // (the emitter circles slowly; each puff curls on round, so the trail wraps the trunk about one and a half times)
-        const h = .25 + age / life * top + Math.sin(born * .51 + i * 1.3) * .2;
-        const rr = r * (1.1 + .12 * k) + .38 + Math.sin(age * 1.1 + i) * .1;   // (clear of the bark, so no puff is cut by it)
-        const x = g.x + Math.cos(th) * rr, y = g.y + h, z = g.z + Math.sin(th) * rr;
-        const a = Math.sin(Math.PI * k) ** 2, sz = .24 + .32 * k;
-        if (i % 18 === 5) QADD.bill(RD, x, y, z, .08, .08, [.85, 1, 1, .8 * a * (.5 + .5 * Math.sin(vt * 4 + i))], 1, 0);   // (a rare spark)
-        else QADD.bill(RD, x, y, z, sz, sz, [.35, .9, .95, .16 * a], 1, 0);
-      }
-    }
-    for (let k = 0; k < 4; k++) {   // a few fireflies drifting round the trunk
-      const ph = vt * (.2 + (k % 3) * .07) + k * 1.9 + g.x, rr = r * (1.5 + 1.2 * ((k * .37) % 1)), hgt = .3 + ((k * .53 + vt * .03) % 1) * top * .6;
-      const tw = .5 + .5 * Math.sin(vt * 3.1 + k * 2.3);
-      QADD.bill(RD, g.x + Math.cos(ph) * rr, g.y + hgt, g.z + Math.sin(ph * 1.3) * rr, .05, .05, [1, .95, .7, .6 * tw], 1, 0);
+    const r = edgeTrunkR(g), top = g.mh || 5.6, out = g.x < 5.5 ? -1 : 1;   // (out: the side away from the field)
+    QADD.ground(g.x, g.z, g.y + .04, r * 2.2, r * 2.2, [.2, .85, .9, .12 + .03 * Math.sin(vt * 1.3 + g.x)], 1, 0);   // (a soft glow at the roots)
+    for (let i = 0; i < EW_N; i++) {
+      const q0 = ewH(i, 1), q1 = ewH(i, 2), q2 = ewH(i, 3), q3 = ewH(i, 4), q4 = ewH(i, 5);
+      const life = 4.5 + q0 * 5, k = ((vt / life + q1) % 1 + 1) % 1, age = k * life;   // (its own speed: 4.5-9.5 s up)
+      const dir = q2 < .72 ? 1 : -1;   // (most circle one way; a few against them)
+      const drift = q3 < .3 ? (q3 / .3) : 0;   // (three in ten drift off outward near the end)
+      // its angle: a steady climb round the bole plus two slow sines (it wanders, speeds and slows)
+      const th = q4 * 6.2832 + dir * (age * (1.1 + q0 * .9)) + Math.sin(age * (1.3 + q2) + q1 * 9) * .45 + Math.sin(vt * .23 + i) * .2;
+      const h = .15 + k * top * (.75 + q2 * .35) + Math.sin(age * (2.1 + q3 * 1.4) + i) * .18 + Math.sin(vt * .7 + q4 * 9) * .08;
+      let rr = r * 1.1 + .35 + q1 * .45 + Math.sin(age * (1.7 + q4) + q0 * 7) * .14;
+      let x = g.x + Math.cos(th) * rr, z = g.z + Math.sin(th) * rr;
+      if (drift) { const d = k * k * drift * 1.4; x += out * d; z += Math.sin(i + age) * d * .4; }   // (drifting off, away from the field)
+      const y = g.y + h;
+      const fade = Math.min(1, k * 6) * (1 - k) ** (drift ? 1.4 : .45);
+      const tw = .62 + .38 * Math.sin(vt * (2.2 + q3 * 4) + i * 2.1);   // (a gentle twinkle)
+      const c = EW_COL[q0 < .38 ? 0 : q0 < .66 ? 1 : q0 < .8 ? 2 : q0 < .91 ? 3 : 4];
+      const spark = i % 23 === 7, sz = spark ? .2 : .1 + q4 * .1, a = fade * tw;
+      QADD.bill(RD, x, y, z, sz, sz, [c[0], c[1], c[2], a], 1, 0);
+      if (spark) QADD.bill(RD, x, y, z, .05, .05, [1, 1, 1, .9 * a], 1, 0);   // (its white-hot core)
+      QADD.bill(RD, x, y, z, sz * 2.8, sz * 2.8, [c[0], c[1], c[2], (spark ? .24 : .15) * a], 1, 0);   // (a soft halo)
     }
   }
 }
@@ -59089,11 +59097,11 @@ const CL_EDGE = {
   // x, z, height, magic (a little in from the frame: owner; the top left one set back a cell so its roots rest on the painted
   // ledge, not hanging over the rocks above the stream); the left two clear of the painted stream and its falls (owner:
   // "tree is covering where the stream is"): the one that stood on it now at the frame's outer edge, past the water
-  giants: [[-4.25, -4.85, 34, 1], [-12.2, -.3, 36, 0], [16.9, 2.8, 36, 0], [18.1, 7.2, 32, 1],
+  giants: [[-4.25, -4.85, 34, 0], [-12.2, -.3, 36, 0], [16.9, 2.8, 36, 0], [18.1, 7.2, 32, 1],
     // standing over the painting's edges, where past its rect the shader mirrors it (owner: "trunks that cover where the art
     // repeats itself"): the right edge (x 23.5), the left (x -12.3) and the top behind the tunnel (z -7), clear of the tunnel
     [23.3, -4.6, 36, 0], [23.6, 2.4, 34, 0], [23.2, 9.6, 36, 0], [23.5, 15.4, 34, 0],
-    [-12.4, -6.4, 34, 0], [-12.6, 6.8, 36, 0], [-12.3, 13.2, 34, 0],
+    [-12.4, -6.4, 34, 0], [-12.6, 6.8, 36, 1], [-12.3, 13.2, 34, 0],
     [-7.4, -7.2, 34, 0], [-1.8, -7.4, 36, 0], [12.2, -7.4, 34, 0], [17.6, -7.1, 36, 0]],
   firs: [[-10.8, 9.2, 5.6], [-10.2, 12.6, 6.2], [-11.4, 15.6, 5.8], [22.6, 14.2, 5.4]],            // x, z, height (TreeForge fir)
   bushes: [[-6.2, 2.4], [-5.6, 11.4], [16.2, 5.4], [17.4, 12.4]],
