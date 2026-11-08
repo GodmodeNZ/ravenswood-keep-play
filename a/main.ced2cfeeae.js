@@ -1,4 +1,4 @@
-const BUILD_TAG = '0e114ad@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'cb68509@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53978,28 +53978,182 @@ const FS_TREE = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vNor, vCol, vW; in vec4 vL; in vec2 vUV; in float vH;
 uniform sampler2D uTex; uniform float uLeaf, uCut, uTime, uGain;
+uniform vec3 uFade;   // the 3D maps' giant trees (map3d.js): above uFade.x the tree dissolves (gone by uFade.y), so the camera
+                      // looks under the canopy at the trunks; uFade.z: moss on the bark (the tops of roots and low limbs)
 out vec4 o;
+${NOISE_GLSL}
 ${LIGHT_GLSL}
 void main(){
+  if(vW.y > uFade.x && !gl_FrontFacing) discard;   // (no inside showing through the dissolve)
+  if(vW.y > uFade.x){ float ig = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));   // (screen-door: no sorting)
+    if(ig < smoothstep(uFade.x, uFade.y, vW.y)) discard; }
   vec3 base = vCol;
   vec3 n = normalize(vNor);
   if(uLeaf>.5){ vec4 t = texture(uTex, vUV); vec2 ts = vec2(textureSize(uTex, 0)); float mip = max(0., .5*log2(max(dot(dFdx(vUV*ts),dFdx(vUV*ts)), dot(dFdy(vUV*ts),dFdy(vUV*ts))))); t.a *= 1. + mip*.28; if(t.a < uCut) discard; base *= pow(t.rgb, vec3(2.2))*.88*uGain; }
-  else { if(!gl_FrontFacing) n = -n; base *= .85 + .25*vH; }
+  else { if(!gl_FrontFacing) n = -n; base *= .85 + .25*vH;
+    if(uFade.z > 0.){   // bark: furrows, and moss over what faces up, thickest low down
+      float an = atan(n.z, n.x);
+      float f = vnoise(vec2(an*3., vW.y*1.6)*vec2(1., 2.5)), rid = abs(vnoise(vec2(an*7.5 + vnoise(vW.xz*3.)*1.5, vW.y*.35))*2. - 1.);
+      base *= (.62 + .5*f)*mix(.55, 1.15, smoothstep(.05, .45, rid));   // deep vertical furrows between bark ridges
+      float m = uFade.z*smoothstep(-.1, .55, n.y + (fbm(vW.xz*2.1 + vW.y)*.6 - .3))*(1. - smoothstep(.5, 3.5, vW.y)*.7);
+      base = mix(base, vec3(.05, .085, .03)*(.7 + .6*fbm(vW.xz*5. + vW.y*3.)), clamp(m, 0., .9));
+    } }
   float sh = uShadowOn>.5 ? shadowAt(vL) : 1.;
   vec3 light = lightAt(n, vW, sh, uLeaf*.3);
   float ao = uLeaf>.5 ? mix(.55, 1.05, smoothstep(.15,.95,vH)) : mix(.6,1.,smoothstep(0.,.3,vH));
   vec3 col = base*light*ao*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
+  if(uFade.z > 0.){ vec3 V = normalize(uCam - vW); float rim = pow(1. - max(dot(n, V), 0.), 2.6);   // the giants: a silvery rim of moonlight down the trunks
+    col += rim*uSunCol*uRim*(uLeaf > .5 ? .25 : .9)*mix(.4, 1., sh)*(.25 + base*2.)*(1. - smoothstep(4., 10., vW.y)*.7);
+    col *= mix(1., .22, smoothstep(2.2, uFade.x, vW.y)); }   // rising into the canopy's shade
   o = vec4(finish(col, vW), 1.);
 }`;
 const VS_TREE_SH = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=3) in vec2 aUV; layout(location=4) in vec4 aI; layout(location=5) in vec2 aI2;
-uniform mat4 uLVP; uniform float uTime, uE, uH; out vec2 vUV;
+uniform mat4 uLVP; uniform float uTime, uE, uH; out vec2 vUV; out float vY;
 void main(){ float c=cos(aI2.x), s=sin(aI2.x); vec3 m=aPos*uE; float hrel=clamp(m.y/uH,0.,1.); vec3 p=m*aI.w; p=vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);
   float sw=hrel*hrel*aI.w*uH*.014; p.x += sin(uTime*1.2 + aI2.y + aI.x*.35)*sw; p.z += cos(uTime*1.05 + aI2.y*1.3 + aI.z*.3)*sw*.7;
-  vUV=aUV; gl_Position=uLVP*vec4(p+aI.xyz,1.); }`;
+  vUV=aUV; vY = p.y + aI.y; gl_Position=uLVP*vec4(p+aI.xyz,1.); }`;
 const FS_TREE_SH = `#version 300 es
-precision highp float; in vec2 vUV; uniform sampler2D uTex; uniform float uLeaf, uCut;
-void main(){ if(uLeaf>.5){ vec2 ts = vec2(textureSize(uTex, 0)); float mip = max(0., .5*log2(max(dot(dFdx(vUV*ts),dFdx(vUV*ts)), dot(dFdy(vUV*ts),dFdy(vUV*ts))))); if(texture(uTex, vUV).a*(1.+mip*.28) < uCut) discard; } }`;
+precision highp float; in vec2 vUV; in float vY; uniform sampler2D uTex; uniform float uLeaf, uCut; uniform vec3 uFade;
+void main(){ if(vY > (uFade.z > 0. ? uFade.x*.45 : uFade.x)) discard; if(uLeaf>.5){ vec2 ts = vec2(textureSize(uTex, 0)); float mip = max(0., .5*log2(max(dot(dFdx(vUV*ts),dFdx(vUV*ts)), dot(dFdy(vUV*ts),dFdy(vUV*ts))))); if(texture(uTex, vUV).a*(1.+mip*.28) < uCut) discard; } }`;
+/* The 3D maps' terrain (map3d.js): one heightfield mesh, painted in the shader by splat weights. Per vertex: aSp = (road,
+   moss, rock) weights laid by the map, aAE = (ambient occlusion, how far into the woods: 0 on the field, 1+ in the forest).
+   Layers: grass (two tones, dry patches, blades), moss, forest litter, dirt road (pebbles, ruts), rock (triplanar, strata,
+   cracks; also wherever the slope is steep) and snow (the pass: on flat-ish ground above uTK.x). The worn road follows the
+   foes' live path (uPath: a small top-down texture map3d.js rasterises from G.path), so the maze reads as the road. Mist:
+   a slow teal glow lying in the woods (uTM). Light: the shared LIGHT_GLSL (sun, sky/ground, point lights, map light,
+   shadows), so per-map light tints apply here as everywhere. Bakeable: everything but the path, the shadows, the point
+   lights and the mist's drift is static, and can go into one colour texture later (see docs/design/map3d.md). */
+const VS_TER = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aSp; layout(location=3) in vec2 aAE;
+uniform mat4 uVP, uLVP; uniform float uTime;
+out vec3 vW, vNor, vSp; out vec2 vAE; out vec4 vL;
+${BEND_GLSL}
+void main(){ vW = aPos; vNor = aNor; vSp = aSp; vAE = aAE; vL = uLVP*vec4(aPos, 1.); gl_Position = uVP*vec4(bendW(aPos), 1.); }`;
+const FS_TER = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vW, vNor, vSp; in vec2 vAE; in vec4 vL; uniform float uTime;
+uniform sampler2D uPath; uniform vec4 uPathR;
+uniform vec3 uTP[8];   // grass dark, grass light, moss, dirt, dirt dark, rock, litter, snow (linear)
+uniform vec4 uTK;      // (snow line, snow amount, the woods' darkening, path wear)
+uniform vec4 uTM;      // mist (rgb, strength)
+out vec4 o;
+${NOISE_GLSL}
+${LIGHT_GLSL}
+float trip(vec3 p, vec3 w){ return fbm(p.zy)*w.x + fbm(p.xz)*w.y + fbm(p.xy)*w.z; }
+void main(){
+  vec3 n = normalize(vNor); vec2 xz = vW.xz;
+  float n1 = fbm(xz*.42), n2 = fbm(xz*1.7 + 3.1), n3 = vnoise(xz*6.3 + 1.7), n4 = fbm(xz*.13 + 7.), n5 = vnoise(mat2(.8, -.6, .6, .8)*xz*13. + 5.)*.6 + vnoise(xz*27. + 2.)*.4;   // (two rotated octaves: no square pebbles)
+  // grass: two tones in broad drifts, dry patches, a fine blade grain
+  vec3 grass = mix(uTP[0], uTP[1], smoothstep(.28, .78, n1));
+  grass = mix(grass, grass*vec3(1.18, 1.06, .62), smoothstep(.62, .86, n4)*.45);
+  // clumps: dark hollows between tufts, lit tips, at two scales and stretched a little (the blades lean together)
+  float cl1 = vnoise(xz*vec2(7.5, 5.) + n2*2.), cl2 = vnoise(xz*vec2(17., 12.) + 4.1);
+  grass *= .8 + .26*cl1 + .16*cl2;
+  grass = mix(grass, grass*vec3(.72, .86, .66), smoothstep(.55, .8, fbm(xz*.9 + 5.))*.35);   // darker, bluer clover drifts
+  vec3 moss = uTP[2]*(.75 + .5*n2)*(.9 + .2*n5);
+  // forest floor: dark litter with fallen-leaf flecks and needles
+  vec3 lit = uTP[6]*(.65 + .55*n3);
+  float fl = smoothstep(.78, .9, vnoise(xz*9. + n1*3.)); lit = mix(lit, lit*vec3(1.9, 1.35, .7), fl*.5);
+  // dirt road: two tones, pebbles, wheel-rut streaks
+  vec3 dirt = mix(uTP[4], uTP[3], smoothstep(.25, .75, n2));
+  float pb = smoothstep(.72, .86, n5); dirt = mix(dirt, uTP[5]*1.25, pb*.45); dirt *= .88 + .2*n3;
+  // rock: triplanar, banded strata, dark cracks, moss on its tops
+  vec3 aw = pow(abs(n), vec3(4.)); aw /= aw.x + aw.y + aw.z;
+  vec3 q = vW*1.9; float rt = trip(q, aw);
+  float strata = smoothstep(.35, .65, sin(vW.y*7. + fbm(xz*1.1)*4.)*.5 + .5);
+  float cr = 1. - abs((vnoise(q.zy*3.)*aw.x + vnoise(q.xz*3.)*aw.y + vnoise(q.xy*3.)*aw.z)*2. - 1.);
+  vec3 rock = uTP[5]*(.7 + .6*rt)*mix(1.08, .84, strata*(1. - aw.y));
+  rock = mix(rock, rock*.55, smoothstep(.9, .98, cr)*.7);
+  rock = mix(rock, moss*.8, smoothstep(.6, .9, n.y)*smoothstep(.45, .7, n2)*.8);
+  // weights
+  float slope = 1. - n.y;
+  float wRock = clamp(smoothstep(.3, .52, slope + (n2 - .5)*.22) + vSp.z, 0., 1.);
+  vec2 pw = (xz + (vec2(n2, n1) - .5)*.42 - uPathR.xy)*uPathR.zw;
+  float pt = (pw.x > 0. && pw.x < 1. && pw.y > 0. && pw.y < 1.) ? texture(uPath, pw).r*uTK.w : 0.;
+  float wRoad = smoothstep(.28, .62, max(vSp.x, pt) + (n3 - .5)*.3);
+  float wMoss = clamp(vSp.y, 0., 1.)*smoothstep(.38, .68, n1 + n3*.35);
+  float wLit = smoothstep(.25, .95, vAE.y + (n2 - .5)*.5);
+  vec3 base = mix(grass, moss, wMoss);
+  base = mix(base, lit, wLit*(1. - wMoss*.5));
+  base = mix(base, mix(dirt, dirt*.82, wLit), wRoad);
+  // trampled grass at the road's edge: a darker, flattened rim
+  base *= 1. - .18*smoothstep(.1, .3, max(vSp.x, pt))*(1. - wRoad);
+  base = mix(base, rock, wRock);
+  if(uTK.y > 0.){   // snow: on what is flat enough to hold it, above the snow line; thin and grey on the road
+    float wS = uTK.y*smoothstep(.62, .82, n.y + (n1 - .5)*.25)*smoothstep(uTK.x - .4, uTK.x + .4, vW.y + (n2 - .5)*.8);
+    vec3 snow = uTP[7]*(.92 + .1*n3);
+    base = mix(base, snow, wS*(1. - wRoad*.6));
+  }
+  float ao = vAE.x;
+  float sh = uShadowOn > .5 ? shadowAt(vL) : 1.;
+  vec3 light = lightAt(n, vW, sh, 0.);
+  vec3 col = base*light*ao*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
+  col *= mix(1., uTK.z, smoothstep(.0, 2.6, vAE.y));   // the woods are darker than the field: play reads first
+  // mist lying in the woods, drifting
+  float mist = uTM.a*smoothstep(.3, 2.2, vAE.y)*smoothstep(.25, .8, fbm(xz*.22 + vec2(uTime*.018, uTime*.011)))*smoothstep(3.5, .2, vW.y);
+  col += uTM.rgb*mist;
+  o = vec4(finish(col, vW), 1.);
+}`;
+/* The 3D maps' streams and falls (map3d.js), after the Ember engine's River Forge look (its simRiverGlsl / simRiverFalls
+   shaders, adapted without the simulation): ripples are flow-mapped (three noise layers advected along the stream's own
+   direction a third of a period apart, raised-cosine weighted, so they never stretch), the colour runs deep to shallow
+   across the channel with a magical teal glow and a caustic web over the shallows, foam gathers at the banks and below the
+   falls and is dragged downstream, and the falls are a sheet of fast streaks. Per vertex: aFlow = downstream xz velocity,
+   aX = (depth 0 bank..1 channel middle, foam, fall), aS = (across -1..1, along). Drawn after the opaque world, blended. */
+const VS_WAT = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aFlow; layout(location=2) in vec3 aX; layout(location=3) in vec2 aS;
+uniform mat4 uVP, uLVP; uniform float uTime;
+out vec3 vW, vX; out vec2 vFlow, vS; out vec4 vL;
+${BEND_GLSL}
+void main(){ vec3 w = aPos; if(aX.z > .5) w.xz += aFlow*.0;
+  vW = w; vX = aX; vFlow = aFlow; vS = aS; vL = uLVP*vec4(w, 1.); gl_Position = uVP*vec4(bendW(w), 1.); }`;
+const FS_WAT = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vW, vX; in vec2 vFlow, vS; in vec4 vL; uniform float uTime;
+uniform vec3 uWDeep, uWShal, uWGlow;   // linear colours: the channel's middle, its shallows, the glow
+out vec4 o;
+${NOISE_GLSL}
+${LIGHT_GLSL}
+float web(vec2 uv){ float v = fbm(uv*1.7); return pow(max(0., 1. - abs(v - .5)*5.), 4.); }
+void main(){
+  vec2 F = vFlow; float depth = vX.x, fall = vX.z;
+  // flow-mapped ripples
+  float T = 1.6; vec2 g = vec2(0.); float nh = 0.;
+  for(int k = 0; k < 3; k++){
+    float ph = fract(uTime/T + float(k)/3.), w = .5 - .5*cos(ph*6.2832);
+    vec2 uv = vW.xz*2.6 - F*ph*T*2.6 + vec2(float(k)*3.7, float(k)*1.3);
+    float a = fbm(uv), b = fbm(uv + vec2(.06, 0.)), c = fbm(uv + vec2(0., .06));
+    g += vec2(b - a, c - a)/.06*w; nh += a*w;
+  }
+  g /= 1.5; nh /= 1.5;
+  vec3 n = normalize(vec3(-g.x*.22, 1., -g.y*.22));
+  // the falls: a sheet of streaks rushing down
+  float streak = 0.;
+  if(fall > .01){
+    float s1 = vnoise(vec2(vS.x*14., vS.y*2.2 - uTime*4.2)), s2 = vnoise(vec2(vS.x*31. + 7., vS.y*4. - uTime*6.5));
+    streak = smoothstep(.45, .85, s1*.6 + s2*.5);
+    n = normalize(mix(n, vec3(0., .3, 1.), fall*.6));
+  }
+  vec3 V = normalize(uCam - vW);
+  float fres = pow(1. - max(dot(n, V), 0.), 3.);
+  float sh = uShadowOn > .5 ? shadowAt(vL) : 1.;
+  vec3 light = lightAt(vec3(0., 1., 0.), vW, sh, 0.);
+  vec3 body = mix(uWShal, uWDeep, smoothstep(.0, .85, depth))*(.75 + .5*nh);
+  float cau = web(vW.xz*.9 + F*uTime*.15) + .6*web(vW.xz*1.6 - F.yx*uTime*.1 + 3.);
+  vec3 col = body*light*.5;
+  col += uWGlow*(.55 + .9*cau*(1. - depth*.6) + .4*nh);          // the magic in the water: it glows from within
+  col += mix(uGnd, uSky*1.6, .7)*fres*.6;
+  vec3 R = reflect(-V, n); col += uSunCol*pow(max(dot(R, uSunDir), 0.), 80.)*1.6*sh;
+  // foam: at the banks, where the map says (below the falls, at rocks), dragged downstream; the falls' streaks
+  float fn = fbm(vW.xz*3.4 - F*uTime*1.4) + fbm(vW.xz*7. - F*uTime*2.)*.5;
+  float foam = smoothstep(.7, 1.05, fn*.8 + vX.y*.9 + pow(1. - depth, 6.)*.5);
+  foam = max(foam, streak*fall);
+  col = mix(col, vec3(.85, .97, 1.)*(light*.55 + uWGlow*.6), foam*.85);
+  float a = mix(.62, .9, smoothstep(0., .7, depth)) + foam*.3 + fall*.15;
+  a *= smoothstep(0., .12, depth + fall);
+  o = vec4(finish(col, vW), clamp(a, 0., 1.));
+}`;
 const VS_Q = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aShp;
 uniform mat4 uVP; out vec2 vUV; out vec4 vCol; out vec2 vShp;
@@ -54058,6 +54212,7 @@ function createRenderer(canvas, opt = {}) {
   let STY = null;   // the sculpted models' stylised program (built the first time one is drawn)
   const styProg = () => STY || (STY = prog(VS_STY, FS_STY));
   let SSH = null; const sshProg = () => SSH || (SSH = prog(VS_SSH, FS_SH));   // (a rigged model's shadow, posed)
+  let TERP = null, WATP = null;   // the 3D maps' terrain program (built the first time a terrain is drawn)
   // 1x1 stand-in so samplers never point at an empty unit
   const blank = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, blank); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
   const blankA = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, blankA); gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
@@ -54208,10 +54363,52 @@ function createRenderer(canvas, opt = {}) {
     addTrees(asset, lod, inst, tex) {
       if (!TP || !inst.length) return [];
       const L_ = asset.lods[lod], H = asset.height, hs = [];
-      hs.push(Object.assign(treeMesh(L_.bark, L_.bark.E, H, 0, inst), { tex: null, cut: 0, lod }));
+      if (L_.bark) hs.push(Object.assign(treeMesh(L_.bark, L_.bark.E, H, 0, inst), { tex: null, cut: 0, lod }));   // (a leaf-only asset: map3d.js's boughs)
       if (L_.leaf) hs.push(Object.assign(treeMesh(L_.leaf, L_.leaf.E, H, 1, inst), { tex, cut: asset.cutoff || .5, lod, gain: asset.gain || 1 }));
       this.trees.push(...hs);
       return hs;
+    },
+    // the 3D maps' terrain (map3d.js): t = { pos, nor, sp, ae, idx (Uint32), pal: 8 linear rgb, k: [4], mist: [4] } or null
+    setTerrain(t) {
+      this.terrain = null; if (!t) return;   // (a theme's terrain stays built while its env is cached: view.js THENV)
+      if (!t.vao) {
+        const vao = gl.createVertexArray(); gl.bindVertexArray(vao); const bufs = [];
+        [[t.pos, 3], [t.nor, 3], [t.sp, 3], [t.ae, 2]].forEach(([arr, n], i) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW); gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, n, gl.FLOAT, false, 0, 0); bufs.push(b); });
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, t.idx, gl.STATIC_DRAW); bufs.push(ib);
+        gl.bindVertexArray(null); t.vao = vao; t.bufs = bufs; t.ni = t.idx.length;
+      }
+      this.terrain = t;
+    },
+    // the 3D maps' water (map3d.js): w = { pos, flow, x, s, idx (Uint32), deep, shal, glow: linear rgb } or null
+    setWater(w) {
+      this.water = null; if (!w || !w.idx.length) return;
+      if (!w.vao) {
+        const vao = gl.createVertexArray(); gl.bindVertexArray(vao); const bufs = [];
+        [[w.pos, 3], [w.flow, 2], [w.x, 3], [w.s, 2]].forEach(([arr, n], i) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW); gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, n, gl.FLOAT, false, 0, 0); bufs.push(b); });
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, w.idx, gl.STATIC_DRAW); bufs.push(ib);
+        gl.bindVertexArray(null); w.vao = vao; w.bufs = bufs; w.ni = w.idx.length;
+      }
+      this.water = w;
+    },
+    drawWater() {
+      const w = this.water; if (!w) return;
+      if (!WATP) WATP = prog(VS_WAT, FS_WAT);
+      const u = WATP.u; gl.useProgram(WATP.p); this.litUniforms(u);
+      gl.uniform3fv(u.uWDeep, w.deep); gl.uniform3fv(u.uWShal, w.shal); gl.uniform3fv(u.uWGlow, w.glow);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+      gl.bindVertexArray(w.vao); gl.drawElements(gl.TRIANGLES, w.ni, gl.UNSIGNED_INT, 0); this.stats.draws++;
+      gl.bindVertexArray(null); gl.depthMask(true); gl.disable(gl.BLEND);
+    },
+    // the worn road under the foes' path: an R8-ish top-down texture (u8 RGBA), rect [x0, z0, 1/w, 1/d]
+    setTerrainPath(u8, w, h, rect) { const t = this.terrain; if (!t) return; t.pathTex = this.dataTex(u8, w, h, t.pathTex); t.pathR = rect; },
+    drawTerrain(shadow) {
+      const t = this.terrain; if (!t || shadow) return;
+      if (!TERP) TERP = prog(VS_TER, FS_TER);
+      const u = TERP.u; gl.useProgram(TERP.p); this.litUniforms(u);
+      gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, t.pathTex || blank); gl.uniform1i(u.uPath, 8); gl.activeTexture(gl.TEXTURE0);
+      gl.uniform4fv(u.uPathR, t.pathR || [0, 0, 0, 0]); gl.uniform3fv(u.uTP, t.pal); gl.uniform4fv(u.uTK, t.k); gl.uniform4fv(u.uTM, t.mist);
+      gl.bindVertexArray(t.vao); gl.drawElements(gl.TRIANGLES, t.ni, gl.UNSIGNED_INT, 0); this.stats.draws++;
+      gl.bindVertexArray(null);
     },
     setInstances(h, inst) { gl.bindBuffer(gl.ARRAY_BUFFER, h.ibuf); gl.bufferData(gl.ARRAY_BUFFER, inst.length ? inst : new Float32Array(6), gl.STATIC_DRAW); h.count = inst.length / 6; },
     // screen-sized painted layer (backdrop / overlay): row 0 of the canvas is the top of the screen
@@ -54255,8 +54452,9 @@ function createRenderer(canvas, opt = {}) {
       gl.activeTexture(gl.TEXTURE1); if (u.uTex) gl.uniform1i(u.uTex, 1);
       for (const t of this.trees) {
         if (t.leaf && !t.tex) continue;
-        if (shadow && (t.lod > 0 || !this.treeShadows)) continue;
+        if (shadow && (t.lod > 0 || !this.treeShadows || t.noShadow)) continue;   // (noShadow: a painted map's framing trees: the painting has its own shadows)
         gl.uniform1f(u.uLeaf, t.leaf); gl.uniform1f(u.uE, t.E); gl.uniform1f(u.uH, t.H); if (u.uCut) gl.uniform1f(u.uCut, t.cut); if (u.uGain) gl.uniform1f(u.uGain, t.gain || 1);
+        if (u.uFade) { const f = t.fade; gl.uniform3f(u.uFade, f ? f[0] : 1e4, f ? f[1] : 1e4 + 1, f ? f[2] || 0 : 0); }
         if (t.leaf) gl.bindTexture(gl.TEXTURE_2D, t.tex);
         if (!t.count) continue;
         gl.bindVertexArray(t.vao); gl.drawElementsInstanced(gl.TRIANGLES, t.ni, t.it, 0, t.count);
@@ -54351,8 +54549,10 @@ function createRenderer(canvas, opt = {}) {
         const h = upload(g.mesh); gl.bindVertexArray(h.vao); ptr(h, g.s * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); dr++;
       }
       this.stats.draws = dr;
+      if (this.terrain) { this.drawTerrain(false); gl.useProgram(L.p); }
       if (anyTex) this.drawSculpted(list);
       if (this.trees.length) { this.drawTrees(false); gl.useProgram(L.p); }
+      if (this.water) { this.drawWater(); gl.useProgram(L.p); }
       if (passes.ground) this.quads(passes.ground, 'alpha', true);
       if (list.some(it => it.alpha != null && it.alpha < 1)) {
         gl.useProgram(L.p); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
@@ -57527,6 +57727,144 @@ const UNIT_TEX = {};
   for (const k in T) { const im = new Image(); im.onload = () => { MAT_SRC = null; }; im.src = T[k]; UNIT_TEX[k] = { img: im }; }
 })();
 
+/* ================= EDGE TREES: giant trunks, canopy boughs and undergrowth that frame a map =================
+   Shared by the painted Sunfall Glade (buildClearingPainted in maps.js: 3D trunks rooted where its painted trunks stand,
+   rising past the top of the view, with boughs and bushes at the frame's edges) and the 3D maps (map3d.js).
+   The trees are the owner's TreeForge exports (tfforge.js, tools/make_tftrees.py): the oak's crown without its trunk for
+   the boughs, its leaf cards for the bushes, flowering shrubs and ferns. The giant trunk is built here in the same format.
+
+   Rule (owner: "canopy should be applied in artful areas, not cover the battle map"): nothing tall stands over the battle
+   map as the 57-degree camera sees it. The camera is orthographic: a world x is a screen column, and a point at height y
+   shows on the screen row of the ground .65 y further up the field. edgeClear tests a thing's screen footprint (a box of
+   half width r from its foot to its top) against the field plus a margin, and against any other rects a map keeps clear
+   (its road). */
+const EDGE_FIELD = [-.7, -2.9, COLS + .7, ROWS + 1.1];   // x0, z0, x1, z1 in screen rows (ground-equivalent z)
+function edgeClear(x, z, r, top, keep) {
+  const z0 = z - .65 * top - r, z1 = z + r, x0 = x - r, x1 = x + r;
+  for (const R of [EDGE_FIELD].concat(keep || [])) if (x1 > R[0] && x0 < R[2] && z1 > R[1] && z0 < R[3]) return false;
+  return true;
+}
+const edgeAsset = n => (typeof TF_FORGE !== 'undefined' && TF_FORGE.find(t => t.name === n)) || null;
+// the oak's crown alone (no trunk): a bough of leaves hung high on a giant
+function edgeBoughAsset() { const src = edgeAsset('oak'); if (!src) return null; return src._leafOnly || (src._leafOnly = Object.assign({}, src, { name: 'oak_bough', lods: src.lods.map(l => ({ leaf: l.leaf, tris: l.leaf.ni / 3 })) })); }
+
+/* ---------- the giant trunk: built here in the TreeForge format, so it draws (instanced) with the trees' shader: moss on
+   its roots, the silver rim, the canopy dissolving overhead. (The TreeForge colossal elder and cloud giant were tried: cut
+   to their trunks and decimated, their limbs came apart into shards at this scale; a TreeForge export of a trunk with its
+   root flares and no crown would drop straight in here.) Model units: height GH, the trunk's radius about 1 at head height. ---------- */
+let EDGE_GIANT = null;
+function edgeGiantAsset() {
+  if (EDGE_GIANT) return EDGE_GIANT;
+  const GH = 30, P = [], N = [], C = [], I = [], rnd = mulberry32(77), R0 = 1.05;   // (a tall bole: it rises past the top of the view)
+  const roots = []; for (let k = 0; k < 7; k++) roots.push(k / 7 * TAU + (rnd() - .5) * .5);
+  const nz = (a, b) => fbm2(a, b) - .5;
+  const rad = (y, th) => {
+    let r = R0 * (1 + .65 * Math.exp(-Math.max(y, 0) / .7)) * (1 - .3 * y / GH) * (1 + .16 * nz(th * 1.6 + 3, y * .55) + .06 * nz(th * 5, y * 2));
+    for (const f of roots) { const c = Math.cos(th - f); if (c > 0) r += R0 * .9 * Math.exp(-Math.max(y, 0) / .9) * c ** 10; }
+    return r;
+  };
+  const bark = (y, th, k) => { const v = .75 + .35 * (nz(th * 7, y * 3.5) + .5) * k; return [.2 * v, .12 * v, .06 * v]; };
+  // the trunk: rings up the bole, twisting a little as it rises
+  const NA = 26, NJ = 44, ys = []; for (let j = 0; j <= NJ; j++) ys.push(-.5 + (GH + .5) * (j / NJ) ** 1.35);
+  const ring = j => { const y = ys[j], tw = y * .09, out = []; for (let i = 0; i <= NA; i++) { const th = i / NA * TAU; const r = rad(y, th); out.push([Math.cos(th + tw) * r, y, Math.sin(th + tw) * r, th]); } return out; };
+  const R = []; for (let j = 0; j <= NJ; j++) R.push(ring(j));
+  const base = 0;
+  for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NA; i++) {
+    const p = R[j][i], pa = R[j][(i + 1) % (NA + 1)], pb = R[Math.min(NJ, j + 1)][i], pc = R[Math.max(0, j - 1)][i], pd = R[j][Math.max(0, i - 1)];
+    const tx = [pa[0] - pd[0], pa[1] - pd[1], pa[2] - pd[2]], ty = [pb[0] - pc[0], pb[1] - pc[1], pb[2] - pc[2]];
+    let n = [ty[1] * tx[2] - ty[2] * tx[1], ty[2] * tx[0] - ty[0] * tx[2], ty[0] * tx[1] - ty[1] * tx[0]]; const l = Math.hypot(...n) || 1; n = n.map(v => v / l);
+    if (n[0] * p[0] + n[2] * p[2] < 0) n = n.map(v => -v);
+    P.push(p[0], p[1], p[2]); N.push(...n); C.push(...bark(p[1], p[3], 1));
+  }
+  for (let j = 0; j < NJ; j++) for (let i = 0; i < NA; i++) { const a = base + j * (NA + 1) + i, b = a + 1, c = a + NA + 1, d = c + 1; I.push(a, c, d, a, d, b); }
+  // buttress roots: tapering tubes from the bole out across the ground, diving in at the end
+  for (const f of roots) {
+    const L = R0 * (1.5 + rnd() * 1.1), S = 9, M = 8, b0 = P.length / 3, bend = (rnd() - .5) * .5;
+    for (let s = 0; s <= S; s++) {
+      const t = s / S, a = f + bend * t, dist = R0 * 1.2 + L * t, cx = Math.cos(a) * dist, cz = Math.sin(a) * dist, cy = .7 * (1 - t) ** 1.6 - .12 * t, rr = R0 * (.55 * (1 - t) ** 1.2 + .06);
+      const fx = Math.cos(a), fz = Math.sin(a), sx = -fz, sz = fx;
+      for (let m = 0; m <= M; m++) {
+        const q = m / M * TAU, cq = Math.cos(q), sq = Math.sin(q), w = rr * (1 + .2 * nz(q * 2 + f, t * 4));
+        const nx = sx * cq, ny = sq * .9, nzz = sz * cq;
+        P.push(cx + nx * w, cy + ny * w * .8, cz + nzz * w); const l = Math.hypot(nx, ny, nzz) || 1; N.push(nx / l, ny / l, nzz / l); C.push(...bark(cy, q + f, .8));
+      }
+    }
+    for (let s = 0; s < S; s++) for (let m = 0; m < M; m++) { const a = b0 + s * (M + 1) + m, b = a + 1, c = a + M + 1, d = c + 1; I.push(a, c, d, a, d, b); }
+  }
+  // pack as tfassets.js does (int16 positions x E, int8 normals, u8 colours, u16/u32 indices, base64)
+  let E = 0; for (const v of P) E = Math.max(E, Math.abs(v)); E *= 1.0001;
+  const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(s); };
+  const pos = new Int16Array(P.length); for (let i = 0; i < P.length; i++) pos[i] = Math.round(P[i] / E * 32767);
+  const nor = new Int8Array(N.length); for (let i = 0; i < N.length; i++) nor[i] = Math.round(clamp(N[i], -1, 1) * 127);
+  const col = new Uint8Array(C.length); for (let i = 0; i < C.length; i++) col[i] = Math.round(clamp(C[i], 0, 1) * 255);
+  const n = P.length / 3, big = n > 65535, idx = big ? new Uint32Array(I) : new Uint16Array(I);
+  const bk = { n, E, pos: b64(new Uint8Array(pos.buffer)), nor: b64(new Uint8Array(nor.buffer)), col: b64(col), idx32: big, idx: b64(new Uint8Array(idx.buffer)), ni: I.length };
+  return (EDGE_GIANT = { name: 'giant', height: GH, wantH: GH, lods: [{ bark: bk, tris: I.length / 3 }] });
+}
+
+// a giant's trunk radius about head height (from its bark mesh, once)
+function edgeTrunkR(g) {
+  if (g.r) return g.r;
+  const b = g.tr.lods[0].bark, bin = atob(b.pos), n = bin.length >> 1, P = new Int16Array(n);
+  for (let i = 0; i < n; i++) P[i] = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8);
+  const k = b.E / 32767 * g.H / g.tr.height, R = [];
+  for (let i = 0; i < n; i += 3) { const y = P[i + 1] * k; if (y > .9 && y < 1.6) R.push(Math.hypot(P[i], P[i + 2]) * k); }
+  R.sort((a, b) => a - b);
+  return (g.r = R.length ? R[Math.floor(R.length * .5)] : g.H * .05);
+}
+// magic curling up the giant trunks (owner: "the magic curling up the tree like in the concept"): teal ribbons spiralling
+// round and rising, fading at the top; a soft glow at the roots. giants: [{ x, z, y, H, tr, magic }]
+function edgeMagic(giants) {
+  for (const g of giants || []) {
+    if (!g.magic) continue;
+    const r = edgeTrunkR(g), wc = [.3, 1, .92];
+    QADD.ground(g.x, g.z, g.y + .04, r * 2.6, r * 2.6, [.2, .9, .85, .18 + .05 * Math.sin(vt * 1.3 + g.x)], 1, 0);
+    for (let k = 0; k < 2; k++) {
+      const ph0 = vt * .55 + k * Math.PI + g.x;
+      for (let i = 0; i < 96; i++) {
+        const u = i / 95, hgt = .1 + u * 5.5, a = ph0 + u * 9.5 - vt * .4, rr = r * (1.05 + .25 * Math.sin(u * 7 + vt + k)) * (1 - u * .35);
+        const al = Math.sin(Math.PI * Math.min(1, u * 1.15)) * (.55 + .45 * Math.sin(vt * 2.3 + i * .4 + k * 2)) * (1 - u * .4);
+        const x = g.x + Math.cos(a) * rr, z = g.z + Math.sin(a) * rr;
+        if (i % 3 === 0) QADD.bill(RD, x, g.y + hgt, z, .42, .42, [wc[0], wc[1], wc[2], .1 * al], 1, 0);   // (the glow round the ribbon, every third point)
+        QADD.bill(RD, x, g.y + hgt, z, .075, .075, [.7, 1, .97, .7 * al], 1, 0);
+      }
+    }
+  }
+}
+
+/* ---------- the painted Sunfall Glade's frame: its trunks in 3D, rising out of view, boughs and bushes at the edges ----------
+   World positions read off assets/clearing/clearing.png on the CL_PAINT_RECT grid: the big trunks' feet (top left, the left
+   edge, the right side and its far edge) and the dark firs down the lower left; the bushes by the painted stones. */
+const CL_EDGE = {
+  giants: [[-5.0, -3.6, 34, 1], [-8.8, -.6, 36, 0], [18.2, 2.8, 36, 1], [19.4, 7.4, 32, 0]],   // x, z, height, magic
+  firs: [[-10.8, 9.2, 5.6], [-10.2, 12.6, 6.2], [-11.4, 15.6, 5.8], [22.6, 14.2, 5.4]],            // x, z, height (TreeForge fir)
+  bushes: [[-6.2, 2.4], [-5.6, 11.4], [16.2, 5.4], [17.4, 12.4]],
+  road: [[3.6, -7, 7.4, -2.4]],   // (the tunnel foes come down, kept clear)
+};
+function buildClearingTrees() {
+  const rnd = mulberry32(1717), inst = new Map(), giants = [];
+  const put = (tr, key, x, y, z, H, lod, extra) => { if (!tr) return; if (!inst.has(key)) inst.set(key, Object.assign({ asset: tr, lod, arr: [] }, extra || {})); inst.get(key).arr.push(x, y, z, H / tr.height, rnd() * TAU, rnd() * 10); };
+  const G_ = edgeGiantAsset();
+  for (const [x, z, H, magic] of CL_EDGE.giants) { put(G_, 'giant', x, -.1, z, H, 0, { fade: [16, 60, .9], noShadow: true }); giants.push({ x, z, y: 0, H, tr: G_, magic }); }
+  const fir = edgeAsset('dfir'); for (const [x, z, H] of CL_EDGE.firs) if (edgeClear(x, z, H * .3, H, CL_EDGE.road)) put(fir, 'fir', x, -.05, z, H, 0, { noShadow: true });
+  // boughs: two or three on each giant, high and out over the frame's edge
+  const bough = edgeBoughAsset();
+  if (bough) for (const g of giants) for (let k = 0; k < 3; k++) {
+    const a = rnd() * TAU, r = 1.2 + rnd() * 2.6, sz = 2 + rnd() * 1.4, rc = sz * .75 + .3, by = 7 + rnd() * 8;
+    const bx = g.x + Math.cos(a) * r, bz = g.z + Math.sin(a) * r;
+    if (edgeClear(bx, bz, rc, by + sz * .7, CL_EDGE.road)) put(bough, 'bough', bx, by - sz * .35, bz, sz, 0, { noShadow: true });
+  }
+  // undergrowth by the painted stones and round the giants' feet
+  const kinds = ['bush', 'fbush', 'fbush'];
+  const spots = CL_EDGE.bushes.slice(); for (const g of giants) for (let k = 0; k < 3; k++) { const a = rnd() * TAU, r = 2 + rnd() * 1.6; spots.push([g.x + Math.cos(a) * r, g.z + Math.sin(a) * r]); }
+  for (const [x, z] of spots) for (let k = 0; k < 1; k++) {
+    const tr = edgeAsset(kinds[(k + (rnd() * 3 | 0)) % 3]); if (!tr) continue;
+    const H = (tr.wantH || 1) * .6 * (.8 + rnd() * .5), px = x + (rnd() - .5) * .8, pz = z + (rnd() - .5) * .8;
+    if (edgeClear(px, pz, H * .45, H, CL_EDGE.road)) put(tr, 'u_' + tr.name, px, 0, pz, H, 0, { noShadow: true });
+  }
+  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade, noShadow: v.noShadow })), giants };
+}
+
 /* ================= MAPS: themes, their 3D surroundings, map light and painted backdrops ================= */
 const MAPS = {
   meadow: { name: 'Kingsmeadow', blurb: 'Sunlit fields' },
@@ -57882,7 +58220,10 @@ function buildClearingPainted() {
   const d = new Geo(73);
   const [x0, z0, wx, wz] = typeof CL_PAINT_RECT !== 'undefined' ? CL_PAINT_RECT : [-12, -7, 36, 24], gr = new Geo(1); gr.jit = 0;
   for (let z = Math.floor(z0 - 6); z < z0 + wz + 6; z += 1) for (let x = Math.floor(x0 - 6); x < x0 + wx + 6; x += 1.5) gr.quad([x, 0, z], [x, 0, z + 1], [x + 1.5, 0, z + 1], [x + 1.5, 0, z], '#2f4a1f');   // grass until the painting has decoded
-  return { ground: gr.finish(), wild: [], deco: d.finish(), trees: [], fx: null };
+  // its trunks in 3D, rising out of view, with boughs and bushes at the frame's edges (edgetrees.js; owner: the trunks going
+  // up past the viewpoint, with some foliage)
+  const et = typeof buildClearingTrees === 'function' && typeof TF_FORGE !== 'undefined' ? buildClearingTrees() : { groups: [], giants: null };
+  return { ground: gr.finish(), wild: [], deco: d.finish(), trees: et.groups, edgeGiants: et.giants, fx: null };
 }
 
 /* ---------- map light: lantern/candle/fire glow baked to a top-down grid ---------- */
@@ -58238,6 +58579,525 @@ function paintMoonwoodFG(cv, C, rnd, sky, M) {
   // a whisper of vignette over everything so the clearing's corners sink into the night
   const v2 = g.createRadialGradient(w / 2, h * .5, Math.min(w, h) * .4, w / 2, h * .5, Math.hypot(w, h) * .6);
   v2.addColorStop(0, 'rgba(2,7,6,0)'); v2.addColorStop(1, 'rgba(2,7,6,.22)'); g.fillStyle = v2; g.fillRect(0, 0, w, h);
+}
+
+/* ================= 3D MAPS: heightfield terrain, TreeForge trees, streams and scatter =================
+   A map drawn fully in 3D instead of on a painting: the play grid (COLS x ROWS, G.blk, the path and flow field) is exactly
+   as on every map, flat at y = 0; the terrain, trees, water and props are a visual layer under and around it.
+   Open one with ?map3d=grove (Mossveil Glade, the Grove's forest glade) or ?map3d=pass (Ironhold's snowy pass, a sketch on
+   the same system). Nothing else changes without the flag.
+
+   One definition a map (M3D_DEFS): its light, terrain palette, the shape of its banks, its trees, stones, streams and
+   lanterns. The layout of Mossveil Glade follows the painted Sunfall Glade (assets/clearing/clearing.png, the same world
+   coordinates as CL_PAINT_RECT): the tunnel of trees foes come out of at the head, mossy standing stones down both
+   flanks, the glowing stream and its falls on the left, the small stream on the right, big trunks in the corners.
+
+   What draws what: gl.js drawTerrain (one mesh, splat-painted in FS_TER), drawWater (FS_WAT), drawTrees (TreeForge trees,
+   instanced, three LODs: tfforge.js from tools/make_tftrees.py), the props as ordinary static meshes (ENV.wild/deco), the
+   lanterns' light baked into the map light (bakeLightMap). Per frame only the worn road (m3dPathWear: when the path
+   changes) and the ambient motes, wisps and spray (m3dFrame).
+
+   Bakeable (docs/design/map3d.md): the terrain's colour and occlusion, the props and the near trees' shadows are all
+   static; only the path wear, the units' shadows, the point lights, the water and the mist move. */
+const M3D_FORCE = (() => { try { const q = new URLSearchParams(location.search).get('map3d'); return q == null ? null : q === 'pass' ? 'pass3d' : 'grove3d'; } catch (e) { return null; } })();
+const M3D_RECT = { x0: -.45, x1: COLS + .45, z0: -TOPM - .75, z1: ROWS + .75 };   // flat ground: the field and its edge
+// the painting's way in (CL_ENTRY): out of the trees at the head, down to the field (the clearing map's own)
+const M3D_ENTRY = typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : [[5.593, -5.439], [5.315, -4.188], [4.99, -3.029], [4.759, -1.987]];
+
+const M3D_DEFS = {
+  grove3d: {
+    name: 'Mossveil Glade', blurb: 'A twilight glade of the elves', seed: 5150,
+    // terrain palette (sRGB): grass dark, grass light, moss, dirt, dirt dark, rock, litter, snow
+    pal: ['#284a20', '#4c7530', '#3c6426', '#7a6650', '#4e4234', '#727466', '#2e3420', '#e8eef4'],   // (owner's target: a lush, bright meadow)
+    k: [99, 0, .82, 1],              // snow line, snow, the woods' darkening, path wear
+    mist: ['#2fb4b0', .05],          // the mist lying in the woods (teal), its strength
+    bank: 1, hill: 1.3, crag: 1.1,   // the banks round the glade: rise, rolling hills, rocky crags
+    water: { deep: '#06303f', shal: '#1b7f8f', glow: '#0f8fa3' },
+    trees: [['oak', .4], ['dfir', .28], ['ponder', .16], ['sprig', .16]],
+    treeH: { oak: 2.5, elder: 3.4, dfir: 3.3, sprig: 2.9, ponder: 3.0 },   // heights in the game (world units)
+    // tree density by distance from the field: the framing band, the open glade with its stones and stream, the deep woods
+    belts: [[1.25, 0], [2.6, .02], [11, .6]],   // (an open glade: the deep woods only far out)
+    // [x, z, size]: the painting's mossy standing stones
+    stones: [[-8.2, -.7, .55], [-2.9, -.5, .5], [-3.3, 1.8, .45], [-5.0, 6.6, .6], [-8.5, 9.0, .5], [-6.8, 11.4, .5], [-9.6, 13.2, .5], [-2.7, 13.9, .45], [-4.3, 15.4, .4],
+      [13.4, -1.1, .45], [15.1, -1.9, .4], [17.5, 3.5, .55], [19.6, 5.9, .5], [19.3, 8.0, .5], [18.2, 9.8, .45], [17.2, 12.8, .55], [13.2, 5.6, .38], [-2.3, 7.4, .36]],
+    // the big trunks in the painting's corners: [x, z, species, height]
+    heroes: [[-11.3, -3.1, 'oak', 4.2], [20.2, .7, 'oak', 4], [-10.8, 12.4, 'dfir', 4.2], [-11.6, 15.6, 'dfir', 4.4], [21, 14.5, 'dfir', 4]],
+    // giant trees framing the field (owner: "make the trees bigger so we see giant trunks"): [x, z, species, height, magic];
+    // their canopies dissolve overhead (fade: from, to, moss), so from the camera they are huge mossy trunks and root flares.
+    // magic: teal wisps curling up the trunk (as in the title painting)
+    // (owner: "fewer, much bigger trees, placed only at the outer framing positions like the painting": the painted glade's
+    // trunks at its corners and right side, each wider than two or three cells, rising out of frame)
+    giants: [[-5.2, -4.6, 'giant', 38, 1], [-9.6, -2.4, 'giant', 34, 0], [17.4, 3.2, 'giant', 40, 1], [18.6, 9.2, 'giant', 36, 0], [14.8, -4.4, 'giant', 34, 1],
+      [-10.6, 14.4, 'giant', 36, 0]],
+    // leafy boughs overhead: leaf-card clusters (the oak's crown without its trunk) hung from the giants, high up and out over
+    // the edges, never over the grid's columns (on screen a world x is a screen column, so x outside the field stays off it)
+    boughs: { sp: 'oak', per: 2, h: [7, 15], size: [2, 3.2] },
+    // undergrowth (tfforge.js: bushes, flowering shrubs and ferns from the TreeForge oak's cards; saplings: small TreeForge
+    // trees) round the edges and between the giants, never on the grid or the road
+    under: { n: 170, mix: [['bush', .26], ['fbush', .22], ['fern', .38], ['sapling', .14]], sapling: ['oak', 'sprig'], k: .6 },
+    giantFade: [16, 60, .9],
+    // streams: points [x, z, width]; falls: [point index, drop]
+    streams: [
+      { pts: [[-10.6, -11], [-10.1, -7.5], [-9.4, -4.8], [-8.6, -2.4], [-8.0, -.2], [-7.6, 1.7], [-7.45, 2.15], [-7.8, 4.2], [-8.8, 6.5], [-10.3, 8.7], [-12.6, 10.6], [-16, 12.4]], w: [.5, .55, .6, .62, .66, .7, .72, .8, .86, .9, .95, 1], falls: [5, 1.0] },
+      { pts: [[15.6, 1.2], [16.6, 4.4], [17.7, 7.6], [18.9, 10.8], [19.8, 13.6], [21.2, 17], [23, 21]], w: [.3, .36, .42, .45, .5, .55, .6], falls: [3, .35] },
+    ],
+    lanterns: [],   // (the owner had the little lamp posts removed)
+    flowers: ['#9b6bdc', '#b98ae8', '#f2efe6', '#e6d7a2', '#7c5bd0'],
+    fern: ['#3f5a26', '#36502a', '#4a6430', '#5a6a2c'],
+    fly: [1, .78, .38],
+  },
+  // Ironhold's snowy pass: the same system, other numbers (a sketch: see docs/design/map3d.md)
+  pass3d: {
+    name: 'Ironhold Pass', blurb: 'A snowbound pass under the peaks', seed: 7301,
+    pal: ['#59614f', '#77806a', '#5d6a4e', '#6e655a', '#4b443d', '#6d7078', '#3f3a33', '#c9d3e0'],
+    k: [.15, 1, .7, 1],
+    mist: ['#9cc4e4', .16],
+    bank: 1.7, hill: 2.2, crag: 2.4,
+    water: { deep: '#1d4660', shal: '#6fb5d0', glow: '#5ab8e0' },
+    trees: [['dfir', .45], ['sprig', .4], ['ponder', .15]],
+    treeH: { dfir: 3.4, sprig: 3, ponder: 3 },
+    belts: [[1.25, .35], [2.6, .12], [7, .75]],
+    stones: [[-2.6, 1.2, .7], [-3.4, 7.5, .8], [-2.4, 13.4, .6], [13.6, 2.5, .75], [14.2, 9.4, .85], [13.4, 14.6, .6], [-6, -2, 1.1], [17.5, -1.5, 1]],
+    heroes: [], giants: [], under: { n: 260, mix: [['bush', .5], ['fern', .2], ['sapling', .3]], sapling: ['sprig', 'dfir'] },
+    streams: [{ pts: [[16, -8], [15.5, -3], [16.4, 2], [17.6, 7], [18.6, 12], [20, 18]], w: [.4, .45, .5, .55, .6, .65], falls: [2, .8] }],
+    lanterns: [[-1.35, 3.2, 1], [-1.4, 10.4, 1], [COLS + 1.35, 6.4, -1], [3.3, -3.4, 1], [7.8, -3.5, -1]],
+    flowers: ['#dfe7ef', '#c8d4e0'],
+    fern: ['#5b6650', '#4c5744'],
+    fly: [1, .85, .6],
+  },
+};
+// the light for each 3D map (the per-map light table: maps.js LIGHT_DEF)
+if (typeof LIGHT_DEF !== 'undefined') {
+  // a full-moon night in the elves' glade, not dark: silver-blue moonlight, a bluey-purple haze (as Sunfall Glade on playbuild);
+  // the teal glow is the water's and the wisps' own
+  LIGHT_DEF.grove3d = { sun: '#fff0d6', sunI: 1.45, az: 215, el: 48, rim: .2, fill: .12, ground: 1, paint: 1, sky: '#b4cdf2', skyI: .5, gnd: '#7a8a5a', gndI: .2, fog: '#3c5a6e', fogNear: .97, woods: .3, lamps: 1, expo: 1.0, rays: 1.3, ray: '#fff1cc' };   // (owner's target image: bright and readable, soft sun shafts from the upper left)
+  // the pass at dusk: a pale cold sun, blue snow light
+  LIGHT_DEF.pass3d = { sun: '#ffe2c4', sunI: 1.45, az: 150, el: 36, rim: .25, fill: .2, ground: 1, paint: 1, sky: '#8fb2e0', skyI: .7, gnd: '#8a9bb0', gndI: .3, fog: '#5d7590', fogNear: .97, woods: .4, lamps: 1.2, expo: 1.0, rays: 0, ray: '#cfe4ff' };
+}
+if (typeof MAP_MOOD !== 'undefined') {
+  MAP_MOOD.grove3d = { top: '#b4c8ff', topK: .16, key: '#fff0d8', keyK: .1, bounce: '#9cb456', bounceK: .14, env: .35 };   // (env: the 3D ground and trees take a share of it)
+  MAP_MOOD.pass3d = { top: '#a8c0ff', topK: .22, key: '#fff0e0', keyK: .1, bounce: '#9aa8c8', bounceK: .14, env: .45 };
+}
+const m3dLin = h => lin3(h);
+let M3D = null;   // the map being built / shown: its definition plus its built streams (for the height function)
+
+/* ---------- the shape of the land ---------- */
+function m3dRoadX(z) { if (z >= -2) return 4.76; const t = Math.min(1, (-2 - z) / 4); return 4.76 + (5.6 - 4.76) * t + Math.sin((-2 - z) * .3) * .5 * Math.max(0, (-6 - z) / 6); }
+function m3dOut(x, z) {   // how far a point lies outside the open ground (the field, its head and the road into the trees)
+  const dx = Math.max(M3D_RECT.x0 - x, 0, x - M3D_RECT.x1), dz = Math.max(M3D_RECT.z0 - z, 0, z - M3D_RECT.z1);
+  let d = Math.hypot(dx, dz);
+  if (z > ROWS) d = Math.min(d, Math.max(0, Math.abs(x - 5.5) - 1.3));   // the way out at the foot
+  return d;
+}
+function m3dNat(x, z) {   // the land before the streams carve it
+  const D = M3D, d = m3dOut(x, z);
+  if (d <= 0) return 0;
+  const n = fbm2(x * .19 + 3, z * .19 + 11), c = fbm2(x * .33 + 9, z * .33 + 2);
+  let h = D.bank * (m3dSs(0, 1.5, d) * .45 + Math.max(0, d - 1) * .36);
+  h += (n - .42) * D.hill * Math.min(1, d * .3);
+  h += m3dSs(.6, .78, c) * D.crag * Math.min(1, d * .35);
+  return h;
+}
+function m3dSs(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+// the streams: resampled centre lines with their water level; the land is carved round them
+function m3dBuildStreams(D) {
+  const out = [];
+  for (const S of D.streams) {
+    const P = S.pts, smp = [];
+    // Catmull-Rom through the points, ~.2 apart
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+      const L = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]), n = Math.max(2, Math.ceil(L / .2));
+      for (let k = 0; k < n; k++) {
+        const t = k / n, t2 = t * t, t3 = t2 * t;
+        const cr = (a, b, c, d) => .5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+        smp.push({ x: cr(p0[0], p1[0], p2[0], p3[0]), z: cr(p0[1], p1[1], p2[1], p3[1]), w: S.w[i] + (S.w[i + 1] - S.w[i]) * t, seg: i, t });
+      }
+    }
+    const last = P[P.length - 1]; smp.push({ x: last[0], z: last[1], w: S.w[S.w.length - 1], seg: P.length - 1, t: 0 });
+    // water level: the land along the way, never rising downstream, plus the drop at the falls
+    let lo = 1e9; const fi = S.falls ? S.falls[0] : -1, drop = S.falls ? S.falls[1] : 0;
+    for (const s of smp) { const h = Math.min(m3dNat(s.x, s.z), m3dNat(s.x + .6, s.z), m3dNat(s.x - .6, s.z)); lo = Math.min(lo, h - .32); s.y = lo; }
+    // smooth the level a little, then add the falls' drop upstream of them
+    for (let it = 0; it < 4; it++) for (let i = 1; i < smp.length - 1; i++) smp[i].y = Math.min(smp[i - 1].y, (smp[i - 1].y + smp[i].y + smp[i + 1].y) / 3);
+    for (const s of smp) { s.fall = 0; if (fi >= 0 && s.seg < fi) s.y += drop; if (fi >= 0 && s.seg === fi) { s.y += drop * (1 - m3dSs(.0, .55, s.t)); s.fall = s.t < .55 ? 1 : 0; } }
+    for (let i = 0; i < smp.length; i++) { const a = smp[Math.max(0, i - 1)], b = smp[Math.min(smp.length - 1, i + 1)], l = Math.hypot(b.x - a.x, b.z - a.z) || 1; smp[i].dx = (b.x - a.x) / l; smp[i].dz = (b.z - a.z) / l; }
+    let acc = 0; for (let i = 0; i < smp.length; i++) { if (i) acc += Math.hypot(smp[i].x - smp[i - 1].x, smp[i].z - smp[i - 1].z, smp[i].y - smp[i - 1].y); smp[i].s = acc; }
+    out.push({ smp, falls: S.falls });
+  }
+  return out;
+}
+// the nearest stream sample to a point: { d, s (sample), st (stream) } or null when none is near
+function m3dNearStream(x, z, R = 3) {
+  let best = null;
+  for (const st of M3D.streamsB) for (const s of st.smp) { const dx = x - s.x, dz = z - s.z; if (Math.abs(dx) > R || Math.abs(dz) > R) continue; const d = Math.hypot(dx, dz) - s.w; if (!best || d < best.d) best = { d, s, st }; }
+  return best;
+}
+/* the ravine foes come up (owner: "make the monsters come up a ravine so they are getting ambushed and don't have a clear
+   sight of the enemy"): a narrow gully along their way in, its floor climbing from well below the glade up to the field's
+   head, its sides steep rock (the terrain paints them rock by their slope), roots and the giants' boughs over it. The foes'
+   way and timing are the walk-in map's own (CL_ENTRY); only their height follows the floor (view.js creepBaseY). */
+const M3D_RAV = { top: -2.35, w: .8, wall: 3.6, fall: .55, deep: 1.9, end: -8.6 };
+function m3dRavFloor(z) { return z >= M3D_RAV.top ? 0 : -Math.min(M3D_RAV.deep, (M3D_RAV.top - z) * M3D_RAV.fall) * m3dSs(0, 1.2, M3D_RAV.top - z) ** .5; }
+function m3dRavine(x, z, h) {
+  if (z > M3D_RAV.top + .6) return h;
+  const cx = m3dRoadX(z), d = Math.abs(x - cx) + (fbm2(x * .9, z * .9) - .5) * .35, fl = m3dRavFloor(z);
+  const wall = fl + Math.max(0, d - M3D_RAV.w) * M3D_RAV.wall + (d > M3D_RAV.w ? (fbm2(x * 2.3 + 4, z * 2.3) - .5) * .25 : (fbm2(x * 3, z * 3) - .5) * .06);
+  const k = (z > M3D_RAV.top ? m3dSs(M3D_RAV.top + .6, M3D_RAV.top, z) : 1) * m3dSs(M3D_RAV.end - 1.6, M3D_RAV.end, z);   // (fades out at the head, onto the flat, and closes at its far end in the woods)
+  return Math.min(h, h + (wall - h) * k);
+}
+function m3dH(x, z) {
+  return m3dRavine(x, z, m3dH0(x, z));
+}
+function m3dH0(x, z) {
+  const h0 = m3dNat(x, z);
+  if (!M3D.streamsB || h0 <= 0) return h0;
+  const ns = m3dNearStream(x, z, 2.6); if (!ns) return h0;
+  const W = ns.s.y, w = ns.s.w, dc = ns.d + w;   // dc: distance from the centre line
+  if (dc < w) return W - .3 * (1 - (dc / w) ** 2) - .04;   // the bed
+  const bankH = Math.max(h0, W + .22), t = m3dSs(w, w + .35, dc), k = m3dSs(w + .35, w + 1.9, dc);
+  const h = (W + .1) + (bankH - W - .1) * t;
+  return h + (h0 - h) * k;
+}
+
+/* ---------- the terrain mesh: heights, splat weights, occlusion ---------- */
+function m3dTerrain(D, trees) {
+  const x0 = -18, x1 = COLS + 18, z0 = -20, z1 = ROWS + 14, st = .3;
+  const nx = Math.round((x1 - x0) / st), nz = Math.round((z1 - z0) / st), NV = (nx + 1) * (nz + 1);
+  const H = new Float32Array(NV), pos = new Float32Array(NV * 3), nor = new Float32Array(NV * 3), sp = new Float32Array(NV * 3), ae = new Float32Array(NV * 2);
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) { const k = j * (nx + 1) + i, x = x0 + i * st, z = z0 + j * st; H[k] = m3dH(x, z); pos[k * 3] = x; pos[k * 3 + 1] = H[k]; pos[k * 3 + 2] = z; }
+  const at = (i, j) => H[Math.min(nz, Math.max(0, j)) * (nx + 1) + Math.min(nx, Math.max(0, i))];
+  // canopy: how much tree stands over each spot (darker, littered ground under the trees)
+  const cw = Math.ceil((x1 - x0) / .6), ch = Math.ceil((z1 - z0) / .6), can = new Float32Array(cw * ch);
+  for (const t of trees) { const r = t.r, ci = Math.round((t.x - x0) / .6), cj = Math.round((t.z - z0) / .6), R = Math.ceil(r / .6);
+    for (let b = -R; b <= R; b++) for (let a = -R; a <= R; a++) { const ii = ci + a, jj = cj + b; if (ii < 0 || jj < 0 || ii >= cw || jj >= ch) continue; const d = Math.hypot(a, b) * .6 / r; if (d < 1) can[jj * cw + ii] += (1 - d * d) * .7; } }
+  const canAt = (x, z) => { const ii = Math.round((x - x0) / .6), jj = Math.round((z - z0) / .6); return ii < 0 || jj < 0 || ii >= cw || jj >= ch ? 0 : Math.min(1, can[jj * cw + ii]); };
+  const roadPts = [];
+  for (let z = -16; z < -1; z += .3) roadPts.push([m3dRoadX(z), z]);
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+    const k = j * (nx + 1) + i, x = x0 + i * st, z = z0 + j * st, h = H[k];
+    let n0 = at(i - 1, j) - at(i + 1, j), n2 = at(i, j - 1) - at(i, j + 1), l = Math.hypot(n0, 2 * st, n2);
+    nor[k * 3] = n0 / l; nor[k * 3 + 1] = 2 * st / l; nor[k * 3 + 2] = n2 / l;
+    // occlusion: hollows (lower than the land around), the foot of slopes, under the canopy
+    let avg = 0, cnt = 0; for (const [a, b] of [[-3, 0], [3, 0], [0, -3], [0, 3], [-2, -2], [2, 2], [-2, 2], [2, -2]]) { avg += at(i + a, j + b); cnt++; } avg /= cnt;
+    const cav = Math.max(0, avg - h), cp = canAt(x, z);
+    let ao = clamp(1 - cav * .55, .5, 1) * (1 - cp * .38);
+    const out = m3dOut(x, z);
+    // splat: road (the way in from the trees, the way out at the foot), moss (the field's margins, under trees, by water), rock (crags)
+    let road = 0;
+    if (z < -1.2) { let dmin = 9; for (const p of roadPts) { const d = Math.hypot(x - p[0], z - p[1]); if (d < dmin) dmin = d; } road = clamp((1.0 + (fbm2(x * 1.3, z * 1.3) - .5) * .6 - dmin) * 1.6, 0, 1) * m3dSs(-1.2, -2.4, z); }
+    if (z > ROWS - .3) road = Math.max(road, clamp((1.0 + (fbm2(x * 1.3, z * 1.3) - .5) * .6 - Math.abs(x - 5.5)) * 1.6, 0, 1) * m3dSs(ROWS - .3, ROWS + .5, z));
+    const ns = M3D.streamsB.length ? m3dNearStream(x, z, 2.2) : null, wet = ns ? 1 - m3dSs(0, 1.6, ns.d) : 0;
+    let moss = clamp(m3dSs(.2, 1.4, out) * (1 - m3dSs(3, 6, out)) + cp * .6 + wet * .8, 0, 1);
+    let rock = clamp(m3dSs(.62, .8, fbm2(x * .33 + 9, z * .33 + 2)) * Math.min(1, out * .4) * 1.3, 0, 1);
+    if (ns && ns.d < .25) rock = Math.max(rock, .55 * (1 - m3dSs(-.2, .25, ns.d)));   // pebbled stream bed
+    sp[k * 3] = road; sp[k * 3 + 1] = moss; sp[k * 3 + 2] = rock;
+    ae[k * 2] = ao; ae[k * 2 + 1] = out <= 0 ? 0 : out / 1.4 + cp * .6;
+  }
+  const idx = new Uint32Array(nx * nz * 6); let q = 0;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx[q++] = a; idx[q++] = c; idx[q++] = d; idx[q++] = a; idx[q++] = d; idx[q++] = b; }
+  const pal = new Float32Array(24); D.pal.forEach((h, i) => pal.set(m3dLin(h), i * 3));
+  const mc = m3dLin(D.mist[0]);
+  return { pos, nor, sp, ae, idx, pal, k: new Float32Array(D.k), mist: new Float32Array([mc[0], mc[1], mc[2], D.mist[1]]) };
+}
+
+/* ---------- water: one ribbon a stream (5 across), the falls a steep stretch of it ---------- */
+function m3dWater(D) {
+  const pos = [], flow = [], X = [], S = [], idx = [];
+  for (const st of M3D.streamsB) {
+    const smp = st.smp, base = pos.length / 3, AC = [-1, -.5, 0, .5, 1];
+    for (const s of smp) {
+      const px = -s.dz, pz = s.dx, sp = .55 + s.fall * 1.6;
+      for (const a of AC) {
+        const x = s.x + px * a * s.w * 1.02, z = s.z + pz * a * s.w * 1.02;
+        pos.push(x, s.y + .02, z); flow.push(s.dx * sp, s.dz * sp);
+        const foamFall = st.falls && s.seg === st.falls[0] && s.t > .4 && s.t < 1 ? 1 - (s.t - .4) / .6 : st.falls && s.seg === st.falls[0] + 1 && s.t < .4 ? .6 * (1 - s.t / .4) : 0;
+        X.push(1 - Math.abs(a), foamFall, s.fall); S.push(a, s.s);
+      }
+    }
+    for (let i = 0; i < smp.length - 1; i++) for (let c = 0; c < 4; c++) { const a = base + i * 5 + c, b = a + 1, d = a + 5, e = d + 1; idx.push(a, d, e, a, e, b); }
+  }
+  const W = D.water;
+  return { pos: new Float32Array(pos), flow: new Float32Array(flow), x: new Float32Array(X), s: new Float32Array(S), idx: new Uint32Array(idx), deep: m3dLin(W.deep), shal: m3dLin(W.shal), glow: m3dLin(W.glow) };
+}
+
+/* ---------- what may stand where: nothing over the battle map as the camera sees it ----------
+   The camera is orthographic at 57 degrees, looking up the field (-z): a world x is a screen column, and a point at height
+   y shows on the screen row of the ground .65 y further up the field (cos 57 / sin 57). A tree, bough or bush is a box of
+   half width r from its foot (x, z) up to its top; its screen footprint must miss the field (plus a margin) and the
+   ravine's floor where foes climb into view. (Owner: "canopy should be applied in artful areas, not cover the battle map".) */
+const M3D_KEEP = [[-.7, -2.9, COLS + .7, ROWS + 1.1]];   // screen-space rects: x0, z0, x1, z1 (ground-equivalent rows)
+function m3dClear(x, z, r, top) {
+  const z0 = z - .65 * top - r, z1 = z + r, x0 = x - r, x1 = x + r;
+  for (const R of M3D_KEEP) if (x1 > R[0] && x0 < R[2] && z1 > R[1] && z0 < R[3]) return false;
+  for (let zz = -2.6; zz > -9; zz -= .5) { const cx = m3dRoadX(zz); if (x1 > cx - 1.3 && x0 < cx + 1.3 && z1 > zz - .25 && z0 < zz + .25 && zz > -6.8) return false; }   // (the ravine's floor in view)
+  return true;
+}
+/* ---------- trees: dense in the woods, none over the grid ---------- */
+function m3dTrees(D, rnd) {
+  const pool = typeof TF_FORGE !== 'undefined' && TF_FORGE.length ? TF_FORGE : typeof TF_TREES !== 'undefined' ? TF_TREES : [];
+  const byName = n => pool.find(t => t.name === n) || pool[0];
+  const pick = () => { let r = rnd(), acc = 0; for (const [n, w] of D.trees) { acc += w; if (r < acc) return byName(n); } return byName(D.trees[0][0]); };
+  const placed = [], inst = new Map();
+  const add = (tr, x, z, H, lod) => {
+    if (!tr) return;
+    const key = tr.name + '|' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [] });
+    inst.get(key).arr.push(x, m3dH(x, z) - .06, z, H / tr.height, rnd() * TAU, rnd() * 10);
+    placed.push({ x, z, r: H * .32 });
+  };
+  const blocked = (x, z, r) => {
+    for (const s of D.stones) if ((s[0] - x) ** 2 + (s[1] - z) ** 2 < (s[2] + r) ** 2) return true;
+    const ns = m3dNearStream(x, z, 2); if (ns && ns.d < .35) return true;
+    return false;
+  };
+  for (const [x, z, n, H] of D.heroes) if (m3dClear(x, z, H * .38, H)) add(byName(n), x, z, H, 0);
+  const giants = [];
+  for (const [x, z, n, H, magic] of D.giants || []) {
+    const tr = n === 'giant' ? edgeGiantAsset() : byName(n); if (!tr) continue;
+    const key = tr.name + '|giant'; if (!inst.has(key)) inst.set(key, { asset: tr, lod: 0, arr: [], fade: D.giantFade });
+    const rot = rnd() * TAU; inst.get(key).arr.push(x, m3dH(x, z) - .15, z, H / tr.height, rot, rnd() * 10);
+    placed.push({ x, z, r: 2.4 }); giants.push({ x, z, H, magic, tr, rot, y: m3dH(x, z) });
+  }
+  if (D.boughs && giants.length) {   // the canopy hanging in from the frame: leaf clusters high on the giants
+    const src = byName(D.boughs.sp), B = D.boughs;
+    if (src) {
+      const leafOnly = src._leafOnly || (src._leafOnly = Object.assign({}, src, { name: src.name + '_bough', lods: src.lods.map(l => ({ leaf: l.leaf, tris: l.leaf.ni / 3 })) }));
+      const arr = []; inst.set('bough', { asset: leafOnly, lod: 0, arr });
+      for (const g of giants) for (let k = 0; k < B.per; k++) {
+        const side = g.x < 5.5 ? -1 : 1, a = rnd() * TAU, r = 1.2 + rnd() * 2.8;
+        let bx = g.x + Math.cos(a) * r; const bz = g.z + Math.sin(a) * r;
+        const sz = B.size[0] + rnd() * (B.size[1] - B.size[0]), by = g.y + B.h[0] + rnd() * (B.h[1] - B.h[0]);
+        const rc = sz * .75 + .3;   // (the crown's half width: on screen a world x is a screen column, so the whole crown stays off the grid's columns)
+        if (bz > -3.5) bx = side < 0 ? Math.min(bx, -.4 - rc) : Math.max(bx, COLS + .4 + rc);
+        if (!m3dClear(bx, bz, rc, by + sz * .7)) continue;
+        arr.push(bx, by - sz * .35, bz, sz / src.height, rnd() * TAU, rnd() * 10);
+      }
+    }
+  }
+  let near = 0;
+  for (let z = -18; z < ROWS + 12; z += .95) for (let x = -17; x < COLS + 17; x += .95) {
+    const px = x + (rnd() - .5) * .8, pz = z + (rnd() - .5) * .8, out = m3dOut(px, pz);
+    // keep clear of the grid and its edge (a tree's crown overhangs it), the foot (trees there would stand over the last rows)
+    if (out < 1.25) continue;
+    if (pz > ROWS - 1.5 && px > -2.6 && px < COLS + 2.6 && pz < ROWS + 6) continue;
+    if (D.heroes.some(h => (h[0] - px) ** 2 + (h[1] - pz) ** 2 < 2.2) || (D.giants || []).some(h => (h[0] - px) ** 2 + (h[1] - pz) ** 2 < 9)) continue;
+    if (blocked(px, pz, .3)) continue;
+    if (pz < -1.6 && Math.abs(px - m3dRoadX(pz)) < 2.1) continue;   // (the ravine stays open from above)
+    const glade = fbm2(px * .16 + 4, pz * .16 + 8);   // open glades among the woods
+    let p = 0; for (const [d0, pp] of D.belts) if (out >= d0) p = pp;
+    if (pz < -2.6) p = Math.max(p, .85);   // the tunnel of trees at the head
+    p *= glade > .64 ? .3 : 1;
+    if (rnd() > p) continue;
+    const tr = pick(); if (!tr) continue;
+    const H = ((D.treeH && D.treeH[tr.name]) || tr.wantH || 3) * (.78 + rnd() * .45) * (out < 3 ? .9 : 1.05);
+    if (!m3dClear(px, pz, H * .38, H)) continue;
+    const lod = out < 5.5 && pz > -9 && near < 260 ? 0 : out < 10 ? 1 : 2; if (lod === 0) near++;
+    add(tr, px, pz, H, Math.min(lod, (tr.lods.length || 1) - 1));
+  }
+  // undergrowth
+  if (D.under) {
+    const U = D.under, pickU = () => { let r = rnd(), acc = 0; for (const [n, w] of U.mix) { acc += w; if (r < acc) return n; } return U.mix[0][0]; };
+    let tries = 0, made = 0;
+    const put = (tr, x, z, H, lod) => { const key = tr.name + '|u' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [] }); inst.get(key).arr.push(x, m3dH(x, z) - .03, z, H / tr.height, rnd() * TAU, rnd() * 10); };
+    for (const g of giants) for (let k = 0; k < 6; k++) {   // foliage gathered round each giant's foot
+      const a = rnd() * TAU, r = edgeTrunkR(g) * (1.4 + rnd() * 1.6), x = g.x + Math.cos(a) * r, z = g.z + Math.sin(a) * r;
+      const tr = pool.find(t => t.name === ['bush', 'fbush', 'fern'][k % 3]); if (!tr) continue;
+      const H = (tr.wantH || 1) * (D.under.k || 1) * (.9 + rnd() * .6);
+      if (m3dOut(x, z) < 1 || !m3dClear(x, z, H * .45, H) || blocked(x, z, .1)) continue;
+      put(tr, x, z, H, 0);
+    }
+    while (made < U.n && tries++ < U.n * 8) {
+      const x = -11 + rnd() * (COLS + 22), z = -9 + rnd() * (ROWS + 12), out = m3dOut(x, z);
+      if (out < 1 || out > 9 || rnd() > .35 + out * .08) continue;
+      if (z < -1.6 && Math.abs(x - m3dRoadX(z)) < M3D_RAV.w + .5) continue;   // (not on the ravine's floor)
+      if (z > ROWS - .3 && Math.abs(x - 5.5) < 1.6) continue;   // (nor the road out)
+      if (blocked(x, z, .15)) continue;
+      if (giants.some(g => (g.x - x) ** 2 + (g.z - z) ** 2 < 1.6)) continue;
+      const kind = pickU(); let tr, H;
+      if (kind === 'sapling') { tr = byName(U.sapling[rnd() * U.sapling.length | 0]); H = .9 + rnd() * .8; }
+      else { tr = pool.find(t => t.name === kind); if (!tr) continue; H = (tr.wantH || 1) * (U.k || 1) * (.7 + rnd() * .6); }
+      if (!tr || !m3dClear(x, z, H * .45, H)) continue;
+      const lod = out < 5 ? 0 : Math.min(1, tr.lods.length - 1);
+      const key = tr.name + '|u' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [] });
+      inst.get(key).arr.push(x, m3dH(x, z) - .03, z, H / tr.height, rnd() * TAU, rnd() * 10);
+      made++;
+    }
+  }
+  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade })), placed, giants };
+}
+
+/* ---------- props: standing stones, logs, lanterns, ferns, flowers, grass ---------- */
+function m3dStone(g, x, z, s, rnd, D) {
+  const y = m3dH(x, z), pal = D.id === 'pass3d' ? ['#7d8088', '#6f727a', '#888b93'] : ['#6b705a', '#5f654f', '#787c64', '#596048'];
+  g.smooth = 50;
+  g.with(T(x, 0, z, rnd() * TAU), () => g.rock(0, y + s * .45, 0, s * 1.15, s * .85, s, { seed: rnd() * 90, lump: .18, terrace: s * .35, base: .2, detail: 2, pal }));   // (big round mossy boulders, as in the owner's target)
+  g.smooth = false;
+  // a skirt of smaller stones and moss at its foot
+  for (let k = 0; k < 3; k++) { const a = rnd() * TAU, r = s * (.9 + rnd() * .5); g.rock(x + Math.cos(a) * r, m3dH(x + Math.cos(a) * r, z + Math.sin(a) * r) + .05, z + Math.sin(a) * r, s * (.18 + rnd() * .16), s * (.12 + rnd() * .1), s * (.18 + rnd() * .14), { seed: rnd() * 90, lump: .35, detail: 1, pal }); }
+}
+function m3dLantern(g, x, z, face, rnd, FX) {
+  // an elven lantern: a slender curved post of pale wood, a leaf-capped lantern hung from its crook
+  const y0 = m3dH(x, z), wood = '#8a7a5c', woodD = '#5e5038';
+  g.rock(x, y0 + .03, z, .13, .07, .13, { seed: rnd() * 40, lump: .3, detail: 1, pal: ['#5d625a', '#545950', '#676c63'] });
+  let px = x, py = y0, pz = z;
+  for (let k = 0; k < 6; k++) { const u = (k + 1) / 6, nx = x + face * Math.sin(u * 1.4) * .32 * u, ny = y0 + u * 1.35; g.seg([px, py, pz], [nx, ny, pz], .07 * (1 - u * .45), k % 2 ? wood : woodD); px = nx; py = ny; }
+  g.seg([px, py, pz], [px + face * .18, py - .05, pz], .03, woodD);
+  const lx = px + face * .2, ly = py - .3;
+  g.seg([lx, py - .05, z], [lx, ly + .1, z], .01, '#2a2620');
+  g.with(T(lx, ly + .075, z), () => { g.cyl(0, 0, 0, .09, .0, .09, 6, '#3d5a2a'); });   // a leaf cap
+  g.em = .95; g.ico(lx, ly, z, .065, '#ffc070', 0, 1.25); g.em = 0;
+  FX.glows.push([lx, ly, z, .9]);
+  FX.lights.push({ x: lx, y: ly, z, col: [1, .62, .28], I: 1.5, R: 2.6 });
+}
+function m3dFern(g, x, z, s, rnd, col) {
+  const y0 = m3dH(x, z); g.sway = .9;
+  for (let f = 0; f < 7; f++) {
+    const a = f / 7 * TAU + rnd() * .5, L = s * (.32 + rnd() * .2), ex = x + Math.cos(a) * L, ez = z + Math.sin(a) * L;
+    for (let k = 0; k < 4; k++) {
+      const u0 = k / 4, u1 = (k + 1) / 4, px = x + (ex - x) * u0, pz = z + (ez - z) * u0, qx = x + (ex - x) * u1, qz = z + (ez - z) * u1;
+      const hy = y0 + Math.sin(u0 * Math.PI * .8) * s * .24, hy1 = y0 + Math.sin(u1 * Math.PI * .8) * s * .24, wd = s * .09 * (1 - u0 * .7);
+      g.tri([px - Math.sin(a) * wd, hy, pz + Math.cos(a) * wd], [qx, hy1, qz], [px + Math.sin(a) * wd, hy, pz - Math.cos(a) * wd], col);
+    }
+  }
+  g.sway = 0;
+}
+function m3dTuft(g, x, z, rnd, cols, hmul = 1) {
+  const y = m3dH(x, z), c = cols[rnd() * cols.length | 0];
+  for (let b = 0; b < 4; b++) { const a = rnd() * TAU, h = (.09 + rnd() * .12) * hmul; g.tri([x + Math.cos(a) * .045, y, z + Math.sin(a) * .045], [x - Math.cos(a) * .045, y, z - Math.sin(a) * .045], [x + (rnd() - .5) * .12, y + h, z + (rnd() - .5) * .12], c, y); }
+}
+function m3dFlower(g, x, z, rnd, col, spike) {
+  const y = m3dH(x, z);
+  if (spike) {   // a lupine spike: a stem of little bells
+    g.sway = .8; g.seg([x, y, z], [x, y + .28, z], .012, '#3e5a26');
+    g.em = .12; for (let k = 0; k < 5; k++) g.ico(x + (rnd() - .5) * .02, y + .1 + k * .045, z + (rnd() - .5) * .02, .022 - k * .003, col); g.em = 0; g.sway = 0;
+  } else { g.sway = .6; g.em = .15; g.ico(x, y + .05 + rnd() * .04, z, .016, col); g.em = 0; g.sway = 0; }
+}
+function m3dLog(g, x, z, a, L, rnd) {
+  const y = m3dH(x, z), ex = x + Math.cos(a) * L, ez = z + Math.sin(a) * L;
+  g.matWith('wood', .8, () => g.seg([x, y + .12, z], [ex, m3dH(ex, ez) + .1, ez], .2, '#4a3a28'));
+  for (let k = 0; k < 3; k++) { const u = rnd(); g.ico(x + (ex - x) * u, y + .22, z + (ez - z) * u, .1, '#3f5d2a', .5, .5); }
+}
+function m3dProps(D, rnd, FX) {
+  const gs = new Geo(D.seed + 1); gs.jit = .06;   // stones, logs (cast shadows)
+  const gl_ = new Geo(D.seed + 2); gl_.jit = .05;   // lanterns (cast shadows)
+  const gp = new Geo(D.seed + 3); gp.jit = .12;   // ferns, grass, flowers (no shadow)
+  for (const [x, z, s] of D.stones) m3dStone(gs, x, z, s, rnd, D);
+  for (const [x, z, f] of D.lanterns) m3dLantern(gl_, x, z, f, rnd, FX);
+  // boulders at the falls' lips and along the banks
+  for (const st of M3D.streamsB) for (let i = 0; i < st.smp.length; i += 5) {
+    const s = st.smp[i]; if (rnd() < .45 && !s.fall) continue;
+    const side = rnd() < .5 ? -1 : 1, r = s.w + .2 + rnd() * .3, x = s.x - s.dz * side * r, z = s.z + s.dx * side * r, sz = .16 + rnd() * .22 + s.fall * .25;
+    gs.rock(x, m3dH(x, z) + sz * .35, z, sz * 1.2, sz * .8, sz, { seed: rnd() * 90, lump: .32, detail: 1, pal: ['#5a5e58', '#4f534e', '#646861'] });
+  }
+  for (let z = -2.8; z > -11; z -= .55) for (const sd of [-1, 1]) {   // roots crawling over the ravine's lips and hanging down its walls
+    if (rnd() < .35) continue;
+    const cx = m3dRoadX(z), lx = cx + sd * (M3D_RAV.w + 1.3 + rnd() * .5), ly = m3dH(lx, z), dx = cx + sd * (M3D_RAV.w + .25), dy = m3dRavFloor(z) + .4 + rnd() * .6;
+    gs.seg([lx + sd * .5, ly + .05, z + (rnd() - .5) * .3], [lx, ly + .02, z], .08 + rnd() * .05, '#3b2c1f');
+    gs.seg([lx, ly + .02, z], [dx, dy, z + (rnd() - .5) * .4], .05 + rnd() * .04, '#33261a');
+  }
+  for (let k = 0; k < 10; k++) { const x = rnd() < .5 ? -2 - rnd() * 8 : COLS + 2 + rnd() * 8, z = -2 + rnd() * (ROWS + 2); if (m3dNearStream(x, z, 2) && m3dNearStream(x, z, 2).d < .8) continue; m3dLog(gs, x, z, rnd() * TAU, .8 + rnd() * .9, rnd); }
+  // round each standing stone: golden ferns, flower spikes, grass
+  for (const [x, z, s] of D.stones) {
+    for (let k = 0; k < 3; k++) { const a = rnd() * TAU, r = s + .25 + rnd() * .6; m3dFern(gp, x + Math.cos(a) * r, z + Math.sin(a) * r, .7 + rnd() * .6, rnd, D.fern[rnd() * D.fern.length | 0]); }
+    for (let k = 0; k < 9; k++) { const a = rnd() * TAU, r = s + .2 + rnd() * .9; m3dFlower(gp, x + Math.cos(a) * r, z + Math.sin(a) * r, rnd, D.flowers[rnd() * D.flowers.length | 0], rnd() < .55); }
+  }
+  // the woods' floor and the field's margins: ferns, grass, flowers
+  const gc = ['#4d7a34', '#5a8a3a', '#43702e', '#668f40'];
+  for (let n = 0; n < 700; n++) {
+    const x = -12 + rnd() * (COLS + 24), z = -9 + rnd() * (ROWS + 13), out = m3dOut(x, z);
+    if (out <= .05 || out > 9) continue;
+    const ns = m3dNearStream(x, z, 1.5); if (ns && ns.d < .1) continue;
+    const q = rnd();
+    if (q < .1 && out > .6) m3dFern(gp, x, z, .6 + rnd() * .7, rnd, D.fern[rnd() * D.fern.length | 0]);
+    else if (q < .3) m3dFlower(gp, x, z, rnd, D.flowers[rnd() * D.flowers.length | 0], rnd() < .4);
+    else m3dTuft(gp, x, z, rnd, gc, 1.2);
+  }
+  // the field: sparse tufts and small flowers, never thick enough to hide a unit's footing
+  const gd = new Geo(D.seed + 4); gd.jit = .12;
+  for (let n = 0; n < 60; n++) { const side = rnd() < .5, x = side ? -.35 + rnd() * .5 : COLS - .15 + rnd() * .5, z = -2 + rnd() * (ROWS + 2); m3dFlower(gd, x, z, rnd, D.flowers[rnd() * D.flowers.length | 0], rnd() < .3); }   // (only along the field's edge)
+  return { wild: [gs.finish(), gl_.finish(), gp.finish()], deco: gd.finish() };
+}
+
+/* ---------- the theme ---------- */
+function buildMap3d(id) {
+  const D = Object.assign({ id }, M3D_DEFS[id]);
+  M3D = D; D.streamsB = [];
+  D.streamsB = m3dBuildStreams(D);
+  const rnd = mulberry32(D.seed), FX = { lights: [], flames: [], glows: [], fires: [] };
+  const tr = m3dTrees(D, rnd); D.giantsB = tr.giants;
+  const terrain = m3dTerrain(D, tr.placed);
+  const water = m3dWater(D);
+  const pr = m3dProps(D, rnd, FX);
+  // the streams' glow, baked into the map light so the banks and anything beside them catch it
+  const gc = m3dLin(D.water.glow);
+  for (const st of D.streamsB) for (let i = 0; i < st.smp.length; i += 6) { const s = st.smp[i]; FX.lights.push({ x: s.x, y: s.y + .2, z: s.z, col: gc, I: .7 + s.fall * 1.2, R: 1.8 }); }
+  terrain.water = water;
+  return { ground: null, terrain, wild: pr.wild, deco: pr.deco, trees: tr.groups, fx: FX };
+}
+for (const id of Object.keys(M3D_DEFS)) {
+  const D = M3D_DEFS[id];
+  THEMES[id] = {
+    id, sunDir: nrm3([.24, .6, -.67]), sunCol: [1.5, 1.1, .7], sky: [.2, .26, .44], gnd: [.1, .14, .1], fogHex: '#173843',
+    pitch: 57, fitTop: -4.2, fitBot: ROWS + .65, noKeep: true, h: (x, z) => M3D && M3D.id === id ? m3dH(x, z) : 0, shafts: id === 'grove3d' ? 'moon' : 'none', fly: D.fly,
+    lmRect: [-16, -12, COLS + 16, ROWS + 8], painted: null, m3d: true,
+    build: () => buildMap3d(id),
+  };
+}
+if (M3D_FORCE) MAPS[M3D_FORCE] = { name: M3D_DEFS[M3D_FORCE].name, blurb: M3D_DEFS[M3D_FORCE].blurb, entry: M3D_ENTRY };
+
+/* ---------- per frame: the worn road under the live path, and the water's wisps and spray ---------- */
+const M3D_PW = { x0: -1.5, z0: -6, w: 13 + 1.5, d: ROWS + 8, px: 6 };
+let m3dLastPath = null, m3dLastN = -1;
+function m3dPathWear() {
+  const P = G && G.path, pts = P && P.pts;
+  if (P === m3dLastPath && (pts ? pts.length : 0) === m3dLastN) return;
+  m3dLastPath = P; m3dLastN = pts ? pts.length : 0;
+  const k = M3D_PW.px, W = Math.round(M3D_PW.w * k), Hh = Math.round(M3D_PW.d * k), A = new Float32Array(W * Hh);
+  const stamp = (x, z) => { const ci = (x - M3D_PW.x0) * k, cj = (z - M3D_PW.z0) * k, R = .5 * k; for (let b = Math.floor(cj - R); b <= cj + R; b++) for (let a = Math.floor(ci - R); a <= ci + R; a++) { if (a < 0 || b < 0 || a >= W || b >= Hh) continue; const d = Math.hypot(a - ci, b - cj) / R; if (d < 1) A[b * W + a] = Math.max(A[b * W + a], (1 - d * d) * .95); } };
+  const line = L => { for (let n = 0; n < L.length - 1; n++) { const [x0, z0] = L[n], [x1, z1] = L[n + 1], len = Math.hypot(x1 - x0, z1 - z0), s = Math.max(1, Math.ceil(len / .12)); for (let q = 0; q <= s; q++) stamp(x0 + (x1 - x0) * q / s, z0 + (z1 - z0) * q / s); } };
+  line(M3D_ENTRY);
+  if (pts && pts.length) { line([M3D_ENTRY[M3D_ENTRY.length - 1], pts[0]]); line(pts); line([pts[pts.length - 1], [pts[pts.length - 1][0], ROWS + 6]]); }
+  else line([[5.5, -2], [5.5, ROWS + 6]]);
+  const u8 = new Uint8Array(W * Hh * 4); for (let i = 0; i < W * Hh; i++) { const v = Math.round(A[i] * 255); u8[i * 4] = v; u8[i * 4 + 1] = v; u8[i * 4 + 2] = v; u8[i * 4 + 3] = 255; }
+  RD.setTerrainPath(u8, W, Hh, [M3D_PW.x0, M3D_PW.z0, 1 / M3D_PW.w, 1 / M3D_PW.d]);
+}
+function m3dFrame(dt) {
+  if (!M3D || !TH.m3d) return;
+  if (typeof G !== 'undefined' && G) m3dPathWear();
+  edgeMagic(M3D.giantsB);   // (edgetrees.js)
+  // mist pooled in the ravine (owner): layered soft cards lying in the gully, thickest at the bottom and thinning upward,
+  // drifting; foes climbing are half hidden in it and clear it as they crest into the glade. Never past its head.
+  if (M3D.id === 'grove3d') {
+    const mc = [.78, .86, .9];
+    for (let zz = -2.9; zz > -9.5; zz -= .55) {
+      const cx = m3dRoadX(zz), fl = m3dRavFloor(zz), deep = clamp((-2.6 - zz) / 2.5, 0, 1);
+      for (let L = 0; L < 3; L++) {
+        const dr = Math.sin(vt * .13 + zz * 1.7 + L * 2.1), y = fl + .12 + L * .38, a = (.34 - L * .09) * (.35 + .65 * deep) * (.8 + .2 * Math.sin(vt * .3 + zz + L));
+        QA.ground(cx + dr * .25, zz + Math.cos(vt * .09 + L + zz) * .15, y, 1.5 - L * .15, .75, [mc[0], mc[1], mc[2], a], 1, 0);
+      }
+      if (deep > .3) QA.bill(RD, cx + Math.sin(vt * .2 + zz * 3) * .4, fl + .5, zz, 1.3, .7, [mc[0], mc[1], mc[2], .12 * deep], 1, 0);
+    }
+  }
+  // cyan wisps curling over the water, spray and mist at the falls
+  const gc = M3D.water.glow ? lin3(M3D.water.glow) : [.2, .8, .9];
+  const wc = [Math.min(1, gc[0] * 2 + .2), Math.min(1, gc[1] * 1.4 + .2), Math.min(1, gc[2] * 1.3 + .2)];
+  for (const st of M3D.streamsB) {
+    const smp = st.smp;
+    for (let k = 0; k < 9; k++) {
+      const ph = (vt * .045 + k / 9 + smp.length * .01) % 1, s = smp[Math.min(smp.length - 1, Math.floor(ph * smp.length))];
+      const sw = Math.sin(vt * .8 + k * 2.1), x = s.x - s.dz * sw * s.w * .7, z = s.z + s.dx * sw * s.w * .7, y = s.y + .25 + .2 * Math.sin(vt * 1.3 + k), f = Math.sin(ph * Math.PI);
+      QADD.bill(RD, x, y, z, .38, .38, [wc[0], wc[1], wc[2], .12 * f], 1, 0);
+      QADD.bill(RD, x, y, z, .06, .06, [.8, 1, 1, .7 * f], 1, 0);
+    }
+    if (st.falls) {
+      const fs = smp.filter(s => s.fall), b = fs.length ? fs[fs.length - 1] : null; if (!b) continue;
+      for (let k = 0; k < 7; k++) {
+        const u = (vt * .6 + k / 7) % 1, a = k * 2.4 + vt;
+        QA.bill(RD, b.x + Math.cos(a) * b.w * .6 * u + b.dx * .3, b.y + .05 + u * .55, b.z + Math.sin(a) * b.w * .4 * u + b.dz * .3, .25 + u * .35, .2 + u * .3, [.8, .95, 1, .16 * (1 - u)], 1, 0);
+      }
+      QADD.bill(RD, b.x, b.y + .3, b.z, 1.4, .9, [wc[0], wc[1], wc[2], .08 + .03 * Math.sin(vt * 2)], 1, 0);
+    }
+  }
 }
 
 /* Dungeon leaders' own bodies, group 1 (spectres and flyers): bonewarden, mirrorwitch, abbess, keening, voltaris, nightwing.
@@ -66529,12 +67389,14 @@ function initView(canvas) {
 /* ---------- map themes: lighting, 3D surroundings, map light, painted backdrop ---------- */
 let TH = THEMES.meadow, LS = Object.assign({}, LIGHT_DEF.meadow); const THENV = {}, BGC = {};
 function buildThemeEnv(th) {
-  const b = th.build(), E = { ground: b.ground, wild: b.wild, deco: b.deco, fx: b.fx, treeGroups: [], treeHs: [], lm: null };
+  const b = th.build(), E = { ground: b.ground, wild: b.wild, deco: b.deco, fx: b.fx, treeGroups: [], treeHs: [], lm: null, terrain: b.terrain || null, edgeGiants: b.edgeGiants || null };   // (terrain: a 3D map's heightfield, drawn by gl.js drawTerrain: map3d.js)
   const keep = RD.trees; RD.trees = [];
   for (const t of b.trees) {
     const a = t.asset;
     if (!a._img) { a._img = new Image(); a._texP = new Promise(res => { a._img.onload = () => res(a._img); a._img.onerror = () => res(null); }); a._img.src = a.tex; }
     const hs = RD.addTrees(a, t.lod, t.inst, null);
+    if (t.fade) for (const h of hs) h.fade = t.fade;   // (a giant's canopy dissolves overhead: edgetrees.js)
+    if (t.noShadow) for (const h of hs) h.noShadow = true;
     E.treeGroups.push({ asset: a, all: t.inst, hs });
     a._texP.then(img => { if (!img) return; if (!a._glTex) a._glTex = RD.texture(img); for (const h of hs) if (h.leaf) h.tex = a._glTex; });
   }
@@ -66559,14 +67421,15 @@ function buildThemeEnv(th) {
   return E;
 }
 function applyTheme(id) {
+  if (typeof M3D_FORCE !== 'undefined' && M3D_FORCE && THEMES[M3D_FORCE]) { id = M3D_FORCE; if (typeof G !== 'undefined' && G) G.map = id; }
   const th = THEMES[id] || THEMES.meadow;
   if (typeof AudioSys !== 'undefined' && AudioSys.ambience) AudioSys.ambience(th.id === 'moonwood' ? 'night' : 'day');   // birds by day, crickets and owls by night
   if (RD && TH === th && THENV[th.id]) { RD.mood = moodGet(th.id); return; }   // (the same map, maybe another Chronicles location: its mood)
   if (!RD) return;
   TH = th; LS = lightGet(th.id);
   const E = THENV[th.id] || (THENV[th.id] = buildThemeEnv(th));
-  ENV.ground = E.ground; ENV.wild = E.wild; ENV.deco = E.deco; ENV.fx = E.fx; ENV.treeGroups = E.treeGroups;
-  RD.trees = E.treeHs; RD.lm = E.lm;
+  ENV.ground = E.ground; ENV.wild = E.wild; ENV.deco = E.deco; ENV.fx = E.fx; ENV.treeGroups = E.treeGroups; ENV.edgeGiants = E.edgeGiants;
+  RD.trees = E.treeHs; RD.lm = E.lm; if (RD.setTerrain) { RD.setTerrain(E.terrain); RD.setWater(E.terrain && E.terrain.water || null); }
   CAM.pitch = th.pitch * Math.PI / 180;
   applyLight();
   amb.length = 0;
@@ -66607,7 +67470,8 @@ function paintBackdrop() {
   BGC.bgTex = RD.screenTex(BGC.bg, BGC.bgTex); BGC.fgTex = RD.screenTex(BGC.fg, BGC.fgTex);
   RD.bg = { tex: BGC.bgTex, dissolve: true, fr: TH.bg.fr, fd: TH.bg.fd }; RD.fg = { tex: BGC.fgTex };
 }
-function setMap(id) { if (typeof G !== 'undefined') G.map = MAPS[id] ? id : 'meadow'; if (RD) applyTheme(G.map); }
+function setMap(id) { if (typeof M3D_FORCE !== 'undefined' && M3D_FORCE) id = M3D_FORCE;   // (?map3d=grove|pass: the 3D maps, map3d.js)
+  if (typeof G !== 'undefined') G.map = MAPS[id] ? id : 'meadow'; if (RD) applyTheme(G.map); }
 
 // oh = half the view height in world units (the orthographic "zoom" that fits the field); zoom = pinch magnification
 function setCam(tz, oh, aspect, shakeX = 0, shakeZ = 0, zoom) {
@@ -66707,6 +67571,7 @@ const ELITE_SC = 1.18;
 function creepBaseY(c) {
   let y = c.fly ? .95 + Math.sin(vt * 3 + c.anim) * .07 : 0;
   if (c.fly && c.lowT > G.time) y = .3 + .05 * Math.sin(vt * 5 + c.anim);   // knocked down low by Flak
+  if (TH.m3d && c.y < -1.4 && !c.fly && typeof m3dH === 'function') y += Math.min(0, m3dH(c.x, c.y));   // (up a 3D map's ravine: on its floor)
   if (c.liftT > G.time) { const u = 1 - (c.liftT - G.time) / (c.liftD || 1); y += c.liftK === 'cyc' ? c.liftH * Math.min(1, u * 5, (1 - u) * 5) + .08 * Math.sin(vt * 9) : c.liftH * Math.sin(Math.PI * clamp(u, 0, 1)); }
   return y;
 }
@@ -66729,6 +67594,7 @@ const tunE = c => { const k = tunT(c); return Math.min(1, 1.15 * k * k * (3 - 2 
 // appears, growing slowly at first and faster as it nears), its full size on the field
 const tunS = c => 1 / (1 + 4.5 * tunK(c));
 function tunnelView(m, c) {
+  if (TH.m3d) return m;   // (a 3D map's ravine is real: no painted perspective)
   const k = tunK(c), e = tunE(c); if (!e) return m;
   const a = -CAM.pitch * e, sc = 1 / (1 + 4.5 * k), ca = Math.cos(a) * sc, sa = Math.sin(a) * sc;
   const x = m[12], y = m[13], z = m[14];
@@ -66752,7 +67618,7 @@ function creepMatrix(out, c, s, scale) {
   const lean = (c.spdM || 1) > 1.01 || c.rageT > 0 || c.packT > 0 ? .12 : 0;
   const sc = scale * cscale(c.type) * (c.elite ? ELITE_SC : 1) * (c.grow || 1);
   const pl = c.pile ? (c.pileT < .8 ? c.pileT / .8 : 1) : 0;   // Ossyra crashed down as a heap of bones, drawing herself back up in her last moment
-  return tunnelView(M4.trs(out, x + c.kbx, y, z + c.kbz, s.yaw * (1 - tunE(c)) + wob, fp + lean + (c.lunge || 0) * .35 + (dizzy ? .12 : 0), fr + (dizzy ? Math.sin(vt * 6.5 + c.anim + 1.3) * .14 : 0), sc * (1 + .12 * hq * sq) * (1 + .25 * pl), sc * (1 - .2 * hq * sq) * (1 - .7 * pl), sc * (1 + .12 * hq * sq) * (1 + .25 * pl)), c);
+  return tunnelView(M4.trs(out, x + c.kbx, y, z + c.kbz, s.yaw * (TH.m3d ? 1 : 1 - tunE(c)) + wob, fp + lean + (c.lunge || 0) * .35 + (dizzy ? .12 : 0), fr + (dizzy ? Math.sin(vt * 6.5 + c.anim + 1.3) * .14 : 0), sc * (1 + .12 * hq * sq) * (1 + .25 * pl), sc * (1 - .2 * hq * sq) * (1 - .7 * pl), sc * (1 + .12 * hq * sq) * (1 + .25 * pl)), c);
 }
 // every creep (bosses included) has its own model built at its true proportions, so CREEPS[].scale/.model are no longer used
 const CSC = { spider: 1.1 }; // spiderlings come in swarms of 20-36: keep them visibly smaller than the other walkers
@@ -66874,7 +67740,9 @@ function renderView(dt) {
   const sh = G.shake > 0 ? G.shake : 0;
   setCam(CAM.tz, CAM.oh, W / H, sh ? R_(-1, 1) * sh * .18 : 0, sh ? R_(-1, 1) * sh * .18 : 0);
   // environment
-  item(ENV.ground, _I, { shadow: false, ground: true });
+  if (ENV.ground) item(ENV.ground, _I, { shadow: false, ground: true });   // (a 3D map's terrain is drawn by the renderer itself: RD.terrain)
+  if (RD.terrain && typeof m3dFrame === 'function') m3dFrame(dt);
+  if (ENV.edgeGiants && typeof edgeMagic === 'function') edgeMagic(ENV.edgeGiants);   // (the magic up a painted map's 3D trunks: edgetrees.js)
   ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 }));
   const walkIn = MAPS[G.map] && MAPS[G.map].entry;   // (a map foes walk into from the woods has no portal)
   if (!SCENE_OFF) { item(ENV.deco, _I, { shadow: false }); if (!walkIn) item(ENV.portal, _I); if (!TH.noKeep) item(ENV.keep, _I); }   // (the FX Lab side view hides the scenery)
@@ -66935,7 +67803,7 @@ function renderView(dt) {
     if (typeof drawSynergyGlow === 'function') drawSynergyGlow(vt);
   }
   drawAmbient(dt);
-  if (TH.shafts === 'moon') drawMoonShafts(); else drawSunShafts();
+  if (TH.shafts === 'moon') drawMoonShafts(); else if (TH.shafts !== 'none') drawSunShafts();
   const list = DL.slice(0, dlN);
   RD.render(list, { ground: QG, alpha: QA, add: QADD, over: QO });
   { let v = 0, sv = 0; for (let k = 0; k < dlN; k++) { const it = DL[k], n = it.mesh.count; v += n; if (it.shadow) sv += n; }   // (one object a frame, kept: tests read it)
@@ -67114,7 +67982,7 @@ function drawCreeps(dt) {
     drawModel(model, _m, ph, { pile: c.pile ? (c.pileT < .8 ? c.pileT / .8 : 1) : 0, tint: tintFor(c), alpha: c.ent && c.age < 1.1 ? Math.max(.04, c.age / 1.1) : c.phased ? .3 : c.etherOn ? .5 : c.def.lead === 'unseen' && !c.seen ? .2 + .06 * Math.sin(vt * 4 + c.anim) : model.alpha < 1 ? model.alpha : null, cast: ck, c });
     if (ck > 0) drawCreepCast(c, s, model, ck);
     const r = c.def.r * cscale(c.type);
-    if (tunK(c) > .02) { const k = tunK(c), ts = tunS(c); QG.ground(c.x + c.ox, c.y + c.oy, .025, r * ts * 1.1, r * ts * .5, [0, 0, 0, .3 * (1 - k * .6)], 2, 0); continue; }   // still in the woods: only a shape, no bars or marks
+    if (tunK(c) > .02) { const k = tunK(c), ts = tunS(c); if (!TH.m3d) QG.ground(c.x + c.ox, c.y + c.oy, .025, r * ts * 1.1, r * ts * .5, [0, 0, 0, .3 * (1 - k * .6)], 2, 0); continue; }   // still in the woods: only a shape, no bars or marks
     if (c.atk && c.atk.kind === 'blast') { const by = creepBaseY(c) + creepH(c) * pop + .14, f = .5 + .5 * Math.sin(vt * 18 + c.anim); QA.bill(RD, c.x + c.ox, by, c.y + c.oy, .2, .2, [.12, .1, .1, 1], 5, 0); QADD.bill(RD, c.x + c.ox + .07, by + .13, c.y + c.oy, .16 + .1 * f, .16 + .1 * f, [1, .7, .25, .95], 1, 0); QADD.bill(RD, c.x + c.ox, by, c.y + c.oy, .45, .45, [1, .4, .1, .18 + .12 * f], 1, 0); }
     QG.ground(c.x + c.ox, c.y + c.oy, .025, r * (c.fly ? .7 : 1.05), r * (c.fly ? .55 : .85), [0, 0, 0, c.fly ? .25 : .32], 2, 0);
     if (c.frostT > 0) drawFrostOn(c, r);
