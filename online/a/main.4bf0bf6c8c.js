@@ -1,4 +1,4 @@
-const BUILD_TAG = '5706df3@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ac1ffd3@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1304,6 +1304,7 @@ function waveSpec(n) {
 // creep health per wave: steep through the first thirty, then a gentler climb to fifty (endless keeps climbing)
 const HP_KNEE = 30;
 let HP_EASE9 = .3;
+let HP_CUT11 = .1;   // and another 10% less from wave 11 on (owner, 8 Nov 2026)
 let HP_CUT14 = .2;   // and 20% less again from wave 14 on (owner, 8 Nov 2026)
 let HP_CUT9 = .145;   // every foe, bosses too, less health from wave 9 on, on top of HP_EASE9: 5%, then 10% more (owner, 8 Nov 2026)
 // waves 2 to 9 died too easily: extra health there, easing back out by wave 12 (wave 1 stays the gentle opener)
@@ -1322,7 +1323,7 @@ function waveHP(n, diff) {
   if (!(typeof G !== 'undefined' && G && G.vs)) h *= HP_ALL * WAVE_TUNE[Math.min(n, MAX_WAVE) - 1];   // every foe in the campaign, summons and bosses too (Tower Wars keeps its own)
   if (!oldRules()) h *= (FORM_TUNE[Math.min(n, MAX_WAVE) - 1] || 1) * (typeof forceHpK === 'function' ? forceHpK(n) : 1);   // the force march's own formations (Classic keeps WAVE_TUNE alone), and its gentler unit tiers (forces_zz_tiers.js)
   // the climb eased from wave 9: 30% less health by wave 14 and after (18% at first; eased again the same day) (owner, 7 Nov 2026: consistently losing from wave 9)
-  if (!(typeof G !== 'undefined' && G && G.vs)) { h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1); if (n >= 9) h *= 1 - HP_CUT9; if (n >= 14) h *= 1 - HP_CUT14; }
+  if (!(typeof G !== 'undefined' && G && G.vs)) { h *= 1 - HP_EASE9 * clamp((n - 8) / 6, 0, 1); if (n >= 9) h *= 1 - HP_CUT9; if (n >= 14) h *= 1 - HP_CUT14; if (n >= 11) h *= 1 - HP_CUT11; }
   return h * (1 + (m - 1) * Math.min(1, (n - 1) / 12)) * (typeof riteHP === 'function' ? riteHP() : 1);   // a Rite of Passage's tougher foes
 }
 // bosses arrive every 5th wave; early ones are softened so a reasonable maze can bring them down
@@ -58121,6 +58122,15 @@ function buildClearingTrees() {
     const a = rnd() * TAU, r = 1.2 + rnd() * 2.6, sz = 2 + rnd() * 1.4, rc = sz * .75 + .3, by = 7 + rnd() * 8;
     const bx = g.x + Math.cos(a) * r, bz = g.z + Math.sin(a) * r;
     if (edgeClear(bx, bz, rc, by + sz * .7, CL_EDGE.road)) put(bough, 'bough', bx, by - sz * .35, bz, sz, 0, { noShadow: true });
+  }
+  // a little lower foliage hugging each trunk (owner, ref. images/95: a couple of leafy clumps at mid height, the bark
+  // still showing above and below): small TreeForge oak crowns pressed against the bole
+  if (bough) for (const g of giants) {
+    const R = edgeTrunkR(g);
+    for (let k = 0; k < 2; k++) {
+      const a = rnd() * TAU, sz = 1.3 + rnd() * .5, hy = 2.6 + k * 1.6 + rnd() * .6, bx = g.x + Math.cos(a) * R * 1.05, bz = g.z + Math.sin(a) * R * 1.05;
+      if (edgeClear(bx, bz, sz * .6, hy + sz * .6, CL_EDGE.road) && !clWet(bx, bz, .5)) put(bough, 'bough', bx, hy - sz * .4, bz, sz, 0, { noShadow: true });
+    }
   }
   // undergrowth by the painted stones and round the giants' feet
   const kinds = ['gbush', 'gflower', 'gshrub', 'gflower2', 'fern'];   // (gbush, gshrub: the owner's sculpted bush and leafy shrub)
