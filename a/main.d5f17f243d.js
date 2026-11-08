@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ed7ab8d@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0fdd949@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -89561,414 +89561,6 @@ if (typeof document !== 'undefined' && document.createElement) {
   (document.head || document.documentElement).append(css);
 }
 
-/* ================= WEAPONS, on screen: the weapon slot on the Gear sheet, its rack, its card, the info pane's line =================
-   (the rules: forces_zzzzzzzzzzzzz_weapons.js). Kept to the weapon's own corner of each screen, wrapped in from here:
-   - the Gear sheet (gearpanel.js openGearPanel): a weapon slot heads the right-hand column, and the weapon heads the Gear
-     list. Tapping the slot opens the weapon rack for that unit: what it holds now, and every weapon that fits it with the
-     change in plain numbers ("Damage 10-14 -> 16-21", "Speed 1.1 -> 1.3/s", "DPS 13 -> 24", "Spell Damage 0 -> 120"),
-     Equip, Salvage, and Take off (back to its issued weapon).
-   - the info pane (ui.js infoHTML): one line right under the stats row (never dropped on a crowded pane), the weapon's icon, name, damage, speed and DPS.
-   - the card (wpnCardHTML): the RPG tooltip in the items' style (itemtip.js), on hover anywhere a weapon is shown
-     (data-wid="<id>", or data-wst="<unit id>" for its issued weapon).
-   Icons: the item icon painter's class glyph on the rarity frame; a painting can go in RELIC_IMG['w-<model key>']. */
-const wpE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-const wpN = v => v >= 100 ? String(Math.round(v)) : v >= 10 ? String(Math.round(v)) : String(Math.max(1, Math.round(v)));
-const wpS = v => String(+v.toFixed(2));
-const wpRange = n => `${wpN(n.lo)}–${wpN(n.hi)}`;
-function wpKey(w) {
-  const d = wpnDef(w); if (!d) return 'g:empty';
-  const C = WPN_CLASS[d.cls] || {}, art = wpArtKey(w, d);   // (tinted with the unit's or the force's own colours: wpnShow)
-  return `g:${C.icon || 'sword'}:${String(wpnShow(w).hue).slice(1)}:${w.starter ? 0 : Math.max(0, w.rar | 0)}:${art}:${typeof RELIC_IMG !== 'undefined' && RELIC_IMG[art] ? 1 : 0}`;
-}
-const _wpURL = {};
-function wpIconURL(w) {
-  const k = wpKey(w); if (_wpURL[k]) return _wpURL[k];
-  try { const c = document.createElement('canvas'); c.width = c.height = 64; iconPaint(c, k); return (_wpURL[k] = c.toDataURL()); } catch (e) { return ''; }
-}
-const wpTowerById = id => (G.towers || []).find(t => t.id === id) || null;
-function wpById(id) {
-  for (const w of G.wbag || []) if (w.id === id) return w;
-  for (const t of G.towers || []) if (t.weapon && t.weapon.id === id) return t.weapon;
-  return null;
-}
-const wpWearer = w => (G.towers || []).find(t => t.weapon === w) || null;
-// the kind line: "Rare spear · Item Level 14", "Legendary staff · Briarwardens only", "Issued spear · Thornguard Spears"
-function wpKindLine(w) {
-  const d = wpnDef(w); if (!d) return '';
-  const fit = d.leg ? `${(TOWERS[Object.keys(TOWERS).find(ty => TOWERS[ty].unit === d.u)] || {}).name || d.u} only` : (() => {
-    const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty) === d.cls); return tys.length ? 'for ' + tys.map(ty => String(TOWERS[ty].name).split(',')[0]).join(', ') : '';
-  })();
-  return [`${wpnRarName(w)} ${d.cls}`, w.starter ? '' : `Item Level ${w.il || 1}`, fit].filter(Boolean).join(' · ');
-}
-// the weapon's card. t: the unit it is on or would go on (its tier's numbers); vs: the weapon to compare with (what t holds)
-function wpnCardHTML(w, t, o) {
-  o = o || {}; const d = wpnDef(w); if (!d) return '';
-  const ty = t ? t.type : (Object.keys(TOWERS).find(k => d.leg ? TOWERS[k].unit === d.u : wpnClassOf(k) === d.cls) || null);
-  const n = ty ? wpnNums(w, ty) : null, col = wpnCol(w);
-  const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
-  let live = '';
-  if (t && n && t.def) {
-    const st = t.weapon === w || (w.starter && !t.weapon) ? (t.st || effStats(t)) : (() => { const w0 = t.weapon; t.weapon = w.starter ? null : w; try { return effStats(t); } finally { t.weapon = w0; } })();
-    const D = st.dmg || st.smite || 0, spr = (st.wpn && st.wpn.spr) || (wpnCalcOf(w).spr), dps = typeof towerDps === 'function' ? towerDps(t.type, st) : 0;
-    live = `<p class="itc-k">On this ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}, its talents and items on top): ${wpN(D * (1 - spr))}–${wpN(D * (1 + spr))} a strike · ${wpS(1 / (st.rate || 1))} a second · ${wpN(dps)} DPS</p>`;
-  }
-  const rule = d.leg ? wpnRuleText(d) : '';
-  const runes = typeof RUNES !== 'undefined' && !w.starter ? (w.runes || []).slice(0, forgeSlots(w)).filter(k => RUNES[k]).map(k => `<div class="itc-ab"><b style="color:${RUNES[k].hue}">${RUNES[k].name}</b> ${wpE(RUNES[k].text)}</div>`).join('')
-    + (forgeSlots(w) > (w.runes || []).filter(Boolean).length ? `<p class="itc-k">${forgeSlots(w) - (w.runes || []).filter(Boolean).length} empty rune socket${forgeSlots(w) - (w.runes || []).filter(Boolean).length > 1 ? 's' : ''} (the forge)</p>` : '') : '';
-  let cmp = '';
-  if (o.vs !== undefined && ty) {
-    const a = wpnNums(o.vs || wpnStarter(ty), ty), b = n, arrow = (x, y, f, suf) => { const up = y > x + 1e-6, dn = y < x - 1e-6; return `${f(x)}${suf || ''} → <b class="${up ? 'bo' : dn ? 'neg' : ''}">${f(y)}${suf || ''}</b>`; };
-    const rg = (x, y) => `${wpRange(x)} → <b class="${y.avg > x.avg + 1e-6 ? 'bo' : y.avg < x.avg - 1e-6 ? 'neg' : ''}">${wpRange(y)}</b>`;
-    cmp = `<div class="wp-cmp"><p>Damage ${rg(a, b)}</p><p>Speed ${arrow(a.aps, b.aps, wpS, '/s')}</p><p>DPS ${arrow(a.dps, b.dps, wpN)}</p>${a.sp || b.sp ? `<p>Spell Damage ${arrow(a.sp || 0, b.sp || 0, v => String(v))}</p>` : ''}</div>`;
-  }
-  return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${wpE(wpnName(w))}</h5><p class="itc-k">${wpE(wpKindLine(w))}</p>`
-    + (lines.length ? `<ul class="itc-s">${lines.join('')}</ul>` : '') + live
-    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '') + runes
-    + cmp + (w.starter ? `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p><p class="itc-k">Issued weapon. Better ones drop from bosses, elites and the waves' last foes.</p>` : `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p>`)
-    + (o.note || '') + '</div>';
-}
-if (typeof document !== 'undefined' && typeof itipBind === 'function') {
-  itipBind(document, '[data-wid]', el => { const w = wpById(+el.dataset.wid); return w ? wpnCardHTML(w, el.dataset.wt ? wpTowerById(+el.dataset.wt) : wpWearer(w)) : ''; });
-  itipBind(document, '[data-wst]', el => { const t = wpTowerById(+el.dataset.wst); return t ? wpnCardHTML(wpnOf(t), t) : ''; });
-}
-// the attributes that show a weapon's card on hover
-const wpTipAttr = (w, t) => w && !w.starter ? `data-wid="${w.id}"${t ? ` data-wt="${t.id}"` : ''}` : t ? `data-wst="${t.id}"` : '';
-
-/* ---------- the info pane: one line under the stats ---------- */
-function wpInfoLine(t) {
-  if (!wpnOn() || !t || !t.def || !wpnClassOf(t.type)) return '';
-  const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
-  const nw = (G.wbag || []).some(q => q.isNew && wpnFits(q, t)) ? ' <i class="wp-nb">new weapon in rack</i>' : '';
-  return `<p class="wp-ln" tabindex="0" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b>${nw} <span>${wpRange(n)} · ${wpS(n.aps)}/s · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</span></p>`;
-}
-if (typeof infoHTML === 'function') {
-  const _wpInfo = infoHTML;
-  infoHTML = function () {
-    const h = _wpInfo.apply(this, arguments);
-    try {
-      const s = G && G.sel, t = s && s.kind === 'tower' ? s.ref : null, ln = t ? wpInfoLine(t) : '';
-      if (!ln || typeof h !== 'string') return h;
-      // right under the stats row (closed where its divs balance), so a crowded pane drops other lines first
-      const st = h.indexOf('<div class="st">');
-      if (st >= 0) { let d = 0; const re = /<\/?div\b/g; re.lastIndex = st; for (let m; (m = re.exec(h));) { d += m[0][1] === '/' ? -1 : 1; if (!d) { const e = h.indexOf('>', m.index) + 1; return h.slice(0, e) + ln + h.slice(e); } } }
-      const at = h.indexOf('<div class="tags">');
-      return at >= 0 ? h.slice(0, at) + ln + h.slice(at) : h + ln;
-    } catch (e) { return h; }
-  };
-}
-
-/* ---------- the Gear sheet: the weapon slot, and the weapon at the head of its Gear list ---------- */
-function wpSockHTML(t) {
-  const w = wpnOf(t);
-  return `<button type="button" class="gp-sock wp-sock${t.weapon ? '' : ' empty'}${(G.wbag || []).some(q => wpnFits(q, t) && q.isNew) ? ' wp-new' : ''}" ${wpTipAttr(w, t)}><canvas width="112" height="112" data-key="${wpKey(w)}"></canvas><small style="color:${wpnCol(w)}">${wpE(t.weapon ? wpnName(w) : 'Weapon')}</small></button>`;
-}
-function wpGearRow(t) {
-  const w = wpnOf(t), n = wpnNums(w, t.type); if (!n) return '';
-  return `<div class="gp-it wp-it" tabindex="0" ${wpTipAttr(w, t)}><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <small>${wpE(wpKindLine(w))}</small><p class="gp-isl">Damage ${wpRange(n)} · ${wpS(n.aps)} attacks a second · ${wpN(n.dps)} DPS${n.sp ? ` · +${n.sp} Spell Damage` : ''}</p>${wpnDef(w).leg ? `<p class="gp-iab">Passive: ${wpE(wpnDef(w).name)}</p>` : ''}</div>`;
-}
-if (typeof openGearPanel === 'function') {
-  const _wpGp = openGearPanel;
-  openGearPanel = function (t) {
-    const r = _wpGp.apply(this, arguments);
-    try {
-      if (!wpnOn() || !t || !wpnClassOf(t.type) || typeof ovp === 'undefined' || !ovp || !ovp.classList.contains('gearp')) return r;
-      const cols = ovp.querySelectorAll('.gp-doll > .gp-col'), col = cols[1] || cols[0];
-      if (col) {
-        col.insertAdjacentHTML('afterbegin', wpSockHTML(t));
-        const b = col.querySelector('.wp-sock'), c = b.querySelector('canvas'); iconPaint(c, c.dataset.key);
-        b.onclick = () => { if (typeof sfx === 'function') sfx('click'); if (typeof itipHide === 'function') itipHide(); wpRack(t); };
-      }
-      const gl = ovp.querySelector('.gp-gear');
-      if (gl) { const none = gl.querySelector('.gp-none'); if (none) none.remove(); gl.insertAdjacentHTML('afterbegin', wpGearRow(t)); }
-    } catch (e) { console.error(e); }
-    return r;
-  };
-}
-
-/* ---------- the rack: the weapons that fit this unit, compared with what it holds ---------- */
-// a spell's hit with it, against now (the sheet's own number, gearpanel.js gpDmgNums): " · Grasping Thicket 56 → 72"
-function wpSpellCmp(t, w) {
-  const kit = typeof abilKit === 'function' && abilKit(t); if (!kit || typeof gpDmgNums !== 'function') return '';
-  const w0 = t.weapon, now = effStats(t); let alt; t.weapon = w; try { alt = effStats(t); } finally { t.weapon = w0; }
-  const learned = (t.ab && t.ab.learned) || [];
-  const abs = kit.abilities.filter(ab => learned.includes(ab.id)).concat(kit.abilities.filter(ab => !learned.includes(ab.id)));
-  for (const ab of abs) {
-    const a = gpDmgNums(t, now, ab)[0], b = gpDmgNums(t, alt, ab)[0]; if (a == null || b == null) continue;
-    return ` · ${wpE(ab.name)} ${a} → <b class="${b > a ? 'bo' : b < a ? 'neg' : ''}">${b}</b>`;
-  }
-  return '';
-}
-function wpRack(t) {
-  if (!ovp) return;
-  const old = ovp.querySelector('.wp-rack'); if (old) old.remove();
-  const cur = wpnOf(t), bag = G.wbag || [];
-  const fit = bag.filter(w => wpnFits(w, t)).sort((a, b) => wpnDpsWith(t, b) - wpnDpsWith(t, a) || b.rar - a.rar);
-  const other = bag.length - fit.length, d0 = wpnDpsWith(t, t.weapon || null);
-  const rows = fit.map(w => {
-    const d1 = wpnDpsWith(t, w), n = wpnNums(w, t.type), c = wpnNums(cur, t.type);
-    const cl = (x, y) => y > x + 1e-6 ? 'bo' : y < x - 1e-6 ? 'neg' : '';
-    return `<div class="wp-row" data-w="${w.id}" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}${w.isNew ? ' <i class="wp-nw">new</i>' : ''}</b><small>${wpE(wpKindLine(w))}</small>
-      <p>Damage ${wpRange(c)} → <b class="${cl(c.avg, n.avg)}">${wpRange(n)}</b> · Speed ${wpS(c.aps)} → <b class="${cl(c.aps, n.aps)}">${wpS(n.aps)}/s</b> · DPS ${wpN(c.dps)} → <b class="${cl(c.dps, n.dps)}">${wpN(n.dps)}</b>${c.sp || n.sp ? ` · Spell Damage ${c.sp || 0} → <b class="${cl(c.sp || 0, n.sp || 0)}">${n.sp || 0}</b>` : ''}</p>
-      <p class="wp-unit">This ${wpE(t.def.name)} at tier ${ROMAN[t.tier]}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS${wpSpellCmp(t, w)}${wpnDef(w).leg ? ` · ${wpE(wpnRuleText(wpnDef(w)))}` : ''}</p></div>
-      <div class="wp-bt"><button type="button" class="pri" data-eq="${w.id}">Equip</button><button type="button" data-fg="${w.id}">Forge</button><button type="button" data-sv="${w.id}">Salvage ${WPN_SALVAGE[w.rar | 0]}g</button></div></div>`;
-  }).join('');
-  const html = `<div class="wp-rack" role="dialog" aria-label="Weapon rack"><div class="wp-hd"><h3>Weapon · ${wpE(t.def.name)} <small>tier ${ROMAN[t.tier]}</small></h3><button type="button" class="tx" id="wpClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
-    <div class="wp-cur"><img src="${wpIconURL(cur)}" alt=""><div>${wpnCardHTML(cur, t)}</div></div>
-    ${t.weapon ? `<p class="wp-off"><button type="button" id="wpOff">Take it off</button> ${typeof forgeSlots === 'function' ? `<button type="button" data-fg="${t.weapon.id}">Forge it</button> ` : ''}<small>back to the rack; the unit fights with its issued weapon</small></p>` : ''}
-    <h4>In your rack, for this unit <small>(${fit.length}${other ? `; ${other} more fit other units` : ''})</small></h4>
-    <div class="wp-list">${rows || `<p class="gp-none">No weapon in your rack fits a ${wpE(t.def.name)} yet. Wave bosses always drop one, the last elite of an elite wave often, and a wave's last foe now and then.</p>`}</div></div>`;
-  ovp.insertAdjacentHTML('beforeend', html);
-  for (const w of fit) w.isNew = false;
-  const box = ovp.querySelector('.wp-rack'), back = () => { box.remove(); openGearPanel(t); };
-  box.querySelector('#wpClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); back(); };
-  const off = box.querySelector('#wpOff'); if (off) off.onclick = () => { wpnEquip(t, null); back(); };
-  for (const b of box.querySelectorAll('[data-eq]')) b.onclick = () => { const w = wpById(+b.dataset.eq); if (w && wpnEquip(t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped.`); back(); } };
-  for (const b of box.querySelectorAll('[data-fg]')) b.onclick = () => { const w = wpById(+b.dataset.fg); if (!w) return; if (typeof sfx === 'function') sfx('click'); box.remove(); wpForge(t, w); };
-  for (const b of box.querySelectorAll('[data-sv]')) b.onclick = () => { const w = wpById(+b.dataset.sv); if (!w) return; const v = wpnSalvage(w); if (typeof onToast === 'function') onToast(`Salvaged ${wpnName(w)} for ${v} gold.`); box.remove(); wpRack(t); };
-}
-
-/* ---------- the FORGE (forces_zzzzzzzzzzzzzzz_forge.js): upgrade, reroll, runes, re-forge, each with its plain numbers ---------- */
-function wpForgeLines(t, a, b) {
-  const x = wpnNums(a, t.type), y = wpnNums(b, t.type), cl = (p, q) => q > p + 1e-6 ? 'bo' : q < p - 1e-6 ? 'neg' : '';
-  const d0 = wpnDpsWith(t, a.starter ? null : a), d1 = wpnDpsWith(t, b);
-  return `Damage ${wpRange(x)} → <b class="${cl(x.avg, y.avg)}">${wpRange(y)}</b> · DPS ${wpN(x.dps)} → <b class="${cl(x.dps, y.dps)}">${wpN(y.dps)}</b>${x.sp || y.sp ? ` · Spell Damage ${x.sp || 0} → <b class="${cl(x.sp || 0, y.sp || 0)}">${y.sp || 0}</b>` : ''} · this ${wpE(t.def.name)}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS`;
-}
-function wpForge(t, w) {
-  if (!ovp || typeof forgeSlots !== 'function') return;
-  const old = ovp.querySelector('.wp-rack'); if (old) old.remove();
-  const gold = G.gold | 0, btn = (act, cost, label, extra) => cost == null ? '' : `<button type="button" class="pri" data-fa="${act}" ${extra || ''}${gold >= cost ? '' : ' disabled'}>${label} · ${cost} gold</button>`;
-  const rows = [];
-  // 1. a rarity up
-  { const c = forgeUpCost(w), nx = RARITY[Math.min(4, (w.rar | 0) + 1)];
-    rows.push(`<div class="wp-fr"><h4>Upgrade to <span style="color:${nx.col}">${nx.name}</span></h4>${c == null ? `<p class="itc-k">${WPN_LEG[w.b] ? 'A legendary is as high as a weapon goes.' : (w.rar | 0) >= 3 ? 'Epic is the forge\'s highest: legendaries only drop.' : ''}</p>` : `<p>${wpForgeLines(t, w, forgePreview(w, 'up'))}</p>${(w.rar | 0) === 1 ? '<p class="itc-k">At rare it opens a rune socket.</p>' : (w.rar | 0) === 2 ? '<p class="itc-k">At epic it opens a second rune socket.</p>' : ''}${btn('up', c, 'Upgrade')}`}</div>`); }
-  // 2. re-forge to the wave's level
-  { const c = forgeRelevelCost(w);
-    rows.push(`<div class="wp-fr"><h4>Re-forge to Item Level ${forgeNow()} <small>now ${forgeLv(w)}</small></h4>${c == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, w, forgePreview(w, 'lv'))}</p>${btn('lv', c, 'Re-forge')}`}</div>`); }
-  // 3. a reroll of its make
-  { const c = forgeRerollCost(w), lo = wpnNums(Object.assign({}, w, { q: 0, _c: null, _k: null }), t.type), hi = wpnNums(Object.assign({}, w, { q: 1, _c: null, _k: null }), t.type), now = wpnNums(w, t.type);
-    rows.push(`<div class="wp-fr"><h4>Reroll its make <small>${w.rr ? `rerolled ${w.rr}×; each one costs more` : 'its roll within its rarity'}</small></h4><p>Damage now ${wpRange(now)}; a reroll lands anywhere from ${wpRange(lo)} to ${wpRange(hi)}${now.sp ? ` (Spell Damage ${lo.sp} to ${hi.sp})` : ''}.</p>${btn('rr', c, 'Reroll')}</div>`); }
-  // 4. runes
-  { const n = forgeSlots(w), c = forgeRuneCost(w), R = w.runes || [];
-    const opts = Object.keys(RUNES).filter(k => runeFits(k, t));
-    let h = `<div class="wp-fr"><h4>Runes <small>${n ? `${n} socket${n > 1 ? 's' : ''}; a rune costs ${c} gold, a new one replaces the old` : 'a socket opens at rare, a second at epic'}</small></h4>`;
-    for (let i = 0; i < n; i++) h += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${wpE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${opts.filter(k => k !== R[i]).map(k => `<button type="button" data-fr="${i}|${k}" title="${wpE(RUNES[k].text)}"${gold >= c ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${wpE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
-    rows.push(h + '</div>'); }
-  ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack wp-forge" role="dialog" aria-label="Weapon forge"><div class="wp-hd"><h3>Forge · <span style="color:${wpnCol(w)}">${wpE(wpnName(w))}</span> <small>${wpE(wpKindLine(w))} · you have ${gold} gold</small></h3><button type="button" class="tx" id="wpFgBack" aria-label="Back to the rack">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
-    <div class="wp-cur"><img src="${wpIconURL(w)}" alt=""><div>${wpnCardHTML(w, t)}</div></div>${rows.join('')}
-    <p class="itc-k">Forging is a late sink for gold: a lucky drop is still the big jump. Gold put into it is not returned on salvage.</p></div>`);
-  const box = ovp.querySelector('.wp-forge'), redo = () => { box.remove(); wpForge(t, w); };
-  box.querySelector('#wpFgBack').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); wpRack(t); };
-  for (const b of box.querySelectorAll('[data-fa]')) b.onclick = () => { const a = b.dataset.fa, ok = a === 'up' ? forgeUpgrade(w) : a === 'lv' ? forgeRelevel(w) : forgeReroll(w); if (ok) { if (typeof onToast === 'function') onToast(`${wpnName(w)}: ${a === 'up' ? 'upgraded to ' + RARITY[w.rar].name : a === 'lv' ? 're-forged to Item Level ' + w.il : 'rerolled'}.`); redo(); } };
-  for (const b of box.querySelectorAll('[data-fr]')) b.onclick = () => { const [i, k] = b.dataset.fr.split('|'); if (forgeRune(w, +i, k, t)) { if (typeof onToast === 'function') onToast(`${RUNES[k].name} set in ${wpnName(w)}.`); redo(); } };
-}
-
-/* ---------- Playtest start (playtest.js): a rack to go with the bag, since the foes' health counts on weapons ----------
-   typical: a weapon for each of the force's units from a few waves back (uncommon, one in three rare: about an ordinary
-   run's); strong: rares and epics, and a legendary for one unit from wave 15 */
-if (typeof ptApply === 'function') {
-  const _wpPt = ptApply;
-  ptApply = function (W, kind) {
-    const r = _wpPt.apply(this, arguments);
-    try {
-      if (wpnOn() && (kind === 'typical' || kind === 'strong') && W > 2) {
-        const tys = Object.keys(TOWERS).filter(ty => wpnClassOf(ty)), strong = kind === 'strong', src = Math.max(1, W - 3);
-        G.wbag = []; G.wDropW = W - 1;
-        tys.forEach((ty, i) => G.wbag.push(wpnRoll(src, false, strong ? (W >= EPIC_FROM && i % 2 === 0 ? 3 : 2) : i % 3 === 0 ? 2 : 1, ty)));   // (typical: an ordinary run's uncommons, one in three rare)
-        if (strong && W >= 15 && tys.length) G.wbag.push(wpnRoll(src, true, 4, lootPick(tys)));
-        for (const w of G.wbag) w.isNew = true;
-        if (G.playtest) G.playtest.weapons = G.wbag.length;
-      }
-    } catch (e) { console.error(e); }
-    return r;
-  };
-}
-
-/* ---------- the boss-loot screen and the loot tables (renown.js): weapons show there too ----------
-   (owner, 9 Nov 2026: "cant see any weapons in the first bosses loot pool"). The screen shows the weapon the boss just
-   dropped above the relic choices (it is already in the rack: Equip on the unit it lifts most, or later from a Gear sheet);
-   each boss's loot table strip (its card, the forecast, the screen) ends with the weapons it can drop: one for each kind
-   of unit you field, with the odds by rarity on hover. */
-function wpBestFor(w) { let best = null; for (const t of G.towers || []) { if (t.wrecked || !wpnFits(w, t)) continue; const g = wpnDpsWith(t, w) - wpnDpsWith(t, t.weapon || null); if (!best || g > best.g) best = { t, g }; } return best; }
-function wpBossBlock(L) {
-  const D = G.wBossDrop; if (!D || !D.w || D.wave !== L.w || !(G.wbag || []).includes(D.w)) return '';
-  const w = D.w, b = wpBestFor(w), t = b && b.t;
-  return `<div class="wp-boss"><img src="${wpIconURL(w)}" alt=""><div class="wp-bt2"><h4>Weapon dropped <small>already in your rack, as well as the relic you take</small></h4>${wpnCardHTML(w, t || null, t ? { vs: t.weapon || null } : {})}
-    ${t ? `<button type="button" class="pri" id="wpBossEq">Equip on ${wpE(t.def.name)} (tier ${ROMAN[t.tier]}): ${wpN(wpnDpsWith(t, t.weapon || null))} → ${wpN(wpnDpsWith(t, w))} DPS</button>` : '<p class="itc-k">None of your units can hold it yet.</p>'}</div></div>`;
-}
-if (typeof rnLootScreen === 'function') {
-  const _wpRn = rnLootScreen;
-  rnLootScreen = function () {
-    const r = _wpRn.apply(this, arguments);
-    try {
-      const L = typeof rnLootCur === 'function' ? rnLootCur() : null, box = ovp && ovp.querySelector('.rn-three'); if (!L || !box || !wpnOn()) return r;
-      const h = wpBossBlock(L); if (!h) return r;
-      box.insertAdjacentHTML('beforebegin', h);
-      const b = ovp.querySelector('#wpBossEq');
-      if (b) b.onclick = () => { const w = G.wBossDrop && G.wBossDrop.w, bt = w && wpBestFor(w); if (bt && wpnEquip(bt.t, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} equipped on ${bt.t.def.name}.`); const el = ovp.querySelector('.wp-boss'); if (el) el.innerHTML = `<p class="itc-k">${wpE(wpnName(w))} is on your ${wpE(bt.t.def.name)}.</p>`; } };
-    } catch (e) { console.error(e); }
-    return r;
-  };
-}
-// the loot table strip: the weapons a boss can drop (one icon for each kind of unit you field)
-function wpTableHTML(type) {
-  if (!wpnOn()) return '';
-  const seen = new Set(), out = [];
-  for (const t of G.towers || []) { const c = t.def && !t.def.wall ? wpnClassOf(t.type) : null; if (!c || seen.has(c)) continue; seen.add(c); out.push(t); }
-  if (!out.length) for (const ty in TOWERS) { const c = wpnClassOf(ty); if (c && !seen.has(c) && out.length < 4) { seen.add(c); out.push({ type: ty, def: TOWERS[ty], id: 0 }); } }
-  return `<span class="rn-icons wp-icons">${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}</span>`;
-}
-if (typeof rnIconsHTML === 'function') {
-  const _wpIc = rnIconsHTML;
-  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { return h + wpTableHTML(t); } catch (e) { return h; } };
-}
-function wpTableCard(el) {
-  const [ty] = (el.dataset.wbt || '').split('|'); const d = TOWERS[ty]; if (!d) return '';
-  const c = wpnClassOf(ty), O = wpnBossOdds(Math.max(5, G.wave | 0)), names = WPN_CLASS[c].bases.map(b => wpnName({ b: b[0], rar: 2 }));
-  const legs = WPN_LEGS.filter(r => r[0] === d.unit).map(r => r[2]);
-  return `<div class="itc" style="--rc:#d8c08a"><h5 class="itc-n">A weapon for ${wpE(d.name)}</h5><p class="itc-k">Weapon drop · ${Math.round(O.p * 100)}% from this boss · it goes to your rack</p>
-    <ul class="itc-s">${O.rar.map((p, r) => p > .005 ? `<li><b style="color:${RARITY[r].col}">${Math.round(p * 100)}%</b> ${RARITY[r].name}</li>` : '').join('')}</ul>
-    <p class="itc-k">${wpE(names.join(', '))}${legs.length ? `; legendary: ${wpE(legs.join(', '))}` : ''}</p><p class="itc-fl">A boss's weapon is for one of the units you field, made for what that unit holds.</p></div>`;
-}
-if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-wbt]', wpTableCard);
-// the card's Gear button pulses while the rack holds a new weapon this unit can hold
-if (typeof abilitySlots === 'function') {
-  const _wpSl = abilitySlots;
-  abilitySlots = function (t, s) { const r = _wpSl.apply(this, arguments); try { if (s && s[5] && wpnOn() && (G.wbag || []).some(w => w.isNew && wpnFits(w, t))) { s[5].pulse = true; s[5].name = (s[5].name || '') + ' A new weapon in your rack fits it.'; } } catch (e) {} return r; };
-}
-
-/* ---------- the look ---------- */
-if (typeof document !== 'undefined') {
-  const css = `
-  .wp-sock.wp-new::after{content:'';position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#ffd166;box-shadow:0 0 6px #ffd166}
-  .wp-sock{position:relative}
-  .wp-ln{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px;line-height:1.25;cursor:default}
-  .wp-ln img{width:20px;height:20px;border-radius:3px;flex:none}
-  .wp-ln span{color:#cfc6b4}
-  .wp-it{border-left:3px solid #6a5a3a;padding-left:6px}
-  .wp-rack{position:fixed;inset:5% 8%;z-index:9000;background:rgba(18,15,12,.97);border:1px solid #6a5a3a;border-radius:8px;padding:12px 14px;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6);color:#e8dfcc}
-  .wp-hd{display:flex;justify-content:space-between;align-items:center}
-  .wp-hd h3{margin:0;font-size:18px}.wp-hd small{color:#a49c8c;font-weight:400}
-  .wp-rack h4{margin:12px 0 6px;font-size:14px}.wp-rack h4 small{color:#a49c8c;font-weight:400}
-  .wp-cur{display:flex;gap:10px;align-items:flex-start}.wp-cur img{width:56px;height:56px;border-radius:4px}
-  .wp-cur .itc{max-width:520px}
-  .wp-off{margin:6px 0;font-size:12px;color:#a49c8c}
-  .wp-row{display:flex;gap:10px;align-items:flex-start;padding:7px 6px;border-top:1px solid rgba(255,255,255,.08)}
-  .wp-row img{width:44px;height:44px;border-radius:4px;flex:none}
-  .wp-rt{flex:1;min-width:0}.wp-rt small{display:block;color:#a49c8c;font-size:11px}
-  .wp-rt p{margin:3px 0 0;font-size:12.5px}.wp-rt .wp-unit{color:#cfc6b4;font-size:12px}
-  .wp-rt b.bo,.wp-cmp b.bo{color:#7be37b}.wp-rt b.neg,.wp-cmp b.neg{color:#ff7a6a}
-  .wp-nw{font-style:normal;font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px;margin-left:4px}
-  .wp-bt{display:flex;flex-direction:column;gap:4px;flex:none}
-  .wp-bt button{font-size:12px;padding:4px 10px}
-  .wp-cmp{margin:6px 0 2px;font-size:12px}.wp-cmp p{margin:1px 0}
-  .wp-fr{border-top:1px solid rgba(255,255,255,.08);padding:8px 2px}.wp-fr h4{margin:0 0 4px;font-size:14px}.wp-fr h4 small{color:#a49c8c;font-weight:400}
-  .wp-fr p{margin:2px 0 6px;font-size:12.5px}.wp-fr b.bo{color:#7be37b}.wp-fr b.neg{color:#ff7a6a}
-  .wp-rs{margin:4px 0;font-size:12.5px}.wp-ro{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.wp-ro button{font-size:11.5px;padding:3px 7px;text-align:left}.wp-ro small{color:#a49c8c}
-  .wp-boss{display:flex;gap:10px;align-items:flex-start;margin:6px auto 10px;max-width:760px;padding:8px 10px;border:1px solid #d8c08a;border-radius:8px;background:rgba(40,32,18,.85)}
-  .wp-boss img{width:56px;height:56px;border-radius:4px;flex:none}.wp-boss h4{margin:0 0 4px;font-size:14px;color:#f2d27a}.wp-boss h4 small{color:#a49c8c;font-weight:400}
-  .wp-boss .itc{max-width:none}.wp-boss button{margin-top:6px}
-  .wp-icons{margin-left:6px;padding-left:6px;border-left:1px dashed rgba(216,192,138,.5)}.wp-ii img{width:100%;height:100%}
-  .wp-ln .wp-nb{font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px}
-  @media (max-width:640px){.wp-rack{inset:2%;padding:10px}.wp-row{flex-wrap:wrap}.wp-bt{flex-direction:row}}`;
-  const add = () => { const s = document.createElement('style'); s.id = 'wpCss'; s.textContent = css; document.head.append(s); };
-  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
-}
-
-/* ================= HERO WEAPONS, on screen (forces_zzzzzzzzzzzzzzzz_heroweapons.js) =================
-   - The weapon rack of a Champion opens the hero's own page: its weapon's card, the four stages (each with its name, the
-     effect it adds and whether it is reached), the progress to the next ("wave bosses slain while it stands: 2 / 3"), the
-     reforged legendary it may become, TEMPERING (each rack weapon that can be tempered into it, with the numbers before and after),
-     re-forging to the wave's level and its runes (the forge's own prices: forces_zzzzzzzzzzzzzzz_forge.js).
-   - Its card (wpnCardHTML) says Hero weapon, its stage, its stage effects and its progress.
-   - The glow: a small light at the weapon's tip in its stage's colour (hwGlow), brighter each stage; Maren's sculpted twin
-     blade is also tinted (unitmodels_maren.js, hwTint). Kept small, at the tip only (the owner's rule: never hide the unit). */
-const hwE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-function hwProgress(h) {
-  if (h.stage >= 3) return h.ult ? 'Reforged: its ultimate form.' : `Stage IV reached. Each wave boss slain while it stands may drop its reforged form (very rare).`;
-  return `Wave bosses slain while it stands: ${h.bosses | 0} / ${HW_AT[h.stage + 1]} to stage ${['I', 'II', 'III', 'IV'][h.stage + 1]}`;
-}
-function hwStagesHTML(h) {
-  const H = HW[h.u]; let s = '<ol class="hw-st">';
-  for (let i = 0; i < 4; i++) {
-    const on = (h.stage | 0) >= i, fx = i ? H.fx[i - 1] : null, txt = fx ? wpnRuleText({ fx }) : 'Its damage as issued' + (WPN_CLASS[(WPN_BASE[h.b] || {}).cls] && WPN_CLASS[WPN_BASE[h.b].cls].cast ? ', and its Spell Damage' : '') + '.';
-    s += `<li class="${on ? 'on' : ''}"><b>${['I', 'II', 'III', 'IV'][i]} · ${hwE(H.n[i])}</b> <small>${i ? `at ${HW_AT[i]} wave boss${HW_AT[i] > 1 ? 'es' : ''}` : 'from the start'}</small><p>${hwE(txt)}</p></li>`;
-  }
-  s += `<li class="ult${h.ult ? ' on' : ''}"><b style="color:${RARITY[4].col}">Reforged · ${hwE(H.ult[0])}</b> <small>very rare, from a wave boss once it is at stage III</small><p>${hwE(H.ult[1].charAt(0).toUpperCase() + H.ult[1].slice(1))}. Adds: ${hwE(H.ult[2].map(fx => wpnRuleText({ fx })).join(' '))}</p></li>`;
-  return s + '</ol>';
-}
-// its card wherever a weapon card shows
-if (typeof wpnCardHTML === 'function') {
-  const _hwCard = wpnCardHTML;
-  wpnCardHTML = function (w, t, o) {
-    if (!w || !w.hero || !HW[w.u]) return _hwCard.apply(this, arguments);
-    const ty = t ? t.type : Object.keys(TOWERS).find(k => TOWERS[k].unit === w.u), n = ty ? wpnNums(w, ty) : null, H = HW[w.u], sh = wpnShow(w);
-    const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
-    const fx = hwFx(w).map(f => `<div class="itc-ab"><b>${hwE(f === (H.ult[2] || [])[0] || H.ult[2].includes(f) ? 'Reforged' : 'Awakened')}</b> ${hwE(wpnRuleText({ fx: f }))}</div>`).join('');
-    return `<div class="itc" style="--rc:${H.glow}"><h5 class="itc-n" style="color:${H.glow}">${hwE(sh.name)}</h5><p class="itc-k">Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}</p>
-      <ul class="itc-s">${lines.join('')}</ul>${fx}${w.tw ? `<p class="itc-k">Tempered with: ${hwE(w.tw.n)} (item level ${w.tw.il})</p>` : ''}<p class="itc-k">${hwE(hwProgress(w))}</p><p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${(o && o.note) || ''}</div>`;
-  };
-}
-// its kind line (the Gear sheet's row, the rack): Hero weapon and its stage, not a rarity
-if (typeof wpKindLine === 'function') {
-  const _hwKind = wpKindLine;
-  wpKindLine = function (w) { return w && w.hero && HW[w.u] ? `Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}` : _hwKind.apply(this, arguments); };
-}
-// the rack of a Champion: its hero page
-if (typeof wpRack === 'function') {
-  const _hwRack = wpRack;
-  wpRack = function (t) { if (hwOn() && hwIsHero(t)) return hwPanel(t); return _hwRack.apply(this, arguments); };
-}
-function hwPanel(t) {
-  if (!ovp) return;
-  for (const q of ovp.querySelectorAll('.wp-rack')) q.remove();
-  const h = hwState(t.def.unit); if (!h) return; t.weapon = h;
-  const gold = G.gold | 0, cl = (a, b) => b > a + 1e-6 ? 'bo' : b < a - 1e-6 ? 'neg' : '';
-  const now = wpnNums(h, t.type), d0 = wpnDpsWith(t, h);
-  const melt = (G.wbag || []).filter(w => !hwMeltWhy(h, w)).map(w => {
-    const r = hwMeltResult(h, w), n = wpnNums(r, t.type), d1 = wpnDpsWith(t, r), c = hwMeltCost(h, w);
-    return `<div class="wp-row"><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${hwE(wpnName(w))}</b><small>${hwE(wpKindLine(w))}</small>
-      <p>Item Level ${h.il | 0} → <b class="${cl(h.il, r.il)}">${r.il}</b> · Damage ${wpRange(now)} → <b class="${cl(now.avg, n.avg)}">${wpRange(n)}</b>${now.sp || n.sp ? ` · Spell Damage ${now.sp} → <b class="${cl(now.sp, n.sp)}">${n.sp}</b>` : ''} · DPS on it ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b></p></div>
-      <div class="wp-bt"><button type="button" class="pri" data-hm="${w.id}"${gold >= c ? '' : ' disabled'}>Temper into ${hwE(wpnName(h))} · ${c} gold</button></div></div>`;
-  }).join('');
-  const lc = typeof forgeRelevelCost === 'function' ? forgeRelevelCost(h) : null, rc = typeof forgeRuneCost === 'function' ? forgeRuneCost(h) : null, slots = typeof forgeSlots === 'function' ? forgeSlots(h) : 0, R = h.runes || [];
-  const runeOpts = typeof RUNES !== 'undefined' ? Object.keys(RUNES).filter(k => runeFits(k, t)) : [];
-  let runes = '';
-  for (let i = 0; i < slots; i++) runes += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${hwE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${runeOpts.filter(k => k !== R[i]).map(k => `<button type="button" data-hr="${i}|${k}"${gold >= rc ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${hwE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
-  ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack hw-panel" role="dialog" aria-label="Hero weapon"><div class="wp-hd"><h3>Hero weapon · ${hwE(t.def.name.split(',')[0])} <small>it keeps this weapon all run · you have ${gold} gold</small></h3><button type="button" class="tx" id="hwClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
-    <div class="wp-cur"><img src="${wpIconURL(h)}" alt=""><div>${wpnCardHTML(h, t)}</div></div>
-    <h4>Awakening <small>${hwE(hwProgress(h))}</small></h4>${hwStagesHTML(h)}
-    <h4>Temper <small>${hwUnique(h) ? 'Temper any weapon into the hero\'s weapon (no one else holds its kind)' : `Temper a weapon of its kind (a ${hwE((WPN_BASE[h.b] || {}).cls)}) into the hero's weapon`} to raise its level: it rises to the tempering weapon's Item Level and takes half of a better roll; its look never changes</small></h4>${h.tw ? `<p class="itc-k">Tempered with: ${hwE(h.tw.n)} (item level ${h.tw.il})</p>` : ''}
-    <div class="wp-list">${melt || '<p class="gp-none">Nothing in the rack can be tempered into it yet.</p>'}</div>
-    <div class="wp-fr"><h4>Re-forge to Item Level ${typeof forgeNow === 'function' ? forgeNow() : G.wave} <small>now ${h.il | 0}</small></h4>${lc == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, h, Object.assign({}, h, { il: forgeNow(), _c: null }))}</p><button type="button" class="pri" id="hwLv"${gold >= lc ? '' : ' disabled'}>Re-forge · ${lc} gold</button>`}</div>
-    <div class="wp-fr"><h4>Runes <small>${slots} socket${slots === 1 ? '' : 's'} (more as it awakens); a rune costs ${rc} gold</small></h4>${runes}</div></div>`);
-  const box = ovp.querySelector('.hw-panel'), redo = () => { box.remove(); hwPanel(t); };
-  box.querySelector('#hwClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); openGearPanel(t); };
-  for (const b of box.querySelectorAll('[data-hm]')) b.onclick = () => { const w = (G.wbag || []).find(q => q.id === +b.dataset.hm); if (w && hwMelt(h, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} tempered into ${wpnName(h)}: Item Level ${h.il}.`); redo(); } };
-  const lv = box.querySelector('#hwLv'); if (lv) lv.onclick = () => { if (forgeRelevel(h)) redo(); };
-  for (const b of box.querySelectorAll('[data-hr]')) b.onclick = () => { const [i, k] = b.dataset.hr.split('|'); if (forgeRune(h, +i, k, t)) redo(); };
-}
-// the glow at its tip, a step brighter each stage (small, at the tip only)
-if (typeof drawSchoolMarks === 'function') {
-  const _hwMarks = drawSchoolMarks;
-  drawSchoolMarks = function (t) {
-    const r = _hwMarks.apply(this, arguments);
-    try {
-      const g = hwGlow(t); if (!g || typeof QADD === 'undefined') return r;
-      const tip = t.tipW && t.tipAt != null && G.time - t.tipAt < .5 ? t.tipW : [t.x, towerTop(t) + .05, t.y], vt = G.time || 0;
-      const a = (.18 + .3 * g.k) * (.8 + .2 * Math.sin(vt * 3 + t.x)), s = .12 + .14 * g.k + (g.ult ? .06 : 0);
-      QADD.bill(RD, tip[0], tip[1], tip[2], s, s, [g.col[0], g.col[1], g.col[2], a], 1, 0);
-      if (typeof VLIVE !== 'undefined' && VLIVE && Math.random() < .04 + .1 * g.k) part({ k: 'spark', x: tip[0] + R_(-.06, .06), z: tip[2] + R_(-.06, .06), h: tip[1], vh: R_(.15, .45), drag: 1, life: .45, max: .45, size: .03 + .02 * g.k, col: g.hex });
-    } catch (e) {}
-    return r;
-  };
-}
-if (typeof document !== 'undefined') {
-  const css = `.hw-st{list-style:none;margin:4px 0 8px;padding:0}.hw-st li{padding:5px 8px;margin:3px 0;border-left:3px solid #4a4436;opacity:.6;font-size:12.5px}
-  .hw-st li.on{opacity:1;border-left-color:#f2d27a;background:rgba(242,210,122,.06)}.hw-st li small{color:#a49c8c}.hw-st li p{margin:2px 0 0}.hw-st li.ult{border-left-color:${'#ff8c1a'}}`;
-  const add = () => { const s = document.createElement('style'); s.id = 'hwCss'; s.textContent = css; document.head.append(s); };
-  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
-}
-
 /* Issued weapons reflect the unit's visible prop. Paintings live in COMPLETION_ART.weapons.
    The base/class still owns combat numbers and drop compatibility. New model variants only change presentation. */
 const WPN_START_ART = {
@@ -90732,6 +90324,101 @@ if (typeof document !== 'undefined') {
   .wp-ln .wp-nb{font-size:10px;color:#1a1408;background:#ffd166;border-radius:3px;padding:0 4px}
   @media (max-width:640px){.wp-rack{inset:2%;padding:10px}.wp-row{flex-wrap:wrap}.wp-bt{flex-direction:row}}`;
   const add = () => { const s = document.createElement('style'); s.id = 'wpCss'; s.textContent = css; document.head.append(s); };
+  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+}
+
+/* ================= HERO WEAPONS, on screen (forces_zzzzzzzzzzzzzzzz_heroweapons.js) =================
+   - The weapon rack of a Champion opens the hero's own page: its weapon's card, the four stages (each with its name, the
+     effect it adds and whether it is reached), the progress to the next ("wave bosses slain while it stands: 2 / 3"), the
+     reforged legendary it may become, TEMPERING (each rack weapon that can be tempered into it, with the numbers before and after),
+     re-forging to the wave's level and its runes (the forge's own prices: forces_zzzzzzzzzzzzzzz_forge.js).
+   - Its card (wpnCardHTML) says Hero weapon, its stage, its stage effects and its progress.
+   - The glow: a small light at the weapon's tip in its stage's colour (hwGlow), brighter each stage; Maren's sculpted twin
+     blade is also tinted (unitmodels_maren.js, hwTint). Kept small, at the tip only (the owner's rule: never hide the unit). */
+const hwE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function hwProgress(h) {
+  if (h.stage >= 3) return h.ult ? 'Reforged: its ultimate form.' : `Stage IV reached. Each wave boss slain while it stands may drop its reforged form (very rare).`;
+  return `Wave bosses slain while it stands: ${h.bosses | 0} / ${HW_AT[h.stage + 1]} to stage ${['I', 'II', 'III', 'IV'][h.stage + 1]}`;
+}
+function hwStagesHTML(h) {
+  const H = HW[h.u]; let s = '<ol class="hw-st">';
+  for (let i = 0; i < 4; i++) {
+    const on = (h.stage | 0) >= i, fx = i ? H.fx[i - 1] : null, txt = fx ? wpnRuleText({ fx }) : 'Its damage as issued' + (WPN_CLASS[(WPN_BASE[h.b] || {}).cls] && WPN_CLASS[WPN_BASE[h.b].cls].cast ? ', and its Spell Damage' : '') + '.';
+    s += `<li class="${on ? 'on' : ''}"><b>${['I', 'II', 'III', 'IV'][i]} · ${hwE(H.n[i])}</b> <small>${i ? `at ${HW_AT[i]} wave boss${HW_AT[i] > 1 ? 'es' : ''}` : 'from the start'}</small><p>${hwE(txt)}</p></li>`;
+  }
+  s += `<li class="ult${h.ult ? ' on' : ''}"><b style="color:${RARITY[4].col}">Reforged · ${hwE(H.ult[0])}</b> <small>very rare, from a wave boss once it is at stage III</small><p>${hwE(H.ult[1].charAt(0).toUpperCase() + H.ult[1].slice(1))}. Adds: ${hwE(H.ult[2].map(fx => wpnRuleText({ fx })).join(' '))}</p></li>`;
+  return s + '</ol>';
+}
+// its card wherever a weapon card shows
+if (typeof wpnCardHTML === 'function') {
+  const _hwCard = wpnCardHTML;
+  wpnCardHTML = function (w, t, o) {
+    if (!w || !w.hero || !HW[w.u]) return _hwCard.apply(this, arguments);
+    const ty = t ? t.type : Object.keys(TOWERS).find(k => TOWERS[k].unit === w.u), n = ty ? wpnNums(w, ty) : null, H = HW[w.u], sh = wpnShow(w);
+    const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
+    const fx = hwFx(w).map(f => `<div class="itc-ab"><b>${hwE(f === (H.ult[2] || [])[0] || H.ult[2].includes(f) ? 'Reforged' : 'Awakened')}</b> ${hwE(wpnRuleText({ fx: f }))}</div>`).join('');
+    return `<div class="itc" style="--rc:${H.glow}"><h5 class="itc-n" style="color:${H.glow}">${hwE(sh.name)}</h5><p class="itc-k">Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}</p>
+      <ul class="itc-s">${lines.join('')}</ul>${fx}${w.tw ? `<p class="itc-k">Tempered with: ${hwE(w.tw.n)} (item level ${w.tw.il})</p>` : ''}<p class="itc-k">${hwE(hwProgress(w))}</p><p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${(o && o.note) || ''}</div>`;
+  };
+}
+// its kind line (the Gear sheet's row, the rack): Hero weapon and its stage, not a rarity
+if (typeof wpKindLine === 'function') {
+  const _hwKind = wpKindLine;
+  wpKindLine = function (w) { return w && w.hero && HW[w.u] ? `Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}` : _hwKind.apply(this, arguments); };
+}
+// the rack of a Champion: its hero page
+if (typeof wpRack === 'function') {
+  const _hwRack = wpRack;
+  wpRack = function (t) { if (hwOn() && hwIsHero(t)) return hwPanel(t); return _hwRack.apply(this, arguments); };
+}
+function hwPanel(t) {
+  if (!ovp) return;
+  for (const q of ovp.querySelectorAll('.wp-rack')) q.remove();
+  const h = hwState(t.def.unit); if (!h) return; t.weapon = h;
+  const gold = G.gold | 0, cl = (a, b) => b > a + 1e-6 ? 'bo' : b < a - 1e-6 ? 'neg' : '';
+  const now = wpnNums(h, t.type), d0 = wpnDpsWith(t, h);
+  const melt = (G.wbag || []).filter(w => !hwMeltWhy(h, w)).map(w => {
+    const r = hwMeltResult(h, w), n = wpnNums(r, t.type), d1 = wpnDpsWith(t, r), c = hwMeltCost(h, w);
+    return `<div class="wp-row"><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${hwE(wpnName(w))}</b><small>${hwE(wpKindLine(w))}</small>
+      <p>Item Level ${h.il | 0} → <b class="${cl(h.il, r.il)}">${r.il}</b> · Damage ${wpRange(now)} → <b class="${cl(now.avg, n.avg)}">${wpRange(n)}</b>${now.sp || n.sp ? ` · Spell Damage ${now.sp} → <b class="${cl(now.sp, n.sp)}">${n.sp}</b>` : ''} · DPS on it ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b></p></div>
+      <div class="wp-bt"><button type="button" class="pri" data-hm="${w.id}"${gold >= c ? '' : ' disabled'}>Temper into ${hwE(wpnName(h))} · ${c} gold</button></div></div>`;
+  }).join('');
+  const lc = typeof forgeRelevelCost === 'function' ? forgeRelevelCost(h) : null, rc = typeof forgeRuneCost === 'function' ? forgeRuneCost(h) : null, slots = typeof forgeSlots === 'function' ? forgeSlots(h) : 0, R = h.runes || [];
+  const runeOpts = typeof RUNES !== 'undefined' ? Object.keys(RUNES).filter(k => runeFits(k, t)) : [];
+  let runes = '';
+  for (let i = 0; i < slots; i++) runes += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${hwE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${runeOpts.filter(k => k !== R[i]).map(k => `<button type="button" data-hr="${i}|${k}"${gold >= rc ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${hwE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
+  ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack hw-panel" role="dialog" aria-label="Hero weapon"><div class="wp-hd"><h3>Hero weapon · ${hwE(t.def.name.split(',')[0])} <small>it keeps this weapon all run · you have ${gold} gold</small></h3><button type="button" class="tx" id="hwClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
+    <div class="wp-cur"><img src="${wpIconURL(h)}" alt=""><div>${wpnCardHTML(h, t)}</div></div>
+    <h4>Awakening <small>${hwE(hwProgress(h))}</small></h4>${hwStagesHTML(h)}
+    <h4>Temper <small>${hwUnique(h) ? 'Temper any weapon into the hero\'s weapon (no one else holds its kind)' : `Temper a weapon of its kind (a ${hwE((WPN_BASE[h.b] || {}).cls)}) into the hero's weapon`} to raise its level: it rises to the tempering weapon's Item Level and takes half of a better roll; its look never changes</small></h4>${h.tw ? `<p class="itc-k">Tempered with: ${hwE(h.tw.n)} (item level ${h.tw.il})</p>` : ''}
+    <div class="wp-list">${melt || '<p class="gp-none">Nothing in the rack can be tempered into it yet.</p>'}</div>
+    <div class="wp-fr"><h4>Re-forge to Item Level ${typeof forgeNow === 'function' ? forgeNow() : G.wave} <small>now ${h.il | 0}</small></h4>${lc == null ? '<p class="itc-k">It is at the current wave\'s level.</p>' : `<p>${wpForgeLines(t, h, Object.assign({}, h, { il: forgeNow(), _c: null }))}</p><button type="button" class="pri" id="hwLv"${gold >= lc ? '' : ' disabled'}>Re-forge · ${lc} gold</button>`}</div>
+    <div class="wp-fr"><h4>Runes <small>${slots} socket${slots === 1 ? '' : 's'} (more as it awakens); a rune costs ${rc} gold</small></h4>${runes}</div></div>`);
+  const box = ovp.querySelector('.hw-panel'), redo = () => { box.remove(); hwPanel(t); };
+  box.querySelector('#hwClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); openGearPanel(t); };
+  for (const b of box.querySelectorAll('[data-hm]')) b.onclick = () => { const w = (G.wbag || []).find(q => q.id === +b.dataset.hm); if (w && hwMelt(h, w)) { if (typeof onToast === 'function') onToast(`${wpnName(w)} tempered into ${wpnName(h)}: Item Level ${h.il}.`); redo(); } };
+  const lv = box.querySelector('#hwLv'); if (lv) lv.onclick = () => { if (forgeRelevel(h)) redo(); };
+  for (const b of box.querySelectorAll('[data-hr]')) b.onclick = () => { const [i, k] = b.dataset.hr.split('|'); if (forgeRune(h, +i, k, t)) redo(); };
+}
+// the glow at its tip, a step brighter each stage (small, at the tip only)
+if (typeof drawSchoolMarks === 'function') {
+  const _hwMarks = drawSchoolMarks;
+  drawSchoolMarks = function (t) {
+    const r = _hwMarks.apply(this, arguments);
+    try {
+      const g = hwGlow(t); if (!g || typeof QADD === 'undefined') return r;
+      const tip = t.tipW && t.tipAt != null && G.time - t.tipAt < .5 ? t.tipW : [t.x, towerTop(t) + .05, t.y], vt = G.time || 0;
+      const a = (.18 + .3 * g.k) * (.8 + .2 * Math.sin(vt * 3 + t.x)), s = .12 + .14 * g.k + (g.ult ? .06 : 0);
+      QADD.bill(RD, tip[0], tip[1], tip[2], s, s, [g.col[0], g.col[1], g.col[2], a], 1, 0);
+      if (typeof VLIVE !== 'undefined' && VLIVE && Math.random() < .04 + .1 * g.k) part({ k: 'spark', x: tip[0] + R_(-.06, .06), z: tip[2] + R_(-.06, .06), h: tip[1], vh: R_(.15, .45), drag: 1, life: .45, max: .45, size: .03 + .02 * g.k, col: g.hex });
+    } catch (e) {}
+    return r;
+  };
+}
+if (typeof document !== 'undefined') {
+  const css = `.hw-st{list-style:none;margin:4px 0 8px;padding:0}.hw-st li{padding:5px 8px;margin:3px 0;border-left:3px solid #4a4436;opacity:.6;font-size:12.5px}
+  .hw-st li.on{opacity:1;border-left-color:#f2d27a;background:rgba(242,210,122,.06)}.hw-st li small{color:#a49c8c}.hw-st li p{margin:2px 0 0}.hw-st li.ult{border-left-color:${'#ff8c1a'}}`;
+  const add = () => { const s = document.createElement('style'); s.id = 'hwCss'; s.textContent = css; document.head.append(s); };
   if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
 }
 
