@@ -1,4 +1,4 @@
-const BUILD_TAG = '88b3514@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '875c7d0@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53849,6 +53849,7 @@ void main(){
     dd += (fbm(vW.xz*.85 + 3.) - .5)*1.1 + (vnoise(vW.xz*3.1) - .5)*.3;
     fc = mix(fc, texture(uBg, gl_FragCoord.xy/uRes).rgb, smoothstep(uFD.x, uFD.y, dd));
   }
+  if(uGPOn > .5 && vX.y < .5) fc = mix(fc, dot(fc, vec3(.2126, .7152, .0722))*uGrade.rgb, uGrade.a*.6);   // (on a painted map: its grade, a little lighter on the units so they read)
   o = vec4(fc, vX.x);
 }`;
 /* A rigged model's skinning on the GPU: two bones a vertex (aBone: their indices, aBW: the first one's share), each bone a
@@ -53970,6 +53971,7 @@ void main(){
   vec3 fc = finish(col, vW);
   fc = mix(fc, max(fc, vCol*(.75 + .25*vX.z)), max(vEm, 0.));
   if(rk > 0.) fc = mix(fc, max(fc, tx/max(max(tx.r, max(tx.g, tx.b)), .02)*(.8 + .2*vX.z)), rk);   // (the eyes keep their green through the tone curve)
+  if(uGPOn > .5 && vX.y < .5) fc = mix(fc, dot(fc, vec3(.2126, .7152, .0722))*uGrade.rgb, uGrade.a*.6);   // (on a painted map: its grade, a little lighter on the units so they read)
   o = vec4(fc, vX.x);
 }`;
 const VS_SH = `#version 300 es
@@ -53996,8 +53998,9 @@ void main(){
 const FS_TREE = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vNor, vCol, vW; in vec4 vL; in vec2 vUV; in float vH;
-uniform sampler2D uTex; uniform float uLeaf, uCut, uTime, uGain;
+uniform sampler2D uTex; uniform float uLeaf, uCut, uTime, uGain, uSway;
 uniform highp sampler2DArray uTC; uniform float uTOn;   // (the painted terrain textures: tree_bark is layer 9)
+uniform sampler2D uGPT; uniform float uGPOn; uniform vec4 uGP; uniform vec2 uGPS;   // (a painted map: the light painted under it, as the units take it)
 in vec3 vC;   // (the instance's foot)
 uniform vec3 uFade;   // the 3D maps' giant trees (map3d.js): above uFade.x the tree dissolves (gone by uFade.y), so the camera
                       // looks under the canopy at the trunks; uFade.z: moss on the bark (the tops of roots and low limbs)
@@ -54010,29 +54013,47 @@ void main(){
     if(ig < smoothstep(uFade.x, uFade.y, vW.y)) discard; }
   vec3 base = vCol;
   vec3 n = normalize(vNor);
-  if(uLeaf>.5){ vec4 t = texture(uTex, vUV); vec2 ts = vec2(textureSize(uTex, 0)); float mip = max(0., .5*log2(max(dot(dFdx(vUV*ts),dFdx(vUV*ts)), dot(dFdy(vUV*ts),dFdy(vUV*ts))))); t.a *= 1. + mip*.28; if(t.a < uCut) discard; base *= pow(t.rgb, vec3(2.2))*.88*uGain; }
+  if(uLeaf>.5){ vec4 t = texture(uTex, vUV); vec2 ts = vec2(textureSize(uTex, 0)); float mip = max(0., .5*log2(max(dot(dFdx(vUV*ts),dFdx(vUV*ts)), dot(dFdy(vUV*ts),dFdy(vUV*ts))))); t.a *= 1. + mip*.28; if(t.a < uCut) discard; base *= pow(t.rgb, vec3(2.2))*.88*uGain;
+    if(uSway < .5){ float bl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(bl), base, .4)*vec3(.9, 1.06, .9)*(uGPOn > .5 ? 1.9 : 1.); }   // (on the painting: as light as its painted stones)
+    else if(uGPOn > .5){   // plants on the painting: its muted olive and sage, the leaves' own hue only partly kept
+      float bl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(bl)*vec3(.92, 1., .78), base, .45)*.85;
+    }   // (rocks and stumps: grey-green, the violet left to their shade)
+  }
   else { if(!gl_FrontFacing) n = -n; base *= .85 + .25*vH;
     if(uFade.z > 0.){   // bark: furrows, and moss over what faces up, thickest low down
       float an = atan(n.z, n.x);
       if(uTOn > .5){   // the painted bark, wrapped round the trunk (u round it, v up it)
         vec2 buv = vec2(atan(vW.z - vC.z, vW.x - vC.x)/6.2832*6., vW.y*.42);
         vec3 bt = texture(uTC, vec3(buv, 9.)).rgb; base = bt*bt*(bt*.2 + .8)*(.62 + .38*smoothstep(-.4, 1.2, vW.y - vC.y));
+        if(uGPOn > .5) base *= vec3(1.5, 1.12, .78);   // (on the painting: its warm brown trunks)
       }
       float f = vnoise(vec2(an*3., vW.y*1.6)*vec2(1., 2.5)), rid = abs(vnoise(vec2(an*7.5 + vnoise(vW.xz*3.)*1.5, vW.y*.35))*2. - 1.);
       base *= (.62 + .5*f)*mix(.55, 1.15, smoothstep(.05, .45, rid));   // deep vertical furrows between bark ridges
       float m = uFade.z*smoothstep(-.1, .55, n.y + (fbm(vW.xz*2.1 + vW.y)*.6 - .3))*(1. - smoothstep(.5, 3.5, vW.y)*.7);
-      base = mix(base, vec3(.05, .085, .03)*(.7 + .6*fbm(vW.xz*5. + vW.y*3.)), clamp(m, 0., .9));
+      if(uGPOn > .5) m *= .45;   // (on the painting: brown bark and roots with only a little warm moss, as painted)
+      base = mix(base, mix(vec3(.05, .085, .03), vec3(.14, .13, .05), uGPOn)*(.7 + .6*fbm(vW.xz*5. + vW.y*3.)), clamp(m, 0., .9));
     } }
   float sh = uShadowOn>.5 ? shadowAt(vL) : 1.;
   vec3 light = lightAt(n, vW, sh, uLeaf*.3);
   float ao = uLeaf>.5 ? mix(.55, 1.05, smoothstep(.15,.95,vH)) : mix(.6,1.,smoothstep(0.,.3,vH));
-  vec3 col = base*light*ao*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
+  if(uGPOn > .5 && uGPS.x > .5){   // the one lighting path on the painted map: the light painted where it stands, as the units
+    vec2 pu = clamp((vC.xz - uGP.xy)*uGP.zw, 0., 1.);
+    float pl = dot(textureLod(uGPT, pu, 4.5).rgb, vec3(.3, .59, .11));
+    light *= clamp(pow(pl/uGPS.y, .85), uSway < .5 ? .6 : .25, 1.3);   // (rocks keep more light: dark paint under them made them black)
+    if(uLeaf > .5 && uSway > .5){   // plants: a warm golden lift on the lit leaves, the painting's cool blue-violet in their shade
+      float lit = smoothstep(-.1, .6, dot(n, uSunDir))*sh;
+      base *= mix(vec3(.82, .86, 1.08), vec3(1.14, 1.06, .8), lit);
+    }
+  }
+  float gc = uFade.z > 0. ? (1. - .45*(1. - smoothstep(0., .9, vW.y - vC.y))) : 1.;   // (a giant's soft contact with the ground)
+  vec3 col = base*light*ao*gc*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
   if(uLeaf > .5 && uTOn > .5){ vec3 Vs = normalize(uCam - vW); float lum = dot(base, vec3(.3, .59, .11))/max(.05, uGain*.3);
     col += uSunCol*pow(max(dot(n, normalize(uSunDir + Vs)), 0.), 36.)*.35*sh*clamp(lum*lum, 0., 1.); }   // (a glint on wet stone and leaf edges)
   if(uFade.z > 0.){ vec3 V = normalize(uCam - vW); float rim = pow(1. - max(dot(n, V), 0.), 2.6);   // the giants: a silvery rim of moonlight down the trunks
     col += rim*uSunCol*uRim*(uLeaf > .5 ? .25 : .9)*mix(.4, 1., sh)*(.25 + base*2.)*(1. - smoothstep(4., 10., vW.y)*.7);
     col *= mix(1., .22, smoothstep(2.2, uFade.x, vW.y)); }   // rising into the canopy's shade
   o = vec4(finish(col, vW), 1.);
+  if(uGPOn > .5) o.rgb = mix(o.rgb, dot(o.rgb, vec3(.2126, .7152, .0722))*uGrade.rgb, uGrade.a);   // (the map's grade, as on the painting)
 }`;
 const VS_TREE_SH = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=3) in vec2 aUV; layout(location=4) in vec4 aI; layout(location=5) in vec2 aI2;
@@ -54136,12 +54157,24 @@ void main(){
   }
   float ao = vAE.x;
   float sh = uShadowOn > .5 ? shadowAt(vL) : 1.;
-  vec3 glow = vec3(0.);
+  vec3 glow = vec3(0.); float dap = 1., fieldK = 0.;
   if(uTOn > .5){
     // the painted layers, blended by the same rules (grass, lush grass toward the woods, moss, forest litter, the road -
     // packed earth on the foes' live path, flagstones on the fixed ways in and out - roots, stream bed, rock), each at its
     // own tile size; the data layer (normal, AO, roughness) and the glint mask blend with them
-    vec4 C = tCol(uLay[0], xz/2.2); vec4 D = texture(uTD, vec3(xz/2.2, uLay[0])); float gs = .45;
+    // the field's grass (owner: "too much repetition"): two samples at different scales and turns, blended by a large
+    // noise, each softened toward its own mip (fewer high-contrast blades); then broad patches of lush, dry and a little moss
+    vec2 gA = xz/2.2, gB = mat2(.62, -.78, .78, .62)*xz/3.7 + vec2(.43, .19);
+    float gm = smoothstep(.3, .7, fbm(xz*.11 + 21.));
+    vec4 C = mix(tCol(uLay[0], gA), texture(uTC, vec3(gB, uLay[0])), gm);
+    C.rgb = mix(C.rgb, textureLod(uTC, vec3(gA, uLay[0]), 3.).rgb, .35);
+    vec4 D = mix(texture(uTD, vec3(gA, uLay[0])), texture(uTD, vec3(gB, uLay[0])), gm); float gs = .45;
+    {
+      float pL = smoothstep(.55, .78, fbm(xz*.07 + 3.)), pD = smoothstep(.58, .8, fbm(xz*.09 + 17.)), pM = smoothstep(.62, .82, fbm(xz*.13 + 40.));
+      C.rgb = mix(C.rgb, mix(C.rgb, textureLod(uTC, vec3(xz/2.6, uLay[1]), 1.).rgb, .7), pL*.6);
+      C.rgb = mix(C.rgb, C.rgb*vec3(1.12, 1.06, .78), pD*.4);
+      C.rgb = mix(C.rgb, textureLod(uTC, vec3(xz/2.4, uLay[2]), 1.).rgb, pM*.3);
+    }
     #define TLAY(Li, w, sc, g) if((w) > .01){ vec2 uv_ = xz/(sc); vec4 c_ = tCol(uLay[Li], uv_), d_ = texture(uTD, vec3(uv_, uLay[Li])); C = mix(C, c_, (w)); D = mix(D, d_, (w)); gs = mix(gs, (g), (w)); }
     float wLeaf = smoothstep(1.4, 2.8, vAE.y + (n2 - .5)*.8);   // (forest litter only deep in the woods: lush grass and moss frame the field)
     float wLush = smoothstep(.15, 1.1, vAE.y + (n1 - .5)*.6)*(1. - wLeaf*.6);
@@ -54159,12 +54192,14 @@ void main(){
       vec4 rd = texture(uTD, vec3(q3.xz, uLay[6]));
       C = mix(C, rc, wRock); D = mix(D, rd, wRock); gs = mix(gs, .36, wRock);
     }
-    base = tLin(C.rgb)*vec3(.54, .66, .66)*mix(1., .85, wLeaf)*(1. - .14*smoothstep(.1, .3, max(vSp.x, pt))*(1. - wRoad));
+    base = tLin(C.rgb)*vec3(.56, .64, .7)*mix(1., .85, wLeaf)*(1. - .14*smoothstep(.1, .3, max(vSp.x, pt))*(1. - wRoad));
     // as the painting: lighter, sun-worn patches in the field, and dappled light through the canopy
-    float fieldK = 1. - smoothstep(.2, 1., vAE.y);
-    base = mix(base, base*vec3(1.22, 1.14, .86), smoothstep(.6, .8, fbm(xz*.33 + 9.))*.45*fieldK*(1. - wRoad));
-    float dap = smoothstep(.34, .6, fbm(xz*.27 + vec2(3.1, 7.7)) + (vnoise(xz*1.3) - .5)*.12);
-    sh *= mix(.55, 1., dap);   // (strong dapple, as painted: leaf shadow with ragged edges)
+    fieldK = 1. - smoothstep(.2, 1., vAE.y);
+    base = mix(base, base*vec3(1.16, 1.12, .92), smoothstep(.6, .8, fbm(xz*.33 + 9.))*.35*fieldK*(1. - wRoad));
+    { float bl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(bl), base, mix(1., .9, fieldK)); }   // (calmer greens in the field: one moonlit palette with the edges)
+    // dappled moonlight through the canopy: soft pools of light, the rest gently shaded (never dark)
+    dap = smoothstep(.42, .62, fbm(xz*.23 + vec2(3.1, 7.7)) + (vnoise(xz*1.1) - .5)*.14);
+    sh *= mix(.72, 1., dap);
     if(uTK.y > 0.){   // the pass: snow drifts over what is flat enough, as before
       float wS = uTK.y*smoothstep(.62, .82, n.y + (n1 - .5)*.25)*smoothstep(uTK.x - .4, uTK.x + .4, vW.y + (n2 - .5)*.8);
       base = mix(base, tLin(tCol(10., xz/3.).rgb), wS*(1. - wRoad*.6)*.6);
@@ -54181,9 +54216,9 @@ void main(){
     // toward the light (it shimmers as the camera or light moves, no random term), driven by the key light whatever its
     // colour (the moonlit lavender too) and a little by the sky
     float mk = clamp(D.b*3.5, 0., 1.);   // (the handoff's mask peaks near 0.29: brought to 0..1)
-    float m2 = mk*mk, nh_ = max(dot(n, normalize(uSunDir + Vv)), 0.), sparkle = smoothstep(.78, .97, mk)*(pow(nh_, 12.)*.9 + pow(nh_, 80.)*1.6);   // (points on the brightest blade tips only: a sparkle, not a sheen over everything)
+    float m2 = mk*mk, nh_ = max(dot(n, normalize(uSunDir + Vv)), 0.), sparkle = smoothstep(.84, .98, mk)*(pow(nh_, 14.)*.45 + pow(nh_, 80.)*1.1);   // (points on the brightest blade tips only: a sparkle, not a sheen over everything)
     vec3 kc = uSunCol/max(.2, max(uSunCol.r, max(uSunCol.g, uSunCol.b)));
-    glow = mix(pig, vec3(1.), .7)*(kc*mix(1., sh, .7))*(glintLobe(n, uSunDir, Vv, sharp)*mk*.25 + sparkle)*uGl.x*gs*detail + pig*uSky*.12*m2*uGl.x*gs*detail;
+    glow = mix(pig, vec3(1.), .7)*(kc*mix(.4, 1.25, dap)*mix(1., sh, .7))*(glintLobe(n, uSunDir, Vv, sharp)*mk*.25 + sparkle)*uGl.x*gs*detail + pig*uSky*.12*m2*uGl.x*gs*detail;
   }
   vec3 light = lightAt(n, vW, sh, 0.);
   vec3 col = base*light*ao*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE) + glow*(.6 + .4*length(uSunCol));
@@ -54191,7 +54226,8 @@ void main(){
   if(uTOn > .5){   // warm sun patches against cool green shade; the woods vignette darker and blue-green
     col *= mix(vec3(.9, .9, 1.12), vec3(1.04, 1., .96), sh);   // (shade cool violet, light a touch warmer)
     col = mix(col, col*vec3(.86, .86, 1.06), smoothstep(.4, 2.4, vAE.y)*.6);
-    col = max(col, base*(uSky*.5 + vec3(.02, .015, .04)));   // (no area near black: the lavender ambient floor)
+    col = max(col, base*(uSky*.55 + vec3(.03, .02, .05)));
+    col += vec3(.05, .035, .09)*dap*fieldK*.6;   // (the moonlit pools: a soft lavender lift)   // (no area near black: the lavender ambient floor)
   }
   // mist lying in the woods, drifting
   float mist = uTM.a*smoothstep(.3, 2.2, vAE.y)*smoothstep(.25, .8, fbm(xz*.22 + vec2(uTime*.018, uTime*.011)))*smoothstep(3.5, .2, vW.y);
@@ -54249,7 +54285,7 @@ void main(){
     g += vec2(b - a, c - a)/.06*w; nh += a*w;
   }
   g /= 1.5; nh /= 1.5;
-  vec3 N = normalize(vec3(-g.x*.16, 1., -g.y*.16));
+  vec3 N = normalize(vec3(-g.x*.3, 1., -g.y*.3));   // (stronger ripples following the flow)
   float streak = 0.;
   if(fall > .01){   // the falls: a sheet of fast streaks
     float s1 = vnoise(vec2(vS.x*14., vS.y*2.2 - uTime*4.2)), s2 = vnoise(vec2(vS.x*31. + 7., vS.y*4. - uTime*6.5));
@@ -54259,9 +54295,10 @@ void main(){
   vec3 V = normalize(uCam - vW);
   float sh = uShadowOn > .5 ? shadowAt(vL) : 1.;
   // fresnel (Schlick), the reflected sky capped so it never clips the brook to white
-  float NdV = max(dot(N, V), 0.), Fr = .02 + .98*pow(1. - NdV, 5.);
+  float NdV = max(dot(N, V), 0.), Fr = .04 + .96*pow(1. - NdV, 4.);
   vec3 R = reflect(-V, N); R.y = max(R.y, .03);
-  vec3 refl = min(mix(uGnd*.9, uSky*1.1, smoothstep(-.1, .6, R.y)), vec3(.8));
+  vec3 refl = min(mix(uGnd*.9, uSky*1.25 + uSunCol*.1, smoothstep(-.1, .6, R.y)), vec3(1.));
+  refl += uSunCol*pow(max(dot(R, uSunDir), 0.), 40.)*.25;   // (the moon's soft reflection)
   // the bed, where the refracted ray meets it, with the moving caustics laid on it
   float dep = .06 + .3*depth;   // (the column's depth: shallow at the banks, deepest mid-channel and in the pools)
   vec3 Tr = refract(-V, N, 1./1.33);
@@ -54273,18 +54310,20 @@ void main(){
   float cau = rvCaustic(bp.xz*.55, F, 1.);
   bed *= lightIn*(.55 + 1.2*cau*sh*(1. - fall));
   // one extinction along the path through the water, and the single-scattered light it picks up (its glow)
-  vec3 sigT = uAbs.rgb + vec3(uAbs.w), trans = exp(-sigT*path*10.);
-  vec3 inscat = (vec3(uAbs.w)/sigT)*(lightIn*.35 + uWGlow*2.2)*(1. - trans)*mix(uWShal, uWDeep, depth)*3.;
+  // (owner: "doesn't look like the water from Ember": clear, a little teal, the stones seen through the shallows, darker in
+  // the pools; only a gentle teal shimmer on top)
+  vec3 sigT = uAbs.rgb + vec3(uAbs.w), trans = exp(-sigT*path*4.5);
+  vec3 inscat = (vec3(uAbs.w)/sigT)*lightIn*(1. - trans)*mix(uWShal, uWDeep, smoothstep(.2, 1., depth))*1.6;
   vec3 col = bed*trans + inscat;
-  col += uWGlow*(.18 + .35*cau + .15*nh);   // the magic in the water: a glow from within (the owner's teal)
+  col += uWGlow*(.03 + .1*cau*(1. - depth*.5));   // the magic: a gentle teal shimmer
   col = mix(col, refl, Fr);
   col += uSunCol*pow(max(dot(R, uSunDir), 0.), 160.)*.4*sh;
   // foam: baked at the drops and pools (vX.y), at the banks (shallow), dragged downstream by the flow; the falls' streaks
   float fn = fbm(vW.xz*4. - F*uTime*1.4) + fbm(vW.xz*8.5 - F*uTime*2.2)*.5;
-  float foam = smoothstep(1., 1.3, fn*.75 + vX.y*.9 + pow(1. - depth, 5.)*.3)*.7;
+  float foam = smoothstep(1.05, 1.35, fn*.75 + vX.y*1.1 + pow(1. - depth, 4.)*.4)*.8;   // (white lines along the edges, behind rocks, below each fall)
   foam = max(foam, streak*fall);
   col = mix(col, vec3(.88, .97, 1.)*(lightIn*.6 + uWGlow*.5), foam);
-  float a = smoothstep(0., .14, depth + fall)*(.9 + .1*foam);
+  float a = smoothstep(0., .14, depth + fall)*mix(.92 + .08*foam, .55 + .45*streak, fall);   // (the falls: a translucent sheet)
   o = vec4(finish(col, vW), clamp(a, 0., 1.));
 }`;
 const VS_Q = `#version 300 es
@@ -57936,7 +57975,7 @@ function edgeGiantAsset() {
     for (const f of roots) { const c = Math.cos(th - f); if (c > 0) r += R0 * .9 * Math.exp(-Math.max(y, 0) / .9) * c ** 10; }
     return r;
   };
-  const bark = (y, th, k) => { const v = .75 + .35 * (nz(th * 7, y * 3.5) + .5) * k; return [.2 * v, .12 * v, .06 * v]; };
+  const bark = (y, th, k) => { const v = .75 + .35 * (nz(th * 7, y * 3.5) + .5) * k; return [.26 * v, .17 * v, .09 * v]; };
   // the trunk: rings up the bole, twisting a little as it rises
   const NA = 26, NJ = 44, ys = []; for (let j = 0; j <= NJ; j++) ys.push(-.5 + (GH + .5) * (j / NJ) ** 1.35);
   const ring = j => { const y = ys[j], tw = y * .09, out = []; for (let i = 0; i <= NA; i++) { const th = i / NA * TAU; const r = rad(y, th); out.push([Math.cos(th + tw) * r, y, Math.sin(th + tw) * r, th]); } return out; };
@@ -57954,12 +57993,12 @@ function edgeGiantAsset() {
   for (const f of roots) {
     const L = R0 * (1.5 + rnd() * 1.1), S = 9, M = 8, b0 = P.length / 3, bend = (rnd() - .5) * .5;
     for (let s = 0; s <= S; s++) {
-      const t = s / S, a = f + bend * t, dist = R0 * 1.2 + L * t, cx = Math.cos(a) * dist, cz = Math.sin(a) * dist, cy = .7 * (1 - t) ** 1.6 - .12 * t, rr = R0 * (.55 * (1 - t) ** 1.2 + .06);
+      const t = s / S, a = f + bend * t, dist = R0 * 1.2 + L * t, cx = Math.cos(a) * dist, cz = Math.sin(a) * dist, cy = .85 * (1 - t) ** 1.5 - .2 * t, rr = R0 * (.62 * (1 - t) ** 1.1 + .08);
       const fx = Math.cos(a), fz = Math.sin(a), sx = -fz, sz = fx;
       for (let m = 0; m <= M; m++) {
         const q = m / M * TAU, cq = Math.cos(q), sq = Math.sin(q), w = rr * (1 + .2 * nz(q * 2 + f, t * 4));
         const nx = sx * cq, ny = sq * .9, nzz = sz * cq;
-        P.push(cx + nx * w, cy + ny * w * .8, cz + nzz * w); const l = Math.hypot(nx, ny, nzz) || 1; N.push(nx / l, ny / l, nzz / l); C.push(...bark(cy, q + f, .8));
+        P.push(cx + nx * w, cy + ny * w, cz + nzz * w); const l = Math.hypot(nx, ny, nzz) || 1; N.push(nx / l, ny / l, nzz / l); C.push(...bark(cy, q + f, .8));
       }
     }
     for (let s = 0; s < S; s++) for (let m = 0; m < M; m++) { const a = b0 + s * (M + 1) + m, b = a + 1, c = a + M + 1, d = c + 1; I.push(a, c, d, a, d, b); }
@@ -57990,17 +58029,40 @@ function edgeTrunkR(g) {
 function edgeMagic(giants) {
   for (const g of giants || []) {
     if (!g.magic) continue;
-    const r = edgeTrunkR(g), wc = [.3, 1, .92];
-    QADD.ground(g.x, g.z, g.y + .04, r * 2.6, r * 2.6, [.2, .9, .85, .18 + .05 * Math.sin(vt * 1.3 + g.x)], 1, 0);
-    for (let k = 0; k < 2; k++) {
-      const ph0 = vt * .55 + k * Math.PI + g.x;
-      for (let i = 0; i < 96; i++) {
-        const u = i / 95, hgt = .1 + u * 5.5, a = ph0 + u * 9.5 - vt * .4, rr = r * (1.05 + .25 * Math.sin(u * 7 + vt + k)) * (1 - u * .35);
-        const al = Math.sin(Math.PI * Math.min(1, u * 1.15)) * (.55 + .45 * Math.sin(vt * 2.3 + i * .4 + k * 2)) * (1 - u * .4);
-        const x = g.x + Math.cos(a) * rr, z = g.z + Math.sin(a) * rr;
-        if (i % 3 === 0) QADD.bill(RD, x, g.y + hgt, z, .42, .42, [wc[0], wc[1], wc[2], .1 * al], 1, 0);   // (the glow round the ribbon, every third point)
-        QADD.bill(RD, x, g.y + hgt, z, .075, .075, [.7, 1, .97, .7 * al], 1, 0);
-      }
+    const r = edgeTrunkR(g), WC = [[.3, 1, .92], [.72, .5, 1]];   // (teal and violet: owner)
+    QADD.ground(g.x, g.z, g.y + .04, r * 2.6, r * 2.6, [.35, .75, .95, .2 + .05 * Math.sin(vt * 1.3 + g.x)], 1, 0);
+    const top = g.mh || 5.5;
+    // (owner: "more like the magic on the title screen", titlefx.js: not dotted rings but a few soft wisps, each a rising
+    // trail that curls round the trunk, a bright core fading to soft edges, born at the roots, drifting up and out, fading)
+    const ribbons = typeof vfxReady === 'function' && vfxReady();
+    for (let k = 0; k < 4; k++) {
+      const wc = WC[k % 2], life = 7 + k * 1.3, age = ((vt + k * 2.9 + g.x * .7) % life) / life;   // each wisp's cycle
+      const head = age * top * 1.15, len = top * .55, dir = k % 2 ? 1 : -1, a0 = k * 1.7 + g.z;
+      const fade = Math.sin(Math.PI * Math.min(1, age * 1.05)) ** 1.5;
+      const pt = (u, out) => {   // a point u (0 tail .. 1 head) along this wisp
+        const h = Math.max(.05, head - (1 - u) * len), turn = a0 + dir * (h * 1.15 + Math.sin(vt * .4 + k + h) * .35);
+        const rr = r * (1.08 + .35 * (h / top) + .12 * Math.sin(vt * .7 + h * 1.7 + k)) + Math.max(0, h - top * .7) * .5;   // (drifting out near the top)
+        out[0] = g.x + Math.cos(turn) * rr; out[1] = g.y + h; out[2] = g.z + Math.sin(turn) * rr; return out;
+      };
+      const P = [0, 0, 0], N = 22;
+      if (ribbons) {
+        for (const pass of [0, 1]) {   // a soft wide glow, then the bright core
+          vfxRb.begin(VX, pass ? VT.WISP : VT.GLOWS, 1, 0);
+          for (let i = 0; i < N; i++) {
+            const u = i / (N - 1), env = Math.sin(Math.PI * u) ** .8 * fade, w = (pass ? .16 : .55) * (.5 + .5 * u);
+            pt(u, P); vfxRb.pt(P[0], P[1], P[2], w, pass ? [.75 + .25 * wc[0], .95, 1] : wc, (pass ? .55 : .2) * env, u * 1.5 - vt * .3);
+          }
+          vfxRb.end();
+        }
+      } else for (let i = 0; i < N; i++) { const u = i / (N - 1), env = Math.sin(Math.PI * u) * fade; pt(u, P); QADD.bill(RD, P[0], P[1], P[2], .3, .3, [wc[0], wc[1], wc[2], .1 * env], 1, 0); }
+      // its glow on the bark and the plants below it: a soft pool of its colour round the trunk at its height
+      if (fade > .2) { pt(1, P); QADD.bill(RD, P[0], P[1], P[2], 1.1, 1.1, [wc[0], wc[1], wc[2], .05 * fade], 1, 0); }
+    }
+    for (let k = 0; k < 6; k++) {   // fireflies and motes drifting round the trunk
+      const ph = vt * (.2 + (k % 3) * .07) + k * 1.9 + g.x, rr = r * (1.6 + 1.4 * ((k * .37) % 1)), hgt = .3 + ((k * .53 + vt * .03) % 1) * top * .6;
+      const x = g.x + Math.cos(ph) * rr, z = g.z + Math.sin(ph * 1.3) * rr, tw = .5 + .5 * Math.sin(vt * 3.1 + k * 2.3), c = k % 3 ? [1, .9, .55] : WC[k % 2];
+      QADD.bill(RD, x, g.y + hgt, z, .2, .2, [c[0], c[1], c[2], .12 * tw], 1, 0);
+      QADD.bill(RD, x, g.y + hgt, z, .05, .05, [1, 1, .9, .8 * tw], 1, 0);
     }
   }
 }
@@ -58008,8 +58070,25 @@ function edgeMagic(giants) {
 /* ---------- the painted Sunfall Glade's frame: its trunks in 3D, rising out of view, boughs and bushes at the edges ----------
    World positions read off assets/clearing/clearing.png on the CL_PAINT_RECT grid: the big trunks' feet (top left, the left
    edge, the right side and its far edge) and the dark firs down the lower left; the bushes by the painted stones. */
+const EDGE_GATE = { x: 5.5, half: 1.05 };   // where the road leaves the field's foot
+// the ward along the field's foot: a faint, steady glow in a soft lavender-teal, the threshold foes must not pass
+function edgeWard() {
+  const z = ROWS + .95, br = .85 + .08 * Math.sin(vt * .6);   // (along the ridge's visible foot, below the last row)
+  for (let x = -.6; x <= COLS + .6; x += .42) {
+    if (Math.abs(x - EDGE_GATE.x) < EDGE_GATE.half - .1) continue;
+    QADD.ground(x, z, .03, .5, .18, [.55, .66, 1, .45 * br], 1, 0);
+  }
+  // the gateway: a slightly brighter band across it, the line foes cross
+  QADD.ground(EDGE_GATE.x, z + .1, .032, EDGE_GATE.half, .2, [.6, .9, 1, .5 * br], 1, 0);
+  for (const sd of [-1, 1]) QADD.bill(RD, EDGE_GATE.x + sd * (EDGE_GATE.half + .95), 1.4, ROWS + 2.45, 1.3, 1.4, [.55, .75, 1, .1 * br], 1, 0);   // (a soft glow on the gate stones)
+  for (let k = 0; k < 8; k++) {   // a few motes rising slowly off it
+    const u = (vt * .08 + k * .137) % 1, x = -.4 + ((k * .618) % 1) * (COLS + .8);
+    if (Math.abs(x - EDGE_GATE.x) < EDGE_GATE.half - .1) continue;
+    QADD.bill(RD, x, .05 + u * .55, z, .05, .05, [.75, .82, 1, .5 * Math.sin(Math.PI * u)], 1, 0);
+  }
+}
 const CL_EDGE = {
-  giants: [[-5.0, -3.6, 34, 1], [-8.8, -.6, 36, 0], [18.2, 2.8, 36, 1], [19.4, 7.4, 32, 0]],   // x, z, height, magic
+  giants: [[-4.2, -3.3, 34, 1], [-7.7, -.3, 36, 0], [16.9, 2.8, 36, 1], [18.1, 7.2, 32, 0]],   // x, z, height, magic (a little in from the frame: owner)
   firs: [[-10.8, 9.2, 5.6], [-10.2, 12.6, 6.2], [-11.4, 15.6, 5.8], [22.6, 14.2, 5.4]],            // x, z, height (TreeForge fir)
   bushes: [[-6.2, 2.4], [-5.6, 11.4], [16.2, 5.4], [17.4, 12.4]],
   road: [[3.6, -7, 7.4, -2.4]],   // (the tunnel foes come down, kept clear)
@@ -58028,16 +58107,30 @@ function buildClearingTrees() {
     if (edgeClear(bx, bz, rc, by + sz * .7, CL_EDGE.road)) put(bough, 'bough', bx, by - sz * .35, bz, sz, 0, { noShadow: true });
   }
   // undergrowth by the painted stones and round the giants' feet
-  const kinds = ['gbush', 'gflower', 'gshrub'];   // (gbush, gshrub: the owner's sculpted bush and leafy shrub)
+  const kinds = ['gbush', 'gflower', 'gshrub', 'gflower2', 'fern'];   // (gbush, gshrub: the owner's sculpted bush and leafy shrub)
   const spots = CL_EDGE.bushes.slice(); for (const g of giants) for (let k = 0; k < 3; k++) { const a = rnd() * TAU, r = 2 + rnd() * 1.6; spots.push([g.x + Math.cos(a) * r, g.z + Math.sin(a) * r]); }
+  // plants gathered round each trunk's roots, hiding where it meets the ground (owner)
+  for (const g of giants) { const R = edgeTrunkR(g); for (let k = 0; k < 14; k++) { const a = k / 14 * TAU + rnd() * .4, r = R * (1.15 + rnd() * 1.1); spots.push([g.x + Math.cos(a) * r, g.z + Math.sin(a) * r]); } }
   for (const [x, z] of spots) for (let k = 0; k < 1; k++) {
-    const tr = edgeAsset(kinds[(k + (rnd() * 3 | 0)) % 3]) || edgeAsset('bush'); if (!tr) continue;
+    const tr = edgeAsset(kinds[rnd() * kinds.length | 0]) || edgeAsset('bush'); if (!tr) continue;
     const H = (tr.wantH || 1) * .6 * (.75 + rnd() * .7), px = x + (rnd() - .5) * .8, pz = z + (rnd() - .5) * .8;
     if (edgeClear(px, pz, H * .45, H, CL_EDGE.road)) put(tr, 'u_' + tr.name, px, 0, pz, H, 0, { noShadow: true });
   }
   // the owner's ivy outcrops at two of the giants' feet
   const iout = edgeAsset('ivyout');
   if (iout) for (const g of giants.slice(0, 3)) { const a = rnd() * TAU, x = g.x + Math.cos(a) * 3.2, z = g.z + Math.sin(a) * 3.2, H = 2.4 + rnd() * .8; if (edgeClear(x, z, H * .55, H, CL_EDGE.road)) put(iout, 'ivyout', x, 0, z, H, 0, { noShadow: true }); }
+  // the field's foot (owner: Sunfall has no keep, "need some other way of telling where the edge of the map is"): a low line
+  // of the owner's ivy rocks just below the last row, a gap where the road leaves, two taller stones flanking it; a ward glow
+  // along it (edgeWard). Each stone's screen footprint stays below the last row (a point at height y shows .65 y further up).
+  const IR = edgeAsset('ivyrock'), IO = edgeAsset('ivyout');
+  const below = (z, H, r) => z - .65 * H - r >= ROWS + .04;
+  // (owner: "make them larger and mostly off screen": a foreground ridge, its tops showing at the foot of the view)
+  if (IR) for (let x = -.8; x <= COLS + .8; x += 1.05 + rnd() * .35) {
+    if (Math.abs(x - EDGE_GATE.x) < EDGE_GATE.half + .7) continue;   // (the gateway)
+    const z = ROWS + 1.75 + (rnd() - .5) * .25, H = 1.2 + rnd() * .5;
+    if (below(z, H, H * .45)) put(IR, 'ward', x, -.06, z, H, 0, { noShadow: true });
+  }
+  if (IO) for (const sd of [-1, 1]) { const x = EDGE_GATE.x + sd * (EDGE_GATE.half + .95), z = ROWS + 2.45, H = 2.6; if (below(z, H, H * .25)) put(IO, 'wardgate', x, -.05, z, H, 0, { noShadow: true }); }
   const stump = edgeAsset('stump');   // the owner's tree stump by two of the giants
   if (stump) for (const g of giants.slice(1, 3)) { const a = rnd() * TAU, x = g.x + Math.cos(a) * 3, z = g.z + Math.sin(a) * 3, H = .7 + rnd() * .5; if (edgeClear(x, z, H * .6, H, CL_EDGE.road)) put(stump, 'stump', x, 0, z, H, 0, { noShadow: true }); }
   return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade, noShadow: v.noShadow })), giants };
@@ -58788,9 +58881,9 @@ const M3D_DEFS = {
     // terrain palette (sRGB): grass dark, grass light, moss, dirt, dirt dark, rock, litter, snow
     pal: ['#284a20', '#4c7530', '#3c6426', '#7a6650', '#4e4234', '#727466', '#2e3420', '#e8eef4'],   // (owner's target: a lush, bright meadow)
     k: [99, 0, .9, 1],              // snow line, snow, the woods' darkening, path wear
-    mist: ['#2fb4b0', .05],          // the mist lying in the woods (teal), its strength
+    mist: ['#b4a4ec', .2],   // (owner: a low, soft lavender mist through the woods, thinner near the field)          // the mist lying in the woods (teal), its strength
     bank: 1, hill: 1.3, crag: 1.1,   // the banks round the glade: rise, rolling hills, rocky crags
-    water: { deep: '#062a52', shal: '#1460a8', glow: '#1a74d8' },   // (the painting's glowing blue)
+    water: { deep: '#0c3640', shal: '#5aa8a4', glow: '#3cc8c0', abs: [.75, .2, .14, .18] },   // (clear, a little teal; owner)   // (the painting's glowing blue)
     trees: [['oak', .4], ['dfir', .28], ['ponder', .16], ['sprig', .16]],
     treeH: { oak: 2.5, elder: 3.4, dfir: 3.3, sprig: 2.9, ponder: 3.0 },   // heights in the game (world units)
     // tree density by distance from the field: the framing band, the open glade with its stones and stream, the deep woods
@@ -58859,7 +58952,7 @@ const M3D_DEFS = {
 if (typeof LIGHT_DEF !== 'undefined') {
   // a full-moon night in the elves' glade, not dark: silver-blue moonlight, a bluey-purple haze (as Sunfall Glade on playbuild);
   // the teal glow is the water's and the wisps' own
-  LIGHT_DEF.grove3d = { sun: '#dcd6ff', sunI: 1.25, az: 218, el: 44, rim: .3, fill: .2, ground: 1, paint: 1, sky: '#a89cf4', skyI: .95, gnd: '#8a7cc4', gndI: .45, fog: '#6a64a8', fogNear: .97, woods: .3, lamps: 1.1, expo: 1.12, rays: 1.4, ray: '#ffe6c8' };   // (owner: "bathed in a nice blue-purple light": a pale lavender key, lavender sky and fill, violet shade, a hint of warmth in the shafts)
+  LIGHT_DEF.grove3d = { sun: '#dcd6ff', sunI: 1.25, az: 218, el: 44, rim: .3, fill: .2, ground: 1, paint: 1, sky: '#a89cf4', skyI: .95, gnd: '#8a7cc4', gndI: .45, fog: '#8c80c8', fogNear: .97, woods: .3, lamps: 1.1, expo: 1.12, rays: 1.4, ray: '#ffe6c8' };   // (owner: "bathed in a nice blue-purple light": a pale lavender key, lavender sky and fill, violet shade, a hint of warmth in the shafts)
   // the pass at dusk: a pale cold sun, blue snow light
   LIGHT_DEF.pass3d = { sun: '#ffe2c4', sunI: 1.45, az: 150, el: 36, rim: .25, fill: .2, ground: 1, paint: 1, sky: '#8fb2e0', skyI: .7, gnd: '#8a9bb0', gndI: .3, fog: '#5d7590', fogNear: .97, woods: .4, lamps: 1.2, expo: 1.0, rays: 0, ray: '#cfe4ff' };
 }
@@ -59052,8 +59145,9 @@ function m3dTrees(D, rnd) {
   };
   for (const [x, z, n, H] of D.heroes) if (m3dClear(x, z, H * .38, H)) add(byName(n), x, z, H, 0);
   // the owner's fantasy tree at the corners, scaled up (its crown is part of its one mesh: it passes the footprint test whole)
+  const magicTrees = [];
   const ftree = pool.find(t => t.name === 'gtree');
-  if (ftree && D.cornerTrees) for (const [x, z, H] of D.cornerTrees) if (m3dClear(x, z, H * .46, H)) add(ftree, x, z, H, 0);
+  if (ftree && D.cornerTrees) for (const [x, z, H] of D.cornerTrees) if (m3dClear(x, z, H * .46, H)) { add(ftree, x, z, H, 0); magicTrees.push({ x, z, y: m3dH(x, z), H, tr: ftree, magic: 1, r: H * .09, mh: H * .32 }); }   // (magic spiralling up them: edgeMagic)
   const giants = [];
   for (const [x, z, n, H, magic] of D.giants || []) {
     const tr = n === 'giant' ? edgeGiantAsset() : byName(n); if (!tr) continue;
@@ -59172,7 +59266,7 @@ function m3dTrees(D, rnd) {
     }
     }
   }
-  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade })), placed, giants };
+  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade })), placed, giants, magicTrees };
 }
 
 /* ---------- natural clusters of the owner's models (owner: "more variation ... like the concept art") ----------
@@ -59331,7 +59425,7 @@ function buildMap3d(id) {
   M3D = D; D.streamsB = [];
   D.streamsB = m3dBuildStreams(D);
   const rnd = mulberry32(D.seed), FX = { lights: [], flames: [], glows: [], fires: [] };
-  const tr = m3dTrees(D, rnd); D.giantsB = tr.giants;
+  const tr = m3dTrees(D, rnd); D.giantsB = tr.giants; D.magicB = tr.magicTrees;
   const terrain = m3dTerrain(D, tr.placed);
   const water = m3dWater(D);
   const pr = m3dProps(D, rnd, FX);
@@ -59371,11 +59465,11 @@ function m3dPathWear() {
 function m3dFrame(dt) {
   if (!M3D || !TH.m3d) return;
   if (typeof G !== 'undefined' && G) m3dPathWear();
-  edgeMagic(M3D.giantsB);   // (edgetrees.js)
+  edgeMagic(M3D.giantsB); if (M3D.magicB) edgeMagic(M3D.magicB);   // (edgetrees.js)
   // mist pooled in the ravine (owner): layered soft cards lying in the gully, thickest at the bottom and thinning upward,
   // drifting; foes climbing are half hidden in it and clear it as they crest into the glade. Never past its head.
   if (M3D.id === 'grove3d') {
-    const mc = [.78, .86, .9];
+    const mc = [.82, .76, .98];   // (lavender: owner)
     for (let zz = -2.9; zz > -9.5; zz -= .55) {
       const cx = m3dRoadX(zz), fl = m3dRavFloor(zz), deep = clamp((-2.6 - zz) / 2.5, 0, 1);
       for (let L = 0; L < 3; L++) {
@@ -68051,7 +68145,8 @@ function renderView(dt) {
   // environment
   if (ENV.ground) item(ENV.ground, _I, { shadow: false, ground: true });   // (a 3D map's terrain is drawn by the renderer itself: RD.terrain)
   if (RD.terrain && typeof m3dFrame === 'function') m3dFrame(dt);
-  if (ENV.edgeGiants && typeof edgeMagic === 'function') edgeMagic(ENV.edgeGiants);   // (the magic up a painted map's 3D trunks: edgetrees.js)
+  if (ENV.edgeGiants && typeof edgeMagic === 'function') edgeMagic(ENV.edgeGiants);
+  if (TH.id === 'clearing' && typeof edgeWard === 'function') edgeWard();   // (Sunfall's field foot: edgetrees.js)   // (the magic up a painted map's 3D trunks: edgetrees.js)
   ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 }));
   const walkIn = MAPS[G.map] && MAPS[G.map].entry;   // (a map foes walk into from the woods has no portal)
   if (!SCENE_OFF) { item(ENV.deco, _I, { shadow: false }); if (!walkIn) item(ENV.portal, _I); if (!TH.noKeep) item(ENV.keep, _I); }   // (the FX Lab side view hides the scenery)
@@ -74489,87 +74584,194 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best}${res.rite ? ' on ' + riteName(res.rite) : ''}${res.rank ? ` (#${res.rank})` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    try { BOARD.rows[diff] = await q('rite,'); } catch (e) { if (e.status !== 400) throw e; BOARD.rows[diff] = await q(''); }   // a server not yet given the rites column
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush(); }
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -74578,74 +74780,206 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.e.r ? riteName(x.e.r | 0) : '—'; rt.title = x.e.r ? RITES[(x.e.r | 0) - 1].name : 'No rite';
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = x.rite ? riteName(x.rite | 0) : '—'; rt.title = x.rite ? RITES[(x.rite | 0) - 1].name : 'No rite';
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)}${e.r ? ' on ' + riteName(e.r | 0) : ''}, #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave}${mine.rite ? ' on ' + riteName(mine.rite | 0) : ''}, #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${x.e.r ? esc(RITES[(x.e.r | 0) - 1].name) : 'No rite'}">${x.e.r ? 'Rite ' + RITE_ROMAN[x.e.r | 0] : '—'}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${x.rite ? esc(RITES[(x.rite | 0) - 1].name) : 'No rite'}">${x.rite ? 'Rite ' + RITE_ROMAN[x.rite | 0] : '—'}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
