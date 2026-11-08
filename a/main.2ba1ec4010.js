@@ -1,4 +1,4 @@
-const BUILD_TAG = '74b1bd8@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd47349e@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -80146,6 +80146,129 @@ if (typeof umDraw === 'function') {
   umDraw = function (t, u) {
     if (u === AU_UNIT && NEWMODELS && t && !t.wrecked) return auDraw.apply(this, arguments);
     return _auUm.apply(this, arguments);
+  };
+}
+
+/* The Astrologer, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's silver-haired star mage in violet
+   robes (model_unit_astrologer.js: assets/unit-art/astrologer/scripts/rig.py, tools/make_gunman.py) drawn as the Conclave's
+   Astrologers (AS_UNIT) in place of their code-built body, on the College's rune slate.
+   - His moves (30 fps, in place on his post): idle (square, gazing up at the sky, a little starlight cradled in his left
+     palm), ready (the clip's casting stance, a foe in reach), attack (the clip's one-handed cast) and attack_up (the same,
+     loosed up at a flyer), and one for each spell: Falling Star (an arm raised into the sky, a star caught and pulled down),
+     Lodestar (a star cupped, lifted and hung up ahead), Grand Orrery (both arms round the sky overhead, spread wide).
+   - The attack's wind-up runs over the reload's last part (t.windup) so its release frame lands on the shot: the bolt leaves
+     the right palm where it is that frame (t.tipW; ccHand and sfxMuzzle read it through unitTip). A spell's wind-up runs
+     over its cast bar (t.ab.cast) and its big moment lands on the release (castAbility), then he recovers; while spells
+     are instant (CAST_UNITS off) the move enters late and its big moment lands with the spell (AS.ENTER, AS.LAND).
+   - Effects on him stay small and brief: a faint starlight in the idle palm, a short glint at the casting palm.
+   - Every move is eased into from where he was (a per-unit pose followed at a rate by kind). */
+const AS_UNIT = 'cc_astrologer';
+UM_UNITS[AS_UNIT] = { mdl: 'astrologer', k: .95, rig: 'astro' };
+// (spells are instant while CAST_UNITS is off: a move then enters late, at ENTER, and reaches its big moment LAND seconds after
+// the cast: the star's fall lands .3 s after Falling Star goes off, the Lodestar hangs and the planets start at once)
+const AS = { CAST: { cc_fallingstar: 'star', cc_omen: 'lode', cc_orrery: 'orrery' }, ENTER: { star: 18, lode: 8, orrery: 18 }, LAND: { star: .3, lode: .12, orrery: .15 }, BASE_H: .045, RATE: { idle: 4, ready: 8, atk: 45, move: 40 }, STAR: [.93, .95, 1] };
+let AS_IN_STAR = false;
+// his shots (not the echoes) and his casts' releases
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_star) {
+  const _asAtk = FORCE_ATTACK.cc_star;
+  FORCE_ATTACK.cc_star = function (t, st, tg, pow, echo) {
+    AS_IN_STAR = true; let r;
+    try { r = _asAtk.apply(this, arguments); } finally { AS_IN_STAR = false; }
+    try { if (!echo && typeof G !== 'undefined') { t._asShotAt = G.time; t._asUp = !!(tg && tg.fly); } } catch (e) {}
+    return r;
+  };
+}
+if (typeof castAbility === 'function') {
+  const _asCast = castAbility;
+  castAbility = function (t, ab) {
+    const r = _asCast.apply(this, arguments);
+    try { if (r && t && t.def && t.def.unit === AS_UNIT && ab && AS.CAST[ab.id] && typeof G !== 'undefined') { t._asRelAt = G.time; t._asMv = AS.CAST[ab.id]; t._asWound = typeof CAST_REL !== 'undefined' && !!CAST_REL; } } catch (e) {}
+    return r;
+  };
+}
+// the bolt (and the College's hand-cast effects) from his right palm as drawn
+if (typeof ccHand === 'function') {
+  const _asHand = ccHand;
+  ccHand = function (t, h) {
+    if (typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === AS_UNIT && typeof unitTip === 'function') {
+      const p = unitTip(t); if (p) return [p[0], p[1] - (AS_IN_STAR ? .1 : 0), p[2]];   // (cc_star lifts its bolt .1 off the hand it is given)
+    }
+    return _asHand.apply(this, arguments);
+  };
+}
+function asClips(M) { return UNIT_MDL[M.S.mdl].anim.clips; }
+function asClip(M, name, f) { const c = asClips(M)[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+function asRel(M, name) { const r = UNIT_MDL[M.S.mdl].marks.rel; return r && r[name] != null ? r[name] : 15; }
+// what he does now: { f (the anim's frame), rate (how fast the pose follows), glow (the starlight in his left palm),
+// cast (the glint at his right palm) }
+function asCtl(t, live, M) {
+  if (!live) return { f: asClip(M, 'ready', 0), rate: 0, glow: 0, cast: 0 };
+  const now = G.time, A = asClips(M);
+  // a spell: its wind-up stretched over the cast bar, its big moment on the release, then the recovery
+  const C = t.ab && t.ab.cast, cm = C && AS.CAST[C.id];
+  if (cm) { const u = Math.max(0, Math.min(1, (now - C.at) / Math.max(.05, C.T))); return { f: asClip(M, cm, asRel(M, cm) * u), rate: AS.RATE.move, glow: 0, cast: cm === 'orrery' ? 0 : .35 * u * u }; }
+  if (t._asMv && t._asRelAt != null) {
+    const mv = t._asMv, u = now - t._asRelAt, R = asRel(M, mv), n = A[mv][1] - 1, e = AS.ENTER[mv], L = AS.LAND[mv];
+    const f = t._asWound ? R + u * 30 : u < L ? e + (R - e) * u / L : R + (u - L) * 30;   // (wound up over a cast bar: on from the release; instant: in late, the big moment as the spell lands)
+    if (u >= 0 && f < n) return { f: asClip(M, mv, f), rate: AS.RATE.move, glow: 0, cast: mv === 'orrery' ? 0 : Math.max(0, .6 - Math.abs(f - R) / 10) };
+  }
+  // the attack: wound up over the reload's last part, released as the shot goes, the follow-through sped to end in time
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t._asShotAt == null ? 9 : now - t._asShotAt;
+  const up = fight ? !!t.tg.fly : !!t._asUp, mv = up ? 'attack_up' : 'attack', R = asRel(M, 'attack'), n = A.attack[1] - 1;
+  const rate = (t.st && t.st.rate) || .8, wl = Math.min(.6, rate * .6);
+  if (fight && (t.windup || 0) > 0 && s > .15) return { f: asClip(M, mv, R * t.windup), rate: AS.RATE.atk, glow: 0, cast: .25 * t.windup * t.windup };
+  const D = Math.max(.3, rate - wl);
+  if (s >= 0 && s < D) return { f: asClip(M, mv, R + (n - R) * s / D), rate: AS.RATE.atk, glow: 0, cast: Math.max(0, .7 - s * 6) };
+  const ph = (now + (t.anim || 0) * 3) * 30;
+  if (fight || s < 1.5) return { f: asClip(M, 'ready', ph % A.ready[1]), rate: AS.RATE.ready, glow: 0, cast: 0 };
+  return { f: asClip(M, 'idle', ph % A.idle[1]), rate: AS.RATE.idle, glow: .3 + .08 * Math.sin(now * 2.1 + (t.anim || 0) * 5), cast: 0 };
+}
+const _asT = new Float32Array(SKIN_MAX * 12);
+function asPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _asT);
+  const now = G.time, dt = t._asT == null ? 1 : Math.max(0, Math.min(.1, now - t._asT)); t._asT = now;
+  if (!t._asO || t._asO.length !== nb * 12) { t._asO = new Float32Array(nb * 12); t._asO.set(_asT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._asO, _asT, k, t._asO);
+  const o = R.out; o.set(t._asO); return o;
+}
+const _asA = new Float32Array(16), _asB = new Float32Array(16), _asC = new Float32Array(16);
+function asDraw(t, tier, sx, sy, sz, wob, opts) {
+  const M = umModel(AS_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const tr = Math.max(0, Math.min(5, tier | 0)), K = UNIT_K(AS_UNIT), full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+  const csz = typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1, lift = AS.BASE_H * K * csz;
+  // the College's rune slate under him, as under every Conclave unit, and he stands on it
+  const bm = typeof ccBase === 'function' ? dynMesh('as_base' + tr, g => withPal(AS_UNIT, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ccWith(AS_UNIT, () => g.with(T(0, 0, 0, 0, 0, 0, csz), () => ccBase(g, tr)))))) : null;
+  M4.trs(_asA, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _asA, opts);
+  const s = Math.max(.3, full.max[1] - lift) / M.h * M.S.k * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+  M4.trs(_asA, x, bm ? lift * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_asB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_asC, _asA, _asB);
+  const P = asCtl(t, live, M), o = asPose(M, t, P, live);
+  const it = item(M.mesh, _asC, opts); it.sec = [0, 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _asC;
+  const mk = UNIT_MDL[M.S.mdl].marks;
+  if (live && mk && mk.CastHand) {
+    const p = umXf(o, mk.gunBone, mk.CastHand), w = M4.xf(_asC, p[0], p[1], p[2]); t.tipW = w; t.tipYaw = yaw; t.tipAt = G.time;
+    if (typeof QADD !== 'undefined' && typeof RD !== 'undefined' && RD) {
+      const c = AS.STAR;
+      if (P.cast > .02) QADD.bill(RD, w[0], w[1], w[2], .16 * s / M.S.k, .16 * s / M.S.k, [c[0], c[1], c[2], Math.min(.5, P.cast)], 1, 0);   // a glint at the casting palm
+      if (P.glow > .02 && mk.StarHand) { const q = umXf(o, mk.starBone, mk.StarHand), v = M4.xf(_asC, q[0], q[1] + .02, q[2]); QADD.bill(RD, v[0], v[1], v[2], .11 * s / M.S.k, .11 * s / M.S.k, [c[0], c[1], c[2], P.glow], 1, 0); }   // the starlight he holds
+    }
+  }
+  return true;
+}
+if (typeof drawForceUnitPlain === 'function') {
+  const _asPlain = drawForceUnitPlain;
+  drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+    if (NEWMODELS && t && t.def && t.def.unit === AS_UNIT && !t.wrecked && asDraw(t, tier, sx, sy, sz, wob, opts)) {
+      forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(AS_UNIT));
+      return;
+    }
+    return _asPlain.apply(this, arguments);
   };
 }
 
