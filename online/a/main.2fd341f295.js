@@ -1,4 +1,4 @@
-const BUILD_TAG = '875c7d0@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5706df3@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -58088,16 +58088,32 @@ function edgeWard() {
   }
 }
 const CL_EDGE = {
-  giants: [[-4.2, -3.3, 34, 1], [-7.7, -.3, 36, 0], [16.9, 2.8, 36, 1], [18.1, 7.2, 32, 0]],   // x, z, height, magic (a little in from the frame: owner)
+  // x, z, height, magic (a little in from the frame: owner); the left two clear of the painted stream and its falls (owner:
+  // "tree is covering where the stream is"): the one that stood on it now at the frame's outer edge, past the water
+  giants: [[-4.25, -3.75, 34, 1], [-12.2, -.3, 36, 0], [16.9, 2.8, 36, 1], [18.1, 7.2, 32, 0]],
   firs: [[-10.8, 9.2, 5.6], [-10.2, 12.6, 6.2], [-11.4, 15.6, 5.8], [22.6, 14.2, 5.4]],            // x, z, height (TreeForge fir)
   bushes: [[-6.2, 2.4], [-5.6, 11.4], [16.2, 5.4], [17.4, 12.4]],
   road: [[3.6, -7, 7.4, -2.4]],   // (the tunnel foes come down, kept clear)
 };
+// the painting's water (tools: a blue-pixel mask of assets/clearing/clearing.png, specks dropped, a margin round it), a .25 world grid, rows run-length coded
+const CL_WATER = { x0: -12, z0: -7, st: 0.25, nx: 144, nz: 96, rows: ['0144', '0144', '0144', '068,6,70', '066,8,70', '014,3,48,9,70', '014,5,46,9,70', '013,7,45,9,70', '012,8,46,8,70', '012,8,47,7,70', '011,10,123', '09,12,123', '09,12,123', '05,15,124', '01,4,15,124', '01,4,15,124', '01,4,14,125', '01,5,13,125', '01,5,11,127', '01,5,11,127', '07,10,127', '08,9,127', '08,8,82,6,19,4,17', '08,5,6,4,75,6,19,4,17', '019,8,71,6,19,4,17', '019,10,70,4,41', '019,11,114', '019,11,114', '020,10,114', '020,9,115', '03,16,9,116', '03,16,7,105,8,5', '04,12,9,105,9,5', '08,8,7,9,3,95,9,5', '09,7,7,8,4,95,9,5', '09,7,5,10,4,96,9,4', '010,5,6,10,3,97,10,3', '011,4,6,10,3,98,9,3', '012,3,6,113,7,3', '013,1,7,94,4,16,6,3', '013,1,7,94,4,17,4,4', '021,93,5,25', '02,19,89,9,25', '02,19,89,9,25', '05,16,89,4,30', '05,16,89,4,30', '06,15,123', '08,12,124', '010,10,124', '010,10,124', '010,9,125', '09,10,125', '09,10,125', '09,10,125', '09,9,126', '09,7,128', '09,6,110,4,15', '0124,5,15', '0124,7,13', '0125,7,12', '0127,5,12', '0127,5,12', '0128,3,13', '0144', '0144', '0144', '0121,4,19', '0121,5,18', '0121,6,17', '0121,7,16', '0121,7,16', '019,5,97,7,16', '019,5,97,11,12', '019,5,98,11,11', '019,4,99,12,10', '0123,11,10', '0112,3,13,6,10', '0111,4,14,5,10', '0111,4,29', '0111,4,29', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144', '0144'] };
+let CL_WET = null;
+// is there painted water within r of (x, z)? (owner: "tree is covering where the stream is")
+function clWet(x, z, r = 0) {
+  const W = CL_WATER;
+  if (!CL_WET) { CL_WET = new Uint8Array(W.nx * W.nz); W.rows.forEach((row, j) => { let v = row[0] === '1' ? 1 : 0, i = 0; for (const n of row.slice(1).split(',').map(Number)) { if (v) CL_WET.fill(1, j * W.nx + i, j * W.nx + i + n); i += n; v ^= 1; } }); }
+  for (let k = 0; k < 9; k++) {
+    const a = k / 8 * TAU, rr = k ? r : 0, i = Math.floor((x + Math.cos(a) * rr - W.x0) / W.st), j = Math.floor((z + Math.sin(a) * rr - W.z0) / W.st);
+    if (i >= 0 && j >= 0 && i < W.nx && j < W.nz && CL_WET[j * W.nx + i]) return true;
+  }
+  return false;
+}
 function buildClearingTrees() {
   const rnd = mulberry32(1717), inst = new Map(), giants = [];
-  const put = (tr, key, x, y, z, H, lod, extra) => { if (!tr) return; if (!inst.has(key)) inst.set(key, Object.assign({ asset: tr, lod, arr: [] }, extra || {})); inst.get(key).arr.push(x, y, z, H / tr.height, rnd() * TAU, rnd() * 10); };
+  const put = (tr, key, x, y, z, H, lod, extra) => { if (!tr || (key !== 'giant' && clWet(x, z, H * .3))) return; /* (nothing on the painted stream) */ if (!inst.has(key)) inst.set(key, Object.assign({ asset: tr, lod, arr: [] }, extra || {})); inst.get(key).arr.push(x, y, z, H / tr.height, rnd() * TAU, rnd() * 10); };
   const G_ = edgeGiantAsset();
-  for (const [x, z, H, magic] of CL_EDGE.giants) { put(G_, 'giant', x, -.1, z, H, 0, { fade: [16, 60, .9], noShadow: true }); giants.push({ x, z, y: 0, H, tr: G_, magic }); }
+  for (const [x, z, H, magic] of CL_EDGE.giants) {
+    put(G_, 'giant', x, -.1, z, H, 0, { fade: [16, 60, .9], noShadow: true }); giants.push({ x, z, y: 0, H, tr: G_, magic }); }
   const fir = edgeAsset('dfir'); for (const [x, z, H] of CL_EDGE.firs) if (edgeClear(x, z, H * .3, H, CL_EDGE.road)) put(fir, 'fir', x, -.05, z, H, 0, { noShadow: true });
   // boughs: two or three on each giant, high and out over the frame's edge
   const bough = edgeBoughAsset();
