@@ -1,4 +1,4 @@
-const BUILD_TAG = 'af889d6@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '784e4c3@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -5464,10 +5464,11 @@ function bossRuleFx(c, r) {
     if (ty) { const k = c4(SCHOOL_COL[ty] || '#ffffff'), s = 1 + c.abT * .7; QG.ground(c.x, c.y, .046, s, s, [k[0], k[1], k[2], .9], 4, .12); }
   }
 }
-// Malgrath's Dread Command: the units his legion halves right now (a ring at their feet in their colour, a tag over them)
+// Malgrath's Dread Command: the units his legion halves right now (a ring at their feet in their colour)
 const bossAdaptOn = () => typeof G !== 'undefined' && G && G.adapt && G.adapt.ty && G.adapt.until > G.time && G.adapt.by && !G.adapt.by.dead;
 const bossAdaptUnits = () => bossAdaptOn() ? G.towers.filter(t => t.type === G.adapt.ty && !t.wrecked && !t.def.wall) : [];
-function bossAdaptTags() { return bossAdaptUnits().map(t => [t, `½ dmg · ${Math.ceil(G.adapt.until - G.time)}s`, SCHOOL_COL[G.adapt.ty] || '#ff9a8a']); }
+// (no tag over them any more, owner 9 Nov 2026: no overhead modifiers; the ring stays, the top-right effects bar names it: buffs.js 'dread')
+function bossAdaptTags() { return []; }
 function bossAdaptMarks() {
   const L = bossAdaptUnits(); if (!L.length) return;
   const k = c4(SCHOOL_COL[G.adapt.ty] || '#ff9a8a'), p = .5 + .5 * Math.sin(vt * 4);
@@ -51023,20 +51024,9 @@ function dfBars(c, x, top, z, w, h) {
     y += (2 * bh + gap) * k;
   }
 }
-// the numbers beside the bars: [creep, text, colour]
-function dfTags() {
-  const out = [];
-  if (!G || !G.creeps) return out;
-  for (const c of G.creeps) {
-    if (c.dead) continue;
-    const s = [];
-    if (c.momDR > 0) s.push(`Hardened ${Math.round(c.momDR * 100)}%`);
-    if (c.drT > 0) s.push(`−${Math.round((c.drK || .5) * 100)}% dmg`);
-    if (c.amT > 0) s.push('−40% magic');
-    if (s.length) out.push([c, s.join(' · '), c.momDR > 0 ? '#d8b0ff' : c.drT > 0 ? '#c0b8ff' : '#c8a8ff']);
-  }
-  return out;
-}
+// the numbers beside the bars: none any more (owner, 9 Nov 2026: "dont like overhead things like (40% damage)"). The bars stay;
+// what each one does is on the top-right effects bar (buffs.js: Mother's Wrath, Shrouded, Spell Ward), in plain numbers.
+function dfTags() { return []; }
 // show the bars block for these even at full health
 const epShowBars = c => epOn() && ((c.apMax > 0 && c.ap < c.apMax - .01) || (c.mwMax > 0 && c.mw < c.mwMax - .01) || (c.mpMax > 0 && (c.mp < c.mpMax - .01 || c.epC)));
 function epFx(c, r) {
@@ -82519,8 +82509,8 @@ if (typeof drawForceUnitPlain === 'function') {
 /* Aurelian, the Lion of the Ford, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's knight with his
    sword and the lion shield strapped along his left forearm (model_unit_aurelian.js: assets/unit-art/aurelian/scripts/rig.py,
    tools/make_gunman.py) drawn as the Silver Order's Champion ch_aurelian (AU_UNIT) in place of his code-built rider.
-   - His moves (the clips, 30 fps): idle (as in his portrait: feet planted, the sword low across his body in his fist,
-     the shield low at his side, its lion upright and facing out; breathing and a slow weight shift), guard (a foe in reach: the shield
+   - His moves (the clips, 30 fps): idle (feet planted, his sword arm by his side, the blade angled down before his right foot,
+     the shield hanging plumb beside his left leg, its lion upright and facing out; breathing and a slow weight shift), guard (a foe in reach: the shield
      up before him, the sword over its rim), swing (his strike: one overhead cut from the combo, landing as the charge's blow
      lands), and one for each ability: Dawnsweep (the sword raised to the sun, then levelled forward in a lunge), Bulwark
      Slam (he kneels and drives his weight down into the road; a shield-slam clip would suit it better), The Crossing (a
@@ -86859,13 +86849,17 @@ bfAdd('deathbound', { name: 'Deathbound', kind: 'buff', pri: 17, icon: 'skull', 
   get: c => bfLive(c.boundBy) ? { src: 'from ' + c.boundBy.def.name, say: 'Raised from the fallen. Kill the Necromancer holding it up and it crumbles to 30% of its health.' } : null });
 bfAdd('spellward', { name: 'Spell Ward', kind: 'buff', pri: 18, icon: 'orb', hue: '#5a3a7a', f: ['amT'],
   def: 'Magic and Arcane do 40% less to it for a few seconds.',
-  get: c => c.amT > 0 ? { t: c.amT, say: 'Magic and Arcane do 40% less to it.' } : null });
+  get: c => c.amT > 0 ? { t: c.amT, T: 4, say: 'Magic and Arcane hits land light on it: a 100-damage spell does 60.' } : null });
 bfAdd('hardened', { name: 'Hardened', kind: 'buff', pri: 18, icon: 'shell', hue: '#5a5a6a', f: ['armorBT', 'armorB'],
   def: 'A leader\'s spell hardens its armour for a few seconds.',
   get: c => c.armorBT > 0 ? { t: c.armorBT, say: `${bfInt(c.armorB || 0)} more armour.` } : null });
 bfAdd('shrouded', { name: 'Shrouded', kind: 'buff', pri: 18, icon: 'cloud', hue: '#3a2a5a', f: ['drT', 'drK'],
   def: 'Wrapped in a shroud: it takes less from every hit.',
-  get: c => c.drT > 0 ? { t: c.drT, say: `It takes ${bfPct(c.drK || .5)} less from every hit.` } : null });
+  get: c => c.drT > 0 ? { t: c.drT, T: 5, say: `Every hit lands light on it: a 100-damage hit does ${bfInt(100 * (1 - (c.drK || .5)))}.` } : null });
+bfAdd('mwrath', { name: 'Mother’s Wrath', kind: 'buff', pri: 18, icon: 'web', hue: '#5a2a7a', f: ['momDR'],
+  def: 'Arachnara hardens as her brood falls near her: every hit on her lands lighter, and it wears off slowly.',
+  get: c => c.momDR > 0 ? { fill: c.momDR / ((typeof MOM_WRATH !== 'undefined' && MOM_WRATH.cap) || .24), src: 'from her fallen brood',
+    say: `Hardened by every spider that dies near her: a 100-damage hit does ${bfInt(100 * (1 - c.momDR))} (at most ${bfInt(100 * (1 - ((typeof MOM_WRATH !== 'undefined' && MOM_WRATH.cap) || .24)))}). It wears off over time; kill the spiders away from her.` } : null });
 bfAdd('aegis', { name: 'Aegis', kind: 'buff', pri: 8, icon: 'shieldx', hue: '#2a6a2a', f: ['aegisT'],
   def: 'An unbreakable aegis: it slows to a crawl while its summons pour out.',
   get: c => c.aegisT > 0 ? { t: c.aegisT, say: 'An unbreakable aegis: it walks at 40% speed while the stalkers it called pour out.' } : null });
@@ -87119,6 +87113,22 @@ bfAdd('wardcrack', { name: 'Ward cracked', kind: 'debuff', pri: 14, icon: 'crack
    YOUR UNITS
    ===================================================================================================== */
 const BF_U = (id, o) => bfAdd(id, Object.assign({ who: 'unit' }, o));
+// a pace change in baseline numbers (owner: no "% faster", show the numbers): attacks a second without it -> with it.
+// t.st is the unit's live stats (with this effect in them); k is this effect's own speed factor (1.3 = 30% quicker)
+const bfAps = v => { const r = Math.round(v * 100) / 100; return String(r); };
+function bfPace(t, k, lead) {
+  const r = t && t.st && t.st.rate; if (!(r > 0)) return lead + '.';
+  const now = 1 / r, was = now / k;
+  return `${lead}: attacks a second ${bfAps(was)} → ${bfAps(now)}.`;
+}
+// Malgrath's Dread Command (game.js: his legion takes half from one kind of unit for a while; bossrules.js rings them)
+BF_U('dread', { name: 'Dread Command', kind: 'debuff', pri: 2, icon: 'doom', hue: '#7a1a1a',
+  def: 'Malgrath hardens his legion against one kind of unit for a while: its hits on his foes land at half.',
+  get: t => {
+    const A = typeof G !== 'undefined' && G && G.adapt;
+    if (!A || !A.ty || !(A.until > bfNow()) || !bfLive(A.by) || t.type !== A.ty || t.def.wall) return null;
+    return { t: A.until - bfNow(), src: bfFrom(A.by) || 'from Malgrath', say: 'His legion has hardened against this kind of unit: a 100-damage hit from it does 50 until the time runs out. Let your other units carry the fight.' };
+  } });
 BF_U('champion', { name: 'Champion', kind: 'trait', pri: 1, icon: 'ascend', hue: '#8a6a20',
   def: 'Your commander in person: only one may stand on the field.',
   get: t => {
@@ -87199,7 +87209,7 @@ BF_U('smoulder', { name: 'Smoulder Stout', kind: 'buff', pri: 10, icon: 'ember',
   get: t => t.ihDragonT > bfNow() ? { say: 'Its strikes on walkers set them burning for 2s.' } : null });
 BF_U('beltfed', { name: 'Endless Belt', kind: 'buff', pri: 10, icon: 'arrows3', hue: '#6a5a3a', f: ['ihBeltT'],
   def: 'The belt keeps feeding it: it attacks faster for 3s.',
-  get: t => t.ihBeltT > bfNow() ? { t: bfLeft(t.ihBeltT), T: 3, say: 'It attacks 30% faster.' } : null });
+  get: t => t.ihBeltT > bfNow() ? { t: bfLeft(t.ihBeltT), T: 3, say: bfPace(t, 1.3, 'The belt keeps feeding it') } : null });
 BF_U('borrowed', { name: 'Borrowed Time', kind: 'buff', pri: 10, icon: 'hourglass', hue: '#4a3a7a', f: ['ccBorrowT', 'ccBorrowK'],
   def: 'A Chronomancer beside it lends it time: it attacks faster.',
   get: t => t.ccBorrowT > bfNow() ? { src: 'from a Chronomancer', say: `It attacks ${bfPct(t.ccBorrowK || 0)} faster.` } : null });
@@ -87213,13 +87223,13 @@ BF_U('wblaststand', { name: 'Final Oath', kwSpell: 'Final Oath', kind: 'buff', p
 // Lord Aedric's Champion (forces_zx_champ_wardbound.js): Blaze of Glory, its burnout, and the winded ride after a Sun Charge
 BF_U('wbglory', { name: 'Blaze of Glory', kwSpell: 'Blaze of Glory', kind: 'buff', pri: 3, icon: 'flame', hue: '#8a6a1a', f: ['wbGloryT'],
   def: 'Aedric\'s Blaze of Glory: he strikes far faster and every strike brands its foe, until he burns out.',
-  get: t => t.wbGloryT > bfNow() ? { t: bfLeft(t.wbGloryT), say: 'He strikes 60% faster and every strike brands its foe. Then he burns out: 30% slower for 4s.' } : null });
+  get: t => t.wbGloryT > bfNow() ? { t: bfLeft(t.wbGloryT), say: bfPace(t, 1.6, 'Every strike brands its foe') + ' Then he burns out and strikes slower for 4s.' } : null });
 BF_U('wbburnout', { name: 'Burnt Out', kind: 'debuff', pri: 4, icon: 'ember', hue: '#5a3a1a', f: ['wbGloryBurnT'],
   def: 'After Blaze of Glory he burns out for a while: his strikes come slower.',
-  get: t => !(t.wbGloryT > bfNow()) && t.wbGloryBurnT > bfNow() ? { t: bfLeft(t.wbGloryBurnT), T: 4, say: 'Burnt out after Blaze of Glory: he strikes 30% slower.' } : null });
+  get: t => !(t.wbGloryT > bfNow()) && t.wbGloryBurnT > bfNow() ? { t: bfLeft(t.wbGloryBurnT), T: 4, say: bfPace(t, 1 / 1.3, 'Burnt out after Blaze of Glory') } : null });
 BF_U('wbweary', { name: 'Winded', kind: 'debuff', pri: 5, icon: 'snail', hue: '#5a4a2a', f: ['wbWearyT'],
   def: 'Winded after a Sun Charge: his strikes come slower for a moment.',
-  get: t => t.wbWearyT > bfNow() ? { t: bfLeft(t.wbWearyT), say: 'Winded after a Sun Charge: he strikes 20% slower.' } : null });
+  get: t => t.wbWearyT > bfNow() ? { t: bfLeft(t.wbWearyT), say: bfPace(t, 1 / 1.2, 'Winded after a Sun Charge') } : null });
 BF_U('wbnowound', { name: 'Can\'t be Wounded', kind: 'buff', pri: 4, icon: 'shield', hue: '#6a5a2a', f: ['wbNoWoundT'],
   def: 'Held up by an oath (Final Oath, Anvil Stance, a Sworn Vow): its health can\'t fall to 0 while it lasts.',
   get: t => t.wbNoWoundT > bfNow() ? { t: bfLeft(t.wbNoWoundT), say: 'Its health can\'t fall to 0 while it lasts: it can\'t be Wounded.' } : null });
@@ -87338,13 +87348,14 @@ function bfFindSubj(k) {
 }
 const bfAria = s => `${s.label}${s.label !== s.e.name ? ' (' + s.e.name + ')' : ''}, ${BF_KIND[s.kind || s.e.kind].toLowerCase()}${s.src ? ', ' + s.src : ''}`;
 // the info pane's row (only which statuses are there: the timers, stacks and gauges are filled in by bfTick)
+const bfIconHTML = (s, k) => { const kind = s.kind || s.e.kind; return `<span class="bf-ic bf-${kind} ${bfIconClass(s)}" role="listitem" tabindex="0" ${s.iid ? `data-iid="${s.iid}"` : `data-bf="${bfEsc(s.id)}"`} data-bs="${k}" aria-label="${bfEsc(bfAria(s))}"><i class="bf-g"></i><b class="bf-n"></b></span>`; };
+// the info pane's row: gone from the pane now the effects sit top right (owner, 9 Nov 2026), unless BF_BAR_ON is turned off
+const BF_BAR_ON = true;
 function bfRowHTML(x) {
+  if (BF_BAR_ON) return '';
   const L = bfList(x); if (!L.length) return '';
   const k = bfSubjKey(x);
-  return `<div class="bf-row" role="list" aria-label="Effects">${L.map(s => {
-    const kind = s.kind || s.e.kind, cls = bfIconClass(s);
-    return `<span class="bf-ic bf-${kind} ${cls}" role="listitem" tabindex="0" ${s.iid ? `data-iid="${s.iid}"` : `data-bf="${bfEsc(s.id)}"`} data-bs="${k}" aria-label="${bfEsc(bfAria(s))}"><i class="bf-g"></i><b class="bf-n"></b></span>`;
-  }).join('')}</div>`;
+  return `<div class="bf-row" role="list" aria-label="Effects">${L.map(s => bfIconHTML(s, k)).join('')}</div>`;
 }
 // the hover card
 function bfCardHTML(x, id) {
@@ -87373,6 +87384,9 @@ function bfFillIcon(el, s, subj) {
   if (el.__g !== g) { el.__g = g; if (g) el.style.setProperty('--g', g); else el.style.removeProperty('--g'); el.classList.toggle('bf-ga', !!g); }
   const n = s.n > 1 ? String(s.n) : '', b = el.__b || (el.__b = el.querySelector('.bf-n'));
   if (b && b.textContent !== n) b.textContent = n;
+  // the seconds under a timed icon on the top-right bar
+  const tm = el.__tm !== undefined ? el.__tm : (el.__tm = el.parentNode && el.parentNode.classList && el.parentNode.classList.contains('bfb-c') ? el.parentNode.querySelector('.bfb-t') : null);
+  if (tm) { const v = s.t > 0 ? (s.t >= 60 ? Math.ceil(s.t / 60) + 'm' : s.t < 10 ? (Math.ceil(s.t * 10) / 10).toFixed(1) : String(Math.ceil(s.t))) : ''; if (tm.textContent !== v) tm.textContent = v; }
 }
 function bfPaneTick() {
   if (typeof document === 'undefined' || !document.getElementById) return;
@@ -87388,10 +87402,88 @@ function bfCardTick() {
   if (typeof ITIP === 'undefined' || !ITIP || ITIP.hidden || !itipAnchor || !itipAnchor.dataset || !itipAnchor.dataset.bf) return;
   const now = performance.now(); if (now - bfCardAt < 250) return; bfCardAt = now;
   const a = itipAnchor, subj = bfFindSubj(a.dataset.bs);
-  if (!a.isConnected) { const n = document.querySelector(`#infoBody .bf-ic[data-bf="${a.dataset.bf}"][data-bs="${a.dataset.bs}"]`); if (n) itipAnchor = n; }
+  if (!a.isConnected) { const n = document.querySelector(`.bf-ic[data-bf="${a.dataset.bf}"][data-bs="${a.dataset.bs}"]`); if (n) itipAnchor = n; else { itipHide(); return; } }
   const h = subj ? bfCardHTML(subj, a.dataset.bf) : '';
   if (!h) { itipHide(); return; }
   if (ITIP.__bf !== h) { ITIP.__bf = h; ITIP.innerHTML = h; }
+}
+
+/* ---------- the effects bar: top right of the field (owner, 9 Nov 2026: "have the buffs sit on the screen top right") ----------
+   Whose effects: the foe under the cursor (it lingers a moment so the pointer can reach the bar), else the unit or foe
+   selected; frozen while the pointer is on the bar. A small portrait and name, the buffs (and traits, states) in one row,
+   the debuffs in a row under it; each icon has its remaining-time sweep, its seconds under it, its stacks; hover (tap on
+   touch) shows the card. It sits just below the wave forecast (#fcast), or beside it when the forecast is open tall. */
+const BFB = { el: null, sig: '', subj: null, hovC: null, hovUntil: 0, inside: false, at: 0, placeAt: 0 };
+const bfIsFoe = x => !!x && x.bounty !== undefined;
+function bfBarSubj() {
+  if (typeof G === 'undefined' || !G || G.state !== 'play') return null;
+  const alive = x => x && !x.dead && (bfIsFoe(x) ? (G.creeps || []).includes(x) : (G.towers || []).includes(x));
+  if (BFB.inside && alive(BFB.subj)) return BFB.subj;
+  const now = performance.now(), h = BF_FIELD.hov;
+  if (h && alive(h)) { BFB.hovC = h; BFB.hovUntil = now + 1200; }
+  if (BFB.hovC && now < BFB.hovUntil && alive(BFB.hovC)) return BFB.hovC;
+  const s = G.sel; if (s && (s.kind === 'creep' || s.kind === 'tower') && alive(s.ref)) return s.ref;
+  return null;
+}
+function bfBarPortrait(x) {
+  try {
+    if (bfIsFoe(x)) return (typeof UNIT_ART !== 'undefined' && UNIT_ART.enemies && UNIT_ART.enemies[x.type]) || '';
+    return typeof unitArtURL === 'function' ? unitArtURL(x.type) || '' : '';
+  } catch (err) { return ''; }
+}
+// the bar's insides for x (null: no effects): its HTML holds only which statuses are there; bfFillIcon fills the numbers
+function bfBarHTML(x) {
+  const L = bfList(x); if (!L.length) return null;
+  const k = bfSubjKey(x), up = L.filter(s => (s.kind || s.e.kind) !== 'debuff'), dn = L.filter(s => (s.kind || s.e.kind) === 'debuff');
+  const row = (A, c, lbl) => A.length ? `<div class="bfb-row ${c}" role="list" aria-label="${lbl}">${A.map(s => `<span class="bfb-c">${bfIconHTML(s, k)}<i class="bfb-t"></i></span>`).join('')}</div>` : '';
+  const nm = (x.def && x.def.name) || '';
+  return `<div class="bfb-who"><span class="bfb-pt${bfIsFoe(x) ? ' foe' : ''}" aria-hidden="true"></span><b>${bfEsc(nm)}</b></div>` + row(up, 'bfb-up', 'Buffs') + row(dn, 'bfb-dn', 'Debuffs');
+}
+function bfBarEl() {
+  if (BFB.el) return BFB.el;
+  const st = typeof document !== 'undefined' && document.getElementById && document.getElementById('stage'); if (!st) return null;
+  const el = BFB.el = document.createElement('div'); el.id = 'bfBar'; el.hidden = true; el.setAttribute('role', 'region'); el.setAttribute('aria-label', 'Effects on the selected unit or foe');
+  el.addEventListener('pointerenter', e => { if (e.pointerType !== 'touch') BFB.inside = true; });
+  el.addEventListener('pointerleave', () => { BFB.inside = false; BFB.hovUntil = performance.now() + 400; });
+  st.append(el);
+  return el;
+}
+// below the wave forecast; beside it when it is open tall and there is room
+function bfBarPlace(el) {
+  const fc = document.getElementById('fcast'), st = el.parentNode;
+  let top = 8, right = '';
+  if (fc && !fc.hidden && fc.offsetHeight) {
+    const room = st.clientWidth - fc.offsetWidth - 28;
+    if (fc.offsetHeight > 150 && room >= 240) right = (st.clientWidth - fc.offsetLeft + 8) + 'px';
+    else top = fc.offsetTop + fc.offsetHeight + 6;
+  }
+  const ts = top + 'px';
+  if (el.__top !== ts) { el.__top = ts; el.style.top = ts; }
+  if (el.__right !== right) { el.__right = right; el.style.right = right; }
+}
+function bfBarTick() {
+  const el = bfBarEl(); if (!el) return;
+  const x = BF_BAR_ON ? bfBarSubj() : null, now = performance.now();
+  if (!x) { if (!el.hidden) { el.hidden = true; BFB.sig = ''; BFB.subj = null; BFB.inside = false; } return; }
+  let L = null;
+  if (x !== BFB.subj || now - BFB.at > 120) {
+    BFB.at = now; L = bfList(x);
+    const sig = bfSubjKey(x) + '|' + L.map(s => s.id).join('|');
+    if (sig !== BFB.sig || x !== BFB.subj) {
+      BFB.sig = sig; BFB.subj = x;
+      const h = L.length ? bfBarHTML(x) : null;
+      if (!h) { if (!el.hidden) el.hidden = true; return; }
+      el.innerHTML = h; el.hidden = false;
+      const pt = el.querySelector('.bfb-pt'), u = bfBarPortrait(x);
+      if (pt) { if (u) pt.style.backgroundImage = `url("${u}")`; else pt.classList.add('none'); }
+    }
+  }
+  if (el.hidden) return;
+  const gh = !!(G.buildType || G.cast); if (el.__gh !== gh) { el.__gh = gh; el.classList.toggle('ghost', gh); }
+  if (now - BFB.placeAt > 200) { BFB.placeAt = now; bfBarPlace(el); }
+  L = L || bfList(x);
+  const by = {}; for (const s of L) by[s.id] = s;
+  for (const ic of el.querySelectorAll('.bf-ic')) { const s = ic.dataset.bf ? by[ic.dataset.bf] : L.find(q => q.iid && String(q.iid) === ic.dataset.iid); if (s) bfFillIcon(ic, s, x); }
 }
 
 /* ---------- on the field ---------- */
@@ -87452,7 +87544,7 @@ function bfWireHover() {
 }
 function bfTick() {
   if (typeof G === 'undefined' || !G) return;
-  try { bfWireHover(); bfPaneTick(); bfCardTick(); bfFieldTick(); } catch (err) { /* the icons are never worth a broken frame */ }
+  try { bfWireHover(); bfPaneTick(); bfBarTick(); bfCardTick(); bfFieldTick(); } catch (err) { /* the icons are never worth a broken frame */ }
 }
 
 /* ---------- wiring: run after the floating numbers each frame, and after the info pane is redrawn ---------- */
