@@ -1,4 +1,4 @@
-const BUILD_TAG = 'acb0ea0@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c74bfed@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -58066,7 +58066,7 @@ const MAP_MOOD = {
   // Kingsmeadow: a sunlit afternoon over open fields: a soft blue sky, golden sun, grass under foot
   meadow: { top: '#a8c4ff', topK: .12, key: '#ffc27a', keyK: .22, bounce: '#9cb456', bounceK: .18, env: 0 },
   // Sunfall Glade: light, in a bluey-purple haze (owner: lighter, a blue-purple haze; was twilight teal-green)
-  clearing: { top: '#9894ff', topK: .45, key: '#c4d0ff', keyK: .42, bounce: '#8878c0', bounceK: .16, env: 1, grade: '#a8bcc8', gradeK: .34 },   // env 1: the painted ground takes the moonlight too
+  clearing: { top: '#9894ff', topK: .45, key: '#c4d0ff', keyK: .42, bounce: '#8878c0', bounceK: .16, env: 1, grade: '#a8bcc8', gradeK: .18 },   // env 1: the painted ground takes the moonlight too
   // Moonwood: cold moonlight, a teal bounce off the wet moss
   moonwood: { top: '#6c8cff', topK: .24, key: '#b4ccff', keyK: .12, bounce: '#2a7a70', bounceK: .24, env: 0 },
 };
@@ -79957,6 +79957,124 @@ if (typeof pauseMenu === 'function') {
   };
 }
 
+/* The Mageling, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's white-robed, hooded young mage
+   (model_unit_mageling.js: assets/unit-art/mageling/scripts/rig.py from three Mixamo clips of the one model,
+   tools/make_gunman.py with no prop) drawn as the Conclave's Magelings (ML_UNIT) in place of their code-built body.
+   - Her moves (the clips, 30 fps, all on her post: the downloads' travel pinned, her feet planted):
+       idle      the stance eased, breathing, the casting hand turning a slow small circle (it glows faintly)
+       ready     a foe in reach: side-on, the left hand forward, the right cocked
+       attack    the one-hand cast: the wind-up plays over the game's own wind-up (t.windup), so the release frame (meta.rel)
+                 lands on the shot; then the follow-through
+       barrage   Arcane Barrage: the step-in push, the right hand held out trembling while the missiles stream from it
+       curtain   Missile Curtain: she squares up and the left hand leads, sweeping wide across the road
+       orbstart / orbhold / orbthrow   Gathering Orb: down into a crouch, the cupped hands circling while the orb gathers,
+                 then the rise and the fling, its release frame on the hurl (t.ccxOrbThrowAt)
+   - Every move is eased into from where she was (a per-unit pose followed at a rate by kind).
+   - Her missiles leave her casting hand where it is this frame (CastR on the RightHand bone: t.tipW, unitTip -> ccHand).
+   - The hand's faint glow (emw on its vertices) brightens a moment at each release; nothing else is drawn round her. */
+const ML_UNIT = 'cc_mageling';
+UM_UNITS[ML_UNIT] = { mdl: 'mageling', k: .82, rig: 'mage', trim: .32 };   // (trim: her white robe, held back from the sculpt shader's boost so its folds read)
+const ML = { CAST: { cc_barrage: 'barrage', cc_sparks: 'curtain', cc_grandorb: 'orbstart' }, RATE: { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW: .1 };
+// her shots (each missile of a strike, Twin Casting's second, the Starry Hat's: one release a strike) and her casts
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_missile) {
+  const _mlAtk = FORCE_ATTACK.cc_missile;
+  FORCE_ATTACK.cc_missile = function (t, st, tg, pow, echo) { const r = _mlAtk.apply(this, arguments); try { if (!echo && t && t.def && t.def.unit === ML_UNIT) t._mlShotAt = G.time; } catch (e) {} return r; };
+}
+if (typeof castAbility === 'function') {
+  const _mlCast = castAbility;
+  castAbility = function (t, ab) {
+    const r = _mlCast.apply(this, arguments);
+    try { if (r && t && t.def && t.def.unit === ML_UNIT && ab && ML.CAST[ab.id] && typeof G !== 'undefined') { t._mlCastAt = G.time; t._mlCast = ML.CAST[ab.id]; } } catch (e) {}
+    return r;
+  };
+}
+// where her missiles leave: the casting hand as drawn (ccMissile lifts its start .05: taken off again, so it is the hand)
+let _mlMis = 0;
+if (typeof ccMissile === 'function') {
+  const _mlM = ccMissile;
+  ccMissile = function () { _mlMis++; try { return _mlM.apply(this, arguments); } finally { _mlMis--; } };
+}
+if (typeof ccHand === 'function') {
+  const _mlHand = ccHand;
+  ccHand = function (t, h) {
+    if (h == null && NEWMODELS && t && t.def && t.def.unit === ML_UNIT && typeof unitTip === 'function') { const w = unitTip(t); if (w) return [w[0], w[1] - (_mlMis ? .05 : 0), w[2]]; }
+    return _mlHand.apply(this, arguments);
+  };
+}
+function mlClips(M) { return UNIT_MDL[M.S.mdl].anim.clips; }
+function mlRel(M, k) { const m = UNIT_MDL[M.S.mdl].meta; return (m && m.rel && m.rel[k]) || 0; }
+function mlClip(M, name, f) { const c = mlClips(M)[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+function mlLen(M, name) { return (mlClips(M)[name][1] - 1) / 30; }
+// what she does now: { f (the anim's frame), rate (how fast the pose follows), glow (the hand's) }
+function mlCtl(t, live, M) {
+  if (!live) return { f: mlClip(M, 'ready', 0), rate: 0, glow: .2 };
+  const now = G.time, A = mlClips(M), ph = (now + (t.anim || 0) * 3) * 30;
+  // Gathering Orb: the crouch while it gathers, the hurl timed so its release frame lands on the throw
+  if (t.ccxOrbT != null) {
+    const rel = mlRel(M, 'orbthrow') / 30, t0 = (t.ccxOrbThrowAt != null && t.ccxOrbThrowAt >= t.ccxOrbT - .05 ? t.ccxOrbThrowAt : t.ccxOrbT) - rel, u = now - t0;
+    if (u >= 0 && u < mlLen(M, 'orbthrow')) return { f: mlClip(M, 'orbthrow', u * 30), rate: ML.RATE.move, glow: .5 + 1.2 * Math.max(0, 1 - Math.abs(u - rel) / .15) };
+    if (now < t0 && now >= (t._mlCastAt || -9)) {
+      const s = now - t._mlCastAt;
+      if (t._mlCast === 'orbstart' && s < mlLen(M, 'orbstart')) return { f: mlClip(M, 'orbstart', s * 30), rate: ML.RATE.move, glow: .5 };
+      return { f: mlClip(M, 'orbhold', ph % A.orbhold[1]), rate: ML.RATE.move * .5, glow: .6 };
+    }
+  }
+  // a cast bar filling (forces_zz_casttimes.js): the move's lead-in over it, so its release frame lands as the spell goes
+  const C = t.ab && t.ab.cast, cm = C && ML.CAST[C.id];
+  if (cm && cm !== 'orbstart' && C.T > 0) { const u = Math.max(0, Math.min(1, (now - C.at) / C.T)); return { f: mlClip(M, cm, mlRel(M, cm) * u), rate: ML.RATE.move * .6, glow: .3 + .4 * u }; }
+  if (t._mlCast && t._mlCast !== 'orbstart' && t._mlCastAt != null) {
+    const u = now - t._mlCastAt, rel = mlRel(M, t._mlCast) / 30;
+    if (u >= 0 && u < mlLen(M, t._mlCast)) return { f: mlClip(M, t._mlCast, u * 30), rate: ML.RATE.move, glow: .45 + (u > rel ? .6 * Math.max(0, 1 - (u - rel) / .5) : 0) };
+  }
+  // the strike: the wind-up over the game's own (t.windup, 0..1 to the shot), the release on the shot, the follow-through
+  const rel = mlRel(M, 'attack'), s = t._mlShotAt == null ? 9 : now - t._mlShotAt, wind = t.tg && t.windup > 0 ? t.windup : 0;
+  const flash = s >= 0 ? Math.max(0, 1 - s / .18) : 0;
+  if (s >= 0 && s < (A.attack[1] - 1 - rel) / 30 && !(wind > 0 && s > ML.FOLLOW)) return { f: mlClip(M, 'attack', rel + s * 30), rate: ML.RATE.atk, glow: .25 + 1.1 * flash };
+  if (wind > 0 && G.phase === 'wave') return { f: mlClip(M, 'attack', rel * wind), rate: ML.RATE.atk, glow: .25 + .35 * wind };
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+  if (fight || s < 1.5) return { f: mlClip(M, 'ready', ph % A.ready[1]), rate: ML.RATE.ready, glow: .25 };
+  return { f: mlClip(M, 'idle', ph % A.idle[1]), rate: ML.RATE.idle, glow: .15 + .1 * Math.sin(now * 1.7 + (t.anim || 0) * 3) };
+}
+const _mlT = new Float32Array(SKIN_MAX * 12);
+function mlPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _mlT);
+  const now = G.time, dt = t._mlT == null ? 1 : Math.max(0, Math.min(.1, now - t._mlT)); t._mlT = now;
+  if (!t._mlO || t._mlO.length !== nb * 12) { t._mlO = new Float32Array(nb * 12); t._mlO.set(_mlT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._mlO, _mlT, k, t._mlO);
+  const o = R.out; o.set(t._mlO); return o;
+}
+const _mlA = new Float32Array(16), _mlB = new Float32Array(16), _mlC = new Float32Array(16);
+function mlDraw(t, tier, sx, sy, sz, wob, opts) {
+  const M = umModel(ML_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const K = UNIT_K(ML_UNIT), tr = Math.min(5, tier | 0), full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+  const s = Math.max(.3, full.max[1]) / M.h * M.S.k * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+  // the Conclave's rune slate under her, as under every Conclave unit, and she stands on it
+  const sz_ = typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1;
+  const bm = typeof ccBase === 'function' ? dynMesh('ml_base' + tr, g => withPal(ML_UNIT, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * sz_), () => ccWith(ML_UNIT, () => ccBase(g, tr, .28))))) : null;
+  M4.trs(_mlA, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _mlA, opts);
+  M4.trs(_mlA, x, bm ? .047 * K * sz_ * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_mlB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_mlC, _mlA, _mlB);
+  const P = mlCtl(t, live, M), o = mlPose(M, t, P, live);
+  const it = item(M.mesh, _mlC, opts); it.sec = [Math.max(0, P.glow || 0), M.S.trim || 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _mlC;
+  // the casting hand, where it is this frame: her missiles leave from it
+  const mk = UNIT_MDL[M.S.mdl].marks;
+  if (live && mk && mk.CastR) { const p = umXf(o, mk.gunBone, mk.CastR); t.tipW = M4.xf(_mlC, p[0], p[1], p[2]); t.tipYaw = yaw; t.tipAt = G.time; }
+  return true;
+}
+if (typeof drawForceUnitPlain === 'function') {
+  const _mlPlain = drawForceUnitPlain;
+  drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+    if (NEWMODELS && t && t.def && t.def.unit === ML_UNIT && !t.wrecked && mlDraw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(ML_UNIT)); return; }
+    return _mlPlain.apply(this, arguments);
+  };
+}
+
 /* Aurelian, the Lion of the Ford, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's knight with his
    sword and the lion shield strapped along his left forearm (model_unit_aurelian.js: assets/unit-art/aurelian/scripts/rig.py,
    tools/make_gunman.py) drawn as the Silver Order's Champion ch_aurelian (AU_UNIT) in place of his code-built rider.
@@ -80030,6 +80148,164 @@ if (typeof umDraw === 'function') {
   };
 }
 
+/* The Conclave's Pyroclasts, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's white-haired fire wizard
+   in his plum robe (model_unit_pyroclast.js: assets/unit-art/pyroclast/scripts/rig.py, tools/make_gunman.py) drawn as the
+   Pyroclasts (PY_UNIT) in place of their code-built body, on the Conclave's rune slate.
+   - His moves (the clips, 30 fps): idle (upright, an ember cupped in his hands), ready (a foe in reach: Casting Spell's deep
+     side-on gather, looped), cast (his strike: the clip's thrust of the right hand), and one for each ability: skip (Skipping
+     Flame: a low sidearm skim), breath (Furnace Breath: both hands thrust out low and held while it pours), phoenix (Phoenix:
+     Magic Heal's step and reach, the bird born from the right palm).
+   - Timing: the strike's wind-up plays over the last of the reload (t.cd), so the right palm reaches its release frame as
+     the game looses the fireball, and the ball leaves from that palm (ccHand, while he is drawn); the follow-through plays
+     after. Furnace Breath's thrust lands as its pour starts (0.1 s) and holds while it pours; Phoenix's reach is fullest at
+     0.3 s, when the bird leaves (CCX.PHX_LIFT), from the palm; Skipping Flame's skim lets go at 0.1 s, the hop from the palm.
+     A spell cast through a cast bar (forces_zz_casttimes.js) holds its move's start until the bar ends.
+   - The fire is the lab's (pyrofire.js): here only where it leaves from. Round him: a faint ember glow in each palm (brighter
+     in the casting hand as a strike gathers), brief and small (owner: never flashy round the caster).
+   - Every frame is checked on the game's skinning (rig.py): the arms clear of his body, the legs inside the robe, the skin's
+     stretch. Every move is eased into from where he was. */
+const PY_UNIT = 'cc_pyroclast';
+UM_UNITS[PY_UNIT] = { mdl: 'pyroclast', k: .97, rig: 'mage' };
+const PY = { CAST: { cc_kindle: 'skip', cc_pyresigil: 'breath', cc_flamewave: 'phoenix' }, RATE: { idle: 4, ready: 8, cast: 30, move: 40 }, BASE_H: .045 };
+const pyMk = M => UNIT_MDL[M.S.mdl].marks;
+function pyClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
+const pyN = (M, name) => UNIT_MDL[M.S.mdl].anim.clips[name][1];
+if (typeof castAbility === 'function') {
+  const _pyCast = castAbility;
+  castAbility = function (t, ab) {
+    // Skipping Flame's hop leaves from where his skim lets it go (ccxHand -> unitTip: the right palm at the move's release)
+    try { if (ab && ab.id === 'cc_kindle' && pyLive(t)) { const p = pyPalmAt(t, 'skip', pyMk(UM[PY_UNIT]).rel.skip, 'R', true); if (p) { t.tipW = p; t.tipYaw = t._pyYaw; t.tipAt = G.time; } } } catch (e) {}
+    const r = _pyCast.apply(this, arguments);
+    try { if (r && t && t.def && t.def.unit === PY_UNIT && ab && PY.CAST[ab.id] && typeof G !== 'undefined') { t._pyCastAt = G.time; t._pyCast = PY.CAST[ab.id]; } } catch (e) {}
+    return r;
+  };
+}
+// what he does now: { f (the anim's frame), rate (how fast the pose follows), gl (the casting palm's glow, 0..1) }
+function pyCtl(t, live, M) {
+  if (!live) return { f: pyClip(M, 'idle', 0), rate: 0, gl: 0 };
+  const now = G.time, mk = pyMk(M), REL = mk.rel, ph = (now + (t.anim || 0) * 3) * 30;
+  // a spell's cast bar: its move's start held until the bar ends
+  const AC = t.ab && t.ab.cast;
+  if (AC && PY.CAST[AC.id]) return { f: pyClip(M, PY.CAST[AC.id], 0), rate: PY.RATE.move, gl: .5 };
+  // Furnace Breath: the thrust (0.1 s), held while it pours (looped), and back
+  const B = t.ccxBreath, BR = REL.breath;
+  if (B && now >= B.at && now < B.until + (BR[2] - BR[1]) / 30) {
+    const el = now - B.at, f = el * 30 < BR[0] ? el * 30 : now < B.until ? BR[0] + ((el * 30 - BR[0]) % (BR[1] - BR[0])) : BR[1] + (now - B.until) * 30;
+    return { f: pyClip(M, 'breath', f), rate: PY.RATE.move, gl: 1 };
+  }
+  if (t._pyCast && t._pyCast !== 'breath' && t._pyCastAt != null) {
+    const u = now - t._pyCastAt, n = pyN(M, t._pyCast);
+    if (u >= 0 && u * 30 < n - 1) return { f: pyClip(M, t._pyCast, u * 30), rate: PY.RATE.move, gl: u * 30 < REL[t._pyCast] ? 1 : 0 };
+  }
+  // the strike: the wind-up over the reload's last part (the release frame as the fireball is loosed), the follow-through after
+  const st = t.st, rate = Math.max(.5, (st && st.rate) || 1.5), n = pyN(M, 'cast'), R = REL.cast;
+  const pre = Math.min(R / 30, rate * .45), post = Math.max(.35, Math.min((n - 1 - R) / 30, rate - pre - .05));
+  const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+  if (fight && t.cd > 0 && t.cd < pre) return { f: pyClip(M, 'cast', R * (1 - t.cd / pre)), rate: PY.RATE.cast, gl: 1 - t.cd / pre };
+  const s = t.shotT == null ? 9 : t.shotT;
+  if (s >= 0 && s < post && t.shots) return { f: pyClip(M, 'cast', R + (n - 1 - R) * s / post), rate: PY.RATE.cast, gl: 0 };
+  if (fight || s < 1.5) return { f: pyClip(M, 'ready', ph % (pyN(M, 'ready') - 1)), rate: PY.RATE.ready, gl: 0 };
+  return { f: pyClip(M, 'idle', ph % (pyN(M, 'idle') - 1)), rate: PY.RATE.idle, gl: 0 };
+}
+const _pyT = new Float32Array(SKIN_MAX * 12);
+function pyPose(M, t, P, live) {
+  const R = M.R, nb = R.anim.nb;
+  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  umMixFrame(R, P.f, _pyT);
+  const now = G.time, dt = t._pyT == null ? 1 : Math.max(0, Math.min(.1, now - t._pyT)); t._pyT = now;
+  if (!t._pyO || t._pyO.length !== nb * 12) { t._pyO = new Float32Array(nb * 12); t._pyO.set(_pyT.subarray(0, nb * 12)); }
+  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
+  umBlendPose(R, t._pyO, _pyT, k, t._pyO);
+  const o = R.out; o.set(t._pyO); return o;
+}
+// a palm (R or L) in the world at a frame of a clip, as he stands now (his last drawn place, turned to where he faces now)
+const _pyF = new Float32Array(SKIN_MAX * 12);
+function pyPalmAt(t, clip, i, side, raw) {
+  const M = UM[PY_UNIT]; if (!M || !M.R || !t._pyMat || typeof G === 'undefined' || !(G.time - t._pyAt < .6)) return null;
+  const mk = pyMk(M); umMixFrame(M.R, pyClip(M, clip, i), _pyF);
+  const p = umXf(_pyF, mk['b' + side], mk['Palm' + side]), w = M4.xf(t._pyMat, p[0], p[1], p[2]);
+  return raw ? w : pyTurn(t, w);
+}
+function pyTurn(t, w) {   // (as unitTip: a point drawn at the last yaw, turned to his facing now)
+  const d = (t.ang == null ? 0 : t.ang) - (t._pyYaw || 0), c = Math.cos(d), s = Math.sin(d), dx = w[0] - t.x, dz = w[2] - t.y;
+  return [t.x + dx * c + dz * s, w[1], t.y - dx * s + dz * c];
+}
+function pyLive(t) { return t && t.def && t.def.unit === PY_UNIT && NEWMODELS && t._pyPR && typeof G !== 'undefined' && G && G.time - t._pyAt < .6 && G.time >= t._pyAt; }
+const _pyA = new Float32Array(16), _pyB = new Float32Array(16), _pyC = new Float32Array(16);
+function pyDraw(t, tier, sx, sy, sz, wob, opts) {
+  const M = umModel(PY_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
+  if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+  if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+  const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+  const K = UNIT_K(PY_UNIT), full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang, tr = Math.min(5, tier | 0), mk = pyMk(M);
+  // as tall upright (his idle's head) as the code-built scholar, a little more again from IV; the deep stance crouches him
+  const s = Math.max(.3, full.max[1]) / (mk.hIdle || M.h) * M.S.k * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+  // the Conclave's rune slate under him, as under every scholar, and he stands on it
+  const sz0 = typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1;
+  const bm = typeof ccBase === 'function' && typeof ccWith === 'function' ? dynMesh('py_base' + tr, g => withPal(PY_UNIT, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * sz0), () => ccWith(PY_UNIT, () => ccBase(g, tr))))) : null;
+  M4.trs(_pyA, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _pyA, opts);
+  M4.trs(_pyA, x, bm ? PY.BASE_H * K * sz0 * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_pyB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_pyC, _pyA, _pyB);
+  const P = pyCtl(t, live, M), o = pyPose(M, t, P, live);
+  const it = item(M.mesh, _pyC, opts); it.sec = [0, 0]; it.bones = o.slice();
+  FX_PM.root = FX_PM.torso = _pyC;
+  if (live) {
+    // the palms where they are this frame: Skipping Flame's hop leaves the right one (unitTip), the hands' fire sits in them
+    const pR = umXf(o, mk.bR, mk.PalmR), pL = umXf(o, mk.bL, mk.PalmL);
+    t._pyPR = M4.xf(_pyC, pR[0], pR[1], pR[2]); t._pyPL = M4.xf(_pyC, pL[0], pL[1], pL[2]); t._pyAt = G.time; t._pyYaw = yaw;
+    (t._pyMat || (t._pyMat = new Float32Array(16))).set(_pyC);
+    t.tipW = t._pyPR; t.tipYaw = yaw; t.tipAt = G.time;
+    // a faint ember glow in each palm (the casting hand's warmer as a strike or a spell gathers), small and brief
+    if (typeof QADD !== 'undefined' && QADD && RD) {
+      const fl = .85 + .15 * Math.sin(G.time * 9 + (t.i | 0) * 1.7), a = (.13 + .2 * (P.gl || 0)) * fl;
+      QADD.bill(RD, t._pyPR[0], t._pyPR[1], t._pyPR[2], (.05 + .025 * (P.gl || 0)) * s, (.05 + .025 * (P.gl || 0)) * s, [1, .5, .16, a], 1, 0);
+      QADD.bill(RD, t._pyPL[0], t._pyPL[1], t._pyPL[2], .04 * s, .04 * s, [1, .45, .14, .1 * fl], 1, 0);
+    }
+  }
+  return true;
+}
+if (typeof drawForceUnitPlain === 'function') {
+  const _pyPlain = drawForceUnitPlain;
+  drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+    if (NEWMODELS && t && t.def && t.def.unit === PY_UNIT && !t.wrecked && pyDraw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(PY_UNIT)); return; }
+    return _pyPlain.apply(this, arguments);
+  };
+}
+// where his fire leaves: the fireball from the right palm at the strike's release frame; Furnace Breath from between his palms;
+// anything else (the hands' small flame) from the right palm as drawn this frame
+let PY_SHOT = null;
+if (typeof ccHand === 'function') {
+  const _pyHand = ccHand;
+  ccHand = function (t, h) {
+    try {
+      if (pyLive(t)) {
+        if (PY_SHOT === t) { const p = pyPalmAt(t, 'cast', pyMk(UM[PY_UNIT]).rel.cast, 'R'); if (p) return p; }
+        if (t.ccxBreath && G.time < t.ccxBreath.until + .35) { const a = pyTurn(t, t._pyPR), b = pyTurn(t, t._pyPL); return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]; }
+        return pyTurn(t, t._pyPR);
+      }
+    } catch (e) {}
+    return _pyHand.apply(this, arguments);
+  };
+}
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_fireball) {
+  const _pyAtk = FORCE_ATTACK.cc_fireball;
+  FORCE_ATTACK.cc_fireball = function (t) { const was = PY_SHOT; PY_SHOT = t; try { return _pyAtk.apply(this, arguments); } finally { PY_SHOT = was; } };
+}
+// Phoenix: the bird's flight drawn from the right palm at the move's release (its route's first point and height); the
+// spell's own route (the hits) is untouched
+if (typeof CCX_FX !== 'undefined' && typeof CCX_FX.phoenix === 'function') {
+  const _pyPhx = CCX_FX.phoenix;
+  CCX_FX.phoenix = function (C, t, F) {
+    try {
+      if (pyLive(t) && F && F.R && typeof ccxAlong === 'function') {
+        const p = pyPalmAt(t, 'phoenix', pyMk(UM[PY_UNIT]).rel.phoenix, 'R');
+        if (p) { const R = [[p[0], p[2]]].concat(F.R.slice(1)); F = Object.assign({}, F, { R, h0: p[1], tot: ccxAlong(R, 0)[4] }); }
+      }
+    } catch (e) {}
+    return _pyPhx.call(this, C, t, F);
+  };
+}
+// (the code-built body's orb and hands' glow would float where its hands stood: the part's own draw is skipped with the body)
+
 /* ================= THE MODEL LAB (runehold.html?lab=1) =================
    The owner's bench for the sculpted units' animations, close up: one unit on its post, a stand-in foe held in front of it,
    the game's own clock run slow, paused or scrubbed, and the real strike and spell effects playing on the foe.
@@ -80082,7 +80358,7 @@ if (typeof umDraw === 'function') {
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const REC_S = 6;
-  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', bladedancer: 'Blade Dancers', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey', ch_aurelian: 'Aurelian' };
+  const NAMES = { gladebow: 'Gladebow Rangers', ch_faelan: 'Faelan', steamhammer: 'Steam Hammers', thundergun: 'Thunderguns', bladedancer: 'Blade Dancers', wb_oathbound: 'Oathbound', ch_varic: 'Varic Dunmoor', ch_maren: 'Maren Vey', ch_aurelian: 'Aurelian', cc_mageling: 'Magelings' };
 
   /* ---- what can be shown ---- */
   function sculpted() { return typeof UM_UNITS === 'undefined' ? [] : Object.keys(UM_UNITS).filter(u => !UM_UNITS[u].part && UNIT_MDL && UNIT_MDL[UM_UNITS[u].mdl]); }   // (part: a piece of another, as Varic's sword)
