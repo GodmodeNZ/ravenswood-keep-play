@@ -1,4 +1,4 @@
-const BUILD_TAG = 'aab6c25@2026-11-08';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7c63539@2026-11-08';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53518,6 +53518,17 @@ uniform sampler2D uLM; uniform vec4 uLMR; uniform float uLMOn, uLMK;
 uniform float uRim, uExpo, uFill;
 uniform float uOwn;   // the units' shading (owner, 6 Nov 2026: "make it uniform ... across all units"): 1 on, 0 the older look
 uniform vec4 uOwnK;   // its gradient up a code-built unit: the feet's light, the head's, the heights (world) it runs between
+/* the map's mood (maps.js MAP_MOOD): every model on the field takes the light of its place, as a unit in a twilit glade turns
+   teal in the shade and peach in the sun. Three tints, each of luminance 1 so only the hue moves (rgb, a: how far): uMood the
+   ambient from above, uBounce the ground's bounce from below, uMoodKey the warm (or cold) key on what faces the sun. uMoodE: the
+   share the surroundings (the ground, trees) take; models take it whole. Unset (all 0) it is no change. Applied to the lit
+   colour before the emission and the hit tint, so glows, spells and faction colours stay true. */
+uniform vec4 uMood, uBounce, uMoodKey; uniform float uMoodE;
+vec3 moodOf(vec3 n, float lit, float k){
+  vec3 t = mix(mix(vec3(1.), uBounce.rgb, uBounce.a), mix(vec3(1.), uMood.rgb, uMood.a), smoothstep(-.6, .5, n.y));
+  t = mix(t, mix(vec3(1.), uMoodKey.rgb, uMoodKey.a), clamp(lit, 0., 1.)*.75);
+  return mix(vec3(1.), t, k);
+}
 float shadowAt(vec4 L){
   vec3 p = L.xyz/L.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.||p.z>1.) return 1.;
   float b = .0016; float s=0.; float t=uTexel*1.2;
@@ -53684,7 +53695,7 @@ void main(){
     float shp = uShadowOn>.5 ? shadowAt(vL) : 1.;
     vec3 pl = vec3(0.);
     for(int i=0;i<6;i++){ if(i>=uNPL) break; vec3 d=uPL[i].xyz-vW; float l=length(d); float a=clamp(1.-l/uPL[i].w,0.,1.); a*=a; pl += uPLc[i]*a*(.35+.65*max(d.y/l,0.)); }
-    o = vec4(tx*uGPGain*mix(.48, 1., shp) + tx*pl*.6 + pl*.03, 1.);
+    o = vec4((tx*uGPGain*mix(.48, 1., shp) + tx*pl*.6 + pl*.03)*moodOf(vec3(0., 1., 0.), shp*.6, uMoodE), 1.);
     return;
   }
   vec3 base = vCol; float metal = 0., mtl = 0.;
@@ -53800,6 +53811,7 @@ void main(){
   } else if(metal > .5){ vec3 R = reflect(-V, n); col += uSunCol*pow(max(dot(R, uSunDir), 0.), 18.)*.55*sh + uSky*.12*max(n.y, 0.); }
   else if(mtl > 0.){ vec3 R = reflect(-V, n); vec3 tn = mix(vec3(1.), base/max(max(base.r, max(base.g, base.b)), .02), .65);
     col += tn*mtl*(uSunCol*(pow(max(dot(R, uSunDir), 0.), 22.)*.75 + pow(max(dot(R, uSunDir), 0.), 4.)*.08)*mix(.2, 1., sh) + uSky*.1*max(R.y, 0.)); }
+  col *= moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, vX.y < .5 ? 1. : uMoodE);   // the map's mood (models whole, the ground its share)
   col = mix(col, base*2.6, vEm);
   col = col*vTint.rgb + vTint.a * vTint.rgb / max(1., max(vTint.r, max(vTint.g, vTint.b)));   // emission takes the tint's hue (white for a plain hit flash)
   vec3 fc = finish(col, vW);
@@ -53819,6 +53831,7 @@ void main(){
 /* A rigged model's skinning on the GPU: two bones a vertex (aBone: their indices, aBW: the first one's share), each bone a
    3x4 matrix taking the rest pose to the posed one, as three vec4 (its columns, then the offset in their w); uSkinOn 0
    for a static model (its bone attributes then read 0 and nothing moves) */
+const MOOD_NONE = { top: [1, 1, 1, 0], bounce: [1, 1, 1, 0], key: [1, 1, 1, 0], env: 0 };   // (the icon and gear-sheet renderers: neutral)
 const SKIN_MAX = 40;   // (a sculpted unit's bones: 22 of Mixamo's body, 10 for the drawing hand's fingers, the string's nock and the arrow; 120 vec4, inside WebGL2's 256)
 const SKIN_GLSL = `
 layout(location=11) in vec2 aBone; layout(location=12) in float aBW;
@@ -53868,7 +53881,7 @@ void main(){
   vec3 V = normalize(uCam - vW);
   float h = clamp(vOP.y, 0., 1.);   // the model stands 0..1 tall in its own space
   if(uSty < .5){   // the plain path (to compare): the engine's light on the painted texture
-    vec3 c = base*lightAt(n, vW, sh, 0.);
+    vec3 c = base*lightAt(n, vW, sh, 0.)*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, 1.);
     c = mix(c, vCol*(2.6 + vX.z*2.), max(vEm, 0.));
     c = c*vTint.rgb + vTint.a*vTint.rgb/max(1., max(vTint.r, max(vTint.g, vTint.b)));
     o = vec4(finish(c, vW), vX.x); return;
@@ -53904,6 +53917,7 @@ void main(){
   // and a soft dark contour on the edges turned down and away, so the silhouette holds against a light ground
   col *= 1. - .32*smoothstep(.62, .95, fr)*smoothstep(.45, -.5, n.y);
   col *= mix(.72, 1., smoothstep(0., .12, h));   // contact: the boots sink into their shadow
+  vec3 mood = moodOf(n, sun, 1.); col *= mood;   // the map's mood
   // the emissive group (the eyes) stays bright: above the light, and brighter at the higher tiers
   col = mix(col, vCol*(3. + vX.z*3.), max(vEm, 0.));
   // a glowing blade (a mesh's triangles marked ext -2 pink, -3 red: Maren Vey's twin blades, unitmodels_maren.js): the painted
@@ -53919,7 +53933,7 @@ void main(){
     float rune = smoothstep(.3, .6, bl)*smoothstep(.55, .25, (bmx - bmn)/max(bmx, .01));
     float shim = .88 + .12*sin(uTime*6.5 - vOP.z*38. + vOP.x*20.);
     vec3 pb = mix(base, hue*(.3 + .9*bl), red ? .6 : .3);
-    vec3 lit = pb*light*grad + mix(pb, vec3(1., .8, .95), .4)*pow(max(dot(n, Hh), 0.), 28.)*.8*key;
+    vec3 lit = (pb*light*grad)*mood + mix(pb, vec3(1., .8, .95), .4)*pow(max(dot(n, Hh), 0.), 28.)*.8*key;
     float facet = .45 + .55*abs(dot(n, V));
     vec3 fb = finish(lit, vW) + (hue*(.22 + .3*vX.z)*facet + mix(hue, vec3(1., .72, .94), .5)*rune*(.3 + .35*vX.z))*shim;
     o = vec4(fb, vX.x); return;
@@ -53970,7 +53984,7 @@ void main(){
   float sh = uShadowOn>.5 ? shadowAt(vL) : 1.;
   vec3 light = lightAt(n, vW, sh, uLeaf*.3);
   float ao = uLeaf>.5 ? mix(.55, 1.05, smoothstep(.15,.95,vH)) : mix(.6,1.,smoothstep(0.,.3,vH));
-  vec3 col = base*light*ao;
+  vec3 col = base*light*ao*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
   o = vec4(finish(col, vW), 1.);
 }`;
 const VS_TREE_SH = `#version 300 es
@@ -54261,6 +54275,7 @@ function createRenderer(canvas, opt = {}) {
       if (u.uMT) { let mt = null; try { mt = matTexture(); } catch (e) {} gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D_ARRAY, mt || blankA); gl.uniform1i(u.uMT, 6); gl.uniform1f(u.uMTOn, mt ? 1 : 0); if (mt) gl.uniform4fv(u.uMTR, matRef); }
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
       if (u.uUQ) gl.uniform1f(u.uUQ, this.uq == null ? 2 : this.uq); if (u.uCamR) gl.uniform3fv(u.uCamR, this.right); gl.uniform1f(u.uRim, this.rim == null ? .12 : this.rim); gl.uniform1f(u.uExpo, this.expo == null ? 1 : this.expo); gl.uniform1f(u.uFill, this.fill || 0); if (u.uOwn) gl.uniform1f(u.uOwn, this.own == null ? 1 : this.own); if (u.uOwnK) { const k = this.ownK || OWN_K; gl.uniform4f(u.uOwnK, k[0], k[1], k[2], k[3]); }
+      if (u.uMood) { const m = this.mood || MOOD_NONE; gl.uniform4fv(u.uMood, m.top); gl.uniform4fv(u.uBounce, m.bounce); gl.uniform4fv(u.uMoodKey, m.key); gl.uniform1f(u.uMoodE, m.env); }
       if (u.uBg) {
         const bg = this.bg && this.bg.tex && this.bg.dissolve ? this.bg : null;
         gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, bg ? bg.tex : blank); gl.uniform1i(u.uBg, 3); gl.uniform1f(u.uBgOn, bg ? 1 : 0);
@@ -57522,6 +57537,36 @@ const LIGHT_DEF = {
   clearing: { sun: '#ffe2b8', sunI: 1.55, az: 165, el: 44, rim: .14, fill: .1, ground: 1, paint: 1, sky: '#b8caf0', skyI: .42, gnd: '#d9c79a', gndI: .18, fog: '#26302a', fogNear: .9, woods: 0, lamps: 1, expo: 1, rays: 0, ray: '#ffe0a0' },
   moonwood: { sun: '#b8cbf2', sunI: 1.35, az: 153, el: 48, rim: .65, fill: .95, ground: .85, paint: 1, sky: '#4a6290', skyI: .45, gnd: '#1c2636', gndI: .8, fog: '#0e1828', fogNear: .9, woods: .8, lamps: 1.5, expo: .95, rays: 2, ray: '#68b4f0' },
 };
+/* Each map's mood: the light every model on it takes (units, foes, bosses, props, missiles), so a unit stands in its place
+   instead of on it. Keyed by map id; a Chronicles location can override its map's (CAMP_MOOD, by location id).
+   top: the ambient from above (the sky or canopy), bounce: the ground's light from below, key: what faces the sun.
+   Colours are sRGB hex and only their hue counts (each is scaled to luminance 1); the numbers say how far each pulls, 0..1
+   (about .1-.25 keeps units in their own colours). env: the share the ground and trees take (0: the painting is already
+   in the mood). gl.js moodOf applies it. */
+const MAP_MOOD = {
+  // Kingsmeadow: a sunlit afternoon over open fields: a soft blue sky, golden sun, grass under foot
+  meadow: { top: '#a8c4ff', topK: .12, key: '#ffc27a', keyK: .22, bounce: '#9cb456', bounceK: .18, env: 0 },
+  // Sunfall Glade: twilight in the deep wood (the title painting): cool teal-green from the canopy, dark moss below, a low peach sun
+  clearing: { top: '#4cb8a4', topK: .36, key: '#ffb47c', keyK: .28, bounce: '#2c5a26', bounceK: .36, env: 0 },
+  // Moonwood: cold moonlight, a teal bounce off the wet moss
+  moonwood: { top: '#6c8cff', topK: .24, key: '#b4ccff', keyK: .12, bounce: '#2a7a70', bounceK: .24, env: 0 },
+};
+const CAMP_MOOD = {
+  ember: { top: '#c87050', topK: .16, key: '#ff9040', keyK: .24, bounce: '#803020', bounceK: .2, env: .55 },      // the glade burns: smoke and embers at dusk
+  thorn: { top: '#8ea85a', topK: .2, key: '#d8c070', keyK: .12, bounce: '#4a5a28', bounceK: .24, env: .55 },      // swamp murk under the brood's webs
+  hollowgl: { top: '#9c80e0', topK: .18, key: '#c0f0b0', keyK: .12, bounce: '#406848', bounceK: .18, env: .5 },   // the light gone wrong
+  barrow: { top: '#88b0ff', topK: .22, key: '#d0e0ff', keyK: .1, bounce: '#50687c', bounceK: .2, env: .55 },      // frost on the barrows
+  storm: { top: '#7888c0', topK: .2, key: '#c8d0ff', keyK: .1, bounce: '#3a5060', bounceK: .18, env: .5 },        // storm light in the canopy
+  hex: { top: '#c090d8', topK: .16, key: '#ffc0a0', keyK: .12, bounce: '#8a9a58', bounceK: .12, env: .45 },       // a violet dusk over the choir
+  banner: { top: '#b8c8e8', topK: .12, key: '#ffd0a0', keyK: .1, bounce: '#8a9070', bounceK: .1, env: .4 },       // an overcast field of steel
+};
+// the mood in force for a map: its location's (in the Chronicles) or the map's own, as the renderer's uniforms
+function moodGet(mapId) {
+  let M = MAP_MOOD[mapId] || MAP_MOOD.meadow;
+  try { const c = typeof G !== 'undefined' && G.camp && typeof CAMP_LOCS !== 'undefined' ? CAMP_LOCS[G.camp.loc | 0] : null; if (c && c.map === mapId && CAMP_MOOD[c.id]) M = CAMP_MOOD[c.id]; } catch (e) {}
+  const t = (hex, k) => { const c = lin3(hex), l = Math.max(1e-4, c[0] * .2126 + c[1] * .7152 + c[2] * .0722); return [c[0] / l, c[1] / l, c[2] / l, k || 0]; };
+  return { top: t(M.top, M.topK), bounce: t(M.bounce, M.bounceK), key: t(M.key, M.keyK), env: M.env || 0 };
+}
 const LIGHT_KEY = id => 'runehold.light3.' + id;
 // the light schemes are fixed (the old Lighting panel is gone); any tweaks it saved are cleared
 try { for (const id of Object.keys(LIGHT_DEF)) localStorage.removeItem(LIGHT_KEY(id)); } catch (e) {}
@@ -62981,7 +63026,7 @@ function qxOpt(id, T, at) {
   o.kind = D.kind; if (D.kind === 'hold') o.lives = D.lives(T);
   o.reward = D.reward(o);
   {   // every challenge also pays gold on top of its reward (owner, 8 Nov 2026): added to a gold reward it already has
-    const add = Math.round(qxGold(1, at) / 20) * 10, g = o.reward.find(r => r.k === 'gold');   // (halved: owner, more than a wave gave)
+    const add = Math.round(8 * Math.pow(1.3, (at - 8) / 5)) * 10, g = o.reward.find(r => r.k === 'gold');   // 80 at wave 8, 30% more each challenge after (owner: half the first figure, then climbing faster)
     if (g) g.n += add; else o.reward.push({ k: 'gold', n: add });
   }
   for (const r of o.reward) if (r.k === 'relic') {   // three different relics, rolled now so the card can show them
@@ -66511,7 +66556,8 @@ function buildThemeEnv(th) {
 function applyTheme(id) {
   const th = THEMES[id] || THEMES.meadow;
   if (typeof AudioSys !== 'undefined' && AudioSys.ambience) AudioSys.ambience(th.id === 'moonwood' ? 'night' : 'day');   // birds by day, crickets and owls by night
-  if (!RD || (TH === th && THENV[th.id])) return;
+  if (RD && TH === th && THENV[th.id]) { RD.mood = moodGet(th.id); return; }   // (the same map, maybe another Chronicles location: its mood)
+  if (!RD) return;
   TH = th; LS = lightGet(th.id);
   const E = THENV[th.id] || (THENV[th.id] = buildThemeEnv(th));
   ENV.ground = E.ground; ENV.wild = E.wild; ENV.deco = E.deco; ENV.fx = E.fx; ENV.treeGroups = E.treeGroups;
@@ -66529,6 +66575,7 @@ function applyLight() {
   const L = LS;
   RD.sunDir = lightDir(L.az, L.el); RD.sunCol = linMul(L.sun, L.sunI); RD.sky = linMul(L.sky, L.skyI); RD.gnd = linMul(L.gnd, L.gndI);
   RD.fogCol = lin3(L.fog); RD.rim = L.rim; RD.expo = L.expo; RD.lmGain = L.lamps; RD.fill = L.fill;
+  RD.mood = moodGet(TH.id);   // the map's mood on every model (maps.js MAP_MOOD)
   const E = THENV[TH.id]; RD.gtex = E && E.gtex ? Object.assign(E.gtex, { gain: L.ground }) : null;
   RD.gpaint = E && E.gpaint ? Object.assign(E.gpaint, { gain: L.paint == null ? 1 : L.paint }) : null;
   RD.clear = RD.fogCol.map(v => { const x = v * 1.05; return Math.pow(Math.min(1, (x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14)), 1 / 2.2); });
