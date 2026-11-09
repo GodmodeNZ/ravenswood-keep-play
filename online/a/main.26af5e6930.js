@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b354ad1@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '30e860d@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1760,6 +1760,56 @@ function tryBuild(type, i, j) {
   onDirty(); onSave();
   return t;
 }
+/* ---- a wall dragged out in one go (owner, 10 Nov 2026: "allow multiple walls to be built at once so you can shape a full
+   wall"; ui.js draws it). wallLinePlan reads the dragged cells in order without building: 'ok' (it goes up), 'taken'
+   (outside the field, the road, already built, a creep standing there), 'block' (with the ones before it, it would seal
+   the road or trap a creep: left open) or 'poor' (no gold left for it). placeWallLine builds the 'ok' ones at once. ---- */
+function wallLinePlan(cells, type) {
+  type = type || 'wall';
+  const cost = TOWERS[type].tiers[0].cost, blk = G.blk.slice(), out = [], seen = new Set();
+  let gold = G.gold, n = 0, spent = 0, dist = null;
+  const why = chalBlocks(type) || (typeof champBlocks === 'function' && champBlocks(type));
+  for (const [i, j] of cells) {
+    const k = inGrid(i, j) ? idx(i, j) : -1;
+    if (k >= 0 && seen.has(k)) continue;
+    if (k >= 0) seen.add(k);
+    let st = 'ok';
+    if (why || k < 0 || RES[k] || blk[k] || G.tAt[k]) st = 'taken';
+    else if (G.creeps.some(c => !c.fly && !c.dead && ((c.state !== 'exit' && idx(c.ti, c.tj) === k) || (Math.floor(c.x) === i && Math.floor(c.y) === j)))) st = 'taken';
+    else if (gold < cost) st = 'poor';
+    else {
+      blk[k] = 1; const d = flowField(blk);
+      if (!isFinite(d[SPAWN_K]) || G.creeps.some(c => !c.fly && !c.dead && c.state !== 'exit' && !c.atk && !isFinite(d[idx(c.ti, c.tj)]))) { blk[k] = 0; st = 'block'; }
+      else { gold -= cost; spent += cost; n++; dist = d; }
+    }
+    out.push({ i, j, st });
+  }
+  return { cells: out, n, cost: spent, dist, blk, why };
+}
+function placeWallLine(cells, type) {
+  type = type || 'wall';
+  const P = wallLinePlan(cells, type);
+  if (P.why) { onToast(P.why); sfx('error'); return P; }
+  let built = 0, spent = 0;
+  for (const c of P.cells) if (c.st === 'ok') { const g = G.gold; if (tryBuild(type, c.i, c.j)) { built++; spent += g - G.gold; } }
+  const nb = P.cells.filter(c => c.st === 'block').length, nt = P.cells.filter(c => c.st === 'taken').length, np = P.cells.filter(c => c.st === 'poor').length;
+  const left = [nb && `${nb} left open so the road stays clear`, nt && `${nt} already taken`, np && `${np} more ${np === 1 ? 'needs' : 'need'} gold`].filter(Boolean);
+  const nm = oldRules() ? 'barricade' : 'wall';
+  if (built) onToast(`Built ${built} ${nm}${built === 1 ? '' : 's'} for ${spent} gold.${left.length ? ' ' + left.join(', ').replace(/^./, m => m.toUpperCase()) + '.' : ''}`);
+  else if (left.length) { onToast(`No ${nm}s built: ${left.join(', ')}.`); sfx('error'); }
+  P.built = built; P.spent = spent;
+  return P;
+}
+// the cells a drag passed over, from (a) to (b), side by side (no diagonal gaps: a dragged wall is solid)
+function wallLineStep(a, b) {
+  const out = []; let [i, j] = a;
+  while (i !== b[0] || j !== b[1]) {
+    const di = Math.sign(b[0] - i), dj = Math.sign(b[1] - j);
+    if (di && (!dj || Math.abs(b[0] - i) >= Math.abs(b[1] - j))) i += di; else j += dj;
+    out.push([i, j]);
+  }
+  return out;
+}
 function upgradeCost(t) {
   if (t.tier >= t.def.tiers.length - 1) return 0;
   const m = TALENTS[t.type] ? talentStats(t.type, t.tier, talPicks(t.type)).upCost || 1 : 1;   // some talents make upgrades dearer
@@ -1809,9 +1859,25 @@ function convert(t, type) {
   return true;
 }
 function sellValue(t) { return t.fresh + Math.floor((t.invested - t.fresh) * .75); }
-function sell(t) {
-  if (t.gear && t.gear.some(Boolean)) onToast('Its relics went back to your bag.');
+// what a sold unit hands back (owner, 10 Nov 2026: "get items back after selling a unit"): every socketed item and its
+// charm to the bag, its weapon to the rack (a Champion's iconic weapon stays with the commander); the bag may run over
+// LOOT_CAP for now, never losing an item, and the toast says so
+function sellReturns(t) { return { g: (t.gear || []).filter(Boolean).length, c: t.charm ? 1 : 0, w: t.weapon && !t.weapon.hero ? 1 : 0 }; }
+function sellReturnsText(r) {
+  const it = G.force && !G.vs ? 'item' : 'relic', bag = [], n = r.g;
+  if (n) bag.push(n === 1 ? (it === 'item' ? 'an item' : 'a relic') : `${n} ${it}s`);
+  if (r.c) bag.push(r.c === 1 ? 'a charm' : `${r.c} charms`);
+  const parts = [];
+  if (bag.length) parts.push(`${bag.join(' and ')} went back to your bag`);
+  if (r.w) parts.push(`${r.w === 1 ? 'its weapon' : r.w + ' weapons'} went to your weapon rack`);
+  if (!parts.length) return '';
+  const over = G.loot && G.loot.length > LOOT_CAP ? ` Your bag holds ${G.loot.length} of ${LOOT_CAP} for now: socket or salvage some.` : '';
+  return parts.join(', ') + '.' + over;
+}
+function sell(t, quiet) {
+  const back = sellReturns(t);
   unsocketAll(t);
+  if (!quiet) { const tx = sellReturnsText(back); if (tx) onToast(tx.charAt(0).toUpperCase() + tx.slice(1)); }
   const v = sellValue(t);
   G.gold += v;
   const k = idx(t.i, t.j);
@@ -1823,6 +1889,23 @@ function sell(t) {
   addText(t.x, t.y, 1.1, '+' + v, '#ffd76a');
   if (G.sel && G.sel.ref === t) G.sel = null;
   sfx('sell'); onDirty(); onSave();
+  return Object.assign(back, { v });
+}
+// a box drawn over the field (ui.js, desktop): your units in it, not walls, unless the box holds walls only
+function boxPick(list) {
+  const L = (list || []).filter(t => t && t.def && G.towers.includes(t)), U = L.filter(t => !t.def.wall);
+  return U.length ? U : L;
+}
+const groupSellValue = list => (list || []).reduce((a, t) => a + (G.towers.includes(t) ? sellValue(t) : 0), 0);
+// sell a whole selection at once: each pays as a single sell does and hands back its items; one toast says it all
+function sellGroup(list) {
+  const L = (list || []).filter(t => t && G.towers.includes(t));
+  if (!L.length) return null;
+  const tot = { n: 0, v: 0, g: 0, c: 0, w: 0 }, walls = L.every(t => t.def.wall);
+  for (const t of L) { const r = sell(t, true); if (!r) continue; tot.n++; tot.v += r.v; tot.g += r.g; tot.c += r.c; tot.w += r.w; }
+  const back = sellReturnsText(tot).replace('its weapon', 'a weapon');
+  onToast(`Sold ${tot.n} ${walls ? (tot.n === 1 ? 'wall' : 'walls') : uw(tot.n)} for ${tot.v} gold.${back ? ' ' + back.charAt(0).toUpperCase() + back.slice(1) : ''}`);
+  return tot;
 }
 
 /* ---- Waves ---- */
@@ -3200,6 +3283,7 @@ function leak(c) {
   }
   c.dead = true; c.leaked = true;
   if (G.state === 'demo') return;
+  if (typeof vetLeak === 'function') vetLeak(c);   // veterancy: the damage the units did to it still counts, at half (xp.js)
   if (G.wl && G.wl.leaks.length < 80) {   // what got through: its health left and where on its road it was last hurt
     const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && G.dist[SPAWN_K]) || 0, R_ = c.lhR, fr = R_ == null || !isFinite(R_) || R_ >= 99 || !(road > 0) ? -1 : clamp(1 - R_ / road, 0, 1);
     G.wl.leaks.push({ t: c.type, hp: Math.max(0, c.hp) / Math.max(1, c.maxHp), seg: fr < 0 ? 'untouched' : fr < 1 / 3 ? 'entry' : fr < 2 / 3 ? 'middle' : 'gate', big: !!(c.def.boss || c.def.lead), elite: !!c.elite });
@@ -3545,21 +3629,21 @@ function hurt(c, amt, type, src, dot, kb, elem) {
   if (c.frostT > 0) amp += srChillAmp(c);   // Glacier Crown
   if (G.force && DTAG === AB_TAG && typeof spAmp === 'function') amp += spAmp(c, src);   // a spell's talents: harder on foes in a state (forces_zy_spells.js)
   amt *= 1 + amp;
-  if (c.ward > 0) { const a = Math.min(c.ward, amt); c.ward -= a; wlAside('Shields (wards and bulwarks)', a); amt -= a; credit(src, a, dot, rxK); if (amt <= 0) { if (!dot) c.hit = .1; return; } }
-  if (c.apMax > 0 && !oldRules()) { const r = epAbsorb(c, amt, type, ss, dot); amt = r[0]; wlAside('Armour bars', r[1]); if (r[1] > 0) credit(src, r[1], dot, rxK); if (amt <= 0) { if (!dot) c.hit = .1; return; } }   // the armour bar first (enemypools.js)
-  if (c.mwMax > 0 && !oldRules()) { const r = epWardAbsorb(c, amt, type, ss, dot); amt = r[0]; wlAside('Ward bars', r[1]); if (r[1] > 0) credit(src, r[1], dot, rxK); if (amt <= 0) { if (!dot) c.hit = .1; return; } }   // then the ward bar (enemypools.js)
+  if (c.ward > 0) { const a = Math.min(c.ward, amt); c.ward -= a; wlAside('Shields (wards and bulwarks)', a); amt -= a; credit(src, a, dot, rxK); vetDmg(c, src, a); if (amt <= 0) { if (!dot) c.hit = .1; return; } }
+  if (c.apMax > 0 && !oldRules()) { const r = epAbsorb(c, amt, type, ss, dot); amt = r[0]; wlAside('Armour bars', r[1]); if (r[1] > 0) { credit(src, r[1], dot, rxK); vetDmg(c, src, r[1]); } if (amt <= 0) { if (!dot) c.hit = .1; return; } }   // the armour bar first (enemypools.js)
+  if (c.mwMax > 0 && !oldRules()) { const r = epWardAbsorb(c, amt, type, ss, dot); amt = r[0]; wlAside('Ward bars', r[1]); if (r[1] > 0) { credit(src, r[1], dot, rxK); vetDmg(c, src, r[1]); } if (amt <= 0) { if (!dot) c.hit = .1; return; } }   // then the ward bar (enemypools.js)
   c.hp -= amt; if (G.wl) G.wl.dealt += Math.min(amt, c.hp + amt);
   if (c.def.boss || c.def.lead) bossDmgNote(c, src, amt, dot);   // the boss's damage ledger (below)
   if (c.def.brule) bossRuleDealt(c, amt, type, dot);
-  credit(src, amt, dot, rxK);
+  credit(src, amt, dot, rxK); vetDmg(c, src, Math.min(amt, c.hp + amt));
   if (G.adapt && src && src.def && !src.def.wall && TOWERS[src.type]) G.adapt.d[src.type] = (G.adapt.d[src.type] || 0) + amt;
   if (c.def.lead === 'mirror' && src && src.type) { const m = c.mir || (c.mir = {}); m[src.type] = (m[src.type] || 0) + amt; }
   if (c.linkK && !LINKING) linkShare(c, amt);
   c.dmgAcc = (c.dmgAcc || 0) + Math.min(amt, c.hp + amt);
   if (amt > (c.dmgMax || 0)) { c.dmgMax = amt; c.dmgEl = elem || type; }
-  if (c.hp > 0 && ss && ss.exec && !c.def.boss && !dot && c.hp < c.maxHp * ss.exec) { credit(src, c.hp, false, 0); c.hp = 0; fxMark(c, 'exec'); }
-  if (c.poison.length && c.hp > 0 && c.hp < c.maxHp * (c.def.boss ? .05 : .2) && talentHas('venom', 'lethal')) { src = c.poison[0].src || src; credit(src, c.hp, true, 0); if (c.def.boss || c.def.lead) bossDmgNote(c, src, c.hp, true); c.hp = 0; fxVenom(c.x, c.y, hitH(c)); }
-  if (c.curseDoom && c.curseT > 0 && c.hp > 0 && c.hp < c.maxHp * (c.def.boss ? .0125 : .03) * c.curseDoom) { src = c.drainSrc || src; credit(src, c.hp, true, 0); if (c.def.boss || c.def.lead) bossDmgNote(c, src, c.hp, true); c.hp = 0; fxCurse(c.x, c.y, hitH(c)); }
+  if (c.hp > 0 && ss && ss.exec && !c.def.boss && !dot && c.hp < c.maxHp * ss.exec) { credit(src, c.hp, false, 0); vetDmg(c, src, c.hp); c.hp = 0; fxMark(c, 'exec'); }
+  if (c.poison.length && c.hp > 0 && c.hp < c.maxHp * (c.def.boss ? .05 : .2) && talentHas('venom', 'lethal')) { src = c.poison[0].src || src; credit(src, c.hp, true, 0); vetDmg(c, src, c.hp); if (c.def.boss || c.def.lead) bossDmgNote(c, src, c.hp, true); c.hp = 0; fxVenom(c.x, c.y, hitH(c)); }
+  if (c.curseDoom && c.curseT > 0 && c.hp > 0 && c.hp < c.maxHp * (c.def.boss ? .0125 : .03) * c.curseDoom) { src = c.drainSrc || src; credit(src, c.hp, true, 0); vetDmg(c, src, c.hp); if (c.def.boss || c.def.lead) bossDmgNote(c, src, c.hp, true); c.hp = 0; fxCurse(c.x, c.y, hitH(c)); }
   if (!dot) {   // the hit lands: a flinch away from the blow (harder for a big hit), and a small shove that way
     c.hit = .14;
     const hk = clamp(amt / Math.max(1, c.maxHp) * 5, .35, 1.4) * (c.def.boss ? .4 : c.def.lead ? .6 : 1);
@@ -4110,7 +4194,7 @@ function relicOnHit(c, st, src, amt) {
   }
 
   if (p.reaper && !c.dead && !c.def.boss && c.hp > 0 && c.hp < c.maxHp * p.reaper) {   // Executioner's Hook: a hooked blade sweeps the foe away
-    src.dmg += c.hp; rfx({ k: 'slash', x: c.x, z: c.y, h: hitH(c), r: Math.max(.32, c.def.r * 1.9), a: Math.atan2(c.x - src.x, c.y - src.y), col: relicGlow('reaper'), life: .38 });
+    tagged('relic', () => credit(src, c.hp, false, 0)); vetDmg(c, src, c.hp); rfx({ k: 'slash', x: c.x, z: c.y, h: hitH(c), r: Math.max(.32, c.def.r * 1.9), a: Math.atan2(c.x - src.x, c.y - src.y), col: relicGlow('reaper'), life: .38 });
     part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .25, max: .25, size: 1, col: '#ff5a4a' }); fxSpark(c.x, c.y, hitH(c), '#ffd0c0', 6); relicGlint(src, 'reaper', true);
     kill(c, src);
   }
@@ -5170,7 +5254,7 @@ function serialize() {
     towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0, t.def.wall ? 0 : Math.round((t.vx || 0) * 100) / 100, t.bornW | 0, t.vSeed | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
-    chal: G.chal || null, trophies: G.trophies || {}, chalSchools: G.chalSchools || [], unlocked: G.unlocked || null, paths: G.paths || {}, pp: G.pp || 0, ppEarned: G.ppEarned || 0, momentum: G.momentum || 0, run: G.run || null, reports: (G.reports || []).slice(-3), plan: G.plan || null, planAuto: G.planAuto !== false,
+    chal: G.chal || null, trophies: G.trophies || {}, chalSchools: G.chalSchools || [], unlocked: G.unlocked || null, paths: G.paths || {}, pp: G.pp || 0, ppEarned: G.ppEarned || 0, momentum: G.momentum || 0, vet2: 1, run: G.run || null, reports: (G.reports || []).slice(-3), plan: G.plan || null, planAuto: G.planAuto !== false,
     hero: G.hero || null, heroTal: G.heroTal || null, champAt: (() => { const c = G.champ && G.towers.find(t => t.id === G.champ); return c ? [c.i, c.j] : null; })(), champBoost: G.champBoost || 1, champKills: G.champKills | 0, champTrophy: G.champTrophy | 0,
     quest: G.quest || null, questOffer: G.questOffer || null, questOffered: G.questOffered || [], questsDone: G.questsDone || [], sagaR: G.sagaR || {},
     xp: xpSave() };
@@ -5260,6 +5344,8 @@ function restore(s) {
     const U = G.towers.filter(t => !t.def.wall), avg = U.length ? U.reduce((a, t) => a + (t.kills | 0), 0) / U.length : 0;
     for (const t of U) { t.ast = Math.round(Math.max(t.kills | 0, avg)); t.vx = (t.kills | 0) + VET_AST * t.ast; }
   }
+  if (!s.vet2 && typeof VET_NEED !== 'undefined') for (const t of G.towers) if (!t.def.wall && t.vx != null) t.vx *= VET_NEED[0] / 70;   // a save from before credit by contribution (10 Nov 2026): its veterancy on the new scale (tier IV was 70)
+  if (typeof runRekey === 'function') runRekey();   // (the run's per-unit ledger follows each unit to its new id, by its cell)
   if (typeof vetSync === 'function') vetSync();   // (what each unit has already opened: no unlock cue for it)
   xpRestore(s);   // the XP bar, or an older run's points turned into its level (after the paths: Scholar ranks pay their own)
   refreshField();
@@ -6249,13 +6335,18 @@ function credit(src, a, dot, rxK) {
   if (!src || !(a > 0)) return;
   src.dmg += a;
   if (!src.def || G.state !== 'play') return;
-  const w = G.wstat || (G.wstat = wstatNew());
-  let r = w.t[src.id]; if (!r) r = w.t[src.id] = { type: src.type, tier: src.tier, i: src.i, j: src.j, hit: 0, dot: 0, rx: 0, relic: 0, abil: 0, k: 0 };
-  r.tier = src.tier;
+  const r = wstatRow(src);
   const cat = DTAG || (dot ? 'dot' : 'hit');
   if (rxK > 0 && cat === 'hit') { r.rx += a * rxK; r.hit += a * (1 - rxK); } else r[cat] += a;
 }
-function creditKill(src) { if (src && src.def && G.state === 'play' && G.wstat && G.wstat.t[src.id]) G.wstat.t[src.id].k++; }
+// the wave's row for unit src (made on its first credit or kill)
+function wstatRow(src) {
+  const w = G.wstat || (G.wstat = wstatNew());
+  let r = w.t[src.id]; if (!r) r = w.t[src.id] = { type: src.type, tier: src.tier, i: src.i, j: src.j, hit: 0, dot: 0, rx: 0, relic: 0, abil: 0, k: 0 };
+  r.tier = src.tier; return r;
+}
+// a kill on the wave's row (a unit that kills before it has credited any damage this wave still gets its row)
+function creditKill(src) { if (src && src.def && G.state === 'play') wstatRow(src).k++; }
 function rxCount(id) {
   if (G.state !== 'play') return;
   if (G.hero) questEv('rx', 1);
@@ -6265,18 +6356,28 @@ function rxCount(id) {
 // a wave (or a run of early-sent waves) is over: file its report and add it to the run's totals
 function fileReport(ws) {
   const w = G.wstat || wstatNew(); G.wstat = null;
-  const rows = Object.entries(w.t).map(([id, r]) => Object.assign({ id: +id, tot: DKEYS.reduce((a, k) => a + (r[k] || 0), 0) }, r)).filter(r => r.tot > 0).sort((a, b) => b.tot - a.tot);
+  const rows = Object.entries(w.t).map(([id, r]) => Object.assign({ id: +id, tot: DKEYS.reduce((a, k) => a + (r[k] || 0), 0) }, r)).filter(r => r.tot > 0 || r.k > 0).sort((a, b) => b.tot - a.tot);
   for (const r of rows) for (const k of DKEYS.concat('tot')) r[k] = Math.round(r[k] || 0);
   const rep = { waves: ws.slice(), rows, rx: w.rx, kills: G.stats.kills - w.k0, gold: G.stats.gold - w.g0, leaks: G.stats.leaks - w.l0 };
   const run = G.run || (G.run = { by: {}, rx: {}, waves: 0 });
   for (const r of rows) { const b = run.by[r.type] || (run.by[r.type] = { hit: 0, dot: 0, rx: 0, relic: 0, abil: 0 }); for (const k of DKEYS) b[k] = (b[k] || 0) + (r[k] || 0); }   // (|| 0: a run saved before a category existed)
   for (const k in w.rx) run.rx[k] = (run.rx[k] || 0) + w.rx[k];
+  const U = run.u || (run.u = {});   // each unit's run: its damage and kills, wave by wave (the War Room's Whole run; kept after it is sold)
+  for (const r of rows) { const u = U[r.id] || (U[r.id] = { type: r.type, tier: r.tier, i: r.i, j: r.j, k: 0, hit: 0, dot: 0, rx: 0, relic: 0, abil: 0 }); u.tier = r.tier; u.k += r.k | 0; for (const k of DKEYS) u[k] = (u[k] || 0) + (r[k] || 0); }
+  run.kills = (run.kills | 0) + rep.kills;
   run.waves += ws.length;
   rep.paid = creditUpgrades(rep);
   run.paid = run.paid || {}; for (const k in rep.paid) run.paid[k] = (run.paid[k] || 0) + rep.paid[k];
   G.reports = (G.reports || []).concat([rep]).slice(-10);
   G.repNew = 1;
   return rep;
+}
+// after a load the units get new ids: the run's per-unit ledger and the reports' rows follow each one by its cell and type
+function runRekey() {
+  const byCell = new Map(); for (const t of G.towers || []) if (!t.def.wall) byCell.set(t.i + ',' + t.j + ',' + t.type, t.id);
+  const re = r => { const id = byCell.get(r.i + ',' + r.j + ',' + r.type); return id != null ? id : -1 - Math.abs(+r.id || 0); };   // (a sold unit's row keeps a negative id: no live unit shares it)
+  if (G.run && G.run.u) { const U = {}; for (const id in G.run.u) { const u = G.run.u[id], n = re(Object.assign({ id }, u)); if (U[n]) { for (const k of DKEYS.concat('k')) U[n][k] = (U[n][k] || 0) + (u[k] || 0); } else U[n] = u; } G.run.u = U; }
+  for (const rep of G.reports || []) for (const r of rep.rows || []) r.id = re(r);
 }
 // the run so far, by school: [{type, hit, dot, rx, relic, tot}] largest first, and the grand total
 function runBySchool() {
@@ -7093,31 +7194,29 @@ function xpHud() {
 }
 
 /* ---- Veterancy: a unit earns its top tiers (IV, V, VI) in the field (owner, 8 Nov 2026) ----
-   Every unit counts its kills and its assists. An assist: a foe dies while it carries this unit's work: slowed or rooted
-   by it within the last VET_WIN seconds, or still under one of its statuses (frozen, burning, venom, curse, brand, mark,
-   armour crack ...: read through buffs.js's registry, bfCapture), or killed by a unit this one's aura or haste was on
-   (or by a unit whose assist it helped: vetAid). A plain hit is not an assist (VET_HIT: off), so the damage dealers'
-   count stays their kills and the support units' their help. The killer gets the whole kill; every other unit that
-   helped gets one assist, worth VET_AST of a kill (nobody's credit is split, so the damage dealers are never slowed).
-   Veterancy = kills + VET_AST x assists. Tiers IV, V and VI each open for that unit at VET_NEED (it still pays its gold);
-   tiers I-III are open from the start. No wave gate: a unit that works hard early spikes early.
+   Every unit counts its kills and its assists, and earns veterancy by what it did to each foe slain (see "credit by
+   contribution" below: its share of the damage, the last hit, its help). Help: a foe it slowed or rooted within the last
+   VET_TOUCH seconds, or still under one of its statuses (frozen, burning, venom, curse, brand, mark, armour crack ...:
+   read through buffs.js's registry, bfCapture), or one hurt by a unit its aura, haste, Ward, heal or mana was on (vetAid).
+   Tiers IV, V and VI each open for that unit at VET_NEED (it still pays its gold); tiers I-III are open from the start.
+   No wave gate: a unit that works hard early spikes early.
    This replaces the keep upgrades (Castle, Fortress, Citadel) as the gate on unit tiers in every mode but Tower Wars,
    which keeps them (its rival keep's AI plays the keep upgrades: versus.js).
-   The pacing (tools/check_veterancy.js plays it: 8 units, the run's own gold, no items or talents): a wave sends ~26 foes
-   (~6 on a boss wave; ~1.17x that are slain, with what they summon), so ~200 slain by wave 8, ~275 by 12, ~470 by 20,
-   ~650 by 28. A main unit ends up with ~0.32 veterancy per foe slain on the field, a damage dealer through its kills
-   (Ironbreakers 88, Thunderguns 85 by wave 12) and a slowing / rooting unit through its assists (Chain Trappers 8 kills
-   + 73 assists = 81, Briarwardens 6 + 82 = 88): at VET_AST 1 they climb at the same pace. So tier IV at 70 comes about
-   wave 9-11, V at 125 about wave 16-18, VI at 180 about wave 23-26; the army's lesser units a few waves later. */
-const VET_AST = 1, VET_WIN = 8, VET_HIT = false;
+   The pacing (10 Nov 2026, tools/check_veterancy.js: 8 units, the run's own gold, no items or talents, 5 forces): a top-3
+   damage unit opens IV at about wave 5-7, V 3-5 waves later and VI 3-5 after that (it earns ~12-20 a wave in the middle
+   waves); a support that slows, roots or buffs well (Briarwardens, Lightbinder Sisters, Frostweavers, Hail Shamans)
+   about with a mid-damage unit: IV about wave 7-10, V about 11-17. Before (kills + 1 an assist, IV 70 / V 125 / VI 180,
+   the old catch-up): a top-damage unit that rarely took the last hit (Grail Knights, Spellblades, Blade Dancers) opened
+   IV only at wave 14-17 and never V by wave 20. */
+const VET_AST = 1, VET_WIN = 8, VET_HIT = false;   // (VET_AST: an assist's worth in a save from before credit by contribution)
 let VET_ACT = null, VET_TOUCH = 8;   // VET_TOUCH: how long ago a slow, root, stun, burn ... may have landed and still count (seconds)   // the unit whose code is running (updateTowers, impact, a hazard's tick): stuns, mana and wards it gives count as its help
-const VET_NEED = [70, 125, 180];   // veterancy that opens tier IV, V and VI
+const VET_NEED = [150, 220, 290];   // veterancy that opens tier IV, V and VI
 const vetOn = () => typeof G !== 'undefined' && !!G && !G.vs;
 const vetUnit = o => !!o && !!o.def && o.invested !== undefined && !o.def.wall;   // one of your units (not a foe, a hazard or the hero's spell)
 const vetNeed = n => n >= 3 ? VET_NEED[Math.min(2, n - 3)] : 0;   // what tier index n (0-based: 3 is tier IV) asks for
 // a playtest that starts at wave W: the army it raises there counts as seasoned (about what a main unit has by then)
 function vetSeason(W) { W = Math.max(0, (W | 0) - 1); return W <= 0 ? 0 : Math.round(VET_PACE * W + VET_PACE2 * W * W); }
-const VET_PACE = 7.5, VET_PACE2 = 0;   // a main unit's veterancy after W waves, roughly (see VET_NEED's note)
+const VET_PACE = 15, VET_PACE2 = 0;   // a main unit's veterancy after W waves, roughly (see VET_NEED's note)
 // what it has earned (t.vx: kills and assists, each at the pace it earned it; an older save: kills + assists)
 const vetRaw = t => (t.vx != null ? +t.vx || 0 : (t.kills | 0) + VET_AST * (t.ast | 0)) + (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
 function vetPts(t) {
@@ -7126,12 +7225,13 @@ function vetPts(t) {
 }
 /* ---- keeping the army together (owner, 9 Nov 2026: "slows the top unit's veterancy based on the average of your troop") ----
    A unit's gains are scaled by how far it is ahead of the army's average veterancy: full pace up to VET_AHEAD[0] times the
-   average, then tapering (x0.6 at 2x, x0.3 at 3x, x0.2 from 4x). Behind the average: full pace (no boost). The average
+   average, then tapering (x0.7 at 3x, x0.5 from 4x; 10 Nov 2026, eased from x0.6 at 2x / x0.2 at 4x: the owner found the
+   top-damage units dragging). Behind the average: full pace (no boost). The average
    counts only units that have fought at least VET_SEASONED waves (a fresh unit doesn't drag it down) and never walls;
    with fewer than VET_AVG_N such units, or an average under VET_AVG_MIN (the first waves), nobody is slowed, so an early
    tier IV spike still comes. The card says so ("Ahead of your army: gaining at 60%") and the bars dim while it applies. */
-let VET_AHEAD = [[1.5, 1], [2, .6], [3, .3], [4, .2]], VET_AVG_TOP = .75;   // (owner, 9 Nov 2026: the army's best 75% only, so units idling at the back of the maze don't hold the rest back)
-const VET_SEASONED = 1, VET_AVG_N = 3, VET_AVG_MIN = 25;
+let VET_AHEAD = [[2, 1], [3, .7], [4, .5]], VET_AVG_TOP = .75;   // (owner, 9 Nov 2026: the army's best 75% only, so units idling at the back of the maze don't hold the rest back)
+const VET_SEASONED = 1, VET_AVG_N = 3, VET_AVG_MIN = 50;
 let VET_CATCH = true;   // (tools/check_veterancy.js --nocatch turns it off to compare)
 function vetAvg() {
   const L = [];
@@ -7145,21 +7245,36 @@ function vetAvg() {
    veterancy"): VET_SEED of the fielded average (vetAvg: units that have fought a wave, so not itself), but never closer than
    VET_SEED_GAP to tier IV, so it still earns its first unlock. No farming: what a sold unit had is gone with it, and its
    replacement starts from the same average (now without the one sold), never from what the sold one carried. */
-const VET_SEED = .6, VET_SEED_GAP = 10;
+const VET_SEED = .6, VET_SEED_GAP = 20;
 function vetSeed(t) {
   t.vSeed = 0;
   if (!vetOn() || G.state !== 'play' || !t || t.def.wall) return;
   const a = vetAvg(), s = Math.floor(Math.max(0, Math.min(VET_SEED * a, VET_NEED[0] - VET_SEED_GAP)));
   if (s > 0) { t.vSeed = s; t.vx = (+t.vx || 0) + s; }
 }
-/* a support by its record (owner, 9 Nov 2026: "support units ... aren't gaining veterancy nearly as fast"): a unit whose
-   assists are at least VET_SUP_R times its kills (and VET_SUP_MIN of them) has each assist count VET_SUP_K. A slower or
-   a warder helps with most of the foes its army kills but lands few blows itself; this keeps it level with the units
-   that do the killing (tools/check_veterancy.js: the CC units' tier IV comes within a wave or two of the carry's). */
-const VET_SUP_R = 2, VET_SUP_MIN = 6;
-let VET_SUP_K = 1.5;
-const vetSup = t => (t.ast | 0) >= VET_SUP_MIN && (t.ast | 0) >= VET_SUP_R * (t.kills | 0);
-const vetSupK = t => vetSup(t) ? VET_SUP_K : 1;
+/* ---- credit by contribution (owner, 10 Nov 2026: "reduce the veterancy drag, noticed a unit took a very long time to get to
+   the next rank despite being one of the top damage"; "support units are also still too slow to upgrade") ----
+   Each foe slain hands out veterancy by what each unit did to it, worth VET_W of a plain foe (an elite, a leader, a boss):
+   - its share of the damage on that foe (vetDmg, beside every credit() in hurt): VET_K_DMG x share, so a unit that
+     softens a foe for another's last hit is paid for the work;
+   - the last hit: VET_K_LAST more (the kill itself still counts on its own line);
+   - help: VET_K_HELP for a foe it slowed, rooted, stunned, branded or still had a status on (vetTouch, bfCapture), and
+     VET_K_HELP x the damage share of the units it buffed, warded, healed or fed mana (vetAid), whichever is more.
+   Assists (the card's count): a foe this unit helped with, or dealt VET_AST_SHARE of the damage to, without the last hit.
+   The pacing (tools/check_veterancy.js, 8 units, no items): a top-3 damage unit earns ~12-16 a wave at waves 15-30, so
+   V and VI come ~4 waves apart; a support that holds or buffs well earns about what a mid-damage unit does. */
+let VET_K_DMG = 1.6, VET_K_LAST = .3, VET_K_HELP = 1;
+const VET_AST_SHARE = .1;
+// a foe's worth: the square root of its health against its wave's plain foe (a brute ~1.5, an elite ~2, a boss 4-5), so the
+// unit that grinds down the big ones is paid for it
+let VET_W_POW = .75, VET_W_MAX = 10;
+function vetW(c) {
+  if (!c || !c.def || !(c.maxHp > 0) || typeof waveHP !== 'function') return 1;
+  let b = 0; try { b = waveHP(c.wv || G.wave || 1, G.diff || 'normal'); } catch (e) { b = 0; }
+  return b > 0 ? clamp(Math.pow(c.maxHp / b, VET_W_POW), .4, VET_W_MAX) : 1;
+}
+// hurt: unit src dealt a damage to foe c (what its share of the foe is read from)
+function vetDmg(c, src, a) { if (a > 0 && src && src.invested !== undefined && src.id && src.def && !src.def.wall) { const D = c.vD || (c.vD = {}); D[src.id] = (D[src.id] || 0) + a; } }
 function vetRate(t, avg) {
   if (!VET_CATCH || !vetOn()) return 1;
   if (avg === undefined) avg = vetAvg();
@@ -7181,23 +7296,49 @@ function vetAid(o, by, dur) {
 }
 // hurt, chill, rootFoe: unit src touched foe c just now
 function vetTouch(c, src) { if (src && src.invested !== undefined && src.id && src.def && !src.def.wall) (c.vHit || (c.vHit = {}))[src.id] = G.time; }
-// kill (after the killer's kills++): the assists, and the unlock cues
+// kill (after the killer's kills++): each unit's share of the foe, the assists, and the unlock cues
 function vetKill(c, src) {
   if (!vetOn() || G.state !== 'play' || !G.towers) return;
-  const now = G.time, killer = vetUnit(src) ? src : null, H = c.vHit, cap = new Set();
+  const now = G.time, killer = vetUnit(src) ? src : null, H = c.vHit, D = c.vD || {}, cap = new Set(), w = vetW(c);
   if (typeof bfCapture === 'function') for (const o of bfCapture(c)) cap.add(o);
-  const help = new Set();
+  let tot = 0; for (const id in D) tot += D[id];
+  const share = t => tot > 0 && D[t.id] ? D[t.id] / tot : 0;
+  const help = new Map();   // unit -> its help on this foe, 0..1
+  const lend = (t, k) => { if (k > (help.get(t) || 0)) help.set(t, Math.min(1, k)); };
   for (const t of G.towers) {
-    if (t === killer || t.def.wall) continue;
+    if (t.def.wall) continue;
     const h = H && H[t.id];
-    if ((h != null && now - h <= VET_TOUCH) || cap.has(t)) help.add(t);
+    if ((h != null && now - h <= VET_TOUCH) || cap.has(t)) lend(t, 1);
   }
-  const aid = new Set();
-  for (const o of killer ? [killer, ...help] : [...help]) if (o.vAid) for (const id in o.vAid) { if (o.vAid[id] + VET_WIN >= now) aid.add(+id); else delete o.vAid[id]; }
-  if (aid.size) for (const t of G.towers) if (t !== killer && !t.def.wall && aid.has(t.id)) help.add(t);
-  const avg = vetAvg(), gain = (t, n) => { if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0) - n; t.vx += n * vetRate(t, avg); };
-  for (const t of help) { t.ast = (t.ast | 0) + 1; gain(t, VET_AST * vetSupK(t)); vetCheck(t); }
-  if (killer) { gain(killer, 1); vetCheck(killer); }
+  // an aura, haste, Ward, heal or mana on a unit that hurt this foe: its giver shares in that unit's part of it
+  const aidK = {};
+  for (const o of G.towers) {
+    if (o.def.wall || !o.vAid) continue;
+    const k = o === killer ? Math.max(share(o), .5) : share(o) || (help.get(o) ? .25 : 0);
+    for (const id in o.vAid) { if (o.vAid[id] + VET_WIN < now) { delete o.vAid[id]; continue; } if (k > 0) aidK[id] = (aidK[id] || 0) + k; }
+  }
+  for (const t of G.towers) if (aidK[t.id] > 0 && !t.def.wall) lend(t, aidK[t.id]);
+  const avg = vetAvg(), gain = (t, n) => { if (!(n > 0)) return; if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0); t.vx += n * vetRate(t, avg); };
+  for (const t of G.towers) {
+    if (t.def.wall) continue;
+    const s = share(t), hp = help.get(t) || 0;
+    if (!(s > 0) && !hp && t !== killer) continue;
+    gain(t, w * (VET_K_DMG * s + VET_K_HELP * hp + (t === killer ? VET_K_LAST : 0)));
+    if (t !== killer && (hp > 0 || s >= VET_AST_SHARE)) t.ast = (t.ast | 0) + 1;
+    vetCheck(t);
+  }
+}
+// a foe got through: each unit that hurt it is paid VET_LEAK_K of its damage share, measured against the foe's whole health
+// (a foe chipped for 5% pays 5%), with no last hit or help (they did not stop it)
+const VET_LEAK_K = .5;
+function vetLeak(c) {
+  if (!vetOn() || G.state !== 'play' || !G.towers || !c.vD || !(c.maxHp > 0)) return;
+  const w = vetW(c), avg = vetAvg();
+  for (const t of G.towers) {
+    const d = c.vD[t.id]; if (!(d > 0) || t.def.wall) continue;
+    if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
+    t.vx += w * VET_K_DMG * VET_LEAK_K * Math.min(1, d / c.maxHp) * vetRate(t, avg); vetCheck(t);
+  }
 }
 // a unit's veterancy just opened a new tier: say so (several at once share one toast), and a small ring on it
 let VET_CUE = null;
@@ -7224,7 +7365,7 @@ function vetSync() { for (const t of G.towers || []) if (!t.def.wall) t.vetOk = 
 // the line for a locked tier (the Upgrade button, a toast)
 function vetLockText(t) {
   const n = (t.tier | 0) + 1, need = vetNeed(n), p = vetPts(t);
-  return `Tier ${ROMAN[n]} opens at ${need} veterancy (kills + assists): ${p} so far, ${need - p} to go`;
+  return `Tier ${ROMAN[n]} opens at ${need} veterancy (its damage, kills and help): ${p} so far, ${need - p} to go`;
 }
 // the next tier this unit's veterancy works toward (tier index), or null when it can climb no higher (tier VI, or VI already open)
 function vetNext(t) { const last = t.def.tiers.length - 1; for (let n = Math.max(3, (t.tier | 0) + 1); n <= last; n++) if (vetPts(t) < vetNeed(n)) return n; return null; }
@@ -7248,14 +7389,13 @@ function vetCardHTML(t) {
   const up = n != null ? `<p class="vtc-up">Tier ${ROMAN[n]} unlocks at <b>${need}</b>${(t.tier | 0) + 1 === n ? ' · it still costs its gold' : ''}</p>`
     : `<p class="vtc-up">${(t.tier | 0) >= t.def.tiers.length - 1 ? 'Tier VI: the top' : 'Every tier is open'}${(t.tier | 0) < t.def.tiers.length - 1 ? ' · each still costs its gold' : ''}</p>`;
   const seed = t.vSeed > 0 ? `<p class="vtc-seed">Started with ${t.vSeed} from your army\u2019s experience</p>` : '';
-  const sup = vetSup(t) && VET_SUP_K !== 1 ? `<p class="vtc-seed">A support: its assists count ${VET_SUP_K === 2 ? 'double' : '\u00d7' + VET_SUP_K}</p>` : '';
   const rt = vetRate(t), slow = rt < .995 ? `<p class="vtc-slow">Ahead of your army: gaining at ${Math.round(rt * 100)}%</p>` : '';
   const pt = G.playtest && G.playtest.wave ? `<p class="itc-hint">A playtest army starts seasoned: +${vetSeason(G.playtest.wave)}.</p>` : '';
   return `<div class="itc vtc" data-kw-off><p class="itc-n">Veterancy</p><p class="itc-k">${t.def.name} · tier ${ROMAN[t.tier | 0]}</p>`
     + `<div class="vtc-bar${rt < .995 ? ' slow' : ''}"><i class="${n == null ? 'full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i><span>${n != null ? `${p} / ${need}` : `${p} · max`}</span></div>`
-    + up + slow + sup + seed
+    + up + slow + seed
     + `<ul class="vtc-ka"><li>${VET_GLYPH.kill}<b>${K}</b> ${pl(K, 'kill')}</li><li>${VET_GLYPH.assist}<b>${A}</b> ${pl(A, 'assist')}</li></ul>`
-    + `<p class="itc-hint">An assist: a foe that dies slowed, rooted, frozen, burning, cursed or branded by this ${uw(1)}, or slain by one under its aura or haste.</p>${pt}</div>`;
+    + `<p class="itc-hint">Each foe slain pays this ${uw(1)} for its share of the damage on it (a last hit a little more), and for its help: a foe it slowed, rooted, stunned or left a status on, or one hurt by a ${uw(1)} it buffed, warded, healed or fed mana. An assist: a foe it helped with or hurt, without the last hit.</p>${pt}</div>`;
 }
 
 /* ================= FORCES: who answered the keep's call =================
@@ -72397,6 +72537,8 @@ function drawParts() {
   }
 }
 function drawSelection() {
+  if (G.boxPv) for (const o of G.boxPv) QG.ground(o.x, o.y, .04, .56, .56, [1, .88, .5, .55], 3, .08);   // under a selection box being drawn (ui.js)
+  if (G.sel && G.sel.kind === 'box') for (const o of G.sel.list) if (G.towers.includes(o)) QG.ground(o.x, o.y, .04, .6, .6, [1, .88, .5, .8 + .12 * Math.sin(vt * 5)], 3, .1);
   const t = G.sel && G.sel.kind === 'tower' ? G.sel.ref : null;
   if (!t) return;
   if (G.sel.group) for (const o of G.sel.group) if (o !== t) QG.ground(o.x, o.y, .04, .58, .58, [1, .88, .5, .7 + .15 * Math.sin(vt * 5)], 3, .09);   // the rest of a double-tapped set
@@ -72478,6 +72620,14 @@ function drawSnagged(c, r, dt) {
   c._snag = on;
 }
 function drawGhost() {
+  if (G.buildType && G.wallLine) {   // a wall line being dragged (ui.js): every cell, green where it goes up, red where it can't, grey past the gold
+    for (const c of G.wallLine.cells) {
+      const x = c.i + .5, z = c.j + .5, ok = c.st === 'ok';
+      QG.ground(x, z, .04, .5, .5, ok ? [.4, 1, .45, .55] : c.st === 'poor' ? [.7, .7, .7, .45] : [1, .3, .25, .6], 7, 0);
+      if (ok) { M4.trs(_m, x, 0, z); item((typeof wallGhostMesh === 'function' && wallGhostMesh(G.buildType, c.i, c.j)) || towerMesh(G.buildType, 0), _m, { alpha: .5, shadow: false, tint: [.9, 1.15, .9, .05] }); }
+    }
+    return;
+  }
   if (!G.buildType || !G.ghost || !G.ghost.in) return;
   const { i, j, ok } = G.ghost, x = i + .5, z = j + .5;
   QG.ground(x, z, .04, .5, .5, ok ? [.4, 1, .45, .55] : [1, .3, .25, .6], 7, 0);
@@ -74599,7 +74749,7 @@ function warClick(e) {
 function curReport() { const R = G.reports || []; return warRep === -2 ? null : R[warRep < 0 ? R.length - 1 : warRep] || null; }
 function reportSub() {
   const r = curReport();
-  if (warRep === -2) return `The whole run · ${(G.run && G.run.waves) || 0} waves`;
+  if (warRep === -2) return `The whole run · ${(G.run && G.run.waves) || 0} waves${G.run && G.run.kills ? ` · <b>${G.run.kills}</b> slain` : ''}`;
   if (!r) return 'No wave fought yet';
   return `${r.waves.length > 1 ? `Waves ${r.waves[0]}–${r.waves[r.waves.length - 1]}` : `Wave ${r.waves[0]}`} · <b>${r.kills}</b> slain · <b>${r.gold}</b> gold${r.leaks ? ` · <b class="bad">${r.leaks}</b> leaked` : ' · no leaks'}`;
 }
@@ -74626,7 +74776,7 @@ function reportHTML() {
     if (!all) return nav + `<p class="wr-none">Nothing fought yet.</p>`;
     const sum = { hit: 0, dot: 0, rx: 0, relic: 0, abil: 0 }; for (const r of rows) for (const k in sum) sum[k] += r[k] || 0;   // (|| 0: rows saved before a category existed)
     return nav + legend + stackBar(sum, all, 'big') + pctLine(sum, all)
-      + `<h4 class="wr-h">By ${G.force && !G.vs ? 'unit' : 'school'}</h4>` + rows.map(r => `<div class="wr-row">${schoolImg(r.type, 'wr-ic')}<div class="wr-l"><b>${TOWERS[r.type].name}</b><small>${Math.round(100 * r.tot / all)}% of all damage</small>${stackBar(r, rows[0].tot)}</div><b class="wr-n">${fmtK(r.tot)}</b></div>`).join('')
+      + (runUnitRows().length ? runUnitsHTML(all) : `<h4 class="wr-h">By ${G.force && !G.vs ? 'unit' : 'school'}</h4>` + rows.map(r => `<div class="wr-row">${schoolImg(r.type, 'wr-ic')}<div class="wr-l"><b>${TOWERS[r.type].name}</b><small>${Math.round(100 * r.tot / all)}% of all damage</small>${stackBar(r, rows[0].tot)}</div><b class="wr-n">${fmtK(r.tot)}</b></div>`).join(''))
       + paidHTML(G.run.paid, 'What paid off this run')
       + (G.force ? '' : `<h4 class="wr-h">Reactions this run</h4>` + rxChips(G.run.rx));   // (no reactions in a force run)
   }
@@ -74637,9 +74787,19 @@ function reportHTML() {
   const top = rep.rows[0];
   return nav + legend + stackBar(sum, all, 'big') + pctLine(sum, all)
     + `<h4 class="wr-h">${uw(2, 1)} <small>tap one to find it</small></h4>`
-    + rep.rows.map(r => { const live = G.towers.some(t => t.id === r.id); return `<button type="button" class="wr-row${live ? '' : ' gone'}" data-act="tower" data-id="${r.id}">${schoolImg(r.type, 'wr-ic')}<div class="wr-l"><b>${TOWERS[r.type].name} <span class="wr-t">${ROMAN[r.tier]}</span>${r === top ? ' <span class="wr-mvp">Most damage</span>' : ''}</b><small>${r.k} kill${r.k === 1 ? '' : 's'} · ${Math.round(100 * r.tot / all)}%${live ? '' : ' · sold'}</small>${stackBar(r, top.tot)}</div><b class="wr-n">${fmtK(r.tot)}</b></button>`; }).join('')
+    + rep.rows.map(r => { const live = G.towers.some(t => t.id === r.id); return `<button type="button" class="wr-row${live ? '' : ' gone'}" data-act="tower" data-id="${r.id}">${schoolImg(r.type, 'wr-ic')}<div class="wr-l"><b>${TOWERS[r.type].name} <span class="wr-t">${ROMAN[r.tier]}</span>${r === top ? ' <span class="wr-mvp">Most damage</span>' : ''}</b><small>${r.k} kill${r.k === 1 ? '' : 's'} this wave${(() => { const t = G.towers.find(t => t.id === r.id); return t ? ` (${t.kills | 0} in all)` : ''; })()} · ${Math.round(100 * r.tot / all)}%${live ? '' : ' · sold'}</small>${stackBar(r, top.tot)}</div><b class="wr-n">${fmtK(r.tot)}</b></button>`; }).join('')
     + paidHTML(rep.paid, 'What paid off')
     + (G.force ? '' : `<h4 class="wr-h">Reactions</h4>` + rxChips(rep.rx));
+}
+// the whole run, unit by unit (G.run.u, filed with each wave's report: the same numbers as the play log's damage table),
+// with each one's kills (its last hits) over the run; a sold unit stays, marked
+function runUnitRows() {
+  const U = (G.run && G.run.u) || {};
+  return Object.entries(U).map(([id, u]) => Object.assign({ id: +id, tot: DKEYS.reduce((a, k) => a + (u[k] || 0), 0) }, u)).filter(r => r.tot > 0 || r.k > 0).sort((a, b) => b.tot - a.tot);
+}
+function runUnitsHTML(all) {
+  const rows = runUnitRows(), top = rows[0];
+  return `<h4 class="wr-h">${uw(2, 1)} <small>tap one to find it</small></h4>` + rows.map(r => { const live = G.towers.some(t => t.id === r.id); return `<button type="button" class="wr-row${live ? '' : ' gone'}" data-act="tower" data-id="${r.id}">${schoolImg(r.type, 'wr-ic')}<div class="wr-l"><b>${TOWERS[r.type] ? TOWERS[r.type].name : r.type} <span class="wr-t">${ROMAN[r.tier]}</span>${r === top ? ' <span class="wr-mvp">Most damage</span>' : ''}</b><small>${r.k} kill${r.k === 1 ? '' : 's'} · ${Math.round(100 * r.tot / Math.max(1, all))}% of all damage${live ? '' : ' · sold'}</small>${stackBar(r, top.tot)}</div><b class="wr-n">${fmtK(r.tot)}</b></button>`; }).join('');
 }
 // the talents and relics that added the most damage, with how much
 function paidHTML(paid, title) {
@@ -78039,94 +78199,204 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -78135,75 +78405,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -78309,6 +78711,7 @@ function slotsNow() {
     : { key: 'horn', lbl: armed ? 'Sure?' : 'Next', on: true, warn: armed, name: `Send wave ${G.wave + 1} early`, hk: 'Enter', cost: '+' + sendBonus(G.wave + 1), act: sendEarly };
   if (TW) { s[11] = twSendSlot(); if (TW.menu && !G.sel && !G.buildType) return twSlots(s); }   // Tower Wars: the horn is the shared clock's; this slot sends minions
   const sel = G.sel;
+  if (sel && sel.kind === 'box') { boxPrune(); if (G.sel && G.sel.kind === 'box') s[10] = boxSellSlot(); return s; }
   if (sel && sel.kind === 'tower') {
     const t = sel.ref;
     if (t.def.wall && t.wrecked) {
@@ -78530,6 +78933,7 @@ function infoHTML() {
   if (!G.towers || G.state === 'demo') return '';
   if (TW && TW.menu && !G.sel && !G.buildType) return twInfoHTML();
   const s = G.sel;
+  if (s && s.kind === 'box') return boxInfoHTML();
   if (s && s.kind === 'tower') {
     const t = s.ref, d = t.def;
     if (d.wall && t.wrecked) return `<h3>Barricade rubble</h3><p>Creeps can climb through this breach. Rebuild it to close the maze again.</p>`;
@@ -78564,7 +78968,7 @@ function infoHTML() {
   if (s && s.kind === 'keep') {
     const a = ageNext(), r = G.ageRes, cur = AGES[G.age], top = ROMAN[maxTierFor(G.age)];
     const fk = !!G.force && !G.vs;   // a force run: units, and Renown opens them (Classic: schools and School Keys)
-    let h = vetOn() ? `<h3>Your keep</h3><p class="mut" data-d="2">${uw(2, true)} open tiers I to III here. Tiers IV, V and VI each ${uw(1)} earns with veterancy: its kills and assists (${VET_NEED.join(', ')}). Its card shows how far it has to go.</p>`
+    let h = vetOn() ? `<h3>Your keep</h3><p class="mut" data-d="2">${uw(2, true)} open tiers I to III here. Tiers IV, V and VI each ${uw(1)} earns with veterancy: its share of the damage on foes slain, its kills and its help (${VET_NEED.join(', ')}). Its card shows how far it has to go.</p>`
       : `<h3>${cur.name} <span class="tier asc">${cur.short}</span></h3><p class="mut" data-d="2">${fk ? 'Units' : 'Towers'} can climb to tier ${top}. Upgrade the keep to open the next tier.</p>`;
     if (r) { const f = clamp(r.t / r.T, 0, 1); h += `<p class="up">Upgrading to a ${AGES[r.to].name}: ${Math.ceil(r.T - r.t)}s left</p><div class="agebar"><i style="width:${Math.round(f * 100)}%"></i></div>`; }
     else if (a) h += `<p class="up">Next: ${a.name} · <b>${a.cost}</b> gold${G.wave < a.wave ? ` · from wave ${a.wave}` : ''}</p><p class="up perk" data-d="1">${fk ? a.text.replace(/^Towers/, 'Units') : a.text}</p>`;
@@ -78804,6 +79208,90 @@ function tapSelect(p, e) {
   if (p.y > ROWS + .3 && p.y < ROWS + 5 && p.x > -3 && p.x < COLS + 3) { if (G.sel && G.sel.kind === 'keep') deselect(); else select('keep', null); return; }
   if (G.sel) deselect();
 }
+/* ---- box select (owner, 10 Nov 2026: "on desktop, use drag to select units and sell them all at once") ----
+   A mouse drag on the field draws a box (zoomed in: Shift-drag, since a plain drag pans there); your units under it are
+   selected (walls only when the box holds nothing else; game.js boxPick), Shift adds to the selection. The info pane
+   shows the group: how many, what, the gold they sell for, and Sell all, which asks once more before it sells. */
+let boxDrag = null, boxEl = null;
+function boxRect(b) { return { l: Math.min(b.x0, b.x1), r: Math.max(b.x0, b.x1), t: Math.min(b.y0, b.y1), b: Math.max(b.y0, b.y1) }; }
+function boxShow() {
+  if (!boxDrag) { if (boxEl) boxEl.hidden = true; G.boxPv = null; markDirty(); return; }
+  if (!boxEl) { boxEl = document.createElement('div'); boxEl.id = 'boxSel'; boxEl.style.cssText = 'position:fixed;z-index:30;pointer-events:none;border:1.5px solid rgba(255,224,140,.95);background:rgba(255,214,110,.12);border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.35)'; document.body.appendChild(boxEl); }
+  const R = boxRect(boxDrag);
+  Object.assign(boxEl.style, { left: R.l + 'px', top: R.t + 'px', width: (R.r - R.l) + 'px', height: (R.b - R.t) + 'px' }); boxEl.hidden = false;
+  G.boxPv = boxUnits(boxDrag); markDirty();
+}
+// your pieces whose foot is inside the box on screen
+function boxUnits(b) {
+  const R = boxRect(b), c = cv.getBoundingClientRect(), L = [];
+  for (const t of G.towers || []) { const p = toScreen(t.x, .25, t.y), x = p.x + c.left, y = p.y + c.top; if (p.ok && x >= R.l && x <= R.r && y >= R.t && y <= R.b) L.push(t); }
+  return boxPick(L);
+}
+function boxEnd(b) {
+  let L = boxUnits(b);
+  if (boxEl) boxEl.hidden = true; G.boxPv = null;
+  if (b.add && G.sel) { const had = G.sel.kind === 'box' ? G.sel.list : G.sel.kind === 'tower' && G.sel.ref ? [G.sel.ref] : []; L = boxPick([...new Set(had.concat(L))]); }
+  if (!L.length) { if (!b.add && G.sel) deselect(); markDirty(); return; }
+  if (L.length === 1) { select('tower', L[0]); return; }
+  G.sel = { kind: 'box', list: L, ref: null }; G.buildType = null; G.ghost = null; if (TW) TW.menu = false; sfx('select'); markDirty();
+}
+// drop what is gone (sold, or a unit grown from a wall since); one left: a plain selection
+function boxPrune() {
+  const S = G.sel; if (!S || S.kind !== 'box') return;
+  S.list = S.list.filter(t => G.towers.includes(t));
+  if (S.list.length === 1) G.sel = { kind: 'tower', ref: S.list[0] }; else if (!S.list.length) G.sel = null;
+}
+function boxSellArmed() { const S = G.sel; return !!(S && S.kind === 'box' && S.arm > performance.now()); }
+function boxSellNow() {
+  const S = G.sel; if (!S || S.kind !== 'box') return;
+  boxPrune(); if (!G.sel || G.sel.kind !== 'box') { markDirty(); return; }
+  if (!boxSellArmed()) { S.arm = performance.now() + 3000; sfx('click'); toast(`Tap again to sell all ${S.list.length} for ${groupSellValue(S.list)} gold.`); setTimeout(markDirty, 3100); markDirty(); return; }
+  const L = S.list.slice(); G.sel = null; sellGroup(L); markDirty();
+}
+function boxSellSlot() {
+  const S = G.sel, n = S.list.length, v = groupSellValue(S.list), arm = boxSellArmed();
+  return { key: 'sell:box', lbl: arm ? 'Sure?' : 'Sell all', cost: v, on: true, warn: arm, name: `Sell all ${n} for ${v} gold`, hk: 'S', act: boxSellNow };
+}
+function boxInfoHTML() {
+  boxPrune(); const S = G.sel; if (!S || S.kind !== 'box') return '';
+  const L = S.list, v = groupSellValue(L), walls = L.every(t => t.def.wall), by = {};
+  for (const t of L) { const k = t.def.wall ? (oldRules() ? 'Barricade' : t.def.name) : `${t.def.name} ${ROMAN[t.tier]}`; by[k] = (by[k] || 0) + 1; }
+  const items = L.reduce((a, t) => a + (t.gear || []).filter(Boolean).length + (t.charm ? 1 : 0) + (t.weapon && !t.weapon.hero ? 1 : 0), 0), arm = boxSellArmed();
+  return `<h3>${L.length} ${walls ? 'walls' : uw(L.length)} selected</h3>`
+    + `<p class="mut">${Object.keys(by).map(k => `${by[k] > 1 ? by[k] + ' \u00d7 ' : ''}${esc(k)}`).join(' \u00b7 ')}</p>`
+    + `<p>They sell for <b>${v}</b> gold${items ? `; their ${items} item${items === 1 ? '' : 's'} go back to your bag (weapons to the rack)` : ''}.</p>`
+    + `<p><button type="button" class="box-sell${arm ? ' warn' : ''}" data-act="boxsell">${arm ? `Sure? Sell all ${L.length} for ${v} gold` : `Sell all (${v} gold)`}</button></p>`
+    + `<p class="mut" data-d="1">Shift-drag adds more. Right-click or Esc clears it.</p>`;
+}
+/* ---- a wall line (owner, 10 Nov 2026: "allow multiple walls to be built at once so you can shape a full wall") ----
+   Desktop: with the wall picked, hold and drag across the field; every cell passed over joins the line (side by side, so
+   it is solid), going back over it takes cells off. The ghost shows each cell (green: goes up; red: taken, or left
+   open because the line would seal the road; grey: no gold left) and a label the count and cost; letting go builds
+   them all at once (game.js wallLinePlan, placeWallLine). A plain click still builds one. */
+let wlEl = null;
+function wallDragTo(p, e) {
+  const i = Math.floor(p.x), j = Math.floor(p.y), L = drag.line, last = L[L.length - 1];
+  if (!inGrid(i, j) || (last[0] === i && last[1] === j)) { wallLineLabel(e); return; }
+  for (const c of wallLineStep(last, [i, j])) {
+    if (!inGrid(c[0], c[1])) continue;
+    const at = L.findIndex(q => q[0] === c[0] && q[1] === c[1]);
+    if (at >= 0) L.length = at + 1; else L.push(c);
+  }
+  const P = wallLinePlan(L, G.buildType);
+  G.wallLine = P;
+  if (P.dist) G.ghost = Object.assign({}, G.ghost || { i, j, in: true }, { path: tracePath(P.dist, nextField(P.dist, P.blk)) });
+  wallLineLabel(e); markDirty();
+}
+function wallLineLabel(e) {
+  const P = G.wallLine;
+  if (!P || !drag || !drag.line || drag.line.length < 2) { if (wlEl) wlEl.hidden = true; return; }
+  if (!wlEl) { wlEl = document.createElement('div'); wlEl.id = 'wallLineLbl'; wlEl.style.cssText = 'position:fixed;z-index:30;pointer-events:none;padding:3px 8px;border-radius:4px;background:rgba(20,16,10,.82);color:#f4e6c0;font:600 12px/1.3 system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.5)'; document.body.appendChild(wlEl); }
+  const nb = P.cells.filter(c => c.st === 'block').length, nt = P.cells.filter(c => c.st === 'taken').length, np = P.cells.filter(c => c.st === 'poor').length, nm = oldRules() ? 'barricade' : 'wall';
+  const bits = [`${P.n} ${nm}${P.n === 1 ? '' : 's'} \u00b7 ${P.cost} gold`, nb && `${nb} left open (the road)`, nt && `${nt} taken`, np && `${np} need gold`].filter(Boolean);
+  const tx = bits.join(' \u00b7 '); if (wlEl.textContent !== tx) wlEl.textContent = tx;
+  wlEl.style.left = (e.clientX + 16) + 'px'; wlEl.style.top = (e.clientY + 14) + 'px'; wlEl.hidden = false;
+}
+function wallLineClear() { G.wallLine = null; if (wlEl) wlEl.hidden = true; }
 // One finger: tap to select, or with a tower chosen drag to place it. While zoomed in, a one-finger drag pans.
 // Two fingers: pinch to zoom, move to pan. Mouse wheel zooms about the cursor.
 const touches = new Map();
@@ -78827,11 +79315,11 @@ function bindCanvas() {
     const p = pickGround(e.clientX, e.clientY);
     if (G.buildType) {
       const i = Math.floor(p.x), j = Math.floor(p.y);
-      drag = { id: e.pointerId, i, j, moved: false };
-      G.ghost = null; setGhost(p);
+      drag = { id: e.pointerId, i, j, moved: false, line: G.buildType === 'wall' && e.pointerType === 'mouse' && inGrid(i, j) ? [[i, j]] : null };   // (desktop: hold and drag a wall to lay a line of them)
+      G.ghost = null; G.wallLine = null; setGhost(p);
       return;
     }
-    tap = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    tap = { id: e.pointerId, x: e.clientX, y: e.clientY, box: e.pointerType === 'mouse' && e.button === 0 && !G.cast && !G.moveT && (CAM.zoom.z <= 1.01 || e.shiftKey), add: e.shiftKey };   // (desktop: a drag draws a selection box; zoomed in, a plain drag still pans and Shift-drag boxes)
   });
   cv.addEventListener('pointermove', e => {
     const tp = touches.get(e.pointerId);
@@ -78843,20 +79331,23 @@ function bindCanvas() {
     }
     if (G.state !== 'play' || G.paused) return;
     if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 9) {
-      if (CAM.zoom.z > 1.01) { panning = { id: tap.id, x: tap.x, y: tap.y }; }
+      if (tap.box) boxDrag = { id: tap.id, x0: tap.x, y0: tap.y, x1: e.clientX, y1: e.clientY, add: tap.add };
+      else if (CAM.zoom.z > 1.01) { panning = { id: tap.id, x: tap.x, y: tap.y }; }
       tap = null;
     }
+    if (boxDrag && e.pointerId === boxDrag.id) { boxDrag.x1 = e.clientX; boxDrag.y1 = e.clientY; boxShow(); return; }
     if (panning && e.pointerId === panning.id) { panBy(e.clientX - panning.x, e.clientY - panning.y); panning.x = e.clientX; panning.y = e.clientY; return; }
     if (G.cast) { G.castAim = pickGround(e.clientX, e.clientY); return; }
     if (!G.buildType) return;
     const p = pickGround(e.clientX, e.clientY);
-    if (drag && e.pointerId === drag.id) { if (Math.floor(p.x) !== drag.i || Math.floor(p.y) !== drag.j) drag.moved = true; setGhost(p); }
+    if (drag && e.pointerId === drag.id) { if (Math.floor(p.x) !== drag.i || Math.floor(p.y) !== drag.j) drag.moved = true; setGhost(p); if (drag.line) wallDragTo(p, e); }
     else if (e.pointerType === 'mouse') setGhost(p);
   });
   const end = e => {
     touches.delete(e.pointerId);
     if (pinch && touches.size < 2) pinch = null;
     if (panning && e.pointerId === panning.id) panning = null;
+    if (boxDrag && e.pointerId === boxDrag.id) { const b = boxDrag; boxDrag = null; boxEnd(b); return; }
     if (gestured) { if (!touches.size) gestured = false; drag = null; G.ghost = null; tap = null; return; }
     if (tap && e.pointerId === tap.id) {
       const t0 = tap; tap = null;
@@ -78865,7 +79356,9 @@ function bindCanvas() {
     }
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
-    if (G.state !== 'play' || !G.buildType) return;
+    if (G.state !== 'play' || !G.buildType) { wallLineClear(); return; }
+    if (d.line && d.line.length > 1) { placeWallLine(d.line, G.buildType); wallLineClear(); G.ghost = null; setGhost(pickGround(e.clientX, e.clientY)); markDirty(); return; }
+    wallLineClear();
     const gh = G.ghost;
     if (gh && gh.in) {
       const k = idx(gh.i, gh.j);
@@ -78876,10 +79369,11 @@ function bindCanvas() {
     if (e.pointerType !== 'mouse') G.ghost = null; else { G.ghost = null; setGhost(pickGround(e.clientX, e.clientY)); }
   };
   cv.addEventListener('pointerup', end);
-  cv.addEventListener('pointercancel', e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; panning = null; tap = null; if (drag && e.pointerId === drag.id) { drag = null; G.ghost = null; } });
+  cv.addEventListener('pointercancel', e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; panning = null; tap = null; if (boxDrag) { boxDrag = null; boxShow(); } if (drag && e.pointerId === drag.id) { drag = null; G.ghost = null; wallLineClear(); } });
   cv.addEventListener('pointerleave', e => { if (!drag && e.pointerType === 'mouse') G.ghost = null; });
   cv.addEventListener('wheel', e => { if (G.state !== 'play') return; e.preventDefault(); zoomAt(e.clientX, e.clientY, CAM.zoom.z * Math.pow(1.0015, -e.deltaY)); }, { passive: false });
   cv.addEventListener('contextmenu', e => e.preventDefault());
+  if (infoEl) infoEl.addEventListener('click', e => { const b = e.target.closest('[data-act="boxsell"]'); if (b && G.state === 'play' && !G.paused) { e.stopPropagation(); boxSellNow(); } });
   // zoom buttons step about the middle of the battlefield
   const zStep = k => { if (G.state !== 'play') return; const r = cv.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, CAM.zoom.z * k); sfx('click'); syncZoomUI(); };
   $('#bHold').onclick = e => { e.stopPropagation(); toggleHold(); };
@@ -78893,7 +79387,8 @@ function syncZoomUI() {
   $('#zoomUI').hidden = h; a.disabled = dIn; b.disabled = dOut;
 }
 function rightClickOff() {
-  if (drag) { drag = null; }
+  if (drag) { drag = null; wallLineClear(); }
+  if (boxDrag) { boxDrag = null; boxShow(); }
   if (G.cast) { G.cast = null; G.castAim = null; toast('Spell cancelled.'); sfx('click'); markDirty(); return; }   // aiming a hero spell: right-click puts it away
   if (G.buildType || G.sel) { deselect(); markDirty(); }
   G.ghost = null;
@@ -78916,7 +79411,7 @@ function bindKeys() {
   window.addEventListener('keydown', e => {
     if (G.state !== 'play' || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (PAN_K[k] && CAM.zoom.z > 1.01 && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) && (k.startsWith('Arrow') || !(G.sel && G.sel.kind === 'tower'))) {
+    if (PAN_K[k] && CAM.zoom.z > 1.01 && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) && (k.startsWith('Arrow') || !(G.sel && (G.sel.kind === 'tower' || G.sel.kind === 'box')))) {
       e.preventDefault(); panHeld.add(k); if (!panRaf) { panLast = 0; panRaf = requestAnimationFrame(panStep); } return;
     }
     if (k === 'Escape') { if (G.paused) resumeGame(); else if (G.cast) { G.cast = null; toast('Spell cancelled.'); markDirty(); } else if (G.sel && G.sel.page) { G.sel.page = G.sel.page.startsWith('lore:') ? 'lore' : null; sfx('click'); markDirty(); } else if (G.buildType || G.sel) deselect(); else if (TW && TW.menu) twMenu(false); else if (TW && TW.view === 'E') twView('P'); else pauseMenu(); return; }
@@ -78947,6 +79442,7 @@ function bindKeys() {
     if (k === 'k') { if (G.sel && G.sel.kind === 'keep') deselect(); else select('keep', null); }
     if (t && k === 'r' && repairCost(t)) { repairTower(t); markDirty(); }
     if (t && k === 's') { const sl = card.find(c => c.slot && c.slot.key === 'sell'); if (sl) sl.slot.act(); markDirty(); }
+    if (k === 's' && G.sel && G.sel.kind === 'box' && !e.repeat) { boxSellNow(); markDirty(); }   // a box selection: S sells them all (asks once)
     if (k === 'p') pauseMenu();
   });
 }
@@ -80280,7 +80776,7 @@ function endTips(won) {
     const fk = !!G.force && !G.vs;
     if (vetOn()) { const U = G.towers.filter(t => !t.def.wall), top = U.reduce((m, t) => Math.max(m, t.tier | 0), 0), up = U.filter(t => t.tier === 2 && !vetLocked(t) && upgradeCost(t)).length;
       if (n >= 12 && up) add(5, `${up} of your ${uw(2)} had earned tier IV with veterancy but were still at tier III. Their Upgrade button pulses when it opens: tier IV hits far harder.`);
-      else if (n >= 14 && top < 3) add(4, `No ${uw(1)} reached tier IV. Veterancy (kills + assists) opens it: put your strongest ${uw(2)} where the most foes walk past them.`); }
+      else if (n >= 14 && top < 3) add(4, `No ${uw(1)} reached tier IV. Veterancy (its share of the damage, kills and help) opens it: put your strongest ${uw(2)} where the most foes walk past them.`); }
     else if (n >= 12 && (G.age | 0) === 0) add(5, fk ? `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV units hit far harder.` : `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV towers hit far harder and take a path.`);
     else if (n >= 22 && (G.age | 0) < 2) add(5, `Your keep wasn't a Fortress by wave ${n}. Tier V ${fk ? 'units' : 'towers'} open there, with a third socket.`);
     if ((G.tp | 0) >= 3) add(4, `You fell with ${G.tp} talent points unspent. Spend them in Talents between waves: every point helps.`);
@@ -87306,7 +87802,7 @@ function plEnd(result, cause) {
 function plDmgRows(partial) {
   if (!partial) { const rep = G.reports && G.reports.length ? G.reports[G.reports.length - 1] : null; return rep ? rep.rows : []; }
   const w = G.wstat, keys = typeof DKEYS !== 'undefined' ? DKEYS : ['hit', 'dot', 'rx', 'relic', 'abil'];
-  return w && w.t ? Object.values(w.t).map(r => ({ type: r.type, tot: keys.reduce((a, k) => a + (r[k] || 0), 0) })).filter(r => r.tot > 0) : [];
+  return w && w.t ? Object.values(w.t).map(r => ({ type: r.type, k: r.k | 0, tot: keys.reduce((a, k) => a + (r[k] || 0), 0) })).filter(r => r.tot > 0 || r.k > 0) : [];
 }
 function plWave(ws, partial) {
   const t0 = performance.now();
@@ -87317,9 +87813,9 @@ function plWave(ws, partial) {
   const kind = anyBoss ? 'boss' : (W.elites || d.leader) ? 'elite' : 'normal';
   // damage by unit type (the battle report filed by fileReport) and by spell; a wave cut short (a run lost or abandoned
   // mid-wave) has no report yet, so it reads the wave's live ledger (G.wstat) instead
-  const byT = {};
-  let dmgAll = 0; for (const row of plDmgRows(partial)) { plBump(byT, row.type, row.tot); dmgAll += row.tot; }
-  const units = Object.keys(byT).sort((a, b) => byT[b] - byT[a]).slice(0, 5).map(t => [plUnit(t), plR(byT[t]), dmgAll ? Math.round(byT[t] / dmgAll * 100) : 0]);
+  const byT = {}, byK = {};   // (kills: last hits, by the unit that took them, as the War Room's rows count them)
+  let dmgAll = 0; for (const row of plDmgRows(partial)) { plBump(byT, row.type, row.tot); plBump(byK, row.type, row.k | 0); dmgAll += row.tot; }
+  const units = Object.keys(byT).sort((a, b) => byT[b] - byT[a]).slice(0, 5).map(t => [plUnit(t), plR(byT[t]), dmgAll ? Math.round(byT[t] / dmgAll * 100) : 0, byK[t] | 0]);
   const spells = Object.keys(PL.spell).sort((a, b) => PL.spell[b] - PL.spell[a]).slice(0, 5).map(k => [k === '*hero' ? 'Commander spell' : plAbil(k), plR(PL.spell[k]), PL.casts[k] | 0]);
   // leaks: lives lost by foe type, and where each was last hurt (a third of its road), with the health it had left
   const lb = {}, seg = { entry: 0, middle: 0, gate: 0, untouched: 0 };
@@ -87409,7 +87905,7 @@ function plWaveLine(w) {
   const cnt = o => Object.keys(o).map(k => `${k}${o[k] > 1 ? '×' + o[k] : ''}`).join(', ');
   const acts = [w.built && 'built ' + cnt(w.built), w.upgraded && 'up ' + cnt(w.upgraded), w.converted && 'wall→ ' + cnt(w.converted), w.sold && 'sold ' + cnt(w.sold)].filter(Boolean);
   if (acts.length) b.push(acts.join('; '));
-  if (w.dmg.units.length) b.push(`dmg ${plK(w.dmg.total)}: ` + w.dmg.units.map(u => `${u[0]} ${u[2]}%`).join(', '));
+  if (w.dmg.units.length) b.push(`dmg ${plK(w.dmg.total)}: ` + w.dmg.units.map(u => `${u[0]} ${u[2]}%${u[3] != null ? ` (${u[3]} kills)` : ''}`).join(', '));
   if (w.dmg.spells.length) b.push('spells: ' + w.dmg.spells.map(s => `${s[0]} ${plK(s[1])}${s[2] ? ` (${s[2]}×)` : ''}`).join(', '));
   if (w.big) b.push(w.big.map(k => `${k.boss ? 'boss' : k.lead ? 'leader' : 'elite'} ${k.name} ${k.t}s @${k.road}%${k.top ? ` [${k.top.join('; ')}${k.hit ? '; biggest ' + k.hit : ''}]` : ''}`).join('; '));
   if (w.equipped) b.push('equipped ' + w.equipped.join(', '));
