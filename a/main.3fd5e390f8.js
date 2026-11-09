@@ -1,4 +1,4 @@
-const BUILD_TAG = '2e589bd@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ae743a6@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7353,7 +7353,6 @@ function vetCheck(t) {
   const go = () => {
     const L = VET_CUE ? VET_CUE.L : [t]; VET_CUE = null;
     const nm = [...new Set(L.map(o => o.def.name))], top = Math.max(...L.map(o => o.vetOk));
-    if (typeof sfx === 'function') sfx('talent');
     if (typeof onToast === 'function') onToast(L.length === 1 ? `${L[0].def.name}: veterancy ${vetPts(L[0])}. Tier ${ROMAN[top]} is open for it (it still costs gold).`
       : `Veterancy: tier ${ROMAN[top]} is open for ${L.length} ${uw(L.length)} (${nm.slice(0, 3).join(', ')}${nm.length > 3 ? ' ...' : ''}). Each still costs gold.`);
     if (typeof onDirty === 'function') onDirty();
@@ -66347,8 +66346,8 @@ const GNOLL = (() => {
   const OLD_CLIP = typeof MALGRATH_WALK !== 'undefined' && MALGRATH_WALK && MALGRATH_WALK.q && MALGRATH_WALK.rest ? MALGRATH_WALK : null;
   // the Kimodo clip set (src/model_gnoll_kimodo.js, made by tools/kimodo_retarget.py from NVIDIA Kimodo text-to-motion
   // generations): a run made for him (a hunched run with the cleaver carried) and two deaths (knocked back onto his back,
-  // pitched forward onto his face) in place of the ragdoll. An alternative to compare: the Model Lab switches sets (setClips);
-  // the game keeps the old set unless the page has ?gclips=kimodo
+  // pitched forward onto his face) in place of the ragdoll. An alternative to compare: the Model Lab switches sets (setClips),
+  // or gives each foe its own (c.gclip, its side-by-side compare); the game keeps the old set unless the page has ?gclips=kimodo
   const KIMO = typeof GNOLL_KIMODO !== 'undefined' && GNOLL_KIMODO && GNOLL_KIMODO.v === 1 && GNOLL_KIMODO.run && GNOLL_KIMODO.back && GNOLL_KIMODO.fwd ? GNOLL_KIMODO : null;
   let SET = 'old', CLIP = OLD_CLIP;
   // (NRUN: run frames a cycle, for each of two stride lengths)
@@ -66365,6 +66364,12 @@ const GNOLL = (() => {
   let CLIP_STRIDE = 1.3, CLIP_K = OLD_K, CLIP_PH = .458;
   // (a clip may bring its own: the Kimodo run's tune and ph, see tools/kimodo_retarget.py)
   function useTune() { const t = CLIP && CLIP.tune; CLIP_STRIDE = t && t.stride ? t.stride : 1.3; CLIP_K = t && t.K ? t.K : OLD_K; CLIP_PH = CLIP && CLIP.ph != null ? CLIP.ph : .458; }
+  // the set the posing reads now (CUR): the global SET, or for the length of inSet a foe's own (c.gclip: 'old' or 'kimodo',
+  // else SET). Each set keeps its own baked frames (bake), so both can be on the field at once
+  let CUR = 'old';
+  const setOf = c => { const g = c && c.gclip; return g === 'kimodo' && KIMO ? 'kimodo' : g === 'old' ? 'old' : SET; };
+  function useSet(n) { CUR = n === 'kimodo' && KIMO ? 'kimodo' : 'old'; CLIP = CUR === 'kimodo' ? KIMO.run : OLD_CLIP; useTune(); }
+  function inSet(n, fn) { const prev = CUR; if (n !== prev) useSet(n); try { return fn(); } finally { if (CUR !== prev) useSet(prev); } }
   const qm = (a, b) => [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3], a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2], a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1], a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]];
   const qi = a => [a[0], -a[1], -a[2], -a[3]];
   // (q's turn, a share of it: his feet are long for his legs, half a leg against a fifth on the clip's body, so the clip's full
@@ -66377,7 +66382,7 @@ const GNOLL = (() => {
     return q.map(v => v / l);
   };
   function clipFor(R) {
-    if (R.clip !== undefined) return R.clip;
+    const RC = R.clips || (R.clips = {}); if (RC[CUR] !== undefined) return RC[CUR];
     const W = CLIP, nb = W.bones.length, out = new Float32Array(W.n * nb * 4), BI = W.bones.map(n => R.bix[n]), A = {};
     // (the feet: the clip's foot bone runs from the ankle to the ball, steep, his from the ankle to the toes' tip, so a foot is
     // turned to his right foot's rest instead, which stands flat on the road as the clip's rest foot does)
@@ -66401,6 +66406,14 @@ const GNOLL = (() => {
     for (let i = 0; i < W.n; i++) {
       const D = { root: [1, 0, 0, 0] }, Wd = { root: [1, 0, 0, 0] };
       for (let k = 0; k < nb; k++) { const n = W.bones[k], o = (i * nb + k) * 4; D[n] = qm(D[par(n)] || [1, 0, 0, 0], [W.q[o], W.q[o + 1], W.q[o + 2], W.q[o + 3]]); Wd[n] = A[n] ? qm(/^foot/.test(n) ? qk(D[n], FOOT_K) : D[n], A[n]) : D[n]; }
+      // (a clip's tune.flat: each foot held flat at its rest while planted, eased in and out at landing and push-off: a run
+      // rolls onto the ball of the foot, which on his long feet reads as tiptoeing; toeUp: radians the toes lift from the rest,
+      // his sculpted foot standing a little heel-up)
+      const fl = W.tune && W.tune.flat || 0;
+      if (fl && W.legs) for (const [n, sd] of [['footR', 0], ['footL', 1]]) {
+        const g = (((i / W.n - CLIP_PH - .25 - .5 * sd) % 1) + 1) % 1, e = g < .5 ? Math.min(1, g / .08, (.5 - g) / .08) * fl : 0;
+        if (e > 0 && A[n]) { const tu = (W.tune.toeUp || 0) / 2, a = Wd[n], b = qm([Math.cos(tu), -Math.sin(tu), 0, 0], A[n]), sg = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -1 : 1, r = a.map((v, j) => v * (1 - e) + sg * b[j] * e), l = Math.hypot(...r) || 1; Wd[n] = r.map(v => v / l); }
+      }
       const pos = { root: h('root') }, T = [];
       for (const n of ['pelvis', 'thighR', 'shinR', 'footR', 'thighL', 'shinL', 'footL']) { const pn = par(n); pos[n] = qv(Wd[pn], sub(h(n), h(pn))).map((v, j) => v + pos[pn][j]); }
       if (W.legs) for (const [th, sh, ft, sd] of LEG) { const L_ = len(sub(h(sh), h(th))) + len(sub(h(ft), h(sh))), o = (i * 2 + sd) * 3; T.push([0, 1, 2].map(j => pos[th][j] + W.legs[o + j] * L_ * (j === 2 ? CLIP_STRIDE : 1) + (j === 1 ? .5 * (depth[sd] - dMean) : 0))); }
@@ -66418,7 +66431,9 @@ const GNOLL = (() => {
         st.push({ idx, z: (T0[2] + T1[2]) / 2, span: T0[2] - T1[2], y: Math.min(...idx.map(i => S1[i].T[sd][1])), x: idx.reduce((a, i) => a + S1[i].T[sd][0], 0) / idx.length });
       }
       const span = (st[0].span + st[1].span) / 2;
-      for (const sd of [0, 1]) for (const i of st[sd].idx) { const u = gOf(i, sd) / .5; S1[i].T[sd] = [st[sd].x, st[sd].y, st[sd].z + span * (.5 - u)]; }
+      // (a clip's tune.bob: the planted ankle rises toward the hip mid-stance, so the knee gives and the body dips under his weight)
+      const bob = CLIP.tune && CLIP.tune.bob || 0;
+      for (const sd of [0, 1]) for (const i of st[sd].idx) { const u = gOf(i, sd) / .5; S1[i].T[sd] = [st[sd].x, st[sd].y * (1 - bob * Math.sin(Math.PI * u)), st[sd].z + span * (.5 - u)]; }
     }
     // pass 2: the legs' IK (his proportions aren't the clip's: turning his bones as the clip's turn leaves one foot dragging and
     // the other hovering): each ankle to its target, the knee kept in the plane the turned leg had, the foot keeping its turn
@@ -66436,7 +66451,7 @@ const GNOLL = (() => {
       }
       for (let k = 0; k < nb; k++) { const n = W.bones[k]; let l = qm(qi(Wd[par(n)] || [1, 0, 0, 0]), Wd[n]); if (l[0] < 0) l = l.map(v => -v); out.set(l, (i * nb + k) * 4); }
     }
-    return R.clip = BI.some(b => b == null) ? null : { q: out, BI, K: W.bones.map(n => CLIP_K[n] != null ? CLIP_K[n] : n in W.rest ? -1 : 1) };
+    return RC[CUR] = BI.some(b => b == null) ? null : { q: out, BI, K: W.bones.map(n => CLIP_K[n] != null ? CLIP_K[n] : n in W.rest ? -1 : 1) };
   }
   function clipPose(R, p, ph, w, k) {
     const C = clipFor(R); if (!C) return false;
@@ -66479,6 +66494,8 @@ const GNOLL = (() => {
     // the body's beat, twice a cycle: down as each foot lands and takes the weight (just after pi/2 and 3pi/2), up at push-off
     const beat = Math.cos(2 * (ph - Math.PI / 2 - .35));   // 1 = deepest
     if (CLIP && clipPose(R, p, ph, w, k)) {
+      // (a clip's tune.lean: his trunk pitched further over the road than the clip's own lean, spine and chest)
+      if (CLIP.tune && CLIP.tune.lean) { rx(p, I.spine, CLIP.tune.lean * .55 * w); rx(p, I.chest, CLIP.tune.lean * .45 * w); }
       // (the clip's legs: the bake's correction still evens the planted foot's sweep, see stanceFix)
       if (q.corr) { rx(p, I.thighR, q.corr[0] * w); rx(p, I.thighL, q.corr[1] * w); }
       rx(p, I.mane, (.12 + .14 * Math.cos(2 * (ph - Math.PI / 2 - .35) - 2.2)) * w); rz(p, I.mane, -.12 * Math.sin(ph - 1.2) * k);
@@ -66523,7 +66540,7 @@ const GNOLL = (() => {
     // ---- flinch: the upper body thrown back, the arms out
     if (q.hit > 0) { const h = q.hit * .5; rx(p, I.spine, -.22 * h); rx(p, I.chest, -.2 * h); rx(p, I.head, -.35 * h); rz(p, I.armR, -.2 * h); rz(p, I.armL, .2 * h); rx(p, I.handR, .3 * h); }
     // ---- death, the Kimodo set: one of its two falls (q.dclip: 'back' or 'fwd') at u
-    if (q.death != null && SET === 'kimodo' && KIMO) { kimoDeath(R, p, KIMO[q.dclip === 'back' ? 'back' : 'fwd'], q.death); return p; }
+    if (q.death != null && KIMO && (q.dclip || CUR === 'kimodo')) { kimoDeath(R, p, KIMO[q.dclip === 'back' ? 'back' : 'fwd'], q.death); return p; }
     // ---- death: the knees go, he pitches forward on his face, the cleaver flung out of reach of his hand
     if (q.death != null) {
       const u = q.death, kn = sm(.05, .4, u), tp = sm(.35, .85, u), sl = sm(.75, 1, u);
@@ -66554,8 +66571,16 @@ const GNOLL = (() => {
     }
     return out;
   }
-  // the frames, baked on first use for a level of detail
-  function bake(L) {
+  // the frames, baked on first use for a level of detail and a clip set (L.F[set]; the global set's also on the level itself,
+  // as the harness scripts read them: sim/mob_gait_check.js)
+  function bake(L, set) {
+    const s = set === 'kimodo' && KIMO ? 'kimodo' : set === 'old' ? 'old' : SET;
+    const B = inSet(s, () => bakeSet({ R: L.R }));
+    (L.F || (L.F = {}))[s] = B;
+    if (s === SET) Object.assign(L, B);
+    return B;
+  }
+  function bakeSet(L) {
     const R = L.R, M = new Float32Array(R.bones.length * 12), P = new Float32Array(R.nv * 3), N = new Float32Array(R.nv * 3), gs = ['body', 'cleaver'];
     const mk = q => { MOBRIG.posed(R, pose(R, q), M, P, N); return MOBRIG.soup(R, gs, P, N); };
     L.corr = STRIDES.map(k => stanceFix(R, k));
@@ -66566,7 +66591,11 @@ const GNOLL = (() => {
     L.stand = mk({ ph: 0, walk: 0, hit: 0, death: null, t: 0 });
     // (the Kimodo set: both its falls, a frame for each of the clip's)
     L.kd = null;
-    if (SET === 'kimodo' && KIMO) { L.kd = {}; for (const dc of ['back', 'fwd']) { const n = KIMO[dc].n, a = []; for (let i = 0; i < n; i++) a.push(mk({ ph: 0, walk: 0, hit: 0, death: i / (n - 1), dclip: dc, t: 0 })); L.kd[dc] = a; } }
+<<<<<<< HEAD
+    if (CUR === 'kimodo' && KIMO) { L.kd = {}; for (const dc of ['back', 'fwd']) { const n = KIMO[dc].n, a = []; for (let i = 0; i < n; i++) a.push(mk({ ph: 0, walk: 0, hit: 0, death: i / (n - 1), dclip: dc, t: 0 })); L.kd[dc] = a; } }
+=======
+    if (SET === 'kimodo' && KIMO) { L.kd = {}; for (const dc of ['back', 'fwd']) { const n = KD_BAKED, a = []; for (let i = 0; i < n; i++) a.push(mk({ ph: 0, walk: 0, hit: 0, death: i / (n - 1), dclip: dc, t: 0 })); L.kd[dc] = a; } }
+>>>>>>> kimodo
     // how far a cycle carries him (model units), for each stride: the ground the planted foot sweeps back under him, frame
     // to frame, while it stays on the road. The run's phase runs on the distance he walks over this (runPhase), so his feet
     // stay put on the road at any speed
@@ -66585,9 +66614,11 @@ const GNOLL = (() => {
     });
     // (each frame planted on its lowest point: the down-beat comes from the stance knee giving, not from a moving root)
     L.baked = true;
+    return L;
   }
   const LODS = [];
-  const lodNow = () => { const L = LODS[typeof GFX !== 'undefined' && GFX === 'low' && LODS[1] ? 1 : 0]; if (!L.baked) bake(L); return L; };
+  // a level's frames for a clip set (the global SET when none is given)
+  const lodNow = set => { const L = LODS[typeof GFX !== 'undefined' && GFX === 'low' && LODS[1] ? 1 : 0], s = set === 'kimodo' && KIMO ? 'kimodo' : set === 'old' ? 'old' : SET; return L.F && L.F[s] || bake(L, s); };
   const fr = (ph, n) => ((Math.floor(((ph % TAU) + TAU) % TAU / TAU * n + .5)) % n);
   // each gnoll one of the two strides and its own phase, from its own seed, so a pack never runs in lockstep; the cadence
   // follows from the stride and his speed (runPhase)
@@ -66630,14 +66661,15 @@ const GNOLL = (() => {
     o = MOBRIG.calmTint(o);
     const c = o && o.c || null, lean = leanOf(c);
     let m = base, back = 0;
+    const gs = setOf(c);
     if (c && o.death == null) {
-      const L = lodNow(); ph = runPhase(L, c, Math.hypot(base[0], base[1], base[2]));
+      const L = lodNow(gs); ph = runPhase(L, c, Math.hypot(base[0], base[1], base[2]));
       // the frames are a 24th of a cycle apart: the body is drawn back by the phase the shown frame lags or leads, so the
       // planted foot sits exactly where it landed between frames (the body steps by a hair instead of the foot sliding)
       if (!(c.stunT > 0) && !(c.gnFlEnd > G.time)) { const st = vary(c) < .5 ? 0 : 1, e = ph - fr(ph, NRUN) / NRUN * TAU; back = (Math.atan2(Math.sin(e), Math.cos(e))) / TAU * L.cyc[st]; }
     }
     if (Math.abs(lean) > .005 || back) { M4.trs(_lr, 0, 0, -back, 0, lean, 0, 1); M4.mul(_lm, base, _lr); m = _lm; }
-    item(frameFor(lodNow(), c, ph, o && o.death != null ? o.death : null), m, o);
+    item(frameFor(lodNow(gs), c, ph, o && o.death != null ? o.death : null), m, o);
   }
   /* ---------- the death: a cheap procedural ragdoll on the skeleton ----------
      One of four falls, picked by the killing blow (where it came from, how hard, a blast, a stun): pitched forward and
@@ -66662,6 +66694,7 @@ const GNOLL = (() => {
     const w = { skid: .3 + .9 * Math.max(0, lz), back: .2 + .9 * Math.max(0, -lz) + 1.3 * big, spin: .25 + .8 * Math.abs(lx) * (1 - .5 * stun), knees: .3 + 1.4 * stun - .25 * big };
     let tot = 0; for (const f of FALLS) tot += Math.max(.02, w[f]);
     let r = rnd(seed + 1) * tot, kind = FALLS[0]; for (const f of FALLS) { r -= Math.max(.02, w[f]); if (r <= 0) { kind = f; break; } }
+    if (c && c.gfall && FALLS.includes(c.gfall)) kind = c.gfall;   // (a fall asked for: the Model Lab's compare, the same fall on both)
     return { kind, dx, dz, lx, lz, big: Math.min(1.6, big), seed, side: lx > 0 ? 1 : lx < 0 ? -1 : (rnd(seed + 2) < .5 ? -1 : 1), spin: (rnd(seed + 3) < .5 ? -1 : 1) * (4 + 3 * rnd(seed + 4)), fly: rnd(seed + 5) < 1 / 3, ph: 0, reach: 9 };
   }
   // the limbs that go loose: [bone name, axis, how strongly the body's swing throws it (its inertia)]
@@ -66746,7 +66779,7 @@ const GNOLL = (() => {
     const L = LODS[LODS.length - 1], R = L.R, f = k.fall, t = k.t;
     if (t > RAG_DIE) { k.done = true; return false; }
     const s = k.slot; s.k = k; s.vt = vt;
-    const { p, S } = ragPose(R, f, Math.min(t, RAG_T));
+    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(t, RAG_T)));   // (the old set's run under the fall, whatever the global set)
     const su = Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - S.h / k.sc;
     MOBRIG.posed(R, p, s.M, s.P, s.N, sink);
     s.ver++; MOBRIG.refill(s.body, R, ['body'], s.P, s.N); s.body.ver = s.ver;
@@ -66778,24 +66811,79 @@ const GNOLL = (() => {
   // along the killing blow), a puff of dust, then he sinks away
   const DIE = 1.7, FALL = .85, SINK0 = 1.1;
   // the Kimodo set's death: the fall the killing blow calls for (knocked back by a blow from ahead or a blast, else pitched
-  // forward), played on its baked frames at KD_SPEED, then he sinks away as in the baked fall; the cleaver stays in his fist
-  const KD_SPEED = 1.25, KD_SINK = .6;
+  // forward), played at KD_SPEED, then he sinks away as in the baked fall; the cleaver stays in his fist. While there is
+  // room (RAG_CAP, shared with the ragdolls) it is skinned on the CPU every frame from the clip itself, eased between its
+  // frames (smooth at any frame rate), and blended out of the run pose he died in over KD_BLEND; past the cap, on KD_BAKED
+  // baked frames
+  const KD_SPEED = 1.25, KD_SINK = .6, KD_BLEND = .15, KD_BAKED = 30;
+  const m2q = (m, o) => {   // a pose's 3x3 (column-major) as a quaternion (w, x, y, z)
+    const a = m[o], b = m[o + 3], c = m[o + 6], d = m[o + 1], e = m[o + 4], f = m[o + 7], g = m[o + 2], h = m[o + 5], i = m[o + 8], t = a + e + i;
+    let q;
+    if (t > 0) { const r = Math.sqrt(t + 1) * 2; q = [.25 * r, (h - f) / r, (c - g) / r, (d - b) / r]; }
+    else if (a > e && a > i) { const r = Math.sqrt(1 + a - e - i) * 2; q = [(h - f) / r, .25 * r, (b + d) / r, (c + g) / r]; }
+    else if (e > i) { const r = Math.sqrt(1 + e - a - i) * 2; q = [(c - g) / r, (b + d) / r, .25 * r, (f + h) / r]; }
+    else { const r = Math.sqrt(1 + i - a - e) * 2; q = [(d - b) / r, (c + g) / r, (f + h) / r, .25 * r]; }
+    return q;
+  };
+  // p's turns eased toward q's by f (0: p, 1: q), and its root
+  function blendPose(R, p, q, f) {
+    for (let b = 0; b < R.bones.length; b++) {
+      const o = b * 9, A = m2q(p.m, o), B = m2q(q.m, o), sg = A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3] < 0 ? -1 : 1;
+      let w = A[0] * (1 - f) + sg * B[0] * f, x = A[1] * (1 - f) + sg * B[1] * f, y = A[2] * (1 - f) + sg * B[2] * f, z = A[3] * (1 - f) + sg * B[3] * f;
+      const l = Math.hypot(w, x, y, z) || 1; w /= l; x /= l; y /= l; z /= l;
+      const m = p.m;
+      m[o] = 1 - 2 * (y * y + z * z); m[o + 1] = 2 * (x * y + w * z); m[o + 2] = 2 * (x * z - w * y);
+      m[o + 3] = 2 * (x * y - w * z); m[o + 4] = 1 - 2 * (x * x + z * z); m[o + 5] = 2 * (y * z + w * x);
+      m[o + 6] = 2 * (x * z + w * y); m[o + 7] = 2 * (y * z - w * x); m[o + 8] = 1 - 2 * (x * x + y * y);
+      p.s[b] = p.s[b] * (1 - f) + q.s[b] * f; for (let j = 0; j < 3; j++) p.t[b * 3 + j] = p.t[b * 3 + j] * (1 - f) + q.t[b * 3 + j] * f;
+    }
+    for (let j = 0; j < 3; j++) p.root[j] = p.root[j] * (1 - f) + q.root[j] * f;
+    return p;
+  }
+  // the Kimodo fall at t seconds after the blow (the clip at KD_SPEED), out of the run at phase ph
+  function kimoPose(R, kc, t, ph) {
+    const D = KIMO[kc], p = MOBRIG.newPose(R); kimoDeath(R, p, D, Math.min(1, t * KD_SPEED / D.dur));
+    const b = 1 - Math.min(1, t / KD_BLEND);
+    if (b > 0) blendPose(R, p, pose(R, { ph: ph || 0, walk: 1, stride: 1, hit: 0, death: null, t: 0 }), b * b * (3 - 2 * b));
+    return p;
+  }
   function kimoDie(k) {
-    const L = lodNow(); if (!L.kd) return false;
+<<<<<<< HEAD
+    const L = lodNow('kimodo'); if (!L.kd) return false;
     if (!k.kc) { const f = pickFall(k.c, k.yaw, ((k.c && k.c.id) || 0) * 1.37 + k.x * 3.1); k.kc = f.kind === 'back' ? 'back' : 'fwd'; }
     const D = KIMO[k.kc], fr_ = L.kd[k.kc], dur = D.dur / KD_SPEED, c = k.c;
     if (k.t > dur + KD_SINK) return false;
+=======
+    if (!k.kc) {
+      const f = pickFall(k.c, k.yaw, ((k.c && k.c.id) || 0) * 1.37 + k.x * 3.1); k.kc = f.kind === 'back' ? 'back' : 'fwd';
+      const gs = k.c && GT.get(k.c); k.kph = gs ? gs.ph : k.ph || 0;
+      let on = 0; for (const s of RSLOTS) if (s.k && !s.k.done && s.vt >= vt - .5) on++;
+      k.slot = on < RAG_CAP() && LODS.length ? ragSlot(LODS[LODS.length - 1].R) : null; if (k.slot) { k.slot.k = k; k.slot.vt = vt; }
+    }
+    const D = KIMO[k.kc], dur = D.dur / KD_SPEED, c = k.c;
+    if (k.t > dur + KD_SINK) { k.done = true; return false; }
+>>>>>>> kimodo
     const u = Math.min(1, k.t / dur), su = Math.max(0, (k.t - dur) / KD_SINK), f = Math.max(0, 1 - k.t / .14), dk = 1 - .35 * Math.min(1, su * 2.5);
     if (!k.thud && u > .55) { k.thud = true; MOBRIG.thud(k, 5, false); }
-    M4.trs(_m, k.x, k.y - su * su * .45 * k.sc, k.z, k.yaw, 0, 0, k.sc);
     const t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0];
     const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * f) * dk, t0[1] * (.8 + .25 * f) * dk, t0[2] * (.75 + .25 * f) * dk, Math.max(t0[3] * dk, .08 * f)];
-    item(fr_[Math.min(fr_.length - 1, Math.round(u * (fr_.length - 1)))], _m, { tint, shadow: su < .2 });
+    const o = { tint, shadow: su < .2 };
+    if (k.slot) {
+      const s = k.slot, R = LODS[LODS.length - 1].R; s.k = k; s.vt = vt;
+      MOBRIG.posed(R, kimoPose(R, k.kc, k.t, k.kph), s.M, s.P, s.N, su * su * .5);
+      s.ver++; MOBRIG.refill(s.body, R, ['body'], s.P, s.N); s.body.ver = s.ver; MOBRIG.refill(s.cl, R, ['cleaver'], s.P, s.N); s.cl.ver = s.ver;
+      M4.trs(_m, k.x, k.y, k.z, k.yaw, 0, 0, k.sc); item(s.body, _m, o); item(s.cl, _m, o);
+    } else {
+      const L = lodNow(); if (!L.kd) return false;
+      const fr_ = L.kd[k.kc];
+      M4.trs(_m, k.x, k.y - su * su * .45 * k.sc, k.z, k.yaw, 0, 0, k.sc);
+      item(fr_[Math.min(fr_.length - 1, Math.round(u * (fr_.length - 1)))], _m, o);
+    }
     if (k.gilded && k.t < 1.4) QADD.bill(RD, k.x, k.y + .2, k.z, .6, .6, [1, .8, .3, .3 * (1 - k.t / 1.4)], 1, 0);
     return true;
   }
   function die(k) {
-    if (SET === 'kimodo' && KIMO) return kimoDie(k);
+    if ((k.gs || (k.gs = setOf(k.c))) === 'kimodo' && KIMO) return kimoDie(k);   // (the foe's own set, else the global one; kept from its first frame)
     if (k.fall === undefined) {
       let on = 0; for (const s of RSLOTS) if (s.k && !s.k.done && s.vt >= vt - .5) on++;
       k.fall = null;
@@ -66814,7 +66902,7 @@ const GNOLL = (() => {
     M4.trs(_m, k.x + k.sx * sl, k.y - su * su * .45 * k.sc, k.z + k.sz * sl, k.yaw, 0, 0, k.sc);
     const t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0];
     const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * f) * dk, t0[1] * (.8 + .25 * f) * dk, t0[2] * (.75 + .25 * f) * dk, Math.max(t0[3] * dk, .08 * f)];
-    item(frameFor(lodNow(), null, 0, u), _m, { tint, shadow: su < .2 });
+    item(frameFor(lodNow('old'), null, 0, u), _m, { tint, shadow: su < .2 });
     if (k.gilded && k.t < 1.4) QADD.bill(RD, k.x, k.y + .2, k.z, .6, .6, [1, .8, .3, .3 * (1 - k.t / 1.4)], 1, 0);
     return true;
   }
@@ -66836,11 +66924,16 @@ const GNOLL = (() => {
     MESH.c_gnoll = model;
     { const R = LODS[LODS.length - 1].R, a = MOBRIG.soup(R, ['cleaver'], R.P, R.N), h = R.bones[R.bix.cleaver].h; for (let i = 0; i < a.pos.length; i += 3) { a.pos[i] -= h[0]; a.pos[i + 1] -= h[1]; a.pos[i + 2] -= h[2]; } CLEAVER = a; }
   } catch (e) { model = null; LODS.length = 0; if (typeof console !== 'undefined') console.warn('The gnolls keep their old body:', e.message); }
-  const api = { model, LODS, pose, bake, lodNow, frameFor, vary, runPhase, FOOT_DOWN, pickFall, fallAt, ragPose, cleaverAt, FALLS, RAG_CAP, NRUN, NHIT, NDIE, STRIDES, KIMO, SET };
+<<<<<<< HEAD
+  const api = { model, LODS, pose, bake, lodNow, frameFor, vary, runPhase, FOOT_DOWN, pickFall, fallAt, ragPose, cleaverAt, FALLS, RAG_CAP, NRUN, NHIT, NDIE, STRIDES, KIMO, SET, setOf };
+  // the global clip set: 'old' (the Mixamo walk, the ragdoll deaths) or 'kimodo', for every foe without its own (c.gclip);
+  // each set's frames are baked once, on first use, and kept
+=======
+  const api = { model, LODS, pose, kimoPose, bake, lodNow, frameFor, vary, runPhase, FOOT_DOWN, pickFall, fallAt, ragPose, cleaverAt, FALLS, RAG_CAP, NRUN, NHIT, NDIE, STRIDES, KIMO, SET };
   // the clip set: 'old' (the Mixamo walk, the ragdoll deaths) or 'kimodo'; the frames are baked again on next use
+>>>>>>> kimodo
   api.setClips = name => {
-    SET = name === 'kimodo' && KIMO ? 'kimodo' : 'old'; CLIP = SET === 'kimodo' ? KIMO.run : OLD_CLIP; useTune();
-    for (const L of LODS) { L.baked = false; L.R.clip = undefined; }
+    SET = name === 'kimodo' && KIMO ? 'kimodo' : 'old'; useSet(SET);
     api.SET = SET; return SET;
   };
   try { if (typeof location !== 'undefined' && location.search && /[?&]gclips=kimodo\b/.test(location.search)) api.setClips('kimodo'); } catch (e) {}
@@ -82655,7 +82748,8 @@ function hfPatch(x, z, r, dur, o) {
   // a little wider and longer, instead of piling a second fire on it)
   for (const q of HFP) if (!q.alive && G.time < q.until && Math.hypot(q.x - x, q.z - z) < Math.max(q.r, r) * .7) { q.until = Math.max(q.until, G.time + dur); q.r = Math.min(Math.max(q.r, r) * 1.08, 1.2); return q; }
   if (HFP.length >= HFP_MAX) HFP.shift();
-  const d0 = o.at || 0, q = { x, z, r, at: G.time + d0, until: G.time + d0 + dur, seed: o.seed != null ? o.seed : (Math.random() * 97) | 0, flare: o.flare == null ? .3 : o.flare, heat: o.heat || 0, alive: o.alive || null, big: o.big || 1 };
+  const d0 = o.at || 0, q = { x, z, r, at: G.time + d0, until: G.time + d0 + dur, seed: o.seed != null ? o.seed : (Math.random() * 97) | 0, flare: o.flare == null ? .3 : o.flare, heat: o.heat || 0, alive: o.alive || null, big: o.big || 1,
+    efx: o.efx || (typeof EFX !== 'undefined' && EFX.on ? efxSpell() : null) };   // (the Element Lab: the effect whose ground fire this is, elemfx.js)
   HFP.push(q); return q;
 }
 function hfBall(x, y, z, s, vx, vy, vz, seed, heat) {
@@ -82685,7 +82779,9 @@ function hfPatchFrame() {
     const n = low || load > .8 ? 1 : load > .5 ? Math.min(2, Math.max(1, Math.round(1 + q.r * 1.2))) : Math.max(1, Math.min(3, Math.round(1.5 + q.r * 1.6)));
     for (let i = 0; i < n; i++) {
       const c = i === 0, an = q.seed + i * 2.39996, d = c ? 0 : q.r * (.42 + .25 * ((i * .618) % 1)), sz = q.r * (c ? .4 : .28) * (n === 1 ? 1.2 : 1) * q.big;
+      const e0 = q.efx ? efxPush(q.efx, 'ground') : null;
       hfQueue(q.x + Math.cos(an) * d, -.05 * sz, q.z + Math.sin(an) * d, sz, flare, q.heat, 0, 0, 0, q.seed + i, fade * (load > .5 ? .45 : .58));   // (see-through: foes on the road stay visible through it)
+      if (e0) efxPop(e0);
     }
   }
 }
@@ -82761,7 +82857,7 @@ void main(){ vUV = aUV; vCol = aCol; gl_Position = uVP * vec4(bendW(aPos), 1.); 
 // vUV.xy: this frame's colour, vUV.zw: the next frame's; vCol: brightness, the blend to the next frame, (unused), opacity
 const LAB_FS = `#version 300 es
 precision highp float;
-in vec4 vUV; in vec4 vCol; uniform sampler2D uT; uniform float uHalf; uniform vec2 uGrid; out vec4 o;
+in vec4 vUV; in vec4 vCol; uniform sampler2D uT; uniform float uHalf; uniform vec2 uGrid; uniform vec4 uTg[3]; uniform float uTgOn; out vec4 o;
 void main(){
   vec3 c0 = texture(uT, vUV.xy).rgb, c1 = texture(uT, vUV.zw).rgb;
   float a0 = texture(uT, vUV.xy + vec2(0., uHalf)).r, a1 = texture(uT, vUV.zw + vec2(0., uHalf)).r;
@@ -82769,6 +82865,11 @@ void main(){
   // (each frame's edges faded out: its baked glow never shows the card's rim)
   vec2 q = fract(vUV.xy * uGrid); float e = smoothstep(0., .07, q.x) * smoothstep(1., .93, q.x) * smoothstep(0., .07, q.y) * smoothstep(1., .93, q.y);
   c *= e; a *= e;
+  // (the Element Lab's recolour, elemfx.js: by brightness, the hot core to the start colour, the flame to the mid, smoke and
+  // edges to the end; off, as baked)
+  if (uTgOn > .5) { float l = dot(c, vec3(.299, .587, .114)), t = clamp(l * 1.4 / max(vCol.x, .2), 0., 1.);
+    vec4 g = t > .5 ? mix(uTg[1], uTg[0], t * 2. - 1.) : mix(uTg[2], uTg[1], t * 2.);
+    c = g.rgb * (l * 1.5 + a * .18 * (1. - t)); a *= g.a; c *= g.a; }
   if (a < .004 && max(c.r, max(c.g, c.b)) < .004) discard;
   o = vec4(c * vCol.w, a * vCol.w);
 }`;
@@ -82802,10 +82903,10 @@ const LAB_EXT = {
   // never cuts the bottom of a card that leans back with the view
   fill() {
     const r = RD.right, up = RD.up, fw = [RD.view[2], RD.view[6], RD.view[10]], now = labNow();
-    const by = {}; for (const e of LABF.list) { const k = e.name + (e.top ? '|' : ''); (by[k] = by[k] || []).push(e); }   // (top: drawn over the foes, no depth test)
+    const by = {}; for (const e of LABF.list) { const k = e.name + (e.top ? '|' : '') + (e.tg ? '#' + e.tg.id : ''); (by[k] = by[k] || []).push(e); }   // (top: drawn over the foes, no depth test; tg: the Element Lab's recolour)
     this.groups.length = 0; let o = 0, q = 0;
     for (const key in by) {
-      const name = key.replace('|', ''), top = key !== name, B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
+      const e0 = by[key][0], name = e0.name, top = !!e0.top, tg = e0.tg || null, B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
       const q0 = q, fu = 1 / B.cols, fv = .5 / B.rows;
       for (const e of by[key]) {
         if (q >= LAB_MAXQ) break;
@@ -82824,12 +82925,12 @@ const LAB_EXT = {
         };
         corner(-1, -1); corner(1, -1); corner(1, 1); corner(-1, 1); q++;
       }
-      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2], top]);
+      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2], top, tg]);
     }
     // the looping cards of this frame: the card's long axis along the effect's way as the screen sees it, its width across
-    const byq = {}; for (const e of LABF.q) { const k = e.name + (e.top ? '|' : ''); (byq[k] = byq[k] || []).push(e); }
+    const byq = {}; for (const e of LABF.q) { const k = e.name + (e.top ? '|' : '') + (e.tg ? '#' + e.tg.id : ''); (byq[k] = byq[k] || []).push(e); }
     for (const key in byq) {
-      const name = key.replace('|', ''), top = key !== name, B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
+      const e0 = byq[key][0], name = e0.name, top = !!e0.top, tg = e0.tg || null, B = LAB_FX[name], tex = this.texOf(name); if (!tex) continue;
       const q0 = q, fu = 1 / B.cols, fv = .5 / B.rows, up_ = B.axis !== 'right', an = B.anchor || [.5, .5];
       for (const e of byq[key]) {
         if (q >= LAB_MAXQ) break;
@@ -82852,7 +82953,7 @@ const LAB_EXT = {
         };
         corner(-1, -1); corner(1, -1); corner(1, 1); corner(-1, 1); q++;
       }
-      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2], top]);
+      if (q > q0) this.groups.push([tex, q0, q - q0, .5, [B.cols, B.rows * 2], top, tg]);
     }
     LABF.q.length = 0;
     return q;
@@ -82865,8 +82966,9 @@ const LAB_EXT = {
     const u = this.P.u; gl.useProgram(this.P.p);
     gl.uniformMatrix4fv(u.uVP, false, R.vp); if (u.uBend) gl.uniform3fv(u.uBend, R.bend);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    for (const [tex, q0, n, half, grid, top] of this.groups) {
+    for (const [tex, q0, n, half, grid, top, tg] of this.groups) {
       if (top) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
+      if (u.uTgOn) { gl.uniform1f(u.uTgOn, tg ? 1 : 0); if (tg && u.uTg) gl.uniform4fv(u.uTg, tg.c); }
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(u.uT, 0); gl.uniform1f(u.uHalf, half); gl.uniform2f(u.uGrid, grid[0], grid[1]);
       gl.drawElements(gl.TRIANGLES, n * 6, gl.UNSIGNED_SHORT, q0 * 12);
     }
@@ -83039,7 +83141,9 @@ function pfGlyphs() {
   for (const z of G.hazards || []) {
     if (z.k !== 'cc_glyph' || (z.s !== 'fire' && z.s !== 'magma') || PF.seen.has(z)) continue;
     PF.seen.add(z);
-    hfPatch(z.x, z.z, Math.min(.8, (z.r || .5) * .6), .1, { flare: .25, heat: z.s === 'magma' ? .4 : 0, alive: () => (G.hazards.includes(z) && z.t > 0 ? z.t : 0) });
+    // (its fire: the Element Lab's ground layer of the effect that left it, elemfx.js; a golem's magma keeps the fireball's defaults)
+    const g = z.s === 'magma' ? ELEM_FX_DEF.cc_fireball.ground : efxOf(z._efs, 'cc_fireball', 'ground');
+    hfPatch(z.x, z.z, Math.min(g.rMax, (z.r || .5) * g.r), .1, { flare: g.flare, heat: z.s === 'magma' ? .4 : 0, alive: () => (G.hazards.includes(z) && z.t > 0 ? z.t : 0), efx: z.s === 'magma' ? null : z._efs || null });
   }
 }
 // the fireballs in flight (G.ccP lobs of the fire school)
@@ -83048,8 +83152,11 @@ function pfBalls() {
     if (p.done || p.k !== 'lob' || p.col !== CC_COL.fire) continue;
     const tr = p.tr, a = tr && tr.length > 1 ? tr[tr.length - 2] : null, dt = (typeof VDT !== 'undefined' && VDT) || 1 / 60;
     const v = a ? [(p.x - a[0]) / dt, (p.h - a[1]) / dt, (p.z - a[2]) / dt] : [0, 0, 0];
-    const q0 = typeof LABF !== 'undefined' ? LABF.q.length : 0;
-    hfBall(p.x, p.h, p.z, PF_BALL * (p.sz || 1), v[0] * .5, v[1] * .5, v[2] * .5, (p.pfSeed = p.pfSeed || ((Math.random() * 97) | 0)), .8);
+    const q0 = typeof LABF !== 'undefined' ? LABF.q.length : 0, es = p._efs || 'cc_fireball', c = efxOf(es, 'cc_fireball', 'core');   // (its size and heat: elemfx.js)
+    if (c._g && !c.on) { p._pfLab = G.time; continue; }   // (the Element Lab turned the core off: nothing drawn)
+    const e0 = efxPush(es, 'core');
+    hfBall(p.x, p.h, p.z, c.ball * (p.sz || 1), v[0] * .5, v[1] * .5, v[2] * .5, (p.pfSeed = p.pfSeed || ((Math.random() * 97) | 0)), c.heat);
+    efxPop(e0);
     p._pfLab = typeof LABF !== 'undefined' && LABF.q.length > q0 ? G.time : -1;   // (the lab drew it: its older sprite look is left out)
   }
   // Skipping Flame's hops (an arc from where it rose to where it falls, over T seconds)
@@ -83058,7 +83165,9 @@ function pfBalls() {
   for (const h of PF.hops) {
     const u = Math.max(0, (now - h.at) / h.T), x = h.x0 + (h.x - h.x0) * u, z = h.z0 + (h.z - h.z0) * u, y = h.h0 + (.2 - h.h0) * u + Math.sin(u * Math.PI) * h.arc;
     const du = .02, x2 = h.x0 + (h.x - h.x0) * (u + du), z2 = h.z0 + (h.z - h.z0) * (u + du), y2 = h.h0 + (.2 - h.h0) * (u + du) + Math.sin((u + du) * Math.PI) * h.arc, k = 1 / (du * h.T);
-    hfBall(x, y, z, .1 * h.s, (x2 - x) * k * .5, (y2 - y) * k * .5, (z2 - z) * k * .5, h.seed, .8);
+    const c = efxOf(h.efx, 'cc_kindle', 'core'), e0 = efxPush(h.efx || 'cc_kindle', 'core');
+    hfBall(x, y, z, c.ball * h.s, (x2 - x) * k * .5, (y2 - y) * k * .5, (z2 - z) * k * .5, h.seed, .8);
+    efxPop(e0);
   }
 }
 // their hands: a small flame in the casting hand of each Pyroclast
@@ -83066,8 +83175,9 @@ function pfHands() {
   if (hfLoad() > .7) return;   // (a busy screen keeps its budget for the fire that matters)
   for (const t of G.towers) {
     if (!t.def || t.def.unit !== 'cc_pyroclast' || t.wrecked || t.build > 0) continue;
-    const h = ccHand(t, towerTop(t) * .8);
-    hfQueue(h[0], h[1] - .03, h[2], .045 + .006 * (t.tier | 0), .1, .3, 0, 0, 0, ((t.i | 0) * 5 + (t.j | 0)) % 97, 1);
+    const h = ccHand(t, towerTop(t) * .8), c = efx('cc_fireball', 'glow'), e0 = efxPush('cc_fireball', 'glow');   // (the hand flame: the fireball's heat glow, elemfx.js)
+    if (!(c._g && !c.on)) hfQueue(h[0], h[1] - .03, h[2], c.hand + c.handTier * (t.tier | 0), c.handFlare, c.handHeat, 0, 0, 0, ((t.i | 0) * 5 + (t.j | 0)) % 97, 1);
+    efxPop(e0);
   }
 }
 const PF_BAKES = ['pyroblast', 'ballloop', 'skiphop', 'jetloop', 'breathloop', 'phxloop', 'phxboom', 'phxboom_big'];
@@ -83085,7 +83195,9 @@ function pfBreaths() {
   const now = G.time;
   PF.breath = PF.breath.filter(e => now < e.B.until + .35 && G.towers.includes(e.t) && e.t.ccxBreath === e.B);
   const BLON = typeof LAB_FX !== 'undefined' && !!LAB_FX.breathloop;
-  for (const e of PF.breath) {
+  // (its values and layers: the Element Lab's Furnace Breath, elemfx.js)
+  const EC = efx('cc_pyresigil', 'core'), EF = efx('cc_pyresigil', 'flames'), EE = efx('cc_pyresigil', 'embers'), EL = efx('cc_pyresigil', 'light'), e0 = efxPush('cc_pyresigil', null);
+  try { for (const e of PF.breath) {
     const { t, B } = e, el = now - B.at; if (el < .08) continue;
     const on = Math.min(1, (el - .08) / .15) * Math.min(1, Math.max(0, (B.until + .35 - now) / .35)), h = ccHand(t, towerTop(t) * .8), busy = hfLoad() > .6;
     const a0 = Math.atan2(B.uz, B.ux), m = busy ? 0 : 3;
@@ -83094,11 +83206,15 @@ function pfBreaths() {
     if (now < B.until - .05 && now >= (e.next || 0) && typeof labPlay === 'function') {
       const j = e.j = (e.j | 0) + 1, F = j % 3 ? G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= B.r && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS) : [];
       const c = F.length ? F[j % F.length] : null, f0 = c ? Math.hypot(c.x - t.x, c.y - t.y) / B.r : .3 + .7 * ((j * .37) % 1), f = Math.max(.3, f0), a = c ? Math.atan2(c.y - t.y, c.x - t.x) : a0 + (((j * 5) % 7) / 6 * 2 - 1) * .5 * f;   // (two in three on a foe in the cone)
-      if (labPlay('pyroblast', t.x + Math.cos(a) * B.r * f, t.y + Math.sin(a) * B.r * f, (1.6 + 2 * f) * (B.r / 2.4), { k: 1.05 + .25 * f, a: 1, speed: 1.25, seed: j, top: 1 })) e.next = now + (busy ? .2 : BLON ? .15 : .085);   // (the bake fills about a third of its card)
+      EFX.lay = 'flames';
+      if (labPlay('pyroblast', t.x + Math.cos(a) * B.r * f, t.y + Math.sin(a) * B.r * f, (EF.w0 + EF.w1 * f) * (B.r / 2.4), { k: EF.k0 + EF.k1 * f, a: 1, speed: 1.25, seed: j, top: 1 })) e.next = now + (busy ? .2 : BLON ? .15 : EF.every);   // (the bake fills about a third of its card)
+      EFX.lay = null;
     }
     // the pour itself: the lab's Furnace Breath (the owner's tuning) streaming out of the hands along the cone; where the bake
     // is missing, a thin core and tongues of flame carried out along it
-    const bd = [B.ux, -.12, B.uz], bdl = Math.hypot(...bd), BL = typeof LAB_FX !== 'undefined' && LAB_FX.breathloop && labQueue('breathloop', [h[0] + B.ux * .15, Math.max(.15, h[1] - .05), h[2] + B.uz * .15], [bd[0] / bdl, bd[1] / bdl, bd[2] / bdl], B.r * 2.7 * (.55 + .45 * on), { k: .85 * on, a: on, seed: e.seed, pull: .4 });
+    EFX.lay = 'core';
+    const bd = [B.ux, -.12, B.uz], bdl = Math.hypot(...bd), BL = typeof LAB_FX !== 'undefined' && LAB_FX.breathloop && labQueue('breathloop', [h[0] + B.ux * .15, Math.max(.15, h[1] - .05), h[2] + B.uz * .15], [bd[0] / bdl, bd[1] / bdl, bd[2] / bdl], B.r * EC.len * (.55 + .45 * on), { k: EC.k * on, a: on, seed: e.seed, pull: .4 });
+    EFX.lay = 'flames';
     if (!BL) { const dx = B.ux, dz = B.uz, P = [h[0] + dx * .4, Math.max(.12, h[1] - .1), h[2] + dz * .4], d = [dx, -.1, dz], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
       if (!labQueue('jetloop', P, u, B.r * .55 * (.6 + .4 * on), { k: .6 * on, a: .7 * on, seed: e.seed, pull: .4 })) hfQueue(P[0], P[1], P[2], B.r * .08, .4, .2, 0, 0, 0, e.seed, on, u); }
     // the pour: tongues of flame carried out along the cone, each standing taller and brighter the farther it goes
@@ -83110,19 +83226,22 @@ function pfBreaths() {
       if (!labQueue('jetloop', [x, .03, z], u, len, { k: (.8 + .45 * ph) * fade, a: fade, seed: e.seed + j * 3, pull: .7 })) hfQueue(x, .05, z, len * .14, .4, .2, 0, 0, 0, e.seed + j, fade);
     }
     // where it strikes: embers thrown up off the burning foes, and the ground lit
-    if (on > .5 && (e.n = (e.n | 0) + 1) % 3 === 0) {
+    EFX.lay = null;
+    if (on > .5 && (e.n = (e.n | 0) + 1) % Math.max(1, Math.round(EE.every)) === 0) {
       const fx = t.x + B.ux * B.r * .65, fz = t.y + B.uz * B.r * .65;
-      v2Spray(e.C, 'ember', fx, fz, .2, busy ? 2 : 4, { r: B.r * .3, sp: 1.1 });
-      if (e.n % 12 === 0 && G.flashes.length < 4) flashLight(fx, fz, .3, e.C.P.light, 1.3, .25);
+      v2Spray(e.C, 'ember', fx, fz, .2, busy ? Math.min(2, EE.count) : EE.count, { r: B.r * .3, sp: 1.1 });
+      if (e.n % Math.max(1, Math.round(EL.every)) === 0 && G.flashes.length < 4) flashLight(fx, fz, .3, e.C.P.light, EL.rad, .25);
     }
-  }
+  } } finally { efxPop(e0); }
 }
 /* ---- Phoenix: born from the orb, it rises off the hands, strikes the head of the column and sweeps the road back,
    wings beating, then dives into a blast (CCX_FX.phoenixBoom) ---- */
 function pfPhoenixes() {
   const now = G.time, busy = hfLoad() > .6;
   PF.phx = PF.phx.filter(F => (now - F.at) * F.spd < F.tot + .05);
-  for (const F of PF.phx) {
+  // (its values and layers: the Element Lab's Phoenix, elemfx.js)
+  const EC = efx('cc_flamewave', 'core'), ET = efx('cc_flamewave', 'trail'), EL = efx('cc_flamewave', 'light'), e0 = efxPush('cc_flamewave', null);
+  try { for (const F of PF.phx) {
     const d = (now - F.at) * F.spd; if (d < 0) continue;
     const [x, z, hx, hz] = ccxAlong(F.R, d), d1 = Math.hypot(F.R[1][0] - F.R[0][0], F.R[1][1] - F.R[0][1]) || 1, end = F.tot - d;
     const rise = Math.min(1, d / Math.max(.6, d1 * .7)), dive = end < .9 ? 1 - end / .9 : 0;
@@ -83130,18 +83249,22 @@ function pfPhoenixes() {
     const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), dl = Math.hypot(hx, vh, hz), fwd = [hx / dl, vh / dl, hz / dl];
     const g = Math.min(1, d / .5) * .55 + .45;   // (small as it leaves the hands, its full span out over the road)
     // the bird: the lab's Phoenix (the owner's tuning) held in a headwind, wings beating, drawn along its flight
-    if (typeof LAB_FX !== 'undefined' && LAB_FX.phxloop && labQueue('phxloop', [x, y, z], fwd, 7.4 * g, { k: 1.15, seed: F.seed, pull: .5, top: 1 })) { if ((F.n = (F.n | 0) + 1) % 10 === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2); continue; }
+    EFX.lay = 'core';
+    if (typeof LAB_FX !== 'undefined' && LAB_FX.phxloop && labQueue('phxloop', [x, y, z], fwd, EC.span * g, { k: EC.k, seed: F.seed, pull: .5, top: 1 })) { EFX.lay = null; if ((F.n = (F.n | 0) + 1) % Math.max(1, Math.round(EL.every)) === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2); continue; }
     // the body and the tail: the lab's Fireball loop streaming back along its flight
     if (!labQueue('ballloop', [x, y, z], fwd, 4 * g, { k: 1.2, seed: F.seed, pull: .5, top: 1 })) hfBall(x, y, z, .12 * g, hx * 4, vh * 4, hz * 4, F.seed, 1);
+    EFX.lay = 'flames';
     // the wings: two jets swept out and back from the shoulders, beating
     const fl = Math.sin(now * 10 + F.seed), px = -hz, pz = hx;
     for (const sd of busy ? [] : [-1, 1]) {
       const w = [sd * px * .85 - hx * .45, .25 + .55 * fl, sd * pz * .85 - hz * .45], wl = Math.hypot(...w);
       labQueue('jetloop', [x + hx * .06, y + .02, z + hz * .06], [w[0] / wl, w[1] / wl, w[2] / wl], 1.3 * g * (.9 + .1 * fl), { k: 1, a: 1, seed: F.seed + (sd > 0 ? 5 : 9), pull: .5, top: 1 });
     }
-    if ((F.n = (F.n | 0) + 1) % (busy ? 4 : 2) === 0) part({ k: 'ember', x: x - hx * .3, z: z - hz * .3, h: y, vx: -hx * .8 + R(-.4, .4), vz: -hz * .8 + R(-.4, .4), vh: R(.2, .8), drag: 1.2, life: .55, max: .55, size: R(.08, .15), col: F.n % 6 ? '#ff8a2a' : '#ffd27a' });
-    if (F.n % 10 === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2);
-  }
+    EFX.lay = 'trail';
+    if ((F.n = (F.n | 0) + 1) % (busy ? 4 : Math.max(1, Math.round(ET.every))) === 0) part({ k: 'ember', x: x - hx * .3, z: z - hz * .3, h: y, vx: -hx * .8 + R(-.4, .4), vz: -hz * .8 + R(-.4, .4), vh: R(.2, .8), drag: 1.2, life: .55, max: .55, size: R(.08, .15), col: F.n % 6 ? '#ff8a2a' : '#ffd27a' });
+    EFX.lay = null;
+    if (F.n % Math.max(1, Math.round(EL.every)) === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2);
+  } } finally { efxPop(e0); }
 }
 if (typeof renderView === 'function') {
   const _pfView = renderView;
@@ -83155,7 +83278,8 @@ if (typeof ccFireBurst === 'function') {
     const lab = typeof labPlay === 'function' && typeof LAB_FX !== 'undefined' && !!LAB_FX.pyroblast;
     PF.quiet = lab; let r;
     try { r = _pfBurst.apply(this, arguments); } finally { PF.quiet = false; }
-    try { const sp = (st.splash || .85) * (o && o.great ? 2 : 1); if (!(lab && labPlay('pyroblast', x, z, Math.min(3.8, sp * 3) * (o && o.small ? .75 : 1), { k: o && o.great ? 1.2 : 1.1, top: 1 }))) hfBurst(x, z, Math.min(1, sp * .5), { dur: .4 }); sfx('pyroLand', o && o.great ? 1 : 0); } catch (e) {}
+    try { const sp = (st.splash || .85) * (o && o.great ? 2 : 1), c = efxOf(efxSpell(), 'cc_fireball', 'burst');   // (its size and brightness: elemfx.js)
+      if (!(lab && labPlay('pyroblast', x, z, Math.min(c.wMax, sp * c.w) * (o && o.small ? .75 : 1), { k: o && o.great ? c.kGreat : c.k, top: 1 }))) hfBurst(x, z, Math.min(1, sp * .5), { dur: .4 }); sfx('pyroLand', o && o.great ? 1 : 0); } catch (e) {}
     return r;
   };
   if (typeof fxFire === 'function') { const _pfFx = fxFire; fxFire = function () { if (PF.quiet) return; return _pfFx.apply(this, arguments); }; }
@@ -83176,21 +83300,23 @@ if (typeof CCX_FX !== 'undefined') {
     // (the lab's Phoenix blast, the owner's tuning; a bigger one as its blast grows with tier and talents, owner: "different
     // burst sizes based on talent/item improvements")
     const LF = typeof LAB_FX !== 'undefined' ? LAB_FX : {}, bn = (bm || 0) >= 2.85 && LF.phxboom_big ? 'phxboom_big' : LF.phxboom ? 'phxboom' : 'pyroblast', LB = LF[bn] || { span: 1.41 };
-    const lab = typeof labPlay === 'function' && labPlay(bn, x, z, 3.4 * LB.span / 1.41, { k: 1, top: 1 });
-    hfBurst(x, z, lab ? .55 : .8, { dur: .5, smoke: true });
-    hfPatch(x, z, .7, 1.4, { flare: 0, at: .25 });
+    const EB = efx('cc_flamewave', 'burst'), EG = efx('cc_flamewave', 'ground');   // (its sizes: the Element Lab's Phoenix, elemfx.js)
+    const lab = typeof labPlay === 'function' && labPlay(bn, x, z, EB.w * LB.span / 1.41, { k: EB.k, top: 1 });
+    hfBurst(x, z, lab ? EG.boom : .8, { dur: .5, smoke: true });
+    hfPatch(x, z, EG.r, EG.dur, { flare: 0, at: .25 });
     v2Hit(C, x, z, .3, C.S * .8, { sp: 'ember', n: 10, light: 1, ring: 1 });
   };
   const _hop = CCX_FX.skipHop;
   CCX_FX.skipHop = function (C, x0, h0, z0, foe, x, z, T, j) {
-    if (PF.hops.length < 24) { PF.hops.push({ x0, h0, z0, x, z, T, at: G.time, arc: j ? .35 : .6, s: Math.pow(.88, j), seed: (Math.random() * 97) | 0 }); if (typeof LAB_FX !== 'undefined' && LAB_FX.ballloop) return; }
+    const c = efx('cc_kindle', 'core');   // (its arc and size: the Element Lab's Skipping Flame, elemfx.js)
+    if (PF.hops.length < 24) { PF.hops.push({ x0, h0, z0, x, z, T, at: G.time, arc: j ? c.arc : c.arc0, s: Math.pow(c.shrink, j), seed: (Math.random() * 97) | 0, efx: 'cc_kindle' }); if (typeof LAB_FX !== 'undefined' && LAB_FX.ballloop) return; }
     return _hop.apply(this, arguments);
   };
   CCX_FX.skipLand = function (C, x, z, j, n) {
-    const k = Math.pow(.85, j);
-    v2Hit(C, x, z, .25, C.S * .65 * k, { sp: 'ember', n: 5, light: j ? 0 : 1, ring: j ? 0 : 1 });
+    const EB = efx('cc_kindle', 'burst'), k = Math.pow(EB.shrink, j);   // (its sizes: the Element Lab's Skipping Flame, elemfx.js)
+    v2Hit(C, x, z, .25, C.S * EB.hit * k, { sp: 'ember', n: efx('cc_kindle', 'embers').count, light: j ? 0 : 1, ring: j ? 0 : 1 });
     // (the lab's Skipping Flame hop; the old burst where the bake is missing)
-    if (!(typeof labPlay === 'function' && typeof LAB_FX !== 'undefined' && LAB_FX.skiphop && labPlay('skiphop', x, z, 4.4 * k * (j === n - 1 ? 1.25 : 1), { k: 1, top: 1 }))) hfBurst(x, z, .38 * k, { dur: .35, smoke: j === n - 1 });
+    if (!(typeof labPlay === 'function' && typeof LAB_FX !== 'undefined' && LAB_FX.skiphop && labPlay('skiphop', x, z, EB.w * k * (j === n - 1 ? EB.last : 1), { k: 1, top: 1 }))) hfBurst(x, z, efx('cc_kindle', 'ground').burst * k, { dur: .35, smoke: j === n - 1 });
     // (its sound is played by the spell itself, forces_zxc_conclave_cool.js, so it is heard when the look is skipped too)
   };
 }
@@ -85054,6 +85180,9 @@ if (typeof towerTop === 'function') {
      play as in a run, at the lab's speed.
    - Tiers I-VI rebuild the unit at that tier. The unit's own effects (the Steam Hammer's fire, the runes on a blade)
      draw as in the game, since the lab is the game.
+   - Compare (a foe on the gnoll's body): two of it side by side, Old on the left and Kimodo on the right (each its own clip
+     set, c.gclip), labelled, on the same clock and the same foe action; their death from one killing blow (from front,
+     from behind, a blast) so the same fall is compared; the view framed to fit both; the unit can be hidden.
    Hooks (all here): drawTower (the pose's record and scrub), setCam (the orbit), fire / castStart / castAbility (the
    markers), pauseMenu (the playtest button). The game's own frame() is set aside while the lab runs (as fxlab.js does). */
 (function () {
@@ -85085,7 +85214,9 @@ if (typeof towerTop === 'function') {
     unit: Q.get('unit') || null, foe: Q.get('foe') || null, tier: 0, anim: 'attack', loop: true, paused: false, speed: 1,
     t: null, c: null, clock: 0, rec: [], marks: [], scrub: null, dark: false, yaw: 0, pitch: 57 * Math.PI / 180, oh: 1.6, free: false,
     loopAt: 0, ready: false, errs: [], foeAct: 'hold', deadAt: null, shift: -.3, dist: +(Q.get('dist') || 0),
+    cmp: Q.get('cmp') === '1', c2: null, blow: 'front', hideUnit: false,
   };
+  const GAP = 1.5;   // (the compare pair: the Kimodo one this many cells right of the Old one)
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const REC_S = 6;
@@ -85114,6 +85245,10 @@ if (typeof towerTop === 'function') {
   function unitName(u) { const P = forceOf(u); const d = P && FORCES[P[0]].units[P[1]]; return NAMES[u] || (d && d.name) || u; }
   function rigged(type) { const def = CREEPS[type]; return !!def && (type === 'malgrath' || type === 'torchbearer' || /gnoll|arachn|rot|mire/i.test(type)); }
   function foeList() { return Object.keys(CREEPS).filter(k => !CREEPS[k].fly && !CREEPS[k].immune).sort((a, b) => (rigged(b) - rigged(a)) || a.localeCompare(b)); }
+  // a foe drawn on the gnoll's body (its own model or a borrowed one), and whether the side-by-side compare is on for it
+  function gnollBody(type) { try { return typeof GNOLL !== 'undefined' && !!GNOLL.model && creepModel(typeof mdlOf === 'function' ? mdlOf(type) : type) === GNOLL.model; } catch (e) { return false; } }
+  function cmpOn() { return !!(L.cmp && typeof GNOLL !== 'undefined' && GNOLL.KIMO && gnollBody(L.foe)); }
+  const foes = () => [L.c, L.c2].filter(Boolean);
   function kitOf(t) { const k = t && typeof abilKit === 'function' ? abilKit(t) : null; return k ? k.abilities : []; }
 
   /* ---- the bench ---- */
@@ -85136,11 +85271,15 @@ if (typeof towerTop === 'function') {
   }
   function foeSpot() { const st = L.t && (L.t.st || effStats(L.t)), r = L.dist > 0 ? L.dist : Math.min(2.2, Math.max(.95, (st && st.range || 1.4) * .75)); return [CELL[0] + .5 + r, CELL[1] + .5]; }   // (beside him, so the view sees both side by side)
   function spawnFoe() {
-    for (const c of G.creeps) c.dead = true; G.creeps.length = 0; L.c = null; L.deadAt = null;
+    for (const c of G.creeps) c.dead = true; G.creeps.length = 0; L.c = L.c2 = null; L.deadAt = null;
     const type = CREEPS[L.foe] ? L.foe : ['gnoll', 'wolf', 'troll'].find(k => CREEPS[k]) || Object.keys(CREEPS)[0]; L.foe = type;
-    const [x, y] = foeSpot();
-    const c = spawn({ type, hp: 1e9, bounty: 0, at: { x, y, ti: Math.floor(x), tj: Math.floor(y), tx: x, ty: y + 1, state: 'walk' } });
-    c.abT = 1e9; c.hp = c.maxHp = 1e9; c.__ax = x; c.__ay = y; c.__w = 0; L.c = c;
+    const [x, y] = foeSpot(), cmp = cmpOn();
+    const one = (dx, gc) => {   // (__ax: the pair's x, __dx: this one's place in it)
+      const c = spawn({ type, hp: 1e9, bounty: 0, at: { x: x + dx, y, ti: Math.floor(x + dx), tj: Math.floor(y), tx: x + dx, ty: y + 1, state: 'walk' } });
+      c.abT = 1e9; c.hp = c.maxHp = 1e9; c.__ax = x; c.__dx = dx; c.__ay = y; c.__w = 0; if (gc) c.gclip = gc; return c;
+    };
+    L.c = one(0, cmp ? 'old' : null);
+    if (cmp) { L.c2 = one(GAP, 'kimodo'); L.c2.anim = L.c.anim; }   // (the same seed: the same stride and run phase)
   }
   // the foe stays put (or walks to and fro), whole; the unit's mana full; out of reach when it should rest
   function hold(dt) {
@@ -85149,22 +85288,34 @@ if (typeof towerTop === 'function') {
       if (L.foeAct === 'walk') { c.__w = c.__w || 1; c.__ax += dt * .7 * c.__w; const [x0] = foeSpot(); if (c.__ax > x0 + 1.4) c.__w = -1; if (c.__ax < x0 - 1.4) c.__w = 1; c.face = c.__w; }
       else c.__ax = foeSpot()[0];
       const far = L.anim === 'rest';
-      c.x = far ? c.__ax + 6 : c.__ax; c.y = c.__ay; c.hp = c.maxHp; c.state = 'walk'; c.remain = 10; c.leaked = false; c.abT = 1e9;
+      for (const f of foes()) {   // (the compare pair walks in step, the same distance apart)
+        if (f !== c) { f.__ax = c.__ax; f.__w = c.__w; if (L.foeAct === 'walk') f.face = c.face; }
+        f.x = (far ? f.__ax + 6 : f.__ax) + (f.__dx || 0); f.y = f.__ay; f.hp = f.maxHp; f.state = 'walk'; f.remain = 10; f.leaked = false; f.abT = 1e9;
+      }
+      // (the unit strikes the nearer one: the other flinches, is stunned or frozen with it, so the two stay frame for frame)
+      if (L.c2) for (const k of ['hit', 'gnFlEnd', 'gnFlNext', 'stunT', 'frostT']) L.c2[k] = c[k];
     }
     if (L.deadAt != null && L.clock - L.deadAt > 3) spawnFoe();
     if (c && c.dead && L.deadAt == null) L.deadAt = L.clock;
     G.lives = 1e6; G.gold = 1e9;
     if (t.ab) t.ab.mana = abMax(t); t.hp = t.maxHp; t.wrecked = false; t.silT = 0;
-    if (L.anim !== 'attack') t.cd = Math.max(t.cd, .7);   // (only the attack strikes)
+    if (L.anim !== 'attack' || L.hideUnit) t.cd = Math.max(t.cd, .7);   // (only the attack strikes; a hidden unit not at all)
   }
   function act(a) {   // start an animation
     L.anim = a; L.scrub = null; L.loopAt = L.clock;
     const t = L.t; if (!t) return;
-    if (a === 'flinch' && L.c) { L.c.hit = .1; try { hurt(L.c, 1, 'phys', null); } catch (e) {} }
-    else if (a === 'death' && L.c) { try { L.c.hp = 1; hurt(L.c, 10, 'phys', t); if (!L.c.dead) kill(L.c, t); } catch (e) { L.errs.push(e.message); } }
+    if (a === 'flinch' && L.c) for (const c of foes()) { c.hit = .1; c.gnFlNext = 0; try { hurt(c, 1, 'phys', null); } catch (e) {} }
+    else if (a === 'death' && L.c) for (const c of foes()) { try { c.hp = 1; hurt(c, 10, 'phys', t); if (!c.dead) kill(c, t); if (L.c2) blow(c); } catch (e) { L.errs.push(e.message); } }
     else if (a === 'walk' || a === 'stand') L.foeAct = a === 'walk' ? 'walk' : 'hold';
     else if (a.startsWith('ab:')) cast(a.slice(3));
     panel();
+  }
+  // the compare pair's killing blow, the same for both (read when each first falls): from the front (knocked onto his back),
+  // from behind (pitched onto his face) or a blast (thrown back hard); the fall asked for (c.gfall) so both show the same one
+  function blow(c) {
+    const yaw = typeof vstate === 'function' ? vstate(c).yaw : 0, sg = L.blow === 'behind' ? 1 : -1;
+    c.hdx = Math.sin(yaw) * sg; c.hdz = Math.cos(yaw) * sg;
+    c.dieFx = L.blow === 'blast' ? 'blast' : 'cut'; c.overK = L.blow === 'blast' ? .6 : 0; c.gfall = L.blow === 'behind' ? 'skid' : 'back';
   }
   function cast(id) {
     const t = L.t, ab = ABIL[id]; if (!t || !ab) return;
@@ -85188,6 +85339,7 @@ if (typeof towerTop === 'function') {
     const d0 = drawTower;
     drawTower = function (t) {
       if (!L.ready || t !== L.t) return d0.apply(this, arguments);
+      if (L.hideUnit) return;
       const n0 = dlN; const r = d0.apply(this, arguments);
       for (let k = n0; k < dlN; k++) { const it = DL[k]; if (!it.bones) continue;
         if (L.scrub != null) { const f = recAt(L.scrub); if (f && f.b.length === it.bones.length) it.bones = f.b; }
@@ -85203,12 +85355,15 @@ if (typeof towerTop === 'function') {
     const s0 = setCam;
     setCam = function (tz, oh, aspect) {
       if (!L.ready || !L.t) return s0.apply(this, arguments);
-      const K = typeof UNIT_K === 'function' && L.t.def ? UNIT_K(L.t.def.unit) : 1, f = foeSpot(), fh = L.face ? 1 : 0, x = L.t.x + (f[0] - L.t.x) * .3 * (1 - fh), z = L.t.y;
+      const K = typeof UNIT_K === 'function' && L.t.def ? UNIT_K(L.t.def.unit) : 1, f = foeSpot(), fh = L.face ? 1 : 0, z = L.t.y;
+      // (the compare pair, or the foe alone with the unit hidden: framed to fit what is shown)
+      const fit = !fh && (L.c2 || L.hideUnit), lo = L.hideUnit ? f[0] : Math.min(L.t.x, f[0]), hi = f[0] + (L.c2 ? GAP : 0), fitK = fit ? Math.max(1, (hi - lo + .9) / 2.6) : 1;
+      const x = fit ? (lo + hi) / 2 : L.t.x + (f[0] - L.t.x) * .3 * (1 - fh);
       const zk = L.t.def && typeof umReady === 'function' && umReady(L.t.def.unit) ? umScaleK(L.t.def.unit) : 1;   // (the sculpted units drawn bigger, unitmodels_size.js: framed to fit)
       const cy = (fh ? Math.max(.3, towerMesh(L.t.type, Math.min(2, L.t.tier | 0)).max[1]) * .9 : .45 * K + .1) * zk;   // (Face: aimed at the head)
       const D = 40, cp = Math.cos(L.pitch), sp = Math.sin(L.pitch);
       CAM.tgt = [x, cy, z]; CAM.eye = [x + Math.sin(L.yaw) * cp * D, cy + sp * D, z + Math.cos(L.yaw) * cp * D];
-      RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, L.oh * zk, { z: 1, cx: L.shift, cy: 0 });   // (cx: the view's centre moved clear of the panel)
+      RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, L.oh * zk * fitK, { z: 1, cx: L.shift, cy: 0 });   // (cx: the view's centre moved clear of the panel)
     };
   }
 
@@ -85228,7 +85383,7 @@ if (typeof towerTop === 'function') {
         if (dt > 0) step(dt);
         if (L.dark) { RD.bg = null; RD.fg = null; } else if (!RD.bg) layoutAll();
         renderView(dt);
-        timeline();
+        timeline(); tags();
       }
     } catch (e) { L.errs.push(String(e && e.stack || e)); if (L.errs.length > 20) L.errs.shift(); }
     requestAnimationFrame(labFrame);
@@ -85241,7 +85396,9 @@ if (typeof towerTop === 'function') {
 #mlab .row{display:flex;flex-wrap:wrap;gap:4px}#mlab button{background:#1b221d;color:#e8dfc8;border:1px solid #4a4030;border-radius:6px;padding:4px 8px;cursor:pointer;font:12px system-ui}
 #mlab button.on{background:#5a4a1e;border-color:#e6c46a;color:#fff6d8}#mlab button:hover{border-color:#c8a85a}
 #mlab .note{color:#a89c80;font-size:11.5px}#mlab canvas{width:100%;height:64px;background:#0b0f0c;border:1px solid #3a3326;border-radius:6px;display:block}
-#mlab input[type=range]{width:100%}#mlab .err{color:#ff9a80;font-size:11px;white-space:pre-wrap}`;
+#mlab input[type=range]{width:100%}#mlab .err{color:#ff9a80;font-size:11px;white-space:pre-wrap}
+#mlTags span{position:fixed;z-index:55;transform:translate(-50%,-100%);pointer-events:none;padding:1px 7px;border-radius:5px;font:600 12px system-ui,sans-serif;background:rgba(10,14,12,.78);border:1px solid #8a8a80;color:#e8e8e0}
+#mlTags span.k{border-color:#e6c46a;color:#fff0c0}`;
   function panel() { panel0(); if (L.post && G.force !== L.post[0]) { try { applyForce(L.post[0], L.post[2]); G.force = L.post[0]; G.hero = L.post[2]; } catch (e) {} } }   /* (the unit list's names apply each force in turn: the shown unit's force back after) */
   function panel0() {
     const el = $('#mlab'); if (!el || !L.t) return;
@@ -85270,15 +85427,23 @@ if (typeof towerTop === 'function') {
   // run and two deaths made with NVIDIA Kimodo, src/model_gnoll_kimodo.js); for every foe drawn on the gnoll's body
   function gnollSets() {
     if (typeof GNOLL === 'undefined' || !GNOLL.model || !GNOLL.KIMO || !GNOLL.setClips) return '';
-    const on = GNOLL.SET === 'kimodo';
-    return `<div class="note" style="margin-top:6px">Gnoll clips (any foe on the gnoll's body):</div><div class="row"><button data-gc="old" class="${on ? '' : 'on'}" title="The Mixamo walk and the ragdoll deaths">Old</button><button data-gc="kimodo" class="${on ? 'on' : ''}" title="NVIDIA Kimodo: a hunched loping run, a fall backward and a fall forward">Kimodo</button></div>`;
+    const on = GNOLL.SET === 'kimodo', cmp = cmpOn();
+    const blows = [['front', 'From front', 'A blow from ahead: knocked onto his back (Old: the backward ragdoll; Kimodo: the fall back)'], ['behind', 'From behind', 'A blow from behind: pitched onto his face (Old: the forward skid; Kimodo: the fall forward)'], ['blast', 'Blast', 'A blast from ahead: thrown back hard (Old: the backward ragdoll, flung; Kimodo: the fall back)']];
+    return `<div class="note" style="margin-top:6px">Gnoll clips (any foe on the gnoll's body):</div><div class="row"><button data-gc="old" class="${!cmp && !on ? 'on' : ''}" title="The Mixamo walk and the ragdoll deaths">Old</button><button data-gc="kimodo" class="${!cmp && on ? 'on' : ''}" title="NVIDIA Kimodo: a hunched loping run, a fall backward and a fall forward">Kimodo</button><button data-gc="cmp" class="${cmp ? 'on' : ''}" title="Two side by side: Old on the left, Kimodo on the right, on the same clock${gnollBody(L.foe) ? '' : ' (switches the foe to the Gnoll Raider)'}">Compare</button></div>`
+      + (cmp ? `<div class="note" style="margin-top:4px">Killing blow (both alike):</div><div class="row">${blows.map(([k, n, tip]) => `<button data-blow="${k}" class="${L.blow === k ? 'on' : ''}" title="${esc(tip)}">${n}</button>`).join('')}<button data-a="hideunit" class="${L.hideUnit ? 'on' : ''}" title="Hide the unit (it stops striking)">Hide unit</button></div>` : '');
   }
   function bind() {
     $('#mlU').onchange = e => { const q = new URLSearchParams(location.search); q.set('lab', '1'); q.set('unit', e.target.value); q.set('foe', L.foe || ''); if (L.dist > 0) q.set('dist', L.dist); else q.delete('dist'); location.search = '?' + q.toString(); };   /* (keeps the playtest key and the distance) */
     $('#mlF').onchange = e => { L.foe = e.target.value; spawnFoe(); panel(); };
     $('#mlDist').oninput = e => { L.dist = (+e.target.value) / 10; $('#mlDv').textContent = L.dist > 0 ? L.dist.toFixed(1) + ' cells (reach ' + ((L.t && (L.t.st || effStats(L.t)).range) || 0).toFixed(1) + ')' : 'auto'; spawnFoe(); };   /* 0: auto, beside it */
     for (const x of document.querySelectorAll('#mlab [data-tier]')) x.onclick = () => { L.tier = +x.dataset.tier; L.ready = false; build(); L.ready = true; act(L.anim.startsWith('ab:') ? 'ready' : L.anim); };
-    for (const x of document.querySelectorAll('#mlab [data-gc]')) x.onclick = () => { GNOLL.setClips(x.dataset.gc); try { const q = new URLSearchParams(location.search); if (GNOLL.SET === 'kimodo') q.set('gclips', 'kimodo'); else q.delete('gclips'); history.replaceState(null, '', '?' + q.toString()); } catch (e) {} if (L.anim === 'death') act('death'); panel(); };   /* (kept in the address, so a unit change keeps the set) */
+    for (const x of document.querySelectorAll('#mlab [data-blow]')) x.onclick = () => { L.blow = x.dataset.blow; if (L.anim === 'death') act('death'); else panel(); };
+    for (const x of document.querySelectorAll('#mlab [data-gc]')) x.onclick = x.dataset.gc === 'cmp' ? () => {
+      L.cmp = !cmpOn(); if (L.cmp && !gnollBody(L.foe)) L.foe = 'gnoll';
+      if (!L.cmp) L.hideUnit = false;
+      try { const q = new URLSearchParams(location.search); if (L.cmp) q.set('cmp', '1'); else q.delete('cmp'); q.set('foe', L.foe); history.replaceState(null, '', '?' + q.toString()); } catch (e) {}
+      spawnFoe(); if (L.anim === 'death') act('death'); else panel();
+    } : () => { if (cmpOn()) { L.cmp = false; L.hideUnit = false; spawnFoe(); } GNOLL.setClips(x.dataset.gc); try { const q = new URLSearchParams(location.search); if (GNOLL.SET === 'kimodo') q.set('gclips', 'kimodo'); else q.delete('gclips'); history.replaceState(null, '', '?' + q.toString()); } catch (e) {} if (L.anim === 'death') act('death'); panel(); };   /* (kept in the address, so a unit change keeps the set) */
     for (const x of document.querySelectorAll('#mlab [data-speed]')) x.onclick = () => { L.speed = +x.dataset.speed; panel(); };
     for (const x of document.querySelectorAll('#mlab [data-a]')) x.onclick = () => {
       const a = x.dataset.a;
@@ -85289,6 +85454,7 @@ if (typeof towerTop === 'function') {
       else if (a === 'cam57') { L.face = false; L.yaw = 0; L.pitch = 57 * Math.PI / 180; }
       else if (a === 'front') { L.yaw = L.t ? L.t.ang : 0; L.pitch = 12 * Math.PI / 180; }
       else if (a === 'side') { L.yaw = (L.t ? L.t.ang : 0) + Math.PI / 2; L.pitch = 12 * Math.PI / 180; }
+      else if (a === 'hideunit') { L.hideUnit = !L.hideUnit; panel(); }
       else if (a === 'dark') { L.dark = !L.dark; panel(); }
       else if (a === 'sound') {   // (the click starts the game's audio; the music stays off so the unit's sounds can be heard)
         L.sound = !L.sound;
@@ -85299,6 +85465,18 @@ if (typeof towerTop === 'function') {
       else act(a);
     };
     $('#mlScrub').oninput = e => { if (!L.rec.length) return; L.paused = true; const a = L.rec[0].at, z = L.rec[L.rec.length - 1].at; L.scrub = a + (z - a) * e.target.value / 1000; };
+  }
+  // the compare pair's labels, floating over each
+  function tags() {
+    let box = $('#mlTags');
+    if (!L.c2 || !L.c) { if (box) box.style.display = 'none'; return; }
+    if (!box) { box = document.createElement('div'); box.id = 'mlTags'; box.innerHTML = '<span class="o">Old</span><span class="k">Kimodo</span>'; document.body.appendChild(box); }
+    box.style.display = '';
+    const cv = document.getElementById('cv') || document.querySelector('canvas'), r = cv.getBoundingClientRect();
+    [L.c, L.c2].forEach((c, i) => {
+      const el = box.children[i], h = creepBaseY(c) + creepH(c) + .45, p = typeof bendP === 'function' ? bendP(c.x + (c.ox || 0), h, c.y + (c.oy || 0)) : [c.x, h, c.y], q = M4.proj(RD.vp, p[0], p[1], p[2]);
+      el.style.left = (r.left + (q[0] * .5 + .5) * r.width) + 'px'; el.style.top = (r.top + (.5 - q[1] * .5) * r.height) + 'px'; el.style.visibility = q[2] > 0 ? '' : 'hidden';
+    });
   }
   const MCOL = { hit: '#ff6a40', cast: '#6ab0ff', effect: '#ffd860' };
   function timeline() {
