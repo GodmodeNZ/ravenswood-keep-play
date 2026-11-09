@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a48563a@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'fad90ca@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1207,7 +1207,9 @@ const FUS_BY = Object.fromEntries(FUSIONS.map(f => [f.id, f]));
 // rows open as talent points are earned over the run (any tree)
 function talEarned() { return typeof G !== 'undefined' ? G.tpEarned || 0 : 0; }
 function talTierPts(picks) { return talSpent(picks || []) + (typeof pathOn === 'function' && pathOn('sch', 2) ? 2 : 0); }   // Quick Study counts 2 more
-function talRowOpen(r, type, picks) { return talTierPts(picks || (type ? talPicks(type) : [])) >= (TAL_TIER[r] || 0); }
+// the points that open each row of a tree: a force's six-row trees have their own (TAL_TIER6, forces_zzzzzzzzzzzzzzzzz_spread.js)
+const talTierOf = type => (type && typeof TALENTS !== 'undefined' && TALENTS[type] && TALENTS[type].tiers) || TAL_TIER;
+function talRowOpen(r, type, picks) { return talTierPts(picks || (type ? talPicks(type) : [])) >= (talTierOf(type)[r] || 0); }
 
 const MULT_MODS = { hpM: 1, upCost: 1, dmg: 1, rate: 1, splash: 1, burn: 1, poison: 1, drain: 1, smite: 1, rangeM: 1, vsAir: 1, vsGround: 1, vsBoss: 1, vsOther: 1, vsChill: 1, vsArmored: 1 };
 const SET_MODS = { nth: 1, nthM: 1, nthStun: 1, critM: 1, minR: 1, slowOn: 1, shredOn: 1, stunCh: 1, mark: 1, near: 1, rain: 1, rampMax: 1, rampDMax: 1, stoke: 1, bossStun: 1 };
@@ -5250,7 +5252,7 @@ function updateFx(dt) {
 /* ---- Save / restore ---- */
 function serialize() {
   if (!G.towers || (G.state !== 'play') || G.vs) return null;   // a Tower Wars match is not saved over your campaign
-  return { v: 8, ftv: 5, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
+  return { v: 8, ftv: 6, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
     towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0, t.def.wall ? 0 : Math.round((t.vx || 0) * 100) / 100, t.bornW | 0, t.vSeed | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
@@ -5294,7 +5296,9 @@ function restore(s) {
   const mt = migrateTal(tal0, s.v, oldForceTal, talN); G.tal = mt.tal; G.tp = (s.tp || 0) + mt.refund + holyPts;
   // ftv 4 (6 Nov 2026): the spell talents moved to each tree's own rows (forces_zy_spells.js). The picks keep their talents
   // (a tree's list order is unchanged); migrateTal replays them on the new layout, and a rank that no longer fits is refunded
-  if (!oldForceTal && (s.ftv | 0) >= 3 && (s.ftv | 0) <= 4 && G.force && mt.refund > 0 && typeof onToast === 'function') setTimeout(() => onToast(`The talent trees were rearranged: ${mt.refund} talent point${mt.refund > 1 ? 's' : ''} that no longer fit came back to spend.`), 1600);
+  // ftv 6 (10 Nov 2026): every force tree spread over six rows (forces_zzzzzzzzzzzzzzzzz_spread.js), the list order kept: the
+  // same replay refunds a pick whose new row or prerequisite it no longer meets
+  if (!oldForceTal && (s.ftv | 0) >= 3 && (s.ftv | 0) <= 5 && G.force && mt.refund > 0 && typeof onToast === 'function') setTimeout(() => onToast(`The talent trees were rearranged: ${mt.refund} talent point${mt.refund > 1 ? 's' : ''} that no longer fit came back to spend.`), 1600);
   if ((s.v | 0) < 8) { const done = Math.max(0, (s.wave | 0) - 1), more = Math.max(0, done - Math.floor(done / 3)); G.tp += more; G.tpEarned += more; }   // v8 pays a point every wave: catch an older run up
   G.fus = {}; for (const k in s.fus || {}) if (s.fus[k]) { if (FUS_BY[k] && !G.force) G.fus[k] = 1; else G.tp++; }   // a fusion that no longer exists (the Shadow ones), or one a force run bought before they left it, gives its point back
   const okGear = it => !!(((s.v | 0) >= 6 || remapTome(it)) && ((s.v | 0) >= 8 || remapTome8(it)) && migrateGear(it)) && RARITY[it.rar];
@@ -6771,7 +6775,7 @@ function followPlan() {
   while (G.tp > 0 && moved) {
     moved = false;
     for (const id of P.fus) if (G.tp > 0 && !(G.fus && G.fus[id]) && FUS_BY[id] && fusReady(FUS_BY[id]) && buyFusion(id)) { n++; moved = true; }
-    for (let r = 0; r < TAL_TIER.length && G.tp > 0; r++) for (const ty of COMBAT_TYPES) {
+    for (let r = 0; r < 6 && G.tp > 0; r++) for (const ty of COMBAT_TYPES) {
       const want = P.tal[ty] || [];
       for (const t of TALENTS[ty].list) {
         if (t.r !== r || G.tp <= 0) continue;
@@ -7004,7 +7008,7 @@ function nextMilestone(type) {
     const m = t.mod(1), big = t.r === talRowsOf(type) - 1 || MILE_KEYS.some(k => (m[k] || 0) > 0) || (t.cap && t.r >= 2);
     if (!big) continue;
     let pts = 1, q = t; while (q.req) { q = talAt(type, q.req[0], q.req[1]); pts += Math.max(0, q.max - (pk[q.id] | 0)); if ((pk[q.id] | 0) >= q.max) break; }   // the ranks still owed down its chain
-    const rowPts = Math.max(0, (TAL_TIER[t.r] || 0) - talTierPts(pk));
+    const rowPts = Math.max(0, (talTierOf(type)[t.r] || 0) - talTierPts(pk));
     pts = Math.max(pts, rowPts + 1); const score = pts;
     if (!best || score < best.score) best = { t, pts, rowPts, score };
   }
@@ -7501,7 +7505,7 @@ function rootStrike(t, st, tg, pow) {   // the Rootweaver: vines out of the grou
   if (tg.rootT > G.time + .15) { const o = G.creeps.filter(o => !o.dead && !(o.rootT > G.time) && canTarget(t, st, o) && inRange(t, st, o)).sort((a, b) => a.remain - b.remain)[0]; if (o) tg = o; }
   const n = (st.rootN || 1) + (C.snare2 ? 1 : 0);   // Second Snare
   const hit = [tg].concat(n > 1 ? nearest(tg.x, tg.y, 1.6, n - 1, tg, o => !o.fly && !(o.rootT > G.time) && canTarget(t, st, o)) : []);
-  if (C.overgrow && ((t.shots + 1) % 3 === 0 || tg.gvcCloudT > G.time || tg.gvcWithT > G.time)) {   // Overgrowth: every 3rd strike erupts wide, every strike on a foe under Mothcloud or Wither
+  if (C.overgrow && (t.shots + 1) % 2 === 0) {   // Overgrowth: every 2nd strike erupts wide (plain-text pass: was every 3rd, and every strike on a foe under Mothcloud or Wither)
     inSplash(tg.x, tg.y, 1.2, true, o => { if (!hit.includes(o) && canTarget(t, st, o)) hit.push(o); });
     fxRing(tg.x, tg.y, 1.2, '#9be06a'); fxDust(tg.x, tg.y, 6);
   }
@@ -7532,7 +7536,8 @@ function rootBurst(c) {
   if ((G.rbN = (G.rbN || 0) + 1) >= 10) return;   // (a chain of bursts can't run away in one frame)
   G.delayed.push({ t: .1, fn: () => {
     G.rbN = 0; if (G.state !== 'play') return;
-    inSplash(x, z, 1.2, true, o => { hurt(o, s.dmg * 2, 'magic', t, false, null, null); if (!o.dead) rootFoe(o, .6, t); });
+    // (.8s: its Strangling Bloom rider folded in, plain-text pass)
+    inSplash(x, z, 1.2, true, o => { hurt(o, s.dmg * 2, 'magic', t, false, null, null); if (!o.dead) rootFoe(o, .8, t); });
     fxRing(x, z, 1.2, '#9be06a'); fxDust(x, z, 6);
     for (let k = 0; k < 10; k++) part({ k: 'chunk', x, z, h: .05, vh: R(1, 2), vx: R(-1.4, 1.4), vz: R(-1.4, 1.4), g: 7, life: .45, max: .45, size: R(.03, .06), col: k % 2 ? '#4a7a2a' : '#5a4430' });
   } });
@@ -7668,7 +7673,7 @@ function podBurst(x, z, sp) {   // a Thornspitter's seed pod bursting: green spr
 function swarmMove(c) {   // a host of spores (a Seedcaster's, the Seedmother's) has fallen: they drift on to the nearest foe
   let best = null; for (const q of c.poison) if ((q.src === HERO_SRC || (q.src && q.src.def && (q.src.def.swarm || q.src.def.pod))) && (!best || q.dps > best.dps)) best = q;
   if (!best) return;
-  const bs = best.src && best.src.st, n = Math.max((G.hero === 'hivemother' && sagaHas('fin') ? 2 : 1) + (bs && bs.caps && bs.caps.drift ? 1 : 0), (bs && bs.pw && bs.pw.bloom) || 0);   // Drifting Spores, Heart of the Bloom
+  const bs = best.src && best.src.st, n = Math.max((G.hero === 'hivemother' && sagaHas('fin') ? 2 : 1) + (bs && bs.caps && bs.caps.drift ? 2 : 0), (bs && bs.pw && bs.pw.bloom) || 0);   // Drifting Spores, Heart of the Bloom
   for (const o of nearest(c.x, c.y, 1.9, n, c, o => !isImmune(o, 'poison'))) {
     dose(o, { poison: best.dps, poisonT: Math.max(2, best.t), caps: {} }, best.src); o.swarmOn = true;
     for (let k = 0; k < 7; k++) part({ k: 'spark', x: c.x, z: c.y, h: hitH(c), vx: (o.x - c.x) * 2.6 + R(-.3, .3), vz: (o.y - c.y) * 2.6 + R(-.3, .3), vh: R(.2, .7), g: 1, life: .4, max: .4, size: .045, col: '#c8d860' });
@@ -12921,14 +12926,14 @@ function ccRidersOf(t, st) {
   if (!u) return CC_NORIDE;
   const out = [];
   if (u === 'cc_spellblade') {
-    if (C.ccStarsteel) out.push([['overload'], 'starsteel', (id, e, c) => { stun(c, .4, .4, null); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .4, life: .3, max: .3, size: 1, col: CC_COL.star }); return 1; }]);   /* Starsteel */
+    if (C.ccStarsteel) out.push([['overload'], 'starsteel', (id, e, c) => { part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .4, life: .3, max: .3, size: 1, col: CC_COL.star }); return 1.3; }]);   /* Starsteel */
     if (C.ccWeaverBlade) out.push(['*', 'weaver', (id, e, c, S) => { ccTouch(t, c, e, S); return .6; }]);   /* Weaver's Blade */
   }
   if (u === 'cc_mageling' && C.ccEcho) out.push([['echo'], 'echo', (id, e, c, S) => {   /* Echoing Missiles */
     G.delayed.push({ t: .4, fn: () => { if (!c.dead && ccAlive(t)) { tagged('rx', () => ccHit(t, t.st || st, c, S * .7, { noMark: true })); part({ k: 'ring', x: c.x, z: c.y, h: hitH(c), life: .3, max: .3, size: .4, col: CC_COL.chrono }); } } });
     return 0; }]);
   if (u === 'cc_rimeweaver' && C.ccEntomb) out.push([['encase'], 'entomb', (id, e, c) => { ccFreeze(t, c, CC_RXK.encase + 1); c.ccTombBy = t; return .5; }]);   /* Entomb */
-  if (u === 'cc_chronomancer' && C.ccParadox) out.push([['echo'], 'paradox', (id, e, c, S) => { ccRewind(t, st, c, .7, S, false); return .6; }]);   /* Paradox */
+  if (u === 'cc_chronomancer' && C.ccParadox) out.push([['echo'], 'paradox', (id, e, c, S) => { ccRewind(t, st, c, .9, S, false); return 0; }]);   /* Paradox */
   if (u === 'cc_astrologer' && C.ccComet) out.push([['pull'], 'comet', (id, e, c, S) => { ccComet(t, st, c, S); return 0; }]);   /* Comet */
   if (u === 'cc_golemwarden' && C.ccMagma) out.push([['magma'], 'deepmagma', () => {   /* Deep Magma: the magma it just poured lasts longer and spreads */
     for (const g of G.hazards) if (g.k === 'cc_glyph' && g.s === 'magma' && g.src === t && g.born === G.time) { g.t += 3; g.T += 3; g.r += .3; }
@@ -13035,15 +13040,14 @@ FORCE_ATTACK.cc_blade = function (t, st, tg, pow, echo) {
   const blinkN = C.ccPhase ? 3 : C.ccBlinkstep ? 4 : 0;
   if (blinkN && !echo && n % blinkN === 0) {   // Blinkstep / Phase Dancer: a hop to the foe furthest along within reach + 1
     const o = G.creeps.filter(q => !q.dead && ccWalker(q) && canTarget(t, st, q) && Math.hypot(q.x - t.x, q.y - t.y) <= st.range + 1).sort((a, b) => a.remain - b.remain)[0];
-    if (o) { c = o; k *= 1.5; ccBlinkTo(t, o, .38); if (C.ccPhase) { ccGain(t, 1); ccEv('cap:ccPhase'); } else ccEv('tal:ccBlinkstep'); }
+    if (o) { c = o; k *= C.ccPhase ? 1.8 : 1.5; ccBlinkTo(t, o, .38); if (C.ccPhase) { ccGain(t, 1); ccEv('cap:ccPhase'); } else ccEv('tal:ccBlinkstep'); }
   }
   const dx = c.x - t.x, dz = c.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
   ccHit(t, st, c, st.dmg * k, { type: 'phys', kb: [ux * .08, uz * .08] });
   if (!c.dead && t.def.unit === 'cc_spellblade') ccStaggerFoe(c, t);
   if (C.ccChEdge && ccFull(t)) inSplash(c.x, c.y, .8, true, o => { if (o !== c && canTarget(t, st, o)) ccHit(t, st, o, st.dmg * k * .2 * C.ccChEdge, { type: 'phys', noRx: true }); });   /* Charged Edge */
-  if (C.ccPhase && c !== tg && !tg.dead) G.delayed.push({ t: .2, fn: () => { if (ccAlive(t) && !tg.dead) { ccHit(t, t.st || st, tg, st.dmg * .6, { type: 'phys' }); ccGhostFx(t, tg); } } });   // Phase Dancer's afterimage
   if (C.ccThousand && !echo && n % 6 === 0) {   // Thousand Edges: three afterimages, each through every walker in reach for 40%
-    for (let q = 0; q < 3; q++) G.delayed.push({ t: .12 + q * .12, fn: () => { if (!ccAlive(t)) return; const s2 = t.st || st; inSplash(t.x, t.y, s2.range + .1, true, o => { if (canTarget(t, s2, o) && !o.ent) { ccHit(t, s2, o, s2.dmg * .4, { type: 'phys', noRx: q > 0 }); if (!o.dead && q === 0) ccStaggerFoe(o, t); } }); ccRingFx(t.x, t.y, s2.range, CC_COL.arcane); } });
+    for (let q = 0; q < 3; q++) G.delayed.push({ t: .12 + q * .12, fn: () => { if (!ccAlive(t)) return; const s2 = t.st || st; inSplash(t.x, t.y, s2.range + .1, true, o => { if (canTarget(t, s2, o) && !o.ent) { ccHit(t, s2, o, s2.dmg * .45, { type: 'phys', noRx: q > 0 }); } }); ccRingFx(t.x, t.y, s2.range, CC_COL.arcane); } });
     t.ccThousandAt = G.time; ccEv('cap:ccThousand');
   }
   if (t.ccSpecT > G.time && !echo) {   // Spectral Edge: a ghost blade at another foe within 3 cells (flyers too)
@@ -13150,7 +13154,7 @@ FORCE_ATTACK.cc_rime = function (t, st, tg, pow, echo) {
     if (c.dead) return;
     chill(c, { slow: s.slow || .25, slowT: s.slowT || 1.5 }, 'frost', t);
     if (flash) ccFreeze(t, c, .25 * C.ccFlash);   // Flash Freeze
-    if (still) { ccEv('cap:ccStill'); ccFreeze(t, c, .8); inSplash(c.x, c.y, .8, false, o => { if (o !== c) chill(o, { slow: .5, slowT: 1.5 }, 'frost', t); }); ccRingFx(c.x, c.y, .8, '#dff6ff'); }   // Absolute Stillness
+    if (still) { ccEv('cap:ccStill'); ccFreeze(t, c, 1.1); ccRingFx(c.x, c.y, .5, '#dff6ff'); }   // Absolute Stillness
     if (!echo && typeof ccrSecond === 'function') ccrSecond(t, s, c);
     fxShards(c.x, c.y, hitH(c), 4);
   } });
@@ -13219,12 +13223,11 @@ function ccStarHit(t, st, c, pow) {
   part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .15, max: .15, size: .55, col: CC_COL.star });
   if (c.fly && !c.dead && C.ccSkybreak) c.lowT = Math.max(c.lowT || 0, G.time + .6 * C.ccSkybreak);   // Skybreaker
 }
-// Comet: a burst of ice around the foe (Twinkling Ice: colder, and a small glyph)
+// Comet: a burst of ice around the foe (Twinkling Ice: colder and wider)
 function ccComet(t, st, c, amt) {
   const C = st.caps || {}, x = c.x, z = c.y, r = 1 + .1 * (C.ccTwinkle || 0), m = .6, sl = .3 + .15 * (C.ccTwinkle || 0);
   tagged('rx', () => inSplash(x, z, r, false, o => { if (o.ent || o === c) return; ccHit(t, st, o, amt * m, { noRx: true }); if (!o.dead) chill(o, { slow: sl, slowT: 2 }, 'frost', t); }));
   chill(c, { slow: sl, slowT: 2 }, 'frost', t);
-  if (C.ccTwinkle && !c.fly) ccGlyph({ s: 'frost', sub: 'glyph', x, z, r: .5, t: 2, src: t, st, slow: .3 });
   fxShards(x, z, hitH(c), 10); ccRingFx(x, z, r, '#d8f2ff'); part({ k: 'flare', x, z, h: hitH(c), life: .25, max: .25, size: 1.1, col: '#e8f8ff' });
 }
 
@@ -15285,7 +15288,7 @@ function druidStrike(t, st, tg, pow) {
     G.delayed.push({ t: .1, fn: () => {
       if (!live()) return;
       hurt(tg, amt, 'phys', t, false, [ux * .12, uz * .12]); onHit(tg, st, t, amt);
-      if (!tg.dead && C.bramclaw) { const b = amt * .15 * C.bramclaw / 3; tg.bleedDps = Math.max(tg.bleedT > 0 ? tg.bleedDps : 0, b); tg.bleedT = 3; tg.bleedSrc = t; }   // Bramble Claws
+      if (!tg.dead && C.bramclaw) { const b = amt * .2 * C.bramclaw / 3; tg.bleedDps = Math.max(tg.bleedT > 0 ? tg.bleedDps : 0, b); tg.bleedT = 3; tg.bleedSrc = t; }   // Bramble Claws
       if (!tg.dead && n % 4 === 0) stun(tg, .35, .4);   // every 4th maul staggers
       AOE++; try { inSplash(tg.x, tg.y, .75, true, o => { if (o === tg || o.dead || o.ent || !canTarget(t, st, o)) return; hurt(o, amt * .4, 'phys', t, false, [(o.x - t.x) * .05, (o.y - t.y) * .05]); }); } finally { AOE--; }   // the cleave
       rfx({ k: 'slash', x: tg.x, h: hitH(tg) * .7, z: tg.y, a: Math.atan2(ux, uz), r: .5, col: '#c8e890', life: .22 });
@@ -15898,9 +15901,8 @@ function ihVentK(t, st) {
 // the vent went off: the gauge empties, the unit is warm, and the overheat pause (st.rate is this strike's reload)
 function ihVented(t, st, noPause) {
   t.ihHeat = 0; t.ihVentAt = G.time; t.ihVents = (t.ihVents || 0) + 1; t.ihWarm = 1;
-  if (!noPause && !(st.caps && st.caps.ihBelt) && !(st.caps && st.caps.ihValve)) st.rate += IH_VENT_PAUSE;
+  if (!noPause && !(st.caps && st.caps.ihBelt)) st.rate += IH_VENT_PAUSE;
   if (st.caps && st.caps.ihSwab) t.ihSwab = 1 + st.caps.ihSwab;   // Quick Swab: the next shots reload twice as fast
-  if (st.caps && st.caps.ihBelt) t.ihBeltT = G.time + 3;           // Endless Belt
   const top = towerTop(t);
   ihSteam(t.x, t.y, top * .8, 10, true);   // (no ring round the unit: the owner)
   if (st.pw && st.pw.ihBoiler) ihBoilerChain(t);   // Boiler of Endless Steam
@@ -15980,9 +15982,8 @@ FORCE_ATTACK.ironbreaker = function (t, st, tg, pow, echo) {
   if (!tg.dead) { const cur = tg.shredT > 0 ? tg.shred : 0; tg.shred = Math.max(cur, Math.min(cap, cur + 1)); tg.shredT = Math.max(tg.shredT, 5); }
   if (had) tg.ihChopN = (tg.ihChopN || 0) + 1;
   if (C.ihShatter && had && !tg.ihShat && (ihArmor(tg) <= 0 || tg.ihChopN >= 4)) {   // Armourbreaker: the 4th chop an armoured foe takes (or one once it is bare) shatters its plate, once a foe
-    tg.ihShat = 1; tg.shred = Math.max(tg.shred, tg.armor); tg.shredT = Math.max(tg.shredT, 6);
+    tg.ihShat = 1; tg.shred = Math.max(tg.shred, tg.armor); tg.shredT = Math.max(tg.shredT, 8);
     if (!tg.dead) ihHit(t, st, tg, amt * 3, 'phys', true);
-    inSplash(tg.x, tg.y, 1, true, o => { if (o !== tg && !o.dead) { o.shred = Math.max(o.shredT > 0 ? o.shred : 0, 4); o.shredT = Math.max(o.shredT, 5); } });
     fxShards(tg.x, tg.y, hitH(tg), 10); fxRing(tg.x, tg.y, 1, '#d8d8e0'); G.shake = Math.max(G.shake, .08);
   }
   if (C.ihCleave) { const o = nearest(tg.x, tg.y, .85, 1, tg, q => !q.fly && canTarget(t, st, q))[0]; if (o) ihHit(t, st, o, amt * .6, 'phys'); }   // Cleaving Chop
@@ -16068,7 +16069,7 @@ FORCE_ATTACK.chaintrapper = function (t, st, tg, pow, echo) {
   G.delayed.push({ t: trav, fn: () => {
     if (tg.dead || !ihLive(t)) return; const s = t.st || st, amt = s.dmg * pow;
     ihBolaHit(t, s, tg, amt, net);
-    if (C.ihBola2 && !net) { const o = nearest(tg.x, tg.y, 1.5, 1, tg, q => !q.dead && canTarget(t, s, q) && !(q.slowT > .4))[0]; if (o) { rfx({ k: 'streak', x0: tg.x, h0: hitH(tg), z0: tg.y, c: o, col: '#8a6a42', w: .025, life: .15 }); ihBolaHit(t, s, o, amt * .5 * C.ihBola2, false); } }   // Tangle
+    if (C.ihBola2 && !net) { const o = nearest(tg.x, tg.y, 1.5, 1, tg, q => !q.dead && canTarget(t, s, q))[0]; if (o) { rfx({ k: 'streak', x0: tg.x, h0: hitH(tg), z0: tg.y, c: o, col: '#8a6a42', w: .025, life: .15 }); ihBolaHit(t, s, o, amt * .5 * C.ihBola2, false); } }   // Tangle
     if (trapLine) ihCaltrops(t, s, tg.x, tg.y, .6, 3, .25, 1);   // Trap Line
   } });
   t.recoil = 1; sfx('glaiveHit', 0);   // (a low thud as the bola lands)
@@ -16106,7 +16107,7 @@ FORCE_ATTACK.runesmith = function (t, st, tg, pow, echo) {
   G.delayed.push({ t: trav, fn: () => {
     if (tg.dead || !ihLive(t)) return; const s = t.st || st, amt = s.dmg * pow;
     ihHit(t, s, tg, amt, 'arcane');
-    if (!tg.dead) ihBrand(tg, (s.brand || .08) + .02 * (C.ihDeepBrand || 0), 4 + (C.ihDeepBrand || 0), t);
+    if (!tg.dead) ihBrand(tg, (s.brand || .08) + .03 * (C.ihDeepBrand || 0), 4, t);
     if (C.ihSear && !tg.dead) ignite(tg, amt * .1 * C.ihSear, 3, t, false);   // Searing Brand
     if (C.ihRing) ihAoe(() => inSplash(tg.x, tg.y, .55, false, o => { if (o !== tg && canTarget(t, s, o)) ihHit(t, s, o, amt * .4 * C.ihRing, 'arcane', true); }));   // Ringing Anvil
     ihSparks(tg.x, tg.y, hitH(tg), 6, IH_COL.rune); part({ k: 'flare', x: tg.x, z: tg.y, h: hitH(tg), life: .18, max: .18, size: .6, col: IH_COL.rune });
@@ -16146,8 +16147,6 @@ FORCE_ATTACK.flakgunner = function (t, st, tg, pow, echo) {
     const F = ihFoes(t, st, t.x, t.y, st.range, c => c.fly && !(c.lowT > G.time));
     if (F.length) G.delayed.push({ t: .3, fn: () => { if (!ihLive(t)) return; const s = t.st || st; ihAoe(() => { for (const c of F) if (!c.dead) { ihHit(t, s, c, s.dmg * .5, 'phys', true); ihFlakFx(c.x, c.y, hitH(c), .5); } }); } });
   }
-  if (C.ihCluster && fN % 5 === 0) for (let q = 0; q < 4; q++) { const a = q / 4 * TAU + R(.5), x = tg.x + Math.cos(a) * .9, z = tg.y + Math.sin(a) * .9;   // Shellstorm
-    G.delayed.push({ t: .35 + q * .06, fn: () => { if (!ihLive(t)) return; ihFlakBurst(t, t.st || st, x, z, tg.fly ? 1.15 : .45, .4, null); } }); }
 };
 function ihFlakShell(t, st, tg, pow, quiet) {
   const d = Math.hypot(tg.x - t.x, tg.y - t.y), trav = .12 + d / 12, mz = ihMuzzle(t), h = hitH(tg);
@@ -16220,7 +16219,7 @@ function ihSteamBurst(t, st, pow, k) {
     if (st.pw && st.pw.ihGauge) { ihStun(c, .4); relicGlint(t, 'ih_gauge'); }   // Pressure Gauge
   }));
   for (let q = 0; q < 12; q++) { const a = q / 12 * TAU + R(-.3, .3), v = r * R(1.1, 2.4); part({ k: 'smoke', x: t.x + Math.cos(a) * R(.35, .6), z: t.y + Math.sin(a) * R(.35, .6), h: .1, vx: Math.cos(a) * v, vz: Math.sin(a) * v, vh: R(.15, .6), drag: 2.4, life: .8, max: .8, size: R(.14, .24), col: IH_COL.steam }); }   // (the steam rolls out low from round his feet, clear of him, ragged so it never reads as a ring)
-  if (C.ihValve && G.hazards.length < 40) { const o = nearest(t.x, t.y, st.range + .5, 1, null, c => !c.fly)[0]; if (o) G.hazards.push({ k: 'ih_vent', x: o.x, z: o.y, r: .7, t: 3, T: 3, tick: 0, src: t, st, dmgK: .3 }); }   // Safety Valve
+  if (C.ihValve && G.hazards.length < 40) { const o = nearest(t.x, t.y, st.range + .5, 1, null, c => !c.fly)[0]; if (o) G.hazards.push({ k: 'ih_vent', x: o.x, z: o.y, r: .7, t: 4, T: 4, tick: 0, src: t, st, dmgK: .3 }); }   // Safety Valve
   G.shake = Math.max(G.shake, .1); sfx('quake', 1); t.ihBurstAt = G.time;
 }
 
@@ -16228,7 +16227,7 @@ function ihSteamBurst(t, st, pow, k) {
 FORCE_ATTACK.mortarcrew = function (t, st, tg, pow, echo) {
   const C = st.caps, vent = !echo && ihVentReady(t), n = echo ? 1 : (t.ihShellN = (t.ihShellN || 0) + 1);
   let p = pow;
-  if (vent) p *= (C.ihBertha ? 3.5 : 2.5) * ihVentK(t, st);
+  if (vent) p *= (C.ihBertha ? 4 : 2.5) * ihVentK(t, st);
   ihMortarShell(t, st, tg.x, tg.y, tg, p, { big: vent, bertha: vent, fused: !echo && st.pw && st.pw.ihFused && n % 3 === 0 ? st.pw.ihFused : 0 });
   if (vent) { ihVented(t, st); t.ihBerthaAt = G.time; }
   else if (!echo) ihHeatStrike(t, st);
@@ -16262,7 +16261,7 @@ function ihMortarLand(t, st0, p, o) {
     if (c.dead) continue;
     if (C.ihPitch) ignite(c, st.dmg * p.pow * .08 * C.ihPitch, 3, t, false);   // Pitch-Soaked Wadding
     if (C.ihCasing) { c.shred = Math.max(c.shredT > 0 ? c.shred : 0, 2 * C.ihCasing); c.shredT = Math.max(c.shredT, 5); }   // Shrapnel Casing
-    if (o.bertha) { ihStun(c, C.ihBertha ? 1 : .5); c.ihVentHitT = G.time; }
+    if (o.bertha) { ihStun(c, .5); c.ihVentHitT = G.time; }
     if (C.ihShake && (t.ihShakeN || 0) % 4 === 3) ihStun(c, .6);   // Quake Shell
   }
   if (C.ihShake) t.ihShakeN = (t.ihShakeN || 0) + 1;
@@ -16314,7 +16313,7 @@ FORCE_HOOKS[IH_ID] = {
     if (c.ihBrandT > G.time && c.ihBrandBy && c.ihBrandBy.st && ihIs(c.ihBrandBy)) {
       const b = c.ihBrandBy, s = b.st, C = s.caps;
       if (C.ihBrandLeap) for (const o of nearest(c.x, c.y, 2, 2, c, o => !o.dead)) { ihBrand(o, c.ihBrandK, 4, b); rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: o, col: IH_COL.rune, w: .03, life: .25 }); }
-      if (C.ihDetonate && (IH.detN = (IH.detN || 0) + 1) < 12) { const x = c.x, z = c.y; G.delayed.push({ t: .08, fn: () => { IH.detN = 0; ihAoe(() => inSplash(x, z, 1, false, o => { if (!o.dead && canTarget(b, s, o)) { ihHit(b, s, o, s.dmg * 2, 'arcane', true); ihBrand(o, s.brand || .08, 3, b); } })); fxRing(x, z, 1, IH_COL.rune); ihSparks(x, z, .4, 10, IH_COL.rune); } }); }
+      if (C.ihDetonate && (IH.detN = (IH.detN || 0) + 1) < 12) { const x = c.x, z = c.y; G.delayed.push({ t: .08, fn: () => { IH.detN = 0; const ud = Math.max(2, byT(ABIL.ih_forgeburst.by.dur, b) - 2); for (const o of G.creeps) if (!o.dead && !o.ent && o !== c && Math.hypot(o.x - x, o.y - z) <= 1 && canTarget(b, s, o) && typeof ihcUnmake === 'function') ihcUnmake(b, o, 1, ud); fxRing(x, z, 1, IH_COL.rune); ihSparks(x, z, .4, 10, IH_COL.rune); } }); }
     }
     if (typeof ihItemsKill === 'function') ihItemsKill(c, src);
     if (typeof ihHeroKill === 'function') ihHeroKill(c, src);
@@ -18802,7 +18801,7 @@ FORCE_ATTACK.so_chain = (t, st, tg, pow, echo) => {
     soChainFx(from ? from.x : hx, from ? hitH(from) : hh, from ? from.y : hz, c, bind);
     from = c;
     if (C.so_j_chain && !echo && soJ(c) >= soJMax()) {   // Chain of Judgement: the full mark leaps on
-      for (const o of nearest(c.x, c.y, 1.6, 3, c, q => soJ(q) > 0 && !hit.includes(q) && canTarget(t, st, q))) { soEv('cap:so_j_chain'); soStrike(t, st, o, st.dmg * pow * .6, 'magic'); if (!o.dead) { chill(o, { slow: st.slow || .3, slowT: st.slowT || 1.5 }, null, t); soJudge(o, 1, t); } soChainFx(c.x, hitH(c), c.y, o, false); }
+      for (const o of nearest(c.x, c.y, 1.6, 3, c, q => !hit.includes(q) && canTarget(t, st, q))) { soEv('cap:so_j_chain'); soStrike(t, st, o, st.dmg * pow * .6, 'magic'); if (!o.dead) { chill(o, { slow: st.slow || .3, slowT: st.slowT || 1.5 }, null, t); soJudge(o, 1, t); } soChainFx(c.x, hitH(c), c.y, o, false); }
     }
   }
   t.recoil = 1; if (bind) sfx('ward', 0);
@@ -18921,7 +18920,7 @@ function soSlam(t, st, pow, mult, o) {
 // ---- Censer Bearers: a lobbed coal of incense that bursts in holy fire and smoulders on the road ----
 FORCE_ATTACK.so_censer = (t, st, tg, pow, echo) => {
   const C = st.caps, big = !echo && C.so_great_censer && (t.shots + 1) % 3 === 0;
-  soLob(t, st, tg.x, tg.y, pow, { tg, sp: st.splash * (big ? 1.6 : 1), zone: 2.5 + (C.so_linger ? .75 * C.so_linger : 0), big });
+  soLob(t, st, tg.x, tg.y, pow, { tg, sp: st.splash * (big ? 1.6 : 1), zone: 2.5 + (C.so_linger || 0), big });
   if (C.so_litany_coals && !echo && (t.shots + 1) % 4 === 0) soEv('cap:so_litany_coals');
   if (C.so_litany_coals && !echo && (t.shots + 1) % 4 === 0) for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + R(.4), r = R(.6, 1.2); G.delayed.push({ t: .08 * (k + 1), fn: () => { if (soAlive(t)) soLob(t, t.st || st, tg.x + Math.cos(a) * r, tg.y + Math.sin(a) * r, pow * .5, { sp: st.splash * .7, zone: 1.5, small: true }); } }); }   // Endless Litany
   if (C.so_scatter && !echo) for (const o of nearest(tg.x, tg.y, 2.2, 2, tg, q => !q.fly && canTarget(t, st, q))) soLob(t, st, o.x, o.y, pow * .45, { tg: o, sp: st.splash * .6, zone: 1.5, small: true });   // Scattered Coals
@@ -19078,7 +19077,7 @@ function soHeaven(t, st) {
   const L = G.creeps.filter(c => canTarget(t, st, c) && inRange(t, st, c)); if (!L.length) { t.soHvT = .5; return; }
   t.soHvT = 6; soEv('cap:so_heaven'); const F = L.filter(c => c.fly), c = (F.length ? F : L).reduce((b, o) => !b || o.hp > b.hp ? o : b, null);
   G.beams.push({ k: 'smite', a: [c.x, 4.5, c.y], b: [c.x, 0, c.y], life: .45, max: .45, lv: 2 });
-  soStrike(t, st, c, st.dmg * 3, 'magic'); if (!c.dead) soJudge(c, 2, t);
+  soStrike(t, st, c, st.dmg * 3.3, 'magic');
   flashLight(c.x, c.y, 1, [1.8, 1.6, 1], 2.5, .3); sfx('ward', 0);
 }
 // an Oath-Stone on any of the 8 cells around a unit (cached for half a second)
@@ -20861,7 +20860,7 @@ function sbChain(t, st, first, m, o = {}) {
   let left = (o.jumps != null ? o.jumps : (st && st.chain) || 3) - 1 + (C.sbRoll || 0) + ((st && st.pw && st.pw.sbRod) || 0);
   const fall = o.fall != null ? o.fall : .75, reach = (o.reach || 2.2) + ((st && st.sbArc) || 0);
   const living = (C.sbLiving && S.lv >= 2) || (st && st.pw && st.pw.sbHeart);   // Living Storm, the Heart of the Thunderbird
-  const xMax = 4 + (C.sbConductor || 0) * 2, gain = 1 + (C.sbConductor || 0) + (talentHas('frost', 'sbFrostLight') && first.frostT > 0 ? 1 : 0);
+  const xMax = 4 + (C.sbConductor || 0) * 2, gain = 1 + (C.sbConductor && first.sbWetT > G.time ? C.sbConductor : 0) + (talentHas('frost', 'sbFrostLight') && first.frostT > 0 ? 1 : 0);
   const zapped = [];
   const zap = (c, a) => { sbZap(t, st, c, a, true); zapped.push(c); fxSpark(c.x, c.y, hitH(c), SB_COL.pale, 4 + Math.min(4, t.tier | 0)); };
   zap(first, dmg); if (sbCond(first) && extra < xMax) { left += gain; extra += gain; }
@@ -20877,7 +20876,7 @@ function sbChain(t, st, first, m, o = {}) {
     if (!best) break;
     const cd = sbCond(best);
     if (!cd && !living) dmg *= fall;
-    left--; if (cd && extra < xMax) { const g = 1 + (C.sbConductor || 0) + (talentHas('frost', 'sbFrostLight') && best.frostT > 0 ? 1 : 0); left += g; extra += g; }
+    left--; if (cd && extra < xMax) { const g = 1 + (C.sbConductor && best.sbWetT > G.time ? C.sbConductor : 0) + (talentHas('frost', 'sbFrostLight') && best.frostT > 0 ? 1 : 0); left += g; extra += g; }
     hit.add(best); pts.push([best.x, hitH(best), best.y]); zap(best, dmg); cur = best;
   }
   if (C.sbGroundC && !o.depth) {   // Ground Current: out of foes, the bolt finds the earth
@@ -21145,7 +21144,8 @@ function sbTick(dt) {
 FORCE_ATTACK.sbWolf = (t, st, tg, pow) => {
   const C = st.caps, [ux, uz] = sbDir(t, tg), n = t.sbThrust = (t.sbThrust || 0) + 1;
   let k = 1;
-  if (C.sbGspear && sbCond(tg)) k *= 1 + .15 * C.sbGspear;   // Grounding Spear
+  // Grounding Spear (soaked foes; talent clarity, 10 Nov 2026)
+  if (C.sbGspear && tg.sbWetT > G.time) k *= 1 + .2 * C.sbGspear;
   if (C.sbCombo && t.sbComboOn === tg && t.sbComboT > G.time) { k *= 1 + .25 * C.sbCombo; t.sbComboOn = null; fxSpark(tg.x, tg.y, hitH(tg), '#e8f0ff', 6); }   // Blood Moon... (the wolf set it up)
   const storm = C.sbStormspear && n % 4 === 0; if (storm) k *= 2.5;   // Stormspear
   const amt = st.dmg * pow * k, x0 = tg.x, z0 = tg.y, h0 = hitH(tg);
@@ -21190,13 +21190,14 @@ function sbWolfLunge(t, st, tg, mult, slot, o = {}) {
     if (c.dead || !sbAlive(t)) return;
     const s = t.st || st, C2 = s.caps;
     let m = (o.m != null ? o.m : (.6 + .15 * (C2.sbBond || 0)) * mult) * SB_HERO_K();
-    const moon = C2.sbMoonfang && nL % 3 === 0 && !o.free; if (moon) m *= 2;   // Moonfang Pounce
+    // Moonfang Pounce (its bite no longer doubles: the drag-down reaches 1.2 cells)
+    const moon = C2.sbMoonfang && nL % 3 === 0 && !o.free;
     sbHit(t, s, c, s.dmg * m, 'phys', null); c.sbSpiritT = G.time + .6;
     if (!c.dead && C2.sbHam) { chill(c, { slow: .2 * C2.sbHam, slowT: 1.5 }, null, t); woundFoe(c); }   // Hock Bite: slowed and Wounded
     // the bite drags its foe down, soaked, and feeds the Storm
     if (!c.dead && o.down) sbWolfDown(t, c);
     // Moonfang Pounce: and the walkers beside it
-    if (moon && !c.dead) { fxMark(c, 'exposed'); if (o.down) for (const q of nearest(c.x, c.y, 1, 6, c, q => !q.phased && !q.ent && sbWalks(q) && canTarget(t, s, q))) { stun(q, SB_WOLF.down, false, null); sbSoak(q, SB_WOLF.soak); if (q.stunT > 0) { q.sbDownT = G.time + q.stunT; q.sbDownX = 0; } } }
+    if (moon && !c.dead) { fxMark(c, 'exposed'); if (o.down) for (const q of nearest(c.x, c.y, 1.2, 6, c, q => !q.phased && !q.ent && sbWalks(q) && canTarget(t, s, q))) { stun(q, SB_WOLF.down, false, null); sbSoak(q, SB_WOLF.soak); if (q.stunT > 0) { q.sbDownT = G.time + q.stunT; q.sbDownX = 0; } } }
     if (!c.dead && o.stun) stun(c, o.stun, .4, null);
     if (C2.sbCombo) { t.sbComboOn = c; t.sbComboT = G.time + 3; }
     for (let k = 0; k < 6; k++) part({ k: 'wisp', x: c.x, z: c.y, h: hitH(c), vx: R(-1, 1), vz: R(-1, 1), vh: R(0, .8), life: .4, max: .4, size: R(.06, .1), col: SB_COL.spirit });
@@ -21226,7 +21227,8 @@ function sbHailStone(t, st, c, x, z, pow, r, n) {
     inSplash(cx, cz, rr, false, (o, d) => {
       if (o.ent || o.phased || !canTarget(t, s, o)) return;
       const a = s.dmg * pow * (1 - .4 * d / rr);
-      const wasCond = o.sbWetT > G.time && o.frostT > 0;
+      // (Frozen Through: soaked is enough)
+      const wasCond = o.sbWetT > G.time;
       sbHit(t, s, o, a, 'magic', null); if (o.dead) return;
       chill(o, { slow: (s.slow || .2) + (C.sbSleet && o.sbWetT > G.time ? .15 : 0), slowT: s.slowT || 1.6 }, 'frost', t);
       sbSoak(o, soakT);
@@ -21285,7 +21287,6 @@ FORCE_ATTACK.sbStomp = (t, st, tg, pow) => {
     inSplash(t.x, t.y, r, true, (c, d) => {
       if (c.ent || c.phased || !canTarget(t, s, c)) return;
       let a = s.dmg * k * (1 - .3 * d / r);
-      if (C2.sbMud && c.sbWetT > G.time) a *= 1 + .1 * C2.sbMud;   // Mud and Rain
       sbHit(t, s, c, a, 'phys', null); if (c.dead) return;
       if (!sub && C2.sbTremor && n % 3 === 0) stun(c, .4, .4, 'earth');   // Tremor
       if (!sub && C2.sbRattle && c.stunT > 0) sbSoak(c, 2 * C2.sbRattle);   // Rattled: a stunned walker is shaken into the wet
@@ -21474,7 +21475,8 @@ function sbWindArrow(p, tg, st, src, amt, pow) {
   if (p.sbPierce) return;
   const dx = tg.x - src.x, dz = tg.y - src.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
   const hurr = C.sbHurricane || P.sbFourWinds, len = hurr ? Math.max(.5, (st.range || 3) + .5 - L) : 1.2 + .4 * (C.sbThrough || 0) + (P.sbPetrel || 0);
-  const share = hurr ? 1 : .5 + .1 * (C.sbThrough || 0) + (P.sbPetrel ? .25 : 0);
+  // (sbThrough: no talent carries it now; Through and Through is plain armour pen, talent clarity)
+  const share = hurr ? 1 : .5 + .15 * (C.sbThrough || 0) + (P.sbPetrel ? .25 : 0);
   let k = 0;
   for (const c of G.creeps.slice()) {
     if (c === tg || c.dead || c.phased || c.ent || !canTarget(src, st, c)) continue;
@@ -21484,10 +21486,11 @@ function sbWindArrow(p, tg, st, src, amt, pow) {
   if (k) for (let q = 0; q < 5; q++) { const f = (q + 1) / 5 * len; part({ k: 'smoke', x: tg.x + ux * f, z: tg.y + uz * f, h: hitH(tg), vx: ux * 2, vz: uz * 2, vh: 0, drag: 2, life: .25, max: .25, size: .08, col: SB_COL.wind }); }
   if (C.sbRainArrow && !tg.dead) sbSoak(tg, C.sbRainArrow);   // Rain Arrows
   if (C.sbFeatherfall && tg.fly && !tg.dead) tg.lowT = Math.max(tg.lowT || 0, G.time + 1);   // Featherfall
-  if (C.sbLfletch && sbCond(tg)) for (const o of nearest(tg.x, tg.y, 2, 2, tg, q => !q.phased)) { sbZap(src, st, o, amt * .6); if (G.bolts.length < 50) G.bolts.push({ pts: [[tg.x, hitH(tg), tg.y], [o.x, hitH(o), o.y]], life: .14, max: .14, w: .6, col: SB_COL.bolt }); }   // Lightning Fletch
+  if (C.sbLfletch && tg.sbWetT > G.time) for (const o of nearest(tg.x, tg.y, 2, 2, tg, q => !q.phased)) { sbZap(src, st, o, amt * .6); if (G.bolts.length < 50) G.bolts.push({ pts: [[tg.x, hitH(tg), tg.y], [o.x, hitH(o), o.y]], life: .14, max: .14, w: .6, col: SB_COL.bolt }); }   // Lightning Fletch
   if (C.sbSkyrend && tg.fly && !tg.dead && (src.sbRendN = (src.sbRendN || 0) + 1) % 4 === 0) {   // Skyrend
     hurt(tg, amt * 2, 'phys', src, false, null, null);
-    if (!tg.dead) { stun(tg, .8, .4, null); tg.lowT = Math.max(tg.lowT || 0, G.time + 2.5); }
+    // (no stun: pulled down 3s)
+    if (!tg.dead) tg.lowT = Math.max(tg.lowT || 0, G.time + 3);
     part({ k: 'flare', x: tg.x, z: tg.y, h: hitH(tg), life: .22, max: .22, size: .9, col: '#e8f6ff' }); for (let q = 0; q < 8; q++) part({ k: 'smoke', x: tg.x, z: tg.y, h: hitH(tg), vx: R(-1, 1), vz: R(-1, 1), vh: R(-2, 0), drag: 2, life: .45, max: .45, size: .12, col: SB_COL.wind });
   }
   const gEvery = P.sbFourWinds ? 3 : C.sbGustF ? (C.sbGustF >= 2 ? 2 : 3) : 4;
@@ -21514,7 +21517,7 @@ function sbFissureTick(z, dt) {
     if (c.dead || c.fly || c.ent || c.phased || !sbOnFissure(z, c)) continue;
     hurt(c, (st.dmg || 0) * .3 * (z.fk || 1), 'phys', t, true, null, null);
     if (!c.dead) chill(c, { slow: .25 + .15 * (C.sbFissSlow || 0), slowT: .7 }, null, t);
-    if (C.sbMud && !c.dead) sbSoak(c, 1.2);
+    if (C.sbMud && !c.dead) sbSoak(c, 1.5 * C.sbMud);   // Mud and Rain
   }
 }
 // per unit per frame: the Ancestor Totem's mana and storm feathers, charms that work on mana, relics on a clock
@@ -23863,8 +23866,8 @@ WB_HOOK.tick.push(() => wbTalReg());
 WB_HOOK.amp.push((c, src, dot) => {
   if (dot || !src || !src.st || !src.st.caps || !wbNotSpell()) return 0;
   const C = src.st.caps; let a = 0;
-  if (C.wbRimeCut && c.frostT > 0 && wbRunesNear(c.x, c.y, .55).some(z => z.kinds.includes('frost'))) a += .15 * C.wbRimeCut;
-  if (C.wbShatter && c.frostT > 0 && c.stunT > 0) a += .25 * C.wbShatter;
+  if (C.wbRimeCut && wbRunesNear(c.x, c.y, .55).some(z => z.kinds.includes('frost'))) a += .15 * C.wbRimeCut;
+  if (C.wbShatter && c.frostT > 0 && c.stunT > 0) a += .3 * C.wbShatter;
   if (C.wbThunderbrand && wbBrandOf(c) > 0) a += .15 * C.wbThunderbrand;
   return a;
 });
@@ -23899,12 +23902,10 @@ WB_HOOK.pulse.push((t, st, dt) => {
     const B = wbCap(s, 'wbShaftBrand');
     if (B && (B >= 2 || (t.wbTalB = (t.wbTalB || 0) + 1) % 2 === 0)) wbBrand(c, 1, t);
     if (wbCap(s, 'wbLineShot') && wbOnLine(c, .3)) wbHit(t, s, c, s.dmg * p.pow * .5, 'phys');
-    // Glaive of Judgement: three brands spent: pinned, struck again in full, the brands passed to the nearest walker
+    // Glaive of Judgement: three brands spent: pinned and struck again half as hard again (talent clarity, 10 Nov 2026: the brands no longer pass on)
     if (!c.dead && wbCap(s, 'wbJudgeArrow') && wbBrandOf(c) >= 3) {
-      const n = wbBrandOf(c), x = c.x, z = c.y; c.wbBrand = 0; c.wbBrandT = 0;
-      rootFoe(c, .8, t); wbHit(t, s, c, s.dmg * p.pow, 'phys');
-      const q = nearest(x, z, 1.5, 1, c, o => !o.fly && !o.phased && !o.ent)[0];
-      if (q) { wbBrand(q, n, t); if (G.state === 'play' && G.bolts.length < 60) G.bolts.push({ pts: [[x, hitH(c), z], [q.x, hitH(q), q.y]], life: .2, max: .2, w: .5, col: [1.5, 1.2, .5] }); }
+      const x = c.x, z = c.y; c.wbBrand = 0; c.wbBrandT = 0;
+      rootFoe(c, .8, t); wbHit(t, s, c, s.dmg * p.pow * 1.5, 'phys');
       if (G.state === 'play') fxSpark(x, z, hitH(c) + .2, WB_COL.gold, 5);
     }
   };
@@ -23927,7 +23928,7 @@ WB_HOOK.pulse.push((t, st, dt) => {
 WB_RUNE_HOOK.push((c, z, k) => {
   if (k !== 'shaft') return;
   const n = wbCap(wbZSt(z), 'wbKeenShaft'); if (!n) return;
-  c.shred = Math.max(c.shred || 0, (z.spent ? 3 : 2) + n); c.shredT = Math.max(c.shredT || 0, 4);
+  c.shred = Math.max(c.shred || 0, (z.spent ? 3 : 2) + 2 * n); c.shredT = Math.max(c.shredT || 0, 4);
 });
 
 /* ---------- Frostbrand Sentries ---------- */
@@ -23936,7 +23937,6 @@ WB_RUNE_HOOK.push((c, z, k) => {
   FORCE_ATTACK.wbFrost = (t, st, tg, pow, echo) => {
     const x = tg.x, z = tg.y, frozen = tg.frostT > 0 && tg.stunT > 0, br = wbBrandOf(tg);
     const r = a0(t, st, tg, pow, echo);
-    if (!tg.dead && frozen && wbCap(st, 'wbShatter')) wbBrand(tg, 2, t);
     // Glacial Brand: a foe branded three times frozen solid (once every 4s a foe)
     if (!tg.dead && br >= 3 && wbCap(st, 'wbGlacial') && !(tg.wbGlacT > G.time)) { tg.wbGlacT = G.time + 4; chill(tg, { slow: st.slow || .3, slowT: 2 }, 'frost', t); stun(tg, .8, .4, 'frost'); fxSpark(tg.x, tg.y, hitH(tg), WB_COL.frost, 6); }
     // Rime Crown: the frost rune it just laid holds oath too
@@ -24034,7 +24034,7 @@ WB_HOOK.kill.push((c, src) => {
     if (!shake && !weight) return s0(p, dt);
     const before = new Set(p.hit), i0 = p.i;
     s0(p, dt);
-    if (weight) for (const c of p.hit) if (!before.has(c) && !c.dead) { wbBrand(c, 1, p.t); rootFoe(c, .4, p.t); }
+    if (weight) for (const c of p.hit) if (!before.has(c) && !c.dead) rootFoe(c, .4, p.t);
     if (shake && p.i !== i0) {
       const W = p.wbWoke || (p.wbWoke = new Set());
       for (const z of wbRunesNear(p.x, p.z, .7)) {
@@ -24088,12 +24088,12 @@ WB_LINE_HOOK.push((c, l) => {
   // Oathfire: a line ending in one of its oath runes strikes the walker crossing it
   for (const z of ends) {
     const s = wbZSt(z);
-    if (z.kinds.includes('oath') && wbCap(s, 'wbOathfire') && z.src && G.towers.includes(z.src)) { wbHit(z.src, s, c, (s.dmg || 0) * .6 * (l.woven ? 2 : 1), 'phys'); break; }
+    if (z.kinds.includes('oath') && wbCap(s, 'wbOathfire') && z.src && G.towers.includes(z.src)) { wbHit(z.src, s, c, (s.dmg || 0) * .8, 'phys'); break; }
   }
-  // Winter's Line: a line between two frost runes chills, and freezes the already chilled
+  // Winter's Line: a line between two frost runes freezes every walker crossing it
   if (!c.dead && ends.length === 2 && ends.every(z => z.kinds.includes('frost'))) {
     const z = ends.find(q => wbCap(wbZSt(q), 'wbWinterLine'));
-    if (z) { const was = c.frostT > 0; chill(c, { slow: .3, slowT: 2 }, 'frost', z.src); if (was) stun(c, .4, .4, 'frost'); }
+    if (z) { chill(c, { slow: .3, slowT: 2 }, 'frost', z.src); stun(c, .4, .4, 'frost'); }
   }
 });
 
@@ -24112,8 +24112,8 @@ function wbVowWrap() {
     if (wbCap(st, 'wbvKeeper')) for (const q of G.towers) if (q !== o && wbUnit(q) && !q.wrecked && q.maxHp && q.hp < q.maxHp && Math.hypot(q.x - t.x, q.y - t.y) <= R) wbMend(q, amt * (WBV.MEND + .1 * M) * .5);
     // Sanctuary: mended to full, it can't be Wounded for 3s
     if (o && wbCap(st, 'wbvSanct') && o.hp >= o.maxHp) o.wbNoWoundT = Math.max(o.wbNoWoundT || 0, G.time + 3);
-    // Siege-Ward: a fresh knock-back on a siege troop lasts longer and brands it
-    if (wbCap(st, 'wbvSiegeWard') && !tg.dead && tg.wbvT !== siegeT && tg.wbvT > G.time) { tg.atkCD = (tg.atkCD || 0) + .5; wbBrand(tg, 1, t); }
+    // Siege-Ward: a fresh knock-back on a siege troop lasts longer
+    if (wbCap(st, 'wbvSiegeWard') && !tg.dead && tg.wbvT !== siegeT && tg.wbvT > G.time) tg.atkCD = (tg.atkCD || 0) + .7;
     return r;
   };
 }
@@ -27331,11 +27331,8 @@ FORCE_ATTACK.so_censure = (t, st, tg, pow, echo) => {
   soStrike(t, st, tg, amt, 'magic');
   if (tg.mpMax > 0 && !tg.dead) soJudge(tg, 1, t);
   if (C.sxs_inquest && tg.mpMax > 0 && !echo && (t.shots + 1) % 3 === 0 && typeof epDrain === 'function')   // Grand Inquest: every third lash on a caster burns every caster near it
-    for (const o of [tg].concat(nearest(tg.x, tg.y, 1.5, 6, tg, q => q.mpMax > 0))) {
-      if (o !== tg) { epDrain(o, mb); soStreak(tg.x, hitH(tg), tg.y, o, SXS.COL.hush, .035, .25); }
-      // (a caster burned dry is silenced)
-      if (!o.dead && !(o.mp > 0)) { specHush(o, 1.5, t); soEv('cap:sxs_inquest:dry'); }
-    }
+    // (the clarity pass, Nov 2026: 2 cells, not 1.5, and no silence on a caster burned dry)
+    for (const o of nearest(tg.x, tg.y, 2, 6, tg, q => q.mpMax > 0)) { epDrain(o, mb); soStreak(tg.x, hitH(tg), tg.y, o, SXS.COL.hush, .035, .25); }
   fxSpark(tg.x, tg.y, hitH(tg), burned > 0 ? SXS.COL.hush : SXS.COL.chain, burned > 0 ? 8 : 4);
   t.recoil = 1; sfx('ward', 0);
 };
@@ -33038,25 +33035,28 @@ SBC_DRAW.sbcnone = () => {};
    ===================================================================================================== */
 const sbcScentM = st => (.6 + .15 * ((st.caps && st.caps.sbBond) || 0)) * SBC.scent.k;
 sbcSet('sb_packhowl', { name: 'Scent of Rain', short: 'Scent', glyph: 'rain', hue: '#9cc8f0', mana: 100, cd: 16, pref: 'grouped',
-  by: { dur: [5, 5, 6, 6, 7, 7], beat: [.6, .6, .6, .6, .6, .6] },
+  by: { dur: [5, 5, 6, 6, 7, 7], beat: [.6, .6, .6, .6, .6, .6], n: [1, 1, 1, 1, 1, 1] },
   auto: 'two or more walkers within the wolf\'s run, or one soaked walker, or a boss',
-  text: (t, st, ab) => `For ${byT(ab.by.dur, t)}s the spirit wolf hunts the soaked: every ${gNf(byT(ab.by.beat, t))}s it drags down a soaked walker within ${gNf(sbcWolfR(t, st))} cells (a dry one every other beat): ${xD(st, sbcScentM(st))}, stunned 1s, soaked 3s.`,
+  text: (t, st, ab) => `For ${byT(ab.by.dur, t)}s the spirit wolf hunts the soaked: every ${gNf(byT(ab.by.beat, t))}s it drags down ${byT(ab.by.n, t) > 1 ? byT(ab.by.n, t) + ' soaked walkers' : 'a soaked walker'} within ${gNf(sbcWolfR(t, st))} cells (a dry one every other beat): ${xD(st, sbcScentM(st))}, stunned 1s, soaked 3s.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, sbcWolfR(t, st), abWalker); return L.length && (man || L.length >= 2 || L.some(c => c.sbWetT > G.time) || L.some(abBig)) ? t : null; },
   cast(t, st, _, ab) {
-    sbZone(t, st, 'sb_packhowl', t.x, t.y, sbcWolfR(t, st), byT(ab.by.dur, t), byT(ab.by.beat, t), { follow: 1, _sfx: 1, beatN: 0, gap: new Map() });
+    sbZone(t, st, 'sb_packhowl', t.x, t.y, sbcWolfR(t, st), byT(ab.by.dur, t), byT(ab.by.beat, t), { follow: 1, _sfx: 1, beatN: 0, gap: new Map(), n: Math.max(1, byT(ab.by.n, t) | 0) });
     sfx('howl', 0);
   },
   zone(t, st, z) {
     const n = ++z.beatN, now = G.time, free = c => !((z.gap.get(c) || 0) > now);
     const L = abFoes(t, st, z.r, c => abWalker(c) && !c.phased && !c.ent && free(c)).sort((a, b) => a.remain - b.remain);
-    const c = L.find(q => q.sbWetT > now) || (n % 2 === 1 ? L[0] : null); if (!c) return;
+    // Pack Tactics (by.n): the wolf drags down z.n walkers a beat, the soaked first (a dry one only every other beat)
+    for (let i = 0; i < (z.n || 1); i++) {
+    const c = L.find(q => q.sbWetT > now && !(z.gap.get(q) > now)) || (n % 2 === 1 ? L.find(q => !(z.gap.get(q) > now)) : null); if (!c) return;
     z.gap.set(c, now + (c.sbWetT > now ? SBC.scent.wet : SBC.scent.dry));
-    sbWolfLunge(t, st, null, SBC.scent.k, 'a', { c, down: true, T: .5 }); sfx('glaiveHit', 1);
+    sbWolfLunge(t, st, null, SBC.scent.k, i ? 'b' : 'a', { c, down: true, T: .5 }); sfx('glaiveHit', 1);
     sbcFx('sb_packhowl', t, c, C => {   // the scent: a thread of rain-mist from the warrior to its prey, droplets shaken off it as the wolf lands
       const K = sbcK(), h = hitH(c);
       v2Beam(C, t.x, .35, t.y, c.x, h * .6, c.y, { w: .05, life: .45, grow: .18, col: K.rain, ccol: K.pale, wob: .06, foe: c, tube: 0 });
       v2At(C, .24, () => { if (c.dead) return; v2Spray(C, 'spark', c.x, c.y, h, 7, { sp: .8, col: '#9cc8f0' }); v2Spray(C, 'wisp', c.x, c.y, h * .6, 3, { sp: .4, col: '#cfe6ff' }); sfxAdd({ k: 'vflash', x: c.x, z: c.y, h: h * .6, s: .4, life: .14, col: K.rain, a: .5 * sfxZk() }); });
     });
+    }
   },
 });
 SBC_CAST.sb_packhowl = C => {   // the howl: a breath of pale light at the head and mist rising off the warrior; the hunt's reach marked on the ground
@@ -34622,9 +34622,8 @@ for (const f in FORCES) { const u = FORCES[f].units && FORCES[f].units.arrow; if
        then the gauge starts again. No pause after it (Ironhold's vent is bigger and more often, then overheats).
    Light against heat: a vent comes every 4-5 strikes and then a pause; a Bloom every ~10 (~7 on held or spored foes),
    worth about one or two extra strikes plus a hold or spores, so it adds roughly a tenth to a unit's damage.
-   Shaping it (riders on existing talents and a Champion trait, by name; the talents keep their place and idea):
-     - Rootburst (Briarwardens, row IV): Strangling Bloom snares 2 more foes;
-     - Drifting Spores (Seedcasters, row IV): Burstpod's spores reach GW_DRIFT cells farther;
+   Shaping it (a Champion trait; the talent riders Rootburst and Drifting Spores had were cut in the plain-text pass,
+   10 Nov 2026, so each talent does one thing: forces_zzzzzzzzzzzzzzzzzz_plain_grove.js):
      - Nyssa's trait, Bloom Heart: while she is on the field, every unit keeps GW_KEEP Growth after it Blooms.
    On screen: a thin leaf-green gauge under the mana bar (drawGrowthBar, as Ironhold's drawHeatBar), turning pink as it
    ripens, and a five-petal flower opening over the unit as it Blooms; the info pane's Growth line with a hover hint
@@ -34635,7 +34634,6 @@ const GW_ID = 'grove';
 const GW_N = 10, GW_STRIKE = 100 / GW_N;   // a gauge fills in 10 strikes
 const GW_FED = 1.5;          // a strike at a held or spored foe grows it this much faster
 const GW_KEEP = 25;          // Nyssa's Bloom Heart: what stays after a Bloom
-const GW_DRIFT = .6;         // Drifting Spores: Burstpod's spores reach this much farther
 const GW_RIPE = 80;          // from here the gauge turns pink
 const gwOn = () => typeof G !== 'undefined' && G && G.force === GW_ID && !G.vs;
 const gwUnit = t => t && t.def && t.def.force === GW_ID && !t.def.wall;
@@ -34668,8 +34666,8 @@ const GW_BLOOM = {
   champ: { name: 'Heartbloom', k: 2, mana: .3,
     say: (t, st, B) => `the strike lands for ${gwDmg(st, B.k)} and fills ${Math.round(B.mana * 100)}% of the Champion's mana (${Math.round(B.mana * gwMax(t))})` },
 };
-const gwBriarN = () => GW_BLOOM.briarwarden.n + (gwTal('frost', 'rootburst') ? 2 : 0);
-const gwDriftR = () => (gwTal('cannon', 'drift') ? GW_DRIFT : 0);
+const gwBriarN = () => GW_BLOOM.briarwarden.n;
+const gwDriftR = () => 0;
 const gwMax = t => (t && t.ab && typeof abMax === 'function' ? abMax(t) : (t && t.def && UNIT_KITS[t.def.unit] && UNIT_KITS[t.def.unit].mana && UNIT_KITS[t.def.unit].mana.max) || 100);
 const gwDmg = (st, k) => `${Math.round((st && st.dmg || 0) * k)} damage`;
 const gwKind = t => t && t.def && t.def.champ ? 'champ' : t && t.def && t.def.unit;
@@ -34740,10 +34738,7 @@ FORCE_HOOKS[GW_ID] = Object.assign(FORCE_HOOKS[GW_ID] || {}, {
 });
 
 /* ---------- riders: the talents and the Champion trait that shape it (by name; text appended) ---------- */
-const GW_RIDERS = {
-  frost: { Rootburst: ' Its Bloom, Strangling Bloom, snares 2 more foes.' },
-  cannon: { 'Drifting Spores': ` Its Bloom, Burstpod, spreads its spores ${GW_DRIFT} cells farther.` },
-};
+const GW_RIDERS = {};
 for (const slot in GW_RIDERS) for (const name in GW_RIDERS[slot]) {
   const tree = FORCES[GW_ID].talents && FORCES[GW_ID].talents[slot], tal = tree && tree.list.find(x => x.name === name);
   if (!tal) { console.warn('growth: no talent', slot, name); continue; }
@@ -36439,7 +36434,7 @@ function socLeashTick() {
     const t = Lk.by; if (!abLive(t)) continue; const s = t.st || effStats(t), sc = socBy(Lk.ab, 'scour', t);
     socAs('so_flare', () => {
       soAbHit(t, s, c, .9, 'magic');
-      if (sc > 0) inSplash(c.x, c.y, .8, true, o => { if (!socFoe(o) || !canTarget(t, s, o)) return; soBlind(o, sc, t); soJudge(o, 1, t); });
+      if (sc > 0) inSplash(c.x, c.y, .8, true, o => { if (!socFoe(o) || !canTarget(t, s, o)) return; soBlind(o, sc, t); });
     });
     sfx('ward', 1);
     socFx('so_flare', t, c, C => { v2Hit(C, c.x, c.y, hitH(c), .55 * C.S, { sp: 'gold', n: 6, sp2: 'spark', n2: 4, light: 0 }); if (sc > 0) v2Area(C, c.x, c.y, .8, { minor: 1, sp: 'gold', n: 5, light: 0, deep: 0 }); });
@@ -36889,8 +36884,8 @@ socDef('ch_fordstandard', { name: 'Bulwark Slam', short: 'Slam', glyph: 'shield'
       for (const o of soUnitsNear(t.x, t.y, 1.6, t)) soWard(o, socBy(ab, 'ward', t));
       const S = socShields(t);
       for (const o of S) soWard(o, socBy(ab, 'ward', t) + socBy(ab, 'wardS', t));   // the shields beside him lock with his
-      // Shield Wall: with two or more Templars of the Ford beside him, every one of them slams with him
-      if (st.caps && st.caps.sofWall && S.length >= 2) for (const o of S) {
+      // Shield Wall: every Templar of the Ford beside him slams with him
+      if (st.caps && st.caps.sofWall) for (const o of S) {
         const s2 = o.st || effStats(o); o.shotT = 0; soSlam(o, s2, 1, 1, { sub: 1 }); soEv('fresh:sofWall');
       }
       G.shake = Math.max(G.shake, .07);
@@ -37015,7 +37010,7 @@ function socNoonTick() {
     const ab = ABIL.ch_highnoon, st = t.st || effStats(t); t.socNoonNext = socBy(ab, 'pulse', t) + G.time; t.socNoonAt = G.time;
     for (const c of G.creeps) if (socFoe(c) && canTarget(t, st, c) && inRange(t, st, c)) soBlind(c, 1, t);
     // Dawnsinger: the sun's flare makes the host Radiant
-    if (st.caps && st.caps.so_dawnsinger) for (const o of soUnitsNear(t.x, t.y, st.range || 3, t)) { soRadiate(o, 1.2, SO.RAD_K); soEv('cap:so_dawnsinger'); }
+    if (st.caps && st.caps.so_dawnsinger) for (const o of soUnitsNear(t.x, t.y, st.range || 3, t)) { soRadiate(o, 1.5, SO.RAD_K); soEv('cap:so_dawnsinger'); }
     socFx('ch_highnoon', t, null, C => { for (const c of G.creeps) if (socFoe(c) && soBlinded(c) && inRange(t, st, c)) sfxAdd({ k: 'vflash', x: c.x, z: c.y, h: hitH(c), s: .3, life: .15, col: socC(C, SOC.white), a: .35 }); });
   }
 }
@@ -37965,13 +37960,13 @@ ihcPatch('ih_slug', { name: 'Breaching Slug', short: 'Breach', glyph: 'beam', hu
       abAoe(() => { ihcShred(o, sh, sh, 5); abHit(t, s, o, IHC_RS.mult * K * k, 'phys', null); });
       const a1 = ihArmor(o); carry.n += Math.max(0, a0 - a1); ihcHeat(t, s, IHC_RS.heat);
       if (a0 > 0 && a1 <= 0 && !o.dead) {
-        const sp = ihcRider(t, ab.id, 'spall'); if (sp) inSplash(o.x, o.y, .5, true, q => { if (q !== o && canTarget(t, s, q)) { ihcShred(q, sp, 12, 5); ihStun(q, .3); } });
+        const sp = ihcRider(t, ab.id, 'spall'); if (sp) inSplash(o.x, o.y, .5, true, q => { if (q !== o && canTarget(t, s, q)) ihcShred(q, sp, 12, 5); });
       }
       ihcFx(ab.id, t, o, C => { const h = v2FoeH(o, hitH(o)); ihcPop(C, o.x, o.y, h, .9, ihcC('#ffb060'), ihcC('#fff0c8', 1.5)); ihcSpray(C, 'spark', o.x, o.y, h, 6, { sp: 1.3, col: '#ffc070' }); });
     } });
     for (const [x, z, d] of R0.rings) G.delayed.push({ t: d / IHC_RS.speed, fn: () => {
       if (!abLive(t)) return; ihcHeat(t, t.st || st, IHC_RS.heat); sfx('block', 1);
-      const sp = ihcRider(t, ab.id, 'spall'); if (sp) inSplash(x, z, .5, true, o => { if (canTarget(t, t.st || st, o)) { ihcShred(o, sp, 12, 5); ihStun(o, .3); } });
+      const sp = ihcRider(t, ab.id, 'spall'); if (sp) inSplash(x, z, .5, true, o => { if (canTarget(t, t.st || st, o)) ihcShred(o, sp, 12, 5); });
       ihcFx(ab.id, t, null, C => { sfxAdd({ k: 'vstar', x, z, h: .45, s: .5 * C.T.glow, life: .16 * C.T.dur, col: ihcC('#fff4d8', 1.6), rot: R(TAU) }); sfxAdd({ k: 'vflash', x, z, h: .45, s: .4 * C.T.glow, life: .1 * C.T.dur, col: ihcC('#ff9a40'), a: .6 * sfxZk() }); ihcSpray(C, 'spark', x, z, .45, 10, { sp: 1.6, col: '#ffd890' }); ihcSpray(C, 'dust', x, z, .1, 2); });
     } });
     ihcFx(ab.id, t, c, C => {
@@ -40016,7 +40011,7 @@ if (typeof fsetAdd === 'function') {
    hooks and a few Conclave functions (ccxRiposte, ccFallingStar, ccGlyphTick, ccReactNote, ccRidersOf, ccStaggerFoe).
    Every number is in CX. The look reuses the spells' own effects and the light rfx marks: nothing new or bright. */
 const CX = {
-  RIP_FAR: 1.2, STREAM_N: 15, STREAM_GAP: .2, HALL_K: .5, BRAND_N: 4, MOMENT_R2: 1.2, TWIN_R: 2, CONST_R: 2, CONST_N: 4,
+  RIP_FAR: 1.2, STREAM_N: 15, STREAM_GAP: .2, HALL_K: .5, BRAND_N: 4, MOMENT_R: 1, MOMENT_T: .6, TWIN_R: 2, CONST_R: 2, CONST_N: 4,
   CRACK_R: .95, CRACK_T: 4, CRACK_STUN: .4, LEAP_T: 1.35, WALK_STEP: .4, SKIP_MORE: 6, SKIP_KEEP: .85, REND_R: 1.5,
   REND_MORE: 6, SPILL_R: 1.2, LOOM_MORE: 8, THREAD_R: 1.6, THREAD_N: 18, WEAVE_GAP: .25, GHOSTS: 3, KEEP_S: 1,
   CHAIN_MAX: 14, SEAM_T: .4, BURST_R: 1,
@@ -40202,8 +40197,7 @@ cxWrap('cc_hoarbloom', (cast0, t, st, L, ab) => {
 function cxMoment(t, q, p) {
   if (!ccAlive(t)) return;
   const x = q ? q.x : p.x, z = q ? q.y : p.z;
-  const dil = G.hazards.some(g => g.k === 'cc_glyph' && g.s === 'chrono' && g.src === t && g.t > 0 && Math.hypot(x - g.x, z - g.z) <= g.r);
-  const r = dil ? CX.MOMENT_R2 : .8, d = dil ? 1 : .5;
+  const r = CX.MOMENT_R, d = CX.MOMENT_T;
   inSplash(x, z, r, true, o => { if (!o.ent) stun(o, d, .4, null); });
   ccRingFx(x, z, r, CC_COL.chrono); rfx({ k: 'rune', x, z, r, col: CC_COL.chrono, life: .6 });
 }
@@ -40269,10 +40263,10 @@ ccFallingStar = function (t, st, c, k, free) {
 /* =====================================================================================================
    GOLEM WARDENS
    ===================================================================================================== */
-// Shatterground: a crack in the road (a stone glyph: it stuns each walker stepping onto it once and marks it Stone)
+// Shatterground: a crack in the road (a stone glyph: it stuns each walker stepping onto it once)
 function cxCrack(t, x, z) {
   if (!abLive(t)) return; const s = t.st || effStats(t);
-  const g = ccGlyph({ s: 'stone', sub: 'quake', x, z, r: CX.CRACK_R, t: CX.CRACK_T, src: t, st: s, every: .5, type: 'phys', ccxCrack: 1, cseen: new Set() });
+  const g = ccGlyph({ s: 'stone', sub: 'quake', x, z, r: CX.CRACK_R, t: CX.CRACK_T, src: t, st: s, every: .5, type: 'phys', nomark: 1, ccxCrack: 1, cseen: new Set() });
   if (!g) return;
   for (const c of G.creeps) if (!c.dead && Math.hypot(c.x - x, c.y - z) <= g.r) g.cseen.add(c);
   // (drawn as the Conclave's own glyph, not as the spell's zone)
@@ -40431,14 +40425,14 @@ cxWrap('ch_unravel', (cast0, t, st, p, ab) => {
   }
   return r;
 });
-// Spellweaver: any Conclave reaction within her reach charges her and readies the Loom (at most once every WEAVE_GAP s)
+// Spellweaver: any Conclave reaction within her reach readies the Loom (at most once every WEAVE_GAP s)
 { const n0 = ccReactNote;
   ccReactNote = function (t, c, id, s) {
     const r = n0.apply(this, arguments);
     if (c && t && ccUnit(t) && G.state === 'play') {
       const m = cxChamp('ch_maelis', 'ccxWeaveCharge');
       if (m && !(G.time - (m.cxWvAt == null ? -99 : m.cxWvAt) < CX.WEAVE_GAP) && Math.hypot(c.x - m.x, c.y - m.y) <= ((m.st && m.st.range) || 3) + .2) {
-        m.cxWvAt = G.time; ccGain(m, 1);
+        m.cxWvAt = G.time;
         if (m.ab && m.ab.cd.ch_mirrorweave > G.time) m.ab.cd.ch_mirrorweave = Math.max(G.time, m.ab.cd.ch_mirrorweave - 1);
       }
     }
@@ -40519,7 +40513,7 @@ cxWrap('ch_riftchain', (cast0, t, st, L, ab) => {
 function cxSeam(t, c, amt, s) {
   G.delayed.push({ t: CX.SEAM_T, fn: () => {
     if (c.dead || !ccAlive(t)) return; const st = t.st || effStats(t);
-    tagged('rx', () => ccHit(t, st, c, amt, { type: 'phys', noRx: true })); if (!c.dead) ccTouch(t, c, s);
+    tagged('rx', () => ccHit(t, st, c, amt, { type: 'phys', noRx: true }));
     rfx({ k: 'slash', x: c.x, h: hitH(c), z: c.y, a: (t.shots | 0) * 1.7, r: .45, col: CC_COL[s] || '#ffb0f0', life: .28 });
   } });
 }
@@ -40532,7 +40526,7 @@ function cxSeam(t, c, amt, s) {
 // Bursting Seams: a foe her Stagger stuns while Unbound Blade burns bursts (each foe at most once a second)
 function cxBurst(t, c) {
   if (!ccAlive(t)) return; const st = t.st || effStats(t), x = c.x, z = c.y;
-  abAoe(() => inSplash(x, z, CX.BURST_R, true, o => { if (o === c || o.ent || !canTarget(t, st, o)) return; ccHit(t, st, o, (st.dmg || 0) * .5, { type: 'phys', noRx: true }); if (!o.dead) ccStaggerFoe(o, t); }));
+  abAoe(() => inSplash(x, z, CX.BURST_R, true, o => { if (o === c || o.ent || !canTarget(t, st, o)) return; ccHit(t, st, o, (st.dmg || 0) * .5, { type: 'phys', noRx: true }); }));
   ccRingFx(x, z, CX.BURST_R, '#f070d8'); fxSpark(x, z, hitH(c), '#ffb0f0', 6); sfx('glaiveHit', 1);
 }
 { const s0 = ccStaggerFoe;
@@ -40550,7 +40544,7 @@ function cxBurst(t, c) {
    shouldnt have more than 3 capstones per unit". The trees (forces.js GROVE_TALENTS, forces_zs_grove.js, the Champions in
    forces_zx_champ_grove.js) hold the names and words; this file holds the rules the spell-talent system (sp) can't say.
    It loads after every other forces file and wraps, always calling the original first:
-     gwBloom            Living Palisade (Thornguard), Wild Heart (Shifters: Kindred Echo's 2 more foes)
+     gwBloom            Living Palisade (Thornguard)
      castAbility        Splitting Shaft, Curtain Call, White Hart's Hunt's tally, Rootmother, Twin Elders, Watchtower
                         Bough, Moonlit Aim, Seedmother
      abHit              Run to Ground (a held foe run through is held again)
@@ -40570,11 +40564,10 @@ const gcWalk = o => !!o && !o.dead && !o.ent && !o.phased && abWalker(o);
 const gcLeft = (c, f) => { let s = 0; if (c && c.poison) for (const p of c.poison) if (!f || f(p)) s += p.dps * Math.max(0, p.t); return s; };
 const gcStreak = (a, o, col) => { if (typeof rfx === 'function') rfx({ k: 'streak', x0: a.x, h0: hitH(a), z0: a.y, c: o, col, w: .03, life: .3 }); };
 
-/* ---------- Growth: Living Palisade, Wild Heart ---------- */
+/* ---------- Growth: Living Palisade ---------- */
 if (typeof gwBloom === 'function') {
   const _gcBloom = gwBloom;
   gwBloom = function (t, st, tg, pow, B) {
-    if (gcOn() && t && t.def && t.def.unit === 'wayfarer' && B && gcHas(t, 'gcWild')) B = Object.assign({}, B, { n: (B.n || 0) + 2 });
     const r = _gcBloom.call(this, t, st, tg, pow, B);
     if (gcOn() && t && t.def && t.def.unit === 'thornguard' && t.ab && gcHas(t, 'gcPalisade') && ABIL.brambleguard) {   // Living Palisade: a free Thornhedge
       const ab = ABIL.brambleguard, s = gcSt(t), p = typeof gvcHedgeSpot === 'function' ? gvcHedgeSpot(t, s, ab) : null;
@@ -40804,7 +40797,7 @@ function gcTick(dt) {
   for (const t of G.towers) {   // Wild Heart: every change of form feeds the Growth bar
     if (!t.def || t.def.unit !== 'wayfarer') continue;
     const n = t.shiftN | 0; if (t.gcShiftN == null) { t.gcShiftN = n; continue; }
-    if (n !== t.gcShiftN) { const d = Math.max(0, n - t.gcShiftN); t.gcShiftN = n; if (d && gcHas(t, 'gcWild') && typeof gvcGrow === 'function') gvcGrow(t, 30 * d); }
+    if (n !== t.gcShiftN) { const d = Math.max(0, n - t.gcShiftN); t.gcShiftN = n; if (d && gcHas(t, 'gcWild') && typeof gvcGrow === 'function') gvcGrow(t, 40 * d); }
   }
   const F = G.gcFields; if (!F || !F.length) return;   // Rootmother: Entangle's roots wait in the ground
   for (let i = F.length - 1; i >= 0; i--) {
@@ -40870,7 +40863,7 @@ if (typeof CHAMPS !== 'undefined' && CHAMPS.thornbow && CHAMPS.thornbow.hit) {
      Ironbreakers   Hot Shards (the shards split the plate behind)       Breach the Line (a free Shield Shove that bowls the line)
      Thunderguns    Thunder Belt (Rattlegun fills the barrel: Thunderpeals mid-burst)
      Chain Trappers Twin Nets (a second Chain Net, free)                  Double Line (a second Tripwire further down the road)
-     Runesmiths     Runebrand Detonation (the Unmaking passes on)         Ringing Anvil (the great rune stays on the road)
+     Runesmiths     Runebrand Detonation (branded foes burst, Unmaking)  Ringing Anvil (the great rune stays on the road)
      Flak           Endless Belt (barrage shells heat the gun)           Shellstorm (clusters in Starshell's light)   Spent Flare
      Steam Hammers  Molten Rivets (cracked foes burst as they die)       Piston Rhythm (Pile Driver slams on while crowded)
      Mortar Crew    Walking Fire (The Long Drop walks up the road)       Red-Hot Tube (two Big Berthas after it)
@@ -41004,7 +40997,7 @@ function ihcAnvilTick(dt) {
   const shell0 = ihFlakShell;
   ihFlakShell = function (t, st, tg, pow, quiet) {
     const r = shell0.apply(this, arguments);
-    if (quiet && t && t.def && t.def.unit === 'flakgunner' && st && st.caps && st.caps.ihBelt) ihHeatAdd(t, st, .12);
+    if (quiet && t && t.def && t.def.unit === 'flakgunner' && st && st.caps && st.caps.ihBelt) ihHeatAdd(t, st, .15);
     return r;
   };
 }
@@ -41012,9 +41005,9 @@ if (FORCE_ATTACK.flakgunner) {
   const flak0 = FORCE_ATTACK.flakgunner;
   FORCE_ATTACK.flakgunner = function (t, st, tg, pow, echo) {
     const n0 = t.ihFlakN || 0, r = flak0.apply(this, arguments), C = (st && st.caps) || {};
-    if (C.ihCluster && tg && tg.ihcLitT > G.time && (t.ihFlakN || 0) > n0 && t.ihFlakN % 5 !== 0)
+    if (C.ihCluster && tg && tg.ihcLitT > G.time && (t.ihFlakN || 0) > n0)
       for (let q = 0; q < 4; q++) { const a = q / 4 * TAU + R(.5), x = tg.x + Math.cos(a) * .9, z = tg.y + Math.sin(a) * .9;
-        G.delayed.push({ t: .35 + q * .06, fn: () => { if (ihLive(t)) ihFlakBurst(t, t.st || st, x, z, tg.fly ? 1.15 : .45, .4, null); } }); }
+        G.delayed.push({ t: .35 + q * .06, fn: () => { if (ihLive(t)) ihFlakBurst(t, t.st || st, x, z, tg.fly ? 1.15 : .45, .5, null); } }); }
     return r;
   };
 }
@@ -41022,11 +41015,8 @@ ihcWrapCast('ih_airburst', (raw, t, st, p, ab, again) => {
   const r = raw(); if (r === false || again || !p || !ihcCap('storm', 'ihcSpent')) return r;
   const x = p.x, z = p.y, d = Math.hypot(x - t.x, z - t.y), trav = .45 + d / 12, dur = byT(ab.by.dur, t);
   G.delayed.push({ t: trav + dur, fn: () => {
-    if (!abLive(t)) return; const s = t.st || st, m = byT(ab.by.mult, t);
+    if (!abLive(t)) return; const s = t.st || st, m = byT(ab.by.mult, t) * 1.25;
     abAoe(() => inSplash(x, z, IHC_SS.burstR, false, c => { if (canTarget(t, s, c)) abHit(t, s, c, m * (c.fly ? 2 : 1), 'phys', null); }));
-    for (const c of G.creeps) if (!c.dead && c.fly && Math.hypot(c.x - x, c.y - z) <= IHC_SS.lightR && canTarget(t, s, c)) {   // dragged down 2s (a boss 0.8s)
-      const dd = c.def.boss ? .8 : 2; c.lowT = Math.max(c.lowT || 0, G.time + dd); c.ihHeldT = Math.max(c.ihHeldT || 0, G.time + dd);
-    }
     ihFlakFx(x, z, .5, 1); fxRing(x, z, IHC_SS.burstR, '#fff0b0'); G.shake = Math.max(G.shake, .06); sfx('boom', 1);
   } });
   return r;
@@ -41204,11 +41194,7 @@ ihcWrapCast('ch_onthehouse', (raw, t, st, p, ab, again) => {
   H.kill = function (c, src) {
     const r = kill0 ? kill0.apply(this, arguments) : undefined;
     if (G.state !== 'play' || !c) return r;
-    // Runebrand Detonation: a branded foe that dies Unmade passes the Unmaking on to the foes its burst catches
-    if (c.ihBrandT > G.time && c.ihcUnT > G.time && c.ihcUnBy && ihcCap('arcane', 'ihDetonate')) {
-      const by = c.ihcUnBy, K = c.ihcUnK || 1, x = c.x, z = c.y, dur = Math.max(2, byT(ABIL.ih_forgeburst.by.dur, by) - 2);
-      G.delayed.push({ t: .12, fn: () => { for (const o of G.creeps) if (o !== c && !o.dead && !o.ent && Math.hypot(o.x - x, o.y - z) <= 1) ihcUnmake(by, o, K, dur); } });
-    }
+    // (Runebrand Detonation: every branded foe's burst now Unmakes the foes round it, in forces_ironhold_a.js's kill hook)
     // Molten Rivets: a cracked foe that dies bursts in hot rivets (the nearest Steam Hammer's slam)
     if (c.ihCrackT > G.time && !c.fly && ihcCap('earth', 'ihcRivets')) {
       let h = null, hd = 9;
@@ -41274,8 +41260,8 @@ function socxSnap(t, z) {
       if (!G.towers.includes(o) || o.wrecked) continue;
       for (const c of G.creeps.slice()) {
         if (hit.has(c) || !socFoe(c) || !abWalker(c) || !canTarget(t, s, c) || socSeg(c.x, c.y, t.x, t.y, o.x, o.y)[0] > .5) continue;
-        hit.add(c); soAbHit(t, s, c, 1, 'magic'); if (c.dead) continue;
-        soBindFoe(t, s, c, .6); soVerdict(c, t, 1);
+        // (the clarity pass, Nov 2026: the snap is one thing now, a Verdict half again as strong; it was a strike, a bind and a Verdict)
+        hit.add(c); soJudge(c, 1, t); soVerdict(c, t, 1.5);
         socFx('so_shackle', t, c, C => v2Hit(C, c.x, c.y, hitH(c), .5 * C.S, { sp: 'gold', n: 5, ring: 0, light: 0, deep: 0 }));
       }
     }
@@ -41340,7 +41326,7 @@ if (ABIL.ch_fordstandard) {
     G.delayed.push({ t: .8, fn: () => {
       if (G.state !== 'play' || !abLive(t)) return;
       const s = t.st || st, r = abReach(t, s, ab2); let n = 0;
-      abAoe(() => { for (const c of abCone(t, s, ux, uz, r, SOC_ROAR)) { if (!socFoe(c) || !abWalker(c)) continue; abHit(t, s, c, .6, 'magic'); if (c.dead) continue; soJudge(c, 1, t); stun(c, .6, .4, null); n++; } });
+      abAoe(() => { for (const c of abCone(t, s, ux, uz, r, SOC_ROAR)) { if (!socFoe(c) || !abWalker(c)) continue; abHit(t, s, c, .7, 'magic'); if (c.dead) continue; stun(c, .6, .4, null); n++; } });
       sfx('so_bash', 1);
       socFx('ch_fordstandard', t, null, C => { for (let k = 0; k < 2; k++) sfxAdd({ k: 'socroar', delay: k * .09, x: t.x, z: t.y, ang: Math.atan2(uz, ux), half: Math.acos(SOC_ROAR), r, life: .4, col: socC(C, SOC.light, 1.2) }); });
       if (n) soEv('cap:so_ford_echo');
@@ -41357,7 +41343,7 @@ if (ABIL.ch_fordstandard) {
     if (G.hero !== 'so_lion' || !src || !src.def) return;
     const L = G.towers.find(o => o.id === G.champ && !o.wrecked); if (!L || !L.ab || !socxCaps(L).so_lion_debt) return;
     if (Math.hypot(L.x - x, L.y - z) > 2 || !socxGate(L, 'debt', .5)) return;
-    const A = L.ab; if (A.cd.ch_lionsdue > G.time) { A.cd.ch_lionsdue = Math.max(G.time, A.cd.ch_lionsdue - 1); soEv('cap:so_lion_debt'); }
+    const A = L.ab; if (A.cd.ch_lionsdue > G.time) { A.cd.ch_lionsdue = Math.max(G.time, A.cd.ch_lionsdue - 1.5); soEv('cap:so_lion_debt'); }
   };
 }
 
@@ -41419,14 +41405,16 @@ function socxOnKill(c, src) {
     const z = t.ab.zones.find(q => q.k === 'so_pyre' && q.chain === c && q.until > G.time); if (!z) continue;
     z.chains = (z.chains || 0) + 1; soEv('cap:sxs_pyre_burst');
     const s = t.st || effStats(t);
-    abRun('so_pyre', () => abAoe(() => inSplash(z.x, z.z, z.r + .2, true, o => { if (o === c || !socFoe(o) || !canTarget(t, s, o)) return; soAbHit(t, s, o, 1.5, 'magic'); if (!o.dead && specCaster(o)) specHush(o, 2, t); })));
+    abRun('so_pyre', () => abAoe(() => inSplash(z.x, z.z, z.r + .2, true, o => { if (o === c || !socFoe(o) || !canTarget(t, s, o)) return; soAbHit(t, s, o, 2, 'magic'); })));
     sfx('so_embers', 1);
     socFx('so_pyre', t, null, C2 => v2Area(C2, z.x, z.z, z.r, { sp: 'ember', n: 8, sp2: 'flame', n2: 4, deep: 0 }));
     break;
   }
-  // Magebane Inquisitors' Ashes Speak: a caster it slays speaks from its ashes, and Silence Edict falls there free (once every 4s)
-  if (C.sxs_ashes && c.mpMax > 0 && sxsIs(src) && ABIL.so_edict && socxGate(src, 'ashes', 4)) {
-    const x = c.x, y = c.y;
+  // Magebane Inquisitors' Ashes Speak: a caster that dies in its Heretic's Stake's fire speaks from its ashes, and Silence
+  // Edict falls there free (once every 2s). (The clarity pass, Nov 2026: it was any caster it slew, every 4s, plus the stake readied by its kills.)
+  const ashT = c.mpMax > 0 ? G.towers.find(o => sxsIs(o) && o.ab && socxCaps(o).sxs_ashes && ABIL.so_edict && o.ab.zones.some(q => q.k === 'so_pyre' && q.until > G.time && Math.hypot(c.x - q.x, c.y - q.z) <= (q.r || 1) + .15)) : null;
+  if (ashT && socxGate(ashT, 'ashes', 2)) {
+    const x = c.x, y = c.y, src = ashT;
     G.delayed.push({ t: .1, fn: () => {
       if (!abLive(src) || src.silT > 0) return; const ab = ABIL.so_edict;
       abRun('so_edict', () => ab.cast(src, src.st || effStats(src), { x, y }, ab)); soEv('cap:sxs_ashes');
@@ -41435,7 +41423,7 @@ function socxOnKill(c, src) {
   // Celestine's Spilled Light: a Blinded foe she slays spills its light on the foes round it
   if (C.so_spill && G.hero === 'so_dawn' && src.id === G.champ && soBlinded(c)) {
     let n = 0;
-    inSplash(c.x, c.y, 1, false, o => { if (o === c || !socFoe(o)) return; soBlind(o, 1.5, src); soBlindFx(o); soJudge(o, 1, src); n++; });
+    inSplash(c.x, c.y, 1, false, o => { if (o === c || !socFoe(o)) return; soBlind(o, 2, src); soBlindFx(o); n++; });
     if (n) soEv('cap:so_spill');
   }
 }
@@ -41657,15 +41645,15 @@ let SBC_MIRE_IN = 0;
 }
 
 /* =====================================================================================================
-   CLOUD DANCERS: Breaking Sky (each time the Storm rises a level, every lingering cloud of its own breaks: 200% of a
-   strike beneath it, soaked, and the cloud's time renewed) and Many Skies (Skyleap also falls from each of its lingering
+   CLOUD DANCERS: Breaking Sky (each time the Storm rises a level, every lingering cloud of its own breaks: 250% of a
+   strike beneath it, and the cloud's time renewed) and Many Skies (Skyleap also falls from each of its lingering
    clouds on the toughest foe beneath, for half its strike). With them, Tarka's Storm Caller: each rise of the Storm
    readies Tomorrow's Storm. The rises are watched once a frame (the Tempest counts as a rise).
    ===================================================================================================== */
 function sbcBreakCloud(z) {
   const t = z.src, st = t.st || z.st, D = (st && st.dmg) || 0;
   SB_BOLT++;
-  try { inSplash(z.x, z.z, z.r, false, c => { if (c.ent || c.phased || !canTarget(t, st, c)) return; hurt(c, D * 2, 'magic', t, false, null, null); if (!c.dead) sbSoak(c, 3); }); } finally { SB_BOLT--; }
+  try { inSplash(z.x, z.z, z.r, false, c => { if (c.ent || c.phased || !canTarget(t, st, c)) return; hurt(c, D * 2.5, 'magic', t, false, null, null); }); } finally { SB_BOLT--; }
   for (let q = 0; q < 3; q++) if (G.bolts.length < 60) G.bolts.push({ pts: [[z.x + R(-.4, .4), 3, z.z + R(-.4, .4)], [z.x + R(-.5, .5), .2, z.z + R(-.5, .5)]], life: .25, max: .25, w: 1.4, col: SB_COL.bolt });
   fxRing(z.x, z.z, z.r, '#e0ecff');
   z.t = z.T || z.t;
@@ -41816,13 +41804,14 @@ function sbcStormRose() {
 
 /* =====================================================================================================
    HURI: Stormcarrier (the thunderbird seizes a second foe after the drop), Blood Trail (the pack runs on when the
-   prey falls within 2s) and Beastcaller (each Wolfsong and Talons keeps a running Spirit Hunt 3s longer, up to 10s).
+   prey falls within 2s) and Beastcaller (each Talons keeps a running Spirit Hunt 5s longer, up to 10s).
    ===================================================================================================== */
 const SBC_HUNT_MAX = 10;
 function sbcHuntOn(t) {
   if (!sbcCap(t, 'sbcBeast')) return;
   const H = sbS().hunt; if (!H || !(H.until > G.time)) return;
-  const add = Math.min(3, SBC_HUNT_MAX - (H.sbcExt || 0)); if (!(add > 0)) return;
+  // (5s, from the Talons only: talent clarity)
+  const add = Math.min(5, SBC_HUNT_MAX - (H.sbcExt || 0)); if (!(add > 0)) return;
   H.sbcExt = (H.sbcExt || 0) + add; H.until += add;
   fxRing(t.x, t.y, 1, SB_COL.spirit);
 }
@@ -41845,7 +41834,6 @@ function sbcHuntOn(t) {
   if (f0) ab.cast = function (t, st, c, a) {
     const A = a || ab, r = f0.call(this, t, st, c, a);
     if (r === false || !c) return r;
-    sbcHuntOn(t);
     if (!sbcIsAgain(A) && sbcCap(t, 'sbcTrail')) {
       const until = G.time + 2;
       const look = () => {
@@ -41877,7 +41865,9 @@ function sbcHuntOn(t) {
    - Varic: The Gate Holds (the Gate flares again), Last Warden (his Oathbound strike with it), The Road Remembers
    - Aedric: Undying Blaze (kills keep it going, a second burst), Sun-Sworn (charges while it blazes), Open Road (a fire trail)
    - Isaura: Turned Twice (a second turning), Veiled Oath (the rooted are bound and pay again), Sworn Road (oath runes)
-   Glaive of Judgement, Oathfire and Mountain's Weight are read in forces_wardbound_b.js, Runesight there too. */
+   Glaive of Judgement, Oathfire and Mountain's Weight are read in forces_wardbound_b.js, Runesight there too.
+   Talent clarity (10 Nov 2026, owner: "talents are little bit too conditional"): each capstone was cut to its one core effect,
+   the lost part folded into it (forces_zzzzzzzzzzzzzzzzzz_plain_wardbound.js lists them and gives their plain words). */
 
 const wbkHas = (t, cap) => !!(t && t.def && wbOn() && typeof talentHas === 'function' && talentHas(t.type, cap));
 // the clock s seconds from now (the capstones' own guards and clocks: never a status a foe or unit shows)
@@ -41891,7 +41881,7 @@ wbkWrap('wb_laststand', 'cast', function (c0, t, st, tg, ab) {
   const r = c0.call(this, t, st, tg, ab); if (r === false) return r;
   if (wbkHas(t, 'wbkFulfil')) t.wbkFulT = t.wbStandT;
   if (wbkHas(t, 'wbkSharedOath')) for (const o of G.towers) {
-    if (o === t || o.wrecked || !o.def || o.def.wall || Math.hypot(o.x - t.x, o.y - t.y) > 1.6) continue;
+    if (o === t || o.wrecked || !o.def || o.def.wall || Math.hypot(o.x - t.x, o.y - t.y) > 2) continue;
     o.wbNoWoundT = Math.max(o.wbNoWoundT || 0, t.wbStandT || G.time);
     if (G.state === 'play') fxSpark(o.x, o.y, towerTop(o), WB_COL.gold, 4);
   }
@@ -41904,7 +41894,7 @@ const wbkGreat = (x, z) => wbRunes().filter(q => q.wbBeacon > G.time && q.born =
 wbkWrap('wb_wardarrow', 'cast', function (c0, t, st, p, ab) {
   const r = c0.call(this, t, st, p, ab); if (r === false || !p) return r;
   const z1 = wbkGreat(p.x, p.y);
-  if (z1 && wbkHas(t, 'wbkLodestar')) { z1.wbkStar = t; z1.wbkStarT = wbkAt(2); }
+  if (z1 && wbkHas(t, 'wbkLodestar')) { z1.wbkStar = t; z1.wbkStarT = wbkAt(1.5); }
   if (wbkHas(t, 'wbkTwinWard') && !t.wbkTwin) {
     const L = abFoes(t, st, abReach(t, st, ab), abWalker).filter(c => Math.hypot(c.x - p.x, c.y - p.y) >= 1.5).sort((a, b) => (a.remain || 0) - (b.remain || 0));
     if (L[0]) {
@@ -41932,17 +41922,17 @@ wbkWrap('wb_wardarrow', 'cast', function (c0, t, st, p, ab) {
     S.lines = out; return out;
   };
 }
-// Lodestar: the great rune pulses every 2s down the ward-lines linked to it
+// Lodestar: the great rune pulses every 1.5s down the ward-lines linked to it (talent clarity, 10 Nov 2026: no pin, no brand; a quicker pulse)
 WB_HOOK.tick.push(() => {
   for (const z of G.hazards) {
     if (z.k !== 'wb_rune' || !z.wbkStar || !(z.t > 0) || !(z.wbBeacon > G.time) || G.time < z.wbkStarT) continue;
-    z.wbkStarT = wbkAt(2); const t = z.wbkStar;
+    z.wbkStarT = wbkAt(1.5); const t = z.wbkStar;
     if (!wbkLive(t)) { z.wbkStar = null; continue; }
     const s = t.st || effStats(t), L = wbLinesNow().filter(l => l.a.rune === z || l.b.rune === z); if (!L.length) continue;
     abRun('wb_wardarrow', () => abAoe(() => {
       for (const c of G.creeps) {
         if (c.dead || c.ent || c.phased || !wbWalks(c) || !L.some(l => wbSegD(c.x, c.y, l.a, l.b) <= .35)) continue;
-        wbHit(t, s, c, s.dmg, 'phys'); if (!c.dead) wbBrand(c, 1, t);
+        wbHit(t, s, c, s.dmg, 'phys');
       }
     }));
     if (typeof wbFxFlare === 'function') wbFxFlare(L, [z], WB_COL.teal);
@@ -41982,7 +41972,7 @@ WB_HOOK.tick.push(() => {
     W.splice(i, 1);
     const t = z.wbkWord; if (!wbkLive(t)) continue;
     const s = t.st || effStats(t);
-    abRun('wb_scribe', () => abAoe(() => { for (const c of G.creeps) if (!c.dead && !c.ent && !c.phased && wbSigOf(c) > 0 && Math.hypot(c.x - z.x, c.y - z.z) <= 1.5) wbDetonate(t, s, c, .9); }));
+    abRun('wb_scribe', () => abAoe(() => { for (const c of G.creeps) if (!c.dead && !c.ent && !c.phased && wbSigOf(c) > 0 && Math.hypot(c.x - z.x, c.y - z.z) <= 1.5) wbDetonate(t, s, c, 1.2); }));
     fxRing(z.x, z.z, 1.5, WB_COL.sigil);
   }
 });
@@ -42007,16 +41997,13 @@ wbkWrap('wb_skyfall', 'cast', function (c0, t, st, tg, ab) {
   } });
   return r;
 });
-WB_HOOK.kill.push((c, src) => {
-  if (typeof AB_NOW === 'undefined' || AB_NOW !== 'wb_skyfall' || !wbUnit(src) || !wbkLive(src) || !wbkHas(src, 'wbkSecondSky')) return;
-  wbRune(src, src.st, c.x, c.y, 'storm');
-});
+// (Second Thunder's kills no longer leave storm runes: talent clarity, 10 Nov 2026)
 
 /* ---------- Anvil Guard: Unmoving, Breaking Stance ---------- */
 wbkWrap('wb_anvil', 'zone', function (c0, t, st, z, ab) {
   const on = wbkHas(t, 'wbkUnmoving') && z && z.seen, before = on ? new Map(z.seen) : null;
   const r = c0.call(this, t, st, z, ab);
-  if (on && !(t.wbkQuakeT > G.time)) for (const [c, at] of z.seen) if (at === G.time && before.get(c) !== at && !c.dead) { t.wbkQuakeT = wbkAt(1); wbQuake(t, st, c.x, c.y, 2, .6); break; }
+  if (on && !(t.wbkQuakeT > G.time)) for (const [c, at] of z.seen) if (at === G.time && before.get(c) !== at && !c.dead) { t.wbkQuakeT = wbkAt(1); wbQuake(t, st, c.x, c.y, 3, .6); break; }
   return r;
 });
 wbkWrap('wb_anvil', 'cast', function (c0, t, st, tg, ab) {
@@ -42031,8 +42018,8 @@ WB_HOOK.kill.push(c => {
   for (const L of S.tethers) {
     const i = L.foes.indexOf(c); if (i < 0 || !(L.until > G.time)) continue;
     const t = L.src; if (!wbkLive(t) || !wbkHas(t, 'wbkChain')) continue;
-    const other = L.foes[1 - i], q = nearest(c.x, c.y, 2, 1, c, o => o !== other && !o.dead && !o.fly && !o.phased && !o.ent)[0]; if (!q) continue;
-    L.foes[i] = q; L.hp.set(q, q.hp); rootFoe(q, .5, t); wbBrand(q, 1, t);
+    const other = L.foes[1 - i], q = nearest(c.x, c.y, 2.5, 1, c, o => o !== other && !o.dead && !o.fly && !o.phased && !o.ent)[0]; if (!q) continue;
+    L.foes[i] = q; L.hp.set(q, q.hp);
     if (G.state === 'play' && G.bolts.length < 60) G.bolts.push({ pts: [[c.x, hitH(c), c.y], [(c.x + q.x) / 2, Math.max(hitH(c), hitH(q)) + .15, (c.y + q.y) / 2], [q.x, hitH(q), q.y]], life: .25, max: .25, w: .6, col: [1.3, .8, .5] });
   }
 });
@@ -42042,7 +42029,7 @@ WB_HOOK.kill.push(c => {
     if (!st || G.state !== 'play' || !wbkHas(t, 'wbkKept')) return r0.apply(this, arguments);
     const Z = wbRunesNear(x, z, WBC.runeshot.rr).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
     if (!Z.length) return r0.apply(this, arguments);
-    // (as Rune Shot's own landing, forces_wardbound_c.js, but each rune bursts and stays: renewed to full, Bound with pin)
+    // (as Rune Shot's own landing, forces_wardbound_c.js, but each rune bursts and stays, renewed to full)
     const hits = new Map();
     Z.forEach((rn, i) => G.delayed.push({ t: i * .06, fn: () => {
       if (!(rn.t > 0)) return; const s = (t && t.st) || st, col = WB_KIND[rn.kinds[0]] ? WB_KIND[rn.kinds[0]].col : WB_COL.gold;
@@ -42050,7 +42037,7 @@ WB_HOOK.kill.push(c => {
         if (c.dead || c.phased || c.ent || Math.hypot(c.x - rn.x, c.y - rn.z) > WBC.runeshot.near) continue; const n = hits.get(c) || 0; if (n >= WBC.runeshot.most) continue; hits.set(c, n + 1);
         wbHit(t, s, c, s.dmg * m, 'magic'); if (!c.dead) wbTouch(c, rn);
       } });
-      rn.t = Math.max(rn.t, rn.life || WB_RUNE.life); wbRuneAdd(rn, 'pin'); wbS().linesAt = -1;
+      rn.t = Math.max(rn.t, rn.life || WB_RUNE.life); wbS().linesAt = -1;
       fxRing(rn.x, rn.z, WBC.runeshot.near, col); fxSpark(rn.x, rn.z, .2, col, 6);
       if (i === 0) { G.shake = Math.max(G.shake, .1); sfx('quake', .5); }
     } }));
@@ -42060,13 +42047,12 @@ WB_HOOK.kill.push(c => {
 /* ---------- Vowkeepers: Sanctuary, Hallowed Road ---------- */
 wbkWrap('wb_vow', 'cast', function (c0, t, st, o, ab) {
   const r = c0.call(this, t, st, o, ab); if (r === false || !o || !o.def || !wbkHas(t, 'wbkSanct')) return r;
-  const until = G.time + byT(ab.by.dur, t);
   for (const q of G.towers) {
-    if (q === o || q.wrecked || !wbUnit(q) || !q.maxHp || Math.hypot(q.x - o.x, q.y - o.y) > 1.2) continue;
-    wbMend(q, (q.maxHp - q.hp) * .5); q.wbNoWoundT = Math.max(q.wbNoWoundT || 0, until);
+    if (q === o || q.wrecked || !wbUnit(q) || !q.maxHp || Math.hypot(q.x - o.x, q.y - o.y) > 1.5) continue;
+    wbMend(q, (q.maxHp - q.hp) * .5);
     if (G.state === 'play') fxSpark(q.x, q.y, towerTop(q), WB_COL.vow, 5);
   }
-  if (G.state === 'play') fxRing(o.x, o.y, 1.2, WB_COL.vow);
+  if (G.state === 'play') fxRing(o.x, o.y, 1.5, WB_COL.vow);
   return r;
 });
 wbkWrap('wb_rite', 'cast', function (c0, t, st, tg, ab) {
@@ -42080,8 +42066,7 @@ WB_RUNE_HOOK.push((c, z) => {
   const M = z.wbkHalSeen || (z.wbkHalSeen = new Map()); if (G.time - (M.get(c) || -9) < 1) return; M.set(c, G.time);
   if (M.size > 60) for (const [q] of M) if (q.dead) M.delete(q);
   const s = t.st || effStats(t);
-  abRun('wb_rite', () => wbHit(t, s, c, s.dmg * .5, 'magic'));
-  if (!c.dead) wbBrand(c, 1, t);
+  abRun('wb_rite', () => wbHit(t, s, c, s.dmg * .7, 'magic'));
 });
 
 /* ---------- Varic: The Gate Holds, Last Warden, The Road Remembers ---------- */
@@ -42110,7 +42095,7 @@ wbkWrap('ch_lastgate', 'cast', function (c0, t, st, tg, ab) {
     if (!wbkLive(t)) return; const s = t.st || st;
     abAoe(() => { for (const c of G.creeps) {
       if (c.dead || c.ent || c.phased || !wbWalks(c) || !pts.some(p => Math.hypot(c.x - p[0], c.y - p[1]) <= .5)) continue;
-      wbchHit(t, s, c, m / 3, 'magic'); if (!c.dead) rootFoe(c, .5, t);
+      wbchHit(t, s, c, m / 2, 'magic'); if (!c.dead) { rootFoe(c, .5, t); wbBrand(c, 1, t); }
     } });
     for (const p of pts) part({ k: 'ring', x: p[0], z: p[1], h: .04, life: .35, max: .35, size: .45, col: WB_COL.gold });
   } });
@@ -42131,7 +42116,7 @@ wbkWrap('ch_blazeglory', 'cast', function (c0, t, st, tg, ab) {
 });
 WB_HOOK.kill.push((c, src) => {
   if (!src || !src.def || src.def.unit !== 'ch_aedric' || !(src.wbGloryT > G.time)) return;
-  if (src.wbkUndy && (src.wbkUndyAdd || 0) < 6) { src.wbkUndyAdd = (src.wbkUndyAdd || 0) + 1; src.wbGloryT += 1; src.wbGloryBurnT = src.wbGloryT + 4; }
+  if (src.wbkUndy && (src.wbkUndyAdd || 0) < 8) { src.wbkUndyAdd = (src.wbkUndyAdd || 0) + 1; src.wbGloryT += 1; src.wbGloryBurnT = src.wbGloryT + 4; }
   if (wbkHas(src, 'wbkSunSworn') && src.ab && src.ab.cd && src.ab.cd.ch_suncharge > G.time) src.ab.cd.ch_suncharge = Math.max(G.time, src.ab.cd.ch_suncharge - 3);
 });
 // Open Road: the trail burns (a line zone, drawn as embers, not a ring)
@@ -42145,7 +42130,6 @@ wbkWrap('ch_suncharge', 'cast', function (c0, t, st, c, ab) {
   let ux = 0, uz = 0, len = 0; if (road) { [ux, uz] = abDir(t, c); len = byT(ab.by.len, t); }
   const r = c0.call(this, t, st, c, ab); if (r === false) return r;
   if (road) wbcZone(t, st, 'ch_suncharge', x0 + ux * len / 2, z0 + uz * len / 2, len / 2, 4, .5, { line: [x0, z0, x0 + ux * len, z0 + uz * len], w: .45, noDraw: true });
-  if (wbkHas(t, 'wbkSunSworn') && t.wbGloryT > G.time) t.wbWearyT = 0;
   return r;
 });
 
@@ -42158,10 +42142,9 @@ wbkWrap('ch_oathturned', 'cast', function (c0, t, st, c, ab) {
   const r = c0.call(this, t, st, c, ab); if (r === false) return r;
   if (veil) {
     const B = L.filter(o => !o.dead && o.rootT > G.time);
-    for (const o of B) chill(o, { slow: .5, slowT: 4 }, null, t);
     if (B.length) G.delayed.push({ t: 4, fn: () => {
       if (!wbkLive(t)) return; const s = t.st || st, m2 = byT(ab.by.m2, t);
-      abAoe(() => { for (const o of B) { if (o.dead) continue; wbHit(t, s, o, (abD(s) * m2 + toll) * (wbeOnRune(o) ? 2 : 1), 'magic'); if (G.state === 'play') fxSpark(o.x, o.y, hitH(o), WB_COL.sigil, 5); } });
+      abAoe(() => { for (const o of B) { if (o.dead) continue; wbHit(t, s, o, (abD(s) * m2 + toll) * 1.5, 'magic'); if (G.state === 'play') fxSpark(o.x, o.y, hitH(o), WB_COL.sigil, 5); } });
     } });
   }
   if (twice) G.delayed.push({ t: .6, fn: () => {
@@ -42179,9 +42162,9 @@ wbkWrap('ch_oathturned', 'cast', function (c0, t, st, c, ab) {
 });
 wbkWrap('ch_bindsweep', 'cast', function (c0, t, st, tg, ab) {
   if (!wbkHas(t, 'wbkSwornRoad')) return c0.call(this, t, st, tg, ab);
-  const L = abFoes(t, st, abReach(t, st, ab), abWalker).filter(c => !c.ent && !c.phased), on = new Set(L.filter(c => wbRunesNear(c.x, c.y, .55).length > 0));
+  const L = abFoes(t, st, abReach(t, st, ab), abWalker).filter(c => !c.ent && !c.phased);
   const r = c0.call(this, t, st, tg, ab); if (r === false) return r;
-  for (const c of L) { if (c.dead || !(c.rootT > G.time)) continue; if (on.has(c)) wbBrand(c, 2, t); wbRune(t, t.st || st, c.x, c.y, 'oath'); }
+  for (const c of L) { if (c.dead || !(c.rootT > G.time)) continue; wbRune(t, t.st || st, c.x, c.y, 'oath'); }
   wbS().linesAt = -1;
   return r;
 });
@@ -42191,16 +42174,11 @@ WB_HOOK.tick.push(() => {
   for (const t of G.towers) {
     if (t.wbkFulT && G.time >= t.wbkFulT) {
       t.wbkFulT = 0;
-      if (wbkLive(t)) abRun('wb_laststand', () => { const s = t.st || effStats(t), hit = wbFlare(t, s, 1.5, { near: { x: t.x, z: t.y, r: 2 }, kinds: ['oath'] }); for (const c of hit) if (!c.dead) rootFoe(c, 1, t); });
+      if (wbkLive(t)) abRun('wb_laststand', () => { const s = t.st || effStats(t), hit = wbFlare(t, s, 2, { near: { x: t.x, z: t.y, r: 2 }, kinds: ['oath'], brand: 0 }); for (const c of hit) if (!c.dead) rootFoe(c, 1, t); });
     }
     if (t.wbkBreakT && G.time >= t.wbkBreakT) { t.wbkBreakT = 0; if (wbkLive(t) && typeof fsFreeCast === 'function') fsFreeCast(t, 'wb_shieldwall'); }
-    if (t.wbkUndy && !(t.wbGloryT > G.time)) {
-      t.wbkUndy = 0; t.wbGloryBurnT = 0;
-      const ab = ABIL.ch_blazeglory; if (!wbkLive(t) || !ab) continue;
-      const s = t.st || effStats(t), m = byT(ab.by.mult, t);
-      abRun('ch_blazeglory', () => abAoe(() => { for (const c of abFoes(t, s, abReach(t, s, ab))) { if (c.ent || c.phased) continue; wbchHit(t, s, c, m, 'magic'); if (!c.dead) wbBrand(c, 1, t); } }));
-      fxRing(t.x, t.y, abReach(t, s, ab), ab.hue); sfx('holy', .6);
-    }
+    // (Undying Blaze no longer ends in a second burst: talent clarity, 10 Nov 2026; its kills keep it going up to 8s longer)
+    if (t.wbkUndy && !(t.wbGloryT > G.time)) t.wbkUndy = 0;
   }
 });
 
@@ -42439,7 +42417,7 @@ if (typeof restore === 'function') {
    ccOnCast, ccsGain, ccsSpend, the Champions' first spells (ccArchSpell, ccChronoSpell, ccMarenSpell), a few spells'
    casts and zones (cxWrap, cxWrapZone) and the force's hooks. No new look beyond the light marks the spells already use. */
 
-const CCF = { COPY_R: 2, SALUTE: 1, STEP_R: 1.5, NEEDLE_R: .8, NEEDLE_K: .3, INK_GAP: 3, SING_GAP: .25, SAND_GAP: 2, SWING_R: 1.2,
+const CCF = { COPY_R: 2, SALUTE: 1, STEP_R: 1.5, NEEDLE_R: .8, NEEDLE_K: .4, INK_GAP: 3, SING_GAP: .25, SAND_GAP: 2, SWING_R: 1.2,
   BORROW_R: 1.5, CLOCK_STOP: .6, HEAVENS_R: .5, NIGHT_T: 4, GRIND_T: 4, BREATH_N: 3, HUNT_R: 1, LESSON_R: 2, SNAP_R: .8,
   PEND_R: 1.5, LENT_R: 2, FOLLOW_R: 1.5, FOLLOW_N: 3, GUARD_T: 4, FLOURISH_R: .8, DUEL_K: .4 };
 const ccfCap = (t, k) => (t && t.st && t.st.caps && t.st.caps[k]) || 0;
@@ -42613,9 +42591,9 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
     if (ab === 'cc_fallingstar' && C.ccfOmen && pre.marks.includes('star') && !c.dead) { stun(c, .2 * C.ccfOmen, .4, null); ccEv('tal:ccfOmen'); }   /* Ill Omen */
   } else if (u === 'cc_golemwarden' && basic) {
     if (C.ccfRes && t.ccfResAt !== G.time && pre.marks.some(s => s !== 'stone')) { t.ccfResAt = G.time; gainMana(t, 3 * C.ccfRes); ccEv('tal:ccfRes'); }   /* Ley Reservoir */
-    if (C.ccfGrind && pre.stunned && !c.fly && !c.dead) { c.shred = Math.min(3 * C.ccfGrind, (c.shredT > 0 ? c.shred || 0 : 0) + C.ccfGrind); c.shredT = Math.max(c.shredT || 0, CCF.GRIND_T); ccEv('tal:ccfGrind'); }   // Granite Fists
+    if (C.ccfGrind && pre.stunned && !c.fly && !c.dead) { c.shred = Math.min(4 * C.ccfGrind, (c.shredT > 0 ? c.shred || 0 : 0) + C.ccfGrind); c.shredT = Math.max(c.shredT || 0, CCF.GRIND_T); ccEv('tal:ccfGrind'); }   // Granite Fists
   } else if (u === 'cc_pyroclast' && basic) {
-    if (C.ccfWardburn && pre.burning && c.mwMax > 0 && !c.dead && typeof epWardOpen === 'function') { epWardOpen(c, 1, .4 * C.ccfWardburn); ccEv('tal:ccfWardburn'); }   // Wardburn
+    if (C.ccfWardburn && pre.burning && c.mwMax > 0 && !c.dead && typeof epWardOpen === 'function') { epWardOpen(c, 1, .6 * C.ccfWardburn); ccEv('tal:ccfWardburn'); }   // Wardburn
   } else if (u === 'ch_maelis' && basic) {
     if (C.ccfPage && ((t.ccfPgN = (t.ccfPgN | 0) + 1) % (5 - C.ccfPage) === 0) && !c.dead) { ccMark(c, ['arcane', 'frost', 'fire'][((t.chRuneN || 0) + 1) % 3], t); ccEv('tal:ccfPage'); }   /* Flicked Pages */
     if (C.ccfBook && (t.ccQ || 0) >= 5) { const q = nearest(c.x, c.y, 1, 1, c, q => canTarget(t, st, q))[0]; if (q) { ccHit(t, st, q, amt * .25 * C.ccfBook, { noRx: true }); ccEv('tal:ccfBook'); } }   /* Open Book */
@@ -42780,8 +42758,7 @@ const ccfCaster = u => (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER && C
     const C = t.st.caps || {}, L = G.creeps.filter(c => !c.dead && !c.ent && Math.hypot(c.x - p.x, c.y - p.y) <= R + .2);
     if (C.ccfQuill && L.filter(c => ccMarksOn(c).length > 0).length >= 4) { const s = 1.5 * C.ccfQuill; G.delayed.push({ t: 0, fn: () => ccfReady(t, 'ch_thousandfold', s) }); ccEv('tal:ccfQuill'); }
     if (C.ccfThreads) for (const c of L) {
-      if (ccHas(c, 'frost')) chill(c, { slow: .15 * C.ccfThreads, slowT: 2 }, 'frost', t);
-      if (ccHas(c, 'fire')) ignite(c, (t.st.dmg || 0) * .1 * C.ccfThreads, 2, t, false);
+      if (ccHas(c, 'frost')) chill(c, { slow: .2 * C.ccfThreads, slowT: 2 }, 'frost', t);
     }
     if (C.ccfLesson) for (const o of G.towers) if (o !== t && ccUnit(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= CCF.LESSON_R + .05) ccGain(o, 1);
     const r = a0.apply(this, arguments);
@@ -43121,6 +43098,10 @@ Object.assign(SP_RIDE, {
   gfSeed: (c, v, s) => { c.gfSeededT = G.time + v; c.gfSeededBy = s; },   // Still Quarry
   gfFlush: (c, v, s) => { c.gfFlushT = G.time + v; c.gfFlushBy = s; },   // Mark of the Hunt
   gfPetal: (c, v, s) => { c.gfPetalT = G.time + 6; c.gfPetalK = v; c.gfPetalBy = s; },   // Petal Cuts
+  gfChoke: (c, v, s) => {   // Choking Thorns: while the cage hangs, every support foe within v cells of it is Thornmarked (plain-text pass: a rider, was a cast rule with a longer hold and a wound)
+    const hold = ABIL.gv_wither && ABIL.gv_wither.by ? byT(ABIL.gv_wither.by.hold, s) : 2;
+    for (let k = 0; k * .5 <= hold; k++) G.delayed.push({ t: k * .5, fn: () => { if (c.dead || !abLive(s)) return; for (const o of nearest(c.x, c.y, v, 6, c, q => specSupport(q))) gvsMark(o, .7, s); } });
+  },
   gfRootmark: (c, v, s) => { if (!c.fly) { c.gfRootmarkT = G.time + v; c.gfRootmarkBy = s; } },   // Rootmark Seed
   gfSnap: (c, v, s) => { if (!c.fly && c._gfSnapBy !== s) { c._gfSnapBy = s; c._gfSnapK = v; c._gfHeld = 0; c._gfSnapped = 0; } },   // Strangling Hold
   gfSong: (c, v, s) => { for (const o of abAllies(s, 1.6)) if (o.maxHp > 0 && o.hp < o.maxHp) { o.hp = Math.min(o.maxHp, o.hp + o.maxHp * v); if (Math.random() < .5) fxSparkle(o.x, o.y, towerTop(o), '#9be06a'); } },   // Sap Song
@@ -43165,7 +43146,8 @@ function gfLive(t, st) {
   else if (u === 'wayfarer') {
     const f = st.form || t.form;
     if ((n = has('gfPace')) && f === 'bear') { const r = st.range || 1; if (gfQ(t, 'pack', () => gfCount(t.x, t.y, r + .1, gfWalk, 2)) >= 2) gfFaster(st, .05 * n); }   // Wild Pace
-    if ((n = has('gfHawk')) && f === 'hawk') st.airR = (st.airR || 0) + .3 * n;   // Hawk's Reach
+    // Hawk's Reach (plain-text pass: reach only, .3 -> .4 a rank)
+    if ((n = has('gfHawk')) && f === 'hawk') st.airR = (st.airR || 0) + .4 * n;
   }
   else if (u === 'bladedancer') {
     if ((n = has('gfWide')) && t.gwAt != null && G.time - t.gwAt < 4) st.range = (st.range || 0) * (1 + .1 * n);   // Wide Whirl
@@ -43208,12 +43190,10 @@ function gfFire(t, st, tg, pow, echo) {
   else if (u === 'wayfarer') {
     const f = t.form || 'sage';
     if ((n = has('gfTithe')) && typeof gwFed === 'function' && gwFed(tg)) gfMana(t, n);   // Wildwood Tithe
-    if ((n = has('bramclaw')) && f === 'bear' && tg.bleedT > 0) gfShred(tg, 2 * n, 4);   // Bramble Claws
     if (has('gfSkin') && !echo && t.shiftAt != null && t._gfSkin !== t.shiftAt) {   // Second Skin: the new form's first strike, twice
       t._gfSkin = t.shiftAt;
       G.delayed.push({ t: .14, fn: () => { if (!tg.dead && G.towers.includes(t) && !t.wrecked && G.state === 'play') fire(t, t.st || st, tg, true); } });
     }
-    if (has('gfHawk') && f === 'hawk' && tg.fly && t.shiftAt != null && t._gfHawk !== t.shiftAt) { t._gfHawk = t.shiftAt; tg.lowT = Math.max(tg.lowT || 0, G.time + (tg.def.boss ? .45 : 1)); }   // Hawk's Reach
   }
   else if (u === 'bladedancer' && (n = has('gfBreath')) && gfCount(t.x, t.y, (st.range || 1.45) + .1, o => !o.ent && !o.phased, 3) >= 3) gfMana(t, 2 * n);   // Dancer's Breath
   else if (u === 'seedcaster') {
@@ -43254,7 +43234,6 @@ function gfRipen(c, src, k) {
 function gfKill(c, src) {
   let n;
   if (src && gfIs(src, 'gladebow') && (n = gfHas(src, 'gfLong')) && Math.hypot(c.x - src.x, c.y - src.y) >= 2) { gfMana(src, 8 * n); fxSparkle(src.x, src.y, towerTop(src), '#d8f07a'); }   // Patient Hunter
-  if (c.gfQuarryT > G.time && c.gfQuarryBy && G.towers.includes(c.gfQuarryBy) && c.gfQuarryBy.ab) c.gfQuarryBy.ab.cd.aimedshot = G.time;   // Mark the Quarry
   if (src && gfArcher(src)) { const f = gfFaelan(); if (f && (n = gfFaeNear(src, 'gfShare'))) gfMana(f, 5 * n); }   // Captain's Share
   if (c.poison && c.poison.length) {
     const seen = new Set();
@@ -43278,13 +43257,17 @@ function gfKill(c, src) {
 function gfAmp(c, src) {
   const u = src.def.unit, spell = gfSpell(); let a = 0, n;
   if (c.gfPetalT > G.time && src.def.force === 'grove' && !(spell && AB_NOW === 'leafdance')) { a += c.gfPetalK || 0; c.gfPetalT = 0; }   // Petal Cuts: the guard dropped, once
+  // Wounded Prey (plain-text pass)
+  if (u === 'gladebow' && gfHas(src, 'gfPrey') && (c.bleedT > 0 || (typeof gwSpored === 'function' && gwSpored(c)))) a += .45;
   if (spell) return a;
   if (u === 'thornguard' && c.gfSnagT > G.time && (n = gfHas(src, 'gfSnag'))) a += .15 * n;   // Thornwall Ward
   else if (u === 'gladebow') {
-    if (c.gfQuarryT > G.time && gfHas(src, 'gfQuarry')) a += .15;   // Mark the Quarry
+    // Mark the Quarry (plain-text pass: no reset, 15% -> 25%)
+    if (c.gfQuarryT > G.time && gfHas(src, 'gfQuarry')) a += .25;
     if (c.gfFlushT > G.time && typeof talentHas === 'function' && talentHas('arcane', 'gfFlush')) a += .2;   // Mark of the Hunt
   }
-  else if (u === 'staglancer' && (c.stunT > 0 || c.rootT > G.time) && (n = gfHas(src, 'gfHeavy'))) a += .08 * n;   // Heavy Lance
+  // (gfHeavy: no talent carries it now; Heavy Lance is plain armour pen, talent clarity)
+  else if (u === 'staglancer' && (c.stunT > 0 || c.rootT > G.time) && (n = gfHas(src, 'gfHeavy'))) a += .12 * n;
   return a;
 }
 
@@ -43366,10 +43349,6 @@ function gfOnCast(t, ab, tg, st, pre) {
   }
   else if (id === 'wildsurge') t._gfWorn = new Set([t.form || 'sage']);   // (Harrier's Cry counts afresh)
   else if (id === 'haze') { t.gfHazeAt = G.time; t.gfHazeD = byT(ab.by.dur, t); }   // (Far Cast)
-  else if (id === 'gv_wither' && tg && tg.x != null && gfHas(t, 'gfChoke')) {   // Choking Thorns: the cage's thorns choke the healers round it
-    const c = tg, hold = byT(ab.by.hold, t);
-    for (let k = 0; k * .5 <= hold; k++) G.delayed.push({ t: .3 + k * .5, fn: () => { if (c.dead || !abLive(t)) return; for (const o of nearest(c.x, c.y, 1.5, 6, c, q => specSupport(q))) gvsMark(o, .7, t); } });
-  }
   else if (id === 'ch_entangle') {
     const L = pre.L || [];
     if ((n = gfHas(t, 'gfSap')) && L.length) gfMana(t, 3 * n * Math.min(8, L.length));   // Deep Sap
@@ -43444,7 +43423,7 @@ if (typeof gvsMark === 'function') {
 /* ---------- the statuses on the foe card and their words ---------- */
 SPEC_KW.push(
   { key: 'gv:snagged', name: 'Caught on the thorns', alias: ['caught on the thorns'], cat: 'status', force: 'grove', col: '#9ab85a', def: "A walker a Thornhedge snagged, while Thornwall Ward is learned: for 4s the Thornguard Spears' thrusts strike it harder." },
-  { key: 'gv:quarry', name: "Rangers' Quarry", alias: ['quarry'], cat: 'status', force: 'grove', col: '#d8f07a', def: "The first foe an Aimed Shot pierces, while Mark the Quarry is learned: for 5s the Gladebow Rangers' arrows strike it harder, and if it falls the Ranger that named it has Aimed Shot ready at once." },
+  { key: 'gv:quarry', name: "Rangers' Quarry", alias: ['quarry'], cat: 'status', force: 'grove', col: '#d8f07a', def: "The first foe an Aimed Shot pierces, while Mark the Quarry is learned: for 5s the Gladebow Rangers' arrows strike it 25% harder." },
   { key: 'gv:thornseeded', name: 'Thornseeded', alias: ['thornseeded'], cat: 'status', force: 'grove', col: '#8ad84a', def: 'A foe a Thornseed Arrow struck, while Still Quarry is learned: for 4s Aimed Shot strikes it harder.' },
   { key: 'gv:flushed', name: 'Flushed', alias: ['flushes', 'flushed'], cat: 'status', force: 'grove', col: '#f4dc9a', def: "A foe a Stag Lancer's Heroic Charge struck, while Mark of the Hunt is learned: for 6s the Gladebow Rangers' arrows strike it harder." },
   { key: 'gv:offguard', name: 'Off Guard', alias: ['off guard'], cat: 'status', force: 'grove', col: '#a8f070', def: "A walker Threading Dance cut, while Petal Cuts is learned: the next hit on it from any of your units, within 6s, lands harder." },
@@ -43454,8 +43433,8 @@ SPEC_KW.push(
 SPEC_BUFF.push(
   ['gv_snagged', { name: 'Caught on the thorns', kw: 'gv:snagged', kind: 'debuff', pri: 30, icon: 'shield', hue: '#6a8a3a', f: ['gfSnagT'], def: "The Thornguard Spears' thrusts strike it harder.",
     get: c => c.gfSnagT > bfNow() ? { t: bfLeft(c.gfSnagT), src: c.gfSnagBy, say: "The Spears' thrusts strike it harder." } : null }],
-  ['gv_quarry', { name: "Rangers' Quarry", kw: 'gv:quarry', kind: 'debuff', pri: 30, icon: 'target', hue: '#8aa83a', f: ['gfQuarryT'], def: "The Gladebow Rangers' arrows strike it harder; if it falls, Aimed Shot is ready again.",
-    get: c => c.gfQuarryT > bfNow() ? { t: bfLeft(c.gfQuarryT), src: c.gfQuarryBy, say: "The Rangers' arrows strike it 15% harder." } : null }],
+  ['gv_quarry', { name: "Rangers' Quarry", kw: 'gv:quarry', kind: 'debuff', pri: 30, icon: 'target', hue: '#8aa83a', f: ['gfQuarryT'], def: "The Gladebow Rangers' arrows strike it harder.",
+    get: c => c.gfQuarryT > bfNow() ? { t: bfLeft(c.gfQuarryT), src: c.gfQuarryBy, say: "The Rangers' arrows strike it 25% harder." } : null }],
   ['gv_thornseeded', { name: 'Thornseeded', kw: 'gv:thornseeded', kind: 'debuff', pri: 30, icon: 'arrowhead', hue: '#5a9a2a', f: ['gfSeededT'], def: 'Aimed Shot strikes it harder.',
     get: c => c.gfSeededT > bfNow() ? { t: bfLeft(c.gfSeededT), src: c.gfSeededBy, say: 'Aimed Shot strikes it 50% harder.' } : null }],
   ['gv_flushed', { name: 'Flushed', kw: 'gv:flushed', kind: 'debuff', pri: 30, icon: 'crosshair', hue: '#a88a4a', f: ['gfFlushT'], def: "The Gladebow Rangers' arrows strike it harder.",
@@ -43479,14 +43458,14 @@ SPEC_BUFF.push(
    forces_zs_ironhold.js, forces_zx_champ_ironhold.js); the mechanics are here, as wrappers that keep the original call.
    Loaded after the capstones (forces_zzzzzzzzz_caps_ironhold.js: ihcWrapCast, ihcRider) and before the talent names.
    Talents and their caps (st.caps keys, or a rider read with ihcRider for a Champion's spell):
-     Ironbreakers   Off Balance ihfOff, Caught Between Shields ihfPincer, Plate Salvage ihfSalvage (mana), Knock Them
+     Ironbreakers   Off Balance ihfOff (retired: now armour pen), Caught Between Shields ihfPincer, Plate Salvage ihfSalvage (mana), Knock Them
                     Flat ihfFlat, Shield Signal ihfSignal
-     Thunderguns    Powder Smoke ihfSmoke, Sighting In ihfSight, Powder Tally ihfTally (mana), Hard Kick ihfKick,
+     Thunderguns    Powder Smoke ihfSmoke (Long Shot's smoke), Sighting In ihfSight, Powder Tally ihfTally (mana), Hard Kick ihfKick,
                     Case-Hardened (its daze: forces_zzzzzz_ironhold_cool.js)
      Chain Trappers Third Wrap ihfWrap, Wing Cords ihfWing, Trapper's Haul ihfHaul (mana), Bound and Broken (rider
                     ihfLandPin), Hooked Chain ihfHook, Caltrop Bed (rider ihfBed)
      Runesmiths     Kinsmark ihfKin, Quench ihfQuench, Paid in Kind ihfKind (mana), Answering Rune ihfAnswer, Masterwork
-                    Strike ihfMaster
+                    Strike (rider ihfMasterRB on Runebrand)
      Flak           Torn Wings ihfTorn, Scorched Barrel ihfScorch, Sky Watch ihfSky (mana)
      Steam Hammers  Packed Crowd ihfCrowd, Steam in the Cracks ihfCracks, Hammer Home ihfHome, Pressure Gauge ihfGauge
                     (mana), Steam Jacket ihfJacket, Piledriven ihfDrive, Echoing Slam (rider ihfScald), Line Them Up
@@ -43538,12 +43517,10 @@ const ihfAround = (x, z, r, skip) => G.creeps.filter(c => c !== skip && ihfWalke
   const A0 = FORCE_ATTACK.ironbreaker;
   FORCE_ATTACK.ironbreaker = function (t, st, tg, pow, echo) {
     const C = (st && st.caps) || {}, ib = t.def.unit === 'ironbreaker', hal = t.def.unit === 'ch_haldra';
-    const arm0 = ihArmor(tg), had = (tg.armor || 0) > 0, off = C.ihfOff && tg.ihfOffT > G.time;
+    const arm0 = ihArmor(tg), had = (tg.armor || 0) > 0;
     const r = A0.apply(this, arguments);
     if (!ihfOn()) return r;
     if (!tg.dead) {
-      // Off Balance: a chop at a foe its shield threw back bites deeper (up to the axe's limit)
-      if (off) { const cap = 4 + (st.ihShredMax || 0), cur = tg.shredT > 0 ? tg.shred : 0; tg.shred = Math.max(cur, Math.min(cap, cur + C.ihfOff)); tg.shredT = Math.max(tg.shredT || 0, 5); }
       // Clan Drill (Haldra): her blow on a foe an Ironbreaker struck in the last 2s cracks more of its plate
       if (hal && C.ihfDrill && tg.ihfIbAt > G.time - 2) ihcShred(tg, C.ihfDrill, 12, 5);
     }
@@ -43564,10 +43541,9 @@ const ihfAround = (x, z, r, skip) => G.creeps.filter(c => c !== skip && ihfWalke
     return r;
   };
 }
-// a shield shove (the strike's every 5th, or Shield Shove the spell): Off Balance marks the foe; Knock Them Flat holds a held foe on
+// a shield shove (the strike's every 5th, or Shield Shove the spell): Knock Them Flat holds a held foe on (Off Balance is plain armour pen now)
 function ihfShoveDone(t, C, tg, held) {
   if (!tg || tg.dead) return;
-  if (C.ihfOff) { tg.ihfOffT = G.time + 2; tg.ihfOffBy = t; }
   if (C.ihfFlat && held) { ihfHoldMore(tg, .2 * C.ihfFlat); ihSparks(tg.x, tg.y, hitH(tg), 4, '#ffe8b0'); }
 }
 {
@@ -43608,11 +43584,6 @@ ihcWrapCast('ih_bulwark', (raw, t, st, c, ab, again) => {
     if (peal) {
       // the foes the Thunderpeal struck: those it marked this instant along its line
       const hit = G.creeps.filter(c => c.ihVentHitT === G.time && (() => { const px = c.x - t.x, pz = c.y - t.y, a = px * ux + pz * uz; return a > -.3 && a <= len + .3 && Math.abs(px * uz - pz * ux) <= .7; })());
-      if (C.ihfSmoke) {   // Powder Smoke: the smoke hangs on the line
-        IHF.smoke.push({ x0: t.x, z0: t.y, ux, uz, len, until: G.time + 2, slow: .15 * C.ihfSmoke, src: t });
-        if (IHF.smoke.length > 24) IHF.smoke.shift();
-        for (let q = 1; q <= 4; q++) ihSmokePuff(t.x + ux * len * q / 4.5, t.y + uz * len * q / 4.5, .25, 1, '#8a847a');
-      }
       if (C.ihfTally) ihfMana(t, 5 * C.ihfTally * Math.min(4, hit.length));   // Powder Tally
       if (tov && C.ihfRivet) for (const c of hit) if (!c.dead && !c.fly) ihPin(c, .2 * C.ihfRivet, t);   // Riveting Peal
       if (tov && C.ihfOver) for (const z of G.hazards) if (z.k === 'ih_sentry' && !z.blown && z.t > 0) z.ihfBurst = 3 * C.ihfOver;   // Overpressure
@@ -43653,7 +43624,19 @@ ihcWrapCast('ih_bulwark', (raw, t, st, c, ab, again) => {
   };
 }
 ihcWrapCast('ih_grapple', (raw, t, st, c, ab, again) => {
-  const r = raw(); if (r !== false && !again && ihfOn() && ihfC(t).ihfHook) t.ihfNetNext = 1;
+  const r = raw(); if (r !== false && !again && ihfOn() && ihfC(t).ihfHook) { t.ihfNetNext = 1; t.cd = Math.min(t.cd || 0, .1); }
+  return r;
+});
+// Powder Smoke: Long Shot leaves its powder smoke hanging along its line (walkers in it slowed: the tick below)
+ihcWrapCast('ih_longshot', (raw, t, st, c, ab, again) => {
+  const r = raw(), n = ihfC(t).ihfSmoke; if (r === false || !n || !c || !ihfOn()) return r;
+  const x1 = c.x, z1 = c.y;
+  G.delayed.push({ t: .36, fn: () => {
+    if (!ihfLiveT(t) || !ihfOn()) return; const dx = x1 - t.x, dz = z1 - t.y, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len;
+    IHF.smoke.push({ x0: t.x, z0: t.y, ux, uz, len: len + .3, until: G.time + 3, slow: .2 * n, src: t });
+    if (IHF.smoke.length > 24) IHF.smoke.shift();
+    for (let q = 1; q <= 4; q++) ihSmokePuff(t.x + ux * len * q / 4.5, t.y + uz * len * q / 4.5, .25, 1, '#8a847a');
+  } });
   return r;
 });
 
@@ -43679,21 +43662,15 @@ ihcWrapCast('ih_grapple', (raw, t, st, c, ab, again) => {
   };
 }
 ihcWrapCast('ih_runeofpower', (raw, t, st, L, ab, again) => { const r = raw(); if (r !== false) t.ihfAnsUntil = G.time + 2; return r; });
-{
-  const R0 = FORCE_ATTACK.runesmith;
-  FORCE_ATTACK.runesmith = function (t, st, tg, pow, echo) {   // Masterwork Strike: every 4th stroke brands the foes round its target
-    const C = (st && st.caps) || {}, r = R0.apply(this, arguments);
-    if (ihfOn() && C.ihfMaster && !echo && (t.ihfMwN = (t.ihfMwN || 0) + 1) % 4 === 0) {
-      const d = Math.hypot(tg.x - t.x, tg.y - t.y), trav = .08 + d / 14;
-      G.delayed.push({ t: trav + .01, fn: () => {
-        if (!ihfLiveT(t)) return; const s = t.st || st, k = (s.brand || .08) + .02 * (C.ihDeepBrand || 0), dur = 4 + (C.ihDeepBrand || 0);
-        for (const o of nearest(tg.x, tg.y, .8, 6, tg, q => !q.dead && !q.ent && canTarget(t, s, q))) ihBrand(o, k, dur, t);
-        ihSparks(tg.x, tg.y, hitH(tg), 8, IH_COL.rune);
-      } });
-    }
-    return r;
-  };
-}
+// Masterwork Strike: Runebrand brands every foe within 1 cell of its target too, as deep (talent clarity, 10 Nov 2026: was every
+// 4th stroke branding the foes round its target, and Runebrand 20% harder on held foes)
+ihcWrapCast('ih_runebrand', (raw, t, st, c, ab, again) => {
+  const r = raw(); if (r === false || !c || !ihfOn() || !ihcRider(t, 'ih_runebrand', 'ihfMasterRB')) return r;
+  const k = byT(ab.by.amp, t);
+  for (const o of nearest(c.x, c.y, 1, 6, c, q => !q.dead && !q.ent && canTarget(t, st, q))) ihBrand(o, k, 8, t);
+  ihSparks(c.x, c.y, hitH(c), 8, IH_COL.rune);
+  return r;
+});
 
 /* =====================================================================================================
    FLAK CANNONEERS: the sky
@@ -43766,7 +43743,6 @@ ihcWrapCast('ih_steamvent', (raw, t, st, _, ab, again) => {
       G.delayed.push({ t: Math.max(0, p.T - .3), fn: () => {
         if (!ihfOn()) return;
         for (const c of ihfAround(x, z, sp)) {
-          if (c.def.boss || c.def.lead) { chill(c, { slow: .3, slowT: .4 }, null, t); continue; }
           if (c.ihfWhCd > G.time) continue; c.ihfWhCd = G.time + 1.5; ihStun(c, .2 * C.ihfWhistle);
         }
       } });
@@ -43878,7 +43854,7 @@ ihcWrapCast('ch_anvil', (raw, t, st, tg, ab, again) => {
     if (call && o.def.unit === 'ironbreaker') G.delayed.push({ t: .3, fn: () => {
       if (!ihfLiveT(o) || !ihfOn()) return; const s = o.st || effStats(o), c = acquire(o, s); if (!c || c.fly) return;
       const L = Math.hypot(c.x - o.x, c.y - o.y) || 1; ihShieldShove(o, s, c, (c.x - o.x) / L, (c.y - o.y) / L);
-      if (call >= 2 && !c.dead) ihStun(c, .4);
+      if (!c.dead) ihStun(c, .2 * call);
     } });
     if (trap && o.def.unit === 'chaintrapper') { const ev = ihfC(o).ihNet3 ? 3 : 4; o.ihThrowN = (Math.floor((o.ihThrowN || 0) / ev) + 1) * ev - 1; o.cd = Math.min(o.cd || 0, .1); }
   }
@@ -43897,7 +43873,7 @@ if (typeof IH_HAZ !== 'undefined' && IH_HAZ.ih_sentry) {
       const sc = ihfHolyCap('ih_artificer', 'ihfScrap'), sv = ihfHolyCap('ih_artificer', 'ihfSalv');
       const L = G.creeps.filter(c => c.ihSentryHitT === G.time && Math.hypot(c.x - z.x, c.y - z.z) <= 1.1);
       if (sc) for (const c of L) if (!c.dead) ihcShred(c, 2 * sc, 12, 5);
-      if (sv) { const ch = ihfChamp('ih_artificer'); if (ch) ihfMana(ch, 8 * sv + 4 * sv * Math.min(3, L.length)); }
+      if (sv) { const ch = ihfChamp('ih_artificer'); if (ch) ihfMana(ch, 15 * sv); }
     }
     return r;
   };
@@ -44015,7 +43991,7 @@ ihcWrapCast('ch_firebrew', (raw, t, st, c, ab, again) => {
     const p = fire0 ? fire0.apply(this, arguments) : pow;
     if (ihfOn() && !echo && tg && !tg.dead && t.ihRune && t.ihRune.by) {
       const by = t.ihRune.by, n = ihfC(by).ihfKin;
-      if (n && G.towers.includes(by)) ihBrand(tg, ((by.st && by.st.brand) || .08) * .5, n, by);
+      if (n && G.towers.includes(by)) ihBrand(tg, ((by.st && by.st.brand) || .08) * .75, n, by);
     }
     return p;
   };
@@ -44075,12 +44051,8 @@ ihcWrapCast('ch_firebrew', (raw, t, st, c, ab, again) => {
   };
 }
 
-/* ---------- the words: a foe off balance (a status), and its keyword ---------- */
-if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['ih_offbalance', { name: 'Off balance', kw: 'ih:offbalance', kind: 'debuff', pri: 7, icon: 'shieldbreak', hue: '#8a5a30', f: ['ihfOffT', 'ihfOffBy'],
-  def: 'Thrown back by an Ironbreaker\'s shield (Off Balance): its chops bite deeper into the plate.',
-  get: c => c.ihfOffT > bfNow() ? { t: bfLeft(c.ihfOffT), src: bfFrom(c.ihfOffBy), say: 'Thrown back by a shield: the Ironbreakers\' chops bite deeper into its plate.' } : null }]);
-if (typeof SPEC_KW !== 'undefined') SPEC_KW.push({ key: 'ih:offbalance', name: 'Off balance', alias: ['off balance'], cat: 'force', force: 'ironhold',
-  def: 'An Ironbreaker talent (Off Balance): for 2s after its shield throws a foe back, each of its chops at that foe strips more armour.' });
+/* (Off balance, the status and its keyword, retired with the talent's rule: talent clarity, 10 Nov 2026. Off Balance is
+   now plain armour penetration, forces_zzzzzzzzzzzzzzzzzz_plain_ironhold.js.) */
 
 /* ================= THE SILVER ORDER: fresh talents for the samey ones =================
    The owner (7 Nov 2026): "lots of talents have saves 100% mana faster or increase range by x, can you make these more
@@ -44152,7 +44124,7 @@ SP_RIDE.sofCondemn = (c, v, s) => { if (!(c.soCondT > G.time)) c.soCondBy = s; c
     if (C.sofTighten && !echo && t.sofTlN > 0 && !tg.dead) { chill(tg, { slow: (st.slow || .3) + .05 * C.sofTighten * t.sofTlN, slowT: st.slowT || 1.5 }, null, t); soEv('fresh:sofTighten'); }
     if (C.sofGlint && blind && !echo) {
       const o = nearest(tg.x, tg.y, 1.2, 1, tg, q => sofFoe(q) && canTarget(t, st, q))[0];
-      if (o) { soStrike(t, st, o, st.dmg * pow * .4 * C.sofGlint, 'magic'); if (!o.dead) soJudge(o, 1, t); soChainFx(tg.x, hitH(tg), tg.y, o, false); soEv('fresh:sofGlint'); }
+      if (o) { soStrike(t, st, o, st.dmg * pow * .45 * C.sofGlint, 'magic'); soChainFx(tg.x, hitH(tg), tg.y, o, false); soEv('fresh:sofGlint'); }
     }
     return r;
   };
@@ -44169,7 +44141,7 @@ function sofBoltLanded(p, tg, st, src) {
   if (!sofChamp(src, 'so_judge')) return;
   if (C.sofSummary && tg.hp < tg.maxHp * .25 && soJ(tg) > 0 && socxGate(src, 'sofSummary', 8 - 2 * C.sofSummary) && soVerdict(tg, src, 1)) soEv('fresh:sofSummary');   // Summary Ruling
   if (tg.dead) return;
-  if (C.sofBailiff && tg.stunT > 0) { soJudge(tg, C.sofBailiff, src); soEv('fresh:sofBailiff'); }   // Bailiff
+  if (C.sofBailiff && tg.stunT > 0) { soJudge(tg, C.sofBailiff + 1, src); soEv('fresh:sofBailiff'); }   // Bailiff
   if (src.sofQuillN > 0) { src.sofQuillN--; soJudge(tg, 1, src); soEv('fresh:sofQuill'); }   // Clerk's Quill
   if (C.sofLongArm && soJ(tg) >= 3) { chill(tg, { slow: .15 * C.sofLongArm, slowT: 1.5 }, null, src); soEv('fresh:sofLongArm'); }   // Long Arm of the Law
   if (C.sofGuilt && soJ(tg) >= soJMax()) { SP_RIDE.sofCondemn(tg, C.sofGuilt, src); soEv('fresh:sofGuilt'); }   // Mark of Guilt
@@ -44180,7 +44152,8 @@ function sofBoltLanded(p, tg, st, src) {
   socWitness = function (c, src) {
     const W = c && c.socWit, n0 = W ? W.size : 0, by = c && c.socWitBy;
     const r = wit0.call(this, c, src);
-    if (W && W.size > n0 && by && sofC(by).sofSworn) { soRadiate(src, sofC(by).sofSworn, SO.RAD_K); soEv('fresh:sofSworn'); }
+    // (Wards it now, 3s a rank; it made it Radiant: the clarity pass, Nov 2026)
+    if (W && W.size > n0 && by && sofC(by).sofSworn) { soWard(src, 3 * sofC(by).sofSworn); soEv('fresh:sofSworn'); }
     return r;
   };
 }
@@ -44280,13 +44253,13 @@ if (ABIL.so_vow) {
   const oh0 = soOnHit;
   soOnHit = function (c, st, src, amt) {
     const dawn = !!c && !c.dead && sofChamp(src, 'so_dawn'), C = dawn ? (st && st.caps) || sofC(src) : null;
-    if (dawn && C.sofHymn && soWarded(src) && (src.soChN || 0) % 4 === 2) src.soChN = (src.soChN || 0) + 1;   // (every 3rd, not every 4th)
+    if (dawn && C.sofHymn && src.sofHymnT > G.time && (src.soChN || 0) % 4 === 2) src.soChN = (src.soChN || 0) + 1;   // (every 3rd, not every 4th)
     const pre = dawn ? src.soChN || 0 : 0;
     const r = oh0.call(this, c, st, src, amt);
     if (dawn && (src.soChN || 0) !== pre && src.soChN % 4 === 0 && !c.dead) {
-      if (C.sofHalo) { soBlind(c, 2 + .5 * C.sofHalo, src); soJudge(c, C.sofHalo, src); soEv('fresh:sofHalo'); }
+      if (C.sofHalo) { soJudge(c, C.sofHalo + 1, src); soEv('fresh:sofHalo'); }
       if (C.sofEarly) { sofReady(src, 'ch_dawnbreak', C.sofEarly); soEv('fresh:sofEarly'); }
-      if (C.sofHymn && soWarded(src)) soEv('fresh:sofHymn');
+      if (C.sofHymn && src.sofHymnT > G.time) soEv('fresh:sofHymn');
     }
     return r;
   };
@@ -44300,7 +44273,8 @@ if (ABIL.so_vow) {
     if (!t || !t.def || G.hero !== 'so_dawn' || !p) return r;
     const C = sofC(t);
     if (C.sofChorus) { for (const o of soUnitsNear(t.x, t.y, 1.6)) soRadiate(o, 2 * C.sofChorus, SO.RAD_K); soEv('fresh:sofChorus'); }
-    if (C.sofHymn) soWard(t, 3 * C.sofHymn);
+    // (Radiant Hymn: a timer now, not a Ward on her: the clarity pass, Nov 2026)
+    if (C.sofHymn) t.sofHymnT = G.time + 3 * C.sofHymn;
     if (C.sofFirstL || C.sofSear) G.delayed.push({ t: .3, fn: () => {
       if (G.state !== 'play') return; let n = 0;
       inSplash(p.x, p.y, R, false, c => {
@@ -44343,7 +44317,7 @@ if (ABIL.ch_highnoon) {
     const r0 = cast0.call(this, t, st, p, ab2); if (r0 === false || !(st && st.caps && st.caps.sofBell)) return r0;
     G.delayed.push({ t: Math.max(.1, (t.chNoonT || G.time) - G.time), fn: () => {
       if (!abLive(t)) return; const s = t.st || effStats(t); let n = 0;
-      for (const c of G.creeps.slice()) if (sofFoe(c) && soBlinded(c) && soJ(c) > 0 && canTarget(t, s, c) && inRange(t, s, c) && soVerdict(c, t, 1)) n++;
+      for (const c of G.creeps.slice()) if (sofFoe(c) && soJ(c) > 0 && canTarget(t, s, c) && inRange(t, s, c) && soVerdict(c, t, 1)) n++;
       if (n) { fxRing(t.x, t.y, 1, SO.COL.gold); sfx('ward', 1); soEv('fresh:sofBell'); }
     } });
     return r0;
@@ -44366,13 +44340,13 @@ if (ABIL.ch_highnoon) {
       // Unbroken: a walker thrown back onto a Templar of the Ford meets its shield
       if (C.sofPride) for (const c of S) {
         if (c.dead || c.fly) continue; const o = shields.find(q => Math.hypot(q.x - c.x, q.y - c.y) <= 1); if (!o) continue;
-        stun(c, .4 * C.sofPride, .4, null); soJudge(c, 1, o); o.soBashAt = G.time; fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 6); soEv('fresh:sofPride');
+        stun(c, .5 * C.sofPride, .4, null); o.soBashAt = G.time; fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 6); soEv('fresh:sofPride');
       }
       // Burnished Shields: each Templar of the Ford the sweep made Radiant flashes its shield at the walkers in its reach
       if (C.sofBurnish) for (const o of shields) {
         if (!(o.soRadT > G.time) || (!sagaHas('fin') && Math.hypot(o.x - p.x, o.y - p.y) > R + 1.3)) continue;
         const s2 = o.st || effStats(o); let n = 0;
-        for (const c of G.creeps) { if (!sofFoe(c) || c.fly || Math.hypot(c.x - o.x, c.y - o.y) > s2.range || !canTarget(o, s2, c)) continue; soJudge(c, 1, o); stun(c, .3 * C.sofBurnish, .4, null); n++; }
+        for (const c of G.creeps) { if (!sofFoe(c) || c.fly || Math.hypot(c.x - o.x, c.y - o.y) > s2.range || !canTarget(o, s2, c)) continue; soJudge(c, C.sofBurnish, o); n++; }
         if (n) { o.soBashAt = G.time; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) * .6, life: .3, max: .3, size: .7, col: SO.COL.light }); fxRing(o.x, o.y, s2.range, SO.COL.gold); soEv('fresh:sofBurnish'); }
       }
     } });
@@ -44387,7 +44361,7 @@ if (ABIL.ch_fordstandard) {
     G.delayed.push({ t: .25, fn: () => {
       if (!abLive(t)) return;
       for (const o of soUnitsNear(t.x, t.y, 1.6, t)) {
-        if (C.sofStandard) { soRadiate(o, 2, SO.RAD_K); soEv('fresh:sofStandard'); }
+        if (C.sofStandard) { soRadiate(o, 1.5 * C.sofStandard, SO.RAD_K); soEv('fresh:sofStandard'); }
         if (C.sofRallyB) { o.cd = 0; soEv('fresh:sofRallyB'); }
       }
     } });
@@ -44434,7 +44408,7 @@ if (ABIL.so_hallow) {
   ab.cast = function (t, st, p, ab2) {
     const r0 = cast0.call(this, t, st, p, ab2);
     if (r0 !== false && st && st.caps && st.caps.sofHallow && G.hazards.length < 46) {
-      G.hazards.push({ k: 'so_incense', x: t.x, z: t.y, r: (st.range || 1.5) * .9, t: 4, tick: .25, jt: 0, src: t, st, slow: .2, hallow: 1 });
+      G.hazards.push({ k: 'so_incense', x: t.x, z: t.y, r: (st.range || 1.5) * .9, t: 5, tick: .25, jt: 0, src: t, st, slow: 0, hallow: 1 });
       soEv('fresh:sofHallow');
     }
     return r0;
@@ -44451,8 +44425,8 @@ if (ABIL.so_hallow) {
     if (!ours) return r;
     if (inc && inc.length) {
       const sp = o.sp || st.splash || .9;
-      inSplash(x, y, sp, true, c => { if (sofFoe(c) && canTarget(t, st, c)) soJudge(c, 1, t); });
-      for (const h of inc) if (!h.sofFanned) { h.sofFanned = 1; h.t += C.sofFan; }
+      // (Fanned Embers: a Judgement a rank; the smoke no longer smoulders on: the clarity pass, Nov 2026)
+      inSplash(x, y, sp, true, c => { if (sofFoe(c) && canTarget(t, st, c)) soJudge(c, C.sofFan, t); });
       soEv('fresh:sofFan');
     }
     if (C.sofAsh && !o.small && o.tg && sofFoe(o.tg) && !o.tg.fly && Math.hypot(o.tg.x - x, o.tg.y - y) <= .5) { soBlind(o.tg, .3 * C.sofAsh, t); soEv('fresh:sofAsh'); }
@@ -44498,7 +44472,7 @@ if (ABIL.so_seize) {
     if (r0 === false || !k || !c0) return r0;
     soLater(t, .35, () => {
       if (c0.dead) return; let n = 0;
-      for (const o of nearest(c0.x, c0.y, 2, 8, c0, q => q.mpMax > 0 && sofFoe(q))) { soJudge(o, k, t); if (typeof epDrain === 'function') epDrain(o, 10 * k); n++; }
+      for (const o of nearest(c0.x, c0.y, 2, 8, c0, q => q.mpMax > 0 && sofFoe(q))) { soJudge(o, k + 1, t); n++; }
       if (n) soEv('fresh:sofConfess');
     });
     return r0;
@@ -44869,7 +44843,7 @@ function sbfRise(lv) {
   sbChain = function (t, st, first, m, o = {}) {
     const r = ch0.apply(this, arguments); if (!r || !t || !t.st) return r;
     const C = t.st.caps || {};
-    if (C.sbfDrink) { let n = 0; for (const c of r.hit) if (n < 3 && sbCond(c)) n++; if (n) sbfMana(t, C.sbfDrink * n); }   // Drinking the Storm
+    if (C.sbfDrink) { let n = 0; for (const c of r.hit) if (n < 3 && c.sbWetT > G.time) n++; if (n) sbfMana(t, C.sbfDrink * n); }   // Drinking the Storm
     if (C.sbfGround && !o.depth && r.last) {   // Ground Strike: the last bolt grounds and soaks
       const gx = r.last.x, gz = r.last.y; let n = 0;
       inSplash(gx, gz, .8, true, c => { if (!c.ent && !c.phased) { sbSoak(c, 2 * C.sbfGround); n++; } });
@@ -44883,9 +44857,10 @@ function sbfRise(lv) {
   };
   const z0 = sbZap;
   sbZap = function (t, st, c, amt, quiet) {   // Wardsplitter Bolts: through the wards of the wet
-    const k = t && t.st && c && !c.dead && sbfK(t, 'sbfWard') && sbCond(c) ? sbfK(t, 'sbfWard') : 0;
+    // (sbfWard: no talent carries it now; Wardsplitter Bolts is plain ward pen, talent clarity)
+    const k = t && t.st && c && !c.dead && sbfK(t, 'sbfWard') && c.sbWetT > G.time ? sbfK(t, 'sbfWard') : 0;
     if (!k) return z0.apply(this, arguments);
-    const s = t.st, mp = s.magicPen; s.magicPen = (mp || 0) + .05 * k;
+    const s = t.st, mp = s.magicPen; s.magicPen = (mp || 0) + .1 * k;
     try { return z0.apply(this, arguments); } finally { s.magicPen = mp; }
   };
 }
@@ -44971,17 +44946,19 @@ let SBF_STOMP = null, SBF_BLADE = null;   // the Earthbinder stomping / Oshana c
   const ab = ABIL.ch_gather, f0 = ab && ab.cast;
   if (f0) ab.cast = function (t, st, tg, a) {
     const p = tg && tg !== t && tg.x != null ? { x: tg.x, y: tg.y } : null, kr = sbfK(t, 'sbfRainOn');
-    let wet = 0; if (p && kr) { const R0 = champQR(t, a || ab); for (const c of G.creeps) if (!c.dead && !c.ent && c.sbWetT > G.time && Math.hypot(c.x - p.x, c.y - p.y) <= R0) wet++; }
+    // (every foe struck, soaked or not: talent clarity)
+    let wet = 0; if (p && kr) { const R0 = champQR(t, a || ab); for (const c of G.creeps) if (!c.dead && !c.ent && !c.phased && Math.hypot(c.x - p.x, c.y - p.y) <= R0) wet++; }
     const r = f0.apply(this, arguments); if (r === false) return r;
-    if (wet) sbFeed(t, Math.min(wet, 3 * kr));   // Rain on Rain
+    if (wet) sbFeed(t, Math.min(wet, 2 * kr));   // Rain on Rain
     const kc = sbfK(t, 'sbfCloud'); if (kc && p) sbCloudAt(t, t.st || st, p.x, p.y, 1, 3 * kc);   // Heavy Clouds
     t.sbfGatherAt = G.time;   // (Eye of the Gathering: the 4s after it)
     return r;
   };
   const a0 = FORCE_ATTACK.sbThunder;
   FORCE_ATTACK.sbThunder = function (t, st, tg, pow) {   // Eye of the Gathering
-    const wet = !!(tg && tg.sbWetT > G.time), r = a0.apply(this, arguments);
-    if (wet && t.sbfGatherAt != null && G.time - t.sbfGatherAt <= 4) { const k = sbfK(t, 'sbfEye'); if (k) sbFeed(t, k); }
+    // (every bolt, soaked foe or not: talent clarity)
+    const r = a0.apply(this, arguments);
+    if (tg && t.sbfGatherAt != null && G.time - t.sbfGatherAt <= 4) { const k = sbfK(t, 'sbfEye'); if (k) sbFeed(t, k); }
     return r;
   };
   const dr = ABIL.ch_eyestorm, d0 = dr && dr.cast;
@@ -44990,8 +44967,9 @@ let SBF_STOMP = null, SBF_BLADE = null;   // the Earthbinder stomping / Oshana c
     const A = a || dr, n = typeof sbcDrumN === 'function' ? sbcDrumN(t, A) : 6;
     for (let k = 0; k < n; k++) G.delayed.push({ t: .13 + k * .45, fn: () => {
       if (!abLive(t)) return; const s = t.st || st, c = abFoes(t, s, abReach(t, s, A), q => !q.ent && !q.phased).sort((x, y) => x.remain - y.remain)[0];
-      if (!c || c.dead || !(c.sbWetT > G.time)) return;
-      for (const o of sbfOf('sb_thundercaller')) if (Math.hypot(o.x - t.x, o.y - t.y) <= 2 && o.st) sbChain(o, o.st, c, .3, { jumps: 1, w: .8 });
+      // (every beat, soaked foe or not, 25%: talent clarity)
+      if (!c || c.dead) return;
+      for (const o of sbfOf('sb_thundercaller')) if (Math.hypot(o.x - t.x, o.y - t.y) <= 2 && o.st) sbChain(o, o.st, c, .25, { jumps: 1, w: .8 });
     } });
     return r;
   };
@@ -45206,15 +45184,7 @@ WB_LINE_HOOK.push(c => { c.wbfLineAt = G.time; });
     return r;
   };
 }
-// a rune laid while a spell casts: Sword and Stone (Oathbreaker Thrust's runes Bound with stone)
-{
-  const r0 = wbRune;
-  wbRune = function (t, st, x, z, kind, o) {
-    const q = r0(t, st, x, z, kind, o);
-    if (q && kind === 'oath' && wbfNow('wb_swordplant') && wbCap(st, 'wbfThrustStone') >= 2) wbRuneAdd(q, 'stone');
-    return q;
-  };
-}
+// (Sword and Stone no longer Binds Oathbreaker Thrust's runes with stone: talent clarity, 10 Nov 2026; it brands once more a rank, its sp)
 
 /* ---------- blows on the units: Avenging Oath, Anvil's Toll ---------- */
 {
@@ -45456,11 +45426,9 @@ let WBF_VOW = null, WBF_VOW_WR = false;
   const m0 = wbMend;
   wbMend = function (t, amt) {
     const k = WBF_VOW ? wbfC(WBF_VOW, 'wbfChaplain') : 0, wasW = !!(t && t.wounded);
-    if (k && wasW) amt *= 2;
-    const r = m0(t, amt);
-    // Field Chaplain (rank 2): mended to half its health, it rises from its wound
-    if (k >= 2 && wasW && t.wounded && t.maxHp && t.hp >= t.maxHp * .5) t.wounded = false;
-    return r;
+    // Field Chaplain: a Wounded knight mended 2x (rank 1) or 3x (rank 2)
+    if (k && wasW) amt *= 1 + k;
+    return m0(t, amt);
   };
 }
 // (the strike is wrapped once the core's own wrap (forces_wardbound_b.js wbVowWrap) has run, so it sits outside it)
@@ -45482,7 +45450,7 @@ WB_HOOK.live.push((t, st) => {
   const n = wbCap(st, 'wbfUrgent'); if (!n || !st.rate) return;
   if (G.towers.some(o => o !== t && o.wounded && !o.wrecked && wbUnit(o) && Math.hypot(o.x - t.x, o.y - t.y) <= 1.6)) st.rate /= 1 + .05 * n;
 });
-// Incense of Vigil and Choking Censer: what its Censer Smoke does each frame
+// Incense of Vigil (foes in the smoke gain a brand every 3s, 2s at rank 2) and Choking Censer: what its Censer Smoke does each frame
 WB_HOOK.tick.push(() => {
   for (const z of G.hazards) {
     if (z.k !== 'wb_zone' || z.ab !== 'wb_censer' || !(z.t > 0) || !z.src || !G.towers.includes(z.src)) continue;
@@ -45490,8 +45458,7 @@ WB_HOOK.tick.push(() => {
     const M = z.wbfAt || (z.wbfAt = new Map());
     for (const c of G.creeps) {
       if (c.dead || c.ent || c.phased || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue;
-      if (inc && wbBrandOf(c) > 0) c.wbBrandT = Math.max(c.wbBrandT, G.time + WB_BRAND.fade);
-      if (inc >= 2) { const a = M.get(c); if (a == null) M.set(c, G.time); else if (G.time - a >= 2) { M.set(c, G.time); wbBrand(c, 1, z.src); } }
+      if (inc) { const a = M.get(c); if (a == null) M.set(c, G.time); else if (G.time - a >= (inc >= 2 ? 2 : 3)) { M.set(c, G.time); wbBrand(c, 1, z.src); } }
       if (ch && (c.atk || c.siege)) c.wbfChokeT = G.time + 1.5;
     }
   }
@@ -45564,8 +45531,8 @@ WB_ONHIT.push((c, st, t) => {
     case 'wb_shieldwall':   // Braced Shove: siege troops stunned longer
       if (C.wbfBraced && (c.atk || c.siege)) { const x = .4 * C.wbfBraced; G.delayed.push({ t: 0, fn: () => { if (!c.dead && c.stunT > 0) c.stunT += x; } }); }
       break;
-    case 'wb_quakeline':   // Fault Line: twice on a rune or a ward-line
-      if (C.wbfFault && !c.dead && (wbfOnRune(c) || wbOnLine(c, .3))) wbBrand(c, 2, t);
+    case 'wb_quakeline':   // Fault Line: twice on a rune
+      if (C.wbfFault && !c.dead && wbfOnRune(c)) wbBrand(c, 2, t);
       break;
     case 'wb_pinbolt':   // Crank Drill: pinned longer for each brand (the pin follows the hit)
       if (C.wbfCrank && pre.br > 0) { const x = .15 * C.wbfCrank * pre.br; G.delayed.push({ t: 0, fn: () => { if (!c.dead && c.rootT > G.time && c.rootBy === t) { c.rootT += x; c.stunT += x; } } }); }
@@ -45756,10 +45723,9 @@ const sslCaps = t => (t && t.st && t.st.caps) || {};
       if (k) { sfx('so_bash', 1); soEv('aff:so_lion:bash'); }
     }
     const C = sslCaps(L);
-    // Debt of Oaths: the slam brings The Crossing 1s nearer (shares the Verdicts' gate: twice a second at most)
-    if (C.so_lion_debt && L.ab && L.ab.cd && L.ab.cd.ch_lionsdue > G.time && socxGate(L, 'debt', .5)) { L.ab.cd.ch_lionsdue = Math.max(G.time, L.ab.cd.ch_lionsdue - 1); soEv('cap:so_lion_debt'); }
-    // Swift Reprisal: a slam that strikes 2 or more walkers draws his next strike at once
-    if (C.sofReprisal && n >= 2 && socxGate(L, 'sofReprisal', 7 - 1.5 * C.sofReprisal)) { L.cd = 0; soEv('fresh:sofReprisal'); }
+    // (Debt of Oaths no longer counts the slams: only the Order's Verdicts near him, forces_zzzzzzzzz_caps_silver.js; the clarity pass, Nov 2026)
+    // Swift Reprisal: a slam that strikes a walker draws his next strike at once
+    if (C.sofReprisal && n >= 1 && socxGate(L, 'sofReprisal', 7 - 1.5 * C.sofReprisal)) { L.cd = 0; soEv('fresh:sofReprisal'); }
     return n;
   };
 }
@@ -45774,7 +45740,7 @@ if (ABIL.ch_summons) {
       let n = 0;
       for (const q of G.creeps) {
         if (q === c || !socFoe(q) || !abWalker(q) || !canTarget(t, st, q) || socSeg(q.x, q.y, t.x, t.y, c.x, c.y)[0] > .4) continue;
-        soJudge(q, 1, t); woundFoe(q, 2 * C.sofTrample); fxDust(q.x, q.y, 2); n++;
+        soJudge(q, C.sofTrample, t); fxDust(q.x, q.y, 2); n++;
       }
       if (typeof rfx === 'function') rfx({ k: 'drag', x0: t.x, z0: t.y, x1: c.x, z1: c.y, h: .15, col: '#c8ccd8', life: .5 });
       if (n) soEv('fresh:sofTrample');
@@ -45813,7 +45779,8 @@ if (ABIL.ch_summons) {
   const H = FORCE_HOOKS.silver, amp0 = H.amp;
   H.amp = function (c, src, dot) {
     let a = amp0 ? amp0.call(this, c, src, dot) || 0 : 0;
-    if (!dot && c && src && src.def && src.def.unit === 'ch_morrow' && G.hero === 'so_judge' && !AB_NOW && c.stunT > 0) { const k = sslCaps(src).sofBailiff; if (k) { a += .1 * k; soEv('fresh:sofBailiff:amp'); } }
+    // (Ride Them Down's harder strike on a held foe went in the clarity pass, Nov 2026: it lays more Judgement instead,
+    // forces_zzzzzzzzzz_fresh_silver.js)
     return a;
   };
 }
@@ -45880,7 +45847,7 @@ function talRemapByName(src, oldNames, list) {
 const CCR = {
   SPEAR_FLY: .16, SPEAR_SLOW: [.4, .4, .42, .42, .45, .45], SPEAR_SLOWT: [2.5, 2.5, 2.5, 2.5, 3, 3],
   COFFIN_TICK: .5, COFFIN_BOSS: .45, BLOOM_T: 10, BLOOM_R: 1.1, BLOOM_SLOW: .4, BLOOM_MAX: 12,
-  LANCE_HOLD: .5, DEEP_R: .8, HAND_MANA: 10, BURST_R: 1, BURST_FRZ: .6, INK_R: .6, INK_GAP: 3, SECOND_N: 4, THERMAL_R: .8,
+  DEEP_R: .8, HAND_MANA: 10, BURST_R: 1, BURST_FRZ: .6, INK_R: .6, INK_GAP: 3, SECOND_N: 4,
   CRIT_COL: '#bfefff', CRIT_GAP: .08,
 };
 const ccFrozen = c => !!(c && !c.dead && c.stunT > 0 && c.stunEl === 'frost');
@@ -45895,8 +45862,7 @@ function ccrSpell(id, o) {
 /* =====================================================================================================
    FROST SPEAR (cc_glacialglyph)
    ===================================================================================================== */
-// a spear of ice at c (m: its share of the strike, k: the cast's power); Frozen Lance: on a Frozen foe it always crits and
-// holds the ice a little longer
+// a spear of ice at c (m: its share of the strike, k: the cast's power); Frozen Lance: on a Frozen foe it always crits
 function ccrSpear(t, st, c, m, k, free) {
   if (!c || c.dead) return;
   const [hx, hh, hz] = ccHand(t, towerTop(t) * .95), ab = ABIL.cc_glacialglyph;
@@ -45907,7 +45873,7 @@ function ccrSpear(t, st, c, m, k, free) {
     const pw = s.pw || {}, sl = byT(ab.by.slow, t) + (pw.ccCirclet || 0);
     chill(q, { slow: sl, slowT: byT(ab.by.slowT, t) }, 'frost', t);
     if (pw.ccCirclet) { ccEv('item:cc_circlet'); inSplash(q.x, q.y, .6, false, o => { if (o !== q && !o.ent) chill(o, { slow: sl, slowT: 2 }, 'frost', t); }); }
-    if (lance) { q.stunT += CCR.LANCE_HOLD; ccEv('cap:ccrLance'); }
+    if (lance) ccEv('cap:ccrLance');
     if (frz && ccrCap(s, 'ccrHand') && t.ab) gainMana(t, CCR.HAND_MANA * ccrCap(s, 'ccrHand'));   /* Practised Hand */
     fxShards(q.x, q.y, hitH(q), free ? 4 : 8);
   } });
@@ -46017,7 +45983,7 @@ function ccrSecond(t, st, c) {
    ===================================================================================================== */
 function ccFrozenCrit(t, st) {
   const C = (st && st.caps) || {};
-  return .25 * (C.ccrEye || 0) + .15 * (C.ccrFocus || 0) + .2 * (C.ccrThermal || 0) + .1 * (C.ccrLens || 0);
+  return .25 * (C.ccrEye || 0) + .15 * (C.ccrFocus || 0) + .25 * (C.ccrThermal || 0) + .1 * (C.ccrLens || 0);
 }
 function ccFrozenCritK(t, st) {
   const C = (st && st.caps) || {};
@@ -46030,8 +45996,6 @@ function ccrCritFx(t, c, amt) {
   const h = hitH(c); fxShards(c.x, c.y, h, 14); part({ k: 'flare', x: c.x, z: c.y, h, life: .22, max: .22, size: 1, col: CCR.CRIT_COL });
   if (typeof addText === 'function') addText(c.x, c.y, h + .95, Math.round(amt) + '!', CCR.CRIT_COL);
   sfx('shatter', 1);
-  const C = (t && t.st && t.st.caps) || {};
-  if (C.ccrThermal && t.def.unit === 'cc_pyroclast') { inSplash(c.x, c.y, CCR.THERMAL_R, false, o => { if (o !== c && !o.ent) chill(o, { slow: .3, slowT: 2 }, 'frost', t); }); ccEv('tal:ccrThermal'); }
 }
 
 /* =====================================================================================================
@@ -46050,12 +46014,12 @@ function ccrCritFx(t, c, amt) {
   re(F, 'Rime Field', GT('Deep Chill', 'snowflake', 3, 1, 1, `While Ice Coffin holds a foe, its cold chills every other foe within ${CCR.DEEP_R} cells 30%, and a foe that dies in the ice gives 10 mana back.`, {}, { cap: 'ccrDeep', sp: { ab: 'cc_rimelance', kill: { mana: 10 } } }));
   re(F, "Scrivener's Hand", GT('Second Spear', 'icicle', 3, 2, 1, `Every ${gOrd(CCR.SECOND_N)} bolt is followed by a free Frost Spear at half strength.`, {}, { cap: 'ccrSecond', sp: { ab: 'cc_glacialglyph' } }));
   re(F, 'Glacier Script', GT("Winter's Garden", 'icepeak', 4, 0, 1, 'Shatterbloom blooms on up to 3 foes at once, and each bloom that bursts plants a new one on the toughest foe it froze (twice down the chain).', {}, { cap: 'ccrGarden', sp: { ab: 'cc_hoarbloom', by: { n: 2 } } }), 4, 0, [3, 0]);
-  re(F, 'Flash Freeze', GT('Frozen Lance', 'icicle', 4, 1, 1, `Frost Spear always crits a Frozen foe and holds its ice ${CCR.LANCE_HOLD}s longer, and each Shatterbloom brings Frost Spear 2s nearer.`, {}, { cap: 'ccrLance', sp: [{ ab: 'cc_glacialglyph' }, { ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', 2] }] }), 4, 1);
+  re(F, 'Flash Freeze', GT('Frozen Lance', 'icicle', 4, 1, 1, 'Frost Spear always crits a Frozen foe, and each Shatterbloom brings Frost Spear 2s nearer.', {}, { cap: 'ccrLance', sp: [{ ab: 'cc_glacialglyph' }, { ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', 2] }] }), 4, 1);
   re(F, 'Lingering Rime', GT('Coffin Burst', 'iceblock', 4, 2, 1, `When Ice Coffin lets go, the ice bursts: every foe within ${CCR.BURST_R} cell of it is Frozen ${CCR.BURST_FRZ}s.`, {}, { cap: 'ccrBurst', sp: { ab: 'cc_rimelance' } }));
   // the other mages: each reads the Frozen crit its own way
   re(T.arrow.list, 'Keen Reader', GT('Cold Focus', 'eye', 1, 1, 2, n => `Its missiles crit Frozen foes ${15 * n}% of the time: the ice holds them still for a clean shot.`, {}, { cap: 'ccrFocus' }));
   re(T.storm.list, 'Fallen Lights', GT('Cold Starlight', 'lens', 1, 2, 2, n => `Against a Frozen foe its star-bolts and spells crit ${10 * n}% of the time, and those crits strike ${abPct(.5 * n)} harder.`, {}, { cap: 'ccrLens' }));
-  if (T.cannon.list.find(o => o.name === 'Ember Breath')) re(T.cannon.list, 'Ember Breath', GT('Thermal Crack', 'firering', 1, 3, 2, n => `Its fireballs crit Frozen foes ${20 * n}% of the time, and each such crit cracks out a cold steam that chills every foe within ${CCR.THERMAL_R} cells 30% for 2s.`, {}, { cap: 'ccrThermal' }));
+  if (T.cannon.list.find(o => o.name === 'Ember Breath')) re(T.cannon.list, 'Ember Breath', GT('Thermal Crack', 'firering', 1, 3, 2, n => `Its fireballs crit Frozen foes ${25 * n}% of the time.`, {}, { cap: 'ccrThermal' }));
 }
 
 /* =====================================================================================================
@@ -46111,7 +46075,7 @@ function ccrCritFx(t, c, amt) {
      cc_spectral     Thrown Riftblade       a spectral copy of the blade thrown down a line of foes and back through the rift
    Also: each Conclave unit's role line on its build card (ROLE), and the wave card's one-line tips for a force run's
    counters (forceTipLine, ui.js). Every number is in CRF. */
-const CRF = { LUNGE_FAR: 1.6, RIFT_R: .4, RIFT_T: 2, STEP_R: 1.5, SPLIT_R: .3, THROW_LEN: 1.5, THROW_W: .4, THROW_BACK: .5, TWIN_GAP: .4, GHOST_FAR: 1.2, GHOST_K: .5 };
+const CRF = { LUNGE_FAR: 1.6, RIFT_R: .4, RIFT_T: 2, STEP_R: 1.5, STEP_K: .4, SPLIT_R: .3, THROW_LEN: 1.5, THROW_W: .4, THROW_BACK: .5, TWIN_GAP: .4, GHOST_FAR: 1.2 };
 function crfSpell(id, o) {
   const ab = ABIL[id]; if (!ab) return console.warn('conclave rift: no spell', id);
   for (const k of ['zone', 'every', 'rr', 'len', 'r']) delete ab[k];
@@ -46125,13 +46089,12 @@ function crfLunge(t, st, c, k, m, step) {
   ccBlinkTo(t, c, .3);
   G.delayed.push({ t: .17, fn: () => {
     if (c.dead || !abLive(t)) return; const s = t.st || st, ab = ABIL.cc_blinkstrike;
-    const was = c.stunT > 0;
     ccAb(t, s, c, m, k, { type: 'phys' }); if (!c.dead) ccStaggerFoe(c, t);
     fxSpark(c.x, c.y, hitH(c), '#e8d8ff');
     if (!step) ccGlyph({ s: 'arcane', sub: 'glyph', x: x0, z: z0, r: CRF.RIFT_R, t: CRF.RIFT_T, src: t, st: s, every: .3, dmg: (s.dmg || 0) * byT(ab.by.after, t) * .5, type: 'phys', tag: 'abil' });
-    if (!step && ccrCap(s, 'ccfStep') && (c.dead || was)) {   /* Unbroken Step: on through the rift to the next walker */
+    if (!step && ccrCap(s, 'ccfStep')) {   /* Unbroken Step: on through the rift to the next walker, every lunge */
       const o = nearest(c.x, c.y, CRF.STEP_R, 1, c, q => !q.dead && !q.ent && abWalker(q) && canTarget(t, s, q))[0];
-      if (o) { ccEv('tal:ccfStep'); G.delayed.push({ t: .2, fn: () => { if (!o.dead && abLive(t)) crfLunge(t, s, o, k, m * .5, true); } }); }
+      if (o) { ccEv('tal:ccfStep'); G.delayed.push({ t: .2, fn: () => { if (!o.dead && abLive(t)) crfLunge(t, s, o, k, m * CRF.STEP_K, true); } }); }
     }
   } });
 }
@@ -46167,7 +46130,7 @@ crfSpell('cc_sigilcleave', { name: 'Ward-Splitter', short: 'Split', glyph: 'shie
     const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t))), ghost = ccrCap(st, 'ccxGhostRip');
     const L = [c].concat(abFoes(t, st, (st.range || 1.4) + CRF.SPLIT_R + (ghost ? CRF.GHOST_FAR : 0)).filter(o => o !== c && !(o.ccSplitT > G.time)).sort((a, b) => (crfWarded(b) - crfWarded(a)) || abByTough(a, b)).slice(0, n - 1));
     L.forEach((o, i) => G.delayed.push({ t: i * .18, fn: () => { if (o.dead || !abLive(t)) return; const s = t.st || st; if (i) ccBlinkTo(t, o, .2); abRun(ab.id, () => crfSplit(t, s, o, k, ab));
-      if (ghost) G.delayed.push({ t: .4, fn: () => { if (!o.dead && abLive(t)) { abRun(ab.id, () => ccAb(t, t.st || s, o, byT(ab.by.mult, t) * CRF.GHOST_K, k, { type: 'phys' })); ccGhostFx(t, o); } } }); } }));
+      if (ghost && i) ccGhostFx(t, o); } }));
     sfx('glaiveHit', 1);
   } });
 
@@ -46180,10 +46143,10 @@ function crfThrow(t, st, c, k, ab, twin) {
     G.delayed.push({ t: d / 9, fn: () => { if (o.dead || !abLive(t)) return; const s = t.st || st; abRun(ab.id, () => { abAoe(() => ccAb(t, s, o, m, k, { type: 'phys' })); if (!o.dead) ccStaggerFoe(o, t); }); ccGhostFx(t, o); } });
     G.delayed.push({ t: len / 9 + .15 + (len - d) / 9, fn: () => { if (o.dead || !abLive(t)) return; const s = t.st || st; abRun(ab.id, () => abAoe(() => ccAb(t, s, o, m * CRF.THROW_BACK, k, { type: 'phys', noRx: true }))); } }); }
   G.delayed.push({ t: len / 9 + .15, fn: () => { if (abLive(t)) rfx({ k: 'streak', x0: t.x + ux * len, h0: .5, z0: t.y + uz * len, x1: t.x, h1: h, z1: t.y, col: '#ecdcff', w: .06, life: .4 }); } });
-  if (!twin && ccrCap(st, 'ccxEight')) { ccEv('cap:ccxEight'); G.delayed.push({ t: CRF.TWIN_GAP, fn: () => { if (!c.dead && abLive(t)) crfThrow(t, t.st || st, c, k, ab, true); } }); }
+  if (!twin && Math.round(byT(ab.by.n, t)) > 1) { ccEv('cap:ccxEight'); G.delayed.push({ t: CRF.TWIN_GAP, fn: () => { if (!c.dead && abLive(t)) crfThrow(t, t.st || st, c, k, ab, true); } }); }
 }
 crfSpell('cc_spectral', { name: 'Thrown Riftblade', short: 'Throw', glyph: 'glaive2', hue: '#ecdcff', mana: 110, cd: 16, pref: 'grouped',
-  by: { mult: [2.4, 2.4, 2.6, 2.6, 2.8, 2.8] },
+  by: { mult: [2.4, 2.4, 2.6, 2.6, 2.8, 2.8], n: [1, 1, 1, 1, 1, 1] },
   auto: 'two or more walkers in a line within its reach + 1.5 cells, or a boss or elite', none: 'no walkers in reach',
   blurb: 'Hurls a spectral copy of its riftsteel blade through a line of foes; it comes back through the rift, cutting again.',
   text: (t, st, ab) => `Hurls a spectral copy of its blade at a walker and ${CRF.THROW_LEN} cells beyond: every foe on the line takes ${xD(st, byT(ab.by.mult, t))} and a stack of Stagger, and the blade comes back through the rift, cutting each again for ${xD(st, byT(ab.by.mult, t) * CRF.THROW_BACK)}.`,
@@ -48262,6 +48225,1767 @@ function hwTypical(w, join) {
 }
 // the reforged form's model key for the owner's model (WEAPON_MDL); until it is there the hero keeps its own model, at full glow
 const hwModel = h => h && h.ult && WEAPON_MDL['hw_ult_' + h.u] ? 'hw_ult_' + h.u : null;
+
+/* ================= TALENT CLARITY: six rows, a tag on every talent, plain text (owner, 10 Nov 2026) =================
+   The owner: "talents are little bit too conditional ... people will be playing in a flow state and want to just quickly
+   figure out what a talent does and pick it. need to understand at a glance if its something that will help their desired
+   plan or not", and "can we keep the current amount of talents but create an extra row so those talents are spread
+   further out, keep the capstones as they are". The audit and the rules: docs/talent_clarity.md.
+   - SIX ROWS. Every force tree and Champion tree keeps its talents, names and capstones; the talents of rows I-IV are
+     spread over rows I-V (TAL_SPREAD: each stays on its row or drops one, a chain joined by arrows drops together) and the
+     capstones sit on row VI as they were. tools/spread_trees.js finds the layout and writes the table below; it keeps
+     every rule of tools/check_talent_trees.js. The talents keep their places in the list (G.tal[slot][i]), so a pick still
+     names the same talent; game.js deserialize (ftv 6) refunds a pick an older save made that the new rows no longer allow.
+   - The rows open at TAL_TIER6 points in that tree (the towers' four-row trees keep TAL_TIER): the capstone still opens at
+     12, as before, so a run reaches it on the same points.
+   - A spell keeps the strength its old row gave it (SP_DEPTH, forces_zy_spells.js): ab.row follows the talent to its new
+     row, ab.rowPre remembers the row its depth was set on.
+   - TAGS. Each talent carries one tag from a small fixed set (TAL_TAGS), shown as a coloured chip on its node and a word in
+     its tooltip, so the player sees at a glance what it is for. A force's plain-text file sets each talent's tag; talTag()
+     derives one for anything else.
+   - PLAIN TEXT. talPlain(force, tree, table) gives a tree's talents their plain words (one effect, the result first, at
+     most one condition and one keyword) and, where a talent's rule was simplified, its new sp / mod / cap / mana. The
+     tables are the forces' own files (forces_zzzzzzzzzzzzzzzzzz_plain_<force>.js), loaded after this one.
+   - RANKS. talRankSteps(t) reads the numbers that change from rank to rank, so the tooltip shows what the next rank adds. */
+const TAL_TIER6 = [0, 2, 4, 7, 10, 12];
+/* <spread> */
+const TAL_SPREAD = {
+  "grove.glaive": {"Long Haft":[0,3],"Hold the Line":[0,2],"Set Spears":[2,3],"Shieldsplitter":[0,1],"Thornhedge":[1,3],"Bloodthorn":[2,0],"Rootbreaker":[4,0],"Phalanx":[3,1],"Wall of Spears":[5,2],"Impaler":[5,0],"Spearwood Rising":[3,0],"Living Palisade":[5,1],"Skewer":[3,3],"Splintered Line":[4,2],"Deep Thrust":[1,0],"Living Haft":[1,1],"Thornwall Ward":[2,2]},
+  "grove.arrow": {"Patient Hunter":[0,3],"Canopy Sight":[0,0],"Mark the Quarry":[2,2],"Thornpoint Arrows":[0,1],"Paired Shafts":[2,0],"Thornseed Arrow":[1,0],"Heartseeker":[1,3],"Snaring Shot":[3,0],"Pinning Shot":[5,2],"Thornrain":[5,1],"Nailing Shaft":[4,3],"Still Quarry":[3,2],"Wounded Prey":[4,1],"Splitting Shaft":[5,3],"Quick Nock":[1,2],"Hunter's Rhythm":[2,1],"Hushed Quarry":[3,3]},
+  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,1],"Clinging Briars":[2,0],"Thorn Hold":[0,3],"Mothcloud":[1,0],"The Deep Hungers":[5,3],"Wither":[4,3],"Second Snare":[3,0],"Bramble Squeeze":[2,1],"Spreading Roots":[3,2],"Bloodbriar":[4,1],"Rootburst":[3,3],"Overgrowth":[5,2],"Strangleroot":[5,0],"Warden's Reach":[1,2],"Sapwell":[1,3],"Quickening Sap":[2,2]},
+  "grove.arcane": {"Heavy Lance":[0,1],"Trample":[1,0],"Wheel About":[0,2],"Bowl Over":[3,0],"Run to Ground":[5,3],"Mark of the Hunt":[3,3],"Bounding Leap":[2,0],"White Hart's Hunt":[4,3],"Lord of the Glade":[3,1],"Hooves of Thunder":[5,2],"Hunter's Finish":[5,0],"Second Charge":[2,1],"Goring Antlers":[1,3],"Long Gallop":[0,3],"Stag's Wind":[1,2],"Herd Instinct":[4,2]},
+  "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,3],"Wing-Clipper":[2,3],"Bramble Claws":[1,1],"Primal Pounce":[1,3],"Hawk's Mark":[3,1],"Grounded Prey":[3,0],"Moonsap Bolts":[1,0],"Skyfall":[5,2],"Shapestorm":[2,0],"Second Skin":[2,2],"Harrier's Cry":[3,2],"Hawk Lord":[5,0],"Wild Heart":[5,1],"Wild Pace":[0,0],"Druid's Patience":[0,2],"Talon Rend":[4,3]},
+  "grove.earth": {"Leaf-Edged Blades":[0,2],"Wide Whirl":[0,0],"Flowing Steps":[2,0],"Tripping Blades":[1,3],"Blade Rhythm":[2,2],"Threading Dance":[1,0],"Curtain Call":[5,3],"Bladestorm":[5,0],"Encore":[4,3],"Twin Whirl":[3,1],"Gale of Blades":[4,0],"Reaper's Step":[5,2],"Quickstep":[0,3],"Dancer's Breath":[1,1],"Petal Cuts":[3,3]},
+  "grove.cannon": {"Potent Spores":[0,0],"Ripe Pods":[0,3],"Choking Spores":[1,1],"Seed Scatter":[2,3],"Hard Husk":[3,1],"Clinging Spores":[4,0],"Puffcap Sowing":[1,3],"Snapjaw Bloom":[3,0],"Spore Cloud":[5,2],"Bursting Rot":[5,3],"Puffcap Trail":[5,1],"Rootmark Seed":[4,3],"Drifting Spores":[3,2],"Far Cast":[1,2],"Seedwell":[2,0],"Thorned Husks":[0,1],"Burrowing Pods":[2,2]},
+  "grove.venom": {"Hunter's Patience":[0,0],"Barbed Darts":[0,1],"Quick Quiver":[0,3],"Lone Prey":[1,0],"Long Severance":[2,1],"Sap Thief":[1,2],"Bramble Snare":[1,3],"Briar Gibbet":[3,1],"Silent Stalk":[2,2],"Deep Snare":[2,3],"Thornmark Trail":[3,0],"Choking Thorns":[4,1],"Snare Line":[4,3],"Apex Stalker":[5,0],"Gallows Briar":[5,1],"Torn Ties":[5,2]},
+  "champ:rootmother": {"Patient Earth":[0,3],"Long Vines":[1,1],"Deep Grip":[0,0],"Twin Elders":[5,3],"Rootway":[1,3],"Bramble Grasp":[2,3],"Thorned Roots":[1,0],"Sap Song":[3,1],"Heartwood Sapling":[3,0],"Strangling Hold":[4,1],"Sapling Warden":[3,3],"Rootmother":[5,1],"The Old Wood Walks":[2,0],"Thousand Roots":[5,2],"Quick Tendrils":[0,2],"Deep Sap":[2,2],"Sapling Song":[4,2]},
+  "champ:thornbow": {"Steady Draw":[0,0],"High Boughs":[0,2],"Snaring Rain":[0,1],"Root Platform":[3,1],"Farshot":[1,0],"Barbed Shafts":[2,0],"Thorn Rain":[2,3],"Hunter’s Patience":[2,2],"Blood Moon":[5,3],"Snarled Ground":[3,0],"Running Shafts":[3,3],"Warden’s Mark":[4,2],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,2],"Fletcher's Pace":[1,3],"Captain's Share":[1,1],"Moonlit Aim":[5,1]},
+  "champ:hivemother": {"Ripe Seeds":[0,3],"Drifting Pods":[0,2],"Passing Spores":[0,0],"Compost":[3,1],"Moth Swarm":[1,3],"Thick Garden":[2,3],"Sticky Pollen":[3,0],"Pollen Drift":[2,2],"Overripe":[5,0],"Bloom of Moths":[5,2],"Swarm Song":[3,3],"Seedmother":[5,1],"Full Bloom":[4,0],"Rotfeast":[4,2],"Busy Hive":[1,1],"Honey Store":[1,2]},
+  "conclave.glaive": {"Measured Cuts":[0,3],"Opening Salute":[0,0],"Lone Duel":[0,2],"Riftsteel Edge":[3,3],"Ward-Splitter":[1,3],"Charged Edge":[2,3],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[3,1],"Thrown Riftblade":[4,0],"Fifth Form":[4,2],"Phase Dancer":[2,2],"Ghostblade Rush":[5,3],"Weaver's Blade":[5,1],"Press the Opening":[1,1],"Binding Cut":[1,0],"Guard Broken":[2,1]},
+  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,0],"Missile Swarm":[5,0],"Homing Missiles":[2,0],"Apprentice's Zeal":[3,3],"Missile Curtain":[1,0],"Echoing Missiles":[3,0],"Charged Curtain":[3,2],"Gathering Orb":[2,3],"Unstable Charge":[5,3],"Orb Lattice":[4,2],"Study the Reaction":[1,3],"Cold Focus":[2,1],"Lecture Hall":[5,1],"Margin Notes":[0,3],"Recitation":[1,2],"Static Sparks":[4,1]},
+  "conclave.frost": {"Hoar Ink":[0,0],"Biting Spear":[0,3],"Frozen Lance":[5,1],"Second Spear":[3,2],"Entomb":[3,3],"Cold Eye":[2,3],"Ice Coffin":[1,3],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,1],"Coffin Burst":[5,2],"Cold Library":[1,0],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[2,1],"Needle Rime":[1,2],"Brittle Coffin":[2,2]},
+  "conclave.arcane": {"Lagging Hour":[0,0],"Tick Forward":[3,3],"Borrowed Time":[3,0],"Heavy Hours":[0,1],"Backward Hour":[2,0],"Paradox":[2,1],"Stopped Clock":[3,2],"Quickening Bell":[5,2],"Frozen Moment":[5,0],"Hourglass Heart":[4,1],"Recurrence":[4,3],"Rewound Wounds":[1,0],"Arcane Clockwork":[2,3],"Borrowed Hour":[5,3],"Pendulum Swing":[0,2],"Stolen Sand":[1,2],"Patient Hours":[1,3]},
+  "conclave.storm": {"Wide Heavens":[0,3],"Star-Chart":[0,0],"Constellation":[5,0],"Skybreaker":[1,1],"Comet":[4,1],"Lodestar":[1,0],"Grounded Stars":[3,3],"Zodiac":[3,0],"Starfall Sky":[5,2],"Twin Stars":[5,3],"Grand Orrery":[2,3],"Twinkling Ice":[1,3],"Frost Lens":[2,0],"Turning Spheres":[4,2],"Night Sight":[0,2],"Cold Starlight":[2,2],"Ill Omen":[3,1]},
+  "conclave.earth": {"Broad Palms":[0,3],"Second Tremor":[0,2],"Staggering Blow":[2,3],"Mana Quarry":[3,3],"Heave":[1,3],"Shatterground":[5,0],"Deep Magma":[3,2],"Golem Core":[2,1],"Living Bulwark":[4,0],"Fault Line":[4,1],"Obsidian":[2,0],"Walking Wall":[5,2],"Ember Stone":[1,2],"Living Mountain":[5,1],"Granite Fists":[0,1],"Ley Reservoir":[1,0],"Glyph Anchor":[3,0]},
+  "conclave.cannon": {"Slow-Burning Ink":[0,2],"Wide Blast":[0,0],"Pyre Scribe":[3,0],"Fire Feeds Mana":[2,0],"Firewalk":[3,3],"Cinder Charge":[3,1],"Skipping Flame":[1,0],"Phoenix":[2,3],"Ember Heart":[5,2],"Pyre Lord":[5,1],"Rolling Inferno":[4,2],"Endless Skip":[5,0],"Searing Tide":[4,1],"Leaping Cinders":[1,1],"Thermal Crack":[1,3],"Wardburn":[0,3],"Kindled Fingers":[2,2]},
+  "conclave.venom": {"Keen Crescent":[0,0],"Hunting Crescent":[0,1],"Lasting Undoing":[0,3],"Quick Severing":[2,0],"Ward Feedback":[1,2],"Returning Crescent":[1,3],"Splintering":[3,0],"Sever the Link":[2,1],"Seeking Edge":[2,3],"Arcane Memory":[3,2],"Rend the Veil":[4,0],"Shatterpoint":[4,2],"Brimming Severance":[3,1],"Void Ground":[5,0],"Unravelling Veil":[5,1],"Wardbreaker":[5,3]},
+  "champ:cc_arch": {"Quick Quill":[0,3],"Open Book":[0,2],"Marginalia":[0,0],"Read the Marks":[3,2],"Unravel":[1,3],"Loose Threads":[2,3],"Threads Pulled":[1,0],"Shared Lesson":[3,0],"Deeper Loom":[5,0],"Woven Edge":[2,1],"Snapping Threads":[4,3],"Spellweaver":[5,3],"Sixfold Loom":[4,0],"Rewoven Threads":[5,1],"Flicked Pages":[1,1],"Deep Inkwell":[2,2]},
+  "champ:cc_chrono": {"Patient Hands":[0,0],"Long Pendulum":[0,3],"Weighted Hour":[1,1],"Gathered Ghosts":[5,0],"Recall":[1,0],"Long Way Back":[2,0],"Leaden Minutes":[1,3],"Lent Time":[3,1],"Endless Hour":[3,3],"Late Arrival":[3,0],"Second Hand":[4,2],"Timekeeper":[5,3],"The Hour Strikes":[2,3],"Twelve Strokes":[5,2],"Ticking Hand":[0,2],"Saved Seconds":[2,2],"Leaden Pull":[4,1]},
+  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,1],"Follow-Through":[0,3],"Practice Yard":[3,1],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[1,3],"Shared Edge":[2,2],"Bursting Seams":[5,3],"Cut the Fallen":[3,0],"Flourish":[3,3],"Blade of the Conclave":[5,1],"Unbound Blade":[4,3],"Duelling Ground":[4,2],"Flowing Cuts":[1,2],"Steady Breath":[2,1],"Chain to Blade":[5,0]},
+  "ironhold.glaive": {"Heavy Shoulders":[0,0],"Bearded Axe":[0,3],"Ringing Rim":[2,3],"Off Balance":[0,1],"Bowling Shove":[3,3],"Spinning Shield":[1,3],"Hot Shards":[5,0],"Shield Rush":[3,1],"Armourbreaker":[5,3],"Breaker's Blow":[4,0],"Brace and Shove":[3,0],"Shield Signal":[4,2],"Breach the Line":[5,1],"Hold the Pass":[2,2],"Caught Between Shields":[1,2],"Plate Salvage":[1,0],"Knock Them Flat":[2,1]},
+  "ironhold.arrow": {"Powder Smoke":[0,0],"Range-Finder":[0,1],"Long Belt":[2,0],"Called Shot":[5,2],"Rattlegun":[1,0],"Sighting In":[1,2],"Kneecapper":[3,3],"Thunder Belt":[5,1],"Gatling Crank":[5,3],"Breaching Slug":[2,3],"Quick Swab":[2,1],"Hard Kick":[3,0],"Case-Hardened":[4,1],"Quick Reload":[0,3],"Powder Tally":[1,3],"Pinning Rounds":[3,2],"Called Volley":[4,2]},
+  "ironhold.frost": {"Weighted Chains":[0,0],"Third Wrap":[0,3],"Trap Line":[2,0],"Tangle":[0,2],"Tripwire":[1,0],"Bound and Broken":[3,3],"Twin Nets":[5,0],"Double Line":[5,2],"Harpoon Winch":[2,3],"Bear Trap":[5,3],"Wide Nets":[4,1],"Hooked Chain":[3,2],"Spiked Caltrops":[1,3],"Wing Cords":[1,1],"Trapper's Haul":[2,2],"Barbed Chain":[3,1],"Caltrop Bed":[4,0]},
+  "ironhold.arcane": {"Searing Brand":[0,3],"Deep Brand":[0,0],"Brand Chain":[3,2],"Swift Inscription":[2,0],"Ringing Anvil":[5,3],"Masterwork Strike":[4,1],"Rune of Making":[1,0],"Rune of Unmaking":[4,3],"Rune Lord":[5,2],"Answering Rune":[2,1],"Runic Overflow":[1,3],"Forge Heat":[3,3],"Runebrand Detonation":[5,0],"Kinsmark":[0,2],"Paid in Kind":[2,2],"Quench":[1,1]},
+  "ironhold.storm": {"Torn Wings":[0,3],"Scorched Barrel":[1,0],"Spent Flare":[5,3],"Chain-Fed":[3,0],"Sky Shatter":[2,1],"Grapnel Shot":[2,0],"Tracer Rounds":[3,3],"Starshell":[4,3],"Endless Belt":[5,0],"Shellstorm":[5,1],"Reel In":[4,2],"Ground Burst":[1,3],"Hot Shrapnel":[1,2],"Barbed Shrapnel":[0,1],"Sky Watch":[0,2]},
+  "ironhold.earth": {"Packed Crowd":[0,0],"Steam in the Cracks":[0,3],"Scalding Steam":[2,0],"Rivet Popper":[1,1],"Piston Rhythm":[5,3],"Pile Driver":[1,0],"Echoing Slam":[3,3],"Groundsplitter":[5,2],"Molten Rivets":[5,1],"Steam Uppercut":[2,3],"Tremor Step":[3,0],"Safety Valve":[4,1],"Line Them Up":[4,2],"Hammer Home":[0,2],"Pressure Gauge":[1,3],"Steam Jacket":[2,2],"Piledriven":[3,1]},
+  "ironhold.cannon": {"Glowing Casings":[0,0],"Whistling Shells":[0,1],"Rattling Blast":[2,0],"Pitch-Soaked Wadding":[2,3],"Skipping Shell":[1,0],"Double Crew":[3,3],"Red-Hot Tube":[5,3],"Big Bertha":[3,2],"Clinging Fire":[0,2],"The Long Drop":[4,3],"Shrapnel Casing":[2,1],"Quake Shell":[4,0],"Walking Fire":[5,1],"Napalm":[5,0],"Ringing Ears":[1,3],"Powder Runners":[1,2]},
+  "ironhold.venom": {"Planted by Hand":[0,0],"Shaped Charges":[0,1],"Fuse Cutter":[0,2],"Blasting Wage":[1,0],"Black Powder Pack":[1,1],"Cracked Plate":[1,3],"Powder Trail":[2,1],"Rubble":[2,2],"Short Fuse":[3,3],"Tamped Charges":[3,0],"Long Trail":[3,1],"Demolition":[4,3],"Siege Master":[5,0],"Chain Demolition":[5,3],"Breach and Clear":[5,2],"Collapse":[4,2]},
+  "champ:ih_thane": {"Locked Shields":[0,0],"Shield-Ring":[0,2],"Wall of the Clan":[1,3],"Thane's Line":[3,2],"Horn of the Hold":[1,0],"Braced Heels":[2,0],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,2],"War Cry":[4,1],"Unbroken Line":[5,0],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,1]},
+  "champ:ih_artificer": {"Tally Wheel":[0,3],"Riveting Peal":[0,2],"Scrap Shrapnel":[1,1],"Engine Yard":[4,3],"Lodestone":[1,3],"Stronger Field":[2,3],"Barbed Rivets":[1,0],"Torn Loose":[3,1],"Counterweight":[3,0],"Magnetised":[3,2],"Overpressure":[4,1],"Chain Drive":[5,2],"Wrecking Ball":[2,0],"Restless Stone":[5,1],"Ricochet Rivets":[0,0],"Spare Parts":[2,2]},
+  "champ:ih_brewer": {"Leaky Keg":[0,0],"Slick Floor":[0,3],"Heavy Barrel":[0,2],"Open Tap":[3,2],"Firewater Breath":[1,0],"Double Measure":[2,0],"Sticky Stout":[3,3],"Scorching Gust":[2,1],"Brimming Keg":[5,3],"Spilled Pints":[5,1],"Last Call":[4,0],"On the Slate":[1,2],"Last Orders":[4,3],"Topped Up":[1,1]},
+  "silver.glaive": {"Shield-Ward":[0,1],"Witness the Blow":[0,3],"Staggering Bash":[0,0],"Shield of Faith":[3,0],"Vigil":[5,3],"Edge of Dawn":[1,0],"Rampart of Dawn":[1,3],"Oath of Challenge":[4,0],"Wall of Shields":[5,1],"Oath of Rebuke":[5,0],"Unyielding":[3,2],"Unbroken Oath":[4,1],"Pommel Blow":[1,2],"The Line Held":[2,1],"Dawn Shield":[2,3],"Ringing Rampart":[2,2]},
+  "silver.arrow": {"First Testimony":[0,3],"Witnessed":[0,1],"Twin Quarrels":[5,1],"Mark of the Accused":[0,2],"Flare Bolt":[1,3],"Heavy Quarrel":[3,3],"Slow Match":[2,3],"Deep Mark":[4,0],"Writ of Execution":[5,2],"Bear Witness":[3,0],"Through and Through":[3,2],"Bodkin Heads":[1,0],"Sworn Witnesses":[4,1],"Storm of Silver":[5,3],"Crank on the Verdict":[1,2],"Testimony Heard":[2,0],"Pinning Light":[2,1]},
+  "silver.frost": {"Tightening Links":[0,3],"Glinting Links":[0,1],"Tight Bindings":[0,0],"Dazzle":[1,0],"Twin Chains":[3,3],"Chain of Penance":[1,3],"Scouring Light":[2,3],"Last Rites":[3,0],"Blinding Chains":[4,1],"Chain of Judgement":[5,1],"Vigil Chains":[4,0],"Quick Binding":[5,2],"Shackle Litany":[5,0],"Swift Lash":[1,2],"Vigil Lamp":[2,1],"Glare of Dawn":[2,2]},
+  "silver.arcane": {"Full Gallop":[0,3],"Couched Lance":[0,0],"Spurs":[2,3],"Grail Quest":[0,1],"Tourney Passes":[1,3],"Shining Example":[3,0],"Trampling Hooves":[2,1],"Charge of the Vow":[2,0],"Echoing Verdict":[5,0],"Glory of the Charge":[5,1],"Rallying Vow":[3,1],"Vowkeeper":[4,3],"Unhorse":[4,2],"Shield and Spur":[1,2],"Grail's Grace":[1,0],"Unhorsing Ride":[3,2]},
+  "silver.storm": {"Zenith":[0,1],"Morning Rays":[0,0],"Sky Verdict":[2,2],"Fall from Grace":[3,0],"Prism":[1,0],"Kindled Faith":[5,1],"Noon Sweep":[2,0],"Dawnfall":[4,3],"Lance of Heaven":[5,0],"Dawnward":[5,3],"Sunburst":[3,3],"Judgement Ray":[2,1],"Searing Eye":[1,3],"Burning Pinions":[1,1],"Piercing Dawn":[0,2],"Sun Wheel":[4,2]},
+  "silver.earth": {"Press of Battle":[0,1],"Crushing Weight":[0,0],"Tremor":[0,3],"Ringing Steel":[5,1],"Zeal":[2,0],"Shield Fervour":[1,0],"Blade of Judgement":[3,3],"Shockwave":[5,3],"Final Judgement":[5,0],"Sword of Heaven":[2,3],"Sundering Blow":[3,0],"Marked by the Blade":[4,2],"Hurled Verdict":[4,1],"Sundered Plate":[1,2],"Reliquary":[1,3],"Censed Blade":[2,1],"Consecrated Earth":[3,2]},
+  "silver.cannon": {"Fanned Embers":[0,1],"Lingering Smoke":[0,0],"Glowing Coal":[5,3],"Swift Swing":[2,0],"Procession of Incense":[1,0],"Choking Smoke":[2,3],"Kindle the Censers":[4,3],"Censing of the Faithful":[5,2],"Ember Psalm":[5,0],"Thick Smoke":[3,1],"Purging Fire":[2,2],"Rekindling":[4,2],"Ash in the Eyes":[0,2],"Offering Bowl":[1,3],"Pall of Smoke":[1,1],"Censing Prayer":[3,3]},
+  "silver.venom": {"Broken Litany":[0,0],"Scorching Seal":[0,1],"Heavy Silence":[0,2],"Dry Well":[1,3],"Zealot's Vow":[1,0],"Writ of Seizure":[1,2],"Forfeit":[2,3],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[2,2],"Heretic's Stake":[4,0],"Penitent Chains":[3,1],"Confession":[4,3],"Pyre Eternal":[5,0],"Ashes Speak":[5,2],"Grand Inquest":[5,3]},
+  "champ:so_lion": {"Shoulder to Shoulder":[0,0],"Lowered Shield":[3,3],"Wide Sweep":[0,1],"Shield Wall":[3,2],"Bulwark Slam":[1,0],"Shields Raised":[2,0],"Burnished Shields":[1,3],"Rally to the Shield":[2,1],"The Far Bank":[5,3],"Debt of Oaths":[5,1],"Unbroken":[4,0],"The Crossing":[4,3],"The Ford Itself":[5,0],"Swift Reprisal":[0,2],"Hearts Lifted":[1,2]},
+  "champ:so_dawn": {"Early Dawn":[0,3],"Clear Sky":[0,1],"Dawn Chorus":[0,2],"Cloister Wall":[5,2],"Prism of Dawn":[1,3],"Lingering Star":[2,3],"Searing Light":[3,1],"Be Still":[2,2],"Noonday":[4,0],"Blinding Glare":[3,2],"Radiant Hymn":[2,0],"Dawnsinger":[5,1],"High Noon":[3,0],"Spilled Light":[5,3],"Bright Halo":[1,0],"First Light":[1,1],"Noon Bell":[4,3]},
+  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[0,3],"Ready Ledger":[0,2],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,0],"Trampling Host":[2,1],"Clerk’s Quill":[3,1],"Grey Justicar":[5,2],"Final Verdict":[4,3],"Riders of the Ford":[4,2],"Ride Them Down":[1,1],"Court Fines":[1,3],"Summary Ruling":[2,2]},
+  "stormborn.glaive": {"Wolf at the Throat":[0,1],"Hunting Bond":[0,3],"Hock Bite":[1,0],"Hunter's Due":[5,2],"Pack Tactics":[2,3],"Scent of Rain":[1,3],"Restless Spear":[5,0],"Wolf and Spear":[2,1],"Spirit Pack":[5,3],"Moonfang Pounce":[3,1],"Stormpin":[4,0],"Guard the Pass":[2,2],"Grounding Spear":[4,3],"Thunder-Called Spear":[0,2],"Blood on the Fur":[1,2],"Hunting Cry":[3,0]},
+  "stormborn.arrow": {"Riding the Gale":[1,0],"Through and Through":[0,3],"Quick Wind":[3,0],"Gust Fletching":[0,1],"Headwind":[2,0],"Walking Wind":[5,3],"Featherfall":[2,1],"Skyward Gust":[4,3],"Skyrend":[5,0],"Lightning Fletch":[5,1],"Rain Arrows":[1,3],"Hurricane Volley":[3,3],"Updraft Reader":[0,2],"Breath of the Gust":[1,2],"Eddying Wake":[4,2]},
+  "stormborn.frost": {"Heavy Hail":[0,0],"Water Turns to Ice":[0,3],"Brittle Cold":[3,1],"Sleet":[2,3],"Hail Cairn":[5,1],"Bitter Rain":[1,2],"Black Ice":[1,3],"Skystone":[2,0],"Frozen Through":[5,0],"Frostbound Totem":[3,0],"Ice Crust":[1,0],"Frost Lightning":[4,3],"Hail Shatter":[5,3],"First Clouds":[0,1],"Meltwater":[2,1],"Shattering Hail":[3,2],"Brittle Fall":[4,2]},
+  "stormborn.arcane": {"Restless Dead":[0,0],"Deep Hex":[0,3],"Lingering Spirits":[3,0],"Spirit Weight":[0,2],"Judgment":[3,2],"Ancestors' Toll":[1,3],"Walk On":[5,0],"Spirit Host":[5,1],"Spirit Walk":[4,0],"Renewed Hex":[2,3],"Spirit Echo":[4,1],"The Final Tally":[5,3],"Spirit Draw":[1,1],"Debts Repaid":[1,0],"Kindred Chains":[2,1],"Final Reckoning":[2,2]},
+  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[0,3],"Conductor":[1,3],"Overcharge":[2,2],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[3,3],"Living Storm":[5,2],"Last Spark":[5,0],"Lightning Rod":[2,3],"Stormseed":[5,3],"Split Sky":[4,1],"Copper Crown":[3,2],"Ground Strike":[1,1],"Drinking the Storm":[4,0],"Wardsplitter Bolts":[0,2],"Thunder Wings":[3,1]},
+  "stormborn.earth": {"Ground Gives Way":[0,3],"Deep Fissures":[0,0],"Mountain's Echo":[5,2],"Rattled":[3,3],"Stonewake":[1,3],"Shake Loose":[2,2],"Widening Earth":[5,0],"Riftmaker":[4,1],"Sinkhole":[4,0],"Rift Rhythm":[2,3],"Mud and Rain":[1,0],"Storm Mire":[5,1],"Second Tremor":[0,2],"Stone Remembers":[2,1],"Drumming Feet":[1,1],"Deep Rift":[3,0]},
+  "stormborn.cannon": {"Long Clouds":[0,1],"Brooding Sky":[0,3],"Many Skies":[5,3],"Heavy Rain":[4,2],"Storm Dance":[0,0],"Static Clouds":[3,0],"Rain Dance":[1,3],"Skyleap":[2,0],"Breaking Sky":[5,2],"Rolling Clouds":[3,1],"Landing Thunder":[4,3],"Sky Strike":[1,0],"Sky Lattice":[5,1],"Thunder Answers":[1,2],"Rain Returns":[2,1],"Drenching Pour":[2,3],"Rainmaker":[3,2]},
+  "stormborn.venom": {"Downwind Haul":[0,0],"Long Cord":[0,1],"Quick Cast":[0,2],"Sky Lore":[1,0],"Ground Stake":[1,1],"Charged Harpoons":[2,2],"Drenching Barbs":[1,3],"Heavy Air":[2,1],"Many Cords":[3,2],"Skyfall Harpoon":[2,3],"Pinned to Earth":[4,0],"Storm-Cord":[4,1],"Fallen Sky":[3,3],"Twin Harpoon":[5,0],"Master of the Sky":[5,2]},
+  "champ:sb_caller": {"Heavy Clouds":[0,3],"Crown of Rain":[0,1],"Rain on Rain":[0,2],"Drum Circle":[3,1],"Thunder Drum":[1,3],"Long Roll":[2,3],"Drenching Storm":[3,0],"Drum of the Host":[2,2],"Two Tomorrows":[5,0],"Eye of the Gathering":[4,3],"Storm Caller":[5,2],"Tomorrow's Storm":[4,0],"Drum in the Rain":[5,3],"Gusting Staff":[1,0],"Rainwell":[1,1]},
+  "champ:sb_wind": {"Rain in the Wind":[0,3],"Feather-Cut":[0,2],"Wide Funnel":[0,0],"Road's End":[5,2],"Stoneward Gale":[1,3],"Wide Gale":[2,3],"Biting Gale":[3,1],"Feather Gift":[3,2],"Long Road Back":[3,0],"Hard Landing":[4,3],"Wind at Her Back":[1,0],"Twin Gale":[5,0],"Turn the Road":[2,0],"Whirling Steps":[1,1],"Returning Breath":[2,2],"Rising Air":[4,1]},
+  "champ:sb_beast": {"Old Calls":[0,3],"Keen Nose":[0,1],"Long Hunt":[0,2],"Wolf Den":[3,3],"Wolfsong":[1,3],"Heel Biters":[2,3],"Pack Hunger":[3,0],"Thunder on the Prey":[4,1],"Stormcarrier":[5,0],"Blood Trail":[5,2],"Spirit Run":[2,2],"Beastcaller":[5,3],"Thunderbird’s Talons":[4,0],"Pack Pace":[1,0],"Hunter's Breath":[2,0],"Hunter's Stride":[1,1]},
+  "wardbound.glaive": {"Avenging Oath":[1,0],"Deep Carving":[0,1],"Oathbreaker's Due":[0,2],"Oathsworn Cut":[0,3],"Sword and Stone":[2,1],"Oath Kept":[1,2],"Rune Cleave":[1,3],"Unbroken Line":[3,0],"Hold Fast":[2,2],"Bright Wards":[2,3],"Final Oath":[4,0],"Oath of Iron":[3,1],"Linebreaker":[4,3],"Oath Fulfilled":[5,0],"Oathfire":[5,1],"Shared Oath":[5,2]},
+  "wardbound.arrow": {"The Long Watch":[0,1],"Masked Sight":[0,2],"Rune-Etched Edge":[0,3],"Branding Edge":[1,0],"Mask's Tally":[1,2],"Mark the Fallen":[1,3],"Returning Oath":[2,0],"Branding Rite":[2,1],"Line Cut":[3,3],"Dragging Edge":[3,0],"Caught Again":[4,2],"Warding Glaive":[4,3],"Glaive of Judgement":[5,1],"Twin Wards":[5,2],"Lodestar":[5,3]},
+  "wardbound.frost": {"Brand-Rime":[0,0],"Wide Sweep":[0,1],"Creeping Rime":[1,2],"Bitter Steel":[0,3],"Hard Rime":[1,0],"Meltwater":[2,1],"Frostbite":[1,3],"Winter Ward":[2,0],"Rimecut":[3,2],"Deep Bite":[2,3],"Long Winter":[3,0],"Shatter Oath":[3,1],"Cold Vigil":[4,2],"Biting Wind":[4,3],"Winter's Line":[5,0],"Hoarfrost":[5,1],"Rime Crown":[5,3]},
+  "wardbound.arcane": {"Shared Margins":[0,0],"Lingering Ink":[0,1],"Ward-Cutting Script":[1,2],"Deep Script":[0,3],"Palimpsest":[1,0],"Spent Ink":[2,1],"Detonate":[1,3],"Ink of Binding":[3,0],"Sigil Ward":[2,2],"Chain Reaction":[2,3],"Scribe the Road":[4,0],"Double Stroke":[3,1],"Volatile Script":[4,2],"The Last Word":[5,0],"Cascade":[5,1],"Runesight":[5,3]},
+  "wardbound.storm": {"Couched Lance":[0,0],"Thunder Hooves":[1,1],"Branding Sparks":[0,2],"Forked Pennon":[0,3],"Storm Pennant":[1,0],"Sky-Drawn":[2,2],"Spur and Lance":[1,3],"Cracking Pennant":[2,0],"Thunderbrand":[3,1],"Skyfall":[2,3],"Charge Through":[3,0],"Pennant Call":[4,1],"Gathering Storm":[4,2],"Sky's Answer":[3,3],"Thunder Oath":[5,0],"Stormwake":[5,2],"Second Thunder":[5,3]},
+  "wardbound.earth": {"Broad Shield":[0,0],"Iron Rhythm":[0,1],"Deep Quake":[1,2],"Restless Earth":[0,3],"Braced Shove":[1,0],"Anvil's Toll":[2,1],"Quake Line":[1,3],"Wall of Shields":[3,0],"Shield Brand":[2,2],"Fault Line":[2,3],"Anvil Stance":[4,0],"Rune-Shaker":[3,1],"Aftershock":[4,3],"Unmoving":[5,0],"Breaking Stance":[5,2],"Mountain's Weight":[5,3]},
+  "wardbound.cannon": {"Spotter":[0,0],"Wide Blast":[0,1],"Heavy Bolts":[1,2],"Long Pin":[0,3],"Crank Drill":[1,0],"Steady Crew":[2,1],"Rune Shot":[1,3],"Chain Bolt":[2,0],"Pinned and Branded":[3,2],"Kindled Runes":[2,3],"Iron Tether":[3,0],"Bolt Sequence":[3,1],"Shatter Shot":[4,2],"Rearm":[4,3],"Unbroken Chain":[5,1],"Ballista Volley":[5,2],"Kept Runes":[5,3]},
+  "wardbound.venom": {"Field Chaplain":[0,0],"Urgent Hands":[0,1],"Deep Mending":[0,2],"Incense of Vigil":[1,0],"Sworn Vow":[1,1],"Mender's Due":[2,2],"Siege-Ward":[1,3],"Oath Renewed":[2,1],"Choking Censer":[3,2],"Rite of Holding":[2,3],"Vow of Iron":[4,0],"Ember Vow":[4,1],"Long Rite":[3,3],"Keeper of Vows":[5,0],"Sanctuary":[5,1],"Hallowed Road":[5,2]},
+  "champ:wb_varic": {"Patient Oath":[0,3],"Warden's Reach":[0,1],"Wide Ring":[0,2],"Shield Brothers":[3,1],"Hold Fast":[1,3],"Long Vigil":[2,3],"Heavy Hand":[3,0],"Shared Watch":[2,2],"The Gate Holds":[5,0],"The Road Remembers":[5,3],"Steady Pace":[4,3],"Last Warden":[5,2],"The Last Gate":[4,0],"Held to Account":[1,1],"Old Discipline":[1,0]},
+  "champ:wb_aedric": {"Eager Sun":[0,3],"Sunlit Reach":[0,1],"Sun's Due":[0,2],"Into the Fray":[3,1],"Sun Charge":[1,3],"Sun-Struck Trail":[2,3],"Searing Wheel":[3,0],"Rallying Cry":[2,2],"Undying Blaze":[5,0],"Open Road":[5,3],"Hot Blood":[4,3],"Sun-Sworn":[5,2],"Blaze of Glory":[4,0],"Battle Fever":[1,1],"Spurs":[1,0]},
+  "champ:wb_isaura": {"Ready Vow":[0,3],"Silent Vow":[0,1],"Vow Carved":[0,2],"Witness of Vows":[3,1],"Binding Sweep":[1,3],"Tighter Bonds":[2,3],"Heavy Vow":[3,0],"Shared Vow":[2,2],"Turned Twice":[5,0],"Sworn Road":[5,3],"Quiet Step":[4,3],"Veiled Oath":[5,2],"Oath Turned":[4,0],"Vow's Reckoning":[1,1],"Measured Sweeps":[1,0]},
+};
+/* </spread> */
+
+// one tree onto its six rows: the cells move, the arrows and prerequisites follow the talents they named
+function talSpreadTree(tree, key) {
+  const P = TAL_SPREAD[key]; if (!P || !tree || tree._spread) return;
+  const L = tree.list, miss = L.filter(t => !P[t.name]);
+  if (miss.length) { console.warn(`talent spread ${key}: no place for ${miss.map(t => t.name).join(', ')}; the tree keeps five rows`); return; }
+  const byOld = new Map(L.map(t => [t.r + ',' + t.c, t])), now = new Map(L.map(t => [t, P[t.name]]));
+  if (new Set(L.map(t => now.get(t).join(','))).size !== L.length) { console.warn(`talent spread ${key}: two talents share a cell`); return; }
+  const to = rc => { const q = rc && byOld.get(rc[0] + ',' + rc[1]); return q ? now.get(q).slice() : rc; };
+  for (const t of L) {
+    const r0 = t.r;
+    if (t.reqs) t.reqs = t.reqs.map(to);
+    if (t.req) t.req = to(t.req);
+    [t.r, t.c] = now.get(t);
+    const ab = t.spell && typeof ABIL !== 'undefined' ? ABIL[t.spell] : null;
+    if (ab && ab.row === r0) { ab.rowPre = r0; ab.row = t.r; }
+  }
+  tree.rows = 6; tree.tiers = TAL_TIER6; tree._spread = 1;
+}
+for (const f in FORCES) { const F = FORCES[f]; if (F.talents) for (const slot in F.talents) { const u = F.units && F.units[slot]; if (u && !u.champ) talSpreadTree(F.talents[slot], `${f}.${slot}`); } }
+if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) talSpreadTree(CHAMPS[h].tree, 'champ:' + h);
+
+/* ---------- tags: what a talent is for, at a glance ---------- */
+// ic: a 12×12 glyph (an SVG path); col: the chip's colour. The force tags name each force's own mechanic.
+const TAL_TAGS = {
+  Damage:    { col: '#ff6a4a', ic: 'M10 1l1 1-5 5.6 1 1-1 1-1-1L3 11 1 9l2-2-1-1 1-1 1 1z', say: 'more damage' },
+  Spell:     { col: '#8ec8ff', ic: 'M6 1l1.4 3.5 3.6.1-2.8 2.3.9 3.6L6 8.5l-3.1 2 .9-3.6L1 4.6l3.6-.1z', say: 'a spell, or a change to one' },
+  Control:   { col: '#5ee0cc', ic: 'M2 1h8v1.5L7 6l3 3.5V11H2V9.5L5 6 2 2.5z', say: 'holds and slows foes' },
+  Support:   { col: '#8fe07a', ic: 'M5 1h2v4h4v2H7v4H5V7H1V5h4z', say: 'helps other units' },
+  Survival:  { col: '#d8c8a0', ic: 'M6 1l4.5 1.5V6c0 2.8-2 4.3-4.5 5C3.5 10.3 1.5 8.8 1.5 6V2.5z', say: 'keeps units standing' },
+  Mana:      { col: '#5a8cff', ic: 'M6 1S2 5.5 2 7.8a4 4 0 0 0 8 0C10 5.5 6 1 6 1z', say: 'more mana, more casts' },
+  Growth:    { col: '#ff9ad0', ic: 'M10.5 1.5C4 1.5 1.5 5 1.5 10.5c5.5 0 9-2.5 9-9z', say: 'the Growth bar and Blooms', force: 'grove' },
+  Judgement: { col: '#ffd060', ic: 'M6 2.5a3.5 3.5 0 1 1-.01 0zM6 0v1.5M6 10.5V12M0 6h1.5M10.5 6H12', say: 'Judgement and Verdicts', force: 'silver' },
+  Elements:  { col: '#c49aff', ic: 'M6 1l5 5-5 5-5-5z', say: 'element marks and reactions', force: 'conclave' },
+  Heat:      { col: '#ff9a3a', ic: 'M6 1c2 3 4 4 4 7a4 4 0 0 1-8 0c0-2 1.5-3 2-4.5.8 1.5 1.5 2 2 2.5.5-2 0-3.5 0-5z', say: 'heat and vents', force: 'ironhold' },
+  Storm:     { col: '#fff27a', ic: 'M7 1L2 7h3.5l-1 4L10 4.8H6.5z', say: 'the Storm meter and its weather', force: 'stormborn' },
+  Runes:     { col: '#f0c050', ic: 'M3 1h2v4l3-4h2.2L6.6 6l3.6 5H8L5 7v4H3z', say: 'runes, ward-lines and brands', force: 'wardbound' },
+};
+const TAL_FORCE_TAG = { grove: 'Growth', silver: 'Judgement', conclave: 'Elements', ironhold: 'Heat', stormborn: 'Storm', wardbound: 'Runes' };
+const TAL_FORCE_RE = { grove: /\b(Growth|Bloom)/, silver: /\b(Judge|Judgement|Verdict)/, conclave: /\b(element|reaction|Arcane Charge|Shatter|Encase|Magma|Overload)/i,
+  ironhold: /\b(heat|vents?|vented)\b/i, stormborn: /\b(Storm meter|the Storm|Gale|Rain|Hail|Tempest|soaked)\b/, wardbound: /\b(runes?|ward-lines?|brand(s|ed)?|sigils?)\b/i };
+// a talent's tag: its own (the plain-text files set one on every force talent), else read from what it does
+function talTag(t, force) {
+  if (!t) return 'Damage';
+  if (t.tag && TAL_TAGS[t.tag]) return t.tag;
+  if (t.spell) return 'Spell';
+  let txt = ''; try { txt = String(t.pro(t.max)).replace(/<[^>]+>/g, ''); } catch (e) { /* no text: the data alone */ }
+  if (force && TAL_FORCE_RE[force] && TAL_FORCE_RE[force].test(txt)) return TAL_FORCE_TAG[force];
+  if (t.mana || (typeof MANA_OF !== 'undefined' && MANA_OF.has(t)) || /\bmana\b/i.test(txt)) return 'Mana';
+  if (/\b(every unit|all units|other units?|nearby units|allies|each other)\b/i.test(txt)) return 'Support';
+  if (/\b(root|slow|stun|freez|frozen|push|knock|pin|daze|snare|bind|leash|stagger|shove|hold)/i.test(txt)) return 'Control';
+  if (t.sp) return 'Spell';
+  if (/\b(health|heal|wounded|blows on)/i.test(txt)) return 'Survival';
+  return 'Damage';
+}
+// the force whose tree a talent tab shows (G.force in a force run), for talTag's force words
+const talTagForce = () => (typeof G !== 'undefined' && G && G.force) || null;
+
+/* ---------- plain text: a force's table of its talents' words (and any simplified rule) ---------- */
+// table: { name: [tag, pro] | { tag, pro, sp, mod, cap, mana } }. pro: a string or n => string (rank n).
+function talPlain(force, key, table) {
+  const tree = key.startsWith('champ:') ? (typeof CHAMPS !== 'undefined' && CHAMPS[key.slice(6)] ? CHAMPS[key.slice(6)].tree : null) : (FORCES[force] && FORCES[force].talents ? FORCES[force].talents[key] : null);
+  if (!tree) { console.warn(`talent plain text: no tree ${force}.${key}`); return; }
+  for (const name in table) {
+    const t = tree.list.find(q => q.name === name);
+    if (!t) { console.warn(`talent plain text: no talent ${name} in ${force}.${key}`); continue; }
+    const o = Array.isArray(table[name]) ? { tag: table[name][0], pro: table[name][1] } : table[name];
+    if (o.tag) { if (!TAL_TAGS[o.tag]) console.warn(`talent plain text: ${name} has no tag ${o.tag}`); t.tag = o.tag; }
+    if (o.pro != null && !t.spell) { const p = o.pro; t.pro = typeof p === 'function' ? p : () => p; }
+    if ('sp' in o) t.sp = o.sp == null ? null : typeof o.sp === 'function' ? o.sp : () => o.sp;
+    if ('mod' in o) { const m = o.mod; t.mod = typeof m === 'function' ? m : () => Object.assign({}, m || {}); }
+    if ('cap' in o) t.cap = o.cap;
+    if ('mana' in o) { t.mana = o.mana || null; if (typeof MANA_OF !== 'undefined') { if (o.mana) MANA_OF.set(t, o.mana); else MANA_OF.delete(t); } }
+  }
+}
+
+/* ---------- ranks: the numbers that change from one rank to the next ---------- */
+// [{ vals: ['10%', '20%', '30%'] }, ...] for each number that differs between the ranks (null when the ranks' texts don't line up)
+const TAL_NUM_RE = /(\d+(?:\.\d+)?)(%|s\b|×|x\b|st\b|nd\b|rd\b|th\b| cells?\b| mana\b| armour\b)?/g;
+function talRankSteps(t) {
+  if (!t || !(t.max > 1)) return null;
+  const R = []; try { for (let n = 1; n <= t.max; n++) R.push([...String(t.pro(n)).replace(/<[^>]+>/g, '').matchAll(TAL_NUM_RE)].map(m => m[0])); } catch (e) { return null; }
+  if (R.some(a => a.length !== R[0].length)) return null;
+  const out = [];
+  for (let k = 0; k < R[0].length; k++) if (R.some(a => a[k] !== R[0][k])) out.push({ vals: R.map(a => a[k]) });
+  return out.length ? out : null;
+}
+
+/* ================= THE CONCLAVE'S TALENTS IN PLAIN WORDS (owner, 10 Nov 2026) =================
+   The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and
+   want to just quickly figure out what a talent does and pick it". Loads after forces_zzzzzzzzzzzzzzzzz_spread.js and
+   gives every Conclave talent (the eight unit trees and the three Champions' trees) its plain text through talPlain():
+   one effect, the result first, at most one condition and one word to look up, and a tag (TAL_TAGS) saying what it is
+   for. The rules and the scorer: docs/talent_clarity.md, tools/talent_clarity.js.
+   Where a talent did two or three things, its rule was cut to its core and the lost power folded into what stayed.
+   Those rules live where they always did (forces_conclave_a.js, the caps, fresh, frost and rift files); the ones that
+   only needed new numbers or a dropped part get a new sp / mod / cap here:
+     Charged Edge       Ward-Splitter's bonus on marked foes only (20% a rank, was 15% and a longer split)
+     Twin Riftblades    the second throw is Thrown Riftblade's by.n (no stunned bonus)
+     Ghostblade Rush    Ward-Splitter splits 4 foes (was 3 and an afterimage)
+     Weaver's Blade     Thrown Riftblade marks Stone, so it Overloads on its own (no reaction bonus)
+     Press the Opening  armour cut only, 15% a rank (no Arcane Charges on stunned foes)
+     Binding Cut        a 10% slow a rank (no Wounded)
+     Apprentice's Zeal  the orb's slow only, 20% a rank (no longer gather)
+     Winter's Garden    Shatterbloom on 4 foes at once (no new bloom down the chain)
+     Needle Rime        frozen splinters only, 40% (no ward cut)
+     Borrowed Time      Backward Hour quickens its caster 12% a rank (no haste for the units round it)
+     Grounded Stars     Grand Orrery's bonus on downed flyers, 35% a rank (no longer turning)
+     Ill Omen           Lodestar's chill, 15% a rank (no stun from Falling Star)
+     Granite Fists      the grind on stunned walkers, up to 4 a rank (no flat armour cut)
+     Pyre Scribe        Furnace Breath pours 1s longer (was 0.5s, and a glyph every 2nd fireball)
+     Firewalk           Phoenix flies 1.5 cells a rank farther (glyphs no longer wider or slower)
+     Wardburn           burning wards crack open 0.6s a rank (no ward cut)
+     Seeking Edge       each throw readies Sundering Glyph 1.5s (no wider loop) */
+{
+  const f = v => String(+(+v).toFixed(2));
+  const ord = n => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
+  const stacks = n => n === 1 ? 'one more stack' : n + ' more stacks';
+
+  /* ---- Spellblades ---- */
+  talPlain('conclave', 'glaive', {
+    'Measured Cuts': { tag: 'Damage', pro: n => `Each cut on the same foe hits ${5 * n}% harder than the last, up to ${20 * n}%.` },
+    'Opening Salute': { tag: 'Control', pro: n => `Its first cut on each new foe lays ${stacks(n)} of Stagger.` },
+    'Lone Duel': { tag: 'Damage', pro: n => `Cuts ${15 * n}% faster while only one foe is in its reach.` },
+    'Riftsteel Edge': { tag: 'Elements', pro: 'Each Overload its cuts set off strikes 130% harder.' },
+    'Charged Edge': { tag: 'Elements', pro: n => `Ward-Splitter cuts foes bearing an element mark ${20 * n}% harder.`,
+      sp: n => ({ ab: 'cc_sigilcleave', vs: ['elmarked', .2 * n] }) },
+    'Twin Riftblades': { tag: 'Spell', pro: 'Thrown Riftblade throws a second blade down the same line 0.4s later.',
+      sp: { ab: 'cc_spectral', by: { n: 1 } } },
+    'Unbroken Step': { tag: 'Damage', pro: 'Rift Lunge also cuts a second foe within 1.5 cells for 40%.' },
+    'Thousand Edges': { tag: 'Damage', pro: 'Every 6th cut sends three afterimages through every foe in its reach for 45%.' },
+    'Fifth Form': { tag: 'Spell', pro: 'Casting Ward-Splitter readies Rift Lunge 2s sooner.' },
+    'Phase Dancer': { tag: 'Elements', pro: 'Every 3rd cut blinks to the foe furthest along and gains an Arcane Charge.' },
+    'Ghostblade Rush': { tag: 'Spell', pro: 'Ward-Splitter splits up to 4 foes, reaching warded ones 1.2 cells beyond its reach.',
+      sp: { ab: 'cc_sigilcleave', by: { n: 3 } } },
+    "Weaver's Blade": { tag: 'Elements', pro: 'Thrown Riftblade also marks every foe it cuts Stone, so each one Overloads.', cap: null },
+    'Press the Opening': { tag: 'Damage', pro: n => `Its riftsteel cuts ignore ${15 * n}% of armour.`, mod: n => ({ armorPen: .15 * n }), cap: null },
+    'Binding Cut': { tag: 'Control', pro: n => `Its cuts slow foes ${10 * n}% for 1.5s.`, mod: n => ({ slowOn: [.1 * n, 1.5] }) },
+    'Guard Broken': { tag: 'Spell', pro: n => `Each foe its Stagger breaks brings Rift Lunge ${n}s nearer.` },
+    'Ward-Splitter': { tag: 'Spell' }, 'Thrown Riftblade': { tag: 'Spell' },
+  });
+
+  /* ---- Magelings ---- */
+  talPlain('conclave', 'arrow', {
+    'Twin Casting': { tag: 'Damage', pro: n => `Every ${ord(6 - n)} cast looses a second missile at the same foe.` },
+    'Copied Lesson': { tag: 'Elements', pro: n => `After another school casts within 2 cells, its next ${2 * n} missiles carry that element.` },
+    'Missile Swarm': { tag: 'Spell', pro: 'Arcane Barrage becomes a 3s stream of 15 missiles at the toughest foes.' },
+    'Homing Missiles': { tag: 'Spell', pro: n => `Missile Curtain hangs ${n} more missile${n > 1 ? 's' : ''}.` },
+    "Apprentice's Zeal": { tag: 'Control', pro: n => `Gathering Orb's burst slows foes ${20 * n}% for 2s.`,
+      sp: n => ({ ab: 'cc_grandorb', rider: { slow: [.2 * n, 2] } }) },
+    'Echoing Missiles': { tag: 'Elements', pro: 'Each Echo its missiles set off repeats the missile 0.4s later for 70%.' },
+    'Charged Curtain': { tag: 'Elements', pro: 'Missile Curtain gives an Arcane Charge for each foe it hits bearing another element.' },
+    'Unstable Charge': { tag: 'Elements', pro: 'A full Arcane Charge fires a free Arcane Barrage at 60%, keeping 2 charges.' },
+    'Orb Lattice': { tag: 'Elements', pro: "Gathering Orb marks foes with each nearby school's element, and readies Missile Curtain 2s sooner." },
+    'Study the Reaction': { tag: 'Mana', pro: n => `Each reaction it sets off gives it ${10 * n} mana.` },
+    'Cold Focus': { tag: 'Damage', pro: n => `Its missiles land crits on Frozen foes ${15 * n}% of the time.` },
+    'Lecture Hall': { tag: 'Spell', pro: 'While Gathering Orb gathers, Conclave units within 2 cells pour half their blows into it.' },
+    'Margin Notes': { tag: 'Mana', pro: n => `Gains ${6 * n} mana when another unit reacts with an Arcane mark it laid.` },
+    'Recitation': { tag: 'Spell', pro: n => `Arcane Barrage adds a missile for each other element marked in range, up to ${n}.` },
+    'Static Sparks': { tag: 'Control', pro: n => `Missile Curtain's missiles stun the foes they hit for ${f(.2 * n)}s.` },
+    'Missile Curtain': { tag: 'Spell' }, 'Gathering Orb': { tag: 'Spell' },
+  });
+
+  /* ---- Frostweavers ---- */
+  talPlain('conclave', 'frost', {
+    'Hoar Ink': { tag: 'Control', pro: n => `Its bolts on Frozen foes chill foes within 0.6 cells ${10 * n}% for 2s.` },
+    'Biting Spear': { tag: 'Control', pro: n => `Frost Spear's slow lasts ${f(.5 * n)}s longer.` },
+    'Frozen Lance': { tag: 'Spell', pro: 'Frost Spear always crits Frozen foes, and each Shatterbloom readies it 2s sooner.' },
+    'Second Spear': { tag: 'Spell', pro: 'Every 4th bolt also throws a free Frost Spear at half strength.' },
+    'Entomb': { tag: 'Elements', pro: 'Encases from its bolts hold 1s longer, and the bolt strikes again for 50%.' },
+    'Cold Eye': { tag: 'Damage', pro: n => `Crits Frozen foes ${25 * n}% of the time, and Ice Coffin readies Frost Spear ${n}s sooner.` },
+    "Winter's Garden": { tag: 'Spell', pro: 'Shatterbloom blooms on up to 4 foes at once.', sp: { ab: 'cc_hoarbloom', by: { n: 3 } }, cap: null },
+    'Deep Chill': { tag: 'Control', pro: 'Ice Coffin chills foes within 0.8 cells 30%, and its kills refund 10 mana.' },
+    'Coffin Burst': { tag: 'Control', pro: 'When Ice Coffin lets go, foes within 1 cell of it freeze for 0.6s.' },
+    'Cold Library': { tag: 'Mana', pro: n => `Each foe it freezes gives it ${8 * n} mana.` },
+    'Absolute Stillness': { tag: 'Control', pro: 'Every 3rd bolt freezes its foe for 1.1s.' },
+    'Practised Hand': { tag: 'Mana', pro: n => `Each Frost Spear on a Frozen foe gives back ${10 * n} mana.` },
+    'Singing Ice': { tag: 'Mana', pro: n => `Gains ${3 * n} mana when another unit strikes a foe it keeps frozen.` },
+    'Needle Rime': { tag: 'Damage', pro: n => `Its rime bolts and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
+    'Brittle Coffin': { tag: 'Damage', pro: n => `Ice Coffin strips ${2 * n} armour from its foe for 4s as it lets go.` },
+    'Ice Coffin': { tag: 'Spell' }, 'Shatterbloom': { tag: 'Spell' },
+  });
+
+  /* ---- Chronomancers ---- */
+  talPlain('conclave', 'arcane', {
+    'Lagging Hour': { tag: 'Control', pro: n => `Time Dilation's slow follows foes out for ${n}s.` },
+    'Tick Forward': { tag: 'Support', pro: n => `Each bolt readies the spells of Conclave units within 1.5 cells ${f(.2 * n)}s sooner.` },
+    'Borrowed Time': { tag: 'Spell', pro: n => `Casting Backward Hour quickens its strikes ${12 * n}% for 3s.`,
+      sp: n => ({ ab: 'cc_quicken', haste: [.12 * n, 3] }), cap: null },
+    'Heavy Hours': { tag: 'Control', pro: n => `Its bolts deepen their own slows by ${5 * n}%, up to three times.` },
+    'Paradox': { tag: 'Elements', pro: 'Each Echo its bolts set off rewinds the foe 0.9 cells.' },
+    'Stopped Clock': { tag: 'Spell', pro: 'Backward Hour stops foes in its Time Dilations 0.6s, costing 20% less while one stands.' },
+    'Quickening Bell': { tag: 'Spell', pro: 'Recurrence casts twice, 1s apart, and quickens its bolts 30% for 4s.' },
+    'Frozen Moment': { tag: 'Control', pro: 'Every 4th bolt stops every foe within 1 cell of its target for 0.6s.' },
+    'Hourglass Heart': { tag: 'Support', pro: 'Every 10s in a fight, it readies nearby Conclave spells 2s sooner, its own 4s.' },
+    'Rewound Wounds': { tag: 'Support', pro: n => `A foe Paradox rewinds takes ${8 * n}% more from every unit for 3s.` },
+    'Arcane Clockwork': { tag: 'Damage', pro: n => `Its bolts hit Arcane-marked foes ${12 * n}% harder.` },
+    'Borrowed Hour': { tag: 'Support', pro: "Recurrence also recasts up to 3 nearby allies' last spells at half strength, giving units within 1.6 cells 20 mana." },
+    'Pendulum Swing': { tag: 'Elements', pro: n => `Every ${ord(5 - n)} bolt also marks a second foe nearby with Time.` },
+    'Stolen Sand': { tag: 'Mana', pro: n => `Gains ${2 * n} mana when a Conclave spell strikes a foe it slowed.` },
+    'Patient Hours': { tag: 'Spell', pro: n => `Time Dilation lasts ${f(.5 * n)}s longer for each Time-marked foe inside, up to 3.` },
+    'Backward Hour': { tag: 'Spell' }, 'Recurrence': { tag: 'Spell' },
+  });
+
+  /* ---- Astrologers ---- */
+  talPlain('conclave', 'storm', {
+    'Wide Heavens': { tag: 'Control', pro: n => `Falling Star on a flyer drags down every flyer within ${f(.5 * n)} cells.` },
+    'Star-Chart': { tag: 'Damage', pro: n => `Every ${ord(6 - n)} bolt also strikes a second foe within 1.5 cells.` },
+    'Constellation': { tag: 'Elements', pro: 'When Falling Star lands on a marked foe, stars fall on up to 4 foes sharing that mark, for half.' },
+    'Skybreaker': { tag: 'Control', pro: n => `Falling Star drags flyers down ${f(.5 * n)}s longer.` },
+    'Comet': { tag: 'Elements', pro: 'Each Pull its bolts set off bursts into a chilling comet for 60%.' },
+    'Grounded Stars': { tag: 'Spell', pro: n => `Grand Orrery strikes flyers dragged out of the sky ${35 * n}% harder.`,
+      sp: n => ({ ab: 'cc_orrery', vs: ['grounded', .35 * n] }) },
+    'Zodiac': { tag: 'Spell', pro: 'Every 12th bolt calls a free Falling Star down on its foe.' },
+    'Starfall Sky': { tag: 'Damage', pro: 'Every 2s a star falls on a foe in its reach for 120%, flyers first.' },
+    'Twin Stars': { tag: 'Spell', pro: 'Falling Star falls twice, the second star 0.4s later for 70%.' },
+    'Twinkling Ice': { tag: 'Control', pro: n => `Comets chill ${15 * n}% harder and reach ${f(.1 * n)} cells wider.` },
+    'Frost Lens': { tag: 'Damage', pro: n => `Lodestar's fall strikes chilled foes ${15 * n}% harder.` },
+    'Turning Spheres': { tag: 'Control', pro: "Grand Orrery's planets drag the flyers they strike down for 1s." },
+    'Night Sight': { tag: 'Support', pro: n => `Flyers it first strikes take ${5 * n}% more from every unit for 4s.` },
+    'Cold Starlight': { tag: 'Damage', pro: n => `Crits Frozen foes ${10 * n}% of the time, and those crits strike ${50 * n}% harder.` },
+    'Ill Omen': { tag: 'Control', pro: n => `Lodestar's fall chills every foe it strikes ${15 * n}% for 2s.`,
+      sp: n => ({ ab: 'cc_omen', rider: { chill: [.15 * n, 2] } }), cap: null },
+    'Lodestar': { tag: 'Spell' }, 'Grand Orrery': { tag: 'Spell' },
+  });
+
+  /* ---- Golem Wardens ---- */
+  talPlain('conclave', 'earth', {
+    'Broad Palms': { tag: 'Damage', pro: n => `Its slams also hit flyers dragged out of the sky in its reach, for ${30 * n}%.` },
+    'Second Tremor': { tag: 'Damage', pro: n => `Every 3rd slam is followed by an aftershock for ${30 * n}%.` },
+    'Staggering Blow': { tag: 'Control', pro: n => `Heave stuns the walkers it strikes ${f(.2 * n)}s longer.` },
+    'Mana Quarry': { tag: 'Mana', pro: 'Each slam gives it 3 mana for each walker it strikes, up to 5.' },
+    'Shatterground': { tag: 'Control', pro: 'Seismic Slam and Living Bulwark crack the road, stunning walkers on it and striking stunned foes 30% harder.' },
+    'Deep Magma': { tag: 'Elements', pro: 'Each Magma its slams set off lasts 3s longer and spreads 0.3 cells wider.' },
+    'Golem Core': { tag: 'Damage', pro: 'Every 5th slam strikes 2.5 times as hard and throws walkers 0.3 cells back.' },
+    'Fault Line': { tag: 'Damage', pro: 'Each slam also strikes walkers in a 2-cell line beyond its foe for 50%.' },
+    'Obsidian': { tag: 'Control', pro: n => `Its magma slows the walkers in it ${15 * n}%.` },
+    'Walking Wall': { tag: 'Control', pro: 'Living Bulwark strides back up the road, shoving the foes it holds and slowing those it strikes 30%.' },
+    'Ember Stone': { tag: 'Damage', pro: n => `Slams hit Fire-marked or burning foes ${12 * n}% harder.` },
+    'Living Mountain': { tag: 'Spell', pro: 'Seismic Slam leaps twice, landing again 1s later on the thickest crowd in reach.' },
+    'Granite Fists': { tag: 'Damage', pro: n => `Its stone slams ignore ${9 * n}% of armour.`, mod: n => ({ armorPen: .09 * n }), cap: null },
+    'Ley Reservoir': { tag: 'Mana', pro: n => `Each slam on a foe bearing another element gives it ${3 * n} mana.` },
+    'Glyph Anchor': { tag: 'Spell', pro: 'Heave comes 25% sooner while 2 or more held walkers are in its reach.' },
+    'Heave': { tag: 'Spell' }, 'Living Bulwark': { tag: 'Spell' },
+  });
+
+  /* ---- Pyroclasts ---- */
+  talPlain('conclave', 'cannon', {
+    'Slow-Burning Ink': { tag: 'Damage', pro: n => `Its burns last ${n}s longer.` },
+    'Wide Blast': { tag: 'Damage', pro: n => `Its fireballs burst ${6 * n}% wider on burning foes.` },
+    'Pyre Scribe': { tag: 'Spell', pro: 'Furnace Breath pours 1s longer.', sp: { ab: 'cc_pyresigil', by: { dur: 1 } }, cap: null },
+    'Fire Feeds Mana': { tag: 'Mana', pro: n => `Each foe Skipping Flame slays gives it ${8 * n} mana.` },
+    'Firewalk': { tag: 'Spell', pro: n => `Phoenix flies ${f(1.5 * n)} more cells back up the road.`,
+      sp: n => ({ ab: 'cc_flamewave', by: { len: 1.5 * n } }), cap: null },
+    'Cinder Charge': { tag: 'Damage', pro: 'Skipping Flame hits burning foes 25% harder.' },
+    'Ember Heart': { tag: 'Elements', pro: 'Each Shatter its fireballs set off throws shards at up to 3 foes for half.' },
+    'Pyre Lord': { tag: 'Damage', pro: 'A foe slain in one of its fire glyphs leaves a new glyph where it fell.' },
+    'Rolling Inferno': { tag: 'Damage', pro: n => `Walkers Phoenix passes burn for 3s, ${10 * n}% of a fireball a second.` },
+    'Endless Skip': { tag: 'Spell', pro: 'Skipping Flame skips up to 6 more times while it finds walkers, each 85% of the last.' },
+    'Searing Tide': { tag: 'Control', pro: 'Phoenix slows every walker it passes 20% for 2s.' },
+    'Leaping Cinders': { tag: 'Damage', pro: n => `Each burning foe it slays throws its fire to the nearest walker within ${f(.6 + .3 * n)} cells.` },
+    'Thermal Crack': { tag: 'Damage', pro: n => `Its fireballs land crits on Frozen foes ${25 * n}% of the time.` },
+    'Wardburn': { tag: 'Damage', pro: n => `Its fireballs and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
+    'Kindled Fingers': { tag: 'Elements', pro: n => `Each fireball that bursts over ${5 - n} or more foes adds an Arcane Charge.` },
+    'Skipping Flame': { tag: 'Spell' }, 'Phoenix': { tag: 'Spell' },
+  });
+
+  /* ---- Arcane Severers ---- */
+  talPlain('conclave', 'venom', {
+    'Keen Crescent': { tag: 'Damage', pro: n => `Each crescent tears ${25 + 5 * n}% off a ward bar, not 25%.` },
+    'Hunting Crescent': { tag: 'Damage', pro: n => `A ward-breaking crescent flies on to another warded foe within ${f(1 + .5 * n)} cells, for half.` },
+    'Lasting Undoing': { tag: 'Spell', pro: n => `Sundering Glyph keeps wards open ${f(.5 * n)}s longer.` },
+    'Quick Severing': { tag: 'Damage', pro: n => `Breaking a ward or shield quickens its crescents 25% for ${n}s.` },
+    'Ward Feedback': { tag: 'Mana', pro: 'Each ward or shield it breaks gives it 8 mana.' },
+    'Splintering': { tag: 'Support', pro: n => `Breaking a ward cracks open the wards of foes within ${f(1.5 + .25 * n)} cells for ${2 + n}s.` },
+    'Sever the Link': { tag: 'Control', pro: n => `Sundering Glyph also slows its foe ${15 * n}% for 2s.` },
+    'Seeking Edge': { tag: 'Spell', pro: 'Every Returning Crescent throw puts Sundering Glyph 1.5s closer to ready.', sp: { ab: 'cc_shards', ready: ['cc_sunder', 1.5] } },
+    'Arcane Memory': { tag: 'Mana', pro: n => `Each spell that spends its Severance gives it ${8 * n} mana.` },
+    'Shatterpoint': { tag: 'Damage', pro: n => `Returning Crescent cuts foes with cracked or Severed wards ${15 * n}% harder.` },
+    'Brimming Severance': { tag: 'Damage', pro: 'Severance can store twice as much.' },
+    'Void Ground': { tag: 'Spell', pro: 'Rend the Veil tears up to 6 more foes nearby, and each foe it slays refunds 10 mana.' },
+    'Unravelling Veil': { tag: 'Elements', pro: "Rend the Veil spreads each torn foe's element marks nearby, and readies Sundering Glyph 3s sooner." },
+    'Wardbreaker': { tag: 'Damage', pro: 'Every 3rd crescent at a warded foe breaks its whole ward at once.' },
+    'Returning Crescent': { tag: 'Spell' }, 'Rend the Veil': { tag: 'Spell' },
+  });
+
+  /* ---- Maelis, the Archmage ---- */
+  talPlain('conclave', 'champ:cc_arch', {
+    'Quick Quill': { tag: 'Spell', pro: n => `Thousandfold Barrage cast over 4 or more marked foes comes ${f(1.5 * n)}s sooner.` },
+    'Open Book': { tag: 'Damage', pro: n => `With 5 Arcane Charges, her bolts also strike a nearby foe for ${25 * n}%.` },
+    'Marginalia': { tag: 'Elements', pro: n => `Thousandfold Barrage ends by marking up to ${4 * n} foes with an element they lack.` },
+    'Read the Marks': { tag: 'Spell', pro: 'Thousandfold Barrage and Unravel cost 25% less with 3 marked foes in her reach.' },
+    'Loose Threads': { tag: 'Spell', pro: n => `Unravel pays out ${f(.25 * n)}× more for each mark it tears off.` },
+    'Threads Pulled': { tag: 'Control', pro: n => `Thousandfold Barrage chills the Frost-marked foes it falls on ${20 * n}% for 2s.` },
+    'Shared Lesson': { tag: 'Support', pro: 'Each Thousandfold Barrage gives Conclave units within 2 cells of her an Arcane Charge.' },
+    'Deeper Loom': { tag: 'Spell', pro: 'Sixfold Loom throws 2 more bolts, and each reaction it sets off throws another.' },
+    'Woven Edge': { tag: 'Damage', pro: n => `Unravel pays out ${15 * n}% more on bosses and elites.` },
+    'Snapping Threads': { tag: 'Damage', pro: n => `Unravel splashes ${25 * n}% of its payout around each foe that reacted in the last 2s.` },
+    'Spellweaver': { tag: 'Elements', pro: 'Every reaction near her brings Sixfold Loom 1s nearer, and each Loom readies Unravel 4s sooner.' },
+    'Rewoven Threads': { tag: 'Elements', pro: 'Unravel throws each mark it tears off on to a nearby foe that lacks it.' },
+    'Flicked Pages': { tag: 'Elements', pro: n => `Every ${ord(5 - n)} bolt of hers also lays her next bolt's element, so the two react.` },
+    'Deep Inkwell': { tag: 'Mana', pro: n => `Gains ${5 * n} mana for each foe that dies near her within 2s of reacting.` },
+    'Unravel': { tag: 'Spell' }, 'Sixfold Loom': { tag: 'Spell' },
+  });
+
+  /* ---- Aurel, the Chronarch ---- */
+  talPlain('conclave', 'champ:cc_chrono', {
+    'Patient Hands': { tag: 'Spell', pro: n => `Each foe slain while stopped in time brings Stopped Hour ${n}s nearer.` },
+    'Long Pendulum': { tag: 'Damage', pro: n => `Every 3rd bolt swings back to strike and slow a second foe for ${20 * n}%.` },
+    'Weighted Hour': { tag: 'Control', pro: n => `Stopped Hour holds Time-marked foes ${f(.3 * n)}s longer.` },
+    'Gathered Ghosts': { tag: 'Control', pro: 'Recall marks the 3 toughest walkers in his reach, not one.' },
+    'Long Way Back': { tag: 'Control', pro: n => `Recall's ghost waits ${f(.5 * n)}s longer, so its foe is dragged back farther.` },
+    'Leaden Minutes': { tag: 'Elements', pro: n => `Marks on foes Stopped Hour holds last ${2 * n}s past the hold.` },
+    'Lent Time': { tag: 'Support', pro: 'Each Recall readies the slowest spell among Conclave units within 2 cells 2s sooner.' },
+    'Endless Hour': { tag: 'Control', pro: 'The Hour Strikes holds every foe it stops 0.4s longer.' },
+    'Late Arrival': { tag: 'Damage', pro: n => `Recall hits slowed foes ${15 * n}% harder.` },
+    'Second Hand': { tag: 'Control', pro: n => `Every foe Recall strikes is stopped in time for ${f(.3 * n)}s.` },
+    'Timekeeper': { tag: 'Spell', pro: 'Each foe slain in his reach brings his spells 1s nearer, The Hour Strikes 2s.' },
+    'Twelve Strokes': { tag: 'Control', pro: 'The Hour Strikes sweeps twice, pushing the foes it passes again a cell back up the road.' },
+    'Ticking Hand': { tag: 'Control', pro: n => `Its bolts keep foes stopped in time ${f(.1 * n)}s longer, up to 1s a foe.` },
+    'Saved Seconds': { tag: 'Mana', pro: n => `Each foe stopped in time near him gives ${n} mana a second, 4 at most.` },
+    'Leaden Pull': { tag: 'Spell', pro: 'Each sweep of The Hour Strikes brings Recall 3s nearer.' },
+    'Recall': { tag: 'Spell' }, 'The Hour Strikes': { tag: 'Spell' },
+  });
+
+  /* ---- Maren, the Bladewarden ---- */
+  talPlain('conclave', 'champ:cc_maren', {
+    'Quick Draw': { tag: 'Control', pro: n => `Severing Arc lays ${stacks(n)} on foes already bearing Stagger.` },
+    'Passing Cut': { tag: 'Damage', pro: n => `Her flash-steps also cut the walker nearest her path for ${25 * n}%.` },
+    'Follow-Through': { tag: 'Damage', pro: n => `Each foe Severing Arc slays lets her cut another for ${50 * n}%, up to 3.` },
+    'Practice Yard': { tag: 'Spell', pro: 'Severing Arc and Rift Chain cost 25% less with a Spellblade within 2 cells.' },
+    'Long Chain': { tag: 'Spell', pro: n => `Rift Chain hops ${n} more time${n > 1 ? 's' : ''}.` },
+    'Opened Guard': { tag: 'Support', pro: n => `Foes Severing Arc cuts take ${25 * n}% more from her or a Spellblade's next cut.` },
+    'Shared Edge': { tag: 'Support', pro: "Each foe Rift Chain cuts readies nearby Spellblades' blinks 1s sooner." },
+    'Bursting Seams': { tag: 'Control', pro: 'While Unbound Blade burns, foes her Stagger breaks burst, cutting nearby foes for half, and it hits them 30% harder.' },
+    'Cut the Fallen': { tag: 'Damage', pro: n => `Rift Chain cuts stunned foes ${15 * n}% harder.` },
+    'Flourish': { tag: 'Control', pro: n => `Rift Chain's last cut lays ${n === 1 ? 'a stack' : n + ' stacks'} of Stagger on walkers around it.` },
+    'Blade of the Conclave': { tag: 'Elements', pro: 'Each reaction her cuts set off strikes the foe again 0.4s later, as hard.' },
+    'Duelling Ground': { tag: 'Damage', pro: 'Rift Chain cuts bosses and elites twice, the second cut for 40%.' },
+    'Flowing Cuts': { tag: 'Damage', pro: n => `Her cuts come ${5 * n}% faster while she holds 4 or more Arcane Charges.` },
+    'Steady Breath': { tag: 'Mana', pro: n => `Gains ${4 * n} mana for each foe her Stagger breaks.` },
+    'Chain to Blade': { tag: 'Spell', pro: 'Every Rift Chain cut that stuns earns another hop, and each Unbound Blade readies Rift Chain 3s sooner.' },
+    'Rift Chain': { tag: 'Spell' }, 'Unbound Blade': { tag: 'Spell' },
+  });
+}
+
+/* ================= THE GROVE'S TALENTS IN PLAIN WORDS =================
+   Owner (10 Nov 2026): "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow
+   state and want to just quickly figure out what a talent does and pick it", and "lots of reading to figure out what a
+   talent does with keywords that require further reading for a new player".
+   This file gives every Grove talent (the eight unit trees and the three Champions' trees) its plain words and its tag,
+   through talPlain (forces_zzzzzzzzzzzzzzzzz_spread.js): one effect, the result first, at most one condition and one
+   word a new player must look up, about a dozen words (a capstone, the last row, up to twenty). The numbers still follow
+   the rank (pro(n)). Spell talents take their words from their spell, so only their tag is set here.
+   Where a talent did two or three things, it now does its core one, with the lost power folded into that one (the same
+   role, about the same strength). Those rules changed where they live, and the entries here that carry a new sp, mod or
+   cap say so in a comment above them:
+     Shieldsplitter       Thorn Lunge strips 4 armour a rank (was armour pen on every thrust + 2 a rank + Growth while split)
+     Rootbreaker          Thorn Lunge and Spearwood Rising hit held foes 20% harder a rank (was 15%, + Rising's extra root)
+     Splintered Line      Spearwood Rising slows 15% a rank for 3s (was a bleed + a 10% slow)
+     Canopy Sight         Aimed Shot's line 1 cell longer a rank (was 0.5, + range while the mana is full)
+     Mark the Quarry      Rangers' arrows 25% harder on the marked foe (was 15% + Aimed Shot readied on its death)
+     Wounded Prey         arrows 45% harder on bleeding or spored foes (was 40% on any of five wounds, game.js's Blood Scent)
+     Hushed Quarry        Thornseed Arrow's burst roots the walkers round its foe (its spore on the foe cut)
+     Clinging Briars      Mothcloud spreads 1 time more a rank (its sting's extra hold cut)
+     Rootburst            the burst roots 0.8s (was 0.6s + Strangling Bloom's 2 more foes, forces_zz_growth.js)
+     Overgrowth           every 2nd strike erupts (was every 3rd, and every strike on a foe under Mothcloud or Wither)
+     Heavy Lance          the lance hits a stunned or held foe 12% harder a rank (was 8% + 8% armour pen a rank)
+     Bowl Over            Bounding Leap stuns 0.4s a rank (was 0.3s + its root 0.15s longer)
+     Hawk's Reach         0.4 cells a rank (was 0.3 + the first flyer of each hawk form dragged down)
+     Wing-Clipper         Primal Pounce holds 0.75s longer a rank (was 0.5s + hawk talons dragging flyers down 0.6s)
+     Bramble Claws        bear mauls bleed for 20% a rank (was 15% + an armour strip on bleeding foes)
+     Hawk's Mark          Primal Pounce readies a free Shift Form for 4s (was readied + 70% cheaper for 4s)
+     Second Skin          the first strike in each new form lands twice (Shift Form's longer arrival cut)
+     Harrier's Cry        Shapestorm brings Shift Form 4s nearer a rank (was 2s + Shapestorm sooner for each new form)
+     Wild Heart           each change of form adds 40 Growth (was 30 + Kindred Echo's 2 more foes)
+     Leaf-Edged Blades    Wounded 2s a rank (was 4s + a bleed)
+     Flowing Steps        Threading Dance Wounds 4s a rank (was 4s + its hold 0.2s longer a rank)
+     Seed Scatter         one more puffcap (its 5 Growth a burst cut)
+     Clinging Spores      Snapjaw Bloom bites spored foes 30% harder a rank (was 20% + its roots 0.2s longer)
+     Drifting Spores      spores drift on to 3 foes (was 2 + Burstpod's spores 0.6 cells farther)
+     Thorned Husks        a pod at a held walker gives it 1 more spore a rank (its 5% ward pen a rank cut)
+     Choking Thorns       Briar Gibbet Thornmarks the support foes within 2 cells of the cage (was 1.5, + a longer hold and
+                          a wound); a rider now (SP_RIDE.gfChoke, forces_zzzzzzzzzz_fresh_grove.js)
+   The code those lines name: forces.js (rootBurst, rootStrike's Overgrowth, the drift), forces_zz_growth.js (the riders),
+   forces_grove_druid.js (Bramble Claws), forces_zzzzzzzzz_caps_grove.js (Wild Heart),
+   forces_zzzzzzzzzz_fresh_grove.js (Hawk's Reach, Bramble Claws, Mark the Quarry, Heavy Lance, Wounded Prey, Choking
+   Thorns). Check: node tools/talent_clarity.js --force grove --check, and tools/check_talent_trees.js. */
+{
+  const n2 = n => gNf(n);
+  const s = (n, one, many) => n > 1 ? many : one;
+
+  /* ---- Thornguard Spears ---- */
+  talPlain('grove', 'glaive', {
+    'Long Haft': { tag: 'Growth', pro: n => `Reaches ${n2(.15 * n)} cells farther while its Growth bar is half full.` },
+    'Hold the Line': { tag: 'Control', pro: n => `Every thrust slows its foe ${6 * n}% for 1.5s.` },
+    'Set Spears': { tag: 'Control', pro: n => `Thornhedge snags ${n} more ${s(n, 'walker', 'walkers')} and holds them ${n2(.2 * n)}s longer.` },
+    // one effect: Thorn Lunge's armour strip, 4 a rank (its armour pen and Growth while split cut)
+    'Shieldsplitter': { tag: 'Damage', pro: n => `Its thorn-tipped thrusts ignore ${15 * n}% of armour.`, mod: n => ({ armorPen: .15 * n }), cap: null, sp: null },
+    'Thornhedge': { tag: 'Control' },
+    'Bloodthorn': { tag: 'Damage', pro: n => `Thorn Lunge makes its foe bleed for ${40 * n}% of a thrust over 3s.` },
+    // one effect: both spells 20% harder on held foes a rank (Spearwood Rising's extra root cut)
+    'Rootbreaker': { tag: 'Damage', pro: n => `Thorn Lunge and Spearwood Rising hit held foes ${20 * n}% harder.`,
+      sp: n => [{ ab: 'lunge', vs: ['rooted', .2 * n] }, { ab: 'sunder', vs: ['rooted', .2 * n] }] },
+    'Phalanx': { tag: 'Support', pro: 'Thrusts 8% harder for each other Thornguard within 1.5 cells, up to two.' },
+    'Wall of Spears': { tag: 'Damage', pro: 'Thrusts also hit every walker up to 2 cells behind the target, for 75%.' },
+    'Impaler': { tag: 'Control', pro: 'Every 4th thrust hits ×3 and roots every foe it runs through for 1s.' },
+    'Spearwood Rising': { tag: 'Control' },
+    'Living Palisade': { tag: 'Growth', pro: 'Each Bloom also grows a free Thornhedge across the road beside the Spears.' },
+    'Skewer': { tag: 'Damage', pro: 'Thrusts run on through a third foe in line, at the second foe\'s share.' },
+    // one effect: Spearwood Rising's slow, 15% a rank for 3s (its bleed cut)
+    'Splintered Line': { tag: 'Control', pro: n => `Spearwood Rising slows the walkers it impales ${15 * n}% for 3s.`, sp: n => ({ ab: 'sunder', rider: { slow: [.15 * n, 3] } }) },
+    'Deep Thrust': { tag: 'Damage', pro: n => `The foe behind takes ${50 + 15 * n}% of the thrust, not 50%.` },
+    'Living Haft': { tag: 'Mana', pro: n => `Each walker its Bloom holds gives it ${4 * n} mana.` },
+    'Thornwall Ward': { tag: 'Spell', pro: n => `Thrusts hit walkers snagged by Thornhedge ${15 * n}% harder for 4s.` },
+  });
+
+  /* ---- Gladebow Rangers ---- */
+  talPlain('grove', 'arrow', {
+    'Patient Hunter': { tag: 'Mana', pro: n => `Restores ${8 * n} mana when it slays a foe 2 or more cells away.` },
+    // one effect: Aimed Shot's line 1 cell longer a rank (its range while the mana is full cut)
+    'Canopy Sight': { tag: 'Spell', pro: n => `Aimed Shot's line flies ${n2(n)} ${s(n, 'cell', 'cells')} farther.`, cap: null, sp: n => ({ ab: 'aimedshot', geom: { line: n } }) },
+    'Mark the Quarry': { tag: 'Damage', pro: 'Rangers hit the first foe each Aimed Shot pierces 25% harder for 5s.' },
+    'Thornpoint Arrows': { tag: 'Damage', pro: n => `Arrows strip 1 armour from spored foes for 5s, up to ${2 * n}.` },
+    'Paired Shafts': { tag: 'Control', pro: 'Thornseed Arrow seeds one more foe, its roots holding 0.3s longer.' },
+    'Thornseed Arrow': { tag: 'Control' },
+    'Heartseeker': { tag: 'Spell', pro: n => `Aimed Shot hits ${20 * n}% harder for each foe it has already pierced.` },
+    'Snaring Shot': { tag: 'Control', pro: n => `Aimed Shot roots every walker it pierces for ${n2(.3 * n)}s.` },
+    'Pinning Shot': { tag: 'Control', pro: 'Every 4th arrow hits ×4 and roots its foe for 0.8s.' },
+    'Thornrain': { tag: 'Damage', pro: 'Every 5th shot rains thorns on every foe in range. Each Nailing Shaft quickens its shots 30% for 4s.' },
+    'Nailing Shaft': { tag: 'Control' },
+    'Still Quarry': { tag: 'Spell', pro: 'Aimed Shot hits foes struck by Thornseed Arrow 50% harder for 4s.' },
+    // one rule: bleeding or spored foes, 45% (game.js's Blood Scent read five wounds at 40%)
+    'Wounded Prey': { tag: 'Damage', pro: 'Arrows hit bleeding or spored foes 45% harder.', cap: 'gfPrey' },
+    'Splitting Shaft': { tag: 'Control', pro: 'Nailing Shaft splits into 2 more shafts at the toughest foes nearby, for 60%. Its splinters root walkers 0.5s.' },
+    'Quick Nock': { tag: 'Damage', pro: n => `Every ${gOrd(6 - n)} arrow is loosed twice.` },
+    'Hunter\'s Rhythm': { tag: 'Damage', pro: n => `Each arrow at the same foe quickens the next by ${3 * n}%, up to ${12 * n}%.` },
+    // one effect: the burst's roots (the arrow's spore cut)
+    'Hushed Quarry': { tag: 'Control', pro: 'Thornseed Arrow\'s burst roots walkers within 1 cell of its foe, half as long.', sp: { ab: 'volley', by: { near: 1 } } },
+  });
+
+  /* ---- Briarwardens ---- */
+  talPlain('grove', 'frost', {
+    'Deep Roots': { tag: 'Control', pro: n => `Its roots hold ${n2(.15 * n)}s longer, Grasping Thicket's too.` },
+    'Thorned Vines': { tag: 'Spell', pro: n => `Grasping Thicket makes walkers bleed for ${40 * n}% of a strike over 3s.` },
+    // one effect: Mothcloud spreads more (its sting's extra hold on held walkers cut)
+    'Clinging Briars': { tag: 'Spell', pro: n => `Mothcloud can spread ${n + 1} more times as walkers die inside it.`, cap: null, sp: n => ({ ab: 'constrict', by: { n: n + 1 } }) },
+    'Thorn Hold': { tag: 'Damage', pro: n => `Its roots strip 1 armour from what they hold, up to ${2 * n}.` },
+    'Mothcloud': { tag: 'Control' },
+    'The Deep Hungers': { tag: 'Spell', pro: 'Wither leaps to the toughest nearby walker as its foe dies, up to 3 times. Kills ready it 4s sooner.' },
+    'Wither': { tag: 'Damage' },
+    'Second Snare': { tag: 'Control', pro: 'Its roots seize one more foe near the first.' },
+    'Bramble Squeeze': { tag: 'Spell', pro: 'Mothcloud makes the walkers it stings bleed for 40% of a strike over 3s.' },
+    'Spreading Roots': { tag: 'Control', pro: 'Roots spread to walkers within 1 cell of a held foe, for half as long.' },
+    'Bloodbriar': { tag: 'Spell', pro: n => `Mothcloud stings bleeding foes ${20 * n}% harder.` },
+    // one effect: the burst, its roots 0.8s (Strangling Bloom's 2 more foes cut)
+    'Rootburst': { tag: 'Control', pro: 'A held foe that dies bursts for 2 strikes, rooting walkers within 1.2 cells 0.8s.' },
+    // two parts kept (Wither needs two talents that change it); erupts every 2nd strike, the under-a-spell rule cut
+    'Overgrowth': { tag: 'Control', pro: 'Every 2nd strike erupts, rooting and striking walkers within 1.2 cells. Mothcloud and Wither hit held foes 30% harder.' },
+    'Strangleroot': { tag: 'Damage', pro: 'Held foes take the strike\'s damage again every 0.5s until they break free.' },
+    'Warden\'s Reach': { tag: 'Damage', pro: n => `Reaches ${n2(.1 * n)} cells farther for each held foe in its reach, up to 3.` },
+    'Sapwell': { tag: 'Mana', pro: n => `Gains ${n2(.4 * n)} mana a second for each foe its roots hold, up to 4.` },
+    'Quickening Sap': { tag: 'Growth', pro: n => `Each foe its roots seize adds ${3 * n} Growth.` },
+  });
+
+  /* ---- Stag Lancers ---- */
+  talPlain('grove', 'arcane', {
+    // one effect: the lance on a stunned or held foe, 12% a rank (its armour pen cut)
+    'Heavy Lance': { tag: 'Damage', pro: n => `Its lance ignores ${12 * n}% of armour.`, mod: n => ({ armorPen: .12 * n }), cap: null },
+    'Trample': { tag: 'Damage', pro: n => `Each charge tramples the walkers on its way out for ${15 * n}% of the lance.` },
+    'Wheel About': { tag: 'Spell', pro: n => `Heroic Charge comes ${2 * n}s sooner if its foe survives.` },
+    // one effect: the landing's stun, 0.4s a rank (its longer root cut)
+    'Bowl Over': { tag: 'Control', pro: n => `Bounding Leap stuns the walkers it lands on for ${n2(.4 * n)}s.`, sp: n => ({ ab: 'stampede', rider: { stun: .4 * n } }) },
+    'Run to Ground': { tag: 'Control', pro: 'White Hart\'s Hunt rides 2 more charges. A held foe it runs through is held again 0.5s.' },
+    'Mark of the Hunt': { tag: 'Support', pro: 'Gladebow Rangers hit the foe of each Heroic Charge 20% harder for 6s.' },
+    'Bounding Leap': { tag: 'Control' },
+    'White Hart\'s Hunt': { tag: 'Damage' },
+    'Lord of the Glade': { tag: 'Damage', pro: 'The lance hits bosses and elites ×2.25, not ×1.5.' },
+    'Hooves of Thunder': { tag: 'Control', pro: 'Each charge ends in a stomp, hitting walkers within 1 cell for 50% and holding them 1s.' },
+    'Hunter\'s Finish': { tag: 'Spell', pro: 'Each foe White Hart\'s Hunt slays adds a charge, up to 3, and refunds 10 mana.' },
+    'Second Charge': { tag: 'Damage', pro: 'Every 3rd charge is followed at once by another at a second foe, for 70%.' },
+    'Goring Antlers': { tag: 'Damage', pro: n => `The lance makes its foe bleed for ${15 * n}% of the hit over 3s.` },
+    'Long Gallop': { tag: 'Support', pro: n => `Reaches ${n2(.15 * n)} cells farther for each other Stag Lancer within 2 cells, up to two.` },
+    'Stag\'s Wind': { tag: 'Mana', pro: n => `Each lance at a boss or elite restores ${3 * n} mana.` },
+    'Herd Instinct': { tag: 'Spell', pro: n => `Bounding Leap readies Heroic Charge when it lands among ${5 - n} or more walkers.` },
+  });
+
+  /* ---- Grove Shifters ---- */
+  talPlain('grove', 'storm', {
+    'Hawk\'s Reach': { tag: 'Damage', pro: n => `In hawk form its talons reach ${n2(.4 * n)} cells farther at flyers.` },
+    'Wildwood Tithe': { tag: 'Mana', pro: n => `Each strike at a held or spored foe restores ${n} mana.` },
+    // one effect: Primal Pounce's hold, 0.75s a rank (its hawk talons' grounding cut; it is the spell's upgrade below it)
+    'Wing-Clipper': { tag: 'Control', pro: n => `Primal Pounce holds its foe ${n2(.75 * n)}s longer.`, cap: null, sp: n => ({ ab: 'wildstrike', by: { hold: .75 * n } }) },
+    'Bramble Claws': { tag: 'Damage', pro: n => `In bear form its mauls bleed the foe for ${20 * n}% of the hit over 3s.` },
+    'Primal Pounce': { tag: 'Control' },
+    // one effect: a free Shift Form after each Pounce (was readied, then 70% cheaper for 4s)
+    'Hawk\'s Mark': { tag: 'Spell', pro: 'Each Primal Pounce readies Shift Form, free for the next 4s.',
+      sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -1 }] },
+    'Grounded Prey': { tag: 'Spell', pro: n => `Shapestorm hits grounded flyers and held foes ${25 * n}% harder.` },
+    'Moonsap Bolts': { tag: 'Damage', pro: n => `In sage form each bolt strips 1 armour for 4s, up to ${2 * n}.` },
+    'Skyfall': { tag: 'Control', pro: 'In hawk form, every 4th strike at a flyer hits ×3, stuns it 1s and drags it down 2.5s.' },
+    'Shapestorm': { tag: 'Damage' },
+    // one effect: the first strike in each new form lands twice (Shift Form's longer arrival cut)
+    'Second Skin': { tag: 'Damage', pro: 'Its first strike in each new form lands twice.', sp: null },
+    // one effect: each Shapestorm brings Shift Form 4s nearer a rank (Shapestorm sooner for each new form cut)
+    'Harrier\'s Cry': { tag: 'Spell', pro: n => `Each Shapestorm takes ${4 * n}s off Shift Form's wait.`, cap: null, sp: n => ({ ab: 'wildsurge', ready: ['shift', 4 * n] }) },
+    'Hawk Lord': { tag: 'Damage', pro: 'A spirit hawk dives on a foe in reach every 1.5s, flyers first, for 150% of a strike.' },
+    'Wild Heart': { tag: 'Growth', pro: 'Each change of form adds 40 Growth.' },
+    'Wild Pace': { tag: 'Damage', pro: n => `In bear form its mauls come ${5 * n}% faster while 2 walkers are in reach.` },
+    'Druid\'s Patience': { tag: 'Mana', pro: n => `Gains ${n2(.4 * n)} mana a second in sage form.` },
+    'Talon Rend': { tag: 'Spell', pro: n => `Primal Pounce leaves its foe bleeding for ${40 * n}% of a strike over 3s.` },
+  });
+
+  /* ---- Blade Dancers ---- */
+  talPlain('grove', 'earth', {
+    // one effect: the Wound, 2s a rank (its bleed cut)
+    'Leaf-Edged Blades': { tag: 'Damage', pro: n => `Its cuts leave foes Wounded for ${2 * n}s, halving their heals and shields.`, mod: n => ({ wound: 2 * n }) },
+    'Wide Whirl': { tag: 'Growth', pro: n => `Its whirls reach ${10 * n}% farther for 4s after each Bloom.` },
+    // one effect: the Wound, 4s a rank (its longer hold cut)
+    'Flowing Steps': { tag: 'Spell', pro: n => `Threading Dance leaves every walker it cuts Wounded for ${4 * n}s.`, sp: n => ({ ab: 'leafdance', rider: { wound: 4 * n } }) },
+    'Tripping Blades': { tag: 'Control', pro: n => `Whirlwind slows the walkers it cuts ${10 * n}% for 1.2s.` },
+    'Blade Rhythm': { tag: 'Spell', pro: 'Whirlwind spins one more whirl.' },
+    'Threading Dance': { tag: 'Control' },
+    'Curtain Call': { tag: 'Spell', pro: 'Encore plays twice, the second free 1.5s later. Its afterimages hit held foes 30% harder.' },
+    'Bladestorm': { tag: 'Damage', pro: 'Every 5th whirl becomes a 2s bladestorm, cutting every foe in reach for 40% each 0.25s.' },
+    'Encore': { tag: 'Damage' },
+    'Twin Whirl': { tag: 'Damage', pro: 'Every 3rd whirl spins again 0.25s later, for 60%.' },
+    'Gale of Blades': { tag: 'Damage', pro: 'Each whirl flings leaf-blades a cell past its reach, cutting foes there for 50%.' },
+    'Reaper\'s Step': { tag: 'Spell', pro: 'Each foe Encore slays leaves a whirling afterimage that cuts walkers within 1 cell. Kills ready Encore 2s sooner.' },
+    'Quickstep': { tag: 'Damage', pro: n => `Its whirls come ${4 * n}% faster while a Wounded foe is in reach.` },
+    'Dancer\'s Breath': { tag: 'Mana', pro: n => `Restores ${2 * n} mana when a whirl cuts 3 or more foes.` },
+    'Petal Cuts': { tag: 'Support', pro: n => `Walkers Threading Dance cuts take their next hit within 6s ${25 * n}% harder.` },
+  });
+
+  /* ---- Seedcasters ---- */
+  talPlain('grove', 'cannon', {
+    'Potent Spores': { tag: 'Damage', pro: n => `Its spores eat ${20 * n}% harder, Choking Haze's too.` },
+    'Ripe Pods': { tag: 'Damage', pro: n => `Pods at spored foes eat ${10 * n}% of what the spores have left at once.` },
+    'Choking Spores': { tag: 'Control', pro: n => `Each spore on a foe slows it ${2 * n}%.` },
+    // one effect: one more puffcap (its Growth a burst cut)
+    'Seed Scatter': { tag: 'Spell', pro: 'Puffcap Sowing sows one more, 4 in all.', cap: null },
+    'Hard Husk': { tag: 'Spell', pro: n => `Choking Haze lingers ${n}s longer.` },
+    // one effect: the bites on spored foes, 30% a rank (its longer roots cut)
+    'Clinging Spores': { tag: 'Spell', pro: n => `Snapjaw Bloom's bites hit spored foes ${30 * n}% harder.`, sp: n => ({ ab: 'bindseed', vs: ['spored', .3 * n] }) },
+    'Puffcap Sowing': { tag: 'Damage' },
+    'Snapjaw Bloom': { tag: 'Control' },
+    'Spore Cloud': { tag: 'Damage', pro: 'Every 3rd pod leaves a 3s spore cloud that gives walkers inside a spore every 0.5s.' },
+    'Bursting Rot': { tag: 'Damage', pro: 'A spored foe bursts on death, passing its spores and their unspent damage to walkers within 1 cell.' },
+    'Puffcap Trail': { tag: 'Damage', pro: 'Every 3rd pod sows a puffcap where it lands, up to 3 waiting.' },
+    'Rootmark Seed': { tag: 'Control', pro: 'For 5s, roots hold walkers bitten by Snapjaw Bloom\'s jaws 0.5s longer.' },
+    // one effect: spores drift on to 3 foes (Burstpod's wider spores cut)
+    'Drifting Spores': { tag: 'Damage', pro: 'When a spored foe dies, its spores drift on to 3 foes, not 1.' },
+    'Far Cast': { tag: 'Damage', pro: n => `Reaches ${n2(.3 * n)} cells farther while its Choking Haze lingers.` },
+    'Seedwell': { tag: 'Mana', pro: n => `Each foe that dies with its spores gives it ${5 * n} mana.` },
+    // one effect: more spores on held walkers (its ward pen cut)
+    'Thorned Husks': { tag: 'Damage', pro: n => `Its thorned pods and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
+    'Burrowing Pods': { tag: 'Control', pro: n => `Puffcap Sowing's bursts root walkers for ${n2(.3 * n)}s.` },
+  });
+
+  /* ---- Thornwarden Stalkers ---- */
+  talPlain('grove', 'venom', {
+    'Hunter\'s Patience': { tag: 'Damage', pro: n => `Reaches ${n2(.25 * n)} cells farther while no support foe is in reach.` },
+    'Barbed Darts': { tag: 'Control', pro: n => `Its darts' Thornmark lasts ${n2(.5 * n)}s longer.` },
+    'Quick Quiver': { tag: 'Damage', pro: n => `Its darts come ${6 * n}% faster at a Thornmarked foe.` },
+    'Lone Prey': { tag: 'Damage', pro: n => `A lone support foe takes ${n2(GVS.ALONE + .25 * n)}× its dart, not ${GVS.ALONE}×.` },
+    'Long Severance': { tag: 'Spell', pro: n => `Severing Thorn's mark and cut ties last ${n}s longer.` },
+    'Sap Thief': { tag: 'Mana', pro: n => `Each support foe it newly Thornmarks gives it ${6 * n} mana.` },
+    'Bramble Snare': { tag: 'Control' },
+    'Briar Gibbet': { tag: 'Control' },
+    'Silent Stalk': { tag: 'Control', pro: 'Casters its darts Thornmark regain no mana for 2s.' },
+    'Deep Snare': { tag: 'Control', pro: 'Bramble Snare drags one more support foe.' },
+    'Thornmark Trail': { tag: 'Control', pro: 'Thornmarked foes pass their mark on death to 4 support foes within 2 cells.' },
+    // one effect: the cage Thornmarks the support foes round it, now a rider (its longer hold and wound cut, 1.5 -> 2 cells)
+    'Choking Thorns': { tag: 'Spell', pro: 'Briar Gibbet Thornmarks every support foe within 2 cells of the cage while it hangs.', cap: null, sp: { ab: 'gv_wither', rider: { gfChoke: 2 } } },
+    'Snare Line': { tag: 'Control', pro: n => `Foes Bramble Snare drags stay Wounded for ${4 * n}s.` },
+    'Apex Stalker': { tag: 'Control', pro: 'A dart at a lone support foe roots it 0.8s, and a second dart follows at once.' },
+    'Gallows Briar': { tag: 'Spell', pro: 'Briar Gibbet leaps to cage a second foe nearby when it opens, support foes first. Its kills refund 15 mana.' },
+    'Torn Ties': { tag: 'Damage', pro: 'Darts at a support foe also hit each foe it is helping for half, Thornmarking them.' },
+  });
+
+  /* ---- Elowen, Heart of the Wood ---- */
+  talPlain('grove', 'champ:rootmother', {
+    'Patient Earth': { tag: 'Spell', pro: n => `Entangle comes ${n2(.2 * n)}s nearer each second for each walker her roots hold, up to 3.` },
+    'Long Vines': { tag: 'Damage', pro: n => `Her lashes at held walkers whip on to another walker nearby for ${40 * n}%.` },
+    'Deep Grip': { tag: 'Control', pro: n => `Entangle holds walkers that were already slowed or held ${n2(.3 * n)}s longer.` },
+    'Twin Elders': { tag: 'Spell', pro: 'The Old Wood Walks wakes a second tree, 1s behind the first.' },
+    'Rootway': { tag: 'Control' },
+    'Bramble Grasp': { tag: 'Control', pro: n => `Rootway's roots hold ${n2(.15 * n)}s longer.` },
+    'Thorned Roots': { tag: 'Damage', pro: n => `Entangle makes every walker it seizes bleed for ${40 * n}% of a lash over 3s.` },
+    'Sap Song': { tag: 'Survival', pro: 'Units within 1.6 cells of her heal 3% for each walker Rootway seizes.' },
+    'Heartwood Sapling': { tag: 'Spell', pro: 'The Old Wood Walks lasts 2s longer, walking farther up the road.' },
+    'Strangling Hold': { tag: 'Control', pro: n => `Rootway and The Old Wood Walks hold their walkers again ${n2(.4 * n)}s once they break free.` },
+    'Sapling Warden': { tag: 'Damage', pro: n => `Each Entangle grows a 4s sapling that lashes a nearby walker each second for ${50 * n}%.` },
+    'Rootmother': { tag: 'Control', pro: 'Entangle\'s roots linger 4s, holding 1s and lashing every walker that steps in.' },
+    'The Old Wood Walks': { tag: 'Control' },
+    'Thousand Roots': { tag: 'Control', pro: 'Rootway seizes two walkers every half second, not one.' },
+    'Quick Tendrils': { tag: 'Damage', pro: n => `Her lashes come ${5 * n}% faster while a walker her roots hold is in reach.` },
+    'Deep Sap': { tag: 'Mana', pro: n => `Each walker Entangle seizes gives her ${3 * n} mana.` },
+    'Sapling Song': { tag: 'Growth', pro: 'Grove units near her gain 8 Growth for each walker The Old Wood Walks strikes.' },
+  });
+
+  /* ---- Faelan, Warden of the Long Watch ---- */
+  talPlain('grove', 'champ:thornbow', {
+    'Steady Draw': { tag: 'Spell', pro: n => `His shots at held foes bring Thorn Volley ${n2(.3 * n)}s nearer.` },
+    'High Boughs': { tag: 'Damage', pro: n => `Reaches ${n2(.2 * n)} cells farther while an archer stands within 2 cells of him.` },
+    'Snaring Rain': { tag: 'Control', pro: n => `Thorn Volley roots walkers that were already slowed for ${n2(.3 * n)}s.` },
+    'Root Platform': { tag: 'Spell', pro: 'With 2 archers near him, Farshot costs 30% less and comes 20% sooner.' },
+    'Farshot': { tag: 'Control' },
+    'Barbed Shafts': { tag: 'Control', pro: n => `Farshot pins its foe ${n2(.2 * n)}s longer.` },
+    'Thorn Rain': { tag: 'Control', pro: n => `Thorn Volley's falls slow walkers ${15 * n}% for 2s.` },
+    'Hunter’s Patience': { tag: 'Mana', pro: 'Farshot refunds half its mana when its foe is already held or slowed.' },
+    'Blood Moon': { tag: 'Spell', pro: 'Under Hunter’s Moon, killing ricochets leap on, up to 3 more. Each Moon quickens his shots 20% for 6s.' },
+    'Snarled Ground': { tag: 'Control', pro: n => `Farshot's pin slows walkers within 0.8 cells ${20 * n}% while it holds.` },
+    'Running Shafts': { tag: 'Damage', pro: n => `After each Farshot, his next ${2 * n} shots also hit the walker behind, for half.` },
+    'Warden’s Mark': { tag: 'Support', pro: 'For 4s, archers within 2 cells of him shoot the foes Thorn Volley struck first.' },
+    'Hunter’s Moon': { tag: 'Damage' },
+    'Watchtower Bough': { tag: 'Support', pro: 'Farshot hits 8% harder for each archer within 2 cells, up to 4. Each looses an arrow with it.' },
+    'Fletcher\'s Pace': { tag: 'Support', pro: n => `Archers within 2 cells of him shoot ${3 * n}% faster.` },
+    'Captain\'s Share': { tag: 'Mana', pro: n => `Gains ${5 * n} mana for each foe an archer within 2 cells of him slays.` },
+    'Moonlit Aim': { tag: 'Spell', pro: 'Each Hunter’s Moon readies Farshot, and the first Farshot under it is loosed twice.' },
+  });
+
+  /* ---- Nyssa, the Bloom ---- */
+  talPlain('grove', 'champ:hivemother', {
+    'Ripe Seeds': { tag: 'Spell', pro: n => `Each foe her spores slay brings Spore Cloud ${n2(.5 * n)}s nearer.` },
+    'Drifting Pods': { tag: 'Damage', pro: n => `Reaches ${n2(.2 * n)} cells farther while 4 or more foes are spored by her.` },
+    'Passing Spores': { tag: 'Damage', pro: n => `Spored walkers in Spore Cloud pass a spore to ${n} unspored ${s(n, 'walker', 'walkers')} within 1 cell.` },
+    'Compost': { tag: 'Mana', pro: 'Spore Cloud and Moth Swarm cost 25% less with 3 spored foes in her reach.' },
+    'Moth Swarm': { tag: 'Control' },
+    'Thick Garden': { tag: 'Spell', pro: n => `Moth Swarm's moths feed ${n}s longer.` },
+    'Sticky Pollen': { tag: 'Control', pro: n => `Spore Cloud slows the foes it chokes ${10 * n}% for 2s.` },
+    'Pollen Drift': { tag: 'Support', pro: "After each Moth Swarm, nearby Grove units' next 3 strikes spore their foe." },
+    'Overripe': { tag: 'Spell', pro: 'Full Bloom bursts spores ×1.8, not ×1.5, spraying half of each burst on walkers within 1.2 cells.' },
+    'Bloom of Moths': { tag: 'Spell', pro: 'Full Bloom\'s bursts free moths that spore and slow walkers for 4s. It hits slowed foes 30% harder.' },
+    'Swarm Song': { tag: 'Support', pro: n => `Each Spore Cloud readies the haze of Seedcasters within 2 cells ${2 * n}s sooner.` },
+    'Seedmother': { tag: 'Spell', pro: 'Each Full Bloom readies Spore Cloud and casts it free on the thickest knot of foes.' },
+    'Full Bloom': { tag: 'Damage' },
+    'Rotfeast': { tag: 'Spell', pro: 'Moth Swarm\'s moths feed 30% harder on foes with 3 or more spores.' },
+    'Busy Hive': { tag: 'Growth', pro: n => `${4 * n}% faster throws per Grove unit within 1.6 cells about to Bloom, two at most.` },
+    'Honey Store': { tag: 'Mana', pro: n => `Each Bloom of a Grove unit within 1.6 cells of her gives her ${6 * n} mana.` },
+  });
+}
+
+/* ================= IRONHOLD: the talents in plain words (talent clarity, owner, 10 Nov 2026) =================
+   The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and
+   want to just quickly figure out what a talent does and pick it". Each Ironhold talent gets one effect, the result
+   first, at most one condition and one keyword, and a tag (TAL_TAGS in forces_zzzzzzzzzzzzzzzzz_spread.js). Loaded after
+   the spread file; talPlain() swaps in the words, and the sp / mod / cap of the talents whose rules were cut down.
+   The talents that did two or three things were cut to one, the lost power folded into what is left:
+     Ironbreakers   Off Balance (armour pen only, 8% a rank; no off balance), Armourbreaker (no plate off the neighbours; the
+                    shattered plate stays off 8s, not 6s)
+     Thunderguns    Powder Smoke (Long Shot leaves the smoke, 3s, 20% a rank; no Long Shot bonus on slowed foes),
+                    Kneecapper (slows only, 25% a rank), Case-Hardened (no daze; 3 armour, not 2)
+     Chain Trappers Tangle (bounces to any foe), Bound and Broken (the haul's landing pin only, 0.6s a rank; no amp on
+                    pinned foes), Hooked Chain (the net at once; no mark)
+     Runesmiths     Deep Brand (deeper brands, 3% a rank; no longer brands), Swift Inscription (Rune of Making only; no
+                    rune reach), Masterwork Strike (Runebrand brands the foes round its target), Runebrand Detonation
+                    (a branded foe's death Unmakes the foes round it), Kinsmark (no ward pen; three-quarter brands)
+     Flak           Tracer Rounds (the mark only, 4s), Endless Belt (no haste; shells heat 15%), Shellstorm (clusters only
+                    in Starshell's light, at 50%), Spent Flare (the second burst only, 25% harder)
+     Steam Hammers  Echoing Slam (the scald only, 30% a rank), Safety Valve (the steam vent only, 4s)
+     Mortar Crew    Big Bertha (4x, no longer stun), Whistling Shells (bosses stunned too, as any stun)
+     Siege Breakers Collapse (20 mana a kill; no cooldown back)
+     Haldra         Braced Heels (the shove stuns 0.2s a rank)
+     Tovin          Spare Parts (15 mana a rank, flat)
+   The code for those lives in forces_ironhold_a.js, forces_zzzzzz_ironhold_cool.js, forces_zzzzzzzzz_caps_ironhold.js
+   and forces_zzzzzzzzzz_fresh_ironhold.js; the words, tags and new sp / mod / cap are below. Spell talents read their
+   spell's own brief. */
+
+// a rank's number as the game writes it (0.3, 1.5)
+const ihPl = v => String(Math.round(v * 100) / 100);
+
+talPlain('ironhold', 'glaive', {
+  'Heavy Shoulders': { tag: 'Control', pro: n => `Shield Shove and its chop shoves throw foes ${ihPl(.1 * n)} cells further.` },
+  'Bearded Axe': { tag: 'Damage', pro: n => `Chops strip up to ${4 + 2 * n} armour, not 4.` },
+  'Ringing Rim': { tag: 'Spell', pro: n => `Spinning Shield's return stuns ${ihPl(.15 * n)}s longer and strips ${n} more armour.` },
+  'Off Balance': { tag: 'Damage', cap: null, mod: n => ({ armorPen: .08 * n }), pro: n => `Its chops ignore ${8 * n}% of armour.` },
+  'Bowling Shove': { tag: 'Control', pro: 'Shoves also knock back up to 3 walkers behind the foe, half as far.' },
+  'Spinning Shield': { tag: 'Spell' },
+  'Hot Shards': { tag: 'Damage', pro: "Breaker's Blow's shards fly 1 cell farther, pin walkers 0.3s and strip all their armour." },
+  'Shield Rush': { tag: 'Control', pro: 'Every 4th shove is a charge, stunning its foe and walkers within 1 cell 0.5s.' },
+  'Armourbreaker': { tag: 'Damage', pro: 'The 4th chop on an armoured foe hits 3× as hard and strips all its armour for 8s.' },
+  "Breaker's Blow": { tag: 'Spell' },
+  'Brace and Shove': { tag: 'Control', pro: 'Every 3rd chop is a shield shove, not every 5th.' },
+  'Shield Signal': { tag: 'Heat', pro: 'Spinning Shield gives every other Ironbreaker within 2 cells 30% heat.' },
+  'Breach the Line': { tag: 'Control', pro: "Breaker's Blow ends in a free Shield Shove that bowls over and stuns the walkers behind 0.5s." },
+  'Hold the Pass': { tag: 'Control', pro: 'Walkers within 1.3 cells of it are slowed 40% and count as held.' },
+  'Caught Between Shields': { tag: 'Control', pro: n => `A foe chopped by two Ironbreakers within 1s is pinned ${ihPl(.05 + .15 * n)}s, once every 3s.` },
+  'Plate Salvage': { tag: 'Mana', pro: n => `Stripping a foe's last armour gives it ${8 * n} mana, once a foe.` },
+  'Knock Them Flat': { tag: 'Control', pro: n => `Shoving a held foe holds it ${ihPl(.2 * n)}s longer.` },
+});
+
+talPlain('ironhold', 'arrow', {
+  'Powder Smoke': { tag: 'Control', sp: { ab: 'ih_longshot', rider: { ihfSmokeL: 1 } }, pro: n => `Long Shot leaves smoke along its line for 3s, slowing walkers ${20 * n}%.` },
+  'Range-Finder': { tag: 'Damage', pro: n => `Shots at foes over 2.5 cells away hit ${12 * n}% harder.` },
+  'Long Belt': { tag: 'Spell', pro: n => `Rattlegun fires ${2 * n} more bullets a burst.` },
+  'Called Shot': { tag: 'Damage', pro: 'Thunderpeals strip all armour from every foe they pass through for 4s.' },
+  'Rattlegun': { tag: 'Spell' },
+  'Sighting In': { tag: 'Heat', pro: n => `Each shot at the same foe as its last gives it ${4 * n}% heat.` },
+  'Kneecapper': { tag: 'Control', sp: n => ({ ab: 'ih_slug', rider: { slow: [.25 * n, 1.5] } }), pro: n => `Breaching Slug leaves the foes it punches through ${25 * n}% slower for 1.5s.` },
+  'Thunder Belt': { tag: 'Heat', pro: 'Rattlegun warms the barrel 3× as fast, so Thunderpeals fire mid-burst.' },
+  'Gatling Crank': { tag: 'Damage', pro: 'Each Thunderpeal is followed at once by 5 quick rounds at 60%.' },
+  'Breaching Slug': { tag: 'Spell' },
+  'Quick Swab': { tag: 'Damage', pro: n => `After a Thunderpeal its next ${1 + n} shots reload twice as fast.` },
+  'Hard Kick': { tag: 'Control', pro: 'Above 75% heat, its shots knock walkers back 0.15 cells.' },
+  'Case-Hardened': { tag: 'Spell', sp: { ab: 'ih_slug', rider: { spall: 3 } }, pro: 'When Breaching Slug strips a foe bare, walkers beside it lose 3 armour.' },
+  'Quick Reload': { tag: 'Heat', pro: n => `The barrel keeps ${10 * n}% of its warmth after each Thunderpeal.` },
+  'Powder Tally': { tag: 'Mana', pro: n => `Each Thunderpeal gives it ${5 * n} mana per foe it hits, up to 4.` },
+  'Pinning Rounds': { tag: 'Control', pro: n => `Every ${n >= 2 ? '3rd' : '4th'} Rattlegun bullet pins its foe 0.3s.` },
+  'Called Volley': { tag: 'Support', pro: "Rattlegun's last target takes 10% more from every unit for 5s." },
+});
+
+talPlain('ironhold', 'frost', {
+  'Weighted Chains': { tag: 'Control', pro: n => `Nets pin ${ihPl(.1 * n)}s longer, Chain Net's too.` },
+  'Third Wrap': { tag: 'Control', pro: n => `A walker hit by 3 bolas within 4s is pinned ${ihPl(.15 + .15 * n)}s, once every 4s.` },
+  'Trap Line': { tag: 'Control', pro: n => `Tripwire trips ${n} more walker${n > 1 ? 's' : ''} and holds each ${ihPl(.15 * n)}s longer.` },
+  'Tangle': { tag: 'Damage', pro: n => `Bolas bounce on to a second foe within 1.5 cells, at ${50 * n}%.` },
+  'Tripwire': { tag: 'Spell' },
+  'Bound and Broken': { tag: 'Control', cap: null, sp: n => ({ ab: 'ih_grapple', rider: { ihfLandPin: .6 * n } }), pro: n => `Harpoon Winch pins its catch ${ihPl(.6 * n)}s where it lands.` },
+  'Twin Nets': { tag: 'Control', pro: 'Each Chain Net is followed 0.6s later by a free second net.' },
+  'Double Line': { tag: 'Spell', pro: 'Tripwire pegs a second chain 1 cell further down the road.' },
+  'Harpoon Winch': { tag: 'Spell' },
+  'Bear Trap': { tag: 'Control', pro: 'Every 6s it sets a bear trap that pins a walker 1.5s and hits 3× as hard.' },
+  'Wide Nets': { tag: 'Control', pro: 'Nets also catch every foe within 0.6 cells of the target.' },
+  'Hooked Chain': { tag: 'Control', sp: null, pro: 'After Harpoon Winch, it throws a Chain Net at once.' },
+  'Spiked Caltrops': { tag: 'Damage', pro: n => `Walkers in its caltrops take ${30 * n}% of a throw a second.` },
+  'Wing Cords': { tag: 'Support', pro: n => `Bolas drag flyers down into every unit's reach for ${ihPl(.4 * n)}s, once every 3s.` },
+  "Trapper's Haul": { tag: 'Mana', pro: n => `Each foe that dies in its nets or chains gives it ${6 * n} mana.` },
+  'Barbed Chain': { tag: 'Spell', pro: n => `Walkers Tripwire trips bleed ${30 * n}% of a throw over 3s.` },
+  'Caltrop Bed': { tag: 'Spell', pro: 'Harpoon Winch leaves caltrops for 3s where its catch lands.' },
+});
+
+talPlain('ironhold', 'arcane', {
+  'Searing Brand': { tag: 'Damage', pro: n => `Its strokes burn foes for ${10 * n}% of the stroke a second for 3s.` },
+  'Deep Brand': { tag: 'Damage', pro: n => `Its brands make foes take ${3 * n}% more from every unit.` },
+  'Brand Chain': { tag: 'Damage', pro: 'A dying foe passes its brand to the 2 foes nearest it.' },
+  'Swift Inscription': { tag: 'Support', cap: null, pro: n => `Rune of Making inscribes ${n} more unit${n > 1 ? 's' : ''}.` },
+  'Ringing Anvil': { tag: 'Spell', pro: 'Rune of Unmaking stays on the road 4s, Unmaking every foe that steps onto it.' },
+  'Masterwork Strike': { tag: 'Spell', cap: null, sp: { ab: 'ih_runebrand', rider: { ihfMasterRB: 1 } }, pro: 'Runebrand also brands every foe within 1 cell of its target.' },
+  'Rune of Making': { tag: 'Spell' },
+  'Rune of Unmaking': { tag: 'Spell' },
+  'Rune Lord': { tag: 'Support', pro: 'Every 3rd stroke inscribes a rune on every unit in reach at once.' },
+  'Answering Rune': { tag: 'Support', pro: 'Units Rune of Making inscribes strike again at once.' },
+  'Runic Overflow': { tag: 'Mana', pro: n => `A spell cast on one of its runes gives back ${30 * n}% of its mana.` },
+  'Forge Heat': { tag: 'Heat', pro: n => `Each stroke gives the coolest engine within 2 cells ${10 * n}% heat.` },
+  'Runebrand Detonation': { tag: 'Damage', pro: 'Branded foes burst as they die, Unmaking every foe within 1 cell, as Rune of Unmaking does.' },
+  'Kinsmark': { tag: 'Damage', cap: null, mod: n => ({ magicPen: .08 * n }), pro: n => `Its strokes and spells ignore ${8 * n}% of wards.` },
+  'Paid in Kind': { tag: 'Mana', pro: n => `It gains ${6 * n} mana each time a unit spends one of its runes.` },
+  'Quench': { tag: 'Heat', pro: n => `Engines that spend one of its runes gain ${20 * n}% heat.` },
+});
+
+talPlain('ironhold', 'storm', {
+  'Torn Wings': { tag: 'Support', pro: n => `A flyer hit by 3 of its bursts within 4s is dragged down for ${n}s.` },
+  'Scorched Barrel': { tag: 'Heat', pro: n => `Each flyer it shoots down gives its gun ${15 * n}% heat.` },
+  'Spent Flare': { tag: 'Spell', pro: "When Starshell's flare burns out, it bursts again 25% harder." },
+  'Chain-Fed': { tag: 'Support', pro: "Grapnel Shot's foe takes 10% more from every unit for 4s." },
+  'Sky Shatter': { tag: 'Damage', pro: 'Flyers it kills crash down, hitting walkers within 0.8 cells for 2× a burst.' },
+  'Grapnel Shot': { tag: 'Spell' },
+  'Tracer Rounds': { tag: 'Support', sp: { ab: 'ih_flakscreen', rider: { mark: [.1, 4] } }, pro: 'Foes Flak Screen hits take 10% more from every unit for 4s.' },
+  'Starshell': { tag: 'Spell' },
+  'Endless Belt': { tag: 'Heat', pro: 'Barrage shells heat the gun again, so barrages roll into one another.' },
+  'Shellstorm': { tag: 'Spell', pro: "Each shell bursting on a foe in Starshell's light scatters 4 more bursts at 50%." },
+  'Reel In': { tag: 'Control', pro: 'Grapnel Shot stuns the foe it hooks for 0.4s.' },
+  'Ground Burst': { tag: 'Damage', pro: n => `Its bursts strip ${n} armour from walkers for 3s.` },
+  'Hot Shrapnel': { tag: 'Damage', pro: n => `Its bursts burn walkers for ${15 * n}% of the burst over 3s.` },
+  'Barbed Shrapnel': { tag: 'Damage', pro: n => `Its bursts leave foes Wounded for ${2 * n}s.` },
+  'Sky Watch': { tag: 'Mana', pro: n => `It gains ${ihPl(.5 * n)} mana a second for each flyer in reach, up to 4.` },
+});
+
+talPlain('ironhold', 'earth', {
+  'Packed Crowd': { tag: 'Heat', pro: n => `Slams hitting 3 or more walkers give it ${5 * n}% heat.` },
+  'Steam in the Cracks': { tag: 'Damage', pro: n => `Its Steam Burst burns cracked foes for ${10 * n}% of the burst over 3s.` },
+  'Scalding Steam': { tag: 'Spell', pro: n => `Pile Driver's slams burn walkers for ${20 * n}% of a slam a second for 3s.` },
+  'Rivet Popper': { tag: 'Control', pro: n => `A slam that cracks a foe's last armour stuns it ${ihPl(.3 * n)}s, once a foe.` },
+  'Piston Rhythm': { tag: 'Spell', pro: 'Pile Driver slams up to 4 more times while 3 or more walkers stand in reach.' },
+  'Pile Driver': { tag: 'Spell' },
+  'Echoing Slam': { tag: 'Spell', sp: n => ({ ab: 'ih_pistondrive', rider: { ihfScald: .3 * n } }), pro: n => `Steam Uppercut burns walkers where its foe lands for ${30 * n}% of a strike over 3s.` },
+  'Groundsplitter': { tag: 'Control', pro: 'Every 4th slam hits 2.5× as hard and stuns every walker in reach 0.6s.' },
+  'Molten Rivets': { tag: 'Damage', pro: 'Cracked foes near a Steam Hammer burst as they die, slamming and cracking walkers within 0.9 cells.' },
+  'Steam Uppercut': { tag: 'Spell' },
+  'Tremor Step': { tag: 'Control', pro: 'Slams slow every walker they hit 20% for 1s, Pressure Slam too.' },
+  'Safety Valve': { tag: 'Heat', pro: 'Each Steam Burst leaves a scalding, slowing steam cloud on the path for 4s.' },
+  'Line Them Up': { tag: 'Heat', pro: 'Steam Uppercut on a held foe gives it 50% heat.' },
+  'Hammer Home': { tag: 'Control', pro: n => `Its slams hold held foes ${ihPl(.2 * n)}s longer, once every 2s a foe.` },
+  'Pressure Gauge': { tag: 'Mana', pro: n => `Above 75% heat, each slam gives it ${2 * n} mana.` },
+  'Steam Jacket': { tag: 'Control', pro: n => `Above half heat, it slows walkers within 1 cell ${8 * n}%.` },
+  'Piledriven': { tag: 'Control', pro: "Walkers caught by both of Pile Driver's first two slams are pinned 0.4s." },
+});
+
+talPlain('ironhold', 'cannon', {
+  'Glowing Casings': { tag: 'Damage', pro: n => `Burning walkers its shells hit lose ${n} armour for 4s.` },
+  'Whistling Shells': { tag: 'Control', pro: n => `Walkers under its falling shells are stunned ${ihPl(.2 * n)}s, once every 1.5s.` },
+  'Rattling Blast': { tag: 'Control', pro: n => `Skipping Shell's bursts slow walkers ${15 * n}% for 1.5s.` },
+  'Pitch-Soaked Wadding': { tag: 'Damage', pro: n => `Its shells burn the blast for ${8 * n}% of a shell a second for 3s.` },
+  'Skipping Shell': { tag: 'Spell' },
+  'Double Crew': { tag: 'Damage', pro: 'Every 3rd shell is followed by a second at 60%.' },
+  'Red-Hot Tube': { tag: 'Heat', pro: 'After The Long Drop, its next 2 shells are extra Big Berthas.' },
+  'Big Bertha': { tag: 'Heat', pro: 'Big Berthas hit 4× as hard, not 2.5×.' },
+  'Clinging Fire': { tag: 'Spell', pro: n => `Incendiary Round burns its blast for ${30 * n}% of a shell a second for 3s.` },
+  'The Long Drop': { tag: 'Spell' },
+  'Shrapnel Casing': { tag: 'Spell', pro: n => `Skipping Shell strips ${2 * n} more armour from every walker it hits, for 5s.` },
+  'Quake Shell': { tag: 'Control', pro: 'Every 4th shell stuns every walker in the blast 0.6s.' },
+  'Walking Fire': { tag: 'Spell', pro: 'The Long Drop walks: 3 more shells land behind it up the road, each at half strength.' },
+  'Napalm': { tag: 'Damage', pro: 'Shells leave burning pitch for 3s, hitting walkers in it for 30% of a shell a second.' },
+  'Ringing Ears': { tag: 'Control', pro: n => `Big Berthas slow every walker in the blast ${15 * n}% for 2s.` },
+  'Powder Runners': { tag: 'Mana', pro: n => `Each Big Bertha from it or a crew within 2 cells gives it ${8 * n} mana.` },
+});
+
+talPlain('ironhold', 'venom', {
+  'Planted by Hand': { tag: 'Damage', pro: n => `Its lobs at foes within ${ihPl(.5 + .5 * n)} cells stick 2 charges, not 1.` },
+  'Shaped Charges': { tag: 'Damage', pro: n => `Each charge blows ${Math.round((IHS.BAR + .03 * n) * 100)}% of an armour bar apart, not ${Math.round(IHS.BAR * 100)}%.` },
+  'Fuse Cutter': { tag: 'Damage', pro: n => `When a foe dies, its charges jump to the nearest walker within ${ihPl(.5 + .5 * n)} cells.` },
+  'Blasting Wage': { tag: 'Mana', pro: n => `It gains ${6 * n} mana when 3 or more charges blow on one foe at once.` },
+  'Black Powder Pack': { tag: 'Heat', pro: n => `Each lob at a heavy or plated foe gives it ${5 * n}% heat.` },
+  'Cracked Plate': { tag: 'Spell', pro: n => `Breaching Charge strips ${3 * n} armour from its foe for 5s.` },
+  'Powder Trail': { tag: 'Spell' },
+  'Rubble': { tag: 'Control', pro: 'Foes whose armour bar its blasts empty move 30% slower for 2s.' },
+  'Short Fuse': { tag: 'Spell', pro: n => `Breaching Charge sets off charges already stuck on foes it hits, at ${50 * n}%.` },
+  'Tamped Charges': { tag: 'Damage', pro: n => `Charges left on a foe 3s or more blow ${25 * n}% harder.` },
+  'Long Trail': { tag: 'Spell', pro: 'Powder Trail lays one more charge.' },
+  'Demolition': { tag: 'Spell' },
+  'Siege Master': { tag: 'Heat', pro: 'Its vent also sticks 2 charges on every walker within 1 cell of its foe.' },
+  'Chain Demolition': { tag: 'Spell', pro: "Demolition's chain runs on: each charge it throws throws another, up to 5 links." },
+  'Breach and Clear': { tag: 'Spell', pro: 'After each Demolition, a free Breaching Charge hits the heaviest walker it blasted.' },
+  'Collapse': { tag: 'Mana', sp: { ab: 'ih_trench', kill: { mana: 20 } }, pro: 'Each foe Powder Trail kills gives it 20 mana.' },
+});
+
+talPlain('ironhold', 'champ:ih_thane', {
+  'Locked Shields': { tag: 'Control', pro: n => `Walkers Iron Wall throws back as it falls are pinned ${ihPl(.3 * n)}s.` },
+  'Shield-Ring': { tag: 'Control', pro: n => `Every 4th blow stuns walkers within 1 cell of her ${ihPl(.2 * n)}s.` },
+  'Wall of the Clan': { tag: 'Control', pro: n => `Iron Wall stands ${n}s longer for each Ironbreaker within 2 cells, up to 2.` },
+  "Thane's Line": { tag: 'Mana', pro: 'Iron Wall and Horn of the Hold cost 25% less with 2 Ironbreakers near her.' },
+  'Horn of the Hold': { tag: 'Spell' },
+  'Braced Heels': { tag: 'Support', pro: n => `Horn of the Hold makes Ironbreakers in its call shove their foe, stunning it ${ihPl(.2 * n)}s.` },
+  'Dented Plate': { tag: 'Spell', pro: n => `Every foe Iron Wall strikes as it falls loses ${2 * n} armour for 5s.` },
+  'Shield-Brother': { tag: 'Support', pro: 'Horn of the Hold makes Chain Trappers in its call throw a net at once.' },
+  'Deep Roots': { tag: 'Spell', pro: 'Rising Peaks erupts again 1s later along the same cone, at 60%.' },
+  'Shield-Toll': { tag: 'Mana', pro: n => `Each foe that stops to hammer at her shield gives her ${4 * n} mana.` },
+  'War Cry': { tag: 'Control', pro: n => `Walkers Iron Wall throws back count as held for ${2 * n}s.` },
+  'Unbroken Line': { tag: 'Spell', pro: 'Each Horn of the Hold also raises a free Iron Wall before her.' },
+  'Rising Peaks': { tag: 'Spell' },
+  'Holds the Pass': { tag: 'Control', pro: 'Rising Peaks leaves a stone ridge on the road for 4s that pins each walker 1s.' },
+  'Clan Drill': { tag: 'Damage', pro: n => `Her blows strip ${n} more armour from foes an Ironbreaker hit in the last 2s.` },
+});
+
+talPlain('ironhold', 'champ:ih_artificer', {
+  'Tally Wheel': { tag: 'Spell', pro: n => `Each foe Clockwork Sentry kills keeps it up ${n}s longer, up to 4s more.` },
+  'Riveting Peal': { tag: 'Control', pro: n => `His Thunderpeal pins each foe it punches through ${ihPl(.2 * n)}s.` },
+  'Scrap Shrapnel': { tag: 'Damage', pro: n => `Clockwork Sentry's final blast strips ${2 * n} armour from every foe it hits.` },
+  'Engine Yard': { tag: 'Heat', pro: 'His gun gains 50% heat every 3rd time an engine within 2 cells fills up.' },
+  'Lodestone': { tag: 'Spell' },
+  'Stronger Field': { tag: 'Spell', pro: n => `Lodestone hums ${ihPl(.5 * n)}s longer, tearing off more plate.` },
+  'Barbed Rivets': { tag: 'Spell', pro: n => `Every foe Clockwork Sentry strikes bleeds ${30 * n}% of a shot over 3s.` },
+  'Torn Loose': { tag: 'Control', pro: 'Foes Lodestone strips bare are stunned 0.4s.' },
+  'Counterweight': { tag: 'Spell', pro: 'Wrecking Ball swings across a third time.' },
+  'Magnetised': { tag: 'Damage', pro: n => `Lodestone and Wrecking Ball hit stripped foes ${15 * n}% harder.` },
+  'Overpressure': { tag: 'Damage', pro: n => `His Thunderpeal makes a standing Clockwork Sentry fire ${3 * n} quick shots.` },
+  'Chain Drive': { tag: 'Heat', pro: 'Every 2nd time his gun vents, he swings Wrecking Ball at once, free.' },
+  'Wrecking Ball': { tag: 'Spell' },
+  'Restless Stone': { tag: 'Spell', pro: 'Lodestone hops 1.5 cells up the road after it ends and hums again, half as long.' },
+  'Ricochet Rivets': { tag: 'Damage', pro: n => `Rivets that kill ricochet to a foe within 1.5 cells for ${30 * n}% of the shot.` },
+  'Spare Parts': { tag: 'Mana', pro: n => `When Clockwork Sentry blows up, he gains ${15 * n} mana.` },
+});
+
+talPlain('ironhold', 'champ:ih_brewer', {
+  'Leaky Keg': { tag: 'Spell', pro: n => `Rolling Keg leaves ${n === 1 ? 'an ale puddle' : n + ' ale puddles'} as it rolls.` },
+  'Slick Floor': { tag: 'Control', pro: n => `Her jugs stun walkers standing in her ale ${ihPl(.2 * n)}s, once a second.` },
+  'Heavy Barrel': { tag: 'Damage', pro: n => `Rolling Keg burns walkers it bowls over, ${10 * n}% of a throw a second for 3s.` },
+  'Open Tap': { tag: 'Control', pro: 'Walkers in her ale when Firewater Breath lights it are stunned 0.5s.' },
+  'Firewater Breath': { tag: 'Spell' },
+  'Double Measure': { tag: 'Spell', pro: n => `Firewater Breath breathes ${n} more gout${n > 1 ? 's' : ''} of flame.` },
+  'Sticky Stout': { tag: 'Control', pro: n => `Rolling Keg pins the walkers it bowls over ${ihPl(.3 * n)}s.` },
+  'Scorching Gust': { tag: 'Control', pro: 'Firewater Breath pushes each walker it sets burning back 0.3 cells.' },
+  'Brimming Keg': { tag: 'Spell', pro: 'Last Orders floods a second spot 1.5 cells up the road, lit in turn.' },
+  'Spilled Pints': { tag: 'Spell', pro: 'Foes that die burning from her fire leave burning ale for Last Orders to relight.' },
+  'Last Call': { tag: 'Damage', pro: n => `Rolling Keg's burst leaves ${n >= 2 ? '3 burning ale puddles' : 'a burning ale puddle'}.` },
+  'On the Slate': { tag: 'Mana', pro: n => `She gains ${ihPl(.5 * n)} mana a second for each walker in her ale, up to 4.` },
+  'Last Orders': { tag: 'Spell' },
+  'Topped Up': { tag: 'Spell', pro: n => `Jugs landing in her ale puddles make them last ${n}s longer, up to double.` },
+});
+
+/* ================= THE SILVER ORDER: plain talent text (the talent clarity pass, owner 10 Nov 2026) =================
+   The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and
+   want to just quickly figure out what a talent does and pick it", and "currently lots of reading to figure out what a
+   talent does with keywords that require further reading for a new player".
+   Every Silver Order talent (the eight unit trees and the three Champions' trees) gets its plain words here, through
+   talPlain (forces_zzzzzzzzzzzzzzzzz_spread.js): one effect, the result first, at most one condition and one word to look
+   up, and a tag (TAL_TAGS) that says what it is for. Spell talents take their words from their spell.
+   Where a talent did two or three things it was cut to its core and the lost power folded into what stays. Rules that live
+   in a talent's own data (sp, cap) are changed here; rules that live in code were changed where they are:
+     forces_silver_a.js (Chain of Judgement, Lance of Heaven, Lingering Smoke), forces_zzz_silver_cool.js (Scouring Light,
+     Shield Wall, Dawnsinger), forces_zzzzzzzzz_caps_silver.js (Shackle Litany, Debt of Oaths, The Ford Itself, Pyre Eternal,
+     Ashes Speak, Spilled Light), forces_zzzzzzzzzz_shieldline.js (Debt of Oaths, Swift Reprisal, Trampling Host, Ride Them
+     Down), forces_zs_silver.js (Grand Inquest), forces_zzzzzzzzzz_fresh_silver.js (Glinting Links, Sworn Witnesses, Radiant
+     Hymn, Bright Halo, Noon Bell, Unbroken, Burnished Shields, Shields Raised, Consecrated Earth, Fanned Embers,
+     Confession, Ride Them Down).
+   rider: { fresh: 1 } is the Order's marker (as before) for a talent whose own rule changes how a spell works. */
+
+/* ---------- Oathsworn Shieldbearers ---------- */
+talPlain('silver', 'glaive', {
+  'Shield-Ward': { tag: 'Survival', pro: n => `Each shield bash Wards it for ${n}s.` },
+  'Witness the Blow': { tag: 'Judgement', pro: n => `Every ${gOrd(4 - n)} strike lays a Judgement on its foe.` },
+  'Staggering Bash': { tag: 'Control', pro: n => `Bulwark Bash slows its foe ${25 * n}% for 1.2s.` },
+  'Shield of Faith': { tag: 'Support', pro: 'Units beside it are Warded.' },
+  // (Vigil keeps its Oath of Challenge mana: the spell needs two talents that change it, and only the capstones sit below it)
+  'Vigil': { tag: 'Damage', pro: 'Each kill makes it Radiant for 3s, bashing with every blow. Oath of Challenge kills restore 15 mana.' },
+  'Edge of Dawn': { tag: 'Judgement', pro: n => `Bulwark Bash hits Judged foes ${15 * n}% harder.` },
+  'Wall of Shields': { tag: 'Control', pro: 'Each shield bash also hits, shoves and dazes every walker up to a cell behind its foe.' },
+  // (simplified: the hold alone; its closing stun is gone)
+  'Oath of Rebuke': { tag: 'Control', pro: "Walkers Oath of Challenge calls can't walk out of it, bosses aside.", sp: { ab: 'so_rebuke', rider: { fresh: 1 } } },
+  'Unyielding': { tag: 'Control', pro: 'Every 2nd blow is a shield bash, not every 3rd.' },
+  'Unbroken Oath': { tag: 'Support', pro: 'Every unit within 1.5 cells of it is Warded.' },
+  'Pommel Blow': { tag: 'Control', pro: n => `Each cut keeps a dazed walker dazed ${gNf(.15 * n)}s longer, up to 0.6s (not bosses).` },
+  'The Line Held': { tag: 'Mana', pro: n => `Each walker that dies dazed by its shield restores ${6 * n} mana.` },
+  // (simplified: the Blind alone, longer; the extra length went)
+  'Dawn Shield': { tag: 'Control', pro: n => `Rampart of Dawn Blinds every walker it catches for ${gNf(1.5 * n)}s.`, sp: n => ({ ab: 'so_aegis', rider: { blind: 1.5 * n } }) },
+  'Ringing Rampart': { tag: 'Control', pro: 'Rampart of Dawn dazes every walker it catches for 0.8s.' },
+});
+
+/* ---------- Silverbolt Crossbows ---------- */
+talPlain('silver', 'arrow', {
+  'First Testimony': { tag: 'Judgement', pro: n => `Its first bolt at each foe lays ${n} more Judgement.` },
+  'Witnessed': { tag: 'Judgement', pro: n => `Judgement makes the Order's strikes ${4 + n}% harder a stack, not 4%.` },
+  // (simplified: the second flare alone; a flare no longer leaps when its foe falls)
+  'Twin Quarrels': { tag: 'Spell', pro: 'Flare Bolt looses a second flare at the toughest foe near the first.', cap: null },
+  // (simplified: the armour alone, more of it; no Condemnation)
+  'Mark of the Accused': { tag: 'Damage', pro: n => `Consecrated Bolt strips ${3 * n} more armour.`, sp: n => ({ ab: 'so_sanct', rider: { shred: [3 * n, 3 * n] } }) },
+  'Heavy Quarrel': { tag: 'Damage', pro: 'Every 4th bolt hits 2.5× as hard and Wounds its foe for 4s.' },
+  'Slow Match': { tag: 'Spell', pro: n => `Flare Bolt's fire burns ${n}s longer and ${gNf(.2 * n)} cells wider.` },
+  // (simplified: the readied bolt alone, sooner; Bear Witness no longer lasts longer or lays Judgement through its witnesses)
+  'Deep Mark': { tag: 'Spell', pro: n => `Each Bear Witness brings Consecrated Bolt ${3 * n}s nearer.`, sp: n => ({ ab: 'so_witness', ready: ['so_sanct', 3 * n] }) },
+  'Writ of Execution': { tag: 'Judgement', pro: 'Its bolts deliver a Verdict on any foe at full stacks.' },
+  'Through and Through': { tag: 'Damage', pro: 'Each bolt runs on into the next foe within 1.5 cells, for 60%.' },
+  'Bodkin Heads': { tag: 'Damage', pro: n => `Bolts ignore another ${15 * n}% of armour.` },
+  // (Wards each witness now; it made them Radiant)
+  'Sworn Witnesses': { tag: 'Support', pro: n => `Bear Witness Wards each unit that joins it for ${3 * n}s.` },
+  'Storm of Silver': { tag: 'Damage', pro: 'Every 5th shot also looses a half-strength bolt at every foe in range.' },
+  'Crank on the Verdict': { tag: 'Judgement', pro: n => `Other units' Verdicts in its reach reload it at once, every ${8 - 2 * n}s at most.` },
+  'Testimony Heard': { tag: 'Mana', pro: n => `Bolts on Condemned or fully Judged foes restore ${2 * n} mana.` },
+  'Pinning Light': { tag: 'Control', pro: n => `Flare Bolt slows every foe it burns ${15 * n}% for 2s.` },
+});
+
+/* ---------- Lightbinder Sisters ---------- */
+talPlain('silver', 'frost', {
+  'Tightening Links': { tag: 'Control', pro: n => `Each lash in a row on one foe slows it ${5 * n}% more, up to 3.` },
+  // (simplified: the leap alone, a little stronger; it no longer Judges)
+  'Glinting Links': { tag: 'Damage', pro: n => `Lashes on Blinded foes leap to a second foe for ${45 * n}%.` },
+  'Tight Bindings': { tag: 'Control', pro: n => `Binding Light binds ${gNf(.15 * n)}s longer.` },
+  'Dazzle': { tag: 'Damage', pro: n => `Blinded foes take ${15 + 5 * n}% more from the Order, not 15%.` },
+  'Twin Chains': { tag: 'Control', pro: 'Binding Light seizes one more foe.' },
+  // (simplified: the Blind alone, longer; no Judgement, no readied Binding Light)
+  'Scouring Light': { tag: 'Control', pro: n => `Chain of Penance's snap Blinds every walker near its foe for ${gNf(1.5 * n)}s.`, sp: n => ({ ab: 'so_flare', by: { scour: 1.5 * n }, rider: { fresh: 1 } }) },
+  'Last Rites': { tag: 'Spell', pro: n => `Each foe that dies bound brings Binding Light ${2 * n}s nearer.` },
+  'Blinding Chains': { tag: 'Control', pro: 'Its binds also Blind their foe for 1.5s.' },
+  // (simplified: it leaps to any three foes nearby, not only Judged ones)
+  'Chain of Judgement': { tag: 'Judgement', pro: 'Lashes on foes at full Judgement leap to three foes nearby, at 60%.' },
+  // (simplified: no readied Binding Light)
+  'Quick Binding': { tag: 'Control', pro: 'Every 2nd lash binds, and every lash during Vigil Chains.', sp: { ab: 'so_shackle', rider: { fresh: 1 } } },
+  // (simplified: the snap is a Verdict half again as strong, not a strike, a bind and a Verdict)
+  'Shackle Litany': { tag: 'Judgement', pro: 'Vigil Chains strings one more chain, and each walker on one hears its Verdict as it ends.' },
+  'Swift Lash': { tag: 'Judgement', pro: n => `Every ${gOrd(5 - n)} lash lays 2 Judgement, not 1.` },
+  'Vigil Lamp': { tag: 'Mana', pro: n => `She gains ${2 * n} mana a second for each foe she holds bound, up to 3.` },
+  'Glare of Dawn': { tag: 'Judgement', pro: 'Chain of Penance lays 2 more Judgement on its foe.' },
+});
+
+/* ---------- Grail Knights ---------- */
+talPlain('silver', 'arcane', {
+  'Full Gallop': { tag: 'Judgement', pro: n => `A charge from 2+ cells away makes its Verdict ${15 * n}% stronger.` },
+  // (simplified: the harder lance alone; the longer knockdown on a Blinded foe went)
+  'Couched Lance': { tag: 'Judgement', pro: n => `Grail Charge hits foes with 3+ Judgement ${12 * n}% harder.`, cap: null, sp: n => ({ ab: 'so_grail', vs: ['judged3', .12 * n] }) },
+  // (simplified: the Judgement alone; the longer knockdown went)
+  'Spurs': { tag: 'Judgement', pro: n => `Tourney Passes lays ${n} more Judgement on every walker it rides through.`, sp: n => ({ ab: 'so_ridedown', rider: { judge: n } }) },
+  // (simplified: the harder strike alone; the longer stun went)
+  'Grail Quest': { tag: 'Damage', pro: n => `Bosses and elites take ${15 * n}% more from Grail Charge.`, sp: n => ({ ab: 'so_grail', vs: ['big', .15 * n] }) },
+  // (simplified: a bigger Vow alone; no Radiance after a big Verdict)
+  'Shining Example': { tag: 'Spell', pro: 'Charge of the Vow lasts 1s longer and sends one more phantom knight.', cap: null },
+  'Trampling Hooves': { tag: 'Judgement', pro: n => `Walkers in its charge path take ${20 * n}% of the lance and a Judgement.` },
+  'Echoing Verdict': { tag: 'Judgement', pro: 'Its Verdicts of 3+ stacks leap on at 60% to the nearest foe within 1.6 cells.' },
+  'Glory of the Charge': { tag: 'Judgement', pro: 'Each charge bursts where it lands, giving walkers within a cell 40% of the lance and 2 Judgement.' },
+  'Rallying Vow': { tag: 'Support', pro: 'Charge of the Vow Wards each unit its knights ride out from for 4s.' },
+  'Vowkeeper': { tag: 'Judgement', pro: n => `Charge of the Vow lays ${n} Judgement on walkers beside each unit it blesses.` },
+  'Unhorse': { tag: 'Control', pro: "The lance's knockdown also throws down every walker within a cell of its foe." },
+  'Shield and Spur': { tag: 'Judgement', pro: n => `Its charge first lays ${n} Judgement on foes a Shieldbearer has dazed.` },
+  'Grail\'s Grace': { tag: 'Mana', pro: n => `Each Verdict restores ${n} mana for every stack it spends.` },
+  'Unhorsing Ride': { tag: 'Control', pro: 'Tourney Passes stuns every walker it tramples for 0.3s.' },
+});
+
+/* ---------- Sunlance Clerics ---------- */
+talPlain('silver', 'storm', {
+  'Zenith': { tag: 'Damage', pro: n => `Beams and Sunlance hit flyers ${10 * n}% harder.` },
+  'Morning Rays': { tag: 'Mana', pro: n => `Each beam that strikes a flyer restores ${n} mana.` },
+  'Sky Verdict': { tag: 'Judgement', pro: n => `Sunlance lays ${n} more Judgement on every foe it strikes.` },
+  // (simplified: Noon Sweep against the grounded alone, stronger; the army-wide bonus and the longer hold went)
+  'Fall from Grace': { tag: 'Damage', pro: n => `Noon Sweep hits dragged-down flyers ${30 * n}% harder.`, cap: null, sp: n => ({ ab: 'so_halo', vs: ['grounded', .3 * n] }) },
+  'Prism': { tag: 'Judgement', pro: 'Every 3rd beam splits to a second foe for 60% and Judges it.' },
+  'Kindled Faith': { tag: 'Judgement', pro: 'Every 4th beam delivers a Verdict on foes with 3+ stacks.' },
+  // (simplified: the column alone, a little stronger; no Judgement, no readied Sunlance)
+  'Lance of Heaven': { tag: 'Damage', pro: 'Every 6s, and with each Dawnfall, a column of light hits the toughest flyer in reach (else foe) for 330%.', sp: { ab: 'so_dawnfall', rider: { fresh: 1 } } },
+  // (simplified: no longer Blinds the walkers under the crash longer)
+  'Dawnward': { tag: 'Judgement', pro: 'Each flyer Dawnfall slams down gains 2 stacks and hears its Verdict as it crashes.', sp: { ab: 'so_dawnfall', rider: { judge: 2 } } },
+  'Sunburst': { tag: 'Judgement', pro: 'Every 5th beam bursts, hitting foes within a cell for 100% and a Judgement.' },
+  'Judgement Ray': { tag: 'Judgement', pro: 'Beams hit 6% harder for each Judgement stack on their foe.' },
+  'Searing Eye': { tag: 'Control', pro: n => `Its beams Blind flyers with 3+ Judgement for ${gNf(.5 * n)}s, once every 3s each.` },
+  'Burning Pinions': { tag: 'Control', pro: n => `Sunlance drags every flyer it strikes out of the sky for ${n}s.` },
+  'Piercing Dawn': { tag: 'Damage', pro: n => `Its beams and spells ignore ${5 * n}% of wards.` },
+  'Sun Wheel': { tag: 'Control', pro: n => `Noon Sweep slows every foe it crosses ${10 * n}% for 2s.` },
+});
+
+/* ---------- Templars of the Ford ---------- */
+talPlain('silver', 'earth', {
+  'Press of Battle': { tag: 'Damage', pro: n => `Slams that hit 3+ walkers make it Radiant for ${n}s.` },
+  'Crushing Weight': { tag: 'Control', pro: n => `Its slam slows foes ${25 + 15 * n}% for 1s, not 25%.` },
+  'Tremor': { tag: 'Control', pro: n => `Sanctified Slam stuns ${gNf(.1 * n)}s longer.` },
+  'Ringing Steel': { tag: 'Judgement', pro: 'Each kill by its Verdict makes it slam again at once, once a second.' },
+  // (simplified: the slow alone, deeper; the stagger went)
+  'Zeal': { tag: 'Control', pro: n => `Shield Fervour slows every walker it strikes ${15 * n}% for 1.5s.`, sp: n => ({ ab: 'so_hallow', rider: { slow: [.15 * n, 1.5] } }) },
+  // (simplified: a bigger Sword of Heaven alone; the stronger slam Verdicts went)
+  'Blade of Judgement': { tag: 'Control', pro: n => `Sword of Heaven stuns ${gNf(.2 * n)}s longer and its shock reaches ${gNf(.25 * n)} cells wider.`, cap: null, sp: n => ({ ab: 'so_hammerfall', by: { stun: .2 * n, wave: .25 * n } }) },
+  'Shockwave': { tag: 'Judgement', pro: 'Each slam rolls a cell further, hitting foes there for 50% and a Judgement.' },
+  'Final Judgement': { tag: 'Judgement', pro: 'Each foe its Verdicts slay passes 3 stacks to every walker within a cell.' },
+  'Sundering Blow': { tag: 'Judgement', pro: 'Each slam lays a Judgement just before it strikes.' },
+  'Marked by the Blade': { tag: 'Support', pro: "Sword of Heaven's foe takes 10% more from every unit for 4s." },
+  'Hurled Verdict': { tag: 'Judgement', pro: 'Sword of Heaven lays 2 Judgement on its foe.' },
+  'Sundered Plate': { tag: 'Judgement', pro: n => `Each Verdict strips ${n} armour from its foe, up to ${2 * n}.` },
+  'Reliquary': { tag: 'Mana', pro: n => `Each Judged foe that dies in its reach restores ${2 * n} mana.` },
+  'Censed Blade': { tag: 'Judgement', pro: n => `Its slams lay ${n} Judgement on walkers standing in incense.` },
+  // (simplified: Judgement alone, a second longer; the slow went)
+  'Consecrated Earth': { tag: 'Judgement', pro: 'Shield Fervour hallows the ground for 5s, laying Judgement on walkers there each second.' },
+});
+
+/* ---------- Censer Bearers ---------- */
+talPlain('silver', 'cannon', {
+  // (simplified: Judgement a rank; the smoke no longer smoulders on)
+  'Fanned Embers': { tag: 'Judgement', pro: n => `Coals that land in incense lay ${n} more Judgement.` },
+  // (simplified: the road's incense and the sweep's both last a second a rank)
+  'Lingering Smoke': { tag: 'Spell', pro: n => `Incense from its coals and Thurible Sweep lasts ${n}s longer.` },
+  // (simplified: the incense is spent as before)
+  'Glowing Coal': { tag: 'Spell', pro: 'Kindle the Censers lights one more patch, and each patch flares again 1s later.', sp: { ab: 'so_embers', by: { n: 1 } } },
+  // (simplified: more incense alone; it no longer smoulders longer)
+  'Swift Swing': { tag: 'Spell', pro: n => `Procession of Incense lays ${n} more cell${n > 1 ? 's' : ''} of incense.`, sp: n => ({ ab: 'so_smoke', by: { n } }) },
+  'Choking Smoke': { tag: 'Control', pro: n => `Its incense slows walkers in it ${10 * n}%.` },
+  'Censing of the Faithful': { tag: 'Support', pro: 'Units within a cell of incense are Radiant.' },
+  // (simplified: the coal alone; no mana back)
+  'Ember Psalm': { tag: 'Damage', pro: 'Each walker Kindle the Censers slays throws a burning coal at the nearest walker.', sp: { ab: 'so_embers', rider: { fresh: 1 } } },
+  'Thick Smoke': { tag: 'Judgement', pro: 'Incense lays Judgement every half second, not every second.' },
+  'Purging Fire': { tag: 'Judgement', pro: 'Its bursts deliver a 40% Verdict on foes with 3+ stacks.' },
+  'Rekindling': { tag: 'Damage', pro: 'Each foe its bursts slay throws a smaller coal at the nearest walker.' },
+  'Ash in the Eyes': { tag: 'Control', pro: n => `Its coal Blinds the walker it hits square for ${gNf(.3 * n)}s.` },
+  'Offering Bowl': { tag: 'Mana', pro: n => `Each foe that dies in its incense restores ${2 * n} mana.` },
+  'Pall of Smoke': { tag: 'Control', pro: n => `Its incense slows flyers above it ${10 * n}%.` },
+  'Censing Prayer': { tag: 'Support', pro: 'Procession of Incense Wards Order units within a cell of its path for 4s.' },
+});
+
+/* ---------- Magebane Inquisitors ---------- */
+talPlain('silver', 'venom', {
+  'Broken Litany': { tag: 'Control', pro: n => `Its lash breaks a caster's wind-up, silencing it ${gNf(.5 * n)}s, once every 4s.` },
+  'Scorching Seal': { tag: 'Mana', pro: n => `Each lash burns ${3 * n} more mana from a caster.` },
+  'Heavy Silence': { tag: 'Control', pro: n => `Silence Edict silences ${gNf(.5 * n)}s longer.` },
+  'Dry Well': { tag: 'Damage', pro: n => `Its lashes and spells hit casters with no mana left ${15 * n}% harder.` },
+  'Zealot\'s Vow': { tag: 'Damage', pro: n => `Its Zeal grows to ${SXS.ZEAL + 2 * n}, not ${SXS.ZEAL}.` },
+  'Forfeit': { tag: 'Mana', pro: n => `Each lash returns ${15 * n}% of the mana it burns to her.` },
+  'Sealed Tongues': { tag: 'Mana', pro: n => `Casters Silence Edict strikes can't regain mana for ${2 * n}s.` },
+  'Shield of Doctrine': { tag: 'Support', pro: 'Units within 1.5 cells of it shrug off silences and hexes.' },
+  // (simplified: the second caster alone; the longer turned silence went)
+  'Writ of Iron': { tag: 'Spell', pro: 'Writ of Seizure seizes one more caster near the first.', sp: { ab: 'so_seize', by: { n: 1 } } },
+  'Penitent Chains': { tag: 'Control', pro: n => `Writ of Seizure blinds its caster for ${n}s, slowing it 45%.` },
+  // (simplified: Judgement alone, one more; no mana lost)
+  'Confession': { tag: 'Judgement', pro: n => `Writ of Seizure lays ${n + 1} Judgement on every other caster within 2 cells.` },
+  // (simplified: the burst alone, stronger; no longer burns longer or silences)
+  'Pyre Eternal': { tag: 'Damage', pro: "A foe that dies on Heretic's Stake bursts for 200% to the pyre, and the stake takes another.", sp: { ab: 'so_pyre', rider: { fresh: 1 } } },
+  // (simplified: casters that die in the stake's fire, every 2s; no readied stake)
+  'Ashes Speak': { tag: 'Control', pro: "Each caster that dies in Heretic's Stake's fire casts a free Silence Edict there, once every 2s.", sp: { ab: 'so_pyre', rider: { fresh: 1 } } },
+  // (simplified: the spread burn alone, wider; no silence)
+  'Grand Inquest': { tag: 'Mana', pro: 'Every 3rd lash on a caster burns the same mana from every caster within 2 cells.' },
+});
+
+/* ---------- Aurelian ---------- */
+talPlain('silver', 'champ:so_lion', {
+  'Shoulder to Shoulder': { tag: 'Support', pro: n => `His strikes ready nearby Templars of the Ford to slam again, every ${8 - 2 * n}s each.` },
+  'Lowered Shield': { tag: 'Control', pro: n => `His blows knock down foes with 3+ Judgement for ${gNf(.25 * n)}s.` },
+  'Wide Sweep': { tag: 'Spell', pro: n => `Dawnsweep's arc reaches ${gNf(.15 * n)} cells wider.` },
+  // (simplified: any Templar of the Ford beside him slams, not only with two or more there)
+  'Shield Wall': { tag: 'Support', pro: 'Bulwark Slam makes every Templar of the Ford within 2 cells slam with him.' },
+  // (simplified: the Radiance alone, a rank longer; the longer Ward went)
+  'Shields Raised': { tag: 'Support', pro: n => `Bulwark Slam makes the units it Wards Radiant for ${gNf(1.5 * n)}s.`, sp: { ab: 'ch_fordstandard', rider: { fresh: 1 } } },
+  // (simplified: Judgement alone, a stack a rank; no daze)
+  'Burnished Shields': { tag: 'Judgement', pro: n => `Templars of the Ford near Dawnsweep lay ${n} Judgement on every walker in their reach.` },
+  'Rally to the Shield': { tag: 'Support', pro: 'Bulwark Slam readies the next strike of every Order unit within 1.6 cells.' },
+  // (simplified: two more strides, not one plus one for each kill)
+  'The Far Bank': { tag: 'Spell', pro: 'The Crossing strides 2 more times.', cap: null, sp: { ab: 'ch_lionsdue', by: { n: 2 } } },
+  // (simplified: the Verdicts alone, 1.5s each; the slams and the harder Crossing went)
+  'Debt of Oaths': { tag: 'Judgement', pro: 'Each Verdict the Order lands within 2 cells of him brings The Crossing 1.5s nearer, twice a second at most.', sp: { ab: 'ch_lionsdue', rider: { fresh: 1 } } },
+  // (simplified: the daze alone, longer; no Judgement)
+  'Unbroken': { tag: 'Control', pro: n => `Walkers Dawnsweep throws next to a Templar of the Ford are dazed ${gNf(.5 * n)}s.` },
+  // (simplified: no Judgement; the second strike is a little stronger)
+  'The Ford Itself': { tag: 'Control', pro: 'Bulwark Slam strikes again 0.8s later down the same cone, for 70% and a 0.6s daze.' },
+  // (simplified: any slam that strikes a walker counts)
+  'Swift Reprisal': { tag: 'Damage', pro: n => `Templar of the Ford slams within 2 cells ready his next strike, every ${gNf(7 - 1.5 * n)}s.` },
+  'Hearts Lifted': { tag: 'Mana', pro: n => `Each strike restores ${n} mana per Order unit within 1.6 cells, up to 4.` },
+});
+
+/* ---------- Celestine ---------- */
+talPlain('silver', 'champ:so_dawn', {
+  'Early Dawn': { tag: 'Spell', pro: n => `Each foe her Halo Blinds brings Dawnbreak ${n}s nearer.` },
+  'Clear Sky': { tag: 'Judgement', pro: n => `Every 3rd beam on a blind foe delivers its Verdict at ${25 * n}%.` },
+  'Dawn Chorus': { tag: 'Support', pro: n => `Dawnbreak makes Order units within 1.6 cells of her Radiant for ${2 * n}s.` },
+  'Cloister Wall': { tag: 'Judgement', pro: 'Each Oath-Stone Prism of Dawn bounces from bursts, hitting walkers within a cell for 100% and a Judgement.' },
+  // (simplified: the bounces alone; the longer Blind went)
+  'Lingering Star': { tag: 'Spell', pro: n => `Prism of Dawn bounces ${n} more time${n > 1 ? 's' : ''}.`, sp: n => ({ ab: 'ch_morningstar', by: { n } }) },
+  'Searing Light': { tag: 'Damage', pro: n => `Foes Dawnbreak Blinds burn for ${15 * n}% of her beam each second.` },
+  'Be Still': { tag: 'Control', pro: 'Prism of Dawn binds already Blinded foes it crosses for 0.6s.' },
+  // (simplified: the quicker sun alone; it no longer lasts longer)
+  'Noonday': { tag: 'Spell', pro: "High Noon's sun flares every 0.6s, not every second.", sp: { ab: 'ch_highnoon', by: { pulse: -.4 } } },
+  'Blinding Glare': { tag: 'Damage', pro: n => `Slowed foes take ${15 * n}% more from Prism of Dawn.` },
+  // (simplified: a timer, not a Ward on her)
+  'Radiant Hymn': { tag: 'Control', pro: n => `Each Dawnbreak makes her Halo Blind every 3rd beam, not 4th, for ${3 * n}s.` },
+  // (simplified: the Radiance alone, a little longer; the quicker beams went)
+  'Dawnsinger': { tag: 'Support', pro: "Each flare of High Noon's sun makes Order units in her reach Radiant for 1.5s.", sp: { ab: 'ch_highnoon', rider: { fresh: 1 } } },
+  // (simplified: the Blind alone, longer; no Judgement)
+  'Spilled Light': { tag: 'Control', pro: 'Each Blinded foe she slays Blinds every foe within a cell for 2s.' },
+  // (simplified: Judgement alone, a stack more; the longer Blind went)
+  'Bright Halo': { tag: 'Judgement', pro: n => `Each foe her Halo Blinds gains ${n + 1} Judgement.` },
+  'First Light': { tag: 'Mana', pro: n => `Each foe Dawnbreak Blinds restores ${2 * n} mana to her, up to 5 foes.` },
+  // (simplified: every Judged foe in reach, Blinded or not)
+  'Noon Bell': { tag: 'Judgement', pro: 'As High Noon ends, every foe in her reach hears its Verdict.' },
+});
+
+/* ---------- Morrow ---------- */
+talPlain('silver', 'champ:so_judge', {
+  'Swift Justice': { tag: 'Spell', pro: n => `Each foe he fills to full Judgement brings Sentence ${n}s nearer.` },
+  'Long Arm of the Law': { tag: 'Control', pro: n => `His charges slow foes with 3+ Judgement ${15 * n}% for 1.5s.` },
+  'Ready Ledger': { tag: 'Judgement', pro: n => `Foes that live through Sentence keep ${n} Judgement.` },
+  // (simplified: no readied Debt Collection)
+  'Iron Chains': { tag: 'Judgement', pro: 'When its foe dies, Final Verdict marks every foe within 1.5 cells for 5s.', sp: { ab: 'ch_verdict', rider: { fresh: 1 } } },
+  'Mark of Guilt': { tag: 'Judgement', pro: n => `His charges Condemn foes at full Judgement for ${n}s.` },
+  // (simplified: the daze alone, a little longer; the longer bind went)
+  'Witnesses Called': { tag: 'Control', pro: 'Debt Collection dazes every foe it takes Judgement from for 0.6s.', sp: { ab: 'ch_summons', by: { daze: .6 } } },
+  // (simplified: no stun)
+  'Wide Reckoning': { tag: 'Judgement', pro: "When Final Verdict's foe survives, its gavel also falls at half on foes within 1.2 cells.", sp: { ab: 'ch_verdict', rider: { fresh: 1 } } },
+  // (simplified: Judgement alone, a stack a rank; no Wound)
+  'Trampling Host': { tag: 'Judgement', pro: n => `Debt Collection lays ${n} Judgement on every walker between him and its foe.` },
+  'Clerk’s Quill': { tag: 'Judgement', pro: n => `After each Debt Collection, his next ${2 * n} charges lay 1 more Judgement.` },
+  'Grey Justicar': { tag: 'Judgement', pro: 'His charges also lay a Judgement on foes within 0.8 cells of their target.' },
+  'Riders of the Ford': { tag: 'Support', pro: 'Each Debt Collection sends Grail Knights within 2 cells charging its foe, every 4s each.' },
+  // (simplified: Judgement alone, a stack more; the harder strike went)
+  'Ride Them Down': { tag: 'Judgement', pro: n => `His charges lay ${n + 1} more Judgement on dazed, bound or downed foes.` },
+  'Court Fines': { tag: 'Mana', pro: n => `Each foe Sentence strikes pays him ${2 * n} mana.` },
+  'Summary Ruling': { tag: 'Judgement', pro: n => `His charges deliver a Verdict on foes under 25% health, every ${8 - 2 * n}s at most.` },
+});
+
+/* ================= THE STORMBORN'S TALENTS IN PLAIN WORDS (owner, 10 Nov 2026) =================
+   The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and want
+   to just quickly figure out what a talent does and pick it", and "lots of reading to figure out what a talent does with
+   keywords that require further reading for a new player". Each talent of the Stormborn's eight unit trees and three
+   Champion trees gets one tag (TAL_TAGS) and its words: one effect, the result first, at most one condition and one
+   keyword, about 12-15 words (talPlain, forces_zzzzzzzzzzzzzzzzz_spread.js). Spell talents read their spell's own brief.
+   Check: node tools/talent_clarity.js --force stormborn --check.
+   Where the honest words could not be that short, the rule itself was cut to its one core effect and the lost power
+   folded into what stayed. Those rules live where they always did (forces_stormborn_a.js, forces_zxx_stormborn_cool.js,
+   forces_zzzzzzzzz_caps_stormborn.js, forces_zzzzzzzzzz_fresh_stormborn.js); the new spell entries (sp) and the dropped
+   stat lines (mod) and caps are set here:
+     Wolfguard       Hock Bite: a slow only (25/50% for 2s), no Wounded. Pack Tactics: Scent of Rain's wolf drags down 2
+                     walkers a beat (by.n), not a longer, quicker hunt. Grounding Spear: thrusts on soaked foes only, 20/40%
+                     (no chilled, no Scent of Rain bonus). Moonfang Pounce: every 3rd lunge drags down the walkers within
+                     1.2 cells (no double bite).
+     Windrunners     Through and Through: no armour; the arrow behind strikes for 65/80/95%. Featherfall: flyers pulled
+                     down 2s (no extra push). Walking Wind: no extra second; its foes land slowed 40%. Skyrend: no stun;
+                     pulled down 3s. Lightning Fletch: soaked foes only.
+     Hail Shamans    Sleet: Black Ice soaks the walkers it knocks down (no slow on stones, no extra second, no bonus).
+                     Bitter Rain: Freezing Rain 1.5/3s longer (stones' soak no longer longer). Frostbound Totem: 30% sooner
+                     among 3 chilled foes (no cheaper). Frozen Through: soaked foes (chilled no longer needed too).
+     Thunder Callers Conductor and Drinking the Storm: soaked foes only. Wardsplitter Bolts: 10/20/30% of wards on soaked
+                     foes (none elsewhere). Skybolt: soaked foes 25/50% harder (no cheaper).
+     Earthbinders    Mud and Rain: its fissures soak 1.5/3s (no stomp bonus).
+     Cloud Dancers   Static Clouds: Skyleap on soaked foes 25/50% harder (no forks, no cloud chains). Breaking Sky: 250%,
+                     no soak.
+     Skyhunters      Heavy Air: Storm Tether 4s nearer (Ground Stake no longer holds longer). Many Cords: no sooner.
+     Tarka           Rain on Rain: each foe struck, soaked or not, up to 2/4. Drum of the Host: every beat, 25%, soaked or
+                     not. Eye of the Gathering: every bolt, soaked or not. Storm Caller: readies Thunder Drum, not Gather the
+                     Storm.
+     Oshana          Hard Landing: foes under half health (not slowed foes).
+     Huri            Beastcaller: only Thunderbird's Talons keeps a running Spirit Hunt going, 5s (not 3s from both spells).
+   Tags: Damage, Spell (changes a spell), Control (holds, slows, pushes), Support (helps other units), Survival, Mana, and
+   Storm (the Storm meter, its weather and soaking, the force's own mechanic). */
+
+{
+  const f = gNf;
+
+  // ---- Wolfguard: the spear and the wolf hunt as one ----
+  talPlain('stormborn', 'glaive', {
+    'Wolf at the Throat': { tag: 'Damage', pro: n => `Its thrusts also strike the foe its wolf holds down, for ${25 * n}%.` },
+    'Hunting Bond': { tag: 'Damage', pro: n => `Its wolf bites for ${60 + 15 * n}% of a thrust, up from 60%.` },
+    'Hock Bite': { tag: 'Control', pro: n => `Its wolf's bites slow foes ${20 * n}% for 1.5s and leave them Wounded.` },
+    "Hunter's Due": { tag: 'Spell', pro: 'Stormpin is ready again at once when it slays a foe, with 35 mana back.' },
+    'Pack Tactics': { tag: 'Spell', pro: "Scent of Rain's wolf drags down 2 walkers each beat, not 1.", sp: { ab: 'sb_packhowl', by: { n: 1 } } },
+    'Restless Spear': { tag: 'Spell', pro: 'Stormpin soaks its foes, then pins the next toughest walker with half the bolts.' },
+    'Wolf and Spear': { tag: 'Control', pro: n => `Pounce knocks its foe down ${f(.1 * n)}s longer.` },
+    'Spirit Pack': { tag: 'Control', pro: 'A second spirit wolf lunges with the first, dragging down another foe.' },
+    'Moonfang Pounce': { tag: 'Control', pro: 'Every 3rd wolf lunge also drags down every walker within 1.2 cells of its foe.' },
+    'Guard the Pass': { tag: 'Storm', pro: 'Its first thrust at each new foe soaks it 3s and gathers the Storm 2.' },
+    'Grounding Spear': { tag: 'Damage', pro: n => `Its thrusts hit soaked foes ${20 * n}% harder.`, sp: null },
+    'Thunder-Called Spear': { tag: 'Storm', pro: n => `Each new Storm level arms its next ${3 * n} thrusts with a lightning spark for 30%.` },
+    'Blood on the Fur': { tag: 'Mana', pro: n => `Each foe its wolf drags down gives it ${3 * n} mana.` },
+    'Hunting Cry': { tag: 'Support', pro: n => `Another Wolfguard within ${n >= 2 ? 2.5 : 1.5} cells thrusts at each walker Scent of Rain drags down.` },
+  });
+
+  // ---- Windrunners: the wind carries what the hand begins ----
+  talPlain('stormborn', 'arrow', {
+    'Riding the Gale': { tag: 'Storm', pro: n => `Its arrows fly ${f(.2 * n)} cells farther while the wind blows at Gale or above.` },
+    'Through and Through': { tag: 'Damage', pro: n => `Its storm-tipped arrows ignore ${10 * n}% of armour.`, mod: n => ({ armorPen: .1 * n }), cap: null },
+    'Quick Wind': { tag: 'Spell', pro: n => `Headwind soaks every foe it buffets for ${n}s.` },
+    'Gust Fletching': { tag: 'Control', pro: n => n >= 2 ? 'Every 2nd arrow gusts, and gusts blow foes half again as far.' : 'Every 3rd arrow gusts, not every 4th.' },
+    'Walking Wind': { tag: 'Control', pro: 'Skyward Gust walks back up the road a cell a second and slows the foes it flings 40%.',
+      sp: { ab: 'sb_skyshot', rider: { slow: [.4, 2] } } },
+    'Featherfall': { tag: 'Control', pro: 'Gale Arrow pulls the flyers it strikes down into every unit\'s reach for 2s.', sp: { ab: 'sb_galearrow', rider: { low: 2 } } },
+    'Skyrend': { tag: 'Damage', pro: 'Every 4th arrow at a flyer strikes 3× and pulls it down 3s. Skyward Gust pulls its flyers down too.' },
+    'Lightning Fletch': { tag: 'Damage', pro: 'Arrows striking soaked foes fork lightning to 2 foes nearby, for 60%.' },
+    'Rain Arrows': { tag: 'Storm', pro: n => `Its arrows soak every foe they strike for ${n}s.` },
+    'Hurricane Volley': { tag: 'Damage', pro: 'Its arrows run on through the whole line, at full strength.' },
+    'Updraft Reader': { tag: 'Control', pro: n => `Its arrows gust flyers still in the air, once every ${n >= 2 ? 2.5 : 4}s each.` },
+    'Breath of the Gust': { tag: 'Mana', pro: n => `Each gusting arrow gives it ${2 * n} mana.` },
+    'Eddying Wake': { tag: 'Control', pro: 'Gale Arrow blows foes twice as far for 3s after Headwind buffets them.' },
+  });
+
+  // ---- Hail Shamans: cold and wet, then the thunder ----
+  talPlain('stormborn', 'frost', {
+    'Heavy Hail': { tag: 'Damage', pro: n => `Its hailstones splash ${8 * n}% wider.` },
+    'Water Turns to Ice': { tag: 'Control', pro: n => `Foes it chilled freeze solid ${f(.2 * n)}s as their soak dries, once every 5s.` },
+    'Brittle Cold': { tag: 'Support', pro: n => `Chilled foes take ${8 * n}% more from every unit.` },
+    'Sleet': { tag: 'Control', pro: 'Black Ice soaks the walkers it knocks down, so they fall more often.',
+      sp: { ab: 'sb_hailstorm', rider: { soak: 3 } }, cap: null },
+    'Hail Cairn': { tag: 'Damage', pro: 'Its Skystones stand 2s longer and drop a half hailstone on the nearest foe each second.' },
+    'Bitter Rain': { tag: 'Spell', pro: n => `Freezing Rain hangs ${f(1.5 * n)}s longer.`, sp: n => ({ ab: 'sb_freezingrain', by: { dur: 1.5 * n } }), cap: null },
+    'Frozen Through': { tag: 'Control', pro: 'Its stones freeze soaked foes solid for 0.8s, once every 4s each.' },
+    'Frostbound Totem': { tag: 'Spell', pro: 'Skystone comes 30% sooner while 3 or more chilled foes are in its reach.',
+      sp: { ab: 'sb_rimetotem', at: 'foes', foes: { n: 3, cond: 'chilled' }, cd: -.3 } },
+    'Ice Crust': { tag: 'Control', pro: n => `Every 4th stone freezes its foes solid for ${f(.25 * n)}s.` },
+    'Frost Lightning': { tag: 'Support', pro: 'Lightning leaping onto chilled foes gains 2 jumps, not 1, for every unit.' },
+    'Hail Shatter': { tag: 'Damage', pro: 'Chilled foes burst on death, chilling foes within 1.1 cells and striking them for 3× a stone.' },
+    'First Clouds': { tag: 'Storm', pro: n => `Each rain cloud it calls gathers the Storm ${3 * n} more.` },
+    'Meltwater': { tag: 'Mana', pro: n => `Each chilled foe that dies in its reach gives it ${4 * n} mana.` },
+    'Shattering Hail': { tag: 'Spell', pro: n => `Each fall on Black Ice strips 1 armour from the walker, up to ${2 * n}.` },
+    'Brittle Fall': { tag: 'Control', pro: 'The next hailstone to hit a foe within 4s of Skystone freezes it 0.3s.' },
+  });
+
+  // ---- Spirit Walkers: our dead forget nothing ----
+  talPlain('stormborn', 'arcane', {
+    'Restless Dead': { tag: 'Damage', pro: n => `A hexed foe's death passes a ${2 * n}s hex to the nearest foe within 2 cells.` },
+    'Deep Hex': { tag: 'Damage', pro: n => `Its hexes store ${20 + 5 * n}% of what their foe loses, up from 20%.` },
+    'Lingering Spirits': { tag: 'Damage', pro: n => `Its hexes hold ${n}s longer before they pay back.` },
+    'Spirit Weight': { tag: 'Control', pro: n => `Spirit Chains slows each bound foe ${8 * n}% per other foe bound, up to ${24 * n}%.` },
+    'Judgment': { tag: 'Support', pro: n => `Hexed foes take ${6 * n}% more from every unit.` },
+    'Walk On': { tag: 'Spell', pro: 'Spirit Walk soaks its foe, then walks the toughest foe within 2 cells too.' },
+    'Spirit Host': { tag: 'Damage', pro: 'Every bolt hexes every foe within 1 cell of its mark as well.' },
+    'Renewed Hex': { tag: 'Spell', pro: "Ancestors' Toll hexes its target for 4s." },
+    'Spirit Echo': { tag: 'Damage', pro: 'Each hex payback echoes half its damage onto the nearest other foe.' },
+    'The Final Tally': { tag: 'Spell', pro: "Each Spirit Walk ends with a free Ancestors' Toll on its foe, and readies the Toll." },
+    'Spirit Draw': { tag: 'Damage', pro: n => `Its bolts come ${4 * n}% faster for each hexed foe in its reach, up to 3.` },
+    'Debts Repaid': { tag: 'Mana', pro: n => `Each of its hexes that pays back gives it ${4 * n} mana.` },
+    'Kindred Chains': { tag: 'Spell', pro: n => `Spirit Chains hexes every foe it binds for ${2 * n}s.` },
+    'Final Reckoning': { tag: 'Control', pro: "Ancestors' Toll stuns its target for 0.3s." },
+  });
+
+  // ---- Thunder Callers: the sky has been waiting for this ----
+  talPlain('stormborn', 'storm', {
+    'Rolling Thunder': { tag: 'Storm', pro: n => `Its chains gain a jump per Storm level, up to ${2 * n}.` },
+    'Static Field': { tag: 'Support', pro: n => `Foes its lightning strikes take ${5 * n}% more from Stormborn lightning for 2s.` },
+    'Conductor': { tag: 'Damage', pro: n => `Its chains gain ${n + 1} jumps, not 1, off each soaked foe.` },
+    'Overcharge': { tag: 'Control', pro: n => `Call Lightning's bolts and forks stun their foes for ${f(.4 + .1 * n)}s.` },
+    'Skybolt': { tag: 'Spell', pro: n => `Arc Bridge strikes soaked foes ${25 * n}% harder.`, sp: n => ({ ab: 'sb_thunderbird', vs: ['soaked', .25 * n] }) },
+    'Copper Kin': { tag: 'Spell', pro: n => `Lightning Rod's spike jumps ${n >= 2 ? 'twice' : 'once'} to the toughest foe nearby when its foe dies.` },
+    'Living Storm': { tag: 'Storm', pro: 'Its chains never weaken as they leap, at Rain and above.' },
+    'Last Spark': { tag: 'Damage', pro: 'Foes its lightning kills release a new 60% chain, up to 3 per bolt.' },
+    'Stormseed': { tag: 'Damage', pro: 'Every 4th bolt plants a 4s storm totem where its chain ends, chaining lightning each second.' },
+    'Split Sky': { tag: 'Damage', pro: 'Each bolt forks into a second chain from its first foe, at 60%.' },
+    'Copper Crown': { tag: 'Spell', pro: "Lightning Rod's strikes soak their foes for 1.5s." },
+    'Ground Strike': { tag: 'Storm', pro: n => `Its chain's last bolt soaks walkers within 0.8 cells of it for ${2 * n}s.` },
+    'Drinking the Storm': { tag: 'Mana', pro: n => `Each soaked foe its chains strike gives it ${n} mana, up to 3 a chain.` },
+    'Wardsplitter Bolts': { tag: 'Damage', pro: n => `Its lightning and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
+    'Thunder Wings': { tag: 'Support', pro: "Arc Bridge pulls flyers crossing it down into every unit's reach for 2s." },
+  });
+
+  // ---- Earthbinders: the mountain is listening ----
+  talPlain('stormborn', 'earth', {
+    'Ground Gives Way': { tag: 'Control', pro: n => `Its stomps knock slowed walkers down for ${f(.15 * n)}s, once every 3s each.` },
+    'Deep Fissures': { tag: 'Control', pro: n => `Its fissures stay open ${n}s longer.` },
+    "Mountain's Echo": { tag: 'Damage', pro: 'Its Stone Totems stand 2s longer and quake with each of its stomps, for half.' },
+    'Rattled': { tag: 'Storm', pro: n => `Its stomps soak stunned walkers for ${2 * n}s.` },
+    'Shake Loose': { tag: 'Control', pro: n => `Its fissures slow soaked walkers ${15 * n}% more.` },
+    'Widening Earth': { tag: 'Control', pro: 'As Sinkhole closes, a second opens 1.5 cells up the road. Sinkhole hits stunned walkers 30% harder.' },
+    'Riftmaker': { tag: 'Control', pro: 'Every stomp opens a fissure, not every 3rd.' },
+    'Rift Rhythm': { tag: 'Spell', pro: 'Stone Totem comes back 3s early with each Stonewake.' },
+    'Mud and Rain': { tag: 'Storm', pro: n => `Its fissures soak the walkers in them for ${f(1.5 * n)}s.` },
+    'Storm Mire': { tag: 'Spell', pro: 'Sinkhole soaks its walkers; once a second, lightning striking one leaps to the rest at half.' },
+    'Second Tremor': { tag: 'Damage', pro: n => `Each stomp shakes the ground again 0.4s later, for ${15 * n}%.` },
+    'Stone Remembers': { tag: 'Mana', pro: n => `Each walker that dies on its fissures gives it ${6 * n} mana.` },
+    'Drumming Feet': { tag: 'Damage', pro: n => `Its stomps come ${4 * n}% faster while one of its Stone Totems stands.` },
+    'Deep Rift': { tag: 'Support', pro: 'Walkers Stonewake strikes take 10% more from every unit for 4s.' },
+  });
+
+  // ---- Cloud Dancers: every cloud carries a storm ----
+  talPlain('stormborn', 'cannon', {
+    'Long Clouds': { tag: 'Damage', pro: n => `Its lingering clouds stay ${n}s longer.` },
+    'Brooding Sky': { tag: 'Damage', pro: n => `Strikes landing under its clouds splash ${6 * n}% wider.` },
+    'Many Skies': { tag: 'Spell', pro: 'Skyleap also falls from each of its clouds, on the toughest foe beneath, for half.' },
+    'Heavy Rain': { tag: 'Control', pro: n => `Its lingering clouds soak foes beneath them and slow them ${10 * n}%.` },
+    'Storm Dance': { tag: 'Storm', pro: n => `Its strikes feed the Storm, and Thunderhead lasts ${n}s longer.` },
+    'Static Clouds': { tag: 'Spell', pro: n => `Skyleap deals ${25 * n}% more to soaked foes.`, sp: n => ({ ab: 'sb_stormdance', vs: ['soaked', .25 * n] }), cap: null },
+    'Breaking Sky': { tag: 'Storm', pro: 'Each new Storm level breaks its clouds for 250% of a strike, renewing them.' },
+    'Rolling Clouds': { tag: 'Damage', pro: 'Its lingering clouds drift back up the road, striking as they go.' },
+    'Landing Thunder': { tag: 'Spell', pro: n => `Skyleap leaves one of its clouds where it lands, for ${2 * n}s.` },
+    'Sky Strike': { tag: 'Damage', pro: n => `Its strikes hit their main target ${15 * n}% harder.` },
+    'Sky Lattice': { tag: 'Damage', pro: 'Lightning joins its clouds within 2.2 cells, striking foes between them for 30% each strike.' },
+    'Thunder Answers': { tag: 'Damage', pro: n => `Another Stormborn cast within 2 cells adds a ${50 * n}% bolt to its next strike.` },
+    'Rain Returns': { tag: 'Mana', pro: n => `Each foe under one of its fading clouds gives it ${2 * n} mana, up to 5.` },
+    'Drenching Pour': { tag: 'Spell', pro: 'Rain Dance dances one beat longer.' },
+    'Rainmaker': { tag: 'Spell', pro: "Rain Dance's lightning readies Thunderhead at once." },
+  });
+
+  // ---- Skyhunters: come down, the ground has been waiting ----
+  talPlain('stormborn', 'venom', {
+    'Downwind Haul': { tag: 'Control', pro: n => `Flyers it hauls down are blown ${f(.3 * n)} cells back up the road.` },
+    'Long Cord': { tag: 'Control', pro: n => `Its harpoons hold a flyer down ${f(.4 * n)}s longer.` },
+    'Quick Cast': { tag: 'Damage', pro: n => `Its harpoons come ${4 * n}% faster while a flyer is held down in its reach.` },
+    'Sky Lore': { tag: 'Mana', pro: n => `Each flyer it hauls down gives it ${3 * n} mana.` },
+    'Charged Harpoons': { tag: 'Damage', pro: n => `Harpoons striking flyers still in the air add lightning for ${40 * n}% of the hit.` },
+    'Drenching Barbs': { tag: 'Storm', pro: 'Its harpoons soak walkers too, for 1.5s.' },
+    'Heavy Air': { tag: 'Spell', pro: "Every Ground Stake cuts 4s from Storm Tether's wait.", sp: { ab: 'sb_downdraft', ready: ['sb_tether', 4] } },
+    'Many Cords': { tag: 'Spell', pro: 'Storm Tether binds 1 more flyer.', sp: { ab: 'sb_tether', by: { n: 1 } } },
+    'Pinned to Earth': { tag: 'Control', pro: n => `Storm Tether slows every flyer it binds ${15 * n}% for 3s.` },
+    'Storm-Cord': { tag: 'Storm', pro: n => `Each foe Ground Stake's cord shocks gathers the Storm ${2 * n}, once every 2s.` },
+    'Fallen Sky': { tag: 'Storm', pro: 'Skyfall Harpoon soaks every walker within 1.5 cells of its strike for 3s.' },
+    'Twin Harpoon': { tag: 'Spell', pro: 'Skyfall Harpoon fires again at the next toughest flyer, free; each brings Storm Tether 3s nearer.' },
+    'Master of the Sky': { tag: 'Damage', pro: 'Harpoons at a held down flyer leap to every other held down flyer within 2.5 cells, for half.' },
+  });
+
+  // ---- Tarka Stormbrow: the storm answers her drum ----
+  talPlain('stormborn', 'champ:sb_caller', {
+    'Heavy Clouds': { tag: 'Damage', pro: n => `Gather the Storm leaves a cloud for ${3 * n}s that strikes below every 0.75s for 40%.` },
+    'Crown of Rain': { tag: 'Storm', pro: n => `Her Stormcrown thunderbolt soaks every foe it strikes for ${2 * n}s.` },
+    'Rain on Rain': { tag: 'Storm', pro: n => `Gather the Storm gathers 1 more for each foe it strikes, up to ${2 * n}.` },
+    'Drum Circle': { tag: 'Spell', pro: 'Gather the Storm and Thunder Drum cost 25% less within 2 cells of Thunder Callers.' },
+    'Long Roll': { tag: 'Spell', pro: n => `Thunder Drum beats ${n === 1 ? 'once more' : n + ' more times'}.` },
+    'Drenching Storm': { tag: 'Control', pro: n => `Gather the Storm's lightning slows every foe it strikes ${10 * n}% for 2s.` },
+    'Drum of the Host': { tag: 'Support', pro: 'Each Thunder Drum beat calls a 25% bolt from every Thunder Caller within 2 cells.' },
+    'Two Tomorrows': { tag: 'Spell', pro: "Tomorrow's Storm also brings the level after next, at 60%, and soaks every foe it strikes for 3s." },
+    'Eye of the Gathering': { tag: 'Storm', pro: n => `For 4s after Gather the Storm, each of her bolts gathers the Storm ${n} more.` },
+    'Storm Caller': { tag: 'Storm', pro: "Tomorrow's Storm is ready again at each new Storm level, and each cast brings Thunder Drum 8s nearer.",
+      sp: { ab: 'ch_stormcall', ready: ['ch_eyestorm', 8] } },
+    'Drum in the Rain': { tag: 'Damage', pro: "Thunder Drum's beats leap from their foe to every soaked foe within 2 cells, for 60%." },
+    'Gusting Staff': { tag: 'Storm', pro: n => `Her bolts come ${4 * n}% faster at Hail and above.` },
+    'Rainwell': { tag: 'Mana', pro: n => `Each soaked foe her Stormcrown thunderbolt strikes gives her ${2 * n} mana.` },
+  });
+
+  // ---- Elder Oshana: the wind turns the whole road back ----
+  talPlain('stormborn', 'champ:sb_wind', {
+    'Rain in the Wind': { tag: 'Storm', pro: n => `Cyclone soaks every foe it catches for ${2 * n}s.` },
+    'Feather-Cut': { tag: 'Support', pro: n => `Her wind blades pull flyers down into every unit's reach for ${n}s.` },
+    'Wide Funnel': { tag: 'Spell', pro: n => `Cyclone grows ${f(.15 * n)} cells wider.` },
+    "Road's End": { tag: 'Control', pro: 'As Turn the Road ends, every walker it turned is slammed and stunned 0.8s (bosses 0.3s).' },
+    'Wide Gale': { tag: 'Spell', pro: n => `Stoneward Gale's cone opens ${10 * n}° wider.` },
+    'Biting Gale': { tag: 'Support', pro: n => `Walkers Stoneward Gale strikes take ${15 * n}% more from Stormborn lightning for 3s.` },
+    'Feather Gift': { tag: 'Support', pro: 'Each Stoneward Gale makes the next arrow of Windrunners within 2 cells gust.' },
+    'Long Road Back': { tag: 'Control', pro: 'Turn the Road lasts 0.5s longer.' },
+    'Hard Landing': { tag: 'Damage', pro: n => `Stoneward Gale and Turn the Road strike foes under half health ${15 * n}% harder.`,
+      sp: n => [{ ab: 'ch_updraft', vs: ['low', .15 * n] }, { ab: 'ch_galewall', vs: ['low', .15 * n] }] },
+    'Wind at Her Back': { tag: 'Control', pro: n => `Each Cyclone makes her next ${2 * n} blades blow their foe a step back.` },
+    'Twin Gale': { tag: 'Control', pro: 'Stoneward Gale blows a second gust down the same cone a second later.' },
+    'Whirling Steps': { tag: 'Damage', pro: n => `Her blades come ${4 * n}% faster for 1.5s after wind moves a foe near her.` },
+    'Returning Breath': { tag: 'Mana', pro: n => `Each foe her Tailwind blows back gives her ${3 * n} mana.` },
+    'Rising Air': { tag: 'Storm', pro: 'Each foe Turn the Road turned gathers the Storm 2 as it ends.' },
+  });
+
+  // ---- Huri Wolfsong: wolf, bird and bear run with her ----
+  talPlain('stormborn', 'champ:sb_beast', {
+    'Old Calls': { tag: 'Support', pro: n => `Spirit Hunt's thunderbird pulls flyers it strikes down into every unit's reach for ${f(1.5 * n)}s.` },
+    'Keen Nose': { tag: 'Damage', pro: n => `Her spears strike ${15 * n}% harder on foes a spirit animal bit in the last 2s.` },
+    'Long Hunt': { tag: 'Storm', pro: n => `Spirit Hunt's wolves soak every walker they bite for ${2 * n}s.` },
+    'Wolf Den': { tag: 'Spell', pro: 'Spirit Hunt costs 25% less with a Wolfguard within 2 cells of her.' },
+    'Heel Biters': { tag: 'Control', pro: n => `Wolfsong's first bite holds its prey ${f(.15 * n)}s longer.` },
+    'Pack Hunger': { tag: 'Damage', pro: n => `Wolfsong's bites bleed for ${40 * n}% of a bite over 3s, through armour.` },
+    'Thunder on the Prey': { tag: 'Spell', pro: 'Wolfsong ends with a 60% thunderbird bolt on the prey, chaining to 2 more foes.' },
+    'Stormcarrier': { tag: 'Spell', pro: 'Thunderbird’s Talons seizes a second foe within 2 cells of the drop, and seized flyers fly low 3s.' },
+    'Blood Trail': { tag: 'Damage', pro: "If Wolfsong's prey dies within 2s, the pack piles onto the toughest walker within 2.5 cells." },
+    'Spirit Run': { tag: 'Spell', pro: n => `Her spirit wolf bites Wolfsong's prey ${n + 1} times, each for 50% of her strike.` },
+    'Beastcaller': { tag: 'Spell', pro: 'Each Thunderbird’s Talons brings Spirit Hunt 8s nearer and adds 5s to a running one.' },
+    'Pack Pace': { tag: 'Damage', pro: n => `Her spears come ${4 * n}% faster while Spirit Hunt runs.` },
+    "Hunter's Breath": { tag: 'Mana', pro: n => `Each foe that dies within 2s of a spirit animal's bite gives her ${3 * n} mana.` },
+    "Hunter's Stride": { tag: 'Control', pro: n => `Each Spirit Hunt wolf stuns the first walker it bites for ${f(.4 * n)}s.` },
+  });
+}
+
+/* ================= THE WARDBOUND: plain talent text (talent clarity, owner 10 Nov 2026) =================
+   The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and
+   want to just quickly figure out what a talent does and pick it". Every Wardbound talent here gets one plain line: the
+   result first, one effect, at most one condition and one word a new player must look up (brand, sigil, ward-line,
+   rooted ...), and a tag from TAL_TAGS (Runes is the force's own: runes, ward-lines, brands and sigils).
+   talPlain (forces_zzzzzzzzzzzzzzzzz_spread.js) swaps the words in; the names, places, ranks and list order stay.
+   Where a talent did two or three things its rule was cut to the core one and the lost part folded into it:
+   - here (sp): Sword and Stone and Charge Through brand once more a rank (no Bound stone, no storm runes); the
+     capstones that also shaped their spell a second way (a ready, a haste, a pin, a burn, a brand, an ally gift) now
+     carry the plain marker rider { wbf: 1 } in its place: Oath Fulfilled, Shared Oath, Twin Wards, Lodestar, Hoarfrost,
+     The Last Word, Unmoving, Breaking Stance, Hallowed Road, The Gate Holds, Last Warden, Undying Blaze, Turned Twice,
+     Veiled Oath; Rune-Etched Edge and Ward-Cutting Script lose their stat line (mod) for a deeper rule.
+   - in forces_wardbound_b.js, forces_zzzzzzzzz_caps_wardbound.js and forces_zzzzzzzzzz_fresh_wardbound.js (each
+     marked "talent clarity"): the rule itself.
+   Spell talents (t.spell) take their words from their spell and are listed with their tag only. */
+
+/* ---------- Oathbound ---------- */
+talPlain('wardbound', 'glaive', {
+  'Avenging Oath': { tag: 'Control', pro: n => `Its next ${2 * n} cuts root 0.4s and brand after a nearby unit is struck.` },
+  'Deep Carving': { tag: 'Runes', pro: n => `Its oath runes last ${15 * n}% longer.` },
+  "Oathbreaker's Due": { tag: 'Damage', pro: n => `Its cuts ignore ${15 * n}% of armour on foes within 3s of crossing a ward-line.` },
+  'Oathsworn Cut': { tag: 'Control', pro: n => `Its oath runes slow walkers ${20 + 6 * n}%, up from 20%.` },
+  'Sword and Stone': { tag: 'Runes', pro: n => `Oathbreaker Thrust brands every foe it strikes ${n > 1 ? n + ' more times' : 'once more'}.`,
+    sp: n => ({ ab: 'wb_swordplant', rider: { wbBrand: n } }) },
+  'Oath Kept': { tag: 'Mana', pro: n => `Restores ${2 * n} mana each time a walker springs one of its oath runes.` },
+  'Rune Cleave': { tag: 'Spell' },
+  'Unbroken Line': { tag: 'Runes', pro: n => `Rune Cleave carves an oath rune under up to ${2 * n} walkers standing on none.` },
+  'Hold Fast': { tag: 'Runes', pro: 'Brands every walker held in place within its reach, once a second.' },
+  'Bright Wards': { tag: 'Control', pro: 'Rune Cleave roots every foe it strikes for 0.5s.' },
+  'Final Oath': { tag: 'Spell' },
+  'Oath of Iron': { tag: 'Control', pro: 'Every 4th cut roots every walker within 0.8 cells for 0.6s and brands them.' },
+  'Linebreaker': { tag: 'Damage', pro: n => `Rune Cleave cuts ${15 * n}% deeper into branded foes.` },
+  // capstones: Oath Fulfilled no longer readies Rune Cleave (its flare is 2x a cut, was 1.5x); Shared Oath gives no mana (its reach is 2 cells, was 1.6);
+  // Oathfire is 80% of a cut on any ward-line (was 60%, twice on a woven one)
+  'Oath Fulfilled': { tag: 'Control', pro: 'When Final Oath ends, nearby oath runes and their lines flare for 2× a cut, rooting 1s.',
+    sp: { ab: 'wb_laststand', rider: { wbf: 1 } } },
+  'Oathfire': { tag: 'Damage', pro: 'Walkers crossing a ward-line from its oath runes take 80% of a cut.' },
+  'Shared Oath': { tag: 'Survival', pro: 'While Final Oath holds, units within 2 cells of him can\'t be Wounded either.',
+    sp: { ab: 'wb_laststand', rider: { wbf: 1 } } },
+});
+
+/* ---------- Glaive Wardens ---------- */
+talPlain('wardbound', 'arrow', {
+  'The Long Watch': { tag: 'Damage', pro: n => `Gains up to ${gNf(.25 * n)} reach for its next throw while no foe is near.` },
+  'Masked Sight': { tag: 'Control', pro: n => `Pulls each flyer it strikes down to the road for ${gNf(.5 * n)}s, once every 4s.` },
+  // (its stat line folded into the runes: shaft runes strip 2 more armour a rank, was 1 and 5% armour ignored)
+  'Rune-Etched Edge': { tag: 'Damage', pro: n => `Its glaive ignores ${8 * n}% of armour.`, mod: n => ({ armorPen: .08 * n }), cap: null },
+  'Branding Edge': { tag: 'Runes', pro: n => `${n >= 2 ? 'Every foe' : 'Every 2nd foe'} its glaive strikes is branded.` },
+  "Mask's Tally": { tag: 'Mana', pro: n => `Restores ${4 * n} mana for each glaive kill, twice that on branded foes.` },
+  'Mark the Fallen': { tag: 'Runes', pro: n => n >= 2 ? 'Each foe Ricochet Rite slays leaves a Bound rune (shaft and oath) where it fell.' : 'Each foe Ricochet Rite slays leaves a shaft rune where it fell.' },
+  'Returning Oath': { tag: 'Spell' },
+  'Branding Rite': { tag: 'Runes', pro: 'Ricochet Rite brands every foe it strikes.' },
+  'Line Cut': { tag: 'Damage', pro: 'Its glaive strikes foes on a ward-line again for half.' },
+  'Dragging Edge': { tag: 'Control', pro: n => `Returning Oath slows every foe it strikes ${15 * n}% for 1.5s.` },
+  'Caught Again': { tag: 'Mana', pro: 'Returning Oath refunds half its mana if it strikes 3 or more foes.' },
+  'Warding Glaive': { tag: 'Spell' },
+  // capstones: Glaive of Judgement strikes again 1.5x (was 1x, and passed the brands on); Twin Wards no longer brands twice;
+  // Lodestar no longer pins or brands (it pulses every 1.5s, was 2s)
+  'Glaive of Judgement': { tag: 'Damage', pro: "Its glaive spends a foe's 3 brands to pin it 0.8s and strike again 1.5× as hard." },
+  'Twin Wards': { tag: 'Runes', pro: 'Warding Glaive throws a second great rune further down the road, linked to the first.',
+    sp: { ab: 'wb_wardarrow', rider: { wbf: 1 } } },
+  'Lodestar': { tag: 'Runes', pro: "Warding Glaive's great rune pulses every 1.5s, striking every walker on its ward-lines.",
+    sp: { ab: 'wb_wardarrow', rider: { wbf: 1 } } },
+});
+
+/* ---------- Frostbrand Sentries ---------- */
+talPlain('wardbound', 'frost', {
+  'Brand-Rime': { tag: 'Control', pro: n => `Its chill lasts ${gNf(.5 * n)}s longer on a walker for each of its brands.` },
+  'Wide Sweep': { tag: 'Damage', pro: 'Each sweep cuts one more walker.' },
+  'Creeping Rime': { tag: 'Runes', pro: n => `A sprung frost rune lays a fresh one a cell nearer the gate${n >= 2 ? ', twice over' : ''}.` },
+  'Bitter Steel': { tag: 'Damage', pro: n => `Its sweeps strip ${n} armour from chilled walkers for 4s, stacking to ${3 * n}.` },
+  'Hard Rime': { tag: 'Control', pro: n => `Rimeline freezes already chilled walkers for ${gNf(.3 * n)}s.` },
+  'Meltwater': { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each frozen walker its sweeps strike.` },
+  'Frostbite': { tag: 'Spell' },
+  'Winter Ward': { tag: 'Spell' },
+  // (Rimecut: any foe on a frost rune, no longer only a chilled one)
+  'Rimecut': { tag: 'Damage', pro: n => `Its sweeps hit foes standing on a frost rune ${15 * n}% harder.` },
+  'Deep Bite': { tag: 'Control', pro: 'Frostbite freezes walkers on a frost rune 0.5s longer.' },
+  'Long Winter': { tag: 'Runes', pro: 'Winter Ward lays a frost rune one road cell ahead of each walker it strikes.' },
+  // (Shatter Oath: 30% harder a rank, was 25% and two brands)
+  'Shatter Oath': { tag: 'Damage', pro: n => `Its sweeps hit frozen foes ${30 * n}% harder.` },
+  'Cold Vigil': { tag: 'Support', pro: 'Winter Ward makes Frostbrand Sentries within 3 cells each lay a frost rune too.' },
+  'Biting Wind': { tag: 'Runes', pro: 'Its next 3 sweeps after each Frostbite brand every walker they strike.' },
+  // capstones: Winter's Line freezes every walker crossing it (was only the already chilled); Hoarfrost no longer lays runes
+  "Winter's Line": { tag: 'Control', pro: 'A ward-line between two frost runes freezes walkers crossing it for 0.4s.' },
+  'Hoarfrost': { tag: 'Control', pro: 'Frostbite also freezes and strikes every walker on a frost rune within 3 cells.',
+    sp: { ab: 'wb_frostbite', rider: { wbf: 1 } } },
+  'Rime Crown': { tag: 'Runes', pro: 'Its frost runes are Bound with oath, so they also slow.' },
+});
+
+/* ---------- Runecarvers ---------- */
+talPlain('wardbound', 'arcane', {
+  'Shared Margins': { tag: 'Runes', pro: n => `${n >= 2 ? 'Its flicks add' : 'Every 2nd flick adds'} an extra sigil to foes another Runecarver carved.` },
+  'Lingering Ink': { tag: 'Runes', pro: n => `Its sigils last ${2 * n}s longer.` },
+  // (its stat line folded in: 10% of wards a rank on a carved foe, was 5% on any and 5% more on a carved one)
+  'Ward-Cutting Script': { tag: 'Damage', pro: n => `Its carved flicks and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
+  'Deep Script': { tag: 'Damage', pro: n => `Sigils its flicks set off strike for ${60 + 15 * n}% of a flick, up from 60%.` },
+  'Palimpsest': { tag: 'Spell', pro: n => `Etch sets off a foe's 3 sigils first, ${n >= 2 ? 90 : 60}% of a flick each.` },
+  'Spent Ink': { tag: 'Mana', pro: n => `Restores ${n + 1} mana for each sigil it sets off.` },
+  'Detonate': { tag: 'Spell' },
+  'Ink of Binding': { tag: 'Control', pro: n => `Etch roots walkers that already carry a sigil for ${gNf(.3 * n)}s.` },
+  'Sigil Ward': { tag: 'Runes', pro: 'Carved foes gain another sigil when they cross a line between runes.' },
+  'Chain Reaction': { tag: 'Spell', pro: 'Every foe Detonate strikes is carved with a fresh sigil.' },
+  'Scribe the Road': { tag: 'Spell' },
+  'Double Stroke': { tag: 'Damage', pro: 'Every 3rd flick carves two sigils.' },
+  'Volatile Script': { tag: 'Damage', pro: n => `Detonate bursts branded foes ${15 * n}% harder.` },
+  // capstones: The Last Word no longer readies Etch (its burst is 120% of a flick a sigil, was 90%)
+  'The Last Word': { tag: 'Runes', pro: "When Scribe the Road's rune fades, sigils within 1.5 cells burst for 120% of a flick each.",
+    sp: { ab: 'wb_scribe', rider: { wbf: 1 } } },
+  'Cascade': { tag: 'Runes', pro: 'Foes slain by bursting sigils pass two sigils to every foe within 1.2 cells.' },
+  'Runesight': { tag: 'Damage', pro: 'Third sigils burst at once, and Scribe the Road quickens its flicks 30% for 5s.' },
+});
+
+/* ---------- Stormward Lancers ---------- */
+talPlain('wardbound', 'storm', {
+  'Couched Lance': { tag: 'Runes', pro: n => `Its thrusts spring the storm rune under their foe at once${n >= 2 ? ', chaining once more' : ''}.` },
+  'Thunder Hooves': { tag: 'Damage', pro: n => `Its thrusts come ${3 * n}% faster for each stunned walker in reach, up to 3.` },
+  'Branding Sparks': { tag: 'Runes', pro: 'Its storm runes brand every foe they spark.' },
+  'Forked Pennon': { tag: 'Damage', pro: n => `Its chains jump ${n} more time${n > 1 ? 's' : ''} when they start on a branded foe.` },
+  'Storm Pennant': { tag: 'Spell' },
+  'Sky-Drawn': { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each flyer its lightning hits.` },
+  'Spur and Lance': { tag: 'Control', pro: n => `Thunder Charge holds branded walkers ${gNf(.15 * n)}s longer.` },
+  'Cracking Pennant': { tag: 'Runes', pro: 'While Storm Pennant holds, its chains lay a storm rune under each walker hit.' },
+  'Thunderbrand': { tag: 'Damage', pro: n => `Its lance and lightning hit branded foes ${15 * n}% harder.` },
+  'Skyfall': { tag: 'Spell' },
+  // (Charge Through: twice at rank 2, was a storm rune under each)
+  'Charge Through': { tag: 'Runes', pro: n => `Thunder Charge brands every foe it strikes${n >= 2 ? ' twice' : ''}.`,
+    sp: n => ({ ab: 'wb_charge', rider: { wbBrand: n } }) },
+  'Pennant Call': { tag: 'Support', pro: 'Each Storm Pennant brings Thunder Charge 4s nearer for Stormward Lancers within 2 cells.' },
+  'Gathering Storm': { tag: 'Damage', pro: 'Skyfall hits branded foes 20% harder.' },
+  "Sky's Answer": { tag: 'Control', pro: n => `Skyfall stuns every foe it strikes for ${gNf(.2 + .1 * n)}s.` },
+  // capstones: Second Thunder's kills no longer leave storm runes
+  'Thunder Oath': { tag: 'Damage', pro: 'Each foe it slays lets loose a new chain at 30% of a thrust, 2 a thrust at most.' },
+  'Stormwake': { tag: 'Runes', pro: 'Each chain lays a storm rune under its last foe.' },
+  'Second Thunder': { tag: 'Spell', pro: 'Skyfall strikes again 1s later on every storm rune it struck.' },
+});
+
+/* ---------- Anvil Guard ---------- */
+talPlain('wardbound', 'earth', {
+  'Broad Shield': { tag: 'Damage', pro: n => `Its slams reach ${5 * n}% wider beside another Anvil Guard (1.5 cells).` },
+  'Iron Rhythm': { tag: 'Runes', pro: n => `Its slams brand up to ${n} walker${n > 1 ? 's' : ''} standing on a stone rune.` },
+  'Deep Quake': { tag: 'Damage', pro: n => `Its quakes run ${n} more road cell${n > 1 ? 's' : ''} each way.` },
+  'Restless Earth': { tag: 'Damage', pro: 'Every 2nd slam also sends a quake.' },
+  'Braced Shove': { tag: 'Control', pro: n => `Shield Wall stuns foes that attack your units ${gNf(.4 * n)}s longer.` },
+  "Anvil's Toll": { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each blow on it or a unit beside it.` },
+  'Quake Line': { tag: 'Spell' },
+  'Wall of Shields': { tag: 'Support', pro: 'Shield Wall makes every other Anvil Guard within 2 cells slam at once.' },
+  'Shield Brand': { tag: 'Runes', pro: n => `${n >= 2 ? 'Each slam' : 'Every 2nd slam'} brands every held walker in its reach.` },
+  // (Fault Line: on a rune only, no longer on a ward-line too)
+  'Fault Line': { tag: 'Runes', pro: 'Quake Line brands walkers standing on a rune twice.' },
+  'Anvil Stance': { tag: 'Spell' },
+  'Rune-Shaker': { tag: 'Runes', pro: 'Its quakes trigger every rune they pass without using it up.' },
+  'Aftershock': { tag: 'Spell', pro: n => `Quake Line sends a second, weaker quake ${1 + n} cells both ways 1s later.` },
+  // capstones: Unmoving no longer quickens the slams (its quakes run 3 cells, were 2); Breaking Stance no longer brands;
+  // Mountain's Weight no longer brands
+  'Unmoving': { tag: 'Control', pro: 'While Anvil Stance holds, each walker it shoves sends a quake 3 cells both ways, once a second.',
+    sp: { ab: 'wb_anvil', rider: { wbf: 1 } } },
+  'Breaking Stance': { tag: 'Spell', pro: 'When Anvil Stance ends, it casts Shield Wall at once, free.',
+    sp: { ab: 'wb_anvil', rider: { wbf: 1 } } },
+  "Mountain's Weight": { tag: 'Control', pro: 'Its quakes run twice as far, rooting each walker they strike for 0.4s.' },
+});
+
+/* ---------- Siege Wardens ---------- */
+talPlain('wardbound', 'cannon', {
+  'Spotter': { tag: 'Damage', pro: n => `Gains ${gNf(.25 * n)} range while a Glaive Warden stands within 2 cells.` },
+  'Wide Blast': { tag: 'Damage', pro: n => `Its blast reaches ${8 * n}% wider on a walker standing on a rune.` },
+  'Heavy Bolts': { tag: 'Damage', pro: n => `Its bolts ignore ${15 * n}% of armour on bosses, leaders and elites.` },
+  'Long Pin': { tag: 'Control', pro: n => `Its bolts pin their foe ${gNf(.15 * n)}s longer.` },
+  'Crank Drill': { tag: 'Control', pro: n => `Pinning Bolt pins ${gNf(.15 * n)}s longer for each brand on its foe.` },
+  'Steady Crew': { tag: 'Mana', pro: n => `Restores ${2 * n} mana when a blast catches 3 or more walkers.` },
+  'Rune Shot': { tag: 'Spell' },
+  'Chain Bolt': { tag: 'Spell' },
+  'Pinned and Branded': { tag: 'Runes', pro: 'Every foe its bolts pin is branded.' },
+  'Kindled Runes': { tag: 'Runes', pro: 'Rune Shot leaves 2 brands on every foe it strikes.' },
+  'Iron Tether': { tag: 'Control', pro: n => `A bolt on one Chain Bolt foe pins the other for ${gNf(.2 * n)}s.` },
+  'Bolt Sequence': { tag: 'Damage', pro: 'Its next bolt flies at once after each Pinning Bolt.' },
+  'Shatter Shot': { tag: 'Damage', pro: n => `Rune Shot strips ${2 * n} armour from pinned walkers for 5s.` },
+  'Rearm': { tag: 'Control', pro: n => `Chain Bolt pins both its foes ${gNf(.4 * n)}s as the chain ends.` },
+  // capstones: Unbroken Chain no longer pins or brands its new foe (it leaps 2.5 cells, was 2); Kept Runes no longer adds pin
+  'Unbroken Chain': { tag: 'Spell', pro: "When a chained foe dies, Chain Bolt's chain leaps to the nearest walker within 2.5 cells." },
+  'Ballista Volley': { tag: 'Damage', pro: 'Every 4th bolt fires two more bolts at the next walkers along.' },
+  'Kept Runes': { tag: 'Runes', pro: 'Runes that Rune Shot bursts stay on the road, renewed to full.' },
+});
+
+/* ---------- Vowkeepers ---------- */
+talPlain('wardbound', 'venom', {
+  // (Field Chaplain: three times at rank 2, was twice and a rise from the wound)
+  'Field Chaplain': { tag: 'Survival', pro: n => `Its cuts mend Wounded knights ${n >= 2 ? 'three times' : 'twice'} as much.` },
+  'Urgent Hands': { tag: 'Survival', pro: n => `Its cuts come ${5 * n}% faster while a nearby unit is Wounded.` },
+  'Deep Mending': { tag: 'Survival', pro: n => `Each cut mends for ${30 + 10 * n}% of the cut, up from 30%.` },
+  // (Incense of Vigil: a brand every 3s, 2s at rank 2, was "brands don't fade" and a brand every 2s at rank 2)
+  'Incense of Vigil': { tag: 'Runes', pro: n => `Foes in its Censer Smoke gain a brand every ${n >= 2 ? 2 : 3}s.` },
+  'Sworn Vow': { tag: 'Spell' },
+  "Mender's Due": { tag: 'Mana', pro: n => `Restores ${n} mana for each mending cut, ${4 * n} on a Wounded knight.` },
+  // (Siege-Ward: 0.7s, was 0.5s and a brand)
+  'Siege-Ward': { tag: 'Survival', pro: "Its cuts delay a siege troop's next blow 0.7s longer." },
+  'Oath Renewed': { tag: 'Support', pro: 'A Wounded knight Sworn Vow mends gets its spells 4s sooner.' },
+  'Choking Censer': { tag: 'Control', pro: 'Siege troops leaving its Censer Smoke still can\'t attack for 1.5s.' },
+  'Rite of Holding': { tag: 'Spell' },
+  'Vow of Iron': { tag: 'Mana', pro: n => `Sworn Vow also restores ${25 * n}% of the knight's mana.` },
+  'Ember Vow': { tag: 'Runes', pro: 'Its vow runes brand every foe that steps on them.' },
+  'Long Rite': { tag: 'Runes', pro: 'Rite of Holding also renews runes of every other kind, adding vow.' },
+  // capstones: Sanctuary no longer stops Wounds (it reaches 1.5 cells, was 1.2); Hallowed Road no longer slows or brands
+  // (its runes strike for 70% of a cut, was 50%)
+  'Keeper of Vows': { tag: 'Survival', pro: 'Its cuts also mend every other hurt knight in reach, for half.' },
+  'Sanctuary': { tag: 'Survival', pro: 'Sworn Vow also heals units within 1.5 cells for half their missing health.' },
+  'Hallowed Road': { tag: 'Damage', pro: 'For 6s after Rite of Holding, its vow runes hit foes on them for 70% of a cut each second.',
+    sp: { ab: 'wb_rite', rider: { wbf: 1 } } },
+});
+
+/* ---------- Varic Dunmoor, the Last Warden ---------- */
+talPlain('wardbound', 'champ:wb_varic', {
+  'Patient Oath': { tag: 'Spell', pro: n => `Warden's Oath recharges ${25 * n}% faster while no walker is in his reach.` },
+  "Warden's Reach": { tag: 'Damage', pro: n => `His blade reaches ${gNf(.15 * n)} cells farther while a walker near him is rooted.` },
+  'Wide Ring': { tag: 'Spell', pro: n => `Warden's Oath strikes a ${gNf(.15 * n)}-cell wider area.` },
+  'Shield Brothers': { tag: 'Mana', pro: "Warden's Oath and Hold Fast cost 25% less with 2 Oathbound within 2 cells." },
+  'Hold Fast': { tag: 'Spell' },
+  'Long Vigil': { tag: 'Spell', pro: n => `Hold Fast stands ${n}s longer.` },
+  'Heavy Hand': { tag: 'Runes', pro: n => `Warden's Oath carves Bound runes of oath and stone${n >= 2 ? ' and pin' : ''}.` },
+  'Shared Watch': { tag: 'Support', pro: 'Each Hold Fast gives every unit within 1.6 cells of him 15 mana.' },
+  'Steady Pace': { tag: 'Spell', pro: n => `Hold Fast comes ${4 * n}s sooner each time Warden's Oath catches 4 or more walkers.` },
+  'The Last Gate': { tag: 'Spell' },
+  'Held to Account': { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each walker his cuts root on a rune or ward-line.` },
+  'Old Discipline': { tag: 'Damage', pro: n => `Walkers springing his oath runes in his reach take ${20 * n}% of his cut.` },
+  // capstones: The Gate Holds no longer adds 2 runes (its flares strike for half, were a third, and brand); Last Warden no longer readies Warden's Oath
+  'The Gate Holds': { tag: 'Control', pro: "The Last Gate's runes flare 3 more times, a second apart, at half strength.",
+    sp: { ab: 'ch_lastgate', rider: { wbf: 1 } } },
+  'The Road Remembers': { tag: 'Runes', pro: 'Walkers slain on a rune or line within 2.5 cells of him leave a Bound rune of oath and stone.' },
+  'Last Warden': { tag: 'Support', pro: 'The Last Gate makes every Oathbound within 2.5 cells of him strike the walkers round it too.',
+    sp: { ab: 'ch_lastgate', rider: { wbf: 1 } } },
+});
+
+/* ---------- Lord Aedric Solmane, the Sun-Sworn ---------- */
+talPlain('wardbound', 'champ:wb_aedric', {
+  'Eager Sun': { tag: 'Spell', pro: n => `Sunwheel comes ${n}s sooner for each foe it strikes that holds 3 brands.` },
+  'Sunlit Reach': { tag: 'Damage', pro: n => `His lance reaches ${gNf(.15 * n)} cells farther at 5 or more Momentum.` },
+  "Sun's Due": { tag: 'Survival', pro: n => `Sunwheel scorches him ${n >= 2 ? 'not at all' : 'half as much'} when it catches 3 or more foes.` },
+  'Into the Fray': { tag: 'Mana', pro: 'Sunwheel and Sun Charge refund 3% of their mana for each Momentum the army has.' },
+  'Sun Charge': { tag: 'Spell' },
+  'Sun-Struck Trail': { tag: 'Runes', pro: n => n >= 2 ? 'Sun Charge leaves a Bound rune (storm and oath) under each walker it strikes.' : 'Sun Charge leaves a storm rune under each walker it strikes.' },
+  'Searing Wheel': { tag: 'Spell', pro: n => `Sunwheel sets every foe it strikes burning for ${gNf(.3 * n)}× his damage a second, 3s.` },
+  'Rallying Cry': { tag: 'Support', pro: 'Each Sun Charge adds 2 Momentum to the army.' },
+  'Hot Blood': { tag: 'Spell', pro: n => `Sun Charge is ready at once when the army Blazes${n >= 2 ? ', Sunwheel 6s sooner' : ''}.` },
+  'Blaze of Glory': { tag: 'Spell' },
+  'Battle Fever': { tag: 'Mana', pro: n => `Restores ${2 * n} mana to him for every 3 Momentum the army gains.` },
+  'Spurs': { tag: 'Damage', pro: n => `His strikes come ${4 * n}% faster on a burning foe.` },
+  // capstones: Undying Blaze no longer burns or ends in a second burst (its kills keep it going up to 8s, were 6s);
+  // Sun-Sworn no longer spares him the winded ride
+  'Undying Blaze': { tag: 'Spell', pro: 'Each foe he slays during Blaze of Glory keeps it going 1s longer, up to 8s.',
+    sp: { ab: 'ch_blazeglory', rider: { wbf: 1 } } },
+  'Open Road': { tag: 'Damage', pro: 'Sun Charge leaves its trail ablaze for 4s, burning every walker on it.' },
+  'Sun-Sworn': { tag: 'Spell', pro: 'Blaze of Glory readies Sun Charge, and each kill during it brings Sun Charge 3s sooner.' },
+});
+
+/* ---------- Lady Isaura Vell, the Veiled Oath ---------- */
+talPlain('wardbound', 'champ:wb_isaura', {
+  'Ready Vow': { tag: 'Spell', pro: n => `Oathbind comes ${n}s sooner whenever a walker breaks free on a rune or line.` },
+  'Silent Vow': { tag: 'Control', pro: n => `Walkers her sweeps root can't strike your units for ${n}s.` },
+  'Vow Carved': { tag: 'Runes', pro: n => `Oathbind carves oath runes under the ${2 * n} bound walkers nearest the gate.` },
+  'Witness of Vows': { tag: 'Mana', pro: 'Oathbind and Binding Sweep cost 25% less with 2 held foes in her reach.' },
+  'Binding Sweep': { tag: 'Spell' },
+  'Tighter Bonds': { tag: 'Control', pro: n => `Binding Sweep roots ${gNf(.15 * n)}s longer.` },
+  'Heavy Vow': { tag: 'Damage', pro: n => `Oathbind strips ${2 * n} armour from every foe it binds for 5s.` },
+  'Shared Vow': { tag: 'Support', pro: 'Binding Sweep makes units within 1.6 cells root the next walker they strike, 0.5s.' },
+  'Quiet Step': { tag: 'Control', pro: n => `For ${2 * n}s after Oathbind, her sweeps root without their 3-second wait.` },
+  'Oath Turned': { tag: 'Spell' },
+  "Vow's Reckoning": { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each rooted walker slain in her reach.` },
+  'Measured Sweeps': { tag: 'Damage', pro: n => `Rooted walkers beside her target take ${70 + 10 * n}% of her sweep, up from 70%.` },
+  // capstones: Turned Twice no longer brands; Veiled Oath no longer slows or readies Oathbind (the second toll is 1.5x, was 1x or 2x on a rune);
+  // Sworn Road no longer brands
+  'Turned Twice': { tag: 'Spell', pro: 'Oath Turned strikes again 0.6s later at half strength, from the toughest walker it hit.',
+    sp: { ab: 'ch_oathturned', rider: { wbf: 1 } } },
+  'Sworn Road': { tag: 'Runes', pro: 'Binding Sweep carves an oath rune under every walker it roots.' },
+  'Veiled Oath': { tag: 'Damage', pro: 'Walkers Oath Turned roots take its blow again 4s later, 1.5× as hard.',
+    sp: { ab: 'ch_oathturned', rider: { wbf: 1 } } },
+});
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
@@ -61648,6 +63372,10 @@ function moodUni(M) {
    Use in game preset is on. To bake a preset: the Light Lab's "Bake" button copies the three lines to paste here (its light
    into LIGHT_DEF, its mood into MAP_MOOD, its look into LOOK_DEF). */
 const LOOK_DEF = {};
+// Sunfall Glade: the owner's Light Lab preset (10 Nov 2026), baked as the map's default
+LIGHT_DEF.clearing = Object.assign({}, LIGHT_DEF.clearing, {"fogFar":2.24,"sun":"#b2f104","sunI":0.93,"az":-11,"el":51,"rim":0.24,"fill":0.12,"ground":1,"paint":0.94,"sky":"#a8b4f0","skyI":0.6,"gnd":"#6c6890","gndI":0.2,"fog":"#385b29","fogNear":0.59,"woods":0,"lamps":1,"expo":1.1,"rays":1,"ray":"#c8d8ff"});
+MAP_MOOD.clearing = Object.assign({}, MAP_MOOD.clearing, {"top":"#11ff00","topK":0.15,"key":"#d4ff00","keyK":0.3,"bounce":"#4418e2","bounceK":0.1,"env":0.81,"grade":"#a8bcc8","gradeK":0.18});
+LOOK_DEF.clearing = {"fwd":{"shOn":1,"shFloor":0.3,"shSoft":1.2,"shBias":0.0016,"shQ":0,"tm":0,"backOn":1,"back":"#a8c8ff","backI":0.6,"backAz":0,"backEl":25,"spec":1,"rough":1,"sharp":0,"fres":0,"gGlintOn":1,"gGlint":1.4,"gSharp":30},"post":{"on":0,"ao":{"on":1,"strength":0.8,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.35},"bloom":{"on":1,"thr":0.62,"strength":0.35,"radius":1.5},"rays":{"on":0,"col":"#8ee9f5","strength":0.5,"len":0.255,"thr":0.55},"hfog":{"on":1,"col":"#46a05c","dens":0.69,"top":1.85,"fall":1.2,"max":0.5,"noise":0.5},"tone":{"on":1,"ev":0,"contrast":1,"sat":1,"warm":0,"tint":0},"grade":{"on":1,"lift":-0.003,"liftC":"#42f045","liftK":0.49,"gamma":1.37,"gammaC":"#ffffff","gammaK":0.18,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#3a5a8a","splSK":0.33,"splH":"#ffb070","splHK":0.255,"bal":0.01},"vig":{"on":1,"str":0.3,"rad":0.75,"soft":0.7},"sharp":{"on":1,"k":0.3}}};
 const LIGHT_KEY = id => 'runehold.light3.' + id;
 // the light schemes are fixed (the old Lighting panel is gone); any tweaks it saved are cleared
 try { for (const id of Object.keys(LIGHT_DEF)) localStorage.removeItem(LIGHT_KEY(id)); } catch (e) {}
@@ -78687,94 +80415,204 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -78783,75 +80621,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
