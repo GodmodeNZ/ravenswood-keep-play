@@ -1,4 +1,4 @@
-const BUILD_TAG = '7e14774@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'aa837ee+@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -80325,7 +80325,7 @@ const UM_UNITS = {
   // his hand when drawing"): the arrow rests on top of the bow fist (restUp), the nock between the string fingers
   // (nockShift), the string hand held out from the hood at the jaw (anchorOut, jaw) with the bow lifted to shoulder
   // height and canted (bowAt, bowRaise, cant), so the string runs in front of his chest. Plain eyes (noEyeGlow; owner: "remove faelans glowing eyes"). fb: his old model, if the new one is missing.
-  ch_faelan: { mdl: 'faelan_lb', tip: [.02, .45, .2], sink: 0, k: .94, rig: 'archer', upright: .9, stance: [0, 0], lineUp: 1, trim: 0, idle: 'concept', idleBase: 32, jaw: .1, restUp: .045, restOut: .05, bowAt: .07, bowRaise: .12, anchorOut: .16, nockShift: -.8, bowUp: 1, cant: .3, raiseDir: [.3, 1, .6], noEyeGlow: 1, readyF: 20, readyDown: .65, arrowAt: 13.5, volleyUp: [.3, .5], moonUp: [1, .12, .15],
+  ch_faelan: { mdl: 'faelan_lb', tip: [.02, .45, .2], sink: 0, k: .94, rig: 'archer', upright: .9, stance: [0, 0], lineUp: 1, trim: 0, idle: 'concept', idleBase: 32, jaw: .1, restUp: .045, restOut: .05, bowAt: .07, bowRaise: .12, anchorOut: .16, nockShift: -.8, bowUp: 1, cant: .3, raiseDir: [.3, 1, .6], noEyeGlow: 1, readyF: 20, readyDown: .65, arrowAt: 13.5, volleyUp: [.3, .5], moonUp: [1, .06, .1],
     ci: { clav: .93, grip: [.095, .536, .142], hand: [.015, .606, .166] },
     spells: { ch_thornvolley: { move: 'volley', T: 1.3 }, ch_pinarrow: { draw: .55, deep: 1, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { move: 'moon', T: 2.75 } },
     fb: { mdl: 'faelan', tip: [.02, .45, .2], sink: .5, k: .94, rig: 'archer', upright: .9, stance: [.11, .1], lineUp: 1, trim: .12, idle: 'concept', jaw: .065, restUp: .01, restOut: .05, bowAt: .02, bowUp: 1, cant: .1, spells: { ch_thornvolley: {}, ch_pinarrow: { draw: .55, deep: 1, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { raise: 1, f: 4, glow: 1.8 } } } },
@@ -80558,6 +80558,28 @@ function umBlendPose(R, from, to, w, out) {
     out[k] = q[0]; out[k + 1] = q[1]; out[k + 2] = q[2]; out[k + 3] = t[0]; out[k + 4] = q[3]; out[k + 5] = q[4]; out[k + 6] = q[5]; out[k + 7] = t[1]; out[k + 8] = q[6]; out[k + 9] = q[7]; out[k + 10] = q[8]; out[k + 11] = t[2];
   }
 }
+// Hunter's Moon's offering (X.offer 0..1, S.offer: targets): both arms raised overhead by IK, the bow in the left fist
+// turned to lie across above his head, its upper limb a little high toward his right and its back to the sky, the right
+// hand closed on that upper limb; built on the pose so far and blended in by rotations, so the arms carry the bow up and
+// lower it again (owner: "the bow floats ... the arms don't go up with it")
+const _umOf = new Float32Array(SKIN_MAX * 12);
+function umOffer(R, out, k, S_) {
+  const { B, bix, sub, mk } = R, C = Object.assign({ grip: [.11, 1.06, .1], ax: [-1, .32, .12], back: [0, .75, .65], up: .38, clav: .95 }, S_.offer || {});
+  if (!mk.bowTipA || bix.LeftShoulder == null) return;
+  const o = _umOf; o.set(out.subarray(0, R.anim.nb * 12));
+  const L = bix.LeftHand, Hh = bix.RightHand;
+  umClav(R, o, bix.LeftShoulder, bix.LeftArm, bix.LeftForeArm, L, C.grip, C.clav);
+  umIK(R, o, bix.LeftArm, bix.LeftForeArm, L, C.grip, [.4, -.3, -1]);
+  const w = umXf(o, L, B[L].h), tA = umXf(o, L, mk.bowTipA), tB = umXf(o, L, mk.bowTipB), g = umXf(o, L, mk.LeftHandMiddle1), nk = umXf(o, L, mk.nock);
+  umTurn(o, sub[B[L].n], UMX.frame(UMX.sub(tA, tB), UMX.sub(g, nk), UMX.nrm(C.ax), C.back), w);
+  // the right hand on the upper limb (C.up of the way from the grip to its tip), reached by the arm, corrected by its fingers
+  const target = UMX.lerp(umXf(o, L, mk.LeftHandMiddle1), umXf(o, L, mk.bowTipA), C.up);
+  const fb = n => bix[n] != null ? bix[n] : Hh, fing = () => UMX.lerp(umXf(o, fb('RightHandIndex1'), mk.RightHandIndex2), umXf(o, fb('RightHandMiddle1'), mk.RightHandMiddle2), .5);
+  let Wt = UMX.add(target, [0, -.05, -.02]);
+  umClav(R, o, bix.RightShoulder, bix.RightArm, bix.RightForeArm, Hh, Wt, C.clav);
+  for (let i = 0; i < 4; i++) { umIK(R, o, bix.RightArm, bix.RightForeArm, Hh, Wt, [-.4, -.3, -1]); Wt = UMX.add(Wt, UMX.sc(UMX.sub(target, fing()), .8)); }
+  umBlendPose(R, out, o, k, out);
+}
 function umMixBuild(R, f, rec, br, out, pitch, X) {
   X = X || {};
   umMixFrame(R, f, out);
@@ -80649,6 +80671,7 @@ function umMixBuild(R, f, rec, br, out, pitch, X) {
     let d = UMX.sub(G_, H); d = [d[0], 0, d[2]]; const dl = Math.hypot(...d);
     if (dl > 1e-4) { const ax = UMX.cross([0, 1, 0], UMX.sc(d, 1 / dl)), q = UMX.rot(ax[0], ax[1], ax[2], X.lower); for (const n of ['LeftArm', 'RightArm']) umTurn(out, sub[n], q, umXf(out, bix[n], B[bix[n]].h)); }
   }
+  if (X.offer > .001) umOffer(R, out, umSm(0, 1, X.offer), S_);
   if (X.lean) { const c = umXf(out, bix.Spine, B[bix.Spine].h); umTurn(out, sub.Spine, UMX.rx(-X.lean), c); }   // (X.lean: the whole trunk leant back from the waist with the aim: Thorn Volley shot high)
   if (pitch) { const c = umXf(out, bix.Spine2, B[bix.Spine2].h); umTurn(out, sub.Spine2, UMX.rx(-pitch), c); }   // aiming high (a volley): the chest, arms and bow tilt up together
   if (br) { const c = umXf(out, bix.Spine2, B[bix.Spine2].h); umTurn(out, sub.Spine2, UMX.rx(.011 * br), c); }   // a breath through the chest
@@ -80715,7 +80738,7 @@ function umArcherMove(t, mv, sc, S, dt) {
   if (t._umMvAt !== t._umRel) { t._umMvAt = t._umRel; t._umMvI = t._umI || 0; }
   const iw = (t._umMvI || 0) * (1 - umSm(0, .12, sc)); t._umI = 0;
   const lv = typeof vt !== 'undefined' ? vt : 0;
-  let f, rec = 0, tilt = 0, lean = 0, nockW = 1, arrowW = 1, fadeW = null, pitch = 0, glow = 0, moon = 0, flash = 0, sh = 0, rT;
+  let f, rec = 0, tilt = 0, lean = 0, offer = 0, nockW = 1, arrowW = 1, fadeW = null, pitch = 0, glow = 0, moon = 0, flash = 0, sh = 0, rT;
   if (mv.move === 'volley') {
     rT = .28; const k = umKf(sc, [[0, 0], [.22, 1], [.85, 1], [1.3, 0]]), up = S.volleyUp || [.3, .5];   // (the trunk back from the waist and the chest: about 45 deg up, the arms kept as at full draw so the drawing arm stays clear of the hood)
     f = sc < rT ? 17 + 14 * umSm(0, rT, sc) : sc < .9 ? 31 : 17; if (sc >= .9) fadeW = umSm(.9, 1.3, sc);
@@ -80724,14 +80747,14 @@ function umArcherMove(t, mv, sc, S, dt) {
   } else {   // 'moon'
     const up = S.moonUp || [1, .12, .15]; rT = 2.1; const k = umKf(sc, [[0, 0], [.6, 1], [1.2, 1], [1.6, 0]]);   // (both arms up with the bow, a little lean back: the bow over him, clear of his hood)
     f = sc < 1.6 ? 17 : sc < rT - .05 ? 17 + 14 * umSm(1.6, rT - .05, sc) : sc < 2.45 ? 31 : 17; if (sc >= 2.45) fadeW = umSm(2.45, 2.75, sc);
-    tilt = -up[0] * k; lean = up[1] * k; pitch = up[2] * k;
+    offer = k; lean = up[1] * k; pitch = up[2] * k;
     nockW = umSm(1.4, 1.6, sc); arrowW = umSm(1.3, 1.5, sc);
     moon = umKf(sc, [[.3, 0], [.9, 1], [1.3, 1], [1.7, 0]]); flash = sc >= rT ? 1 - umSm(rT, rT + .35, sc) : 0;
     glow = Math.max(moon * .6, flash);
   }
   if (sc >= rT) { const r = sc - rT; rec = r < .05 ? r / .05 : 1 - umSm(.12, .6, r); nockW = 0; arrowW = 0; sh = r < .35 ? Math.sin(r * 70) * (1 - r / .35) : 0; }
   t._umF = f;
-  return { f, rec, fadeFrom: 31, fadeW, pitch, deep: 0, raise: 0, kick: 0, tilt, lean, idleW: iw, br: Math.sin(lv * 1.5 + (t.anim || 0) * 3) * .4,
+  return { f, rec, fadeFrom: 31, fadeW, pitch, deep: 0, raise: 0, kick: 0, tilt, lean, offer, idleW: iw, br: Math.sin(lv * 1.5 + (t.anim || 0) * 3) * .4,
     nockW, arrowW, shiver: sh, glow, moon, flash };
 }
 // the archer's controls this frame, from the unit's reload, its shot and its spells
@@ -90564,7 +90587,13 @@ const WPN_START_ART = {
 };
 const WPN_START_MODELS = {"cc_mageling": "mageling", "cc_rimeweaver": "frostweaver", "cc_astrologer": "astrologer", "ch_maren": "maren", "ch_aurelian": "aurelian", "ch_elowen": "elowen"};
 function wpArtKey(w, base) {
-  if (!w.starter || !w.u) return 'w-' + base.mdl;
+  if (!w.starter || !w.u) {
+    // Shared weapon classes have a different painted make for each army.
+    const force = typeof wpnForceNow === 'function' ? wpnForceNow() : null;
+    const variant = force && !base.leg && base.id ? 'w-style_' + force + '_' + base.id : null;
+    if (variant && typeof COMPLETION_ART !== 'undefined' && COMPLETION_ART.weapons && COMPLETION_ART.weapons[variant]) return variant;
+    return 'w-' + base.mdl;
+  }
   const u = w.u, mdl = WPN_START_MODELS[u];
   const sculpted = mdl && typeof NEWMODELS !== 'undefined' && NEWMODELS && typeof UNIT_MDL !== 'undefined' && UNIT_MDL[mdl];
   const art = WPN_START_ART[sculpted ? u + '_sculpted' : u];
