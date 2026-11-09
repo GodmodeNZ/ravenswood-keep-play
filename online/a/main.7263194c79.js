@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cf1e600+@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1431baa+@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -80340,9 +80340,9 @@ const UM_UNITS = {
   // his hand when drawing"): the arrow rests on top of the bow fist (restUp), the nock between the string fingers
   // (nockShift), the string hand held out from the hood at the jaw (anchorOut, jaw) with the bow lifted to shoulder
   // height and canted (bowAt, bowRaise, cant), so the string runs in front of his chest. Plain eyes (noEyeGlow; owner: "remove faelans glowing eyes"). fb: his old model, if the new one is missing.
-  ch_faelan: { mdl: 'faelan_lb', tip: [.02, .45, .2], sink: 0, k: .94, rig: 'archer', upright: .9, stance: [0, 0], lineUp: 1, trim: 0, idle: 'concept', idleBase: 32, jaw: .1, restUp: .045, restOut: .05, bowAt: .07, bowRaise: .12, anchorOut: .16, nockShift: -.8, bowUp: 1, cant: .3, raiseDir: [.3, 1, .6], noEyeGlow: 1, readyF: 20, readyDown: .65, arrowAt: 13.5, volleyUp: [.3, .5], moonUp: [1, .06, .1],
+  ch_faelan: { mdl: 'faelan_lb', tip: [.02, .45, .2], sink: 0, k: .94, rig: 'archer', upright: .9, stance: [0, 0], lineUp: 1, trim: 0, idle: 'concept', idleBase: 32, jaw: .1, restUp: .045, restOut: .05, bowAt: .07, bowRaise: .12, anchorOut: .16, nockShift: -.8, bowUp: 1, cant: .3, raiseDir: [.3, 1, .6], noEyeGlow: 1, drawArm: { up: .25, out: .9 }, readyF: 20, readyDown: .65, arrowAt: 13.5, volleyUp: [.3, .5], moonUp: [1, .06, .1],
     ci: { clav: .93, grip: [.095, .536, .142], hand: [.015, .606, .166] },
-    spells: { ch_thornvolley: { move: 'volley', T: 1.3 }, ch_pinarrow: { draw: .55, deep: 1, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { move: 'moon', T: 2.75 } },
+    spells: { ch_thornvolley: { move: 'volley', T: 1.3 }, ch_pinarrow: { draw: .55, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { move: 'moon', T: 2.75 } },
     fb: { mdl: 'faelan', tip: [.02, .45, .2], sink: .5, k: .94, rig: 'archer', upright: .9, stance: [.11, .1], lineUp: 1, trim: .12, idle: 'concept', jaw: .065, restUp: .01, restOut: .05, bowAt: .02, bowUp: 1, cant: .1, spells: { ch_thornvolley: {}, ch_pinarrow: { draw: .55, deep: 1, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { raise: 1, f: 4, glow: 1.8 } } } },
 };   // (k: against the code-built body's height)
 // a unit whose model is missing falls back to its old one (fb), keeping its size factor (unitmodels_size.js scales k once)
@@ -80595,6 +80595,33 @@ function umOffer(R, out, k, S_) {
   for (let i = 0; i < 4; i++) { umIK(R, o, bix.RightArm, bix.RightForeArm, Hh, Wt, [-.4, -.3, -1]); Wt = UMX.add(Wt, UMX.sc(UMX.sub(target, fing()), .8)); }
   umBlendPose(R, out, o, k, out);
 }
+// the drawing arm rebuilt as an archer's (S.drawArm): the string hand kept where the draw put it (at the jaw), the elbow
+// placed straight back behind it along the shot and a touch above it, the upper arm one straight line from the shoulder
+// to the elbow. On Faelan's rig the upper arm is mostly the shoulder bone (the arm joint sits mid upper arm), so the
+// draw's turns about the arm joint kinked the upper arm in the middle and threw the elbow up beside his head (owner:
+// "faelan's arm when he's pulling the bow back looks wrong"). The hand keeps its own turn. k: how far in (0..1).
+function umDrawArm(R, o, k, C) {
+  const { B, bix, sub, mk } = R, sh = bix.RightShoulder, ar = bix.RightArm, fo = bix.RightForeArm, ha = bix.RightHand;
+  if (sh == null || !mk.LeftHandMiddle1 || k < .001) return;
+  const S0 = umXf(o, sh, B[sh].h), A = umXf(o, ar, B[ar].h), E = umXf(o, fo, B[fo].h), W = umXf(o, ha, B[ha].h);
+  const G_ = umXf(o, bix.LeftHand, mk.LeftHandMiddle1), hk = ha * 12, Rh = [o[hk], o[hk + 1], o[hk + 2], o[hk + 4], o[hk + 5], o[hk + 6], o[hk + 8], o[hk + 9], o[hk + 10]];
+  const l1 = Math.hypot(...UMX.sub(A, S0)) + Math.hypot(...UMX.sub(E, A)), l2 = Math.hypot(...UMX.sub(W, E));
+  const shot = UMX.nrm(UMX.sub(G_, W)), back = UMX.sc(shot, -1);
+  const pole = UMX.nrm(UMX.add(UMX.add(back, [0, C.up, 0]), UMX.sc(UMX.nrm(UMX.sub([W[0], S0[1], W[2]], [0, S0[1], 0])), C.out)));
+  const D = UMX.sub(W, S0), dl = Math.min(Math.hypot(...D), (l1 + l2) * .999), dir = UMX.nrm(D);
+  const a = (l1 * l1 - l2 * l2 + dl * dl) / (2 * dl), hh = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const pp = UMX.nrm(UMX.sub(pole, UMX.sc(dir, UMX.dot(pole, dir)))), E2 = UMX.add(UMX.add(S0, UMX.sc(dir, a)), UMX.sc(pp, hh));
+  const Eb = UMX.lerp(E, E2, k);   // (blended in by the elbow's place)
+  umTurn(o, sub[B[sh].n], UMX.arc(UMX.sub(A, S0), UMX.sub(Eb, S0)), S0);
+  const A2 = umXf(o, ar, B[ar].h), E1 = umXf(o, fo, B[fo].h);
+  umTurn(o, sub[B[ar].n], UMX.arc(UMX.sub(E1, A2), UMX.sub(Eb, A2)), A2);
+  const E3 = umXf(o, fo, B[fo].h), W1 = umXf(o, ha, B[ha].h);
+  umTurn(o, sub[B[fo].n], UMX.arc(UMX.sub(W1, E3), UMX.sub(W, E3)), E3);
+  // the hand back to its own turn (the clip's grip on the string), about the wrist
+  const W2 = umXf(o, ha, B[ha].h), Rn = [o[hk], o[hk + 1], o[hk + 2], o[hk + 4], o[hk + 5], o[hk + 6], o[hk + 8], o[hk + 9], o[hk + 10]];
+  const Rt = [Rn[0], Rn[3], Rn[6], Rn[1], Rn[4], Rn[7], Rn[2], Rn[5], Rn[8]];
+  umTurn(o, sub[B[ha].n], UMX.mul(Rh, Rt), W2);
+}
 function umMixBuild(R, f, rec, br, out, pitch, X) {
   X = X || {};
   umMixFrame(R, f, out);
@@ -80670,6 +80697,7 @@ function umMixBuild(R, f, rec, br, out, pitch, X) {
     const Sh = umXf(out, bix.LeftArm, B[bix.LeftArm].h), G_ = umXf(out, bix.LeftHand, mk_.LeftHandMiddle1 || B[bix.LeftHand].h), v = UMX.sub(G_, Sh);
     umTurn(out, sub.LeftArm, UMX.blend(UMX.I(), UMX.arc(v, UMX.sc(UMX.nrm(X.raiseDir || S_.raiseDir || [.05, 1, .42]), Math.hypot(v[0], v[1], v[2]))), umSm(0, 1, X.raise)), Sh);   // (S.raiseDir: a unit's own, for a wider bow held clear of a big hood)
   }
+  if (S_.drawArm) umDrawArm(R, out, umSm(17, 25, f) * (X.tilt && X.tilt > 0 ? 1 - Math.min(1, X.tilt / .3) : 1), S_.drawArm);
   // (X.tilt: both arms, the bow and the arrow turned together about the shoulders' middle, square to the shot: + aims
   // down (Faelan's ready: the bow pointed at the ground ahead, nocked), - aims up (Thorn Volley; Hunter's Moon lifts the bow
   // to the sky); the string hand keeps its place on the string)
@@ -80691,8 +80719,9 @@ function umMixBuild(R, f, rec, br, out, pitch, X) {
   if (pitch) { const c = umXf(out, bix.Spine2, B[bix.Spine2].h); umTurn(out, sub.Spine2, UMX.rx(-pitch), c); }   // aiming high (a volley): the chest, arms and bow tilt up together
   if (br) { const c = umXf(out, bix.Spine2, B[bix.Spine2].h); umTurn(out, sub.Spine2, UMX.rx(.011 * br), c); }   // a breath through the chest
   if (rec > .001) {   // the release: the drawing arm swings back a little about its shoulder, the hand past the jaw
-    const S = umXf(out, bix.RightArm, B[bix.RightArm].h), H = umXf(out, bix.RightHand, B[bix.RightHand].h), v = UMX.sub(H, S);
-    umTurn(out, sub.RightArm, UMX.arc(v, UMX.add(v, UMX.sc([-.02, .012, -.055], rec))), S);
+    const rb = S_.drawArm && bix.RightShoulder != null ? 'RightShoulder' : 'RightArm';   // (an archer's arm swings back from the shoulder itself)
+    const S = umXf(out, bix[rb], B[bix[rb]].h), H = umXf(out, bix.RightHand, B[bix.RightHand].h), v = UMX.sub(H, S);
+    umTurn(out, sub[rb], UMX.arc(v, UMX.add(v, UMX.sc([-.02, .012, -.055], rec))), S);
     if (X.kick > .001 && mk_.LeftHandMiddle1) {   // a strong shot's recoil: the bow hand thrown forward and down a little
       const Sb = umXf(out, bix.LeftArm, B[bix.LeftArm].h), Gb = umXf(out, bix.LeftHand, mk_.LeftHandMiddle1), vb = UMX.sub(Gb, Sb);
       umTurn(out, sub.LeftArm, UMX.arc(vb, UMX.add(vb, UMX.sc([0, -.035, .02], rec * X.kick))), Sb);
