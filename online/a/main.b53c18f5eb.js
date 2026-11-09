@@ -1,4 +1,4 @@
-const BUILD_TAG = '4ab82b7+@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'cb04243@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -90771,12 +90771,16 @@ const WPN_START_ART = {
   }
 };
 const WPN_START_MODELS = {"cc_mageling": "mageling", "cc_rimeweaver": "frostweaver", "cc_astrologer": "astrologer", "ch_maren": "maren", "ch_aurelian": "aurelian", "ch_elowen": "elowen"};
+// which painting: an issued weapon or a Champion's iconic one (hero weapons, every stage and its reforged form until that has
+// its own) shows the unit's own; a base weapon its force's make (WPN_STYLE: 'w-style_<force>_<base>') when painted; else the base's
+const wpArtHas = k => typeof COMPLETION_ART !== 'undefined' && COMPLETION_ART && COMPLETION_ART.weapons && !!COMPLETION_ART.weapons[k];
 function wpArtKey(w, base) {
+  if (w.hero && w.u && WPN_START_ART[w.u]) return wpArtKey({ starter: 1, u: w.u }, base);
   if (!w.starter || !w.u) {
-    // Shared weapon classes have a different painted make for each army.
-    const force = typeof wpnForceNow === 'function' ? wpnForceNow() : null;
-    const variant = force && !base.leg && base.id ? 'w-style_' + force + '_' + base.id : null;
-    if (variant && typeof COMPLETION_ART !== 'undefined' && COMPLETION_ART.weapons && COMPLETION_ART.weapons[variant]) return variant;
+    if (!base.leg && typeof wpnStyle === 'function' && typeof wpnForceNow === 'function') {
+      const S = wpnStyle(base.cls), f = wpnForceNow(), k = S && S.names[base.id] && f ? 'w-style_' + f + '_' + base.id : null;
+      if (k && wpArtHas(k)) return k;
+    }
     return 'w-' + base.mdl;
   }
   const u = w.u, mdl = WPN_START_MODELS[u];
@@ -91061,11 +91065,11 @@ function wpTableHTML(type) {
   const seen = new Set(), out = [];
   for (const t of G.towers || []) { const c = t.def && !t.def.wall ? wpnClassOf(t.type) : null; if (!c || seen.has(c)) continue; seen.add(c); out.push(t); }
   if (!out.length) for (const ty in TOWERS) { const c = wpnClassOf(ty); if (c && !seen.has(c) && out.length < 4) { seen.add(c); out.push({ type: ty, def: TOWERS[ty], id: 0 }); } }
-  return `<span class="rn-icons wp-icons">${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}</span>`;
+  return `${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}`;
 }
 if (typeof rnIconsHTML === 'function') {
   const _wpIc = rnIconsHTML;
-  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { return h + wpTableHTML(t); } catch (e) { return h; } };
+  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { const w = wpTableHTML(t); if (!w) return h; const i = h.lastIndexOf('</span>'); return i >= 0 ? h.slice(0, i) + w + h.slice(i) : h + `<span class="rn-icons">${w}</span>`; } catch (e) { return h; } };   // (in the same strip as the relics: owner, "just show what weapons are in the loot table alongside the other items")
 }
 // (the boss's weapon is a choice card on its loot screen now: the strip says which units it may be for)
 function wpTableCard(el) {

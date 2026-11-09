@@ -1,4 +1,4 @@
-const BUILD_TAG = '4ab82b7+@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9a93a73@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -90529,12 +90529,16 @@ const WPN_START_ART = {
   }
 };
 const WPN_START_MODELS = {"cc_mageling": "mageling", "cc_rimeweaver": "frostweaver", "cc_astrologer": "astrologer", "ch_maren": "maren", "ch_aurelian": "aurelian", "ch_elowen": "elowen"};
+// which painting: an issued weapon or a Champion's iconic one (hero weapons, every stage and its reforged form until that has
+// its own) shows the unit's own; a base weapon its force's make (WPN_STYLE: 'w-style_<force>_<base>') when painted; else the base's
+const wpArtHas = k => typeof COMPLETION_ART !== 'undefined' && COMPLETION_ART && COMPLETION_ART.weapons && !!COMPLETION_ART.weapons[k];
 function wpArtKey(w, base) {
+  if (w.hero && w.u && WPN_START_ART[w.u]) return wpArtKey({ starter: 1, u: w.u }, base);
   if (!w.starter || !w.u) {
-    // Shared weapon classes have a different painted make for each army.
-    const force = typeof wpnForceNow === 'function' ? wpnForceNow() : null;
-    const variant = force && !base.leg && base.id ? 'w-style_' + force + '_' + base.id : null;
-    if (variant && typeof COMPLETION_ART !== 'undefined' && COMPLETION_ART.weapons && COMPLETION_ART.weapons[variant]) return variant;
+    if (!base.leg && typeof wpnStyle === 'function' && typeof wpnForceNow === 'function') {
+      const S = wpnStyle(base.cls), f = wpnForceNow(), k = S && S.names[base.id] && f ? 'w-style_' + f + '_' + base.id : null;
+      if (k && wpArtHas(k)) return k;
+    }
     return 'w-' + base.mdl;
   }
   const u = w.u, mdl = WPN_START_MODELS[u];
@@ -90770,10 +90774,11 @@ if (typeof ptApply === 'function') {
    each boss's loot table strip (its card, the forecast, the screen) ends with the weapons it can drop: one for each kind
    of unit you field, with the odds by rarity on hover. */
 function wpBestFor(w) { let best = null; for (const t of G.towers || []) { if (t.wrecked || !wpnFits(w, t)) continue; const g = wpnDpsWith(t, w) - wpnDpsWith(t, t.weapon || null); if (!best || g > best.g) best = { t, g }; } return best; }
+const WPN_BOSS_OFFER = .4;   // the chance a boss's loot offers a weapon, in place of one of its two relics
 // the boss's weapon card: rolled when its loot opens (L.wpn), rolled afresh on a reroll, taken in place of a relic
 function wpOfferFor(L) {
   if (!L || !wpnOn()) return null;
-  if (L.wpn === undefined) { L.wpn = wpnRoll(L.w, true) || null; if (L.wpn) L.wpn.isNew = true; }
+  if (L.wpn === undefined) { L.wpn = Math.random() < WPN_BOSS_OFFER ? (wpnRoll(L.w, true) || null) : null; if (L.wpn) L.wpn.isNew = true; }   // (sometimes: owner, "should just be 2 options with the weapon being a random chance")
   return L.wpn;
 }
 if (typeof rnLootReroll === 'function') {
@@ -90798,8 +90803,9 @@ if (typeof rnLootScreen === 'function') {
     try {
       const L = typeof rnLootCur === 'function' ? rnLootCur() : null, box = ovp && ovp.querySelector('.rn-three'); if (!L || !box || !wpnOn()) return r;
       const w = wpOfferFor(L); if (!w) return r;
-      const b = wpBestFor(w), t = b && b.t, n = box.querySelectorAll('.rn-pick').length + 1;
-      box.className = box.className.replace(/rn-n\d+/, 'rn-n' + n);
+      const b = wpBestFor(w), t = b && b.t, picks = box.querySelectorAll('.rn-pick');
+      if (picks.length > 1) picks[picks.length - 1].remove();   // two choices: the weapon takes the last relic's place
+      else box.className = box.className.replace(/rn-n\d+/, 'rn-n' + (picks.length + 1));
       box.insertAdjacentHTML('beforeend', `<button type="button" class="rn-pick wp-pick" data-rpw="1"><div class="sp-card qx-pc rn-ic${w.rar >= 4 ? ' rn-leg' : ''}" style="--sc:${wpnCol(w)}"><img alt="" src="${wpIconURL(w)}">${wpnCardHTML(w, t || null, t ? { vs: t.weapon || null } : {})}<span class="sp-go">Take it</span></div></button>`);
       const btn = box.querySelector('[data-rpw]');
       btn.onclick = () => {
@@ -90817,18 +90823,18 @@ function wpTableHTML(type) {
   const seen = new Set(), out = [];
   for (const t of G.towers || []) { const c = t.def && !t.def.wall ? wpnClassOf(t.type) : null; if (!c || seen.has(c)) continue; seen.add(c); out.push(t); }
   if (!out.length) for (const ty in TOWERS) { const c = wpnClassOf(ty); if (c && !seen.has(c) && out.length < 4) { seen.add(c); out.push({ type: ty, def: TOWERS[ty], id: 0 }); } }
-  return `<span class="rn-icons wp-icons">${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}</span>`;
+  return `${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}`;
 }
 if (typeof rnIconsHTML === 'function') {
   const _wpIc = rnIconsHTML;
-  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { return h + wpTableHTML(t); } catch (e) { return h; } };
+  rnIconsHTML = function (t) { const h = _wpIc.apply(this, arguments); try { const w = wpTableHTML(t); if (!w) return h; const i = h.lastIndexOf('</span>'); return i >= 0 ? h.slice(0, i) + w + h.slice(i) : h + `<span class="rn-icons">${w}</span>`; } catch (e) { return h; } };   // (in the same strip as the relics: owner, "just show what weapons are in the loot table alongside the other items")
 }
 // (the boss's weapon is a choice card on its loot screen now: the strip says which units it may be for)
 function wpTableCard(el) {
   const [ty] = (el.dataset.wbt || '').split('|'); const d = TOWERS[ty]; if (!d) return '';
   const c = wpnClassOf(ty), O = wpnBossOdds(Math.max(5, G.wave | 0)), names = WPN_CLASS[c].bases.map(b => wpnName({ b: b[0], rar: 2 }));
   const legs = WPN_LEGS.filter(r => r[0] === d.unit).map(r => r[2]);
-  return `<div class="itc" style="--rc:#d8c08a"><h5 class="itc-n">A weapon for ${wpE(d.name)}</h5><p class="itc-k">Weapon choice · this boss offers one among its loot · take it in place of a relic</p>
+  return `<div class="itc" style="--rc:#d8c08a"><h5 class="itc-n">A weapon for ${wpE(d.name)}</h5><p class="itc-k">Weapon chance · this boss sometimes offers one among its loot · take it in place of a relic</p>
     <ul class="itc-s">${O.rar.map((p, r) => p > .005 ? `<li><b style="color:${RARITY[r].col}">${Math.round(p * 100)}%</b> ${RARITY[r].name}</li>` : '').join('')}</ul>
     <p class="itc-k">${wpE(names.join(', '))}${legs.length ? `; legendary: ${wpE(legs.join(', '))}` : ''}</p><p class="itc-fl">A boss's weapon is for one of the units you field, made for what that unit holds.</p></div>`;
 }
