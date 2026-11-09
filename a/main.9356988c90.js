@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ae845e2+@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4ab82b7+@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -60649,13 +60649,15 @@ function edgeMagic(giants, title) {
 // modulating as it goes up"): one slow wisp a trunk, a broad soft teal-cyan ribbon of mist with fine particles flowing
 // through it, curling up and round the bole and flaring at its top into a bright glowing head with sparkles; a soft glow
 // on the trunk and a little fog round its foot; sparse golden specks.
+// All of it calm (owner: "ensure the motion is slow and not distracting"): particles take 55-90 s to climb, gold specks
+// drift lazily, brightness only breathes slowly (no twinkle), few sparkles, faint at the roots.
 // Its centre line wanders by slow multi-octave noise in space and time (fbm2: no helix, no repeating wave), with small
 // eddies; its width swells and pinches along it and over time (wide and billowy, then thin), widening into the head.
 // The mist is soft overlapping sprites along the line plus puffs flowing up it; the particles sit across its width, dense
 // at the middle. The centre line is sampled once a frame (EW_SEG points). About 650 additive billboards a trunk in the
 // shared batch, never more than the batch can spare for the spells drawn after it; fewer on Low graphics. Painted-only
 // maps (maplite.js) have no 3D trunks, so no wisps. On the two trunks the default camera sees whole, off the battle map.
-const EW_N = 460, EW_MIST = 34, EW_PUFF = 40, EW_GOLD = 16, EW_SPARK = 22, EW_SEG = 40;
+const EW_N = 460, EW_MIST = 34, EW_PUFF = 40, EW_GOLD = 16, EW_SPARK = 10, EW_SEG = 40;
 const ewH = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };   // (a particle's fixed random numbers)
 const EW_L = new Float32Array((EW_SEG + 1) * 6);   // the sampled centre line: x, y, z, outward x, outward z, width
 function ewLine(g, r, top) {
@@ -60663,13 +60665,13 @@ function ewLine(g, r, top) {
   for (let k = 0; k <= EW_SEG; k++) {
     const s = k / EW_SEG;
     // the winding: about a turn, its pace along the trunk wandering, drifting round over time
-    const th = ph + s * 6.0 + (fbm2(s * 1.7 + ph, t * .035) - .5) * 3.2 + (fbm2(s * 5.3 + 7, t * .09 + ph) - .5) * .7;
-    const rr = r * 1.1 + .55 + (fbm2(s * 2.4 + 3, t * .05 + ph * 2) - .5) * .9 + (fbm2(s * 8.1, t * .14 + 9) - .5) * .25 + s * s * .5;   // (in and out, eddies; drifting out at the top)
-    const h = .3 + s * top + (fbm2(s * 2.9 + 13, t * .045 + ph) - .5) * 1.1 + (fbm2(s * 7.7 + 2, t * .12) - .5) * .3;
+    const th = ph + s * 6.0 + (fbm2(s * 1.7 + ph, t * .017) - .5) * 3.2 + (fbm2(s * 5.3 + 7, t * .04 + ph) - .5) * .6;
+    const rr = r * 1.1 + .55 + (fbm2(s * 2.4 + 3, t * .024 + ph * 2) - .5) * .9 + (fbm2(s * 8.1, t * .06 + 9) - .5) * .2 + s * s * .5;   // (in and out, eddies; drifting out at the top)
+    const h = .3 + s * top + (fbm2(s * 2.9 + 13, t * .022 + ph) - .5) * 1.1 + (fbm2(s * 7.7 + 2, t * .05) - .5) * .25;
     const cx = Math.cos(th), cz = Math.sin(th), o = k * 6;
     EW_L[o] = g.x + cx * rr; EW_L[o + 1] = g.y + h; EW_L[o + 2] = g.z + cz * rr; EW_L[o + 3] = cx; EW_L[o + 4] = cz;
     // its width: swelling and pinching along it and over time (contrast-stretched noise), flaring into the head
-    const n = Math.min(1, Math.max(0, (fbm2(s * 3.1 + 21, t * .05 + ph) - .32) / .36));
+    const n = Math.min(1, Math.max(0, (fbm2(s * 3.1 + 21, t * .025 + ph) - .32) / .36));
     EW_L[o + 5] = (.14 + .8 * n * n) * (1 + 1.1 * Math.max(0, (s - .72) / .28) ** 2) * Math.min(1, s * 5 + .3);
   }
 }
@@ -60678,7 +60680,7 @@ function ewAt(s, out) {   // the centre line at s (0..1), interpolated: x, y, z,
   for (let j = 0; j < 6; j++) out[j] = EW_L[a + j] + (EW_L[b + j] - EW_L[a + j]) * u;
   return out;
 }
-const ewEnv = s => Math.min(1, s * 8) * (s > .97 ? (1 - s) / .03 : 1);   // (in from the roots, bright to the head)
+const ewEnv = s => Math.min(1, s * 3) ** 1.5 * (s > .97 ? (1 - s) / .03 : 1);   // (faint at the roots (owner: no busy sparkle there), bright to the head)
 function edgeWisps(giants) {
   const low = typeof vfxFid === 'function' && vfxFid().name === 'Low';
   const mg = (giants || []).filter(g => g.magic); if (!mg.length) return;
@@ -60697,37 +60699,37 @@ function edgeWisps(giants) {
       QADD.bill(RD, P[0], P[1], P[2], sz, sz * 1.15, [TEAL[0], TEAL[1], TEAL[2], .11 * ewEnv(s) * (.6 + .5 * Math.min(1, w * 2))], 1, 0);
     }
     if (!low) for (let i = 0; i < EW_PUFF; i++) {   // puffs of it flowing up the line, so the mist moves
-      const q0 = ewH(i, 21), q1 = ewH(i, 22), q2 = ewH(i, 23), s = (q0 + vt * (.02 + q1 * .015)) % 1; ewAt(s, P);
+      const q0 = ewH(i, 21), q1 = ewH(i, 22), q2 = ewH(i, 23), s = (q0 + vt * (.009 + q1 * .006)) % 1; ewAt(s, P);
       const w = P[5], a = (q2 - .5) * w * 1.2, sz = .3 + w * 2 * (.7 + q1 * .6);
       QADD.bill(RD, P[0] + P[3] * a, P[1] + (q1 - .5) * w * .8, P[2] + P[4] * a, sz, sz, [CYAN[0], CYAN[1], CYAN[2], .09 * ewEnv(s) * Math.sin(Math.PI * ((s * 7 + q2) % 1))], 1, 0);
     }
     // the fine particles flowing through it, across its width, dense at its middle
     for (let i = 0; i < N; i++) {
       const q0 = ewH(i, 1), q1 = ewH(i, 2), q2 = ewH(i, 3), q3 = ewH(i, 4), q4 = ewH(i, 5), q5 = ewH(i, 6);
-      const s = (q0 + vt * (.026 + q1 * .02)) % 1; ewAt(s, P);
+      const s = (q0 + vt * (.011 + q1 * .008)) % 1; ewAt(s, P);   // (55-90 s to climb it)
       const w = P[5], a = (q2 + q3 - 1) * w * 1.5, b = (q4 + q5 - 1) * w * 1.3;
-      const x = P[0] + P[3] * a + (fbm2(i * .37, vt * .3) - .5) * .06, y = P[1] + b, z = P[2] + P[4] * a;
+      const x = P[0] + P[3] * a + (fbm2(i * .37, vt * .07) - .5) * .05, y = P[1] + b, z = P[2] + P[4] * a;
       const core = 1 - Math.min(1, Math.hypot(a, b) / (w * 1.2 + .02));
       const c = q1 < .45 ? TEAL : q1 < .85 ? CYAN : [.8, 1, 1];
-      const sz = .035 + q4 * .035 + core * .02, al = ewEnv(s) * (.3 + .7 * core) * (.8 + .2 * Math.sin(vt * 1.3 + i * 2.3));
+      const sz = .035 + q4 * .035 + core * .02, al = ewEnv(s) * (.3 + .7 * core) * (.86 + .14 * Math.sin(vt * .3 + i * 2.3));
       QADD.bill(RD, x, y, z, sz, sz, [c[0], c[1], c[2], Math.min(1, al)], 2, 0);
     }
     // the head: a bright soft glow where it flares out at the top, sparkles drifting off it
-    const hb = .85 + .15 * Math.sin(vt * .7 + g.ph);
+    const hb = .88 + .12 * Math.sin(vt * .25 + g.ph);
     QADD.bill(RD, H[0], H[1], H[2], 1.9, 1.9, [TEAL[0], TEAL[1], TEAL[2], .24 * hb], 1, 0);
     QADD.bill(RD, H[0], H[1], H[2], .7, .7, [.7, 1, 1, .5 * hb], 1, 0);
     for (let i = 0; i < EW_SPARK; i++) {
-      const q0 = ewH(i, 31), q1 = ewH(i, 32), q2 = ewH(i, 33), k = (q0 + vt * (.12 + q1 * .1)) % 1;
-      const an = q1 * 6.2832 + (fbm2(i * .5, vt * .1) - .5) * 4, d = .15 + k * (.6 + q2 * .6);
-      const x = H[0] + Math.cos(an) * d, y = H[1] + (q2 - .3) * d * 1.2 + k * .4, z = H[2] + Math.sin(an) * d;
-      QADD.bill(RD, x, y, z, .05 + q2 * .04, .05 + q2 * .04, [.75, 1, 1, Math.sin(Math.PI * k) * .9], 2, 0);
+      const q0 = ewH(i, 31), q1 = ewH(i, 32), q2 = ewH(i, 33), k = (q0 + vt * (.035 + q1 * .025)) % 1;
+      const an = q1 * 6.2832 + (fbm2(i * .5, vt * .03) - .5) * 3, d = .15 + k * (.5 + q2 * .4);
+      const x = H[0] + Math.cos(an) * d, y = H[1] + (q2 - .3) * d * 1.2 + k * .3, z = H[2] + Math.sin(an) * d;
+      QADD.bill(RD, x, y, z, .05 + q2 * .04, .05 + q2 * .04, [.75, 1, 1, Math.sin(Math.PI * k) * .7], 2, 0);
     }
     for (let i = 0; i < EW_GOLD; i++) {   // sparse golden specks drifting round it
       const q0 = ewH(i, 11), q1 = ewH(i, 12), q2 = ewH(i, 13);
-      const s = (q0 + vt * (.015 + q1 * .015)) % 1; ewAt(s, P);
-      const off = .3 + q2 * .7 + P[5], an = q1 * 6.2832 + (fbm2(i * .7, vt * .05) - .5) * 5;
-      const x = P[0] + Math.cos(an) * off * .8, y = P[1] + (fbm2(i * .9 + 4, vt * .06) - .5) * off * 1.6, z = P[2] + Math.sin(an) * off * .8;
-      const tw = (.7 + .3 * Math.sin(vt * (.7 + q2) + i * 2.1)) * ewEnv(s), sz = .08 + q2 * .09;
+      const s = (q0 + vt * (.005 + q1 * .004)) % 1; ewAt(s, P);
+      const off = .3 + q2 * .7 + P[5], an = q1 * 6.2832 + (fbm2(i * .7, vt * .018) - .5) * 4;
+      const x = P[0] + Math.cos(an) * off * .8, y = P[1] + (fbm2(i * .9 + 4, vt * .02) - .5) * off * 1.4, z = P[2] + Math.sin(an) * off * .8;
+      const tw = (.82 + .18 * Math.sin(vt * (.18 + q2 * .12) + i * 2.1)) * Math.max(.4, ewEnv(s)), sz = .08 + q2 * .09;
       QADD.bill(RD, x, y, z, sz, sz, [1, .74, .32, .6 * tw], 2, 0); QADD.bill(RD, x, y, z, sz * 2.4, sz * 2.4, [1, .7, .3, .07 * tw], 1, 0);
     }
   }
@@ -72199,7 +72201,7 @@ function drawAmbient(dt) {
     if (a.k === 'bird') { drawBird(a, dt); continue; }
     if (a.k === 'dust') {   // a speck of dust or pollen, turning slowly as it drifts: it only shows where the sun falls
       const x = a.x + a.vx * a.t + Math.sin(a.t * .4 + a.ph) * .25, z = a.z + Math.cos(a.t * .3 + a.ph) * .15, h = a.h + Math.sin(a.t * .5 + a.ph * 2) * .15 + a.t * .02;
-      const sun = clamp((paintLum(x, z) - .95) * 2.2, 0, 1), tw = .6 + .4 * Math.sin(a.t * 2.3 + a.ph);
+      const sun = clamp((paintLum(x, z) - .95) * 2.2, 0, 1), tw = .75 + .25 * Math.sin(a.t * .6 + a.ph);   // (a slow breathing, no flicker: owner)
       if (sun > .02) QADD.bill(RD, x, h, z, .035, .035, [1, .9, .62, f * sun * tw * .55], 1, 0);
     } else if (a.k === 'leaf') {   // a leaf spinning down, flipping as it goes, swinging side to side
       const u = a.t / a.life, h = a.h * (1 - u), sw = Math.sin(a.t * 1.6 + a.ph);
@@ -72211,11 +72213,11 @@ function drawAmbient(dt) {
       const cx = a.x + a.dx * a.t + Math.sin(a.t * .35 + a.ph) * .25, cz = a.z + a.dz * a.t, ch = a.h + Math.sin(a.t * .6 + a.ph) * .12;
       const sun = paintLum(cx, cz), al = Math.min(1, a.t * 1.5, (a.life - a.t) * 1.5);
       for (const g of a.b) {
-        g.vx += (R_(-1, 1) * 9 - g.ox * 14 - g.vx * 3) * dt; g.vz += (R_(-1, 1) * 9 - g.oz * 14 - g.vz * 3) * dt; g.vh += (R_(-1, 1) * 7 - g.oh * 14 - g.vh * 3) * dt;
+        g.vx += (R_(-1, 1) * 2.5 - g.ox * 4 - g.vx * 2) * dt; g.vz += (R_(-1, 1) * 2.5 - g.oz * 4 - g.vz * 2) * dt; g.vh += (R_(-1, 1) * 2 - g.oh * 4 - g.vh * 2) * dt;   // (milling slowly, no darting: owner)
         g.ox += g.vx * dt; g.oz += g.vz * dt; g.oh += g.vh * dt;
         const x = cx + g.ox, z = cz + g.oz, h = ch + g.oh;
         QA.bill(RD, x, h, z, .018, .018, [.05, .05, .04, al * .85], 5, 0);
-        if (sun > 1.05 && Math.sin(vt * 9 + g.ph) > .82) QADD.bill(RD, x, h, z, .03, .03, [1, .95, .75, al * .6 * clamp(sun - 1, 0, 1)], 1, 0);   // a wing catching the sun
+        if (sun > 1.05 && Math.sin(vt * 1.1 + g.ph) > .9) QADD.bill(RD, x, h, z, .03, .03, [1, .95, .75, al * .6 * clamp(sun - 1, 0, 1)], 1, 0);   // a wing catching the sun
       }
     } else if (a.k === 'spray') {   // the pale spray off the falls
       const u = a.t / a.life;
