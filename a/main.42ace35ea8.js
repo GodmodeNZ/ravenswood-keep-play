@@ -1,4 +1,4 @@
-const BUILD_TAG = '392ff63@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a48563a@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -78540,7 +78540,7 @@ function fcMinionHTML(g) {
     + (art ? `<img alt="" src="${art}">` : fcSvg(R ? R.g : FC_ROLE.armoured.g, c)) + (g.boss ? '' : `<b>${g.count}</b>`) + `</button>`;
 }
 // the boss loot: a button that opens the Renown tap menu's loot tab (renown.js), not a strip in the card
-const fcLootBtn = n => typeof rnLootOn === 'function' && rnLootOn() && typeof rnBossType === 'function' && rnBossType(n) ? `<button type="button" class="fc-loot" data-loot="${n}" aria-label="Wave ${n} boss loot">Loot</button>` : '';
+const fcLootBtn = n => false && typeof rnLootOn === 'function' && rnLootOn() && typeof rnBossType === 'function' && rnBossType(n) ? `<button type="button" class="fc-loot" data-loot="${n}" aria-label="Wave ${n} boss loot">Loot</button>` : '';
 function fcDetailHTML(d) {
   const roleChips = fcRoleOrder(d).map(r => fcRoleChip(r, d.roles[r], true)).join('');
   const thr = d.threats.filter(t => t.k !== 'fly' && t.k !== 'boss').map(fcThreatChip).join('');   // (flying shows among the roles; the boss in the heading)
@@ -79717,7 +79717,7 @@ const HOW = `<ul>
 <li>The fallen leave corpses. Necromancers raise them and Carrion Beasts eat them to grow, but burned or shattered corpses are no use to either. Tap any creep to read what it does.</li>
 <li>From wave 30, every 10th wave brings siege troops. They ignore your maze and march straight for the gate, smashing whatever tower or barricade stands in their way. A wrecked tower is an open breach and stops firing. Nothing repairs itself: select a damaged tower to pay for repairs.</li>
 <li>From wave 3 on, every wave brings elites, ringed in gold. They are tougher, and now and then one drops a relic. Relics come in five rarities: common, uncommon, rare, epic and legendary. Socket one into a tower (fully upgraded towers take two) to give it bonuses. Legendary relics go further and change how a tower works: borrowed elements, overkill that spills over, attacks that become pulses, kills that reset the attack. Each one suggests what to pair it with. Selling a tower returns its relics.</li>
-<li>A force commander's units each start with one spell, their innate one. Their other two spells unlock in the unit's talent tree: the round spell talents, on rows II to IV (each unit's tree places them its own way). The deeper a spell sits, the stronger it is: harder hits or a longer effect, for a little more mana. Each needs the talent straight above it at full rank, and the talents that improve a spell sit below it. Once a spell is unlocked, every unit of that kind knows it at once, and so does every one you build later. Resetting the tree makes them forget it. Most other talents in a force's trees reshape its spells: cheaper, quicker, wider, or harder against foes that are held, frozen, burning or marked.</li>
+<li>A force commander's units each start with one spell, their innate one. Their other two spells unlock in the unit's talent tree: the round spell talents, on rows II to V (each unit's tree places them its own way). The deeper a spell sits, the stronger it is: harder hits or a longer effect, for a little more mana. Each needs the talent straight above it at full rank, and the talents that improve a spell sit below it. Once a spell is unlocked, every unit of that kind knows it at once, and so does every one you build later. Resetting the tree makes them forget it. Most other talents in a force's trees reshape its spells: cheaper, quicker, wider, or harder against foes that are held, frozen, burning or marked.</li>
 <li>With the keep's towers, every wave you clear earns a talent point. A force commander earns them by experience instead: slain foes fill the XP bar beside the wave counter (bosses and elites the most, foes that get through nothing), and every level pays a talent point, about one a wave. Every talent is a single point with a big effect. Spend them under Talents to reshape how a tower type fights; the card shows exactly what a talent changes before you take it. Rows open in every tree as you earn points (one row every two), so you can mix schools freely. Most talents come with a drawback, so choose carefully.</li>
 <li>Reactions happen on their own when two schools meet on a foe: Frost and Flame Melt, lightning on a chilled foe Superconducts, Flame on a poisoned foe goes Volatile, quakes and cannons Crush frozen foes, quakes on a burning foe set off an Eruption. Arcane bolts hit harder for every effect on a foe, and arrows and glaives hit stunned foes harder. With 2 points in two trees you can learn their Fusion talent, which supercharges a reaction.</li>
 <li>Relics are rare. Bosses (and the keep's dungeon leaders) sometimes drop one, elites now and then, and any other foe once in a long while. The first waves drop rare (blue) relics; epics start turning up from wave 6, and legendaries, rarer still, from wave 11, growing more likely as the run goes on. Many of them are school relics: one legendary for each school that empowers every tower of that school you own, more for every one you build. A Storm relic early is a good reason to spend your next School Key on Storm.</li>
@@ -79758,8 +79758,8 @@ const HOW_F = `<ul>
 <li>Creeps fight as a warband. Warcallers whip their neighbours into a frenzy, Shieldbearers block shots at the allies behind them, Menders heal, Shamans wash off roots, chills, burns and poison, and Torchbearers thaw frozen allies. Pack Alphas speed up their wolves, and the pack panics when the alpha falls. Burrowers dive underground when focused and stay out of reach until they surface.</li>
 <li>The fallen leave corpses. Necromancers raise them and Carrion Beasts eat them to grow, but burned or shattered corpses are no use to either. Tap any creep to read what it does.</li>
 <li>From wave 30, every 10th wave brings siege troops. They ignore your maze and march straight for the gate, smashing whatever unit or barricade stands in their way. A unit beaten down is Wounded: it holds its post and fights on, slower, and recovers when the wave ends. A wrecked wall is an open breach until you rebuild it.</li>
-<li>Your units each start with one spell, their innate one. Their other two spells unlock in the unit's talent tree: the round spell talents, on rows II to IV (each unit's tree places them its own way). The deeper a spell sits, the stronger it is: harder hits or a longer effect, for a little more mana. Each needs the talent straight above it at full rank, and the talents that improve a spell sit below it. Once a spell is unlocked, every unit of that kind knows it at once, and so does every one you build later. Resetting the tree makes them forget it. Most other talents reshape the spells: cheaper, quicker, wider, or harder against foes that are held, frozen, burning or marked.</li>
-<li>Slain foes fill the experience bar beside the wave counter (bosses and elites the most, foes that get through nothing), and every level pays a talent point, about one a wave. Spend them under Talents to reshape how a unit fights; the card shows exactly what a talent changes before you take it.</li>
+<li>Your units each start with one spell, their innate one. Their other two spells unlock in the unit's talent tree: the round spell talents, on rows II to V (each unit's tree places them its own way). The deeper a spell sits, the stronger it is: harder hits or a longer effect, for a little more mana. Each needs the talent straight above it at full rank, and the talents that improve a spell sit below it. Once a spell is unlocked, every unit of that kind knows it at once, and so does every one you build later. Resetting the tree makes them forget it. Most other talents reshape the spells: cheaper, quicker, wider, or harder against foes that are held, frozen, burning or marked.</li>
+<li>Slain foes fill the experience bar beside the wave counter (bosses and elites the most, foes that get through nothing), and every level pays a talent point, about one a wave. Spend them under Talents to reshape how a unit fights; the card shows exactly what a talent changes before you take it, and what its next rank adds. The coloured chip on each talent says what it is for: Damage, Spell, Control, Support, Survival, Mana or the force's own mechanic. A force's trees have six rows; the last holds the capstones (pick one), open at 12 points in that tree.</li>
 <li>Every wave resists two of your units (×0.7), and most bosses come with a weakness to some of them (×1.75), shown as icons on the wave and boss cards. Read the next wave and build for it.</li>
 <li>Clear a wave without a leak to build a Flawless streak: +10% gold from kills and wave bonuses per clean wave, up to +50%. One leak resets it.</li>
 <li>Gold you don't spend earns interest when a wave is cleared, and the more you hold the higher the rate: nothing under 100 gold, 5% at 100, then +1% for every further 100, up to 12% at 800 (each payout is capped at 20 + 8 per wave). The green number beside your gold is what you will earn. Saving pays, but units win waves.</li>
@@ -80313,16 +80313,19 @@ function buildTree() {
   const pc = $('#tPort'), ps = Math.round((pc.clientWidth || 56) * sc); pc.width = pc.height = ps; pc.getContext('2d').drawImage(talIcon(talTab), 0, 0, ps, ps);
   $('#tBg').style.backgroundImage = `url(${talSceneURL(talTab, true)})`;
   // four rows of up to four talents; chains run straight down a column
-  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="lock"></span><span class="sp">Spell</span><span class="pl" title="In your plan"></span><span class="rk"></span><span class="tr"></span></button>`).join('')
+  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="lock"></span><span class="sp">Spell</span><span class="pl" title="In your plan"></span>${talTagChip(t)}<span class="rk"></span><span class="tr"></span></button>`).join('')
     + `<span class="tcap" style="grid-row:${talRowsOf(talTab)}">pick one</span>`;
   const TAL_ROWS = talRowsOf(talTab);   // (this tree's rows: a force's trees have five)
   const cols = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(...tl.list.map(t => t.c)) + 1;   // (a force's spell trees keep the whole 4-column grid, as WoW's do)
   grid.style.gridTemplateColumns = `repeat(${cols}, var(--n))`; grid.style.gridTemplateRows = `repeat(${TAL_ROWS}, var(--n))`;
-  const availH = tree.clientHeight - 30, availW = tree.clientWidth - 58, G0 = tl.list.some(t => t.req) ? 40 : 24;   // room between the rows for the prerequisite arrows
-  let n = Math.floor(clamp(Math.min((availH - (TAL_ROWS - 1) * G0) / TAL_ROWS, (availW - (cols - 1) * 14) / cols), 30, 84));
+  const availH = tree.clientHeight - 30, availW = tree.clientWidth - 58, G1 = tl.list.some(t => t.req) ? 40 : 24;   // room between the rows for the prerequisite arrows
+  // a short panel (a phone on its side) with a six-row tree: tighter rows and smaller talents, so every row still fits
+  const tight = (availH - (TAL_ROWS - 1) * G1) / TAL_ROWS < 30, G0 = tight ? 10 : G1, nMin = tight ? 22 : 30;
+  let n = Math.floor(clamp(Math.min((availH - (TAL_ROWS - 1) * G0) / TAL_ROWS, (availW - (cols - 1) * 14) / cols), nMin, 84));
   const gap = clamp((availH - TAL_ROWS * n) / (TAL_ROWS - .4), G0, n * 1.1);
-  n = Math.floor(clamp(Math.min(n, (availH - (TAL_ROWS - 1) * gap) / TAL_ROWS), 30, 84));
-  grid.style.setProperty('--n', n + 'px'); grid.style.rowGap = Math.round(gap) + 'px'; grid.style.columnGap = Math.round(clamp((availW - cols * n) / Math.max(1, cols - 1), 10, n * .6)) + 'px';
+  n = Math.floor(clamp(Math.min(n, (availH - (TAL_ROWS - 1) * gap) / TAL_ROWS), nMin, 84));
+  grid.classList.toggle('tight', tight);
+  grid.style.setProperty('--n', n + 'px'); grid.style.rowGap = Math.round(gap) + 'px'; grid.style.columnGap = Math.round(clamp((availW - cols * n) / Math.max(1, cols - 1), 10, tight ? 46 : n * .6)) + 'px';
   placeArrows(); requestAnimationFrame(() => { if (talOpen) placeArrows(); });   // and again once the panel has settled, so the arrows are always there
   if (!tree._ro && typeof ResizeObserver !== 'undefined') { tree._ro = new ResizeObserver(() => { if (talOpen && talTab !== 'fusion') placeArrows(); }); tree._ro.observe(tree); }
 }
@@ -80365,6 +80368,7 @@ function drawSpine(spent) {
   const g = $('#tSpine'), grid = $('#tGrid'); if (!g || !grid || talTab === 'fusion' || talTab === 'paths') return;
   const tl = TALENTS[talTab], ys = [], TAL_ROWS = talRowsOf(talTab);
   for (let r = 0; r < TAL_ROWS; r++) { const t = tl.list.find(q => q.r === r), nd = t && grid.querySelector(`.tn[data-i="${t.id}"]`); ys.push(nd ? grid.offsetTop + nd.offsetTop + nd.offsetHeight / 2 : 0); }
+  const TAL_TIER = talTierOf(talTab);   // (a force's six-row trees open on their own points)
   let k = 0; while (k < TAL_ROWS - 1 && spent >= TAL_TIER[k + 1]) k++;
   const x = grid.offsetLeft + 17, f = k >= TAL_ROWS - 1 ? 0 : (spent - TAL_TIER[k]) / (TAL_TIER[k + 1] - TAL_TIER[k]);
   const yf = ys[k] + (k < TAL_ROWS - 1 ? (ys[k + 1] - ys[k]) * f : 0);
@@ -80418,7 +80422,7 @@ function refreshTalents() {
     n.querySelector('.tr').textContent = t.name;
     n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank, as in WoW: grey 0, green while learning, gold when full
     const lk = n.querySelector('.lock'), want = s === 'locked' || s === 'excl' || s === 'req' ? LOCK_SVG : ''; if (lk.innerHTML !== want) lk.innerHTML = want;
-    n.setAttribute('aria-label', `${t.name}, rank ${r} of ${t.max}. ${t.pro(Math.max(1, r))}`);
+    n.setAttribute('aria-label', `${t.name}${talTagOf(t) ? ', ' + talTagOf(t) : ''}, rank ${r} of ${t.max}. ${t.pro(Math.max(1, r))}`);
     n.setAttribute('aria-pressed', on);
   }
   for (const a of ovp.querySelectorAll('.lkg')) { const t = tl.list[+a.dataset.i], q = talAt(ty, t.req[0], t.req[1]); a.classList.toggle('lit', talRankOf(pk, q.id) >= q.max); }
@@ -80566,13 +80570,32 @@ function renderPathTip(det, ci) {
    talents", "same with all talents"): no side pane. The talent under the mouse, or the one tapped on touch (a second tap
    learns it), shows a compact tooltip at its node: a spell talent its spell's tooltip (spellhud.js), any other its name,
    rank and effect, its drawback, and the next rank muted. Row locks, links and ranks show on the tree itself. */
+// a talent's tag (forces_zzzzzzzzzzzzzzzzz_spread.js): a coloured chip on its node and a word in its tooltip
+const talTagOf = t => typeof talTag === 'function' && typeof talTagForce === 'function' && talTagForce() ? talTag(t, talTagForce()) : '';
+function talTagChip(t) {
+  const k = !t.spell && talTagOf(t), T = k && TAL_TAGS[k]; if (!T) return '';   // (a spell's node already says Spell)
+  return `<span class="tg" style="--tg:${T.col}" title="${k}: ${T.say}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${T.ic}"/></svg></span>`;
+}
+function talTagLine(t) {
+  const k = talTagOf(t), T = k && TAL_TAGS[k]; if (!T) return '';
+  return `<div class="wt-tag" style="--tg:${T.col}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${T.ic}"/></svg><b>${k}</b><span>${T.say}</span></div>`;
+}
+// what each rank gives, as numbers: "Next rank: 20% → 30%" (the numbers that change), or every rank's before the first
+function talRankHTML(t, n) {
+  if (!(t.max > 1)) return '';
+  const S = typeof talRankSteps === 'function' ? talRankSteps(t) : null;
+  if (!S) return n > 0 && n < t.max ? `<div class="wt-t">Next rank: ${t.pro(n + 1)}</div>` : '';
+  if (n > 0 && n < t.max) return `<div class="wt-t">Next rank: ${S.map(s => `${s.vals[n - 1]} → <b>${s.vals[n]}</b>`).join(', ')}</div>`;
+  if (n >= t.max) return '';
+  return `<div class="wt-t">Each rank: ${S.map(s => s.vals.map((v, i) => i === 0 ? `<b>${v}</b>` : v).join(' → ')).join(', ')}</div>`;
+}
 function talTipHTML(ty, ci) {
   const tl = TALENTS[ty], t = tl.list[ci], n = talRankOf(talPicks(ty), ci);
   const ab = t.spell && typeof ABIL !== 'undefined' ? ABIL[t.spell] : null;
   if (ab && typeof spellTipHTML === 'function') { try { return spellTipHTML(ab, spellSample(ab, ty), {}); } catch (e) { /* the plain talent below */ } }
   const k = Math.max(1, n), con = r => { const c = t.con(r); return c && c !== 'undefined' ? c : ''; }, c = con(k);
-  return `<div class="wt-h"><i class="wt-n">${t.name}</i><i class="wt-k">Rank ${n}/${t.max}</i></div><div class="wt-d">${t.pro(k)}</div>`
-    + (c ? `<div class="wt-c">${c}</div>` : '') + (n > 0 && n < t.max ? `<div class="wt-t">Next rank: ${t.pro(n + 1)}</div>` : '');
+  return `<div class="wt-h"><i class="wt-n">${t.name}</i><i class="wt-k">Rank ${n}/${t.max}</i></div>${talTagLine(t)}<div class="wt-d">${t.pro(k)}</div>`
+    + (c ? `<div class="wt-c">${c}</div>` : '') + talRankHTML(t, n);
 }
 function renderTip() {
   if (!talOpen || typeof spellTipShow !== 'function') return;
@@ -88742,8 +88765,8 @@ function rnMenu(tab) {
     <li>It caps at ${RN.cap}: spend it. Each purchase of a kind costs 1 more than the last. Leaks never cost Renown.${R.earned ? ` This run: ${R.earned} earned${R.over ? `, ${R.over} lost to the cap` : ''}.` : ''}</li></ul>`;
   const loot = rnLootListHTML(from);
   showOverlay(`<div class="bg-head hs-head rn-head"><h2 class="ttl">Renown <small class="qk-ch">${R.v} of ${RN.cap}</small></h2><span class="qk-line">${rnBar()}</span><button type="button" class="tx" id="rnClose" aria-label="Close and resume">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
-    <div class="bg-tabs rn-tabs" role="tablist">${[['spend', 'Spend'], ['earn', 'Earn'], ['loot', 'Boss loot']].map(([k, n]) => `<button type="button" role="tab" data-rt="${k}" aria-selected="${rnMenuTab === k}">${n}</button>`).join('')}</div>
-    <div class="rn-body">${rnMenuTab === 'earn' ? earn : rnMenuTab === 'loot' ? loot : spend}</div>`, 'bag rn-ov');
+    <div class="bg-tabs rn-tabs" role="tablist">${[['spend', 'Spend'], ['earn', 'Earn']].map(([k, n]) => `<button type="button" role="tab" data-rt="${k}" aria-selected="${rnMenuTab === k}">${n}</button>`).join('')}</div>
+    <div class="rn-body">${rnMenuTab === 'earn' ? earn : rnMenuTab === 'loot' && false ? loot : rnMenuTab === 'earn' ? earn : spend}</div>`, 'bag rn-ov');
   const q = id => document.getElementById(id);
   q('rnClose').onclick = () => { sfx('click'); resumeGame(); };
   for (const b of ovp.querySelectorAll('[data-rt]')) b.onclick = () => { rnMenuTab = b.dataset.rt; sfx('click'); rnMenu(); };
@@ -88848,7 +88871,7 @@ function rnIconsHTML(t, attr, n) {
     try {
       if (typeof bcEl === 'undefined' || !bcEl) return r;
       let el = bcEl.querySelector('.rn-bc');
-      const t = rnLootOn() && !bcEl.hidden && bcC.type && rnBossType(G.wave) === bcC.type ? bcC.type : null, key = t ? t + ':' + G.wave + ':' + (rnS().pledge[G.wave] || '') + ':' + (rnS().bossW[G.wave] ? 1 : 0) + ':' + rnOn() : '';
+      const t = false && rnLootOn() && !bcEl.hidden && bcC.type && rnBossType(G.wave) === bcC.type ? bcC.type : null, key = t ? t + ':' + G.wave + ':' + (rnS().pledge[G.wave] || '') + ':' + (rnS().bossW[G.wave] ? 1 : 0) + ':' + rnOn() : '';
       if (!el) { if (!t) return r; el = document.createElement('div'); el.className = 'rn-bc'; bcEl.appendChild(el); el.addEventListener('click', e => { e.stopPropagation(); if (rnOn()) rnMenu('loot'); }); }
       if (el._k === key) return r; el._k = key; el.hidden = !t; if (!t) return r;
       const R = rnS(), pl = R.pledge[G.wave];
@@ -90818,7 +90841,7 @@ const SPELL_HELP = {
   // Cloud Dancers (sb_clouddancer)
   sb_thunderhead: { when: "Three or more foes within 1.2 cells of one foe in reach ({reach} cells), or a boss or elite at that densest spot.", aim: "The densest spot: the foe with the most others within 1.2 cells.", tips: ["It soaks everything beneath it: Call Lightning forks and Hailstorm freezes on top.", "Best on a corner where the crowd lingers for the cloud's whole 5-7s.", "Slows from Crosswind or Downpour keep foes under it longer."] },
   sb_downpour: { when: "Three or more foes within {reach} cells, or the Storm within 12 of its next level with a foe in reach, or a boss or elite.", aim: "Itself: every foe in its reach is soaked each beat.", tips: ["Dance as the Storm nears a level: the dance will carry it over, and the sky answers with lightning.", "The dancer strikes nothing while it dances: give it a quiet moment, early in a wave.", "Everything in reach stays soaked 6s: Thunder Callers behind it chain much further."] },
-  sb_stormdance: { when: "Any foe within {reach} cells.", aim: "The toughest foe in reach, bosses and elites first.", tips: ["Higher in the Storm, more forks: cast it at Hail or the Tempest.", "The rain it brings soaks everything near its foe: chain lightning follows.", "Static Clouds adds forks for every Storm level."] },
+  sb_stormdance: { when: "Any foe within {reach} cells.", aim: "The toughest foe in reach, bosses and elites first.", tips: ["Higher in the Storm, more forks: cast it at Hail or the Tempest.", "The rain it brings soaks everything near its foe: chain lightning follows.", "Static Clouds makes it deal more to soaked foes: dance where the rain falls."] },
   // Tarka Stormbrow, the Storm Caller (Champion, sb_caller)
   ch_gather: { when: "Three or more foes within 1.7 cells of one foe in reach ({reach} cells; the area grows to 1.9 by tier VI), or any boss or elite in reach.", aim: "The densest spot: the foe with the most others within 1.7 cells. A boss in reach without a crowd still gets that spot, not the boss.", tips: ["The Storm leaps to its next threshold: cast it to bring Rain or the Tempest sooner.", "It soaks for 6s: follow with Stormcall, Call Lightning or Hailstorm.", "Post Tarka beside a corner where crowds bunch inside the area."] },
   ch_eyestorm: { when: "Two or more foes within {reach} cells, or a boss or elite there.", aim: "Herself: each beat strikes the foe nearest the gate in her reach.", tips: ["Post her near the end of the maze: every beat lands on whatever is about to slip through.", "Soaked foes are held on each beat: soak the road and the drum holds the line.", "Each beat feeds the Storm 2: a full drum often lifts it a level."] },
@@ -91177,9 +91200,9 @@ function kwBuild() {
     const B = GW_BLOOM[u];
     kwAdd({ key: 'gw:b_' + u, name: B.name, cat: 'force', sub: 'Bloom', col: '#ffb8d8', def: () => kwBloomText(u) });
   }
-  kwAdd({ key: 'gw:rootburst', name: 'Rootburst', cat: 'force', sub: GR, col: '#7da650', def: 'A Briarwarden talent: Strangling Bloom\'s roots creep on to 2 more walkers.' });
+  kwAdd({ key: 'gw:rootburst', name: 'Rootburst', cat: 'force', sub: GR, col: '#7da650', def: 'A Briarwarden talent: a held foe that dies bursts for 2 strikes, rooting the walkers within 1.2 cells for 0.8s.' });
   kwAdd({ key: 'gw:puffcap', name: 'Puffcap', alias: ['puffcap', 'puffcaps'], cat: 'force', sub: GR, col: '#c8b06a', def: 'A mushroom a Seedcaster sows on the road (Puffcap Sowing; Puffcap Trail sows one with every 3rd pod): it waits, and the first walker on it bursts it in a puff of spores.' });
-  kwAdd({ key: 'gw:drift', name: 'Drifting Spores', cat: 'force', sub: GR, col: '#b2c23e', def: 'A Seedcaster talent: Burstpod\'s spores reach a little further.' });
+  kwAdd({ key: 'gw:drift', name: 'Drifting Spores', cat: 'force', sub: GR, col: '#b2c23e', def: 'A Seedcaster talent: when a spored foe dies, its spores drift on to 3 foes, not 1.' });
   kwAdd({ key: 'gw:heart', name: 'Bloom Heart', cat: 'force', sub: GR, col: '#8fd06a', def: () => `Nyssa's trait: while her Champion stands, every unit keeps ${typeof GW_KEEP !== 'undefined' ? GW_KEEP : 25} Growth after it Blooms.` });
 
   // ---- the Silver Order: Judgement and Verdict ----
@@ -92827,7 +92850,7 @@ function tutTeach(type, what) {
   const pk = talPicks(type).slice(); while (pk.length < tl.list.length) pk.push(0);
   const need = (t, d) => { if (d > 6) return; for (const [r, c] of talReqs(t)) { const q = talAt(type, r, c); if (q) { pk[q.id] = Math.max(pk[q.id] | 0, q.max); need(q, d + 1); } } };
   need(tg, 0);
-  const rowPts = (r) => TAL_TIER[r] || 0;
+  const rowPts = (r) => talTierOf(type)[r] || 0;
   // a row opens once enough points sit in the rows above it
   for (let r = 1; r <= tg.r; r++) {
     for (let g = 0; g < 40 && talSpent(pk) < rowPts(r); g++) { const q = tl.list.find(o => o.r < r && !o.spell && o.id !== tg.id && (pk[o.id] | 0) < o.max && talCapTaken(type, pk, o.id) == null); if (!q) break; pk[q.id] = (pk[q.id] | 0) + 1; }
