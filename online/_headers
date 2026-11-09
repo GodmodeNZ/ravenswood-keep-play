@@ -1,7 +1,7 @@
 # Netlify reads this file: the security headers for every page, and caching. Rebuilt by ./build_web.sh (the
 # script hashes change with every build, so always deploy index.html and _headers together).
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-6kik1B1y9OINCEfl1IGTm9owR3jXly1Wi6/Zk6oT9a0=' 'sha256-bnfEeHeBO4ruHX9QJjcmwUtxb0OBf/p70yiBLQyBLhU=' 'sha256-OsrfMyjltQ0EwpyACmeNgYpvLrxyXcQ/drvm0i9/ynQ=' 'sha256-gmeafi42c7IdhOrupHAV1gEjczt9C6KCSSlZ9yzAuPw='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://*.supabase.co; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-6kik1B1y9OINCEfl1IGTm9owR3jXly1Wi6/Zk6oT9a0=' 'sha256-bnfEeHeBO4ruHX9QJjcmwUtxb0OBf/p70yiBLQyBLhU=' 'sha256-OsrfMyjltQ0EwpyACmeNgYpvLrxyXcQ/drvm0i9/ynQ=' 'sha256-IHF+d1WHfFL1f6eE3t+70aXSNQM+lyz7ootThVKTgeI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://*.supabase.co; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
