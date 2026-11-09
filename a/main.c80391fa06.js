@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cf6c27c@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5faf2f0@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -56554,15 +56554,17 @@ const VS_TREE = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec3 aCol; layout(location=3) in vec2 aUV;
 layout(location=4) in vec4 aI; layout(location=5) in vec2 aI2;
 uniform mat4 uVP, uLVP; uniform float uTime, uLeaf, uE, uH, uSway;   // (uSway 0: a rock, which stands still)
+// the wind's weight: x on bark (trunks, roots), y on leaves, z its pace (1, 1, 1 but on Sunfall's edge trees: edgetrees.js)
+uniform vec3 uSwayK;
 out vec3 vNor, vCol, vW, vC; out vec4 vL; out vec2 vUV; out float vH;
 ${BEND_GLSL}
 void main(){
   float c=cos(aI2.x), s=sin(aI2.x);
   vec3 m = aPos*uE; float hrel = clamp(m.y/uH, 0., 1.);
   vec3 p = m*aI.w; p = vec3(c*p.x + s*p.z, p.y, -s*p.x + c*p.z);
-  float sw = hrel*hrel*aI.w*uH*.014*uSway;
-  p.x += sin(uTime*1.2 + aI2.y + aI.x*.35)*sw; p.z += cos(uTime*1.05 + aI2.y*1.3 + aI.z*.3)*sw*.7;
-  if(uLeaf>.5 && uSway > .5){ p += vec3(sin(uTime*2.4 + m.y*.8 + aI2.y), sin(uTime*1.9 + m.x*.9)*.4, cos(uTime*2.1 + m.z*.8))*.012*aI.w*uH*hrel; }
+  float wt = uTime*uSwayK.z, sw = hrel*hrel*aI.w*uH*.014*uSway*(uLeaf > .5 ? uSwayK.y : uSwayK.x);
+  p.x += sin(wt*1.2 + aI2.y + aI.x*.35)*sw; p.z += cos(wt*1.05 + aI2.y*1.3 + aI.z*.3)*sw*.7;
+  if(uLeaf>.5 && uSway > .5){ p += vec3(sin(wt*2.4 + m.y*.8 + aI2.y), sin(wt*1.9 + m.x*.9)*.4, cos(wt*2.1 + m.z*.8))*.012*aI.w*uH*hrel*uSwayK.y; }
   vec3 w = p + aI.xyz;
   vC = aI.xyz; vW=w; vNor=vec3(c*aNor.x + s*aNor.z, aNor.y, -s*aNor.x + c*aNor.z); vCol=aCol; vUV=aUV; vH=hrel; vL=uLVP*vec4(w,1.); gl_Position=uVP*vec4(bendW(w),1.);
 }`;
@@ -56646,9 +56648,9 @@ void main(){
 }`;
 const VS_TREE_SH = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=3) in vec2 aUV; layout(location=4) in vec4 aI; layout(location=5) in vec2 aI2;
-uniform mat4 uLVP; uniform float uTime, uE, uH, uSway; out vec2 vUV; out float vY;
+uniform mat4 uLVP; uniform float uTime, uE, uH, uSway, uLeaf; uniform vec3 uSwayK; out vec2 vUV; out float vY;
 void main(){ float c=cos(aI2.x), s=sin(aI2.x); vec3 m=aPos*uE; float hrel=clamp(m.y/uH,0.,1.); vec3 p=m*aI.w; p=vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);
-  float sw=hrel*hrel*aI.w*uH*.014*uSway; p.x += sin(uTime*1.2 + aI2.y + aI.x*.35)*sw; p.z += cos(uTime*1.05 + aI2.y*1.3 + aI.z*.3)*sw*.7;
+  float wt=uTime*uSwayK.z, sw=hrel*hrel*aI.w*uH*.014*uSway*(uLeaf > .5 ? uSwayK.y : uSwayK.x); p.x += sin(wt*1.2 + aI2.y + aI.x*.35)*sw; p.z += cos(wt*1.05 + aI2.y*1.3 + aI.z*.3)*sw*.7;
   vUV=aUV; vY = p.y + aI.y; gl_Position=uLVP*vec4(p+aI.xyz,1.); }`;
 const FS_TREE_SH = `#version 300 es
 precision highp float; in vec2 vUV; in float vY; uniform sampler2D uTex; uniform float uLeaf, uCut; uniform vec3 uFade;
@@ -57254,6 +57256,8 @@ function createRenderer(canvas, opt = {}) {
         if (shadow && (t.lod > 0 || !this.treeShadows || t.noShadow)) continue;   // (noShadow: a painted map's framing trees: the painting has its own shadows)
         gl.uniform1f(u.uLeaf, t.leaf); gl.uniform1f(u.uE, t.E); gl.uniform1f(u.uH, t.H); if (u.uCut) gl.uniform1f(u.uCut, t.cut); if (u.uGain) gl.uniform1f(u.uGain, t.gain || 1);
         if (u.uSway) gl.uniform1f(u.uSway, t.still ? 0 : 1);
+        // (Sunfall's edge trees: trunks and roots still, leaves gently: edgetrees.js)
+        if (u.uSwayK) gl.uniform3fv(u.uSwayK, t.swayK || SWAY_K1);
         if (u.uPropW) { const P = this.propLight; gl.uniform4fv(u.uPropW, P ? P.warm : [1, 1, 1, 0]); gl.uniform4fv(u.uPropC, P ? P.cool : [1, 1, 1, 0]); gl.uniform3fv(u.uPropL, P ? P.dir : [0, 1, 0]); }
         if (u.uFade) { const f = t.fade; gl.uniform3f(u.uFade, f ? f[0] : 1e4, f ? f[1] : 1e4 + 1, f ? f[2] || 0 : 0); }
         if (t.leaf) gl.bindTexture(gl.TEXTURE_2D, t.tex);
@@ -57425,6 +57429,8 @@ function createRenderer(canvas, opt = {}) {
 }
 const ONE_TINT = new Float32Array([1, 1, 1, 0]);
 const _litPL = new Float32Array(24), _litPC = new Float32Array(18), _glScG = [];
+// the trees' wind as it always was (drawTrees: uSwayK)
+const SWAY_K1 = new Float32Array([1, 1, 1]);
 const OWN_K = [.55, 1.07, .22, 1.02];   // the units' gradient (FS_LIT uOwnK, after the tone curve): the light at the feet and at the head, and the heights (world) between
 
 /* ---- quad batch (CPU side) ---- */
@@ -60798,9 +60804,12 @@ function clWet(x, z, r = 0) {
   }
   return false;
 }
+// the wind on Sunfall's edge trees (gl.js uSwayK: bark weight, leaf weight, pace): the giants' trunks and roots and every
+// other trunk and stem stand still (owner: the trunks wobbled too much); only leaves, plants and grasses sway, gently and slowly
+const CL_SWAY_STILL = new Float32Array([0, 0, 1]), CL_SWAY_LEAF = new Float32Array([0, .35, .5]);
 function buildClearingTrees() {
   const rnd = mulberry32(1717), inst = new Map(), giants = [];
-  const put = (tr, key, x, y, z, H, lod, extra) => { if (!tr || (!key.startsWith('giant') && clWet(x, z, H * .3))) return; /* (nothing on the painted stream) */ if (!inst.has(key)) inst.set(key, Object.assign({ asset: tr, lod, arr: [] }, extra || {})); inst.get(key).arr.push(x, y, z, H / tr.height, rnd() * TAU, rnd() * 10); };
+  const put = (tr, key, x, y, z, H, lod, extra) => { if (!tr || (!key.startsWith('giant') && clWet(x, z, H * .3))) return; /* (nothing on the painted stream) */ if (!inst.has(key)) inst.set(key, Object.assign({ asset: tr, lod, arr: [], swayK: key.startsWith('giant') ? CL_SWAY_STILL : CL_SWAY_LEAF }, extra || {})); inst.get(key).arr.push(x, y, z, H / tr.height, rnd() * TAU, rnd() * 10); };
   // the owner's TreeForge trunk with its gnarled roots (groots: tools/make_tftrees.py ROOTED, its base slimmed), else the
   // code-built one; the four by the field at TreeForge's LOD1 (4.9k triangles), the eleven over the painting's edges at LOD2 (2.3k)
   const GR = edgeAsset('groots'), G_ = GR || edgeGiantAsset();
@@ -60850,7 +60859,7 @@ function buildClearingTrees() {
   if (IO) for (const sd of [-1, 1]) { const x = EDGE_GATE.x + sd * (EDGE_GATE.half + .95), z = ROWS + 2.45, H = 2.6; if (below(z, H, H * .25)) put(IO, 'wardgate', x, -.05, z, H, 0, { noShadow: true }); }
   const stump = edgeAsset('stump');   // the owner's tree stump by two of the giants
   if (stump) for (const g of giants.slice(1, 3)) { const a = rnd() * TAU, x = g.x + Math.cos(a) * 3, z = g.z + Math.sin(a) * 3, H = .7 + rnd() * .5; if (edgeClear(x, z, H * .6, H, CL_EDGE.road)) put(stump, 'stump', x, 0, z, H, 0, { noShadow: true }); }
-  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade, noShadow: v.noShadow })), giants };
+  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade, noShadow: v.noShadow, swayK: v.swayK })), giants };
 }
 
 /* ================= MAPS: themes, their 3D surroundings, map light and painted backdrops ================= */
@@ -70941,6 +70950,8 @@ function buildThemeEnv(th) {
     const hs = RD.addTrees(a, t.lod, t.inst, null);
     if (t.fade) for (const h of hs) h.fade = t.fade;   // (a giant's canopy dissolves overhead: edgetrees.js)
     if (t.noShadow) for (const h of hs) h.noShadow = true;
+    // (Sunfall's edge trees: still trunks, gentle leaves: edgetrees.js)
+    if (t.swayK) for (const h of hs) h.swayK = t.swayK;
     if (a.still) for (const h of hs) h.still = true;   // (a rock: no sway)
     E.treeGroups.push({ asset: a, all: t.inst, hs });
     a._texP.then(img => { if (!img) return; if (!a._glTex) a._glTex = RD.texture(img); for (const h of hs) if (h.leaf) h.tex = a._glTex; });
@@ -79161,6 +79172,9 @@ const talArt = {};
 // a talent's painted icon (TALART, indexed by the talent's place in the old full tree, t.art); trees without paintings
 // use faction-specific paintings first, then existing paintings; unknown future entries retain a drawn fallback
 function talIconOf(type, t) {
+  // the Grove's spell talents show their own talent painting (the 9 Nov Grove handoff) ahead of the spell's art
+  const gk = 'grove:' + type + ':' + t.name;
+  if (t.spell && FORCE_NOW === 'grove' && talForce(type) && typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents[gk]) return talArt[gk] = TALENT_PAINT.talents[gk];
   if (t.spell && typeof ABIL !== 'undefined' && ABIL[t.spell]) {   // a spell talent shows its spell's painting (or its glyph)
     const ab = ABIL[t.spell], k = 'spell:' + ab.id;
     if (typeof UI_ART !== 'undefined' && UI_ART[ab.art || ab.id]) return UI_ART[ab.art || ab.id];
@@ -84476,7 +84490,7 @@ if (typeof towerTop === 'function') {
   const L = window.MODELLAB = {
     unit: Q.get('unit') || null, foe: Q.get('foe') || null, tier: 0, anim: 'attack', loop: true, paused: false, speed: 1,
     t: null, c: null, clock: 0, rec: [], marks: [], scrub: null, dark: false, yaw: 0, pitch: 57 * Math.PI / 180, oh: 1.6, free: false,
-    loopAt: 0, ready: false, errs: [], foeAct: 'hold', deadAt: null, shift: -.3,
+    loopAt: 0, ready: false, errs: [], foeAct: 'hold', deadAt: null, shift: -.3, dist: +(Q.get('dist') || 0),
   };
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -84485,6 +84499,12 @@ if (typeof towerTop === 'function') {
 
   /* ---- what can be shown ---- */
   function sculpted() { return typeof UM_UNITS === 'undefined' ? [] : Object.keys(UM_UNITS).filter(u => !UM_UNITS[u].part && UNIT_MDL && (UNIT_MDL[UM_UNITS[u].mdl] || (UM_UNITS[u].fb && UNIT_MDL[UM_UNITS[u].fb.mdl]))); }   // (part: a piece of another, as Varic's sword)
+  function allUnits() {   // every unit the lab can post: the sculpted ones first, then each force's units and Champions (owner, 10 Nov 2026)
+    const out = sculpted(), seen = new Set(out);
+    for (const f of Object.keys(FORCES || {})) { const F = FORCES[f]; if (!F || !F.units) continue; for (const d of Object.values(F.units)) if (d && d.id && !d.wall && !seen.has(d.id)) { seen.add(d.id); out.push(d.id); } }
+    if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) { const d = CHAMPS[h] && CHAMPS[h].unit; if (d && d.id && !seen.has(d.id)) { seen.add(d.id); out.push(d.id); } }
+    return out;
+  }
   function forceOf(u) {   // [force, slot, hero]: the unit's post, and a commander who fields it
     if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h] && CHAMPS[h].unit && CHAMPS[h].unit.id === u && CHAMPS[h].force) { try { applyForce(CHAMPS[h].force, h); } catch (e) {} return [CHAMPS[h].force, 'holy', h]; }   /* (a commander's own Champion: its own force, first) */
     for (const f of Object.keys(FORCES)) {
@@ -84520,7 +84540,7 @@ if (typeof towerTop === 'function') {
     spawnFoe();
     if (typeof SFX !== 'undefined' && SFX.list) { SFX.list.length = 0; SFX.watch.length = 0; }
   }
-  function foeSpot() { const st = L.t && (L.t.st || effStats(L.t)), r = Math.min(2.2, Math.max(.95, (st && st.range || 1.4) * .75)); return [CELL[0] + .5 + r, CELL[1] + .5]; }   // (beside him, so the view sees both side by side)
+  function foeSpot() { const st = L.t && (L.t.st || effStats(L.t)), r = L.dist > 0 ? L.dist : Math.min(2.2, Math.max(.95, (st && st.range || 1.4) * .75)); return [CELL[0] + .5 + r, CELL[1] + .5]; }   // (beside him, so the view sees both side by side)
   function spawnFoe() {
     for (const c of G.creeps) c.dead = true; G.creeps.length = 0; L.c = null; L.deadAt = null;
     const type = CREEPS[L.foe] ? L.foe : ['gnoll', 'wolf', 'troll'].find(k => CREEPS[k]) || Object.keys(CREEPS)[0]; L.foe = type;
@@ -84635,10 +84655,11 @@ if (typeof towerTop === 'function') {
     const anims = [['rest', 'Rest'], ['ready', 'Ready'], ['attack', 'Attack']].concat(kit.map(a => ['ab:' + a.id, a.name]));
     const foeAn = [['stand', 'Foe holds'], ['walk', 'Foe walks'], ['flinch', 'Flinch'], ['death', 'Death']];
     el.innerHTML = `<h2>Model Lab</h2><div class="note">Nothing here is saved. Drag the view to orbit, the wheel to zoom.</div>
-      <h3>Unit</h3><select id="mlU">${sculpted().map(u => `<option value="${u}"${u === L.unit ? ' selected' : ''}>${esc(unitName(u))}</option>`).join('')}</select>
+      <h3>Unit</h3><select id="mlU">${allUnits().map(u => `<option value="${u}"${u === L.unit ? ' selected' : ''}>${esc(unitName(u) + (sculpted().includes(u) ? '' : ' (built)'))}</option>`).join('')}</select>
       <div class="row" style="margin-top:4px">${[0, 1, 2, 3, 4, 5].map(k => `<button data-tier="${k}" class="${k === L.tier ? 'on' : ''}">${['I', 'II', 'III', 'IV', 'V', 'VI'][k]}</button>`).join('')}</div>
       <h3>Animation</h3><div class="row">${anims.map(([id, n]) => b(id, n, L.anim === id)).join('')}</div>
       <h3>Stand-in foe</h3><select id="mlF">${foeList().map(k => `<option value="${k}"${k === L.foe ? ' selected' : ''}>${esc((CREEPS[k].name || k) + (rigged(k) ? ' (rigged)' : ''))}</option>`).join('')}</select>
+      <div class="note" style="margin-top:4px">Distance: <b id="mlDv">${L.dist > 0 ? L.dist.toFixed(1) + ' cells' : 'auto'}</b></div><input type="range" id="mlDist" min="0" max="60" value="${Math.round((L.dist || 0) * 10)}">
       <div class="row" style="margin-top:4px">${foeAn.map(([id, n]) => b(id, n, (id === 'walk' && L.foeAct === 'walk') || (id === 'stand' && L.foeAct === 'hold' && L.anim !== 'death') || L.anim === id)).join('')}</div>
       <h3>Clock</h3><div class="row">${b('pause', L.paused ? 'Play' : 'Pause', L.paused)}${b('step', 'Step 1/30 s')}${b('loop', 'Loop', L.loop, 'Repeat the spell (or death) every 3 s')}
         ${[.25, .5, 1].map(s => `<button data-speed="${s}" class="${L.speed === s ? 'on' : ''}">${s}x</button>`).join('')}</div>
@@ -84651,8 +84672,9 @@ if (typeof towerTop === 'function') {
     bind();
   }
   function bind() {
-    $('#mlU').onchange = e => { location.search = '?lab=1&unit=' + encodeURIComponent(e.target.value) + '&foe=' + encodeURIComponent(L.foe || ''); };
+    $('#mlU').onchange = e => { const q = new URLSearchParams(location.search); q.set('lab', '1'); q.set('unit', e.target.value); q.set('foe', L.foe || ''); if (L.dist > 0) q.set('dist', L.dist); else q.delete('dist'); location.search = '?' + q.toString(); };   /* (keeps the playtest key and the distance) */
     $('#mlF').onchange = e => { L.foe = e.target.value; spawnFoe(); panel(); };
+    $('#mlDist').oninput = e => { L.dist = (+e.target.value) / 10; $('#mlDv').textContent = L.dist > 0 ? L.dist.toFixed(1) + ' cells (reach ' + ((L.t && (L.t.st || effStats(L.t)).range) || 0).toFixed(1) + ')' : 'auto'; spawnFoe(); };   /* 0: auto, beside it */
     for (const x of document.querySelectorAll('#mlab [data-tier]')) x.onclick = () => { L.tier = +x.dataset.tier; L.ready = false; build(); L.ready = true; act(L.anim.startsWith('ab:') ? 'ready' : L.anim); };
     for (const x of document.querySelectorAll('#mlab [data-speed]')) x.onclick = () => { L.speed = +x.dataset.speed; panel(); };
     for (const x of document.querySelectorAll('#mlab [data-a]')) x.onclick = () => {
@@ -84707,7 +84729,7 @@ if (typeof towerTop === 'function') {
     try { if (typeof hideOverlay === 'function') hideOverlay(); } catch (e) {}
     try { if (typeof AudioSys !== 'undefined' && AudioSys.pref) AudioSys.pref.music = false; } catch (e) {}
     if (typeof NEWMODELS !== 'undefined') NEWMODELS = 1;
-    const all = sculpted(); if (!all.includes(L.unit)) L.unit = all.includes('wb_oathbound') ? 'wb_oathbound' : all[0];
+    const all = allUnits(); if (!all.includes(L.unit)) L.unit = all.includes('wb_oathbound') ? 'wb_oathbound' : all[0];
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     const p = document.createElement('div'); p.id = 'mlab'; document.body.appendChild(p);
     frame = function () {};   // the game's own loop stops; the lab drives the clock
