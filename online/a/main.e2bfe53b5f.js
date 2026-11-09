@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cb04243@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4200028@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -77587,17 +77587,28 @@ const fcRoleChip = (r, k, big) => { const R = FC_ROLE[r]; return `<span class="f
 const fcThreatChip = t => `<span class="fc-t" data-fc="threat:${t.k}" tabindex="0" style="--c:${t.c}">${t.n}${t.count > 1 ? ` <b>${t.count}</b>` : ''}</span>`;
 const fcRoleOrder = d => Object.keys(FC_ROLE).filter(r => d.roles[r]);
 const fcHex = c => '#' + c.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0')).join('');
+// a minion's painted portrait (unitart.js), or its role glyph where there is none
+const fcArt = ty => (typeof UNIT_ART !== 'undefined' && UNIT_ART.enemies && UNIT_ART.enemies[ty]) || '';
+// the forecast's minion row: one small icon per foe type, with its count (hover or tap for its card)
+function fcMinionHTML(g) {
+  const d = CREEPS[g.type], R = FC_ROLE[((d && d.roles) || []).find(q => FC_ROLE[q])] || null, c = R ? R.c : '#c9b98a', art = fcArt(g.type);
+  return `<button type="button" class="fc-m${g.boss ? ' boss' : ''}" data-fc="type:${g.type}" style="--c:${c}" aria-label="${fcEsc(g.name)}${g.boss ? '' : ' ×' + g.count}">`
+    + (art ? `<img alt="" src="${art}">` : fcSvg(R ? R.g : FC_ROLE.armoured.g, c)) + (g.boss ? '' : `<b>${g.count}</b>`) + `</button>`;
+}
+// the boss loot: a button that opens the Renown tap menu's loot tab (renown.js), not a strip in the card
+const fcLootBtn = n => typeof rnLootOn === 'function' && rnLootOn() && typeof rnBossType === 'function' && rnBossType(n) ? `<button type="button" class="fc-loot" data-loot="${n}" aria-label="Wave ${n} boss loot">Loot</button>` : '';
 function fcDetailHTML(d) {
   const roleChips = fcRoleOrder(d).map(r => fcRoleChip(r, d.roles[r], true)).join('');
   const thr = d.threats.filter(t => t.k !== 'fly' && t.k !== 'boss').map(fcThreatChip).join('');   // (flying shows among the roles; the boss in the heading)
-  const foes = d.groups.filter(g => !g.lead).map(g => `<span class="fc-f${g.boss ? ' boss' : ''}" data-fc="type:${g.type}" tabindex="0">${d.force && !g.boss ? fcDot(g.type) : ''}${g.swift ? 'Swift ' : ''}${fcEsc(g.name)} <b>×${g.count}</b></span>`).join('');
+  const foes = d.groups.filter(g => !g.lead).map(fcMinionHTML).join('');
   const C = d.chief && CREEPS[d.chief];
   return (d.title ? `<p class="fc-ti">${fcEsc(d.title)}</p>` : '')
     + (d.text ? `<p class="fc-tx">${fcEsc(d.text)}</p>` : '')
     + (C ? `<p class="fc-ld" data-fc="type:${d.chief}" tabindex="0"><small>${C.boss ? 'Boss' : 'Led by'}</small><b>${fcEsc(C.name)}</b>${d.rule ? `<em>${fcEsc(d.rule.name)}</em>` : C.abil ? `<em>${fcEsc(C.abil[0])}</em>` : ''}</p>` : '')
+    + (d.boss ? `<div class="fc-lootrow">${fcLootBtn(d.n)}</div>` : '')
     + (roleChips || thr ? `<div class="fc-chips">${roleChips}${thr}</div>` : '')
     + (!d.force && d.traits.length ? `<div class="fc-chips">${d.traits.filter(t => !/^(Boss|Leader|Armored$|Flying$|Resists magic$)/.test(t)).slice(0, 6).map(t => `<span class="fc-t" style="--c:#cfe6b4">${fcEsc(t)}</span>`).join('')}</div>` : '')
-    + `<div class="fc-foes">${foes}</div>`
+    + `<div class="fc-min">${foes}</div>`
     + (d.ties.length ? `<div class="fc-row"><small>Covers</small><div>${d.ties.map(t => `<p class="fc-tie" data-fc="type:${t.type}" tabindex="0"><i style="background:${fcHex(t.col)}"></i><b>${fcEsc(t.name)}</b> ${fcEsc(t.say)}</p>`).join('')}</div></div>` : '')
     + (d.prep.length ? `<div class="fc-row"><small>Prep</small><div class="fc-chips">${d.prep.map((p, k) => `<span class="fc-p" data-fc="prep:${k}" tabindex="0">${fcEsc(p.label)}</span>`).join('')}</div></div>` : '')
     + (d.ways.length ? `<p class="fc-ways">${d.ways.map(fcEsc).join(' · ')}</p>` : '')
@@ -77614,7 +77625,7 @@ function fcBriefHTML(d, sel) {
 function fcHorizonHTML(h, from) {
   if (!h) return '';
   const k = h.n - from;
-  return `<div class="fc-hz" data-fc="boss:${h.n}" tabindex="0"><small>${k <= 1 ? 'Boss next' : `Boss in ${k} waves`}</small><p><b>Wave ${h.n}: ${fcEsc(h.name)}</b>${h.siege ? ' <span class="fc-t" style="--c:#ffa14a">Siege</span>' : ''}</p>${h.rule ? `<p class="fc-hr"><em>${fcEsc(h.rule)}.</em> ${fcEsc(fcFirst(h.text))}</p>` : ''}</div>`;
+  return `<div class="fc-hz" data-fc="boss:${h.n}" tabindex="0"><small>${k <= 1 ? 'Boss next' : `Boss in ${k} waves`}</small><p><b>Wave ${h.n}: ${fcEsc(h.name)}</b>${h.siege ? ' <span class="fc-t" style="--c:#ffa14a">Siege</span>' : ''}${fcLootBtn(h.n)}</p>${h.rule ? `<p class="fc-hr"><em>${fcEsc(h.rule)}.</em> ${fcEsc(fcFirst(h.text))}</p>` : ''}</div>`;
 }
 // the folded strip: the next wave's make-up at a glance, and how far off the next boss is
 function fcStripHTML(d, h, from, open) {
@@ -77646,6 +77657,7 @@ function forecastTick() {
       e.stopPropagation();
       const pk = e.target.closest('[data-peek]');
       if (pk) { const n = +pk.dataset.peek; fcPeek = fcPeek === n ? 0 : n; fcKey = ''; fcHideCard(); if (typeof sfx === 'function') sfx('click'); return; }
+      if (e.target.closest('[data-loot]')) { fcHideCard(); if (typeof sfx === 'function') sfx('click'); if (typeof rnMenu === 'function') rnMenu('loot'); return; }
       if (e.target.closest('.fc-head')) { fcOpenPref = fcIsOpen() ? '0' : '1'; if (typeof lsSet === 'function') lsSet('runehold.fcopen', fcOpenPref); fcPeek = 0; fcKey = ''; fcHideCard(); if (typeof sfx === 'function') sfx('click'); return; }
       const c = e.target.closest('[data-fc]'); if (c) { if (c === fcCardFor && !(typeof canHover === 'function' && canHover())) fcHideCard(); else fcShowCard(c); } else fcHideCard();
     });
@@ -77688,7 +77700,13 @@ function fcCardHTML(spec) {
     else if (C.abil) rows.push(`<p class="fcc-ab"><b>${fcEsc(C.abil[0])}.</b> ${fcEsc(C.abil[1])}</p>`);
     if (C.eco) rows.push(`<p class="fcc-eco">${fcEsc(C.eco)}</p>`);
     else if (C.trait && !C.abil) rows.push(`<p class="fcc-eco">${fcEsc(C.trait)}</p>`);
-    return `<h4>${fcEsc(C.name)}${g && !g.lead && !g.boss ? ` <small>×${g.count}</small>` : ''}</h4>${C.title ? `<p class="fcc-sub">${fcEsc(C.title)}</p>` : ''}${rows.join('')}`;
+    // its stats in plain numbers (foe values: health and speed against the base troop, armour, magic resistance)
+    const st = [`Health ${Math.round((C.hp || 1) * 100)}%`, `Speed ${Math.round((C.spd || 1) * 100)}%`, C.armor ? `Armour ${C.armor}` : '', C.mres ? `Magic resist ${Math.round(C.mres * 100)}%` : ''].filter(Boolean);
+    rows.splice(force && roles.length ? 1 : 0, 0, `<p class="fcc-stats">${st.map(s => `<span>${fcEsc(s)}</span>`).join('')}</p>`);
+    // counters: the answer to each of its roles, in the player's own words (force runs)
+    if (force) for (const r of roles.filter(r => FC_ROLE[r] && typeof ROLE_WEAK !== 'undefined' && ROLE_WEAK[r]).slice(0, 2)) rows.push(`<p class="fcc-weak"><b>Counter · ${FC_ROLE[r].n}:</b> ${fcEsc(ROLE_WEAK[r])}</p>`);
+    const art = fcArt(id);
+    return `<div class="fcc-hd">${art ? `<img alt="" src="${art}">` : ''}<div><h4>${fcEsc(C.name)}${g && !g.lead && !g.boss ? ` <small>×${g.count}</small>` : ''}</h4>${C.title ? `<p class="fcc-sub">${fcEsc(C.title)}</p>` : ''}</div></div>${rows.join('')}`;
   }
   if (kind === 'role') {
     const R = FC_ROLE[id]; if (!R) return '';
@@ -80394,7 +80412,7 @@ const UM_UNITS = {
   // his hand when drawing"): the arrow rests on top of the bow fist (restUp), the nock between the string fingers
   // (nockShift), the string hand held out from the hood at the jaw (anchorOut, jaw) with the bow lifted to shoulder
   // height and canted (bowAt, bowRaise, cant), so the string runs in front of his chest. Plain eyes (noEyeGlow; owner: "remove faelans glowing eyes"). fb: his old model, if the new one is missing.
-  ch_faelan: { mdl: 'faelan_lb', tip: [.02, .45, .2], sink: 0, k: .94, rig: 'archer', upright: .9, stance: [0, 0], lineUp: 1, trim: 0, idle: 'concept', idleBase: 32, jaw: .1, restUp: .045, restOut: .05, bowAt: .07, bowRaise: .12, anchorOut: .16, nockShift: -.8, bowUp: 1, cant: .3, raiseDir: [.3, 1, .6], noEyeGlow: 1, drawArm: { up: .25, out: .9 }, readyF: 20, readyDown: .65, arrowAt: 10, reach: .45, volleyUp: [.3, .5], moonUp: [1, .06, .1],
+  ch_faelan: { mdl: 'faelan_lb', tip: [.02, .45, .2], sink: 0, k: .94, rig: 'archer', upright: .9, stance: [0, 0], lineUp: 1, trim: 0, idle: 'concept', idleBase: 32, jaw: .1, restUp: .045, restOut: .05, bowAt: .07, bowRaise: .12, anchorOut: .16, nockShift: -.8, bowUp: 1, cant: .3, raiseDir: [.3, 1, .6], noEyeGlow: 1, drawArm: { up: .25, out: .9 }, readyF: 20, readyDown: .65, arrowAt: 10, reach: .45, quiverSlide: .28, volleyUp: [.3, .5], moonUp: [1, .06, .1],
     ci: { clav: .93, grip: [.095, .536, .142], hand: [.015, .606, .166] },
     spells: { ch_thornvolley: { move: 'volley', T: 1.3 }, ch_pinarrow: { draw: .55, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { move: 'moon', T: 2.75 } },
     fb: { mdl: 'faelan', tip: [.02, .45, .2], sink: .5, k: .94, rig: 'archer', upright: .9, stance: [.11, .1], lineUp: 1, trim: .12, idle: 'concept', jaw: .065, restUp: .01, restOut: .05, bowAt: .02, bowUp: 1, cant: .1, spells: { ch_thornvolley: {}, ch_pinarrow: { draw: .55, deep: 1, pitch: .12, kick: 1, glow: 1.4 }, ch_huntermoon: { raise: 1, f: 4, glow: 1.8 } } } },
@@ -80680,14 +80698,17 @@ function umDrawArm(R, o, k, C) {
 // frame): the string hand alone, by IK, up over his head and back behind his left shoulder to the quiver's arrows (where
 // they are on this model), an arrow drawn up out of it along the quiver, brought round in front and nocked, back into
 // the ready hold; the shoulder bone swings first as this rig needs (owner: "whichever hand isn't holding the bow")
-const umQuiver = (R, o, S_) => { const Q = S_.quiver || { top: [.15, .98, -.125], ax: [-.35, -1, .05] }, c = R.bix.Spine2 * 12;
+const umQuiver = (R, o, S_) => { const Q = S_.quiver || { top: [.13, .89, -.094], ax: [-.485, -.875, 0] }, c = R.bix.Spine2 * 12;   // (top: the quiver's rim, its middle; ax: down the quiver, measured on the model's back)
   return { top: umXf(o, R.bix.Spine2, Q.top), ax: UMX.nrm([o[c] * Q.ax[0] + o[c + 4] * Q.ax[1] + o[c + 8] * Q.ax[2], o[c + 1] * Q.ax[0] + o[c + 5] * Q.ax[1] + o[c + 9] * Q.ax[2], o[c + 2] * Q.ax[0] + o[c + 6] * Q.ax[1] + o[c + 10] * Q.ax[2]]) }; };
 function umReach(R, o, u, S_) {
   const { B, bix, mk } = R, H = bix.RightHand; if (bix.RightShoulder == null) return;
   const fb = n => bix[n] != null ? bix[n] : H, fing = () => UMX.lerp(umXf(o, fb('RightHandIndex1'), mk.RightHandIndex2), umXf(o, fb('RightHandMiddle1'), mk.RightHandMiddle2), .5);
   const Q = umQuiver(R, o, S_), hd = umXf(o, bix.Head, B[bix.Head].h), F0 = fing();   // (F0: the ready hold's nock, where it ends)
-  const grab = UMX.add(Q.top, UMX.sc(Q.ax, -.03)), over = UMX.add(hd, [.04, .2, -.08]), out = UMX.add(grab, UMX.sc(Q.ax, -(S_.drawOut || .3)));
-  const K = [[0, F0, 0], [.2, over, 1], [.42, grab, 1], [.62, out, 1], [.84, F0, 1], [1, F0, 0]];
+  // (the arrow sits in the quiver with only its fletching above the rim (seat); he lifts it straight up the quiver's line
+  // by its whole length past that, so its point clears the rim, before it swings round: owner: "make sure the arrow lifts
+  // out of the quiver and clears it before moving down")
+  const AL = (mk.arrowLen || .43), seat = S_.quiverSeat || .13, grab = UMX.add(Q.top, UMX.sc(Q.ax, -seat)), over = UMX.add(hd, [.04, .25, -.1]), out = UMX.add(grab, UMX.sc(Q.ax, -(AL - seat + .05)));
+  const K = [[0, F0, 0], [.2, over, 1], [.4, grab, 1], [.66, out, 1], [.86, F0, 1], [1, F0, 0]];
   let i = 1; while (i < K.length - 1 && u > K[i][0]) i++;
   const [a0, p0, w0] = K[i - 1], [a1, p1, w1] = K[i], t = umSm(a0, a1, u), T = UMX.lerp(p0, p1, t), w = w0 + (w1 - w0) * t;
   if (w < .001) return;
@@ -80851,7 +80872,10 @@ function umMixPose(R, P) {
   if (P.reach != null && P.reach < .86 && bix.Spine2 != null) {   // (drawn from the quiver: the shaft along the quiver, down into it, sliding out as the hand rises; turned round to the bow as he nocks it)
     // (out of the quiver it swings tip-up over his shoulder, clear of his back and hood, then round to the bow)
     const Q = umQuiver(R, o, R.S || {}), c = bix.Spine2 * 12, ub = [.3, 1, -.35], up = UMX.nrm([o[c] * ub[0] + o[c + 4] * ub[1] + o[c + 8] * ub[2], o[c + 1] * ub[0] + o[c + 5] * ub[1] + o[c + 9] * ub[2], o[c + 2] * ub[0] + o[c + 6] * ub[1] + o[c + 10] * ub[2]]);
-    const k1 = umSm(.6, .7, P.reach), k2 = umSm(.72, .85, P.reach); adir = UMX.lerp(UMX.nrm(UMX.lerp(Q.ax, up, k1)), UMX.nrm(adir), k2); alen = 1 + (alen - 1) * k2;
+    const k1 = umSm(.68, .76, P.reach), k2 = umSm(.76, .87, P.reach); adir = UMX.lerp(UMX.nrm(UMX.lerp(Q.ax, up, k1)), UMX.nrm(adir), k2); alen = 1 + (alen - 1) * k2;
+    // (his arm reaches only so far over his head: the last of the lift is the shaft drawn on up through his closed hand
+    // (S.quiverSlide), so the point clears the rim before the swing; it slides back to the nock as he brings it round)
+    const sl = (R.S.quiverSlide || 0) * umSm(.48, .66, P.reach) * (1 - k2); if (sl > 1e-4) apos = UMX.sub(apos, UMX.sc(Q.ax, sl));
   } else if (P.armF != null && R.S && R.S.reach && P.armF < 16.5 && bix.Spine2 != null) {   // (just drawn from the quiver: the shaft hangs from the fingers down his back, along the quiver, turning round to the bow as he nocks it)
     const c = bix.Spine2 * 12, qb = (R.S.quiverDir || [-.15, -1, -.9]), qd = UMX.nrm([o[c] * qb[0] + o[c + 4] * qb[1] + o[c + 8] * qb[2], o[c + 1] * qb[0] + o[c + 5] * qb[1] + o[c + 9] * qb[2], o[c + 2] * qb[0] + o[c + 6] * qb[1] + o[c + 10] * qb[2]]);
     const kq = umSm(12.5, 16.5, P.armF); adir = UMX.lerp(qd, UMX.nrm(adir), kq); alen = 1 + (alen - 1) * kq;
@@ -80961,7 +80985,7 @@ function umMixArcher(t, live, S) {
   const rk = S && S.readyDown && !cast && !(rs && rs.raise) && !rel ? umSm(10, rF, F) * (1 - umSm(0, .45, w)) : 0, tilt = rk * ((S && S.readyDown) || 0), lower = rk * ((S && S.readyLow) || 0);
   const AF = armF != null ? armF : F;   // (the string hand's own frame: the nock and the new arrow follow it)
   return { f: F, armF, reach, rec, fadeFrom: 31, fadeW, pitch, deep, raise, kick, tilt, lower, idleW: S && S.idleF != null ? 0 : t._umI, br: Math.sin(lv * 1.5 + ph) * (engaged ? .4 : 1),
-    nockW: rel || quiet ? 0 : reach != null ? umSm(.8, .88, reach) : umSm(16, 17.5, AF), arrowW: rel || quiet ? 0 : reach != null ? umSm(.4, .44, reach) : umSm((S && S.arrowAt) || 11, ((S && S.arrowAt) || 11) + 1.5, AF),   // (S.arrowAt: the frame the new arrow shows in the string hand: Faelan's later, once his hand is down past his hood)
+    nockW: rel || quiet ? 0 : reach != null ? umSm(.82, .9, reach) : umSm(16, 17.5, AF), arrowW: rel || quiet ? 0 : reach != null ? umSm(.37, .4, reach) : umSm((S && S.arrowAt) || 11, ((S && S.arrowAt) || 11) + 1.5, AF),   // (S.arrowAt: the frame the new arrow shows in the string hand: Faelan's later, once his hand is down past his hood)
     shiver: since < .35 ? Math.sin(since * 70) * (1 - since / .35) : 0, glow: Math.max(glow, sc < .4 ? 1 - sc / .4 : 0) };
 }
 const _umA = new Float32Array(16), _umB = new Float32Array(16), _umC = new Float32Array(16);
@@ -85514,16 +85538,14 @@ function rnIconsHTML(t, attr, n) {
     return r;
   });
   // the forecast: the boss line says what a clean kill pays and shows the boss's loot
+  // (the loot itself is no longer in the forecast: its Loot button opens the loot tab, rnMenu('loot'), forecast.js fcLootBtn)
   W('fcHorizonHTML', f => function (h, from) {
     const s = f.apply(this, arguments); if (!s || !h || !rnLootOn()) return s;
-    const t = rnBossType(h.n); if (!t) return s;
-    const R = rnS(), k = h.n - from, add = `<div class="rn-fc">${R.pledge[h.n] ? '<p><em class="rn-pl">Pledged</em></p>' : ''}<small>Loot</small>${rnIconsHTML(t, 'fc')}</div>`;
-    return (rnOn() ? s.replace(/(Boss next|Boss in \d+ waves)<\/small>/, `$1 · <b class="rn-ck">clean kill +${RN.boss[0][1]}</b></small>`) : s).replace(/<\/div>\s*$/, add + '</div>');
+    return rnOn() ? s.replace(/(Boss next|Boss in \d+ waves)<\/small>/, `$1 · <b class="rn-ck">clean kill +${RN.boss[0][1]}</b></small>`) : s;
   });
   W('fcDetailHTML', f => function (d) {
-    const s = f.apply(this, arguments); if (!rnLootOn() || !d || !d.n) return s;
-    const t = rnBossType(d.n); if (!t) return s;
-    return s + `<div class="rn-fc">${rnOn() ? `<p>Renown: <b>clean kill +${RN.boss[0][1]}</b>, before halfway +${RN.boss[1][1]}${rnS().pledge[d.n] ? ' · <em class="rn-pl">Pledged</em>' : ''}</p>` : ''}<small>Loot: it offers ${RN_LOOT.offer} of these; take one</small>${rnIconsHTML(t, 'fc')}</div>`;
+    const s = f.apply(this, arguments); if (!rnOn() || !d || !d.n || !rnBossType(d.n)) return s;
+    return s + `<div class="rn-fc"><p>Renown: <b>clean kill +${RN.boss[0][1]}</b>, before halfway +${RN.boss[1][1]}${rnS().pledge[d.n] ? ' · <em class="rn-pl">Pledged</em>' : ''}</p></div>`;
   });
   W('fcStripHTML', f => function (d, h) { const s = f.apply(this, arguments); if (!rnOn() || !h || !rnBossType(h.n)) return s; return s.replace(`>Boss W${h.n}</span>`, `>Boss W${h.n} · +${RN.boss[0][1]}</span>`); });
   W('fcCardHTML', f => function (spec) {   // (a loot-table icon's card)
