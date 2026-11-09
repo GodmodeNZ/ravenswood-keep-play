@@ -1,4 +1,4 @@
-const BUILD_TAG = '5faf2f0@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b354ad1@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -56103,14 +56103,27 @@ vec3 moodOf(vec3 n, float lit, float k){
   t = mix(t, mix(vec3(1.), uMoodKey.rgb, uMoodKey.a), clamp(lit, 0., 1.)*.75);
   return mix(vec3(1.), t, k);
 }
+/* The Light Lab's live controls (lightlab.js; litUniforms sets them every draw, so their defaults are the look as it was):
+   uShK the shadows (floor, softness in texels, bias, 12 taps when w > .5), uTMo the tone curve (0 ACES, 1 filmic),
+   uBack a back light's colour x strength (a rim from uBackD), uGlint the units' glint (sheen x, roughness x, a sharp sun
+   glint, a fresnel sky edge). */
+uniform vec4 uShK, uBack, uGlint; uniform vec3 uBackD; uniform float uTMo;
 float shadowAt(vec4 L){
   vec3 p = L.xyz/L.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.||p.z>1.) return 1.;
-  float b = .0016; float s=0.; float t=uTexel*1.2;
+  float b = uShK.z; float s=0.; float t=uTexel*uShK.y;
+  if(uShK.w > .5){   // twelve taps on a disc, turned per pixel: a wider, smoother penumbra
+    float a0 = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))))*6.2832;
+    for(int i=0;i<12;i++){ float fi = float(i), r = sqrt((fi + .5)/12.), a = a0 + fi*2.39996;
+      s += texture(uShadow, vec3(p.xy + vec2(cos(a), sin(a))*r*t*1.6, p.z-b)); }
+    return mix(uShK.x, 1., s/12.);
+  }
   s += texture(uShadow, vec3(p.xy+vec2(-t,-t), p.z-b)); s += texture(uShadow, vec3(p.xy+vec2(t,-t), p.z-b));
   s += texture(uShadow, vec3(p.xy+vec2(-t,t), p.z-b)); s += texture(uShadow, vec3(p.xy+vec2(t,t), p.z-b));
-  return mix(.3, 1., s*.25);   // shadows never fall below 30% of the light: softer, lighter shadows everywhere (owner, 8 Nov 2026)
+  return mix(uShK.x, 1., s*.25);   // shadows never fall below 30% of the light (uShK.x .3): softer, lighter shadows everywhere (owner, 8 Nov 2026)
 }
 vec3 aces(vec3 x){ return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.); }
+vec3 hable(vec3 x){ return ((x*(.15*x+.05)+.004)/(x*(.15*x+.5)+.06)) - .0667; }
+vec3 filmic(vec3 x){ return clamp(hable(x*2.)/hable(vec3(11.2)).x, 0., 1.); }
 vec3 lightAt(vec3 n, vec3 W, float sh, float trans){
   float ndl = dot(n, uSunDir);
   float diff = smoothstep(-.12, .55, ndl) * mix(.1, 1., sh);
@@ -56129,7 +56142,7 @@ vec3 lightAt(vec3 n, vec3 W, float sh, float trans){
 vec3 finish(vec3 col, vec3 W){
   float fd = distance(W, uCam); float fog = smoothstep(uFog.x, uFog.y, fd);
   col = mix(col, uFogCol, fog);
-  col = aces(col*.9*uExpo);
+  col = uTMo > .5 ? filmic(col*uExpo) : aces(col*.9*uExpo);
   col = pow(col, vec3(1./2.2));
   float lum = dot(col, vec3(.299,.587,.114));
   col = mix(col*vec3(.86,.93,1.12), col*vec3(1.06,1.0,.9), smoothstep(.15,.75,lum));
@@ -56376,6 +56389,7 @@ void main(){
        camera's upper left that models its front whatever the map's sun does (on a map lit from behind, the sun is its
        back light), the ground's occlusion round its feet and in its texture's crevices, a little more light toward its
        head and shoulders, a bright rim on its upper edges that lifts it off the ground, and a soft dark contour. */
+    if(uGlint.y != 1.) rough = clamp(rough*uGlint.y, .04, 1.);   // (the Light Lab's roughness)
     float ndv = max(dot(n, V), 0.), met = clamp(mtl, 0., 1.);
     float ao = mix(.5, 1., smoothstep(.0, .5, vW.y)) * mix(.75, 1., smoothstep(.55, 1.2, hgt)) * (.9 + .16*smoothstep(.3, 1.3, vW.y));
     vec3 tn = base/max(max(base.r, max(base.g, base.b)), .02);
@@ -56395,14 +56409,17 @@ void main(){
     // and bright at the head and shoulders, on the diffuse light only (metal's glint and the glows keep theirs), and a
     // deeper contact shadow where they stand
     own = vX.y < -1.5 ? uOwn : 0.;
-    col = base*(light + kc*kd)*ao*(1. - met*.6) + spec + env*Fv*(1. - rough)*ao*(.3 + .45*met);
+    col = base*(light + kc*kd)*ao*(1. - met*.6) + spec*uGlint.x + env*Fv*(1. - rough)*ao*(.3 + .45*met);
+    if(uGlint.z > 0.) col += uSunCol*pow(max(dot(n, normalize(uSunDir + V)), 0.), 90.)*uGlint.z*sh*(.25 + .75*met)*(1. - rough*.6);   // a sharp sun glint
+    if(uGlint.w > 0.) col += env*pow(1. - ndv, 4.)*uGlint.w*.6*ao;   // the sky caught at grazing edges
     float rimE = pow(1. - ndv, 2.4)*smoothstep(-.35, .8, n.y);
     col += rimE*(uSunCol*.28 + uSky*.7)*(base*1.6 + .045)*(.55 + uRim*2.2)*mix(.55, 1., sh);
     col *= 1. - .38*smoothstep(.8, .98, 1. - ndv)*smoothstep(.5, -.4, n.y);
     float cl = dot(col, vec3(.3, .59, .11)); col = max(mix(vec3(cl), col, 1.14 + .06*own), 0.);   // a little more colour: units read as painted, the ground as ground
-  } else if(metal > .5){ vec3 R = reflect(-V, n); col += uSunCol*pow(max(dot(R, uSunDir), 0.), 18.)*.55*sh + uSky*.12*max(n.y, 0.); }
+  } else if(metal > .5){ vec3 R = reflect(-V, n); col += (uSunCol*pow(max(dot(R, uSunDir), 0.), 18./max(uGlint.y, .2))*.55*sh + uSky*.12*max(n.y, 0.))*uGlint.x; }
   else if(mtl > 0.){ vec3 R = reflect(-V, n); vec3 tn = mix(vec3(1.), base/max(max(base.r, max(base.g, base.b)), .02), .65);
-    col += tn*mtl*(uSunCol*(pow(max(dot(R, uSunDir), 0.), 22.)*.75 + pow(max(dot(R, uSunDir), 0.), 4.)*.08)*mix(.2, 1., sh) + uSky*.1*max(R.y, 0.)); }
+    col += tn*mtl*(uSunCol*(pow(max(dot(R, uSunDir), 0.), 22./max(uGlint.y, .2))*.75 + pow(max(dot(R, uSunDir), 0.), 4.)*.08)*mix(.2, 1., sh) + uSky*.1*max(R.y, 0.))*uGlint.x; }
+  if(uBack.a > 0. && vX.y < .5){ float bf = pow(1. - max(dot(n, V), 0.), 2.2)*max(dot(n, uBackD) + .25, 0.); col += uBack.rgb*bf*(base*1.5 + .04)*mix(.6, 1., sh); }   // the back light's rim
   col *= moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, vX.y < .5 ? 1. : uMoodE);   // the map's mood (models whole, the ground its share)
   col = mix(col, base*2.6, vEm);
   col = col*vTint.rgb + vTint.a * vTint.rgb / max(1., max(vTint.r, max(vTint.g, vTint.b)));   // emission takes the tint's hue (white for a plain hit flash)
@@ -56502,11 +56519,16 @@ void main(){
   float grad = mix(.62, 1.18, smoothstep(.02, .85, h));
   vec3 col = base*light*grad;
   // a broad soft sheen (the leather and leaves), never a sharp glint
-  vec3 Hh = normalize(Lk + V); col += base*pow(max(dot(n, Hh), 0.), 10.)*.35*key;
+  vec3 Hh = normalize(Lk + V); col += base*pow(max(dot(n, Hh), 0.), 10./max(uGlint.y*uGlint.y, .05))*.35*key*uGlint.x;
   // the rim: its upper edges catch a cool sky light and warm sun, which lifts it off the grass
   float ndv = max(dot(n, V), 0.), fr = 1. - ndv;
   float rim = pow(fr, 2.6)*smoothstep(-.3, .7, n.y);
   col += rim*(uSky*.9 + uSunCol*.35)*(base*1.4 + .06)*(1.1 + uRim*2.5)*mix(.65, 1., sh);
+  // the Light Lab's extras (all off by default): a sharp sun glint on the texture's bright, polished parts, the sky at its
+  // grazing edges, a back light's rim
+  if(uGlint.z > 0.){ vec3 Hs = normalize(uSunDir + V); col += uSunCol*pow(max(dot(n, Hs), 0.), 70./max(uGlint.y, .2))*uGlint.z*sh*smoothstep(.15, .6, tl)*1.5; }
+  if(uGlint.w > 0.) col += pow(fr, 4.)*mix(uGnd, uSky*1.4, smoothstep(-.3, .7, reflect(-V, n).y))*uGlint.w*.5;
+  if(uBack.a > 0.) col += uBack.rgb*pow(fr, 2.2)*max(dot(n, uBackD) + .25, 0.)*(base*1.5 + .04)*mix(.6, 1., sh);
   // and a soft dark contour on the edges turned down and away, so the silhouette holds against a light ground
   col *= 1. - .32*smoothstep(.62, .95, fr)*smoothstep(.45, -.5, n.y);
   col *= mix(.72, 1., smoothstep(0., .12, h));   // contact: the boots sink into their shadow
@@ -57283,6 +57305,10 @@ function createRenderer(canvas, opt = {}) {
       if (u.uMT) { let mt = null; try { mt = matTexture(); } catch (e) {} gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D_ARRAY, mt || blankA); gl.uniform1i(u.uMT, 6); gl.uniform1f(u.uMTOn, mt ? 1 : 0); if (mt) gl.uniform4fv(u.uMTR, matRef); }
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
       if (u.uUQ) gl.uniform1f(u.uUQ, this.uq == null ? 2 : this.uq); if (u.uCamR) gl.uniform3fv(u.uCamR, this.right); gl.uniform1f(u.uRim, this.rim == null ? .12 : this.rim); gl.uniform1f(u.uExpo, this.expo == null ? 1 : this.expo); gl.uniform1f(u.uFill, this.fill || 0); if (u.uOwn) gl.uniform1f(u.uOwn, this.own == null ? 1 : this.own); if (u.uOwnK) { const k = this.ownK || OWN_K; gl.uniform4f(u.uOwnK, k[0], k[1], k[2], k[3]); }
+      if (u.uShK) gl.uniform4fv(u.uShK, this.shK || SHK_DEF);   // (the Light Lab's controls: their defaults are the look as it was)
+      if (u.uTMo) gl.uniform1f(u.uTMo, this.tmo || 0);
+      if (u.uGlint) gl.uniform4fv(u.uGlint, this.glintK || GLINTK_DEF);
+      if (u.uBack) { const b = this.back; gl.uniform4f(u.uBack, b ? b[0] : 0, b ? b[1] : 0, b ? b[2] : 0, b ? 1 : 0); if (u.uBackD) gl.uniform3fv(u.uBackD, b && b.dir ? b.dir : [0, .5, -1]); }
       if (u.uMood) { const m = this.mood || MOOD_NONE; gl.uniform4fv(u.uMood, m.top); gl.uniform4fv(u.uBounce, m.bounce); gl.uniform4fv(u.uMoodKey, m.key); gl.uniform1f(u.uMoodE, m.env); if (u.uGrade) gl.uniform4fv(u.uGrade, m.grade || MOOD_NONE.grade); }
       if (u.uBg) {
         const bg = this.bg && this.bg.tex && this.bg.dissolve ? this.bg : null;
@@ -57311,8 +57337,11 @@ function createRenderer(canvas, opt = {}) {
     },
     render(list, passes) {
       gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+      const PT = this.look && this.postAttach ? this.postAttach() : null, TM = this.timing ? this.timer() : null;   // the post (the Light Lab's look: postGL); its GPU timer
+      if (TM) TM.poll();
       // shadow pass
       frameBatch(list); this._fbl = list;   // (every item packed once: the shadow, opaque and sculpted passes draw runs of it)
+      if (TM) TM.begin('shadows');
       if (this.shadowOn) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, shFB); gl.viewport(0, 0, SM, SM); gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.useProgram(S.p); gl.uniformMatrix4fv(S.u.uLVP, false, this.lvp); gl.uniform1f(S.u.uTime, this.time);
@@ -57338,8 +57367,10 @@ function createRenderer(canvas, opt = {}) {
           }
         }
         this.drawTrees(true);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.outFB || null);
       }
+      if (TM) TM.begin('scene');
+      this.outFB = PT ? PT.begin() : null;   // (with the post: the scene goes to its own target, the post draws it to the canvas)
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(this.clear[0], this.clear[1], this.clear[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       if (this.bg && this.bg.tex) this.screen(this.bg.tex, false);
@@ -57369,8 +57400,15 @@ function createRenderer(canvas, opt = {}) {
       if (passes.add) this.quads(passes.add, 'add', true);
       if (this.vfx) this.vfx.draw(0);   // the spells' textured sprites and ribbons (vfx.js)
       if (this.fg && this.fg.tex) this.screen(this.fg.tex, true);
-      if (passes.over) this.quads(passes.over, 'alpha', false);
-      if (this.vfx) { this.vfx.draw(1); this.vfx.bloom(); }   // (then their glow)
+      if (this.outFB) {   // the post: the spells' top layer and glow first, then the look over the frame, then the bars and marks drawn crisp over it
+        if (this.vfx) { this.vfx.draw(1); this.vfx.bloom(); }
+        PT.end(TM); this.outFB = null;
+        if (passes.over) this.quads(passes.over, 'alpha', false);
+      } else {
+        if (passes.over) this.quads(passes.over, 'alpha', false);
+        if (this.vfx) { this.vfx.draw(1); this.vfx.bloom(); }   // (then their glow)
+      }
+      if (TM) TM.end();
       gl.bindVertexArray(null);
     },
     // the sculpted models (mesh.tex: their colour texture, an image), with the stylised light (VS_STY/FS_STY); sty: 1
@@ -57425,9 +57463,13 @@ function createRenderer(canvas, opt = {}) {
     },
   };
   R.vfxAttach = () => R.vfx || (R.vfx = vfxGL(gl, R, prog, canvas));   // (made on first use: the icon renderer never pays for it)
+  // the post (postGL) and the GPU timer: made on first use, only when a look is set (the Light Lab, or Use in game)
+  R.postAttach = () => R.post || R.postFail ? R.post : (() => { try { R.post = postGL(gl, R, prog, canvas); } catch (e) { R.postFail = String(e && e.message || e); console.warn('Post failed:', R.postFail); } return R.post; })();
+  R.timer = () => R._tm !== undefined ? R._tm : (R._tm = gpuTimer(gl));
   return R;
 }
 const ONE_TINT = new Float32Array([1, 1, 1, 0]);
+const SHK_DEF = new Float32Array([.3, 1.2, .0016, 0]), GLINTK_DEF = new Float32Array([1, 1, 0, 0]);   // (the shadows and the units' glint as they always were: LIGHT_GLSL uShK, uGlint)
 const _litPL = new Float32Array(24), _litPC = new Float32Array(18), _glScG = [];
 // the trees' wind as it always was (drawTrees: uSwayK)
 const SWAY_K1 = new Float32Array([1, 1, 1]);
@@ -57684,7 +57726,7 @@ function vfxGL(gl, R, prog, canvas) {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.bindFramebuffer(gl.FRAMEBUFFER, q.f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, q.t, 0);
     });
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, R.outFB || null);
   }
   // the copies of the frame: its depth (soft edges) and its colour (distortion), blitted from the canvas. The canvas's own
   // formats are the browser's: each format is tried until one blits clean, and if none does that copy is left off
@@ -57703,16 +57745,18 @@ function vfxGL(gl, R, prog, canvas) {
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, c.f);
     if (isDep) { gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0); gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, null, 0); gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, DEP_F[c.fi][3], gl.TEXTURE_2D, c.t, 0); }
     else gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, c.t, 0);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, R.outFB || null);
   }
   function capture(c, isDep) {
+    const src = R.outFB || null;   // (the frame: the canvas, or the post's scene target when the Light Lab's post runs: each its own formats)
+    if (c.src !== src) { c.src = src; c.fi = 0; c.ok = null; c.w = 0; }
     if (c.ok === false) return false;
     for (;;) {
       capMake(c, isDep);
       if (c.ok === null) while (gl.getError()) {}
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, c.f);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, src); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, c.f);
       gl.blitFramebuffer(0, 0, c.w, c.h, 0, 0, c.w, c.h, isDep ? gl.DEPTH_BUFFER_BIT : gl.COLOR_BUFFER_BIT, gl.NEAREST);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, src);
       if (c.ok) return true;
       if (!gl.getError()) { c.ok = true; return true; }
       c.fi++; if (c.fi >= (isDep ? DEP_F : COL_F).length) { c.ok = false; if (c.t) gl.deleteTexture(c.t); c.t = null; return false; }
@@ -57834,7 +57878,7 @@ function vfxGL(gl, R, prog, canvas) {
         gl.disable(gl.BLEND); gl.bindVertexArray(scVao);
         X.blit(T[0], T[1], 1, 0); X.blit(T[1], T[0], 0, 1);     // a quarter: blurred across, then down
         X.blit(T[0], T[2], 2, 0); X.blit(T[2], T[3], 0, 1.5);   // an eighth, wider
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, R.outFB || null); gl.viewport(0, 0, canvas.width, canvas.height);
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
         gl.useProgram(CO.p); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T[0].t); gl.uniform1i(CO.u.uA, 0);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T[3].t); gl.uniform1i(CO.u.uB, 1); gl.uniform2f(CO.u.uK, X.bloomK[0] * X.fid.bloomK, X.bloomK[1] * X.fid.bloomK);
@@ -57847,6 +57891,221 @@ function vfxGL(gl, R, prog, canvas) {
     },
   };
   return X;
+}
+
+/* ---- The post (the Light Lab, lightlab.js): the frame drawn to its own target, then a look laid over it ----
+   R.look (a compiled look, lightlab.js llCompile) turns it on; null (the game as it always was) never makes any of it.
+   The scene goes to a multisampled target (the canvas's antialiasing kept), resolved to a colour and a depth texture; then:
+   - SSAO (half size): the depth read back to world positions (the camera's inverse), 12 samples in the hemisphere round
+     each pixel's normal (from the depth's neighbours), a range check, then a two-pass blur that keeps depth edges. On a
+     painted map the painting already holds its own occlusion, so flat ground near y 0 takes only its share (look.ao[5]).
+   - Bloom: the bright parts at a quarter, blurred there, at an eighth and a sixteenth, added back (radius weights them).
+   - Light shafts: the bright parts smeared toward the sun's direction on screen, at a quarter (a screen-space stand-in).
+   - Composite: sharpen, the occlusion, height fog (from depth), bloom and shafts in linear light, exposure, white balance and
+     a soft shoulder, then contrast, saturation, lift / gamma / gain, split toning, vignette and a dither, to the canvas.
+   The tone curve itself stays in the scene's shaders (LIGHT_GLSL finish: uTMo), so the painted ground and the models keep
+   their one curve. */
+const FS_PP_AO = `#version 300 es
+precision highp float; in vec2 vUV; uniform highp sampler2D uDep; uniform mat4 uInv, uVP; uniform vec3 uCam, uFwd; uniform vec4 uAO; uniform vec2 uPx; out vec4 o;
+vec3 wp(vec2 uv, float d){ vec4 p = uInv*vec4(uv*2.-1., d*2.-1., 1.); return p.xyz/p.w; }
+float dep(vec2 uv){ return texture(uDep, uv).r; }
+void main(){
+  float d = dep(vUV); if(d >= .99999){ o = vec4(1.); return; }
+  vec3 P = wp(vUV, d);
+  vec2 ex = vec2(uPx.x, 0.), ey = vec2(0., uPx.y);
+  vec3 r = wp(vUV + ex, dep(vUV + ex)) - P, l = P - wp(vUV - ex, dep(vUV - ex));
+  vec3 t = wp(vUV + ey, dep(vUV + ey)) - P, b = P - wp(vUV - ey, dep(vUV - ey));
+  vec3 dx = dot(r, r) < dot(l, l) ? r : l, dy = dot(t, t) < dot(b, b) ? t : b;
+  vec3 N = normalize(cross(dx, dy)); if(dot(N, uFwd) > 0.) N = -N;
+  vec3 T1 = normalize(abs(N.y) < .9 ? cross(N, vec3(0., 1., 0.)) : cross(N, vec3(1., 0., 0.))), T2 = cross(N, T1);
+  float a0 = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))))*6.2832, occ = 0.;
+  for(int i = 0; i < 12; i++){
+    float fi = (float(i) + .5)/12., a = a0 + float(i)*2.39996, z = 1. - fi*.85, rr = sqrt(1. - z*z);
+    vec3 S = P + (T1*cos(a)*rr + T2*sin(a)*rr + N*z)*uAO.x*mix(.15, 1., fi*fi) + N*.015;
+    vec4 c = uVP*vec4(S, 1.); vec2 su = c.xy/c.w*.5 + .5;
+    if(su.x < 0. || su.y < 0. || su.x > 1. || su.y > 1.) continue;
+    float sd = dep(su); if(sd >= .99999) continue;
+    vec3 Q = wp(su, sd);
+    float range = min(1., uAO.x/max(length(Q - P), 1e-3)*.9);
+    occ += step(dot(Q - uCam, uFwd), dot(S - uCam, uFwd) - uAO.z)*range*range;
+  }
+  float gnd = smoothstep(.8, .97, N.y)*(1. - smoothstep(.03, .2, P.y));
+  o = vec4(1. - occ/12., mix(1., uAO.w, gnd), 0., 1.);   // r: the light left, g: how much of the occlusion lands here
+}`;
+const FS_PP_AOBLUR = `#version 300 es
+precision highp float; in vec2 vUV; uniform sampler2D uT; uniform highp sampler2D uDep; uniform vec2 uD; out vec4 o;
+void main(){
+  float d0 = texture(uDep, vUV).r; vec4 s = vec4(0.); float ws = 0.;
+  for(int i = -3; i <= 3; i++){ vec2 uv = vUV + uD*float(i); float w = exp(-float(i*i)*.18)*exp(-abs(texture(uDep, uv).r - d0)*800.); s += texture(uT, uv)*w; ws += w; }
+  o = s/ws;
+}`;
+const FS_PP_BRIGHT = `#version 300 es
+precision mediump float; in vec2 vUV; uniform sampler2D uT; uniform vec2 uPx, uK; out vec4 o;
+void main(){
+  vec3 c = (texture(uT, vUV + uPx*vec2(-1., -1.)).rgb + texture(uT, vUV + uPx*vec2(1., -1.)).rgb + texture(uT, vUV + uPx*vec2(-1., 1.)).rgb + texture(uT, vUV + uPx).rgb)*.25;
+  float l = max(c.r, max(c.g, c.b));
+  o = vec4(c*c*smoothstep(uK.x, uK.x + uK.y, l), 1.);   // (linear-ish: squared)
+}`;
+const FS_PP_RAYS = `#version 300 es
+precision mediump float; in vec2 vUV; uniform sampler2D uT; uniform vec2 uDir; uniform float uThr; out vec4 o;
+void main(){
+  vec3 s = vec3(0.); float w = 1., ws = 0.; vec2 uv = vUV;
+  for(int i = 0; i < 24; i++){ vec3 c = texture(uT, uv).rgb; float l = dot(c, vec3(.3, .59, .11)); s += c*c*smoothstep(uThr, uThr + .2, l)*w; ws += w; w *= .93; uv += uDir; }
+  o = vec4(s/ws, 1.);
+}`;
+const FS_PP_COMP = `#version 300 es
+precision highp float; in vec2 vUV;
+uniform sampler2D uScene, uAOT, uB1, uB2, uB3, uRays; uniform highp sampler2D uDep;
+uniform mat4 uInv; uniform vec2 uPx; uniform float uTime;
+uniform vec4 uOn0, uOn1;          // (ao, bloom, shafts, height fog), (tone, grade, vignette, sharpen)
+uniform vec2 uAOk;                // occlusion: strength, power
+uniform vec4 uBl;                 // bloom: strength, then the weights of its three sizes
+uniform vec3 uRayC;               // shafts: colour x strength
+uniform vec4 uHF; uniform vec3 uHFC; uniform float uHFn;   // height fog: density, top, falloff, most; its colour (linear); drift
+uniform vec4 uTone; uniform vec2 uWB;   // exposure (EV), contrast, saturation; warmth, tint
+uniform vec3 uLift, uGamma, uGain; uniform vec4 uSplS, uSplH; uniform float uSplB;
+uniform vec4 uVig; uniform float uSharp;
+out vec4 o;
+const vec3 LW = vec3(.2126, .7152, .0722);
+float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3. - 2.*f); return mix(mix(h21(i), h21(i + vec2(1., 0.)), u.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), u.x), u.y); }
+void main(){
+  vec3 c = texture(uScene, vUV).rgb;
+  if(uOn1.w > .5){ vec3 n4 = texture(uScene, vUV + vec2(uPx.x, 0.)).rgb + texture(uScene, vUV - vec2(uPx.x, 0.)).rgb + texture(uScene, vUV + vec2(0., uPx.y)).rgb + texture(uScene, vUV - vec2(0., uPx.y)).rgb;
+    c = max(c + (c*4. - n4)*uSharp*.25, 0.); }
+  vec3 L = pow(c, vec3(2.2));
+  if(uOn0.x > .5){ vec4 a = texture(uAOT, vUV); float occ = (1. - a.r)*a.g*uAOk.x; L *= pow(clamp(1. - occ, 0., 1.), uAOk.y); }
+  if(uOn0.w > .5){ float d = texture(uDep, vUV).r;
+    if(d < .99999){ vec4 p = uInv*vec4(vUV*2. - 1., d*2. - 1., 1.); vec3 P = p.xyz/p.w;
+      float h = clamp((uHF.y - P.y)/max(uHF.y, .01), 0., 1.), n = mix(1., .55 + .9*vn(P.xz*.35 + vec2(uTime*.05, uTime*.03)), uHFn);
+      L = mix(L, uHFC, clamp(uHF.x*pow(h, uHF.z)*n, 0., uHF.w)); } }
+  if(uOn0.y > .5) L += (texture(uB1, vUV).rgb*uBl.y + texture(uB2, vUV).rgb*uBl.z + texture(uB3, vUV).rgb*uBl.w)*uBl.x;
+  if(uOn0.z > .5) L += texture(uRays, vUV).rgb*uRayC;
+  if(uOn1.x > .5){
+    L *= exp2(uTone.x)*vec3(1. + uWB.x*.12 - uWB.y*.03, 1. + uWB.y*.08, 1. - uWB.x*.12 - uWB.y*.03);
+    L = mix(L, .8 + .2*(1. - exp(-(L - .8)/.2)), step(.8, L));   // a soft shoulder: extra light rolls off, never clips
+  }
+  c = pow(max(L, 0.), vec3(1./2.2));
+  if(uOn1.x > .5){ c = (c - .45)*uTone.y + .45; c = mix(vec3(dot(c, LW)), c, uTone.z); }
+  if(uOn1.y > .5){
+    c = clamp(c, 0., 1.); c = uGain*(c + uLift*(1. - c)); c = pow(max(c, 0.), 1./max(uGamma, vec3(.05)));
+    float l = clamp(dot(c, LW), 0., 1.), bal = .5 + uSplB*.35, sw = 1. - smoothstep(0., bal, l), hw = smoothstep(bal, 1., l);
+    c += (uSplS.rgb - dot(uSplS.rgb, LW))*uSplS.a*sw + (uSplH.rgb - dot(uSplH.rgb, LW))*uSplH.a*hw;   // (the hue pushed, the brightness kept)
+  }
+  if(uOn1.z > .5){ vec2 q = (vUV - .5)*vec2(uVig.w, 1.)*2.; c *= 1. - uVig.x*smoothstep(uVig.y, uVig.y + uVig.z, length(q)); }
+  c += (fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715)))) - .5)/255.;
+  o = vec4(c, 1.);
+}`;
+// the GPU's own time for each pass (EXT_disjoint_timer_query_webgl2; null where the browser has none): a smoothed ms each
+function gpuTimer(gl) {
+  let ext = null; try { ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); } catch (e) {} if (!ext) return null;
+  const pend = [], ms = {}; let cur = null;
+  return {
+    ms,
+    begin(name) { if (cur) this.end(); if (pend.length > 64) return; const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); cur = { q, name }; },
+    end() { if (!cur) return; gl.endQuery(ext.TIME_ELAPSED_EXT); pend.push(cur); cur = null; },
+    poll() {
+      const dis = gl.getParameter(ext.GPU_DISJOINT_EXT);
+      while (pend.length) {
+        const p = pend[0]; if (!dis && !gl.getQueryParameter(p.q, gl.QUERY_RESULT_AVAILABLE)) break;
+        pend.shift(); if (!dis) { const v = gl.getQueryParameter(p.q, gl.QUERY_RESULT) / 1e6; ms[p.name] = ms[p.name] == null ? v : ms[p.name] * .9 + v * .1; }
+        gl.deleteQuery(p.q);
+      }
+    },
+    reset() { for (const k in ms) delete ms[k]; },
+  };
+}
+function postGL(gl, R, prog, canvas) {
+  const AO = prog(VS_SCR, FS_PP_AO), AOB = prog(VS_SCR, FS_PP_AOBLUR), BR = prog(VS_SCR, FS_PP_BRIGHT), BL = prog(VS_SCR, FS_BLUR), RY = prog(VS_SCR, FS_PP_RAYS), CO = prog(VS_SCR, FS_PP_COMP), vao = gl.createVertexArray();
+  const tex = (w, h, ifmt, fmt, type, filt) => {
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t;
+  };
+  const tgt = (w, h) => { const t = tex(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR), f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return { t, f, w, h }; };
+  const free = q => { if (!q) return; if (q.t) gl.deleteTexture(q.t); if (q.f) gl.deleteFramebuffer(q.f); };
+  const S = { w: 0, h: 0, samples: Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 0) };
+  let T = {};
+  function fit() {
+    const w = canvas.width, h = canvas.height; if (S.w === w && S.h === h) return;
+    S.w = w; S.h = h;
+    if (S.ms) gl.deleteFramebuffer(S.ms); if (S.msC) gl.deleteRenderbuffer(S.msC); if (S.msD) gl.deleteRenderbuffer(S.msD);
+    if (S.t) gl.deleteTexture(S.t); if (S.d) gl.deleteTexture(S.d); if (S.f) gl.deleteFramebuffer(S.f);
+    for (const k in T) free(T[k]);
+    // the resolved scene: colour and depth (depth read as a texture: nearest only)
+    S.t = tex(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR); S.d = tex(w, h, gl.DEPTH24_STENCIL8, gl.DEPTH_STENCIL, gl.UNSIGNED_INT_24_8, gl.NEAREST);
+    S.f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, S.f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, S.t, 0); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, S.d, 0);
+    S.ms = null; S.msC = null; S.msD = null;
+    if (S.samples > 0) {   // the scene itself, antialiased as the canvas is (if the GPU refuses, the resolved target alone)
+      S.msC = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, S.msC); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S.samples, gl.RGBA8, w, h);
+      S.msD = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, S.msD); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, S.samples, gl.DEPTH24_STENCIL8, w, h);
+      S.ms = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, S.ms);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, S.msC); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, S.msD);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { gl.deleteFramebuffer(S.ms); S.ms = null; S.samples = 0; }
+    }
+    const h2 = [Math.max(2, w >> 1), Math.max(2, h >> 1)], q4 = [Math.max(2, w >> 2), Math.max(2, h >> 2)], e8 = [Math.max(2, w >> 3), Math.max(2, h >> 3)], s16 = [Math.max(2, w >> 4), Math.max(2, h >> 4)];
+    T = { a0: tgt(...h2), a1: tgt(...h2), q0: tgt(...q4), q1: tgt(...q4), e0: tgt(...e8), e1: tgt(...e8), s0: tgt(...s16), s1: tgt(...s16), ry: tgt(...q4) };
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+  const draw = (P, dst) => { gl.bindFramebuffer(gl.FRAMEBUFFER, dst ? dst.f : null); gl.viewport(0, 0, dst ? dst.w : canvas.width, dst ? dst.h : canvas.height); gl.useProgram(P.p); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+  const bindT = (u, unit, t) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(u, unit); };
+  function blur(src, dst, dx, dy) { gl.useProgram(BL.p); bindT(BL.u.uT, 0, src.t); gl.uniform2f(BL.u.uD, dx / src.w, dy / src.h); draw(BL, dst); }
+  const P = {
+    stats: { samples: 0 },
+    begin() { fit(); const f = S.ms || S.f; gl.bindFramebuffer(gl.FRAMEBUFFER, f); P.stats.samples = S.ms ? S.samples : 0; return f; },
+    end(TM) {
+      const L = R.look, w = S.w, h = S.h;
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.BLEND); gl.bindVertexArray(vao);
+      if (TM) TM.begin('resolve');
+      if (S.ms) { gl.bindFramebuffer(gl.READ_FRAMEBUFFER, S.ms); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, S.f); gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST); }
+      const fwd = [-R.view[2], -R.view[6], -R.view[10]];
+      const ao = L.ao && L.ao[0], bl = L.bloom && L.bloom[0], ry = L.rays && L.rays[0];
+      if (ao) {
+        if (TM) TM.begin('ssao');
+        gl.useProgram(AO.p); const u = AO.u; bindT(u.uDep, 0, S.d);
+        gl.uniformMatrix4fv(u.uInv, false, R.inv); gl.uniformMatrix4fv(u.uVP, false, R.vp); gl.uniform3fv(u.uCam, R.cam); gl.uniform3fv(u.uFwd, fwd);
+        gl.uniform4f(u.uAO, L.ao[2], 0, L.ao[3], L.ao[5]); gl.uniform2f(u.uPx, 1 / w, 1 / h); draw(AO, T.a0);
+        if (TM) TM.begin('ssao blur');
+        gl.useProgram(AOB.p); bindT(AOB.u.uDep, 1, S.d);
+        bindT(AOB.u.uT, 0, T.a0.t); gl.uniform2f(AOB.u.uD, 1 / T.a0.w, 0); draw(AOB, T.a1);
+        bindT(AOB.u.uT, 0, T.a1.t); gl.uniform2f(AOB.u.uD, 0, 1 / T.a0.h); draw(AOB, T.a0);
+      }
+      if (bl) {
+        if (TM) TM.begin('bloom');
+        const r = L.bloom[3];
+        gl.useProgram(BR.p); bindT(BR.u.uT, 0, S.t); gl.uniform2f(BR.u.uPx, 1 / w, 1 / h); gl.uniform2f(BR.u.uK, L.bloom[1], .25); draw(BR, T.q0);
+        blur(T.q0, T.q1, r, 0); blur(T.q1, T.q0, 0, r);
+        blur(T.q0, T.e0, r * 1.5, 0); blur(T.e0, T.e1, 0, r * 1.5);
+        blur(T.e1, T.s0, r * 1.5, 0); blur(T.s0, T.s1, 0, r * 1.5);
+      }
+      if (ry) {
+        if (TM) TM.begin('shafts');
+        // the sun's direction on screen: where a step toward the sun lands
+        const c = R.cam, s = R.sunDir, p0 = [c[0] + fwd[0] * 30, c[1] + fwd[1] * 30, c[2] + fwd[2] * 30];
+        const a = M4.proj(R.vp, p0[0], p0[1], p0[2]), b = M4.proj(R.vp, p0[0] + s[0] * 8, p0[1] + s[1] * 8, p0[2] + s[2] * 8);
+        let dx = b[0] - a[0], dy = b[1] - a[1]; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+        gl.useProgram(RY.p); bindT(RY.u.uT, 0, S.t); gl.uniform2f(RY.u.uDir, dx * L.rays[4] / 24, dy * L.rays[4] / 24); gl.uniform1f(RY.u.uThr, L.rays[5]); draw(RY, T.ry);
+      }
+      if (TM) TM.begin('composite');
+      gl.useProgram(CO.p); const u = CO.u;
+      bindT(u.uScene, 0, S.t); bindT(u.uAOT, 1, ao ? T.a0.t : S.t); bindT(u.uB1, 2, bl ? T.q0.t : S.t); bindT(u.uB2, 3, bl ? T.e1.t : S.t); bindT(u.uB3, 4, bl ? T.s1.t : S.t); bindT(u.uRays, 5, ry ? T.ry.t : S.t); bindT(u.uDep, 6, S.d);
+      gl.uniformMatrix4fv(u.uInv, false, R.inv); gl.uniform2f(u.uPx, 1 / w, 1 / h); gl.uniform1f(u.uTime, R.time || 0);
+      const hf = L.hf || [0], tn = L.tone || [0], gr = L.grade || { on: 0 }, vg = L.vig || [0], sp = L.sharp || [0];
+      gl.uniform4f(u.uOn0, ao ? 1 : 0, bl ? 1 : 0, ry ? 1 : 0, hf[0] ? 1 : 0); gl.uniform4f(u.uOn1, tn[0] ? 1 : 0, gr.on ? 1 : 0, vg[0] ? 1 : 0, sp[0] ? 1 : 0);
+      if (ao) gl.uniform2f(u.uAOk, L.ao[1], L.ao[4]);
+      if (bl) { const r = Math.max(0, Math.min(1, (L.bloom[3] - .5) / 2.5)); gl.uniform4f(u.uBl, L.bloom[2], 1 - r * .5, .6 + r * .2, .25 + r * .75); }
+      if (ry) gl.uniform3f(u.uRayC, L.rays[1], L.rays[2], L.rays[3]);
+      if (hf[0]) { gl.uniform4f(u.uHF, hf[1], hf[2], hf[3], hf[4]); gl.uniform3f(u.uHFC, hf[6], hf[7], hf[8]); gl.uniform1f(u.uHFn, hf[5]); }
+      if (tn[0]) { gl.uniform4f(u.uTone, tn[1], tn[2], tn[3], 0); gl.uniform2f(u.uWB, tn[4], tn[5]); }
+      if (gr.on) { gl.uniform3fv(u.uLift, gr.lift); gl.uniform3fv(u.uGamma, gr.gamma); gl.uniform3fv(u.uGain, gr.gain); gl.uniform4fv(u.uSplS, gr.splS); gl.uniform4fv(u.uSplH, gr.splH); gl.uniform1f(u.uSplB, gr.bal); }
+      if (vg[0]) gl.uniform4f(u.uVig, vg[1], vg[2], vg[3], w / h);
+      if (sp[0]) gl.uniform1f(u.uSharp, sp[1]);
+      draw(CO, null);
+      gl.activeTexture(gl.TEXTURE0); gl.bindVertexArray(null); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
+    },
+  };
+  return P;
 }
 
 /* ================= VFX TOOLKIT: textured sprites, ribbons, organic thorns and glow for the spell effects =================
@@ -60903,10 +61162,20 @@ const CAMP_MOOD = {
 function moodGet(mapId) {
   let M = MAP_MOOD[mapId] || MAP_MOOD.meadow;
   try { const c = typeof G !== 'undefined' && G.camp && typeof CAMP_LOCS !== 'undefined' ? CAMP_LOCS[G.camp.loc | 0] : null; if (c && c.map === mapId && CAMP_MOOD[c.id]) M = CAMP_MOOD[c.id]; } catch (e) {}
+  return moodUni(M);
+}
+// a mood (MAP_MOOD's form) as the renderer's uniforms (the Light Lab sets its own through this too)
+function moodUni(M) {
   const t = (hex, k) => { const c = lin3(hex), l = Math.max(1e-4, c[0] * .2126 + c[1] * .7152 + c[2] * .0722); return [c[0] / l, c[1] / l, c[2] / l, k || 0]; };
   const g = M.grade ? lin3(M.grade) : [1, 1, 1], gl = Math.max(1e-4, g[0] * .2126 + g[1] * .7152 + g[2] * .0722);
   return { top: t(M.top, M.topK), bounce: t(M.bounce, M.bounceK), key: t(M.key, M.keyK), env: M.env || 0, grade: [g[0] / gl, g[1] / gl, g[2] / gl, M.gradeK || 0] };   // grade: the painted ground graded toward one tint at the same brightness (a night, a dusk)
 }
+/* Each map's baked look (the Light Lab's post: SSAO, bloom, shafts, height fog, exposure, grade, vignette, sharpen), keyed by
+   map id, in the Light Lab's preset form (its "post" and "fwd" parts: lightlab.js LL_DEF). Empty: no map has one yet. Shown in
+   play only where the Graphics setting allows it (view.js GFX_LV post, off everywhere for now; never on Low) or a device's
+   Use in game preset is on. To bake a preset: the Light Lab's "Bake" button copies the three lines to paste here (its light
+   into LIGHT_DEF, its mood into MAP_MOOD, its look into LOOK_DEF). */
+const LOOK_DEF = {};
 const LIGHT_KEY = id => 'runehold.light3.' + id;
 // the light schemes are fixed (the old Lighting panel is gone); any tweaks it saved are cleared
 try { for (const id of Object.keys(LIGHT_DEF)) localStorage.removeItem(LIGHT_KEY(id)); } catch (e) {}
@@ -70867,7 +71136,7 @@ let SCENE_OFF = false;   // the FX Lab side view: no keep, portal or decor betwe
 let UNIT_ON = false, UNIT_OWN = false, qScale = 1, inIcon = false, cv, RD = null, IR = null, W = 1, H = 1, dpr = 1, vt = 0;
 // graphics quality (Settings, pause menu): auto drops the render scale when frames run slow; high, medium and low are fixed.
 // q: render scale · sh: sun shadows · parts: share of the particle budget
-const GFX_LV = { auto: { q: 1, sh: true, parts: 1, uq: 2, name: 'Auto' }, high: { q: 1, sh: true, parts: 1, uq: 2, name: 'High' }, medium: { q: .75, sh: true, parts: .6, uq: 1, name: 'Medium' }, low: { q: .5, sh: false, parts: .3, uq: 0, name: 'Low' } };   // uq: the units' shading (gl.js uUQ)
+const GFX_LV = { auto: { q: 1, sh: true, parts: 1, uq: 2, name: 'Auto', post: false }, high: { q: 1, sh: true, parts: 1, uq: 2, name: 'High', post: false }, medium: { q: .75, sh: true, parts: .6, uq: 1, name: 'Medium', post: false }, low: { q: .5, sh: false, parts: .3, uq: 0, name: 'Low', post: false } };   // uq: the units' shading (gl.js uUQ); post: the map's baked look (maps.js LOOK_DEF, the Light Lab's post) in play: off everywhere until the owner approves it (Low never)
 const GFX_NEXT = { auto: 'high', high: 'medium', medium: 'low', low: 'auto' };
 let GFX = 'auto'; try { GFX = localStorage.getItem('runehold.gfx') || 'auto'; } catch (e) {} if (!GFX_LV[GFX]) GFX = 'auto';
 qScale = GFX_LV[GFX].q;
@@ -71009,7 +71278,7 @@ function applyLight() {
   const E = THENV[TH.id]; RD.gtex = E && E.gtex ? Object.assign(E.gtex, { gain: L.ground }) : null;
   RD.gpaint = E && E.gpaint ? Object.assign(E.gpaint, { gain: L.paint == null ? 1 : L.paint }) : null;
   RD.clear = RD.fogCol.map(v => { const x = v * 1.05; return Math.pow(Math.min(1, (x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14)), 1 / 2.2); });
-  RD.fog = [CAM.dist * L.fogNear, CAM.dist * (L.fogNear + .95)];
+  RD.fog = [CAM.dist * L.fogNear, CAM.dist * (L.fogFar != null ? L.fogFar : L.fogNear + .95)];   // (fogFar: the Light Lab's fog end; unset, as it always was)
   RD.setShadowBox(5.5, TH.paint ? 4 : 6.5, TH.paint ? 16 : 14.5);
 }
 // the Lighting panel calls this on every slider move; the painted backdrop is redrawn once the hand settles
@@ -84976,6 +85245,506 @@ if (typeof towerTop === 'function') {
     const p = document.createElement('div'); p.id = 'mlab'; document.body.appendChild(p);
     frame = function () {};   // the game's own loop stops; the lab drives the clock
     layoutAll(); build(); L.ready = true; act('attack'); orbit();
+    requestAnimationFrame(labFrame);
+  }
+  boot();
+})();
+
+/* ================= THE LIGHT LAB (runehold.html?lightlab=1) =================
+   The owner's bench for the maps' light and look (owner, 10 Nov 2026: "create a basic environment for me to tweak the current
+   map, i also want lighting sliders, let me also add units to the map. include ao, glint etc. id like to try to achieve
+   professional looking aaa lighting that make the game looks incredible").
+   - Open: ?lightlab=1 (&map=clearing|meadow|moonwood; the playtest key is kept), or Light Lab in a playtest run's pause
+     menu. The game's clock runs for the models (their idle, strikes and spells) but no wave ever comes. Leave reloads the
+     page without the flag. Nothing the game saves is written while it runs; only the lab's own keys (runehold.lightlab.*).
+   - Units: every force unit and Champion and a few foes. Click a cell to place (tier I-VI, pose: rest, attack on a loop
+     against a stand-in foe, or its spells cast in turn); right-click removes. "Foes walk the road" sends a stream of
+     unkillable foes down the maze, so the light can be judged on moving models.
+   - Light (live): sun, sky and ground fill, rim and a back light, shadows (floor, softness, bias, 12 taps), the units' glint
+     (sheen, roughness, a sharp sun glint, a fresnel edge) and the ground's glint, the tone curve, fog, the map's mood.
+   - The post (gl.js postGL): SSAO, bloom, screen-space light shafts, height fog, exposure and white balance, contrast and
+     saturation, lift / gamma / gain and split toning, vignette, sharpen; each with its switch and its GPU time (where the
+     browser gives a GPU timer), the frame time at the top.
+   - Presets: three to start from (Golden hour, Overcast, Moonlit), saved ones (this device), JSON export / import / copy,
+     Use in game (this map, this device: normal play takes the preset; on Low without the post), and Bake: the three lines
+     to paste into maps.js (LIGHT_DEF, MAP_MOOD, LOOK_DEF) to make a preset the map's own (CLAUDE.md, The Light Lab).
+   Outside the lab this file only wraps applyLight (view.js): with a device's Use in game preset, or a map's baked look on
+   a Graphics setting that allows the post, it lays them over the map's light; otherwise the game is as it was. */
+const LL_KEY = 'runehold.lightlab.';
+const llGet = (k, d) => { try { const v = localStorage.getItem(LL_KEY + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const llSet = (k, v) => { try { localStorage.setItem(LL_KEY + k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+const llClone = o => JSON.parse(JSON.stringify(o));
+function llMerge(a, b) {   // b over a, deep (objects only; arrays and values replaced)
+  const o = llClone(a);
+  for (const k in b || {}) o[k] = b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && o[k] && typeof o[k] === 'object' ? llMerge(o[k], b[k]) : b[k];
+  return o;
+}
+/* the forward controls and the post as the game draws today (the post all off): a state's fwd and post parts start here */
+const LL_DEF = {
+  fwd: { shOn: 1, shFloor: .3, shSoft: 1.2, shBias: .0016, shQ: 0, tm: 0, backOn: 0, back: '#a8c8ff', backI: .6, backAz: 0, backEl: 25,
+    spec: 1, rough: 1, sharp: 0, fres: 0, gGlintOn: 1, gGlint: 1.4, gSharp: 30 },
+  post: { on: 1,
+    ao: { on: 0, strength: .8, radius: .45, bias: .03, power: 1.2, ground: .35 },
+    bloom: { on: 0, thr: .62, strength: .35, radius: 1.5 },
+    rays: { on: 0, col: '#ffe2b0', strength: .5, len: .18, thr: .55 },
+    hfog: { on: 0, col: '#8090b0', dens: .35, top: 1.2, fall: 1.5, max: .5, noise: .5 },
+    tone: { on: 0, ev: 0, contrast: 1, sat: 1, warm: 0, tint: 0 },
+    grade: { on: 0, lift: 0, liftC: '#ffffff', liftK: 0, gamma: 1, gammaC: '#ffffff', gammaK: 0, gain: 1, gainC: '#ffffff', gainK: 0, splS: '#3a5a8a', splSK: 0, splH: '#ffb070', splHK: 0, bal: 0 },
+    vig: { on: 0, str: .3, rad: .75, soft: .7 },
+    sharp: { on: 0, k: .3 } },
+};
+/* the starting presets: laid over the map's own light (so a map keeps what they leave alone), tuned on Sunfall Glade
+   (painted: the ground keeps its painted light, so the mood's grade, the painting's brightness and the post carry it) and
+   checked on Kingsmeadow and Moonwood */
+const LL_PRESETS = {
+  'Golden hour': {
+    light: { sun: '#ffc07a', sunI: 1.8, az: -62, el: 24, sky: '#9fb6e6', skyI: .4, gnd: '#c89060', gndI: .24, rim: .3, fill: .12, fog: '#5a4036', fogNear: .9, expo: 1.3, rays: 1, ray: '#ffd49a', paint: .96, lamps: 1 },
+    mood: { top: '#a8b8ff', topK: .14, key: '#ffb060', keyK: .32, bounce: '#c08048', bounceK: .18, env: .3, grade: '#ffd8a8', gradeK: .13 },
+    fwd: { shFloor: .26, shSoft: 1.6, shQ: 1, tm: 1, backOn: 1, back: '#ffd8a8', backI: .5, backAz: 25, backEl: 18, spec: 1.2, rough: .85, sharp: .5, fres: .25, gGlint: 1.7, gSharp: 34 },
+    post: { on: 1, ao: { on: 1, strength: .75, radius: .45, ground: .3 }, bloom: { on: 1, thr: .74, strength: .2, radius: 1.6 },
+      rays: { on: 1, col: '#ffcf8a', strength: .3, len: .16, thr: .66 }, hfog: { on: 1, col: '#a08a7a', dens: .14, top: .9, fall: 1.6, max: .2, noise: .6 },
+      tone: { on: 1, ev: .05, contrast: 1.1, sat: 1.04, warm: .22, tint: 0 },
+      grade: { on: 1, lift: -.01, gain: 1.02, splS: '#3a5a8a', splSK: .1, splH: '#ffb070', splHK: .08, bal: 0 },
+      vig: { on: 1, str: .3, rad: .7, soft: .8 }, sharp: { on: 1, k: .25 } },
+  },
+  'Overcast': {
+    light: { sun: '#e6ecf2', sunI: .95, az: -30, el: 62, sky: '#c8d4e4', skyI: .78, gnd: '#8a8a80', gndI: .36, rim: .15, fill: .2, fog: '#7a8490', fogNear: .85, expo: 1.3, rays: 0, paint: .96, lamps: .9 },
+    mood: { top: '#c0ccdc', topK: .18, key: '#e8eef4', keyK: .1, bounce: '#8a9070', bounceK: .14, env: .35, grade: '#b8c4cc', gradeK: .22 },
+    fwd: { shFloor: .55, shSoft: 2.6, shQ: 1, tm: 1, backOn: 0, spec: .8, rough: 1.15, sharp: 0, fres: .35, gGlint: .7, gSharp: 24 },
+    post: { on: 1, ao: { on: 1, strength: .95, radius: .55, power: 1.3, ground: .45 }, bloom: { on: 1, thr: .8, strength: .15, radius: 2 },
+      rays: { on: 0 }, hfog: { on: 1, col: '#98a4ac', dens: .16, top: 1.2, fall: 1.4, max: .2, noise: .4 },
+      tone: { on: 1, ev: .1, contrast: 1.02, sat: .9, warm: -.1, tint: 0 },
+      grade: { on: 1, lift: .005, gain: 1, splS: '#4a6a70', splSK: .08, splH: '#e0e8f0', splHK: .05, bal: .1 },
+      vig: { on: 1, str: .22, rad: .75, soft: .8 }, sharp: { on: 1, k: .3 } },
+  },
+  'Moonlit': {
+    light: { sun: '#9fb4ff', sunI: 1.25, az: 150, el: 48, sky: '#3a4a80', skyI: .55, gnd: '#1a2238', gndI: .4, rim: .55, fill: .5, fog: '#0e1428', fogNear: .85, expo: 1, lamps: 1.6, rays: 1.4, ray: '#9cc0ff', paint: .84 },
+    mood: { top: '#7088ff', topK: .35, key: '#b8c8ff', keyK: .3, bounce: '#304a80', bounceK: .2, env: .75, grade: '#8aa0d8', gradeK: .36 },
+    fwd: { shFloor: .22, shSoft: 1.4, shQ: 1, tm: 0, backOn: 1, back: '#6fa0ff', backI: .9, backAz: 0, backEl: 25, spec: 1.1, rough: .9, sharp: .7, fres: .4, gGlint: 1.1, gSharp: 40 },
+    post: { on: 1, ao: { on: 1, strength: .8, radius: .45, ground: .3 }, bloom: { on: 1, thr: .55, strength: .45, radius: 2.2 },
+      rays: { on: 1, col: '#a8c8ff', strength: .35, len: .14, thr: .5 }, hfog: { on: 1, col: '#2a3a6a', dens: .45, top: 1.3, fall: 1.4, max: .45, noise: .7 },
+      tone: { on: 1, ev: -.05, contrast: 1.1, sat: .92, warm: -.3, tint: .05 },
+      grade: { on: 1, lift: -.005, gain: 1, splS: '#1a3a8a', splSK: .14, splH: '#c8d8ff', splHK: .06, bal: 0 },
+      vig: { on: 1, str: .4, rad: .65, soft: .8 }, sharp: { on: 1, k: .25 } },
+  },
+};
+// a map's state as the game draws it today (the post off)
+function llBase(map) {
+  const light = Object.assign({ fogFar: null }, typeof lightGet === 'function' ? lightGet(map) : {});
+  if (light.fogFar == null) light.fogFar = +(light.fogNear + .95).toFixed(3);
+  const mood = llClone((typeof MAP_MOOD !== 'undefined' && (MAP_MOOD[map] || MAP_MOOD.meadow)) || {});
+  if (!mood.grade) { mood.grade = '#ffffff'; mood.gradeK = 0; }
+  return { v: 1, map, light, mood, fwd: llClone(LL_DEF.fwd), post: llMerge(LL_DEF.post, { on: 0 }) };
+}
+const llHue = (hex, k) => { const c = lin3(hex), l = Math.max(1e-4, c[0] * .2126 + c[1] * .7152 + c[2] * .0722); return [1 + (c[0] / l - 1) * k, 1 + (c[1] / l - 1) * k, 1 + (c[2] / l - 1) * k]; };
+// the post's settings as the renderer's arrays (gl.js postGL reads them)
+function llCompile(P) {
+  if (!P || !P.on) return null;
+  const D = LL_DEF.post, g = k => Object.assign({}, D[k], P[k] || {});
+  const ao = g('ao'), bl = g('bloom'), ry = g('rays'), hf = g('hfog'), tn = g('tone'), gr = g('grade'), vg = g('vig'), sp = g('sharp');
+  const rc = lin3(ry.col), fc = lin3(hf.col), sr = srgb4(gr.splS), sh = srgb4(gr.splH);
+  const lh = llHue(gr.liftC, gr.liftK * .05), gh = llHue(gr.gammaC, gr.gammaK * .3), ga = llHue(gr.gainC, gr.gainK * .3);
+  return {
+    ao: [ao.on ? 1 : 0, ao.strength, ao.radius, ao.bias, ao.power, ao.ground],
+    bloom: [bl.on ? 1 : 0, bl.thr, bl.strength, bl.radius],
+    rays: [ry.on ? 1 : 0, rc[0] * ry.strength, rc[1] * ry.strength, rc[2] * ry.strength, ry.len, ry.thr],
+    hf: [hf.on ? 1 : 0, hf.dens, hf.top, hf.fall, hf.max, hf.noise, fc[0], fc[1], fc[2]],
+    tone: [tn.on ? 1 : 0, tn.ev, tn.contrast, tn.sat, tn.warm, tn.tint],
+    grade: { on: gr.on ? 1 : 0, lift: [gr.lift + lh[0] - 1, gr.lift + lh[1] - 1, gr.lift + lh[2] - 1], gamma: gh.map(v => v * gr.gamma), gain: ga.map(v => v * gr.gain), splS: [sr[0], sr[1], sr[2], gr.splSK], splH: [sh[0], sh[1], sh[2], gr.splHK], bal: gr.bal },
+    vig: [vg.on ? 1 : 0, vg.str, vg.rad, vg.soft],
+    sharp: [sp.on ? 1 : 0, sp.k],
+  };
+}
+// a whole state onto the renderer: the map's light (through view.js's own applyLight), the mood, the forward controls, the post
+let llApplyLight0 = null;   // (view.js applyLight, unwrapped)
+function llApply(S, post) {
+  if (!RD || !S) return;
+  LS = Object.assign(lightGet(TH.id), S.light || {}); llApplyLight0();
+  if (S.mood && typeof moodUni === 'function') RD.mood = moodUni(S.mood);
+  const f = Object.assign({}, LL_DEF.fwd, S.fwd || {});
+  RD.shK = [f.shFloor, f.shSoft, f.shBias, f.shQ]; RD.tmo = f.tm; RD.glintK = [f.spec, f.rough, f.sharp, f.fres];
+  RD.shadowOn = !!f.shOn && GFX_LV[GFX].sh;
+  if (f.backOn) { const b = linMul(f.back, f.backI), a = f.backAz * Math.PI / 180, e = f.backEl * Math.PI / 180; b.dir = [-Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)]; RD.back = b; } else RD.back = null;
+  if (!RD._glint0) RD._glint0 = Object.assign({}, RD.glint);
+  RD.glint.strength = f.gGlint; RD.glint.sharpness = f.gSharp; RD.glintOn = !!f.gGlintOn && !mapLite();
+  RD.look = post === false ? null : llCompile(S.post);
+}
+// back to the game as it was (a map with no preset)
+function llClear() {
+  if (!RD) return;
+  RD.shK = null; RD.tmo = 0; RD.glintK = null; RD.back = null; RD.look = null;
+  if (RD._glint0) Object.assign(RD.glint, RD._glint0);
+  RD.glintOn = !mapLite(); RD.shadowOn = GFX_LV[GFX].sh;
+}
+
+/* ---- in play: Use in game (this device), or a map's baked look where the Graphics setting allows the post ---- */
+if (typeof applyLight === 'function') {
+  llApplyLight0 = applyLight;
+  applyLight = function () {
+    const r = llApplyLight0.apply(this, arguments);
+    try {
+      if (window.LIGHTLAB) { const S = window.LIGHTLAB.S; if (S && S.mood && typeof moodUni === 'function') RD.mood = moodUni(S.mood); return r; }   // (the lab sets its own; a re-fit keeps its mood)
+      const use = llGet('use', {})[TH.id], lowG = GFX === 'low';
+      if (use) { const S = llMerge(llBase(TH.id), use); llApply(S, lowG ? false : undefined); }
+      else if (typeof LOOK_DEF !== 'undefined' && LOOK_DEF[TH.id] && GFX_LV[GFX].post && !lowG) { const B = LOOK_DEF[TH.id]; RD.look = llCompile(llMerge(LL_DEF.post, B.post || {})); const f = Object.assign({}, LL_DEF.fwd, B.fwd || {}); RD.shK = [f.shFloor, f.shSoft, f.shBias, f.shQ]; RD.tmo = f.tm; RD.glintK = [f.spec, f.rough, f.sharp, f.fres]; }
+      else if (RD.look || RD.shK || RD.back || RD.glintK) llClear();
+    } catch (e) {}
+    return r;
+  };
+}
+
+(function () {
+  const Q = new URLSearchParams(location.search);
+  // the playtest pause menu's way in (as the Model Lab's)
+  if (typeof pauseMenu === 'function') {
+    const _pm = pauseMenu;
+    pauseMenu = function () {
+      const r = _pm.apply(this, arguments);
+      try {
+        if (typeof G !== 'undefined' && G && G.playtest && !document.getElementById('llOpen')) {
+          const box = document.querySelector('.ptx-pause') || (document.getElementById('pTal') || {}).parentNode; if (!box) return r;
+          const b = document.createElement('button'); b.className = 'btn ghost'; b.id = 'llOpen'; b.type = 'button';
+          b.innerHTML = 'Light Lab<small>This map’s light and look, with sliders (leaves the run; nothing is saved)</small>';
+          b.onclick = () => { const q = new URLSearchParams(location.search); q.delete('lab'); q.set('lightlab', '1'); q.set('map', G.map || 'clearing'); location.search = '?' + q.toString(); };
+          box.appendChild(b);
+        }
+      } catch (e) {}
+      return r;
+    };
+  }
+  if (Q.get('lightlab') !== '1') return;
+
+  // nothing the game saves is kept while the lab runs: only the lab's own keys
+  try { const sp = Storage.prototype.setItem, rm = Storage.prototype.removeItem;
+    Storage.prototype.setItem = function (k) { if (String(k).startsWith(LL_KEY)) return sp.apply(this, arguments); };
+    Storage.prototype.removeItem = function (k) { if (String(k).startsWith(LL_KEY)) return rm.apply(this, arguments); }; } catch (e) {}
+
+  const L = window.LIGHTLAB = {
+    map: Q.get('map') || 'clearing', S: null, ready: false, errs: [], note: '',
+    pick: null, tier: 2, pose: 'attack', walk: false, walker: null, walkN: 6, walkT: 0, freeze: false,
+    orbit: false, yaw: 0, pitch: 57 * Math.PI / 180, oh: 9, tgt: [5.5, 0, 7], inRender: false, hide: false,
+    units: [], foes: [], ms: 16.7, fps: 60, open: llGet('open', { units: 1, sun: 1, presets: 1 }),
+  };
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const get = (o, p) => p.split('.').reduce((a, k) => a == null ? a : a[k], o);
+  const put = (o, p, v) => { const ks = p.split('.'), last = ks.pop(); let a = o; for (const k of ks) a = a[k] || (a[k] = {}); a[last] = v; };
+
+  /* ---- what can be placed ---- */
+  function palette() {
+    const out = [], seen = new Set();
+    for (const f of Object.keys(FORCES || {})) {
+      const F = FORCES[f]; if (!F || !F.units) continue; const g = { label: F.name || f, items: [] };
+      for (const d of Object.values(F.units)) if (d && d.id && !d.wall && !seen.has(d.id)) { seen.add(d.id); g.items.push(['u:' + d.id, d.name || d.id]); }
+      if (g.items.length) out.push(g);
+    }
+    if (typeof CHAMPS !== 'undefined') { const g = { label: 'Champions', items: [] }; for (const h in CHAMPS) { const d = CHAMPS[h] && CHAMPS[h].unit; if (d && d.id && !seen.has(d.id)) { seen.add(d.id); g.items.push(['u:' + d.id, d.name || d.id]); } } if (g.items.length) out.push(g); }
+    out.push({ label: 'Foes', items: foeList().map(k => ['f:' + k, CREEPS[k].name || k]) });
+    return out;
+  }
+  function foeList() { const pref = ['gnoll', 'torchbearer', 'troll', 'wolf', 'malgrath', 'arachnara', 'rotfather', 'mire', 'brakka']; return pref.filter(k => CREEPS[k]).concat(Object.keys(CREEPS).filter(k => !pref.includes(k) && !CREEPS[k].fly && !CREEPS[k].immune && CREEPS[k].boss).slice(0, 4)); }
+  function forceOf(u) {   // [force, slot, hero] (as the Model Lab finds a unit's post)
+    if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h] && CHAMPS[h].unit && CHAMPS[h].unit.id === u && CHAMPS[h].force) return [CHAMPS[h].force, 'holy', h];
+    for (const f of Object.keys(FORCES)) {
+      const F = FORCES[f]; if (!F || !F.units) continue;
+      const heroes = HEROES.filter(h => h.force === f);
+      for (const [s, d] of Object.entries(F.units)) if (d && d.id === u) return [f, s, heroes[0] && heroes[0].id];
+      if (/^ch_/.test(u) || heroes.some(h => h.champ === u)) for (const h of heroes) { try { applyForce(f, h.id); const d = FORCES[f].units.holy; if (d && d.id === u) return [f, 'holy', h.id]; } catch (e) {} }
+    }
+    return null;
+  }
+  const kitOf = t => { const k = t && typeof abilKit === 'function' ? abilKit(t) : null; return k ? k.abilities : []; };
+
+  /* ---- the field ---- */
+  const cellOK = (i, j) => i >= 0 && j >= 0 && i < COLS && j < ROWS;
+  function place(i, j) {
+    if (!L.pick || !cellOK(i, j)) return;
+    if (L.pick.startsWith('f:')) { addFoe(L.pick.slice(2), i + .5, j + .5); return; }
+    const k = idx(i, j); if (G.tAt[k] || G.blk[k]) { L.note = 'Something stands there already (right-click removes it).'; return info(); }
+    const why = typeof canBuild === 'function' ? canBuild(i, j) : { ok: true }; if (!why.ok) { L.note = why.msg; return info(); }
+    const P = forceOf(L.pick.slice(2)); if (!P) { L.note = 'No post for ' + L.pick; return info(); }
+    try {
+      applyForce(P[0], P[2]); G.force = P[0]; G.hero = P[2];
+      const t = makeTower(P[1], i, j, L.tier); t.build = 0; G.towers.push(t); G.blk[k] = 1; G.tAt[k] = t;
+      t.st = effStats(t); t.ang = Math.PI / 2; t.__pose = L.pose; t.__castAt = 0; t.__castI = 0;
+      const A = typeof abilEnsure === 'function' && kitOf(t).length ? abilEnsure(t) : null;
+      if (A) { A.learned = kitOf(t).map(a => a.id); A.mode = 'rotate'; for (const a of kitOf(t)) { A.auto[a.id] = false; try { loreGet().done[loreKey(t.def.unit, a.id)] = true; } catch (e) {} } }
+      refreshField(); L.note = '';
+    } catch (e) { L.errs.push('place: ' + e.message); }
+    info();
+  }
+  function removeAt(x, y) {
+    let best = null, bd = .55;
+    for (const c of G.creeps) { if (c.dead || c.__dummy) continue; const d = Math.hypot(c.x - x, c.y - y); if (d < bd) { bd = d; best = c; } }
+    if (best) { best.dead = true; G.creeps.splice(G.creeps.indexOf(best), 1); L.foes = L.foes.filter(f => f !== best); return info(); }
+    const i = Math.floor(x), j = Math.floor(y); if (!cellOK(i, j)) return; const k = idx(i, j), t = G.tAt[k]; if (!t) return;
+    G.towers.splice(G.towers.indexOf(t), 1); G.tAt[k] = null; G.blk[k] = 0;
+    if (t.__dummy) { t.__dummy.dead = true; const n = G.creeps.indexOf(t.__dummy); if (n >= 0) G.creeps.splice(n, 1); }
+    refreshField(); info();
+  }
+  function heldFoe(type, x, y) {
+    const c = spawn({ type, hp: 1e9, bounty: 0, at: { x, y, ti: Math.floor(x), tj: Math.floor(y), tx: x, ty: y + 1, state: 'walk' } });
+    c.abT = 1e9; c.hp = c.maxHp = 1e9; c.__ax = x; c.__ay = y; return c;
+  }
+  function addFoe(type, x, y) { L.foes.push(heldFoe(type, x, y)); info(); }
+  const foeType = () => (L.walker && CREEPS[L.walker]) ? L.walker : foeList()[0];
+  // each frame: held foes stay put and whole; the posed units get their stand-in foe (attack, cast) or none (rest)
+  function hold(dt) {
+    G.lives = 1e6; G.maxLives = 1e6; G.gold = 1e9; G.phase = 'build'; G.countdown = 0; G.spawnQ.length = 0;
+    for (const c of L.foes) if (!c.dead) { c.x = c.__ax; c.y = c.__ay; c.hp = c.maxHp; c.state = 'walk'; c.remain = 10; c.leaked = false; c.abT = 1e9; }
+    L.foes = L.foes.filter(c => !c.dead && G.creeps.includes(c));
+    for (const t of G.towers) {
+      const pose = t.__pose || 'rest';
+      if (t.ab) t.ab.mana = abMax(t);
+      t.hp = t.maxHp; t.wrecked = false; t.silT = 0;
+      const want = pose !== 'rest';
+      if (want && (!t.__dummy || t.__dummy.dead || !G.creeps.includes(t.__dummy))) {
+        const st = t.st || effStats(t), r = Math.min(1.6, Math.max(.9, (st && st.range || 1.4) * .7));
+        const x = t.x + (t.i < COLS - 2 ? r : -r), y = t.y + .15; t.__dummy = heldFoe(foeType(), x, y); t.__dummy.__dummy = 1;
+      }
+      if (!want && t.__dummy) { t.__dummy.dead = true; const n = G.creeps.indexOf(t.__dummy); if (n >= 0) G.creeps.splice(n, 1); t.__dummy = null; }
+      const c = t.__dummy;
+      if (c && !c.dead) { c.x = c.__ax; c.y = c.__ay; c.hp = c.maxHp; c.state = 'walk'; c.remain = 10; c.leaked = false; c.abT = 1e9; }
+      if (pose !== 'attack') t.cd = Math.max(t.cd || 0, .7);
+      if (pose === 'cast' && dt > 0 && G.time - (t.__castAt || 0) > 3.2) { t.__castAt = G.time; cast(t); }
+    }
+    for (const c of G.creeps) if (c.__walk) { c.hp = c.maxHp; c.abT = 1e9; }
+  }
+  function cast(t) {
+    const kit = kitOf(t); if (!kit.length || typeof abilEnsure !== 'function') return;
+    const ab = ABIL[kit[(t.__castI++) % kit.length].id]; if (!ab) return;
+    const A = abilEnsure(t); A.mana = abMax(t); A.cd[ab.id] = 0; A.busyT = 0; A.cast = null;
+    const st = t.st || effStats(t); let tg = null; try { tg = abPick(t, st, ab, true); } catch (e) {}
+    if (!tg && t.__dummy) { try { rootFoe(t.__dummy, 3, t); } catch (e) {} try { tg = abPick(t, st, ab, true); } catch (e) {} }
+    if (!tg) return;
+    try { (typeof castStart === 'function' ? castStart : castAbility)(t, ab, tg, st, true); } catch (e) { L.errs.push('cast: ' + e.message); }
+  }
+  function walkers(dt) {
+    const live = G.creeps.filter(c => c.__walk && !c.dead);
+    if (!L.walk) { for (const c of live) { c.dead = true; G.creeps.splice(G.creeps.indexOf(c), 1); } return; }
+    L.walkT -= dt;
+    if (live.length < L.walkN && L.walkT <= 0) { L.walkT = 1.1; try { const c = spawn({ type: foeType(), hp: 1e9, bounty: 0 }); c.__walk = 1; c.abT = 1e9; } catch (e) { L.errs.push('walk: ' + e.message); } }
+  }
+
+  /* ---- the camera: the game's view, or an orbit round the field ---- */
+  if (typeof setCam === 'function') {
+    const s0 = setCam;
+    setCam = function (tz, oh, aspect) {
+      if (!L.ready || !L.orbit || !L.inRender) return s0.apply(this, arguments);
+      const D = 40, cp = Math.cos(L.pitch), sp = Math.sin(L.pitch), T = L.tgt;
+      CAM.tgt = T.slice(); CAM.eye = [T[0] + Math.sin(L.yaw) * cp * D, T[1] + sp * D, T[2] + Math.cos(L.yaw) * cp * D];
+      RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, L.oh, { z: 1, cx: L.hide ? 0 : -.22, cy: 0 });
+    };
+  }
+  function setOrbit(on) {
+    L.orbit = on;
+    if (on) { RD.bg = null; RD.fg = null; for (const gp of ENV.treeGroups || []) for (const h of gp.hs) RD.setInstances(h, gp.all instanceof Float32Array ? gp.all : new Float32Array(gp.all)); }
+    else { try { layoutAll(); } catch (e) {} }
+    panel();
+  }
+
+  /* ---- the loop ---- */
+  let last = 0, statT = 0;
+  function labFrame(now) {
+    const real = Math.max(0, (now - (last || now)) / 1000), dt = Math.min(.05, real); last = now;
+    if (real > 0 && real < .5) { L.ms = L.ms * .92 + real * 1000 * .08; L.fps = 1000 / L.ms; }
+    try {
+      if (L.ready && G.state === 'play') {
+        const d = L.freeze ? 0 : dt;
+        hold(d); if (d > 0) { walkers(d); update(d); } hold(0);
+        L.inRender = true; try { renderView(d); } finally { L.inRender = false; }
+        statT -= real; if (statT <= 0) { statT = .25; stats(); }
+      }
+    } catch (e) { L.errs.push(String(e && e.message || e)); if (L.errs.length > 20) L.errs.shift(); }
+    requestAnimationFrame(labFrame);
+  }
+
+  /* ---- the controls ---- */
+  // [path, label, min, max, step] | [path, label, 'color'] | [path, label, 'check'] | [path, label, 'select', [[v, name]...]]
+  const GROUPS = [
+    { id: 'sun', t: 'Sun', items: [['light.az', 'Azimuth', -180, 180, 1], ['light.el', 'Elevation', 4, 89, 1], ['light.sun', 'Colour', 'color'], ['light.sunI', 'Intensity', 0, 3.5, .01]] },
+    { id: 'sky', t: 'Sky and ground fill', items: [['light.sky', 'Sky colour', 'color'], ['light.skyI', 'Sky strength', 0, 2, .01], ['light.gnd', 'Ground bounce', 'color'], ['light.gndI', 'Bounce strength', 0, 1.5, .01], ['light.fill', 'Front fill on units', 0, 1.5, .01], ['light.lamps', 'Map lights (lanterns)', 0, 3, .01]] },
+    { id: 'back', t: 'Rim and back light', on: 'fwd.backOn', items: [['light.rim', 'Rim (key colour)', 0, 1.5, .01], ['fwd.back', 'Back light colour', 'color'], ['fwd.backI', 'Back light strength', 0, 3, .01], ['fwd.backAz', 'Back light angle (0 = behind)', -180, 180, 1], ['fwd.backEl', 'Back light height', 0, 80, 1]] },
+    { id: 'shadow', t: 'Shadows', on: 'fwd.shOn', cost: ['shadows'], items: [['fwd.shFloor', 'Strength floor (light left)', 0, 1, .01], ['fwd.shSoft', 'Softness', .3, 5, .05], ['fwd.shBias', 'Bias', 0, .008, .0001], ['fwd.shQ', 'Soft disc (12 taps)', 'check']] },
+    { id: 'ao', t: 'Ambient occlusion (SSAO)', on: 'post.ao.on', cost: ['ssao', 'ssao blur'], items: [['post.ao.strength', 'Strength', 0, 2, .01], ['post.ao.radius', 'Radius (cells)', .08, 1.5, .01], ['post.ao.bias', 'Bias', 0, .2, .005], ['post.ao.power', 'Contrast', .5, 3, .05], ['post.ao.ground', 'On flat ground', 0, 1, .01]] },
+    { id: 'glint', t: 'Specular glint', items: [['fwd.spec', 'Sheen and spec', 0, 3, .01], ['fwd.rough', 'Roughness x', .3, 2, .01], ['fwd.sharp', 'Sharp sun glint', 0, 3, .01], ['fwd.fres', 'Fresnel edge', 0, 2, .01], ['fwd.gGlintOn', 'Ground glint (the grass)', 'check'], ['fwd.gGlint', 'Ground glint strength', 0, 4, .01], ['fwd.gSharp', 'Ground glint sharpness', 4, 90, 1]] },
+    { id: 'bloom', t: 'Bloom', on: 'post.bloom.on', cost: ['bloom'], items: [['post.bloom.thr', 'Threshold', 0, 1, .01], ['post.bloom.strength', 'Strength', 0, 1.5, .01], ['post.bloom.radius', 'Radius', .5, 4, .05]] },
+    { id: 'tone', t: 'Exposure and tone', on: 'post.tone.on', items: [['fwd.tm', 'Tone curve', 'select', [[0, 'ACES (the game’s)'], [1, 'Filmic (Hable)']]], ['light.expo', 'Scene exposure', .4, 2.2, .01], ['post.tone.ev', 'Post exposure (EV)', -2, 2, .01], ['post.tone.contrast', 'Contrast', .6, 1.6, .01], ['post.tone.sat', 'Saturation', 0, 2, .01], ['post.tone.warm', 'Warmth', -1, 1, .01], ['post.tone.tint', 'Tint (green / magenta)', -1, 1, .01]] },
+    { id: 'grade', t: 'Colour grade', on: 'post.grade.on', items: [['post.grade.lift', 'Lift', -.1, .1, .001], ['post.grade.liftC', 'Lift colour', 'color'], ['post.grade.liftK', 'Lift colour amount', 0, 1, .01], ['post.grade.gamma', 'Gamma', .5, 2, .01], ['post.grade.gammaC', 'Gamma colour', 'color'], ['post.grade.gammaK', 'Gamma colour amount', 0, 1, .01], ['post.grade.gain', 'Gain', .5, 1.6, .01], ['post.grade.gainC', 'Gain colour', 'color'], ['post.grade.gainK', 'Gain colour amount', 0, 1, .01], ['post.grade.splS', 'Shadows tone', 'color'], ['post.grade.splSK', 'Shadows tone amount', 0, .5, .005], ['post.grade.splH', 'Highlights tone', 'color'], ['post.grade.splHK', 'Highlights tone amount', 0, .5, .005], ['post.grade.bal', 'Balance', -1, 1, .01]] },
+    { id: 'mood', t: 'Map mood (the light on models)', items: [['mood.top', 'From above', 'color'], ['mood.topK', 'Above amount', 0, 1, .01], ['mood.key', 'Sunlit side', 'color'], ['mood.keyK', 'Sunlit amount', 0, 1, .01], ['mood.bounce', 'From below', 'color'], ['mood.bounceK', 'Below amount', 0, 1, .01], ['mood.env', 'Share on ground and trees', 0, 1, .01], ['mood.grade', 'Painting grade', 'color'], ['mood.gradeK', 'Painting grade amount', 0, 1, .01], ['light.paint', 'Painting brightness', .4, 1.6, .01], ['light.ground', 'Ground texture brightness', .4, 1.6, .01]] },
+    { id: 'fog', t: 'Fog and atmosphere', items: [['light.fog', 'Fog colour', 'color'], ['light.fogNear', 'Fog start', .3, 1.6, .01], ['light.fogFar', 'Fog end', .5, 3, .01], ['light.rays', 'Painted light shafts', 0, 3, .01], ['light.ray', 'Shaft colour', 'color']] },
+    { id: 'hfog', t: 'Height fog', on: 'post.hfog.on', items: [['post.hfog.col', 'Colour', 'color'], ['post.hfog.dens', 'Density', 0, 1.5, .01], ['post.hfog.top', 'Height', .1, 4, .05], ['post.hfog.fall', 'Falloff', .3, 4, .05], ['post.hfog.max', 'Most', 0, 1, .01], ['post.hfog.noise', 'Drift', 0, 1, .01]] },
+    { id: 'rays', t: 'Light shafts (screen-space)', on: 'post.rays.on', cost: ['shafts'], items: [['post.rays.col', 'Colour', 'color'], ['post.rays.strength', 'Strength', 0, 2, .01], ['post.rays.len', 'Length', .02, .5, .005], ['post.rays.thr', 'Threshold', 0, 1, .01]] },
+    { id: 'vig', t: 'Vignette', on: 'post.vig.on', items: [['post.vig.str', 'Strength', 0, 1, .01], ['post.vig.rad', 'Radius', .2, 1.4, .01], ['post.vig.soft', 'Softness', .05, 1.5, .01]] },
+    { id: 'sharp', t: 'Sharpen', on: 'post.sharp.on', items: [['post.sharp.k', 'Amount', 0, 1.5, .01]] },
+  ];
+  const fmt = (v, step) => typeof v !== 'number' ? String(v) : step < .001 ? v.toFixed(4) : step < .01 ? v.toFixed(3) : step < 1 ? v.toFixed(2) : String(Math.round(v));
+  const toHex = v => { const s = String(v || '#ffffff'); return /^#[0-9a-f]{6}$/i.test(s) ? s : '#ffffff'; };
+  function ctl(it) {
+    const [p, lab, a] = it, v = get(L.S, p);
+    if (a === 'color') return `<label class="ll-r"><span>${esc(lab)}</span><input type="color" data-p="${p}" value="${toHex(v)}"></label>`;
+    if (a === 'check') return `<label class="ll-r ll-c"><input type="checkbox" data-p="${p}"${v ? ' checked' : ''}><span>${esc(lab)}</span></label>`;
+    if (a === 'select') return `<label class="ll-r"><span>${esc(lab)}</span><select data-p="${p}" data-num="1">${it[3].map(([k, n]) => `<option value="${k}"${+v === +k ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`;
+    const [, , mn, mx, st] = it;
+    return `<label class="ll-r"><span>${esc(lab)} <b data-v="${p}">${fmt(+v, st)}</b></span><input type="range" data-p="${p}" min="${mn}" max="${mx}" step="${st}" value="${+v}"></label>`;
+  }
+  function group(g) {
+    const on = g.on ? `<input type="checkbox" class="ll-on" data-p="${g.on}"${get(L.S, g.on) ? ' checked' : ''} title="On / off">` : '';
+    const cost = g.cost ? ` <i class="ll-ms" data-cost="${g.cost.join(',')}"></i>` : '';
+    return `<details data-g="${g.id}"${L.open[g.id] ? ' open' : ''}><summary>${on}<span>${esc(g.t)}</span>${cost}</summary><div class="ll-b">${g.items.map(ctl).join('')}</div></details>`;
+  }
+  const CSS = `#llab{position:fixed;left:8px;top:8px;bottom:8px;width:318px;z-index:60;overflow:auto;padding:8px 10px;background:rgba(9,12,14,.93);border:1px solid #6b5a2e;border-radius:10px;color:#e8dfc8;font:12.5px/1.3 system-ui,sans-serif;scrollbar-width:thin}
+#llab.hide{display:none}#llab h2{margin:0 0 4px;font:600 16px Cinzel,serif;color:#e6c46a;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+#llab details{border-top:1px solid #2e2a22;padding:3px 0}#llab summary{cursor:pointer;font:600 12px system-ui;color:#d8b860;letter-spacing:.04em;display:flex;align-items:center;gap:6px;padding:3px 0;list-style:none}
+#llab summary::-webkit-details-marker{display:none}#llab summary::before{content:'▸';color:#7a6a40;width:9px}#llab details[open]>summary::before{content:'▾'}
+#llab .ll-ms{margin-left:auto;font:11px ui-monospace,monospace;color:#9fd0a0;font-style:normal}#llab .ll-b{padding:2px 0 4px 15px}
+#llab .ll-r{display:block;margin:3px 0}#llab .ll-r>span{display:flex;justify-content:space-between;color:#c8bea6}#llab .ll-r b{font:11px ui-monospace,monospace;color:#f0e2b8}
+#llab .ll-c{display:flex;gap:6px;align-items:center}#llab input[type=range]{width:100%;margin:1px 0;accent-color:#c8a85a}#llab input[type=color]{width:100%;height:20px;border:1px solid #4a4030;background:#151a16;padding:0}
+#llab select,#llab textarea,#llab input[type=text]{width:100%;box-sizing:border-box;background:#151a16;color:#e8dfc8;border:1px solid #4a4030;border-radius:5px;padding:3px}
+#llab textarea{height:90px;font:11px ui-monospace,monospace}#llab .row{display:flex;flex-wrap:wrap;gap:3px;margin:3px 0}
+#llab button{background:#1b221d;color:#e8dfc8;border:1px solid #4a4030;border-radius:5px;padding:3px 7px;cursor:pointer;font:11.5px system-ui}#llab button.on{background:#5a4a1e;border-color:#e6c46a;color:#fff6d8}#llab button:hover{border-color:#c8a85a}
+#llab .note{color:#a89c80;font-size:11px}#llab .err{color:#ff9a80;font-size:11px;white-space:pre-wrap}#llab .ll-top{font:11.5px ui-monospace,monospace;color:#9fd0a0;margin:2px 0 4px}
+#llShow{position:fixed;left:8px;top:8px;z-index:61;display:none}#llShow.on{display:block}`;
+  function panel() {
+    const el = $('#llab'); if (!el || !L.S) return;
+    const b = (a, lab, on, tip) => `<button data-a="${esc(a)}" class="${on ? 'on' : ''}" title="${esc(tip || '')}">${esc(lab)}</button>`;
+    const pal = palette(), use = !!llGet('use', {})[L.map], saved = llGet('presets', {});
+    el.innerHTML = `<h2><span>Light Lab</span>${b('hide', 'Hide (H)', false, 'Hide the panel; H shows it again')}</h2>
+      <div class="ll-top" id="llTop">…</div>
+      <div class="row"><select id="llMap" style="flex:1">${Object.keys(MAPS).map(k => `<option value="${k}"${k === L.map ? ' selected' : ''}>${esc(MAPS[k].name)}</option>`).join('')}</select>
+        ${b('post', 'Post ' + (L.S.post.on ? 'on' : 'off'), L.S.post.on, 'The post pipeline (SSAO, bloom, shafts, height fog, tone, grade, vignette, sharpen): off is the game as it draws today')}</div>
+      <div class="row">${b('game', 'Game view', !L.orbit)}${b('orbit', 'Orbit', L.orbit, 'Drag to orbit, the wheel to zoom, a click still places')}${b('reset', 'Reset orbit')}${b('freeze', L.freeze ? 'Time frozen' : 'Freeze time', L.freeze)}${b('exit', 'Leave')}</div>
+      <details data-g="units"${L.open.units ? ' open' : ''}><summary><span>Units on the map</span></summary><div class="ll-b">
+        <select id="llPick"><option value="">Choose a unit or foe, then click a cell</option>${pal.map(g => `<optgroup label="${esc(g.label)}">${g.items.map(([v, n]) => `<option value="${esc(v)}"${v === L.pick ? ' selected' : ''}>${esc(n)}</option>`).join('')}</optgroup>`).join('')}</select>
+        <div class="row">${[0, 1, 2, 3, 4, 5].map(k => `<button data-tier="${k}" class="${k === L.tier ? 'on' : ''}">${['I', 'II', 'III', 'IV', 'V', 'VI'][k]}</button>`).join('')}</div>
+        <div class="row">${[['rest', 'Rest'], ['attack', 'Attack loop'], ['cast', 'Cast']].map(([k, n]) => `<button data-pose="${k}" class="${k === L.pose ? 'on' : ''}">${n}</button>`).join('')}${b('all', 'Apply to all', false, 'The tier and pose to every unit placed')}${b('clear', 'Clear')}</div>
+        <label class="ll-r ll-c"><input type="checkbox" id="llWalk"${L.walk ? ' checked' : ''}><span>Foes walk the road</span></label>
+        <select id="llWalker">${foeList().map(k => `<option value="${k}"${k === foeType() ? ' selected' : ''}>${esc(CREEPS[k].name || k)}</option>`).join('')}</select>
+        <div class="note">Click a cell to place, right-click to remove. Units in Attack or Cast get a stand-in foe; walkers can't die. ${G.towers.length} units, ${L.foes.length} foes placed.</div>
+      </div></details>
+      ${GROUPS.map(group).join('')}
+      <details data-g="presets"${L.open.presets ? ' open' : ''}><summary><span>Presets</span></summary><div class="ll-b">
+        <div class="row">${Object.keys(LL_PRESETS).map(n => `<button data-pre="${esc(n)}">${esc(n)}</button>`).join('')}${b('def', 'Map default', false, 'The map as the game draws it today (post off)')}</div>
+        <select id="llSaved"><option value="">Saved on this device…</option>${Object.keys(saved).map(n => `<option>${esc(n)}</option>`).join('')}</select>
+        <div class="row">${b('load', 'Load')}${b('del', 'Delete')}</div>
+        <div class="row"><input type="text" id="llName" placeholder="Name" style="flex:1;width:auto">${b('save', 'Save')}</div>
+        <label class="ll-r ll-c"><input type="checkbox" id="llUse"${use ? ' checked' : ''}><span>Use in game (${esc(MAPS[L.map].name)}, this device)</span></label>
+        <div class="row">${b('export', 'Export JSON')}${b('copy', 'Copy')}${b('import', 'Load JSON')}${b('bake', 'Bake (copy code)', false, 'The three lines for maps.js that make this the map’s own look')}</div>
+        <textarea id="llJson" placeholder="JSON (Export fills it; paste one and Load JSON)"></textarea>
+      </div></details>
+      <div class="note" id="llNote">${esc(L.note || '')}</div><div class="err" id="llErr">${esc(L.errs.slice(-3).join('\n'))}</div>`;
+    bind(); stats();
+  }
+  function info() { const n = $('#llNote'); if (n) n.textContent = L.note || ''; const e = $('#llErr'); if (e) e.textContent = L.errs.slice(-3).join('\n'); }
+  function stats() {
+    const top = $('#llTop'); if (!top) return;
+    const tm = RD.timer && RD.timing ? RD.timer() : null, ms = tm ? tm.ms : null, P = RD.post;
+    const post = ms ? ['resolve', 'ssao', 'ssao blur', 'bloom', 'shafts', 'composite'].reduce((a, k) => a + (L.S.post.on && ms[k] ? ms[k] : 0), 0) : 0;
+    top.innerHTML = `${L.fps.toFixed(0)} fps · ${L.ms.toFixed(1)} ms/frame` + (ms ? `<br>GPU: shadows ${(ms.shadows || 0).toFixed(2)} · scene ${(ms.scene || 0).toFixed(2)} · post ${post.toFixed(2)} ms` + (L.S.post.on && ms.composite ? ` (composite ${ms.composite.toFixed(2)})` : '') : '<br>GPU timer not offered by this browser: toggle an effect and watch ms/frame')
+      + (L.S.post.on && P ? ` · MSAA ${P.stats.samples}x` : '') + (RD.postFail ? `<br><span style="color:#ff9a80">Post failed: ${esc(RD.postFail)}</span>` : '');
+    for (const x of document.querySelectorAll('#llab [data-cost]')) { if (!ms) { x.textContent = ''; continue; } const v = x.dataset.cost.split(',').reduce((a, k) => a + (ms[k] || 0), 0); x.textContent = v ? v.toFixed(2) + ' ms' : ''; }
+  }
+  let saveT = 0;
+  function changed(rebuild) {
+    try { llApply(L.S); } catch (e) { L.errs.push('apply: ' + e.message); info(); }
+    if (rebuild) panel();
+    clearTimeout(saveT); saveT = setTimeout(() => { const all = llGet('last', {}); all[L.map] = L.S; llSet('last', all); if (TH.paint && !L.orbit) try { paintBackdrop(); } catch (e) {} }, 250);
+    if (RD.timer && RD.timer()) RD.timer().reset();
+  }
+  function setState(S, why) { L.S = llMerge(llBase(L.map), S || {}); L.S.map = L.map; L.note = why || ''; changed(true); }
+  const copyText = txt => { const done = () => { L.note = 'Copied.'; info(); }; try { navigator.clipboard.writeText(txt).then(done, () => fallback()); } catch (e) { fallback(); }
+    function fallback() { const ta = $('#llJson'); if (!ta) return; ta.value = txt; ta.select(); try { document.execCommand('copy'); done(); } catch (e) { L.note = 'Select the text and copy it.'; info(); } } };
+  function bake() {
+    const B = llBase(L.map), S = L.S, js = o => JSON.stringify(o).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ');
+    const light = Object.assign({}, S.light); if (Math.abs(light.fogFar - (light.fogNear + .95)) < 1e-3) delete light.fogFar;
+    const diff = (a, b) => { const o = {}; for (const k in a) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) o[k] = a[k]; return o; };
+    const post = {}; for (const k in S.post) if (k !== 'on') { const d = diff(S.post[k], LL_DEF.post[k]); if (S.post[k].on) post[k] = Object.assign({ on: 1 }, d); }
+    return `LIGHT_DEF.${L.map} = ${js(light)};\nMAP_MOOD.${L.map} = ${js(S.mood)};\nLOOK_DEF.${L.map} = ${js({ fwd: diff(S.fwd, LL_DEF.fwd), post })};`;
+  }
+  function bind() {
+    const el = $('#llab');
+    for (const x of el.querySelectorAll('details[data-g]')) x.ontoggle = () => { L.open[x.dataset.g] = x.open ? 1 : 0; llSet('open', L.open); };
+    for (const x of el.querySelectorAll('input[data-p],select[data-p]')) {
+      const p = x.dataset.p, ev = x.type === 'range' ? 'oninput' : 'onchange';
+      x[ev] = () => {
+        const v = x.type === 'checkbox' ? (x.checked ? 1 : 0) : x.type === 'range' || x.dataset.num ? +x.value : x.value;
+        put(L.S, p, v); const b = el.querySelector(`[data-v="${p}"]`); if (b) b.textContent = fmt(v, +x.step || 1);
+        changed(false);
+      };
+      if (x.classList.contains('ll-on')) x.onclick = e => e.stopPropagation();
+    }
+    $('#llMap').onchange = e => { const q = new URLSearchParams(location.search); q.set('lightlab', '1'); q.set('map', e.target.value); location.search = '?' + q.toString(); };
+    $('#llPick').onchange = e => { L.pick = e.target.value || null; L.note = L.pick ? 'Click a cell to place it.' : ''; info(); };
+    $('#llWalk').onchange = e => { L.walk = e.target.checked; };
+    $('#llWalker').onchange = e => { L.walker = e.target.value; for (const c of G.creeps) if (c.__walk) c.dead = true; G.creeps = G.creeps.filter(c => !c.__walk); for (const t of G.towers) if (t.__dummy) { t.__dummy.dead = true; G.creeps.splice(G.creeps.indexOf(t.__dummy), 1); t.__dummy = null; } };
+    $('#llUse').onchange = e => { const u = llGet('use', {}); if (e.target.checked) u[L.map] = L.S; else delete u[L.map]; llSet('use', u); L.note = e.target.checked ? 'Normal play on this device now draws ' + MAPS[L.map].name + ' with this look (Graphics Low: without the post).' : 'Normal play is back to the map’s own look.'; info(); };
+    for (const x of el.querySelectorAll('[data-tier]')) x.onclick = () => { L.tier = +x.dataset.tier; panel(); };
+    for (const x of el.querySelectorAll('[data-pose]')) x.onclick = () => { L.pose = x.dataset.pose; panel(); };
+    for (const x of el.querySelectorAll('[data-pre]')) x.onclick = () => setState(LL_PRESETS[x.dataset.pre], x.dataset.pre + ' (on ' + MAPS[L.map].name + ')');
+    for (const x of el.querySelectorAll('[data-a]')) x.onclick = () => {
+      const a = x.dataset.a, saved = llGet('presets', {});
+      if (a === 'hide') { L.hide = true; el.classList.add('hide'); $('#llShow').classList.add('on'); }
+      else if (a === 'post') { L.S.post.on = L.S.post.on ? 0 : 1; changed(true); }
+      else if (a === 'game') setOrbit(false);
+      else if (a === 'orbit') setOrbit(true);
+      else if (a === 'reset') { L.yaw = 0; L.pitch = 57 * Math.PI / 180; L.oh = 9; L.tgt = [5.5, 0, 7]; }
+      else if (a === 'freeze') { L.freeze = !L.freeze; panel(); }
+      else if (a === 'exit') { const q = new URLSearchParams(location.search); q.delete('lightlab'); q.delete('map'); location.search = q.toString() ? '?' + q.toString() : ''; }
+      else if (a === 'all') { for (const t of G.towers) { t.__pose = L.pose; if (t.tier !== L.tier) { t.tier = L.tier; try { t.st = effStats(t); } catch (e) {} } } panel(); }
+      else if (a === 'clear') { for (const t of G.towers.slice()) removeAt(t.x, t.y); for (const c of L.foes) { c.dead = true; } G.creeps = G.creeps.filter(c => !c.dead); L.foes = []; panel(); }
+      else if (a === 'def') setState(null, 'The map as the game draws it today.');
+      else if (a === 'load') { const n = $('#llSaved').value; if (saved[n]) setState(saved[n], 'Loaded ' + n); }
+      else if (a === 'del') { const n = $('#llSaved').value; if (saved[n]) { delete saved[n]; llSet('presets', saved); L.note = 'Deleted ' + n; panel(); } }
+      else if (a === 'save') { const n = ($('#llName').value || '').trim() || 'Preset ' + (Object.keys(saved).length + 1); saved[n] = llClone(L.S); L.note = llSet('presets', saved) ? 'Saved ' + n + ' on this device.' : 'This browser would not save (private mode?): use Export.'; panel(); }
+      else if (a === 'export') { $('#llJson').value = JSON.stringify(L.S, null, 1); }
+      else if (a === 'copy') copyText($('#llJson').value || JSON.stringify(L.S, null, 1));
+      else if (a === 'import') { try { const o = JSON.parse($('#llJson').value); setState(o, 'Loaded the JSON.'); } catch (e) { L.note = 'That is not valid JSON: ' + e.message; info(); } }
+      else if (a === 'bake') { const s = bake(); $('#llJson').value = s; copyText(s); L.note = 'Paste these three lines into src/maps.js after the tables (see CLAUDE.md, The Light Lab).'; info(); }
+    };
+  }
+  // the pointer over the field: click places, right-click removes; in Orbit, a drag orbits and the wheel zooms
+  function pointer() {
+    const cv = document.getElementById('cv') || document.querySelector('canvas'); if (!cv) return;
+    let dn = null;
+    const mine = e => L.ready && (e.target === cv);
+    const stop = e => { e.stopImmediatePropagation(); e.preventDefault(); };
+    window.addEventListener('pointerdown', e => { if (!mine(e)) return; dn = { x: e.clientX, y: e.clientY, b: e.button, yaw: L.yaw, pitch: L.pitch, moved: false }; stop(e); }, true);
+    window.addEventListener('pointermove', e => { if (!dn) return; if (Math.hypot(e.clientX - dn.x, e.clientY - dn.y) > 4) dn.moved = true;
+      if (L.orbit && dn.b === 0 && dn.moved) { L.yaw = dn.yaw - (e.clientX - dn.x) * .008; L.pitch = Math.max(.12, Math.min(1.5, dn.pitch + (e.clientY - dn.y) * .006)); } if (e.target === cv) e.stopImmediatePropagation(); }, true);
+    window.addEventListener('pointerup', e => { if (!dn) return; const d = dn; dn = null; if (e.target === cv) stop(e); if (d.moved) return;
+      const p = pickGround(e.clientX, e.clientY); if (d.b === 2) removeAt(p.x, p.y); else if (d.b === 0) place(Math.floor(p.x), Math.floor(p.y)); }, true);
+    for (const t of ['click', 'mousedown', 'mouseup', 'touchstart', 'dblclick']) window.addEventListener(t, e => { if (mine(e)) e.stopImmediatePropagation(); }, true);
+    window.addEventListener('contextmenu', e => { if (mine(e)) stop(e); }, true);
+    window.addEventListener('wheel', e => { if (!mine(e) || !L.orbit) return; L.oh = Math.max(1.5, Math.min(20, L.oh * Math.exp(e.deltaY * .0012))); stop(e); }, { capture: true, passive: false });
+    window.addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.key === 'h' || e.key === 'H') { L.hide = !L.hide; $('#llab').classList.toggle('hide', L.hide); $('#llShow').classList.toggle('on', L.hide); e.stopImmediatePropagation(); } }, true);
+  }
+
+  /* ---- start, once the game has loaded ---- */
+  function boot() {
+    if (typeof G === 'undefined' || !G || G.state !== 'title' || typeof renderView !== 'function' || typeof layoutAll !== 'function' || !RD
+      || (typeof UNIT_MDL !== 'undefined' && !UNIT_MDL.oathbound && (boot.n = (boot.n || 0) + 1) < 150)) { setTimeout(boot, 200); return; }   /* (the sculpted models come in later asset scripts: wait up to 30s for them) */
+    try { if (typeof hideOverlay === 'function') hideOverlay(); } catch (e) {}
+    try { if (typeof AudioSys !== 'undefined' && AudioSys.pref) AudioSys.pref.music = false; } catch (e) {}
+    if (!MAPS[L.map]) L.map = 'clearing';
+    const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
+    const p = document.createElement('div'); p.id = 'llab'; document.body.appendChild(p);
+    const sh = document.createElement('button'); sh.id = 'llShow'; sh.className = 'btn ghost'; sh.textContent = 'Light Lab (H)'; sh.onclick = () => { L.hide = false; p.classList.remove('hide'); sh.classList.remove('on'); }; document.body.appendChild(sh);
+    frame = function () {};   // the game's own loop stops; the lab drives the clock (as the Model Lab does)
+    try { setMap(L.map); } catch (e) { L.errs.push('map: ' + e.message); }
+    newGame('normal', null, null, 0);
+    Object.assign(G, { paused: false, hold: false, phase: 'build', countdown: 0, mute: true });
+    RD.timing = true;
+    layoutAll();
+    const last = llGet('last', {})[L.map];
+    L.S = llMerge(llBase(L.map), last || {}); L.S.map = L.map;
+    llApply(L.S);
+    L.ready = true; panel(); pointer();
+    // a few units to start with, so the light has something to fall on
+    if (Q.get('units') !== '0') {
+      const start = ['u:wb_oathbound', 'u:gladebow', 'u:ch_maren', 'u:steamhammer', 'u:cc_mageling'], cells = [[3, 5], [5, 5], [7, 5], [4, 8], [6, 8]];
+      start.forEach((u, k) => { const id = u.slice(2); if (!forceOf(id)) return; L.pick = u; place(cells[k][0], cells[k][1]); });
+      L.pick = null; L.note = ''; panel();
+    }
     requestAnimationFrame(labFrame);
   }
   boot();
