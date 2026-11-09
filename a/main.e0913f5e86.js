@@ -1,4 +1,4 @@
-const BUILD_TAG = '1431baa+@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'bdebd83+@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -82471,7 +82471,7 @@ if (typeof UI_ART !== 'undefined' && typeof MISSING_ART !== 'undefined') for (co
    under his right fist, his left fist kept on the haft by IK wherever the clip has both hands on it); the fire coming out
    of it is hammerfire.js.
    - His moves (DW_CAST, the clips' own frames at 30 fps; the clip named, then [seconds, frame] keys):
-       rest           out of the fight: the hammer over his right shoulder, its head behind his back (DW_REST, owner)
+       rest           out of the fight: the hammer resting on his right shoulder, its head behind him (DW_REST, owner)
        ready          a foe near: the club clip's guard, the hammer up by his shoulder, breathing
        the strike     (his slam on every walker round him) the club clip's first blow: over the wind-up the hammer swings
                       down behind him and up over his head (frames 0-47), on the shot it comes down (47-51 in 0.075s, when
@@ -82499,9 +82499,12 @@ const DW_WIND = 47, DW_HIT = .075, DW_SLAM = [[0, 47], [DW_HIT, 51], [.22, 52], 
 // (yaw: the body turned about the vertical, radians toward his left, so the blow lands before him, on his target: the clips
 // strike off to his right; eased like the pose)
 const DW_YAW = { strike: .4, ready: .15 };
-// at rest, out of the fight: the hammer over his right shoulder, its head behind him (owner: "rest the hammer on their back
-// during idle like their concept art", "over their shoulder"): a frame of the club clip's wind-up, held, breathing
-const DW_REST = { clip: 'club', f: 18 };
+// at rest, out of the fight: the hammer resting on his right shoulder, its head behind him (owner: "rest the hammer on their
+// back during idle like their concept art", "over their shoulder", "hammer idle is wrong, should be resting on his shoulder"):
+// the rig's own rest (assets/unit-art/dwarf/scripts/rig.py: the right fist before his shoulder, the haft over the pauldron,
+// the head lying behind it outboard of his tanks, the left arm easy at his side), held, breathing (the club clip's wind-up
+// frame it replaces held the hammer up over his head)
+const DW_REST = { clip: 'rest', f: 0 };
 function dwKeys(K, u) {   // seconds -> the clip's frame, straight between keys (the clip keeps its own timing)
   if (u <= K[0][0]) return K[0][1];
   for (let i = 1; i < K.length; i++) if (u <= K[i][0]) { const a = K[i - 1], b = K[i]; return a[1] + (b[1] - a[1]) * (u - a[0]) / (b[0] - a[0]); }
@@ -82752,7 +82755,10 @@ if (typeof pauseMenu === 'function') {
    - Out of the fight he holds it at port arms; a foe in reach (in a wave), he aims; each shot kicks; when the next shot is a
      while off he works the bolt. Every move is eased into from where he was (a per-unit pose followed at a rate by kind).
    - The shot leaves the rifle's muzzle where it is this frame (the Gun bone carries the mark; unitTip -> ihMuzzle), so the
-     muzzle blast (mortarfire.js) and the tracer start there. */
+     muzzle blast (mortarfire.js) and the tracer start there.
+   - He aims bladed like a rifleman (a dwarf's arms are too short to reach the fore-end square on): the rig turns his rifle
+     aimYaw to his left of his feet; while he aims, fires or works the bolt he is turned that much to his right (eased), so
+     the barrel points at the foe. */
 const GM_UNIT = 'thundergun';   // which unit the gunman draws
 UM_UNITS[GM_UNIT] = { mdl: 'thundergun', k: 1.0, rig: 'gunman' };
 const GM = { FIRE: .45, RELOAD: 1.5, RATE: { idle: 4, aim: 10, fire: 60, reload: 24 } };
@@ -82761,31 +82767,62 @@ if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.thundergun) {
   const _gmAtk = FORCE_ATTACK.thundergun;
   FORCE_ATTACK.thundergun = function (t) { const r = _gmAtk.apply(this, arguments); try { t._gmShotAt = G.time; t._gmBig = t.ihClapAt === G.time; } catch (e) {} return r; };
 }
+function gmYaw(M) { const m = UNIT_MDL[M.S.mdl].meta; return m && m.aimYaw ? -m.aimYaw : 0; }
 function gmClip(M, name, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[name]; return c[0] + Math.max(0, Math.min(c[1] - 1.001, f)); }
 // what he does now: { f (the anim's frame), rate (how fast the pose follows) }
 function gmCtl(t, live, M) {
-  if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : gmClip(M, 'aim', 0), rate: 0 }; }
+  if (!live) { const sf = umShowF(M, 'idle'); return sf != null ? { f: sf, rate: 0, yaw: 0 } : { f: gmClip(M, 'aim', 0), rate: 0, yaw: gmYaw(M) }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t.ihCrankAt != null && t.ihCrankAt > (t._gmShotAt || -9)) t._gmShotAt = t.ihCrankAt;
   const s = t._gmShotAt == null ? 9 : now - t._gmShotAt;
-  if (s >= 0 && s < GM.FIRE) return { f: gmClip(M, 'fire', s * 30 * (t._gmBig ? .8 : 1)), rate: GM.RATE.fire };
+  const ay = gmYaw(M);
+  if (s >= 0 && s < GM.FIRE) return { f: gmClip(M, 'fire', s * 30 * (t._gmBig ? .8 : 1)), rate: GM.RATE.fire, yaw: ay };
   const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
   // the bolt worked between shots, when the next is far enough off
   const ru = s - GM.FIRE;
-  if (ru >= 0 && ru < GM.RELOAD && (t.cd || 0) >= (GM.RELOAD - ru) * .7) return { f: gmClip(M, 'reload', ru * 30), rate: GM.RATE.reload };
-  if (fight || s < 1.6 || (t.ihAimAt != null && now - t.ihAimAt < 1)) return { f: gmClip(M, 'aim', ((now + (t.anim || 0) * 3) * 30) % A.aim[1]), rate: GM.RATE.aim };
-  return { f: gmClip(M, 'idle', ((now + (t.anim || 0) * 3) * 30) % A.idle[1]), rate: GM.RATE.idle };
+  if (ru >= 0 && ru < GM.RELOAD && (t.cd || 0) >= (GM.RELOAD - ru) * .7) return { f: gmClip(M, 'reload', ru * 30), rate: GM.RATE.reload, yaw: ay };
+  if (fight || s < 1.6 || (t.ihAimAt != null && now - t.ihAimAt < 1)) return { f: gmClip(M, 'aim', ((now + (t.anim || 0) * 3) * 30) % A.aim[1]), rate: GM.RATE.aim, yaw: ay };
+  return { f: gmClip(M, 'idle', ((now + (t.anim || 0) * 3) * 30) % A.idle[1]), rate: GM.RATE.idle, yaw: 0 };
 }
 const _gmT = new Float32Array(SKIN_MAX * 12);
+// a bone's pose as [3x3 (columns), translation], and back; composed and inverted (rigid)
+const gmGet = (o, b) => { const k = b * 12; return [[o[k], o[k + 1], o[k + 2], o[k + 4], o[k + 5], o[k + 6], o[k + 8], o[k + 9], o[k + 10]], [o[k + 3], o[k + 7], o[k + 11]]]; };
+const gmSet = (o, b, [m, p]) => { const k = b * 12; o[k] = m[0]; o[k + 1] = m[1]; o[k + 2] = m[2]; o[k + 4] = m[3]; o[k + 5] = m[4]; o[k + 6] = m[5]; o[k + 8] = m[6]; o[k + 9] = m[7]; o[k + 10] = m[8]; o[k + 3] = p[0]; o[k + 7] = p[1]; o[k + 11] = p[2]; };
+const gmMul = ([a, p], [b, q]) => [UMX.mul(a, b), UMX.add(UMX.mv(a, q), p)];
+const gmT3 = a => [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]];
+const gmInv = ([a, p]) => { const t = gmT3(a); return [t, UMX.sc(UMX.mv(t, p), -1)]; };
+const gmPt = ([a, p], v) => UMX.add(UMX.mv(a, v), p);
+// the rifle kept in his hands through every blend (owner: "isnt holding his gun when reloading, its only in his hand for a
+// second as he's shooting it"): the pose blend turns each bone on its own, and the rifle hangs from no bone, so between two
+// moves it drifted off on its own path. After the blend it is set back in the right fist as the move being eased into holds
+// it there, and the left arm reaches (IK) to where that move's left hand holds the rifle, the hand turned to match.
+function gmHold(R, o, tg) {
+  const bx = R.bix, gb = R.mk.gunBone, rh = bx.RightHand, lh = bx.LeftHand;
+  if (gb == null || rh == null || lh == null || bx.LeftArm == null || bx.LeftForeArm == null) return;
+  const D = gmMul(gmGet(o, rh), gmInv(gmGet(tg, rh)));   // (the right fist's drift from the move's own, carried onto the rifle)
+  gmSet(o, gb, gmMul(D, gmGet(tg, gb)));
+  const want = gmMul(D, gmGet(tg, lh)), Wt = gmPt(want, R.B[lh].h);
+  const S = umXf(o, bx.LeftArm, R.B[bx.LeftArm].h), E = umXf(o, bx.LeftForeArm, R.B[bx.LeftForeArm].h);
+  umIK(R, o, bx.LeftArm, bx.LeftForeArm, lh, Wt, UMX.sub(E, S));
+  const cur = gmGet(o, lh);
+  umTurn(o, R.sub.LeftHand, UMX.mul(want[0], gmT3(cur[0])), umXf(o, lh, R.B[lh].h));
+}
+const gmTurnList = R => R._gmTurn || (R._gmTurn = R.mk.gunBone != null && !R.sub.Hips.includes(R.mk.gunBone) ? R.sub.Hips.concat([R.mk.gunBone]) : R.sub.Hips);
 function gmPose(M, t, P, live) {
   const R = M.R, nb = R.anim.nb;
-  if (!live) { umMixFrame(R, P.f, R.out); return R.out; }
+  if (!live) { umMixFrame(R, P.f, R.out); if (P.yaw) umTurn(R.out, gmTurnList(R), UMX.ry(P.yaw), [0, 0, 0]); return R.out; }
   umMixFrame(R, P.f, _gmT);
   const now = G.time, dt = t._gmT == null ? 1 : Math.max(0, Math.min(.1, now - t._gmT)); t._gmT = now;
   if (!t._gmO || t._gmO.length !== nb * 12) { t._gmO = new Float32Array(nb * 12); t._gmO.set(_gmT.subarray(0, nb * 12)); }
   const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
   umBlendPose(R, t._gmO, _gmT, k, t._gmO);
-  const o = R.out; o.set(t._gmO); return o;
+  if (k < .999) gmHold(R, t._gmO, _gmT);
+  const o = R.out; o.set(t._gmO);
+  // (turned with the aim: his feet stay square to the foe's side, the barrel on it; eased as the pose is, a little slower)
+  const ky = P.rate ? 1 - Math.exp(-dt * Math.min(P.rate, 14)) : 1;
+  t._gmY = t._gmY == null ? P.yaw || 0 : t._gmY + ((P.yaw || 0) - t._gmY) * ky;
+  if (t._gmY) umTurn(o, gmTurnList(R), UMX.ry(t._gmY), [0, 0, 0]);   // (the rifle with him: it hangs from no bone)
+  return o;
 }
 const GM_BASE_H = .05;
 const _gmA = new Float32Array(16), _gmB = new Float32Array(16), _gmC = new Float32Array(16);
