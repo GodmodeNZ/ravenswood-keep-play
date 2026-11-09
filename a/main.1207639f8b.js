@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ccbbd13@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '392ff63@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7210,7 +7210,7 @@ function xpHud() {
    IV only at wave 14-17 and never V by wave 20. */
 const VET_AST = 1, VET_WIN = 8, VET_HIT = false;   // (VET_AST: an assist's worth in a save from before credit by contribution)
 let VET_ACT = null, VET_TOUCH = 8;   // VET_TOUCH: how long ago a slow, root, stun, burn ... may have landed and still count (seconds)   // the unit whose code is running (updateTowers, impact, a hazard's tick): stuns, mana and wards it gives count as its help
-const VET_NEED = [150, 220, 290];   // veterancy that opens tier IV, V and VI
+const VET_NEED = [190, 280, 370];   // veterancy that opens tier IV, V and VI
 const vetOn = () => typeof G !== 'undefined' && !!G && !G.vs;
 const vetUnit = o => !!o && !!o.def && o.invested !== undefined && !o.def.wall;   // one of your units (not a foe, a hazard or the hero's spell)
 const vetNeed = n => n >= 3 ? VET_NEED[Math.min(2, n - 3)] : 0;   // what tier index n (0-based: 3 is tier IV) asks for
@@ -8063,7 +8063,7 @@ function wfFist(g, tier) {
     wfSpike(g, [h[0] + .05, h[1] + .006, h[2] - .07], [.9, .25, -.4], .06, .014, trim); });   // its ring; a flared point on the cuff
 }
 // a banner on a short pole, carried on the back (sashimono): the unit's own leaves at IV, larger and gilt at V and VI
-function backBanner(g, x, y0, y1, z, w, h, col, colL, tier) {
+function backBanner(g, x, y0, y1, z, w, h, col, colL, tier) { return;   /* (owner, 10 Nov 2026: no banners on upgraded units) */
   mat(g, 'woodgrain', () => g.seg([x, y0, z], [x, y1, z], .012, WE.wood));
   mat(g, 'cloth', () => { for (const dz of [-.002, .002]) { const q = [[x, y1 - .02, z + dz], [x + w, y1 - .03, z + dz], [x + w * .8, y1 - h, z + dz], [x, y1 - h * .9, z + dz]];
     if (dz < 0) g.quad(q[0], q[1], q[2], q[3], col); else g.quad(q[3], q[2], q[1], q[0], col); } });
@@ -18108,10 +18108,6 @@ const _ihM = new Float32Array(16), _ihM2 = new Float32Array(16);
 function ihAscMesh(u, tier) {
   return dynMesh('ihasc_' + u + tier, g => ihPal(u, () => g.with(T(0, 0, 0, 0, 0, 0, IH_K), () => {
     const P = IHP, hh = .95 + (tier - 3) * .12;
-    ihArtMat(g, 'woodgrain', () => g.seg([-.12, .2, -.17], [-.12, hh, -.17], .018, '#5a3a22'));
-    ihArtMat(g, 'gilt', () => { g.ico(-.12, hh + .02, -.17, .03, P.trim); g.seg([-.12, hh - .02, -.17], [.12, hh - .02, -.17], .012, P.trim); });
-    ihArtMat(g, 'cloth', () => { const y0 = hh - .02, y1 = hh - .3 - (tier - 3) * .05; for (const z of [-.172, -.168]) { g.quad([-.12, y0, z], [.12, y0, z], [.12, y1, z], [-.12, y1, z], '#7a1a14'); g.quad([.12, y0, z], [-.12, y0, z], [-.12, y1, z], [.12, y1, z], '#7a1a14'); } g.tri([-.12, y1, -.17], [.12, y1, -.17], [0, y1 - .08, -.17], '#7a1a14'); g.tri([.12, y1, -.17], [-.12, y1, -.17], [0, y1 - .08, -.17], '#7a1a14'); });
-    g.em = .8; ihArtMat(g, 'gilt', () => { g.box(0, hh - .14, -.164, .07, .1, .01, '#e0a040'); g.box(0, hh - .14, -.176, .07, .1, .01, '#e0a040'); }); g.em = 0;   // the clan's anvil-mark
     if (tier >= 4) { g.em = 1; for (const sd of [-1, 1]) g.box(sd * .17, .5, .0, .09, .012, .03, '#ff8a2a'); g.em = 0; }
     if (tier >= 5) ihArtMat(g, 'gilt', () => { g.cyl(0, .68, -.01, .12, .1, .03, 10, P.trim, { capT: false }); for (let k = 0; k < 5; k++) { const a = (k - 2) * .5; g.with(T(Math.sin(a) * .11, .7, Math.cos(a) * .11 - .01), () => g.cyl(0, 0, 0, .018, 0, .06, 4, P.trim)); } });
   })));
@@ -53968,7 +53964,7 @@ const AudioSys = (() => {
         }
         pts.push([L, 0]);
         const f0 = 950 * p, w = (k ? .7 : 1) * (big ? .8 : 1);
-        if (recSfx(tk, take('spin'), { rate: big ? .9 : 1, v: .13 * w, pan: pk * .6, raw: 1 })) continue;   // recorded spin, as sent
+        if (bladeSpin(w * (big ? 1.25 : 1), tk - t, big ? .97 : 1)) continue;   // a spinning blade (Zapsplat takes, bladeSpin), in place of the old spin takes that sounded like flame
         nhit(tk, { n: 'p', type: 'bandpass', fp: [[0, f0 * .85], [L * .4, f0 * 1.15], [L, f0 * .7]], q: 1.5, pts, v: (.34 + .04 * lv) * w, pan: pk * .4, panTo: pk, panT: L, room: .15 });
         nhit(tk, { n: 'b', type: 'lowpass', f: 300, pts, v: .2 * w, pan: pk * .4 });
       }
@@ -55782,8 +55778,8 @@ const AudioSys = (() => {
       } catch (e) {}
     }
   }
-  function morPlay(B, at, len, vol, lp, rate) {   // (lp: a low-pass's cutoff in Hz, softening a take's bright top at play time; rate: played a touch faster or slower)
-    const r = rate || 1, t = now(), d0 = Math.min(len, B.duration - at); if (d0 <= .05) return; const d = d0 / r;
+  function morPlay(B, at, len, vol, lp, rate, dt) {   // (lp: a low-pass's cutoff in Hz, softening a take's bright top at play time; rate: played a touch faster or slower; dt: start that much later)
+    const r = rate || 1, t = now() + (dt || 0), d0 = Math.min(len, B.duration - at); if (d0 <= .05) return; const d = d0 / r;
     const src = C.createBufferSource(), g = gn(1); src.buffer = B; if (r !== 1) src.playbackRate.value = r;
     g.gain.setValueAtTime(1, t); g.gain.setValueAtTime(1, t + Math.max(0, d - .12)); g.gain.linearRampToValueAtTime(0, t + d);
     let f = null; if (lp) { f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = .5; src.connect(f); f.connect(g); } else src.connect(g);
@@ -55819,19 +55815,33 @@ const AudioSys = (() => {
   // peak (optional): seconds from now when the take's loudest moment should land (a swing's whoosh on the blow)
   const fireBufs = {}; let fireWait = 0;
   function fireLoad() {
-    if (fireWait || typeof FIRE_SFX === 'undefined') return; fireWait = 1;
-    for (const k in FIRE_SFX) {
+    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined')) return; fireWait = 1;
+    for (const k in fxTakes()) {
       try {
-        const d = FIRE_SFX[k].d, s = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+        const d = fxTakes()[k].d, s = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
         const p = C.decodeAudioData(u.buffer, b => { fireBufs[k] = b; }, () => {}); if (p && p.catch) p.catch(() => {});
       } catch (e) {}
     }
   }
+  // (the glaive's spinning-blade takes, bladesfxdata.js, are cut the same way and play through the same loader)
+  let fxAll = null;
+  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}));
   function firePlay(k, vol, gap, peak, lp, rate) {
-    fireLoad(); const B = fireBufs[k], F = typeof FIRE_SFX !== 'undefined' && FIRE_SFX[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
+    fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
     let at = F.at, len = F.len;
     if (peak != null) { const skip = Math.max(0, F.pk - peak); at += skip; len -= skip; }   // (started late enough that its peak lands on time)
     morPlay(B, at, len, vol, lp, rate); return true;
+  }
+  // the glaive's throw (owner: "glaive throw on glaive units sounds like flame sound. can you find spinning blade sound
+  // instead"): a spinning blade whirring away, "whum-whum-whum", from the owner's Zapsplat "fast swooshes" pack (bladesfxdata.js,
+  // tools/make_bladesfx.py). Three cut takes in turn, never the same twice running, each a touch louder or softer and at most 3%
+  // faster or slower. v: loudness, dt: start that much later (the second of a pair). The caller's ok('glaive') thins a busy field.
+  const GV_SPIN = [['gvSpin1', .08], ['gvSpin2', .08], ['gvSpin3', .072]]; let gvSpinK = -1;
+  function bladeSpin(v, dt, rate) {
+    fireLoad(); if (gvSpinK < 0) gvSpinK = Math.floor(Math.random() * GV_SPIN.length);
+    gvSpinK = (gvSpinK + 1 + (Math.random() < .3 ? 1 : 0)) % GV_SPIN.length;
+    const [k, kv] = GV_SPIN[gvSpinK], B = fireBufs[k], F = fxTakes()[k]; if (!B || !F) return false;
+    morPlay(B, F.at, F.len, kv * v * (.9 + Math.random() * .15), null, Math.max(.97, Math.min(1.03, (rate || 1) * (.98 + Math.random() * .04))), dt); return true;
   }
   // one of a sound's takes [key, vol] in turn, never the same twice running (the vols even out the takes' loudness)
   const fireRound = {};
@@ -57417,6 +57427,13 @@ void main(){
       float arm=min(max(ad.x/.16,ad.y/.034), max(ad.y/.16,ad.x/.034)); m=max(m, smoothstep(1.15,.8,arm)*step(e,1.)); }
     c=mix(c, vec3(.16,.15,.13), m); a=max((smoothstep(.7,.97,e)*.85+.22)*step(e,1.)*tint, m*.85); }
   else if(s==11){ float ang=atan(vUV.y,vUV.x); float n=fbm(vUV*3.+p*7.); float l=abs(fract(ang*1.11+n*.5+p)-.5); a = (smoothstep(.06,.0,l*(.35+r*1.4))*smoothstep(1.,.25,r) + smoothstep(.32,.0,r)*.7)*(.7+.3*n); }
+  else if(s==15){ // a small five-point star (a unit's level): a dark rim, the fill with a bright core; p>=1 adds a gold glint passing over it (fract part: its phase)
+    vec2 q=vUV*1.06; const vec2 k1=vec2(.809017,-.587785); const vec2 k2=vec2(-.809017,-.587785);
+    q.x=abs(q.x); q-=2.*max(dot(k1,q),0.)*k1; q-=2.*max(dot(k2,q),0.)*k2; q.x=abs(q.x); q.y-=.95;
+    vec2 ba=.46*vec2(-k1.y,k1.x)-vec2(0.,1.); float h=clamp(dot(q,ba)/dot(ba,ba),0.,.95); float d=length(q-ba*h)*sign(q.y*ba.x-q.x*ba.y);
+    float fw=max(fwidth(d),.02); float fill=smoothstep(fw,-fw,d+max(.2,fw*1.6)); a=smoothstep(fw,-fw,d);
+    c=mix(vec3(.06,.04,.02), c*(1.+.45*exp(-r*r*7.)), fill);
+    if(p>=1.){ float sw=vUV.x*.7+vUV.y*.7-(fract(uTime*.35+p)*5.-2.5); c+=vec3(1.,.95,.75)*exp(-sw*sw*6.)*.75*fill; } }
   if(a<.004) discard;
   o = vec4(c, vCol.a*a);
 }`;
@@ -72321,11 +72338,27 @@ function drawTower(t) {
   if (G.moveT === t) { const f = .5 + .5 * Math.sin(vt * 7); QADD.ground(t.x, t.y, .06, .7 + .1 * f, .7 + .1 * f, [.6, .7, 1.2, .5 + .4 * f], 4, .12, vt); }   // a Waystone waiting for where to move it
   if (t.lightT > G.time) { const a = Math.min(1, (t.lightT - G.time) * 2); QADD.ground(t.x, t.y, .05, .62, .62, [1, .92, .6, .45 * a], 3, .1); if (!t.def.unit) QADD.bill(RD, t.x, towerTop(t) * .6, t.y, .7, towerTop(t) * .8, [1, .95, .7, .12 * a], 1, 0); }   // (a unit: the ring only, no veil over it)
   if (t.hp < t.maxHp) towerBar(t);
+  const qn0 = QO.n;
   if (t.ab && typeof drawManaBar === 'function') drawManaBar(t);   // a force unit's mana (abilities.js)
+  const qn1 = QO.n;
   if (typeof drawHeatBar === 'function') drawHeatBar(t);   // Ironhold's heat gauge, under the mana bar (forces_ironhold_a.js)
   if (typeof drawGrowthBar === 'function') drawGrowthBar(t);   // the Grove's Growth gauge, under the mana bar (forces_zz_growth.js)
+  drawLevelStars(t, QO.n > qn0, QO.n > qn1);   // the unit's level as small stars, under the mana bar (or where it would be)
   if (typeof ccDrawPips === 'function') ccDrawPips(t);   // the Conclave's Arcane Charges, pips over the bars (forces_conclave_b.js)
   if (t.ab && t.ab.cast && typeof drawCastBar === 'function') drawCastBar(t);   // its cast bar (forces_zz_casttimes.js)
+}
+/* A force unit's level (tier I-VI) as a row of small stars under its mana bar, or where the mana bar sits when it is hidden.
+   Tiers opened by veterancy (IV-VI) are a richer gold with a glint passing over them (not on Low). */
+function drawLevelStars(t, manaShown, gaugeShown) {
+  if (!t.def || !t.def.unit || t.def.wall || t.wrecked || t.build > .5 || (typeof inIcon !== 'undefined' && inIcon)) return;
+  const n = clamp((t.tier | 0) + 1, 1, 6), sel = G.sel && G.sel.ref === t, glint = GFX !== 'low';
+  const top = towerTop(t) + .45 - (t.hp < t.maxHp ? .11 : 0) - (manaShown ? .075 : 0) - (gaugeShown ? .06 : 0);
+  const r = .042, gap = .088, x0 = -(n - 1) * gap / 2, R = RD.right, al = sel ? 1 : .88;
+  for (let k = 0; k < n; k++) {
+    const d = x0 + k * gap, vet = k >= 3;
+    const col = vet ? [1, .78, .26, al] : [.93, .89, .76, al];
+    QO.bill(RD, t.x + R[0] * d, top + R[1] * d, t.y + R[2] * d, r, r, col, 15, vet && glint ? 1 + ((t.id * .37 + k * .06) % .9) : 0);
+  }
 }
 function towerBar(t) {
   const top = towerTop(t) + .45, w = .62, f = clamp(t.hp / t.maxHp, 0, 1);
@@ -78199,8 +78232,9 @@ function gpWhyNot(t, it, i) {
   if (i >= gearSlots(t)) return 'That socket is locked: it opens at a higher tier';
   return gearFits(it, t) ? '' : `Only fits ${gearForA(it)}`;
 }
-// the socket a bag item would go to when nothing says which: the charm socket, else the first free one (else the first)
-const gpAutoSlot = (t, it) => isCharm(it) ? 3 : Math.max(0, Array.from({ length: gearSlots(t) }, (_, k) => k).find(k => !(t.gear || [])[k]) ?? 0);
+// the socket a bag item would go to when nothing says which: the charm socket, else the first free one, else the one the
+// compare shows (itemcompare.js: the weakest, or the one Shift/Alt cycled to)
+const gpAutoSlot = (t, it) => isCharm(it) ? 3 : typeof icSlotFor === 'function' ? icSlotFor(t, it) : Math.max(0, Array.from({ length: gearSlots(t) }, (_, k) => k).find(k => !(t.gear || [])[k]) ?? 0);
 const gpItemAt = (t, i) => i === 3 ? t.charm || null : (t.gear || [])[i] || null;
 // the unit's stats with socket i holding it (null: emptied)
 function gpStatsWith(t, i, it) {
@@ -95172,5 +95206,360 @@ if (typeof drawSelection === 'function' && !drawSelection._shrn) {
   const _shrnDS = drawSelection;
   drawSelection = function () { const r = _shrnDS.apply(this, arguments); try { shrnDraw(); } catch (e) { if (!shrnDraw._err) { shrnDraw._err = 1; console.error(e); } } return r; };
   drawSelection._shrn = 1;
+}
+
+/* ================= ITEM COMPARE and DOUBLE-CLICK TO SOCKET (owner, 10 Nov 2026) =================
+   "add a compare feature for items, allow me to double click the item and it sockets it into an available slot".
+   - Compare: hovering an item in the Bag, the Gear sheet's bag strip, a boss's loot offer or the Anvil's list shows its
+     card beside the card of what it would replace ("Equipped"), WoW style, with every stat it changes in plain numbers
+     ("Damage 18 -> 24 (+6)", green or red) and each spell's damage before and after (gearpanel.js's own numbers).
+     - The unit: the Gear sheet's, else the Bag's, else the selected one; with none (or one that can't use it), the unit
+       it lifts most ("vs your Gladebow Rangers II").
+     - The socket: a free one (against "Empty socket"); with all full, the weakest (icRelicOrder: what each socketed relic
+       adds to the unit's damage a second and its spells' damage a second; the Gear sheet's own pick, gpAutoSlot, uses
+       it too). Shift or Alt cycles through the others.
+     - A charm compares with the charm socket, a weapon with the weapon slot (the issued weapon when it has none).
+   - Double-click (double-tap) a bag item in the Bag or on the Gear sheet: it goes into that unit's first free fitting
+     socket, else in place of the item the compare shows (that one goes back to the bag). No unit, or nothing fits: a toast
+     says why (and, with no unit, which unit it suits best). A single click keeps doing what it did.
+   The rules (what fits, locked sockets, set and class items) are the equip functions' own: equipGear, equipCharm,
+   wpnEquip. Check: node tools/check_item_compare.js -v. */
+const IC = { cyc: 0, key: null, cur: null, last: null, cache: new Map() };
+const icE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const icIsWpn = it => !!it && !it.base && !it.leg && !it.shop && typeof wpnDef === 'function' && !!wpnDef(it);
+const icKind = it => icIsWpn(it) ? 'weapon' : isCharm(it) ? 'charm' : 'relic';
+const icUnits = () => ((typeof G !== 'undefined' && G && G.towers) || []).filter(t => t && t.def && !t.def.wall && !t.wrecked);
+const icName = t => `${String(t.def.name).split(',')[0]} ${ROMAN[t.tier | 0] || ''}`.trim();
+const icInBag = it => !!it && ((G.loot || []).includes(it) || (G.wbag || []).includes(it));
+// why unit t can't take it ('' when it can, in some socket)
+function icWhyNot(t, it) {
+  if (!t || !t.def) return 'Pick a unit first';
+  if (t.def.wall) return 'A wall takes no items';
+  const k = icKind(it);
+  if (k === 'weapon') {
+    if (typeof wpnOn === 'function' && !wpnOn()) return 'Weapons are for force runs';
+    if (wpnFits(it, t)) return '';
+    return typeof hwIsHero === 'function' && hwIsHero(t) ? `${String(t.def.name).split(',')[0]} keeps its own weapon` : `${wpnName(it)} doesn't fit your ${String(t.def.name).split(',')[0]}`;
+  }
+  if (k === 'charm') {
+    if (typeof abilKit !== 'function' || !abilKit(t) || !t.def.force) return `Your ${String(t.def.name).split(',')[0]} has no charm socket`;
+    if (!charmOpen(t)) return 'Its charm socket is locked: it opens at tier II';
+    if (typeof fsCharmFits === 'function' && !fsCharmFits(it, t)) return `Only fits ${gearForA(it)}`;
+    return '';
+  }
+  if (gearSlots(t) <= 0) return 'Its relic sockets are locked';
+  return gearFits(it, t) ? '' : `Only fits ${gearForA(it)}`;
+}
+// its stats with target p (a relic socket 0-2, the charm 3, or the weapon 'w') holding it (null: emptied)
+function icStatsWith(t, p, it) {
+  if (p.slot === 'w') { const w0 = t.weapon; t.weapon = it && !it.starter ? it : null; _scT = -1; try { return effStats(t); } finally { t.weapon = w0; _scT = -1; } }
+  return gpStatsWith(t, p.slot, it);
+}
+const icNow = t => { _scT = -1; return effStats(t); };
+// each spell's damage figures (gearpanel.js gpDmgNums), learned ones first
+function icSpells(t, st) {
+  const kit = typeof abilKit === 'function' && abilKit(t); if (!kit || typeof gpDmgNums !== 'function') return [];
+  const L = (t.ab && t.ab.learned) || [];
+  return kit.abilities.map(ab => ({ ab, known: L.includes(ab.id), n: gpDmgNums(t, st, ab) })).filter(x => x.n.length).sort((a, b) => b.known - a.known);
+}
+// the score the pick goes by: damage a second from its strikes, plus each learned spell's damage over its recharge
+function icScore(t, st) {
+  let s = typeof towerDps === 'function' ? towerDps(t.type, st) : 0;
+  for (const x of icSpells(t, st)) if (x.known) s += x.n.reduce((a, b) => a + b, 0) / Math.max(1, (typeof abCd === 'function' && abCd(t, x.ab)) || 1);
+  return isFinite(s) ? s : 0;
+}
+const icIl = it => typeof ilOf === 'function' && !it.tome ? ilOf(it) || 0 : 0;
+// the socketed relics, weakest first: what each adds to the score (then the lower rarity, the lower level, the first socket)
+function icRelicOrder(t) {
+  const g = t.gear || [], key = `${t.id}|${t.tier}|${g.map(x => x ? x.id : 0).join(',')}|${t.charm ? t.charm.id : 0}|${t.weapon ? t.weapon.id : 0}|${G.talV | 0}|${G.wave | 0}`;
+  const hit = IC.cache.get(t); if (hit && hit.key === key) return hit.list;
+  const n = gearSlots(t), full = icScore(t, icNow(t)), out = [];
+  for (let i = 0; i < n; i++) { const cur = g[i]; if (!cur) continue; out.push({ slot: i, cur, worth: full - icScore(t, gpStatsWith(t, i, null)) }); }
+  out.sort((a, b) => a.worth - b.worth || (a.cur.rar | 0) - (b.cur.rar | 0) || icIl(a.cur) - icIl(b.cur) || a.slot - b.slot);
+  IC.cache.set(t, { key, list: out });
+  return out;
+}
+// where it can go on t: { why } or { kind, free, list: [{ slot, cur }] } (free: one free socket; else the full ones, weakest first)
+function icTargets(t, it) {
+  const why = icWhyNot(t, it); if (why) return { why, list: [] };
+  const k = icKind(it);
+  if (k === 'weapon') return { kind: k, free: !t.weapon, list: [{ slot: 'w', cur: t.weapon || null }] };
+  if (k === 'charm') return { kind: k, free: !t.charm, list: [{ slot: 3, cur: t.charm || null }] };
+  const f = freeSocket(t); if (f >= 0) return { kind: k, free: true, list: [{ slot: f, cur: null }] };
+  return { kind: k, free: false, list: icRelicOrder(t).map(x => ({ slot: x.slot, cur: x.cur })) };
+}
+// the one it compares with (and a double-click replaces): the cyc-th of the targets
+function icPick(t, it, cyc) {
+  const T = icTargets(t, it), n = T.list.length; if (!n) return null;
+  const i = (((cyc | 0) % n) + n) % n;
+  return Object.assign({ kind: T.kind, free: T.free, n, i }, T.list[i]);
+}
+const icPickFor = (t, it) => icPick(t, it, IC.key === icKeyOf(t, it) ? IC.cyc : 0);
+const icKeyOf = (t, it) => `${t ? t.id : 0}:${it ? (icIsWpn(it) ? 'w' : 'g') + (it.id > 0 ? it.id : it.leg || it.base || it.b || it.id) : 0}`;
+// a relic socket for t when nothing says which: the first free one, else the weakest (the Gear sheet's gpAutoSlot, the Bag)
+function icRelicSlot(t) { const f = freeSocket(t); if (f >= 0) return f; const o = icRelicOrder(t); return o.length ? o[0].slot : 0; }
+function icSlotFor(t, it) { const p = !isCharm(it) && !icWhyNot(t, it) ? icPickFor(t, it) : null; return p && typeof p.slot === 'number' ? p.slot : icRelicSlot(t); }
+// what it would add to t in its compared socket
+function icGain(t, it, p) { return icScore(t, icStatsWith(t, p, it)) - icScore(t, icNow(t)); }
+// the unit it suits best: the one it lifts most (a tie: the higher tier)
+function icBestUnit(it) {
+  let best = null;
+  for (const t of icUnits()) { const p = icPick(t, it, 0); if (!p) continue; const g = icGain(t, it, p); if (!best || g > best.g + 1e-9 || (Math.abs(g - best.g) <= 1e-9 && (t.tier | 0) > (best.t.tier | 0))) best = { t, g }; }
+  return best ? best.t : null;
+}
+const icSel = () => { const s = typeof G !== 'undefined' && G && G.sel; const t = s && s.kind === 'tower' ? s.ref : null; return t && t.def && !t.def.wall && G.towers.includes(t) ? t : null; };
+/* the unit a hover compares with: o.t (the sheet's, the Bag's), else the selected one, else the best match.
+   { t, why, how: 'here'|'sel'|'best' } (why: the given or selected unit can't use it; then t is the best match, if any) */
+function icUnitFor(it, o) {
+  const t0 = (o && o.t) || icSel(), why = t0 ? icWhyNot(t0, it) : '';
+  if (t0 && !why) return { t: t0, how: o && o.t ? 'here' : 'sel' };
+  if (o && o.t && o.only) return { t: null, why, t0 };
+  return { t: icBestUnit(it), how: 'best', why, t0 };
+}
+
+/* ---------- the numbers: each stat it changes, and each spell's damage ---------- */
+// p decimals by size (the sheet's gpF): 0 from 100, 1 from 10, else 2; the change from the shown numbers, so they add up
+const icP = v => Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : 2;
+const icR = (v, p) => +(+v).toFixed(p);
+function icRow(lbl, a, b, pct) {
+  if (!isFinite(a) || !isFinite(b)) return null;
+  const k = pct ? 100 : 1, A = a * k, B = b * k, p = pct ? 0 : icP(Math.max(Math.abs(A), Math.abs(B))), ra = icR(A, p), rb = icR(B, p);
+  if (ra === rb) return null;
+  const d = icR(rb - ra, p), u = pct ? '%' : '';
+  return { lbl, a: ra, b: rb, d, u, up: d > 0, txt: `${lbl} ${ra}${u} → ${rb}${u} (${d > 0 ? '+' : '−'}${Math.abs(d)}${u})` };
+}
+// a: its stats now, b: with it. [{ lbl, a, b, d, up, txt }], the changed ones only
+function icDeltas(t, a, b) {
+  const out = [], add = r => { if (r) out.push(r); }, d = TOWERS[t.type] || {};
+  const dps = s => typeof towerDps === 'function' ? towerDps(t.type, s) : 0;
+  add(icRow('Damage per second', dps(a), dps(b)));
+  if (!d.support || a.smite || b.smite) add(icRow('Damage', a.dmg || a.smite || 0, b.dmg || b.smite || 0));
+  if (a.rate && b.rate) add(icRow('Attacks a second', 1 / a.rate, 1 / b.rate));
+  add(icRow('Range', a.range || 0, b.range || 0));
+  add(icRow('Crit Chance', a.crit || 0, b.crit || 0, true));
+  add(icRow('Splash', a.splash || 0, b.splash || 0));
+  if (typeof oldRules !== 'function' || !oldRules()) {
+    add(icRow('Armour Penetration', Math.min(.9, a.armorPen || 0), Math.min(.9, b.armorPen || 0), true));
+    add(icRow('Magic Penetration', Math.min(.9, a.magicPen || 0), Math.min(.9, b.magicPen || 0), true));
+  }
+  const kit = typeof abilKit === 'function' && abilKit(t);
+  if (kit) {
+    add(icRow('Spell Damage', a.spDmg || 0, b.spDmg || 0));
+    add(icRow('Cooldown Reduction', 1 - ((a.sh && a.sh.cdK) || 1), 1 - ((b.sh && b.sh.cdK) || 1), true));
+    const base = (typeof abMax === 'function' ? abMax(t) : 0) - ((t.st && t.st.manaMax) || 0);
+    add(icRow('Mana pool', base + (a.manaMax || 0), base + (b.manaMax || 0)));
+    const rg = s => kit.mana.regen * (typeof manaRegenK === 'function' ? manaRegenK(t, s) : 1) + (s.manaRegen || 0);
+    add(icRow('Mana a second', rg(a), rg(b)));
+  }
+  return out;
+}
+// each spell's main hit now and with it: [{ name, known, a, b, d, txt }], the changed ones only
+function icSpellDeltas(t, a, b) {
+  const A = icSpells(t, a), B = icSpells(t, b), out = [];
+  for (const x of A) {
+    const y = B.find(q => q.ab.id === x.ab.id); if (!y || y.n[0] == null || x.n[0] === y.n[0]) continue;
+    const d = y.n[0] - x.n[0];
+    out.push({ name: x.ab.name, known: x.known, a: x.n[0], b: y.n[0], d, txt: `${x.ab.name} ${x.n[0]} → ${y.n[0]} (${d > 0 ? '+' : '−'}${Math.abs(d)})` });
+  }
+  return out;
+}
+// the whole comparison as data (the check reads this): { t, how, p, rows, spells } or { why }
+function icCompare(it, o) {
+  const u = icUnitFor(it, o); if (!u.t) return { why: u.why || 'None of your units can use it', t0: u.t0 };
+  const t = u.t, p = icPickFor(t, it); if (!p) return { why: icWhyNot(t, it) };
+  const a = icNow(t), b = icStatsWith(t, p, it);
+  return { t, how: u.how, why: u.why, t0: u.t0, p, rows: icDeltas(t, a, b), spells: icSpellDeltas(t, a, b) };
+}
+
+/* ---------- the cards ---------- */
+const icSockName = p => p.slot === 'w' ? 'weapon slot' : p.slot === 3 ? 'charm socket' : `relic socket ${p.slot + 1}`;
+function icDeltaHTML(C, it) {
+  const t = C.t, p = C.p, nm = icE(icName(t));
+  const head = C.how === 'best' ? (C.t0 ? `Your ${icE(icName(C.t0))} can't use it (${icE(C.why)}). vs your ${nm}` : `vs your ${nm}, the unit it suits best`) : `vs your ${nm}`;
+  const li = r => `<li class="${r.up ? 'bo' : 'neg'}">${icE(r.lbl)} ${r.a}${r.u} → <b>${r.b}${r.u}</b> (${r.d > 0 ? '+' : '−'}${Math.abs(r.d)}${r.u})</li>`;
+  const sp = C.spells.map(s => `<li class="${s.d > 0 ? 'bo' : 'neg'}">${icE(s.name)}${s.known ? '' : ' <small>(not learned)</small>'} ${s.a} → <b>${s.b}</b> (${s.d > 0 ? '+' : '−'}${Math.abs(s.d)})</li>`).join('');
+  const none = !C.rows.length && !C.spells.length ? `<p class="icmp-k">No change to its numbers: what it does is its passive.</p>` : '';
+  const cyc = p.n > 1 ? `<p class="icmp-k">${p.free ? '' : `In place of the ${p.i ? `${['', 'second', 'third'][p.i] || ''} weakest` : 'weakest'}. `}Shift or Alt: compare with another (${p.i + 1} of ${p.n})</p>` : '';
+  return `<div class="icmp-d"><p class="icmp-h">${head} · ${icSockName(p)}</p>${C.rows.length ? `<ul>${C.rows.map(li).join('')}</ul>` : ''}${sp ? `<p class="icmp-s">Spell damage</p><ul>${sp}</ul>` : ''}${none}${cyc}</div>`;
+}
+const icCardOf = (it, t, o) => icIsWpn(it) ? wpnCardHTML(it, t, o) : itemCardHTML(it, o);
+function icEquippedHTML(C) {
+  const t = C.t, p = C.p;
+  if (p.slot === 'w') return wpnCardHTML(t.weapon || wpnOf(t), t);
+  if (p.cur) return itemCardHTML(p.cur);
+  return `<div class="itc icmp-empty"><h5 class="itc-n">Empty ${icSockName(p)}</h5><p class="itc-k">Your ${icE(icName(t))}: nothing in it yet, so all of the change above is gain.</p></div>`;
+}
+/* the compare tooltip for a bag item (or an offer): o.t the unit (o.only: that unit or nothing), o.note/o.price the card's
+   own extras, o.hint the action line, o.noNew (a loot offer: its card is on screen already) */
+function icHTML(it, o) {
+  o = o || {}; IC.cur = null;
+  const C = icCompare(it, o);
+  if (!C.t) { const no = `<p class="itc-no">${icE(C.why)}</p>`; return o.noNew ? `<div class="itc">${no}</div>` : icCardOf(it, null, { note: (o.note || '') + no + (o.hint || ''), price: o.price }); }
+  const d = icDeltaHTML(C, it);
+  const mine = o.noNew ? `<div class="itc">${d}</div>` : icCardOf(it, C.t, { note: d + (o.note || '') + (o.hint || ''), price: o.price });
+  IC.cur = { it, o, n: C.p.n, t: C.t };
+  return `<div class="icmp"><div class="icmp-c"><p class="icmp-l">${o.noNew ? 'If you take it' : 'This item'}</p>${mine}</div><div class="icmp-c icmp-eq"><p class="icmp-l">Equipped</p>${icEquippedHTML(C)}</div></div>`;
+}
+// a new item under the pointer starts its cycle at the weakest
+function icHover(t, it) { const k = icKeyOf(t, it); if (k !== IC.key) { IC.key = k; IC.cyc = 0; } }
+
+/* ---------- double-click to socket ---------- */
+// put it into t: the first free fitting socket, else in place of the compared one. { ok, why, p, replaced }
+function icSocket(t, it, cyc) {
+  const why = icWhyNot(t, it); if (why) return { ok: false, why };
+  if (!icInBag(it)) return { ok: false, why: 'It is not in your bag' };
+  const p = icPick(t, it, cyc == null ? (IC.key === icKeyOf(t, it) ? IC.cyc : 0) : cyc); if (!p) return { ok: false, why: 'Nothing fits' };
+  const wasNew = !!it.isNew;
+  const ok = p.slot === 'w' ? wpnEquip(t, it) : p.slot === 3 ? equipCharm(t, it) : equipGear(t, p.slot, it);
+  if (!ok) return { ok: false, why: 'It would not go in', p };
+  if (wasNew) { if (p.slot === 'w') G.wNew = Math.max(0, (G.wNew | 0) - 1); else G.lootNew = Math.max(0, Math.min((G.lootNew | 0) - 1, (G.loot || []).length)); }
+  IC.key = null; IC.cyc = 0; IC.cache.delete(t);
+  return { ok: true, p, replaced: p.cur || null };
+}
+// the double-click in a screen: socket it, say what happened, redraw
+function icDouble(t, it, where) {
+  const nm = it ? (icIsWpn(it) ? wpnName(it) : gearName(it)) : '';
+  if (!t) {
+    const b = icBestUnit(it);
+    onToast(`Pick a unit first, then double-click to socket ${nm}.${b ? ` It suits your ${icName(b)} best.` : ''}`); sfx('nogold'); return false;
+  }
+  const r = icSocket(t, it);
+  if (!r.ok) { onToast(`${r.why}.`); sfx('nogold'); return false; }
+  const old = r.replaced ? (icIsWpn(r.replaced) ? wpnName(r.replaced) : gearName(r.replaced)) : '';
+  onToast(`${nm} socketed into your ${icName(t)}${old ? `; ${old} went back to your bag` : ''}.`);
+  if (typeof itipHide === 'function') itipHide();
+  if (where === 'sheet') { if (typeof gpPick !== 'undefined') gpPick = null; openGearPanel(t); }
+  else if (where === 'bag' && typeof renderBag === 'function') { if (typeof bagSel !== 'undefined') bagSel = null; renderBag(); }
+  if (typeof markDirty === 'function') markDirty();
+  return true;
+}
+
+/* ---------- the screens ---------- */
+const icSheetT = () => typeof gpT !== 'undefined' && gpT && typeof ovp !== 'undefined' && ovp && ovp.classList.contains('gearp') && !ov.hidden ? gpT : null;
+const icBagT = () => typeof bagCtx !== 'undefined' && bagCtx && bagCtx.t && G.towers.includes(bagCtx.t) ? bagCtx.t : null;
+const icCellItem = el => !el || !el.dataset ? null : el.dataset.wbi != null ? (G.wbag || []).find(w => w.id === +el.dataset.wbi) || null
+  : el.dataset.bi != null ? (G.loot || []).find(q => q.id === +el.dataset.bi) || null
+  : el.dataset.id != null && el.closest && el.closest('#gGrid') ? (G.loot || []).find(q => q.id === +el.dataset.id) || null : null;
+const icHint = () => `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Double-click' : 'Double-tap'} to socket it</p>`;
+// a bag cell on the Gear sheet (a relic .gp-bc or a weapon .wp-bc): compared on the sheet's unit
+function icSheetCard(el) {
+  const t = icSheetT(), it = icCellItem(el); if (!t || !it || (typeof gpDrag !== 'undefined' && gpDrag && gpDrag.on)) return '';
+  icHover(t, it);
+  return icHTML(it, { t, only: true, hint: icHint() + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Or drag it onto a socket' : 'Or tap it, then a socket'}</p>` });
+}
+// a bag cell in the Bag: the Bag's unit (its socket when one was tapped), else the selected one, else the best match
+function icBagCard(el) {
+  if (typeof bagTab !== 'undefined' && bagTab === 'shop') return '';
+  if (typeof bagInf !== 'undefined' && bagInf) return '';
+  const it = icCellItem(el); if (!it) return '';
+  const t = icBagT(), k = icKind(it);
+  if (t && typeof bagCtx !== 'undefined' && !bagCtx.auto && k !== 'weapon' && (bagCtx.slot === 'charm') === (k === 'charm') && !icWhyNot(t, it)) {
+    // a socket tapped on purpose: that socket, no cycling
+    const slot = bagCtx.slot === 'charm' ? 3 : bagCtx.slot, cur = slot === 3 ? t.charm || null : (t.gear || [])[slot] || null;
+    IC.key = icKeyOf(t, it); IC.cyc = 0;
+    const a = icNow(t), b = gpStatsWith(t, slot, it), C = { t, how: 'here', p: { slot, cur, n: 1, i: 0, free: !cur, kind: k }, rows: icDeltas(t, a, b), spells: icSpellDeltas(t, a, b) };
+    IC.cur = { it, n: 1, t };
+    const price = it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : it.tome ? '' : `Salvage: ${gearValue(it)} gold`;
+    return `<div class="icmp"><div class="icmp-c"><p class="icmp-l">This item</p>${itemCardHTML(it, { price, note: icDeltaHTML(C, it) + (typeof setInfo === 'function' ? setInfo(it) : '') + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Click to socket it; right-click for more' : 'Tap to socket it; hold for more'}</p>` })}</div><div class="icmp-c icmp-eq"><p class="icmp-l">Equipped</p>${icEquippedHTML(C)}</div></div>`;
+  }
+  if (t) icHover(t, it); else { const u = icUnitFor(it, {}); if (u.t) icHover(u.t, it); }
+  const price = icIsWpn(it) ? `Salvage: ${WPN_SALVAGE[it.rar | 0]} gold` : it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : it.tome ? '' : `Salvage: ${gearValue(it)} gold`;
+  return icHTML(it, { t, price, note: !icIsWpn(it) && typeof setInfo === 'function' ? setInfo(it) : '', hint: t ? icHint() + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Click or right-click for its actions' : 'Tap or hold for its actions'}</p>` : `<p class="itc-hint">Pick a unit, then double-click to socket it</p>` });
+}
+// a boss's loot offer: what it would do to the selected unit, else the unit it suits best
+function icLootCard(el) {
+  const L = typeof rnLootCur === 'function' ? rnLootCur() : null; if (!L) return '';
+  const it = el.dataset.rpw != null ? L.wpn : el.dataset.rp != null && L.items[+el.dataset.rp] != null ? rnItem(L.items[+el.dataset.rp], true) : null; if (!it) return '';
+  const u = icUnitFor(it, {}); if (u.t) icHover(u.t, it);
+  return icHTML(it, { noNew: true });
+}
+// the Anvil's list: a bag item compares; one in a unit's hands shows its own card
+function icAnvilCard(el) {
+  if (typeof anItems !== 'function') return '';
+  const x = anItems()[+el.dataset.ai]; if (!x) return '';
+  if (x.t) return x.kind === 'w' ? wpnCardHTML(x.it, x.t) : itemCardHTML(x.it);
+  const ft = typeof ANV !== 'undefined' && ANV.unit ? (G.towers || []).find(t => String(t.id) === ANV.unit) : null;
+  const u = icUnitFor(x.it, ft ? { t: ft } : {}); if (u.t) icHover(u.t, x.it);
+  return icHTML(x.it, ft ? { t: ft } : {});
+}
+// Shift or Alt over a compare: the next socket (the sheet's stat preview follows)
+function icCycle() {
+  if (typeof ITIP === 'undefined' || !ITIP || ITIP.hidden || !itipAnchor || !IC.cur || IC.cur.n < 2 || !itipAnchor.isConnected) return false;
+  const el = itipAnchor, el2 = el;
+  IC.cyc++;
+  let html = '';
+  if (el2.matches('.gp-bc, .wp-bc') && icSheetT()) html = icSheetCard(el2);
+  else if (el2.closest('#gGrid')) html = icBagCard(el2);
+  else if (el2.matches('.rn-pick')) html = icLootCard(el2);
+  else if (el2.matches('.an-it')) html = icAnvilCard(el2);
+  if (!html) return false;
+  itipShow(html, el2);
+  const t = icSheetT(), it = icCellItem(el2);
+  if (t && it && !icIsWpn(it) && !isCharm(it) && typeof gpPreview === 'function') { const p = icPickFor(t, it); if (p) gpPreview(t, gpStatsWith(t, p.slot, it), `With ${gearName(it)}${p.cur ? ` in place of ${gearName(p.cur)}` : ''}`); }
+  icBagSync(it);
+  return true;
+}
+// a Bag opened without a socket (the HUD, or with a unit selected): its click socket follows the compare
+function icBagSync(it) {
+  const t = icBagT(); if (!t || !it || !bagCtx.auto || icIsWpn(it) || isCharm(it) || icWhyNot(t, it)) return;
+  const p = icPickFor(t, it); if (p && typeof p.slot === 'number' && p.slot < 3) bagCtx.slot = p.slot;
+}
+
+if (typeof document !== 'undefined' && typeof itipBind === 'function') {
+  // the Bag: its cells' card (relics through bagCardOf, weapons through the page's [data-wid] binding: both compare now)
+  if (typeof bagCardOf === 'function') {
+    const _icBag = bagCardOf;
+    bagCardOf = function (el) { try { const h = icBagCard(el); if (h) return h; } catch (e) { console.error(e); } return _icBag.apply(this, arguments); };
+  }
+  itipBind(document, '#gGrid .wp-bc[data-wbi]', el => { try { return icBagCard(el); } catch (e) { console.error(e); return ''; } });
+  itipBind(document, '.gp-body .gp-bc[data-bi], .gp-body .wp-bc[data-wbi]', el => { try { return icSheetCard(el); } catch (e) { console.error(e); return ''; } });
+  itipBind(document, '.rn-pick[data-rp], .rn-pick[data-rpw]', el => { try { return icLootCard(el); } catch (e) { console.error(e); return ''; } });
+  itipBind(document, '.an-it[data-ai]', el => { try { return icAnvilCard(el); } catch (e) { console.error(e); return ''; } });
+  // a Bag opened with no socket picked takes the unit's free or weakest socket (not always the first)
+  if (typeof openBag === 'function') {
+    const _icOpen = openBag;
+    openBag = function (t, slot, tab) {
+      const auto = !t, r = _icOpen.apply(this, arguments);
+      try { if (typeof bagCtx !== 'undefined' && bagCtx) { bagCtx.auto = auto; if (auto && bagCtx.slot !== 'charm' && bagCtx.t) { bagCtx.slot = icRelicSlot(bagCtx.t); if (typeof bagHead === 'function') bagHead(); } } } catch (e) { console.error(e); }
+      return r;
+    };
+  }
+  document.addEventListener('keydown', e => {
+    if (e.repeat || (e.key !== 'Shift' && e.key !== 'Alt')) return;
+    if (icCycle() && e.key === 'Alt') e.preventDefault();
+  });
+  document.addEventListener('keyup', e => { if (e.key === 'Alt' && IC.cur && typeof ITIP !== 'undefined' && ITIP && !ITIP.hidden) e.preventDefault(); });
+  /* double-click / double-tap: two clicks on the same bag item within 400 ms. The first click does what it always did (on
+     the sheet it picks the item; in a Bag with a fitting socket it already sockets it); the second sockets it. If the first
+     already put it in, the second is swallowed so it can't land on whatever took its place. */
+  const cellOf = e => { const el = e.target && e.target.closest ? e.target.closest('.gp-body .gp-bc[data-bi], .gp-body .wp-bc[data-wbi], #gGrid .bg-cell[data-id], #gGrid .wp-bc[data-wbi]') : null; return el; };
+  document.addEventListener('click', e => {
+    const now = performance.now(), L = IC.last, el = cellOf(e), it = icCellItem(el);
+    if (L && now - L.at < 400 && Math.hypot(e.clientX - L.x, e.clientY - L.y) < 24) {
+      if (it && it === L.it) {
+        e.stopPropagation(); e.preventDefault(); IC.last = null;
+        const sheet = icSheetT(), where = sheet && el.closest('.gp-body') ? 'sheet' : 'bag', t = where === 'sheet' ? sheet : icBagT() || icSel();
+        icDouble(t, it, where); return;
+      }
+      if (!icInBag(L.it)) { e.stopPropagation(); e.preventDefault(); IC.last = null; return; }
+    }
+    IC.last = it ? { at: now, x: e.clientX, y: e.clientY, it } : null;
+    if (it && el.closest('#gGrid')) icBagSync(it);
+  }, true);
+  // the default double-click (select a word, zoom the page) does nothing on an item
+  document.addEventListener('dblclick', e => { if (cellOf(e)) e.preventDefault(); }, true);
+  const css = `#itip:has(.icmp){max-width:min(640px,calc(100vw - 16px))}
+  .icmp{display:flex;gap:6px;align-items:flex-start}
+  .icmp-c{flex:1 1 0;min-width:0;max-width:310px}
+  .icmp-l{margin:0 0 3px;font:700 11px/1 var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:#cfc6b4;text-shadow:0 1px 2px #000}
+  .icmp-eq .icmp-l{color:#9a9ca2}.icmp-eq .itc{opacity:.94}
+  .icmp-d{margin:6px 0 2px;padding-top:5px;border-top:1px solid rgba(255,255,255,.12);font-size:12.5px}
+  .icmp-d ul{margin:2px 0 4px;padding:0;list-style:none}.icmp-d li{color:#cfd2d8;padding:0}
+  .icmp-d li.bo b{color:#7be37b}.icmp-d li.neg b{color:#ff7a6a}.icmp-d li.bo{color:#bfe9bf}.icmp-d li.neg{color:#f2c0b8}
+  .icmp-h{margin:0 0 2px;color:#f2d27a;font-size:12px}.icmp-s{margin:4px 0 0;color:#9a9ca2;font-size:11.5px}.icmp-k{margin:3px 0 0;color:#9a9ca2;font-size:11.5px}
+  .icmp-empty .itc-n{color:#9a9ca2}
+  @media (max-width:560px){.icmp{flex-direction:column}.icmp-c{max-width:none;width:100%}}`;
+  const add = () => { if (document.getElementById('icCss')) return; const s = document.createElement('style'); s.id = 'icCss'; s.textContent = css; document.head.append(s); };
+  if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
 }
 
