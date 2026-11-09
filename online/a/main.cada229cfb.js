@@ -1,4 +1,4 @@
-const BUILD_TAG = 'aa837ee+@2026-11-09';   // the play log's build version (playlog.js)
+const BUILD_TAG = '74314e3+@2026-11-09';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -78910,6 +78910,7 @@ function titleScreen(opt) {
       <div class="t2-stage">
         <img class="t2-art" src="${typeof TITLE_FRAME !== 'undefined' ? TITLE_FRAME : ''}" alt="" width="1586" height="466">
         <img class="t2-mart" src="${typeof TITLE_MFRAME !== 'undefined' ? TITLE_MFRAME : ''}" alt="" width="640" height="759">
+        <i class="t2-shade" aria-hidden="true"></i><i class="t2-glow" aria-hidden="true"></i>
         <button type="button" class="t2-begin" id="oNew"><span>Begin</span>${R.pick ? `<small>${riteName(R.pick)}</small>` : ''}</button>
         <nav class="t2-menu" aria-label="Menu">
           <button type="button" class="t2-btn" id="oClassic" title="The elemental towers, on the old waves">Classic<small>The elemental towers</small></button>
@@ -78922,6 +78923,9 @@ function titleScreen(opt) {
     </div>
   </div>`, 'title2');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
+  { const st = ovp.querySelector('.t2-stage');   // the frame art's own shapes, as the masks of its shade and its lights (head.html .t2-shade)
+    if (st && typeof TITLE_FRAME !== 'undefined') st.style.setProperty('--t2frame', `url(${TITLE_FRAME})`);
+    if (st && typeof TITLE_MFRAME !== 'undefined') st.style.setProperty('--t2mframe', `url(${TITLE_MFRAME})`); }
   titleSaves();
   $('#oNew').onclick = () => { AudioSys.init(); sfx('click'); openHeroPicker(() => beginGame(), null, false); };
   $('#oClassic').onclick = () => { AudioSys.init(); sfx('click'); openHeroPicker(() => beginGame(), null, true); };
