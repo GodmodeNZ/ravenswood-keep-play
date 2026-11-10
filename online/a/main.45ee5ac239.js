@@ -1,4 +1,4 @@
-const BUILD_TAG = '539d26e@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '03e4e83@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7577,7 +7577,7 @@ function rootStrike(t, st, tg, pow) {   // the Rootweaver: vines out of the grou
     G.bolts.push({ pts: [[t.x, towerTop(t), t.y], [(t.x + c.x) / 2, .15, (t.y + c.y) / 2], [c.x, .1, c.y]], life: .22, max: .22, col: [.45, 1, .35] });
   }
   if (C.bramble && G.hazards.length < 40) G.hazards.push({ k: 'rubble', x: tg.x, z: tg.y, r: .7, t: 3, tick: 0, src: t, st });   // Bramble Snarl (the Rubble hazard's 30% slow, drawn green)
-  t.recoil = 1; sfx('burrow', 0);
+  t.recoil = 1; sfx('rootrise', 0);   // (roots breaking out of the earth: audio.js; it was the Sand Burrower's crunch)
 }
 // Rootburst: a foe that dies held by a Briarwarden's roots bursts them out around it (called from kill)
 function rootBurst(c) {
@@ -30634,7 +30634,7 @@ gvcSet('constrict', { name: 'Mothcloud', short: 'Moths', glyph: 'spores', hue: '
     const z = gvcFresh({ k: 'constrict', x: t.x, z: t.y, x0: t.x, z0: t.y, tx: c.x, tz: c.y, mv: G.time, mvT: T, settle: G.time + T, until: G.time + T + byT(ab.by.dur, t), tick: 0, every: .25, hitAt: G.time + T + .25, spreads: 0, in: new Set(), r: gvcMothR(t, ab), h0: top });
     abZone(t, z);
     gvcFx('mothcloud', t, ab, { z });
-    sfx('splat', 0);
+    sfx('mothswarm', 0);
   },
   zone(t, st, z) {
     const now = G.time, ab = ABIL.constrict;
@@ -30685,7 +30685,7 @@ gvcSet('briarfield', { name: 'Wither', short: 'Wither', glyph: 'wither', hue: '#
     const d = byT(ab.by.dur, t), T = .3;
     gvcFx('wither', t, ab, { c, T, d });
     G.delayed.push({ t: T, fn: () => { if (c.dead || !G.creeps.includes(c)) return; gvcWither(t, t.st || st, [c], d, 1, c); } });   // (it takes hold as the stream reaches it)
-    sfx('splat', 0);
+    sfx('wither', 0);
   },
   zone(t, st, z) {
     const now = G.time, ab = ABIL.briarfield, cap = byT(ab.by.shred, t) * z.str, el = now - z.t0;
@@ -30714,7 +30714,7 @@ function gvcCrumble(t, st, c) {
   gvcFx('crumble', t, ABIL.briarfield, { x, z, h: hitH(c), r: (c.def && c.def.r) || .3 });
   if (near.length) gvcWither(t, st, near, 2, .5, null);
   if (c.feWitherBy === t && typeof feGvBriarErupt === 'function') feGvBriarErupt(t, x, z);   // (Regalia of the Deep Root's (4) bonus)
-  sfx('burrow', 0);
+  sfx('crumble', 0);
 }
 
 /* =====================================================================================================
@@ -55490,7 +55490,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -56584,6 +56584,40 @@ const AudioSys = (() => {
       thump(t, 112 * p, 62 * p, .13, .3, { pan });
       nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 300], [.1, 480], [.3, 210]], q: .6, pts: [[.04, .8], [.14, .45], [.34, 0]], v: .3, pan });
       for (let i = 0, tt = t + .06; i < 3; i++, tt += rnd(.05, .09)) wood(tt, rnd(150, 210) * p * (1 + i * .12), .06, .07, { pan: pan + sp(.2) });
+    },
+    /* --- the Briarwardens (unit two of the spell effects pass): roots, moths and withering. Low, woody and dry; nothing
+       bright, no hiss. Their roots played the Sand Burrower's crunch, their spells the venom's splat. --- */
+    // roots breaking out of the earth and taking hold: the ground heaved up, a few thick roots creaking as they bend.
+    // arg 1: a thicket (wider, more of them)
+    rootrise(big) {
+      if (!ok('rtr', .08, 200)) return; const t = now(), lv = E.lv, p = rnd(.92, 1.08) * (big ? .85 : 1) * (1 - .05 * lv), pan = sp(.3);
+      thump(t, 96 * p, 50 * p, .16, (big ? .5 : .38) + .05 * lv, { pan, room: .1 });
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 420], [.12, 300], [.4, 170]], q: .6, pts: [[.03, 1], [.14, .5], [big ? .55 : .4, 0]], v: big ? .5 : .36, pan, room: .1 });
+      const n = big ? 6 : 3; for (let i = 0, tt = t + .04; i < n; i++, tt += rnd(.05, .11)) wood(tt, rnd(120, 190) * p, .09, big ? .1 : .085, { pan: pan + sp(.25) });
+      const cl = []; for (let i = 0; i < (big ? 7 : 4); i++) { const u = Math.pow(Math.random(), 1.3); cl.push([t + .12 + u * .4, (1 - u * .6) * rnd(.3, .7), rnd(230, 480)]); }
+      train(cl, { n: 'p', type: 'bandpass', q: 1.4, d: .026, v: .2, pan: sp(.5), room: .12 });
+    },
+    // a swarm of moths let go: many soft wings beating, low and close, like a blanket shaken out
+    mothswarm() {
+      if (!ok('mth', .15, 200)) return; const t = now(), p = rnd(.94, 1.06), pan = sp(.3), w = [];
+      for (let i = 0; i < 26; i++) { const u = i / 26; w.push([t + u * .75 + rnd(0, .02), (.35 + .65 * Math.sin(Math.PI * u)) * rnd(.5, 1), rnd(260, 520) * p]); }
+      train(w, { n: 'p', type: 'bandpass', q: 1.1, d: .022, v: .2, pan, room: .15 });
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 260], [.35, 420], [.8, 220]], q: .5, pts: [[.2, .6], [.5, .45], [.85, 0]], v: .2, pan, room: .15 });
+    },
+    // a withering laid on a foe: a long dry breath going out, and old wood ticking as it shrinks
+    wither() {
+      if (!ok('wth', .12, 200)) return; const t = now(), p = rnd(.94, 1.06), pan = sp(.3);
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 520], [.5, 240], [.9, 150]], q: .7, pts: [[.08, .8], [.4, .5], [.95, 0]], v: .34, pan, room: .15 });
+      thump(t + .02, 84 * p, 52 * p, .3, .26, { pan });
+      for (let i = 0, tt = t + .1; i < 5; i++, tt += rnd(.09, .17)) wood(tt, rnd(170, 250) * p * (1 - i * .05), .05, .06, { pan: pan + sp(.2) });
+    },
+    // a withered thing crumbling: a dry husk giving way, and its leaves and dust settling
+    crumble() {
+      if (!ok('crm', .08, 200)) return; const t = now(), p = rnd(.92, 1.08), pan = sp(.35);
+      wood(t, 150 * p, .1, .2, { pan, room: .1 }); thump(t + .004, 88 * p, 48 * p, .18, .4, { pan });
+      nhit(t + .01, { n: 'b', type: 'lowpass', fp: [[0, 560], [.4, 180]], q: .6, pts: [[.02, 1], [.14, .5], [.5, 0]], v: .4, pan, room: .12 });
+      const lf = []; for (let i = 0; i < 12; i++) { const u = Math.pow(Math.random(), 1.2); lf.push([t + .06 + u * .6, (1 - u * .6) * rnd(.3, .8), rnd(300, 620)]); }
+      train(lf, { n: 'p', type: 'bandpass', q: 1.2, d: .028, v: .22, pan: sp(.5), room: .12 });
     },
     /* --- earth --- */
     quake(m) {
@@ -91965,6 +91999,248 @@ const SEED2 = (() => {
   return { S, CL, REL, MV, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
 })();
 
+/* The Pyroclasts on a rig and clips made from scratch (the owner, 11 Nov 2026: "fix pyroclasts model and animations from
+   scratch"). His mesh is the owner's white-haired fire scholar taken un-rigged ("fantasy wizard 3d model (1).zip", the sculpt
+   his Mixamo download was made from); nothing of Mixamo's skeleton, weights or clips is used. tools/make_pyro2.py ->
+   src/model_pyro2.js: 38 bones (the robe below his belt on four panels, each in two lengths, that hang from his hips and
+   are pushed out by his knees and take no leg bone; each bell sleeve's drape on two bones that hang toward the ground,
+   and a cuff bone that keeps the sleeve from wringing when his forearm turns;
+   collar bones that follow the arms; two finger bones a hand), 6,399 triangles, 9 clips baked at 30 frames a second.
+   ON by default: his earlier look (unitmodels_pyroclast.js on model_unit_pyroclast.js) is untouched and draws when the page
+   has ?pyro=old, or the Model Lab's "Pyroclast rig" row is set to Old (runehold.html?lab=1&unit=cc_pyroclast).
+   His moves, by the same cues his shipped version reads (its hooks still set t._pyCast, t._pyCastAt; t.ccxBreath):
+     idle      no foe in reach: upright, his left hand behind his back, the ember over his raised right palm, fingers working
+     ready     a foe in reach: side-on, the fire hand up by his shoulder, his left hand out toward the foes
+     cast      his strike, a fireball: the hand drawn back by his ear over the last of the reload (t.cd), thrust out palm first
+               so the release frame lands on the shot; the follow-through after
+     skip      Skipping Flame: a low sidearm flick; the flame leaves 0.1 s after the cast (frame 3), as before
+     breathin / breath / breathout   Furnace Breath: both hands thrust out by 0.1 s, when the pour starts; the hold looped for
+               as long as it pours (t.ccxBreath); then drawn back
+     phoenix   Phoenix: gathered low, both arms thrown up like wings; the bird leaves the right palm at 0.3 s (frame 9), as before
+     wounded   Wounded (t.wounded): bowed, a hand at his chest
+   The fire is the game's (pyrofire.js and the spells' own code), untouched: this file only says where his palms are, in the
+   fields his shipped version wrote (t._pyPR, t._pyPL, t._pyAt, t._pyYaw, t._pyMat, t._pyGl, t.tipW) and through pyPalmAt
+   (the palm at a move's release frame), so the fireball, the breath, the skip and the Phoenix leave his hands as drawn.
+   His sounds are new too (pyrosfx2data.js: see S.sfx below; ?pyrosfx=old for the earlier takes).
+   Also PYRO2.anchors(t) -> { palmR, palmL, tipR, tipL, clip, s, at } (world space) or null when he has not been drawn lately.
+   Checks: `python tools/make_pyro2.py --check`. Notes: docs/model_pilot/pyroclast2.md. */
+const PYRO2 = (() => {
+  const U = typeof PY_UNIT !== 'undefined' ? PY_UNIT : 'cc_pyroclast', NAMES = ['idle', 'ready', 'cast', 'skip', 'breathin', 'breath', 'breathout', 'phoenix', 'wounded'];
+  const RATE = { idle: 4, ready: 8, cast: 40, move: 40 }, BASE_H = .045;
+  /* FIT: his height against his shipped model's (whose size rule and evening, UM_UNITS / UM_EVEN, are kept): set so his head
+     joint stands where the other human-sized units' do (UM_EVEN_HEAD) at tier I; measured in the Model Lab */
+  const FIT = 1.125, TRIM = 0;
+  const S = { on: true, wound: false, err: null };
+  try { S.on = !/[?&]pyro=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, MK = null, BI = null;
+  /* his new sounds (pyrosfx2data.js, tools/make_pyrosfx.py: fifteen takes cut from the owner's Zapsplat fire packs, one for each
+     of his sound slots, at the loudness of the take it replaces): put in place of his earlier takes before any sound is
+     played, so audio.js plays them through the same calls at the same levels. ?pyrosfx=old keeps the earlier ones. */
+  S.sfx = false;
+  try { if (typeof PYRO2_SFX !== 'undefined' && typeof FIRE_SFX !== 'undefined' && !/[?&]pyrosfx=old/.test(location.search)) { S.sfxOld = {}; for (const k in PYRO2_SFX) if (FIRE_SFX[k]) { S.sfxOld[k] = FIRE_SFX[k]; FIRE_SFX[k] = PYRO2_SFX[k]; } S.sfx = true; } } catch (e) {}
+  const CL = {}, REL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  /* a rest point carried by a bone of the buffer */
+  const at = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2] + out[g + 3], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2] + out[g + 7], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2] + out[g + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'pyro2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('pyro2: too many bones');
+    BI = {}; for (const nm of ['hips', 'head', 'handL', 'handR', 'tipL', 'tipR']) { if (R_.bix[nm] == null) throw new Error('pyro2: no ' + nm); BI[nm] = R_.bix[nm]; }
+    for (const nm of ['palmL', 'palmR', 'tipL', 'tipR']) if (!data.marks || !data.marks[nm]) throw new Error('pyro2: no mark ' + nm);
+    D = data; R = R_; NB = nb; HGT = R.height || 1; MK = data.marks;
+    for (const nm of NAMES) {
+      const c = D.clips && D.clips[nm]; if (!c) throw new Error('pyro2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * NB * 4 || t.length !== c.n * 3) throw new Error('pyro2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      CL[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+      if (c.rel != null) REL[nm] = c.rel;
+    }
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('pyro2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.7, -.02, -.7]; m.max = [.7, 1.35, .8]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('PYRO2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'pyro2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), gl (the casting palm's glow, 0..1) } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, gl: 0 };
+    const now = G.time, ph = now + (t.anim || 0) * 3, CAST = typeof PY !== 'undefined' ? PY.CAST : { cc_kindle: 'skip', cc_pyresigil: 'breath', cc_flamewave: 'phoenix' };
+    // a spell's cast bar: its move's start held until the bar ends (as his shipped version does)
+    const AC = t.ab && t.ab.cast; if (AC && CAST[AC.id]) { const m = CAST[AC.id]; return { c: m === 'breath' ? 'breathin' : m, s: 0, rate: RATE.move, gl: .5 }; }
+    // Furnace Breath: the thrust (0.1 s), held while it pours (looped), and back
+    const B = t.ccxBreath;
+    if (B && now >= B.at && now < B.until + CL.breathout.len) {
+      const el = now - B.at;
+      if (el < CL.breathin.len) return { c: 'breathin', s: el, rate: RATE.move, gl: 1 };
+      if (now < B.until) return { c: 'breath', s: el - CL.breathin.len, rate: RATE.move, gl: 1 };
+      return { c: 'breathout', s: now - B.until, rate: RATE.move, gl: Math.max(0, 1 - (now - B.until) / .3) };
+    }
+    if (t._pyCast && t._pyCast !== 'breath' && t._pyCastAt != null && CL[t._pyCast]) {
+      const u = now - t._pyCastAt, c = CL[t._pyCast];
+      if (u >= 0 && u < c.len) return { c: t._pyCast, s: u, rate: RATE.move, gl: u * 30 < (c.rel || 0) ? 1 : Math.max(0, 1 - (u - (c.rel || 0) / 30) / .4) };
+    }
+    // the strike: the wind-up over the reload's last part (the release frame as the fireball is loosed), the follow-through after
+    const st = t.st, rate = Math.max(.5, (st && st.rate) || 1.5), r = (CL.cast.rel || 0) / 30, pre = Math.min(r, rate * .45), post = Math.max(.3, Math.min(CL.cast.len - r, rate - pre - .05));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+    if (fight && t.cd > 0 && t.cd < pre) return { c: 'cast', s: r * (1 - t.cd / pre), rate: RATE.cast, gl: 1 - t.cd / pre };
+    const s = t.shotT == null ? 9 : t.shotT;
+    if (s >= 0 && s < post && t.shots) return { c: 'cast', s: r + (CL.cast.len - r) * s / post, rate: RATE.cast, gl: 0 };
+    if (t.wounded || S.wound) return { c: 'wounded', s: ph, rate: RATE.idle, gl: 0 };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: RATE.ready, gl: .15 };
+    return { c: 'idle', s: ph, rate: RATE.idle, gl: 0 };
+  }
+  let PT = null, OUT = null, PF = null, OF = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang, tr = Math.min(5, tier | 0);
+    const M = typeof umModel === 'function' ? umModel(U) : null, k = M && M.S && M.S.k != null ? M.S.k : .97;   // (his shipped model's size, as unitmodels_size.js scaled it)
+    const s = Math.max(.3, full.max[1]) / HGT * k * FIT * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+    // the Conclave's rune slate under him, as under every scholar, and he stands on it
+    const sz0 = typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1;
+    const bm = typeof ccBase === 'function' && typeof ccWith === 'function' ? dynMesh('py_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * sz0), () => ccWith(U, () => ccBase(g, tr))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sz0 * sy : 0;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._p2T == null ? 1 : Math.max(0, Math.min(.1, now - t._p2T)); t._p2T = now;
+      if (!t._p2P || t._p2P.q.length !== NB * 4) { t._p2P = newPose(); t._p2P.q.set(PT.q); t._p2P.t.set(PT.t); }
+      follow(t._p2P, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._p2P;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, TRIM]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = R.bones[BI.head].h[1] * s + lift;   // (for fitting FIT: his head joint's height as drawn)
+    if (live) {
+      // his palms where they are this frame, in the fields his shipped version wrote (pyrofire.js and the spells read them)
+      const w = (b, p) => { const q = at(OUT, b, p); return M4.xf(_c, q[0], q[1], q[2]); };
+      t._pyPR = w(BI.handR, MK.palmR); t._pyPL = w(BI.handL, MK.palmL); t._pyAt = G.time; t._pyYaw = yaw; t._p2At = G.time;
+      t._p2TipR = w(BI.tipR, MK.tipR); t._p2TipL = w(BI.tipL, MK.tipL); t._p2Clip = P.c; t._p2S = P.s;
+      (t._pyMat || (t._pyMat = new Float32Array(16))).set(_c);
+      t.tipW = t._pyPR; t.tipYaw = yaw; t.tipAt = G.time;
+      t._pyGl = P.gl || 0;   // how much the casting palm's fire gathers (pyrofire.js draws the hand's flame)
+    }
+    return true;
+  }
+  const mine = t => S.on && MESH_ && t && t._p2At != null && typeof G !== 'undefined' && G && G.time - t._p2At < .6 && G.time >= t._p2At;
+  const anchors = t => mine(t) && G.time - t._p2At < .3 ? { palmR: t._pyPR, palmL: t._pyPL, tipR: t._p2TipR, tipL: t._p2TipL, clip: t._p2Clip, s: t._p2S, at: t._p2At } : null;
+  try { load(typeof PYRO2_MDL !== 'undefined' ? PYRO2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Pyroclast rig:', e.message); }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+        try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('pyro2:', e); } }
+      }
+      return _plain.apply(this, arguments);
+    };
+  }
+  /* a palm at a move's release frame, as he stands now: his shipped version's pyPalmAt (the fireball's start, the skip's first
+     hop, the Phoenix's lift) answered from this rig's clips while this rig is the one drawn. (clip: cast | skip | phoenix; the
+     frame asked for is the shipped model's own release frame, so this rig's is used in its place) */
+  if (MESH_ && typeof pyPalmAt === 'function') {
+    const _palm = pyPalmAt;
+    pyPalmAt = function (t, clip, i, side, raw) {
+      try {
+        if (mine(t) && t._pyMat && CL[clip]) {
+          if (!PF) { PF = newPose(); OF = new Float32Array(NB * 12); }
+          sample(CL[clip], (CL[clip].rel || 0) / 30, PF); toBones(PF, OF);
+          const p = at(OF, side === 'L' ? BI.handL : BI.handR, side === 'L' ? MK.palmL : MK.palmR), w = M4.xf(t._pyMat, p[0], p[1], p[2]);
+          return raw ? w : pyTurn(t, w);
+        }
+      } catch (e) {}
+      return _palm.apply(this, arguments);
+    };
+  }
+  /* the Model Lab's row (modellab.js untouched): his shipped rig or the new one; Wounded held on */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('pyro2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'pyro2Row';
+    box.innerHTML = '<h3>Pyroclast rig</h3><div class="row">' + `<button data-p2="0" class="${S.on ? '' : 'on'}" title="His earlier look: Mixamo's rig and clips (?pyro=old)">Old (Mixamo)</button><button data-p2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (from scratch)</button><button data-p2w="1" class="${S.wound ? 'on' : ''}" title="Hold his Wounded stance (the lab keeps units whole)">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-p2]')) x.onclick = () => { S.on = x.dataset.p2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-p2w]')) x.onclick = () => { S.wound = !S.wound; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false, q = null; try { q = new URLSearchParams(location.search); lab = q.get('lab') === '1'; } catch (e) {}
+    if (lab) {
+      /* &shots=1 (the contact sheets, sim/pyro_shots.js): every frame the page asks of the browser is queued, to be stepped by hand */
+      if (q.get('shots') === '1' && !window.__rafQ) { const Q_ = window.__rafQ = []; window.requestAnimationFrame = cb => { Q_.push(cb); return Q_.length; }; }
+      const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('pyro2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); };
+    }
+  }
+  return { S, CL, REL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
+})();
+
 /* The Thornguard on a rig and clips made from scratch (the owner, 11 Nov 2026: "keep working on thornguard animations, they
    are incorrect"). The mesh is the un-rigged sculpt the shipped model was made from ("fantasy elf armor 3d model"), the
    spear ("fantasy spear 3d model") in the right fist and the thorn shield ("fantasy shield 3d model") held by its handle in
@@ -93563,6 +93839,8 @@ const SDT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], dr
 const SD = { parts: [], shots: [], puffs: [], jaws: [], st: new WeakMap(), cards: 0, cap: 200, load: 0, last: 0, off: false, has: 0, hasT: -1 };
 const SD_COL = { pod: [.3, .47, .14], spore: [.76, .7, .2], seed: [.34, .25, .12], stem: [.3, .4, .17], leaf: [.27, .5, .17], petal: [.84, .36, .3], jaw: [.3, .44, .17], cap: [.74, .42, .2], stalk: [.8, .74, .56], mote: [.86, .88, .46] };
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { SD.shots.length = 0; SD.puffs.length = 0; SD.jaws.length = 0; });
+// other units built on this kit (briarfx.js): their per-frame drawing, the recipes they replace, their lab rows
+const SD_FRAMES = [], SD_NORUN = new Set(['haze']), ELEM_FX_ROWS = [['seedcaster', 'Seedcasters']];
 const sdLv = () => typeof GFX === 'undefined' ? 2 : GFX === 'low' ? 0 : GFX === 'medium' ? 1 : 2;
 const sdLive = () => typeof G !== 'undefined' && G && G.time != null && G.state !== 'title';
 // the new drawing is on: the toolkit is up (never in the sims, which have no GL: they keep the older drawing)
@@ -93681,11 +93959,12 @@ function sdOnL(s, l) { return sdT(s, l, 1, {}); }
 
 /* ---- things left in the world to play out where they were left ----
    kind: spore (a billow of dust w across: thrown, slowed by the air, swelling), husk (half a pod's shell, tumbling, falling),
+   mesh (any mesh of SD_MESH, o.mesh, w its size: a clod, a dry leaf),
    seed (a dark seed thrown on an arc), mote (a pale spore drifting up) */
 function sdShot(kind, x, y, z, w, dur, o, s, l) {
   o = o || {}; if (SD.shots.length >= 260) SD.shots.shift();
   SD.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, drag: o.drag || 0, g: o.g || 0, grow: o.grow || 0, rot: o.rot || 0, vr: o.vr || 0,
-    a: o.a == null ? 1 : o.a, k: o.k == null ? 1 : o.k, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0, col: o.col, seed: (Math.random() * 97) | 0, s, l, t: G.time });
+    a: o.a == null ? 1 : o.a, k: o.k == null ? 1 : o.k, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0, col: o.col, mesh: o.mesh || null, seed: (Math.random() * 97) | 0, s, l, t: G.time });
 }
 function sdShots(now) {
   SD.shots = SD.shots.filter(e => now - e.at < e.dur);
@@ -93695,11 +93974,12 @@ function sdShots(now) {
     if (dt > 0) {
       if (e.drag) { const k = Math.exp(-e.drag * dt); e.vx *= k; e.vz *= k; if (!e.g) e.vy *= k; }
       e.vy -= e.g * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.rot += e.vr * dt;
-      const fl = e.kind === 'husk' ? e.w * .3 : .03;
+      const fl = e.kind === 'husk' || e.kind === 'mesh' ? e.w * .3 : .03;
       if (e.g && e.y < fl) { e.y = fl; if (e.vy < -.6) { e.vy = -e.vy * .28; e.vx *= .5; e.vz *= .5; e.vr *= .4; } else { e.vy = 0; e.vx = 0; e.vz = 0; e.vr = 0; e.g = 0; } }
     }
     const u = el / e.dur;
     if (e.kind === 'spore') { const W = e.w * (1 + e.grow * u); sdBill(SDT_SH.SPORE, [e.x, e.y, e.z], W, W, { age: u, seed: e.seed, k: e.k, a: e.a, p0: e.p0, p1: e.p1, col: e.col || SD_COL.spore, soft: .07 }, e.s, e.l); }
+    else if (e.kind === 'mesh') { const k = sdOnL(e.s, e.l); if (k != null) sdPlace(e.mesh, [e.x, e.y, e.z], e.rot, e.rot * .7 + .6, e.w * k * (1 - sdSs(.75, 1, u))); }
     else if (e.kind === 'husk') { const k = sdOnL(e.s, e.l); if (k != null) sdPlace('husk', [e.x, e.y, e.z], e.rot, e.rot * .7 + 1.2, e.w * 1.5 * k * (1 - sdSs(.75, 1, u))); }
     else {
       const sp = Math.hypot(e.vx, e.vy, e.vz), d = sp > .05 ? [e.vx / sp, e.vy / sp, e.vz / sp] : [0, 1, 0], seed = e.kind === 'seed';
@@ -93914,7 +94194,9 @@ function sdFrame() {
   if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask) return;   // (the Element Lab's foes-alone frame)
   const now = G.time;
   SD.cap = [70, 130, 200][sdLv()]; SD.load = SD.cards / SD.cap; SD.cards = 0;
-  sdHazes(now); sdPuffs(now); sdJaws(now); sdPods(now); sdShots(now);
+  sdHazes(now); sdPuffs(now); sdJaws(now); sdPods(now);
+  for (const f of SD_FRAMES) f(now);
+  sdShots(now);
   for (const e of spored || []) if (!e.c.dead) sdSpored(e.c, e.r);
   // (the cards' soft edges read the spells' depth copy, which is only made when the spells' own batch has something in it)
   if (SDT.q.length && typeof VX !== 'undefined' && VX && !VX.ni && typeof vfxSprite === 'function') { const c = SDT.q[0].c; vfxSprite(VX, c[0], c[1], c[2], .01, .01, 0, SD_COL.spore, .004, VT.GLOW, 1); }
@@ -93948,7 +94230,7 @@ if (typeof drawHazard === 'function') { const _dh = drawHazard; drawHazard = fun
 // (nor the toolkit's lingering zone on it: its ring and bubbles)
 if (typeof sfxZone === 'function') { const _sz = sfxZone; sfxZone = function (C, z) { if (sdIsHaze(z) && sdOn()) { z._sfx = 1; return; } return _sz.apply(this, arguments); }; }
 // Choking Haze's cast: no glyph under her, no burst of the recipe's (the pod and its cloud are the spell)
-if (typeof sfxRun === 'function') { const _run = sfxRun; sfxRun = function (C) { if (C && C.id === 'haze' && sdOn()) return; return _run.apply(this, arguments); }; }
+if (typeof sfxRun === 'function') { const _run = sfxRun; sfxRun = function (C) { if (C && SD_NORUN.has(C.id) && sdOn()) return; return _run.apply(this, arguments); }; }
 // spored foes
 if (typeof drawSwarmOn === 'function') { const _sw = drawSwarmOn; drawSwarmOn = function (c, r) { if (!sdOn()) return _sw.apply(this, arguments); (SD.spored || (SD.spored = [])).push({ c, r }); }; }
 // Puffcap Sowing and Snapjaw Bloom (forces_zx_grove_cool.js): their own cards in place of the toolkit's sprites
@@ -94036,6 +94318,295 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
 const EFX_LNAME_SEED = { core: 'The pod (or the seed thrown)', trail: 'Spore dust shed in flight', burst: 'The burst (the puff where it splits, its husk)', spores: 'Spore dust rolling out to the real edge',
   seeds: 'Seeds scattering, pale spores', cloud: 'The haze (one rolling cloud over its real radius)', caps: 'Puffcaps (stem and cap)', leaves: 'Rosette of leaves', runners: 'Runners out to its reach', neck: 'Neck (the thorned stem)', jaw: 'Jaws and head' };
 const EFX_LKIND_SEED = { core: 'c', trail: 'c', burst: 'c', spores: 'c', seeds: 'c', cloud: 'c', caps: 'c', leaves: 'c', runners: 'c', neck: 'c', jaw: 'c' };
+
+/* ================= THE BRIARWARDENS' ROOTS, BRAMBLES, MOTHS AND WITHERING: solid, grown out of the ground =================
+   Unit two of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), after the Seedcasters (seedfx.js), on the
+   owner's rules for it: solid things are real meshes fixed in the world, never camera-facing cards ("dont use flat planes",
+   "spell also turns with the camera"); nothing is a mark on the ground; one cohesive effect a spell; its real area shown by
+   the effect itself; foes stay readable. Until now a rooted foe stood on two painted discs with nine flat spikes round it,
+   a strike was a green lightning line and a ring, Grasping Thicket two rings and a sigil, Mothcloud flat moth sprites over a
+   glow on the ground, Wither a ribbon and a ring.
+     a rooted foe      gnarled roots break out of the earth round its feet and curl in over its legs, for as long as it is
+                       held (every root of the Grove's: the strike, Grasping Thicket, the Snapjaw's bite, the archers' snares)
+     the strike        the roots themselves, with clods of earth thrown up and a little dust; no line from the staff
+     Grasping Thicket  a thicket of thorned brambles bursts up across its real radius, outward from its middle, stands
+                       while its roots hold and sinks back
+     Mothcloud         a loose swarm of pale moths, each a little body with two beating wings, pours from the staff and
+                       circles over the walkers, in a thin veil of wing dust
+     Wither            dry leaves stream from the staff to the foe; while it ages, dead leaves fall round it; if it dies
+                       withered it crumbles: dry leaves and grey dust thrown out to its real 1.2 cells
+   It uses the Seedcasters' kit (SD_MESH, sdPlace / sdSpan / sdBasis, SD.parts, sdShot, the plant shader's soft SPORE and
+   MOTE cards) and their switch: SD.off (the Element Lab's "Old look") or no toolkit (the sims) brings the older drawing
+   back. Gameplay, timing and balance are untouched: this file only draws, and steps the older drawing aside by wrapping it.
+   Tuning: the Element Lab's entries rootstrike, thicket, constrict (Mothcloud) and briarfield (Wither). */
+const BRW = { rooted: [], thickets: [], moths: [], withers: [], st: new WeakMap(), quiet: 0 };
+const BRW_COL = { earth: [.42, .34, .22], dust: [.6, .56, .46], veil: [.9, .86, .7], ash: [.5, .48, .4] };
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { BRW.rooted.length = 0; BRW.thickets.length = 0; BRW.moths.length = 0; BRW.withers.length = 0; });
+const brwOn = () => typeof sdOn === 'function' && sdOn();
+function brSt(o) { let s = BRW.st.get(o); if (!s) BRW.st.set(o, s = {}); return s; }
+// where his effects leave him: the ONE place that knows his model (today the staff's crystal, as the game's own effects
+// find it; else the top of his post)
+function brAnchor(t) { const m = typeof sfxMuzzle === 'function' ? sfxMuzzle(t) : null; return m ? [m[0], m[1], m[2]] : [t.x, typeof towerTop === 'function' ? towerTop(t) : 1, t.y]; }
+
+/* ---- his meshes (built once; see SD_MESH in seedfx.js) ---- */
+// a tapered tube along a path in the mesh's own Y-Z plane: C(v) its middle, Rr(v) its radius, v 0..1
+function brTubeGeo(g, C, Rr, n, sides, col) {
+  const ring = i => {
+    const v = i / n, c = C(v), c2 = C(Math.min(1, v + .01)), c1 = C(Math.max(0, v - .01)); let ty = c2[1] - c1[1], tz = c2[2] - c1[2]; const l = Math.hypot(ty, tz) || 1; ty /= l; tz /= l;
+    const r = Rr(v), out = []; for (let k = 0; k < sides; k++) { const a = k / sides * TAU, sn = Math.sin(a) * r; out.push([c[0] + Math.cos(a) * r, c[1] - tz * sn, c[2] + ty * sn]); } return out;
+  };
+  let A = ring(0);
+  for (let i = 1; i <= n; i++) { const B = ring(i); for (let k = 0; k < sides; k++) { const k2 = (k + 1) % sides; g.quad(A[k], B[k], B[k2], A[k2], col(i, k)); } A = B; }
+}
+if (typeof SD_MESH !== 'undefined') Object.assign(SD_MESH, {
+  // a root: out of the ground at the origin, up +Y and hooking over toward +Z (what it grips), 1 tall; bark to a green tip
+  root: g => { g.smooth = 50; const b1 = lin3('#5a4326'), b2 = lin3('#463420'), tip = lin3('#5c7a2c');
+    brTubeGeo(g, v => [.05 * Math.sin(v * 5), Math.sin(v * 1.7) * .92, (1 - Math.cos(v * 2.2)) * .3], v => .13 * Math.pow(1 - v, .7) + .014, 8, 5, (i, k) => _sdMx(k % 2 ? b1 : b2, tip, Math.max(0, (i - 5) / 3) * .8));
+    // (a rootlet off its side)
+    brTubeGeo(g, v => [.1 + v * .26, .28 + Math.sin(v * 1.5) * .3, .04 + v * .12], v => .05 * (1 - v) + .008, 4, 4, (i, k) => k % 2 ? b1 : b2); },
+  // a bramble: a root's hooked stem, greener, set with thorns
+  bramble: g => { g.smooth = 50; const s1 = lin3('#4a6226'), s2 = lin3('#3a4e20'), th = lin3('#e2d8b0');
+    brTubeGeo(g, v => [.07 * Math.sin(v * 6), Math.sin(v * 1.6) * .95, (1 - Math.cos(v * 2.4)) * .34], v => .085 * Math.pow(1 - v, .6) + .012, 8, 5, (i, k) => k % 2 ? s1 : s2);
+    g.smooth = 0;
+    for (let q = 0; q < 6; q++) { const v = .14 + q * .14, y = Math.sin(v * 1.6) * .95, z = (1 - Math.cos(v * 2.4)) * .34, a = q * 2.4, r = .085 * Math.pow(1 - v, .6) + .012, cx = Math.cos(a), cz = Math.sin(a);
+      const A = [cx * (r + .2), y + .08, z + cz * (r + .2)], b = [[cx * r - cz * .04, y - .04, z + cz * r + cx * .04], [cx * r + cz * .04, y - .04, z + cz * r - cx * .04], [cx * r, y + .05, z + cz * r]];
+      g.tri(b[0], b[1], A, th); g.tri(b[1], b[2], A, th); g.tri(b[2], b[0], A, th); } },
+  // a clod of earth
+  clod: g => { g.smooth = 0; g.sphere(0, 0, 0, 1, .7, .85, 5, 3, '#4a3622'); },
+  // a dry leaf: the leaf's form, dead
+  dleaf: g => { g.smooth = 60; const nv = 5, P = (u, v) => { const w = .34 * Math.pow(Math.sin(Math.PI * Math.pow(v, .72)), .9); return [u * w, .16 * Math.sin(Math.PI * v) + .2 * Math.abs(u) * w / .34, v - .5]; }, a = lin3('#8a6a36'), b = lin3('#6e5228'), c = lin3('#a88a4a');
+    for (let j = 0; j < nv; j++) for (const sd of [-1, 1]) { const v0 = j / nv, v1 = (j + 1) / nv, col = _sdMx(sd > 0 ? a : b, c, j % 2 ? .3 : 0); g.quad(P(0, v0), P(sd, v0), P(sd, v1), P(0, v1), col); g.quad(P(0, v0), P(0, v1), P(sd, v1), P(sd, v0), _sdMx(col, b, .5)); } },
+  // a moth's wing: 1 long out along +X from its root, its chord along Z; pale, dusky at its tip (both faces)
+  mothw: g => { g.smooth = 0; const c = lin3('#f0e8c6'), d = lin3('#c8b88a'), e = lin3('#8a7a56');
+    // (a broad fore wing and a smaller hind wing, a dark eye-spot's worth of colour at the tip)
+    const F = [[0, 0, -.1], [.45, .02, -.62], [1, .04, -.42], [.78, .02, .02], [0, 0, .12]], H = [[0, 0, .1], [.62, .01, .12], [.58, .01, .5], [.12, 0, .42]];
+    for (const dy of [0, -.014]) { const f = F.map(p => [p[0], p[1] + dy, p[2]]), h = H.map(p => [p[0], p[1] + dy, p[2]]), w = dy ? (a, b, cc, col) => g.tri(a, cc, b, col) : (a, b, cc, col) => g.tri(a, b, cc, col);
+      w(f[0], f[1], f[4], c); w(f[1], f[3], f[4], c); w(f[1], f[2], f[3], e); w(h[0], h[1], h[3], d); w(h[1], h[2], h[3], d); } },
+  // its body: 1 long along Z
+  mothb: g => { g.smooth = 50; g.sphere(0, 0, 0, .11, .1, .42, 5, 3, '#7a6a4c'); },
+});
+
+/* ---- clods and dust thrown up where something breaks out of the earth at x, z ---- */
+function brErupt(x, z, r, n, s, l) {
+  const lv = sdLv(), k = SD.load > .7 ? .5 : 1;
+  for (let i = 0; i < Math.round(n * k * (lv ? 1 : .5)); i++) { const a = R(TAU), v = R(.5, 1.3); sdShot('mesh', x + Math.cos(a) * r * .5, .06, z + Math.sin(a) * r * .5, R(.035, .06), R(.6, .9), { mesh: 'clod', vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(1.6, 2.8), g: 9, rot: R(TAU), vr: R(-9, 9) }, s, l); }
+  sdShot('spore', x, .1 + r * .2, z, r * 1.5 + .2, .55, { vy: .25, grow: .7, p0: .7, a: .7, col: BRW_COL.earth }, s, l);
+}
+// dust rolling out low to a real radius (as a pod's spores do)
+function brRoll(x, z, rad, col, n, s, l) {
+  const a0 = R(TAU), w = rad * .6, drag = 4.5;
+  for (let k = 0; k < n; k++) { const a = a0 + (k + R(-.3, .3)) / n * TAU, reach = Math.max(0, rad - w * .34) * R(.8, 1), v = reach * drag; sdShot('spore', x, w * .3, z, w * R(.85, 1.1), R(.7, 1), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.05, .2), drag, grow: .6, p0: .6, a: .75, col, delay: R(.04) }, s, l); }
+}
+
+/* ---- rooted foes: roots out of the earth round each, curling in over its legs ---- */
+function brRooted(now) {
+  const L = BRW.rooted; if (!L.length) return;
+  const V = sdV('rootstrike', 'roots'), lv = sdLv(), kL = sdOnL('rootstrike', 'roots');
+  for (const e of L) {
+    const c = e.c; if (!c || c.dead || kL == null) continue;
+    const st = brSt(c), left = c.rootT - now, age = now - (c.rootAt || 0);
+    if (st.at !== c.rootAt) { const fresh = st.until == null || now > st.until + .3; st.at = c.rootAt; if (st.seed == null) st.seed = R(TAU); if (fresh) { st.born = now; brErupt(c.x, c.y, e.r, V.clods, 'rootstrike', 'burst'); } }
+    st.until = c.rootT;
+    const k = sdBack(Math.max(0, Math.min(1, (now - st.born) / V.grow))) * Math.max(0, Math.min(1, left / .25));
+    if (k <= .01) continue;
+    const n = Math.max(3, Math.round(V.count * [.6, .8, 1][lv] * (SD.load > .7 ? .7 : 1))), fh = typeof creepH === 'function' ? creepH(c) : .9, H = Math.max(.3, fh * V.h) * kL;
+    for (let i = 0; i < n; i++) {
+      const a = st.seed + i * TAU / n + (sdRnd(i * 3 + st.seed) - .5) * .5, rr = e.r * V.grip, hh = H * (.75 + .5 * sdRnd(i * 7 + st.seed)) * k, tight = .08 * Math.sin(now * 2.2 + i);
+      sdPlace('root', [c.x + Math.cos(a) * rr, -.02, c.y + Math.sin(a) * rr], Math.atan2(-Math.cos(a), -Math.sin(a)), .12 + tight, hh * .85, hh, hh * .85);
+    }
+  }
+  L.length = 0;
+}
+
+/* ---- Grasping Thicket: brambles across its real radius, breaking out from the middle, standing while the roots hold ---- */
+function brThickets(now) {
+  BRW.thickets = BRW.thickets.filter(q => now < q.at + q.dur + .6);
+  if (!BRW.thickets.length) return;
+  const V = sdV('thicket', 'brambles'), lv = sdLv(), kL = sdOnL('thicket', 'brambles'); if (kL == null) return;
+  for (const q of BRW.thickets) {
+    const el = now - q.at, n = Math.max(5, Math.round(V.count * [.5, .75, 1][lv])), rim = Math.min(n - 1, Math.round(V.rim * [.6, .8, 1][lv]));
+    for (let i = 0; i < n; i++) {
+      // (a ring of them stands at its edge: that is its real reach; the rest fill it)
+      const onRim = i < rim, a = onRim ? q.seed + i * TAU / rim : sdRnd(i * 5.3 + q.seed) * TAU, d = onRim ? q.r * .94 : q.r * .8 * Math.sqrt(.08 + .92 * sdRnd(i * 9.1 + q.seed));
+      const born = d / Math.max(.1, q.r) * V.spread, k = sdBack(Math.max(0, Math.min(1, (el - born) / V.grow))) * (1 - sdSs(q.dur, q.dur + .5, el));
+      if (k <= .01) continue;
+      const x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d, hh = V.h * (.7 + .6 * sdRnd(i * 2.7 + q.seed)) * k * kL, yaw = onRim ? Math.atan2(-Math.cos(a), -Math.sin(a)) + (sdRnd(i + q.seed) - .5) : sdRnd(i * 4.1 + q.seed) * TAU;
+      sdPlace('bramble', [x, -.02, z], yaw, .1 + .05 * Math.sin(now * 1.7 + i), hh * .9, hh, hh * .9);
+      if (lv && i % 2 === 0) sdPlace('leaf', [x, .02, z], yaw + 2.2, -.3, hh * .45, hh * .45, hh * .45);
+      if (!q['e' + i] && el >= born) { q['e' + i] = 1; if (i % 3 === 0) brErupt(x, z, .15, 2, 'thicket', 'burst'); }
+    }
+  }
+}
+
+/* ---- Mothcloud: pale moths, each a body and two beating wings, over the walkers in a thin veil of wing dust ---- */
+function brMoths(now) {
+  BRW.moths = BRW.moths.filter(q => !q.dead);
+  if (!BRW.moths.length) return;
+  const V = sdV('constrict', 'moths'), Vc = sdV('constrict', 'veil'), lv = sdLv(), kL = sdOnL('constrict', 'moths');
+  for (const q of BRW.moths) {
+    const z = q.z, alive = q.t && q.t.ab && q.t.ab.zones.includes(z);
+    if (!alive && q.end == null) q.end = now;
+    const fe = q.end == null ? 1 : Math.max(0, 1 - (now - q.end) / .6); if (fe <= 0) { q.dead = 1; continue; }
+    const dt = Math.max(0, Math.min(.05, now - (q.lt == null ? now : q.lt))); q.lt = now;
+    // (the swarm leaves the staff and settles: its middle follows the zone, a little behind it)
+    let top = 0; if (z.in && typeof creepH === 'function') for (const c of z.in) if (!c.dead) top = Math.max(top, creepH(c));
+    q.top = q.top == null ? top : q.top + (top - q.top) * Math.min(1, dt * 3);   // (they fly over the heads of what is under them, never inside it)
+    const fly = Math.max(0, Math.min(1, (now - q.at) / Math.max(.15, q.T))), hz = q.h0 + (Math.max(V.h, q.top * 1.08 + .12) - q.h0) * sdSs(0, 1, fly);
+    if (q.cx == null) { q.cx = q.x0; q.cz = q.z0; }
+    q.cx += (z.x - q.cx) * Math.min(1, dt * 6); q.cz += (z.z - q.cz) * Math.min(1, dt * 6);
+    const r = z.r * (.25 + .75 * fly), n = kL == null ? 0 : Math.max(4, Math.round(V.count * [.45, .7, 1][lv] * (SD.load > .7 ? .7 : 1)));
+    for (let k = 0; k < n; k++) {
+      // each on its own loop round the middle (some near, some at the rim: the rim is its real reach), bobbing
+      const ph = q.seed + k * 2.39996, rr = r * (.4 + .65 * ((k * .618) % 1)), sp = (.8 + .5 * ((k * .29) % 1)) * (k % 2 ? 1 : -1) * V.speed, an = ph + now * sp;
+      const x = q.cx + Math.cos(an) * rr, zz = q.cz + Math.sin(an) * rr * .9, y = Math.max(.12, hz * (.9 + .35 * ((k * .37) % 1)) + .08 * Math.sin(now * 3 + k)), s = V.wing * (.8 + .4 * ((k * .53) % 1)) * fe * kL;
+      // (it faces the way it flies; its wings beat about its length)
+      const hd = an + (sp > 0 ? Math.PI / 2 : -Math.PI / 2), F = [Math.cos(hd), 0, Math.sin(hd)], Rt = [F[2], 0, -F[0]], f = Math.sin(now * 34 + k * 1.7) * .7 + .2, cf = Math.cos(f), sf = Math.sin(f);
+      for (const sd of [-1, 1]) { const X = [Rt[0] * cf * sd * s, sf * s, Rt[2] * cf * sd * s], Z = [F[0] * s, 0, F[2] * s], Y = [(Z[1] * X[2] - Z[2] * X[1]) / s, (Z[2] * X[0] - Z[0] * X[2]) / s, (Z[0] * X[1] - Z[1] * X[0]) / s]; sdPart('mothw', sdBasis([x, y, zz], X, Y, Z)); }
+      if (lv) sdPart('mothb', sdBasis([x, y, zz], [Rt[0] * s, 0, Rt[2] * s], [0, s, 0], [F[0] * s, 0, F[2] * s]));
+    }
+    // the veil: wing dust hanging among them, thin
+    const nv = Math.round(Vc.count * [.5, .75, 1][lv]);
+    for (let k = 0; k < nv; k++) {
+      const per = 2.8 * (.8 + .5 * sdRnd(k + q.seed)), ph = (now - q.at) / per + sdRnd(k * 3.1 + q.seed), cyc = Math.floor(ph), u = ph - cyc, a = sdRnd(k * 7.3 + cyc * 13.7 + q.seed) * TAU, rr = r * .6 * Math.sqrt(sdRnd(k * 5.9 + cyc * 3.3 + q.seed));
+      sdBill(SDT_SH.SPORE, [q.cx + Math.cos(a) * rr, hz * (.85 + .3 * sdRnd(k * 2.3 + cyc)), q.cz + Math.sin(a) * rr], z.r * Vc.w, z.r * Vc.w * .8, { age: .08 + u * .36, seed: k * 5 + cyc * 3, a: fe * fly * Vc.a * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)), p0: Vc.thick, p1: 1.5, col: BRW_COL.veil, soft: .1, sp: .7, pull: .15 }, 'constrict', 'veil');
+    }
+  }
+}
+
+/* ---- Wither: dry leaves from the staff to the foe; dead leaves falling round it while it ages ---- */
+function brWithers(now) {
+  BRW.withers = BRW.withers.filter(q => !q.dead);
+  if (!BRW.withers.length) return;
+  const V = sdV('briarfield', 'stream'), Vl = sdV('briarfield', 'leaves'), lv = sdLv();
+  for (const q of BRW.withers) {
+    const c = q.c, el = now - q.at;
+    if (!c || c.dead) { q.dead = 1; continue; }
+    const h = hitH(c), kS = sdOnL('briarfield', 'stream');
+    if (el < q.T + .25 && kS != null) {
+      // the stream: leaves leave the staff one after another and fly straight to it
+      const n = Math.round(V.leaves * [.6, .8, 1][lv]), A = q.A;
+      for (let i = 0; i < n; i++) { const u = (el - i * .035) / q.T; if (u <= 0 || u >= 1) continue; const wob = Math.sin(u * 9 + i) * .05;
+        sdPlace('dleaf', [A[0] + (c.x - A[0]) * u + wob, A[1] + (h - A[1]) * u + wob, A[2] + (c.y - A[2]) * u], now * 9 + i, now * 7 + i * 2, V.w * kS); }
+      if (now - (q.shed || 0) > .05) { q.shed = now; const u = Math.min(1, el / q.T); sdShot('spore', A[0] + (c.x - A[0]) * u, A[1] + (h - A[1]) * u, A[2] + (c.y - A[2]) * u, .16, .4, { vy: .1, grow: .9, p0: .5, a: .6, col: BRW_COL.ash }, 'briarfield', 'stream'); }
+      continue;
+    }
+    if (!(c.gvcWithT > now)) { if (el > q.T + .4) q.dead = 1; continue; }
+    // while it ages: dead leaves let go of it and fall, more of them as it weakens
+    const kL = sdOnL('briarfield', 'leaves'); if (kL == null) continue;
+    const K = c.gvcWithK || 0, n = Math.round(Vl.count * (.5 + .5 * K) * [.5, .75, 1][lv]), fr = Math.max(.25, ((c.def && c.def.r) || .3) * 1.1), top = (typeof creepH === 'function' ? creepH(c) : .9) * .95;
+    for (let i = 0; i < n; i++) {
+      const per = 1.3 + .5 * sdRnd(i + q.seed), ph = (now - q.at) / per + sdRnd(i * 3.7 + q.seed), cyc = Math.floor(ph), u = ph - cyc, a = sdRnd(i * 5.1 + cyc * 7.7 + q.seed) * TAU + u * 1.4, rr = fr * (.7 + .5 * u);
+      sdPlace('dleaf', [c.x + Math.cos(a) * rr + Math.sin(u * 8 + i) * .05, top * (1 - u) + .04, c.y + Math.sin(a) * rr], a + u * 5, u * 6 + i, Vl.w * kL * sdSs(0, .12, u) * (1 - sdSs(.85, 1, u)));
+    }
+    if (lv && now - (q.dust || 0) > .5) { q.dust = now; sdShot('spore', c.x + R(-.1, .1), h * .6, c.y + R(-.1, .1), .3, .7, { vy: -.08, grow: .6, p0: .45, a: .5 * (.4 + .6 * K), col: BRW_COL.ash }, 'briarfield', 'leaves'); }
+  }
+}
+// it died withered: it crumbles into dry leaves and grey dust, thrown out to the real reach of what it withers (1.2 cells)
+function brCrumble(x, z, h, r) {
+  const V = sdV('briarfield', 'crumble'), lv = sdLv();
+  for (let i = 0; i < Math.round(V.leaves * [.5, .75, 1][lv]); i++) { const a = R(TAU), d = V.reach * R(.3, 1), T = R(.4, .7), vy = R(1.2, 2.4); sdShot('mesh', x, h * R(.3, 1), z, R(.1, .16), R(1, 1.5), { mesh: 'dleaf', vx: Math.cos(a) * d / T, vz: Math.sin(a) * d / T, vy, g: 5, rot: R(TAU), vr: R(-8, 8) }, 'briarfield', 'crumble'); }
+  brRoll(x, z, V.reach, BRW_COL.ash, Math.round(V.dust * [.6, .8, 1][lv]), 'briarfield', 'crumble');
+  sdShot('spore', x, h * .6, z, r * 3 + .3, .6, { vy: .2, grow: .6, p0: .8, a: .8, col: BRW_COL.ash }, 'briarfield', 'crumble');
+}
+
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { brThickets(now); brMoths(now); brWithers(now); brRooted(now); });
+
+/* ---- the older drawing stepped aside (it comes back with SD.off, or where the toolkit is not up) ---- */
+// a rooted foe: its roots in place of the discs and flat spikes
+if (typeof drawRooted === 'function') { const _dr = drawRooted; drawRooted = function (c, r) { if (!brwOn()) return _dr.apply(this, arguments); BRW.rooted.push({ c, r }); }; }
+// while his own strike or Grasping Thicket runs: no ring, no chips of the game's, no green line from the staff
+const brQuiet = () => BRW.quiet > 0 && brwOn();
+if (typeof fxRing === 'function') { const _fr = fxRing; fxRing = function () { if (brQuiet()) return; return _fr.apply(this, arguments); }; }
+if (typeof fxDust === 'function') { const _fd = fxDust; fxDust = function () { if (brQuiet()) return; return _fd.apply(this, arguments); }; }
+if (typeof abRootFx === 'function') { const _ar = abRootFx; abRootFx = function () { if (brQuiet()) return; return _ar.apply(this, arguments); }; }
+function brHush(fn) {
+  const nb = G.bolts.length, np = G.parts.length; BRW.quiet++;
+  try { return fn(); } finally {
+    BRW.quiet--;
+    if (brwOn()) {
+      for (let i = G.bolts.length - 1; i >= nb; i--) { const c = G.bolts[i].col; if (c && c[0] === .45 && c[1] === 1 && c[2] === .35) G.bolts.splice(i, 1); }
+      for (let i = G.parts.length - 1; i >= np; i--) { const p = G.parts[i]; if (p.k === 'chunk' && (p.col === '#4a7a2a' || p.col === '#5a4430')) G.parts.splice(i, 1); }
+    }
+  }
+}
+if (typeof rootStrike === 'function') {
+  const _rs = rootStrike;
+  rootStrike = function (t, st, tg) {
+    const wide = !!(st && st.caps && st.caps.overgrow && (t.shots + 1) % 2 === 0), x = tg.x, z = tg.y;
+    const r = brHush(() => _rs.apply(this, arguments));
+    if (wide && brwOn()) brRoll(x, z, 1.2, BRW_COL.earth, 6, 'rootstrike', 'burst');   // Overgrowth: the earth heaves out to its real reach
+    return r;
+  };
+}
+if (typeof ABIL !== 'undefined' && ABIL.thicket && typeof ABIL.thicket.cast === 'function') {
+  const _tc = ABIL.thicket.cast;
+  ABIL.thicket.cast = function (t, st, c, ab) {
+    const x = c.x, z = c.y, r = brHush(() => _tc.apply(this, arguments));
+    if (brwOn()) { const d = byT(ab.by.root, t); BRW.thickets.push({ x, z, r: ab.rr, at: G.time, dur: d, seed: R(TAU) }); brRoll(x, z, ab.rr, BRW_COL.earth, 5, 'thicket', 'burst'); }
+    return r;
+  };
+}
+if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('thicket');   // (no ring, sigil or spikes of the recipe's under it)
+// Mothcloud, Wither and its crumble (forces_zx_grove_cool.js): their own meshes in place of the toolkit's sprites
+if (typeof GVC_FX !== 'undefined') {
+  const _mc = GVC_FX.mothcloud, _ms = GVC_FX.mothspread, _wi = GVC_FX.wither, _cr = GVC_FX.crumble;
+  GVC_FX.mothcloud = function (C, t, o) {
+    if (!brwOn()) return _mc.apply(this, arguments);
+    const A = brAnchor(t), z = o.z;
+    BRW.moths.push({ z, t, at: G.time, T: z.mvT || .4, x0: A[0], z0: A[2], h0: A[1], seed: R(TAU) });
+  };
+  GVC_FX.mothspread = function () { if (!brwOn()) return _ms.apply(this, arguments); };
+  GVC_FX.wither = function (C, t, o) {
+    if (!brwOn()) return _wi.apply(this, arguments);
+    BRW.withers.push({ c: o.c, t, at: G.time, T: o.T, A: brAnchor(t), seed: R(TAU) });
+  };
+  GVC_FX.crumble = function (C, t, o) { if (!brwOn()) return _cr.apply(this, arguments); brCrumble(o.x, o.z, o.h, o.r); };
+}
+// every root of the Grove's sounds like roots, not like the Sand Burrower
+if (typeof AB_SFX !== 'undefined') AB_SFX.roots = 'rootrise';
+
+/* ---- the Element Lab's entries ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    rootstrike: { unit: 'briarwarden', force: 'grove', el: 'seed', name: 'Root Strike', basic: 1, layers: ['roots', 'burst'] },
+    thicket: { unit: 'briarwarden', force: 'grove', el: 'seed', name: 'Grasping Thicket', layers: ['brambles', 'burst'] },
+    constrict: { unit: 'briarwarden', force: 'grove', el: 'seed', name: 'Mothcloud', layers: ['moths', 'veil'] },
+    briarfield: { unit: 'briarwarden', force: 'grove', el: 'seed', name: 'Wither', layers: ['stream', 'leaves', 'crumble'] },
+  });
+  Object.assign(ELEM_FX_DEF, {
+    rootstrike: {
+      // the roots round a held foe: how many, their height (x the foe's), how far out they stand (x its radius), how fast
+      // they break out (s), clods thrown up
+      roots: { count: 5, h: .55, grip: .8, grow: .22, clods: 4 },
+      burst: {},
+    },
+    thicket: {
+      // the brambles: how many, how many of them ring its edge, their height, how long the break-out takes to reach the
+      // edge (s), how fast each grows (s)
+      brambles: { count: 13, rim: 6, h: .6, spread: .22, grow: .25 },
+      burst: {},
+    },
+    constrict: {
+      // the moths: how many, a wing's length, how fast they circle (x), the height they settle at
+      moths: { count: 14, wing: .17, speed: 1, h: .62 },
+      // the veil of wing dust: billows, a billow's width (x the radius), thickness, opacity
+      veil: { count: 4, w: 1.1, thick: .5, a: .7 },
+    },
+    briarfield: {
+      // the stream: leaves, a leaf's size
+      stream: { leaves: 7, w: .24 },
+      // dead leaves falling round it while it ages: the most at once, their size
+      leaves: { count: 8, w: .22 },
+      // the crumble: leaves thrown, dust billows, its real reach (cells)
+      crumble: { leaves: 12, dust: 6, reach: 1.2 },
+    },
+  });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { grip: ['Stand out from it (x its radius)', .3, 1.6, .01], clods: ['Clods thrown up', 0, 12, 1], rim: ['Of them, round its edge', 0, 12, 1], wing: ['Wing length', .03, .4, .005], leaves: ['Leaves', 0, 24, 1], dust: ['Dust billows', 0, 12, 1] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { roots: 'Roots round a held foe', brambles: 'Brambles (across its real radius)', moths: 'Moths (body and two wings)', veil: 'Veil of wing dust', stream: 'Leaves streaming from the staff', leaves: 'Dead leaves falling round it', crumble: 'The crumble (leaves and dust to its real reach)' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { roots: 'c', brambles: 'c', moths: 'c', veil: 'c', stream: 'c', leaves: 'c', crumble: 'c' });
+  if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['briarwarden', 'Briarwardens']);
+  if (typeof efxSync === 'function') efxSync();
+}
 
 /* ELEMENT FX hooks (elemfx.js): the drawing primitives asked about the Pyroclasts' and Frostweavers' layers. Loaded after every
    effect module (pyrofire.js, labfx.js, the unit models), so each wrapper sits outside theirs. Every wrapper looks first at
@@ -95507,9 +96078,9 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
       <div class="el-top" id="elTop">…</div>
       <div class="row" style="align-items:center"><span class="note" style="width:72px">Pyroclasts</span>${spells('cc_pyroclast')}</div>
       <div class="row" style="align-items:center"><span class="note" style="width:72px">Frostweavers</span>${spells('cc_rimeweaver')}</div>
-      ${typeof SD !== 'undefined' ? `<div class="row" style="align-items:center"><span class="note" style="width:72px">Seedcasters</span>${spells('seedcaster')}</div>` : ''}
+      ${typeof ELEM_FX_ROWS !== 'undefined' ? ELEM_FX_ROWS.map(([u, n]) => `<div class="row" style="align-items:center"><span class="note" style="width:72px">${esc(n)}</span>${spells(u)}</div>`).join('') : ''}
       <details data-g="play"${L.open.play ? ' open' : ''}><summary><span>Playback</span></summary><div class="el-b">
-        <div class="row">${b('cast', 'Cast (Space)', false, sp.basic ? 'Loose one strike' : 'Cast it now')}${b('loop', L.loop ? 'Loop on' : 'Loop off', L.loop)}${b('pause', L.paused ? 'Paused (P)' : 'Pause (P)', L.paused)}${b('step', 'Step (.)', false, 'One frame (1/60 s) while paused')}${b('before', L.before ? 'Showing: as authored' : 'Before / after', L.before, 'Show the effect without any tuning')}${sp.el === 'seed' ? b('old', SD.off ? 'Showing: old look' : 'Old look', SD.off, 'Her effects as they were before 11 Nov 2026 (the cannon ball, the puddle, the discs)') : ''}</div>
+        <div class="row">${b('cast', 'Cast (Space)', false, sp.basic ? 'Loose one strike' : 'Cast it now')}${b('loop', L.loop ? 'Loop on' : 'Loop off', L.loop)}${b('pause', L.paused ? 'Paused (P)' : 'Pause (P)', L.paused)}${b('step', 'Step (.)', false, 'One frame (1/60 s) while paused')}${b('before', L.before ? 'Showing: as authored' : 'Before / after', L.before, 'Show the effect without any tuning')}${sp.el === 'seed' ? b('old', SD.off ? 'Showing: old look' : 'Old look', SD.off, 'These effects as they were before 11 Nov 2026 (flat sprites, rings and discs on the ground)') : ''}</div>
         <div class="row">${[.1, .25, .5, 1].map(v => `<button data-slow="${v}" class="${v === L.slow ? 'on' : ''}">${v}×</button>`).join('')}</div>
         ${sp.basic ? '<div class="note">The strike loops at its own rate; Loop off holds it for Cast.</div>' : `<label class="el-r"><span>Loop every <b>${L.every.toFixed(1)}s</b></span><input type="range" id="elEvery" min="1" max="8" step=".1" value="${L.every}"></label>`}
       </div></details>
