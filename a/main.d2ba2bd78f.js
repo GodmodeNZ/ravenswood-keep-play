@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd4a259e@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '687316e@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -5252,7 +5252,7 @@ function updateFx(dt) {
 /* ---- Save / restore ---- */
 function serialize() {
   if (!G.towers || (G.state !== 'play') || G.vs) return null;   // a Tower Wars match is not saved over your campaign
-  return { v: 8, ftv: 6, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
+  return { v: 8, ftv: 7, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
     towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0, t.def.wall ? 0 : Math.round((t.vx || 0) * 100) / 100, t.bornW | 0, t.vSeed | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
@@ -5298,7 +5298,9 @@ function restore(s) {
   // (a tree's list order is unchanged); migrateTal replays them on the new layout, and a rank that no longer fits is refunded
   // ftv 6 (10 Nov 2026): every force tree spread over six rows (forces_zzzzzzzzzzzzzzzzz_spread.js), the list order kept: the
   // same replay refunds a pick whose new row or prerequisite it no longer meets
-  if (!oldForceTal && (s.ftv | 0) >= 3 && (s.ftv | 0) <= 5 && G.force && mt.refund > 0 && typeof onToast === 'function') setTimeout(() => onToast(`The talent trees were rearranged: ${mt.refund} talent point${mt.refund > 1 ? 's' : ''} that no longer fit came back to spend.`), 1600);
+  // ftv 7 (10 Nov 2026): the talents were re-placed within their trees so look-alike talents no longer share a cell from
+  // tree to tree (tools/vary_trees.js; the list order, and so every pick, kept): the same replay, the same toast
+  if (!oldForceTal && (s.ftv | 0) >= 3 && (s.ftv | 0) <= 6 && G.force && mt.refund > 0 && typeof onToast === 'function') setTimeout(() => onToast(`The talent trees were rearranged: ${mt.refund} talent point${mt.refund > 1 ? 's' : ''} that no longer fit came back to spend.`), 1600);
   if ((s.v | 0) < 8) { const done = Math.max(0, (s.wave | 0) - 1), more = Math.max(0, done - Math.floor(done / 3)); G.tp += more; G.tpEarned += more; }   // v8 pays a point every wave: catch an older run up
   G.fus = {}; for (const k in s.fus || {}) if (s.fus[k]) { if (FUS_BY[k] && !G.force) G.fus[k] = 1; else G.tp++; }   // a fusion that no longer exists (the Shadow ones), or one a force run bought before they left it, gives its point back
   const okGear = it => !!(((s.v | 0) >= 6 || remapTome(it)) && ((s.v | 0) >= 8 || remapTome8(it)) && migrateGear(it)) && RARITY[it.rar];
@@ -7211,7 +7213,11 @@ function xpHud() {
    waves); a support that slows, roots or buffs well (Briarwardens, Lightbinder Sisters, Frostweavers, Hail Shamans)
    about with a mid-damage unit: IV about wave 7-10, V about 11-17. Before (kills + 1 an assist, IV 70 / V 125 / VI 180,
    the old catch-up): a top-damage unit that rarely took the last hit (Grail Knights, Spellblades, Blade Dancers) opened
-   IV only at wave 14-17 and never V by wave 20. */
+   IV only at wave 14-17 and never V by wave 20.
+   The stagger (10 Nov 2026, "the pace by standing" below; tools/check_vet_stagger.js scripts it, check_veterancy.js --old plays
+   it without): before, the front three units opened each tier within a wave of each other (IV at about wave 10, V 15, VI 20);
+   now the unit doing the most opens it first and the next two follow about two waves apart each (IV 9 / 11 / 13, V 13 / 15 / 18,
+   VI 17 / 19 / 22), with the army's tier unlocks by wave 15 and 20 about as many as before (4.5 against 4.9, 8.8 against 8.9). */
 const VET_AST = 1, VET_WIN = 8, VET_HIT = false;   // (VET_AST: an assist's worth in a save from before credit by contribution)
 let VET_ACT = null, VET_TOUCH = 8;   // VET_TOUCH: how long ago a slow, root, stun, burn ... may have landed and still count (seconds)   // the unit whose code is running (updateTowers, impact, a hazard's tick): stuns, mana and wards it gives count as its help
 const VET_NEED = [190, 280, 370];   // veterancy that opens tier IV, V and VI
@@ -7279,6 +7285,35 @@ function vetW(c) {
 }
 // hurt: unit src dealt a damage to foe c (what its share of the foe is read from)
 function vetDmg(c, src, a) { if (a > 0 && src && src.invested !== undefined && src.id && src.def && !src.def.wall) { const D = c.vD || (c.vD = {}); D[src.id] = (D[src.id] || 0) + a; } }
+/* ---- the pace by standing (owner, 10 Nov 2026: "veterancy unlocks are all happening around the same time, should be
+   staggered a bit more, so that units that contributed the most get it first") ----
+   The army forms a queue for its unlocks, and each unit keeps its distance from the one in front. Units still working
+   toward a tier are ranked by what they have earned plus VET_STAND_LEAD times what they earned lately (t.vRec: the credit
+   before any slowing, VET_STAND_KEEP of it carried from one wave to the next), so the unit doing the most work leads, and a
+   unit that out-earns the one ahead overtakes it. The front unit gains at full pace, as before. Each unit behind it gains
+   at (its gap, in veterancy, to the unit in front / VET_STAND_GAP): full pace once it trails by VET_STAND_GAP, slower as it
+   closes on it, never under VET_STAND_MIN (and at the floor while it is ahead of a unit that is working harder). Units doing
+   about the same work therefore open each tier VET_STAND_GAP apart (about two waves of a busy unit) instead of together,
+   a unit far behind is not slowed at all, and the army as a whole is held up only by that one gap. A unit with every tier
+   open stands aside, so the rest move up. Only the pace changes: the numbers a tier asks for are the same for every unit. */
+let VET_STAND = true, VET_STAND_GAP = 45, VET_STAND_MIN = .5, VET_STAND_UP = 1.15, VET_STAND_LEAD = 1, VET_STAND_KEEP = .6;
+function vetRec(t) {
+  const w = (typeof G !== 'undefined' && G && G.wave) | 0;
+  if (t.vRecW !== w) { t.vRec = (+t.vRec || 0) * Math.pow(VET_STAND_KEEP, Math.max(0, w - (t.vRecW | 0))); t.vRecW = w; }
+  return t.vRec || 0;
+}
+// every unit working toward a tier -> its pace by the gap to the unit in front (a Map; the front unit and any other not in it gain at full pace)
+function vetPaces() {
+  const P = new Map();
+  if (!VET_STAND || !vetOn() || !G.towers) return P;
+  const L = [];
+  for (const o of G.towers) if (!o.def.wall && vetNext(o) != null) { const v = vetRaw(o); L.push([o, v, v + VET_STAND_LEAD * vetRec(o)]); }
+  L.sort((a, b) => b[2] - a[2] || b[1] - a[1] || a[0].id - b[0].id);
+  for (let r = 0; r < L.length; r++) P.set(L[r][0], VET_STAND_UP * (r ? clamp((L[r - 1][1] - L[r][1]) / VET_STAND_GAP, VET_STAND_MIN, 1) : 1));
+  return P;
+}
+const vetStand = (t, P) => (P || vetPaces()).get(t) || 1;
+const vetStandRel = t => { const p = vetPaces().get(t); return p ? Math.min(1, p / VET_STAND_UP) : 1; };   // (what the card shows: 1 at the front)
 function vetRate(t, avg) {
   if (!VET_CATCH || !vetOn()) return 1;
   if (avg === undefined) avg = vetAvg();
@@ -7322,12 +7357,18 @@ function vetKill(c, src) {
     for (const id in o.vAid) { if (o.vAid[id] + VET_WIN < now) { delete o.vAid[id]; continue; } if (k > 0) aidK[id] = (aidK[id] || 0) + k; }
   }
   for (const t of G.towers) if (aidK[t.id] > 0 && !t.def.wall) lend(t, aidK[t.id]);
-  const avg = vetAvg(), gain = (t, n) => { if (!(n > 0)) return; if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0); t.vx += n * vetRate(t, avg); };
+  const pay = new Map();
   for (const t of G.towers) {
     if (t.def.wall) continue;
     const s = share(t), hp = help.get(t) || 0;
     if (!(s > 0) && !hp && t !== killer) continue;
-    gain(t, w * (VET_K_DMG * s + VET_K_HELP * hp + (t === killer ? VET_K_LAST : 0)));
+    const n = w * (VET_K_DMG * s + VET_K_HELP * hp + (t === killer ? VET_K_LAST : 0));
+    pay.set(t, n); vetRec(t); t.vRec += n;
+  }
+  const avg = vetAvg(), P = vetPaces(), gain = (t, n) => { if (!(n > 0)) return; if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0); t.vx += n * vetRate(t, avg) * vetStand(t, P); };
+  for (const [t, n] of pay) {
+    const s = share(t), hp = help.get(t) || 0;
+    gain(t, n);
     if (t !== killer && (hp > 0 || s >= VET_AST_SHARE)) t.ast = (t.ast | 0) + 1;
     vetCheck(t);
   }
@@ -7337,11 +7378,12 @@ function vetKill(c, src) {
 const VET_LEAK_K = .5;
 function vetLeak(c) {
   if (!vetOn() || G.state !== 'play' || !G.towers || !c.vD || !(c.maxHp > 0)) return;
-  const w = vetW(c), avg = vetAvg();
+  const w = vetW(c), avg = vetAvg(), P = vetPaces();
   for (const t of G.towers) {
     const d = c.vD[t.id]; if (!(d > 0) || t.def.wall) continue;
     if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
-    t.vx += w * VET_K_DMG * VET_LEAK_K * Math.min(1, d / c.maxHp) * vetRate(t, avg); vetCheck(t);
+    const n = w * VET_K_DMG * VET_LEAK_K * Math.min(1, d / c.maxHp); vetRec(t); t.vRec += n;
+    t.vx += n * vetRate(t, avg) * vetStand(t, P); vetCheck(t);
   }
 }
 // a unit's veterancy just opened a new tier: say so (several at once share one toast), and a small ring on it
@@ -7378,7 +7420,7 @@ function vetFrac(t) { const n = (t.tier | 0) + 1; return n >= 3 && n < t.def.tie
 function vetInfoHTML(t) {
   if (!vetOn() || !t || t.def.wall) return '';
   const n = vetNext(t), f = n != null ? clamp(vetPts(t) / vetNeed(n), 0, 1) : 1;
-  return `<p class="mut vet-row" data-vet="${t.id}" tabindex="0">Veterancy <span class="mn-bar vt-bar${vetRate(t) < .995 ? ' slow' : ''}"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span></p>`;
+  return `<p class="mut vet-row" data-vet="${t.id}" tabindex="0">Veterancy <span class="mn-bar vt-bar${vetRate(t) < .995 || vetStandRel(t) < .995 ? ' slow' : ''}"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span></p>`;
 }
 // the hover card (#itip, the item cards' look): the bar with its numbers, the next tier, kills and assists, what an assist is
 const VET_GLYPH = {
@@ -7392,13 +7434,14 @@ function vetCardHTML(t) {
   const up = n != null ? `<p class="vtc-up">Tier ${ROMAN[n]} unlocks at <b>${need}</b>${(t.tier | 0) + 1 === n ? ' · it still costs its gold' : ''}</p>`
     : `<p class="vtc-up">${(t.tier | 0) >= t.def.tiers.length - 1 ? 'Tier VI: the top' : 'Every tier is open'}${(t.tier | 0) < t.def.tiers.length - 1 ? ' · each still costs its gold' : ''}</p>`;
   const seed = t.vSeed > 0 ? `<p class="vtc-seed">Started with ${t.vSeed} from your army\u2019s experience</p>` : '';
-  const rt = vetRate(t), slow = rt < .995 ? `<p class="vtc-slow">Ahead of your army: gaining at ${Math.round(rt * 100)}%</p>` : '';
+  const ra = vetRate(t), qu = vetStandRel(t), rt = ra * qu, why = ra < .995 && qu < .995 ? `Ahead of your army, and waiting behind its front ${uw(2)}` : ra < .995 ? 'Ahead of your army' : `Waiting its turn behind your front ${uw(2)}`;
+  const slow = rt < .995 ? `<p class="vtc-slow">${why}: gaining at ${Math.round(rt * 100)}%</p>` : '';
   const pt = G.playtest && G.playtest.wave ? `<p class="itc-hint">A playtest army starts seasoned: +${vetSeason(G.playtest.wave)}.</p>` : '';
   return `<div class="itc vtc" data-kw-off><p class="itc-n">Veterancy</p><p class="itc-k">${t.def.name} · tier ${ROMAN[t.tier | 0]}</p>`
     + `<div class="vtc-bar${rt < .995 ? ' slow' : ''}"><i class="${n == null ? 'full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i><span>${n != null ? `${p} / ${need}` : `${p} · max`}</span></div>`
     + up + slow + seed
     + `<ul class="vtc-ka"><li>${VET_GLYPH.kill}<b>${K}</b> ${pl(K, 'kill')}</li><li>${VET_GLYPH.assist}<b>${A}</b> ${pl(A, 'assist')}</li></ul>`
-    + `<p class="itc-hint">Each foe slain pays this ${uw(1)} for its share of the damage on it (a last hit a little more), and for its help: a foe it slowed, rooted, stunned or left a status on, or one hurt by a ${uw(1)} it buffed, warded, healed or fed mana. An assist: a foe it helped with or hurt, without the last hit.</p>${pt}</div>`;
+    + `<p class="itc-hint">Each foe slain pays this ${uw(1)} for its share of the damage on it (a last hit a little more), and for its help: a foe it slowed, rooted, stunned or left a status on, or one hurt by a ${uw(1)} it buffed, warded, healed or fed mana. An assist: a foe it helped with or hurt, without the last hit. Units doing about the same work open each tier a couple of waves apart, the one doing more first.</p>${pt}</div>`;
 }
 
 /* ================= FORCES: who answered the keep's call =================
@@ -48206,71 +48249,71 @@ const hwModel = h => h && h.ult && WEAPON_MDL['hw_ult_' + h.u] ? 'hw_ult_' + h.u
 const TAL_TIER6 = [0, 2, 4, 7, 10, 12];
 /* <spread> */
 const TAL_SPREAD = {
-  "grove.glaive": {"Long Haft":[0,3],"Hold the Line":[0,2],"Set Spears":[2,3],"Shieldsplitter":[0,1],"Thornhedge":[1,3],"Bloodthorn":[2,0],"Rootbreaker":[4,0],"Phalanx":[3,1],"Wall of Spears":[5,2],"Impaler":[5,0],"Spearwood Rising":[3,0],"Living Palisade":[5,1],"Skewer":[3,3],"Splintered Line":[4,2],"Deep Thrust":[1,0],"Living Haft":[1,1],"Thornwall Ward":[2,2]},
-  "grove.arrow": {"Patient Hunter":[0,3],"Canopy Sight":[0,0],"Mark the Quarry":[2,2],"Thornpoint Arrows":[0,1],"Paired Shafts":[2,0],"Thornseed Arrow":[1,0],"Heartseeker":[1,3],"Snaring Shot":[3,0],"Pinning Shot":[5,2],"Thornrain":[5,1],"Nailing Shaft":[4,3],"Still Quarry":[3,2],"Wounded Prey":[4,1],"Splitting Shaft":[5,3],"Quick Nock":[1,2],"Hunter's Rhythm":[2,1],"Hushed Quarry":[3,3]},
-  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,1],"Clinging Briars":[2,0],"Thorn Hold":[0,3],"Mothcloud":[1,0],"The Deep Hungers":[5,3],"Wither":[4,3],"Second Snare":[3,0],"Bramble Squeeze":[2,1],"Spreading Roots":[3,2],"Bloodbriar":[4,1],"Rootburst":[3,3],"Overgrowth":[5,2],"Strangleroot":[5,0],"Warden's Reach":[1,2],"Sapwell":[1,3],"Quickening Sap":[2,2]},
-  "grove.arcane": {"Heavy Lance":[0,1],"Trample":[1,0],"Wheel About":[0,2],"Bowl Over":[3,0],"Run to Ground":[5,3],"Mark of the Hunt":[3,3],"Bounding Leap":[2,0],"White Hart's Hunt":[4,3],"Lord of the Glade":[3,1],"Hooves of Thunder":[5,2],"Hunter's Finish":[5,0],"Second Charge":[2,1],"Goring Antlers":[1,3],"Long Gallop":[0,3],"Stag's Wind":[1,2],"Herd Instinct":[4,2]},
-  "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,3],"Wing-Clipper":[2,3],"Bramble Claws":[1,1],"Primal Pounce":[1,3],"Hawk's Mark":[3,1],"Grounded Prey":[3,0],"Moonsap Bolts":[1,0],"Skyfall":[5,2],"Shapestorm":[2,0],"Second Skin":[2,2],"Harrier's Cry":[3,2],"Hawk Lord":[5,0],"Wild Heart":[5,1],"Wild Pace":[0,0],"Druid's Patience":[0,2],"Talon Rend":[4,3]},
-  "grove.earth": {"Leaf-Edged Blades":[0,2],"Wide Whirl":[0,0],"Flowing Steps":[2,0],"Tripping Blades":[1,3],"Blade Rhythm":[2,2],"Threading Dance":[1,0],"Curtain Call":[5,3],"Bladestorm":[5,0],"Encore":[4,3],"Twin Whirl":[3,1],"Gale of Blades":[4,0],"Reaper's Step":[5,2],"Quickstep":[0,3],"Dancer's Breath":[1,1],"Petal Cuts":[3,3]},
-  "grove.cannon": {"Potent Spores":[0,0],"Ripe Pods":[0,3],"Choking Spores":[1,1],"Seed Scatter":[2,3],"Hard Husk":[3,1],"Clinging Spores":[4,0],"Puffcap Sowing":[1,3],"Snapjaw Bloom":[3,0],"Spore Cloud":[5,2],"Bursting Rot":[5,3],"Puffcap Trail":[5,1],"Rootmark Seed":[4,3],"Drifting Spores":[3,2],"Far Cast":[1,2],"Seedwell":[2,0],"Thorned Husks":[0,1],"Burrowing Pods":[2,2]},
-  "grove.venom": {"Hunter's Patience":[0,0],"Barbed Darts":[0,1],"Quick Quiver":[0,3],"Lone Prey":[1,0],"Long Severance":[2,1],"Sap Thief":[1,2],"Bramble Snare":[1,3],"Briar Gibbet":[3,1],"Silent Stalk":[2,2],"Deep Snare":[2,3],"Thornmark Trail":[3,0],"Choking Thorns":[4,1],"Snare Line":[4,3],"Apex Stalker":[5,0],"Gallows Briar":[5,1],"Torn Ties":[5,2]},
-  "champ:rootmother": {"Patient Earth":[0,3],"Long Vines":[1,1],"Deep Grip":[0,0],"Twin Elders":[5,3],"Rootway":[1,3],"Bramble Grasp":[2,3],"Thorned Roots":[1,0],"Sap Song":[3,1],"Heartwood Sapling":[3,0],"Strangling Hold":[4,1],"Sapling Warden":[3,3],"Rootmother":[5,1],"The Old Wood Walks":[2,0],"Thousand Roots":[5,2],"Quick Tendrils":[0,2],"Deep Sap":[2,2],"Sapling Song":[4,2]},
-  "champ:thornbow": {"Steady Draw":[0,0],"High Boughs":[0,2],"Snaring Rain":[0,1],"Root Platform":[3,1],"Farshot":[1,0],"Barbed Shafts":[2,0],"Thorn Rain":[2,3],"Hunter’s Patience":[2,2],"Blood Moon":[5,3],"Snarled Ground":[3,0],"Running Shafts":[3,3],"Warden’s Mark":[4,2],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,2],"Fletcher's Pace":[1,3],"Captain's Share":[1,1],"Moonlit Aim":[5,1]},
-  "champ:hivemother": {"Ripe Seeds":[0,3],"Drifting Pods":[0,2],"Passing Spores":[0,0],"Compost":[3,1],"Moth Swarm":[1,3],"Thick Garden":[2,3],"Sticky Pollen":[3,0],"Pollen Drift":[2,2],"Overripe":[5,0],"Bloom of Moths":[5,2],"Swarm Song":[3,3],"Seedmother":[5,1],"Full Bloom":[4,0],"Rotfeast":[4,2],"Busy Hive":[1,1],"Honey Store":[1,2]},
-  "conclave.glaive": {"Measured Cuts":[0,3],"Opening Salute":[0,0],"Lone Duel":[0,2],"Riftsteel Edge":[3,3],"Ward-Splitter":[1,3],"Charged Edge":[2,3],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[3,1],"Thrown Riftblade":[4,0],"Fifth Form":[4,2],"Phase Dancer":[2,2],"Ghostblade Rush":[5,3],"Weaver's Blade":[5,1],"Press the Opening":[1,1],"Binding Cut":[1,0],"Guard Broken":[2,1]},
-  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,0],"Missile Swarm":[5,0],"Homing Missiles":[2,0],"Apprentice's Zeal":[3,3],"Missile Curtain":[1,0],"Echoing Missiles":[3,0],"Charged Curtain":[3,2],"Gathering Orb":[2,3],"Unstable Charge":[5,3],"Orb Lattice":[4,2],"Study the Reaction":[1,3],"Cold Focus":[2,1],"Lecture Hall":[5,1],"Margin Notes":[0,3],"Recitation":[1,2],"Static Sparks":[4,1]},
-  "conclave.frost": {"Hoar Ink":[0,0],"Biting Spear":[0,3],"Frozen Lance":[5,1],"Second Spear":[3,2],"Entomb":[3,3],"Cold Eye":[2,3],"Ice Coffin":[1,3],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,1],"Coffin Burst":[5,2],"Cold Library":[1,0],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[2,1],"Needle Rime":[1,2],"Brittle Coffin":[2,2]},
-  "conclave.arcane": {"Lagging Hour":[0,0],"Tick Forward":[3,3],"Borrowed Time":[3,0],"Heavy Hours":[0,1],"Backward Hour":[2,0],"Paradox":[2,1],"Stopped Clock":[3,2],"Quickening Bell":[5,2],"Frozen Moment":[5,0],"Hourglass Heart":[4,1],"Recurrence":[4,3],"Rewound Wounds":[1,0],"Arcane Clockwork":[2,3],"Borrowed Hour":[5,3],"Pendulum Swing":[0,2],"Stolen Sand":[1,2],"Patient Hours":[1,3]},
-  "conclave.storm": {"Wide Heavens":[0,3],"Star-Chart":[0,0],"Constellation":[5,0],"Skybreaker":[1,1],"Comet":[4,1],"Lodestar":[1,0],"Grounded Stars":[3,3],"Zodiac":[3,0],"Starfall Sky":[5,2],"Twin Stars":[5,3],"Grand Orrery":[2,3],"Twinkling Ice":[1,3],"Frost Lens":[2,0],"Turning Spheres":[4,2],"Night Sight":[0,2],"Cold Starlight":[2,2],"Ill Omen":[3,1]},
-  "conclave.earth": {"Broad Palms":[0,3],"Second Tremor":[0,2],"Staggering Blow":[2,3],"Mana Quarry":[3,3],"Heave":[1,3],"Shatterground":[5,0],"Deep Magma":[3,2],"Golem Core":[2,1],"Living Bulwark":[4,0],"Fault Line":[4,1],"Obsidian":[2,0],"Walking Wall":[5,2],"Ember Stone":[1,2],"Living Mountain":[5,1],"Granite Fists":[0,1],"Ley Reservoir":[1,0],"Glyph Anchor":[3,0]},
-  "conclave.cannon": {"Slow-Burning Ink":[0,2],"Wide Blast":[0,0],"Pyre Scribe":[3,0],"Fire Feeds Mana":[2,0],"Firewalk":[3,3],"Cinder Charge":[3,1],"Skipping Flame":[1,0],"Phoenix":[2,3],"Ember Heart":[5,2],"Pyre Lord":[5,1],"Rolling Inferno":[4,2],"Endless Skip":[5,0],"Searing Tide":[4,1],"Leaping Cinders":[1,1],"Thermal Crack":[1,3],"Wardburn":[0,3],"Kindled Fingers":[2,2]},
-  "conclave.venom": {"Keen Crescent":[0,0],"Hunting Crescent":[0,1],"Lasting Undoing":[0,3],"Quick Severing":[2,0],"Ward Feedback":[1,2],"Returning Crescent":[1,3],"Splintering":[3,0],"Sever the Link":[2,1],"Seeking Edge":[2,3],"Arcane Memory":[3,2],"Rend the Veil":[4,0],"Shatterpoint":[4,2],"Brimming Severance":[3,1],"Void Ground":[5,0],"Unravelling Veil":[5,1],"Wardbreaker":[5,3]},
-  "champ:cc_arch": {"Quick Quill":[0,3],"Open Book":[0,2],"Marginalia":[0,0],"Read the Marks":[3,2],"Unravel":[1,3],"Loose Threads":[2,3],"Threads Pulled":[1,0],"Shared Lesson":[3,0],"Deeper Loom":[5,0],"Woven Edge":[2,1],"Snapping Threads":[4,3],"Spellweaver":[5,3],"Sixfold Loom":[4,0],"Rewoven Threads":[5,1],"Flicked Pages":[1,1],"Deep Inkwell":[2,2]},
-  "champ:cc_chrono": {"Patient Hands":[0,0],"Long Pendulum":[0,3],"Weighted Hour":[1,1],"Gathered Ghosts":[5,0],"Recall":[1,0],"Long Way Back":[2,0],"Leaden Minutes":[1,3],"Lent Time":[3,1],"Endless Hour":[3,3],"Late Arrival":[3,0],"Second Hand":[4,2],"Timekeeper":[5,3],"The Hour Strikes":[2,3],"Twelve Strokes":[5,2],"Ticking Hand":[0,2],"Saved Seconds":[2,2],"Leaden Pull":[4,1]},
-  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,1],"Follow-Through":[0,3],"Practice Yard":[3,1],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[1,3],"Shared Edge":[2,2],"Bursting Seams":[5,3],"Cut the Fallen":[3,0],"Flourish":[3,3],"Blade of the Conclave":[5,1],"Unbound Blade":[4,3],"Duelling Ground":[4,2],"Flowing Cuts":[1,2],"Steady Breath":[2,1],"Chain to Blade":[5,0]},
-  "ironhold.glaive": {"Heavy Shoulders":[0,0],"Bearded Axe":[0,3],"Ringing Rim":[2,3],"Off Balance":[0,1],"Bowling Shove":[3,3],"Spinning Shield":[1,3],"Hot Shards":[5,0],"Shield Rush":[3,1],"Armourbreaker":[5,3],"Breaker's Blow":[4,0],"Brace and Shove":[3,0],"Shield Signal":[4,2],"Breach the Line":[5,1],"Hold the Pass":[2,2],"Caught Between Shields":[1,2],"Plate Salvage":[1,0],"Knock Them Flat":[2,1]},
-  "ironhold.arrow": {"Powder Smoke":[0,0],"Range-Finder":[0,1],"Long Belt":[2,0],"Called Shot":[5,2],"Rattlegun":[1,0],"Sighting In":[1,2],"Kneecapper":[3,3],"Thunder Belt":[5,1],"Gatling Crank":[5,3],"Breaching Slug":[2,3],"Quick Swab":[2,1],"Hard Kick":[3,0],"Case-Hardened":[4,1],"Quick Reload":[0,3],"Powder Tally":[1,3],"Pinning Rounds":[3,2],"Called Volley":[4,2]},
-  "ironhold.frost": {"Weighted Chains":[0,0],"Third Wrap":[0,3],"Trap Line":[2,0],"Tangle":[0,2],"Tripwire":[1,0],"Bound and Broken":[3,3],"Twin Nets":[5,0],"Double Line":[5,2],"Harpoon Winch":[2,3],"Bear Trap":[5,3],"Wide Nets":[4,1],"Hooked Chain":[3,2],"Spiked Caltrops":[1,3],"Wing Cords":[1,1],"Trapper's Haul":[2,2],"Barbed Chain":[3,1],"Caltrop Bed":[4,0]},
-  "ironhold.arcane": {"Searing Brand":[0,3],"Deep Brand":[0,0],"Brand Chain":[3,2],"Swift Inscription":[2,0],"Ringing Anvil":[5,3],"Masterwork Strike":[4,1],"Rune of Making":[1,0],"Rune of Unmaking":[4,3],"Rune Lord":[5,2],"Answering Rune":[2,1],"Runic Overflow":[1,3],"Forge Heat":[3,3],"Runebrand Detonation":[5,0],"Kinsmark":[0,2],"Paid in Kind":[2,2],"Quench":[1,1]},
-  "ironhold.storm": {"Torn Wings":[0,3],"Scorched Barrel":[1,0],"Spent Flare":[5,3],"Chain-Fed":[3,0],"Sky Shatter":[2,1],"Grapnel Shot":[2,0],"Tracer Rounds":[3,3],"Starshell":[4,3],"Endless Belt":[5,0],"Shellstorm":[5,1],"Reel In":[4,2],"Ground Burst":[1,3],"Hot Shrapnel":[1,2],"Barbed Shrapnel":[0,1],"Sky Watch":[0,2]},
-  "ironhold.earth": {"Packed Crowd":[0,0],"Steam in the Cracks":[0,3],"Scalding Steam":[2,0],"Rivet Popper":[1,1],"Piston Rhythm":[5,3],"Pile Driver":[1,0],"Echoing Slam":[3,3],"Groundsplitter":[5,2],"Molten Rivets":[5,1],"Steam Uppercut":[2,3],"Tremor Step":[3,0],"Safety Valve":[4,1],"Line Them Up":[4,2],"Hammer Home":[0,2],"Pressure Gauge":[1,3],"Steam Jacket":[2,2],"Piledriven":[3,1]},
-  "ironhold.cannon": {"Glowing Casings":[0,0],"Whistling Shells":[0,1],"Rattling Blast":[2,0],"Pitch-Soaked Wadding":[2,3],"Skipping Shell":[1,0],"Double Crew":[3,3],"Red-Hot Tube":[5,3],"Big Bertha":[3,2],"Clinging Fire":[0,2],"The Long Drop":[4,3],"Shrapnel Casing":[2,1],"Quake Shell":[4,0],"Walking Fire":[5,1],"Napalm":[5,0],"Ringing Ears":[1,3],"Powder Runners":[1,2]},
-  "ironhold.venom": {"Planted by Hand":[0,0],"Shaped Charges":[0,1],"Fuse Cutter":[0,2],"Blasting Wage":[1,0],"Black Powder Pack":[1,1],"Cracked Plate":[1,3],"Powder Trail":[2,1],"Rubble":[2,2],"Short Fuse":[3,3],"Tamped Charges":[3,0],"Long Trail":[3,1],"Demolition":[4,3],"Siege Master":[5,0],"Chain Demolition":[5,3],"Breach and Clear":[5,2],"Collapse":[4,2]},
-  "champ:ih_thane": {"Locked Shields":[0,0],"Shield-Ring":[0,2],"Wall of the Clan":[1,3],"Thane's Line":[3,2],"Horn of the Hold":[1,0],"Braced Heels":[2,0],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,2],"War Cry":[4,1],"Unbroken Line":[5,0],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,1]},
-  "champ:ih_artificer": {"Tally Wheel":[0,3],"Riveting Peal":[0,2],"Scrap Shrapnel":[1,1],"Engine Yard":[4,3],"Lodestone":[1,3],"Stronger Field":[2,3],"Barbed Rivets":[1,0],"Torn Loose":[3,1],"Counterweight":[3,0],"Magnetised":[3,2],"Overpressure":[4,1],"Chain Drive":[5,2],"Wrecking Ball":[2,0],"Restless Stone":[5,1],"Ricochet Rivets":[0,0],"Spare Parts":[2,2]},
-  "champ:ih_brewer": {"Leaky Keg":[0,0],"Slick Floor":[0,3],"Heavy Barrel":[0,2],"Open Tap":[3,2],"Firewater Breath":[1,0],"Double Measure":[2,0],"Sticky Stout":[3,3],"Scorching Gust":[2,1],"Brimming Keg":[5,3],"Spilled Pints":[5,1],"Last Call":[4,0],"On the Slate":[1,2],"Last Orders":[4,3],"Topped Up":[1,1]},
-  "silver.glaive": {"Shield-Ward":[0,1],"Witness the Blow":[0,3],"Staggering Bash":[0,0],"Shield of Faith":[3,0],"Vigil":[5,3],"Edge of Dawn":[1,0],"Rampart of Dawn":[1,3],"Oath of Challenge":[4,0],"Wall of Shields":[5,1],"Oath of Rebuke":[5,0],"Unyielding":[3,2],"Unbroken Oath":[4,1],"Pommel Blow":[1,2],"The Line Held":[2,1],"Dawn Shield":[2,3],"Ringing Rampart":[2,2]},
-  "silver.arrow": {"First Testimony":[0,3],"Witnessed":[0,1],"Twin Quarrels":[5,1],"Mark of the Accused":[0,2],"Flare Bolt":[1,3],"Heavy Quarrel":[3,3],"Slow Match":[2,3],"Deep Mark":[4,0],"Writ of Execution":[5,2],"Bear Witness":[3,0],"Through and Through":[3,2],"Bodkin Heads":[1,0],"Sworn Witnesses":[4,1],"Storm of Silver":[5,3],"Crank on the Verdict":[1,2],"Testimony Heard":[2,0],"Pinning Light":[2,1]},
-  "silver.frost": {"Tightening Links":[0,3],"Glinting Links":[0,1],"Tight Bindings":[0,0],"Dazzle":[1,0],"Twin Chains":[3,3],"Chain of Penance":[1,3],"Scouring Light":[2,3],"Last Rites":[3,0],"Blinding Chains":[4,1],"Chain of Judgement":[5,1],"Vigil Chains":[4,0],"Quick Binding":[5,2],"Shackle Litany":[5,0],"Swift Lash":[1,2],"Vigil Lamp":[2,1],"Glare of Dawn":[2,2]},
-  "silver.arcane": {"Full Gallop":[0,3],"Couched Lance":[0,0],"Spurs":[2,3],"Grail Quest":[0,1],"Tourney Passes":[1,3],"Shining Example":[3,0],"Trampling Hooves":[2,1],"Charge of the Vow":[2,0],"Echoing Verdict":[5,0],"Glory of the Charge":[5,1],"Rallying Vow":[3,1],"Vowkeeper":[4,3],"Unhorse":[4,2],"Shield and Spur":[1,2],"Grail's Grace":[1,0],"Unhorsing Ride":[3,2]},
-  "silver.storm": {"Zenith":[0,1],"Morning Rays":[0,0],"Sky Verdict":[2,2],"Fall from Grace":[3,0],"Prism":[1,0],"Kindled Faith":[5,1],"Noon Sweep":[2,0],"Dawnfall":[4,3],"Lance of Heaven":[5,0],"Dawnward":[5,3],"Sunburst":[3,3],"Judgement Ray":[2,1],"Searing Eye":[1,3],"Burning Pinions":[1,1],"Piercing Dawn":[0,2],"Sun Wheel":[4,2]},
-  "silver.earth": {"Press of Battle":[0,1],"Crushing Weight":[0,0],"Tremor":[0,3],"Ringing Steel":[5,1],"Zeal":[2,0],"Shield Fervour":[1,0],"Blade of Judgement":[3,3],"Shockwave":[5,3],"Final Judgement":[5,0],"Sword of Heaven":[2,3],"Sundering Blow":[3,0],"Marked by the Blade":[4,2],"Hurled Verdict":[4,1],"Sundered Plate":[1,2],"Reliquary":[1,3],"Censed Blade":[2,1],"Consecrated Earth":[3,2]},
-  "silver.cannon": {"Fanned Embers":[0,1],"Lingering Smoke":[0,0],"Glowing Coal":[5,3],"Swift Swing":[2,0],"Procession of Incense":[1,0],"Choking Smoke":[2,3],"Kindle the Censers":[4,3],"Censing of the Faithful":[5,2],"Ember Psalm":[5,0],"Thick Smoke":[3,1],"Purging Fire":[2,2],"Rekindling":[4,2],"Ash in the Eyes":[0,2],"Offering Bowl":[1,3],"Pall of Smoke":[1,1],"Censing Prayer":[3,3]},
-  "silver.venom": {"Broken Litany":[0,0],"Scorching Seal":[0,1],"Heavy Silence":[0,2],"Dry Well":[1,3],"Zealot's Vow":[1,0],"Writ of Seizure":[1,2],"Forfeit":[2,3],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[2,2],"Heretic's Stake":[4,0],"Penitent Chains":[3,1],"Confession":[4,3],"Pyre Eternal":[5,0],"Ashes Speak":[5,2],"Grand Inquest":[5,3]},
-  "champ:so_lion": {"Shoulder to Shoulder":[0,0],"Lowered Shield":[3,3],"Wide Sweep":[0,1],"Shield Wall":[3,2],"Bulwark Slam":[1,0],"Shields Raised":[2,0],"Burnished Shields":[1,3],"Rally to the Shield":[2,1],"The Far Bank":[5,3],"Debt of Oaths":[5,1],"Unbroken":[4,0],"The Crossing":[4,3],"The Ford Itself":[5,0],"Swift Reprisal":[0,2],"Hearts Lifted":[1,2]},
-  "champ:so_dawn": {"Early Dawn":[0,3],"Clear Sky":[0,1],"Dawn Chorus":[0,2],"Cloister Wall":[5,2],"Prism of Dawn":[1,3],"Lingering Star":[2,3],"Searing Light":[3,1],"Be Still":[2,2],"Noonday":[4,0],"Blinding Glare":[3,2],"Radiant Hymn":[2,0],"Dawnsinger":[5,1],"High Noon":[3,0],"Spilled Light":[5,3],"Bright Halo":[1,0],"First Light":[1,1],"Noon Bell":[4,3]},
-  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[0,3],"Ready Ledger":[0,2],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,0],"Trampling Host":[2,1],"Clerk’s Quill":[3,1],"Grey Justicar":[5,2],"Final Verdict":[4,3],"Riders of the Ford":[4,2],"Ride Them Down":[1,1],"Court Fines":[1,3],"Summary Ruling":[2,2]},
-  "stormborn.glaive": {"Wolf at the Throat":[0,1],"Hunting Bond":[0,3],"Hock Bite":[1,0],"Hunter's Due":[5,2],"Pack Tactics":[2,3],"Scent of Rain":[1,3],"Restless Spear":[5,0],"Wolf and Spear":[2,1],"Spirit Pack":[5,3],"Moonfang Pounce":[3,1],"Stormpin":[4,0],"Guard the Pass":[2,2],"Grounding Spear":[4,3],"Thunder-Called Spear":[0,2],"Blood on the Fur":[1,2],"Hunting Cry":[3,0]},
-  "stormborn.arrow": {"Riding the Gale":[1,0],"Through and Through":[0,3],"Quick Wind":[3,0],"Gust Fletching":[0,1],"Headwind":[2,0],"Walking Wind":[5,3],"Featherfall":[2,1],"Skyward Gust":[4,3],"Skyrend":[5,0],"Lightning Fletch":[5,1],"Rain Arrows":[1,3],"Hurricane Volley":[3,3],"Updraft Reader":[0,2],"Breath of the Gust":[1,2],"Eddying Wake":[4,2]},
-  "stormborn.frost": {"Heavy Hail":[0,0],"Water Turns to Ice":[0,3],"Brittle Cold":[3,1],"Sleet":[2,3],"Hail Cairn":[5,1],"Bitter Rain":[1,2],"Black Ice":[1,3],"Skystone":[2,0],"Frozen Through":[5,0],"Frostbound Totem":[3,0],"Ice Crust":[1,0],"Frost Lightning":[4,3],"Hail Shatter":[5,3],"First Clouds":[0,1],"Meltwater":[2,1],"Shattering Hail":[3,2],"Brittle Fall":[4,2]},
-  "stormborn.arcane": {"Restless Dead":[0,0],"Deep Hex":[0,3],"Lingering Spirits":[3,0],"Spirit Weight":[0,2],"Judgment":[3,2],"Ancestors' Toll":[1,3],"Walk On":[5,0],"Spirit Host":[5,1],"Spirit Walk":[4,0],"Renewed Hex":[2,3],"Spirit Echo":[4,1],"The Final Tally":[5,3],"Spirit Draw":[1,1],"Debts Repaid":[1,0],"Kindred Chains":[2,1],"Final Reckoning":[2,2]},
-  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[0,3],"Conductor":[1,3],"Overcharge":[2,2],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[3,3],"Living Storm":[5,2],"Last Spark":[5,0],"Lightning Rod":[2,3],"Stormseed":[5,3],"Split Sky":[4,1],"Copper Crown":[3,2],"Ground Strike":[1,1],"Drinking the Storm":[4,0],"Wardsplitter Bolts":[0,2],"Thunder Wings":[3,1]},
-  "stormborn.earth": {"Ground Gives Way":[0,3],"Deep Fissures":[0,0],"Mountain's Echo":[5,2],"Rattled":[3,3],"Stonewake":[1,3],"Shake Loose":[2,2],"Widening Earth":[5,0],"Riftmaker":[4,1],"Sinkhole":[4,0],"Rift Rhythm":[2,3],"Mud and Rain":[1,0],"Storm Mire":[5,1],"Second Tremor":[0,2],"Stone Remembers":[2,1],"Drumming Feet":[1,1],"Deep Rift":[3,0]},
-  "stormborn.cannon": {"Long Clouds":[0,1],"Brooding Sky":[0,3],"Many Skies":[5,3],"Heavy Rain":[4,2],"Storm Dance":[0,0],"Static Clouds":[3,0],"Rain Dance":[1,3],"Skyleap":[2,0],"Breaking Sky":[5,2],"Rolling Clouds":[3,1],"Landing Thunder":[4,3],"Sky Strike":[1,0],"Sky Lattice":[5,1],"Thunder Answers":[1,2],"Rain Returns":[2,1],"Drenching Pour":[2,3],"Rainmaker":[3,2]},
-  "stormborn.venom": {"Downwind Haul":[0,0],"Long Cord":[0,1],"Quick Cast":[0,2],"Sky Lore":[1,0],"Ground Stake":[1,1],"Charged Harpoons":[2,2],"Drenching Barbs":[1,3],"Heavy Air":[2,1],"Many Cords":[3,2],"Skyfall Harpoon":[2,3],"Pinned to Earth":[4,0],"Storm-Cord":[4,1],"Fallen Sky":[3,3],"Twin Harpoon":[5,0],"Master of the Sky":[5,2]},
-  "champ:sb_caller": {"Heavy Clouds":[0,3],"Crown of Rain":[0,1],"Rain on Rain":[0,2],"Drum Circle":[3,1],"Thunder Drum":[1,3],"Long Roll":[2,3],"Drenching Storm":[3,0],"Drum of the Host":[2,2],"Two Tomorrows":[5,0],"Eye of the Gathering":[4,3],"Storm Caller":[5,2],"Tomorrow's Storm":[4,0],"Drum in the Rain":[5,3],"Gusting Staff":[1,0],"Rainwell":[1,1]},
+  "grove.glaive": {"Long Haft":[0,3],"Hold the Line":[1,1],"Set Spears":[2,3],"Shieldsplitter":[1,2],"Thornhedge":[1,3],"Bloodthorn":[2,0],"Rootbreaker":[4,0],"Phalanx":[3,2],"Wall of Spears":[5,2],"Impaler":[5,0],"Spearwood Rising":[3,0],"Living Palisade":[5,1],"Skewer":[4,3],"Splintered Line":[4,2],"Deep Thrust":[0,2],"Living Haft":[2,1],"Thornwall Ward":[3,1]},
+  "grove.arrow": {"Patient Hunter":[1,1],"Canopy Sight":[1,3],"Mark the Quarry":[2,1],"Thornpoint Arrows":[0,0],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[1,0],"Snaring Shot":[2,2],"Pinning Shot":[5,1],"Thornrain":[5,3],"Nailing Shaft":[4,0],"Still Quarry":[4,1],"Wounded Prey":[4,2],"Splitting Shaft":[5,0],"Quick Nock":[0,1],"Hunter's Rhythm":[3,1],"Hushed Quarry":[3,0]},
+  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[0,1],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[4,2],"Bramble Squeeze":[3,0],"Spreading Roots":[3,3],"Bloodbriar":[4,0],"Rootburst":[3,1],"Overgrowth":[5,3],"Strangleroot":[5,2],"Warden's Reach":[2,1],"Sapwell":[2,2],"Quickening Sap":[1,3]},
+  "grove.arcane": {"Heavy Lance":[1,1],"Trample":[2,2],"Wheel About":[0,2],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[2,0],"Hooves of Thunder":[5,3],"Hunter's Finish":[5,0],"Second Charge":[3,0],"Goring Antlers":[0,0],"Long Gallop":[1,0],"Stag's Wind":[0,3],"Herd Instinct":[4,3]},
+  "grove.storm": {"Hawk's Reach":[3,2],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Pounce":[1,2],"Hawk's Mark":[4,0],"Grounded Prey":[4,3],"Moonsap Bolts":[2,3],"Skyfall":[5,1],"Shapestorm":[3,3],"Second Skin":[2,0],"Harrier's Cry":[4,1],"Hawk Lord":[5,0],"Wild Heart":[5,2],"Wild Pace":[0,1],"Druid's Patience":[0,3],"Talon Rend":[3,1]},
+  "grove.earth": {"Leaf-Edged Blades":[0,0],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,3],"Blade Rhythm":[1,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,3],"Encore":[4,2],"Twin Whirl":[2,3],"Gale of Blades":[4,0],"Reaper's Step":[5,0],"Quickstep":[1,2],"Dancer's Breath":[0,1],"Petal Cuts":[3,2]},
+  "grove.cannon": {"Potent Spores":[1,0],"Ripe Pods":[1,2],"Choking Spores":[1,1],"Seed Scatter":[3,2],"Hard Husk":[4,1],"Clinging Spores":[4,0],"Puffcap Sowing":[2,2],"Snapjaw Bloom":[3,0],"Spore Cloud":[5,2],"Bursting Rot":[5,0],"Puffcap Trail":[5,3],"Rootmark Seed":[4,3],"Drifting Spores":[2,3],"Far Cast":[0,2],"Seedwell":[2,0],"Thorned Husks":[0,1],"Burrowing Pods":[3,1]},
+  "grove.venom": {"Hunter's Patience":[0,1],"Barbed Darts":[0,3],"Quick Quiver":[1,0],"Lone Prey":[2,2],"Long Severance":[2,1],"Sap Thief":[1,2],"Bramble Snare":[2,0],"Briar Gibbet":[3,1],"Silent Stalk":[1,3],"Deep Snare":[3,0],"Thornmark Trail":[4,2],"Choking Thorns":[4,1],"Snare Line":[4,0],"Apex Stalker":[5,2],"Gallows Briar":[5,1],"Torn Ties":[5,3]},
+  "champ:rootmother": {"Patient Earth":[0,2],"Long Vines":[0,0],"Deep Grip":[1,1],"Twin Elders":[5,2],"Rootway":[1,2],"Bramble Grasp":[2,2],"Thorned Roots":[2,3],"Sap Song":[2,1],"Heartwood Sapling":[4,3],"Strangling Hold":[4,0],"Sapling Warden":[3,0],"Rootmother":[5,3],"The Old Wood Walks":[3,3],"Thousand Roots":[5,1],"Quick Tendrils":[0,3],"Deep Sap":[3,2],"Sapling Song":[4,1]},
+  "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,0],"Snaring Rain":[0,3],"Root Platform":[3,0],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[3,2],"Hunter’s Patience":[2,2],"Blood Moon":[5,3],"Snarled Ground":[4,1],"Running Shafts":[3,3],"Warden’s Mark":[4,2],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,3],"Captain's Share":[2,3],"Moonlit Aim":[5,0]},
+  "champ:hivemother": {"Ripe Seeds":[1,3],"Drifting Pods":[1,2],"Passing Spores":[1,0],"Compost":[4,2],"Moth Swarm":[2,3],"Thick Garden":[3,3],"Sticky Pollen":[3,0],"Pollen Drift":[3,1],"Overripe":[5,0],"Bloom of Moths":[5,2],"Swarm Song":[2,2],"Seedmother":[5,1],"Full Bloom":[4,0],"Rotfeast":[4,3],"Busy Hive":[0,2],"Honey Store":[0,0]},
+  "conclave.glaive": {"Measured Cuts":[0,2],"Opening Salute":[0,0],"Lone Duel":[0,3],"Riftsteel Edge":[2,3],"Ward-Splitter":[1,2],"Charged Edge":[2,2],"Twin Riftblades":[5,1],"Unbroken Step":[3,1],"Thousand Edges":[4,2],"Thrown Riftblade":[4,1],"Fifth Form":[4,3],"Phase Dancer":[3,0],"Ghostblade Rush":[5,3],"Weaver's Blade":[5,0],"Press the Opening":[1,0],"Binding Cut":[2,1],"Guard Broken":[3,2]},
+  "conclave.arrow": {"Twin Casting":[0,3],"Copied Lesson":[1,0],"Missile Swarm":[5,1],"Homing Missiles":[3,0],"Apprentice's Zeal":[4,3],"Missile Curtain":[2,0],"Echoing Missiles":[2,2],"Charged Curtain":[3,1],"Gathering Orb":[3,3],"Unstable Charge":[5,0],"Orb Lattice":[4,0],"Study the Reaction":[2,3],"Cold Focus":[1,1],"Lecture Hall":[5,2],"Margin Notes":[0,0],"Recitation":[0,1],"Static Sparks":[4,2]},
+  "conclave.frost": {"Hoar Ink":[0,1],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,1],"Entomb":[2,2],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,3],"Shatterbloom":[4,3],"Deep Chill":[4,0],"Coffin Burst":[5,0],"Cold Library":[2,0],"Absolute Stillness":[3,3],"Practised Hand":[1,3],"Singing Ice":[1,0],"Needle Rime":[0,0],"Brittle Coffin":[3,2]},
+  "conclave.arcane": {"Lagging Hour":[1,1],"Tick Forward":[3,2],"Borrowed Time":[4,0],"Heavy Hours":[1,2],"Backward Hour":[3,0],"Paradox":[2,1],"Stopped Clock":[4,1],"Quickening Bell":[5,1],"Frozen Moment":[5,3],"Hourglass Heart":[3,3],"Recurrence":[4,2],"Rewound Wounds":[2,0],"Arcane Clockwork":[1,3],"Borrowed Hour":[5,2],"Pendulum Swing":[0,1],"Stolen Sand":[0,2],"Patient Hours":[2,2]},
+  "conclave.storm": {"Wide Heavens":[0,2],"Star-Chart":[0,3],"Constellation":[5,0],"Skybreaker":[1,0],"Comet":[3,0],"Lodestar":[1,3],"Grounded Stars":[4,2],"Zodiac":[4,1],"Starfall Sky":[5,3],"Twin Stars":[5,1],"Grand Orrery":[3,2],"Twinkling Ice":[2,2],"Frost Lens":[2,3],"Turning Spheres":[4,0],"Night Sight":[0,1],"Cold Starlight":[1,2],"Ill Omen":[3,3]},
+  "conclave.earth": {"Broad Palms":[1,2],"Second Tremor":[1,3],"Staggering Blow":[3,2],"Mana Quarry":[4,3],"Heave":[2,2],"Shatterground":[5,1],"Deep Magma":[2,1],"Golem Core":[3,3],"Living Bulwark":[4,1],"Fault Line":[4,0],"Obsidian":[2,0],"Walking Wall":[5,0],"Ember Stone":[0,2],"Living Mountain":[5,2],"Granite Fists":[0,0],"Ley Reservoir":[0,1],"Glyph Anchor":[3,1]},
+  "conclave.cannon": {"Slow-Burning Ink":[1,2],"Wide Blast":[1,0],"Pyre Scribe":[2,3],"Fire Feeds Mana":[3,0],"Firewalk":[4,1],"Cinder Charge":[3,2],"Skipping Flame":[2,0],"Phoenix":[3,1],"Ember Heart":[5,0],"Pyre Lord":[5,2],"Rolling Inferno":[4,2],"Endless Skip":[5,3],"Searing Tide":[4,3],"Leaping Cinders":[0,1],"Thermal Crack":[2,1],"Wardburn":[0,3],"Kindled Fingers":[1,3]},
+  "conclave.venom": {"Keen Crescent":[0,3],"Hunting Crescent":[0,0],"Lasting Undoing":[0,1],"Quick Severing":[2,2],"Ward Feedback":[1,2],"Returning Crescent":[1,1],"Splintering":[3,2],"Sever the Link":[1,0],"Seeking Edge":[2,1],"Arcane Memory":[3,3],"Rend the Veil":[4,2],"Shatterpoint":[4,0],"Brimming Severance":[2,3],"Void Ground":[5,2],"Unravelling Veil":[5,1],"Wardbreaker":[5,0]},
+  "champ:cc_arch": {"Quick Quill":[1,3],"Open Book":[0,1],"Marginalia":[0,3],"Read the Marks":[4,2],"Unravel":[2,3],"Loose Threads":[3,3],"Threads Pulled":[2,0],"Shared Lesson":[3,0],"Deeper Loom":[5,0],"Woven Edge":[3,1],"Snapping Threads":[4,3],"Spellweaver":[5,3],"Sixfold Loom":[4,0],"Rewoven Threads":[5,1],"Flicked Pages":[0,2],"Deep Inkwell":[1,1]},
+  "champ:cc_chrono": {"Patient Hands":[0,3],"Long Pendulum":[0,2],"Weighted Hour":[1,1],"Gathered Ghosts":[5,2],"Recall":[1,3],"Long Way Back":[2,3],"Leaden Minutes":[2,0],"Lent Time":[2,1],"Endless Hour":[4,0],"Late Arrival":[3,3],"Second Hand":[4,2],"Timekeeper":[5,0],"The Hour Strikes":[3,0],"Twelve Strokes":[5,3],"Ticking Hand":[0,0],"Saved Seconds":[3,2],"Leaden Pull":[4,1]},
+  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,1],"Follow-Through":[0,2],"Practice Yard":[3,2],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[2,2],"Shared Edge":[2,3],"Bursting Seams":[5,3],"Cut the Fallen":[4,2],"Flourish":[3,3],"Blade of the Conclave":[5,1],"Unbound Blade":[4,3],"Duelling Ground":[4,0],"Flowing Cuts":[1,3],"Steady Breath":[3,1],"Chain to Blade":[5,2]},
+  "ironhold.glaive": {"Heavy Shoulders":[1,0],"Bearded Axe":[1,2],"Ringing Rim":[3,2],"Off Balance":[1,3],"Bowling Shove":[2,3],"Spinning Shield":[2,2],"Hot Shards":[5,1],"Shield Rush":[4,2],"Armourbreaker":[5,3],"Breaker's Blow":[4,1],"Brace and Shove":[3,1],"Shield Signal":[4,3],"Breach the Line":[5,0],"Hold the Pass":[3,0],"Caught Between Shields":[0,0],"Plate Salvage":[0,3],"Knock Them Flat":[2,1]},
+  "ironhold.arrow": {"Powder Smoke":[0,2],"Range-Finder":[1,0],"Long Belt":[2,2],"Called Shot":[5,1],"Rattlegun":[1,2],"Sighting In":[0,1],"Kneecapper":[4,3],"Thunder Belt":[5,0],"Gatling Crank":[5,2],"Breaching Slug":[3,3],"Quick Swab":[3,2],"Hard Kick":[3,0],"Case-Hardened":[4,0],"Quick Reload":[1,3],"Powder Tally":[2,3],"Pinning Rounds":[2,1],"Called Volley":[4,1]},
+  "ironhold.frost": {"Weighted Chains":[0,3],"Third Wrap":[1,2],"Trap Line":[2,3],"Tangle":[0,0],"Tripwire":[1,3],"Bound and Broken":[4,2],"Twin Nets":[5,3],"Double Line":[5,2],"Harpoon Winch":[3,2],"Bear Trap":[5,1],"Wide Nets":[3,1],"Hooked Chain":[4,3],"Spiked Caltrops":[2,2],"Wing Cords":[2,0],"Trapper's Haul":[1,1],"Barbed Chain":[3,3],"Caltrop Bed":[4,0]},
+  "ironhold.arcane": {"Searing Brand":[1,0],"Deep Brand":[0,1],"Brand Chain":[2,3],"Swift Inscription":[2,1],"Ringing Anvil":[5,0],"Masterwork Strike":[4,3],"Rune of Making":[1,1],"Rune of Unmaking":[4,0],"Rune Lord":[5,2],"Answering Rune":[3,2],"Runic Overflow":[0,0],"Forge Heat":[3,0],"Runebrand Detonation":[5,3],"Kinsmark":[1,2],"Paid in Kind":[3,3],"Quench":[0,3]},
+  "ironhold.storm": {"Torn Wings":[0,1],"Scorched Barrel":[2,1],"Spent Flare":[5,2],"Chain-Fed":[4,1],"Sky Shatter":[1,0],"Grapnel Shot":[3,1],"Tracer Rounds":[3,2],"Starshell":[4,2],"Endless Belt":[5,0],"Shellstorm":[5,3],"Reel In":[4,0],"Ground Burst":[2,0],"Hot Shrapnel":[0,0],"Barbed Shrapnel":[1,2],"Sky Watch":[0,2]},
+  "ironhold.earth": {"Packed Crowd":[0,3],"Steam in the Cracks":[1,1],"Scalding Steam":[2,3],"Rivet Popper":[0,1],"Piston Rhythm":[5,0],"Pile Driver":[1,3],"Echoing Slam":[4,0],"Groundsplitter":[5,1],"Molten Rivets":[5,2],"Steam Uppercut":[3,0],"Tremor Step":[2,2],"Safety Valve":[3,1],"Line Them Up":[4,1],"Hammer Home":[1,0],"Pressure Gauge":[2,0],"Steam Jacket":[3,2],"Piledriven":[4,3]},
+  "ironhold.cannon": {"Glowing Casings":[1,0],"Whistling Shells":[0,3],"Rattling Blast":[3,0],"Pitch-Soaked Wadding":[2,3],"Skipping Shell":[2,0],"Double Crew":[3,1],"Red-Hot Tube":[5,1],"Big Bertha":[4,2],"Clinging Fire":[0,2],"The Long Drop":[4,1],"Shrapnel Casing":[3,3],"Quake Shell":[4,0],"Walking Fire":[5,2],"Napalm":[5,3],"Ringing Ears":[1,1],"Powder Runners":[0,1]},
+  "ironhold.venom": {"Planted by Hand":[0,1],"Shaped Charges":[0,3],"Fuse Cutter":[0,2],"Blasting Wage":[1,3],"Black Powder Pack":[2,1],"Cracked Plate":[2,3],"Powder Trail":[3,1],"Rubble":[1,1],"Short Fuse":[3,2],"Tamped Charges":[2,0],"Long Trail":[4,1],"Demolition":[4,2],"Siege Master":[5,1],"Chain Demolition":[5,2],"Breach and Clear":[5,0],"Collapse":[4,3]},
+  "champ:ih_thane": {"Locked Shields":[1,3],"Shield-Ring":[0,2],"Wall of the Clan":[2,1],"Thane's Line":[4,2],"Horn of the Hold":[2,3],"Braced Heels":[3,3],"Dented Plate":[3,0],"Shield-Brother":[3,1],"Deep Roots":[5,0],"Shield-Toll":[1,0],"War Cry":[4,3],"Unbroken Line":[5,1],"Rising Peaks":[4,0],"Holds the Pass":[5,3],"Clan Drill":[0,3]},
+  "champ:ih_artificer": {"Tally Wheel":[0,0],"Riveting Peal":[0,3],"Scrap Shrapnel":[0,2],"Engine Yard":[4,1],"Lodestone":[1,0],"Stronger Field":[2,0],"Barbed Rivets":[1,1],"Torn Loose":[2,2],"Counterweight":[3,1],"Magnetised":[3,3],"Overpressure":[4,0],"Chain Drive":[5,1],"Wrecking Ball":[2,1],"Restless Stone":[5,2],"Ricochet Rivets":[1,3],"Spare Parts":[3,2]},
+  "champ:ih_brewer": {"Leaky Keg":[0,0],"Slick Floor":[0,2],"Heavy Barrel":[0,3],"Open Tap":[3,0],"Firewater Breath":[1,0],"Double Measure":[2,0],"Sticky Stout":[3,3],"Scorching Gust":[2,2],"Brimming Keg":[5,3],"Spilled Pints":[5,0],"Last Call":[4,1],"On the Slate":[1,2],"Last Orders":[4,3],"Topped Up":[1,1]},
+  "silver.glaive": {"Shield-Ward":[1,0],"Witness the Blow":[0,2],"Staggering Bash":[0,1],"Shield of Faith":[3,0],"Vigil":[5,2],"Edge of Dawn":[0,0],"Rampart of Dawn":[1,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,3],"Oath of Rebuke":[5,0],"Unyielding":[4,1],"Unbroken Oath":[4,3],"Pommel Blow":[2,0],"The Line Held":[3,3],"Dawn Shield":[2,2],"Ringing Rampart":[2,1]},
+  "silver.arrow": {"First Testimony":[1,1],"Witnessed":[0,0],"Twin Quarrels":[5,0],"Mark of the Accused":[1,2],"Flare Bolt":[2,1],"Heavy Quarrel":[4,1],"Slow Match":[3,1],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,0],"Bodkin Heads":[1,3],"Sworn Witnesses":[4,0],"Storm of Silver":[5,3],"Crank on the Verdict":[0,3],"Testimony Heard":[2,2],"Pinning Light":[3,3]},
+  "silver.frost": {"Tightening Links":[0,0],"Glinting Links":[1,1],"Tight Bindings":[1,3],"Dazzle":[0,2],"Twin Chains":[4,3],"Chain of Penance":[1,0],"Scouring Light":[2,0],"Last Rites":[3,2],"Blinding Chains":[4,0],"Chain of Judgement":[5,3],"Vigil Chains":[4,2],"Quick Binding":[5,1],"Shackle Litany":[5,2],"Swift Lash":[2,1],"Vigil Lamp":[3,1],"Glare of Dawn":[3,0]},
+  "silver.arcane": {"Full Gallop":[0,1],"Couched Lance":[0,3],"Spurs":[2,1],"Grail Quest":[1,2],"Tourney Passes":[1,1],"Shining Example":[4,3],"Trampling Hooves":[3,1],"Charge of the Vow":[3,3],"Echoing Verdict":[5,3],"Glory of the Charge":[5,0],"Rallying Vow":[4,0],"Vowkeeper":[4,1],"Unhorse":[3,2],"Shield and Spur":[0,0],"Grail's Grace":[2,3],"Unhorsing Ride":[2,0]},
+  "silver.storm": {"Zenith":[1,1],"Morning Rays":[0,3],"Sky Verdict":[3,0],"Fall from Grace":[4,1],"Prism":[2,1],"Kindled Faith":[5,1],"Noon Sweep":[3,1],"Dawnfall":[4,2],"Lance of Heaven":[5,0],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[2,3],"Searing Eye":[0,0],"Burning Pinions":[0,1],"Piercing Dawn":[1,0],"Sun Wheel":[4,3]},
+  "silver.earth": {"Press of Battle":[0,0],"Crushing Weight":[1,3],"Tremor":[1,0],"Ringing Steel":[5,1],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,0],"Final Judgement":[5,3],"Sword of Heaven":[3,0],"Sundering Blow":[2,1],"Marked by the Blade":[4,1],"Hurled Verdict":[4,2],"Sundered Plate":[0,2],"Reliquary":[2,0],"Censed Blade":[1,2],"Consecrated Earth":[3,2]},
+  "silver.cannon": {"Fanned Embers":[1,3],"Lingering Smoke":[1,2],"Glowing Coal":[5,1],"Swift Swing":[3,2],"Procession of Incense":[2,2],"Choking Smoke":[1,1],"Kindle the Censers":[4,1],"Censing of the Faithful":[5,0],"Ember Psalm":[5,2],"Thick Smoke":[2,0],"Purging Fire":[2,3],"Rekindling":[4,0],"Ash in the Eyes":[0,3],"Offering Bowl":[0,0],"Pall of Smoke":[0,2],"Censing Prayer":[3,1]},
+  "silver.venom": {"Broken Litany":[0,3],"Scorching Seal":[0,2],"Heavy Silence":[1,2],"Dry Well":[1,0],"Zealot's Vow":[0,1],"Writ of Seizure":[2,2],"Forfeit":[1,1],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[3,2],"Heretic's Stake":[4,0],"Penitent Chains":[4,2],"Confession":[4,1],"Pyre Eternal":[5,0],"Ashes Speak":[5,2],"Grand Inquest":[5,3]},
+  "champ:so_lion": {"Shoulder to Shoulder":[1,0],"Lowered Shield":[3,3],"Wide Sweep":[1,2],"Shield Wall":[4,0],"Bulwark Slam":[2,0],"Shields Raised":[3,0],"Burnished Shields":[2,3],"Rally to the Shield":[3,1],"The Far Bank":[5,3],"Debt of Oaths":[5,2],"Unbroken":[4,2],"The Crossing":[4,3],"The Ford Itself":[5,1],"Swift Reprisal":[0,3],"Hearts Lifted":[0,1]},
+  "champ:so_dawn": {"Early Dawn":[0,3],"Clear Sky":[0,1],"Dawn Chorus":[0,2],"Cloister Wall":[5,3],"Prism of Dawn":[1,3],"Lingering Star":[2,3],"Searing Light":[4,3],"Be Still":[3,3],"Noonday":[4,2],"Blinding Glare":[2,1],"Radiant Hymn":[2,2],"Dawnsinger":[5,2],"High Noon":[3,2],"Spilled Light":[5,0],"Bright Halo":[1,0],"First Light":[1,2],"Noon Bell":[4,1]},
+  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[0,2],"Ready Ledger":[0,3],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,0],"Trampling Host":[2,3],"Clerk’s Quill":[3,1],"Grey Justicar":[5,1],"Final Verdict":[4,3],"Riders of the Ford":[4,2],"Ride Them Down":[1,2],"Court Fines":[2,1],"Summary Ruling":[1,1]},
+  "stormborn.glaive": {"Wolf at the Throat":[1,0],"Hunting Bond":[0,2],"Hock Bite":[0,3],"Hunter's Due":[5,0],"Pack Tactics":[2,2],"Scent of Rain":[1,2],"Restless Spear":[5,1],"Wolf and Spear":[3,2],"Spirit Pack":[5,2],"Moonfang Pounce":[4,2],"Stormpin":[4,1],"Guard the Pass":[2,1],"Grounding Spear":[3,3],"Thunder-Called Spear":[1,3],"Blood on the Fur":[2,0],"Hunting Cry":[3,1]},
+  "stormborn.arrow": {"Riding the Gale":[0,2],"Through and Through":[1,1],"Quick Wind":[2,2],"Gust Fletching":[0,0],"Headwind":[1,2],"Walking Wind":[5,3],"Featherfall":[3,1],"Skyward Gust":[4,3],"Skyrend":[5,1],"Lightning Fletch":[5,0],"Rain Arrows":[2,1],"Hurricane Volley":[3,3],"Updraft Reader":[1,0],"Breath of the Gust":[0,3],"Eddying Wake":[4,0]},
+  "stormborn.frost": {"Heavy Hail":[0,1],"Water Turns to Ice":[1,1],"Brittle Cold":[2,2],"Sleet":[3,1],"Hail Cairn":[5,3],"Bitter Rain":[1,2],"Black Ice":[2,1],"Skystone":[3,0],"Frozen Through":[5,2],"Frostbound Totem":[4,0],"Ice Crust":[2,0],"Frost Lightning":[3,3],"Hail Shatter":[5,1],"First Clouds":[0,0],"Meltwater":[1,3],"Shattering Hail":[4,3],"Brittle Fall":[4,2]},
+  "stormborn.arcane": {"Restless Dead":[0,2],"Deep Hex":[1,2],"Lingering Spirits":[3,3],"Spirit Weight":[0,3],"Judgment":[2,0],"Ancestors' Toll":[2,2],"Walk On":[5,3],"Spirit Host":[5,2],"Spirit Walk":[4,3],"Renewed Hex":[3,2],"Spirit Echo":[4,1],"The Final Tally":[5,1],"Spirit Draw":[2,1],"Debts Repaid":[0,1],"Kindred Chains":[1,1],"Final Reckoning":[3,0]},
+  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[1,2],"Conductor":[2,1],"Overcharge":[3,2],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[4,1],"Living Storm":[5,1],"Last Spark":[5,3],"Lightning Rod":[3,1],"Stormseed":[5,2],"Split Sky":[3,0],"Copper Crown":[4,3],"Ground Strike":[0,2],"Drinking the Storm":[4,0],"Wardsplitter Bolts":[0,1],"Thunder Wings":[2,3]},
+  "stormborn.earth": {"Ground Gives Way":[1,3],"Deep Fissures":[0,3],"Mountain's Echo":[5,0],"Rattled":[4,3],"Stonewake":[2,3],"Shake Loose":[1,2],"Widening Earth":[5,2],"Riftmaker":[4,1],"Sinkhole":[4,2],"Rift Rhythm":[3,3],"Mud and Rain":[0,0],"Storm Mire":[5,1],"Second Tremor":[1,0],"Stone Remembers":[3,0],"Drumming Feet":[2,2],"Deep Rift":[3,2]},
+  "stormborn.cannon": {"Long Clouds":[1,0],"Brooding Sky":[0,1],"Many Skies":[5,3],"Heavy Rain":[3,0],"Storm Dance":[1,3],"Static Clouds":[4,3],"Rain Dance":[1,1],"Skyleap":[3,3],"Breaking Sky":[5,2],"Rolling Clouds":[4,2],"Landing Thunder":[4,1],"Sky Strike":[2,3],"Sky Lattice":[5,0],"Thunder Answers":[0,2],"Rain Returns":[3,2],"Drenching Pour":[2,1],"Rainmaker":[2,2]},
+  "stormborn.venom": {"Downwind Haul":[0,2],"Long Cord":[1,1],"Quick Cast":[0,1],"Sky Lore":[0,0],"Ground Stake":[2,1],"Charged Harpoons":[1,0],"Drenching Barbs":[2,2],"Heavy Air":[3,1],"Many Cords":[3,3],"Skyfall Harpoon":[3,2],"Pinned to Earth":[4,3],"Storm-Cord":[4,0],"Fallen Sky":[4,2],"Twin Harpoon":[5,2],"Master of the Sky":[5,3]},
+  "champ:sb_caller": {"Heavy Clouds":[0,1],"Crown of Rain":[1,2],"Rain on Rain":[0,3],"Drum Circle":[2,0],"Thunder Drum":[1,1],"Long Roll":[2,1],"Drenching Storm":[3,0],"Drum of the Host":[3,3],"Two Tomorrows":[5,0],"Eye of the Gathering":[4,2],"Storm Caller":[5,1],"Tomorrow's Storm":[4,0],"Drum in the Rain":[5,2],"Gusting Staff":[0,0],"Rainwell":[1,0]},
   "champ:sb_wind": {"Rain in the Wind":[0,3],"Feather-Cut":[0,2],"Wide Funnel":[0,0],"Road's End":[5,2],"Stoneward Gale":[1,3],"Wide Gale":[2,3],"Biting Gale":[3,1],"Feather Gift":[3,2],"Long Road Back":[3,0],"Hard Landing":[4,3],"Wind at Her Back":[1,0],"Twin Gale":[5,0],"Turn the Road":[2,0],"Whirling Steps":[1,1],"Returning Breath":[2,2],"Rising Air":[4,1]},
-  "champ:sb_beast": {"Old Calls":[0,3],"Keen Nose":[0,1],"Long Hunt":[0,2],"Wolf Den":[3,3],"Wolfsong":[1,3],"Heel Biters":[2,3],"Pack Hunger":[3,0],"Thunder on the Prey":[4,1],"Stormcarrier":[5,0],"Blood Trail":[5,2],"Spirit Run":[2,2],"Beastcaller":[5,3],"Thunderbird’s Talons":[4,0],"Pack Pace":[1,0],"Hunter's Breath":[2,0],"Hunter's Stride":[1,1]},
-  "wardbound.glaive": {"Avenging Oath":[1,0],"Deep Carving":[0,1],"Oathbreaker's Due":[0,2],"Oathsworn Cut":[0,3],"Sword and Stone":[2,1],"Oath Kept":[1,2],"Rune Cleave":[1,3],"Unbroken Line":[3,0],"Hold Fast":[2,2],"Bright Wards":[2,3],"Final Oath":[4,0],"Oath of Iron":[3,1],"Linebreaker":[4,3],"Oath Fulfilled":[5,0],"Oathfire":[5,1],"Shared Oath":[5,2]},
-  "wardbound.arrow": {"The Long Watch":[0,1],"Masked Sight":[0,2],"Rune-Etched Edge":[0,3],"Branding Edge":[1,0],"Mask's Tally":[1,2],"Mark the Fallen":[1,3],"Returning Oath":[2,0],"Branding Rite":[2,1],"Line Cut":[3,3],"Dragging Edge":[3,0],"Caught Again":[4,2],"Warding Glaive":[4,3],"Glaive of Judgement":[5,1],"Twin Wards":[5,2],"Lodestar":[5,3]},
-  "wardbound.frost": {"Brand-Rime":[0,0],"Wide Sweep":[0,1],"Creeping Rime":[1,2],"Bitter Steel":[0,3],"Hard Rime":[1,0],"Meltwater":[2,1],"Frostbite":[1,3],"Winter Ward":[2,0],"Rimecut":[3,2],"Deep Bite":[2,3],"Long Winter":[3,0],"Shatter Oath":[3,1],"Cold Vigil":[4,2],"Biting Wind":[4,3],"Winter's Line":[5,0],"Hoarfrost":[5,1],"Rime Crown":[5,3]},
-  "wardbound.arcane": {"Shared Margins":[0,0],"Lingering Ink":[0,1],"Ward-Cutting Script":[1,2],"Deep Script":[0,3],"Palimpsest":[1,0],"Spent Ink":[2,1],"Detonate":[1,3],"Ink of Binding":[3,0],"Sigil Ward":[2,2],"Chain Reaction":[2,3],"Scribe the Road":[4,0],"Double Stroke":[3,1],"Volatile Script":[4,2],"The Last Word":[5,0],"Cascade":[5,1],"Runesight":[5,3]},
-  "wardbound.storm": {"Couched Lance":[0,0],"Thunder Hooves":[1,1],"Branding Sparks":[0,2],"Forked Pennon":[0,3],"Storm Pennant":[1,0],"Sky-Drawn":[2,2],"Spur and Lance":[1,3],"Cracking Pennant":[2,0],"Thunderbrand":[3,1],"Skyfall":[2,3],"Charge Through":[3,0],"Pennant Call":[4,1],"Gathering Storm":[4,2],"Sky's Answer":[3,3],"Thunder Oath":[5,0],"Stormwake":[5,2],"Second Thunder":[5,3]},
-  "wardbound.earth": {"Broad Shield":[0,0],"Iron Rhythm":[0,1],"Deep Quake":[1,2],"Restless Earth":[0,3],"Braced Shove":[1,0],"Anvil's Toll":[2,1],"Quake Line":[1,3],"Wall of Shields":[3,0],"Shield Brand":[2,2],"Fault Line":[2,3],"Anvil Stance":[4,0],"Rune-Shaker":[3,1],"Aftershock":[4,3],"Unmoving":[5,0],"Breaking Stance":[5,2],"Mountain's Weight":[5,3]},
-  "wardbound.cannon": {"Spotter":[0,0],"Wide Blast":[0,1],"Heavy Bolts":[1,2],"Long Pin":[0,3],"Crank Drill":[1,0],"Steady Crew":[2,1],"Rune Shot":[1,3],"Chain Bolt":[2,0],"Pinned and Branded":[3,2],"Kindled Runes":[2,3],"Iron Tether":[3,0],"Bolt Sequence":[3,1],"Shatter Shot":[4,2],"Rearm":[4,3],"Unbroken Chain":[5,1],"Ballista Volley":[5,2],"Kept Runes":[5,3]},
-  "wardbound.venom": {"Field Chaplain":[0,0],"Urgent Hands":[0,1],"Deep Mending":[0,2],"Incense of Vigil":[1,0],"Sworn Vow":[1,1],"Mender's Due":[2,2],"Siege-Ward":[1,3],"Oath Renewed":[2,1],"Choking Censer":[3,2],"Rite of Holding":[2,3],"Vow of Iron":[4,0],"Ember Vow":[4,1],"Long Rite":[3,3],"Keeper of Vows":[5,0],"Sanctuary":[5,1],"Hallowed Road":[5,2]},
-  "champ:wb_varic": {"Patient Oath":[0,3],"Warden's Reach":[0,1],"Wide Ring":[0,2],"Shield Brothers":[3,1],"Hold Fast":[1,3],"Long Vigil":[2,3],"Heavy Hand":[3,0],"Shared Watch":[2,2],"The Gate Holds":[5,0],"The Road Remembers":[5,3],"Steady Pace":[4,3],"Last Warden":[5,2],"The Last Gate":[4,0],"Held to Account":[1,1],"Old Discipline":[1,0]},
-  "champ:wb_aedric": {"Eager Sun":[0,3],"Sunlit Reach":[0,1],"Sun's Due":[0,2],"Into the Fray":[3,1],"Sun Charge":[1,3],"Sun-Struck Trail":[2,3],"Searing Wheel":[3,0],"Rallying Cry":[2,2],"Undying Blaze":[5,0],"Open Road":[5,3],"Hot Blood":[4,3],"Sun-Sworn":[5,2],"Blaze of Glory":[4,0],"Battle Fever":[1,1],"Spurs":[1,0]},
+  "champ:sb_beast": {"Old Calls":[1,3],"Keen Nose":[0,3],"Long Hunt":[0,0],"Wolf Den":[4,2],"Wolfsong":[2,3],"Heel Biters":[3,3],"Pack Hunger":[3,0],"Thunder on the Prey":[4,1],"Stormcarrier":[5,0],"Blood Trail":[5,1],"Spirit Run":[3,1],"Beastcaller":[5,3],"Thunderbird’s Talons":[4,0],"Pack Pace":[0,2],"Hunter's Breath":[2,1],"Hunter's Stride":[1,2]},
+  "wardbound.glaive": {"Avenging Oath":[0,3],"Deep Carving":[1,1],"Oathbreaker's Due":[0,1],"Oathsworn Cut":[1,2],"Sword and Stone":[3,0],"Oath Kept":[0,2],"Rune Cleave":[2,2],"Unbroken Line":[3,1],"Hold Fast":[2,1],"Bright Wards":[3,2],"Final Oath":[4,1],"Oath of Iron":[2,3],"Linebreaker":[4,2],"Oath Fulfilled":[5,1],"Oathfire":[5,3],"Shared Oath":[5,2]},
+  "wardbound.arrow": {"The Long Watch":[1,3],"Masked Sight":[0,2],"Rune-Etched Edge":[1,2],"Branding Edge":[2,3],"Mask's Tally":[0,0],"Mark the Fallen":[0,1],"Returning Oath":[3,3],"Branding Rite":[2,1],"Line Cut":[3,2],"Dragging Edge":[4,3],"Caught Again":[4,0],"Warding Glaive":[4,2],"Glaive of Judgement":[5,0],"Twin Wards":[5,1],"Lodestar":[5,2]},
+  "wardbound.frost": {"Brand-Rime":[0,1],"Wide Sweep":[0,2],"Creeping Rime":[0,3],"Bitter Steel":[1,0],"Hard Rime":[2,1],"Meltwater":[1,3],"Frostbite":[2,0],"Winter Ward":[3,1],"Rimecut":[2,2],"Deep Bite":[3,0],"Long Winter":[4,1],"Shatter Oath":[4,0],"Cold Vigil":[4,2],"Biting Wind":[3,3],"Winter's Line":[5,1],"Hoarfrost":[5,0],"Rime Crown":[5,3]},
+  "wardbound.arcane": {"Shared Margins":[0,3],"Lingering Ink":[0,1],"Ward-Cutting Script":[1,1],"Deep Script":[0,0],"Palimpsest":[2,3],"Spent Ink":[3,3],"Detonate":[1,0],"Ink of Binding":[3,2],"Sigil Ward":[1,2],"Chain Reaction":[2,0],"Scribe the Road":[4,2],"Double Stroke":[3,1],"Volatile Script":[4,1],"The Last Word":[5,2],"Cascade":[5,1],"Runesight":[5,3]},
+  "wardbound.storm": {"Couched Lance":[0,0],"Thunder Hooves":[2,3],"Branding Sparks":[0,3],"Forked Pennon":[0,2],"Storm Pennant":[1,0],"Sky-Drawn":[1,2],"Spur and Lance":[2,2],"Cracking Pennant":[2,0],"Thunderbrand":[4,3],"Skyfall":[3,2],"Charge Through":[3,3],"Pennant Call":[3,1],"Gathering Storm":[4,0],"Sky's Answer":[4,2],"Thunder Oath":[5,3],"Stormwake":[5,0],"Second Thunder":[5,1]},
+  "wardbound.earth": {"Broad Shield":[1,3],"Iron Rhythm":[0,2],"Deep Quake":[0,3],"Restless Earth":[1,1],"Braced Shove":[2,2],"Anvil's Toll":[2,3],"Quake Line":[2,1],"Wall of Shields":[3,3],"Shield Brand":[3,0],"Fault Line":[3,1],"Anvil Stance":[4,3],"Rune-Shaker":[4,1],"Aftershock":[4,2],"Unmoving":[5,3],"Breaking Stance":[5,1],"Mountain's Weight":[5,0]},
+  "wardbound.cannon": {"Spotter":[1,3],"Wide Blast":[1,1],"Heavy Bolts":[0,3],"Long Pin":[0,2],"Crank Drill":[2,3],"Steady Crew":[3,0],"Rune Shot":[1,2],"Chain Bolt":[3,3],"Pinned and Branded":[3,1],"Kindled Runes":[2,2],"Iron Tether":[4,3],"Bolt Sequence":[2,0],"Shatter Shot":[4,2],"Rearm":[4,1],"Unbroken Chain":[5,0],"Ballista Volley":[5,2],"Kept Runes":[5,1]},
+  "wardbound.venom": {"Field Chaplain":[1,2],"Urgent Hands":[1,3],"Deep Mending":[0,2],"Incense of Vigil":[0,1],"Sworn Vow":[2,3],"Mender's Due":[1,0],"Siege-Ward":[2,0],"Oath Renewed":[3,3],"Choking Censer":[2,1],"Rite of Holding":[3,0],"Vow of Iron":[3,2],"Ember Vow":[4,2],"Long Rite":[4,0],"Keeper of Vows":[5,3],"Sanctuary":[5,2],"Hallowed Road":[5,0]},
+  "champ:wb_varic": {"Patient Oath":[0,1],"Warden's Reach":[1,2],"Wide Ring":[1,3],"Shield Brothers":[4,1],"Hold Fast":[1,1],"Long Vigil":[2,1],"Heavy Hand":[3,3],"Shared Watch":[2,2],"The Gate Holds":[5,3],"The Road Remembers":[5,2],"Steady Pace":[3,0],"Last Warden":[5,0],"The Last Gate":[4,3],"Held to Account":[2,0],"Old Discipline":[0,2]},
+  "champ:wb_aedric": {"Eager Sun":[1,2],"Sunlit Reach":[0,1],"Sun's Due":[1,0],"Into the Fray":[4,3],"Sun Charge":[2,2],"Sun-Struck Trail":[3,2],"Searing Wheel":[3,1],"Rallying Cry":[3,0],"Undying Blaze":[5,1],"Open Road":[5,0],"Hot Blood":[4,0],"Sun-Sworn":[5,2],"Blaze of Glory":[4,1],"Battle Fever":[2,1],"Spurs":[0,0]},
   "champ:wb_isaura": {"Ready Vow":[0,3],"Silent Vow":[0,1],"Vow Carved":[0,2],"Witness of Vows":[3,1],"Binding Sweep":[1,3],"Tighter Bonds":[2,3],"Heavy Vow":[3,0],"Shared Vow":[2,2],"Turned Twice":[5,0],"Sworn Road":[5,3],"Quiet Step":[4,3],"Veiled Oath":[5,2],"Oath Turned":[4,0],"Vow's Reckoning":[1,1],"Measured Sweeps":[1,0]},
 };
 /* </spread> */
@@ -80256,40 +80299,24 @@ function gpTick() {
     el.style.setProperty('--cd', f.toFixed(3)); el.textContent = f > 0 ? Math.ceil(abLeft(t, ab)) : ''; });
 }
 
-/* ================= UP NEXT: the wave forecast over the field =================
-   What is coming, early enough to plan for it: the next wave in detail (its make-up by role, who covers whom, the threats, how to
-   prepare), the two or three after it in brief, the next boss and its rule several waves out, and a flag on each enemy type or
-   mechanic the first time it marches. Everything is read from the wave definitions (waveSpec, describeWave, WAVE_PROBLEM, DUNGEONS,
-   CREEPS, and BOSS_RULES through bossRuleAt), so it stays right when they change. ui.js calls forecastTick once a frame.
-   Force runs get it all; Classic (oldRules) shows make-up, traits, leaders and bosses, without ties or role advice; Tower Wars none. */
-const FC_ROLE = {   // the role chips, in the order they show. g: a small drawn glyph (SVG path in a 12-unit box), c: its colour
-  armoured: { n: 'Armoured', c: '#b9c6d8', g: 'M6 1 10.5 2.6V6c0 2.6-1.9 4.3-4.5 5C3.4 10.3 1.5 8.6 1.5 6V2.6z' },
-  mres: { n: 'Magic-resistant', c: '#b49cff', g: 'M6 1.2a4.8 4.8 0 1 0 .01 0zM6 3.4a2.6 2.6 0 1 1-.01 0z' },
-  cloth: { n: 'Cloth', c: '#f2a6c8', g: 'M6 1 9 4.4 10.6 11H1.4L3 4.4z' },
-  support: { n: 'Support', c: '#86e0a2', g: 'M4.6 1.5h2.8v3.1h3.1v2.8H7.4v3.1H4.6V7.4H1.5V4.6h3.1z' },
-  light: { n: 'Light', c: '#f2d36b', g: 'M1.5 2.2 5.4 6 1.5 9.8h2.6L8 6 4.1 2.2zM5.6 2.2 9.5 6l-3.9 3.8h2.6L12 6 8.2 2.2z' },
-  heavy: { n: 'Heavy', c: '#ee9a62', g: 'M1.5 3.5h9v6.8h-9zM4 1.5h4v2H4z' },
-  fly: { n: 'Flying', c: '#8fd8ff', g: 'M6 4.2C4.4 2.2 2.2 1.6.8 2c.9 1 1.3 2.4 1.2 4 1.4-.6 2.8-.2 4 1.2 1.2-1.4 2.6-1.8 4-1.2-.1-1.6.3-3 1.2-4C9.8 1.6 7.6 2.2 6 4.2zM6 7.6l-1 3.4h2z' },
-};
-const FC_PRIO = { cloth: 'Cloth', support: 'Support', armoured: 'Armoured', light: 'Grouped' };   // the target order (core.js PRIO) that answers a role
-// the threats a wave can bring, off the creeps' own data. who: troops and bosses only, or leaders too
-const FC_THREAT = [
-  { k: 'boss', n: 'Boss', c: '#ff7a5c', f: d => d.boss },
-  { k: 'siege', n: 'Siege', c: '#ffa14a', lead: 1, f: (d, g) => g.siege || !!d.atk },
-  { k: 'fly', n: 'Flyers', c: '#8fd8ff', lead: 1, f: d => d.fly },
-  { k: 'swift', n: 'Swift', c: '#f2d36b', f: (d, g) => g.swift },
-  { k: 'burrow', n: 'Burrowers', c: '#e0c27a', lead: 1, f: d => d.burrow || d.lead === 'tunnel' || d.lead === 'dive' },
-  { k: 'phase', n: 'Phasers', c: '#c49cff', f: d => d.phase || d.blink },
-  { k: 'summon', n: 'Summoners', c: '#86e0a2', f: d => d.raise || d.raiseC || d.spawn || d.egg },
-  { k: 'silence', n: 'Silencers', c: '#a8c8ff', f: d => d.silence },
-];
+/* ================= UP NEXT: the next wave's foes, as one row of small square portraits over the field =================
+   The owner (10 Nov 2026): "remove this, instead i just want to see small portrait icons with whats coming in the next wave,
+   can hover over them to see a small section of what they do, clean ui". So there is no panel, no label and no list: a row of
+   square portraits at the top right of the field, one a foe type of the NEXT wave (the boss card's and info pane's own art:
+   portraitPaint), each with its count. A frame colour and one small badge say what kind of foe it is at a glance (no
+   surprises): a boss (red, skull), a dungeon leader (gold, crown), flyers (sky blue, wings), siege troops (orange, hammer),
+   burrowers (earth, arrow down), swift troops (yellow, chevrons); an elite wave's troops wear a plain gold frame. A type
+   marching for the first time has a small teal dot. Hover (tap on touch) any of them for a small card: the name and count,
+   what it does in a line, its traits as the buff bar's icons, and the counter in a line. The boss's loot table is not shown.
+   Everything is read from the wave definitions (waveSpec, CREEPS, bossRuleAt), so it stays right when they change.
+   ui.js calls forecastTick once a frame. Force runs and Classic get it; Tower Wars none. */
 // the new mechanics worth a word the first time they march (troop types speak for themselves through their own text)
 const FC_MECH = { swift: 'Swift troops run about half again as fast and march packed tight, each a little frailer.', siege: 'Siege troops ignore your maze and smash a straight line to the gate, breaking what stands in it.', fly: 'Flyers cross over the maze: only units that reach the air can hit them.' };
 const fcEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fcFirst = s => { const m = String(s || '').match(/^.*?[.!?](\s|$)/); return (m ? m[0] : String(s || '')).trim(); };
 const fcOld = () => typeof oldRules === 'function' && oldRules();
 const fcOn = () => typeof G !== 'undefined' && G && G.state === 'play' && !G.vs && !(typeof TW !== 'undefined' && TW) && Array.isArray(G.towers);
-// the waves to forecast: the next one, then up to three more (none past the last wave unless the run is endless)
+// the waves to forecast: the next one first (the tutorial and the row read only that one); none past the last wave unless the run is endless
 function fcWaves() { const from = G.phase === 'build' ? G.wave : G.wave + 1, out = []; for (let n = from; out.length < 4 && (n <= MAX_WAVE || G.endless); n++) out.push(n); return out; }
 // the troops of a wave as makeWave fields them (past the last wave each group marches 15% stronger, as makeWave does)
 function fcGroups(n) {
@@ -80316,153 +80343,126 @@ function fcFirstWave() {
 // what is new in wave n: types and mechanics no earlier wave has brought (wave 1 is all new, so it flags nothing)
 function fcNew(n) {
   if (n < 2 || n > MAX_WAVE) return [];
-  const F = fcFirstWave(), out = [], force = !fcOld();
-  for (const g of fcGroups(n)) if (F['t:' + g.type] === n && !out.some(o => o.key === 't:' + g.type)) out.push({ key: 't:' + g.type, type: g.type, name: g.name, fly: !!g.def.fly, text: force && g.def.link ? `${g.def.link.say[0].toUpperCase()}${g.def.link.say.slice(1)}.` : fcFirst(g.def.eco) || (g.def.fly ? FC_MECH.fly : g.def.trait) || '' });
-  for (const m in FC_MECH) if (F['m:' + m] === n && !(m === 'fly' && out.some(o => o.fly))) out.push({ key: 'm:' + m, name: FC_THREAT.find(t => t.k === m).n, text: FC_MECH[m] });
+  const F = fcFirstWave(), out = [];
+  for (const g of fcGroups(n)) if (F['t:' + g.type] === n && !out.some(o => o.key === 't:' + g.type)) out.push({ key: 't:' + g.type, type: g.type, name: g.name });
   return out;
 }
-// the one-line answer wherever armoured troops are flagged (the forecast, its foe cards, the boss card, the foe's info pane): force runs
+// the one-line answer wherever armoured troops are flagged (the forecast's cards, the boss card, the foe's info pane): force runs
 const FC_ARM_NOTE = 'Armoured: bring magic or armour penetration.';
 const fcPlateNote = d => !fcOld() && d && ((d.rk && d.rk.armoured) || (d.armor || 0) >= 6) ? FC_ARM_NOTE : '';
 // and wherever the warded (the magic-resistant rank and file, with a ward bar: enemypools.js) are
 const FC_WARD_NOTE = 'Warded: bring steel or magic penetration.';
 const fcWardNote = d => !fcOld() && d && d.rk && d.rk.mres && !d.lead && !d.boss ? FC_WARD_NOTE : '';
 const fcArmNote = d => [fcPlateNote(d), fcWardNote(d)].filter(Boolean).join(' ');
-// the chips a creep counts under: its roles in a force run; in Classic (no role damage there) only what its stats say: plate, a magic ward, wings
-function fcRolesOf(type) {
-  const d = CREEPS[type], out = fcOld() ? [...(d.armor >= 6 ? ['armoured'] : []), ...(d.mres >= .3 ? ['mres'] : [])] : (d.roles || []).slice();
-  if (d.fly) out.push('fly');
-  return out;
+// the foes of wave n, in the order the row shows them: its boss or leader first, then the troops, most first
+function fcIcons(n) {
+  const el = typeof eliteWave === 'function' && eliteWave(n), nw = new Set(fcNew(n).map(x => x.type));
+  const L = fcGroups(n).map((g, k) => Object.assign({ k, elite: !!el && !g.lead && !g.boss, isNew: nw.has(g.type) }, g));
+  return L.sort((a, b) => ((b.boss || b.lead) - (a.boss || a.lead)) || (b.count - a.count) || (a.k - b.k));
 }
-// everything the forecast says about wave n
-function forecastData(n) {
-  const force = !fcOld(), w = describeWave(n), groups = fcGroups(n), troops = groups.filter(g => !g.lead && !g.boss);
-  const total = troops.reduce((a, g) => a + g.count, 0), roles = {};
-  for (const g of troops) { for (const r of fcRolesOf(g.type)) roles[r] = (roles[r] || 0) + g.count; }
-  const threats = [];
-  for (const T of FC_THREAT) { const by = groups.filter(g => (T.lead || !g.lead) && T.f(g.def, g)); if (by.length) threats.push({ k: T.k, n: T.n, c: T.c, by: by.map(g => g.type), count: by.filter(g => !g.lead && !g.boss).reduce((a, g) => a + g.count, 0) }); }
-  const chiefG = groups.find(g => g.lead) || groups.find(g => g.boss && (g.def.abil || g.def.brule)) || groups.find(g => g.boss), chief = chiefG ? chiefG.type : null;
-  const rule = w.rule || null, dg = w.dungeon;
-  // how to prepare, in the player's own controls: target orders, spell choices, what to keep ready (force runs only)
-  const prep = [];
-  if (force) {
-    const share = r => total ? (roles[r] || 0) / total : 0, add = (label, tip) => { if (!prep.some(p => p.label === label)) prep.push({ label, tip }); };
-    if (rule) {
-      if (rule.kind === 'knell') add('Spend mana before the toll', rule.ways[0] || rule.text);
-      if (rule.kind === 'forge' || rule.kind === 'laws') add('Field steel and magic', rule.ways[0] || rule.text);
-      if (rule.kind === 'ground') add('Kill it short of the circle', rule.ways[0] || rule.text);
-      if (rule.kind === 'tell') add('Spread damage across unit types', rule.ways[0] || rule.text);
-    }
-    { const ms = typeof epWaveCasters === 'function' ? epWaveCasters(groups) : ''; if (ms) add('Spend their mana', ms); }   // enemypools.js
-    if (w.ties.length) add('Target order: Support', `Set a unit's target order to Support (or a spell that prefers it) and it cuts these ties first: ${w.ties.map(t => t.name).join(', ')}.`);
-    if (roles.cloth >= 2) add('Spells that prefer Cloth', `${roles.cloth} cloth casters: ${ROLE_WEAK.cloth}. Turn on spells that seek Cloth, or set Cloth as a target order.`);
-    if (share('armoured') >= .3) add('Magic or armour penetration', `${FC_ARM_NOTE} ${roles.armoured} armoured: ${ROLE_WEAK.armoured}. Armour-shred helps your steel too.`);
-    if (share('mres') >= .3) add('Steel or magic penetration', `${FC_WARD_NOTE} ${roles.mres} magic-resistant: ${ROLE_WEAK.mres}.${G.force === 'conclave' ? ' Golem slams crack wards open, and weaves and Arcane Barrage tear them.' : ''}`);
-    if (share('light') >= .5) add('Area damage', `${roles.light} light troops: ${ROLE_WEAK.light}. Spells that seek the thickest crowd (Grouped) pay off.`);
-    if (share('heavy') >= .3) add(G.force ? 'Holds' : 'Burns and venom', `${roles.heavy} heavies: ${ROLE_WEAK.heavy}.`);
-    if (roles.fly) add('Air reach', `${roles.fly} flyers cross over your maze: only units that reach the air can hit them.`);
-    if (w.swift) add('Slows', 'Swift troops: slows and area damage keep them in your killing ground.');
-    if (/\bstun/i.test([rule ? rule.ways.join(' ') : '', dg ? dg.plan : ''].join(' '))) add('Keep a stun ready', rule && rule.ways.find(s => /stun/i.test(s)) || (dg ? dg.plan : ''));
-  }
-  const prob = w.problem;
-  return {
-    n, force, boss: w.boss, siege: w.siege, swift: w.swift, fly: w.fly,
-    title: prob ? prob.name : dg ? dg.name : chief ? CREEPS[chief].name : '', text: prob ? prob.text : '',
-    groups: groups.map(g => ({ type: g.type, name: g.name, count: g.count, swift: g.swift, siege: g.siege, lead: g.lead, boss: g.boss })),
-    total, roles, threats, ties: force ? w.ties : [], traits: w.traits,
-    chief, rule: rule ? { type: rule.type, name: rule.name, text: rule.text, ways: rule.ways, kind: rule.kind } : null,
-    ways: prob ? prob.ways.split(' · ') : [], prep: prep.slice(0, 4), news: fcNew(n),
-  };
+// what the next wave holds (for the row, its cards and the checks)
+function forecastData(n) { const groups = fcIcons(n); return { n, groups, news: fcNew(n), boss: groups.some(g => g.boss), fly: groups.some(g => !g.lead && !g.boss && g.def.fly) }; }
+
+/* ---- the kinds a portrait can wear: one frame colour and one badge (the first that fits) ---- */
+const FC_GLYPH = {   // small drawn badges, SVG paths in a 12-unit box
+  boss: 'M6 1C3.2 1 1.5 2.9 1.5 5.3c0 1.4.6 2.4 1.6 3V10h1.3V9h1v1h1.2V9h1v1h1.3V8.3c1-.6 1.6-1.6 1.6-3C10.5 2.9 8.8 1 6 1zM4.2 4.6a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2zm3.6 0a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z',
+  lead: 'M1 9.6V3.4l2.7 2.6L6 2l2.3 4 2.7-2.6v6.2z',
+  fly: 'M6 4.2C4.4 2.2 2.2 1.6.8 2c.9 1 1.3 2.4 1.2 4 1.4-.6 2.8-.2 4 1.2 1.2-1.4 2.6-1.8 4-1.2-.1-1.6.3-3 1.2-4C9.8 1.6 7.6 2.2 6 4.2zM6 7.6l-1 3.4h2z',
+  siege: 'M1.4 1.8h6.8v3.4H1.4zM4.2 5.2h1.6V11H4.2z',
+  dig: 'M6 11 1.8 6.3h2.7V1.2h3V6.3h2.7z',
+  swift: 'M1.5 2.2 5.4 6 1.5 9.8h2.6L8 6 4.1 2.2zM5.6 2.2 9.5 6l-3.9 3.8h2.6L12 6 8.2 2.2z',
+};
+const FC_KIND = [
+  { k: 'boss', n: 'Boss', c: '#ff6a4a', f: g => g.boss },
+  { k: 'lead', n: 'Leader', c: '#f0c24f', f: g => g.lead },
+  { k: 'fly', n: 'Flyers', c: '#7fd0ff', f: g => g.def.fly },
+  { k: 'siege', n: 'Siege', c: '#ff9a3c', f: g => g.siege || !!g.def.atk },
+  { k: 'dig', n: 'Burrowers', c: '#d6b070', f: g => g.def.burrow || g.def.lead === 'tunnel' || g.def.lead === 'dive' },
+  { k: 'swift', n: 'Swift', c: '#f2e46b', f: g => g.swift },
+];
+const FC_ELITE = '#e8bc4a';
+const fcKindOf = g => FC_KIND.find(K => { try { return !!K.f(g); } catch (e) { return false; } }) || null;
+const fcSvg = k => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${FC_GLYPH[k]}" fill="currentColor" fill-rule="evenodd"/></svg>`;
+
+/* ---- what a foe is, in a line each: its traits as the buff bar's icons, what it does, the counter ---- */
+const FC_TRAIT = [
+  { n: 'Armoured', icon: 'shield', hue: '#4a5060', f: (d, g, F) => (F && (d.roles || []).includes('armoured')) || (d.armor || 0) >= 6 },
+  { n: 'Warded', nc: 'Resists magic', icon: 'orb', hue: '#5a3a8a', f: (d, g, F) => F ? (d.roles || []).includes('mres') : (d.mres || 0) >= .3 },
+  { n: 'Swift', icon: 'quick', hue: '#8a7a20', f: (d, g) => g && g.swift },
+  { n: 'Flying', icon: 'wings', hue: '#3a5a7a', f: d => d.fly },
+  { n: 'Siege', icon: 'hammer', hue: '#6a3a20', f: (d, g) => (g && g.siege) || (d.atk && d.atk.kind !== 'blast') },
+  { n: 'Bomber', icon: 'bomb', hue: '#7a3010', f: d => d.atk && d.atk.kind === 'blast' },
+  { n: 'Heals', icon: 'heart', hue: '#2a6a2a', f: d => d.heal || (d.link && d.link.kind === 'heal') },
+  { n: 'Shields allies', icon: 'halo', hue: '#3a5a8a', f: d => d.link && d.link.kind === 'ward' },
+  { n: 'Rallies', icon: 'banner', hue: '#6a3a1a', f: d => d.link && d.link.kind === 'haste' },
+  { n: 'Cleanses', icon: 'swirl', hue: '#2a5a7a', f: d => d.link && d.link.kind === 'cleanse' },
+  { n: 'Raises the dead', icon: 'skull', hue: '#2a5a3a', f: d => d.raise || d.raiseC },
+  { n: 'Summons', icon: 'horn', hue: '#6a3a1a', f: d => d.spawn || d.egg },
+  { n: 'Regenerates', icon: 'potion', hue: '#2a6a2a', f: d => d.regen > 0 },
+  { n: 'Burrows', icon: 'rocks', hue: '#5a4a2a', f: d => d.burrow || d.lead === 'tunnel' || d.lead === 'dive' },
+  { n: 'Phases', icon: 'spiral', hue: '#5a3a8a', f: d => d.phase || d.blink },
+  { n: 'Silences', icon: 'hexeye', hue: '#3a4a7a', f: d => d.silence },
+  { n: 'Heavy', icon: 'statue', hue: '#5a5040', f: (d, g, F) => F && (d.roles || []).includes('heavy') },
+  { n: 'Cloth', icon: 'feather', hue: '#7a3a5a', f: (d, g, F) => F && (d.roles || []).includes('cloth') },
+];
+function fcTraits(d, g) {
+  const F = !fcOld(), out = [];
+  for (const T of FC_TRAIT) { let on = false; try { on = !!T.f(d, g, F); } catch (e) { on = false; } if (on) out.push({ n: !F && T.nc ? T.nc : T.n, icon: T.icon, hue: T.hue }); }
+  return out.slice(0, 3);
 }
-// the next boss after wave n, and what it brings: its rule in a force run, its own ability in Classic
-function fcHorizon(after) {
-  for (let m = after + 1; m <= after + 12 && (m <= MAX_WAVE || G.endless); m++) {
-    const g = fcGroups(m).find(x => x.boss); if (!g) continue;
-    const r = typeof bossRuleAt === 'function' ? bossRuleAt(m) : null, d = g.def;
-    return { n: m, type: g.type, name: d.name, title: d.title || '', rule: r ? r.name : d.abil ? d.abil[0] : '', text: r ? r.text : d.abil ? d.abil[1] : d.trait || '', ways: r ? r.ways : [], siege: fcGroups(m).some(x => x.siege || x.def.atk) };
-  }
-  return null;
+const fcTraitHTML = t => { let cls = ''; try { cls = typeof bfIconClass === 'function' ? bfIconClass({ e: { kind: 'trait', icon: t.icon, hue: t.hue } }) : ''; } catch (e) { cls = ''; } return `<span><i class="${cls}" aria-hidden="true"></i>${fcEsc(t.n)}</span>`; };
+// the answer to a foe, in one short line: its wings first (only some units reach them), then its roles (Classic: its stats)
+const FC_COUNTER = { support: 'kill it first (target order Support)', armoured: 'magic, or armour-shred to open its plate', mres: 'steel, or magic penetration', cloth: 'steel cuts it down fast', heavy: 'stuns and roots hold it longer', light: 'area damage' };
+function fcCounter(d, id, n) {
+  const F = !fcOld(), out = [];
+  if (F && d.brule && typeof bossRuleAt === 'function') { const r = bossRuleAt(n); if (r && r.type === id && r.ways && r.ways[0]) return /[.!?]$/.test(r.ways[0]) ? r.ways[0] : r.ways[0] + '.'; }
+  if (d.fly) out.push('units that reach the air');
+  if (F) { for (const r of ['support', 'armoured', 'mres', 'cloth', 'heavy', 'light']) if ((d.roles || []).includes(r)) out.push(FC_COUNTER[r]); }
+  else { if ((d.armor || 0) >= 6) out.push('magic gets past its armour'); if ((d.mres || 0) >= .3) out.push('steel ignores its ward'); }
+  const s = out.slice(0, 2).join('; ');
+  return s ? s[0].toUpperCase() + s.slice(1) + '.' : '';
+}
+// what it does, in one line: a boss's rule this wave, a support's tie, its ability, its own text
+function fcSays(d, id, n) {
+  const F = !fcOld();
+  if (F && d.brule && typeof bossRuleAt === 'function') { const r = bossRuleAt(n); if (r && r.type === id) return `${r.name}: ${fcFirst(r.text)}`; }
+  if (F && d.link && d.link.say) return `It ${d.link.say}.`;
+  if (d.abil) return `${d.abil[0]}: ${fcFirst(d.abil[1])}`;
+  return fcFirst(d.eco) || (d.trait && !/^(Ground|Flying|Boss|Leader)$/i.test(d.trait) ? fcFirst(d.trait) : '') || (d.fly ? FC_MECH.fly : '');
 }
 
-/* ---- the markup ---- */
-const fcSvg = (g, c) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${g}" fill="${c}" fill-rule="evenodd"/></svg>`;
-const fcRoleChip = (r, k, big) => { const R = FC_ROLE[r]; return `<span class="fc-r" data-fc="role:${r}" tabindex="0" style="--c:${R.c}" aria-label="${k} ${R.n}">${fcSvg(R.g, R.c)}<b>${k}</b>${big ? `<i>${R.n}</i>` : ''}</span>`; };
-const fcThreatChip = t => `<span class="fc-t" data-fc="threat:${t.k}" tabindex="0" style="--c:${t.c}">${t.n}${t.count > 1 ? ` <b>${t.count}</b>` : ''}</span>`;
-const fcRoleOrder = d => Object.keys(FC_ROLE).filter(r => d.roles[r]);
-const fcHex = c => '#' + c.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0')).join('');
-// a minion's painted portrait (unitart.js), or its role glyph where there is none
-const fcArt = ty => (typeof UNIT_ART !== 'undefined' && UNIT_ART.enemies && UNIT_ART.enemies[ty]) || '';
-// the forecast's minion row: one small icon per foe type, with its count (hover or tap for its card)
-function fcMinionHTML(g) {
-  const d = CREEPS[g.type], R = FC_ROLE[((d && d.roles) || []).find(q => FC_ROLE[q])] || null, c = R ? R.c : '#c9b98a', art = fcArt(g.type);
-  return `<button type="button" class="fc-m${g.boss ? ' boss' : ''}" data-fc="type:${g.type}" style="--c:${c}" aria-label="${fcEsc(g.name)}${g.boss ? '' : ' ×' + g.count}">`
-    + (art ? `<img alt="" src="${art}">` : fcSvg(R ? R.g : FC_ROLE.armoured.g, c)) + (g.boss ? '' : `<b>${g.count}</b>`) + `</button>`;
+/* ---- the row ---- */
+const fcSpec = g => `type:${g.type}${g.swift ? ':s' : ''}`;
+const fcPt = ty => `<canvas data-pt="${fcEsc(ty)}" aria-hidden="true"></canvas>`;
+function fcIconHTML(g) {
+  const K = fcKindOf(g), kn = g.boss ? 'boss' : g.lead ? 'leader' : K ? K.n.toLowerCase() : '', c = K ? K.c : g.elite ? FC_ELITE : '';
+  const lbl = `${g.name}${g.count > 1 ? ' ×' + g.count : ''}${kn ? ', ' + kn : ''}${g.elite ? ', elite' : ''}${g.isNew ? ', new' : ''}`;
+  return `<button type="button" class="fc-m${K ? ' k-' + K.k : ''}${g.elite ? ' el' : ''}${g.isNew ? ' nw' : ''}"${c ? ` style="--c:${c}"` : ''} data-fc="${fcSpec(g)}" aria-label="${fcEsc(lbl)}">${fcPt(g.type)}${K ? `<i class="fc-bg" aria-hidden="true">${fcSvg(K.k)}</i>` : ''}${!g.boss && !g.lead && g.count > 1 ? `<b>×${g.count}</b>` : ''}</button>`;
 }
-// the boss loot: a button that opens the Renown tap menu's loot tab (renown.js), not a strip in the card
-const fcLootBtn = n => false && typeof rnLootOn === 'function' && rnLootOn() && typeof rnBossType === 'function' && rnBossType(n) ? `<button type="button" class="fc-loot" data-loot="${n}" aria-label="Wave ${n} boss loot">Loot</button>` : '';
-function fcDetailHTML(d) {
-  const roleChips = fcRoleOrder(d).map(r => fcRoleChip(r, d.roles[r], true)).join('');
-  const thr = d.threats.filter(t => t.k !== 'fly' && t.k !== 'boss').map(fcThreatChip).join('');   // (flying shows among the roles; the boss in the heading)
-  const foes = d.groups.filter(g => !g.lead).map(fcMinionHTML).join('');
-  const C = d.chief && CREEPS[d.chief];
-  return (d.title ? `<p class="fc-ti">${fcEsc(d.title)}</p>` : '')
-    + (d.text ? `<p class="fc-tx">${fcEsc(d.text)}</p>` : '')
-    + (C ? `<p class="fc-ld" data-fc="type:${d.chief}" tabindex="0"><small>${C.boss ? 'Boss' : 'Led by'}</small><b>${fcEsc(C.name)}</b>${d.rule ? `<em>${fcEsc(d.rule.name)}</em>` : C.abil ? `<em>${fcEsc(C.abil[0])}</em>` : ''}</p>` : '')
-    + (d.boss ? `<div class="fc-lootrow">${fcLootBtn(d.n)}</div>` : '')
-    + (roleChips || thr ? `<div class="fc-chips">${roleChips}${thr}</div>` : '')
-    + (!d.force && d.traits.length ? `<div class="fc-chips">${d.traits.filter(t => !/^(Boss|Leader|Armored$|Flying$|Resists magic$)/.test(t)).slice(0, 6).map(t => `<span class="fc-t" style="--c:#cfe6b4">${fcEsc(t)}</span>`).join('')}</div>` : '')
-    + `<div class="fc-min">${foes}</div>`
-    + (d.ties.length ? `<div class="fc-row"><small>Covers</small><div>${d.ties.map(t => `<p class="fc-tie" data-fc="type:${t.type}" tabindex="0"><i style="background:${fcHex(t.col)}"></i><b>${fcEsc(t.name)}</b> ${fcEsc(t.say)}</p>`).join('')}</div></div>` : '')
-    + (d.prep.length ? `<div class="fc-row"><small>Prep</small><div class="fc-chips">${d.prep.map((p, k) => `<span class="fc-p" data-fc="prep:${k}" tabindex="0">${fcEsc(p.label)}</span>`).join('')}</div></div>` : '')
-    + (d.ways.length ? `<p class="fc-ways">${d.ways.map(fcEsc).join(' · ')}</p>` : '')
-    + (d.news.length ? `<div class="fc-new"><small>New</small>${d.news.map(x => `<p data-fc="${x.type ? 'type:' + x.type : 'mech:' + x.key.slice(2)}" tabindex="0"><b>${fcEsc(x.name)}:</b> ${fcEsc(x.text)}</p>`).join('')}</div>` : '');
-}
-const fcDot = ty => { const r = (CREEPS[ty].roles || []).find(q => q === 'support') || (CREEPS[ty].roles || [])[0]; return r && FC_ROLE[r] ? `<i class="fc-dot" style="background:${FC_ROLE[r].c}"></i>` : ''; };
-// a later wave in one line: its name, the threats and main roles in a few chips, and what is new in it
-function fcBriefHTML(d, sel) {
-  const chips = d.threats.filter(t => t.k !== 'boss').map(t => `<span class="fc-t" style="--c:${t.c}">${t.n}</span>`).slice(0, 2);
-  for (const r of fcRoleOrder(d).filter(r => r !== 'fly' || !d.threats.some(t => t.k === 'fly')).sort((a, b) => d.roles[b] - d.roles[a]).slice(0, Math.max(1, 3 - chips.length))) chips.push(fcRoleChip(r, d.roles[r], false));
-  const C = d.chief && CREEPS[d.chief], title = d.title || (C ? C.name : d.groups.map(g => g.name).slice(0, 2).join(', '));
-  return `<button type="button" class="fc-b${sel ? ' on' : ''}${d.boss ? ' boss' : ''}" data-peek="${d.n}" aria-pressed="${sel}"><span class="fc-bn">W${d.n}</span><span class="fc-bt"><b>${fcEsc(title)}</b>${d.boss ? '<span class="fc-t" style="--c:#ff7a5c">Boss</span>' : ''}${d.news.length ? '<span class="fc-nw">New</span>' : ''}</span><span class="fc-bc">${C && title !== C.name ? `<small>${fcEsc(C.name)}</small>` : ''}${chips.join('')}</span></button>`;
-}
-function fcHorizonHTML(h, from) {
-  if (!h) return '';
-  const k = h.n - from;
-  return `<div class="fc-hz" data-fc="boss:${h.n}" tabindex="0"><small>${k <= 1 ? 'Boss next' : `Boss in ${k} waves`}</small><p><b>Wave ${h.n}: ${fcEsc(h.name)}</b>${h.siege ? ' <span class="fc-t" style="--c:#ffa14a">Siege</span>' : ''}${fcLootBtn(h.n)}</p>${h.rule ? `<p class="fc-hr"><em>${fcEsc(h.rule)}.</em> ${fcEsc(fcFirst(h.text))}</p>` : ''}</div>`;
-}
-// the folded strip: the next wave's make-up at a glance, and how far off the next boss is
-function fcStripHTML(d, h, from, open) {
-  const chips = fcRoleOrder(d).map(r => fcRoleChip(r, d.roles[r], false)).join('') + d.threats.filter(t => t.k !== 'boss' && t.k !== 'fly').map(t => `<span class="fc-t" style="--c:${t.c}">${t.n}</span>`).join('');
-  return `<button type="button" class="fc-head" aria-expanded="${open}" aria-label="Up next: wave ${d.n}. ${open ? 'Fold' : 'Open'} the forecast"><span class="fc-k">Up next</span><span class="fc-w">Wave ${d.n}</span>${d.boss ? '<span class="fc-t" style="--c:#ff7a5c">Boss</span>' : ''}${d.news.length ? '<span class="fc-nw">New</span>' : ''}<span class="fc-sc">${open ? '' : chips}</span>${!open && h && h.n - from <= 5 && !d.boss ? `<span class="fc-hb">Boss W${h.n}</span>` : ''}<span class="fc-ar" aria-hidden="true">${open ? '▴' : '▾'}</span></button>`;
+function forecastHTML() { const ws = fcWaves(); return ws.length ? fcIcons(ws[0]).map(fcIconHTML).join('') : ''; }
+// the portraits: painted once when the row is drawn, and again a moment later for a painting that was still loading
+function fcPaint(root, all) {
+  const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
+  for (const cv of root.querySelectorAll('canvas[data-pt]')) {
+    if (!all && cv._ppKey) continue;
+    const w = Math.round((cv.clientWidth || 40) * dpr);
+    if (cv.width !== w) { cv.width = cv.height = w; cv._ppKey = null; }
+    try { if (typeof portraitPaint === 'function') portraitPaint(cv, { kind: 'creep', type: cv.dataset.pt }); } catch (e) { cv._ppKey = null; }
+  }
 }
 
 /* ---- the panel ---- */
-let fcEl = null, fcCard = null, fcCardFor = null, fcPeek = 0, fcKey = '', fcOpenPref = null;
+let fcEl = null, fcCard = null, fcCardFor = null, fcKey = '', fcRepaint = [];
 const fcPhone = () => typeof phoneUI === 'function' && phoneUI();
-const fcIsOpen = () => { const p = fcOpenPref != null ? fcOpenPref : (typeof lsGet === 'function' ? lsGet('runehold.fcopen') : null); return p === '1'; };   // folded to its strip unless the player opened it (it remembers)
-function forecastHTML() {
-  const ws = fcWaves(); if (!ws.length) return '';
-  const from = ws[0]; if (fcPeek && !ws.includes(fcPeek)) fcPeek = 0;
-  const open = fcIsOpen() && G.phase === 'build', D = ws.map(forecastData), sel = D.find(d => d.n === fcPeek) || D[0], h = fcHorizon(from);
-  if (!open) return fcStripHTML(D[0], h, from, false);
-  return fcStripHTML(sel, h, from, true)
-    + `<div class="fc-body">${sel.n !== from ? `<p class="fc-peek">A look ahead · <button type="button" data-peek="0">back to wave ${from}</button></p>` : ''}${fcDetailHTML(sel)}`
-    + (h && !(sel.boss && h.n === sel.n) ? fcHorizonHTML(h, from) : '')
-    + (D.length > 1 ? `<div class="fc-later">${D.slice(1).map(d => fcBriefHTML(d, d.n === fcPeek)).join('')}</div>` : '') + '</div>';
-}
 function forecastTick() {
   const on = fcOn();
   if (!fcEl) {
     const st = document.getElementById('stage'); if (!st) return;
-    fcEl = document.createElement('div'); fcEl.id = 'fcast'; fcEl.setAttribute('role', 'region'); fcEl.setAttribute('aria-label', 'Up next: the wave forecast'); fcEl.hidden = true;
+    fcEl = document.createElement('div'); fcEl.id = 'fcast'; fcEl.setAttribute('role', 'group'); fcEl.setAttribute('aria-label', 'Foes in the next wave'); fcEl.hidden = true;
     st.append(fcEl);
     fcEl.addEventListener('click', e => {
       e.stopPropagation();
-      const pk = e.target.closest('[data-peek]');
-      if (pk) { const n = +pk.dataset.peek; fcPeek = fcPeek === n ? 0 : n; fcKey = ''; fcHideCard(); if (typeof sfx === 'function') sfx('click'); return; }
-      if (e.target.closest('[data-loot]')) { fcHideCard(); if (typeof sfx === 'function') sfx('click'); if (typeof rnMenu === 'function') rnMenu('loot'); return; }
-      if (e.target.closest('.fc-head')) { fcOpenPref = fcIsOpen() ? '0' : '1'; if (typeof lsSet === 'function') lsSet('runehold.fcopen', fcOpenPref); fcPeek = 0; fcKey = ''; fcHideCard(); if (typeof sfx === 'function') sfx('click'); return; }
-      const c = e.target.closest('[data-fc]'); if (c) { if (c === fcCardFor && !(typeof canHover === 'function' && canHover())) fcHideCard(); else fcShowCard(c); } else fcHideCard();
+      const c = e.target.closest('[data-fc]'); if (c) { if (c === fcCardFor && e.pointerType !== 'mouse') fcHideCard(); else fcShowCard(c); } else fcHideCard();
     });
     fcEl.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const c = e.target.closest('[data-fc]'); if (c) { if (c !== fcCardFor) fcShowCard(c); } else if (fcCardFor) fcHideCard(); });
     fcEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') fcHideCard(); });
@@ -80472,74 +80472,43 @@ function forecastTick() {
   }
   if (!on) { if (!fcEl.hidden) { fcEl.hidden = true; fcHideCard(); fcKey = ''; } return; }
   const ws = fcWaves();
-  // placing a unit: the panel fades and lets taps through, so it never blocks a build spot
+  // placing a unit: the row fades and lets taps through, so it never blocks a build spot
   const ghost = !!G.buildType || !!G.cast;
-  fcEl.classList.toggle('ghost', ghost);
-  const key = [G.wave, G.phase, ws.join(','), fcIsOpen(), fcPeek, fcOld(), fcPhone(), G.endless ? 1 : 0].join('|');
+  if (fcEl.classList.contains('ghost') !== ghost) fcEl.classList.toggle('ghost', ghost);
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  if (fcRepaint.length && now >= fcRepaint[0]) { fcRepaint.shift(); fcPaint(fcEl, false); }
+  const key = [G.wave, G.phase, ws.join(','), fcOld(), fcPhone(), G.endless ? 1 : 0].join('|');
   if (key === fcKey) return;
   fcKey = key;
   const h = ws.length ? forecastHTML() : '';
   const at = fcCardFor && fcCardFor.dataset.fc;
   fcEl.hidden = !h; fcEl.innerHTML = h;
-  fcEl.className = [fcIsOpen() && G.phase === 'build' ? 'open' : 'fold', ghost ? 'ghost' : ''].filter(Boolean).join(' ');
+  fcEl.className = ghost ? 'ghost' : '';
+  if (h) { fcPaint(fcEl, true); fcRepaint = [now + 400, now + 1500, now + 4000]; }
   if (at) { const n = fcEl.querySelector(`[data-fc="${at}"]`); if (n) fcShowCard(n); else fcHideCard(); }
 }
 
-/* ---- the hover / tap card: what an enemy, role, threat or tip means ---- */
+/* ---- the hover / tap card: the name, how many, what it does, the counter ---- */
 function fcCardHTML(spec) {
-  const [kind, id] = spec.split(':'), ws = fcWaves(), n = fcPeek || ws[0], force = !fcOld();
-  const d = forecastData(n);
-  if (kind === 'type') {
-    const C = CREEPS[id]; if (!C) return '';
-    const g = d.groups.find(x => x.type === id), roles = (C.roles || []);
-    const rows = [];
-    if (force && roles.length) rows.push(`<div class="fcc-roles">${roles.map(r => FC_ROLE[r] ? `<span class="fc-r" style="--c:${FC_ROLE[r].c}">${fcSvg(FC_ROLE[r].g, FC_ROLE[r].c)}<i>${FC_ROLE[r].n}</i></span>` : '').join('')}${C.fly ? `<span class="fc-r" style="--c:${FC_ROLE.fly.c}">${fcSvg(FC_ROLE.fly.g, FC_ROLE.fly.c)}<i>Flying</i></span>` : ''}</div>`);
-    if (force && C.link) rows.push(`<p class="fcc-tie"><i style="background:${fcHex(C.link.col)}"></i>It ${fcEsc(C.link.say)}.</p>`);
-    { const an = fcPlateNote(C); if (an) rows.push(`<p class="fcc-tie"><i style="background:${FC_ROLE.armoured.c}"></i><b>${fcEsc(an)}</b></p>`); }
-    { const wn = fcWardNote(C); if (wn) rows.push(`<p class="fcc-tie"><i style="background:${FC_ROLE.mres.c}"></i><b>${fcEsc(wn)}</b></p>`); }
-    { const ms = force && typeof epTypeSay === 'function' ? epTypeSay(id) : ''; if (ms) rows.push(`<p class="fcc-tie"><i style="background:#5294ff"></i>${fcEsc(ms)}</p>`); }   // its mana and armour bars (enemypools.js)
-    const ab = C.brule && force && typeof bossRuleAt === 'function' && bossRuleAt(n) && bossRuleAt(n).type === id ? C.brule : null;
-    if (ab) rows.push(`<p class="fcc-ab"><b>${fcEsc(ab.name)}.</b> ${fcEsc(ab.text)}</p><p class="fcc-ways">${ab.ways.map(fcEsc).join(' · ')}</p>`);
-    else if (C.abil) rows.push(`<p class="fcc-ab"><b>${fcEsc(C.abil[0])}.</b> ${fcEsc(C.abil[1])}</p>`);
-    if (C.eco) rows.push(`<p class="fcc-eco">${fcEsc(C.eco)}</p>`);
-    else if (C.trait && !C.abil) rows.push(`<p class="fcc-eco">${fcEsc(C.trait)}</p>`);
-    // its stats in plain numbers (foe values: health and speed against the base troop, armour, magic resistance)
-    const st = [`Health ${Math.round((C.hp || 1) * 100)}%`, `Speed ${Math.round((C.spd || 1) * 100)}%`, C.armor ? `Armour ${C.armor}` : '', C.mres ? `Magic resist ${Math.round(C.mres * 100)}%` : ''].filter(Boolean);
-    rows.splice(force && roles.length ? 1 : 0, 0, `<p class="fcc-stats">${st.map(s => `<span>${fcEsc(s)}</span>`).join('')}</p>`);
-    // counters: the answer to each of its roles, in the player's own words (force runs)
-    if (force) for (const r of roles.filter(r => FC_ROLE[r] && typeof ROLE_WEAK !== 'undefined' && ROLE_WEAK[r]).slice(0, 2)) rows.push(`<p class="fcc-weak"><b>Counter · ${FC_ROLE[r].n}:</b> ${fcEsc(ROLE_WEAK[r])}</p>`);
-    const art = fcArt(id);
-    return `<div class="fcc-hd">${art ? `<img alt="" src="${art}">` : ''}<div><h4>${fcEsc(C.name)}${g && !g.lead && !g.boss ? ` <small>×${g.count}</small>` : ''}</h4>${C.title ? `<p class="fcc-sub">${fcEsc(C.title)}</p>` : ''}</div></div>${rows.join('')}`;
-  }
-  if (kind === 'role') {
-    const R = FC_ROLE[id]; if (!R) return '';
-    const who = d.groups.filter(g => !g.lead && !g.boss && fcRolesOf(g.type).includes(id));
-    const weak = id === 'fly' ? FC_MECH.fly : force && FC_PRIO[id] ? `Target order <b>${FC_PRIO[id]}</b> goes after it first.` : '';
-    return `<h4 style="color:${R.c}">${R.n} <small>×${d.roles[id] || 0}</small></h4>${weak ? `<p class="fcc-weak">${weak}</p>` : ''}${who.map(g => `<p class="fcc-eco"><b>${fcEsc(g.name)} ×${g.count}</b></p>`).join('')}`;
-  }
-  if (kind === 'threat') {
-    const T = d.threats.find(t => t.k === id); if (!T) return '';
-    return `<h4 style="color:${T.c}">${T.n}</h4>${T.by.map(ty => { const C = CREEPS[ty]; return `<p class="fcc-eco"><b>${fcEsc(C.name)}:</b> ${fcEsc(fcFirst(C.eco) || C.trait || '')}</p>`; }).join('')}${FC_MECH[id] ? `<p class="fcc-weak">${FC_MECH[id]}</p>` : ''}`;
-  }
-  if (kind === 'mech') return FC_MECH[id] ? `<h4>${FC_THREAT.find(t => t.k === id).n}: new</h4><p class="fcc-eco">${FC_MECH[id]}</p>` : '';
-  if (kind === 'prep') { const p = d.prep[+id]; return p ? `<h4>${fcEsc(p.label)}</h4><p class="fcc-eco">${fcEsc(p.tip)}</p>` : ''; }
-  if (kind === 'boss') {
-    const h = fcHorizon(ws[0]); if (!h || h.n !== +id) return '';
-    return `<h4>${fcEsc(h.name)}</h4>${h.title ? `<p class="fcc-sub">${fcEsc(h.title)} · wave ${h.n}</p>` : ''}${h.rule ? `<p class="fcc-ab"><b>${fcEsc(h.rule)}.</b> ${fcEsc(h.text)}</p>` : ''}${h.ways.length ? `<p class="fcc-ways">${h.ways.map(fcEsc).join(' · ')}</p>` : ''}${typeof keyCarried === 'function' && keyCarried(h.n, h.type) ? '<p class="fcc-weak">Carries a School Key.</p>' : ''}`;
-  }
-  return '';
+  const [kind, ty, mod] = (spec || '').split(':'), ws = fcWaves(); if (kind !== 'type' || !ws.length) return '';
+  const n = ws[0], C = CREEPS[ty]; if (!C) return '';
+  const g = fcIcons(n).find(x => x.type === ty && !!x.swift === (mod === 's')); if (!g) return '';
+  const K = fcKindOf(g), say = fcSays(C, ty, n), tr = fcTraits(C, g), ct = fcCounter(C, ty, n);
+  const tag = g.boss ? ['Boss', '#ff8a6c'] : g.lead ? ['Leader', '#f0c24f'] : g.elite ? ['Elite', FC_ELITE] : null;
+  return `<h4>${fcEsc(C.name)}${g.count > 1 && !g.boss && !g.lead ? ` <small>×${g.count}</small>` : ''}${tag ? ` <em class="fcc-tag" style="--c:${tag[1]}">${tag[0]}</em>` : ''}${g.isNew ? ' <em class="fcc-nw">New</em>' : ''}</h4>`
+    + (say ? `<p class="fcc-d">${fcEsc(say)}</p>` : '')
+    + (tr.length ? `<div class="fcc-tr">${tr.map(fcTraitHTML).join('')}</div>` : '')
+    + (ct ? `<p class="fcc-c"><b>Counter:</b> ${fcEsc(ct)}</p>` : '');
 }
 function fcShowCard(el) {
   const h = fcCardHTML(el.dataset.fc || ''); if (!h) { fcHideCard(); return; }
   if (!fcCard) { fcCard = document.createElement('div'); fcCard.id = 'fcCard'; fcCard.setAttribute('role', 'tooltip'); document.body.appendChild(fcCard); }
   fcCardFor = el; fcCard.innerHTML = h; fcCard.hidden = false;
-  const r = el.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, w = Math.min(290, W - 16);
+  const r = el.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, w = Math.min(236, W - 16);
   fcCard.style.width = w + 'px'; fcCard.style.left = '0px'; fcCard.style.top = '0px';
-  const b = fcCard.getBoundingClientRect(), p = fcEl.getBoundingClientRect();
-  // beside the panel when there is room (left of it on a wide screen), else below or above the chip
-  let x, y;
-  if (!fcPhone() && p.left - w - 10 >= 8) { x = p.left - w - 8; y = clamp(r.top - 10, 8, H - b.height - 8); }
-  else { x = clamp(r.left + r.width / 2 - w / 2, 8, W - w - 8); y = r.bottom + 6 + b.height <= H - 8 ? r.bottom + 6 : Math.max(8, r.top - b.height - 6); }
+  const b = fcCard.getBoundingClientRect();
+  // under the portrait, kept on screen (above it if there is no room below)
+  const x = clamp(r.left + r.width / 2 - w / 2, 8, W - w - 8), y = r.bottom + 8 + b.height <= H - 8 ? r.bottom + 8 : Math.max(8, r.top - b.height - 8);
   fcCard.style.left = x + 'px'; fcCard.style.top = y + 'px';
   for (const o of fcEl.querySelectorAll('.fc-hot')) o.classList.remove('fc-hot');
   el.classList.add('fc-hot');
@@ -82033,11 +82002,9 @@ const TAL_FLAVOR = {
 };
 /* ---------- Talents: the illustrated talent codex ----------
    A gilded window: the tower's crest and the school's name, a strip of school emblems, the tree over its painting
-   (gold frames, a gem that lights when a talent can be learned, rank plaques, prerequisite links and a spine that fills
-   as points go in), a detail card with the painting, the talent's ranks and its drawback, and the points left. */
+   (laid out as WoW Classic's: see buildTree), each talent's tooltip at its icon, and the points left. */
 // the emblem each school shows on its tab (a talent index into that tree)
 const TAL_EMBLEM = { arrow: 13, cannon: 0, frost: 12, flame: 13, storm: 1, venom: 1, earth: 9, arcane: 0, holy: 0, glaive: 4 };
-const LOCK_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V6.5a4 4 0 0 1 8 0V9" fill="none" stroke="#c8c0b0" stroke-width="2.2"/><rect x="4" y="9" width="12" height="9" rx="1.5" fill="#c8c0b0"/><circle cx="10" cy="13.2" r="1.5" fill="#2a2620"/></svg>';
 const talArt = {};
 // a talent's painted icon (TALART, indexed by the talent's place in the old full tree, t.art); trees without paintings
 // use faction-specific paintings first, then existing paintings; unknown future entries retain a drawn fallback
@@ -82078,10 +82045,17 @@ function talArtURL(type, i) {
 function talForce(type) { const F = typeof FORCE_NOW !== 'undefined' && FORCE_NOW && typeof FORCES !== 'undefined' && FORCES[FORCE_NOW]; return F && F.talents && F.talents[type] && TALENTS[type] === F.talents[type] ? F : null; }
 const talFlavor = type => { const F = talForce(type); return (F && F.talFlavor && F.talFlavor[type]) || TAL_FLAVOR[type] || ['', '']; };
 function talEmblemURL(type) { const painted = unitArtURL(type); if (painted) return painted; const tl = TALENTS[type], F = talForce(type); if (F) return talIconOf(type, tl.list[(F.talEmblem && F.talEmblem[type]) || 0] || tl.list[0]); return talIconOf(type, (tl.art || tl.list)[TAL_EMBLEM[type] || 0] || tl.list[0]); }
+// the owner's painting for a force's tree (talentbg.js, from tools/make_talentbg.py), or '': keyed by force, slot and
+// the unit's name, so each Champion in the holy slot has its own
+function talBgURL(type) {
+  const d = talForce(type) && typeof TALENT_BG !== 'undefined' && TOWERS[type];
+  return (d && TALENT_BG[FORCE_NOW + ':' + type + ':' + d.name]) || '';
+}
 // tree: the scene behind a talent tree (a force's tree gets a painted scene of its own, not the tower school's painting)
 function talSceneURL(type, tree) {
   const F = tree && talForce(type);
   if (F) {
+    const bg = talBgURL(type); if (bg) return bg;
     const k = type + ':scene:' + FORCE_NOW; if (talArt[k]) return talArt[k];
     const tl = TALENTS[type], em = tl.list[(F.talEmblem && F.talEmblem[type]) || 0] || tl.list[0];
     const c = document.createElement('canvas'); c.width = 520; c.height = 780; TI.paintScene(c, type, talIcon(type), { glyph: em.icon, mote: 'leaf' });
@@ -82160,31 +82134,35 @@ function openTalents(type) {
   refreshTalents();
   const at = ovp.querySelector(`.tc-tab[data-t="${talTab}"]`); if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
-// lay out the current tree: its painting, the talents on a 4x5 grid sized to the room there is, then the links
+/* A talent tree, laid out as World of Warcraft Classic's (owner, 10 Nov 2026: "not a fan of this layout, can you make it
+   more like wows?"): a compact four-column grid of small square icons in thin bevelled frames, the rank ("0/5") in the
+   corner, straight arrows from a talent to the one it opens, the tree's own painting dimmed behind. The grid carries
+   state only (greyscale = locked, a gold frame = can be learned now, green = full; a spell talent's art sits in a round
+   inner frame); names, tags, "Spell", "pick one" and what a locked talent needs are in the tooltip (talTipHTML). */
+const TW_MAX = 52, TW_MIN = 24, TW_GAP = .62;   // the icon's size range (px) and the space between icons, as a share of the icon
 function buildTree() {
   const tree = $('#tTree'), grid = $('#tGrid'); if (!tree) return;
-  tree.classList.toggle('fz', talTab === 'fusion'); tree.classList.toggle('pt', talTab === 'paths');
+  const isTree = talTab !== 'fusion' && talTab !== 'paths';
+  tree.classList.toggle('fz', talTab === 'fusion'); tree.classList.toggle('pt', talTab === 'paths'); tree.classList.toggle('wow', isTree);
+  if (!isTree) { tree.classList.remove('art'); grid.classList.remove('tight'); grid.style.columnGap = ''; }
   if (talTab === 'fusion') return buildFusion();
   if (talTab === 'paths') return buildPaths();
   const tl = TALENTS[talTab], sc = Math.min(2, window.devicePixelRatio || 1);
   hueVars(ovp, 'hue', tl.hue);
   $('#tName').textContent = tl.name;
   const pc = $('#tPort'), ps = Math.round((pc.clientWidth || 56) * sc); pc.width = pc.height = ps; pc.getContext('2d').drawImage(talIcon(talTab), 0, 0, ps, ps);
+  tree.classList.toggle('art', !!talBgURL(talTab));   // (the owner's painting: quiet in the middle, so it is dimmed evenly)
   $('#tBg').style.backgroundImage = `url(${talSceneURL(talTab, true)})`;
-  // four rows of up to four talents; chains run straight down a column
-  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="lock"></span><span class="sp">Spell</span><span class="pl" title="In your plan"></span>${talTagChip(t)}<span class="rk"></span><span class="tr"></span></button>`).join('')
-    + `<span class="tcap" style="grid-row:${talRowsOf(talTab)}">pick one</span>`;
-  const TAL_ROWS = talRowsOf(talTab);   // (this tree's rows: a force's trees have five)
-  const cols = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(...tl.list.map(t => t.c)) + 1;   // (a force's spell trees keep the whole 4-column grid, as WoW's do)
-  grid.style.gridTemplateColumns = `repeat(${cols}, var(--n))`; grid.style.gridTemplateRows = `repeat(${TAL_ROWS}, var(--n))`;
-  const availH = tree.clientHeight - 30, availW = tree.clientWidth - 58, G1 = tl.list.some(t => t.req) ? 40 : 24;   // room between the rows for the prerequisite arrows
-  // a short panel (a phone on its side) with a six-row tree: tighter rows and smaller talents, so every row still fits
-  const tight = (availH - (TAL_ROWS - 1) * G1) / TAL_ROWS < 30, G0 = tight ? 10 : G1, nMin = tight ? 22 : 30;
-  let n = Math.floor(clamp(Math.min((availH - (TAL_ROWS - 1) * G0) / TAL_ROWS, (availW - (cols - 1) * 14) / cols), nMin, 84));
-  const gap = clamp((availH - TAL_ROWS * n) / (TAL_ROWS - .4), G0, n * 1.1);
-  n = Math.floor(clamp(Math.min(n, (availH - (TAL_ROWS - 1) * gap) / TAL_ROWS), nMin, 84));
-  grid.classList.toggle('tight', tight);
-  grid.style.setProperty('--n', n + 'px'); grid.style.rowGap = Math.round(gap) + 'px'; grid.style.columnGap = Math.round(clamp((availW - cols * n) / Math.max(1, cols - 1), 10, tight ? 46 : n * .6)) + 'px';
+  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span></button>`).join('');
+  const rows = talRowsOf(talTab);   // (a force's trees have six rows, the towers' four)
+  const cols = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(TAL_COLS, ...tl.list.map(t => t.c + 1));
+  grid.style.gridTemplateColumns = `repeat(${cols}, var(--n))`; grid.style.gridTemplateRows = `repeat(${rows}, var(--n))`;
+  // one size for every icon, as big as the room allows up to TW_MAX; the same space across and down, so arrows read alike
+  const availH = tree.clientHeight - (tree.clientHeight < 300 ? 14 : 30), availW = tree.clientWidth - 24;   // (a phone on its side: every pixel of height goes to the icons)
+  const n = Math.floor(clamp(Math.min(availH / (rows + (rows - 1) * TW_GAP), availW / (cols + (cols - 1) * TW_GAP)), TW_MIN, TW_MAX));
+  const gap = Math.floor(clamp(Math.min((availH - rows * n) / Math.max(1, rows - 1), (availW - cols * n) / Math.max(1, cols - 1)), 5, n * TW_GAP));
+  grid.classList.toggle('tight', n < 36);
+  grid.style.setProperty('--n', n + 'px'); grid.style.rowGap = grid.style.columnGap = gap + 'px';
   placeArrows(); requestAnimationFrame(() => { if (talOpen) placeArrows(); });   // and again once the panel has settled, so the arrows are always there
   if (!tree._ro && typeof ResizeObserver !== 'undefined') { tree._ro = new ResizeObserver(() => { if (talOpen && talTab !== 'fusion') placeArrows(); }); tree._ro.observe(tree); }
 }
@@ -82205,35 +82183,26 @@ function buildFusion() {
     + `<h4 class="fz-h">Reactions<small>always on, no talents needed</small></h4>`
     + `<div class="fz-rx">${REACTIONS.map(r => `<div class="rx"><span class="rx-ic">${rxIc(r)}</span><span class="rx-t"><b style="color:${RX_COL[r.id]}">${r.name}</b>${r.text}</span></div>`).join('')}</div>`;
 }
-// prerequisite links (a gilded channel from the talent it needs, ending in a chevron) and the row spine's frame
+// prerequisite arrows: one straight line from the edge of the talent that is needed to the edge of the talent it opens
+// (down a column, along a row or across), grey until the needed talent is full, then gold (set here, and kept by refreshTalents)
 function placeArrows() {
   const grid = $('#tGrid'), svg = $('#tLinks'), tree = $('#tTree'); if (!grid || !svg || talTab === 'fusion') return;
   if (talTab === 'paths') return placePathLinks();
-  const tl = TALENTS[talTab], W = tree.clientWidth, H = tree.clientHeight;
+  const tl = TALENTS[talTab], pk = talPicks(talTab), W = tree.clientWidth, H = tree.clientHeight, r1 = v => Math.round(v * 10) / 10;
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H);
-  let h = '<g id="tSpine"></g>';
-  for (const t of tl.list) {
-    if (!t.req) continue;
-    const q = talAt(talTab, t.req[0], t.req[1]), A = grid.querySelector(`.tn[data-i="${q.id}"]`), B = grid.querySelector(`.tn[data-i="${t.id}"]`); if (!A || !B) continue;
-    const x = grid.offsetLeft + A.offsetLeft + A.offsetWidth / 2, y1 = grid.offsetTop + A.offsetTop + A.offsetHeight + 12, y2 = grid.offsetTop + B.offsetTop - 8;
-    if (y2 - y1 < 5) continue;
-    const s = clamp((y2 - y1) * .32, 4, 8), d = `M${x} ${y1}V${y2 - s * 1.2}`, hd = `M${x - s} ${y2 - s * 1.5}L${x} ${y2}L${x + s} ${y2 - s * 1.5}Z`;
-    h += `<g class="lkg" data-i="${t.id}"><path class="lk o" d="${d}"/><path class="lk f" d="${d}"/><path class="hd" d="${hd}"/></g>`;
+  const mid = el => [grid.offsetLeft + el.offsetLeft + el.offsetWidth / 2, grid.offsetTop + el.offsetTop + el.offsetHeight / 2];
+  let h = '';
+  for (const t of tl.list) for (const [qr, qc] of talReqs(t)) {
+    const q = talAt(talTab, qr, qc), A = q && grid.querySelector(`.tn[data-i="${q.id}"]`), B = grid.querySelector(`.tn[data-i="${t.id}"]`); if (!A || !B) continue;
+    const [ax, ay] = mid(A), [bx, by] = mid(B), dx = bx - ax, dy = by - ay, m = Math.max(Math.abs(dx), Math.abs(dy)), L = Math.hypot(dx, dy); if (!m) continue;
+    // leave each square by its edge: a point on the line where the larger of |dx|, |dy| is half the icon (plus a hair)
+    const ka = (A.offsetWidth / 2 + 2) / m, kb = (B.offsetWidth / 2 + 3) / m, x1 = ax + dx * ka, y1 = ay + dy * ka, x2 = bx - dx * kb, y2 = by - dy * kb, len = L * (1 - ka - kb);
+    if (len < 5) continue;
+    const ux = dx / L, uy = dy / L, s = clamp(len * .3, 3, 6), hx = x2 - ux * s * 1.5, hy = y2 - uy * s * 1.5;   // the head: s wide each side, 1.5 s long
+    const d = `M${r1(x1)} ${r1(y1)}L${r1(hx)} ${r1(hy)}`, hd = `M${r1(hx - uy * s)} ${r1(hy + ux * s)}L${r1(x2)} ${r1(y2)}L${r1(hx + uy * s)} ${r1(hy - ux * s)}Z`;
+    h += `<g class="lkg${talRankOf(pk, q.id) >= q.max ? ' lit' : ''}" data-i="${t.id}" data-q="${q.id}"><path class="lk o" d="${d}"/><path class="lk f" d="${d}"/><path class="hd" d="${hd}"/></g>`;
   }
   svg.innerHTML = h;
-}
-// the spine down the tree's left edge: a notch per row with the points it needs, filled as points go in
-function drawSpine(spent) {
-  const g = $('#tSpine'), grid = $('#tGrid'); if (!g || !grid || talTab === 'fusion' || talTab === 'paths') return;
-  const tl = TALENTS[talTab], ys = [], TAL_ROWS = talRowsOf(talTab);
-  for (let r = 0; r < TAL_ROWS; r++) { const t = tl.list.find(q => q.r === r), nd = t && grid.querySelector(`.tn[data-i="${t.id}"]`); ys.push(nd ? grid.offsetTop + nd.offsetTop + nd.offsetHeight / 2 : 0); }
-  const TAL_TIER = talTierOf(talTab);   // (a force's six-row trees open on their own points)
-  let k = 0; while (k < TAL_ROWS - 1 && spent >= TAL_TIER[k + 1]) k++;
-  const x = grid.offsetLeft + 17, f = k >= TAL_ROWS - 1 ? 0 : (spent - TAL_TIER[k]) / (TAL_TIER[k + 1] - TAL_TIER[k]);
-  const yf = ys[k] + (k < TAL_ROWS - 1 ? (ys[k + 1] - ys[k]) * f : 0);
-  let h = `<line class="sp" x1="${x}" y1="${ys[0]}" x2="${x}" y2="${ys[TAL_ROWS - 1]}"/><line class="spf" x1="${x}" y1="${ys[0]}" x2="${x}" y2="${yf}"/>`;
-  ys.forEach((y, r) => { h += `<g class="nt${spent >= TAL_TIER[r] ? ' on' : ''}"><title>Row ${ROMAN[r]} opens with ${TAL_TIER[r]} points in this tree</title><circle cx="${x}" cy="${y}" r="9"/><text x="${x}" y="${y + .5}">${TAL_TIER[r]}</text></g>`; });
-  g.innerHTML = h;
 }
 function tapNode(type, i) {
   const can = type === 'paths' ? pathNodeCan(i) : type === 'fusion' ? fusState(FUSIONS[i]) === 'avail' : G.tp > 0 && talCanLearn(type, talPicks(type), i);
@@ -82276,20 +82245,18 @@ function refreshTalents() {
   $('#tSub').innerHTML = shut ? (oldRules() ? `${TOWERS[ty].name} · school not open yet` : `${TOWERS[ty].name} · locked`) : `${TOWERS[ty].name} · <b>${spent}</b> point${spent === 1 ? '' : 's'} spent`;
   for (const n of ovp.querySelectorAll('.tn')) {
     const i = +n.dataset.i, t = tl.list[i], s = talState(ty, i), on = !!talSel && talSel.t === ty && talSel.i === i, r = talRankOf(pk, i);
-    const upg = r < t.max && talUpgrades(tl, t).some(q => talRankOf(pk, q.id) > 0);   // upgrades a spell the player has taken: it glows
-    n.className = `tn ${s}${r > 0 ? ' has' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}${upg ? ' upg' : ''}`;
-    n.querySelector('.tr').textContent = t.name;
-    n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank, as in WoW: grey 0, green while learning, gold when full
-    const lk = n.querySelector('.lock'), want = s === 'locked' || s === 'excl' || s === 'req' ? LOCK_SVG : ''; if (lk.innerHTML !== want) lk.innerHTML = want;
-    n.setAttribute('aria-label', `${t.name}${talTagOf(t) ? ', ' + talTagOf(t) : ''}, rank ${r} of ${t.max}. ${t.pro(Math.max(1, r))}`);
+    // state only: locked | req | excl (greyscale), open (no point to spend), avail (gold frame), has (ranks in it), maxed (green)
+    n.className = `tn ${s}${r > 0 ? ' has' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}`;
+    n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank in the corner: grey at 0, gold while it can be learned, green when full
+    const why = s === 'locked' || s === 'req' ? 'locked' : s === 'excl' ? 'closed by your capstone' : s.includes('avail') ? 'can be learned' : s === 'maxed' ? 'full' : '';
+    n.setAttribute('aria-label', `${t.name}${t.spell ? ', spell' : talTagOf(t) ? ', ' + talTagOf(t) : ''}, rank ${r} of ${t.max}${why ? ', ' + why : ''}. ${t.pro(Math.max(1, r))}`);
     n.setAttribute('aria-pressed', on);
   }
-  for (const a of ovp.querySelectorAll('.lkg')) { const t = tl.list[+a.dataset.i], q = talAt(ty, t.req[0], t.req[1]); a.classList.toggle('lit', talRankOf(pk, q.id) >= q.max); }
-  drawSpine(talTierPts(pk));
+  for (const a of ovp.querySelectorAll('.lkg')) { const q = tl.list[+a.dataset.q]; a.classList.toggle('lit', !!q && talRankOf(pk, q.id) >= q.max); }
   const cost = respecCost(ty), canReset = spent > 0 && G.phase === 'build' && G.gold >= cost;
   $('#tFoot').innerHTML = `<div class="tc-pts" id="tPtsBox"><i><b id="tPts">${tp}</b></i><span>Talent point${tp === 1 ? '' : 's'}</span></div>`
     + (shut ? `<span class="tc-hint">${keysHeld() ? 'Use a School Key to build its towers and learn its talents.' : `Locked. The boss of every 5th wave carries a School Key${nextKeyWave() ? ` (next: wave ${nextKeyWave()})` : ''}.`}</span><button type="button" class="tc-btn open" id="tOpenSch"${keysHeld() ? '' : ' disabled'}>Open <small>key</small></button>`
-      : `<span class="tc-hint">${tp > 0 ? (canHover() ? 'Click a glowing talent to learn it' : 'Tap a glowing talent twice to learn it') : G.pp > 0 ? pathNudge() : `Next talent point ${xpNextPoint()}`}</span>`)
+      : `<span class="tc-hint">${tp > 0 ? (canHover() ? 'Click a gold-framed talent to learn it' : 'Tap a gold-framed talent twice to learn it') : G.pp > 0 ? pathNudge() : `Next talent point ${xpNextPoint()}`}</span>`)
     + `<button type="button" class="tc-btn reset" id="tReset"${canReset ? '' : ' disabled'} title="${G.phase === 'build' ? 'Refund every point in this tree' : 'Only between waves'}">Reset${spent ? ` <small>${cost}g</small>` : ''}</button>`;
   renderTip();
 }
@@ -82431,10 +82398,6 @@ function renderPathTip(det, ci) {
    rank and effect, its drawback, and the next rank muted. Row locks, links and ranks show on the tree itself. */
 // a talent's tag (forces_zzzzzzzzzzzzzzzzz_spread.js): a coloured chip on its node and a word in its tooltip
 const talTagOf = t => typeof talTag === 'function' && typeof talTagForce === 'function' && talTagForce() ? talTag(t, talTagForce()) : '';
-function talTagChip(t) {
-  const k = !t.spell && talTagOf(t), T = k && TAL_TAGS[k]; if (!T) return '';   // (a spell's node already says Spell)
-  return `<span class="tg" style="--tg:${T.col}" title="${k}: ${T.say}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${T.ic}"/></svg></span>`;
-}
 function talTagLine(t) {
   const k = talTagOf(t), T = k && TAL_TAGS[k]; if (!T) return '';
   return `<div class="wt-tag" style="--tg:${T.col}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="${T.ic}"/></svg><b>${k}</b><span>${T.say}</span></div>`;
@@ -82448,13 +82411,37 @@ function talRankHTML(t, n) {
   if (n >= t.max) return '';
   return `<div class="wt-t">Each rank: ${S.map(s => s.vals.map((v, i) => i === 0 ? `<b>${v}</b>` : v).join(' → ')).join(', ')}</div>`;
 }
+// what the grid no longer says in words, under a talent's tooltip: what a locked talent still needs (red, as WoW writes
+// it), the spell it improves, the capstone row's "pick one", and how to learn it (green)
+function talTipState(ty, ci) {
+  const tl = TALENTS[ty], t = tl.list[ci], pk = talPicks(ty), n = talRankOf(pk, ci), rows = talRowsOf(ty), need = [];
+  if (n < t.max) {
+    if (typeof schoolOpen === 'function' && !schoolOpen(ty)) need.push(oldRules() ? 'This school is not open yet' : 'This unit is locked');
+    else if (typeof champTalLocked === 'function' && champTalLocked(ty)) need.push(`Opens with your Champion${typeof CHAMP_LEVEL !== 'undefined' ? ` (level ${CHAMP_LEVEL})` : ''}`);
+    const tier = talTierOf(ty)[t.r] || 0, have = talTierPts(pk);
+    if (have < tier) need.push(`Requires ${tier} points in ${tl.name} (${have} now)`);
+    for (const [r, c] of talReqs(t)) { const q = talAt(ty, r, c); if (q && talRankOf(pk, q.id) < q.max) need.push(`Requires ${q.name}${q.max > 1 ? ` at rank ${q.max}` : ''}`); }
+    const ex = talCapTaken(ty, pk, ci); if (ex) need.push(`Closed: you chose ${ex.name}`);
+    if (t.spell && oldRules()) need.push('Force runs only');
+  }
+  const two = typeof pathOn === 'function' && pathOn('sch', 5);
+  const capRow = t.r === rows - 1 && tl.list.filter(q => q.r === t.r).length > 1;
+  const up = talUpgrades(tl, t).filter(q => talRankOf(pk, q.id) > 0).map(q => q.name);   // spells the player knows that it improves
+  const can = G.tp > 0 && talCanLearn(ty, pk, ci);
+  return need.map(s => `<div class="wt-need">${s}</div>`).join('')
+    + (up.length && n < t.max ? `<div class="wt-up">Improves ${up.join(' and ')}, which you know</div>` : '')
+    + (capRow ? `<div class="wt-cap">Capstone · pick ${two ? 'two' : 'one'}</div>` : '')
+    + (planWant(ty, ci) > n ? '<div class="wt-plan">In your plan</div>' : '')
+    + (can ? `<div class="wt-go">${canHover() ? 'Click to learn' : 'Tap again to learn'}</div>` : !need.length && n < t.max ? '<div class="wt-t">No talent point to spend</div>' : '');
+}
 function talTipHTML(ty, ci) {
-  const tl = TALENTS[ty], t = tl.list[ci], n = talRankOf(talPicks(ty), ci);
+  const tl = TALENTS[ty], t = tl.list[ci], n = talRankOf(talPicks(ty), ci), state = talTipState(ty, ci);
   const ab = t.spell && typeof ABIL !== 'undefined' ? ABIL[t.spell] : null;
-  if (ab && typeof spellTipHTML === 'function') { try { return spellTipHTML(ab, spellSample(ab, ty), {}); } catch (e) { /* the plain talent below */ } }
+  // a spell talent: its spell's own tooltip, marked "Spell" with its rank where a talent shows "Rank"
+  if (ab && typeof spellTipHTML === 'function') { try { return spellTipHTML(ab, spellSample(ab, ty), { tag: `Spell · ${n}/${t.max}` }) + state; } catch (e) { /* the plain talent below */ } }
   const k = Math.max(1, n), con = r => { const c = t.con(r); return c && c !== 'undefined' ? c : ''; }, c = con(k);
   return `<div class="wt-h"><i class="wt-n">${t.name}</i><i class="wt-k">Rank ${n}/${t.max}</i></div>${talTagLine(t)}<div class="wt-d">${t.pro(k)}</div>`
-    + (c ? `<div class="wt-c">${c}</div>` : '') + talRankHTML(t, n);
+    + (c ? `<div class="wt-c">${c}</div>` : '') + talRankHTML(t, n) + state;
 }
 function renderTip() {
   if (!talOpen || typeof spellTipShow !== 'function') return;
@@ -86488,7 +86475,7 @@ if (typeof drawForceUnitPlain === 'function') {
    - Every move is eased into from where she was (a per-unit pose followed at a rate by kind). */
 const BD_UNIT = 'bladedancer';
 UM_UNITS[BD_UNIT] = { mdl: 'bladedancer', k: .95, rig: 'blade', sink: .5 };
-const BD = { ATK: ['spin', 'cross', 'backhand'], CAST: { whirlwind: 'flurry', leafdance: 'leap', harvest: 'cross' }, RATE: { idle: 5, ready: 9, move: 40 }, EASE: .4 };
+const BD = { ATK: ['spin', 'cross', 'backhand'], CAST: { whirlwind: 'flurry', leafdance: 'leap', harvest: 'cross' }, RATE: { idle: 5, ready: 9, move: 40 }, EASE: .4, BLOW: .42 };   // (BLOW: seconds after a strike before the next one's opening pose may take over: its blow is always played out)
 // her attacks (the whirl: each a strike of its own, taken in turn) and her casts
 if (typeof bladeWhirl === 'function') {
   const _bdW = bladeWhirl;
@@ -86512,6 +86499,11 @@ function bdCtl(t, live, M) {
   if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : bdClip(M, 'ready', 0), rate: 0, mv: sf != null ? 'idle' : 'ready' }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._bdCast && t._bdCastAt != null) { const u = now - t._bdCastAt; if (u >= 0 && u < bdLen(M, t._bdCast)) return { f: bdClip(M, t._bdCast, u * 30), rate: BD.RATE.move, mv: t._bdCast + t._bdCastAt }; }
+  // her next strike's opening pose, eased into over the game's own wind-up (t.windup, 0..1 to the shot; t.cd the seconds left):
+  // she is there by the shot, so the strike's clip starts from its own first frame. (It was snapped into from the ready stance
+  // or the last strike's tail: a blade's joint moved .6 of her height in one frame at tier I, .96 at tier VI.)
+  const w = G.phase === 'wave' && t.tg && !t.tg.dead ? t.windup || 0 : 0;   // (between waves the units aren't updated: a stale wind-up must not hold the pose)
+  if (w > 0 && (t._bdAtkAt == null || now - t._bdAtkAt > BD.BLOW)) { const nx = BD.ATK[((t._bdAtkN | 0) + 1) % BD.ATK.length]; return { f: bdClip(M, nx, 0), rate: Math.max(BD.RATE.ready, 3 / Math.max(.05, t.cd || 0)), mv: 'wind' + nx }; }
   if (t._bdAtkAt != null) { const mv = BD.ATK[t._bdAtkN | 0], u = now - t._bdAtkAt; if (u >= 0 && u < bdLen(M, mv)) return { f: bdClip(M, mv, u * 30), rate: BD.RATE.move, mv: mv + t._bdAtkAt }; }
   const fight = G.phase === 'wave' && t.tg && !t.tg.dead, ph = (now + (t.anim || 0) * 3) * 30;
   if (fight || (t._bdAtkAt != null && now - t._bdAtkAt < 1.5)) return { f: bdClip(M, 'ready', ph % A.ready[1]), rate: BD.RATE.ready, mv: 'ready' };
@@ -86571,7 +86563,8 @@ if (typeof umDraw === 'function') {
 const TG_UNIT = 'thornguard';
 UM_UNITS[TG_UNIT] = { mdl: 'thornguard', k: .95, rig: 'spear', sink: .5 };
 // THR: the thrust played from its drive (frame S) at a rate, so its fullest reach (frame HIT) lands just after the strike
-const TG = { CAST: { lunge: 'lunge', brambleguard: 'bramble', sunder: 'sunder' }, THR: { S: 22, HIT: 33, rate: 1.5 }, RATE: { idle: 5, guard: 9, move: 40 } };
+// (BLOW: seconds after a strike before the next one's coil may take over: the drive and its reach are always played out)
+const TG = { CAST: { lunge: 'lunge', brambleguard: 'bramble', sunder: 'sunder' }, THR: { S: 22, HIT: 33, rate: 1.5, BLOW: .42 }, RATE: { idle: 5, guard: 9, move: 40 } };
 if (typeof spearThrust === 'function') {
   const _tgThr = spearThrust;
   spearThrust = function (t) {
@@ -86594,6 +86587,11 @@ function tgCtl(t, live, M) {
   if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : tgClip(M, 'guard', 0), rate: 0 }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._tgCast && t._tgCastAt != null) { const u = now - t._tgCastAt; if (u >= 0 && u < tgLen(M, t._tgCast)) return { f: tgClip(M, t._tgCast, u * 30), rate: TG.RATE.move }; }
+  // the coil: over the game's own wind-up (t.windup, 0..1 to the shot; t.cd the seconds left) she eases back to the thrust's
+  // drive frame, there by the shot, so the drive starts from its own first frame. (The drive was snapped into from wherever
+  // she was, the last thrust's recovery or the guard: the spear's joint .43 of her height in one frame on every strike.)
+  const w = G.phase === 'wave' && t.tg && !t.tg.dead ? t.windup || 0 : 0;   // (between waves the units aren't updated: a stale wind-up must not hold the coil)
+  if (w > 0 && (t._tgAtkAt == null || now - t._tgAtkAt > TG.THR.BLOW)) return { f: tgClip(M, 'thrust', TG.THR.S), rate: Math.max(TG.RATE.guard, 3 / Math.max(.05, t.cd || 0)) };
   if (t._tgAtkAt != null) {
     const u = now - t._tgAtkAt, f = TG.THR.S + u * 30 * TG.THR.rate;
     if (u >= 0 && f < A.thrust[1] - 1) return { f: tgClip(M, 'thrust', f), rate: TG.RATE.move };
@@ -86991,7 +86989,11 @@ function mvCtl(t, live, M) {
     return { f: mvClip(M, 'slash', C.wind + (C.cut - C.wind) * e), rate: w > .85 ? 400 : w < .12 ? 14 : 70, glow: .2 + unb, spin: 0, tw: k === 'B' ? Math.PI * e : 0, act: 1, trail: k === 'B' && w > .2 };
   }
   const iv = Math.max(.2, (t.st && t.st.rate) || 1.2), wl = Math.min(.6, iv * .6), fol = Math.max(.18, Math.min(.62, iv - wl - .04));
-  if (s < fol && sh > 0) {
+  // (a strike that flash-stepped made its cut in the step: when the step ended, .37 s in, the ordinary follow-through took
+  // over three-quarters of the way through its pirouette, her whole body thrown 260 degrees round in one frame. After a
+  // step she goes back to her guard)
+  const stepped = B && B.at != null && B.at > now - s - .08;
+  if (s < fol && sh > 0 && !stepped) {
     const k = sh % 2 ? 'A' : 'B', C = MV_CUT[k], u = s / fol, e = mvE(u);
     if (k === 'A' && s > .06) mvSnd(t, sh, 'spin', .7);   // (the pirouette)
     return { f: mvClip(M, 'slash', C.cut + (C.end - C.cut) * (k === 'A' ? u : e)), rate: s < .08 ? 400 : 60, glow: .45 * (1 - u) + unb, spin: k === 'A' ? TAU * e : 0, tw: k === 'B' ? Math.PI * (1 + e) : 0, act: 1, trail: u < .85 };
@@ -87279,7 +87281,10 @@ function mlCtl(t, live, M) {
   const rel = mlRel(M, 'attack'), s = t._mlShotAt == null ? 9 : now - t._mlShotAt, wind = t.tg && t.windup > 0 ? t.windup : 0;
   const flash = s >= 0 ? Math.max(0, 1 - s / .18) : 0;
   if (s >= 0 && s < (A.attack[1] - 1 - rel) / 30 && !(wind > 0 && s > ML.FOLLOW)) return { f: mlClip(M, 'attack', rel + s * 30), rate: ML.RATE.atk, glow: .25 + 1.1 * flash };
-  if (wind > 0 && G.phase === 'wave') return { f: mlClip(M, 'attack', rel * wind), rate: ML.RATE.atk, glow: .25 + .35 * wind };
+  // (the wind-up is eased into: followed at the ready stance's pace as it starts, tightly by the release. At the strike's
+  // rate from its first frame she was thrown from her calm stance into the cast's lunge at once: a hand .72 of her height
+  // in one frame, on every strike of a wave)
+  if (wind > 0 && G.phase === 'wave') return { f: mlClip(M, 'attack', rel * wind), rate: ML.RATE.ready + (ML.RATE.atk - ML.RATE.ready) * Math.min(1, wind / .6) ** 2, glow: .25 + .35 * wind };
   const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
   if (fight || s < 1.5) return { f: mlClip(M, 'ready', ph % A.ready[1]), rate: ML.RATE.ready, glow: .25 };
   return { f: mlClip(M, 'idle', ph % A.idle[1]), rate: ML.RATE.idle, glow: .15 + .1 * Math.sin(now * 1.7 + (t.anim || 0) * 3) };
@@ -88213,14 +88218,19 @@ if (typeof towerTop === 'function') {
       if (L.c2) for (const k of ['hit', 'gnFlEnd', 'gnFlNext', 'stunT', 'frostT']) L.c2[k] = c[k];
     }
     if (L.deadAt != null && L.clock - L.deadAt > 3) spawnFoe();
-    if (c && c.dead && L.deadAt == null) L.deadAt = L.clock;
+    if (L.c && L.c.dead && L.deadAt == null) L.deadAt = L.clock;   // (L.c, not c: just after a respawn c is still the dead foe, which marked the new one dead again, so after one death the foe was never held and came back every 3 s)
     G.lives = 1e6; G.gold = 1e9;
+    // (a living foe in reach: the wave phase, where the units' guard stances and wind-ups play, as in a run: the Thornguard's
+    // and Aurelian's guard, the Steam Hammer's wind-up were never shown here. At rest and through the foe's death: the build
+    // phase, so no wave is ever cleared)
+    G.phase = L.c && L.deadAt == null && !L.c.dead && L.anim !== 'rest' && L.anim !== 'death' ? 'wave' : 'build';
     if (t.ab) t.ab.mana = abMax(t); t.hp = t.maxHp; t.wrecked = false; t.silT = 0;
     if (L.anim !== 'attack' || L.hideUnit) t.cd = Math.max(t.cd, .7);   // (only the attack strikes; a hidden unit not at all)
   }
   function act(a) {   // start an animation
     L.anim = a; L.scrub = null; L.loopAt = L.clock;
     const t = L.t; if (!t) return;
+    if (a === 'death' || a === 'rest') G.phase = 'build';   // (before the killing blow: see hold())
     if (a === 'flinch' && L.c) for (const c of foes()) { c.hit = .1; c.gnFlNext = 0; try { hurt(c, 1, 'phys', null); } catch (e) {} }
     else if (a === 'death' && L.c) for (const c of foes()) { try { c.hp = 1; hurt(c, 10, 'phys', t); if (!c.dead) kill(c, t); if (L.c2) blow(c); } catch (e) { L.errs.push(e.message); } }
     else if (a === 'walk' || a === 'stand') L.foeAct = a === 'walk' ? 'walk' : 'hold';
