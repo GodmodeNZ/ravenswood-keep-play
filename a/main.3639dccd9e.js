@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b7ccbd8@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c0c56cd@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53253,10 +53253,10 @@ const ELEM_FX_SPELLS = {
   cc_pyroburn: { unit: 'cc_pyroclast', el: 'fire', name: 'Burning foes', basic: 1, layers: ['flames', 'embers'] },
   cc_pyrostyle: { unit: 'cc_pyroclast', el: 'fire', name: 'Flame look', basic: 1, layers: ['paint'] },
   // the Frostweavers' frost (frostfx.js, drawn live by the ice shader, frosttex.js): each lists its own layers
-  cc_rime: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Bolt', basic: 1, layers: ['hand', 'core', 'trail', 'burst', 'shards', 'mist', 'light'] },
-  cc_glacialglyph: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Spear', layers: ['core', 'trail', 'burst', 'shards', 'mist', 'light'] },
-  cc_rimelance: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice Coffin', layers: ['crystals', 'core', 'shards', 'mist', 'light'] },
-  cc_hoarbloom: { unit: 'cc_rimeweaver', el: 'frost', name: 'Shatterbloom', layers: ['crystals', 'burst', 'shards', 'mist', 'light'] },
+  cc_rime: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Bolt', basic: 1, layers: ['hand', 'core', 'trail', 'burst', 'shards', 'mist', 'ground', 'light'] },
+  cc_glacialglyph: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Spear', layers: ['core', 'trail', 'burst', 'shards', 'mist', 'ground', 'light'] },
+  cc_rimelance: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice Coffin', layers: ['crystals', 'core', 'shards', 'mist', 'ground', 'light'] },
+  cc_hoarbloom: { unit: 'cc_rimeweaver', el: 'frost', name: 'Shatterbloom', layers: ['crystals', 'burst', 'shards', 'mist', 'ground', 'light'] },
   // (not spells: the look of chilled and frozen foes, and of the shader all her ice is cut by; the lab loops the strike for both)
   cc_frostfoe: { unit: 'cc_rimeweaver', el: 'frost', name: 'Chilled / frozen foes', basic: 1, layers: ['crystals', 'mist'] },
   cc_froststyle: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice paint', basic: 1, layers: ['paint'] },
@@ -53274,10 +53274,10 @@ const EFX_LNAME = {
   shards: 'Shatter shards', crystals: 'Ice crystals (spikes, block, bloom)', mist: 'Frost mist / snow',
 };
 // the Frostweavers' layers (frostfx.js): their names, and what the lab shows for each (c: ice cards; l: light; x: its own values only)
-const EFX_LNAME_FROST = { hand: 'Staff frost (glow, sinking mist, glints)', core: 'Core (the shard, the spear; Ice Coffin: the clear crystal over the foe)', trail: 'Wake (torn air, mist left hanging)',
-  burst: 'Impact (needles; the spear: spikes out the far side)', shards: 'Splinters', crystals: 'Crystals (standing ice, the petals of the bloom)', mist: 'Cold mist and glints', light: 'Light',
+const EFX_LNAME_FROST = { hand: 'Staff frost (glow, sinking mist, glints)', core: 'Core (the shard, the spear; Ice Coffin: the ice over the minion itself)', trail: 'Wake (torn air, mist left hanging)',
+  burst: 'Impact (needles; the spear: spikes out the far side)', shards: 'Splinters', crystals: 'Crystals (icicles, standing ice, the petals of the bloom)', mist: 'Cold mist and glints', ground: 'Frost on the ground (a creeping, feathered patch; no ring)', light: 'Light',
   paint: 'Ice paint (every crystal: facets, edges, clearness, sparkle, inner fractures, rime, fog; gradient = palette)' };
-const EFX_LKIND_FROST = { hand: 'c', core: 'c', trail: 'c', burst: 'c', shards: 'c', crystals: 'c', mist: 'c', light: 'l', paint: 'x' };
+const EFX_LKIND_FROST = { hand: 'c', core: 'c', trail: 'c', burst: 'c', shards: 'c', crystals: 'c', mist: 'c', ground: 'c', light: 'l', paint: 'x' };
 const efxLName = (l, el) => { const n = (el === 'frost' && EFX_LNAME_FROST[l]) || EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
 // what each layer is made of (the controls the lab shows for it): p particles, g GPU particles, m moments, f flipbook fire,
 // l light, d decal / ground marks, b billboards drawn by the spell's own code (their own values below)
@@ -53383,64 +53383,72 @@ const ELEM_FX_DEF = {
   // the Frostweavers' frost (frostfx.js; drawn live by the ice shader, frosttex.js). Sizes in world units.
   cc_rime: {
     // the staff's crystal: its glow's width, brightness, how much a gathering cast adds, mist a second, glints a second
-    hand: { w: .34, k: .7, gather: .7, fog: .9, glint: .6, fern: .16 },
+    hand: { w: .34, k: .7, gather: .7, fog: .9, glint: .6, fern: 0 },
     // the shard in flight: its length, its width per length, brightness, how clear, its glow, the most of a foe's height it
     // flies at (it flies straight and level from the staff; at a foe shorter than that it comes down to this)
     core: { long: .5, fat: .3, k: 1, clear: .15, disc: .35, aim: .75, heart: .3, star: .32 },
     // its wake: the torn air's length, a puff of mist every so far, its size, how long it hangs, a glint's chance
-    trail: { streak: .8, gap: .24, puff: .46, secs: .55, glint: .2, shed: .3, fern: .3 },
+    trail: { streak: .8, gap: .24, puff: .46, secs: .55, glint: .2, shed: .3, fern: 0 },
     // the landing's needles: width, how long, brightness
-    burst: { w: 1.05, secs: .15, k: 1.15, spray: 1, crown: 0, rose: .3 },
+    burst: { w: 1.05, secs: .15, k: 1.15, spray: 1, crown: .26, rose: 0 },
     // splinters flung: how many, how hard, their length, how long
     shards: { count: 6, fling: 1.6, w: .2, secs: .5 },
     // the puff of cold: how many, size, how long
     mist: { puffs: 1, w: .7, secs: .8 },
     // the landing's light: radius, brightness, how long; the light carried in flight (kept low: a real light on bright
     // ground whites it out)
+    // the frost it leaves creeping over the ground: its reach (cells)
+    ground: { r: .42 },
     light: { rad: 1.2, k: .32, secs: .2, fly: .3 },
   },
   cc_glacialglyph: {
     // the lance: as the shard, and its barbs' length (x its own)
     core: { long: 1.25, fat: .17, k: 1.05, clear: .1, disc: .3, aim: .75, barb: .3, heart: .4, star: .42 },
-    trail: { streak: 1.2, gap: .24, puff: .58, secs: .75, glint: .5, shed: .5, fern: .46 },
+    trail: { streak: 1.2, gap: .24, puff: .58, secs: .75, glint: .5, shed: .5, fern: 0 },
     // the landing: needles, and the spikes driven out the far side of the foe (how many, their length)
-    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9, spray: 1.7, crown: .42, rose: .62 },
+    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9, spray: 1.7, crown: .42, rose: 0 },
     shards: { count: 11, fling: 2.1, w: .25, secs: .55 },
     mist: { puffs: 2, w: .9, secs: .9 },
+    ground: { r: .62 },
     light: { rad: 1.6, k: .45, secs: .25, fly: .45 },
   },
   cc_rimelance: {
-    // the crystals grown round the foe: how many, their height (x the foe's), width (x its girth), how fast they grow (s),
-    // how clear the ones before it are, brightness
-    crystals: { count: 8, high: 1, wide: 1, grow: .24, clear: .55, k: 1, glint: 1.6, spray: 2, fern: .8 },
-    // the one great clear crystal closed over the foe: its height (x the foe's), width (x its girth), how clear, brightness
-    core: { high: 1.3, wide: 2.3, clear: .9, k: .9, back: .3 },
+    // the icicles hanging from the encased minion: how many, their length (x its height), how fast the ice closes (s),
+    // how clear, brightness, glints a second, the spray of frost as it closes
+    crystals: { count: 5, long: .26, high: 1, wide: 1, grow: .24, clear: .55, k: 1, glint: 1.6, spray: 2 },
+    // the ice on the minion itself and round its outline (High: read from the frame's depth; else a plain glaze of its
+    // shape): its thickness, the glaze's opacity
+    core: { thick: 1, a: 1 },
     // as it breaks: splinters, how hard, their length, how long
     shards: { count: 10, fling: 1.7, w: .24, secs: .65 },
     // its mist: puffs as it closes and breaks, size, how long; a wisp every (s) while it holds; Coffin Burst's wave
     mist: { puffs: 2, w: .9, secs: 1, every: .2 },
+    // the frost under it: its reach (x the foe's girth x 2.6)
+    ground: { r: 1 },
     light: { rad: 1.5, k: .36, secs: .3 },
   },
   cc_hoarbloom: {
     // the bloom over the foe: petals, their length, width per length, how high over its head, how fast it grows (s), how
     // clear, brightness, its glow
     crystals: { count: 6, long: .6, fat: .3, y: .5, grow: .34, clear: .3, k: 1, disc: .5, heart: .6, turn: .35 },
-    burst: { w: 1.2, secs: .17, k: 1, spray: 2.1, rose: .95 },
+    burst: { w: 1.2, secs: .17, k: 1, spray: 2.1, rose: 0 },
     shards: { count: 14, fling: 2.6, w: .2, secs: .6 },
     // the wave of cold rolling out to the burst's real edge: puffs, their size (x the radius), how long
     mist: { puffs: 9, w: .85, secs: .85 },
+    // the frost its burst leaves: its reach (x the burst's real radius)
+    ground: { r: 1 },
     light: { rad: 1.8, k: .4, secs: .28 },
   },
   cc_frostfoe: {
     // a frozen foe's crystals at its feet: how many, their height (x the foe's), width, how clear, brightness; most foes drawn
-    crystals: { count: 5, high: .42, wide: .7, clear: .4, k: 1, max: 16 },
+    crystals: { count: 5, high: .42, wide: .7, clear: .4, k: 1, max: 16, fern: 0 },
     // the cold off a chilled or frozen foe: wisps a second, their size, a glint's chance
     mist: { rate: 1.6, w: .3, glint: .7 },
   },
   cc_froststyle: {
     // the ice shader's look: how far apart its faces' tones are, edge brightness, clearness, sparkle (the turning light and the
     // glints), inner facets and fractures, rime at a planted root, fog density
-    paint: { facet: 1, edge: 1, clear: 1, sparkle: 1, inner: 1, rime: 1, fog: 1 },
+    paint: { facet: 1, edge: 1, clear: 1, sparkle: 1, inner: 1, rime: 1, fog: 1 },   // (rime: the frost crust on every crystal, and the frost on the ground)
   },
 };
 const EFX_INFO = {
@@ -53464,9 +53472,11 @@ const EFX_INFO = {
 Object.assign(EFX_INFO, { long: ['Length', .05, 2.5, .01], fat: ['Width (per length)', .05, .8, .01], clear: ['Clearness (0 solid, 1 glass)', 0, 1, .01], gather: ['Grows as a cast gathers (x)', 0, 3, .05],
   fog: ['Mist (a second / density)', 0, 4, .05], glint: ['Glints (chance / a second)', 0, 4, .05], streak: ['Torn air length', 0, 3, .02], gap: ['A puff every (cells)', .05, 1, .01], puff: ['Puff size', .05, 1.5, .01],
   spikes: ['Spikes out the far side', 0, 5, 1], spike: ['Spike length', .1, 1.5, .01], barb: ['Barb length (x the lance)', 0, .8, .01], high: ['Height (x the foe)', .1, 3, .01], wide: ['Width (x the foe)', .2, 4, .01],
-  fern: ['Hoarfrost feathers (length)', 0, 1.5, .01], rose: ['Star of hoarfrost (arm length)', 0, 2, .01], turn: ['Turns (a second)', 0, 2, .01],
+  // (the hoarfrost feathers are off: the owner asked for them removed, "remove these frosty icons"; 0 keeps them off)
+  fern: ['Hoarfrost feathers (length; 0 off)', 0, 1.5, .01], rose: ['Star of hoarfrost (arm length; 0 off)', 0, 2, .01], turn: ['Turns (a second)', 0, 2, .01],
+  thick: ['Ice thickness', 0, 3, .02],
   heart: ['Glowing heart', 0, 1.5, .02], star: ['Star on its point', 0, 1.5, .02], shed: ['Crystals shed (chance a puff)', 0, 1, .02], spray: ['Frost spray width', 0, 4, .02], crown: ['Crown of ice (spike length)', 0, 1, .01], back: ['Cold light behind the foe', 0, 1, .01],
-  grow: ['Grows over (s)', .03, 1, .01], facet: ['Facet contrast', 0, 2.5, .02], edge: ['Edge brightness', 0, 3, .02], sparkle: ['Sparkle', 0, 3, .02], inner: ['Inner facets and fractures', 0, 3, .02], rime: ['Rime at the root', 0, 2, .02] });
+  grow: ['Grows over (s)', .03, 1, .01], facet: ['Facet contrast', 0, 2.5, .02], edge: ['Edge brightness', 0, 3, .02], sparkle: ['Sparkle', 0, 3, .02], inner: ['Inner facets and fractures', 0, 3, .02], rime: ['Rime (the frost crust)', 0, 2, .02] });
 
 /* ---- state: what is tuned, and the context a drawing call is made in ---- */
 const EFX = { on: false, lab: false, cur: null, lay: null, live: {}, use: null, cache: {}, stat: {}, dup: false };
@@ -89299,6 +89309,8 @@ if (typeof towerTop === 'function') {
      MIST    a puff of cold fog: soft, broken by slow noise, thinning from inside as it ages
      GLOW    soft added cold light;  GLINT a snow glint, twinkling;  FLASH a burst of thin white needles (an impact)
      STREAK  the cold air torn behind a flying shard;  BURST a spray of frost dust thrown out from a point
+     ICE     a minion in ice: the lab's ice laid on the minion's own body and round its outline, from the frame's depth
+     FROST   frost creeping over the ground from a strike: grainy, feathered at its ragged front (no ring or rim)
      FERN    a feather of hoarfrost (her own mark): a stem and its barbs, grown in the air, crumbling to grains
    Nothing is drawn as a mark on the ground. Cards: frtBill (facing the camera), frtAxial (along a direction, turned to the
    camera); copied from pyrotex.js for now (the two could share them and the noise's maker once both are merged). Drawn in
@@ -89306,11 +89318,11 @@ if (typeof towerTop === 'function') {
    The look is the Element Lab's Ice paint (elemfx.js cc_froststyle.paint; its gradient is the palette), live.
    No GL or DOM is touched until the first card is drawn (the sims load this). */
 const FRT = { q: [], sty: null, styAt: -1, tex: null, MAX: 420 };
-const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5, BURST: 6, FERN: 7 };
+const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5, BURST: 6, FERN: 7, FROST: 8, ICE: 9 };
 // laid down: ice and mist (sorted far to near), then added light
-const FRT_ORD = [0, 0, 1, 1, 1, 1, 0, 1];
+const FRT_ORD = [0, 0, 1, 1, 1, 1, 0, 1, -1, -.5];
 // the palette, the deep of the ice to its white edge
-const FRT_PAL = ['#0c2f6b', '#1d6fc2', '#58b4ec', '#bfe8fb', '#f4fcff'];
+const FRT_PAL = ['#0c3a70', '#2283c0', '#62bfe6', '#c2e9f4', '#f6fdff'];
 const frtHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
 
 /* ---- the texture the ice is cut from: one small repeating texture, made once.
@@ -89368,8 +89380,8 @@ void main(){ vUV = aUV; vA = aA; vB = aB; vC = aC; vS = aD; vec3 w = bendW(aPos)
 FRT.fs = /*FS<*/`#version 300 es
 precision highp float;
 in vec2 vUV; in vec4 vA; in vec4 vB; in vec4 vC; in vec2 vS; in float vD;
-uniform sampler2D uN; uniform vec3 uPal[5]; uniform vec4 uSty; uniform vec3 uSty2; uniform vec2 uBloom;
-uniform highp sampler2D uDep; uniform vec4 uNF;
+uniform sampler2D uN, uScene; uniform vec3 uPal[5], uScn; uniform vec4 uSty; uniform vec3 uSty2; uniform vec2 uBloom;
+uniform highp sampler2D uDep, uDepC; uniform vec4 uNF; uniform float uDpOn;
 out vec4 o;
 #define SD (vA.y * .173)
 #define TM vA.z
@@ -89384,12 +89396,13 @@ float sdSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; return length(
 vec4 shard(vec2 uv){
   float y = uv.y, s1 = fract(SD * 7.31 + .13), s2 = fract(SD * 3.77 + .51);
   float tip = max(.05, vB.w) * (.72 + .56 * s2), tail = vC.w, fat = vB.z;
-  float pt = (1. - y) / tip, pb = tail > 0. ? (y + .015) / tail : 9.;
+  float jag = tail > 0. ? ((N(vec2(uv.x * 1.3 + SD * 3., SD)).g - .5) * .7 + abs(sin(uv.x * 8. + SD * 7.)) * .3) * tail : 0.;
+  float pt = (1. - y) / tip, pb = tail > 0. ? (y + .015 - jag) / tail : 9.;
   // (some narrow at a shoulder part way up, as a crystal that grew twice)
   float ys = .42 + .3 * s2, shd = step(.45, s1) * step(tail, .001) * step(ys, y);
-  float prof = clamp(min(pt, pb), 0., 1.), w = fat * prof * (1. - .26 * shd);
+  float prof = clamp(min(pt, pb), 0., 1.), w = fat * prof * (1. - .26 * shd) * (1. + (N(vec2(SD * 2., y * vS.x * .42)).r - .5) * (tail > 0. ? .2 : .26) + .13 * smoothstep(.55, .95, sin(y * vS.x * 4.6 + SD * 30.)) * (1. - smoothstep(.6, .95, y)));
   // (its point sits a little off its middle: a crystal, not a dart)
-  float x = uv.x - (s1 - .5) * .95 * fat * smoothstep(1. - tip, 1., y);
+  float x = uv.x - (s1 - .5) * (s2 > .55 ? 1.75 : .95) * min(fat, .34) * smoothstep(1. - tip, 1., y);
   float u = x / max(w, 1e-4), d = (1. - abs(u)) * w;
   // its faces: a roof of three, the ridges where they meet (a, b); toward the point they all tilt forward
   float a = -.52 + .44 * s1, b = min(.8, a + .42 + .34 * s2), z, zu;
@@ -89397,41 +89410,73 @@ vec4 shard(vec2 uv){
   else if (u < b) { zu = -.2 / (b - a); z = 1. + (u - a) * zu; }
   else { zu = -.8 / (1. - b); z = .8 + (u - b) * zu; }
   float wy = pt < 1. && pt <= pb ? -fat / tip : pb < 1. ? fat / max(tail, .01) : 0.;
-  vec3 n = normalize(vec3(-zu, -wy * (z - u * zu) * 2.4, .85));
-  // the light turns slowly, so its faces catch it in turn
+  vec3 n;
+  // ---- the ice as a material, after the owner's Frostbolt lab (fire-lab, Frostbolt), which is the look asked for
+  // ("more realistic like the one in the lab"): clear ice. What is behind it is seen bent through it (the frame, copied
+  // before the ice is drawn), absorbed with depth (red first: thick ice goes faintly blue-green, thin ice stays clear);
+  // its inside is cloudy toward the root or rear, with fracture sheets and air specks; its rounded, lumpy surface
+  // mirrors a studio (a pale sky, one bright window, a cold rim light); a matte crust of rime lies on it.
   float la = sin(TM * .8 + SD * 9.) * uSty.w;
   vec3 L = normalize(vec3(-.5 + .45 * la, .52 - .2 * la, .66));
-  float tone = smoothstep(-.12, 1.02, dot(n, L));
-  // how much ice the eye looks through here: none at its edges and point, most along its ridge
-  float thick = z * prof;
-  // inside: the ice's own facets and fractures, seen bent through each face; long streaks of trapped air along its length
   vec2 wp = vec2(x * vS.y * .5, y * vS.x);
-  vec4 c = N(wp * .62 + n.xy * .09 + vec2(SD * 5., SD * 3.));
-  float frac = (1. - smoothstep(0., .2, c.b)) * uSty2.x;
-  float streak = smoothstep(.56, .9, N(vec2(wp.x * 1.5 + n.x * .16 + SD * 2., wp.y * .17 + SD)).r) * uSty2.x;
-  tone = clamp(tone * (.62 + .38 * uSty.x) + (c.a - .5) * .46 * uSty.x * uSty2.x, 0., 1.);
-  // thick ice falls to deep blue, its lit faces and thin edges stay pale
-  vec3 col = mix(uPal[1], uPal[2], smoothstep(.15, .7, tone));
-  col = mix(col, uPal[3], smoothstep(.64, 1., tone));
-  col = mix(col, uPal[0], smoothstep(.2, .95, thick) * (.9 - .6 * tone));
-  col += uPal[2] * streak * (.18 + .3 * tone);
-  // its cold core: pale along its axis (vC.z: how much it glows of itself, a flying shard's heart)
-  float glowk = vC.z, core = exp(-u * u * (5. - 2. * glowk)) * smoothstep(0., .3, min(y * 1.6, prof));
-  col = mix(col, uPal[4], min(1., core * (.5 + .5 * glowk))) + uPal[3] * core * glowk * .5;
-  // edges: a thin white line, a wider pale one inside it; light split a little where it bends through one side
-  float dn = d / max(fat, .2), rim = 1. - smoothstep(0., .06, dn), rim2 = 1. - smoothstep(0., .3, dn);
-  float ridge = max(1. - smoothstep(0., .06, abs(u - a)), 1. - smoothstep(0., .06, abs(u - b))) * smoothstep(.05, .35, prof);
-  vec3 H = normalize(L + vec3(0., 0., 1.));
-  float spec = pow(max(dot(n, H), 0.), 38.);
-  // a glint that travels its length now and then, and specks in the ice that twinkle
-  float sw = fract(TM * .21 + SD * 3.) * 2.6 - .8;
-  float sweep = exp(-pow((y - sw - u * .22) * 8., 2.)) * (.3 + .7 * tone) * uSty.w;
-  vec4 sn = N(wp * 2.4 + vec2(SD * 7., SD * 2.));
-  float spk = smoothstep(.72, .95, sn.b) * step(.62, sn.a) * pow(.5 + .5 * sin(TM * 5. + sn.a * 60.), 6.) * uSty.w;
+  vec4 bn = N(wp * .5 + vec2(SD * 5., SD * 3.)), gn = N(wp * 2.3 + vec2(SD * 2., SD * 7.));
+  float lens = sqrt(max(0., 1. - u * u));
+  float thick = clamp(lens * prof * (.6 + .8 * bn.r), 0., 1.3);
+  // (its surface: round across, tilted forward into its point, dented by lumps and long ridges)
+  n = normalize(vec3(u * .9 + (bn.r - .5) * .9 + sin(u * 5.2 + bn.g * 4. + SD * 9.) * .22 + (gn.r - .5) * .28, -wy * 1.6 + (bn.g - .5) * .8 + (gn.g - .5) * .28, .75));
+  float tone = smoothstep(-.2, 1., dot(n, L));
   float clr = clamp(vC.y * uSty.z, 0., 1.);
-  float ledge = step(.45, s1) * step(tail, .001) * (1. - smoothstep(0., .014, abs(y - ys))) * step(abs(uv.x), fat) * .7;
-  float hi = ((rim * .8 + ridge * .4 + ledge) * uSty.y + spec * .95 + sweep * .45 + spk * .85) * (1. - .3 * clr);
-  col += mix(uPal[4], vec3(.8, .82, 1.), .4 * step(0., u)) * hi + uPal[3] * (rim2 * .22 * uSty.y + frac * .025);
+  float root = 1. - smoothstep(.05, tail > 0. ? .7 : .8, y);
+  vec3 col;
+  if (uScn.z > .5) {
+    vec2 suv = gl_FragCoord.xy / uScn.xy + n.xy * vec2(1., uScn.x / uScn.y) * (.01 + .034 * thick) * uSty2.x * (1. - .55 * clr);
+    col = texture(uScene, clamp(suv, vec2(.002), vec2(.998))).rgb;
+  } else col = mix(uPal[1] * .45, uPal[3] * .8, .5 + .5 * n.y);   // (no copy of the frame: a made-up tone behind it)
+  col *= exp(-vec3(5., 1.4, .55) * thick * .5 * uSty.x) * mix(vec3(1.), uPal[2] * 1.4, .22 + .4 * thick);
+  // (ice is never black: a little light scattered in it everywhere)
+  vec3 frostC = mix(uPal[3], uPal[4], .55);
+  col += frostC * (.13 + .22 * thick) * (.5 + .5 * tone) * (1. - .4 * clr);
+  // the cloudy inside
+  float cloud = pow(smoothstep(.3, .76, N(wp * .42 + n.xy * .04 + SD * 2.).r + (gn.a - .5) * .25), 2.) * (.2 + .8 * root) * uSty2.x;
+  col = mix(col, frostC * vec3(.82, .9, .94) * (.5 + .45 * tone), cloud * .72 * (1. - .8 * clr));
+  // fracture sheets: tilted planes of trapped air, bright on one edge, fading into the ice
+  float sheet = 0.;
+  for (int j = 0; j < 2; j++) {
+    float fj = float(j), an = 1.1 + fj * 1.3 + s1 * 2., cy = .28 + .34 * fj + .12 * s2;
+    float dd = dot(vec2(u * .55, (y - cy) * max(vS.x / max(vS.y, .01), 1.) * .5), vec2(cos(an), sin(an)));
+    sheet += smoothstep(0., .012, dd) * exp(-dd * 9.) * (1. - smoothstep(.55, .95, abs(u)));
+  }
+  col += frostC * sheet * .3 * uSty2.x * smoothstep(.15, .6, thick);
+  // its own cold glow (vC.z: a flying shard's heart)
+  float glowk = vC.z, core = exp(-u * u * 4.) * smoothstep(0., .3, min(y * 1.6, prof));
+  col = mix(col, col * vec3(.5, .9, 1.3) + uPal[1] * .1, glowk * .55) + uPal[3] * core * glowk * .35;
+  // the studio in its surface
+  vec3 Rf = reflect(vec3(0., 0., -1.), n); Rf.xy += vec2(.3 * la, -.18 * la);
+  float sky = smoothstep(-.4, .8, Rf.y), fres = .04 + .96 * pow(1. - clamp(n.z, 0., 1.), 4.);
+  vec2 wv = Rf.xy - vec2(-.34, .3);
+  float window = (1. - smoothstep(.09, .16, abs(wv.x))) * (1. - smoothstep(.2, .3, abs(wv.y)));
+  float rimL = pow(max(dot(Rf, normalize(vec3(.5, .28, .55))), 0.), 12.);
+  col = mix(col, mix(vec3(.05, .06, .07), vec3(.58, .66, .73), sky) * (uPal[4] * .3 + .7), fres * .75);
+  // (its edge, where the eye grazes it, turns white: what makes clear ice show against anything)
+  float edgeB = pow(1. - lens, 2.) * smoothstep(0., .04, d);
+  col += frostC * edgeB * (.75 + .3 * tone);
+  // rime: a matte, grainy crust of frost, on its root and rear, in patches, along its edges
+  float grain = gn.g, patch_ = smoothstep(.55, .8, bn.a * .5 + bn.r * .5 + (grain - .5) * .25);
+  float dn = d / max(fat, .2), rim = 1. - smoothstep(0., .06, dn), rim2 = 1. - smoothstep(0., .3, dn);
+  float rime = clamp((patch_ * (.25 + .9 * root) + smoothstep(.34, 0., y + (grain - .5) * .22) * (tail > 0. ? .7 : .95) + rim2 * .28) * uSty2.y, 0., .95) * (1. - .85 * clr);
+  col = mix(col, frostC * (.6 + .4 * tone) * (.8 + .3 * grain), rime * .8);
+  float ridge = 0.;
+  vec3 H = normalize(L + vec3(0., 0., 1.));
+  float spec = pow(max(dot(n, H), 0.), 70.) * 1.3 * (1. - .7 * rime);
+  // a glint that travels its length now and then; specks of trapped air; frost grains that catch the light
+  float sw = fract(TM * .21 + SD * 3.) * 2.6 - .8;
+  float sweep = exp(-pow((y - sw - u * .22) * 8., 2.)) * (.3 + .7 * tone) * uSty.w * (1. - .7 * rime) * .6;
+  vec4 sn = N(wp * 6.5 + vec2(SD * 7., SD * 2.));
+  float spk = smoothstep(.72, .95, sn.b) * step(.7, sn.a) * (.35 + .65 * pow(.5 + .5 * sin(TM * 5. + sn.a * 60.), 6.)) * uSty.w * .45 * smoothstep(.1, .5, thick);
+  spk += pow(grain, 9.) * rime * 2.2 * (.5 + .5 * sin(TM * 7. + grain * 90.)) * uSty.w;
+  float shine = (window * 1.1 + rimL * .55) * (1. - .75 * rime);
+  float hi = (rim * .22 * uSty.y + spec + shine + sweep * .45 + spk * .85) * (1. - .3 * clr);
+  col += vec3(.97, .99, 1.) * hi;
   // cracked: white fractures spreading from its middle
   float ck = vC.x, crack = 0.;
   if (ck > 0.) {
@@ -89439,17 +89484,16 @@ vec4 shard(vec2 uv){
     crack = (1. - smoothstep(0., .055, cb)) * up;
     col += mix(uPal[3], vec3(1.), .65) * crack * 1.3 + uPal[2] * (1. - smoothstep(0., .3, cb)) * up * .3 + uPal[3] * ck * ck * .25;
   }
-  float al = clamp(mix(.92, .15, clr) * (1.08 - .3 * tone * clr) + smoothstep(.3, 1., thick) * .12 * clr + hi * .75 + frac * .02 + crack + core * (.25 + .5 * glowk), 0., 1.);
+  // (with the frame behind it already in its colour it covers what it stands before; else it is a pane of tinted glass)
+  float al = uScn.z > .5 ? .97 : clamp(mix(.5 + .4 * thick, .15, clr) + rime * .85 + cloud * .3 * (1. - clr) + fres * .25 + hi * .75 + crack + core * (.25 + .5 * glowk), 0., 1.);
   float aa = fwidth(d) * 1.3 + .004, cov = smoothstep(0., aa, d);
   if (tail <= 0.) {
-    // planted: a ragged, rimed root, never a hard line where it meets the ground
+    // planted: a ragged root, never a hard line where it meets the ground
     float g = N(vec2(uv.x * vS.y * 1.4 + SD * 4., y * vS.x * 1.2)).g;
-    float rime = smoothstep(.24, 0., y + (g - .5) * .2) * uSty2.y * (1. - .6 * clr);
-    col = mix(col, uPal[4] * .9, rime * .55); al = max(al, rime * .55);
     cov *= smoothstep(0., .07, y + (g - .5) * .06);
   }
   al *= 1. - AGE;
-  if (uBloom.x > .5) return vec4(uPal[3] * (spec * .9 + sweep * .5 + spk + core * (.4 + glowk) + rim * .2 + crack) * cov * vB.x * vB.y * (1. - AGE) * .3, 0.);
+  if (uBloom.x > .5) return vec4(uPal[3] * (spec * .9 + shine * .6 + sweep * .5 + spk + core * (.4 + glowk) + rim * .2 + crack) * cov * vB.x * vB.y * (1. - AGE) * .3, 0.);
   return vec4(col * al * cov * vB.x, al * cov) * vB.y;
 }
 void main(){
@@ -89526,6 +89570,85 @@ void main(){
     float keep = smoothstep(t * 1.2 - .12, t * 1.2, n + .08) * (1. - t * t);
     float v = (line + halo) * keep * vB.y;
     o = uBloom.x > .5 ? vec4(uPal[3] * v * vB.x * .12, 0.) : vec4(mix(uPal[2], uPal[4], line) * v * vB.x * .85, v * .25);
+  } else if (sh == 8) {
+    // frost creeping over the ground from where a spell struck (after the lab's freezing reach): a packed, grainy
+    // middle and feathered fingers at its ragged front; no ring, no rim. -1..1 both ways; vB.z how far it has
+    // spread (0..1); AGE: it thaws
+    vec2 p = vUV; float r = length(p), th = atan(p.y, p.x), reach = vB.z * .74;
+    // (its front is ragged: further along some bearings than others, and split into fine fingers that run outward)
+    float lobe = N(vec2(th * .159 * 2. + SD, SD * 3.)).r * .65 + N(vec2(th * .159 * 5. + SD * 4., SD)).g * .35, f1 = N(vec2(th * .159 * 9. + SD * 2., r * .3)).g, f2 = N(vec2(th * .159 * 26. + SD * 5., r * .5)).r;
+    float front = reach * (.3 + 1.25 * lobe) - r;
+    float bulk = smoothstep(0., .14, front);
+    float fingers = smoothstep(-.08 - .08 * f1, 0., front) * smoothstep(.5, .78, f1 * .55 + f2 * .6) * (1. - bulk);
+    float grain = N(p * 3.2 + SD * 2.).g, fine = N(p * 7. + SD * 4.).r;
+    float cov = clamp(bulk * (.2 + .42 * grain + .28 * fine) + fingers * .8, 0., 1.) * (1. - smoothstep(.55, 1., AGE)) * (1. - smoothstep(.84, 1., r));
+    float glint = pow(fine, 9.) * cov * (.4 + .6 * sin(TM * 4. + fine * 80.)) * 1.5 * uSty.w;
+    float a = cov * vB.y * .44 * uSty2.y;
+    vec3 c = mix(mix(uPal[2], uPal[3], .6), uPal[4], clamp(.1 + .6 * grain * fine * 2. + fingers * .35, 0., 1.));
+    o = uBloom.x > .5 ? vec4(uPal[3] * glint * vB.x * .25, 0.) : vec4(c * a * vB.x * 1.15 + uPal[4] * glint * vB.y, a * .8);
+  } else if (sh == 9) {
+    // a minion in ice (owner: "monsters look like they're encased in a foggy colour, not like they're in ice, can you
+    // please use the ice from the lab"): the lab's ice laid on the minion's own body and a little way out from its
+    // outline, read from the frame's depth. This card stands over the minion; a pixel is the minion where the frame's depth
+    // lies near the card and before the ground behind it; within a few pixels of the minion it is the ice round it. The
+    // minion's own surface gives the ice its shape (the slope of the depth), so it mirrors and bends as the lab's ice does.
+    // vB.z: how deep the minion is (world), vB.w: the card's centre height, vC.y: the ice's thickness round it (world),
+    // vC.w: the eye's height angle, AGE: how far the ice has closed over it from its feet, vC.x: about to break
+    if (uBloom.x > .5 || uScn.z < .5 || uDpOn < .5) discard;
+    ivec2 fc = ivec2(gl_FragCoord.xy);
+    float rng = vB.z, fwy = max(vC.w, .2), upy = sqrt(max(0., 1. - fwy * fwy));
+    // (the card stands before the minion, rng nearer the eye than its middle, so no part of the minion hides it)
+    float mid = vD + rng, gd = mid + (vB.w + vUV.y * vS.x * .5 * upy) / fwy - .05, win = vC.z > 0. ? vC.z : rng, hi_ = min(mid + win, gd), lo_ = mid - win;   // (win: how deep the minion itself is, so one standing close before or behind it is left alone)
+    float wpp = max(fwidth(vUV.x) * vS.y * .5, 1e-4), rad = clamp(vC.y / wpp, 1.5, 26.);
+    float s0 = frLin(texelFetch(uDepC, fc, 0).r), in0 = step(lo_, s0) * step(s0, hi_);
+    float acc = 0.; vec2 dirIn = vec2(0.);
+    for (int i = 0; i < 12; i++) {
+      float a = float(i) * .5236; vec2 o2 = vec2(cos(a), sin(a)) * rad * (i % 2 == 0 ? 1. : .55);
+      float si = frLin(texelFetch(uDepC, fc + ivec2(o2), 0).r), ii = step(lo_, si) * step(si, hi_);
+      acc += ii; dirIn += o2 * ii;
+    }
+    float shell = acc / 12., inside = max(in0, smoothstep(.04, .42, shell));
+    // (the ice closes over it from its feet, its front ragged and white)
+    float hh = vUV.y * .5 + .5, front = AGE * 1.3 - hh + (N(vec2(vUV.x * .4 + SD, .3)).r - .5) * .16;
+    inside *= smoothstep(0., .04, front) * (1. - smoothstep(.74, .98, abs(vUV.x)));
+    if (inside < .01) discard;
+    vec4 bn = N(vUV * vec2(vS.y, vS.x) * .34 + SD * 3.), gn = N(vUV * vec2(vS.y, vS.x) * 1.6 + SD * 7.);
+    vec3 n;
+    if (in0 > .5) {
+      // (its slope from the depth a few pixels to each side, one side only where the other falls off the minion: smooth
+      // across a face, sharp at an edge)
+      float xa = frLin(texelFetch(uDepC, fc + ivec2(2, 0), 0).r), xb = frLin(texelFetch(uDepC, fc - ivec2(2, 0), 0).r), ya = frLin(texelFetch(uDepC, fc + ivec2(0, 2), 0).r), yb = frLin(texelFetch(uDepC, fc - ivec2(0, 2), 0).r);
+      float ex = abs(xa - s0) < abs(xb - s0) ? (xa - s0) : (s0 - xb), ey = abs(ya - s0) < abs(yb - s0) ? (ya - s0) : (s0 - yb);
+      n = normalize(vec3(clamp(ex, -.2, .2), clamp(ey, -.2, .2), wpp * 2.2));
+    }
+    else { vec2 dI = dot(dirIn, dirIn) > .0001 ? normalize(dirIn) : vec2(0., -1.); n = normalize(vec3(-dI * (1.15 - shell) * 1.5, .5)); }
+    n = normalize(n + vec3((bn.rg - .5) * .3 + (gn.rg - .5) * .05, 0.));
+    float thick = in0 > .5 ? .16 + .22 * bn.r : .3 + .55 * shell;
+    vec2 suv = gl_FragCoord.xy / uScn.xy + n.xy * vec2(1., uScn.x / uScn.y) * (.003 + .009 * thick) * uSty2.x;
+    vec3 col = texture(uScene, clamp(suv, vec2(.002), vec2(.998))).rgb;
+    col *= exp(-vec3(5., 1.4, .55) * thick * .42 * uSty.x) * mix(vec3(1.), uPal[2] * 1.4, .12 + .3 * thick);
+    vec3 frostC = mix(uPal[3], uPal[4], .55);
+    float la = sin(TM * .8 + SD * 9.) * uSty.w;
+    vec3 L = normalize(vec3(-.5 + .45 * la, .52 - .2 * la, .66));
+    float tone = smoothstep(-.2, 1., dot(n, L));
+    col += frostC * (.05 + .1 * thick) * (.5 + .5 * tone);
+    // the studio in its surface: a pale sky at its grazing edges, one bright window, a cold rim light
+    vec3 Rf = reflect(vec3(0., 0., -1.), n); Rf.xy += vec2(.3 * la, -.18 * la);
+    float fres = .04 + .96 * pow(1. - clamp(n.z, 0., 1.), 3.);
+    vec2 wv = Rf.xy - vec2(-.34, .3);
+    float window = (1. - smoothstep(.1, .2, abs(wv.x))) * (1. - smoothstep(.22, .34, abs(wv.y)));
+    float rimL = pow(max(dot(Rf, normalize(vec3(.5, .28, .55))), 0.), 10.);
+    col = mix(col, mix(vec3(.24, .3, .37), vec3(.62, .7, .77), smoothstep(-.4, .8, Rf.y)) * (uPal[4] * .3 + .7), fres * .6);
+    col += frostC * pow(1. - clamp(n.z, 0., 1.), 2.) * .42;
+    // rime on what faces up, in patches; grains that catch the light
+    float rime = smoothstep(.2, .7, n.y) * smoothstep(.45, .75, bn.a * .8 + gn.g * .2) * .55 * uSty2.y;
+    col = mix(col, frostC * (.66 + .34 * tone), rime);
+    float spec = pow(max(dot(n, normalize(L + vec3(0., 0., 1.))), 0.), 60.) * 1.3;
+    float spk = pow(gn.g, 12.) * (.5 + .5 * sin(TM * 6. + gn.g * 90.)) * .6 * uSty.w;
+    col += vec3(.97, .99, 1.) * ((window * 1. + rimL * .5 + spec) * (1. - .7 * rime) + spk * (.3 + rime));
+    // the freezing front; the white flicker before it breaks
+    col += vec3(1.) * (1. - smoothstep(0., .07, front)) * step(AGE, .97) * .7 + frostC * vC.x * (.25 + .25 * sin(TM * 50.));
+    o = vec4(col, 1.) * inside * .97 * vB.y;
   } else {
     // the cold air torn behind a flying shard: x across, y from its far end (0) to the shard (1)
     float y = vUV.y, w = .3 + .7 * y;
@@ -89570,6 +89693,12 @@ function frtAxial(sh, P, dir, len, wid, o) {
   return frtPush(sh, [bx - wx[0] * hw, by - wx[1] * hw, bz - wx[2] * hw, bx + wx[0] * hw, by + wx[1] * hw, bz + wx[2] * hw, tx + wx[0] * hw, ty + wx[1] * hw, tz + wx[2] * hw, tx - wx[0] * hw, ty - wx[1] * hw, tz - wx[2] * hw],
     [-1, 0, 1, 1], o, (bx + tx) * .5 * fw[0] + (by + ty) * .5 * fw[1] + (bz + tz) * .5 * fw[2], L, wid);
 }
+// flat on the ground at height y, r from its centre to each side, turned by rot (frost creeping over the ground)
+function frtFlat(sh, x, y, z, r, rot, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const c = Math.cos(rot || 0) * r, s = Math.sin(rot || 0) * r, fw = frtFw();
+  return frtPush(sh, [x - c + s, y, z - s - c, x + c + s, y, z + s - c, x + c - s, y, z + s + c, x - c - s, y, z - s + c], [-1, -1, 1, 1], o, x * fw[0] + y * fw[1] + z * fw[2] - 50, r * 2, r * 2);
+}
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { FRT.q.length = 0; });
 
 /* ---- drawing ---- */
@@ -89597,6 +89726,57 @@ function frtBuild(E) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
   gl.bindTexture(gl.TEXTURE_2D, null);
 }
+// the frame as drawn so far, copied for the ice to bend (as gl.js copies it for its heat haze: each format is tried
+// until one blits clean; none: the ice goes without)
+function frtScene(X) {
+  const gl = X.gl, src = X.R.outFB || null, w = gl.canvas.width, h = gl.canvas.height, C = FRT.cap || (FRT.cap = { f: gl.createFramebuffer(), t: null, w: 0, h: 0, fi: 0, ok: null, src: undefined });
+  if (C.src !== src) { C.src = src; C.fi = 0; C.ok = null; C.w = 0; }
+  if (C.ok === false) return null;
+  const F = [[gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE], [gl.RGB8, gl.RGB, gl.UNSIGNED_BYTE], [gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT], [gl.R11F_G11F_B10F, gl.RGB, gl.UNSIGNED_INT_10F_11F_11F_REV]];
+  for (;;) {
+    if (!C.t || C.w !== w || C.h !== h) {
+      if (C.t) gl.deleteTexture(C.t); C.t = gl.createTexture(); C.w = w; C.h = h; gl.bindTexture(gl.TEXTURE_2D, C.t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, F[C.fi][0], w, h, 0, F[C.fi][1], F[C.fi][2], null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.f); gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, C.t, 0);
+    }
+    if (C.ok === null) while (gl.getError()) {}
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, src); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.f);
+    gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, src);
+    if (C.ok) return C.t;
+    if (!gl.getError()) { C.ok = true; return C.t; }
+    C.fi++; if (C.fi >= F.length) { C.ok = false; gl.deleteTexture(C.t); C.t = null; return null; }
+    C.w = 0;
+  }
+}
+// the frame's depth as drawn so far, copied for the ice that is laid on a minion's own body (as frtScene copies its colour)
+function frtDepth(X) {
+  const gl = X.gl, src = X.R.outFB || null, w = gl.canvas.width, h = gl.canvas.height, C = FRT.dcap || (FRT.dcap = { f: gl.createFramebuffer(), t: null, w: 0, h: 0, fi: 0, ok: null, src: undefined });
+  if (C.src !== src) { C.src = src; C.fi = 0; C.ok = null; C.w = 0; }
+  if (C.ok === false) return null;
+  const F = [[gl.DEPTH24_STENCIL8, gl.DEPTH_STENCIL, gl.UNSIGNED_INT_24_8, gl.DEPTH_STENCIL_ATTACHMENT], [gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, gl.DEPTH_ATTACHMENT], [gl.DEPTH_COMPONENT16, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, gl.DEPTH_ATTACHMENT]];
+  for (;;) {
+    if (!C.t || C.w !== w || C.h !== h) {
+      if (C.t) gl.deleteTexture(C.t); C.t = gl.createTexture(); C.w = w; C.h = h; gl.bindTexture(gl.TEXTURE_2D, C.t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, F[C.fi][0], w, h, 0, F[C.fi][1], F[C.fi][2], null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.f);
+      gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0); gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, null, 0);
+      gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, F[C.fi][3], gl.TEXTURE_2D, C.t, 0);
+    }
+    if (C.ok === null) while (gl.getError()) {}
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, src); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.f);
+    gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, src);
+    if (C.ok) return C.t;
+    if (!gl.getError()) { C.ok = true; return C.t; }
+    C.fi++; if (C.fi >= F.length) { C.ok = false; gl.deleteTexture(C.t); C.t = null; return null; }
+    C.w = 0;
+  }
+}
 // the frame's cards in the order they are laid down, grouped by recolour
 function frtFill(E) {
   const Q = FRT.q; Q.sort((a, b) => a.ord - b.ord || a.dz - b.dz);
@@ -89620,12 +89800,19 @@ function frtDraw(E, bloom) {
   if (!RD || !RD.vfx || !FRT.q.length) return;
   const X = RD.vfx, gl = X.gl; if (!E.P || E.fsOf !== FRT.fs) frtBuild(E);
   gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb);
-  if (!bloom) { const nq = frtFill(E); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _frtV, 0, nq * 4 * FRT_F); }
+  if (!bloom) {
+    const nq = frtFill(E);
+    // (the frame is copied on High, and only when there is ice to bend it)
+    E.scn = null; E.dep = null; if (FRT.refract !== 0 && (typeof GFX === 'undefined' || (GFX !== 'low' && GFX !== 'medium')) && FRT.q.some(e => e.sh === FRT_SH.SHARD || e.sh === FRT_SH.ICE)) { try { E.scn = frtScene(X); E.dep = E.scn && FRT.q.some(e => e.sh === FRT_SH.ICE) ? frtDepth(X) : null; } catch (e) { E.scn = null; E.dep = null; } gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb); }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, _frtV, 0, nq * 4 * FRT_F);
+  }
   // (the spells' shared uniforms: the view, the bend of the world, and the depth copy the soft edges read)
   X.common(E.P, bloom, !bloom);
   const u = E.P.u, S = frtStyle();
   gl.uniform4fv(u.uSty, S.sty); gl.uniform3fv(u.uSty2, S.sty2);
-  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, FRT.tex); gl.uniform1i(u.uN, 2); gl.activeTexture(gl.TEXTURE0);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, FRT.tex); gl.uniform1i(u.uN, 2);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, !bloom && E.scn ? E.scn : FRT.tex); gl.uniform1i(u.uScene, 3); gl.uniform3f(u.uScn, gl.canvas.width, gl.canvas.height, !bloom && E.scn ? 1 : 0);
+  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, !bloom && E.dep ? E.dep : null); gl.uniform1i(u.uDepC, 4); gl.uniform1f(u.uDpOn, !bloom && E.dep ? 1 : 0); gl.activeTexture(gl.TEXTURE0);
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, bloom ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
   if (bloom) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
   const up = u.uPal || u['uPal[0]'];
@@ -89635,7 +89822,7 @@ function frtDraw(E, bloom) {
   }
   gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
 }
-const FRT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], draw(bloom) { frtDraw(this, bloom); } };
+const FRT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, scn: null, dep: null, groups: [], draw(bloom) { frtDraw(this, bloom); } };
 
 /* ================= THE FROSTWEAVERS' FROST: faceted ice, drawn live =================
    The owner (10 Nov 2026): "get another agent to work alongside the pyro to create better look frost spells for frost
@@ -89643,7 +89830,8 @@ const FRT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], dr
    MIST, GLOW, GLINT, FLASH, STREAK): hard crystals that grow, crack and shatter, cold mist that sinks and hangs, snow glints,
    a cold light on the ground and the bodies near it. The cold counterpart of the Pyroclasts' fire (pyrofire.js): where fire
    flows and rises, ice is still and sharp, and its mist falls. Gameplay, timing and the sounds are untouched.
-   Her mark is hoarfrost: feathers of it (a stem and its barbs, as frost grows on a cold pane) crystallise in the air
+   (Hoarfrost feathers were her mark for one pass and are switched off, at the owner's word: "remove these frosty
+   icons". Their values, fern and rose, are 0; the code stays for the lab.) Her mark was hoarfrost: feathers of it (a stem and its barbs, as frost grows on a cold pane) crystallise in the air
    wherever her spells pass or strike, hold a moment, and crumble to grains.
    - The staff: a faint cold glow at its crystal, feathers sprouting round it as a cast gathers, mist sinking from it, a glint now and then; brighter as a cast gathers.
    - Frost Bolt (her strike): one shard of ice with a pale core, flying straight and level at its foe, the cold air torn
@@ -89651,20 +89839,25 @@ const FRT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], dr
      puff of cold.
    - Frost Spear: a long, heavy lance with two barbs swept back, a brighter light, a thicker wake. Where it strikes, spikes of
      ice burst out the far side of the foe, hold a moment, crack and are gone; more splinters, more cold.
-   - Ice Coffin: crystals grow up round the foe, tall behind it and low before it, and one great clear crystal closes over
-     it: the foe is seen inside. In its last moment white cracks spread; when it lets go (or the foe dies) every crystal
-     breaks into falling splinters and a breath of mist.
+   - Ice Coffin: the minion itself becomes the block of ice: held in the stride it had, its own body drawn inside clear
+     shells of ice of its own shape, icicles hanging from it, vapour falling off it. In its last moment the ice flickers
+     white; when it lets go (or the foe dies) it bursts into falling splinters and a breath of mist. Any frozen foe gets
+     the held stride and a thin glaze.
    - Shatterbloom: a cluster of crystals blooms over the foe and waits, glinting. When it bursts, its petals fly apart and a
      wave of cold mist rolls out low to the burst's real edge.
    - Frozen foes (any freeze in a Conclave run): small crystals grown at their feet, dropped as they thaw. Chilled foes:
-     cold mist sinking off them and a glint. No ring, rim or disc is drawn on the ground anywhere (the owner reads those as
-     runes).
+     cold mist sinking off them, a glint, hoarfrost climbing them from the feet.
+   - Frost on the ground (after the owner's own Frostbolt lab, its freezing reach): where a spell strikes, an uneven patch
+     of frost creeps out, grainy in its middle and feathered at its ragged front, lies a while and thaws. It is not a ring,
+     rim or disc (the owner reads those as runes); its layer (ground) can be switched off in the lab.
+   The ice itself follows that lab's material: absorbed to deep blue where thick, a studio's window mirrored in its faces,
+   cloudy inside, fracture sheets, a crust of rime.
    Restraint: all of it scales with the Graphics setting (ffLv) and a card budget a frame (FF.cap); the foe inside a coffin
    stays visible (the lab's Readability). Its values: the Element Lab (elemfx.js ELEM_FX_DEF, read through efx()). */
-const FF = { shots: [], cof: [], blo: [], cards: 0, cap: 170, last: 0, quiet: 0, has: 0, hasT: -1, peak: 0 };
+const FF = { shots: [], cof: [], blo: [], grounds: [], cards: 0, cap: 170, last: 0, quiet: 0, has: 0, hasT: -1, peak: 0 };
 const FF_IDS = ['cc_glacialglyph', 'cc_rimelance', 'cc_hoarbloom'], FF_UNIT = 'cc_rimeweaver', FF_UP = [0, 1, 0], FF_SQ = [-1, -1, 1, 1];
 const FF_RING = ['#dff6ff', '#e6fbff'];   // (the rings the frost kit asks for: a cold wave is drawn in their place)
-if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { FF.shots.length = 0; FF.cof.length = 0; FF.blo.length = 0; });
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { FF.shots.length = 0; FF.cof.length = 0; FF.blo.length = 0; FF.grounds.length = 0; });
 // the Graphics setting: 0 Low (fewer cards), 1 Medium, 2 High
 const ffLv = () => typeof GFX === 'undefined' ? 2 : GFX === 'low' ? 0 : GFX === 'medium' ? 1 : 2;
 const ffLive = () => typeof G !== 'undefined' && G && G.time != null && G.state !== 'title';
@@ -89777,6 +89970,20 @@ function ffGlints(x, y, z, n, r, s, l) {
   for (let i = 0; i < n; i++) ffShot('glint', x + (Math.random() - .5) * r, y + (Math.random() - .5) * r * .7, z + (Math.random() - .5) * r, .11 + .09 * Math.random(), .55 + .5 * Math.random(), { vy: -.22 - .2 * Math.random(), vx: (Math.random() - .5) * .15, vz: (Math.random() - .5) * .15, delay: Math.random() * .25 }, s, l || 'mist');
 }
 function ffLight(x, z, h, k, rad, life, s) { const e = efxPush(s, 'light'); try { if (G.flashes.length < 6) flashLight(x, z, h, [.38 * k, .74 * k, 1.3 * k], rad, life); } finally { efxPop(e); } }
+// frost left creeping over the ground from (x, z) out to r (after the owner's Frostbolt lab: its freezing reach). It
+// spreads over grow seconds, lies dur seconds, thaws. An uneven, feathered patch: no ring, no rim
+function ffFrostAt(x, z, r, dur, grow, s) {
+  const Gd = ffP(s, 'ground'); if (!Gd.on || !(r > 0) || !(Gd.r > 0)) return;
+  if (FF.grounds.length >= 24) FF.grounds.shift();
+  FF.grounds.push({ x, z, r: r * Gd.r, at: G.time, dur: dur * (Gd._g ? Gd.life : 1), grow: grow || .4, seed: (Math.random() * 97) | 0, rot: Math.random() * TAU, s });
+}
+function ffGrounds(now) {
+  FF.grounds = FF.grounds.filter(g => now - g.at < g.dur);
+  for (const g of FF.grounds) {
+    const el = now - g.at, o = { age: el / g.dur, seed: g.seed, p0: 1 - Math.exp(-el * 2.5 / g.grow), k: 1, a: 1 }, z = ffTune(g.s, 'ground', g.r, o);
+    if (z != null) frtFlat(FRT_SH.FROST, g.x, .032, g.z, z / .8, g.rot, o);
+  }
+}
 // a wave of cold rolling out low from a point to r (a burst's real edge): puffs of mist carried out and left hanging
 function ffWave(x, z, r, s, k) {
   const M = ffP(s, 'mist'), n = ffN(M, (M.puffs || 8) * (k || 1), [.5, .75, 1]);
@@ -89873,7 +90080,7 @@ function ffLand(p, hit) {
   const d = F.dir || [1, 0, 0], x = hit ? ffFoeX(hit) : F.tx == null ? p.x : F.tx, z = hit ? ffFoeZ(hit) : F.tz == null ? p.z : F.tz, y = F.aim == null ? p.h : F.aim, sz = F.spear ? (p.sz || 1.7) / 1.7 : Math.sqrt(p.sz || 1);
   const r = hit ? ffFoeR(hit) * .6 : 0, fx = x - d[0] * r, fz = z - d[2] * r;   // (on the foe's near side)
   if (B.on) {
-    ffShot('flash', fx, y, fz, B.w * sz * .75, B.secs, { k: B.k * .65 }, s, 'burst');
+    ffShot('flash', fx, y, fz, B.w * sz * (B.rose > 0 ? .75 : 1), B.secs, { k: B.k * (B.rose > 0 ? .65 : 1) }, s, 'burst');
     if (B.rose > 0) ffRosette(fx, y, fz, 6, B.rose * sz, s, 'burst', { k: B.k * (F.spear ? .9 : .7) });
     if (B.spray > 0) ffShot('burst', fx, y, fz, B.spray * sz, .34, { k: B.k }, s, 'burst');
     if (B.crown > 0 && lv) ffCrown(fx, y - .04, fz, [-d[0], 0, -d[2]], F.spear ? 4 : 3, B.crown * sz, F.spear ? .95 : .8, s, 'burst', { k: B.k });
@@ -89889,6 +90096,7 @@ function ffLand(p, hit) {
     }
   }
   if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
+  ffFrostAt(x, z, 1, F.spear ? 3 : 2.2, .35, s);
 }
 
 /* ---- Ice Coffin: a mass of crystal thrown up round the foe, one great clear crystal over it; cracked, then broken ---- */
@@ -89916,33 +90124,34 @@ function ffCoffins(now, dt) {
     if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', ffFoeX(c) + (Math.random() - .5) * .3, ffFoeY(c) + .2, ffFoeZ(c) + (Math.random() - .5) * .3, M.w * (.8 + .4 * Math.random()), M.secs, { vy: .1, grow: .8, delay: i * .08, a: .8 }, s, 'mist');
     if (K.on && K.spray > 0) ffShot('burst', ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .35, ffFoeZ(c), Math.max(.8, ffFoeH(c)) * K.spray, .4, { k: .8 }, s, 'crystals');
     if (lv) ffGlints(ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .7, ffFoeZ(c), ffN(M, 6, [0, .6, 1]), ffFoeR(c) * 3.2, s, 'mist');
+    ffFrostAt(ffFoeX(c), ffFoeZ(c), ffFoeR(c) * 2.6, (c.ccCoffin.until - now) + 1.6, .5, s);
     if (L.on) ffLight(c.x, c.y, .5, L.k, L.rad, L.secs, s); }
   for (const e of FF.cof) {
     const c = e.c, held = !c.dead && c.ccCoffin && c.ccCoffin.until > now && ffFrozen(c);
     if (!held) { e.gone = true; c._ffC = null; ffCoffinBreak(e, now); continue; }
     e.until = c.ccCoffin.until;
     const el = now - e.at, crack = ffSs(e.until - .45, e.until - .02, now), tipN = lv && K.glint > 0 && Math.random() < dt * K.glint ? (Math.random() * 5) | 0 : -1, tops = [];
-    // (a cold light behind the foe: the ice glows through, and the foe stands out against it)
-    if (B.on && B.back > 0 && lv) ffBill(FRT_SH.GLOW, [ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .55, ffFoeZ(c)], Math.max(.8, ffFoeH(c)) * 2.4, { k: B.back * Math.min(1, el / .3) * (.88 + .12 * Math.sin(now * 2.6 + e.seed)), pull: -ffFoeR(c) * .9 }, s, 'core');
-    if (K.on) ffCoffinAt(e, now, (i, P, dir, h, w, clear) => {
-      // (thrown up from the ground one after another, each a little past its height and back)
-      const g = ffBack((el - (i % 8) * .028 - (i >= 8 ? .1 : 0)) / K.grow); if (g <= 0) return;
-      ffShard(P, dir, h * g, { k: K.k, seed: e.seed + i * 7, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear: Math.max(clear, K.clear * (clear > 0 ? 1 : .35)), crack, floor: .55, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
-      if (i < 3) {
-        tops.push([P[0] + dir[0] * h * .9, P[1] + dir[1] * h * .9, P[2] + dir[2] * h * .9]);
-        // hoarfrost creeping up its great slabs while it holds
-        if (lv === 2 && K.fern > 0) ffFern([P[0], P[1] + h * .04, P[2]], dir, h * K.fern * (.8 + .2 * ffRnd(e.seed + i * 5)), { grow: ffSs(.2, 1.3, el - i * .12), age: crack * .7, k: .6, seed: e.seed + i * 3, pull: .07, floor: .55 }, s, 'crystals');
+    // the minion itself is the block of ice (owner: "change it from the big slabs to turning a minion into a solid block of
+    // ice, make his asset encased"): its own body is drawn inside shells of ice of its own shape (ffShell, below), held
+    // as it stood when the ice took it. Here: icicles hanging from it, and the cold coming off it
+    const x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), g = ffSs(0, K.grow * 1.6, el);
+    tops.push([x, y0 + H * .92, z]);
+    // the block: the lab's ice on the minion's own body and round its outline, closing over it from its feet
+    if (B.on && ffDeepIce()) ffEncase(c, ffSs(0, K.grow * 2.2, el), crack, .11 * B.thick, s, 'core');
+    if (K.on) {
+      const rt = RD.right, fw = frtFw(), n = Math.max(2, Math.round(K.count * [.5, .75, 1][lv] * (K._g ? K.n : 1)));
+      for (let i = 0; i < n; i++) {
+        const a = (n > 1 ? i / (n - 1) * 2 - 1 : 0) * .95 + (ffRnd(e.seed + i * 3) - .5) * .3, hy = .42 + .4 * ffRnd(e.seed + i * 7), len = H * K.long * (.6 + .7 * ffRnd(e.seed + i)) * ffBack((el - .12 - i * .05) / (K.grow * 1.4));
+        if (len <= .01) continue;
+        const P = [x + rt[0] * a * R * .9 + fw[0] * R * .55, y0 + H * hy, z + rt[2] * a * R * .9 + fw[2] * R * .55];
+        ffShard(P, ffNorm([rt[0] * a * .12, -1, rt[2] * a * .12]), len, { k: K.k, seed: e.seed + i * 7, fat: .3, tip: .7, clear: K.clear * .4, crack, floor: .6, pull: .04 }, s, 'crystals');
+        if (i === tipN) ffShot('glint', P[0], P[1] - len * .9, P[2], .26, .5, { fat: 1 }, s, 'crystals');
       }
-      // (light caught on one of its points, now and then)
-      if (i === tipN && g >= 1) ffShot('glint', P[0] + dir[0] * h * .93, P[1] + dir[1] * h * .93, P[2] + dir[2] * h * .93, .3, .5, { fat: 1 }, s, 'crystals');
-    });
-    // the one great crystal closed over the foe: clear, so the foe is seen through its faces
-    if (B.on) {
-      const g = ffBack((el - .1) / (K.grow * 1.25)), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), h = (H * B.high + .12) * g, rt = RD.right;
-      if (g > 0) ffShard([ffFoeX(c), ffFoeY(c), ffFoeZ(c)], ffNorm([rt[0] * .1, 1, rt[2] * .1]), h, { k: B.k, seed: e.seed + 61, fat: R * B.wide / Math.max(.05, h / g), tip: .3, clear: B.clear, crack, floor: .55, pull: R * .9 + .12 }, s, 'core');
+      // (light caught on the ice over its body, now and then)
+      if (lv && tipN >= 0 && Math.random() < .5) ffShot('glint', x + (Math.random() - .5) * R * 1.4, y0 + H * (.3 + .6 * Math.random()), z + (Math.random() - .5) * R * 1.4, .22, .45, { fat: 1, pull: R + .1 }, s, 'crystals');
     }
     // it locks: one hard glint as the last of it closes
-    if (!e.locked && el > K.grow + .16) { e.locked = 1; if (tops[0] && lv) ffShot('glint', tops[0][0], tops[0][1], tops[0][2], .55, .28, { fat: 1, k: 1.1 }, s, 'crystals'); }
+    if (!e.locked && el > K.grow * 1.6) { e.locked = 1; if (lv) ffShot('glint', tops[0][0], tops[0][1] - H * .3, tops[0][2], .6, .3, { fat: 1, k: 1.1, pull: R + .1 }, s, 'crystals'); }
     // the cold pouring off it: vapour spilling from its tops and falling down its sides
     if (lv && M.on && M.every > 0 && tops.length && now >= (e.mi || 0)) { e.mi = now + M.every * (lv === 1 ? 1.8 : 1) * (.7 + .6 * Math.random()); const T = tops[(Math.random() * tops.length) | 0], a = Math.random() * TAU;
       ffShot('mist', T[0], T[1], T[2], .3 + .12 * Math.random(), 1.1, { vy: -.85, vx: Math.cos(a) * .2, vz: Math.sin(a) * .2, drag: 1.1, grow: 1.1, a: .5 }, s, 'mist');
@@ -89955,8 +90164,7 @@ function ffCoffinBreak(e, now) {
   const s = 'cc_rimelance', c = e.c, S = efx(s, 'shards'), M = efx(s, 'mist'), L = efx(s, 'light'), x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c));
   const K = efx(s, 'crystals'), per = Math.max(1, Math.round(S.count / 4 * [.5, .75, 1][ffLv()] * (S._g ? S.n : 1)));
   ffCoffinAt(e, now, (i, P, dir, h, w, clear) => {
-    if (K.on) ffShot('spike', P[0], P[1], P[2], h, .13, { dir, grow: .001, hold: 0, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear, k: K.k, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
-    if (S.on) for (let j = 0; j < (i < 5 ? per : 1); j++) ffSplinters(P[0], P[1] + h * (.25 + .6 * Math.random()), P[2], 1, Math.max(S.w, h * .3) * (.8 + .5 * Math.random()), S.fling * .7, S.secs, s, { dir: [(P[0] - x) * 2, 0, (P[2] - z) * 2], up: .6 });
+    if (S.on) for (let j = 0; j < (i < 5 ? per : 1); j++) ffSplinters(x + (P[0] - x) * .55, y0 + H * (.2 + .7 * Math.random()), z + (P[2] - z) * .55, 1, Math.min(.3, Math.max(S.w, h * .2)) * (.8 + .5 * Math.random()), S.fling * .7, S.secs, s, { dir: [(P[0] - x) * 2, 0, (P[2] - z) * 2], up: .6 });
   });
   if (S.on) { ffShot('flash', x, y0 + H * .6, z, 1.5, .16, { k: 1.1 }, s, 'shards'); ffShot('burst', x, y0 + H * .5, z, H * 2.7, .45, { k: 1 }, s, 'shards'); if (ffLv()) ffGlints(x, y0 + H * .7, z, ffN(S, 9, [0, .6, 1]), ffFoeR(c) * 4, s, 'shards'); }
   if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', x + (Math.random() - .5) * .3, y0 + H * (.3 + .3 * i), z + (Math.random() - .5) * .3, M.w, M.secs, { vy: -.15, grow: .9, delay: i * .06 }, s, 'mist');
@@ -89990,9 +90198,10 @@ function ffBlooms(now, dt) {
 // rolls out to its real edge r
 function ffBloomBurst(x, y, z, r) {
   const s = 'cc_hoarbloom', B = efx(s, 'burst'), S = efx(s, 'shards'), L = efx(s, 'light'), K = efx(s, 'crystals');
-  if (B.on) { ffShot('flash', x, y, z, B.w * .7, B.secs, { k: B.k * .7 }, s, 'burst'); if (B.spray > 0) ffShot('burst', x, y, z, B.spray, .36, { k: B.k * .9 }, s, 'burst'); if (B.rose > 0) ffRosette(x, y, z, 6, B.rose, s, 'burst', { k: B.k, dur: .62, hold: .16 }); }
+  if (B.on) { ffShot('flash', x, y, z, B.w * (B.rose > 0 ? .7 : 1), B.secs, { k: B.k * (B.rose > 0 ? .7 : 1) }, s, 'burst'); if (B.spray > 0) ffShot('burst', x, y, z, B.spray, .36, { k: B.k * .9 }, s, 'burst'); if (B.rose > 0) ffRosette(x, y, z, 6, B.rose, s, 'burst', { k: B.k, dur: .62, hold: .16 }); }
   if (S.on) { const n = ffN(S, S.count, [.5, .75, 1]); ffSplinters(x, y, z, Math.ceil(n * .4), K.long * .8, S.fling, S.secs, s, { up: 1.2 }); ffSplinters(x, y, z, Math.floor(n * .6), S.w, S.fling * .8, S.secs, s, { up: 1.8 }); }
   if (efx(s, 'mist').on) ffWave(x, z, r, s);
+  ffFrostAt(x, z, r, 3.2, .45, s);
   if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
 }
 
@@ -90000,14 +90209,15 @@ function ffBloomBurst(x, y, z, r) {
 function ffFoes(now, dt) {
   const s = 'cc_frostfoe', K = efx(s, 'crystals'), M = efx(s, 'mist'), lv = ffLv(); if (!K.on && !M.on) return;
   const rt = RD.right, fw = frtFw(), rl = Math.hypot(rt[0], rt[2]) || 1, rx = rt[0] / rl, rz = rt[2] / rl, fl = Math.hypot(fw[0], fw[2]) || 1, fx = fw[0] / fl, fz = fw[2] / fl;
-  let left = Math.round(K.max * [.4, .7, 1][lv]);
+  let left = Math.round(K.max * [.4, .7, 1][lv]), ferns = 10;
   for (const c of G.creeps) {
     if (c.dead) continue;
     const fz0 = ffFrozen(c), cold = c.frostT > 0;
-    if (!fz0 && !cold) { if (c._ffZ) c._ffZ = null; continue; }
+    if (!fz0 && !cold) { if (c._ffZ) c._ffZ = null; if (c._ffK) c._ffK = null; continue; }
     const x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.5, ffFoeH(c)), R = ffFoeR(c);
-    if (fz0 && !c._ffC) {
-      // frozen: small crystals grown at its feet (a coffin draws its own)
+    if (fz0 && !c._ffC && ffDeepIce() && efx('cc_rimelance', 'core').on) { if (!c._ffZ) c._ffZ = { at: now, seed: (Math.random() * 97) | 0 }; ffEncase(c, ffSs(0, .25, now - c._ffZ.at), ffSs(.3, 0, c.stunT) * .8, .05, 'cc_rimelance', 'core'); }
+    if (fz0) {
+      // frozen: small crystals grown at its feet
       const e = c._ffZ || (c._ffZ = { at: now, seed: (Math.random() * 97) | 0 });
       if (K.on && left > 0) {
         left--; const n = Math.max(2, Math.round(K.count * [.5, .75, 1][lv] * (K._g ? K.n : 1)));
@@ -90020,7 +90230,13 @@ function ffFoes(now, dt) {
     } else if (c._ffZ && !fz0) {
       // thawed: its crystals drop
       c._ffZ = null;
-      if (K.on && !c._ffC) ffSplinters(x, y0 + H * .25, z, ffN(K, 3, [.34, .67, 1]), .14, 1, .45, s, { up: .6 });
+      if (K.on) ffSplinters(x, y0 + H * .25, z, ffN(K, 3, [.34, .67, 1]), .14, 1, .45, s, { up: .6 });
+    }
+    // hoarfrost climbing it from its feet while the cold is on it, crumbling as it wears off
+    if (lv === 2 && K.on && K.fern > 0 && ferns > 0) {
+      ferns--; if (!c._ffK) c._ffK = { at: now, seed: (Math.random() * 97) | 0 };
+      const gr = Math.min(1, (now - c._ffK.at) / .6), ag = fz0 ? 0 : 1 - Math.min(1, c.frostT / .4);
+      for (const q of [-1, 1]) ffFern([x + (rx * q * .55 + fx * .55) * R, y0 + .03, z + (rz * q * .55 + fz * .55) * R], ffNorm([rx * q * .22, 1, rz * q * .22]), H * K.fern * (q > 0 ? 1 : .8), { grow: gr, age: ag, k: .55, seed: c._ffK.seed + q, pull: .08, floor: .55 }, s, 'crystals');
     }
     // the cold coming off it: mist sinking, a glint
     if (M.on && lv && Math.random() < dt * M.rate * (fz0 ? .6 : 1)) {
@@ -90037,6 +90253,49 @@ function ffCrit(c) {
   ffSplinters(ffFoeX(c), y, ffFoeZ(c), [4, 6, 8][ffLv()], .17, 1.9, .5, s, { up: 1.6 });
 }
 
+// the lab's ice laid on a minion's own body and round its outline (frosttex.js ICE; High only: it reads the frame's depth).
+// grow: how far it has closed over it from its feet; thick: the ice round it (world units)
+function ffEncase(c, grow, crack, thick, s, l) {
+  const x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), fw = frtFw();
+  // (no wider than the minion and its ice: a neighbour standing close is left alone as far as can be)
+  const h = H * 1.5 + .5, w = R * 3.3 + .3, cy = y0 + H * .5, o = { age: grow, seed: (c.id | 0) % 97, p0: R * 1.5 + .25, p1: cy, crack, clear: thick, tail: fw[1], soft: R * 1.1 + .12, k: 1, a: 1, pull: R * 1.5 + .25 };
+  if (ffTune(s, l, 1, o) == null) return false;
+  return frtBill(FRT_SH.ICE, [x, cy, z], w, h, FF_SQ, o);
+}
+// (is the minion's ice drawn from the frame's depth? Else, on Medium and Low, a plain glaze of its own shape stands in)
+const ffDeepIce = () => ffLv() === 2 && typeof FRT !== 'undefined' && FRT.refract !== 0 && !(FRT.cap && FRT.cap.ok === false) && !(FRT.dcap && FRT.dcap.ok === false);
+
+/* ---- the minion in the ice: held as it stood, its own body inside shells of ice of its own shape ---- */
+// A frozen foe keeps the stride it had when the ice took it (the game's own draw snaps it to one pose), and its model is
+// drawn again, a little larger and clear, as a glaze of ice on it (an Ice Coffin also closes a block of clear ice over
+// it: ffCoffins). Drawn by the game's own model drawing, so it is the minion's own
+// shape, lit as the minion is.
+const _ffS = new Float32Array(16), _ffM = new Float32Array(16), FF_ICE = [.74, .97, 1.22, .34];
+function ffShell(dm, model, base, ph, o, c, R_) {
+  const B = efx('cc_rimelance', 'core'); if (!B.on || typeof M4 === 'undefined' || ffDeepIce()) return;
+  const cof = c.ccCoffin && c.ccCoffin.until > G.time && c._ffC, K = efx('cc_rimelance', 'crystals');
+  const g = cof ? ffSs(0, K.grow * 1.5, G.time - c._ffC.at) : Math.min(1, (c._ffZ ? G.time - c._ffZ.at : 1) / .15), kb = (B._g ? B.glow : 1), ka = (B._g ? B.alpha : 1) * B.a;
+  // (as it is about to break the ice flickers white)
+  const brk = cof ? ffSs(c.ccCoffin.until - .4, c.ccCoffin.until, G.time) : 0, fl = 1 + brk * (.5 + .5 * Math.sin(G.time * 55));
+  for (const [k, a] of cof ? [[.06, .42]] : [[.06, .32]]) {
+    const sc = 1 + k * g * B.thick * (B._g ? B.size : 1);
+    M4.trs(_ffS, 0, 0, 0, 0, 0, 0, sc, 1 + (sc - 1) * .55, sc); M4.mul(_ffM, base, _ffS);
+    dm(model, _ffM, ph, Object.assign({}, o, { alpha: Math.min(.9, a * g * ka), tint: [FF_ICE[0] * kb * fl, FF_ICE[1] * kb * fl, FF_ICE[2] * kb * fl, FF_ICE[3] * fl] }), R_);
+  }
+}
+if (typeof drawModel === 'function') {
+  const _dm = drawModel;
+  drawModel = function (model, base, ph, o, R_) {
+    const c = o && o.c;
+    if (!c || c.dead || !ffOn()) return _dm.apply(this, arguments);
+    if (!ffFrozen(c)) { c._ffPh = ph; return _dm.apply(this, arguments); }
+    if (c._ffPh != null) ph = c._ffPh;
+    const r = _dm.call(this, model, base, ph, o, R_);
+    try { if (!(o.alpha != null && o.alpha < 1)) ffShell(_dm, model, base, ph, o, c, R_); } catch (e) {}
+    return r;
+  };
+}
+
 /* ---- each frame: inside the view's spell pass (vfxParts), so the cards land in this frame's draw ---- */
 function ffFrame() {
   if (typeof FRT !== 'undefined') FRT.q.length = 0;
@@ -90046,7 +90305,7 @@ function ffFrame() {
   if (G.force !== 'conclave') { if (FF.shots.length) FF.shots.length = 0; return; }
   const now = G.time, dt = Math.max(0, Math.min(.1, now - FF.last)); FF.last = now;
   FF.cards = 0; FF.cap = [80, 140, 220][ffLv()];
-  ffCoffins(now, dt); ffBlooms(now, dt); ffFoes(now, dt); ffBolts(now); ffStaffs(now, dt); ffShots(now);
+  ffGrounds(now); ffCoffins(now, dt); ffBlooms(now, dt); ffFoes(now, dt); ffBolts(now); ffStaffs(now, dt); ffShots(now);
   if (typeof window !== 'undefined' && window.FF_TEST) window.FF_TEST();
   if (FRT.q.length > FF.peak) FF.peak = FRT.q.length;
 }
