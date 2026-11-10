@@ -1,4 +1,4 @@
-const BUILD_TAG = 'bbfb428@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b39f06e@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47937,31 +47937,35 @@ function forgeRunSim(o) {
 /* ================= HERO WEAPONS: a Champion keeps its iconic weapon all run, and it grows (force runs) =================
    The owner (9 Nov 2026) approved hero weapons. A Champion (the commander in person, the holy slot) never takes a dropped
    weapon: it fights with its ICONIC weapon (the one its model holds: WPN_ISSUED), which
-   1. AWAKENS in four named stages, I to IV (HW[unit].n). The milestone: wave bosses slain while the Champion stands on the
-      field (HW_AT: 1, 3 and 6 of them). Each stage raises its damage (HW_M) and a caster's Spell Damage (HW_SP), re-forges
-      it to the wave's Item Level, adds an effect tied to the hero's own kit (HW[unit].fx: an on-hit effect, a twist on one
-      of its named spells, crit, a mark, a slow), and lights it a step brighter (hwGlow: a colour and a strength 0..1 per
-      stage, which the sculpted models read: Maren's twin blade is tinted by it, every hero's weapon tip glows with it);
-   2. is UPGRADED by its own drops (the owner, 9 Nov 2026: "should get items that drop that upgrade the weapon, they can be
-      anything"; no borrowed terms): each hero has an upgrade item of its own (HUP: a Rift Shard for Maren, Sunsteel Ingots
-      for Aurelian ...), in three grades (plain, Gleaming, Flawless: HUP_STEP), dropped by wave bosses, elites and now and
-      then a wave's last foe while the hero is fielded (hupDropCheck). "Add to <its weapon>" raises its Item Level (up to
-      the wave's level sync) and its roll; its look never changes. (An older save's tempering record, 'melted' and 'tw',
-      is kept and does nothing.)
-   3. may be REFORGED, once a run and very rarely (HW_ULT_P): a wave boss slain while it is at stage III or IV can drop the
-      hero's reforged legendary, its ultimate form (HW[unit].ult: a new name, a stronger effect, a model key for the owner
-      to model; until then the same model at the final stage's glow), announced with a banner.
+   1. AWAKENS in stages, I to IV, and a rare reforged V. Its next stage is one of a wave boss's loot choices, beside the
+      relics (owner, 10 Nov 2026: "should always be part of the same loot table as other items ... make it rarer, and make
+      it the actual hero item with an upgraded name"; then: the stage as a Roman numeral on the item, "Warden Blade II",
+      "Warden Blade III" ...): the commander's own Champion only, from HW_GATE bosses slain while it stands, about once
+      every 2-3 bosses (HW_OFFER, hwOnLoot). Taking it consumes the weapon it holds (the owner: "when you equip it, it
+      consumes the previous version, have an animation to show that": heroweapons_ui.js). Each stage raises its damage
+      (HW_M) and a caster's Spell Damage (HW_SP), re-forges it to the wave's Item Level, adds an effect tied to the hero's
+      own kit (HW[unit].fx: an on-hit effect, a twist on one of its named spells, crit, a mark, a slow), steps its rarity
+      colour up (HW_RAR, the owner: "just make them blue to start": rare at I, epic at II-III, legendary at IV and V; frame
+      and name always that one colour) and lights it a step brighter (hwGlow: a colour and a strength 0..1 per stage,
+      which the sculpted models read: Maren's twin blade is tinted by it, every hero's weapon tip glows with it). Names:
+      stage I its own (HW[unit].n[0]), then the weapon's name and the numeral (hwNameOf); n[1..3], the older descriptive
+      names, are no longer shown.
+   2. Its separate upgrade items (the Rift Shard, Gate-Rune Ember ...: HUP, retired 10 Nov 2026) no longer drop; an older
+      save's are refunded as gold (HW_REFUND). (An older save's 'melted', 'tw' and 'ups' fields are kept and do nothing.)
+   3. V, the REFORGED form, after stage IV (HW_OFFER.ult a boss): HW[unit].ult: its look, a stronger effect, a model key
+      for the owner to model (until then the same model at the final stage's glow).
    Hero weapons are out of the drop pool (no weapon drops for a Champion), and the rack opens the hero's own page
    (heroweapons_ui.js). Saves: G.hw (s.hw); an older save's weapon on a Champion becomes its iconic weapon at the stage its
    rarity matches (uncommon or less I, rare II, epic III, legendary IV) and its Item Level.
-   Balance: a Champion joins near wave 15 (CHAMP_LEVEL), so its stages come about waves 15-20, 30 and 45; its damage then
+   Balance: a Champion joins near wave 15 (CHAMP_LEVEL); its stages come in fewer, bigger steps than the old path (stages
+   by boss count plus upgrade items keeping its Item Level at the wave), about the same total (hwRunSim); its damage
    tracks what a unit gains from an ordinary run's drops and forge (tools/check_weapons.js -v prints both), so the foes'
    health table (WPN_HP_TAB) stands. Art notes for each hero: docs/design/weapons.md (Hero weapons). */
-const HW_AT = [0, 1, 3, 6];                  // wave bosses slain while it stands, to reach stages I-IV
-const HW_M = [1, 1.1, 1.2, 1.32], HW_ULT_M = 1.55;   // its DPS over the Champion's baseline, by stage (x1% an Item Level above 1)
-const HW_SP = [16, 26, 38, 52], HW_ULT_SP = 70;      // a caster's Spell Damage at Item Level 1 (x the strike curve, x the wearer: as weapons)
-const HW_RAR = [2, 3, 3, 4];                 // the frame colour and rune sockets, by stage (rare, epic, epic, legendary)
-const HW_ULT_P = [0, 0, .03, .05];           // its reforged form's chance on a wave boss, by stage
+const HW_GATE = [0, 1, 2, 4];                // wave bosses slain while it stands before stage II, III, IV can be offered
+const HW_M = [1, 1.15, 1.28, 1.44], HW_ULT_M = 1.62;   // its DPS over the Champion's baseline, by stage (x1% an Item Level above 1)
+const HW_SP = [16, 28, 41, 56], HW_ULT_SP = 75;      // a caster's Spell Damage at Item Level 1 (x the strike curve, x the wearer: as weapons)
+const HW_RAR = [2, 3, 3, 4];                 // its rarity (frame, name colour, rune sockets), by stage: rare, epic, epic, legendary (V: legendary)
+const HW_NUM = ['I', 'II', 'III', 'IV', 'V'];   // the stage numerals (V: reforged)
 
 const HW_GLOW = [0, .35, .65, 1];
 // unit -> { n: its four stage names, fx: the effects stages II-IV add, glow, ult: [name, look, [effects]], art: notes }
@@ -48015,7 +48019,12 @@ function hwState(u) {
     S[u] = { hero: 1, u, b: WPN_CLASS[c].bases[0][0], rar: HW_RAR[0], il: Math.max(1, G.wave | 0), q: .5, stage: 0, bosses: 0, ult: false, id: -1 - Object.keys(S).length }; }
   return S[u];
 }
-const hwStageName = h => ['I', 'II', 'III', 'IV'][h.stage | 0];
+const hwStageName = h => HW_NUM[h.ult ? 4 : h.stage | 0];
+// its name: stage I its own ("Varic's Warden Blade"), then the weapon and its numeral ("Warden Blade III"; reforged: "Warden Blade V")
+const hwBase = u => HW[u] ? HW[u].n[0].replace(/^[^ ]+'s /, '') : '';
+const hwNameOf = h => !h || !HW[h.u] ? '' : h.ult || (h.stage | 0) ? hwBase(h.u) + ' ' + hwStageName(h) : HW[h.u].n[0];
+// its rarity: always its stage's (an older save's may differ)
+const hwRar = h => h.ult ? 4 : HW_RAR[Math.max(0, Math.min(3, h.stage | 0))];
 const hwFx = h => { const H = HW[h.u]; if (!H) return []; const fx = H.fx.slice(0, h.stage | 0); return h.ult ? fx.concat(H.ult[2]) : fx; };
 // its numbers (in place of a dropped weapon's: wpnCalc)
 function hwCalc(h) {
@@ -48048,7 +48057,7 @@ function hwTint(t, opts) {
   const _show = wpnShow;
   wpnShow = function (w) {
     if (!w || !w.hero || !HW[w.u]) return _show.apply(this, arguments);
-    const H = HW[w.u]; return { name: w.ult ? H.ult[0] : H.n[w.stage | 0], look: w.ult ? H.ult[1] : (WPN_ISSUED[w.u] || [])[2] || '', hue: H.glow };
+    const H = HW[w.u]; return { name: hwNameOf(w), look: w.ult ? H.ult[1] : (WPN_ISSUED[w.u] || [])[2] || '', hue: H.glow };
   };
   // the iconic weapon is in its hand from the first strike (effStats reads t.weapon); its stages' effects join the weapon's own
   const _eff = effStats;
@@ -48067,122 +48076,89 @@ function hwTint(t, opts) {
   unsocketAll = function (t) { if (t && t.weapon && t.weapon.hero) t.weapon = null; return _uns.apply(this, arguments); };
 }
 
-/* ---------- awakening and the reforged form: on a wave boss slain while the hero stands ---------- */
-function hwOnBoss(c) {
-  if (!hwOn() || !c || typeof isWaveBoss !== 'function' || !isWaveBoss(c)) return;
-  for (const t of G.towers || []) {
-    if (!hwIsHero(t) || t.wrecked) continue;
-    const h = hwState(t.def.unit); if (!h) continue; t.weapon = h;
-    h.bosses = (h.bosses | 0) + 1;
-    if (h.stage < 3 && h.bosses >= HW_AT[h.stage + 1]) {
-      h.stage++; h.rar = HW_RAR[h.stage]; h.il = Math.max(h.il | 0, G.wave | 0); delete h._c; G.talV = (G.talV || 0) + 1;
-      if (typeof onBanner === 'function') onBanner(`${HW[h.u].n[h.stage]}`, `${t.def.name.split(',')[0]}'s weapon awakens: stage ${hwStageName(h)} of IV`);
-      if (typeof sfx === 'function') sfx('lootDrop', 3);
-    }
-    if (!h.ult && Math.random() < HW_ULT_P[h.stage | 0]) hwReforge(t, h, c);
-  }
+/* ---------- its next stage: one of a wave boss's loot choices (owner, 10 Nov 2026) ----------
+   "remove these separate weapon upgrade drops, should always be part of the same loot table as other items ... make it
+   rarer, and make it the actual hero item with an upgraded name". The commander's own Champion only, while it stands:
+   each wave boss's loot counts one (h.bosses); once it has slain HW_GATE of them the next stage can be offered, in place of
+   one of the relics, at HW_OFFER.p a boss, never at two bosses running (HW_OFFER.gap) and sure at the third eligible
+   boss that passed without it (HW_OFFER.sure), so it comes about once every 2-3 bosses. The reforged form (V) follows
+   stage IV, rarely (HW_OFFER.ult). A legendary step (IV, V) never shares an offer with a legendary (the boss's signature
+   relic or a legendary weapon): the legendary pacing stands. Taking it CONSUMES the weapon it holds: the same weapon, a
+   stage up, re-forged to the wave's Item Level, its runes kept (heroweapons_ui.js plays the merge). */
+const HW_OFFER = { p: .5, sure: 3, gap: 2, ult: .1 };
+// the commander's own Champion on the field (a run has one Champion: the commander in person)
+function hwHeroT() {
+  const C = typeof champOf === 'function' ? champOf() : null, u = C && C.unit ? C.unit.id : null;
+  return (G.towers || []).find(t => hwIsHero(t) && !t.wrecked && (!u || t.def.unit === u)) || null;
 }
-function hwReforge(t, h, c) {
-  h.ult = true; h.rar = 4; h.il = Math.max(h.il | 0, (G.wave | 0) + 3); delete h._c; G.talV = (G.talV || 0) + 1;
-  if (G.stats) G.stats.heroReforged = h.u;
-  if (typeof onBanner === 'function') onBanner(HW[h.u].ult[0], `A reforged legendary: ${t.def.name.split(',')[0]}'s weapon in its ultimate form`);
-  if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .8, HW[h.u].ult[0], RARITY[4].col);
-  if (typeof sfx === 'function') sfx('lootDrop', 4);
-  if (typeof onToast === 'function') onToast(`${HW[h.u].ult[0]}: ${HW[h.u].ult[1]}. Its new rule: ${HW[h.u].ult[2].map(f => wpnRuleText({ fx: f })).join(' ')}`);
-}
-if (typeof kill === 'function') {
-  const _hwKill = kill;
-  kill = function (c) { const was = c && !c.dead, r = _hwKill.apply(this, arguments); if (was && c.dead) { try { hwOnBoss(c); hupDropCheck(c); } catch (e) { console.error(e); } } return r; };
-}
-
-/* ---------- the hero's upgrade items: their own drops, added to its weapon ----------
-   HUP: unit -> [name, glyph, hue, flavour]. A grade's step (HUP_STEP: Item Levels and roll) and its odds (HUP_GRADE: a
-   wave boss rolls better). Drops while the hero stands: a wave boss always, the last elite of an elite wave 40%, any other
-   elite 3%, a wave's last foe 20% (about 2-3 every 5 waves: the hero's Item Level keeps near the wave, as an ordinary unit's
-   weapons and forge do: hupRunSim, tools/check_weapons.js). They go to the hero's pouch (G.hup[unit]: counts by grade). */
-const HUP = {
-  ch_maelis: ['Starweave Thread', 'spiral', '#a07ae0', 'A thread of starlight spun on the Sixfold Loom.'],
-  ch_aurel: ['Clockwork Gear', 'hourglass', '#c09a50', 'A brass gear that turns backward.'],
-  ch_maren: ['Rift Shard', 'shards', '#d05a8a', 'A splinter of an open rift, still humming.'],
-  ch_elowen: ['Heartwood Sliver', 'leaf', '#4a9a4a', 'A sliver of the first wood\'s heart.'],
-  ch_faelan: ['Moon-Thorn', 'spikes', '#6a8a3a', 'A thorn that grew under the hunter\'s moon.'],
-  ch_nyssa: ['Bloom Seed', 'acorn', '#7aa840', 'A seed that flowers in the hand.'],
-  ch_haldra: ['Deep-Hold Ore', 'rocks', '#e08040', 'Ore from the deepest hold, warm to the touch.'],
-  ch_tovin: ['Sparking Coil-Spring', 'coil', '#b070ff', 'A spring wound so tight it sparks.'],
-  ch_grenna: ['Firebrew Dregs', 'flask', '#ff9a40', 'The last and strongest drops of the barrel.'],
-  ch_aurelian: ['Sunsteel Ingot', 'sun', '#ffd060', 'Steel quenched at dawn in the Ford.'],
-  ch_celestine: ['Dawnglass', 'sunburst', '#ffe08a', 'Glass that holds the first light of morning.'],
-  ch_morrow: ['Grail Ash', 'scales', '#d8e0f0', 'Ash from the grail\'s altar, cold and white.'],
-  ch_tarka: ['Thunderstone', 'thunder', '#80b8ff', 'A stone that fell with the lightning.'],
-  ch_oshana: ['Wind-Chime Bone', 'feather', '#c8f0ff', 'A bone chime that rings in still air.'],
-  ch_huri: ['Spirit Fang', 'antler', '#a8d0ff', 'A wolf\'s fang, carried back by its spirit.'],
-  ch_varic: ['Gate-Rune Ember', 'rune', '#ffb43a', 'A rune cut from the last gate, still glowing.'],
-  ch_aedric: ['Star-Iron', 'stars', '#fff0b0', 'Iron from a fallen star, bright as noon.'],
-  ch_isaura: ['Veil-Silk', 'swirl', '#e4d8ff', 'A strand of the veil that binds an oath.'],
-};
-const HUP_GRADE = ['', 'Gleaming ', 'Flawless '];
-const HUP_STEP = [{ il: 1, q: 0 }, { il: 3, q: .1 }, { il: 5, q: .25 }];
-const HUP_ODDS = { plain: [.72, .24, .04], boss: [.5, .38, .12] };
-const HUP_DROP = { lastElite: .4, elite: .03, last: .2 };
-const hupName = (u, g) => HUP[u] ? HUP_GRADE[g | 0] + HUP[u][0] : '';
-const hupFielded = () => (G.towers || []).filter(t => hwIsHero(t) && !t.wrecked);
-const hupPouch = u => { const P = G.hup || (G.hup = {}); return P[u] || (P[u] = [0, 0, 0]); };
-// what adding one of grade g makes of its weapon (a copy, for the preview)
-function hupResult(h, g) {
-  const o = Object.assign({}, h); delete o._c; const S = HUP_STEP[g | 0], cap = typeof ilCap === 'function' ? ilCap() : 60;
-  o.il = Math.max(h.il | 0, Math.min(cap, (h.il | 0) + S.il)); o.q = +Math.min(1, (h.q == null ? .5 : h.q) + S.q).toFixed(3);
+// the weapon its next step makes (a copy: the offer's card and compare), or null at the end of the road
+function hwNext(h) {
+  if (!h || h.ult) return null;
+  const o = Object.assign({}, h), now = typeof ilNow === 'function' ? ilNow() : Math.max(1, G.wave | 0); delete o._c;
+  if ((h.stage | 0) < 3) { o.stage = (h.stage | 0) + 1; o.rar = HW_RAR[o.stage]; o.il = Math.max(h.il | 0, now); }
+  else { o.ult = true; o.rar = 4; o.il = Math.max(h.il | 0, now + 3); }
+  if (Array.isArray(h.runes)) o.runes = h.runes.slice();
   return o;
 }
-const hupUseless = (h, g) => { const r = hupResult(h, g); return r.il === (h.il | 0) && r.q === (h.q == null ? .5 : h.q); };
-function hupUse(h, g) {
-  const P = hupPouch(h.u); if (!(P[g | 0] > 0)) return false;
-  if (hupUseless(h, g)) { if (typeof onToast === 'function') onToast(`${wpnName(h)} is at the wave's level: keep the ${hupName(h.u, g)} for later waves.`); return false; }
-  const r = hupResult(h, g); h.il = r.il; h.q = r.q; h.ups = (h.ups | 0) + 1; delete h._c; P[g | 0]--; G.talV = (G.talV || 0) + 1;
-  if (typeof sfx === 'function') sfx('equip', 3 + (g | 0) * .5); if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave();
-  return true;
-}
-function hupGive(t, boss, c) {
-  const u = t.def.unit; if (!HUP[u]) return null;
-  const O = boss ? HUP_ODDS.boss : HUP_ODDS.plain; let x = Math.random(), g = 0; while (g < 2 && x > O[g]) { x -= O[g]; g++; }
-  hupPouch(u)[g]++; G.hupNew = (G.hupNew || 0) + 1; if (boss) G.hupBossDrop = { u, g, wave: G.wave };
-  if (c && typeof addText === 'function') addText(c.x, c.y, (typeof hitH === 'function' ? hitH(c) : .6) + .3, hupName(u, g), HUP[u][2]);
-  if (typeof sfx === 'function') sfx('lootDrop', 2 + g);
-  if (typeof onToast === 'function') onToast(`${hupName(u, g)}: an upgrade for ${(typeof FLOAT_WORDS === 'undefined' || FLOAT_WORDS) ? wpnName(hwState(u)) : t.def.name.split(',')[0] + "'s weapon"}. Open ${t.def.name.split(',')[0]}'s weapon to add it.`);
-  return g;
-}
-function hupDropCheck(c) {
-  if (!hwOn() || G.state !== 'play' || !c || c.splitCopy || c.kid || (c.def && c.def.egg) || c.echo || c.sent || c.type === 'risen' || c.purse) return;
-  const H = hupFielded(); if (!H.length) return;
-  const wv = c.wv || G.wave, boss = typeof isWaveBoss === 'function' && isWaveBoss(c);
-  let p = 0;
-  if (boss) p = 1; else if (typeof isLastElite === 'function' && isLastElite(c)) p = HUP_DROP.lastElite; else if (c.elite) p = HUP_DROP.elite;
-  else { const last = !G.creeps.some(o => o !== c && !o.dead && o.wv === c.wv && !o.kid) && !(G.spawnQ || []).length; if (last && G.hupLastW !== wv) { G.hupLastW = wv; p = HUP_DROP.last; } }
-  if (p && Math.random() < p) for (const t of H) hupGive(t, boss, c);
-}
-// the hero's Item Level over a run with these drops (from the wave it joins): awakenings re-forge it, upgrades add up
-function hupRunSim(join, rnd) {
-  rnd = rnd || Math.random; let il = join, stage = 0, bosses = 0; const IL = [];
-  const pick = O => { let x = rnd(), g = 0; while (g < 2 && x > O[g]) { x -= O[g]; g++; } return g; };
-  for (let w = 1; w <= 50; w++) {
-    if (w >= join) {
-      const got = [];
-      if (bossWave(w)) { bosses++; if (stage < 3 && bosses >= HW_AT[stage + 1]) { stage++; il = Math.max(il, w); } got.push(pick(HUP_ODDS.boss)); }
-      else if (eliteWave(w) && rnd() < HUP_DROP.lastElite) got.push(pick(HUP_ODDS.plain));
-      if (rnd() < HUP_DROP.last) got.push(pick(HUP_ODDS.plain));
-      for (const g of got) il = Math.max(il, Math.min(w + 3, il + HUP_STEP[g].il));
-    }
-    IL[w] = il;
+// the effects its next step adds
+const hwNextFx = h => !h || h.ult ? [] : (h.stage | 0) < 3 ? [HW[h.u].fx[h.stage | 0]] : HW[h.u].ult[2];
+// a wave boss's loot opens (renown.js rnLootOpen, wrapped in heroweapons_ui.js): count the boss, maybe offer its next stage (L.hwo)
+function hwOnLoot(L) {
+  if (!L || L.hwo !== undefined) return; L.hwo = null;
+  if (!hwOn()) return; const t = hwHeroT(); if (!t) return;
+  const h = hwState(t.def.unit); if (!h) return; t.weapon = h;
+  h.bosses = (h.bosses | 0) + 1;
+  if (h.ult) return;
+  const n = (h.stage | 0) < 3 ? (h.stage | 0) + 1 : 4;
+  if (n < 4 && h.bosses < HW_GATE[n]) return;
+  if (h.offB != null && h.bosses - h.offB < HW_OFFER.gap) return;
+  if (n >= 3) {
+    if ((L.items || []).some(k => String(k).startsWith('L:'))) return;
+    const w = typeof wpOfferFor === 'function' ? wpOfferFor(L) : null; if (w && (w.rar | 0) >= 4) return;
   }
-  return IL;
+  const p = n === 4 ? HW_OFFER.ult : (h.dry | 0) >= HW_OFFER.sure - 1 ? 1 : HW_OFFER.p;
+  if (Math.random() < p) { L.hwo = { u: h.u, n }; h.offB = h.bosses; h.dry = 0; }
+  else if (n < 4) h.dry = (h.dry | 0) + 1;
 }
+// take it: the hero's weapon becomes its next stage (the old one is consumed); the relics offered are lost, as any choice's
+function hwTakeOffer() {
+  const R = rnS(), L = rnLootCur(); if (!L || !L.hwo) return null;
+  const h = hwState(L.hwo.u), nx = hwNext(h); if (!nx) return null;
+  const from = Object.assign({}, h); delete from._c;
+  h.stage = nx.stage; h.rar = nx.rar; h.il = nx.il; if (nx.ult) h.ult = true; delete h._c; G.talV = (G.talV || 0) + 1;
+  if (h.ult && G.stats) G.stats.heroReforged = h.u;
+  if (L.wpn && (L.wpn.rar | 0) >= 4) G.wLegN = Math.max(0, (G.wLegN | 0) - 1);   // (a legendary weapon passed over: its place in the pacing comes back)
+  R.loots.shift(); R.log.push({ w: L.w, k: 'loot', what: 'hero:' + h.u + ':' + hwStageName(h), reroll: L.reroll }); if (typeof rnDirty === 'function') rnDirty();
+  const t = hwHeroT(); if (t && t.def.unit === h.u) t.weapon = h;
+  return { from, to: h, t };
+}
+// a run's path (from the wave it joins): its DPS multiple (K) and stage (S) by wave, each offer taken as it comes
+function hwRunSim(join, rnd) {
+  rnd = rnd || Math.random; join = join || 15;
+  const h = { stage: 0, il: join, bosses: 0, dry: 0, offB: null, ult: false }, K = [], S = [];
+  for (let w = 1; w <= 50; w++) {
+    if (w >= join && bossWave(w) && !h.ult) {
+      h.bosses++; const n = h.stage < 3 ? h.stage + 1 : 4;
+      if ((n === 4 || h.bosses >= HW_GATE[n]) && (h.offB == null || h.bosses - h.offB >= HW_OFFER.gap)) {
+        const p = n === 4 ? HW_OFFER.ult : h.dry >= HW_OFFER.sure - 1 ? 1 : HW_OFFER.p;
+        if (rnd() < p) { h.offB = h.bosses; h.dry = 0; if (n === 4) { h.ult = true; h.il = Math.max(h.il, w + 3); } else { h.stage = n; h.il = Math.max(h.il, w); } }
+        else if (n < 4) h.dry++;
+      }
+    }
+    K[w] = w < join ? 1 : (h.ult ? HW_ULT_M : HW_M[h.stage]) * (1 + WPN_IL_GROW * (h.il - 1)); S[w] = h.ult ? 4 : h.stage;
+  }
+  return { K, S };
+}
+// the gold an older save's hero upgrade items (retired 10 Nov 2026) come back as, by grade (plain, Gleaming, Flawless)
+const HW_REFUND = [20, 40, 70];
 
 /* ---------- saves ---------- */
-const hwClean = h => { const o = {}; for (const k of ['hero', 'u', 'b', 'rar', 'il', 'q', 'stage', 'bosses', 'ult', 'id', 'melted', 'fg', 'ups']) if (h[k] != null) o[k] = h[k]; if (h.tw && h.tw.n) o.tw = { n: String(h.tw.n), il: h.tw.il | 0 }; if (Array.isArray(h.runes)) o.runes = h.runes.slice(); return o; };
+const hwClean = h => { const o = {}; for (const k of ['hero', 'u', 'b', 'rar', 'il', 'q', 'stage', 'bosses', 'offB', 'dry', 'ult', 'id', 'melted', 'fg', 'ups']) if (h[k] != null) o[k] = h[k]; if (h.tw && h.tw.n) o.tw = { n: String(h.tw.n), il: h.tw.il | 0 }; if (Array.isArray(h.runes)) o.runes = h.runes.slice(); return o; };
 if (typeof serialize === 'function') {
   const _hwSer = serialize;
   serialize = function () {
     const s = _hwSer.apply(this, arguments);
-    if (s && G.force) { s.hup = G.hup || {}; s.hw = {}; for (const u in G.hw || {}) s.hw[u] = hwClean(G.hw[u]); const hc = new Set((G.towers || []).filter(hwIsHero).map(t => t.i + ',' + t.j)); if (s.wpn && s.wpn.on) s.wpn.on = s.wpn.on.filter(([i, j]) => !hc.has(i + ',' + j)); }
+    if (s && G.force) { s.hw = {}; for (const u in G.hw || {}) s.hw[u] = hwClean(G.hw[u]); const hc = new Set((G.towers || []).filter(hwIsHero).map(t => t.i + ',' + t.j)); if (s.wpn && s.wpn.on) s.wpn.on = s.wpn.on.filter(([i, j]) => !hc.has(i + ',' + j)); }
     return s;
   };
 }
@@ -48195,33 +48171,36 @@ if (typeof restore === 'function') {
   };
 }
 function hwRestore(s) {
-  G.hw = {}; G.hup = {};
-  for (const u in (s && s.hup) || {}) if (HUP[u] && Array.isArray(s.hup[u])) G.hup[u] = [0, 1, 2].map(g => Math.max(0, s.hup[u][g] | 0));
+  G.hw = {}; delete G.hup;
+  // an older save's hero upgrade items (retired): refunded as gold, once (the save no longer carries them)
+  let gold = 0; for (const u in (s && s.hup) || {}) if (Array.isArray(s.hup[u])) for (let g = 0; g < 3; g++) gold += Math.max(0, s.hup[u][g] | 0) * HW_REFUND[g];
+  if (gold > 0) { G.gold = (G.gold | 0) + gold; if (typeof onToast === 'function') onToast(`Hero weapons now awaken from a boss's loot: the upgrade items you held are refunded as ${gold} gold.`); }
   for (const u in (s && s.hw) || {}) { const h = s.hw[u]; if (HW[u] && h && WPN_BASE[h.b]) G.hw[u] = Object.assign({ hero: 1, u, stage: 0, bosses: 0, q: .5, il: 1, rar: 2 }, h, { hero: 1, u, stage: Math.max(0, Math.min(3, h.stage | 0)) }); }
   // an older save: a weapon its Champion held becomes its iconic weapon at the stage its rarity matches (wpnRestore put it in the rack)
   for (const [i, j, w] of (s && s.wpn && s.wpn.on) || []) {
     const t = (G.towers || []).find(o => o.i === i && o.j === j); if (!t || !hwIsHero(t) || !w || w.hero) continue;
     const h = hwState(t.def.unit); if (!h) continue;
     const st = (w.rar | 0) >= 4 ? 3 : (w.rar | 0) === 3 ? 2 : (w.rar | 0) === 2 ? 1 : 0;
-    if (st > h.stage) { h.stage = st; h.bosses = Math.max(h.bosses | 0, HW_AT[st]); h.rar = HW_RAR[st]; }
+    if (st > h.stage) { h.stage = st; h.bosses = Math.max(h.bosses | 0, HW_GATE[st]); }
     h.il = Math.max(h.il | 0, w.il | 0); delete h._c;
     const k = (G.wbag || []).findIndex(q => q.id === w.id); if (k >= 0) G.wbag.splice(k, 1);
   }
+  for (const u in G.hw) G.hw[u].rar = hwRar(G.hw[u]);   // (its stage's colour, frame and name alike)
   for (const t of G.towers || []) if (hwIsHero(t)) { const h = hwState(t.def.unit); if (h) t.weapon = h; }
 }
 if (typeof newGame === 'function') {
   const _hwNew = newGame;
-  newGame = function () { const r = _hwNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.hw = {}; G.hup = {}; } return r; };
+  newGame = function () { const r = _hwNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.hw = {}; delete G.hup; } return r; };
 }
 
 /* ---------- balance: a Champion's weapon by wave, beside an ordinary unit's ----------
-   It joins near wave 15 (CHAMP_LEVEL) and sees a wave boss every 5th wave from then: stage II at the first (wave 15-20),
-   III at the third (about 30), IV at the sixth (about 45), each re-forged to its wave; its upgrade drops and the forge's re-forge
-   keep its Item Level near the wave between. hwTypical(w): its DPS multiple at wave w on that path (a melee hero). */
+   It joins near wave 15 (CHAMP_LEVEL) and sees a wave boss every 5th wave from then; its stages come from their loot
+   (hwRunSim: each taken when offered). hwTypical(w): its DPS multiple at wave w, the median of such runs (a melee hero). */
+const _hwTyp = {};
 function hwTypical(w, join) {
   join = join || 15; if (w < join) return 1;
-  const bosses = Math.floor(w / 5) - Math.floor((join - 1) / 5), st = bosses >= HW_AT[3] ? 3 : bosses >= HW_AT[2] ? 2 : bosses >= HW_AT[1] ? 1 : 0;
-  return (st >= 0 ? HW_M[st] : 1) * (1 + WPN_IL_GROW * (w - 1));   // (a melee hero, kept near the wave's level by its upgrades; level sync aside)
+  if (!_hwTyp[join]) { let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647, R = []; for (let i = 0; i < 801; i++) R.push(hwRunSim(join, rnd).K); _hwTyp[join] = R; }
+  const v = _hwTyp[join].map(K => K[w]).sort((a, b) => a - b); return v[v.length >> 1];
 }
 // the reforged form's model key for the owner's model (WEAPON_MDL); until it is there the hero keeps its own model, at full glow
 const hwModel = h => h && h.ult && WEAPON_MDL['hw_ult_' + h.u] ? 'hw_ult_' + h.u : null;
@@ -53249,7 +53228,12 @@ if (typeof sfxTuneSync === 'function') sfxTuneSync();
    (elementlab.js, runehold.html?elementlab=1) edits this file's tables live; the game reads them.
    - Eight effects: the Pyroclasts' Fireball (their strike), Furnace Breath, Skipping Flame and Phoenix; the Frostweavers'
      Frost Bolt (their strike), Frost Spear, Ice Coffin and Shatterbloom (ELEM_FX_SPELLS: ids as the game knows them; the
-     Frostweavers are cc_rimeweaver in code).
+     Frostweavers are cc_rimeweaver in code). Two more for the Pyroclasts that are not spells: Burning foes (the burns they
+     set) and Flame paint (the look of the shader all their fire is drawn by, pyrotex.js: live as it is tuned).
+   - The Pyroclasts' fire is drawn live by a flame shader (10 Nov 2026, pyrofire.js, pyrotex.js): its layers and values are
+     its own, each effect listing them (ELEM_FX_SPELLS[id].layers: hand flame, core, trail, burst, ring, flames, embers,
+     smoke, glow, light, ground; paint). Tuning saved on a device for the earlier sheets is dropped once (efxFresh). The
+     Frostweavers' are as they were.
    - Each effect is split into layers (EFX_LAYERS: core, flames, embers, smoke, heat glow, light flash, ground, trail, impact
      burst, ground ring; for frost shards, ice crystals and mist). Whatever an effect draws lands in one of them: the code that
      knows says which (efxPush), the rest is sorted by what it is (a spark is an ember, a puff is smoke: EFX_PK and friends).
@@ -53266,30 +53250,35 @@ if (typeof sfxTuneSync === 'function') sfxTuneSync();
 const EFX_KEY = 'runehold.elementlab.';
 // the effects the lab knows: [id]: { unit, el (fire | frost), name, basic (the unit's strike, not a spell) }
 const ELEM_FX_SPELLS = {
-  cc_fireball: { unit: 'cc_pyroclast', el: 'fire', name: 'Fireball', basic: 1 },
-  cc_pyresigil: { unit: 'cc_pyroclast', el: 'fire', name: 'Furnace Breath' },
-  cc_kindle: { unit: 'cc_pyroclast', el: 'fire', name: 'Skipping Flame' },
-  cc_flamewave: { unit: 'cc_pyroclast', el: 'fire', name: 'Phoenix' },
+  cc_fireball: { unit: 'cc_pyroclast', el: 'fire', name: 'Fireball', basic: 1, layers: ['hand', 'core', 'trail', 'burst', 'ring', 'embers', 'smoke', 'light', 'ground'] },
+  cc_pyresigil: { unit: 'cc_pyroclast', el: 'fire', name: 'Furnace Breath', layers: ['core', 'flames', 'embers', 'smoke', 'glow', 'light'] },
+  cc_kindle: { unit: 'cc_pyroclast', el: 'fire', name: 'Skipping Flame', layers: ['core', 'trail', 'burst', 'ring', 'flames', 'embers', 'smoke', 'light', 'ground'] },
+  cc_flamewave: { unit: 'cc_pyroclast', el: 'fire', name: 'Phoenix', layers: ['core', 'flames', 'trail', 'burst', 'ring', 'embers', 'smoke', 'ground', 'light'] },
+  // (not spells: the burns the Pyroclasts set on foes, and the look of the shader every one of their flames is drawn by,
+  // pyrotex.js; the lab loops the strike for both)
+  cc_pyroburn: { unit: 'cc_pyroclast', el: 'fire', name: 'Burning foes', basic: 1, layers: ['flames', 'embers'] },
+  cc_pyrostyle: { unit: 'cc_pyroclast', el: 'fire', name: 'Flame paint', basic: 1, layers: ['paint'] },
   cc_rime: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Bolt', basic: 1 },
   cc_glacialglyph: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Spear' },
   cc_rimelance: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice Coffin' },
   cc_hoarbloom: { unit: 'cc_rimeweaver', el: 'frost', name: 'Shatterbloom' },
 };
-// the layers, in the order the lab lists them, and their names for each element
+// the layers, in the order the lab lists them (an effect's own list, ELEM_FX_SPELLS[id].layers, first), and their names
 const EFX_LAYERS = {
   fire: ['core', 'flames', 'embers', 'smoke', 'glow', 'light', 'ground', 'trail', 'burst', 'ring'],
   frost: ['core', 'trail', 'burst', 'shards', 'crystals', 'mist', 'glow', 'light', 'ground', 'ring', 'embers'],
 };
 const EFX_LNAME = {
-  core: { fire: 'Core (the ball, the pour, the bird)', frost: 'Core (the bolt, the spear)' }, flames: 'Flames', embers: { fire: 'Embers / sparks', frost: 'Sparks / glints' },
-  smoke: 'Smoke', glow: { fire: 'Heat glow (hands, flares)', frost: 'Cold glow (flares, motes)' }, light: 'Light flash',
-  ground: { fire: 'Ground scorch / burning glyph', frost: 'Frost decal / ground' }, trail: 'Projectile trail', burst: 'Impact burst', ring: 'Ground ring',
+  core: { fire: 'Core (the comet, the cone, the bird)', frost: 'Core (the bolt, the spear)' }, flames: { fire: 'Flames (tongues, wings)', frost: 'Flames' },
+  hand: 'Hand flame', paint: 'Flame paint (every flame: outline, hot core, bands, curl, grain, halo; gradient = palette)', embers: { fire: 'Embers / sparks', frost: 'Sparks / glints' },
+  smoke: { fire: 'Smoke puffs', frost: 'Smoke' }, glow: { fire: 'Glow (under the flame)', frost: 'Cold glow (flares, motes)' }, light: 'Light flash',
+  ground: { fire: 'Ground (scorch, burning glyph, ground fire)', frost: 'Frost decal / ground' }, trail: { fire: 'Trail (tongues peeling off)', frost: 'Projectile trail' }, burst: { fire: 'Impact burst', frost: 'Impact burst' }, ring: { fire: 'Ring of flame (the real splash)', frost: 'Ground ring' },
   shards: 'Shatter shards', crystals: 'Ice crystals (spikes, block, bloom)', mist: 'Frost mist / snow',
 };
 const efxLName = (l, el) => { const n = EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
 // what each layer is made of (the controls the lab shows for it): p particles, g GPU particles, m moments, f flipbook fire,
 // l light, d decal / ground marks, b billboards drawn by the spell's own code (their own values below)
-const EFX_LKIND = { core: 'fmb', flames: 'fp', embers: 'pg', smoke: 'pgf', glow: 'pmf', light: 'lm', ground: 'dfm', trail: 'pmf', burst: 'mfp', ring: 'mp', shards: 'pg', crystals: 'pgmb', mist: 'pg' };
+const EFX_LKIND = { hand: 'f', paint: 'x', core: 'fmb', flames: 'fp', embers: 'pg', smoke: 'pgf', glow: 'pmf', light: 'lm', ground: 'dfm', trail: 'pmf', burst: 'mfp', ring: 'mp', shards: 'pg', crystals: 'pgmb', mist: 'pg' };
 // the controls every layer has, at the values that change nothing
 const EFX_GEN = { on: 1, n: 1, size: 1, sol: 1, life: 1, speed: 1, spread: 1, lift: 0, turb: 0, glow: 1, alpha: 1, blend: 'as', shape: 'as', grad: 0,
   c0: '#ffffff', a0: 1, c1: '#ffffff', a1: 1, c2: '#ffffff', a2: 1, haze: 0 };
@@ -53305,30 +53294,80 @@ const EFX_GEN_UI = [
 /* the values the effects' own code used to hard-code (pyrofire.js, the frost kit, forces_conclave_a.js), per effect and layer;
    EFX_INFO: [label, min, max, step] for the lab */
 const ELEM_FX_DEF = {
+  // the Pyroclasts' fire (pyrofire.js; drawn live by the flame shader, pyrotex.js). Sizes in world units.
   cc_fireball: {
-    core: { ball: .13, heat: .8 },                                   // the ball in flight (the lab's Fireball loop): its size, its heat
-    burst: { w: 3, wMax: 3.8, k: 1.1, kGreat: 1.2 },                 // the landing (the lab's pyroblast): width per cell of splash, most, brightness
-    glow: { hand: .045, handTier: .006, handFlare: .1, handHeat: .3 }, // the small flame in the casting hand
-    ground: { r: .6, rMax: .8, flare: .25 },                         // a burning glyph's fire: its radius share, most, flare
+    // the flame in the casting palm: length, longer each tier, grown as a cast gathers, brightness, its glow
+    hand: { flame: .2, tier: .012, cast: .7, k: 1, disc: .5 },
+    // the fireball in flight: its length (the ball two fifths of it across), brightness, its glow, how much of the lob's arc it keeps
+    core: { ball: .9, k: 1.05, disc: .8, arcK: .3 },
+    // tongues peeling off behind it: every (s), their length, how fast they rise, an ember's chance
+    trail: { every: .07, w: .2, rise: .3, ember: .3 },
+    // the landing: width per cell of splash, the largest, brightness, a great ball's, how long it plays
+    burst: { w: 2.3, wMax: 3.2, k: 1.05, kGreat: 1.2, secs: .5 },
+    // the ring of flame racing out: its reach (x the splash), how long
+    ring: { r: 1, secs: .34 },
+    // flung where it lands: how many, a great ball's, how hard, how long, their size
+    embers: { count: 6, great: 11, fling: 1.6, secs: .55, w: .07 },
+    // its puffs (none on Low): how many, a great ball's, size per splash, delay, rise
+    smoke: { puffs: 1, great: 2, w: 1, delay: .14, rise: .45 },
+    // the landing's flash: radius, brightness, how long; the light it carries in flight
+    light: { rad: 1.6, k: .8, secs: .22, fly: 1 },
+    // the scorch it leaves (per splash, how long); a burning glyph: tongues, their height, its glow, its lit rim, embers a second
+    ground: { scorch: .55, dur: 1.5, tongues: 4, tall: .34, disc: .3, rim: 1, ember: 3 },
   },
   cc_kindle: {
-    core: { ball: .1, arc0: .6, arc: .35, shrink: .88 },             // each hop: the ball's size, the first hop's arc, the others', each hop smaller by
-    burst: { w: 4.4, last: 1.25, shrink: .85, hit: .65 },            // each skip's burst (the lab's Skipping Flame): width, the last one bigger, smaller by, the hit's size
-    embers: { count: 5 },                                                // embers thrown at each skip
-    ground: { r: .6, rMax: .8, flare: .25, burst: .38 },             // the glyph each skip leaves, and the burst's fire where the bake is missing
+    // each hop: the comet's length, the first hop's arc, the others', each hop smaller by
+    core: { ball: .7, arc0: .6, arc: .35, shrink: .88, k: 1, disc: .7 },
+    light: { rad: 1.3, fly: .8 },
+    trail: { every: .06, w: .22, rise: .3, ember: .2 },
+    // each landing's burst: width, the last bigger by, each smaller by
+    burst: { w: 1.3, last: 1.3, shrink: .85, k: 1, secs: .42 },
+    ring: { r: .55, secs: .3 },
+    // tongues left licking round each landing
+    flames: { count: 3, w: .3 },
+    embers: { count: 5 },
+    // the last landing's puff
+    smoke: { w: .7 },
+    // the glyph each skip leaves
+    ground: { tongues: 3, tall: .3, disc: .28, rim: 1, ember: 2 },
   },
   cc_pyresigil: {
-    core: { len: 2.7, k: .85 },                                      // the pour from the hands (the lab's Furnace Breath loop): length per reach, brightness
-    flames: { every: .085, w0: 1.6, w1: 2, k0: 1.05, k1: .25 },      // the fire rolled out along the cone: a burst every, its width near and far, brightness
-    embers: { count: 4, every: 3 },                                      // embers off the burning foes: how many, every nth frame
-    light: { every: 12, rad: 1.3 },                                  // the ground lit where it strikes
+    // the cone: jets fanned across it, their reach (x the range), brightness, share of the cone, how far the far end dips
+    core: { jets: 5, len: 1.05, k: 1, cone: .8, drop: .6 },
+    // tongues lifting off along its far half: every (s), their length
+    flames: { every: .09, w: .42 },
+    // off the burning foes
+    embers: { every: .12, count: 2 },
+    smoke: { every: .4, w: .7 },
+    // the glow under the cone: opacity, width
+    glow: { a: .22, w: .45 },
+    light: { every: .35, rad: 1.4 },
   },
   cc_flamewave: {
-    core: { span: 7.4, k: 1.15 },                                    // the bird (the lab's Phoenix): its span, brightness
-    trail: { every: 2 },                                             // embers shed behind it, every nth frame
-    burst: { w: 3.4, k: 1 },                                         // the dive's blast (the lab's Phoenix blast)
-    ground: { boom: .55, r: .7, dur: 1.4 },                          // the fire left where it dives: the burst's fire, the patch's radius, how long
-    light: { every: 10 },                                            // its light as it flies
+    // the bird's body: its length, brightness, glow
+    core: { body: 1.1, k: 1.1, disc: .9 },
+    // its wings: their span, beat speed, tail length, brightness
+    flames: { wing: 1.3, beat: 8, tail: 1.5, k: 1 },
+    // shed behind it: every (s), the tongues' length
+    trail: { every: .05, w: .3 },
+    // the dive's blast
+    burst: { w: 3.2, k: 1.1, secs: .6 },
+    ring: { r: 1, secs: .4 },
+    embers: { count: 12 },
+    smoke: { puffs: 2, w: 1.4 },
+    // the fire left where it dives
+    ground: { r: .75, dur: 1.4, tongues: 5, tall: .42, disc: .35, rim: 0, ember: 4 },
+    light: { every: .3, rad: 1.6 },
+  },
+  cc_pyroburn: {
+    // on each burning foe: tongues, their height, opacity, brightness; most on screen
+    flames: { count: 2, tall: .32, a: .95, k: 1, max: 30 },
+    // a second, a foe
+    embers: { rate: 2.5 },
+  },
+  cc_pyrostyle: {
+    // the flame shader's look: outline width, hot core size, band softness, curl (sway), brush grain, halo
+    paint: { outline: 1, heart: 1, soft: 1, curl: 1, grain: 1, halo: 1 },
   },
   cc_rime: {
     core: { w: .24, core: .1, coreH: .16, a: .8 },                   // the bolt: its glow's width, the ice core's width and height, the glow's opacity
@@ -53346,19 +53385,34 @@ const ELEM_FX_DEF = {
   },
 };
 const EFX_INFO = {
-  ball: ['Ball size', .02, .5, .005], heat: ['Heat (brightness)', 0, 2, .02], w: ['Width', .02, 8, .01], wMax: ['Largest width', .5, 8, .05], k: ['Brightness', 0, 3, .02], kGreat: ['Brightness (great ball)', 0, 3, .02],
-  hand: ['Hand flame size', 0, .2, .002], handTier: ['Hand flame growth per tier', 0, .03, .001], handFlare: ['Hand flame flare', 0, 1.5, .01], handHeat: ['Hand flame heat', 0, 1.5, .01],
-  r: ['Radius', .05, 2, .01], rMax: ['Largest radius', .1, 2, .01], flare: ['Flare', 0, 1.5, .01], arc0: ['First hop arc', 0, 2, .01], arc: ['Hop arc', 0, 2, .01], shrink: ['Each hop smaller by', .4, 1.2, .01],
-  last: ['Last burst bigger by', .5, 2.5, .01], hit: ['Hit size', 0, 2, .01], count: ['How many', 0, 20, 1], halo: ['Halo width', 0, 1.5, .01], burst: ['Burst fire radius', 0, 1.5, .01],
-  len: ['Length (per reach)', .5, 6, .05], every: ['Every (s or frames)', .02, 30, .005], w0: ['Width near', .2, 5, .05], w1: ['Width far (added)', 0, 5, .05], k0: ['Brightness near', 0, 3, .02], k1: ['Brightness far (added)', 0, 2, .02],
-  rad: ['Light radius', 0, 5, .05], span: ['Span', 1, 16, .1], boom: ['Burst fire radius', 0, 2, .01], dur: ['How long (s)', 0, 5, .05],
+  ball: ['Ball length', .05, 2, .01], w: ['Width / size', .02, 8, .01], wMax: ['Largest width', .5, 8, .05], k: ['Brightness', 0, 3, .02], kGreat: ['Brightness (great ball)', 0, 3, .02],
+  flame: ['Flame length', .02, .6, .005], tier: ['Longer each tier', 0, .05, .001], cast: ['Grows as a cast gathers (x)', 0, 3, .05], disc: ['Glow disc', 0, 2, .01],
+  rise: ['Rise speed', 0, 2, .01], ember: ['Embers (chance / a second)', 0, 10, .05], great: ['How many (great ball)', 0, 30, 1], fling: ['Fling speed', 0, 5, .05], secs: ['Lifetime (s)', .05, 3, .01],
+  puffs: ['Puffs', 0, 6, 1], delay: ['Delay (s)', 0, 1, .01], scorch: ['Scorch radius (per splash)', 0, 2, .01], tongues: ['Tongues', 0, 12, 1], tall: ['Tongue height', .05, 1.2, .01],
+  len0: ['Length at the hands', .05, 2, .01], len1: ['Length added by the end', 0, 3, .01], cone: ['Share of the cone', 0, 1.5, .01], drop: ['Dip toward the ground', 0, 1, .01], chance: ['Chance', 0, 1, .01],
+  body: ['Body length', .1, 3, .01], wing: ['Wing span', .1, 2.5, .01], beat: ['Wing beat speed', 0, 25, .1], feathers: ['Feathers a wing', 1, 5, 1], tail: ['Tail length', 0, 2, .01],
+  max: ['Most on screen', 0, 80, 1], rate: ['A second', 0, 20, .1], jets: ['Jets across the cone', 1, 9, 1], arcK: ['Flight arc (x the lob: 0 flat)', 0, 1.5, .01], fly: ['Light carried in flight', 0, 2, .02], len: ['Reach (x the range)', .3, 2, .01],
+  outline: ['Outline width', 0, 3, .02], heart: ['Hot core size', .3, 3, .02], soft: ['Band softness', 0, 4, .05], curl: ['Curl', 0, 3, .02], grain: ['Brush grain', 0, 3, .02],
+  r: ['Radius', .05, 2, .01], arc0: ['First hop arc', 0, 2, .01], arc: ['Hop arc', 0, 2, .01], shrink: ['Each hop smaller by', .4, 1.2, .01],
+  last: ['Last burst bigger by', .5, 2.5, .01], count: ['How many', 0, 20, 1], halo: ['Halo width', 0, 3, .02],
+  every: ['Every (s)', .01, 2, .005], rad: ['Light radius', 0, 5, .05], dur: ['How long (s)', 0, 5, .05],
   core: ['Core width', .01, .5, .005], coreH: ['Core height', .01, .6, .005], a: ['Opacity', 0, 1, .01], h: ['Height', .1, 5, .02], rim: ['Rim opacity', 0, 1, .01], frost: ['Frost at the feet', 0, 1, .01], y: ['Height over the head', 0, 2, .01],
 };
 
 /* ---- state: what is tuned, and the context a drawing call is made in ---- */
 const EFX = { on: false, lab: false, cur: null, lay: null, live: {}, use: null, cache: {}, stat: {}, dup: false };
+// tuning saved on this device for the Pyroclasts' earlier fire (other values, other sizes) is dropped, once
+const EFX_PYRO_V = '2';
+function efxFresh(o) { if (o) for (const id in ELEM_FX_SPELLS) if (ELEM_FX_SPELLS[id].unit === 'cc_pyroclast') delete o[id]; return o; }
 // the device's Use in game set (only if the owner turned it on in the lab)
-try { if (typeof localStorage !== 'undefined') { const u = localStorage.getItem(EFX_KEY + 'use'); if (u) EFX.use = JSON.parse(u); } } catch (e) { EFX.use = null; }
+try {
+  if (typeof localStorage !== 'undefined') {
+    const old = localStorage.getItem(EFX_KEY + 'pyrov') !== EFX_PYRO_V;
+    for (const k of ['use', 'live']) { const u = localStorage.getItem(EFX_KEY + k); if (u && old) localStorage.setItem(EFX_KEY + k, JSON.stringify(efxFresh(JSON.parse(u)))); }
+    if (old) localStorage.setItem(EFX_KEY + 'pyrov', EFX_PYRO_V);
+    const u = localStorage.getItem(EFX_KEY + 'use'); if (u) EFX.use = JSON.parse(u);
+  }
+} catch (e) { EFX.use = null; }
 // the effect a drawing call belongs to: the lab's explicit context, else the spell being drawn (spellfx.js) or cast
 function efxSpell() { return EFX.cur || (typeof SFX_NOW !== 'undefined' && SFX_NOW) || (typeof AB_NOW !== 'undefined' && AB_NOW) || null; }
 // draw as effect s, layer l (null: sorted by what is drawn) until efxPop; cheap when nothing is tuned
@@ -53388,7 +53442,7 @@ function efxCount(s, l, n) { if (!EFX.lab) return; const S = EFX.stat[s] || (EFX
 // part() kinds (game.js, vfx.js)
 const EFX_PK = { spark: 'embers', xspark: 'embers', ember: 'embers', xember: 'embers', smoke: 'smoke', xsmoke: 'smoke', xpuff: 'smoke', xdust: 'smoke',
   flare: 'glow', wisp: 'glow', xwisp: 'glow', xrune: 'glow', xmote: 'mist', snow: 'mist', frost: 'mist', bubble: 'mist', xcrys: 'crystals', shard: 'shards',
-  xshard: 'shards', chunk: 'shards', xrock: 'shards', ring: 'ring', shock: 'ring', xflame: 'flames', xelem: 'glow' };
+  xshard: 'shards', chunk: 'shards', xrock: 'shards', ring: 'ring', shock: 'ring', xflame: 'flames', xelem: 'glow', pfe: 'embers' };
 // moments (spellfx.js sfxAdd kinds)
 const EFX_MK = { vburst: 'burst', vstar: 'burst', vflash: 'light', vring: 'ring', varea: 'ring', vglow: 'glow', v2disc: 'ground', v2gather: 'glow', v2ptrail: 'trail',
   v2proj: 'core', v2spikes: 'crystals', v2beam: 'trail', v2mark: 'glow', v2flames: 'flames', v2wedge: 'flames', v2band: 'trail' };
@@ -53402,7 +53456,7 @@ const efxLayerOf = (el, map, k, dflt) => efxHome(el, (EFX.lay) || map[k] || dflt
 /* ---- the particles: a part() call under a tuned layer ---- */
 // the shape each part() kind is drawn as when the lab redraws it (its colour gradient, blend or shape changed)
 const EFX_SHAPE_OF = { spark: 'SPARK', xspark: 'SPARK', ember: 'EMBER', xember: 'EMBER', flare: 'GLOW', wisp: 'WISP', xwisp: 'WISP', xrune: 'RUNE', smoke: 'SMOKE', xsmoke: 'SMOKE',
-  xdust: 'SMOKE', xpuff: 'PUFF', shard: 'SHARD', xshard: 'SHARD', xcrys: 'CRYS', frost: 'GLOW', xmote: 'STAR', snow: 'STAR', xflame: 'FLAME', chunk: 'SHARD', xrock: 'SHARD', bubble: 'GLOW' };
+  xdust: 'SMOKE', xpuff: 'PUFF', shard: 'SHARD', xshard: 'SHARD', xcrys: 'CRYS', frost: 'GLOW', xmote: 'STAR', snow: 'STAR', xflame: 'FLAME', pfe: 'EMBER', chunk: 'SHARD', xrock: 'SHARD', bubble: 'GLOW' };
 const EFX_SOFT = { SMOKE: 1, PUFF: 1, CRYS: 1, SHARD: 1 };   // (drawn soft, not added, unless the blend says otherwise)
 const EFX_GROUND = { ring: 1, shock: 1 };
 function efxPart(o) {
@@ -58318,15 +58372,16 @@ vec3 lightAt(vec3 n, vec3 W, float sh, float trans){
   }
   return light;
 }
-vec3 finish(vec3 col, vec3 W){
-  float fd = distance(W, uCam); float fog = smoothstep(uFog.x, uFog.y, fd);
+vec3 finishK(vec3 col, vec3 W, float fk){   // (fk: how much of the fog; the trees' own amount from the Light Lab, 1 elsewhere)
+  float fd = distance(W, uCam); float fog = clamp(smoothstep(uFog.x, uFog.y, fd)*fk, 0., 1.);
   col = mix(col, uFogCol, fog);
   col = uTMo > .5 ? filmic(col*uExpo) : aces(col*.9*uExpo);
   col = pow(col, vec3(1./2.2));
   float lum = dot(col, vec3(.299,.587,.114));
   col = mix(col*vec3(.86,.93,1.12), col*vec3(1.06,1.0,.9), smoothstep(.15,.75,lum));
   return mix(vec3(lum), col, 1.06);
-}`;
+}
+vec3 finish(vec3 col, vec3 W){ return finishK(col, W, 1.); }`;
 const FS_LIT = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vNor, vCol, vW, vOP, vON; in vec4 vL; in float vEm; flat in float vMat, vMatP;
@@ -58336,6 +58391,7 @@ uniform sampler2D uGT; uniform float uGTOn; uniform vec2 uGTS;   // tiled ground
 uniform sampler2D uGPT; uniform float uGPOn, uGPGain; uniform vec4 uGP;   // painted map laid on the ground: (x0, z0, 1/width, 1/depth)
 uniform sampler2D uGLT; uniform float uGLOn; uniform vec4 uGL;   // the ground's glint (glintdata.js): (strength, sharpness, world units a repeat, the blades' relief); mask scale in uGLK
 uniform float uGLK;
+uniform sampler2D uWM; uniform vec4 uWK;   // a painted map's moving water (tools/make_clwater.py: r the mask, gb the flow): (on, speed, warp, shimmer)
 uniform highp sampler2DArray uMT; uniform float uMTOn; uniform vec4 uMTR[${MAT_TEX.length}];
 const float MT_METAL[${MAT_TEX.length}] = float[${MAT_TEX.length}](${MAT_TEX.map(m => (m.metal || 0).toFixed(2)).join(', ')});   // textured materials (MAT_TEX): per layer, its average colour and scale
 uniform vec2 uGPS;   // (on, the painting's mean brightness): towers and foes take the light painted under them
@@ -58348,6 +58404,25 @@ ${LIGHT_GLSL}
 
 float h11(float n){ return fract(sin(n*12.9898+4.1)*43758.5453); }
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+/* The painting's water, moving (owner, 10 Nov 2026: "add some motion warping to show a bit of movement in the water image"):
+   only where the mask says water. Two copies of the painting slide along the flow, each a half cycle apart and crossfaded
+   (the classic flow-map trick: no stretch builds up), a slow noise ripple drifts down the stream with them, and the bright
+   parts glint now and then. The flow's length is its speed: the falls run fast and straight down, the stream slowly. */
+vec3 waterAt(vec3 tx0, vec2 uv, vec4 wm, vec2 gx, vec2 gy){
+  vec2 f = wm.gb*2. - 1.; float sp = length(f), m = smoothstep(.02, .55, wm.r), t = uTime*uWK.y;
+  vec2 dir = f/max(sp, .001), p = vW.xz*2.4;
+  vec2 rip = vec2(vnoise(p - f*t*2.2 + vec2(t*.13, 0.)), vnoise(p.yx*1.13 + 5.2 - f*t*2.2)) - .5;
+  float T = t*(.55 + .9*sp), f0 = fract(T), f1 = fract(T + .5), A = (.08 + .3*sp)*uWK.z;
+  vec2 wv = rip*.09*uWK.z;
+  vec3 s0 = textureGrad(uGPT, uv + (wv - dir*A*(f0 - .5))*uGP.zw, gx, gy).rgb, s1 = textureGrad(uGPT, uv + (wv - dir*A*(f1 - .5))*uGP.zw, gx, gy).rgb;
+  vec3 c = mix(s0, s1, abs(f0 - .5)*2.);
+  float lum = dot(c, vec3(.3, .59, .11));
+  float n1 = vnoise(vW.xz*9. - f*t*5. + vec2(0., t*.7)), n2 = vnoise(vW.xz*13.7 + 3.1 - f*t*6.3 - vec2(t*.5, 0.));
+  float spark = smoothstep(.62, .95, n1)*smoothstep(.6, .95, n2)*smoothstep(.25, .7, lum)*uWK.w;
+  c *= 1. + (n1 - .5)*.12*uWK.w*smoothstep(.15, .5, lum);
+  c += c*spark*1.6 + vec3(.6, .9, 1.)*spark*.12;
+  return mix(tx0, c, m);
+}
 // planar object-space UV: walls map (around, up); near-flat faces map xz
 vec2 matUV(vec3 p, vec3 n){
   if(abs(n.y) > .8) return p.xz;
@@ -58460,6 +58535,7 @@ void main(){
     vec2 uv = (vW.xz - uGP.xy)*uGP.zw, ov = max(max(-uv, uv - 1.), 0.);
     float od = length(ov/uGP.zw);   // world units past the painting's edge: there the mirrored copy blurs and darkens, so its seam never shows
     vec3 tx = texture(uGPT, uv, clamp(od*1.8, 0., 5.)).rgb*(1. - clamp(od/3.6, 0., .85));
+    if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .02) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
     float shp = uShadowOn>.5 ? shadowAt(vL) : 1.;
     vec3 pl = vec3(0.);
     for(int i=0;i<6;i++){ if(i>=uNPL) break; vec3 d=uPL[i].xyz-vW; float l=length(d); float a=clamp(1.-l/uPL[i].w,0.,1.); a*=a; pl += uPLc[i]*a*(.35+.65*max(d.y/l,0.)); }
@@ -58779,6 +58855,10 @@ uniform vec4 uPropW, uPropC; uniform vec3 uPropL;   // (a painted map's props: i
 in vec3 vC;   // (the instance's foot)
 uniform vec3 uFade;   // the 3D maps' giant trees (map3d.js): above uFade.x the tree dissolves (gone by uFade.y), so the camera
                       // looks under the canopy at the trunks; uFade.z: moss on the bark (the tops of roots and low limbs)
+/* The Light Lab's Trees section (lightlab.js; drawTrees sets them, TREEK_DEF the look as it was): uTrB the bark's tint x
+   brightness, uTrL the leaves' tint x brightness (a: saturation), uTrK (sun through the leaves, the leaves' glint x, the
+   darkening toward the foot, its height x), uTrK2 (shadow received, canopy rim, fog x), uTrR the rim's colour */
+uniform vec4 uTrB, uTrL, uTrK, uTrK2; uniform vec3 uTrR;
 out vec4 o;
 ${NOISE_GLSL}
 ${LIGHT_GLSL}
@@ -58809,9 +58889,12 @@ void main(){
       if(uGPOn > .5) m *= .45;   // (on the painting: brown bark and roots with only a little warm moss, as painted)
       base = mix(base, mix(vec3(.05, .085, .03), vec3(.14, .13, .05), uGPOn)*(.7 + .6*fbm(vW.xz*5. + vW.y*3.)), clamp(m, 0., .9));
     } }
-  float sh = uShadowOn>.5 ? shadowAt(vL) : 1.;
+  if(uLeaf > .5 && uSway > .5){ float tl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(tl), base, uTrL.a)*uTrL.rgb; }   // (the Light Lab: leaves, bark; rocks left alone)
+  else if(uLeaf < .5) base *= uTrB.rgb;
+  float sh = uShadowOn>.5 ? mix(1., shadowAt(vL), uTrK2.x) : 1.;
   vec3 light = lightAt(n, vW, sh, uLeaf*.3);
-  float ao = uLeaf>.5 ? mix(.55, 1.05, smoothstep(.15,.95,vH)) : mix(.6,1.,smoothstep(0.,.3,vH));
+  float aoH = max(uTrK.w, .05);
+  float ao = uLeaf>.5 ? mix(mix(1., .55, uTrK.z), 1.05, smoothstep(.15*aoH,.95*aoH,vH)) : mix(mix(1., .6, uTrK.z),1.,smoothstep(0.,.3*aoH,vH));
   float pf = 1.;   // (the painted light under its foot, as a factor)
   if(uGPOn > .5 && uGPS.x > .5){   // the one lighting path on the painted map: the light painted where it stands, as the units
     vec2 pu = clamp((vC.xz - uGP.xy)*uGP.zw, 0., 1.);
@@ -58822,7 +58905,7 @@ void main(){
       base *= mix(vec3(.82, .86, 1.08), vec3(1.14, 1.06, .8), lit);
     }
   }
-  float gc = uFade.z > 0. ? (1. - .45*(1. - smoothstep(0., .9, vW.y - vC.y))) : 1.;   // (a giant's soft contact with the ground)
+  float gc = uFade.z > 0. ? (1. - .45*uTrK.z*(1. - smoothstep(0., .9*aoH, vW.y - vC.y))) : 1.;   // (a giant's soft contact with the ground)
   vec3 col = base*light*ao*gc*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
   bool prop = uGPOn > .5 && uPropW.a > 0. && uSway > .5;
   if(prop){   // the painting's own light on its props (trunks, roots, clumps, plants), in place of the moonlight and the map's
@@ -58839,12 +58922,18 @@ void main(){
     pc += uPropC.rgb*rimP*(1. - smoothstep(-.3, .2, dk))*uPropC.a*.35*lf*(.2 + bl*2.);    // a faint cool rim in the shade
     col = pc*clamp(pf, .55, 1.2)*ao*gc;
   }
+  if(uLeaf > .5 && uSway > .5 && (uTrK.x > 0. || uTrK2.y > 0.)){   // (the Light Lab: sun through the leaves when backlit, a rim on the canopies)
+    vec3 Lt = prop ? normalize(uPropL) : uSunDir, Vt = normalize(uCam - vW), Lc = prop ? uPropW.rgb*(.6 + uPropW.a) : uSunCol;
+    float back = max(0., -dot(n, Lt))*.6 + .4*pow(max(0., dot(-Lt, Vt)), 3.);
+    col += base*Lc*back*uTrK.x*mix(.35, 1., sh)*1.5;
+    col += uTrR*pow(1. - abs(dot(n, Vt)), 2.5)*uTrK2.y*(.3 + dot(base, vec3(.3, .59, .11))*2.)*mix(.5, 1., sh);
+  }
   if(uLeaf > .5 && uTOn > .5){ vec3 Vs = normalize(uCam - vW); float lum = dot(base, vec3(.3, .59, .11))/max(.05, uGain*.3);
-    col += uSunCol*pow(max(dot(n, normalize(uSunDir + Vs)), 0.), 36.)*.35*sh*clamp(lum*lum, 0., 1.); }   // (a glint on wet stone and leaf edges)
+    col += uSunCol*pow(max(dot(n, normalize(uSunDir + Vs)), 0.), 36.)*.35*uTrK.y*sh*clamp(lum*lum, 0., 1.); }   // (a glint on wet stone and leaf edges)
   if(uFade.z > 0.){ vec3 V = normalize(uCam - vW); float rim = pow(1. - max(dot(n, V), 0.), 2.6);   // the giants: a silvery rim of moonlight down the trunks
     if(!prop) col += rim*uSunCol*uRim*(uLeaf > .5 ? .25 : .9)*mix(.4, 1., sh)*(.25 + base*2.)*(1. - smoothstep(4., 10., vW.y)*.7);
     col *= mix(1., prop ? .6 : .22, smoothstep(2.2, uFade.x, vW.y)); }   // rising into the canopy's shade (on the painting, as its trunks: lit well up)
-  o = vec4(finish(col, vW), 1.);
+  o = vec4(finishK(col, vW, uTrK2.z), 1.);
   if(uGPOn > .5) o.rgb = mix(o.rgb, dot(o.rgb, vec3(.2126, .7152, .0722))*uGrade.rgb, uGrade.a*(prop ? .35 : 1.));   // (the map's grade, as on the painting; lighter on the props, whose warm and cool are the painting's own)
 }`;
 const VS_TREE_SH = `#version 300 es
@@ -59458,6 +59547,7 @@ function createRenderer(canvas, opt = {}) {
       if (shadow) gl.uniformMatrix4fv(u.uLVP, false, this.lvp);
       else this.litUniforms(u);
       if (!shadow) this.bindTerrainTex(u);
+      if (!shadow && u.uTrB) { const K = this.treeK || TREEK_DEF; gl.uniform4fv(u.uTrB, K.b); gl.uniform4fv(u.uTrL, K.l); gl.uniform4fv(u.uTrK, K.k); gl.uniform4fv(u.uTrK2, K.k2); gl.uniform3fv(u.uTrR, K.r); }   // (the Light Lab's Trees: TREEK_DEF the look as it was)
       gl.activeTexture(gl.TEXTURE1); if (u.uTex) gl.uniform1i(u.uTex, 1);
       for (const t of this.trees) {
         if (t.leaf && !t.tex) continue;
@@ -59487,6 +59577,8 @@ function createRenderer(canvas, opt = {}) {
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, lm ? lm.tex : blank); gl.uniform1i(u.uLM, 2); gl.uniform1f(u.uLMOn, lm ? 1 : 0);
       if (lm) { gl.uniform4fv(u.uLMR, lm.rect); gl.uniform1f(u.uLMK, lm.k * (this.lmGain == null ? 1 : this.lmGain)); }
       if (u.uGPT) { const gp = this.gpaint; gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, gp ? gp.tex : blank); gl.uniform1i(u.uGPT, 5); gl.uniform1f(u.uGPOn, gp ? 1 : 0); if (gp) { gl.uniform4f(u.uGP, gp.rect[0], gp.rect[1], 1 / gp.rect[2], 1 / gp.rect[3]); gl.uniform1f(u.uGPGain, gp.gain || 1); } if (u.uGPS) gl.uniform2f(u.uGPS, gp && gp.shade ? 1 : 0, gp && gp.shade ? gp.shade : 1); }
+      if (u.uWM) { const w = this.gwater, on = !!(w && w.tex && this.gpaint && !(typeof GFX !== 'undefined' && GFX === 'low')), k = on ? w.k || WATER_K1 : WATER_K1;   // (a painted map's moving water: off on Graphics Low)
+        gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, on ? w.tex : blank); gl.uniform1i(u.uWM, 13); gl.uniform4f(u.uWK, on ? 1 : 0, k[0], k[1], k[2]); }
       if (u.uGLT) { const gl_ = this.glintTex(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, gl_ || blank); gl.uniform1i(u.uGLT, 8); gl.uniform1f(u.uGLOn, gl_ && this.glintOn && !(typeof vfxFid === 'function' && vfxFid().name === 'Low') ? 1 : 0); if (gl_) { const g = this.glint; gl.uniform4f(u.uGL, g.strength, g.sharpness, g.scale, g.relief); gl.uniform1f(u.uGLK, typeof GLINT_MASK_K !== 'undefined' ? GLINT_MASK_K : .31); } }
       if (u.uMT) { let mt = null; try { mt = matTexture(); } catch (e) {} gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D_ARRAY, mt || blankA); gl.uniform1i(u.uMT, 6); gl.uniform1f(u.uMTOn, mt ? 1 : 0); if (mt) gl.uniform4fv(u.uMTR, matRef); }
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
@@ -59661,6 +59753,10 @@ const SHK_DEF = new Float32Array([.3, 1.2, .0016, 0]), GLINTK_DEF = new Float32A
 const _litPL = new Float32Array(24), _litPC = new Float32Array(18), _glScG = [];
 // the trees' wind as it always was (drawTrees: uSwayK)
 const SWAY_K1 = new Float32Array([1, 1, 1]);
+// a painted map's water as tuned (speed, warp, shimmer; RD.gwater.k from maps.js WATER_DEF or the Light Lab)
+const WATER_K1 = [1, 1, 1];
+// the trees' light as it always was (FS_TREE uTrB, uTrL, uTrK, uTrK2, uTrR; RD.treeK from maps.js TREE_DEF or the Light Lab: lightlab.js treeUni)
+const TREEK_DEF = { b: new Float32Array([1, 1, 1, 0]), l: new Float32Array([1, 1, 1, 1]), k: new Float32Array([0, 1, 1, 1]), k2: new Float32Array([1, 0, 1, 0]), r: new Float32Array([.8, .9, 1]) };
 const OWN_K = [.55, 1.07, .22, 1.02];   // the units' gradient (FS_LIT uOwnK, after the tone curve): the light at the feet and at the head, and the heights (world) between
 
 /* ---- quad batch (CPU side) ---- */
@@ -62966,6 +63062,10 @@ const MALGRATH_WALK = {"n":32,"bones":["pelvis","spine","chest","head","armR","f
    lengths. Read by src/models_lead8_mobs.js. */
 const GNOLL_KIMODO = {"v":1,"src":{"run":"run_lope_3","back":"death_back_3","fwd":"death_knees_fwd_1","model":"Kimodo-SOMA-RP-v1.2","info":{"run":{"cut":[25,48],"frames":23,"crabDeg":0.1,"seconds":0.767,"loopErr":0.0364,"seamDeg":25.94,"strideK":1.3423,"speedLegs":1.751,"land":0.5312,"hipsK":1.0},"back":{"cut":[12,89],"seconds":2.567,"travelLegs":[-0.275,-0.83],"hipsEnd":0.049,"front":0.996,"land":0.545},"fwd":{"cut":[0,88],"seconds":2.933,"travelLegs":[0.169,1.18],"hipsEnd":0.096,"front":-0.951,"land":0.523}}},"run":{"n":32,"bones":["pelvis","spine","chest","head","armR","foreR","handR","armL","foreL","handL","thighR","shinR","footR","thighL","shinL","footL"],"strideK":1.3423,"rest":{"thighR":[0.0,-0.9998,-0.0184],"shinR":[0.0,-0.9966,-0.0828],"footR":[0.0,-0.3205,0.9472],"thighL":[0.0,-0.9998,-0.0184],"shinL":[0.0,-0.9966,-0.0828],"footL":[0.0,-0.3205,0.9472]},"legs":[0.0074,-0.8826,-0.3664,-0.0078,-0.9512,0.2683,0.0006,-0.8547,-0.3868,-0.012,-0.9552,0.2456,-0.0065,-0.8207,-0.3986,-0.0179,-0.9554,0.2145,-0.0138,-0.7815,-0.4016,-0.0249,-0.9515,0.178,-0.0213,-0.738,-0.3929,-0.032,-0.9417,0.1411,-0.0273,-0.7031,-0.3719,-0.0382,-0.9335,0.1055,-0.0312,-0.6799,-0.3428,-0.0434,-0.9275,0.0701,-0.0327,-0.6706,-0.3061,-0.0474,-0.9238,0.0343,-0.0305,-0.6821,-0.2595,-0.0499,-0.923,0.0003,-0.0276,-0.7053,-0.2063,-0.0508,-0.9241,-0.0337,-0.024,-0.7376,-0.1471,-0.0505,-0.9266,-0.0677,-0.0196,-0.7777,-0.0808,-0.0491,-0.9299,-0.1015,-0.0161,-0.8205,-0.0084,-0.0467,-0.933,-0.1369,-0.0139,-0.8593,0.0657,-0.0439,-0.935,-0.174,-0.0134,-0.8917,0.1393,-0.0409,-0.9355,-0.2128,-0.0159,-0.9078,0.2005,-0.0376,-0.9318,-0.251,-0.0198,-0.9145,0.2402,-0.0343,-0.924,-0.2858,-0.0232,-0.917,0.259,-0.031,-0.9126,-0.3162,-0.0238,-0.9197,0.252,-0.0279,-0.8976,-0.3398,-0.0185,-0.9253,0.219,-0.0239,-0.8773,-0.3515,-0.0118,-0.929,0.1772,-0.0187,-0.8537,-0.3537,-0.0045,-0.9298,0.1296,-0.0126,-0.8275,-0.3464,0.0027,-0.9244,0.083,-0.0078,-0.8016,-0.326,0.0094,-0.9183,0.0381,-0.0052,-0.7846,-0.2936,0.0151,-0.9121,-0.0055,-0.004,-0.7759,-0.2522,0.0193,-0.906,-0.048,-0.0038,-0.7771,-0.2019,0.0203,-0.9013,-0.0914,-0.0047,-0.7905,-0.1434,0.0208,-0.8979,-0.1347,-0.0055,-0.81,-0.0816,0.0206,-0.8958,-0.1782,-0.0062,-0.8349,-0.0167,0.0185,-0.8948,-0.2233,-0.0068,-0.8645,0.0521,0.0156,-0.8926,-0.2694,-0.0072,-0.8953,0.1245,0.0119,-0.8887,-0.317,-0.0075,-0.9246,0.1971],"q":[0.9958,0.0892,0.007,0.0194,0.9993,0.0358,0.0064,0.0026,0.9964,0.0838,0.0085,-0.013,0.9961,-0.0773,-0.0341,0.0248,0.8387,0.036,0.541,0.0517,0.9323,-0.3409,-0.1019,-0.0648,1.0,0.0,-0.0,0.0,0.9697,0.0296,-0.1661,-0.1768,0.9609,-0.2078,0.1412,0.1167,1.0,0.0,-0.0,-0.0,0.9987,-0.0501,0.0042,-0.0103,0.9641,0.2657,0.0017,-0.0025,0.9982,-0.0517,-0.0316,-0.0026,0.9521,-0.3046,-0.0047,-0.0254,0.9932,0.1165,-0.0026,0.002,0.9948,0.0517,0.0729,-0.0494,0.996,0.0858,0.0101,0.0237,0.9994,0.035,0.0054,0.0001,0.9964,0.083,0.0092,-0.0157,0.9969,-0.0628,-0.0376,0.028,0.8385,0.0307,0.5411,0.0562,0.9356,-0.3291,-0.1088,-0.0668,1.0,0.0,0.0,0.0,0.974,0.0322,-0.1421,-0.1736,0.9625,-0.1965,0.1456,0.1178,1.0,0.0,-0.0,0.0,0.9982,-0.0572,-0.0012,-0.0187,0.9485,0.3169,0.0021,-0.0022,0.9993,-0.0162,-0.0335,-0.0004,0.9541,-0.2977,-0.0056,-0.0325,0.9912,0.1324,-0.0018,0.0022,0.9956,0.0553,0.065,-0.0379,0.9962,0.0803,0.014,0.0298,0.9993,0.0357,0.0036,-0.0033,0.9963,0.0837,0.0091,-0.0196,0.9972,-0.0531,-0.0413,0.0323,0.8391,0.0241,0.5399,0.0615,0.9389,-0.3165,-0.1157,-0.0696,1.0,0.0,0.0,0.0,0.9774,0.0345,-0.1224,-0.169,0.9633,-0.1901,0.1481,0.118,1.0,-0.0,0.0,0.0,0.997,-0.0716,-0.006,-0.0298,0.9248,0.3804,0.002,-0.0014,0.9992,0.0176,-0.035,0.0028,0.955,-0.2936,-0.0028,-0.0425,0.9861,0.1663,-0.0012,0.002,0.9974,0.0364,0.0574,-0.0237,0.9964,0.0734,0.0186,0.0381,0.9993,0.0376,0.0016,-0.0075,0.9959,0.0861,0.008,-0.0254,0.9971,-0.049,-0.0453,0.0377,0.8405,0.0162,0.5373,0.0677,0.9422,-0.3033,-0.1225,-0.073,1.0,0.0,0.0,-0.0,0.98,0.0362,-0.1083,-0.1629,0.9637,-0.1875,0.1493,0.1175,1.0,0.0,0.0,0.0,0.9947,-0.0924,-0.0097,-0.0437,0.8921,0.4517,0.0018,-0.0006,0.9983,0.046,-0.0346,0.0063,0.955,-0.2914,0.003,-0.0553,0.9771,0.2126,-0.0004,0.002,0.9987,0.0002,0.0506,-0.0101,0.9963,0.066,0.0237,0.0502,0.9991,0.0404,0.0003,-0.0128,0.9953,0.0907,0.0048,-0.0349,0.9962,-0.0546,-0.0504,0.0443,0.8429,0.0067,0.5327,0.0751,0.9453,-0.2897,-0.129,-0.0768,1.0,0.0,0.0,-0.0,0.9818,0.0362,-0.105,-0.1538,0.9637,-0.1876,0.1496,0.1171,1.0,0.0,0.0,0.0,0.9909,-0.1195,-0.0109,-0.0616,0.851,0.5252,0.0017,-0.0004,0.9978,0.0587,-0.029,0.0087,0.9544,-0.2897,0.0112,-0.0712,0.9651,0.2619,0.0007,0.0022,0.998,-0.0457,0.0431,-0.005,0.996,0.0598,0.0266,0.0615,0.999,0.0423,-0.0001,-0.0169,0.9943,0.0968,0.0014,-0.0442,0.9953,-0.0622,-0.0556,0.0489,0.8456,-0.0019,0.5273,0.0836,0.9475,-0.2781,-0.1354,-0.0814,1.0,0.0,0.0,0.0,0.9827,0.03,-0.1126,-0.1443,0.9641,-0.1819,0.1532,0.1179,1.0,-0.0,-0.0,0.0,0.9858,-0.1495,-0.0047,-0.076,0.8118,0.5839,0.0012,-0.0002,0.9982,0.0535,-0.0265,0.0066,0.9562,-0.2797,0.0214,-0.0843,0.9562,0.2926,0.0015,0.002,0.9959,-0.0832,0.0353,-0.0037,0.9956,0.0547,0.028,0.0702,0.9988,0.0438,-0.0,-0.0197,0.9933,0.1028,-0.002,-0.0519,0.9945,-0.0686,-0.0602,0.0521,0.8485,-0.0084,0.5209,0.0927,0.9488,-0.2693,-0.1409,-0.0857,1.0,0.0,0.0,0.0,0.9824,0.0194,-0.1271,-0.1354,0.9649,-0.171,0.1595,0.1199,1.0,-0.0,-0.0,0.0,0.9797,-0.181,0.0049,-0.0855,0.7787,0.6273,0.0006,0.0003,0.9987,0.0424,-0.0298,0.0009,0.9593,-0.2645,0.031,-0.0936,0.9503,0.3114,0.0021,0.0019,0.9929,-0.1151,0.0288,-0.0045,0.9954,0.0508,0.0279,0.0758,0.9988,0.0448,0.0003,-0.021,0.9925,0.108,-0.0057,-0.0574,0.9938,-0.0729,-0.064,0.0544,0.8518,-0.0122,0.5136,0.1022,0.9495,-0.2636,-0.1453,-0.089,1.0,0.0,0.0,-0.0,0.9807,0.0046,-0.1479,-0.1275,0.9658,-0.1543,0.1685,0.123,1.0,0.0,-0.0,-0.0,0.9726,-0.2138,0.0164,-0.0896,0.7553,0.6553,-0.0004,0.001,0.9988,0.0288,-0.0398,-0.0083,0.9637,-0.2449,0.0391,-0.0987,0.9476,0.3195,0.0022,0.0018,0.9896,-0.1415,0.0241,-0.007,0.9954,0.049,0.0275,0.077,0.9987,0.0459,0.0001,-0.0216,0.9921,0.1103,-0.0103,-0.0595,0.9933,-0.0747,-0.0663,0.0574,0.8559,-0.0113,0.5049,0.111,0.9492,-0.2636,-0.1469,-0.0896,1.0,0.0,0.0,0.0,0.9769,-0.0138,-0.1753,-0.1213,0.9663,-0.1328,0.1794,0.128,1.0,0.0,0.0,0.0,0.9645,-0.2478,0.0251,-0.0877,0.75,0.6615,-0.0016,0.0016,0.9982,0.0157,-0.0542,-0.0203,0.969,-0.2221,0.0435,-0.099,0.949,0.3153,0.002,0.0015,0.9869,-0.1593,0.0226,-0.0097,0.9955,0.0487,0.0275,0.0759,0.9987,0.0469,-0.0007,-0.022,0.9919,0.1106,-0.0158,-0.0597,0.993,-0.0756,-0.0677,0.0612,0.8603,-0.0083,0.4957,0.1187,0.9484,-0.2666,-0.1468,-0.0895,1.0,0.0,0.0,-0.0,0.9714,-0.0329,-0.2046,-0.1157,0.9664,-0.1122,0.1896,0.1328,1.0,0.0,-0.0,-0.0,0.956,-0.2796,0.0309,-0.0835,0.7578,0.6525,-0.0025,0.0017,0.9976,0.0072,-0.063,-0.027,0.9745,-0.1972,0.0451,-0.0966,0.9529,0.3031,0.0016,0.0013,0.9847,-0.1723,0.0223,-0.013,0.9957,0.0499,0.0275,0.0727,0.9986,0.0476,-0.0018,-0.0222,0.9921,0.1093,-0.0219,-0.0582,0.9927,-0.0756,-0.0681,0.0653,0.8652,-0.0038,0.4855,0.1252,0.9472,-0.2721,-0.145,-0.0885,1.0,0.0,0.0,0.0,0.9645,-0.0514,-0.2341,-0.1105,0.966,-0.0944,0.1977,0.137,1.0,0.0,-0.0,-0.0,0.9476,-0.308,0.0342,-0.0772,0.7773,0.6291,-0.0031,0.0015,0.9974,0.0026,-0.0667,-0.0282,0.98,-0.1709,0.0449,-0.0919,0.9587,0.2845,0.0011,0.001,0.9832,-0.1803,0.0233,-0.0169,0.996,0.0529,0.0269,0.0674,0.9986,0.0476,-0.003,-0.0224,0.9924,0.1061,-0.0282,-0.0548,0.9926,-0.0742,-0.067,0.069,0.871,0.0018,0.4737,0.1304,0.9456,-0.2804,-0.1411,-0.0862,1.0,-0.0,-0.0,-0.0,0.957,-0.0678,-0.2615,-0.1062,0.9658,-0.0833,0.2016,0.1404,1.0,-0.0,0.0,0.0,0.9407,-0.3304,0.0349,-0.0688,0.8092,0.5876,-0.0031,0.0009,0.9976,0.0026,-0.0655,-0.0211,0.985,-0.1437,0.0434,-0.0848,0.9658,0.2592,0.0005,0.0007,0.9829,-0.1811,0.0259,-0.022,0.9963,0.0563,0.0245,0.0604,0.9986,0.0474,-0.004,-0.0225,0.993,0.1018,-0.0343,-0.0496,0.9929,-0.0723,-0.063,0.0708,0.8772,0.0085,0.461,0.1343,0.9431,-0.2917,-0.1356,-0.0837,1.0,-0.0,0.0,0.0,0.9499,-0.0802,-0.2837,-0.1032,0.9657,-0.0828,0.2014,0.1414,1.0,-0.0,-0.0,0.0,0.9381,-0.3396,0.0331,-0.0596,0.8526,0.5225,-0.0028,-0.0002,0.9978,0.0083,-0.064,-0.0124,0.9897,-0.1135,0.0417,-0.0761,0.9738,0.2275,-0.0005,0.0005,0.9844,-0.1712,0.0298,-0.0277,0.9966,0.0599,0.0209,0.0535,0.9986,0.0467,-0.0049,-0.0227,0.9935,0.0968,-0.0398,-0.0438,0.9934,-0.0694,-0.0574,0.0704,0.8836,0.0162,0.4472,0.1379,0.9404,-0.3042,-0.1292,-0.0802,1.0,0.0,0.0,-0.0,0.9438,-0.0896,-0.3016,-0.1012,0.9659,-0.0882,0.1986,0.141,1.0,0.0,-0.0,-0.0,0.9386,-0.3401,0.029,-0.051,0.8969,0.4422,-0.0023,-0.0012,0.9979,0.022,-0.0605,-0.002,0.9936,-0.0806,0.0399,-0.0677,0.9815,0.1914,-0.0013,0.0004,0.9871,-0.153,0.0343,-0.0333,0.9967,0.0634,0.0162,0.0472,0.9987,0.0454,-0.0058,-0.0233,0.9941,0.0911,-0.0445,-0.0376,0.9943,-0.065,-0.0505,0.0676,0.8901,0.0248,0.4326,0.1411,0.9374,-0.3173,-0.1218,-0.0757,1.0,0.0,0.0,-0.0,0.939,-0.0958,-0.3148,-0.1004,0.9661,-0.0988,0.1934,0.1393,1.0,-0.0,0.0,0.0,0.9419,-0.3322,0.0229,-0.0435,0.9374,0.3482,-0.0017,-0.0013,0.9974,0.0448,-0.0547,0.0108,0.9964,-0.0454,0.0376,-0.0604,0.9884,0.1519,-0.0016,0.0005,0.9904,-0.1267,0.0392,-0.0385,0.9968,0.066,0.0101,0.0438,0.9987,0.0434,-0.0062,-0.0247,0.9947,0.0847,-0.0489,-0.0323,0.9956,-0.0576,-0.0423,0.061,0.8958,0.035,0.4187,0.1446,0.9343,-0.3299,-0.115,-0.071,1.0,0.0,0.0,0.0,0.9362,-0.0978,-0.3222,-0.1008,0.9664,-0.1136,0.1861,0.1365,1.0,-0.0,-0.0,-0.0,0.9482,-0.315,0.0143,-0.0386,0.9681,0.2504,-0.0018,-0.0013,0.9956,0.0796,-0.0419,0.0266,0.9978,-0.0106,0.033,-0.0574,0.9934,0.1146,-0.0011,0.0006,0.9937,-0.0942,0.0448,-0.0411,0.9967,0.0684,0.005,0.043,0.9988,0.0407,-0.0062,-0.0265,0.9951,0.0787,-0.0529,-0.0283,0.9967,-0.0493,-0.0353,0.0536,0.9007,0.0457,0.4061,0.1478,0.9308,-0.3424,-0.1091,-0.0669,1.0,0.0,0.0,0.0,0.9343,-0.0986,-0.3271,-0.1023,0.9662,-0.1289,0.1785,0.1343,1.0,0.0,-0.0,-0.0,0.9538,-0.2982,0.0103,-0.0364,0.9849,0.1732,-0.0019,-0.0009,0.9926,0.1101,-0.0327,0.0386,0.9978,0.0175,0.0281,-0.0575,0.996,0.0892,-0.001,0.001,0.9961,-0.0581,0.0502,-0.0427,0.9966,0.0704,0.0008,0.0432,0.9989,0.0377,-0.0059,-0.0278,0.9954,0.0736,-0.0565,-0.0253,0.9977,-0.0409,-0.0295,0.046,0.9046,0.0558,0.3949,0.1505,0.9274,-0.3537,-0.1044,-0.063,1.0,-0.0,0.0,-0.0,0.933,-0.099,-0.3298,-0.1046,0.9656,-0.1442,0.1708,0.1325,1.0,-0.0,-0.0,0.0,0.9584,-0.2831,0.0102,-0.0354,0.9927,0.1204,-0.002,-0.0005,0.9894,0.1355,-0.0269,0.0439,0.9973,0.0373,0.0228,-0.059,0.997,0.078,-0.001,0.0016,0.9973,-0.0194,0.0551,-0.0435,0.9965,0.0719,-0.0022,0.0433,0.999,0.0349,-0.0052,-0.0277,0.9955,0.0699,-0.0593,-0.0232,0.9984,-0.0334,-0.025,0.0386,0.9075,0.0643,0.3859,0.1527,0.9245,-0.3626,-0.1011,-0.0593,1.0,0.0,-0.0,0.0,0.9324,-0.0999,-0.3301,-0.1079,0.965,-0.1587,0.1631,0.1305,1.0,0.0,-0.0,0.0,0.9617,-0.2717,0.0143,-0.0344,0.9948,0.1022,-0.0018,-0.0004,0.9871,0.1537,-0.0258,0.0378,0.997,0.0452,0.0177,-0.0604,0.9962,0.0873,-0.0007,0.002,0.9971,0.0214,0.059,-0.0432,0.9965,0.0728,-0.004,0.0414,0.9991,0.0328,-0.0035,-0.0251,0.9956,0.0685,-0.0609,-0.0211,0.9989,-0.0276,-0.0206,0.0315,0.9094,0.0694,0.3802,0.1534,0.9228,-0.3684,-0.0981,-0.0555,1.0,0.0,0.0,0.0,0.933,-0.1018,-0.3264,-0.1123,0.9644,-0.1722,0.1554,0.1269,1.0,0.0,0.0,0.0,0.964,-0.2632,0.021,-0.0302,0.993,0.1182,-0.0015,0.0,0.9862,0.1619,-0.0279,0.0184,0.9976,0.0353,0.0147,-0.0585,0.9921,0.1255,-0.0,0.0017,0.9949,0.0667,0.0611,-0.0453,0.9967,0.0724,-0.0054,0.0376,0.9992,0.0324,-0.002,-0.0217,0.9956,0.0685,-0.0607,-0.0179,0.9992,-0.026,-0.0161,0.0251,0.9103,0.0725,0.3779,0.1525,0.9215,-0.3727,-0.0956,-0.0528,1.0,0.0,0.0,0.0,0.934,-0.1032,-0.3212,-0.1175,0.9635,-0.1866,0.1471,0.1232,1.0,-0.0,-0.0,-0.0,0.9658,-0.257,0.0267,-0.0235,0.9887,0.1499,-0.0012,0.0004,0.9886,0.1476,-0.0302,0.0024,0.9983,0.0163,0.0126,-0.0538,0.9841,0.1778,0.0009,0.0014,0.9911,0.1062,0.0615,-0.0508,0.9969,0.071,-0.0064,0.0318,0.9993,0.0337,-0.0007,-0.0178,0.9957,0.07,-0.0587,-0.0132,0.9993,-0.0295,-0.0117,0.0196,0.9102,0.0733,0.379,0.15,0.9206,-0.3756,-0.0936,-0.0516,1.0,0.0,-0.0,0.0,0.9353,-0.1038,-0.315,-0.123,0.9621,-0.2022,0.1384,0.1194,1.0,0.0,-0.0,-0.0,0.9669,-0.253,0.0303,-0.0142,0.9811,0.1934,-0.0009,0.0005,0.9932,0.112,-0.0319,-0.0085,0.9988,-0.0106,0.011,-0.0462,0.9708,0.2399,0.0017,0.0011,0.9874,0.1341,0.0602,-0.0586,0.9973,0.07,-0.0064,0.0227,0.9993,0.036,0.001,-0.0129,0.9957,0.0736,-0.0556,-0.0059,0.999,-0.0411,-0.0084,0.0164,0.9088,0.0696,0.385,0.145,0.9206,-0.3756,-0.0933,-0.0528,1.0,0.0,-0.0,0.0,0.9371,-0.1028,-0.3081,-0.1279,0.96,-0.2203,0.1299,0.1136,1.0,0.0,-0.0,-0.0,0.9673,-0.2522,0.0284,-0.0013,0.9705,0.2412,-0.001,-0.0,0.9972,0.0672,-0.0312,-0.0133,0.9984,-0.0441,0.0094,-0.0355,0.9535,0.3014,0.002,0.0013,0.9885,0.1237,0.0599,-0.0635,0.9974,0.0699,-0.0054,0.0145,0.9992,0.0378,0.0025,-0.0092,0.9955,0.0787,-0.052,0.0007,0.9984,-0.0542,-0.0053,0.0152,0.9062,0.0615,0.3944,0.1395,0.9224,-0.3697,-0.0965,-0.0566,1.0,-0.0,0.0,-0.0,0.9394,-0.0992,-0.3006,-0.1317,0.9578,-0.2376,0.1214,0.1069,1.0,0.0,-0.0,0.0,0.9686,-0.2474,0.0219,0.0094,0.9607,0.2776,-0.0012,-0.0003,0.999,0.0295,-0.0284,-0.0165,0.9963,-0.0812,0.0063,-0.0268,0.9368,0.3499,0.0023,0.0012,0.9912,0.0995,0.0596,-0.0634,0.9975,0.0704,-0.004,0.0079,0.9992,0.0393,0.0041,-0.0064,0.9953,0.0844,-0.0475,0.0062,0.9976,-0.0669,-0.0026,0.015,0.9024,0.0508,0.4065,0.1336,0.9258,-0.3587,-0.1023,-0.062,1.0,0.0,0.0,0.0,0.9419,-0.0929,-0.293,-0.1352,0.9556,-0.2525,0.114,0.1005,1.0,-0.0,0.0,0.0,0.9706,-0.2395,0.0135,0.0176,0.9521,0.3059,-0.0015,-0.0004,0.9995,-0.0034,-0.0243,-0.0184,0.9925,-0.1205,0.0025,-0.0201,0.9223,0.3864,0.0026,0.001,0.9938,0.0722,0.0587,-0.061,0.9974,0.0713,-0.0028,0.0034,0.9992,0.0405,0.0057,-0.0045,0.995,0.0902,-0.042,0.01,0.9969,-0.0777,-0.0007,0.0154,0.8972,0.0381,0.4214,0.1268,0.9308,-0.3416,-0.1106,-0.0683,1.0,0.0,0.0,-0.0,0.9446,-0.0831,-0.2857,-0.1386,0.9537,-0.2637,0.1086,0.0957,1.0,0.0,0.0,-0.0,0.9733,-0.2286,0.0042,0.0222,0.9452,0.3266,-0.0016,-0.0004,0.9991,-0.0321,-0.0196,-0.0186,0.9868,-0.1612,-0.0014,-0.0157,0.9123,0.4094,0.0029,0.0007,0.9956,0.0482,0.0561,-0.0579,0.9974,0.0726,-0.0027,0.0012,0.9991,0.041,0.0072,-0.0028,0.9949,0.0946,-0.0346,0.011,0.9964,-0.0839,-0.001,0.0157,0.8883,0.0272,0.4435,0.1163,0.9365,-0.3205,-0.1207,-0.0749,1.0,-0.0,0.0,-0.0,0.9475,-0.0682,-0.2774,-0.1435,0.9534,-0.2651,0.1087,0.0948,1.0,0.0,0.0,0.0,0.977,-0.2121,-0.0031,0.0225,0.9415,0.3369,-0.0012,-0.0003,0.9982,-0.0553,-0.0151,-0.0163,0.9797,-0.1998,-0.0026,-0.0132,0.9112,0.412,0.0029,0.0006,0.9965,0.0324,0.0538,-0.0554,0.9972,0.0743,-0.003,0.0003,0.9991,0.0409,0.0084,-0.001,0.9948,0.0974,-0.0264,0.0106,0.996,-0.0874,-0.0027,0.0159,0.8766,0.0203,0.4699,0.1022,0.9411,-0.3021,-0.1292,-0.0801,1.0,0.0,0.0,0.0,0.9507,-0.0515,-0.2667,-0.1497,0.9544,-0.2593,0.1125,0.096,1.0,-0.0,0.0,0.0,0.9811,-0.1922,-0.0084,0.0213,0.9405,0.3397,-0.0006,-0.0004,0.9972,-0.0734,-0.0113,-0.0132,0.9721,-0.2342,-0.0026,-0.0114,0.916,0.4011,0.0027,0.0007,0.9969,0.0217,0.0525,-0.0542,0.9971,0.0765,-0.0035,0.0007,0.9991,0.0405,0.009,0.0008,0.9949,0.0987,-0.0177,0.0087,0.9959,-0.0887,-0.0056,0.0161,0.8625,0.0176,0.4984,0.0853,0.9443,-0.2885,-0.135,-0.0831,1.0,-0.0,-0.0,0.0,0.954,-0.0339,-0.2532,-0.157,0.9565,-0.2472,0.1193,0.0992,1.0,0.0,-0.0,-0.0,0.9854,-0.1689,-0.0118,0.0184,0.9421,0.3352,0.0001,-0.0005,0.9962,-0.0862,-0.0085,-0.0094,0.9645,-0.2639,-0.0015,-0.0103,0.9263,0.3767,0.0022,0.001,0.997,0.0162,0.0531,-0.0541,0.9968,0.0792,-0.0035,0.0028,0.9992,0.0397,0.0085,0.0024,0.9952,0.0973,-0.0087,0.0052,0.996,-0.0877,-0.0102,0.0163,0.8488,0.0207,0.5239,0.068,0.9447,-0.2882,-0.133,-0.0822,1.0,0.0,0.0,0.0,0.9579,-0.017,-0.2341,-0.1655,0.9591,-0.2302,0.1275,0.1044,1.0,0.0,0.0,-0.0,0.9898,-0.1414,-0.0124,0.013,0.9468,0.322,0.0002,-0.0006,0.9958,-0.0916,-0.0082,-0.0048,0.9581,-0.2861,0.0006,-0.0107,0.9425,0.3342,0.0011,0.0015,0.9967,0.0182,0.0581,-0.0546,0.9965,0.0827,-0.0015,0.0071,0.9992,0.0386,0.0077,0.003,0.9956,0.0938,-0.0014,-0.0,0.996,-0.0856,-0.0165,0.0182,0.8401,0.0263,0.5389,0.0566,0.9422,-0.301,-0.1251,-0.078,1.0,0.0,0.0,0.0,0.9621,-0.0005,-0.2116,-0.1722,0.9605,-0.2179,0.134,0.1097,1.0,0.0,0.0,-0.0,0.9936,-0.1127,-0.0088,0.0061,0.9524,0.3048,0.0006,-0.001,0.9961,-0.087,-0.0127,-0.0023,0.9538,-0.3003,0.0006,-0.0139,0.9616,0.2744,0.0,0.0018,0.9962,0.0259,0.0651,-0.0526,0.9962,0.0861,0.0019,0.0127,0.9993,0.0373,0.007,0.0031,0.996,0.0892,0.0044,-0.0062,0.9961,-0.0823,-0.0244,0.0211,0.8365,0.0317,0.5447,0.0509,0.9379,-0.3194,-0.1144,-0.0723,1.0,-0.0,0.0,0.0,0.966,0.0152,-0.1884,-0.1762,0.961,-0.2103,0.1386,0.1141,1.0,0.0,-0.0,-0.0,0.9966,-0.0824,-0.003,-0.0018,0.9583,0.2858,0.0011,-0.0016,0.9971,-0.0739,-0.0206,-0.0017,0.9516,-0.3067,-0.0011,-0.0189,0.9795,0.2016,-0.0012,0.002,0.9956,0.0373,0.0704,-0.0503],"ph":0.2812,"tune":{"stride":1.5,"lean":0.22,"bob":0.12,"life":1,"flat":1,"toeUp":0.06,"K":{"armR":0.35,"foreR":0.35,"handR":0,"armL":0.6,"foreL":0.7,"handL":0,"spine":1,"chest":1,"head":0.7}}},"back":{"n":78,"dur":2.567,"land":0.5455,"bones":["pelvis","spine","chest","head","armR","foreR","handR","armL","foreL","handL","thighR","shinR","footR","thighL","shinL","footL"],"q":[0.9991,0.0388,-0.0006,0.0165,0.9771,0.2124,0.0002,-0.0115,0.971,0.2373,-0.0265,-0.0079,0.967,-0.2445,0.0705,-0.0156,0.9065,0.0296,0.4192,-0.0418,0.9168,-0.287,0.2759,0.031,0.9912,0.0579,0.1158,0.0261,0.9069,-0.0253,-0.4205,-0.0049,0.8454,-0.4618,-0.2539,-0.0875,0.9929,-0.0627,-0.0751,0.0672,0.9499,-0.2803,0.0939,0.1018,0.8602,0.4868,-0.0874,-0.1245,0.959,-0.2638,0.0995,0.0296,0.9156,-0.399,0.0219,-0.0449,0.9894,0.1391,0.0278,0.0316,0.9819,0.0965,-0.1274,-0.102,0.9982,0.0573,0.0049,0.0145,0.9749,0.2224,-0.0005,-0.0112,0.9651,0.2601,-0.029,-0.0069,0.974,-0.2162,0.0654,-0.0191,0.9064,0.0179,0.42,-0.0403,0.9078,-0.3103,0.279,0.0411,0.9905,0.0637,0.1194,0.0246,0.9067,-0.0362,-0.4201,0.0062,0.8295,-0.4685,-0.289,-0.0943,0.9907,-0.0629,-0.0898,0.0803,0.9392,-0.3145,0.0924,0.102,0.8537,0.4982,-0.0899,-0.1224,0.9597,-0.2601,0.1024,0.0291,0.908,-0.4168,0.0133,-0.0402,0.9899,0.1351,0.0307,0.0302,0.9814,0.0997,-0.1212,-0.1102,0.9976,0.0666,0.0096,0.0134,0.9734,0.2287,-0.0013,-0.0111,0.9613,0.2739,-0.0292,-0.0068,0.9822,-0.1787,0.0546,-0.0191,0.9065,0.0165,0.4203,-0.0375,0.8984,-0.3277,0.2872,0.0542,0.9913,0.0639,0.1117,0.0258,0.9067,-0.0351,-0.4199,0.0154,0.8118,-0.4782,-0.3194,-0.1011,0.991,-0.0623,-0.088,0.0789,0.9333,-0.3313,0.0935,0.1018,0.8492,0.5058,-0.0922,-0.1205,0.9597,-0.2605,0.1014,0.0298,0.905,-0.4238,0.0064,-0.0374,0.9903,0.1316,0.0322,0.0296,0.9811,0.1011,-0.1194,-0.1139,0.997,0.075,0.0134,0.0123,0.972,0.2345,-0.0019,-0.0113,0.9573,0.2874,-0.0294,-0.0068,0.9885,-0.1436,0.0446,-0.0189,0.9064,0.0142,0.4206,-0.0349,0.8898,-0.3436,0.293,0.0656,0.992,0.0642,0.1059,0.026,0.9067,-0.0353,-0.4197,0.0235,0.7946,-0.4871,-0.346,-0.1078,0.9911,-0.0616,-0.0876,0.0789,0.9276,-0.3471,0.0941,0.1017,0.8451,0.5126,-0.0941,-0.1189,0.9597,-0.2603,0.1013,0.0305,0.9019,-0.4305,-0.0007,-0.0348,0.9907,0.1289,0.0335,0.0291,0.9809,0.1025,-0.1171,-0.117,0.9966,0.0801,0.0158,0.0115,0.971,0.2387,-0.0024,-0.0121,0.954,0.2983,-0.0293,-0.0074,0.9931,-0.1103,0.0346,-0.0179,0.9064,0.013,0.4209,-0.0322,0.8829,-0.3561,0.2967,0.0755,0.9927,0.0633,0.0999,0.0255,0.9066,-0.0347,-0.4195,0.0298,0.7787,-0.4961,-0.3666,-0.1145,0.9915,-0.0603,-0.0854,0.0778,0.9235,-0.3576,0.0946,0.1016,0.8422,0.5175,-0.0956,-0.1176,0.9598,-0.2599,0.1014,0.0315,0.9,-0.4347,-0.0074,-0.0331,0.9908,0.1273,0.0342,0.029,0.9809,0.1035,-0.1152,-0.1179,0.9964,0.0824,0.0164,0.011,0.9703,0.2416,-0.0028,-0.0133,0.9512,0.3072,-0.0287,-0.0086,0.9964,-0.0798,0.0254,-0.0165,0.9064,0.0122,0.4211,-0.0294,0.8779,-0.3653,0.2981,0.0833,0.9933,0.0616,0.0945,0.0242,0.9066,-0.0344,-0.4193,0.0345,0.7644,-0.505,-0.3822,-0.1209,0.9919,-0.0585,-0.0828,0.0766,0.9209,-0.3641,0.095,0.1018,0.8401,0.5208,-0.0965,-0.1167,0.9599,-0.2592,0.1023,0.0324,0.8988,-0.4369,-0.0138,-0.032,0.9908,0.1274,0.0344,0.0292,0.9812,0.104,-0.1131,-0.1166,0.9964,0.0822,0.0152,0.0107,0.9698,0.2434,-0.003,-0.015,0.9488,0.3145,-0.0277,-0.0106,0.9984,-0.0518,0.0177,-0.0153,0.9065,0.0118,0.4213,-0.0264,0.8747,-0.3716,0.2981,0.0895,0.994,0.0595,0.0894,0.0225,0.9065,-0.0345,-0.419,0.038,0.7514,-0.5135,-0.3943,-0.1271,0.9923,-0.0561,-0.0803,0.0754,0.9193,-0.3678,0.0954,0.1022,0.8386,0.5233,-0.0971,-0.1161,0.96,-0.258,0.1039,0.0331,0.8983,-0.4378,-0.02,-0.0315,0.9906,0.1293,0.0343,0.0295,0.9819,0.1038,-0.1107,-0.1133,0.9967,0.0799,0.0125,0.0106,0.9695,0.2445,-0.0033,-0.017,0.9468,0.3204,-0.0264,-0.0132,0.9995,-0.0256,0.0114,-0.0147,0.9065,0.0117,0.4215,-0.0231,0.8727,-0.3754,0.2977,0.0945,0.9945,0.0576,0.0847,0.0207,0.9065,-0.0351,-0.4188,0.0406,0.7396,-0.5214,-0.4044,-0.1329,0.9927,-0.0529,-0.0784,0.0745,0.9185,-0.3697,0.0959,0.1027,0.8369,0.5261,-0.0976,-0.1155,0.96,-0.2568,0.1061,0.0336,0.898,-0.4381,-0.0255,-0.0314,0.99,0.1335,0.0343,0.0299,0.9828,0.1029,-0.1085,-0.1088,0.997,0.0756,0.0086,0.0109,0.9693,0.2451,-0.0034,-0.0192,0.9452,0.3251,-0.0249,-0.0162,0.9999,-0.0001,0.0065,-0.0149,0.9065,0.0121,0.4217,-0.0193,0.8717,-0.3772,0.2969,0.0988,0.995,0.0561,0.0806,0.0189,0.9065,-0.036,-0.4186,0.0423,0.7289,-0.5286,-0.4125,-0.1384,0.993,-0.0491,-0.0772,0.0743,0.9181,-0.3705,0.0965,0.1031,0.8346,0.5297,-0.0982,-0.115,0.9599,-0.256,0.1089,0.0339,0.898,-0.4378,-0.0301,-0.0316,0.9891,0.1402,0.0346,0.0303,0.9837,0.1012,-0.1068,-0.1036,0.9975,0.0693,0.0038,0.0117,0.9692,0.2451,-0.0035,-0.0215,0.944,0.3285,-0.0233,-0.0196,0.9995,0.0256,0.0027,-0.0163,0.9065,0.0131,0.4218,-0.0153,0.8714,-0.3777,0.2958,0.1027,0.9953,0.0557,0.0776,0.0172,0.9065,-0.037,-0.4184,0.0433,0.7196,-0.5351,-0.4185,-0.1436,0.9932,-0.0449,-0.0771,0.0748,0.918,-0.3703,0.0972,0.1031,0.8314,0.5346,-0.099,-0.1145,0.9596,-0.2556,0.1124,0.034,0.8981,-0.4373,-0.0331,-0.0322,0.9877,0.1493,0.0355,0.0308,0.9846,0.0987,-0.106,-0.0983,0.9981,0.061,-0.002,0.0128,0.9693,0.2449,-0.0035,-0.0238,0.9432,0.3308,-0.0218,-0.0231,0.9984,0.0524,-0.0,-0.0191,0.9065,0.0145,0.4219,-0.011,0.8716,-0.3774,0.2943,0.1064,0.9954,0.0564,0.0758,0.0156,0.9065,-0.0377,-0.4183,0.0436,0.7119,-0.5412,-0.4222,-0.1485,0.9932,-0.0405,-0.0778,0.076,0.9184,-0.3694,0.0979,0.1028,0.8274,0.5407,-0.1001,-0.114,0.9591,-0.2555,0.1168,0.0342,0.8984,-0.4365,-0.0344,-0.0333,0.9858,0.1606,0.0369,0.0312,0.9853,0.0956,-0.1062,-0.0934,0.9986,0.0508,-0.0085,0.0143,0.9694,0.2442,-0.0034,-0.0259,0.9427,0.3319,-0.0202,-0.0268,0.9965,0.0807,-0.0016,-0.0235,0.9065,0.0165,0.4219,-0.0066,0.8721,-0.3767,0.2924,0.11,0.9954,0.0583,0.0753,0.0144,0.9065,-0.038,-0.4183,0.0431,0.7055,-0.5471,-0.4237,-0.1533,0.9932,-0.0361,-0.079,0.0778,0.9191,-0.3677,0.0987,0.1019,0.8227,0.5477,-0.1015,-0.1136,0.9585,-0.2554,0.1223,0.0345,0.8989,-0.4355,-0.0334,-0.0345,0.9835,0.1739,0.0389,0.0317,0.9859,0.092,-0.1075,-0.0891,0.999,0.0389,-0.0159,0.0161,0.9695,0.2434,-0.0034,-0.0279,0.9426,0.3319,-0.0187,-0.0305,0.9934,0.1104,-0.0018,-0.0295,0.9065,0.0188,0.4218,-0.0024,0.8727,-0.376,0.2901,0.1135,0.9951,0.0613,0.0759,0.0134,0.9065,-0.0378,-0.4185,0.0419,0.7001,-0.553,-0.4232,-0.158,0.9931,-0.0319,-0.0801,0.0799,0.9201,-0.3652,0.0995,0.1008,0.8174,0.5554,-0.1031,-0.1132,0.9577,-0.2551,0.1285,0.0348,0.8995,-0.4343,-0.0301,-0.0358,0.9806,0.1887,0.0415,0.0321,0.9864,0.0881,-0.11,-0.0851,0.9992,0.0255,-0.0239,0.018,0.9698,0.2422,-0.0032,-0.0296,0.9429,0.3309,-0.0172,-0.0343,0.9893,0.1412,-0.0006,-0.0371,0.9065,0.0217,0.4217,0.0015,0.8735,-0.3754,0.2874,0.1164,0.9948,0.0651,0.0776,0.0126,0.9065,-0.0372,-0.4187,0.0401,0.6958,-0.5586,-0.4211,-0.1627,0.993,-0.0279,-0.0808,0.082,0.9215,-0.3619,0.1005,0.0993,0.8117,0.5633,-0.1048,-0.1128,0.9569,-0.2546,0.1353,0.0352,0.9004,-0.4328,-0.0244,-0.0369,0.9773,0.2045,0.0446,0.0325,0.9866,0.0842,-0.1136,-0.0815,0.9992,0.0109,-0.0322,0.0202,0.97,0.2409,-0.003,-0.0311,0.9434,0.329,-0.0157,-0.0379,0.984,0.1722,0.0019,-0.046,0.9065,0.0249,0.4215,0.0049,0.8744,-0.3749,0.2844,0.1184,0.9942,0.0697,0.0806,0.0119,0.9065,-0.0362,-0.419,0.0377,0.6925,-0.564,-0.4177,-0.167,0.9929,-0.024,-0.0807,0.084,0.9231,-0.3577,0.1016,0.0977,0.8059,0.5714,-0.1067,-0.1124,0.9561,-0.254,0.1418,0.0353,0.9014,-0.4309,-0.0166,-0.0378,0.9737,0.2205,0.0479,0.0329,0.9866,0.0807,-0.1186,-0.0784,0.9989,-0.0046,-0.0404,0.0226,0.9704,0.2393,-0.0028,-0.0324,0.9442,0.3265,-0.0141,-0.0412,0.9777,0.2023,0.0054,-0.0555,0.9065,0.0282,0.4212,0.0077,0.8755,-0.3747,0.2808,0.1192,0.9936,0.0748,0.0845,0.0111,0.9065,-0.035,-0.4193,0.0349,0.6903,-0.5689,-0.4132,-0.1704,0.9929,-0.02,-0.0798,0.0858,0.9251,-0.3528,0.1028,0.0959,0.8001,0.5793,-0.1085,-0.1121,0.9554,-0.2533,0.1478,0.0348,0.9027,-0.4286,-0.0072,-0.0385,0.9698,0.2361,0.0512,0.0335,0.9862,0.0778,-0.1247,-0.0758,0.9983,-0.0205,-0.0477,0.0252,0.9708,0.2374,-0.0024,-0.0334,0.9451,0.3234,-0.0126,-0.044,0.9708,0.2307,0.0093,-0.0648,0.9065,0.0313,0.421,0.0102,0.8769,-0.3746,0.2767,0.1189,0.9928,0.0798,0.0891,0.0103,0.9065,-0.0335,-0.4197,0.0318,0.6892,-0.5738,-0.4075,-0.1725,0.993,-0.0158,-0.078,0.0874,0.9272,-0.3474,0.1037,0.0938,0.7941,0.5871,-0.1104,-0.1117,0.9548,-0.2527,0.1528,0.0336,0.904,-0.4257,0.0031,-0.0388,0.9659,0.2508,0.0543,0.034,0.9856,0.0758,-0.1319,-0.074,0.9975,-0.0367,-0.0536,0.0278,0.9713,0.2353,-0.0019,-0.034,0.9462,0.32,-0.011,-0.0458,0.9635,0.2569,0.013,-0.0734,0.9065,0.034,0.4207,0.0126,0.8786,-0.3745,0.2717,0.1179,0.9919,0.0846,0.094,0.0092,0.9065,-0.032,-0.42,0.0283,0.6892,-0.5789,-0.4001,-0.173,0.9931,-0.0115,-0.0755,0.0888,0.9295,-0.3419,0.1037,0.0918,0.7881,0.5949,-0.1122,-0.1112,0.9544,-0.2523,0.1568,0.0313,0.9054,-0.4225,0.0137,-0.0385,0.9621,0.2644,0.0572,0.0346,0.9847,0.0748,-0.1398,-0.073,0.9965,-0.053,-0.0575,0.03,0.9719,0.233,-0.0012,-0.0342,0.9474,0.3163,-0.0094,-0.0467,0.9559,0.2818,0.0157,-0.0809,0.9065,0.036,0.4204,0.0153,0.8807,-0.3742,0.266,0.1166,0.9911,0.0889,0.0988,0.0078,0.9066,-0.0306,-0.4203,0.0241,0.6901,-0.5846,-0.3905,-0.172,0.9933,-0.0072,-0.0723,0.0899,0.9318,-0.3365,0.1024,0.0899,0.7818,0.603,-0.114,-0.1105,0.954,-0.2522,0.1599,0.0278,0.9068,-0.4191,0.0239,-0.0374,0.9583,0.2772,0.0596,0.0352,0.9834,0.0745,-0.1485,-0.0728,0.9953,-0.0695,-0.0593,0.0318,0.9725,0.2304,-0.0004,-0.034,0.9487,0.3126,-0.0078,-0.0467,0.9477,0.3064,0.0171,-0.0873,0.9065,0.0373,0.4201,0.0185,0.8831,-0.3737,0.2592,0.1152,0.9903,0.0928,0.1037,0.0059,0.9066,-0.0295,-0.4205,0.019,0.6921,-0.5908,-0.3783,-0.1694,0.9936,-0.003,-0.0683,0.0904,0.9341,-0.3314,0.0993,0.0884,0.7749,0.6117,-0.1159,-0.1096,0.9535,-0.2526,0.1626,0.0232,0.9082,-0.4156,0.0333,-0.0352,0.9545,0.2896,0.0617,0.0359,0.9818,0.075,-0.158,-0.0736,0.994,-0.0863,-0.0588,0.0331,0.9732,0.2276,0.0007,-0.0334,0.95,0.3089,-0.0062,-0.0458,0.9385,0.3322,0.017,-0.0924,0.9065,0.0378,0.4198,0.0224,0.8861,-0.3724,0.2515,0.1135,0.9894,0.0964,0.1087,0.0035,0.9067,-0.0286,-0.4206,0.0129,0.6954,-0.5975,-0.3635,-0.1653,0.9939,0.0009,-0.0634,0.0902,0.9364,-0.3267,0.094,0.0873,0.767,0.6213,-0.1182,-0.1084,0.9529,-0.2539,0.1651,0.0173,0.9096,-0.4122,0.0417,-0.0318,0.9504,0.3022,0.0636,0.0365,0.9799,0.0757,-0.1685,-0.0755,0.9925,-0.1035,-0.056,0.0338,0.9739,0.2246,0.0018,-0.0324,0.9513,0.3051,-0.0044,-0.0444,0.9281,0.3593,0.0152,-0.0961,0.9066,0.0377,0.4196,0.0268,0.8897,-0.3704,0.2425,0.1116,0.9884,0.1002,0.1141,0.001,0.9068,-0.0278,-0.4205,0.0056,0.6997,-0.6041,-0.3465,-0.1595,0.9943,0.0046,-0.0577,0.089,0.9386,-0.3227,0.0863,0.0864,0.7577,0.6322,-0.121,-0.107,0.952,-0.256,0.1677,0.0105,0.9108,-0.409,0.049,-0.0271,0.9459,0.3155,0.0654,0.0372,0.9775,0.0766,-0.1799,-0.0786,0.9907,-0.1212,-0.0512,0.0343,0.9747,0.2215,0.0028,-0.0311,0.9527,0.301,-0.0025,-0.0426,0.9168,0.3869,0.012,-0.0982,0.9066,0.0372,0.4192,0.0315,0.8938,-0.3676,0.2326,0.1092,0.9874,0.1041,0.1195,-0.0012,0.907,-0.0268,-0.4202,-0.0026,0.7048,-0.6103,-0.3281,-0.152,0.9949,0.0084,-0.0515,0.0867,0.9406,-0.3195,0.0766,0.0854,0.7468,0.6447,-0.1243,-0.1054,0.9507,-0.2592,0.1704,0.0028,0.9119,-0.4062,0.0549,-0.0213,0.9409,0.3297,0.0672,0.0378,0.9748,0.0774,-0.1919,-0.0827,0.9886,-0.1393,-0.0447,0.0348,0.9754,0.2186,0.0037,-0.0294,0.9541,0.2967,-0.0004,-0.0406,0.9054,0.4128,0.0079,-0.0986,0.9066,0.0363,0.4189,0.0362,0.898,-0.3644,0.2223,0.1065,0.9863,0.1081,0.1247,-0.0024,0.9073,-0.0257,-0.4196,-0.0111,0.7101,-0.616,-0.3096,-0.143,0.9954,0.0122,-0.0452,0.0832,0.9423,-0.3174,0.0654,0.0838,0.734,0.6589,-0.1281,-0.1035,0.949,-0.2633,0.1733,-0.0054,0.9127,-0.404,0.0595,-0.0148,0.9352,0.3452,0.0693,0.0383,0.9719,0.0781,-0.2039,-0.0875,0.9861,-0.1579,-0.0367,0.0354,0.976,0.2158,0.0044,-0.0274,0.9556,0.2922,0.0018,-0.0384,0.8952,0.4349,0.0034,-0.0974,0.9066,0.035,0.4186,0.0403,0.902,-0.3612,0.2124,0.1036,0.9853,0.1118,0.1294,-0.002,0.9076,-0.0247,-0.4187,-0.0191,0.7149,-0.6212,-0.2921,-0.133,0.996,0.0159,-0.0397,0.0787,0.9435,-0.3166,0.0534,0.0816,0.719,0.6747,-0.1325,-0.1014,0.947,-0.2682,0.1763,-0.014,0.9131,-0.4028,0.0627,-0.0077,0.9286,0.3621,0.0717,0.0387,0.9689,0.0787,-0.2153,-0.0929,0.9831,-0.1773,-0.0276,0.036,0.9767,0.2132,0.0049,-0.0252,0.957,0.2878,0.004,-0.0362,0.887,0.4519,-0.001,-0.0948,0.9066,0.0333,0.4183,0.0439,0.9056,-0.3585,0.2032,0.1006,0.9843,0.1151,0.1338,0.0,0.908,-0.0243,-0.4174,-0.026,0.719,-0.6259,-0.2763,-0.1225,0.9965,0.0193,-0.0352,0.0734,0.9442,-0.3171,0.0414,0.0785,0.7016,0.6921,-0.1374,-0.0989,0.9447,-0.2736,0.1792,-0.0228,0.9131,-0.4026,0.0644,-0.0002,0.9208,0.3807,0.0747,0.0391,0.966,0.0792,-0.2256,-0.0984,0.9794,-0.1979,-0.0178,0.0365,0.9772,0.2109,0.0051,-0.0229,0.9583,0.2837,0.0061,-0.0337,0.8813,0.4638,-0.0052,-0.0905,0.9066,0.0311,0.4181,0.0472,0.9085,-0.3568,0.1944,0.0979,0.9833,0.1178,0.1384,0.0035,0.9086,-0.025,-0.4157,-0.0316,0.7221,-0.6301,-0.2624,-0.1124,0.997,0.0221,-0.0315,0.0679,0.9444,-0.3188,0.0299,0.0746,0.6819,0.711,-0.1426,-0.0961,0.9423,-0.2791,0.1822,-0.0316,0.9127,-0.4035,0.0643,0.0073,0.9117,0.4013,0.0784,0.0394,0.9632,0.0797,-0.2346,-0.1038,0.9747,-0.2201,-0.0077,0.037,0.9777,0.2088,0.0053,-0.0208,0.9594,0.2803,0.008,-0.0311,0.8777,0.4717,-0.009,-0.0846,0.9067,0.0286,0.4178,0.0505,0.9108,-0.3564,0.1852,0.0958,0.9824,0.1199,0.1429,0.0081,0.9093,-0.0272,-0.4138,-0.0359,0.7243,-0.634,-0.2507,-0.1031,0.9974,0.0241,-0.028,0.0625,0.9442,-0.3213,0.0196,0.0704,0.6597,0.7309,-0.148,-0.0929,0.9399,-0.2842,0.1848,-0.0405,0.912,-0.4053,0.062,0.0147,0.9012,0.4237,0.0825,0.0398,0.9608,0.0807,-0.2419,-0.1088,0.9691,-0.244,0.0026,0.0372,0.9782,0.2069,0.0054,-0.0189,0.9601,0.2781,0.0096,-0.0282,0.8756,0.4766,-0.0123,-0.0769,0.9068,0.0263,0.4173,0.0545,0.9124,-0.3579,0.1747,0.0946,0.9816,0.1215,0.147,0.0132,0.91,-0.0311,-0.4115,-0.0397,0.7256,-0.6375,-0.241,-0.0951,0.9977,0.0251,-0.0237,0.0577,0.9435,-0.3245,0.011,0.0662,0.6358,0.7512,-0.1535,-0.0894,0.9379,-0.2883,0.1866,-0.0493,0.911,-0.4079,0.0573,0.0215,0.8894,0.4471,0.087,0.0401,0.9588,0.0828,-0.2473,-0.1126,0.9622,-0.2693,0.0126,0.0373,0.9786,0.2052,0.0055,-0.0174,0.9604,0.2772,0.011,-0.0254,0.8744,0.4801,-0.0151,-0.0679,0.9068,0.0246,0.4165,0.0594,0.9133,-0.3614,0.1626,0.0944,0.9809,0.1227,0.1496,0.0188,0.9108,-0.0366,-0.4089,-0.0437,0.7263,-0.6405,-0.2332,-0.0884,0.9981,0.0254,-0.0183,0.0539,0.9425,-0.3284,0.0045,0.0622,0.6108,0.771,-0.1587,-0.0856,0.9366,-0.2903,0.1873,-0.0579,0.9098,-0.4111,0.0502,0.0271,0.8768,0.4703,0.0916,0.0404,0.9573,0.0868,-0.2506,-0.1151,0.9543,-0.2957,0.0221,0.0375,0.9789,0.2035,0.0056,-0.0161,0.9605,0.2773,0.0123,-0.0224,0.8733,0.4833,-0.0175,-0.0588,0.907,0.0241,0.4155,0.0649,0.9131,-0.3674,0.1492,0.0948,0.9807,0.1234,0.1499,0.0246,0.9117,-0.0438,-0.4056,-0.0488,0.7265,-0.6433,-0.2271,-0.0825,0.9983,0.0254,-0.0122,0.0515,0.9411,-0.3332,0.0003,0.0585,0.5856,0.7897,-0.1636,-0.0817,0.9364,-0.2897,0.1868,-0.066,0.9085,-0.4147,0.0414,0.0313,0.8641,0.4925,0.096,0.0408,0.9562,0.0933,-0.2518,-0.1162,0.9452,-0.3229,0.0303,0.0378,0.9793,0.2018,0.0056,-0.0148,0.9604,0.2776,0.0139,-0.0192,0.8718,0.4868,-0.0192,-0.051,0.9071,0.0255,0.4141,0.0705,0.9115,-0.3765,0.1357,0.0954,0.9809,0.1236,0.1467,0.0311,0.9128,-0.0529,-0.4011,-0.0559,0.7257,-0.6465,-0.2225,-0.0768,0.9984,0.0257,-0.0059,0.0502,0.939,-0.3394,-0.0015,0.055,0.5604,0.8072,-0.1683,-0.0776,0.9373,-0.2855,0.1859,-0.0739,0.9069,-0.4188,0.0315,0.0341,0.8515,0.513,0.1005,0.0412,0.9555,0.1026,-0.2513,-0.1156,0.9351,-0.3505,0.0364,0.0383,0.9797,0.2,0.0055,-0.0132,0.9607,0.2767,0.0162,-0.0154,0.8699,0.4907,-0.0199,-0.0457,0.9074,0.0299,0.4125,0.0753,0.9078,-0.3893,0.1234,0.0958,0.9821,0.1223,0.1381,0.0388,0.9145,-0.0646,-0.3941,-0.0653,0.7229,-0.6516,-0.2191,-0.0701,0.9984,0.0266,0.0002,0.0497,0.9361,-0.3479,-0.0008,0.0516,0.5354,0.8235,-0.1728,-0.0733,0.9391,-0.2772,0.1856,-0.0821,0.905,-0.4233,0.0212,0.0358,0.8392,0.5319,0.1049,0.0417,0.955,0.1148,-0.2491,-0.1132,0.924,-0.3783,0.0394,0.0391,0.9802,0.1978,0.0054,-0.0112,0.9617,0.2732,0.0194,-0.0109,0.8684,0.4935,-0.0194,-0.0436,0.9077,0.0382,0.4105,0.0786,0.9015,-0.4062,0.114,0.096,0.9843,0.1184,0.1219,0.0477,0.9174,-0.0796,-0.3824,-0.0768,0.7172,-0.6597,-0.216,-0.0616,0.9984,0.028,0.0058,0.0492,0.9319,-0.3594,0.0028,0.0486,0.5106,0.8386,-0.1772,-0.0686,0.9418,-0.2644,0.1865,-0.091,0.9028,-0.4283,0.011,0.0372,0.8275,0.549,0.1096,0.0422,0.9546,0.1299,-0.2453,-0.1082,0.9121,-0.4061,0.0384,0.04,0.9807,0.1952,0.0052,-0.0086,0.9637,0.2659,0.0233,-0.0054,0.8691,0.4923,-0.0173,-0.0444,0.9081,0.0514,0.4078,0.0801,0.8928,-0.4266,0.1082,0.0963,0.9875,0.1102,0.0968,0.0569,0.9227,-0.0985,-0.3621,-0.0882,0.7081,-0.6716,-0.212,-0.051,0.9984,0.0293,0.0101,0.0482,0.9263,-0.3736,0.0096,0.0468,0.4874,0.8518,-0.1812,-0.0635,0.9452,-0.2464,0.1887,-0.1012,0.9003,-0.4335,0.0014,0.0392,0.8169,0.5636,0.1147,0.0429,0.9542,0.1484,-0.2394,-0.1007,0.8992,-0.4343,0.0336,0.0408,0.9814,0.1919,0.005,-0.0054,0.9666,0.255,0.0268,0.0011,0.8746,0.4825,-0.0138,-0.0465,0.9086,0.07,0.4038,0.0805,0.8821,-0.4488,0.1052,0.0968,0.9911,0.0972,0.0646,0.0646,0.9322,-0.1206,-0.3277,-0.0956,0.696,-0.6869,-0.2053,-0.0397,0.9985,0.028,0.0124,0.0464,0.9198,-0.3891,0.0197,0.0467,0.4689,0.8618,-0.1844,-0.0584,0.9492,-0.2233,0.1912,-0.112,0.8977,-0.4385,-0.0075,0.0428,0.8082,0.5748,0.1203,0.0439,0.9532,0.1711,-0.2319,-0.091,0.8847,-0.4636,0.0263,0.0412,0.9822,0.1875,0.005,-0.002,0.9698,0.2422,0.0282,0.0078,0.8867,0.4598,-0.0098,-0.0471,0.9093,0.0937,0.3972,0.0815,0.8706,-0.4713,0.1025,0.0968,0.994,0.08,0.0305,0.0685,0.9461,-0.1434,-0.2746,-0.0941,0.6822,-0.7039,-0.1954,-0.0301,0.9987,0.0204,0.0115,0.0444,0.9134,-0.403,0.0327,0.0484,0.4599,0.8667,-0.1856,-0.0545,0.9538,-0.196,0.1924,-0.1213,0.8952,-0.4428,-0.0154,0.0482,0.8026,0.5811,0.1263,0.0457,0.9509,0.198,-0.2239,-0.0804,0.8676,-0.4951,0.0189,0.0414,0.9833,0.1817,0.0052,0.001,0.9726,0.2305,0.0255,0.0136,0.9046,0.4239,-0.0064,-0.0434,0.9103,0.1213,0.3862,0.0859,0.8593,-0.4935,0.0961,0.0938,0.9959,0.0604,0.0005,0.0671,0.9621,-0.1628,-0.2035,-0.0802,0.669,-0.72,-0.1829,-0.0241,0.999,0.0038,0.0068,0.0442,0.9085,-0.4121,0.0469,0.0512,0.4665,0.8635,-0.1842,-0.0533,0.9592,-0.167,0.1911,-0.1247,0.8932,-0.4458,-0.0217,0.0544,0.8013,0.5815,0.1322,0.048,0.9467,0.2268,-0.2175,-0.0707,0.8471,-0.5295,0.014,0.042,0.9847,0.1739,0.0054,0.0029,0.9748,0.2219,0.018,0.0168,0.9239,0.3811,-0.0043,-0.034,0.9125,0.1509,0.3677,0.097,0.8478,-0.517,0.083,0.0846,0.9972,0.0396,-0.0235,0.0595,0.9756,-0.1731,-0.1233,-0.0547,0.6593,-0.7323,-0.1689,-0.0209,0.9986,-0.0211,-0.0025,0.0479,0.9067,-0.4139,0.0592,0.0545,0.4935,0.8492,-0.1796,-0.0559,0.9655,-0.1399,0.1865,-0.116,0.8919,-0.4476,-0.0252,0.0599,0.8046,0.5757,0.1367,0.0505,0.9413,0.2535,-0.2135,-0.0645,0.8227,-0.5667,0.0132,0.0435,0.9865,0.1639,0.0055,0.003,0.9761,0.2166,0.0067,0.0165,0.9394,0.3424,-0.0036,-0.0187,0.917,0.1807,0.3362,0.1164,0.8335,-0.5445,0.0645,0.0679,0.9978,0.0181,-0.0438,0.0456,0.9843,-0.1685,-0.048,-0.0222,0.6552,-0.739,-0.1556,-0.0188,0.9972,-0.0482,-0.0155,0.0547,0.9099,-0.4055,0.0657,0.0579,0.5415,0.8205,-0.1719,-0.0626,0.9727,-0.1188,0.1772,-0.0913,0.8914,-0.4481,-0.0242,0.0641,0.8119,0.5645,0.1392,0.0524,0.9362,0.2742,-0.2104,-0.0632,0.7944,-0.6055,0.0174,0.0454,0.9885,0.1514,0.0048,0.0009,0.9771,0.2124,-0.0059,0.0129,0.9482,0.3177,-0.0045,0.0018,0.9248,0.2083,0.2854,0.1407,0.8141,-0.5769,0.0475,0.0471,0.9978,-0.0053,-0.0606,0.0256,0.9891,-0.1465,0.0108,0.0134,0.6576,-0.7389,-0.1459,-0.0175,0.9953,-0.0704,-0.0297,0.0603,0.9193,-0.3838,0.0619,0.0618,0.6067,0.7751,-0.161,-0.0724,0.9797,-0.1062,0.1613,-0.0534,0.8918,-0.4469,-0.0176,0.068,0.8223,0.5491,0.1398,0.0537,0.9335,0.2871,-0.2046,-0.066,0.7633,-0.6438,0.0261,0.0463,0.9907,0.1357,0.0025,-0.0031,0.9784,0.2058,-0.0173,0.0075,0.9505,0.3097,-0.0069,0.0253,0.9353,0.2318,0.2139,0.1602,0.7911,-0.6097,0.0402,0.0283,0.9973,-0.0333,-0.0648,-0.0016,0.9913,-0.11,0.0498,0.053,0.6659,-0.7323,-0.1413,-0.0189,0.9938,-0.0835,-0.0424,0.0597,0.9347,-0.3465,0.0448,0.0655,0.6808,0.7126,-0.1474,-0.0838,0.985,-0.1023,0.1387,-0.0106,0.8933,-0.4432,-0.0038,0.0741,0.836,0.5279,0.1393,0.0549,0.9343,0.2907,-0.1937,-0.0707,0.7318,-0.6789,0.0382,0.0451,0.9932,0.1163,-0.0014,-0.0087,0.9807,0.1939,-0.0266,0.0015,0.9483,0.3136,-0.0091,0.0478,0.9455,0.2503,0.1317,0.1617,0.7722,-0.6337,0.0432,0.0155,0.996,-0.0678,-0.0443,-0.0368,0.9897,-0.0699,0.0743,0.1008,0.6786,-0.7207,-0.1393,-0.0246,0.9933,-0.0891,-0.0524,0.0521,0.9526,-0.2961,0.0149,0.0679,0.7542,0.6363,-0.1316,-0.0945,0.9877,-0.1047,0.1125,0.0286,0.8957,-0.436,0.0187,0.085,0.855,0.4963,0.1399,0.0559,0.939,0.2831,-0.1796,-0.0767,0.703,-0.7081,0.0515,0.0419,0.9954,0.0939,-0.0059,-0.015,0.9838,0.1756,-0.0343,-0.0042,0.9453,0.3197,-0.0075,0.0645,0.953,0.264,0.0589,0.1364,0.7671,-0.6397,0.0471,0.0079,0.9914,-0.1057,-0.0016,-0.0769,0.9821,-0.041,0.0941,0.1581,0.6939,-0.7068,-0.1337,-0.0317,0.993,-0.0918,-0.0611,0.0431,0.9683,-0.2391,-0.0231,0.0681,0.8193,0.5522,-0.1151,-0.1027,0.9883,-0.1096,0.0869,0.0602,0.8981,-0.4248,0.0505,0.1018,0.8797,0.4493,0.1449,0.0564,0.9463,0.263,-0.1676,-0.0855,0.6798,-0.7297,0.0634,0.0375,0.9972,0.0707,-0.0096,-0.0209,0.9874,0.1521,-0.0416,-0.0096,0.9452,0.3183,0.0013,0.0729,0.9581,0.273,0.0124,0.0857,0.7828,-0.6211,0.0388,0.0007,0.9828,-0.1386,0.0409,-0.1148,0.9682,-0.0357,0.1172,0.2182,0.7106,-0.6927,-0.1195,-0.0316,0.992,-0.0955,-0.0724,0.0402,0.9787,-0.1841,-0.0633,0.065,0.8728,0.4657,-0.0994,-0.1073,0.9879,-0.1128,0.065,0.0848,0.8991,-0.4108,0.0888,0.1225,0.9058,0.3887,0.1593,0.0558,0.9542,0.2319,-0.1619,-0.0979,0.6641,-0.7434,0.072,0.0337,0.9984,0.0493,-0.0113,-0.0251,0.9907,0.1263,-0.0483,-0.015,0.9499,0.3034,0.0174,0.0736,0.9613,0.2748,-0.0048,0.0196,0.8187,-0.574,0.0125,-0.0107,0.9748,-0.1584,0.0598,-0.145,0.9506,-0.0559,0.1449,0.2687,0.7277,-0.6789,-0.0967,-0.014,0.9896,-0.1013,-0.0905,0.0475,0.9835,-0.1378,-0.1021,0.0576,0.914,0.3815,-0.0861,-0.1084,0.987,-0.112,0.0486,0.1046,0.8977,-0.3969,0.1264,0.1436,0.9255,0.3255,0.1861,0.0539,0.9608,0.1951,-0.1624,-0.1112,0.6557,-0.7504,0.0771,0.0321,0.9991,0.0313,-0.011,-0.0275,0.9932,0.1015,-0.0531,-0.0203,0.958,0.2757,0.0382,0.0692,0.9624,0.2673,-0.0013,-0.049,0.8661,-0.4983,-0.0282,-0.0275,0.9712,-0.1624,0.0495,-0.167,0.9339,-0.0916,0.1723,0.2997,0.7436,-0.6646,-0.068,0.025,0.9855,-0.1079,-0.1151,0.0617,0.9836,-0.1052,-0.1398,0.0442,0.9423,0.3077,-0.0774,-0.1065,0.9861,-0.1067,0.0393,0.1208,0.8948,-0.386,0.1556,0.1618,0.9335,0.2755,0.2238,0.0513,0.9659,0.1593,-0.1649,-0.1205,0.653,-0.7524,0.0793,0.034,0.9994,0.0168,-0.0096,-0.0288,0.995,0.0799,-0.0545,-0.0254,0.9668,0.2404,0.0605,0.0616,0.9614,0.252,0.0124,-0.1095,0.9118,-0.4011,-0.0741,-0.0473,0.971,-0.1534,0.021,-0.1823,0.9215,-0.1287,0.1936,0.311,0.7557,-0.6492,-0.0366,0.0779,0.9805,-0.1145,-0.1404,0.0762,0.9793,-0.0913,-0.1791,0.0239,0.958,0.2567,-0.0758,-0.1025,0.9855,-0.098,0.0396,0.1328,0.8918,-0.3793,0.1726,0.1759,0.9301,0.249,0.2656,0.0482,0.9703,0.1298,-0.1639,-0.1216,0.655,-0.7504,0.0798,0.0391,0.9995,0.0048,-0.008,-0.0293,0.9963,0.0616,-0.0521,-0.0301,0.9748,0.201,0.082,0.0516,0.9592,0.2337,0.0299,-0.1564,0.9454,-0.2967,-0.1175,-0.0663,0.9718,-0.1367,-0.0109,-0.1918,0.9144,-0.1577,0.2077,0.3095,0.7631,-0.633,-0.0046,0.1306,0.9758,-0.1212,-0.16,0.0867,0.97,-0.0995,-0.2219,-0.0022,0.9624,0.2399,-0.0834,-0.0967,0.9849,-0.0889,0.0506,0.1398,0.8899,-0.3757,0.1793,0.1866,0.9195,0.2463,0.3032,0.0447,0.9753,0.1069,-0.156,-0.114,0.6611,-0.7446,0.0799,0.0454,0.9995,-0.0063,-0.0076,-0.0292,0.9972,0.0455,-0.0472,-0.0346,0.9815,0.1574,0.1012,0.0392,0.9566,0.2168,0.0476,-0.189,0.9637,-0.2006,-0.1552,-0.0829,0.973,-0.117,-0.037,-0.1956,0.911,-0.177,0.2164,0.3031,0.7666,-0.6181,0.0255,0.1722,0.9722,-0.1281,-0.172,0.0938,0.9552,-0.1278,-0.2651,-0.0301,0.9565,0.259,-0.101,-0.0889,0.9839,-0.0834,0.07,0.1417,0.8888,-0.3734,0.1806,0.195,0.9059,0.2598,0.332,0.0408,0.9809,0.0865,-0.1421,-0.1006,0.6718,-0.7346,0.0811,0.0497,0.9994,-0.0177,-0.009,-0.0283,0.9979,0.0307,-0.0419,-0.0396,0.9868,0.1091,0.1173,0.0249,0.9544,0.2038,0.0634,-0.2086,0.9696,-0.1241,-0.1866,-0.0985,0.9746,-0.0969,-0.0543,-0.1944,0.9094,-0.1895,0.2221,0.2961,0.7673,-0.6072,0.0512,0.1997,0.9695,-0.135,-0.1782,0.1003,0.937,-0.168,-0.3016,-0.0539,0.9414,0.3023,-0.1271,-0.0789,0.9825,-0.0826,0.0913,0.14,0.8883,-0.3707,0.1816,0.2015,0.8928,0.2798,0.351,0.0369,0.9861,0.0644,-0.127,-0.0855,0.6863,-0.7207,0.0842,0.0497,0.9991,-0.03,-0.0121,-0.0272,0.9981,0.0174,-0.0379,-0.0453,0.9897,0.0583,0.1302,0.0108,0.9533,0.1948,0.0763,-0.218,0.9681,-0.0703,-0.2112,-0.1147,0.9768,-0.0766,-0.0633,-0.1899,0.9086,-0.1983,0.2259,0.2901,0.7653,-0.602,0.0707,0.2167,0.9672,-0.1417,-0.1811,0.108,0.9198,-0.2082,-0.3253,-0.0691,0.9207,0.3509,-0.1566,-0.0682,0.9812,-0.0832,0.1061,0.1384,0.8881,-0.3669,0.185,0.2061,0.8832,0.2965,0.3617,0.034,0.9899,0.04,-0.1158,-0.071,0.7025,-0.7047,0.0888,0.0454,0.9986,-0.0425,-0.0163,-0.0269,0.998,0.0063,-0.0362,-0.0514,0.9901,0.0101,0.1401,-0.0007,0.9526,0.1901,0.0873,-0.2211,0.9641,-0.0356,-0.2284,-0.1304,0.9791,-0.0555,-0.0653,-0.1843,0.908,-0.205,0.2284,0.2851,0.7609,-0.6013,0.0835,0.2289,0.9651,-0.1478,-0.1823,0.1166,0.9079,-0.2392,-0.3361,-0.0745,0.9008,0.3898,-0.1817,-0.0602,0.9807,-0.0803,0.1088,0.1413,0.888,-0.3628,0.1911,0.2082,0.8796,0.3018,0.3662,0.0328,0.9922,0.0176,-0.1098,-0.0562,0.7168,-0.6898,0.0943,0.0379,0.998,-0.0535,-0.0203,-0.0281,0.9977,-0.0017,-0.0369,-0.0568,0.9886,-0.0312,0.1473,-0.0079,0.9514,0.1901,0.0977,-0.2216,0.9605,-0.0136,-0.2386,-0.1426,0.9813,-0.0334,-0.0614,-0.1794,0.9077,-0.2097,0.2303,0.2813,0.7556,-0.6025,0.091,0.2402,0.9631,-0.1525,-0.1833,0.1251,0.9021,-0.2581,-0.3382,-0.0725,0.8868,0.4143,-0.1964,-0.0579,0.9808,-0.0727,0.1004,0.1508,0.8879,-0.3599,0.198,0.2071,0.8826,0.2922,0.3667,0.0334,0.9936,0.0038,-0.106,-0.0392,0.7266,-0.6791,0.1008,0.0283,0.9974,-0.0606,-0.0233,-0.0304,0.9973,-0.0061,-0.0405,-0.0606,0.9864,-0.0637,0.1511,-0.0107,0.9492,0.1954,0.108,-0.2217,0.9581,0.0013,-0.244,-0.1501,0.983,-0.0109,-0.0527,-0.1756,0.9074,-0.2128,0.2315,0.2788,0.751,-0.6033,0.0955,0.2507,0.9613,-0.1545,-0.1858,0.1326,0.9006,-0.2669,-0.3366,-0.0664,0.8802,0.4263,-0.1995,-0.0615,0.9803,-0.065,0.0875,0.1646,0.8879,-0.3599,0.2027,0.2026,0.8902,0.2716,0.364,0.0354,0.9946,0.0025,-0.1015,-0.0195,0.731,-0.6734,0.1089,0.0168,0.9971,-0.0634,-0.0251,-0.033,0.9969,-0.0067,-0.0467,-0.0634,0.9845,-0.088,0.1512,-0.0102,0.9461,0.2053,0.1178,-0.2211,0.9567,0.0116,-0.2466,-0.1543,0.9842,0.0116,-0.0409,-0.1717,0.9073,-0.2148,0.2319,0.2773,0.748,-0.6026,0.0985,0.2601,0.9596,-0.1528,-0.1907,0.1394,0.9014,-0.2685,-0.3345,-0.0589,0.8793,0.4295,-0.194,-0.0685,0.9788,-0.0626,0.0776,0.1789,0.888,-0.3629,0.2038,0.1957,0.8997,0.2473,0.3576,0.0385,0.9953,0.0131,-0.0957,0.0018,0.7314,-0.6716,0.1184,0.0041,0.9971,-0.0632,-0.0258,-0.035,0.9963,-0.004,-0.0547,-0.0658,0.9833,-0.1056,0.1482,-0.0077,0.9425,0.2181,0.1265,-0.2192,0.9557,0.0186,-0.248,-0.1577,0.985,0.0337,-0.0281,-0.1671,0.9073,-0.2166,0.2313,0.2765,0.7464,-0.6003,0.1005,0.2691,0.958,-0.1477,-0.1979,0.1457,0.9034,-0.2655,-0.3326,-0.0518,0.8818,0.4277,-0.1836,-0.0765,0.9763,-0.0671,0.0749,0.1919,0.8881,-0.3677,0.2023,0.1876,0.9096,0.2245,0.3469,0.0427,0.9952,0.0328,-0.0889,0.0237,0.7295,-0.6717,0.1286,-0.0084,0.9971,-0.0614,-0.0257,-0.0369,0.9957,0.0007,-0.063,-0.0678,0.9826,-0.1181,0.1433,-0.005,0.9392,0.2309,0.1334,-0.2164,0.9548,0.0232,-0.2487,-0.1612,0.9852,0.0539,-0.0161,-0.1618,0.9073,-0.2181,0.2302,0.2761,0.7461,-0.5961,0.1018,0.2784,0.9565,-0.1406,-0.2059,0.1514,0.9064,-0.2594,-0.3303,-0.0463,0.8852,0.4244,-0.171,-0.0845,0.9728,-0.075,0.0799,0.2041,0.8882,-0.3728,0.1999,0.1791,0.9195,0.2042,0.3324,0.0478,0.994,0.058,-0.0804,0.0463,0.7265,-0.6728,0.1385,-0.0192,0.9972,-0.0589,-0.0249,-0.0389,0.9951,0.0059,-0.0706,-0.0688,0.9824,-0.1266,0.1376,-0.0031,0.9366,0.2415,0.1375,-0.2136,0.954,0.0264,-0.249,-0.1649,0.9853,0.0703,-0.0064,-0.1559,0.9075,-0.2189,0.2291,0.2759,0.7475,-0.59,0.1033,0.2873,0.9554,-0.1331,-0.2126,0.1557,0.9102,-0.2511,-0.3265,-0.0426,0.8884,0.4211,-0.1577,-0.092,0.9687,-0.0826,0.0908,0.2159,0.8885,-0.3774,0.1976,0.1708,0.929,0.1863,0.3154,0.0532,0.9915,0.0853,-0.0697,0.0695,0.7231,-0.6743,0.1474,-0.0275,0.9973,-0.0557,-0.0238,-0.0407,0.9946,0.0106,-0.0765,-0.0691,0.9824,-0.132,0.1323,-0.0023,0.9349,0.2489,0.1384,-0.2116,0.9531,0.029,-0.2496,-0.1688,0.9854,0.0815,0.0003,-0.1495,0.9076,-0.2187,0.2285,0.276,0.7504,-0.5822,0.1061,0.2944,0.9551,-0.1264,-0.2163,0.1583,0.915,-0.2411,-0.3209,-0.0406,0.8919,0.4171,-0.1444,-0.0989,0.9644,-0.0884,0.1048,0.2261,0.8887,-0.3811,0.1955,0.1631,0.9371,0.1722,0.2981,0.058,0.9877,0.1119,-0.0569,0.0935,0.7198,-0.6759,0.1549,-0.033,0.9975,-0.0522,-0.0226,-0.042,0.9942,0.0146,-0.0804,-0.0692,0.9824,-0.1358,0.128,-0.0019,0.9342,0.2535,0.1372,-0.2103,0.9519,0.0316,-0.2508,-0.173,0.9858,0.0884,0.0039,-0.1426,0.9078,-0.2175,0.2287,0.2762,0.7549,-0.573,0.1109,0.2991,0.9557,-0.1211,-0.216,0.1589,0.9204,-0.2297,-0.3139,-0.0402,0.8962,0.4105,-0.1317,-0.1047,0.9605,-0.0927,0.119,0.2339,0.889,-0.3844,0.193,0.1569,0.9429,0.164,0.2832,0.0615,0.9829,0.1351,-0.043,0.1177,0.717,-0.6773,0.1609,-0.0361,0.9976,-0.0491,-0.0214,-0.0429,0.994,0.0179,-0.0828,-0.0692,0.9823,-0.1394,0.1248,-0.0018,0.9339,0.2562,0.1356,-0.2093,0.9505,0.0346,-0.2528,-0.1774,0.9864,0.0924,0.0053,-0.1355,0.908,-0.2153,0.2295,0.2767,0.7607,-0.5623,0.1178,0.3023,0.9572,-0.1174,-0.212,0.1583,0.9259,-0.2175,-0.3062,-0.041,0.9017,0.4008,-0.1201,-0.1093,0.9572,-0.0957,0.1313,0.2397,0.8893,-0.3874,0.1895,0.1524,0.9463,0.1623,0.2721,0.0637,0.9777,0.1527,-0.0289,0.141,0.7151,-0.6781,0.1655,-0.0377,0.9978,-0.0467,-0.0203,-0.0435,0.9938,0.0207,-0.084,-0.0692,0.982,-0.1438,0.1227,-0.0017,0.9338,0.2578,0.1348,-0.2083,0.9489,0.0382,-0.2554,-0.1815,0.9871,0.0952,0.005,-0.1284,0.9081,-0.2127,0.2306,0.2773,0.7672,-0.5501,0.1261,0.3048,0.9592,-0.115,-0.2051,0.1572,0.931,-0.2057,-0.2986,-0.0428,0.9078,0.3887,-0.1103,-0.1128,0.9545,-0.0978,0.1406,0.244,0.8895,-0.39,0.1856,0.1495,0.9479,0.1648,0.2648,0.0648,0.9727,0.1657,-0.0154,0.1616,0.714,-0.6784,0.1688,-0.038,0.9978,-0.0454,-0.0195,-0.0441,0.9938,0.0233,-0.0845,-0.069,0.9813,-0.1496,0.1214,-0.0008,0.9337,0.2587,0.1356,-0.2071,0.9471,0.0425,-0.2584,-0.1856,0.9878,0.0973,0.0035,-0.1215,0.9082,-0.2099,0.2318,0.2781,0.7741,-0.5366,0.1354,0.3074,0.9613,-0.1136,-0.1965,0.1561,0.9353,-0.1954,-0.2917,-0.045,0.9139,0.3755,-0.1022,-0.1155,0.9527,-0.0995,0.1466,0.247,0.8896,-0.3921,0.182,0.1477,0.9484,0.1688,0.2603,0.0653,0.9679,0.1771,-0.0035,0.1785,0.7139,-0.6781,0.1708,-0.0373,0.9978,-0.0448,-0.0189,-0.0447,0.9938,0.0257,-0.0841,-0.0687,0.9802,-0.1567,0.1209,0.0012,0.9335,0.259,0.1381,-0.2058,0.9452,0.0474,-0.2617,-0.1894,0.9885,0.0989,0.0011,-0.1148,0.9083,-0.2072,0.233,0.2789,0.781,-0.522,0.1451,0.3106,0.9634,-0.1128,-0.1868,0.1557,0.9386,-0.1875,-0.2857,-0.0472,0.9196,0.3624,-0.0955,-0.1175,0.9516,-0.1014,0.15,0.2485,0.8896,-0.3938,0.1791,0.1464,0.9485,0.1724,0.2575,0.0657,0.9632,0.189,0.0056,0.191,0.7144,-0.6774,0.1715,-0.0357,0.9978,-0.0447,-0.0185,-0.0453,0.9938,0.0277,-0.083,-0.0682,0.9789,-0.1644,0.1209,0.0042,0.9333,0.2587,0.1421,-0.2046,0.9433,0.0529,-0.265,-0.1929,0.9891,0.1001,-0.0017,-0.1082,0.9083,-0.2045,0.2342,0.2799,0.7876,-0.5071,0.1549,0.3139,0.9652,-0.1126,-0.1769,0.1563,0.9411,-0.1822,-0.2805,-0.0489,0.9244,0.3509,-0.09,-0.1192,0.951,-0.1037,0.1521,0.2484,0.8896,-0.3951,0.1769,0.1457,0.9484,0.1753,0.2559,0.0659,0.9589,0.2018,0.011,0.1992,0.7153,-0.6767,0.171,-0.0335,0.9978,-0.0445,-0.018,-0.0459,0.994,0.0293,-0.0814,-0.0674,0.9775,-0.1723,0.1215,0.0075,0.933,0.2578,0.1469,-0.2038,0.9415,0.0587,-0.2681,-0.1955,0.9897,0.1007,-0.0042,-0.1019,0.9083,-0.2021,0.2354,0.2807,0.7935,-0.4931,0.1648,0.3164,0.9665,-0.1131,-0.1676,0.1578,0.9429,-0.1798,-0.2758,-0.05,0.9276,0.3429,-0.086,-0.1205,0.9508,-0.1057,0.1546,0.2469,0.8896,-0.3958,0.1753,0.1459,0.9481,0.1777,0.2553,0.066,0.9551,0.2144,0.0127,0.204,0.7162,-0.6763,0.1695,-0.031,0.9978,-0.0438,-0.0173,-0.0462,0.9941,0.0304,-0.0798,-0.0664,0.976,-0.1797,0.1228,0.0105,0.9325,0.2566,0.1521,-0.2035,0.94,0.0644,-0.2709,-0.1971,0.9902,0.1012,-0.0059,-0.0961,0.9082,-0.2,0.2365,0.2816,0.7984,-0.4808,0.1747,0.3176,0.9674,-0.1143,-0.1593,0.1602,0.9442,-0.1802,-0.271,-0.0505,0.9287,0.3402,-0.0835,-0.1217,0.9507,-0.1066,0.1587,0.244,0.8896,-0.396,0.1739,0.147,0.9476,0.18,0.2556,0.0662,0.9518,0.2259,0.0117,0.207,0.7168,-0.6763,0.1674,-0.0285,0.9979,-0.0428,-0.0166,-0.0465,0.9943,0.0313,-0.0783,-0.0652,0.9744,-0.1863,0.1248,0.0127,0.932,0.2553,0.1574,-0.2035,0.9387,0.0697,-0.2732,-0.1983,0.9906,0.1016,-0.0065,-0.0908,0.9081,-0.198,0.2375,0.2824,0.8022,-0.4706,0.1843,0.3178,0.9679,-0.1161,-0.1517,0.1631,0.9449,-0.1829,-0.2665,-0.051,0.9276,0.3432,-0.0828,-0.1224,0.9507,-0.1071,0.1643,0.24,0.8895,-0.3959,0.1729,0.1487,0.9469,0.1821,0.2564,0.0664,0.949,0.2359,0.0092,0.2091,0.7172,-0.6765,0.1653,-0.0262,0.9979,-0.0418,-0.016,-0.0466,0.9945,0.0322,-0.0769,-0.0641,0.973,-0.1917,0.1279,0.0138,0.9314,0.2544,0.1625,-0.2034,0.9376,0.0741,-0.2749,-0.1997,0.991,0.1021,-0.0063,-0.0859,0.9081,-0.1961,0.2383,0.2832,0.8049,-0.4623,0.1928,0.3183,0.9684,-0.118,-0.1442,0.1656,0.9452,-0.1869,-0.2628,-0.0516,0.9249,0.35,-0.0833,-0.1225,0.9508,-0.108,0.1696,0.2355,0.8895,-0.3954,0.1723,0.1508,0.9463,0.184,0.2573,0.0668,0.9466,0.2442,0.0061,0.2106,0.7174,-0.6768,0.1635,-0.0243,0.9979,-0.0412,-0.0158,-0.0465,0.9946,0.0335,-0.0755,-0.0633,0.9717,-0.1954,0.1318,0.0139,0.9308,0.2538,0.167,-0.2031,0.9365,0.0777,-0.2763,-0.2016,0.9914,0.1026,-0.006,-0.0816,0.908,-0.1942,0.2388,0.2841,0.8066,-0.4552,0.1993,0.3201,0.969,-0.1196,-0.1363,0.1676,0.9449,-0.1909,-0.2607,-0.0523,0.9219,0.3577,-0.0845,-0.1223,0.9511,-0.1087,0.173,0.2315,0.8895,-0.3947,0.1724,0.1528,0.9458,0.1851,0.2581,0.0672,0.9446,0.251,0.0029,0.2113,0.7175,-0.6771,0.1619,-0.0226,0.998,-0.0409,-0.0158,-0.0463,0.9946,0.0349,-0.0741,-0.063,0.9708,-0.1974,0.1359,0.0131,0.9305,0.2532,0.1702,-0.203,0.9355,0.0804,-0.2775,-0.2036,0.9916,0.1029,-0.006,-0.0782,0.908,-0.1924,0.2391,0.2852,0.8077,-0.449,0.2035,0.3234,0.9698,-0.1207,-0.1282,0.169,0.9443,-0.1942,-0.2604,-0.053,0.9195,0.3636,-0.0858,-0.122,0.9518,-0.1078,0.1737,0.2288,0.8895,-0.3937,0.173,0.1546,0.9455,0.1855,0.259,0.0676,0.9432,0.2563,-0.0002,0.2114,0.7175,-0.6774,0.1608,-0.0211,0.998,-0.0408,-0.0158,-0.046,0.9947,0.0363,-0.0728,-0.0631,0.9702,-0.1978,0.1394,0.0118,0.9304,0.2521,0.1716,-0.2036,0.9345,0.0827,-0.2788,-0.2051,0.9917,0.1031,-0.0064,-0.076,0.908,-0.1905,0.2393,0.2862,0.8083,-0.4435,0.2059,0.3281,0.9704,-0.121,-0.1206,0.1707,0.9434,-0.1966,-0.2617,-0.0536,0.9182,0.3668,-0.0869,-0.1218,0.9528,-0.1046,0.1716,0.2276,0.8894,-0.3927,0.1744,0.1559,0.9452,0.1853,0.2602,0.0678,0.9421,0.2604,-0.0033,0.2114,0.7176,-0.6775,0.16,-0.0196,0.998,-0.0408,-0.016,-0.0457,0.9947,0.0375,-0.0714,-0.0635,0.97,-0.1971,0.1422,0.0108,0.9306,0.2506,0.1713,-0.2047,0.9337,0.0845,-0.2803,-0.2062,0.9918,0.1035,-0.0071,-0.0753,0.9081,-0.1888,0.2396,0.287,0.8084,-0.4385,0.2069,0.3339,0.9708,-0.1204,-0.1143,0.173,0.9423,-0.1983,-0.2642,-0.0542,0.9178,0.3675,-0.0877,-0.1219,0.9543,-0.0996,0.1668,0.227,0.8894,-0.3916,0.1761,0.1567,0.945,0.1846,0.2614,0.0678,0.941,0.2639,-0.0065,0.2116,0.7179,-0.6774,0.1594,-0.018,0.998,-0.0408,-0.0163,-0.0453,0.9948,0.0384,-0.0699,-0.064,0.9699,-0.196,0.1441,0.0103,0.9311,0.2487,0.1696,-0.2062,0.9328,0.086,-0.2821,-0.2072,0.9916,0.1041,-0.0079,-0.0758,0.9081,-0.1871,0.2402,0.2875,0.8081,-0.434,0.2069,0.3402,0.971,-0.119,-0.1095,0.1763,0.9411,-0.1996,-0.2672,-0.0548,0.9184,0.366,-0.0882,-0.122,0.9563,-0.0937,0.1599,0.2263,0.8894,-0.3905,0.1782,0.1571,0.9448,0.1838,0.2626,0.0675,0.9399,0.2676,-0.0096,0.212,0.7183,-0.6772,0.1587,-0.0165,0.998,-0.0408,-0.0167,-0.0451,0.9948,0.0391,-0.0682,-0.0644,0.9699,-0.1949,0.1456,0.0102,0.9317,0.2469,0.167,-0.2076,0.9319,0.087,-0.2839,-0.2085,0.9915,0.1047,-0.0088,-0.0773,0.9081,-0.1856,0.2411,0.2878,0.8077,-0.4302,0.2066,0.3463,0.9708,-0.1172,-0.1062,0.1803,0.9401,-0.2002,-0.2703,-0.0553,0.9196,0.3628,-0.0883,-0.1221,0.9585,-0.0879,0.1516,0.2249,0.8894,-0.3896,0.1802,0.1572,0.9447,0.183,0.2636,0.0671,0.9387,0.2715,-0.0122,0.2122,0.7187,-0.677,0.158,-0.0148,0.998,-0.0409,-0.0173,-0.0447,0.9949,0.0397,-0.0664,-0.0648,0.97,-0.1936,0.1466,0.0107,0.9324,0.2451,0.164,-0.209,0.9309,0.0877,-0.2857,-0.21,0.9912,0.1055,-0.0097,-0.0794,0.9081,-0.1839,0.2422,0.288,0.8071,-0.4264,0.206,0.3527,0.9705,-0.1149,-0.1037,0.1851,0.939,-0.2007,-0.2738,-0.0556,0.9211,0.3588,-0.0883,-0.1223,0.9609,-0.0815,0.1423,0.2231,0.8894,-0.3886,0.1823,0.1572,0.9447,0.1822,0.2643,0.0666,0.9373,0.2759,-0.0148,0.2127,0.7188,-0.6771,0.1567,-0.0141,0.998,-0.0402,-0.0178,-0.0448,0.9951,0.0399,-0.064,-0.064,0.9694,-0.194,0.15,0.0092,0.9334,0.2435,0.1609,-0.2089,0.9299,0.0878,-0.2874,-0.212,0.9911,0.1047,-0.0104,-0.0821,0.908,-0.1838,0.243,0.2875,0.8068,-0.4256,0.2053,0.3547,0.9703,-0.1141,-0.1017,0.1875,0.9391,-0.1986,-0.2751,-0.0552,0.9234,0.3536,-0.0871,-0.1217,0.9628,-0.0805,0.1342,0.2203,0.8894,-0.3877,0.1837,0.1579,0.9445,0.1824,0.265,0.0658,0.9364,0.2792,-0.0159,0.2118],"root":[0.0,0.0,-0.0068,-0.0173,-0.0134,-0.0301,-0.0189,-0.0394,-0.0227,-0.0466,-0.0249,-0.0526,-0.0259,-0.0576,-0.0259,-0.0622,-0.0251,-0.0668,-0.0234,-0.0717,-0.0208,-0.0768,-0.0171,-0.0822,-0.0122,-0.0877,-0.0065,-0.0933,-0.0004,-0.0989,0.0054,-0.1047,0.0105,-0.1107,0.0144,-0.1174,0.0167,-0.1245,0.0172,-0.1322,0.0154,-0.14,0.0113,-0.1479,0.0052,-0.156,-0.0027,-0.1643,-0.0115,-0.1731,-0.0208,-0.1827,-0.0301,-0.1936,-0.0392,-0.206,-0.0481,-0.2199,-0.0567,-0.2364,-0.0652,-0.2553,-0.0732,-0.2763,-0.0798,-0.2988,-0.0847,-0.3223,-0.0878,-0.3461,-0.0895,-0.3689,-0.0901,-0.3899,-0.0916,-0.4104,-0.0955,-0.4322,-0.102,-0.4629,-0.1127,-0.4988,-0.1253,-0.5309,-0.1382,-0.5637,-0.1524,-0.6011,-0.1652,-0.6386,-0.175,-0.6742,-0.1823,-0.7054,-0.1875,-0.7316,-0.1929,-0.754,-0.1995,-0.7733,-0.2073,-0.7906,-0.2156,-0.8053,-0.225,-0.8179,-0.2377,-0.8339,-0.2489,-0.8485,-0.2546,-0.854,-0.2587,-0.8567,-0.261,-0.8568,-0.2621,-0.8553,-0.2627,-0.8535,-0.2633,-0.8522,-0.2642,-0.851,-0.265,-0.8496,-0.2658,-0.8474,-0.2669,-0.8445,-0.2689,-0.8414,-0.2702,-0.8381,-0.2713,-0.8352,-0.2726,-0.8323,-0.2727,-0.8292,-0.2748,-0.828,-0.2761,-0.827,-0.2771,-0.8265,-0.2776,-0.8266,-0.2777,-0.8272,-0.2773,-0.8281,-0.2765,-0.8291,-0.2751,-0.8299]},"fwd":{"n":89,"dur":2.933,"land":0.5227,"bones":["pelvis","spine","chest","head","armR","foreR","handR","armL","foreL","handL","thighR","shinR","footR","thighL","shinL","footL"],"q":[0.9974,-0.0694,0.0012,0.0179,0.9999,0.0148,-0.0002,-0.0032,0.9916,0.1192,-0.0472,0.0184,0.9951,0.0067,0.0051,0.0982,0.9449,-0.0172,0.2905,0.15,0.9532,-0.0041,-0.2602,-0.1536,0.9941,-0.0264,0.1048,-0.0054,0.9169,0.0504,-0.3741,-0.1292,0.98,-0.0429,0.1569,0.1143,0.9897,-0.0135,-0.1341,0.0492,0.9946,-0.0082,-0.0666,0.0787,0.8859,0.4382,-0.0813,-0.1289,0.9164,-0.3877,0.092,0.0374,0.981,-0.1737,0.0156,-0.0846,0.9899,0.1347,0.0251,0.0368,0.9696,-0.0086,-0.236,-0.0647,0.9971,-0.0749,0.0013,0.0159,0.9999,0.0129,-0.001,-0.0033,0.9914,0.1205,-0.0474,0.0203,0.991,0.0616,-0.0163,0.1174,0.944,-0.0157,0.2921,0.1529,0.9532,-0.0,-0.2608,-0.1531,0.994,-0.026,0.1061,-0.0077,0.9165,0.0542,-0.3752,-0.1278,0.9805,-0.0426,0.154,0.1143,0.9893,-0.0133,-0.1372,0.0487,0.9943,-0.0065,-0.0709,0.0794,0.8801,0.4495,-0.0833,-0.1284,0.9128,-0.3963,0.0919,0.0362,0.9816,-0.1728,0.0183,-0.079,0.9877,0.1495,0.0277,0.0372,0.9675,-0.0188,-0.2435,-0.0652,0.9965,-0.0823,0.0004,0.0149,0.9999,0.0115,-0.0016,-0.0039,0.9914,0.1198,-0.0485,0.0203,0.9848,0.1075,-0.0348,0.1316,0.945,-0.0119,0.2869,0.1566,0.953,0.0003,-0.2611,-0.154,0.9943,-0.0254,0.1035,-0.0081,0.9167,0.0574,-0.3744,-0.1274,0.9802,-0.0383,0.1564,0.1149,0.9883,-0.013,-0.144,0.0493,0.9941,-0.0069,-0.0762,0.0774,0.8689,0.4704,-0.0875,-0.1272,0.906,-0.4115,0.0935,0.0346,0.9822,-0.1721,0.0223,-0.0724,0.9838,0.1724,0.0313,0.0379,0.9644,-0.035,-0.2535,-0.0663,0.9958,-0.09,-0.0005,0.0142,0.9999,0.0104,-0.0023,-0.0045,0.9914,0.119,-0.0497,0.0202,0.9772,0.147,-0.0517,0.144,0.946,-0.008,0.282,0.1594,0.9527,0.0014,-0.2617,-0.1547,0.9945,-0.0247,0.1015,-0.0088,0.9169,0.0602,-0.3736,-0.1268,0.9798,-0.0337,0.1596,0.116,0.9872,-0.0127,-0.1505,0.0504,0.9939,-0.0071,-0.0811,0.0749,0.8568,0.4916,-0.0919,-0.1259,0.8986,-0.4271,0.0952,0.033,0.9827,-0.1712,0.0256,-0.0665,0.9792,0.1959,0.0349,0.0386,0.961,-0.0516,-0.2632,-0.0667,0.9951,-0.0982,-0.0014,0.0142,0.9999,0.0098,-0.003,-0.0054,0.9916,0.1174,-0.0512,0.0195,0.9704,0.1747,-0.0659,0.1534,0.9476,-0.0034,0.2761,0.1608,0.9521,0.003,-0.263,-0.1558,0.9947,-0.0235,0.0996,-0.0096,0.9174,0.0623,-0.3723,-0.1263,0.9788,-0.0276,0.1652,0.1181,0.9861,-0.0122,-0.1572,0.0525,0.9938,-0.0075,-0.0856,0.071,0.8422,0.5157,-0.0969,-0.1241,0.8896,-0.4452,0.0974,0.0316,0.9831,-0.1703,0.028,-0.0614,0.9733,0.2226,0.0391,0.0394,0.9572,-0.0703,-0.2728,-0.0661,0.9942,-0.1066,-0.0024,0.0146,0.9999,0.0098,-0.0038,-0.0066,0.9918,0.115,-0.053,0.0184,0.9658,0.189,-0.0774,0.1598,0.9495,0.0019,0.2695,0.1605,0.9513,0.0058,-0.265,-0.1572,0.9948,-0.0216,0.0986,-0.0109,0.918,0.0635,-0.3706,-0.1259,0.9772,-0.02,0.1729,0.1216,0.9848,-0.0112,-0.1639,0.0559,0.9938,-0.0082,-0.0894,0.066,0.8252,0.542,-0.1024,-0.1219,0.879,-0.4652,0.0996,0.0305,0.9834,-0.1699,0.0285,-0.0576,0.9656,0.253,0.0438,0.0403,0.9531,-0.0904,-0.2817,-0.0642,0.9933,-0.1146,-0.0032,0.015,0.9999,0.0102,-0.0045,-0.0079,0.9921,0.1117,-0.0548,0.0173,0.9642,0.1898,-0.0862,0.164,0.9521,0.0075,0.2618,0.158,0.9504,0.0098,-0.2674,-0.1588,0.9949,-0.019,0.0984,-0.0128,0.9189,0.0637,-0.3686,-0.1254,0.9751,-0.0116,0.182,0.1261,0.9835,-0.0094,-0.1702,0.0604,0.9938,-0.0095,-0.0924,0.0604,0.8055,0.5703,-0.1084,-0.1192,0.8674,-0.4862,0.102,0.03,0.9834,-0.1707,0.0265,-0.055,0.9556,0.2875,0.0491,0.0414,0.9489,-0.1106,-0.2892,-0.0609,0.9924,-0.122,-0.0039,0.015,0.9999,0.011,-0.0053,-0.0091,0.9924,0.1079,-0.0566,0.0166,0.9654,0.1783,-0.092,0.1668,0.9553,0.0131,0.2526,0.1533,0.9493,0.0146,-0.2701,-0.1604,0.9948,-0.0156,0.0989,-0.0157,0.9199,0.0633,-0.3661,-0.1252,0.9726,-0.0033,0.1917,0.1313,0.9822,-0.0068,-0.1758,0.0658,0.994,-0.0115,-0.0945,0.0545,0.7829,0.6003,-0.1149,-0.116,0.8556,-0.5061,0.1045,0.03,0.9832,-0.1729,0.0219,-0.0535,0.9428,0.326,0.0551,0.0426,0.9451,-0.1294,-0.2946,-0.0564,0.9916,-0.1288,-0.0048,0.0145,0.9999,0.0121,-0.0061,-0.01,0.9927,0.1042,-0.0584,0.0165,0.9684,0.1571,-0.0945,0.169,0.959,0.0186,0.2421,0.1465,0.9482,0.0196,-0.2727,-0.162,0.9947,-0.0116,0.0999,-0.0197,0.9212,0.0623,-0.3629,-0.1254,0.97,0.0033,0.2012,0.1367,0.981,-0.0037,-0.1803,0.0721,0.9942,-0.0141,-0.0951,0.0488,0.7571,0.632,-0.1217,-0.1122,0.8452,-0.5225,0.1076,0.031,0.9829,-0.1755,0.0154,-0.0529,0.9273,0.3667,0.0614,0.0439,0.9421,-0.1457,-0.2976,-0.0512,0.9907,-0.1351,-0.006,0.0138,0.9998,0.0132,-0.0069,-0.0107,0.993,0.1008,-0.0599,0.0171,0.9721,0.13,-0.0938,0.171,0.9628,0.024,0.2312,0.1378,0.947,0.0248,-0.2753,-0.1638,0.9945,-0.007,0.1012,-0.0247,0.9229,0.0612,-0.3585,-0.1266,0.9674,0.0071,0.2099,0.1417,0.9799,-0.0006,-0.1831,0.0792,0.9945,-0.0164,-0.0935,0.0434,0.728,0.6647,-0.1287,-0.1079,0.8373,-0.5343,0.1113,0.0328,0.9827,-0.1774,0.0083,-0.0531,0.9094,0.4079,0.0677,0.0451,0.9401,-0.1587,-0.2983,-0.0456,0.9899,-0.1408,-0.0076,0.0133,0.9998,0.0142,-0.0078,-0.0111,0.9932,0.0977,-0.0612,0.0181,0.9755,0.101,-0.0904,0.1731,0.9665,0.0291,0.2209,0.1278,0.9456,0.0303,-0.2782,-0.1659,0.9942,-0.002,0.1028,-0.0303,0.9251,0.06,-0.3523,-0.1288,0.965,0.0074,0.2175,0.146,0.979,0.0018,-0.184,0.0872,0.9951,-0.0173,-0.0894,0.0386,0.697,0.6965,-0.1354,-0.1035,0.8314,-0.5425,0.1151,0.0354,0.9826,-0.1778,0.0019,-0.0537,0.8899,0.4478,0.074,0.0463,0.939,-0.168,-0.2973,-0.04,0.9892,-0.1454,-0.0095,0.0137,0.9998,0.0147,-0.0088,-0.0114,0.9934,0.0948,-0.0624,0.019,0.9782,0.0726,-0.0853,0.175,0.9697,0.0337,0.2116,0.1173,0.944,0.0366,-0.2813,-0.1684,0.9938,0.0032,0.1048,-0.0362,0.9278,0.0582,-0.344,-0.1319,0.963,0.0043,0.224,0.1495,0.9784,0.0033,-0.183,0.096,0.9958,-0.0163,-0.0827,0.0343,0.6657,0.7259,-0.1416,-0.0991,0.8265,-0.5491,0.1182,0.0385,0.9827,-0.1769,-0.0026,-0.0546,0.8691,0.4858,0.08,0.0474,0.939,-0.1733,-0.2952,-0.0341,0.9887,-0.1487,-0.0115,0.0153,0.9998,0.0149,-0.0096,-0.0118,0.9935,0.0918,-0.0637,0.0196,0.98,0.0458,-0.0795,0.1764,0.9724,0.0373,0.204,0.107,0.9422,0.0437,-0.2848,-0.1711,0.9933,0.0083,0.1075,-0.0419,0.9312,0.0554,-0.3338,-0.1355,0.9614,-0.0014,0.2291,0.1524,0.9779,0.0039,-0.1807,0.1053,0.9967,-0.0131,-0.0739,0.0301,0.6354,0.7521,-0.1471,-0.095,0.8214,-0.556,0.1199,0.0421,0.983,-0.175,-0.0046,-0.0556,0.8475,0.5217,0.0857,0.0482,0.9398,-0.174,-0.2927,-0.0279,0.9884,-0.1502,-0.0133,0.0184,0.9998,0.0149,-0.0105,-0.0122,0.9937,0.0887,-0.0652,0.0196,0.9813,0.0203,-0.0735,0.1769,0.9743,0.0402,0.1992,0.0977,0.9403,0.0512,-0.2882,-0.1736,0.9926,0.0132,0.1114,-0.0468,0.935,0.0508,-0.3222,-0.1392,0.9601,-0.0084,0.2328,0.1546,0.9773,0.0037,-0.1777,0.1148,0.9976,-0.0081,-0.0634,0.0256,0.6064,0.7751,-0.1519,-0.0913,0.8159,-0.5638,0.1199,0.046,0.9834,-0.1724,-0.0039,-0.0565,0.8253,0.5552,0.091,0.0489,0.9416,-0.1693,-0.2903,-0.0216,0.9884,-0.1497,-0.0145,0.0229,0.9997,0.015,-0.0112,-0.0129,0.9939,0.0855,-0.0669,0.0189,0.982,-0.0052,-0.0675,0.1765,0.9751,0.0428,0.1981,0.0899,0.9387,0.0582,-0.2912,-0.1754,0.9917,0.0177,0.1166,-0.0505,0.9388,0.044,-0.3103,-0.1427,0.9592,-0.0155,0.235,0.1561,0.9767,0.0028,-0.1749,0.1243,0.9984,-0.0018,-0.0519,0.0204,0.5788,0.7955,-0.1563,-0.0879,0.8101,-0.5721,0.1184,0.0501,0.9839,-0.1693,-0.0008,-0.0573,0.8029,0.5863,0.096,0.0494,0.9441,-0.1588,-0.2883,-0.0156,0.9887,-0.1467,-0.015,0.0284,0.9997,0.0152,-0.0119,-0.0139,0.994,0.0825,-0.0692,0.0177,0.9821,-0.0324,-0.0614,0.1751,0.975,0.0452,0.2005,0.0843,0.9375,0.0634,-0.2933,-0.1762,0.9908,0.0216,0.1225,-0.0525,0.9423,0.0354,-0.2996,-0.1453,0.9587,-0.022,0.2361,0.157,0.9761,0.0012,-0.1723,0.1327,0.9991,0.0053,-0.0403,0.0147,0.5524,0.8137,-0.1602,-0.0847,0.8045,-0.5801,0.1158,0.0537,0.9844,-0.1659,0.0035,-0.0579,0.7805,0.615,0.1006,0.0497,0.9472,-0.1432,-0.2867,-0.0105,0.9893,-0.1409,-0.0146,0.0344,0.9997,0.0155,-0.0125,-0.0155,0.994,0.08,-0.0724,0.0163,0.9813,-0.0635,-0.0551,0.173,0.9744,0.0461,0.2046,0.0812,0.937,0.0659,-0.2944,-0.1761,0.9901,0.0245,0.1279,-0.0532,0.9447,0.0259,-0.2922,-0.1465,0.9585,-0.0271,0.2364,0.1573,0.9755,-0.0005,-0.1702,0.1391,0.9995,0.0126,-0.0293,0.0088,0.527,0.8299,-0.1637,-0.0817,0.7994,-0.5875,0.1123,0.0565,0.9849,-0.1627,0.0079,-0.0584,0.7586,0.6412,0.1048,0.0499,0.9501,-0.1255,-0.2855,-0.0066,0.9904,-0.1319,-0.0132,0.0403,0.9996,0.016,-0.0129,-0.0175,0.9939,0.0781,-0.0765,0.0147,0.979,-0.1009,-0.0487,0.1705,0.9738,0.044,0.2077,0.0815,0.9372,0.0652,-0.2944,-0.1756,0.9895,0.026,0.1314,-0.0538,0.9458,0.0163,-0.2901,-0.1453,0.9585,-0.0299,0.2362,0.1571,0.9753,-0.0019,-0.1687,0.1425,0.9996,0.0191,-0.0196,0.0033,0.5031,0.8443,-0.1667,-0.079,0.7945,-0.5948,0.1079,0.0582,0.9853,-0.1601,0.0114,-0.0588,0.7377,0.6644,0.1087,0.05,0.9521,-0.1105,-0.285,-0.0037,0.9918,-0.1191,-0.0111,0.0459,0.9996,0.0167,-0.0132,-0.0202,0.9936,0.0769,-0.0817,0.0131,0.9739,-0.1468,-0.0422,0.1678,0.9737,0.0373,0.2076,0.0858,0.9378,0.0613,-0.2934,-0.1753,0.9894,0.0257,0.132,-0.055,0.945,0.0074,-0.2949,-0.141,0.9587,-0.0298,0.2357,0.1563,0.9755,-0.0024,-0.1679,0.1423,0.9996,0.024,-0.0117,-0.0018,0.4812,0.8567,-0.1693,-0.0766,0.7893,-0.6025,0.1021,0.0592,0.9854,-0.159,0.0136,-0.0595,0.7185,0.6846,0.112,0.0501,0.9529,-0.1025,-0.2855,-0.0016,0.9934,-0.1021,-0.0085,0.0513,0.9995,0.0175,-0.0134,-0.0235,0.9932,0.0766,-0.0874,0.0113,0.9648,-0.2019,-0.0362,0.1647,0.9739,0.0257,0.2045,0.0948,0.9388,0.0545,-0.2914,-0.1752,0.9897,0.0233,0.1292,-0.0572,0.9425,-0.0004,-0.3067,-0.1331,0.9594,-0.0265,0.2345,0.1545,0.9761,-0.0018,-0.1679,0.1382,0.9996,0.0262,-0.0053,-0.0066,0.4617,0.8671,-0.1714,-0.0747,0.7841,-0.6104,0.0948,0.0596,0.9851,-0.1604,0.0145,-0.061,0.7012,0.7019,0.1149,0.0502,0.9524,-0.1031,-0.2869,0.0001,0.9951,-0.081,-0.0059,0.0567,0.9994,0.0183,-0.0137,-0.0273,0.9926,0.0772,-0.0933,0.0091,0.9501,-0.2651,-0.0307,0.1614,0.9738,0.01,0.1999,0.1083,0.9403,0.0453,-0.2884,-0.175,0.9904,0.0186,0.1228,-0.0599,0.9381,-0.0072,-0.3242,-0.1217,0.9609,-0.0209,0.231,0.1513,0.9771,-0.0005,-0.1681,0.1302,0.9996,0.0251,-0.0002,-0.0111,0.4451,0.8756,-0.1729,-0.0733,0.7798,-0.6172,0.0862,0.0594,0.9842,-0.1645,0.0148,-0.0634,0.6863,0.7161,0.1174,0.0504,0.9509,-0.1106,-0.2891,0.0018,0.9965,-0.0561,-0.0036,0.0619,0.9992,0.0191,-0.0141,-0.0314,0.992,0.0787,-0.0988,0.0066,0.9294,-0.3324,-0.0259,0.158,0.9723,-0.008,0.1972,0.1252,0.9422,0.0343,-0.2843,-0.1739,0.9915,0.0117,0.1139,-0.0624,0.9325,-0.0132,-0.3446,-0.1073,0.9636,-0.0143,0.2233,0.1463,0.9787,0.0007,-0.1676,0.1183,0.9997,0.0204,0.0038,-0.0156,0.4321,0.8819,-0.1738,-0.0726,0.778,-0.6208,0.0774,0.0584,0.9828,-0.1715,0.0147,-0.067,0.6743,0.727,0.1196,0.0507,0.9487,-0.1223,-0.2917,0.0034,0.9974,-0.0279,-0.002,0.0667,0.9991,0.0193,-0.0146,-0.0353,0.9913,0.0811,-0.1034,0.004,0.9036,-0.3987,-0.0217,0.1553,0.969,-0.0265,0.2,0.1429,0.9446,0.022,-0.2792,-0.1713,0.9924,0.0031,0.1046,-0.0646,0.9264,-0.0194,-0.3646,-0.0916,0.9675,-0.0083,0.2104,0.1399,0.9809,0.001,-0.1648,0.1035,0.9997,0.012,0.007,-0.0202,0.423,0.8863,-0.1741,-0.0725,0.78,-0.6194,0.0691,0.0559,0.9807,-0.1811,0.0148,-0.0719,0.6659,0.7344,0.1212,0.0512,0.9462,-0.1355,-0.2938,0.005,0.9975,0.0034,-0.0016,0.0709,0.9989,0.0188,-0.0154,-0.0389,0.9907,0.084,-0.1066,0.0014,0.8744,-0.4599,-0.0176,0.1537,0.9637,-0.0436,0.2104,0.1584,0.9475,0.008,-0.2727,-0.1669,0.9931,-0.0064,0.0967,-0.0667,0.921,-0.0273,-0.3809,-0.0769,0.972,-0.0044,0.1934,0.133,0.9834,-0.0004,-0.1587,0.0878,0.9996,-0.0006,0.009,-0.0254,0.4183,0.8886,-0.1736,-0.0732,0.7865,-0.6122,0.0622,0.0515,0.9779,-0.1934,0.0154,-0.0784,0.6616,0.738,0.1224,0.0517,0.9442,-0.148,-0.2943,0.0063,0.9965,0.0382,-0.0024,0.0746,0.9988,0.0174,-0.0165,-0.0418,0.9903,0.0868,-0.1081,-0.0012,0.8438,-0.5141,-0.0135,0.1534,0.9571,-0.058,0.2279,0.169,0.951,-0.0091,-0.2643,-0.1603,0.9932,-0.0161,0.0914,-0.0697,0.9169,-0.0384,-0.3918,-0.0651,0.9763,-0.0043,0.1756,0.1266,0.9861,-0.0035,-0.1491,0.0735,0.9992,-0.0185,0.0094,-0.0327,0.418,0.8889,-0.1722,-0.0747,0.7969,-0.5997,0.0573,0.045,0.9739,-0.2092,0.0169,-0.0868,0.6618,0.7377,0.1228,0.0523,0.9434,-0.1572,-0.292,0.0074,0.994,0.0768,-0.0047,0.0782,0.9987,0.0151,-0.0182,-0.0441,0.9903,0.0884,-0.1073,-0.0043,0.8133,-0.5611,-0.0094,0.1536,0.9503,-0.0678,0.2493,0.1736,0.955,-0.032,-0.2532,-0.151,0.993,-0.0263,0.0878,-0.0743,0.9145,-0.053,-0.3972,-0.0565,0.9796,-0.0103,0.1601,0.1207,0.9885,-0.0085,-0.137,0.0628,0.9981,-0.0434,0.0073,-0.0437,0.4219,0.8873,-0.1695,-0.0772,0.8097,-0.5831,0.0562,0.0362,0.9683,-0.2294,0.02,-0.0971,0.6666,0.7333,0.1226,0.0527,0.9443,-0.161,-0.287,0.0081,0.9894,0.1197,-0.0085,0.0821,0.9987,0.0118,-0.0205,-0.0456,0.9907,0.0877,-0.1041,-0.0085,0.784,-0.6015,-0.0057,0.1534,0.9443,-0.0718,0.2708,0.1726,0.9589,-0.0618,-0.2392,-0.1392,0.9925,-0.038,0.0838,-0.0807,0.9133,-0.0696,-0.3983,-0.0494,0.982,-0.0247,0.1479,0.1149,0.9904,-0.0165,-0.1249,0.057,0.9953,-0.0762,0.0012,-0.0598,0.4292,0.8842,-0.1654,-0.0808,0.8238,-0.5631,0.0612,0.0244,0.9608,-0.2543,0.0253,-0.1079,0.676,0.7249,0.1214,0.0527,0.9466,-0.158,-0.2809,0.0079,0.9822,0.1668,-0.013,0.0859,0.9986,0.0072,-0.0231,-0.0462,0.9915,0.0839,-0.0987,-0.0139,0.7571,-0.6353,-0.0029,0.1523,0.9396,-0.07,0.2905,0.167,0.9617,-0.0957,-0.2236,-0.1261,0.9917,-0.0521,0.0774,-0.0886,0.9128,-0.0864,-0.3971,-0.0407,0.9832,-0.0466,0.1376,0.1105,0.9912,-0.0288,-0.1162,0.0573,0.9898,-0.117,-0.0104,-0.0804,0.4386,0.8802,-0.1601,-0.0854,0.8388,-0.5394,0.0737,0.0091,0.9514,-0.2831,0.0326,-0.1166,0.6894,0.7126,0.119,0.052,0.9495,-0.1478,-0.2766,0.0063,0.9719,0.2173,-0.0171,0.0887,0.9986,0.0011,-0.0256,-0.0457,0.9926,0.0769,-0.0922,-0.0205,0.7341,-0.6622,-0.0008,0.1501,0.9359,-0.065,0.3087,0.1569,0.9629,-0.1274,-0.2085,-0.1143,0.9905,-0.0685,0.0681,-0.0978,0.9126,-0.1012,-0.3953,-0.0261,0.9831,-0.0714,0.1267,0.1109,0.9901,-0.046,-0.1151,0.0652,0.9807,-0.1639,-0.028,-0.1029,0.4487,0.8756,-0.1543,-0.0907,0.8542,-0.5116,0.0924,-0.0086,0.9408,-0.314,0.0407,-0.1207,0.7056,0.6973,0.1152,0.0504,0.9522,-0.131,-0.2758,0.0024,0.9584,0.2701,-0.0197,0.09,0.9986,-0.0065,-0.0277,-0.0444,0.9936,0.0674,-0.0858,-0.0279,0.7169,-0.6816,0.0018,0.1466,0.9327,-0.0612,0.3263,0.1411,0.9632,-0.1513,-0.1955,-0.1059,0.9888,-0.0857,0.0568,-0.1082,0.9124,-0.113,-0.3934,-0.002,0.9818,-0.0928,0.1128,0.1213,0.9867,-0.0669,-0.1233,0.0819,0.9679,-0.2135,-0.0494,-0.1232,0.4586,0.8708,-0.1493,-0.0957,0.8692,-0.4805,0.1141,-0.0259,0.9299,-0.3446,0.0471,-0.1198,0.7237,0.6796,0.1099,0.0478,0.9542,-0.109,-0.2786,-0.0048,0.9415,0.3242,-0.0202,0.0901,0.9986,-0.015,-0.0292,-0.0425,0.9944,0.0569,-0.081,-0.0359,0.7064,-0.6935,0.0064,0.1413,0.9297,-0.0635,0.3432,0.1175,0.9633,-0.167,-0.1841,-0.1014,0.9866,-0.1014,0.0452,-0.1198,0.9122,-0.121,-0.3901,0.0341,0.9788,-0.1083,0.0948,0.1458,0.9808,-0.089,-0.1373,0.1059,0.9525,-0.2622,-0.0708,-0.1377,0.4685,0.8655,-0.1466,-0.0997,0.8824,-0.4492,0.1347,-0.0388,0.9194,-0.3728,0.049,-0.1156,0.7433,0.6594,0.1036,0.0438,0.9553,-0.0838,-0.2831,-0.0154,0.921,0.3786,-0.0184,0.0896,0.9984,-0.0234,-0.0301,-0.0408,0.9948,0.0471,-0.0793,-0.044,0.7029,-0.6984,0.0142,0.1336,0.927,-0.0752,0.3576,0.0847,0.9634,-0.1797,-0.1724,-0.0992,0.984,-0.1142,0.0356,-0.1324,0.912,-0.1245,-0.3822,0.0823,0.9727,-0.12,0.0731,0.1847,0.9737,-0.1096,-0.1497,0.1326,0.9367,-0.3065,-0.0882,-0.1445,0.4795,0.859,-0.1475,-0.1019,0.8932,-0.4212,0.1512,-0.0444,0.91,-0.397,0.0444,-0.111,0.7652,0.6354,0.0966,0.0385,0.9553,-0.058,-0.2883,-0.0289,0.8974,0.432,-0.0156,0.089,0.9983,-0.0307,-0.0305,-0.0395,0.9946,0.0395,-0.0816,-0.0508,0.7063,-0.6966,0.026,0.1234,0.9243,-0.097,0.3666,0.0432,0.9626,-0.197,-0.1577,-0.0983,0.9812,-0.1233,0.0298,-0.1458,0.9118,-0.1237,-0.366,0.1392,0.9618,-0.1329,0.0505,0.234,0.9672,-0.1266,-0.1545,0.1572,0.9225,-0.344,-0.0996,-0.144,0.4933,0.8503,-0.1524,-0.1022,0.9017,-0.3987,0.1618,-0.0421,0.9024,-0.4159,0.0342,-0.1075,0.7895,0.6064,0.0893,0.0324,0.9541,-0.0341,-0.2944,-0.0442,0.8712,0.4829,-0.0142,0.0873,0.9981,-0.0363,-0.0302,-0.0383,0.9941,0.0354,-0.087,-0.0543,0.7171,-0.6868,0.0422,0.111,0.9213,-0.1261,0.3678,-0.0033,0.9594,-0.2252,-0.1384,-0.0983,0.9783,-0.1289,0.0286,-0.1596,0.9114,-0.1204,-0.3397,0.1986,0.9456,-0.1518,0.0315,0.2859,0.9625,-0.1391,-0.1512,0.177,0.9112,-0.3736,-0.1058,-0.1372,0.5117,0.8381,-0.1597,-0.1013,0.9087,-0.3814,0.1663,-0.0328,0.8968,-0.4293,0.0225,-0.1044,0.8154,0.5724,0.0821,0.0267,0.9513,-0.0133,-0.3021,-0.0599,0.8437,0.5301,-0.0168,0.0826,0.9981,-0.0403,-0.0291,-0.0363,0.9937,0.0351,-0.0927,-0.0526,0.7367,-0.6663,0.0628,0.0966,0.9181,-0.157,0.3605,-0.0496,0.9518,-0.2669,-0.1144,-0.099,0.9755,-0.1319,0.0321,-0.173,0.9108,-0.1195,-0.304,0.2526,0.9262,-0.1812,0.0188,0.33,0.9597,-0.1474,-0.143,0.1917,0.9033,-0.3954,-0.1092,-0.1258,0.5363,0.8213,-0.1666,-0.1004,0.9149,-0.3678,0.1656,-0.0182,0.8933,-0.4379,0.0146,-0.1,0.841,0.5352,0.0757,0.0226,0.9473,0.0039,-0.3114,-0.0753,0.8163,0.5724,-0.0246,0.0741,0.9982,-0.0432,-0.0273,-0.0325,0.9936,0.0388,-0.0954,-0.0453,0.7652,-0.6327,0.0869,0.0811,0.9153,-0.1846,0.3463,-0.0908,0.9381,-0.3204,-0.0871,-0.0988,0.9728,-0.1331,0.0398,-0.1851,0.9102,-0.127,-0.2619,0.2947,0.9067,-0.2256,0.0114,0.3562,0.9581,-0.1529,-0.1344,0.2014,0.8982,-0.4099,-0.1133,-0.1109,0.5679,0.799,-0.1702,-0.1008,0.9202,-0.3569,0.1609,0.0003,0.8916,-0.4427,0.0149,-0.0941,0.8647,0.4969,0.0703,0.0211,0.9424,0.0178,-0.3216,-0.0908,0.7899,0.6089,-0.0366,0.0628,0.9983,-0.0456,-0.0251,-0.0266,0.994,0.0458,-0.0931,-0.034,0.8,-0.5856,0.1134,0.0651,0.9135,-0.2052,0.3283,-0.125,0.918,-0.3803,-0.0591,-0.0952,0.9703,-0.1337,0.0515,-0.1949,0.9101,-0.1467,-0.2167,0.3214,0.8885,-0.2879,0.0039,0.3574,0.9571,-0.1567,-0.1291,0.2065,0.8953,-0.4183,-0.1205,-0.0939,0.6049,0.7713,-0.1685,-0.1035,0.9241,-0.3487,0.1545,0.0214,0.8911,-0.4445,0.0247,-0.0879,0.886,0.4585,0.0646,0.0226,0.9363,0.0304,-0.3328,-0.1081,0.7657,0.6393,-0.0499,0.0509,0.9984,-0.0481,-0.0229,-0.0187,0.9945,0.055,-0.0861,-0.0211,0.8357,-0.5284,0.1412,0.0494,0.9132,-0.2167,0.3094,-0.1529,0.8934,-0.4397,-0.0332,-0.0866,0.9678,-0.1341,0.0667,-0.2023,0.9103,-0.1777,-0.1715,0.3322,0.8697,-0.3657,-0.009,0.3312,0.9565,-0.1583,-0.1299,0.2076,0.8938,-0.4217,-0.1319,-0.0763,0.644,0.7399,-0.1612,-0.1088,0.9263,-0.3435,0.149,0.0434,0.8916,-0.4431,0.0423,-0.0835,0.9053,0.4203,0.0558,0.0268,0.9283,0.0448,-0.3459,-0.1286,0.7444,0.6636,-0.0623,0.0405,0.9984,-0.051,-0.021,-0.0094,0.9949,0.0645,-0.0764,-0.0089,0.8672,-0.4672,0.1688,0.0345,0.9146,-0.2177,0.2917,-0.1762,0.8669,-0.4928,-0.0112,-0.0735,0.9653,-0.1342,0.0836,-0.2078,0.9108,-0.2134,-0.1288,0.329,0.847,-0.4503,-0.0292,0.2809,0.956,-0.1562,-0.1382,0.2062,0.8932,-0.4208,-0.1471,-0.0595,0.6807,0.7076,-0.1493,-0.1165,0.9264,-0.3409,0.1459,0.0649,0.8929,-0.438,0.0636,-0.0829,0.9228,0.3814,0.042,0.0333,0.9176,0.0636,-0.3615,-0.1528,0.727,0.682,-0.0729,0.0323,0.9983,-0.0548,-0.0197,0.0005,0.9952,0.072,-0.0662,0.0009,0.8918,-0.4075,0.1952,0.0215,0.9176,-0.2073,0.277,-0.1959,0.8415,-0.5371,0.0062,-0.0576,0.9629,-0.1335,0.1001,-0.2121,0.912,-0.2455,-0.0912,0.3156,0.8188,-0.5298,-0.0531,0.2146,0.9552,-0.1496,-0.1534,0.2042,0.8931,-0.4161,-0.1652,-0.0453,0.7118,0.6778,-0.1341,-0.1264,0.9252,-0.3401,0.1454,0.0847,0.8962,-0.428,0.079,-0.0862,0.939,0.3405,0.0275,0.0412,0.9042,0.0878,-0.3775,-0.1797,0.7137,0.6952,-0.0823,0.0252,0.998,-0.06,-0.0191,0.0105,0.9955,0.0757,-0.0569,0.0082,0.9094,-0.3532,0.2194,0.0115,0.9218,-0.1856,0.2664,-0.2117,0.8182,-0.5732,0.0201,-0.0413,0.9608,-0.1313,0.1142,-0.2158,0.9154,-0.2665,-0.0597,0.2956,0.786,-0.5965,-0.0757,0.1436,0.9536,-0.1392,-0.1733,0.2029,0.8932,-0.4083,-0.1852,-0.0344,0.736,0.6525,-0.1164,-0.1379,0.9233,-0.3399,0.1472,0.1019,0.9061,-0.4079,0.0661,-0.0903,0.9552,0.2902,0.0306,0.0495,0.8901,0.1159,-0.3893,-0.2067,0.7036,0.7045,-0.092,0.0164,0.9974,-0.0665,-0.019,0.02,0.9959,0.075,-0.0485,0.0141,0.9208,-0.3069,0.2409,0.0053,0.9266,-0.1549,0.2601,-0.2232,0.7961,-0.6037,0.0326,-0.0261,0.9592,-0.1276,0.1246,-0.2194,0.9231,-0.2715,-0.033,0.2704,0.7491,-0.6509,-0.095,0.0783,0.9512,-0.1271,-0.1954,0.2025,0.8935,-0.3983,-0.2059,-0.0263,0.7543,0.6318,-0.097,-0.1498,0.9212,-0.3386,0.1526,0.1158,0.9267,-0.365,-0.005,-0.0891,0.9719,0.2146,0.0794,0.0554,0.8798,0.1442,-0.3898,-0.2306,0.6951,0.7114,-0.103,0.0034,0.9967,-0.0739,-0.019,0.0286,0.9965,0.0702,-0.0406,0.0206,0.9275,-0.2699,0.2587,0.0023,0.931,-0.1191,0.2567,-0.2307,0.7737,-0.6317,0.0464,-0.013,0.9581,-0.1227,0.1314,-0.223,0.9359,-0.2582,-0.0084,0.2394,0.7065,-0.6981,-0.1138,0.0252,0.948,-0.1157,-0.2171,0.2019,0.8935,-0.3876,-0.2257,-0.02,0.7686,0.6147,-0.0772,-0.1599,0.9189,-0.3352,0.1658,0.1255,0.9445,-0.2865,-0.1405,-0.0787,0.9766,0.1022,0.1805,0.0558,0.8786,0.1671,-0.3729,-0.2472,0.6868,0.7176,-0.1149,-0.0142,0.9958,-0.0817,-0.0187,0.0363,0.9971,0.0628,-0.0323,0.0292,0.9316,-0.2424,0.2707,0.0006,0.9347,-0.0833,0.2533,-0.2351,0.7497,-0.6588,0.0632,-0.002,0.9573,-0.118,0.1351,-0.2267,0.9523,-0.2277,0.0157,0.2025,0.6572,-0.7412,-0.1365,-0.0137,0.9449,-0.1073,-0.236,0.2001,0.8933,-0.3775,-0.2435,-0.0141,0.7807,0.5997,-0.0587,-0.1657,0.9152,-0.3298,0.1915,0.1301,0.9362,-0.1848,-0.292,-0.064,0.9544,-0.0261,0.2928,0.0516,0.8892,0.1784,-0.3374,-0.2523,0.6776,0.7238,-0.1256,-0.034,0.9949,-0.0898,-0.0185,0.043,0.9974,0.0545,-0.0238,0.0403,0.9357,-0.2224,0.2737,-0.0032,0.938,-0.0523,0.2472,-0.2374,0.7239,-0.6849,0.0833,0.0074,0.9566,-0.1142,0.1375,-0.2302,0.9683,-0.185,0.0389,0.1632,0.6046,-0.7783,-0.1648,-0.0396,0.9427,-0.1035,-0.2492,0.1964,0.8928,-0.3679,-0.2596,-0.0084,0.7926,0.5851,-0.0431,-0.166,0.9087,-0.3232,0.2298,0.1303,0.9108,-0.0993,-0.3967,-0.0572,0.9206,-0.128,0.3658,0.0481,0.9084,0.175,-0.2901,-0.2451,0.6682,0.7303,-0.1323,-0.0512,0.9938,-0.0984,-0.0189,0.0485,0.9974,0.0469,-0.016,0.0519,0.9419,-0.2066,0.2646,-0.0122,0.9412,-0.0299,0.2378,-0.2382,0.697,-0.709,0.1063,0.0161,0.9558,-0.1113,0.1399,-0.2334,0.9802,-0.1387,0.0594,0.1279,0.5567,-0.8053,-0.1961,-0.0551,0.9424,-0.1054,-0.2537,0.191,0.8922,-0.3582,-0.2752,-0.0032,0.806,0.5686,-0.0309,-0.1619,0.8991,-0.3166,0.2738,0.1285,0.8934,-0.0509,-0.4422,-0.0617,0.8981,-0.1878,0.3947,0.0483,0.9284,0.1596,-0.2442,-0.2301,0.6601,0.7368,-0.1331,-0.0609,0.9926,-0.1076,-0.0202,0.0525,0.9972,0.0415,-0.0107,0.0613,0.9505,-0.1924,0.2424,-0.0284,0.9442,-0.0185,0.2273,-0.2378,0.6708,-0.7297,0.1305,0.0239,0.9551,-0.1078,0.1433,-0.2358,0.9868,-0.0978,0.0766,0.1035,0.521,-0.8208,-0.2256,-0.0627,0.9444,-0.1125,-0.2471,0.1856,0.8915,-0.3473,-0.291,0.0003,0.8208,0.549,-0.0222,-0.1561,0.8889,-0.3104,0.3119,0.1277,0.8895,-0.028,-0.4508,-0.0696,0.8857,-0.2214,0.4052,0.0486,0.9425,0.1403,-0.2135,-0.2156,0.6551,0.7422,-0.1279,-0.0608,0.9914,-0.117,-0.0223,0.0547,0.997,0.039,-0.0094,0.0659,0.9601,-0.1785,0.2092,-0.0504,0.9461,-0.0188,0.2207,-0.2363,0.6481,-0.7453,0.1538,0.0299,0.9549,-0.1017,0.1473,-0.2369,0.9892,-0.0672,0.0903,0.0936,0.5005,-0.8269,-0.2481,-0.0648,0.9479,-0.1236,-0.2301,0.1825,0.8908,-0.3354,-0.3066,0.001,0.8349,0.5289,-0.0185,-0.1508,0.8819,-0.3049,0.3356,0.1292,0.901,-0.0146,-0.4277,-0.0708,0.8812,-0.2429,0.4036,0.04,0.9483,0.1239,-0.2058,-0.2073,0.6546,0.7449,-0.1181,-0.0517,0.9902,-0.1261,-0.0245,0.0549,0.997,0.0396,-0.0132,0.0652,0.9687,-0.1652,0.1701,-0.074,0.9458,-0.0291,0.2229,-0.2342,0.6312,-0.7551,0.1739,0.0337,0.9557,-0.091,0.1509,-0.236,0.9892,-0.0458,0.0998,0.0975,0.4942,-0.8268,-0.261,-0.0635,0.9513,-0.1361,-0.2066,0.1839,0.8902,-0.3235,-0.3207,-0.0023,0.8449,0.514,-0.0216,-0.1463,0.8801,-0.3003,0.3433,0.1317,0.9399,-0.0097,-0.3363,-0.0583,0.9018,-0.2463,0.355,0.0095,0.9475,0.1118,-0.2187,-0.2045,0.6585,0.7441,-0.1064,-0.0371,0.9891,-0.1347,-0.0264,0.0534,0.997,0.0426,-0.021,0.0608,0.9747,-0.1545,0.1311,-0.0945,0.9429,-0.0464,0.2345,-0.232,0.6205,-0.7602,0.1893,0.0359,0.9576,-0.0753,0.1531,-0.2323,0.9879,-0.0289,0.1043,0.1114,0.4981,-0.8235,-0.2648,-0.0604,0.9534,-0.1471,-0.1821,0.1905,0.8898,-0.3126,-0.3323,-0.0097,0.8485,0.5091,-0.0322,-0.1408,0.8827,-0.2975,0.3386,0.1328,0.9902,-0.0207,-0.1347,-0.0296,0.9505,-0.2153,0.2188,-0.0473,0.9439,0.1007,-0.2413,-0.2016,0.6649,0.7405,-0.0953,-0.0216,0.9881,-0.1425,-0.0275,0.0511,0.9969,0.0467,-0.0302,0.055,0.9779,-0.1498,0.0975,-0.1084,0.9378,-0.067,0.2511,-0.2303,0.613,-0.7632,0.2008,0.038,0.9603,-0.0551,0.154,-0.226,0.986,-0.013,0.1042,0.1295,0.5076,-0.8189,-0.262,-0.0567,0.9538,-0.1549,-0.161,0.2009,0.8894,-0.3036,-0.341,-0.0201,0.8454,0.5151,-0.0489,-0.1328,0.8875,-0.2977,0.3263,0.1313,0.9902,-0.046,0.1315,0.0058,0.9827,-0.1496,0.0229,-0.107,0.9417,0.087,-0.2606,-0.1941,0.6714,0.7359,-0.0868,-0.0083,0.9872,-0.1493,-0.0275,0.0488,0.9968,0.0501,-0.038,0.0502,0.9789,-0.1529,0.073,-0.1147,0.9321,-0.0888,0.2661,-0.2293,0.6055,-0.7665,0.21,0.0413,0.963,-0.033,0.1545,-0.2184,0.9839,0.0014,0.1017,0.1469,0.5179,-0.8145,-0.256,-0.0535,0.9532,-0.1588,-0.1452,0.2123,0.8891,-0.2974,-0.3464,-0.0311,0.8375,0.5283,-0.0687,-0.1218,0.8928,-0.3012,0.3099,0.1272,0.9399,-0.0718,0.3326,0.0292,0.9784,-0.0824,-0.1329,-0.1355,0.9432,0.0702,-0.2688,-0.1824,0.6763,0.7321,-0.0817,0.0015,0.9864,-0.1549,-0.0269,0.047,0.9966,0.0523,-0.0425,0.0474,0.9784,-0.1625,0.0592,-0.1134,0.9271,-0.1107,0.2757,-0.2288,0.5964,-0.7711,0.2182,0.0457,0.9649,-0.0118,0.1557,-0.2109,0.9819,0.0117,0.0992,0.1608,0.5264,-0.8113,-0.2492,-0.0514,0.9523,-0.1595,-0.1343,0.2229,0.8889,-0.2946,-0.3485,-0.0405,0.8275,0.5436,-0.0888,-0.109,0.898,-0.3062,0.2916,0.1216,0.9009,-0.0895,0.4232,0.0355,0.9697,-0.0414,-0.2022,-0.1306,0.9474,0.0523,-0.266,-0.1702,0.679,0.7297,-0.0796,0.008,0.9859,-0.159,-0.0262,0.0459,0.9965,0.0533,-0.044,0.0469,0.9773,-0.1751,0.0562,-0.1052,0.9233,-0.1321,0.2792,-0.2281,0.5862,-0.7765,0.2254,0.0506,0.9661,0.0061,0.1577,-0.2045,0.9803,0.0167,0.0981,0.1706,0.5319,-0.8096,-0.2431,-0.0508,0.9512,-0.1582,-0.1273,0.2322,0.8887,-0.2948,-0.348,-0.047,0.8184,0.5564,-0.1072,-0.0958,0.9036,-0.3105,0.2716,0.1156,0.8886,-0.0994,0.4466,0.0327,0.9692,-0.0245,-0.2175,-0.1133,0.9523,0.035,-0.2571,-0.1608,0.6802,0.7287,-0.0791,0.0125,0.9855,-0.1617,-0.0257,0.0452,0.9964,0.054,-0.0435,0.0479,0.9762,-0.1867,0.0629,-0.0907,0.9208,-0.1525,0.2781,-0.227,0.5763,-0.7819,0.231,0.0552,0.9667,0.0199,0.1596,-0.1988,0.9789,0.0173,0.0992,0.1778,0.5351,-0.8089,-0.2383,-0.0512,0.9501,-0.1558,-0.1228,0.2408,0.8886,-0.2969,-0.346,-0.0507,0.8118,0.5647,-0.1229,-0.083,0.9101,-0.3129,0.2485,0.1102,0.8871,-0.1038,0.449,0.0283,0.9702,-0.0194,-0.2197,-0.0999,0.9563,0.0196,-0.2474,-0.1548,0.6803,0.7285,-0.0791,0.0159,0.9852,-0.1635,-0.0255,0.0448,0.9964,0.0547,-0.0425,0.0497,0.9751,-0.1952,0.0772,-0.0709,0.9192,-0.1713,0.2737,-0.2254,0.568,-0.7867,0.2345,0.0589,0.9675,0.0297,0.1604,-0.1934,0.9773,0.0165,0.1024,0.1845,0.5368,-0.8086,-0.2352,-0.0523,0.9487,-0.153,-0.1199,0.2492,0.8885,-0.2995,-0.3438,-0.0523,0.8083,0.5685,-0.1356,-0.071,0.9172,-0.3135,0.2215,0.1065,0.887,-0.1051,0.4489,0.0251,0.9698,-0.0186,-0.2244,-0.0939,0.9589,0.0066,-0.2401,-0.1513,0.68,0.7287,-0.0788,0.0187,0.985,-0.1648,-0.0255,0.0443,0.9962,0.0557,-0.0418,0.0519,0.9739,-0.2,0.0968,-0.0469,0.9183,-0.1879,0.2671,-0.2238,0.5621,-0.7904,0.2357,0.0613,0.9685,0.0357,0.1594,-0.1879,0.9753,0.017,0.1072,0.1924,0.5378,-0.8082,-0.234,-0.0533,0.9473,-0.1503,-0.1182,0.2572,0.8884,-0.3017,-0.342,-0.053,0.807,0.5691,-0.1452,-0.061,0.924,-0.3135,0.1923,0.1049,0.887,-0.1049,0.4491,0.0229,0.9682,-0.0189,-0.2315,-0.0924,0.9602,-0.0035,-0.236,-0.149,0.6797,0.729,-0.0782,0.0209,0.9849,-0.1656,-0.0254,0.0437,0.996,0.0569,-0.0416,0.0542,0.9719,-0.2018,0.119,-0.0208,0.918,-0.2019,0.2592,-0.2223,0.5591,-0.7926,0.235,0.0625,0.9698,0.0385,0.1569,-0.1825,0.9726,0.0206,0.113,0.2022,0.5388,-0.8074,-0.2342,-0.054,0.9457,-0.1477,-0.1179,0.2646,0.8883,-0.3031,-0.3409,-0.0536,0.8068,0.5684,-0.1518,-0.054,0.9289,-0.314,0.1655,0.1056,0.887,-0.1042,0.4493,0.0211,0.9666,-0.0192,-0.2383,-0.0919,0.961,-0.0096,-0.2341,-0.1471,0.6794,0.7294,-0.0773,0.0224,0.9848,-0.1662,-0.0252,0.043,0.9958,0.0582,-0.0418,0.0563,0.9692,-0.2018,0.1413,0.0047,0.918,-0.2125,0.2516,-0.2212,0.5587,-0.7936,0.2327,0.0628,0.9712,0.0389,0.1536,-0.1778,0.9694,0.0274,0.1189,0.2132,0.5401,-0.8062,-0.2354,-0.0542,0.9439,-0.1453,-0.1192,0.2714,0.8882,-0.3039,-0.3402,-0.0542,0.8069,0.5676,-0.1557,-0.0501,0.9314,-0.3153,0.1462,0.108,0.887,-0.1037,0.4495,0.0194,0.9656,-0.0191,-0.2431,-0.0907,0.9615,-0.0114,-0.2329,-0.1451,0.6791,0.7297,-0.0766,0.0232,0.9848,-0.1667,-0.0248,0.0425,0.9957,0.0596,-0.0417,0.058,0.9658,-0.201,0.1613,0.0274,0.9181,-0.2195,0.2453,-0.2206,0.5599,-0.7936,0.2298,0.0624,0.9724,0.0376,0.1504,-0.1743,0.966,0.0361,0.1239,0.2242,0.5414,-0.8049,-0.237,-0.0537,0.9421,-0.1432,-0.122,0.2776,0.8882,-0.3043,-0.3399,-0.0544,0.8071,0.567,-0.1574,-0.0487,0.932,-0.3172,0.1363,0.1108,0.887,-0.1036,0.4496,0.0178,0.9652,-0.0191,-0.2452,-0.0888,0.9622,-0.0091,-0.2316,-0.1431,0.6787,0.7301,-0.0759,0.0234,0.9847,-0.1671,-0.0245,0.0422,0.9955,0.0609,-0.0413,0.0592,0.9626,-0.1996,0.1775,0.0461,0.9184,-0.2233,0.241,-0.2204,0.5618,-0.7932,0.2265,0.0619,0.9732,0.0355,0.1478,-0.1725,0.9629,0.0452,0.1275,0.2337,0.5425,-0.8037,-0.2386,-0.0529,0.9402,-0.1415,-0.1256,0.2831,0.8882,-0.3044,-0.3399,-0.0542,0.8074,0.5664,-0.1576,-0.0489,0.9314,-0.3191,0.1334,0.113,0.887,-0.104,0.4496,0.0165,0.9654,-0.0197,-0.245,-0.0866,0.9627,-0.0044,-0.2304,-0.1414,0.6782,0.7307,-0.0754,0.0235,0.9847,-0.1673,-0.024,0.0418,0.9955,0.062,-0.0403,0.0596,0.9599,-0.1976,0.1894,0.0603,0.9188,-0.2248,0.2385,-0.2202,0.5635,-0.793,0.2234,0.0615,0.9736,0.0328,0.1459,-0.1723,0.9604,0.0535,0.1294,0.241,0.5427,-0.8032,-0.2401,-0.052,0.9384,-0.1408,-0.1293,0.2879,0.8882,-0.3044,-0.3401,-0.0534,0.8081,0.5656,-0.1569,-0.0499,0.9306,-0.3208,0.1339,0.1143,0.887,-0.1048,0.4494,0.0155,0.9661,-0.0208,-0.2428,-0.0846,0.963,0.0014,-0.23,-0.1406,0.6775,0.7313,-0.0749,0.0235,0.9847,-0.1674,-0.0236,0.0413,0.9955,0.0627,-0.039,0.0595,0.9581,-0.195,0.1975,0.0704,0.9192,-0.2248,0.2375,-0.2194,0.5647,-0.793,0.2204,0.0614,0.9737,0.0298,0.1446,-0.1734,0.9587,0.061,0.1296,0.2458,0.5418,-0.8034,-0.2416,-0.0512,0.9366,-0.1416,-0.1323,0.2919,0.8882,-0.3043,-0.3404,-0.0521,0.809,0.5645,-0.1554,-0.0513,0.93,-0.3222,0.1346,0.1146,0.887,-0.1062,0.4491,0.0148,0.9672,-0.0225,-0.2388,-0.0831,0.9628,0.0076,-0.2304,-0.141,0.6767,0.7321,-0.0746,0.0235,0.9848,-0.1673,-0.023,0.0407,0.9956,0.0632,-0.0375,0.0587,0.9573,-0.192,0.202,0.0767,0.9197,-0.2238,0.2379,-0.2179,0.5656,-0.7931,0.2178,0.0615,0.9736,0.0263,0.1436,-0.1754,0.9577,0.0681,0.1286,0.2482,0.5396,-0.8045,-0.2431,-0.0507,0.935,-0.144,-0.1347,0.2949,0.8882,-0.3042,-0.3407,-0.0503,0.8103,0.5631,-0.1534,-0.0528,0.9299,-0.3229,0.1344,0.1143,0.887,-0.108,0.4487,0.0147,0.9687,-0.025,-0.2331,-0.0821,0.9621,0.0143,-0.2316,-0.143,0.6759,0.7329,-0.0744,0.0235,0.9849,-0.1671,-0.0225,0.0402,0.9957,0.0635,-0.0359,0.0573,0.9574,-0.1891,0.2034,0.0795,0.9203,-0.222,0.2395,-0.2156,0.5663,-0.7931,0.2156,0.0618,0.9734,0.0225,0.1428,-0.1778,0.9574,0.0751,0.1266,0.2484,0.5363,-0.8063,-0.2444,-0.0507,0.9334,-0.1478,-0.1367,0.297,0.8882,-0.3041,-0.3411,-0.0482,0.8119,0.5614,-0.1508,-0.0545,0.9302,-0.3226,0.1332,0.1134,0.887,-0.1099,0.4482,0.0151,0.9702,-0.0287,-0.2261,-0.0816,0.961,0.0218,-0.2333,-0.1467,0.675,0.7336,-0.0746,0.0235,0.9849,-0.1669,-0.022,0.0399,0.9958,0.0638,-0.0345,0.0553,0.9582,-0.1869,0.2019,0.0789,0.9209,-0.2191,0.2426,-0.2124,0.5672,-0.7929,0.2137,0.0624,0.973,0.0183,0.1424,-0.1807,0.9576,0.0825,0.124,0.2466,0.5322,-0.8087,-0.2453,-0.0511,0.932,-0.1525,-0.1386,0.2982,0.8882,-0.3041,-0.3414,-0.0459,0.8136,0.5595,-0.1478,-0.0564,0.9311,-0.3212,0.1318,0.1119,0.887,-0.1115,0.4478,0.0159,0.9718,-0.0336,-0.2188,-0.0819,0.9595,0.0298,-0.2353,-0.1518,0.6742,0.7343,-0.0752,0.0232,0.985,-0.1668,-0.0216,0.0399,0.996,0.0641,-0.0331,0.0528,0.9595,-0.1861,0.1977,0.0752,0.9215,-0.2149,0.2472,-0.2087,0.5681,-0.7926,0.2121,0.0633,0.9725,0.0138,0.1422,-0.1838,0.9581,0.0901,0.1212,0.2434,0.5275,-0.8116,-0.2457,-0.0517,0.9306,-0.1573,-0.1408,0.2989,0.8882,-0.3041,-0.3416,-0.0435,0.8153,0.5577,-0.1446,-0.0584,0.9323,-0.3189,0.1306,0.1096,0.887,-0.1124,0.4475,0.0172,0.9729,-0.0397,-0.2119,-0.0831,0.9578,0.0377,-0.2373,-0.1579,0.6736,0.7348,-0.0763,0.0228,0.985,-0.1665,-0.0212,0.0401,0.9962,0.0645,-0.032,0.05,0.9611,-0.1871,0.1911,0.0687,0.922,-0.2094,0.2532,-0.2049,0.5691,-0.7922,0.2108,0.0644,0.972,0.0089,0.1421,-0.1871,0.9587,0.0971,0.1185,0.2396,0.5224,-0.8148,-0.2459,-0.0524,0.9294,-0.1613,-0.1433,0.2993,0.8883,-0.3043,-0.3416,-0.0412,0.8168,0.5561,-0.1413,-0.0602,0.9337,-0.3161,0.1297,0.1068,0.887,-0.1126,0.4474,0.0188,0.9737,-0.0463,-0.2063,-0.085,0.956,0.0449,-0.239,-0.1641,0.673,0.7352,-0.0779,0.022,0.9851,-0.1659,-0.0207,0.0404,0.9963,0.0648,-0.0309,0.047,0.9629,-0.19,0.182,0.0597,0.9223,-0.2029,0.2599,-0.2014,0.5699,-0.7918,0.2097,0.0657,0.9715,0.0036,0.1417,-0.1901,0.9593,0.1028,0.1165,0.236,0.5173,-0.8179,-0.246,-0.0531,0.9284,-0.1637,-0.1464,0.2999,0.8883,-0.3048,-0.3412,-0.0391,0.818,0.555,-0.1381,-0.0619,0.9351,-0.3134,0.1291,0.1036,0.887,-0.1121,0.4474,0.0205,0.974,-0.0529,-0.2023,-0.0877,0.9545,0.051,-0.2401,-0.1695,0.6724,0.7355,-0.0801,0.021,0.9853,-0.1648,-0.0203,0.0408,0.9965,0.0651,-0.0297,0.044,0.9647,-0.1943,0.1707,0.0485,0.9226,-0.1957,0.2668,-0.1984,0.5703,-0.7915,0.2091,0.0671,0.9711,-0.0023,0.1409,-0.1928,0.9597,0.1066,0.1153,0.2329,0.5123,-0.821,-0.2463,-0.0538,0.9274,-0.1642,-0.15,0.3007,0.8884,-0.3057,-0.3405,-0.0371,0.8188,0.5544,-0.1351,-0.0633,0.9363,-0.3111,0.1285,0.1006,0.887,-0.1107,0.4477,0.0221,0.9737,-0.0591,-0.2002,-0.0911,0.9534,0.0556,-0.2404,-0.1734,0.6718,0.7358,-0.0832,0.0196,0.9855,-0.1632,-0.0198,0.0411,0.9966,0.0655,-0.0282,0.0409,0.9666,-0.1994,0.1573,0.0354,0.9227,-0.1882,0.2736,-0.1958,0.5702,-0.7915,0.209,0.0687,0.9708,-0.009,0.1394,-0.1949,0.9601,0.1082,0.1152,0.2306,0.5072,-0.8239,-0.2469,-0.0545,0.9266,-0.1631,-0.1541,0.3017,0.8885,-0.3072,-0.3392,-0.0353,0.8193,0.5542,-0.1321,-0.0646,0.9373,-0.3093,0.1271,0.0981,0.887,-0.1084,0.4482,0.0236,0.973,-0.0652,-0.2,-0.0952,0.9531,0.0588,-0.2396,-0.1753,0.6711,0.7361,-0.0869,0.0179,0.9859,-0.161,-0.0193,0.0416,0.9968,0.0658,-0.0264,0.0378,0.9684,-0.2042,0.1419,0.0209,0.9227,-0.1808,0.28,-0.1937,0.5697,-0.7916,0.2095,0.0703,0.9707,-0.0161,0.1375,-0.1963,0.9605,0.1078,0.1165,0.2287,0.5022,-0.8266,-0.248,-0.0552,0.926,-0.1607,-0.1587,0.3027,0.8885,-0.3092,-0.3374,-0.0335,0.8198,0.554,-0.1293,-0.0656,0.9385,-0.3075,0.1239,0.0962,0.887,-0.1051,0.4489,0.025,0.9717,-0.0717,-0.2017,-0.1004,0.9535,0.0609,-0.2377,-0.1752,0.6702,0.7364,-0.0913,0.0159,0.9863,-0.1584,-0.0188,0.0424,0.9969,0.066,-0.0245,0.0346,0.9701,-0.2081,0.1248,0.0054,0.9227,-0.1736,0.2858,-0.192,0.5686,-0.7919,0.2107,0.0718,0.9707,-0.0235,0.1354,-0.1969,0.9608,0.1062,0.1189,0.2268,0.497,-0.8292,-0.2495,-0.0561,0.9254,-0.1578,-0.1633,0.3034,0.8886,-0.3116,-0.3352,-0.0316,0.8206,0.5533,-0.1268,-0.0664,0.9401,-0.3053,0.1178,0.0951,0.8871,-0.1006,0.4498,0.0265,0.9698,-0.0793,-0.2047,-0.1067,0.9544,0.063,-0.2346,-0.1736,0.6691,0.7368,-0.096,0.0138,0.9867,-0.1556,-0.0184,0.0433,0.9971,0.0663,-0.0225,0.0314,0.9716,-0.2108,0.1069,-0.0103,0.9225,-0.1668,0.2911,-0.1907,0.5671,-0.7924,0.2125,0.0732,0.9708,-0.0307,0.1333,-0.1968,0.9613,0.1038,0.1222,0.2242,0.4918,-0.8317,-0.2513,-0.0573,0.925,-0.155,-0.168,0.3037,0.8886,-0.3142,-0.3327,-0.0298,0.8218,0.5519,-0.1246,-0.0669,0.9423,-0.3024,0.1087,0.0945,0.8871,-0.0952,0.4508,0.0282,0.9673,-0.0881,-0.2087,-0.1141,0.9557,0.0658,-0.2306,-0.1709,0.6679,0.7373,-0.1007,0.0118,0.9871,-0.1529,-0.0181,0.0443,0.9972,0.0667,-0.0206,0.0283,0.9727,-0.2128,0.0887,-0.0254,0.9224,-0.1604,0.2957,-0.1896,0.5652,-0.7931,0.2146,0.0744,0.971,-0.0376,0.1312,-0.1962,0.9619,0.1013,0.1258,0.2205,0.4863,-0.8342,-0.2534,-0.0588,0.9246,-0.1525,-0.1724,0.3035,0.8887,-0.317,-0.3301,-0.0278,0.8236,0.5496,-0.123,-0.0672,0.9448,-0.2987,0.0964,0.094,0.8871,-0.0892,0.452,0.0302,0.9643,-0.0981,-0.2132,-0.1228,0.9571,0.0703,-0.2259,-0.1672,0.6666,0.7379,-0.1051,0.0099,0.9874,-0.1504,-0.0177,0.0453,0.9972,0.0672,-0.0191,0.0253,0.9733,-0.2147,0.0708,-0.0394,0.9223,-0.1545,0.2997,-0.1888,0.563,-0.7939,0.2168,0.0756,0.9713,-0.0439,0.1292,-0.195,0.9629,0.0987,0.1293,0.2154,0.4805,-0.8367,-0.2557,-0.0604,0.9244,-0.1505,-0.1767,0.3027,0.8887,-0.3196,-0.3276,-0.0258,0.8258,0.5464,-0.122,-0.0673,0.9476,-0.2946,0.0812,0.093,0.8871,-0.0828,0.453,0.0325,0.9607,-0.109,-0.218,-0.1327,0.9586,0.077,-0.221,-0.1625,0.6654,0.7385,-0.109,0.0083,0.9877,-0.1481,-0.0172,0.0462,0.9973,0.068,-0.0179,0.0223,0.9733,-0.2171,0.0535,-0.0519,0.9223,-0.1489,0.3028,-0.1882,0.5608,-0.7948,0.2189,0.077,0.9715,-0.0499,0.1272,-0.1935,0.964,0.0962,0.1325,0.2094,0.4747,-0.8391,-0.2584,-0.0619,0.9242,-0.1489,-0.1808,0.3015,0.8888,-0.322,-0.3253,-0.0238,0.8285,0.5424,-0.1216,-0.0671,0.9504,-0.2904,0.0633,0.0913,0.8871,-0.0765,0.4539,0.0353,0.9567,-0.1204,-0.2226,-0.1436,0.9598,0.0857,-0.2161,-0.1571,0.6642,0.7391,-0.1122,0.0071,0.988,-0.146,-0.0168,0.0469,0.9973,0.0688,-0.0171,0.0195,0.9727,-0.2202,0.0369,-0.0628,0.9224,-0.1436,0.3053,-0.1878,0.5588,-0.7955,0.2206,0.0785,0.9718,-0.0553,0.1252,-0.1919,0.9652,0.0938,0.1357,0.2027,0.469,-0.8412,-0.2614,-0.0633,0.9242,-0.1475,-0.1848,0.3,0.8888,-0.3241,-0.3233,-0.0218,0.8315,0.538,-0.1217,-0.0666,0.9528,-0.2868,0.0438,0.0888,0.8871,-0.0704,0.4546,0.0384,0.9524,-0.132,-0.2269,-0.1551,0.9608,0.0953,-0.2117,-0.1513,0.663,0.7397,-0.1149,0.0061,0.9883,-0.1439,-0.0163,0.0473,0.9973,0.0696,-0.0167,0.0168,0.9718,-0.2236,0.0214,-0.0722,0.9226,-0.1387,0.3073,-0.1875,0.5572,-0.7962,0.222,0.0798,0.9721,-0.0603,0.1232,-0.1902,0.9663,0.0912,0.1392,0.1963,0.4637,-0.8431,-0.2648,-0.0646,0.924,-0.1461,-0.1885,0.2987,0.8888,-0.3259,-0.3216,-0.0199,0.8343,0.5336,-0.122,-0.066,0.9545,-0.2843,0.0253,0.0859,0.887,-0.065,0.4552,0.0415,0.948,-0.1428,-0.2309,-0.1662,0.9616,0.1044,-0.2079,-0.1457,0.662,0.7403,-0.1171,0.005,0.9886,-0.142,-0.0161,0.0475,0.9973,0.0702,-0.0168,0.0143,0.9706,-0.2269,0.0072,-0.0798,0.9228,-0.1344,0.3087,-0.1871,0.5562,-0.7965,0.2232,0.0806,0.9725,-0.0646,0.121,-0.1884,0.9671,0.0886,0.1434,0.1907,0.4587,-0.8445,-0.2686,-0.0657,0.9239,-0.1448,-0.1919,0.2979,0.8888,-0.3273,-0.3203,-0.0182,0.8366,0.5299,-0.1225,-0.0653,0.9554,-0.283,0.0106,0.0832,0.887,-0.0603,0.4556,0.0443,0.9439,-0.1518,-0.2349,-0.1757,0.9623,0.1113,-0.2047,-0.1402,0.6611,0.7408,-0.119,0.0036,0.9889,-0.1402,-0.016,0.0474,0.9973,0.0706,-0.0172,0.0122,0.9694,-0.23,-0.0053,-0.0856,0.9231,-0.1311,0.3096,-0.1865,0.5558,-0.7965,0.2242,0.0806,0.9729,-0.0682,0.1186,-0.1864,0.9674,0.086,0.1488,0.1862,0.4542,-0.8455,-0.2727,-0.0666,0.9236,-0.1434,-0.1947,0.2976,0.8888,-0.3285,-0.3191,-0.0168,0.8382,0.5274,-0.1231,-0.0648,0.9556,-0.2832,0.0016,0.0814,0.887,-0.0568,0.4559,0.0462,0.9405,-0.1578,-0.2392,-0.1825,0.9633,0.1147,-0.2019,-0.1348,0.6604,0.7411,-0.1208,0.0017,0.9891,-0.1383,-0.0162,0.0471,0.9973,0.0707,-0.0181,0.0103,0.9683,-0.2326,-0.0162,-0.0896,0.9234,-0.1288,0.3104,-0.1857,0.556,-0.7961,0.225,0.0802,0.9735,-0.0711,0.116,-0.184,0.9672,0.0835,0.1551,0.1829,0.45,-0.8463,-0.277,-0.0674,0.9232,-0.1421,-0.1969,0.2979,0.8888,-0.3296,-0.318,-0.0156,0.8389,0.5261,-0.1236,-0.0644,0.9552,-0.2847,-0.0022,0.0806,0.887,-0.0543,0.4561,0.0473,0.9382,-0.1604,-0.2434,-0.1865,0.9645,0.1147,-0.1997,-0.1293,0.6599,0.7413,-0.1226,-0.0004,0.9894,-0.1363,-0.0165,0.0467,0.9973,0.0707,-0.0194,0.0086,0.9674,-0.2348,-0.0253,-0.0919,0.9235,-0.1273,0.311,-0.1848,0.5569,-0.7954,0.2256,0.0795,0.9741,-0.0735,0.1131,-0.1814,0.9666,0.0813,0.1624,0.1807,0.4461,-0.8469,-0.2811,-0.0681,0.9228,-0.1406,-0.1986,0.2986,0.8889,-0.3307,-0.3168,-0.0145,0.8389,0.5261,-0.1239,-0.0642,0.9545,-0.2871,-0.0027,0.0805,0.887,-0.0527,0.4563,0.0474,0.937,-0.1601,-0.2473,-0.1879,0.9658,0.1118,-0.1982,-0.1239,0.6596,0.7413,-0.1244,-0.0029,0.9897,-0.1343,-0.0169,0.0461,0.9973,0.0705,-0.0211,0.007,0.9667,-0.2364,-0.0326,-0.0927,0.9236,-0.1264,0.3117,-0.1839,0.558,-0.7946,0.2259,0.0787,0.9748,-0.0754,0.1101,-0.1786,0.9657,0.0794,0.1702,0.1794,0.4423,-0.8476,-0.2849,-0.0687,0.9224,-0.1392,-0.2001,0.2996,0.8889,-0.3318,-0.3155,-0.0135,0.8383,0.527,-0.1239,-0.064,0.9536,-0.2899,-0.0021,0.0808,0.887,-0.0519,0.4564,0.047,0.9368,-0.1575,-0.2502,-0.1871,0.9672,0.1073,-0.1973,-0.1189,0.6595,0.741,-0.1262,-0.0055,0.99,-0.1325,-0.0173,0.0455,0.9972,0.0704,-0.0231,0.0056,0.9663,-0.2373,-0.038,-0.0922,0.9235,-0.126,0.3126,-0.183,0.5594,-0.7937,0.2259,0.0781,0.9756,-0.0768,0.1072,-0.1758,0.9644,0.0778,0.1783,0.1789,0.4387,-0.8483,-0.2884,-0.0693,0.9219,-0.1377,-0.2012,0.301,0.8889,-0.3329,-0.3144,-0.0126,0.8375,0.5285,-0.1237,-0.0637,0.9528,-0.2926,-0.0014,0.0811,0.887,-0.0518,0.4565,0.0462,0.9375,-0.1537,-0.2517,-0.1846,0.9683,0.1027,-0.197,-0.1146,0.6596,0.7406,-0.1279,-0.0081,0.9902,-0.1308,-0.0179,0.0447,0.9972,0.0702,-0.0254,0.0043,0.9663,-0.2372,-0.0413,-0.0909,0.9234,-0.1258,0.3136,-0.1822,0.5608,-0.7929,0.2257,0.0774,0.9763,-0.0777,0.1044,-0.1732,0.9631,0.0768,0.186,0.1787,0.4352,-0.8489,-0.2916,-0.0698,0.9214,-0.1364,-0.2021,0.3026,0.889,-0.3338,-0.3133,-0.0117,0.8364,0.5303,-0.1234,-0.0634,0.952,-0.295,-0.0007,0.0815,0.887,-0.0522,0.4565,0.0452,0.9389,-0.1494,-0.2518,-0.1811,0.969,0.099,-0.197,-0.1117,0.6598,0.7401,-0.1294,-0.0105,0.9904,-0.1295,-0.0184,0.0439,0.9971,0.0702,-0.0277,0.0031,0.9667,-0.2362,-0.0425,-0.0889,0.9232,-0.1256,0.3148,-0.1814,0.5621,-0.7921,0.2253,0.0767,0.9769,-0.0779,0.1019,-0.1708,0.9618,0.0763,0.1928,0.1786,0.4322,-0.8495,-0.2942,-0.0702,0.9209,-0.1356,-0.2026,0.3043,0.889,-0.3344,-0.3125,-0.0111,0.8352,0.5322,-0.1232,-0.0629,0.9513,-0.2971,0.0001,0.0822,0.887,-0.0531,0.4565,0.0442,0.9407,-0.145,-0.2504,-0.1769,0.9694,0.0965,-0.1973,-0.1101,0.6601,0.7396,-0.1309,-0.0128,0.9906,-0.1282,-0.019,0.0431,0.9971,0.0701,-0.03,0.0019,0.9672,-0.2347,-0.043,-0.0867,0.9229,-0.1253,0.316,-0.1808,0.5635,-0.7913,0.2247,0.076,0.9776,-0.078,0.0994,-0.1685,0.9605,0.0759,0.1996,0.1786,0.4291,-0.8501,-0.2969,-0.0706,0.9203,-0.1348,-0.2031,0.3061,0.8891,-0.335,-0.3118,-0.0105,0.834,0.5342,-0.1229,-0.0623,0.9506,-0.299,0.001,0.083,0.887,-0.0541,0.4565,0.0433,0.9427,-0.1407,-0.2486,-0.1725,0.9696,0.0949,-0.1975,-0.1093,0.6604,0.7391,-0.1317,-0.0138,0.9907,-0.1278,-0.0193,0.0422,0.997,0.0702,-0.0318,0.0011,0.9683,-0.2321,-0.0389,-0.0842,0.9227,-0.1251,0.3169,-0.1802,0.5646,-0.7908,0.2241,0.0748,0.978,-0.0774,0.0979,-0.1672,0.9601,0.0772,0.2016,0.1776,0.4277,-0.8505,-0.2979,-0.0708,0.9196,-0.1359,-0.2033,0.3076,0.8891,-0.3354,-0.3114,-0.0107,0.8329,0.5359,-0.1236,-0.0615,0.9502,-0.2999,0.0019,0.0842,0.887,-0.0563,0.4564,0.0419,0.9455,-0.1357,-0.2443,-0.1673,0.969,0.0937,-0.1999,-0.1104],"root":[0.0,0.0,-0.0019,0.0048,-0.0052,0.0113,-0.0091,0.0184,-0.0129,0.0272,-0.0165,0.0376,-0.02,0.0486,-0.0233,0.0601,-0.0264,0.0726,-0.0292,0.0857,-0.0316,0.1002,-0.0335,0.116,-0.0344,0.1326,-0.0341,0.1499,-0.0321,0.1678,-0.029,0.1859,-0.0253,0.2042,-0.0217,0.2221,-0.0185,0.2391,-0.0157,0.2553,-0.0132,0.2708,-0.0107,0.2854,-0.0082,0.3003,-0.0054,0.3163,-0.0022,0.3342,0.002,0.354,0.0077,0.3759,0.0138,0.4005,0.0192,0.4274,0.0232,0.4564,0.0263,0.4869,0.029,0.5176,0.0324,0.5465,0.0373,0.5736,0.0451,0.6019,0.0565,0.6357,0.0709,0.6781,0.0871,0.7288,0.1034,0.7852,0.1193,0.844,0.1342,0.8996,0.1485,0.9505,0.1628,0.9957,0.1766,1.0358,0.1896,1.07,0.1982,1.0977,0.2033,1.1207,0.206,1.1386,0.207,1.1498,0.2036,1.154,0.1978,1.1552,0.1925,1.1558,0.1888,1.1558,0.1865,1.1559,0.1851,1.1562,0.1844,1.1562,0.1836,1.1557,0.1838,1.155,0.1847,1.1533,0.1863,1.1528,0.188,1.1527,0.1892,1.153,0.1897,1.1537,0.1895,1.155,0.1886,1.1569,0.1871,1.1594,0.1848,1.1622,0.1822,1.1651,0.1794,1.1675,0.1767,1.1692,0.1741,1.1703,0.1718,1.1711,0.1699,1.1721,0.1684,1.1734,0.1678,1.175,0.1679,1.1769,0.1686,1.179,0.1696,1.1811,0.17,1.1834,0.1708,1.185,0.1715,1.1858,0.1721,1.186,0.1724,1.1856,0.1725,1.1847,0.1722,1.1837,0.1715,1.1827,0.1707,1.1817,0.1699,1.1806,0.1693,1.1795]}};
 
+/* Sunfall Glade's water (generated by tools/make_clwater.py from assets/clearing/clearing.png): R the water mask, G B its
+   flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's own rect (CL_PAINT_RECT). */
+const CL_FLOW = 'data:image/png;base64,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';
+
 /* The units' material textures (generated by tools/make_unittex.py from assets/units/tex/). A material missing here
    keeps its painted stand-in (matPaint in gl.js). When one has decoded, the material textures are built again. */
 const UNIT_TEX = {};
@@ -63372,6 +63472,19 @@ function moodUni(M) {
    Use in game preset is on. To bake a preset: the Light Lab's "Bake" button copies the three lines to paste here (its light
    into LIGHT_DEF, its mood into MAP_MOOD, its look into LOOK_DEF). */
 const LOOK_DEF = {};
+/* Each map's trees' light (the Light Lab's Trees section: gl.js FS_TREE uTrB/uTrL/uTrK/uTrK2/uTrR) and a painted map's moving
+   water (gl.js FS_LIT waterAt, its mask and flow from tools/make_clwater.py), keyed by map id, as the differences from TREE_LL
+   and WATER_LL. They apply in every run on every Graphics setting (the water is off on Low). The Light Lab's Bake writes them. */
+const TREE_LL = { barkI: 1, bark: '#ffffff', leafI: 1, leaf: '#ffffff', leafSat: 1, trans: 0, glint: 1, ao: 1, aoH: 1, shadow: 1, rim: 0, rimC: '#cce0ff', fog: 1 };   // (the look as it was)
+const WATER_LL = { on: 1, speed: 1, warp: 1, shimmer: 1 };
+const TREE_DEF = {}, WATER_DEF = {};
+// the trees' light as the renderer's uniforms (gl.js drawTrees: RD.treeK; null = TREEK_DEF, the look as it was)
+function treeUni(T) {
+  const t = Object.assign({}, TREE_LL, T || {}), b = linMul(t.bark, t.barkI), l = linMul(t.leaf, t.leafI);
+  return { b: [b[0], b[1], b[2], 0], l: [l[0], l[1], l[2], t.leafSat], k: [t.trans, t.glint, t.ao, t.aoH], k2: [t.shadow, t.rim, t.fog, 0], r: lin3(t.rimC) };
+}
+// a map's water as tuned: [speed, warp, shimmer], or null when it is switched off
+function waterK(id, W) { const w = Object.assign({}, WATER_LL, (W !== undefined ? W : WATER_DEF[id]) || {}); return w.on ? [w.speed, w.warp, w.shimmer] : null; }
 // Sunfall Glade: the owner's Light Lab preset (10 Nov 2026), baked as the map's default
 LIGHT_DEF.clearing = Object.assign({}, LIGHT_DEF.clearing, {"fogFar":2.24,"sun":"#b2f104","sunI":0.93,"az":-11,"el":51,"rim":0.24,"fill":0.12,"ground":1,"paint":0.94,"sky":"#a8b4f0","skyI":0.6,"gnd":"#6c6890","gndI":0.2,"fog":"#385b29","fogNear":0.59,"woods":0,"lamps":1,"expo":1.1,"rays":1,"ray":"#c8d8ff"});
 MAP_MOOD.clearing = Object.assign({}, MAP_MOOD.clearing, {"top":"#11ff00","topK":0.15,"key":"#d4ff00","keyK":0.3,"bounce":"#4418e2","bounceK":0.1,"env":0.81,"grade":"#a8bcc8","gradeK":0.18});
@@ -63723,7 +63836,7 @@ const THEMES = {
     // no keep here: foes walk off down the path at the foot, so the view reaches from the trees at the head (fitTop) to
     // just past the last row (fitBot)
     pitch: 57, fitTop: -6.5, fitBot: ROWS + 1.4, noKeep: true, h: () => 0, shafts: 'moon', fly: [.85, 1, .45],
-    painted: typeof CL_PAINT !== 'undefined' ? { src: CL_PAINT, rect: CL_PAINT_RECT, shade: CL_SHADE_REF } : null,
+    painted: typeof CL_PAINT !== 'undefined' ? { src: CL_PAINT, rect: CL_PAINT_RECT, shade: CL_SHADE_REF, water: typeof CL_FLOW !== 'undefined' ? CL_FLOW : null } : null,   // (water: the stream and falls' mask and flow, clwater.js)
     build: () => buildClearingPainted(),
   },
   moonwood: {
@@ -73610,6 +73723,7 @@ function buildThemeEnv(th) {
         E.plum = { w: c.width, h: c.height, L, rect: th.painted.rect };
       } catch (e) {} };
     img.src = th.painted.src;
+    if (th.painted.water) { const wi = new Image(); wi.onload = () => { E.gwater = { tex: RD.texture(wi, false) }; if (TH === th) applyLight(); }; wi.src = th.painted.water; }   // (its moving water: gl.js waterAt, maps.js WATER_DEF)
   }
   if (th.groundTex) {
     const img = new Image();
@@ -73651,6 +73765,8 @@ function applyLight() {
   RD.mood = moodGet(TH.id);   // the map's mood on every model (maps.js MAP_MOOD)
   const E = THENV[TH.id]; RD.gtex = E && E.gtex ? Object.assign(E.gtex, { gain: L.ground }) : null;
   RD.gpaint = E && E.gpaint ? Object.assign(E.gpaint, { gain: L.paint == null ? 1 : L.paint }) : null;
+  const wk = E && E.gwater ? waterK(TH.id) : null; RD.gwater = wk ? Object.assign(E.gwater, { k: wk }) : null;   // (the painting's moving water; gl.js leaves it out on Graphics Low)
+  RD.treeK = TREE_DEF[TH.id] ? treeUni(TREE_DEF[TH.id]) : null;   // (the trees' light: maps.js TREE_DEF, the Light Lab's Trees)
   RD.clear = RD.fogCol.map(v => { const x = v * 1.05; return Math.pow(Math.min(1, (x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14)), 1 / 2.2); });
   RD.fog = [CAM.dist * L.fogNear, CAM.dist * (L.fogFar != null ? L.fogFar : L.fogNear + .95)];   // (fogFar: the Light Lab's fog end; unset, as it always was)
   RD.setShadowBox(5.5, TH.paint ? 4 : 6.5, TH.paint ? 16 : 14.5);
@@ -85153,7 +85269,8 @@ function hfReset() { for (const f of HF_RESETS) try { f(); } catch (e) {} }
                                o: { k: brightness, a: opacity, seed: which way it is mirrored, speed, top: drawn over the foes (no depth test) }
    Drawn in the spells' pass (gl.js vfxGL ext, after their depth-tested batch): premultiplied, so the fire glows and its smoke
    darkens what is behind it. Each atlas holds the colour frames above and their coverage below (labfxdata.js says why). */
-const LABF = { list: [], q: [], tex: {}, img: {}, MAX: 24, QMAX: 72 };
+// (QMAX, PMAX: room for the Pyroclasts' painted fire, pyrofire.js)
+const LABF = { list: [], q: [], tex: {}, img: {}, MAX: 24, QMAX: 240, PMAX: 360 };
 const labNow = () => (typeof G !== 'undefined' && G && G.time != null ? G.time : (typeof vt !== 'undefined' ? vt : 0));   // (game time: a flipbook pauses with the game)
 function labLoad(name) {
   if (LABF.img[name] || typeof LAB_FX === 'undefined' || !LAB_FX[name]) return;
@@ -85162,7 +85279,7 @@ function labLoad(name) {
 function labPlay(name, x, z, w, o) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
   labLoad(name); o = o || {};
-  if (LABF.list.length >= LABF.MAX) LABF.list.shift();
+  if (LABF.list.length >= LABF.MAX) { let n = 0; for (const e of LABF.list) if (!e.pin) n++; if (n >= LABF.MAX) LABF.list.splice(LABF.list.findIndex(e => !e.pin), 1); }
   LABF.list.push({ name, x, z, w, at: labNow(), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, mir: o.seed == null ? Math.random() < .5 : !!(o.seed & 1), sp: o.speed || 1, top: !!o.top });
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT);
   return true;
@@ -85179,11 +85296,11 @@ function labQueue(name, P, dir, len, o) {
   return true;
 }
 // one frame of a bake, this frame only, its card's centre at P (a bake made following a thing: the burning hammer's head),
-// f the frame (a fraction cross-fades to the next); o: { k, a, top, loop (the last frame runs on into the first), pull }
+// f the frame (a fraction cross-fades to the next); o: { k, a, top, loop (the last frame runs on into the first), pull, mir }
 function labPin(name, f, P, w, o) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
-  labLoad(name); o = o || {}; if (LABF.list.length >= LABF.MAX * 2) return false;
-  LABF.list.push({ name, x: P[0], y: P[1], z: P[2], w, fr: f, pin: 1, loop: !!o.loop, pull: o.pull, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, mir: false, sp: 1, top: !!o.top, at: labNow() });
+  labLoad(name); o = o || {}; if (LABF.list.length >= LABF.PMAX) return false;
+  LABF.list.push({ name, x: P[0], y: P[1], z: P[2], w, fr: f, pin: 1, loop: !!o.loop, pull: o.pull, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, mir: !!o.mir, sp: 1, top: !!o.top, at: labNow() });
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT); LAB_EXT.n = LABF.list.length;
   return true;
 }
@@ -85225,7 +85342,7 @@ void main(){
   if (a < .004 && max(c.r, max(c.g, c.b)) < .004) discard;
   o = vec4(c * vCol.w, a * vCol.w);
 }`;
-const LAB_MAXQ = 96, _labV = new Float32Array(LAB_MAXQ * 4 * 11), _labI = new Uint16Array(LAB_MAXQ * 6);
+const LAB_MAXQ = 640, _labV = new Float32Array(LAB_MAXQ * 4 * 11), _labI = new Uint16Array(LAB_MAXQ * 6);
 const LAB_EXT = {
   n: 1, P: null, vao: null, vb: null, ib: null, groups: [],
   build() {
@@ -85471,224 +85588,759 @@ if (typeof renderView === 'function') {
   };
 }
 
-/* The Conclave's Pyroclasts burn with the lab's fire (hammerfire.js: the owner's reference fire, one shared solver and its
-   API, the same as the Steam Hammers' and the Mortar Crew's incendiary; owner: "improve ... the pyro unit ... using the same
-   flame/smoke"). Nothing here simulates; it places fire with hfBall / hfPatch / hfBurst / hfQueue. Each move reads apart:
-   - their hands burn: a small flame cupped in the casting hand of every Pyroclast on the field;
-   - the fireball (their strike): a soft flame streaming back behind the lobbed ball, a fiery burst and a billow of smoke
-     where it lands (ccFireBurst, wrapped);
-   - every fire glyph (the strike's every third ball, Skipping Flame's skips): the glyph burns, flames licking and smoke
-     rising for as long as the glyph lasts (fewer, bigger flames as the screen fills);
-   - Skipping Flame: the ball streams flame on each hop, a smaller burst at each skip;
-   - Furnace Breath: a cone of the lab's jet flame pouring along the ground from just past its hands, out to where it burns;
-   - Phoenix: a bird of the lab's fire (its Fireball loop the body and tail, two of its Gas jets the beating wings) bursting
-     from the orb, sweeping down the road and diving into a blast.
-   Their older sprite flames on the skips and road cells are left out, so what burns is the lab's fire; the sigils' runes,
-   the rings and the light stay. The Conclave's fire is the same orange (CC_COL.fire), so the lab's colours stand. */
-const PF = { seen: new WeakSet(), hops: [] }, PF_BALL = .13;   // (the ball's scale: the lab's Fireball card follows it)
-if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { PF.hops.length = 0; });
+/* ================= THE PYROCLASTS' FLAME SHADER: painted fire, drawn live =================
+   The owner (10 Nov 2026): "can you do a new flame animation for pyro for all his spells ... make it more stylised", then, of
+   the first painted sheets: "have a go at doing my flame animations again". Those sheets (a few frames each, played as
+   flipbooks) read as flat cut-outs. This draws every Pyroclast flame live instead: each flame is one card, and a shader paints
+   it every frame from a flowing noise field cut into a few flat painted bands (a dark-red edge, red, orange, gold, a cream
+   heart). So no two flames are alike, nothing loops, and the fire rolls, licks and breaks up as it moves.
+     FLAME   a tongue rooted at one end, swaying, licks climbing it and tearing off; aged, it lifts off and goes out
+     BALL    a fireball: a round ball of rolling fire, flame swept back along its flight
+     BURST   an impact: fire swelling low over the ground with a plume up its middle, then lifting off and breaking up
+     RING    a ring of flame racing out over the ground (the splash it shows is the real one)
+     JET     a roaring cone, narrow at the hands and opening, the fire rolling out along it
+     WING    a wing of flame: a hot leading edge, feathers of fire streaming back
+     SMOKE   a painted puff in two tones, lit from above, thinning as it rises
+     GLOW    soft added light;  EMBER a spark;  GROUND a burning patch: glowing cracks, heat wandering through them, a lit rim
+   Cards: pyfBill (facing the camera), pyfAxial (along a direction, turned to the camera), pyfFlat (on the ground), pyfQuad
+   (any quad: the wings). Drawn in the spells' pass (gl.js vfxGL ext) after the lab's flipbooks, depth-tested, premultiplied.
+   The look is the Element Lab's Flame paint (elemfx.js cc_pyrostyle.paint: outline, hot core, band softness, curl, brush
+   grain, halo; its gradient is the palette), live. No GL or DOM is touched until the first card is drawn (the sims load this). */
+const PYF = { q: [], sty: null, styAt: -1, tex: null, groups: [], MAX: 520 };
+const PYF_SH = { FLAME: 0, BALL: 1, BURST: 2, RING: 3, JET: 4, WING: 5, SMOKE: 6, GLOW: 7, EMBER: 8, GROUND: 9 };
+// the order they are laid down: the ground first, smoke, the flames, then added light
+const PYF_ORD = [2, 2, 2, 0, 2, 2, 1, 3, 3, 0];
+// the painted palette, edge to heart
+const PYF_PAL = ['#74120a', '#d2330b', '#f5730f', '#ffbd2e', '#fff2c2'];
+const pyfHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+const pyfSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/* ---- the noise the fire flows through: one small repeating texture, made once.
+   r: rolling noise; g: finer; b: cracks (cell borders); a: slow, broad (the sway) ---- */
+function pyfNoise() {
+  const W = 256, px = new Uint8Array(W * W * 4);
+  const hash = (x, y, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(s | 0, 1274126177); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  // gradient noise (no blobs lined up with the axes), repeating every per cells
+  const vn = (x, y, per, s) => {
+    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10), m = v => ((v % per) + per) % per;
+    const gd = (cx, cy, dx, dy) => { const an = hash(m(cx), m(cy), s) * 6.2831853; return Math.cos(an) * dx + Math.sin(an) * dy; };
+    const a = gd(ix, iy, fx, fy), b = gd(ix + 1, iy, fx - 1, fy), c = gd(ix, iy + 1, fx, fy - 1), d = gd(ix + 1, iy + 1, fx - 1, fy - 1);
+    return (a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy) * .72 + .5;
+  };
+  const fbm = (u, v, per, oct, s) => { let sum = 0, amp = .5, tot = 0; for (let k = 0; k < oct; k++) { sum += amp * vn(u * per, v * per, per, s + k * 17); tot += amp; per *= 2; amp *= .55; } return sum / tot; };
+  // the cells: one point a cell, 7 cells across; how near a pixel is to the border between its two nearest
+  const C = 7, pt = (i, j) => { const m = v => ((v % C) + C) % C; return [i + .15 + .7 * hash(m(i), m(j), 91), j + .15 + .7 * hash(m(i), m(j), 92)]; };
+  const st = v => Math.max(0, Math.min(1, (v - .5) * 2.1 + .5));
+  for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+    const u = (i + .5) / W, v = (j + .5) / W, o = (j * W + i) * 4;
+    const cx = u * C, cy = v * C, ci = Math.floor(cx), cj = Math.floor(cy); let f1 = 9, f2 = 9;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const p = pt(ci + a, cj + b), d = Math.hypot(p[0] - cx, p[1] - cy); if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
+    px[o] = st(fbm(u, v, 4, 4, 3)) * 255; px[o + 1] = st(fbm(u, v, 8, 4, 41)) * 255;
+    px[o + 2] = Math.max(0, Math.min(1, (f2 - f1) * 1.6)) * 255; px[o + 3] = st(fbm(u, v, 2, 3, 77)) * 255;
+  }
+  return { px, W };
+}
+
+/* ---- the look: the Element Lab's Flame paint, else as authored (looked at four times a second) ---- */
+function pyfStyle() {
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  if (PYF.sty && now - PYF.styAt < 250) return PYF.sty;
+  PYF.styAt = now;
+  const P = typeof efx === 'function' && typeof ELEM_FX_SPELLS !== 'undefined' && ELEM_FX_SPELLS.cc_pyrostyle ? efx('cc_pyrostyle', 'paint') : {};
+  const v = (k, d) => typeof P[k] === 'number' && isFinite(P[k]) ? P[k] : d;
+  return (PYF.sty = { pal: P.grad ? pyfPalOf(P.c0, P.c1, P.c2) : pyfPalOf(), sty: [v('outline', 1), Math.max(.3, v('heart', 1)), v('soft', 1), v('grain', 1)], sty2: [v('curl', 1), v('halo', 1), 0] });
+}
+// five bands from a three-stop gradient (start the heart, mid the flame, end the edge); none: the authored palette
+const _pyfPal = new Map();
+function pyfPalOf(c0, c1, c2) {
+  const key = c0 ? c0 + c1 + c2 : ''; let p = _pyfPal.get(key); if (p) return p;
+  if (!c0) p = new Float32Array(PYF_PAL.flatMap(pyfHex));
+  else { const a = pyfHex(c0), b = pyfHex(c1), c = pyfHex(c2), mx = (x, y, k) => x.map((q, i) => q + (y[i] - q) * k); p = new Float32Array([...mx(c, [0, 0, 0], .3), ...mx(b, c, .55), ...b, ...mx(b, a, .5), ...a]); }
+  _pyfPal.set(key, p); return p;
+}
+
+const PYF_VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aA; layout(location=3) in vec4 aB;
+uniform mat4 uVP; out vec2 vUV; out vec4 vA; out vec4 vB;
+${typeof BEND_GLSL !== 'undefined' ? BEND_GLSL : 'vec3 bendW(vec3 p){return p;}'}
+void main(){ vUV = aUV; vA = aA; vB = aB; gl_Position = uVP * vec4(bendW(aPos), 1.); }`;
+// vUV: the card's own coordinates (each shape says which); vA: shape, seed, time, age; vB: brightness, opacity, two of the shape's own
+PYF.fs = /*FS<*/`#version 300 es
+precision highp float;
+in vec2 vUV; in vec4 vA; in vec4 vB;
+uniform sampler2D uN; uniform vec3 uPal[5]; uniform vec4 uSty; uniform vec3 uSty2; uniform float uBloom;
+out vec4 o;
+#define SD (vA.y * .173)
+#define TM vA.z
+#define AGE vA.w
+vec4 N(vec2 p){ return texture(uN, p); }
+// (two takes of it, one turned: for the big shapes, so nothing in them lines up)
+vec4 NR(vec2 p){ return (texture(uN, p) + texture(uN, mat2(.8, -.6, .6, .8) * p * 1.31 + .37) - 1.) * .72 + .5; }
+
+// a tongue: x across (-1..1), y from its root to its tip (0..1)
+float fFlame(vec2 uv){
+  float lift = AGE * .5, v = (uv.y - lift) / (1. - lift), vc = clamp(v, 0., 1.);
+  float sway = (N(vec2(SD, uv.y * .2 - TM * .4)).a - .5) * 1.5 + (N(vec2(SD + .4, uv.y * .55 - TM * 1.)).r - .5) * .6;
+  float x = uv.x - sway * uSty2.x * vc * (.25 + .75 * vc) * .85;
+  float w = 1.5 * pow(vc, .45) * pow(1. - vc, 1.1) * (1. - .85 * AGE * AGE) * vB.z;
+  float body = v < 0. ? v * 8. : 1. - abs(x) / max(w, .0001);
+  float n = N(vec2(uv.x * .32 + SD * 3., uv.y * .5 - TM * 1.2)).g, n2 = N(vec2(uv.x * .7 + SD * 5., uv.y * 1.1 - TM * 2.1)).r;
+  float h = body * (1.1 - .62 * vc) - (n - .3) * (.12 + 1.15 * vc) - (n2 - .5) * .22 * vc;
+  return h - AGE * AGE * .3;
+}
+// a fireball: a round ball of rolling fire, its centre at y .78, flame swept back toward y 0; x across in the same units
+// (the card is half as wide as long)
+float fBall(vec2 uv){
+  float X = uv.x * .25, y = uv.y, R = .2;
+  vec2 d = vec2(X, y - .78); float r = length(d), ang = atan(d.y, d.x);
+  float roll = N(vec2(ang * .159 + SD - TM * .3, r * 1.3 - TM * .45)).r, roll2 = N(vec2(X * 1.4 + SD * 3., y * 1.4 + TM * 1.1)).g;
+  float head = (1. - r / R) * 1.3 + ((roll - .5) * .34 + (roll2 - .5) * .2) * smoothstep(.02, R, r) + .1 * d.y / R;
+  float q = clamp((.78 - y) / .66, 0., 1.);
+  float sway = ((N(vec2(SD, y * .35 + TM * .9)).a - .5) * .2 + (N(vec2(SD + .3, y * .9 + TM * 2.)).r - .5) * .07) * uSty2.x * q;
+  float w = R * (1. - .25 * q) * pow(1. - q, .6);
+  float tail = y > .78 ? -1. : 1. - abs(X - sway) / max(w, .0001);
+  float n = N(vec2(X * 1.6 + SD * 3., y * .55 + TM * 2.4)).g, n2 = N(vec2(X * 3. + SD * 5., y * 1.2 + TM * 3.6)).r;
+  tail = tail * (1. - .55 * q) - (n - .28) * (.1 + 1.35 * q) - (n2 - .5) * .3 * q;
+  return max(head, tail);
+}
+// an impact: a ball of fire blooming over the ground (at y -.6), licking upward, then hollowing and breaking into tongues
+// that lift away; AGE its life
+float fBurst(vec2 p){
+  float t = AGE, e = 1. - pow(1. - t, 3.);
+  vec2 g = vec2(p.x, p.y + .4);
+  g += (NR(g * .16 + vec2(SD, -TM * .25 - e * .4)).rg - .5) * (.14 + .2 * t) * uSty2.x;
+  g.y *= g.y > 0. ? 1. / (1. + .45 * e) : 1.7;
+  float r = length(g), th = atan(g.y, g.x);
+  float n = NR(vec2(th * .159 * 2. + SD, r * .2 - e * .45)).r;
+  float R = (.2 + .6 * e) * (.72 + .46 * n);
+  float h = 1. - r / R;
+  // (eaten away in a few big pieces, from its heart out)
+  float n2 = NR(g * .3 + vec2(SD * 2., -TM * .5 - e * .7)).g;
+  h -= n2 * 1.5 * pow(t, 1.4) + (n2 - .5) * .15;
+  h -= smoothstep(.3, .9, t) * (1. - smoothstep(0., R * .8, r)) * .9;
+  h = min(h, min((p.y + .62) * 7., (1. - max(abs(p.x), abs(p.y))) * 6.));
+  return h * (1.12 - .35 * t) - t * t * .25;
+}
+// a ring racing out over the ground: -1..1 both ways, AGE its life
+float fRing(vec2 p){
+  float t = AGE, e = 1. - pow(1. - t, 2.6), r = length(p), th = atan(p.y, p.x);
+  float R = .1 + .82 * e, w = .05 * (1. - .6 * t) + .014, d = r - R;
+  float n = N(vec2(th * .159 * 6. + SD, r * .5 - e * 1.4)).r, n2 = N(vec2(th * .159 * 11. + SD * 2., r - e * 2.)).g;
+  float h = d > 0. ? 1. - d / w : 1. + d / (w * 3.6);
+  h -= (n - .2) * (.5 + 1.1 * t) + (n2 - .5) * .4;
+  return h * (.72 - .4 * t) - t * t * .3;
+}
+// a cone of fire: x across (-1..1), y from the hands (0) to its end (1); vB.z how far it has reached, vB.w how much has died from the hands
+float fJet(vec2 uv){
+  float u = uv.x, v = uv.y;
+  float w = .07 + .93 * pow(v, .8);
+  float sway = (N(vec2(SD, v * .3 - TM * 1.)).a - .5) * .55 * v * uSty2.x;
+  float body = 1. - abs(u - sway) / w;
+  float n = N(vec2(u / w * .2 + SD * 2., v * .62 - TM * 2.3)).r, n2 = N(vec2(u * .55 + SD * 4., v * 1.5 - TM * 3.8)).g;
+  float h = body * (1.02 - .6 * v) - (n - .22) * (.26 + 1.2 * v) - (n2 - .5) * .36 * v;
+  h -= smoothstep(vB.z - .3, vB.z + .02, v) * 2.4;
+  h -= (1. - smoothstep(vB.w - .05, vB.w + .22, v)) * 2.4 * step(.001, vB.w);
+  return h;
+}
+// a wing seen from above: x along its span from the shoulder (0) to its tip (1), y from its leading edge side (0) back (1).
+// A hot leading edge swept back toward the tip, broad feathers of flame behind it (longest mid-wing), their ends licking
+float fWing(vec2 uv){
+  float s = uv.x, c = uv.y;
+  float lead = .05 + .36 * pow(s, 1.7);
+  float f = fract(s * 5.5 + .25), lobe = 1. - .42 * pow(abs(f * 2. - 1.), 2.2);
+  float chord = (.8 * pow(max(0., 1. - s), .55) * (.45 + .55 * smoothstep(0., .35, s)) + .04) * lobe;
+  float n = N(vec2(s * .6 + SD * 2., c * .5 - TM * 1.3)).r, n2 = N(vec2(s * 1.6 + SD * 4., c * 1.2 - TM * 2.3)).g;
+  chord *= .8 + .4 * n;
+  float d = c - lead, q = d / max(chord, .001);
+  float h = d < 0. ? 1. + d / .035 : 1. - q;
+  h -= (n2 - .32) * smoothstep(.4, 1., q) * .9;
+  h = min(h, min((1. - s) * 9., s * 16. + .5));
+  return h * (.8 - .2 * s);
+}
+// a spark: x across, y along its flight
+float fEmber(vec2 uv){ float y = uv.y * 2. - 1.; return 1. - (abs(uv.x) * 1.15 + (y > 0. ? y * y : -y * .9)); }
+// a burning patch on the ground: -1..1 both ways; vB.z its rim
+float fGround(vec2 p){
+  float r = length(p);
+  float crack = 1. - smoothstep(.03, .2, N(p * .36 + SD * 2.).b);
+  float heat = N(p * .26 + vec2(SD, TM * .2)).r, heat2 = N(p * .5 - vec2(TM * .13, SD)).g;
+  float h = crack * (.3 + 1.25 * heat) - .26;
+  h = max(h, (heat * heat2 - .34) * 2.6);
+  float th = atan(p.y, p.x);
+  float rim = 1. - abs(r - .92) / .06 - N(vec2(th * .159 * 7. + SD, TM * .45)).g * 1.05 + .2;
+  h = max(h, rim * vB.z);
+  h = min(h, (1. - r) * 9.);
+  return h * (.9 - .25 * r);
+}
+// the flat painted bands; hk < 1 keeps the heart out of it
+vec4 paint(float h, vec2 gp){
+  float gr = (N(gp * vec2(1.3, .4) + SD * 7.).g - .5) * uSty.w, x = clamp(h, -1.5, 2.) + gr * .06;
+  float aa = min(.12, fwidth(x) * 1.1 + .005 + .02 * uSty.z);
+  float t1 = .1 * uSty.x, t2 = t1 + .17, t3 = t2 + .2 / uSty.y, t4 = t3 + .25 / uSty.y;
+  float cov = smoothstep(-aa, aa, x);
+  float m1 = smoothstep(t1 - aa, t1 + aa, x), m2 = smoothstep(t2 - aa, t2 + aa, x), m3 = smoothstep(t3 - aa, t3 + aa, x), m4 = smoothstep(t4 - aa, t4 + aa, x);
+  vec3 c = mix(mix(mix(mix(uPal[0], uPal[1], m1), uPal[2], m2), uPal[3], m3), uPal[4], m4);
+  if (uBloom > .5) return vec4(c * m3 * .3 * vB.x * vB.y, 0.);
+  c *= 1. + gr * .16;
+  float al = mix(.95, .72, m3);
+  vec3 rgb = c * cov * vB.x;
+  rgb += uPal[2] * exp(min(x, 0.) * 13.) * (1. - cov) * .2 * uSty2.y;
+  return vec4(rgb, al * cov) * vB.y;
+}
+void main(){
+  int sh = int(vA.x + .5);
+  if (sh == 6) {
+    // smoke: its own two tones, lit from above, warm underneath while it is fresh
+    if (uBloom > .5) discard;
+    vec2 p = vUV; float t = AGE, r = length(p);
+    float n = N(p * .3 + vec2(SD * 2., -TM * .1 - t * .25)).r, n2 = N(p * .62 + vec2(SD * 5., -t * .5)).g;
+    float h = 1. - r / (.5 + .38 * t) + (n - .5) * 1.;
+    h -= t * t * 1.5 * n2 + smoothstep(.55, 1., t) * .5;
+    float aa = fwidth(h) * 1.1 + .03, cov = smoothstep(-aa, aa, h);
+    float lit = smoothstep(-.35, .45, p.y + (n - .5) * .7) * smoothstep(.02, .3, h);
+    vec3 c = mix(vec3(.085, .062, .058), vec3(.25, .2, .185), lit);
+    c = mix(c, uPal[1] * .55, (1. - lit) * (1. - smoothstep(0., .45, t)) * .55);
+    float al = cov * .66 * (1. - t * t) * vB.y;
+    o = vec4(c * al * vB.x, al);
+  } else if (sh == 7) {
+    float g = pow(max(0., 1. - length(vUV)), 2.2);
+    o = vec4(mix(uPal[2], uPal[4], g) * g * vB.x * vB.y * (uBloom > .5 ? .25 : 1.), 0.);
+  } else {
+    float h = sh == 0 ? fFlame(vUV) : sh == 1 ? fBall(vUV) : sh == 2 ? fBurst(vUV) : sh == 3 ? fRing(vUV) : sh == 4 ? fJet(vUV) : sh == 5 ? fWing(vUV) : sh == 8 ? fEmber(vUV) : fGround(vUV);
+    o = paint(h, vUV);
+  }
+  if (o.a < .004 && max(o.r, max(o.g, o.b)) < .004) discard;
+}`/*>FS*/;
+
+/* ---- the cards ---- */
+// o: { seed, age, k (brightness), a (opacity), p0, p1 (the shape's own), sp (its clock's speed), pull (world units toward the
+// camera, so fire among the foes isn't swallowed by them), top (over everything), tg (the Element Lab's recolour) }
+function pyfPush(sh, c, uv, o, dz) {
+  if (PYF.q.length >= PYF.MAX || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
+  o = o || {};
+  const now = typeof G !== 'undefined' && G && G.time != null ? G.time : 0, sd = o.seed || 0;
+  PYF.q.push({ sh, c, uv, sd, tm: (now * (o.sp || 1)) % 997 + sd * .37, age: o.age || 0, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0, ord: PYF_ORD[sh], dz, top: !!o.top, tg: o.tg || null });
+  const X = RD.vfx; if (!X.ext.includes(PYF_EXT)) X.ext.push(PYF_EXT); PYF_EXT.n = PYF.q.length;
+  return true;
+}
+const pyfFw = () => [RD.view[2], RD.view[6], RD.view[10]];   // (toward the camera)
+// facing the camera, w wide and h tall, its centre at P (o.root: P is the middle of its bottom edge); uv: [u0, v0, u1, v1]
+function pyfBill(sh, P, w, h, uv, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const r = RD.right, up = RD.up, fw = pyfFw(), pl = (o && o.pull) || 0, lift = o && o.root ? h * .5 : (o && o.lift) || 0;
+  const cx = P[0] + fw[0] * pl + up[0] * lift, cy = P[1] + fw[1] * pl + up[1] * lift, cz = P[2] + fw[2] * pl + up[2] * lift, a = w * .5, b = h * .5;
+  return pyfPush(sh, [cx - r[0] * a - up[0] * b, cy - r[1] * a - up[1] * b, cz - r[2] * a - up[2] * b, cx + r[0] * a - up[0] * b, cy + r[1] * a - up[1] * b, cz + r[2] * a - up[2] * b,
+    cx + r[0] * a + up[0] * b, cy + r[1] * a + up[1] * b, cz + r[2] * a + up[2] * b, cx - r[0] * a + up[0] * b, cy - r[1] * a + up[1] * b, cz - r[2] * a + up[2] * b], uv, o, cx * fw[0] + cy * fw[1] + cz * fw[2]);
+}
+// along dir from P, len long and wid wide, turned about its length to face the camera; o.at: where along it P is (0 its root)
+function pyfAxial(sh, P, dir, len, wid, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const fw = pyfFw(), dv = dir[0] * fw[0] + dir[1] * fw[1] + dir[2] * fw[2]; let ax = [dir[0] - fw[0] * dv, dir[1] - fw[1] * dv, dir[2] - fw[2] * dv]; const al = Math.hypot(ax[0], ax[1], ax[2]);
+  ax = al > 1e-3 ? [ax[0] / al, ax[1] / al, ax[2] / al] : RD.up;
+  const wx = [fw[1] * ax[2] - fw[2] * ax[1], fw[2] * ax[0] - fw[0] * ax[2], fw[0] * ax[1] - fw[1] * ax[0]];
+  // (seen end on it looks shorter: its length follows how much of it the screen sees, never less than two fifths)
+  const L = len * Math.max(.4, al), pl = (o && o.pull) || 0, at = (o && o.at) || 0, hw = wid * .5;
+  const bx = P[0] + fw[0] * pl - ax[0] * L * at, by = P[1] + fw[1] * pl - ax[1] * L * at, bz = P[2] + fw[2] * pl - ax[2] * L * at, tx = bx + ax[0] * L, ty = by + ax[1] * L, tz = bz + ax[2] * L;
+  return pyfPush(sh, [bx - wx[0] * hw, by - wx[1] * hw, bz - wx[2] * hw, bx + wx[0] * hw, by + wx[1] * hw, bz + wx[2] * hw, tx + wx[0] * hw, ty + wx[1] * hw, tz + wx[2] * hw, tx - wx[0] * hw, ty - wx[1] * hw, tz - wx[2] * hw],
+    [-1, 0, 1, 1], o, (bx + tx) * .5 * fw[0] + (by + ty) * .5 * fw[1] + (bz + tz) * .5 * fw[2]);
+}
+// flat on the ground at height y, r from its centre to each side, turned by rot
+function pyfFlat(sh, x, y, z, r, rot, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const c = Math.cos(rot || 0) * r, s = Math.sin(rot || 0) * r, fw = pyfFw();
+  return pyfPush(sh, [x - c + s, y, z - s - c, x + c + s, y, z + s - c, x + c - s, y, z + s + c, x - c - s, y, z - s + c], [-1, -1, 1, 1], o, x * fw[0] + y * fw[1] + z * fw[2] - 50);
+}
+// any quad: its corner O, its sides U and V (uv 0..1 along each)
+function pyfQuad(sh, O, U, V, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const fw = pyfFw();
+  return pyfPush(sh, [O[0], O[1], O[2], O[0] + U[0], O[1] + U[1], O[2] + U[2], O[0] + U[0] + V[0], O[1] + U[1] + V[1], O[2] + U[2] + V[2], O[0] + V[0], O[1] + V[1], O[2] + V[2]], [0, 0, 1, 1], o,
+    (O[0] + (U[0] + V[0]) * .5) * fw[0] + (O[1] + (U[1] + V[1]) * .5) * fw[1] + (O[2] + (U[2] + V[2]) * .5) * fw[2]);
+}
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { PYF.q.length = 0; });
+
+/* ---- drawing ---- */
+const PYF_F = 13, _pyfV = new Float32Array(PYF.MAX * 4 * PYF_F), _pyfI = new Uint16Array(PYF.MAX * 6);
+const PYF_EXT = {
+  n: 0, P: null, vao: null, vb: null, fsOf: null, filled: -1,
+  build() {
+    const X = RD.vfx, gl = X.gl; this.P = X.prog(PYF_VS, PYF.fs); this.fsOf = PYF.fs;
+    if (this.vao) return;
+    this.vao = gl.createVertexArray(); this.vb = gl.createBuffer(); const ib = gl.createBuffer();
+    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.vb); gl.bufferData(gl.ARRAY_BUFFER, _pyfV.byteLength, gl.DYNAMIC_DRAW);
+    const st = PYF_F * 4;
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, st, 20);
+    gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 36);
+    for (let q = 0; q < PYF.MAX; q++) _pyfI.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, _pyfI, gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    const N0 = pyfNoise(), t = PYF.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N0.W, N0.W, 0, gl.RGBA, gl.UNSIGNED_BYTE, N0.px);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  },
+  // the frame's cards, in the order they are laid down, grouped by what is drawn alike (over everything or not, its recolour)
+  fill() {
+    const Q = PYF.q; Q.sort((a, b) => a.ord - b.ord || a.dz - b.dz);
+    this.groups = []; let o = 0, g = null;
+    for (let i = 0; i < Q.length; i++) {
+      const e = Q[i], c = e.c, uv = e.uv;
+      if (!g || g.top !== e.top || g.tg !== e.tg) this.groups.push(g = { top: e.top, tg: e.tg, q0: i, n: 0 });
+      g.n++;
+      for (let k = 0; k < 4; k++) {
+        _pyfV[o] = c[k * 3]; _pyfV[o + 1] = c[k * 3 + 1]; _pyfV[o + 2] = c[k * 3 + 2];
+        _pyfV[o + 3] = k === 1 || k === 2 ? uv[2] : uv[0]; _pyfV[o + 4] = k > 1 ? uv[3] : uv[1];
+        _pyfV[o + 5] = e.sh; _pyfV[o + 6] = e.sd; _pyfV[o + 7] = e.tm; _pyfV[o + 8] = e.age;
+        _pyfV[o + 9] = e.k; _pyfV[o + 10] = e.a; _pyfV[o + 11] = e.p0; _pyfV[o + 12] = e.p1; o += PYF_F;
+      }
+    }
+    return Q.length;
+  },
+  draw(bloom) {
+    if (!RD || !RD.vfx || !PYF.q.length) return;
+    const X = RD.vfx, gl = X.gl, R = X.R; if (!this.P || this.fsOf !== PYF.fs) this.build();
+    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.vb);
+    if (!bloom) { const nq = this.fill(); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _pyfV, 0, nq * 4 * PYF_F); }
+    const u = this.P.u, S = pyfStyle(); gl.useProgram(this.P.p);
+    gl.uniformMatrix4fv(u.uVP, false, R.vp); if (u.uBend) gl.uniform3fv(u.uBend, R.bend);
+    gl.uniform4fv(u.uSty, S.sty); gl.uniform3fv(u.uSty2, S.sty2); gl.uniform1f(u.uBloom, bloom ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, PYF.tex); gl.uniform1i(u.uN, 0);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, bloom ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    const up = u.uPal || u['uPal[0]'];
+    for (const g of this.groups) {
+      if (g.top || bloom) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
+      gl.uniform3fv(up, g.tg ? pyfPalOf(g.tg.c0, g.tg.c1, g.tg.c2) : S.pal);
+      gl.drawElements(gl.TRIANGLES, g.n * 6, gl.UNSIGNED_SHORT, g.q0 * 12);
+    }
+    gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
+  },
+};
+
+/* ================= THE PYROCLASTS' FIRE: painted flame, drawn live =================
+   The owner (10 Nov 2026): "can you do a new flame animation for pyro for all his spells. remove those ones entirely ... make
+   it more stylised", then of the first painted sheets: "have a go at doing my flame animations again". Every flame the
+   Pyroclasts make is drawn here on cards the flame shader paints live (pyrotex.js: FLAME, BALL, BURST, RING, JET, WING, SMOKE,
+   GLOW, EMBER, GROUND), so the fire flows and no two flames are alike. Embers are game particles (part, kind 'pfe'), so the
+   Element Lab's particle controls act on them. Gameplay, timing and the sounds are untouched.
+   - Hand flame: a living tongue cupped in the casting palm and a faint glow, taller as a strike or spell gathers (then the
+     other palm lights too).
+   - Fireball (owner: "more of a classic fireball. have light emit from it along its path"): a round ball of rolling fire
+     with a short flame swept back, thrown on a flat arc, small tongues peeling off behind it; it carries a light that moves
+     with it and a warm pool on the ground under it. It lands in a quick flash, fire swelling low over the ground with a plume up its middle that lifts off and breaks up, a ring
+     of flame racing out to the splash's real edge, a few tongues left licking, embers flung, one puff of smoke, a scorch.
+   - Burning glyph (a real area): glowing cracks in scorched ground with heat wandering through them, a lit rim, tongues
+     standing in it, embers.
+   - Skipping Flame: a smaller comet hopping along its arcs; each landing a small burst, ring and tongues.
+   - Furnace Breath: a roaring cone, jets of fire fanned from his hands and rolling out along it, tongues lifting off where it
+     ends, a low glow under it.
+   - Phoenix: a bird of flame seen from above: a comet body, two wings of flame beating (a hot leading edge, feathers of fire
+     streaming back), a tail of three long tongues; it dives into a great burst and leaves a ground fire.
+   - Burning foes (burns a Pyroclast set): small tongues licking up the foe's sides, depth-tested, so the foe stays whole.
+   Restraint: all of it scales with the Graphics setting (pfLv) and a card budget a frame (PF.cap); nothing rings the caster;
+   the rings shown are real areas (a splash, a glyph). Its values: the Element Lab (elemfx.js ELEM_FX_DEF, read through efx()). */
+const PF = { shots: [], hops: [], breath: [], phx: [], grounds: [], seen: new WeakSet(), quiet: null, glyphTick: false, cards: 0, cap: 200, last: 0, has: 0, hasT: -1 };
+const PF_IDS = ['cc_fireball', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave'], PF_UNIT = 'cc_pyroclast', PF_UP = [0, 1, 0];
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { for (const k of ['shots', 'hops', 'breath', 'phx', 'grounds']) PF[k].length = 0; });
+// the Graphics setting: 0 Low (fewer cards), 1 Medium, 2 High
+const pfLv = () => typeof GFX === 'undefined' ? 2 : GFX === 'low' ? 0 : GFX === 'medium' ? 1 : 2;
 const pfLive = () => typeof G !== 'undefined' && G && G.time != null && G.state !== 'title';
-// the fire glyphs: each one burns while it lasts
-function pfGlyphs() {
-  for (const z of G.hazards || []) {
-    if (z.k !== 'cc_glyph' || (z.s !== 'fire' && z.s !== 'magma') || PF.seen.has(z)) continue;
-    PF.seen.add(z);
-    // (its fire: the Element Lab's ground layer of the effect that left it, elemfx.js; a golem's magma keeps the fireball's defaults)
-    const g = z.s === 'magma' ? ELEM_FX_DEF.cc_fireball.ground : efxOf(z._efs, 'cc_fireball', 'ground');
-    hfPatch(z.x, z.z, Math.min(g.rMax, (z.r || .5) * g.r), .1, { flare: g.flare, heat: z.s === 'magma' ? .4 : 0, alive: () => (G.hazards.includes(z) && z.t > 0 ? z.t : 0), efx: z.s === 'magma' ? null : z._efs || null });
+const pfIsPyro = t => !!(t && t.def && t.def.unit === PF_UNIT);
+const pfRnd = s => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const pfDrawing = () => typeof vfxReady === 'function' && typeof pyfBill === 'function' && vfxReady();
+const pfNorm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+const pfSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const PF_WARM = [1, .5, .16], PF_SCORCH = [.07, .035, .02], PF_SQ = [-1, -1, 1, 1];
+
+/* ---- drawing: each card under its effect's Element Lab layer ---- */
+// the layer's tuning onto a card's options (brightness, opacity, speed, recolour); its size back, or null: not drawn
+const _pfTg = new Map();
+function pfTune(s, l, size, o) {
+  if (PF.cards >= PF.cap) return null;
+  if (typeof EFX !== 'undefined' && EFX.on) {
+    const id = ELEM_FX_SPELLS[s] ? s : 'cc_fireball', P = efx(id, l); efxCount(id, l);
+    if (P._g) {
+      if (!P.on) return null;
+      o.k = (o.k == null ? 1 : o.k) * P.glow; o.a = (o.a == null ? 1 : o.a) * P.alpha; if (P.speed !== 1) o.sp = (o.sp || 1) * P.speed;
+      if (P.grad) { const key = P.c0 + P.c1 + P.c2; let t = _pfTg.get(key); if (!t) _pfTg.set(key, t = { c0: P.c0, c1: P.c1, c2: P.c2 }); o.tg = t; }
+      size *= P.size;
+    }
+  }
+  PF.cards++; return size;
+}
+// a tongue rooted at P, len long along dir (o.fat: how wide)
+function pfFlame(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.p0 = o.fat == null ? 1 : o.fat; return pyfAxial(PYF_SH.FLAME, P, dir, z, z * .66, o); }
+// a fireball, its ball at P, flying along dir (len: the ball and the flame behind it; the ball two fifths of that across)
+function pfComet(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.at = .78; return pyfAxial(PYF_SH.BALL, P, dir, z, z * .5, o); }
+function pfGlow(P, w, o, s, l) { const z = pfTune(s, l, w, o); return z != null && pyfBill(PYF_SH.GLOW, P, z, z, PF_SQ, o); }
+// a jet of the breath's cone from P along dir, wid across at its end
+function pfJet(P, dir, len, wid, o, s) { const z = pfTune(s, 'core', len, o); return z != null && pyfAxial(PYF_SH.JET, P, dir, z, wid * z / len, o); }
+// a one-shot played where it was left. kind: burst (w across, on the ground at x, z), ring (w its radius), wisp (a tongue w
+// long lifting off from x, y, z), puff (smoke w across), flash (added light w across)
+function pfShot(kind, x, y, z, w, dur, o, s, l) {
+  o = o || {}; if (PF.shots.length >= 160) PF.shots.shift();
+  PF.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, vy: o.rise || 0, vx: o.vx || 0, vz: o.vz || 0, grow: o.grow || 0, lean: o.lean || null, fat: o.fat, seed: (Math.random() * 97) | 0, s, l });
+}
+function pfShots(now) {
+  PF.shots = PF.shots.filter(e => now - e.at < e.dur);
+  for (const e of PF.shots) {
+    const el = now - e.at; if (el < 0) continue;
+    const age = el / e.dur, x = e.x + e.vx * el, y = e.y + e.vy * el, z = e.z + e.vz * el, w = e.w * (1 + e.grow * age), o = { k: e.k, a: e.a, seed: e.seed, age };
+    if (e.kind === 'burst') { const s = pfTune(e.s, e.l, w, o); if (s != null) { o.lift = .3 * s; o.pull = .16 * s; pyfBill(PYF_SH.BURST, [x, .02, z], s, s, PF_SQ, o); } }
+    else if (e.kind === 'ring') { const s = pfTune(e.s, e.l, w, o); if (s != null) pyfFlat(PYF_SH.RING, x, .034, z, s / .92, e.seed, o); }
+    else if (e.kind === 'wisp') { o.pull = .08; o.fat = e.fat; pfFlame([x, y, z], e.lean || PF_UP, w, o, e.s, e.l); }
+    else if (e.kind === 'puff') { const s = pfTune(e.s, e.l, w, o); if (s != null) { o.pull = .2; pyfBill(PYF_SH.SMOKE, [x, y, z], s, s, PF_SQ, o); } }
+    else if (e.kind === 'flash') { o.a = e.a * (1 - age) * (1 - age); o.pull = .2; pfGlow([x, y, z], w * (.7 + .5 * age), o, e.s, e.l); }
   }
 }
-// the fireballs in flight (G.ccP lobs of the fire school)
-function pfBalls() {
+// an ember: a game particle (its count, size, life, speed, lift, turbulence and colour tunable in the lab), drawn as a spark
+function pfEmber(x, h, z, vx, vh, vz, o, s) {
+  const e = efxPush(s, 'embers');
+  try { part({ k: 'pfe', x, z, h, vx, vz, vh, g: -(o.lift == null ? .5 : o.lift), drag: o.drag || 1.6, life: o.life, max: o.life, size: o.w, col: '#ffb040', v: (Math.random() * 97) | 0 }); } finally { efxPop(e); }
+}
+function pfEmbers() {
+  let n = 0; const cap = [40, 90, 150][pfLv()];
+  for (const p of G.parts) {
+    if (p.k !== 'pfe' || n >= cap) continue; n++;
+    const a = Math.max(0, Math.min(1, p.life / p.max)), sp = Math.hypot(p.vx, p.vh, p.vz), sz = p.size * (.6 + .4 * a);
+    pyfAxial(PYF_SH.EMBER, [p.x, p.h, p.z], sp > .05 ? [p.vx / sp, p.vh / sp, p.vz / sp] : PF_UP, sz * (1.5 + Math.min(2.4, sp * .9)), sz, { at: .5, k: 1.1, a: Math.min(1, a * 2.2) * (.8 + .2 * Math.sin(p.life * 31 + p.v)), seed: p.v, pull: .03 });
+  }
+}
+function pfLight(x, z, h, k, rad, life, s) { const e = efxPush(s, 'light'); try { if (G.flashes.length < 6) flashLight(x, z, h, [1.4 * k, .62 * k, .2 * k], rad, life); } finally { efxPop(e); } }
+// a patch of ground the fire touched: a scorch, a warm glow while it is hot, and (fire > 0) a fire burning on it for a while
+function pfGround(x, z, r, dur, fire, s) { if (PF.grounds.length >= 40) PF.grounds.shift(); PF.grounds.push({ x, z, r, at: G.time, dur, fire, s, seed: (Math.random() * 97) | 0 }); }
+// the fire on a patch (a glyph or a ground fire): the scorch, the glowing cracks (rim: its lit edge, a real area's), the
+// tongues standing in it; e: how much of it shows
+function pfPatch(x, z, r, e, n, tall, Gd, s, seed, rim, now, dt) {
+  if (typeof VX !== 'undefined' && typeof vfxFlat === 'function') {
+    vfxFlat(VX, x, z, .021, r * 1.1, r * 1.1, seed, PF_SCORCH, .5 * e, VT.DIRT, 0);
+    if (Gd.disc > 0) vfxFlat(VX, x, z, .026, r * 1.25, r * 1.25, 0, PF_WARM, Gd.disc * e * (.85 + .15 * Math.sin(now * 9 + seed)), VT.GLOW, 1);
+  }
+  const o = { seed, k: 1, a: e, sp: 1 }, rr0 = pfTune(s, 'ground', r, o);
+  if (rr0 != null) { o.p0 = rim ? Gd.rim : 0; pyfFlat(PYF_SH.GROUND, x, .031, z, rr0 / .92, seed * .7, o); }
+  for (let k = 0; k < n; k++) {
+    const a = seed + k * TAU / n + .25 * Math.sin(now * .7 + k), rr = r * (.15 + .5 * ((k * .618 + seed * .1) % 1)), len = tall * (.75 + .5 * pfRnd(seed + k)) * Math.min(1.3, r / .5 + .3) * (.5 + .5 * e);
+    pfFlame([x + Math.cos(a) * rr, .02, z + Math.sin(a) * rr], PF_UP, len, { k: 1, a: e, seed: seed + k * 7, pull: .1, sp: .85 + .3 * pfRnd(k + seed), fat: .9 }, s, 'ground');
+  }
+  if (Gd.ember > 0 && Math.random() < Gd.ember * dt * e) { const a = Math.random() * TAU, rr = Math.random() * r * .7; pfEmber(x + Math.cos(a) * rr, .08, z + Math.sin(a) * rr, (Math.random() - .5) * .3, .5 + Math.random() * .6, (Math.random() - .5) * .3, { life: .7, w: .05, lift: .4 }, s); }
+}
+
+/* ---- the hands ---- */
+function pfHands(now) {
+  const H = efx('cc_fireball', 'hand'); if (!H.on) return;
+  for (const t of G.towers) {
+    if (!pfIsPyro(t) || t.wrecked || t.build > 0) continue;
+    // (the breath pours from them)
+    if (t.ccxBreath && now < t.ccxBreath.until + .3) continue;
+    const p = ccHand(t, towerTop(t) * .8), g = Math.min(1, t._pyGl || 0), len = (H.flame + H.tier * (t.tier | 0)) * (1 + H.cast * g), sd = ((t.i | 0) * 5 + (t.j | 0)) % 97;
+    pfFlame([p[0], p[1] - len * .1, p[2]], PF_UP, len, { k: H.k, seed: sd, pull: .06, sp: 1.1, fat: .95 }, 'cc_fireball', 'hand');
+    if (H.disc > 0 && pfLv()) pfGlow(p, len * 2.6 * H.disc, { k: .3 + .45 * g, pull: .06 }, 'cc_fireball', 'hand');
+    // (the other palm lights as a cast gathers)
+    if (g > .2 && t._pyPL && t._pyAt === now) { const q = t._pyPL, l2 = len * .7 * g; pfFlame([q[0], q[1] - l2 * .1, q[2]], PF_UP, l2, { k: H.k, seed: sd + 31, pull: .06, sp: 1.2, fat: .9 }, 'cc_fireball', 'hand'); }
+  }
+}
+
+/* ---- the fireball in flight, and Skipping Flame's hops ---- */
+// the light a ball of fire carries along its path: a real light that moves with it (o: the thing flying, which keeps it),
+// and its pool on the ground under it, tighter and brighter the lower it flies
+function pfFlyLight(o, x, y, z, k, rad, s) {
+  if (!(k > 0) || !(rad > 0)) return;
+  const e = efxPush(s, 'light');
+  try {
+    let q = [[1.4 * k, .62 * k, .2 * k], rad, .16]; if (typeof EFX !== 'undefined' && EFX.on) q = efxLight(q[0], q[1], q[2]);
+    if (!q) return;
+    let f = o._pfL; if (!f || !G.flashes.includes(f)) { f = null; if (G.flashes.length < 7) G.flashes.push(f = o._pfL = { x, z, h: y, col: q[0], rad: q[1], life: q[2], max: q[2] }); }
+    if (f) { f.x = x; f.z = z; f.h = y; f.col = q[0]; f.rad = q[1]; f.life = f.max = q[2]; }
+    if (typeof VX !== 'undefined' && typeof vfxFlat === 'function') { const near = Math.sqrt(1 / (1 + Math.max(0, y) * .9)), pr = q[1] * (.4 + .2 * (1 - near)); vfxFlat(VX, x, z, .028, pr, pr, 0, PF_WARM, .5 * k * near * (.92 + .08 * Math.sin(G.time * 23)), VT.GLOW, 1); }
+  } finally { efxPop(e); }
+}
+function pfBallAt(x, y, z, d, len, C, T, s, seed, o, now) {
+  { const L = efxOf(s, 'cc_fireball', 'light'); if (L.on && L.fly > 0) pfFlyLight(o, x, y, z, L.fly * Math.min(1.5, len / .9), L.rad * 1.3 * Math.min(1.5, len / .9), s); }
+  if (C.on) {
+    pfComet([x, y, z], d, len, { k: C.k, seed, pull: .12, sp: 1 }, s, 'core');
+    if (C.disc > 0 && pfLv()) pfGlow([x, y, z], len * C.disc, { k: .5, pull: .1 }, s, 'core');
+  }
+  // its trail: small tongues peeling off behind it, leaning back along its flight, lifting and going out
+  const lv = pfLv(); if (!T.on || !lv || T.every <= 0) return;
+  // (none in its first moment: nothing is left hanging at his hand)
+  if (o.lob && o.lob.t < .1) { o._pfT = now; return; }
+  const ev = T.every * (lv === 1 ? 1.6 : 1); if (!o._pfT || now - o._pfT > .3) o._pfT = now;
+  for (let i = 0; i < 2 && now - o._pfT >= ev; i++) {
+    o._pfT += ev * (.75 + .5 * Math.random()); const j = (Math.random() - .5) * len * .12, bx = x - d[0] * len * .5 + j, by = y - d[1] * len * .5, bz = z - d[2] * len * .5 - j;
+    pfShot('wisp', bx, by, bz, T.w * (len / .85) * (.7 + .5 * Math.random()), .3 + .1 * Math.random(), { rise: T.rise, lean: pfNorm([-d[0] * .6, 1, -d[2] * .6]), a: .9, fat: .8 }, s, 'trail');
+    if (Math.random() < T.ember) pfEmber(bx, by, bz, (Math.random() - .5) * .4, .3 + Math.random() * .4, (Math.random() - .5) * .4, { life: .5, w: .05, lift: .3 }, s);
+  }
+}
+function pfBalls(now) {
   for (const p of G.ccP || []) {
     if (p.done || p.k !== 'lob' || p.col !== CC_COL.fire) continue;
-    const tr = p.tr, a = tr && tr.length > 1 ? tr[tr.length - 2] : null, dt = (typeof VDT !== 'undefined' && VDT) || 1 / 60;
-    const v = a ? [(p.x - a[0]) / dt, (p.h - a[1]) / dt, (p.z - a[2]) / dt] : [0, 0, 0];
-    const q0 = typeof LABF !== 'undefined' ? LABF.q.length : 0, es = p._efs || 'cc_fireball', c = efxOf(es, 'cc_fireball', 'core');   // (its size and heat: elemfx.js)
-    if (c._g && !c.on) { p._pfLab = G.time; continue; }   // (the Element Lab turned the core off: nothing drawn)
-    const e0 = efxPush(es, 'core');
-    hfBall(p.x, p.h, p.z, c.ball * (p.sz || 1), v[0] * .5, v[1] * .5, v[2] * .5, (p.pfSeed = p.pfSeed || ((Math.random() * 97) | 0)), c.heat);
-    efxPop(e0);
-    p._pfLab = typeof LABF !== 'undefined' && LABF.q.length > q0 ? G.time : -1;   // (the lab drew it: its older sprite look is left out)
+    const s = p._efs && ELEM_FX_SPELLS[p._efs] ? p._efs : 'cc_fireball', C = efxOf(s, 'cc_fireball', 'core'), T = efxOf(s, 'cc_fireball', 'trail');
+    const q = p.tr && p.tr.length ? p.tr[0] : null, L = p.lob;
+    let d = q ? [p.x - q[0], p.h - q[1], p.z - q[2]] : L ? [L.ax - L.x0, 0, L.az - L.z0] : [1, 0, 0];
+    if (Math.hypot(d[0], d[1], d[2]) < 1e-4) d = L ? [L.ax - L.x0, .3, L.az - L.z0] : [1, 0, 0];
+    if (p.pfSeed == null) p.pfSeed = (Math.random() * 97) | 0;
+    pfBallAt(p.x, p.h, p.z, pfNorm(d), C.ball * (p.sz || 1), C, T, s, p.pfSeed, p, now);
   }
-  // Skipping Flame's hops (an arc from where it rose to where it falls, over T seconds)
-  const now = G.time;
   PF.hops = PF.hops.filter(h => now - h.at < h.T);
+  const C = efx('cc_kindle', 'core'), T = efx('cc_kindle', 'trail');
   for (const h of PF.hops) {
-    const u = Math.max(0, (now - h.at) / h.T), x = h.x0 + (h.x - h.x0) * u, z = h.z0 + (h.z - h.z0) * u, y = h.h0 + (.2 - h.h0) * u + Math.sin(u * Math.PI) * h.arc;
-    const du = .02, x2 = h.x0 + (h.x - h.x0) * (u + du), z2 = h.z0 + (h.z - h.z0) * (u + du), y2 = h.h0 + (.2 - h.h0) * (u + du) + Math.sin((u + du) * Math.PI) * h.arc, k = 1 / (du * h.T);
-    const c = efxOf(h.efx, 'cc_kindle', 'core'), e0 = efxPush(h.efx || 'cc_kindle', 'core');
-    hfBall(x, y, z, c.ball * h.s, (x2 - x) * k * .5, (y2 - y) * k * .5, (z2 - z) * k * .5, h.seed, .8);
-    efxPop(e0);
+    const at = u => [h.x0 + (h.x - h.x0) * u, h.h0 + (.2 - h.h0) * u + Math.sin(u * Math.PI) * h.arc, h.z0 + (h.z - h.z0) * u];
+    const u = Math.max(0, (now - h.at) / h.T), a = at(u), b = at(u + .02);
+    pfBallAt(a[0], a[1], a[2], pfNorm([b[0] - a[0], b[1] - a[1], b[2] - a[2]]), C.ball * h.s, C, T, 'cc_kindle', h.seed, h, now);
   }
 }
-// their hands: a small flame in the casting hand of each Pyroclast
-function pfHands() {
-  if (hfLoad() > .7) return;   // (a busy screen keeps its budget for the fire that matters)
-  for (const t of G.towers) {
-    if (!t.def || t.def.unit !== 'cc_pyroclast' || t.wrecked || t.build > 0) continue;
-    const h = ccHand(t, towerTop(t) * .8), c = efx('cc_fireball', 'glow'), e0 = efxPush('cc_fireball', 'glow');   // (the hand flame: the fireball's heat glow, elemfx.js)
-    if (!(c._g && !c.on)) hfQueue(h[0], h[1] - .03, h[2], c.hand + c.handTier * (t.tier | 0), c.handFlare, c.handHeat, 0, 0, 0, ((t.i | 0) * 5 + (t.j | 0)) % 97, 1);
-    efxPop(e0);
+// a landing: a flash, the burst, the ring out to r (the real splash), n tongues left licking within rad
+function pfBoom(x, z, w, r, n, rad, B, Rg, s, o) {
+  o = o || {};
+  pfShot('flash', x, .25, z, w * .8, .14, { k: o.k || 1 }, s, 'burst');
+  pfShot('burst', x, 0, z, w, (B.secs || .5) * (o.slow || 1), { k: o.k || B.k }, s, 'burst');
+  if (Rg.on && Rg.r > 0 && r > 0) pfShot('ring', x, 0, z, r * Rg.r, Rg.secs || .34, { k: B.k }, s, 'ring');
+  for (let i = 0; i < n; i++) { const a = i * TAU / Math.max(1, n) + Math.random() * 1.2, rr = rad * (.35 + .5 * Math.random()); pfShot('wisp', x + Math.cos(a) * rr, .03, z + Math.sin(a) * rr, w * (.16 + .08 * Math.random()), .4 + .15 * Math.random(), { delay: .1 + .05 * i, rise: .35, lean: pfNorm([Math.cos(a) * .25, 1, Math.sin(a) * .25]), fat: .9 }, s, 'burst'); }
+}
+// the fireball's landing (ccFireBurst, wrapped below)
+function pfImpact(x, z, sp, o, s) {
+  const lv = pfLv(), B = efxOf(s, 'cc_fireball', 'burst'), Rg = efxOf(s, 'cc_fireball', 'ring'), E = efxOf(s, 'cc_fireball', 'embers'), S = efxOf(s, 'cc_fireball', 'smoke'), L = efxOf(s, 'cc_fireball', 'light'), Gd = efxOf(s, 'cc_fireball', 'ground');
+  const great = o && o.great, small = o && o.small;
+  pfBoom(x, z, Math.min(B.wMax, sp * B.w) * (small ? .8 : 1), sp, [1, 2, 3][lv] + (great ? 2 : 0), sp * .6, B, Rg, s, { k: great ? B.kGreat : B.k, slow: great ? 1.15 : 1 });
+  const n = Math.round((great ? E.great : E.count) * [.5, .8, 1][lv]);
+  for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = E.fling * (.4 + .6 * Math.random()) * Math.min(1.4, sp); pfEmber(x + Math.cos(a) * .08, .15 + Math.random() * .2, z + Math.sin(a) * .08, Math.cos(a) * v, 1 + Math.random() * 1.6, Math.sin(a) * v, { life: E.secs * (.7 + .6 * Math.random()), w: E.w * (.7 + .6 * Math.random()), lift: .3 }, s); }
+  if (lv) { const np = great ? S.great : S.puffs; for (let i = 0; i < np; i++) pfShot('puff', x + (i ? (Math.random() - .5) * sp * .5 : 0), .4 + .12 * i, z + (i ? (Math.random() - .5) * sp * .5 : 0), sp * S.w * (.85 + .3 * Math.random()), .9, { delay: S.delay + i * .08, rise: S.rise, grow: .5, a: .85 }, s, 'smoke'); }
+  if (L.on) pfLight(x, z, .3, L.k, L.rad * Math.min(1.5, sp), L.secs, s);
+  if (Gd.on && Gd.scorch > 0) pfGround(x, z, sp * Gd.scorch, Gd.dur, 0, s);
+}
+
+/* ---- the burning glyphs and the ground fires ---- */
+function pfGlyphs(now, dt) {
+  const lv = pfLv(), Z = (G.hazards || []).filter(z => z.k === 'cc_glyph' && z.s === 'fire' && z.t > 0 && pfIsPyro(z.src)), thin = Math.min(1, 10 / Math.max(1, Z.length));
+  for (const z of Z) {
+    const s = z._efs && ELEM_FX_SPELLS[z._efs] ? z._efs : z._sfx ? 'cc_kindle' : 'cc_fireball', Gd = efxOf(s, 'cc_fireball', 'ground'); if (!Gd.on) continue;
+    const e = Math.min(1, z.t / .5, (G.time - (z.born || 0)) / .25), sd = ((z.x * 7.3 + z.z * 3.1) * 10 | 0) % 97;
+    pfPatch(z.x, z.z, z.r || .5, Math.max(0, e), Math.max(1, Math.round(Gd.tongues * [.5, .75, 1][lv] * thin)), Gd.tall, Gd, s, sd, 1, now, dt);
+  }
+  PF.grounds = PF.grounds.filter(g => now - g.at < g.dur);
+  for (const g of PF.grounds) {
+    const u = (now - g.at) / g.dur, e = Math.min(1, (now - g.at) / .15) * (1 - pfSs(.55, 1, u)), Gd = efxOf(g.s, 'cc_fireball', 'ground'); if (!Gd.on) continue;
+    if (!g.fire) { if (typeof vfxFlat === 'function') { vfxFlat(VX, g.x, g.z, .02, g.r, g.r, g.seed, PF_SCORCH, .45 * e, VT.DIRT, 0); vfxFlat(VX, g.x, g.z, .025, g.r * 1.1, g.r * 1.1, 0, PF_WARM, .3 * e * (1 - u), VT.GLOW, 1); } continue; }
+    pfPatch(g.x, g.z, g.r, e, Math.max(1, Math.round(g.fire * [.4, .7, 1][lv])), Gd.tall, Gd, g.s, g.seed, 0, now, dt);
   }
 }
-const PF_BAKES = ['pyroblast', 'ballloop', 'skiphop', 'jetloop', 'breathloop', 'phxloop', 'phxboom', 'phxboom_big'];
-function pfFrame() {
-  if (typeof hfPatch !== 'function' || !pfLive()) return;
-  // (their bakes loaded as soon as a Pyroclast stands on the field, so the first fireball's burst isn't lost to the image's load)
-  if (!PF.pre && typeof labLoad === 'function' && G.towers.some(t => t.def && t.def.unit === 'cc_pyroclast')) { PF.pre = 1; for (const n of PF_BAKES) labLoad(n); }
-  pfGlyphs(); pfBalls(); pfHands(); pfBreaths(); pfPhoenixes();
+
+/* ---- Furnace Breath: a roaring cone, jets of fire fanned from the hands ---- */
+function pfBreaths(now, dt) {
+  const lv = pfLv(), s = 'cc_pyresigil', Cc = efx(s, 'core'), F = efx(s, 'flames'), E = efx(s, 'embers'), S = efx(s, 'smoke'), Gl = efx(s, 'glow'), L = efx(s, 'light');
+  PF.breath = PF.breath.filter(e => G.towers.includes(e.t) && e.t.ccxBreath === e.B && now < e.B.until + .35);
+  for (const e of PF.breath) {
+    const { t, B } = e, el = now - B.at, R0 = B.r, k = R0 / 2.4; if (el < .05) continue;
+    // how far it has reached, how much has died from the hands, how much of it shows
+    const reach = pfSs(0, .22, el - .05), died = pfSs(0, .32, now - (B.until - .05)), on = reach * (1 - died);
+    const h = ccHand(t, towerTop(t) * .8), a0 = Math.atan2(B.uz, B.ux), half = Math.acos(CCX.BR_COS) * Cc.cone, drop = (h[1] - .22) * Cc.drop / R0;
+    if (Cc.on) {
+      const nj = Math.max(1, Math.round(Cc.jets * [.6, .8, 1][lv])), len = R0 * Cc.len, wid = len * 2 * Math.tan(half) / Math.max(1, nj) * 2.1;
+      for (let i = 0; i < nj; i++) {
+        const f = nj > 1 ? i / (nj - 1) * 2 - 1 : 0, a = a0 + f * half * .78 + .05 * Math.sin(now * 2.3 + i * 1.7 + e.seed);
+        pfJet(h, pfNorm([Math.cos(a), -drop, Math.sin(a)]), len * (1 - .14 * f * f), wid, { k: Cc.k * (1 - .12 * Math.abs(f)), seed: e.seed + i * 13, p0: .12 + 1.05 * reach, p1: died * 1.25, pull: .1, sp: .9 + .25 * pfRnd(e.seed + i) }, s);
+      }
+      // (the heart of it: one narrow, hot jet down the middle)
+      pfJet(h, pfNorm([B.ux, -drop, B.uz]), len * .8, wid * .6, { k: Cc.k * 1.12, seed: e.seed + 71, p0: .12 + 1.05 * reach, p1: died * 1.25, pull: .14, sp: 1.25 }, s);
+    }
+    if (on <= 0) continue;
+    // tongues lifting off along its far half
+    if (lv && F.on && F.every > 0 && now >= (e.wi || 0)) {
+      e.wi = now + F.every * (lv === 1 ? 1.6 : 1) * (.7 + .6 * Math.random());
+      const a = a0 + (Math.random() * 2 - 1) * half * .8, d = R0 * (.5 + .5 * Math.random()) * reach;
+      pfShot('wisp', t.x + Math.cos(a) * d, .08, t.y + Math.sin(a) * d, F.w * k * (.7 + .5 * Math.random()), .42, { rise: .5, lean: pfNorm([Math.cos(a) * .35, 1, Math.sin(a) * .35]), fat: .9 }, s, 'flames');
+    }
+    // a low glow under the cone, its light where it strikes, embers off the burning foes, smoke where it ends
+    const cx = t.x + B.ux * R0 * .55, cz = t.y + B.uz * R0 * .55;
+    if (Gl.on && Gl.a > 0 && typeof vfxFlat === 'function') vfxFlat(VX, cx, cz, .027, R0 * .55, R0 * Gl.w, Math.atan2(B.uz, B.ux), PF_WARM, Gl.a * on * (.85 + .15 * Math.sin(now * 11)), VT.GLOW, 1);
+    if (L.on && now >= (e.li || 0)) { e.li = now + L.every; pfLight(t.x + B.ux * R0 * .65, t.y + B.uz * R0 * .65, .3, .8, L.rad, .3, s); }
+    if (E.on && now >= (e.em || 0)) {
+      e.em = now + E.every * (lv ? 1 : 2);
+      const F2 = G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= R0 && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS);
+      const c = F2.length ? F2[(Math.random() * F2.length) | 0] : null, fx = c ? c.x : t.x + B.ux * R0 * .7, fz = c ? c.y : t.y + B.uz * R0 * .7;
+      for (let i = 0; i < E.count; i++) pfEmber(fx + (Math.random() - .5) * .3, .3 + Math.random() * .4, fz + (Math.random() - .5) * .3, B.ux * .6 + (Math.random() - .5) * .8, .8 + Math.random(), B.uz * .6 + (Math.random() - .5) * .8, { life: .6, w: .06, lift: .5 }, s);
+    }
+    if (lv && S.on && S.every > 0 && now >= (e.sm || 0)) { e.sm = now + S.every * (lv === 1 ? 1.5 : 1); pfShot('puff', t.x + B.ux * R0 * .95, .5, t.y + B.uz * R0 * .95, S.w * k, .9, { rise: .45, grow: .5, a: .7 }, s, 'smoke'); }
+  }
 }
-/* ---- Furnace Breath: three tongues of jet flame laid along the cone, rooted a little past the hands (only the orb's small
-   glow at the caster: owner, "never flashy around the caster"), brightest and widest out where the foes burn ---- */
-PF.breath = []; PF.phx = [];
-if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { PF.breath.length = 0; PF.phx.length = 0; });
-function pfBreaths() {
-  const now = G.time;
-  PF.breath = PF.breath.filter(e => now < e.B.until + .35 && G.towers.includes(e.t) && e.t.ccxBreath === e.B);
-  const BLON = typeof LAB_FX !== 'undefined' && !!LAB_FX.breathloop;
-  // (its values and layers: the Element Lab's Furnace Breath, elemfx.js)
-  const EC = efx('cc_pyresigil', 'core'), EF = efx('cc_pyresigil', 'flames'), EE = efx('cc_pyresigil', 'embers'), EL = efx('cc_pyresigil', 'light'), e0 = efxPush('cc_pyresigil', null);
-  try { for (const e of PF.breath) {
-    const { t, B } = e, el = now - B.at; if (el < .08) continue;
-    const on = Math.min(1, (el - .08) / .15) * Math.min(1, Math.max(0, (B.until + .35 - now) / .35)), h = ccHand(t, towerTop(t) * .8), busy = hfLoad() > .6;
-    const a0 = Math.atan2(B.uz, B.ux), m = busy ? 0 : 3;
-    // the body of the breath: the lab's fireball bursts rolled out along the cone, one every ~0.1s, each farther and bigger,
-    // so the flame pours outward and billows where the foes stand
-    if (now < B.until - .05 && now >= (e.next || 0) && typeof labPlay === 'function') {
-      const j = e.j = (e.j | 0) + 1, F = j % 3 ? G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= B.r && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS) : [];
-      const c = F.length ? F[j % F.length] : null, f0 = c ? Math.hypot(c.x - t.x, c.y - t.y) / B.r : .3 + .7 * ((j * .37) % 1), f = Math.max(.3, f0), a = c ? Math.atan2(c.y - t.y, c.x - t.x) : a0 + (((j * 5) % 7) / 6 * 2 - 1) * .5 * f;   // (two in three on a foe in the cone)
-      EFX.lay = 'flames';
-      if (labPlay('pyroblast', t.x + Math.cos(a) * B.r * f, t.y + Math.sin(a) * B.r * f, (EF.w0 + EF.w1 * f) * (B.r / 2.4), { k: EF.k0 + EF.k1 * f, a: 1, speed: 1.25, seed: j, top: 1 })) e.next = now + (busy ? .2 : BLON ? .15 : EF.every);   // (the bake fills about a third of its card)
-      EFX.lay = null;
-    }
-    // the pour itself: the lab's Furnace Breath (the owner's tuning) streaming out of the hands along the cone; where the bake
-    // is missing, a thin core and tongues of flame carried out along it
-    EFX.lay = 'core';
-    const bd = [B.ux, -.12, B.uz], bdl = Math.hypot(...bd), BL = typeof LAB_FX !== 'undefined' && LAB_FX.breathloop && labQueue('breathloop', [h[0] + B.ux * .15, Math.max(.15, h[1] - .05), h[2] + B.uz * .15], [bd[0] / bdl, bd[1] / bdl, bd[2] / bdl], B.r * EC.len * (.55 + .45 * on), { k: EC.k * on, a: on, seed: e.seed, pull: .4 });
-    EFX.lay = 'flames';
-    if (!BL) { const dx = B.ux, dz = B.uz, P = [h[0] + dx * .4, Math.max(.12, h[1] - .1), h[2] + dz * .4], d = [dx, -.1, dz], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
-      if (!labQueue('jetloop', P, u, B.r * .55 * (.6 + .4 * on), { k: .6 * on, a: .7 * on, seed: e.seed, pull: .4 })) hfQueue(P[0], P[1], P[2], B.r * .08, .4, .2, 0, 0, 0, e.seed, on, u); }
-    // the pour: tongues of flame carried out along the cone, each standing taller and brighter the farther it goes
-    for (let j = 0; j < (BL ? 0 : m); j++) {
-      const ph = (now * 2.4 + j / m + (j % 3) * .13) % 1, f = .22 + .78 * ph, side = ((j * 7) % m) / (m - 1) * 2 - 1;
-      const a = a0 + side * .55 * (.4 + .6 * ph) + .05 * Math.sin(now * 5 + j), dx = Math.cos(a), dz = Math.sin(a), x = t.x + dx * B.r * f, z = t.y + dz * B.r * f;
-      const fade = on * Math.min(1, ph / .15) * Math.min(1, (1 - ph) / .2), d = [dx * .7, 1, dz * .7], dl = Math.hypot(...d), u = [d[0] / dl, d[1] / dl, d[2] / dl];
-      const len = (.45 + 1.05 * ph) * (B.r / 2.4) * 1.3;
-      if (!labQueue('jetloop', [x, .03, z], u, len, { k: (.8 + .45 * ph) * fade, a: fade, seed: e.seed + j * 3, pull: .7 })) hfQueue(x, .05, z, len * .14, .4, .2, 0, 0, 0, e.seed + j, fade);
-    }
-    // where it strikes: embers thrown up off the burning foes, and the ground lit
-    EFX.lay = null;
-    if (on > .5 && (e.n = (e.n | 0) + 1) % Math.max(1, Math.round(EE.every)) === 0) {
-      const fx = t.x + B.ux * B.r * .65, fz = t.y + B.uz * B.r * .65;
-      v2Spray(e.C, 'ember', fx, fz, .2, busy ? Math.min(2, EE.count) : EE.count, { r: B.r * .3, sp: 1.1 });
-      if (e.n % Math.max(1, Math.round(EL.every)) === 0 && G.flashes.length < 4) flashLight(fx, fz, .3, e.C.P.light, EL.rad, .25);
-    }
-  } } finally { efxPop(e0); }
-}
-/* ---- Phoenix: born from the orb, it rises off the hands, strikes the head of the column and sweeps the road back,
-   wings beating, then dives into a blast (CCX_FX.phoenixBoom) ---- */
-function pfPhoenixes() {
-  const now = G.time, busy = hfLoad() > .6;
+
+/* ---- Phoenix: a bird of flame, seen from above ---- */
+function pfPhoenixes(now) {
+  const lv = pfLv(), s = 'cc_flamewave', Cb = efx(s, 'core'), Fw = efx(s, 'flames'), Tr = efx(s, 'trail'), L = efx(s, 'light');
   PF.phx = PF.phx.filter(F => (now - F.at) * F.spd < F.tot + .05);
-  // (its values and layers: the Element Lab's Phoenix, elemfx.js)
-  const EC = efx('cc_flamewave', 'core'), ET = efx('cc_flamewave', 'trail'), EL = efx('cc_flamewave', 'light'), e0 = efxPush('cc_flamewave', null);
-  try { for (const F of PF.phx) {
+  for (const F of PF.phx) {
     const d = (now - F.at) * F.spd; if (d < 0) continue;
     const [x, z, hx, hz] = ccxAlong(F.R, d), d1 = Math.hypot(F.R[1][0] - F.R[0][0], F.R[1][1] - F.R[0][1]) || 1, end = F.tot - d;
     const rise = Math.min(1, d / Math.max(.6, d1 * .7)), dive = end < .9 ? 1 - end / .9 : 0;
-    const y = (F.h0 + (1.15 - F.h0) * (1 - (1 - rise) * (1 - rise))) * (1 - dive) + .2 * dive + .05 * Math.sin(now * 6);   // (over the walkers' heads: the cards are depth-tested)
-    const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), dl = Math.hypot(hx, vh, hz), fwd = [hx / dl, vh / dl, hz / dl];
-    const g = Math.min(1, d / .5) * .55 + .45;   // (small as it leaves the hands, its full span out over the road)
-    // the bird: the lab's Phoenix (the owner's tuning) held in a headwind, wings beating, drawn along its flight
-    EFX.lay = 'core';
-    if (typeof LAB_FX !== 'undefined' && LAB_FX.phxloop && labQueue('phxloop', [x, y, z], fwd, EC.span * g, { k: EC.k, seed: F.seed, pull: .5, top: 1 })) { EFX.lay = null; if ((F.n = (F.n | 0) + 1) % Math.max(1, Math.round(EL.every)) === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2); continue; }
-    // the body and the tail: the lab's Fireball loop streaming back along its flight
-    if (!labQueue('ballloop', [x, y, z], fwd, 4 * g, { k: 1.2, seed: F.seed, pull: .5, top: 1 })) hfBall(x, y, z, .12 * g, hx * 4, vh * 4, hz * 4, F.seed, 1);
-    EFX.lay = 'flames';
-    // the wings: two jets swept out and back from the shoulders, beating
-    const fl = Math.sin(now * 10 + F.seed), px = -hz, pz = hx;
-    for (const sd of busy ? [] : [-1, 1]) {
-      const w = [sd * px * .85 - hx * .45, .25 + .55 * fl, sd * pz * .85 - hz * .45], wl = Math.hypot(...w);
-      labQueue('jetloop', [x + hx * .06, y + .02, z + hz * .06], [w[0] / wl, w[1] / wl, w[2] / wl], 1.3 * g * (.9 + .1 * fl), { k: 1, a: 1, seed: F.seed + (sd > 0 ? 5 : 9), pull: .5, top: 1 });
+    const y = (F.h0 + (1.15 - F.h0) * (1 - (1 - rise) * (1 - rise))) * (1 - dive) + .2 * dive + .05 * Math.sin(now * 6);
+    const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), fwd = pfNorm([hx, vh, hz]), g = Math.min(1, d / .5) * .45 + .55, bl = Cb.body * g;
+    // the body: a comet leading, its glow
+    if (Cb.on) { pfComet([x, y, z], fwd, bl, { k: Cb.k, seed: F.seed, pull: .2 }, s, 'core'); if (Cb.disc > 0) pfGlow([x, y, z], bl * Cb.disc, { k: .5, pull: .18 }, s, 'core'); }
+    if (Fw.on) {
+      // the wings: hinged at the shoulders, beating up and down, swept back as it dives
+      const beat = Math.sin(now * Fw.beat + F.seed), span = Fw.wing * g, chord = span * .9, be = .12 + .38 * beat - .3 * dive, sw = .1 + .7 * dive, cb = Math.cos(be), cs = Math.cos(sw), ss = Math.sin(sw), rx = -hz, rz = hx;
+      // (their feathers stream back along the flight as the screen sees it, so a wing is never seen edge on)
+      const fw = pyfFw(), bk = [-fwd[0], -fwd[1] - .06, -fwd[2]], bd = bk[0] * fw[0] + bk[1] * fw[1] + bk[2] * fw[2], bv = pfNorm([bk[0] - fw[0] * bd, bk[1] - fw[1] * bd, bk[2] - fw[2] * bd]);
+      const O = [x - bv[0] * chord * .1 + fw[0] * .2, y - bv[1] * chord * .1 + fw[1] * .2, z - bv[2] * chord * .1 + fw[2] * .2], V = [bv[0] * chord, bv[1] * chord, bv[2] * chord];
+      for (const sd of [-1, 1]) {
+        const o = { k: Fw.k, seed: F.seed + (sd > 0 ? 11 : 3), sp: 1.15 }, sz = pfTune(s, 'flames', span, o); if (sz == null) continue;
+        pyfQuad(PYF_SH.WING, O, [(sd * rx * cb * cs - hx * ss) * sz, Math.sin(be) * sz, (sd * rz * cb * cs - hz * ss) * sz], V, o);
+      }
+      // the tail: three long tongues streaming back, fanned and swaying
+      for (const i of lv ? [-1, 0, 1] : [0]) {
+        const fan = i * (.28 + .08 * Math.sin(now * 3 + i));
+        pfFlame([x - fwd[0] * bl * .3, y - fwd[1] * bl * .3, z - fwd[2] * bl * .3], pfNorm([-hx + rx * fan, -.12 - .5 * dive - fwd[1] * .5, -hz + rz * fan]), Fw.tail * g * (i ? .8 : 1), { k: Fw.k * .95, seed: F.seed + 21 + i * 5, pull: .18, sp: 1.3, fat: .85 }, s, 'flames');
+      }
     }
-    EFX.lay = 'trail';
-    if ((F.n = (F.n | 0) + 1) % (busy ? 4 : Math.max(1, Math.round(ET.every))) === 0) part({ k: 'ember', x: x - hx * .3, z: z - hz * .3, h: y, vx: -hx * .8 + R(-.4, .4), vz: -hz * .8 + R(-.4, .4), vh: R(.2, .8), drag: 1.2, life: .55, max: .55, size: R(.08, .15), col: F.n % 6 ? '#ff8a2a' : '#ffd27a' });
-    EFX.lay = null;
-    if (F.n % Math.max(1, Math.round(EL.every)) === 0 && G.flashes.length < 4 && d > .8) flashLight(x, z, y, [1, .45, .12], 1, .2);
-  } } finally { efxPop(e0); }
+    // shed behind it: small tongues and embers
+    if (Tr.on && now >= (F.em || 0)) {
+      F.em = now + Tr.every * (lv ? 1 : 2.5);
+      pfEmber(x - hx * .3, y, z - hz * .3, -hx * .8 + (Math.random() - .5) * .8, Math.random() * .6, -hz * .8 + (Math.random() - .5) * .8, { life: .55, w: .07, lift: .2 }, s);
+      if (lv && Math.random() < .45) pfShot('wisp', x - hx * bl * .5 + (Math.random() - .5) * .3, y - .05, z - hz * bl * .5 + (Math.random() - .5) * .3, Tr.w * (.7 + .6 * Math.random()), .38, { rise: .3, lean: pfNorm([-hx * .7, 1, -hz * .7]), fat: .8 }, s, 'trail');
+    }
+    if (L.on && d > .8 && now >= (F.li || 0)) { F.li = now + L.every; pfLight(x, z, y, .75, L.rad, .2, s); }
+  }
 }
-if (typeof renderView === 'function') {
-  const _pfView = renderView;
-  renderView = function () { try { pfFrame(); } catch (e) {} return _pfView.apply(this, arguments); };
+
+/* ---- burning foes (a Pyroclast's burn): small tongues licking up their sides ---- */
+function pfBurns(now, dt) {
+  const s = 'cc_pyroburn', F = efx(s, 'flames'), E = efx(s, 'embers'), lv = pfLv(); if (!F.on && !E.on) return;
+  const r = typeof RD !== 'undefined' && RD && RD.right ? RD.right : [1, 0, 0], rl = Math.hypot(r[0], r[2]) || 1, rx = r[0] / rl, rz = r[2] / rl;
+  let left = Math.round(F.max * [.4, .7, 1][lv]);
+  for (const c of G.creeps) {
+    if (left <= 0) break;
+    if (c.dead || !(c.burnT > 0) || !pfIsPyro(c.burnSrc)) continue;
+    const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), y0 = typeof creepBaseY === 'function' ? creepBaseY(c) : (c.fly ? .9 : 0), hh = Math.min(typeof creepH === 'function' ? creepH(c) : 9, hitH(c) * 2.1);
+    const rad = Math.max(.15, (c.def && c.def.r) || .3), fade = Math.min(1, c.burnT / .35), sd = c._pfSd == null ? (c._pfSd = (Math.random() * 97) | 0) : c._pfSd;
+    const n = Math.min(lv ? 3 : 1, Math.round(F.count) + ((c.burnStack || 1) > 2 ? 1 : 0), left);
+    if (F.on) for (let i = 0; i < n; i++) {
+      const side = i === 2 ? 0 : i ? -1 : 1, up = i === 2 ? .22 : .05 + .2 * pfRnd(sd + i * 3), w = side * rad * .75 * (.85 + .15 * Math.sin(now * 2 + sd + i)), len = F.tall * Math.min(1.5, Math.max(.6, hh / .9)) * (.8 + .35 * pfRnd(sd + i)) * (.75 + .25 * fade);
+      pfFlame([x + rx * w, y0 + hh * up, z + rz * w], pfNorm([rx * side * .2, 1, rz * side * .2]), len, { k: F.k, a: F.a * fade, seed: sd + i * 5, pull: .04, sp: 1.3, fat: .85 }, s, 'flames');
+      left--;
+    }
+    if (E.on && Math.random() < E.rate * dt * (1 + .3 * ((c.burnStack || 1) - 1))) pfEmber(x + (Math.random() - .5) * rad, y0 + hh * (.3 + .5 * Math.random()), z + (Math.random() - .5) * rad, (Math.random() - .5) * .3, .5 + Math.random() * .5, (Math.random() - .5) * .3, { life: .55, w: .05, lift: .5 }, s);
+  }
 }
-// the fireball's landing: a burst and a billow of smoke
+
+/* ---- each frame: inside the view's spell pass (vfxParts), so the cards land in this frame's draw ---- */
+function pfFrame() {
+  if (typeof PYF !== 'undefined') PYF.q.length = 0;
+  if (!pfLive() || typeof pyfBill !== 'function' || typeof RD === 'undefined' || !RD || !RD.vfx) return;
+  // (the Element Lab's foes-alone frame)
+  if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask) return;
+  const now = G.time;
+  if (PF.hasT !== now) { PF.hasT = now; PF.has = G.towers.some(pfIsPyro) || PF.shots.length > 0 || PF.grounds.length > 0 || G.parts.some(p => p.k === 'pfe'); }
+  if (!PF.has && !(typeof ELEMLAB !== 'undefined')) return;
+  const dt = Math.max(0, Math.min(.1, now - PF.last)); PF.last = now;
+  PF.cards = 0; PF.cap = [70, 140, 220][pfLv()];
+  pfGlyphs(now, dt); pfShots(now); pfBalls(now); pfBreaths(now, dt); pfPhoenixes(now); pfHands(now); pfBurns(now, dt); pfEmbers();
+}
+if (typeof vfxParts === 'function') {
+  const _pfParts = vfxParts;
+  vfxParts = function () { const r = _pfParts.apply(this, arguments); try { pfFrame(); } catch (e) { if (typeof ELEMLAB !== 'undefined' && ELEMLAB.errs) ELEMLAB.errs.push('pyro fire: ' + e.message); } return r; };
+}
+
+/* ---- the older fire left out ---- */
+// the fireball's landing: its own burst in place of the flare, ring, sprite fire and explosion (the hits, burns and glyph stay)
 if (typeof ccFireBurst === 'function') {
   const _pfBurst = ccFireBurst;
   ccFireBurst = function (t, st, x, z, pow, o) {
-    // (where the lab's burst plays, the older particle fire and flare card under it are left out; the splash's ring stays)
-    const lab = typeof labPlay === 'function' && typeof LAB_FX !== 'undefined' && !!LAB_FX.pyroblast;
-    PF.quiet = lab; let r;
-    try { r = _pfBurst.apply(this, arguments); } finally { PF.quiet = false; }
-    try { const sp = (st.splash || .85) * (o && o.great ? 2 : 1), c = efxOf(efxSpell(), 'cc_fireball', 'burst');   // (its size and brightness: elemfx.js)
-      if (!(lab && labPlay('pyroblast', x, z, Math.min(c.wMax, sp * c.w) * (o && o.small ? .75 : 1), { k: o && o.great ? c.kGreat : c.k, top: 1 }))) hfBurst(x, z, Math.min(1, sp * .5), { dur: .4 }); sfx('pyroLand', o && o.great ? 1 : 0); } catch (e) {}
+    const mine = pfIsPyro(t); PF.quiet = mine ? { x, z } : null; let r;
+    try { r = _pfBurst.apply(this, arguments); } finally { PF.quiet = null; }
+    try {
+      if (mine && pfDrawing()) { const sp = (st.splash || .85) * (o && o.great ? 2 : 1); pfImpact(x, z, sp, o, 'cc_fireball'); }
+      sfx('pyroLand', o && o.great ? 1 : 0);
+    } catch (e) {}
     return r;
   };
-  if (typeof fxFire === 'function') { const _pfFx = fxFire; fxFire = function () { if (PF.quiet) return; return _pfFx.apply(this, arguments); }; }
-  if (typeof part === 'function') { const _pfPart = part; part = function (o) { if (PF.quiet && o && o.k === 'flare') return; return _pfPart.apply(this, arguments); }; }
-  if (typeof fxExplode === 'function') { const _pfEx = fxExplode; fxExplode = function () { if (PF.quiet) return; return _pfEx.apply(this, arguments); }; }
-  // the fireball's flight and its landing: drawn by the lab alone (no sprite orb, flame card or ribbon over it; no sprite explosion
-  // under the lab's burst)
-  const pfFire = p => p && p.k === 'lob' && p.col === CC_COL.fire;
-  if (typeof sfxBasicCC === 'function') { const _pfB = sfxBasicCC; sfxBasicCC = function (p) { if (pfFire(p) && p._pfLab === G.time) return true; return _pfB.apply(this, arguments); }; }
-  if (typeof ccDrawProj === 'function') { const _pfD = ccDrawProj; ccDrawProj = function (p) { if (pfFire(p) && p._pfLab === G.time) return; return _pfD.apply(this, arguments); }; }
-  if (typeof sfxBasicLandCC === 'function') { const _pfL = sfxBasicLandCC; sfxBasicLandCC = function (p) { if (pfFire(p) && typeof LAB_FX !== 'undefined' && LAB_FX.pyroblast) return; return _pfL.apply(this, arguments); }; }
+  if (typeof fxFire === 'function') { const _f = fxFire; fxFire = function () { if (PF.quiet) return; return _f.apply(this, arguments); }; }
+  if (typeof fxExplode === 'function') { const _x = fxExplode; fxExplode = function () { if (PF.quiet) return; return _x.apply(this, arguments); }; }
+  if (typeof ccRingFx === 'function') { const _r = ccRingFx; ccRingFx = function (x, z) { if (PF.quiet && x === PF.quiet.x && z === PF.quiet.z) return; return _r.apply(this, arguments); }; }
+  const pfLob = p => p && p.k === 'lob' && p.col === CC_COL.fire;
+  // a classic fireball flies flatter than the lob it is thrown as (when and where it lands are the lob's, untouched)
+  if (typeof ccShoot === 'function') { const _sh = ccShoot; ccShoot = function (p) { if (pfLob(p) && p.lob && typeof efx === 'function') { const k = efx('cc_fireball', 'core').arcK; if (k >= 0) p.lob.arc *= k; } return _sh.apply(this, arguments); }; }
+  if (typeof sfxBasicCC === 'function') { const _b = sfxBasicCC; sfxBasicCC = function (p) { if (pfLob(p)) return true; return _b.apply(this, arguments); }; }
+  if (typeof ccDrawProj === 'function') { const _d = ccDrawProj; ccDrawProj = function (p) { if (pfLob(p)) return; return _d.apply(this, arguments); }; }
+  if (typeof sfxBasicLandCC === 'function') { const _l = sfxBasicLandCC; sfxBasicLandCC = function (p) { if (pfLob(p)) return; return _l.apply(this, arguments); }; }
 }
-// Skipping Flame: its own fire in place of the older sprite flames (the hits, sparks and light stay); Furnace Breath and Phoenix
+// a burning foe near (x, z) whose burn a Pyroclast set
+function pfBurnAt(x, z) { for (const c of G.creeps) if (!c.dead && c.burnT > 0 && Math.abs(c.x - x) <= .16 && Math.abs(c.y - z) <= .16 && pfIsPyro(c.burnSrc)) return true; return false; }
+// the old particles: the impact's flare, the glyphs' sprite embers and the burn's embers on the foes a Pyroclast set alight
+// (dropped as they are made, so the simulation's own steps are unchanged)
+if (typeof part === 'function') {
+  const _pfPart = part;
+  part = function (o) {
+    if (o && o.k === 'flare' && PF.quiet) return;
+    // (the lobbed ball's own trail of round embers, forces_conclave_a.js: the fireball sheds its own)
+    if (o && o.k === 'ember' && o.life === .35 && o.max === .35 && o.drag === 2 && (o.col === '#ff7a2a' || o.col === '#ffd27a') && (G.ccP || []).some(p => !p.done && p.k === 'lob' && p.col === CC_COL.fire && Math.abs(p.x - o.x) < .12 && Math.abs(p.z - o.z) < .12)) return;
+    if (o && o.k === 'ember' && ((PF.glyphTick && o.life === .5 && o.h === .05) || (o.life === .55 && o.max === .55 && o.col === '#ff9a3a' && pfBurnAt(o.x, o.z)))) return;
+    return _pfPart.apply(this, arguments);
+  };
+}
+if (typeof ccGlyphTick === 'function') {
+  const _gt = ccGlyphTick;
+  ccGlyphTick = function (z) { const mine = z && z.s === 'fire' && pfIsPyro(z.src), was = PF.glyphTick; PF.glyphTick = mine; try { return _gt.apply(this, arguments); } finally { PF.glyphTick = was; } };
+}
+// the glyph's turning seal (forces_conclave_a.js ccDrawGlyph) and the older sprite tongues round it (spellfx.js ccFireZone)
+if (typeof ccDrawGlyph === 'function') { const _dg = ccDrawGlyph; ccDrawGlyph = function (z) { if (z && z.s === 'fire' && pfIsPyro(z.src)) return; return _dg.apply(this, arguments); }; }
+if (typeof ccFireZone === 'function') ccFireZone = function () {};
+// the casting gather (spellfx.js v2Wind: a flash, sparks and motes at the hands): never round the caster for his spells
+if (typeof v2Wind === 'function') { const _w = v2Wind; v2Wind = function () { if (typeof SFX_NOW !== 'undefined' && PF_IDS.includes(SFX_NOW)) return 0; return _w.apply(this, arguments); }; }
+
+/* ---- the Golem Warden's magma keeps the shared fire (hammerfire.js), as before ---- */
+function pfMagma() {
+  if (typeof hfPatch !== 'function' || !pfLive()) return;
+  for (const z of G.hazards || []) {
+    if (z.k !== 'cc_glyph' || z.s !== 'magma' || PF.seen.has(z)) continue;
+    PF.seen.add(z);
+    hfPatch(z.x, z.z, Math.min(.8, (z.r || .5) * .6), .1, { flare: .25, heat: .4, alive: () => (G.hazards.includes(z) && z.t > 0 ? z.t : 0), efx: null });
+  }
+}
+if (typeof renderView === 'function') { const _pfView = renderView; renderView = function () { try { pfMagma(); } catch (e) {} return _pfView.apply(this, arguments); }; }
+
+/* ---- the spells' own moments (forces_zxc_conclave_cool.js calls them through ccxFx, under the spell's id) ---- */
 if (typeof CCX_FX !== 'undefined') {
-  CCX_FX.breath = function (C, t, B) { if (PF.breath.length < 12) PF.breath.push({ C, t, B, seed: (Math.random() * 97) | 0 }); };
+  CCX_FX.breath = function (C, t, B) { if (PF.breath.length < 12) PF.breath.push({ t, B, seed: (Math.random() * 97) | 0 }); };
   CCX_FX.phoenix = function (C, t, F) { if (PF.phx.length < 8) PF.phx.push(Object.assign({ seed: (Math.random() * 97) | 0 }, F)); };
   CCX_FX.phoenixBoom = function (C, x, z, bm) {
-    // (the lab's Phoenix blast, the owner's tuning; a bigger one as its blast grows with tier and talents, owner: "different
-    // burst sizes based on talent/item improvements")
-    const LF = typeof LAB_FX !== 'undefined' ? LAB_FX : {}, bn = (bm || 0) >= 2.85 && LF.phxboom_big ? 'phxboom_big' : LF.phxboom ? 'phxboom' : 'pyroblast', LB = LF[bn] || { span: 1.41 };
-    const EB = efx('cc_flamewave', 'burst'), EG = efx('cc_flamewave', 'ground');   // (its sizes: the Element Lab's Phoenix, elemfx.js)
-    const lab = typeof labPlay === 'function' && labPlay(bn, x, z, EB.w * LB.span / 1.41, { k: EB.k, top: 1 });
-    hfBurst(x, z, lab ? EG.boom : .8, { dur: .5, smoke: true });
-    hfPatch(x, z, EG.r, EG.dur, { flare: 0, at: .25 });
-    v2Hit(C, x, z, .3, C.S * .8, { sp: 'ember', n: 10, light: 1, ring: 1 });
+    const s = 'cc_flamewave', lv = pfLv(), B = efx(s, 'burst'), Rg = efx(s, 'ring'), E = efx(s, 'embers'), S = efx(s, 'smoke'), Gd = efx(s, 'ground'), L = efx(s, 'light'), k = Math.sqrt(Math.max(1, bm || 2.5) / 2.5);
+    pfBoom(x, z, B.w * k, CCX.PHX_BOOM * k, [2, 4, 5][lv], .7 * k, B, Rg, s, { k: B.k });
+    const n = Math.round(E.count * k * [.5, .8, 1][lv]);
+    for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 1.6 * (.4 + .6 * Math.random()) * k; pfEmber(x + Math.cos(a) * .1, .2 + Math.random() * .2, z + Math.sin(a) * .1, Math.cos(a) * v, 1.2 + Math.random() * 1.8, Math.sin(a) * v, { life: .7 + Math.random() * .4, w: .08, lift: .3 }, s); }
+    if (lv) for (let i = 0; i < S.puffs; i++) pfShot('puff', x + (Math.random() - .5) * .6 * k, .55 + .15 * i, z + (Math.random() - .5) * .6 * k, S.w * k * (.85 + .3 * Math.random()), 1, { delay: .18 + i * .1, rise: .45, grow: .5, a: .85 }, s, 'smoke');
+    if (Gd.on) pfGround(x, z, Gd.r * k, Gd.dur, Gd.tongues, s);
+    if (L.on) pfLight(x, z, .4, 1.1, L.rad * k * 1.3, .3, s);
   };
-  const _hop = CCX_FX.skipHop;
   CCX_FX.skipHop = function (C, x0, h0, z0, foe, x, z, T, j) {
-    const c = efx('cc_kindle', 'core');   // (its arc and size: the Element Lab's Skipping Flame, elemfx.js)
-    if (PF.hops.length < 24) { PF.hops.push({ x0, h0, z0, x, z, T, at: G.time, arc: j ? c.arc : c.arc0, s: Math.pow(c.shrink, j), seed: (Math.random() * 97) | 0, efx: 'cc_kindle' }); if (typeof LAB_FX !== 'undefined' && LAB_FX.ballloop) return; }
-    return _hop.apply(this, arguments);
+    const c = efx('cc_kindle', 'core');
+    if (PF.hops.length < 24) PF.hops.push({ x0, h0, z0, x, z, T, at: G.time, arc: j ? c.arc : c.arc0, s: Math.pow(c.shrink, j), seed: (Math.random() * 97) | 0 });
   };
   CCX_FX.skipLand = function (C, x, z, j, n) {
-    const EB = efx('cc_kindle', 'burst'), k = Math.pow(EB.shrink, j);   // (its sizes: the Element Lab's Skipping Flame, elemfx.js)
-    v2Hit(C, x, z, .25, C.S * EB.hit * k, { sp: 'ember', n: efx('cc_kindle', 'embers').count, light: j ? 0 : 1, ring: j ? 0 : 1 });
-    // (the lab's Skipping Flame hop; the old burst where the bake is missing)
-    if (!(typeof labPlay === 'function' && typeof LAB_FX !== 'undefined' && LAB_FX.skiphop && labPlay('skiphop', x, z, EB.w * k * (j === n - 1 ? EB.last : 1), { k: 1, top: 1 }))) hfBurst(x, z, efx('cc_kindle', 'ground').burst * k, { dur: .35, smoke: j === n - 1 });
+    const s = 'cc_kindle', lv = pfLv(), B = efx(s, 'burst'), Rg = efx(s, 'ring'), F = efx(s, 'flames'), E = efx(s, 'embers'), S = efx(s, 'smoke'), last = j === n - 1, k = Math.pow(B.shrink, j) * (last ? B.last : 1);
+    pfBoom(x, z, B.w * k, k, 0, 0, B, Rg, s, { k: B.k });
+    const nf = Math.round(F.count * [.34, .67, 1][lv]);
+    for (let i = 0; i < nf; i++) { const a = i * TAU / Math.max(1, nf) + Math.random() * .8; pfShot('wisp', x + Math.cos(a) * .22 * k, .03, z + Math.sin(a) * .22 * k, F.w * k * (.8 + .4 * Math.random()), .4, { delay: .05 + .04 * i, rise: .35, lean: pfNorm([Math.cos(a) * .25, 1, Math.sin(a) * .25]), fat: .9 }, s, 'flames'); }
+    for (let i = 0; i < Math.round(E.count * k * [.5, .8, 1][lv]); i++) { const a = Math.random() * TAU, v = 1.2 * (.4 + .6 * Math.random()); pfEmber(x, .15, z, Math.cos(a) * v, 1 + Math.random(), Math.sin(a) * v, { life: .5, w: .06, lift: .3 }, s); }
+    if (last && lv && S.on) pfShot('puff', x, .4, z, S.w * k, .9, { delay: .12, rise: .4, grow: .5, a: .8 }, s, 'smoke');
+    if (!j) pfLight(x, z, .3, .7, 1.2, .2, s);
     // (its sound is played by the spell itself, forces_zxc_conclave_cool.js, so it is heard when the look is skipped too)
   };
 }
-// their sounds (the owner's Zapsplat fire takes, firesfxdata.js): a whoosh as a fireball is loosed, a burst where it lands
-// (above), each spell its own take
+
+/* ---- their sounds (the owner's Zapsplat fire takes, firesfxdata.js), unchanged: a burst as a fireball is loosed, its landing
+   (above), each spell its own take ---- */
 if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_fireball) {
   const _pfAtk = FORCE_ATTACK.cc_fireball;
-  FORCE_ATTACK.cc_fireball = function () {
-    const r = _pfAtk.apply(this, arguments);
-    if (typeof sfx === 'function') sfx('pyroCast');   // (a short burst as it is loosed; no flight whoosh, so a fast strike stays easy on the ear)
-    return r;
-  };
+  FORCE_ATTACK.cc_fireball = function () { const r = _pfAtk.apply(this, arguments); if (typeof sfx === 'function') sfx('pyroCast'); return r; };
 }
 if (typeof castAbility === 'function') {
   const _pfCast = castAbility, PF_SND = { cc_pyresigil: 'pyroBreath', cc_flamewave: 'pyroPhx', cc_kindle: 'pyroSkipCast' };
   castAbility = function (t, ab) { const r = _pfCast.apply(this, arguments); if (r && ab && PF_SND[ab.id] && typeof sfx === 'function') sfx(PF_SND[ab.id]); return r; };
 }
-// the older drawing of the fire glyphs (spellfx.js ccFireZone: sprite tongues round every fire glyph) is left out, so the glyphs
-// burn with the lab's fire alone; the runes, embers and rings stay
-if (typeof ccFireZone === 'function') ccFireZone = function () {};
 // the old spells' paintings (Pyre Sigil's ring, Road of Embers' road) don't show the new ones: the glyph stands in until
 // Furnace Breath and Phoenix are painted (docs/conclave_art.md)
 if (typeof UI_ART !== 'undefined' && typeof MISSING_ART !== 'undefined') for (const id of ['cc_pyresigil', 'cc_flamewave']) if (UI_ART[id] && UI_ART[id] === MISSING_ART.abilities[id]) delete UI_ART[id];
@@ -86958,11 +87610,13 @@ if (typeof castAbility === 'function') {
 }
 // the Kimodo clip set (src/model_unit_aurelian_kimodo.js, tools/kimodo_unit.py: NVIDIA Kimodo generations on his skeleton): his
 // strike and his three abilities, each timed so its blow lands when the game lands it (UNIT_KIMODO.land: s after the move
-// starts): the wind-up played at up to AUK_WIND x its pace (starting partway in when it is longer: his spells are instant),
-// the blow on its moment, the rest at its own pace (the strike's squeezed into the charge's time). An alternative to
+// starts). His spells are instant (no cast bar to wind up over), so a move opens on its anticipation: it starts at the
+// wind-up's peak (the clip's 4th number, the striking hand furthest from its blow: the sword raised, the shield drawn
+// back), snapped into from where he was, and the swing into the blow is the clip's own, at most AUK_WIND x its pace (a
+// later start where the peak is further off); the blow on its moment, the rest at its own pace (the strike's squeezed into the charge's time). An alternative to
 // compare: the Model Lab switches it (UM_KSET.set), the game keeps the old clips unless the page has ?uclips=kimodo
 var UM_KSET = typeof UM_KSET !== 'undefined' ? UM_KSET : { set: (() => { try { return /[?&]uclips=kimodo\b/.test(location.search) ? 'kimodo' : 'old'; } catch (e) { return 'old'; } })() };
-const AUK_WIND = 2.5;
+const AUK_WIND = 2;
 // (AUK_R: null not tried yet, false no data or bad data; a split asset may arrive after the first ask, so null is asked again)
 let AUK_R = null;
 function aukR() {   // the set's frames, decoded once (in the shape umMixFrame reads)
@@ -86976,7 +87630,7 @@ const aukOn = M => UM_KSET.set === 'kimodo' && aukR() && aukR().anim.nb === M.R.
 // null once it is over
 function aukF(name, s, squeeze) {
   const K = aukR(), c = K.D.clips[name], land = K.D.land[name]; if (!c) return null;
-  const [f0, n, hit] = c, hs = hit / 30, v = Math.min(AUK_WIND, hs / land), c0 = hs - v * land;
+  const [f0, n, hit, wind] = c, hs = hit / 30, c0 = Math.max((wind || 0) / 30, hs - AUK_WIND * land), v = (hs - c0) / land;
   let x;
   if (s < land) x = c0 + v * s;
   else { const rest = (n - 1 - hit) / 30, k = squeeze ? rest / Math.max(.1, squeeze) : 1; x = hs + (s - land) * k; if (x > (n - 1) / 30) return null; }
@@ -87400,12 +88054,8 @@ function pyDraw(t, tier, sx, sy, sz, wob, opts) {
     t._pyPR = M4.xf(_pyC, pR[0], pR[1], pR[2]); t._pyPL = M4.xf(_pyC, pL[0], pL[1], pL[2]); t._pyAt = G.time; t._pyYaw = yaw;
     (t._pyMat || (t._pyMat = new Float32Array(16))).set(_pyC);
     t.tipW = t._pyPR; t.tipYaw = yaw; t.tipAt = G.time;
-    // a faint ember glow in each palm (the casting hand's warmer as a strike or a spell gathers), small and brief
-    if (typeof QADD !== 'undefined' && QADD && RD) {
-      const fl = .85 + .15 * Math.sin(G.time * 9 + (t.i | 0) * 1.7), a = (.13 + .2 * (P.gl || 0)) * fl;
-      QADD.bill(RD, t._pyPR[0], t._pyPR[1], t._pyPR[2], (.05 + .025 * (P.gl || 0)) * s, (.05 + .025 * (P.gl || 0)) * s, [1, .5, .16, a], 1, 0);
-      QADD.bill(RD, t._pyPL[0], t._pyPL[1], t._pyPL[2], .04 * s, .04 * s, [1, .45, .14, .1 * fl], 1, 0);
-    }
+    // how much the casting palm's fire gathers as a strike or a spell winds up (pyrofire.js draws the hand's painted flame)
+    t._pyGl = P.gl || 0;
   }
   return true;
 }
@@ -87626,6 +88276,17 @@ if (typeof towerTop === 'function') {
       const q = efxFlip(false, len, o); if (!q) return _lq.apply(this, arguments); if (q.off) return true;
       const r = _lq.call(this, name, P, dir, q.size, q.o);
       if (r) { const e = lastOf(LABF.q); if (e) { e.tg = q.o.tg || null; if (q.o.hz && typeof vfxDistHaze === 'function') vfxDistHaze(P[0], P[1] + q.size * .3, P[2], q.size * .4, q.o.hz * .5); } }
+      return r;
+    };
+  }
+  // one frame of a sheet (labfx.js labPin: the Pyroclasts' one-shots, glow discs and embers): as the one-shots
+  if (typeof labPin === 'function') {
+    const _pn = labPin;
+    labPin = function (name, f, P, w, o) {
+      if (!EFX.on) return _pn.apply(this, arguments);
+      const q = efxFlip(true, w, o); if (!q) return _pn.apply(this, arguments); if (q.off) return true;
+      const n0 = LABF.list.length, r = _pn.call(this, name, f, P, q.size, q.o);
+      if (r && LABF.list.length > n0) { const e = lastOf(LABF.list); if (e) e.tg = q.o.tg || null; }
       return r;
     };
   }
@@ -88063,8 +88724,11 @@ if (typeof towerTop === 'function') {
      saturation, lift / gamma / gain and split toning, vignette, sharpen; each with its switch and its GPU time (where the
      browser gives a GPU timer), the frame time at the top.
    - Presets: three to start from (Golden hour, Overcast, Moonlit), saved ones (this device), JSON export / import / copy,
-     Use in game (this map, this device: normal play takes the preset; on Low without the post), and Bake: the three lines
-     to paste into maps.js (LIGHT_DEF, MAP_MOOD, LOOK_DEF) to make a preset the map's own (CLAUDE.md, The Light Lab).
+     Use in game (this map, this device: normal play takes the preset; on Low without the post), and Bake: the five lines
+     to paste into maps.js (LIGHT_DEF, MAP_MOOD, LOOK_DEF, TREE_DEF, WATER_DEF) to make a preset the map's own (CLAUDE.md,
+     The Light Lab). The lab opens on the map as baked (Map default); Last session brings back where it was left.
+   - Trees (FS_TREE uTr*: bark and leaves, translucency, glint, base darkening, shadows received, canopy rim, fog) and the
+     painted maps' moving water (FS_LIT waterAt: speed, warp, shimmer); their defaults (TREE_LL, WATER_LL) are the game's.
    Outside the lab this file only wraps applyLight (view.js): with a device's Use in game preset, or a map's baked look on
    a Graphics setting that allows the post, it lays them over the map's light; otherwise the game is as it was. */
 const LL_KEY = 'runehold.lightlab.';
@@ -88125,13 +88789,23 @@ const LL_PRESETS = {
       vig: { on: 1, str: .4, rad: .65, soft: .8 }, sharp: { on: 1, k: .25 } },
   },
 };
-// a map's state as the game draws it today (the post off)
+// a map's state as the game draws it: its baked light, mood and look (maps.js LIGHT_DEF, MAP_MOOD, LOOK_DEF; the post off where
+// it has no look), its trees' light (TREE_DEF) and its water (WATER_DEF). The lab opens on this, and "Map default" is it.
 function llBase(map) {
   const light = Object.assign({ fogFar: null }, typeof lightGet === 'function' ? lightGet(map) : {});
   if (light.fogFar == null) light.fogFar = +(light.fogNear + .95).toFixed(3);
   const mood = llClone((typeof MAP_MOOD !== 'undefined' && (MAP_MOOD[map] || MAP_MOOD.meadow)) || {});
   if (!mood.grade) { mood.grade = '#ffffff'; mood.gradeK = 0; }
-  return { v: 1, map, light, mood, fwd: llClone(LL_DEF.fwd), post: llMerge(LL_DEF.post, { on: 0 }) };
+  const B = (typeof LOOK_DEF !== 'undefined' && LOOK_DEF[map]) || null;
+  const fwd = llMerge(LL_DEF.fwd, B && B.fwd || {}), post = B ? llMerge(LL_DEF.post, B.post || {}) : llMerge(LL_DEF.post, { on: 0 });
+  const tree = llMerge(TREE_LL, (typeof TREE_DEF !== 'undefined' && TREE_DEF[map]) || {}), water = llMerge(WATER_LL, (typeof WATER_DEF !== 'undefined' && WATER_DEF[map]) || {});
+  return { v: 1, map, light, mood, fwd, post, tree, water };
+}
+// a state's trees and water onto the renderer (gl.js drawTrees RD.treeK; FS_LIT waterAt RD.gwater, once its mask has loaded)
+function llTreeWater(S) {
+  RD.treeK = treeUni(S.tree || {});
+  const E = typeof THENV !== 'undefined' ? THENV[TH.id] : null, wk = E && E.gwater ? waterK(TH.id, S.water || {}) : null;
+  RD.gwater = wk ? Object.assign(E.gwater, { k: wk }) : null;
 }
 const llHue = (hex, k) => { const c = lin3(hex), l = Math.max(1e-4, c[0] * .2126 + c[1] * .7152 + c[2] * .0722); return [1 + (c[0] / l - 1) * k, 1 + (c[1] / l - 1) * k, 1 + (c[2] / l - 1) * k]; };
 // the post's settings as the renderer's arrays (gl.js postGL reads them)
@@ -88158,13 +88832,18 @@ function llApply(S, post) {
   if (!RD || !S) return;
   LS = Object.assign(lightGet(TH.id), S.light || {}); llApplyLight0();
   if (S.mood && typeof moodUni === 'function') RD.mood = moodUni(S.mood);
-  const f = Object.assign({}, LL_DEF.fwd, S.fwd || {});
+  llFwd(S.fwd);
+  RD.look = post === false ? null : llCompile(S.post);
+  llTreeWater(S);
+}
+// the forward controls (shadows, tone curve, the units' glint, the back light, the ground's glint) onto the renderer
+function llFwd(fwd) {
+  const f = Object.assign({}, LL_DEF.fwd, fwd || {});
   RD.shK = [f.shFloor, f.shSoft, f.shBias, f.shQ]; RD.tmo = f.tm; RD.glintK = [f.spec, f.rough, f.sharp, f.fres];
   RD.shadowOn = !!f.shOn && GFX_LV[GFX].sh;
   if (f.backOn) { const b = linMul(f.back, f.backI), a = f.backAz * Math.PI / 180, e = f.backEl * Math.PI / 180; b.dir = [-Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)]; RD.back = b; } else RD.back = null;
   if (!RD._glint0) RD._glint0 = Object.assign({}, RD.glint);
   RD.glint.strength = f.gGlint; RD.glint.sharpness = f.gSharp; RD.glintOn = !!f.gGlintOn && !mapLite();
-  RD.look = post === false ? null : llCompile(S.post);
 }
 // back to the game as it was (a map with no preset)
 function llClear() {
@@ -88180,10 +88859,10 @@ if (typeof applyLight === 'function') {
   applyLight = function () {
     const r = llApplyLight0.apply(this, arguments);
     try {
-      if (window.LIGHTLAB) { const S = window.LIGHTLAB.S; if (S && S.mood && typeof moodUni === 'function') RD.mood = moodUni(S.mood); return r; }   // (the lab sets its own; a re-fit keeps its mood)
+      if (window.LIGHTLAB) { const S = window.LIGHTLAB.S; if (S && S.mood && typeof moodUni === 'function') RD.mood = moodUni(S.mood); if (S) llTreeWater(S); return r; }   // (the lab sets its own; a re-fit keeps its mood)
       const use = llGet('use', {})[TH.id], lowG = GFX === 'low';
       if (use) { const S = llMerge(llBase(TH.id), use); llApply(S, lowG ? false : undefined); }
-      else if (typeof LOOK_DEF !== 'undefined' && LOOK_DEF[TH.id] && GFX_LV[GFX].post && !lowG) { const B = LOOK_DEF[TH.id]; RD.look = llCompile(llMerge(LL_DEF.post, B.post || {})); const f = Object.assign({}, LL_DEF.fwd, B.fwd || {}); RD.shK = [f.shFloor, f.shSoft, f.shBias, f.shQ]; RD.tmo = f.tm; RD.glintK = [f.spec, f.rough, f.sharp, f.fres]; }
+      else if (typeof LOOK_DEF !== 'undefined' && LOOK_DEF[TH.id] && GFX_LV[GFX].post && !lowG) { const B = LOOK_DEF[TH.id]; RD.look = llCompile(llMerge(LL_DEF.post, B.post || {})); llFwd(B.fwd); }   // (as the lab shows it: its back light and ground glint too)
       else if (RD.look || RD.shK || RD.back || RD.glintK) llClear();
     } catch (e) {}
     return r;
@@ -88374,6 +89053,10 @@ if (typeof applyLight === 'function') {
     { id: 'rays', t: 'Light shafts (screen-space)', on: 'post.rays.on', cost: ['shafts'], items: [['post.rays.col', 'Colour', 'color'], ['post.rays.strength', 'Strength', 0, 2, .01], ['post.rays.len', 'Length', .02, .5, .005], ['post.rays.thr', 'Threshold', 0, 1, .01]] },
     { id: 'vig', t: 'Vignette', on: 'post.vig.on', items: [['post.vig.str', 'Strength', 0, 1, .01], ['post.vig.rad', 'Radius', .2, 1.4, .01], ['post.vig.soft', 'Softness', .05, 1.5, .01]] },
     { id: 'sharp', t: 'Sharpen', on: 'post.sharp.on', items: [['post.sharp.k', 'Amount', 0, 1.5, .01]] },
+    { id: 'trees', t: 'Trees', items: [['tree.barkI', 'Trunk and bark brightness', 0, 2.5, .01], ['tree.bark', 'Bark tint', 'color'], ['tree.leafI', 'Leaf brightness', 0, 2.5, .01], ['tree.leaf', 'Leaf tint', 'color'], ['tree.leafSat', 'Leaf saturation', 0, 2, .01],
+      ['tree.trans', 'Translucency (sun through leaves, backlit)', 0, 2, .01], ['tree.glint', 'Leaf specular glint', 0, 4, .01], ['tree.ao', 'Darkening toward the trunk base', 0, 1.6, .01], ['tree.aoH', 'Base darkening height', .2, 4, .01],
+      ['tree.shadow', 'Shadows received on trees', 0, 1, .01], ['tree.rim', 'Canopy rim light', 0, 2, .01], ['tree.rimC', 'Rim colour', 'color'], ['tree.fog', 'Distance fog on trees', 0, 2, .01]] },
+    { id: 'water', t: 'Moving water (painted maps)', on: 'water.on', items: [['water.speed', 'Speed', 0, 3, .01], ['water.warp', 'Warp strength', 0, 3, .01], ['water.shimmer', 'Shimmer and sparkle', 0, 3, .01]] },
   ];
   const fmt = (v, step) => typeof v !== 'number' ? String(v) : step < .001 ? v.toFixed(4) : step < .01 ? v.toFixed(3) : step < 1 ? v.toFixed(2) : String(Math.round(v));
   const toHex = v => { const s = String(v || '#ffffff'); return /^#[0-9a-f]{6}$/i.test(s) ? s : '#ffffff'; };
@@ -88421,12 +89104,12 @@ if (typeof applyLight === 'function') {
       </div></details>
       ${GROUPS.map(group).join('')}
       <details data-g="presets"${L.open.presets ? ' open' : ''}><summary><span>Presets</span></summary><div class="ll-b">
-        <div class="row">${Object.keys(LL_PRESETS).map(n => `<button data-pre="${esc(n)}">${esc(n)}</button>`).join('')}${b('def', 'Map default', false, 'The map as the game draws it today (post off)')}</div>
+        <div class="row">${Object.keys(LL_PRESETS).map(n => `<button data-pre="${esc(n)}">${esc(n)}</button>`).join('')}${b('def', 'Map default', false, 'The map as the game draws it: its baked light, mood, look, trees and water (maps.js)')}${b('last', 'Last session', false, 'What the lab showed on this map when you last left it (this device)')}</div>
         <select id="llSaved"><option value="">Saved on this device…</option>${Object.keys(saved).map(n => `<option>${esc(n)}</option>`).join('')}</select>
         <div class="row">${b('load', 'Load')}${b('del', 'Delete')}</div>
         <div class="row"><input type="text" id="llName" placeholder="Name" style="flex:1;width:auto">${b('save', 'Save')}</div>
         <label class="ll-r ll-c"><input type="checkbox" id="llUse"${use ? ' checked' : ''}><span>Use in game (${esc(MAPS[L.map].name)}, this device)</span></label>
-        <div class="row">${b('export', 'Export JSON')}${b('copy', 'Copy')}${b('import', 'Load JSON')}${b('bake', 'Bake (copy code)', false, 'The three lines for maps.js that make this the map’s own look')}</div>
+        <div class="row">${b('export', 'Export JSON')}${b('copy', 'Copy')}${b('import', 'Load JSON')}${b('bake', 'Bake (copy code)', false, 'The lines for maps.js (light, mood, look, trees, water) that make this the map’s own look')}</div>
         <textarea id="llJson" placeholder="JSON (Export fills it; paste one and Load JSON)"></textarea>
       </div></details>
       <div class="note" id="llNote">${esc(L.note || '')}</div><div class="err" id="llErr">${esc(L.errs.slice(-3).join('\n'))}</div>`;
@@ -88455,8 +89138,9 @@ if (typeof applyLight === 'function') {
     const B = llBase(L.map), S = L.S, js = o => JSON.stringify(o).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ');
     const light = Object.assign({}, S.light); if (Math.abs(light.fogFar - (light.fogNear + .95)) < 1e-3) delete light.fogFar;
     const diff = (a, b) => { const o = {}; for (const k in a) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) o[k] = a[k]; return o; };
-    const post = {}; for (const k in S.post) if (k !== 'on') { const d = diff(S.post[k], LL_DEF.post[k]); if (S.post[k].on) post[k] = Object.assign({ on: 1 }, d); }
-    return `LIGHT_DEF.${L.map} = ${js(light)};\nMAP_MOOD.${L.map} = ${js(S.mood)};\nLOOK_DEF.${L.map} = ${js({ fwd: diff(S.fwd, LL_DEF.fwd), post })};`;
+    const post = { on: S.post.on ? 1 : 0 }; for (const k in S.post) if (k !== 'on') { const d = diff(S.post[k], LL_DEF.post[k]); delete d.on; if (S.post[k].on || Object.keys(d).length) post[k] = Object.assign({ on: S.post[k].on ? 1 : 0 }, d); }   // (an effect switched off keeps its tuning)
+    return `LIGHT_DEF.${L.map} = ${js(light)};\nMAP_MOOD.${L.map} = ${js(S.mood)};\nLOOK_DEF.${L.map} = ${js({ fwd: diff(S.fwd, LL_DEF.fwd), post })};`
+      + `\nTREE_DEF.${L.map} = ${js(diff(S.tree || {}, TREE_LL))};\nWATER_DEF.${L.map} = ${js(diff(S.water || {}, WATER_LL))};`;
   }
   function bind() {
     const el = $('#llab');
@@ -88490,14 +89174,15 @@ if (typeof applyLight === 'function') {
       else if (a === 'exit') { const q = new URLSearchParams(location.search); q.delete('lightlab'); q.delete('map'); location.search = q.toString() ? '?' + q.toString() : ''; }
       else if (a === 'all') { for (const t of G.towers) { t.__pose = L.pose; if (t.tier !== L.tier) { t.tier = L.tier; try { t.st = effStats(t); } catch (e) {} } } panel(); }
       else if (a === 'clear') { for (const t of G.towers.slice()) removeAt(t.x, t.y); for (const c of L.foes) { c.dead = true; } G.creeps = G.creeps.filter(c => !c.dead); L.foes = []; panel(); }
-      else if (a === 'def') setState(null, 'The map as the game draws it today.');
+      else if (a === 'def') setState(null, 'The map as the game draws it (its baked light and look).');
+      else if (a === 'last') { const o = llGet('last', {})[L.map]; if (o) setState(o, 'Your last session on ' + MAPS[L.map].name + '.'); else { L.note = 'Nothing saved from a last session on this map.'; info(); } }
       else if (a === 'load') { const n = $('#llSaved').value; if (saved[n]) setState(saved[n], 'Loaded ' + n); }
       else if (a === 'del') { const n = $('#llSaved').value; if (saved[n]) { delete saved[n]; llSet('presets', saved); L.note = 'Deleted ' + n; panel(); } }
       else if (a === 'save') { const n = ($('#llName').value || '').trim() || 'Preset ' + (Object.keys(saved).length + 1); saved[n] = llClone(L.S); L.note = llSet('presets', saved) ? 'Saved ' + n + ' on this device.' : 'This browser would not save (private mode?): use Export.'; panel(); }
       else if (a === 'export') { $('#llJson').value = JSON.stringify(L.S, null, 1); }
       else if (a === 'copy') copyText($('#llJson').value || JSON.stringify(L.S, null, 1));
       else if (a === 'import') { try { const o = JSON.parse($('#llJson').value); setState(o, 'Loaded the JSON.'); } catch (e) { L.note = 'That is not valid JSON: ' + e.message; info(); } }
-      else if (a === 'bake') { const s = bake(); $('#llJson').value = s; copyText(s); L.note = 'Paste these three lines into src/maps.js after the tables (see CLAUDE.md, The Light Lab).'; info(); }
+      else if (a === 'bake') { const s = bake(); $('#llJson').value = s; copyText(s); L.note = 'Paste these five lines into src/maps.js after the tables, in place of the map’s old ones (see CLAUDE.md, The Light Lab).'; info(); }
     };
   }
   // the pointer over the field: click places, right-click removes; in Orbit, a drag orbits and the wheel zooms
@@ -88548,8 +89233,8 @@ if (typeof applyLight === 'function') {
     Object.assign(G, { paused: false, hold: false, phase: 'build', countdown: 0, mute: true });
     RD.timing = true;
     layoutAll();
-    const last = llGet('last', {})[L.map];
-    L.S = llMerge(llBase(L.map), last || {}); L.S.map = L.map;
+    // (it opens on the map as baked, so tuning starts from the map's own look: Last session brings back the lab's last state)
+    L.S = llBase(L.map); L.S.map = L.map;
     llApply(L.S);
     L.ready = true; panel(); pointer();
     // a few units to start with, so the light has something to fall on
@@ -88864,7 +89549,7 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
         <div class="note">Drag to orbit, wheel to zoom, shift-drag to pan.</div>
       </div></details>
       <details data-g="layers" open><summary><span>Layers: ${esc(sp.name)}</span>${b('resetS', 'Reset effect')}</summary><div class="el-b" style="padding-left:2px">
-        ${EFX_LAYERS[sp.el].map(l => layerHTML(s, l)).join('')}
+        ${(sp.layers || EFX_LAYERS[sp.el]).map(l => layerHTML(s, l)).join('')}
       </div></details>
       <details data-g="save"${L.open.save ? ' open' : ''}><summary><span>Presets and saving</span></summary><div class="el-b">
         <select id="elPre"><option value="">${esc(sp.name)} presets on this device…</option>${Object.keys(pres).map(n => `<option>${esc(n)}</option>`).join('')}</select>
@@ -88883,7 +89568,7 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     const top = $('#elTop'); if (!top) return;
     const s = L.spell, R0 = L.rate[s] || {}, spawn = Object.values(R0).reduce((a, v) => a + v, 0);
     let mine = 0; for (const p of G.parts) if (p._efs === s) mine++;
-    const gpu = typeof vfxPartsLive === 'function' ? vfxPartsLive() : 0, cards = (typeof LABF !== 'undefined' ? LABF.list.length : 0);
+    const gpu = typeof vfxPartsLive === 'function' ? vfxPartsLive() : 0, cards = (typeof LABF !== 'undefined' ? LABF.list.length : 0) + (typeof PYF !== 'undefined' ? PYF.q.length : 0);
     const cv = L.cover == null ? '' : `<br><span class="${L.cover > .4 ? 'warn' : ''}">Foes covered by the effect: ${Math.round(L.cover * 100)}%${L.cover > .4 ? ' (too flashy: the foe is lost)' : ''}</span>`;
     top.innerHTML = `${(1000 / L.ms).toFixed(0)} fps · ${L.ms.toFixed(1)} ms/frame · lab+draw ${L.rms.toFixed(1)} ms<br>${esc(SP().name)}: ${mine} particles live · ${Math.round(spawn)} drawn/s · ${cards} fire cards<br>all: ${G.parts.length} CPU · ${gpu} GPU particles · ${typeof SFX !== 'undefined' ? SFX.list.length : 0} moments` + cv;
     for (const x of document.querySelectorAll('#elab [data-rate]')) { const [sp, l] = x.dataset.rate.split('.'), v = (L.rate[sp] || {})[l] || 0; x.textContent = v ? Math.round(v) + '/s' : '–'; }
@@ -88984,8 +89669,6 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     for (const f of ['drawPath', 'drawWallZone', 'drawAmbient', 'drawKeepAge', 'drawPortalFx', 'drawMapFx']) if (typeof window[f] === 'function') window[f] = function () {};
     if (typeof drawSelection === 'function') drawSelection = function () { try { stageMarks(); } catch (e) {} };
     L.ready = true; stage(); panel(); pointer();
-    // the labs' fire bakes, loaded now so the first cast isn't lost to the images' load
-    if (typeof labLoad === 'function' && typeof PF_BAKES !== 'undefined') for (const n of PF_BAKES) labLoad(n);
     requestAnimationFrame(labFrame);
   }
   boot();
@@ -96600,43 +97283,82 @@ if (typeof document !== 'undefined') {
 }
 
 /* ================= HERO WEAPONS, on screen (forces_zzzzzzzzzzzzzzzz_heroweapons.js) =================
-   - The weapon rack of a Champion opens the hero's own page: its weapon's card, the four stages (each with its name, the
-     effect it adds and whether it is reached), the progress to the next ("wave bosses slain while it stands: 2 / 3"), the
-     reforged legendary it may become, its UPGRADES (its own drops in the pouch: "Add to <its weapon>", with the numbers before and after),
-     re-forging to the wave's level and its runes (the forge's own prices: forces_zzzzzzzzzzzzzzz_forge.js).
-   - Its card (wpnCardHTML) says Hero weapon, its stage, its stage effects and its progress.
+   - The weapon rack of a Champion opens the hero's own page: its weapon's card, its stages I-IV and the reforged V (each
+     with its name, the effect it adds and whether it is reached), where the next comes from, re-forging to the wave's
+     level and its runes (the Anvil: forces_zzzzzzzzzzzzzzz_forge.js, smithy_ui.js).
+   - Its card (wpnCardHTML): a "Hero weapon" tag and its stage numeral, its stage effects; as an offer, its numbers against
+     the weapon it would consume and the new effect, marked New.
+   - Its icon: the weapon's own, with its stage numeral in a small badge at the corner (wpIconURL).
+   - One colour: its stage's rarity (rare I, epic II-III, legendary IV and V: HW_RAR) on the frame, the border and the name
+     (owner, 10 Nov 2026: "varics blade shows as epic but has legendary colour"; "just make them blue to start").
+   - A wave boss's loot: its next stage as one of the choices, in the relics' strip (hwOnLoot); taking it plays the merge
+     (owner: "when you equip it, it consumes the previous version, have an animation to show that"): the old weapon's icon
+     flies into the new one and dissolves, a burst in the new colour as they meet, then the new name (about 1.4 s, a tap
+     skips it; the equip and loot sounds), then a brief glow and spark burst on the hero's weapon on the field.
+   - The loot tables (the boss card, the forecast, the screen) show the next stage's icon, its card on hover.
    - The glow: a small light at the weapon's tip in its stage's colour (hwGlow), brighter each stage; Maren's sculpted twin
      blade is also tinted (unitmodels_maren.js, hwTint). Kept small, at the tip only (the owner's rule: never hide the unit). */
 const hwE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const hwCol = h => RARITY[hwRar(h)].col;
+const hwNumTag = h => `<span class="hw-num" style="--rc:${hwCol(h)}">${hwStageName(h)}</span>`;
 function hwProgress(h) {
-  if (h.stage >= 3) return h.ult ? 'Reforged: its ultimate form.' : `Stage IV reached. Each wave boss slain while it stands may drop its reforged form (very rare).`;
-  return `Wave bosses slain while it stands: ${h.bosses | 0} / ${HW_AT[h.stage + 1]} to stage ${['I', 'II', 'III', 'IV'][h.stage + 1]}`;
+  if (h.ult) return 'Reforged: its final form.';
+  const nx = hwNext(h), n = (h.stage | 0) < 3 ? (h.stage | 0) + 1 : 4, nm = nx ? hwNameOf(nx) : '';
+  if (n < 4 && (h.bosses | 0) < HW_GATE[n]) return `${nm} can be a wave boss's loot choice once it has slain ${HW_GATE[n]} wave boss${HW_GATE[n] > 1 ? 'es' : ''} while it stands (${h.bosses | 0} so far).`;
+  return n === 4 ? `${nm}, its reforged form, is a rare loot choice from a wave boss.` : `${nm} can be one of a wave boss's loot choices, about one boss in two or three.`;
 }
 function hwStagesHTML(h) {
-  const H = HW[h.u]; let s = '<ol class="hw-st">';
-  for (let i = 0; i < 4; i++) {
-    const on = (h.stage | 0) >= i, fx = i ? H.fx[i - 1] : null, txt = fx ? wpnRuleText({ fx }) : 'Its damage as issued' + (WPN_CLASS[(WPN_BASE[h.b] || {}).cls] && WPN_CLASS[WPN_BASE[h.b].cls].cast ? ', and its Spell Damage' : '') + '.';
-    s += `<li class="${on ? 'on' : ''}"><b>${['I', 'II', 'III', 'IV'][i]} · ${hwE(H.n[i])}</b> <small>${i ? `at ${HW_AT[i]} wave boss${HW_AT[i] > 1 ? 'es' : ''}` : 'from the start'}</small><p>${hwE(txt)}</p></li>`;
+  const H = HW[h.u], cast = WPN_CLASS[(WPN_BASE[h.b] || {}).cls] && WPN_CLASS[WPN_BASE[h.b].cls].cast; let s = '<ol class="hw-st">';
+  for (let i = 0; i < 5; i++) {
+    const at = Object.assign({}, h, { stage: Math.min(i, 3), ult: i === 4 }), on = i < 4 ? (h.stage | 0) >= i : !!h.ult;
+    const fx = !i ? null : i < 4 ? [H.fx[i - 1]] : H.ult[2];
+    const txt = fx ? fx.map(f => wpnRuleText({ fx: f })).join(' ') + (i === 4 ? ` (${H.ult[1]})` : '') : 'Its damage as issued' + (cast ? ', and its Spell Damage' : '') + '.';
+    const when = !i ? 'from the start' : i < 4 ? `a wave boss's loot choice, after ${HW_GATE[i]} boss${HW_GATE[i] > 1 ? 'es' : ''} slain` : 'reforged: a rare loot choice after IV';
+    s += `<li class="${on ? 'on' : ''}${i === 4 ? ' ult' : ''}"><b style="color:${hwCol(at)}">${hwNumTag(at)} ${hwE(hwNameOf(at))}</b> <small>${when}</small><p>${hwE(txt)}</p></li>`;
   }
-  s += `<li class="ult${h.ult ? ' on' : ''}"><b style="color:${RARITY[4].col}">Reforged · ${hwE(H.ult[0])}</b> <small>very rare, from a wave boss once it is at stage III</small><p>${hwE(H.ult[1].charAt(0).toUpperCase() + H.ult[1].slice(1))}. Adds: ${hwE(H.ult[2].map(fx => wpnRuleText({ fx })).join(' '))}</p></li>`;
   return s + '</ol>';
 }
-// its card wherever a weapon card shows
+// its card wherever a weapon card shows (o.vs: the weapon it would consume, for an offer's compare)
 if (typeof wpnCardHTML === 'function') {
   const _hwCard = wpnCardHTML;
   wpnCardHTML = function (w, t, o) {
     if (!w || !w.hero || !HW[w.u]) return _hwCard.apply(this, arguments);
-    const ty = t ? t.type : Object.keys(TOWERS).find(k => TOWERS[k].unit === w.u), n = ty ? wpnNums(w, ty) : null, H = HW[w.u], sh = wpnShow(w);
+    o = o || {};
+    const ty = t ? t.type : Object.keys(TOWERS).find(k => TOWERS[k].unit === w.u), n = ty ? wpnNums(w, ty) : null, H = HW[w.u], sh = wpnShow(w), col = hwCol(w);
     const lines = n ? [`<li><b>${wpRange(n)}</b> Damage</li>`, `<li><b>${wpS(n.aps)}</b> attacks a second</li>`, `<li><b>${wpN(n.dps)}</b> DPS</li>`].concat(n.sp ? [`<li><b>+${n.sp}</b> Spell Damage</li>`] : []) : [];
-    const fx = hwFx(w).map(f => `<div class="itc-ab"><b>${hwE(f === (H.ult[2] || [])[0] || H.ult[2].includes(f) ? 'Reforged' : 'Awakened')}</b> ${hwE(wpnRuleText({ fx: f }))}</div>`).join('');
-    return `<div class="itc" style="--rc:${H.glow}"><h5 class="itc-n" style="color:${H.glow}">${hwE(sh.name)}</h5><p class="itc-k">Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}</p>
-      <ul class="itc-s">${lines.join('')}</ul>${fx}<p class="itc-k">${hwE(hwProgress(w))}</p><p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${(o && o.note) || ''}</div>`;
+    const was = o.vs && o.vs.hero ? hwFx(o.vs) : null;
+    const fx = hwFx(w).map(f => { const isNew = was && !was.includes(f); return `<div class="itc-ab${isNew ? ' hw-new' : ''}"><b>${isNew ? 'New: ' : ''}${H.ult[2].includes(f) ? 'Reforged' : 'Awakened'}</b> ${hwE(wpnRuleText({ fx: f }))}</div>`; }).join('');
+    let cmp = '';
+    if (o.vs && ty) {
+      const a = wpnNums(o.vs, ty), b = n, cl = (x, y) => y > x + 1e-6 ? 'bo' : y < x - 1e-6 ? 'neg' : '';
+      cmp = `<div class="wp-cmp"><p>Against ${hwE(wpnName(o.vs))}:</p><p>Damage ${wpRange(a)} → <b class="${cl(a.avg, b.avg)}">${wpRange(b)}</b></p><p>DPS ${wpN(a.dps)} → <b class="${cl(a.dps, b.dps)}">${wpN(b.dps)}</b></p>${a.sp || b.sp ? `<p>Spell Damage ${a.sp || 0} → <b class="${cl(a.sp || 0, b.sp || 0)}">${b.sp || 0}</b></p>` : ''}<p>Item Level ${o.vs.il | 0} → <b class="${cl(o.vs.il | 0, w.il | 0)}">${w.il | 0}</b></p></div>`;
+    }
+    return `<div class="itc" style="--rc:${col}"><h5 class="itc-n" style="color:${col}">${hwE(sh.name)}</h5><p class="itc-k"><span class="hw-tag">Hero weapon</span> ${hwNumTag(w)} ${w.ult ? 'Reforged legendary' : RARITY[hwRar(w)].name} · Item Level ${w.il | 0}</p>
+      <ul class="itc-s">${lines.join('')}</ul>${fx}${cmp}${o.offer ? '' : `<p class="itc-k">${hwE(hwProgress(w))}</p>`}<p class="itc-fl">“${hwE(sh.look.charAt(0).toUpperCase() + sh.look.slice(1))}.”</p>${o.note || ''}</div>`;
   };
 }
-// its kind line (the Gear sheet's row, the rack): Hero weapon and its stage, not a rarity
+// its kind line (the Gear sheet's row, the rack): Hero weapon and its stage, not a rarity alone
 if (typeof wpKindLine === 'function') {
   const _hwKind = wpKindLine;
-  wpKindLine = function (w) { return w && w.hero && HW[w.u] ? `Hero weapon · ${w.ult ? 'Reforged legendary' : `Stage ${hwStageName(w)} of IV`} · Item Level ${w.il | 0}` : _hwKind.apply(this, arguments); };
+  wpKindLine = function (w) { return w && w.hero && HW[w.u] ? `Hero weapon · Stage ${hwStageName(w)} · ${w.ult ? 'Reforged legendary' : RARITY[hwRar(w)].name} · Item Level ${w.il | 0}` : _hwKind.apply(this, arguments); };
+}
+// its icon: the weapon's own, with the stage numeral in a badge at the corner
+if (typeof wpIconURL === 'function') {
+  const _hwIc = wpIconURL, _hwIcU = {};
+  wpIconURL = function (w) {
+    if (!w || !w.hero || !HW[w.u]) return _hwIc.apply(this, arguments);
+    const k = wpKey(w), s = hwStageName(w), key = k + '|' + s; if (_hwIcU[key]) return _hwIcU[key];
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 64; iconPaint(c, k);
+      const x = c.getContext('2d'), S = c.width / 64, col = hwCol(w);
+      x.setTransform(S, 0, 0, S, 0, 0); x.font = 'bold 13px Georgia, serif'; x.textBaseline = 'middle'; x.textAlign = 'center';
+      const bw = Math.max(18, x.measureText(s).width + 8), bx = 64 - bw - 3, by = 64 - 19;
+      x.fillStyle = 'rgba(14,10,6,.88)'; x.strokeStyle = col; x.lineWidth = 1.5;
+      x.beginPath(); if (x.roundRect) x.roundRect(bx, by, bw, 16, 4); else x.rect(bx, by, bw, 16); x.fill(); x.stroke();
+      x.fillStyle = col; x.fillText(s, bx + bw / 2, by + 8.5);
+      return (_hwIcU[key] = c.toDataURL());
+    } catch (e) { return _hwIc.apply(this, arguments); }
+  };
 }
 // the rack of a Champion: its hero page
 if (typeof wpRack === 'function') {
@@ -96647,72 +97369,82 @@ function hwPanel(t) {
   if (!ovp) return;
   for (const q of ovp.querySelectorAll('.wp-rack')) q.remove();
   const h = hwState(t.def.unit); if (!h) return; t.weapon = h;
-  const gold = G.gold | 0, cl = (a, b) => b > a + 1e-6 ? 'bo' : b < a - 1e-6 ? 'neg' : '';
-  const now = wpnNums(h, t.type), d0 = wpnDpsWith(t, h);
-  const P = hupPouch(h.u), I = HUP[h.u];
-  const ups = [0, 1, 2].filter(g => P[g] > 0).map(g => {
-    const r = hupResult(h, g), n = wpnNums(r, t.type), d1 = wpnDpsWith(t, r), no = hupUseless(h, g);
-    return `<div class="wp-row"><img src="${hupIconURL(h.u, g)}" alt=""><div class="wp-rt"><b style="color:${RARITY[2 + g].col}">${hwE(hupName(h.u, g))} × ${P[g]}</b><small>${hwE(I[3])}</small>
-      <p>${no ? 'It is at the wave\'s level: keep it for later waves.' : `Item Level ${h.il | 0} → <b class="${cl(h.il, r.il)}">${r.il}</b> · Damage ${wpRange(now)} → <b class="${cl(now.avg, n.avg)}">${wpRange(n)}</b>${now.sp || n.sp ? ` · Spell Damage ${now.sp} → <b class="${cl(now.sp, n.sp)}">${n.sp}</b>` : ''} · DPS on it ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b>`}</p></div>
-      <div class="wp-bt"><button type="button" class="pri" data-hu="${g}"${no ? ' disabled' : ''}>Add to ${hwE(wpnName(h))}</button></div></div>`;
-  }).join('');
-  const lc = typeof forgeRelevelCost === 'function' ? forgeRelevelCost(h) : null, rc = typeof forgeRuneCost === 'function' ? forgeRuneCost(h) : null, slots = typeof forgeSlots === 'function' ? forgeSlots(h) : 0, R = h.runes || [];
-  const runeOpts = typeof RUNES !== 'undefined' ? Object.keys(RUNES).filter(k => runeFits(k, t)) : [];
-  let runes = '';
-  for (let i = 0; i < slots; i++) runes += `<div class="wp-rs"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${hwE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="wp-ro">${runeOpts.filter(k => k !== R[i]).map(k => `<button type="button" data-hr="${i}|${k}"${gold >= rc ? '' : ' disabled'}><span style="color:${RUNES[k].hue}">${RUNES[k].name}</span> <small>${hwE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
+  const gold = G.gold | 0;
   ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack hw-panel" role="dialog" aria-label="Hero weapon"><div class="wp-hd"><h3>Hero weapon · ${hwE(t.def.name.split(',')[0])} <small>it keeps this weapon all run · you have ${gold} gold</small></h3><button type="button" class="tx" id="hwClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
     <div class="wp-cur"><img src="${wpIconURL(h)}" alt=""><div>${wpnCardHTML(h, t)}</div></div>
     <h4>Awakening <small>${hwE(hwProgress(h))}</small></h4>${hwStagesHTML(h)}
-    <div class="wp-fr"><h4>Upgrading <small>its upgrade items, re-forging and runes are at the Anvil</small></h4><button type="button" class="pri" id="hwAnv">The Anvil</button></div></div>`);
-  const box = ovp.querySelector('.hw-panel'), redo = () => { box.remove(); hwPanel(t); };
+    <div class="wp-fr"><h4>Re-forging and runes <small>at the Anvil</small></h4><button type="button" class="pri" id="hwAnv">The Anvil</button></div></div>`);
+  const box = ovp.querySelector('.hw-panel');
   box.querySelector('#hwClose').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); openGearPanel(t); };
   box.querySelector('#hwAnv').onclick = () => { if (typeof sfx === 'function') sfx('click'); box.remove(); if (typeof openAnvil === 'function') openAnvil({ w: h, back: t, tab: 'hero' }); };
 }
-/* ---------- the upgrade items: icons, cards, the boss's loot screen and tables, the Gear button ---------- */
-const hupKey = (u, g) => `g:${HUP[u][1]}:${HUP[u][2].slice(1)}:${2 + (g | 0)}:hup-${u}:0`;
-const _hupURL = {};
-function hupIconURL(u, g) { const k = hupKey(u, g); if (_hupURL[k]) return _hupURL[k]; try { const c = document.createElement('canvas'); c.width = c.height = 64; iconPaint(c, k); return (_hupURL[k] = c.toDataURL()); } catch (e) { return ''; } }
-function hupCardHTML(u, g, note) {
-  const I = HUP[u], S = HUP_STEP[g | 0], h = hwState(u);
-  return `<div class="itc" style="--rc:${RARITY[2 + (g | 0)].col}"><h5 class="itc-n">${hwE(hupName(u, g))}</h5><p class="itc-k">Hero weapon upgrade · for ${hwE(h ? wpnName(h) : u)}</p>
-    <ul class="itc-s"><li><b>+${S.il}</b> Item Levels (to the wave's level at most)</li>${S.q ? `<li>a better roll</li>` : ''}</ul><p class="itc-fl">“${hwE(I[3])}”</p>${note || ''}</div>`;
+
+/* ---------- a wave boss's loot: its next stage as one of the choices ---------- */
+if (typeof rnLootOpen === 'function') {
+  const _hwOpen = rnLootOpen;
+  rnLootOpen = function () {
+    const r = _hwOpen.apply(this, arguments);
+    try { const R = rnS(); hwOnLoot(R.loots[R.loots.length - 1]); } catch (e) { console.error(e); }
+    return r;
+  };
 }
-if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-hup]', el => { const [u, g] = (el.dataset.hup || '').split('|'); return HUP[u] ? hupCardHTML(u, +g, el.dataset.hupn ? `<p class="itc-k">${hwE(el.dataset.hupn)}</p>` : '') : ''; });
-// the boss's loot screen: the upgrade it just dropped, with Add
 if (typeof rnLootScreen === 'function') {
-  const _hupRn = rnLootScreen;
+  const _hwRn = rnLootScreen;
   rnLootScreen = function () {
-    const r = _hupRn.apply(this, arguments);
+    const r = _hwRn.apply(this, arguments);
     try {
-      const L = typeof rnLootCur === 'function' ? rnLootCur() : null, D = G.hupBossDrop, box = ovp && ovp.querySelector('.rn-three');
-      if (!L || !D || D.wave !== L.w || !box || !HUP[D.u]) return r;
-      const h = hwState(D.u), P = hupPouch(D.u);
-      box.insertAdjacentHTML('beforebegin', `<div class="wp-boss"><img src="${hupIconURL(D.u, D.g)}" alt=""><div class="wp-bt2"><h4>Hero weapon upgrade dropped <small>in the hero's pouch, as well as the relic you take</small></h4>${hupCardHTML(D.u, D.g)}
-        ${P[D.g] > 0 && !hupUseless(h, D.g) ? `<button type="button" class="pri" id="hupBossAdd">Add to ${hwE(wpnName(h))}: Item Level ${h.il | 0} → ${hupResult(h, D.g).il}</button>` : ''}</div></div>`);
-      const b = ovp.querySelector('#hupBossAdd');
-      if (b) b.onclick = () => { if (hupUse(h, D.g)) { const el = ovp.querySelector('.wp-boss .wp-bt2'); if (el) el.insertAdjacentHTML('beforeend', `<p class="itc-k">Added: ${hwE(wpnName(h))} is at Item Level ${h.il}.</p>`); b.remove(); } };
+      const L = typeof rnLootCur === 'function' ? rnLootCur() : null, box = ovp && ovp.querySelector('.rn-three');
+      if (!L || !L.hwo || !box || !hwOn()) return r;
+      const h = hwState(L.hwo.u), nx = hwNext(h), t = hwHeroT(); if (!nx) return r;
+      // it takes a relic's place (a legendary's never; one relic always stays)
+      const relics = [...box.querySelectorAll('.rn-pick')].filter(b => !b.classList.contains('wp-pick') && !b.querySelector('.rn-leg'));
+      if (relics.length > 1) relics[relics.length - 1].remove();
+      else box.className = box.className.replace(/rn-n\d+/, 'rn-n' + (box.querySelectorAll('.rn-pick').length + 1));
+      const note = `<p class="itc-k">Taking it consumes ${hwE(wpnName(h))}: the same weapon, a stage up.</p>`;
+      box.insertAdjacentHTML('beforeend', `<button type="button" class="rn-pick hw-pick" data-rph="1"><div class="sp-card qx-pc rn-ic${hwRar(nx) >= 4 ? ' rn-leg' : ''}" style="--sc:${hwCol(nx)}"><img alt="" src="${wpIconURL(nx)}">${wpnCardHTML(nx, t, { vs: h, offer: 1, note })}<span class="sp-go">Take it</span></div></button>`);
+      const btn = box.querySelector('[data-rph]');
+      btn.onclick = () => {
+        if (btn.dataset.done) return; btn.dataset.done = '1';
+        const got = hwTakeOffer(); if (!got) { if (typeof sfx === 'function') sfx('nogold'); return; }
+        hwMerge(got, () => { resumeGame(); hwWorldFlash(got.t); });
+      };
     } catch (e) { console.error(e); }
     return r;
   };
 }
-// the loot tables (the boss card, the forecast, the screen): the fielded heroes' upgrades, with their odds from a boss
+// the merge: the old weapon flies into the new and dissolves, a burst in the new colour, then the new name (~1.4 s; a tap skips it)
+function hwMerge(got, done) {
+  const a = got.from, b = got.to, nfx = hwFx(b).filter(f => !hwFx(a).includes(f)).map(f => wpnRuleText({ fx: f })).join(' ');
+  let over = false; const tm = [];
+  const el = document.createElement('div'); el.className = 'hw-merge'; el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="hw-mg"><img class="hw-mg-old" style="--c:${hwCol(a)}" src="${wpIconURL(a)}" alt=""><i class="hw-mg-burst" style="--c:${hwCol(b)}"></i><img class="hw-mg-new" style="--c:${hwCol(b)}" src="${wpIconURL(b)}" alt=""></div>
+    <div class="hw-mg-name" style="color:${hwCol(b)}">${hwE(hwNameOf(b))}</div><div class="hw-mg-sub">${hwE(hwNameOf(a))} is consumed.${nfx ? ' New: ' + hwE(nfx) : ''}</div>`;
+  const fin = () => { if (over) return; over = true; tm.forEach(clearTimeout); el.remove(); if (done) done(); };
+  document.body.append(el);
+  if (typeof sfx === 'function') sfx('equip', 4);
+  tm.push(setTimeout(() => { if (typeof sfx === 'function') sfx('lootDrop', Math.max(3, hwRar(b))); }, 500));
+  tm.push(setTimeout(fin, 1450));
+  el.onclick = fin;
+}
+// on the field: a brief glow and spark burst at the hero's weapon (drawn with the tip glow below)
+function hwWorldFlash(t) { if (t && !t.wrecked) { t.hwFlashAt = G.time || 0; t.hwFlashN = 0; } }
+// the loot tables (the boss card, the forecast, the screen): the commander's next weapon stage, its card on hover
 if (typeof rnIconsHTML === 'function') {
-  const _hupIc = rnIconsHTML;
+  const _hwIc = rnIconsHTML;
   rnIconsHTML = function () {
-    const h = _hupIc.apply(this, arguments);
+    const html = _hwIc.apply(this, arguments);
     try {
-      const H = hwOn() ? hupFielded() : []; if (!H.length) return h;
-      const O = HUP_ODDS.boss.map(v => Math.round(v * 100)).join(' / ');
-      return h + `<span class="rn-icons wp-icons">${H.map(t => `<button type="button" class="rn-ii wp-ii" style="--rc:${HUP[t.def.unit][2]}" data-hup="${t.def.unit}|0" data-hupn="Every wave boss drops one while ${t.def.name.split(',')[0]} stands: plain / Gleaming / Flawless ${O}%" aria-label="${hwE(HUP[t.def.unit][0])}"><img alt="" src="${hupIconURL(t.def.unit, 0)}"></button>`).join('')}</span>`;
-    } catch (e) { return h; }
+      if (!hwOn()) return html; const t = hwHeroT(); if (!t) return html;
+      const h = hwState(t.def.unit), nx = hwNext(h); if (!nx) return html;
+      return html + `<span class="rn-icons wp-icons"><button type="button" class="rn-ii wp-ii" style="--rc:${hwCol(nx)}" data-hwo="${h.u}" aria-label="${hwE(hwNameOf(nx))}"><img alt="" src="${wpIconURL(nx)}"></button></span>`;
+    } catch (e) { return html; }
   };
 }
-// the Gear button pulses while the hero's pouch holds an upgrade it can use
-if (typeof abilitySlots === 'function') {
-  const _hupSl = abilitySlots;
-  abilitySlots = function (t, s) { const r = _hupSl.apply(this, arguments); try { if (s && s[5] && hwOn() && hwIsHero(t)) { const h = hwState(t.def.unit), P = hupPouch(t.def.unit); if (h && [0, 1, 2].some(g => P[g] > 0 && !hupUseless(h, g))) { s[5].pulse = true; s[5].name = (s[5].name || '') + ` A ${HUP[t.def.unit][0]} can be added to its weapon.`; } } } catch (e) {} return r; };
-}
-// the glow at its tip, a step brighter each stage (small, at the tip only)
+if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-hwo]', el => {
+  const h = HW[el.dataset.hwo] ? hwState(el.dataset.hwo) : null, nx = hwNext(h); if (!nx) return '';
+  return wpnCardHTML(nx, hwHeroT(), { vs: h, offer: 1, note: `<p class="itc-k">${hwE(hwProgress(h))}</p>` });
+});
+// the glow at its tip, a step brighter each stage (small, at the tip only); a brief burst when it takes a new stage
 if (typeof drawSchoolMarks === 'function') {
   const _hwMarks = drawSchoolMarks;
   drawSchoolMarks = function (t) {
@@ -96720,7 +97452,12 @@ if (typeof drawSchoolMarks === 'function') {
     try {
       const g = hwGlow(t); if (!g || typeof QADD === 'undefined') return r;
       const tip = t.tipW && t.tipAt != null && G.time - t.tipAt < .5 ? t.tipW : [t.x, towerTop(t) + .05, t.y], vt = G.time || 0;
-      const a = (.18 + .3 * g.k) * (.8 + .2 * Math.sin(vt * 3 + t.x)), s = .12 + .14 * g.k + (g.ult ? .06 : 0);
+      let a = (.18 + .3 * g.k) * (.8 + .2 * Math.sin(vt * 3 + t.x)), s = .12 + .14 * g.k + (g.ult ? .06 : 0);
+      const fa = t.hwFlashAt != null ? vt - t.hwFlashAt : -1;
+      if (fa >= 0 && fa < 1.1) {
+        const e = 1 - fa / 1.1; s *= 1 + 1.5 * e; a = Math.min(.85, a + .45 * e);
+        if (!t.hwFlashN) { t.hwFlashN = 1; for (let i = 0; i < 14; i++) { const an = i / 14 * Math.PI * 2; part({ k: 'spark', x: tip[0], z: tip[2], h: tip[1], vx: Math.cos(an) * R_(.4, .9), vz: Math.sin(an) * R_(.4, .9), vh: R_(.3, 1), drag: 2, life: .55, max: .55, size: .04, col: g.hex }); } }
+      } else if (fa >= 1.1) t.hwFlashAt = null;
       QADD.bill(RD, tip[0], tip[1], tip[2], s, s, [g.col[0], g.col[1], g.col[2], a], 1, 0);
       if (typeof VLIVE !== 'undefined' && VLIVE && Math.random() < .04 + .1 * g.k) part({ k: 'spark', x: tip[0] + R_(-.06, .06), z: tip[2] + R_(-.06, .06), h: tip[1], vh: R_(.15, .45), drag: 1, life: .45, max: .45, size: .03 + .02 * g.k, col: g.hex });
     } catch (e) {}
@@ -96729,7 +97466,23 @@ if (typeof drawSchoolMarks === 'function') {
 }
 if (typeof document !== 'undefined') {
   const css = `.hw-st{list-style:none;margin:4px 0 8px;padding:0}.hw-st li{padding:5px 8px;margin:3px 0;border-left:3px solid #4a4436;opacity:.6;font-size:12.5px}
-  .hw-st li.on{opacity:1;border-left-color:#f2d27a;background:rgba(242,210,122,.06)}.hw-st li small{color:#a49c8c}.hw-st li p{margin:2px 0 0}.hw-st li.ult{border-left-color:${'#ff8c1a'}}`;
+  .hw-st li.on{opacity:1;border-left-color:#f2d27a;background:rgba(242,210,122,.06)}.hw-st li small{color:#a49c8c}.hw-st li p{margin:2px 0 0}.hw-st li.ult{border-left-color:${'#ff8c1a'}}
+  .hw-num{display:inline-block;min-width:1.4em;padding:0 4px;border:1px solid var(--rc);border-radius:4px;color:var(--rc);font:700 11px/1.35 Georgia,serif;text-align:center;background:rgba(14,10,6,.6);vertical-align:1px}
+  .hw-tag{display:inline-block;padding:0 5px;border-radius:4px;background:rgba(242,210,122,.14);color:#f2d27a;font-size:11px;font-weight:700;letter-spacing:.03em}
+  .itc-ab.hw-new{border-left:2px solid #f2d27a;padding-left:6px}.itc-ab.hw-new b{color:#f2d27a}
+  .hw-merge{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,4,.6);cursor:pointer;animation:hwMgBg 1.45s ease forwards}
+  .hw-mg{position:relative;width:96px;height:96px}.hw-mg img{position:absolute;inset:0;width:96px;height:96px;border-radius:10px}
+  .hw-mg-old{box-shadow:0 0 12px var(--c);animation:hwMgOld .6s cubic-bezier(.5,0,.8,.4) forwards}
+  .hw-mg-new{opacity:0;box-shadow:0 0 18px var(--c);animation:hwMgNew .5s .5s cubic-bezier(.2,1.4,.4,1) forwards}
+  .hw-mg-burst{position:absolute;left:50%;top:50%;width:170px;height:170px;margin:-85px 0 0 -85px;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(circle,#fff3c8 0,#ffc860 18%,var(--c) 34%,rgba(255,150,50,.25) 56%,transparent 70%);animation:hwMgBurst .6s .45s ease-out forwards}
+  .hw-mg-name{margin-top:14px;font:700 22px/1.2 Georgia,serif;text-shadow:0 2px 6px #000;opacity:0;letter-spacing:.22em;animation:hwMgName .45s .72s ease-out forwards}
+  .hw-mg-sub{margin-top:5px;max-width:440px;padding:0 16px;text-align:center;font-size:13px;color:#d8cfbd;opacity:0;animation:hwMgName .4s .9s ease-out forwards}
+  @keyframes hwMgBg{0%{opacity:0}8%{opacity:1}86%{opacity:1}100%{opacity:0}}
+  @keyframes hwMgOld{0%{transform:translateX(-120px) scale(.9);opacity:1;filter:none}70%{transform:translateX(-12px) scale(.72);opacity:.9;filter:brightness(1.6)}100%{transform:translateX(0) scale(.4);opacity:0;filter:brightness(2.4) blur(3px)}}
+  @keyframes hwMgNew{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+  @keyframes hwMgBurst{0%{opacity:0;transform:scale(.2)}35%{opacity:.8}100%{opacity:0;transform:scale(1.45)}}
+  @keyframes hwMgName{to{opacity:1;letter-spacing:.04em}}
+  @media (prefers-reduced-motion:reduce){.hw-mg-old,.hw-mg-burst{display:none}.hw-mg-new,.hw-mg-name,.hw-mg-sub{animation:none;opacity:1;letter-spacing:.04em}}`;
   const add = () => { const s = document.createElement('style'); s.id = 'hwCss'; s.textContent = css; document.head.append(s); };
   if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
 }
@@ -96773,10 +97526,8 @@ function anTabs(e) {
   if (e.kind === 'w') {
     const hero = !!it.hero;
     if (hero) {
-      const h = it, P = hupPouch(h.u), I = HUP[h.u];
-      const rows = [0, 1, 2].map(g => { const r = hupResult(h, g), no = hupUseless(h, g);
-        return `<div class="an-row"><img src="${hupIconURL(h.u, g)}" alt=""><div><b style="color:${RARITY[2 + g].col}">${anE(hupName(h.u, g))}</b> <small>× ${P[g] | 0}</small><p>${P[g] ? (no ? 'At the wave\'s level: keep it for later waves.' : `Item Level ${h.il | 0} → <b class="bo">${r.il}</b> · ${anWeaponLines(t, h, r)}`) : 'None yet.'}</p>${P[g] && !no ? `<button type="button" class="pri an-do" data-act="hup${g}">Add to ${anE(wpnName(h))}</button>` : ''}</div></div>`; }).join('');
-      tabs.push({ id: 'hero', name: 'Hero weapon', html: `<p class="an-k">${anE(I[0])}s drop while ${anE(((t && t.def.name) || '').split(',')[0] || 'the hero')} stands: from wave bosses, elites and now and then a wave's last foe.</p>${rows}<h4>Awakening</h4><p class="an-k">${anE(hwProgress(h))}</p>${hwStagesHTML(h)}` });
+      const h = it;
+      tabs.push({ id: 'hero', name: 'Hero weapon', html: `<p class="an-k">Its next stage comes as one of a wave boss's loot choices while ${anE(((t && t.def.name) || '').split(',')[0] || 'the hero')} stands; taking it consumes this one.</p><h4>Awakening</h4><p class="an-k">${anE(hwProgress(h))}</p>${hwStagesHTML(h)}` });
     } else {
       const c = forgeUpCost(it), nx = RARITY[Math.min(4, (it.rar | 0) + 1)];
       tabs.push({ id: 'rar', name: 'Raise rarity', html: c == null ? `<p class="an-k">${WPN_LEG[it.b] ? 'A legendary is as high as a weapon goes.' : 'Epic is the Anvil\'s highest: legendaries only drop.'}</p>`
@@ -96800,7 +97551,6 @@ function anTabs(e) {
 function anDo(e, act) {
   const it = e.it, t = anUnitFor(e); let ok = false;
   if (act === 'up') ok = forgeUpgrade(it); else if (act === 'lv') ok = forgeRelevel(it); else if (act === 'rr') ok = forgeReroll(it);
-  else if (/^hup\d$/.test(act)) ok = hupUse(it, +act.slice(3));
   else if (act.startsWith('rune|')) { const [, i, k] = act.split('|'); ok = forgeRune(it, +i, k, t); }
   else if (act === 'ilv' || act === 'ilvp') ok = typeof ilUpgrade === 'function' && ilUpgrade(it);
   if (ok && typeof onToast === 'function') onToast(`${e.kind === 'w' ? wpnName(it) : gearName(it)}: done.`);
