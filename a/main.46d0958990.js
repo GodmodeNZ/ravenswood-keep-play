@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b2f19ca@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'cf0dd65@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -3229,11 +3229,12 @@ function guardBlock(c, amt, src) {
 }
 // a map with no keep (foes walk in from the woods): they leave the field down the painted path, out of view
 const walkOff = () => !!(G && !G.vs && typeof MAPS !== 'undefined' && MAPS[G.map] && MAPS[G.map].entry);
-// the walk in's perspective: [how much smaller a foe is at its far end (1 / (1 + k)), over how many rows]; a map's own (maps.js tun) or Sunfall's
-const tunP = () => (typeof MAPS !== 'undefined' && G && MAPS[G.map] && MAPS[G.map].tun) || TUN_DEF, TUN_DEF = [4.5, 4.9];
+// the walk in's perspective: [how much smaller a foe is at its far end (1 / (1 + k)), over how many rows, the row where it
+// reaches full size (-.9 unless given)]; a map's own (maps.js tun) or Sunfall's
+const tunP = () => (typeof MAPS !== 'undefined' && G && MAPS[G.map] && MAPS[G.map].tun) || TUN_DEF, TUN_DEF = [4.5, 4.9], tunZ = () => { const t = tunP(); return t[2] == null ? -.9 : t[2]; };
 const exitY = () => walkOff() ? ROWS + 2.6 : GATE_Y;
 function moveCreep(c, d) {
-  if (c.ent && walkOff()) d *= .45 + .55 / (1 + tunP()[0] * clamp((-.9 - c.y) / tunP()[1], 0, 1));   // far off up the tunnel each step covers less ground, as it looks (the same perspective as their size)
+  if (c.ent && walkOff()) d *= .45 + .55 / (1 + tunP()[0] * clamp((tunZ() - c.y) / tunP()[1], 0, 1));   // far off up the tunnel each step covers less ground, as it looks (the same perspective as their size)
   while (c.ent && d > 0) {   // still on the way in out of the woods, to the field's head
     const p = c.ent[0], dx = p[0] - c.x, dy = p[1] - c.y, L = Math.hypot(dx, dy);
     if (Math.abs(dx) > .02) c.face = dx > 0 ? 1 : -1;
@@ -48222,71 +48223,71 @@ const TAL_TIER6 = [0, 2, 4, 7, 10, 12];
 /* <spread> */
 const TAL_SPREAD = {
   "grove.glaive": {"Long Haft":[0,3],"Hold the Line":[1,1],"Set Spears":[2,3],"Shieldsplitter":[1,2],"Thornhedge":[1,3],"Bloodthorn":[2,0],"Rootbreaker":[4,0],"Phalanx":[3,2],"Wall of Spears":[5,2],"Impaler":[5,0],"Spearwood Rising":[3,0],"Living Palisade":[5,1],"Skewer":[4,3],"Splintered Line":[4,2],"Deep Thrust":[0,2],"Living Haft":[2,1],"Thornwall Ward":[3,1]},
-  "grove.arrow": {"Patient Hunter":[1,1],"Canopy Sight":[1,3],"Mark the Quarry":[2,1],"Thornpoint Arrows":[0,0],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[1,0],"Snaring Shot":[2,2],"Pinning Shot":[5,1],"Thornrain":[5,3],"Nailing Shaft":[4,0],"Still Quarry":[4,1],"Wounded Prey":[4,2],"Splitting Shaft":[5,0],"Quick Nock":[0,1],"Hunter's Rhythm":[3,1],"Hushed Quarry":[3,0]},
-  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[0,1],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[4,2],"Bramble Squeeze":[3,0],"Spreading Roots":[3,3],"Bloodbriar":[4,0],"Rootburst":[3,1],"Overgrowth":[5,3],"Strangleroot":[5,2],"Warden's Reach":[2,1],"Sapwell":[2,2],"Quickening Sap":[1,3]},
-  "grove.arcane": {"Heavy Lance":[1,1],"Trample":[2,2],"Wheel About":[0,2],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[2,0],"Hooves of Thunder":[5,3],"Hunter's Finish":[5,0],"Second Charge":[3,0],"Goring Antlers":[0,0],"Long Gallop":[1,0],"Stag's Wind":[0,3],"Herd Instinct":[4,3]},
-  "grove.storm": {"Hawk's Reach":[3,2],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Pounce":[1,2],"Hawk's Mark":[4,0],"Grounded Prey":[4,3],"Moonsap Bolts":[2,3],"Skyfall":[5,1],"Shapestorm":[3,3],"Second Skin":[2,0],"Harrier's Cry":[4,1],"Hawk Lord":[5,0],"Wild Heart":[5,2],"Wild Pace":[0,1],"Druid's Patience":[0,3],"Talon Rend":[3,1]},
-  "grove.earth": {"Leaf-Edged Blades":[0,0],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,3],"Blade Rhythm":[1,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,3],"Encore":[4,2],"Twin Whirl":[2,3],"Gale of Blades":[4,0],"Reaper's Step":[5,0],"Quickstep":[1,2],"Dancer's Breath":[0,1],"Petal Cuts":[3,2]},
-  "grove.cannon": {"Potent Spores":[1,0],"Ripe Pods":[1,2],"Choking Spores":[1,1],"Seed Scatter":[3,2],"Hard Husk":[4,1],"Clinging Spores":[4,0],"Puffcap Sowing":[2,2],"Snapjaw Bloom":[3,0],"Spore Cloud":[5,2],"Bursting Rot":[5,0],"Puffcap Trail":[5,3],"Rootmark Seed":[4,3],"Drifting Spores":[2,3],"Far Cast":[0,2],"Seedwell":[2,0],"Thorned Husks":[0,1],"Burrowing Pods":[3,1]},
+  "grove.arrow": {"Patient Hunter":[1,0],"Canopy Sight":[1,3],"Mark the Quarry":[3,2],"Thornpoint Arrows":[0,2],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[0,1],"Snaring Shot":[2,2],"Pinning Shot":[5,3],"Thornrain":[5,2],"Nailing Shaft":[4,0],"Still Quarry":[4,1],"Wounded Prey":[4,2],"Splitting Shaft":[5,0],"Quick Nock":[1,1],"Hunter's Rhythm":[2,1],"Hushed Quarry":[3,0]},
+  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[1,3],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[4,3],"Bramble Squeeze":[4,0],"Spreading Roots":[2,1],"Bloodbriar":[3,2],"Rootburst":[3,1],"Overgrowth":[5,2],"Strangleroot":[5,3],"Warden's Reach":[2,2],"Sapwell":[3,3],"Quickening Sap":[0,1]},
+  "grove.arcane": {"Heavy Lance":[0,1],"Trample":[2,2],"Wheel About":[0,0],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[1,2],"Hooves of Thunder":[5,3],"Hunter's Finish":[5,0],"Second Charge":[2,1],"Goring Antlers":[1,0],"Long Gallop":[2,3],"Stag's Wind":[1,1],"Herd Instinct":[4,3]},
+  "grove.storm": {"Hawk's Reach":[4,3],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[0,0],"Primal Pounce":[1,2],"Hawk's Mark":[3,2],"Grounded Prey":[4,1],"Moonsap Bolts":[2,1],"Skyfall":[5,2],"Shapestorm":[3,1],"Second Skin":[1,3],"Harrier's Cry":[4,2],"Hawk Lord":[5,0],"Wild Heart":[5,3],"Wild Pace":[1,1],"Druid's Patience":[0,3],"Talon Rend":[3,0]},
+  "grove.earth": {"Leaf-Edged Blades":[1,2],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,0],"Blade Rhythm":[0,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,0],"Encore":[4,2],"Twin Whirl":[2,3],"Gale of Blades":[4,0],"Reaper's Step":[5,3],"Quickstep":[2,2],"Dancer's Breath":[0,1],"Petal Cuts":[3,2]},
+  "grove.cannon": {"Potent Spores":[2,0],"Ripe Pods":[1,1],"Choking Spores":[0,2],"Seed Scatter":[3,1],"Hard Husk":[3,2],"Clinging Spores":[4,3],"Puffcap Sowing":[2,1],"Snapjaw Bloom":[3,3],"Spore Cloud":[5,1],"Bursting Rot":[5,0],"Puffcap Trail":[5,2],"Rootmark Seed":[4,0],"Drifting Spores":[1,0],"Far Cast":[1,2],"Seedwell":[2,3],"Thorned Husks":[0,3],"Burrowing Pods":[4,1]},
   "grove.venom": {"Hunter's Patience":[0,1],"Barbed Darts":[0,3],"Quick Quiver":[1,0],"Lone Prey":[2,2],"Long Severance":[2,1],"Sap Thief":[1,2],"Bramble Snare":[2,0],"Briar Gibbet":[3,1],"Silent Stalk":[1,3],"Deep Snare":[3,0],"Thornmark Trail":[4,2],"Choking Thorns":[4,1],"Snare Line":[4,0],"Apex Stalker":[5,2],"Gallows Briar":[5,1],"Torn Ties":[5,3]},
-  "champ:rootmother": {"Patient Earth":[0,2],"Long Vines":[0,0],"Deep Grip":[1,1],"Twin Elders":[5,2],"Rootway":[1,2],"Bramble Grasp":[2,2],"Thorned Roots":[2,3],"Sap Song":[2,1],"Heartwood Sapling":[4,3],"Strangling Hold":[4,0],"Sapling Warden":[3,0],"Rootmother":[5,3],"The Old Wood Walks":[3,3],"Thousand Roots":[5,1],"Quick Tendrils":[0,3],"Deep Sap":[3,2],"Sapling Song":[4,1]},
-  "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,0],"Snaring Rain":[0,3],"Root Platform":[3,0],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[3,2],"Hunter’s Patience":[2,2],"Blood Moon":[5,3],"Snarled Ground":[4,1],"Running Shafts":[3,3],"Warden’s Mark":[4,2],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,3],"Captain's Share":[2,3],"Moonlit Aim":[5,0]},
-  "champ:hivemother": {"Ripe Seeds":[1,3],"Drifting Pods":[1,2],"Passing Spores":[1,0],"Compost":[4,2],"Moth Swarm":[2,3],"Thick Garden":[3,3],"Sticky Pollen":[3,0],"Pollen Drift":[3,1],"Overripe":[5,0],"Bloom of Moths":[5,2],"Swarm Song":[2,2],"Seedmother":[5,1],"Full Bloom":[4,0],"Rotfeast":[4,3],"Busy Hive":[0,2],"Honey Store":[0,0]},
-  "conclave.glaive": {"Measured Cuts":[0,2],"Opening Salute":[0,0],"Lone Duel":[0,3],"Riftsteel Edge":[2,3],"Ward-Splitter":[1,2],"Charged Edge":[2,2],"Twin Riftblades":[5,1],"Unbroken Step":[3,1],"Thousand Edges":[4,2],"Thrown Riftblade":[4,1],"Fifth Form":[4,3],"Phase Dancer":[3,0],"Ghostblade Rush":[5,3],"Weaver's Blade":[5,0],"Press the Opening":[1,0],"Binding Cut":[2,1],"Guard Broken":[3,2]},
-  "conclave.arrow": {"Twin Casting":[0,3],"Copied Lesson":[1,0],"Missile Swarm":[5,1],"Homing Missiles":[3,0],"Apprentice's Zeal":[4,3],"Missile Curtain":[2,0],"Echoing Missiles":[2,2],"Charged Curtain":[3,1],"Gathering Orb":[3,3],"Unstable Charge":[5,0],"Orb Lattice":[4,0],"Study the Reaction":[2,3],"Cold Focus":[1,1],"Lecture Hall":[5,2],"Margin Notes":[0,0],"Recitation":[0,1],"Static Sparks":[4,2]},
-  "conclave.frost": {"Hoar Ink":[0,1],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,1],"Entomb":[2,2],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,3],"Shatterbloom":[4,3],"Deep Chill":[4,0],"Coffin Burst":[5,0],"Cold Library":[2,0],"Absolute Stillness":[3,3],"Practised Hand":[1,3],"Singing Ice":[1,0],"Needle Rime":[0,0],"Brittle Coffin":[3,2]},
-  "conclave.arcane": {"Lagging Hour":[1,1],"Tick Forward":[3,2],"Borrowed Time":[4,0],"Heavy Hours":[1,2],"Backward Hour":[3,0],"Paradox":[2,1],"Stopped Clock":[4,1],"Quickening Bell":[5,1],"Frozen Moment":[5,3],"Hourglass Heart":[3,3],"Recurrence":[4,2],"Rewound Wounds":[2,0],"Arcane Clockwork":[1,3],"Borrowed Hour":[5,2],"Pendulum Swing":[0,1],"Stolen Sand":[0,2],"Patient Hours":[2,2]},
-  "conclave.storm": {"Wide Heavens":[0,2],"Star-Chart":[0,3],"Constellation":[5,0],"Skybreaker":[1,0],"Comet":[3,0],"Lodestar":[1,3],"Grounded Stars":[4,2],"Zodiac":[4,1],"Starfall Sky":[5,3],"Twin Stars":[5,1],"Grand Orrery":[3,2],"Twinkling Ice":[2,2],"Frost Lens":[2,3],"Turning Spheres":[4,0],"Night Sight":[0,1],"Cold Starlight":[1,2],"Ill Omen":[3,3]},
-  "conclave.earth": {"Broad Palms":[1,2],"Second Tremor":[1,3],"Staggering Blow":[3,2],"Mana Quarry":[4,3],"Heave":[2,2],"Shatterground":[5,1],"Deep Magma":[2,1],"Golem Core":[3,3],"Living Bulwark":[4,1],"Fault Line":[4,0],"Obsidian":[2,0],"Walking Wall":[5,0],"Ember Stone":[0,2],"Living Mountain":[5,2],"Granite Fists":[0,0],"Ley Reservoir":[0,1],"Glyph Anchor":[3,1]},
-  "conclave.cannon": {"Slow-Burning Ink":[1,2],"Wide Blast":[1,0],"Pyre Scribe":[2,3],"Fire Feeds Mana":[3,0],"Firewalk":[4,1],"Cinder Charge":[3,2],"Skipping Flame":[2,0],"Phoenix":[3,1],"Ember Heart":[5,0],"Pyre Lord":[5,2],"Rolling Inferno":[4,2],"Endless Skip":[5,3],"Searing Tide":[4,3],"Leaping Cinders":[0,1],"Thermal Crack":[2,1],"Wardburn":[0,3],"Kindled Fingers":[1,3]},
-  "conclave.venom": {"Keen Crescent":[0,3],"Hunting Crescent":[0,0],"Lasting Undoing":[0,1],"Quick Severing":[2,2],"Ward Feedback":[1,2],"Returning Crescent":[1,1],"Splintering":[3,2],"Sever the Link":[1,0],"Seeking Edge":[2,1],"Arcane Memory":[3,3],"Rend the Veil":[4,2],"Shatterpoint":[4,0],"Brimming Severance":[2,3],"Void Ground":[5,2],"Unravelling Veil":[5,1],"Wardbreaker":[5,0]},
-  "champ:cc_arch": {"Quick Quill":[1,3],"Open Book":[0,1],"Marginalia":[0,3],"Read the Marks":[4,2],"Unravel":[2,3],"Loose Threads":[3,3],"Threads Pulled":[2,0],"Shared Lesson":[3,0],"Deeper Loom":[5,0],"Woven Edge":[3,1],"Snapping Threads":[4,3],"Spellweaver":[5,3],"Sixfold Loom":[4,0],"Rewoven Threads":[5,1],"Flicked Pages":[0,2],"Deep Inkwell":[1,1]},
-  "champ:cc_chrono": {"Patient Hands":[0,3],"Long Pendulum":[0,2],"Weighted Hour":[1,1],"Gathered Ghosts":[5,2],"Recall":[1,3],"Long Way Back":[2,3],"Leaden Minutes":[2,0],"Lent Time":[2,1],"Endless Hour":[4,0],"Late Arrival":[3,3],"Second Hand":[4,2],"Timekeeper":[5,0],"The Hour Strikes":[3,0],"Twelve Strokes":[5,3],"Ticking Hand":[0,0],"Saved Seconds":[3,2],"Leaden Pull":[4,1]},
-  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,1],"Follow-Through":[0,2],"Practice Yard":[3,2],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[2,2],"Shared Edge":[2,3],"Bursting Seams":[5,3],"Cut the Fallen":[4,2],"Flourish":[3,3],"Blade of the Conclave":[5,1],"Unbound Blade":[4,3],"Duelling Ground":[4,0],"Flowing Cuts":[1,3],"Steady Breath":[3,1],"Chain to Blade":[5,2]},
-  "ironhold.glaive": {"Heavy Shoulders":[1,0],"Bearded Axe":[1,2],"Ringing Rim":[3,2],"Off Balance":[1,3],"Bowling Shove":[2,3],"Spinning Shield":[2,2],"Hot Shards":[5,1],"Shield Rush":[4,2],"Armourbreaker":[5,3],"Breaker's Blow":[4,1],"Brace and Shove":[3,1],"Shield Signal":[4,3],"Breach the Line":[5,0],"Hold the Pass":[3,0],"Caught Between Shields":[0,0],"Plate Salvage":[0,3],"Knock Them Flat":[2,1]},
-  "ironhold.arrow": {"Powder Smoke":[0,2],"Range-Finder":[1,0],"Long Belt":[2,2],"Called Shot":[5,1],"Rattlegun":[1,2],"Sighting In":[0,1],"Kneecapper":[4,3],"Thunder Belt":[5,0],"Gatling Crank":[5,2],"Breaching Slug":[3,3],"Quick Swab":[3,2],"Hard Kick":[3,0],"Case-Hardened":[4,0],"Quick Reload":[1,3],"Powder Tally":[2,3],"Pinning Rounds":[2,1],"Called Volley":[4,1]},
-  "ironhold.frost": {"Weighted Chains":[0,3],"Third Wrap":[1,2],"Trap Line":[2,3],"Tangle":[0,0],"Tripwire":[1,3],"Bound and Broken":[4,2],"Twin Nets":[5,3],"Double Line":[5,2],"Harpoon Winch":[3,2],"Bear Trap":[5,1],"Wide Nets":[3,1],"Hooked Chain":[4,3],"Spiked Caltrops":[2,2],"Wing Cords":[2,0],"Trapper's Haul":[1,1],"Barbed Chain":[3,3],"Caltrop Bed":[4,0]},
-  "ironhold.arcane": {"Searing Brand":[1,0],"Deep Brand":[0,1],"Brand Chain":[2,3],"Swift Inscription":[2,1],"Ringing Anvil":[5,0],"Masterwork Strike":[4,3],"Rune of Making":[1,1],"Rune of Unmaking":[4,0],"Rune Lord":[5,2],"Answering Rune":[3,2],"Runic Overflow":[0,0],"Forge Heat":[3,0],"Runebrand Detonation":[5,3],"Kinsmark":[1,2],"Paid in Kind":[3,3],"Quench":[0,3]},
-  "ironhold.storm": {"Torn Wings":[0,1],"Scorched Barrel":[2,1],"Spent Flare":[5,2],"Chain-Fed":[4,1],"Sky Shatter":[1,0],"Grapnel Shot":[3,1],"Tracer Rounds":[3,2],"Starshell":[4,2],"Endless Belt":[5,0],"Shellstorm":[5,3],"Reel In":[4,0],"Ground Burst":[2,0],"Hot Shrapnel":[0,0],"Barbed Shrapnel":[1,2],"Sky Watch":[0,2]},
-  "ironhold.earth": {"Packed Crowd":[0,3],"Steam in the Cracks":[1,1],"Scalding Steam":[2,3],"Rivet Popper":[0,1],"Piston Rhythm":[5,0],"Pile Driver":[1,3],"Echoing Slam":[4,0],"Groundsplitter":[5,1],"Molten Rivets":[5,2],"Steam Uppercut":[3,0],"Tremor Step":[2,2],"Safety Valve":[3,1],"Line Them Up":[4,1],"Hammer Home":[1,0],"Pressure Gauge":[2,0],"Steam Jacket":[3,2],"Piledriven":[4,3]},
-  "ironhold.cannon": {"Glowing Casings":[1,0],"Whistling Shells":[0,3],"Rattling Blast":[3,0],"Pitch-Soaked Wadding":[2,3],"Skipping Shell":[2,0],"Double Crew":[3,1],"Red-Hot Tube":[5,1],"Big Bertha":[4,2],"Clinging Fire":[0,2],"The Long Drop":[4,1],"Shrapnel Casing":[3,3],"Quake Shell":[4,0],"Walking Fire":[5,2],"Napalm":[5,3],"Ringing Ears":[1,1],"Powder Runners":[0,1]},
-  "ironhold.venom": {"Planted by Hand":[0,1],"Shaped Charges":[0,3],"Fuse Cutter":[0,2],"Blasting Wage":[1,3],"Black Powder Pack":[2,1],"Cracked Plate":[2,3],"Powder Trail":[3,1],"Rubble":[1,1],"Short Fuse":[3,2],"Tamped Charges":[2,0],"Long Trail":[4,1],"Demolition":[4,2],"Siege Master":[5,1],"Chain Demolition":[5,2],"Breach and Clear":[5,0],"Collapse":[4,3]},
-  "champ:ih_thane": {"Locked Shields":[1,3],"Shield-Ring":[0,2],"Wall of the Clan":[2,1],"Thane's Line":[4,2],"Horn of the Hold":[2,3],"Braced Heels":[3,3],"Dented Plate":[3,0],"Shield-Brother":[3,1],"Deep Roots":[5,0],"Shield-Toll":[1,0],"War Cry":[4,3],"Unbroken Line":[5,1],"Rising Peaks":[4,0],"Holds the Pass":[5,3],"Clan Drill":[0,3]},
-  "champ:ih_artificer": {"Tally Wheel":[0,0],"Riveting Peal":[0,3],"Scrap Shrapnel":[0,2],"Engine Yard":[4,1],"Lodestone":[1,0],"Stronger Field":[2,0],"Barbed Rivets":[1,1],"Torn Loose":[2,2],"Counterweight":[3,1],"Magnetised":[3,3],"Overpressure":[4,0],"Chain Drive":[5,1],"Wrecking Ball":[2,1],"Restless Stone":[5,2],"Ricochet Rivets":[1,3],"Spare Parts":[3,2]},
-  "champ:ih_brewer": {"Leaky Keg":[0,0],"Slick Floor":[0,2],"Heavy Barrel":[0,3],"Open Tap":[3,0],"Firewater Breath":[1,0],"Double Measure":[2,0],"Sticky Stout":[3,3],"Scorching Gust":[2,2],"Brimming Keg":[5,3],"Spilled Pints":[5,0],"Last Call":[4,1],"On the Slate":[1,2],"Last Orders":[4,3],"Topped Up":[1,1]},
-  "silver.glaive": {"Shield-Ward":[1,0],"Witness the Blow":[0,2],"Staggering Bash":[0,1],"Shield of Faith":[3,0],"Vigil":[5,2],"Edge of Dawn":[0,0],"Rampart of Dawn":[1,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,3],"Oath of Rebuke":[5,0],"Unyielding":[4,1],"Unbroken Oath":[4,3],"Pommel Blow":[2,0],"The Line Held":[3,3],"Dawn Shield":[2,2],"Ringing Rampart":[2,1]},
-  "silver.arrow": {"First Testimony":[1,1],"Witnessed":[0,0],"Twin Quarrels":[5,0],"Mark of the Accused":[1,2],"Flare Bolt":[2,1],"Heavy Quarrel":[4,1],"Slow Match":[3,1],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,0],"Bodkin Heads":[1,3],"Sworn Witnesses":[4,0],"Storm of Silver":[5,3],"Crank on the Verdict":[0,3],"Testimony Heard":[2,2],"Pinning Light":[3,3]},
-  "silver.frost": {"Tightening Links":[0,0],"Glinting Links":[1,1],"Tight Bindings":[1,3],"Dazzle":[0,2],"Twin Chains":[4,3],"Chain of Penance":[1,0],"Scouring Light":[2,0],"Last Rites":[3,2],"Blinding Chains":[4,0],"Chain of Judgement":[5,3],"Vigil Chains":[4,2],"Quick Binding":[5,1],"Shackle Litany":[5,2],"Swift Lash":[2,1],"Vigil Lamp":[3,1],"Glare of Dawn":[3,0]},
-  "silver.arcane": {"Full Gallop":[0,1],"Couched Lance":[0,3],"Spurs":[2,1],"Grail Quest":[1,2],"Tourney Passes":[1,1],"Shining Example":[4,3],"Trampling Hooves":[3,1],"Charge of the Vow":[3,3],"Echoing Verdict":[5,3],"Glory of the Charge":[5,0],"Rallying Vow":[4,0],"Vowkeeper":[4,1],"Unhorse":[3,2],"Shield and Spur":[0,0],"Grail's Grace":[2,3],"Unhorsing Ride":[2,0]},
-  "silver.storm": {"Zenith":[1,1],"Morning Rays":[0,3],"Sky Verdict":[3,0],"Fall from Grace":[4,1],"Prism":[2,1],"Kindled Faith":[5,1],"Noon Sweep":[3,1],"Dawnfall":[4,2],"Lance of Heaven":[5,0],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[2,3],"Searing Eye":[0,0],"Burning Pinions":[0,1],"Piercing Dawn":[1,0],"Sun Wheel":[4,3]},
-  "silver.earth": {"Press of Battle":[0,0],"Crushing Weight":[1,3],"Tremor":[1,0],"Ringing Steel":[5,1],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,0],"Final Judgement":[5,3],"Sword of Heaven":[3,0],"Sundering Blow":[2,1],"Marked by the Blade":[4,1],"Hurled Verdict":[4,2],"Sundered Plate":[0,2],"Reliquary":[2,0],"Censed Blade":[1,2],"Consecrated Earth":[3,2]},
-  "silver.cannon": {"Fanned Embers":[1,3],"Lingering Smoke":[1,2],"Glowing Coal":[5,1],"Swift Swing":[3,2],"Procession of Incense":[2,2],"Choking Smoke":[1,1],"Kindle the Censers":[4,1],"Censing of the Faithful":[5,0],"Ember Psalm":[5,2],"Thick Smoke":[2,0],"Purging Fire":[2,3],"Rekindling":[4,0],"Ash in the Eyes":[0,3],"Offering Bowl":[0,0],"Pall of Smoke":[0,2],"Censing Prayer":[3,1]},
-  "silver.venom": {"Broken Litany":[0,3],"Scorching Seal":[0,2],"Heavy Silence":[1,2],"Dry Well":[1,0],"Zealot's Vow":[0,1],"Writ of Seizure":[2,2],"Forfeit":[1,1],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[3,2],"Heretic's Stake":[4,0],"Penitent Chains":[4,2],"Confession":[4,1],"Pyre Eternal":[5,0],"Ashes Speak":[5,2],"Grand Inquest":[5,3]},
-  "champ:so_lion": {"Shoulder to Shoulder":[1,0],"Lowered Shield":[3,3],"Wide Sweep":[1,2],"Shield Wall":[4,0],"Bulwark Slam":[2,0],"Shields Raised":[3,0],"Burnished Shields":[2,3],"Rally to the Shield":[3,1],"The Far Bank":[5,3],"Debt of Oaths":[5,2],"Unbroken":[4,2],"The Crossing":[4,3],"The Ford Itself":[5,1],"Swift Reprisal":[0,3],"Hearts Lifted":[0,1]},
-  "champ:so_dawn": {"Early Dawn":[0,3],"Clear Sky":[0,1],"Dawn Chorus":[0,2],"Cloister Wall":[5,3],"Prism of Dawn":[1,3],"Lingering Star":[2,3],"Searing Light":[4,3],"Be Still":[3,3],"Noonday":[4,2],"Blinding Glare":[2,1],"Radiant Hymn":[2,2],"Dawnsinger":[5,2],"High Noon":[3,2],"Spilled Light":[5,0],"Bright Halo":[1,0],"First Light":[1,2],"Noon Bell":[4,1]},
-  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[0,2],"Ready Ledger":[0,3],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,0],"Trampling Host":[2,3],"Clerk’s Quill":[3,1],"Grey Justicar":[5,1],"Final Verdict":[4,3],"Riders of the Ford":[4,2],"Ride Them Down":[1,2],"Court Fines":[2,1],"Summary Ruling":[1,1]},
-  "stormborn.glaive": {"Wolf at the Throat":[1,0],"Hunting Bond":[0,2],"Hock Bite":[0,3],"Hunter's Due":[5,0],"Pack Tactics":[2,2],"Scent of Rain":[1,2],"Restless Spear":[5,1],"Wolf and Spear":[3,2],"Spirit Pack":[5,2],"Moonfang Pounce":[4,2],"Stormpin":[4,1],"Guard the Pass":[2,1],"Grounding Spear":[3,3],"Thunder-Called Spear":[1,3],"Blood on the Fur":[2,0],"Hunting Cry":[3,1]},
-  "stormborn.arrow": {"Riding the Gale":[0,2],"Through and Through":[1,1],"Quick Wind":[2,2],"Gust Fletching":[0,0],"Headwind":[1,2],"Walking Wind":[5,3],"Featherfall":[3,1],"Skyward Gust":[4,3],"Skyrend":[5,1],"Lightning Fletch":[5,0],"Rain Arrows":[2,1],"Hurricane Volley":[3,3],"Updraft Reader":[1,0],"Breath of the Gust":[0,3],"Eddying Wake":[4,0]},
-  "stormborn.frost": {"Heavy Hail":[0,1],"Water Turns to Ice":[1,1],"Brittle Cold":[2,2],"Sleet":[3,1],"Hail Cairn":[5,3],"Bitter Rain":[1,2],"Black Ice":[2,1],"Skystone":[3,0],"Frozen Through":[5,2],"Frostbound Totem":[4,0],"Ice Crust":[2,0],"Frost Lightning":[3,3],"Hail Shatter":[5,1],"First Clouds":[0,0],"Meltwater":[1,3],"Shattering Hail":[4,3],"Brittle Fall":[4,2]},
-  "stormborn.arcane": {"Restless Dead":[0,2],"Deep Hex":[1,2],"Lingering Spirits":[3,3],"Spirit Weight":[0,3],"Judgment":[2,0],"Ancestors' Toll":[2,2],"Walk On":[5,3],"Spirit Host":[5,2],"Spirit Walk":[4,3],"Renewed Hex":[3,2],"Spirit Echo":[4,1],"The Final Tally":[5,1],"Spirit Draw":[2,1],"Debts Repaid":[0,1],"Kindred Chains":[1,1],"Final Reckoning":[3,0]},
-  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[1,2],"Conductor":[2,1],"Overcharge":[3,2],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[4,1],"Living Storm":[5,1],"Last Spark":[5,3],"Lightning Rod":[3,1],"Stormseed":[5,2],"Split Sky":[3,0],"Copper Crown":[4,3],"Ground Strike":[0,2],"Drinking the Storm":[4,0],"Wardsplitter Bolts":[0,1],"Thunder Wings":[2,3]},
-  "stormborn.earth": {"Ground Gives Way":[1,3],"Deep Fissures":[0,3],"Mountain's Echo":[5,0],"Rattled":[4,3],"Stonewake":[2,3],"Shake Loose":[1,2],"Widening Earth":[5,2],"Riftmaker":[4,1],"Sinkhole":[4,2],"Rift Rhythm":[3,3],"Mud and Rain":[0,0],"Storm Mire":[5,1],"Second Tremor":[1,0],"Stone Remembers":[3,0],"Drumming Feet":[2,2],"Deep Rift":[3,2]},
-  "stormborn.cannon": {"Long Clouds":[1,0],"Brooding Sky":[0,1],"Many Skies":[5,3],"Heavy Rain":[3,0],"Storm Dance":[1,3],"Static Clouds":[4,3],"Rain Dance":[1,1],"Skyleap":[3,3],"Breaking Sky":[5,2],"Rolling Clouds":[4,2],"Landing Thunder":[4,1],"Sky Strike":[2,3],"Sky Lattice":[5,0],"Thunder Answers":[0,2],"Rain Returns":[3,2],"Drenching Pour":[2,1],"Rainmaker":[2,2]},
-  "stormborn.venom": {"Downwind Haul":[0,2],"Long Cord":[1,1],"Quick Cast":[0,1],"Sky Lore":[0,0],"Ground Stake":[2,1],"Charged Harpoons":[1,0],"Drenching Barbs":[2,2],"Heavy Air":[3,1],"Many Cords":[3,3],"Skyfall Harpoon":[3,2],"Pinned to Earth":[4,3],"Storm-Cord":[4,0],"Fallen Sky":[4,2],"Twin Harpoon":[5,2],"Master of the Sky":[5,3]},
-  "champ:sb_caller": {"Heavy Clouds":[0,1],"Crown of Rain":[1,2],"Rain on Rain":[0,3],"Drum Circle":[2,0],"Thunder Drum":[1,1],"Long Roll":[2,1],"Drenching Storm":[3,0],"Drum of the Host":[3,3],"Two Tomorrows":[5,0],"Eye of the Gathering":[4,2],"Storm Caller":[5,1],"Tomorrow's Storm":[4,0],"Drum in the Rain":[5,2],"Gusting Staff":[0,0],"Rainwell":[1,0]},
-  "champ:sb_wind": {"Rain in the Wind":[0,3],"Feather-Cut":[0,2],"Wide Funnel":[0,0],"Road's End":[5,2],"Stoneward Gale":[1,3],"Wide Gale":[2,3],"Biting Gale":[3,1],"Feather Gift":[3,2],"Long Road Back":[3,0],"Hard Landing":[4,3],"Wind at Her Back":[1,0],"Twin Gale":[5,0],"Turn the Road":[2,0],"Whirling Steps":[1,1],"Returning Breath":[2,2],"Rising Air":[4,1]},
-  "champ:sb_beast": {"Old Calls":[1,3],"Keen Nose":[0,3],"Long Hunt":[0,0],"Wolf Den":[4,2],"Wolfsong":[2,3],"Heel Biters":[3,3],"Pack Hunger":[3,0],"Thunder on the Prey":[4,1],"Stormcarrier":[5,0],"Blood Trail":[5,1],"Spirit Run":[3,1],"Beastcaller":[5,3],"Thunderbird’s Talons":[4,0],"Pack Pace":[0,2],"Hunter's Breath":[2,1],"Hunter's Stride":[1,2]},
-  "wardbound.glaive": {"Avenging Oath":[0,3],"Deep Carving":[1,1],"Oathbreaker's Due":[0,1],"Oathsworn Cut":[1,2],"Sword and Stone":[3,0],"Oath Kept":[0,2],"Rune Cleave":[2,2],"Unbroken Line":[3,1],"Hold Fast":[2,1],"Bright Wards":[3,2],"Final Oath":[4,1],"Oath of Iron":[2,3],"Linebreaker":[4,2],"Oath Fulfilled":[5,1],"Oathfire":[5,3],"Shared Oath":[5,2]},
-  "wardbound.arrow": {"The Long Watch":[1,3],"Masked Sight":[0,2],"Rune-Etched Edge":[1,2],"Branding Edge":[2,3],"Mask's Tally":[0,0],"Mark the Fallen":[0,1],"Returning Oath":[3,3],"Branding Rite":[2,1],"Line Cut":[3,2],"Dragging Edge":[4,3],"Caught Again":[4,0],"Warding Glaive":[4,2],"Glaive of Judgement":[5,0],"Twin Wards":[5,1],"Lodestar":[5,2]},
-  "wardbound.frost": {"Brand-Rime":[0,1],"Wide Sweep":[0,2],"Creeping Rime":[0,3],"Bitter Steel":[1,0],"Hard Rime":[2,1],"Meltwater":[1,3],"Frostbite":[2,0],"Winter Ward":[3,1],"Rimecut":[2,2],"Deep Bite":[3,0],"Long Winter":[4,1],"Shatter Oath":[4,0],"Cold Vigil":[4,2],"Biting Wind":[3,3],"Winter's Line":[5,1],"Hoarfrost":[5,0],"Rime Crown":[5,3]},
-  "wardbound.arcane": {"Shared Margins":[0,3],"Lingering Ink":[0,1],"Ward-Cutting Script":[1,1],"Deep Script":[0,0],"Palimpsest":[2,3],"Spent Ink":[3,3],"Detonate":[1,0],"Ink of Binding":[3,2],"Sigil Ward":[1,2],"Chain Reaction":[2,0],"Scribe the Road":[4,2],"Double Stroke":[3,1],"Volatile Script":[4,1],"The Last Word":[5,2],"Cascade":[5,1],"Runesight":[5,3]},
-  "wardbound.storm": {"Couched Lance":[0,0],"Thunder Hooves":[2,3],"Branding Sparks":[0,3],"Forked Pennon":[0,2],"Storm Pennant":[1,0],"Sky-Drawn":[1,2],"Spur and Lance":[2,2],"Cracking Pennant":[2,0],"Thunderbrand":[4,3],"Skyfall":[3,2],"Charge Through":[3,3],"Pennant Call":[3,1],"Gathering Storm":[4,0],"Sky's Answer":[4,2],"Thunder Oath":[5,3],"Stormwake":[5,0],"Second Thunder":[5,1]},
-  "wardbound.earth": {"Broad Shield":[1,3],"Iron Rhythm":[0,2],"Deep Quake":[0,3],"Restless Earth":[1,1],"Braced Shove":[2,2],"Anvil's Toll":[2,3],"Quake Line":[2,1],"Wall of Shields":[3,3],"Shield Brand":[3,0],"Fault Line":[3,1],"Anvil Stance":[4,3],"Rune-Shaker":[4,1],"Aftershock":[4,2],"Unmoving":[5,3],"Breaking Stance":[5,1],"Mountain's Weight":[5,0]},
-  "wardbound.cannon": {"Spotter":[1,3],"Wide Blast":[1,1],"Heavy Bolts":[0,3],"Long Pin":[0,2],"Crank Drill":[2,3],"Steady Crew":[3,0],"Rune Shot":[1,2],"Chain Bolt":[3,3],"Pinned and Branded":[3,1],"Kindled Runes":[2,2],"Iron Tether":[4,3],"Bolt Sequence":[2,0],"Shatter Shot":[4,2],"Rearm":[4,1],"Unbroken Chain":[5,0],"Ballista Volley":[5,2],"Kept Runes":[5,1]},
-  "wardbound.venom": {"Field Chaplain":[1,2],"Urgent Hands":[1,3],"Deep Mending":[0,2],"Incense of Vigil":[0,1],"Sworn Vow":[2,3],"Mender's Due":[1,0],"Siege-Ward":[2,0],"Oath Renewed":[3,3],"Choking Censer":[2,1],"Rite of Holding":[3,0],"Vow of Iron":[3,2],"Ember Vow":[4,2],"Long Rite":[4,0],"Keeper of Vows":[5,3],"Sanctuary":[5,2],"Hallowed Road":[5,0]},
-  "champ:wb_varic": {"Patient Oath":[0,1],"Warden's Reach":[1,2],"Wide Ring":[1,3],"Shield Brothers":[4,1],"Hold Fast":[1,1],"Long Vigil":[2,1],"Heavy Hand":[3,3],"Shared Watch":[2,2],"The Gate Holds":[5,3],"The Road Remembers":[5,2],"Steady Pace":[3,0],"Last Warden":[5,0],"The Last Gate":[4,3],"Held to Account":[2,0],"Old Discipline":[0,2]},
-  "champ:wb_aedric": {"Eager Sun":[1,2],"Sunlit Reach":[0,1],"Sun's Due":[1,0],"Into the Fray":[4,3],"Sun Charge":[2,2],"Sun-Struck Trail":[3,2],"Searing Wheel":[3,1],"Rallying Cry":[3,0],"Undying Blaze":[5,1],"Open Road":[5,0],"Hot Blood":[4,0],"Sun-Sworn":[5,2],"Blaze of Glory":[4,1],"Battle Fever":[2,1],"Spurs":[0,0]},
-  "champ:wb_isaura": {"Ready Vow":[0,3],"Silent Vow":[0,1],"Vow Carved":[0,2],"Witness of Vows":[3,1],"Binding Sweep":[1,3],"Tighter Bonds":[2,3],"Heavy Vow":[3,0],"Shared Vow":[2,2],"Turned Twice":[5,0],"Sworn Road":[5,3],"Quiet Step":[4,3],"Veiled Oath":[5,2],"Oath Turned":[4,0],"Vow's Reckoning":[1,1],"Measured Sweeps":[1,0]},
+  "champ:rootmother": {"Patient Earth":[0,2],"Long Vines":[1,1],"Deep Grip":[0,0],"Twin Elders":[5,2],"Rootway":[1,2],"Bramble Grasp":[2,2],"Thorned Roots":[1,3],"Sap Song":[2,0],"Heartwood Sapling":[3,3],"Strangling Hold":[3,1],"Sapling Warden":[4,3],"Rootmother":[5,1],"The Old Wood Walks":[2,3],"Thousand Roots":[5,0],"Quick Tendrils":[0,1],"Deep Sap":[4,0],"Sapling Song":[4,2]},
+  "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,2],"Snaring Rain":[0,3],"Root Platform":[2,2],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[2,0],"Hunter’s Patience":[3,2],"Blood Moon":[5,3],"Snarled Ground":[4,1],"Running Shafts":[3,3],"Warden’s Mark":[4,0],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,2],"Captain's Share":[3,1],"Moonlit Aim":[5,2]},
+  "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[1,0],"Passing Spores":[2,1],"Compost":[4,2],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[3,0],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[1,1],"Seedmother":[5,0],"Full Bloom":[4,3],"Rotfeast":[4,1],"Busy Hive":[0,2],"Honey Store":[0,0]},
+  "conclave.glaive": {"Measured Cuts":[0,1],"Opening Salute":[0,3],"Lone Duel":[1,2],"Riftsteel Edge":[2,2],"Ward-Splitter":[1,1],"Charged Edge":[2,1],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[4,2],"Thrown Riftblade":[4,0],"Fifth Form":[4,3],"Phase Dancer":[3,2],"Ghostblade Rush":[5,3],"Weaver's Blade":[5,1],"Press the Opening":[0,0],"Binding Cut":[1,3],"Guard Broken":[3,1]},
+  "conclave.arrow": {"Twin Casting":[0,3],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Homing Missiles":[2,2],"Apprentice's Zeal":[4,0],"Missile Curtain":[1,2],"Echoing Missiles":[3,1],"Charged Curtain":[4,2],"Gathering Orb":[3,0],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,0],"Cold Focus":[0,0],"Lecture Hall":[5,3],"Margin Notes":[1,3],"Recitation":[1,1],"Static Sparks":[3,3]},
+  "conclave.frost": {"Hoar Ink":[0,1],"Biting Spear":[1,1],"Frozen Lance":[5,3],"Second Spear":[4,1],"Entomb":[2,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,2],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[1,0],"Singing Ice":[1,2],"Needle Rime":[0,2],"Brittle Coffin":[3,3]},
+  "conclave.arcane": {"Lagging Hour":[2,0],"Tick Forward":[3,3],"Borrowed Time":[4,2],"Heavy Hours":[0,2],"Backward Hour":[3,2],"Paradox":[1,0],"Stopped Clock":[4,1],"Quickening Bell":[5,1],"Frozen Moment":[5,0],"Hourglass Heart":[3,0],"Recurrence":[4,3],"Rewound Wounds":[2,2],"Arcane Clockwork":[2,1],"Borrowed Hour":[5,3],"Pendulum Swing":[0,1],"Stolen Sand":[0,3],"Patient Hours":[1,2]},
+  "conclave.storm": {"Wide Heavens":[0,1],"Star-Chart":[1,1],"Constellation":[5,0],"Skybreaker":[0,2],"Comet":[2,0],"Lodestar":[2,1],"Grounded Stars":[4,3],"Zodiac":[3,2],"Starfall Sky":[5,3],"Twin Stars":[5,2],"Grand Orrery":[3,3],"Twinkling Ice":[2,3],"Frost Lens":[3,1],"Turning Spheres":[4,0],"Night Sight":[0,0],"Cold Starlight":[1,2],"Ill Omen":[4,1]},
+  "conclave.earth": {"Broad Palms":[1,2],"Second Tremor":[0,3],"Staggering Blow":[3,2],"Mana Quarry":[4,3],"Heave":[2,2],"Shatterground":[5,1],"Deep Magma":[2,0],"Golem Core":[2,3],"Living Bulwark":[4,1],"Fault Line":[4,0],"Obsidian":[3,3],"Walking Wall":[5,0],"Ember Stone":[1,0],"Living Mountain":[5,2],"Granite Fists":[1,1],"Ley Reservoir":[0,1],"Glyph Anchor":[3,1]},
+  "conclave.cannon": {"Slow-Burning Ink":[2,3],"Wide Blast":[1,0],"Pyre Scribe":[1,2],"Fire Feeds Mana":[3,0],"Firewalk":[4,1],"Cinder Charge":[3,2],"Skipping Flame":[2,0],"Phoenix":[3,1],"Ember Heart":[5,1],"Pyre Lord":[5,2],"Rolling Inferno":[4,3],"Endless Skip":[5,0],"Searing Tide":[4,2],"Leaping Cinders":[0,2],"Thermal Crack":[2,1],"Wardburn":[1,3],"Kindled Fingers":[0,3]},
+  "conclave.venom": {"Keen Crescent":[1,2],"Hunting Crescent":[0,1],"Lasting Undoing":[0,3],"Quick Severing":[2,2],"Ward Feedback":[0,0],"Returning Crescent":[1,3],"Splintering":[3,2],"Sever the Link":[2,1],"Seeking Edge":[2,3],"Arcane Memory":[3,1],"Rend the Veil":[4,2],"Shatterpoint":[4,1],"Brimming Severance":[3,0],"Void Ground":[5,2],"Unravelling Veil":[5,0],"Wardbreaker":[5,3]},
+  "champ:cc_arch": {"Quick Quill":[1,3],"Open Book":[1,0],"Marginalia":[0,0],"Read the Marks":[3,1],"Unravel":[2,3],"Loose Threads":[3,3],"Threads Pulled":[2,2],"Shared Lesson":[3,2],"Deeper Loom":[5,2],"Woven Edge":[4,0],"Snapping Threads":[4,3],"Spellweaver":[5,1],"Sixfold Loom":[4,2],"Rewoven Threads":[5,0],"Flicked Pages":[0,1],"Deep Inkwell":[1,1]},
+  "champ:cc_chrono": {"Patient Hands":[0,1],"Long Pendulum":[0,2],"Weighted Hour":[0,3],"Gathered Ghosts":[5,0],"Recall":[1,1],"Long Way Back":[2,1],"Leaden Minutes":[2,0],"Lent Time":[2,2],"Endless Hour":[4,0],"Late Arrival":[4,1],"Second Hand":[3,3],"Timekeeper":[5,1],"The Hour Strikes":[3,0],"Twelve Strokes":[5,3],"Ticking Hand":[1,3],"Saved Seconds":[3,2],"Leaden Pull":[4,2]},
+  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,2],"Follow-Through":[0,3],"Practice Yard":[3,1],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[1,1],"Shared Edge":[3,2],"Bursting Seams":[5,3],"Cut the Fallen":[4,0],"Flourish":[3,3],"Blade of the Conclave":[5,1],"Unbound Blade":[4,3],"Duelling Ground":[4,2],"Flowing Cuts":[2,2],"Steady Breath":[2,1],"Chain to Blade":[5,2]},
+  "ironhold.glaive": {"Heavy Shoulders":[2,0],"Bearded Axe":[1,2],"Ringing Rim":[3,2],"Off Balance":[1,0],"Bowling Shove":[2,1],"Spinning Shield":[2,2],"Hot Shards":[5,1],"Shield Rush":[3,3],"Armourbreaker":[5,0],"Breaker's Blow":[4,1],"Brace and Shove":[3,1],"Shield Signal":[4,0],"Breach the Line":[5,3],"Hold the Pass":[4,2],"Caught Between Shields":[0,3],"Plate Salvage":[0,2],"Knock Them Flat":[1,3]},
+  "ironhold.arrow": {"Powder Smoke":[0,2],"Range-Finder":[1,0],"Long Belt":[2,2],"Called Shot":[5,2],"Rattlegun":[1,2],"Sighting In":[1,3],"Kneecapper":[4,3],"Thunder Belt":[5,1],"Gatling Crank":[5,0],"Breaching Slug":[3,3],"Quick Swab":[2,1],"Hard Kick":[3,0],"Case-Hardened":[4,0],"Quick Reload":[0,1],"Powder Tally":[2,3],"Pinning Rounds":[3,1],"Called Volley":[4,2]},
+  "ironhold.frost": {"Weighted Chains":[1,3],"Third Wrap":[0,1],"Trap Line":[3,3],"Tangle":[0,0],"Tripwire":[2,3],"Bound and Broken":[4,2],"Twin Nets":[5,2],"Double Line":[5,0],"Harpoon Winch":[3,2],"Bear Trap":[5,3],"Wide Nets":[2,0],"Hooked Chain":[4,1],"Spiked Caltrops":[2,2],"Wing Cords":[1,2],"Trapper's Haul":[1,1],"Barbed Chain":[3,1],"Caltrop Bed":[4,0]},
+  "ironhold.arcane": {"Searing Brand":[1,2],"Deep Brand":[0,1],"Brand Chain":[2,2],"Swift Inscription":[2,1],"Ringing Anvil":[5,0],"Masterwork Strike":[4,2],"Rune of Making":[1,1],"Rune of Unmaking":[4,0],"Rune Lord":[5,1],"Answering Rune":[2,3],"Runic Overflow":[0,3],"Forge Heat":[3,0],"Runebrand Detonation":[5,3],"Kinsmark":[0,2],"Paid in Kind":[3,3],"Quench":[1,0]},
+  "ironhold.storm": {"Torn Wings":[0,0],"Scorched Barrel":[1,1],"Spent Flare":[5,2],"Chain-Fed":[3,1],"Sky Shatter":[0,1],"Grapnel Shot":[2,1],"Tracer Rounds":[3,2],"Starshell":[4,2],"Endless Belt":[5,1],"Shellstorm":[5,3],"Reel In":[4,0],"Ground Burst":[2,3],"Hot Shrapnel":[1,0],"Barbed Shrapnel":[0,2],"Sky Watch":[1,3]},
+  "ironhold.earth": {"Packed Crowd":[0,3],"Steam in the Cracks":[1,2],"Scalding Steam":[2,3],"Rivet Popper":[1,1],"Piston Rhythm":[5,1],"Pile Driver":[1,3],"Echoing Slam":[4,0],"Groundsplitter":[5,0],"Molten Rivets":[5,2],"Steam Uppercut":[3,0],"Tremor Step":[3,1],"Safety Valve":[4,2],"Line Them Up":[4,3],"Hammer Home":[0,1],"Pressure Gauge":[2,0],"Steam Jacket":[2,1],"Piledriven":[3,2]},
+  "ironhold.cannon": {"Glowing Casings":[1,2],"Whistling Shells":[1,1],"Rattling Blast":[3,2],"Pitch-Soaked Wadding":[2,3],"Skipping Shell":[2,2],"Double Crew":[3,0],"Red-Hot Tube":[5,0],"Big Bertha":[4,1],"Clinging Fire":[0,3],"The Long Drop":[4,0],"Shrapnel Casing":[3,1],"Quake Shell":[4,3],"Walking Fire":[5,2],"Napalm":[5,1],"Ringing Ears":[0,1],"Powder Runners":[0,0]},
+  "ironhold.venom": {"Planted by Hand":[0,3],"Shaped Charges":[1,1],"Fuse Cutter":[0,0],"Blasting Wage":[2,2],"Black Powder Pack":[2,1],"Cracked Plate":[1,3],"Powder Trail":[3,1],"Rubble":[1,0],"Short Fuse":[3,2],"Tamped Charges":[2,0],"Long Trail":[4,1],"Demolition":[4,2],"Siege Master":[5,3],"Chain Demolition":[5,2],"Breach and Clear":[5,0],"Collapse":[4,3]},
+  "champ:ih_thane": {"Locked Shields":[0,2],"Shield-Ring":[0,0],"Wall of the Clan":[3,1],"Thane's Line":[4,0],"Horn of the Hold":[1,2],"Braced Heels":[2,2],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,0],"War Cry":[4,1],"Unbroken Line":[5,1],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,3]},
+  "champ:ih_artificer": {"Tally Wheel":[0,1],"Riveting Peal":[0,2],"Scrap Shrapnel":[0,0],"Engine Yard":[3,2],"Lodestone":[1,1],"Stronger Field":[2,1],"Barbed Rivets":[1,0],"Torn Loose":[3,3],"Counterweight":[3,0],"Magnetised":[4,3],"Overpressure":[4,1],"Chain Drive":[5,2],"Wrecking Ball":[2,0],"Restless Stone":[5,1],"Ricochet Rivets":[2,3],"Spare Parts":[4,2]},
+  "champ:ih_brewer": {"Leaky Keg":[0,0],"Slick Floor":[1,2],"Heavy Barrel":[1,1],"Open Tap":[3,2],"Firewater Breath":[1,0],"Double Measure":[2,0],"Sticky Stout":[3,3],"Scorching Gust":[3,1],"Brimming Keg":[5,3],"Spilled Pints":[5,2],"Last Call":[4,1],"On the Slate":[2,1],"Last Orders":[4,3],"Topped Up":[0,2]},
+  "silver.glaive": {"Shield-Ward":[0,3],"Witness the Blow":[0,2],"Staggering Bash":[1,3],"Shield of Faith":[3,0],"Vigil":[5,1],"Edge of Dawn":[0,0],"Rampart of Dawn":[1,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,2],"Oath of Rebuke":[5,0],"Unyielding":[4,3],"Unbroken Oath":[3,1],"Pommel Blow":[2,3],"The Line Held":[4,1],"Dawn Shield":[2,2],"Ringing Rampart":[2,1]},
+  "silver.arrow": {"First Testimony":[1,0],"Witnessed":[0,3],"Twin Quarrels":[5,3],"Mark of the Accused":[1,2],"Flare Bolt":[2,0],"Heavy Quarrel":[4,0],"Slow Match":[3,0],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,3],"Bodkin Heads":[1,1],"Sworn Witnesses":[4,3],"Storm of Silver":[5,1],"Crank on the Verdict":[0,1],"Testimony Heard":[2,2],"Pinning Light":[3,1]},
+  "silver.frost": {"Tightening Links":[0,0],"Glinting Links":[1,3],"Tight Bindings":[0,1],"Dazzle":[0,2],"Twin Chains":[4,2],"Chain of Penance":[1,0],"Scouring Light":[2,0],"Last Rites":[3,1],"Blinding Chains":[3,2],"Chain of Judgement":[5,0],"Vigil Chains":[4,1],"Quick Binding":[5,3],"Shackle Litany":[5,1],"Swift Lash":[2,3],"Vigil Lamp":[4,3],"Glare of Dawn":[2,2]},
+  "silver.arcane": {"Full Gallop":[0,1],"Couched Lance":[0,0],"Spurs":[2,1],"Grail Quest":[1,0],"Tourney Passes":[1,1],"Shining Example":[4,3],"Trampling Hooves":[2,0],"Charge of the Vow":[3,3],"Echoing Verdict":[5,2],"Glory of the Charge":[5,1],"Rallying Vow":[4,2],"Vowkeeper":[4,0],"Unhorse":[3,2],"Shield and Spur":[1,2],"Grail's Grace":[2,3],"Unhorsing Ride":[3,1]},
+  "silver.storm": {"Zenith":[0,1],"Morning Rays":[1,3],"Sky Verdict":[2,1],"Fall from Grace":[4,0],"Prism":[2,0],"Kindled Faith":[5,0],"Noon Sweep":[3,0],"Dawnfall":[4,2],"Lance of Heaven":[5,3],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[3,3],"Searing Eye":[0,2],"Burning Pinions":[1,2],"Piercing Dawn":[1,1],"Sun Wheel":[4,1]},
+  "silver.earth": {"Press of Battle":[1,1],"Crushing Weight":[1,3],"Tremor":[0,1],"Ringing Steel":[5,1],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,0],"Final Judgement":[5,3],"Sword of Heaven":[3,0],"Sundering Blow":[2,2],"Marked by the Blade":[4,2],"Hurled Verdict":[4,1],"Sundered Plate":[1,2],"Reliquary":[2,0],"Censed Blade":[0,2],"Consecrated Earth":[3,1]},
+  "silver.cannon": {"Fanned Embers":[2,2],"Lingering Smoke":[1,0],"Glowing Coal":[5,1],"Swift Swing":[3,0],"Procession of Incense":[2,0],"Choking Smoke":[0,2],"Kindle the Censers":[4,1],"Censing of the Faithful":[5,0],"Ember Psalm":[5,2],"Thick Smoke":[1,3],"Purging Fire":[3,2],"Rekindling":[4,2],"Ash in the Eyes":[0,1],"Offering Bowl":[0,0],"Pall of Smoke":[1,1],"Censing Prayer":[3,1]},
+  "silver.venom": {"Broken Litany":[1,0],"Scorching Seal":[0,3],"Heavy Silence":[1,2],"Dry Well":[0,2],"Zealot's Vow":[1,3],"Writ of Seizure":[2,2],"Forfeit":[0,1],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[3,2],"Heretic's Stake":[4,0],"Penitent Chains":[4,1],"Confession":[3,3],"Pyre Eternal":[5,0],"Ashes Speak":[5,1],"Grand Inquest":[5,2]},
+  "champ:so_lion": {"Shoulder to Shoulder":[1,1],"Lowered Shield":[3,3],"Wide Sweep":[0,0],"Shield Wall":[4,1],"Bulwark Slam":[2,1],"Shields Raised":[3,1],"Burnished Shields":[2,2],"Rally to the Shield":[3,0],"The Far Bank":[5,3],"Debt of Oaths":[5,2],"Unbroken":[4,2],"The Crossing":[4,3],"The Ford Itself":[5,0],"Swift Reprisal":[0,2],"Hearts Lifted":[1,0]},
+  "champ:so_dawn": {"Early Dawn":[0,3],"Clear Sky":[0,1],"Dawn Chorus":[0,0],"Cloister Wall":[5,1],"Prism of Dawn":[1,3],"Lingering Star":[2,3],"Searing Light":[4,2],"Be Still":[3,0],"Noonday":[4,1],"Blinding Glare":[3,2],"Radiant Hymn":[2,1],"Dawnsinger":[5,0],"High Noon":[3,1],"Spilled Light":[5,2],"Bright Halo":[2,2],"First Light":[1,1],"Noon Bell":[4,3]},
+  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[1,2],"Ready Ledger":[0,2],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,1],"Trampling Host":[2,2],"Clerk’s Quill":[3,2],"Grey Justicar":[5,2],"Final Verdict":[4,3],"Riders of the Ford":[4,2],"Ride Them Down":[2,1],"Court Fines":[3,1],"Summary Ruling":[0,1]},
+  "stormborn.glaive": {"Wolf at the Throat":[0,2],"Hunting Bond":[0,3],"Hock Bite":[0,1],"Hunter's Due":[5,0],"Pack Tactics":[2,3],"Scent of Rain":[1,3],"Restless Spear":[5,1],"Wolf and Spear":[3,2],"Spirit Pack":[5,3],"Moonfang Pounce":[4,0],"Stormpin":[4,1],"Guard the Pass":[3,0],"Grounding Spear":[2,2],"Thunder-Called Spear":[2,1],"Blood on the Fur":[1,2],"Hunting Cry":[3,1]},
+  "stormborn.arrow": {"Riding the Gale":[1,3],"Through and Through":[0,1],"Quick Wind":[3,3],"Gust Fletching":[1,2],"Headwind":[2,3],"Walking Wind":[5,1],"Featherfall":[2,1],"Skyward Gust":[4,1],"Skyrend":[5,2],"Lightning Fletch":[5,3],"Rain Arrows":[3,0],"Hurricane Volley":[3,1],"Updraft Reader":[0,2],"Breath of the Gust":[1,0],"Eddying Wake":[4,2]},
+  "stormborn.frost": {"Heavy Hail":[0,2],"Water Turns to Ice":[1,3],"Brittle Cold":[1,1],"Sleet":[3,3],"Hail Cairn":[5,0],"Bitter Rain":[0,1],"Black Ice":[2,3],"Skystone":[3,0],"Frozen Through":[5,2],"Frostbound Totem":[4,0],"Ice Crust":[2,0],"Frost Lightning":[4,1],"Hail Shatter":[5,1],"First Clouds":[1,2],"Meltwater":[2,1],"Shattering Hail":[3,2],"Brittle Fall":[4,3]},
+  "stormborn.arcane": {"Restless Dead":[0,1],"Deep Hex":[1,2],"Lingering Spirits":[3,3],"Spirit Weight":[0,0],"Judgment":[3,1],"Ancestors' Toll":[2,2],"Walk On":[5,3],"Spirit Host":[5,2],"Spirit Walk":[4,3],"Renewed Hex":[3,2],"Spirit Echo":[4,0],"The Final Tally":[5,1],"Spirit Draw":[2,0],"Debts Repaid":[0,3],"Kindred Chains":[1,1],"Final Reckoning":[4,2]},
+  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[0,1],"Conductor":[2,1],"Overcharge":[4,2],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[4,1],"Living Storm":[5,1],"Last Spark":[5,2],"Lightning Rod":[3,1],"Stormseed":[5,3],"Split Sky":[2,3],"Copper Crown":[4,0],"Ground Strike":[1,3],"Drinking the Storm":[3,2],"Wardsplitter Bolts":[1,2],"Thunder Wings":[3,3]},
+  "stormborn.earth": {"Ground Gives Way":[0,1],"Deep Fissures":[1,0],"Mountain's Echo":[5,3],"Rattled":[3,1],"Stonewake":[1,1],"Shake Loose":[2,0],"Widening Earth":[5,2],"Riftmaker":[4,3],"Sinkhole":[4,2],"Rift Rhythm":[2,1],"Mud and Rain":[1,2],"Storm Mire":[5,0],"Second Tremor":[0,3],"Stone Remembers":[4,1],"Drumming Feet":[3,0],"Deep Rift":[3,2]},
+  "stormborn.cannon": {"Long Clouds":[0,1],"Brooding Sky":[0,2],"Many Skies":[5,3],"Heavy Rain":[3,0],"Storm Dance":[1,0],"Static Clouds":[4,3],"Rain Dance":[1,2],"Skyleap":[3,3],"Breaking Sky":[5,1],"Rolling Clouds":[3,2],"Landing Thunder":[4,1],"Sky Strike":[2,3],"Sky Lattice":[5,2],"Thunder Answers":[0,0],"Rain Returns":[4,0],"Drenching Pour":[2,2],"Rainmaker":[2,1]},
+  "stormborn.venom": {"Downwind Haul":[0,0],"Long Cord":[1,1],"Quick Cast":[1,3],"Sky Lore":[0,2],"Ground Stake":[2,1],"Charged Harpoons":[0,3],"Drenching Barbs":[2,2],"Heavy Air":[3,1],"Many Cords":[2,0],"Skyfall Harpoon":[3,2],"Pinned to Earth":[4,0],"Storm-Cord":[3,3],"Fallen Sky":[4,2],"Twin Harpoon":[5,3],"Master of the Sky":[5,1]},
+  "champ:sb_caller": {"Heavy Clouds":[0,2],"Crown of Rain":[1,3],"Rain on Rain":[1,1],"Drum Circle":[3,2],"Thunder Drum":[1,2],"Long Roll":[2,2],"Drenching Storm":[3,0],"Drum of the Host":[2,1],"Two Tomorrows":[5,0],"Eye of the Gathering":[4,1],"Storm Caller":[5,3],"Tomorrow's Storm":[4,0],"Drum in the Rain":[5,1],"Gusting Staff":[0,0],"Rainwell":[0,1]},
+  "champ:sb_wind": {"Rain in the Wind":[0,3],"Feather-Cut":[0,2],"Wide Funnel":[1,1],"Road's End":[5,2],"Stoneward Gale":[1,3],"Wide Gale":[2,3],"Biting Gale":[3,2],"Feather Gift":[4,0],"Long Road Back":[3,0],"Hard Landing":[3,1],"Wind at Her Back":[1,0],"Twin Gale":[5,1],"Turn the Road":[2,0],"Whirling Steps":[0,1],"Returning Breath":[2,2],"Rising Air":[4,3]},
+  "champ:sb_beast": {"Old Calls":[0,0],"Keen Nose":[0,3],"Long Hunt":[0,1],"Wolf Den":[4,0],"Wolfsong":[1,0],"Heel Biters":[2,0],"Pack Hunger":[3,2],"Thunder on the Prey":[4,1],"Stormcarrier":[5,2],"Blood Trail":[5,3],"Spirit Run":[2,3],"Beastcaller":[5,1],"Thunderbird’s Talons":[4,2],"Pack Pace":[1,1],"Hunter's Breath":[3,3],"Hunter's Stride":[1,2]},
+  "wardbound.glaive": {"Avenging Oath":[0,0],"Deep Carving":[2,1],"Oathbreaker's Due":[0,3],"Oathsworn Cut":[1,0],"Sword and Stone":[3,3],"Oath Kept":[0,2],"Rune Cleave":[2,0],"Unbroken Line":[3,1],"Hold Fast":[1,2],"Bright Wards":[3,0],"Final Oath":[4,1],"Oath of Iron":[2,2],"Linebreaker":[4,3],"Oath Fulfilled":[5,1],"Oathfire":[5,3],"Shared Oath":[5,2]},
+  "wardbound.arrow": {"The Long Watch":[0,3],"Masked Sight":[1,1],"Rune-Etched Edge":[0,2],"Branding Edge":[2,1],"Mask's Tally":[1,0],"Mark the Fallen":[1,2],"Returning Oath":[3,1],"Branding Rite":[2,0],"Line Cut":[3,2],"Dragging Edge":[4,1],"Caught Again":[4,0],"Warding Glaive":[4,2],"Glaive of Judgement":[5,0],"Twin Wards":[5,3],"Lodestar":[5,2]},
+  "wardbound.frost": {"Brand-Rime":[0,3],"Wide Sweep":[0,1],"Creeping Rime":[0,2],"Bitter Steel":[1,0],"Hard Rime":[2,2],"Meltwater":[2,3],"Frostbite":[2,0],"Winter Ward":[3,2],"Rimecut":[1,1],"Deep Bite":[3,0],"Long Winter":[4,2],"Shatter Oath":[4,1],"Cold Vigil":[4,3],"Biting Wind":[3,1],"Winter's Line":[5,3],"Hoarfrost":[5,1],"Rime Crown":[5,0]},
+  "wardbound.arcane": {"Shared Margins":[0,2],"Lingering Ink":[0,3],"Ward-Cutting Script":[1,0],"Deep Script":[0,1],"Palimpsest":[1,2],"Spent Ink":[3,3],"Detonate":[1,1],"Ink of Binding":[3,2],"Sigil Ward":[2,0],"Chain Reaction":[2,1],"Scribe the Road":[4,2],"Double Stroke":[2,3],"Volatile Script":[4,0],"The Last Word":[5,2],"Cascade":[5,1],"Runesight":[5,0]},
+  "wardbound.storm": {"Couched Lance":[0,0],"Thunder Hooves":[2,1],"Branding Sparks":[0,1],"Forked Pennon":[0,2],"Storm Pennant":[1,0],"Sky-Drawn":[1,2],"Spur and Lance":[2,2],"Cracking Pennant":[2,0],"Thunderbrand":[4,1],"Skyfall":[3,2],"Charge Through":[3,1],"Pennant Call":[3,3],"Gathering Storm":[4,0],"Sky's Answer":[4,2],"Thunder Oath":[5,1],"Stormwake":[5,0],"Second Thunder":[5,3]},
+  "wardbound.earth": {"Broad Shield":[0,0],"Iron Rhythm":[0,2],"Deep Quake":[1,2],"Restless Earth":[1,1],"Braced Shove":[2,3],"Anvil's Toll":[3,0],"Quake Line":[2,1],"Wall of Shields":[3,3],"Shield Brand":[2,2],"Fault Line":[3,1],"Anvil Stance":[4,3],"Rune-Shaker":[4,0],"Aftershock":[4,2],"Unmoving":[5,3],"Breaking Stance":[5,2],"Mountain's Weight":[5,1]},
+  "wardbound.cannon": {"Spotter":[1,0],"Wide Blast":[1,3],"Heavy Bolts":[0,1],"Long Pin":[0,2],"Crank Drill":[2,3],"Steady Crew":[3,0],"Rune Shot":[1,2],"Chain Bolt":[3,3],"Pinned and Branded":[3,2],"Kindled Runes":[2,2],"Iron Tether":[4,3],"Bolt Sequence":[2,1],"Shatter Shot":[4,1],"Rearm":[4,2],"Unbroken Chain":[5,0],"Ballista Volley":[5,1],"Kept Runes":[5,2]},
+  "wardbound.venom": {"Field Chaplain":[1,1],"Urgent Hands":[1,3],"Deep Mending":[0,1],"Incense of Vigil":[1,2],"Sworn Vow":[2,3],"Mender's Due":[0,0],"Siege-Ward":[2,0],"Oath Renewed":[3,3],"Choking Censer":[2,2],"Rite of Holding":[3,0],"Vow of Iron":[4,2],"Ember Vow":[4,1],"Long Rite":[4,0],"Keeper of Vows":[5,1],"Sanctuary":[5,2],"Hallowed Road":[5,3]},
+  "champ:wb_varic": {"Patient Oath":[0,3],"Warden's Reach":[0,0],"Wide Ring":[1,2],"Shield Brothers":[4,1],"Hold Fast":[1,3],"Long Vigil":[2,3],"Heavy Hand":[3,0],"Shared Watch":[3,2],"The Gate Holds":[5,0],"The Road Remembers":[5,1],"Steady Pace":[2,1],"Last Warden":[5,2],"The Last Gate":[4,0],"Held to Account":[2,2],"Old Discipline":[0,1]},
+  "champ:wb_aedric": {"Eager Sun":[1,2],"Sunlit Reach":[1,3],"Sun's Due":[0,3],"Into the Fray":[4,3],"Sun Charge":[2,2],"Sun-Struck Trail":[3,2],"Searing Wheel":[3,1],"Rallying Cry":[3,0],"Undying Blaze":[5,1],"Open Road":[5,0],"Hot Blood":[4,0],"Sun-Sworn":[5,2],"Blaze of Glory":[4,1],"Battle Fever":[2,0],"Spurs":[0,1]},
+  "champ:wb_isaura": {"Ready Vow":[0,3],"Silent Vow":[0,0],"Vow Carved":[0,2],"Witness of Vows":[2,1],"Binding Sweep":[1,3],"Tighter Bonds":[2,3],"Heavy Vow":[3,0],"Shared Vow":[3,1],"Turned Twice":[5,0],"Sworn Road":[5,1],"Quiet Step":[4,2],"Veiled Oath":[5,2],"Oath Turned":[4,0],"Vow's Reckoning":[1,1],"Measured Sweeps":[1,2]},
 };
 /* </spread> */
 
@@ -53381,14 +53382,14 @@ const ELEM_FX_DEF = {
   // the Frostweavers' frost (frostfx.js; drawn live by the ice shader, frosttex.js). Sizes in world units.
   cc_rime: {
     // the staff's crystal: its glow's width, brightness, how much a gathering cast adds, mist a second, glints a second
-    hand: { w: .34, k: .7, gather: .7, fog: .9, glint: .6 },
+    hand: { w: .34, k: .7, gather: .7, fog: .9, glint: .6, fern: .16 },
     // the shard in flight: its length, its width per length, brightness, how clear, its glow, the most of a foe's height it
     // flies at (it flies straight and level from the staff; at a foe shorter than that it comes down to this)
     core: { long: .5, fat: .3, k: 1, clear: .15, disc: .35, aim: .75, heart: .3, star: .32 },
     // its wake: the torn air's length, a puff of mist every so far, its size, how long it hangs, a glint's chance
-    trail: { streak: .8, gap: .2, puff: .46, secs: .55, glint: .2, shed: .3 },
+    trail: { streak: .8, gap: .24, puff: .46, secs: .55, glint: .2, shed: .3, fern: .3 },
     // the landing's needles: width, how long, brightness
-    burst: { w: 1.05, secs: .15, k: 1.15, spray: 1.1, crown: .3 },
+    burst: { w: 1.05, secs: .15, k: 1.15, spray: 1, crown: 0, rose: .3 },
     // splinters flung: how many, how hard, their length, how long
     shards: { count: 6, fling: 1.6, w: .2, secs: .5 },
     // the puff of cold: how many, size, how long
@@ -53400,9 +53401,9 @@ const ELEM_FX_DEF = {
   cc_glacialglyph: {
     // the lance: as the shard, and its barbs' length (x its own)
     core: { long: 1.25, fat: .17, k: 1.05, clear: .1, disc: .3, aim: .75, barb: .3, heart: .4, star: .42 },
-    trail: { streak: 1.2, gap: .2, puff: .58, secs: .75, glint: .5, shed: .5 },
+    trail: { streak: 1.2, gap: .24, puff: .58, secs: .75, glint: .5, shed: .5, fern: .46 },
     // the landing: needles, and the spikes driven out the far side of the foe (how many, their length)
-    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9, spray: 1.7, crown: .42 },
+    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9, spray: 1.7, crown: .42, rose: .62 },
     shards: { count: 11, fling: 2.1, w: .25, secs: .55 },
     mist: { puffs: 2, w: .9, secs: .9 },
     light: { rad: 1.6, k: .45, secs: .25, fly: .45 },
@@ -53410,20 +53411,20 @@ const ELEM_FX_DEF = {
   cc_rimelance: {
     // the crystals grown round the foe: how many, their height (x the foe's), width (x its girth), how fast they grow (s),
     // how clear the ones before it are, brightness
-    crystals: { count: 8, high: 1, wide: 1, grow: .24, clear: .55, k: 1, glint: 1.6, spray: 2 },
+    crystals: { count: 8, high: 1, wide: 1, grow: .24, clear: .55, k: 1, glint: 1.6, spray: 2, fern: .8 },
     // the one great clear crystal closed over the foe: its height (x the foe's), width (x its girth), how clear, brightness
     core: { high: 1.3, wide: 2.3, clear: .9, k: .9, back: .3 },
     // as it breaks: splinters, how hard, their length, how long
     shards: { count: 10, fling: 1.7, w: .24, secs: .65 },
     // its mist: puffs as it closes and breaks, size, how long; a wisp every (s) while it holds; Coffin Burst's wave
-    mist: { puffs: 2, w: .9, secs: 1, every: .6 },
+    mist: { puffs: 2, w: .9, secs: 1, every: .2 },
     light: { rad: 1.5, k: .36, secs: .3 },
   },
   cc_hoarbloom: {
     // the bloom over the foe: petals, their length, width per length, how high over its head, how fast it grows (s), how
     // clear, brightness, its glow
-    crystals: { count: 6, long: .6, fat: .3, y: .5, grow: .3, clear: .3, k: 1, disc: .5, heart: .5 },
-    burst: { w: 1.2, secs: .17, k: 1, spray: 2.1 },
+    crystals: { count: 6, long: .6, fat: .3, y: .5, grow: .34, clear: .3, k: 1, disc: .5, heart: .6, turn: .35 },
+    burst: { w: 1.2, secs: .17, k: 1, spray: 2.1, rose: .95 },
     shards: { count: 14, fling: 2.6, w: .2, secs: .6 },
     // the wave of cold rolling out to the burst's real edge: puffs, their size (x the radius), how long
     mist: { puffs: 9, w: .85, secs: .85 },
@@ -53462,6 +53463,7 @@ const EFX_INFO = {
 Object.assign(EFX_INFO, { long: ['Length', .05, 2.5, .01], fat: ['Width (per length)', .05, .8, .01], clear: ['Clearness (0 solid, 1 glass)', 0, 1, .01], gather: ['Grows as a cast gathers (x)', 0, 3, .05],
   fog: ['Mist (a second / density)', 0, 4, .05], glint: ['Glints (chance / a second)', 0, 4, .05], streak: ['Torn air length', 0, 3, .02], gap: ['A puff every (cells)', .05, 1, .01], puff: ['Puff size', .05, 1.5, .01],
   spikes: ['Spikes out the far side', 0, 5, 1], spike: ['Spike length', .1, 1.5, .01], barb: ['Barb length (x the lance)', 0, .8, .01], high: ['Height (x the foe)', .1, 3, .01], wide: ['Width (x the foe)', .2, 4, .01],
+  fern: ['Hoarfrost feathers (length)', 0, 1.5, .01], rose: ['Star of hoarfrost (arm length)', 0, 2, .01], turn: ['Turns (a second)', 0, 2, .01],
   heart: ['Glowing heart', 0, 1.5, .02], star: ['Star on its point', 0, 1.5, .02], shed: ['Crystals shed (chance a puff)', 0, 1, .02], spray: ['Frost spray width', 0, 4, .02], crown: ['Crown of ice (spike length)', 0, 1, .01], back: ['Cold light behind the foe', 0, 1, .01],
   grow: ['Grows over (s)', .03, 1, .01], facet: ['Facet contrast', 0, 2.5, .02], edge: ['Edge brightness', 0, 3, .02], sparkle: ['Sparkle', 0, 3, .02], inner: ['Inner facets and fractures', 0, 3, .02], rime: ['Rime at the root', 0, 2, .02] });
 
@@ -58478,6 +58480,7 @@ flat in vec4 vTint; flat in vec2 vX; uniform float uTime;
 uniform sampler2D uBg; uniform float uBgOn; uniform vec2 uRes; uniform vec4 uFR, uFE; uniform vec2 uFD;
 uniform sampler2D uGT; uniform float uGTOn; uniform vec2 uGTS;   // tiled ground texture: (world units per repeat, gain)
 uniform sampler2D uGPT; uniform float uGPOn, uGPGain; uniform vec4 uGP;   // painted map laid on the ground: (x0, z0, 1/width, 1/depth)
+uniform float uGPE;   // how fast it blurs and sinks into the dark past its edges (1 as it always was; a map's own, maps.js painted.edge: above 1 it also dims the last two units inside its left and right edges)
 uniform sampler2D uGLT; uniform float uGLOn; uniform vec4 uGL;   // the ground's glint (glintdata.js): (strength, sharpness, world units a repeat, the blades' relief); mask scale in uGLK
 uniform float uGLK;
 uniform sampler2D uWM; uniform vec4 uWK;   // a painted map's moving water (tools/make_clwater.py: r the mask, gb the flow): (on, speed, warp, shimmer)
@@ -58625,7 +58628,8 @@ void main(){
     // stood upright on it, drawn as ground, shows the painting behind it and so only hides what stands behind: greatroot.js)
     vec2 gxz = vW.xz - vec2(0., max(vW.y, 0.)*.6494), uv = (gxz - uGP.xy)*uGP.zw, ov = max(max(-uv, uv - 1.), 0.);
     float od = length(ov/uGP.zw);   // world units past the painting's edge: there the mirrored copy blurs and darkens, so its seam never shows
-    vec3 tx = texture(uGPT, uv, clamp(od*1.8, 0., 5.)).rgb*(1. - clamp(od/3.6, 0., .85));
+    vec3 tx = texture(uGPT, uv, clamp(od*1.8*uGPE, 0., 5. + min(uGPE - 1., 1.5))).rgb*(1. - clamp(od*uGPE/3.6, 0., mix(.85, .95, clamp(uGPE - 1., 0., 1.))));
+    if(uGPE > 1.01) tx *= mix(.22, 1., smoothstep(-.2, 2., min(uv.x, 1. - uv.x)/uGP.z));   // (such a map's painting also dims toward its left and right edges, so the seam with its mirrored copy lies in the dark)
     if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .02) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
     float shp = uShadowOn>.5 ? shadowAt(vL) : 1.;
     vec3 pl = vec3(0.);
@@ -59756,7 +59760,7 @@ function createRenderer(canvas, opt = {}) {
       const lm = this.lm;
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, lm ? lm.tex : blank); gl.uniform1i(u.uLM, 2); gl.uniform1f(u.uLMOn, lm ? 1 : 0);
       if (lm) { gl.uniform4fv(u.uLMR, lm.rect); gl.uniform1f(u.uLMK, lm.k * (this.lmGain == null ? 1 : this.lmGain)); }
-      if (u.uGPT) { const gp = this.gpaint; gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, gp ? gp.tex : blank); gl.uniform1i(u.uGPT, 5); gl.uniform1f(u.uGPOn, gp ? 1 : 0); if (gp) { gl.uniform4f(u.uGP, gp.rect[0], gp.rect[1], 1 / gp.rect[2], 1 / gp.rect[3]); gl.uniform1f(u.uGPGain, gp.gain || 1); } if (u.uGPS) gl.uniform2f(u.uGPS, gp && gp.shade ? 1 : 0, gp && gp.shade ? gp.shade : 1); }
+      if (u.uGPT) { const gp = this.gpaint; gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, gp ? gp.tex : blank); gl.uniform1i(u.uGPT, 5); gl.uniform1f(u.uGPOn, gp ? 1 : 0); if (gp) { gl.uniform4f(u.uGP, gp.rect[0], gp.rect[1], 1 / gp.rect[2], 1 / gp.rect[3]); gl.uniform1f(u.uGPGain, gp.gain || 1); } if (u.uGPE) gl.uniform1f(u.uGPE, gp && gp.edge || 1); if (u.uGPS) gl.uniform2f(u.uGPS, gp && gp.shade ? 1 : 0, gp && gp.shade ? gp.shade : 1); }
       if (u.uWM) { const w = this.gwater, on = !!(w && w.tex && this.gpaint && !(typeof GFX !== 'undefined' && GFX === 'low')), k = on ? w.k || WATER_K1 : WATER_K1;   // (a painted map's moving water: off on Graphics Low)
         gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, on ? w.tex : blank); gl.uniform1i(u.uWM, 13); gl.uniform4f(u.uWK, on ? 1 : 0, k[0], k[1], k[2]); }
       if (u.uGLT) { const gl_ = this.glintTex(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, gl_ || blank); gl.uniform1i(u.uGLT, 8); gl.uniform1f(u.uGLOn, gl_ && this.glintOn && !(typeof vfxFid === 'function' && vfxFid().name === 'Low') ? 1 : 0); if (gl_) { const g = this.glint; gl.uniform4f(u.uGL, g.strength, g.sharpness, g.scale, g.relief); gl.uniform1f(u.uGLK, typeof GLINT_MASK_K !== 'undefined' ? GLINT_MASK_K : .31); } }
@@ -63255,11 +63259,13 @@ const GNOLL_KIMODO = {"v":1,"src":{"run":"run_lope_3","back":"death_back_3","fwd
    flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's own rect (CL_PAINT_RECT). */
 const CL_FLOW = 'data:image/png;base64,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';
 
-/* Greatroot Way's painted stream (generated by tools/make_grpaint.py): R the water mask, G B its flow (0.5 + 0.5 *
-   direction * speed, the painting's x and y), over the painting's own rect (GR_PAINT_RECT). */
-const GR_FLOW = 'data:image/png;base64,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';
-const GR_ENTRY = [[5.524, -4.684], [6.667, -4.173], [7.476, -3.662], [7.619, -2.754], [6.952, -1.561], [6.0, -0.483]];   // world x, z: from behind the trunk at the head, down the painted road
-const GR_OCC = [[-2.867, [[3.048, -6.955], [5.333, -6.955], [5.476, -5.82], [5.762, -5.309], [6.31, -5.195], [6.857, -4.855], [7.095, -4.344], [7.19, -3.776], [7.619, -3.123], [7.643, -2.867], [6.667, -2.896], [5.476, -2.981], [4.286, -3.094], [3.048, -3.208]]]];   // the painted trunk foes come out from behind: [its foot's z, its outline (x, z on the painting)]
+/* Greatroot Way's painted water, its way in and the trunks at its head (generated by tools/make_grpaint.py).
+   GR_FLOW: R the water mask, G B its flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's
+   own rect (GR_PAINT_RECT). */
+const GR_FLOW = 'data:image/png;base64,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';
+const GR_ENTRY = [[1.951, -6.035], [4.42, -5.888], [4.975, -4.784], [5.284, -3.018]];   // world x, z: from behind the trunk at the head, onto the road's far end, down it
+const GR_TUN = [0.22, 2.098, -3.938];   // the walk in's perspective: [how much smaller at the far end (1 / (1 + k)), over how many rows, the row of full size]
+const GR_OCC = [[-5.667, [[1.086, 3.062, -14.794], [1.086, 3.062, -11.85], [1.148, 3.0, -9.642], [0.901, 3.093, -8.17], [0.531, 3.34, -7.25], [0.16, 3.586, -6.698], [-0.025, 3.833, -6.33], [-0.241, 3.957, -5.962], [-0.241, 3.957, -5.667]]], [-5.52, [[7.506, 12.259, -14.794], [7.506, 12.259, -11.85], [7.105, 12.259, -9.458], [6.765, 12.414, -7.839], [6.21, 12.568, -7.066], [5.901, 12.877, -6.587], [5.84, 13.494, -5.962], [5.84, 13.494, -5.52]]]];   // the trunks at the head, to stand behind: [the foot's z, rows [x left, x right, z] down the painting]
 
 /* The units' material textures (generated by tools/make_unittex.py from assets/units/tex/). A material missing here
    keeps its painted stand-in (matPaint in gl.js). When one has decoded, the material textures are built again. */
@@ -63621,16 +63627,17 @@ const MAPS = {
   clearing: { name: 'Sunfall Glade', blurb: 'Dappled light in the deep wood', entry: typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : null },
 };
 /* Greatroot Way: the elves' road home under the old trees. The owner's painting is the map (grpaint.js from
-   tools/make_grpaint.py: the glade between the great trees, the stepped stream, the cliff and the valley below; owner,
-   10 Nov 2026: "can you mix in this painting ... prefer this over the cliffs and your water"), with the units, the foes,
-   the moving water and the light of the game on it (greatroot.js). Foes come out from behind the painted trunk at the
-   head and down the painted road (entry: world x, z waypoints, the spawn point at the field's head added by the game:
-   game.js), small with distance at first (tun: how much smaller, over how many rows: view.js tunK), and leave down the
-   painted path at the foot (exitX).
+   tools/make_grpaint.py: a sunlit grass road between great trees, running away to a point between two trunks at the
+   head, a stream and pool on the left, a cascade on the right; owner, 10 Nov 2026: "try this one instead"), with the
+   units, the foes, the moving water and the light of the game on it (greatroot.js). Foes come out from behind the trunk
+   left of the road, nearly full size, cross onto the road and turn down it (entry: world x, z waypoints, the spawn point
+   at the field's head added by the game: game.js; tun: how much smaller they are coming out, over how many rows, the row
+   where they reach full size: game.js tunP, view.js tunK). exitX: where a painted path leaves at the foot, for
+   a map whose path does not leave at the middle (this one's does).
    The full 3D version (map3d.js M3D_DEFS.greatroot3d: terrain, brook, cliff, TreeForge trunks) is kept behind
    ?map3d=greatroot; GR3_ENTRY is its way in, behind its gate elder. */
 const GR3_ENTRY = [[3.5, -7.2], [4.5, -6.25], [5.9, -5.55], [6.75, -4.3], [6.5, -2.7]];
-if (typeof GR_PAINT !== 'undefined') MAPS.greatroot = { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: GR_ENTRY, tun: [1.7, 4.4], exitX: 6.75 };
+if (typeof GR_PAINT !== 'undefined') MAPS.greatroot = { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: GR_ENTRY, tun: typeof GR_TUN !== 'undefined' ? GR_TUN : null };
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
 /* Tunable light schemes. Colours are sRGB hex, strengths multiply them in linear light. The Lighting panel edits a copy per map. */
 const LIGHT_DEF = {
@@ -64064,11 +64071,12 @@ const THEMES = {
   greatroot: typeof GR_PAINT === 'undefined' ? null : {
     id: 'greatroot', sunDir: nrm3([-.54, .73, -.42]), sunCol: [1.6, 1.25, .8], sky: [.2, .3, .3], gnd: [.14, .16, .09], fogHex: '#24463e',
     pitch: 57, fitTop: GR_PAINT_RECT[1] + .1, fitBot: GR_PAINT_RECT[1] + GR_PAINT_RECT[3] - .1, noKeep: true, h: () => 0, fly: [.85, 1, .45],
-    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .42,
+    camX: GR_PAINT_RECT[0] + GR_PAINT_RECT[2] / 2, viewW: GR_PAINT_RECT[2] * 1.1,   // (the view looks at the painting's middle and shows at most a twentieth of the view past each of its sides, dark forest there: view.js setCam, fitCamera)
+    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .7,
     // its god rays, along the painting's own (x, z, width, strength: view.js drawForestShafts), and the spray at its falls (x0, x1, z0, z1)
-    shaftPts: [[-8.3, -3.1, 1.3, 1.1], [-1.2, -1.9, 1, .6], [13.4, 6.6, 1, .5], [2.5, 5.3, 1.1, .2], [8.3, 10.3, 1, .18], [-3.4, 12.6, 1, .5]],
-    spray: [[-6.3, -4.9, -1.5, .9], [-5.6, -4.3, 9.6, 10.6]],
-    painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null },
+    shaftPts: [[-8.1, -8.6, 1.3, .9], [5.5, -2.5, 1.1, .5], [-4.1, .3, 1, .45], [-6.6, 6.2, 1, .4], [25.5, 11, 1.2, .55], [16.3, 4.3, 1, .45], [9.2, 4, 1.1, .15], [4.2, 8.8, 1, .13]],
+    spray: [[-9, -7.7, -2.8, -2.2], [-8.2, -6, 2.9, 4.3], [15.1, 18.7, 12.1, 15.3], [19.4, 23.3, 2.2, 4.3]],
+    painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null, edge: 2.5 },   // (edge: it dims toward its sides and sinks into the dark just past them, so its mirrored copy never shows: gl.js uGPE)
     build: () => buildGreatrootPainted(),
   },
   moonwood: {
@@ -65322,22 +65330,25 @@ function m3dFrame(dt) {
 }
 
 /* ================= GREATROOT WAY =================
-   The map is the owner's painting (owner, 10 Nov 2026, with the painting: "can you mix in this painting ... prefer this
-   over the cliffs and your water"): grpaint.js / grwater.js from tools/make_grpaint.py, the theme in maps.js
-   (THEMES.greatroot), its ground and the painted trunk foes come out from behind built here (buildGreatrootPainted).
-   On it, the game's own: the units and foes lit by what is painted under them, the stream moving (gl.js waterAt), god rays
-   along the painting's own, pollen, leaves, spray at the falls, the ward along the field's foot.
+   The map is the owner's painting (owner, 10 Nov 2026: "try this one instead"): a sunlit grass road between great trees,
+   a stream and pool on the left, a cascade over mossy rocks on the right. grpaint.js / grwater.js come from
+   tools/make_grpaint.py, the theme is in maps.js (THEMES.greatroot), its ground and the painted trunks foes come out from
+   behind are built here (buildGreatrootPainted). On it, the game's own: the units and foes lit by what is painted under
+   them, the water moving (gl.js waterAt), god rays along the painting's own, pollen, leaves, spray at the falls, the ward
+   along the field's foot.
 
    The full 3D version before it (M3D_DEFS.greatroot3d in map3d.js: terrain, brook, cliff, TreeForge trunks; ?map3d=greatroot)
-   keeps its painted sky and valley here (grPaintBack). History: a version with code-built trees, rocks and textures is in
-   git at b23a98f (owner: "textures and models dont look good ... go back to using 3d assets instead"). */
+   keeps its painted sky and valley here (grPaintBack). History: two earlier paintings were the map before this one (git
+   991213b; the branch name elf-map-forest-painting); a version with code-built trees, rocks and textures is at b23a98f
+   (owner: "textures and models dont look good ... go back to using 3d assets instead"). */
 
 /* ---------- the painting as the ground ----------
-   A flat ground the painting is laid on (gl.js FS_LIT's painted path; grass until it has decoded), and the painted trunk at
-   the head as something to stand behind (GR_OCC: its outline on the painting, the row its foot stands on): an upright card
-   at its foot, drawn as ground. The painted ground is sampled where the eye's ray through a point meets y 0 (gl.js: z less
-   .6494 of the height, the 57-degree camera), so the card shows exactly the painting behind it and only its depth differs:
-   a foe behind the trunk is hidden by the painted trunk, one in front of it stands over it. */
+   A flat ground the painting is laid on (gl.js FS_LIT's painted path; grass until it has decoded), and the two painted
+   trunks at the head as things to stand behind (GR_OCC: each one's outline on the painting as rows, and the row its foot
+   stands on): an upright card at its foot, drawn as ground. The painted ground is sampled where the eye's ray through a
+   point meets y 0 (gl.js: z less .6494 of the height, the 57-degree camera), so the card shows exactly the painting behind
+   it and only its depth differs: a foe behind a trunk is hidden by the painted trunk, one in front of it stands over it
+   (owner: "have large trees at the top that the models appear from behind"). */
 const GR_VIEW_K = .6494;   // (cot 57 degrees: a point at height y shows where the ground .6494 y further up the field does)
 function buildGreatrootPainted() {
   const [x0, z0, wx, wz] = GR_PAINT_RECT, gr = new Geo(1); gr.jit = 0;
@@ -65345,10 +65356,9 @@ function buildGreatrootPainted() {
   let occ = null;
   if (typeof GR_OCC !== 'undefined') {
     const g = new Geo(1); g.jit = 0;
-    for (const [zf, pts] of GR_OCC) {
-      const P = pts.map(([x, z]) => [x, Math.max(0, (zf - z) / GR_VIEW_K), zf]), c = [0, 0, zf];
-      for (const p of P) { c[0] += p[0] / P.length; c[1] += p[1] / P.length; }
-      for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; g.tri(c, a, b, '#35532a'); g.tri(c, b, a, '#35532a'); }   // (both faces)
+    for (const [zf, rows] of GR_OCC) {
+      const P = rows.map(([xa, xb, z]) => { const y = Math.max(0, (zf - z) / GR_VIEW_K); return [[xa, y, zf], [xb, y, zf]]; });
+      for (let i = 0; i < P.length - 1; i++) { const [a0, b0] = P[i], [a1, b1] = P[i + 1]; g.quad(a0, a1, b1, b0, '#35532a'); g.quad(b0, b1, a1, a0, '#35532a'); }   // (both faces)
     }
     occ = g.finish();
   }
@@ -74682,7 +74692,7 @@ function buildThemeEnv(th) {
   E.treeHs = RD.trees; RD.trees = keep;
   if (th.painted) {
     const img = new Image();
-    img.onload = () => { E.gpaint = { tex: RD.texture(img, 'mirror'), rect: th.painted.rect, shade: th.painted.shade || 0 }; if (TH === th) applyLight();
+    img.onload = () => { E.gpaint = { tex: RD.texture(img, 'mirror'), rect: th.painted.rect, shade: th.painted.shade || 0, edge: th.painted.edge || 1 }; if (TH === th) applyLight();
       if (th.painted.shade) try {   // the painting's light, coarse, for what drifts through it (dust shows in the sunny patches)
         const N = 96, c = document.createElement('canvas'); c.width = N; c.height = Math.round(N * img.height / img.width);
         const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data, L = new Float32Array(c.width * c.height);
@@ -74779,8 +74789,9 @@ function setMap(id) { if (typeof M3D_FORCE !== 'undefined' && M3D_FORCE) id = M3
 
 // oh = half the view height in world units (the orthographic "zoom" that fits the field); zoom = pinch magnification
 function setCam(tz, oh, aspect, shakeX = 0, shakeZ = 0, zoom) {
-  CAM.tgt = [5.5 + shakeX, 0, tz + shakeZ];
-  CAM.eye = [5.5 + shakeX, Math.sin(CAM.pitch) * CAM_D, tz + shakeZ + Math.cos(CAM.pitch) * CAM_D];
+  const cx = TH.camX != null ? TH.camX : 5.5;   // (a map whose painting is not centred on the field looks at the painting's middle: Greatroot Way)
+  CAM.tgt = [cx + shakeX, 0, tz + shakeZ];
+  CAM.eye = [cx + shakeX, Math.sin(CAM.pitch) * CAM_D, tz + shakeZ + Math.cos(CAM.pitch) * CAM_D];
   RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, oh, zoom === undefined ? CAM.zoom : zoom);
 }
 function fitCamera() {
@@ -74804,6 +74815,9 @@ function fitCamera() {
     const c = (y0 + y1) / 2; if (Math.abs(c) < .003) break;
     tz -= c * oh / Math.sin(CAM.pitch);
   }
+  // a painting narrower than the view (viewW: its width in world units, the view centred on it by camX): the view closes in
+  // until the painting fills it from side to side, its foot kept in view and its top cut, so nothing past its edges shows
+  if (TH.viewW && TH.fitBot != null) { const ohMax = TH.viewW / 2 / aspect; if (oh > ohMax) { oh = ohMax; tz = TH.fitBot - .985 * oh / Math.sin(CAM.pitch); } }
   CAM.tz = tz; CAM.oh = oh; CAM.dist = CAM_D;
   zoomClamp();
   cullTrees();
@@ -74889,11 +74903,11 @@ function vstate(c) {
 // painting's ground runs away to a far horizon, so a foe is drawn small, facing you and seen face on, at eye level (laid
 // back by the camera's own tilt, so its height runs straight up the screen), and as it comes out into the clearing it
 // stands up again and the view drops to the one from above
-const tunK = c => walkOff() && c.y < -.9 ? clamp((-.9 - c.y) / tunP()[1], 0, 1) : 0;
+const tunK = c => walkOff() && c.y < tunZ() ? clamp((tunZ() - c.y) / tunP()[1], 0, 1) : 0;
 // the view's drop from eye level to the one from above runs longer than the shrink: the whole way down the tunnel and on
 // into the clearing's head (TUN_TILT cells past the trees), slowly at first, so a foe comes out upright and face on
 const TUN_TILT = 2.2;
-const tunT = c => walkOff() && c.y < TUN_TILT - .9 ? clamp((TUN_TILT - .9 - c.y) / (tunP()[1] + TUN_TILT), 0, 1) : 0;
+const tunT = c => walkOff() && c.y < TUN_TILT + tunZ() ? clamp((TUN_TILT + tunZ() - c.y) / (tunP()[1] + TUN_TILT), 0, 1) : 0;
 const tunE = c => { const k = tunT(c); return Math.min(1, 1.15 * k * k * (3 - 2 * k)); };
 // how big a foe looks on its way down the tunnel: as if far off, by perspective (about a fifth of its size where it
 // appears, growing slowly at first and faster as it nears), its full size on the field
@@ -87855,7 +87869,7 @@ const OB_MOVE = { wb_swordplant: 'plant', wb_wardflare: 'flare', wb_laststand: '
 const OB_T = { plant: 1.25, plantNow: .9, flare: .85, laststand: 1.2, hold: 5, combo: 2.1 };   // (how long each move runs on after its effect)
 const OB_COMBO = { from: 30, to: 100, T: 2.1 };   // (Sword Fight One's frames, from its 37th: the raise overhead (36-54), the great sweep (54-84), the cut out (84-100))
 // the attack: the outward slash, its guard (wind), the frame the blade crosses his front (cut, on the shot), its end
-const OB_CUT = { clip: 'outward', wind: 8, cut: 26.6, end: 44 };
+const OB_CUT = { clip: 'outward', wind: 8, cut: 26.6, end: 44, rec: 58 };   // (rec: where the clip's own recovery has brought the blade back to his side)
 const OB_FLARE = { clip: 'inward', wind: 4, back: 33, cut: 39.2, end: 52, at: .4, s0: .2, s1: .62 };   // (Rune Cleave: the inward slash's frames; at, the flare; s0-s1, the spin)
 const OB_PLANT = { at: .42, leap: .09 };   // (Oathbreaker Thrust: the landing, when it strikes; the leap's height, model units)   // (Ward Flare's sweep: the inward slash, drawn back, crossing, done)
 const OB_GLOW = .45;
@@ -87906,7 +87920,7 @@ function obCtl(t, live, M) {
       if (cu < at + .25) return { f: obClip(M, F.clip, F.cut + (F.end - F.cut) * (cu - at) / .25), rate: 60, spin: sp, glow: .3, act: 1 };
       return { f: obClip(M, OB_CUT.clip, OB_CUT.wind), rate: 8, glow: .15, act: 1 };
     }
-    if (mv === 'hold') return { f: (A.raise || A.stand)[0], rate: cu < .35 ? 12 : 6, glow: .9 + .5 * Math.exp(-cu * 3), act: 1 };   // (Varic's Hold Fast: the sword raised straight overhead, held)
+    if (mv === 'hold') return { f: (A.raise || A.stand)[0], rate: cu < .35 ? 12 : 6, glow: .9 + .5 * Math.exp(-cu * 3), act: 1 };   // (Varic's Hold Fast: the sword raised straight overhead, held; brought round before him first by obRoute)
     if (mv === 'combo') { const F = OB_COMBO, k = cu / F.T; if (k < 1) return { f: obClip(M, 'fight', F.from + (F.to - F.from) * k), rate: 40, glow: .6 + .8 * Math.sin(Math.PI * k), act: 1 }; }
     if (mv === 'laststand') {   // Final Oath, the stoic one: the blade lowered and planted slowly before him, both hands crossed on the
       // pommel, chin up; then held while the oath lasts (the stand below, breathing), and let go when it ends
@@ -87915,14 +87929,69 @@ function obCtl(t, live, M) {
   }
   // the strike: the wind-up to the cut on the shot, then the follow-through, fitted into the time before the next wind-up
   const K = OB_CUT, s = t.shotT == null ? 9 : t.shotT, w = t.windup || 0;
-  if (w > 0 && t.tg) return { f: obClip(M, K.clip, K.wind + (K.cut - K.wind) * obE(w)), rate: w > .85 ? 400 : w < .12 ? 14 : 70, glow: stand ? .7 : 0, act: 1 };   // (no easing lag into the cut: the blade crosses the foe on the shot)
   const iv = Math.max(.2, (t.st && t.st.rate) || 1), wl = Math.min(.6, iv * .6), fol = Math.min((K.end - K.cut) / 30, Math.max(.15, iv - wl - .02));
-  if (s < fol && (t.shots | 0) > 0) return { f: obClip(M, K.clip, K.cut + (K.end - K.cut) * s / fol), rate: s < .1 ? 400 : 50, glow: stand ? .7 : .25, act: 1 };
+  // the way back from the cut: the clip's own recovery (the blade swung back across his front to his side), fitted into the
+  // time before the next wind-up is a quarter in. (He was blended straight from the cut's end to the ready stance, and the
+  // shortest turn between the two took the blade through his own body: up to 117 of its edges crossing his robe and trunk
+  // for 9 frames after every strike.)
+  const rec = Math.max(.14, Math.min(.45, iv - .75 * wl - fol)), r = s - fol;
+  if ((t.shots | 0) > 0 && t._obFol === t.shots && !(t._obAt != null && t._obAt > now - s) && r >= 0 && r < rec && !(w > .25 && t.tg)) return { f: obClip(M, K.clip, K.end + (K.rec - K.end) * obE(r / rec)), rate: 40, glow: stand ? .7 : .1, act: 1 };
+  if (s < fol && (t.shots | 0) > 0 && !(w > .25 && t.tg)) { t._obFol = t.shots; return { f: obClip(M, K.clip, K.cut + (K.end - K.cut) * s / fol), rate: s < .1 ? 400 : 50, glow: stand ? .7 : .25, act: 1 }; }   // (_obFol: this strike's cut was shown, so its recovery follows; a strike made under a spell's move has none, nor one a spell has been cast since)   // (and, as the recovery, it runs on under the next wind-up's first quarter: at the quicker tiers the wind-up began before the cut had finished, and one frame aimed at the ready stance from mid cut put the blade through him)
+  if (w > 0 && t.tg) { const wf = K.wind + (K.cut - K.wind) * obE(w); if (s > .05) { t._obWf = wf; t._obWs = t.shots | 0; t._obWt = now; } return { f: obClip(M, K.clip, wf), rate: w > .85 ? 400 : w < .12 ? 14 : 70, glow: stand ? .7 : 0, act: 1 }; }   // (no easing lag into the cut: the blade crosses the foe on the shot)
+  // (a wind-up cut short, its foe slain or gone (t._obWf, kept while it runs but not on the shot's own frame, where the
+  // strike is already counted): back down the clip's own frames to the ready stance. Followed straight
+  // back from mid wind-up, the Oathbound's blade crossed his trunk: 106 of its edges for 3 frames)
+  if (t._obWf != null) {
+    if (t._obWs !== (t.shots | 0) || t._obWf <= K.wind + .5 || now - t._obWt > .15) t._obWf = null;   // (.15: only a wind-up that was running a moment ago, not one a spell cut across)
+    else { t._obWf = Math.max(K.wind, t._obWf - Math.max(0, Math.min(.1, now - t._obWt)) * 50); t._obWt = now; return { f: obClip(M, K.clip, t._obWf), rate: 40, glow: stand ? .7 : 0, act: 1 }; }
+  }
   const engaged = t.tg || (t.engaged || 0) > 0 || s < 1.2;
   if (engaged) t._obIdleAt = now;
   if (stand) return { f: A.stand[0], rate: 6, glow: .7, act: 0 };
   const restW = now - (t._obIdleAt == null ? -9 : t._obIdleAt) > .8;
   return restW ? { f: A.rest[0], rate: 3.5, glow: 0, act: 0, rest: 1 } : { f: obClip(M, K.clip, K.wind), rate: 9, glow: 0, act: 0 };
+}
+/* ---- the sword's way between his stances (the animation audit, 10 Nov 2026). His poses fall in two groups: the sword
+   before him (rest, the stand, the plant's two poses, the flare's lead-in, Hold Fast's raise) and the sword drawn back at
+   his side (the ready stance and the cut's wind-up, the slash clip's first and last frames). A pose is followed from the
+   last by turning each bone the shortest way, and between the two groups the shortest way took the blade through his own
+   body: up to 97 of its edges crossing his robe and trunk for 12 frames from rest to ready, and through the back of his
+   hood, 12 frames in his head and neck, raising it for Hold Fast (and again lowering it). Measured on Varic's mesh, the
+   cut's approach (the slash clip's frame OB_HUB, the blade out before him) reaches every pose of the first group with no
+   crossing, and the clip's own frames carry it on to the ready stance. So a change of group goes by that frame:
+     before him -> at his side   to the hub, then the clip back down to the ready stance
+     at his side -> before him   the clip up to the hub, then on to the pose at its own pace
+     the combo's last cut -> at his side   the slash clip's own recovery (as after a strike)
+   A move followed at rate 40 or more is left alone: it is there in a frame or two, and a blow must land on its moment. ---- */
+const OB_HUB = 24, OB_BR = { toSide: .46, toFront: .18, out: .34 };
+function obZone(A, f) {
+  for (const n of ['rest', 'stand', 'plantUp', 'plantDown', 'flareUp', 'raise']) if (A[n] && f === A[n][0]) return 'front';
+  const o = f - A.outward[0]; if (o >= 0 && o < A.outward[1]) return o <= 12 || o >= 54 ? 'side' : null;
+  const g = f - A.fight[0]; if (g >= 84 && g < A.fight[1]) return 'out';
+  return null;
+}
+function obRoute(t, M, P, live) {
+  if (!live) return P;
+  const A = UNIT_MDL[M.S.mdl].anim.clips, z = obZone(A, P.f), now = G.time, was = t._obZ;
+  if (z !== 'front' && z !== 'side') {
+    // (a strike wound up straight from a pose before him: the blade waits at the hub, on the cut's own line, until the
+    // wind-up comes up to it, and never goes back round to the drawn-back start)
+    const o = P.f - A.outward[0];
+    if (was === 'front' && o > 12 && o < OB_HUB - 1) return Object.assign({}, P, { f: obClip(M, OB_CUT.clip, OB_HUB), rate: 20 });
+    t._obZ = z; t._obBrAt = null; return P;   // (a cut, a spell's own clip: as it is)
+  }
+  const going = t._obBrAt != null && t._obBrTo === z;   // (a change under way is seen through, even if the move quickens)
+  if (!was || was === z || (P.rate >= 40 && !going)) { t._obZ = z; t._obBrAt = null; return P; }
+  if (was === 'out' && z === 'front') { t._obZ = z; return P; }   // (the combo's last cut to a pose before him: clear as it is)
+  if (t._obBrAt == null || t._obBrTo !== z) { t._obBrAt = now; t._obBrTo = z; }
+  const T = was === 'out' ? OB_BR.out : z === 'side' ? OB_BR.toSide : OB_BR.toFront, u = (now - t._obBrAt) / T;
+  if (u < 0 || u >= 1) { t._obZ = z; t._obBrAt = null; return P; }
+  let f;
+  if (was === 'out') f = OB_CUT.end + (OB_CUT.rec - OB_CUT.end) * obE(u);
+  else if (z === 'side') f = u < .55 ? OB_HUB : OB_HUB + (9 - OB_HUB) * obE((u - .55) / .45);
+  else f = 9 + (OB_HUB - 9) * obE(u);
+  // (followed gently as it starts, so his hands do not leap off the pommel, and closely once the blade is on its way)
+  return Object.assign({}, P, { f: obClip(M, OB_CUT.clip, f), rate: was === 'out' ? (u < .4 ? 16 : 30) : z === 'side' ? (u < .55 ? 14 : 30) : 26 });
 }
 const _obT = new Float32Array(SKIN_MAX * 12);
 // the pose: the frame, followed from his last pose at the move's rate; a breath through the chest
@@ -88007,7 +88076,7 @@ function obDraw(t, tier, sx, sy, sz, wob, opts) {
   const bm = typeof wbBase === 'function' ? dynMesh('ob_base', g => withPal(OB_UNIT, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => wbBase(g)))) : null;
   M4.trs(_obA, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _obA, opts);
   M4.trs(_obA, x, bm ? OB_BASE_H * K * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_obB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_obC, _obA, _obB);
-  const P = obCtl(t, live, M), o = obPose(M, t, P, live);
+  const P = obRoute(t, M, obCtl(t, live, M), live), o = obPose(M, t, P, live);
   if (live) obWhoosh(t);
   const it = item(M.mesh, _obC, opts);
   if (U === VR_UNIT && !icon && typeof QG !== 'undefined' && QG) QG.ground(x, z, (bm ? OB_BASE_H * K * sy : 0) + .006, .2 * s, .2 * s, [0, 0, 0, .5], 2, 0);   // (a soft contact shadow where his robe meets the dais)
@@ -89126,15 +89195,16 @@ if (typeof towerTop === 'function') {
      MIST    a puff of cold fog: soft, broken by slow noise, thinning from inside as it ages
      GLOW    soft added cold light;  GLINT a snow glint, twinkling;  FLASH a burst of thin white needles (an impact)
      STREAK  the cold air torn behind a flying shard;  BURST a spray of frost dust thrown out from a point
+     FERN    a feather of hoarfrost (her own mark): a stem and its barbs, grown in the air, crumbling to grains
    Nothing is drawn as a mark on the ground. Cards: frtBill (facing the camera), frtAxial (along a direction, turned to the
    camera); copied from pyrotex.js for now (the two could share them and the noise's maker once both are merged). Drawn in
    the spells' pass (gl.js vfxGL ext), depth-tested, premultiplied; ice and mist far to near, then the added light.
    The look is the Element Lab's Ice paint (elemfx.js cc_froststyle.paint; its gradient is the palette), live.
    No GL or DOM is touched until the first card is drawn (the sims load this). */
 const FRT = { q: [], sty: null, styAt: -1, tex: null, MAX: 420 };
-const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5, BURST: 6 };
+const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5, BURST: 6, FERN: 7 };
 // laid down: ice and mist (sorted far to near), then added light
-const FRT_ORD = [0, 0, 1, 1, 1, 1, 0];
+const FRT_ORD = [0, 0, 1, 1, 1, 1, 0, 1];
 // the palette, the deep of the ice to its white edge
 const FRT_PAL = ['#0c2f6b', '#1d6fc2', '#58b4ec', '#bfe8fb', '#f4fcff'];
 const frtHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
@@ -89205,14 +89275,17 @@ vec4 N(vec2 p){ return texture(uN, p); }
 float frLin(float d){ return uNF.z > .5 ? uNF.x + d*(uNF.y-uNF.x) : uNF.x*uNF.y/(uNF.y - d*(uNF.y-uNF.x)); }
 float frSoft(float k){ if (uNF.w < .5 || k <= 0.) return 1.; float s = frLin(texelFetch(uDep, ivec2(gl_FragCoord.xy), 0).r); return clamp((s - vD) / k, 0., 1.); }
 
+float sdSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0., 1.)); }
 // a crystal: x across (-1..1), y from its root (0) to its point (1). vB.z how wide, vB.w how much of its length is point
 vec4 shard(vec2 uv){
   float y = uv.y, s1 = fract(SD * 7.31 + .13), s2 = fract(SD * 3.77 + .51);
-  float tip = max(.05, vB.w), tail = vC.w, fat = vB.z;
+  float tip = max(.05, vB.w) * (.72 + .56 * s2), tail = vC.w, fat = vB.z;
   float pt = (1. - y) / tip, pb = tail > 0. ? (y + .015) / tail : 9.;
-  float prof = clamp(min(pt, pb), 0., 1.), w = fat * prof;
+  // (some narrow at a shoulder part way up, as a crystal that grew twice)
+  float ys = .42 + .3 * s2, shd = step(.45, s1) * step(tail, .001) * step(ys, y);
+  float prof = clamp(min(pt, pb), 0., 1.), w = fat * prof * (1. - .26 * shd);
   // (its point sits a little off its middle: a crystal, not a dart)
-  float x = uv.x - (s1 - .5) * .55 * fat * smoothstep(1. - tip, 1., y);
+  float x = uv.x - (s1 - .5) * .95 * fat * smoothstep(1. - tip, 1., y);
   float u = x / max(w, 1e-4), d = (1. - abs(u)) * w;
   // its faces: a roof of three, the ridges where they meet (a, b); toward the point they all tilt forward
   float a = -.52 + .44 * s1, b = min(.8, a + .42 + .34 * s2), z, zu;
@@ -89252,16 +89325,17 @@ vec4 shard(vec2 uv){
   vec4 sn = N(wp * 2.4 + vec2(SD * 7., SD * 2.));
   float spk = smoothstep(.72, .95, sn.b) * step(.62, sn.a) * pow(.5 + .5 * sin(TM * 5. + sn.a * 60.), 6.) * uSty.w;
   float clr = clamp(vC.y * uSty.z, 0., 1.);
-  float hi = ((rim * .8 + ridge * .4) * uSty.y + spec * .95 + sweep * .45 + spk * .85) * (1. - .3 * clr);
-  col += mix(uPal[4], vec3(.8, .82, 1.), .4 * step(0., u)) * hi + uPal[3] * (rim2 * .22 * uSty.y + frac * .12);
+  float ledge = step(.45, s1) * step(tail, .001) * (1. - smoothstep(0., .014, abs(y - ys))) * step(abs(uv.x), fat) * .7;
+  float hi = ((rim * .8 + ridge * .4 + ledge) * uSty.y + spec * .95 + sweep * .45 + spk * .85) * (1. - .3 * clr);
+  col += mix(uPal[4], vec3(.8, .82, 1.), .4 * step(0., u)) * hi + uPal[3] * (rim2 * .22 * uSty.y + frac * .025);
   // cracked: white fractures spreading from its middle
   float ck = vC.x, crack = 0.;
   if (ck > 0.) {
-    float cb = N(vec2(x * vS.y * .5, y * vS.x) * 1.1 + SD * 3.).b;
-    crack = (1. - smoothstep(0., .13, cb)) * smoothstep(ck * 1.3, ck * 1.3 - .35, abs(y - .4)) * min(1., ck * 4.);
-    col += vec3(1.) * crack + uPal[3] * ck * ck * .35;
+    float cb = N(wp * .48 + vec2(SD * 3., SD)).b, up = smoothstep(ck * 1.3, ck * 1.3 - .3, y) * min(1., ck * 4.);
+    crack = (1. - smoothstep(0., .055, cb)) * up;
+    col += mix(uPal[3], vec3(1.), .65) * crack * 1.3 + uPal[2] * (1. - smoothstep(0., .3, cb)) * up * .3 + uPal[3] * ck * ck * .25;
   }
-  float al = clamp(mix(.92, .15, clr) * (1.08 - .3 * tone * clr) + smoothstep(.3, 1., thick) * .12 * clr + hi * .75 + frac * .08 + crack + core * (.25 + .5 * glowk), 0., 1.);
+  float al = clamp(mix(.92, .15, clr) * (1.08 - .3 * tone * clr) + smoothstep(.3, 1., thick) * .12 * clr + hi * .75 + frac * .02 + crack + core * (.25 + .5 * glowk), 0., 1.);
   float aa = fwidth(d) * 1.3 + .004, cov = smoothstep(0., aa, d);
   if (tail <= 0.) {
     // planted: a ragged, rimed root, never a hard line where it meets the ground
@@ -89321,6 +89395,33 @@ void main(){
     v += exp(-r * r * 30.) * pow(1. - t, 5.) * .6;
     float a = clamp(v, 0., 1.) * vB.y * sf;
     o = uBloom.x > .5 ? vec4(uPal[3] * a * vB.x * .25, 0.) : vec4(mix(uPal[2], uPal[4], clamp(v * 1.2, 0., 1.)) * a * vB.x, a * .5);
+  } else if (sh == 7) {
+    // a feather of hoarfrost, as frost grows on a cold pane: a stem, barbs off it in turn to each side, finer barbs off
+    // those. x across, y from its root to its tip; vB.z how far it has grown; AGE: it crumbles away in grains
+    float g = clamp(vB.z, 0., 1.), y = vUV.y, X = abs(vUV.x) * vS.y * .5 / max(vS.x, .001), t = AGE, s = .115;
+    vec2 p = vec2(X, y);
+    float dm = y < g ? X : length(vec2(X, y - g));
+    float j0 = floor(y / s), side = vUV.x > 0. ? .5 : 0.;
+    for (int k = 0; k < 5; k++) {
+      float yi = (j0 - float(k) + side) * s;
+      if (yi < .015 || yi > g) continue;
+      float rn = fract(sin(yi * 91.7 + SD * 13. + side) * 43758.5);
+      float len = .36 * pow(1. - yi / max(g, .01), .55) * min(1., (g - yi) * 6.) * (.7 + .5 * rn) * (.45 + .55 * g);
+      vec2 a = vec2(0., yi), dir = normalize(vec2(.8, .5 + .25 * rn)), b = a + dir * len;
+      dm = min(dm, sdSeg(p, a, b));
+      float tt = dot(p - a, dir), s2 = .055, i0 = floor(tt / s2);
+      for (int m = 0; m < 2; m++) {
+        float ti = (i0 - float(m) + .5) * s2;
+        if (ti < .02 || ti > len) continue;
+        vec2 c = a + dir * ti; float l2 = (len - ti) * .55;
+        dm = min(dm, sdSeg(p, c, c + vec2(.22, .975) * l2));
+      }
+    }
+    float w = .0016 + fwidth(X) * .55, line = smoothstep(w * 1.6, w * .3, dm), halo = exp(-dm * 95.) * .14;
+    float n = N(vec2(vUV.x * .5 * vS.y, y * vS.x) * 2.6 + SD * 3.).r;
+    float keep = smoothstep(t * 1.2 - .12, t * 1.2, n + .08) * (1. - t * t);
+    float v = (line + halo) * keep * vB.y;
+    o = uBloom.x > .5 ? vec4(uPal[3] * v * vB.x * .12, 0.) : vec4(mix(uPal[2], uPal[4], line) * v * vB.x * .85, v * .25);
   } else {
     // the cold air torn behind a flying shard: x across, y from its far end (0) to the shard (1)
     float y = vUV.y, w = .3 + .7 * y;
@@ -89438,7 +89539,9 @@ const FRT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], dr
    MIST, GLOW, GLINT, FLASH, STREAK): hard crystals that grow, crack and shatter, cold mist that sinks and hangs, snow glints,
    a cold light on the ground and the bodies near it. The cold counterpart of the Pyroclasts' fire (pyrofire.js): where fire
    flows and rises, ice is still and sharp, and its mist falls. Gameplay, timing and the sounds are untouched.
-   - The staff: a faint cold glow at its crystal, mist sinking from it, a glint now and then; brighter as a cast gathers.
+   Her mark is hoarfrost: feathers of it (a stem and its barbs, as frost grows on a cold pane) crystallise in the air
+   wherever her spells pass or strike, hold a moment, and crumble to grains.
+   - The staff: a faint cold glow at its crystal, feathers sprouting round it as a cast gathers, mist sinking from it, a glint now and then; brighter as a cast gathers.
    - Frost Bolt (her strike): one shard of ice with a pale core, flying straight and level at its foe, the cold air torn
      behind it, puffs of mist left hanging along its path. It lands in a blink of white needles, splinters flung back and a
      puff of cold.
@@ -89501,10 +89604,13 @@ function ffShard(P, dir, len, o, s, l) {
   o.p0 = .86; o.p1 = o.tip == null ? .34 : o.tip;
   return frtAxial(FRT_SH.SHARD, P, dir, z, z * (o.fat || .3), o);
 }
+// a feather of hoarfrost from P along dir, len long (o.grow: how far it has grown, 0..1; o.age: crumbling away)
+function ffFern(P, dir, len, o, s, l) { const z = ffTune(s, l, len, o); if (z == null || z <= .01) return false; o.p0 = o.grow == null ? 1 : o.grow; return frtAxial(FRT_SH.FERN, P, dir, z, z * .8, o); }
 function ffBill(sh, P, w, o, s, l) { const z = ffTune(s, l, w, o); return z != null && frtBill(sh, P, z, z, FF_SQ, o); }
 // a one-shot left where it was made. kind: mist (w across, drifting, slowed by drag), splinter (a small crystal flung,
 // tumbling, falling), glint (o.fat: with a long streak across it), flash, burst (a spray of frost dust), glow, spike (a
-// crystal grown at a place: grown over o.grow, held, cracked and gone)
+// crystal grown at a place: grown over o.grow, held, cracked and gone), fern (a feather of hoarfrost grown along o.dir,
+// held, crumbled away)
 function ffShot(kind, x, y, z, w, dur, o, s, l) {
   o = o || {}; if (FF.shots.length >= 240) FF.shots.shift();
   const P = ffP(s, l); if (P._g) dur *= P.life;
@@ -89527,6 +89633,7 @@ function ffShots(now) {
     }
     else if (e.kind === 'glint') { o.pull = .1; o.p1 = e.fat || 0; ffBill(FRT_SH.GLINT, [x, y, z], e.w, o, e.s, e.l); }
     else if (e.kind === 'burst') { o.pull = .18; ffBill(FRT_SH.BURST, [x, y, z], e.w, o, e.s, e.l); }
+    else if (e.kind === 'fern') { o.grow = Math.min(1, el / Math.max(.01, e.grow)); o.age = Math.max(0, (el - e.grow - e.hold) / Math.max(.01, e.dur - e.grow - e.hold)); o.pull = e.pull == null ? .1 : e.pull; ffFern([x, y, z], e.dir, e.w, o, e.s, e.l); }
     else if (e.kind === 'flash') { o.pull = .2; ffBill(FRT_SH.FLASH, [x, y, z], e.w, o, e.s, e.l); }
     else if (e.kind === 'glow') { o.a = e.a * (1 - age) * (1 - age); o.age = 0; o.pull = .15; ffBill(FRT_SH.GLOW, [x, y, z], e.w * (.8 + .4 * age), o, e.s, e.l); }
     else if (e.kind === 'spike') {
@@ -89553,6 +89660,13 @@ function ffCrown(x, y, z, dir, n, len, fan, s, l, o) {
     const f = n > 1 ? i / (n - 1) * 2 - 1 : 0, a = f * fan + (Math.random() - .5) * .2, ca = Math.cos(a), sa = Math.sin(a);
     ffShot('spike', x, y, z, len * (1 - .3 * Math.abs(f)) * (.85 + .3 * Math.random()), o.dur || .42, { dir: ffNorm([dir[0] * ca - dir[2] * sa, (o.up == null ? .55 : o.up) + .25 * Math.abs(f), dir[2] * ca + dir[0] * sa]), grow: .06, hold: o.hold == null ? .12 : o.hold, fat: o.fat || .24, tip: .58, clear: o.clear == null ? .2 : o.clear, k: o.k || 1, delay: .01 * i, pull: o.pull == null ? .12 : o.pull }, s, l);
   }
+}
+// a star of hoarfrost snapped open in the air, facing the eye: n feathers grown out from a point (her mark where a
+// spell strikes), held a moment, crumbled to grains
+function ffRosette(x, y, z, n, len, s, l, o) {
+  o = o || {}; const r = RD.right, u = RD.up, a0 = Math.random() * TAU;
+  for (let i = 0; i < n; i++) { const a = a0 + i * TAU / n, ca = Math.cos(a), sa = Math.sin(a);
+    ffShot('fern', x, y, z, len * (i % 2 ? .78 : 1), o.dur || .44, { dir: [r[0] * ca + u[0] * sa, r[1] * ca + u[1] * sa, r[2] * ca + u[2] * sa], grow: o.grow || .09, hold: o.hold == null ? .12 : o.hold, k: o.k || 1, pull: o.pull == null ? .28 : o.pull, delay: o.delay || 0 }, s, l); }
 }
 // snow glints drifting down from about a point
 function ffGlints(x, y, z, n, r, s, l) {
@@ -89581,6 +89695,7 @@ function ffStaffs(now, dt) {
     const gg = t._ffG, sd = ((t.i | 0) * 5 + (t.j | 0)) % 97;
     ffBill(FRT_SH.GLOW, p, H.w * (1 + H.gather * gg), { k: H.k * (.45 + .75 * gg) * (.92 + .08 * Math.sin(now * 3 + sd)), pull: .08, seed: sd }, 'cc_rime', 'hand');
     if (!ffLv()) continue;
+    if (H.fern > 0 && gg > .3) { const r = RD.right, u = RD.up, n = ffLv() === 2 ? 5 : 3; for (let i = 0; i < n; i++) { const a = sd + i * TAU / n + now * .5, ca = Math.cos(a), sa = Math.sin(a); ffFern(p, [r[0] * ca + u[0] * sa, r[1] * ca + u[1] * sa, r[2] * ca + u[2] * sa], H.fern * (i % 2 ? .75 : 1), { grow: gg, k: .6 * gg, seed: sd + i, pull: .1 }, 'cc_rime', 'hand'); } }
     if (H.fog > 0 && Math.random() < dt * H.fog * (1 + 1.5 * gg)) ffShot('mist', p[0] + (Math.random() - .5) * .06, p[1] - .04, p[2] + (Math.random() - .5) * .06, .2 + .08 * Math.random(), 1, { vy: -.22, vx: (Math.random() - .5) * .08, vz: (Math.random() - .5) * .08, grow: 1.4, a: .16 }, 'cc_rime', 'hand');
     if (H.glint > 0 && Math.random() < dt * H.glint * (1 + 3 * gg)) ffGlints(p[0], p[1], p[2], 1, .16 + .1 * gg, 'cc_rime', 'hand');
   }
@@ -89633,12 +89748,15 @@ function ffBolts(now) {
     // the cold it leaves hanging along its path: a puff every so far, a glint
     if (!T.on || !(T.gap > 0)) continue;
     const gap = T.gap * (lv === 0 ? 2 : lv === 1 ? 1.4 : 1); if (F.lx == null) { F.lx = F.x0; F.lz = F.z0; }
+    const fw = frtFw(), sdv = ffNorm([d[1] * fw[2] - d[2] * fw[1], d[2] * fw[0] - d[0] * fw[2], d[0] * fw[1] - d[1] * fw[0]]);
     for (let i = 0; i < 4 && Math.hypot(P[0] - F.lx, P[2] - F.lz) >= gap; i++) {
       const dd = Math.hypot(P[0] - F.lx, P[2] - F.lz); F.lx += (P[0] - F.lx) / dd * gap; F.lz += (P[2] - F.lz) / dd * gap;
       // (none at the staff itself: nothing is left hanging on her)
       if (Math.hypot(F.lx - F.x0, F.lz - F.z0) < .3) continue;
       ffShot('mist', F.lx, P[1] - .02, F.lz, T.puff * sz * (.8 + .4 * Math.random()), T.secs * (.8 + .4 * Math.random()), { vx: d[0] * .5, vz: d[2] * .5, vy: -.16, drag: 2.5, grow: .8, a: .8 }, s, 'trail');
       if (lv && Math.random() < T.glint) ffGlints(F.lx, P[1], F.lz, 1, .2, s, 'trail');
+      // (her mark: feathers of hoarfrost crystallising in the air behind it, to one side and the other, then crumbling)
+      if (lv && T.fern > 0 && Math.hypot(F.lx - F.x0, F.lz - F.z0) > .55) { const q = (F.fn = (F.fn | 0) + 1) % 2 ? 1 : -1; ffShot('fern', F.lx, P[1], F.lz, T.fern * sz * (.75 + .5 * Math.random()), .5, { dir: ffNorm([-d[0] * .55 + sdv[0] * q * .85, -d[1] * .55 + sdv[1] * q * .85 + .1, -d[2] * .55 + sdv[2] * q * .85]), grow: .09, hold: .12, k: .8, pull: .06 }, s, 'trail'); }
       // (small crystals shed from it, tumbling away)
       if (lv === 2 && T.shed > 0 && Math.random() < T.shed) ffSplinters(F.lx, P[1], F.lz, 1, .1 * sz, .7, .42, s, { dir: [d[0] * .8, 0, d[2] * .8], up: .5 });
     }
@@ -89651,7 +89769,8 @@ function ffLand(p, hit) {
   const d = F.dir || [1, 0, 0], x = hit ? ffFoeX(hit) : F.tx == null ? p.x : F.tx, z = hit ? ffFoeZ(hit) : F.tz == null ? p.z : F.tz, y = F.aim == null ? p.h : F.aim, sz = F.spear ? (p.sz || 1.7) / 1.7 : Math.sqrt(p.sz || 1);
   const r = hit ? ffFoeR(hit) * .6 : 0, fx = x - d[0] * r, fz = z - d[2] * r;   // (on the foe's near side)
   if (B.on) {
-    ffShot('flash', fx, y, fz, B.w * sz, B.secs, { k: B.k }, s, 'burst');
+    ffShot('flash', fx, y, fz, B.w * sz * .75, B.secs, { k: B.k * .65 }, s, 'burst');
+    if (B.rose > 0) ffRosette(fx, y, fz, 6, B.rose * sz, s, 'burst', { k: B.k * (F.spear ? .9 : .7) });
     if (B.spray > 0) ffShot('burst', fx, y, fz, B.spray * sz, .34, { k: B.k }, s, 'burst');
     if (B.crown > 0 && lv) ffCrown(fx, y - .04, fz, [-d[0], 0, -d[2]], F.spear ? 4 : 3, B.crown * sz, F.spear ? .95 : .8, s, 'burst', { k: B.k });
   }
@@ -89668,17 +89787,23 @@ function ffLand(p, hit) {
   if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
 }
 
-/* ---- Ice Coffin: crystals grown up round the foe, one great clear crystal over it; cracked, then broken ---- */
+/* ---- Ice Coffin: a mass of crystal thrown up round the foe, one great clear crystal over it; cracked, then broken ---- */
 // where its crystals stand, in the screen's own right (a) and toward-the-camera (b) round the foe: [a, b, height (x the
-// foe's), width, clear, lean]. Tall behind the foe, low before it, so the foe is never walled off
-const FF_COF = [[.1, -.8, 1.5, 1.15, 0, 0], [-.62, -.58, 1.24, .95, 0, -.5], [.74, -.5, 1.14, .9, 0, .5], [-1.05, .05, .86, .8, .15, -1], [1.08, .1, .9, .8, .15, 1], [-.5, .74, .46, .72, .5, -.7], [.72, .66, .52, .7, .5, .8], [.14, .9, .34, .66, .5, .1]];
+// foe's), width, clear, lean]. Not a fence: one great slab leaning behind the foe, a second crossed against it, shards
+// thrown out to the sides, low broken ones before it, so the foe is never walled off. The first five each carry a smaller
+// crystal budded from their side
+const FF_COF = [[-.2, -.86, 1.9, 1.5, 0, .5], [.6, -.7, 1.45, 1.15, 0, -.7], [-.8, -.48, 1.12, .95, 0, -1.25], [1.12, -.08, .95, .82, .1, 2], [-1.16, .06, .8, .78, .1, -2.2], [.78, .6, .5, .76, .5, 1.5], [-.56, .72, .42, .7, .5, -1.3], [.1, .9, .3, .6, .5, .3]];
 function ffCoffinAt(e, now, each) {
-  const c = e.c, K = efx('cc_rimelance', 'crystals'), x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c);
+  const c = e.c, K = efx('cc_rimelance', 'crystals'), x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), lv = ffLv();
   const rt = RD.right, fw = frtFw(), rl = Math.hypot(rt[0], rt[2]) || 1, rx = rt[0] / rl, rz = rt[2] / rl, fl = Math.hypot(fw[0], fw[2]) || 1, fx = fw[0] / fl, fz = fw[2] / fl;
-  const n = Math.min(FF_COF.length, Math.max(3, Math.round(K.count * [.6, .8, 1][ffLv()] * (K._g ? K.n : 1))));
+  const n = Math.min(FF_COF.length, Math.max(3, Math.round(K.count * [.6, .8, 1][lv] * (K._g ? K.n : 1))));
   for (let i = 0; i < n; i++) {
-    const q = FF_COF[i], jx = (ffRnd(e.seed + i * 3) - .5) * .2, a = q[0] + jx, b = q[1];
-    each(i, [x + (rx * a + fx * b) * R * 1.05, y0, z + (rz * a + fz * b) * R * 1.05], ffNorm([rx * q[5] * .16 + fx * b * .06, 1, rz * q[5] * .16 + fz * b * .06]), H * q[2] * K.high * (.92 + .16 * ffRnd(e.seed + i)), R * q[3] * K.wide, q[4]);
+    const q = FF_COF[i], jx = (ffRnd(e.seed + i * 3) - .5) * .2, a = q[0] + jx, b = q[1], lean = q[5] * .2;
+    const P = [x + (rx * a + fx * b) * R * 1.05, y0, z + (rz * a + fz * b) * R * 1.05], h = H * q[2] * K.high * (.92 + .16 * ffRnd(e.seed + i)), w = R * q[3] * K.wide;
+    each(i, P, ffNorm([rx * lean + fx * b * .1, 1, rz * lean + fz * b * .1]), h, w, q[4]);
+    // (its bud: lower, thinner, leaning further out)
+    if (lv && i < 5) { const sd = q[5] >= 0 ? 1 : -1, l2 = lean + sd * (.3 + .25 * ffRnd(e.seed + i * 11));
+      each(n + i, [P[0] + rx * sd * w * .46 + fx * .04, y0, P[2] + rz * sd * w * .46 + fz * .04], ffNorm([rx * l2 + fx * b * .1, 1, rz * l2 + fz * b * .1]), h * (.42 + .22 * ffRnd(e.seed + i * 7)), w * .58, q[4]); }
   }
 }
 function ffCoffins(now, dt) {
@@ -89692,23 +89817,32 @@ function ffCoffins(now, dt) {
     const c = e.c, held = !c.dead && c.ccCoffin && c.ccCoffin.until > now && ffFrozen(c);
     if (!held) { e.gone = true; c._ffC = null; ffCoffinBreak(e, now); continue; }
     e.until = c.ccCoffin.until;
-    const el = now - e.at, crack = ffSs(e.until - .45, e.until - .02, now), tipN = lv && K.glint > 0 && Math.random() < dt * K.glint ? (Math.random() * 5) | 0 : -1;
+    const el = now - e.at, crack = ffSs(e.until - .45, e.until - .02, now), tipN = lv && K.glint > 0 && Math.random() < dt * K.glint ? (Math.random() * 5) | 0 : -1, tops = [];
     // (a cold light behind the foe: the ice glows through, and the foe stands out against it)
     if (B.on && B.back > 0 && lv) ffBill(FRT_SH.GLOW, [ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .55, ffFoeZ(c)], Math.max(.8, ffFoeH(c)) * 2.4, { k: B.back * Math.min(1, el / .3) * (.88 + .12 * Math.sin(now * 2.6 + e.seed)), pull: -ffFoeR(c) * .9 }, s, 'core');
     if (K.on) ffCoffinAt(e, now, (i, P, dir, h, w, clear) => {
-      const g = ffBack((el - i * .028) / K.grow); if (g <= 0) return;
+      // (thrown up from the ground one after another, each a little past its height and back)
+      const g = ffBack((el - (i % 8) * .028 - (i >= 8 ? .1 : 0)) / K.grow); if (g <= 0) return;
       ffShard(P, dir, h * g, { k: K.k, seed: e.seed + i * 7, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear: Math.max(clear, K.clear * (clear > 0 ? 1 : .35)), crack, floor: .55, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
+      if (i < 3) {
+        tops.push([P[0] + dir[0] * h * .9, P[1] + dir[1] * h * .9, P[2] + dir[2] * h * .9]);
+        // hoarfrost creeping up its great slabs while it holds
+        if (lv === 2 && K.fern > 0) ffFern([P[0], P[1] + h * .04, P[2]], dir, h * K.fern * (.8 + .2 * ffRnd(e.seed + i * 5)), { grow: ffSs(.2, 1.3, el - i * .12), age: crack * .7, k: .6, seed: e.seed + i * 3, pull: .07, floor: .55 }, s, 'crystals');
+      }
       // (light caught on one of its points, now and then)
       if (i === tipN && g >= 1) ffShot('glint', P[0] + dir[0] * h * .93, P[1] + dir[1] * h * .93, P[2] + dir[2] * h * .93, .3, .5, { fat: 1 }, s, 'crystals');
     });
     // the one great crystal closed over the foe: clear, so the foe is seen through its faces
     if (B.on) {
-      const g = ffBack((el - .1) / (K.grow * 1.25)), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), h = (H * B.high + .12) * g;
-      if (g > 0) ffShard([ffFoeX(c), ffFoeY(c), ffFoeZ(c)], FF_UP, h, { k: B.k, seed: e.seed + 61, fat: R * B.wide / Math.max(.05, h / g), tip: .3, clear: B.clear, crack, floor: .55, pull: R * .9 + .12 }, s, 'core');
+      const g = ffBack((el - .1) / (K.grow * 1.25)), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), h = (H * B.high + .12) * g, rt = RD.right;
+      if (g > 0) ffShard([ffFoeX(c), ffFoeY(c), ffFoeZ(c)], ffNorm([rt[0] * .1, 1, rt[2] * .1]), h, { k: B.k, seed: e.seed + 61, fat: R * B.wide / Math.max(.05, h / g), tip: .3, clear: B.clear, crack, floor: .55, pull: R * .9 + .12 }, s, 'core');
     }
-    if (lv && M.on && M.every > 0 && now >= (e.mi || 0)) { e.mi = now + M.every * (lv === 1 ? 1.6 : 1) * (.7 + .6 * Math.random()); const a = Math.random() * TAU, R = ffFoeR(c);
-      ffShot('mist', ffFoeX(c) + Math.cos(a) * R, ffFoeY(c) + ffFoeH(c) * (.3 + .5 * Math.random()), ffFoeZ(c) + Math.sin(a) * R, .34, 1, { vy: -.2, vx: Math.cos(a) * .12, vz: Math.sin(a) * .12, grow: .9, a: .6 }, s, 'mist');
-      if (Math.random() < .6) ffGlints(ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .7, ffFoeZ(c), 1, R * 2.2, s, 'mist'); }
+    // it locks: one hard glint as the last of it closes
+    if (!e.locked && el > K.grow + .16) { e.locked = 1; if (tops[0] && lv) ffShot('glint', tops[0][0], tops[0][1], tops[0][2], .55, .28, { fat: 1, k: 1.1 }, s, 'crystals'); }
+    // the cold pouring off it: vapour spilling from its tops and falling down its sides
+    if (lv && M.on && M.every > 0 && tops.length && now >= (e.mi || 0)) { e.mi = now + M.every * (lv === 1 ? 1.8 : 1) * (.7 + .6 * Math.random()); const T = tops[(Math.random() * tops.length) | 0], a = Math.random() * TAU;
+      ffShot('mist', T[0], T[1], T[2], .3 + .12 * Math.random(), 1.1, { vy: -.85, vx: Math.cos(a) * .2, vz: Math.sin(a) * .2, drag: 1.1, grow: 1.1, a: .5 }, s, 'mist');
+      if (Math.random() < .35) ffGlints(ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .7, ffFoeZ(c), 1, ffFoeR(c) * 2.4, s, 'mist'); }
   }
   if (FF.cof.some(e => e.gone)) FF.cof = FF.cof.filter(e => !e.gone);
 }
@@ -89725,7 +89859,7 @@ function ffCoffinBreak(e, now) {
   if (L.on) ffLight(x, z, .5, L.k * .8, L.rad, .2, s);
 }
 
-/* ---- Shatterbloom: a cluster of crystals blooms over the foe; it bursts ---- */
+/* ---- Shatterbloom: a flower of ice opens over the foe, turning slowly; it bursts ---- */
 function ffBloomAt(c) { return [ffFoeX(c), ffFoeY(c) + ffFoeH(c) + efx('cc_hoarbloom', 'crystals').y, ffFoeZ(c)]; }
 function ffBlooms(now, dt) {
   const s = 'cc_hoarbloom', K = efx(s, 'crystals'), lv = ffLv();
@@ -89734,23 +89868,25 @@ function ffBlooms(now, dt) {
     const c = e.c;
     if (c.dead || !c.ccBloom || c.ccBloom.until <= now) { e.gone = true; c._ffB = null; continue; }
     if (!K.on) continue;
-    const P = ffBloomAt(c), el = now - e.at, n = Math.max(3, Math.round(K.count * [.6, .8, 1][lv] * (K._g ? K.n : 1))), fade = Math.min(1, (c.ccBloom.until - now) / .4);
+    const P = ffBloomAt(c), el = now - e.at, fade = Math.min(1, (c.ccBloom.until - now) / .4), kn = [.6, .8, 1][lv] * (K._g ? K.n : 1);
+    const no = Math.max(3, Math.round(K.count * kn)), ni = Math.max(2, Math.round(K.count * .67 * kn));
     e.P = P;
-    for (let i = 0; i < n; i++) {
-      const g = ffBack((el - i * .045) / K.grow); if (g <= 0) continue;
-      // one petal straight up, the rest leaning out round it
-      const az = e.seed + i * TAU / Math.max(1, n - 1), tl = i ? .78 + .3 * ffRnd(e.seed + i * 5) : 0, len = K.long * (i ? .62 + .3 * ffRnd(e.seed + i) : 1) * g;
-      ffShard([P[0], P[1] - .05, P[2]], [Math.cos(az) * Math.sin(tl), Math.cos(tl), Math.sin(az) * Math.sin(tl)], len, { k: K.k, a: fade, seed: e.seed + i * 7, fat: K.fat, tip: .5, tail: .16, clear: K.clear, core: K.heart, pull: .12, floor: .5 }, s, 'crystals');
-    }
+    // a bud that grows, then opens: an outer ring of broad petals laid out, an inner ring half open, a spike at its heart
+    const g = ffSs(0, K.grow * .7, el), open = ffBack((el - K.grow * .35) / (K.grow * 1.3)), spin = now * K.turn + e.seed;
+    const petal = (az, tl, len, fat, sd, core) => ffShard([P[0], P[1] - .04, P[2]], [Math.cos(az) * Math.sin(tl), Math.cos(tl), Math.sin(az) * Math.sin(tl)], len * g, { k: K.k, a: fade, seed: sd, fat, tip: .62, tail: .3, clear: K.clear, core, pull: .12, floor: .5 }, s, 'crystals');
+    for (let i = 0; i < no; i++) petal(spin + i * TAU / no, .16 + 1.02 * open, K.long * (.78 + .1 * ffRnd(e.seed + i)), K.fat * 1.4, e.seed + i * 7, K.heart * .4);
+    for (let i = 0; i < ni; i++) petal(-spin * .6 + (i + .5) * TAU / ni, .1 + .5 * open, K.long * .64, K.fat * 1.15, e.seed + 40 + i * 5, K.heart * .7);
+    petal(0, 0, K.long * .92, .2, e.seed + 77, K.heart);
     if (K.disc > 0 && lv) ffBill(FRT_SH.GLOW, P, K.long * 2.2 * K.disc, { k: .3 * fade * (.85 + .15 * Math.sin(now * 2.3 + e.seed)), pull: .1 }, s, 'crystals');
     if (lv && Math.random() < dt * 1.2) ffGlints(P[0], P[1] + .1, P[2], 1, K.long * 1.4, s, 'crystals');
   }
   if (FF.blo.some(e => e.gone)) FF.blo = FF.blo.filter(e => !e.gone);
 }
-// the bloom bursts at (x, z), y high: its petals fly apart, the cold rolls out to its real edge r
+// the bloom bursts at (x, z), y high: a great star of hoarfrost snaps open where it was, its petals fly apart, the cold
+// rolls out to its real edge r
 function ffBloomBurst(x, y, z, r) {
   const s = 'cc_hoarbloom', B = efx(s, 'burst'), S = efx(s, 'shards'), L = efx(s, 'light'), K = efx(s, 'crystals');
-  if (B.on) { ffShot('flash', x, y, z, B.w, B.secs, { k: B.k }, s, 'burst'); if (B.spray > 0) ffShot('burst', x, y, z, B.spray, .36, { k: B.k * .9 }, s, 'burst'); ffShot('glint', x, y, z, B.w * .6, .2, { fat: 1, k: .9 }, s, 'burst'); }
+  if (B.on) { ffShot('flash', x, y, z, B.w * .7, B.secs, { k: B.k * .7 }, s, 'burst'); if (B.spray > 0) ffShot('burst', x, y, z, B.spray, .36, { k: B.k * .9 }, s, 'burst'); if (B.rose > 0) ffRosette(x, y, z, 6, B.rose, s, 'burst', { k: B.k, dur: .62, hold: .16 }); }
   if (S.on) { const n = ffN(S, S.count, [.5, .75, 1]); ffSplinters(x, y, z, Math.ceil(n * .4), K.long * .8, S.fling, S.secs, s, { up: 1.2 }); ffSplinters(x, y, z, Math.floor(n * .6), S.w, S.fling * .8, S.secs, s, { up: 1.8 }); }
   if (efx(s, 'mist').on) ffWave(x, z, r, s);
   if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
@@ -89805,7 +89941,7 @@ function ffFrame() {
   if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask) return;
   if (G.force !== 'conclave') { if (FF.shots.length) FF.shots.length = 0; return; }
   const now = G.time, dt = Math.max(0, Math.min(.1, now - FF.last)); FF.last = now;
-  FF.cards = 0; FF.cap = [70, 120, 180][ffLv()];
+  FF.cards = 0; FF.cap = [80, 140, 220][ffLv()];
   ffCoffins(now, dt); ffBlooms(now, dt); ffFoes(now, dt); ffBolts(now); ffStaffs(now, dt); ffShots(now);
   if (typeof window !== 'undefined' && window.FF_TEST) window.FF_TEST();
   if (FRT.q.length > FF.peak) FF.peak = FRT.q.length;
