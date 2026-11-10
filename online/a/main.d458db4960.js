@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd4251b5@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'bb988e5+@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -63786,9 +63786,9 @@ LOOK_DEF.clearing = {"fwd":{"shOn":1,"shFloor":0.3,"shSoft":1.2,"shBias":0.0016,
 /* Greatroot Way (the painting): the painting carries its own light, so the ground is shown as painted (paint 1, no dapple
    laid on it); the sun stands where the painting's does, upper left, for the units' and foes' own shading and shadows, warm
    amber against a teal-green shade; a light post (no fog over the painting). */
-LIGHT_DEF.greatroot = {"sun":"#ffd9a6","sunI":1.75,"az":-128,"el":50,"rim":0.3,"fill":0.14,"ground":1,"paint":1,"sky":"#9cd0c2","skyI":0.62,"gnd":"#5c7a4a","gndI":0.3,"fog":"#24463e","fogNear":0.98,"fogFar":2.4,"woods":0,"lamps":1,"expo":1.04,"rays":0.8,"ray":"#ffe6b0"};
+LIGHT_DEF.greatroot = {"sun":"#ffd9a6","sunI":1.75,"az":-128,"el":50,"rim":0.3,"fill":0.14,"ground":1,"paint":1,"sky":"#9cd0c2","skyI":0.62,"gnd":"#5c7a4a","gndI":0.3,"fog":"#24463e","fogNear":0.98,"fogFar":2.4,"woods":0,"lamps":1,"expo":1,"rays":0.8,"ray":"#ffe6b0"};
 MAP_MOOD.greatroot = {"top":"#8fd8c8","topK":0.14,"key":"#ffd08c","keyK":0.2,"bounce":"#8cb85c","bounceK":0.16,"env":0};
-LOOK_DEF.greatroot = {"fwd":{"shOn":1,"shFloor":0.4,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.5,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":0,"gGlint":1.2,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.7,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.3},"bloom":{"on":1,"thr":0.72,"strength":0.26,"radius":1.6},"rays":{"on":0,"col":"#ffd9a0","strength":0.3,"len":0.2,"thr":0.6},"hfog":{"on":0,"col":"#3f8f86","dens":0.2,"top":1.2,"fall":1.6,"max":0.15,"noise":0.6},"tone":{"on":1,"ev":0,"contrast":1.03,"sat":1.03,"warm":0.03,"tint":0},"grade":{"on":0,"lift":0,"liftC":"#2f8f86","liftK":0,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#1f7a78","splSK":0,"splH":"#ffb86a","splHK":0,"bal":0},"vig":{"on":1,"str":0.22,"rad":0.78,"soft":0.8},"sharp":{"on":1,"k":0.2}}};
+LOOK_DEF.greatroot = {"fwd":{"shOn":1,"shFloor":0.4,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.5,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":0,"gGlint":1.2,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.7,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.3},"bloom":{"on":1,"thr":0.92,"strength":0.1,"radius":1.6},"rays":{"on":0,"col":"#ffd9a0","strength":0.3,"len":0.2,"thr":0.6},"hfog":{"on":0,"col":"#3f8f86","dens":0.2,"top":1.2,"fall":1.6,"max":0.15,"noise":0.6},"tone":{"on":1,"ev":0,"contrast":1,"sat":1.02,"warm":0.03,"tint":0},"grade":{"on":0,"lift":0,"liftC":"#2f8f86","liftK":0,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#1f7a78","splSK":0,"splH":"#ffb86a","splHK":0,"bal":0},"vig":{"on":1,"str":0.22,"rad":0.78,"soft":0.8},"sharp":{"on":1,"k":0.1}}};
 /* Greatroot Way in full 3D (?map3d=greatroot): a late-morning sun slanting in from the upper left through the canopy (dap*: its dapple on everything the
    sun lights, gl.js shadowAt uCookie: strength, the pools' size in world units, their sway, the edge's softness), warm amber
    on the bark, teal-green shade and a teal haze into the distance. Tuned in the Light Lab and baked. */
@@ -64160,7 +64160,7 @@ const THEMES = {
     birdCol: [.95, .92, .78], birdSize: .85,
     perch: [[[-18, -9, 4.5], [-13, -10.5, 5], [-15.5, -5, 3.6], [-10.5, -7, 4]], [[30, -9, 4.5], [25, -10.5, 5], [34, -5, 4], [28.5, -6, 3.6]],
       [[-18, 14, 2.6], [-14, 10, 3.4], [-11, 15, 2.4], [-16.5, 7, 3.6]], [[36, 13, 2.8], [31, 9, 3.6], [38, 7, 3.8], [28, 14.5, 2.6]]],
-    litPts: typeof GR_LIT !== 'undefined' ? GR_LIT : null, shaftK: 2.2,   // (the painting's sunlit patches, shimmering: view.js drawLitPatches)
+    litPts: typeof GR_LIT !== 'undefined' ? GR_LIT : null, shaftK: 1.5, litK: .7, shaftNoPool: true,   // (eased back about 30% from 2.2 and 1: owner, "light is a little too intense")   // (the painting's sunlit patches, shimmering: view.js drawLitPatches)
     shaftPts: [[-9.6, -9.6, 1.2, 1], [-7.4, -8.9, 1, .8], [24.2, -8.6, 1.1, .7], [-8.1, -8.6, 1.3, .9], [5.5, -2.5, 1.1, .5], [-4.1, .3, 1, .45], [-6.6, 6.2, 1, .4], [25.5, 11, 1.2, .55], [16.3, 4.3, 1, .45], [9.2, 4, 1.1, .15], [4.2, 8.8, 1, .13]],
     // the mist where foes step out (owner: "add a slight foggy effect where they come from, should be light bluey colour ...
     // they will be affected by the fog instead, make the fog mostly sit behind and around the tree area"): soft drifts of
@@ -77212,7 +77212,7 @@ function drawForestShafts() {
     QADD.beam(RD, top, [x, 0, z], w * 1.5, [c[0], c[1], c[2], .07 * br], 6);
     QADD.beam(RD, top, [x, 0, z], w * .6, [c[0], c[1], c[2], .08 * br], 6);
     if (TH.litPts) { const o = Math.sin(vt * .19 + i * 2.7) * w * .9, b2 = .5 + .5 * Math.sin(vt * .31 + i * 1.3); QADD.beam(RD, [top[0] + o, top[1], top[2]], [x + o, 0, z], w * .35, [c[0], c[1], c[2], .06 * br * b2], 6); }   // (a painted map with lit patches: a thinner ray sliding beside each)
-    QADD.ground(x, z, .03, w * 1.25, w * .9, [c[0], c[1], c[2], .16 * br], 1, 0);
+    if (!TH.shaftNoPool) QADD.ground(x, z, .03, w * 1.25, w * .9, [c[0], c[1], c[2], .16 * br], 1, 0);   // (the pool where a ray lands; not on a painting that has its own)
     for (let j = 0; j < 3; j++) {   // pollen drifting down the shaft
       const u = (vt * .03 + i * .37 + j * .33) % 1, e = 1 - u, px = x + d[0] * L * e * .55 + Math.sin(vt * .6 + j * 3 + i) * w * .3, py = d[1] * L * e * .55, pz = z + d[2] * L * e * .55;
       QADD.bill(RD, px, py, pz, .04, .04, [1, .93, .7, .5 * br * Math.sin(u * Math.PI)], 1, 0);
@@ -77220,23 +77220,20 @@ function drawForestShafts() {
   }
 }
 /* A painted map's sunlit patches, alive (owner: "add some light effects around the light rays and lit areas of the map"):
-   on each (TH.litPts: x, z, radius, strength) a soft warm light that swells and thins as if the leaves above moved, a
-   brighter heart drifting across it, and motes rising through it. Additive and faint, so a unit standing in one is lit,
-   never hidden. Not on Graphics Low or painted-only devices. */
+   on each (TH.litPts: x, z, radius, strength) motes rising and twinkling through the light. Nothing is added to the
+   patch itself. Not on Graphics Low or painted-only devices. */
 function drawLitPatches() {
   const P = TH.litPts; if (!P || mapLite() || (typeof GFX !== 'undefined' && GFX === 'low')) return;
   const c = c4(LS.ray || '#ffe6b0'), k0 = LS.rays == null ? 1 : LS.rays;
   for (let i = 0; i < P.length; i++) {
-    const [x, z, r, s] = P[i], a = fbm2(i * 3.7, vt * .16), b = fbm2(i * 1.9 + 8, vt * .23), k = s * k0;
+    const [x, z, r, s] = P[i], a = fbm2(i * 3.7, vt * .16), b = fbm2(i * 1.9 + 8, vt * .23), k = s * k0 * (TH.litK == null ? 1 : TH.litK);   // (litK: a map's glow on its sunlit patches eased back or pushed)
     const br = .35 + .65 * a, dx = (b - .5) * r * .7, dz = (a - .5) * r * .35;
-    QADD.ground(x, z, .03, r * 1.6, r * 1.0, [c[0], c[1], c[2], .15 * br * k], 1, 0);
-    QADD.ground(x + dx, z + dz, .032, r * .75, r * .45, [c[0], c[1], c[2] * .9, .2 * (.3 + .7 * b) * k], 1, 0);
-    QADD.bill(RD, x + dx * .5, .7, z, r * 1.1, 1.3, [c[0], c[1], c[2], .05 * br * k], 1, 0);   // a soft haze of light standing over it
+    // (no light is laid on the patch itself: it is already the brightest paint, and light added there burnt it out to
+    // white. Owner: "bright spots were made super bright". Only the motes drifting up through it.)
     for (let j = 0; j < 6; j++) {   // motes rising through the light
       const u = (vt * (.035 + .008 * j) + i * .41 + j * .37) % 1, mx = x + Math.sin(vt * .4 + i * 2.3 + j * 2.1) * r * .5 + (j - 2.5) * r * .22, mz = z + Math.cos(vt * .31 + i + j * 1.7) * r * .25;
       const tw = .6 + .4 * Math.sin(vt * 3.1 + i + j * 2.4);   // (twinkling)
       QADD.bill(RD, mx, .15 + u * 1.5, mz, .07, .07, [1, .95, .72, Math.min(1, .95 * k * Math.sin(u * Math.PI) * (.4 + .6 * br) * tw)], 1, 0);
-      QADD.bill(RD, mx, .15 + u * 1.5, mz, .2, .2, [1, .9, .6, .12 * k * Math.sin(u * Math.PI) * tw], 1, 0);
     }
   }
 }
