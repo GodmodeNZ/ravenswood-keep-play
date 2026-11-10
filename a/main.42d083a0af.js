@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b39f06e@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ed02ee7@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53272,7 +53272,7 @@ const EFX_LNAME = {
   core: { fire: 'Core (the comet, the cone, the bird)', frost: 'Core (the bolt, the spear)' }, flames: { fire: 'Flames (tongues, wings)', frost: 'Flames' },
   hand: 'Hand flame', paint: 'Flame paint (every flame: outline, hot core, bands, curl, grain, halo; gradient = palette)', embers: { fire: 'Embers / sparks', frost: 'Sparks / glints' },
   smoke: { fire: 'Smoke puffs', frost: 'Smoke' }, glow: { fire: 'Glow (under the flame)', frost: 'Cold glow (flares, motes)' }, light: 'Light flash',
-  ground: { fire: 'Ground (scorch, burning glyph, ground fire)', frost: 'Frost decal / ground' }, trail: { fire: 'Trail (tongues peeling off)', frost: 'Projectile trail' }, burst: { fire: 'Impact burst', frost: 'Impact burst' }, ring: { fire: 'Ring of flame (the real splash)', frost: 'Ground ring' },
+  ground: { fire: 'Ground fire (the flame on a burning glyph, its light)', frost: 'Frost decal / ground' }, trail: { fire: 'Trail (tongues peeling off)', frost: 'Projectile trail' }, burst: { fire: 'Impact burst', frost: 'Impact burst' }, ring: { fire: 'Ring of flame (the real splash)', frost: 'Ground ring' },
   shards: 'Shatter shards', crystals: 'Ice crystals (spikes, block, bloom)', mist: 'Frost mist / snow',
 };
 const efxLName = (l, el) => { const n = EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
@@ -53298,8 +53298,10 @@ const ELEM_FX_DEF = {
   cc_fireball: {
     // the flame in the casting palm: length, longer each tier, grown as a cast gathers, brightness, its glow
     hand: { flame: .2, tier: .012, cast: .7, k: 1, disc: .5 },
-    // the fireball in flight: its length (the ball two fifths of it across), brightness, its glow, how much of the lob's arc it keeps
-    core: { ball: .9, k: 1.05, disc: .8, arcK: .3 },
+    // the fireball in flight: its length (the ball two fifths of it across), brightness, its glow, how much of the lob's arc it
+    // keeps (none: it flies straight and level, at the height it left his hand), the most of a foe's height it flies at (a foe
+    // shorter than his hand: it comes down to that)
+    core: { ball: .9, k: 1.05, disc: .8, arcK: 0, aim: .85 },
     // tongues peeling off behind it: every (s), their length, how fast they rise, an ember's chance
     trail: { every: .07, w: .2, rise: .3, ember: .3 },
     // the landing: width per cell of splash, the largest, brightness, a great ball's, how long it plays
@@ -53312,8 +53314,9 @@ const ELEM_FX_DEF = {
     smoke: { puffs: 1, great: 2, w: 1, delay: .14, rise: .45 },
     // the landing's flash: radius, brightness, how long; the light it carries in flight
     light: { rad: 1.6, k: .8, secs: .22, fly: 1 },
-    // the scorch it leaves (per splash, how long); a burning glyph: tongues, their height, its glow, its lit rim, embers a second
-    ground: { scorch: .55, dur: 1.5, tongues: 4, tall: .34, disc: .3, rim: 1, ember: 3 },
+    // the warm light it leaves where it lands (its radius per splash, how long; no mark on the ground); a burning glyph: one
+    // flame over it (its height), its light on the ground, embers a second
+    ground: { scorch: .55, dur: 1.5, tall: .34, disc: .3, ember: 3 },
   },
   cc_kindle: {
     // each hop: the comet's length, the first hop's arc, the others', each hop smaller by
@@ -53329,7 +53332,7 @@ const ELEM_FX_DEF = {
     // the last landing's puff
     smoke: { w: .7 },
     // the glyph each skip leaves
-    ground: { tongues: 3, tall: .3, disc: .28, rim: 1, ember: 2 },
+    ground: { tall: .3, disc: .28, ember: 2 },
   },
   cc_pyresigil: {
     // the cone: jets fanned across it, their reach (x the range), brightness, share of the cone, how far the far end dips
@@ -53356,7 +53359,7 @@ const ELEM_FX_DEF = {
     embers: { count: 12 },
     smoke: { puffs: 2, w: 1.4 },
     // the fire left where it dives
-    ground: { r: .75, dur: 1.4, tongues: 5, tall: .42, disc: .35, rim: 0, ember: 4 },
+    ground: { r: .75, dur: 1.4, tall: .42, disc: .35, ember: 4 },
     light: { every: .3, rad: 1.6 },
   },
   cc_pyroburn: {
@@ -53388,10 +53391,10 @@ const EFX_INFO = {
   ball: ['Ball length', .05, 2, .01], w: ['Width / size', .02, 8, .01], wMax: ['Largest width', .5, 8, .05], k: ['Brightness', 0, 3, .02], kGreat: ['Brightness (great ball)', 0, 3, .02],
   flame: ['Flame length', .02, .6, .005], tier: ['Longer each tier', 0, .05, .001], cast: ['Grows as a cast gathers (x)', 0, 3, .05], disc: ['Glow disc', 0, 2, .01],
   rise: ['Rise speed', 0, 2, .01], ember: ['Embers (chance / a second)', 0, 10, .05], great: ['How many (great ball)', 0, 30, 1], fling: ['Fling speed', 0, 5, .05], secs: ['Lifetime (s)', .05, 3, .01],
-  puffs: ['Puffs', 0, 6, 1], delay: ['Delay (s)', 0, 1, .01], scorch: ['Scorch radius (per splash)', 0, 2, .01], tongues: ['Tongues', 0, 12, 1], tall: ['Tongue height', .05, 1.2, .01],
+  puffs: ['Puffs', 0, 6, 1], delay: ['Delay (s)', 0, 1, .01], scorch: ['Afterglow radius (per splash)', 0, 2, .01], tongues: ['Tongues', 0, 12, 1], tall: ['Flame height', .05, 1.2, .01],
   len0: ['Length at the hands', .05, 2, .01], len1: ['Length added by the end', 0, 3, .01], cone: ['Share of the cone', 0, 1.5, .01], drop: ['Dip toward the ground', 0, 1, .01], chance: ['Chance', 0, 1, .01],
   body: ['Body length', .1, 3, .01], wing: ['Wing span', .1, 2.5, .01], beat: ['Wing beat speed', 0, 25, .1], feathers: ['Feathers a wing', 1, 5, 1], tail: ['Tail length', 0, 2, .01],
-  max: ['Most on screen', 0, 80, 1], rate: ['A second', 0, 20, .1], jets: ['Jets across the cone', 1, 9, 1], arcK: ['Flight arc (x the lob: 0 flat)', 0, 1.5, .01], fly: ['Light carried in flight', 0, 2, .02], len: ['Reach (x the range)', .3, 2, .01],
+  max: ['Most on screen', 0, 80, 1], rate: ['A second', 0, 20, .1], jets: ['Jets across the cone', 1, 9, 1], arcK: ['Flight arc (x the lob: 0 straight)', 0, 1.5, .01], aim: ['Flies level; no higher than (x the foe)', .2, 1.5, .01], fly: ['Light carried in flight', 0, 2, .02], len: ['Reach (x the range)', .3, 2, .01],
   outline: ['Outline width', 0, 3, .02], heart: ['Hot core size', .3, 3, .02], soft: ['Band softness', 0, 4, .05], curl: ['Curl', 0, 3, .02], grain: ['Brush grain', 0, 3, .02],
   r: ['Radius', .05, 2, .01], arc0: ['First hop arc', 0, 2, .01], arc: ['Hop arc', 0, 2, .01], shrink: ['Each hop smaller by', .4, 1.2, .01],
   last: ['Last burst bigger by', .5, 2.5, .01], count: ['How many', 0, 20, 1], halo: ['Halo width', 0, 3, .02],
@@ -85359,15 +85362,16 @@ if (typeof renderView === 'function') {
      JET     a roaring cone, narrow at the hands and opening, the fire rolling out along it
      WING    a wing of flame: a hot leading edge, feathers of fire streaming back
      SMOKE   a painted puff in two tones, lit from above, thinning as it rises
-     GLOW    soft added light;  EMBER a spark;  GROUND a burning patch: glowing cracks, heat wandering through them, a lit rim
+     GLOW    soft added light;  EMBER a spark
+   Nothing is drawn as a mark on the ground (owner: "dont use ground decals, they look like runes which are different").
    Cards: pyfBill (facing the camera), pyfAxial (along a direction, turned to the camera), pyfFlat (on the ground), pyfQuad
    (any quad: the wings). Drawn in the spells' pass (gl.js vfxGL ext) after the lab's flipbooks, depth-tested, premultiplied.
    The look is the Element Lab's Flame paint (elemfx.js cc_pyrostyle.paint: outline, hot core, band softness, curl, brush
    grain, halo; its gradient is the palette), live. No GL or DOM is touched until the first card is drawn (the sims load this). */
 const PYF = { q: [], sty: null, styAt: -1, tex: null, groups: [], MAX: 520 };
-const PYF_SH = { FLAME: 0, BALL: 1, BURST: 2, RING: 3, JET: 4, WING: 5, SMOKE: 6, GLOW: 7, EMBER: 8, GROUND: 9 };
+const PYF_SH = { FLAME: 0, BALL: 1, BURST: 2, RING: 3, JET: 4, WING: 5, SMOKE: 6, GLOW: 7, EMBER: 8 };
 // the order they are laid down: the ground first, smoke, the flames, then added light
-const PYF_ORD = [2, 2, 2, 0, 2, 2, 1, 3, 3, 0];
+const PYF_ORD = [2, 2, 2, 0, 2, 2, 1, 3, 3];
 // the painted palette, edge to heart
 const PYF_PAL = ['#74120a', '#d2330b', '#f5730f', '#ffbd2e', '#fff2c2'];
 const pyfHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
@@ -85435,15 +85439,17 @@ vec4 N(vec2 p){ return texture(uN, p); }
 // (two takes of it, one turned: for the big shapes, so nothing in them lines up)
 vec4 NR(vec2 p){ return (texture(uN, p) + texture(uN, mat2(.8, -.6, .6, .8) * p * 1.31 + .37) - 1.) * .72 + .5; }
 
-// a tongue: x across (-1..1), y from its root to its tip (0..1)
+// a tongue: x across (-1..1), y from its root to its tip (0..1); vB.z how wide; vB.w more tips across it (a broad fire: one
+// body, its top licked into several tips)
 float fFlame(vec2 uv){
+  float tips = 1. + vB.w;
   float lift = AGE * .5, v = (uv.y - lift) / (1. - lift), vc = clamp(v, 0., 1.);
   float sway = (N(vec2(SD, uv.y * .2 - TM * .4)).a - .5) * 1.5 + (N(vec2(SD + .4, uv.y * .55 - TM * 1.)).r - .5) * .6;
-  float x = uv.x - sway * uSty2.x * vc * (.25 + .75 * vc) * .85;
+  float x = uv.x - sway * uSty2.x * vc * (.25 + .75 * vc) * .85 / tips;
   float w = 1.5 * pow(vc, .45) * pow(1. - vc, 1.1) * (1. - .85 * AGE * AGE) * vB.z;
   float body = v < 0. ? v * 8. : 1. - abs(x) / max(w, .0001);
-  float n = N(vec2(uv.x * .32 + SD * 3., uv.y * .5 - TM * 1.2)).g, n2 = N(vec2(uv.x * .7 + SD * 5., uv.y * 1.1 - TM * 2.1)).r;
-  float h = body * (1.1 - .62 * vc) - (n - .3) * (.12 + 1.15 * vc) - (n2 - .5) * .22 * vc;
+  float n = N(vec2(uv.x * .32 * tips + SD * 3., uv.y * .5 - TM * 1.2)).g, n2 = N(vec2(uv.x * .7 * tips + SD * 5., uv.y * 1.1 - TM * 2.1)).r;
+  float h = body * (1.1 - .62 * vc) - (n - .3) * (.12 + 1.15 * vc) * (1. + .4 * vB.w) - (n2 - .5) * .22 * vc;
   return h - AGE * AGE * .3;
 }
 // a fireball: a round ball of rolling fire, its centre at y .78, flame swept back toward y 0; x across in the same units
@@ -85517,19 +85523,6 @@ float fWing(vec2 uv){
 }
 // a spark: x across, y along its flight
 float fEmber(vec2 uv){ float y = uv.y * 2. - 1.; return 1. - (abs(uv.x) * 1.15 + (y > 0. ? y * y : -y * .9)); }
-// a burning patch on the ground: -1..1 both ways; vB.z its rim
-float fGround(vec2 p){
-  float r = length(p);
-  float crack = 1. - smoothstep(.03, .2, N(p * .36 + SD * 2.).b);
-  float heat = N(p * .26 + vec2(SD, TM * .2)).r, heat2 = N(p * .5 - vec2(TM * .13, SD)).g;
-  float h = crack * (.3 + 1.25 * heat) - .26;
-  h = max(h, (heat * heat2 - .34) * 2.6);
-  float th = atan(p.y, p.x);
-  float rim = 1. - abs(r - .92) / .06 - N(vec2(th * .159 * 7. + SD, TM * .45)).g * 1.05 + .2;
-  h = max(h, rim * vB.z);
-  h = min(h, (1. - r) * 9.);
-  return h * (.9 - .25 * r);
-}
 // the flat painted bands; hk < 1 keeps the heart out of it
 vec4 paint(float h, vec2 gp){
   float gr = (N(gp * vec2(1.3, .4) + SD * 7.).g - .5) * uSty.w, x = clamp(h, -1.5, 2.) + gr * .06;
@@ -85564,7 +85557,7 @@ void main(){
     float g = pow(max(0., 1. - length(vUV)), 2.2);
     o = vec4(mix(uPal[2], uPal[4], g) * g * vB.x * vB.y * (uBloom > .5 ? .25 : 1.), 0.);
   } else {
-    float h = sh == 0 ? fFlame(vUV) : sh == 1 ? fBall(vUV) : sh == 2 ? fBurst(vUV) : sh == 3 ? fRing(vUV) : sh == 4 ? fJet(vUV) : sh == 5 ? fWing(vUV) : sh == 8 ? fEmber(vUV) : fGround(vUV);
+    float h = sh == 0 ? fFlame(vUV) : sh == 1 ? fBall(vUV) : sh == 2 ? fBurst(vUV) : sh == 3 ? fRing(vUV) : sh == 4 ? fJet(vUV) : sh == 5 ? fWing(vUV) : fEmber(vUV);
     o = paint(h, vUV);
   }
   if (o.a < .004 && max(o.r, max(o.g, o.b)) < .004) discard;
@@ -85683,16 +85676,18 @@ const PYF_EXT = {
    The owner (10 Nov 2026): "can you do a new flame animation for pyro for all his spells. remove those ones entirely ... make
    it more stylised", then of the first painted sheets: "have a go at doing my flame animations again". Every flame the
    Pyroclasts make is drawn here on cards the flame shader paints live (pyrotex.js: FLAME, BALL, BURST, RING, JET, WING, SMOKE,
-   GLOW, EMBER, GROUND), so the fire flows and no two flames are alike. Embers are game particles (part, kind 'pfe'), so the
+   GLOW, EMBER), so the fire flows and no two flames are alike. Embers are game particles (part, kind 'pfe'), so the
    Element Lab's particle controls act on them. Gameplay, timing and the sounds are untouched.
    - Hand flame: a living tongue cupped in the casting palm and a faint glow, taller as a strike or spell gathers (then the
      other palm lights too).
    - Fireball (owner: "more of a classic fireball. have light emit from it along its path"): a round ball of rolling fire
-     with a short flame swept back, thrown on a flat arc, small tongues peeling off behind it; it carries a light that moves
+     with a short flame swept back, thrown straight and level at its target (owner: "fireball shouldnt lob like that instead
+     it should go straight to the target", "in a straight line across not downwards"), small tongues peeling off behind it; it carries a light that moves
      with it and a warm pool on the ground under it. It lands in a quick flash, fire swelling low over the ground with a plume up its middle that lifts off and breaks up, a ring
-     of flame racing out to the splash's real edge, a few tongues left licking, embers flung, one puff of smoke, a scorch.
-   - Burning glyph (a real area): glowing cracks in scorched ground with heat wandering through them, a lit rim, tongues
-     standing in it, embers.
+     of flame racing out to the splash's real edge, a few tongues left licking, embers flung, one puff of smoke, a brief
+     warm light on the ground.
+   - Burning glyph (a real area): one cohesive flame as wide as the area, its top licked into a few tips, its light on the
+     ground under it, embers. No marks on the ground: the owner found the cracked ground and rim read as runes.
    - Skipping Flame: a smaller comet hopping along its arcs; each landing a small burst, ring and tongues.
    - Furnace Breath: a roaring cone, jets of fire fanned from his hands and rolling out along it, tongues lifting off where it
      ends, a low glow under it.
@@ -85712,7 +85707,7 @@ const pfRnd = s => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return 
 const pfDrawing = () => typeof vfxReady === 'function' && typeof pyfBill === 'function' && vfxReady();
 const pfNorm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
 const pfSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const PF_WARM = [1, .5, .16], PF_SCORCH = [.07, .035, .02], PF_SQ = [-1, -1, 1, 1];
+const PF_WARM = [1, .5, .16], PF_SQ = [-1, -1, 1, 1];
 
 /* ---- drawing: each card under its effect's Element Lab layer ---- */
 // the layer's tuning onto a card's options (brightness, opacity, speed, recolour); its size back, or null: not drawn
@@ -85730,8 +85725,9 @@ function pfTune(s, l, size, o) {
   }
   PF.cards++; return size;
 }
-// a tongue rooted at P, len long along dir (o.fat: how wide)
-function pfFlame(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.p0 = o.fat == null ? 1 : o.fat; return pyfAxial(PYF_SH.FLAME, P, dir, z, z * .66, o); }
+// a tongue rooted at P, len long along dir (o.fat: how wide; o.wide: its card's width per length, o.tips: more tips
+// across it, for one broad fire)
+function pfFlame(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.p0 = o.fat == null ? 1 : o.fat; o.p1 = o.tips || 0; return pyfAxial(PYF_SH.FLAME, P, dir, z, z * (o.wide || .66), o); }
 // a fireball, its ball at P, flying along dir (len: the ball and the flame behind it; the ball two fifths of that across)
 function pfComet(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.at = .78; return pyfAxial(PYF_SH.BALL, P, dir, z, z * .5, o); }
 function pfGlow(P, w, o, s, l) { const z = pfTune(s, l, w, o); return z != null && pyfBill(PYF_SH.GLOW, P, z, z, PF_SQ, o); }
@@ -85769,21 +85765,16 @@ function pfEmbers() {
   }
 }
 function pfLight(x, z, h, k, rad, life, s) { const e = efxPush(s, 'light'); try { if (G.flashes.length < 6) flashLight(x, z, h, [1.4 * k, .62 * k, .2 * k], rad, life); } finally { efxPop(e); } }
-// a patch of ground the fire touched: a scorch, a warm glow while it is hot, and (fire > 0) a fire burning on it for a while
+// a patch of ground the fire touched: its warm light while it is hot, and (fire) a fire burning on it for a while. Nothing
+// is marked on the ground (owner: "dont use ground decals, they look like runes which are different")
 function pfGround(x, z, r, dur, fire, s) { if (PF.grounds.length >= 40) PF.grounds.shift(); PF.grounds.push({ x, z, r, at: G.time, dur, fire, s, seed: (Math.random() * 97) | 0 }); }
-// the fire on a patch (a glyph or a ground fire): the scorch, the glowing cracks (rim: its lit edge, a real area's), the
-// tongues standing in it; e: how much of it shows
-function pfPatch(x, z, r, e, n, tall, Gd, s, seed, rim, now, dt) {
-  if (typeof VX !== 'undefined' && typeof vfxFlat === 'function') {
-    vfxFlat(VX, x, z, .021, r * 1.1, r * 1.1, seed, PF_SCORCH, .5 * e, VT.DIRT, 0);
-    if (Gd.disc > 0) vfxFlat(VX, x, z, .026, r * 1.25, r * 1.25, 0, PF_WARM, Gd.disc * e * (.85 + .15 * Math.sin(now * 9 + seed)), VT.GLOW, 1);
-  }
-  const o = { seed, k: 1, a: e, sp: 1 }, rr0 = pfTune(s, 'ground', r, o);
-  if (rr0 != null) { o.p0 = rim ? Gd.rim : 0; pyfFlat(PYF_SH.GROUND, x, .031, z, rr0 / .92, seed * .7, o); }
-  for (let k = 0; k < n; k++) {
-    const a = seed + k * TAU / n + .25 * Math.sin(now * .7 + k), rr = r * (.15 + .5 * ((k * .618 + seed * .1) % 1)), len = tall * (.75 + .5 * pfRnd(seed + k)) * Math.min(1.3, r / .5 + .3) * (.5 + .5 * e);
-    pfFlame([x + Math.cos(a) * rr, .02, z + Math.sin(a) * rr], PF_UP, len, { k: 1, a: e, seed: seed + k * 7, pull: .1, sp: .85 + .3 * pfRnd(k + seed), fat: .9 }, s, 'ground');
-  }
+// the fire on a patch (a glyph or a ground fire): one cohesive flame as wide as the patch, its top licked into a few tips
+// (owner: "not a fan of these small flames, should look like one cohesive flame"), its light on the ground, embers; e: how
+// much of it shows
+function pfPatch(x, z, r, e, tall, Gd, s, seed, now, dt) {
+  if (Gd.disc > 0 && typeof VX !== 'undefined' && typeof vfxFlat === 'function') vfxFlat(VX, x, z, .026, r * 1.3, r * 1.3, 0, PF_WARM, Gd.disc * e * (.85 + .15 * Math.sin(now * 9 + seed)), VT.GLOW, 1);
+  const ht = Math.max(tall * 1.7, r * 1.15) * (.6 + .4 * e);
+  pfFlame([x, .02, z], PF_UP, ht, { k: 1, a: e, seed, pull: .12, sp: .9, fat: 1.45, tips: 1.6, wide: r * 1.9 / ht }, s, 'ground');
   if (Gd.ember > 0 && Math.random() < Gd.ember * dt * e) { const a = Math.random() * TAU, rr = Math.random() * r * .7; pfEmber(x + Math.cos(a) * rr, .08, z + Math.sin(a) * rr, (Math.random() - .5) * .3, .5 + Math.random() * .6, (Math.random() - .5) * .3, { life: .7, w: .05, lift: .4 }, s); }
 }
 
@@ -85838,10 +85829,21 @@ function pfBalls(now) {
     if (p.done || p.k !== 'lob' || p.col !== CC_COL.fire) continue;
     const s = p._efs && ELEM_FX_SPELLS[p._efs] ? p._efs : 'cc_fireball', C = efxOf(s, 'cc_fireball', 'core'), T = efxOf(s, 'cc_fireball', 'trail');
     const q = p.tr && p.tr.length ? p.tr[0] : null, L = p.lob;
-    let d = q ? [p.x - q[0], p.h - q[1], p.z - q[2]] : L ? [L.ax - L.x0, 0, L.az - L.z0] : [1, 0, 0];
+    // thrown straight and level (owner: "fireball shouldnt lob like that instead it should go straight to the target", "should
+    // go in a straight line across not downwards"): it flies at the height it left his hand, into the foe's body; only at a foe
+    // shorter than that does it come down, to just under the foe's top (aim: that share of its height). The lob's own end is
+    // at the foe's feet, so the ball is drawn above it, more the nearer it gets
+    const flat = L && Math.abs(L.arc) < .02;
+    if (flat && p._pfAim == null) {
+      let fh = 1.3, bd = .7;
+      for (const c of G.creeps) { if (c.dead) continue; const dd = Math.hypot(c.x - L.ax, c.y - L.az); if (dd < bd) { bd = dd; fh = (typeof creepBaseY === 'function' ? creepBaseY(c) : 0) + (typeof creepH === 'function' ? creepH(c) : 1.3); } }
+      p._pfAim = Math.min(L.h0, Math.max(.3, fh * (C.aim == null ? .85 : C.aim)));
+    }
+    const aim = flat ? p._pfAim : .12, y = p.h + (L ? (aim - .12) * Math.min(1, L.t / L.T) : 0);
+    let d = flat ? [L.ax - L.x0, aim - L.h0, L.az - L.z0] : q ? [p.x - q[0], p.h - q[1], p.z - q[2]] : L ? [L.ax - L.x0, 0, L.az - L.z0] : [1, 0, 0];
     if (Math.hypot(d[0], d[1], d[2]) < 1e-4) d = L ? [L.ax - L.x0, .3, L.az - L.z0] : [1, 0, 0];
     if (p.pfSeed == null) p.pfSeed = (Math.random() * 97) | 0;
-    pfBallAt(p.x, p.h, p.z, pfNorm(d), C.ball * (p.sz || 1), C, T, s, p.pfSeed, p, now);
+    pfBallAt(p.x, y, p.z, pfNorm(d), C.ball * (p.sz || 1), C, T, s, p.pfSeed, p, now);
   }
   PF.hops = PF.hops.filter(h => now - h.at < h.T);
   const C = efx('cc_kindle', 'core'), T = efx('cc_kindle', 'trail');
@@ -85873,17 +85875,17 @@ function pfImpact(x, z, sp, o, s) {
 
 /* ---- the burning glyphs and the ground fires ---- */
 function pfGlyphs(now, dt) {
-  const lv = pfLv(), Z = (G.hazards || []).filter(z => z.k === 'cc_glyph' && z.s === 'fire' && z.t > 0 && pfIsPyro(z.src)), thin = Math.min(1, 10 / Math.max(1, Z.length));
+  const Z = (G.hazards || []).filter(z => z.k === 'cc_glyph' && z.s === 'fire' && z.t > 0 && pfIsPyro(z.src));
   for (const z of Z) {
     const s = z._efs && ELEM_FX_SPELLS[z._efs] ? z._efs : z._sfx ? 'cc_kindle' : 'cc_fireball', Gd = efxOf(s, 'cc_fireball', 'ground'); if (!Gd.on) continue;
     const e = Math.min(1, z.t / .5, (G.time - (z.born || 0)) / .25), sd = ((z.x * 7.3 + z.z * 3.1) * 10 | 0) % 97;
-    pfPatch(z.x, z.z, z.r || .5, Math.max(0, e), Math.max(1, Math.round(Gd.tongues * [.5, .75, 1][lv] * thin)), Gd.tall, Gd, s, sd, 1, now, dt);
+    pfPatch(z.x, z.z, z.r || .5, Math.max(0, e), Gd.tall, Gd, s, sd, now, dt);
   }
   PF.grounds = PF.grounds.filter(g => now - g.at < g.dur);
   for (const g of PF.grounds) {
     const u = (now - g.at) / g.dur, e = Math.min(1, (now - g.at) / .15) * (1 - pfSs(.55, 1, u)), Gd = efxOf(g.s, 'cc_fireball', 'ground'); if (!Gd.on) continue;
-    if (!g.fire) { if (typeof vfxFlat === 'function') { vfxFlat(VX, g.x, g.z, .02, g.r, g.r, g.seed, PF_SCORCH, .45 * e, VT.DIRT, 0); vfxFlat(VX, g.x, g.z, .025, g.r * 1.1, g.r * 1.1, 0, PF_WARM, .3 * e * (1 - u), VT.GLOW, 1); } continue; }
-    pfPatch(g.x, g.z, g.r, e, Math.max(1, Math.round(g.fire * [.4, .7, 1][lv])), Gd.tall, Gd, g.s, g.seed, 0, now, dt);
+    if (!g.fire) { if (typeof vfxFlat === 'function') vfxFlat(VX, g.x, g.z, .025, g.r * 1.1, g.r * 1.1, 0, PF_WARM, .3 * e * (1 - u), VT.GLOW, 1); continue; }
+    pfPatch(g.x, g.z, g.r, e, Gd.tall, Gd, g.s, g.seed, now, dt);
   }
 }
 
@@ -86019,7 +86021,8 @@ if (typeof ccFireBurst === 'function') {
   if (typeof fxExplode === 'function') { const _x = fxExplode; fxExplode = function () { if (PF.quiet) return; return _x.apply(this, arguments); }; }
   if (typeof ccRingFx === 'function') { const _r = ccRingFx; ccRingFx = function (x, z) { if (PF.quiet && x === PF.quiet.x && z === PF.quiet.z) return; return _r.apply(this, arguments); }; }
   const pfLob = p => p && p.k === 'lob' && p.col === CC_COL.fire;
-  // a classic fireball flies flatter than the lob it is thrown as (when and where it lands are the lob's, untouched)
+  // a classic fireball flies straight, not on the lob it is thrown as (core.arcK: how much of the lob's arc it keeps, none;
+  // when and where it lands are the lob's, untouched)
   if (typeof ccShoot === 'function') { const _sh = ccShoot; ccShoot = function (p) { if (pfLob(p) && p.lob && typeof efx === 'function') { const k = efx('cc_fireball', 'core').arcK; if (k >= 0) p.lob.arc *= k; } return _sh.apply(this, arguments); }; }
   if (typeof sfxBasicCC === 'function') { const _b = sfxBasicCC; sfxBasicCC = function (p) { if (pfLob(p)) return true; return _b.apply(this, arguments); }; }
   if (typeof ccDrawProj === 'function') { const _d = ccDrawProj; ccDrawProj = function (p) { if (pfLob(p)) return; return _d.apply(this, arguments); }; }
@@ -86070,7 +86073,7 @@ if (typeof CCX_FX !== 'undefined') {
     const n = Math.round(E.count * k * [.5, .8, 1][lv]);
     for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 1.6 * (.4 + .6 * Math.random()) * k; pfEmber(x + Math.cos(a) * .1, .2 + Math.random() * .2, z + Math.sin(a) * .1, Math.cos(a) * v, 1.2 + Math.random() * 1.8, Math.sin(a) * v, { life: .7 + Math.random() * .4, w: .08, lift: .3 }, s); }
     if (lv) for (let i = 0; i < S.puffs; i++) pfShot('puff', x + (Math.random() - .5) * .6 * k, .55 + .15 * i, z + (Math.random() - .5) * .6 * k, S.w * k * (.85 + .3 * Math.random()), 1, { delay: .18 + i * .1, rise: .45, grow: .5, a: .85 }, s, 'smoke');
-    if (Gd.on) pfGround(x, z, Gd.r * k, Gd.dur, Gd.tongues, s);
+    if (Gd.on) pfGround(x, z, Gd.r * k, Gd.dur, 1, s);
     if (L.on) pfLight(x, z, .4, 1.1, L.rad * k * 1.3, .3, s);
   };
   CCX_FX.skipHop = function (C, x0, h0, z0, foe, x, z, T, j) {
