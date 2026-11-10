@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cf0dd65@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b7ccbd8@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1545,7 +1545,8 @@ const RITES = [
 const RITE_ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 // each rite is fought on its own field (index = rite; 0 the standard run). For now the clearing by day and Moonwood by
 // night in turn; a new map for a rite goes in its place here (Kingsmeadow stays for older saves and Tower Wars)
-const RITE_MAPS = ['clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing'];
+// (the standard run, no rite, is on Greatroot Way: owner, 10 Nov 2026, "commit so that map is the new default"; riteMap falls back to Kingsmeadow where a map is missing)
+const RITE_MAPS = ['greatroot', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing'];
 const riteMap = n => { const m = RITE_MAPS[n | 0]; return typeof MAPS !== 'undefined' && MAPS[m] ? m : 'meadow'; };
 const riteName = n => n ? `Rite ${RITE_ROMAN[n]}` : 'No rite';
 // what the current run's rite does to the numbers (0 outside a campaign run)
@@ -54236,8 +54237,10 @@ for (const id in EP_WARD_ABIL) { const ab = typeof ABIL !== 'undefined' && ABIL[
    (short room, long hall) fed by per-sound send levels. Every sound layers transient + body + tail, with
    random pitch / timbre / pan variation on each play. Creep deaths use formant (vocal-tract) synthesis. */
 const AudioSys = (() => {
-  const pref = { sfx: true, music: true, score: 'woodland', sv: 3 };   // score: 'woodland' (the theme song, Woodland Echoes, the owner's recording: the default), 'song' (the written song, Deepwood Path, on recorded instruments), 'distant' (the earlier written song), 'ether' (the far-off synth score) or 'forest' (the woodwind consort)
+  const pref = { sfx: true, music: true, musicVolume: 1, sfxVolume: 1, score: 'woodland', sv: 3 };   // volume is a 0..1 multiplier of the existing mix; old saves keep their original levels
   try { const p = JSON.parse(localStorage.getItem('runehold.audio') || 'null'); if (p) { Object.assign(pref, p); if ((p.sv | 0) < 3) { pref.score = 'woodland'; pref.sv = 3; } } } catch (e) {}   // (the old default moves on to the new song)
+  const volume = v => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+  pref.musicVolume = volume(pref.musicVolume); pref.sfxVolume = volume(pref.sfxVolume);
   const MUSV = .5;                  // music bus level (the score sits under the SFX)
   const BRIGHT = new Set(['zap']);
   const CEIL_HZ = 7200, DIE_HZ = 3600, BRIGHT_HZ = 15000; // frequency ceilings: nothing in the mix goes shrill; death cries stay low and throaty;
@@ -54348,7 +54351,8 @@ const AudioSys = (() => {
     }
     const room = c.createConvolver(); room.buffer = T.room; room.connect(g(1.2, e.pre));
     const hall = c.createConvolver(); hall.buffer = T.hall; hall.connect(g(1, e.pre));
-    const s = e.off || pref.sfx ? 1 : 0, m = e.off || pref.music ? MUSV : 0;
+    // Offline renders keep the authored mix, independent of the player's device settings.
+    const s = e.off ? 1 : pref.sfx ? pref.sfxVolume : 0, m = e.off ? MUSV : pref.music ? MUSV * pref.musicVolume : 0;
     e.sfxIn = g(s, e.pre); e.sfxRoom = g(s, room); e.sfxHall = g(s, hall); e.brightIn = g(s, e.brightPre); e.rawIn = g(s, post);   // rawIn: the sounds you sent, with no ceiling at all
     e.demoIn = g(s, e.demoOut || c.destination);
     e.sfxBus = [e.sfxIn, e.sfxRoom, e.sfxHall, e.brightIn, e.rawIn, e.demoIn];   // everything the effects switch turns on and off (one list, so no bus gets left out)
@@ -58016,12 +58020,13 @@ const AudioSys = (() => {
     intense(b) { wantInt = !!b; },
     ambience(k) { ambKind = k === 'night' ? 'night' : 'day'; },
     set(k, v) {
+      if (k === 'musicVolume' || k === 'sfxVolume') v = volume(v);
       pref[k] = v; savePref();
       if (k === 'sfx' && !v) stopUnitVoice();
       if (!ctx || !L) return;
-      const t = ctx.currentTime, on = !!v;
-      if (k === 'sfx') for (const n of L.sfxBus) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(on ? 1 : 0, t, .05); }
-      if (k === 'music') for (const n of [L.musIn, L.musHall]) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(on ? MUSV : 0, t, .25); }
+      const t = ctx.currentTime;
+      if (k === 'sfx' || k === 'sfxVolume') for (const n of L.sfxBus) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(pref.sfx ? pref.sfxVolume : 0, t, .05); }
+      if (k === 'music' || k === 'musicVolume') for (const n of [L.musIn, L.musHall]) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(pref.music ? MUSV * pref.musicVolume : 0, t, .1); }
       if (k === 'score') { use(L); musicSwap(); }   // the other score: crossfade over to it
     },
     suspend() { stopUnitVoice(); if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); },
@@ -58507,7 +58512,9 @@ float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
    (the classic flow-map trick: no stretch builds up), a slow noise ripple drifts down the stream with them, and the bright
    parts glint now and then. The flow's length is its speed: the falls run fast and straight down, the stream slowly. */
 vec3 waterAt(vec3 tx0, vec2 uv, vec4 wm, vec2 gx, vec2 gy){
-  vec2 f = wm.gb*2. - 1.; float sp = length(f), m = smoothstep(.02, .55, wm.r), t = uTime*uWK.y;
+  // (uWK.x 2, a map with falls: the mask's lower half is the water, its upper half how near a fall's foot: tools/make_grpaint.py)
+  bool falls = uWK.x > 1.5; float foot = falls ? clamp(wm.r*2. - 1., 0., 1.) : 0.;
+  vec2 f = wm.gb*2. - 1.; float sp = length(f), m = smoothstep(.02, .55, falls ? min(wm.r*2., 1.) : wm.r), t = uTime*uWK.y;
   vec2 dir = f/max(sp, .001), p = vW.xz*2.4;
   vec2 rip = vec2(vnoise(p - f*t*2.2 + vec2(t*.13, 0.)), vnoise(p.yx*1.13 + 5.2 - f*t*2.2)) - .5;
   float T = t*(.55 + .9*sp), f0 = fract(T), f1 = fract(T + .5), A = (.08 + .3*sp)*uWK.z;
@@ -58519,6 +58526,27 @@ vec3 waterAt(vec3 tx0, vec2 uv, vec4 wm, vec2 gx, vec2 gy){
   float spark = smoothstep(.62, .95, n1)*smoothstep(.6, .95, n2)*smoothstep(.25, .7, lum)*uWK.w;
   c *= 1. + (n1 - .5)*.12*uWK.w*smoothstep(.15, .5, lum);
   c += c*spark*1.6 + vec3(.6, .9, 1.)*spark*.12;
+  if(falls){
+    /* Down a fall (the flow fast): white strands side by side, each running at its own pace, thin at the lip and heavier
+       toward the foot, with surges travelling down them; at the foot the water lands in a churn and runs outward: foam
+       patches carried out along the fan, rings spreading from where it lands, all fading as the water slows and spreads. */
+    vec3 white = vec3(.9, .97, 1.)*clamp(lum*1.5 + .35, .5, 1.25);
+    vec2 pr = vec2(-dir.y, dir.x); float along = dot(p, dir), across = dot(p, pr);
+    float fk = smoothstep(.42, .85, sp)*(1. - foot);
+    float lane = floor(across*3.4), lr = h11(lane + 7.);
+    float st = vnoise(vec2(across*6., along*1.1 - t*(2.4 + 2.6*lr)*sp + lr*9.));
+    float surge = vnoise(vec2(along*.55 - t*1.9*sp, lane*.37 + 2.));
+    float strands = smoothstep(.5, .86, st)*(.45 + .75*surge)*smoothstep(.3, 1., sp);
+    c = mix(c, white, clamp(strands*fk*.48, 0., .6));
+    c *= 1. + (surge - .5)*.22*fk;
+    if(foot > .01){
+      float churn = vnoise(p*6.5 - f*t*5.5) * vnoise(p.yx*4.3 + 7. - f*t*3.1 + vec2(t*.4, 0.));
+      float foam = smoothstep(.2, .46, churn)*foot;
+      float ring = smoothstep(.6, .95, sin((1. - foot)*15. - t*3.3 + vnoise(p*2.)*4.)*.5 + .5)*foot*(1. - foot)*1.6*smoothstep(0., .25, foot);
+      float land = smoothstep(.72, 1., foot)*(.55 + .45*vnoise(p*11. + t*3.));   // (where it lands: white water)
+      c = mix(c, white, clamp(foam*.55 + ring*.3 + land*.6, 0., .85));
+    }
+  }
   return mix(tx0, c, m);
 }
 // planar object-space UV: walls map (around, up); near-flat faces map xz
@@ -58636,7 +58664,7 @@ void main(){
     float od = length(ov/uGP.zw);   // world units past the painting's edge: there the mirrored copy blurs and darkens, so its seam never shows
     vec3 tx = texture(uGPT, uv, clamp(od*1.8*uGPE, 0., 5. + min(uGPE - 1., 1.5))).rgb*(1. - clamp(od*uGPE/3.6, 0., mix(.85, .95, clamp(uGPE - 1., 0., 1.))));
     if(uGPE > 1.01) tx *= mix(.22, 1., smoothstep(-.2, 2., min(uv.x, 1. - uv.x)/uGP.z));   // (such a map's painting also dims toward its left and right edges, so the seam with its mirrored copy lies in the dark)
-    if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .02) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
+    if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .01) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
     float shp = uShadowOn>.5 ? shadowAt(vL) : 1.;
     vec3 pl = vec3(0.);
     for(int i=0;i<6;i++){ if(i>=uNPL) break; vec3 d=uPL[i].xyz-vW; float l=length(d); float a=clamp(1.-l/uPL[i].w,0.,1.); a*=a; pl += uPLc[i]*a*(.35+.65*max(d.y/l,0.)); }
@@ -59768,8 +59796,8 @@ function createRenderer(canvas, opt = {}) {
       if (lm) { gl.uniform4fv(u.uLMR, lm.rect); gl.uniform1f(u.uLMK, lm.k * (this.lmGain == null ? 1 : this.lmGain)); }
       if (u.uGPT) { const gp = this.gpaint; gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, gp ? gp.tex : blank); gl.uniform1i(u.uGPT, 5); gl.uniform1f(u.uGPOn, gp ? 1 : 0); if (gp) { gl.uniform4f(u.uGP, gp.rect[0], gp.rect[1], 1 / gp.rect[2], 1 / gp.rect[3]); gl.uniform1f(u.uGPGain, gp.gain || 1); } if (u.uGPE) gl.uniform1f(u.uGPE, gp && gp.edge || 1); if (u.uGPS) gl.uniform2f(u.uGPS, gp && gp.shade ? 1 : 0, gp && gp.shade ? gp.shade : 1); }
       if (u.uWM) { const w = this.gwater, on = !!(w && w.tex && this.gpaint && !(typeof GFX !== 'undefined' && GFX === 'low')), k = on ? w.k || WATER_K1 : WATER_K1;   // (a painted map's moving water: off on Graphics Low)
-        gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, on ? w.tex : blank); gl.uniform1i(u.uWM, 13); gl.uniform4f(u.uWK, on ? 1 : 0, k[0], k[1], k[2]); }
-      if (u.uGLT) { const gl_ = this.glintTex(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, gl_ || blank); gl.uniform1i(u.uGLT, 8); gl.uniform1f(u.uGLOn, gl_ && this.glintOn && !(typeof vfxFid === 'function' && vfxFid().name === 'Low') ? 1 : 0); if (gl_) { const g = this.glint; gl.uniform4f(u.uGL, g.strength, g.sharpness, g.scale, g.relief); gl.uniform1f(u.uGLK, typeof GLINT_MASK_K !== 'undefined' ? GLINT_MASK_K : .31); } }
+        gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, on ? w.tex : blank); gl.uniform1i(u.uWM, 13); gl.uniform4f(u.uWK, on ? (w.falls ? 2 : 1) : 0, k[0], k[1], k[2]); }
+      if (u.uGLT) { const gl_ = this.glintTex(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, gl_ || blank); gl.uniform1i(u.uGLT, 8); gl.uniform1f(u.uGLOn, gl_ && this.glintOn && !(this.gpaint && this.gpaint.noGlint) && !(typeof vfxFid === 'function' && vfxFid().name === 'Low') ? 1 : 0); if (gl_) { const g = this.glint; gl.uniform4f(u.uGL, g.strength, g.sharpness, g.scale, g.relief); gl.uniform1f(u.uGLK, typeof GLINT_MASK_K !== 'undefined' ? GLINT_MASK_K : .31); } }
       if (u.uMT) { let mt = null; try { mt = matTexture(); } catch (e) {} gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D_ARRAY, mt || blankA); gl.uniform1i(u.uMT, 6); gl.uniform1f(u.uMTOn, mt ? 1 : 0); if (mt) gl.uniform4fv(u.uMTR, matRef); }
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
       if (u.uUQ) gl.uniform1f(u.uUQ, this.uq == null ? 2 : this.uq); if (u.uCamR) gl.uniform3fv(u.uCamR, this.right); gl.uniform1f(u.uRim, this.rim == null ? .12 : this.rim); gl.uniform1f(u.uExpo, this.expo == null ? 1 : this.expo); gl.uniform1f(u.uFill, this.fill || 0); if (u.uOwn) gl.uniform1f(u.uOwn, this.own == null ? 1 : this.own); if (u.uOwnK) { const k = this.ownK || OWN_K; gl.uniform4f(u.uOwnK, k[0], k[1], k[2], k[3]); }
@@ -63266,12 +63294,13 @@ const GNOLL_KIMODO = {"v":1,"src":{"run":"run_lope_3","back":"death_back_3","fwd
 const CL_FLOW = 'data:image/png;base64,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';
 
 /* Greatroot Way's painted water, its way in and the trunks at its head (generated by tools/make_grpaint.py).
-   GR_FLOW: R the water mask, G B its flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's
+   GR_FLOW: R the water mask (0 .. 0.5 how much is water; above 0.5 how near a fall's foot: gl.js waterAt, uWK.x 2), G B its
+   flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's
    own rect (GR_PAINT_RECT). */
-const GR_FLOW = 'data:image/png;base64,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';
-const GR_ENTRY = [[1.951, -6.035], [4.42, -5.888], [4.975, -4.784], [5.284, -3.018]];   // world x, z: from behind the trunk at the head, onto the road's far end, down it
+const GR_FLOW = 'data:image/png;base64,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';
+const GR_ENTRY = [[1.951, -6.035], [4.605, -5.888], [5.037, -4.784], [5.284, -3.018]];   // world x, z: from behind the trunk at the head, onto the road's far end, down it
 const GR_TUN = [0.22, 2.098, -3.938];   // the walk in's perspective: [how much smaller at the far end (1 / (1 + k)), over how many rows, the row of full size]
-const GR_OCC = [[-5.667, [[1.086, 3.062, -14.794], [1.086, 3.062, -11.85], [1.148, 3.0, -9.642], [0.901, 3.093, -8.17], [0.531, 3.34, -7.25], [0.16, 3.586, -6.698], [-0.025, 3.833, -6.33], [-0.241, 3.957, -5.962], [-0.241, 3.957, -5.667]]], [-5.52, [[7.506, 12.259, -14.794], [7.506, 12.259, -11.85], [7.105, 12.259, -9.458], [6.765, 12.414, -7.839], [6.21, 12.568, -7.066], [5.901, 12.877, -6.587], [5.84, 13.494, -5.962], [5.84, 13.494, -5.52]]]];   // the trunks at the head, to stand behind: [the foot's z, rows [x left, x right, z] down the painting]
+const GR_OCC = [[-5.005, [[1.086, 3.802, -14.794], [1.086, 3.802, -11.85], [1.088, 3.957, -11.776], [1.091, 3.926, -11.703], [1.093, 4.111, -11.629], [1.095, 4.111, -11.556], [1.097, 4.173, -11.482], [1.099, 4.019, -11.408], [1.101, 3.432, -11.335], [1.103, 3.401, -11.261], [1.105, 3.463, -11.188], [1.107, 3.525, -11.114], [1.109, 3.617, -11.04], [1.111, 3.648, -10.967], [1.113, 3.617, -10.893], [1.115, 3.278, -10.82], [1.117, 3.247, -10.746], [1.119, 3.185, -10.672], [1.121, 3.185, -10.599], [1.123, 3.154, -10.525], [1.126, 3.154, -10.452], [1.128, 3.154, -10.378], [1.13, 3.123, -10.304], [1.132, 3.185, -10.231], [1.134, 3.216, -10.157], [1.136, 3.185, -10.084], [1.138, 3.093, -10.01], [1.14, 3.154, -9.936], [1.142, 3.093, -9.863], [1.144, 3.062, -9.789], [1.146, 3.0, -9.716], [1.148, 3.062, -9.642], [1.136, 3.031, -9.568], [1.123, 2.969, -9.495], [1.111, 2.969, -9.421], [1.099, 2.938, -9.348], [1.086, 2.938, -9.274], [1.074, 2.938, -9.2], [1.062, 2.938, -9.127], [1.049, 2.907, -9.053], [1.037, 2.907, -8.98], [1.025, 2.938, -8.906], [1.012, 2.969, -8.832], [1.0, 2.938, -8.759], [0.988, 2.877, -8.685], [0.975, 2.877, -8.612], [0.963, 2.846, -8.538], [0.951, 2.846, -8.464], [0.938, 2.846, -8.391], [0.926, 2.815, -8.317], [0.914, 2.815, -8.243], [0.901, 2.815, -8.17], [0.872, 2.815, -8.096], [0.842, 2.815, -8.023], [0.812, 2.784, -7.949], [0.783, 2.784, -7.875], [0.753, 2.784, -7.802], [0.723, 2.784, -7.728], [0.694, 2.784, -7.655], [0.664, 2.784, -7.581], [0.635, 2.784, -7.507], [0.605, 2.784, -7.434], [0.575, 2.784, -7.36], [0.546, 2.815, -7.287], [0.506, 2.846, -7.213], [0.457, 2.938, -7.139], [0.407, 2.969, -7.066], [0.358, 3.0, -6.992], [0.309, 3.031, -6.919], [0.259, 3.185, -6.845], [0.21, 3.247, -6.771], [0.16, 3.247, -6.698], [0.123, 3.278, -6.624], [0.086, 3.37, -6.551], [0.049, 3.494, -6.477], [0.012, 3.525, -6.403], [-0.025, 3.586, -6.33], [-0.068, 3.679, -6.256], [-0.111, 3.772, -6.183], [-0.154, 3.802, -6.109], [-0.198, 3.833, -6.035], [-0.241, 3.864, -5.962], [-0.241, 3.864, -5.888], [-0.241, 3.864, -5.815], [-0.241, 3.864, -5.741], [-0.241, 3.864, -5.667], [-0.241, 3.864, -5.005]]], [-5.52, [[7.506, 12.259, -14.794], [7.506, 12.259, -11.85], [7.105, 12.259, -9.458], [6.765, 12.414, -7.839], [6.21, 12.568, -7.066], [5.901, 12.877, -6.587], [5.84, 13.494, -5.962], [5.84, 13.494, -5.52]]]];   // the trunks at the head, to stand behind: [the foot's z, rows [x left, x right, z] down the painting]
 
 /* The units' material textures (generated by tools/make_unittex.py from assets/units/tex/). A material missing here
    keeps its painted stand-in (matPaint in gl.js). When one has decoded, the material textures are built again. */
@@ -63631,6 +63660,8 @@ const MAPS = {
   moonwood: { name: 'Moonwood', blurb: 'A haunted grove by night' },
   // the forest clearing: foes come out of the dark tunnel of trees at its head (entry: world x, z waypoints to the field)
   clearing: { name: 'Sunfall Glade', blurb: 'Dappled light in the deep wood', entry: typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : null },
+  // Greatroot Way, the default map (the standard run and the Chronicles' first location): the notes are below
+  greatroot: { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: typeof GR_ENTRY !== 'undefined' ? GR_ENTRY : null, tun: typeof GR_TUN !== 'undefined' ? GR_TUN : null },
 };
 /* Greatroot Way: the elves' road home under the old trees. The owner's painting is the map (grpaint.js from
    tools/make_grpaint.py: a sunlit grass road between great trees, running away to a point between two trunks at the
@@ -63643,7 +63674,6 @@ const MAPS = {
    The full 3D version (map3d.js M3D_DEFS.greatroot3d: terrain, brook, cliff, TreeForge trunks) is kept behind
    ?map3d=greatroot; GR3_ENTRY is its way in, behind its gate elder. */
 const GR3_ENTRY = [[3.5, -7.2], [4.5, -6.25], [5.9, -5.55], [6.75, -4.3], [6.5, -2.7]];
-if (typeof GR_PAINT !== 'undefined') MAPS.greatroot = { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: GR_ENTRY, tun: typeof GR_TUN !== 'undefined' ? GR_TUN : null };
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
 /* Tunable light schemes. Colours are sRGB hex, strengths multiply them in linear light. The Lighting panel edits a copy per map. */
 const LIGHT_DEF = {
@@ -63714,7 +63744,7 @@ LOOK_DEF.clearing = {"fwd":{"shOn":1,"shFloor":0.3,"shSoft":1.2,"shBias":0.0016,
    amber against a teal-green shade; a light post (no fog over the painting). */
 LIGHT_DEF.greatroot = {"sun":"#ffd9a6","sunI":1.75,"az":-128,"el":50,"rim":0.3,"fill":0.14,"ground":1,"paint":1,"sky":"#9cd0c2","skyI":0.62,"gnd":"#5c7a4a","gndI":0.3,"fog":"#24463e","fogNear":0.98,"fogFar":2.4,"woods":0,"lamps":1,"expo":1.04,"rays":0.8,"ray":"#ffe6b0"};
 MAP_MOOD.greatroot = {"top":"#8fd8c8","topK":0.14,"key":"#ffd08c","keyK":0.2,"bounce":"#8cb85c","bounceK":0.16,"env":0};
-LOOK_DEF.greatroot = {"fwd":{"shOn":1,"shFloor":0.4,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.5,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":1,"gGlint":1.2,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.7,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.3},"bloom":{"on":1,"thr":0.72,"strength":0.26,"radius":1.6},"rays":{"on":0,"col":"#ffd9a0","strength":0.3,"len":0.2,"thr":0.6},"hfog":{"on":0,"col":"#3f8f86","dens":0.2,"top":1.2,"fall":1.6,"max":0.15,"noise":0.6},"tone":{"on":1,"ev":0,"contrast":1.03,"sat":1.03,"warm":0.03,"tint":0},"grade":{"on":0,"lift":0,"liftC":"#2f8f86","liftK":0,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#1f7a78","splSK":0,"splH":"#ffb86a","splHK":0,"bal":0},"vig":{"on":1,"str":0.22,"rad":0.78,"soft":0.8},"sharp":{"on":1,"k":0.2}}};
+LOOK_DEF.greatroot = {"fwd":{"shOn":1,"shFloor":0.4,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.5,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":0,"gGlint":1.2,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.7,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.3},"bloom":{"on":1,"thr":0.72,"strength":0.26,"radius":1.6},"rays":{"on":0,"col":"#ffd9a0","strength":0.3,"len":0.2,"thr":0.6},"hfog":{"on":0,"col":"#3f8f86","dens":0.2,"top":1.2,"fall":1.6,"max":0.15,"noise":0.6},"tone":{"on":1,"ev":0,"contrast":1.03,"sat":1.03,"warm":0.03,"tint":0},"grade":{"on":0,"lift":0,"liftC":"#2f8f86","liftK":0,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#1f7a78","splSK":0,"splH":"#ffb86a","splHK":0,"bal":0},"vig":{"on":1,"str":0.22,"rad":0.78,"soft":0.8},"sharp":{"on":1,"k":0.2}}};
 /* Greatroot Way in full 3D (?map3d=greatroot): a late-morning sun slanting in from the upper left through the canopy (dap*: its dapple on everything the
    sun lights, gl.js shadowAt uCookie: strength, the pools' size in world units, their sway, the edge's softness), warm amber
    on the bark, teal-green shade and a teal haze into the distance. Tuned in the Light Lab and baked. */
@@ -64078,11 +64108,13 @@ const THEMES = {
     id: 'greatroot', sunDir: nrm3([-.54, .73, -.42]), sunCol: [1.6, 1.25, .8], sky: [.2, .3, .3], gnd: [.14, .16, .09], fogHex: '#24463e',
     pitch: 57, fitTop: GR_PAINT_RECT[1] + .1, fitBot: GR_PAINT_RECT[1] + GR_PAINT_RECT[3] - .1, noKeep: true, h: () => 0, fly: [.85, 1, .45],
     camX: GR_PAINT_RECT[0] + GR_PAINT_RECT[2] / 2, viewW: GR_PAINT_RECT[2] * 1.1,   // (the view looks at the painting's middle and shows at most a twentieth of the view past each of its sides, dark forest there: view.js setCam, fitCamera)
-    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .7,
+    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .7, walkUpright: true,   // (walkUpright: foes on the way in stand and turn as on the field, owner: "minions also dont turn properly as they pass by a tree")
+   
     // its god rays, along the painting's own (x, z, width, strength: view.js drawForestShafts), and the spray at its falls (x0, x1, z0, z1)
     shaftPts: [[-8.1, -8.6, 1.3, .9], [5.5, -2.5, 1.1, .5], [-4.1, .3, 1, .45], [-6.6, 6.2, 1, .4], [25.5, 11, 1.2, .55], [16.3, 4.3, 1, .45], [9.2, 4, 1.1, .15], [4.2, 8.8, 1, .13]],
     spray: [[-9, -7.7, -2.8, -2.2], [-8.2, -6, 2.9, 4.3], [15.1, 18.7, 12.1, 15.3], [19.4, 23.3, 2.2, 4.3]],
-    painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null, edge: 2.5 },   // (edge: it dims toward its sides and sinks into the dark just past them, so its mirrored copy never shows: gl.js uGPE)
+    painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null, edge: 2.5, glint: false, falls: true },   // (glint: no sun glint on its grass: owner, "remove the glint")
+    //   // (edge: it dims toward its sides and sinks into the dark just past them, so its mirrored copy never shows: gl.js uGPE)
     build: () => buildGreatrootPainted(),
   },
   moonwood: {
@@ -74698,7 +74730,7 @@ function buildThemeEnv(th) {
   E.treeHs = RD.trees; RD.trees = keep;
   if (th.painted) {
     const img = new Image();
-    img.onload = () => { E.gpaint = { tex: RD.texture(img, 'mirror'), rect: th.painted.rect, shade: th.painted.shade || 0, edge: th.painted.edge || 1 }; if (TH === th) applyLight();
+    img.onload = () => { E.gpaint = { tex: RD.texture(img, 'mirror'), rect: th.painted.rect, shade: th.painted.shade || 0, edge: th.painted.edge || 1, noGlint: th.painted.glint === false };   // (glint: false = a painting shown with no sun glint on its grass) if (TH === th) applyLight();
       if (th.painted.shade) try {   // the painting's light, coarse, for what drifts through it (dust shows in the sunny patches)
         const N = 96, c = document.createElement('canvas'); c.width = N; c.height = Math.round(N * img.height / img.width);
         const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data, L = new Float32Array(c.width * c.height);
@@ -74706,7 +74738,7 @@ function buildThemeEnv(th) {
         E.plum = { w: c.width, h: c.height, L, rect: th.painted.rect };
       } catch (e) {} };
     img.src = th.painted.src;
-    if (th.painted.water) { const wi = new Image(); wi.onload = () => { E.gwater = { tex: RD.texture(wi, false) }; if (TH === th) applyLight(); }; wi.src = th.painted.water; }   // (its moving water: gl.js waterAt, maps.js WATER_DEF)
+    if (th.painted.water) { const wi = new Image(); wi.onload = () => { E.gwater = { tex: RD.texture(wi, false), falls: !!th.painted.falls }; /* (falls: its mask also holds its falls' feet, gl.js waterAt) */ if (TH === th) applyLight(); }; wi.src = th.painted.water; }   // (its moving water: gl.js waterAt, maps.js WATER_DEF)
   }
   if (th.groundTex) {
     const img = new Image();
@@ -74920,6 +74952,7 @@ const tunE = c => { const k = tunT(c); return Math.min(1, 1.15 * k * k * (3 - 2 
 const tunS = c => 1 / (1 + tunP()[0] * tunK(c));
 function tunnelView(m, c) {
   if (TH.m3d) return m;   // (a 3D map's ravine is real: no painted perspective)
+  if (TH.walkUpright) { const sc = tunS(c); if (sc < 1) { for (let i = 0; i < 12; i++) m[i] *= sc; m[13] *= sc; } return m; }   // (a map whose foes come in close: only a little smaller, standing and turning as on the field: Greatroot Way)
   const k = tunK(c), e = tunE(c); if (!e) return m;
   const a = -CAM.pitch * e, sc = 1 / (1 + tunP()[0] * k), ca = Math.cos(a) * sc, sa = Math.sin(a) * sc;
   const x = m[12], y = m[13], z = m[14];
@@ -74943,7 +74976,7 @@ function creepMatrix(out, c, s, scale) {
   const lean = (c.spdM || 1) > 1.01 || c.rageT > 0 || c.packT > 0 ? .12 : 0;
   const sc = scale * cscale(c.type) * (c.elite ? ELITE_SC : 1) * (c.grow || 1);
   const pl = c.pile ? (c.pileT < .8 ? c.pileT / .8 : 1) : 0;   // Ossyra crashed down as a heap of bones, drawing herself back up in her last moment
-  return tunnelView(M4.trs(out, x + c.kbx, y, z + c.kbz, s.yaw * (TH.m3d ? 1 : 1 - tunE(c)) + wob, fp + lean + (c.lunge || 0) * .35 + (dizzy ? .12 : 0), fr + (dizzy ? Math.sin(vt * 6.5 + c.anim + 1.3) * .14 : 0), sc * (1 + .12 * hq * sq) * (1 + .25 * pl), sc * (1 - .2 * hq * sq) * (1 - .7 * pl), sc * (1 + .12 * hq * sq) * (1 + .25 * pl)), c);
+  return tunnelView(M4.trs(out, x + c.kbx, y, z + c.kbz, s.yaw * (TH.m3d || TH.walkUpright ? 1 : 1 - tunE(c)) + wob, fp + lean + (c.lunge || 0) * .35 + (dizzy ? .12 : 0), fr + (dizzy ? Math.sin(vt * 6.5 + c.anim + 1.3) * .14 : 0), sc * (1 + .12 * hq * sq) * (1 + .25 * pl), sc * (1 - .2 * hq * sq) * (1 - .7 * pl), sc * (1 + .12 * hq * sq) * (1 + .25 * pl)), c);
 }
 // every creep (bosses included) has its own model built at its true proportions, so CREEPS[].scale/.model are no longer used
 const CSC = { spider: 1.1 }; // spiderlings come in swarms of 20-36: keep them visibly smaller than the other walkers
@@ -75324,10 +75357,11 @@ function drawCreeps(dt) {
     creepMatrix(_m, c, s, pop * (.35 + .65 * fade));
     const ph = c.age * c.def.spd * (c.spdM || 1) * 9 * (c.slowT > 0 ? 1 - c.slowF : 1) * (c.byWall ? .88 : 1) * (c.stunT > 0 && c.frostT > 0 ? 0 : 1) + c.anim;
     const ck = model.castPose ? creepCastK(c) : 0;
-    drawModel(model, _m, ph, { pile: c.pile ? (c.pileT < .8 ? c.pileT / .8 : 1) : 0, tint: tintFor(c), alpha: c.ent && c.age < 1.1 ? Math.max(.04, c.age / 1.1) : c.phased ? .3 : c.etherOn ? .5 : c.def.lead === 'unseen' && !c.seen ? .2 + .06 * Math.sin(vt * 4 + c.anim) : model.alpha < 1 ? model.alpha : null, cast: ck, c });
+    const hid = TH.walkUpright && c.ent && c.ent.length >= MAPS[G.map].entry.length;   // (still behind the painted trunk: no shadow thrown out past it)
+    drawModel(model, _m, ph, { shadow: !hid, pile: c.pile ? (c.pileT < .8 ? c.pileT / .8 : 1) : 0, tint: tintFor(c), alpha: c.ent && c.age < 1.1 && !TH.walkUpright ? Math.max(.04, c.age / 1.1) : c.phased ? .3 : c.etherOn ? .5 : c.def.lead === 'unseen' && !c.seen ? .2 + .06 * Math.sin(vt * 4 + c.anim) : model.alpha < 1 ? model.alpha : null, cast: ck, c });
     if (ck > 0) drawCreepCast(c, s, model, ck);
     const r = c.def.r * cscale(c.type);
-    if (tunK(c) > .02) { const k = tunK(c), ts = tunS(c); if (!TH.m3d) QG.ground(c.x + c.ox, c.y + c.oy, .025, r * ts * 1.1, r * ts * .5, [0, 0, 0, .3 * (1 - k * .6)], 2, 0); continue; }   // still in the woods: only a shape, no bars or marks
+    if (tunK(c) > .02) { const k = tunK(c), ts = tunS(c); if (!TH.m3d && !hid) QG.ground(c.x + c.ox, c.y + c.oy, .025, r * ts * 1.1, r * ts * .5, [0, 0, 0, .3 * (1 - k * .6)], 2, 0); continue; }   // still in the woods: only a shape, no bars or marks
     if (c.atk && c.atk.kind === 'blast') { const by = creepBaseY(c) + creepH(c) * pop + .14, f = .5 + .5 * Math.sin(vt * 18 + c.anim); QA.bill(RD, c.x + c.ox, by, c.y + c.oy, .2, .2, [.12, .1, .1, 1], 5, 0); QADD.bill(RD, c.x + c.ox + .07, by + .13, c.y + c.oy, .16 + .1 * f, .16 + .1 * f, [1, .7, .25, .95], 1, 0); QADD.bill(RD, c.x + c.ox, by, c.y + c.oy, .45, .45, [1, .4, .1, .18 + .12 * f], 1, 0); }
     QG.ground(c.x + c.ox, c.y + c.oy, .025, r * (c.fly ? .7 : 1.05), r * (c.fly ? .55 : .85), [0, 0, 0, c.fly ? .25 : .32], 2, 0);
     if (c.frostT > 0) drawFrostOn(c, r);
@@ -81521,204 +81555,94 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -81727,207 +81651,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -82731,9 +82523,20 @@ window.addEventListener('keyup', e => { panHeld.delete(e.key.length === 1 ? e.ke
 window.addEventListener('blur', () => panHeld.clear());
 function bindKeys() {
   window.addEventListener('keydown', e => {
+    if (!ov.hidden && ovp.classList.contains('clean-menu')) {
+      if (e.key === 'Tab') {
+        const items = Array.from(ovp.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]')).filter(n => n.getClientRects().length);
+        const first = items[0], last = items[items.length - 1];
+        if (first && (e.shiftKey ? document.activeElement === first : document.activeElement === last)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+        return;
+      }
+      if (e.key === 'Escape' && ovp.menuBack) { e.preventDefault(); ovp.menuBack(); return; }
+      // Range arrows, Home/End and select keys belong to the control, never to the camera or build hotkeys.
+      if (e.key !== 'Escape' && e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    }
     if (G.state !== 'play' || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (PAN_K[k] && CAM.zoom.z > 1.01 && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) && (k.startsWith('Arrow') || !(G.sel && (G.sel.kind === 'tower' || G.sel.kind === 'box')))) {
+    if (!G.paused && PAN_K[k] && CAM.zoom.z > 1.01 && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) && (k.startsWith('Arrow') || !(G.sel && (G.sel.kind === 'tower' || G.sel.kind === 'box')))) {
       e.preventDefault(); panHeld.add(k); if (!panRaf) { panLast = 0; panRaf = requestAnimationFrame(panStep); } return;
     }
     if (k === 'Escape') { if (G.paused) resumeGame(); else if (G.cast) { G.cast = null; toast('Spell cancelled.'); markDirty(); } else if (G.sel && G.sel.page) { G.sel.page = G.sel.page.startsWith('lore:') ? 'lore' : null; sfx('click'); markDirty(); } else if (G.buildType || G.sel) deselect(); else if (TW && TW.menu) twMenu(false); else if (TW && TW.view === 'E') twView('P'); else pauseMenu(); return; }
@@ -82843,7 +82646,22 @@ const HOW_F = `<ul>
 <li>The War Room (the book in the top bar, or J) shows a battle report after every wave: which units did the work and how much came from direct hits, burns and poison, abilities and item powers. It also names your build, keeps your journal across runs and scouts the waves ahead.</li>
 <li>Every build has a code (War Room, Build). Paste someone else's to load it as a plan: planned talents are marked, and new talent points are spent on it for you.</li></ul>`;
 const howNow = () => typeof G !== 'undefined' && G && G.force && !G.vs && G.state === 'play' ? HOW_F.replace('<li>Falling behind?', (typeof lvHowLi === 'function' ? lvHowLi() : '') + '<li>Falling behind?') : HOW;   // lvHowLi: how lives come back (lives.js)
-function showOverlay(html, cls) { if (typeof itipHide === 'function') itipHide(); if (typeof hideSpellHud === 'function') hideSpellHud(); talOpen = false; bagOpen = false; warOpen = false; ov.className = 'ov' + (cls ? ' ov-' + cls : ''); ovp.className = 'panel' + (cls ? ' ' + cls : ''); ovp.innerHTML = html; ov.hidden = false; ov.scrollTop = 0; }
+function showOverlay(html, cls) {
+  if (typeof itipHide === 'function') itipHide();
+  if (typeof hideSpellHud === 'function') hideSpellHud();
+  talOpen = false; bagOpen = false; warOpen = false;
+  const clean = cls !== 'title2' && cls !== 'hx-ov';
+  ov.className = 'ov' + (cls ? ' ov-' + cls : '') + (clean ? ' ov-clean' : '');
+  ovp.className = 'panel' + (cls ? ' ' + cls : '') + (clean ? ' clean-menu' : '');
+  ovp.menuBack = null; ovp.innerHTML = html; ov.hidden = false; ov.scrollTop = 0;
+  const heading = ovp.querySelector('.ttl, .tc-ttl small, h2');
+  ovp.setAttribute('aria-label', heading ? heading.textContent.trim() : 'Game menu');
+  if (clean) queueMicrotask(() => {
+    if (ov.hidden || !ovp.classList.contains('clean-menu')) return;
+    const first = ovp.querySelector('#pRes, button:not(:disabled), input:not(:disabled), select:not(:disabled)');
+    if (first) first.focus({ preventScroll: true });
+  });
+}
 function hideOverlay() { if (typeof itipHide === 'function') itipHide(); if (typeof hideSpellHud === 'function') hideSpellHud(); talOpen = false; warOpen = false; if (bagOpen) { bagOpen = false; for (const it of G.loot || []) it.isNew = false; }  ov.hidden = true; ovp.innerHTML = ''; ov.className = 'ov'; ovp.className = 'panel'; }
 const fmtPlay = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : sec ? '<1m' : ''; };
 const fmtDay = t => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
@@ -82916,36 +82734,67 @@ function openSaves(back) {
   showOverlay(`<h2 class="ttl">Saved Games</h2><div class="t2-list sv-list" id="tSaves"></div><button class="btn ghost" id="svBack">Back</button>`, 'savesp');
   titleSaves();
   $('#svBack').onclick = () => { sfx('click'); (back || titleScreen)(); };
+  ovp.menuBack = () => $('#svBack').click();
 }
 // How to play, on its own page
 function openHow(back) {
   showOverlay(`<h2 class="ttl">How to Play</h2><div class="how-body">${howNow()}</div><button class="btn ghost" id="hwBack">Back</button>`, 'howp');
   $('#hwBack').onclick = () => { sfx('click'); (back || titleScreen)(); };
+  ovp.menuBack = () => $('#hwBack').click();
 }
-// Settings: sound, music and the battlefield's numbers (the same switches as the pause menu)
-// Settings > Map detail: painted-only maps (maplite.js) or the full 3D dressing; (auto) when the device chose it, (link) for ?maplite=
+// Shared audio controls: the pause screen and title Settings edit the same saved mix.
+function menuAudioHTML(prefix, kind, label) {
+  const pr = AudioSys.pref, id = prefix + (kind === 'music' ? 'Mus' : 'Sfx'), vol = prefix + (kind === 'music' ? 'MusicVol' : 'SfxVol');
+  const pct = Math.round(pr[kind + 'Volume'] * 100);
+  return `<div class="cm-audio" data-audio="${kind}">
+    <div class="cm-setting"><label for="${vol}">${label}</label><button type="button" class="cm-toggle" id="${id}" aria-label="${label} enabled" aria-pressed="${pr[kind]}"><small>${pr[kind] ? 'On' : 'Off'}</small></button></div>
+    <div class="cm-volume"><input type="range" id="${vol}" min="0" max="100" step="1" value="${pct}" aria-valuetext="${pct} percent${pr[kind] ? '' : ', muted'}" style="--volume:${pct}%"><output for="${vol}">${pct}%</output></div>
+  </div>`;
+}
+function menuAudioBind(prefix) {
+  for (const kind of ['music', 'sfx']) {
+    const id = prefix + (kind === 'music' ? 'Mus' : 'Sfx'), vol = prefix + (kind === 'music' ? 'MusicVol' : 'SfxVol');
+    const button = document.getElementById(id), slider = document.getElementById(vol), box = slider.closest('.cm-audio'), out = box.querySelector('output');
+    const sync = () => {
+      const on = AudioSys.pref[kind], pct = Math.round(AudioSys.pref[kind + 'Volume'] * 100);
+      button.setAttribute('aria-pressed', String(on)); button.querySelector('small').textContent = on ? 'On' : 'Off';
+      box.classList.toggle('muted', !on); slider.value = pct; slider.style.setProperty('--volume', pct + '%');
+      slider.setAttribute('aria-valuetext', pct + ' percent' + (on ? '' : ', muted')); out.value = pct + '%';
+    };
+    button.onclick = () => { AudioSys.init(); AudioSys.set(kind, !AudioSys.pref[kind]); sync(); sfx('click'); };
+    slider.oninput = () => { AudioSys.init(); AudioSys.set(kind + 'Volume', Number(slider.value) / 100); sync(); };
+    slider.onchange = () => { if (kind === 'sfx') sfx('click'); };
+    sync();
+  }
+}
+function menuGraphicsHTML(id) {
+  return `<select id="${id}" aria-label="Graphics quality">${Object.keys(GFX_LV).map(k => `<option value="${esc(k)}"${String(GFX) === String(k) ? ' selected' : ''}>${esc(GFX_LV[k].name)}</option>`).join('')}</select>`;
+}
+// Settings > Map detail: the painting alone or the full 3D dressing; a change reloads from the title.
 function mapDetailName() { const src = typeof MAP_LITE_SRC !== 'undefined' ? MAP_LITE_SRC : 'auto'; return (mapLite() ? 'Painted' : 'Full 3D') + (src === 'auto' ? ' (auto)' : src === 'url' ? ' (link)' : ''); }
 function openSettings(back) {
   const pr = AudioSys.pref;
-  showOverlay(`<h2 class="ttl">Settings</h2>
-    <div class="seg" role="group" aria-label="Audio">
-      <button type="button" id="sMus" aria-pressed="${pr.music}">Music<small>${pr.music ? 'On' : 'Off'}</small></button>
-      <button type="button" id="sScore" aria-pressed="true">Music style<small>${SCORE_NAME[pr.score] || 'Woodland Echoes'}</small></button>
-      <button type="button" id="sSfx" aria-pressed="${pr.sfx}">Sound effects<small>${pr.sfx ? 'On' : 'Off'}</small></button>
+  showOverlay(`<header class="cm-heading"><h2 class="ttl">Settings</h2><p class="sub">Sound &amp; display</p></header>
+    <div class="cm-settings-grid">
+      <section class="cm-section"><h3>Audio</h3>
+        ${menuAudioHTML('s', 'music', 'Music')}
+        ${menuAudioHTML('s', 'sfx', 'Sound effects')}
+        <div class="cm-setting"><label for="sScore">Music style</label><select id="sScore">${Object.keys(SCORE_NAME).map(k => `<option value="${k}"${pr.score === k ? ' selected' : ''}>${SCORE_NAME[k]}</option>`).join('')}</select></div>
+      </section>
+      <section class="cm-section"><h3>Display</h3>
+        <button type="button" class="cm-setting" id="sDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
+        <div class="cm-setting"><label for="sGfx">Graphics</label>${menuGraphicsHTML('sGfx')}</div>
+        <button type="button" class="cm-setting" id="sMap" title="Changing map detail reloads the game">Map detail<small>${mapDetailName()}</small></button>
+      </section>
     </div>
-    <div class="seg" role="group" aria-label="Display">
-      <button type="button" id="sDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
-      <button type="button" id="sGfx" aria-pressed="true" title="Lower it if the game runs slowly: Low halves the render size, turns off shadows and thins the particles">Graphics<small>${GFX_LV[GFX].name}</small></button>
-      <button type="button" id="sMap" aria-pressed="true" title="Painted: the map's painting alone, without its 3D trees, props and magic (faster; the default on phones and tablets). Changing it reloads the game">Map detail<small>${mapDetailName()}</small></button>
-    </div>
-    <div class="seg" role="group" aria-label="Chronicles">
-      <button type="button" id="sSaves">Saved Games<small>${(n => n ? n + ' in progress' : 'None yet')(savesGet().length)}</small></button>
-      <button type="button" id="sScores">Top Scores<small>The board</small></button>
-      <button type="button" id="sHow">How to Play<small>The rules</small></button>
-    </div>
-    <button class="btn ghost" id="sBack">Back</button>`, 'setp');
-  $('#sGfx').onclick = () => { const k = gfxSet(GFX_NEXT[GFX]); $('#sGfx').querySelector('small').textContent = GFX_LV[k].name; sfx('click'); };
-  // map detail (maplite.js): the 3D dressing's data is loaded or not at startup, so a change reloads (from the title: no run is lost)
+    <nav class="cm-links" aria-label="More settings">
+      <button type="button" id="sSaves">Saved games<small>${(n => n ? n + ' in progress' : 'None yet')(savesGet().length)}</small></button>
+      <button type="button" id="sScores">Top scores<small>The board</small></button>
+      <button type="button" id="sHow">How to play<small>The rules</small></button>
+    </nav>
+    <button type="button" class="btn ghost" id="sBack">Back</button>`, 'setp');
+  menuAudioBind('s');
+  $('#sGfx').onchange = e => { gfxSet(e.target.value); sfx('click'); };
   $('#sMap').onclick = () => { sfx('click'); const lite = !mapLite(); lsSet('runehold.maplite', lite ? '1' : '0');
     $('#sMap').querySelector('small').textContent = (lite ? 'Painted' : 'Full 3D') + ' · reloading';
     let href = location.href; try { const u = new URL(href); u.searchParams.delete('maplite'); href = u.href; } catch (e) {}
@@ -82953,12 +82802,10 @@ function openSettings(back) {
   $('#sHow').onclick = () => { sfx('click'); openHow(() => openSettings(back)); };
   $('#sSaves').onclick = () => { sfx('click'); openSaves(() => openSettings(back)); };
   $('#sScores').onclick = () => { sfx('click'); openBoard(() => openSettings(back)); };
-  const tog = (k, id) => { const v = !AudioSys.pref[k]; AudioSys.set(k, v); const b = $(id); b.setAttribute('aria-pressed', v); b.querySelector('small').textContent = v ? 'On' : 'Off'; sfx('click'); };
-  $('#sMus').onclick = () => tog('music', '#sMus');
-  $('#sSfx').onclick = () => tog('sfx', '#sSfx');
-  $('#sScore').onclick = () => { const v = SCORE_NEXT[AudioSys.pref.score] || 'song'; AudioSys.set('score', v); $('#sScore').querySelector('small').textContent = SCORE_NAME[v]; sfx('click'); };
+  $('#sScore').onchange = e => { AudioSys.set('score', e.target.value); sfx('click'); };
   $('#sDmg').onclick = () => { DMG_NUMS = !DMG_NUMS; lsSet('runehold.dmgnums', DMG_NUMS ? '1' : '0'); const b = $('#sDmg'); b.setAttribute('aria-pressed', DMG_NUMS); b.querySelector('small').textContent = DMG_NUMS ? 'On' : 'Off'; sfx('click'); };
   $('#sBack').onclick = () => { sfx('click'); (back || titleScreen)(); };
+  ovp.menuBack = () => $('#sBack').click();
 }
 // Rites of Passage: the ladder, what each rite adds, and which one the next run is set on
 function openRites(back) {
@@ -82987,36 +82834,45 @@ function afterStart(h, p) {
 function pauseMenu() {
   if (G.state !== 'play') return;
   G.paused = true; drag = null; G.ghost = null;
-  const pr = AudioSys.pref;
-  showOverlay(`
-    <h2 class="ttl">Paused</h2>
-    <p class="sub">${TW ? `Tower Wars · wave ${Math.max(1, TW.wave)} · against ${esc(TW.ai.name)} (${TW.L.name})` : `Wave ${G.wave} · ${typeof campSaveName === 'function' && campSaveName(G) || (MAPS[G.map] ? MAPS[G.map].name : MAPS.meadow.name)}${G.rite ? ' · ' + riteName(G.rite) : G.diff !== 'normal' ? ' · ' + DIFFS[G.diff].name : ''}${G.chal ? ' · ' + CHAL_BY[G.chal].name : ''}`}</p>
-    <button class="btn" id="pRes">Resume</button>
-    <button class="btn ghost" id="pWar">War Room<small>Battle report, your build, the journal and scouting</small></button>
-    <button class="btn ghost" id="pTal">Talents<small>${G.tp > 0 ? `${G.tp} point${G.tp > 1 ? 's' : ''} to spend` : `${COMBAT_TYPES.reduce((a, t) => a + talentRank(t), 0)} spent`}</small></button>
-    <div class="seg" role="group" aria-label="Display">
-      <button type="button" id="pDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
-      <button type="button" id="pGfx" aria-pressed="true" title="Lower it if the game runs slowly: Low halves the render size, turns off shadows and thins the particles">Graphics<small>${GFX_LV[GFX].name}</small></button>
-    </div>
-    <div class="seg" role="group" aria-label="Music">
-      <button type="button" id="pMus" aria-pressed="${pr.music}">Music<small>${pr.music ? 'On' : 'Off'}</small></button>
-    </div>
-    <div class="seg" role="group" aria-label="Sound effects">
-      <button type="button" id="pSfx" aria-pressed="${pr.sfx}">Sound effects<small>${pr.sfx ? 'On' : 'Off'}</small></button>
-    </div>
-    <details class="how"><summary>How to play</summary>${howNow()}</details>
-    <button class="btn ghost" id="pQuit">Abandon game</button>`, 'pausep');
+  const log = window.PLAYLOG && PLAYLOG.cur(), logged = log ? log.waves.length : 0;
+  showOverlay(`<div class="cm-pause">
+    <section class="cm-nav" aria-label="Pause menu">
+      <header class="cm-heading"><h2 class="ttl">Paused</h2>
+        <p class="sub">${TW ? `Tower Wars · wave ${Math.max(1, TW.wave)} · against ${esc(TW.ai.name)} (${esc(TW.L.name)})` : `Wave ${G.wave} · ${esc(typeof campSaveName === 'function' && campSaveName(G) || (MAPS[G.map] ? MAPS[G.map].name : MAPS.meadow.name))}${G.rite ? ' · ' + riteName(G.rite) : G.diff !== 'normal' ? ' · ' + DIFFS[G.diff].name : ''}${G.chal ? ' · ' + CHAL_BY[G.chal].name : ''}`}</p>
+      </header>
+      <div class="cm-nav-main">
+        <button type="button" class="btn cm-resume" id="pRes"><span>Resume game</span><kbd>Esc</kbd></button>
+        <button type="button" class="btn ghost" id="pWar">War room<small>Battle report &amp; scouting</small></button>
+        <button type="button" class="btn ghost" id="pTal">Talents<small>${G.tp > 0 ? `${G.tp} point${G.tp > 1 ? 's' : ''} to spend` : `${COMBAT_TYPES.reduce((a, t) => a + talentRank(t), 0)} points spent`}</small></button>
+        <button type="button" class="btn ghost" id="pHow">How to play</button>
+      </div>
+      <div class="cm-nav-utility">
+        <button type="button" class="btn ghost" id="pLog"${log ? '' : ' disabled'}>Save play log<small>${log ? `${logged} wave${logged === 1 ? '' : 's'} logged` : 'Available after the first horn'}</small></button>
+      </div>
+      <footer class="cm-nav-footer"><button type="button" class="btn ghost cm-abandon" id="pQuit">Abandon game</button></footer>
+    </section>
+    <section class="cm-quick" aria-labelledby="pQuick">
+      <h3 id="pQuick">Quick settings</h3>
+      <div class="seg cm-display" role="group" aria-label="Display">
+        <button type="button" id="pDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
+        <div class="cm-setting" id="pGfx"><label for="pQuality">Graphics</label>${menuGraphicsHTML('pQuality')}</div>
+      </div>
+      ${menuAudioHTML('p', 'music', 'Music')}
+      ${menuAudioHTML('p', 'sfx', 'Sound effects')}
+      <p class="cm-keyhint"><kbd>Esc</kbd> Return to battle</p>
+    </section>
+  </div>`, 'pausep');
   $('#pRes').onclick = resumeGame;
   $('#pTal').onclick = () => { sfx('click'); openTalents(); };
   $('#pWar').onclick = () => { sfx('click'); openWar(); };
-  const tog = (k, id) => { const v = !AudioSys.pref[k]; AudioSys.set(k, v); const b = $(id); b.setAttribute('aria-pressed', v); b.querySelector('small').textContent = v ? 'On' : 'Off'; sfx('click'); };
-  $('#pMus').onclick = () => tog('music', '#pMus');
+  $('#pHow').onclick = () => { sfx('click'); openHow(pauseMenu); };
+  $('#pLog').onclick = () => { PLAYLOG.export('md'); $('#pLog small').textContent = 'Saved'; sfx('click'); };
+  menuAudioBind('p');
   $('#pDmg').onclick = () => { DMG_NUMS = !DMG_NUMS; lsSet('runehold.dmgnums', DMG_NUMS ? '1' : '0'); const b = $('#pDmg'); b.setAttribute('aria-pressed', DMG_NUMS); b.querySelector('small').textContent = DMG_NUMS ? 'On' : 'Off'; sfx('click'); };
-  $('#pSfx').onclick = () => tog('sfx', '#pSfx');
-  $('#pGfx').onclick = () => { const k = gfxSet(GFX_NEXT[GFX]); $('#pGfx').querySelector('small').textContent = GFX_LV[k].name; sfx('click'); };
+  $('#pQuality').onchange = e => { gfxSet(e.target.value); sfx('click'); };
   let armed = false;
   $('#pQuit').onclick = e => {
-    if (!armed) { armed = true; e.currentTarget.textContent = 'Tap again to abandon this run'; e.currentTarget.classList.add('danger'); return; }
+    if (!armed) { armed = true; e.currentTarget.textContent = 'Click again to abandon'; e.currentTarget.classList.add('danger'); return; }
     saveDrop(G.runId); if (!G.hunt) { recordBest(G.wave - 1); chalRecord(G.wave - 1); riteRecord(G.rite, G.wave - 1, false); boardPost(G.wave - 1, false).catch(() => {}); if (typeof campRunEnd === 'function') campRunEnd(false); } AudioSys.intense(false); titleScreen();
   };
 }
@@ -94295,7 +94151,7 @@ if (typeof document !== 'undefined' && document.createElement) {
        bosses between are the other eight in an order of their own (no flyer on wave 10, nothing that attacks units before
        wave 30). A boss moved to another wave keeps that wave's boss health budget (CAMP_SWAP: its health is scaled by the
        health of the boss it replaced), so the curve holds.
-     Location 0 (Sunfall Glade) is the standard march, exactly as before.
+     Location 0 (Greatroot Way; it was Sunfall Glade until 10 Nov 2026, its id is still 'sunfall') is the standard march, exactly as before.
    THE WARBAND. Winning wave 50 at a location marches the army on to the next one. It keeps (per force, on this device,
      CAMP_KEY): the commander (and so the Champion), level and XP, talent picks and unspent points, every item (the ones
      socketed come back to the bag), the units it has opened, its plan and its Renown. It rebuilds the maze, the units and
@@ -94333,7 +94189,7 @@ const CAMP_FAMILIES = {
 /* the chain. map: the field; rite: its hardships; fam: its family; lord: its warlord (wave 50's boss); x, y: on the region
    map (a 1000 x 620 board) */
 const CAMP_LOCS = [
-  { id: 'sunfall', name: 'Sunfall Glade', map: 'clearing', rite: 0, fam: null, lord: 'abyss', x: 120, y: 520, say: 'Where every warband is raised. The standard march: the waves as you know them.' },
+  { id: 'sunfall', name: 'Greatroot Way', map: 'greatroot', rite: 0, fam: null, lord: 'abyss', x: 120, y: 520, say: 'Where every warband is raised. The standard march: the waves as you know them.' },
   { id: 'hollow', name: 'Moonwood Hollow', map: 'moonwood', rite: 1, fam: 'beast', lord: 'grakk', x: 250, y: 430, say: 'Packs howl under the pale trees, and the ogre camp drives them on.' },
   { id: 'fords', name: 'Kingsmeadow Fords', map: 'meadow', rite: 2, fam: 'horde', lord: 'kragmor', x: 150, y: 300, say: 'The horde crosses the river at the old fords, and the Unbroken comes last.' },
   { id: 'ember', name: 'Emberfall Glade', map: 'clearing', rite: 3, fam: 'forge', lord: 'titan', x: 300, y: 200, say: 'The glade burns. The forge-host marches out of the smoke behind the Living Forge.' },
@@ -94695,7 +94551,7 @@ function campLocHTML(B, k) {
 }
 function campBandHTML(B, force) {
   const F = FORCES[force];
-  if (!B || !B.hero) return `<section class="cm-band empty"><h3>${cmEsc(F.name)}</h3><p>No warband yet. Raise one at Sunfall Glade: win all 50 waves there and it marches on, keeping its level, talents and items.</p></section>`;
+  if (!B || !B.hero) return `<section class="cm-band empty"><h3>${cmEsc(F.name)}</h3><p>No warband yet. Raise one at Greatroot Way: win all 50 waves there and it marches on, keeping its level, talents and items.</p></section>`;
   const h = HERO_BY[B.hero], lv = B.raised ? xpLevelOf(B.xp || 0) : 1, k = Math.min(B.loc, CAMP_LOCS.length - 1);
   const art = (typeof COMMANDER_ART !== 'undefined' && COMMANDER_ART[h.id]) || (typeof HERO_ART !== 'undefined' && HERO_ART[h.id]) || heroFaceURL(h);
   return `<section class="cm-band"><img class="cm-face" alt="" src="${art}"><div class="cm-bi"><h3>${cmEsc(h.name)}<small>${cmEsc(F.name)}</small></h3>
@@ -96112,6 +95968,7 @@ function openSpellbook(back) {
     <button class="btn ghost" id="spbkBack">Back</button>`, 'spbk');
   sbRender();
   $('#spbkBack').onclick = () => { sfx('click'); (back || (typeof G !== 'undefined' && G && G.state === 'play' ? pauseMenu : titleScreen))(); };
+  ovp.menuBack = () => $('#spbkBack').click();
 }
 
 /* ---------- the way in: a button on the pause menu and on How to Play ---------- */
