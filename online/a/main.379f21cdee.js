@@ -1,4 +1,4 @@
-const BUILD_TAG = '196dbe5@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f0e7410@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -10967,7 +10967,7 @@ function drawManaBar(t) {
   const max = abMax(t), f = clamp(A.mana / max, 0, 1), sel = G.sel && G.sel.ref === t;
   if (f > .995 && !sel) return;
   const top = towerTop(t) + .45 - (t.hp < t.maxHp ? .11 : 0), w = .62;   // barRect is centred on its y (towerBar's backing spans top ± .065)
-  QO.barRect(RD, t.x, top, t.y, -w / 2 - .025, w + .05, .045, [0, 0, 0, .85]);
+  QO.barRect(RD, t.x, top, t.y, -w / 2, w, .025, [0, 0, 0, .42]);
   QO.barRect(RD, t.x, top, t.y, -w / 2, w * f, .025, AB_MANA_COL);
   const nx = abNextAb(t);
   if (nx && f < 1) { const c = clamp(abCost(t, nx) / max, 0, 1); QO.barRect(RD, t.x, top, t.y, -w / 2 + w * c - .006, .012, .04, [.88, .94, 1, .85]); }
@@ -16532,7 +16532,7 @@ function drawHeatBar(t) {
   if (h < .02 && vent <= 0 && !sel) return;
   const manaShown = t.ab && t.ab.learned && t.ab.learned.length && (sel || (t.ab.mana / abMax(t)) < .995);
   const top = towerTop(t) + .45 - (t.hp < t.maxHp ? .11 : 0) - (manaShown ? .06 : 0), w = .62;
-  QO.barRect(RD, t.x, top, t.y, -w / 2 - .025, w + .05, .04, [0, 0, 0, .85]);
+  QO.barRect(RD, t.x, top, t.y, -w / 2, w, .022, [0, 0, 0, .42]);
   const hot = h > .999, k = hot ? .6 + .4 * Math.sin((typeof vt !== 'undefined' ? vt : 0) * 9) : 0;
   QO.barRect(RD, t.x, top, t.y, -w / 2, w * h, .022, [1, .5 + .25 * h + .25 * k, .12 + .5 * k, 1]);
   if (vent > 0) QO.barRect(RD, t.x, top, t.y, -w / 2 - .025, w + .05, .04, [1, .95, .8, .55 * vent]);   // the vent: a white-hot flash
@@ -34880,7 +34880,7 @@ function drawGrowthBar(t) {
   if (v < .02 && fl <= 0 && !sel) { if (since < 1.2) gwFlower(t, since); return; }
   const manaShown = t.ab && t.ab.learned && t.ab.learned.length && (sel || (t.ab.mana / abMax(t)) < .995);
   const top = towerTop(t) + .45 - (t.hp < t.maxHp ? .11 : 0) - (manaShown ? .06 : 0), w = .62;
-  QO.barRect(RD, t.x, top, t.y, -w / 2 - .025, w + .05, .04, [0, 0, 0, .85]);
+  QO.barRect(RD, t.x, top, t.y, -w / 2, w, .022, [0, 0, 0, .42]);
   const ripe = clamp((v * 100 - GW_RIPE) / (100 - GW_RIPE), 0, 1), full = v > .999, T = typeof vt !== 'undefined' ? vt : 0, p = full ? .5 + .5 * Math.sin(T * 6) : 0;
   QO.barRect(RD, t.x, top, t.y, -w / 2, w * v, .022, [.42 + .56 * ripe + .02 * p, .78 - .1 * ripe + .1 * p, .3 + .5 * ripe + .1 * p, 1]);
   if (fl > 0) QO.barRect(RD, t.x, top, t.y, -w / 2 - .025, w + .05, .04, [1, .8, .9, .5 * fl]);
@@ -59705,12 +59705,12 @@ void main(){
       float arm=min(max(ad.x/.16,ad.y/.034), max(ad.y/.16,ad.x/.034)); m=max(m, smoothstep(1.15,.8,arm)*step(e,1.)); }
     c=mix(c, vec3(.16,.15,.13), m); a=max((smoothstep(.7,.97,e)*.85+.22)*step(e,1.)*tint, m*.85); }
   else if(s==11){ float ang=atan(vUV.y,vUV.x); float n=fbm(vUV*3.+p*7.); float l=abs(fract(ang*1.11+n*.5+p)-.5); a = (smoothstep(.06,.0,l*(.35+r*1.4))*smoothstep(1.,.25,r) + smoothstep(.32,.0,r)*.7)*(.7+.3*n); }
-  else if(s==15){ // a small five-point star (a unit's level): a dark rim, the fill with a bright core; p>=1 adds a gold glint passing over it (fract part: its phase)
+  else if(s==15){ // a small five-point star (a unit's level): one flat colour with a slightly brighter core, no rim; p>=1 adds a gold glint passing over it (fract part: its phase)
     vec2 q=vUV*1.06; const vec2 k1=vec2(.809017,-.587785); const vec2 k2=vec2(-.809017,-.587785);
     q.x=abs(q.x); q-=2.*max(dot(k1,q),0.)*k1; q-=2.*max(dot(k2,q),0.)*k2; q.x=abs(q.x); q.y-=.95;
     vec2 ba=.46*vec2(-k1.y,k1.x)-vec2(0.,1.); float h=clamp(dot(q,ba)/dot(ba,ba),0.,.95); float d=length(q-ba*h)*sign(q.y*ba.x-q.x*ba.y);
     float fw=max(fwidth(d),.02); float fill=smoothstep(fw,-fw,d+max(.2,fw*1.6)); a=smoothstep(fw,-fw,d);
-    c=mix(vec3(.06,.04,.02), c*(1.+.45*exp(-r*r*7.)), fill);
+    c=c*(1.+.3*exp(-r*r*7.));
     if(p>=1.){ float sw=vUV.x*.7+vUV.y*.7-(fract(uTime*.35+p)*5.-2.5); c+=vec3(1.,.95,.75)*exp(-sw*sw*6.)*.75*fill; } }
   if(a<.004) discard;
   o = vec4(c, vCol.a*a);
@@ -75781,22 +75781,23 @@ function drawTower(t) {
   if (typeof ccDrawPips === 'function') ccDrawPips(t);   // the Conclave's Arcane Charges, pips over the bars (forces_conclave_b.js)
   if (t.ab && t.ab.cast && typeof drawCastBar === 'function') drawCastBar(t);   // its cast bar (forces_zz_casttimes.js)
 }
-/* A force unit's level (tier I-VI) as a row of small stars under its mana bar, or where the mana bar sits when it is hidden.
-   Tiers opened by veterancy (IV-VI) are a richer gold with a glint passing over them (not on Low). */
+/* A force unit's level (tier I-VI) as a row of stars to the right of its bar (owner, 11 Nov 2026: "make the stars just yellow
+   without black around it, they can be a bit bigger and sit on the right side of the bar"). Plain yellow, no rim; the tiers
+   opened by veterancy (IV-VI) have a glint passing over them (not on Low). */
 function drawLevelStars(t, manaShown, gaugeShown) {
   if (!t.def || !t.def.unit || t.def.wall || t.wrecked || t.build > .5 || (typeof inIcon !== 'undefined' && inIcon)) return;
   const n = clamp((t.tier | 0) + 1, 1, 6), sel = G.sel && G.sel.ref === t, glint = GFX !== 'low';
-  const top = towerTop(t) + .45 - (t.hp < t.maxHp ? .11 : 0) - (manaShown ? .075 : 0) - (gaugeShown ? .06 : 0);
-  const r = .042, gap = .088, x0 = -(n - 1) * gap / 2, R = RD.right, al = sel ? 1 : .88;
+  const top = towerTop(t) + .45 - (t.hp < t.maxHp ? .11 : 0);
+  const r = .056, gap = .1, x0 = .31 + .075, R = RD.right, al = sel ? 1 : .92;
   for (let k = 0; k < n; k++) {
     const d = x0 + k * gap, vet = k >= 3;
-    const col = vet ? [1, .78, .26, al] : [.93, .89, .76, al];
+    const col = [1, .84, .22, al];
     QO.bill(RD, t.x + R[0] * d, top + R[1] * d, t.y + R[2] * d, r, r, col, 15, vet && glint ? 1 + ((t.id * .37 + k * .06) % .9) : 0);
   }
 }
 function towerBar(t) {
   const top = towerTop(t) + .45, w = .62, f = clamp(t.hp / t.maxHp, 0, 1);
-  QO.barRect(RD, t.x, top, t.y, -w / 2 - .025, w + .05, .065, [0, 0, 0, .85]);
+  QO.barRect(RD, t.x, top, t.y, -w / 2, w, .04, [0, 0, 0, .42]);   // (its empty part only, no black frame: owner, 11 Nov 2026)
   if (t.wounded) { woundBar(t, top, w, f); return; }
   QO.barRect(RD, t.x, top, t.y, -w / 2, w * f, .04, f > .5 ? [.95, .8, .25, 1] : [.95, .35, .2, 1]);
 }
@@ -90386,7 +90387,7 @@ const MAGE2 = (() => {
     if (s >= 0 && s < CL.attack.len - r && !(wind > 0 && s > FOLLOW)) return { c: 'attack', s: r + s, rate: RATE.atk, glow: .25 + 1.1 * flash, hand: 'R' };
     if (wind > 0 && G.phase === 'wave') return { c: 'attack', s: r * wind, rate: RATE.atk, glow: .25 + .35 * wind, hand: 'R' };
     if ((G.phase === 'wave' && t.tg && !t.tg.dead) || s < 1.5) return { c: 'ready', s: ph, rate: RATE.ready, glow: .25, hand: 'R' };
-    return { c: 'idle', s: ph, rate: RATE.idle, glow: .15 + .1 * Math.sin(now * 1.7 + (t.anim || 0) * 3), hand: 'R' };
+    return { c: 'idle', s: 0, rate: RATE.idle, glow: .15 + .1 * Math.sin(now * 1.7 + (t.anim || 0) * 3), hand: 'R' };
   }
   let PT = null, OUT = null;
   const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
@@ -90613,7 +90614,7 @@ const FAELAN2 = (() => {
     if (w > 0) return { c: 'draw', s: CL.draw.len * w, rate: RATE.shot, glow: 0 };
     if (after < RL - RL_HEAD) return { c: 'reload', s: RL_HEAD + after, rate: RATE.move, glow: 0 };
     if (engaged || s < rate + .5 || after < RL + .6) return { c: 'ready', s: ph, rate: RATE.ready, glow: 0 };
-    return { c: 'idle', s: ph, rate: RATE.idle, glow: 0 };
+    return { c: 'idle', s: 0, rate: RATE.idle, glow: 0 };
   }
   let PT = null, OUT = null;
   const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
@@ -90828,7 +90829,7 @@ const RANGER2 = (() => {
     if (w > 0) return { c: 'draw', s: CL.draw.len * w, rate: RATE.shot, glow: 0 };
     if (after < RL - RL_HEAD) return { c: 'reload', s: RL_HEAD + after, rate: RATE.move, glow: 0 };
     if (engaged || s < rate + .5 || after < RL + .6) return { c: 'ready', s: ph, rate: RATE.ready, glow: 0 };
-    return { c: 'idle', s: ph, rate: RATE.idle, glow: 0 };
+    return { c: 'idle', s: 0, rate: RATE.idle, glow: 0 };
   }
   let PT = null, OUT = null;
   const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
@@ -90890,9 +90891,9 @@ const RANGER2 = (() => {
 /* The Blade Dancer on a rig and clips made from scratch (the owner, 10 Nov 2026: "find the original blade dancer model and
    knives and redo the full model and all animations"). Her mesh is the un-rigged sculpt her shipped model was made from
    ("forest goddess 3d model") and her knife ("fantasy dagger 3d model"), one in each fist; nothing of Mixamo's skeleton,
-   weights or dual-weapon combo is used. tools/make_bd2.py -> src/model_bd2.js: 34 bones (her hip skirt on four panels of
-   its own, the long front and back ones in two lengths, kept plumb and clear of her legs; her hair on two; the wolf's head
-   on her collar bone; a knife bone a fist), 10 clips baked at 30 frames a second.
+   weights or dual-weapon combo is used. tools/make_bd2.py -> src/model_bd2.js: 36 bones (her hip skirt on four panels of
+   its own, each in two lengths, kept plumb and clear of her legs; her hair on two; the wolf's head
+   on her collar bone; a knife bone a fist), 11 clips baked at 30 frames a second.
    ON by default; her earlier look (unitmodels_bladedancer.js on model_unit_bladedancer.js) is untouched and draws when the
    page has ?bd=old, or the Model Lab's "Blade Dancer rig" row is set to Old (runehold.html?lab=1&unit=bladedancer).
    Her moves go by unitmodels_bladedancer.js's own cues (its hooks set t._bdAtkAt, t._bdAtkN, t._bdCastAt, t._bdCast) and
@@ -90903,15 +90904,15 @@ const RANGER2 = (() => {
                   left foot with both knives out; both knives thrown open from crossed, each sweeping round its own side;
                   the turn the other way with a backhand. Each starts on the game's blow; over the game's wind-up she
                   eases into the next one's first frame
-     whirl        Whirlwind, for as long as it lasts (t.stormT: 1.5 to 3 s): one full turn every half second, the knives
-                  level on each of the game's cuts; `whirlout` is its last slowing turn. Her Bladestorm's 2 s too
+     whirl        Whirlwind, for as long as it lasts (t.stormT: 1.5 to 3 s): one full turn every half second (two different
+                  turns to a loop: one with a knife high and a knife low, one sunk), the knives level on each of the game's cuts; `whirlout` is its last slowing turn. Her Bladestorm's 2 s too
      dart         Leaf Dance, for as long as it lasts (t.ab.busyT): a flat-out lunging thrust for every dart the game
-                  makes (one every 0.22 s), right knife then left, facing the way she darts; `dartout` rises out of it
+                  makes (one every 0.22 s), right knife then left, facing the way she darts; `dartout` / `dartoutL` rise out of the last one
      reap         Harvest: she drops low and turns once with both knives a hand above the ground, on the cast
    A new move is eased into for a quarter of a second; within a move the pose is the clip's own.
    Checks: `python tools/make_bd2.py --check`. Notes: docs/model_pilot/bladedancer2.md. */
 const BD2 = (() => {
-  const U = typeof BD_UNIT !== 'undefined' ? BD_UNIT : 'bladedancer', NAMES = ['idle', 'ready', 'spin', 'fan', 'backhand', 'whirl', 'whirlout', 'dart', 'dartout', 'reap'];
+  const U = typeof BD_UNIT !== 'undefined' ? BD_UNIT : 'bladedancer', NAMES = ['idle', 'ready', 'spin', 'fan', 'backhand', 'whirl', 'whirlout', 'dart', 'dartout', 'dartoutL', 'reap'];
   const ATK = ['spin', 'fan', 'backhand'], EASE = .25, BLOW = .42, K0 = .95, HOP = .22;
   const S = { on: true };
   try { S.on = !/[?&]bd=old\b/.test(location.search); } catch (e) {}
@@ -91013,7 +91014,8 @@ const BD2 = (() => {
       } else if (cast === 'leap') {   // Leaf Dance: a dart every HOP seconds until t.ab.busyT (less its closing fifth of a second)
         const T = Math.max(HOP, (t.ab && t.ab.busyT > at + .2 ? t.ab.busyT : at + .86) - at - .2 + .06);
         if (u < T) return { c: 'dart', s: u, rate: 40, mv: 'dart' + at, dart: 1 };
-        if (u < T + CL.dartout.len) return { c: 'dartout', s: u - T, rate: 40, mv: 'dartout' + at, dart: 1 };
+        /* (out of the lunge she ended in: the left knife's when the darts were an odd number) */
+        if (u < T + CL.dartout.len) return { c: Math.round((T - .06) / HOP) % 2 ? 'dartoutL' : 'dartout', s: u - T, rate: 40, mv: 'dart' + at, dart: 1 };
       } else if (cast === 'cross') { if (u < CL.reap.len) return { c: 'reap', s: u, rate: 40, mv: 'reap' + at }; }   // Harvest
     }
     /* (her Bladestorm: two seconds' spinning that no cast began) */
@@ -91024,7 +91026,7 @@ const BD2 = (() => {
     if (t._bdAtkAt != null) { const mv = ATK[t._bdAtkN | 0], u = now - t._bdAtkAt; if (u >= 0 && u < CL[mv].len) return { c: mv, s: u, rate: 40, mv: mv + t._bdAtkAt }; }
     const fight = G.phase === 'wave' && t.tg && !t.tg.dead, ph = now + (t.anim || 0) * 3;
     if (fight || (t._bdAtkAt != null && now - t._bdAtkAt < 1.5)) return { c: 'ready', s: ph, rate: 9, mv: 'ready' };
-    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+    return { c: 'idle', s: 0, rate: 5, mv: 'idle' };
   }
   let PT = null, OUT = null;
   const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
@@ -91078,6 +91080,180 @@ const BD2 = (() => {
   if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
     let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
     if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('bd2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  return { S, CL, load, hot, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Thornguard on a rig and clips made from scratch (the owner, 11 Nov 2026: "keep working on thornguard animations, they
+   are incorrect"). The mesh is the un-rigged sculpt the shipped model was made from ("fantasy elf armor 3d model"), the
+   spear ("fantasy spear 3d model") in the right fist and the thorn shield ("fantasy shield 3d model") held by its handle in
+   the left; nothing of Mixamo's skeleton, weights or clip is used. tools/make_tg2.py -> src/model_tg2.js: 36 bones (the
+   coat below the belt on four panels of its own, each in two lengths; the hair on two; each pauldron on its collar bone;
+   a bone each for the spear and the shield), 6 clips baked at 30 frames a second.
+   ON by default; the earlier look (unitmodels_thornguard.js on model_unit_thornguard.js) is untouched and draws when the
+   page has ?tg=old, or the Model Lab's "Thornguard rig" row is set to Old (runehold.html?lab=1&unit=thornguard).
+   The moves go by unitmodels_thornguard.js's own cues (its hooks set t._tgAtkAt, t._tgCastAt, t._tgCast):
+     idle (4 s)   at ease: the spear stood on its butt by the right foot, the shield carried at the left side
+     guard (2 s)  a foe in reach: side on behind the shield, the spear couched underarm at the hip
+     thrust       the strike: from the spear drawn back at the hip, driven out past the shield's edge; starts on the game's
+                  blow, home by frame 4; over the game's wind-up the figure eases into its first frame
+     lunge        Thorn Lunge: the spear lifted overhand and stabbed down into the ground before the shield, the weight on it
+     bramble      Thornhedge (id `brambleguard`): the spear stood, the shield swung up and driven point first into the ground
+     sunder       Spearwood Rising (id `sunder`): the spear's butt driven into the ground, then hauled upward, the shield arm thrown up
+   A new move is eased into for a quarter of a second; within a move the pose is the clip's own.
+   Checks: `python tools/make_tg2.py --check`. Notes: docs/model_pilot/thornguard2.md. */
+const TG2 = (() => {
+  const U = typeof TG_UNIT !== 'undefined' ? TG_UNIT : 'thornguard', NAMES = ['idle', 'guard', 'thrust', 'lunge', 'bramble', 'sunder'];
+  const EASE = .25, BLOW = .42, K0 = .95;
+  const S = { on: true };
+  try { S.on = !/[?&]tg=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  /* A toward B by w */
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'tg2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('tg2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'spear', 'shield']) { if (R_.bix[nm] == null) throw new Error('tg2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['tip', 'gripR', 'gripL']) if (!mk || !mk[nm]) throw new Error('tg2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('tg2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('tg2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; HGT = R.height || 1; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('tg2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1, -.02, -1]; m.max = [1, 1.4, 1];
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('TG2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'tg2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what the figure does now, as unitmodels_thornguard.js tgCtl: { c: clip, s: seconds into it, rate, mv (a new move is eased into) } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, cast = t._tgCast, at = t._tgCastAt;
+    if (cast && at != null && CL[cast]) { const u = now - at; if (u >= 0 && u < CL[cast].len) return { c: cast, s: u, rate: 40, mv: cast + at }; }
+    const w = G.phase === 'wave' && t.tg && !t.tg.dead ? t.windup || 0 : 0;
+    if (w > 0 && (t._tgAtkAt == null || now - t._tgAtkAt > BLOW)) return { c: 'thrust', s: 0, rate: Math.max(9, 3 / Math.max(.05, t.cd || 0)), mv: 'wind', wind: 1 };
+    if (t._tgAtkAt != null) { const u = now - t._tgAtkAt; if (u >= 0 && u < CL.thrust.len) return { c: 'thrust', s: u, rate: 40, mv: 'thrust' + t._tgAtkAt }; }
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, ph = now + (t.anim || 0) * 3;
+    if (fight || (t._tgAtkAt != null && now - t._tgAtkAt < 1.5)) return { c: 'guard', s: ph, rate: 9, mv: 'guard' };
+    return { c: 'idle', s: 0, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const US = UM_UNITS[U] || {}, base = L && L.base && L.base.count ? L.base : null;
+    if (base) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _a, opts); }
+    const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / HGT * (US.k != null ? US.k : K0) * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - (US.sink != null ? US.sink : .5)) : 0;
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    const face = ang;
+    M4.trs(_a, x, lift * sy, z, face + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._t2T == null ? 1 : Math.max(0, Math.min(.1, now - t._t2T)); t._t2T = now;
+      if (!t._t2P || t._t2P.q.length !== NB * 4) { t._t2P = newPose(); t._t2P.q.set(PT.q); t._t2P.t.set(PT.t); }
+      /* (eased only into a new move, or toward the wind-up's held pose; within a move the pose is the clip's own, so a turn is
+         never chased the short way round) */
+      if (P.mv !== t._t2Mv) { t._t2Mv = P.mv; t._t2Sw = now; }
+      const k = P.wind || now - t._t2Sw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : 1;
+      follow(t._t2P, PT, k); pose = t._t2P;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, US.trim || 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    if (live) { const mk = MK.tip, o = BI.spear * 12; t.tipW = M4.xf(_c, OUT[o] * mk[0] + OUT[o + 4] * mk[1] + OUT[o + 8] * mk[2] + OUT[o + 3], OUT[o + 1] * mk[0] + OUT[o + 5] * mk[1] + OUT[o + 9] * mk[2] + OUT[o + 7], OUT[o + 2] * mk[0] + OUT[o + 6] * mk[1] + OUT[o + 10] * mk[2] + OUT[o + 11]); t.tipYaw = ang; t.tipAt = G.time; t._t2Clip = P.c; }
+    return true;
+  }
+  try { load(typeof TG2_MDL !== 'undefined' ? TG2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Thornguard rig:', e.message); }
+  if (MESH_ && typeof umDraw === 'function') {
+    const _um = umDraw;
+    umDraw = function (t, u) {
+      if (u === U && S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && !t.wrecked && UM_UNITS[U]) { try { if (draw.apply(this, arguments)) return true; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('tg2:', e); } } }
+      return _um.apply(this, arguments);
+    };
+  }
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('tg2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'tg2Row';
+    box.innerHTML = '<h3>Thornguard rig</h3><div class="row">' + `<button data-t2="0" class="${S.on ? '' : 'on'}" title="The earlier look: Mixamo's rig and clip (?tg=old)">Old (Mixamo)</button><button data-t2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (from scratch)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-t2]')) x.onclick = () => { S.on = x.dataset.t2 === '1'; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('tg2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
   }
   return { S, CL, load, hot, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
 })();
