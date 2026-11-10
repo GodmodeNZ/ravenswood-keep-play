@@ -1,4 +1,4 @@
-const BUILD_TAG = '7c6a5af@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4c6023d@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47104,7 +47104,7 @@ if (typeof forceHpK === 'function') {
 
 /* ---------- saves: the rack and each unit's weapon (by its cell); an old save loads with every unit on its starter ---------- */
 const wpnOk = w => !!(w && typeof w === 'object' && wpnDef(w) && w.rar >= 0 && w.rar <= 4);
-const wpnClean = w => { const o = { id: w.id, b: w.b, rar: w.rar, q: w.q, il: w.il }; if (w.isNew) o.isNew = true;
+const wpnClean = w => { const o = { id: w.id, b: w.b, rar: w.rar, q: w.q, il: w.il }; if (w.isNew) o.isNew = true; if (w.oh) o.oh = w.oh;   // (its on-hit effect: forces_zzzzzzzzzzzzzzzzzzzz_onhit.js)
   if (Array.isArray(w.runes) && w.runes.length) o.runes = w.runes.map(k => typeof RUNES !== 'undefined' && RUNES[k] ? k : null); if (w.rr) o.rr = w.rr | 0; if (w.fg) o.fg = w.fg | 0;   // (the forge: forces_zzzzzzzzzzzzzzz_forge.js)
   return o; };
 if (typeof serialize === 'function') {
@@ -50423,6 +50423,311 @@ const HOLD_TAL = {
   }
   // the Stag Lancers' Bloom no longer holds its foe: it lands harder instead
   if (typeof GW_BLOOM !== 'undefined' && GW_BLOOM.staglancer) { GW_BLOOM.staglancer.k = 3; GW_BLOOM.staglancer.say = (t, st, B) => `the lance strikes for ${gwDmg(st, B.k)}, and ×1.6 that on a foe another unit holds`; }
+}
+
+/* ================= ON-HIT WEAPONS: a chance on every strike (force runs) =================
+   The owner (11 Nov 2026): "i havent seen any weapons that have a chance on hit affect like lightning or reducing armour",
+   and "would also like one that has chance on effect to stun". (Design rule: "Chance-on-hit items are good. Talents avoid
+   random procs.")
+   - A dropped weapon of any class may carry ONE on-hit effect (w.oh, a key of OH): the weapon's name leads with it
+     ("Stormtongue Longbow"), so every unit that has a weapon slot can carry every effect. Rare (blue) and epic (purple)
+     weapons carry the effect at two strengths; three effects have a LEGENDARY (orange) form that changes what happens
+     ("Longbow of the Splitting Sky": each arc forks again). The weapon keeps its ordinary Damage, speed and DPS.
+   - FAIR ACROSS FAST AND SLOW UNITS: an effect has a rate, in triggers a minute of striking (OH[k].ppm). The chance on a
+     strike is rate x the unit's time between strikes / 60, so a 0.4s striker and a 2.5s striker trigger equally often.
+     Each landed basic strike rolls with the time since the unit's last roll (never more than OH_DT_CAP strikes' worth), so
+     a volley, a ricochet or a frenzy changes nothing; hits landing in the same instant (an area strike, a cleave) are ONE
+     strike and roll once. Twinfang is a plain chance a strike (a second strike is worth a strike, whatever its size) and
+     Pyrewake a plain chance a kill (a corpse is worth its own health, whoever felled it).
+     Spells never roll: these are the weapon's strikes.
+   - What an effect deals is counted in SECONDS OF STRIKING (the triggering hit / the time between strikes), so it is the
+     same share of a fast unit's damage as of a slow one's. Its damage is tagged 'relic': it never sets off itself or
+     another on-hit item.
+   - Each has a small mark where it lands, a glint at the unit, and a short low sound (audio.js onhit). The unit counts
+     its triggers this wave (t.ohN), shown on its Gear sheet (onhit_ui.js).
+   - Drops (ohRollOn, wrapping wpnRoll): a rare weapon carries one OH_DROP[2] of the time, an epic OH_DROP[3]; a legendary
+     weapon roll is an on-hit legendary OH_DROP.leg of the time (it still counts against the legendaries' pace). A run
+     that has seen none by wave OH_DROP.pity gets one on its next weapon (that weapon comes rare). The Anvil can etch an
+     effect of your choice into a rare or epic weapon for gold (ohEtch; a legendary form only drops).
+   Check and the balance tables: node tools/check_onhit.js -v. Classic and Tower Wars never come here (wpnOn). */
+const OH_DT_CAP = 2;            // a roll counts at most this many strikes' worth of time (a unit that was idle is not owed a trigger)
+const OH_P_CAP = .5;            // and no strike is likelier than this
+const OH_DROP = { 2: .5, 3: .7, leg: .3, pity: 9 };
+const OH_ETCH = 110;            // the Anvil's price to etch an effect, x forgeLvK(level)
+const ohN1 = v => String(+v.toFixed(1));
+const ohAmt = v => v >= 10 ? String(Math.round(v)) : ohN1(Math.max(.1, v));
+const ohAlive = o => !o.dead && !o.phased;
+const ohBolt = (a, o, col) => G.bolts.push({ pts: [[a.x, hitH(a), a.y], [o.x, hitH(o), o.y]], life: .2, max: .2, col, w: .55 });   // (a thin arc: the foes stay plain to see)
+/* the effects. ppm: triggers a minute of striking, by strength [rare, epic, legendary]; flat: a plain chance a strike instead.
+   say(r, ref): its one line (ref: what a second of the wearer's striking deals, when the card knows the unit).
+   go(c, src, amt, r, ref): do it on foe c; false if nothing happened (no trigger is counted, no sound).
+   best: the kind of unit it suits (the card's last line); only: what it needs of its foe. */
+const OH = {
+  storm: { name: 'Stormtongue', leg: 'the Splitting Sky', hue: '#8ab8ff', glyph: 'thunder', ppm: [6, 6, 6], best: 'a one-foe striker facing packs',
+    n: [3, 4, 3], k: [.7, .8, .8],
+    say(r, ref) { return `lightning arcs to ${this.n[r]} nearby foes${ref ? ` for about ${ohAmt(ref * this.k[r])} each` : ''}${r === 2 ? ', and each arc forks again to one more' : ''}. Lightning is magic: it cuts through armour.`; },
+    go(c, src, amt, r, ref) {
+      const L = nearest(c.x, c.y, 2.2, this.n[r], c, ohAlive); if (!L.length) return false;
+      const d = ref * this.k[r], hit = new Set(L); let a = c;
+      for (const o of L) {
+        ohBolt(a, o, [.62, .78, 1.1]); hurt(o, d, 'magic', src, false, null, null); fxSpark(o.x, o.y, hitH(o), '#bcd8ff', 3); a = o;
+        if (r !== 2) continue;
+        const f = nearest(o.x, o.y, 1.6, 1, o, q => q !== c && ohAlive(q) && !hit.has(q))[0]; if (!f) continue;
+        hit.add(f); ohBolt(o, f, [.9, .86, 1.2]); hurt(f, d * .6, 'magic', src, false, null, null); fxSpark(f.x, f.y, hitH(f), '#e8e0ff', 2);
+      }
+      return true;
+    } },
+  sunder: { name: 'Platebreaker', hue: '#c8ccd4', glyph: 'shieldbreak', ppm: [6, 6], best: 'a unit that reaches armoured foes first', only: 'Armoured foes only.',
+    open: [.5, 1], T: [4, 5],
+    say(r) { return `cracks the foe's armour for ${this.T[r]}s: ${r ? 'every' : 'half of every'} weapon blow on it goes straight to its health, and a piece of the armour bar breaks off.`; },
+    go(c, src, amt, r) {
+      if (!((c.armor || 0) > 0) && !(c.apMax > 0 && c.ap > 0)) return false;
+      const A = Math.max(1, c.armor || c.def.armor || 1), was = c.shredT > 0 ? c.shred : 0;
+      c.shred = Math.max(was, A * this.open[r]); c.shredT = Math.max(c.shredT || 0, this.T[r]);
+      fxShards(c.x, c.y, hitH(c), 4); fxSpark(c.x, c.y, hitH(c), '#d8e2ea', 3);
+      return true;
+    } },
+  wardrend: { name: 'Wardrender', hue: '#b89aff', glyph: 'rune', ppm: [6, 6], best: 'a weapon unit standing with your casters', only: 'Warded foes only.',
+    open: [.5, 1], tear: [.05, .08], T: [4, 5],
+    say(r) { return `cracks the foe's ward for ${this.T[r]}s: ${r ? 'every' : 'half of every'} spell hit on it goes straight to its health, and a piece of the ward bar is torn off.`; },
+    go(c, src, amt, r) {
+      if (typeof epWardOpen !== 'function' || !(c.mwMax > 0) || !(c.mw > 0)) return false;
+      epWardOpen(c, this.open[r], this.T[r]); epWardTear(c, this.tear[r]);
+      fxSpark(c.x, c.y, hitH(c) + .1, '#c4a4ff', 4);
+      return true;
+    } },
+  stun: { name: 'Bellringer', leg: 'the Last Toll', hue: '#ffe08a', glyph: 'echo', ppm: [4, 4, 4], best: 'a unit at a choke point',
+    T: [.5, .7, .7],
+    say(r) { return `stuns the foe for ${ohN1(this.T[r])}s${r === 2 ? `, and the stun rings on to the next foe behind it` : ''} (a boss only for a moment).`; },
+    go(c, src, amt, r) {
+      if (c.hp <= 0 || c.stunImm > 0) return false;
+      const was = c.stunT || 0; stun(c, this.T[r], .4, null); if (!((c.stunT || 0) > was)) return false;
+      fxSpark(c.x, c.y, hitH(c) + .25, '#fff1b8', 4);
+      if (r === 2) { const o = nearest(c.x, c.y, 1.5, 1, c, q => ohAlive(q) && !(q.stunImm > 0))[0]; if (o) { stun(o, this.T[r], .4, null); ohBolt(c, o, [1.1, 1, .6]); fxSpark(o.x, o.y, hitH(o) + .25, '#fff1b8', 3); } }
+      return true;
+    } },
+  twin: { name: 'Twinfang', leg: 'the Second Self', hue: '#e8eef8', glyph: 'swords', flat: [.12, .16, null], ppm: [0, 0, 5], best: 'a unit with on-hit relics or runes: its second strike sets them off too',
+    gT: 4, gK: .8,
+    say(r) { return r === 2 ? `a second self steps out beside it for ${this.gT}s and strikes every time it does, nearly as hard.` : 'it attacks again at once: a full second strike, which sets off its relics and runes too (it cannot set off itself).'; },
+    go(c, src, amt, r) {
+      if (c.dead) return false;
+      if (r === 2) { src.ohGhostT = G.time + this.gT; ohEcho(c, src, amt, this.gK, true); } else ohEcho(c, src, amt, 1, false);
+      return true;
+    } },
+  pyre: { name: 'Pyrewake', leg: 'the Long Pyre', hue: '#ff9a4a', glyph: 'ember', flat: [.35, .45, .45], per: 'kill', pre: 'On a kill: ', best: 'a unit that lands the killing blows on packs',
+    k: [.12, .15, .15], rad: [1.2, 1.4, 1.4],
+    say(r) { return `the corpse bursts: every foe within ${ohN1(this.rad[r])} cells loses ${Math.round(this.k[r] * 100)}% of the slain foe's full health (a boss a quarter of that)${r === 2 ? ', and a foe slain by a burst bursts too' : ''}.`; },
+    burst(c, src, r, depth) {
+      const d = c.maxHp * this.k[r], x = c.x, z = c.y, h = hitH(c); let n = 0;
+      part({ k: 'flare', x, z, h, life: .28, max: .28, size: .8, col: '#ffb060' }); fxSpark(x, z, h, '#ffa04a', 7);
+      const pd = OH_PYRE; OH_PYRE = depth;
+      try { tagged('relic', () => inSplash(x, z, this.rad[r], false, o => { if (o === c || !ohAlive(o)) return; const v = d * (o.def.boss || o.def.lead ? .25 : 1); ohNote('pyre', Math.min(v, o.hp)); hurt(o, v, 'magic', src, false, null, null); n++; })); } finally { OH_PYRE = pd; }
+      return n;
+    } },
+  mark: { name: 'Ravenmark', leg: 'the Unkindness', hue: '#b08cff', glyph: 'feather', ppm: [4, 4, 4], best: 'a fast unit beside your hardest hitter or your biggest spell',
+    k: [2, 3, 2], T: 6, hops: 2,
+    say(r) { return `marks the foe for ${this.T}s: the next hit on it from another unit, strike or spell, lands ${r === 1 ? 'three times' : 'twice'} as hard${r === 2 ? `, and the mark then leaps on to the nearest foe, twice over` : ''}.`; },
+    put(c, src, r, hops) { c.ohMk = { src, k: this.k[r], t: G.time + this.T, hops, r }; c.markT = Math.max(c.markT || 0, this.T); fxSpark(c.x, c.y, hitH(c) + .3, '#c8a8ff', 4); },
+    go(c, src, amt, r) {
+      if (c.hp <= 0 || (c.ohMk && c.ohMk.t > G.time)) return false;
+      this.put(c, src, r, r === 2 ? this.hops : 0);
+      return true;
+    } },
+  last: { name: 'Lastbreath', hue: '#ff6a6a', glyph: 'skull', ppm: [24, 24], best: 'a quick striker near the gate, finishing what gets through (a slow, heavy blow often kills before the line)',
+    at: [.2, .3], k: 3,
+    say(r, ref) { return `a foe below ${Math.round(this.at[r] * 100)}% health is slain outright (an elite, leader or boss takes a heavy blow instead${ref ? `, about ${ohAmt(ref * this.k)}` : ''}).`; },
+    go(c, src, amt, r, ref) {
+      if (c.hp <= 0 || c.hp > c.maxHp * this.at[r]) return false;
+      const big = c.def.boss || c.def.lead || c.elite, v = big ? ref * this.k : c.hp + 1;
+      ohNote('last', Math.min(v, c.hp)); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .22, max: .22, size: .6, col: '#ffd0d0' }); fxSpark(c.x, c.y, hitH(c), '#ff7a7a', 5);
+      hurt(c, v, 'pure', src, false, null, null);
+      return true;
+    } },
+};
+const OH_IDS = Object.keys(OH), OH_LEG_IDS = OH_IDS.filter(k => OH[k].leg);
+// a weapon's effect and its strength: { id, d, r } (r: 0 rare, 1 epic, 2 legendary), or null (none, or the weapon is below rare)
+function ohOf(w) {
+  const d = w && !w.starter && !w.hero && w.oh ? OH[w.oh] : null; if (!d || (w.rar | 0) < 2) return null;
+  return { id: w.oh, d, r: (w.rar | 0) >= 4 && d.leg ? 2 : (w.rar | 0) >= 3 ? 1 : 0 };
+}
+// is this strength a plain chance (a strike, or a kill) rather than a rate?
+const ohFlat = (d, r) => !!d.flat && d.flat[r] != null;
+// the chance on one strike, for a unit with this time between strikes
+const ohChance = (d, r, rate) => ohFlat(d, r) ? d.flat[r] : Math.min(OH_P_CAP, d.ppm[r] * Math.max(.05, rate || 1) / 60);
+// triggers a minute of striking (a plain chance: at this time between strikes)
+const ohPerMin = (d, r, rate) => ohFlat(d, r) ? d.flat[r] * 60 / Math.max(.05, rate || 1) : Math.min(d.ppm[r], OH_P_CAP * 60 / Math.max(.05, rate || 1));
+// the damage an effect dealt this run, by effect (the balance tables read it)
+function ohNote(id, v) { const S = G.ohDmg || (G.ohDmg = {}); S[id] = (S[id] || 0) + v; }
+// its lines for the card. rate: the wearer's time between strikes; ref: what a second of its striking deals (both optional)
+function ohLines(w, rate, ref) {
+  const o = ohOf(w); if (!o) return null;
+  const d = o.d, p = rate ? ohChance(d, o.r, rate) : null;
+  const how = d.per === 'kill' ? `${Math.round(d.flat[o.r] * 100)}% chance on every kill its strikes make`
+    : ohFlat(d, o.r) ? `${Math.round(d.flat[o.r] * 100)}% chance on every strike`
+    : `About ${d.ppm[o.r]} times a minute of striking${o.id === 'last' ? ' such a foe' : ''}, fast unit or slow${p != null ? ` (${Math.max(1, Math.round(p * 100))}% a strike on this unit)` : ''}`;
+  return { name: o.r === 2 ? d.leg.replace(/^the /, 'The ') : d.name, hue: d.hue, text: (d.pre || 'Chance on hit: ') + d.say(o.r, ref), how: how + (d.per === 'kill' ? '. Its spells\' kills do not count.' : '. Area strikes roll once. Its spells do not roll.'), only: d.only || '', best: 'Best on ' + d.best + '.' };
+}
+
+/* ---------- the name: the effect leads it; a legendary form follows it ---------- */
+if (typeof wpnShow === 'function') {
+  const _ohShow = wpnShow;
+  wpnShow = function (w) {
+    const s = _ohShow.apply(this, arguments), o = ohOf(w); if (!o) return s;
+    return Object.assign({}, s, { name: o.r === 2 ? `${s.name} of ${o.d.leg}` : `${o.d.name} ${s.name}` });
+  };
+}
+
+/* ---------- in play ---------- */
+// effStats: the weapon's effect rides the strike (st.oh). st.ipr is made so game.js hurt calls itemProcHit for this unit.
+if (typeof wpnApply === 'function') {
+  const _ohApply = wpnApply;
+  wpnApply = function (t, st) {
+    const r = _ohApply.apply(this, arguments);
+    const o = t && t.weapon && st && st.wpn ? ohOf(t.weapon) : null;
+    if (o) { st.oh = o; st.ipr = st.ipr || []; }
+    return r;
+  };
+}
+// the kind of damage of the hit now landing (a second strike lands in kind). A strike an armour bar or a ward soaks whole
+// never reaches itemProcHit (game.js hurt returns there), and it is still a strike: Platebreaker and Wardrender must fire
+// on exactly those, so it rolls here (OH_REACH: this hit already rolled). A Ravenmark is spent here too: the next hit
+// from another unit (not a burn, not an item's own strike) lands harder.
+let OH_TYPE = null, OH_RAW = 0, OH_REACH = false;   // (OH_RAW: the strike as thrown, before the foe's armour: what a second of striking means, and what a second strike throws again)
+let OH_ECHO = false, OH_PYRE = 0;                   // (a second strike is landing: it cannot set off another; how deep a chain of corpse bursts is)
+function ohMarkSpend(c, amt, src) {
+  const m = c.ohMk; c.ohMk = null;
+  if (!(m.t > G.time)) return amt;
+  ohNote('mark', amt * (m.k - 1));
+  part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .2, life: .2, max: .2, size: .5, col: '#d8c0ff' }); fxSpark(c.x, c.y, hitH(c) + .2, '#c8a8ff', 5);
+  if (typeof sfx === 'function') sfx('onhit', 'mark');
+  if (m.hops > 0) { const o = nearest(c.x, c.y, 2, 1, c, q => ohAlive(q) && !(q.ohMk && q.ohMk.t > G.time))[0]; if (o) { OH.mark.put(o, m.src, m.r, m.hops - 1); ohBolt(c, o, [.8, .6, 1.2]); } }
+  return amt * m.k;
+}
+if (typeof hurt === 'function') {
+  const _ohHurt = hurt;
+  hurt = function (c, amt, type, src, dot) {
+    if (c && c.ohMk && !dot && amt > 0 && src && src.def && src !== c.ohMk.src && DTAG !== 'relic' && DTAG !== 'rx' && !c.dead) arguments[1] = amt = ohMarkSpend(c, amt, src);
+    const p = OH_TYPE, q = OH_REACH, w = OH_RAW; OH_TYPE = type; OH_REACH = false; OH_RAW = amt;
+    const live = !!c && !c.dead && !c.phased && !(c.aegisT > 0);
+    const r = _ohHurt.apply(this, arguments);
+    if (!OH_REACH && live && !dot && amt > 0 && src && src.st && src.st.oh && !DTAG && !c.dead && wpnOn()) { try { ohStrike(c, src, amt); } catch (e) { console.error(e); } }
+    OH_TYPE = p; OH_REACH = q; OH_RAW = w; return r;
+  };
+}
+// a second strike: the same blow again a moment later, as a strike of its own (its relics, runes and strike riders fire
+// on it; it never rolls the weapon's effect again). The tell: the unit's attack plays again and a pale double flash.
+function ohEcho(c, src, amt, k, ghost) {
+  const ty = OH_TYPE || 'phys';
+  G.delayed.push({ t: ghost ? .12 : .09, fn: () => {
+    if (c.dead || G.state !== 'play' || !G.towers.includes(src)) return;
+    const pe = OH_ECHO; OH_ECHO = true;
+    try { tagged('', () => { hurt(c, amt * k, ty, src, false, null); if (!c.dead && src.st) onHit(c, src.st, src, amt * k); }); } finally { OH_ECHO = pe; }
+    ohNote('twin', amt * k);
+    src.recoil = 1; if (!ghost) src.shotT = 0;
+    fxSpark(c.x, c.y, hitH(c), ghost ? '#cfe0ff' : '#f4f8ff', 3);
+    if (ghost) part({ k: 'flare', x: src.x + .28, z: src.y, h: (typeof towerTop === 'function' ? towerTop(src) : 1) * .6, life: .2, max: .2, size: .45, col: '#bcd0ff' });
+    else if (typeof addText === 'function') addText(c.x, c.y, hitH(c) + .45, 'again', '#e8eef8');
+  } });
+}
+// a basic strike has landed (through itemProcHit: not a dot, not a spell, not an item's own strike)
+function ohStrike(c, src, amt) {
+  if (OH_ECHO) return;
+  const o = src.st.oh, d = o.d, now = G.time, last = src.ohAt;
+  if (d.per === 'kill') return;   // (Pyrewake rolls on its kills: ohKill)
+  if (o.id === 'twin' && src.ohGhostT > now) ohEcho(c, src, amt, d.gK, true);   // its second self strikes with every blow
+  if (last != null && now - last < 1e-6) { if (src.ohTwinAt === now && o.id === 'twin' && o.r < 2) ohEcho(c, src, amt, 1, false); return; }   // the same strike landing on another foe: no second roll (a second strike follows on each)
+  src.ohAt = now;
+  const rate = Math.max(.05, src.st.rate || 1);
+  const p = ohFlat(d, o.r) ? d.flat[o.r] : Math.min(OH_P_CAP, d.ppm[o.r] * Math.min(last == null ? rate : now - last, rate * OH_DT_CAP) / 60);
+  if (Math.random() >= p) return;
+  let ok = false; tagged('relic', () => { ok = d.go(c, src, amt, o.r, amt / rate) !== false; });
+  if (!ok) return;
+  if (o.id === 'twin') src.ohTwinAt = now;
+  ohFired(src, o);
+}
+// a foe fell to the wearer's strike (or, for the Long Pyre, to one of its bursts): Pyrewake
+function ohKill(c, src) {
+  const o = src.st.oh; if (o.id !== 'pyre') return;
+  if (DTAG && (!(OH_PYRE > 0) || o.r !== 2 || OH_PYRE >= 5)) return;   // its own strike's kill only; the Long Pyre: its bursts' kills too (five deep at most)
+  if (Math.random() >= o.d.flat[o.r]) return;
+  o.d.burst(c, src, o.r, OH_PYRE + 1); ohFired(src, o);
+}
+if (typeof kill === 'function') {
+  const _ohKill = kill;
+  kill = function (c, src) {
+    const was = c && !c.dead, r = _ohKill.apply(this, arguments);
+    if (was && c.dead && src && src.st && src.st.oh && wpnOn() && !c.splitCopy && !c.def.egg) { try { ohKill(c, src); } catch (e) { console.error(e); } }
+    return r;
+  };
+}
+function ohFired(src, o) {
+  const N = src.ohN && src.ohN.w === G.wave && src.ohN.id === o.id ? src.ohN : (src.ohN = { w: G.wave, id: o.id, n: 0 });
+  N.n++; N.at = G.time;
+  const S = G.ohStat || (G.ohStat = {}); S[o.id] = (S[o.id] || 0) + 1;
+  if (typeof part === 'function' && src.x != null) part({ k: 'flare', x: src.x, z: src.y, h: (typeof towerTop === 'function' ? towerTop(src) : 1) + .1, life: .22, max: .22, size: .4, col: o.d.hue });   // a small glint at the unit: this one fired
+  if (typeof sfx === 'function') sfx('onhit', o.id);
+  if (typeof ohMark === 'function') ohMark(src);   // the Gear sheet's mark, if it is open on this unit (onhit_ui.js)
+}
+if (typeof itemProcHit === 'function') {
+  const _ohProc = itemProcHit;
+  itemProcHit = function (c, src, amt) {
+    const r = _ohProc.apply(this, arguments);
+    if (src && src.st && src.st.oh && !DTAG && wpnOn()) { OH_REACH = true; try { ohStrike(c, src, OH_RAW > 0 ? OH_RAW : amt); } catch (e) { console.error(e); } }
+    return r;
+  };
+}
+// how often a unit's weapon has fired this wave
+const ohCount = t => t && t.ohN && t.ohN.w === G.wave && t.weapon && t.weapon.oh === t.ohN.id ? t.ohN.n : 0;
+
+/* ---------- drops ---------- */
+function ohRollOn(w, wave, asked) {
+  if (!w || w.hero || w.starter) return w;
+  const run = typeof G !== 'undefined' && G ? G : {};
+  if (w.rar === 4) {
+    const L = WPN_LEG[w.b];
+    if (L && Math.random() < OH_DROP.leg && WPN_CLASS[L.cls] && !WPN_CLASS[L.cls].retired) { w.b = lootPick(WPN_CLASS[L.cls].bases)[0]; w.oh = lootPick(OH_LEG_IDS); delete w._c; delete w._k; }
+  } else if ((w.rar === 2 || w.rar === 3) && Math.random() < OH_DROP[w.rar]) w.oh = lootPick(OH_IDS);
+  if (!w.oh && asked == null && w.rar < 4 && !run.ohSeen && wave >= OH_DROP.pity) { if (w.rar < 2) { w.rar = 2; delete w._c; delete w._k; } w.oh = lootPick(OH_IDS); }   // a run that has seen none: its next weapon carries one (and comes rare at least)
+  return w;
+}
+if (typeof wpnRoll === 'function') {
+  const _ohRoll = wpnRoll;
+  wpnRoll = function (wave, boss, rar, ty) { return ohRollOn(_ohRoll.apply(this, arguments), Math.max(1, wave | 0), rar); };
+}
+// (the run has seen one once it reaches the rack: an offer passed over does not count)
+if (typeof wpnToBag === 'function') {
+  const _ohBag = wpnToBag;
+  wpnToBag = function (w) { if (w && w.oh && typeof G !== 'undefined' && G) G.ohSeen = 1; return _ohBag.apply(this, arguments); };
+}
+// the odds a weapon dropped on this wave carries an effect, by rarity [rare, epic, legendary], for the loot tables
+const ohOdds = () => ({ rare: OH_DROP[2], epic: OH_DROP[3], leg: OH_DROP.leg });
+
+/* ---------- the Anvil: etch an effect of your choice into a rare or epic weapon ---------- */
+const ohEtchCost = w => !w || w.starter || w.hero || (w.rar | 0) < 2 || (w.rar | 0) > 3 || WPN_LEG[w.b] ? null : forgeR5(OH_ETCH * forgeLvK(forgeLv(w)));
+function ohEtch(w, id) {
+  if (!OH[id] || w.oh === id) return false;
+  const c = ohEtchCost(w); if (!forgePay(w, c, 'An on-hit effect')) return false;
+  w.oh = id; return forgeDone(w);
+}
+
+/* ---------- saves: the weapon keeps its effect (wpnClean carries w.oh); the run remembers it has seen one ---------- */
+if (typeof serialize === 'function') {
+  const _ohSer = serialize;
+  serialize = function () { const s = _ohSer.apply(this, arguments); if (s && G.force && G.ohSeen) s.ohSeen = 1; return s; };
+}
+if (typeof restore === 'function') {
+  const _ohRes = restore;
+  restore = function (s) {
+    const r = _ohRes.apply(this, arguments);
+    try { G.ohSeen = s && s.ohSeen ? 1 : 0; G.ohStat = {};
+      for (const w of (G.wbag || []).concat((G.towers || []).map(t => t.weapon).filter(Boolean))) { if (w.oh && !OH[w.oh]) delete w.oh; if (w.oh) G.ohSeen = 1; }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+if (typeof newGame === 'function') {
+  const _ohNew = newGame;
+  newGame = function () { const r = _ohNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.ohSeen = 0; G.ohStat = {}; G.ohDmg = {}; } return r; };
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
@@ -55178,7 +55483,7 @@ const AudioSys = (() => {
   let FROST_V = .7;   // its level, set beside the other towers
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
-  const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
+  const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
     cannon: .63, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
@@ -56391,6 +56696,17 @@ const AudioSys = (() => {
       if (!ok('block', .12, 999)) return; const t = now(), pan = sp(.4);
       bell(t, 520, [[1, 1, .18], [2.31, .6, .12], [3.9, .35, .08]], .05, { pan, room: .25 });
       nhit(t, { n: 'w', type: 'highpass', f: 2500, a: .001, d: .04, v: .12, pan });
+    },
+    onhit(k) {    // a weapon's on-hit effect fires (forces_zzzzzzzzzzzzzzzzzzzz_onhit.js): one short, low sound each, never bright
+      if (!ok('oh_' + k, .3, 200) || !ok('oh', .09, 200)) return; const t = now(), pan = sp(.35);
+      if (k === 'storm') { nhit(t, { n: 'b', type: 'bandpass', f: 520, q: 1.4, pts: [[.004, 1], [.05, .35], [.14, 0]], rough: .8, roughR: .0012, v: .1, pan }); thump(t, 150, 60, .12, .1, { pan, lp: 500 }); }
+      else if (k === 'sunder') { thump(t, 190, 70, .1, .13, { pan, lp: 700 }); bell(t + .01, 210, [[1, 1, .16], [2.31, .4, .1]], .035, { pan, room: .2 }); }
+      else if (k === 'wardrend') { bell(t, 262, [[1, 1, .22], [1.5, .5, .16], [2.02, .3, .1]], .04, { pan, room: .3 }); thump(t, 120, 80, .08, .06, { pan }); }
+      else if (k === 'stun') { bell(t, 174, [[1, 1, .4], [2.4, .45, .25], [3.1, .2, .14]], .06, { pan, room: .3 }); thump(t, 110, 55, .1, .1, { pan }); }
+      else if (k === 'pyre') { nhit(t, { n: 'b', type: 'lowpass', f: 420, pts: [[.02, .8], [.1, 1], [.28, 0]], v: .1, pan }); thump(t, 130, 90, .08, .06, { pan }); }
+      else if (k === 'mark') { bell(t, 330, [[1, 1, .18], [2.76, .35, .1]], .03, { pan, room: .25 }); nhit(t, { n: 'b', type: 'bandpass', f: 380, q: 2, pts: [[.01, .7], [.16, 0]], v: .06, pan }); }
+      else if (k === 'last') { thump(t, 120, 42, .16, .16, { pan, lp: 400 }); nhit(t, { n: 'b', type: 'lowpass', f: 300, a: .002, d: .07, v: .08, pan }); }
+      else { thump(t, 210, 120, .05, .09, { pan, lp: 900 }); thump(t + .07, 190, 105, .05, .09, { pan, lp: 900 }); }   // twin: two quick knocks
     },
     shieldBreak() { // the shield gives way
       if (!ok('sBreak', .3, 999)) return; const t = now(), pan = sp(.4);
@@ -82347,13 +82663,17 @@ function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardF
 
 /* ================= YOUR UNITS: a ranked list at the top left of the field (desktop only) =================
    The owner (10 Nov 2026): "on desktop it would be good to have a list of all my units on the top left with their damage
-   totals and rank". One compact row a unit on the field (no walls): its icon, its name, its tier with the level stars the
-   field draws under mana bars (tiers IV-VI, the ones veterancy opens, in the richer gold), and its damage this run, the most
-   first, with a thin bar for its share against the top unit. The numbers are the War Room's own: the run's filed total for
-   the unit (G.run.u, meta.js) plus the wave being fought (G.wstat), printed with the War Room's fmtK. Hovering a row rings
-   that unit on the field; a click selects it. About eight rows show, the rest scroll; the header folds the list away and the
-   choice is remembered (localStorage runehold.ulist.fold). Desktop only (view.js deskHud); it sits under the boss card when
-   that is up. Called once a frame after the forecast (forecastTick is wrapped below). */
+   totals and rank"; then, with a mock-up (11 Nov, art-check/unit_list_mock.webp): "change the damage ui to look more like
+   this, using the units colour as the colour for the border/bar". So there is no panel: the rows float over the map. A row
+   is a unit on the field (no walls): its square portrait in a border of its kind's colour (TALENTS[type].hue, the colour
+   the War Room gives it), its level as plain yellow stars under the portrait, and beside it a tall bar in the same colour,
+   as long as its damage against the top unit's, with the damage written in it; under that a thin teal bar, its veterancy
+   toward the next tier it opens (none once every tier is open). No names or counts on the row: the hover title has them.
+   The numbers are the War Room's own: the run's filed total for the unit (G.run.u, meta.js) plus the wave being fought
+   (G.wstat), printed with the War Room's fmtK. Hovering a row rings that unit on the field; a click selects it. Eight rows
+   show, the rest scroll; the small handle above folds the list away and the choice is remembered (localStorage
+   runehold.ulist.fold). Desktop only (view.js deskHud); it sits under the boss card when that is up. Called once a frame
+   after the forecast (forecastTick is wrapped below). */
 const UL = { el: null, ring: null, hov: null, t: 0, h: '', ico: {}, fold: null };
 function ulTotals() {
   const U = (G.run && G.run.u) || {}, Wt = (G.wstat && G.wstat.t) || {}, sum = r => r ? DKEYS.reduce((a, k) => a + (r[k] || 0), 0) : 0;
@@ -82361,14 +82681,14 @@ function ulTotals() {
 }
 function ulIcon(t) {
   const key = 't:' + t.type + ':' + t.tier; if (UL.ico[key]) return UL.ico[key];
-  try { const c = document.createElement('canvas'); c.width = c.height = 52; iconPaint(c, key); return (UL.ico[key] = c.toDataURL()); } catch (e) { return ''; }
+  try { const c = document.createElement('canvas'); c.width = c.height = 120; iconPaint(c, key); return (UL.ico[key] = c.toDataURL()); } catch (e) { return ''; }
 }
 function unitListTick() {
   const on = typeof deskHud === 'function' && deskHud() && typeof G !== 'undefined' && G && G.state === 'play' && Array.isArray(G.towers) && !(typeof TW !== 'undefined' && TW);
   if (!UL.el) {
     const st = document.getElementById('stage'); if (!st || !on) return;
     const el = UL.el = document.createElement('div'); el.id = 'ulist'; el.hidden = true; el.setAttribute('aria-label', 'Your units by damage');
-    el.innerHTML = '<button type="button" class="ul-head" aria-expanded="true"><b></b><span></span><i aria-hidden="true"></i></button><div class="ul-rows" role="list"></div>';
+    el.innerHTML = '<button type="button" class="ul-head" aria-expanded="true"><i aria-hidden="true"></i></button><div class="ul-rows" role="list"></div>';
     UL.ring = document.createElement('div'); UL.ring.id = 'ulRing'; UL.ring.hidden = true; UL.ring.setAttribute('aria-hidden', 'true');
     st.append(el, UL.ring);
     try { UL.fold = localStorage.getItem('runehold.ulist.fold') === '1'; } catch (e) { UL.fold = false; }
@@ -82390,11 +82710,14 @@ function unitListTick() {
     UL.t = now;
     const all = L.reduce((a, r) => a + r.dmg, 0), top = Math.max(1, L[0].dmg), selT = G.sel && G.sel.kind === 'tower' ? G.sel.ref : null;
     const head = `${L.length}|${fmtK(all)}|${UL.fold ? 1 : 0}`;
-    if (UL.hd !== head) { UL.hd = head; const hb = el.querySelector('.ul-head'); hb.querySelector('b').textContent = L.length; hb.querySelector('span').textContent = fmtK(all); hb.setAttribute('aria-expanded', String(!UL.fold)); hb.title = `${L.length} ${typeof uw === 'function' ? uw(L.length) : 'units'} · ${fmtK(all)} damage this run`; el.classList.toggle('fold', !!UL.fold); }
+    if (UL.hd !== head) { UL.hd = head; const hb = el.querySelector('.ul-head'); hb.setAttribute('aria-expanded', String(!UL.fold)); hb.setAttribute('aria-label', UL.fold ? 'Show your units' : 'Hide your units'); hb.title = `${L.length} ${typeof uw === 'function' ? uw(L.length) : 'units'} · ${fmtK(all)} damage this run`; el.classList.toggle('fold', !!UL.fold); }
+    const vOn = typeof vetOn === 'function' && vetOn() && typeof vetNext === 'function';
     const h = UL.fold ? '' : L.map(({ t, dmg }) => {
       const n = clamp((t.tier | 0) + 1, 1, 6), share = all > 0 ? Math.round(100 * dmg / all) : 0, kills = t.kills | 0;
-      const tip = `${t.def.name} ${ROMAN[t.tier]} · ${fmtK(dmg)} damage, ${share}% of your army's · ${kills} kill${kills === 1 ? '' : 's'}`;
-      return `<button type="button" role="listitem" class="ul-r${t === selT ? ' sel' : ''}" data-id="${t.id}" title="${esc(tip)}"><img alt="" draggable="false" src="${ulIcon(t)}"><span class="ul-m"><span class="ul-n">${esc(t.def.name)}</span><span class="ul-k"><em>${ROMAN[t.tier]}</em><span class="ul-s">${'<i></i>'.repeat(Math.min(n, 3))}${n > 3 ? '<i class="v"></i>'.repeat(n - 3) : ''}</span></span></span><b>${fmtK(dmg)}</b><u style="width:${(100 * dmg / top).toFixed(1)}%"></u></button>`;
+      const col = (TALENTS[t.type] && TALENTS[t.type].hue) || '#c9a95c';
+      const vn = vOn ? vetNext(t) : null, vf = vn != null ? clamp(vetPts(t) / vetNeed(vn), 0, 1) : -1;
+      const tip = `${t.def.name} ${ROMAN[t.tier]} · ${fmtK(dmg)} damage, ${share}% of your army's · ${kills} kill${kills === 1 ? '' : 's'}` + (vf >= 0 ? ` · veterancy ${Math.round(vf * 100)}% of the way to tier ${ROMAN[vn]}` : '');
+      return `<button type="button" role="listitem" class="ul-r${t === selT ? ' sel' : ''}" data-id="${t.id}" title="${esc(tip)}" style="--uc:${col}"><span class="ul-p"><img alt="" draggable="false" src="${ulIcon(t)}"><span class="ul-s">${'<i></i>'.repeat(n)}</span></span><span class="ul-b"><span class="ul-d" style="width:${(100 * dmg / top).toFixed(1)}%"><b>${fmtK(dmg)}</b></span>${vf >= 0 ? `<span class="ul-v" style="width:${(4 + 56 * vf).toFixed(1)}%"></span>` : ''}</span></button>`;
     }).join('');
     if (UL.h !== h) { UL.h = h; const rows = el.querySelector('.ul-rows'), sc = rows.scrollTop; rows.innerHTML = h; rows.scrollTop = sc; }
   }
@@ -101404,7 +101727,7 @@ function wpnCardHTML(w, t, o) {
   }
   return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${wpE(wpnName(w))}</h5><p class="itc-k">${wpE(wpKindLine(w))}</p>`
     + (lines.length ? `<ul class="itc-s">${lines.join('')}</ul>` : '') + live
-    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '') + runes
+    + (rule ? `<div class="itc-ab"><b>Passive: ${wpE(d.name)}</b> ${wpE(rule)}</div>` : '') + (typeof ohCardHTML === 'function' ? ohCardHTML(w, t, n) : '') + runes
     + cmp + (w.starter ? `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p><p class="itc-k">Issued weapon. Better ones drop from bosses, elites and the waves' last foes.</p>` : `<p class="itc-fl">“${wpE(wpnShow(w).look.charAt(0).toUpperCase() + wpnShow(w).look.slice(1))}.”</p>`)
     + (o.note || '') + '</div>';
 }
@@ -101489,7 +101812,7 @@ function wpRack(t) {
     const cl = (x, y) => y > x + 1e-6 ? 'bo' : y < x - 1e-6 ? 'neg' : '';
     return `<div class="wp-row" data-w="${w.id}" ${wpTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><div class="wp-rt"><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}${w.isNew ? ' <i class="wp-nw">new</i>' : ''}</b><small>${wpE(wpKindLine(w))}</small>
       <p>Damage ${wpRange(c)} → <b class="${cl(c.avg, n.avg)}">${wpRange(n)}</b> · Speed ${wpS(c.aps)} → <b class="${cl(c.aps, n.aps)}">${wpS(n.aps)}/s</b> · DPS ${wpN(c.dps)} → <b class="${cl(c.dps, n.dps)}">${wpN(n.dps)}</b>${c.sp || n.sp ? ` · Spell Damage ${c.sp || 0} → <b class="${cl(c.sp || 0, n.sp || 0)}">${n.sp || 0}</b>` : ''}</p>
-      <p class="wp-unit">This ${wpE(t.def.name)} at tier ${ROMAN[t.tier]}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS${wpSpellCmp(t, w)}${wpnDef(w).leg ? ` · ${wpE(wpnRuleText(wpnDef(w)))}` : ''}</p></div>
+      <p class="wp-unit">This ${wpE(t.def.name)} at tier ${ROMAN[t.tier]}: ${wpN(d0)} → <b class="${cl(d0, d1)}">${wpN(d1)}</b> DPS${wpSpellCmp(t, w)}${wpnDef(w).leg ? ` · ${wpE(wpnRuleText(wpnDef(w)))}` : ''}</p>${typeof ohRowLine === 'function' && ohRowLine(w) ? `<p class="wp-unit">${ohRowLine(w)}</p>` : ''}</div>
       <div class="wp-bt"><button type="button" class="pri" data-eq="${w.id}">Equip</button><button type="button" data-fg="${w.id}">The Anvil</button><button type="button" data-sv="${w.id}">Salvage ${WPN_SALVAGE[w.rar | 0]}g</button></div></div>`;
   }).join('');
   const html = `<div class="wp-rack" role="dialog" aria-label="Weapon rack"><div class="wp-hd"><h3>Weapon · ${wpE(t.def.name)} <small>tier ${ROMAN[t.tier]}</small></h3><button type="button" class="tx" id="wpClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
@@ -102002,6 +102325,7 @@ function anTabs(e) {
       let h = `<p class="an-k">${n ? `${n} socket${n > 1 ? 's' : ''}; a rune costs ${c} gold, a new one replaces the old.` : 'A socket opens at rare, a second at epic.'}</p>`;
       for (let i = 0; i < n; i++) h += `<div class="an-sock"><b>Socket ${i + 1}:</b> ${R[i] && RUNES[R[i]] ? `<span style="color:${RUNES[R[i]].hue}">${RUNES[R[i]].name}</span>: ${anE(RUNES[R[i]].text)}` : '<i>empty</i>'}<div class="an-runes">${opts.filter(k => k !== R[i]).map(k => `<button type="button" class="an-do" data-act="rune|${i}|${k}"${gold >= c ? '' : ' disabled'}><b style="color:${RUNES[k].hue}">${RUNES[k].name}</b> · ${c} gold<small>${anE(RUNES[k].text)}</small></button>`).join('')}</div></div>`;
       tabs.push({ id: 'rune', name: 'Runes', html: h }); }
+    if (!hero && typeof ohAnvilTab === 'function') { const ot = ohAnvilTab(it, t, gold); if (ot) tabs.push(ot); }   // (an on-hit effect: onhit_ui.js)
   } else {
     const p = typeof ilUpPlan === 'function' ? ilUpPlan(it, G.gold) : null;
     if (p) { const b = Object.assign({}, it, { il: p.top }), line = (o) => (typeof itemStatLine === 'function' ? itemStatLine(o) : '');
@@ -102013,6 +102337,7 @@ function anDo(e, act) {
   const it = e.it, t = anUnitFor(e); let ok = false;
   if (act === 'up') ok = forgeUpgrade(it); else if (act === 'lv') ok = forgeRelevel(it); else if (act === 'rr') ok = forgeReroll(it);
   else if (act.startsWith('rune|')) { const [, i, k] = act.split('|'); ok = forgeRune(it, +i, k, t); }
+  else if (act.startsWith('oh|')) ok = typeof ohEtch === 'function' && ohEtch(it, act.split('|')[1]);
   else if (act === 'ilv' || act === 'ilvp') ok = typeof ilUpgrade === 'function' && ilUpgrade(it);
   if (ok && typeof onToast === 'function') onToast(`${e.kind === 'w' ? wpnName(it) : gearName(it)}: done.`);
   return ok;
@@ -102567,7 +102892,7 @@ function icDeltaHTML(C, it) {
   const sp = C.spells.map(s => `<li class="${s.d > 0 ? 'bo' : 'neg'}">${icE(s.name)}${s.known ? '' : ' <small>(not learned)</small>'} ${s.a} → <b>${s.b}</b> (${s.d > 0 ? '+' : '−'}${Math.abs(s.d)})</li>`).join('');
   const none = !C.rows.length && !C.spells.length ? `<p class="icmp-k">No change to its numbers: what it does is its passive.</p>` : '';
   const cyc = p.n > 1 ? `<p class="icmp-k">${p.free ? '' : `In place of the ${p.i ? `${['', 'second', 'third'][p.i] || ''} weakest` : 'weakest'}. `}Shift or Alt: compare with another (${p.i + 1} of ${p.n})</p>` : '';
-  return `<div class="icmp-d"><p class="icmp-h">${head} · ${icSockName(p)}</p>${C.rows.length ? `<ul>${C.rows.map(li).join('')}</ul>` : ''}${sp ? `<p class="icmp-s">Spell damage</p><ul>${sp}</ul>` : ''}${none}${cyc}</div>`;
+  return `<div class="icmp-d"><p class="icmp-h">${head} · ${icSockName(p)}</p>${C.rows.length ? `<ul>${C.rows.map(li).join('')}</ul>` : ''}${sp ? `<p class="icmp-s">Spell damage</p><ul>${sp}</ul>` : ''}${typeof ohCmpHTML === 'function' ? ohCmpHTML(p, it) : ''}${none}${cyc}</div>`;
 }
 const icCardOf = (it, t, o) => icIsWpn(it) ? wpnCardHTML(it, t, o) : itemCardHTML(it, o);
 function icEquippedHTML(C) {
@@ -102748,5 +103073,105 @@ if (typeof document !== 'undefined' && typeof itipBind === 'function') {
   @media (max-width:560px){.icmp{flex-direction:column}.icmp-c{max-width:none;width:100%}}`;
   const add = () => { if (document.getElementById('icCss')) return; const s = document.createElement('style'); s.id = 'icCss'; s.textContent = css; document.head.append(s); };
   if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+}
+
+/* ================= ON-HIT WEAPONS, on screen (rules: forces_zzzzzzzzzzzzzzzzzzzz_onhit.js) =================
+   - the weapon card (weapons_ui.js wpnCardHTML calls ohCardHTML): "On hit: Stormtongue" with its one line, how often, what
+     it needs of its foe and the kind of unit it suits; for the unit wearing it, how often it has fired this wave.
+   - the Gear sheet: a small counter on the weapon slot and a line on the weapon's Gear row ("fired 7 times this wave"),
+     which tick and pulse as it fires while the sheet is open (ohMark, called by ohFired).
+   - the Anvil (smithy_ui.js): an "On-hit effect" tab, ohAnvilTab.
+   - playtest: ohGive(id, strength) in the console arms the selected unit (or every unit) with a weapon carrying it. */
+const ohE = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+// the label's colour is the weapon's rarity colour, never the effect's own (orange is kept for legendaries)
+const ohCol = w => typeof wpnCol === 'function' ? wpnCol(w) : '#e9e0c8';
+const ohTimes = n => n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`;
+// the card's block. t: the unit it is on or would go on; n: the weapon's tier I numbers (wpnNums) when no unit is known
+function ohCardHTML(w, t, n) {
+  if (typeof ohOf !== 'function' || !ohOf(w)) return '';
+  let rate = null, ref = null;
+  if (t && t.def) {
+    const st = t.weapon === w ? (t.st || effStats(t)) : (() => { const w0 = t.weapon; t.weapon = w; try { return effStats(t); } finally { t.weapon = w0; } })();
+    rate = st.rate || 1; ref = (st.dmg || st.smite || 0) / rate;
+  } else if (n && n.aps) { rate = 1 / n.aps; ref = n.dps; }
+  const L = ohLines(w, rate, ref), on = t && t.weapon === w ? ohCount(t) : null;
+  return `<div class="itc-ab oh-ab"><b style="color:${ohCol(w)}">On hit: ${ohE(L.name)}</b> ${ohE(L.text)}</div><p class="itc-k">${ohE(L.how)}${L.only ? ' ' + ohE(L.only) : ''} ${ohE(L.best)}</p>`
+    + (on != null && typeof G !== 'undefined' && G.phase === 'wave' ? `<p class="itc-k oh-n">Fired ${ohTimes(on)} this wave.</p>` : '');
+}
+// one short line for a list row
+function ohRowLine(w) {
+  const o = typeof ohOf === 'function' ? ohOf(w) : null; if (!o) return '';
+  const L = ohLines(w);
+  return `<b style="color:${ohCol(w)}">On hit: ${ohE(L.name)}</b> ${ohE(L.text.replace(/^Chance on hit: /, ''))}`;
+}
+// the item compare's line (itemcompare.js icDeltaHTML): what on-hit effect the swap gains and loses
+function ohCmpHTML(p, it) {
+  if (!p || p.slot !== 'w' || typeof ohOf !== 'function') return '';
+  const a = ohOf(p.cur), b = ohOf(it), nm = o => ohE(ohLines({ oh: o.id, rar: o.r + 2 }).name) + (o.r === 1 ? ' (epic)' : '');
+  if (!a && !b) return '';
+  if (a && b && a.id === b.id && a.r === b.r) return `<p class="icmp-k">Same on-hit effect: ${nm(a)}.</p>`;
+  return `<p class="icmp-k">${b ? `<span class="bo">Gains on hit: ${nm(b)}.</span> ` : ''}${a ? `<span class="neg">Loses on hit: ${nm(a)}.</span>` : ''}</p>`;
+}
+/* ---------- the Gear sheet's mark ---------- */
+const ohMarkText = t => { const n = ohCount(t); return n ? `fired ${ohTimes(n)} this wave` : 'not fired yet this wave'; };
+function ohMark(t) {
+  if (typeof ovp === 'undefined' || !ovp || !t) return;
+  for (const el of ovp.querySelectorAll(`[data-oh="${t.id}"]`)) {
+    el.textContent = el.classList.contains('oh-badge') ? String(ohCount(t)) : ohMarkText(t);
+    el.classList.remove('oh-pulse'); void el.offsetWidth; el.classList.add('oh-pulse');
+  }
+}
+if (typeof openGearPanel === 'function') {
+  const _ohGp = openGearPanel;
+  openGearPanel = function (t) {
+    const r = _ohGp.apply(this, arguments);
+    try {
+      const o = t && t.weapon && typeof ohOf === 'function' ? ohOf(t.weapon) : null;
+      if (!o || typeof ovp === 'undefined' || !ovp || !ovp.classList.contains('gearp')) return r;
+      const sock = ovp.querySelector('.wp-sock'), row = ovp.querySelector('.wp-it');
+      if (sock && !sock.querySelector('.oh-badge')) sock.insertAdjacentHTML('beforeend', `<i class="oh-badge" data-oh="${t.id}" style="--oh:${ohCol(t.weapon)}" title="Times its on-hit effect has fired this wave">${ohCount(t)}</i>`);
+      if (row && !row.querySelector('.oh-row')) row.insertAdjacentHTML('beforeend', `<p class="gp-iab oh-row">${ohRowLine(t.weapon)} <span class="oh-mark" data-oh="${t.id}" style="--oh:${ohCol(t.weapon)}">${ohMarkText(t)}</span></p>`);
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+/* ---------- the Anvil's tab ---------- */
+function ohAnvilTab(it, t, gold) {
+  if (typeof ohEtchCost !== 'function' || !it || it.hero) return null;
+  const c = ohEtchCost(it), cur = ohOf(it);
+  let rate = null, ref = null; if (t && t.st) { rate = t.st.rate || 1; ref = (t.st.dmg || t.st.smite || 0) / rate; }
+  let h = cur ? `<p>Now: ${ohRowLine(it)}</p>` : '<p class="an-k">This weapon has no on-hit effect.</p>';
+  if (c == null) h += `<p class="an-k">${(it.rar | 0) < 2 ? 'A weapon holds an on-hit effect from rare up: raise its rarity first.' : 'A legendary\'s effect is its own and cannot be changed.'}</p>`;
+  else {
+    h += `<p class="an-k">Etch one effect into it for ${c} gold; a new one replaces the old. Its strength follows the weapon's rarity. The legendary forms only drop.</p><div class="an-runes">`;
+    for (const k of OH_IDS) { if (k === it.oh) continue; const L = ohLines(Object.assign({}, it, { oh: k, rar: Math.max(2, it.rar | 0) }), rate, ref);
+      h += `<button type="button" class="an-do" data-act="oh|${k}"${gold >= c ? '' : ' disabled'}><b style="color:${ohCol(it)}">${ohE(L.name)}</b> · ${c} gold<small>${ohE(L.text)} ${ohE(L.how)}${L.only ? ' ' + ohE(L.only) : ''}</small></button>`; }
+    h += '</div>';
+  }
+  return { id: 'oh', name: 'On-hit effect', html: h };
+}
+/* ---------- playtest: arm a unit from the console ----------
+   ohGive('storm')            the selected unit (or every unit on the field) gets a rare weapon of its class with the effect
+   ohGive('storm', 'epic')    'rare' | 'epic' | 'legendary' (a legendary form exists for storm, stun, twin, pyre and mark) */
+function ohGive(id, strength) {
+  if (typeof OH === 'undefined' || !OH[id] || !wpnOn()) return 0;
+  const rar = strength === 'legendary' && OH[id].leg ? 4 : strength === 'epic' ? 3 : 2;
+  const sel = G.sel && G.sel.kind === 'tower' ? [G.sel.ref] : G.towers; let n = 0;
+  for (const t of sel) {
+    const c = wpnClassOf(t.type); if (!c || t.wrecked || (typeof hwIsHero === 'function' && hwIsHero(t))) continue;
+    const w = { id: G.wUid = (G.wUid | 0) + 1, b: WPN_CLASS[c].bases[0][0], rar, q: .5, il: Math.max(1, G.wave | 0), oh: id };
+    (G.wbag || (G.wbag = [])).push(w); if (wpnEquip(t, w)) n++;
+  }
+  return n;
+}
+if (typeof document !== 'undefined' && document.head) {
+  const s = document.createElement('style');
+  s.textContent = `.oh-badge{position:absolute;right:2px;top:2px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#14110ccc;border:1px solid var(--oh,#ffe08a);color:var(--oh,#ffe08a);font:700 11px/16px var(--f-ui,sans-serif);font-style:normal;text-align:center;box-sizing:border-box;pointer-events:none}
+.oh-mark{display:inline-block;margin-left:6px;padding:0 6px;border-radius:8px;border:1px solid var(--oh,#ffe08a);color:var(--oh,#ffe08a);font-weight:600;white-space:nowrap}
+.oh-row{white-space:normal}
+@keyframes ohPulse{0%{transform:scale(1.35);filter:brightness(1.8)}100%{transform:scale(1);filter:none}}
+.oh-pulse{animation:ohPulse .45s ease-out}
+@media (prefers-reduced-motion:reduce){.oh-pulse{animation:none}}`;
+  document.head.appendChild(s);
 }
 
