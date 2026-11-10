@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd6548d4@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '196dbe5@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7653,6 +7653,8 @@ function bladeWhirl(t, st, pow, sub) {   // Blade Dancers: a whirl of both blade
 }
 function stagCharge(t, st, tg, pow, again) {   // Stag Lancers: out to the foe, the lance strikes, and back to the post (again: a follow-up charge)
   const C = st.caps, dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, reach = Math.max(0, L - .45);
+  if (typeof rideBlocked === 'function' && rideBlocked(t, tg.x, tg.y)) return;   // a unit or wall in the way: no charge (forces_zzzzzzzzzzzzzzzzzzz_lanes.js)
+  if (typeof rideRun === 'function') pow *= rideRun(t, L);   // a running start: a long charge lands harder
   if (again !== 'stag') t.wsN = 0;   // (a fresh charge starts the Antler's chain over)
   t.chg ={ x: t.x + ux * reach, z: t.y + uz * reach, at: G.time, T: .75 };
   if (C.trample) G.delayed.push({ t: .13, fn: () => {   // Trample: every walker in a strip along the run out
@@ -11310,6 +11312,12 @@ const GV_LEGENDS = {
     combo: 'Trample, Hooves of Thunder and a crowded lane.',
     build: 'Trample, Hooves of Thunder and Bowl Over (every link of the chain carries them), Hunter\'s Finish to make the kills, and a crowded lane.',
     fx: (st, k) => gvPw(st, 'whitestag', Math.max(2, Math.round(2 * k))) },
+  gv_partingbridle: { for: 'arcane', name: 'Bridle of the Parting Boughs', icon: 'antler', hue: '#b8d890',
+    twist: 'The line opens for the stag: this Stag Lancer charges straight through your units and walls.',
+    text: () => 'Its charges ride through your units and walls.',
+    combo: 'A post deep inside the maze, with Trample and Second Charge.',
+    build: 'Post it in the heart of the maze where no lane is clear; Trample and Second Charge, since every foe in its reach is now a target.',
+    fx: (st, k) => gvPw(st, 'rdBridle', 1) },
   gv_hawkmother: { for: 'storm', name: "Hawkmother's Jess", icon: 'wings', hue: '#a08a6a', proc: 1, atk: 1,
     twist: 'In hawk form the Shifter\'s strikes rake every flyer in its reach, turning hawk form into the army\'s answer to the air.',
     text: k => `In hawk form, every strike at a flyer also strikes every other flyer in its reach for ${P_(.6 * k)} of its strike.`,
@@ -11755,7 +11763,7 @@ const ITEM_STATS = {
   gv_longbow: 'dmg as range|Run-On Arrow', gv_motherroot: 'sp mana regen|Mother-Root', gv_twinmoon: 'dmg as pen|Second Moon', gv_horncup: 'sp regen|Moonwell Draught',
   gc_dew: 'regen|Dewfall', gc_knot: 'mana|Thrift', gc_sap: 'cd|Quickening', gc_due: 'mana regen|Hunter’s Due', gc_locket: 'mana|Heartwood',
   gc_ember: 'sp cd|Glade Ember', gc_gourd: 'mana regen|Brimming', gc_twin: 'sp cd|Twin Seed',
-  gv_aegis: 'dmg as pen|Thornheart', gv_rootstring: 'as range pen|Rootstring', gv_deepcrown: 'sp mana cd|Deep Roots', gv_whitestag: 'as crit pen|Wheeling Charge',
+  gv_aegis: 'dmg as pen|Thornheart', gv_rootstring: 'as range pen|Rootstring', gv_deepcrown: 'sp mana cd|Deep Roots', gv_whitestag: 'as crit pen|Wheeling Charge', gv_partingbridle: 'as range pen|Parting Boughs',
   gv_hawkmother: 'dmg as crit|Hawkmother', gv_dancesash: 'dmg as crit|Endless Dance', gv_bloomheart: 'sp splash regen|Bloom', gv_greenhorn: 'sp mana cd|Greenwood Call',
   gv_wellspring: 'mana regen cd|Wellspring', gv_worldseed: 'dmg sp range|Sapling', gv_rotcrown: 'sp mana regen|Spore Reaping', gv_huntbrand: 'dmg as pen|Huntlord’s Brand',
   gs_bracers: 'dmg=4 pen=6|', gs_cloak: 'as=20|', gs_lens: 'range=0.6|', gs_satchel: 'regen=1.2|', gs_tabard: 'mana=20|Barkskin', gs_snares: 'as=8|Tanglefoot',
@@ -11794,7 +11802,7 @@ const ITEM_STATS = {
   so_zenith: 'sp as range|Zenith Beam', so_anvil: 'dmg as pen|Great Slam', so_thurible: 'splash sp|Thurible', so_clapper: 'sp cd regen|Gold Clapper',
   so_c_vial: 'regen|Holy Water', so_c_hourglass: 'cd|Vespers', so_c_beads: 'mana|Counting', so_c_matins: 'mana regen|Matins', so_c_tithe: 'regen|Tithe',
   so_c_sunstone: 'sp|Sunstone', so_c_wardknot: 'regen mana|Ward-Knot', so_c_echo: 'sp cd|Echo of the Bell',
-  so_lionshield: 'dmg sp pen|Condemn', so_sunbolt: 'as crit pen|Sunbolt', so_firstchain: 'sp mana cd|The First Chain', so_truegrail: 'sp dmg pen|True Grail',
+  so_lionshield: 'dmg sp pen|Condemn', so_sunbolt: 'as crit pen|Sunbolt', so_firstchain: 'sp mana cd|The First Chain', so_truegrail: 'sp dmg pen|True Grail', so_opengate: 'as range pen|Open Gate',
   so_firstlight: 'sp as range|First Light', so_lasthammer: 'dmg crit pen|Last Verdict', so_saintcenser: 'splash sp regen|Saints’ Coals', so_silvermere: 'sp mana regen|Silvermere',
   so_dawncrown: 'sp cd regen|Crown of Dawn', so_lawbook: 'sp mana cd|The Law', so_martyr: 'dmg as pen|Martyr’s Fury', so_oathblade: 'dmg crit as|Passed Judgement',
   so_s_gauntlets: 'dmg=4 pen=6|', so_s_spurs: 'as=20|', so_s_glass: 'range=0.6|', so_s_rosary: 'regen=1.2|', so_s_mail: 'mana=20|Self-Mending', so_s_chalk: 'as=8|Judgement Chalk',
@@ -11822,7 +11830,7 @@ const ITEM_STATS = {
   wbc_lampoil: 'regen|Lamp Oil', wbc_oathknot: 'mana|Oath-Knot', wbc_sandglass: 'cd|Sandglass', wbc_tally: 'mana regen|Gold Tally', wbc_linetoken: 'regen|Line-Warden',
   wbc_brandring: 'sp mana|Brand-Seal', wbc_runechalk: 'cd mana|Rune-Chalk', wbc_hourseal: 'sp cd|Sworn Hour',
   wbl_oathkeeper: 'dmg as pen|Oathkeeper', wbl_sunbow: 'as range pen|Split Shafts', wbl_winterhall: 'dmg sp as|Winter Hall', wbl_lexicon: 'sp mana cd|Unwritten Lexicon',
-  wbl_skyrider: 'sp regen as|Sky-Riders', wbl_hillheart: 'dmg sp pen|Unmoved Hill', wbl_longoath: 'dmg splash pen|Long Oath', wbl_kingsoath: 'sp mana regen|Last King’s Oath',
+  wbl_skyrider: 'sp regen as|Sky-Riders', wbl_stormgate: 'cd regen range|Stormgate', wbl_hillheart: 'dmg sp pen|Unmoved Hill', wbl_longoath: 'dmg splash pen|Long Oath', wbl_kingsoath: 'sp mana regen|Last King’s Oath',
   wbl_unbroken: 'dmg range regen|Unbroken Line', wbl_runecrown: 'sp cd mana|Every Rune', wbl_brandlord: 'dmg as crit|Brandmaster', wbl_roadscribe: 'sp cd regen|Road-Scribe',
   wbs_gauntlets: 'dmg=4 pen=6|', wbs_greaves: 'as=20|', wbs_visor: 'range=0.6|', wbs_flask: 'regen=1.2|', wbs_mantle: 'mana=20|Self-Mending', wbs_chalk: 'as=8|Warden’s Mark',
   wbs_wardhorn: 'sp=10 mana=20 mpen=12|', wbs_runeblade: 'sp=18 cd=20 mpen=12|',
@@ -18865,7 +18873,9 @@ function soChainFx(x0, h0, z0, c, big) {
 FORCE_ATTACK.so_lance = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, { down: t.def.unit === 'grailknight' || t.def.unit === 'ch_morrow' });   // (Morrow leads the Knights' charge with his own lance)
 // o: { vk (Verdict strength), stun, far (reach beyond its range), again (a follow-up charge), T }
 function soCharge(t, st, tg, pow, o) {
+  if (typeof rideBlocked === 'function' && rideBlocked(t, tg.x, tg.y)) return;   // a unit or wall in the way: no charge (forces_zzzzzzzzzzzzzzzzzzz_lanes.js)
   const C = st.caps, dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, reach = Math.max(0, L - .45);
+  if (typeof rideRun === 'function') pow *= rideRun(t, L);   // a running start: a long charge lands harder
   t.chg = { x: t.x + ux * reach, z: t.y + uz * reach, at: G.time, T: o.T || .75 };
   if (C.so_trample) G.delayed.push({ t: .13, fn: () => {   // Trampling Hooves
     if (G.state !== 'play') return; const a = st.dmg * pow * .2 * C.so_trample;
@@ -20243,6 +20253,7 @@ const SO_TALENTS = {
     GT('Shield and Spur', 'swirl', 0, 2, 3, n => `A charge at a foe a Shieldbearer's bash has dazed lays ${n} Judgement before the lance strikes, so it hears a Verdict.`, {}, { cap: 'sofSpur' }),
     GT('Grail\'s Grace', 'target', 1, 0, 2, n => `Each Verdict it delivers restores ${n} mana for every stack of Judgement it spends.`, {}, { cap: 'sofGrace' }),
     GT('Unhorsing Ride', 'bounce', 2, 2, 1, 'Tourney Passes stuns every ground foe it tramples for 0.3s.', {}, { sp: { ab: 'so_ridedown', rider: { stun: .3 } } }),
+    GT('Part the Ranks', 'wing', 4, 2, 1, 'The line opens for the knights: their charges ride through your units and walls.', {}, { cap: 'rdPartRanks' }),   // (the lane rule's capstone: forces_zzzzzzzzzzzzzzzzzzz_lanes.js)
   ] },
 
   /* ---- Sunlance Clerics (storm): Sunlance (innate), Noon Sweep (row III), Dawnfall (row IV) ---- */
@@ -20421,6 +20432,11 @@ const SO_LEGENDS = {
     text: k => `Every foe its chains strike stays slowed 50% for ${nf1(2 * k)}s, and a foe it binds is filled with Judgement.`,
     build: 'Quick Binding, Twin Chains and Chain of Judgement, beside Grail Knights or Sword of Heaven.',
     combo: 'Quick Binding, Grail Knights and Sword of Heaven.', fx: (st, k) => soPw(st, 'so_firstchain', 2 * k) },
+  so_opengate: { for: 'arcane', name: 'Clarion of the Open Gate', icon: 'banner', hue: '#e8d8a0',
+    twist: 'At its call the line parts: this Grail Knight charges straight through your units and walls.',
+    text: () => 'Its charges ride through your units and walls.',
+    build: 'Post it behind the Shieldbearers in the heart of the maze; Trampling Hooves and Tourney Passes, since every foe in its reach is now a target.',
+    combo: 'A post deep inside the maze, Trampling Hooves and Tourney Passes.', fx: (st, k) => soPw(st, 'rdClarion', 1) },
   so_truegrail: { for: 'arcane', name: 'The True Grail', icon: 'flask', hue: '#ffd060',
     twist: 'Grail Charge stops spending Judgement: every charge is a full Verdict, and so is the next one.',
     text: () => 'Its Verdicts are never spent: the light strikes, and the Judgement stays on the foe.',
@@ -24478,7 +24494,7 @@ const WB_KITS = {
       text: (t, st, ab) => `The lancer charges down a line through the ground foes: each takes ${xD(st, WBC.charge.m)}, is stunned ${byT(ab.by.stun, t)}s and arced with lightning (${xD(st, WBC.charge.arc)}, one jump on), and storm runes crackle in its trail.`,
       pick: (t, st, ab, man) => wbcBestLine(t, st, abReach(t, st, ab), abReach(t, st, ab) + .6, .5, 2, man, abWalker),
       cast(t, st, c, ab) {
-        const [ux, uz] = abDir(t, c), len = abReach(t, st, ab) + .6, T = WBC.charge.T, x0 = t.x, z0 = t.y, sn = byT(ab.by.stun, t);
+        const [ux, uz] = abDir(t, c), len0 = abReach(t, st, ab) + .6, len = typeof rideLen === 'function' ? rideLen(t, ux, uz, len0) : len0, T = WBC.charge.T, x0 = t.x, z0 = t.y, sn = byT(ab.by.stun, t);   // (a unit or wall in its way stops it short)
         t.chg = { x: t.x + ux * len, z: t.y + uz * len, at: G.time, T }; t.cd = Math.max(t.cd, T); t.ab.busyT = G.time + T;
         G.delayed.push({ t: T * .34, fn: () => {
           if (!wbcLive(t)) return; const s = t.st || st;
@@ -24942,6 +24958,11 @@ const WB_LEGENDS = {
     text: k => `When a foe it carved falls, its sigils leap on, one each, to the ${Math.max(2, Math.round(2 * k))} foes nearest it within 1.6 cells.`,
     build: 'Etch and Detonate, in a crowded corner where foes fall together.',
     combo: 'Etch, Detonate and a crowded corner.', fx: (st, k) => wbPw(st, 'wbLexicon', Math.max(2, Math.round(2 * k))) },
+  wbl_stormgate: { for: 'storm', name: 'Barding of the Stormgate', icon: 'thunder', hue: '#c8d8ff',
+    twist: 'Thunder Charge stops for nothing: this Stormward Lancer rides straight through your units and walls.',
+    text: () => 'Thunder Charge rides through your units and walls.',
+    build: 'Post it inside the line of Oathbound; Thunder Charge then lays its storm runes the full length, whatever stands beside it.',
+    combo: 'A post inside the line, Thunder Charge and Skyfall.', fx: (st, k) => wbPw(st, 'rdBarding', 1) },
   wbl_skyrider: { for: 'storm', name: 'Pennon of the Sky-Riders', icon: 'thunder', hue: '#a8c8ff',
     twist: 'Every Stormward lance thrust calls lightning down on every storm rune near it.',
     text: k => `Each thrust also strikes every storm rune within 2.5 cells with lightning: every foe on or beside one (0.5 cells) takes ${P_(.35 * k)} of its damage.`,
@@ -29338,7 +29359,7 @@ champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
     CT('Wide Reckoning', 'ring', 4, 0, 1, "When Final Verdict's gavel falls, it falls at half on every Judged foe within 1.2 cells of its foe too, and Final Verdict stuns every foe it strikes for 0.5s.", {}, { cap: 'so_wide_reck', sp: { ab: 'ch_verdict', rider: { stun: .5 } } }),
     CT('Trampling Host', 'snail', 2, 1, 2, n => `He rides each debt down: every ground foe on the line between him and Debt Collection's foe is trampled, Judged and Wounded for ${2 * n}s (its heals and shields halved).`, {}, { cap: 'sofTrample', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
     CT('Clerk’s Quill', 'wings', 3, 1, 2, n => `After each Debt Collection, his next ${2 * n} charges each lay one more Judgement.`, {}, { cap: 'sofQuill', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
-    CT('Grey Justicar', 'shield', 4, 2, 1, 'His charges are warrants: each one also lays a Judgement on every foe within 0.8 cells of its foe, so Sentence finds the whole crowd.', {}, { cap: 'so_grey_warrant' }),
+    CT('Grey Justicar', 'shield', 4, 2, 1, 'His charges are warrants: they ride through your units and walls, and each one also lays a Judgement on every foe within 0.8 cells of its foe, so Sentence finds the whole crowd.', {}, { cap: 'so_grey_warrant' }),
     GS('ch_verdict', 3, 3),
     CT('Riders of the Ford', 'swords', 3, 2, 1, 'The Grail Knights ride with him: each Debt Collection sends every Grail Knight within 2 cells charging its foe at once, lances couched: it is knocked down and hears their Verdicts (at most once every 4s a knight).', {}, { cap: 'sofFord', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
     CT('Ride Them Down', 'quick', 0, 1, 3, n => `His charges strike a foe that is dazed, bound or knocked down ${10 * n}% harder and lay ${n} more Judgement on it.`, {}, { cap: 'sofBailiff' }),
@@ -29921,7 +29942,7 @@ champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
       text: (t, st, ab) => `He charges ${gNf(byT(ab.by.len, t))} cells headlong through a line of ground foes: each takes ${xD(st, byT(ab.by.mult, t))} and a brand. Winded after, his strikes come 20% slower for 3s.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null; const b = abBestLine(t, st, L, byT(ab.by.len, t), ab.w, abWalker); return b && (b.n >= (man ? 1 : 2) || abBig(b.c)) ? b.c : null; },
       cast(t, st, c, ab) {
-        const [ux, uz] = abDir(t, c), len = byT(ab.by.len, t), m = byT(ab.by.mult, t), T = .75;
+        const [ux, uz] = abDir(t, c), len0 = byT(ab.by.len, t), len = typeof rideLen === 'function' ? rideLen(t, ux, uz, len0) : len0, m = byT(ab.by.mult, t), T = .75;   // (a unit or wall in its way stops it short)
         t.chg = { x: t.x + ux * len * .85, z: t.y + uz * len * .85, at: G.time, T }; t.ab.busyT = G.time + T;
         const L = abLine(t, st, t.x, t.y, ux, uz, len, ab.w, abWalker);
         for (const o of L) G.delayed.push({ t: T * .34 * Math.min(1, abDist(t, o) / len), fn: () => {
@@ -29955,7 +29976,7 @@ champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
     CT('Searing Wheel', 'flame', 2, 0, 2, n => `Sunwheel sets every foe it strikes burning: ${gNf(.3 * n)}× his damage a second for 3s.`, {}, { sp: n => ({ ab: 'ch_sunwheel', rider: { burn: .3 * n } }) }),
     CT('Rallying Cry', 'horn', 2, 2, 1, 'Each Sun Charge fires up the army: 2 Momentum.', {}, { sp: { ab: 'ch_suncharge', rider: { wbf: 1 } }, cap: 'wbfRally' }),
     CT('Undying Blaze', 'sunburst', 4, 0, 1, 'Blaze of Glory\'s burst sets every foe it strikes burning (0.3× his damage a second for 3s), each foe he slays while it blazes keeps it going 1s longer (6s at most), and it ends in a second burst instead of a burnout.', {}, { sp: { ab: 'ch_blazeglory', rider: { burn: .3 } }, cap: 'wbkUndying', req: [3, 0] }),
-    CT('Open Road', 'flame', 4, 3, 1, 'Sun Charge leaves its trail ablaze for 4s: every ground foe on it is set burning, 0.4× his damage a second.', {}, { cap: 'wbkOpenRoad' }),
+    CT('Open Road', 'flame', 4, 3, 1, 'Sun Charge rides through your units and walls and leaves its trail ablaze for 4s: every ground foe on it is set burning, 0.4× his damage a second.', {}, { cap: 'wbkOpenRoad' }),
     CT('Hot Blood', 'quick', 3, 3, 2, n => `When the army Blazes, Sun Charge is readied at once${n >= 2 ? ' and Sunwheel comes 6s nearer' : ''}.`, {}, { cap: 'wbfHot' }),
     CT('Sun-Sworn', 'sun', 4, 2, 1, 'Each Blaze of Glory readies Sun Charge at once; while it blazes, each foe he slays brings Sun Charge 3s nearer and charging never winds him.', {}, { sp: { ab: 'ch_blazeglory', ready: ['ch_suncharge', 30] }, cap: 'wbkSunSworn' }),
     GS('ch_blazeglory', 3, 0),
@@ -30701,8 +30722,8 @@ function gvcCrumble(t, st, c) {
 const gvcLeapR = (t, st, ab) => abReach(t, st, ab) + 1.5;
 gvcSet('stampede', { name: 'Bounding Leap', short: 'Leap', glyph: 'tremor', hue: '#c8a070', mana: 75, cd: 12,
   by: { root: [.7, .7, .8, .8, .9, 1] },
-  auto: 'a ground foe beyond its reach or over a wall, else a knot of two or more ground foes in reach, or a boss or elite',
-  text: (t, st, ab) => `The stag leaps over walls and units onto a ground foe up to ${gNf(gvcLeapR(t, st, ab))} cells away: ${xD(st, GVC.leapK)}, and ${xD(st, GVC.leapRingK)} to ground foes within 0.8 cells, rooted ${gNf(byT(ab.by.root, t))}s. Then it bounds back.`,
+  auto: 'a ground foe beyond its reach with a clear lane, else a knot of two or more ground foes in reach, or a boss or elite',
+  text: (t, st, ab) => `The stag bounds out and leaps onto a ground foe up to ${gNf(gvcLeapR(t, st, ab))} cells away: ${xD(st, GVC.leapK)}, and ${xD(st, GVC.leapRingK)} to ground foes within 0.8 cells, rooted ${gNf(byT(ab.by.root, t))}s. Then it bounds back.`,
   pick(t, st, ab, man) {
     const reach = abReach(t, st, ab), L = abFoes(t, st, gvcLeapR(t, st, ab), gvcWalker); if (!L.length) return null;
     let best = null;
@@ -36547,7 +36568,7 @@ socDef('so_ridedown', { name: 'Tourney Passes', short: 'Tourney', glyph: 'tremor
     t.cd = Math.max(t.cd, n * P); A.busyT = Math.max(A.busyT || 0, G.time + n * P);
     for (let k = 0; k < n; k++) G.delayed.push({ t: k * P, fn: () => {
       if (!abLive(t)) return; const s = t.st || effStats(t);
-      if (!tg || tg.dead || abDist(t, tg) > abReach(t, s, ab) + .6) tg = abToughest(abFoes(t, s, abReach(t, s, ab), abWalker));
+      if (!tg || tg.dead || abDist(t, tg) > abReach(t, s, ab) + .6 || (typeof rideBlocked === 'function' && rideBlocked(t, tg.x, tg.y))) tg = abToughest(abFoes(t, s, abReach(t, s, ab), abWalker));
       if (!tg) return; const o = tg, [ux, uz] = abDir(t, o), Lr = Math.max(0, abDist(t, o) - .4);
       t.ang = Math.atan2(o.x - t.x, o.y - t.y); t.chg = { x: t.x + ux * Lr, z: t.y + uz * Lr, at: G.time, T: P * .95 };
       sfx('so_ridedown', 0);
@@ -48262,7 +48283,7 @@ const TAL_SPREAD = {
   "silver.glaive": {"Shield-Ward":[0,1],"Witness the Blow":[1,2],"Staggering Bash":[0,2],"Shield of Faith":[3,0],"Vigil":[5,1],"Edge of Dawn":[0,3],"Rampart of Dawn":[2,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,2],"Oath of Rebuke":[5,0],"Unyielding":[4,3],"Unbroken Oath":[2,3],"Pommel Blow":[1,1],"The Line Held":[4,1],"Dawn Shield":[3,2],"Ringing Rampart":[3,3]},
   "silver.arrow": {"First Testimony":[0,3],"Witnessed":[0,2],"Twin Quarrels":[5,1],"Mark of the Accused":[0,1],"Flare Bolt":[1,3],"Heavy Quarrel":[4,0],"Slow Match":[2,3],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,0],"Bodkin Heads":[1,1],"Sworn Witnesses":[4,3],"Storm of Silver":[5,0],"Crank on the Verdict":[1,0],"Testimony Heard":[2,2],"Pinning Light":[3,1]},
   "silver.frost": {"Tightening Links":[0,2],"Glinting Links":[2,1],"Tight Bindings":[0,1],"Dazzle":[1,3],"Twin Chains":[4,2],"Chain of Penance":[1,2],"Scouring Light":[2,2],"Last Rites":[3,1],"Blinding Chains":[2,3],"Chain of Judgement":[5,2],"Vigil Chains":[4,1],"Quick Binding":[5,0],"Shackle Litany":[5,1],"Swift Lash":[3,3],"Vigil Lamp":[4,3],"Glare of Dawn":[3,0]},
-  "silver.arcane": {"Full Gallop":[1,1],"Couched Lance":[0,2],"Spurs":[3,1],"Grail Quest":[1,0],"Tourney Passes":[2,1],"Shining Example":[4,3],"Trampling Hooves":[1,2],"Charge of the Vow":[3,3],"Echoing Verdict":[5,1],"Glory of the Charge":[5,2],"Rallying Vow":[4,0],"Vowkeeper":[4,1],"Unhorse":[2,0],"Shield and Spur":[0,1],"Grail's Grace":[2,3],"Unhorsing Ride":[3,2]},
+  "silver.arcane": {"Full Gallop":[1,1],"Couched Lance":[0,2],"Spurs":[3,1],"Grail Quest":[1,0],"Tourney Passes":[2,1],"Shining Example":[4,3],"Trampling Hooves":[1,2],"Charge of the Vow":[3,3],"Echoing Verdict":[5,1],"Glory of the Charge":[5,2],"Rallying Vow":[4,0],"Vowkeeper":[4,1],"Unhorse":[2,0],"Shield and Spur":[0,1],"Grail's Grace":[2,3],"Unhorsing Ride":[3,2],"Part the Ranks":[5,3]},
   "silver.storm": {"Zenith":[1,1],"Morning Rays":[1,3],"Sky Verdict":[2,3],"Fall from Grace":[4,0],"Prism":[2,0],"Kindled Faith":[5,1],"Noon Sweep":[3,0],"Dawnfall":[4,2],"Lance of Heaven":[5,3],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[2,1],"Searing Eye":[0,1],"Burning Pinions":[0,0],"Piercing Dawn":[0,2],"Sun Wheel":[4,1]},
   "silver.earth": {"Press of Battle":[2,2],"Crushing Weight":[1,3],"Tremor":[0,1],"Ringing Steel":[5,2],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,1],"Final Judgement":[5,0],"Sword of Heaven":[3,0],"Sundering Blow":[1,1],"Marked by the Blade":[4,3],"Hurled Verdict":[4,2],"Sundered Plate":[1,2],"Reliquary":[2,0],"Censed Blade":[0,2],"Consecrated Earth":[3,1]},
   "silver.cannon": {"Fanned Embers":[3,1],"Lingering Smoke":[1,0],"Glowing Coal":[5,2],"Swift Swing":[3,0],"Procession of Incense":[2,0],"Choking Smoke":[0,2],"Kindle the Censers":[4,2],"Censing of the Faithful":[5,3],"Ember Psalm":[5,1],"Thick Smoke":[1,1],"Purging Fire":[2,3],"Rekindling":[4,3],"Ash in the Eyes":[1,3],"Offering Bowl":[0,0],"Pall of Smoke":[0,1],"Censing Prayer":[3,2]},
@@ -49273,6 +49294,7 @@ talPlain('silver', 'arcane', {
   'Trampling Hooves': { tag: 'Judgement', pro: n => `Ground foes in its charge path take ${20 * n}% of the lance and a Judgement.` },
   'Echoing Verdict': { tag: 'Judgement', pro: 'Its Verdicts of 3+ stacks leap on at 60% to the nearest foe within 1.6 cells.' },
   'Glory of the Charge': { tag: 'Judgement', pro: 'Each charge bursts where it lands, giving ground foes within a cell 40% of the lance and 2 Judgement.' },
+  'Part the Ranks': { tag: 'Support', pro: 'Its charges ride through your units and walls.' },
   'Rallying Vow': { tag: 'Support', pro: 'Charge of the Vow Wards each unit its knights ride out from for 4s.' },
   'Vowkeeper': { tag: 'Judgement', pro: n => `Charge of the Vow lays ${n} Judgement on ground foes beside each unit it blesses.` },
   'Unhorse': { tag: 'Control', pro: "The lance's knockdown also throws down every ground foe within a cell of its foe." },
@@ -49436,7 +49458,7 @@ talPlain('silver', 'champ:so_judge', {
   // (simplified: Judgement alone, a stack a rank; no Wound)
   'Trampling Host': { tag: 'Judgement', pro: n => `Debt Collection lays ${n} Judgement on every ground foe between him and its foe.` },
   'Clerk’s Quill': { tag: 'Judgement', pro: n => `After each Debt Collection, his next ${2 * n} charges lay 1 more Judgement.` },
-  'Grey Justicar': { tag: 'Judgement', pro: 'His charges also lay a Judgement on foes within 0.8 cells of their target.' },
+  'Grey Justicar': { tag: 'Judgement', pro: 'His charges ride through your units and walls, and lay a Judgement on foes within 0.8 cells of their target.' },
   'Riders of the Ford': { tag: 'Support', pro: 'Each Debt Collection sends Grail Knights within 2 cells charging its foe, every 4s each.' },
   // (simplified: Judgement alone, a stack more; the harder strike went)
   'Ride Them Down': { tag: 'Judgement', pro: n => `His charges lay ${n + 1} more Judgement on dazed, bound or downed foes.` },
@@ -49936,7 +49958,7 @@ talPlain('wardbound', 'champ:wb_aedric', {
   // Sun-Sworn no longer spares him the winded ride
   'Undying Blaze': { tag: 'Spell', pro: 'Each foe he slays during Blaze of Glory keeps it going 1s longer, up to 8s.',
     sp: { ab: 'ch_blazeglory', rider: { wbf: 1 } } },
-  'Open Road': { tag: 'Damage', pro: 'Sun Charge leaves its trail ablaze for 4s, burning every ground foe on it.' },
+  'Open Road': { tag: 'Damage', pro: 'Sun Charge rides through your units and walls and leaves its trail ablaze for 4s, burning ground foes on it.' },
   'Sun-Sworn': { tag: 'Spell', pro: 'Blaze of Glory readies Sun Charge, and each kill during it brings Sun Charge 3s sooner.' },
 });
 
@@ -49962,6 +49984,200 @@ talPlain('wardbound', 'champ:wb_isaura', {
   'Veiled Oath': { tag: 'Damage', pro: 'Ground foes Oath Turned roots take its blow again 4s later, 1.5× as hard.',
     sp: { ab: 'ch_oathturned', rider: { wbf: 1 } } },
 });
+
+/* ================= CHARGE LANES: mounted units cannot ride through your other units or walls =================
+   The owner (11 Nov 2026): "Make it so mounted units can't go through other units when attacking. Need to position
+   strategically. Only allow that via legendaries or maybe capstone talent."
+   THE RULE (one rule for every mounted unit): a rider's charge runs in a straight line from its post, and anything solid
+   on the field (another unit, a wall, a shrine: G.blk) stops it. So a rider can only charge a foe it has a clear lane
+   to, and a charge down a line stops at the first unit or wall in its way and strikes only what it reached. With no foe
+   in a clear lane it holds at its post.
+   WHO (RIDE): the units that sit a mount and leave their post along the ground.
+     - Stag Lancers (the Grove): the lance charge, Heroic Charge, Bounding Leap, White Hart's Hunt (the owner, 11 Nov:
+       "Any unit on a mount", every attack or ability that leaves its post: the leap no longer clears walls and units).
+     - Grail Knights (the Silver Order): the lance charge, Grail Charge, Tourney Passes. Charge of the Vow's phantom
+       knights are spirits and ride from other units: untouched.
+     - Morrow (the Silver Order's Champion): his lance charge.
+     - Stormward Lancers (the Wardbound): Thunder Charge (their thrust never leaves the post).
+     - Lord Aedric (the Wardbound's Champion): Sun Charge.
+   The owner's ruling on who: "Any unit on a mount" (a horse, stag, wolf or any other steed), Champions too.
+   Units on foot that dart or step out (Blade Dancers, the bear form, Spellblades and Maren, Aurelian) are left alone.
+   HOW: canTarget is wrapped: while a rider's charge is choosing or striking (its strike, or one of its charge spells
+   picking, casting or landing) a foe with no clear lane from the post cannot be targeted, so acquire, abFoes and abLine
+   all follow the rule. stagCharge and soCharge refuse a blocked foe outright, the two line charges cut their length with
+   rideLen, and chargeAt never draws a rider past a blocker.
+   THE EXCEPTION (rideFree): earned only. A capstone (Grail Knights: Part the Ranks; Morrow: Grey Justicar; Aedric: Open
+   Road) or the force's legendary (Bridle of the Parting Boughs, Clarion of the Open Gate, Barding of the Stormgate).
+   THE PREVIEW (rideLaneDraw, called from view.js): a rider selected or being placed shows where it can charge: its
+   reach with the parts its neighbours block cut away, and the blocking cells marked.
+   Check: node tools/check_charge_lanes.js -v */
+const RD_HALF = .42;   // half the side of what a solid cell blocks (a little under the cell, so a charge can graze a corner)
+const RIDE = {
+  staglancer: { basic: 1, abs: ['heroiccharge', 'stampede', 'runthrough'], free: (t, st) => rdPw(st, 'rdBridle') },
+  grailknight: { basic: 1, abs: ['so_grail', 'so_ridedown'], free: (t, st, ty) => rdPw(st, 'rdClarion') || rdTal(ty, 'rdPartRanks') },
+  ch_morrow: { basic: 1, abs: [], free: (t, st, ty) => rdTal(ty, 'so_grey_warrant') },
+  wb_stormward: { basic: 0, abs: ['wb_charge'], ring: st => (st.range || 1.9) + 1.1, free: (t, st) => rdPw(st, 'rdBarding') },
+  ch_aedric: { basic: 0, abs: ['ch_suncharge'], ring: (st, t) => { const ab = typeof ABIL !== 'undefined' && ABIL.ch_suncharge; return ab && ab.by && ab.by.len ? byT(ab.by.len, t || { tier: 0 }) : 3; }, known: 'ch_suncharge', free: (t, st, ty) => rdTal(ty, 'wbkOpenRoad') },
+};
+const rdPw = (st, k) => !!(st && st.pw && st.pw[k]);
+const rdTal = (ty, cap) => !!(ty && typeof talentHas === 'function' && talentHas(ty, cap));
+const rideDef = t => (t && t.def && RIDE[t.def.unit]) || null;
+// may this rider pass through your units and walls? (a capstone or a legendary)
+function rideFree(t) { const R = rideDef(t); if (!R) return true; try { return !!R.free(t, t.st || null, t.type); } catch (e) { return false; } }
+
+// how far a straight run from (x0, z0) along (ux, uz) goes before something solid stops it (len when nothing does).
+// (oi, oj): the runner's own cell, which never blocks it
+function rideRay(x0, z0, ux, uz, len, oi, oj) {
+  if (typeof G === 'undefined' || !G || !G.blk || !(len > 0)) return len;
+  const x1 = x0 + ux * len, z1 = z0 + uz * len;
+  const i0 = Math.floor(Math.min(x0, x1) - RD_HALF), i1 = Math.floor(Math.max(x0, x1) + RD_HALF), j0 = Math.floor(Math.min(z0, z1) - RD_HALF), j1 = Math.floor(Math.max(z0, z1) + RD_HALF);
+  let best = len;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    if (!inGrid(i, j) || (i === oi && j === oj) || !G.blk[idx(i, j)]) continue;
+    // the ray against the cell's box (slabs)
+    const cx = i + .5, cz = j + .5; let ta = 0, tb = best, hit = true;
+    for (let q = 0; q < 2 && hit; q++) {
+      const o = q ? z0 : x0, d = q ? uz : ux, lo = (q ? cz : cx) - RD_HALF, hi = (q ? cz : cx) + RD_HALF;
+      if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) hit = false; continue; }
+      let a = (lo - o) / d, b = (hi - o) / d; if (a > b) { const s = a; a = b; b = s; }
+      if (a > ta) ta = a; if (b < tb) tb = b; if (ta > tb) hit = false;
+    }
+    if (hit && ta < best) best = ta;
+  }
+  return Math.max(0, best);
+}
+const rdCell = t => [t.i != null ? t.i : Math.floor(t.x), t.j != null ? t.j : Math.floor(t.y)];
+// is the straight run from rider t's post to (x, z) stopped by a unit or wall? (never for a unit that is no rider, or one
+// that has earned the way through)
+function rideBlocked(t, x, z) {
+  if (!rideDef(t) || rideFree(t)) return false;
+  const dx = x - t.x, dz = z - t.y, L = Math.hypot(dx, dz); if (L < .05) return false;
+  const [oi, oj] = rdCell(t);
+  return rideRay(t.x, t.y, dx / L, dz / L, L, oi, oj) < L - 1e-6;
+}
+// a line charge's length: len, or as far as the first unit or wall in its way (the mount pulls up just short of it)
+function rideLen(t, ux, uz, len) {
+  if (!rideDef(t) || rideFree(t)) return len;
+  const [oi, oj] = rdCell(t), d = rideRay(t.x, t.y, ux, uz, len, oi, oj);
+  return d < len ? Math.max(0, d - .3) : len;
+}
+
+/* ---------- what good positioning gives back: a running start ----------
+   A rider in a wall line now reaches only the foes right in front of it; one posted at the end of a straight run meets
+   them from far off. A charge of RD_RUN_D cells or more lands RD_RUN_K times as hard (the lance charges of the Stag
+   Lancers, the Grail Knights and Morrow: stagCharge, soCharge). Numbers: node tools/check_charge_lanes.js -v */
+const RD_RUN_D = 2, RD_RUN_K = 1.2;
+const rideRun = (t, L) => { const R = rideDef(t); return R && R.basic && L >= RD_RUN_D ? RD_RUN_K : 1; };
+
+/* ---------- the rule, in the targeting ---------- */
+let RD_PICK = null;   // the ability whose pick is running (abPick)
+// does the lane rule apply to rider t right now? Its own strike (no ability running), or one of its charge spells
+function rideCtx(t) {
+  const R = rideDef(t); if (!R) return false;
+  const now = RD_PICK || (typeof AB_NOW !== 'undefined' ? AB_NOW : null);
+  return now ? R.abs.includes(now) : !!R.basic;
+}
+if (typeof canTarget === 'function' && !canTarget._ride) {
+  const _rdCt = canTarget;
+  canTarget = function (t, st, c) {
+    const r = _rdCt.apply(this, arguments);
+    if (!r || !c || !rideCtx(t)) return r;
+    return !rideBlocked(t, c.x, c.y);
+  };
+  canTarget._ride = 1;
+}
+// a rider drops a foe that has walked behind a unit or wall
+if (typeof inRange === 'function' && !inRange._ride) {
+  const _rdIn = inRange;
+  inRange = function (t, st, c) {
+    const r = _rdIn.apply(this, arguments);
+    if (!r || !c || RD_PICK || (typeof AB_NOW !== 'undefined' && AB_NOW)) return r;
+    const R = rideDef(t); return R && R.basic ? !rideBlocked(t, c.x, c.y) : r;
+  };
+  inRange._ride = 1;
+}
+if (typeof abPick === 'function' && !abPick._ride) {
+  const _rdPick = abPick;
+  abPick = function (t, st, ab, man) { const p = RD_PICK; RD_PICK = ab && ab.id; try { return _rdPick.apply(this, arguments); } finally { RD_PICK = p; } };
+  abPick._ride = 1;
+}
+// the last guard: a rider is never drawn past a blocker (each charge is cut once, when it is first drawn)
+if (typeof chargeAt === 'function' && !chargeAt._ride) {
+  const _rdAt = chargeAt;
+  chargeAt = function (t) {
+    const c = t && t.chg;
+    if (c && !c.rd && rideDef(t) && typeof G !== 'undefined' && G.blk && G.towers && G.towers.includes(t)) {
+      c.rd = 1;
+      if (!rideFree(t)) { const dx = c.x - t.x, dz = c.z - t.y, L = Math.hypot(dx, dz); if (L > .05) { const d = rideLen(t, dx / L, dz / L, L); if (d < L) { c.x = t.x + dx / L * d; c.z = t.y + dz / L * d; } } }
+    }
+    return _rdAt.apply(this, arguments);
+  };
+  chargeAt._ride = 1;
+}
+
+/* ---------- the exception: the legendaries' and the capstone's flags ---------- */
+// (the items set st.pw.rdBridle / rdClarion / rdBarding through their forces' own fx; the capstones are read by talentHas)
+
+/* ---------- the preview: where this rider can charge ---------- */
+const RD_RAYS = 96;
+const _rdRay = new Float32Array(RD_RAYS + 1);
+// the reach the lanes are drawn to, or 0 when this unit shows none
+function rideRing(unit, st, t) {
+  const R = RIDE[unit]; if (!R || !st) return 0;
+  if (R.known && t && !(t.ab && t.ab.learned && t.ab.learned.includes(R.known))) return 0;
+  return R.ring ? R.ring(st, t) : (st.range || 0);
+}
+// draws rider `unit` at (x, z) (cell i, j): its reach with what its neighbours block cut away. Returns true when it drew
+// (the caller then leaves out its own plain range disc). free: it rides through, so the whole reach is open.
+function rideLaneDraw(unit, x, z, i, j, st, t, ok) {
+  const R = RIDE[unit]; if (!R || typeof QG === 'undefined') return false;
+  const r = rideRing(unit, st, t); if (!(r > 0)) return false;
+  const free = t ? rideFree(t) : (() => { try { return !!R.free(null, st, typeof G !== 'undefined' ? G.buildType : null); } catch (e) { return false; } })();
+  const gold = ok === false ? [1, .35, .3] : R.basic ? [1, .9, .55] : [.62, .8, 1];
+  let cut = false;
+  for (let k = 0; k <= RD_RAYS; k++) { const a = k / RD_RAYS * Math.PI * 2, d = free ? r : rideRay(x, z, Math.sin(a), Math.cos(a), r, i, j); _rdRay[k] = d; if (d < r - 1e-4) cut = true; }
+  // what is out of reach: the rest of the ring, dim and red
+  if (cut) { QG.ground(x, z, .028, r, r, [1, .3, .25, .05], 5, 0); QG.ground(x, z, .033, r, r, [1, .4, .35, .4], 4, .02); }
+  const y = .034, fill = [gold[0], gold[1], gold[2], cut ? .13 : .07], edge = [gold[0], gold[1], gold[2], .9], w = .022;
+  for (let k = 0; k < RD_RAYS; k++) {
+    const a0 = k / RD_RAYS * Math.PI * 2, a1 = (k + 1) / RD_RAYS * Math.PI * 2, d0 = _rdRay[k], d1 = _rdRay[k + 1];
+    const s0 = Math.sin(a0), c0 = Math.cos(a0), s1 = Math.sin(a1), c1 = Math.cos(a1);
+    const p0 = [x + s0 * d0, y, z + c0 * d0], p1 = [x + s1 * d1, y, z + c1 * d1];
+    if (cut) QG.quad([x, y - .003, z], p0, p1, [x, y - .003, z], fill, 10, 0);
+    // the edge of the reach: an arc where it is open, the line of the blocker where it is cut
+    const ex = p1[0] - p0[0], ez = p1[2] - p0[2], el = Math.hypot(ex, ez) || 1, nx = -ez / el * w, nz = ex / el * w;
+    QG.quad([p0[0] - nx, y, p0[2] - nz], [p1[0] - nx, y, p1[2] - nz], [p1[0] + nx, y, p1[2] + nz], [p0[0] + nx, y, p0[2] + nz], edge, 10, 0);
+  }
+  if (!cut) QG.ground(x, z, .03, r, r, [gold[0], gold[1], gold[2], .07], 5, 0);
+  // the cells that block it
+  if (cut && typeof G !== 'undefined' && G.blk) {
+    const n = Math.ceil(r) + 1;
+    for (let dj = -n; dj <= n; dj++) for (let di = -n; di <= n; di++) {
+      const ci = i + di, cj = j + dj; if ((!di && !dj) || !inGrid(ci, cj) || !G.blk[idx(ci, cj)]) continue;
+      const cx = ci + .5, cz = cj + .5, L = Math.hypot(cx - x, cz - z); if (L > r + .5) continue;
+      // it blocks when the run toward it is stopped at it (not by something nearer)
+      const d = rideRay(x, z, (cx - x) / L, (cz - z) / L, L, i, j);
+      if (d > L - RD_HALF * 1.5 - .02) QG.ground(cx, cz, .036, .46, .46, [1, .35, .3, .3], 7, 0);
+    }
+  }
+  return true;
+}
+/* ---------- the words: every rider's card and every charge spell say it ---------- */
+const RIDE_NOTE = 'Your other units and walls block the charge, so post it with a clear lane to the road; a charge of 2 cells or more hits ×1.2.';
+const RIDE_NOTE_SPELL = { wb_stormward: 'Your other units and walls stop Thunder Charge short.', ch_aedric: 'Your other units and walls stop Sun Charge short.' };
+const RIDE_AB_NOTE = ' Your other units and walls block it.';
+const rideNote = unit => RIDE[unit] ? (RIDE[unit].basic ? RIDE_NOTE : RIDE_NOTE_SPELL[unit] || '') : '';
+{
+  const tell = d => { const u = d && (d.unit || d.id); if (u && RIDE[u] && d.blurb && !d._rideNote) { d.blurb = String(d.blurb).replace(/\s+$/, '') + ' ' + rideNote(u); d._rideNote = 1; } };
+  if (typeof FORCES !== 'undefined') for (const f in FORCES) { const U = FORCES[f].units; if (U) for (const s in U) tell(U[s]); }
+  if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) tell(CHAMPS[h].unit);
+  if (typeof TOWERS !== 'undefined') for (const s in TOWERS) tell(TOWERS[s]);
+  if (typeof ABIL !== 'undefined') for (const u in RIDE) for (const id of RIDE[u].abs) {
+    const ab = ABIL[id]; if (!ab || typeof ab.text !== 'function' || ab._rideNote) continue;
+    const t0 = ab.text; ab.text = function () { return String(t0.apply(this, arguments)).replace(/\s+$/, '') + RIDE_AB_NOTE; }; ab._rideNote = 1;
+    if (typeof ab.blurb === 'string' && !/block/.test(ab.blurb)) ab.blurb = ab.blurb.replace(/\s+$/, '') + RIDE_AB_NOTE;
+  }
+}
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
@@ -76252,7 +76468,9 @@ function drawSelection() {
   if (t.def.wall) return;
   const st = effStats(t);
   if (t.type === 'holy' && !t.def.champ) drawAuraPreview(t.x, t.y, st.auraR, t);
-  if (t.type !== 'holy' || t.def.champ || holySmites(t, st)) { const r = st.range; QG.ground(t.x, t.y, .03, r, r, [1, .9, .55, .07], 5, 0); QG.ground(t.x, t.y, .035, r, r, [1, .88, .55, .85], 4, .025); }
+  if (t.type !== 'holy' || t.def.champ || holySmites(t, st)) { const r = st.range, RDu = typeof RIDE !== 'undefined' && t.def.unit && RIDE[t.def.unit];   // (a rider: where it can charge, forces_zzzzzzzzzzzzzzzzzzz_lanes.js)
+    if (!(RDu && RDu.basic && rideLaneDraw(t.def.unit, t.x, t.y, t.i, t.j, st, t, true))) { QG.ground(t.x, t.y, .03, r, r, [1, .9, .55, .07], 5, 0); QG.ground(t.x, t.y, .035, r, r, [1, .88, .55, .85], 4, .025); }
+    if (RDu && !RDu.basic) rideLaneDraw(t.def.unit, t.x, t.y, t.i, t.j, st, t, true); }
 }
 // the keep: a gold ring when selected, a research bar over the gate while a new Age is coming, a beacon when one is affordable
 function drawKeepAge() {
@@ -76342,7 +76560,10 @@ function drawGhost() {
   const st = talentStats(G.buildType, 0, talentRank(G.buildType));
   { const dr = typeof druidGhostRange === 'function' ? druidGhostRange(G.buildType, st) : 0; if (dr) st.range = dr; }
   if (G.buildType === 'holy' && !TOWERS.holy.champ) { drawAuraPreview(x, z, st.auraR, null); return; }
+  const RDu = typeof RIDE !== 'undefined' && TOWERS[G.buildType] && RIDE[TOWERS[G.buildType].unit];   // (a rider: where it could charge from here)
+  if (RDu && RDu.basic && st.range && rideLaneDraw(TOWERS[G.buildType].unit, x, z, i, j, st, null, ok)) return;
   if (st.range) { QG.ground(x, z, .03, st.range, st.range, ok ? [1, .9, .55, .07] : [1, .3, .25, .07], 5, 0); QG.ground(x, z, .035, st.range, st.range, ok ? [1, .9, .55, .85] : [1, .35, .3, .85], 4, .025); }
+  if (RDu && !RDu.basic && !RDu.known) rideLaneDraw(TOWERS[G.buildType].unit, x, z, i, j, st, null, ok);
 }
 function drawAmbient(dt) {
   if ((TH.id === 'clearing' || TH.perch) && VLIVE && !mapLite()) gladeBirds(dt);
@@ -79379,7 +79600,7 @@ const SPELL_BRIEFS = {
   constrict: 'Releases moths for {dur} sec. Enemies inside are slowed 30% and take {d} every sec, and support casters can\'t cast. If one dies inside, the swarm spreads to the next group.',
   briarfield: 'Curses for {dur} sec, stripping armour, slowing and dealing increasing damage each sec (from {d}). If it dies cursed, it crumbles and curses nearby enemies for 2 sec.',
   heroiccharge: 'Charges up to 1.5 cells past its range, dealing {d} (50% more to bosses and elites), stunning for {stun} sec and rooting for 1 sec.',
-  stampede: ({ d, v, full }) => { const m = /up to ([\d.]+) cells away/.exec(String(full).replace(/<[^>]+>/g, '')); return `Leaps over walls and units up to ${m ? m[1] : '4'} cells, dealing ${d(1)}. Ground enemies within 0.8 cells take ${d(2)}, and all are rooted for ${v('root')} sec.`; },
+  stampede: ({ d, v, full }) => { const m = /up to ([\d.]+) cells away/.exec(String(full).replace(/<[^>]+>/g, '')); return `Leaps onto a ground enemy up to ${m ? m[1] : '4'} cells away (your units and walls block it), dealing ${d(1)}. Ground enemies within 0.8 cells take ${d(2)}, and all are rooted for ${v('root')} sec.`; },
   runthrough: 'Charges {n} times. Each deals {d} and roots for 0.6 sec, or {d2} if already rooted or stunned.',
   wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Pounces in the form needed. Hawk: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: ${d(2)} to a ground enemy, rooting for ${+(h * .6).toFixed(2)} sec. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
   wildsurge: 'Strikes once in each form. Hawk: {d}, dragging down for 2 sec. Bear: {d2} to the toughest ground enemy, rooting for 1 sec. Sage: {d3} to every enemy in a line, slowing {slowPct} for 2 sec.',
@@ -79604,7 +79825,7 @@ const SPELL_TARGETS = {
   constrict: 'the densest group of ground enemies',
   briarfield: 'bosses and elites first, then the toughest',
   heroiccharge: 'the toughest ground enemy in range',
-  stampede: 'ground enemies furthest out or over a wall',
+  stampede: 'ground enemies furthest out in a clear lane',
   runthrough: 'the toughest ground enemy in range',
   shift: 'its own form',
   wildstrike: 'flying enemies first, then armoured casters',
@@ -83017,6 +83238,7 @@ const HOW_F = `<ul>
 <li>Double-tap a unit to select every unit of the same kind and tier, then upgrade them all at once.</li>
 <li>Press Space, or tap the pause button above the zoom buttons, to freeze the battle. You can still build and upgrade while it's paused. Enter sounds the horn.</li>
 <li>Flyers ignore the maze and cut straight down the middle. Only units that reach the air can hit them.</li>
+<li>Mounted units charge out from their post in a straight line, and your other units and walls block the charge. Give a rider a clear lane to the road, such as the end of a straight run: select or place one and the ground shows where it can ride, with what its neighbours block cut away. A charge of 2 cells or more hits harder.</li>
 <li>Anything built since the last wave sells for a full refund.</li>
 <li>Sound the horn early to earn bonus gold. During a wave, the horn sends the next wave on top of it for even more.</li>
 <li>Foes have roles. Armour blunts steel: a grey bar under its health takes physical hits until it breaks, so bring magic or armour penetration. Magic resistance is its mirror: a blue-violet ward bar takes spells until it breaks (Arcane breaks it twice as fast), so bring steel, which cracks it, or magic penetration, which goes through it. Cloth casters fall fast, and light troops melt under area damage. Each foe's card and the forecast say what bites it, and a unit you are about to build shows how it fares against the next wave.</li>
@@ -97096,8 +97318,8 @@ const SPELL_HELP = {
   briarfield: { when: "Any foe within {reach} cells that is not already withered (a manual cast may wither one again).", aim: "A boss or elite in reach first, the toughest of them; otherwise the toughest foe in reach.", ctl: "Not a hold: the foe keeps walking, slower each second. Its armour falls a point a second, so every unit striking it hits harder as it goes.", tips: ["Save it for bosses and elites: its damage rises each second, so it does most to a foe that lives through all of it.", "Its falling armour helps every unit striking the foe: post the Wardens where your heavy hitters reach.", "If the withered foe dies inside a crowd, its crumble withers the ground foes round it for 2s."] },
 
   // Stag Lancers (staglancer)
-  heroiccharge: { when: "One ground foe within {reach} cells is enough.", aim: "The ground foe in reach with the most health.", tips: ["Its long reach lets the Lancers stand back from the path and still pick off the biggest ground foe.", "Its stun and half again on bosses and elites make it a boss opener; the stunned foe is ready for White Hart's Hunt.", "Ground foes only: flyers are out of its reach."] },
-  stampede: { when: "A ground foe beyond its reach (up to {reach+1.5} cells) or across a wall or a unit, or two or more ground foes bunched within 0.8 cells, or a boss or elite.", aim: "The ground foe that is farthest out or across a wall first, then the one in the thickest knot of ground foes, then a boss or elite.", tips: ["Post the Lancers behind a wall between two roads: the stag clears it and lands on the far road.", "Its landing roots the ground foes round its foe, which sets up White Hart's Hunt's run-throughs.", "It reaches 1.5 cells past the Lancers' charge, so it catches ground foes that slip by out of range."] },
+  heroiccharge: { when: "One ground foe within {reach} cells is enough.", aim: "The ground foe in reach with the most health.", tips: ["It needs a clear lane: post the Lancers at the end of a straight run, with no unit or wall between them and the road.", "Its stun and half again on bosses and elites make it a boss opener; the stunned foe is ready for White Hart's Hunt.", "Ground foes only: flyers are out of its reach."] },
+  stampede: { when: "A ground foe beyond its reach (up to {reach+1.5} cells) with a clear lane to it, or two or more ground foes bunched within 0.8 cells, or a boss or elite.", aim: "The ground foe that is farthest out first, then the one in the thickest knot of ground foes, then a boss or elite.", tips: ["Your units and walls block the leap: post the Lancers at the end of a straight run, and it lands on foes far down it.", "Its landing roots the ground foes round its foe, which sets up White Hart's Hunt's run-throughs.", "It reaches 1.5 cells past the Lancers' charge, so it catches ground foes that slip by out of range."] },
   runthrough: { when: "A boss or elite in reach, or two or more ground foes within {reach} cells.", aim: "Each charge: the toughest ground foe in reach. A free foe is pinned; a held one is run through for double.", ctl: "Hunts for about 2s: no other strikes meanwhile.", tips: ["Cast it on a boss: the first charge pins it and every charge after runs it through for double.", "Post the Lancers within the Briarwardens' roots: every charge at a held ground foe is a run-through.", "Heroic Charge's stun counts as held too, so it opens a hunt well."] },
 
   // Grove Shifters (wayfarer)
@@ -97147,7 +97369,7 @@ const SPELL_HELP = {
   so_shackle: { when: "Two or more ground foes within {reach} cells (or a boss or leader), and a post within 2.6 cells whose chain would cross the road.", aim: "The posts round her (Oath-Stones and units) whose chains cross the most road.", tips: ["Post the Sisters on one side of the road with Oath-Stones or units on the other: every chain then crosses it.", "Chains strung across a straight catch every ground foe once each: three chains, three binds.", "Ground foes bound by the chains stand Blinded and Judged: a good moment for a Grail Charge or a slam."] },
 
   // Grail Knights (grailknight)
-  so_grail: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The ground foe with the most health in reach.", tips: ["Its Verdict is double strength: Judge the big foe first with Consecrated Bolt or Rebuke, then charge.", "On a Condemned foe (Mark of Witness) the Verdict strikes half again as hard: the Order's best boss burst.", "Its reach is 1.5 cells past its range, so it can hit a boss before it reaches the Knights' corner."] },
+  so_grail: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The ground foe with the most health in reach.", tips: ["Its Verdict is double strength: Judge the big foe first with Consecrated Bolt or Rebuke, then charge.", "On a Condemned foe (Mark of Witness) the Verdict strikes half again as hard: the Order's best boss burst.", "Its reach is 1.5 cells past its range: with a clear lane down a straight run it hits a boss before it reaches the Knights."] },
   so_ridedown: { when: "One foe is enough: the toughest ground foe within {reach} cells, if it is a boss or elite, carries 2 or more Judgement, or three or more ground foes are in reach.", aim: "The toughest ground foe in reach; if it falls, the next pass rides at the toughest left.", tips: ["Its last pass delivers the Verdict: let the Crossbows Judge the boss first.", "Ground foes between the knight and its foe are trampled each pass: post it so the road runs between it and the gate.", "Each pass knocks its foe down, so a boss stands still for most of the joust."] },
   so_vow: { when: "Two or more units within 2 cells of the knight are fighting, or a unit within 2 cells and three or more ground foes near them.", aim: "Itself and every unit within 2 cells: each rides a phantom knight at the ground foe nearest it.", tips: ["Build a cluster of different units round the knight: each sends its own phantom rider.", "Radiant units' strikes lay Judgement: cast it as the Templars and Censers start slamming.", "The phantom riders knock ground foes down: a cheap hold for a whole crowd at a corner."] },
 
@@ -97343,7 +97565,7 @@ const SPELL_HELP = {
   wb_detonate: { when: "Two or more sigil-carved foes within {reach} cells, four or more sigils among them, or a carved boss or elite.", aim: "Every sigil-carved foe in reach.", tips: ["Cast it right after Etch: every carved foe bursts at once.", "Each burst strikes the foes round it too: carve a crowd and blow it apart.", "Branded foes take more from it: let them cross a ward-line first."] },
   wb_scribe: { when: "The ground foe furthest along within {reach} cells with another within 1.2 cells, or a boss, where no great sigil rune lies.", aim: "The road under the ground foe furthest along with company.", tips: ["Carve it where the road narrows: every foe that walks over it gains sigils.", "It links into the ward-lines like any rune, and its line to a different rune is woven.", "Pair it with Detonate: the foes that crossed it carry sigils to burst."] },
   // Stormward Lancers (wb_stormward)
-  wb_charge: { when: "A line from the unit through two or more ground foes within {reach} cells, or a boss or elite.", aim: "The line through the most ground foes, then the one nearest the gate.", tips: ["Post the Lancers beside a straight run: the charge goes through the whole column.", "Each foe it strikes is arced with lightning, and its trail lays storm runes for Skyfall.", "Cast Storm Pennant first: every arc jumps once more."] },
+  wb_charge: { when: "A line from the unit through two or more ground foes within {reach} cells, or a boss or elite.", aim: "The line through the most ground foes, then the one nearest the gate.", tips: ["Post the Lancers at the end of a straight run: the charge goes through the whole column, and stops at the first unit or wall.", "Each foe it strikes is arced with lightning, and its trail lays storm runes for Skyfall.", "Cast Storm Pennant first: every arc jumps once more."] },
   wb_stormbanner: { when: "Two or more foes within {reach} cells (flyers too), or a boss or elite.", aim: "The toughest foe in reach, bosses and elites first.", tips: ["Raise it among several Lancers: every chain from units within 2 cells jumps once more.", "Its own bolt jumps on: cast it into a crowd.", "Lancers' lightning reaches flyers: it works on a flying wave too."] },
   wb_skyfall: { when: "Two or more foes within 0.85 cells of storm runes within {reach+1.5} cells, or a boss or elite near one.", aim: "Every storm rune in range at once; on a tap with none, a rune under the toughest foe first.", tips: ["Lay storm runes first with Thunder Charge and the Lancers' thrusts.", "A storm rune merged into a Bound rune is struck too: Bound runes sit where ground foes bunch.", "Each bolt stuns: it stops a crowd for the units round it."] },
   // Anvil Guard (wb_anvilguard)
@@ -97363,7 +97585,7 @@ const SPELL_HELP = {
   ch_lastgate: { when: "Two or more ground foes within {reach} cells with road in reach, or a ground boss or elite there.", aim: "The road cells in his reach nearest the gate: a line of Bound oath runes along them, flaring a moment later.", tips: ["Post Varic beside the last stretch of road: the gate is carved where the leaks would happen.", "If no ground foe stands on the runes when they flare, half its mana comes back: it never wastes much.", "The runes stay: they link into ward-lines that brand and slow for 10s more."] },
   // Lord Aedric Solmane, the Sun-Sworn (ch_aedric)
   ch_sunwheel: { when: "Three or more foes within 1.6 cells of one foe in reach ({reach} cells; the area grows to 1.8 by tier VI), or any boss or elite in reach.", aim: "The densest spot: the foe with the most others within 1.6 cells.", tips: ["Foes already at 3 brands flare white-gold and burst: brand them first (ward-lines, Sun Charge, Blaze of Glory).", "It strikes harder with the army's Momentum: cast it in the middle of a killing streak.", "It scorches Aedric for 8% of his health each cast: keep Vowkeepers near him."] },
-  ch_suncharge: { when: "A line from him through two or more ground foes within {reach} cells, or a ground boss or elite.", aim: "The line through the most ground foes, then over the most road.", tips: ["Post him where the road runs straight past him: the charge rides along it.", "Every ground foe it passes is branded: follow with Sunwheel.", "He is winded for 3s after (20% slower strikes): do not cast it just before a boss reaches him."] },
+  ch_suncharge: { when: "A line from him through two or more ground foes within {reach} cells, or a ground boss or elite.", aim: "The line through the most ground foes, then over the most road.", tips: ["Post him at the end of a straight run of road: the charge rides along it, and stops at the first unit or wall.", "Every ground foe it passes is branded: follow with Sunwheel.", "He is winded for 3s after (20% slower strikes): do not cast it just before a boss reaches him."] },
   ch_blazeglory: { when: "Three or more foes within {reach} cells, or a boss or elite there.", aim: "Himself: the burst of sunlight strikes every foe in his reach.", tips: ["Every strike during the Blaze brands its foe: three strikes make a full sun-mark for Sunwheel.", "He burns out after it (30% slower for 4s): spend it on a boss or a big wave, not a straggler.", "Pair it with the army's own Blaze from Momentum for one short, overwhelming push."] },
   // Lady Isaura Vell, the Veiled Oath (ch_isaura)
   ch_oathbind: { when: "Three or more foes within 1.3 cells of one foe in reach ({reach} cells; the area grows to 1.5 by tier VI), or any boss or elite in reach.", aim: "The densest spot of ground foes: the foe with the most others within 1.3 cells.", tips: ["The toll is doubled on a rune or a ward-line: bind them where the road is carved.", "Bound foes are rooted then held at half speed: the rest of the army has 4s to work on them.", "With Broken Vows, every foe that breaks free on a rune pays again."] },
