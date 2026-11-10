@@ -1,4 +1,4 @@
-const BUILD_TAG = '7ce4e52@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f7a5355@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -74897,7 +74897,7 @@ function setMap(id) { if (typeof M3D_FORCE !== 'undefined' && M3D_FORCE) id = M3
 
 // oh = half the view height in world units (the orthographic "zoom" that fits the field); zoom = pinch magnification
 function setCam(tz, oh, aspect, shakeX = 0, shakeZ = 0, zoom) {
-  const cx = TH.camX != null ? TH.camX : 5.5;   // (a map whose painting is not centred on the field looks at the painting's middle: Greatroot Way)
+  const cx = CAM.cx != null ? CAM.cx : 5.5;   // (where the view looks, across: the field's middle, a wide painting's middle, or where the player has dragged it: fitCamera, worldPan)
   CAM.tgt = [cx + shakeX, 0, tz + shakeZ];
   CAM.eye = [cx + shakeX, Math.sin(CAM.pitch) * CAM_D, tz + shakeZ + Math.cos(CAM.pitch) * CAM_D];
   RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, oh, zoom === undefined ? CAM.zoom : zoom);
@@ -74910,6 +74910,7 @@ function fitCamera() {
   if (TH.fitBot != null) for (let k = raw.length - 1; k >= 0; k--) if (raw[k][2] > ROWS) raw.splice(k, 1);   // (no keep below the field to show)
   if (TH.fitBot != null) raw.push([-.1, 0, TH.fitBot], [COLS + .1, 0, TH.fitBot]);
   const pts = raw.map(p => bendP(p[0], p[1], p[2]));
+  CAM.cx = 5.5;   // (the fit is made on the field's own middle, so the field is centred on any shape of screen)
   let tz = (ROWS - TOPM) / 2, oh = 10;
   for (let it = 0; it < 8; it++) {
     let lo = 2, hi = 40;
@@ -74926,6 +74927,14 @@ function fitCamera() {
   // a painting narrower than the view (viewW: its width in world units, the view centred on it by camX): the view closes in
   // until the painting fills it from side to side, its foot kept in view and its top cut, so nothing past its edges shows
   if (TH.viewW && TH.fitBot != null) { const ohMax = TH.viewW / 2 / aspect; if (oh > ohMax) { oh = ohMax; tz = TH.fitBot - .985 * oh / Math.sin(CAM.pitch); } }
+  /* Across: a painted map whose painting is wider than the view (a tablet, a phone: owner, on an iPad, "Battlefield map
+     isn't centred") keeps the field in the middle and can be dragged sideways to look along the painting (CAM.panX: how far,
+     worldPan); a view wide enough to show a whole painting that is not centred on the field (Greatroot Way: camX) looks at
+     the painting's middle. */
+  { const R = TH.painted && TH.painted.rect, hw = oh * aspect; CAM.panX = null;
+    if (R && R[2] > 2 * hw + .2) { const lo = R[0] + hw, hi = R[0] + R[2] - hw; CAM.cx = clamp(5.5, lo, hi); CAM.panX = [Math.min(lo, CAM.cx), Math.max(hi, CAM.cx)]; }
+    else if (TH.camX != null) CAM.cx = TH.camX;
+    CAM.cx0 = CAM.cx; }
   CAM.tz = tz; CAM.oh = oh; CAM.dist = CAM_D;
   zoomClamp();
   cullTrees();
@@ -74975,7 +74984,13 @@ function zoomAt(clientX, clientY, z1, anchor) {
   Z.z = clamp(z1, 1, ZOOM_MAX); Z.cx = b[0] - s[0] / Z.z; Z.cy = b[1] - s[1] / Z.z; zoomClamp();
 }
 function zoomAnchor(clientX, clientY) { const Z = CAM.zoom, s = screenNDC(clientX, clientY); return [s[0] / Z.z + Z.cx, s[1] / Z.z + Z.cy]; }
-function panBy(dxPx, dyPx) { const r = cv.getBoundingClientRect(), Z = CAM.zoom; Z.cx -= dxPx / r.width * 2 / Z.z; Z.cy += dyPx / r.height * 2 / Z.z; zoomClamp(); }
+function panBy(dxPx, dyPx) { const r = cv.getBoundingClientRect(), Z = CAM.zoom, want = Z.cx - dxPx / r.width * 2 / Z.z; Z.cx = want; Z.cy += dyPx / r.height * 2 / Z.z; zoomClamp();
+  if (Math.abs(want - Z.cx) > 1e-6) worldPan((want - Z.cx) * CAM.oh * (r.width / r.height)); }   // (what the zoomed view cannot take goes to looking along the painting)
+// look along a painted map that is wider than the view: the view's middle moved across, kept inside the painting
+function worldPan(dx) { if (!CAM.panX) return false; const x = clamp(CAM.cx + dx, CAM.panX[0], CAM.panX[1]); if (x === CAM.cx) return false; CAM.cx = x; return true; }
+const canWorldPan = () => !!CAM.panX;
+// back to the fitted view (a double tap; the zoom buttons step the zoom only)
+function viewReset() { const Z = CAM.zoom, ch = Z.z !== 1 || Z.cx || Z.cy || CAM.cx !== CAM.cx0; Z.z = 1; Z.cx = 0; Z.cy = 0; if (CAM.cx0 != null) CAM.cx = CAM.cx0; return !!ch; }
 function toScreen(x, y, z) {
   const b = bendP(x, y, z), q = M4.proj(RD.vp, b[0], b[1], b[2]);
   return { x: (q[0] * .5 + .5) * W, y: (.5 - q[1] * .5) * H, ok: q[2] > 0 };
@@ -75181,9 +75196,9 @@ function renderView(dt) {
   if (RD.terrain && typeof m3dFrame === 'function') m3dFrame(dt);
   if (ENV.edgeGiants && typeof edgeMagic === 'function') edgeMagic(ENV.edgeGiants, true);   // (Sunfall: the title's wisps)
   if (TH.id === 'clearing' && typeof edgeWard === 'function') edgeWard();   // (Sunfall's field foot: edgetrees.js)   // (the magic up a painted map's 3D trunks: edgetrees.js)
-  if (TH.mistAt && !mapLite()) for (let i = 0; i < TH.mistAt.length; i++) { const [mx, my, mz, mw, mh, ma] = TH.mistAt[i], d = Math.sin(vt * .21 + i * 2.1);   // (a map's own drifts of mist: where Greatroot Way's foes step out, softening them)
+  if (TH.mistAt) for (let i = 0; i < TH.mistAt.length; i++) { const [mx, my, mz, mw, mh, ma] = TH.mistAt[i], d = Math.sin(vt * .21 + i * 2.1);   // (a map's own drifts of mist: where Greatroot Way's foes step out, softening them)
     QA.bill(RD, mx + d * .22, my + Math.cos(vt * .17 + i) * .05, mz, mw, mh, [(TH.mistCol || MIST_COL)[0], (TH.mistCol || MIST_COL)[1], (TH.mistCol || MIST_COL)[2], ma * (.8 + .2 * Math.sin(vt * .33 + i * 1.7))], 1, 0); }
-  if (TH.mistSwirl && !mapLite() && !(typeof GFX !== 'undefined' && GFX === 'low')) { const mc = TH.mistCol || MIST_COL;   // (wisps curling out of a map's mist: each a short trail of soft puffs on a widening spiral, drifting out and thinning away)
+  if (TH.mistSwirl && !(typeof GFX !== 'undefined' && GFX === 'low')) { const mc = TH.mistCol || MIST_COL;   // (wisps curling out of a map's mist: each a short trail of soft puffs on a widening spiral, drifting out and thinning away)
     for (let s = 0; s < TH.mistSwirl.length; s++) { const [sx, sy, sz, reach, n] = TH.mistSwirl[s];
       for (let j = 0; j < n; j++) { const h = Math.sin((s * 7 + j) * 12.9898) * 43758.5453, r0 = h - Math.floor(h), dir = j % 2 ? 1 : -1;
         for (let q = 0; q < 6; q++) { const u = ((vt * (.035 + .012 * r0) + j / n + r0) % 1) - q * .022; if (u <= 0) continue;
@@ -82517,7 +82532,7 @@ function wallLineClear() { G.wallLine = null; if (wlEl) wlEl.hidden = true; }
 // One finger: tap to select, or with a tower chosen drag to place it. While zoomed in, a one-finger drag pans.
 // Two fingers: pinch to zoom, move to pan. Mouse wheel zooms about the cursor.
 const touches = new Map();
-let tap = null, pinch = null, panning = null, gestured = false;
+let tap = null, pinch = null, panning = null, gestured = false, lastTap = null;
 function bindCanvas() {
   cv.addEventListener('pointerdown', e => {
     AudioSys.init();
@@ -82554,11 +82569,11 @@ function bindCanvas() {
     if (G.state !== 'play' || G.paused) return;
     if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 9) {
       if (tap.box) boxDrag = { id: tap.id, x0: tap.x, y0: tap.y, x1: e.clientX, y1: e.clientY, add: tap.add };
-      else if (CAM.zoom.z > 1.01) { panning = { id: tap.id, x: tap.x, y: tap.y }; }
+      else if (CAM.zoom.z > 1.01 || canWorldPan()) { panning = { id: tap.id, x: tap.x, y: tap.y }; }   // (zoomed in, or on a painting wider than the view: a drag looks around)
       tap = null;
     }
     if (boxDrag && e.pointerId === boxDrag.id) { boxDrag.x1 = e.clientX; boxDrag.y1 = e.clientY; boxShow(); return; }
-    if (panning && e.pointerId === panning.id) { panBy(e.clientX - panning.x, e.clientY - panning.y); panning.x = e.clientX; panning.y = e.clientY; return; }
+    if (panning && e.pointerId === panning.id) { panBy(e.clientX - panning.x, e.clientY - panning.y); panning.x = e.clientX; panning.y = e.clientY; markDirty(); return; }
     if (G.cast) { G.castAim = pickGround(e.clientX, e.clientY); return; }
     if (!G.buildType) return;
     const p = pickGround(e.clientX, e.clientY);
@@ -82572,7 +82587,8 @@ function bindCanvas() {
     if (boxDrag && e.pointerId === boxDrag.id) { const b = boxDrag; boxDrag = null; boxEnd(b); return; }
     if (gestured) { if (!touches.size) gestured = false; drag = null; G.ghost = null; tap = null; return; }
     if (tap && e.pointerId === tap.id) {
-      const t0 = tap; tap = null;
+      const t0 = tap; tap = null;   /* a double tap on a touch screen: back to the fitted view (only when the view has been moved or zoomed) */
+      if (e.pointerType !== 'mouse') { const now = performance.now(), l = lastTap; lastTap = { t: now, x: t0.x, y: t0.y }; if (l && now - l.t < 320 && Math.hypot(t0.x - l.x, t0.y - l.y) < 40 && viewReset()) { lastTap = null; syncZoomUI(); markDirty(); return; } }
       if (G.state === 'play' && !G.paused) tapSelect(pickGround(t0.x, t0.y), { clientX: t0.x, clientY: t0.y });
       return;
     }
@@ -82682,7 +82698,7 @@ function bindKeys() {
 
 /* ---------- screens ---------- */
 const HOW = `<ul>
-<li>Tap the + and − buttons, pinch with two fingers or use the mouse wheel to zoom in. While zoomed in, drag with one finger, or use WASD or the arrow keys, to look around.</li>
+<li>Tap the + and − buttons, pinch with two fingers or use the mouse wheel to zoom in. While zoomed in, drag with one finger, or use WASD or the arrow keys, to look around. On a tablet or phone, drag sideways on empty ground to look along the map, and double-tap to come back.</li>
 <li>Creeps walk the shortest route from the portal to your keep. Every tower blocks that route, so arrange them into a long maze.</li>
 <li>You can't seal the path completely.</li>
 <li>With the keep's towers, every wave is a dungeon on the march, led by someone with a rule of their own: the info pane shows who leads the next one and how to beat them, and a fallen leader may drop a relic. A force's march has no leaders: a boss comes every 5th wave and elites every 3rd, and the info pane shows what each boss does.</li>
@@ -82723,7 +82739,7 @@ const HOW = `<ul>
 // How to Play in a force run: the same game in the army's words, without the keep's schools, School Keys, reactions,
 // fusions, tier IV paths, relic sets, title challenges or the Paths tab (Classic and the title page read HOW, unchanged)
 const HOW_F = `<ul>
-<li>Tap the + and − buttons, pinch with two fingers or use the mouse wheel to zoom in. While zoomed in, drag with one finger, or use WASD or the arrow keys, to look around.</li>
+<li>Tap the + and − buttons, pinch with two fingers or use the mouse wheel to zoom in. While zoomed in, drag with one finger, or use WASD or the arrow keys, to look around. On a tablet or phone, drag sideways on empty ground to look along the map, and double-tap to come back.</li>
 <li>Creeps walk the shortest route from the portal to your keep. Every unit and barricade blocks that route, so arrange them into a long maze.</li>
 <li>You can't seal the path completely.</li>
 <li>A boss comes every 5th wave and elites every 3rd. Up next, over the field, shows what each wave brings, who covers whom and what each boss does. A fallen boss opens its loot: take one of the items it offers.</li>
