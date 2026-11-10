@@ -1,4 +1,4 @@
-const BUILD_TAG = 'c0c56cd@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'effeeb6@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -48223,72 +48223,72 @@ const hwModel = h => h && h.ult && WEAPON_MDL['hw_ult_' + h.u] ? 'hw_ult_' + h.u
 const TAL_TIER6 = [0, 2, 4, 7, 10, 12];
 /* <spread> */
 const TAL_SPREAD = {
-  "grove.glaive": {"Long Haft":[0,3],"Hold the Line":[1,1],"Set Spears":[2,3],"Shieldsplitter":[1,2],"Thornhedge":[1,3],"Bloodthorn":[2,0],"Rootbreaker":[4,0],"Phalanx":[3,2],"Wall of Spears":[5,2],"Impaler":[5,0],"Spearwood Rising":[3,0],"Living Palisade":[5,1],"Skewer":[4,3],"Splintered Line":[4,2],"Deep Thrust":[0,2],"Living Haft":[2,1],"Thornwall Ward":[3,1]},
-  "grove.arrow": {"Patient Hunter":[1,0],"Canopy Sight":[1,3],"Mark the Quarry":[3,2],"Thornpoint Arrows":[0,2],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[0,1],"Snaring Shot":[2,2],"Pinning Shot":[5,3],"Thornrain":[5,2],"Nailing Shaft":[4,0],"Still Quarry":[4,1],"Wounded Prey":[4,2],"Splitting Shaft":[5,0],"Quick Nock":[1,1],"Hunter's Rhythm":[2,1],"Hushed Quarry":[3,0]},
-  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[1,3],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[4,3],"Bramble Squeeze":[4,0],"Spreading Roots":[2,1],"Bloodbriar":[3,2],"Rootburst":[3,1],"Overgrowth":[5,2],"Strangleroot":[5,3],"Warden's Reach":[2,2],"Sapwell":[3,3],"Quickening Sap":[0,1]},
-  "grove.arcane": {"Heavy Lance":[0,1],"Trample":[2,2],"Wheel About":[0,0],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[1,2],"Hooves of Thunder":[5,3],"Hunter's Finish":[5,0],"Second Charge":[2,1],"Goring Antlers":[1,0],"Long Gallop":[2,3],"Stag's Wind":[1,1],"Herd Instinct":[4,3]},
-  "grove.storm": {"Hawk's Reach":[4,3],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[0,0],"Primal Pounce":[1,2],"Hawk's Mark":[3,2],"Grounded Prey":[4,1],"Moonsap Bolts":[2,1],"Skyfall":[5,2],"Shapestorm":[3,1],"Second Skin":[1,3],"Harrier's Cry":[4,2],"Hawk Lord":[5,0],"Wild Heart":[5,3],"Wild Pace":[1,1],"Druid's Patience":[0,3],"Talon Rend":[3,0]},
-  "grove.earth": {"Leaf-Edged Blades":[1,2],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,0],"Blade Rhythm":[0,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,0],"Encore":[4,2],"Twin Whirl":[2,3],"Gale of Blades":[4,0],"Reaper's Step":[5,3],"Quickstep":[2,2],"Dancer's Breath":[0,1],"Petal Cuts":[3,2]},
-  "grove.cannon": {"Potent Spores":[2,0],"Ripe Pods":[1,1],"Choking Spores":[0,2],"Seed Scatter":[3,1],"Hard Husk":[3,2],"Clinging Spores":[4,3],"Puffcap Sowing":[2,1],"Snapjaw Bloom":[3,3],"Spore Cloud":[5,1],"Bursting Rot":[5,0],"Puffcap Trail":[5,2],"Rootmark Seed":[4,0],"Drifting Spores":[1,0],"Far Cast":[1,2],"Seedwell":[2,3],"Thorned Husks":[0,3],"Burrowing Pods":[4,1]},
-  "grove.venom": {"Hunter's Patience":[0,1],"Barbed Darts":[0,3],"Quick Quiver":[1,0],"Lone Prey":[2,2],"Long Severance":[2,1],"Sap Thief":[1,2],"Bramble Snare":[2,0],"Briar Gibbet":[3,1],"Silent Stalk":[1,3],"Deep Snare":[3,0],"Thornmark Trail":[4,2],"Choking Thorns":[4,1],"Snare Line":[4,0],"Apex Stalker":[5,2],"Gallows Briar":[5,1],"Torn Ties":[5,3]},
-  "champ:rootmother": {"Patient Earth":[0,2],"Long Vines":[1,1],"Deep Grip":[0,0],"Twin Elders":[5,2],"Rootway":[1,2],"Bramble Grasp":[2,2],"Thorned Roots":[1,3],"Sap Song":[2,0],"Heartwood Sapling":[3,3],"Strangling Hold":[3,1],"Sapling Warden":[4,3],"Rootmother":[5,1],"The Old Wood Walks":[2,3],"Thousand Roots":[5,0],"Quick Tendrils":[0,1],"Deep Sap":[4,0],"Sapling Song":[4,2]},
-  "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,2],"Snaring Rain":[0,3],"Root Platform":[2,2],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[2,0],"Hunter’s Patience":[3,2],"Blood Moon":[5,3],"Snarled Ground":[4,1],"Running Shafts":[3,3],"Warden’s Mark":[4,0],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,2],"Captain's Share":[3,1],"Moonlit Aim":[5,2]},
-  "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[1,0],"Passing Spores":[2,1],"Compost":[4,2],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[3,0],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[1,1],"Seedmother":[5,0],"Full Bloom":[4,3],"Rotfeast":[4,1],"Busy Hive":[0,2],"Honey Store":[0,0]},
-  "conclave.glaive": {"Measured Cuts":[0,1],"Opening Salute":[0,3],"Lone Duel":[1,2],"Riftsteel Edge":[2,2],"Ward-Splitter":[1,1],"Charged Edge":[2,1],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[4,2],"Thrown Riftblade":[4,0],"Fifth Form":[4,3],"Phase Dancer":[3,2],"Ghostblade Rush":[5,3],"Weaver's Blade":[5,1],"Press the Opening":[0,0],"Binding Cut":[1,3],"Guard Broken":[3,1]},
-  "conclave.arrow": {"Twin Casting":[0,3],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Homing Missiles":[2,2],"Apprentice's Zeal":[4,0],"Missile Curtain":[1,2],"Echoing Missiles":[3,1],"Charged Curtain":[4,2],"Gathering Orb":[3,0],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,0],"Cold Focus":[0,0],"Lecture Hall":[5,3],"Margin Notes":[1,3],"Recitation":[1,1],"Static Sparks":[3,3]},
-  "conclave.frost": {"Hoar Ink":[0,1],"Biting Spear":[1,1],"Frozen Lance":[5,3],"Second Spear":[4,1],"Entomb":[2,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,2],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[1,0],"Singing Ice":[1,2],"Needle Rime":[0,2],"Brittle Coffin":[3,3]},
-  "conclave.arcane": {"Lagging Hour":[2,0],"Tick Forward":[3,3],"Borrowed Time":[4,2],"Heavy Hours":[0,2],"Backward Hour":[3,2],"Paradox":[1,0],"Stopped Clock":[4,1],"Quickening Bell":[5,1],"Frozen Moment":[5,0],"Hourglass Heart":[3,0],"Recurrence":[4,3],"Rewound Wounds":[2,2],"Arcane Clockwork":[2,1],"Borrowed Hour":[5,3],"Pendulum Swing":[0,1],"Stolen Sand":[0,3],"Patient Hours":[1,2]},
-  "conclave.storm": {"Wide Heavens":[0,1],"Star-Chart":[1,1],"Constellation":[5,0],"Skybreaker":[0,2],"Comet":[2,0],"Lodestar":[2,1],"Grounded Stars":[4,3],"Zodiac":[3,2],"Starfall Sky":[5,3],"Twin Stars":[5,2],"Grand Orrery":[3,3],"Twinkling Ice":[2,3],"Frost Lens":[3,1],"Turning Spheres":[4,0],"Night Sight":[0,0],"Cold Starlight":[1,2],"Ill Omen":[4,1]},
-  "conclave.earth": {"Broad Palms":[1,2],"Second Tremor":[0,3],"Staggering Blow":[3,2],"Mana Quarry":[4,3],"Heave":[2,2],"Shatterground":[5,1],"Deep Magma":[2,0],"Golem Core":[2,3],"Living Bulwark":[4,1],"Fault Line":[4,0],"Obsidian":[3,3],"Walking Wall":[5,0],"Ember Stone":[1,0],"Living Mountain":[5,2],"Granite Fists":[1,1],"Ley Reservoir":[0,1],"Glyph Anchor":[3,1]},
-  "conclave.cannon": {"Slow-Burning Ink":[2,3],"Wide Blast":[1,0],"Pyre Scribe":[1,2],"Fire Feeds Mana":[3,0],"Firewalk":[4,1],"Cinder Charge":[3,2],"Skipping Flame":[2,0],"Phoenix":[3,1],"Ember Heart":[5,1],"Pyre Lord":[5,2],"Rolling Inferno":[4,3],"Endless Skip":[5,0],"Searing Tide":[4,2],"Leaping Cinders":[0,2],"Thermal Crack":[2,1],"Wardburn":[1,3],"Kindled Fingers":[0,3]},
-  "conclave.venom": {"Keen Crescent":[1,2],"Hunting Crescent":[0,1],"Lasting Undoing":[0,3],"Quick Severing":[2,2],"Ward Feedback":[0,0],"Returning Crescent":[1,3],"Splintering":[3,2],"Sever the Link":[2,1],"Seeking Edge":[2,3],"Arcane Memory":[3,1],"Rend the Veil":[4,2],"Shatterpoint":[4,1],"Brimming Severance":[3,0],"Void Ground":[5,2],"Unravelling Veil":[5,0],"Wardbreaker":[5,3]},
-  "champ:cc_arch": {"Quick Quill":[1,3],"Open Book":[1,0],"Marginalia":[0,0],"Read the Marks":[3,1],"Unravel":[2,3],"Loose Threads":[3,3],"Threads Pulled":[2,2],"Shared Lesson":[3,2],"Deeper Loom":[5,2],"Woven Edge":[4,0],"Snapping Threads":[4,3],"Spellweaver":[5,1],"Sixfold Loom":[4,2],"Rewoven Threads":[5,0],"Flicked Pages":[0,1],"Deep Inkwell":[1,1]},
-  "champ:cc_chrono": {"Patient Hands":[0,1],"Long Pendulum":[0,2],"Weighted Hour":[0,3],"Gathered Ghosts":[5,0],"Recall":[1,1],"Long Way Back":[2,1],"Leaden Minutes":[2,0],"Lent Time":[2,2],"Endless Hour":[4,0],"Late Arrival":[4,1],"Second Hand":[3,3],"Timekeeper":[5,1],"The Hour Strikes":[3,0],"Twelve Strokes":[5,3],"Ticking Hand":[1,3],"Saved Seconds":[3,2],"Leaden Pull":[4,2]},
-  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,2],"Follow-Through":[0,3],"Practice Yard":[3,1],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[1,1],"Shared Edge":[3,2],"Bursting Seams":[5,3],"Cut the Fallen":[4,0],"Flourish":[3,3],"Blade of the Conclave":[5,1],"Unbound Blade":[4,3],"Duelling Ground":[4,2],"Flowing Cuts":[2,2],"Steady Breath":[2,1],"Chain to Blade":[5,2]},
-  "ironhold.glaive": {"Heavy Shoulders":[2,0],"Bearded Axe":[1,2],"Ringing Rim":[3,2],"Off Balance":[1,0],"Bowling Shove":[2,1],"Spinning Shield":[2,2],"Hot Shards":[5,1],"Shield Rush":[3,3],"Armourbreaker":[5,0],"Breaker's Blow":[4,1],"Brace and Shove":[3,1],"Shield Signal":[4,0],"Breach the Line":[5,3],"Hold the Pass":[4,2],"Caught Between Shields":[0,3],"Plate Salvage":[0,2],"Knock Them Flat":[1,3]},
-  "ironhold.arrow": {"Powder Smoke":[0,2],"Range-Finder":[1,0],"Long Belt":[2,2],"Called Shot":[5,2],"Rattlegun":[1,2],"Sighting In":[1,3],"Kneecapper":[4,3],"Thunder Belt":[5,1],"Gatling Crank":[5,0],"Breaching Slug":[3,3],"Quick Swab":[2,1],"Hard Kick":[3,0],"Case-Hardened":[4,0],"Quick Reload":[0,1],"Powder Tally":[2,3],"Pinning Rounds":[3,1],"Called Volley":[4,2]},
-  "ironhold.frost": {"Weighted Chains":[1,3],"Third Wrap":[0,1],"Trap Line":[3,3],"Tangle":[0,0],"Tripwire":[2,3],"Bound and Broken":[4,2],"Twin Nets":[5,2],"Double Line":[5,0],"Harpoon Winch":[3,2],"Bear Trap":[5,3],"Wide Nets":[2,0],"Hooked Chain":[4,1],"Spiked Caltrops":[2,2],"Wing Cords":[1,2],"Trapper's Haul":[1,1],"Barbed Chain":[3,1],"Caltrop Bed":[4,0]},
-  "ironhold.arcane": {"Searing Brand":[1,2],"Deep Brand":[0,1],"Brand Chain":[2,2],"Swift Inscription":[2,1],"Ringing Anvil":[5,0],"Masterwork Strike":[4,2],"Rune of Making":[1,1],"Rune of Unmaking":[4,0],"Rune Lord":[5,1],"Answering Rune":[2,3],"Runic Overflow":[0,3],"Forge Heat":[3,0],"Runebrand Detonation":[5,3],"Kinsmark":[0,2],"Paid in Kind":[3,3],"Quench":[1,0]},
-  "ironhold.storm": {"Torn Wings":[0,0],"Scorched Barrel":[1,1],"Spent Flare":[5,2],"Chain-Fed":[3,1],"Sky Shatter":[0,1],"Grapnel Shot":[2,1],"Tracer Rounds":[3,2],"Starshell":[4,2],"Endless Belt":[5,1],"Shellstorm":[5,3],"Reel In":[4,0],"Ground Burst":[2,3],"Hot Shrapnel":[1,0],"Barbed Shrapnel":[0,2],"Sky Watch":[1,3]},
-  "ironhold.earth": {"Packed Crowd":[0,3],"Steam in the Cracks":[1,2],"Scalding Steam":[2,3],"Rivet Popper":[1,1],"Piston Rhythm":[5,1],"Pile Driver":[1,3],"Echoing Slam":[4,0],"Groundsplitter":[5,0],"Molten Rivets":[5,2],"Steam Uppercut":[3,0],"Tremor Step":[3,1],"Safety Valve":[4,2],"Line Them Up":[4,3],"Hammer Home":[0,1],"Pressure Gauge":[2,0],"Steam Jacket":[2,1],"Piledriven":[3,2]},
-  "ironhold.cannon": {"Glowing Casings":[1,2],"Whistling Shells":[1,1],"Rattling Blast":[3,2],"Pitch-Soaked Wadding":[2,3],"Skipping Shell":[2,2],"Double Crew":[3,0],"Red-Hot Tube":[5,0],"Big Bertha":[4,1],"Clinging Fire":[0,3],"The Long Drop":[4,0],"Shrapnel Casing":[3,1],"Quake Shell":[4,3],"Walking Fire":[5,2],"Napalm":[5,1],"Ringing Ears":[0,1],"Powder Runners":[0,0]},
-  "ironhold.venom": {"Planted by Hand":[0,3],"Shaped Charges":[1,1],"Fuse Cutter":[0,0],"Blasting Wage":[2,2],"Black Powder Pack":[2,1],"Cracked Plate":[1,3],"Powder Trail":[3,1],"Rubble":[1,0],"Short Fuse":[3,2],"Tamped Charges":[2,0],"Long Trail":[4,1],"Demolition":[4,2],"Siege Master":[5,3],"Chain Demolition":[5,2],"Breach and Clear":[5,0],"Collapse":[4,3]},
-  "champ:ih_thane": {"Locked Shields":[0,2],"Shield-Ring":[0,0],"Wall of the Clan":[3,1],"Thane's Line":[4,0],"Horn of the Hold":[1,2],"Braced Heels":[2,2],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,0],"War Cry":[4,1],"Unbroken Line":[5,1],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,3]},
-  "champ:ih_artificer": {"Tally Wheel":[0,1],"Riveting Peal":[0,2],"Scrap Shrapnel":[0,0],"Engine Yard":[3,2],"Lodestone":[1,1],"Stronger Field":[2,1],"Barbed Rivets":[1,0],"Torn Loose":[3,3],"Counterweight":[3,0],"Magnetised":[4,3],"Overpressure":[4,1],"Chain Drive":[5,2],"Wrecking Ball":[2,0],"Restless Stone":[5,1],"Ricochet Rivets":[2,3],"Spare Parts":[4,2]},
-  "champ:ih_brewer": {"Leaky Keg":[0,0],"Slick Floor":[1,2],"Heavy Barrel":[1,1],"Open Tap":[3,2],"Firewater Breath":[1,0],"Double Measure":[2,0],"Sticky Stout":[3,3],"Scorching Gust":[3,1],"Brimming Keg":[5,3],"Spilled Pints":[5,2],"Last Call":[4,1],"On the Slate":[2,1],"Last Orders":[4,3],"Topped Up":[0,2]},
-  "silver.glaive": {"Shield-Ward":[0,3],"Witness the Blow":[0,2],"Staggering Bash":[1,3],"Shield of Faith":[3,0],"Vigil":[5,1],"Edge of Dawn":[0,0],"Rampart of Dawn":[1,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,2],"Oath of Rebuke":[5,0],"Unyielding":[4,3],"Unbroken Oath":[3,1],"Pommel Blow":[2,3],"The Line Held":[4,1],"Dawn Shield":[2,2],"Ringing Rampart":[2,1]},
-  "silver.arrow": {"First Testimony":[1,0],"Witnessed":[0,3],"Twin Quarrels":[5,3],"Mark of the Accused":[1,2],"Flare Bolt":[2,0],"Heavy Quarrel":[4,0],"Slow Match":[3,0],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,3],"Bodkin Heads":[1,1],"Sworn Witnesses":[4,3],"Storm of Silver":[5,1],"Crank on the Verdict":[0,1],"Testimony Heard":[2,2],"Pinning Light":[3,1]},
-  "silver.frost": {"Tightening Links":[0,0],"Glinting Links":[1,3],"Tight Bindings":[0,1],"Dazzle":[0,2],"Twin Chains":[4,2],"Chain of Penance":[1,0],"Scouring Light":[2,0],"Last Rites":[3,1],"Blinding Chains":[3,2],"Chain of Judgement":[5,0],"Vigil Chains":[4,1],"Quick Binding":[5,3],"Shackle Litany":[5,1],"Swift Lash":[2,3],"Vigil Lamp":[4,3],"Glare of Dawn":[2,2]},
-  "silver.arcane": {"Full Gallop":[0,1],"Couched Lance":[0,0],"Spurs":[2,1],"Grail Quest":[1,0],"Tourney Passes":[1,1],"Shining Example":[4,3],"Trampling Hooves":[2,0],"Charge of the Vow":[3,3],"Echoing Verdict":[5,2],"Glory of the Charge":[5,1],"Rallying Vow":[4,2],"Vowkeeper":[4,0],"Unhorse":[3,2],"Shield and Spur":[1,2],"Grail's Grace":[2,3],"Unhorsing Ride":[3,1]},
-  "silver.storm": {"Zenith":[0,1],"Morning Rays":[1,3],"Sky Verdict":[2,1],"Fall from Grace":[4,0],"Prism":[2,0],"Kindled Faith":[5,0],"Noon Sweep":[3,0],"Dawnfall":[4,2],"Lance of Heaven":[5,3],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[3,3],"Searing Eye":[0,2],"Burning Pinions":[1,2],"Piercing Dawn":[1,1],"Sun Wheel":[4,1]},
-  "silver.earth": {"Press of Battle":[1,1],"Crushing Weight":[1,3],"Tremor":[0,1],"Ringing Steel":[5,1],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,0],"Final Judgement":[5,3],"Sword of Heaven":[3,0],"Sundering Blow":[2,2],"Marked by the Blade":[4,2],"Hurled Verdict":[4,1],"Sundered Plate":[1,2],"Reliquary":[2,0],"Censed Blade":[0,2],"Consecrated Earth":[3,1]},
-  "silver.cannon": {"Fanned Embers":[2,2],"Lingering Smoke":[1,0],"Glowing Coal":[5,1],"Swift Swing":[3,0],"Procession of Incense":[2,0],"Choking Smoke":[0,2],"Kindle the Censers":[4,1],"Censing of the Faithful":[5,0],"Ember Psalm":[5,2],"Thick Smoke":[1,3],"Purging Fire":[3,2],"Rekindling":[4,2],"Ash in the Eyes":[0,1],"Offering Bowl":[0,0],"Pall of Smoke":[1,1],"Censing Prayer":[3,1]},
+  "grove.glaive": {"Long Haft":[0,3],"Hold the Line":[0,2],"Set Spears":[2,3],"Shieldsplitter":[1,2],"Thornhedge":[1,3],"Bloodthorn":[2,1],"Rootbreaker":[4,1],"Phalanx":[4,0],"Wall of Spears":[5,3],"Impaler":[5,1],"Spearwood Rising":[3,1],"Living Palisade":[5,2],"Skewer":[3,0],"Splintered Line":[4,2],"Deep Thrust":[0,1],"Living Haft":[2,2],"Thornwall Ward":[3,3]},
+  "grove.arrow": {"Patient Hunter":[2,1],"Canopy Sight":[1,3],"Mark the Quarry":[2,2],"Thornpoint Arrows":[0,2],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[1,0],"Snaring Shot":[3,2],"Pinning Shot":[5,1],"Thornrain":[5,2],"Nailing Shaft":[4,0],"Still Quarry":[4,3],"Wounded Prey":[4,1],"Splitting Shaft":[5,0],"Quick Nock":[0,1],"Hunter's Rhythm":[1,1],"Hushed Quarry":[3,0]},
+  "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[2,2],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[3,3],"Bramble Squeeze":[4,2],"Spreading Roots":[1,2],"Bloodbriar":[2,1],"Rootburst":[3,1],"Overgrowth":[5,0],"Strangleroot":[5,2],"Warden's Reach":[3,0],"Sapwell":[4,3],"Quickening Sap":[0,1]},
+  "grove.arcane": {"Heavy Lance":[0,2],"Trample":[2,2],"Wheel About":[0,0],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[1,3],"Hooves of Thunder":[5,2],"Hunter's Finish":[5,3],"Second Charge":[3,3],"Goring Antlers":[0,1],"Long Gallop":[2,3],"Stag's Wind":[1,1],"Herd Instinct":[4,0]},
+  "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Pounce":[1,2],"Hawk's Mark":[2,3],"Grounded Prey":[4,0],"Moonsap Bolts":[2,0],"Skyfall":[5,2],"Shapestorm":[3,0],"Second Skin":[1,1],"Harrier's Cry":[4,2],"Hawk Lord":[5,1],"Wild Heart":[5,3],"Wild Pace":[0,0],"Druid's Patience":[0,1],"Talon Rend":[3,2]},
+  "grove.earth": {"Leaf-Edged Blades":[0,1],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,2],"Blade Rhythm":[1,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,1],"Encore":[4,2],"Twin Whirl":[3,0],"Gale of Blades":[4,1],"Reaper's Step":[5,3],"Quickstep":[2,2],"Dancer's Breath":[0,3],"Petal Cuts":[3,2]},
+  "grove.cannon": {"Potent Spores":[1,1],"Ripe Pods":[1,0],"Choking Spores":[0,2],"Seed Scatter":[3,0],"Hard Husk":[4,2],"Clinging Spores":[4,3],"Puffcap Sowing":[2,0],"Snapjaw Bloom":[3,3],"Spore Cloud":[5,0],"Bursting Rot":[5,1],"Puffcap Trail":[5,2],"Rootmark Seed":[4,1],"Drifting Spores":[1,3],"Far Cast":[2,2],"Seedwell":[2,3],"Thorned Husks":[0,1],"Burrowing Pods":[3,1]},
+  "grove.venom": {"Hunter's Patience":[0,1],"Barbed Darts":[0,2],"Quick Quiver":[0,3],"Lone Prey":[1,0],"Long Severance":[2,1],"Sap Thief":[2,0],"Bramble Snare":[1,3],"Briar Gibbet":[3,1],"Silent Stalk":[1,2],"Deep Snare":[2,3],"Thornmark Trail":[4,2],"Choking Thorns":[4,1],"Snare Line":[3,0],"Apex Stalker":[5,2],"Gallows Briar":[5,1],"Torn Ties":[5,0]},
+  "champ:rootmother": {"Patient Earth":[0,1],"Long Vines":[0,2],"Deep Grip":[0,0],"Twin Elders":[5,1],"Rootway":[1,1],"Bramble Grasp":[2,1],"Thorned Roots":[1,2],"Sap Song":[3,0],"Heartwood Sapling":[3,2],"Strangling Hold":[4,3],"Sapling Warden":[4,0],"Rootmother":[5,3],"The Old Wood Walks":[2,2],"Thousand Roots":[5,2],"Quick Tendrils":[1,3],"Deep Sap":[3,3],"Sapling Song":[4,1]},
+  "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,2],"Snaring Rain":[0,3],"Root Platform":[2,0],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[1,0],"Hunter’s Patience":[4,2],"Blood Moon":[5,3],"Snarled Ground":[3,1],"Running Shafts":[3,3],"Warden’s Mark":[3,0],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,2],"Captain's Share":[4,0],"Moonlit Aim":[5,2]},
+  "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[2,0],"Passing Spores":[1,3],"Compost":[3,1],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[4,1],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[0,1],"Seedmother":[5,2],"Full Bloom":[4,3],"Rotfeast":[4,0],"Busy Hive":[0,2],"Honey Store":[1,0]},
+  "conclave.glaive": {"Measured Cuts":[0,1],"Opening Salute":[1,3],"Lone Duel":[2,3],"Riftsteel Edge":[1,2],"Ward-Splitter":[1,1],"Charged Edge":[2,1],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[4,1],"Thrown Riftblade":[4,0],"Fifth Form":[4,3],"Phase Dancer":[3,1],"Ghostblade Rush":[5,1],"Weaver's Blade":[5,2],"Press the Opening":[0,0],"Binding Cut":[0,2],"Guard Broken":[3,2]},
+  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Homing Missiles":[2,2],"Apprentice's Zeal":[4,3],"Missile Curtain":[1,2],"Echoing Missiles":[3,2],"Charged Curtain":[3,0],"Gathering Orb":[3,3],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,3],"Cold Focus":[0,3],"Lecture Hall":[5,3],"Margin Notes":[1,1],"Recitation":[1,0],"Static Sparks":[2,1]},
+  "conclave.frost": {"Hoar Ink":[0,3],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,3],"Entomb":[1,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,1],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[1,0],"Needle Rime":[0,2],"Brittle Coffin":[3,3]},
+  "conclave.arcane": {"Lagging Hour":[2,0],"Tick Forward":[3,3],"Borrowed Time":[3,1],"Heavy Hours":[0,1],"Backward Hour":[2,1],"Paradox":[2,3],"Stopped Clock":[4,2],"Quickening Bell":[5,2],"Frozen Moment":[5,1],"Hourglass Heart":[4,0],"Recurrence":[4,3],"Rewound Wounds":[1,1],"Arcane Clockwork":[3,2],"Borrowed Hour":[5,3],"Pendulum Swing":[1,2],"Stolen Sand":[0,0],"Patient Hours":[0,2]},
+  "conclave.storm": {"Wide Heavens":[0,0],"Star-Chart":[1,3],"Constellation":[5,1],"Skybreaker":[1,1],"Comet":[2,1],"Lodestar":[2,3],"Grounded Stars":[4,0],"Zodiac":[4,2],"Starfall Sky":[5,2],"Twin Stars":[5,3],"Grand Orrery":[3,0],"Twinkling Ice":[2,0],"Frost Lens":[3,3],"Turning Spheres":[4,1],"Night Sight":[0,1],"Cold Starlight":[0,2],"Ill Omen":[3,2]},
+  "conclave.earth": {"Broad Palms":[1,2],"Second Tremor":[0,1],"Staggering Blow":[3,2],"Mana Quarry":[4,0],"Heave":[2,2],"Shatterground":[5,1],"Deep Magma":[2,0],"Golem Core":[3,0],"Living Bulwark":[4,1],"Fault Line":[4,3],"Obsidian":[2,3],"Walking Wall":[5,0],"Ember Stone":[1,1],"Living Mountain":[5,2],"Granite Fists":[1,0],"Ley Reservoir":[0,2],"Glyph Anchor":[3,1]},
+  "conclave.cannon": {"Slow-Burning Ink":[1,3],"Wide Blast":[1,0],"Pyre Scribe":[2,3],"Fire Feeds Mana":[3,0],"Firewalk":[4,1],"Cinder Charge":[3,2],"Skipping Flame":[2,0],"Phoenix":[3,1],"Ember Heart":[5,2],"Pyre Lord":[5,1],"Rolling Inferno":[4,0],"Endless Skip":[5,3],"Searing Tide":[4,3],"Leaping Cinders":[0,1],"Thermal Crack":[2,1],"Wardburn":[1,2],"Kindled Fingers":[0,2]},
+  "conclave.venom": {"Keen Crescent":[0,2],"Hunting Crescent":[1,0],"Lasting Undoing":[0,3],"Quick Severing":[2,2],"Ward Feedback":[0,1],"Returning Crescent":[1,3],"Splintering":[3,2],"Sever the Link":[1,1],"Seeking Edge":[2,3],"Arcane Memory":[3,3],"Rend the Veil":[4,2],"Shatterpoint":[4,1],"Brimming Severance":[2,1],"Void Ground":[5,2],"Unravelling Veil":[5,0],"Wardbreaker":[5,1]},
+  "champ:cc_arch": {"Quick Quill":[1,0],"Open Book":[0,2],"Marginalia":[1,2],"Read the Marks":[3,3],"Unravel":[2,0],"Loose Threads":[3,0],"Threads Pulled":[2,3],"Shared Lesson":[3,1],"Deeper Loom":[5,1],"Woven Edge":[4,2],"Snapping Threads":[4,0],"Spellweaver":[5,3],"Sixfold Loom":[4,1],"Rewoven Threads":[5,2],"Flicked Pages":[0,1],"Deep Inkwell":[1,3]},
+  "champ:cc_chrono": {"Patient Hands":[0,1],"Long Pendulum":[0,2],"Weighted Hour":[1,0],"Gathered Ghosts":[5,2],"Recall":[1,1],"Long Way Back":[2,1],"Leaden Minutes":[2,2],"Lent Time":[2,0],"Endless Hour":[4,2],"Late Arrival":[3,3],"Second Hand":[3,0],"Timekeeper":[5,1],"The Hour Strikes":[3,2],"Twelve Strokes":[5,0],"Ticking Hand":[0,3],"Saved Seconds":[4,3],"Leaden Pull":[4,1]},
+  "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,1],"Follow-Through":[0,2],"Practice Yard":[4,3],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[2,2],"Shared Edge":[2,1],"Bursting Seams":[5,2],"Cut the Fallen":[3,3],"Flourish":[3,2],"Blade of the Conclave":[5,0],"Unbound Blade":[4,2],"Duelling Ground":[4,0],"Flowing Cuts":[1,1],"Steady Breath":[3,1],"Chain to Blade":[5,1]},
+  "ironhold.glaive": {"Heavy Shoulders":[1,3],"Bearded Axe":[2,2],"Ringing Rim":[4,2],"Off Balance":[0,1],"Bowling Shove":[2,3],"Spinning Shield":[3,2],"Hot Shards":[5,0],"Shield Rush":[2,1],"Armourbreaker":[5,1],"Breaker's Blow":[4,0],"Brace and Shove":[3,0],"Shield Signal":[4,3],"Breach the Line":[5,2],"Hold the Pass":[3,1],"Caught Between Shields":[1,2],"Plate Salvage":[0,2],"Knock Them Flat":[0,0]},
+  "ironhold.arrow": {"Powder Smoke":[1,1],"Range-Finder":[1,2],"Long Belt":[3,1],"Called Shot":[5,2],"Rattlegun":[2,1],"Sighting In":[0,2],"Kneecapper":[4,3],"Thunder Belt":[5,1],"Gatling Crank":[5,3],"Breaching Slug":[3,3],"Quick Swab":[1,3],"Hard Kick":[2,0],"Case-Hardened":[4,2],"Quick Reload":[0,1],"Powder Tally":[2,3],"Pinning Rounds":[4,0],"Called Volley":[3,2]},
+  "ironhold.frost": {"Weighted Chains":[1,3],"Third Wrap":[0,1],"Trap Line":[3,3],"Tangle":[0,2],"Tripwire":[2,3],"Bound and Broken":[4,2],"Twin Nets":[5,3],"Double Line":[5,2],"Harpoon Winch":[3,2],"Bear Trap":[5,1],"Wide Nets":[1,0],"Hooked Chain":[4,0],"Spiked Caltrops":[2,2],"Wing Cords":[2,0],"Trapper's Haul":[1,1],"Barbed Chain":[3,1],"Caltrop Bed":[4,1]},
+  "ironhold.arcane": {"Searing Brand":[1,3],"Deep Brand":[0,2],"Brand Chain":[2,3],"Swift Inscription":[2,2],"Ringing Anvil":[5,0],"Masterwork Strike":[4,3],"Rune of Making":[1,2],"Rune of Unmaking":[4,0],"Rune Lord":[5,2],"Answering Rune":[2,1],"Runic Overflow":[0,1],"Forge Heat":[3,0],"Runebrand Detonation":[5,1],"Kinsmark":[0,3],"Paid in Kind":[3,1],"Quench":[1,0]},
+  "ironhold.storm": {"Torn Wings":[1,0],"Scorched Barrel":[1,2],"Spent Flare":[5,1],"Chain-Fed":[3,2],"Sky Shatter":[0,2],"Grapnel Shot":[2,2],"Tracer Rounds":[3,1],"Starshell":[4,1],"Endless Belt":[5,3],"Shellstorm":[5,2],"Reel In":[4,0],"Ground Burst":[1,1],"Hot Shrapnel":[2,0],"Barbed Shrapnel":[0,1],"Sky Watch":[0,3]},
+  "ironhold.earth": {"Packed Crowd":[1,1],"Steam in the Cracks":[0,1],"Scalding Steam":[3,1],"Rivet Popper":[0,0],"Piston Rhythm":[5,1],"Pile Driver":[2,1],"Echoing Slam":[4,0],"Groundsplitter":[5,3],"Molten Rivets":[5,2],"Steam Uppercut":[3,0],"Tremor Step":[2,2],"Safety Valve":[4,3],"Line Them Up":[4,2],"Hammer Home":[0,2],"Pressure Gauge":[2,0],"Steam Jacket":[1,3],"Piledriven":[3,3]},
+  "ironhold.cannon": {"Glowing Casings":[0,1],"Whistling Shells":[1,3],"Rattling Blast":[2,1],"Pitch-Soaked Wadding":[2,0],"Skipping Shell":[1,1],"Double Crew":[3,2],"Red-Hot Tube":[5,2],"Big Bertha":[3,3],"Clinging Fire":[0,2],"The Long Drop":[4,2],"Shrapnel Casing":[2,2],"Quake Shell":[4,0],"Walking Fire":[5,1],"Napalm":[5,3],"Ringing Ears":[0,0],"Powder Runners":[1,0]},
+  "ironhold.venom": {"Planted by Hand":[1,2],"Shaped Charges":[0,1],"Fuse Cutter":[0,2],"Blasting Wage":[3,0],"Black Powder Pack":[2,1],"Cracked Plate":[0,3],"Powder Trail":[3,1],"Rubble":[2,3],"Short Fuse":[3,2],"Tamped Charges":[1,1],"Long Trail":[4,1],"Demolition":[4,2],"Siege Master":[5,1],"Chain Demolition":[5,2],"Breach and Clear":[5,0],"Collapse":[4,3]},
+  "champ:ih_thane": {"Locked Shields":[0,0],"Shield-Ring":[0,1],"Wall of the Clan":[4,1],"Thane's Line":[4,0],"Horn of the Hold":[1,0],"Braced Heels":[2,0],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,2],"War Cry":[3,2],"Unbroken Line":[5,1],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,2]},
+  "champ:ih_artificer": {"Tally Wheel":[0,3],"Riveting Peal":[0,1],"Scrap Shrapnel":[0,2],"Engine Yard":[4,0],"Lodestone":[1,3],"Stronger Field":[2,3],"Barbed Rivets":[1,0],"Torn Loose":[3,3],"Counterweight":[3,0],"Magnetised":[4,2],"Overpressure":[4,1],"Chain Drive":[5,1],"Wrecking Ball":[2,0],"Restless Stone":[5,2],"Ricochet Rivets":[2,1],"Spare Parts":[3,2]},
+  "champ:ih_brewer": {"Leaky Keg":[0,2],"Slick Floor":[1,0],"Heavy Barrel":[1,1],"Open Tap":[3,0],"Firewater Breath":[1,2],"Double Measure":[2,2],"Sticky Stout":[3,1],"Scorching Gust":[4,3],"Brimming Keg":[5,1],"Spilled Pints":[5,2],"Last Call":[3,2],"On the Slate":[2,1],"Last Orders":[4,1],"Topped Up":[0,1]},
+  "silver.glaive": {"Shield-Ward":[0,1],"Witness the Blow":[1,2],"Staggering Bash":[0,2],"Shield of Faith":[3,0],"Vigil":[5,1],"Edge of Dawn":[0,3],"Rampart of Dawn":[2,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,2],"Oath of Rebuke":[5,0],"Unyielding":[4,3],"Unbroken Oath":[2,3],"Pommel Blow":[1,1],"The Line Held":[4,1],"Dawn Shield":[3,2],"Ringing Rampart":[3,3]},
+  "silver.arrow": {"First Testimony":[0,3],"Witnessed":[0,2],"Twin Quarrels":[5,1],"Mark of the Accused":[0,1],"Flare Bolt":[1,3],"Heavy Quarrel":[4,0],"Slow Match":[2,3],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,0],"Bodkin Heads":[1,1],"Sworn Witnesses":[4,3],"Storm of Silver":[5,0],"Crank on the Verdict":[1,0],"Testimony Heard":[2,2],"Pinning Light":[3,1]},
+  "silver.frost": {"Tightening Links":[0,2],"Glinting Links":[2,1],"Tight Bindings":[0,1],"Dazzle":[1,3],"Twin Chains":[4,2],"Chain of Penance":[1,2],"Scouring Light":[2,2],"Last Rites":[3,1],"Blinding Chains":[2,3],"Chain of Judgement":[5,2],"Vigil Chains":[4,1],"Quick Binding":[5,0],"Shackle Litany":[5,1],"Swift Lash":[3,3],"Vigil Lamp":[4,3],"Glare of Dawn":[3,0]},
+  "silver.arcane": {"Full Gallop":[1,1],"Couched Lance":[0,2],"Spurs":[3,1],"Grail Quest":[1,0],"Tourney Passes":[2,1],"Shining Example":[4,3],"Trampling Hooves":[1,2],"Charge of the Vow":[3,3],"Echoing Verdict":[5,1],"Glory of the Charge":[5,2],"Rallying Vow":[4,0],"Vowkeeper":[4,1],"Unhorse":[2,0],"Shield and Spur":[0,1],"Grail's Grace":[2,3],"Unhorsing Ride":[3,2]},
+  "silver.storm": {"Zenith":[1,1],"Morning Rays":[1,3],"Sky Verdict":[2,3],"Fall from Grace":[4,0],"Prism":[2,0],"Kindled Faith":[5,1],"Noon Sweep":[3,0],"Dawnfall":[4,2],"Lance of Heaven":[5,3],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[2,1],"Searing Eye":[0,1],"Burning Pinions":[0,0],"Piercing Dawn":[0,2],"Sun Wheel":[4,1]},
+  "silver.earth": {"Press of Battle":[2,2],"Crushing Weight":[1,3],"Tremor":[0,1],"Ringing Steel":[5,2],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,1],"Final Judgement":[5,0],"Sword of Heaven":[3,0],"Sundering Blow":[1,1],"Marked by the Blade":[4,3],"Hurled Verdict":[4,2],"Sundered Plate":[1,2],"Reliquary":[2,0],"Censed Blade":[0,2],"Consecrated Earth":[3,1]},
+  "silver.cannon": {"Fanned Embers":[3,1],"Lingering Smoke":[1,0],"Glowing Coal":[5,2],"Swift Swing":[3,0],"Procession of Incense":[2,0],"Choking Smoke":[0,2],"Kindle the Censers":[4,2],"Censing of the Faithful":[5,3],"Ember Psalm":[5,1],"Thick Smoke":[1,1],"Purging Fire":[2,3],"Rekindling":[4,3],"Ash in the Eyes":[1,3],"Offering Bowl":[0,0],"Pall of Smoke":[0,1],"Censing Prayer":[3,2]},
   "silver.venom": {"Broken Litany":[1,0],"Scorching Seal":[0,3],"Heavy Silence":[1,2],"Dry Well":[0,2],"Zealot's Vow":[1,3],"Writ of Seizure":[2,2],"Forfeit":[0,1],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[3,2],"Heretic's Stake":[4,0],"Penitent Chains":[4,1],"Confession":[3,3],"Pyre Eternal":[5,0],"Ashes Speak":[5,1],"Grand Inquest":[5,2]},
-  "champ:so_lion": {"Shoulder to Shoulder":[1,1],"Lowered Shield":[3,3],"Wide Sweep":[0,0],"Shield Wall":[4,1],"Bulwark Slam":[2,1],"Shields Raised":[3,1],"Burnished Shields":[2,2],"Rally to the Shield":[3,0],"The Far Bank":[5,3],"Debt of Oaths":[5,2],"Unbroken":[4,2],"The Crossing":[4,3],"The Ford Itself":[5,0],"Swift Reprisal":[0,2],"Hearts Lifted":[1,0]},
-  "champ:so_dawn": {"Early Dawn":[0,3],"Clear Sky":[0,1],"Dawn Chorus":[0,0],"Cloister Wall":[5,1],"Prism of Dawn":[1,3],"Lingering Star":[2,3],"Searing Light":[4,2],"Be Still":[3,0],"Noonday":[4,1],"Blinding Glare":[3,2],"Radiant Hymn":[2,1],"Dawnsinger":[5,0],"High Noon":[3,1],"Spilled Light":[5,2],"Bright Halo":[2,2],"First Light":[1,1],"Noon Bell":[4,3]},
-  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[1,2],"Ready Ledger":[0,2],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,1],"Trampling Host":[2,2],"Clerk’s Quill":[3,2],"Grey Justicar":[5,2],"Final Verdict":[4,3],"Riders of the Ford":[4,2],"Ride Them Down":[2,1],"Court Fines":[3,1],"Summary Ruling":[0,1]},
-  "stormborn.glaive": {"Wolf at the Throat":[0,2],"Hunting Bond":[0,3],"Hock Bite":[0,1],"Hunter's Due":[5,0],"Pack Tactics":[2,3],"Scent of Rain":[1,3],"Restless Spear":[5,1],"Wolf and Spear":[3,2],"Spirit Pack":[5,3],"Moonfang Pounce":[4,0],"Stormpin":[4,1],"Guard the Pass":[3,0],"Grounding Spear":[2,2],"Thunder-Called Spear":[2,1],"Blood on the Fur":[1,2],"Hunting Cry":[3,1]},
-  "stormborn.arrow": {"Riding the Gale":[1,3],"Through and Through":[0,1],"Quick Wind":[3,3],"Gust Fletching":[1,2],"Headwind":[2,3],"Walking Wind":[5,1],"Featherfall":[2,1],"Skyward Gust":[4,1],"Skyrend":[5,2],"Lightning Fletch":[5,3],"Rain Arrows":[3,0],"Hurricane Volley":[3,1],"Updraft Reader":[0,2],"Breath of the Gust":[1,0],"Eddying Wake":[4,2]},
-  "stormborn.frost": {"Heavy Hail":[0,2],"Water Turns to Ice":[1,3],"Brittle Cold":[1,1],"Sleet":[3,3],"Hail Cairn":[5,0],"Bitter Rain":[0,1],"Black Ice":[2,3],"Skystone":[3,0],"Frozen Through":[5,2],"Frostbound Totem":[4,0],"Ice Crust":[2,0],"Frost Lightning":[4,1],"Hail Shatter":[5,1],"First Clouds":[1,2],"Meltwater":[2,1],"Shattering Hail":[3,2],"Brittle Fall":[4,3]},
-  "stormborn.arcane": {"Restless Dead":[0,1],"Deep Hex":[1,2],"Lingering Spirits":[3,3],"Spirit Weight":[0,0],"Judgment":[3,1],"Ancestors' Toll":[2,2],"Walk On":[5,3],"Spirit Host":[5,2],"Spirit Walk":[4,3],"Renewed Hex":[3,2],"Spirit Echo":[4,0],"The Final Tally":[5,1],"Spirit Draw":[2,0],"Debts Repaid":[0,3],"Kindred Chains":[1,1],"Final Reckoning":[4,2]},
-  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[0,1],"Conductor":[2,1],"Overcharge":[4,2],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[4,1],"Living Storm":[5,1],"Last Spark":[5,2],"Lightning Rod":[3,1],"Stormseed":[5,3],"Split Sky":[2,3],"Copper Crown":[4,0],"Ground Strike":[1,3],"Drinking the Storm":[3,2],"Wardsplitter Bolts":[1,2],"Thunder Wings":[3,3]},
-  "stormborn.earth": {"Ground Gives Way":[0,1],"Deep Fissures":[1,0],"Mountain's Echo":[5,3],"Rattled":[3,1],"Stonewake":[1,1],"Shake Loose":[2,0],"Widening Earth":[5,2],"Riftmaker":[4,3],"Sinkhole":[4,2],"Rift Rhythm":[2,1],"Mud and Rain":[1,2],"Storm Mire":[5,0],"Second Tremor":[0,3],"Stone Remembers":[4,1],"Drumming Feet":[3,0],"Deep Rift":[3,2]},
-  "stormborn.cannon": {"Long Clouds":[0,1],"Brooding Sky":[0,2],"Many Skies":[5,3],"Heavy Rain":[3,0],"Storm Dance":[1,0],"Static Clouds":[4,3],"Rain Dance":[1,2],"Skyleap":[3,3],"Breaking Sky":[5,1],"Rolling Clouds":[3,2],"Landing Thunder":[4,1],"Sky Strike":[2,3],"Sky Lattice":[5,2],"Thunder Answers":[0,0],"Rain Returns":[4,0],"Drenching Pour":[2,2],"Rainmaker":[2,1]},
-  "stormborn.venom": {"Downwind Haul":[0,0],"Long Cord":[1,1],"Quick Cast":[1,3],"Sky Lore":[0,2],"Ground Stake":[2,1],"Charged Harpoons":[0,3],"Drenching Barbs":[2,2],"Heavy Air":[3,1],"Many Cords":[2,0],"Skyfall Harpoon":[3,2],"Pinned to Earth":[4,0],"Storm-Cord":[3,3],"Fallen Sky":[4,2],"Twin Harpoon":[5,3],"Master of the Sky":[5,1]},
-  "champ:sb_caller": {"Heavy Clouds":[0,2],"Crown of Rain":[1,3],"Rain on Rain":[1,1],"Drum Circle":[3,2],"Thunder Drum":[1,2],"Long Roll":[2,2],"Drenching Storm":[3,0],"Drum of the Host":[2,1],"Two Tomorrows":[5,0],"Eye of the Gathering":[4,1],"Storm Caller":[5,3],"Tomorrow's Storm":[4,0],"Drum in the Rain":[5,1],"Gusting Staff":[0,0],"Rainwell":[0,1]},
-  "champ:sb_wind": {"Rain in the Wind":[0,3],"Feather-Cut":[0,2],"Wide Funnel":[1,1],"Road's End":[5,2],"Stoneward Gale":[1,3],"Wide Gale":[2,3],"Biting Gale":[3,2],"Feather Gift":[4,0],"Long Road Back":[3,0],"Hard Landing":[3,1],"Wind at Her Back":[1,0],"Twin Gale":[5,1],"Turn the Road":[2,0],"Whirling Steps":[0,1],"Returning Breath":[2,2],"Rising Air":[4,3]},
-  "champ:sb_beast": {"Old Calls":[0,0],"Keen Nose":[0,3],"Long Hunt":[0,1],"Wolf Den":[4,0],"Wolfsong":[1,0],"Heel Biters":[2,0],"Pack Hunger":[3,2],"Thunder on the Prey":[4,1],"Stormcarrier":[5,2],"Blood Trail":[5,3],"Spirit Run":[2,3],"Beastcaller":[5,1],"Thunderbird’s Talons":[4,2],"Pack Pace":[1,1],"Hunter's Breath":[3,3],"Hunter's Stride":[1,2]},
-  "wardbound.glaive": {"Avenging Oath":[0,0],"Deep Carving":[2,1],"Oathbreaker's Due":[0,3],"Oathsworn Cut":[1,0],"Sword and Stone":[3,3],"Oath Kept":[0,2],"Rune Cleave":[2,0],"Unbroken Line":[3,1],"Hold Fast":[1,2],"Bright Wards":[3,0],"Final Oath":[4,1],"Oath of Iron":[2,2],"Linebreaker":[4,3],"Oath Fulfilled":[5,1],"Oathfire":[5,3],"Shared Oath":[5,2]},
-  "wardbound.arrow": {"The Long Watch":[0,3],"Masked Sight":[1,1],"Rune-Etched Edge":[0,2],"Branding Edge":[2,1],"Mask's Tally":[1,0],"Mark the Fallen":[1,2],"Returning Oath":[3,1],"Branding Rite":[2,0],"Line Cut":[3,2],"Dragging Edge":[4,1],"Caught Again":[4,0],"Warding Glaive":[4,2],"Glaive of Judgement":[5,0],"Twin Wards":[5,3],"Lodestar":[5,2]},
-  "wardbound.frost": {"Brand-Rime":[0,3],"Wide Sweep":[0,1],"Creeping Rime":[0,2],"Bitter Steel":[1,0],"Hard Rime":[2,2],"Meltwater":[2,3],"Frostbite":[2,0],"Winter Ward":[3,2],"Rimecut":[1,1],"Deep Bite":[3,0],"Long Winter":[4,2],"Shatter Oath":[4,1],"Cold Vigil":[4,3],"Biting Wind":[3,1],"Winter's Line":[5,3],"Hoarfrost":[5,1],"Rime Crown":[5,0]},
-  "wardbound.arcane": {"Shared Margins":[0,2],"Lingering Ink":[0,3],"Ward-Cutting Script":[1,0],"Deep Script":[0,1],"Palimpsest":[1,2],"Spent Ink":[3,3],"Detonate":[1,1],"Ink of Binding":[3,2],"Sigil Ward":[2,0],"Chain Reaction":[2,1],"Scribe the Road":[4,2],"Double Stroke":[2,3],"Volatile Script":[4,0],"The Last Word":[5,2],"Cascade":[5,1],"Runesight":[5,0]},
-  "wardbound.storm": {"Couched Lance":[0,0],"Thunder Hooves":[2,1],"Branding Sparks":[0,1],"Forked Pennon":[0,2],"Storm Pennant":[1,0],"Sky-Drawn":[1,2],"Spur and Lance":[2,2],"Cracking Pennant":[2,0],"Thunderbrand":[4,1],"Skyfall":[3,2],"Charge Through":[3,1],"Pennant Call":[3,3],"Gathering Storm":[4,0],"Sky's Answer":[4,2],"Thunder Oath":[5,1],"Stormwake":[5,0],"Second Thunder":[5,3]},
-  "wardbound.earth": {"Broad Shield":[0,0],"Iron Rhythm":[0,2],"Deep Quake":[1,2],"Restless Earth":[1,1],"Braced Shove":[2,3],"Anvil's Toll":[3,0],"Quake Line":[2,1],"Wall of Shields":[3,3],"Shield Brand":[2,2],"Fault Line":[3,1],"Anvil Stance":[4,3],"Rune-Shaker":[4,0],"Aftershock":[4,2],"Unmoving":[5,3],"Breaking Stance":[5,2],"Mountain's Weight":[5,1]},
-  "wardbound.cannon": {"Spotter":[1,0],"Wide Blast":[1,3],"Heavy Bolts":[0,1],"Long Pin":[0,2],"Crank Drill":[2,3],"Steady Crew":[3,0],"Rune Shot":[1,2],"Chain Bolt":[3,3],"Pinned and Branded":[3,2],"Kindled Runes":[2,2],"Iron Tether":[4,3],"Bolt Sequence":[2,1],"Shatter Shot":[4,1],"Rearm":[4,2],"Unbroken Chain":[5,0],"Ballista Volley":[5,1],"Kept Runes":[5,2]},
-  "wardbound.venom": {"Field Chaplain":[1,1],"Urgent Hands":[1,3],"Deep Mending":[0,1],"Incense of Vigil":[1,2],"Sworn Vow":[2,3],"Mender's Due":[0,0],"Siege-Ward":[2,0],"Oath Renewed":[3,3],"Choking Censer":[2,2],"Rite of Holding":[3,0],"Vow of Iron":[4,2],"Ember Vow":[4,1],"Long Rite":[4,0],"Keeper of Vows":[5,1],"Sanctuary":[5,2],"Hallowed Road":[5,3]},
-  "champ:wb_varic": {"Patient Oath":[0,3],"Warden's Reach":[0,0],"Wide Ring":[1,2],"Shield Brothers":[4,1],"Hold Fast":[1,3],"Long Vigil":[2,3],"Heavy Hand":[3,0],"Shared Watch":[3,2],"The Gate Holds":[5,0],"The Road Remembers":[5,1],"Steady Pace":[2,1],"Last Warden":[5,2],"The Last Gate":[4,0],"Held to Account":[2,2],"Old Discipline":[0,1]},
-  "champ:wb_aedric": {"Eager Sun":[1,2],"Sunlit Reach":[1,3],"Sun's Due":[0,3],"Into the Fray":[4,3],"Sun Charge":[2,2],"Sun-Struck Trail":[3,2],"Searing Wheel":[3,1],"Rallying Cry":[3,0],"Undying Blaze":[5,1],"Open Road":[5,0],"Hot Blood":[4,0],"Sun-Sworn":[5,2],"Blaze of Glory":[4,1],"Battle Fever":[2,0],"Spurs":[0,1]},
-  "champ:wb_isaura": {"Ready Vow":[0,3],"Silent Vow":[0,0],"Vow Carved":[0,2],"Witness of Vows":[2,1],"Binding Sweep":[1,3],"Tighter Bonds":[2,3],"Heavy Vow":[3,0],"Shared Vow":[3,1],"Turned Twice":[5,0],"Sworn Road":[5,1],"Quiet Step":[4,2],"Veiled Oath":[5,2],"Oath Turned":[4,0],"Vow's Reckoning":[1,1],"Measured Sweeps":[1,2]},
+  "champ:so_lion": {"Shoulder to Shoulder":[0,1],"Lowered Shield":[3,3],"Wide Sweep":[0,3],"Shield Wall":[4,1],"Bulwark Slam":[1,1],"Shields Raised":[2,1],"Burnished Shields":[1,2],"Rally to the Shield":[2,0],"The Far Bank":[5,3],"Debt of Oaths":[5,1],"Unbroken":[3,2],"The Crossing":[4,3],"The Ford Itself":[5,2],"Swift Reprisal":[0,2],"Hearts Lifted":[1,0]},
+  "champ:so_dawn": {"Early Dawn":[0,0],"Clear Sky":[0,2],"Dawn Chorus":[0,1],"Cloister Wall":[5,2],"Prism of Dawn":[1,0],"Lingering Star":[2,0],"Searing Light":[3,2],"Be Still":[3,0],"Noonday":[4,1],"Blinding Glare":[4,3],"Radiant Hymn":[2,1],"Dawnsinger":[5,1],"High Noon":[3,1],"Spilled Light":[5,0],"Bright Halo":[1,3],"First Light":[1,2],"Noon Bell":[4,2]},
+  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[1,1],"Ready Ledger":[0,1],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,2],"Trampling Host":[2,1],"Clerk’s Quill":[3,1],"Grey Justicar":[5,1],"Final Verdict":[4,3],"Riders of the Ford":[4,1],"Ride Them Down":[2,2],"Court Fines":[3,2],"Summary Ruling":[0,2]},
+  "stormborn.glaive": {"Wolf at the Throat":[0,1],"Hunting Bond":[0,3],"Hock Bite":[0,2],"Hunter's Due":[5,0],"Pack Tactics":[2,3],"Scent of Rain":[1,3],"Restless Spear":[5,1],"Wolf and Spear":[4,0],"Spirit Pack":[5,2],"Moonfang Pounce":[4,3],"Stormpin":[4,1],"Guard the Pass":[2,1],"Grounding Spear":[2,2],"Thunder-Called Spear":[3,2],"Blood on the Fur":[1,1],"Hunting Cry":[3,1]},
+  "stormborn.arrow": {"Riding the Gale":[2,3],"Through and Through":[0,1],"Quick Wind":[4,3],"Gust Fletching":[0,2],"Headwind":[3,3],"Walking Wind":[5,1],"Featherfall":[2,2],"Skyward Gust":[4,1],"Skyrend":[5,0],"Lightning Fletch":[5,2],"Rain Arrows":[2,0],"Hurricane Volley":[3,1],"Updraft Reader":[1,0],"Breath of the Gust":[1,3],"Eddying Wake":[4,2]},
+  "stormborn.frost": {"Heavy Hail":[1,1],"Water Turns to Ice":[1,3],"Brittle Cold":[0,1],"Sleet":[3,3],"Hail Cairn":[5,1],"Bitter Rain":[0,2],"Black Ice":[2,3],"Skystone":[3,2],"Frozen Through":[5,2],"Frostbound Totem":[4,2],"Ice Crust":[2,2],"Frost Lightning":[4,3],"Hail Shatter":[5,0],"First Clouds":[0,0],"Meltwater":[1,2],"Shattering Hail":[3,0],"Brittle Fall":[4,1]},
+  "stormborn.arcane": {"Restless Dead":[0,1],"Deep Hex":[1,1],"Lingering Spirits":[3,3],"Spirit Weight":[0,2],"Judgment":[2,2],"Ancestors' Toll":[2,1],"Walk On":[5,3],"Spirit Host":[5,2],"Spirit Walk":[4,3],"Renewed Hex":[3,1],"Spirit Echo":[4,2],"The Final Tally":[5,1],"Spirit Draw":[2,0],"Debts Repaid":[0,3],"Kindred Chains":[1,0],"Final Reckoning":[3,0]},
+  "stormborn.storm": {"Rolling Thunder":[0,0],"Static Field":[0,2],"Conductor":[1,2],"Overcharge":[3,1],"Skybolt":[2,0],"Arc Bridge":[1,0],"Copper Kin":[3,2],"Living Storm":[5,1],"Last Spark":[5,3],"Lightning Rod":[2,2],"Stormseed":[5,2],"Split Sky":[3,3],"Copper Crown":[4,2],"Ground Strike":[2,3],"Drinking the Storm":[4,1],"Wardsplitter Bolts":[0,1],"Thunder Wings":[4,0]},
+  "stormborn.earth": {"Ground Gives Way":[0,2],"Deep Fissures":[0,1],"Mountain's Echo":[5,2],"Rattled":[2,0],"Stonewake":[1,2],"Shake Loose":[3,3],"Widening Earth":[5,0],"Riftmaker":[4,3],"Sinkhole":[4,0],"Rift Rhythm":[2,2],"Mud and Rain":[1,1],"Storm Mire":[5,1],"Second Tremor":[1,3],"Stone Remembers":[4,2],"Drumming Feet":[3,1],"Deep Rift":[3,0]},
+  "stormborn.cannon": {"Long Clouds":[1,2],"Brooding Sky":[0,1],"Many Skies":[5,2],"Heavy Rain":[4,1],"Storm Dance":[0,2],"Static Clouds":[3,0],"Rain Dance":[1,1],"Skyleap":[2,0],"Breaking Sky":[5,1],"Rolling Clouds":[4,0],"Landing Thunder":[4,2],"Sky Strike":[1,0],"Sky Lattice":[5,3],"Thunder Answers":[0,3],"Rain Returns":[3,2],"Drenching Pour":[2,1],"Rainmaker":[2,3]},
+  "stormborn.venom": {"Downwind Haul":[0,1],"Long Cord":[1,3],"Quick Cast":[0,2],"Sky Lore":[0,0],"Ground Stake":[2,3],"Charged Harpoons":[1,0],"Drenching Barbs":[2,1],"Heavy Air":[3,3],"Many Cords":[1,2],"Skyfall Harpoon":[3,1],"Pinned to Earth":[4,0],"Storm-Cord":[3,2],"Fallen Sky":[4,1],"Twin Harpoon":[5,1],"Master of the Sky":[5,2]},
+  "champ:sb_caller": {"Heavy Clouds":[0,2],"Crown of Rain":[0,0],"Rain on Rain":[2,0],"Drum Circle":[3,2],"Thunder Drum":[1,2],"Long Roll":[2,2],"Drenching Storm":[3,3],"Drum of the Host":[2,3],"Two Tomorrows":[5,3],"Eye of the Gathering":[4,1],"Storm Caller":[5,1],"Tomorrow's Storm":[4,3],"Drum in the Rain":[5,2],"Gusting Staff":[1,1],"Rainwell":[0,1]},
+  "champ:sb_wind": {"Rain in the Wind":[0,3],"Feather-Cut":[0,2],"Wide Funnel":[0,1],"Road's End":[5,2],"Stoneward Gale":[1,3],"Wide Gale":[2,3],"Biting Gale":[3,2],"Feather Gift":[3,1],"Long Road Back":[4,0],"Hard Landing":[4,2],"Wind at Her Back":[2,0],"Twin Gale":[5,1],"Turn the Road":[3,0],"Whirling Steps":[1,2],"Returning Breath":[2,1],"Rising Air":[4,3]},
+  "champ:sb_beast": {"Old Calls":[1,0],"Keen Nose":[1,1],"Long Hunt":[1,3],"Wolf Den":[4,3],"Wolfsong":[2,0],"Heel Biters":[3,0],"Pack Hunger":[3,2],"Thunder on the Prey":[4,1],"Stormcarrier":[5,2],"Blood Trail":[5,1],"Spirit Run":[3,3],"Beastcaller":[5,0],"Thunderbird’s Talons":[4,2],"Pack Pace":[0,1],"Hunter's Breath":[2,2],"Hunter's Stride":[0,2]},
+  "wardbound.glaive": {"Avenging Oath":[0,1],"Deep Carving":[3,3],"Oathbreaker's Due":[1,3],"Oathsworn Cut":[0,0],"Sword and Stone":[4,2],"Oath Kept":[0,2],"Rune Cleave":[1,0],"Unbroken Line":[3,1],"Hold Fast":[2,3],"Bright Wards":[2,0],"Final Oath":[4,1],"Oath of Iron":[2,1],"Linebreaker":[3,2],"Oath Fulfilled":[5,1],"Oathfire":[5,2],"Shared Oath":[5,0]},
+  "wardbound.arrow": {"The Long Watch":[0,1],"Masked Sight":[0,2],"Rune-Etched Edge":[0,0],"Branding Edge":[2,1],"Mask's Tally":[1,3],"Mark the Fallen":[2,0],"Returning Oath":[3,1],"Branding Rite":[1,0],"Line Cut":[3,2],"Dragging Edge":[4,1],"Caught Again":[4,0],"Warding Glaive":[4,2],"Glaive of Judgement":[5,1],"Twin Wards":[5,3],"Lodestar":[5,2]},
+  "wardbound.frost": {"Brand-Rime":[0,1],"Wide Sweep":[0,2],"Creeping Rime":[0,3],"Bitter Steel":[1,0],"Hard Rime":[2,3],"Meltwater":[1,2],"Frostbite":[2,0],"Winter Ward":[3,3],"Rimecut":[2,1],"Deep Bite":[3,0],"Long Winter":[4,3],"Shatter Oath":[4,2],"Cold Vigil":[4,1],"Biting Wind":[3,2],"Winter's Line":[5,1],"Hoarfrost":[5,2],"Rime Crown":[5,0]},
+  "wardbound.arcane": {"Shared Margins":[1,2],"Lingering Ink":[0,2],"Ward-Cutting Script":[1,3],"Deep Script":[0,1],"Palimpsest":[2,2],"Spent Ink":[3,2],"Detonate":[1,1],"Ink of Binding":[3,3],"Sigil Ward":[3,0],"Chain Reaction":[2,1],"Scribe the Road":[4,3],"Double Stroke":[2,0],"Volatile Script":[4,2],"The Last Word":[5,3],"Cascade":[5,2],"Runesight":[5,1]},
+  "wardbound.storm": {"Couched Lance":[0,1],"Thunder Hooves":[3,0],"Branding Sparks":[0,2],"Forked Pennon":[1,0],"Storm Pennant":[1,1],"Sky-Drawn":[0,3],"Spur and Lance":[2,2],"Cracking Pennant":[2,1],"Thunderbrand":[3,1],"Skyfall":[3,2],"Charge Through":[4,0],"Pennant Call":[2,3],"Gathering Storm":[4,3],"Sky's Answer":[4,2],"Thunder Oath":[5,3],"Stormwake":[5,2],"Second Thunder":[5,1]},
+  "wardbound.earth": {"Broad Shield":[0,2],"Iron Rhythm":[0,1],"Deep Quake":[2,3],"Restless Earth":[1,1],"Braced Shove":[1,2],"Anvil's Toll":[3,0],"Quake Line":[2,1],"Wall of Shields":[3,3],"Shield Brand":[1,0],"Fault Line":[3,1],"Anvil Stance":[4,3],"Rune-Shaker":[4,2],"Aftershock":[4,0],"Unmoving":[5,3],"Breaking Stance":[5,2],"Mountain's Weight":[5,1]},
+  "wardbound.cannon": {"Spotter":[1,0],"Wide Blast":[0,3],"Heavy Bolts":[0,1],"Long Pin":[0,2],"Crank Drill":[2,3],"Steady Crew":[3,1],"Rune Shot":[1,2],"Chain Bolt":[3,3],"Pinned and Branded":[2,0],"Kindled Runes":[2,2],"Iron Tether":[4,3],"Bolt Sequence":[1,1],"Shatter Shot":[4,1],"Rearm":[4,0],"Unbroken Chain":[5,2],"Ballista Volley":[5,0],"Kept Runes":[5,1]},
+  "wardbound.venom": {"Field Chaplain":[0,2],"Urgent Hands":[1,2],"Deep Mending":[0,1],"Incense of Vigil":[1,1],"Sworn Vow":[2,2],"Mender's Due":[0,0],"Siege-Ward":[2,0],"Oath Renewed":[3,2],"Choking Censer":[2,1],"Rite of Holding":[3,0],"Vow of Iron":[4,1],"Ember Vow":[3,3],"Long Rite":[4,0],"Keeper of Vows":[5,2],"Sanctuary":[5,1],"Hallowed Road":[5,3]},
+  "champ:wb_varic": {"Patient Oath":[0,2],"Warden's Reach":[1,1],"Wide Ring":[2,3],"Shield Brothers":[4,2],"Hold Fast":[1,2],"Long Vigil":[2,2],"Heavy Hand":[3,0],"Shared Watch":[3,3],"The Gate Holds":[5,0],"The Road Remembers":[5,2],"Steady Pace":[2,1],"Last Warden":[5,1],"The Last Gate":[4,0],"Held to Account":[1,0],"Old Discipline":[0,1]},
+  "champ:wb_aedric": {"Eager Sun":[1,3],"Sunlit Reach":[1,2],"Sun's Due":[0,2],"Into the Fray":[4,0],"Sun Charge":[2,3],"Sun-Struck Trail":[3,3],"Searing Wheel":[3,1],"Rallying Cry":[3,2],"Undying Blaze":[5,1],"Open Road":[5,0],"Hot Blood":[4,3],"Sun-Sworn":[5,2],"Blaze of Glory":[4,1],"Battle Fever":[2,0],"Spurs":[0,1]},
+  "champ:wb_isaura": {"Ready Vow":[0,3],"Silent Vow":[0,2],"Vow Carved":[1,1],"Witness of Vows":[2,1],"Binding Sweep":[1,3],"Tighter Bonds":[2,3],"Heavy Vow":[3,2],"Shared Vow":[4,3],"Turned Twice":[5,2],"Sworn Road":[5,0],"Quiet Step":[3,0],"Veiled Oath":[5,1],"Oath Turned":[4,2],"Vow's Reckoning":[2,2],"Measured Sweeps":[0,1]},
 };
 /* </spread> */
 
@@ -53300,8 +53300,8 @@ const ELEM_FX_DEF = {
   // the Pyroclasts' fire (pyrofire.js; drawn live by the flame shader, pyrotex.js). Sizes in world units.
   cc_fireball: {
     // the flame in the casting palm: length, longer each tier, grown as a cast gathers, brightness, its glow, how much it
-    // lags the hand as it moves
-    hand: { flame: .2, tier: .012, cast: .7, k: 1, disc: .5, lag: 1 },
+    // lags the hand as it moves; the ball of fire that swells in his palm as a strike winds up, then is thrown (x its size; 0 none)
+    hand: { flame: .2, tier: .012, cast: .7, k: 1, disc: .5, lag: 1, charge: 1 },
     // the fireball in flight: its length (the ball about half of it across, its flame swept back the rest), brightness, its
     // glow, how much of the lob's arc it keeps (none: it flies straight and level, at the height it left his hand), the most of
     // a foe's height it flies at (a foe shorter than his hand: it comes down to that), the air's shimmer
@@ -53378,7 +53378,7 @@ const ELEM_FX_DEF = {
   cc_pyrostyle: {
     // the flame shader's look: soot at the cool ends, hot core size, gradient blend (1 smooth, 0 flat bands), turbulence,
     // brush grain, glow round the flame, flicker
-    paint: { soot: 1, heart: 1, soft: .85, curl: 1, grain: 1, halo: 1, flicker: 1 },
+    paint: { soot: 1, heart: 1, soft: .85, curl: 1, grain: .55, halo: 1, flicker: 1 },
   },
   // the Frostweavers' frost (frostfx.js; drawn live by the ice shader, frosttex.js). Sizes in world units.
   cc_rime: {
@@ -53453,7 +53453,7 @@ const ELEM_FX_DEF = {
 };
 const EFX_INFO = {
   ball: ['Ball length', .05, 2, .01], w: ['Width / size', .02, 8, .01], wMax: ['Largest width', .5, 8, .05], k: ['Brightness', 0, 3, .02], kGreat: ['Brightness (great ball)', 0, 3, .02],
-  flame: ['Flame length', .02, .6, .005], tier: ['Longer each tier', 0, .05, .001], cast: ['Grows as a cast gathers (x)', 0, 3, .05], disc: ['Glow disc', 0, 2, .01],
+  flame: ['Flame length', .02, .6, .005], tier: ['Longer each tier', 0, .05, .001], cast: ['Grows as a cast gathers (x)', 0, 3, .05], charge: ['Ball swelling in the palm (x size)', 0, 2, .05], disc: ['Glow disc', 0, 2, .01],
   rise: ['Rise speed', 0, 2, .01], ember: ['Embers (chance / a second)', 0, 10, .05], great: ['How many (great ball)', 0, 30, 1], fling: ['Fling speed', 0, 5, .05], secs: ['Lifetime (s)', .05, 3, .01],
   puffs: ['Puffs', 0, 6, 1], delay: ['Delay (s)', 0, 1, .01], scorch: ['Afterglow radius (per splash)', 0, 2, .01], tongues: ['Tongues', 0, 12, 1], tall: ['Flame height', .05, 1.2, .01],
   len0: ['Length at the hands', .05, 2, .01], len1: ['Length added by the end', 0, 3, .01], cone: ['Share of the cone', 0, 1.5, .01], drop: ['Dip toward the ground', 0, 1, .01], chance: ['Chance', 0, 1, .01],
@@ -53482,7 +53482,7 @@ Object.assign(EFX_INFO, { long: ['Length', .05, 2.5, .01], fat: ['Width (per len
 const EFX = { on: false, lab: false, cur: null, lay: null, live: {}, use: null, cache: {}, stat: {}, dup: false };
 // tuning saved on this device for the Pyroclasts' earlier fire (other values, other sizes: the sheets, then the flat painted
 // bands) is dropped, once each time their fire is rebuilt
-const EFX_PYRO_V = '3';
+const EFX_PYRO_V = '4';
 function efxFresh(o) { if (o) for (const id in ELEM_FX_SPELLS) if (ELEM_FX_SPELLS[id].unit === 'cc_pyroclast') delete o[id]; return o; }
 // the device's Use in game set (only if the owner turned it on in the lab)
 try {
@@ -58675,7 +58675,7 @@ void main(){
     vec3 tx = texture(uGPT, uv, clamp(od*1.8*uGPE, 0., 5. + min(uGPE - 1., 1.5))).rgb*(1. - clamp(od*uGPE/3.6, 0., mix(.85, .95, clamp(uGPE - 1., 0., 1.))));
     if(uGPE > 1.01) tx *= mix(.22, 1., smoothstep(-.2, 2., min(uv.x, 1. - uv.x)/uGP.z));   // (such a map's painting also dims toward its left and right edges, so the seam with its mirrored copy lies in the dark)
     if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .01) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
-    float shp = uShadowOn>.5 ? shadowAt(vL) : 1.;
+    float shp = uShadowOn>.5 && vW.y < .05 ? shadowAt(vL) : 1.;   // (a card stood on the painting takes no shadow: it only shows the painting behind it)
     vec3 pl = vec3(0.);
     for(int i=0;i<6;i++){ if(i>=uNPL) break; vec3 d=uPL[i].xyz-vW; float l=length(d); float a=clamp(1.-l/uPL[i].w,0.,1.); a*=a; pl += uPLc[i]*a*(.35+.65*max(d.y/l,0.)); }
     vec3 gcol = tx*uGPGain*mix(.48, 1., shp) + tx*pl*.6 + pl*.03;
@@ -58990,6 +58990,7 @@ in vec3 vNor, vCol, vW; in vec4 vL; in vec2 vUV; in float vH;
 uniform sampler2D uTex; uniform float uLeaf, uCut, uTime, uGain, uSway;
 uniform highp sampler2DArray uTC; uniform float uTOn;   // (the painted terrain textures: tree_bark is layer 9)
 uniform sampler2D uGPT; uniform float uGPOn; uniform vec4 uGP; uniform vec2 uGPS;   // (a painted map: the light painted under it, as the units take it)
+uniform vec4 uRock;   // (a painted map's rocks lit as its painted rocks are: how much of the texture's own colour is kept, its brightness, the sunlit and shaded strengths; 0 = as they were: view.js PROP_LIGHT rock)
 uniform vec4 uPropW, uPropC; uniform vec3 uPropL;   // (a painted map's props: its painted trunks' warm key (rgb, strength), cool shade (rgb, strength), the key's direction: view.js PROP_LIGHT)
 in vec3 vC;   // (the instance's foot)
 uniform vec3 uFade;   // the 3D maps' giant trees (map3d.js): above uFade.x the tree dissolves (gone by uFade.y), so the camera
@@ -59062,6 +59063,25 @@ void main(){
     pc += uPropW.rgb*rimP*smoothstep(-.15, .45, dk)*uPropW.a*1.6*lf*(.25 + bl*2.5);      // the warm rim on the lit side
     pc += uPropC.rgb*rimP*(1. - smoothstep(-.3, .2, dk))*uPropC.a*.35*lf*(.2 + bl*2.);    // a faint cool rim in the shade
     col = pc*clamp(pf, .55, 1.2)*ao*gc;
+  }
+  if(uGPOn > .5 && uLeaf > .5 && uSway < .5 && uRock.y > 0.){
+    /* a rock standing on a painting, lit as the painting's own rocks are (owner: "match the lighting of the other rocks in the
+       painting"): its texture's colour kept (grey stone, green moss), a warm sun on what faces the painting's light and on
+       its top, a cool blue-green shade on the far side and toward its foot, the moss on top catching the light */
+    // (measured off the painting: its rocks are muted, a dull grey-green stone going pale where the sun reaches and deep
+    // green in the shade, olive moss on top, soft from one to the next. The model's texture is lime moss on blue-grey in hard
+    // patches, so only its light and dark is kept, as grain, and where it is mossy; the colours are the painting's.)
+    vec3 tx = texture(uTex, vUV).rgb; float tl = dot(tx, vec3(.3, .59, .11));
+    float grain = clamp(mix(1., tl/.34, uRock.x), .72, 1.3);
+    vec3 ns = normalize(mix(n, normalize(vec3(n.x*.5, .9, n.z*.5)), .4));   // (softened: the model is faceted, the painted rocks are not)
+    vec3 L = normalize(uPropL); float dk = dot(ns, L), wk = smoothstep(-.35, .75, dk), top = smoothstep(.05, .9, ns.y);
+    float lit = clamp(wk*.95 + top*.4 - .38 + uRock.w, 0., 1.)*mix(.5, 1., sh)*mix(.55, 1., smoothstep(0., .55, vH))*clamp(pf, .75, 1.2);
+    float moss = clamp(smoothstep(.08, .22, tx.g - tx.b)*.45 + smoothstep(.7, .98, ns.y)*.5 - .1, 0., 1.)*uRock.z;
+    vec3 sD = vec3(.012, .03, .017), sM = vec3(.08, .105, .082), sL = vec3(.27, .3, .21);     // stone: shade, mid, sunlit (linear)
+    vec3 mD = vec3(.008, .03, .006), mM = vec3(.06, .11, .02), mL = vec3(.22, .26, .06);       // moss
+    vec3 dC = mix(sD, mD, moss), mC = mix(sM, mM, moss), lC = mix(sL, mL, moss);
+    col = (lit < .5 ? mix(dC, mC, lit*2.) : mix(mC, lC, lit*2. - 1.))*grain*uRock.y;
+    col += lC*pow(1. - max(dot(n, normalize(uCam - vW)), 0.), 3.)*wk*.25*uRock.y;   // a soft pale edge where the light grazes
   }
   if(uLeaf > .5 && uSway > .5 && (uTrK.x > 0. || uTrK2.y > 0.)){   // (the Light Lab: sun through the leaves when backlit, a rim on the canopies)
     vec3 Lt = prop ? normalize(uPropL) : uSunDir, Vt = normalize(uCam - vW), Lc = prop ? uPropW.rgb*(.6 + uPropW.a) : uSunCol;
@@ -59784,7 +59804,7 @@ function createRenderer(canvas, opt = {}) {
         if (u.uSway) gl.uniform1f(u.uSway, t.still ? 0 : 1);
         // (Sunfall's edge trees: trunks and roots still, leaves gently: edgetrees.js)
         if (u.uSwayK) gl.uniform3fv(u.uSwayK, t.swayK || SWAY_K1);
-        if (u.uPropW) { const P = this.propLight; gl.uniform4fv(u.uPropW, P ? P.warm : [1, 1, 1, 0]); gl.uniform4fv(u.uPropC, P ? P.cool : [1, 1, 1, 0]); gl.uniform3fv(u.uPropL, P ? P.dir : [0, 1, 0]); }
+        if (u.uPropW) { const P = this.propLight; gl.uniform4fv(u.uPropW, P ? P.warm : [1, 1, 1, 0]); gl.uniform4fv(u.uPropC, P ? P.cool : [1, 1, 1, 0]); gl.uniform3fv(u.uPropL, P ? P.dir : [0, 1, 0]); if (u.uRock) gl.uniform4fv(u.uRock, P && P.rock ? P.rock : [0, 0, 0, 0]); }
         if (u.uFade) { const f = t.fade; gl.uniform3f(u.uFade, f ? f[0] : 1e4, f ? f[1] : 1e4 + 1, f ? f[2] || 0 : 0); }
         if (t.leaf) gl.bindTexture(gl.TEXTURE_2D, t.tex);
         if (!t.count) continue;
@@ -63307,10 +63327,11 @@ const CL_FLOW = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAYMAAAD+CAIAAABXz
    GR_FLOW: R the water mask (0 .. 0.5 how much is water; above 0.5 how near a fall's foot: gl.js waterAt, uWK.x 2), G B its
    flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's
    own rect (GR_PAINT_RECT). */
-const GR_FLOW = 'data:image/png;base64,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';
-const GR_ENTRY = [[1.951, -6.035], [4.605, -5.888], [5.037, -4.784], [5.284, -3.018]];   // world x, z: from behind the trunk at the head, onto the road's far end, down it
-const GR_TUN = [0.22, 2.098, -3.938];   // the walk in's perspective: [how much smaller at the far end (1 / (1 + k)), over how many rows, the row of full size]
-const GR_OCC = [[-5.005, [[1.086, 3.802, -14.794], [1.086, 3.802, -11.85], [1.088, 3.957, -11.776], [1.091, 3.926, -11.703], [1.093, 4.111, -11.629], [1.095, 4.111, -11.556], [1.097, 4.173, -11.482], [1.099, 4.019, -11.408], [1.101, 3.432, -11.335], [1.103, 3.401, -11.261], [1.105, 3.463, -11.188], [1.107, 3.525, -11.114], [1.109, 3.617, -11.04], [1.111, 3.648, -10.967], [1.113, 3.617, -10.893], [1.115, 3.278, -10.82], [1.117, 3.247, -10.746], [1.119, 3.185, -10.672], [1.121, 3.185, -10.599], [1.123, 3.154, -10.525], [1.126, 3.154, -10.452], [1.128, 3.154, -10.378], [1.13, 3.123, -10.304], [1.132, 3.185, -10.231], [1.134, 3.216, -10.157], [1.136, 3.185, -10.084], [1.138, 3.093, -10.01], [1.14, 3.154, -9.936], [1.142, 3.093, -9.863], [1.144, 3.062, -9.789], [1.146, 3.0, -9.716], [1.148, 3.062, -9.642], [1.136, 3.031, -9.568], [1.123, 2.969, -9.495], [1.111, 2.969, -9.421], [1.099, 2.938, -9.348], [1.086, 2.938, -9.274], [1.074, 2.938, -9.2], [1.062, 2.938, -9.127], [1.049, 2.907, -9.053], [1.037, 2.907, -8.98], [1.025, 2.938, -8.906], [1.012, 2.969, -8.832], [1.0, 2.938, -8.759], [0.988, 2.877, -8.685], [0.975, 2.877, -8.612], [0.963, 2.846, -8.538], [0.951, 2.846, -8.464], [0.938, 2.846, -8.391], [0.926, 2.815, -8.317], [0.914, 2.815, -8.243], [0.901, 2.815, -8.17], [0.872, 2.815, -8.096], [0.842, 2.815, -8.023], [0.812, 2.784, -7.949], [0.783, 2.784, -7.875], [0.753, 2.784, -7.802], [0.723, 2.784, -7.728], [0.694, 2.784, -7.655], [0.664, 2.784, -7.581], [0.635, 2.784, -7.507], [0.605, 2.784, -7.434], [0.575, 2.784, -7.36], [0.546, 2.815, -7.287], [0.506, 2.846, -7.213], [0.457, 2.938, -7.139], [0.407, 2.969, -7.066], [0.358, 3.0, -6.992], [0.309, 3.031, -6.919], [0.259, 3.185, -6.845], [0.21, 3.247, -6.771], [0.16, 3.247, -6.698], [0.123, 3.278, -6.624], [0.086, 3.37, -6.551], [0.049, 3.494, -6.477], [0.012, 3.525, -6.403], [-0.025, 3.586, -6.33], [-0.068, 3.679, -6.256], [-0.111, 3.772, -6.183], [-0.154, 3.802, -6.109], [-0.198, 3.833, -6.035], [-0.241, 3.864, -5.962], [-0.241, 3.864, -5.888], [-0.241, 3.864, -5.815], [-0.241, 3.864, -5.741], [-0.241, 3.864, -5.667], [-0.241, 3.864, -5.005]]], [-5.52, [[7.506, 12.259, -14.794], [7.506, 12.259, -11.85], [7.105, 12.259, -9.458], [6.765, 12.414, -7.839], [6.21, 12.568, -7.066], [5.901, 12.877, -6.587], [5.84, 13.494, -5.962], [5.84, 13.494, -5.52]]]];   // the trunks at the head, to stand behind: [the foot's z, rows [x left, x right, z] down the painting]
+const GR_FLOW = 'data:image/png;base64,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';
+const GR_ENTRY = [[2.074, -7.36], [4.235, -7.103], [4.636, -6.256], [5.006, -4.858], [5.284, -3.018]];   // world x, z: from behind the trunk at the head, onto the road's far end, down it
+const GR_TUN = [0.38, 3.423, -3.938];   // the walk in's perspective: [how much smaller at the far end (1 / (1 + k)), over how many rows, the row of full size]
+const GR_LIT = [[10.56, 11.19, 2.39, 1.0], [25.96, 10.53, 2.31, 1.0], [11.36, 5.52, 2.28, 1.0], [6.61, 7.84, 2.22, 1.0], [-0.27, 7.32, 2.04, 1.0], [29.6, -1.69, 2.03, 1.0], [8.0, 2.76, 2.03, 1.0], [2.94, 15.05, 2.03, 1.0], [4.45, -0.99, 2.0, 1.0], [26.8, -12.14, 1.99, 1.0], [1.02, 3.75, 1.99, 1.0], [24.42, 15.16, 1.98, 1.0], [4.02, 9.31, 1.95, 1.0], [5.56, 13.73, 1.92, 1.0], [6.21, -3.5, 1.86, 0.99], [9.54, 7.84, 1.83, 0.95], [14.39, -11.67, 1.72, 0.83], [7.63, 11.08, 1.68, 0.77]];   // the sunlit patches of the painting: [x, z, radius, strength]
+const GR_OCC = [[-5.005, [[1.086, 4.451, -15.089], [1.086, 4.451, -12.144], [1.086, 4.451, -12.071], [1.086, 4.481, -11.997], [1.086, 4.543, -11.924], [1.086, 4.574, -11.85], [1.088, 4.667, -11.776], [1.091, 4.698, -11.703], [1.093, 3.864, -11.629], [1.095, 3.802, -11.556], [1.097, 3.833, -11.482], [1.099, 3.926, -11.408], [1.101, 4.142, -11.335], [1.103, 4.08, -11.261], [1.105, 4.049, -11.188], [1.107, 3.71, -11.114], [1.109, 3.679, -11.04], [1.111, 3.617, -10.967], [1.113, 3.586, -10.893], [1.115, 3.556, -10.82], [1.117, 3.525, -10.746], [1.119, 3.525, -10.672], [1.121, 3.525, -10.599], [1.123, 3.556, -10.525], [1.126, 3.617, -10.452], [1.128, 3.617, -10.378], [1.13, 3.586, -10.304], [1.132, 3.525, -10.231], [1.134, 3.556, -10.157], [1.136, 3.463, -10.084], [1.138, 3.463, -10.01], [1.14, 3.432, -9.936], [1.142, 3.432, -9.863], [1.144, 3.401, -9.789], [1.146, 3.37, -9.716], [1.148, 3.309, -9.642], [1.136, 3.309, -9.568], [1.123, 3.309, -9.495], [1.111, 3.309, -9.421], [1.099, 3.309, -9.348], [1.086, 3.309, -9.274], [1.074, 3.278, -9.2], [1.062, 3.309, -9.127], [1.049, 3.34, -9.053], [1.037, 3.309, -8.98], [1.025, 3.278, -8.906], [1.012, 3.247, -8.832], [1.0, 3.216, -8.759], [0.988, 3.216, -8.685], [0.975, 3.216, -8.612], [0.963, 3.216, -8.538], [0.951, 3.185, -8.464], [0.938, 3.185, -8.391], [0.926, 3.185, -8.317], [0.914, 3.185, -8.243], [0.901, 3.154, -8.17], [0.872, 3.154, -8.096], [0.842, 3.154, -8.023], [0.812, 3.154, -7.949], [0.783, 3.154, -7.875], [0.753, 3.154, -7.802], [0.723, 3.154, -7.728], [0.694, 3.154, -7.655], [0.664, 3.154, -7.581], [0.635, 3.154, -7.507], [0.605, 3.185, -7.434], [0.575, 3.247, -7.36], [0.546, 3.278, -7.287], [0.506, 3.309, -7.213], [0.457, 3.34, -7.139], [0.407, 3.401, -7.066], [0.358, 3.525, -6.992], [0.309, 3.586, -6.919], [0.259, 3.617, -6.845], [0.21, 3.648, -6.771], [0.16, 3.71, -6.698], [0.123, 3.772, -6.624], [0.086, 3.895, -6.551], [0.049, 3.926, -6.477], [0.012, 4.019, -6.403], [-0.025, 4.08, -6.33], [-0.068, 4.142, -6.256], [-0.111, 4.173, -6.183], [-0.154, 4.173, -6.109], [-0.198, 4.173, -6.035], [-0.241, 4.173, -5.962], [-0.241, 4.173, -5.005]]], [-5.52, [[7.506, 12.259, -14.794], [7.506, 12.259, -11.85], [7.105, 12.259, -9.458], [6.765, 12.414, -7.839], [6.21, 12.568, -7.066], [5.901, 12.877, -6.587], [5.84, 13.494, -5.962], [5.84, 13.494, -5.52]]]];   // the trunks at the head, to stand behind: [the foot's z, rows [x left, x right, z] down the painting]
 
 /* The units' material textures (generated by tools/make_unittex.py from assets/units/tex/). A material missing here
    keeps its painted stand-in (matPaint in gl.js). When one has decoded, the material textures are built again. */
@@ -64118,10 +64139,29 @@ const THEMES = {
     id: 'greatroot', sunDir: nrm3([-.54, .73, -.42]), sunCol: [1.6, 1.25, .8], sky: [.2, .3, .3], gnd: [.14, .16, .09], fogHex: '#24463e',
     pitch: 57, fitTop: GR_PAINT_RECT[1] + .1, fitBot: GR_PAINT_RECT[1] + GR_PAINT_RECT[3] - .1, noKeep: true, h: () => 0, fly: [.85, 1, .45],
     camX: GR_PAINT_RECT[0] + GR_PAINT_RECT[2] / 2, viewW: GR_PAINT_RECT[2] * 1.1,   // (the view looks at the painting's middle and shows at most a twentieth of the view past each of its sides, dark forest there: view.js setCam, fitCamera)
-    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .7, walkUpright: true,   // (walkUpright: foes on the way in stand and turn as on the field, owner: "minions also dont turn properly as they pass by a tree")
+    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .7, walkUpright: true, walkTilt: .5, walkRise: .9,   // (walkUpright: foes on the way in stand and turn as on the field, owner: "minions also dont turn properly as they pass by a tree")
    
     // its god rays, along the painting's own (x, z, width, strength: view.js drawForestShafts), and the spray at its falls (x0, x1, z0, z1)
-    shaftPts: [[-8.1, -8.6, 1.3, .9], [5.5, -2.5, 1.1, .5], [-4.1, .3, 1, .45], [-6.6, 6.2, 1, .4], [25.5, 11, 1.2, .55], [16.3, 4.3, 1, .45], [9.2, 4, 1.1, .15], [4.2, 8.8, 1, .13]],
+    litPts: typeof GR_LIT !== 'undefined' ? GR_LIT : null,   // (the painting's sunlit patches, shimmering: view.js drawLitPatches)
+    shaftPts: [[-9.6, -9.6, 1.2, 1], [-7.4, -8.9, 1, .8], [24.2, -8.6, 1.1, .7], [-8.1, -8.6, 1.3, .9], [5.5, -2.5, 1.1, .5], [-4.1, .3, 1, .45], [-6.6, 6.2, 1, .4], [25.5, 11, 1.2, .55], [16.3, 4.3, 1, .45], [9.2, 4, 1.1, .15], [4.2, 8.8, 1, .13]],
+    // the mist where foes step out (owner: "add a slight foggy effect where they come from, should be light bluey colour ...
+    // they will be affected by the fog instead, make the fog mostly sit behind and around the tree area"): soft drifts of
+    // pale blue mist (x, height, z, width, height, strength) standing between the eye and the far end of the road, so a foe
+    // coming out is veiled by it and clears as it walks down; behind the painted trunk's card, so the trunk stays sharp.
+    // No fog colour is put on the foes themselves (inFog is the hook for a map that wants that).
+    mistCol: [.7, .85, 1], mistAt: [
+      // (all of it stands in front of the trunk's card, none behind: mist cut off by the trunk's outline was a hard edge,
+      // owner: "not soft enough, needs to remove the edge". It lies mostly to the road side of the trunk and thins over it.
+      // A drift faces the eye, so its top leans back: kept clear of the card.)
+      // (thick where they come from, owner: "looks like they're clipping through the map, maybe just crank up the fog where
+      // they come from": a foe rising there is lost in it and comes out of it as it walks down)
+      // (owner: "spread it out a bit more": wider and thinner than one bright patch, reaching down the road and to both sides)
+      [4.3, 4.6, -4.3, 3.2, 1.9, .62], [4.7, 5, -4.3, 2.8, 1.7, .5], [3.9, 5.3, -4.3, 3.4, 2, .45], [5.2, 4.3, -4.3, 3, 1.6, .4], [4.6, 6, -4.3, 4, 1.8, .36], [3.3, 5.7, -4.3, 3, 1.9, .28], [4.6, 3.6, -4.3, 3.4, 1.4, .34],
+      [5.6, 3.1, -4.3, 3.2, 1.3, .2], [4, 2.9, -4.3, 3.6, 1.3, .2], [6, 5.2, -4.3, 2.8, 1.6, .2], [2.4, 6.4, -4.3, 2.8, 1.7, .16],
+      [3.9, 2.15, -4.3, 2.8, 1.3, .2], [4.6, 1.7, -4.3, 2.3, 1.1, .16], [3.1, 2.75, -4.3, 2.6, 1.4, .13], [3.4, 3.4, -4.3, 2.6, 1.4, .14]],
+    // wisps curling out of the mist (owner: "would be cool if you could get swirly bits that come out maybe a bit come out from
+    // up here", the gap between the trunks up to the left): where each lot starts (x, height, z), how far they reach, how many
+    mistSwirl: [[4.4, 4.5, -4.3, 2.6, 6], [.4, 7.1, -4.3, 1.8, 3]],
     spray: [[-9, -7.7, -2.8, -2.2], [-8.2, -6, 2.9, 4.3], [15.1, 18.7, 12.1, 15.3], [19.4, 23.3, 2.2, 4.3]],
     painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null, edge: 2.5, glint: false, falls: true },   // (glint: no sun glint on its grass: owner, "remove the glint")
     //   // (edge: it dims toward its sides and sinks into the dark just past them, so its mirrored copy never shows: gl.js uGPE)
@@ -74783,7 +74823,7 @@ const envH = (x, z) => TH.h(x, z);
 // from where its light comes, cool blue-violet in the shade (gl.js FS_TREE uPropW/uPropC/uPropL); linear rgb, strength
 const PROP_LIGHT = {
   clearing: { warm: [1.0, .7, .3, .9], cool: [.34, .52, 1.0, .75], dir: [-.8, .45, -.3] },   // (Sunfall: the shafts from the upper left)
-  greatroot: { warm: [1.0, .74, .4, .8], cool: [.3, .56, .5, .6], dir: [-.75, .5, -.4] },    // (Greatroot Way: amber sun from the upper left, teal-green shade)
+  greatroot: { warm: [1.0, .74, .4, .8], cool: [.3, .56, .5, .6], dir: [-.75, .5, -.4], rock: [.45, 1, .7, 0] },   // (rock: its rocks in the painted rocks' own colours: how much of the model's texture shows as grain, brightness; gl.js uRock)    // (Greatroot Way: amber sun from the upper left, teal-green shade)
 };
 function applyLight() {
   const L = LS;
@@ -74938,6 +74978,7 @@ const ELITE_SC = 1.18;
 function creepBaseY(c) {
   let y = c.fly ? .95 + Math.sin(vt * 3 + c.anim) * .07 : 0;
   if (c.fly && c.lowT > G.time) y = .3 + .05 * Math.sin(vt * 5 + c.anim);   // knocked down low by Flak
+  if (TH.walkRise && !c.fly && c.ent && typeof tunK === 'function') { const k = tunK(c); y -= TH.walkRise * k * k * creepH(c); }   // (coming up and over into view: sunk behind the rise at the far end of the way in, the ground hiding what is below it)
   if (TH.m3d && c.y < -1.4 && !c.fly && typeof m3dH === 'function') y += Math.min(0, m3dH(c.x, c.y));   // (up a 3D map's ravine: on its floor)
   if (c.liftT > G.time) { const u = 1 - (c.liftT - G.time) / (c.liftD || 1); y += c.liftK === 'cyc' ? c.liftH * Math.min(1, u * 5, (1 - u) * 5) + .08 * Math.sin(vt * 9) : c.liftH * Math.sin(Math.PI * clamp(u, 0, 1)); }
   return y;
@@ -74962,8 +75003,10 @@ const tunE = c => { const k = tunT(c); return Math.min(1, 1.15 * k * k * (3 - 2 
 const tunS = c => 1 / (1 + tunP()[0] * tunK(c));
 function tunnelView(m, c) {
   if (TH.m3d) return m;   // (a 3D map's ravine is real: no painted perspective)
-  if (TH.walkUpright) { const sc = tunS(c); if (sc < 1) { for (let i = 0; i < 12; i++) m[i] *= sc; m[13] *= sc; } return m; }   // (a map whose foes come in close: only a little smaller, standing and turning as on the field: Greatroot Way)
-  const k = tunK(c), e = tunE(c); if (!e) return m;
+  // (a map whose foes come in close, Greatroot Way: they stand and turn as on the field (walkUpright), a little smaller, and
+  // are seen a little more from the side while still far up the way in (walkTilt: the share of the camera's tilt taken
+  // off them there), easing to the view from above as they come: owner, "their perspective to us should change slightly")
+  const k = tunK(c), e = TH.walkUpright ? (TH.walkTilt || 0) * k * k * (3 - 2 * k) : tunE(c); if (!e && !(TH.walkUpright && k)) return m;
   const a = -CAM.pitch * e, sc = 1 / (1 + tunP()[0] * k), ca = Math.cos(a) * sc, sa = Math.sin(a) * sc;
   const x = m[12], y = m[13], z = m[14];
   for (let col = 0; col < 3; col++) {   // lay it back about its feet (a turn about the world x axis, away from the camera), and shrink
@@ -75007,6 +75050,7 @@ function drawModel(model, base, ph, o, R_) {
 function tintFor(c) {
   const t = c.def.tint ? c.def.tint.slice() : [1, 1, 1, 0];
   if (walkOff() && c.y < 0) { const k0 = TH.inShade || .12, k = clamp(k0 + (1 - k0) * (c.y + 4.8) / 4.6, k0, 1); /* (inShade: a map whose way in is lighter, Greatroot Way's misty gap) */ t[0] *= k; t[1] *= k * 1.02; t[2] *= k * 1.1; t[3] *= k; }   // still in the dark of the trees: a shape, lit as it steps into the clearing
+  if (TH.inFog && walkOff()) { const k = tunK(c) * TH.inFog[3]; if (k > .01) { for (let i = 0; i < 3; i++) t[i] *= 1 - k * (1 - TH.inFog[i]); t[3] = Math.max(t[3], k * .4); } }   // (a map's mist on those still far up its way in: paler and hazed, clearing as they come: Greatroot Way)
   if (c.frostT > 0) { // chilled: icy blue-white skin with a cold sheen; frozen solid: near-white ice
     const fz = c.stunT > 0, sh = .5 + .5 * Math.sin(vt * 5 + c.anim);
     t[0] = fz ? .85 : .62; t[1] = fz ? 1.3 : 1.0; t[2] = fz ? 2.0 : 1.75; t[3] = Math.max(t[3], fz ? .2 : .1 + .06 * sh);
@@ -75114,7 +75158,15 @@ function renderView(dt) {
   if (RD.terrain && typeof m3dFrame === 'function') m3dFrame(dt);
   if (ENV.edgeGiants && typeof edgeMagic === 'function') edgeMagic(ENV.edgeGiants, true);   // (Sunfall: the title's wisps)
   if (TH.id === 'clearing' && typeof edgeWard === 'function') edgeWard();   // (Sunfall's field foot: edgetrees.js)   // (the magic up a painted map's 3D trunks: edgetrees.js)
-  else if (TH.ward && typeof edgeWard === 'function') edgeWard(TH.ward, TH.wardBare ? -1 : ROWS + 1.55);   // (a map's own colour; a 3D map's waystones, none on a painting)
+  if (TH.mistAt && !mapLite()) for (let i = 0; i < TH.mistAt.length; i++) { const [mx, my, mz, mw, mh, ma] = TH.mistAt[i], d = Math.sin(vt * .21 + i * 2.1);   // (a map's own drifts of mist: where Greatroot Way's foes step out, softening them)
+    QA.bill(RD, mx + d * .22, my + Math.cos(vt * .17 + i) * .05, mz, mw, mh, [(TH.mistCol || MIST_COL)[0], (TH.mistCol || MIST_COL)[1], (TH.mistCol || MIST_COL)[2], ma * (.8 + .2 * Math.sin(vt * .33 + i * 1.7))], 1, 0); }
+  if (TH.mistSwirl && !mapLite() && !(typeof GFX !== 'undefined' && GFX === 'low')) { const mc = TH.mistCol || MIST_COL;   // (wisps curling out of a map's mist: each a short trail of soft puffs on a widening spiral, drifting out and thinning away)
+    for (let s = 0; s < TH.mistSwirl.length; s++) { const [sx, sy, sz, reach, n] = TH.mistSwirl[s];
+      for (let j = 0; j < n; j++) { const h = Math.sin((s * 7 + j) * 12.9898) * 43758.5453, r0 = h - Math.floor(h), dir = j % 2 ? 1 : -1;
+        for (let q = 0; q < 6; q++) { const u = ((vt * (.035 + .012 * r0) + j / n + r0) % 1) - q * .022; if (u <= 0) continue;
+          const an = r0 * 6.28 + dir * (u * 5.2 + Math.sin(vt * .2 + j) * .4), rr = reach * Math.pow(u, .8), sz2 = .28 + u * .7;
+          QA.bill(RD, sx + Math.cos(an) * rr * (1 + .5 * r0), sy + Math.sin(an) * rr * .5 - u * .5, sz, sz2, sz2 * .8, [mc[0], mc[1], mc[2], .34 * Math.sin(Math.PI * Math.min(1, u * 1.05)) * (1 - q * .13)], 1, 0); } } } }
+  if (TH.id === 'clearing') {} else if (TH.ward && typeof edgeWard === 'function') edgeWard(TH.ward, TH.wardBare ? -1 : ROWS + 1.55);   // (a map's own colour; a 3D map's waystones, none on a painting)
   ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 }));
   const walkIn = MAPS[G.map] && MAPS[G.map].entry;   // (a map foes walk into from the woods has no portal)
   if (!SCENE_OFF) { item(ENV.deco, _I, { shadow: false }); if (!walkIn) item(ENV.portal, _I); if (!TH.noKeep) item(ENV.keep, _I); }   // (the FX Lab side view hides the scenery)
@@ -75175,7 +75227,7 @@ function renderView(dt) {
     if (typeof drawSynergyGlow === 'function') drawSynergyGlow(vt);
   }
   drawAmbient(dt);
-  if (TH.shafts === 'moon') drawMoonShafts(); else if (TH.shafts === 'forest') drawForestShafts(); else if (TH.shafts !== 'none') drawSunShafts();
+  if (TH.shafts === 'moon') drawMoonShafts(); else if (TH.shafts === 'forest') { drawForestShafts(); drawLitPatches(); } else if (TH.shafts !== 'none') drawSunShafts();
   const list = DL.slice(0, dlN);
   RD.render(list, { ground: QG, alpha: QA, add: QADD, over: QO });
   { let v = 0, sv = 0; for (let k = 0; k < dlN; k++) { const it = DL[k], n = it.mesh.count; v += n; if (it.shadow) sv += n; }   // (one object a frame, kept: tests read it)
@@ -77119,6 +77171,7 @@ function drawForestShafts() {
     const x = x0 + sw * .18, z = z0 + Math.cos(vt * .08 + i) * .12, top = [x + d[0] * L, d[1] * L, z + d[2] * L];
     QADD.beam(RD, top, [x, 0, z], w * 1.5, [c[0], c[1], c[2], .07 * br], 6);
     QADD.beam(RD, top, [x, 0, z], w * .6, [c[0], c[1], c[2], .08 * br], 6);
+    if (TH.litPts) { const o = Math.sin(vt * .19 + i * 2.7) * w * .9, b2 = .5 + .5 * Math.sin(vt * .31 + i * 1.3); QADD.beam(RD, [top[0] + o, top[1], top[2]], [x + o, 0, z], w * .35, [c[0], c[1], c[2], .06 * br * b2], 6); }   // (a painted map with lit patches: a thinner ray sliding beside each)
     QADD.ground(x, z, .03, w * 1.25, w * .9, [c[0], c[1], c[2], .16 * br], 1, 0);
     for (let j = 0; j < 3; j++) {   // pollen drifting down the shaft
       const u = (vt * .03 + i * .37 + j * .33) % 1, e = 1 - u, px = x + d[0] * L * e * .55 + Math.sin(vt * .6 + j * 3 + i) * w * .3, py = d[1] * L * e * .55, pz = z + d[2] * L * e * .55;
@@ -77126,6 +77179,25 @@ function drawForestShafts() {
     }
   }
 }
+/* A painted map's sunlit patches, alive (owner: "add some light effects around the light rays and lit areas of the map"):
+   on each (TH.litPts: x, z, radius, strength) a soft warm light that swells and thins as if the leaves above moved, a
+   brighter heart drifting across it, and motes rising through it. Additive and faint, so a unit standing in one is lit,
+   never hidden. Not on Graphics Low or painted-only devices. */
+function drawLitPatches() {
+  const P = TH.litPts; if (!P || mapLite() || (typeof GFX !== 'undefined' && GFX === 'low')) return;
+  const c = c4(LS.ray || '#ffe6b0'), k0 = LS.rays == null ? 1 : LS.rays;
+  for (let i = 0; i < P.length; i++) {
+    const [x, z, r, s] = P[i], a = fbm2(i * 3.7, vt * .16), b = fbm2(i * 1.9 + 8, vt * .23), k = s * k0;
+    const br = .35 + .65 * a, dx = (b - .5) * r * .7, dz = (a - .5) * r * .35;
+    QADD.ground(x, z, .03, r * 1.5, r * .95, [c[0], c[1], c[2], .07 * br * k], 1, 0);
+    QADD.ground(x + dx, z + dz, .032, r * .7, r * .42, [c[0], c[1], c[2] * .9, .09 * (.3 + .7 * b) * k], 1, 0);
+    for (let j = 0; j < 3; j++) {   // motes rising through the light
+      const u = (vt * (.035 + .01 * j) + i * .41 + j * .37) % 1, mx = x + Math.sin(vt * .4 + i * 2.3 + j * 2.1) * r * .5 + (j - 1) * r * .3, mz = z + Math.cos(vt * .31 + i + j * 1.7) * r * .25;
+      QADD.bill(RD, mx, .15 + u * 1.3, mz, .045, .045, [1, .95, .72, .55 * k * Math.sin(u * Math.PI) * (.4 + .6 * br)], 1, 0);
+    }
+  }
+}
+const MIST_COL = [.72, .88, .9];   // (a map's drifts of mist, TH.mistAt: their colour unless the map gives its own)
 function drawSunShafts() {
   const d = SUN;
   for (let k = 0; k < 5; k++) {
@@ -81565,204 +81637,94 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -81771,207 +81733,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 6).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 6) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -83493,7 +83323,7 @@ function openTalents(type) {
 /* A talent tree, laid out as World of Warcraft Classic's (owner, 10 Nov 2026: "not a fan of this layout, can you make it
    more like wows?"): a compact four-column grid of small square icons in thin bevelled frames, the rank ("0/5") in the
    corner, straight arrows from a talent to the one it opens, the tree's own painting dimmed behind. The grid carries
-   state only (greyscale = locked, a gold frame = can be learned now, green = full; a spell talent's art sits in a round
+   state only (greyscale = locked, full colour = can be learned now, a yellow outline = has a point, an orange one = full; a spell talent's art sits in a round
    inner frame); names, tags, "Spell", "pick one" and what a locked talent needs are in the tooltip (talTipHTML). */
 const TW_MAX = 52, TW_MIN = 24, TW_GAP = .62;   // the icon's size range (px) and the space between icons, as a share of the icon
 function buildTree() {
@@ -83601,9 +83431,9 @@ function refreshTalents() {
   $('#tSub').innerHTML = shut ? (oldRules() ? `${TOWERS[ty].name} · school not open yet` : `${TOWERS[ty].name} · locked`) : `${TOWERS[ty].name} · <b>${spent}</b> point${spent === 1 ? '' : 's'} spent`;
   for (const n of ovp.querySelectorAll('.tn')) {
     const i = +n.dataset.i, t = tl.list[i], s = talState(ty, i), on = !!talSel && talSel.t === ty && talSel.i === i, r = talRankOf(pk, i);
-    // state only: locked | req | excl (greyscale), open (no point to spend), avail (gold frame), has (ranks in it), maxed (green)
+    // state only: locked | req | excl (greyscale), open (no point to spend), avail (full colour, plain frame), has (ranks in it: yellow outline), maxed (orange outline)
     n.className = `tn ${s}${r > 0 ? ' has' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}`;
-    n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank in the corner: grey at 0, gold while it can be learned, green when full
+    n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank in the corner: grey at 0, gold while it can be learned, orange when full
     const why = s === 'locked' || s === 'req' ? 'locked' : s === 'excl' ? 'closed by your capstone' : s.includes('avail') ? 'can be learned' : s === 'maxed' ? 'full' : '';
     n.setAttribute('aria-label', `${t.name}${t.spell ? ', spell' : talTagOf(t) ? ', ' + talTagOf(t) : ''}, rank ${r} of ${t.max}${why ? ', ' + why : ''}. ${t.pro(Math.max(1, r))}`);
     n.setAttribute('aria-pressed', on);
@@ -83612,7 +83442,7 @@ function refreshTalents() {
   const cost = respecCost(ty), canReset = spent > 0 && G.phase === 'build' && G.gold >= cost;
   $('#tFoot').innerHTML = `<div class="tc-pts" id="tPtsBox"><i><b id="tPts">${tp}</b></i><span>Talent point${tp === 1 ? '' : 's'}</span></div>`
     + (shut ? `<span class="tc-hint">${keysHeld() ? 'Use a School Key to build its towers and learn its talents.' : `Locked. The boss of every 5th wave carries a School Key${nextKeyWave() ? ` (next: wave ${nextKeyWave()})` : ''}.`}</span><button type="button" class="tc-btn open" id="tOpenSch"${keysHeld() ? '' : ' disabled'}>Open <small>key</small></button>`
-      : `<span class="tc-hint">${tp > 0 ? (canHover() ? 'Click a gold-framed talent to learn it' : 'Tap a gold-framed talent twice to learn it') : G.pp > 0 ? pathNudge() : `Next talent point ${xpNextPoint()}`}</span>`)
+      : `<span class="tc-hint">${tp > 0 ? (canHover() ? 'Click a coloured talent to learn it' : 'Tap a coloured talent twice to learn it') : G.pp > 0 ? pathNudge() : `Next talent point ${xpNextPoint()}`}</span>`)
     + `<button type="button" class="tc-btn reset" id="tReset"${canReset ? '' : ' disabled'} title="${G.phase === 'build' ? 'Refund every point in this tree' : 'Only between waves'}">Reset${spent ? ` <small>${cost}g</small>` : ''}</button>`;
   renderTip();
 }
@@ -86701,7 +86531,8 @@ const PYF_SH = { FLAME: 0, BALL: 1, PUFF: 2, JET: 4, WING: 5, SMOKE: 6, GLOW: 7,
 // the order they are laid down: smoke, the fire, then added light
 const PYF_ORD = [2, 2, 2, 2, 2, 2, 1, 3, 3];
 // the heat gradient, coolest to hottest: the dark red of a tip, deep red, saturated orange, yellow, the white-yellow heart
-const PYF_PAL = ['#4d0a03', '#b51d05', '#f55e07', '#ffad26', '#fff0c2'];
+// (midway between the painted gradient and a black body's own colours, 700-2800 K: a little more amber, a paler heart)
+const PYF_PAL = ['#450a03', '#ae2405', '#f3670a', '#ffb035', '#ffedbe'];
 const pyfHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
 const pyfSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -86792,6 +86623,8 @@ vec3 fFlame(vec2 uv){
   q += (N(q * .55 + vec2(.31, -TM * .3)).ra - .5) * .2 * CURL;
   float n = N(q).r, n2 = N(q * vec2(2.2, 2.) + vec2(SD * 2., -TM * 1.1)).g;
   float d = body * (1.1 - .55 * vc) - (n - .3) * (.16 + 1.25 * vc) * (1. + .4 * vB.w) - (n2 - .5) * (.1 + .3 * vc);
+  // (fine wisps carried up its edge faster than its body: a flow's detail, not a brush's)
+  d -= (N(q * vec2(4.6, 3.4) + vec2(SD * 5., -TM * 2.3)).g - .5) * (.05 + .2 * vc);
   d -= AGE * AGE * .3;
   // (it thins to nothing at its root, sooner toward its sides, so no flame ends in a hard line on the ground or a body)
   float xr = uv.x / max(.3, vB.z * .85);
@@ -86803,11 +86636,13 @@ vec3 fFlame(vec2 uv){
 }
 // a ball of fire, -1..1 both ways: fire rolling out from a white-hot heart
 vec3 fBall(vec2 p){
-  float r = length(p), ang = atan(p.y, p.x);
-  vec2 w = N(p * .22 + vec2(SD, -TM * .4)).ra - .5;
+  // (vB.w: how fast it swirls about its middle; its body is kept round, only its skin roils)
+  float r = length(p), sw = TM * 1.3 * vB.w, cs = cos(sw), sn = sin(sw);
+  vec2 ps = mat2(cs, -sn, sn, cs) * p; float ang = atan(ps.y, ps.x);
+  vec2 w = N(ps * .22 + vec2(SD, -TM * .4)).ra - .5;
   float roll = N(vec2(ang * .159 + SD - TM * .22, r * .5 - TM * .75)).r;
-  float n2 = N(p * .5 + w * .35 * CURL + vec2(SD * 3., TM * .8)).g, bl = N(p * .3 + w * .2 + vec2(-TM * .3, SD * 2.)).b;
-  float d = (1. - r / .82) * 1.5 + ((roll - .5) * .85 + (bl - .5) * .4) * smoothstep(.08, .6, r) + (n2 - .5) * .3 - smoothstep(.8, 1., r);
+  float n2 = N(ps * .5 + w * .35 * CURL + vec2(SD * 3., TM * .8)).g, bl = N(ps * .3 + w * .2 + vec2(-TM * .3, SD * 2.)).b;
+  float d = (1. - r / .82) * 1.5 + ((roll - .5) * .6 + (bl - .5) * .34) * smoothstep(.2, .72, r) + (n2 - .5) * .24 - smoothstep(.8, 1., r);
   float heat = max(.3, (1.2 - r * 1.55) * (.88 + .24 * roll)) + (n2 - .5) * .2;
   return vec3(d, heat * clamp(d * 1.6, 0., 1.), 0.);
 }
@@ -86874,11 +86709,13 @@ vec4 fire(float d, float heat, float smk, vec2 gp){
   float h = clamp(heat * uSty.y * vC.y + gr * .12, 0., 1.25);
   // (a little terracing left in the gradient, the painter's hand: uSty.z 1 none, 0 flat bands)
   float S = uSty.z, qh = h * 6., fh = fract(qh);
-  h = mix((floor(qh) + smoothstep(.5 - .5 * S, .5 + .5 * S, fh)) / 6., h, S * S * .6);
+  h = mix((floor(qh) + smoothstep(.5 - .5 * S, .5 + .5 * S, fh)) / 6., h, .45 + .55 * S * S);
   vec3 c = ramp(h);
   if (uBloom.x > .5) return vec4(c * dens * smoothstep(.62, 1., h) * .3 * vB.x * vB.y, 0.);
   float cool = 1. - smoothstep(.03, .2, h), sm = clamp(smk, 0., 1.), soot = sm * min(1., uSty.x * vC.w);
-  vec3 e = mix(c * (.5 + 1.35 * h * h) * vB.x, vec3(.076, .055, .047), cool * soot);
+  // (its light rolls off like film's: a hot flame pales toward yellow-white, it never clips flat)
+  vec3 lum = c * (.5 + 1.35 * h * h) * vB.x, fl = (lum * (2.51 * lum + .03)) / (lum * (2.43 * lum + .59) + .14);
+  vec3 e = mix(mix(lum, fl, .5), vec3(.076, .055, .047), cool * soot);
   // (cool fire that is not smoke only adds its dim light: it never darkens what is behind it, so nothing gets a dark rim)
   float al = dens * mix(mix(.06, .6, smoothstep(.08, .42, h)) - .18 * smoothstep(.45, .95, h), .5 * uSty.x * vC.w, cool * sm);
   vec3 rgb = e * dens * mix(1., mix(.7, 1., soot), cool);
@@ -87226,8 +87063,22 @@ function pfHands(now) {
     if (t.ccxBreath && now < t.ccxBreath.until + .3) continue;
     const p = ccHand(t, towerTop(t) * .8), g = Math.min(1, t._pyGl || 0), len = (H.flame + H.tier * (t.tier | 0)) * (1 + H.cast * g), sd = ((t.i | 0) * 5 + (t.j | 0)) % 97;
     // (the flame lags the hand as it moves)
-    const lag = H.lag > 0 ? pfLag(pfVel(pfSt(t), p[0], p[1], p[2], now), .07 * H.lag, len * .8) : null;
-    pfFire([p[0], p[1] - len * .1, p[2]], PF_UP, len, { k: H.k, seed: sd, pull: .06, sp: 1.1, fat: .95, lag, n: 2, soft: .05 }, 'cc_fireball', 'hand');
+    const st = pfSt(t), lag = H.lag > 0 ? pfLag(pfVel(st, p[0], p[1], p[2], now), .07 * H.lag, len * .8) : null;
+    // a strike winding up (not a spell's cast: those hold the gather at a fixed value): a ball of fire swells in his palm,
+    // fast at first, fire drawn into it from the air round it, until it is the size it flies at and he throws it
+    const ch = H.charge > 0 && !(t.ab && t.ab.cast) && g > 0 && g < 1 ? g : 0, ce = 1 - Math.pow(1 - ch, 3);
+    pfFire([p[0], p[1] - len * .1, p[2]], PF_UP, len * (1 - .55 * ce), { k: H.k, seed: sd, pull: .06, sp: 1.1, fat: .95, lag, n: 2, soft: .05 }, 'cc_fireball', 'hand');
+    if (ch > 0) {
+      const C = efx('cc_fireball', 'core'), bw = C.ball * .6 * (.25 + .75 * ce) * H.charge, c = [p[0], p[1] + bw * .3 + .012 * Math.sin(now * 7), p[2]], lv = pfLv();
+      pfFlame(c, PF_UP, bw * 1.2, { k: H.k * .9, seed: sd + 5, pull: .1, sp: 1.5, fat: .85, heat: .8, lag, soft: .05 }, 'cc_fireball', 'hand');
+      pfBall(c, bw, { k: C.k, seed: sd, pull: .13, sp: 1.3, p1: 1.5 }, 'cc_fireball', 'hand');
+      const ev = .045 * [2.4, 1.5, 1][lv] * pfThin(); if (!st.ct || now - st.ct > .3 || now < st.ct) st.ct = now;
+      for (let i = 0; i < 3 && now - st.ct >= ev; i++) {
+        st.ct += ev;
+        const a = Math.random() * 6.283, rr = bw * (.85 + .5 * Math.random()), ox = Math.cos(a) * rr, oy = (Math.random() - .35) * rr, oz = Math.sin(a) * rr, T = .2;
+        pfShot('puff', c[0] + ox, c[1] + oy, c[2] + oz, bw * .5, T, { vx: (-ox * .9 - oz * .8) / T, rise: -oy * .9 / T, vz: (-oz * .9 + ox * .8) / T, grow: -.55, hot: 1, soot: 0, a: .8, pull: .09 }, 'cc_fireball', 'hand');
+      }
+    }
     if (H.disc > 0 && pfLv()) pfGlow(p, len * 2.6 * H.disc, { k: .3 + .45 * g, pull: .06 }, 'cc_fireball', 'hand');
     // (the other palm lights as a cast gathers)
     if (g > .2 && t._pyPL && t._pyAt === now) { const q = t._pyPL, l2 = len * .7 * g; pfFire([q[0], q[1] - l2 * .1, q[2]], PF_UP, l2, { k: H.k, seed: sd + 31, pull: .06, sp: 1.2, fat: .9, n: 2, soft: .05 }, 'cc_fireball', 'hand'); }
@@ -87260,7 +87111,7 @@ function pfBallAt(x, y, z, d, len, C, T, s, seed, o, now) {
     const tg = .35 + .65 * Math.min(1, (now - st.born) / .14);
     pfFlame([x, y, z], td, len * .98 * tg, { k: C.k * .85, seed: seed + 7, pull: .1, sp: 1.5, fat: 1.08, heat: .72, wide: .6 / tg, floor: .4 }, s, 'core');
     if (lv) pfFlame([x, y, z], td, len * .64 * tg, { k: C.k, seed: seed + 13, pull: .13, sp: 1.9, fat: .78, heat: 1.2, wide: .58 / tg, floor: .4 }, s, 'core');
-    pfBall([x, y, z], len * .54, { k: C.k, seed, pull: .15, sp: 1.2 }, s, 'core');
+    pfBall([x, y, z], len * .6, { k: C.k, seed, pull: .15, sp: 1.2, p1: .6 }, s, 'core');
     if (C.disc > 0 && lv) pfGlow([x, y, z], len * C.disc * 1.25, { k: .4, pull: .1 }, s, 'core');
     if (C.shimmer > 0 && typeof vfxDistHaze === 'function') vfxDistHaze(x + td[0] * len * .7, y + td[1] * len * .7 + len * .15, z + td[2] * len * .7, len * .5, C.shimmer);
   }
