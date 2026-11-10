@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b8e69cb@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b2f19ca@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -53384,49 +53384,50 @@ const ELEM_FX_DEF = {
     hand: { w: .34, k: .7, gather: .7, fog: .9, glint: .6 },
     // the shard in flight: its length, its width per length, brightness, how clear, its glow, the most of a foe's height it
     // flies at (it flies straight and level from the staff; at a foe shorter than that it comes down to this)
-    core: { long: .5, fat: .3, k: 1, clear: .15, disc: .5, aim: .75 },
+    core: { long: .5, fat: .3, k: 1, clear: .15, disc: .35, aim: .75, heart: .3, star: .32 },
     // its wake: the torn air's length, a puff of mist every so far, its size, how long it hangs, a glint's chance
-    trail: { streak: .8, gap: .2, puff: .46, secs: .55, glint: .2 },
+    trail: { streak: .8, gap: .2, puff: .46, secs: .55, glint: .2, shed: .3 },
     // the landing's needles: width, how long, brightness
-    burst: { w: 1.05, secs: .15, k: 1.15 },
+    burst: { w: 1.05, secs: .15, k: 1.15, spray: 1.1, crown: .3 },
     // splinters flung: how many, how hard, their length, how long
     shards: { count: 6, fling: 1.6, w: .2, secs: .5 },
     // the puff of cold: how many, size, how long
     mist: { puffs: 1, w: .7, secs: .8 },
-    // the landing's light: radius, brightness, how long; the light carried in flight
-    light: { rad: 1.2, k: .6, secs: .2, fly: .5 },
+    // the landing's light: radius, brightness, how long; the light carried in flight (kept low: a real light on bright
+    // ground whites it out)
+    light: { rad: 1.2, k: .32, secs: .2, fly: .3 },
   },
   cc_glacialglyph: {
     // the lance: as the shard, and its barbs' length (x its own)
-    core: { long: 1.25, fat: .17, k: 1.05, clear: .1, disc: .5, aim: .75, barb: .3 },
-    trail: { streak: 1.2, gap: .2, puff: .58, secs: .75, glint: .5 },
+    core: { long: 1.25, fat: .17, k: 1.05, clear: .1, disc: .3, aim: .75, barb: .3, heart: .4, star: .42 },
+    trail: { streak: 1.2, gap: .2, puff: .58, secs: .75, glint: .5, shed: .5 },
     // the landing: needles, and the spikes driven out the far side of the foe (how many, their length)
-    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9 },
+    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9, spray: 1.7, crown: .42 },
     shards: { count: 11, fling: 2.1, w: .25, secs: .55 },
     mist: { puffs: 2, w: .9, secs: .9 },
-    light: { rad: 1.7, k: .9, secs: .25, fly: .8 },
+    light: { rad: 1.6, k: .45, secs: .25, fly: .45 },
   },
   cc_rimelance: {
     // the crystals grown round the foe: how many, their height (x the foe's), width (x its girth), how fast they grow (s),
     // how clear the ones before it are, brightness
-    crystals: { count: 8, high: 1, wide: 1, grow: .24, clear: .55, k: 1 },
+    crystals: { count: 8, high: 1, wide: 1, grow: .24, clear: .55, k: 1, glint: 1.6, spray: 2 },
     // the one great clear crystal closed over the foe: its height (x the foe's), width (x its girth), how clear, brightness
-    core: { high: 1.3, wide: 2.3, clear: .9, k: .9 },
+    core: { high: 1.3, wide: 2.3, clear: .9, k: .9, back: .3 },
     // as it breaks: splinters, how hard, their length, how long
     shards: { count: 10, fling: 1.7, w: .24, secs: .65 },
     // its mist: puffs as it closes and breaks, size, how long; a wisp every (s) while it holds; Coffin Burst's wave
     mist: { puffs: 2, w: .9, secs: 1, every: .6 },
-    light: { rad: 1.5, k: .7, secs: .3 },
+    light: { rad: 1.5, k: .36, secs: .3 },
   },
   cc_hoarbloom: {
     // the bloom over the foe: petals, their length, width per length, how high over its head, how fast it grows (s), how
     // clear, brightness, its glow
-    crystals: { count: 6, long: .6, fat: .3, y: .5, grow: .3, clear: .3, k: 1, disc: .5 },
-    burst: { w: 1.4, secs: .18, k: 1.1 },
+    crystals: { count: 6, long: .6, fat: .3, y: .5, grow: .3, clear: .3, k: 1, disc: .5, heart: .5 },
+    burst: { w: 1.2, secs: .17, k: 1, spray: 2.1 },
     shards: { count: 14, fling: 2.6, w: .2, secs: .6 },
     // the wave of cold rolling out to the burst's real edge: puffs, their size (x the radius), how long
     mist: { puffs: 9, w: .85, secs: .85 },
-    light: { rad: 2, k: 1, secs: .3 },
+    light: { rad: 1.8, k: .4, secs: .28 },
   },
   cc_frostfoe: {
     // a frozen foe's crystals at its feet: how many, their height (x the foe's), width, how clear, brightness; most foes drawn
@@ -53461,6 +53462,7 @@ const EFX_INFO = {
 Object.assign(EFX_INFO, { long: ['Length', .05, 2.5, .01], fat: ['Width (per length)', .05, .8, .01], clear: ['Clearness (0 solid, 1 glass)', 0, 1, .01], gather: ['Grows as a cast gathers (x)', 0, 3, .05],
   fog: ['Mist (a second / density)', 0, 4, .05], glint: ['Glints (chance / a second)', 0, 4, .05], streak: ['Torn air length', 0, 3, .02], gap: ['A puff every (cells)', .05, 1, .01], puff: ['Puff size', .05, 1.5, .01],
   spikes: ['Spikes out the far side', 0, 5, 1], spike: ['Spike length', .1, 1.5, .01], barb: ['Barb length (x the lance)', 0, .8, .01], high: ['Height (x the foe)', .1, 3, .01], wide: ['Width (x the foe)', .2, 4, .01],
+  heart: ['Glowing heart', 0, 1.5, .02], star: ['Star on its point', 0, 1.5, .02], shed: ['Crystals shed (chance a puff)', 0, 1, .02], spray: ['Frost spray width', 0, 4, .02], crown: ['Crown of ice (spike length)', 0, 1, .01], back: ['Cold light behind the foe', 0, 1, .01],
   grow: ['Grows over (s)', .03, 1, .01], facet: ['Facet contrast', 0, 2.5, .02], edge: ['Edge brightness', 0, 3, .02], sparkle: ['Sparkle', 0, 3, .02], inner: ['Inner facets and fractures', 0, 3, .02], rime: ['Rime at the root', 0, 2, .02] });
 
 /* ---- state: what is tuned, and the context a drawing call is made in ---- */
@@ -89365,16 +89367,16 @@ if (typeof towerTop === 'function') {
              clear (what is behind it shows through its faces), cracked (white fractures spreading), planted (rime at its root)
      MIST    a puff of cold fog: soft, broken by slow noise, thinning from inside as it ages
      GLOW    soft added cold light;  GLINT a snow glint, twinkling;  FLASH a burst of thin white needles (an impact)
-     STREAK  the cold air torn behind a flying shard
+     STREAK  the cold air torn behind a flying shard;  BURST a spray of frost dust thrown out from a point
    Nothing is drawn as a mark on the ground. Cards: frtBill (facing the camera), frtAxial (along a direction, turned to the
    camera); copied from pyrotex.js for now (the two could share them and the noise's maker once both are merged). Drawn in
    the spells' pass (gl.js vfxGL ext), depth-tested, premultiplied; ice and mist far to near, then the added light.
    The look is the Element Lab's Ice paint (elemfx.js cc_froststyle.paint; its gradient is the palette), live.
    No GL or DOM is touched until the first card is drawn (the sims load this). */
 const FRT = { q: [], sty: null, styAt: -1, tex: null, MAX: 420 };
-const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5 };
+const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5, BURST: 6 };
 // laid down: ice and mist (sorted far to near), then added light
-const FRT_ORD = [0, 0, 1, 1, 1, 1];
+const FRT_ORD = [0, 0, 1, 1, 1, 1, 0];
 // the palette, the deep of the ice to its white edge
 const FRT_PAL = ['#0c2f6b', '#1d6fc2', '#58b4ec', '#bfe8fb', '#f4fcff'];
 const frtHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
@@ -89428,7 +89430,7 @@ uniform mat4 uVP, uView; out vec2 vUV; out vec4 vA; out vec4 vB; out vec4 vC; ou
 ${typeof BEND_GLSL !== 'undefined' ? BEND_GLSL : 'vec3 bendW(vec3 p){return p;}'}
 void main(){ vUV = aUV; vA = aA; vB = aB; vC = aC; vS = aD; vec3 w = bendW(aPos); gl_Position = uVP * vec4(w, 1.); vD = -(uView * vec4(w, 1.)).z; }`;
 // vUV: the card's own coordinates (each shape says which); vA: shape, seed, time, age; vB: brightness, opacity, two of the
-// shape's own; vC: cracked (0..1), clear (0 solid .. 1 glass), soft (the depth it fades over where it meets the scene),
+// shape's own; vC: cracked (0..1), clear (0 solid .. 1 glass), soft (the depth it fades over where it meets the scene; a shard: how much its core glows),
 // tail (a shard: how much of its length its back end tapers over; 0: planted, a flat root); vS: its length and width in the
 // world; vD: its depth in view
 FRT.fs = /*FS<*/`#version 300 es
@@ -89465,23 +89467,35 @@ vec4 shard(vec2 uv){
   float la = sin(TM * .8 + SD * 9.) * uSty.w;
   vec3 L = normalize(vec3(-.5 + .45 * la, .52 - .2 * la, .66));
   float tone = smoothstep(-.12, 1.02, dot(n, L));
-  // inside: the ice's own facets and fractures, seen bent through each face
-  vec2 q = vec2(x * vS.y * .5, y * vS.x) * .62 + n.xy * .07 + vec2(SD * 5., SD * 3.);
-  vec4 c = N(q);
+  // how much ice the eye looks through here: none at its edges and point, most along its ridge
+  float thick = z * prof;
+  // inside: the ice's own facets and fractures, seen bent through each face; long streaks of trapped air along its length
+  vec2 wp = vec2(x * vS.y * .5, y * vS.x);
+  vec4 c = N(wp * .62 + n.xy * .09 + vec2(SD * 5., SD * 3.));
   float frac = (1. - smoothstep(0., .2, c.b)) * uSty2.x;
-  tone = clamp(tone * (.62 + .38 * uSty.x) + (c.a - .5) * .5 * uSty.x * uSty2.x, 0., 1.);
-  vec3 col = mix(uPal[0], uPal[1], smoothstep(0., .5, tone));
-  col = mix(col, uPal[2], smoothstep(.4, .78, tone));
-  col = mix(col, uPal[3], smoothstep(.72, 1., tone));
-  // its cold core: pale along its axis
-  float core = exp(-u * u * 4.) * smoothstep(0., .3, min(y * 1.6, prof)) * .6;
-  col = mix(col, uPal[4], core);
-  float rim = 1. - smoothstep(0., .1, d / max(fat, .2));
-  float ridge = max(1. - smoothstep(0., .075, abs(u - a)), 1. - smoothstep(0., .075, abs(u - b))) * smoothstep(.05, .35, prof);
-  float spec = pow(max(dot(n, normalize(L + vec3(0., 0., 1.))), 0.), 26.);
+  float streak = smoothstep(.56, .9, N(vec2(wp.x * 1.5 + n.x * .16 + SD * 2., wp.y * .17 + SD)).r) * uSty2.x;
+  tone = clamp(tone * (.62 + .38 * uSty.x) + (c.a - .5) * .46 * uSty.x * uSty2.x, 0., 1.);
+  // thick ice falls to deep blue, its lit faces and thin edges stay pale
+  vec3 col = mix(uPal[1], uPal[2], smoothstep(.15, .7, tone));
+  col = mix(col, uPal[3], smoothstep(.64, 1., tone));
+  col = mix(col, uPal[0], smoothstep(.2, .95, thick) * (.9 - .6 * tone));
+  col += uPal[2] * streak * (.18 + .3 * tone);
+  // its cold core: pale along its axis (vC.z: how much it glows of itself, a flying shard's heart)
+  float glowk = vC.z, core = exp(-u * u * (5. - 2. * glowk)) * smoothstep(0., .3, min(y * 1.6, prof));
+  col = mix(col, uPal[4], min(1., core * (.5 + .5 * glowk))) + uPal[3] * core * glowk * .5;
+  // edges: a thin white line, a wider pale one inside it; light split a little where it bends through one side
+  float dn = d / max(fat, .2), rim = 1. - smoothstep(0., .06, dn), rim2 = 1. - smoothstep(0., .3, dn);
+  float ridge = max(1. - smoothstep(0., .06, abs(u - a)), 1. - smoothstep(0., .06, abs(u - b))) * smoothstep(.05, .35, prof);
+  vec3 H = normalize(L + vec3(0., 0., 1.));
+  float spec = pow(max(dot(n, H), 0.), 38.);
+  // a glint that travels its length now and then, and specks in the ice that twinkle
+  float sw = fract(TM * .21 + SD * 3.) * 2.6 - .8;
+  float sweep = exp(-pow((y - sw - u * .22) * 8., 2.)) * (.3 + .7 * tone) * uSty.w;
+  vec4 sn = N(wp * 2.4 + vec2(SD * 7., SD * 2.));
+  float spk = smoothstep(.72, .95, sn.b) * step(.62, sn.a) * pow(.5 + .5 * sin(TM * 5. + sn.a * 60.), 6.) * uSty.w;
   float clr = clamp(vC.y * uSty.z, 0., 1.);
-  float hi = ((rim * .7 + ridge * .42) * uSty.y + spec * .9) * (1. - .3 * clr);
-  col += uPal[4] * hi + uPal[3] * frac * .13;
+  float hi = ((rim * .8 + ridge * .4) * uSty.y + spec * .95 + sweep * .45 + spk * .85) * (1. - .3 * clr);
+  col += mix(uPal[4], vec3(.8, .82, 1.), .4 * step(0., u)) * hi + uPal[3] * (rim2 * .22 * uSty.y + frac * .12);
   // cracked: white fractures spreading from its middle
   float ck = vC.x, crack = 0.;
   if (ck > 0.) {
@@ -89489,7 +89503,7 @@ vec4 shard(vec2 uv){
     crack = (1. - smoothstep(0., .13, cb)) * smoothstep(ck * 1.3, ck * 1.3 - .35, abs(y - .4)) * min(1., ck * 4.);
     col += vec3(1.) * crack + uPal[3] * ck * ck * .35;
   }
-  float al = clamp(mix(.9, .16, clr) * (1.08 - .3 * tone * clr) + hi * .75 + frac * .08 + crack + core * .25, 0., 1.);
+  float al = clamp(mix(.92, .15, clr) * (1.08 - .3 * tone * clr) + smoothstep(.3, 1., thick) * .12 * clr + hi * .75 + frac * .08 + crack + core * (.25 + .5 * glowk), 0., 1.);
   float aa = fwidth(d) * 1.3 + .004, cov = smoothstep(0., aa, d);
   if (tail <= 0.) {
     // planted: a ragged, rimed root, never a hard line where it meets the ground
@@ -89499,34 +89513,36 @@ vec4 shard(vec2 uv){
     cov *= smoothstep(0., .07, y + (g - .5) * .06);
   }
   al *= 1. - AGE;
-  if (uBloom.x > .5) return vec4(uPal[3] * (spec * .9 + core * .5 + rim * .2 + crack) * cov * vB.x * vB.y * (1. - AGE) * .3, 0.);
+  if (uBloom.x > .5) return vec4(uPal[3] * (spec * .9 + sweep * .5 + spk + core * (.4 + glowk) + rim * .2 + crack) * cov * vB.x * vB.y * (1. - AGE) * .3, 0.);
   return vec4(col * al * cov * vB.x, al * cov) * vB.y;
 }
 void main(){
   int sh = int(vA.x + .5);
-  float sf = frSoft(vC.z);
-  if (sh == 0) o = shard(vUV) * (vC.z > 0. ? .25 + .75 * sf : 1.);
+  float sf = sh == 0 ? 1. : frSoft(vC.z);
+  if (sh == 0) o = shard(vUV);
   else if (sh == 1) {
     // cold fog, -1..1 both ways; AGE its life
     if (uBloom.x > .5) discard;
     vec2 p = vUV; float t = AGE, r = length(p);
-    vec2 w = N(p * .2 + vec2(SD, TM * .04)).rg - .5;
-    float n = N(p * .24 + w * .3 + vec2(SD * 2., TM * .05 + t * .15)).r, n2 = N(p * .55 + w * .2 + vec2(SD * 5., t * .25)).g;
-    float d = .92 - r / (.6 + .36 * t) + (n - .5) * 1. + (n2 - .5) * .38;
+    vec2 w = N(p * .13 + vec2(SD, TM * .03)).rg - .5;
+    vec2 pp = p + w * .5;
+    float n = N(pp * .2 + vec2(SD * 2., TM * .04 + t * .12)).r, n2 = N(pp * vec2(.5, .36) + w * .3 + vec2(SD * 5., t * .2)).g;
+    float d = .95 - r / (.6 + .36 * t) + ((n - .5) * .95 + (n2 - .5) * .5) * vB.z;   // (vB.z: how broken it is; a rolling bank of fog is smoother)
     d -= t * t * 1.1 * n2;
-    float a = smoothstep(0., .95, d) * (1. - t) * smoothstep(0., .12, t) * (1. - smoothstep(.82, 1., r));
+    float a = smoothstep(0., 1.05, d); a *= a * (3. - 2. * a) * (1. - t) * smoothstep(0., .12, t) * (1. - smoothstep(.82, 1., r));
     float lit = smoothstep(-.6, .5, p.y + (n - .5) * .8);
-    vec3 c = mix(mix(uPal[2], uPal[3], .65), uPal[4], .2 + .7 * lit);
-    a *= vB.y * sf * .44 * uSty2.z;
+    // (pale and bright where it is thick, blue in its thin edges)
+    vec3 c = mix(uPal[2] * vec3(.8, .95, 1.1), uPal[4], smoothstep(.15, .95, d) * (.45 + .55 * lit));
+    a *= vB.y * sf * .62 * uSty2.z;
     // (mostly laid over what is behind it, only a little added: on bright ground it stays a mist, never a white-out)
-    o = vec4(c * vec3(.84, .94, 1.08) * a * vB.x * .8, a * .62);
+    o = vec4(c * a * vB.x * 1., a * .52);
   } else if (sh == 2) {
     float g = pow(max(0., 1. - length(vUV)), 2.2);
     o = vec4(mix(uPal[1], uPal[3], g) * g * vB.x * vB.y * sf * (uBloom.x > .5 ? .25 : 1.), 0.);
   } else if (sh == 3) {
     // a snow glint: a four-pointed star that twinkles, born and gone softly
     vec2 a = abs(vUV); float r = length(vUV);
-    float star = pow(max(0., 1. - (a.x * a.y * 34. + (a.x + a.y) * .9)), 3.) + exp(-r * r * 46.) * .8;
+    float star = pow(max(0., 1. - (a.x * a.y * 34. + (a.x + a.y) * .9)), 3.) + exp(-r * r * 46.) * .8 + vB.w * exp(-a.y * a.y * 900.) * pow(max(0., 1. - a.x), 2.) * .8;
     float tw = (.5 + .5 * sin(TM * 15. + SD * 50.)) * sin(3.14159 * clamp(AGE, 0., 1.));
     o = vec4(mix(uPal[3], uPal[4], .6) * star * tw * vB.x * vB.y * uSty.w * (uBloom.x > .5 ? .4 : 1.), 0.);
   } else if (sh == 4) {
@@ -89535,8 +89551,18 @@ void main(){
     float n = N(vec2(th * .159 * 4. + SD, .3 + SD)).r, n2 = N(vec2(th * .159 * 11. + SD * 2., .7)).g;
     float ray = pow(clamp(n * 2. - .62, 0., 1.), 2.) * 1.6 + pow(n2, 6.) * 1.1;
     float R = .22 + .78 * e, v = ray * smoothstep(R, R * .3, r) * smoothstep(e * .4 - .12, e * .4 + .08, r) * pow(1. - t, 1.3);
-    v += exp(-r * r * 30.) * pow(1. - t, 3.) * 1.6;
+    v += exp(-r * r * 40.) * pow(1. - t, 3.) * 1.1;
     o = vec4(mix(uPal[2], uPal[4], clamp(v * 1.4, 0., 1.)) * v * vB.x * vB.y * (uBloom.x > .5 ? .3 : 1.), 0.);
+  } else if (sh == 6) {
+    // a spray of frost thrown out from a point: streaks of ice dust, hollowing as it spreads
+    vec2 p = vUV; float t = AGE, r = length(p), th = atan(p.y, p.x), e = 1. - pow(1. - t, 2.6);
+    float n = N(vec2(th * .159 * 5. + SD, r * .22 - e * .5)).r, n2 = N(vec2(th * .159 * 14. + SD * 2., r * .7 - e * 1.3)).g, n3 = N(p * .9 + SD * 4.).g;
+    float R = (.16 + .8 * e) * (.5 + .75 * n);
+    float v = smoothstep(R, R * .4, r) * (.12 + 1.7 * n2 * n2) * mix(1., smoothstep(e * .62 - .22, e * .62 + .1, r / max(R, .01)), .6) * pow(1. - t, 1.5);
+    v *= .7 + .6 * n3;
+    v += exp(-r * r * 30.) * pow(1. - t, 5.) * .6;
+    float a = clamp(v, 0., 1.) * vB.y * sf;
+    o = uBloom.x > .5 ? vec4(uPal[3] * a * vB.x * .25, 0.) : vec4(mix(uPal[2], uPal[4], clamp(v * 1.2, 0., 1.)) * a * vB.x, a * .5);
   } else {
     // the cold air torn behind a flying shard: x across, y from its far end (0) to the shard (1)
     float y = vUV.y, w = .3 + .7 * y;
@@ -89555,7 +89581,7 @@ function frtPush(sh, c, uv, o, dz, len, wid) {
   o = o || {};
   const now = typeof G !== 'undefined' && G && G.time != null ? G.time : 0, sd = o.seed || 0;
   FRT.q.push({ sh, c, uv, sd, tm: (now * (o.sp || 1)) % 997 + sd * .37, age: o.age || 0, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0,
-    crack: o.crack || 0, clear: o.clear || 0, soft: o.soft == null ? (sh === FRT_SH.MIST ? .3 : sh === FRT_SH.SHARD ? 0 : .12) : o.soft, tail: o.tail || 0, len, wid, ord: FRT_ORD[sh], dz, tg: o.tg || null });
+    crack: o.crack || 0, clear: o.clear || 0, soft: sh === FRT_SH.SHARD ? o.core || 0 : o.soft == null ? (sh === FRT_SH.MIST ? .3 : .12) : o.soft, tail: o.tail || 0, len, wid, ord: FRT_ORD[sh], dz, tg: o.tg || null });
   const X = RD.vfx; if (!X.ext.includes(FRT_EXT)) X.ext.push(FRT_EXT); FRT_EXT.n = FRT.q.length;
   return true;
 }
@@ -89719,12 +89745,13 @@ function ffShard(P, dir, len, o, s, l) {
 }
 function ffBill(sh, P, w, o, s, l) { const z = ffTune(s, l, w, o); return z != null && frtBill(sh, P, z, z, FF_SQ, o); }
 // a one-shot left where it was made. kind: mist (w across, drifting, slowed by drag), splinter (a small crystal flung,
-// tumbling, falling), glint, flash, glow, spike (a crystal grown at a place: grown over o.grow, held, cracked and gone)
+// tumbling, falling), glint (o.fat: with a long streak across it), flash, burst (a spray of frost dust), glow, spike (a
+// crystal grown at a place: grown over o.grow, held, cracked and gone)
 function ffShot(kind, x, y, z, w, dur, o, s, l) {
   o = o || {}; if (FF.shots.length >= 240) FF.shots.shift();
   const P = ffP(s, l); if (P._g) dur *= P.life;
   FF.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, drag: o.drag || 0, g: o.g || 0, grow: o.grow || 0,
-    dir: o.dir || null, pull: o.pull, spin: o.spin || 0, a0: o.a0 || 0, fat: o.fat, tip: o.tip, clear: o.clear || 0, hold: o.hold || 0, seed: (Math.random() * 97) | 0, s, l });
+    dir: o.dir || null, pull: o.pull, soft: o.soft, spin: o.spin || 0, a0: o.a0 || 0, fat: o.fat, tip: o.tip, clear: o.clear || 0, hold: o.hold || 0, seed: (Math.random() * 97) | 0, s, l });
 }
 function ffShots(now) {
   FF.shots = FF.shots.filter(e => now - e.at < e.dur);
@@ -89733,14 +89760,15 @@ function ffShots(now) {
     const age = el / e.dur, m = e.drag > 0 ? (1 - Math.exp(-e.drag * el)) / e.drag : el;
     let x = e.x + e.vx * m, y = e.y + e.vy * m - .5 * e.g * el * el, z = e.z + e.vz * m;
     const o = { k: e.k, a: e.a, seed: e.seed, age };
-    if (e.kind === 'mist') { o.pull = .06; ffBill(FRT_SH.MIST, [x, Math.max(.06, y), z], e.w * (1 + e.grow * age), o, e.s, e.l); }
+    if (e.kind === 'mist') { o.pull = .06; if (e.soft != null) o.p0 = e.soft; ffBill(FRT_SH.MIST, [x, Math.max(.06, y), z], e.w * (1 + e.grow * age), o, e.s, e.l); }
     else if (e.kind === 'splinter') {
       // (it lies where it lands, and is gone)
       let a = e.a0 + e.spin * el; if (y < .04) { const tl = (e.vy + Math.sqrt(e.vy * e.vy + 2 * e.g * Math.max(0, e.y - .04))) / Math.max(.01, e.g); a = e.a0 + e.spin * tl; y = .04; x = e.x + e.vx * tl; z = e.z + e.vz * tl; }
       const d = e.dir; o.age = ffSs(.55, 1, age); o.tail = .42; o.tip = .46; o.fat = e.fat || .36; o.at = .5; o.clear = .2; o.pull = .05;
       ffShard([x, y, z], [Math.cos(a) * d[0], Math.sin(a), Math.cos(a) * d[1]], e.w, o, e.s, e.l);
     }
-    else if (e.kind === 'glint') { o.pull = .1; ffBill(FRT_SH.GLINT, [x, y, z], e.w, o, e.s, e.l); }
+    else if (e.kind === 'glint') { o.pull = .1; o.p1 = e.fat || 0; ffBill(FRT_SH.GLINT, [x, y, z], e.w, o, e.s, e.l); }
+    else if (e.kind === 'burst') { o.pull = .18; ffBill(FRT_SH.BURST, [x, y, z], e.w, o, e.s, e.l); }
     else if (e.kind === 'flash') { o.pull = .2; ffBill(FRT_SH.FLASH, [x, y, z], e.w, o, e.s, e.l); }
     else if (e.kind === 'glow') { o.a = e.a * (1 - age) * (1 - age); o.age = 0; o.pull = .15; ffBill(FRT_SH.GLOW, [x, y, z], e.w * (.8 + .4 * age), o, e.s, e.l); }
     else if (e.kind === 'spike') {
@@ -89759,6 +89787,15 @@ function ffSplinters(x, y, z, n, w, v, secs, s, o) {
       { vx: dx * sp + bx, vz: dz * sp + bz, vy: (o.up == null ? 1.5 : o.up) * (.5 + Math.random()), g: 7, dir: [dx, dz], spin: (Math.random() < .5 ? -1 : 1) * (5 + 9 * Math.random()), a0: Math.random() * TAU, fat: .3 + .14 * Math.random() }, s, 'shards');
   }
 }
+// a crown of ice thrown up where something strikes: n short spikes fanned about dir (leaning up), grown in a blink,
+// held a moment, cracked and gone
+function ffCrown(x, y, z, dir, n, len, fan, s, l, o) {
+  o = o || {};
+  for (let i = 0; i < n; i++) {
+    const f = n > 1 ? i / (n - 1) * 2 - 1 : 0, a = f * fan + (Math.random() - .5) * .2, ca = Math.cos(a), sa = Math.sin(a);
+    ffShot('spike', x, y, z, len * (1 - .3 * Math.abs(f)) * (.85 + .3 * Math.random()), o.dur || .42, { dir: ffNorm([dir[0] * ca - dir[2] * sa, (o.up == null ? .55 : o.up) + .25 * Math.abs(f), dir[2] * ca + dir[0] * sa]), grow: .06, hold: o.hold == null ? .12 : o.hold, fat: o.fat || .24, tip: .58, clear: o.clear == null ? .2 : o.clear, k: o.k || 1, delay: .01 * i, pull: o.pull == null ? .12 : o.pull }, s, l);
+  }
+}
 // snow glints drifting down from about a point
 function ffGlints(x, y, z, n, r, s, l) {
   for (let i = 0; i < n; i++) ffShot('glint', x + (Math.random() - .5) * r, y + (Math.random() - .5) * r * .7, z + (Math.random() - .5) * r, .11 + .09 * Math.random(), .55 + .5 * Math.random(), { vy: -.22 - .2 * Math.random(), vx: (Math.random() - .5) * .15, vz: (Math.random() - .5) * .15, delay: Math.random() * .25 }, s, l || 'mist');
@@ -89769,7 +89806,7 @@ function ffWave(x, z, r, s, k) {
   const M = ffP(s, 'mist'), n = ffN(M, (M.puffs || 8) * (k || 1), [.5, .75, 1]);
   for (let i = 0; i < n; i++) {
     const a = i * TAU / Math.max(1, n) + Math.random() * .5, v = r * 3.1 * (.85 + .3 * Math.random());
-    ffShot('mist', x + Math.cos(a) * .12, .16, z + Math.sin(a) * .12, r * (M.w || .85) * (.8 + .4 * Math.random()), (M.secs || .85) * (.85 + .3 * Math.random()), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, drag: 3.6, grow: .7, a: .9 }, s, 'mist');
+    ffShot('mist', x + Math.cos(a) * .12, .16, z + Math.sin(a) * .12, r * (M.w || .85) * 1.2 * (.8 + .4 * Math.random()), (M.secs || .85) * (.85 + .3 * Math.random()), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, drag: 3.6, grow: .7, a: .72, k: 1.05, soft: .55, delay: i * .012 }, s, 'mist');
   }
   if (ffLv()) ffGlints(x, .3, z, ffN(M, 5, [0, .6, 1]), r * 1.5, s, 'mist');
 }
@@ -89786,7 +89823,7 @@ function ffStaffs(now, dt) {
     const gg = t._ffG, sd = ((t.i | 0) * 5 + (t.j | 0)) % 97;
     ffBill(FRT_SH.GLOW, p, H.w * (1 + H.gather * gg), { k: H.k * (.45 + .75 * gg) * (.92 + .08 * Math.sin(now * 3 + sd)), pull: .08, seed: sd }, 'cc_rime', 'hand');
     if (!ffLv()) continue;
-    if (H.fog > 0 && Math.random() < dt * H.fog * (1 + 1.5 * gg)) ffShot('mist', p[0] + (Math.random() - .5) * .06, p[1] - .04, p[2] + (Math.random() - .5) * .06, .2 + .08 * Math.random(), 1, { vy: -.22, vx: (Math.random() - .5) * .08, vz: (Math.random() - .5) * .08, grow: 1.1, a: .32 }, 'cc_rime', 'hand');
+    if (H.fog > 0 && Math.random() < dt * H.fog * (1 + 1.5 * gg)) ffShot('mist', p[0] + (Math.random() - .5) * .06, p[1] - .04, p[2] + (Math.random() - .5) * .06, .2 + .08 * Math.random(), 1, { vy: -.22, vx: (Math.random() - .5) * .08, vz: (Math.random() - .5) * .08, grow: 1.4, a: .16 }, 'cc_rime', 'hand');
     if (H.glint > 0 && Math.random() < dt * H.glint * (1 + 3 * gg)) ffGlints(p[0], p[1], p[2], 1, .16 + .1 * gg, 'cc_rime', 'hand');
   }
 }
@@ -89830,8 +89867,10 @@ function ffBolts(now) {
         const fw = frtFw(), sd = ffNorm([d[1] * fw[2] - d[2] * fw[1], d[2] * fw[0] - d[0] * fw[2], d[0] * fw[1] - d[1] * fw[0]]), B = [P[0] - d[0] * len * .12, P[1] - d[1] * len * .12, P[2] - d[2] * len * .12];
         for (const q of [-1, 1]) ffShard(B, ffNorm([-d[0] * .82 + sd[0] * q * .5, -d[1] * .82 + sd[1] * q * .5, -d[2] * .82 + sd[2] * q * .5]), len * C.barb, { k: C.k, seed: F.seed + 7 + q, tail: .3, tip: .6, fat: .3, clear: C.clear, pull: .1 }, s, 'core');
       }
-      ffShard(P, d, len, { k: C.k, seed: F.seed, at: .78, tail: F.spear ? .2 : .34, tip: F.spear ? .5 : .44, fat: C.fat, clear: C.clear, pull: .12 }, s, 'core');
-      if (C.disc > 0 && lv) ffBill(FRT_SH.GLOW, P, len * C.disc + .2, { k: .42, pull: .1 }, s, 'core');
+      ffShard(P, d, len, { k: C.k, seed: F.seed, at: .78, tail: F.spear ? .2 : .34, tip: F.spear ? .5 : .44, fat: C.fat, clear: C.clear, core: C.heart, pull: .12 }, s, 'core');
+      // (the light caught on its point)
+      if (C.star > 0 && lv) ffBill(FRT_SH.GLINT, [P[0] + d[0] * len * .16, P[1] + d[1] * len * .16, P[2] + d[2] * len * .16], C.star * (F.spear ? 1.25 : 1) * (.9 + .1 * Math.sin(now * 31 + F.seed)), { age: .5, k: .6, p1: 1, seed: F.seed, pull: .16 }, s, 'core');
+      if (C.disc > 0 && lv) ffBill(FRT_SH.GLOW, P, len * C.disc + .2, { k: .3, pull: .1 }, s, 'core');
     }
     // the cold it leaves hanging along its path: a puff every so far, a glint
     if (!T.on || !(T.gap > 0)) continue;
@@ -89842,6 +89881,8 @@ function ffBolts(now) {
       if (Math.hypot(F.lx - F.x0, F.lz - F.z0) < .3) continue;
       ffShot('mist', F.lx, P[1] - .02, F.lz, T.puff * sz * (.8 + .4 * Math.random()), T.secs * (.8 + .4 * Math.random()), { vx: d[0] * .5, vz: d[2] * .5, vy: -.16, drag: 2.5, grow: .8, a: .8 }, s, 'trail');
       if (lv && Math.random() < T.glint) ffGlints(F.lx, P[1], F.lz, 1, .2, s, 'trail');
+      // (small crystals shed from it, tumbling away)
+      if (lv === 2 && T.shed > 0 && Math.random() < T.shed) ffSplinters(F.lx, P[1], F.lz, 1, .1 * sz, .7, .42, s, { dir: [d[0] * .8, 0, d[2] * .8], up: .5 });
     }
   }
 }
@@ -89851,7 +89892,11 @@ function ffLand(p, hit) {
   const F = p._ff || ffFlight(p), s = F.s, lv = ffLv(), B = efx(s, 'burst'), S = efx(s, 'shards'), M = efx(s, 'mist'), L = efx(s, 'light');
   const d = F.dir || [1, 0, 0], x = hit ? ffFoeX(hit) : F.tx == null ? p.x : F.tx, z = hit ? ffFoeZ(hit) : F.tz == null ? p.z : F.tz, y = F.aim == null ? p.h : F.aim, sz = F.spear ? (p.sz || 1.7) / 1.7 : Math.sqrt(p.sz || 1);
   const r = hit ? ffFoeR(hit) * .6 : 0, fx = x - d[0] * r, fz = z - d[2] * r;   // (on the foe's near side)
-  if (B.on) ffShot('flash', fx, y, fz, B.w * sz, B.secs, { k: B.k }, s, 'burst');
+  if (B.on) {
+    ffShot('flash', fx, y, fz, B.w * sz, B.secs, { k: B.k }, s, 'burst');
+    if (B.spray > 0) ffShot('burst', fx, y, fz, B.spray * sz, .34, { k: B.k }, s, 'burst');
+    if (B.crown > 0 && lv) ffCrown(fx, y - .04, fz, [-d[0], 0, -d[2]], F.spear ? 4 : 3, B.crown * sz, F.spear ? .95 : .8, s, 'burst', { k: B.k });
+  }
   if (S.on) ffSplinters(fx, y, fz, ffN(S, S.count * sz, [.5, .75, 1]), S.w * sz, S.fling, S.secs, s, { dir: [-d[0], 0, -d[2]] });
   if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', fx + (Math.random() - .5) * .2, y - .05 * i, fz + (Math.random() - .5) * .2, M.w * sz * (.85 + .3 * Math.random()), M.secs, { vx: -d[0] * .5, vz: -d[2] * .5, vy: -.12, drag: 2.5, grow: .8, delay: i * .05 }, s, 'mist');
   if (lv) ffGlints(fx, y, fz, ffN(M, F.spear ? 4 : 2, [0, .6, 1]), .5, s, 'mist');
@@ -89882,15 +89927,21 @@ function ffCoffins(now, dt) {
   const s = 'cc_rimelance', K = efx(s, 'crystals'), B = efx(s, 'core'), M = efx(s, 'mist'), L = efx(s, 'light'), lv = ffLv();
   for (const c of G.ccCoffins || []) if (c.ccCoffin && !c.dead && !c._ffC) { const e = c._ffC = { c, at: now, seed: (Math.random() * 97) | 0, until: c.ccCoffin.until }; FF.cof.push(e);
     if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', ffFoeX(c) + (Math.random() - .5) * .3, ffFoeY(c) + .2, ffFoeZ(c) + (Math.random() - .5) * .3, M.w * (.8 + .4 * Math.random()), M.secs, { vy: .1, grow: .8, delay: i * .08, a: .8 }, s, 'mist');
+    if (K.on && K.spray > 0) ffShot('burst', ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .35, ffFoeZ(c), Math.max(.8, ffFoeH(c)) * K.spray, .4, { k: .8 }, s, 'crystals');
+    if (lv) ffGlints(ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .7, ffFoeZ(c), ffN(M, 6, [0, .6, 1]), ffFoeR(c) * 3.2, s, 'mist');
     if (L.on) ffLight(c.x, c.y, .5, L.k, L.rad, L.secs, s); }
   for (const e of FF.cof) {
     const c = e.c, held = !c.dead && c.ccCoffin && c.ccCoffin.until > now && ffFrozen(c);
     if (!held) { e.gone = true; c._ffC = null; ffCoffinBreak(e, now); continue; }
     e.until = c.ccCoffin.until;
-    const el = now - e.at, crack = ffSs(e.until - .45, e.until - .02, now);
+    const el = now - e.at, crack = ffSs(e.until - .45, e.until - .02, now), tipN = lv && K.glint > 0 && Math.random() < dt * K.glint ? (Math.random() * 5) | 0 : -1;
+    // (a cold light behind the foe: the ice glows through, and the foe stands out against it)
+    if (B.on && B.back > 0 && lv) ffBill(FRT_SH.GLOW, [ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .55, ffFoeZ(c)], Math.max(.8, ffFoeH(c)) * 2.4, { k: B.back * Math.min(1, el / .3) * (.88 + .12 * Math.sin(now * 2.6 + e.seed)), pull: -ffFoeR(c) * .9 }, s, 'core');
     if (K.on) ffCoffinAt(e, now, (i, P, dir, h, w, clear) => {
       const g = ffBack((el - i * .028) / K.grow); if (g <= 0) return;
       ffShard(P, dir, h * g, { k: K.k, seed: e.seed + i * 7, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear: Math.max(clear, K.clear * (clear > 0 ? 1 : .35)), crack, floor: .55, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
+      // (light caught on one of its points, now and then)
+      if (i === tipN && g >= 1) ffShot('glint', P[0] + dir[0] * h * .93, P[1] + dir[1] * h * .93, P[2] + dir[2] * h * .93, .3, .5, { fat: 1 }, s, 'crystals');
     });
     // the one great crystal closed over the foe: clear, so the foe is seen through its faces
     if (B.on) {
@@ -89911,7 +89962,7 @@ function ffCoffinBreak(e, now) {
     if (K.on) ffShot('spike', P[0], P[1], P[2], h, .13, { dir, grow: .001, hold: 0, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear, k: K.k, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
     if (S.on) for (let j = 0; j < (i < 5 ? per : 1); j++) ffSplinters(P[0], P[1] + h * (.25 + .6 * Math.random()), P[2], 1, Math.max(S.w, h * .3) * (.8 + .5 * Math.random()), S.fling * .7, S.secs, s, { dir: [(P[0] - x) * 2, 0, (P[2] - z) * 2], up: .6 });
   });
-  if (S.on) ffShot('flash', x, y0 + H * .6, z, 1.5, .16, { k: 1.1 }, s, 'shards');
+  if (S.on) { ffShot('flash', x, y0 + H * .6, z, 1.5, .16, { k: 1.1 }, s, 'shards'); ffShot('burst', x, y0 + H * .5, z, H * 2.7, .45, { k: 1 }, s, 'shards'); if (ffLv()) ffGlints(x, y0 + H * .7, z, ffN(S, 9, [0, .6, 1]), ffFoeR(c) * 4, s, 'shards'); }
   if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', x + (Math.random() - .5) * .3, y0 + H * (.3 + .3 * i), z + (Math.random() - .5) * .3, M.w, M.secs, { vy: -.15, grow: .9, delay: i * .06 }, s, 'mist');
   if (L.on) ffLight(x, z, .5, L.k * .8, L.rad, .2, s);
 }
@@ -89920,7 +89971,7 @@ function ffCoffinBreak(e, now) {
 function ffBloomAt(c) { return [ffFoeX(c), ffFoeY(c) + ffFoeH(c) + efx('cc_hoarbloom', 'crystals').y, ffFoeZ(c)]; }
 function ffBlooms(now, dt) {
   const s = 'cc_hoarbloom', K = efx(s, 'crystals'), lv = ffLv();
-  for (const c of G.ccBlooms || []) if (c.ccBloom && !c.dead && !c._ffB) { const e = c._ffB = { c, at: now, seed: (Math.random() * 97) | 0 }; FF.blo.push(e); if (lv) ffGlints(...ffBloomAt(c), 3, .4, s, 'crystals'); }
+  for (const c of G.ccBlooms || []) if (c.ccBloom && !c.dead && !c._ffB) { const e = c._ffB = { c, at: now, seed: (Math.random() * 97) | 0 }; FF.blo.push(e); const Q = ffBloomAt(c); ffShot('burst', Q[0], Q[1], Q[2], K.long * 2.6, .32, { k: .8 }, s, 'crystals'); if (lv) ffGlints(Q[0], Q[1], Q[2], 4, .5, s, 'crystals'); }
   for (const e of FF.blo) {
     const c = e.c;
     if (c.dead || !c.ccBloom || c.ccBloom.until <= now) { e.gone = true; c._ffB = null; continue; }
@@ -89931,7 +89982,7 @@ function ffBlooms(now, dt) {
       const g = ffBack((el - i * .045) / K.grow); if (g <= 0) continue;
       // one petal straight up, the rest leaning out round it
       const az = e.seed + i * TAU / Math.max(1, n - 1), tl = i ? .78 + .3 * ffRnd(e.seed + i * 5) : 0, len = K.long * (i ? .62 + .3 * ffRnd(e.seed + i) : 1) * g;
-      ffShard([P[0], P[1] - .05, P[2]], [Math.cos(az) * Math.sin(tl), Math.cos(tl), Math.sin(az) * Math.sin(tl)], len, { k: K.k, a: fade, seed: e.seed + i * 7, fat: K.fat, tip: .5, tail: .16, clear: K.clear, pull: .12, floor: .5 }, s, 'crystals');
+      ffShard([P[0], P[1] - .05, P[2]], [Math.cos(az) * Math.sin(tl), Math.cos(tl), Math.sin(az) * Math.sin(tl)], len, { k: K.k, a: fade, seed: e.seed + i * 7, fat: K.fat, tip: .5, tail: .16, clear: K.clear, core: K.heart, pull: .12, floor: .5 }, s, 'crystals');
     }
     if (K.disc > 0 && lv) ffBill(FRT_SH.GLOW, P, K.long * 2.2 * K.disc, { k: .3 * fade * (.85 + .15 * Math.sin(now * 2.3 + e.seed)), pull: .1 }, s, 'crystals');
     if (lv && Math.random() < dt * 1.2) ffGlints(P[0], P[1] + .1, P[2], 1, K.long * 1.4, s, 'crystals');
@@ -89941,7 +89992,7 @@ function ffBlooms(now, dt) {
 // the bloom bursts at (x, z), y high: its petals fly apart, the cold rolls out to its real edge r
 function ffBloomBurst(x, y, z, r) {
   const s = 'cc_hoarbloom', B = efx(s, 'burst'), S = efx(s, 'shards'), L = efx(s, 'light'), K = efx(s, 'crystals');
-  if (B.on) ffShot('flash', x, y, z, B.w, B.secs, { k: B.k }, s, 'burst');
+  if (B.on) { ffShot('flash', x, y, z, B.w, B.secs, { k: B.k }, s, 'burst'); if (B.spray > 0) ffShot('burst', x, y, z, B.spray, .36, { k: B.k * .9 }, s, 'burst'); ffShot('glint', x, y, z, B.w * .6, .2, { fat: 1, k: .9 }, s, 'burst'); }
   if (S.on) { const n = ffN(S, S.count, [.5, .75, 1]); ffSplinters(x, y, z, Math.ceil(n * .4), K.long * .8, S.fling, S.secs, s, { up: 1.2 }); ffSplinters(x, y, z, Math.floor(n * .6), S.w, S.fling * .8, S.secs, s, { up: 1.8 }); }
   if (efx(s, 'mist').on) ffWave(x, z, r, s);
   if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
@@ -89984,7 +90035,7 @@ function ffFoes(now, dt) {
 // a Frozen foe's crit cracks its ice (the frost kit's ccrCritFx): splinters and a blink of needles
 function ffCrit(c) {
   const s = 'cc_frostfoe', y = ffFoeY(c) + ffFoeH(c) * .6;
-  ffShot('flash', ffFoeX(c), y, ffFoeZ(c), .85, .13, { k: 1 }, s, 'crystals');
+  ffShot('flash', ffFoeX(c), y, ffFoeZ(c), .85, .13, { k: 1 }, s, 'crystals'); ffShot('burst', ffFoeX(c), y, ffFoeZ(c), 1.1, .3, { k: .9 }, s, 'crystals');
   ffSplinters(ffFoeX(c), y, ffFoeZ(c), [4, 6, 8][ffLv()], .17, 1.9, .5, s, { up: 1.6 });
 }
 
