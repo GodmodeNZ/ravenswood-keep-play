@@ -1,4 +1,4 @@
-const BUILD_TAG = 'edf3a7e@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7ce4e52@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -83055,7 +83055,7 @@ function titleScreen(opt) {
   const R = ritesGet();
   mapPick = riteMap(R.pick); setMap(mapPick);
   showOverlay(`<div class="t2">
-    <header class="t2-head"><h1 class="t2-brand">Ravenswood Keep</h1></header>
+    <header class="t2-head"><h1 class="t2-brand">${typeof LOGO_URI !== 'undefined' && LOGO_URI ? `<img src="${LOGO_URI}" alt="Ravenswood Keep" width="1100" height="471">` : 'Ravenswood Keep'}</h1></header>
     <div class="t2-ui">
       <section class="t2-stage t2-nav" aria-labelledby="t2MenuTitle">
         <h2 id="t2MenuTitle">Main menu</h2>
