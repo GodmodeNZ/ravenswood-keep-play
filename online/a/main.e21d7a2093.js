@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b4b42e5@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b8e69cb@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -3229,9 +3229,11 @@ function guardBlock(c, amt, src) {
 }
 // a map with no keep (foes walk in from the woods): they leave the field down the painted path, out of view
 const walkOff = () => !!(G && !G.vs && typeof MAPS !== 'undefined' && MAPS[G.map] && MAPS[G.map].entry);
+// the walk in's perspective: [how much smaller a foe is at its far end (1 / (1 + k)), over how many rows]; a map's own (maps.js tun) or Sunfall's
+const tunP = () => (typeof MAPS !== 'undefined' && G && MAPS[G.map] && MAPS[G.map].tun) || TUN_DEF, TUN_DEF = [4.5, 4.9];
 const exitY = () => walkOff() ? ROWS + 2.6 : GATE_Y;
 function moveCreep(c, d) {
-  if (c.ent && walkOff()) d *= .45 + .55 / (1 + 4.5 * clamp((-.9 - c.y) / 4.9, 0, 1));   // far off up the tunnel each step covers less ground, as it looks (the same perspective as their size)
+  if (c.ent && walkOff()) d *= .45 + .55 / (1 + tunP()[0] * clamp((-.9 - c.y) / tunP()[1], 0, 1));   // far off up the tunnel each step covers less ground, as it looks (the same perspective as their size)
   while (c.ent && d > 0) {   // still on the way in out of the woods, to the field's head
     const p = c.ent[0], dx = p[0] - c.x, dy = p[1] - c.y, L = Math.hypot(dx, dy);
     if (Math.abs(dx) > .02) c.face = dx > 0 ? 1 : -1;
@@ -3260,7 +3262,7 @@ function moveCreep(c, d) {
 function arrive(c) {
   if (c.state === 'exit') { leak(c); return false; }
   const k = idx(c.ti, c.tj), sf = c.atk && G.state === 'play' ? siegeField() : null;
-  if ((sf ? sf.dist : G.dist)[k] === 0) { c.state = 'exit'; c.tx = 5.5 + (c.x - 5.5) * .4; c.ty = exitY(); return true; }
+  if ((sf ? sf.dist : G.dist)[k] === 0) { c.state = 'exit'; c.tx = (walkOff() && MAPS[G.map].exitX || 5.5) + (c.x - 5.5) * .4; c.ty = exitY(); return true; }   // (exitX: where a map's painted path leaves)
   const n = sf ? sf.next[k] : G.next[k];
   if (n < 0) return false;
   if (sf && G.blk[n] && !(G.tAt[n] && G.tAt[n].wounded)) return false;   // a structure stands in the way: hold here until it falls (a Wounded unit is pushed past)
@@ -13592,13 +13594,7 @@ function ccDrawProj(p) {
   const head = [p.x, p.h, p.z];
   if (p.k === 'star') { if (tr.length) QADD.beam(RD, tr[0], head, .07 * s, [col[0], col[1], col[2], .75]); QADD.bill(RD, p.x, p.h, p.z, .26 * s, .26 * s, [col[0], col[1], col[2], .95], 1, 0); QADD.bill(RD, p.x, p.h, p.z, .08 * s, .26 * s, [1, 1, 1, .9], 5, 0, vt * 4); QADD.bill(RD, p.x, p.h, p.z, .26 * s, .08 * s, [1, 1, 1, .9], 5, 0, vt * 4); return; }
   if (p.k === 'chrono') { QADD.bill(RD, p.x, p.h, p.z, .3 * s, .3 * s, [col[0], col[1], col[2], .55], 3, .15); QADD.bill(RD, p.x, p.h, p.z, .14 * s, .14 * s, [1, .95, .7, 1], 1, 0); if (tr.length) QADD.beam(RD, tr[0], head, .04 * s, [col[0], col[1], col[2], .5]); return; }
-  if (p.k === 'ice') {   // (its sizes, colours and layers: the Element Lab's Frost Bolt / Frost Spear, elemfx.js ELEM_FX_DEF)
-    const E = typeof efxOf === 'function' ? efxOf(p._efs, 'cc_rime', 'core') : { w: .24, core: .1, coreH: .16, a: .8 }, T = typeof efxOf === 'function' ? efxOf(p._efs, 'cc_rime', 'trail') : { w: .07, a: .45 };
-    const on = !E._g || E.on, ton = !T._g || T.on, g = E._g ? E.glow * E.alpha : 1, k = E._g ? E.size : 1, gc = E._g && E.grad ? efxRGB(E.c1) : [.6, .9, 1], cc = E._g && E.grad ? efxRGB(E.c0) : [.9, .98, 1];
-    if (on) { QADD.bill(RD, p.x, p.h, p.z, E.w * k * s, E.w * k * s, [gc[0], gc[1], gc[2], E.a * g], 1, 0); QA.bill(RD, p.x, p.h, p.z, E.core * k * s, E.coreH * k * s, [cc[0], cc[1], cc[2], 1], 5, 0, vt * 3); }
-    if (ton && tr.length) { const tg = T._g ? T.glow * T.alpha : 1, tc = T._g && T.grad ? efxRGB(T.c0) : [.7, .9, 1]; QADD.beam(RD, tr[0], head, T.w * (T._g ? T.size : 1) * s, [tc[0], tc[1], tc[2], T.a * tg]); }
-    return;
-  }
+  if (p.k === 'ice' && typeof ffBolts === 'function') return;   // (the Frostweavers' bolt and spear: frostfx.js)
   if (p.k === 'blade') { if (tr.length) QADD.beam(RD, tr[0], head, .09, [.75, .55, 1, .7]); QADD.bill(RD, p.x, p.h, p.z, .22, .22, [.8, .6, 1, .9], 1, 0); return; }
   if (p.k === 'orb') { const f = 1 + .1 * Math.sin(vt * 20); QADD.bill(RD, p.x, p.h, p.z, .7 * s * f, .7 * s * f, [.65, .4, 1, .75], 1, 0); QADD.bill(RD, p.x, p.h, p.z, .3 * s, .3 * s, [1, .9, 1, 1], 1, 0); QADD.bill(RD, p.x, p.h, p.z, .55 * s, .55 * s, [.8, .6, 1, .5], 3, .12); if (tr.length) QADD.beam(RD, tr[0], head, .2 * s, [.7, .45, 1, .4]); return; }
   // a missile: a bright head and a short curling tail
@@ -45894,7 +45890,7 @@ function talRemapByName(src, oldNames, list) {
      cc_hoarbloom     Shatterbloom           an ice crystal blooms on a foe; when it dies, or it Shatters, the bloom bursts,
                                              freezing and slowing the foes round it
    Frozen (one status, c.stunT with c.stunEl 'frost', freezeFoe in game.js): Ice Coffin, Encase, Shatterbloom's burst and
-   anything that holds a foe in ice. Drawn with an icy crust (ccDrawFoe below). Conclave hits on a Frozen foe can crit
+   anything that holds a foe in ice. Drawn with crystals of ice at the foe's feet (frostfx.js). Conclave hits on a Frozen foe can crit
    (ccFrozenCrit, read by ccHit): the Frostweavers' Cold Eye, the Magelings' Cold Focus, the Pyroclasts' Thermal Crack, the
    Astrologers' Frost Lens, Frozen Lance and Maelis. A frozen crit cracks the ice: shards and a big icy number.
    Every number is in CCR. */
@@ -46091,31 +46087,7 @@ function ccrCritFx(t, c, amt) {
     }
     return h0.apply(this, arguments);
   }; }
-// the Frozen look: an icy crust round the foe and a pale-blue tint, distinct from a plain chill; Ice Coffin's block of ice;
-// a Shatterbloom's crystal over the foe
-{ const d0 = ccDrawFoe;
-  ccDrawFoe = function (c) {
-    d0.apply(this, arguments);
-    const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), h = hitH(c), r = .2 + (c.def.r || .3) * .9;
-    // (Ice Coffin's block and Shatterbloom's crystal: their sizes, opacities and colours are the Element Lab's, elemfx.js)
-    const EK = typeof efx === 'function' ? efx : null;
-    if (ccFrozen(c)) {
-      const coffin = c.ccCoffin && c.ccCoffin.until > G.time, B = coffin && EK ? EK('cc_rimelance', 'crystals') : { w: 2.3, h: 2.1, a: .5, rim: .45, frost: .45 };
-      const on = !B._g || B.on, k = B._g ? B.size : 1, al = B._g ? B.alpha : 1, gl = B._g ? B.glow : 1, c0 = coffin && B._g && B.grad ? efxRGB(B.c0) : [.72, .9, 1], c1 = coffin && B._g && B.grad ? efxRGB(B.c1) : [.85, .97, 1], c2 = coffin && B._g && B.grad ? efxRGB(B.c2) : [.8, .95, 1];
-      const w = (coffin ? r * B.w : r * 1.7) * k, hh = (coffin ? h * B.h + .2 : h * 1.6) * k;
-      if (on) {
-        QA.bill(RD, x, h * .85, z, w, hh, [c0[0], c0[1], c0[2], (coffin ? B.a : .32) * al], 5, 0, 0);
-        QADD.bill(RD, x, h * .85, z, w * 1.05, hh * 1.03, [c1[0], c1[1], c1[2], (coffin ? B.rim : .25) * al * gl], 3, .06);
-        QADD.ground(x, z, .03, r * 1.6 * k, r * 1.6 * k, [c2[0], c2[1], c2[2], (coffin ? B.frost : .45) * al], 4, .08, 0);
-      }
-    }
-    if (c.ccBloom && c.ccBloom.until > G.time) {
-      const B = EK ? EK('cc_hoarbloom', 'crystals') : { w: .14, h: .24, y: .55, halo: .3, a: .95 }, k = B._g ? B.size : 1, al = B._g ? B.alpha : 1, gl = B._g ? B.glow : 1;   // (B.halo: its halo's width)
-      const c0 = B._g && B.grad ? efxRGB(B.c0) : [.88, .98, 1], c1 = B._g && B.grad ? efxRGB(B.c1) : [.6, .9, 1];
-      const f = (.85 + .15 * Math.sin(vt * 4 + c.id)) * k, y = h + B.y;
-      if (!B._g || B.on) { QA.bill(RD, x, y, z, B.w * f, B.h * f, [c0[0], c0[1], c0[2], B.a * al], 5, 0, vt * .6); QADD.bill(RD, x, y, z, B.halo * f, B.halo * f, [c1[0], c1[1], c1[2], .35 * al * gl], 1, 0); }
-    }
-  }; }
+// (the Frozen look, Ice Coffin's crystals and a Shatterbloom's cluster are drawn by frostfx.js)
 
 /* ================= THE SPELLBLADES' RIFTSTEEL KIT, ROLE LINES AND WAVE TIPS =================
    The owner (8 Nov 2026): the blades glow because they are riftsteel (docs/lore.md): College steel quenched in a tear
@@ -53249,7 +53221,7 @@ if (typeof sfxTuneSync === 'function') sfxTuneSync();
    - Eight effects: the Pyroclasts' Fireball (their strike), Furnace Breath, Skipping Flame and Phoenix; the Frostweavers'
      Frost Bolt (their strike), Frost Spear, Ice Coffin and Shatterbloom (ELEM_FX_SPELLS: ids as the game knows them; the
      Frostweavers are cc_rimeweaver in code). Two more for the Pyroclasts that are not spells: Burning foes (the burns they
-     set) and Flame paint (the look of the shader all their fire is drawn by, pyrotex.js: live as it is tuned).
+     set) and Flame look (the look of the shader all their fire is drawn by, pyrotex.js: live as it is tuned).
    - The Pyroclasts' fire is drawn live by a flame shader (10 Nov 2026, pyrofire.js, pyrotex.js): its layers and values are
      its own, each effect listing them (ELEM_FX_SPELLS[id].layers: hand flame, core, trail, burst, ring, flames, embers,
      smoke, glow, light, ground; paint). Tuning saved on a device for the earlier sheets is dropped once (efxFresh). The
@@ -53277,11 +53249,15 @@ const ELEM_FX_SPELLS = {
   // (not spells: the burns the Pyroclasts set on foes, and the look of the shader every one of their flames is drawn by,
   // pyrotex.js; the lab loops the strike for both)
   cc_pyroburn: { unit: 'cc_pyroclast', el: 'fire', name: 'Burning foes', basic: 1, layers: ['flames', 'embers'] },
-  cc_pyrostyle: { unit: 'cc_pyroclast', el: 'fire', name: 'Flame paint', basic: 1, layers: ['paint'] },
-  cc_rime: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Bolt', basic: 1 },
-  cc_glacialglyph: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Spear' },
-  cc_rimelance: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice Coffin' },
-  cc_hoarbloom: { unit: 'cc_rimeweaver', el: 'frost', name: 'Shatterbloom' },
+  cc_pyrostyle: { unit: 'cc_pyroclast', el: 'fire', name: 'Flame look', basic: 1, layers: ['paint'] },
+  // the Frostweavers' frost (frostfx.js, drawn live by the ice shader, frosttex.js): each lists its own layers
+  cc_rime: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Bolt', basic: 1, layers: ['hand', 'core', 'trail', 'burst', 'shards', 'mist', 'light'] },
+  cc_glacialglyph: { unit: 'cc_rimeweaver', el: 'frost', name: 'Frost Spear', layers: ['core', 'trail', 'burst', 'shards', 'mist', 'light'] },
+  cc_rimelance: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice Coffin', layers: ['crystals', 'core', 'shards', 'mist', 'light'] },
+  cc_hoarbloom: { unit: 'cc_rimeweaver', el: 'frost', name: 'Shatterbloom', layers: ['crystals', 'burst', 'shards', 'mist', 'light'] },
+  // (not spells: the look of chilled and frozen foes, and of the shader all her ice is cut by; the lab loops the strike for both)
+  cc_frostfoe: { unit: 'cc_rimeweaver', el: 'frost', name: 'Chilled / frozen foes', basic: 1, layers: ['crystals', 'mist'] },
+  cc_froststyle: { unit: 'cc_rimeweaver', el: 'frost', name: 'Ice paint', basic: 1, layers: ['paint'] },
 };
 // the layers, in the order the lab lists them (an effect's own list, ELEM_FX_SPELLS[id].layers, first), and their names
 const EFX_LAYERS = {
@@ -53289,13 +53265,18 @@ const EFX_LAYERS = {
   frost: ['core', 'trail', 'burst', 'shards', 'crystals', 'mist', 'glow', 'light', 'ground', 'ring', 'embers'],
 };
 const EFX_LNAME = {
-  core: { fire: 'Core (the comet, the cone, the bird)', frost: 'Core (the bolt, the spear)' }, flames: { fire: 'Flames (tongues, wings)', frost: 'Flames' },
-  hand: 'Hand flame', paint: 'Flame paint (every flame: outline, hot core, bands, curl, grain, halo; gradient = palette)', embers: { fire: 'Embers / sparks', frost: 'Sparks / glints' },
-  smoke: { fire: 'Smoke puffs', frost: 'Smoke' }, glow: { fire: 'Glow (under the flame)', frost: 'Cold glow (flares, motes)' }, light: 'Light flash',
-  ground: { fire: 'Ground fire (the flame on a burning glyph, its light)', frost: 'Frost decal / ground' }, trail: { fire: 'Trail (tongues peeling off)', frost: 'Projectile trail' }, burst: { fire: 'Impact burst', frost: 'Impact burst' }, ring: { fire: 'Ring of flame (the real splash)', frost: 'Ground ring' },
+  core: { fire: 'Core (the ball and its flame, the stream, the bird)', frost: 'Core (the bolt, the spear)' }, flames: { fire: 'Flames (billows, tongues, wings)', frost: 'Flames' },
+  hand: 'Hand flame', paint: 'Flame look (every flame: soot, hot core, gradient blend, turbulence, grain, glow, flicker; gradient = palette)', embers: { fire: 'Embers / sparks', frost: 'Sparks / glints' },
+  smoke: { fire: 'Smoke', frost: 'Smoke' }, glow: { fire: 'Glow (under the flame)', frost: 'Cold glow (flares, motes)' }, light: 'Light flash',
+  ground: { fire: 'Ground fire (one fire over a burning glyph, its light)', frost: 'Frost decal / ground' }, trail: { fire: 'Trail (fire shed behind it, cooling to smoke)', frost: 'Projectile trail' }, burst: { fire: 'Impact burst (the ball of fire, fire thrown up)', frost: 'Impact burst' }, ring: { fire: 'Blast (fire rolling out to the edge of the real splash)', frost: 'Ground ring' },
   shards: 'Shatter shards', crystals: 'Ice crystals (spikes, block, bloom)', mist: 'Frost mist / snow',
 };
-const efxLName = (l, el) => { const n = EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
+// the Frostweavers' layers (frostfx.js): their names, and what the lab shows for each (c: ice cards; l: light; x: its own values only)
+const EFX_LNAME_FROST = { hand: 'Staff frost (glow, sinking mist, glints)', core: 'Core (the shard, the spear; Ice Coffin: the clear crystal over the foe)', trail: 'Wake (torn air, mist left hanging)',
+  burst: 'Impact (needles; the spear: spikes out the far side)', shards: 'Splinters', crystals: 'Crystals (standing ice, the petals of the bloom)', mist: 'Cold mist and glints', light: 'Light',
+  paint: 'Ice paint (every crystal: facets, edges, clearness, sparkle, inner fractures, rime, fog; gradient = palette)' };
+const EFX_LKIND_FROST = { hand: 'c', core: 'c', trail: 'c', burst: 'c', shards: 'c', crystals: 'c', mist: 'c', light: 'l', paint: 'x' };
+const efxLName = (l, el) => { const n = (el === 'frost' && EFX_LNAME_FROST[l]) || EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
 // what each layer is made of (the controls the lab shows for it): p particles, g GPU particles, m moments, f flipbook fire,
 // l light, d decal / ground marks, b billboards drawn by the spell's own code (their own values below)
 const EFX_LKIND = { hand: 'f', paint: 'x', core: 'fmb', flames: 'fp', embers: 'pg', smoke: 'pgf', glow: 'pmf', light: 'lm', ground: 'dfm', trail: 'pmf', burst: 'mfp', ring: 'mp', shards: 'pg', crystals: 'pgmb', mist: 'pg' };
@@ -53304,10 +53285,10 @@ const EFX_GEN = { on: 1, n: 1, size: 1, sol: 1, life: 1, speed: 1, spread: 1, li
   c0: '#ffffff', a0: 1, c1: '#ffffff', a1: 1, c2: '#ffffff', a2: 1, haze: 0 };
 // [key, label, kinds it acts on, min, max, step] (or 'check' / 'select' / 'grad')
 const EFX_GEN_UI = [
-  ['n', 'Particle count', 'pg', 0, 4, .05], ['size', 'Size', 'pgmfldb', .1, 4, .05], ['sol', 'Size over life (end)', 'pg', 0, 4, .05],
-  ['life', 'Lifetime', 'pgmld', .1, 4, .05], ['speed', 'Speed', 'pgf', 0, 4, .05], ['spread', 'Spread / cone', 'pg', 0, 4, .05],
-  ['lift', 'Gravity (-) / lift (+)', 'pg', -8, 8, .1], ['turb', 'Turbulence (curl noise)', 'pg', 0, 6, .05], ['glow', 'Glow / bloom', 'pgmflb', 0, 4, .05],
-  ['alpha', 'Opacity', 'mfb', 0, 2, .02], ['haze', 'Heat haze (distortion, High)', 'f', 0, 2, .05],
+  ['n', 'Particle count', 'pgc', 0, 4, .05], ['size', 'Size', 'pgmfldbc', .1, 4, .05], ['sol', 'Size over life (end)', 'pg', 0, 4, .05],
+  ['life', 'Lifetime', 'pgmldc', .1, 4, .05], ['speed', 'Speed', 'pgfc', 0, 4, .05], ['spread', 'Spread / cone', 'pg', 0, 4, .05],
+  ['lift', 'Gravity (-) / lift (+)', 'pg', -8, 8, .1], ['turb', 'Turbulence (curl noise)', 'pg', 0, 6, .05], ['glow', 'Glow / bloom', 'pgmflbc', 0, 4, .05],
+  ['alpha', 'Opacity', 'mfbc', 0, 2, .02], ['haze', 'Heat haze (distortion, High)', 'f', 0, 2, .05],
   ['blend', 'Blend', 'pg', 'select', [['as', 'As authored'], ['add', 'Additive (glows)'], ['soft', 'Soft (alpha)']]],
   ['shape', 'Shape (toolkit sprite)', 'pg', 'select', [['as', 'As authored'], ['GLOW', 'Soft glow'], ['SPARK', 'Spark streak'], ['EMBER', 'Ember'], ['FLAME', 'Flame tongue'], ['SMOKE', 'Smoke'], ['PUFF', 'Puff'], ['WISP', 'Wisp'], ['STAR', 'Star mote'], ['CRYS', 'Ice crystal'], ['SHARD', 'Shard'], ['RUNE', 'Rune']]],
 ];
@@ -53316,95 +53297,147 @@ const EFX_GEN_UI = [
 const ELEM_FX_DEF = {
   // the Pyroclasts' fire (pyrofire.js; drawn live by the flame shader, pyrotex.js). Sizes in world units.
   cc_fireball: {
-    // the flame in the casting palm: length, longer each tier, grown as a cast gathers, brightness, its glow
-    hand: { flame: .2, tier: .012, cast: .7, k: 1, disc: .5 },
-    // the fireball in flight: its length (the ball two fifths of it across), brightness, its glow, how much of the lob's arc it
-    // keeps (none: it flies straight and level, at the height it left his hand), the most of a foe's height it flies at (a foe
-    // shorter than his hand: it comes down to that)
-    core: { ball: .9, k: 1.05, disc: .8, arcK: 0, aim: .85 },
-    // tongues peeling off behind it: every (s), their length, how fast they rise, an ember's chance
-    trail: { every: .07, w: .2, rise: .3, ember: .3 },
-    // the landing: width per cell of splash, the largest, brightness, a great ball's, how long it plays
-    burst: { w: 2.3, wMax: 3.2, k: 1.05, kGreat: 1.2, secs: .5 },
-    // the ring of flame racing out: its reach (x the splash), how long
+    // the flame in the casting palm: length, longer each tier, grown as a cast gathers, brightness, its glow, how much it
+    // lags the hand as it moves
+    hand: { flame: .2, tier: .012, cast: .7, k: 1, disc: .5, lag: 1 },
+    // the fireball in flight: its length (the ball about half of it across, its flame swept back the rest), brightness, its
+    // glow, how much of the lob's arc it keeps (none: it flies straight and level, at the height it left his hand), the most of
+    // a foe's height it flies at (a foe shorter than his hand: it comes down to that), the air's shimmer
+    core: { ball: .9, k: 1.05, disc: .8, arcK: 0, aim: .85, shimmer: .12 },
+    // fire shed behind it, left hanging to cool into smoke: every (s), a billow's size, how fast it rises, a spark's chance
+    trail: { every: .034, w: .27, rise: .3, ember: .35 },
+    // the landing: width per cell of splash, the largest, brightness, a great ball's, how long it plays, the air's shimmer
+    burst: { w: 2.3, wMax: 3.2, k: 1.05, kGreat: 1.2, secs: .5, shimmer: .20 },
+    // fire rolling out low over the ground: its reach (x the splash), how long
     ring: { r: 1, secs: .34 },
-    // flung where it lands: how many, a great ball's, how hard, how long, their size
-    embers: { count: 6, great: 11, fling: 1.6, secs: .55, w: .07 },
-    // its puffs (none on Low): how many, a great ball's, size per splash, delay, rise
-    smoke: { puffs: 1, great: 2, w: 1, delay: .14, rise: .45 },
+    // flung where it lands: how many, a great ball's, how hard, how long, their size; fine sparks (Medium; none on Low)
+    embers: { count: 8, great: 14, fling: 1.6, secs: .55, w: .055, sparks: 9 },
+    // its smoke (none on Low): how many, a great ball's, size per splash, delay, rise
+    smoke: { puffs: 1, great: 2, w: 1.1, delay: .16, rise: .45 },
     // the landing's flash: radius, brightness, how long; the light it carries in flight
     light: { rad: 1.6, k: .8, secs: .22, fly: 1 },
     // the warm light it leaves where it lands (its radius per splash, how long; no mark on the ground); a burning glyph: one
-    // flame over it (its height), its light on the ground, embers a second
-    ground: { scorch: .55, dur: 1.5, tall: .34, disc: .3, ember: 3 },
+    // fire over it (its height), its light on the ground and on what stands in it, embers a second, flames torn off its top
+    // (every s), smoke off it (every s), the air's shimmer
+    ground: { scorch: .55, dur: 1.5, tall: .34, disc: .3, ember: 4, tear: .15, fume: .55, shimmer: .10 },
   },
   cc_kindle: {
-    // each hop: the comet's length, the first hop's arc, the others', each hop smaller by
-    core: { ball: .7, arc0: .6, arc: .35, shrink: .88, k: 1, disc: .7 },
+    // each hop: the fireball's length, the first hop's arc, the others', each hop smaller by
+    core: { ball: .7, arc0: .6, arc: .35, shrink: .88, k: 1, disc: .7, shimmer: .10 },
     light: { rad: 1.3, fly: .8 },
-    trail: { every: .06, w: .22, rise: .3, ember: .2 },
+    trail: { every: .034, w: .25, rise: .3, ember: .25 },
     // each landing's burst: width, the last bigger by, each smaller by
-    burst: { w: 1.3, last: 1.3, shrink: .85, k: 1, secs: .42 },
+    burst: { w: 1.3, last: 1.3, shrink: .85, k: 1, secs: .42, shimmer: .14 },
     ring: { r: .55, secs: .3 },
     // tongues left licking round each landing
-    flames: { count: 3, w: .3 },
-    embers: { count: 5 },
-    // the last landing's puff
-    smoke: { w: .7 },
+    flames: { count: 2, w: .3 },
+    embers: { count: 5, sparks: 5 },
+    // the last landing's smoke
+    smoke: { w: .8 },
     // the glyph each skip leaves
-    ground: { tall: .3, disc: .28, ember: 2 },
+    ground: { tall: .3, disc: .28, ember: 3, tear: .18, fume: .7, shimmer: .08 },
   },
   cc_pyresigil: {
-    // the cone: jets fanned across it, their reach (x the range), brightness, share of the cone, how far the far end dips
-    core: { jets: 5, len: 1.05, k: 1, cone: .8, drop: .6 },
-    // tongues lifting off along its far half: every (s), their length
-    flames: { every: .09, w: .42 },
-    // off the burning foes
-    embers: { every: .12, count: 2 },
-    smoke: { every: .4, w: .7 },
+    // the stream: sheets fanned across the cone, their reach (x the range), brightness, share of the cone, how far the far end
+    // dips, the air's shimmer
+    core: { jets: 3, len: 1.05, k: 1, cone: .8, drop: .6, shimmer: .16 },
+    // billows thrown down it: every (s), their size at the hands, how much they swell (x), how long each lives
+    flames: { every: .045, w: .3, grow: 2.2, secs: .55 },
+    // off the burning foes; fine sparks blown down the cone each time (Medium; none on Low)
+    embers: { every: .12, count: 2, sparks: 3 },
+    smoke: { every: .3, w: .8 },
     // the glow under the cone: opacity, width
     glow: { a: .22, w: .45 },
     light: { every: .35, rad: 1.4 },
   },
   cc_flamewave: {
-    // the bird's body: its length, brightness, glow
-    core: { body: 1.1, k: 1.1, disc: .9 },
+    // the bird's body: its length, brightness, glow, the air's shimmer
+    core: { body: 1.1, k: 1.1, disc: .9, shimmer: .12 },
     // its wings: their span, beat speed, tail length, brightness
     flames: { wing: 1.3, beat: 8, tail: 1.5, k: 1 },
-    // shed behind it: every (s), the tongues' length
-    trail: { every: .05, w: .3 },
+    // fire shed from its wingtips and tail: every (s), a billow's size
+    trail: { every: .04, w: .34 },
     // the dive's blast
-    burst: { w: 3.2, k: 1.1, secs: .6 },
+    burst: { w: 3.2, k: 1.1, secs: .6, shimmer: .24 },
     ring: { r: 1, secs: .4 },
-    embers: { count: 12 },
-    smoke: { puffs: 2, w: 1.4 },
+    embers: { count: 12, sparks: 14 },
+    smoke: { puffs: 2, w: 1.5 },
     // the fire left where it dives
-    ground: { r: .75, dur: 1.4, tall: .42, disc: .35, ember: 4 },
+    ground: { r: .75, dur: 1.4, tall: .42, disc: .35, ember: 5, tear: .13, fume: .5, shimmer: .10 },
     light: { every: .3, rad: 1.6 },
   },
   cc_pyroburn: {
-    // on each burning foe: tongues, their height, opacity, brightness; most on screen
-    flames: { count: 2, tall: .32, a: .95, k: 1, max: 30 },
+    // on each burning foe: flames, their height, opacity, brightness; most on screen; how much they lean back from the way it
+    // walks; wisps shed behind it (every s)
+    flames: { count: 2, tall: .4, a: .9, k: 1, max: 30, lean: 1, shed: .3 },
     // a second, a foe
     embers: { rate: 2.5 },
   },
   cc_pyrostyle: {
-    // the flame shader's look: outline width, hot core size, band softness, curl (sway), brush grain, halo
-    paint: { outline: 1, heart: 1, soft: 1, curl: 1, grain: 1, halo: 1 },
+    // the flame shader's look: soot at the cool ends, hot core size, gradient blend (1 smooth, 0 flat bands), turbulence,
+    // brush grain, glow round the flame, flicker
+    paint: { soot: 1, heart: 1, soft: .85, curl: 1, grain: 1, halo: 1, flicker: 1 },
   },
+  // the Frostweavers' frost (frostfx.js; drawn live by the ice shader, frosttex.js). Sizes in world units.
   cc_rime: {
-    core: { w: .24, core: .1, coreH: .16, a: .8 },                   // the bolt: its glow's width, the ice core's width and height, the glow's opacity
-    trail: { w: .07, a: .45 },                                       // the streak behind it
+    // the staff's crystal: its glow's width, brightness, how much a gathering cast adds, mist a second, glints a second
+    hand: { w: .34, k: .7, gather: .7, fog: .9, glint: .6 },
+    // the shard in flight: its length, its width per length, brightness, how clear, its glow, the most of a foe's height it
+    // flies at (it flies straight and level from the staff; at a foe shorter than that it comes down to this)
+    core: { long: .5, fat: .3, k: 1, clear: .15, disc: .5, aim: .75 },
+    // its wake: the torn air's length, a puff of mist every so far, its size, how long it hangs, a glint's chance
+    trail: { streak: .8, gap: .2, puff: .46, secs: .55, glint: .2 },
+    // the landing's needles: width, how long, brightness
+    burst: { w: 1.05, secs: .15, k: 1.15 },
+    // splinters flung: how many, how hard, their length, how long
+    shards: { count: 6, fling: 1.6, w: .2, secs: .5 },
+    // the puff of cold: how many, size, how long
+    mist: { puffs: 1, w: .7, secs: .8 },
+    // the landing's light: radius, brightness, how long; the light carried in flight
+    light: { rad: 1.2, k: .6, secs: .2, fly: .5 },
   },
   cc_glacialglyph: {
-    core: { w: .24, core: .1, coreH: .16, a: .8 },
-    trail: { w: .07, a: .45 },
+    // the lance: as the shard, and its barbs' length (x its own)
+    core: { long: 1.25, fat: .17, k: 1.05, clear: .1, disc: .5, aim: .75, barb: .3 },
+    trail: { streak: 1.2, gap: .2, puff: .58, secs: .75, glint: .5 },
+    // the landing: needles, and the spikes driven out the far side of the foe (how many, their length)
+    burst: { w: 1.5, secs: .17, k: 1.2, spikes: 3, spike: .9 },
+    shards: { count: 11, fling: 2.1, w: .25, secs: .55 },
+    mist: { puffs: 2, w: .9, secs: .9 },
+    light: { rad: 1.7, k: .9, secs: .25, fly: .8 },
   },
   cc_rimelance: {
-    crystals: { w: 2.3, h: 2.1, a: .5, rim: .45, frost: .45 },       // the block of ice round the foe: width and height per foe, its opacity, its rim's, the frost at its feet
+    // the crystals grown round the foe: how many, their height (x the foe's), width (x its girth), how fast they grow (s),
+    // how clear the ones before it are, brightness
+    crystals: { count: 8, high: 1, wide: 1, grow: .24, clear: .55, k: 1 },
+    // the one great clear crystal closed over the foe: its height (x the foe's), width (x its girth), how clear, brightness
+    core: { high: 1.3, wide: 2.3, clear: .9, k: .9 },
+    // as it breaks: splinters, how hard, their length, how long
+    shards: { count: 10, fling: 1.7, w: .24, secs: .65 },
+    // its mist: puffs as it closes and breaks, size, how long; a wisp every (s) while it holds; Coffin Burst's wave
+    mist: { puffs: 2, w: .9, secs: 1, every: .6 },
+    light: { rad: 1.5, k: .7, secs: .3 },
   },
   cc_hoarbloom: {
-    crystals: { w: .14, h: .24, y: .55, halo: .3, a: .95 },          // the crystal over the foe while it waits: width, height, how high over its head, its glow, opacity
+    // the bloom over the foe: petals, their length, width per length, how high over its head, how fast it grows (s), how
+    // clear, brightness, its glow
+    crystals: { count: 6, long: .6, fat: .3, y: .5, grow: .3, clear: .3, k: 1, disc: .5 },
+    burst: { w: 1.4, secs: .18, k: 1.1 },
+    shards: { count: 14, fling: 2.6, w: .2, secs: .6 },
+    // the wave of cold rolling out to the burst's real edge: puffs, their size (x the radius), how long
+    mist: { puffs: 9, w: .85, secs: .85 },
+    light: { rad: 2, k: 1, secs: .3 },
+  },
+  cc_frostfoe: {
+    // a frozen foe's crystals at its feet: how many, their height (x the foe's), width, how clear, brightness; most foes drawn
+    crystals: { count: 5, high: .42, wide: .7, clear: .4, k: 1, max: 16 },
+    // the cold off a chilled or frozen foe: wisps a second, their size, a glint's chance
+    mist: { rate: 1.6, w: .3, glint: .7 },
+  },
+  cc_froststyle: {
+    // the ice shader's look: how far apart its faces' tones are, edge brightness, clearness, sparkle (the turning light and the
+    // glints), inner facets and fractures, rime at a planted root, fog density
+    paint: { facet: 1, edge: 1, clear: 1, sparkle: 1, inner: 1, rime: 1, fog: 1 },
   },
 };
 const EFX_INFO = {
@@ -53414,18 +53447,27 @@ const EFX_INFO = {
   puffs: ['Puffs', 0, 6, 1], delay: ['Delay (s)', 0, 1, .01], scorch: ['Afterglow radius (per splash)', 0, 2, .01], tongues: ['Tongues', 0, 12, 1], tall: ['Flame height', .05, 1.2, .01],
   len0: ['Length at the hands', .05, 2, .01], len1: ['Length added by the end', 0, 3, .01], cone: ['Share of the cone', 0, 1.5, .01], drop: ['Dip toward the ground', 0, 1, .01], chance: ['Chance', 0, 1, .01],
   body: ['Body length', .1, 3, .01], wing: ['Wing span', .1, 2.5, .01], beat: ['Wing beat speed', 0, 25, .1], feathers: ['Feathers a wing', 1, 5, 1], tail: ['Tail length', 0, 2, .01],
-  max: ['Most on screen', 0, 80, 1], rate: ['A second', 0, 20, .1], jets: ['Jets across the cone', 1, 9, 1], arcK: ['Flight arc (x the lob: 0 straight)', 0, 1.5, .01], aim: ['Flies level; no higher than (x the foe)', .2, 1.5, .01], fly: ['Light carried in flight', 0, 2, .02], len: ['Reach (x the range)', .3, 2, .01],
-  outline: ['Outline width', 0, 3, .02], heart: ['Hot core size', .3, 3, .02], soft: ['Band softness', 0, 4, .05], curl: ['Curl', 0, 3, .02], grain: ['Brush grain', 0, 3, .02],
+  max: ['Most on screen', 0, 80, 1], rate: ['A second', 0, 20, .1], jets: ['Sheets across the cone', 1, 9, 1], arcK: ['Flight arc (x the lob: 0 straight)', 0, 1.5, .01], aim: ['Flies level; no higher than (x the foe)', .2, 1.5, .01], fly: ['Light carried in flight', 0, 2, .02], len: ['Reach (x the range)', .3, 2, .01],
+  soot: ['Soot at the cool ends', 0, 2, .02], heart: ['Hot core size', .3, 3, .02], soft: ['Gradient blend (0 flat bands, 1 smooth)', .04, 1, .02], curl: ['Turbulence', 0, 3, .02], grain: ['Brush grain', 0, 3, .02], flicker: ['Flicker', 0, 3, .05],
+  shimmer: ['Heat shimmer (High)', 0, 1.5, .05], sparks: ['Fine sparks (Medium; none on Low)', 0, 40, 1], lag: ['Lags the hand', 0, 3, .05], lean: ['Leans back from its walk', 0, 3, .05], shed: ['Wisps shed behind it (every s)', 0, 2, .01],
+  tear: ['Flames torn off its top (every s)', 0, 2, .01], fume: ['Smoke off it (every s)', 0, 3, .05], grow: ['Swells by (x)', 0, 5, .05],
   r: ['Radius', .05, 2, .01], arc0: ['First hop arc', 0, 2, .01], arc: ['Hop arc', 0, 2, .01], shrink: ['Each hop smaller by', .4, 1.2, .01],
-  last: ['Last burst bigger by', .5, 2.5, .01], count: ['How many', 0, 20, 1], halo: ['Halo width', 0, 3, .02],
+  last: ['Last burst bigger by', .5, 2.5, .01], count: ['How many', 0, 20, 1], halo: ['Glow round the flame', 0, 3, .02],
   every: ['Every (s)', .01, 2, .005], rad: ['Light radius', 0, 5, .05], dur: ['How long (s)', 0, 5, .05],
   core: ['Core width', .01, .5, .005], coreH: ['Core height', .01, .6, .005], a: ['Opacity', 0, 1, .01], h: ['Height', .1, 5, .02], rim: ['Rim opacity', 0, 1, .01], frost: ['Frost at the feet', 0, 1, .01], y: ['Height over the head', 0, 2, .01],
 };
 
+// the frost's own values (frostfx.js)
+Object.assign(EFX_INFO, { long: ['Length', .05, 2.5, .01], fat: ['Width (per length)', .05, .8, .01], clear: ['Clearness (0 solid, 1 glass)', 0, 1, .01], gather: ['Grows as a cast gathers (x)', 0, 3, .05],
+  fog: ['Mist (a second / density)', 0, 4, .05], glint: ['Glints (chance / a second)', 0, 4, .05], streak: ['Torn air length', 0, 3, .02], gap: ['A puff every (cells)', .05, 1, .01], puff: ['Puff size', .05, 1.5, .01],
+  spikes: ['Spikes out the far side', 0, 5, 1], spike: ['Spike length', .1, 1.5, .01], barb: ['Barb length (x the lance)', 0, .8, .01], high: ['Height (x the foe)', .1, 3, .01], wide: ['Width (x the foe)', .2, 4, .01],
+  grow: ['Grows over (s)', .03, 1, .01], facet: ['Facet contrast', 0, 2.5, .02], edge: ['Edge brightness', 0, 3, .02], sparkle: ['Sparkle', 0, 3, .02], inner: ['Inner facets and fractures', 0, 3, .02], rime: ['Rime at the root', 0, 2, .02] });
+
 /* ---- state: what is tuned, and the context a drawing call is made in ---- */
 const EFX = { on: false, lab: false, cur: null, lay: null, live: {}, use: null, cache: {}, stat: {}, dup: false };
-// tuning saved on this device for the Pyroclasts' earlier fire (other values, other sizes) is dropped, once
-const EFX_PYRO_V = '2';
+// tuning saved on this device for the Pyroclasts' earlier fire (other values, other sizes: the sheets, then the flat painted
+// bands) is dropped, once each time their fire is rebuilt
+const EFX_PYRO_V = '3';
 function efxFresh(o) { if (o) for (const id in ELEM_FX_SPELLS) if (ELEM_FX_SPELLS[id].unit === 'cc_pyroclast') delete o[id]; return o; }
 // the device's Use in game set (only if the owner turned it on in the lab)
 try {
@@ -53436,6 +53478,15 @@ try {
     const u = localStorage.getItem(EFX_KEY + 'use'); if (u) EFX.use = JSON.parse(u);
   }
 } catch (e) { EFX.use = null; }
+// tuning saved on this device for the Frostweavers' earlier frost (other layers, other values) is dropped, once
+const EFX_FROST_V = '1';
+try {
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(EFX_KEY + 'frostv') !== EFX_FROST_V) {
+    const fresh = o => { if (o) for (const id in o) if (!ELEM_FX_SPELLS[id] || ELEM_FX_SPELLS[id].unit === 'cc_rimeweaver') delete o[id]; return o; };
+    for (const k of ['use', 'live']) { const u = localStorage.getItem(EFX_KEY + k); if (u) localStorage.setItem(EFX_KEY + k, JSON.stringify(fresh(JSON.parse(u)))); }
+    localStorage.setItem(EFX_KEY + 'frostv', EFX_FROST_V); fresh(EFX.use);
+  }
+} catch (e) {}
 // the effect a drawing call belongs to: the lab's explicit context, else the spell being drawn (spellfx.js) or cast
 function efxSpell() { return EFX.cur || (typeof SFX_NOW !== 'undefined' && SFX_NOW) || (typeof AB_NOW !== 'undefined' && AB_NOW) || null; }
 // draw as effect s, layer l (null: sorted by what is drawn) until efxPop; cheap when nothing is tuned
@@ -58364,18 +58415,31 @@ vec3 moodOf(vec3 n, float lit, float k){
    uBack a back light's colour x strength (a rim from uBackD), uGlint the units' glint (sheen x, roughness x, a sharp sun
    glint, a fresnel sky edge). */
 uniform vec4 uShK, uBack, uGlint; uniform vec3 uBackD; uniform float uTMo;
+/* A canopy's dapple on the sun (a map's own: maps.js LIGHT_DEF dap*, view.js applyLight; 0 everywhere else, so no change):
+   a slow noise in the light's own plane (the shadow map's xy), so one pool of light falls the same on the ground, a unit
+   standing in it, a foe walking through it and the trunk behind them. It is part of the shadow term: never below the
+   shadows' floor. uCookie: strength, cells across the shadow box, sway, the edge's softness. */
+uniform vec4 uCookie;
+float ckH(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+float ckN(vec2 p){ vec2 i = floor(p), f = fract(p), u = f*f*(3. - 2.*f); return mix(mix(ckH(i), ckH(i + vec2(1., 0.)), u.x), mix(ckH(i + vec2(0., 1.)), ckH(i + vec2(1., 1.)), u.x), u.y); }
+float cookieAt(vec2 p){
+  vec2 q = p*uCookie.y; float t = uTime*uCookie.z;
+  float n = ckN(q + vec2(t*.05, t*.03))*.5 + ckN(mat2(.8, -.6, .6, .8)*q*2.1 + vec2(-t*.07, t*.05) + 5.2)*.32 + ckN(q*4.7 + vec2(t*.09, -t*.06) + 1.7)*.18;
+  return 1. - uCookie.x*(1. - smoothstep(.5 - uCookie.w, .5 + uCookie.w, n + .04));
+}
 float shadowAt(vec4 L){
-  vec3 p = L.xyz/L.w*.5+.5; if(p.x<0.||p.x>1.||p.y<0.||p.y>1.||p.z>1.) return 1.;
+  vec3 p = L.xyz/L.w*.5+.5; float ck = uCookie.x > 0. ? cookieAt(p.xy) : 1.;
+  if(p.x<0.||p.x>1.||p.y<0.||p.y>1.||p.z>1.) return mix(uShK.x, 1., ck);
   float b = uShK.z; float s=0.; float t=uTexel*uShK.y;
   if(uShK.w > .5){   // twelve taps on a disc, turned per pixel: a wider, smoother penumbra
     float a0 = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))))*6.2832;
     for(int i=0;i<12;i++){ float fi = float(i), r = sqrt((fi + .5)/12.), a = a0 + fi*2.39996;
       s += texture(uShadow, vec3(p.xy + vec2(cos(a), sin(a))*r*t*1.6, p.z-b)); }
-    return mix(uShK.x, 1., s/12.);
+    return mix(uShK.x, 1., s/12.*ck);
   }
   s += texture(uShadow, vec3(p.xy+vec2(-t,-t), p.z-b)); s += texture(uShadow, vec3(p.xy+vec2(t,-t), p.z-b));
   s += texture(uShadow, vec3(p.xy+vec2(-t,t), p.z-b)); s += texture(uShadow, vec3(p.xy+vec2(t,t), p.z-b));
-  return mix(uShK.x, 1., s*.25);   // shadows never fall below 30% of the light (uShK.x .3): softer, lighter shadows everywhere (owner, 8 Nov 2026)
+  return mix(uShK.x, 1., s*.25*ck);   // shadows never fall below 30% of the light (uShK.x .3): softer, lighter shadows everywhere (owner, 8 Nov 2026)
 }
 vec3 aces(vec3 x){ return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.); }
 vec3 hable(vec3 x){ return ((x*(.15*x+.05)+.004)/(x*(.15*x+.5)+.06)) - .0667; }
@@ -58555,7 +58619,9 @@ void main(){
   if(vX.y>.5 && uGPOn>.5){
     // a painted map already carries its own light: show it as painted, with only unit shadows and the
     // light of towers, blasts, the portal and the keep's braziers laid over it. Past its edges it mirrors and sinks into the dark.
-    vec2 uv = (vW.xz - uGP.xy)*uGP.zw, ov = max(max(-uv, uv - 1.), 0.);
+    // (sampled where the eye's ray through this point meets the ground, the 57-degree camera: flat ground is itself; a card
+    // stood upright on it, drawn as ground, shows the painting behind it and so only hides what stands behind: greatroot.js)
+    vec2 gxz = vW.xz - vec2(0., max(vW.y, 0.)*.6494), uv = (gxz - uGP.xy)*uGP.zw, ov = max(max(-uv, uv - 1.), 0.);
     float od = length(ov/uGP.zw);   // world units past the painting's edge: there the mirrored copy blurs and darkens, so its seam never shows
     vec3 tx = texture(uGPT, uv, clamp(od*1.8, 0., 5.)).rgb*(1. - clamp(od/3.6, 0., .85));
     if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .02) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
@@ -58568,7 +58634,7 @@ void main(){
       // artistic detail mask, added to the light): the grass blades' own normals (the source's relief option: on this flat
       // field the geometric normal alone gives no response) tilt the lobe so single blades catch the sun; only on the
       // painting's grass, out of its painted shade and the units' shadows
-      vec4 gt = texture(uGLT, vW.xz/uGL.z);
+      vec4 gt = texture(uGLT, gxz/uGL.z);
       vec2 nxy = (gt.rg*2. - 1.)*uGL.w; vec3 N = normalize(vec3(nxy.x, sqrt(max(1. - dot(nxy, nxy), .05)), -nxy.y));
       vec3 L = normalize(uSunDir), V = normalize(uCam - vW), H = L + V; H = dot(H, H) > 1e-8 ? normalize(H) : V;
       float lobe = pow(max(dot(N, H), 0.), uGL.y); lobe *= smoothstep(.015, .12, lobe)*step(.0001, dot(N, L));
@@ -58882,6 +58948,8 @@ uniform vec3 uFade;   // the 3D maps' giant trees (map3d.js): above uFade.x the 
    brightness, uTrL the leaves' tint x brightness (a: saturation), uTrK (sun through the leaves, the leaves' glint x, the
    darkening toward the foot, its height x), uTrK2 (shadow received, canopy rim, fog x), uTrR the rim's colour */
 uniform vec4 uTrB, uTrL, uTrK, uTrK2; uniform vec3 uTrR;
+uniform float uBarkL;   // the bark's layer in the terrain textures (tree_bark, 9, or a map's own: maps.js barkName)
+uniform vec3 uTrM;   // the moss on a giant's roots and flares (linear; (.05, .085, .03) as it was: maps.js TREE_DEF moss)
 out vec4 o;
 ${NOISE_GLSL}
 ${LIGHT_GLSL}
@@ -58902,7 +58970,7 @@ void main(){
       float an = atan(n.z, n.x);
       if(uTOn > .5){   // the painted bark, wrapped round the trunk (u round it, v up it)
         vec2 buv = vec2(atan(vW.z - vC.z, vW.x - vC.x)/6.2832*6., vW.y*.42);
-        vec3 bt = texture(uTC, vec3(buv, 9.)).rgb; base = bt*bt*(bt*.2 + .8)*(.62 + .38*smoothstep(-.4, 1.2, vW.y - vC.y));
+        vec3 bt = texture(uTC, vec3(buv, uBarkL)).rgb; base = bt*bt*(bt*.2 + .8)*(.62 + .38*smoothstep(-.4, 1.2, vW.y - vC.y));
         base *= mix(vec3(1.), clamp(vCol/vec3(.26, .17, .09), .3, 1.6), .7);   // (the model's own colour over it: TreeForge's moss, its occlusion)
         if(uGPOn > .5) base *= vec3(1.5, 1.12, .78);   // (on the painting: its warm brown trunks)
       }
@@ -58910,7 +58978,7 @@ void main(){
       base *= (.62 + .5*f)*mix(.55, 1.15, smoothstep(.05, .45, rid));   // deep vertical furrows between bark ridges
       float m = uFade.z*smoothstep(-.1, .55, n.y + (fbm(vW.xz*2.1 + vW.y)*.6 - .3))*(1. - smoothstep(.5, 3.5, vW.y)*.7);
       if(uGPOn > .5) m *= .45;   // (on the painting: brown bark and roots with only a little warm moss, as painted)
-      base = mix(base, mix(vec3(.05, .085, .03), vec3(.14, .13, .05), uGPOn)*(.7 + .6*fbm(vW.xz*5. + vW.y*3.)), clamp(m, 0., .9));
+      base = mix(base, mix(uTrM, vec3(.14, .13, .05), uGPOn)*(.7 + .6*fbm(vW.xz*5. + vW.y*3.)), clamp(m, 0., .9));
     } }
   if(uLeaf > .5 && uSway > .5){ float tl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(tl), base, uTrL.a)*uTrL.rgb; }   // (the Light Lab: leaves, bark; rocks left alone)
   else if(uLeaf < .5) base *= uTrB.rgb;
@@ -58955,7 +59023,7 @@ void main(){
     col += uSunCol*pow(max(dot(n, normalize(uSunDir + Vs)), 0.), 36.)*.35*uTrK.y*sh*clamp(lum*lum, 0., 1.); }   // (a glint on wet stone and leaf edges)
   if(uFade.z > 0.){ vec3 V = normalize(uCam - vW); float rim = pow(1. - max(dot(n, V), 0.), 2.6);   // the giants: a silvery rim of moonlight down the trunks
     if(!prop) col += rim*uSunCol*uRim*(uLeaf > .5 ? .25 : .9)*mix(.4, 1., sh)*(.25 + base*2.)*(1. - smoothstep(4., 10., vW.y)*.7);
-    col *= mix(1., prop ? .6 : .22, smoothstep(2.2, uFade.x, vW.y)); }   // rising into the canopy's shade (on the painting, as its trunks: lit well up)
+    col *= mix(1., prop ? .6 : mix(.22, 1., uTrK2.w), smoothstep(2.2, uFade.x, vW.y)); }   // rising into the canopy's shade (on the painting, as its trunks: lit well up; uTrK2.w: a map's trunks kept lit up high, maps.js TREE_DEF high)
   o = vec4(finishK(col, vW, uTrK2.z), 1.);
   if(uGPOn > .5) o.rgb = mix(o.rgb, dot(o.rgb, vec3(.2126, .7152, .0722))*uGrade.rgb, uGrade.a*(prop ? .35 : 1.));   // (the map's grade, as on the painting; lighter on the props, whose warm and cool are the painting's own)
 }`;
@@ -58989,6 +59057,15 @@ uniform sampler2D uPath; uniform vec4 uPathR;
 uniform vec3 uTP[8];   // grass dark, grass light, moss, dirt, dirt dark, rock, litter, snow (linear)
 uniform vec4 uTK;      // (snow line, snow amount, the woods' darkening, path wear)
 uniform vec4 uTM;      // mist (rgb, strength)
+/* the textured ground's tone, a map's own (map3d.js tone; TER_TONE the moonlit glade as it was): uTT = the textures' tint,
+   the shade's tint, the lit ground's, the woods', the floor no spot falls below, the lift in the pools of light;
+   uTTk = (the built-in dapple's floor: 1 where the sun's own dapple does it, the lift's strength, the field's saturation,
+   the sky's share of the floor) */
+uniform vec3 uTT[6]; uniform vec4 uTTk;
+/* a map's land far below a cliff (map3d.js cliff; off elsewhere): uLow = (its level, on, haze, cloud shadow), uLowC = haze,
+   woods, meadow, water (linear), uLowR = its river (x, swing, bend, width). Below the rim the wall sinks into haze, and the
+   floor is drawn in miniature (fine crowns, meadows, a river) under drifting cloud shadows: far down, not near. */
+uniform vec4 uLow, uLowR; uniform vec3 uLowC[4];
 out vec4 o;
 ${NOISE_GLSL}
 ${LIGHT_GLSL}
@@ -59096,14 +59173,14 @@ void main(){
       vec4 rd = texture(uTD, vec3(q3.xz, uLay[6]));
       C = mix(C, rc, wRock); D = mix(D, rd, wRock); gs = mix(gs, .36, wRock);
     }
-    base = tLin(C.rgb)*vec3(.56, .64, .7)*mix(1., .85, wLeaf)*(1. - .14*smoothstep(.1, .3, max(vSp.x, pt))*(1. - wRoad));
+    base = tLin(C.rgb)*uTT[0]*mix(1., .85, wLeaf)*(1. - .14*smoothstep(.1, .3, max(vSp.x, pt))*(1. - wRoad));
     // as the painting: lighter, sun-worn patches in the field, and dappled light through the canopy
     fieldK = 1. - smoothstep(.2, 1., vAE.y);
     base = mix(base, base*vec3(1.16, 1.12, .92), smoothstep(.6, .8, fbm(xz*.33 + 9.))*.35*fieldK*(1. - wRoad));
-    { float bl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(bl), base, mix(1., .9, fieldK)); }   // (calmer greens in the field: one moonlit palette with the edges)
+    { float bl = dot(base, vec3(.3, .59, .11)); base = mix(vec3(bl), base, mix(1., uTTk.z, fieldK)); }   // (calmer greens in the field: one moonlit palette with the edges)
     // dappled moonlight through the canopy: soft pools of light, the rest gently shaded (never dark)
     dap = smoothstep(.42, .62, fbm(xz*.23 + vec2(3.1, 7.7)) + (vnoise(xz*1.1) - .5)*.14);
-    sh *= mix(.72, 1., dap);
+    sh *= mix(uTTk.x, 1., dap);
     if(uTK.y > 0.){   // the pass: snow drifts over what is flat enough, as before
       float wS = uTK.y*smoothstep(.62, .82, n.y + (n1 - .5)*.25)*smoothstep(uTK.x - .4, uTK.x + .4, vW.y + (n2 - .5)*.8);
       base = mix(base, tLin(tCol(10., xz/3.).rgb), wS*(1. - wRoad*.6)*.6);
@@ -59128,14 +59205,46 @@ void main(){
   vec3 col = base*light*ao*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE) + glow*(.6 + .4*length(uSunCol));
   col *= mix(1., uTK.z, smoothstep(.0, 2.6, vAE.y));   // the woods are darker than the field: play reads first
   if(uTOn > .5){   // warm sun patches against cool green shade; the woods vignette darker and blue-green
-    col *= mix(vec3(.9, .9, 1.12), vec3(1.04, 1., .96), sh);   // (shade cool violet, light a touch warmer)
-    col = mix(col, col*vec3(.86, .86, 1.06), smoothstep(.4, 2.4, vAE.y)*.6);
-    col = max(col, base*(uSky*.55 + vec3(.03, .02, .05)));
-    col += vec3(.05, .035, .09)*dap*fieldK*.6;   // (the moonlit pools: a soft lavender lift)   // (no area near black: the lavender ambient floor)
+    col *= mix(uTT[1], uTT[2], sh);   // (shade cool violet, light a touch warmer)
+    col = mix(col, col*uTT[3], smoothstep(.4, 2.4, vAE.y)*.6);
+    col = max(col, base*(uSky*uTTk.w + uTT[4]));
+    col += uTT[5]*dap*fieldK*uTTk.y;   // (the moonlit pools: a soft lavender lift)   // (no area near black: the lavender ambient floor)
   }
   // mist lying in the woods, drifting
   float mist = uTM.a*smoothstep(.3, 2.2, vAE.y)*smoothstep(.25, .8, fbm(xz*.22 + vec2(uTime*.018, uTime*.011)))*smoothstep(3.5, .2, vW.y);
   col += uTM.rgb*mist;
+  if(uLow.y > .5 && vW.y < -.3){
+    float dn = smoothstep(uLow.x*.25, uLow.x*.95, vW.y), fl = smoothstep(uLow.x*.74, uLow.x*.9, vW.y);   // down the wall; on the floor
+    vec3 nG = normalize(vNor); float rel = vW.y - uLow.x;   // (its height above the floor's own level)
+    // the wall: its rock in the shade of the plateau, lit by the sky and by the bright valley it faces, sinking into haze
+    vec3 wallC = base*(uSky*1.5 + uLowC[0]*.6*clamp(nG.x*.7 + nG.z*.5 + .35, 0., 1.) + uSunCol*.3*max(dot(nG, uSunDir), 0.))*ao;
+    wallC *= .78 + .3*smoothstep(.35, .65, sin(vW.y*9. + fbm(xz*.9)*5.)*.5 + .5);   // its beds of stone
+    wallC = mix(wallC, uLowC[0]*.9, max(dn*.62, .6*smoothstep(3., -5., vW.z)));   // (and into the distance)
+    // the floor, in miniature: woods (light crowns, dark gaps), hedged fields in the clearings, bare hilltops
+    float big = fbm(xz*.16 + 4.), mid = fbm(xz*.55 + 11.);
+    float crown = vnoise(xz*7.)*.6 + vnoise(mat2(.8, -.6, .6, .8)*xz*15. + 3.)*.4;
+    float open = smoothstep(.54, .61, big*.6 + mid*.4);
+    vec3 wood = mix(uLowC[1]*.3, uLowC[1]*2., smoothstep(.3, .74, crown));
+    vec2 fc = xz*1.25 + (mid - .5)*1.7, fi = floor(fc), ff = fract(fc);
+    float fv = hash(fi*1.31 + 7.), hedge = smoothstep(0., .05, min(min(ff.x, 1. - ff.x), min(ff.y, 1. - ff.y)));
+    vec3 fld = mix(uLowC[1]*1.1, uLowC[2]*(.72 + .4*fv)*mix(vec3(1.), vec3(1.16, 1.05, .76), step(.72, fv)), .45 + .55*hedge);
+    vec3 land = mix(wood, fld, open);
+    land = mix(land, vec3(.3, .33, .29)*(.7 + .5*crown), smoothstep(.45, .95, rel)*.7);
+    land *= .5 + .8*smoothstep(-.3, .55, dot(nG, uSunDir));                                               // its hills' sunny sides
+    float rx = uLowR.x + uLowR.y*sin(vW.z*uLowR.z + 1.) + uLowR.y*.4*sin(vW.z*uLowR.z*2.7 + .5), rd = abs(vW.x - rx);
+    land = mix(land, uLowC[2]*vec3(1.5, 1.35, .95), (1. - smoothstep(uLowR.w, uLowR.w*2.6, rd))*.6);    // its sandy banks
+    land = mix(land, uLowC[3], 1. - smoothstep(uLowR.w*.5, uLowR.w, rd));                                // the river
+    land *= 1. - uLow.w*smoothstep(.48, .68, fbm(xz*.09 + vec2(uTime*.008, uTime*.005)));               // cloud shadows drifting
+    // haze: thin below the rim, thicker toward the horizon, lying in the hollows
+    float hz = clamp(uLow.z*(.16 + .8*smoothstep(7., -6.5, vW.z)) + .12*(1. - smoothstep(0., .45, rel)), 0., .93);
+    vec3 lowCol = mix(land*(uSunCol*.42 + uSky), uLowC[0], hz);
+    col = mix(mix(col, wallC, smoothstep(-.3, -.8, vW.y)), lowCol, fl);
+    if(uLow.y > 1.5){   // the land below is a painting behind the world (greatroot.js grPaintBack): no floor, the wall thinning into it
+      float ig = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715))));
+      if(ig < smoothstep(uLow.x*.42, uLow.x*.8, vW.y)) discard;
+      col = mix(col, wallC, smoothstep(-.3, -.8, vW.y));
+    }
+  }
   o = vec4(finish(col, vW), 1.);
 }`;
 /* The 3D maps' streams and falls (map3d.js), after the Ember engine's River Forge look (its simRiverGlsl / simRiverFalls
@@ -59157,6 +59266,13 @@ in vec3 vW, vX; in vec2 vFlow, vS; in vec4 vL; uniform float uTime;
 uniform vec3 uWDeep, uWShal, uWGlow;   // linear colours: the channel's middle, its shallows, the glow
 uniform highp sampler2DArray uTC; uniform float uTOn, uBedL;   // the painted stream bed seen through the water
 uniform vec4 uAbs;   // the water's extinction: absorption rgb (per world unit), scattering
+/* Clear water (a map's own: map3d.js water.clear; owner, Greatroot Way: "transparency, refraction, take special care to make
+   it look nice"): the frame as drawn so far is copied (colour and depth, drawWater), so the water shows what really lies
+   under it, bent by its ripples, and knows its own depth along the eye's ray. Shallow water is glass over the pebbles with
+   caustics dancing on them; deeper it takes the light away red first and fills with its own turquoise; a line of foam
+   where it meets a bank or a stone, rings spreading from the foot of each fall. uClr = (on, refraction, rings, clarity),
+   uWAb = what it takes from the light a unit of depth (rgb), its own colour's strength. */
+uniform sampler2D uScn; uniform highp sampler2D uScnD; uniform vec4 uClr, uWAb, uNF2; uniform vec2 uRes2;
 out vec4 o;
 ${NOISE_GLSL}
 ${LIGHT_GLSL}
@@ -59228,6 +59344,33 @@ void main(){
   foam = max(foam, streak*fall);
   col = mix(col, vec3(.88, .97, 1.)*(lightIn*.6 + uWGlow*.5), foam);
   float a = smoothstep(0., .14, depth + fall)*mix(.92 + .08*foam, .55 + .45*streak, fall);   // (the falls: a translucent sheet)
+  if(uClr.x > .5){
+    vec2 suv = gl_FragCoord.xy/uRes2; float dW = gl_FragCoord.z, span = uNF2.y - uNF2.x;
+    float t0 = max(0., (texture(uScnD, suv).r - dW)*span);                       // its depth here along the eye's ray (world units)
+    vec2 off = vec2(N.x, -N.z*.84)*uClr.y*min(1., t0*3.5)*(1. - fall*.7);         // the ripples bend what is seen through them, less at the edge
+    float dS = texture(uScnD, suv + off).r; if(dS < dW){ off = vec2(0.); dS = texture(uScnD, suv).r; }   // (never what stands in front of the water)
+    float t = max(0., (dS - dW)*span);
+    vec3 under = vec3(texture(uScn, suv + off*1.12).r, texture(uScn, suv + off).g, texture(uScn, suv + off*.9).b);   // (a breath of colour fringe)
+    float shal = 1. - smoothstep(0., .34, t);
+    under *= 1. + (.55*cau*sh - .05)*shal*(1. - fall);                           // caustics on the shallow bed, lightly
+    vec3 Tm = exp(-uWAb.rgb*t/uClr.w);                                            // what the water lets through
+    vec3 lw = lightAt(vec3(0., 1., 0.), vW, sh, 0.);
+    vec3 own = finish(mix(uWShal, uWDeep, smoothstep(.04, .5*uClr.w, t))*lw*uWAb.a, vW);   // its own colour, in the deep
+    vec3 c2 = under*Tm + own*(1. - Tm.g);
+    c2 = mix(c2, finish(refl, vW), Fr*.5*(1. - fall));                            // the sky on it, at a glance
+    float nh2 = max(dot(N, normalize(uSunDir + V)), 0.);
+    c2 += (uSunCol/max(.3, max(uSunCol.r, max(uSunCol.g, uSunCol.b))))*(pow(nh2, 220.)*1.6 + pow(nh2, 40.)*.12)*sh*(1. - fall);   // the sun's sparkle
+    // foam: where it meets a bank or a stone, below each fall (baked), rings spreading from where the water lands
+    float fl2 = fbm(vW.xz*7. - F*uTime*1.1);
+    float shore = (1. - smoothstep(.0, .06, t))*smoothstep(.25, .6, fl2 + .25)*(1. - fall);
+    float rr = length(vec2((1. - vX.y)*1.25, vS.x*.62));
+    float ring = smoothstep(.62, .96, sin(rr*27. - uTime*4.2 + fl2*2.5)*.5 + .5)*smoothstep(0., .35, vX.y)*(1. - fall)*uClr.z;   // (broken a little by the foam's own drift: lace, not rules)
+    float fm = clamp(foam*.9 + shore*.75 + ring*.55, 0., 1.);
+    vec3 white = vec3(.93, .98, .97)*clamp(dot(lw, vec3(.3, .59, .11))*.62 + .28, .45, 1.08);
+    c2 = mix(c2, white, fm);
+    c2 = mix(c2, white*vec3(.94, .99, 1.), fall*(.28 + .7*streak));              // the falls: white water, the rock dark between its strands
+    o = vec4(c2, smoothstep(0., .014, t + fall*.2 + fm*.05)); return;
+  }
   o = vec4(finish(col, vW), clamp(a, 0., 1.));
 }`;
 const VS_Q = `#version 300 es
@@ -59277,7 +59420,8 @@ void main(){
 const VS_SCR = `#version 300 es
 out vec2 vUV; void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); vUV = p; gl_Position = vec4(p*2.-1., 0., 1.); }`;
 const FS_SCR = `#version 300 es
-precision mediump float; in vec2 vUV; uniform sampler2D uT; out vec4 o; void main(){ o = texture(uT, vUV); }`;
+precision mediump float; in vec2 vUV; uniform sampler2D uT; uniform vec4 uZ; out vec4 o;
+void main(){ vec2 uv = uZ.w > .5 ? ((vUV*2. - 1.)/uZ.x + uZ.yz)*.5 + .5 : vUV; o = texture(uT, uv); }`;   // (uZ: the view's zoom and its centre, for a backdrop that must stay under the world: a map's sky)
 
 /* ---- renderer ---- */
 function createRenderer(canvas, opt = {}) {
@@ -59476,9 +59620,17 @@ function createRenderer(canvas, opt = {}) {
     drawWater() {
       const w = this.water; if (!w) return;
       if (!WATP) WATP = prog(VS_WAT, FS_WAT);
+      // clear water (w.clear: refraction, rings, clarity; never on Graphics Low): the frame so far, colour and depth, copied
+      // before anything of this pass is bound (the copy may make its textures)
+      const cp = w.clear && this.vfx && this.vfx.grab && !(typeof GFX !== 'undefined' && GFX === 'low') && this.nf && this.nf[2] ? this.vfx.grab() : null;
       const u = WATP.u; gl.useProgram(WATP.p); this.litUniforms(u);
       gl.uniform3fv(u.uWDeep, w.deep); gl.uniform3fv(u.uWShal, w.shal); gl.uniform3fv(u.uWGlow, w.glow);
       this.bindTerrainTex(u); if (u.uBedL) gl.uniform1f(u.uBedL, this.terrain && this.terrain.lay ? this.terrain.lay[8] : 8); if (u.uAbs) gl.uniform4fv(u.uAbs, w.abs || [.45, .12, .08, .25]);
+      // (its two samplers always get their own units, the blank texture when there is no copy: left on unit 0 they would
+      // share the shadow map's with a sampler of another kind, which stops the draw)
+      if (u.uScn) { gl.activeTexture(gl.TEXTURE11); gl.bindTexture(gl.TEXTURE_2D, cp ? cp.col : blank); gl.uniform1i(u.uScn, 11); gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D, cp ? cp.dep : blank); gl.uniform1i(u.uScnD, 12); gl.activeTexture(gl.TEXTURE0); }
+      if (u.uClr) { gl.uniform4f(u.uClr, cp ? 1 : 0, cp ? w.clear[0] : 0, cp ? w.clear[1] : 0, cp ? w.clear[2] : 1);
+        if (cp) { gl.uniform4fv(u.uWAb, w.take || [5, 1.3, 1.1, .6]); gl.uniform4f(u.uNF2, this.nf[0], this.nf[1], 0, 0); gl.uniform2f(u.uRes2, canvas.width, canvas.height); } }
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
       gl.bindVertexArray(w.vao); gl.drawElements(gl.TRIANGLES, w.ni, gl.UNSIGNED_INT, 0); this.stats.draws++;
       gl.bindVertexArray(null); gl.depthMask(true); gl.disable(gl.BLEND);
@@ -59520,6 +59672,8 @@ function createRenderer(canvas, opt = {}) {
       gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, t.pathTex || blank); gl.uniform1i(u.uPath, 8); gl.activeTexture(gl.TEXTURE0);
       gl.uniform4fv(u.uPathR, t.pathR || [0, 0, 0, 0]); gl.uniform3fv(u.uTP, t.pal); gl.uniform4fv(u.uTK, t.k); gl.uniform4fv(u.uTM, t.mist);
       this.bindTerrainTex(u); if (u.uLay) gl.uniform1fv(u.uLay, t.lay || [0, 1, 2, 3, 4, 5, 6, 7, 8]); if (u.uGl) gl.uniform4fv(u.uGl, t.glint || [.55, .5, .35, .6]);
+      if (u.uTT) gl.uniform3fv(u.uTT, t.tone || TER_TONE); if (u.uTTk) gl.uniform4fv(u.uTTk, t.toneK || TER_TONE_K);
+      if (u.uLow) { gl.uniform4fv(u.uLow, t.low || LOW_OFF); if (t.low) { gl.uniform3fv(u.uLowC, t.lowC); gl.uniform4fv(u.uLowR, t.lowR); } }
       gl.bindVertexArray(t.vao); gl.drawElements(gl.TRIANGLES, t.ni, gl.UNSIGNED_INT, 0); this.stats.draws++;
       gl.bindVertexArray(null);
     },
@@ -59541,8 +59695,9 @@ function createRenderer(canvas, opt = {}) {
       return t;
     },
     freeTex(t) { if (t) gl.deleteTexture(t); },
-    screen(tex, blend) {
+    screen(tex, blend, zoom) {
       gl.useProgram(SC.p); gl.bindVertexArray(scVao); gl.disable(gl.DEPTH_TEST); gl.depthMask(false);
+      if (SC.u.uZ) gl.uniform4f(SC.u.uZ, zoom ? zoom.z : 1, zoom ? zoom.cx : 0, zoom ? zoom.cy : 0, zoom ? 1 : 0);
       if (blend) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); } else gl.disable(gl.BLEND);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(SC.u.uT, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -59570,7 +59725,7 @@ function createRenderer(canvas, opt = {}) {
       if (shadow) gl.uniformMatrix4fv(u.uLVP, false, this.lvp);
       else this.litUniforms(u);
       if (!shadow) this.bindTerrainTex(u);
-      if (!shadow && u.uTrB) { const K = this.treeK || TREEK_DEF; gl.uniform4fv(u.uTrB, K.b); gl.uniform4fv(u.uTrL, K.l); gl.uniform4fv(u.uTrK, K.k); gl.uniform4fv(u.uTrK2, K.k2); gl.uniform3fv(u.uTrR, K.r); }   // (the Light Lab's Trees: TREEK_DEF the look as it was)
+      if (!shadow && u.uTrB) { const K = this.treeK || TREEK_DEF; gl.uniform4fv(u.uTrB, K.b); gl.uniform4fv(u.uTrL, K.l); gl.uniform4fv(u.uTrK, K.k); gl.uniform4fv(u.uTrK2, K.k2); gl.uniform3fv(u.uTrR, K.r); if (u.uTrM) gl.uniform3fv(u.uTrM, K.m || TREE_MOSS); if (u.uBarkL) gl.uniform1f(u.uBarkL, this.barkL || 9); }   // (the Light Lab's Trees: TREEK_DEF the look as it was)
       gl.activeTexture(gl.TEXTURE1); if (u.uTex) gl.uniform1i(u.uTex, 1);
       for (const t of this.trees) {
         if (t.leaf && !t.tex) continue;
@@ -59607,6 +59762,7 @@ function createRenderer(canvas, opt = {}) {
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
       if (u.uUQ) gl.uniform1f(u.uUQ, this.uq == null ? 2 : this.uq); if (u.uCamR) gl.uniform3fv(u.uCamR, this.right); gl.uniform1f(u.uRim, this.rim == null ? .12 : this.rim); gl.uniform1f(u.uExpo, this.expo == null ? 1 : this.expo); gl.uniform1f(u.uFill, this.fill || 0); if (u.uOwn) gl.uniform1f(u.uOwn, this.own == null ? 1 : this.own); if (u.uOwnK) { const k = this.ownK || OWN_K; gl.uniform4f(u.uOwnK, k[0], k[1], k[2], k[3]); }
       if (u.uShK) gl.uniform4fv(u.uShK, this.shK || SHK_DEF);   // (the Light Lab's controls: their defaults are the look as it was)
+      if (u.uCookie) gl.uniform4fv(u.uCookie, this.cookie || COOKIE_OFF);   // (a map's canopy dapple: view.js applyLight)
       if (u.uTMo) gl.uniform1f(u.uTMo, this.tmo || 0);
       if (u.uGlint) gl.uniform4fv(u.uGlint, this.glintK || GLINTK_DEF);
       if (u.uBack) { const b = this.back; gl.uniform4f(u.uBack, b ? b[0] : 0, b ? b[1] : 0, b ? b[2] : 0, b ? 1 : 0); if (u.uBackD) gl.uniform3fv(u.uBackD, b && b.dir ? b.dir : [0, .5, -1]); }
@@ -59628,6 +59784,7 @@ function createRenderer(canvas, opt = {}) {
       M4.lookAt(this.view, eye, target, [0, 1, 0]);
       M4.mul(this.vp, this.proj, this.view);
       if (zoom && zoom.z !== 1) { const Z = M4.I(); Z[0] = zoom.z; Z[5] = zoom.z; Z[12] = -zoom.z * zoom.cx; Z[13] = -zoom.z * zoom.cy; M4.mul(this.vp, Z, this.vp.slice()); }
+      this.zoom = zoom && zoom.z !== 1 ? zoom : null;
       M4.invert(this.inv, this.vp); this.cam = eye.slice(); this.nf = [near, far, orthoH ? 1 : 0];   // (the VFX's soft edges read the depth copy with these)
       this.right = [this.view[0], this.view[4], this.view[8]]; this.up = [this.view[1], this.view[5], this.view[9]];
     },
@@ -59676,7 +59833,7 @@ function createRenderer(canvas, opt = {}) {
       this.outFB = PT ? PT.begin() : null;   // (with the post: the scene goes to its own target, the post draws it to the canvas)
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(this.clear[0], this.clear[1], this.clear[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      if (this.bg && this.bg.tex) this.screen(this.bg.tex, false);
+      if (this.bg && this.bg.tex) this.screen(this.bg.tex, false, this.bg.zoom ? this.zoom : null);
       gl.useProgram(L.p);
       const u = L.u;
       this.litUniforms(u);
@@ -59778,6 +59935,11 @@ const _litPL = new Float32Array(24), _litPC = new Float32Array(18), _glScG = [];
 const SWAY_K1 = new Float32Array([1, 1, 1]);
 // a painted map's water as tuned (speed, warp, shimmer; RD.gwater.k from maps.js WATER_DEF or the Light Lab)
 const WATER_K1 = [1, 1, 1];
+const COOKIE_OFF = [0, 1, 0, .1];   // no canopy dapple (shadowAt uCookie)
+const TREE_MOSS = [.05, .085, .03];   // the giants' moss as it was (FS_TREE uTrM)
+const LOW_OFF = [0, 0, 0, 0];       // no land below a cliff (FS_TER uLow)
+// the terrain's tone as it always was (FS_TER uTT, uTTk: Mossveil's moonlit glade); a map's own in its definition (map3d.js tone)
+const TER_TONE = new Float32Array([.56, .64, .7, .9, .9, 1.12, 1.04, 1, .96, .86, .86, 1.06, .03, .02, .05, .05, .035, .09]), TER_TONE_K = new Float32Array([.72, .6, .9, .55]);
 // the trees' light as it always was (FS_TREE uTrB, uTrL, uTrK, uTrK2, uTrR; RD.treeK from maps.js TREE_DEF or the Light Lab: lightlab.js treeUni)
 const TREEK_DEF = { b: new Float32Array([1, 1, 1, 0]), l: new Float32Array([1, 1, 1, 1]), k: new Float32Array([0, 1, 1, 1]), k2: new Float32Array([1, 0, 1, 0]), r: new Float32Array([.8, .9, 1]) };
 const OWN_K = [.55, 1.07, .22, 1.02];   // the units' gradient (FS_LIT uOwnK, after the tone curve): the light at the feet and at the head, and the heights (world) between
@@ -60072,6 +60234,8 @@ function vfxGL(gl, R, prog, canvas) {
   }
   let depOn = false;
   const X = {
+    // the frame so far, colour and depth, for another pass that needs to see through itself (the water: drawWater); null where they cannot be made
+    grab() { return capture(cap.col, false) && capture(cap.dep, true) ? { col: cap.col.t, dep: cap.dep.t } : null; },
     batches: [null, null, null],   // [depth-tested, drawn over everything, distortion]
     // other drawers with their own programs and textures (hammerfire.js): each { n, draw(bloom) }, drawn after the depth-tested
     // batch and into the glow; gl and prog handed over so they can build them
@@ -63089,6 +63253,12 @@ const GNOLL_KIMODO = {"v":1,"src":{"run":"run_lope_3","back":"death_back_3","fwd
    flow (0.5 + 0.5 * direction * speed, the painting's x and y), over the painting's own rect (CL_PAINT_RECT). */
 const CL_FLOW = 'data:image/png;base64,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';
 
+/* Greatroot Way's painted stream (generated by tools/make_grpaint.py): R the water mask, G B its flow (0.5 + 0.5 *
+   direction * speed, the painting's x and y), over the painting's own rect (GR_PAINT_RECT). */
+const GR_FLOW = 'data:image/png;base64,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';
+const GR_ENTRY = [[5.524, -4.684], [6.667, -4.173], [7.476, -3.662], [7.619, -2.754], [6.952, -1.561], [6.0, -0.483]];   // world x, z: from behind the trunk at the head, down the painted road
+const GR_OCC = [[-2.867, [[3.048, -6.955], [5.333, -6.955], [5.476, -5.82], [5.762, -5.309], [6.31, -5.195], [6.857, -4.855], [7.095, -4.344], [7.19, -3.776], [7.619, -3.123], [7.643, -2.867], [6.667, -2.896], [5.476, -2.981], [4.286, -3.094], [3.048, -3.208]]]];   // the painted trunk foes come out from behind: [its foot's z, its outline (x, z on the painting)]
+
 /* The units' material textures (generated by tools/make_unittex.py from assets/units/tex/). A material missing here
    keeps its painted stand-in (matPaint in gl.js). When one has decoded, the material textures are built again. */
 const UNIT_TEX = {};
@@ -63340,19 +63510,20 @@ function edgeWisps(giants) {
    edge, the right side and its far edge) and the dark firs down the lower left; the bushes by the painted stones. */
 const EDGE_GATE = { x: 5.5, half: 1.05 };   // where the road leaves the field's foot
 // the ward along the field's foot: a faint, steady glow in a soft lavender-teal, the threshold foes must not pass
-function edgeWard() {
+function edgeWard(col, gz) {   // (col: a map's own ward colour, linear rgb: Greatroot Way's jade; Sunfall's lavender-teal without. gz: where its gate stones stand)
   const z = ROWS + .95, br = .85 + .08 * Math.sin(vt * .6);   // (along the ridge's visible foot, below the last row)
+  const c = col || [.55, .66, 1], g = col ? [col[0] * .8 + .2, col[1] * .8 + .2, col[2] * .8 + .2] : [.6, .9, 1], gs = col || [.55, .75, 1], m = col ? [col[0] * .6 + .4, col[1] * .6 + .4, col[2] * .6 + .4] : [.75, .82, 1];
   for (let x = -.6; x <= COLS + .6; x += .42) {
     if (Math.abs(x - EDGE_GATE.x) < EDGE_GATE.half - .1) continue;
-    QADD.ground(x, z, .03, .5, .18, [.55, .66, 1, .45 * br], 1, 0);
+    QADD.ground(x, z, .03, .5, .18, [c[0], c[1], c[2], .45 * br], 1, 0);
   }
   // the gateway: a slightly brighter band across it, the line foes cross
-  QADD.ground(EDGE_GATE.x, z + .1, .032, EDGE_GATE.half, .2, [.6, .9, 1, .5 * br], 1, 0);
-  for (const sd of [-1, 1]) QADD.bill(RD, EDGE_GATE.x + sd * (EDGE_GATE.half + .95), 1.4, ROWS + 2.45, 1.3, 1.4, [.55, .75, 1, .1 * br], 1, 0);   // (a soft glow on the gate stones)
+  QADD.ground(EDGE_GATE.x, z + .1, .032, EDGE_GATE.half, .2, [g[0], g[1], g[2], .5 * br], 1, 0);
+  if (!(gz < 0)) for (const sd of [-1, 1]) QADD.bill(RD, EDGE_GATE.x + sd * (EDGE_GATE.half + .95), gz ? 1.1 : 1.4, gz || ROWS + 2.45, gz ? 1 : 1.3, gz ? 1.2 : 1.4, [gs[0], gs[1], gs[2], .1 * br], 1, 0);   // (a soft glow on the gate stones)
   for (let k = 0; k < 8; k++) {   // a few motes rising slowly off it
     const u = (vt * .08 + k * .137) % 1, x = -.4 + ((k * .618) % 1) * (COLS + .8);
     if (Math.abs(x - EDGE_GATE.x) < EDGE_GATE.half - .1) continue;
-    QADD.bill(RD, x, .05 + u * .55, z, .05, .05, [.75, .82, 1, .5 * Math.sin(Math.PI * u)], 1, 0);
+    QADD.bill(RD, x, .05 + u * .55, z, .05, .05, [m[0], m[1], m[2], .5 * Math.sin(Math.PI * u)], 1, 0);
   }
 }
 const CL_EDGE = {
@@ -63447,6 +63618,17 @@ const MAPS = {
   // the forest clearing: foes come out of the dark tunnel of trees at its head (entry: world x, z waypoints to the field)
   clearing: { name: 'Sunfall Glade', blurb: 'Dappled light in the deep wood', entry: typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : null },
 };
+/* Greatroot Way: the elves' road home under the old trees. The owner's painting is the map (grpaint.js from
+   tools/make_grpaint.py: the glade between the great trees, the stepped stream, the cliff and the valley below; owner,
+   10 Nov 2026: "can you mix in this painting ... prefer this over the cliffs and your water"), with the units, the foes,
+   the moving water and the light of the game on it (greatroot.js). Foes come out from behind the painted trunk at the
+   head and down the painted road (entry: world x, z waypoints, the spawn point at the field's head added by the game:
+   game.js), small with distance at first (tun: how much smaller, over how many rows: view.js tunK), and leave down the
+   painted path at the foot (exitX).
+   The full 3D version (map3d.js M3D_DEFS.greatroot3d: terrain, brook, cliff, TreeForge trunks) is kept behind
+   ?map3d=greatroot; GR3_ENTRY is its way in, behind its gate elder. */
+const GR3_ENTRY = [[3.5, -7.2], [4.5, -6.25], [5.9, -5.55], [6.75, -4.3], [6.5, -2.7]];
+if (typeof GR_PAINT !== 'undefined') MAPS.greatroot = { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: GR_ENTRY, tun: [1.7, 4.4], exitX: 6.75 };
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
 /* Tunable light schemes. Colours are sRGB hex, strengths multiply them in linear light. The Lighting panel edits a copy per map. */
 const LIGHT_DEF = {
@@ -63498,13 +63680,13 @@ const LOOK_DEF = {};
 /* Each map's trees' light (the Light Lab's Trees section: gl.js FS_TREE uTrB/uTrL/uTrK/uTrK2/uTrR) and a painted map's moving
    water (gl.js FS_LIT waterAt, its mask and flow from tools/make_clwater.py), keyed by map id, as the differences from TREE_LL
    and WATER_LL. They apply in every run on every Graphics setting (the water is off on Low). The Light Lab's Bake writes them. */
-const TREE_LL = { barkI: 1, bark: '#ffffff', leafI: 1, leaf: '#ffffff', leafSat: 1, trans: 0, glint: 1, ao: 1, aoH: 1, shadow: 1, rim: 0, rimC: '#cce0ff', fog: 1 };   // (the look as it was)
+const TREE_LL = { barkI: 1, bark: '#ffffff', leafI: 1, leaf: '#ffffff', leafSat: 1, trans: 0, glint: 1, ao: 1, aoH: 1, shadow: 1, rim: 0, rimC: '#cce0ff', fog: 1, high: 0 };   // (the look as it was)
 const WATER_LL = { on: 1, speed: 1, warp: 1, shimmer: 1 };
 const TREE_DEF = {}, WATER_DEF = {};
 // the trees' light as the renderer's uniforms (gl.js drawTrees: RD.treeK; null = TREEK_DEF, the look as it was)
 function treeUni(T) {
   const t = Object.assign({}, TREE_LL, T || {}), b = linMul(t.bark, t.barkI), l = linMul(t.leaf, t.leafI);
-  return { b: [b[0], b[1], b[2], 0], l: [l[0], l[1], l[2], t.leafSat], k: [t.trans, t.glint, t.ao, t.aoH], k2: [t.shadow, t.rim, t.fog, 0], r: lin3(t.rimC) };
+  return { b: [b[0], b[1], b[2], 0], l: [l[0], l[1], l[2], t.leafSat], k: [t.trans, t.glint, t.ao, t.aoH], k2: [t.shadow, t.rim, t.fog, t.high || 0], r: lin3(t.rimC), m: t.moss ? linMul(t.moss, t.mossI == null ? 1 : t.mossI) : null };   // (high: the giants' trunks kept lit as they rise, 0 = into the canopy's shade as they were)
 }
 // a map's water as tuned: [speed, warp, shimmer], or null when it is switched off
 function waterK(id, W) { const w = Object.assign({}, WATER_LL, (W !== undefined ? W : WATER_DEF[id]) || {}); return w.on ? [w.speed, w.warp, w.shimmer] : null; }
@@ -63512,6 +63694,19 @@ function waterK(id, W) { const w = Object.assign({}, WATER_LL, (W !== undefined 
 LIGHT_DEF.clearing = Object.assign({}, LIGHT_DEF.clearing, {"fogFar":3,"sun":"#b2f104","sunI":0.93,"az":-11,"el":51,"rim":0.24,"fill":0.12,"ground":1,"paint":0.94,"sky":"#a8b4f0","skyI":0.6,"gnd":"#6c6890","gndI":0.2,"fog":"#385b29","fogNear":1.6,"woods":0,"lamps":1,"expo":1.1,"rays":1,"ray":"#c8d8ff"});
 MAP_MOOD.clearing = Object.assign({}, MAP_MOOD.clearing, {"top":"#11ff00","topK":0.15,"key":"#d4ff00","keyK":0.3,"bounce":"#4418e2","bounceK":0.1,"env":0.81,"grade":"#a8bcc8","gradeK":0.18});
 LOOK_DEF.clearing = {"fwd":{"shOn":1,"shFloor":0.3,"shSoft":1.2,"shBias":0.0016,"shQ":0,"tm":0,"backOn":1,"back":"#a8c8ff","backI":0.6,"backAz":0,"backEl":25,"spec":1,"rough":1,"sharp":0,"fres":0,"gGlintOn":1,"gGlint":1.4,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.8,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.35},"bloom":{"on":1,"thr":0.62,"strength":0.35,"radius":1.5},"rays":{"on":0,"col":"#8ee9f5","strength":0.5,"len":0.255,"thr":0.55},"hfog":{"on":0,"col":"#46a05c","dens":0.69,"top":1.85,"fall":1.2,"max":0.5,"noise":0.5},"tone":{"on":1,"ev":0,"contrast":1,"sat":1,"warm":0,"tint":0},"grade":{"on":1,"lift":-0.003,"liftC":"#42f045","liftK":0.49,"gamma":1.37,"gammaC":"#ffffff","gammaK":0.18,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#3a5a8a","splSK":0.33,"splH":"#ffb070","splHK":0.255,"bal":0.01},"vig":{"on":1,"str":0.3,"rad":0.75,"soft":0.7},"sharp":{"on":1,"k":0.3}}};
+/* Greatroot Way (the painting): the painting carries its own light, so the ground is shown as painted (paint 1, no dapple
+   laid on it); the sun stands where the painting's does, upper left, for the units' and foes' own shading and shadows, warm
+   amber against a teal-green shade; a light post (no fog over the painting). */
+LIGHT_DEF.greatroot = {"sun":"#ffd9a6","sunI":1.75,"az":-128,"el":50,"rim":0.3,"fill":0.14,"ground":1,"paint":1,"sky":"#9cd0c2","skyI":0.62,"gnd":"#5c7a4a","gndI":0.3,"fog":"#24463e","fogNear":0.98,"fogFar":2.4,"woods":0,"lamps":1,"expo":1.04,"rays":0.8,"ray":"#ffe6b0"};
+MAP_MOOD.greatroot = {"top":"#8fd8c8","topK":0.14,"key":"#ffd08c","keyK":0.2,"bounce":"#8cb85c","bounceK":0.16,"env":0};
+LOOK_DEF.greatroot = {"fwd":{"shOn":1,"shFloor":0.4,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.5,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":1,"gGlint":1.2,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.7,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.3},"bloom":{"on":1,"thr":0.72,"strength":0.26,"radius":1.6},"rays":{"on":0,"col":"#ffd9a0","strength":0.3,"len":0.2,"thr":0.6},"hfog":{"on":0,"col":"#3f8f86","dens":0.2,"top":1.2,"fall":1.6,"max":0.15,"noise":0.6},"tone":{"on":1,"ev":0,"contrast":1.03,"sat":1.03,"warm":0.03,"tint":0},"grade":{"on":0,"lift":0,"liftC":"#2f8f86","liftK":0,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#1f7a78","splSK":0,"splH":"#ffb86a","splHK":0,"bal":0},"vig":{"on":1,"str":0.22,"rad":0.78,"soft":0.8},"sharp":{"on":1,"k":0.2}}};
+/* Greatroot Way in full 3D (?map3d=greatroot): a late-morning sun slanting in from the upper left through the canopy (dap*: its dapple on everything the
+   sun lights, gl.js shadowAt uCookie: strength, the pools' size in world units, their sway, the edge's softness), warm amber
+   on the bark, teal-green shade and a teal haze into the distance. Tuned in the Light Lab and baked. */
+LIGHT_DEF.greatroot3d = {"sun":"#ffd6a0","sunI":2.1,"az":-128,"el":47,"rim":0.4,"fill":0.1,"ground":1,"paint":1,"sky":"#86c2b6","skyI":0.6,"gnd":"#4f7048","gndI":0.36,"fog":"#2f625c","fogNear":0.96,"fogFar":1.75,"woods":0.25,"lamps":1,"expo":1.08,"rays":1,"ray":"#ffe2a8","dap":0.72,"dapS":3.1,"dapV":0.5,"dapE":0.13};
+MAP_MOOD.greatroot3d = {"top":"#7fd8c4","topK":0.16,"key":"#ffcf8a","keyK":0.2,"bounce":"#86b060","bounceK":0.16,"env":0.3};
+LOOK_DEF.greatroot3d = {"fwd":{"shOn":1,"shFloor":0.36,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.55,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":1,"gGlint":1.4,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.85,"radius":0.5,"bias":0.03,"power":1.25,"ground":0.4},"bloom":{"on":1,"thr":0.68,"strength":0.34,"radius":1.7},"rays":{"on":1,"col":"#ffd9a0","strength":0.34,"len":0.2,"thr":0.6},"hfog":{"on":1,"col":"#3f8f86","dens":0.26,"top":1.2,"fall":1.6,"max":0.17,"noise":0.6},"tone":{"on":1,"ev":0.04,"contrast":1.08,"sat":1.06,"warm":0.1,"tint":0},"grade":{"on":1,"lift":-0.004,"liftC":"#2f8f86","liftK":0.3,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1.01,"gainC":"#ffe6c0","gainK":0.12,"splS":"#1f7a78","splSK":0.16,"splH":"#ffb86a","splHK":0.12,"bal":0.05},"vig":{"on":1,"str":0.3,"rad":0.72,"soft":0.8},"sharp":{"on":1,"k":0.28}}};
+TREE_DEF.greatroot3d = {"barkI":1.2,"bark":"#ffe6c8","leafI":1.05,"leaf":"#f0ffd8","leafSat":1.05,"trans":0.55,"glint":1,"ao":1,"aoH":1,"shadow":1,"rim":0.35,"rimC":"#ffdca0","fog":1,"high":0.5,"moss":"#2f5a1e","mossI":0.6};
 const LIGHT_KEY = id => 'runehold.light3.' + id;
 // the light schemes are fixed (the old Lighting panel is gone); any tweaks it saved are cleared
 try { for (const id of Object.keys(LIGHT_DEF)) localStorage.removeItem(LIGHT_KEY(id)); } catch (e) {}
@@ -63862,6 +64057,18 @@ const THEMES = {
     painted: typeof CL_PAINT !== 'undefined' ? { src: CL_PAINT, rect: CL_PAINT_RECT, shade: CL_SHADE_REF, water: typeof CL_FLOW !== 'undefined' ? CL_FLOW : null } : null,   // (water: the stream and falls' mask and flow, clwater.js)
     build: () => buildClearingPainted(),
   },
+  // Greatroot Way: the owner's painting is the ground, shown as painted (no bend: the painting's own view up the glade), the
+  // view fitted to its top and foot (greatroot.js buildGreatrootPainted: the ground, the painted trunk as an occluder)
+  greatroot: typeof GR_PAINT === 'undefined' ? null : {
+    id: 'greatroot', sunDir: nrm3([-.54, .73, -.42]), sunCol: [1.6, 1.25, .8], sky: [.2, .3, .3], gnd: [.14, .16, .09], fogHex: '#24463e',
+    pitch: 57, fitTop: GR_PAINT_RECT[1] + .1, fitBot: GR_PAINT_RECT[1] + GR_PAINT_RECT[3] - .1, noKeep: true, h: () => 0, fly: [.85, 1, .45],
+    bendR: 1e5, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: .42,
+    // its god rays, along the painting's own (x, z, width, strength: view.js drawForestShafts), and the spray at its falls (x0, x1, z0, z1)
+    shaftPts: [[-8.3, -3.1, 1.3, 1.1], [-1.2, -1.9, 1, .6], [13.4, 6.6, 1, .5], [2.5, 5.3, 1.1, .2], [8.3, 10.3, 1, .18], [-3.4, 12.6, 1, .5]],
+    spray: [[-6.3, -4.9, -1.5, .9], [-5.6, -4.3, 9.6, 10.6]],
+    painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null },
+    build: () => buildGreatrootPainted(),
+  },
   moonwood: {
     id: 'moonwood', sunDir: nrm3([.3, .74, -.6]), sunCol: [.58, .8, .9], sky: [.075, .15, .165], gnd: [.03, .045, .04], fogHex: '#1c3835',
     pitch: 57, fitTop: null, h: () => 0, shafts: 'moon', fly: [1, .82, .4], lmRect: [-8, -6, COLS + 8, ROWS + 6],
@@ -63871,6 +64078,7 @@ const THEMES = {
   },
 };
 
+if (!THEMES.greatroot) delete THEMES.greatroot;
 /* ---------- painted backdrop for Moonwood ----------
    Everything here is 2D canvas painting, laid out from the live camera so it frames the 3D clearing on any screen:
    a misty teal sky and cold moon, ranks of trunks fading into fog, giant trunks and lantern-lit undergrowth around
@@ -64202,7 +64410,7 @@ function paintMoonwoodFG(cv, C, rnd, sky, M) {
 
    Bakeable (docs/design/map3d.md): the terrain's colour and occlusion, the props and the near trees' shadows are all
    static; only the path wear, the units' shadows, the point lights, the water and the mist move. */
-const M3D_FORCE = (() => { try { const q = new URLSearchParams(location.search).get('map3d'); return q == null || (typeof MAP_LITE !== 'undefined' && MAP_LITE) ? null : q === 'pass' ? 'pass3d' : 'grove3d'; } catch (e) { return null; } })();   // (painted-only maps, maplite.js: the painted map instead)
+const M3D_FORCE = (() => { try { const q = new URLSearchParams(location.search).get('map3d'); return q == null || (typeof MAP_LITE !== 'undefined' && MAP_LITE) ? null : q === 'pass' ? 'pass3d' : q === 'greatroot' ? 'greatroot3d' : 'grove3d'; } catch (e) { return null; } })();   // (painted-only maps, maplite.js: the painted map instead)
 const M3D_RECT = { x0: -.45, x1: COLS + .45, z0: -TOPM - .75, z1: ROWS + .75 };   // flat ground: the field and its edge
 // the painting's way in (CL_ENTRY): out of the trees at the head, down to the field (the clearing map's own)
 const M3D_ENTRY = typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : [[5.593, -5.439], [5.315, -4.188], [4.99, -3.029], [4.759, -1.987]];
@@ -64279,7 +64487,77 @@ const M3D_DEFS = {
     fern: ['#5b6650', '#4c5744'],
     fly: [1, .85, .6],
   },
+  /* Greatroot Way: the elves' road home (owner: "a new map ... with AAA lighting that suits the forest, using textures and
+     running water ... a place they might inhabit and defend ... large trees at the top that the models appear from behind";
+     the concept: a mossy road between colossal buttressed trunks, god rays from the upper left, a brook at the left,
+     foxgloves, ferns and mossy boulders, emerald and teal shade, amber light on the bark). Always a map (maps.js MAPS), not
+     behind the flag. Its own way in (entry: no ravine): foes come down the road behind the gate elder at the head and step
+     out from behind its trunk; the world's bend past the field's head (view.js BEND) lays the forest back to a hazy horizon. */
+  greatroot3d: {
+    name: 'Greatroot Way (3D)', blurb: 'The elves’ road home, under the old trees', seed: 4127,
+    entry: typeof GR3_ENTRY !== 'undefined' ? GR3_ENTRY : null, wayW: 1.15,
+    // the view: the world rolls away sooner past the field's head (bendR: the forest laid back to a near horizon, its far
+    // trunks standing in the haze), and reaches three units up the gate elder's bole (fitPts)
+    fit: [-6.4, ROWS + 1.3], fitPts: [[4.3, 3, -4.35]], bendR: 5.5, spanX: 26, shafts: 'forest', amb: 'forest', ward: [.42, .95, .78],
+    // the cliff down the right: the rim (x0 at z0, k further out each step north), the wall's run, the land's level below,
+    // its far ridges; then how the renderer draws that land: haze, cloud shadow, colours (haze, woods, meadow, water), the river
+    cliff: { painted: true, x0: 13.7, z0: 16, k: .42, zt: 1.5, k2: 1.05, w: 1.5, low: -3.6, ridge: 1, haze: .78, cloud: .34, cols: ['#b4dcd6', '#2f7a4f', '#9cc46a', '#eaf6ee'], river: [23.5, 2.4, .31, .1] },
+    skyPaint: (cv, C) => grPaintBack(cv, C), step: .24,   // (the sky and the valley below as one painting: greatroot.js)
+    keep: [[5.1, -12, 8.5, -1.6]],   // (screen rows kept clear of everything but the elders: where foes step out from behind the gate)
+    pal: ['#2c5222', '#55822f', '#3f6a28', '#7a664c', '#4f4232', '#70746a', '#2f3a22', '#e8eef4'],
+    k: [99, 0, .88, 1],
+    mist: ['#8fe0cc', .1],
+    bank: .42, hill: .55, crag: .45,
+    // clear water (owner's concept: a turquoise brook, its pebbles seen through it, white where it falls): clear = refraction,
+    // rings at the falls' feet, clarity; take = what a unit of depth takes from the light (red first), its own colour's strength
+    water: { deep: '#0b6f7c', shal: '#59d6c8', glow: '#2fbfae', abs: [.7, .15, .12, .2], glowI: .18, wisps: .12, bedK: 1.7, clear: [.016, 1, 1], take: [4.6, 1.15, 1.0, .75] },
+    trees: [['oak', .66], ['sprig', .18], ['dfir', .16]],
+    treeH: { oak: 3.8, dfir: 4.6, sprig: 3.8 },
+    belts: [[1.25, 0], [9, .08], [12.5, .42]], headTrees: .1, noSaplings: true, lodBias: 1,   // (an open forest floor between the elders: no lesser trees near the field, the woods closing in far out, where a wide screen still sees)
+    lay: [0, 1, 2, 3, 3, 2, 6, 7, 8],   // (the road in is trodden earth and roots, not flagstones; the woods' floor is moss, not leaf litter)
+    // its own textures (owner, 10 Nov 2026: a Greatroot-only set), each taken once it has been painted and imported
+    // (tools/make_terraintex.py EXTRA), the shared layer above until then; barkName: its trunks' bark
+    layNames: ['greatroot_grass', 'greatroot_grass_lush', 'greatroot_moss', 'greatroot_path', 'greatroot_path', 'greatroot_moss', 'greatroot_rock', 'greatroot_roots', 'greatroot_stream_bed'],
+    barkName: 'greatroot_bark',
+    glint: [1.25, .8, .5, .65],
+    // the textured ground's tone (gl.js FS_TER uTT, uTTk): the textures' tint, teal-green shade, warm sun, the woods, the floor,
+    // (no built-in dapple or lift: the sun's own dapple, LIGHT_DEF.greatroot3d dap, lights the ground, the units and the trunks alike)
+    tone: { c: [[.56, .72, .55], [.62, .88, .98], [1.14, 1.04, .82], [.8, .96, .93], [.012, .03, .028], [0, 0, 0]], k: [1, 0, 1, .62] },
+    // mossy boulders (the owner's ivy outcrops): the concept's lower corners, the field's margins, the brook's bends
+    stones: [[-2.7, 14.7, .6], [-3.9, 16.3, .5], [12.9, 14.3, .5], [13.3, 6.3, .45], [-2.3, 5.2, .4], [13.1, -1.9, .45], [-2.4, -2.4, .45], [-8.6, 7.4, .5], [15.4, 7.2, .5], [17.6, 1.2, .5]],
+    heroes: [], cornerTrees: [], giants: [],
+    // the elders: x, z, height, turn, far (a lighter LOD), kind (1: the second trunk). The gate (the first: foes pass behind it and step out on its right),
+    // its right post, the row across the head, the ranks behind them fading into the haze, those down the left, and three on
+    // the right standing at the cliff's rim, their roots over the edge
+    // (owner: "trees are too large and block the path mobs come through": the owner's rooted TreeForge trunk at modest
+    // sizes, the gate's two set wide apart so the road between them is open to the eye)
+    elders: [[4.2, -4.5, 26, 2.2, 0, 1], [10.3, -5.6, 27, .6],
+      [-1.4, -6.0, 28, 4.1], [-6.0, -4.2, 30, 1.2, 0, 1], [14.4, -3.2, 28, 3.3, 0, 1], [-11, -6.3, 30, 2.7], [-16, -4.5, 30, 3.9, 1, 1],
+      [1.3, -9.4, 30, 1.7, 1, 1], [7.4, -11.2, 30, 4.6, 1], [-4.6, -9.8, 30, 5.6, 1], [-9.4, -11, 30, 2.1, 2, 1], [-14.5, -9.4, 30, 1.1, 2], [-20, -8, 30, 5, 2, 1],
+      [-11.2, 3.6, 32, .8, 0, 1], [-14.6, 10.6, 30, 3.6, 1], [-18.5, 2, 30, 2.5, 2], [-20.5, 9.2, 30, 4.2, 2, 1], [-18.2, 16.8, 32, 1.4, 2], [-24, 4, 30, .7, 2, 1],
+      [16.3, 3.9, 30, 4.9], [13.5, 12.1, 24, 1.9, 0, 1]],
+    giantFade: [15, 46, .85],
+    clusters: true, clusterOut: 9.5, clusterMax: 12.5, clusterN: 125, brookClear: true, brookRocks: true,
+    under: { n: 0, mix: [['gbush', 1]], sapling: ['oak'], k: .55 },
+    // the brook down the left: out of the woods at the head, bending round the rocks, stepping down over four little falls
+    streams: [
+      // (owner: "small rocks along it, abnormal wideness along it": narrow chutes between wide pools, a step down into each)
+      { pts: [[-8.2, -14], [-7.4, -9.5], [-8.1, -6.4], [-7.0, -3.6], [-5.7, -1.6], [-4.7, .4], [-5.5, 2.4], [-6.7, 4.2], [-6.0, 6.2], [-4.6, 7.8], [-3.7, 9.6], [-4.5, 11.6], [-5.9, 13.2], [-5.3, 15.0], [-4.0, 16.8], [-4.6, 20.5]],
+        w: [.3, .32, .3, .34, .5, .32, .46, .3, .6, .34, .5, .3, .66, .4, .5, .5], poolK: 1.5, falls: [[3, .32], [5, .36], [7, .4], [9, .36], [11, .4], [13, .34]] },
+    ],
+    lanterns: [],
+    flowers: ['#a55adc', '#b86cea', '#c98af2', '#8b4ccc', '#9a52d6'],   // (foxglove purples)
+    fern: ['#3d6a2a', '#34582a', '#4a7432', '#587a30'],
+    fly: [1, .86, .5],
+    props: (D, rnd, FX) => m3dGreatProps(D, rnd, FX), frame: dt => m3dGreatFrame(dt),
+  },
 };
+// Greatroot Way's rill: out of the woods at the head on the right, down the margin and over the cliff's rim in a fall (its
+// drop is the land's own: falls [segment, 0] only marks the sheet), a short run below it lost in the mist
+{ const D = M3D_DEFS.greatroot3d, zr = 9.4, xr = m3dRimXC(D.cliff, zr);
+  D.streams.push({ pts: [[12.3, -3.9], [12.7, -2.4], [13.3, -1.0], [13.0, 1.4], [12.9, 3.8], [13.3, 6.0], [14.2, 7.8], [xr - 1.2, zr - .5], [xr + .05, zr], [xr + D.cliff.w + .75, zr + .6]],
+    w: [.26, .28, .3, .3, .32, .34, .36, .46, .62, .7], falls: [[8, 0, .96]] }); }
+if (M3D_DEFS.greatroot3d.streams[1].pts.length !== M3D_DEFS.greatroot3d.streams[1].w.length) throw new Error('greatroot rill: widths');
 // the light for each 3D map (the per-map light table: maps.js LIGHT_DEF)
 if (typeof LIGHT_DEF !== 'undefined') {
   // a full-moon night in the elves' glade, not dark: silver-blue moonlight, a bluey-purple haze (as Sunfall Glade on playbuild);
@@ -64296,14 +64574,50 @@ const m3dLin = h => lin3(h);
 let M3D = null;   // the map being built / shown: its definition plus its built streams (for the height function)
 
 /* ---------- the shape of the land ---------- */
+/* A map with its own way in (D.entry, as Greatroot Way: maps.js GR_ENTRY) has no ravine: the way is a level road through
+   the trees. m3dWay samples it every .2, led in from deeper in the woods and on to the field's head; m3dWayD is a point's
+   distance from it. m3dOnWay: is a point within r of the way foes come in by (either kind of map)? */
+function m3dWay(D) {
+  const E = D.entry, a = E[0], b = E[1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, out = [];
+  const P = [[a[0] - (b[0] - a[0]) / l * 9, a[1] - (b[1] - a[1]) / l * 9]].concat(E, [[PORTAL.x, PORTAL.y], [PORTAL.x, -.3]]);
+  for (let i = 0; i < P.length - 1; i++) { const n = Math.max(1, Math.ceil(Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) / .2)); for (let k = 0; k < n; k++) out.push([P[i][0] + (P[i + 1][0] - P[i][0]) * k / n, P[i][1] + (P[i + 1][1] - P[i][1]) * k / n]); }
+  return out;
+}
+function m3dWayD(x, z) { let d = 99; for (const p of M3D.wayB) { const q = Math.hypot(x - p[0], z - p[1]); if (q < d) d = q; } return d; }
+function m3dOnWay(x, z, r) { return M3D.wayB ? z < -.6 && m3dWayD(x, z) < r : z < -1.6 && Math.abs(x - m3dRoadX(z)) < r; }
 function m3dRoadX(z) { if (z >= -2) return 4.76; const t = Math.min(1, (-2 - z) / 4); return 4.76 + (5.6 - 4.76) * t + Math.sin((-2 - z) * .3) * .5 * Math.max(0, (-6 - z) / 6); }
 function m3dOut(x, z) {   // how far a point lies outside the open ground (the field, its head and the road into the trees)
   const dx = Math.max(M3D_RECT.x0 - x, 0, x - M3D_RECT.x1), dz = Math.max(M3D_RECT.z0 - z, 0, z - M3D_RECT.z1);
   let d = Math.hypot(dx, dz);
   if (z > ROWS) d = Math.min(d, Math.max(0, Math.abs(x - 5.5) - 1.3));   // the way out at the foot
+  if (M3D.wayB && d > 0 && z < -1.5) d = Math.min(d, Math.max(0, m3dWayD(x, z) - (M3D.wayW || 1.1)));   // (a map's own way in: level ground)
   return d;
 }
-function m3dNat(x, z) {   // the land before the streams carve it
+/* A map's cliff (D.cliff, Greatroot Way: owner, "make the right most map look like it drops off a cliff to a land below ...
+   nice and atmospheric like a majestic landscape"): east of a rim the plateau ends in a rock wall and the land lies far
+   below. The rim runs from the far right at the head in toward the field's foot (x0 at z0, k further out each step north,
+   never nearer the field than a margin), wandering, so the wall faces the camera all the way down. Below: gentle hills, and
+   ridges rising toward the far horizon. The renderer draws that floor in miniature under haze (gl.js FS_TER uLow) and the
+   sky past it is the map's painted backdrop (m3dGreatSky), so the drop reads as far deeper than its world depth (which
+   stays inside the world's bend past the field's head: view.js BEND). */
+function m3dRimXC(C, z) {   // (a headland: out to its point near zt, then back in toward the head, so the sky and the far land show past it)
+  const t = Math.max(0, C.zt - z), back = C.k2 * t * t / (t + 3);   // (a soft turn: nothing at zt, a slope of k2 well past it)
+  return Math.max(COLS + 1.75, C.x0 + C.k * (C.z0 - Math.max(z, C.zt)) - back + .8 * Math.sin(z * .47 + .6) + .25 * Math.sin(z * 1.1 + 2) + (fbm2(z * .35, 3.3) - .5) * 1.2);
+}
+const m3dRimX = z => m3dRimXC(M3D.cliff, z);
+const m3dLow = (x, z, m = 0) => !!M3D.cliff && x > m3dRimX(z) - m;   // past the rim (or within m of it)
+function m3dCliff(x, z, h) {
+  const C = M3D.cliff; if (!C) return h;
+  const e = x - m3dRimX(z); if (e < -.6) return h;
+  const lip = h + .14 * m3dSs(-.6, 0, e); if (e < 0) return lip;   // a rounded lip of rock and roots
+  const w = C.w * (1 + .4 * (fbm2(x * .7 + 5, z * .7) - .5));
+  const low = C.low + .85 * (fbm2(x * .3 + 2, z * .3 + 9) - .42) + C.ridge * m3dSs(1, -7.5, z) * Math.max(0, fbm2(x * .2 + 7, z * .34 + 1) - .34) * 2.4;
+  if (e >= w) return low + (e < w + 1.3 ? (1 - (e - w) / 1.3) ** 2 * .55 : 0);   // (scree banked against the wall's foot)
+  const t = e / w, led = clamp(t + .07 * Math.sin(t * 15 + fbm2(x, z) * 6), 0, 1);   // the wall, broken by ledges
+  return lip + (low + .55 - lip) * m3dSs(0, 1, led) ** .8;
+}
+function m3dNat(x, z) { return m3dCliff(x, z, m3dNat0(x, z)); }
+function m3dNat0(x, z) {   // the land before the streams carve it (and before a map's cliff)
   const D = M3D, d = m3dOut(x, z);
   if (d <= 0) return 0;
   const n = fbm2(x * .19 + 3, z * .19 + 11), c = fbm2(x * .33 + 9, z * .33 + 2);
@@ -64336,14 +64650,14 @@ function m3dBuildStreams(D) {
     for (let it = 0; it < 4; it++) for (let i = 1; i < smp.length - 1; i++) smp[i].y = Math.min(smp[i - 1].y, (smp[i - 1].y + smp[i].y + smp[i + 1].y) / 3);
     for (const s of smp) {
       s.fall = 0; s.pool = 0; s.foam = 0;
-      for (const [fi, drop] of FL) {
+      for (const [fi, drop, fr = .3] of FL) {   // (fr: how much of the segment is the falling sheet)
         if (s.seg < fi) s.y += drop;
-        if (s.seg === fi) { s.y += drop * (1 - m3dSs(0, .3, s.t)); if (s.t < .3) s.fall = 1; else s.foam = Math.max(s.foam, Math.max(0, 1 - (s.t - .3) / .22)); }   // (foam just where the water lands)
+        if (s.seg === fi) { s.y += drop * (1 - m3dSs(0, fr, s.t)); if (s.t < fr) s.fall = 1; else s.foam = Math.max(s.foam, Math.max(0, 1 - (s.t - fr) / .22)); }   // (foam just where the water lands)
         // a little pool at the foot of each drop: wider, deeper, foaming where the water lands
-        if (s.seg === fi && s.t >= .3) s.pool = Math.max(s.pool, Math.sin(Math.PI * Math.min(1, (s.t - .3) / .7)));
+        if (s.seg === fi && s.t >= fr) s.pool = Math.max(s.pool, Math.sin(Math.PI * Math.min(1, (s.t - fr) / (1 - fr))));
         if (s.seg === fi + 1 && s.t < .25) s.foam = Math.max(s.foam, .5 * (1 - s.t / .25));
       }
-      s.w *= 1 + .9 * s.pool;
+      s.w *= 1 + (S.poolK != null ? S.poolK : .9) * s.pool;   // (poolK: how much a stream widens into its pools)
     }
     for (let i = 0; i < smp.length; i++) { const a = smp[Math.max(0, i - 1)], b = smp[Math.min(smp.length - 1, i + 1)], l = Math.hypot(b.x - a.x, b.z - a.z) || 1; smp[i].dx = (b.x - a.x) / l; smp[i].dz = (b.z - a.z) / l; }
     let acc = 0; for (let i = 0; i < smp.length; i++) { if (i) acc += Math.hypot(smp[i].x - smp[i - 1].x, smp[i].z - smp[i - 1].z, smp[i].y - smp[i - 1].y); smp[i].s = acc; }
@@ -64364,7 +64678,7 @@ function m3dNearStream(x, z, R = 3) {
 const M3D_RAV = { top: -2.35, w: .8, wall: 3.6, fall: .55, deep: 1.9, end: -8.6 };
 function m3dRavFloor(z) { return z >= M3D_RAV.top ? 0 : -Math.min(M3D_RAV.deep, (M3D_RAV.top - z) * M3D_RAV.fall) * m3dSs(0, 1.2, M3D_RAV.top - z) ** .5; }
 function m3dRavine(x, z, h) {
-  if (z > M3D_RAV.top + .6) return h;
+  if (z > M3D_RAV.top + .6 || M3D.wayB) return h;   // (a map with its own way in has no ravine)
   const cx = m3dRoadX(z), d = Math.abs(x - cx) + (fbm2(x * .9, z * .9) - .5) * .35, fl = m3dRavFloor(z);
   const wall = fl + Math.max(0, d - M3D_RAV.w) * M3D_RAV.wall + (d > M3D_RAV.w ? (fbm2(x * 2.3 + 4, z * 2.3) - .5) * .25 : (fbm2(x * 3, z * 3) - .5) * .06);
   const k = (z > M3D_RAV.top ? m3dSs(M3D_RAV.top + .6, M3D_RAV.top, z) : 1) * m3dSs(M3D_RAV.end - 1.6, M3D_RAV.end, z);   // (fades out at the head, onto the flat, and closes at its far end in the woods)
@@ -64375,10 +64689,10 @@ function m3dH(x, z) {
 }
 function m3dH0(x, z) {
   const h0 = m3dNat(x, z);
-  if (!M3D.streamsB || h0 <= 0) return h0;
+  if (!M3D.streamsB || (h0 <= 0 && !(M3D.cliff && x > COLS + 1.5))) return h0;   // (below a cliff the land is under 0: a stream still carves its way down the wall)
   const ns = m3dNearStream(x, z, 2.6); if (!ns) return h0;
   const W = ns.s.y, w = ns.s.w, dc = ns.d + w;   // dc: distance from the centre line
-  if (dc < w) return W - (.22 + .2 * (ns.s.pool || 0)) * (1 - (dc / w) ** 2) - .04;   // the bed (deeper in a pool)
+  if (dc < w) return W - (.22 + .2 * (ns.s.pool || 0)) * (M3D.water.bedK || 1) * (1 - (dc / w) ** 2) - .04;   // the bed (deeper in a pool; bedK: a map's deeper brooks)
   const bankH = Math.max(h0, W + .2), t = m3dSs(w, w + .18, dc), k = m3dSs(w + .18, w + 1.3, dc);   // (a small channel: steep low banks)
   const h = (W + .1) + (bankH - W - .1) * t;
   return h + (h0 - h) * k;
@@ -64386,7 +64700,7 @@ function m3dH0(x, z) {
 
 /* ---------- the terrain mesh: heights, splat weights, occlusion ---------- */
 function m3dTerrain(D, trees) {
-  const x0 = -18, x1 = COLS + 18, z0 = -20, z1 = ROWS + 14, st = .3;
+  const sx = D.spanX || 18, x0 = -sx, x1 = COLS + sx, z0 = -20, z1 = ROWS + 14, st = D.step || .3;   // (spanX: a map seen on very wide screens reaches further out)
   const nx = Math.round((x1 - x0) / st), nz = Math.round((z1 - z0) / st), NV = (nx + 1) * (nz + 1);
   const H = new Float32Array(NV), pos = new Float32Array(NV * 3), nor = new Float32Array(NV * 3), sp = new Float32Array(NV * 3), ae = new Float32Array(NV * 4);
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) { const k = j * (nx + 1) + i, x = x0 + i * st, z = z0 + j * st; H[k] = m3dH(x, z); pos[k * 3] = x; pos[k * 3 + 1] = H[k]; pos[k * 3 + 2] = z; }
@@ -64397,7 +64711,8 @@ function m3dTerrain(D, trees) {
     for (let b = -R; b <= R; b++) for (let a = -R; a <= R; a++) { const ii = ci + a, jj = cj + b; if (ii < 0 || jj < 0 || ii >= cw || jj >= ch) continue; const d = Math.hypot(a, b) * .6 / r; if (d < 1) can[jj * cw + ii] += (1 - d * d) * .7; } }
   const canAt = (x, z) => { const ii = Math.round((x - x0) / .6), jj = Math.round((z - z0) / .6); return ii < 0 || jj < 0 || ii >= cw || jj >= ch ? 0 : Math.min(1, can[jj * cw + ii]); };
   const roadPts = [];
-  for (let z = -16; z < -1; z += .3) roadPts.push([m3dRoadX(z), z]);
+  if (M3D.wayB) { for (let i = 0; i < M3D.wayB.length; i += 2) roadPts.push(M3D.wayB[i]); }
+  else for (let z = -16; z < -1; z += .3) roadPts.push([m3dRoadX(z), z]);
   for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
     const k = j * (nx + 1) + i, x = x0 + i * st, z = z0 + j * st, h = H[k];
     let n0 = at(i - 1, j) - at(i + 1, j), n2 = at(i, j - 1) - at(i, j + 1), l = Math.hypot(n0, 2 * st, n2);
@@ -64415,6 +64730,7 @@ function m3dTerrain(D, trees) {
     let moss = clamp(m3dSs(.2, 1.4, out) * (1 - m3dSs(3, 6, out)) + cp * .6 + wet * .8, 0, 1);
     let rock = clamp(m3dSs(.62, .8, fbm2(x * .33 + 9, z * .33 + 2)) * Math.min(1, out * .4) * 1.3, 0, 1);
     if (ns && ns.d < .25) rock = Math.max(rock, .55 * (1 - m3dSs(-.2, .25, ns.d)));   // pebbled stream bed
+    if (M3D.cliff) { const e = x - m3dRimX(z); if (e > -1.1) { rock = Math.max(rock, m3dSs(-1.1, -.15, e + (fbm2(x * 1.7, z * 1.7) - .5) * .7)); moss *= 1 - m3dSs(-.5, .1, e); road = 0; } }   // (bare rock at the rim and down the wall)
     sp[k * 3] = road; sp[k * 3 + 1] = moss; sp[k * 3 + 2] = rock;
     let roots = 0; for (const g of M3D.giantsB || []) { const d = Math.hypot(x - g.x, z - g.z) / (edgeTrunkR(g) * 3.2); if (d < 1) roots = Math.max(roots, 1 - d); }
     ae[k * 4] = ao; ae[k * 4 + 1] = out <= 0 ? 0 : out / 1.4 + cp * .6; ae[k * 4 + 2] = roots; ae[k * 4 + 3] = ns ? 1 - m3dSs(-.3, .35, ns.d) : 0;
@@ -64423,7 +64739,9 @@ function m3dTerrain(D, trees) {
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx[q++] = a; idx[q++] = c; idx[q++] = d; idx[q++] = a; idx[q++] = d; idx[q++] = b; }
   const pal = new Float32Array(24); D.pal.forEach((h, i) => pal.set(m3dLin(h), i * 3));
   const mc = m3dLin(D.mist[0]);
-  return { pos, nor, sp, ae, idx, pal, k: new Float32Array(D.k), mist: new Float32Array([mc[0], mc[1], mc[2], D.mist[1]]), lay: new Float32Array(D.lay || [0, 1, 2, 3, 4, 5, 6, 7, 8]), glint: new Float32Array(D.glint || [.55, .5, .35, .6]) };
+  return { pos, nor, sp, ae, idx, pal, k: new Float32Array(D.k), mist: new Float32Array([mc[0], mc[1], mc[2], D.mist[1]]), lay: new Float32Array(m3dLay(D)), glint: new Float32Array(D.glint || [.55, .5, .35, .6]),
+    tone: D.tone ? new Float32Array(D.tone.c.flat()) : null, toneK: D.tone ? new Float32Array(D.tone.k) : null,
+    low: D.cliff ? new Float32Array([D.cliff.low, D.cliff.painted ? 2 : 1, D.cliff.haze, D.cliff.cloud]) : null, lowC: D.cliff ? new Float32Array(D.cliff.cols.map(m3dLin).flat()) : null, lowR: D.cliff ? new Float32Array(D.cliff.river) : null };   // (the textured ground's tone: gl.js FS_TER uTT, uTTk)
 }
 
 /* ---------- water: one ribbon a stream (5 across), the falls a steep stretch of it ---------- */
@@ -64443,7 +64761,8 @@ function m3dWater(D) {
     for (let i = 0; i < smp.length - 1; i++) for (let c = 0; c < 4; c++) { const a = base + i * 5 + c, b = a + 1, d = a + 5, e = d + 1; idx.push(a, d, e, a, e, b); }
   }
   const W = D.water;
-  return { pos: new Float32Array(pos), flow: new Float32Array(flow), x: new Float32Array(X), s: new Float32Array(S), idx: new Uint32Array(idx), deep: m3dLin(W.deep), shal: m3dLin(W.shal), glow: m3dLin(W.glow), abs: W.abs || [.9, .3, .12, .22] };
+  return { pos: new Float32Array(pos), flow: new Float32Array(flow), x: new Float32Array(X), s: new Float32Array(S), idx: new Uint32Array(idx), deep: m3dLin(W.deep), shal: m3dLin(W.shal), glow: m3dLin(W.glow), abs: W.abs || [.9, .3, .12, .22],
+    clear: W.clear || null, take: W.take || null };   // (clear water: gl.js FS_WAT uClr, uWAb)
 }
 
 /* ---------- what may stand where: nothing over the battle map as the camera sees it ----------
@@ -64451,10 +64770,12 @@ function m3dWater(D) {
    y shows on the screen row of the ground .65 y further up the field (cos 57 / sin 57). A tree, bough or bush is a box of
    half width r from its foot (x, z) up to its top; its screen footprint must miss the field (plus a margin) and the
    ravine's floor where foes climb into view. (Owner: "canopy should be applied in artful areas, not cover the battle map".) */
-const M3D_KEEP = [[-.7, -2.9, COLS + .7, ROWS + 1.1]];   // screen-space rects: x0, z0, x1, z1 (ground-equivalent rows)
+const M3D_KEEP = [[-.7, -2.9, COLS + .7, ROWS + 1.1]];
+const M3D_STILL = new Float32Array([0, 0, 1]);   // (an elder's trunk and roots stand still: gl.js uSwayK)   // screen-space rects: x0, z0, x1, z1 (ground-equivalent rows)
 function m3dClear(x, z, r, top) {
   const z0 = z - .65 * top - r, z1 = z + r, x0 = x - r, x1 = x + r;
   for (const R of M3D_KEEP) if (x1 > R[0] && x0 < R[2] && z1 > R[1] && z0 < R[3]) return false;
+  if (M3D.keep) { for (const R of M3D.keep) if (x1 > R[0] && x0 < R[2] && z1 > R[1] && z0 < R[3]) return false; return true; }   // (a map's own: where its foes come into view)
   for (let zz = -2.6; zz > -9; zz -= .5) { const cx = m3dRoadX(zz); if (x1 > cx - 1.3 && x0 < cx + 1.3 && z1 > zz - .25 && z0 < zz + .25 && zz > -6.8) return false; }   // (the ravine's floor in view)
   return true;
 }
@@ -64466,6 +64787,7 @@ function m3dTrees(D, rnd) {
   const placed = [], inst = new Map();
   const add = (tr, x, z, H, lod) => {
     if (!tr) return;
+    if (D.lodBias && tr.lods[lod].tris > 5000) lod = Math.min(lod + D.lodBias, tr.lods.length - 1);   // (a map that draws its trees a LOD lighter)
     const key = tr.name + '|' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [] });
     inst.get(key).arr.push(x, m3dH(x, z) - .06, z, H / tr.height, rnd() * TAU, rnd() * 10);
     placed.push({ x, z, r: H * .32 });
@@ -64487,6 +64809,14 @@ function m3dTrees(D, rnd) {
     const rot = rnd() * TAU; inst.get(key).arr.push(x, m3dH(x, z) - .15, z, H / tr.height, rot, rnd() * 10);
     placed.push({ x, z, r: 2.4 }); giants.push({ x, z, H, magic, tr, rot, y: m3dH(x, z) });
   }
+  // a map's elders (D.elders: [x, z, height, turn, far]): the owner's rooted TreeForge trunk at its largest, each placed and
+  // turned by hand (the gate at the head foes come out from behind, the trunks lining the way); the far ones a lighter LOD
+  for (const [x, z, H, rot, far, kind] of D.elders || []) {   // (kind 1: the second TreeForge trunk, groots2, so they are not all one tree)
+    const tr = (kind && pool.find(t => t.name === 'groots2')) || pool.find(t => t.name === 'groots') || edgeGiantAsset(), lod = far ? Math.min(far, tr.lods.length - 1) : 0;
+    const key = tr.name + '|elder' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [], fade: D.giantFade, swayK: M3D_STILL });
+    const y = m3dH(x, z); inst.get(key).arr.push(x, y - .12, z, H / tr.height, rot, 0);
+    placed.push({ x, z, r: H * .085 }); giants.push({ x, z, H, magic: 0, tr, rot, y });
+  }
   if (D.boughs && giants.length) {   // the canopy hanging in from the frame: leaf clusters high on the giants
     const src = byName(D.boughs.sp), B = D.boughs;
     if (src) {
@@ -64503,18 +64833,42 @@ function m3dTrees(D, rnd) {
       }
     }
   }
+  if (D.elders && D.elders.length) {
+    const putE = (tr, key, x, y, z, H, lod, still) => { if (!tr) return; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [], swayK: still ? M3D_STILL : null }); inst.get(key).arr.push(x, y, z, H / tr.height, rnd() * TAU, rnd() * 10); };
+    // a little foliage hugging each near elder: two small oak crowns pressed against the bole, the bark showing above and below
+    const src = byName('oak'), bough = src && (src._leafOnly || (src._leafOnly = Object.assign({}, src, { name: src.name + '_bough', lods: src.lods.map(l => ({ leaf: l.leaf, tris: l.leaf.ni / 3 })) })));
+    if (bough) for (const g of giants) {
+      if (g.z < -8 || Math.abs(g.x - 5.5) > 17) continue;
+      const R = g.H * .042;
+      for (let k = 0; k < 2; k++) {
+        const a = rnd() * TAU, sz = 1.3 + rnd() * .6, hy = 2.8 + k * 1.7 + rnd() * .6, bx = g.x + Math.cos(a) * R, bz = g.z + Math.sin(a) * R;
+        if (m3dClear(bx, bz, sz * .6, hy + sz * .6) && !m3dLow(bx, bz, .2)) putE(bough, 'bough_low', bx, g.y + hy - sz * .4, bz, sz, Math.min(1, bough.lods.length - 1));
+      }
+    }
+    // the field's foot (no keep: foes walk off down the road): a low ridge of the owner's ivy rocks just below the last row,
+    // a gap where the road leaves (the waystones flank it: m3dGreatProps), as Sunfall's (edgetrees.js)
+    const IR = pool.find(t => t.name === 'ivyrock'), below = (z, H, r) => z - .65 * H - r >= ROWS + .04;
+    if (IR && D.ward) for (let x = -.8; x <= COLS + .8; x += 1.05 + rnd() * .35) {
+      if (Math.abs(x - 5.5) < 1.75) continue;
+      const z = ROWS + 1.75 + (rnd() - .5) * .25, H = 1.2 + rnd() * .5;
+      if (below(z, H, H * .45)) putE(IR, 'ward', x, m3dH(x, z) - .06, z, H, 0, true);
+    }
+  }
   let near = 0;
-  for (let z = -18; z < ROWS + 12; z += .95) for (let x = -17; x < COLS + 17; x += .95) {
+  const tsx = (D.spanX || 18) - 1;
+  for (let z = -18; z < ROWS + 12; z += .95) for (let x = -tsx; x < COLS + tsx; x += .95) {
     const px = x + (rnd() - .5) * .8, pz = z + (rnd() - .5) * .8, out = m3dOut(px, pz);
     // keep clear of the grid and its edge (a tree's crown overhangs it), the foot (trees there would stand over the last rows)
     if (out < 1.25) continue;
+    if (m3dLow(px, pz, 1.1)) continue;   // (nothing past a cliff's rim)
     if (pz > ROWS - 1.5 && px > -2.6 && px < COLS + 2.6 && pz < ROWS + 6) continue;
     if (D.heroes.some(h => (h[0] - px) ** 2 + (h[1] - pz) ** 2 < 2.2) || (D.giants || []).some(h => (h[0] - px) ** 2 + (h[1] - pz) ** 2 < 9)) continue;
+    if (D.elders && D.elders.some(h => (h[0] - px) ** 2 + (h[1] - pz) ** 2 < (h[2] * .075) ** 2)) continue;   // (not in an elder's roots)
     if (blocked(px, pz, .3)) continue;
-    if (pz < -1.6 && Math.abs(px - m3dRoadX(pz)) < 2.1) continue;   // (the ravine stays open from above)
+    if (m3dOnWay(px, pz, 2.1)) continue;   // (the ravine stays open from above)
     const glade = fbm2(px * .16 + 4, pz * .16 + 8);   // open glades among the woods
     let p = 0; for (const [d0, pp] of D.belts) if (out >= d0) p = pp;
-    if (pz < -2.6) p = Math.max(p, .85);   // the tunnel of trees at the head
+    if (pz < -2.6) p = Math.max(p, D.headTrees != null ? D.headTrees : .85);   // the tunnel of trees at the head
     p *= glade > .64 ? .3 : 1;
     if (rnd() > p) continue;
     const tr = pick(); if (!tr) continue;
@@ -64528,8 +64882,15 @@ function m3dTrees(D, rnd) {
     const U = D.under, pickU = () => { let r = rnd(), acc = 0; for (const [n, w] of U.mix) { acc += w; if (r < acc) return n; } return U.mix[0][0]; };
     let tries = 0, made = 0;
     const put = (tr, x, z, H, lod, sink = .03) => { const key = tr.name + '|u' + lod; if (!inst.has(key)) inst.set(key, { asset: tr, lod, arr: [] }); inst.get(key).arr.push(x, m3dH(x, z) - sink, z, H / tr.height, rnd() * TAU, rnd() * 10); };
-    if (D.modelsOnly) m3dClusters(D, rnd, put, pool, blocked);   // (natural clusters of the owner's models)
-    if (!D.modelsOnly) {
+    if (D.modelsOnly || D.clusters) m3dClusters(D, rnd, put, pool, blocked);   // (natural clusters of the owner's models)
+    const brock = D.brookRocks && pool.find(t => t.name === 'ivyrock');
+    if (brock) for (const st of M3D.streamsB) for (let i = 2; i < st.smp.length; i += 1 + (rnd() * 3 | 0)) {   // small stones along a brook: on its banks, and standing in the edge of its pools
+      const sm = st.smp[i]; if (sm.fall || sm.y < -.8) continue;
+      const sd = rnd() < .5 ? -1 : 1, inW = rnd() < .3, d = sm.w * (inW ? .62 + rnd() * .25 : 1.05 + rnd() * .45), x = sm.x - sm.dz * sd * d, z = sm.z + sm.dx * sd * d, H = (inW ? .16 : .2) + rnd() * (inW ? .16 : .32);
+      if (m3dOut(x, z) < .35 || m3dOnWay(x, z, 1)) continue;
+      put(brock, x, z, H, Math.min(1, brock.lods.length - 1), .04 + rnd() * .08 + (inW ? .1 : 0));
+    }
+    if (!D.modelsOnly && !D.clusters) {
     const iout = pool.find(t => t.name === 'ivyout'), irock = pool.find(t => t.name === 'ivyrock');
     if (iout && irock && D.ivyRocks) {
       D._ivy = true;
@@ -64598,7 +64959,7 @@ function m3dTrees(D, rnd) {
     }
     }
   }
-  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade })), placed, giants, magicTrees };
+  return { groups: [...inst.values()].map(v => ({ asset: v.asset, lod: v.lod, inst: new Float32Array(v.arr), fade: v.fade, swayK: v.swayK })), placed, giants, magicTrees };
 }
 
 /* ---------- natural clusters of the owner's models (owner: "more variation ... like the concept art") ----------
@@ -64607,16 +64968,26 @@ function m3dTrees(D, rnd) {
    anchor: a big ivy outcrop with small rocks huddled at its foot and bushes spilling out of it, a flowering shrub bed, or
    a sapling with a stump. Every model from 0.5x to 1.6x its size, turned at random, rocks sunk to different depths; the
    small ones sit in front (toward the camera, +z) of the big so the edges read in layers. Every piece passes m3dClear. */
+// would a thing (half width r, height top, its foot at x, z) hide a stretch of a stream from the camera? (its screen
+// footprint, as m3dClear's, against the water's centre line)
+function m3dHidesBrook(x, z, r, top) {
+  const z0 = z - .65 * top - r * .5, z1 = z + r * .4;
+  for (const st of M3D.streamsB) for (let i = 0; i < st.smp.length; i += 2) { const s = st.smp[i]; if (Math.abs(s.x - x) < r + s.w * .6 && s.z > z0 && s.z < z1) return true; }
+  return false;
+}
 function m3dClusters(D, rnd, put, pool, blocked) {
   const get = n => pool.find(t => t.name === n);
   const IO = get('ivyout'), IR = get('ivyrock'), GB = get('gbush'), GS = get('gshrub'), GF = get('gflower'), ST = get('stump');
-  const SAP = ['oak', 'sprig'].map(get).filter(Boolean);
+  const SAP = D.noSaplings ? [] : ['oak', 'sprig'].map(get).filter(Boolean);
   if (!IO || !IR) return;
   const place = (tr, x, z, H, sink) => {
     if (!tr) return false;
     if (m3dOut(x, z) < .9 || !m3dClear(x, z, H * .48, H) || blocked(x, z, .02)) return false;
-    if (z < -1.6 && Math.abs(x - m3dRoadX(z)) < M3D_RAV.w + 1.1) return false;
+    if (m3dOnWay(x, z, M3D_RAV.w + 1.1)) return false;
     if (z > ROWS - .4 && Math.abs(x - 5.5) < 1.6) return false;
+    if (M3D.giantsB0 && M3D.giantsB0.some(g => (g.x - x) ** 2 + (g.z - z) ** 2 < (g.H * .05 + H * .3) ** 2)) return false;   // (not inside an elder's bole)
+    if (D.brookClear && m3dHidesBrook(x, z, H * .42, H)) return false;   // (nothing standing between the camera and the water)
+    if (m3dLow(x, z, H * .3 + .35)) return false;   // (nor past a cliff's rim)
     put(tr, x, z, H, m3dOut(x, z) < 6 ? 0 : 1, sink); return true;
   };
   const sc = () => .5 + Math.pow(rnd(), 1.3) * 1.1;   // 0.5x-1.6x, more small than big
@@ -64624,9 +64995,9 @@ function m3dClusters(D, rnd, put, pool, blocked) {
   const bush = () => [GB, GS, GF, GF2 || GF, GF, GF2 || GS][rnd() * 6 | 0];
   // cluster centres: Poisson disc, minimum spacing 1.7, in the margins and the woods' edge
   const C = [];
-  for (let tries = 0; tries < 3000 && C.length < 90; tries++) {
-    const side = rnd() < .5 ? -1 : 1, off = 1.2 + Math.pow(rnd(), 1.6) * 7.5, x = side < 0 ? -.45 - off : COLS + .45 + off, z = -8 + rnd() * (ROWS + 12), out = m3dOut(x, z);   // (more of them near the field's edge, where they frame it)
-    if (out < 1.2 || out > 8.5) continue;
+  for (let tries = 0; tries < 3000 && C.length < (D.clusterN || 90); tries++) {
+    const side = rnd() < .5 ? -1 : 1, off = 1.2 + Math.pow(rnd(), 1.6) * (D.clusterOut || 7.5), x = side < 0 ? -.45 - off : COLS + .45 + off, z = -8 + rnd() * (ROWS + 12), out = m3dOut(x, z);   // (more of them near the field's edge, where they frame it)
+    if (out < 1.2 || out > (D.clusterMax || 8.5)) continue;
     if (C.some(c => (c[0] - x) ** 2 + (c[1] - z) ** 2 < 1.7 * 1.7)) continue;
     const dens = fbm2(x * .21 + 13, z * .21 + 5);   // thickets where high, open moss where low
     if (dens < .38 && rnd() < .8) continue;
@@ -64635,7 +65006,7 @@ function m3dClusters(D, rnd, put, pool, blocked) {
   // the fixed anchors too: the painting's stone spots, beside the brook's falls, the ravine's rim
   for (const [x, z] of D.stones) C.push([x, z, .7, 'rock']);
   for (const st of M3D.streamsB) for (let i = 1; i < st.smp.length; i++) if (st.smp[i - 1].fall && !st.smp[i].fall && rnd() < .8) { const sm = st.smp[i], sd = rnd() < .5 ? -1 : 1, d = sm.w + .8; C.push([sm.x - sm.dz * sd * d, sm.z + sm.dx * sd * d, .7, 'rock']); }
-  for (const zz of [-3.4, -5.6]) for (const sd of [-1, 1]) C.push([m3dRoadX(zz) + sd * (M3D_RAV.w + 2.1), zz, .6, 'rock']);
+  if (!M3D.wayB) for (const zz of [-3.4, -5.6]) for (const sd of [-1, 1]) C.push([m3dRoadX(zz) + sd * (M3D_RAV.w + 2.1), zz, .6, 'rock']);
   for (const [cx, cz, dens, kind] of C) {
     const r = rnd(), type = kind || (r < .38 ? 'rock' : r < .66 ? 'bed' : r < .86 ? 'thicket' : 'lone');
     if (type === 'lone') { place(rnd() < .5 ? bush() : SAP[rnd() * SAP.length | 0], cx, cz, (rnd() < .5 ? 1 : 1.3) * sc(), .03); continue; }
@@ -64711,6 +65082,7 @@ function m3dProps(D, rnd, FX) {
   // (owner, Mossveil Glade: "remove anything that isn't using these 3D models": no code-built stones, logs, roots, ferns,
   // flowers or grass there; only the owner's models, placed in m3dTrees)
   if (D.modelsOnly) { const e = new Geo(D.seed); return { wild: [e.finish(), e.finish(), e.finish()], deco: e.finish() }; }
+  if (D.props) return D.props(D, rnd, FX);   // (a map's own dressing: Greatroot Way's foxgloves, ferns and waystones)
   const gs = new Geo(D.seed + 1); gs.jit = .06;   // stones, logs (cast shadows)
   const gl_ = new Geo(D.seed + 2); gl_.jit = .05;   // lanterns (cast shadows)
   const gp = new Geo(D.seed + 3); gp.jit = .12;   // ferns, grass, flowers (no shadow)
@@ -64751,10 +65123,117 @@ function m3dProps(D, rnd, FX) {
   return { wild: [gs.finish(), gl_.finish(), gp.finish()], deco: gd.finish() };
 }
 
+/* ---------- Greatroot Way's dressing (code-built, beside the owner's models in m3dTrees / m3dClusters) ----------
+   Foxgloves (the concept's purple spikes) in drifts among the elders' roots, by the boulders and along the brook; ferns
+   everywhere the ground is shaded; mossy logs; two elven waystones with a jade glyph flanking the road out at the foot. */
+function m3dFoxglove(g, x, z, s, rnd, cols) {
+  const y = m3dH(x, z), lean = (rnd() - .5) * .12, lz = (rnd() - .5) * .1, H = s * (.55 + rnd() * .35), n = 6 + (rnd() * 3 | 0);
+  g.sway = .7; g.seg([x, y, z], [x + lean, y + H, z + lz], .014, '#4a6a2c');
+  for (let k = 0; k < 3; k++) { const a = rnd() * TAU, L = s * (.16 + rnd() * .1); g.tri([x - Math.sin(a) * .04, y + .02, z + Math.cos(a) * .04], [x + Math.cos(a) * L, y + .07, z + Math.sin(a) * L], [x + Math.sin(a) * .04, y + .02, z - Math.cos(a) * .04], '#3f6a2a'); }   // its leaves at the foot
+  g.em = .22;
+  for (let k = 0; k < n; k++) {   // the bells, hanging round the stem, smaller toward the tip
+    const u = .32 + .68 * k / (n - 1), a = k * 2.4 + rnd(), r = .045 * (1 - u * .55) * s / .8, px = x + lean * u + Math.cos(a) * r * .9, pz = z + lz * u + Math.sin(a) * r * .9;
+    g.ico(px, y + H * u, pz, r, cols[(k + (rnd() * 2 | 0)) % cols.length], .2, .3);
+  }
+  g.em = 0; g.sway = 0;
+}
+function m3dWaystone(g, x, z, face, rnd, FX, k = 1) {
+  const y = m3dH(x, z), st = ['#7c8478', '#6f786c', '#889082'];
+  g.rock(x, y + .05 * k, z, .34 * k, .12 * k, .3 * k, { seed: rnd() * 40, lump: .3, detail: 1, pal: st });
+  g.with(T(x, y, z, face * .12, 0, face * .05, k, k, k), () => {
+    g.rockMat = true; g.box(0, .95, 0, .34, 1.9, .26, st[0], { taper: [.62, .7], top: '#98a090' }); g.rockMat = false;
+    g.em = .9; g.box(0, 1.15, .118, .035, .34, .01, '#7ff0cc'); g.box(0, 1.3, .118, .15, .03, .01, '#7ff0cc'); g.box(.035, 1.02, .118, .1, .03, .01, '#7ff0cc'); g.box(-.03, .9, .118, .08, .03, .01, '#7ff0cc'); g.em = 0;
+    g.ico(-.12, .1, .1, .12, '#3f6a2a', .5, .5); g.ico(.1, .06, -.08, .1, '#476f2c', .5, .5); g.ico(.05, 1.86, 0, .09, '#3f6a2a', .5, .4);   // moss at its foot and cap
+  });
+  FX.glows.push([x, y + 1.15 * k, z + .13 * k, .5 * k, 1]);
+  FX.lights.push({ x, y: y + 1.1 * k, z: z + .3, col: [.3, .95, .75], I: .9 * k, R: 2.2 * k });
+}
+function m3dGreatProps(D, rnd, FX) {
+  const gs = new Geo(D.seed + 1); gs.jit = .06;   // logs, waystones (cast shadows)
+  const g2 = new Geo(D.seed + 2); g2.jit = .05;   // (cast shadows: none yet)
+  const gp = new Geo(D.seed + 3); gp.jit = .1;    // ferns, foxgloves, grass (no shadow)
+  const wet = (x, z, r) => { const ns = m3dNearStream(x, z, 2); return !!ns && ns.d < r; };
+  const inBole = (x, z, k = .05) => D.elders.some(e => (e[0] - x) ** 2 + (e[1] - z) ** 2 < (e[2] * k) ** 2);
+  const free = (x, z) => m3dOut(x, z) > .12 && !wet(x, z, .12) && !inBole(x, z) && !m3dOnWay(x, z, 1.0) && !(z > ROWS - .4 && Math.abs(x - 5.5) < 1.5) && !m3dLow(x, z, .25);
+  // the waystones at the road out
+  for (const sd of [-1, 1]) m3dWaystone(gs, 5.5 + sd * 2.0, ROWS + 1.55, sd, rnd, FX);
+  // ...and a smaller pair where the road comes onto the field at the head
+  m3dWaystone(gs, 4.15, -1.95, -1, rnd, FX, .62); m3dWaystone(gs, 7.75, -1.75, 1, rnd, FX, .62);
+  // mossy logs fallen in the margins
+  for (const [x, z, a, L] of [[-2.2, 9.4, 1.9, 1.5], [13.4, 10.6, .5, 1.3], [14.6, 1.2, 2.6, 1.6], [-9.2, 13.4, .3, 1.7], [-2.9, -3.4, 2.9, 1.2]]) if (!wet(x, z, .5)) m3dLog(gs, x, z, a, L, rnd);
+  // foxglove drifts: round the near elders' roots, by the boulders, along the brook, in the field's margins
+  const drifts = [];
+  for (const e of D.elders) { if (e[1] < -7.5 || Math.abs(e[0] - 5.5) > 16) continue; const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const a = rnd() * TAU, r = e[2] * (.07 + rnd() * .04); drifts.push([e[0] + Math.cos(a) * r, e[1] + Math.abs(Math.sin(a)) * r * (rnd() < .75 ? 1 : -1), 5 + (rnd() * 4 | 0)]); } }
+  for (const [x, z, sz] of D.stones) for (let k = 0; k < 2; k++) { const a = rnd() * TAU, r = sz * 1.6 + .5 + rnd() * .5; drifts.push([x + Math.cos(a) * r, z + Math.abs(Math.sin(a)) * r, 4 + (rnd() * 3 | 0)]); }
+  for (const st of M3D.streamsB) for (let i = 14; i < st.smp.length; i += 16) { const sm = st.smp[i], sd = rnd() < .5 ? -1 : 1, d = sm.w + .5 + rnd() * .5; drifts.push([sm.x - sm.dz * sd * d, sm.z + sm.dx * sd * d, 3 + (rnd() * 4 | 0)]); }
+  for (let k = 0; k < 24; k++) { const side = k % 2, x = side ? COLS + .75 + rnd() * 1.6 : -.75 - rnd() * 1.6; drifts.push([x, -1.5 + rnd() * (ROWS + 2), 4 + (rnd() * 4 | 0)]); }
+  for (const [cx, cz, n] of drifts) for (let k = 0; k < n; k++) {
+    const a = rnd() * TAU, r = Math.sqrt(rnd()) * .7, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r * .8;
+    if (free(x, z)) m3dFoxglove(gp, x, z, 1 + rnd() * .6, rnd, D.flowers);
+  }
+  // ferns: thick under the trees and by the water, a fringe along the field
+  for (let n = 0; n < 900; n++) {
+    const x = -17 + rnd() * (COLS + 34), z = -8.5 + rnd() * (ROWS + 12.5), out = m3dOut(x, z);
+    if (out > 14 || !free(x, z)) continue;
+    if (out > 3 && rnd() < .35) continue;
+    m3dFern(gp, x, z, .7 + rnd() * .8, rnd, D.fern[rnd() * D.fern.length | 0]);
+  }
+  // grass and small pale flowers in the open margins
+  const gc = ['#4d7a34', '#5a8a3a', '#43702e', '#668f40'];
+  for (let n = 0; n < 520; n++) {
+    const x = -10 + rnd() * (COLS + 20), z = -5 + rnd() * (ROWS + 8), out = m3dOut(x, z);
+    if (out > 6 || !free(x, z)) continue;
+    if (rnd() < .2) m3dFlower(gp, x, z, rnd, rnd() < .5 ? '#f3efe2' : '#f0dc8a', false); else m3dTuft(gp, x, z, rnd, gc, 1.25);
+  }
+  const gd = new Geo(D.seed + 4);   // (nothing on the field itself: the ground's own textures and the light carry it)
+  return { wild: [gs.finish(), g2.finish(), gp.finish()], deco: gd.finish() };
+}
+/* Greatroot Way, each frame: the bright haze at the far end of the road (the concept's hazy opening at the top), low mist
+   among the far trunks. All of it beyond the gate elders (z < -7.5), behind where foes step into view, never on the field. */
+function m3dGreatFrame(dt) {
+  const k = typeof LS !== 'undefined' && LS.woods != null ? clamp(LS.woods * 4, 0, 1.6) : 1;
+  const br = .9 + .1 * Math.sin(vt * .23);
+  QADD.bill(RD, 7.0, 2.2, -8.2, 6.5, 3.4, [1, .9, .66, .22 * br * k], 1, 0);
+  QADD.bill(RD, 7.0, 1.5, -7.8, 3, 1.9, [1, .95, .8, .26 * br * k], 1, 0);
+  QADD.ground(6.6, -5.9, .04, 2.2, 1.3, [1, .9, .64, .1 * br * k], 1, 0);   // (its light on the road)
+  for (let i = 0; i < 9; i++) {
+    const ph = vt * .02 + i * 1.37, x = -13 + ((i * 4.7 + vt * .05) % 37), z = -8.2 - (i % 3) * 1.1;
+    QA.bill(RD, x + Math.sin(ph) * .8, .7 + (i % 2) * .5, z, 3.4, .9, [.62, .86, .8, (.06 + .025 * Math.sin(ph * 2)) * k], 1, 0);
+  }
+  const C = M3D.cliff; if (!C) return;
+  // the drop: mist banked against the wall's foot all the way down, and slow banks of cloud between the rim and the land
+  // below (they drift east; under them the floor's own cloud shadows move: gl.js FS_TER)
+  const mc = [.86, .95, .9];
+  for (let i = 0; i < 13; i++) {
+    const z = -3 + i * 1.6, ph = vt * .05 + i * 2.1, x = m3dRimX(z) + C.w + .9 + Math.sin(ph) * .35;
+    QA.ground(x, z + Math.cos(ph * .7) * .3, C.low + .7, 1.5, 1, [mc[0], mc[1], mc[2], .14 + .04 * Math.sin(ph * 1.3)], 1, 0);
+  }
+  if (!C.painted) for (let i = 0; i < 12; i++) {
+    const u = (i * .137 + vt * .0035 * (1 + (i % 3) * .3)) % 1, z = -5 + ((i * 7.3) % 23), x0 = m3dRimX(z) + 2.5, x = x0 + u * 16, a = Math.sin(Math.PI * u) * (.08 + .04 * (i % 2));
+    QA.ground(x, z, C.low + 1.1 + (i % 3) * .5, 2.6 + (i % 4) * .5, 1.3 + (i % 3) * .3, [.93, .98, .95, a], 1, 0);
+  }
+  for (const st of M3D.streamsB) for (let i = 0; i < st.smp.length; i += 2) {   // the fall's white water down the wall
+    const b = st.smp[i]; if (!b.fall || b.y > -.2) continue;
+    const u = (vt * 1.7 + i * .37) % 1; QA.bill(RD, b.x + b.dx * u * .3, b.y + .08 - u * .25, b.z + b.dz * u * .3, b.w * 1.05, .2, [.95, 1, .98, .2 * Math.sin(Math.PI * u)], 1, 0);
+  }
+  for (const st of M3D.streamsB) for (let i = 1; i < st.smp.length; i++) {   // the fall's plume where it lands
+    if (!st.smp[i - 1].fall || st.smp[i].fall || st.smp[i].y > C.low * .5) continue; const b = st.smp[i];
+    for (let q = 0; q < 4; q++) { const u = (vt * .22 + q / 4) % 1; QA.bill(RD, b.x + .5 + u * .4, b.y + .25 + u * .9, b.z + .2, .7 + u * .9, .6 + u * .7, [.93, .99, .97, .2 * (1 - u)], 1, 0); }
+  }
+}
+// a map's terrain layers (its nine roles' layers in terraintex.js): D.lay by number; D.layNames, a map's own textures by name
+// (tools/make_terraintex.py EXTRA), each used once it is in TERRAIN_TEX, the numbered one until then
+function m3dLay(D) {
+  const lay = (D.lay || [0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(), N = typeof TERRAIN_TEX !== 'undefined' ? TERRAIN_TEX.names : [];
+  (D.layNames || []).forEach((n, i) => { const k = n ? N.indexOf(n) : -1; if (k >= 0) lay[i] = k; });
+  return lay;
+}
 /* ---------- the theme ---------- */
+const M3D_BUILT = {};   // each 3D map's definition as built (the one shown follows the theme: m3dFrame)
 function buildMap3d(id) {
   const D = Object.assign({ id }, M3D_DEFS[id]);
-  M3D = D; D.streamsB = [];
+  M3D = D; D.streamsB = []; D.wayB = D.entry ? m3dWay(D) : null;
+  D.giantsB0 = (D.elders || []).map(([x, z, H]) => ({ x, z, H }));
   D.streamsB = m3dBuildStreams(D);
   const rnd = mulberry32(D.seed), FX = { lights: [], flames: [], glows: [], fires: [] };
   const tr = m3dTrees(D, rnd); D.giantsB = tr.giants; D.magicB = tr.magicTrees;
@@ -64763,20 +65242,23 @@ function buildMap3d(id) {
   const pr = m3dProps(D, rnd, FX);
   // the streams' glow, baked into the map light so the banks and anything beside them catch it
   const gc = m3dLin(D.water.glow);
-  for (const st of D.streamsB) for (let i = 0; i < st.smp.length; i += 6) { const s = st.smp[i]; FX.lights.push({ x: s.x, y: s.y + .2, z: s.z, col: gc, I: .7 + s.fall * 1.2, R: 1.8 }); }
-  terrain.water = water;
+  const gk = D.water.glowI == null ? 1 : D.water.glowI;
+  for (const st of D.streamsB) for (let i = 0; i < st.smp.length; i += 6) { const s = st.smp[i]; FX.lights.push({ x: s.x, y: s.y + .2, z: s.z, col: gc, I: (.7 + s.fall * 1.2) * gk, R: 1.8 }); }
+  terrain.water = water; M3D_BUILT[id] = D;
   return { ground: null, terrain, wild: pr.wild, deco: pr.deco, trees: tr.groups, fx: FX };
 }
 for (const id of Object.keys(M3D_DEFS)) {
   const D = M3D_DEFS[id];
   THEMES[id] = {
     id, sunDir: nrm3([.24, .6, -.67]), sunCol: [1.5, 1.1, .7], sky: [.2, .26, .44], gnd: [.1, .14, .1], fogHex: '#173843',
-    pitch: 57, fitTop: -4.2, fitBot: ROWS + .65, noKeep: true, h: (x, z) => M3D && M3D.id === id ? m3dH(x, z) : 0, shafts: id === 'grove3d' ? 'moon' : 'none', fly: D.fly,
+    pitch: 57, fitTop: D.fit ? D.fit[0] : -4.2, fitBot: D.fit ? D.fit[1] : ROWS + .65, noKeep: true, h: (x, z) => M3D && M3D.id === id ? m3dH(x, z) : 0, shafts: D.shafts || (id === 'grove3d' ? 'moon' : 'none'), fly: D.fly,
+    amb: D.amb || null, ward: D.ward || null,   // (its small life: view.js applyTheme; the ward along the field's foot: edgetrees.js edgeWard)
+    bendR: D.bendR || null, fitPts: D.fitPts || null, skyPaint: D.skyPaint || null, barkName: D.barkName || null,   // (skyPaint: its painted sky, view.js paintBackdrop; "sky" is the theme's old sky colour)
     lmRect: [-16, -12, COLS + 16, ROWS + 8], painted: null, m3d: true,
     build: () => buildMap3d(id),
   };
 }
-if (M3D_FORCE) MAPS[M3D_FORCE] = { name: M3D_DEFS[M3D_FORCE].name, blurb: M3D_DEFS[M3D_FORCE].blurb, entry: M3D_ENTRY };
+if (M3D_FORCE && !MAPS[M3D_FORCE]) MAPS[M3D_FORCE] = { name: M3D_DEFS[M3D_FORCE].name, blurb: M3D_DEFS[M3D_FORCE].blurb, entry: M3D_DEFS[M3D_FORCE].entry || M3D_ENTRY };   // (a 3D map with its own way in: Greatroot Way's 3D version)
 
 /* ---------- per frame: the worn road under the live path, and the water's wisps and spray ---------- */
 const M3D_PW = { x0: -1.5, z0: -6, w: 13 + 1.5, d: ROWS + 8, px: 6 };
@@ -64788,14 +65270,16 @@ function m3dPathWear() {
   const k = M3D_PW.px, W = Math.round(M3D_PW.w * k), Hh = Math.round(M3D_PW.d * k), A = new Float32Array(W * Hh);
   const stamp = (x, z) => { const ci = (x - M3D_PW.x0) * k, cj = (z - M3D_PW.z0) * k, R = .36 * k; for (let b = Math.floor(cj - R); b <= cj + R; b++) for (let a = Math.floor(ci - R); a <= ci + R; a++) { if (a < 0 || b < 0 || a >= W || b >= Hh) continue; const d = Math.hypot(a - ci, b - cj) / R; if (d < 1) A[b * W + a] = Math.max(A[b * W + a], (1 - d * d) * .95); } };
   const line = L => { for (let n = 0; n < L.length - 1; n++) { const [x0, z0] = L[n], [x1, z1] = L[n + 1], len = Math.hypot(x1 - x0, z1 - z0), s = Math.max(1, Math.ceil(len / .12)); for (let q = 0; q <= s; q++) stamp(x0 + (x1 - x0) * q / s, z0 + (z1 - z0) * q / s); } };
-  line(M3D_ENTRY);
-  if (pts && pts.length) { line([M3D_ENTRY[M3D_ENTRY.length - 1], pts[0]]); line(pts); line([pts[pts.length - 1], [pts[pts.length - 1][0], ROWS + 6]]); }
+  const ENT = (M3D && M3D.entry) || M3D_ENTRY;
+  line(ENT);
+  if (pts && pts.length) { line([ENT[ENT.length - 1], pts[0]]); line(pts); line([pts[pts.length - 1], [pts[pts.length - 1][0], ROWS + 6]]); }
   else line([[5.5, -2], [5.5, ROWS + 6]]);
   const u8 = new Uint8Array(W * Hh * 4); for (let i = 0; i < W * Hh; i++) { const v = Math.round(A[i] * 255); u8[i * 4] = v; u8[i * 4 + 1] = v; u8[i * 4 + 2] = v; u8[i * 4 + 3] = 255; }
   RD.setTerrainPath(u8, W, Hh, [M3D_PW.x0, M3D_PW.z0, 1 / M3D_PW.w, 1 / M3D_PW.d]);
 }
 function m3dFrame(dt) {
   if (!M3D || !TH.m3d) return;
+  if (M3D.id !== TH.id && M3D_BUILT[TH.id]) { M3D = M3D_BUILT[TH.id]; m3dLastPath = null; }   // (another 3D map was built since: this one's streams, road and frame)
   if (typeof G !== 'undefined' && G) m3dPathWear();
   edgeMagic(M3D.giantsB); if (M3D.magicB) edgeMagic(M3D.magicB);   // (edgetrees.js)
   // mist pooled in the ravine (owner): layered soft cards lying in the gully, thickest at the bottom and thinning upward,
@@ -64811,7 +65295,9 @@ function m3dFrame(dt) {
       if (deep > .3) QA.bill(RD, cx + Math.sin(vt * .2 + zz * 3) * .4, fl + .5, zz, 1.3, .7, [mc[0], mc[1], mc[2], .12 * deep], 1, 0);
     }
   }
+  if (M3D.frame) M3D.frame(dt);   // (a map's own: Greatroot Way's haze at the gate)
   // cyan wisps curling over the water, spray and mist at the falls
+  const wk = M3D.water.wisps == null ? 1 : M3D.water.wisps;
   const gc = M3D.water.glow ? lin3(M3D.water.glow) : [.2, .8, .9];
   const wc = [Math.min(1, gc[0] * 2 + .2), Math.min(1, gc[1] * 1.4 + .2), Math.min(1, gc[2] * 1.3 + .2)];
   for (const st of M3D.streamsB) {
@@ -64819,8 +65305,8 @@ function m3dFrame(dt) {
     for (let k = 0; k < 9; k++) {
       const ph = (vt * .045 + k / 9 + smp.length * .01) % 1, s = smp[Math.min(smp.length - 1, Math.floor(ph * smp.length))];
       const sw = Math.sin(vt * .8 + k * 2.1), x = s.x - s.dz * sw * s.w * .7, z = s.z + s.dx * sw * s.w * .7, y = s.y + .25 + .2 * Math.sin(vt * 1.3 + k), f = Math.sin(ph * Math.PI);
-      QADD.bill(RD, x, y, z, .38, .38, [wc[0], wc[1], wc[2], .12 * f], 1, 0);
-      QADD.bill(RD, x, y, z, .06, .06, [.8, 1, 1, .7 * f], 1, 0);
+      QADD.bill(RD, x, y, z, .38, .38, [wc[0], wc[1], wc[2], .12 * f * wk], 1, 0);
+      QADD.bill(RD, x, y, z, .06, .06, [.8, 1, 1, .7 * f * wk], 1, 0);
     }
     if (st.falls) for (let i = 1; i < smp.length; i++) {   // spray and a glow at the foot of each fall
       if (!smp[i - 1].fall || smp[i].fall) continue; const b = smp[i];
@@ -64828,9 +65314,144 @@ function m3dFrame(dt) {
         const u = (vt * .6 + k / 7) % 1, a = k * 2.4 + vt;
         QA.bill(RD, b.x + Math.cos(a) * b.w * .8 * u + b.dx * .15, b.y + .04 + u * .3, b.z + Math.sin(a) * b.w * .6 * u + b.dz * .15, .14 + u * .2, .12 + u * .16, [.8, .95, 1, .15 * (1 - u)], 1, 0);
       }
-      QADD.bill(RD, b.x, b.y + .2, b.z, .8, .5, [wc[0], wc[1], wc[2], .07 + .03 * Math.sin(vt * 2 + i)], 1, 0);
+      QADD.bill(RD, b.x, b.y + .2, b.z, .8, .5, [wc[0], wc[1], wc[2], (.07 + .03 * Math.sin(vt * 2 + i)) * wk], 1, 0);
     }
   }
+}
+
+/* ================= GREATROOT WAY =================
+   The map is the owner's painting (owner, 10 Nov 2026, with the painting: "can you mix in this painting ... prefer this
+   over the cliffs and your water"): grpaint.js / grwater.js from tools/make_grpaint.py, the theme in maps.js
+   (THEMES.greatroot), its ground and the painted trunk foes come out from behind built here (buildGreatrootPainted).
+   On it, the game's own: the units and foes lit by what is painted under them, the stream moving (gl.js waterAt), god rays
+   along the painting's own, pollen, leaves, spray at the falls, the ward along the field's foot.
+
+   The full 3D version before it (M3D_DEFS.greatroot3d in map3d.js: terrain, brook, cliff, TreeForge trunks; ?map3d=greatroot)
+   keeps its painted sky and valley here (grPaintBack). History: a version with code-built trees, rocks and textures is in
+   git at b23a98f (owner: "textures and models dont look good ... go back to using 3d assets instead"). */
+
+/* ---------- the painting as the ground ----------
+   A flat ground the painting is laid on (gl.js FS_LIT's painted path; grass until it has decoded), and the painted trunk at
+   the head as something to stand behind (GR_OCC: its outline on the painting, the row its foot stands on): an upright card
+   at its foot, drawn as ground. The painted ground is sampled where the eye's ray through a point meets y 0 (gl.js: z less
+   .6494 of the height, the 57-degree camera), so the card shows exactly the painting behind it and only its depth differs:
+   a foe behind the trunk is hidden by the painted trunk, one in front of it stands over it. */
+const GR_VIEW_K = .6494;   // (cot 57 degrees: a point at height y shows where the ground .6494 y further up the field does)
+function buildGreatrootPainted() {
+  const [x0, z0, wx, wz] = GR_PAINT_RECT, gr = new Geo(1); gr.jit = 0;
+  for (let z = Math.floor(z0 - 6); z < z0 + wz + 6; z += 1) for (let x = Math.floor(x0 - 6); x < x0 + wx + 6; x += 1.5) gr.quad([x, 0, z], [x, 0, z + 1], [x + 1.5, 0, z + 1], [x + 1.5, 0, z], '#35532a');   // grass until the painting has decoded
+  let occ = null;
+  if (typeof GR_OCC !== 'undefined') {
+    const g = new Geo(1); g.jit = 0;
+    for (const [zf, pts] of GR_OCC) {
+      const P = pts.map(([x, z]) => [x, Math.max(0, (zf - z) / GR_VIEW_K), zf]), c = [0, 0, zf];
+      for (const p of P) { c[0] += p[0] / P.length; c[1] += p[1] / P.length; }
+      for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; g.tri(c, a, b, '#35532a'); g.tri(c, b, a, '#35532a'); }   // (both faces)
+    }
+    occ = g.finish();
+  }
+  return { ground: gr.finish(), wild: [], deco: new Geo(73).finish(), trees: [], occ, fx: null };
+}
+
+/* ---------- the 3D version's valley below the cliff, and its sky: one painting behind the world ----------
+   Owner: "perhaps the land below can be a painting". Painted once for the fitted view (view.js paintBackdrop: it stays under
+   the world as the view zooms), the world drawn over it wherever there is ground; past the cliff's rim the terrain's floor
+   is left out (gl.js FS_TER uLow, painted) and the wall thins into it. It is built as a matte painter would: a tall sky
+   paling to gold on the horizon and three ranks of mountains, then the valley as ridge behind ridge of forest, each nearer
+   one deeper in tone, mist lying between them (up the screen is away); on the ridges tree-crowned pillars of rock with falls
+   dropping into the mist, a river's glint in the gaps, flat-topped trees on the nearest. projB projects a world point
+   (through the world's bend). */
+function grPaintBack(cv, C) {
+  const { w, h } = C, g = cv.getContext('2d'), rnd = mulberry32(8123), D = M3D_DEFS.greatroot3d, low = D.cliff.low;
+  const zh = BEND[0] - BEND[1] * .995, yH = clamp(C.projB(5.5, low, zh)[1], h * .12, h * .6), yP = clamp(C.projB(5.5, 0, zh)[1], 0, yH);
+  const px = Math.abs(C.projB(1, 0, 8)[0] - C.projB(0, 0, 8)[0]), xV = C.projB(COLS + 2, 0, 12)[0], vw = Math.max(px * 6, w - xV), fh = h - yH;
+  const MIST = [206, 232, 226], mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const css = (c, a = 1) => 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a + ')';
+  const kOf = t => .2 + .8 * Math.pow(clamp(t, 0, 1), 1.15), hzOf = t => .04 + .8 * Math.pow(1 - clamp(t, 0, 1), 1.35);
+  const far = (c, t, l = 1) => mixc([c[0] * l, c[1] * l, c[2] * l], [176, 212, 214], hzOf(t));   // a colour at depth t (0 the horizon, 1 just below the rim)
+  const ell = (x, y, rx, ry, col, rot = 0) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, Math.max(.3, rx), Math.max(.3, ry), rot, 0, TAU); g.fill(); };
+  const crown = (x, y, r, t, base, lum = 1) => {   // a tree's crown from above and a little to the side, lit from the upper left
+    ell(x + r * .14, y + r * .24, r, r * .74, css(far(base, t, .5 * lum)));
+    ell(x, y, r, r * .74, css(far(base, t, lum)));
+    ell(x - r * .2, y - r * .22, r * .6, r * .42, css(far([base[0] * 1.9 + 30, base[1] * 1.5 + 22, base[2] * 1.05], t, lum), .9));
+    ell(x - r * .34, y - r * .34, r * .26, r * .18, css(far([196, 214, 120], t, lum), .55));
+  };
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  // the sky
+  let gr = g.createLinearGradient(0, 0, 0, yH);
+  gr.addColorStop(0, '#34848f'); gr.addColorStop(.45, '#5faaaa'); gr.addColorStop(.8, '#b2dac6'); gr.addColorStop(1, '#f6ecc4');
+  g.fillStyle = gr; g.fillRect(0, 0, w, yH + 1);
+  g.globalCompositeOperation = 'screen';
+  { const gp = C.projB(7, 1.5, -6.5); pGlow(g, gp[0], yP, w * .2, [[0, 'rgba(255,240,200,.75)'], [.4, 'rgba(255,230,180,.3)'], [1, 'rgba(255,230,180,0)']], 1, .5); }   // (the bright opening at the head of the road)
+  pGlow(g, xV + vw * .5, yH, vw * .7, [[0, 'rgba(255,244,210,.55)'], [.5, 'rgba(255,238,196,.2)'], [1, 'rgba(255,238,196,0)']], 1, .4);
+  g.globalCompositeOperation = 'source-over';
+  for (let k = 0; k < 8; k++) pGlow(g, rnd() * w, yH * (.25 + rnd() * .6), w * (.06 + rnd() * .1), [[0, 'rgba(255,250,232,.3)'], [1, 'rgba(255,250,232,0)']], 1, .13);   // long thin clouds
+  for (const [col, hgt, rough] of [['#9cc4c6', .25, 1], ['#7dadb3', .17, 1.6], ['#5f949b', .1, 2.4]]) {   // the far ranges
+    const ph = rnd() * 10;
+    g.fillStyle = col; g.beginPath(); g.moveTo(0, yH + 2);
+    for (let x = 0; x <= w; x += 5) { const u = x / w * 6 * rough + ph, r = 1 - Math.abs(fbm2(u, ph) * 2 - 1), pk = Math.pow(r, 2.2) * .8 + fbm2(u * 3.1, 4.2) * .2; g.lineTo(x, yH - h * hgt * pk * (.45 + .55 * m3dSs(.4, .85, x / w)) * (.8 + .2 * Math.sin(x / w * 9 + ph))); }
+    g.lineTo(w, yH + 2); g.closePath(); g.fill();
+    const mg = g.createLinearGradient(0, yH - h * hgt * .45, 0, yH + 2); mg.addColorStop(0, 'rgba(236,240,214,0)'); mg.addColorStop(1, 'rgba(240,238,208,.6)');
+    g.fillStyle = mg; g.fillRect(0, yH - h * hgt * .45, w, h * hgt * .45 + 2);
+  }
+  g.fillStyle = css(far(MIST, 0)); g.fillRect(0, yH, w, fh + 1);
+  // a tree-crowned pillar of rock standing out of a ridge, some with a fall dropping into the mist
+  const tower = (x, y, t, sz, fall) => {
+    const k = kOf(t), W = px * 1.3 * k * sz, Ht = px * (2.8 + rnd() * 1.4) * k * sz, top = y - Ht;
+    const rock = far([104, 118, 112], t), dark = far([40, 62, 70], t), lit = far([196, 190, 150], t);
+    const side = (sd, yy) => x + sd * W * (.46 + .07 * Math.sin(yy * .11 + x) + .16 * (yy - top) / Ht);
+    g.beginPath(); for (let yy = top; yy <= y; yy += 5) g.lineTo(side(-1, yy), yy); for (let yy = y; yy >= top; yy -= 5) g.lineTo(side(1, yy), yy); g.closePath();
+    let rg = g.createLinearGradient(0, top, 0, y); rg.addColorStop(0, css(rock)); rg.addColorStop(.6, css(mixc(rock, MIST, .3))); rg.addColorStop(1, css(mixc(rock, MIST, .85))); g.fillStyle = rg; g.fill();
+    g.save(); g.clip();
+    rg = g.createLinearGradient(x - W * .62, 0, x + W * .62, 0); rg.addColorStop(0, css(lit, .7)); rg.addColorStop(.32, css(lit, 0)); rg.addColorStop(.55, css(dark, 0)); rg.addColorStop(1, css(dark, .75)); g.fillStyle = rg; g.fillRect(x - W, top, W * 2, Ht * .75);
+    for (let i = 0; i < 12 * sz; i++) { const cx = x + (rnd() - .5) * W, y0 = top + rnd() * Ht * .55; g.strokeStyle = css(dark, .4 * (1 - hzOf(t))); g.lineWidth = Math.max(1, W * .028); g.beginPath(); g.moveTo(cx, y0); g.lineTo(cx + (rnd() - .5) * W * .07, y0 + Ht * (.1 + rnd() * .22)); g.stroke(); }
+    for (let i = 0; i < 4; i++) { const yy = top + Ht * (.18 + i * .14 + rnd() * .05); g.strokeStyle = css(far([70, 120, 70], t), .7); g.lineWidth = Math.max(1, W * .05); g.beginPath(); g.moveTo(side(-1, yy) + W * .05, yy); g.lineTo(x - W * .5 + rnd() * W, yy + W * .03); g.stroke(); }   // moss on its ledges
+    if (fall) { const fx = x + W * (rnd() < .5 ? -.16 : .15), fg = g.createLinearGradient(0, top + Ht * .08, 0, y); fg.addColorStop(0, 'rgba(252,255,253,.98)'); fg.addColorStop(.65, 'rgba(244,252,250,.8)'); fg.addColorStop(1, 'rgba(244,252,250,0)'); g.fillStyle = fg; g.fillRect(fx - W * .06, top + Ht * .06, W * .12, Ht); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(fx - W * .02, top + Ht * .06, W * .04, Ht * .85); }
+    g.restore();
+    const n = Math.round(10 * sz + 4); for (let i = 0; i < n; i++) crown(x + (rnd() - .5) * W * 1.3, top + (rnd() - .72) * W * .36, W * (.15 + rnd() * .14), t, rnd() < .5 ? [34, 92, 58] : [28, 80, 62]);   // its trees, hanging a little over the edge
+    pGlow(g, x, y - Ht * .04, W * 1.2, [[0, css(MIST, .55)], [1, css(MIST, 0)]], 1, .42);
+  };
+  // a flat-topped tree
+  const umbrella = (x, y, t, sz) => {
+    const k = kOf(t), R = px * .95 * k * sz, Ht = px * 1.5 * k * sz;
+    g.strokeStyle = css(far([50, 38, 30], t)); g.lineWidth = Math.max(1.5, R * .09); g.lineCap = 'round'; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + R * .12, y - Ht * .5, x - R * .05, y - Ht); g.stroke();
+    for (const sd of [-1, 1]) { g.lineWidth = Math.max(1, R * .05); g.beginPath(); g.moveTo(x, y - Ht * .62); g.quadraticCurveTo(x + sd * R * .3, y - Ht * .82, x + sd * R * .55, y - Ht * .98); g.stroke(); }
+    for (const [dx, dy, s] of [[-.5, .08, .62], [.52, .04, .6], [0, -.06, .9], [-.2, -.22, .55], [.3, -.2, .5]]) {
+      const cx = x + dx * R, cy = y - Ht + dy * R, rx = R * s, ry = rx * .36;
+      ell(cx + rx * .05, cy + ry * .45, rx, ry, css(far([16, 56, 46], t, .9))); ell(cx, cy, rx, ry, css(far([34, 98, 60], t)));
+      for (let i = 0; i < 8; i++) ell(cx + (rnd() - .62) * rx * 1.5, cy - ry * (.2 + rnd() * .5), rx * (.16 + rnd() * .16), ry * (.3 + rnd() * .25), css(far([132, 188, 92], t), .8));
+    }
+  };
+  // the valley: ridge behind ridge, far to near; mist pools at each one's foot before the next is laid over it
+  const LN = 8, yOf = i => yH + fh * Math.pow(i / LN, 1.08);
+  const feats = { 1: [[.72, 'T', .9, 1]], 2: [[.3, 'T', 1, 0], [.9, 'T', 1.05, 0]], 3: [[.58, 'T', 1.2, 1]], 4: [[.2, 'T', 1.1, 0], [.84, 'T', 1.3, 1], [.46, 'U', .8]], 5: [[.66, 'T', 1.25, 0], [.3, 'U', 1]], 6: [[.5, 'T', 1.3, 1], [.86, 'U', 1.2], [.14, 'U', 1]], 7: [[.7, 'U', 1.3], [.36, 'U', 1.2], [.98, 'U', 1.25]] };
+  for (let i = 0; i < LN; i++) {
+    const t = (i + .6) / LN, k = kOf(t), y0 = yOf(i) + fh * .012, y1 = yOf(i + 1.9), amp = px * 1.25 * k, ph = rnd() * 30;
+    const top = x => y0 - amp * (.55 * fbm2(x / (px * 5 * k) + ph, i * 3.1) + .45 * (1 - Math.abs(fbm2(x / (px * 1.9 * k) + ph * 2, i + .5) * 2 - 1)) - .35);
+    const base = [22 + 14 * (1 - t), 74 + 12 * (1 - t), 66 - 8 * t], cb = far(base, t);
+    g.beginPath(); g.moveTo(xV - px * 6, y1 + 2); for (let x = xV - px * 6; x <= w + 8; x += 6) g.lineTo(x, top(x)); g.lineTo(w + 8, y1 + 2); g.closePath();
+    const bg = g.createLinearGradient(0, y0 - amp, 0, y1); bg.addColorStop(0, css(cb)); bg.addColorStop(.45, css(mixc(cb, MIST, .28))); bg.addColorStop(1, css(mixc(cb, MIST, .82))); g.fillStyle = bg; g.fill();
+    // its woods: crowns thick along the ridge line, thinning and paling down its near slope into the mist
+    const r0 = px * .3 * k;
+    for (let row = 0; row < 7; row++) {
+      const f = row / 7, lum = 1 - f * .3, dens = 1 - f * .55;
+      for (let x = xV - px * 5 + rnd() * r0; x < w + r0; x += r0 * (1.0 + rnd() * 1.1)) {
+        if (rnd() > dens) continue; const r = r0 * (.6 + rnd() * .9), yy = top(x) + r * .2 + f * (y1 - y0) * .62 + (rnd() - .5) * r;
+        const q = rnd(), b2 = q < .25 ? [26, 78, 74] : q < .6 ? [36, 98, 58] : [30, 86, 56];
+        crown(x, yy, r, t, mixc(b2, MIST, f * .55), lum);
+      }
+    }
+    for (const [u, kind, sz, fl] of feats[i] || []) { const x = xV + u * vw, y = top(x) + amp * .5; if (kind === 'T') tower(x, y + px * .5 * k, t, sz, fl); else umbrella(x, y + px * .3 * k, t, sz); }
+    // the river's glint where it shows between the ridges
+    if (i > 0 && i < LN - 1) { const rx = xV + vw * (.52 + .22 * Math.sin(i * 1.9 + .6)), ry = y0 + (y1 - y0) * .5; g.save(); g.translate(rx, ry); g.rotate(-.5 + Math.sin(i * 2.3) * .4); ell(0, 0, px * 1.5 * k, px * .13 * k, css(far([226, 242, 232], t), .9)); ell(0, 0, px * 1.1 * k, px * .05 * k, 'rgba(255,255,250,.9)'); g.restore(); }
+    // mist at its foot
+    const my = y0 + (y1 - y0) * .78, mh = (y1 - y0) * .4, mg = g.createLinearGradient(0, my - mh, 0, my + mh); mg.addColorStop(0, css(MIST, 0)); mg.addColorStop(.6, css(MIST, .5 - t * .22)); mg.addColorStop(1, css(MIST, 0)); g.fillStyle = mg; g.fillRect(0, my - mh, w, mh * 2);
+    for (let q = 0; q < 4; q++) pGlow(g, xV + rnd() * vw, my + (rnd() - .5) * mh * .5, vw * (.07 + rnd() * .1), [[0, css(MIST, .34 - t * .12)], [1, css(MIST, 0)]], 1, .32);
+  }
+  // haze banked against the cliff, a warm wash from the sun's side, a painter's grain
+  for (let i = 0; i < 9; i++) { const zz = -3 + i / 8 * 20, p = C.projB(m3dRimXC(D.cliff, zz) + D.cliff.w + .8, low + .4, zz); pGlow(g, p[0], p[1], px * (1.6 + rnd()), [[0, css(MIST, .42)], [1, css(MIST, 0)]], 1, .7); }
+  gr = g.createLinearGradient(xV, 0, xV + vw, 0); gr.addColorStop(0, 'rgba(255,226,160,.3)'); gr.addColorStop(.7, 'rgba(255,226,160,0)'); g.globalCompositeOperation = 'soft-light'; g.fillStyle = gr; g.fillRect(0, yH, w, fh); g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < w * h / 500; i++) { const x = rnd() * w, y = rnd() * h, L = 2 + rnd() * 5, a = rnd() * Math.PI; g.strokeStyle = rnd() < .5 ? 'rgba(255,255,240,.04)' : 'rgba(0,30,30,.04)'; g.lineWidth = 1 + rnd(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); }
 }
 
 /* Dungeon leaders' own bodies, group 1 (spectres and flyers): bonewarden, mirrorwitch, abbess, keening, voltaris, nightwing.
@@ -69990,6 +70611,327 @@ const TORCHB = (() => {
   return { R, model, pose, FR, bakeOne, walkAt, NW, NR, NHIT, NDIE, STRIDE, frames: FR };
 })();
 
+/* ================= The Gnoll Mauler on the owner's hyena-man sculpt (a foe; in no wave yet) =================
+   The model (tools/make_mauler.py, src/model_mauler.js, a split asset): the owner's "werewolf creature" sculpt, the same
+   spotted hyena-man the Gnoll Torchbearer stands on, here unarmed and on a rig of its own: 36 bones (digitigrade legs of four
+   bones, clavicles, claws, jaw, ears, tail, the fur down his back, six panels of loincloth), 6K triangles on one 1024 atlas.
+   Drawn by the stylised sculpt pass (gl.js drawSculpted), skinned on the GPU: one draw a Mauler.
+   Unlike the other rigged foes, whose moves are posed in code each frame, his are CLIPS baked by the tool (a turn per bone
+   and the hips' offset, 30 frames a second) and blended here:
+   - idle (4 s loop): two heavy breaths, the weight easing from foot to foot, a look to his left, an ear flicked, the claws
+     working; he stands in it whenever he is not covering ground;
+   - the lope (24 frames a cycle): its phase runs on the ground he covers (0.90 of his height a cycle), and the clip's planted
+     foot is carried straight back at that pace, so it holds on the road at any speed; idle and lope cross-fade on his pace;
+   - the claw swipe (1.15 s; the claws land 0.50 s in): a foe that attacks units (def.atk, a siege wave) winds up as its blow
+     comes due (c.atkCD) so the claws land when the game's damage does (0.18 s after c.atkAt);
+   - the hit (0.6 s): standing, the whole clip; on the run, only its trunk, head and arms laid over the lope (the legs keep
+     the ground); at most every 0.7-1.6 s, like the other gnolls;
+   - the death (2.1 s): the blow, the knees going, down onto his chest; then he sinks away.
+   Stunned he stands (the idle, slowed); frozen he holds the frame he was in.
+   CREEPS.mauler is added here, not in core.js: it is in no wave, pool or table (the owner's call), only the labs' lists.
+   The Model Lab (modellab.js is not touched): with the Mauler as the stand-in foe a row of buttons plays each clip on him,
+   and a Gnoll Raider stands beside him for scale (runehold.html?lab=1&foe=mauler; &mclip=idle|run|attack|hit|death starts
+   on a clip, &beside=0 leaves the Raider out).
+   If the data is missing or broken there is simply no Mauler. Checks: `python tools/make_mauler.py --check`. */
+const MAULER = (() => {
+  const TYPE = 'mauler', TRIM = .1;
+  /* the sinking after the death clip, and the flinch's rhythm */
+  const SINK0 = 2.6, GONE = 3.5;
+  let D = null, R = null, MESHB = null, img = null, model = null, NB = 0;
+  const CL = {};
+  let H = null, PAR = null, UPPER = null, HIPS = 0;
+
+  /* ---------- clips: per frame a quaternion a bone and the hips' offset ---------- */
+  function b64(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
+  function decodeClip(c) {
+    const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+    if (q16.length !== c.n * NB * 4 || t.length !== c.n * 3) throw new Error('mauler: bad clip');
+    for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+    return Object.assign({}, c, { q, t });
+  }
+  /* a pose: q (NB * 4) and t (the hips' offset) */
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  /* the clip at frame position u (frames; a loop wraps, a one-shot holds its ends) into P */
+  function sampleF(c, u, P) {
+    const n = c.n; let i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3];
+      let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  const sampleT = (c, sec, P) => sampleF(c, sec / c.dur * (c.loop ? c.n : c.n - 1), P);
+  /* A toward B by w, every bone (or only those in `mask`) */
+  function mixPose(A, B, w, mask) {
+    if (w <= 0) return A;
+    const a = A.q, b = B.q;
+    for (let i = 0; i < NB; i++) {
+      if (mask && !mask[i]) continue;
+      const k = i * 4, ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3];
+      let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    if (!mask) for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+    return A;
+  }
+  /* a layer laid over A: on the masked bones, w of the turn that takes `ref` to `lay` (both poses of one clip), on top of A's */
+  function layer(A, ref, lay, w, mask) {
+    const a = A.q, r = ref.q, l = lay.q;
+    for (let i = 0; i < NB; i++) {
+      if (!mask[i]) continue;
+      const k = i * 4;
+      /* d = lay * conj(ref) */
+      const rx = -r[k], ry = -r[k + 1], rz = -r[k + 2], rw = r[k + 3], lx = l[k], ly = l[k + 1], lz = l[k + 2], lw = l[k + 3];
+      let dx = lw * rx + lx * rw + ly * rz - lz * ry, dy = lw * ry - lx * rz + ly * rw + lz * rx, dz = lw * rz + lx * ry - ly * rx + lz * rw, dw = lw * rw - lx * rx - ly * ry - lz * rz;
+      if (dw < 0) { dx = -dx; dy = -dy; dz = -dz; dw = -dw; }
+      /* w of it (toward the identity) */
+      dx *= w; dy *= w; dz *= w; dw = 1 + (dw - 1) * w; const n = 1 / (Math.hypot(dx, dy, dz, dw) || 1); dx *= n; dy *= n; dz *= n; dw *= n;
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3];
+      a[k] = dw * ax + dx * aw + dy * az - dz * ay; a[k + 1] = dw * ay - dx * az + dy * aw + dz * ax; a[k + 2] = dw * az + dx * ay - dy * ax + dz * aw; a[k + 3] = dw * aw - dx * ax - dy * ay - dz * az;
+    }
+    return A;
+  }
+  /* a pose into the GPU's bone buffer: per bone three vec4, each a column of its turn and one part of its offset */
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2];
+      let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0;
+      out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+
+  /* ---------- per creep: the ground covered, the pace, the flinch, the last pose ---------- */
+  const ST = new WeakMap(), _sc = b => Math.hypot(b[0], b[1], b[2]);
+  const vary = c => { const a = c ? c.anim || 0 : 0, h = Math.sin(a * 12.9898 + 7.3) * 43758.5453; return h - Math.floor(h); };
+  function stateOf(c) { let s = ST.get(c); if (!s) ST.set(c, s = { x: c.x, y: c.y, d: 0, vt: null, sp: 0, run: 0, hitAt: -9, hitNext: 0, atkW: 0, atkT: 0, idleT: vary(c) * 4, last: newPose(), has: false }); return s; }
+  const now = () => typeof G !== 'undefined' && G && G.time != null ? G.time : vt;
+  let PA = null, PB = null, BUF = null, REF_HIT = null;
+  /* when the claws are due: the swipe's clock from the game's own (c.atkCD counting down to the blow, c.atkAt when it was struck;
+     the damage lands 0.18 s after that, game.js creepAttack), or -1 */
+  const LAND = .18;
+  function swipeAt(c) {
+    const A = CL.attack; if (!A || !c.atk || typeof G === 'undefined' || !G) return -1;
+    const pre = A.hit - LAND;
+    if (c.atkAt != null && G.time >= c.atkAt && G.time - c.atkAt < A.dur - pre) return pre + (G.time - c.atkAt);
+    if (c.siegeTg && c.atkCD > 0 && c.atkCD < pre) return pre - c.atkCD;
+    return -1;
+  }
+  /* the live pose of a creep into PA */
+  function livePose(c, sc) {
+    const s = stateOf(c), t = now(), dt = s.vt == null ? 0 : Math.min(.1, Math.max(0, vt - s.vt)); s.vt = vt;
+    const mv = Math.hypot(c.x - s.x, c.y - s.y), frozen = c.stunT > 0 && c.frostT > 0;
+    if (dt > 0 && mv < .5) s.sp += (mv / dt - s.sp) * (1 - Math.exp(-dt * 9));
+    if (mv < .5) s.d += mv;
+    s.x = c.x; s.y = c.y;
+    if (frozen && s.has) { PA.q.set(s.last.q); PA.t.set(s.last.t); return PA; }
+    /* a clip asked for by name (the Model Lab's buttons): played on its own clock */
+    const F = c.mauClip;
+    if (F && CL[F.n]) {
+      const C_ = CL[F.n]; let u = t - F.t0;
+      if (C_.loop) { if (F.n === 'run') sampleF(C_, u / C_.dur * C_.n, PA); else sampleT(C_, u, PA); }
+      else { if (F.loop) u = u % (C_.dur + (F.n === 'death' ? 1.2 : .45)); sampleT(C_, Math.min(u, C_.dur), PA); }
+      s.last.q.set(PA.q); s.last.t.set(PA.t); s.has = true; return PA;
+    }
+    /* idle and lope, by his pace (model units a second against the pace the lope was drawn for) */
+    const pace = s.sp / Math.max(.05, sc), want = Math.max(0, Math.min(1, (pace - .12) / (.42 * D.vnom)));
+    s.run += (want - s.run) * (1 - Math.exp(-dt * 7));
+    if (!(c.stunT > 0)) s.idleT += dt; else s.idleT += dt * .35;
+    sampleT(CL.idle, s.idleT, PA);
+    if (s.run > .002) { sampleF(CL.run, (s.d / (CL.run.cyc * Math.max(.05, sc)) + vary(c)) * CL.run.n, PB); mixPose(PA, PB, s.run); }
+    /* the swipe */
+    const at = swipeAt(c);
+    if (at >= 0) { s.atkT = at; s.atkW = Math.min(1, s.atkW + dt / .1); } else s.atkW = Math.max(0, s.atkW - dt / .16);
+    if (s.atkW > 0) { sampleT(CL.attack, s.atkT, PB); const w = s.atkW; mixPose(PA, PB, w * w * (3 - 2 * w)); }
+    /* the hit */
+    if (!(c.stunT > 0) && c.hit > .045 && t >= s.hitNext && t - s.hitAt > CL.hit.dur * .6) { s.hitAt = t; s.hitNext = t + .7 + Math.random() * .9; }
+    const ht = t - s.hitAt;
+    if (ht >= 0 && ht < CL.hit.dur && s.atkW < .5) {
+      const w = Math.min(1, ht / .04) * Math.min(1, (CL.hit.dur - ht) / .16);
+      sampleT(CL.hit, ht, PB);
+      if (s.run < .5) mixPose(PA, PB, w * (1 - s.run * 2));
+      if (s.run > 0) layer(PA, REF_HIT, PB, w * Math.min(1, s.run * 2), UPPER);
+    }
+    s.last.q.set(PA.q); s.last.t.set(PA.t); s.has = true;
+    return PA;
+  }
+  /* The engine tips a foe's whole body forward for a hasted pace (every troop's, core.js MINION_SPD) and a lunge, tips it away
+     from a blow and squashes it (view.js creepMatrix): right for a body with no moves of its own. His clips carry all of
+     that, and a tipped body lifts a planted foot off the road behind him and sinks one into it ahead, so that tilt and squash
+     are taken back out of the matrix he is given: its place, its turn about his own up, its size and the entry tunnel's
+     lay-back (applied after, view.js tunnelView) are kept. */
+  const _U = new Float32Array(16);
+  function upright(base, c) {
+    if (!c || typeof vstate !== 'function' || typeof G === 'undefined' || !G) return base;
+    const s = vstate(c), hq = Math.max(0, Math.min(1, (c.hit || 0) / .14)) * (c.hitK || 1), sq = c.def && c.def.boss ? .35 : 1;
+    const rel = c.hdx != null ? Math.atan2(c.hdx, c.hdz) - s.yaw : Math.PI, frozen = c.stunT > 0 && c.frostT > 0;
+    const dizzy = c.stunT > 0 && !frozen && !(c.liftT > G.time) && c.stunEl !== 'root';
+    const lean = (c.spdM || 1) > 1.01 || c.rageT > 0 || c.packT > 0 ? .12 : 0;
+    const p = Math.cos(rel) * hq * .3 * sq + lean + (c.lunge || 0) * .35 + (dizzy ? .12 : 0), r = -Math.sin(rel) * hq * .3 * sq + (dizzy ? Math.sin(vt * 6.5 + c.anim + 1.3) * .14 : 0);
+    const kx = 1 + .12 * hq * sq, ky = 1 - .2 * hq * sq, cp = Math.cos(p), sp = Math.sin(p), cr = Math.cos(r), sr = Math.sin(r);
+    for (let q = 0; q < 3; q++) {
+      const c0 = base[q] / kx, c1 = base[4 + q] / ky, c2 = base[8 + q] / kx;
+      _U[q] = c0 * cr - c1 * sr; _U[4 + q] = c0 * cp * sr + c1 * cp * cr - c2 * sp; _U[8 + q] = c0 * sp * sr + c1 * sp * cr + c2 * cp;
+    }
+    _U[3] = _U[7] = _U[11] = 0; _U[12] = base[12]; _U[13] = base[13]; _U[14] = base[14]; _U[15] = 1;
+    return _U;
+  }
+  function draw(base, ph, o) {
+    if (!img || !img.complete || !img.naturalWidth) return;
+    o = MOBRIG.calmTint(o);
+    const c = o && o.c || null;
+    if (c && !(o && o.deathT != null)) base = upright(base, c);
+    const sc = _sc(base);
+    if (o && o.deathT != null) {
+      sampleT(CL.death, o.deathT, PA);
+      const s = c && ST.get(c);
+      /* (out of the pose he was struck in, over the first tenth of a second) */
+      if (s && s.has && o.deathT < .12) { PB.q.set(s.last.q); PB.t.set(s.last.t); mixPose(PB, PA, o.deathT / .12); PA.q.set(PB.q); PA.t.set(PB.t); }
+    } else if (!c) sampleT(CL.idle, vt, PA);
+    else livePose(c, sc);
+    const it = item(MESHB, base, o);
+    it.bones = itemBones(it, toBones(PA, BUF)); it.sec = [0, TRIM];
+  }
+  function die(k) {
+    if (k.t > GONE) return false;
+    const c = k.c, DT = CL.death;
+    if (!k.kneel && k.t > DT.kneel) { k.kneel = true; MOBRIG.thud(k, 3, false); }
+    if (!k.thud && k.t > DT.thud) { k.thud = true; MOBRIG.thud(k, 6, false); }
+    const su = Math.max(0, (k.t - SINK0) / (GONE - SINK0)), f = Math.max(0, 1 - k.t / .14), dk = 1 - .35 * Math.min(1, su * 2.5);
+    M4.trs(_m, k.x, k.y - su * su * .5 * k.sc, k.z, k.yaw, 0, 0, k.sc);
+    const t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0];
+    const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * f) * dk, t0[1] * (.8 + .25 * f) * dk, t0[2] * (.75 + .25 * f) * dk, Math.max(t0[3] * dk, .08 * f)];
+    draw(_m, 0, { c, deathT: k.t, tint, shadow: su < .2 });
+    return true;
+  }
+
+  /* everything read from the tool's data (again, with new data, for MAULER.hot: a re-baked model tried without a rebuild) */
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'mauler', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('mauler: too many bones');
+    for (const nm of ['hips', 'spine', 'chest', 'head', 'thighL', 'toeL', 'thighR', 'toeR']) if (R_.bix[nm] == null) throw new Error('mauler: no ' + nm);
+    D = data; R = R_; NB = nb;
+    for (const nm of ['idle', 'run', 'attack', 'hit', 'death']) { if (!D.clips || !D.clips[nm]) throw new Error('mauler: no clip ' + nm); CL[nm] = decodeClip(D.clips[nm]); }
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    /* the bones the hit lays over the lope: everything above the hips (the legs, the tail and the loincloth keep the lope's) */
+    UPPER = new Uint8Array(NB);
+    R.bones.forEach((b, i) => { let p = i, up = false; while (p >= 0) { if (R.bones[p].n === 'spine') up = true; p = R.bones[p].p; } UPPER[i] = up ? 1 : 0; });
+    PA = newPose(); PB = newPose(); BUF = new Float32Array(NB * 12);
+    REF_HIT = sampleF(CL.hit, 0, newPose());
+    /* the draw mesh: the textured triangle soup with each corner's two bones, for the GPU's skinning */
+    const G_ = R.groups.body, idx = G_.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('mauler: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    /* (the bounds wide enough for the lope's reach and the body laid out by the death) */
+    m.min = [-.75, -.05, -.75]; m.max = [.75, 1.25, 1.15];
+    if (!D.tex) throw new Error('mauler: no texture');
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESHB = m;
+    if (!model) { model = { limbs: [], bob: 0, fly: false, float: false, alpha: 1, rigged: true }; model.draw = draw; model.die = (k, dt) => die(k); }
+    model.body = m; model.bounds = [[-.3, 0, -.3], [.3, R.height, .3]]; model.tris = nc / 3;
+    if (typeof LEAD_CH !== 'undefined') LEAD_CH[TYPE] = R.height - .06;
+  }
+  /* a re-baked model file tried in the running page (the owner's bench, or `python tools/make_mauler.py` then this) */
+  function hot(url) {
+    return fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('MAULER_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'mauler: ' + NB + ' bones, ' + Object.keys(CL).map(k => k + ' ' + CL[k].n).join(', '); });
+  }
+  try {
+    load(typeof MAULER_MDL !== 'undefined' ? MAULER_MDL : null);
+    /* the foe itself: in no wave, pool or table; the labs list every CREEPS entry */
+    if (typeof CREEPS !== 'undefined' && !CREEPS[TYPE]) {
+      CREEPS[TYPE] = { name: 'Gnoll Mauler', hp: 1.6, spd: 1.15, r: .36, atk: { r: 1.0, rate: 2.2, dmg: 12, kind: 'smash' }, trait: 'Claws at your units', eco: 'A heavy gnoll that lopes in on long strides and claws at whatever unit stands in its way.',
+        roles: ['heavy'], rk: { heavy: 1 }, notInWaves: true };
+    }
+    MESH['c_' + TYPE] = model;
+  } catch (e) { model = null; if (typeof console !== 'undefined') console.warn('No Gnoll Mauler:', e.message); }
+
+  /* ---------- the Model Lab: his clips by name, and a Gnoll Raider beside him for scale (modellab.js itself untouched) ---------- */
+  const LAB = { clip: null, beside: 'gnoll', on: false };
+  function labPlay(n) {
+    const L = window.MODELLAB; if (!L || !L.c) return;
+    LAB.clip = n;
+    if (n === 'run') { L.foeAct = 'walk'; L.c.mauClip = null; }
+    else { L.foeAct = 'hold'; L.c.mauClip = n ? { n, t0: now(), loop: true } : null; }
+    labRow();
+  }
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('mauRow'); if (old) old.remove();
+    if (L.foe !== TYPE) return;
+    const box = document.createElement('div'); box.id = 'mauRow';
+    const b = (id, lab, tip) => `<button data-mau="${id}" class="${(LAB.clip || '') === id ? 'on' : ''}" title="${tip}">${lab}</button>`;
+    box.innerHTML = '<h3>Gnoll Mauler: his clips</h3><div class="row">' + b('', 'As in a run', 'Idle while he stands, the lope as he covers ground, flinches as he is struck') + b('idle', 'Idle', 'The 4 s idle loop') + b('run', 'Lope', 'He lopes to and fro at his own pace: the feet hold on the road')
+      + b('attack', 'Claw swipe', 'The swipe, again and again (the claws land 0.50 s in)') + b('hit', 'Hit', 'The hit reaction, standing') + b('death', 'Death', 'The death, then up again')
+      + '</div><div class="row" style="margin-top:4px">' + `<button data-maub="1" class="${LAB.beside ? 'on' : ''}" title="A Gnoll Raider beside him, for scale">Raider beside him</button><button data-mauh="1" class="${L.hideUnit ? 'on' : ''}" title="Hide the unit (it stops striking)">Hide unit</button></div>`
+      + '<div class="note" style="margin-top:4px">Pause and Step 1/30 s (Clock) go through a clip frame by frame.</div>';
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Clock/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-mau]')) x.onclick = () => labPlay(x.dataset.mau || null);
+    box.querySelector('[data-maub]').onclick = () => { LAB.beside = LAB.beside ? null : 'gnoll'; const L2 = window.MODELLAB; if (L2.c2) { L2.c2.dead = true; const i = G.creeps.indexOf(L2.c2); if (i >= 0) G.creeps.splice(i, 1); L2.c2 = null; } labRow(); };
+    box.querySelector('[data-mauh]').onclick = () => { L.hideUnit = !L.hideUnit; labRow(); };
+  }
+  function labTick(dt) {
+    const L = window.MODELLAB; if (!L || !L.ready || typeof G === 'undefined' || !G) return;
+    if (L.foe !== TYPE) { if (document.getElementById('mauRow')) labRow(); return; }
+    const c = L.c; if (!c || c.dead) return;
+    if (!document.getElementById('mauRow') && document.getElementById('mlab')) labRow();
+    if (LAB.fresh) { LAB.fresh = false; if (LAB.clip === 'run') L.foeAct = 'walk'; labRow(); }
+    /* the clip asked for stays on him through the lab's respawns */
+    if (LAB.clip && LAB.clip !== 'run' && !c.mauClip) c.mauClip = { n: LAB.clip, t0: now(), loop: true };
+    /* the lope at his own pace (the lab walks its foes at 0.7 cells a second) */
+    if (LAB.clip === 'run' && L.foeAct === 'walk' && !L.paused && L.scrub == null) c.__ax += dt * L.speed * (BASE_SPD * c.def.spd - .7) * (c.__w || 1);
+    /* a Gnoll Raider beside him (the lab's compare slot holds it in step) */
+    if (LAB.beside && !L.c2 && CREEPS[LAB.beside] && L.deadAt == null) {
+      const o = spawn({ type: LAB.beside, hp: 1e9, bounty: 0, at: { x: c.x + 1.25, y: c.y, ti: Math.floor(c.x + 1.25), tj: Math.floor(c.y), tx: c.x + 1.25, ty: c.y + 1, state: 'walk' } });
+      o.abT = 1e9; o.hp = o.maxHp = 1e9; o.__ax = c.__ax; o.__dx = 1.25; o.__ay = c.__ay; o.__w = 0; L.c2 = o;
+    }
+    const tg = document.getElementById('mlTags');
+    if (tg && tg.children.length === 2 && L.c2) { tg.children[0].textContent = 'Gnoll Mauler'; tg.children[1].textContent = CREEPS[L.c2.type].name; }
+  }
+  if (model && typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined' && new URLSearchParams(location.search).get('lab') === '1' && typeof renderView === 'function') {
+    const rv0 = renderView;
+    renderView = function (dt) { try { labTick(dt || 0); } catch (e) {} return rv0.apply(this, arguments); };
+    const q = new URLSearchParams(location.search); if (q.get('mclip')) { LAB.clip = q.get('mclip'); LAB.fresh = true; } if (q.get('beside') === '0') LAB.beside = null;
+    /* &shots=1 (sim/mauler_shots.js, the contact sheets): every frame the page asks of the browser is queued instead, for the
+       sheets' driver to run by hand, 1/30 s a step: exact frames, and a hidden page (whose clock never ticks) draws all the same */
+    if (q.get('shots') === '1') { const Q_ = window.__rafQ = []; window.requestAnimationFrame = cb => { Q_.push(cb); return Q_.length; }; }
+  }
+  return { get R() { return R; }, get model() { return model; }, CL, sampleT, sampleF, toBones, newPose, mixPose, layer, labPlay, LAB, TYPE, hot, load };
+})();
+
 /* ================= CHALLENGES: opt-in risk for a reward (force runs) =================
    Midway between bosses (the build phase of waves 8, 13, 18 ... 48) the commander is offered two challenges and a skip. A
    challenge is a twist on the next few waves that asks one new question (more support casters, a warded column, a cursed
@@ -73720,7 +74662,7 @@ function initView(canvas) {
 /* ---------- map themes: lighting, 3D surroundings, map light, painted backdrop ---------- */
 let TH = THEMES.meadow, LS = Object.assign({}, LIGHT_DEF.meadow); const THENV = {}, BGC = {};
 function buildThemeEnv(th) {
-  const b = th.build(), E = { ground: b.ground, wild: b.wild, deco: b.deco, fx: b.fx, treeGroups: [], treeHs: [], lm: null, terrain: b.terrain || null, edgeGiants: b.edgeGiants || null };   // (terrain: a 3D map's heightfield, drawn by gl.js drawTerrain: map3d.js)
+  const b = th.build(), E = { ground: b.ground, wild: b.wild, deco: b.deco, fx: b.fx, treeGroups: [], treeHs: [], lm: null, terrain: b.terrain || null, edgeGiants: b.edgeGiants || null, occ: b.occ || null };   // (terrain: a 3D map's heightfield, drawn by gl.js drawTerrain: map3d.js)
   if (mapLite()) { b.trees = []; E.terrain = null; E.edgeGiants = null; }   // (painted-only maps: the painting alone)
   const keep = RD.trees; RD.trees = [];
   for (const t of b.trees) {
@@ -73763,13 +74705,15 @@ function applyTheme(id) {
   if (RD && TH === th && THENV[th.id]) { RD.mood = moodGet(th.id); return; }   // (the same map, maybe another Chronicles location: its mood)
   if (!RD) return;
   TH = th; LS = lightGet(th.id);
+  BEND[1] = th.bendR || 9;   // (how soon the world rolls away past the field's head: a map's own, Greatroot Way's nearer horizon)
   const E = THENV[th.id] || (THENV[th.id] = buildThemeEnv(th));
-  ENV.ground = E.ground; ENV.wild = E.wild; ENV.deco = E.deco; ENV.fx = E.fx; ENV.treeGroups = E.treeGroups; ENV.edgeGiants = E.edgeGiants;
+  ENV.ground = E.ground; ENV.wild = E.wild; ENV.deco = E.deco; ENV.fx = E.fx; ENV.treeGroups = E.treeGroups; ENV.edgeGiants = E.edgeGiants; ENV.occ = E.occ;   // (occ: a painted map's trunk to stand behind, greatroot.js)
   RD.trees = E.treeHs; RD.lm = E.lm; if (RD.setTerrain) { RD.setTerrain(E.terrain); RD.setWater(E.terrain && E.terrain.water || null); }
   CAM.pitch = th.pitch * Math.PI / 180;
   applyLight();
   amb.length = 0;
   if (th.id === 'clearing') { for (let k = 0; k < 70; k++) amb.push(newAmb(k < 40 ? 'dust' : k < 52 ? 'leaf' : k < 62 ? 'gnats' : 'spray', true)); }
+  else if (th.amb === 'forest') { for (let k = 0; k < 74; k++) amb.push(newAmb(k < 40 ? 'dust' : k < 54 ? 'leaf' : k < 62 ? 'gnats' : th.spray && k < 70 ? 'spray' : 'fly', true)); }   // (Greatroot Way: pollen in the sun, falling leaves, gnats, fireflies in the shade)
   else for (let k = 0; k < (th.paint ? 90 : 70); k++) amb.push(newAmb(k % 3 === 0 ? 'mote' : 'fly', true));
   if (W > 1) fitCamera(); else { RD.bg = null; RD.fg = null; }
 }
@@ -73779,6 +74723,7 @@ const envH = (x, z) => TH.h(x, z);
 // from where its light comes, cool blue-violet in the shade (gl.js FS_TREE uPropW/uPropC/uPropL); linear rgb, strength
 const PROP_LIGHT = {
   clearing: { warm: [1.0, .7, .3, .9], cool: [.34, .52, 1.0, .75], dir: [-.8, .45, -.3] },   // (Sunfall: the shafts from the upper left)
+  greatroot: { warm: [1.0, .74, .4, .8], cool: [.3, .56, .5, .6], dir: [-.75, .5, -.4] },    // (Greatroot Way: amber sun from the upper left, teal-green shade)
 };
 function applyLight() {
   const L = LS;
@@ -73789,7 +74734,10 @@ function applyLight() {
   const E = THENV[TH.id]; RD.gtex = E && E.gtex ? Object.assign(E.gtex, { gain: L.ground }) : null;
   RD.gpaint = E && E.gpaint ? Object.assign(E.gpaint, { gain: L.paint == null ? 1 : L.paint }) : null;
   const wk = E && E.gwater ? waterK(TH.id) : null; RD.gwater = wk ? Object.assign(E.gwater, { k: wk }) : null;   // (the painting's moving water; gl.js leaves it out on Graphics Low)
+  { const bk = TH.barkName && typeof TERRAIN_TEX !== 'undefined' ? TERRAIN_TEX.names.indexOf(TH.barkName) : -1; RD.barkL = bk >= 0 ? bk : 9; }   // (a map's own bark texture, once it exists: gl.js uBarkL)
   RD.treeK = TREE_DEF[TH.id] ? treeUni(TREE_DEF[TH.id]) : null;   // (the trees' light: maps.js TREE_DEF, the Light Lab's Trees)
+  // a canopy's dapple on the sun (maps.js LIGHT_DEF dap*: strength, the pools' size in world units, sway, edge; gl.js shadowAt uCookie)
+  RD.cookie = L.dap > 0 && !mapLite() ? [L.dap, 2 * (TH.paint ? 16 : 14.5) / Math.max(.3, L.dapS || 2.6), L.dapV == null ? .5 : L.dapV, Math.max(.02, L.dapE || .16)] : null;
   RD.clear = RD.fogCol.map(v => { const x = v * 1.05; return Math.pow(Math.min(1, (x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14)), 1 / 2.2); });
   RD.fog = [CAM.dist * L.fogNear, CAM.dist * (L.fogFar != null ? L.fogFar : L.fogNear + .95)];   // (fogFar: the Light Lab's fog end; unset, as it always was)
   RD.setShadowBox(5.5, TH.paint ? 4 : 6.5, TH.paint ? 16 : 14.5);
@@ -73802,6 +74750,16 @@ function relight(L, repaint) {
 }
 // paint the 2D backdrop and foreground for the current camera; the 3D clearing sits inside it
 function paintBackdrop() {
+  if (TH.skyPaint && !mapLite()) {   // a 3D map's sky (map3d.js: Greatroot Way's, past its cliff): painted once for the fitted view, kept under the world as it zooms
+    const k = clamp(dpr, 1, 1.5), w = Math.max(2, Math.round(W * k)), h = Math.max(2, Math.round(H * k));
+    if (!BGC.sky) BGC.sky = document.createElement('canvas');
+    BGC.sky.width = w; BGC.sky.height = h;
+    setCam(CAM.tz, CAM.oh, W / H, 0, 0, null);
+    const vp = RD.vp.slice(), projB = (x, y, z) => { const b = bendP(x, y, z), q = M4.proj(vp, b[0], b[1], b[2]); return [(q[0] * .5 + .5) * w, (.5 - q[1] * .5) * h, q[2]]; };
+    try { TH.skyPaint(BGC.sky, { w, h, s: Math.sqrt(w * h) / 700, projB, L: LS }); } catch (e) { console.warn('sky', e); }
+    BGC.skyTex = RD.screenTex(BGC.sky, BGC.skyTex);
+    RD.bg = { tex: BGC.skyTex, dissolve: false, zoom: true }; RD.fg = null; return;
+  }
   if (!TH.paint) { RD.bg = null; RD.fg = null; return; }
   const k = clamp(dpr, 1, 1.5), w = Math.max(2, Math.round(W * k)), h = Math.max(2, Math.round(H * k));
   if (!BGC.bg) { BGC.bg = document.createElement('canvas'); BGC.fg = document.createElement('canvas'); }
@@ -73827,6 +74785,7 @@ function fitCamera() {
   const aspect = W / H;
   const raw = [[-.1, 0, -TOPM - .1], [COLS + .1, 0, -TOPM - .1], [-.1, 0, ROWS + .55], [COLS + .1, 0, ROWS + .55], [PORTAL.x, 1.1, PORTAL.y - 1.1], [0, 1.9, .2], [COLS, 1.9, .2], [5.5, 0, ROWS + 1.05]];
   if (TH.fitTop != null) raw.push([5.5, 0, TH.fitTop]);
+  if (TH.fitPts) for (const p of TH.fitPts) raw.push(p);   // (a map's own: what stands at its head must show, e.g. a trunk's height)
   if (TH.fitBot != null) for (let k = raw.length - 1; k >= 0; k--) if (raw[k][2] > ROWS) raw.splice(k, 1);   // (no keep below the field to show)
   if (TH.fitBot != null) raw.push([-.1, 0, TH.fitBot], [COLS + .1, 0, TH.fitBot]);
   const pts = raw.map(p => bendP(p[0], p[1], p[2]));
@@ -73928,19 +74887,19 @@ function vstate(c) {
 // painting's ground runs away to a far horizon, so a foe is drawn small, facing you and seen face on, at eye level (laid
 // back by the camera's own tilt, so its height runs straight up the screen), and as it comes out into the clearing it
 // stands up again and the view drops to the one from above
-const tunK = c => walkOff() && c.y < -.9 ? clamp((-.9 - c.y) / 4.9, 0, 1) : 0;
+const tunK = c => walkOff() && c.y < -.9 ? clamp((-.9 - c.y) / tunP()[1], 0, 1) : 0;
 // the view's drop from eye level to the one from above runs longer than the shrink: the whole way down the tunnel and on
 // into the clearing's head (TUN_TILT cells past the trees), slowly at first, so a foe comes out upright and face on
 const TUN_TILT = 2.2;
-const tunT = c => walkOff() && c.y < TUN_TILT - .9 ? clamp((TUN_TILT - .9 - c.y) / (4.9 + TUN_TILT), 0, 1) : 0;
+const tunT = c => walkOff() && c.y < TUN_TILT - .9 ? clamp((TUN_TILT - .9 - c.y) / (tunP()[1] + TUN_TILT), 0, 1) : 0;
 const tunE = c => { const k = tunT(c); return Math.min(1, 1.15 * k * k * (3 - 2 * k)); };
 // how big a foe looks on its way down the tunnel: as if far off, by perspective (about a fifth of its size where it
 // appears, growing slowly at first and faster as it nears), its full size on the field
-const tunS = c => 1 / (1 + 4.5 * tunK(c));
+const tunS = c => 1 / (1 + tunP()[0] * tunK(c));
 function tunnelView(m, c) {
   if (TH.m3d) return m;   // (a 3D map's ravine is real: no painted perspective)
   const k = tunK(c), e = tunE(c); if (!e) return m;
-  const a = -CAM.pitch * e, sc = 1 / (1 + 4.5 * k), ca = Math.cos(a) * sc, sa = Math.sin(a) * sc;
+  const a = -CAM.pitch * e, sc = 1 / (1 + tunP()[0] * k), ca = Math.cos(a) * sc, sa = Math.sin(a) * sc;
   const x = m[12], y = m[13], z = m[14];
   for (let col = 0; col < 3; col++) {   // lay it back about its feet (a turn about the world x axis, away from the camera), and shrink
     const o = col * 4, my = m[o + 1], mz = m[o + 2];
@@ -73982,7 +74941,7 @@ function drawModel(model, base, ph, o, R_) {
 }
 function tintFor(c) {
   const t = c.def.tint ? c.def.tint.slice() : [1, 1, 1, 0];
-  if (walkOff() && c.y < 0) { const k = clamp(.12 + .88 * (c.y + 4.8) / 4.6, .12, 1); t[0] *= k; t[1] *= k * 1.02; t[2] *= k * 1.1; t[3] *= k; }   // still in the dark of the trees: a shape, lit as it steps into the clearing
+  if (walkOff() && c.y < 0) { const k0 = TH.inShade || .12, k = clamp(k0 + (1 - k0) * (c.y + 4.8) / 4.6, k0, 1); /* (inShade: a map whose way in is lighter, Greatroot Way's misty gap) */ t[0] *= k; t[1] *= k * 1.02; t[2] *= k * 1.1; t[3] *= k; }   // still in the dark of the trees: a shape, lit as it steps into the clearing
   if (c.frostT > 0) { // chilled: icy blue-white skin with a cold sheen; frozen solid: near-white ice
     const fz = c.stunT > 0, sh = .5 + .5 * Math.sin(vt * 5 + c.anim);
     t[0] = fz ? .85 : .62; t[1] = fz ? 1.3 : 1.0; t[2] = fz ? 2.0 : 1.75; t[3] = Math.max(t[3], fz ? .2 : .1 + .06 * sh);
@@ -74029,7 +74988,8 @@ function newGlade(kind, init) {
     for (let i = 0; i < n; i++) b.push({ ox: R_(-.15, .15), oz: R_(-.12, .12), oh: R_(-.1, .1), vx: 0, vz: 0, vh: 0, ph: R_(0, 10) });
     return { k: 'gnats', x, z: top ? R_(-3.2, -1.6) : R_(-2.5, ROWS), h: R_(.35, 1), t: t0, life: R_(7, 13), ph: R_(0, 10), b, dx: top ? R_(-.05, .05) : 0, dz: top ? 0 : R_(-.08, .08) };
   }
-  return { k: 'spray', x: R_(-8.1, -6.6), z: R_(1.2, 3.4), h: R_(.1, .6), t: init ? R_(0, 3) : 0, life: R_(1.5, 3), vh: R_(.15, .45), vx: R_(-.15, .25) };
+  const sp = TH.spray ? TH.spray[Math.random() * TH.spray.length | 0] : [-8.1, -6.6, 1.2, 3.4];   // (where a map's falls land: Sunfall's, or its own)
+  return { k: 'spray', x: R_(sp[0], sp[1]), z: R_(sp[2], sp[3]), h: R_(.1, .6), t: init ? R_(0, 3) : 0, life: R_(1.5, 3), vh: R_(.15, .45), vx: R_(-.15, .25) };
 }
 // birds of the glade: now and then one to three of them flit from one painted treetop to another, high over the field
 // (well above any tower), wings beating with a glide or two, and vanish into the leaves
@@ -74085,9 +75045,11 @@ function renderView(dt) {
   setCam(CAM.tz, CAM.oh, W / H, sh ? R_(-1, 1) * sh * .18 : 0, sh ? R_(-1, 1) * sh * .18 : 0);
   // environment
   if (ENV.ground) item(ENV.ground, _I, { shadow: false, ground: true });   // (a 3D map's terrain is drawn by the renderer itself: RD.terrain)
+  if (ENV.occ) item(ENV.occ, _I, { shadow: false, ground: true });   // (a painted trunk as an unseen card: what stands behind it is hidden, greatroot.js)
   if (RD.terrain && typeof m3dFrame === 'function') m3dFrame(dt);
   if (ENV.edgeGiants && typeof edgeMagic === 'function') edgeMagic(ENV.edgeGiants, true);   // (Sunfall: the title's wisps)
   if (TH.id === 'clearing' && typeof edgeWard === 'function') edgeWard();   // (Sunfall's field foot: edgetrees.js)   // (the magic up a painted map's 3D trunks: edgetrees.js)
+  else if (TH.ward && typeof edgeWard === 'function') edgeWard(TH.ward, TH.wardBare ? -1 : ROWS + 1.55);   // (a map's own colour; a 3D map's waystones, none on a painting)
   ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 }));
   const walkIn = MAPS[G.map] && MAPS[G.map].entry;   // (a map foes walk into from the woods has no portal)
   if (!SCENE_OFF) { item(ENV.deco, _I, { shadow: false }); if (!walkIn) item(ENV.portal, _I); if (!TH.noKeep) item(ENV.keep, _I); }   // (the FX Lab side view hides the scenery)
@@ -74148,7 +75110,7 @@ function renderView(dt) {
     if (typeof drawSynergyGlow === 'function') drawSynergyGlow(vt);
   }
   drawAmbient(dt);
-  if (TH.shafts === 'moon') drawMoonShafts(); else if (TH.shafts !== 'none') drawSunShafts();
+  if (TH.shafts === 'moon') drawMoonShafts(); else if (TH.shafts === 'forest') drawForestShafts(); else if (TH.shafts !== 'none') drawSunShafts();
   const list = DL.slice(0, dlN);
   RD.render(list, { ground: QG, alpha: QA, add: QADD, over: QO });
   { let v = 0, sv = 0; for (let k = 0; k < dlN; k++) { const it = DL[k], n = it.mesh.count; v += n; if (it.shadow) sv += n; }   // (one object a frame, kept: tests read it)
@@ -76073,6 +77035,28 @@ function drawMapFx() {
       const t = vt * .35 + p, x = wx + Math.sin(t) * .6 + Math.sin(t * 2.3) * .2, z = wz + Math.cos(t * .8) * .45, y = .55 + .25 * Math.sin(t * 1.7), fl = .75 + .25 * Math.sin(vt * 9 + p * 3);
       QADD.bill(RD, x, y, z, .45, .45, [.4, 1, .85, .2 * fl], 1, 0);
       QADD.bill(RD, x, y, z, .07, .07, [.85, 1, .95, .9 * fl], 1, 0);
+    }
+  }
+}
+/* Greatroot Way's god rays: soft warm shafts slanting down along the sun's own direction (so they lean as the Light Lab's
+   sun does) through gaps in the canopy, each with a pool where it lands and pollen drifting down it. They land on the road
+   in at the head and in the margins, two faint ones on the field's upper corner; thin and low in strength (LS.rays, LS.ray:
+   the Light Lab's "Painted light shafts"), so a unit or a foe standing in one is lit, never hidden. [x, z, width, strength] */
+const FOREST_SHAFTS = [[6.5, -3.3, 1.4, 1.5], [2.2, -2.3, .9, .7], [9.6, -1.9, .8, .6], [-2.6, 1.4, 1.1, .9], [-1.7, 8.6, .8, .7], [13.2, 3.4, 1, .8], [12.6, 11.2, .9, .7],
+  [2.6, 2.4, 1.2, .34], [7.8, 6.2, 1, .26], [-6.2, 5.4, 1.1, .8], [16.4, 8.2, 1.2, .8], [-4.8, 13.6, 1, .7]];
+function drawForestShafts() {
+  const k = LS.rays == null ? 1 : LS.rays; if (k <= 0 || mapLite()) return;
+  const d = RD.sunDir, c = c4(LS.ray || '#ffe2a8'), L = 11;
+  const SH = TH.shaftPts || FOREST_SHAFTS;   // (a map's own: the painted Greatroot Way's, along its painting's)
+  for (let i = 0; i < SH.length; i++) {
+    const [x0, z0, w, s] = SH[i], sw = Math.sin(vt * .11 + i * 1.9), br = (.74 + .26 * Math.sin(vt * .27 + i * 2.3) * Math.sin(vt * .09 + i)) * s * k;
+    const x = x0 + sw * .18, z = z0 + Math.cos(vt * .08 + i) * .12, top = [x + d[0] * L, d[1] * L, z + d[2] * L];
+    QADD.beam(RD, top, [x, 0, z], w * 1.5, [c[0], c[1], c[2], .07 * br], 6);
+    QADD.beam(RD, top, [x, 0, z], w * .6, [c[0], c[1], c[2], .08 * br], 6);
+    QADD.ground(x, z, .03, w * 1.25, w * .9, [c[0], c[1], c[2], .16 * br], 1, 0);
+    for (let j = 0; j < 3; j++) {   // pollen drifting down the shaft
+      const u = (vt * .03 + i * .37 + j * .33) % 1, e = 1 - u, px = x + d[0] * L * e * .55 + Math.sin(vt * .6 + j * 3 + i) * w * .3, py = d[1] * L * e * .55, pz = z + d[2] * L * e * .55;
+      QADD.bill(RD, px, py, pz, .04, .04, [1, .93, .7, .5 * br * Math.sin(u * Math.PI)], 1, 0);
     }
   }
 }
@@ -81841,7 +82825,7 @@ function showOverlay(html, cls) { if (typeof itipHide === 'function') itipHide()
 function hideOverlay() { if (typeof itipHide === 'function') itipHide(); if (typeof hideSpellHud === 'function') hideSpellHud(); talOpen = false; warOpen = false; if (bagOpen) { bagOpen = false; for (const it of G.loot || []) it.isNew = false; }  ov.hidden = true; ovp.innerHTML = ''; ov.className = 'ov'; ovp.className = 'panel'; }
 const fmtPlay = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : sec ? '<1m' : ''; };
 const fmtDay = t => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
-const mapThumb = k => k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
+const mapThumb = k => k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
 /* The title: the tower in the forest at dusk, the logo, and the carved frame below it. The glowing plaque begins a
    run; the left panel holds the saved games, the middle the menu, the right the top scores. On a phone the middle
    of the frame stands alone and the two side panels follow below it. */
@@ -85559,36 +86543,40 @@ if (typeof renderView === 'function') {
   };
 }
 
-/* ================= THE PYROCLASTS' FLAME SHADER: painted fire, drawn live =================
-   The owner (10 Nov 2026): "can you do a new flame animation for pyro for all his spells ... make it more stylised", then, of
-   the first painted sheets: "have a go at doing my flame animations again". Those sheets (a few frames each, played as
-   flipbooks) read as flat cut-outs. This draws every Pyroclast flame live instead: each flame is one card, and a shader paints
-   it every frame from a flowing noise field cut into a few flat painted bands (a dark-red edge, red, orange, gold, a cream
-   heart). So no two flames are alike, nothing loops, and the fire rolls, licks and breaks up as it moves.
-     FLAME   a tongue rooted at one end, swaying, licks climbing it and tearing off; aged, it lifts off and goes out
-     BALL    a fireball: a round ball of rolling fire, flame swept back along its flight
-     BURST   an impact: fire swelling low over the ground with a plume up its middle, then lifting off and breaking up
-     RING    a ring of flame racing out over the ground (the splash it shows is the real one)
-     JET     a roaring cone, narrow at the hands and opening, the fire rolling out along it
-     WING    a wing of flame: a hot leading edge, feathers of fire streaming back
-     SMOKE   a painted puff in two tones, lit from above, thinning as it rises
-     GLOW    soft added light;  EMBER a spark
+/* ================= THE PYROCLASTS' FLAME SHADER: fire with an inside, drawn live =================
+   The owner (10 Nov 2026): "can you do a new flame animation for pyro for all his spells ... make it more stylised", then
+   "have a go at doing my flame animations again", then of the flat painted bands with a dark outline that followed: "would
+   like it looking more like diablo4 style fire, slightly more realistic and a bit less like a moving sprite". So a flame is
+   no longer one card cut to a silhouette. Each card is a soft sheet or billow of fire: the shader works out how much fire is
+   at each point (its density, from turbulence that climbs the flame, curls and tears its tips off) and how hot it is there,
+   and paints that through a heat gradient: a small white-yellow heart falling off fast through saturated orange to deep red,
+   then dark soot at the tips. Edges are soft (no outline); a card fades where it meets the ground or a body (the spells'
+   depth copy, gl.js vfxSoft). pyrofire.js lays several of them over each other at different depths, sizes and speeds, and
+   leaves billows behind in the world to cool into smoke, which is what gives the fire its volume.
+     FLAME   a sheet of flame rooted at one end: licks climbing it, its tip lagging (bend) and tearing off
+     BALL    a rolling ball of fire, white-hot at its heart
+     PUFF    a billow of fire left in the world: it rolls, swells, cools from yellow to red to dark smoke and is eaten away
+     JET     a stream of fire, narrow at the hands and opening, rolling out along its length
+     WING    a wing of flame: a hot leading edge, feathers of fire streaming back and cooling
+     SMOKE   a soft dark billow, warm underneath while fresh, thinning as it rises
+     GLOW    soft added light;  EMBER a spark and its streak
    Nothing is drawn as a mark on the ground (owner: "dont use ground decals, they look like runes which are different").
-   Cards: pyfBill (facing the camera), pyfAxial (along a direction, turned to the camera), pyfFlat (on the ground), pyfQuad
-   (any quad: the wings). Drawn in the spells' pass (gl.js vfxGL ext) after the lab's flipbooks, depth-tested, premultiplied.
-   The look is the Element Lab's Flame paint (elemfx.js cc_pyrostyle.paint: outline, hot core, band softness, curl, brush
-   grain, halo; its gradient is the palette), live. No GL or DOM is touched until the first card is drawn (the sims load this). */
-const PYF = { q: [], sty: null, styAt: -1, tex: null, groups: [], MAX: 520 };
-const PYF_SH = { FLAME: 0, BALL: 1, BURST: 2, RING: 3, JET: 4, WING: 5, SMOKE: 6, GLOW: 7, EMBER: 8 };
-// the order they are laid down: the ground first, smoke, the flames, then added light
-const PYF_ORD = [2, 2, 2, 0, 2, 2, 1, 3, 3];
-// the painted palette, edge to heart
-const PYF_PAL = ['#74120a', '#d2330b', '#f5730f', '#ffbd2e', '#fff2c2'];
+   Cards: pyfBill (facing the camera), pyfAxial (along a direction, turned to the camera), pyfQuad (any quad: the wings).
+   Drawn in the spells' pass (gl.js vfxGL ext) after the lab's flipbooks, depth-tested, premultiplied (hot fire mostly adds
+   its light, cool fire and soot cover what is behind them). The look is the Element Lab's Flame look (elemfx.js
+   cc_pyrostyle.paint: soot, hot core, gradient blend, turbulence, grain, glow, flicker; its gradient is the palette), live.
+   No GL or DOM is touched until the first card is drawn (the sims load this). */
+const PYF = { q: [], sty: null, styAt: -1, tex: null, MAX: 560 };
+const PYF_SH = { FLAME: 0, BALL: 1, PUFF: 2, JET: 4, WING: 5, SMOKE: 6, GLOW: 7, EMBER: 8 };
+// the order they are laid down: smoke, the fire, then added light
+const PYF_ORD = [2, 2, 2, 2, 2, 2, 1, 3, 3];
+// the heat gradient, coolest to hottest: the dark red of a tip, deep red, saturated orange, yellow, the white-yellow heart
+const PYF_PAL = ['#4d0a03', '#b51d05', '#f55e07', '#ffad26', '#fff0c2'];
 const pyfHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
 const pyfSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /* ---- the noise the fire flows through: one small repeating texture, made once.
-   r: rolling noise; g: finer; b: cracks (cell borders); a: slow, broad (the sway) ---- */
+   r: rolling noise; g: finer; b: billows (round puffs with dark creases between them); a: slow, broad (the sway) ---- */
 function pyfNoise() {
   const W = 256, px = new Uint8Array(W * W * 4);
   const hash = (x, y, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(s | 0, 1274126177); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -85600,187 +86588,220 @@ function pyfNoise() {
     return (a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy) * .72 + .5;
   };
   const fbm = (u, v, per, oct, s) => { let sum = 0, amp = .5, tot = 0; for (let k = 0; k < oct; k++) { sum += amp * vn(u * per, v * per, per, s + k * 17); tot += amp; per *= 2; amp *= .55; } return sum / tot; };
-  // the cells: one point a cell, 7 cells across; how near a pixel is to the border between its two nearest
-  const C = 7, pt = (i, j) => { const m = v => ((v % C) + C) % C; return [i + .15 + .7 * hash(m(i), m(j), 91), j + .15 + .7 * hash(m(i), m(j), 92)]; };
+  // billows: one point a cell, C cells across; bright at the point, falling to the crease where two cells meet
+  const cell = (u, v, C, s) => {
+    const m = q => ((q % C) + C) % C, cx = u * C, cy = v * C, ci = Math.floor(cx), cj = Math.floor(cy); let f1 = 9;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const i = ci + a, j = cj + b, d = Math.hypot(i + .15 + .7 * hash(m(i), m(j), s) - cx, j + .15 + .7 * hash(m(i), m(j), s + 1) - cy); if (d < f1) f1 = d; }
+    return Math.pow(Math.max(0, 1 - f1 * 1.12), 1.25);
+  };
   const st = v => Math.max(0, Math.min(1, (v - .5) * 2.1 + .5));
   for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
     const u = (i + .5) / W, v = (j + .5) / W, o = (j * W + i) * 4;
-    const cx = u * C, cy = v * C, ci = Math.floor(cx), cj = Math.floor(cy); let f1 = 9, f2 = 9;
-    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const p = pt(ci + a, cj + b), d = Math.hypot(p[0] - cx, p[1] - cy); if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
     px[o] = st(fbm(u, v, 4, 4, 3)) * 255; px[o + 1] = st(fbm(u, v, 8, 4, 41)) * 255;
-    px[o + 2] = Math.max(0, Math.min(1, (f2 - f1) * 1.6)) * 255; px[o + 3] = st(fbm(u, v, 2, 3, 77)) * 255;
+    px[o + 2] = Math.max(0, Math.min(1, cell(u, v, 5, 91) * .66 + cell(u, v, 11, 57) * .3 + (fbm(u, v, 16, 2, 23) - .5) * .22 + .06)) * 255;
+    px[o + 3] = st(fbm(u, v, 2, 3, 77)) * 255;
   }
   return { px, W };
 }
 
-/* ---- the look: the Element Lab's Flame paint, else as authored (looked at four times a second) ---- */
+/* ---- the look: the Element Lab's Flame look, else as authored (looked at four times a second) ---- */
 function pyfStyle() {
   const now = typeof performance !== 'undefined' ? performance.now() : 0;
   if (PYF.sty && now - PYF.styAt < 250) return PYF.sty;
   PYF.styAt = now;
   const P = typeof efx === 'function' && typeof ELEM_FX_SPELLS !== 'undefined' && ELEM_FX_SPELLS.cc_pyrostyle ? efx('cc_pyrostyle', 'paint') : {};
   const v = (k, d) => typeof P[k] === 'number' && isFinite(P[k]) ? P[k] : d;
-  return (PYF.sty = { pal: P.grad ? pyfPalOf(P.c0, P.c1, P.c2) : pyfPalOf(), sty: [v('outline', 1), Math.max(.3, v('heart', 1)), v('soft', 1), v('grain', 1)], sty2: [v('curl', 1), v('halo', 1), 0] });
+  return (PYF.sty = { pal: P.grad ? pyfPalOf(P.c0, P.c1, P.c2) : pyfPalOf(), sty: [Math.max(0, v('soot', 1)), Math.max(.3, v('heart', 1)), Math.max(.04, Math.min(1, v('soft', 1))), v('grain', 1)], sty2: [v('curl', 1), v('halo', 1), v('flicker', 1)] });
 }
-// five bands from a three-stop gradient (start the heart, mid the flame, end the edge); none: the authored palette
+// five stops from a three-stop gradient (start the heart, mid the flame, end the edge); none: the authored palette
 const _pyfPal = new Map();
 function pyfPalOf(c0, c1, c2) {
   const key = c0 ? c0 + c1 + c2 : ''; let p = _pyfPal.get(key); if (p) return p;
   if (!c0) p = new Float32Array(PYF_PAL.flatMap(pyfHex));
-  else { const a = pyfHex(c0), b = pyfHex(c1), c = pyfHex(c2), mx = (x, y, k) => x.map((q, i) => q + (y[i] - q) * k); p = new Float32Array([...mx(c, [0, 0, 0], .3), ...mx(b, c, .55), ...b, ...mx(b, a, .5), ...a]); }
+  else { const a = pyfHex(c0), b = pyfHex(c1), c = pyfHex(c2), mx = (x, y, k) => x.map((q, i) => q + (y[i] - q) * k); p = new Float32Array([...mx(c, [0, 0, 0], .45), ...mx(b, c, .6), ...b, ...mx(b, a, .5), ...a]); }
   _pyfPal.set(key, p); return p;
 }
 
 const PYF_VS = `#version 300 es
-layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aA; layout(location=3) in vec4 aB;
-uniform mat4 uVP; out vec2 vUV; out vec4 vA; out vec4 vB;
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aA; layout(location=3) in vec4 aB; layout(location=4) in vec4 aC;
+uniform mat4 uVP, uView; out vec2 vUV; out vec4 vA; out vec4 vB; out vec4 vC; out float vD;
 ${typeof BEND_GLSL !== 'undefined' ? BEND_GLSL : 'vec3 bendW(vec3 p){return p;}'}
-void main(){ vUV = aUV; vA = aA; vB = aB; gl_Position = uVP * vec4(bendW(aPos), 1.); }`;
-// vUV: the card's own coordinates (each shape says which); vA: shape, seed, time, age; vB: brightness, opacity, two of the shape's own
+void main(){ vUV = aUV; vA = aA; vB = aB; vC = aC; vec3 w = bendW(aPos); gl_Position = uVP * vec4(w, 1.); vD = -(uView * vec4(w, 1.)).z; }`;
+// vUV: the card's own coordinates (each shape says which); vA: shape, seed, time, age; vB: brightness, opacity, two of the
+// shape's own; vC: bend (a flame's tip lags by this, in half-widths), heat (x its temperature), soft (the depth it fades over
+// where it meets the scene; 0: none), soot (how much dark smoke its cool end leaves); vD: its depth in view
 PYF.fs = /*FS<*/`#version 300 es
 precision highp float;
-in vec2 vUV; in vec4 vA; in vec4 vB;
-uniform sampler2D uN; uniform vec3 uPal[5]; uniform vec4 uSty; uniform vec3 uSty2; uniform float uBloom;
+in vec2 vUV; in vec4 vA; in vec4 vB; in vec4 vC; in float vD;
+uniform sampler2D uN; uniform vec3 uPal[5]; uniform vec4 uSty; uniform vec3 uSty2; uniform vec2 uBloom;
+uniform highp sampler2D uDep; uniform vec4 uNF;
 out vec4 o;
 #define SD (vA.y * .173)
 #define TM vA.z
 #define AGE vA.w
+#define CURL uSty2.x
 vec4 N(vec2 p){ return texture(uN, p); }
-// (two takes of it, one turned: for the big shapes, so nothing in them lines up)
-vec4 NR(vec2 p){ return (texture(uN, p) + texture(uN, mat2(.8, -.6, .6, .8) * p * 1.31 + .37) - 1.) * .72 + .5; }
+// (the spells' soft edges, gl.js VFX_SOFT_GLSL: how far the scene is behind this point of the card)
+float pyLin(float d){ return uNF.z > .5 ? uNF.x + d*(uNF.y-uNF.x) : uNF.x*uNF.y/(uNF.y - d*(uNF.y-uNF.x)); }
+float pySoft(float k){ if (uNF.w < .5 || k <= 0.) return 1.; float s = pyLin(texelFetch(uDep, ivec2(gl_FragCoord.xy), 0).r); return clamp((s - vD) / k, 0., 1.); }
 
-// a tongue: x across (-1..1), y from its root to its tip (0..1); vB.z how wide; vB.w more tips across it (a broad fire: one
-// body, its top licked into several tips)
-float fFlame(vec2 uv){
+// Each shape gives back (how much fire is here: 0 its edge, 1 its thick middle; how hot it is: 0 cold .. 1 the white heart;
+// how far its cool parts have gone to smoke: 0 they just fade out red, 1 they are soot).
+
+// a sheet of flame: x across (-1..1), y from its root to its tip (0..1); vB.z how wide; vB.w more tips across it (a broad
+// fire: one body, its top licked into several tips); vC.x its tip lags by this much
+vec3 fFlame(vec2 uv){
   float tips = 1. + vB.w;
   float lift = AGE * .5, v = (uv.y - lift) / (1. - lift), vc = clamp(v, 0., 1.);
-  float sway = (N(vec2(SD, uv.y * .2 - TM * .4)).a - .5) * 1.5 + (N(vec2(SD + .4, uv.y * .55 - TM * 1.)).r - .5) * .6;
-  float x = uv.x - sway * uSty2.x * vc * (.25 + .75 * vc) * .85 / tips;
-  float w = 1.5 * pow(vc, .45) * pow(1. - vc, 1.1) * (1. - .85 * AGE * AGE) * vB.z;
-  float body = v < 0. ? v * 8. : 1. - abs(x) / max(w, .0001);
-  float n = N(vec2(uv.x * .32 * tips + SD * 3., uv.y * .5 - TM * 1.2)).g, n2 = N(vec2(uv.x * .7 * tips + SD * 5., uv.y * 1.1 - TM * 2.1)).r;
-  float h = body * (1.1 - .62 * vc) - (n - .3) * (.12 + 1.15 * vc) * (1. + .4 * vB.w) - (n2 - .5) * .22 * vc;
-  return h - AGE * AGE * .3;
+  float sway = (N(vec2(SD, uv.y * .2 - TM * .38)).a - .5) * 1.4 + (N(vec2(SD + .4, uv.y * .55 - TM * .95)).r - .5) * .55;
+  float x = uv.x - vC.x * vc * vc - sway * CURL * vc * (.22 + .78 * vc) * .8 / tips;
+  float w = 1.45 * pow(vc, .42 + .1 * min(vB.w, 2.)) * (1. - vc) * (1. - .8 * AGE * AGE) * vB.z;
+  float body = v < 0. ? v * 8. : 1. - pow(abs(x) / max(w, .0001), 1.5);
+  // the turbulence climbing it, warped by a slower one: licks that curl, stretch and tear off, finer and looser up the flame
+  vec2 q = vec2(x * .34 * tips + SD * 3., uv.y * .46 - TM * 1.2);
+  q += (N(q * .55 + vec2(.31, -TM * .3)).ra - .5) * .2 * CURL;
+  float n = N(q).r, n2 = N(q * vec2(2.2, 2.) + vec2(SD * 2., -TM * 1.1)).g;
+  float d = body * (1.1 - .55 * vc) - (n - .3) * (.16 + 1.25 * vc) * (1. + .4 * vB.w) - (n2 - .5) * (.1 + .3 * vc);
+  d -= AGE * AGE * .3;
+  // (it thins to nothing at its root, sooner toward its sides, so no flame ends in a hard line on the ground or a body)
+  float xr = uv.x / max(.3, vB.z * .85);
+  d = min(d, (v - .14 * xr * xr) * 2.2 - .02);
+  // hottest on its axis a little above its root, cooling fast up it and out to its edge
+  // (its edge is thin orange, not dark: only its tip and what has aged go dark)
+  float heat = (.24 + .98 * pow(clamp(d, 0., 1.1), 1.5)) * (1.22 - 1.0 * vc) * (.42 + .58 * smoothstep(.02, .3, vc)) - .25 * AGE;
+  return vec3(d, heat, smoothstep(.45, 1., vc) * .75 + AGE * .7);
 }
-// a fireball: a round ball of rolling fire, its centre at y .78, flame swept back toward y 0; x across in the same units
-// (the card is half as wide as long)
-float fBall(vec2 uv){
-  float X = uv.x * .25, y = uv.y, R = .2;
-  vec2 d = vec2(X, y - .78); float r = length(d), ang = atan(d.y, d.x);
-  float roll = N(vec2(ang * .159 + SD - TM * .3, r * 1.3 - TM * .45)).r, roll2 = N(vec2(X * 1.4 + SD * 3., y * 1.4 + TM * 1.1)).g;
-  float head = (1. - r / R) * 1.3 + ((roll - .5) * .34 + (roll2 - .5) * .2) * smoothstep(.02, R, r) + .1 * d.y / R;
-  float q = clamp((.78 - y) / .66, 0., 1.);
-  float sway = ((N(vec2(SD, y * .35 + TM * .9)).a - .5) * .2 + (N(vec2(SD + .3, y * .9 + TM * 2.)).r - .5) * .07) * uSty2.x * q;
-  float w = R * (1. - .25 * q) * pow(1. - q, .6);
-  float tail = y > .78 ? -1. : 1. - abs(X - sway) / max(w, .0001);
-  float n = N(vec2(X * 1.6 + SD * 3., y * .55 + TM * 2.4)).g, n2 = N(vec2(X * 3. + SD * 5., y * 1.2 + TM * 3.6)).r;
-  tail = tail * (1. - .55 * q) - (n - .28) * (.1 + 1.35 * q) - (n2 - .5) * .3 * q;
-  return max(head, tail);
+// a ball of fire, -1..1 both ways: fire rolling out from a white-hot heart
+vec3 fBall(vec2 p){
+  float r = length(p), ang = atan(p.y, p.x);
+  vec2 w = N(p * .22 + vec2(SD, -TM * .4)).ra - .5;
+  float roll = N(vec2(ang * .159 + SD - TM * .22, r * .5 - TM * .75)).r;
+  float n2 = N(p * .5 + w * .35 * CURL + vec2(SD * 3., TM * .8)).g, bl = N(p * .3 + w * .2 + vec2(-TM * .3, SD * 2.)).b;
+  float d = (1. - r / .82) * 1.5 + ((roll - .5) * .85 + (bl - .5) * .4) * smoothstep(.08, .6, r) + (n2 - .5) * .3 - smoothstep(.8, 1., r);
+  float heat = max(.3, (1.2 - r * 1.55) * (.88 + .24 * roll)) + (n2 - .5) * .2;
+  return vec3(d, heat * clamp(d * 1.6, 0., 1.), 0.);
 }
-// an impact: a ball of fire blooming over the ground (at y -.6), licking upward, then hollowing and breaking into tongues
-// that lift away; AGE its life
-float fBurst(vec2 p){
-  float t = AGE, e = 1. - pow(1. - t, 3.);
-  vec2 g = vec2(p.x, p.y + .4);
-  g += (NR(g * .16 + vec2(SD, -TM * .25 - e * .4)).rg - .5) * (.14 + .2 * t) * uSty2.x;
-  g.y *= g.y > 0. ? 1. / (1. + .45 * e) : 1.7;
-  float r = length(g), th = atan(g.y, g.x);
-  float n = NR(vec2(th * .159 * 2. + SD, r * .2 - e * .45)).r;
-  float R = (.2 + .6 * e) * (.72 + .46 * n);
-  float h = 1. - r / R;
-  // (eaten away in a few big pieces, from its heart out)
-  float n2 = NR(g * .3 + vec2(SD * 2., -TM * .5 - e * .7)).g;
-  h -= n2 * 1.5 * pow(t, 1.4) + (n2 - .5) * .15;
-  h -= smoothstep(.3, .9, t) * (1. - smoothstep(0., R * .8, r)) * .9;
-  h = min(h, min((p.y + .62) * 7., (1. - max(abs(p.x), abs(p.y))) * 6.));
-  return h * (1.12 - .35 * t) - t * t * .25;
+// a billow of fire, -1..1 both ways; AGE its life: it rolls, swells, cools and is eaten away. vB.z how hot it starts
+vec3 fPuff(vec2 p){
+  float t = AGE, an = vA.y * 1.7 + t * 1.5 * (fract(vA.y * .37) > .5 ? 1. : -1.), ca = cos(an), sa = sin(an);
+  vec2 q = mat2(ca, -sa, sa, ca) * p;
+  vec2 w = N(q * .2 + vec2(SD, SD * 1.7 + TM * .1)).ra - .5;
+  q += w * (.3 + .35 * t) * CURL;
+  float r = length(p + w * .22 * CURL);
+  float bl = N(q * .3 + vec2(SD * 3., -TM * .3 - t * .3)).b, n2 = N(q * .72 + vec2(SD * 5., -TM * .7)).g;
+  float n1 = N(q * .26 + vec2(SD * 2., -TM * .22 - t * .25)).r;
+  float d = (1. - r) * 1.5 + (n1 - .5) * .9 + (bl - .5) * .7 + (n2 - .5) * .22 - .2 - smoothstep(.7, 1., length(p)) * 1.6;
+  d -= pow(t, 1.5) * (.7 + 1.5 * n2) + smoothstep(.72, 1., t) * 1.6 + (1. - smoothstep(0., .08, t)) * .7;
+  float heat = (.2 + .88 * pow(clamp(d, 0., 1.), 1.7)) * vB.z * pow(max(0., 1. - t * 1.15), 1.2) + (n1 - .5) * .1;
+  return vec3(d, heat, smoothstep(.2, .65, t));
 }
-// a ring racing out over the ground: -1..1 both ways, AGE its life
-float fRing(vec2 p){
-  float t = AGE, e = 1. - pow(1. - t, 2.6), r = length(p), th = atan(p.y, p.x);
-  float R = .1 + .82 * e, w = .05 * (1. - .6 * t) + .014, d = r - R;
-  float n = N(vec2(th * .159 * 6. + SD, r * .5 - e * 1.4)).r, n2 = N(vec2(th * .159 * 11. + SD * 2., r - e * 2.)).g;
-  float h = d > 0. ? 1. - d / w : 1. + d / (w * 3.6);
-  h -= (n - .2) * (.5 + 1.1 * t) + (n2 - .5) * .4;
-  return h * (.72 - .4 * t) - t * t * .3;
-}
-// a cone of fire: x across (-1..1), y from the hands (0) to its end (1); vB.z how far it has reached, vB.w how much has died from the hands
-float fJet(vec2 uv){
+// a stream of fire: x across (-1..1), y from the hands (0) to its end (1); vB.z how far it has reached, vB.w how much has died from the hands
+vec3 fJet(vec2 uv){
   float u = uv.x, v = uv.y;
-  float w = .07 + .93 * pow(v, .8);
-  float sway = (N(vec2(SD, v * .3 - TM * 1.)).a - .5) * .55 * v * uSty2.x;
-  float body = 1. - abs(u - sway) / w;
-  float n = N(vec2(u / w * .2 + SD * 2., v * .62 - TM * 2.3)).r, n2 = N(vec2(u * .55 + SD * 4., v * 1.5 - TM * 3.8)).g;
-  float h = body * (1.02 - .6 * v) - (n - .22) * (.26 + 1.2 * v) - (n2 - .5) * .36 * v;
-  h -= smoothstep(vB.z - .3, vB.z + .02, v) * 2.4;
-  h -= (1. - smoothstep(vB.w - .05, vB.w + .22, v)) * 2.4 * step(.001, vB.w);
-  return h;
+  float w = .08 + .92 * pow(v, .75);
+  float sway = (N(vec2(SD, v * .3 - TM * 1.)).a - .5) * .5 * v * CURL;
+  float x = (u - sway) / w;
+  vec2 q = vec2(x * .22 + SD * 2., v * .55 - TM * 2.2);
+  q += (N(q * .6 + vec2(.2, -TM * .5)).ra - .5) * .2 * CURL;
+  float n = N(q).r, n2 = N(q * 2.3 + vec2(SD * 4., -TM * 1.6)).g;
+  float d = (1. - pow(abs(x), 1.5)) * (1.05 - .55 * v) - (n - .25) * (.25 + 1.15 * v) - (n2 - .5) * .34 * v;
+  d = min(d, v * 9.);
+  d -= smoothstep(vB.z - .3, vB.z + .02, v) * 2.4;
+  d -= (1. - smoothstep(vB.w - .05, vB.w + .22, v)) * 2.4 * step(.001, vB.w);
+  float heat = (.2 + .86 * pow(clamp(d, 0., 1.1), 1.3)) * (1.28 - 1.18 * v);
+  return vec3(d, heat, smoothstep(.55, 1., v));
 }
 // a wing seen from above: x along its span from the shoulder (0) to its tip (1), y from its leading edge side (0) back (1).
-// A hot leading edge swept back toward the tip, broad feathers of flame behind it (longest mid-wing), their ends licking
-float fWing(vec2 uv){
+// A hot leading edge swept back toward the tip, broad feathers of flame behind it (longest mid-wing), cooling to their ends
+vec3 fWing(vec2 uv){
   float s = uv.x, c = uv.y;
-  float lead = .05 + .36 * pow(s, 1.7);
-  float f = fract(s * 5.5 + .25), lobe = 1. - .42 * pow(abs(f * 2. - 1.), 2.2);
+  float lead = .06 + .36 * pow(s, 1.7);
+  float f = fract(s * 5.5 + .25), lobe = 1. - .58 * pow(abs(f * 2. - 1.), 2.2);
   float chord = (.8 * pow(max(0., 1. - s), .55) * (.45 + .55 * smoothstep(0., .35, s)) + .04) * lobe;
-  float n = N(vec2(s * .6 + SD * 2., c * .5 - TM * 1.3)).r, n2 = N(vec2(s * 1.6 + SD * 4., c * 1.2 - TM * 2.3)).g;
+  vec2 wq = (N(vec2(s * .4 + SD, c * .4 - TM * .5)).ra - .5) * .12 * CURL;
+  float n = N(vec2(s * .6 + SD * 2., c * .5 - TM * 1.3) + wq).r, n2 = N(vec2(s * 1.6 + SD * 4., c * 1.2 - TM * 2.3) + wq).g;
   chord *= .8 + .4 * n;
-  float d = c - lead, q = d / max(chord, .001);
-  float h = d < 0. ? 1. + d / .035 : 1. - q;
-  h -= (n2 - .32) * smoothstep(.4, 1., q) * .9;
-  h = min(h, min((1. - s) * 9., s * 16. + .5));
-  return h * (.8 - .2 * s);
+  float dd = c - lead, q = dd / max(chord, .001);
+  float d = dd < 0. ? 1. + dd / .05 : 1. - q;
+  d -= (n2 - .32) * smoothstep(.3, 1., q) * .9;
+  d = min(d, min((1. - s) * 9., s * 16. + .5)) * (.9 - .2 * s);
+  float heat = (.2 + .85 * pow(clamp(d, 0., 1.), 1.5)) * (1.22 - .62 * s) * (1. - .55 * smoothstep(.35, 1., q)) + (n - .5) * .1;
+  return vec3(d, heat, smoothstep(.5, 1., q) * .6);
 }
-// a spark: x across, y along its flight
-float fEmber(vec2 uv){ float y = uv.y * 2. - 1.; return 1. - (abs(uv.x) * 1.15 + (y > 0. ? y * y : -y * .9)); }
-// the flat painted bands; hk < 1 keeps the heart out of it
-vec4 paint(float h, vec2 gp){
-  float gr = (N(gp * vec2(1.3, .4) + SD * 7.).g - .5) * uSty.w, x = clamp(h, -1.5, 2.) + gr * .06;
-  float aa = min(.12, fwidth(x) * 1.1 + .005 + .02 * uSty.z);
-  float t1 = .1 * uSty.x, t2 = t1 + .17, t3 = t2 + .2 / uSty.y, t4 = t3 + .25 / uSty.y;
-  float cov = smoothstep(-aa, aa, x);
-  float m1 = smoothstep(t1 - aa, t1 + aa, x), m2 = smoothstep(t2 - aa, t2 + aa, x), m3 = smoothstep(t3 - aa, t3 + aa, x), m4 = smoothstep(t4 - aa, t4 + aa, x);
-  vec3 c = mix(mix(mix(mix(uPal[0], uPal[1], m1), uPal[2], m2), uPal[3], m3), uPal[4], m4);
-  if (uBloom > .5) return vec4(c * m3 * .3 * vB.x * vB.y, 0.);
-  c *= 1. + gr * .16;
-  float al = mix(.95, .72, m3);
-  vec3 rgb = c * cov * vB.x;
-  rgb += uPal[2] * exp(min(x, 0.) * 13.) * (1. - cov) * .2 * uSty2.y;
-  return vec4(rgb, al * cov) * vB.y;
+// the heat gradient
+vec3 ramp(float h){
+  vec3 c = mix(uPal[0], uPal[1], smoothstep(.08, .3, h));
+  c = mix(c, uPal[2], smoothstep(.26, .5, h));
+  c = mix(c, uPal[3], smoothstep(.48, .74, h));
+  return mix(c, uPal[4], smoothstep(.72, .98, h));
+}
+// fire of density d and this heat, painted: soft where it thins (no outline), the gradient blended smoothly with a little
+// terracing and brush grain left in it; hot fire mostly adds its light; where it has cooled it fades out red, or (smk) is
+// dark soot that covers what is behind it
+vec4 fire(float d, float heat, float smk, vec2 gp){
+  float gr = (N(gp * vec2(1.9, .7) + SD * 7.).g - .5) * uSty.w;
+  float dens = smoothstep(0., .32, d + gr * .07);
+  float h = clamp(heat * uSty.y * vC.y + gr * .12, 0., 1.25);
+  // (a little terracing left in the gradient, the painter's hand: uSty.z 1 none, 0 flat bands)
+  float S = uSty.z, qh = h * 6., fh = fract(qh);
+  h = mix((floor(qh) + smoothstep(.5 - .5 * S, .5 + .5 * S, fh)) / 6., h, S * S * .6);
+  vec3 c = ramp(h);
+  if (uBloom.x > .5) return vec4(c * dens * smoothstep(.62, 1., h) * .3 * vB.x * vB.y, 0.);
+  float cool = 1. - smoothstep(.03, .2, h), sm = clamp(smk, 0., 1.), soot = sm * min(1., uSty.x * vC.w);
+  vec3 e = mix(c * (.5 + 1.35 * h * h) * vB.x, vec3(.076, .055, .047), cool * soot);
+  // (cool fire that is not smoke only adds its dim light: it never darkens what is behind it, so nothing gets a dark rim)
+  float al = dens * mix(mix(.06, .6, smoothstep(.08, .42, h)) - .18 * smoothstep(.45, .95, h), .5 * uSty.x * vC.w, cool * sm);
+  vec3 rgb = e * dens * mix(1., mix(.7, 1., soot), cool);
+  rgb += uPal[2] * exp(min(d, 0.) * 6.5) * (1. - dens) * .09 * uSty2.y * vB.x;
+  return vec4(rgb, al) * vB.y;
 }
 void main(){
   int sh = int(vA.x + .5);
+  float sf = pySoft(vC.z);
   if (sh == 6) {
-    // smoke: its own two tones, lit from above, warm underneath while it is fresh
-    if (uBloom > .5) discard;
-    vec2 p = vUV; float t = AGE, r = length(p);
-    float n = N(p * .3 + vec2(SD * 2., -TM * .1 - t * .25)).r, n2 = N(p * .62 + vec2(SD * 5., -t * .5)).g;
-    float h = 1. - r / (.5 + .38 * t) + (n - .5) * 1.;
-    h -= t * t * 1.5 * n2 + smoothstep(.55, 1., t) * .5;
-    float aa = fwidth(h) * 1.1 + .03, cov = smoothstep(-aa, aa, h);
-    float lit = smoothstep(-.35, .45, p.y + (n - .5) * .7) * smoothstep(.02, .3, h);
-    vec3 c = mix(vec3(.085, .062, .058), vec3(.25, .2, .185), lit);
-    c = mix(c, uPal[1] * .55, (1. - lit) * (1. - smoothstep(0., .45, t)) * .55);
-    float al = cov * .66 * (1. - t * t) * vB.y;
+    // smoke: a soft dark billow, lit from above, warm underneath while it is fresh
+    if (uBloom.x > .5) discard;
+    vec2 p = vUV; float t = AGE, an = vA.y * 2.1 + t * 1.1, ca = cos(an), sa = sin(an);
+    vec2 q = mat2(ca, -sa, sa, ca) * p, w = N(q * .2 + vec2(SD, t * .2)).ra - .5;
+    q += w * .4 * CURL;
+    float bl = N(q * .3 + vec2(SD * 2., -TM * .07 - t * .2)).b, n2 = N(q * .68 + vec2(SD * 5., -t * .4)).g;
+    float d = (1. - length(p + w * .2)) * 1.35 + (bl - .5) * 1.15 + (n2 - .5) * .3 - .22 - t * t * 1.1 * (.5 + n2) - smoothstep(.7, 1., length(p)) * 1.6;
+    float cov = smoothstep(0., .5, d);
+    float lit = smoothstep(-.4, .5, p.y + (bl - .5) * .8) * smoothstep(.05, .7, d);
+    vec3 c = mix(vec3(.07, .055, .05), vec3(.215, .178, .162), lit);
+    c = mix(c, uPal[1] * .6, (1. - lit) * (1. - smoothstep(0., .4, t)) * .5);
+    float al = cov * .62 * (1. - t) * smoothstep(0., .1, t) * vB.y * sf;
     o = vec4(c * al * vB.x, al);
   } else if (sh == 7) {
     float g = pow(max(0., 1. - length(vUV)), 2.2);
-    o = vec4(mix(uPal[2], uPal[4], g) * g * vB.x * vB.y * (uBloom > .5 ? .25 : 1.), 0.);
+    o = vec4(mix(uPal[2], uPal[4], g * g) * g * vB.x * vB.y * sf * (uBloom.x > .5 ? .25 : 1.), 0.);
+  } else if (sh == 8) {
+    // a spark: a hot head (y 1) and its streak, cooling as it dies
+    float y = vUV.y, core = pow(max(0., 1. - abs(vUV.x)), 2.5) * smoothstep(0., .85, y) * (1. - smoothstep(.86, 1., y));
+    vec3 c = mix(mix(uPal[2], mix(uPal[3], uPal[4], .35), y * y * y), uPal[1], AGE * .75) * (.9 + .8 * y);
+    o = vec4(c * core * vB.x * vB.y * (uBloom.x > .5 ? .35 : 1.), 0.);
   } else {
-    float h = sh == 0 ? fFlame(vUV) : sh == 1 ? fBall(vUV) : sh == 2 ? fBurst(vUV) : sh == 3 ? fRing(vUV) : sh == 4 ? fJet(vUV) : sh == 5 ? fWing(vUV) : fEmber(vUV);
-    o = paint(h, vUV);
+    vec3 f = sh == 0 ? fFlame(vUV) : sh == 1 ? fBall(vUV) : sh == 2 ? fPuff(vUV) : sh == 4 ? fJet(vUV) : fWing(vUV);
+    o = fire(f.x, f.y, f.z, vUV) * sf;
   }
-  if (o.a < .004 && max(o.r, max(o.g, o.b)) < .004) discard;
+  if (max(o.a, max(o.r, max(o.g, o.b))) < .003) discard;
 }`/*>FS*/;
 
 /* ---- the cards ---- */
 // o: { seed, age, k (brightness), a (opacity), p0, p1 (the shape's own), sp (its clock's speed), pull (world units toward the
-// camera, so fire among the foes isn't swallowed by them), top (over everything), tg (the Element Lab's recolour) }
+// camera, so fire among the foes isn't swallowed by them), top (over everything), tg (the Element Lab's recolour), bend, heat,
+// soft, soot (see the shader's vC) }
 function pyfPush(sh, c, uv, o, dz) {
   if (PYF.q.length >= PYF.MAX || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
   o = o || {};
   const now = typeof G !== 'undefined' && G && G.time != null ? G.time : 0, sd = o.seed || 0;
-  PYF.q.push({ sh, c, uv, sd, tm: (now * (o.sp || 1)) % 997 + sd * .37, age: o.age || 0, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0, ord: PYF_ORD[sh], dz, top: !!o.top, tg: o.tg || null });
+  let k = o.k == null ? 1 : o.k;
+  // (fire flickers: each card's brightness wavers on its own)
+  if (sh < 6) { const fl = pyfStyle().sty2[2]; if (fl) k *= 1 + fl * (.085 * Math.sin(now * 37 + sd * 1.7) + .06 * Math.sin(now * 23.3 + sd * .9)); }
+  PYF.q.push({ sh, c, uv, sd, tm: (now * (o.sp || 1)) % 997 + sd * .37, age: o.age || 0, k, a: o.a == null ? 1 : o.a, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0,
+    bend: o.bend || 0, heat: o.heat == null ? 1 : o.heat, soft: o.soft == null ? .12 : o.soft, soot: o.soot == null ? 1 : o.soot,
+    // (fire that has aged toward smoke is laid down first, so hot fire always shows over smoke, never greyed behind it)
+    ord: PYF_ORD[sh] - (sh < 6 ? Math.min(.8, Math.floor((o.age || 0) * 5) / 10) : 0), dz, top: !!o.top, tg: o.tg || null });
   const X = RD.vfx; if (!X.ext.includes(PYF_EXT)) X.ext.push(PYF_EXT); PYF_EXT.n = PYF.q.length;
   return true;
 }
@@ -85793,23 +86814,20 @@ function pyfBill(sh, P, w, h, uv, o) {
   return pyfPush(sh, [cx - r[0] * a - up[0] * b, cy - r[1] * a - up[1] * b, cz - r[2] * a - up[2] * b, cx + r[0] * a - up[0] * b, cy + r[1] * a - up[1] * b, cz + r[2] * a - up[2] * b,
     cx + r[0] * a + up[0] * b, cy + r[1] * a + up[1] * b, cz + r[2] * a + up[2] * b, cx - r[0] * a + up[0] * b, cy - r[1] * a + up[1] * b, cz - r[2] * a + up[2] * b], uv, o, cx * fw[0] + cy * fw[1] + cz * fw[2]);
 }
-// along dir from P, len long and wid wide, turned about its length to face the camera; o.at: where along it P is (0 its root)
+// along dir from P, len long and wid wide, turned about its length to face the camera; o.at: where along it P is (0 its
+// root); o.lag: a world vector its tip trails by (a flame on something moving): the card widens to hold the bend
 function pyfAxial(sh, P, dir, len, wid, o) {
   if (typeof RD === 'undefined' || !RD || !RD.right) return false;
   const fw = pyfFw(), dv = dir[0] * fw[0] + dir[1] * fw[1] + dir[2] * fw[2]; let ax = [dir[0] - fw[0] * dv, dir[1] - fw[1] * dv, dir[2] - fw[2] * dv]; const al = Math.hypot(ax[0], ax[1], ax[2]);
   ax = al > 1e-3 ? [ax[0] / al, ax[1] / al, ax[2] / al] : RD.up;
   const wx = [fw[1] * ax[2] - fw[2] * ax[1], fw[2] * ax[0] - fw[0] * ax[2], fw[0] * ax[1] - fw[1] * ax[0]];
-  // (seen end on it looks shorter: its length follows how much of it the screen sees, never less than two fifths)
-  const L = len * Math.max(.4, al), pl = (o && o.pull) || 0, at = (o && o.at) || 0, hw = wid * .5;
+  // (seen end on it looks shorter: its length follows how much of it the screen sees, never less than two fifths, or
+  // o.floor: a flame standing on the ground is kept taller than the game's steep camera would truly show it)
+  const L = len * Math.max((o && o.floor) || .4, al), pl = (o && o.pull) || 0, at = (o && o.at) || 0; let hw = wid * .5, ux = 1;
+  if (o && o.lag) { const b = Math.max(-1.6, Math.min(1.6, (o.lag[0] * wx[0] + o.lag[1] * wx[1] + o.lag[2] * wx[2]) / Math.max(1e-4, hw))); o.bend = b; ux = 1 + Math.abs(b); hw *= ux; }
   const bx = P[0] + fw[0] * pl - ax[0] * L * at, by = P[1] + fw[1] * pl - ax[1] * L * at, bz = P[2] + fw[2] * pl - ax[2] * L * at, tx = bx + ax[0] * L, ty = by + ax[1] * L, tz = bz + ax[2] * L;
   return pyfPush(sh, [bx - wx[0] * hw, by - wx[1] * hw, bz - wx[2] * hw, bx + wx[0] * hw, by + wx[1] * hw, bz + wx[2] * hw, tx + wx[0] * hw, ty + wx[1] * hw, tz + wx[2] * hw, tx - wx[0] * hw, ty - wx[1] * hw, tz - wx[2] * hw],
-    [-1, 0, 1, 1], o, (bx + tx) * .5 * fw[0] + (by + ty) * .5 * fw[1] + (bz + tz) * .5 * fw[2]);
-}
-// flat on the ground at height y, r from its centre to each side, turned by rot
-function pyfFlat(sh, x, y, z, r, rot, o) {
-  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
-  const c = Math.cos(rot || 0) * r, s = Math.sin(rot || 0) * r, fw = pyfFw();
-  return pyfPush(sh, [x - c + s, y, z - s - c, x + c + s, y, z + s - c, x + c - s, y, z + s + c, x - c - s, y, z - s + c], [-1, -1, 1, 1], o, x * fw[0] + y * fw[1] + z * fw[2] - 50);
+    [-ux, 0, ux, 1], o, (bx + tx) * .5 * fw[0] + (by + ty) * .5 * fw[1] + (bz + tz) * .5 * fw[2]);
 }
 // any quad: its corner O, its sides U and V (uv 0..1 along each)
 function pyfQuad(sh, O, U, V, o) {
@@ -85821,92 +86839,108 @@ function pyfQuad(sh, O, U, V, o) {
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { PYF.q.length = 0; });
 
 /* ---- drawing ---- */
-const PYF_F = 13, _pyfV = new Float32Array(PYF.MAX * 4 * PYF_F), _pyfI = new Uint16Array(PYF.MAX * 6);
-const PYF_EXT = {
-  n: 0, P: null, vao: null, vb: null, fsOf: null, filled: -1,
-  build() {
-    const X = RD.vfx, gl = X.gl; this.P = X.prog(PYF_VS, PYF.fs); this.fsOf = PYF.fs;
-    if (this.vao) return;
-    this.vao = gl.createVertexArray(); this.vb = gl.createBuffer(); const ib = gl.createBuffer();
-    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.vb); gl.bufferData(gl.ARRAY_BUFFER, _pyfV.byteLength, gl.DYNAMIC_DRAW);
-    const st = PYF_F * 4;
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
-    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 12);
-    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, st, 20);
-    gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 36);
-    for (let q = 0; q < PYF.MAX; q++) _pyfI.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, _pyfI, gl.STATIC_DRAW);
-    gl.bindVertexArray(null);
-    const N0 = pyfNoise(), t = PYF.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N0.W, N0.W, 0, gl.RGBA, gl.UNSIGNED_BYTE, N0.px);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-  },
-  // the frame's cards, in the order they are laid down, grouped by what is drawn alike (over everything or not, its recolour)
-  fill() {
-    const Q = PYF.q; Q.sort((a, b) => a.ord - b.ord || a.dz - b.dz);
-    this.groups = []; let o = 0, g = null;
-    for (let i = 0; i < Q.length; i++) {
-      const e = Q[i], c = e.c, uv = e.uv;
-      if (!g || g.top !== e.top || g.tg !== e.tg) this.groups.push(g = { top: e.top, tg: e.tg, q0: i, n: 0 });
-      g.n++;
-      for (let k = 0; k < 4; k++) {
-        _pyfV[o] = c[k * 3]; _pyfV[o + 1] = c[k * 3 + 1]; _pyfV[o + 2] = c[k * 3 + 2];
-        _pyfV[o + 3] = k === 1 || k === 2 ? uv[2] : uv[0]; _pyfV[o + 4] = k > 1 ? uv[3] : uv[1];
-        _pyfV[o + 5] = e.sh; _pyfV[o + 6] = e.sd; _pyfV[o + 7] = e.tm; _pyfV[o + 8] = e.age;
-        _pyfV[o + 9] = e.k; _pyfV[o + 10] = e.a; _pyfV[o + 11] = e.p0; _pyfV[o + 12] = e.p1; o += PYF_F;
-      }
+const PYF_F = 17, _pyfV = new Float32Array(PYF.MAX * 4 * PYF_F), _pyfI = new Uint16Array(PYF.MAX * 6);
+function pyfBuild(E) {
+  const X = RD.vfx, gl = X.gl; E.P = X.prog(PYF_VS, PYF.fs); E.fsOf = PYF.fs;
+  if (E.vao) return;
+  E.vao = gl.createVertexArray(); E.vb = gl.createBuffer(); const ib = gl.createBuffer();
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb); gl.bufferData(gl.ARRAY_BUFFER, _pyfV.byteLength, gl.DYNAMIC_DRAW);
+  const st = PYF_F * 4;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, st, 20);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 36);
+  gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 4, gl.FLOAT, false, st, 52);
+  for (let q = 0; q < PYF.MAX; q++) _pyfI.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, _pyfI, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  const N0 = pyfNoise(), t = PYF.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N0.W, N0.W, 0, gl.RGBA, gl.UNSIGNED_BYTE, N0.px);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+}
+// the frame's cards, in the order they are laid down (far to near within each), grouped by what is drawn alike (over
+// everything or not, its recolour)
+function pyfFill(E) {
+  const Q = PYF.q; Q.sort((a, b) => a.ord - b.ord || a.dz - b.dz);
+  E.groups = []; let o = 0, g = null;
+  for (let i = 0; i < Q.length; i++) {
+    const e = Q[i], c = e.c, uv = e.uv;
+    if (!g || g.top !== e.top || g.tg !== e.tg) E.groups.push(g = { top: e.top, tg: e.tg, q0: i, n: 0 });
+    g.n++;
+    for (let k = 0; k < 4; k++) {
+      _pyfV[o] = c[k * 3]; _pyfV[o + 1] = c[k * 3 + 1]; _pyfV[o + 2] = c[k * 3 + 2];
+      _pyfV[o + 3] = k === 1 || k === 2 ? uv[2] : uv[0]; _pyfV[o + 4] = k > 1 ? uv[3] : uv[1];
+      _pyfV[o + 5] = e.sh; _pyfV[o + 6] = e.sd; _pyfV[o + 7] = e.tm; _pyfV[o + 8] = e.age;
+      _pyfV[o + 9] = e.k; _pyfV[o + 10] = e.a; _pyfV[o + 11] = e.p0; _pyfV[o + 12] = e.p1;
+      _pyfV[o + 13] = e.bend; _pyfV[o + 14] = e.heat; _pyfV[o + 15] = e.soft; _pyfV[o + 16] = e.soot; o += PYF_F;
     }
-    return Q.length;
-  },
-  draw(bloom) {
-    if (!RD || !RD.vfx || !PYF.q.length) return;
-    const X = RD.vfx, gl = X.gl, R = X.R; if (!this.P || this.fsOf !== PYF.fs) this.build();
-    gl.bindVertexArray(this.vao); gl.bindBuffer(gl.ARRAY_BUFFER, this.vb);
-    if (!bloom) { const nq = this.fill(); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _pyfV, 0, nq * 4 * PYF_F); }
-    const u = this.P.u, S = pyfStyle(); gl.useProgram(this.P.p);
-    gl.uniformMatrix4fv(u.uVP, false, R.vp); if (u.uBend) gl.uniform3fv(u.uBend, R.bend);
-    gl.uniform4fv(u.uSty, S.sty); gl.uniform3fv(u.uSty2, S.sty2); gl.uniform1f(u.uBloom, bloom ? 1 : 0);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, PYF.tex); gl.uniform1i(u.uN, 0);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, bloom ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    const up = u.uPal || u['uPal[0]'];
-    for (const g of this.groups) {
-      if (g.top || bloom) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
-      gl.uniform3fv(up, g.tg ? pyfPalOf(g.tg.c0, g.tg.c1, g.tg.c2) : S.pal);
-      gl.drawElements(gl.TRIANGLES, g.n * 6, gl.UNSIGNED_SHORT, g.q0 * 12);
-    }
-    gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
-  },
-};
+  }
+  return Q.length;
+}
+function pyfDraw(E, bloom) {
+  if (!RD || !RD.vfx || !PYF.q.length) return;
+  const X = RD.vfx, gl = X.gl; if (!E.P || E.fsOf !== PYF.fs) pyfBuild(E);
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb);
+  if (!bloom) { const nq = pyfFill(E); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _pyfV, 0, nq * 4 * PYF_F); }
+  // (the spells' shared uniforms: the view, the bend of the world, and the depth copy the soft edges read)
+  X.common(E.P, bloom, !bloom);
+  const u = E.P.u, S = pyfStyle();
+  gl.uniform4fv(u.uSty, S.sty); gl.uniform3fv(u.uSty2, S.sty2);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, PYF.tex); gl.uniform1i(u.uN, 2); gl.activeTexture(gl.TEXTURE0);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, bloom ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  const up = u.uPal || u['uPal[0]'];
+  for (const g of E.groups) {
+    if (g.top || bloom) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
+    gl.uniform3fv(up, g.tg ? pyfPalOf(g.tg.c0, g.tg.c1, g.tg.c2) : S.pal);
+    gl.drawElements(gl.TRIANGLES, g.n * 6, gl.UNSIGNED_SHORT, g.q0 * 12);
+  }
+  gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
+}
+const PYF_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], draw(bloom) { pyfDraw(this, bloom); } };
 
-/* ================= THE PYROCLASTS' FIRE: painted flame, drawn live =================
+/* ================= THE PYROCLASTS' FIRE: flame with an inside, drawn live =================
    The owner (10 Nov 2026): "can you do a new flame animation for pyro for all his spells. remove those ones entirely ... make
-   it more stylised", then of the first painted sheets: "have a go at doing my flame animations again". Every flame the
-   Pyroclasts make is drawn here on cards the flame shader paints live (pyrotex.js: FLAME, BALL, BURST, RING, JET, WING, SMOKE,
-   GLOW, EMBER), so the fire flows and no two flames are alike. Embers are game particles (part, kind 'pfe'), so the
-   Element Lab's particle controls act on them. Gameplay, timing and the sounds are untouched.
-   - Hand flame: a living tongue cupped in the casting palm and a faint glow, taller as a strike or spell gathers (then the
-     other palm lights too).
-   - Fireball (owner: "more of a classic fireball. have light emit from it along its path"): a round ball of rolling fire
-     with a short flame swept back, thrown straight and level at its target (owner: "fireball shouldnt lob like that instead
-     it should go straight to the target", "in a straight line across not downwards"), small tongues peeling off behind it; it carries a light that moves
-     with it and a warm pool on the ground under it. It lands in a quick flash, fire swelling low over the ground with a plume up its middle that lifts off and breaks up, a ring
-     of flame racing out to the splash's real edge, a few tongues left licking, embers flung, one puff of smoke, a brief
-     warm light on the ground.
-   - Burning glyph (a real area): one cohesive flame as wide as the area, its top licked into a few tips, its light on the
-     ground under it, embers. No marks on the ground: the owner found the cracked ground and rim read as runes.
-   - Skipping Flame: a smaller comet hopping along its arcs; each landing a small burst, ring and tongues.
-   - Furnace Breath: a roaring cone, jets of fire fanned from his hands and rolling out along it, tongues lifting off where it
-     ends, a low glow under it.
-   - Phoenix: a bird of flame seen from above: a comet body, two wings of flame beating (a hot leading edge, feathers of fire
-     streaming back), a tail of three long tongues; it dives into a great burst and leaves a ground fire.
-   - Burning foes (burns a Pyroclast set): small tongues licking up the foe's sides, depth-tested, so the foe stays whole.
-   Restraint: all of it scales with the Graphics setting (pfLv) and a card budget a frame (PF.cap); nothing rings the caster;
-   the rings shown are real areas (a splash, a glyph). Its values: the Element Lab (elemfx.js ELEM_FX_DEF, read through efx()). */
-const PF = { shots: [], hops: [], breath: [], phx: [], grounds: [], seen: new WeakSet(), quiet: null, glyphTick: false, cards: 0, cap: 200, last: 0, has: 0, hasT: -1 };
+   it more stylised", then "have a go at doing my flame animations again", then of the flat painted cut-outs that followed:
+   "would like it looking more like diablo4 style fire, slightly more realistic and a bit less like a moving sprite". Every
+   flame the Pyroclasts make is drawn here from the flame shader's soft cards (pyrotex.js: FLAME, BALL, PUFF, JET, WING, SMOKE,
+   GLOW, EMBER), and no effect is one card any more. Each is built the way fire is:
+   - volume: sheets of flame laid over each other at different depths, sizes and speeds (pfFire: a big, cool, slow one behind,
+     the body, a small white-hot one in front), so a flame has an inside and the layers slide over each other;
+   - shed fire: billows left behind in the world (PF.shots 'puff') that roll, swell, cool from yellow through red to dark smoke
+     and are eaten away, so a fireball's flame trails and is torn off, the breath rolls and billows, a fire's top tears away;
+   - lag: a flame's tip trails what carries it (a walking foe, a moving hand, a hop's arc);
+   - its company: smoke rising off it, sparks with streaks (cards, part 'pfe', and fine GPU sparks on Medium and High), a soft
+     glow, real light on the ground and on bodies (G.flashes), the air shimmering over it on High (vfxDistHaze), soft edges
+     where a card meets the ground or a body.
+   Gameplay, timing and the sounds are untouched.
+   - Hand flame: a small layered flame cupped in the casting palm, lagging the hand, taller as a cast gathers.
+   - Fireball (owner: "more of a classic fireball. have light emit from it along its path"): a rolling ball of fire, white at
+     its heart, its flame swept back, thrown straight and level at its target (owner: "fireball shouldnt lob like that instead
+     it should go straight to the target", "in a straight line across not downwards"); it sheds billows that hang where they were left and go to smoke, and carries a light that
+     moves with it and a warm pool on the ground under it (pfFlyLight). It lands in a quick flash: a ball of fire swelling
+     over the ground, fire thrown up its middle, fire rolling out low to the splash's real edge (no ring is drawn on the
+     ground), sparks flung, smoke, a brief light.
+   - Burning glyph (a real area): one cohesive fire over the area with depth (a bed of fire rolling over the whole of it, and
+     standing in that a tall cool sheet at its back, its body, a low white-hot sheet in front), flames torn off its top going
+     to smoke, its light on the ground and on what stands in it. No marks on the ground: the owner found cracked ground, rims
+     and rings read as runes.
+   - Skipping Flame: a smaller fireball hopping along its arcs, its flame bending with the arc; each landing a small burst.
+   - Furnace Breath: a stream of fire from his hands with billows thrown down it, swelling and rolling as they go, cooling to
+     red and to smoke where the cone ends.
+   - Phoenix: a bird of flame seen from above: a white-hot head, a body of fire streaming back, two layered wings beating (a
+     hot leading edge, feathers of fire cooling back), a tail of three long tongues; it sheds fire from its wingtips and tail,
+     dives into a great burst and leaves a ground fire.
+   - Burning foes (burns a Pyroclast set): small flames on the foe's back and sides, sized to its body, that lean back from
+     the way it walks and shed wisps behind it; held just clear of its body toward the camera and depth-tested, so the foe
+     stays whole and they are never swallowed by it.
+   Restraint: all of it scales with the Graphics setting (pfLv) and a card budget a frame (PF.cap); when the field is already
+   full of fire what is shed is thinned (pfThin); nothing rings the caster. Its values: the Element Lab (elemfx.js
+   ELEM_FX_DEF, read through efx()). */
+const PF = { shots: [], hops: [], breath: [], phx: [], grounds: [], seen: new WeakSet(), st: new WeakMap(), quiet: null, glyphTick: false, cards: 0, cap: 200, load: 0, last: 0, has: 0, hasT: -1 };
 const PF_IDS = ['cc_fireball', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave'], PF_UNIT = 'cc_pyroclast', PF_UP = [0, 1, 0];
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { for (const k of ['shots', 'hops', 'breath', 'phx', 'grounds']) PF[k].length = 0; });
 // the Graphics setting: 0 Low (fewer cards), 1 Medium, 2 High
@@ -85918,6 +86952,20 @@ const pfDrawing = () => typeof vfxReady === 'function' && typeof pyfBill === 'fu
 const pfNorm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
 const pfSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const PF_WARM = [1, .5, .16], PF_SQ = [-1, -1, 1, 1];
+// what the fire remembers about a thing between frames (a foe's pace, a hand's, a patch's timers): never on the thing itself
+function pfSt(o) { let s = PF.st.get(o); if (!s) PF.st.set(o, s = {}); return s; }
+// when the field is already full of fire, what is shed comes less often (1: as authored)
+function pfThin() { return PF.load > .8 ? 2.2 : PF.load > .55 ? 1.5 : 1; }
+// how fast a thing is moving, from where it was a frame ago, smoothed (st: its memory)
+function pfVel(st, x, y, z, now) {
+  const v = st.v || (st.v = [0, 0, 0]), p = st.p;
+  if (p && now > p[3] && now - p[3] < .25) { const k = 1 / (now - p[3]), m = Math.min(1, (now - p[3]) * 10); v[0] += ((x - p[0]) * k - v[0]) * m; v[1] += ((y - p[1]) * k - v[1]) * m; v[2] += ((z - p[2]) * k - v[2]) * m; }
+  else if (!p || now - p[3] >= .25 || now < p[3]) v[0] = v[1] = v[2] = 0;
+  if (!p || now !== p[3]) st.p = [x, y, z, now];
+  return v;
+}
+// the way a flame's tip trails something moving at v: back along it by lag seconds, never more than most
+function pfLag(v, lag, most) { let x = -v[0] * lag, y = -v[1] * lag, z = -v[2] * lag; const l = Math.hypot(x, y, z); if (l < 1e-3) return null; if (l > most) { const k = most / l; x *= k; y *= k; z *= k; } return [x, y, z]; }
 
 /* ---- drawing: each card under its effect's Element Lab layer ---- */
 // the layer's tuning onto a card's options (brightness, opacity, speed, recolour); its size back, or null: not drawn
@@ -85935,33 +86983,46 @@ function pfTune(s, l, size, o) {
   }
   PF.cards++; return size;
 }
-// a tongue rooted at P, len long along dir (o.fat: how wide; o.wide: its card's width per length, o.tips: more tips
-// across it, for one broad fire)
-function pfFlame(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.p0 = o.fat == null ? 1 : o.fat; o.p1 = o.tips || 0; return pyfAxial(PYF_SH.FLAME, P, dir, z, z * (o.wide || .66), o); }
-// a fireball, its ball at P, flying along dir (len: the ball and the flame behind it; the ball two fifths of that across)
-function pfComet(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.at = .78; return pyfAxial(PYF_SH.BALL, P, dir, z, z * .5, o); }
-function pfGlow(P, w, o, s, l) { const z = pfTune(s, l, w, o); return z != null && pyfBill(PYF_SH.GLOW, P, z, z, PF_SQ, o); }
-// a jet of the breath's cone from P along dir, wid across at its end
-function pfJet(P, dir, len, wid, o, s) { const z = pfTune(s, 'core', len, o); return z != null && pyfAxial(PYF_SH.JET, P, dir, z, wid * z / len, o); }
-// a one-shot played where it was left. kind: burst (w across, on the ground at x, z), ring (w its radius), wisp (a tongue w
-// long lifting off from x, y, z), puff (smoke w across), flash (added light w across)
+// one sheet of flame rooted at P, len long along dir (o.fat: how wide; o.wide: its card's width per length; o.tips: more
+// tips across it, for one broad fire; o.heat: x its temperature; o.lag: its tip trails by this, in the world)
+function pfFlame(P, dir, len, o, s, l) { const z = pfTune(s, l, len, o); if (z == null) return false; o.p0 = o.fat == null ? 1 : o.fat; o.p1 = o.tips || 0; if (o.soft == null) o.soft = Math.min(.2, z * .3); if (o.floor == null) o.floor = .7; return pyfAxial(PYF_SH.FLAME, P, dir, z, z * (o.wide || .66), o); }
+// a flame with an inside: sheets at different depths, sizes and speeds. o.n: how many (1 its body; 2 a small white-hot
+// sheet in front of it too; 3 also a big, cool, slow one behind); by default as many as the Graphics setting draws
+function pfFire(P, dir, len, o, s, l) {
+  const lv = pfLv(), n = Math.min(o.n || 3, lv + 1), sd = o.seed || 0, pull = o.pull || 0, k = o.k == null ? 1 : o.k, fat = o.fat == null ? 1 : o.fat, sp = o.sp || 1, ht = o.heat == null ? 1 : o.heat;
+  if (n > 2) pfFlame(P, dir, len * 1.1, Object.assign({}, o, { seed: sd + 7, pull: pull - .025, k: k * .85, heat: ht * .66, fat: fat * 1.15, sp: sp * .78 }), s, l);
+  pfFlame(P, dir, len * (n > 1 ? .92 : 1), Object.assign({}, o), s, l);
+  if (n > 1) pfFlame(P, dir, len * .56, Object.assign({}, o, { seed: sd + 13, pull: pull + .025, heat: ht * 1.4, fat: fat * .64, sp: sp * 1.3, tips: (o.tips || 0) * .6 }), s, l);
+}
+// a ball of fire w across at P
+function pfBall(P, w, o, s, l) { const z = pfTune(s, l, w, o); if (z == null) return false; if (o.soft == null) o.soft = Math.min(.2, z * .3); return pyfBill(PYF_SH.BALL, P, z, z, PF_SQ, o); }
+function pfGlow(P, w, o, s, l) { const z = pfTune(s, l, w, o); if (z == null) return false; if (o.soft == null) o.soft = Math.min(.3, z * .2); return pyfBill(PYF_SH.GLOW, P, z, z, PF_SQ, o); }
+// a sheet of the breath's stream from P along dir, wid across at its end
+function pfJet(P, dir, len, wid, o, s) { const z = pfTune(s, 'core', len, o); if (z == null) return false; if (o.soft == null) o.soft = .14; return pyfAxial(PYF_SH.JET, P, dir, z, wid * z / len, o); }
+// something left in the world to play out where it was left, drifting: thrown (vx, rise, vz), slowed by the air (drag),
+// lifted by its own heat (buoy), swelling (grow). kind: puff (a billow of fire w across, cooling to smoke: hot how hot it
+// starts, soot how much smoke it leaves), wisp (a tongue w long lifting off), smoke (w across), flash (added light), haze (the
+// air shimmering, High)
 function pfShot(kind, x, y, z, w, dur, o, s, l) {
-  o = o || {}; if (PF.shots.length >= 160) PF.shots.shift();
-  PF.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, vy: o.rise || 0, vx: o.vx || 0, vz: o.vz || 0, grow: o.grow || 0, lean: o.lean || null, fat: o.fat, seed: (Math.random() * 97) | 0, s, l });
+  o = o || {}; if (PF.shots.length >= 240) PF.shots.shift();
+  PF.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, vy: o.rise || 0, vx: o.vx || 0, vz: o.vz || 0, drag: o.drag || 0, buoy: o.buoy || 0, grow: o.grow || 0,
+    lean: o.lean || null, fat: o.fat, hot: o.hot == null ? 1 : o.hot, soot: o.soot == null ? 1 : o.soot, heat: o.heat == null ? 1 : o.heat, pull: o.pull, seed: (Math.random() * 97) | 0, s, l });
 }
 function pfShots(now) {
   PF.shots = PF.shots.filter(e => now - e.at < e.dur);
   for (const e of PF.shots) {
     const el = now - e.at; if (el < 0) continue;
-    const age = el / e.dur, x = e.x + e.vx * el, y = e.y + e.vy * el, z = e.z + e.vz * el, w = e.w * (1 + e.grow * age), o = { k: e.k, a: e.a, seed: e.seed, age };
-    if (e.kind === 'burst') { const s = pfTune(e.s, e.l, w, o); if (s != null) { o.lift = .3 * s; o.pull = .16 * s; pyfBill(PYF_SH.BURST, [x, .02, z], s, s, PF_SQ, o); } }
-    else if (e.kind === 'ring') { const s = pfTune(e.s, e.l, w, o); if (s != null) pyfFlat(PYF_SH.RING, x, .034, z, s / .92, e.seed, o); }
-    else if (e.kind === 'wisp') { o.pull = .08; o.fat = e.fat; pfFlame([x, y, z], e.lean || PF_UP, w, o, e.s, e.l); }
-    else if (e.kind === 'puff') { const s = pfTune(e.s, e.l, w, o); if (s != null) { o.pull = .2; pyfBill(PYF_SH.SMOKE, [x, y, z], s, s, PF_SQ, o); } }
+    const age = el / e.dur, f = e.drag > 0 ? (1 - Math.exp(-e.drag * el)) / e.drag : el, x = e.x + e.vx * f, y = e.y + e.vy * f + .5 * e.buoy * el * el, z = e.z + e.vz * f;
+    const w = e.w * (1 + e.grow * (1 - (1 - age) * (1 - age))), o = { k: e.k, a: e.a, seed: e.seed, age };
+    if (e.kind === 'puff') { const sz = pfTune(e.s, e.l, w, o); if (sz != null) { o.p0 = e.hot; o.soot = e.soot; o.pull = e.pull == null ? .12 : e.pull; o.soft = Math.min(.3, sz * .25); o.sp = .8; pyfBill(PYF_SH.PUFF, [x, Math.max(y, sz * .42 * RD.up[1]), z], sz, sz, PF_SQ, o); } }   // (it rests on the ground, never cut by it)
+    else if (e.kind === 'wisp') { o.pull = .08; o.fat = e.fat; o.heat = e.heat; pfFlame([x, y, z], e.lean || PF_UP, w, o, e.s, e.l); }
+    else if (e.kind === 'smoke') { const sz = pfTune(e.s, e.l, w, o); if (sz != null) { o.pull = .1; o.soft = Math.min(.4, sz * .3); pyfBill(PYF_SH.SMOKE, [x, y, z], sz, sz, PF_SQ, o); } }
     else if (e.kind === 'flash') { o.a = e.a * (1 - age) * (1 - age); o.pull = .2; pfGlow([x, y, z], w * (.7 + .5 * age), o, e.s, e.l); }
+    else if (e.kind === 'haze') { if (typeof vfxDistHaze === 'function') vfxDistHaze(x, y, z, w * (.6 + .6 * age), e.a * (1 - age)); }
   }
 }
 // an ember: a game particle (its count, size, life, speed, lift, turbulence and colour tunable in the lab), drawn as a spark
+// with a streak
 function pfEmber(x, h, z, vx, vh, vz, o, s) {
   const e = efxPush(s, 'embers');
   try { part({ k: 'pfe', x, z, h, vx, vz, vh, g: -(o.lift == null ? .5 : o.lift), drag: o.drag || 1.6, life: o.life, max: o.life, size: o.w, col: '#ffb040', v: (Math.random() * 97) | 0 }); } finally { efxPop(e); }
@@ -85970,22 +87031,60 @@ function pfEmbers() {
   let n = 0; const cap = [40, 90, 150][pfLv()];
   for (const p of G.parts) {
     if (p.k !== 'pfe' || n >= cap) continue; n++;
-    const a = Math.max(0, Math.min(1, p.life / p.max)), sp = Math.hypot(p.vx, p.vh, p.vz), sz = p.size * (.6 + .4 * a);
-    pyfAxial(PYF_SH.EMBER, [p.x, p.h, p.z], sp > .05 ? [p.vx / sp, p.vh / sp, p.vz / sp] : PF_UP, sz * (1.5 + Math.min(2.4, sp * .9)), sz, { at: .5, k: 1.1, a: Math.min(1, a * 2.2) * (.8 + .2 * Math.sin(p.life * 31 + p.v)), seed: p.v, pull: .03 });
+    const a = Math.max(0, Math.min(1, p.life / p.max)), sp = Math.hypot(p.vx, p.vh, p.vz), sz = p.size * (.55 + .45 * a);
+    pyfAxial(PYF_SH.EMBER, [p.x, p.h, p.z], sp > .05 ? [p.vx / sp, p.vh / sp, p.vz / sp] : PF_UP, sz * (1.7 + Math.min(4.5, sp * 1.7)), sz * .6, { at: .88, age: 1 - a, k: 1.2, a: Math.min(1, a * 2.4) * (.75 + .25 * Math.sin(p.life * 31 + p.v)), seed: p.v, pull: .03, soft: 0 });
   }
 }
+// fine sparks flung from a point (GPU particles: none on Low, more on High; n: how many on Medium). o: over the burst's own
+let _pfSpk = null;
+function pfSparks(x, y, z, n, o, s) {
+  if (!(n > 0) || typeof vfxBurst !== 'function' || typeof vfxC !== 'function') return;
+  const C = _pfSpk || (_pfSpk = [vfxC('#ffe9b4', 1.4), vfxC('#ff5210')]), e = efxPush(s, 'embers');
+  try { vfxBurst(Object.assign({ x, y, z, shape: 'hemi', sp: [.6, 2.2], up: [.3, 1.2], life: [.25, .55], size: [.011, .02], c0: C[0], c1: C[1], a0: 1, a1: 0, drag: 1.6, grav: 2.2, curl: .25, stretch: .035 }, o), n); } finally { efxPop(e); }
+}
 function pfLight(x, z, h, k, rad, life, s) { const e = efxPush(s, 'light'); try { if (G.flashes.length < 6) flashLight(x, z, h, [1.4 * k, .62 * k, .2 * k], rad, life); } finally { efxPop(e); } }
+// a fire that stays lights what is round it: a real light kept while it burns (st: the fire's memory; few at once, so the
+// fireballs' own lights are never crowded out)
+function pfKeepLight(st, x, y, z, k, rad, s, l, most) {
+  if (!(k > 0) || !(rad > 0)) return;
+  const e = efxPush(s, l);
+  try {
+    let q = [[1.4 * k, .62 * k, .2 * k], rad, .2]; if (typeof EFX !== 'undefined' && EFX.on) q = efxLight(q[0], q[1], q[2]);
+    if (!q) return;
+    let f = st.L; if (!f || !G.flashes.includes(f)) { f = null; if (G.flashes.length < most) G.flashes.push(f = st.L = { x, z, h: y, col: q[0], rad: q[1], life: q[2], max: q[2] }); }
+    if (f) { f.x = x; f.z = z; f.h = y; f.col = q[0]; f.rad = q[1]; f.life = f.max = q[2]; }
+  } finally { efxPop(e); }
+}
 // a patch of ground the fire touched: its warm light while it is hot, and (fire) a fire burning on it for a while. Nothing
 // is marked on the ground (owner: "dont use ground decals, they look like runes which are different")
 function pfGround(x, z, r, dur, fire, s) { if (PF.grounds.length >= 40) PF.grounds.shift(); PF.grounds.push({ x, z, r, at: G.time, dur, fire, s, seed: (Math.random() * 97) | 0 }); }
-// the fire on a patch (a glyph or a ground fire): one cohesive flame as wide as the patch, its top licked into a few tips
-// (owner: "not a fan of these small flames, should look like one cohesive flame"), its light on the ground, embers; e: how
-// much of it shows
-function pfPatch(x, z, r, e, tall, Gd, s, seed, now, dt) {
-  if (Gd.disc > 0 && typeof VX !== 'undefined' && typeof vfxFlat === 'function') vfxFlat(VX, x, z, .026, r * 1.3, r * 1.3, 0, PF_WARM, Gd.disc * e * (.85 + .15 * Math.sin(now * 9 + seed)), VT.GLOW, 1);
-  const ht = Math.max(tall * 1.7, r * 1.15) * (.6 + .4 * e);
-  pfFlame([x, .02, z], PF_UP, ht, { k: 1, a: e, seed, pull: .12, sp: .9, fat: 1.45, tips: 1.6, wide: r * 1.9 / ht }, s, 'ground');
-  if (Gd.ember > 0 && Math.random() < Gd.ember * dt * e) { const a = Math.random() * TAU, rr = Math.random() * r * .7; pfEmber(x + Math.cos(a) * rr, .08, z + Math.sin(a) * rr, (Math.random() - .5) * .3, .5 + Math.random() * .6, (Math.random() - .5) * .3, { life: .7, w: .05, lift: .4 }, s); }
+// the fire on a patch (a glyph or a ground fire): one cohesive fire as wide as the patch (owner: "not a fan of these small
+// flames, should look like one cohesive flame"), with depth: a tall cool sheet at its back, its body, a low white-hot sheet
+// in front, each with its top licked into a few tips. Flames tear off its top and go to smoke; it lights the ground and what
+// stands in it; e: how much of it shows; st: its memory
+function pfPatch(x, z, r, e, tall, Gd, s, seed, now, dt, st) {
+  const lv = pfLv(), fl = .86 + .14 * Math.sin(now * 9 + seed) * Math.sin(now * 5.3 + seed * 2);
+  if (Gd.disc > 0) {
+    if (typeof VX !== 'undefined' && typeof vfxFlat === 'function') vfxFlat(VX, x, z, .026, r * 2, r * 2, 0, PF_WARM, Gd.disc * .7 * e * fl, VT.GLOW, 1);
+    pfKeepLight(st, x, .35, z, Gd.disc * 2 * e * fl, r * 2 + .7, s, 'ground', 4);
+  }
+  const ht = Math.max(tall * 2.2, r * 1.5) * (.6 + .4 * e), fw = pyfFw(), gl = Math.hypot(fw[0], fw[2]) || 1, bx = -fw[0] / gl * r * .36, bz = -fw[2] / gl * r * .36, hm = ht * (lv ? .9 : 1), sf = Math.min(.4, ht * .5);
+  // (its bed: fire rolling over the whole area, which the flames stand in, so none of them ends in a line on the ground)
+  { const o = { k: .95, a: e, seed: seed + 3, age: .1, p0: .86, soot: 0, pull: .1, sp: .9, soft: Math.min(.4, r * .6) }, w = pfTune(s, 'ground', r * 2.5, o); if (w != null) pyfBill(PYF_SH.PUFF, [x, w * .27 * RD.up[1], z], w, w * .62, PF_SQ, o); }
+  if (lv) pfFlame([x + bx, .03, z + bz], PF_UP, ht * 1.06, { k: .85, a: e, seed: seed + 5, pull: .1, sp: .72, fat: 1.3, tips: 1.5, heat: .7, soft: sf, wide: r * 1.6 / (ht * 1.06) }, s, 'ground');
+  pfFlame([x, .03, z], PF_UP, hm, { k: 1, a: e, seed, pull: .13, sp: .9, fat: 1.35, tips: 1.2, soft: sf, wide: r * 1.7 / hm }, s, 'ground');
+  if (lv > 1) pfFlame([x - bx, .03, z - bz], PF_UP, ht * .6, { k: 1.05, a: e, seed: seed + 11, pull: .16, sp: 1.15, fat: 1.3, tips: 1.6, heat: 1.3, soft: sf, wide: r * 1.3 / (ht * .6) }, s, 'ground');
+  if (e > .3 && Gd.tear > 0 && now >= (st.tr || 0)) {
+    st.tr = now + Gd.tear * [2.4, 1.5, 1][lv] * pfThin() * (.6 + .8 * Math.random());
+    const a = Math.random() * TAU, rr = Math.random() * r * .55;
+    pfShot('puff', x + Math.cos(a) * rr, ht * (.35 + .25 * Math.random()), z + Math.sin(a) * rr, r * (.4 + .25 * Math.random()), .5 + .2 * Math.random(), { rise: .55 + .3 * Math.random(), buoy: .6, grow: .7, hot: .8, a: e, pull: .12 }, s, 'ground');
+  }
+  if (lv && e > .3 && Gd.fume > 0 && now >= (st.sm || 0)) {
+    st.sm = now + Gd.fume * (lv === 1 ? 1.6 : 1) * (.7 + .6 * Math.random());
+    pfShot('smoke', x + (Math.random() - .5) * r * .6, ht * .95, z + (Math.random() - .5) * r * .6, r * 1.15, 1.1, { rise: .5, grow: .7, a: .55 * e }, s, 'smoke');
+  }
+  if (Gd.ember > 0 && Math.random() < Gd.ember * dt * e) { const a = Math.random() * TAU, rr = Math.random() * r * .7; pfEmber(x + Math.cos(a) * rr, .08 + Math.random() * ht * .4, z + Math.sin(a) * rr, (Math.random() - .5) * .4, .6 + Math.random() * .8, (Math.random() - .5) * .4, { life: .5 + .4 * Math.random(), w: .04, lift: .5 }, s); }
+  if (Gd.shimmer > 0 && typeof vfxDistHaze === 'function') vfxDistHaze(x, ht * 1.05, z, r * .95, Gd.shimmer * e);
 }
 
 /* ---- the hands ---- */
@@ -85996,10 +87095,12 @@ function pfHands(now) {
     // (the breath pours from them)
     if (t.ccxBreath && now < t.ccxBreath.until + .3) continue;
     const p = ccHand(t, towerTop(t) * .8), g = Math.min(1, t._pyGl || 0), len = (H.flame + H.tier * (t.tier | 0)) * (1 + H.cast * g), sd = ((t.i | 0) * 5 + (t.j | 0)) % 97;
-    pfFlame([p[0], p[1] - len * .1, p[2]], PF_UP, len, { k: H.k, seed: sd, pull: .06, sp: 1.1, fat: .95 }, 'cc_fireball', 'hand');
+    // (the flame lags the hand as it moves)
+    const lag = H.lag > 0 ? pfLag(pfVel(pfSt(t), p[0], p[1], p[2], now), .07 * H.lag, len * .8) : null;
+    pfFire([p[0], p[1] - len * .1, p[2]], PF_UP, len, { k: H.k, seed: sd, pull: .06, sp: 1.1, fat: .95, lag, n: 2, soft: .05 }, 'cc_fireball', 'hand');
     if (H.disc > 0 && pfLv()) pfGlow(p, len * 2.6 * H.disc, { k: .3 + .45 * g, pull: .06 }, 'cc_fireball', 'hand');
     // (the other palm lights as a cast gathers)
-    if (g > .2 && t._pyPL && t._pyAt === now) { const q = t._pyPL, l2 = len * .7 * g; pfFlame([q[0], q[1] - l2 * .1, q[2]], PF_UP, l2, { k: H.k, seed: sd + 31, pull: .06, sp: 1.2, fat: .9 }, 'cc_fireball', 'hand'); }
+    if (g > .2 && t._pyPL && t._pyAt === now) { const q = t._pyPL, l2 = len * .7 * g; pfFire([q[0], q[1] - l2 * .1, q[2]], PF_UP, l2, { k: H.k, seed: sd + 31, pull: .06, sp: 1.2, fat: .9, n: 2, soft: .05 }, 'cc_fireball', 'hand'); }
   }
 }
 
@@ -86017,21 +87118,32 @@ function pfFlyLight(o, x, y, z, k, rad, s) {
     if (typeof VX !== 'undefined' && typeof vfxFlat === 'function') { const near = Math.sqrt(1 / (1 + Math.max(0, y) * .9)), pr = q[1] * (.4 + .2 * (1 - near)); vfxFlat(VX, x, z, .028, pr, pr, 0, PF_WARM, .5 * k * near * (.92 + .08 * Math.sin(G.time * 23)), VT.GLOW, 1); }
   } finally { efxPop(e); }
 }
+// a ball of fire at (x, y, z) flying along d: its rolling head, its flame swept back (two sheets; they lag the flight, so a
+// hop's arc bends them), its glow, the air shimmering round it; what it sheds hangs where it was left and goes to smoke
 function pfBallAt(x, y, z, d, len, C, T, s, seed, o, now) {
   { const L = efxOf(s, 'cc_fireball', 'light'); if (L.on && L.fly > 0) pfFlyLight(o, x, y, z, L.fly * Math.min(1.5, len / .9), L.rad * 1.3 * Math.min(1.5, len / .9), s); }
+  const lv = pfLv(), st = pfSt(o), v = pfVel(st, x, y, z, now), dt = Math.max(0, Math.min(.1, now - (st.t || now))); st.t = now;
+  let td = st.td; if (!td) td = st.td = [-d[0], -d[1], -d[2]]; else { const k = Math.min(1, dt * 11); td = st.td = pfNorm([td[0] + (-d[0] - td[0]) * k, td[1] + (-d[1] - td[1]) * k, td[2] + (-d[2] - td[2]) * k]); }
   if (C.on) {
-    pfComet([x, y, z], d, len, { k: C.k, seed, pull: .12, sp: 1 }, s, 'core');
-    if (C.disc > 0 && pfLv()) pfGlow([x, y, z], len * C.disc, { k: .5, pull: .1 }, s, 'core');
+    // (its flame draws out behind it over its first moment, so it never streams back through the caster as it leaves his hand)
+    if (st.born == null || now < st.born) st.born = now;
+    const tg = .35 + .65 * Math.min(1, (now - st.born) / .14);
+    pfFlame([x, y, z], td, len * .98 * tg, { k: C.k * .85, seed: seed + 7, pull: .1, sp: 1.5, fat: 1.08, heat: .72, wide: .6 / tg, floor: .4 }, s, 'core');
+    if (lv) pfFlame([x, y, z], td, len * .64 * tg, { k: C.k, seed: seed + 13, pull: .13, sp: 1.9, fat: .78, heat: 1.2, wide: .58 / tg, floor: .4 }, s, 'core');
+    pfBall([x, y, z], len * .54, { k: C.k, seed, pull: .15, sp: 1.2 }, s, 'core');
+    if (C.disc > 0 && lv) pfGlow([x, y, z], len * C.disc * 1.25, { k: .4, pull: .1 }, s, 'core');
+    if (C.shimmer > 0 && typeof vfxDistHaze === 'function') vfxDistHaze(x + td[0] * len * .7, y + td[1] * len * .7 + len * .15, z + td[2] * len * .7, len * .5, C.shimmer);
   }
-  // its trail: small tongues peeling off behind it, leaning back along its flight, lifting and going out
-  const lv = pfLv(); if (!T.on || !lv || T.every <= 0) return;
-  // (none in its first moment: nothing is left hanging at his hand)
+  if (!T.on || T.every <= 0) return;
+  // (nothing is shed in its first moment: nothing is left hanging at his hand)
   if (o.lob && o.lob.t < .1) { o._pfT = now; return; }
-  const ev = T.every * (lv === 1 ? 1.6 : 1); if (!o._pfT || now - o._pfT > .3) o._pfT = now;
-  for (let i = 0; i < 2 && now - o._pfT >= ev; i++) {
-    o._pfT += ev * (.75 + .5 * Math.random()); const j = (Math.random() - .5) * len * .12, bx = x - d[0] * len * .5 + j, by = y - d[1] * len * .5, bz = z - d[2] * len * .5 - j;
-    pfShot('wisp', bx, by, bz, T.w * (len / .85) * (.7 + .5 * Math.random()), .3 + .1 * Math.random(), { rise: T.rise, lean: pfNorm([-d[0] * .6, 1, -d[2] * .6]), a: .9, fat: .8 }, s, 'trail');
-    if (Math.random() < T.ember) pfEmber(bx, by, bz, (Math.random() - .5) * .4, .3 + Math.random() * .4, (Math.random() - .5) * .4, { life: .5, w: .05, lift: .3 }, s);
+  const ev = T.every * [2.4, 1.5, 1][lv] * pfThin(); if (!o._pfT || now - o._pfT > .3) o._pfT = now;
+  for (let i = 0; i < 3 && now - o._pfT >= ev; i++) {
+    o._pfT += ev * (.75 + .5 * Math.random());
+    const j = () => (Math.random() - .5) * len * .16, bx = x - d[0] * len * .32 + j(), by = y - d[1] * len * .32 + j() * .6, bz = z - d[2] * len * .32 + j();
+    // (carried a little way along with the ball, then left behind to rise and cool)
+    pfShot('puff', bx, by, bz, T.w * (len / .85) * (.8 + .5 * Math.random()), .3 + .16 * Math.random(), { vx: v[0] * .28 + j(), rise: v[1] * .28 + T.rise, vz: v[2] * .28 + j(), drag: 5, buoy: .6, grow: .95, hot: .9, soot: .85, a: .92, pull: .06 }, s, 'trail');
+    if (Math.random() < T.ember) pfEmber(bx, by, bz, v[0] * .2 + (Math.random() - .5) * .7, .2 + Math.random() * .5, v[2] * .2 + (Math.random() - .5) * .7, { life: .35 + .25 * Math.random(), w: .04, lift: .3 }, s);
   }
 }
 function pfBalls(now) {
@@ -86063,43 +87175,56 @@ function pfBalls(now) {
     pfBallAt(a[0], a[1], a[2], pfNorm([b[0] - a[0], b[1] - a[1], b[2] - a[2]]), C.ball * h.s, C, T, 'cc_kindle', h.seed, h, now);
   }
 }
-// a landing: a flash, the burst, the ring out to r (the real splash), n tongues left licking within rad
+// a landing: a flash; a ball of fire w across swelling over the ground and rolling up into smoke; fire thrown up its middle;
+// fire rolling out low over the ground to r (the real splash: nothing is drawn on the ground itself); n tongues left licking
+// within rad; the air shimmering over it
 function pfBoom(x, z, w, r, n, rad, B, Rg, s, o) {
-  o = o || {};
-  pfShot('flash', x, .25, z, w * .8, .14, { k: o.k || 1 }, s, 'burst');
-  pfShot('burst', x, 0, z, w, (B.secs || .5) * (o.slow || 1), { k: o.k || B.k }, s, 'burst');
-  if (Rg.on && Rg.r > 0 && r > 0) pfShot('ring', x, 0, z, r * Rg.r, Rg.secs || .34, { k: B.k }, s, 'ring');
+  o = o || {}; const lv = pfLv(), k = o.k || B.k, T = (B.secs || .5) * (o.slow || 1), th = pfThin();
+  pfShot('flash', x, .25, z, w * .6, .1, { k: k * .45 }, s, 'burst');
+  pfShot('puff', x, w * .13, z, w * .4, T * .78, { k, grow: .85, hot: 1.02, soot: .7, rise: .3, pull: .22 }, s, 'burst');
+  const nu = Math.max(1, Math.round([1, 2, 3][lv] / th));
+  for (let i = 0; i < nu; i++) pfShot('puff', x + (Math.random() - .5) * w * .1, w * .2, z + (Math.random() - .5) * w * .1, w * (.26 + .1 * Math.random()), T * (.8 + .3 * Math.random()),
+    { delay: .03 + .05 * i, k, grow: 1, hot: .88 - .08 * i, rise: (1.3 + .5 * i) * Math.sqrt(w / 2), drag: 2, buoy: .5, vx: (Math.random() - .5) * .3, vz: (Math.random() - .5) * .3, pull: .2 }, s, 'burst');
+  if (Rg.on && Rg.r > 0 && r > 0) {
+    const rr = r * Rg.r, nr = Math.max(3, Math.round([4, 6, 8][lv] * Math.min(1.5, Math.sqrt(rr)) / th)), T2 = (Rg.secs || .34) + .14, D = 5, a0 = Math.random() * TAU;
+    for (let i = 0; i < nr; i++) {
+      const a = a0 + (i + (Math.random() - .5) * .5) * TAU / nr, sz = Math.max(.2, rr * (.42 + .14 * Math.random())), reach = Math.max(.05, rr - sz * .62) * (.86 + .14 * Math.random()), v = reach * D / (1 - Math.exp(-D * T2));
+      pfShot('puff', x + Math.cos(a) * .06, sz * .2, z + Math.sin(a) * .06, sz, T2 * (.85 + .3 * Math.random()), { k, vx: Math.cos(a) * v, vz: Math.sin(a) * v, drag: D, rise: .2, buoy: .8, grow: .8, hot: .78, soot: .9, pull: .14 }, s, 'ring');
+    }
+  }
   for (let i = 0; i < n; i++) { const a = i * TAU / Math.max(1, n) + Math.random() * 1.2, rr = rad * (.35 + .5 * Math.random()); pfShot('wisp', x + Math.cos(a) * rr, .03, z + Math.sin(a) * rr, w * (.16 + .08 * Math.random()), .4 + .15 * Math.random(), { delay: .1 + .05 * i, rise: .35, lean: pfNorm([Math.cos(a) * .25, 1, Math.sin(a) * .25]), fat: .9 }, s, 'burst'); }
+  if (B.shimmer > 0) pfShot('haze', x, w * .45, z, w * .5, T * 1.4, { a: B.shimmer, rise: .4 }, s, 'burst');
 }
 // the fireball's landing (ccFireBurst, wrapped below)
 function pfImpact(x, z, sp, o, s) {
   const lv = pfLv(), B = efxOf(s, 'cc_fireball', 'burst'), Rg = efxOf(s, 'cc_fireball', 'ring'), E = efxOf(s, 'cc_fireball', 'embers'), S = efxOf(s, 'cc_fireball', 'smoke'), L = efxOf(s, 'cc_fireball', 'light'), Gd = efxOf(s, 'cc_fireball', 'ground');
   const great = o && o.great, small = o && o.small;
-  pfBoom(x, z, Math.min(B.wMax, sp * B.w) * (small ? .8 : 1), sp, [1, 2, 3][lv] + (great ? 2 : 0), sp * .6, B, Rg, s, { k: great ? B.kGreat : B.k, slow: great ? 1.15 : 1 });
+  pfBoom(x, z, Math.min(B.wMax, sp * B.w) * (small ? .8 : 1), sp, [0, 1, 2][lv] + (great ? 2 : 0), sp * .6, B, Rg, s, { k: great ? B.kGreat : B.k, slow: great ? 1.15 : 1 });
   const n = Math.round((great ? E.great : E.count) * [.5, .8, 1][lv]);
-  for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = E.fling * (.4 + .6 * Math.random()) * Math.min(1.4, sp); pfEmber(x + Math.cos(a) * .08, .15 + Math.random() * .2, z + Math.sin(a) * .08, Math.cos(a) * v, 1 + Math.random() * 1.6, Math.sin(a) * v, { life: E.secs * (.7 + .6 * Math.random()), w: E.w * (.7 + .6 * Math.random()), lift: .3 }, s); }
-  if (lv) { const np = great ? S.great : S.puffs; for (let i = 0; i < np; i++) pfShot('puff', x + (i ? (Math.random() - .5) * sp * .5 : 0), .4 + .12 * i, z + (i ? (Math.random() - .5) * sp * .5 : 0), sp * S.w * (.85 + .3 * Math.random()), .9, { delay: S.delay + i * .08, rise: S.rise, grow: .5, a: .85 }, s, 'smoke'); }
+  for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = E.fling * (.4 + .6 * Math.random()) * Math.min(1.4, sp); pfEmber(x + Math.cos(a) * .08, .15 + Math.random() * .2, z + Math.sin(a) * .08, Math.cos(a) * v, 1 + Math.random() * 1.8, Math.sin(a) * v, { life: E.secs * (.7 + .6 * Math.random()), w: E.w * (.6 + .6 * Math.random()), lift: -2.4 }, s); }
+  if (E.on) pfSparks(x, .18, z, E.sparks * (great ? 1.6 : 1), { sp: [.7, E.fling * 1.6 * Math.min(1.4, sp)] }, s);
+  if (lv) { const np = great ? S.great : S.puffs; for (let i = 0; i < np; i++) pfShot('smoke', x + (i ? (Math.random() - .5) * sp * .5 : 0), .45 + .12 * i, z + (i ? (Math.random() - .5) * sp * .5 : 0), sp * S.w * (.85 + .3 * Math.random()), 1, { delay: S.delay + i * .08, rise: S.rise, grow: .6, a: .8 }, s, 'smoke'); }
   if (L.on) pfLight(x, z, .3, L.k, L.rad * Math.min(1.5, sp), L.secs, s);
   if (Gd.on && Gd.scorch > 0) pfGround(x, z, sp * Gd.scorch, Gd.dur, 0, s);
 }
 
 /* ---- the burning glyphs and the ground fires ---- */
 function pfGlyphs(now, dt) {
-  const Z = (G.hazards || []).filter(z => z.k === 'cc_glyph' && z.s === 'fire' && z.t > 0 && pfIsPyro(z.src));
-  for (const z of Z) {
+  for (const z of G.hazards || []) {
+    if (z.k !== 'cc_glyph' || z.s !== 'fire' || !(z.t > 0) || !pfIsPyro(z.src)) continue;
     const s = z._efs && ELEM_FX_SPELLS[z._efs] ? z._efs : z._sfx ? 'cc_kindle' : 'cc_fireball', Gd = efxOf(s, 'cc_fireball', 'ground'); if (!Gd.on) continue;
     const e = Math.min(1, z.t / .5, (G.time - (z.born || 0)) / .25), sd = ((z.x * 7.3 + z.z * 3.1) * 10 | 0) % 97;
-    pfPatch(z.x, z.z, z.r || .5, Math.max(0, e), Gd.tall, Gd, s, sd, now, dt);
+    pfPatch(z.x, z.z, z.r || .5, Math.max(0, e), Gd.tall, Gd, s, sd, now, dt, pfSt(z));
   }
   PF.grounds = PF.grounds.filter(g => now - g.at < g.dur);
   for (const g of PF.grounds) {
     const u = (now - g.at) / g.dur, e = Math.min(1, (now - g.at) / .15) * (1 - pfSs(.55, 1, u)), Gd = efxOf(g.s, 'cc_fireball', 'ground'); if (!Gd.on) continue;
     if (!g.fire) { if (typeof vfxFlat === 'function') vfxFlat(VX, g.x, g.z, .025, g.r * 1.1, g.r * 1.1, 0, PF_WARM, .3 * e * (1 - u), VT.GLOW, 1); continue; }
-    pfPatch(g.x, g.z, g.r, e, Gd.tall, Gd, g.s, g.seed, now, dt);
+    pfPatch(g.x, g.z, g.r, e, Gd.tall, Gd, g.s, g.seed, now, dt, g);
   }
 }
 
-/* ---- Furnace Breath: a roaring cone, jets of fire fanned from the hands ---- */
+/* ---- Furnace Breath: a stream of fire from the hands, billows rolling out down the cone ---- */
 function pfBreaths(now, dt) {
   const lv = pfLv(), s = 'cc_pyresigil', Cc = efx(s, 'core'), F = efx(s, 'flames'), E = efx(s, 'embers'), S = efx(s, 'smoke'), Gl = efx(s, 'glow'), L = efx(s, 'light');
   PF.breath = PF.breath.filter(e => G.towers.includes(e.t) && e.t.ccxBreath === e.B && now < e.B.until + .35);
@@ -86107,24 +87232,29 @@ function pfBreaths(now, dt) {
     const { t, B } = e, el = now - B.at, R0 = B.r, k = R0 / 2.4; if (el < .05) continue;
     // how far it has reached, how much has died from the hands, how much of it shows
     const reach = pfSs(0, .22, el - .05), died = pfSs(0, .32, now - (B.until - .05)), on = reach * (1 - died);
-    const h = ccHand(t, towerTop(t) * .8), a0 = Math.atan2(B.uz, B.ux), half = Math.acos(CCX.BR_COS) * Cc.cone, drop = (h[1] - .22) * Cc.drop / R0;
+    const h = ccHand(t, towerTop(t) * .8), a0 = Math.atan2(B.uz, B.ux), half = Math.acos(CCX.BR_COS) * Cc.cone, drop = (h[1] - .22) * Cc.drop / R0, len = R0 * Cc.len;
     if (Cc.on) {
-      const nj = Math.max(1, Math.round(Cc.jets * [.6, .8, 1][lv])), len = R0 * Cc.len, wid = len * 2 * Math.tan(half) / Math.max(1, nj) * 2.1;
+      // the stream: a few soft sheets fanned across the cone, a narrow white-hot one down its middle
+      const nj = Math.max(1, Math.round(Cc.jets * [.34, .67, 1][lv])), wid = len * 2 * Math.tan(half) / nj * (nj > 1 ? 1.75 : 1.2);
       for (let i = 0; i < nj; i++) {
-        const f = nj > 1 ? i / (nj - 1) * 2 - 1 : 0, a = a0 + f * half * .78 + .05 * Math.sin(now * 2.3 + i * 1.7 + e.seed);
-        pfJet(h, pfNorm([Math.cos(a), -drop, Math.sin(a)]), len * (1 - .14 * f * f), wid, { k: Cc.k * (1 - .12 * Math.abs(f)), seed: e.seed + i * 13, p0: .12 + 1.05 * reach, p1: died * 1.25, pull: .1, sp: .9 + .25 * pfRnd(e.seed + i) }, s);
+        const f = nj > 1 ? i / (nj - 1) * 2 - 1 : 0, a = a0 + f * half * .6 + .05 * Math.sin(now * 2.3 + i * 1.7 + e.seed);
+        pfJet(h, pfNorm([Math.cos(a), -drop, Math.sin(a)]), len * (1 - .12 * f * f), wid, { k: Cc.k * (1 - .1 * Math.abs(f)), seed: e.seed + i * 13, p0: .12 + 1.05 * reach, p1: died * 1.25, pull: .1, sp: .9 + .25 * pfRnd(e.seed + i), heat: .78 }, s);
       }
-      // (the heart of it: one narrow, hot jet down the middle)
-      pfJet(h, pfNorm([B.ux, -drop, B.uz]), len * .8, wid * .6, { k: Cc.k * 1.12, seed: e.seed + 71, p0: .12 + 1.05 * reach, p1: died * 1.25, pull: .14, sp: 1.25 }, s);
+      if (lv) pfJet(h, pfNorm([B.ux, -drop, B.uz]), len * .72, wid * .5, { k: Cc.k * 1.1, seed: e.seed + 71, p0: .12 + 1.05 * reach, p1: died * 1.25, pull: .14, sp: 1.3, heat: 1.15 }, s);
+      if (on > .05) pfGlow(h, .55 * k, { k: .5 * on, pull: .12 }, s, 'core');
+      if (Cc.shimmer > 0 && on > .05 && typeof vfxDistHaze === 'function') vfxDistHaze(t.x + B.ux * R0 * .6, .8, t.y + B.uz * R0 * .6, R0 * .42, Cc.shimmer * on);
     }
     if (on <= 0) continue;
-    // tongues lifting off along its far half
-    if (lv && F.on && F.every > 0 && now >= (e.wi || 0)) {
-      e.wi = now + F.every * (lv === 1 ? 1.6 : 1) * (.7 + .6 * Math.random());
-      const a = a0 + (Math.random() * 2 - 1) * half * .8, d = R0 * (.5 + .5 * Math.random()) * reach;
-      pfShot('wisp', t.x + Math.cos(a) * d, .08, t.y + Math.sin(a) * d, F.w * k * (.7 + .5 * Math.random()), .42, { rise: .5, lean: pfNorm([Math.cos(a) * .35, 1, Math.sin(a) * .35]), fat: .9 }, s, 'flames');
+    // billows thrown down it from his hands: they swell and roll as they go, cool to red, and are smoke where the cone ends
+    if (F.on && F.every > 0 && died < .5) {
+      const ev = F.every * [2.3, 1.5, 1][lv] * pfThin(); if (!(e.wi > now - .3)) e.wi = now;
+      for (let i = 0; i < 3 && now >= e.wi; i++) {
+        e.wi += ev * (.7 + .6 * Math.random());
+        const a = a0 + (Math.random() * 2 - 1) * half * .8, T = (F.secs || .55) * (.8 + .4 * Math.random()), D = 2.2, far = len * (.68 + .3 * Math.random()) * reach, v = far * D / (1 - Math.exp(-D * T));
+        pfShot('puff', h[0] + Math.cos(a) * .12, h[1] - .02, h[2] + Math.sin(a) * .12, F.w * k * (.8 + .4 * Math.random()), T, { vx: Math.cos(a) * v, rise: -drop * v, vz: Math.sin(a) * v, drag: D, buoy: 1.1, grow: F.grow == null ? 2.2 : F.grow, hot: .98, pull: .1 }, s, 'flames');
+      }
     }
-    // a low glow under the cone, its light where it strikes, embers off the burning foes, smoke where it ends
+    // a low glow under the cone, its light where it strikes, sparks blown down it, embers off the burning foes, smoke where it ends
     const cx = t.x + B.ux * R0 * .55, cz = t.y + B.uz * R0 * .55;
     if (Gl.on && Gl.a > 0 && typeof vfxFlat === 'function') vfxFlat(VX, cx, cz, .027, R0 * .55, R0 * Gl.w, Math.atan2(B.uz, B.ux), PF_WARM, Gl.a * on * (.85 + .15 * Math.sin(now * 11)), VT.GLOW, 1);
     if (L.on && now >= (e.li || 0)) { e.li = now + L.every; pfLight(t.x + B.ux * R0 * .65, t.y + B.uz * R0 * .65, .3, .8, L.rad, .3, s); }
@@ -86132,9 +87262,10 @@ function pfBreaths(now, dt) {
       e.em = now + E.every * (lv ? 1 : 2);
       const F2 = G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= R0 && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS);
       const c = F2.length ? F2[(Math.random() * F2.length) | 0] : null, fx = c ? c.x : t.x + B.ux * R0 * .7, fz = c ? c.y : t.y + B.uz * R0 * .7;
-      for (let i = 0; i < E.count; i++) pfEmber(fx + (Math.random() - .5) * .3, .3 + Math.random() * .4, fz + (Math.random() - .5) * .3, B.ux * .6 + (Math.random() - .5) * .8, .8 + Math.random(), B.uz * .6 + (Math.random() - .5) * .8, { life: .6, w: .06, lift: .5 }, s);
+      for (let i = 0; i < E.count; i++) pfEmber(fx + (Math.random() - .5) * .3, .3 + Math.random() * .4, fz + (Math.random() - .5) * .3, B.ux * .6 + (Math.random() - .5) * .8, .8 + Math.random(), B.uz * .6 + (Math.random() - .5) * .8, { life: .6, w: .05, lift: .5 }, s);
+      pfSparks(h[0], h[1], h[2], E.sparks || 0, { shape: 'cone', ux: B.ux, uy: -drop, uz: B.uz, ang: half * .8, sp: [R0 * .8, R0 * 1.9], up: [0, .3], life: [.3, .6], drag: 1.8, grav: -.6, curl: .5 }, s);
     }
-    if (lv && S.on && S.every > 0 && now >= (e.sm || 0)) { e.sm = now + S.every * (lv === 1 ? 1.5 : 1); pfShot('puff', t.x + B.ux * R0 * .95, .5, t.y + B.uz * R0 * .95, S.w * k, .9, { rise: .45, grow: .5, a: .7 }, s, 'smoke'); }
+    if (lv && S.on && S.every > 0 && now >= (e.sm || 0)) { e.sm = now + S.every * (lv === 1 ? 1.5 : 1); const a = a0 + (Math.random() * 2 - 1) * half * .6; pfShot('smoke', t.x + Math.cos(a) * R0 * .92, .55, t.y + Math.sin(a) * R0 * .92, S.w * k * 1.2, 1, { rise: .5, vx: B.ux * .4, vz: B.uz * .4, grow: .6, a: .65 }, s, 'smoke'); }
   }
 }
 
@@ -86147,52 +87278,83 @@ function pfPhoenixes(now) {
     const [x, z, hx, hz] = ccxAlong(F.R, d), d1 = Math.hypot(F.R[1][0] - F.R[0][0], F.R[1][1] - F.R[0][1]) || 1, end = F.tot - d;
     const rise = Math.min(1, d / Math.max(.6, d1 * .7)), dive = end < .9 ? 1 - end / .9 : 0;
     const y = (F.h0 + (1.15 - F.h0) * (1 - (1 - rise) * (1 - rise))) * (1 - dive) + .2 * dive + .05 * Math.sin(now * 6);
-    const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), fwd = pfNorm([hx, vh, hz]), g = Math.min(1, d / .5) * .45 + .55, bl = Cb.body * g;
-    // the body: a comet leading, its glow
-    if (Cb.on) { pfComet([x, y, z], fwd, bl, { k: Cb.k, seed: F.seed, pull: .2 }, s, 'core'); if (Cb.disc > 0) pfGlow([x, y, z], bl * Cb.disc, { k: .5, pull: .18 }, s, 'core'); }
+    const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), fwd = pfNorm([hx, vh, hz]), g = Math.min(1, d / .5) * .45 + .55, bl = Cb.body * g, rx = -hz, rz = hx;
+    // its body: a white-hot head carried ahead of its wings, fire streaming back from it along its flight, its glow
+    if (Cb.on) {
+      const bk = [-fwd[0], -fwd[1], -fwd[2]], hd = [x + fwd[0] * bl * .34, y + fwd[1] * bl * .34, z + fwd[2] * bl * .34];
+      pfFlame(hd, bk, bl * 1.35, { k: Cb.k * .88, seed: F.seed + 7, pull: .18, sp: 1.5, fat: .95, heat: .78, wide: .44, floor: .4 }, s, 'core');
+      if (lv) pfFlame(hd, bk, bl * .9, { k: Cb.k, seed: F.seed + 13, pull: .2, sp: 1.9, fat: .7, heat: 1.2, wide: .42, floor: .4 }, s, 'core');
+      pfBall(hd, bl * .4, { k: Cb.k, seed: F.seed, pull: .22, sp: 1.2 }, s, 'core');
+      if (Cb.disc > 0) pfGlow(hd, bl * Cb.disc, { k: .4, pull: .18 }, s, 'core');
+      if (Cb.shimmer > 0 && typeof vfxDistHaze === 'function') vfxDistHaze(x - hx * bl * 1.1, y + .1, z - hz * bl * 1.1, bl * .7, Cb.shimmer);
+    }
+    let tipL = null, tipR = null;
     if (Fw.on) {
       // the wings: hinged at the shoulders, beating up and down, swept back as it dives
-      const beat = Math.sin(now * Fw.beat + F.seed), span = Fw.wing * g, chord = span * .9, be = .12 + .38 * beat - .3 * dive, sw = .1 + .7 * dive, cb = Math.cos(be), cs = Math.cos(sw), ss = Math.sin(sw), rx = -hz, rz = hx;
+      const beat = Math.sin(now * Fw.beat + F.seed), span = Fw.wing * g, be = .12 + .38 * beat - .3 * dive, sw = .34 + .5 * dive, cb = Math.cos(be), cs = Math.cos(sw), ss = Math.sin(sw);
       // (their feathers stream back along the flight as the screen sees it, so a wing is never seen edge on)
       const fw = pyfFw(), bk = [-fwd[0], -fwd[1] - .06, -fwd[2]], bd = bk[0] * fw[0] + bk[1] * fw[1] + bk[2] * fw[2], bv = pfNorm([bk[0] - fw[0] * bd, bk[1] - fw[1] * bd, bk[2] - fw[2] * bd]);
-      const O = [x - bv[0] * chord * .1 + fw[0] * .2, y - bv[1] * chord * .1 + fw[1] * .2, z - bv[2] * chord * .1 + fw[2] * .2], V = [bv[0] * chord, bv[1] * chord, bv[2] * chord];
       for (const sd of [-1, 1]) {
-        const o = { k: Fw.k, seed: F.seed + (sd > 0 ? 11 : 3), sp: 1.15 }, sz = pfTune(s, 'flames', span, o); if (sz == null) continue;
-        pyfQuad(PYF_SH.WING, O, [(sd * rx * cb * cs - hx * ss) * sz, Math.sin(be) * sz, (sd * rz * cb * cs - hz * ss) * sz], V, o);
+        // (each wing twice on High: a broad, cooler one behind, the hot one over it, so the wing has depth too)
+        for (const ly of lv > 1 ? [0, 1] : [1]) {
+          const o = { k: Fw.k * (ly ? 1 : .8), seed: F.seed + (sd > 0 ? 11 : 3) + ly * 17, sp: ly ? 1.15 : .85, heat: ly ? 1.1 : .66, soft: .1 }, sz = pfTune(s, 'flames', span * (ly ? 1 : 1.13), o); if (sz == null) continue;
+          const chord = sz * .9, pl = ly ? .2 : .15, O = [x - bv[0] * chord * .1 + fw[0] * pl, y - bv[1] * chord * .1 + fw[1] * pl, z - bv[2] * chord * .1 + fw[2] * pl], U = [(sd * rx * cb * cs - hx * ss) * sz, Math.sin(be) * sz, (sd * rz * cb * cs - hz * ss) * sz];
+          pyfQuad(PYF_SH.WING, O, U, [bv[0] * chord, bv[1] * chord, bv[2] * chord], o);
+          if (ly) { const tp = [O[0] + U[0] * .8 + bv[0] * chord * .35, O[1] + U[1] * .8 + bv[1] * chord * .35, O[2] + U[2] * .8 + bv[2] * chord * .35]; if (sd < 0) tipL = tp; else tipR = tp; }
+        }
       }
-      // the tail: three long tongues streaming back, fanned and swaying
+      // the tail: three long tongues streaming back, fanned, their ends swaying behind it
       for (const i of lv ? [-1, 0, 1] : [0]) {
-        const fan = i * (.28 + .08 * Math.sin(now * 3 + i));
-        pfFlame([x - fwd[0] * bl * .3, y - fwd[1] * bl * .3, z - fwd[2] * bl * .3], pfNorm([-hx + rx * fan, -.12 - .5 * dive - fwd[1] * .5, -hz + rz * fan]), Fw.tail * g * (i ? .8 : 1), { k: Fw.k * .95, seed: F.seed + 21 + i * 5, pull: .18, sp: 1.3, fat: .85 }, s, 'flames');
+        const fan = i * (.28 + .08 * Math.sin(now * 3 + i)), tl = Fw.tail * g * (i ? .8 : 1), wv = Math.sin(now * 5 + i * 2.1 + F.seed) * tl * .16;
+        pfFlame([x - fwd[0] * bl * .55, y - fwd[1] * bl * .55, z - fwd[2] * bl * .55], pfNorm([-hx + rx * fan, -.12 - .5 * dive - fwd[1] * .5, -hz + rz * fan]), tl, { k: Fw.k, seed: F.seed + 21 + i * 5, pull: .18, sp: 1.3, fat: .8, heat: 1, lag: [rx * wv, 0, rz * wv], floor: .4 }, s, 'flames');
       }
     }
-    // shed behind it: small tongues and embers
+    // shed behind it, from its wingtips and its tail: fire that hangs where it was left and goes to smoke, and sparks
     if (Tr.on && now >= (F.em || 0)) {
-      F.em = now + Tr.every * (lv ? 1 : 2.5);
-      pfEmber(x - hx * .3, y, z - hz * .3, -hx * .8 + (Math.random() - .5) * .8, Math.random() * .6, -hz * .8 + (Math.random() - .5) * .8, { life: .55, w: .07, lift: .2 }, s);
-      if (lv && Math.random() < .45) pfShot('wisp', x - hx * bl * .5 + (Math.random() - .5) * .3, y - .05, z - hz * bl * .5 + (Math.random() - .5) * .3, Tr.w * (.7 + .6 * Math.random()), .38, { rise: .3, lean: pfNorm([-hx * .7, 1, -hz * .7]), fat: .8 }, s, 'trail');
+      F.em = now + Tr.every * [2.6, 1.5, 1][lv] * pfThin();
+      const pk = Math.random(), P = pk < .33 && tipL ? tipL : pk < .66 && tipR ? tipR : [x - hx * bl * .7 + (Math.random() - .5) * .3, y - .05, z - hz * bl * .7 + (Math.random() - .5) * .3];
+      pfShot('puff', P[0], P[1], P[2], Tr.w * (.9 + .6 * Math.random()), .36 + .2 * Math.random(), { vx: hx * F.spd * .2, vz: hz * F.spd * .2, rise: .25, drag: 4, buoy: .6, grow: 1.1, hot: .9, soot: .8, pull: .14 }, s, 'trail');
+      pfEmber(x - hx * .3, y, z - hz * .3, -hx * .8 + (Math.random() - .5) * .8, Math.random() * .6, -hz * .8 + (Math.random() - .5) * .8, { life: .55, w: .05, lift: .2 }, s);
+      if (lv) pfSparks(x - hx * .3, y, z - hz * .3, .8, { shape: 'point', sp: [.2, .9], up: [-.2, .4], vx: -hx, vz: -hz, life: [.3, .6], grav: 1.2 }, s);
     }
     if (L.on && d > .8 && now >= (F.li || 0)) { F.li = now + L.every; pfLight(x, z, y, .75, L.rad, .2, s); }
   }
 }
 
-/* ---- burning foes (a Pyroclast's burn): small tongues licking up their sides ---- */
+/* ---- burning foes (a Pyroclast's burn): small flames on the foe, leaning back from the way it walks ---- */
 function pfBurns(now, dt) {
   const s = 'cc_pyroburn', F = efx(s, 'flames'), E = efx(s, 'embers'), lv = pfLv(); if (!F.on && !E.on) return;
   const r = typeof RD !== 'undefined' && RD && RD.right ? RD.right : [1, 0, 0], rl = Math.hypot(r[0], r[2]) || 1, rx = r[0] / rl, rz = r[2] / rl;
   let left = Math.round(F.max * [.4, .7, 1][lv]);
+  const fwv = pyfFw(), fhz = Math.max(.25, Math.hypot(fwv[0], fwv[2])), fvy = Math.max(.25, fwv[1]);
   for (const c of G.creeps) {
     if (left <= 0) break;
     if (c.dead || !(c.burnT > 0) || !pfIsPyro(c.burnSrc)) continue;
     const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), y0 = typeof creepBaseY === 'function' ? creepBaseY(c) : (c.fly ? .9 : 0), hh = Math.min(typeof creepH === 'function' ? creepH(c) : 9, hitH(c) * 2.1);
-    const rad = Math.max(.15, (c.def && c.def.r) || .3), fade = Math.min(1, c.burnT / .35), sd = c._pfSd == null ? (c._pfSd = (Math.random() * 97) | 0) : c._pfSd;
+    const st = pfSt(c), rad = Math.max(.15, (c.def && c.def.r) || .3), fade = Math.min(1, c.burnT / .35), sd = st.sd == null ? (st.sd = (Math.random() * 97) | 0) : st.sd;
+    // (the way it walks: its flames lean back from it and their tips trail)
+    const v = pfVel(st, x, y0, z, now), lean = F.lean == null ? 1 : F.lean, vx = v[0] * lean, vz = v[2] * lean;
     const n = Math.min(lv ? 3 : 1, Math.round(F.count) + ((c.burnStack || 1) > 2 ? 1 : 0), left);
+    // (its body as it is drawn: how tall, and how far its sides stand out from its middle)
+    const bh = typeof creepH === 'function' ? Math.min(2.6, Math.max(hh, creepH(c))) : hh, wd = Math.max(rad * .9, bh * .3);
+    // (how far toward the camera a flame at height y, R in from its side, must be held to stand clear of its body)
+    const clear = (y, R) => Math.min(R / fhz, Math.max(.05, bh - y) / fvy) + .1;
+    // (the first rides its back and shoulders, held in front of its body so it is never swallowed by it; the others lick up
+    // its sides, one side then the other)
     if (F.on) for (let i = 0; i < n; i++) {
-      const side = i === 2 ? 0 : i ? -1 : 1, up = i === 2 ? .22 : .05 + .2 * pfRnd(sd + i * 3), w = side * rad * .75 * (.85 + .15 * Math.sin(now * 2 + sd + i)), len = F.tall * Math.min(1.5, Math.max(.6, hh / .9)) * (.8 + .35 * pfRnd(sd + i)) * (.75 + .25 * fade);
-      pfFlame([x + rx * w, y0 + hh * up, z + rz * w], pfNorm([rx * side * .2, 1, rz * side * .2]), len, { k: F.k, a: F.a * fade, seed: sd + i * 5, pull: .04, sp: 1.3, fat: .85 }, s, 'flames');
+      const s0 = pfRnd(sd) > .5 ? 1 : -1, side = i === 0 ? 0 : i === 1 ? s0 : -s0, up = i ? .44 + .12 * pfRnd(sd + i * 3) : .7, w = side * wd * .95 * (.92 + .08 * Math.sin(now * 2 + sd + i));
+      const len = F.tall * Math.min(2, Math.max(.6, bh / 1.25)) * (i ? .85 + .3 * pfRnd(sd + i) : 1.3) * (.75 + .25 * fade);
+      // (the one on its back is broad, its top licked into a few tips, and rises out of the top of it, so it shows from
+      // any side; the ones at its sides lean out from it)
+      pfFire([x + rx * w, y0 + bh * up, z + rz * w], pfNorm([rx * side * .35 - vx * .22, 1, rz * side * .35 - vz * .22]), len, { k: F.k, a: F.a * fade, seed: sd + i * 5, pull: clear(bh * up, (i ? .35 : 1) * wd), sp: 1.3, fat: i ? .9 : 1.2, tips: i ? 0 : .9, wide: i ? .66 : Math.min(1.5, wd * 1.7 / len), lag: pfLag([vx, 0, vz], .16, len * .9), n: i ? 1 : 2, soft: .04 }, s, 'flames');
       left--;
     }
-    if (E.on && Math.random() < E.rate * dt * (1 + .3 * ((c.burnStack || 1) - 1))) pfEmber(x + (Math.random() - .5) * rad, y0 + hh * (.3 + .5 * Math.random()), z + (Math.random() - .5) * rad, (Math.random() - .5) * .3, .5 + Math.random() * .5, (Math.random() - .5) * .3, { life: .55, w: .05, lift: .5 }, s);
+    // (and it sheds: wisps of fire left behind it, gone to smoke)
+    if (F.on && lv && F.shed > 0 && now >= (st.sh || 0)) {
+      st.sh = now + F.shed * (lv === 1 ? 1.8 : 1) * pfThin() * (.6 + .8 * Math.random());
+      pfShot('puff', x + (Math.random() - .5) * rad, y0 + bh * (.75 + .25 * Math.random()), z + (Math.random() - .5) * rad, F.tall * (.55 + .3 * Math.random()), .36 + .18 * Math.random(), { vx: v[0] * .2, vz: v[2] * .2, rise: .4, buoy: .6, grow: .9, hot: .72, soot: .9, a: F.a * fade * .85, pull: clear(bh * .85, wd) }, s, 'flames');
+    }
+    if (E.on && Math.random() < E.rate * dt * (1 + .3 * ((c.burnStack || 1) - 1))) pfEmber(x + (Math.random() - .5) * rad, y0 + hh * (.5 + .5 * Math.random()), z + (Math.random() - .5) * rad, (Math.random() - .5) * .3 - vx * .2, .5 + Math.random() * .5, (Math.random() - .5) * .3 - vz * .2, { life: .55, w: .04, lift: .5 }, s);
   }
 }
 
@@ -86206,8 +87368,10 @@ function pfFrame() {
   if (PF.hasT !== now) { PF.hasT = now; PF.has = G.towers.some(pfIsPyro) || PF.shots.length > 0 || PF.grounds.length > 0 || G.parts.some(p => p.k === 'pfe'); }
   if (!PF.has && !(typeof ELEMLAB !== 'undefined')) return;
   const dt = Math.max(0, Math.min(.1, now - PF.last)); PF.last = now;
-  PF.cards = 0; PF.cap = [70, 140, 220][pfLv()];
+  PF.cap = [90, 170, 260][pfLv()]; PF.load = PF.cards / PF.cap; PF.cards = 0;
   pfGlyphs(now, dt); pfShots(now); pfBalls(now); pfBreaths(now, dt); pfPhoenixes(now); pfHands(now); pfBurns(now, dt); pfEmbers();
+  // (the cards' soft edges read the spells' depth copy, which is only made when the spells' own batch has something in it)
+  if (PYF.q.length && typeof VX !== 'undefined' && VX && !VX.ni && typeof vfxSprite === 'function') { const c = PYF.q[0].c; vfxSprite(VX, c[0], c[1], c[2], .01, .01, 0, PF_WARM, .004, VT.GLOW, 1); }
 }
 if (typeof vfxParts === 'function') {
   const _pfParts = vfxParts;
@@ -86279,10 +87443,11 @@ if (typeof CCX_FX !== 'undefined') {
   CCX_FX.phoenix = function (C, t, F) { if (PF.phx.length < 8) PF.phx.push(Object.assign({ seed: (Math.random() * 97) | 0 }, F)); };
   CCX_FX.phoenixBoom = function (C, x, z, bm) {
     const s = 'cc_flamewave', lv = pfLv(), B = efx(s, 'burst'), Rg = efx(s, 'ring'), E = efx(s, 'embers'), S = efx(s, 'smoke'), Gd = efx(s, 'ground'), L = efx(s, 'light'), k = Math.sqrt(Math.max(1, bm || 2.5) / 2.5);
-    pfBoom(x, z, B.w * k, CCX.PHX_BOOM * k, [2, 4, 5][lv], .7 * k, B, Rg, s, { k: B.k });
+    pfBoom(x, z, B.w * k, CCX.PHX_BOOM * k, [1, 3, 4][lv], .7 * k, B, Rg, s, { k: B.k });
     const n = Math.round(E.count * k * [.5, .8, 1][lv]);
-    for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 1.6 * (.4 + .6 * Math.random()) * k; pfEmber(x + Math.cos(a) * .1, .2 + Math.random() * .2, z + Math.sin(a) * .1, Math.cos(a) * v, 1.2 + Math.random() * 1.8, Math.sin(a) * v, { life: .7 + Math.random() * .4, w: .08, lift: .3 }, s); }
-    if (lv) for (let i = 0; i < S.puffs; i++) pfShot('puff', x + (Math.random() - .5) * .6 * k, .55 + .15 * i, z + (Math.random() - .5) * .6 * k, S.w * k * (.85 + .3 * Math.random()), 1, { delay: .18 + i * .1, rise: .45, grow: .5, a: .85 }, s, 'smoke');
+    for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 1.6 * (.4 + .6 * Math.random()) * k; pfEmber(x + Math.cos(a) * .1, .2 + Math.random() * .2, z + Math.sin(a) * .1, Math.cos(a) * v, 1.2 + Math.random() * 2, Math.sin(a) * v, { life: .7 + Math.random() * .4, w: .06, lift: -2.4 }, s); }
+    if (E.on) pfSparks(x, .2, z, (E.sparks || 0) * k, { sp: [.8, 3.2 * k], up: [.4, 1.8] }, s);
+    if (lv) for (let i = 0; i < S.puffs; i++) pfShot('smoke', x + (Math.random() - .5) * .6 * k, .6 + .15 * i, z + (Math.random() - .5) * .6 * k, S.w * k * (.85 + .3 * Math.random()), 1.1, { delay: .18 + i * .1, rise: .45, grow: .6, a: .8 }, s, 'smoke');
     if (Gd.on) pfGround(x, z, Gd.r * k, Gd.dur, 1, s);
     if (L.on) pfLight(x, z, .4, 1.1, L.rad * k * 1.3, .3, s);
   };
@@ -86293,10 +87458,11 @@ if (typeof CCX_FX !== 'undefined') {
   CCX_FX.skipLand = function (C, x, z, j, n) {
     const s = 'cc_kindle', lv = pfLv(), B = efx(s, 'burst'), Rg = efx(s, 'ring'), F = efx(s, 'flames'), E = efx(s, 'embers'), S = efx(s, 'smoke'), last = j === n - 1, k = Math.pow(B.shrink, j) * (last ? B.last : 1);
     pfBoom(x, z, B.w * k, k, 0, 0, B, Rg, s, { k: B.k });
-    const nf = Math.round(F.count * [.34, .67, 1][lv]);
+    const nf = Math.round(F.count * [0, .5, 1][lv]);
     for (let i = 0; i < nf; i++) { const a = i * TAU / Math.max(1, nf) + Math.random() * .8; pfShot('wisp', x + Math.cos(a) * .22 * k, .03, z + Math.sin(a) * .22 * k, F.w * k * (.8 + .4 * Math.random()), .4, { delay: .05 + .04 * i, rise: .35, lean: pfNorm([Math.cos(a) * .25, 1, Math.sin(a) * .25]), fat: .9 }, s, 'flames'); }
-    for (let i = 0; i < Math.round(E.count * k * [.5, .8, 1][lv]); i++) { const a = Math.random() * TAU, v = 1.2 * (.4 + .6 * Math.random()); pfEmber(x, .15, z, Math.cos(a) * v, 1 + Math.random(), Math.sin(a) * v, { life: .5, w: .06, lift: .3 }, s); }
-    if (last && lv && S.on) pfShot('puff', x, .4, z, S.w * k, .9, { delay: .12, rise: .4, grow: .5, a: .8 }, s, 'smoke');
+    for (let i = 0; i < Math.round(E.count * k * [.5, .8, 1][lv]); i++) { const a = Math.random() * TAU, v = 1.2 * (.4 + .6 * Math.random()); pfEmber(x, .15, z, Math.cos(a) * v, 1 + Math.random() * 1.2, Math.sin(a) * v, { life: .5, w: .05, lift: -2.4 }, s); }
+    if (E.on) pfSparks(x, .15, z, (E.sparks || 0) * k, { sp: [.6, 2] }, s);
+    if (last && lv && S.on) pfShot('smoke', x, .45, z, S.w * k, 1, { delay: .12, rise: .4, grow: .6, a: .75 }, s, 'smoke');
     if (!j) pfLight(x, z, .3, .7, 1.2, .2, s);
     // (its sound is played by the spell itself, forces_zxc_conclave_cool.js, so it is heard when the look is skipped too)
   };
@@ -88189,6 +89355,701 @@ if (typeof towerTop === 'function') {
   };
 }
 
+/* ================= THE FROSTWEAVERS' ICE SHADER: faceted ice, cold mist and glints, drawn live =================
+   The cold counterpart of the Pyroclasts' flame shader (pyrotex.js), for the owner's "get another agent to work alongside
+   the pyro to create better look frost spells for frost weaver" (10 Nov 2026). Where fire is a flowing field, ice is hard:
+   every crystal is one card, and the shader cuts it into flat faces (a roof of three long faces, a pointed tip), lights each
+   face on its own, and shows the ice's inner facets and fracture lines bent through them, so a crystal reads as a solid,
+   translucent thing with bright edges and a pale core, never as an outlined sprite.
+     SHARD   a crystal of ice along its card: a bolt, a spear, a standing spike, a petal of a bloom, a splinter. It can be
+             clear (what is behind it shows through its faces), cracked (white fractures spreading), planted (rime at its root)
+     MIST    a puff of cold fog: soft, broken by slow noise, thinning from inside as it ages
+     GLOW    soft added cold light;  GLINT a snow glint, twinkling;  FLASH a burst of thin white needles (an impact)
+     STREAK  the cold air torn behind a flying shard
+   Nothing is drawn as a mark on the ground. Cards: frtBill (facing the camera), frtAxial (along a direction, turned to the
+   camera); copied from pyrotex.js for now (the two could share them and the noise's maker once both are merged). Drawn in
+   the spells' pass (gl.js vfxGL ext), depth-tested, premultiplied; ice and mist far to near, then the added light.
+   The look is the Element Lab's Ice paint (elemfx.js cc_froststyle.paint; its gradient is the palette), live.
+   No GL or DOM is touched until the first card is drawn (the sims load this). */
+const FRT = { q: [], sty: null, styAt: -1, tex: null, MAX: 420 };
+const FRT_SH = { SHARD: 0, MIST: 1, GLOW: 2, GLINT: 3, FLASH: 4, STREAK: 5 };
+// laid down: ice and mist (sorted far to near), then added light
+const FRT_ORD = [0, 0, 1, 1, 1, 1];
+// the palette, the deep of the ice to its white edge
+const FRT_PAL = ['#0c2f6b', '#1d6fc2', '#58b4ec', '#bfe8fb', '#f4fcff'];
+const frtHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+
+/* ---- the texture the ice is cut from: one small repeating texture, made once.
+   r: rolling noise; g: finer; b: how near the border between two cells (fracture lines); a: each cell its own value (the
+   ice's inner facets) ---- */
+function frtNoise() {
+  const W = 256, px = new Uint8Array(W * W * 4);
+  const hash = (x, y, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(s | 0, 1274126177); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const vn = (x, y, per, s) => {
+    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10), m = v => ((v % per) + per) % per;
+    const gd = (cx, cy, dx, dy) => { const an = hash(m(cx), m(cy), s) * 6.2831853; return Math.cos(an) * dx + Math.sin(an) * dy; };
+    const a = gd(ix, iy, fx, fy), b = gd(ix + 1, iy, fx - 1, fy), c = gd(ix, iy + 1, fx, fy - 1), d = gd(ix + 1, iy + 1, fx - 1, fy - 1);
+    return (a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy) * .72 + .5;
+  };
+  const fbm = (u, v, per, oct, s) => { let sum = 0, amp = .5, tot = 0; for (let k = 0; k < oct; k++) { sum += amp * vn(u * per, v * per, per, s + k * 17); tot += amp; per *= 2; amp *= .55; } return sum / tot; };
+  const C = 7, m7 = v => ((v % C) + C) % C, pt = (i, j) => [i + .12 + .76 * hash(m7(i), m7(j), 91), j + .12 + .76 * hash(m7(i), m7(j), 92)];
+  const st = v => Math.max(0, Math.min(1, (v - .5) * 2.1 + .5));
+  for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+    const u = (i + .5) / W, v = (j + .5) / W, o = (j * W + i) * 4;
+    const cx = u * C, cy = v * C, ci = Math.floor(cx), cj = Math.floor(cy); let f1 = 9, f2 = 9, id = 0;
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const p = pt(ci + a, cj + b), d = Math.hypot(p[0] - cx, p[1] - cy); if (d < f1) { f2 = f1; f1 = d; id = hash(m7(ci + a), m7(cj + b), 55); } else if (d < f2) f2 = d; }
+    px[o] = st(fbm(u, v, 4, 4, 3)) * 255; px[o + 1] = st(fbm(u, v, 8, 4, 41)) * 255;
+    px[o + 2] = Math.max(0, Math.min(1, (f2 - f1) * 1.6)) * 255; px[o + 3] = id * 255;
+  }
+  return { px, W };
+}
+
+/* ---- the look: the Element Lab's Ice paint, else as authored (looked at four times a second) ---- */
+function frtStyle() {
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  if (FRT.sty && now - FRT.styAt < 250) return FRT.sty;
+  FRT.styAt = now;
+  const P = typeof efx === 'function' && typeof ELEM_FX_SPELLS !== 'undefined' && ELEM_FX_SPELLS.cc_froststyle ? efx('cc_froststyle', 'paint') : {};
+  const v = (k, d) => typeof P[k] === 'number' && isFinite(P[k]) ? P[k] : d;
+  return (FRT.sty = { pal: P.grad ? frtPalOf(P.c0, P.c1, P.c2) : frtPalOf(), sty: [v('facet', 1), v('edge', 1), v('clear', 1), v('sparkle', 1)], sty2: [v('inner', 1), v('rime', 1), v('fog', 1)] });
+}
+// five tones from a three-stop gradient (start the white edge, mid the body, end the deep); none: the authored palette
+const _frtPal = new Map();
+function frtPalOf(c0, c1, c2) {
+  const key = c0 ? c0 + c1 + c2 : ''; let p = _frtPal.get(key); if (p) return p;
+  if (!c0) p = new Float32Array(FRT_PAL.flatMap(frtHex));
+  else { const a = frtHex(c0), b = frtHex(c1), c = frtHex(c2), mx = (x, y, k) => x.map((q, i) => q + (y[i] - q) * k); p = new Float32Array([...c, ...mx(c, b, .6), ...b, ...mx(b, a, .6), ...a]); }
+  _frtPal.set(key, p); return p;
+}
+
+const FRT_VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aA; layout(location=3) in vec4 aB; layout(location=4) in vec4 aC; layout(location=5) in vec2 aD;
+uniform mat4 uVP, uView; out vec2 vUV; out vec4 vA; out vec4 vB; out vec4 vC; out vec2 vS; out float vD;
+${typeof BEND_GLSL !== 'undefined' ? BEND_GLSL : 'vec3 bendW(vec3 p){return p;}'}
+void main(){ vUV = aUV; vA = aA; vB = aB; vC = aC; vS = aD; vec3 w = bendW(aPos); gl_Position = uVP * vec4(w, 1.); vD = -(uView * vec4(w, 1.)).z; }`;
+// vUV: the card's own coordinates (each shape says which); vA: shape, seed, time, age; vB: brightness, opacity, two of the
+// shape's own; vC: cracked (0..1), clear (0 solid .. 1 glass), soft (the depth it fades over where it meets the scene),
+// tail (a shard: how much of its length its back end tapers over; 0: planted, a flat root); vS: its length and width in the
+// world; vD: its depth in view
+FRT.fs = /*FS<*/`#version 300 es
+precision highp float;
+in vec2 vUV; in vec4 vA; in vec4 vB; in vec4 vC; in vec2 vS; in float vD;
+uniform sampler2D uN; uniform vec3 uPal[5]; uniform vec4 uSty; uniform vec3 uSty2; uniform vec2 uBloom;
+uniform highp sampler2D uDep; uniform vec4 uNF;
+out vec4 o;
+#define SD (vA.y * .173)
+#define TM vA.z
+#define AGE vA.w
+vec4 N(vec2 p){ return texture(uN, p); }
+// (the spells' soft edges, gl.js: how far the scene is behind this point of the card)
+float frLin(float d){ return uNF.z > .5 ? uNF.x + d*(uNF.y-uNF.x) : uNF.x*uNF.y/(uNF.y - d*(uNF.y-uNF.x)); }
+float frSoft(float k){ if (uNF.w < .5 || k <= 0.) return 1.; float s = frLin(texelFetch(uDep, ivec2(gl_FragCoord.xy), 0).r); return clamp((s - vD) / k, 0., 1.); }
+
+// a crystal: x across (-1..1), y from its root (0) to its point (1). vB.z how wide, vB.w how much of its length is point
+vec4 shard(vec2 uv){
+  float y = uv.y, s1 = fract(SD * 7.31 + .13), s2 = fract(SD * 3.77 + .51);
+  float tip = max(.05, vB.w), tail = vC.w, fat = vB.z;
+  float pt = (1. - y) / tip, pb = tail > 0. ? (y + .015) / tail : 9.;
+  float prof = clamp(min(pt, pb), 0., 1.), w = fat * prof;
+  // (its point sits a little off its middle: a crystal, not a dart)
+  float x = uv.x - (s1 - .5) * .55 * fat * smoothstep(1. - tip, 1., y);
+  float u = x / max(w, 1e-4), d = (1. - abs(u)) * w;
+  // its faces: a roof of three, the ridges where they meet (a, b); toward the point they all tilt forward
+  float a = -.52 + .44 * s1, b = min(.8, a + .42 + .34 * s2), z, zu;
+  if (u < a) { zu = 1. / (a + 1.); z = (u + 1.) * zu; }
+  else if (u < b) { zu = -.2 / (b - a); z = 1. + (u - a) * zu; }
+  else { zu = -.8 / (1. - b); z = .8 + (u - b) * zu; }
+  float wy = pt < 1. && pt <= pb ? -fat / tip : pb < 1. ? fat / max(tail, .01) : 0.;
+  vec3 n = normalize(vec3(-zu, -wy * (z - u * zu) * 2.4, .85));
+  // the light turns slowly, so its faces catch it in turn
+  float la = sin(TM * .8 + SD * 9.) * uSty.w;
+  vec3 L = normalize(vec3(-.5 + .45 * la, .52 - .2 * la, .66));
+  float tone = smoothstep(-.12, 1.02, dot(n, L));
+  // inside: the ice's own facets and fractures, seen bent through each face
+  vec2 q = vec2(x * vS.y * .5, y * vS.x) * .62 + n.xy * .07 + vec2(SD * 5., SD * 3.);
+  vec4 c = N(q);
+  float frac = (1. - smoothstep(0., .2, c.b)) * uSty2.x;
+  tone = clamp(tone * (.62 + .38 * uSty.x) + (c.a - .5) * .5 * uSty.x * uSty2.x, 0., 1.);
+  vec3 col = mix(uPal[0], uPal[1], smoothstep(0., .5, tone));
+  col = mix(col, uPal[2], smoothstep(.4, .78, tone));
+  col = mix(col, uPal[3], smoothstep(.72, 1., tone));
+  // its cold core: pale along its axis
+  float core = exp(-u * u * 4.) * smoothstep(0., .3, min(y * 1.6, prof)) * .6;
+  col = mix(col, uPal[4], core);
+  float rim = 1. - smoothstep(0., .1, d / max(fat, .2));
+  float ridge = max(1. - smoothstep(0., .075, abs(u - a)), 1. - smoothstep(0., .075, abs(u - b))) * smoothstep(.05, .35, prof);
+  float spec = pow(max(dot(n, normalize(L + vec3(0., 0., 1.))), 0.), 26.);
+  float clr = clamp(vC.y * uSty.z, 0., 1.);
+  float hi = ((rim * .7 + ridge * .42) * uSty.y + spec * .9) * (1. - .3 * clr);
+  col += uPal[4] * hi + uPal[3] * frac * .13;
+  // cracked: white fractures spreading from its middle
+  float ck = vC.x, crack = 0.;
+  if (ck > 0.) {
+    float cb = N(vec2(x * vS.y * .5, y * vS.x) * 1.1 + SD * 3.).b;
+    crack = (1. - smoothstep(0., .13, cb)) * smoothstep(ck * 1.3, ck * 1.3 - .35, abs(y - .4)) * min(1., ck * 4.);
+    col += vec3(1.) * crack + uPal[3] * ck * ck * .35;
+  }
+  float al = clamp(mix(.9, .16, clr) * (1.08 - .3 * tone * clr) + hi * .75 + frac * .08 + crack + core * .25, 0., 1.);
+  float aa = fwidth(d) * 1.3 + .004, cov = smoothstep(0., aa, d);
+  if (tail <= 0.) {
+    // planted: a ragged, rimed root, never a hard line where it meets the ground
+    float g = N(vec2(uv.x * vS.y * 1.4 + SD * 4., y * vS.x * 1.2)).g;
+    float rime = smoothstep(.24, 0., y + (g - .5) * .2) * uSty2.y * (1. - .6 * clr);
+    col = mix(col, uPal[4] * .9, rime * .55); al = max(al, rime * .55);
+    cov *= smoothstep(0., .07, y + (g - .5) * .06);
+  }
+  al *= 1. - AGE;
+  if (uBloom.x > .5) return vec4(uPal[3] * (spec * .9 + core * .5 + rim * .2 + crack) * cov * vB.x * vB.y * (1. - AGE) * .3, 0.);
+  return vec4(col * al * cov * vB.x, al * cov) * vB.y;
+}
+void main(){
+  int sh = int(vA.x + .5);
+  float sf = frSoft(vC.z);
+  if (sh == 0) o = shard(vUV) * (vC.z > 0. ? .25 + .75 * sf : 1.);
+  else if (sh == 1) {
+    // cold fog, -1..1 both ways; AGE its life
+    if (uBloom.x > .5) discard;
+    vec2 p = vUV; float t = AGE, r = length(p);
+    vec2 w = N(p * .2 + vec2(SD, TM * .04)).rg - .5;
+    float n = N(p * .24 + w * .3 + vec2(SD * 2., TM * .05 + t * .15)).r, n2 = N(p * .55 + w * .2 + vec2(SD * 5., t * .25)).g;
+    float d = .92 - r / (.6 + .36 * t) + (n - .5) * 1. + (n2 - .5) * .38;
+    d -= t * t * 1.1 * n2;
+    float a = smoothstep(0., .95, d) * (1. - t) * smoothstep(0., .12, t) * (1. - smoothstep(.82, 1., r));
+    float lit = smoothstep(-.6, .5, p.y + (n - .5) * .8);
+    vec3 c = mix(mix(uPal[2], uPal[3], .65), uPal[4], .2 + .7 * lit);
+    a *= vB.y * sf * .44 * uSty2.z;
+    // (mostly laid over what is behind it, only a little added: on bright ground it stays a mist, never a white-out)
+    o = vec4(c * vec3(.84, .94, 1.08) * a * vB.x * .8, a * .62);
+  } else if (sh == 2) {
+    float g = pow(max(0., 1. - length(vUV)), 2.2);
+    o = vec4(mix(uPal[1], uPal[3], g) * g * vB.x * vB.y * sf * (uBloom.x > .5 ? .25 : 1.), 0.);
+  } else if (sh == 3) {
+    // a snow glint: a four-pointed star that twinkles, born and gone softly
+    vec2 a = abs(vUV); float r = length(vUV);
+    float star = pow(max(0., 1. - (a.x * a.y * 34. + (a.x + a.y) * .9)), 3.) + exp(-r * r * 46.) * .8;
+    float tw = (.5 + .5 * sin(TM * 15. + SD * 50.)) * sin(3.14159 * clamp(AGE, 0., 1.));
+    o = vec4(mix(uPal[3], uPal[4], .6) * star * tw * vB.x * vB.y * uSty.w * (uBloom.x > .5 ? .4 : 1.), 0.);
+  } else if (sh == 4) {
+    // an impact: thin white needles thrown out from a point, gone in a blink
+    vec2 p = vUV; float t = AGE, r = length(p), th = atan(p.y, p.x), e = 1. - pow(1. - t, 3.);
+    float n = N(vec2(th * .159 * 4. + SD, .3 + SD)).r, n2 = N(vec2(th * .159 * 11. + SD * 2., .7)).g;
+    float ray = pow(clamp(n * 2. - .62, 0., 1.), 2.) * 1.6 + pow(n2, 6.) * 1.1;
+    float R = .22 + .78 * e, v = ray * smoothstep(R, R * .3, r) * smoothstep(e * .4 - .12, e * .4 + .08, r) * pow(1. - t, 1.3);
+    v += exp(-r * r * 30.) * pow(1. - t, 3.) * 1.6;
+    o = vec4(mix(uPal[2], uPal[4], clamp(v * 1.4, 0., 1.)) * v * vB.x * vB.y * (uBloom.x > .5 ? .3 : 1.), 0.);
+  } else {
+    // the cold air torn behind a flying shard: x across, y from its far end (0) to the shard (1)
+    float y = vUV.y, w = .3 + .7 * y;
+    float n = N(vec2(vUV.x * .3 + SD, y * .35 - TM * 1.6)).r, n2 = N(vec2(vUV.x * .8 + SD * 3., y * .9 - TM * 2.6)).g;
+    float v = pow(max(0., 1. - abs(vUV.x) / w), 1.6) * pow(y, 1.7) * (.35 + .9 * n) * (.6 + .6 * n2) * (1. - smoothstep(.93, 1., y));
+    o = vec4(mix(uPal[1], uPal[3], y * y) * v * vB.x * vB.y * sf * (uBloom.x > .5 ? .2 : 1.), 0.);
+  }
+  if (max(o.a, max(o.r, max(o.g, o.b))) < .003) discard;
+}`/*>FS*/;
+
+/* ---- the cards ---- */
+// o: { seed, age, k (brightness), a (opacity), p0, p1 (the shape's own), crack, clear, soft, tail, sp (its clock's speed),
+// pull (world units toward the camera, so ice among the foes isn't swallowed by them), tg (the Element Lab's recolour) }
+function frtPush(sh, c, uv, o, dz, len, wid) {
+  if (FRT.q.length >= FRT.MAX || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
+  o = o || {};
+  const now = typeof G !== 'undefined' && G && G.time != null ? G.time : 0, sd = o.seed || 0;
+  FRT.q.push({ sh, c, uv, sd, tm: (now * (o.sp || 1)) % 997 + sd * .37, age: o.age || 0, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0,
+    crack: o.crack || 0, clear: o.clear || 0, soft: o.soft == null ? (sh === FRT_SH.MIST ? .3 : sh === FRT_SH.SHARD ? 0 : .12) : o.soft, tail: o.tail || 0, len, wid, ord: FRT_ORD[sh], dz, tg: o.tg || null });
+  const X = RD.vfx; if (!X.ext.includes(FRT_EXT)) X.ext.push(FRT_EXT); FRT_EXT.n = FRT.q.length;
+  return true;
+}
+const frtFw = () => [RD.view[2], RD.view[6], RD.view[10]];   // (toward the camera)
+// facing the camera, w wide and h tall, its centre at P; uv: [u0, v0, u1, v1]; o.rot: turned by this in its own plane
+function frtBill(sh, P, w, h, uv, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  let r = RD.right, up = RD.up; const fw = frtFw(), pl = (o && o.pull) || 0;
+  if (o && o.rot) { const cs = Math.cos(o.rot), sn = Math.sin(o.rot); const r2 = [r[0] * cs + up[0] * sn, r[1] * cs + up[1] * sn, r[2] * cs + up[2] * sn]; up = [up[0] * cs - r[0] * sn, up[1] * cs - r[1] * sn, up[2] * cs - r[2] * sn]; r = r2; }
+  const cx = P[0] + fw[0] * pl, cy = P[1] + fw[1] * pl, cz = P[2] + fw[2] * pl, a = w * .5, b = h * .5;
+  return frtPush(sh, [cx - r[0] * a - up[0] * b, cy - r[1] * a - up[1] * b, cz - r[2] * a - up[2] * b, cx + r[0] * a - up[0] * b, cy + r[1] * a - up[1] * b, cz + r[2] * a - up[2] * b,
+    cx + r[0] * a + up[0] * b, cy + r[1] * a + up[1] * b, cz + r[2] * a + up[2] * b, cx - r[0] * a + up[0] * b, cy - r[1] * a + up[1] * b, cz - r[2] * a + up[2] * b], uv, o, cx * fw[0] + cy * fw[1] + cz * fw[2], h, w);
+}
+// along dir from P, len long and wid wide, turned about its length to face the camera; o.at: where along it P is (0 its
+// root); o.floor: the least of its length the screen shows when it points at the camera (two fifths)
+function frtAxial(sh, P, dir, len, wid, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const fw = frtFw(), dv = dir[0] * fw[0] + dir[1] * fw[1] + dir[2] * fw[2]; let ax = [dir[0] - fw[0] * dv, dir[1] - fw[1] * dv, dir[2] - fw[2] * dv]; const al = Math.hypot(ax[0], ax[1], ax[2]);
+  ax = al > 1e-3 ? [ax[0] / al, ax[1] / al, ax[2] / al] : RD.up;
+  const wx = [fw[1] * ax[2] - fw[2] * ax[1], fw[2] * ax[0] - fw[0] * ax[2], fw[0] * ax[1] - fw[1] * ax[0]];
+  const L = len * Math.max((o && o.floor) || .4, al), pl = (o && o.pull) || 0, at = (o && o.at) || 0, hw = wid * .5;
+  const bx = P[0] + fw[0] * pl - ax[0] * L * at, by = P[1] + fw[1] * pl - ax[1] * L * at, bz = P[2] + fw[2] * pl - ax[2] * L * at, tx = bx + ax[0] * L, ty = by + ax[1] * L, tz = bz + ax[2] * L;
+  return frtPush(sh, [bx - wx[0] * hw, by - wx[1] * hw, bz - wx[2] * hw, bx + wx[0] * hw, by + wx[1] * hw, bz + wx[2] * hw, tx + wx[0] * hw, ty + wx[1] * hw, tz + wx[2] * hw, tx - wx[0] * hw, ty - wx[1] * hw, tz - wx[2] * hw],
+    [-1, 0, 1, 1], o, (bx + tx) * .5 * fw[0] + (by + ty) * .5 * fw[1] + (bz + tz) * .5 * fw[2], L, wid);
+}
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { FRT.q.length = 0; });
+
+/* ---- drawing ---- */
+const FRT_F = 19, _frtV = new Float32Array(FRT.MAX * 4 * FRT_F), _frtI = new Uint16Array(FRT.MAX * 6);
+function frtBuild(E) {
+  const X = RD.vfx, gl = X.gl; E.P = X.prog(FRT_VS, FRT.fs); E.fsOf = FRT.fs;
+  if (E.vao) return;
+  E.vao = gl.createVertexArray(); E.vb = gl.createBuffer(); const ib = gl.createBuffer();
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb); gl.bufferData(gl.ARRAY_BUFFER, _frtV.byteLength, gl.DYNAMIC_DRAW);
+  const st = FRT_F * 4;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, st, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, st, 20);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 36);
+  gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 4, gl.FLOAT, false, st, 52);
+  gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 2, gl.FLOAT, false, st, 68);
+  for (let q = 0; q < FRT.MAX; q++) _frtI.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, _frtI, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  const N0 = frtNoise(), t = FRT.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N0.W, N0.W, 0, gl.RGBA, gl.UNSIGNED_BYTE, N0.px);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+}
+// the frame's cards in the order they are laid down, grouped by recolour
+function frtFill(E) {
+  const Q = FRT.q; Q.sort((a, b) => a.ord - b.ord || a.dz - b.dz);
+  E.groups = []; let o = 0, g = null;
+  for (let i = 0; i < Q.length; i++) {
+    const e = Q[i], c = e.c, uv = e.uv;
+    if (!g || g.tg !== e.tg) E.groups.push(g = { tg: e.tg, q0: i, n: 0 });
+    g.n++;
+    for (let k = 0; k < 4; k++) {
+      _frtV[o] = c[k * 3]; _frtV[o + 1] = c[k * 3 + 1]; _frtV[o + 2] = c[k * 3 + 2];
+      _frtV[o + 3] = k === 1 || k === 2 ? uv[2] : uv[0]; _frtV[o + 4] = k > 1 ? uv[3] : uv[1];
+      _frtV[o + 5] = e.sh; _frtV[o + 6] = e.sd; _frtV[o + 7] = e.tm; _frtV[o + 8] = e.age;
+      _frtV[o + 9] = e.k; _frtV[o + 10] = e.a; _frtV[o + 11] = e.p0; _frtV[o + 12] = e.p1;
+      _frtV[o + 13] = e.crack; _frtV[o + 14] = e.clear; _frtV[o + 15] = e.soft; _frtV[o + 16] = e.tail;
+      _frtV[o + 17] = e.len; _frtV[o + 18] = e.wid; o += FRT_F;
+    }
+  }
+  return Q.length;
+}
+function frtDraw(E, bloom) {
+  if (!RD || !RD.vfx || !FRT.q.length) return;
+  const X = RD.vfx, gl = X.gl; if (!E.P || E.fsOf !== FRT.fs) frtBuild(E);
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb);
+  if (!bloom) { const nq = frtFill(E); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _frtV, 0, nq * 4 * FRT_F); }
+  // (the spells' shared uniforms: the view, the bend of the world, and the depth copy the soft edges read)
+  X.common(E.P, bloom, !bloom);
+  const u = E.P.u, S = frtStyle();
+  gl.uniform4fv(u.uSty, S.sty); gl.uniform3fv(u.uSty2, S.sty2);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, FRT.tex); gl.uniform1i(u.uN, 2); gl.activeTexture(gl.TEXTURE0);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, bloom ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  if (bloom) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
+  const up = u.uPal || u['uPal[0]'];
+  for (const g of E.groups) {
+    gl.uniform3fv(up, g.tg ? frtPalOf(g.tg.c0, g.tg.c1, g.tg.c2) : S.pal);
+    gl.drawElements(gl.TRIANGLES, g.n * 6, gl.UNSIGNED_SHORT, g.q0 * 12);
+  }
+  gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
+}
+const FRT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], draw(bloom) { frtDraw(this, bloom); } };
+
+/* ================= THE FROSTWEAVERS' FROST: faceted ice, drawn live =================
+   The owner (10 Nov 2026): "get another agent to work alongside the pyro to create better look frost spells for frost
+   weaver". Everything the Frostweavers' frost shows is drawn here on cards the ice shader cuts live (frosttex.js: SHARD,
+   MIST, GLOW, GLINT, FLASH, STREAK): hard crystals that grow, crack and shatter, cold mist that sinks and hangs, snow glints,
+   a cold light on the ground and the bodies near it. The cold counterpart of the Pyroclasts' fire (pyrofire.js): where fire
+   flows and rises, ice is still and sharp, and its mist falls. Gameplay, timing and the sounds are untouched.
+   - The staff: a faint cold glow at its crystal, mist sinking from it, a glint now and then; brighter as a cast gathers.
+   - Frost Bolt (her strike): one shard of ice with a pale core, flying straight and level at its foe, the cold air torn
+     behind it, puffs of mist left hanging along its path. It lands in a blink of white needles, splinters flung back and a
+     puff of cold.
+   - Frost Spear: a long, heavy lance with two barbs swept back, a brighter light, a thicker wake. Where it strikes, spikes of
+     ice burst out the far side of the foe, hold a moment, crack and are gone; more splinters, more cold.
+   - Ice Coffin: crystals grow up round the foe, tall behind it and low before it, and one great clear crystal closes over
+     it: the foe is seen inside. In its last moment white cracks spread; when it lets go (or the foe dies) every crystal
+     breaks into falling splinters and a breath of mist.
+   - Shatterbloom: a cluster of crystals blooms over the foe and waits, glinting. When it bursts, its petals fly apart and a
+     wave of cold mist rolls out low to the burst's real edge.
+   - Frozen foes (any freeze in a Conclave run): small crystals grown at their feet, dropped as they thaw. Chilled foes:
+     cold mist sinking off them and a glint. No ring, rim or disc is drawn on the ground anywhere (the owner reads those as
+     runes).
+   Restraint: all of it scales with the Graphics setting (ffLv) and a card budget a frame (FF.cap); the foe inside a coffin
+   stays visible (the lab's Readability). Its values: the Element Lab (elemfx.js ELEM_FX_DEF, read through efx()). */
+const FF = { shots: [], cof: [], blo: [], cards: 0, cap: 170, last: 0, quiet: 0, has: 0, hasT: -1, peak: 0 };
+const FF_IDS = ['cc_glacialglyph', 'cc_rimelance', 'cc_hoarbloom'], FF_UNIT = 'cc_rimeweaver', FF_UP = [0, 1, 0], FF_SQ = [-1, -1, 1, 1];
+const FF_RING = ['#dff6ff', '#e6fbff'];   // (the rings the frost kit asks for: a cold wave is drawn in their place)
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { FF.shots.length = 0; FF.cof.length = 0; FF.blo.length = 0; });
+// the Graphics setting: 0 Low (fewer cards), 1 Medium, 2 High
+const ffLv = () => typeof GFX === 'undefined' ? 2 : GFX === 'low' ? 0 : GFX === 'medium' ? 1 : 2;
+const ffLive = () => typeof G !== 'undefined' && G && G.time != null && G.state !== 'title';
+const ffDrawing = () => typeof vfxReady === 'function' && typeof frtBill === 'function' && vfxReady();
+// the frost of a Conclave run is drawn here (the old sprites, rings and shells step aside)
+const ffOn = () => ffLive() && G.force === 'conclave' && ffDrawing();
+const ffIsFw = t => !!(t && t.def && t.def.unit === FF_UNIT);
+const ffRnd = s => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const ffNorm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+const ffSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const ffBack = t => { t = Math.max(0, Math.min(1, t)) - 1; return 1 + 2.4 * t * t * t + 1.4 * t * t; };   // (grown a little past its size, then settled)
+const ffFrozen = c => !!(c && !c.dead && c.stunT > 0 && c.stunEl === 'frost');
+const ffFoeX = c => c.x + (c.ox || 0) + (c.kbx || 0), ffFoeZ = c => c.y + (c.oy || 0) + (c.kbz || 0);
+const ffFoeY = c => typeof creepBaseY === 'function' ? creepBaseY(c) : (c.fly ? .9 : 0);
+const ffFoeH = c => typeof creepH === 'function' ? creepH(c) : hitH(c) * 1.6;
+const ffFoeR = c => Math.max(.2, ((c.def && c.def.r) || .3) * (typeof cscale === 'function' ? Math.min(1.6, cscale(c.type)) : 1));
+const ffP = (s, l) => efx(ELEM_FX_SPELLS[s] ? s : 'cc_rime', l);
+// how many of a thing: the Graphics setting's share and the lab's count
+const ffN = (P, n, ks) => Math.max(0, Math.round(n * (ks ? ks[ffLv()] : 1) * (P._g ? P.n : 1)));
+
+/* ---- drawing: each card under its effect's Element Lab layer ---- */
+// the layer's tuning onto a card's options (brightness, opacity, speed, recolour); its size back, or null: not drawn
+const _ffTg = new Map();
+function ffTune(s, l, size, o) {
+  if (FF.cards >= FF.cap) return null;
+  if (typeof EFX !== 'undefined' && EFX.on) {
+    const id = ELEM_FX_SPELLS[s] ? s : 'cc_rime', P = efx(id, l); efxCount(id, l);
+    if (P._g) {
+      if (!P.on) return null;
+      o.k = (o.k == null ? 1 : o.k) * P.glow; o.a = (o.a == null ? 1 : o.a) * P.alpha; if (P.speed !== 1) o.sp = (o.sp || 1) * P.speed;
+      if (P.grad) { const key = P.c0 + P.c1 + P.c2; let t = _ffTg.get(key); if (!t) _ffTg.set(key, t = { c0: P.c0, c1: P.c1, c2: P.c2 }); o.tg = t; }
+      size *= P.size;
+    }
+  }
+  FF.cards++; return size;
+}
+// a crystal from P along dir, len long (o.fat: its width per length; o.tip: how much of it is point; o.tail: its back end
+// tapers too (a flying shard), else it is planted; o.clear, o.crack, o.at)
+function ffShard(P, dir, len, o, s, l) {
+  const z = ffTune(s, l, len, o); if (z == null || z <= .004) return false;
+  o.p0 = .86; o.p1 = o.tip == null ? .34 : o.tip;
+  return frtAxial(FRT_SH.SHARD, P, dir, z, z * (o.fat || .3), o);
+}
+function ffBill(sh, P, w, o, s, l) { const z = ffTune(s, l, w, o); return z != null && frtBill(sh, P, z, z, FF_SQ, o); }
+// a one-shot left where it was made. kind: mist (w across, drifting, slowed by drag), splinter (a small crystal flung,
+// tumbling, falling), glint, flash, glow, spike (a crystal grown at a place: grown over o.grow, held, cracked and gone)
+function ffShot(kind, x, y, z, w, dur, o, s, l) {
+  o = o || {}; if (FF.shots.length >= 240) FF.shots.shift();
+  const P = ffP(s, l); if (P._g) dur *= P.life;
+  FF.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, drag: o.drag || 0, g: o.g || 0, grow: o.grow || 0,
+    dir: o.dir || null, pull: o.pull, spin: o.spin || 0, a0: o.a0 || 0, fat: o.fat, tip: o.tip, clear: o.clear || 0, hold: o.hold || 0, seed: (Math.random() * 97) | 0, s, l });
+}
+function ffShots(now) {
+  FF.shots = FF.shots.filter(e => now - e.at < e.dur);
+  for (const e of FF.shots) {
+    const el = now - e.at; if (el < 0) continue;
+    const age = el / e.dur, m = e.drag > 0 ? (1 - Math.exp(-e.drag * el)) / e.drag : el;
+    let x = e.x + e.vx * m, y = e.y + e.vy * m - .5 * e.g * el * el, z = e.z + e.vz * m;
+    const o = { k: e.k, a: e.a, seed: e.seed, age };
+    if (e.kind === 'mist') { o.pull = .06; ffBill(FRT_SH.MIST, [x, Math.max(.06, y), z], e.w * (1 + e.grow * age), o, e.s, e.l); }
+    else if (e.kind === 'splinter') {
+      // (it lies where it lands, and is gone)
+      let a = e.a0 + e.spin * el; if (y < .04) { const tl = (e.vy + Math.sqrt(e.vy * e.vy + 2 * e.g * Math.max(0, e.y - .04))) / Math.max(.01, e.g); a = e.a0 + e.spin * tl; y = .04; x = e.x + e.vx * tl; z = e.z + e.vz * tl; }
+      const d = e.dir; o.age = ffSs(.55, 1, age); o.tail = .42; o.tip = .46; o.fat = e.fat || .36; o.at = .5; o.clear = .2; o.pull = .05;
+      ffShard([x, y, z], [Math.cos(a) * d[0], Math.sin(a), Math.cos(a) * d[1]], e.w, o, e.s, e.l);
+    }
+    else if (e.kind === 'glint') { o.pull = .1; ffBill(FRT_SH.GLINT, [x, y, z], e.w, o, e.s, e.l); }
+    else if (e.kind === 'flash') { o.pull = .2; ffBill(FRT_SH.FLASH, [x, y, z], e.w, o, e.s, e.l); }
+    else if (e.kind === 'glow') { o.a = e.a * (1 - age) * (1 - age); o.age = 0; o.pull = .15; ffBill(FRT_SH.GLOW, [x, y, z], e.w * (.8 + .4 * age), o, e.s, e.l); }
+    else if (e.kind === 'spike') {
+      const gr = ffBack(el / Math.max(.01, e.grow)), end = Math.max(0, (el - e.grow - e.hold) / Math.max(.01, e.dur - e.grow - e.hold));
+      o.age = end * end; o.crack = Math.min(1, end * 2.2); o.fat = e.fat || .26; o.tip = e.tip == null ? .5 : e.tip; o.clear = e.clear; o.pull = e.pull == null ? .08 : e.pull;
+      ffShard([x, y, z], e.dir, e.w * gr, o, e.s, e.l);
+    }
+  }
+}
+// splinters of ice flung from a point: n of them, w long, v fast (o.dir: thrown mostly that way; o.up)
+function ffSplinters(x, y, z, n, w, v, secs, s, o) {
+  o = o || {};
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, sp = v * (.45 + .55 * Math.random()), dx = Math.cos(a), dz = Math.sin(a), bx = o.dir ? o.dir[0] * v * .5 : 0, bz = o.dir ? o.dir[2] * v * .5 : 0;
+    ffShot('splinter', x + dx * .05, y, z + dz * .05, w * (.6 + .7 * Math.random()), secs * (.8 + .4 * Math.random()),
+      { vx: dx * sp + bx, vz: dz * sp + bz, vy: (o.up == null ? 1.5 : o.up) * (.5 + Math.random()), g: 7, dir: [dx, dz], spin: (Math.random() < .5 ? -1 : 1) * (5 + 9 * Math.random()), a0: Math.random() * TAU, fat: .3 + .14 * Math.random() }, s, 'shards');
+  }
+}
+// snow glints drifting down from about a point
+function ffGlints(x, y, z, n, r, s, l) {
+  for (let i = 0; i < n; i++) ffShot('glint', x + (Math.random() - .5) * r, y + (Math.random() - .5) * r * .7, z + (Math.random() - .5) * r, .11 + .09 * Math.random(), .55 + .5 * Math.random(), { vy: -.22 - .2 * Math.random(), vx: (Math.random() - .5) * .15, vz: (Math.random() - .5) * .15, delay: Math.random() * .25 }, s, l || 'mist');
+}
+function ffLight(x, z, h, k, rad, life, s) { const e = efxPush(s, 'light'); try { if (G.flashes.length < 6) flashLight(x, z, h, [.38 * k, .74 * k, 1.3 * k], rad, life); } finally { efxPop(e); } }
+// a wave of cold rolling out low from a point to r (a burst's real edge): puffs of mist carried out and left hanging
+function ffWave(x, z, r, s, k) {
+  const M = ffP(s, 'mist'), n = ffN(M, (M.puffs || 8) * (k || 1), [.5, .75, 1]);
+  for (let i = 0; i < n; i++) {
+    const a = i * TAU / Math.max(1, n) + Math.random() * .5, v = r * 3.1 * (.85 + .3 * Math.random());
+    ffShot('mist', x + Math.cos(a) * .12, .16, z + Math.sin(a) * .12, r * (M.w || .85) * (.8 + .4 * Math.random()), (M.secs || .85) * (.85 + .3 * Math.random()), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, drag: 3.6, grow: .7, a: .9 }, s, 'mist');
+  }
+  if (ffLv()) ffGlints(x, .3, z, ffN(M, 5, [0, .6, 1]), r * 1.5, s, 'mist');
+}
+
+/* ---- the staff: a cold glow at its crystal, mist sinking from it ---- */
+function ffStaffs(now, dt) {
+  const H = efx('cc_rime', 'hand'); if (!H.on) return;
+  for (const t of G.towers) {
+    if (!ffIsFw(t) || t.wrecked || t.build > 0) continue;
+    const p = ccHand(t, towerTop(t) * .95), A = t.ab, cs = A && A.cast, fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+    // (how far a cast or the next bolt has gathered)
+    const g = cs && cs.T > 0 ? Math.min(1, (now - cs.at) / cs.T) : fight && (t.cd || 0) < .3 ? 1 - (t.cd || 0) / .3 : 0;
+    t._ffG = (t._ffG || 0) + (g - (t._ffG || 0)) * Math.min(1, dt * 12);
+    const gg = t._ffG, sd = ((t.i | 0) * 5 + (t.j | 0)) % 97;
+    ffBill(FRT_SH.GLOW, p, H.w * (1 + H.gather * gg), { k: H.k * (.45 + .75 * gg) * (.92 + .08 * Math.sin(now * 3 + sd)), pull: .08, seed: sd }, 'cc_rime', 'hand');
+    if (!ffLv()) continue;
+    if (H.fog > 0 && Math.random() < dt * H.fog * (1 + 1.5 * gg)) ffShot('mist', p[0] + (Math.random() - .5) * .06, p[1] - .04, p[2] + (Math.random() - .5) * .06, .2 + .08 * Math.random(), 1, { vy: -.22, vx: (Math.random() - .5) * .08, vz: (Math.random() - .5) * .08, grow: 1.1, a: .32 }, 'cc_rime', 'hand');
+    if (H.glint > 0 && Math.random() < dt * H.glint * (1 + 3 * gg)) ffGlints(p[0], p[1], p[2], 1, .16 + .1 * gg, 'cc_rime', 'hand');
+  }
+}
+
+/* ---- the bolt and the spear in flight ---- */
+// the light a shard carries along its path: a real light that moves with it, and a faint cold pool on the ground under it
+function ffFlyLight(o, x, y, z, k, rad, s) {
+  if (!(k > 0) || !(rad > 0)) return;
+  const e = efxPush(s, 'light');
+  try {
+    let q = [[.38 * k, .74 * k, 1.3 * k], rad, .14]; if (typeof EFX !== 'undefined' && EFX.on) q = efxLight(q[0], q[1], q[2]);
+    if (!q) return;
+    let f = o._ffL; if (!f || !G.flashes.includes(f)) { f = null; if (G.flashes.length < 7) G.flashes.push(f = o._ffL = { x, z, h: y, col: q[0], rad: q[1], life: q[2], max: q[2] }); }
+    if (f) { f.x = x; f.z = z; f.h = y; f.col = q[0]; f.rad = q[1]; f.life = f.max = q[2]; }
+  } finally { efxPop(e); }
+}
+// where a shard is drawn: thrown straight and level from the staff into the foe's body (the game's own point runs down to
+// the foe's middle; a foe shorter than the staff: it comes down to core.aim of its height)
+function ffFlight(p) {
+  const F = p._ff || (p._ff = { x0: p.x, h0: p.h, z0: p.z, spear: p.spd >= 12, seed: (Math.random() * 97) | 0 }), tg = p.tg && !p.tg.dead ? p.tg : null;
+  const s = F.spear ? 'cc_glacialglyph' : 'cc_rime', C = efx(s, 'core');
+  if (tg) { F.tx = tg.x; F.tz = tg.y; if (F.aim == null) F.aim = Math.min(F.h0, Math.max(.3, ffFoeY(tg) + ffFoeH(tg) * (C.aim == null ? .75 : C.aim))); }
+  else if (F.tx == null) { F.tx = p.lx == null ? p.x : p.lx; F.tz = p.lz == null ? p.z : p.lz; }
+  if (F.aim == null) F.aim = Math.min(F.h0, .7);
+  const d0 = Math.hypot(p.x - F.x0, p.z - F.z0), d1 = Math.hypot(F.tx - p.x, F.tz - p.z), u = d0 + d1 > 1e-4 ? d0 / (d0 + d1) : 1;
+  const y = F.h0 + (F.aim - F.h0) * u;
+  if (d1 > .04 || !F.dir) F.dir = ffNorm([F.tx - p.x, F.aim - y, F.tz - p.z]);
+  F.pos = [p.x, y, p.z]; F.s = s;
+  return F;
+}
+function ffBolts(now) {
+  const lv = ffLv();
+  for (const p of G.ccP || []) {
+    if (p.done || p.k !== 'ice') continue;
+    const F = ffFlight(p), s = F.s, C = efx(s, 'core'), T = efx(s, 'trail'), L = efx(s, 'light'), d = F.dir, P = F.pos, sz = F.spear ? (p.sz || 1.7) / 1.7 : (p.sz || 1), out = Math.hypot(P[0] - F.x0, P[1] - F.h0, P[2] - F.z0), len = Math.min(C.long * sz, out / .78 + .12);   // (it slides out of the staff's crystal: none of it is drawn behind her)
+    if (L.on && L.fly > 0 && lv) ffFlyLight(p, P[0], P[1], P[2], L.fly, L.rad, s);
+    if (T.on && T.streak > 0) { const o = { k: .8, seed: F.seed, at: 1, pull: .04 }, z = ffTune(s, 'trail', T.streak * sz, o); if (z != null) frtAxial(FRT_SH.STREAK, [P[0] - d[0] * len * .3, P[1] - d[1] * len * .3, P[2] - d[2] * len * .3], d, z, len * C.fat * 2.6, o); }
+    if (C.on) {
+      if (F.spear && C.barb > 0) {
+        // its barbs: two small crystals swept back from behind its point
+        const fw = frtFw(), sd = ffNorm([d[1] * fw[2] - d[2] * fw[1], d[2] * fw[0] - d[0] * fw[2], d[0] * fw[1] - d[1] * fw[0]]), B = [P[0] - d[0] * len * .12, P[1] - d[1] * len * .12, P[2] - d[2] * len * .12];
+        for (const q of [-1, 1]) ffShard(B, ffNorm([-d[0] * .82 + sd[0] * q * .5, -d[1] * .82 + sd[1] * q * .5, -d[2] * .82 + sd[2] * q * .5]), len * C.barb, { k: C.k, seed: F.seed + 7 + q, tail: .3, tip: .6, fat: .3, clear: C.clear, pull: .1 }, s, 'core');
+      }
+      ffShard(P, d, len, { k: C.k, seed: F.seed, at: .78, tail: F.spear ? .2 : .34, tip: F.spear ? .5 : .44, fat: C.fat, clear: C.clear, pull: .12 }, s, 'core');
+      if (C.disc > 0 && lv) ffBill(FRT_SH.GLOW, P, len * C.disc + .2, { k: .42, pull: .1 }, s, 'core');
+    }
+    // the cold it leaves hanging along its path: a puff every so far, a glint
+    if (!T.on || !(T.gap > 0)) continue;
+    const gap = T.gap * (lv === 0 ? 2 : lv === 1 ? 1.4 : 1); if (F.lx == null) { F.lx = F.x0; F.lz = F.z0; }
+    for (let i = 0; i < 4 && Math.hypot(P[0] - F.lx, P[2] - F.lz) >= gap; i++) {
+      const dd = Math.hypot(P[0] - F.lx, P[2] - F.lz); F.lx += (P[0] - F.lx) / dd * gap; F.lz += (P[2] - F.lz) / dd * gap;
+      // (none at the staff itself: nothing is left hanging on her)
+      if (Math.hypot(F.lx - F.x0, F.lz - F.z0) < .3) continue;
+      ffShot('mist', F.lx, P[1] - .02, F.lz, T.puff * sz * (.8 + .4 * Math.random()), T.secs * (.8 + .4 * Math.random()), { vx: d[0] * .5, vz: d[2] * .5, vy: -.16, drag: 2.5, grow: .8, a: .8 }, s, 'trail');
+      if (lv && Math.random() < T.glint) ffGlints(F.lx, P[1], F.lz, 1, .2, s, 'trail');
+    }
+  }
+}
+// a shard lands (sfxBasicLandCC, wrapped below): a blink of white needles, splinters flung back, a puff of cold; the spear
+// drives spikes of ice out the far side of its foe
+function ffLand(p, hit) {
+  const F = p._ff || ffFlight(p), s = F.s, lv = ffLv(), B = efx(s, 'burst'), S = efx(s, 'shards'), M = efx(s, 'mist'), L = efx(s, 'light');
+  const d = F.dir || [1, 0, 0], x = hit ? ffFoeX(hit) : F.tx == null ? p.x : F.tx, z = hit ? ffFoeZ(hit) : F.tz == null ? p.z : F.tz, y = F.aim == null ? p.h : F.aim, sz = F.spear ? (p.sz || 1.7) / 1.7 : Math.sqrt(p.sz || 1);
+  const r = hit ? ffFoeR(hit) * .6 : 0, fx = x - d[0] * r, fz = z - d[2] * r;   // (on the foe's near side)
+  if (B.on) ffShot('flash', fx, y, fz, B.w * sz, B.secs, { k: B.k }, s, 'burst');
+  if (S.on) ffSplinters(fx, y, fz, ffN(S, S.count * sz, [.5, .75, 1]), S.w * sz, S.fling, S.secs, s, { dir: [-d[0], 0, -d[2]] });
+  if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', fx + (Math.random() - .5) * .2, y - .05 * i, fz + (Math.random() - .5) * .2, M.w * sz * (.85 + .3 * Math.random()), M.secs, { vx: -d[0] * .5, vz: -d[2] * .5, vy: -.12, drag: 2.5, grow: .8, delay: i * .05 }, s, 'mist');
+  if (lv) ffGlints(fx, y, fz, ffN(M, F.spear ? 4 : 2, [0, .6, 1]), .5, s, 'mist');
+  if (F.spear && B.on && B.spikes > 0) {
+    const n = Math.max(1, Math.round(B.spikes * [.34, .67, 1][lv])), bx = x + d[0] * r * .6, bz = z + d[2] * r * .6;
+    for (let i = 0; i < n; i++) {
+      const f = n > 1 ? i / (n - 1) * 2 - 1 : 0, a = f * .5, ca = Math.cos(a), sa = Math.sin(a);
+      ffShot('spike', bx, y - .05, bz, B.spike * sz * (1 - .28 * Math.abs(f)) * (.9 + .2 * Math.random()), .52, { dir: ffNorm([d[0] * ca - d[2] * sa, .3 + .25 * Math.abs(f), d[2] * ca + d[0] * sa]), grow: .07, hold: .2, fat: .22, tip: .55, clear: .2, k: B.k, delay: .012 * i, pull: .3 }, s, 'burst');
+    }
+  }
+  if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
+}
+
+/* ---- Ice Coffin: crystals grown up round the foe, one great clear crystal over it; cracked, then broken ---- */
+// where its crystals stand, in the screen's own right (a) and toward-the-camera (b) round the foe: [a, b, height (x the
+// foe's), width, clear, lean]. Tall behind the foe, low before it, so the foe is never walled off
+const FF_COF = [[.1, -.8, 1.5, 1.15, 0, 0], [-.62, -.58, 1.24, .95, 0, -.5], [.74, -.5, 1.14, .9, 0, .5], [-1.05, .05, .86, .8, .15, -1], [1.08, .1, .9, .8, .15, 1], [-.5, .74, .46, .72, .5, -.7], [.72, .66, .52, .7, .5, .8], [.14, .9, .34, .66, .5, .1]];
+function ffCoffinAt(e, now, each) {
+  const c = e.c, K = efx('cc_rimelance', 'crystals'), x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c);
+  const rt = RD.right, fw = frtFw(), rl = Math.hypot(rt[0], rt[2]) || 1, rx = rt[0] / rl, rz = rt[2] / rl, fl = Math.hypot(fw[0], fw[2]) || 1, fx = fw[0] / fl, fz = fw[2] / fl;
+  const n = Math.min(FF_COF.length, Math.max(3, Math.round(K.count * [.6, .8, 1][ffLv()] * (K._g ? K.n : 1))));
+  for (let i = 0; i < n; i++) {
+    const q = FF_COF[i], jx = (ffRnd(e.seed + i * 3) - .5) * .2, a = q[0] + jx, b = q[1];
+    each(i, [x + (rx * a + fx * b) * R * 1.05, y0, z + (rz * a + fz * b) * R * 1.05], ffNorm([rx * q[5] * .16 + fx * b * .06, 1, rz * q[5] * .16 + fz * b * .06]), H * q[2] * K.high * (.92 + .16 * ffRnd(e.seed + i)), R * q[3] * K.wide, q[4]);
+  }
+}
+function ffCoffins(now, dt) {
+  const s = 'cc_rimelance', K = efx(s, 'crystals'), B = efx(s, 'core'), M = efx(s, 'mist'), L = efx(s, 'light'), lv = ffLv();
+  for (const c of G.ccCoffins || []) if (c.ccCoffin && !c.dead && !c._ffC) { const e = c._ffC = { c, at: now, seed: (Math.random() * 97) | 0, until: c.ccCoffin.until }; FF.cof.push(e);
+    if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', ffFoeX(c) + (Math.random() - .5) * .3, ffFoeY(c) + .2, ffFoeZ(c) + (Math.random() - .5) * .3, M.w * (.8 + .4 * Math.random()), M.secs, { vy: .1, grow: .8, delay: i * .08, a: .8 }, s, 'mist');
+    if (L.on) ffLight(c.x, c.y, .5, L.k, L.rad, L.secs, s); }
+  for (const e of FF.cof) {
+    const c = e.c, held = !c.dead && c.ccCoffin && c.ccCoffin.until > now && ffFrozen(c);
+    if (!held) { e.gone = true; c._ffC = null; ffCoffinBreak(e, now); continue; }
+    e.until = c.ccCoffin.until;
+    const el = now - e.at, crack = ffSs(e.until - .45, e.until - .02, now);
+    if (K.on) ffCoffinAt(e, now, (i, P, dir, h, w, clear) => {
+      const g = ffBack((el - i * .028) / K.grow); if (g <= 0) return;
+      ffShard(P, dir, h * g, { k: K.k, seed: e.seed + i * 7, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear: Math.max(clear, K.clear * (clear > 0 ? 1 : .35)), crack, floor: .55, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
+    });
+    // the one great crystal closed over the foe: clear, so the foe is seen through its faces
+    if (B.on) {
+      const g = ffBack((el - .1) / (K.grow * 1.25)), H = Math.max(.55, ffFoeH(c)), R = ffFoeR(c), h = (H * B.high + .12) * g;
+      if (g > 0) ffShard([ffFoeX(c), ffFoeY(c), ffFoeZ(c)], FF_UP, h, { k: B.k, seed: e.seed + 61, fat: R * B.wide / Math.max(.05, h / g), tip: .3, clear: B.clear, crack, floor: .55, pull: R * .9 + .12 }, s, 'core');
+    }
+    if (lv && M.on && M.every > 0 && now >= (e.mi || 0)) { e.mi = now + M.every * (lv === 1 ? 1.6 : 1) * (.7 + .6 * Math.random()); const a = Math.random() * TAU, R = ffFoeR(c);
+      ffShot('mist', ffFoeX(c) + Math.cos(a) * R, ffFoeY(c) + ffFoeH(c) * (.3 + .5 * Math.random()), ffFoeZ(c) + Math.sin(a) * R, .34, 1, { vy: -.2, vx: Math.cos(a) * .12, vz: Math.sin(a) * .12, grow: .9, a: .6 }, s, 'mist');
+      if (Math.random() < .6) ffGlints(ffFoeX(c), ffFoeY(c) + ffFoeH(c) * .7, ffFoeZ(c), 1, R * 2.2, s, 'mist'); }
+  }
+  if (FF.cof.some(e => e.gone)) FF.cof = FF.cof.filter(e => !e.gone);
+}
+// it lets go: every crystal breaks where it stood into falling splinters; a blink, a breath of mist
+function ffCoffinBreak(e, now) {
+  const s = 'cc_rimelance', c = e.c, S = efx(s, 'shards'), M = efx(s, 'mist'), L = efx(s, 'light'), x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.55, ffFoeH(c));
+  const K = efx(s, 'crystals'), per = Math.max(1, Math.round(S.count / 4 * [.5, .75, 1][ffLv()] * (S._g ? S.n : 1)));
+  ffCoffinAt(e, now, (i, P, dir, h, w, clear) => {
+    if (K.on) ffShot('spike', P[0], P[1], P[2], h, .13, { dir, grow: .001, hold: 0, fat: w / Math.max(.05, h) * 1.05, tip: .36, clear, k: K.k, pull: clear > .3 ? .1 : 0 }, s, 'crystals');
+    if (S.on) for (let j = 0; j < (i < 5 ? per : 1); j++) ffSplinters(P[0], P[1] + h * (.25 + .6 * Math.random()), P[2], 1, Math.max(S.w, h * .3) * (.8 + .5 * Math.random()), S.fling * .7, S.secs, s, { dir: [(P[0] - x) * 2, 0, (P[2] - z) * 2], up: .6 });
+  });
+  if (S.on) ffShot('flash', x, y0 + H * .6, z, 1.5, .16, { k: 1.1 }, s, 'shards');
+  if (M.on) for (let i = 0, n = ffN(M, M.puffs, [.5, 1, 1]); i < n; i++) ffShot('mist', x + (Math.random() - .5) * .3, y0 + H * (.3 + .3 * i), z + (Math.random() - .5) * .3, M.w, M.secs, { vy: -.15, grow: .9, delay: i * .06 }, s, 'mist');
+  if (L.on) ffLight(x, z, .5, L.k * .8, L.rad, .2, s);
+}
+
+/* ---- Shatterbloom: a cluster of crystals blooms over the foe; it bursts ---- */
+function ffBloomAt(c) { return [ffFoeX(c), ffFoeY(c) + ffFoeH(c) + efx('cc_hoarbloom', 'crystals').y, ffFoeZ(c)]; }
+function ffBlooms(now, dt) {
+  const s = 'cc_hoarbloom', K = efx(s, 'crystals'), lv = ffLv();
+  for (const c of G.ccBlooms || []) if (c.ccBloom && !c.dead && !c._ffB) { const e = c._ffB = { c, at: now, seed: (Math.random() * 97) | 0 }; FF.blo.push(e); if (lv) ffGlints(...ffBloomAt(c), 3, .4, s, 'crystals'); }
+  for (const e of FF.blo) {
+    const c = e.c;
+    if (c.dead || !c.ccBloom || c.ccBloom.until <= now) { e.gone = true; c._ffB = null; continue; }
+    if (!K.on) continue;
+    const P = ffBloomAt(c), el = now - e.at, n = Math.max(3, Math.round(K.count * [.6, .8, 1][lv] * (K._g ? K.n : 1))), fade = Math.min(1, (c.ccBloom.until - now) / .4);
+    e.P = P;
+    for (let i = 0; i < n; i++) {
+      const g = ffBack((el - i * .045) / K.grow); if (g <= 0) continue;
+      // one petal straight up, the rest leaning out round it
+      const az = e.seed + i * TAU / Math.max(1, n - 1), tl = i ? .78 + .3 * ffRnd(e.seed + i * 5) : 0, len = K.long * (i ? .62 + .3 * ffRnd(e.seed + i) : 1) * g;
+      ffShard([P[0], P[1] - .05, P[2]], [Math.cos(az) * Math.sin(tl), Math.cos(tl), Math.sin(az) * Math.sin(tl)], len, { k: K.k, a: fade, seed: e.seed + i * 7, fat: K.fat, tip: .5, tail: .16, clear: K.clear, pull: .12, floor: .5 }, s, 'crystals');
+    }
+    if (K.disc > 0 && lv) ffBill(FRT_SH.GLOW, P, K.long * 2.2 * K.disc, { k: .3 * fade * (.85 + .15 * Math.sin(now * 2.3 + e.seed)), pull: .1 }, s, 'crystals');
+    if (lv && Math.random() < dt * 1.2) ffGlints(P[0], P[1] + .1, P[2], 1, K.long * 1.4, s, 'crystals');
+  }
+  if (FF.blo.some(e => e.gone)) FF.blo = FF.blo.filter(e => !e.gone);
+}
+// the bloom bursts at (x, z), y high: its petals fly apart, the cold rolls out to its real edge r
+function ffBloomBurst(x, y, z, r) {
+  const s = 'cc_hoarbloom', B = efx(s, 'burst'), S = efx(s, 'shards'), L = efx(s, 'light'), K = efx(s, 'crystals');
+  if (B.on) ffShot('flash', x, y, z, B.w, B.secs, { k: B.k }, s, 'burst');
+  if (S.on) { const n = ffN(S, S.count, [.5, .75, 1]); ffSplinters(x, y, z, Math.ceil(n * .4), K.long * .8, S.fling, S.secs, s, { up: 1.2 }); ffSplinters(x, y, z, Math.floor(n * .6), S.w, S.fling * .8, S.secs, s, { up: 1.8 }); }
+  if (efx(s, 'mist').on) ffWave(x, z, r, s);
+  if (L.on) ffLight(x, z, y, L.k, L.rad, L.secs, s);
+}
+
+/* ---- chilled and frozen foes ---- */
+function ffFoes(now, dt) {
+  const s = 'cc_frostfoe', K = efx(s, 'crystals'), M = efx(s, 'mist'), lv = ffLv(); if (!K.on && !M.on) return;
+  const rt = RD.right, fw = frtFw(), rl = Math.hypot(rt[0], rt[2]) || 1, rx = rt[0] / rl, rz = rt[2] / rl, fl = Math.hypot(fw[0], fw[2]) || 1, fx = fw[0] / fl, fz = fw[2] / fl;
+  let left = Math.round(K.max * [.4, .7, 1][lv]);
+  for (const c of G.creeps) {
+    if (c.dead) continue;
+    const fz0 = ffFrozen(c), cold = c.frostT > 0;
+    if (!fz0 && !cold) { if (c._ffZ) c._ffZ = null; continue; }
+    const x = ffFoeX(c), z = ffFoeZ(c), y0 = ffFoeY(c), H = Math.max(.5, ffFoeH(c)), R = ffFoeR(c);
+    if (fz0 && !c._ffC) {
+      // frozen: small crystals grown at its feet (a coffin draws its own)
+      const e = c._ffZ || (c._ffZ = { at: now, seed: (Math.random() * 97) | 0 });
+      if (K.on && left > 0) {
+        left--; const n = Math.max(2, Math.round(K.count * [.5, .75, 1][lv] * (K._g ? K.n : 1)));
+        for (let i = 0; i < n; i++) {
+          const a = (i / n * 2 - 1 + .5 / n) * 1.25 + (ffRnd(e.seed + i) - .5) * .3, b = i % 2 ? .62 : -.5, g = ffBack((now - e.at - i * .02) / .14); if (g <= 0) continue;
+          const h = H * K.high * (b < 0 ? 1.25 : .8) * (.8 + .4 * ffRnd(e.seed + i * 3)) * g;
+          ffShard([x + (rx * a + fx * b) * R, y0, z + (rz * a + fz * b) * R], ffNorm([rx * a * .22, 1, rz * a * .22]), h, { k: K.k, seed: e.seed + i * 7, fat: Math.min(.5, R * K.wide * .5 / Math.max(.05, h / g)), tip: .45, clear: b > 0 ? K.clear : K.clear * .4, floor: .55, pull: b > 0 ? .06 : 0, crack: ffSs(.3, 0, c.stunT) * .8 }, s, 'crystals');
+        }
+      }
+    } else if (c._ffZ && !fz0) {
+      // thawed: its crystals drop
+      c._ffZ = null;
+      if (K.on && !c._ffC) ffSplinters(x, y0 + H * .25, z, ffN(K, 3, [.34, .67, 1]), .14, 1, .45, s, { up: .6 });
+    }
+    // the cold coming off it: mist sinking, a glint
+    if (M.on && lv && Math.random() < dt * M.rate * (fz0 ? .6 : 1)) {
+      const a = Math.random() * TAU;
+      ffShot('mist', x + Math.cos(a) * R * .7, y0 + H * (.25 + .5 * Math.random()), z + Math.sin(a) * R * .7, M.w * (.8 + .5 * Math.random()), .9, { vy: -.18, vx: Math.cos(a) * .1, vz: Math.sin(a) * .1, grow: .9, a: .55 }, s, 'mist');
+      if (Math.random() < M.glint) ffGlints(x, y0 + H * .6, z, 1, R * 2, s, 'mist');
+    }
+  }
+}
+// a Frozen foe's crit cracks its ice (the frost kit's ccrCritFx): splinters and a blink of needles
+function ffCrit(c) {
+  const s = 'cc_frostfoe', y = ffFoeY(c) + ffFoeH(c) * .6;
+  ffShot('flash', ffFoeX(c), y, ffFoeZ(c), .85, .13, { k: 1 }, s, 'crystals');
+  ffSplinters(ffFoeX(c), y, ffFoeZ(c), [4, 6, 8][ffLv()], .17, 1.9, .5, s, { up: 1.6 });
+}
+
+/* ---- each frame: inside the view's spell pass (vfxParts), so the cards land in this frame's draw ---- */
+function ffFrame() {
+  if (typeof FRT !== 'undefined') FRT.q.length = 0;
+  if (!ffLive() || typeof frtBill !== 'function' || typeof RD === 'undefined' || !RD || !RD.vfx) return;
+  // (the Element Lab's foes-alone frame)
+  if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask) return;
+  if (G.force !== 'conclave') { if (FF.shots.length) FF.shots.length = 0; return; }
+  const now = G.time, dt = Math.max(0, Math.min(.1, now - FF.last)); FF.last = now;
+  FF.cards = 0; FF.cap = [70, 120, 180][ffLv()];
+  ffCoffins(now, dt); ffBlooms(now, dt); ffFoes(now, dt); ffBolts(now); ffStaffs(now, dt); ffShots(now);
+  if (typeof window !== 'undefined' && window.FF_TEST) window.FF_TEST();
+  if (FRT.q.length > FF.peak) FF.peak = FRT.q.length;
+}
+if (typeof vfxParts === 'function') {
+  const _ffParts = vfxParts;
+  vfxParts = function () { const r = _ffParts.apply(this, arguments); try { ffFrame(); } catch (e) { if (typeof ELEMLAB !== 'undefined' && ELEMLAB.errs) ELEMLAB.errs.push('frost: ' + e.message); } return r; };
+}
+
+/* ---- the older frost left out (what each did in the game is untouched: only what it drew) ---- */
+// the shards the game's frost throws (game.js fxShards: sprites): splinters of real ice in their place
+function ffShards(x, z, h, n) { if (FF.quiet) return; ffSplinters(x, h, z, Math.max(1, Math.round(n * [.25, .4, .55][ffLv()])), .15, 1.5, .5, 'cc_frostfoe'); }
+if (typeof fxShards === 'function') { const _s = fxShards; fxShards = function (x, z, h, n) { if (ffOn()) return ffShards(x, z, h, n); return _s.apply(this, arguments); }; }
+// while one of the frost kit's own moments runs, its sprite shards and flares are left out (each draws its own here)
+function ffQuiet(fn, self, args) { FF.quiet++; try { return fn.apply(self, args); } finally { FF.quiet--; } }
+if (typeof part === 'function') { const _p = part; part = function (o) { if (FF.quiet && o && o.k === 'flare' && ffOn()) return; return _p.apply(this, arguments); }; }
+// the ground rings the frost kit asks for (a bloom's burst, Coffin Burst, Absolute Stillness): a wave of cold to that edge
+if (typeof ccRingFx === 'function') { const _r = ccRingFx; ccRingFx = function (x, z, r, col) { if (FF_RING.includes(col) && ffOn()) { if (!FF.quiet) ffWave(x, z, r, 'cc_rimelance', .7); return; } return _r.apply(this, arguments); }; }
+// the bolt and the spear: tagged as they are loosed, drawn and landed here
+if (typeof ccShoot === 'function') {
+  const _sh = ccShoot;
+  ccShoot = function (p) {
+    if (p && p.k === 'ice') { p._ff = { x0: p.x, h0: p.h, z0: p.z, spear: p.spd >= 12, seed: (Math.random() * 97) | 0 }; const f = p.fn; if (f) p.fn = function () { return ffQuiet(f, this, arguments); }; }
+    return _sh.apply(this, arguments);
+  };
+}
+if (typeof sfxBasicCC === 'function') { const _b = sfxBasicCC; sfxBasicCC = function (p) { if (p && p.k === 'ice' && ffOn()) return true; return _b.apply(this, arguments); }; }
+if (typeof ccDrawProj === 'function') { const _d = ccDrawProj; ccDrawProj = function (p) { if (p && p.k === 'ice' && ffOn()) return; return _d.apply(this, arguments); }; }
+if (typeof sfxBasicLandCC === 'function') { const _l = sfxBasicLandCC; sfxBasicLandCC = function (p, hit) { if (p && p.k === 'ice' && ffOn()) { try { ffLand(p, hit); } catch (e) {} return; } return _l.apply(this, arguments); }; }
+// the frost kit's moments (forces_zzzzzzzzzzz_frost_conclave.js)
+if (typeof ccrBloomBurst === 'function') {
+  const _bb = ccrBloomBurst;
+  ccrBloomBurst = function (c) {
+    const had = c && c.ccBloom && ffOn(), P = had ? (c._ffB && c._ffB.P) || ffBloomAt(c) : null, ok = had && G.towers.includes(c.ccBloom.t) && !c.ccBloom.t.wrecked;
+    const r = ffQuiet(_bb, this, arguments);
+    try { if (ok) ffBloomBurst(P[0], P[1], P[2], CCR.BLOOM_R); } catch (e) {}
+    return r;
+  };
+}
+if (typeof ccrBloom === 'function') { const _b = ccrBloom; ccrBloom = function () { return ffQuiet(_b, this, arguments); }; }
+if (typeof ccrCoffinTick === 'function') { const _t = ccrCoffinTick; ccrCoffinTick = function () { return ffQuiet(_t, this, arguments); }; }
+if (typeof ccrCritFx === 'function') { const _c = ccrCritFx, _at = { t: -9 }; ccrCritFx = function (t, c) { const on = ffOn() && c && G.time - _at.t >= CCR.CRIT_GAP; const r = ffQuiet(_c, this, arguments); try { if (on) { _at.t = G.time; ffCrit(c); } } catch (e) {} return r; }; }
+if (typeof ABIL !== 'undefined' && ABIL.cc_rimelance && typeof ABIL.cc_rimelance.cast === 'function') { const _c = ABIL.cc_rimelance.cast; ABIL.cc_rimelance.cast = function () { return ffQuiet(_c, this, arguments); }; }
+// the spells' older looks (spellfx.js: the gather at her hands, the sprite spear, the ring of spikes, crystal sprites)
+if (typeof SFX_CUSTOM !== 'undefined' && typeof sfxRun === 'function') for (const id of FF_IDS) {
+  const was = SFX_CUSTOM[id], mine = function (C, pre) { if (ffOn()) return; if (was) return was.apply(this, arguments); delete SFX_CUSTOM[id]; try { return sfxRun(C, pre); } finally { SFX_CUSTOM[id] = mine; } };
+  SFX_CUSTOM[id] = mine;
+}
+// the rime ring, sprite crystals and shell on a chilled or frozen foe (view.js drawFrostOn)
+if (typeof drawFrostOn === 'function') { const _f = drawFrostOn; drawFrostOn = function () { if (ffOn()) return; return _f.apply(this, arguments); }; }
+// the motes at her hands (unitmodels_frostweaver.js fwMote): her staff's own frost is drawn above
+if (typeof fwMote === 'function') { const _m = fwMote; fwMote = function () { if (ffOn()) return; return _m.apply(this, arguments); }; }
+
 /* ELEMENT FX hooks (elemfx.js): the drawing primitives asked about the Pyroclasts' and Frostweavers' layers. Loaded after every
    effect module (pyrofire.js, labfx.js, the unit models), so each wrapper sits outside theirs. Every wrapper looks first at
    EFX.on: with nothing tuned (no lab, no Use in game, nothing baked) it calls straight through, so normal play is unchanged. */
@@ -88706,6 +90567,131 @@ if (typeof towerTop === 'function') {
   boot();
 })();
 
+/* The owner's wooden torch-staff as a prop (assets/models/wooden_staff), decimated and baked to its own atlas by
+   tools/make_propstaff.py: its butt at the origin, its shaft up +y, one unit long. Generated: do not edit; rerun the tool.
+   Read by src/props_staff.js. */
+const PROP_STAFF_MDL = {"v":1,"src":"medieval_wooden_staff_3d_model.fbx","nv":950,"ni":2097,"min":[-0.11477,0.0,-0.10256],"max":[0.12415,1.0,0.09982],"pos":"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","nor":"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","uv":"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","idx":"AAABAAIAAwAEAAUABgAHAAEACAAJAAoACwAMAA0ADgAPABAAEQAPABIAEwAUABUAFgAXABgAGQAaABUAGQAbABoAHAAdAB4AHwAeAB0AIAAhACIAHAAjACQAJQAmACcAKAApACoAKwAgACwALQAuAC8AMAAxADIAMwA0ADUANgA3ADgAOQA6ADsAPAA9AD4APwBAAEEAQgBDAEQARABFAEIARgBHAEgASQBKAEsATABNAE4ATwBQAFEAUgBTAFQAVQBWAFcAWABZAFQAWgBbAFwAUgBdAF4ABABfAGAAYQBiAGMAZABjAGIAZQBmAGcAaABpAGoAawBsAG0AbgBvAHAAMgBxAHIAbgBwAHMAdAB1AHYAdwB0AHYAeAB5AHoAewB8AH0AfQB+AH8AgAB7AH0AgQCCAIMACACEAAkAhQAJAIQAYwCGAIcAiACJAIoAiwCIAIoAjACNAI4AjwCQAJEAkgCTAJQAkgCVAJMAlQCSAJYAlwCYAJkAlQCaAJsAmgCVAJYANgA4AJwAnQCeAJ8AoAChAKIAowCkAKUApgCnAKgAqQCqAKsAqgCsAK0ArgCvALAArgCwALEAsgCzALQAtQC2ALcAuAC5ALoAugC7ALgAvAC9AL4AvwDAAFYAwQDCAMMAuQC4AMQAxQDGAMcAyADJAMoAyQDLAMwAzQDOAM8A0ADRANIA0wDUAHcA1QDWANcA2ADZANoA2wDcAN0A3gDfAOAA4QAEAOIA4wDkAOUA5gDnAOgABwAGAOkABwAQAOoAEAAPAOoADQAMAOsA7ADtAAkADwAOABIAFQAUAO4A7wDwAPEA8gASAPMA8QD0AGcA7gAZABUA9QDuAPYA9QAZAO4A9wD4AGgA+QBoAPgA+gD7APwAHgD6ABwA+AAiAPkAKgD9AP4A/wAqAP4AAAEBAQIBAwEsACAABAEtAAUBLQAqAC4ABgEHAQgBCQEKAQsBDAENAQ4BDwEQAREBEgETARQBFQEEAQUBFQEWAQQBFwEYARkBGgEbARwBHQEeAR8BIAEhASIBIwEkASUBJgEnASgBKQEqASsBJwEsAS0BLgEvAQ8BMAExATIBMwE0ATUBNgE3ATgBOQExATABOgE7ATwBBQEtAD0BPgE4ATcBPwFAAUEBQgFDAUQBRQFGAUcBSAE7ADoASQFKAUsBSwFKAUwBTQFOAU8BUAFRAVIBUwFUAVUBVgFXAVgBWQFaAVsBXAFdAV4BXwFgAWEBbwBdAWIBXgFdAW8AYwFkAWUBTQFmAU4BUQFQAWcBaAFbAWkBagFrAWwBbQFuAW8BcAFxAXIBVwBJAEsAVwBLAHMBYQFHAHQBdQFSAFQAPABLAEoAdgF3AXgBdwF5AXgBegF7AXwBfQF+AX8BfQGAAX4BVABTAFgAfwFaAH0BWgBcAH0BgQF9AVwAggGDAV4AUgB1AYQBUgBeAIMBggFeAIUBhgGHAYgBiQGKAYsBigGMAYsBjQGOAY8BkAGNAY8B6wCRAV8AjgGSAZMBjgGTAY8BkgFhAJMBYQCSAZQBYQCVAZMBYQCUAWIA7wBmAJYBZgDvAGcA9ABqAGcAlwGYAZkBagD0APcAxwCaAWsA9wBoAGoAbQCbAZwBaACdAZ4BIgCdAfkAnwGgAaEBogGZAKMBIAArACEApAHLAMgApQGmAacBqAGpAaoBqwGnAaYBrAGtAa4BrwGwAbEBsgGoAbMBtAEUAbUBtgG3AbgBFAG5ARIBugG7AbwBvQG+Ab8BwAEsADAAwQHCAcMBxAHFAcYBowDHAcgByQHDAcoBywHMAc0BzgHPAdAB0QHSAdMB1AHVAdYB1wHYAdkB2gFJAUsBXgFuANsB2gFLAdwBbwBuAF4B3QHeAd8B4AHhAeIB4wHkAeUB5gHnAegB6QHqAesBgABwAOwB7QHuAe8B7QHwAfEB8gF8APMBfADyAfQBewDsAfMB3AH1AfYBfgB8APQB5wH3AegB+AH5AfoBfAB+AH0A+QH7AfoB/AH9Af4B/QHdAP4BgQH/AQACAAL/AQECAQL/AQICAwIEAgUCBgIAAgcCBQIIAgkCAAIKAgcCgADsAXsACwJ1AAwC0AANAtEA+wH5AQ4CDwLUANMAgQAQAhECEgITAhQCCACBAIMAhAAIAIMAFQIWAuwA7AAJABUCiQAWAooAFwIYAhkCGgIbAhwC9QD2AB0CGAIeAhkCHwIgAo8AIQIiAiMCHwKPAJEAmwAkApUAHQEfASUCLQEmAicBJwIoAikCKgIrAiwCPwEtAkABLgKcAC8CLQAvADACMQIyAjMCNAI1AjYCNwI4AjkCOgI2AjUCOwI8Aj0CJwI+AigCogChAD8CQAJBAkICQwJEAkUCRgJHAkgCRwJGAkkCZAFKAmUBSwJMAk0CTgJNAkwCTwKqAFACUQJIAkcCawE/AqEAUgJTAlQCVQJWAlcCWAIvAlkCKwLBAMMAWgJXAlYCWwJcAl0CUwJSAl4CTgJfAk0CYAKkAGECYgJjAmQCXAJbAmUCZgJnAmgCaQJqAmsCbAJiAm0CbgJvAnACRwBGAHQBcQJPAroATQByAnMCUAB0AnUCUAB1AnYCVgBVAL8AXgBdAIQBdwJ4AnkCUAB2AnoCegJ7AlAAegJ8AnsCewJ8An0CfgJZAn8CgAJ/AlkCgQJQAoICxAC4AIECggKDAoEChAKFAoYCuQDEAHUChwJ+An8CxACIAnUCagKJAmsCdQKIAnYCigKLAowCjQKOAnYCjwKQApECkgKNAZABkgKTApQCkwKSApABkwGQAY8BYQCHAJUCxwCWAmQAxQBtAJwBmwGjAZwBkQCXAh8CrwGYArABNAKZAjUCmgIxApsCnAKdAjcCnAKrAZ0CngKfAqACHAGhAqICowKkAqUCpgKnAiUCxAGoAqkCqgKrAqwCrQKuAq8C1wDMAMEBsAKxArICswK0ArUCsAK2ArECtwK4ArkCpAC6AmECtwC7ArUAswCyALwCvQK+Ar8CvwJ3AMACwQLCAsMC1ADAAncA5QHEAsUC6QHGAuoBxwLIAuEBvgJ0AHcAyQLKAssCVwLMAs0CzgLFAs8C0ALRArQCggLSAoMC1QDTAtYA/QHbAN0A1ALVAtYC1wLcAM0A/gHdANwA2wDfANUC3wDWAtUCBQLYAggC2QLaAgQC2wIIAtwC2ALcAggC3QLeAt8C4ADbAP0B4ALhAnoC4gLgAo4C3wDeAOMC5ALlAuYC5wLOAM0A4QAFAAQA5gDoAucABgABAAAA6gACAAEA6gABAAcAEAAHAOkCDQDqAgsA6wLsAu0CEADpAvMADgAQAPMAEgAOAPMA7wDxAGcAFgDuAhcA7wIXAO4C+gAbAPsA+wAbABkA+wAZAPUA+gAjABwAIwD6APwA/wAoACoAKgAtAP0A8ALxAvICAwEgAPMCBAH9AC0AKgApAC4ABgH0AgcBDAH1Ag0BKAH2AiYB9wL4AisB+QImAfYC+gJKAUkB+wIwATIBHQH8Ah4BNAD9Av4CKwEqAf8CJgEsAScBLwEQAQ8BAAMBAwIDAgMDAwADBAM6AAUDBgMzATUBNAD+AjUAugG8AQcDCANCAUQBPwFBAQkDKwH/AvcCOgAEA0gBRgEKA0cBCwMiAQwDIgELAw0DDgNWAVgBUwEPA1QBEAMRAxIDDwMTA1QBXwEUA0AAXwFAAGABSgA9ADwAYwEVA2QBIQEMAyIBDgNYARYDWwFoAVkBUwEXAw8DAwMYAwADGQNRAWcBTQEaA2YBZwFMAhkDFwMbAw8DagE/AmsBHAMdAx4DGAMDAx8DPwBBAEgASABBACADRgBIACEDXQEiA2IBYQFgAUcAPAAjA0sAcwFLACMDVQBXAHMBIwMkA3MBJQMmAycDKAMpA3sBewEpA3wBhAFdAFIABABgAOIA5AAqA+UAKwOSAiwDkgIrA40BBAADAF8A6wBfAAMAkQHrAAwAlgJjAGQALQMuA8cAxwAuA5oBxwBrAG0AngEvA2gAaAD5AJ0BmwGiAaMBIgAhAJ0BMAOZAKIBpAHCAcsAMQMyAzMDsgGpAagBtwG2ATQDNQO4AbcBwAEwADIAQwFCATYDrgGtATcDwAErACwAOAMxATkBwQHLAMIBzADLAMEBxAGpAsUBOQOsAjoDFAG0AbkByQHBAcMBowDIATsDPAM9Az4DzgE/A88BQAPHAaMAowA7A7oCQQNCA0MDRAM6A6wCMQBFAzIAFgEVAfEB3wFGA90B2QHYAUcDXAFeAdsB8AEWAfEBMgBFA3EA8wFwAG8A8wHsAXAA4AHHAuEBSAPpAesBSwFJA9wB6AH3AUoD5QHkAcQCSwNMA00DdABNA0wDdQB0AEwDdAC+Ak0D7wHwAe0B9gHaAdwB7gHtAU4DTgNPA+4BUANRA1IDegB5AFMDVAPcAUkDVQNWA1cDWANWA1UDgAF9AVkDWQN9AQYCWgOKAYkBfQGBAQYCBgKBAQACiQGLAVsDDAJ1AEwDDQLQAFwDDwJ1ANQA1AB1AAsCXQPjAOUAggCBABEC6ADnAF4DFQIJAIUAFgIVAl8DFgJfA4oA7wLuAmAD9gDuABQAjwBhA5AAjwAgAmIDHwJjAyACZANlA2YDJAKTAJUAZwMfApQAkgCUAB8CkgAfApcCHAEbAaECaAP8Ah0BKgIsAmkDLgI2AJwAagM0AjYCmgIyAjECmgBrA5sAyQCfAJ4ALQFsAyYCPAJtAz0CbgNvA3ADQAJCAnEDQwJyA0QCGgNzA2YBdANFAnUDSwIZA0wCdgN3A10CqwB4A6kASAAgAyEDKgLBACsCqgCpAKwATwKrAKoAeQN6A3ADcANvA3kDRQJ0A0MCWAIuAi8CdwNbAl0CqgB7A1ACfAOuALEAfQN+A38DXgJSAoADgQOCA4MDUAJ7A4ICQgJBAoQDbAJjAmIC0gKCAnsDcwEkA4UDRgCGA3QBTQBMAHICugBPAlACuwC6AFACuQCHA7oAewJRAFAAhQFeAIQBiAN9AokDfQJ8AokDdgLgAnoCwAC/AIoD2QKLA9oC2QIDAosDgQK7AFACuwCBArgAfgJYAlkCwwDCAIwD5wLNAI0DjgOPA5ADLAOSApQCYQCVApUBYQBjAIcAlgKGAGMAxwDGAJYCxQDHAG0AmQAwA5EDmACjAZkAlwCZAJEDkgOfAaEByQDMAJ8AyADLAMkAqwGcAqcBrwGTA5gCOQKcAjcClAOaApsCnwKeAjEDMQMzA58CrAKrAkQDJgJsA5UDOwKWAzwCJwKXAz4CowKYA6QCmQMcAaICJQKnAh0BmgOuAq0CmwOtAq8C1wDWAMwAQQNDA5wDnQO1ArQCPwPOAZ4DzADWAJ8ApwJoAx0BnwOgA6EDpQBAA6MAogOjA6QDpACjALoCswLQArQCpQOqAqwCrwKuAqYDvwK+AncAzwDXAs0A6QGnA8YC5QHOAqgDxQLOAuUBpgOpA68CQQOcA6oDVwJaAswCqwOsA60DrgOvA7ADewOxA9IC1wL+AdwA1QLNANwA3ADbANUCBQIEAtgCBAIDAtkC2AIEAtwCsgMGAgcCswPfAt4CegLhArQD4gLhAuAC4ADfANsAtQPDAsIC4AJ2Ao4C","marks":{"grip":[0.18,0.58],"band":0.6,"head":[0.72,1.0],"gripR":0.041,"profile":[0.0456,0.039,0.0408,0.0359,0.0318,0.041,0.0425,0.0453,0.0477,0.0387,0.0401,0.0479,0.0847,0.0725,0.0768,0.11,0.1216,0.1147,0.1097,0.0667]},"tex":"data:image/jpeg;base64,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"};
+
+/* ================= Props: rigid models seated on a rigged model's bone (the owner's wooden torch-staff is the first) =================
+   A rigid prop needs no skeleton. tools/make_propstaff.py bakes it once in a frame a holder can seat it by (its butt at the
+   origin, its shaft up +y, one unit long; src/model_prop_staff.js); here it is decoded into an ordinary textured mesh, drawn
+   by the stylised sculpt pass like the models that carry it.
+     PROPS.staff                    the prop: its mesh and marks (where the wrapped grip runs, the iron band, the rag head)
+     PROPS.seat(out, prop, o)       the 4x4 (in the holder's model space) that puts the prop's point `g` (a share of its length
+                                    up from the butt) on the point o.at, its shaft along o.dir, `len` long, turned o.roll about it
+     PROPS.onBone(it, b, prop, o)   draws the prop on a posed, GPU-skinned draw item `it` (its bone buffer, view.js itemBones):
+                                    bone b carries the grip point o.at and the direction o.dir (both in the holder's rest pose),
+                                    so the prop rides that bone through every move; lit and tinted as its holder is
+   Which unit or foe should carry the staff is the owner's call (the Gnoll Torchbearer already has it baked into his model).
+   Until then one demonstration, in the Model Lab only: runehold.html?lab=1&unit=briarwarden&prop=staff puts it in the
+   Briarwardens' druid's right hand in place of his own staff (his staff bone carries it: the same grip and the same line in every
+   one of his moves, at a torch's length; his own staff is drawn shrunk into his fist). Without &prop=staff nothing changes: no
+   unit's shipped look is touched. */
+const PROPS = (() => {
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  function decode(D, tag) {
+    if (!D || D.v !== 1) throw new Error(tag + ': no prop data');
+    const q = new Uint16Array(b64(D.pos)), nq = new Int8Array(b64(D.nor)), uq = new Uint16Array(b64(D.uv)), idx = new Uint16Array(b64(D.idx));
+    if (q.length !== D.nv * 3 || nq.length !== D.nv * 3 || uq.length !== D.nv * 2 || idx.length !== D.ni) throw new Error(tag + ': bad sizes');
+    const n = idx.length, pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3).fill(1), ext = new Float32Array(n * 2), uv = new Float32Array(n * 2);
+    for (let k = 0; k < n; k++) {
+      const i = idx[k]; if (i >= D.nv) throw new Error(tag + ': bad index');
+      for (let a = 0; a < 3; a++) { pos[k * 3 + a] = D.min[a] + q[i * 3 + a] / 65535 * (D.max[a] - D.min[a]); nor[k * 3 + a] = nq[i * 3 + a] / 127; }
+      uv[k * 2] = uq[i * 2] / 65535; uv[k * 2 + 1] = uq[i * 2 + 1] / 65535;
+    }
+    const mesh = { pos, nor, col, ext, uv, count: n, min: D.min.slice(), max: D.max.slice(), gl: new Map() };
+    if (typeof Image !== 'undefined') { const img = new Image(); img.decoding = 'async'; img.src = D.tex; mesh.tex = img; }
+    return { mesh, marks: D.marks || {}, tris: n / 3 };
+  }
+  const P = {};
+  try { P.staff = decode(typeof PROP_STAFF_MDL !== 'undefined' ? PROP_STAFF_MDL : null, 'staff'); } catch (e) { if (typeof console !== 'undefined') console.warn('No staff prop:', e.message); }
+
+  const nrm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  /* o: at (the grip's place), dir (the shaft's way, butt to head), len (the prop's length), g (the grip, a share of its length),
+     roll (a turn about the shaft, radians). The prop's +y goes to dir; its +z as near the holder's +z as it can be, then rolled. */
+  function seat(out, prop, o) {
+    const d = nrm(o.dir), len = o.len == null ? 1 : o.len, g = o.g == null ? .4 : o.g, r = o.roll || 0;
+    let x = crs(d, Math.abs(d[2]) > .96 ? [1, 0, 0] : [0, 0, 1]); x = nrm(x); let z = crs(x, d);
+    const c = Math.cos(r), s = Math.sin(r), x2 = [x[0] * c + z[0] * s, x[1] * c + z[1] * s, x[2] * c + z[2] * s], z2 = crs(x2, d);
+    out[0] = x2[0] * len; out[1] = x2[1] * len; out[2] = x2[2] * len; out[3] = 0;
+    out[4] = d[0] * len; out[5] = d[1] * len; out[6] = d[2] * len; out[7] = 0;
+    out[8] = z2[0] * len; out[9] = z2[1] * len; out[10] = z2[2] * len; out[11] = 0;
+    out[12] = o.at[0] - d[0] * len * g; out[13] = o.at[1] - d[1] * len * g; out[14] = o.at[2] - d[2] * len * g; out[15] = 1;
+    return out;
+  }
+  const _S = new Float32Array(16), _B = new Float32Array(16), _T = new Float32Array(16), _M = new Float32Array(16);
+  /* bone b of a GPU bone buffer (three vec4 a bone: a column of its turn and one part of its offset) as a 4x4 */
+  function boneM(out, bones, b) {
+    const k = b * 12;
+    out[0] = bones[k]; out[1] = bones[k + 1]; out[2] = bones[k + 2]; out[3] = 0; out[4] = bones[k + 4]; out[5] = bones[k + 5]; out[6] = bones[k + 6]; out[7] = 0;
+    out[8] = bones[k + 8]; out[9] = bones[k + 9]; out[10] = bones[k + 10]; out[11] = 0; out[12] = bones[k + 3]; out[13] = bones[k + 7]; out[14] = bones[k + 11]; out[15] = 1;
+    return out;
+  }
+  function onBone(it, b, prop, o) {
+    if (!prop || !it || !it.bones || !prop.mesh.tex || !prop.mesh.tex.complete || !prop.mesh.tex.naturalWidth) return null;
+    seat(_S, prop, o); boneM(_B, it.bones, b);
+    M4.mul(_T, _B, _S); M4.mul(_M, it.m, _T);
+    const p = item(prop.mesh, _M, { shadow: it.shadow });
+    p.unit = it.unit; p.tint.set(it.tint); p.alpha = it.alpha; p.sec = [0, o.trim || 0];
+    return p;
+  }
+
+  /* ---------- the demonstration (the Model Lab, &prop=staff): the torch-staff in the Briarwardens' druid's hand ---------- */
+  /* (len, g: a torch's length, over half his height, gripped a third of the way up its wrapped shaft, as the Gnoll Torchbearer
+     carries it; at a walking staff's length its shaft would be as thick as his arm) */
+  const DEMO = { on: false, unit: typeof WIZ_UNIT !== 'undefined' ? WIZ_UNIT : 'briarwarden', bone: 'staff', len: .56, g: .30, roll: 0, fit: null };
+  /* his own staff's reach along its bone, read once off his mesh: how far its foot is below his grip, its head above */
+  function fitOf(M) {
+    if (DEMO.fit) return DEMO.fit;
+    const R = M.R, b = R.bix[DEMO.bone], B = R.B[b], h = B.h, d = nrm([B.t[0] - h[0], B.t[1] - h[1], B.t[2] - h[2]]), m = M.mesh;
+    let lo = 0, hi = 0;
+    for (let k = 0; k < m.count; k++) {
+      if (m.bone[k * 2] !== b || m.bw[k] < .9) continue;
+      const s = (m.pos[k * 3] - h[0]) * d[0] + (m.pos[k * 3 + 1] - h[1]) * d[1] + (m.pos[k * 3 + 2] - h[2]) * d[2];
+      if (s < lo) lo = s; if (s > hi) hi = s;
+    }
+    return DEMO.fit = { b, h, d, foot: -lo, head: hi };
+  }
+  function demo(t, n0) {
+    if (!DEMO.on || !P.staff || !t || !t.def || t.def.unit !== DEMO.unit || typeof umModel !== 'function') return;
+    const M = umModel(DEMO.unit); if (!M || !M.R || M.R.bix[DEMO.bone] == null) return;
+    for (let k = n0; k < dlN; k++) {
+      const it = DL[k]; if (it.mesh !== M.mesh || !it.bones) continue;
+      const F = fitOf(M), b = F.b, o = b * 12, bo = it.bones;
+      /* the torch-staff: his grip where his own staff's was, upright along his staff's own line (len null: its foot set where his
+         staff's foot was instead, a walking staff's length) */
+      onBone(it, b, P.staff, { at: F.h, dir: F.d, len: DEMO.len != null ? DEMO.len : F.foot / DEMO.g, g: DEMO.g, roll: DEMO.roll });
+      /* his own staff, shrunk into his fist about the grip (its bone's matrix scaled about that point) */
+      const e = .001, h = F.h, gx = bo[o] * h[0] + bo[o + 4] * h[1] + bo[o + 8] * h[2] + bo[o + 3], gy = bo[o + 1] * h[0] + bo[o + 5] * h[1] + bo[o + 9] * h[2] + bo[o + 7], gz = bo[o + 2] * h[0] + bo[o + 6] * h[1] + bo[o + 10] * h[2] + bo[o + 11];
+      for (const q of [0, 1, 2, 4, 5, 6, 8, 9, 10]) bo[o + q] *= e;
+      bo[o + 3] = gx - (bo[o] * h[0] + bo[o + 4] * h[1] + bo[o + 8] * h[2]); bo[o + 7] = gy - (bo[o + 1] * h[0] + bo[o + 5] * h[1] + bo[o + 9] * h[2]); bo[o + 11] = gz - (bo[o + 2] * h[0] + bo[o + 6] * h[1] + bo[o + 10] * h[2]);
+      break;
+    }
+  }
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('propRow'); if (old) old.remove();
+    if (L.unit !== DEMO.unit) return;
+    const box = document.createElement('div'); box.id = 'propRow';
+    box.innerHTML = '<h3>Prop: the wooden torch-staff</h3><div class="row">' + `<button data-pr="0" class="${DEMO.on ? '' : 'on'}" title="His own staff, as shipped">His own staff</button><button data-pr="1" class="${DEMO.on ? 'on' : ''}" title="The owner's wooden torch-staff seated on his staff bone: the same grip and line as his own, at a torch's length (this lab only)">The torch-staff</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-pr]')) x.onclick = () => { DEMO.on = x.dataset.pr === '1'; labRow(); };
+  }
+  if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined' && typeof drawTower === 'function' && typeof renderView === 'function') {
+    const q = new URLSearchParams(location.search);
+    if (q.get('lab') === '1') {
+      DEMO.on = q.get('prop') === 'staff';
+      const d0 = drawTower;
+      drawTower = function (t) { const n0 = dlN, r = d0.apply(this, arguments); try { demo(t, n0); } catch (e) {} return r; };
+      const rv0 = renderView;
+      renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === DEMO.unit) !== !!document.getElementById('propRow')) labRow(); } catch (e) {} return rv0.apply(this, arguments); };
+    }
+  }
+  return Object.assign(P, { decode, seat, onBone, boneM, DEMO });
+})();
+
 /* ================= THE LIGHT LAB (runehold.html?lightlab=1) =================
    The owner's bench for the maps' light and look (owner, 10 Nov 2026: "create a basic environment for me to tweak the current
    map, i also want lighting sliders, let me also add units to the map. include ao, glint etc. id like to try to achieve
@@ -89036,7 +91022,8 @@ if (typeof applyLight === 'function') {
   /* ---- the controls ---- */
   // [path, label, min, max, step] | [path, label, 'color'] | [path, label, 'check'] | [path, label, 'select', [[v, name]...]]
   const GROUPS = [
-    { id: 'sun', t: 'Sun', items: [['light.az', 'Azimuth', -180, 180, 1], ['light.el', 'Elevation', 4, 89, 1], ['light.sun', 'Colour', 'color'], ['light.sunI', 'Intensity', 0, 3.5, .01]] },
+    { id: 'sun', t: 'Sun', items: [['light.az', 'Azimuth', -180, 180, 1], ['light.el', 'Elevation', 4, 89, 1], ['light.sun', 'Colour', 'color'], ['light.sunI', 'Intensity', 0, 3.5, .01],
+      ['light.dap', 'Canopy dapple', 0, 1, .01], ['light.dapS', 'Dapple size', .6, 8, .05], ['light.dapV', 'Dapple sway', 0, 3, .05], ['light.dapE', 'Dapple edge softness', .02, .5, .01]] },   // (the sun through a canopy, on everything it lights: gl.js shadowAt uCookie)
     { id: 'sky', t: 'Sky and ground fill', items: [['light.sky', 'Sky colour', 'color'], ['light.skyI', 'Sky strength', 0, 2, .01], ['light.gnd', 'Ground bounce', 'color'], ['light.gndI', 'Bounce strength', 0, 1.5, .01], ['light.fill', 'Front fill on units', 0, 1.5, .01], ['light.lamps', 'Map lights (lanterns)', 0, 3, .01]] },
     { id: 'back', t: 'Rim and back light', on: 'fwd.backOn', items: [['light.rim', 'Rim (key colour)', 0, 1.5, .01], ['fwd.back', 'Back light colour', 'color'], ['fwd.backI', 'Back light strength', 0, 3, .01], ['fwd.backAz', 'Back light angle (0 = behind)', -180, 180, 1], ['fwd.backEl', 'Back light height', 0, 80, 1]] },
     { id: 'shadow', t: 'Shadows', on: 'fwd.shOn', cost: ['shadows'], items: [['fwd.shFloor', 'Strength floor (light left)', 0, 1, .01], ['fwd.shSoft', 'Softness', .3, 5, .05], ['fwd.shBias', 'Bias', 0, .008, .0001], ['fwd.shQ', 'Soft disc (12 taps)', 'check']] },
@@ -89053,7 +91040,7 @@ if (typeof applyLight === 'function') {
     { id: 'sharp', t: 'Sharpen', on: 'post.sharp.on', items: [['post.sharp.k', 'Amount', 0, 1.5, .01]] },
     { id: 'trees', t: 'Trees', items: [['tree.barkI', 'Trunk and bark brightness', 0, 2.5, .01], ['tree.bark', 'Bark tint', 'color'], ['tree.leafI', 'Leaf brightness', 0, 2.5, .01], ['tree.leaf', 'Leaf tint', 'color'], ['tree.leafSat', 'Leaf saturation', 0, 2, .01],
       ['tree.trans', 'Translucency (sun through leaves, backlit)', 0, 2, .01], ['tree.glint', 'Leaf specular glint', 0, 4, .01], ['tree.ao', 'Darkening toward the trunk base', 0, 1.6, .01], ['tree.aoH', 'Base darkening height', .2, 4, .01],
-      ['tree.shadow', 'Shadows received on trees', 0, 1, .01], ['tree.rim', 'Canopy rim light', 0, 2, .01], ['tree.rimC', 'Rim colour', 'color'], ['tree.fog', 'Distance fog on trees', 0, 2, .01]] },
+      ['tree.shadow', 'Shadows received on trees', 0, 1, .01], ['tree.rim', 'Canopy rim light', 0, 2, .01], ['tree.rimC', 'Rim colour', 'color'], ['tree.fog', 'Distance fog on trees', 0, 2, .01], ['tree.high', 'Giant trunks lit up high', 0, 1, .01]] },
     { id: 'water', t: 'Moving water (painted maps)', on: 'water.on', items: [['water.speed', 'Speed', 0, 3, .01], ['water.warp', 'Warp strength', 0, 3, .01], ['water.shimmer', 'Shimmer and sparkle', 0, 3, .01]] },
   ];
   const fmt = (v, step) => typeof v !== 'number' ? String(v) : step < .001 ? v.toFixed(4) : step < .01 ? v.toFixed(3) : step < 1 ? v.toFixed(2) : String(Math.round(v));
@@ -89497,7 +91484,7 @@ if (typeof applyLight === 'function') {
     return `<label class="el-r${tuned}"><span>${esc(I[0])} <b data-v="${s}.${l}.${k}">${fmt(+V, I[3])}</b></span><input type="range" data-s="${s}" data-l="${l}" data-k="${k}" min="${I[1]}" max="${I[2]}" step="${I[3]}" value="${+V}"></label>`;
   }
   function layerHTML(s, l) {
-    const el = EL(), kinds = EFX_LKIND[l] || 'p', V = efx(s, l), D = ELEM_FX_DEF[s] && ELEM_FX_DEF[s][l], rate = (L.rate[s] || {})[l] || 0, tuned = Object.keys(live(s, l)).length;
+    const el = EL(), kinds = (el === 'frost' && typeof EFX_LKIND_FROST !== 'undefined' && EFX_LKIND_FROST[l]) || EFX_LKIND[l] || 'p', V = efx(s, l), D = ELEM_FX_DEF[s] && ELEM_FX_DEF[s][l], rate = (L.rate[s] || {})[l] || 0, tuned = Object.keys(live(s, l)).length;
     const gen = EFX_GEN_UI.filter(it => [...it[2]].some(c => kinds.includes(c))).map(it => ctlGen(s, l, it)).join('');
     const grad = `<label class="el-r el-c"><input type="checkbox" data-s="${s}" data-l="${l}" data-k="grad"${V.grad ? ' checked' : ''}><span>Colour gradient (start → mid → end${kinds.includes('f') ? '; fire: hot core → flame → smoke and edges' : ''})</span></label>
       <div class="el-grad">${[0, 1, 2].map(i => `<div><input type="color" data-s="${s}" data-l="${l}" data-k="c${i}" value="${V['c' + i]}"><input type="range" data-s="${s}" data-l="${l}" data-k="a${i}" min="0" max="1" step=".02" value="${V['a' + i]}" title="Opacity at the ${['start', 'middle', 'end'][i]}"><small>${['start', 'mid', 'end'][i]}</small></div>`).join('')}</div>`;
@@ -89566,9 +91553,9 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     const top = $('#elTop'); if (!top) return;
     const s = L.spell, R0 = L.rate[s] || {}, spawn = Object.values(R0).reduce((a, v) => a + v, 0);
     let mine = 0; for (const p of G.parts) if (p._efs === s) mine++;
-    const gpu = typeof vfxPartsLive === 'function' ? vfxPartsLive() : 0, cards = (typeof LABF !== 'undefined' ? LABF.list.length : 0) + (typeof PYF !== 'undefined' ? PYF.q.length : 0);
+    const gpu = typeof vfxPartsLive === 'function' ? vfxPartsLive() : 0, cards = (typeof LABF !== 'undefined' ? LABF.list.length : 0) + (typeof PYF !== 'undefined' ? PYF.q.length : 0) + (typeof FRT !== 'undefined' ? FRT.q.length : 0);
     const cv = L.cover == null ? '' : `<br><span class="${L.cover > .4 ? 'warn' : ''}">Foes covered by the effect: ${Math.round(L.cover * 100)}%${L.cover > .4 ? ' (too flashy: the foe is lost)' : ''}</span>`;
-    top.innerHTML = `${(1000 / L.ms).toFixed(0)} fps · ${L.ms.toFixed(1)} ms/frame · lab+draw ${L.rms.toFixed(1)} ms<br>${esc(SP().name)}: ${mine} particles live · ${Math.round(spawn)} drawn/s · ${cards} fire cards<br>all: ${G.parts.length} CPU · ${gpu} GPU particles · ${typeof SFX !== 'undefined' ? SFX.list.length : 0} moments` + cv;
+    top.innerHTML = `${(1000 / L.ms).toFixed(0)} fps · ${L.ms.toFixed(1)} ms/frame · lab+draw ${L.rms.toFixed(1)} ms<br>${esc(SP().name)}: ${mine} particles live · ${Math.round(spawn)} drawn/s · ${cards} ${EL() === 'frost' ? 'ice' : 'fire'} cards<br>all: ${G.parts.length} CPU · ${gpu} GPU particles · ${typeof SFX !== 'undefined' ? SFX.list.length : 0} moments` + cv;
     for (const x of document.querySelectorAll('#elab [data-rate]')) { const [sp, l] = x.dataset.rate.split('.'), v = (L.rate[sp] || {})[l] || 0; x.textContent = v ? Math.round(v) + '/s' : '–'; }
   }
   const copyText = txt => { const done = () => { L.note = 'Copied.'; info(); }; const ta = $('#elJson'); try { navigator.clipboard.writeText(txt).then(done, () => fb()); } catch (e) { fb(); }
