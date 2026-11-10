@@ -1,4 +1,4 @@
-const BUILD_TAG = '3bba966+@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '539d26e@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -4491,9 +4491,9 @@ function fire(t, st, tg, echo) {
       G.projs.push(mk(tg, 'ball', { x: mx, z: mz, x0: mx, z0: mz, h0: sh, ax: tg.x, az: tg.y, t: 0, T: .55 + d * .07, arc: (.9 + d * .15) * (tg.fly ? .5 : 1), big: st.caps.powder && (t.shots + 1) % 3 === 0, cloud: st.caps.sporecloud && (t.shots + 1) % 3 === 0, air: !!tg.fly }));   // Powder Charge / Spore Cloud (air: a Flak shell bursting at a flyer)
       // extra targets (Seeker's Compass, Hydra Fang) get a shell each at full strength: the cannon used to ignore them although its card counted them
       extra.forEach((o, v) => { const d2 = Math.hypot(o.x - sx, o.y - sz); G.projs.push(mk(o, 'ball', { x: mx, z: mz, x0: mx, z0: mz, h0: sh, ax: o.x, az: o.y, t: -.07 * (v + 1), T: .55 + d2 * .07, arc: .9 + d2 * .15, pow: 1, crit: false, fx: exFx[v] })); });
-      sfx('cannon', 0, lv);
-      for (let k = 0; k < 4 + lv * 2; k++) part({ k: 'smoke', x: mx, z: mz, h: sh + .1, vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.4, .9), drag: 2, life: .7, max: .7, size: R(.14, .22) * (1 + lv * .2), col: '#d8cfc0' });
-      part({ k: 'flare', x: mx, z: mz, h: sh + .05, life: .12, max: .12, size: .5 + lv * .2, col: '#ffb24a' });
+      sfx(t.def && t.def.pod ? 'seedcast' : 'cannon', 0, lv);   // (a Seedcaster slings a pod: no powder, no smoke)
+      if (!(t.def && t.def.pod)) for (let k = 0; k < 4 + lv * 2; k++) part({ k: 'smoke', x: mx, z: mz, h: sh + .1, vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.4, .9), drag: 2, life: .7, max: .7, size: R(.14, .22) * (1 + lv * .2), col: '#d8cfc0' });
+      if (!(t.def && t.def.pod)) part({ k: 'flare', x: mx, z: mz, h: sh + .05, life: .12, max: .12, size: .5 + lv * .2, col: '#ffb24a' });
       if (st.caps.carpet && t.shots % 4 === 3) carpet(t, st, tg);
       break;
     }
@@ -4770,7 +4770,7 @@ function updateProjs(dt) {
       if (p.air && p.tg && !p.tg.dead) p.ah = hitH(p.tg);
       p.x = lerp(p.x0, p.ax, u); p.z = lerp(p.z0, p.az, u); p.h = lerp(p.h0, p.air ? (p.ah || 1.15) : .15, u) + Math.sin(u * Math.PI) * p.arc;
       p.dir = [p.x - px, p.h - ph, p.z - pz];
-      if (Math.random() < .5) part({ k: 'smoke', x: p.x, z: p.z, h: p.h, vh: .2, life: .4, max: .4, size: .08, col: '#bdb4a6' });
+      if (Math.random() < .5 && !(p.src && p.src.def && p.src.def.pod)) part({ k: 'smoke', x: p.x, z: p.z, h: p.h, vh: .2, life: .4, max: .4, size: .08, col: '#bdb4a6' });
       if (p.meteor || p.comet) { for (let k = 0; k < 3; k++) part({ k: 'ember', x: p.x + R(-.15, .15), z: p.z + R(-.15, .15), h: p.h + R(-.1, .3), vh: R(.2, .8), drag: 2, life: .45, max: .45, size: R(.18, .3), col: k % 2 ? '#ff6a1a' : '#ffd06a' }); part({ k: 'smoke', x: p.x, z: p.z, h: p.h + .2, vh: .4, drag: 1, life: .8, max: .8, size: .3, col: '#3a2a22' }); }
       if (u >= 1) { p.done = true; if (p.abId) abRun(p.abId, () => impact(p)); else if (p.abil) tagged('abil', () => impact(p)); else impact(p); }   // (abil: an ability's pod, credited as ability damage)
       continue;
@@ -4996,7 +4996,7 @@ function updateHazards(dt) {
     const st = z.st || z.src.st;
     if (z.k === 'fire' && Math.random() < dt * 14) part({ k: 'ember', x: z.x + R(-z.r, z.r) * .8, z: z.z + R(-z.r, z.r) * .8, h: .05, vh: R(.5, 1.1), life: .5, max: .5, size: R(.08, .15), col: Math.random() < .5 ? '#ff8a2a' : '#ffd27a' });
     if (z.k === 'rime' && Math.random() < dt * 6) part({ k: 'frost', x: z.x + R(-z.r, z.r) * .7, z: z.z + R(-z.r, z.r) * .7, h: .08, vh: R(.05, .25), drag: 2, life: .7, max: .7, size: R(.07, .12), col: '#e8fbff' });
-    if (z.k === 'miasma' && Math.random() < dt * 8) part({ k: 'bubble', x: z.x + R(-z.r, z.r) * .7, z: z.z + R(-z.r, z.r) * .7, h: .05, vh: R(.2, .5), life: .7, max: .7, size: R(.06, .1), col: '#9be05a' });
+    if (z.k === 'miasma' && Math.random() < dt * 8 && !(typeof sdIsHaze === 'function' && sdIsHaze(z) && sdOn())) part({ k: 'bubble', x: z.x + R(-z.r, z.r) * .7, z: z.z + R(-z.r, z.r) * .7, h: .05, vh: R(.2, .5), life: .7, max: .7, size: R(.06, .1), col: '#9be05a' });
     if (z.k === 'spikes' && Math.random() < dt * 10) { const a = R(TAU), d = R(.3, z.r); part({ k: 'chunk', x: z.x + Math.cos(a) * d, z: z.z + Math.sin(a) * d, h: .02, vh: R(.6, 1.2), g: 8, life: .35, max: .35, size: R(.04, .07), col: '#7a654b' }); }
     if (z.k === 'orb' && Math.random() < dt * 20) part({ k: 'spark', x: z.x + R(-.15, .15), z: z.z + R(-.15, .15), h: (z.h || .6) + R(-.15, .15), vx: R(-1, 1), vz: R(-1, 1), vh: R(-1, 1), drag: 4, life: .2, max: .2, size: .07, col: '#cfeeff' });
     if (z.k === 'phoenix') { phoenixFly(z, dt); continue; }
@@ -30938,7 +30938,7 @@ gvcSet('barrage', { name: 'Puffcap Sowing', short: 'Puffcaps', glyph: 'bombs', h
     const caps = S.map((q, k) => ({ x: q.x, z: q.z, born: G.time + .25 + k * .08, pop: 0 }));
     abZone(t, gvcFresh({ k: 'barrage', caps, until: G.time + 8.3, tick: .25, every: .1 }));
     gvcFx('sow', t, ab, { caps });
-    sfx('splat', 0);
+    sfx('sprout', 0);
   },
   zone(t, st, z) {
     let live = 0;
@@ -30950,7 +30950,7 @@ gvcSet('barrage', { name: 'Puffcap Sowing', short: 'Puffcaps', glyph: 'bombs', h
       q.pop = G.time; live--;
       const sd = sporeDose(st);
       abAoe(() => { for (const o of G.creeps) if (gvcWalker(o) && canTarget(t, st, o) && Math.hypot(o.x - q.x, o.y - q.z) <= .8) { abHit(t, st, o, GVC.puffK, 'magic', null); if (o.dead) continue; if (!isImmune(o, 'poison')) { dose(o, sd, t); o.swarmOn = true; } } });
-      gvcFx('puff', t, ABIL.barrage, { q }); sfx('splat', 1);
+      gvcFx('puff', t, ABIL.barrage, { q }); sfx('podburst', 2);
     }
     if (!live) z.until = G.time;
   } });
@@ -30966,7 +30966,7 @@ gvcSet('bindseed', { name: 'Snapjaw Bloom', short: 'Snapjaw', glyph: 'spores', h
     const d = Math.hypot(p.x - t.x, p.y - t.y), T = .35 + d * .06, dur = byT(ab.by.dur, t);
     const z = gvcFresh({ k: 'bindseed', x: p.x, z: p.y, until: G.time + T + dur, tick: T + .45, every: GVC.jawEvery, born: G.time + T, root: byT(ab.by.root, t), snaps: 0 });
     abZone(t, z); gvcFx('jawseed', t, ab, { z, T, dur });
-    sfx('splat', 0);
+    sfx('seedcast', 0);
   },
   zone(t, st, z) {
     const L = G.creeps.filter(o => gvcWalker(o) && canTarget(t, st, o) && Math.hypot(o.x - z.x, o.y - z.z) <= 1.1);
@@ -30976,7 +30976,7 @@ gvcSet('bindseed', { name: 'Snapjaw Bloom', short: 'Snapjaw', glyph: 'spores', h
     G.delayed.push({ t: .14, fn: () => {
       if (!G.towers.includes(t)) return; const s = t.st || st, sd = sporeDose(s), x = c.x, y = c.y;
       abAoe(() => { for (const o of G.creeps) { if (!gvcWalker(o) || !canTarget(t, s, o) || Math.hypot(o.x - x, o.y - y) > .65) continue; abHit(t, s, o, GVC.jawK, 'magic', null); if (o.dead) continue; rootFoe(o, z.root, t); if (!isImmune(o, 'poison')) { dose(o, sd, t); o.swarmOn = true; } } });
-      sfx('thwack', 1);
+      sfx('jawsnap', 0);
     } });
   } });
 
@@ -42532,7 +42532,7 @@ function ccfTal(list, name, nt) {
   // Frostweavers: cold written on the road
   ccfTal(T.frost.list, 'Biting Cold', GT('Hoar Ink', 'snowflake', 0, 0, 3, n => `Its bolts on a frozen ground foe write a small frost glyph under it that lasts ${1 + n}s (once a foe every ${CCF.INK_GAP}s).`, {}, { cap: 'ccfInk' }));
   ccfTal(T.frost.list, 'Steady Glyphwork', GT('Practised Hand', 'rune', 0, 1, 2, n => `Each frost glyph it writes brings Glacial Glyph ${gNf(.5 * n)}s nearer.`, {}, { cap: 'ccfHand' }));
-  ccfTal(T.frost.list, 'Needle Rime', GT('Needle Rime', 'shieldbreak', 0, 2, 3, n => `Its bolts and spells ignore ${5 * n}% of wards, and on a frozen foe its bolts splinter: shards strike up to ${n === 1 ? 'one other ground foe' : n + ' other ground foes'} within ${CCF.NEEDLE_R} cells for ${Math.round(CCF.NEEDLE_K * 100)}% of the bolt.`, n => ({ magicPen: .05 * n }), { cap: 'ccfNeedle' }));
+  ccfTal(T.frost.list, 'Needle Rime', GT('Needle Frost', 'shieldbreak', 0, 2, 3, n => `Its bolts and spells ignore ${5 * n}% of wards, and on a frozen foe its bolts splinter: shards strike up to ${n === 1 ? 'one other ground foe' : n + ' other ground foes'} within ${CCF.NEEDLE_R} cells for ${Math.round(CCF.NEEDLE_K * 100)}% of the bolt.`, n => ({ magicPen: .05 * n }), { cap: 'ccfNeedle' }));
   ccfTal(T.frost.list, 'Rimewell', GT('Singing Ice', 'snowflake', 1, 1, 2, n => `While a foe it froze is still frozen, each strike another Conclave unit lands on it gives the Frostweaver ${3 * n} mana: the ice sings.`, {}, { cap: 'ccfSing' }));
   { const L = T.frost.list, o = L.find(x => x.name === "Scrivener's Hand"); if (o) ccfTal(L, "Scrivener's Hand", GT("Scrivener's Hand", 'rune', 3, 2, 1, 'Every 2nd bolt writes a frost glyph instead of every 3rd.', {}, { cap: 'ccGlyph2' })); }
   // Chronomancers: the clock's keepers
@@ -42649,7 +42649,7 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
     if (ab === 'cc_sparks' && C.ccfCurtain && pre.marks.some(s => s !== 'arcane')) { ccGain(t, 1); ccEv('tal:ccfCurtain'); }   /* Charged Curtain */
   } else if (u === 'cc_rimeweaver' && basic) {
     if (C.ccfInk && pre.frozen && ccWalker(c) && !c.dead && !((c.ccfInkT || 0) > G.time)) { c.ccfInkT = G.time + CCF.INK_GAP; ccFrostGlyph(t, st, c.x, c.y, 1, { r: .45, t: 1 + C.ccfInk }); ccEv('tal:ccfInk'); }   // Hoar Ink
-    if (C.ccfNeedle && pre.frozen) {   // Needle Rime
+    if (C.ccfNeedle && pre.frozen) {   // Needle Frost
       for (const q of nearest(c.x, c.y, CCF.NEEDLE_R, C.ccfNeedle, c, q => ccWalker(q) && !q.ent && canTarget(t, st, q))) { ccHit(t, st, q, amt * CCF.NEEDLE_K, { noRx: true }); G.bolts.push({ pts: [[c.x, hitH(c), c.y], [q.x, hitH(q), q.y]], life: .12, max: .12, col: [.85, .95, 1.2] }); }
       ccEv('tal:ccfNeedle');
     }
@@ -46084,7 +46084,7 @@ function ccrCritFx(t, c, amt) {
   const T = CC_TALENTS, F = T.frost.list;
   for (const o of F) if (o.spell && ABIL[o.spell]) o.name = ABIL[o.spell].name;   /* the spell talents carry their spell's new name */
   const re = (L, name, nt, r, c, req) => { if (!L.find(o => o.name === name)) return console.warn('conclave frost: no talent', name); ccxTal(L, name, nt); if (r != null) { const o = L.find(x => x.name === nt.name); o.r = r; o.c = c; o.req = req || null; o.reqs = null; } };
-  re(F, 'Hoar Ink', GT('Hoar Ink', 'frostbite', 0, 0, 3, n => `Its bolts on a Frozen foe splash frost: every foe within ${CCR.INK_R} cells is chilled ${10 * n}% for 2s (once a foe every ${CCR.INK_GAP}s).`, {}, { cap: 'ccrInk' }));
+  re(F, 'Hoar Ink', GT('Spreading Frost', 'frostbite', 0, 0, 3, n => `Its bolts on a Frozen foe splash frost: every foe within ${CCR.INK_R} cells is chilled ${10 * n}% for 2s (once a foe every ${CCR.INK_GAP}s).`, {}, { cap: 'ccrInk' }));
   re(F, 'Practised Hand', GT('Practised Hand', 'icicle', 0, 1, 2, n => `Each Frost Spear that strikes a Frozen foe gives back ${10 * n} mana.`, {}, { cap: 'ccrHand' }));
   re(F, 'Wide Glyphs', GT('Biting Spear', 'snowflake', 0, 3, 3, n => `Frost Spear's slow lasts ${gNf(.5 * n)}s longer.`, {}, { sp: n => ({ ab: 'cc_glacialglyph', by: { slowT: .5 * n } }) }));
   re(F, 'Brittle Rime', GT('Cold Eye', 'eye', 2, 3, 2, n => `Its bolts and spells crit Frozen foes ${25 * n}% of the time, and each Ice Coffin brings Frost Spear ${n}s nearer.`, {}, { cap: 'ccrEye', sp: n => ({ ab: 'cc_rimelance', ready: ['cc_glacialglyph', n] }) }));
@@ -46101,7 +46101,7 @@ function ccrCritFx(t, c, amt) {
 }
 
 /* =====================================================================================================
-   HOOKS: the coffin's clock, the bloom on a death, Hoar Ink, the Frozen look
+   HOOKS: the coffin's clock, the bloom on a death, Spreading Frost, the Frozen look
    ===================================================================================================== */
 { const H = FORCE_HOOKS.conclave, tk0 = H.tick, k0 = H.kill, w0 = H.wave;
   H.tick = function (dt) { const r = tk0.apply(this, arguments); ccrCoffinTick(); if (G.ccBlooms && G.ccBlooms.length) for (const c of G.ccBlooms.slice()) if (!c.dead && c.ccBloom && c.ccBloom.until <= G.time) { c.ccBloom = null; G.ccBlooms = G.ccBlooms.filter(o => o !== c); } return r; };
@@ -48262,7 +48262,7 @@ const TAL_SPREAD = {
   "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[2,0],"Passing Spores":[1,3],"Compost":[3,1],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[4,1],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[0,1],"Seedmother":[5,2],"Full Bloom":[4,3],"Rotfeast":[4,0],"Busy Hive":[0,2],"Honey Store":[1,0]},
   "conclave.glaive": {"Measured Cuts":[0,1],"Opening Salute":[1,3],"Lone Duel":[2,3],"Riftsteel Edge":[1,2],"Ward-Splitter":[1,1],"Charged Edge":[2,1],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[4,1],"Thrown Riftblade":[4,0],"Fifth Form":[4,3],"Phase Dancer":[3,1],"Ghostblade Rush":[5,1],"Weaver's Blade":[5,2],"Press the Opening":[0,0],"Binding Cut":[0,2],"Guard Broken":[3,2]},
   "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Homing Missiles":[2,2],"Apprentice's Zeal":[4,3],"Missile Curtain":[1,2],"Echoing Missiles":[3,2],"Charged Curtain":[3,0],"Gathering Orb":[3,3],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,3],"Cold Focus":[0,3],"Lecture Hall":[5,3],"Margin Notes":[1,1],"Recitation":[1,0],"Static Sparks":[2,1]},
-  "conclave.frost": {"Hoar Ink":[0,3],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,3],"Entomb":[1,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,1],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[1,0],"Needle Rime":[0,2],"Brittle Coffin":[3,3]},
+  "conclave.frost": {"Spreading Frost":[0,3],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,3],"Entomb":[1,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,1],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[1,0],"Needle Frost":[0,2],"Brittle Coffin":[3,3]},
   "conclave.arcane": {"Lagging Hour":[2,0],"Tick Forward":[3,3],"Borrowed Time":[3,1],"Heavy Hours":[0,1],"Backward Hour":[2,1],"Paradox":[2,3],"Stopped Clock":[4,2],"Quickening Bell":[5,2],"Frozen Moment":[5,1],"Hourglass Heart":[4,0],"Recurrence":[4,3],"Rewound Wounds":[1,1],"Arcane Clockwork":[3,2],"Borrowed Hour":[5,3],"Pendulum Swing":[1,2],"Stolen Sand":[0,0],"Patient Hours":[0,2]},
   "conclave.storm": {"Wide Heavens":[0,0],"Star-Chart":[1,3],"Constellation":[5,1],"Skybreaker":[1,1],"Comet":[2,1],"Lodestar":[2,3],"Grounded Stars":[4,0],"Zodiac":[4,2],"Starfall Sky":[5,2],"Twin Stars":[5,3],"Grand Orrery":[3,0],"Twinkling Ice":[2,0],"Frost Lens":[3,3],"Turning Spheres":[4,1],"Night Sight":[0,1],"Cold Starlight":[0,2],"Ill Omen":[3,2]},
   "conclave.earth": {"Broad Palms":[1,2],"Second Tremor":[0,1],"Staggering Blow":[3,2],"Mana Quarry":[4,0],"Heave":[2,2],"Shatterground":[5,1],"Deep Magma":[2,0],"Golem Core":[3,0],"Living Bulwark":[4,1],"Fault Line":[4,3],"Obsidian":[2,3],"Walking Wall":[5,0],"Ember Stone":[1,1],"Living Mountain":[5,2],"Granite Fists":[1,0],"Ley Reservoir":[0,2],"Glyph Anchor":[3,1]},
@@ -48422,7 +48422,7 @@ function talRankSteps(t) {
      Binding Cut        a 10% slow a rank (no Wounded)
      Apprentice's Zeal  the orb's slow only, 20% a rank (no longer gather)
      Winter's Garden    Shatterbloom on 4 foes at once (no new bloom down the chain)
-     Needle Rime        frozen splinters only, 40% (no ward cut)
+     Needle Frost       frozen splinters only, 40% (no ward cut)
      Borrowed Time      Backward Hour quickens its caster 12% a rank (no haste for the units round it)
      Grounded Stars     Grand Orrery's bonus on downed flyers, 35% a rank (no longer turning)
      Ill Omen           Lodestar's chill, 15% a rank (no stun from Falling Star)
@@ -48482,7 +48482,7 @@ function talRankSteps(t) {
 
   /* ---- Frostweavers ---- */
   talPlain('conclave', 'frost', {
-    'Hoar Ink': { tag: 'Control', pro: n => `Its bolts on Frozen foes chill foes within 0.6 cells ${10 * n}% for 2s.` },
+    'Spreading Frost': { tag: 'Control', pro: n => `Its bolts on Frozen foes chill foes within 0.6 cells ${10 * n}% for 2s.` },
     'Biting Spear': { tag: 'Control', pro: n => `Frost Spear's slow lasts ${f(.5 * n)}s longer.` },
     'Frozen Lance': { tag: 'Spell', pro: 'Frost Spear always crits Frozen foes, and each Shatterbloom readies it 2s sooner.' },
     'Second Spear': { tag: 'Spell', pro: 'Every 4th bolt also throws a free Frost Spear at half strength.' },
@@ -48495,7 +48495,7 @@ function talRankSteps(t) {
     'Absolute Stillness': { tag: 'Control', pro: 'Every 3rd bolt freezes its foe for 1.1s.' },
     'Practised Hand': { tag: 'Mana', pro: n => `Each Frost Spear on a Frozen foe gives back ${10 * n} mana.` },
     'Singing Ice': { tag: 'Mana', pro: n => `Gains ${3 * n} mana when another unit strikes a foe it keeps frozen.` },
-    'Needle Rime': { tag: 'Damage', pro: n => `Its rime bolts and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
+    'Needle Frost': { tag: 'Damage', pro: n => `Its frost bolts and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
     'Brittle Coffin': { tag: 'Damage', pro: n => `Ice Coffin strips ${2 * n} armour from its foe for 4s as it lets go.` },
     'Ice Coffin': { tag: 'Spell' }, 'Shatterbloom': { tag: 'Spell' },
   });
@@ -50521,13 +50521,13 @@ const OH = {
       const d = c.maxHp * this.k[r], x = c.x, z = c.y, h = hitH(c); let n = 0;
       part({ k: 'flare', x, z, h, life: .28, max: .28, size: .8, col: '#ffb060' }); fxSpark(x, z, h, '#ffa04a', 7);
       const pd = OH_PYRE; OH_PYRE = depth;
-      try { tagged('relic', () => inSplash(x, z, this.rad[r], false, o => { if (o === c || !ohAlive(o)) return; const v = d * (o.def.boss || o.def.lead ? .25 : 1); ohNote('pyre', Math.min(v, o.hp)); hurt(o, v, 'magic', src, false, null, null); n++; })); } finally { OH_PYRE = pd; }
+      try { tagged('relic', () => inSplash(x, z, this.rad[r], false, o => { if (o === c || !ohAlive(o)) return; const v = d * (o.def.boss || o.def.lead ? .25 : 1); ohNote('pyre', Math.min(v, o.hp)); hurt(o, v, 'pure', src, false, null, null); n++; })); } finally { OH_PYRE = pd; }
       return n;
     } },
   mark: { name: 'Ravenmark', leg: 'the Unkindness', hue: '#b08cff', glyph: 'feather', ppm: [4, 4, 4], best: 'a fast unit beside your hardest hitter or your biggest spell',
     k: [2, 3, 2], T: 6, hops: 2,
     say(r) { return `marks the foe for ${this.T}s: the next hit on it from another unit, strike or spell, lands ${r === 1 ? 'three times' : 'twice'} as hard${r === 2 ? `, and the mark then leaps on to the nearest foe, twice over` : ''}.`; },
-    put(c, src, r, hops) { c.ohMk = { src, k: this.k[r], t: G.time + this.T, hops, r }; c.markT = Math.max(c.markT || 0, this.T); fxSpark(c.x, c.y, hitH(c) + .3, '#c8a8ff', 4); },
+    put(c, src, r, hops) { c.ohMk = { src, k: this.k[r], t: G.time + this.T, hops, r }; fxSpark(c.x, c.y, hitH(c) + .3, '#c8a8ff', 4); },
     go(c, src, amt, r) {
       if (c.hp <= 0 || (c.ohMk && c.ohMk.t > G.time)) return false;
       this.put(c, src, r, r === 2 ? this.hops : 0);
@@ -50640,7 +50640,9 @@ function ohStrike(c, src, amt) {
   const rate = Math.max(.05, src.st.rate || 1);
   const p = ohFlat(d, o.r) ? d.flat[o.r] : Math.min(OH_P_CAP, d.ppm[o.r] * Math.min(last == null ? rate : now - last, rate * OH_DT_CAP) / 60);
   if (Math.random() >= p) return;
-  let ok = false; tagged('relic', () => { ok = d.go(c, src, amt, o.r, amt / rate) !== false; });
+  let ok = false; const held = typeof HOLD_ITEM !== 'undefined';   // (a weapon's stun is an item's hold: the line-holder rule lets it stand on any unit, forces_zzzzzzzzzzzzzzzzzzzz_holds.js)
+  if (held) HOLD_ITEM++;
+  try { tagged('relic', () => { ok = d.go(c, src, amt, o.r, amt / rate) !== false; }); } finally { if (held) HOLD_ITEM--; }
   if (!ok) return;
   if (o.id === 'twin') src.ohTwinAt = now;
   ohFired(src, o);
@@ -54048,7 +54050,7 @@ const EFX_LNAME_FROST = { hand: 'Staff frost (glow, sinking mist, glints)', core
   burst: 'Impact (needles; the spear: spikes out the far side)', shards: 'Splinters', crystals: 'Crystals (icicles, standing ice, the petals of the bloom)', mist: 'Cold mist and glints', ground: 'Frost on the ground (a creeping, feathered patch; no ring)', light: 'Light',
   paint: 'Ice paint (every crystal: facets, edges, clearness, sparkle, inner fractures, rime, fog; gradient = palette)' };
 const EFX_LKIND_FROST = { hand: 'c', core: 'c', trail: 'c', burst: 'c', shards: 'c', crystals: 'c', mist: 'c', ground: 'c', light: 'l', paint: 'x' };
-const efxLName = (l, el) => { const n = (el === 'frost' && EFX_LNAME_FROST[l]) || EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
+const efxLName = (l, el) => { const n = (el === 'frost' && EFX_LNAME_FROST[l]) || (el === 'seed' && typeof EFX_LNAME_SEED !== 'undefined' && EFX_LNAME_SEED[l]) || EFX_LNAME[l]; return typeof n === 'string' ? n : (n && n[el]) || l; };
 // what each layer is made of (the controls the lab shows for it): p particles, g GPU particles, m moments, f flipbook fire,
 // l light, d decal / ground marks, b billboards drawn by the spell's own code (their own values below)
 const EFX_LKIND = { hand: 'f', paint: 'x', core: 'fmb', flames: 'fp', embers: 'pg', smoke: 'pgf', glow: 'pmf', light: 'lm', ground: 'dfm', trail: 'pmf', burst: 'mfp', ring: 'mp', shards: 'pg', crystals: 'pgmb', mist: 'pg' };
@@ -55488,7 +55490,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -56543,6 +56545,45 @@ const AudioSys = (() => {
       bb.sort((a, b) => a[0] - b[0]); pings(bb, { bend: 1.9, bt: .025, v: .1, pan });
       nhit(t + .03, { n: 'k', type: 'highpass', f: 4000, pts: [[.04, .7], [.6, 0]], v: .25, pan });
       nhit(t + .03, { type: 'highpass', f: 6000, pts: [[.05, .5], [.5, 0]], trem: [30, .6], v: .06, pan, room: .12 });
+    },
+    /* --- the Seedcasters (owner, 11 Nov 2026: "would like the seedcasters improved and her sound changed, sounds like a
+       cannon"). She stood in the cannon's slot and played its shot. These are wood, husk, seed and earth: low, soft,
+       nothing of powder, nothing bright, no hiss. --- */
+    // a pod slung: the sling's wooden cup knocking as it lets go, and the low breath of air the pod parts. arg 1: a great pod
+    seedcast(big) {
+      if (!ok('sdc', .08, 200)) return; const t = now(), lv = E.lv, p = rnd(.93, 1.07) * (big ? .8 : 1) * (1 - .05 * lv), pan = sp(.25);
+      wood(t, 215 * p, .07, .2, { pan });
+      thump(t + .004, 124 * p, 76 * p, .1, .3 + .05 * lv, { pan });
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 240], [.08, 560], [.26, 220]], q: .6, pts: [[.05, .9], [.12, .5], [.3, 0]], v: big ? .5 : .34, pan });
+    },
+    // a pod bursting: its husk gives with a hollow woody pop, fibres split after it, a dull soft puff of spores, and seeds
+    // patter down onto earth and leaves. arg: 0 a pod, 1 a great pod, 2 a puffcap (no husk: only the soft puff and a few spores)
+    podburst(kind) {
+      if (!ok('pdb', .06, 210)) return; const t = now(), lv = E.lv, big = kind === 1, soft = kind === 2, p = rnd(.92, 1.08) * (big ? .78 : 1) * (1 - .05 * lv), pan = sp(.35);
+      if (!soft) {
+        wood(t, 178 * p, .09, .26, { pan, room: .1 });
+        thump(t + .003, 98 * p, 56 * p, .14, (big ? .55 : .4) + .05 * lv, { pan });
+        train([[t + .028, .8, 400 * p], [t + .052, .55, 320 * p], [t + .085, .4, 360 * p]], { n: 'p', type: 'bandpass', q: 2.2, d: .018, v: .3, pan });
+      } else thump(t, 128 * p, 68 * p, .11, .34, { pan });
+      nhit(t + .008, { n: 'b', type: 'lowpass', fp: [[0, 640], [.3, 190]], q: .6, pts: [[.02, 1], [.1, .5], [big ? .5 : .34, 0]], v: big ? .58 : soft ? .36 : .42, pan, room: .12 });
+      const seeds = [], n = soft ? 4 : big ? 11 : 7;
+      for (let i = 0; i < n; i++) { const u = Math.pow(Math.random(), 1.3); seeds.push([t + .08 + u * (big ? .55 : .4), (1 - u * .6) * rnd(.3, .8), rnd(250, 540)]); }
+      train(seeds, { n: 'p', type: 'bandpass', q: 1.6, d: .022, v: soft ? .16 : .24, pan: sp(.5), room: .12 });
+    },
+    // the Snapjaw Bloom bites: two woody jaws clapping shut, and its leaves shaken
+    jawsnap() {
+      if (!ok('jws', .08, 200)) return; const t = now(), p = rnd(.92, 1.08), pan = sp(.35);
+      wood(t, 236 * p, .05, .24, { pan }); wood(t + .012, 168 * p, .07, .18, { pan });
+      thump(t + .004, 142 * p, 82 * p, .09, .34, { pan });
+      const lf = []; for (let i = 0; i < 5; i++) lf.push([t + .03 + i * rnd(.025, .045), rnd(.3, .7) * (1 - i * .15), rnd(380, 620)]);
+      train(lf, { n: 'p', type: 'bandpass', q: 1.2, d: .03, v: .16, pan: sp(.4) });
+    },
+    // something sown or pushing up through the road: earth shouldered aside, a stem's low creak
+    sprout() {
+      if (!ok('spr', .1, 200)) return; const t = now(), p = rnd(.93, 1.07), pan = sp(.3);
+      thump(t, 112 * p, 62 * p, .13, .3, { pan });
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 300], [.1, 480], [.3, 210]], q: .6, pts: [[.04, .8], [.14, .45], [.34, 0]], v: .3, pan });
+      for (let i = 0, tt = t + .06; i < 3; i++, tt += rnd(.05, .09)) wood(tt, rnd(150, 210) * p * (1 + i * .12), .06, .07, { pan: pan + sp(.2) });
     },
     /* --- earth --- */
     quake(m) {
@@ -76915,7 +76956,7 @@ function drawProjs() {
       case 'arrow': {   // a real arrow, its shooter's own (arrows.js): along the way it moves, a slight arc, a faint trail
         const lv = p.lv || 0, S = (1 + lv * .06) * (p.big ? 1.6 : 1), u = p.src && p.src.def ? p.src.def.unit : null, F = arrowFlight(p);
         arrowPlace(u, F[0], F[1], F[2], F[3][0], F[3][1], F[3][2], S, ba ? 0 : (p.pow || 1) > 1.5 ? 1.6 : 1); break; }
-      case 'ball': { if (p.t < 0) break; const sw = 1 + Math.min(.35, L * .02), S = 1.25 * (1 + (p.lv || 0) * .18) * (p.fixed ? .8 : 1) * (p.rock ? 1.5 : 1) * (p.big || p.bowl ? 1.5 : 1); M4.trs(_m, p.x, p.h, p.z, yaw + (p.rock ? vt * 5 : 0), pitch + (p.rock ? vt * 3 : 0), 0, S, S * (p.rock ? .85 : 1), S * sw); item(ENV.ball, _m, p.mfFire ? { tint: mfHot(p), shadow: false } : p.rock ? { tint: [1.5, 1.15, .8, .55] } : p.src && p.src.def && p.src.def.pod ? { tint: [.55, 1.25, .4, .25] } : undefined); QG.ground(p.x, p.z, .03, .16, .16, [0, 0, 0, .4], 2, 0);
+      case 'ball': { if (p.t < 0) break; if (typeof sdIsPod === 'function' && sdIsPod(p) && sdOn()) break;   /* (a Seedcaster's pod is drawn by seedfx.js) */ const sw = 1 + Math.min(.35, L * .02), S = 1.25 * (1 + (p.lv || 0) * .18) * (p.fixed ? .8 : 1) * (p.rock ? 1.5 : 1) * (p.big || p.bowl ? 1.5 : 1); M4.trs(_m, p.x, p.h, p.z, yaw + (p.rock ? vt * 5 : 0), pitch + (p.rock ? vt * 3 : 0), 0, S, S * (p.rock ? .85 : 1), S * sw); item(ENV.ball, _m, p.mfFire ? { tint: mfHot(p), shadow: false } : p.rock ? { tint: [1.5, 1.15, .8, .55] } : p.src && p.src.def && p.src.def.pod ? { tint: [.55, 1.25, .4, .25] } : undefined); QG.ground(p.x, p.z, .03, .16, .16, [0, 0, 0, .4], 2, 0);
         if (p.mfFire) { const f = .85 + .15 * Math.sin(vt * 23 + p.x * 7); QADD.bill(RD, p.x, p.h, p.z, .5 * f, .5 * f, [1, .32, .08, .55], 1, 0); QADD.bill(RD, p.x, p.h, p.z, .2, .2, [1, .6, .25, .7], 1, 0); }   // (the Incendiary Round: red hot, a glow round it)
         else if (ba !== 2) QADD.bill(RD, p.x, p.h, p.z, .32, .32, [1, .55, .2, .35], 1, 0); break; }
       case 'ice': { // frost bolt: a glowing crystal head trailing a long ribbon of cold mist; bigger and brighter per tower level
@@ -82735,204 +82776,94 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -82941,207 +82872,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -93158,6 +92957,844 @@ if (typeof drawFrostOn === 'function') { const _f = drawFrostOn; drawFrostOn = f
 // the motes at her hands (unitmodels_frostweaver.js fwMote): her staff's own frost is drawn above
 if (typeof fwMote === 'function') { const _m = fwMote; fwMote = function () { if (ffOn()) return; return _m.apply(this, arguments); }; }
 
+/* ================= THE SEEDCASTERS' PLANT SHADER: pods, husks, spores, stems, leaves and caps, drawn live =================
+   The owner (11 Nov 2026): "audit all spell animations and improve them, start with one unit ... would like the seedcasters
+   improved and her sound changed, sounds like a cannon". Her pods were the cannon's iron ball tinted green, with its muzzle
+   smoke, landing in a green puddle painted on the ground. Here everything she throws and grows is cut each frame by one
+   shader, after the Pyroclasts' fire (pyrotex.js) and the Frostweavers' ice (frosttex.js): each card is a shaded, rounded
+   thing lit from the map's sun side, not a flat sprite, and seedfx.js builds every spell out of several of them.
+     POD     a ribbed seed pod, rounded and lit; it can split down its seam and show the pale seed-bed inside
+     HUSK    half a burst pod's shell, tumbling
+     SPORE   a billow of spore dust: a soft olive-gold body, lit on top, with fine drifting specks; it rolls, thins and is gone
+     MOTE    a drifting spore (a soft pale speck) or a thrown seed (a dark teardrop with a highlight)
+     STEM    a stem or vine between two points: round, barked, with thorns if asked; it can grow from its root to its tip
+     LEAF    a leaf, a petal or one jaw of the Snapjaw: a midrib, veins, a toothed edge if asked, a pale throat if asked
+     CAP     a puffcap's cap: a spotted dome over a band of gills
+     GLOW    a little soft added light
+     JAW     one jaw of the Snapjaw's maw: a fleshy rounded lobe with long pale teeth round its rim; its outside warty
+             and ribbed, its inside a pale throat deepening to red
+   Nothing is drawn as a mark on the ground. Almost nothing adds light: spores and plants cover what is behind them, so they
+   read on Greatroot Way's sunlit patches without whiting out, and stay modest in the shade. Nothing is drawn in the bloom
+   pass. Cards: sdtBill (facing the camera, turned by o.rot), sdtSeg (between two points, turned to the camera).
+   The noise is the fire's (pyfNoise, pyrotex.js). No GL or DOM is touched until the first card is drawn (the sims load this). */
+const SDT = { q: [], tex: null, MAX: 420 };
+const SDT_SH = { POD: 0, HUSK: 1, SPORE: 2, MOTE: 3, STEM: 4, LEAF: 5, CAP: 6, GLOW: 7, JAW: 8 };
+// where the light comes from on screen (right, up): the upper left, as the units are lit on the painted maps
+const SDT_SUN = [-.5, .78];
+const sdtHex = h => { const n = parseInt(String(h).slice(1, 7), 16) || 0; return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+
+const SDT_VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aA; layout(location=3) in vec4 aB; layout(location=4) in vec4 aC; layout(location=5) in vec4 aD;
+uniform mat4 uVP, uView; out vec2 vUV; out vec4 vA; out vec4 vB; out vec4 vC; out vec4 vD; out float vDp;
+${typeof BEND_GLSL !== 'undefined' ? BEND_GLSL : 'vec3 bendW(vec3 p){return p;}'}
+void main(){ vUV = aUV; vA = aA; vB = aB; vC = aC; vD = aD; vec3 w = bendW(aPos); gl_Position = uVP * vec4(w, 1.); vDp = -(uView * vec4(w, 1.)).z; }`;
+// vUV: the card's own coordinates (each shape says which); vA: shape, seed, time, age; vB: brightness, opacity, two of the
+// shape's own (p0, p1); vC: the light's direction in the card's own axes (x, y), soft (the depth it fades over where it meets
+// the scene; 0: none), bend; vD: its colour, and a third value of the shape's own (p2)
+SDT.fs = /*FS<*/`#version 300 es
+precision highp float;
+in vec2 vUV; in vec4 vA; in vec4 vB; in vec4 vC; in vec4 vD; in float vDp;
+uniform sampler2D uN; uniform vec2 uBloom; uniform highp sampler2D uDep; uniform vec4 uNF;
+out vec4 o;
+#define SD (vA.y * .173)
+#define TM vA.z
+#define AGE vA.w
+#define P0 vB.z
+#define P1 vB.w
+#define P2 vD.w
+const vec3 PALE = vec3(.96, .94, .72);
+vec4 N(vec2 p){ return texture(uN, p); }
+float sdLin(float d){ return uNF.z > .5 ? uNF.x + d*(uNF.y-uNF.x) : uNF.x*uNF.y/(uNF.y - d*(uNF.y-uNF.x)); }
+float sdSoft(float k){ if (uNF.w < .5 || k <= 0.) return 1.; float s = sdLin(texelFetch(uDep, ivec2(gl_FragCoord.xy), 0).r); return clamp((s - vDp) / k, 0., 1.); }
+// a surface of this colour facing n, lit from the card's sun: a cool shadow side, the colour, a warm pale light side
+vec3 lit3(vec3 base, vec3 n, float gloss){
+  vec3 L = normalize(vec3(vC.xy, .62));
+  float d = dot(n, L), w = smoothstep(-.55, .5, d);
+  vec3 dk = base * vec3(.3, .36, .4), hi = mix(base, PALE, .32) * 1.1;
+  vec3 c = mix(dk, mix(base, hi, smoothstep(.35, 1., d)), w);
+  c += PALE * pow(max(0., d), 9.) * gloss;
+  // (a thin pale rim on the shadow side, so a dark thing still has an edge against dark ground)
+  c += base * .35 * pow(1. - n.z, 3.) * (1. - w);
+  return c * vB.x;
+}
+// a seed pod, -1..1 both ways, its length along y. P0: how far it has split down its seam (0 whole)
+vec4 sPod(vec2 p){
+  float wy = .62 * pow(max(0., 1. - p.y * p.y), .72) * (1. + .1 * sin(p.y * 2.2 + .6)), gap = P0 * .3 * (1. - p.y * p.y * .55), ax = abs(p.x);
+  float sil = smoothstep(0., .07, wy + gap - ax) * step(abs(p.y), 1.);
+  if (sil <= 0.) return vec4(0.);
+  vec3 c;
+  if (ax < gap) {
+    // the seed-bed inside: pale, a little bright, rows of dark seeds
+    float u = ax / max(gap, .001), sd = smoothstep(.62, .8, N(p * vec2(.9, .55) + SD).b);
+    c = mix(vec3(1., .96, .7), vec3(.82, .74, .3), u * u) * (1.05 - .5 * sd) * vB.x * 1.1;
+  } else {
+    float nx = sign(p.x) * clamp((ax - gap) / max(wy, .001), 0., 1.), nz = sqrt(max(0., 1. - nx * nx));
+    vec3 n = normalize(vec3(nx, p.y * .55, nz + .08));
+    float a = asin(nx), rib = 1. - smoothstep(0., .34, abs(sin(a * 2.3 + .4)));
+    float mot = N(p * vec2(.3, .2) + SD * 3.).r;
+    // green through its middle, dry and ochre toward its tips and in patches
+    vec3 base = mix(vD.rgb, vec3(.62, .5, .2), smoothstep(.45, 1., abs(p.y)) * .7 + (mot - .5) * .5);
+    base *= 1. - .55 * rib; base = mix(base, base * .72, smoothstep(.5, .75, N(p * .9 + SD * 5.).g));
+    // (its stalk end: a dark woody nub)
+    base = mix(base, vec3(.3, .2, .1), smoothstep(.8, .97, -p.y));
+    c = lit3(base, n, .22);
+    // (the lip of the split: a pale edge)
+    c = mix(c, PALE * vB.x, P0 * (1. - smoothstep(0., .1, ax - gap)) * .6);
+  }
+  return vec4(c * sil, sil);
+}
+// half a pod's shell, -1..1: a curved crescent, pale inside
+vec4 sHusk(vec2 p){
+  // (the pod's outline cut down its length: the rounded husk on one side, the pale hollow along the cut)
+  float o1 = length(p / vec2(.8, 1.)), cut = .22 - .3 * p.y * p.y - p.x;
+  float sil = smoothstep(1., .9, o1) * smoothstep(0., .08, cut);
+  if (sil <= 0.) return vec4(0.);
+  float nx = clamp(p.x / .8, -1., 1.);
+  vec3 n = normalize(vec3(nx, p.y * .5, sqrt(max(0., 1. - nx * nx)) + .1));
+  float inner = 1. - smoothstep(.08, .42, cut);
+  vec3 base = mix(vD.rgb * (1. - .45 * (1. - smoothstep(0., .3, abs(sin(asin(nx) * 2.3))))), vec3(.92, .86, .56), inner * .9);
+  float fade = 1. - smoothstep(.7, 1., AGE);
+  return vec4(lit3(base, n, .15) * sil, sil) * fade;
+}
+// a billow of spore dust, -1..1; AGE its life. P0: how thick it is; P1: how many drifting specks
+vec4 sSpore(vec2 p){
+  float t = AGE, an = vA.y * 1.7 + t * 1.2 * (fract(vA.y * .37) > .5 ? 1. : -1.), ca = cos(an), sa = sin(an);
+  vec2 q = mat2(ca, -sa, sa, ca) * p;
+  vec2 w = N(q * .2 + vec2(SD, SD * 1.7 + TM * .07)).ra - .5;
+  q += w * (.3 + .3 * t);
+  float r = length(p + w * .2);
+  float bl = N(q * .3 + vec2(SD * 3., -TM * .16 - t * .22)).b, n1 = N(q * .26 + vec2(SD * 2., -TM * .12 - t * .2)).r, n2 = N(q * .72 + vec2(SD * 5., -TM * .3)).g;
+  float d = (1. - r) * 1.5 + (n1 - .5) * .9 + (bl - .5) * .75 + (n2 - .5) * .24 - .2 - smoothstep(.7, 1., length(p)) * 1.6;
+  d -= pow(t, 1.7) * (.55 + 1.3 * n2) + smoothstep(.78, 1., t) * 1.4 + (1. - smoothstep(0., .1, t)) * .7;
+  float cov = smoothstep(0., .6, d);
+  // lit from the sun side and on the crowns of its billows; its thin edge is pale dust
+  float lt = smoothstep(-.55, .6, dot(p, normalize(vC.xy)) * .8 + (bl - .5) * 1.3);
+  vec3 c = mix(vD.rgb * vec3(.36, .42, .26), vD.rgb * 1.1, lt);
+  c = mix(c, PALE, lt * lt * .4 * smoothstep(.15, .9, d));
+  c = mix(mix(vD.rgb, PALE, .45), c, smoothstep(.02, .4, d));
+  float sp = smoothstep(.84, .92, N(q * 2.9 + vec2(SD * 9., TM * .22 + t * .3)).g) * smoothstep(.5, .7, N(q * 1.3 - vec2(TM * .1, SD * 4.)).r) * smoothstep(-.25, .3, d) * (1. - t * t);
+  float al = min(1., cov * P0) * vB.y;
+  vec3 rgb = c * vB.x * al + PALE * sp * .55 * P1 * vB.y;
+  return vec4(rgb, min(1., al + sp * .35 * P1 * vB.y));
+}
+// x across (-1..1), y from its tail (0) to its head (1). P0 0: a drifting spore; 1: a thrown seed
+vec4 sMote(vec2 uv){
+  vec2 h = vec2(uv.x, (uv.y - .8) * 5.);
+  if (P0 > .5) {
+    float w = .8 * sqrt(clamp(uv.y, 0., 1.)) * (1. - smoothstep(.82, 1., uv.y)), sil = smoothstep(0., .25, w - abs(uv.x)) * step(.3, uv.y);
+    vec3 n = normalize(vec3(uv.x / max(w, .01), .2, 1.));
+    return vec4(lit3(vD.rgb, n, .5) * sil, sil) * vB.y;
+  }
+  float g = pow(max(0., 1. - length(h)), 1.8), tail = pow(max(0., 1. - abs(uv.x)), 2.) * smoothstep(0., .8, uv.y) * (1. - smoothstep(.8, 1., uv.y)) * .35;
+  float a = (g + tail) * vB.y * (1. - AGE * AGE);
+  // (a pale heart in a dusky halo: it shows on bright grass and on dark)
+  vec3 c = mix(vD.rgb * .45, mix(vD.rgb, PALE, .7), smoothstep(.15, .6, g));
+  return vec4(c * vB.x * a, a * .85);
+}
+// a stem: x across (-1..1), y along it (any run of numbers: it goes on from one piece to the next). P0: how far it has grown,
+// in y; P1: thorns; P2: how wide its body is in its card (the rest is room for its thorns)
+vec4 sStem(vec2 uv){
+  float v = uv.y, body = P2 > 0. ? P2 : 1., front = smoothstep(0., .1, P0 - v);
+  if (front <= 0.) return vec4(0.);
+  float x = uv.x / body, ax = abs(x), wd = front;
+  float sil = smoothstep(wd, wd - .16, ax);
+  vec3 c = vec3(0.);
+  if (sil > 0.) {
+    float nx = clamp(x / max(wd, .01), -1., 1.);
+    vec3 n = normalize(vec3(nx, 0., sqrt(max(0., 1. - nx * nx)) + .05));
+    float bark = N(vec2(x * .16 + SD, v * .7)).r, node = 1. - smoothstep(0., .05, abs(fract(v * 2.4 + SD) - .5));
+    vec3 base = vD.rgb * (.78 + .44 * bark) * (1. - .14 * node);
+    c = lit3(base, n, .12) * sil;
+  }
+  // thorns: short curved spikes off alternate sides
+  float th = 0.;
+  if (P1 > 0. && body < 1.) {
+    float k = v * 3.2 + SD * 3., id = floor(k), f = fract(k), side = mod(id, 2.) > .5 ? 1. : -1.;
+    float reach = (uv.x * side - body * .8) / (1. - body * .8), tip = 1. - reach;
+    th = step(0., reach) * smoothstep(0., .08, tip * .22 - abs(f - .5 - reach * .12)) * front * P1;
+    c = mix(c, mix(vD.rgb * .5, PALE, reach * .8) * vB.x * th, th * (1. - sil));
+  }
+  float a = max(sil, th * (1. - sil)) ;
+  return vec4(c, a) * vB.y;
+}
+// a leaf: x across (-1..1), y from its stalk (0) to its tip (1). P0: teeth along its edge; P1: a pale throat (a petal, the
+// inside of a jaw); P2: how far it has unfurled (0 a bud, 1 open)
+vec4 sLeaf(vec2 uv){
+  float y = uv.y, open = P2 <= 0. ? 1. : P2, x = (uv.x - vC.w * y * y) / mix(.35, 1., open);
+  float w = pow(sin(3.14159 * pow(clamp(y, 0., 1.), .72)), .85) * (1. - .22 * y) * .92;
+  float saw = abs(fract(y * 7. + .5) - .5) * 2.;
+  w *= 1. - P0 * .3 * saw * smoothstep(.1, .3, y);
+  float sil = smoothstep(0., .1, w - abs(x)) * step(0., y) * step(y, 1.);
+  if (sil <= 0.) return vec4(0.);
+  float nx = clamp(x / max(w, .01), -1., 1.);
+  // (cupped along its midrib: each half faces its own way)
+  vec3 n = normalize(vec3(nx * .75 - sign(x) * .25, (y - .5) * .5, .8));
+  float rib = 1. - smoothstep(0., .07, abs(x)), vein = 1. - smoothstep(0., .1, abs(fract((y - abs(x) * .55) * 5.5) - .5));
+  float mot = N(vec2(x * .2 + SD, y * .3 + SD * 2.)).r;
+  vec3 base = vD.rgb * (.82 + .36 * mot) * (1. - .16 * vein * (1. - rib));
+  base = mix(base, mix(vD.rgb, PALE, .75), P1 * smoothstep(.75, .05, y) * (1. - .5 * abs(nx)));
+  base = mix(base, mix(base, PALE, .5), rib * .5);
+  // (teeth: pale points)
+  base = mix(base, PALE, P0 * smoothstep(.2, 0., w - abs(x)) * smoothstep(.1, .3, y) * .8);
+  return vec4(lit3(base, n, .1) * sil, sil) * vB.y;
+}
+// a puffcap's cap, -1..1: a spotted dome, a band of gills under its lip. P0: how swollen (it pales and tightens as it is about to burst)
+vec4 sCap(vec2 p){
+  float yb = -.22, d = length(vec2(p.x / .96, (p.y - yb) / 1.12));
+  float lip = yb - .13 * (1. - p.x * p.x);
+  float dome = smoothstep(1., .93, d) * smoothstep(lip - .03, lip + .03, p.y);
+  float gill = smoothstep(.86, .8, abs(p.x)) * smoothstep(lip - .2, lip - .14, p.y) * (1. - smoothstep(lip - .03, lip + .03, p.y));
+  if (dome + gill <= 0.) return vec4(0.);
+  vec3 n = normalize(vec3(p.x / .96, (p.y - yb) / 1.12, sqrt(max(0., 1. - d * d)) + .05));
+  float spot = smoothstep(.6, .74, N(p * .42 + SD * 4.).b) * smoothstep(1., .5, d);
+  vec3 base = mix(vD.rgb, PALE, spot * .7 + P0 * .3);
+  vec3 c = lit3(base, n, .28) * dome;
+  float gl = .5 + .5 * sin(p.x * 26.);
+  c += mix(vec3(.5, .42, .26), vec3(.86, .8, .6), gl) * vB.x * (.55 + .3 * vC.y) * gill * (1. - dome);
+  float a = max(dome, gill);
+  return vec4(c, a) * vB.y;
+}
+// one jaw of a great maw: x across (-1..1), y from its hinge (0) to its rim (1). P0: how long its teeth are; P1: 0 its
+// outside, 1 its inside (the throat)
+vec4 sJaw(vec2 uv){
+  vec2 q = vec2(uv.x / .74, (uv.y - .4) / .4);
+  float d = length(q), a = atan(q.x, q.y);
+  // (it narrows to its hinge)
+  float pinch = 1. - .22 * smoothstep(0., -1., q.y) * (1. - abs(q.x));
+  float body = smoothstep(1., .93, d / pinch);
+  // teeth round the upper rim: long, curved a little inward, pale
+  float tk = a * 2.9 + .5, tf = fract(tk), tl = .44 * P0 * (.75 + .25 * sin(floor(tk) * 2.1 + vA.y)) * smoothstep(1.7, 1.25, abs(a));
+  float tw = 1. - abs(tf * 2. - 1.), reach = (d - .96) / max(tl, .001);
+  float tooth = step(.96, d) * smoothstep(0., .1, tw * .62 - reach * .6) * step(reach, 1.) * step(0., tl - .01);
+  float sil = max(body, tooth);
+  if (sil <= 0.) return vec4(0.);
+  vec3 c;
+  if (body > tooth * .5) {
+    vec3 n = normalize(vec3(q.x * .8, q.y * .6, sqrt(max(0., 1. - min(d, 1.) * min(d, 1.))) + .25));
+    float mot = N(uv * vec2(.3, .22) + SD * 3.).r, wart = smoothstep(.62, .78, N(uv * .7 + SD * 5.).b);
+    float rib = 1. - smoothstep(0., .12, abs(fract(a * 1.6 + .5) - .5));
+    vec3 outC = vD.rgb * (.8 + .4 * mot) * (1. - .3 * rib); outC = mix(outC, mix(vD.rgb, PALE, .45), wart * .5);
+    // (the throat: pale and wet at the lip, deep red down toward the hinge, ridged)
+    vec3 inC = mix(vec3(.5, .06, .1), mix(vD.rgb, vec3(1., .78, .7), .6), smoothstep(-.9, .7, q.y) * (.6 + .4 * smoothstep(1., .35, d)));
+    inC *= 1. - .22 * rib; n = mix(n, normalize(vec3(-q.x * .5, -q.y * .3, 1.)), P1);
+    vec3 base = mix(outC, inC, P1);
+    // (its lip: a pale gum line the teeth stand in)
+    base = mix(base, mix(base, PALE, .55), smoothstep(.78, .95, d) * smoothstep(-.2, .3, q.y));
+    c = lit3(base, n, .22 + .2 * P1) * body;
+  } else {
+    c = mix(vec3(.72, .66, .5), vec3(1., .97, .86), clamp(reach * 1.3, 0., 1.)) * (.75 + .25 * tw) * vB.x * tooth;
+  }
+  return vec4(c, sil) * vB.y;
+}
+void main(){
+  if (uBloom.x > .5) discard;
+  int sh = int(vA.x + .5);
+  if (sh == 0) o = sPod(vUV);
+  else if (sh == 1) o = sHusk(vUV);
+  else if (sh == 2) o = sSpore(vUV) * sdSoft(vC.z);
+  else if (sh == 3) o = sMote(vUV);
+  else if (sh == 4) o = sStem(vUV);
+  else if (sh == 5) o = sLeaf(vUV);
+  else if (sh == 6) o = sCap(vUV);
+  else if (sh == 8) o = sJaw(vUV);
+  else { float g = pow(max(0., 1. - length(vUV)), 2.2); o = vec4(vD.rgb * g * vB.x * vB.y * sdSoft(vC.z), 0.); }
+  if (max(o.a, max(o.r, max(o.g, o.b))) < .004) discard;
+}`/*>FS*/;
+
+/* ---- the cards ---- */
+// o: { seed, age, k (brightness), a (opacity), p0, p1, p2 (the shape's own), col ([r, g, b]), sp (its clock's speed), soft,
+// bend, pull (world units toward the camera), top (over everything), ord (laid down later the higher) }
+function sdtPush(sh, c, uv, o, dz, lx, ly) {
+  if (SDT.q.length >= SDT.MAX || typeof RD === 'undefined' || !RD || !RD.vfx) return false;
+  o = o || {};
+  const now = typeof G !== 'undefined' && G && G.time != null ? G.time : 0, sd = o.seed || 0;
+  SDT.q.push({ sh, c, uv, sd, tm: (now * (o.sp || 1)) % 997 + sd * .37, age: o.age || 0, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, p0: o.p0 == null ? 0 : o.p0, p1: o.p1 || 0, p2: o.p2 || 0,
+    lx, ly, soft: o.soft || 0, bend: o.bend || 0, col: o.col || SDT_WHITE, ord: o.ord == null ? (sh === 7 ? 3 : 1) : o.ord, dz, top: !!o.top });
+  const X = RD.vfx; if (!X.ext.includes(SDT_EXT)) X.ext.push(SDT_EXT); SDT_EXT.n = SDT.q.length;
+  return true;
+}
+const SDT_WHITE = [1, 1, 1];
+const sdtFw = () => [RD.view[2], RD.view[6], RD.view[10]];   // (toward the camera)
+// facing the camera, w wide and h tall, its centre at P, turned by o.rot in its own plane; uv -1..1 both ways
+function sdtBill(sh, P, w, h, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  let r = RD.right, up = RD.up; const fw = sdtFw(), pl = (o && o.pull) || 0, rot = (o && o.rot) || 0, cs = Math.cos(rot), sn = Math.sin(rot);
+  if (rot) { const r2 = [r[0] * cs + up[0] * sn, r[1] * cs + up[1] * sn, r[2] * cs + up[2] * sn]; up = [up[0] * cs - r[0] * sn, up[1] * cs - r[1] * sn, up[2] * cs - r[2] * sn]; r = r2; }
+  const cx = P[0] + fw[0] * pl, cy = P[1] + fw[1] * pl, cz = P[2] + fw[2] * pl, a = w * .5, b = h * .5;
+  return sdtPush(sh, [cx - r[0] * a - up[0] * b, cy - r[1] * a - up[1] * b, cz - r[2] * a - up[2] * b, cx + r[0] * a - up[0] * b, cy + r[1] * a - up[1] * b, cz + r[2] * a - up[2] * b,
+    cx + r[0] * a + up[0] * b, cy + r[1] * a + up[1] * b, cz + r[2] * a + up[2] * b, cx - r[0] * a + up[0] * b, cy - r[1] * a + up[1] * b, cz - r[2] * a + up[2] * b], SDT_SQ, o,
+    cx * fw[0] + cy * fw[1] + cz * fw[2], SDT_SUN[0] * cs + SDT_SUN[1] * sn, -SDT_SUN[0] * sn + SDT_SUN[1] * cs);
+}
+const SDT_SQ = [-1, -1, 1, 1];
+// between two points A and B, w0 wide at A and w1 at B, turned about its length to face the camera; its y runs o.v0 .. o.v1
+// (0..1 if not given), so a chain of pieces carries one pattern
+function sdtSeg(sh, A, B, w0, w1, o) {
+  if (typeof RD === 'undefined' || !RD || !RD.right) return false;
+  const fw = sdtFw(), d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], dv = d[0] * fw[0] + d[1] * fw[1] + d[2] * fw[2];
+  let ax = [d[0] - fw[0] * dv, d[1] - fw[1] * dv, d[2] - fw[2] * dv]; const al = Math.hypot(ax[0], ax[1], ax[2]);
+  ax = al > 1e-4 ? [ax[0] / al, ax[1] / al, ax[2] / al] : RD.up;
+  const wx = [fw[1] * ax[2] - fw[2] * ax[1], fw[2] * ax[0] - fw[0] * ax[2], fw[0] * ax[1] - fw[1] * ax[0]], pl = (o && o.pull) || 0, a = w0 * .5, b = w1 * .5;
+  const ax0 = A[0] + fw[0] * pl, ay0 = A[1] + fw[1] * pl, az0 = A[2] + fw[2] * pl, bx0 = B[0] + fw[0] * pl, by0 = B[1] + fw[1] * pl, bz0 = B[2] + fw[2] * pl;
+  const r = RD.right, up = RD.up, Lw = [SDT_SUN[0] * r[0] + SDT_SUN[1] * up[0], SDT_SUN[0] * r[1] + SDT_SUN[1] * up[1], SDT_SUN[0] * r[2] + SDT_SUN[1] * up[2]];
+  return sdtPush(sh, [ax0 - wx[0] * a, ay0 - wx[1] * a, az0 - wx[2] * a, ax0 + wx[0] * a, ay0 + wx[1] * a, az0 + wx[2] * a, bx0 + wx[0] * b, by0 + wx[1] * b, bz0 + wx[2] * b, bx0 - wx[0] * b, by0 - wx[1] * b, bz0 - wx[2] * b],
+    [-1, o && o.v0 != null ? o.v0 : 0, 1, o && o.v1 != null ? o.v1 : 1], o, (ax0 + bx0) * .5 * fw[0] + (ay0 + by0) * .5 * fw[1] + (az0 + bz0) * .5 * fw[2],
+    Lw[0] * wx[0] + Lw[1] * wx[1] + Lw[2] * wx[2], Lw[0] * ax[0] + Lw[1] * ax[1] + Lw[2] * ax[2]);
+}
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { SDT.q.length = 0; });
+
+/* ---- drawing ---- */
+const SDT_F = 21, _sdtV = new Float32Array(SDT.MAX * 4 * SDT_F), _sdtI = new Uint16Array(SDT.MAX * 6);
+function sdtBuild(E) {
+  const X = RD.vfx, gl = X.gl; E.P = X.prog(SDT_VS, SDT.fs); E.fsOf = SDT.fs;
+  if (E.vao) return;
+  E.vao = gl.createVertexArray(); E.vb = gl.createBuffer(); const ib = gl.createBuffer();
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb); gl.bufferData(gl.ARRAY_BUFFER, _sdtV.byteLength, gl.DYNAMIC_DRAW);
+  const st = SDT_F * 4; let off = 0;
+  [3, 2, 4, 4, 4, 4].forEach((n, i) => { gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, n, gl.FLOAT, false, st, off); off += n * 4; });
+  for (let q = 0; q < SDT.MAX; q++) _sdtI.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, _sdtI, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  // (the fire's own noise: rolling, finer, billows, slow and broad)
+  const N0 = pyfNoise(), t = SDT.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N0.W, N0.W, 0, gl.RGBA, gl.UNSIGNED_BYTE, N0.px);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+}
+// the frame's cards, far to near (the little added light last), grouped by whether they are drawn over everything
+function sdtFill(E) {
+  const Q = SDT.q; Q.sort((a, b) => a.ord - b.ord || a.dz - b.dz);
+  E.groups = []; let o = 0, g = null;
+  for (let i = 0; i < Q.length; i++) {
+    const e = Q[i], c = e.c, uv = e.uv;
+    if (!g || g.top !== e.top) E.groups.push(g = { top: e.top, q0: i, n: 0 });
+    g.n++;
+    for (let k = 0; k < 4; k++) {
+      _sdtV[o] = c[k * 3]; _sdtV[o + 1] = c[k * 3 + 1]; _sdtV[o + 2] = c[k * 3 + 2];
+      _sdtV[o + 3] = k === 1 || k === 2 ? uv[2] : uv[0]; _sdtV[o + 4] = k > 1 ? uv[3] : uv[1];
+      _sdtV[o + 5] = e.sh; _sdtV[o + 6] = e.sd; _sdtV[o + 7] = e.tm; _sdtV[o + 8] = e.age;
+      _sdtV[o + 9] = e.k; _sdtV[o + 10] = e.a; _sdtV[o + 11] = e.p0; _sdtV[o + 12] = e.p1;
+      _sdtV[o + 13] = e.lx; _sdtV[o + 14] = e.ly; _sdtV[o + 15] = e.soft; _sdtV[o + 16] = e.bend;
+      _sdtV[o + 17] = e.col[0]; _sdtV[o + 18] = e.col[1]; _sdtV[o + 19] = e.col[2]; _sdtV[o + 20] = e.p2; o += SDT_F;
+    }
+  }
+  return Q.length;
+}
+function sdtDraw(E, bloom) {
+  if (bloom || !RD || !RD.vfx || !SDT.q.length) return;
+  const X = RD.vfx, gl = X.gl; if (!E.P || E.fsOf !== SDT.fs) sdtBuild(E);
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.vb);
+  const nq = sdtFill(E); gl.bufferSubData(gl.ARRAY_BUFFER, 0, _sdtV, 0, nq * 4 * SDT_F);
+  X.common(E.P, false, true);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, SDT.tex); gl.uniform1i(E.P.u.uN, 2); gl.activeTexture(gl.TEXTURE0);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  for (const g of E.groups) {
+    if (g.top) gl.disable(gl.DEPTH_TEST); else gl.enable(gl.DEPTH_TEST);
+    gl.drawElements(gl.TRIANGLES, g.n * 6, gl.UNSIGNED_SHORT, g.q0 * 12);
+  }
+  gl.bindVertexArray(null); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
+}
+const SDT_EXT = { n: 0, P: null, vao: null, vb: null, fsOf: null, groups: [], draw(bloom) { sdtDraw(this, bloom); } };
+
+/* ================= THE SEEDCASTERS' PODS AND SPORES: grown, not fired =================
+   The owner (11 Nov 2026): "would like the seedcasters improved and her sound changed, sounds like a cannon". Until now she
+   threw the cannon's iron ball tinted green, on the cannon's lob, with its muzzle smoke and its boom; a pod landed in a green
+   puddle painted on the ground, Choking Haze was two flat green discs, a puffcap burst in a ring. Here each of her spells is
+   one effect made of the plant shader's cards (seedtex.js), after the Pyroclasts' fire and the Frostweavers' frost:
+     the strike       a ribbed pod flies straight and level from her sling, shedding a little spore dust, splits as it
+                      arrives and bursts: its husk in two halves, spore dust rolling out low to the real edge of its
+                      splash, seeds scattering and pattering down
+     Choking Haze     a great pod bursts the same way, then one slow rolling cloud of spore dust hangs over the haze's real
+                      radius for as long as it lasts (no discs on the ground)
+     Puffcap Sowing   puffcaps push up on the road, each a stem and a spotted cap that breathes; one bursts in a puff of
+                      spores out to its real reach (no ring)
+     Snapjaw Bloom    a seed is thrown, a plant grows where it lands: a rosette of leaves, runners creeping out over the
+                      ground to its real reach, and one great maw on a thorned neck that is thrown at what it bites and shuts over it
+     spored foes      a few pale spores drifting up round them
+   Nothing is a mark on the ground, nothing adds much light (it must not white out on Greatroot Way's sun patches), spores
+   are thin enough to see foes through. Gameplay, timing and balance are untouched: this file only draws, and steps the
+   older drawing aside by wrapping it (podBurst, drawHazard, sfxBasicProj, sfxRun, drawSwarmOn, GVC_FX's sow / puff /
+   jawseed). SD.off = true (the Element Lab's "Old look") brings the older drawing back.
+   Tuning: the Element Lab's entries seedpod, haze, barrage, bindseed (registered at the end of this file). */
+const SD = { parts: [], shots: [], puffs: [], jaws: [], st: new WeakMap(), cards: 0, cap: 200, load: 0, last: 0, off: false, has: 0, hasT: -1 };
+const SD_COL = { pod: [.3, .47, .14], spore: [.76, .7, .2], seed: [.34, .25, .12], stem: [.3, .4, .17], leaf: [.27, .5, .17], petal: [.84, .36, .3], jaw: [.3, .44, .17], cap: [.74, .42, .2], stalk: [.8, .74, .56], mote: [.86, .88, .46] };
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { SD.shots.length = 0; SD.puffs.length = 0; SD.jaws.length = 0; });
+const sdLv = () => typeof GFX === 'undefined' ? 2 : GFX === 'low' ? 0 : GFX === 'medium' ? 1 : 2;
+const sdLive = () => typeof G !== 'undefined' && G && G.time != null && G.state !== 'title';
+// the new drawing is on: the toolkit is up (never in the sims, which have no GL: they keep the older drawing)
+const sdOn = () => !SD.off && typeof sdtBill === 'function' && typeof vfxReady === 'function' && vfxReady();
+const sdIsPod = p => !!(p && p.k === 'ball' && p.src && p.src.def && p.src.def.pod);
+const sdRnd = s => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const sdSs = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const sdBack = x => x >= 1 ? 1 : 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1, 2);
+function sdSt(o) { let s = SD.st.get(o); if (!s) SD.st.set(o, s = {}); return s; }
+
+/* ---- where her effects are anchored on her: the ONE place that knows her model ----
+   A new Seedcaster model is being rigged (branch seedcaster-model, 11 Nov 2026): when it lands, point this at its marked
+   anchors (her hands, the point a seed leaves from) and nothing else in this file changes. Today it reads what the game
+   itself uses: the shot's own start (the sling's cup: game.js fire, case 'ball') and, for a spell with no shot of the
+   game's, a point at her top, a little way out the way she faces. Back: { release: [x, y, z] the point a pod or seed
+   leaves from, hand: [x, y, z] her casting hand, face: the way she faces (radians, as t.ang) }. p: the game's shot, if any */
+function sdAnchor(t, p) {
+  const face = t && t.ang != null ? t.ang : 0, top = t && typeof towerTop === 'function' ? towerTop(t) : 1;
+  const hand = t ? [t.x + Math.sin(face) * .3, top * .8, t.y + Math.cos(face) * .3] : [0, top, 0];
+  // (the new sculpted Seedcaster, branch seedcaster-model, unitmodels_seedcaster2.js: each frame she is drawn she marks, in
+  // world space, the pouch of her sling, t.sdShot (her strike leaves it), the seed in her LEFT palm, t.sdSeed (Choking
+  // Haze's great pod and the Snapjaw's seed leave it), and her palms, t.sdPalmR / t.sdPalmL; stale after 0.3 s, as when she
+  // is off screen or the old model is drawn: then the game's own points below)
+  if (t && t.sdAt != null && typeof G !== 'undefined' && G && G.time - t.sdAt <= .3) {
+    const fromSling = !!(p && !p.fixed), rel = fromSling ? t.sdShot || t.sdSeed : t.sdSeed || t.sdShot;
+    if (rel) return { release: rel.slice(0, 3), hand: (fromSling ? t.sdPalmR : t.sdPalmL || t.sdPalmR || rel).slice(0, 3), face, model: 1 };
+  }
+  const release = p && p.x0 != null ? [p.x0, p.h0, p.z0] : t ? [t.x + Math.sin(face) * .45, top, t.y + Math.cos(face) * .45] : hand;
+  return { release, hand, face };
+}
+
+/* ---- drawing: each card under its effect's Element Lab layer ---- */
+// the layer's tuning onto a card's options (on, brightness, opacity, speed, colour); its size back, or null: not drawn
+function sdT(s, l, size, o) {
+  if (SD.cards >= SD.cap) return null;
+  if (typeof EFX !== 'undefined' && EFX.on && ELEM_FX_SPELLS[s]) {
+    const P = efx(s, l); efxCount(s, l);
+    if (P._g) {
+      if (!P.on) return null;
+      o.k = (o.k == null ? 1 : o.k) * P.glow; o.a = (o.a == null ? 1 : o.a) * P.alpha; if (P.speed !== 1) o.sp = (o.sp || 1) * P.speed;
+      if (P.grad) o.col = efxRGB(P.c1);
+      size *= P.size;
+    }
+  }
+  SD.cards++; return size;
+}
+function sdBill(sh, P, w, h, o, s, l) { const z = sdT(s, l, w, o); if (z == null) return false; return sdtBill(sh, P, z, h * z / w, o); }
+function sdSeg(sh, A, B, w0, w1, o, s, l) { const z = sdT(s, l, 1, o); if (z == null) return false; return sdtSeg(sh, A, B, w0 * z, w1 * z, o); }
+const sdV = (s, l) => efx(s, l);
+
+/* ---- solid things are real meshes, fixed in the world (owner, 11 Nov 2026: "dont use flat planes", "spell also turns with
+   the camera"): the pod, its husk, a puffcap, and every part of the Snapjaw (leaves, stems, thorns, its two jaws and their
+   teeth) are built once with the game's own geometry kit and drawn as ordinary lit, shadowed items, as the units are. Only
+   what is soft stays on cards: spore dust, drifting spores, the seeds' specks. sdFrame lists the frame's parts (SD.parts:
+   mesh name, matrix); the view draws them with its projectiles (drawProjs is wrapped at the end of this file). ---- */
+const SD_HEX = { stem: '#4f6a2a', stemD: '#3a4f20', thorn: '#e6dfb8', leaf: '#4f8a2c', leafL: '#7bb040', leafD: '#39701f', pod: '#5a8228', podD: '#456a20', podT: '#a08a3a', husk: '#ece0a2',
+  jawOut: '#527428', jawOutD: '#496a24', lip: '#6a2420', jawIn: '#f0a394', jawDeep: '#6a1018', tooth: '#f4eed2', cap: '#b06a38', capL: '#ecd9a8', stalk: '#d8cdaa', gill: '#b9ab84' };
+const _sdMx = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+// a cupped shell, its hinge at the origin, 1 long up +Y, bulging toward -Z; its hollow faces +Z. o: nu, nv, wide, bulge,
+// thick, out(i, j, u, v) and inn(i, j, u, v) colours, teeth (a side), tl (their length)
+function sdShellGeo(g, o) {
+  const P = (u, v, inn) => { const w = o.wide * Math.pow(Math.max(0, 1 - (2 * v - 1) * (2 * v - 1)), .42), b = -o.bulge * (1 - u * u) * Math.pow(Math.sin(Math.PI * Math.min(1, v)), .7); return [u * w, v, inn ? b * .82 + o.thick : b]; };
+  g.smooth = 55;
+  for (let j = 0; j < o.nv; j++) for (let i = 0; i < o.nu; i++) {
+    const u0 = -1 + 2 * i / o.nu, u1 = -1 + 2 * (i + 1) / o.nu, v0 = j / o.nv, v1 = (j + 1) / o.nv, um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
+    g.quad(P(u0, v0), P(u0, v1), P(u1, v1), P(u1, v0), o.out(i, j, um, vm));
+    g.quad(P(u0, v0, 1), P(u1, v0, 1), P(u1, v1, 1), P(u0, v1, 1), o.inn(i, j, um, vm));
+  }
+  g.smooth = 0;
+  if (!o.teeth) return;
+  const col = lin3(SD_HEX.tooth), tooth = (R0, T, N, k) => {
+    const tl = o.tl * k, b1 = [R0[0] - T[0] * .04, R0[1] - T[1] * .04, o.thick * .5], b2 = [R0[0] + T[0] * .04, R0[1] + T[1] * .04, o.thick * .5], b3 = [R0[0] + N[0] * .07, R0[1] + N[1] * .07, o.thick * .5], A = [R0[0] + N[0] * .02, R0[1] + N[1] * .02, o.thick + tl];
+    for (const [a, b] of [[b1, b2], [b2, b3], [b3, b1]]) { g.tri(a, b, A, col); g.tri(b, a, A, col); }
+  };
+  for (const sd of [-1, 1]) for (let k = 0; k < o.teeth; k++) { const v = .2 + .72 * (k + .5) / o.teeth, R0 = P(sd, v); tooth(R0, [0, 1, 0], [-sd, 0, 0], .8 + .4 * ((k * 7 + (sd > 0 ? 3 : 0)) % 5) / 5); }
+  for (const u of [-.55, 0, .55]) { const R0 = [u * o.wide * .55, .985 - Math.abs(u) * .09, 0]; tooth(R0, [1, 0, 0], [0, -1, 0], 1.1); }
+}
+const SD_MESH = {
+  // a stem's piece: 1 long up +Y, 1 in radius; T: with two thorns
+  seg: g => { g.smooth = 50; g.cyl(0, 0, 0, 1, 1, 1, 6, SD_HEX.stem, { capT: false, alt: SD_HEX.stemD }); },
+  segT: g => { SD_MESH.seg(g); g.smooth = 0; const c = lin3(SD_HEX.thorn);
+    for (const [sx, y, a] of [[1, .28, .4], [-1, .7, 2.2]]) { const ca = Math.cos(a) * sx, sa = Math.sin(a) * sx, A = [ca * 2.7, y + .14, sa * 2.7], b1 = [ca * .9 - sa * .4, y - .07, sa * .9 + ca * .4], b2 = [ca * .9 + sa * .4, y - .07, sa * .9 - ca * .4], b3 = [ca * .9, y + .1, sa * .9]; for (const [p, q] of [[b1, b2], [b2, b3], [b3, b1]]) { g.tri(p, q, A, c); g.tri(q, p, A, c); } } },
+  joint: g => { g.smooth = 60; g.sphere(0, 0, 0, 1, 1, 1, 6, 4, SD_HEX.stem); },
+  // a leaf: 1 long along +Z from its stalk, arched, cupped along its midrib
+  leaf: g => { g.smooth = 60; const nv = 6, P = (u, v) => { const w = .3 * Math.pow(Math.sin(Math.PI * Math.pow(v, .72)), .9); return [u * w, .2 * Math.sin(Math.PI * v * .92) + .12 * Math.abs(u) * w / .3, v]; }, L = lin3(SD_HEX.leaf), Ll = lin3(SD_HEX.leafL), Ld = lin3(SD_HEX.leafD);
+    for (let j = 0; j < nv; j++) for (const sd of [-1, 1]) { const v0 = j / nv, v1 = (j + 1) / nv, c = _sdMx(sd > 0 ? L : Ld, Ll, j % 2 ? .12 : 0), a = P(0, v0), b = P(sd, v0), d = P(sd, v1), e = P(0, v1); g.quad(a, b, d, e, c); g.quad(a, e, d, b, _sdMx(c, Ld, .35)); } },
+  // a seed pod: 1 long up +Y, ribbed, dry at its tips, a woody nub at its stalk end
+  pod: g => { g.smooth = 55; const a = lin3(SD_HEX.pod), b = lin3(SD_HEX.podD), t = lin3(SD_HEX.podT); g.sphere(0, .5, 0, .3, .5, .3, 8, 6, a, { colFn: (j, i) => j === 0 || j === 5 ? _sdMx(i % 2 ? a : b, t, .7) : i % 2 ? a : b }); g.cyl(0, -.05, 0, .05, .07, .09, 5, '#4a3216'); },
+  // half a pod's shell, pale inside
+  husk: g => sdShellGeo(g, { nu: 6, nv: 6, wide: .3, bulge: .3, thick: .03, out: (i, j) => lin3(i % 2 ? SD_HEX.pod : SD_HEX.podD), inn: () => lin3(SD_HEX.husk) }),
+  // one jaw of the Snapjaw's maw: ribbed and green outside, red at its lip; inside a pale throat deepening to dark red; teeth
+  jaw: g => sdShellGeo(g, { nu: 8, nv: 8, wide: .5, bulge: .34, thick: .035, teeth: 6, tl: .17,
+    out: (i, j, u, v) => _sdMx(lin3(i % 2 ? SD_HEX.jawOut : SD_HEX.jawOutD), lin3(SD_HEX.lip), i === 0 || i === 7 || j === 7 ? .7 : 0),
+    inn: (i, j, u, v) => _sdMx(_sdMx(lin3(SD_HEX.jawDeep), lin3(SD_HEX.jawIn), Math.max(0, Math.min(1, v * 1.5 - .15))), lin3(SD_HEX.jawDeep), i % 2 ? .14 : 0) }),
+  // a puffcap: 1 wide, its stem .5 tall, a spotted dome over pale gills
+  cap: g => { g.smooth = 55; g.cyl(0, 0, 0, .1, .08, .5, 7, SD_HEX.stalk, { capT: false }); g.lathe(0, 0, 0, [[.09, .43], [.47, .5]], 10, SD_HEX.gill);
+    const c = lin3(SD_HEX.cap), l = lin3(SD_HEX.capL); g.sphere(0, .5, 0, .5, .42, .5, 10, 5, c, { v1: .5, colFn: (j, i) => (i * 7 + j * 5) % 6 === 0 ? _sdMx(c, l, .75) : j === 0 ? _sdMx(c, l, .2) : c }); },
+};
+const sdMesh = k => dynMesh('sd_' + k, SD_MESH[k]);
+const _sdMs = []; let _sdMi = 0;
+function sdPart(k, m) { SD.parts.push(k, m); }
+// a matrix from a corner and three axes (each already as long as that side of the mesh should be)
+function sdBasis(O, X, Y, Z) { const m = _sdMs[_sdMi] || (_sdMs[_sdMi] = new Float32Array(16)); _sdMi++; m[0] = X[0]; m[1] = X[1]; m[2] = X[2]; m[3] = 0; m[4] = Y[0]; m[5] = Y[1]; m[6] = Y[2]; m[7] = 0; m[8] = Z[0]; m[9] = Z[1]; m[10] = Z[2]; m[11] = 0; m[12] = O[0]; m[13] = O[1]; m[14] = O[2]; m[15] = 1; return m; }
+// a mesh that is 1 long up +Y laid from A to B, rx and rz wide, turned about its length by roll
+function sdSpan(k, A, B, rx, rz, roll) {
+  const y = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], L = Math.hypot(y[0], y[1], y[2]) || 1e-4, n = [y[0] / L, y[1] / L, y[2] / L], ref = Math.abs(n[1]) > .92 ? [1, 0, 0] : [0, 1, 0];
+  let x = [ref[1] * n[2] - ref[2] * n[1], ref[2] * n[0] - ref[0] * n[2], ref[0] * n[1] - ref[1] * n[0]]; const xl = Math.hypot(x[0], x[1], x[2]) || 1; x = [x[0] / xl, x[1] / xl, x[2] / xl];
+  let z = [x[1] * n[2] - x[2] * n[1], x[2] * n[0] - x[0] * n[2], x[0] * n[1] - x[1] * n[0]];
+  if (roll) { const c = Math.cos(roll), s2 = Math.sin(roll), x2 = [x[0] * c + z[0] * s2, x[1] * c + z[1] * s2, x[2] * c + z[2] * s2]; z = [z[0] * c - x[0] * s2, z[1] * c - x[1] * s2, z[2] * c - x[2] * s2]; x = x2; }
+  sdPart(k, sdBasis(A, [x[0] * rx, x[1] * rx, x[2] * rx], y, [z[0] * rz, z[1] * rz, z[2] * rz]));
+}
+// a mesh at P, turned (yaw about up, then pitch), scaled
+function sdPlace(k, P, yaw, pitch, sx, sy, sz) { const m = _sdMs[_sdMi] || (_sdMs[_sdMi] = new Float32Array(16)); _sdMi++; M4.trs(m, P[0], P[1], P[2], yaw, pitch, 0, sx, sy == null ? sx : sy, sz == null ? sx : sz); sdPart(k, m); }
+// is this layer on, and how big (the lab's On and Size); null: not drawn
+function sdOnL(s, l) { return sdT(s, l, 1, {}); }
+
+/* ---- things left in the world to play out where they were left ----
+   kind: spore (a billow of dust w across: thrown, slowed by the air, swelling), husk (half a pod's shell, tumbling, falling),
+   seed (a dark seed thrown on an arc), mote (a pale spore drifting up) */
+function sdShot(kind, x, y, z, w, dur, o, s, l) {
+  o = o || {}; if (SD.shots.length >= 260) SD.shots.shift();
+  SD.shots.push({ kind, x, y, z, w, dur, at: G.time + (o.delay || 0), vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, drag: o.drag || 0, g: o.g || 0, grow: o.grow || 0, rot: o.rot || 0, vr: o.vr || 0,
+    a: o.a == null ? 1 : o.a, k: o.k == null ? 1 : o.k, p0: o.p0 == null ? 1 : o.p0, p1: o.p1 || 0, col: o.col, seed: (Math.random() * 97) | 0, s, l, t: G.time });
+}
+function sdShots(now) {
+  SD.shots = SD.shots.filter(e => now - e.at < e.dur);
+  for (const e of SD.shots) {
+    const el = now - e.at; if (el < 0) continue;
+    const dt = Math.max(0, Math.min(.05, now - Math.max(e.t, e.at))); e.t = now;
+    if (dt > 0) {
+      if (e.drag) { const k = Math.exp(-e.drag * dt); e.vx *= k; e.vz *= k; if (!e.g) e.vy *= k; }
+      e.vy -= e.g * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.rot += e.vr * dt;
+      const fl = e.kind === 'husk' ? e.w * .3 : .03;
+      if (e.g && e.y < fl) { e.y = fl; if (e.vy < -.6) { e.vy = -e.vy * .28; e.vx *= .5; e.vz *= .5; e.vr *= .4; } else { e.vy = 0; e.vx = 0; e.vz = 0; e.vr = 0; e.g = 0; } }
+    }
+    const u = el / e.dur;
+    if (e.kind === 'spore') { const W = e.w * (1 + e.grow * u); sdBill(SDT_SH.SPORE, [e.x, e.y, e.z], W, W, { age: u, seed: e.seed, k: e.k, a: e.a, p0: e.p0, p1: e.p1, col: e.col || SD_COL.spore, soft: .07 }, e.s, e.l); }
+    else if (e.kind === 'husk') { const k = sdOnL(e.s, e.l); if (k != null) sdPlace('husk', [e.x, e.y, e.z], e.rot, e.rot * .7 + 1.2, e.w * 1.5 * k * (1 - sdSs(.75, 1, u))); }
+    else {
+      const sp = Math.hypot(e.vx, e.vy, e.vz), d = sp > .05 ? [e.vx / sp, e.vy / sp, e.vz / sp] : [0, 1, 0], seed = e.kind === 'seed';
+      const L = seed ? e.w * 2.2 : e.w * (1.6 + Math.min(2.5, sp * 1.2)), wob = seed ? 0 : Math.sin(now * 5 + e.seed) * .03;
+      const H = [e.x + wob, e.y, e.z + wob * .6];
+      sdSeg(SDT_SH.MOTE, [H[0] - d[0] * L * .8, H[1] - d[1] * L * .8, H[2] - d[2] * L * .8], [H[0] + d[0] * L * .2, H[1] + d[1] * L * .2, H[2] + d[2] * L * .2], e.w, e.w,
+        { age: seed ? 0 : u, p0: seed ? 1 : 0, col: e.col || (seed ? SD_COL.seed : SD_COL.mote), a: e.a * (seed ? 1 - sdSs(.75, 1, u) : 1), k: e.k }, e.s, e.l);
+    }
+  }
+}
+
+/* ---- a pod bursts at x, z; sp: the real radius of what it hits. o.great: Choking Haze's; o.cap: a puffcap (no husk) ---- */
+function sdBurst(x, z, sp, o, s) {
+  o = o || {};
+  const lv = sdLv(), B = sdV(s, 'burst'), C = sdV(s, 'spores'), E = sdV(s, 'seeds'), thin = SD.load > .75 ? .55 : SD.load > .5 ? .8 : 1, sc = o.great ? 1.35 : 1;
+  const a0 = Math.random() * TAU;
+  // its husk, in two halves thrown apart
+  if (!o.cap && B.husk > 0) for (let k = 0; k < (lv ? 2 : 1); k++) {
+    const a = a0 + k * Math.PI + R(-.4, .4), v = R(.9, 1.5) * sc;
+    sdShot('husk', x, .22 * sc, z, B.husk * sc, B.secs * R(1.3, 1.7), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(1.8, 2.6), g: 9, rot: R(TAU), vr: R(-11, 11) }, s, 'burst');
+  }
+  // the puff where it split: one billow that swells and lifts a little
+  sdShot('spore', x, Math.max(.24 * sc, sp * B.w * .34), z, sp * B.w, B.secs, { vy: .3, drag: 1.5, grow: .55, p0: C.thick * 1.15, p1: C.specks, a: B.a }, s, 'burst');
+  // spore dust rolling out low to the real edge of the splash (thrown fast, stopped by the air just short of it)
+  const n = Math.max(3, Math.round([4, 6, 8][lv] * thin * (o.cap ? .75 : 1) * C.dens)), w = sp * C.w, drag = 4.5;
+  for (let k = 0; k < n; k++) {
+    const a = a0 + (k + R(-.3, .3)) / n * TAU, reach = Math.max(0, sp * C.reach - w * .34) * R(.8, 1), v = reach * drag;
+    sdShot('spore', x + Math.cos(a) * .05, w * .3 + R(.05), z + Math.sin(a) * .05, w * R(.85, 1.1), C.secs * R(.8, 1.15), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.05, .2), drag, grow: .6, p0: C.thick, p1: C.specks, a: C.a, delay: R(.03) }, s, 'spores');
+  }
+  // seeds scattering: thrown up and out, pattering down inside the splash
+  const ns = Math.round(E.count * (o.great ? 1.5 : 1) * thin * (lv ? 1 : .5));
+  for (let k = 0; k < ns; k++) {
+    const a = R(TAU), d = sp * R(.25, .9), T = R(.3, .5), vy = R(1.6, 2.8);
+    sdShot('seed', x, .2, z, E.w * R(.8, 1.2), E.secs, { vx: Math.cos(a) * d / T, vz: Math.sin(a) * d / T, vy, g: 2 * vy / T }, s, 'seeds');
+  }
+  // a few pale spores lifting off after it
+  if (lv) for (let k = 0; k < Math.round(E.motes * thin); k++) { const a = R(TAU), d = sp * R(.1, .7); sdShot('mote', x + Math.cos(a) * d, R(.15, .4), z + Math.sin(a) * d, .05, R(.7, 1.2), { vy: R(.25, .5), vx: R(-.1, .1), vz: R(-.1, .1), drag: .8, delay: R(.1, .35) }, s, 'seeds'); }
+}
+
+/* ---- pods in flight: straight and level from her sling ---- */
+function sdPods(now) {
+  if (!G.projs) return;
+  for (const p of G.projs) {
+    if (!sdIsPod(p) || p.t < 0 || p.done) continue;
+    const great = !!p.fixed, s = great ? 'haze' : 'seedpod', C = sdV(s, 'core'), W = sdV(s, 'trail'), st = sdSt(p), u = Math.min(1, p.t / p.T);
+    if (st.seed == null) { st.seed = (Math.random() * 97) | 0; st.shed = now; }
+    // (the game moves it on a lob; drawn, it keeps arcK of that arc: none. It flies level at the height it left her sling,
+    // coming down only to aim of a shorter foe's height, or to the ground where a great pod is thrown at a spot)
+    if (!st.rel) st.rel = sdAnchor(p.src, p).release;
+    const rel = st.rel, hEnd = p.air ? (p.ah || 1.15) : great || !p.tg ? .32 : Math.min(rel[1], Math.max(.3, hitH(p.tg) * C.aim));
+    const lin = p.h0 + ((p.air ? (p.ah || 1.15) : .15) - p.h0) * u, h = rel[1] + (hEnd - rel[1]) * u + (p.h - lin) * C.arcK;
+    const px = rel[0] + (p.ax - rel[0]) * u, pz = rel[2] + (p.az - rel[2]) * u;
+    const d = [p.ax - rel[0], hEnd - rel[1], p.az - rel[2]], dl = Math.hypot(d[0], d[1], d[2]) || 1, ks = sdOnL(s, 'core');
+    const size = C.pod * (1 + (p.lv || 0) * .08) * (great ? 1 : 1) * (p.big ? 1.35 : 1) * sdSs(0, .12, u + .04) * (ks == null ? 0 : ks), hl = size * .5 / dl;
+    // (it flies point first, turning slowly about its length, wobbling a little)
+    const wb = Math.sin(now * C.wob + st.seed) * .12 * size;
+    if (size > 0) sdSpan('pod', [px - d[0] * hl, h - d[1] * hl + wb, pz - d[2] * hl], [px + d[0] * hl, h + d[1] * hl - wb, pz + d[2] * hl], size, size, now * C.wob * .6 + st.seed);
+    // a little spore dust shed behind it
+    if (W.every > 0 && now - st.shed >= W.every * (SD.load > .6 ? 2 : 1)) {
+      st.shed = now;
+      sdShot('spore', px + R(-.03, .03), h + R(-.03, .03), pz + R(-.03, .03), W.w * (great ? 1.5 : 1), W.secs, { vy: W.rise, grow: .9, p0: W.thick, p1: 1, a: W.a }, s, 'trail');
+      if (sdLv() && Math.random() < W.mote) sdShot('mote', px, h, pz, .045, R(.5, .8), { vy: R(.1, .3), vx: R(-.15, .15), vz: R(-.15, .15), drag: 1 }, s, 'trail');
+    }
+  }
+}
+
+/* ---- Choking Haze, and the Spore Cloud a third pod leaves: one slow cloud of spore dust over its real radius ---- */
+const sdIsHaze = z => !!(z && z.k === 'miasma' && z.src && z.src.def && z.src.def.pod);
+function sdHazes(now) {
+  if (!G.hazards) return;
+  for (const z of G.hazards) {
+    if (!sdIsHaze(z)) continue;
+    const st = sdSt(z); if (st.born == null) { st.born = now; st.seed = (Math.random() * 97) | 0; st.mote = now; }
+    const H = sdV('haze', 'cloud'), lv = sdLv(), n = Math.max(3, Math.round([4, 6, 9][lv] * H.dens * (SD.load > .7 ? .7 : 1))), fade = Math.min(1, (now - st.born) / .45) * Math.min(1, Math.max(0, z.t) / .7);
+    if (fade <= 0) continue;
+    const w = z.r * H.w;
+    for (let k = 0; k < n; k++) {
+      // each billow lives a few seconds where it rose, rolls, thins and rises again somewhere else in the haze
+      const per = H.roll * (.8 + .5 * sdRnd(k + st.seed)), ph = (now - st.born) / per + sdRnd(k * 3.1 + st.seed), cyc = Math.floor(ph), u = ph - cyc;
+      const a = sdRnd(k * 7.3 + cyc * 13.7 + st.seed) * TAU, rr = Math.max(0, z.r - w * .36) * Math.sqrt(.12 + .88 * sdRnd(k * 5.9 + cyc * 3.3 + st.seed)), dr = u * .1;
+      sdBill(SDT_SH.SPORE, [z.x + Math.cos(a) * (rr + dr), H.h * (.6 + .9 * sdRnd(k * 2.3 + cyc)) + u * H.drift, z.z + Math.sin(a) * (rr + dr)], w, w * .82,
+        { age: .08 + u * .36, seed: k * 5 + cyc * 3 + st.seed, a: fade * H.a * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)), p0: H.thick, p1: H.specks, col: SD_COL.spore, soft: .1, sp: .7, pull: H.pull }, 'haze', 'cloud');
+    }
+    if (lv && H.motes > 0 && now - st.mote > 1 / H.motes) { st.mote = now; const a = R(TAU), d = z.r * Math.sqrt(R(1)) * .9; sdShot('mote', z.x + Math.cos(a) * d, R(.2, .5), z.z + Math.sin(a) * d, .05, R(.8, 1.3), { vy: R(.2, .45), drag: .6 }, 'haze', 'cloud'); }
+  }
+}
+
+/* ---- Puffcap Sowing: a stem and a spotted cap pushed up through the road, breathing; one bursts in a puff of spores ---- */
+function sdPuffs(now) {
+  SD.puffs = SD.puffs.filter(q => now < q.until && (!q.t || !q.zr || (q.t.ab && q.t.ab.zones.includes(q.zr)) || q.caps.some(c => c.pop && now - c.pop < .5)));
+  if (!SD.puffs.length) return;
+  const P = sdV('barrage', 'caps'), lv = sdLv();
+  for (const q of SD.puffs) for (const c of q.caps) {
+    const s0 = now - c.born; if (s0 < 0) continue;
+    let pop = -1;
+    if (c.pop) { pop = now - c.pop; if (!c._sd) { c._sd = 1; sdBurst(c.x, c.z, .8, { cap: 1 }, 'barrage'); } if (pop > .1) continue; }
+    if (!c._sdUp) { c._sdUp = 1; sdShot('spore', c.x, .08, c.z, .22, .5, { vy: .2, grow: .8, p0: .7, a: .7, col: [.42, .34, .22] }, 'barrage', 'caps'); c._sdSeed = (Math.random() * 97) | 0; c._sdMote = now + R(1.5); }
+    const g = sdBack(Math.min(1, s0 / .4)), br = 1 + P.breathe * Math.sin(now * 2.6 + c._sdSeed), sw = pop >= 0 ? 1 + pop * 4 : 1, lean = (sdRnd(c._sdSeed) - .5) * .08;
+    const hS = P.stem * g, cw = P.cap * g * br * sw, top = [c.x + lean, hS, c.z];
+    const kc = sdOnL('barrage', 'caps');
+    if (kc != null) sdPlace('cap', [c.x, 0, c.z], c._sdSeed, lean * 2, cw * kc, P.stem * 2 * g * kc * (pop >= 0 ? 1 + pop * 2 : 1), cw * kc);
+    // (a spore or two let go while it waits)
+    if (lv > 1 && P.motes > 0 && pop < 0 && now > c._sdMote) { c._sdMote = now + R(.6, 1.6) / P.motes; sdShot('mote', top[0] + R(-.06, .06), hS + .05, top[2] + R(-.06, .06), .04, R(.7, 1.1), { vy: R(.15, .3), drag: .6 }, 'barrage', 'caps'); }
+  }
+}
+
+/* ---- Snapjaw Bloom ---- */
+const SD_MAW_GAP = .9;   // blooms nearer than this (cells) share one maw: the older one's
+// v turned about the axis n (a unit vector) by the angle a
+function sdTurn(v, n, a) { const c = Math.cos(a), s = Math.sin(a), d = v[0] * n[0] + v[1] * n[1] + v[2] * n[2]; return [v[0] * c + (n[1] * v[2] - n[2] * v[1]) * s + n[0] * d * (1 - c), v[1] * c + (n[2] * v[0] - n[0] * v[2]) * s + n[1] * d * (1 - c), v[2] * c + (n[0] * v[1] - n[1] * v[0]) * s + n[2] * d * (1 - c)]; }
+function sdJaws(now) {
+  if (!SD.jaws.length) return;
+  const J = sdV('bindseed', 'jaw'), N = sdV('bindseed', 'neck'), Lf = sdV('bindseed', 'leaves'), Rn = sdV('bindseed', 'runners'), lv = sdLv(), s = 'bindseed';
+  SD.jaws = SD.jaws.filter(q => !q.dead);
+  // ONE mouth on a foe, and one mouth on a spot (owner: "the previous version was fine, only you had multiple mouths come
+  // and attacking the same unit"): where two blooms stand together or bite the same foe, only the older one's maw is
+  // drawn; the younger keeps its leaves and runners, and takes over when the older is gone
+  const claimed = new Set(), mawAt = [];
+  for (const q of SD.jaws) {
+    const z = q.zr, tf = now - q.at;
+    if (tf < q.T) {
+      // its seed thrown, straight
+      const u = tf / q.T, x = q.x0 + (z.x - q.x0) * u, y = q.h0 + (.12 - q.h0) * u, zz = q.z0 + (z.z - q.z0) * u;
+      const d = [z.x - q.x0, .12 - q.h0, z.z - q.z0], dl = Math.hypot(d[0], d[1], d[2]) || 1, hl = .13 / dl;
+      if (sdOnL(s, 'core') != null) sdSpan('pod', [x - d[0] * hl, y - d[1] * hl, zz - d[2] * hl], [x + d[0] * hl, y + d[1] * hl, zz + d[2] * hl], .26, .26, now * 5);
+      if (now - (q.shed || 0) > .05) { q.shed = now; sdShot('spore', x, y, zz, .12, .35, { vy: .2, grow: .9, p0: .6, a: .6 }, s, 'core'); }
+      continue;
+    }
+    const alive = !q.t || (q.t.ab && q.t.ab.zones.includes(z));
+    if (!alive && q.gone == null) q.gone = now;
+    const endAt = q.gone != null ? q.gone : z.until - .1, end = Math.max(0, Math.min(1, (now - endAt) / .5)), s0 = tf - q.T;
+    if (end >= 1) { q.dead = 1; continue; }
+    if (!q.up) { q.up = 1; sdShot('spore', z.x, .1, z.z, .4, .55, { vy: .25, grow: .8, p0: .8, a: .8, col: [.42, .34, .22] }, s, 'leaves'); for (let k = 0; k < 4; k++) { const a = R(TAU); sdShot('seed', z.x, .08, z.z, .05, .5, { vx: Math.cos(a) * .9, vz: Math.sin(a) * .9, vy: R(1.2, 2), g: 9, col: [.3, .22, .14] }, s, 'leaves'); } }
+    const g = sdBack(Math.min(1, s0 / J.grow)), g2 = sdSs(0, J.grow * 2.2, s0), S = J.scale * (1 - .3 * end), wilt = 1 - end, R0 = [z.x, 0, z.z];
+    // runners creeping out over the ground to its real reach, a leaf at the end of each
+    const kr = sdOnL(s, 'runners'), nr = kr == null ? 0 : Math.round(Rn.count * [.6, .8, 1][lv]);
+    for (let k = 0; k < nr; k++) {
+      const a = q.seed + k * TAU / nr + (sdRnd(k + q.seed) - .5) * .5, len = Rn.reach * (.72 + .28 * sdRnd(k * 3 + q.seed)) * g2 * wilt, ca = Math.cos(a), sa = Math.sin(a), wig = (sdRnd(k * 7 + q.seed) - .5) * .22;
+      if (len < .05) continue;
+      const rw = Rn.w * .5 * kr, M = [z.x + ca * len * .5 - sa * wig * len, .05, z.z + sa * len * .5 + ca * wig * len], T = [z.x + ca * len, .025, z.z + sa * len];
+      sdSpan('seg', R0, M, rw, rw, k); sdSpan('seg', M, T, rw * .75, rw * .75, k + 1); sdPlace('joint', M, 0, 0, rw);
+      sdPlace('leaf', T, Math.atan2(ca, sa), -.25, .2 * g2, .2 * g2, .2 * g2);
+    }
+    // the rosette it grows from: broad leaves arching up and out
+    const kl = sdOnL(s, 'leaves'), nl = kl == null ? 0 : Math.round(Lf.count * [.6, .8, 1][lv]);
+    for (let k = 0; k < nl; k++) {
+      const a = q.seed * 1.7 + k * TAU / nl, L = Lf.len * S * g * kl * (.85 + .3 * sdRnd(k * 11 + q.seed)), wv = .04 * Math.sin(now * 1.4 + k);
+      sdPlace('leaf', [z.x + Math.cos(a) * .03, .02, z.z + Math.sin(a) * .03], Math.atan2(Math.cos(a), Math.sin(a)), -(.22 + wv) * wilt, L * Lf.w / .3 * 1.4, L, L);
+    }
+    // ONE great eating plant (owner, 11 Nov 2026: "snapjaw bloom needs some work, would like a big main eating plant to
+    // engulf the unit", then "dont use flat planes ... spell also turns with the camera"): a maw of two great cupped,
+    // toothed jaws on a thick thorned neck, solid and fixed in the world. At rest it gapes over its root; on a bite the maw
+    // is thrown to the foe it has snapped up, sized to that foe, and its two jaws close round it from either side, their
+    // teeth meeting over it; it stays shut on it for as long as the bite holds it rooted
+    const sn = z.snapAt ? now - z.snapAt : 9, sx = z.sx == null ? z.x : z.sx, sz = z.sz == null ? z.z : z.sz, c = z.snapC;
+    if (z.snapAt && q.snL !== z.snaps) { q.snL = z.snaps; const dl = Math.hypot(sx - z.x, sz - z.z); if (dl > .05) { q.lx = (sx - z.x) / dl; q.lz = (sz - z.z) / dl; } }
+    if (q.lx == null) { q.lx = Math.cos(q.seed); q.lz = Math.sin(q.seed); }
+    const solo = !mawAt.some(m => Math.hypot(m[0] - z.x, m[1] - z.z) < SD_MAW_GAP); if (solo) mawAt.push([z.x, z.z]);   // (a wilting one still holds its spot until it is gone)
+    const held = !!(solo && c && !c.dead && end <= 0 && sn < 8 && (sn < .5 || c.rootT > G.time) && !claimed.has(c)); if (held) claimed.add(c);
+    q.mawK = (q.mawK == null ? (solo ? 1 : 0) : q.mawK) + ((solo ? 1 : 0) - (q.mawK == null ? (solo ? 1 : 0) : q.mawK)) * Math.min(1, 6 * Math.max(0, Math.min(.05, now - (q.lt == null ? now : q.lt))));
+    const fh = held ? Math.max(.6, typeof creepH === 'function' ? creepH(c) : .9) : .75, fr = held ? Math.max(.2, ((c.def && c.def.r) || .3) * .95) : .2;
+    const tx = held ? c.x : z.x + q.lx * .2, tz = held ? c.y : z.z + q.lz * .2;
+    const dq = Math.max(0, Math.min(.05, now - (q.lt == null ? now : q.lt))); q.lt = now;
+    if (q.hx == null) { q.hx = z.x; q.hz = z.z; q.cl = 0; q.fh = fh; q.fr = fr; }
+    const km = 1 - Math.exp(-dq * (held ? 24 : 5)); q.hx += (tx - q.hx) * km; q.hz += (tz - q.hz) * km; q.fh += (fh - q.fh) * km; q.fr += (fr - q.fr) * km;
+    const ct = held && sn > .05 ? 1 : J.rest + .07 * Math.sin(now * 1.8 + q.seed); q.cl += (ct - q.cl) * (1 - Math.exp(-dq * (ct > q.cl ? 30 : 4.5)));
+    const kj = sdOnL(s, 'jaw'), cl = Math.max(0, Math.min(1, q.cl)) * wilt, L = Math.max(J.min, q.fh * J.len) * S * g * (kj == null ? 0 : kj) * (q.mawK > .05 ? q.mawK : 0), wj = L * J.w;
+    // its neck: a thick thorned stem bowed up from the root to under the maw
+    const kn = q.mawK > .05 ? sdOnL(s, 'neck') : null, Hn = [q.hx, .08, q.hz], nd = Math.hypot(Hn[0] - R0[0], Hn[2] - R0[2]);
+    if (kn != null && nd > .08) {
+      const bow = [(R0[0] + Hn[0]) * .5, (N.h + nd * .35) * S * g * wilt + .05, (R0[2] + Hn[2]) * .5], np = [3, 4, 5][lv], pts = [];
+      for (let i = 0; i <= np; i++) { const v = i / np, a = (1 - v) * (1 - v), b = 2 * v * (1 - v), e2 = v * v; pts.push([R0[0] * a + bow[0] * b + Hn[0] * e2, R0[1] * a + bow[1] * b + Hn[1] * e2, R0[2] * a + bow[2] * b + Hn[2] * e2]); }
+      for (let i = 0; i < np; i++) { const r = N.w * .5 * S * g * kn * (1 - .25 * i / np); sdSpan(N.thorns > 0 ? 'segT' : 'seg', pts[i], pts[i + 1], r, r, i * 1.3); if (i) sdPlace('joint', pts[i], 0, 0, r); }
+    }
+    // its two jaws, hinged either side of what it holds, across the way its neck comes in: each leans out when it gapes
+    // and stands up to shut, a little short of upright, so the foe's head shows between the teeth from above
+    if (L > 0) {
+      const tilt = (1 - cl) * J.gape + J.shut, sT = Math.sin(tilt), cT = Math.cos(tilt), base = q.fr * (1 + .25 * (1 - cl));
+      for (const sd of [-1, 1]) {
+        const dx = q.lx * sd, dz = q.lz * sd, H0 = [q.hx - dx * base, .02, q.hz - dz * base];
+        const Y = [-dx * sT * L, cT * L, -dz * sT * L], Z = [dx * cT * wj, sT * wj, dz * cT * wj], X = [(Y[1] * Z[2] - Y[2] * Z[1]) / L, (Y[2] * Z[0] - Y[0] * Z[2]) / L, (Y[0] * Z[1] - Y[1] * Z[0]) / L];
+        sdPart('jaw', sdBasis(H0, X, Y, Z));
+        // (a sepal under each jaw)
+        sdPlace('leaf', H0, Math.atan2(-dx, -dz), -.5 - .5 * (1 - cl), L * .5, L * .5, L * .5);
+      }
+    }
+    // the bite itself: a small puff of spores and a few seeds where its jaws meet
+    if (z.snapAt && q.sn !== z.snaps && sn >= .12) {
+      q.sn = z.snaps;
+      sdShot('spore', sx, .32, sz, .5 * J.puff, .5, { vy: .3, grow: .7, p0: .8, p1: 1, a: .8 }, s, 'jaw');
+      if (lv) for (let k = 0; k < 4; k++) { const a = R(TAU); sdShot('mote', sx + Math.cos(a) * .12, R(.25, .45), sz + Math.sin(a) * .12, .045, R(.6, .9), { vx: Math.cos(a) * .4, vz: Math.sin(a) * .4, vy: R(.2, .5), drag: 1.5 }, s, 'jaw'); }
+    }
+  }
+}
+
+/* ---- spored foes: a few pale spores drifting up round each (in place of the ring of dots) ---- */
+function sdSpored(c, r) {
+  const n = SD.load > .6 ? 2 : [2, 3, 4][sdLv()], h = hitH(c), now = G.time, sd = c.anim || 0;
+  for (let i = 0; i < n; i++) {
+    const cyc = (now * .5 + i * .37 + sd * .1) % 1, a = now * (.9 + (i % 3) * .3) + i * 1.7 + sd, rr = r * (.65 + .3 * Math.sin(now * 1.3 + i)), y = h * (.35 + 1.05 * cyc);
+    const P = [c.x + Math.cos(a) * rr, y, c.y + Math.sin(a) * rr * .7];
+    sdSeg(SDT_SH.MOTE, [P[0], P[1] - .09, P[2]], [P[0], P[1] + .025, P[2]], .05, .05, { age: Math.max(0, cyc * 2 - 1), col: SD_COL.mote, a: sdSs(0, .15, cyc) }, 'seedpod', 'spores');
+  }
+}
+
+/* ---- each frame ---- */
+function sdFrame() {
+  if (typeof SDT !== 'undefined') SDT.q.length = 0;
+  const spored = SD.spored; SD.spored = [];
+  SD.parts.length = 0; _sdMi = 0;
+  if (!sdLive() || !sdOn() || typeof RD === 'undefined' || !RD || !RD.vfx || !RD.right) return;
+  if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask) return;   // (the Element Lab's foes-alone frame)
+  const now = G.time;
+  SD.cap = [70, 130, 200][sdLv()]; SD.load = SD.cards / SD.cap; SD.cards = 0;
+  sdHazes(now); sdPuffs(now); sdJaws(now); sdPods(now); sdShots(now);
+  for (const e of spored || []) if (!e.c.dead) sdSpored(e.c, e.r);
+  // (the cards' soft edges read the spells' depth copy, which is only made when the spells' own batch has something in it)
+  if (SDT.q.length && typeof VX !== 'undefined' && VX && !VX.ni && typeof vfxSprite === 'function') { const c = SDT.q[0].c; vfxSprite(VX, c[0], c[1], c[2], .01, .01, 0, SD_COL.spore, .004, VT.GLOW, 1); }
+}
+if (typeof vfxParts === 'function') {
+  const _sdParts = vfxParts;
+  vfxParts = function () { const r = _sdParts.apply(this, arguments); try { sdFrame(); } catch (e) { if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.errs) ELEMLAB.errs.push('seed fx: ' + e.message); } return r; };
+}
+
+/* ---- the older drawing stepped aside (all of it comes back with SD.off, or where the toolkit is not up) ---- */
+// a pod's landing: its own burst and sound in place of the puddle, the sparks and the splat
+if (typeof podBurst === 'function') {
+  const _pb = podBurst;
+  podBurst = function (x, z, sp) {
+    if (!sdOn()) return _pb.apply(this, arguments);
+    const great = !!(G.projs && G.projs.some(p => sdIsPod(p) && p.fixed && Math.abs(p.ax - x) < .02 && Math.abs(p.az - z) < .02 && p.t >= p.T - .06));
+    sdBurst(x, z, sp, { great }, great ? 'haze' : 'seedpod');
+    sfx('podburst', great ? 1 : 0);
+  };
+}
+// the frame's solid parts, drawn with the view's projectiles as ordinary lit items (listed by sdFrame the frame before)
+function sdMeshes() {
+  if (!SD.parts.length || !sdOn() || (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask)) return;
+  for (let i = 0; i < SD.parts.length; i += 2) item(sdMesh(SD.parts[i]), SD.parts[i + 1]);
+}
+if (typeof drawProjs === 'function') { const _dp = drawProjs; drawProjs = function () { const r = _dp.apply(this, arguments); try { sdMeshes(); } catch (e) { if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.errs) ELEMLAB.errs.push('seed mesh: ' + e.message); } return r; }; }
+// a pod in flight: no trail of the toolkit's (the mesh is left out in view.js drawProjs)
+if (typeof sfxBasicProj === 'function') { const _bp = sfxBasicProj; sfxBasicProj = function (p) { if (sdIsPod(p) && sdOn()) return 1; return _bp.apply(this, arguments); }; }
+// the haze: no discs on the ground
+if (typeof drawHazard === 'function') { const _dh = drawHazard; drawHazard = function (z) { if (sdIsHaze(z) && sdOn()) return; return _dh.apply(this, arguments); }; }
+// (nor the toolkit's lingering zone on it: its ring and bubbles)
+if (typeof sfxZone === 'function') { const _sz = sfxZone; sfxZone = function (C, z) { if (sdIsHaze(z) && sdOn()) { z._sfx = 1; return; } return _sz.apply(this, arguments); }; }
+// Choking Haze's cast: no glyph under her, no burst of the recipe's (the pod and its cloud are the spell)
+if (typeof sfxRun === 'function') { const _run = sfxRun; sfxRun = function (C) { if (C && C.id === 'haze' && sdOn()) return; return _run.apply(this, arguments); }; }
+// spored foes
+if (typeof drawSwarmOn === 'function') { const _sw = drawSwarmOn; drawSwarmOn = function (c, r) { if (!sdOn()) return _sw.apply(this, arguments); (SD.spored || (SD.spored = [])).push({ c, r }); }; }
+// Puffcap Sowing and Snapjaw Bloom (forces_zx_grove_cool.js): their own cards in place of the toolkit's sprites
+if (typeof GVC_FX !== 'undefined') {
+  const _sow = GVC_FX.sow, _puff = GVC_FX.puff, _jaw = GVC_FX.jawseed;
+  GVC_FX.sow = function (C, t, o) {
+    if (!sdOn()) return _sow.apply(this, arguments);
+    const Z = t && t.ab && t.ab.zones ? t.ab.zones.find(q => q.caps === o.caps) || t.ab.zones.find(q => q.k === 'barrage' && q.caps && o.caps.every(c => q.caps.includes(c))) : null;
+    SD.puffs.push({ caps: o.caps, until: G.time + 9, t, zr: Z });
+  };
+  GVC_FX.puff = function () { if (!sdOn()) return _puff.apply(this, arguments); };
+  GVC_FX.jawseed = function (C, t, o) {
+    if (!sdOn()) return _jaw.apply(this, arguments);
+    const rel = sdAnchor(t, null).release;
+    SD.jaws.push({ zr: o.z, t, at: G.time, T: o.T, x0: rel[0], z0: rel[2], h0: rel[1], seed: (Math.random() * 97) | 0 });
+  };
+}
+// (where it is spored, a foe was drawn before the frame's cards are gathered: the list above is drawn by sdFrame)
+if (typeof ABIL !== 'undefined' && ABIL.haze && typeof ABIL.haze.cast === 'function') {
+  // Choking Haze's own cast sound: a great pod slung
+  const _hc = ABIL.haze.cast; ABIL.haze.cast = function () { sfx('seedcast', 1); return _hc.apply(this, arguments); };
+}
+
+/* ---- the Element Lab's entries (elemfx.js tables; elementlab.js lists them) ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    seedpod: { unit: 'seedcaster', force: 'grove', el: 'seed', name: 'Seed Pod', basic: 1, layers: ['core', 'trail', 'burst', 'spores', 'seeds'] },
+    haze: { unit: 'seedcaster', force: 'grove', el: 'seed', name: 'Choking Haze', layers: ['core', 'trail', 'burst', 'spores', 'seeds', 'cloud'] },
+    barrage: { unit: 'seedcaster', force: 'grove', el: 'seed', name: 'Puffcap Sowing', layers: ['caps', 'burst', 'spores', 'seeds'] },
+    bindseed: { unit: 'seedcaster', force: 'grove', el: 'seed', name: 'Snapjaw Bloom', layers: ['core', 'leaves', 'runners', 'neck', 'jaw'] },
+  });
+  Object.assign(ELEM_FX_DEF, {
+    seedpod: {
+      // the pod in flight: its length, how much of the lob's arc it keeps (none: straight and level), the most of a foe's
+      // height it flies at, how fast it wobbles, how far it splits open as it arrives
+      core: { pod: .3, arcK: 0, aim: .85, wob: 7 },
+      // spore dust shed behind it: every (s), a puff's size, how long it hangs, its rise, thickness, opacity, a spore's chance
+      trail: { every: .05, w: .16, secs: .45, rise: .15, thick: .55, a: .7, mote: .25 },
+      // the burst where it splits: the middle puff's width (per cell of splash), how long, opacity; the husk halves' size (0 none)
+      burst: { w: .95, secs: .7, a: .85, husk: .3 },
+      // spore dust rolling out low: how many (x), a billow's width (per splash), how far out its edge gets (x the splash),
+      // how long, thickness, drifting specks, opacity
+      spores: { dens: 1, w: .7, reach: 1, secs: .85, thick: .75, specks: 1, a: .9 },
+      // seeds scattering: how many, their size, how long they lie; pale spores lifting off after
+      seeds: { count: 7, w: .05, secs: .9, motes: 5 },
+    },
+    haze: {
+      core: { pod: .46, arcK: 0, aim: .85, wob: 5 },
+      trail: { every: .04, w: .2, secs: .5, rise: .15, thick: .6, a: .75, mote: .4 },
+      burst: { w: 1.1, secs: .85, a: .95, husk: .3 },
+      spores: { dens: 1.2, w: .75, reach: 1, secs: 1, thick: .8, specks: 1, a: .92 },
+      seeds: { count: 9, w: .055, secs: 1, motes: 7 },
+      // the cloud that hangs over the haze's real radius: billows (x), a billow's width (x the radius), its height, how far
+      // each lifts as it rolls, how far it is held toward the camera (so it lies over the foes in it, thin), how long one rolls before it rises again elsewhere (s), thickness, specks, opacity, spores a second
+      cloud: { dens: 1.3, w: 1.2, h: .36, drift: .16, pull: .22, roll: 2.6, thick: 1.15, specks: 1.2, a: .9, motes: 3 },
+    },
+    barrage: {
+      // a puffcap: its cap's width, its stem's height, how much it breathes, spores it lets go while it waits (a second)
+      caps: { cap: .4, stem: .2, breathe: .05, motes: .5 },
+      burst: { w: .9, secs: .7, a: .9, husk: 0 },
+      spores: { dens: 1, w: .7, reach: 1, secs: .9, thick: .75, specks: 1.2, a: .9 },
+      seeds: { count: 0, w: .05, secs: .8, motes: 6 },
+    },
+    bindseed: {
+      core: { pod: .24 },
+      // the rosette: leaves, their length, their width
+      leaves: { count: 6, len: .5, w: .22 },
+      // runners over the ground: how many, how far they creep (cells: the bloom bites within 1.1), their width
+      runners: { count: 5, reach: 1.05, w: .05 },
+      // its neck: how high it bows, its width, thorns
+      neck: { h: .3, w: .15, thorns: 1 },
+      // its maw: the whole plant's size (x), how fast it grows (s), a jaw's height (x the foe it has), the least, its width
+      // (per height), the front jaw's height (x the back's: the foe's head shows over it), how far the back jaw leans when
+      // it gapes (radians), how far shut it rests (0 wide open), the puff of spores where it bites (x)
+      jaw: { scale: 1, grow: .45, len: 1.15, min: .9, w: .95, gape: 1.0, shut: .1, rest: .12, puff: 1 },
+    },
+  });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { pod: ['Pod length', .05, 1.5, .01], wob: ['Wobble speed', 0, 20, .5], husk: ['Husk halves (size; 0 none)', 0, .8, .01],
+    thick: ['Thickness (how much it hides)', 0, 1.5, .02], specks: ['Drifting specks', 0, 3, .05], reach: ['Reach (x the real radius)', .3, 1.5, .01], mote: ['Spores let go (chance)', 0, 1, .05], motes: ['Pale spores', 0, 20, .5],
+    roll: ['A billow rolls for (s)', .8, 6, .1], drift: ['Lift as it rolls', 0, .6, .01], pull: ['Held toward the camera (over the foes)', 0, .6, .01], cap: ['Cap width', .08, .8, .01], stem: ['Stem height', .02, .6, .01], breathe: ['Breathing', 0, .3, .01],
+    thorns: ['Thorns', 0, 1, .05], gape: ['Gape (radians)', .1, 1.4, .01], min: ['Least height', .3, 2, .01], shut: ['Left open when shut (radians)', 0, .6, .01], rest: ['Shut at rest (0 open, 1 shut)', 0, 1, .01], scale: ['Size (x)', .3, 2.5, .02], dens: ['How many (x)', .2, 3, .05] });
+  if (typeof efxSync === 'function') efxSync();
+}
+// the lab's names for her layers, and what it shows for each (c: cards)
+const EFX_LNAME_SEED = { core: 'The pod (or the seed thrown)', trail: 'Spore dust shed in flight', burst: 'The burst (the puff where it splits, its husk)', spores: 'Spore dust rolling out to the real edge',
+  seeds: 'Seeds scattering, pale spores', cloud: 'The haze (one rolling cloud over its real radius)', caps: 'Puffcaps (stem and cap)', leaves: 'Rosette of leaves', runners: 'Runners out to its reach', neck: 'Neck (the thorned stem)', jaw: 'Jaws and head' };
+const EFX_LKIND_SEED = { core: 'c', trail: 'c', burst: 'c', spores: 'c', seeds: 'c', cloud: 'c', caps: 'c', leaves: 'c', runners: 'c', neck: 'c', jaw: 'c' };
+
 /* ELEMENT FX hooks (elemfx.js): the drawing primitives asked about the Pyroclasts' and Frostweavers' layers. Loaded after every
    effect module (pyrofire.js, labfx.js, the unit models), so each wrapper sits outside theirs. Every wrapper looks first at
    EFX.on: with nothing tuned (no lab, no Use in game, nothing baked) it calls straight through, so normal play is unchanged. */
@@ -94406,7 +95043,8 @@ if (typeof applyLight === 'function') {
   EFX.lab = true; EFX.use = null; EFX.live = get('live', {}); efxSync();
 
   /* ---- the stage ---- */
-  const heroC = () => { const h = HEROES.find(q => q.force === 'conclave'); return h ? h.id : null; };
+  const FORCE = () => SP().force || 'conclave';   // (the Seedcasters are the Grove's: seedfx.js)
+  const heroC = () => { const h = HEROES.find(q => q.force === FORCE()); return h ? h.id : null; };
   function foeList() { const pref = ['gnoll', 'torchbearer', 'troll', 'wolf', 'malgrath', 'arachnara', 'brakka']; return pref.filter(k => CREEPS[k]).concat(Object.keys(CREEPS).filter(k => !pref.includes(k) && !CREEPS[k].fly && CREEPS[k].boss).slice(0, 3)); }
   function heldFoe(type, x, y) {
     const c = spawn({ type, hp: 1e9, bounty: 0, at: { x, y, ti: Math.floor(x), tj: Math.floor(y), tx: x, ty: y + 1, state: 'walk' } });
@@ -94421,9 +95059,9 @@ if (typeof applyLight === 'function') {
   function stage() {
     try {
       clearStage();
-      const unit = SP().unit, slot = Object.entries(FORCES.conclave.units).find(([s, d]) => d && d.id === unit);
+      const unit = SP().unit, slot = Object.entries(FORCES[FORCE()].units).find(([s, d]) => d && d.id === unit);
       if (!slot) { L.errs.push('no post for ' + unit); return info(); }
-      applyForce('conclave', heroC()); G.force = 'conclave'; G.hero = heroC();
+      applyForce(FORCE(), heroC()); G.force = FORCE(); G.hero = heroC();
       const i = Math.floor(CX), j = Math.floor(CZ), t = makeTower(slot[0], i, j, L.tier); t.build = 0; G.towers.push(t); G.tAt[idx(i, j)] = t;
       t.st = effStats(t); t.ang = Math.PI / 2; L.t = t;
       const kit = typeof abilKit === 'function' && abilKit(t) ? abilKit(t).abilities : [];
@@ -94592,7 +95230,7 @@ if (typeof applyLight === 'function') {
     return `<label class="el-r${tuned}"><span>${esc(I[0])} <b data-v="${s}.${l}.${k}">${fmt(+V, I[3])}</b></span><input type="range" data-s="${s}" data-l="${l}" data-k="${k}" min="${I[1]}" max="${I[2]}" step="${I[3]}" value="${+V}"></label>`;
   }
   function layerHTML(s, l) {
-    const el = EL(), kinds = (el === 'frost' && typeof EFX_LKIND_FROST !== 'undefined' && EFX_LKIND_FROST[l]) || EFX_LKIND[l] || 'p', V = efx(s, l), D = ELEM_FX_DEF[s] && ELEM_FX_DEF[s][l], rate = (L.rate[s] || {})[l] || 0, tuned = Object.keys(live(s, l)).length;
+    const el = EL(), kinds = (el === 'frost' && typeof EFX_LKIND_FROST !== 'undefined' && EFX_LKIND_FROST[l]) || (el === 'seed' && typeof EFX_LKIND_SEED !== 'undefined' && EFX_LKIND_SEED[l]) || EFX_LKIND[l] || 'p', V = efx(s, l), D = ELEM_FX_DEF[s] && ELEM_FX_DEF[s][l], rate = (L.rate[s] || {})[l] || 0, tuned = Object.keys(live(s, l)).length;
     const gen = EFX_GEN_UI.filter(it => [...it[2]].some(c => kinds.includes(c))).map(it => ctlGen(s, l, it)).join('');
     const grad = `<label class="el-r el-c"><input type="checkbox" data-s="${s}" data-l="${l}" data-k="grad"${V.grad ? ' checked' : ''}><span>Colour gradient (start → mid → end${kinds.includes('f') ? '; fire: hot core → flame → smoke and edges' : ''})</span></label>
       <div class="el-grad">${[0, 1, 2].map(i => `<div><input type="color" data-s="${s}" data-l="${l}" data-k="c${i}" value="${V['c' + i]}"><input type="range" data-s="${s}" data-l="${l}" data-k="a${i}" min="0" max="1" step=".02" value="${V['a' + i]}" title="Opacity at the ${['start', 'middle', 'end'][i]}"><small>${['start', 'mid', 'end'][i]}</small></div>`).join('')}</div>`;
@@ -94611,7 +95249,7 @@ if (typeof applyLight === 'function') {
 #elab select,#elab textarea,#elab input[type=text]{width:100%;box-sizing:border-box;background:#151515;color:#e8dfc8;border:1px solid #4a4030;border-radius:5px;padding:3px}
 #elab textarea{height:80px;font:11px ui-monospace,monospace}#elab .row{display:flex;flex-wrap:wrap;gap:3px;margin:3px 0}
 #elab button{background:#1c1a18;color:#e8dfc8;border:1px solid #4a4030;border-radius:5px;padding:3px 7px;cursor:pointer;font:11.5px system-ui}#elab button.on{background:#6a3a14;border-color:#ffb46a;color:#fff2e0}#elab button:hover{border-color:#d08a4a}
-#elab button.fr{border-color:#7a4a2a}#elab button.fz{border-color:#2a5a7a}#elab button.fz.on{background:#1a4a6a;border-color:#8fe0ff}
+#elab button.fr{border-color:#7a4a2a}#elab button.fz{border-color:#2a5a7a}#elab button.fz.on{background:#1a4a6a;border-color:#8fe0ff}#elab button.sd{border-color:#5a6a2a}#elab button.sd.on{background:#3e4a16;border-color:#c8d860}
 #elab .note{color:#a89c80;font-size:11px}#elab .err{color:#ff9a80;font-size:11px;white-space:pre-wrap}#elab .el-top{font:11.5px ui-monospace,monospace;color:#9fd0a0;margin:2px 0 4px}
 #elab .warn{color:#ffb080}#elShow{position:fixed;left:8px;top:8px;z-index:61;display:none}#elShow.on{display:block}#elOv{position:fixed;pointer-events:none;z-index:40}
 #elab kbd{font:10.5px ui-monospace,monospace;border:1px solid #4a4030;border-radius:3px;padding:0 3px;color:#c8bea6}`;
@@ -94622,13 +95260,14 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     const el = $('#elab'); if (!el) return;
     const b = (a, lab, on, tip, cl) => `<button data-a="${esc(a)}" class="${on ? 'on' : ''} ${cl || ''}" title="${esc(tip || '')}">${esc(lab)}</button>`;
     const s = L.spell, sp = SP(), useOn = !!get('useOn', 0), pres = (get('presets', {})[s]) || {};
-    const spells = u => Object.keys(ELEM_FX_SPELLS).filter(k => ELEM_FX_SPELLS[k].unit === u).map(k => `<button data-sp="${k}" class="${k === s ? 'on' : ''} ${ELEM_FX_SPELLS[k].el === 'fire' ? 'fr' : 'fz'}">${esc(ELEM_FX_SPELLS[k].name)}</button>`).join('');
+    const spells = u => Object.keys(ELEM_FX_SPELLS).filter(k => ELEM_FX_SPELLS[k].unit === u).map(k => `<button data-sp="${k}" class="${k === s ? 'on' : ''} ${ELEM_FX_SPELLS[k].el === 'fire' ? 'fr' : ELEM_FX_SPELLS[k].el === 'seed' ? 'sd' : 'fz'}">${esc(ELEM_FX_SPELLS[k].name)}</button>`).join('');
     el.innerHTML = `<h2><span>Element Lab</span>${b('hide', 'Hide (H)', false, 'Hide the panel; H shows it again')}</h2>
       <div class="el-top" id="elTop">…</div>
       <div class="row" style="align-items:center"><span class="note" style="width:72px">Pyroclasts</span>${spells('cc_pyroclast')}</div>
       <div class="row" style="align-items:center"><span class="note" style="width:72px">Frostweavers</span>${spells('cc_rimeweaver')}</div>
+      ${typeof SD !== 'undefined' ? `<div class="row" style="align-items:center"><span class="note" style="width:72px">Seedcasters</span>${spells('seedcaster')}</div>` : ''}
       <details data-g="play"${L.open.play ? ' open' : ''}><summary><span>Playback</span></summary><div class="el-b">
-        <div class="row">${b('cast', 'Cast (Space)', false, sp.basic ? 'Loose one strike' : 'Cast it now')}${b('loop', L.loop ? 'Loop on' : 'Loop off', L.loop)}${b('pause', L.paused ? 'Paused (P)' : 'Pause (P)', L.paused)}${b('step', 'Step (.)', false, 'One frame (1/60 s) while paused')}${b('before', L.before ? 'Showing: as authored' : 'Before / after', L.before, 'Show the effect without any tuning')}</div>
+        <div class="row">${b('cast', 'Cast (Space)', false, sp.basic ? 'Loose one strike' : 'Cast it now')}${b('loop', L.loop ? 'Loop on' : 'Loop off', L.loop)}${b('pause', L.paused ? 'Paused (P)' : 'Pause (P)', L.paused)}${b('step', 'Step (.)', false, 'One frame (1/60 s) while paused')}${b('before', L.before ? 'Showing: as authored' : 'Before / after', L.before, 'Show the effect without any tuning')}${sp.el === 'seed' ? b('old', SD.off ? 'Showing: old look' : 'Old look', SD.off, 'Her effects as they were before 11 Nov 2026 (the cannon ball, the puddle, the discs)') : ''}</div>
         <div class="row">${[.1, .25, .5, 1].map(v => `<button data-slow="${v}" class="${v === L.slow ? 'on' : ''}">${v}×</button>`).join('')}</div>
         ${sp.basic ? '<div class="note">The strike loops at its own rate; Loop off holds it for Cast.</div>' : `<label class="el-r"><span>Loop every <b>${L.every.toFixed(1)}s</b></span><input type="range" id="elEvery" min="1" max="8" step=".1" value="${L.every}"></label>`}
       </div></details>
@@ -94661,9 +95300,9 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     const top = $('#elTop'); if (!top) return;
     const s = L.spell, R0 = L.rate[s] || {}, spawn = Object.values(R0).reduce((a, v) => a + v, 0);
     let mine = 0; for (const p of G.parts) if (p._efs === s) mine++;
-    const gpu = typeof vfxPartsLive === 'function' ? vfxPartsLive() : 0, cards = (typeof LABF !== 'undefined' ? LABF.list.length : 0) + (typeof PYF !== 'undefined' ? PYF.q.length : 0) + (typeof FRT !== 'undefined' ? FRT.q.length : 0);
+    const gpu = typeof vfxPartsLive === 'function' ? vfxPartsLive() : 0, cards = (typeof LABF !== 'undefined' ? LABF.list.length : 0) + (typeof PYF !== 'undefined' ? PYF.q.length : 0) + (typeof FRT !== 'undefined' ? FRT.q.length : 0) + (typeof SDT !== 'undefined' ? SDT.q.length : 0);
     const cv = L.cover == null ? '' : `<br><span class="${L.cover > .4 ? 'warn' : ''}">Foes covered by the effect: ${Math.round(L.cover * 100)}%${L.cover > .4 ? ' (too flashy: the foe is lost)' : ''}</span>`;
-    top.innerHTML = `${(1000 / L.ms).toFixed(0)} fps · ${L.ms.toFixed(1)} ms/frame · lab+draw ${L.rms.toFixed(1)} ms<br>${esc(SP().name)}: ${mine} particles live · ${Math.round(spawn)} drawn/s · ${cards} ${EL() === 'frost' ? 'ice' : 'fire'} cards<br>all: ${G.parts.length} CPU · ${gpu} GPU particles · ${typeof SFX !== 'undefined' ? SFX.list.length : 0} moments` + cv;
+    top.innerHTML = `${(1000 / L.ms).toFixed(0)} fps · ${L.ms.toFixed(1)} ms/frame · lab+draw ${L.rms.toFixed(1)} ms<br>${esc(SP().name)}: ${mine} particles live · ${Math.round(spawn)} drawn/s · ${cards} ${EL() === 'frost' ? 'ice' : EL() === 'seed' ? 'plant' : 'fire'} cards<br>all: ${G.parts.length} CPU · ${gpu} GPU particles · ${typeof SFX !== 'undefined' ? SFX.list.length : 0} moments` + cv;
     for (const x of document.querySelectorAll('#elab [data-rate]')) { const [sp, l] = x.dataset.rate.split('.'), v = (L.rate[sp] || {})[l] || 0; x.textContent = v ? Math.round(v) + '/s' : '–'; }
   }
   const copyText = txt => { const done = () => { L.note = 'Copied.'; info(); }; const ta = $('#elJson'); try { navigator.clipboard.writeText(txt).then(done, () => fb()); } catch (e) { fb(); }
@@ -94678,7 +95317,7 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
         const v = x.type === 'checkbox' ? (x.checked ? 1 : 0) : x.type === 'range' ? +x.value : x.value;
         setV(s, l, k, v); const bb = el.querySelector(`[data-v="${s}.${l}.${k}"]`); if (bb) bb.textContent = fmt(v, +x.step || 1);
         const r = x.closest('.el-r'); if (r) r.classList.toggle('tuned', k in live(s, l));
-        if (k === 'grad' && v) { const V = efx(s, l); if (V.c0 === '#ffffff' && V.c1 === '#ffffff' && V.c2 === '#ffffff') { const P = EL() === 'fire' ? ['#fff0b0', '#ff7a1e', '#3a2a22'] : ['#ffffff', '#9fe4ff', '#2a4a7a']; P.forEach((c, i) => setV(s, l, 'c' + i, c)); panel(); } }
+        if (k === 'grad' && v) { const V = efx(s, l); if (V.c0 === '#ffffff' && V.c1 === '#ffffff' && V.c2 === '#ffffff') { const P = EL() === 'fire' ? ['#fff0b0', '#ff7a1e', '#3a2a22'] : EL() === 'seed' ? ['#f4f0b8', '#bcbc4c', '#4a5a20'] : ['#ffffff', '#9fe4ff', '#2a4a7a']; P.forEach((c, i) => setV(s, l, 'c' + i, c)); panel(); } }
       };
       if (x.classList.contains('el-on')) x.onclick = e => e.stopPropagation();
     }
@@ -94690,7 +95329,7 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     $('#elDist').oninput = e => { L.dist = +e.target.value; e.target.previousElementSibling.querySelector('b').textContent = L.dist.toFixed(1) + ' cells'; };
     $('#elDist').onchange = () => { set('dist', L.dist); stage(); };
     $('#elFoe').onchange = e => { L.foe = e.target.value; set('foe', L.foe); stage(); };
-    $('#elUse').onchange = e => { set('useOn', e.target.checked ? 1 : null); set('use', e.target.checked ? EFX.live : null); L.note = e.target.checked ? 'Normal play on this device now draws the Pyroclasts’ and Frostweavers’ effects with this tuning.' : 'Normal play is back to the baked look.'; info(); };
+    $('#elUse').onchange = e => { set('useOn', e.target.checked ? 1 : null); set('use', e.target.checked ? EFX.live : null); L.note = e.target.checked ? 'Normal play on this device now draws the lab’s units’ effects with this tuning.' : 'Normal play is back to the baked look.'; info(); };
     for (const x of el.querySelectorAll('[data-a]')) x.onclick = e => {
       e.stopPropagation(); const a = x.dataset.a, s = L.spell, P = get('presets', {});
       if (a === 'hide') { L.hide = true; el.classList.add('hide'); $('#elShow').classList.add('on'); }
@@ -94699,6 +95338,7 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
       else if (a === 'pause') { L.paused = !L.paused; panel(); }
       else if (a === 'step') { L.paused = true; L.step = 1; panel(); }
       else if (a === 'before') { L.before = !L.before; EFX.lab = !L.before; efxSync(); panel(); }
+      else if (a === 'old') { SD.off = !SD.off; stage(); panel(); }
       else if (a === 'grid') { L.grid = L.grid ? 0 : 1; set('grid', L.grid); panel(); }
       else if (a === 'disc') { L.disc = L.disc ? 0 : 1; set('disc', L.disc); panel(); }
       else if (a === 'read') { L.read = L.read ? 0 : 1; rdT = 0; panel(); }
@@ -99213,7 +99853,7 @@ function kwBuild() {
   ST('stunned', 'Stunned', ['stunned', 'stun', 'stuns', 'Stun'], '#ffe9a8', 'It can\'t move or act for a moment. Bosses shake it off in less than half the time.');
   ST('pinned', 'Pinned', ['pinned'], '#c8a050', 'Held by Ironhold\'s chains: it can\'t move or act. A pinned flyer is dragged out of the sky instead, for longer.');
   ST('severed', 'Severed', ['severed'], '#8ae8d8', 'Its wards were torn out: no shield takes on it, its Spell Ward falls and its ward bar stands cracked open while it lasts.');
-  ST('rimebranded', 'Rime-branded', ['rime-branded', 'branded with rime'], '#c0f0ff', 'Each step it takes leaves a frost print on the road: the next ground foe to step on one is struck and frozen a moment.');
+  ST('rimebranded', 'Frost-branded', ['frost-branded', 'branded with frost'], '#c0f0ff', 'Each step it takes leaves a frost print on the road: the next ground foe to step on one is struck and frozen a moment.');
   ST('staggered', 'Staggered', ['Stagger', 'stagger', 'staggers', 'staggered'], '#d8c8ff', () => { const S = typeof CC_STAGGER !== 'undefined' ? CC_STAGGER : { n: 3, slow: .1, t: 2, stun: 1 }; return `Each Spellblade cut slows it ${kwPct(S.slow)} more for ${S.t}s; the ${S.n}rd stack stuns it for ${S.stun}s (longer on heavy foes, shorter on bosses), and clears.`; });
   ST('slowed', 'Slowed', ['slowed'], '#9fe4ff', 'It moves slower for a short time.');
   ST('chilled', 'Chilled', ['chilled'], '#9fe4ff', 'A frost slow. A chilled foe also carries Stormborn lightning further.');
@@ -99931,6 +100571,9 @@ bfAdd('bleeding', { name: 'Bleeding', kind: 'debuff', pri: 22, icon: 'drop', hue
 bfAdd('cursed', { name: 'Cursed', kw: 'st:cursed', kind: 'debuff', pri: 10, icon: 'doom', hue: '#4a1a6a', f: ['curseT', 'curseAmp', 'drainDps', 'drainSrc'],
   def: 'It takes more from every hit while the curse lasts.',
   get: c => c.curseT > 0 ? { t: c.curseT, src: bfFrom(c.drainSrc), say: `It takes ${bfPct(c.curseAmp || 0)} more from every hit${c.drainDps > 0 ? `, and the curse drains ${bfInt(c.drainDps)} health a second` : ''}.` } : null });
+bfAdd('ravenmark', { name: 'Ravenmark', kind: 'debuff', pri: 9, icon: 'feather', hue: '#5a3a90', f: ['ohMk'],
+  def: 'Marked by a Ravenmark weapon: the next hit on it from another unit lands harder.',
+  get: c => c.ohMk && c.ohMk.t > bfNow() ? { t: bfLeft(c.ohMk.t), say: `The next hit on it from another unit lands ${c.ohMk.k >= 3 ? 'three times' : 'twice'} as hard.` } : null });
 bfAdd('calledout', { name: 'Called out', kw: 'st:calledout', kind: 'debuff', pri: 9, icon: 'target', hue: '#8a6a10', f: ['markT', 'markAmp'],
   def: 'Marked: it takes more from every unit for a few seconds.',
   get: c => c.markT > 0 ? { t: c.markT, say: `It takes ${bfPct(c.markAmp || 0)} more from every unit.` } : null });
@@ -100027,7 +100670,7 @@ bfAdd('reacted', { name: 'Reacted', kw: 'cc:reaction', kind: 'debuff', pri: 11, 
     if (typeof ccReacted !== 'function' || !ccReacted(c, 1.5) || !CC_RX[c.ccRxId]) return null; const X = CC_RX[c.ccRxId];
     return { t: Math.max(0, (c.ccRxT || 0) - bfNow()), say: `${X.name}: ${X.text}` };
   } });
-bfAdd('rimebrand', { name: 'Rime-branded', kw: 'st:rimebranded', kind: 'debuff', pri: 8, icon: 'frostbite', hue: '#2a6a8a', f: ['ccxBrandT', 'ccxBrand'],
+bfAdd('rimebrand', { name: 'Frost-branded', kw: 'st:rimebranded', kind: 'debuff', pri: 8, icon: 'frostbite', hue: '#2a6a8a', f: ['ccxBrandT', 'ccxBrand'],
   def: 'A Frostweaver\'s brand: each step it takes leaves a frost print that bites the ground foe behind it.',
   get: c => c.ccxBrandT > bfNow() ? { t: bfLeft(c.ccxBrandT), n: c.ccxBrand ? c.ccxBrand.left : 0, src: bfFrom(c.ccxBrand && c.ccxBrand.t), say: 'Each step leaves a frost print: the next ground foe on it is struck and frozen a moment.' } : null });
 bfAdd('ccfguard', { name: 'Guard Dropped', kind: 'debuff', pri: 6, icon: 'shieldbreak', hue: '#8a3a7a', f: ['ccfGuardT', 'ccfGuardK'],
@@ -100150,6 +100793,9 @@ BF_U('bewitched', { name: 'Bewitched', kind: 'debuff', pri: 1, icon: 'hexeye', h
 BF_U('drumbeat', { name: 'Drumbeat', kind: 'buff', pri: 8, icon: 'horn', hue: '#7a4a10', f: ['drumT', 'drumK'],
   def: 'A war drum\'s beat: it attacks faster.',
   get: t => t.drumT > bfNow() ? { t: bfLeft(t.drumT), say: `It attacks ${bfPct(t.drumK || 0)} faster.` } : null });
+BF_U('secondself', { name: 'Second Self', kind: 'buff', pri: 8, icon: 'swords', hue: '#4a5a80', f: ['ohGhostT'],
+  def: 'A legendary Twinfang weapon: for a few seconds a second self strikes with every blow.',
+  get: t => t.ohGhostT > bfNow() ? { t: bfLeft(t.ohGhostT), say: 'A second self strikes every time it does, nearly as hard.' } : null });
 BF_U('frenzy', { name: 'Frenzy', kind: 'buff', pri: 8, icon: 'fist', hue: '#8a2a10', f: ['frenzyT'],
   def: 'It attacks twice as fast for a few seconds.',
   get: t => t.frenzyT > bfNow() ? { t: bfLeft(t.frenzyT), say: 'It attacks twice as fast.' } : null });
