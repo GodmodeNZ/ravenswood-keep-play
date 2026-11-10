@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f7a5355@2026-11-10';   // the play log's build version (playlog.js)
+const BUILD_TAG = '20fdb37@2026-11-10';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13194,8 +13194,9 @@ function ccGrimoire(t, st, c, marks, pow) {
 FORCE_ATTACK.cc_rime = function (t, st, tg, pow, echo) {
   const C = st.caps, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t) * .95);
   const still = C.ccStill && !echo && n % 3 === 0, flash = C.ccFlash && !echo && n % 4 === 0;
-  // her bolt is loosed with the ice tower's own sound, the jet of cold gas (owner: "use the old frost sound from the ice tower for the frostweaver")
-  if (!echo) sfx('frost', 0);
+  // her bolt is loosed with a quick snap of ice (owner: first "use the old frost sound from the ice tower for the frostweaver", then
+  // "need a different sound on frost auto": a short cut of the ice blast recording, frostsfxdata.js)
+  if (!echo) sfx('frostBolt');
   ccShoot({ k: 'ice', x: hx, h: hh, z: hz, tg, spd: 8, col: CC_COL.frost, sz: still ? 1.5 : 1, fn: c => {
     const s = t.st || st; if (!c) return;
     const amt = s.dmg * pow * (C.ccColdStone && ccHas(c, 'stone') ? 1 + .15 * C.ccColdStone : 1);   // Cold Stone
@@ -57750,6 +57751,7 @@ const AudioSys = (() => {
   S.pyroSkipCast = () => firePlay('pyroSkipCast', .087, .4);
   // the Frostweavers' spells, from three recordings the owner chose (frostsfxdata.js, tools/make_frostsfx.py): an ice blast for
   // Frost Spear, ice freezing over for Ice Coffin, a cold whoosh for Shatterbloom; until a take has loaded, the synth frost
+  S.frostBolt = () => { if (!firePlay('frBolt', .075, .09)) S.frost(0); };
   S.frostSpear = () => { if (!firePlay('frSpear', .11, .25)) S.frost(0); };
   S.frostCoffin = () => { if (!firePlay('frCoffin', .16, .3)) S.frost(1); };
   S.frostBloom = () => { if (!firePlay('frBloom', .12, .4)) S.frost(1); };
@@ -81678,204 +81680,94 @@ function fcShowCard(el) {
 }
 function fcHideCard() { if (fcCard) fcCard.hidden = true; if (fcCardFor) fcCardFor.classList.remove('fc-hot'); fcCardFor = null; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -81884,207 +81776,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -89727,6 +89487,640 @@ if (typeof towerTop === 'function') {
     return v * umScaleK(u);
   };
 }
+
+/* The Mageling on a rig and clips made from scratch (the owner, 10 Nov 2026, after the Gnoll Mauler: "can you do completely
+   new rigging and animation for the mageling and her spell casts"). Her mesh is the one she ships with (the white-robed young
+   mage); nothing of Mixamo's skeleton, weights or clips is used. tools/make_mageling2.py -> src/model_mageling2.js:
+   37 bones (a book in her left hand on a bone of its own; the robe below her hips on four panels, each in two lengths, kept plumb and pushed by her knees, each sleeve's drape on two bones
+   that hang toward the ground, collar bones that follow the arms, two finger bones a hand), 6,000 triangles, 8 clips baked at 30 frames a second.
+   ON by default (the owner: "Make it default"): her earlier look (unitmodels_mageling.js, model_unit_mageling.js) is untouched and draws when
+   the page has ?mage=old, or the Model Lab's "Mageling rig" row is set to Old (runehold.html?lab=1&unit=cc_mageling).
+   Her moves, by the same cues her shipped version reads (its hooks set t._mlShotAt, t._mlCastAt, t._mlCast):
+     idle       no foe in reach: her weight on one leg, the casting hand held up palm up, her eyes on it (4 s loop)
+     ready      a foe in reach: the casting hand brought up before her, palm up (2 s loop)
+     attack     her missile: the hand drawn back by her ear over the game's own wind-up (t.windup), thrown straight out so the
+                release frame lands on the shot, the arm straight; the follow-through after
+     barrage    Arcane Barrage: a step in, the right hand thrust out and held, kicking with each missile (0.1 to 0.6 s)
+     curtain    Mana Sparks: the LEFT hand snapped out at the foes as the spark leaves it, then drawn across before her
+     orbstart / orbhold / orbthrow   Gathering Orb: both hands raised to the orb gathering over her head, circling under
+                it; then drawn back and hurled forward with a step, the release on the hurl (t.ccxOrbThrowAt)
+   Every move is eased into from where she was (the pose followed at a rate by kind, bone by bone, by quaternion).
+   Her missiles and sparks leave the casting hand where it is drawn (t.tipW: the right palm; Mana Sparks the left).
+   Checks: `python tools/make_mageling2.py --check`. Notes: docs/model_pilot/mageling2.md. */
+const MAGE2 = (() => {
+  const U = typeof ML_UNIT !== 'undefined' ? ML_UNIT : 'cc_mageling';
+  const CAST = { cc_barrage: 'barrage', cc_sparks: 'curtain', cc_grandorb: 'orbstart' }, RATE = { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW = .1, K0 = .82, TRIM = .32;
+  const S = { on: true };
+  try { S.on = !/[?&]mage=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  /* A toward B by w */
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'mageling2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('mageling2: too many bones');
+    for (const nm of ['hips', 'handR', 'handL']) if (R_.bix[nm] == null) throw new Error('mageling2: no ' + nm);
+    D = data; R = R_; NB = nb; HGT = R.height || 1;
+    for (const nm of ['idle', 'ready', 'attack', 'barrage', 'curtain', 'orbstart', 'orbhold', 'orbthrow']) {
+      const c = D.clips && D.clips[nm]; if (!c) throw new Error('mageling2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * NB * 4 || t.length !== c.n * 3) throw new Error('mageling2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      CL[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length, gw = D.glow ? new Uint8Array(b64(D.glow)) : null, gc = D.glowCol || [.39, .75, 1];
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('mageling2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) {
+      const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v];
+      /* (the casting glow on her palms and fingers: lit in its own colour by the sculpt shader, by the item's glow level) */
+      if (gw && gw[v] > 20) { const w = gw[v] / 255; ext[k * 2] = w * .7; for (let a = 0; a < 3; a++) col[k * 3 + a] = 1 + (Math.max(gc[a], .02) - 1) * w; }
+    }
+    m.min = [-.6, -.02, -.6]; m.max = [.6, 1.25, .7];
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('MAGELING2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'mageling2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what she does now: { c: clip, s: seconds into it, rate, glow, hand } */
+  function ctl(t, live) {
+    if (!live) { const sh = typeof UM_SHOW !== 'undefined' && UM_SHOW != null; return { c: sh ? 'idle' : 'ready', s: sh ? UM_SHOW : 0, rate: 0, glow: .2, hand: 'R' }; }
+    const now = G.time, ph = now + (t.anim || 0) * 3, rel = n => (CL[n].rel || 0) / 30;
+    if (t.ccxOrbT != null) {
+      const r = rel('orbthrow'), t0 = (t.ccxOrbThrowAt != null && t.ccxOrbThrowAt >= t.ccxOrbT - .05 ? t.ccxOrbThrowAt : t.ccxOrbT) - r, u = now - t0;
+      if (u >= 0 && u < CL.orbthrow.len) return { c: 'orbthrow', s: u, rate: RATE.move, glow: .5 + 1.2 * Math.max(0, 1 - Math.abs(u - r) / .15), hand: 'R' };
+      if (now < t0 && now >= (t._mlCastAt || -9)) {
+        const s = now - t._mlCastAt;
+        if (t._mlCast === 'orbstart' && s < CL.orbstart.len) return { c: 'orbstart', s, rate: RATE.move, glow: .5, hand: 'R' };
+        return { c: 'orbhold', s: ph, rate: RATE.move * .5, glow: .6, hand: 'R' };
+      }
+    }
+    const C = t.ab && t.ab.cast, cm = C && CAST[C.id];
+    if (cm && cm !== 'orbstart' && C.T > 0) { const u = Math.max(0, Math.min(1, (now - C.at) / C.T)); return { c: cm, s: rel(cm) * u, rate: RATE.move * .6, glow: .3 + .4 * u, hand: cm === 'curtain' ? 'L' : 'R' }; }
+    if (t._mlCast && t._mlCast !== 'orbstart' && t._mlCastAt != null && CL[t._mlCast]) {
+      const u = now - t._mlCastAt, r = rel(t._mlCast);
+      if (u >= 0 && u < CL[t._mlCast].len) return { c: t._mlCast, s: u, rate: RATE.move, glow: .45 + (u > r ? .6 * Math.max(0, 1 - (u - r) / .5) : 0), hand: t._mlCast === 'curtain' ? 'L' : 'R' };
+    }
+    const r = rel('attack'), s = t._mlShotAt == null ? 9 : now - t._mlShotAt, wind = t.tg && t.windup > 0 ? t.windup : 0, flash = s >= 0 ? Math.max(0, 1 - s / .18) : 0;
+    if (s >= 0 && s < CL.attack.len - r && !(wind > 0 && s > FOLLOW)) return { c: 'attack', s: r + s, rate: RATE.atk, glow: .25 + 1.1 * flash, hand: 'R' };
+    if (wind > 0 && G.phase === 'wave') return { c: 'attack', s: r * wind, rate: RATE.atk, glow: .25 + .35 * wind, hand: 'R' };
+    if ((G.phase === 'wave' && t.tg && !t.tg.dead) || s < 1.5) return { c: 'ready', s: ph, rate: RATE.ready, glow: .25, hand: 'R' };
+    return { c: 'idle', s: ph, rate: RATE.idle, glow: .15 + .1 * Math.sin(now * 1.7 + (t.anim || 0) * 3), hand: 'R' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), full = towerMesh(t.type, tier), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    /* (as tall as her shipped model: the same k, which unitmodels_size.js evens across the units) */
+    const k = typeof UM_UNITS !== 'undefined' && UM_UNITS[U] && UM_UNITS[U].k != null ? UM_UNITS[U].k : K0;
+    const s = Math.max(.3, full.max[1]) / HGT * k * (1 + .025 * Math.max(0, (t.tier | 0) - 2));
+    const sz_ = typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1;
+    const bm = typeof ccBase === 'function' ? dynMesh('ml_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * sz_), () => ccWith(U, () => ccBase(g, tr, .28))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    M4.trs(_a, x, bm ? .047 * K * sz_ * sy : 0, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._m2T == null ? 1 : Math.max(0, Math.min(.1, now - t._m2T)); t._m2T = now;
+      if (!t._m2P || t._m2P.q.length !== NB * 4) { t._m2P = newPose(); t._m2P.q.set(PT.q); t._m2P.t.set(PT.t); }
+      follow(t._m2P, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._m2P;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [Math.max(0, P.glow || 0), TRIM]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    if (live && D.marks) {
+      const mk = P.hand === 'L' ? D.marks.CastL : D.marks.CastR, b = R.bix[P.hand === 'L' ? 'handL' : 'handR'], o = b * 12;
+      const px = OUT[o] * mk[0] + OUT[o + 4] * mk[1] + OUT[o + 8] * mk[2] + OUT[o + 3], py = OUT[o + 1] * mk[0] + OUT[o + 5] * mk[1] + OUT[o + 9] * mk[2] + OUT[o + 7], pz = OUT[o + 2] * mk[0] + OUT[o + 6] * mk[1] + OUT[o + 10] * mk[2] + OUT[o + 11];
+      t.tipW = M4.xf(_c, px, py, pz); t.tipYaw = yaw; t.tipAt = G.time; t._m2Clip = P.c;
+    }
+    return true;
+  }
+  try { load(typeof MAGELING2_MDL !== 'undefined' ? MAGELING2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Mageling rig:', e.message); }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked && draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; }
+      return _plain.apply(this, arguments);
+    };
+  }
+  /* the Model Lab's row (modellab.js untouched): her shipped rig or the new one */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('mage2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'mage2Row';
+    box.innerHTML = '<h3>Mageling rig</h3><div class="row">' + `<button data-m2="0" class="${S.on ? '' : 'on'}" title="Her earlier look: Mixamo's rig and clips (?mage=old)">Old (Mixamo)</button><button data-m2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (from scratch)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-m2]')) x.onclick = () => { S.on = x.dataset.m2 === '1'; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('mage2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  return { S, CL, load, hot, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* Faelan, Warden of the Long Watch, on a rig and clips made from scratch (the owner, 10 Nov 2026: "redo faelan animations with
+   the baseline asset"). His mesh is the one he ships with (the "Lite Longbow Pack" character) and his vine bow; nothing of
+   Mixamo's skeleton, weights or clips is used. tools/make_faelan2.py -> src/model_faelan2.js: 36 bones (his cloak on three
+   panels, each in two lengths, that hang plumb and swing clear of his legs; the cloth strip from his belt; the bow in his
+   left fist; a string of two lengths and an arrow that this file places every frame), 8 clips baked at 30 frames a second.
+   ON by default; his earlier look (unitmodels.js umMixArcher on model_unit_faelan_lb.js) is untouched and draws when the
+   page has ?faelan=old, or the Model Lab's "Faelan rig" row is set to Old (runehold.html?lab=1&unit=ch_faelan).
+   His moves, by the cues his earlier version reads (t.windup, t.shotT, t.ab.cast, t.ab.last / lastAt, t.tg):
+     idle      no foe in reach: his portrait's stance, the bow held low across him, his eyes along the road (6 s loop)
+     ready     a foe in reach: side on, an arrow nocked, the bow let down at the ground ahead (2.4 s loop)
+     draw      over the game's wind-up: the bow up, the string back to his jaw
+     reload    from the shot, every shot (the owner: "pull an arrow out of his quiver after every shot"): the string hand flies
+               back, goes up behind his head to the arrows in his quiver, lifts one out (it lengthens out of the quiver),
+               brings it over his shoulder and down onto the string, over the first six tenths of his rate; the draw
+               fills the rest, so every shot has its arrow whatever his rate; a spell's move is followed by one too
+     volley    Thorn Volley: a quick draw sent high          moon   Hunter's Moon: the bow raised to the sky, then the bright shot
+     pindraw / pinloose   Pinning Arrow: a slow deep draw over its cast, a strong shot's kick
+   Every move is eased into from where he was (bone by bone, by quaternion). The string's middle rides his fingers while a
+   clip says it is on them, the arrow lies from his fingers to the bow; his arrows leave from the bow's grip (t.tipW).
+   Checks: `python tools/make_faelan2.py --check`. Notes: docs/model_pilot/faelan2.md. */
+const FAELAN2 = (() => {
+  const U = 'ch_faelan', NAMES = ['idle', 'ready', 'draw', 'reload', 'volley', 'moon', 'pindraw', 'pinloose'], RL_HEAD = .2;
+  const RATE = { idle: 4, ready: 9, move: 34, shot: 60 }, K0 = .94;
+  const S = { on: true };
+  try { S.on = !/[?&]faelan=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, MK = null, BI = null, MV = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), x: [0, 0, 1] });
+  const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    /* (the string on his fingers: the frame's own, never blended; how much of the arrow shows and its lie: blended, but an
+       arrow never fades in from nothing or out to it between two frames) */
+    const j = (f < .5 ? i0 : i1) * 3, a1 = c.x[i0 * 3 + 1], b1 = c.x[i1 * 3 + 1]; P.x[0] = c.x[j] / 255; P.x[1] = (a1 < 8 || b1 < 8 ? c.x[j + 1] : a1 + (b1 - a1) * f) / 255; P.x[2] = (c.x[i0 * 3 + 2] + (c.x[i1 * 3 + 2] - c.x[i0 * 3 + 2]) * f) / 255;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  /* a rest point carried by a bone of the buffer */
+  const at = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2] + out[g + 3], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2] + out[g + 7], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2] + out[g + 11]]; };
+  const dir = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2]]; };
+  /* the string and the arrow, placed (as tools/faelan_anim.py props): the string's ends on the bow's tips, its middle on his
+     fingers' hook by x[0]; the arrow's nock at the hook, laid toward the bow's grip by x[2] (else along his fist), shown by x[1] */
+  function props(out, x) {
+    const nk = at(out, BI.fingR, MK.nock);
+    for (const [bn, mk, w] of [[BI.strT, MK.top, 0], [BI.strM, MK.mid, x[0]], [BI.strB, MK.bot, 0]]) {
+      const p = at(out, BI.bow, mk), g = bn * 12;
+      out[g] = 1; out[g + 1] = 0; out[g + 2] = 0; out[g + 4] = 0; out[g + 5] = 1; out[g + 6] = 0; out[g + 8] = 0; out[g + 9] = 0; out[g + 10] = 1;
+      out[g + 3] = p[0] + (nk[0] - p[0]) * w - mk[0]; out[g + 7] = p[1] + (nk[1] - p[1]) * w - mk[1]; out[g + 11] = p[2] + (nk[2] - p[2]) * w - mk[2];
+    }
+    const r = at(out, BI.bow, MK.rest), d0 = dir(out, BI.handR, [0, 0, 1]); let d = [r[0] - nk[0], r[1] - nk[1], r[2] - nk[2]], l = Math.hypot(d[0], d[1], d[2]) || 1;
+    d = [d0[0] + (d[0] / l - d0[0]) * x[2], d0[1] + (d[1] / l - d0[1]) * x[2], d0[2] + (d[2] / l - d0[2]) * x[2]]; l = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / l, d[1] / l, d[2] / l];
+    /* (the least turn taking +z, the way the arrow lies at rest, to d) */
+    const sc = x[1] > .03 ? 1 : 0, ln = x[1], c = d[2], k = 1 / (1 + Math.max(-.999, c)), vx = -d[1], vy = d[0];
+    const m = [1 - vy * vy * k, vx * vy * k, vy, vx * vy * k, 1 - vx * vx * k, -vx, -vy, vx, 1 - (vx * vx + vy * vy) * k];   // rows
+    const g = BI.arrow * 12, h = [H[BI.arrow * 3], H[BI.arrow * 3 + 1], H[BI.arrow * 3 + 2]];
+    out[g] = m[0] * sc; out[g + 1] = m[3] * sc; out[g + 2] = m[6] * sc; out[g + 4] = m[1] * sc; out[g + 5] = m[4] * sc; out[g + 6] = m[7] * sc; out[g + 8] = m[2] * sc * ln; out[g + 9] = m[5] * sc * ln; out[g + 10] = m[8] * sc * ln;   // (its length: x[1] of it)
+    out[g + 3] = nk[0] - sc * (m[0] * h[0] + m[1] * h[1] + m[2] * ln * h[2]); out[g + 7] = nk[1] - sc * (m[3] * h[0] + m[4] * h[1] + m[5] * ln * h[2]); out[g + 11] = nk[2] - sc * (m[6] * h[0] + m[7] * h[1] + m[8] * ln * h[2]);
+    return out;
+  }
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'faelan2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('faelan2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'handR', 'fingR', 'bow', 'strT', 'strM', 'strB', 'arrow']) { if (R_.bix[nm] == null) throw new Error('faelan2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['top', 'mid', 'bot', 'rest', 'grip', 'nock']) if (!mk || !mk[nm]) throw new Error('faelan2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('faelan2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), x = new Uint8Array(b64(c.x));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || x.length !== c.n * 3) throw new Error('faelan2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, x, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; HGT = R.height || 1; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    /* each spell's move: `pre` plays over its cast (up to preLen), `post` from the release (from `from`; an instant spell from `inst`) */
+    MV = { ch_thornvolley: { pre: 'volley', preLen: CL.volley.rel / 30, post: 'volley', from: CL.volley.rel / 30, inst: 0, glow: 1 },
+           ch_huntermoon: { pre: 'moon', preLen: CL.moon.rel / 30, post: 'moon', from: CL.moon.rel / 30, inst: 0, glow: 1.8, moon: 1 },
+           ch_pinarrow: { pre: 'pindraw', preLen: CL.pindraw.len, post: 'pinloose', from: 0, inst: 0, glow: 1.4 } };
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('faelan2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.7, -.02, -.7]; m.max = [.7, 1.35, .8];
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('FAELAN2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'faelan2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate, glow, moon, flash } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, glow: 0 };
+    const now = G.time, ph = now + (t.anim || 0) * 3, A = t.ab, cast = A && A.cast && MV[A.cast.id] ? A.cast : null;
+    if (cast) t._f2Cast = cast; else if (t._f2Cast) { t._f2Rel = now; t._f2RelId = t._f2Cast.id; t._f2RelCast = true; t._f2Cast = null; }   // (a spell goes: its release)
+    if (A && A.lastAt != null && A.lastAt !== t._f2LastAt) { t._f2LastAt = A.lastAt; if (!cast && MV[A.last] && !(t._f2RelId === A.last && now - t._f2Rel < .2)) { t._f2Rel = A.lastAt; t._f2RelId = A.last; t._f2RelCast = false; } }   // (an instant spell: its move from when it went)
+    if (cast) { const m = MV[cast.id], u = Math.max(0, Math.min(1, (now - cast.at) / Math.max(.05, cast.T))); return { c: m.pre, s: m.preLen * sm(0, 1, u), rate: RATE.move, glow: sm(.2, .7, u) * m.glow, moon: m.moon ? sm(.15, .5, u) : 0 }; }
+    const sc = t._f2Rel != null ? now - t._f2Rel : 9, m = t._f2RelId ? MV[t._f2RelId] : null, RL = CL.reload.len;
+    let after = 9;   // seconds since a spell's move ended (the next arrow follows it)
+    if (m && sc >= 0) {
+      const s0 = t._f2RelCast ? m.from : m.inst, s = s0 + sc, r = CL[m.post].rel != null ? CL[m.post].rel / 30 : 0;
+      if (s < CL[m.post].len) return { c: m.post, s, rate: RATE.shot, glow: s < r ? sm(0, r, s) * m.glow : Math.max(0, 1 - (s - r) / .4) * m.glow, moon: m.moon && s < r ? sm(.3, .9, s) * (1 - sm(r - .4, r, s) * .4) : 0, flash: m.moon && s >= r ? Math.max(0, 1 - (s - r) / .35) : 0 };
+      after = s - CL[m.post].len;
+    }
+    const s = t.shotT != null ? t.shotT : 9, w = t.tg ? t.windup || 0 : 0;
+    if (t._f2RateAt == null || now - t._f2RateAt > 2 || now < t._f2RateAt) { t._f2RateAt = now; try { t._f2Rate = (t.st && t.st.rate) || effStats(t).rate; } catch (e) { t._f2Rate = 1; } }
+    const rate = Math.max(.3, t._f2Rate || 1), engaged = G.phase === 'wave' && t.tg && !t.tg.dead;
+    /* one shot's cycle, whatever the rate: from the release the next arrow is taken from the quiver and laid on the string
+       over the first six tenths of it (the clip's own pace at a rate of about 1.8 s; quicker for a quicker shooter), and the
+       draw fills the rest, so the string is at the jaw as the next shot goes */
+    if (s >= 0 && s < rate * 1.15 && s <= after + .3) {
+      const u = s / rate;
+      if (u < .6) return { c: 'reload', s: Math.min(RL, Math.max(s, RL * u / .6)), rate: RATE.shot, glow: Math.max(0, 1 - s / .3) * .6 };
+      if (w > 0 || engaged) return { c: 'draw', s: CL.draw.len * Math.min(1, (u - .6) / .4), rate: RATE.shot, glow: 0 };
+    }
+    if (w > 0) return { c: 'draw', s: CL.draw.len * w, rate: RATE.shot, glow: 0 };
+    if (after < RL - RL_HEAD) return { c: 'reload', s: RL_HEAD + after, rate: RATE.move, glow: 0 };
+    if (engaged || s < rate + .5 || after < RL + .6) return { c: 'ready', s: ph, rate: RATE.ready, glow: 0 };
+    return { c: 'idle', s: ph, rate: RATE.idle, glow: 0 };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  /* drawn as unitmodels.js umDraw draws him (the same base, size and place), on this rig */
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const US = UM_UNITS[U] || {}, base = L && L.base && L.base.count ? L.base : null;
+    if (base) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _a, opts); }
+    const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / HGT * (US.k != null ? US.k : K0) * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - (US.sink || 0)) : 0;
+    M4.trs(_a, x, (B.y * K + lift) * sy, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._f2T == null ? 1 : Math.max(0, Math.min(.1, now - t._f2T)); t._f2T = now;
+      if (!t._f2P || t._f2P.q.length !== NB * 4) { t._f2P = newPose(); t._f2P.q.set(PT.q); t._f2P.t.set(PT.t); }
+      follow(t._f2P, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._f2P;
+    }
+    toBones(pose, OUT); props(OUT, PT.x);
+    const it = item(MESH_, _c, opts); it.sec = [(tr >= 3 ? .45 * (tr - 2) : 0) * 0 + Math.max(0, P.glow || 0) * .25, US.trim || 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    if (live && !icon && typeof QADD !== 'undefined' && ((P.moon || 0) > .01 || (P.flash || 0) > .01)) {   // Hunter's Moon: a pale light along the raised bow (faint: he stays readable), one flare at the grip on the bright shot
+      const a = at(OUT, BI.bow, MK.top), b = at(OUT, BI.bow, MK.bot), mo = P.moon || 0;
+      for (let i = 0; i <= 6 && mo > .01; i++) { const f = i / 6, w = M4.xf(_c, a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f), pul = .8 + .2 * Math.sin((G.time || 0) * 5 + i); QADD.bill(RD, w[0], w[1], w[2], .07 * s, .07 * s, [.82, .88, 1, .1 * mo * pul], 1, 0); }
+      if ((P.flash || 0) > .01) { const g = at(OUT, BI.bow, MK.grip), w = M4.xf(_c, g[0], g[1], g[2]); QADD.bill(RD, w[0], w[1], w[2], .16 * s, .16 * s, [.9, .94, 1, .35 * P.flash], 1, 0); }
+    }
+    if (live) { const g = at(OUT, BI.bow, MK.rest); t.tipW = M4.xf(_c, g[0], g[1], g[2]); t.tipYaw = ang; t.tipAt = G.time; t._f2Clip = P.c; }
+    return true;
+  }
+  try { load(typeof FAELAN2_MDL !== 'undefined' ? FAELAN2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Faelan rig:', e.message); }
+  if (MESH_ && typeof umDraw === 'function') {
+    const _um = umDraw;
+    umDraw = function (t, u) {
+      if (u === U && S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && UM_UNITS[U]) { try { if (draw.apply(this, arguments)) return true; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('faelan2:', e); } } }
+      return _um.apply(this, arguments);
+    };
+  }
+  /* the Model Lab's row (modellab.js untouched): his earlier rig or the new one */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('fae2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'fae2Row';
+    box.innerHTML = '<h3>Faelan rig</h3><div class="row">' + `<button data-f2="0" class="${S.on ? '' : 'on'}" title="His earlier look: Mixamo's rig and draw clip (?faelan=old)">Old (Mixamo)</button><button data-f2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (from scratch)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-f2]')) x.onclick = () => { S.on = x.dataset.f2 === '1'; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('fae2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  return { S, CL, load, hot, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Gladebow Rangers on a rig and clips made from scratch (the owner, 10 Nov 2026, of Faelan's new rig and his arrow from
+   the quiver after every shot: "same with rangers"). Their mesh is the one they ship with, taken un-rigged (her bow sculpted
+   in her left fist); nothing of Mixamo's skeleton, weights or clips is used. tools/make_ranger2.py -> src/model_ranger2.js:
+   Faelan's 36 bones fitted to her, 7 clips baked at 30 frames a second by the same solver (tools/faelan_anim.py).
+   ON by default; their earlier look (unitmodels.js umMixArcher on model_unit_gladebow.js) is untouched and draws when the
+   page has ?ranger=old, or the Model Lab's "Ranger rig" row is set to Old (runehold.html?lab=1&unit=gladebow).
+   This file is src/unitmodels_faelan2.js with the names changed (see it for how the moves are chosen and the string and the
+   arrow placed): idle, ready, draw over the wind-up, and from every shot `reload` (the release, then an arrow taken from
+   the quiver behind her head, over her shoulder and onto the string); Arrow Rain plays `volley` (a quick draw sent high),
+   Aimed Shot `pindraw` over its cast and `pinloose`.
+   Checks: `python tools/make_ranger2.py --check`. Notes: docs/model_pilot/ranger2.md. */
+const RANGER2 = (() => {
+  const U = 'gladebow', NAMES = ['idle', 'ready', 'draw', 'reload', 'volley', 'pindraw', 'pinloose'], RL_HEAD = .2;
+  const RATE = { idle: 4, ready: 9, move: 34, shot: 60 }, K0 = .94;
+  const S = { on: true };
+  try { S.on = !/[?&]ranger=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, MK = null, BI = null, MV = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), x: [0, 0, 1] });
+  const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    /* (the string on his fingers: the frame's own, never blended; how much of the arrow shows and its lie: blended, but an
+       arrow never fades in from nothing or out to it between two frames) */
+    const j = (f < .5 ? i0 : i1) * 3, a1 = c.x[i0 * 3 + 1], b1 = c.x[i1 * 3 + 1]; P.x[0] = c.x[j] / 255; P.x[1] = (a1 < 8 || b1 < 8 ? c.x[j + 1] : a1 + (b1 - a1) * f) / 255; P.x[2] = (c.x[i0 * 3 + 2] + (c.x[i1 * 3 + 2] - c.x[i0 * 3 + 2]) * f) / 255;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  /* a rest point carried by a bone of the buffer */
+  const at = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2] + out[g + 3], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2] + out[g + 7], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2] + out[g + 11]]; };
+  const dir = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2]]; };
+  /* the string and the arrow, placed (as tools/faelan_anim.py props): the string's ends on the bow's tips, its middle on his
+     fingers' hook by x[0]; the arrow's nock at the hook, laid toward the bow's grip by x[2] (else along his fist), shown by x[1] */
+  function props(out, x) {
+    const nk = at(out, BI.fingR, MK.nock);
+    for (const [bn, mk, w] of [[BI.strT, MK.top, 0], [BI.strM, MK.mid, x[0]], [BI.strB, MK.bot, 0]]) {
+      const p = at(out, BI.bow, mk), g = bn * 12;
+      out[g] = 1; out[g + 1] = 0; out[g + 2] = 0; out[g + 4] = 0; out[g + 5] = 1; out[g + 6] = 0; out[g + 8] = 0; out[g + 9] = 0; out[g + 10] = 1;
+      out[g + 3] = p[0] + (nk[0] - p[0]) * w - mk[0]; out[g + 7] = p[1] + (nk[1] - p[1]) * w - mk[1]; out[g + 11] = p[2] + (nk[2] - p[2]) * w - mk[2];
+    }
+    const r = at(out, BI.bow, MK.rest), d0 = dir(out, BI.handR, [0, 0, 1]); let d = [r[0] - nk[0], r[1] - nk[1], r[2] - nk[2]], l = Math.hypot(d[0], d[1], d[2]) || 1;
+    d = [d0[0] + (d[0] / l - d0[0]) * x[2], d0[1] + (d[1] / l - d0[1]) * x[2], d0[2] + (d[2] / l - d0[2]) * x[2]]; l = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / l, d[1] / l, d[2] / l];
+    /* (the least turn taking +z, the way the arrow lies at rest, to d) */
+    const sc = x[1] > .03 ? 1 : 0, ln = x[1], c = d[2], k = 1 / (1 + Math.max(-.999, c)), vx = -d[1], vy = d[0];
+    const m = [1 - vy * vy * k, vx * vy * k, vy, vx * vy * k, 1 - vx * vx * k, -vx, -vy, vx, 1 - (vx * vx + vy * vy) * k];   // rows
+    const g = BI.arrow * 12, h = [H[BI.arrow * 3], H[BI.arrow * 3 + 1], H[BI.arrow * 3 + 2]];
+    out[g] = m[0] * sc; out[g + 1] = m[3] * sc; out[g + 2] = m[6] * sc; out[g + 4] = m[1] * sc; out[g + 5] = m[4] * sc; out[g + 6] = m[7] * sc; out[g + 8] = m[2] * sc * ln; out[g + 9] = m[5] * sc * ln; out[g + 10] = m[8] * sc * ln;   // (its length: x[1] of it)
+    out[g + 3] = nk[0] - sc * (m[0] * h[0] + m[1] * h[1] + m[2] * ln * h[2]); out[g + 7] = nk[1] - sc * (m[3] * h[0] + m[4] * h[1] + m[5] * ln * h[2]); out[g + 11] = nk[2] - sc * (m[6] * h[0] + m[7] * h[1] + m[8] * ln * h[2]);
+    return out;
+  }
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'ranger2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('ranger2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'handR', 'fingR', 'bow', 'strT', 'strM', 'strB', 'arrow']) { if (R_.bix[nm] == null) throw new Error('ranger2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['top', 'mid', 'bot', 'rest', 'grip', 'nock']) if (!mk || !mk[nm]) throw new Error('ranger2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('ranger2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), x = new Uint8Array(b64(c.x));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || x.length !== c.n * 3) throw new Error('ranger2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, x, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; HGT = R.height || 1; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    /* each spell's move: `pre` plays over its cast (up to preLen), `post` from the release (from `from`; an instant spell from `inst`) */
+    MV = { arrowrain: { pre: 'volley', preLen: CL.volley.rel / 30, post: 'volley', from: CL.volley.rel / 30, inst: 0, glow: 1 },
+           aimedshot: { pre: 'pindraw', preLen: CL.pindraw.len, post: 'pinloose', from: 0, inst: 0, glow: 1.2 } };
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('ranger2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.7, -.02, -.7]; m.max = [.7, 1.35, .8];
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('RANGER2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'ranger2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate, glow, moon, flash } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, glow: 0 };
+    const now = G.time, ph = now + (t.anim || 0) * 3, A = t.ab, cast = A && A.cast && MV[A.cast.id] ? A.cast : null;
+    if (cast) t._r2Cast = cast; else if (t._r2Cast) { t._r2Rel = now; t._r2RelId = t._r2Cast.id; t._r2RelCast = true; t._r2Cast = null; }   // (a spell goes: its release)
+    if (A && A.lastAt != null && A.lastAt !== t._r2LastAt) { t._r2LastAt = A.lastAt; if (!cast && MV[A.last] && !(t._r2RelId === A.last && now - t._r2Rel < .2)) { t._r2Rel = A.lastAt; t._r2RelId = A.last; t._r2RelCast = false; } }   // (an instant spell: its move from when it went)
+    if (cast) { const m = MV[cast.id], u = Math.max(0, Math.min(1, (now - cast.at) / Math.max(.05, cast.T))); return { c: m.pre, s: m.preLen * sm(0, 1, u), rate: RATE.move, glow: sm(.2, .7, u) * m.glow, moon: m.moon ? sm(.15, .5, u) : 0 }; }
+    const sc = t._r2Rel != null ? now - t._r2Rel : 9, m = t._r2RelId ? MV[t._r2RelId] : null, RL = CL.reload.len;
+    let after = 9;   // seconds since a spell's move ended (the next arrow follows it)
+    if (m && sc >= 0) {
+      const s0 = t._r2RelCast ? m.from : m.inst, s = s0 + sc, r = CL[m.post].rel != null ? CL[m.post].rel / 30 : 0;
+      if (s < CL[m.post].len) return { c: m.post, s, rate: RATE.shot, glow: s < r ? sm(0, r, s) * m.glow : Math.max(0, 1 - (s - r) / .4) * m.glow, moon: m.moon && s < r ? sm(.3, .9, s) * (1 - sm(r - .4, r, s) * .4) : 0, flash: m.moon && s >= r ? Math.max(0, 1 - (s - r) / .35) : 0 };
+      after = s - CL[m.post].len;
+    }
+    const s = t.shotT != null ? t.shotT : 9, w = t.tg ? t.windup || 0 : 0;
+    if (t._r2RateAt == null || now - t._r2RateAt > 2 || now < t._r2RateAt) { t._r2RateAt = now; try { t._r2Rate = (t.st && t.st.rate) || effStats(t).rate; } catch (e) { t._r2Rate = 1; } }
+    const rate = Math.max(.3, t._r2Rate || 1), engaged = G.phase === 'wave' && t.tg && !t.tg.dead;
+    /* one shot's cycle, whatever the rate: from the release the next arrow is taken from the quiver and laid on the string
+       over the first six tenths of it (the clip's own pace at a rate of about 1.8 s; quicker for a quicker shooter), and the
+       draw fills the rest, so the string is at the jaw as the next shot goes */
+    if (s >= 0 && s < rate * 1.15 && s <= after + .3) {
+      const u = s / rate;
+      if (u < .6) return { c: 'reload', s: Math.min(RL, Math.max(s, RL * u / .6)), rate: RATE.shot, glow: Math.max(0, 1 - s / .3) * .6 };
+      if (w > 0 || engaged) return { c: 'draw', s: CL.draw.len * Math.min(1, (u - .6) / .4), rate: RATE.shot, glow: 0 };
+    }
+    if (w > 0) return { c: 'draw', s: CL.draw.len * w, rate: RATE.shot, glow: 0 };
+    if (after < RL - RL_HEAD) return { c: 'reload', s: RL_HEAD + after, rate: RATE.move, glow: 0 };
+    if (engaged || s < rate + .5 || after < RL + .6) return { c: 'ready', s: ph, rate: RATE.ready, glow: 0 };
+    return { c: 'idle', s: ph, rate: RATE.idle, glow: 0 };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  /* drawn as unitmodels.js umDraw draws him (the same base, size and place), on this rig */
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const US = UM_UNITS[U] || {}, base = L && L.base && L.base.count ? L.base : null;
+    if (base) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _a, opts); }
+    const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / HGT * (US.k != null ? US.k : K0) * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - (US.sink || 0)) : 0;
+    M4.trs(_a, x, (B.y * K + lift) * sy, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._r2T == null ? 1 : Math.max(0, Math.min(.1, now - t._r2T)); t._r2T = now;
+      if (!t._r2P || t._r2P.q.length !== NB * 4) { t._r2P = newPose(); t._r2P.q.set(PT.q); t._r2P.t.set(PT.t); }
+      follow(t._r2P, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._r2P;
+    }
+    toBones(pose, OUT); props(OUT, PT.x);
+    const it = item(MESH_, _c, opts); it.sec = [(tr >= 3 ? .45 * (tr - 2) : 0) * 0 + Math.max(0, P.glow || 0) * .25, US.trim || 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    if (live && !icon && typeof QADD !== 'undefined' && ((P.moon || 0) > .01 || (P.flash || 0) > .01)) {   // Hunter's Moon: a pale light along the raised bow (faint: he stays readable), one flare at the grip on the bright shot
+      const a = at(OUT, BI.bow, MK.top), b = at(OUT, BI.bow, MK.bot), mo = P.moon || 0;
+      for (let i = 0; i <= 6 && mo > .01; i++) { const f = i / 6, w = M4.xf(_c, a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f), pul = .8 + .2 * Math.sin((G.time || 0) * 5 + i); QADD.bill(RD, w[0], w[1], w[2], .07 * s, .07 * s, [.82, .88, 1, .1 * mo * pul], 1, 0); }
+      if ((P.flash || 0) > .01) { const g = at(OUT, BI.bow, MK.grip), w = M4.xf(_c, g[0], g[1], g[2]); QADD.bill(RD, w[0], w[1], w[2], .16 * s, .16 * s, [.9, .94, 1, .35 * P.flash], 1, 0); }
+    }
+    if (live) { const g = at(OUT, BI.bow, MK.rest); t.tipW = M4.xf(_c, g[0], g[1], g[2]); t.tipYaw = ang; t.tipAt = G.time; t._r2Clip = P.c; }
+    return true;
+  }
+  try { load(typeof RANGER2_MDL !== 'undefined' ? RANGER2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Ranger rig:', e.message); }
+  if (MESH_ && typeof umDraw === 'function') {
+    const _um = umDraw;
+    umDraw = function (t, u) {
+      if (u === U && S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && UM_UNITS[U]) { try { if (draw.apply(this, arguments)) return true; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('ranger2:', e); } } }
+      return _um.apply(this, arguments);
+    };
+  }
+  /* the Model Lab's row (modellab.js untouched): his earlier rig or the new one */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('rng2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'rng2Row';
+    box.innerHTML = '<h3>Ranger rig</h3><div class="row">' + `<button data-r2="0" class="${S.on ? '' : 'on'}" title="Their earlier look: Mixamo's rig and draw clip (?ranger=old)">Old (Mixamo)</button><button data-r2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (from scratch)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-r2]')) x.onclick = () => { S.on = x.dataset.r2 === '1'; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('rng2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  return { S, CL, load, hot, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
 
 /* ================= THE FROSTWEAVERS' ICE SHADER: faceted ice, cold mist and glints, drawn live =================
    The cold counterpart of the Pyroclasts' flame shader (pyrotex.js), for the owner's "get another agent to work alongside
