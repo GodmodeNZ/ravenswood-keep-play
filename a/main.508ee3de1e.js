@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f0e7410@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7c6a5af@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -2144,10 +2144,12 @@ function spawn(s) {
 }
 
 /* ---- Update ---- */
+// one delayed call coming due (an ability's as that ability; forces_zzzzzzzzzzzzzzzzzzzz_holds.js wraps it to know whose it is)
+function delayedRun(d) { if (d.abId) abRun(d.abId, d.fn); else d.fn(); }
 function update(dt) {
   if (G.hitStop > 0) { G.hitStop -= dt; if (!G.vs) dt *= .25; }
   G.time += dt;
-  if (G.delayed.length) { for (const d of G.delayed) { d.t -= dt; if (d.t <= 0) { if (d.abId) abRun(d.abId, d.fn); else d.fn(); } } G.delayed = G.delayed.filter(d => d.t > 0); }
+  if (G.delayed.length) { for (const d of G.delayed) { d.t -= dt; if (d.t <= 0) delayedRun(d); } G.delayed = G.delayed.filter(d => d.t > 0); }
   if (G.phase === 'build' && G.countdown > 0) { G.countdown -= dt; if (G.countdown <= 0) { G.countdown = 0; callWave(); } }
   if (G.phase === 'wave') {
     G.waveT += dt;
@@ -7589,7 +7591,7 @@ function rootBurst(c) {
     for (let k = 0; k < 10; k++) part({ k: 'chunk', x, z, h: .05, vh: R(1, 2), vx: R(-1.4, 1.4), vz: R(-1.4, 1.4), g: 7, life: .45, max: .45, size: R(.03, .06), col: k % 2 ? '#4a7a2a' : '#5a4430' });
   } });
 }
-// the single-target melee units' holds, both roots (the Grove's own hold): the Thornguard's Pin, the Stag Lancers' pinning
+// the single-target melee units' holds, both roots (the Grove's own hold; since 11 Nov 2026 only the Thornguard's is laid: the Stag Lancers hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js): the Thornguard's Pin, the Stag Lancers' pinning
 // charge. A foe they root is a rooted foe for Growth (gwRootFed) and for every "vs rooted" talent and spell.
 const GV_PIN = { every: 4, t: 1 }, GV_KNOCK = 1;
 function spearThrust(t, st, tg, pow) {   // Thornguard: a spear thrust at the foe beside it, through to the one behind
@@ -7673,14 +7675,14 @@ function stagCharge(t, st, tg, pow, again) {   // Stag Lancers: out to the foe, 
       hurt(tg, amt, 'phys', t, false, [ux * .3, uz * .3]); onHit(tg, st, t, amt);
       fxSpark(tg.x, tg.y, hitH(tg), '#f4ecc8', 12); fxDust(tg.x, tg.y, 4); sfx('glaiveHit', 1);
       // the charge pins its foe to the ground (rooted), and the stag's Growth feeds on it
-      if (!tg.dead) { rootFoe(tg, GV_KNOCK, t); if (typeof gwRootFed === 'function') gwRootFed(t, tg); }
+      if (!tg.dead && L >= 2 && typeof gwRootFed === 'function') gwRootFed(t, tg);   // (no pin: the Lancers hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js; a charge of 2 cells or more feeds their Growth as a rooted foe did)
     }
     // Hooves of Thunder: a stomp at the mark roots the walkers around it too
     if (C.hooves) {
-      inSplash(mx, mz, 1, true, o => { if (o.phased || o.ent) return; if (o !== tg) { hurt(o, amt * .5, 'phys', t, false, null); onHit(o, st, t, amt * .5); if (!o.dead) rootFoe(o, GV_KNOCK, t); } });
+      inSplash(mx, mz, 1, true, o => { if (o.phased || o.ent) return; if (o !== tg) { const a = amt * (typeof holdHeld === 'function' && holdHeld(o) ? 1 : .5); hurt(o, a, 'phys', t, false, null); onHit(o, st, t, a); } });   // (held foes take all of it; it holds none itself)
       fxRing(mx, mz, 1, '#e8d8a8'); fxDust(mx, mz, 8); G.shake = Math.max(G.shake, .06);
     }
-    if (C.bowl && !tg.dead) { stun(tg, .3, false, null); const x0 = tg.x, z0 = tg.y; shove(tg, .6); dragFx(tg, x0, z0, '#d8c8a0'); }   // Bowl Over (shove: bosses weigh nothing to it)
+    if (C.bowl && !tg.dead) { const x0 = tg.x, z0 = tg.y; shove(tg, .6); dragFx(tg, x0, z0, '#d8c8a0'); }   // Bowl Over (shove: bosses weigh nothing to it)
     const ws = st.pw && st.pw.whitestag;   // Antler of the White Stag: a charge that kills wheels into the next foe
     if (ws && tg.dead && (t.wsN | 0) < ws) G.delayed.push({ t: .22, fn: () => {
       if (!G.towers.includes(t) || t.wrecked || G.state !== 'play') return;
@@ -16065,7 +16067,7 @@ function ihShieldShove(t, st, tg, ux, uz, extra) {
   for (const c of hit) {
     if (c.dead) continue;
     ihShove(c, charge ? Math.max(.6, d) : d, t, '#e8d0a0');
-    if (charge) ihStun(c, .5);
+    // (Shield Rush: the charge throws them back; it adds no stun: one hold talent fewer, root audit 11 Nov 2026)
   }
   if (charge) { fxRing(tg.x, tg.y, 1, '#e8d0a0'); G.shake = Math.max(G.shake, .1); }
   fxDust(tg.x, tg.y, 3); ihSparks(tg.x, tg.y, hitH(tg), 6, '#ffe8b0'); sfx('glaiveHit', 1);
@@ -16251,8 +16253,8 @@ function ihSlam(t, st, pow, sub) {
     ihHit(t, st, c, amt, 'phys', sub < 1);
     if (c.dead) return;
     const cr = 2 + (C.ihCrack || 0); c.shred = Math.max(c.shredT > 0 ? c.shred : 0, cr); c.shredT = Math.max(c.shredT, 4); c.ihCrackT = G.time + 4;   // the armour cracks
-    if (C.ihPop && had && ihArmor(c) <= 0 && !c.ihPopped) { c.ihPopped = 1; ihStun(c, .3 * C.ihPop); }   // Rivet Popper
-    if (big && C.ihBreak) ihStun(c, .6);   // Groundsplitter
+    if (C.ihPop && had && ihArmor(c) <= 0 && !c.ihPopped) { c.ihPopped = 1; ihHeatAdd(t, st, .1 * C.ihPop); }   // Rivet Popper (it fills the gauge: the Hammers hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js)
+    // (Groundsplitter: the 4th slam's weight only; it stuns no one now)
   }));
   if (t.def.unit === 'steamhammer' && typeof shSlamFx === 'function') { if (sub === 1) { t.ihBig = big ? 1 : 0; sfx('quake', 0); } else fxDust(t.x, t.y, 2); }   // (the hammer's own landing: forces_ironhold_g.js)
   else { fxQuake(t.x, t.y, R0 * .9, sub < 1 ? .3 : big ? 1 : .55); if (sub === 1) { fxDust(t.x, t.y, 4); G.shake = Math.max(G.shake, big ? .1 : .04); sfx('quake', 0); } }
@@ -16268,7 +16270,7 @@ function ihSteamBurst(t, st, pow, k) {
     chill(c, { slow: .4, slowT: 1.5 }, null, t);
     if (C.ihScald) ignite(c, amt * .2 * C.ihScald / 3, 3, t, false);   // Scalding Steam
     if (C.ihOver) ihShove(c, .4, t, '#f0e8dc');                         // Overpressure
-    if (st.pw && st.pw.ihGauge) { ihStun(c, .4); relicGlint(t, 'ih_gauge'); }   // Pressure Gauge
+    if (st.pw && st.pw.ihGauge) { if (typeof holdCrack === 'function') holdCrack(c, 2); relicGlint(t, 'ih_gauge'); }   // Pressure Gauge (armour, not a stun: the Hammers hold nothing)
   }));
   for (let q = 0; q < 12; q++) { const a = q / 12 * TAU + R(-.3, .3), v = r * R(1.1, 2.4); part({ k: 'smoke', x: t.x + Math.cos(a) * R(.35, .6), z: t.y + Math.sin(a) * R(.35, .6), h: .1, vx: Math.cos(a) * v, vz: Math.sin(a) * v, vh: R(.15, .6), drag: 2.4, life: .8, max: .8, size: R(.14, .24), col: IH_COL.steam }); }   // (the steam rolls out low from round his feet, clear of him, ragged so it never reads as a ring)
   if (C.ihValve && G.hazards.length < 40) { const o = nearest(t.x, t.y, st.range + .5, 1, null, c => !c.fly)[0]; if (o) G.hazards.push({ k: 'ih_vent', x: o.x, z: o.y, r: .7, t: 4, T: 4, tick: 0, src: t, st, dmgK: .3 }); }   // Safety Valve
@@ -17160,7 +17162,7 @@ const IH_RELICS = {
     text: k => `Its barrages fire ${Math.max(1, Math.round(2 * k))} more shells.`,
     fx: (st, k) => ihPw(st, 'ihDrum', Math.max(1, Math.round(2 * k))) },
   ih_gauge: { rar: 3, for: ['earth'], name: 'Pressure Gauge', icon: 'hourglass', hue: '#c8803a', theme: 'heat',
-    text: k => `Its Steam Bursts reach ${nf1(.5 * k)} cells further and stun every ground foe caught for 0.4s.`,
+    text: k => `Its Steam Bursts reach ${nf1(.5 * k)} cells further and crack 2 more armour off every ground foe caught.`,
     fx: (st, k) => ihPw(st, 'ihGauge', .5 * k) },
   ih_fusedshells: { rar: 3, for: ['cannon'], name: 'Fused Shells', icon: 'cluster', hue: '#b89a3a', theme: 'blast', proc: 1,
     text: k => `Every 3rd shell splits as it lands: 3 bomblets burst round it for ${P_(.35 * k)} each.`,
@@ -18943,7 +18945,7 @@ function soSlam(t, st, pow, mult, o) {
   inSplash(t.x, t.y, R0, true, (c, d) => { if (!c.phased && !c.ent && canTarget(t, st, c)) cut.push([c, d]); });
   const p = st.pw || {}, great = p.so_anvil && !o.sub && (t.shots + 1) % 4 === 0;   // the Anvil-Breaker's great slam
   let k = pow * mult * (great ? p.so_anvil : 1);
-  if (great) { o = Object.assign({}, o, { stun: Math.max(o.stun || 0, .5), big: true }); relicGlint(t, 'so_anvil', true); soEv('item:so_anvil'); }
+  if (great) { o = Object.assign({}, o, { big: true }); relicGlint(t, 'so_anvil', true); soEv('item:so_anvil'); }
   if (C.so_crowd) k *= 1 + Math.min(.4, .08 * Math.max(0, cut.length - 1));   // Into the Press
   const vMin = o.vMin || (C.so_anvil_t ? 1 : 2), vK = (o.vk || .6) * (1 + .2 * (C.so_hammer_judge || 0)), tremor = C.so_tremor && !o.sub && (t.shots + 1) % 3 === 0;
   for (const [c, d] of cut) {
@@ -20394,7 +20396,7 @@ const SO_RELICS = {
   so_zenith: { rar: 3, for: ['storm'], name: 'Staff of the Zenith', icon: 'wings', hue: '#f0c050', theme: 'sky',
     text: k => `Every beam at a flyer also strikes every other flyer within 1.5 cells of it for ${P_(.5 * k)}.`, fx: (st, k) => soPw(st, 'so_zenith', .5 * k) },
   so_anvil: { rar: 3, for: ['earth'], name: 'Anvil-Breaker', icon: 'hammer', hue: '#9aa8c8', theme: 'slam',
-    text: k => `Every 4th slam is a great slam: ×${nf1(1.5 + .5 * k)}, and every ground foe it strikes is stunned 0.5s.`, fx: (st, k) => soPw(st, 'so_anvil', 1.5 + .5 * k) },
+    text: k => `Every 4th slam is a great slam: ×${nf1(1.5 + .5 * k)} to every ground foe it strikes.`, fx: (st, k) => soPw(st, 'so_anvil', 1.5 + .5 * k) },
   so_thurible: { rar: 2, for: ['cannon'], name: 'Silver Thurible', icon: 'bubbles', hue: '#b0a0d8', theme: 'incense',
     text: k => `Its incense hangs ${nf1(k)}s longer and slows ground foes 15%.`, fx: (st, k) => soPw(st, 'so_thurible', k) },
   so_clapper: { rar: 3, for: ['holy'], name: 'Gold Clapper', icon: 'scales', hue: '#e0b050', theme: 'bell',   // (the Bell's toll, rehomed: the Champion rings it with every spell)
@@ -24094,7 +24096,7 @@ WB_HOOK.kill.push((c, src) => {
     if (!shake && !weight) return s0(p, dt);
     const before = new Set(p.hit), i0 = p.i;
     s0(p, dt);
-    if (weight) for (const c of p.hit) if (!before.has(c) && !c.dead) rootFoe(c, .4, p.t);
+    if (weight) for (const c of p.hit) if (!before.has(c) && !c.dead) chill(c, { slow: .3, slowT: 2 }, 'earth', p.t);   // (a slow, not a root: Anvil Guard holds nothing)
     if (shake && p.i !== i0) {
       const W = p.wbWoke || (p.wbWoke = new Set());
       for (const z of wbRunesNear(p.x, p.z, .7)) {
@@ -24215,7 +24217,7 @@ const WBC = {
   charge: { m: 1.6, arc: .5, T: .8 },
   pennant: { r: 2, jumps: 3 },
   sky: { more: 1.5, r: .85, stun: .25, most: 2 },
-  wall: { half: .6, more: .4, m: 1.4, push: .4 },
+  wall: { half: .6, more: .4, m: 1.4, push: .7 },   // (push .4 -> .7 when its stun went: root audit, 11 Nov 2026)
   quake: { r: 3, m: 1.4 },
   anvil: { r: 1.15, m: 1, push: .6, stag: .3, again: 1 },
   pinbolt: { m: 1.8, w: .4, n: 3 },
@@ -30866,7 +30868,7 @@ gvcSet('leafdance', { name: 'Threading Dance', short: 'Thread', glyph: 'glaive2'
     } }));
     G.delayed.push({ t: hop * list.length + .08, fn: () => {
       if (!G.towers.includes(t)) return; th.taut = G.time;
-      for (const c of th.foes) if (!c.dead) rootFoe(c, root, t);
+      for (const c of th.foes) if (!c.dead) chill(c, { slow: .3, slowT: 2 }, null, t);   // (it slows: the Dancers hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js)
       gvcFx('taut', t, ab, { th }); sfx('burrow', 1);
     } });
   } });
@@ -33491,7 +33493,7 @@ const sbcWakeFoes = (t, st, S) => { const out = new Set(); for (const s of S) fo
 sbcSet('sb_fissure', { name: 'Stonewake', short: 'Wake', glyph: 'rocks', hue: '#e0c890', mana: 90, cd: 12, pref: null,
   by: { stun: [.5, .5, .6, .6, .7, .7] },
   auto: 'two or more ground foes beside the walls and stones within 2.2 cells of it (or a boss)',
-  text: (t, st, ab) => `Every wall and stone within ${SBC.wake.r} cells, or its own post with none, bursts into the ground foes beside it: ${xD(st, SBC.wake.hit)} and a ${gNf(byT(ab.by.stun, t))}s stun; a second burst on one ground foe deals ${xD(st, SBC.wake.hit2)}.`,
+  text: (t, st, ab) => `Every wall and stone within ${SBC.wake.r} cells, or its own post with none, bursts into the ground foes beside it: ${xD(st, SBC.wake.hit)}, soaked 3s; a second burst on one ground foe deals ${xD(st, SBC.wake.hit2)}.`,
   pick(t, st, ab, man) { const F = sbcWakeFoes(t, st, sbcStones(t)); return F.size && (man || F.size >= 2 || [...F].some(abBig)) ? t : null; },
   cast(t, st, _, ab) {
     const S = sbcStones(t), sn = byT(ab.by.stun, t), struck = new Map();
@@ -33501,7 +33503,7 @@ sbcSet('sb_fissure', { name: 'Stonewake', short: 'Wake', glyph: 'rocks', hue: '#
       for (const c of G.creeps) {
         if (c.dead || c.ent || c.phased || !abWalker(c) || !canTarget(t, st2, c) || Math.hypot(c.x - s.x, c.y - s.z) > s.r) continue;
         const k = struck.get(c) || 0; if (k >= 2) continue; struck.set(c, k + 1); n++;
-        sbHit(t, st2, c, abD(st2) * (k ? SBC.wake.hit2 : SBC.wake.hit), 'phys', null); if (!c.dead) stun(c, sn, .4, 'earth');
+        sbHit(t, st2, c, abD(st2) * (k ? SBC.wake.hit2 : SBC.wake.hit), 'phys', null); if (!c.dead && typeof sbSoak === 'function') sbSoak(c, 3);   // (it soaks: the Earthbinders' stomps and stones hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js)
         sbcFx('sb_fissure', t, c, C => { const [ux, uz] = abDir({ x: s.x, y: s.z }, c); v2Spray(C, 'rock', c.x, c.y, .2, 4, { ux, uz, sp: 1.1 }); v2Hit(C, c.x, c.y, hitH(c) * .6, .55, { sp: 'dust', n: 3, light: 0, ring: 0, star: 0 }); });
       }
       if (n) sbFeed(t, .5);
@@ -36576,7 +36578,7 @@ socDef('so_ridedown', { name: 'Tourney Passes', short: 'Tourney', glyph: 'tremor
         if (!abLive(t) || o.dead) return; const s2 = t.st || effStats(t);
         for (const q of abLine(t, s2, t.x, t.y, ux, uz, Lr, .4, abWalker)) { if (q === o) continue; soAbHit(t, s2, q, .35, 'phys'); if (!q.dead) soJudge(q, socBy(ab, 'tj', t), t); fxDust(q.x, q.y, 2); }
         soAbHit(t, s2, o, .5, 'phys', [ux * .25, uz * .25]); if (o.dead) return;
-        socHold(o, socBy(ab, 'kd', t) * (o.def.boss ? .4 : 1)); soJudge(o, 1, t);
+        soJudge(o, 1, t);   // (no knockdown: the Knights hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js)
         const last = k === n - 1; if (last) soVerdict(o, t, 1);
         sfx('so_ridedown', 1); G.shake = Math.max(G.shake, last ? .08 : .04);
         socFx('so_ridedown', t, o, C => {
@@ -37103,7 +37105,7 @@ socDef('ch_summons', { name: 'Debt Collection', short: 'Debt', glyph: 'chains', 
   by: { r: [1.6, 1.6, 1.6, 1.7, 1.7, 1.7], bind: [1, 1, 1, 1.2, 1.2, 1.2], mult: [1.7, 2, 2.2, 2.5, 2.7, 3], daze: [0, 0, 0, 0, 0, 0] },
   none: 'no foe in his reach',
   auto: 'a foe in reach with 2 or more stacks of Judgement on the foes round it (bosses and the most Judged first)',
-  text: (t, st, ab) => { const dz = socBy(ab, 'daze', t); return `Gathers all the Judgement on foes within ${gNf(socBy(ab, 'r', t))} cells onto one foe${dz > 0 ? ` (dazing each ${gNf(dz)}s)` : ''}: it is bound ${gNf(socBy(ab, 'bind', t))}s and struck for ${xD(st, socBy(ab, 'mult', t))}, plus ${xD(st, .3)} per stack beyond what it can hold.`; },
+  text: (t, st, ab) => { const dz = socBy(ab, 'daze', t); return `Gathers all the Judgement on foes within ${gNf(socBy(ab, 'r', t))} cells onto one foe${dz > 0 ? ` (dazing each ${gNf(dz)}s)` : ''}: it is struck for ${xD(st, socBy(ab, 'mult', t))}, plus ${xD(st, .3)} per stack beyond what it can hold.`; },
   pick: socDebtPick,
   cast(t, st, c, ab) {
     const r = socBy(ab, 'r', t), dz = socBy(ab, 'daze', t); let total = 0;
@@ -37116,7 +37118,7 @@ socDef('ch_summons', { name: 'Debt Collection', short: 'Debt', glyph: 'chains', 
     socFx('ch_summons', t, c, C => { const m = sfxMuzzle(t) || [t.x, towerTop(t), t.y]; v2Beam(C, m[0], m[1], m[2], c.x, hitH(c), c.y, { foe: c, L: VT.CHAIN, w: .05, life: .6, col: socC(C, '#c8d0e8'), ccol: socC(C, SOC.white, 1.5), sag: .12, tube: 0 }); });
     G.delayed.push({ t: .38, fn: () => {
       if (c.dead || G.state !== 'play') return; const s = t.st || st;
-      stun(c, socBy(ab, 'bind', t), .4, null); abHit(t, s, c, socBy(ab, 'mult', t), 'magic'); if (c.dead) return;
+      abHit(t, s, c, socBy(ab, 'mult', t), 'magic'); if (c.dead) return;
       const took = total ? soJudge(c, total, t) : 0, over = total - took;
       if (over > 0) abHit(t, s, c, .3 * over, 'magic');
       socFx('ch_summons', t, c, C => v2Hit(C, c.x, c.y, hitH(c), (.5 + .06 * Math.min(8, total)) * C.S, { sp: 'gold', n: 5 + Math.min(8, total), light: over > 0 ? 1 : 0 }));
@@ -39423,7 +39425,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_gv_stag', epic: 1, spells: ['heroiccharge', 'stampede'], force: 'grove', unit: 'arcane', name: 'The Hart-King’s Tack',
     pieces: [['fe_gv_lancetip', 'Hartsblood Lance-Tip', 3, 'arrowhead', '#c8b070', 'dmg pen'], ['fe_gv_bridle', 'Silverbirch Bridle', 3, 'antler', '#d8d0b0', 'as range']],
     old: [['fe_gv_fernmail', 'Fernmail Barding', 3, 'shield', '#7a9a5a', 'dmg as crit'], ['fe_gv_moonhoof', 'Moon-Hoof Charm', 3, 'heart', '#e0d8a0', 'cd regen']],
-    b2: 'Each Heroic Charge brings Bounding Leap 3s nearer. Bounding Leap onto a stunned or rooted foe readies Heroic Charge at once, and that Charge stuns every ground foe within 1 cell of its foe.',
+    b2: 'Each Heroic Charge brings Bounding Leap 3s nearer. Bounding Leap onto a stunned or rooted foe readies Heroic Charge at once, and that Charge also strikes every ground foe within 1 cell of its foe for half as much.',
     cast(t, ab, tg, n) {
       if (ab.id === 'heroiccharge') { fsReady(t, 'stampede', 3); if (t.feStagArm) { t.feStagArm = 0; t.feStagT = G.time + 2; } }
     },
@@ -39433,8 +39435,8 @@ if (typeof fsetAdd === 'function') {
         fsReady(t, 'heroiccharge', 999); t.feStagArm = 1; fxRing(t.x, t.y, .7, '#f4dc9a'); fsGlint(t, this);
       }
       if (sp === 'heroiccharge' && (t.feStagT || 0) > G.time) {
-        t.feStagT = 0; const s = fsBy(t, 'heroiccharge', 'stun', 1);
-        for (const o of fsNear(c, 1.05, 8)) stun(o, s, false);
+        t.feStagT = 0;
+        for (const o of fsNear(c, 1.05, 8)) if (o !== c && !o.dead) hurt(o, amt * .5, 'phys', t, false, null);   // (it strikes them: the Lancers hold nothing)
         fxRing(c.x, c.y, 1, '#f4dc9a'); fxSpark(c.x, c.y, hitH(c), '#fff0c0', 10);
       }
     } });
@@ -39443,7 +39445,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_gv_shift', epic: 1, spells: ['shift', 'wildstrike'], force: 'grove', unit: 'storm', name: 'Skins of the Many-Shaped',
     pieces: [['fe_gv_moontalon', 'Talon of the Turning Moon', 3, 'feather', '#c8b890', 'dmg crit'], ['fe_gv_bearpelt', 'Bearhide Shoulder-Pelt', 3, 'shield', '#7a5a3a', 'dmg as']],
     old: [['fe_gv_sagetotem', 'Sage-Bark Totem', 3, 'rune', '#8ab070', 'sp mana cd'], ['fe_gv_shedskin', 'Shed-Skin Locket', 3, 'ring', '#a0c080', 'regen cd']],
-    b2: 'Each Shift Form brings Primal Pounce 3s nearer. Every Shift Form ends in a pounce: it casts Primal Pounce at once, free, and a foe that pounce strikes is rooted 1s.',
+    b2: 'Each Shift Form brings Primal Pounce 3s nearer. Every Shift Form ends in a pounce: it casts Primal Pounce at once, free, and a ground foe that pounce strikes is bowled back up the road.',
     cast(t, ab, tg, n) {
       if (ab.id !== 'shift') return;
       fsReady(t, 'wildstrike', 3);
@@ -40044,7 +40046,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_wb_hill', epic: 1, spells: ['wb_shieldwall', 'wb_quakeline'], force: 'wardbound', unit: 'earth', name: 'Regalia of the Iron Hill',
     pieces: [['fe_wb_runeshield', 'Great Rune-Girdle', 3, 'rune', '#d89a50', 'dmg splash'], ['fe_wb_bronzemail', 'Bronze-Scaled Hauberk', 3, 'shield', '#b8884a', 'dmg as']],
     old: [['fe_wb_hillcrown', 'Crown of the Iron Hill', 3, 'mountain', '#c8a050', 'dmg pen splash'], ['fe_wb_stonecharm', 'Stone of the Held Road', 3, 'gem', '#d8c098', 'regen cd']],
-    b2: 'Shield Wall brands every ground foe it stuns. Each Shield Wall sends a quake 3 cells along the road both ways, laying stone runes, and Quake Line comes 4s nearer.',
+    b2: 'Shield Wall brands every ground foe it strikes. Each Shield Wall sends a quake 3 cells along the road both ways, laying stone runes, and Quake Line comes 4s nearer.',
     hit(t, c, amt, sp) { if (sp === 'wb_shieldwall' && !c.dead) wbBrand(c, 1, t); },
     cast(t, ab, tg, n) {
       if (n < 2 || ab.id !== 'wb_shieldwall') return;
@@ -41003,7 +41005,7 @@ ihcWrapCast('ih_breakerblow', (raw, t, st, c, ab, again) => {
     abRun('ih_shieldshove', () => sv.cast(t, s, c, sv, { K: 1, echo: 1 }));
     if (t.ab) { t.ab.last = 'ih_shieldshove'; t.ab.lastAt = G.time; }
     if (c.dead) return;
-    for (const o of nearest(c.x, c.y, .8, 5, c, q => !q.fly && !q.dead && canTarget(t, s, q))) { ihShove(o, .3, t, '#e8d0a0'); ihStun(o, .5); }
+    for (const o of nearest(c.x, c.y, .8, 5, c, q => !q.fly && !q.dead && canTarget(t, s, q))) { ihShove(o, .3, t, '#e8d0a0'); }
     fxDust(c.x, c.y, 4);
   } });
   return r;
@@ -43605,7 +43607,7 @@ const ihfAround = (x, z, r, skip) => G.creeps.filter(c => c !== skip && ihfWalke
     if (ib && !echo) {
       // Caught Between Shields: chopped by two Ironbreakers within a second, the foe is pinned between them
       if (C.ihfPincer && !tg.dead && tg.ihfIbBy && tg.ihfIbBy !== t && tg.ihfIbAt >= G.time - 1 && !(tg.ihfPinCd > G.time)) {
-        tg.ihfPinCd = G.time + 3; ihPin(tg, .05 + .15 * C.ihfPincer, t); ihSparks(tg.x, tg.y, hitH(tg), 4, '#e8d0a0');
+        tg.ihfPinCd = G.time + 3; holdCrack(tg, C.ihfPincer); ihSparks(tg.x, tg.y, hitH(tg), 4, '#e8d0a0');
       }
       tg.ihfIbBy = t; tg.ihfIbAt = G.time;
     }
@@ -43782,7 +43784,7 @@ ihcWrapCast('ih_runebrand', (raw, t, st, c, ab, again) => {
     const r = SH0.apply(this, arguments);
     if (vent || !ihfOn()) return r;
     if (C.ihfCrowd && !echo && n >= 3) ihHeatAdd(t, st, .05 * C.ihfCrowd);   // Packed Crowd
-    if (held) for (const c of held) if (!c.dead) { c.ihfHomeCd = G.time + 2; ihfHoldMore(c, .2 * C.ihfHome); }   // Hammer Home
+    if (held) for (const c of held) if (!c.dead) { c.ihfHomeCd = G.time + 2; holdCrack(c, C.ihfHome); }   // Hammer Home (more armour off a held foe; it holds none longer)
     if (C.ihfGauge && !echo && hot0 >= .75) ihfMana(t, 2 * C.ihfGauge);   // Pressure Gauge
     return r;
   };
@@ -43802,7 +43804,7 @@ ihcWrapCast('ih_steamvent', (raw, t, st, _, ab, again) => {
   G.delayed.push({ t: IHC_PD.first + .01, fn: () => { if (ihfLiveT(t)) S1 = new Set(ihfAround(t.x, t.y, (t.st || st).range || 1.4)); } });
   G.delayed.push({ t: IHC_PD.first + IHC_PD.gap + .01, fn: () => {
     if (!S1 || !ihfLiveT(t)) return;
-    for (const c of ihfAround(t.x, t.y, (t.st || st).range || 1.4)) if (S1.has(c)) ihPin(c, .4, t);
+    for (const c of ihfAround(t.x, t.y, (t.st || st).range || 1.4)) if (S1.has(c)) holdCrack(c, 2);
   } });
   return r;
 });
@@ -44959,7 +44961,7 @@ let SBF_STOMP = null, SBF_BLADE = null;   // the Earthbinder stomping / Oshana c
   sbHit = function (t, st, c, amt, type, kb) {
     const slowed = !!(c && c.slowT > 0), r = h0.apply(this, arguments);
     if (!t || !c || c.dead) return r;
-    if (SBF_STOMP === t && slowed && !c.fly && !(G.time - (c.sbfGgAt == null ? -99 : c.sbfGgAt) < 3)) { const k = sbfK(t, 'sbfGive'); if (k) { c.sbfGgAt = G.time; stun(c, .15 * k, .4, 'earth'); } }   // Ground Gives Way
+    if (SBF_STOMP === t && slowed && !c.fly && !(G.time - (c.sbfGgAt == null ? -99 : c.sbfGgAt) < 3)) { const k = sbfK(t, 'sbfGive'); if (k) { c.sbfGgAt = G.time; shove(c, .1 * k); } }   // Ground Gives Way
     if (SBF_BLADE === t && c.fly) { const k = sbfK(t, 'sbfFeather'); if (k) c.lowT = Math.max(c.lowT || 0, G.time + k); }   // Feather-Cut
     return r;
   };
@@ -45602,10 +45604,10 @@ WB_ONHIT.push((c, st, t) => {
       if (C.wbfPalimp && wbSigOf(c) >= 3) { WBF_PALIMP = true; try { wbDetonate(t, st, c, C.wbfPalimp >= 2 ? .9 : .6); } finally { WBF_PALIMP = false; } }
       break;
     case 'wb_charge':   // Spur and Lance: a branded walker stunned longer (the stun follows the hit)
-      if (C.wbfSpur && pre.br > 0) { const x = .15 * C.wbfSpur; G.delayed.push({ t: 0, fn: () => { if (!c.dead && c.stunT > 0) c.stunT += x; } }); }
+      if (C.wbfSpur && pre.br > 0 && typeof gainMana === 'function') gainMana(t, 2 * C.wbfSpur);   // (mana, not a longer stun: the Lancers hold nothing)
       break;
     case 'wb_shieldwall':   // Braced Shove: siege troops stunned longer
-      if (C.wbfBraced && (c.atk || c.siege)) { const x = .4 * C.wbfBraced; G.delayed.push({ t: 0, fn: () => { if (!c.dead && c.stunT > 0) c.stunT += x; } }); }
+      if (C.wbfBraced && (c.atk || c.siege) && !c.dead) shove(c, .2 * C.wbfBraced);   // (thrown farther, not stunned longer: Anvil Guard holds nothing)
       break;
     case 'wb_quakeline':   // Fault Line: twice on a rune
       if (C.wbfFault && !c.dead && wbfOnRune(c)) wbBrand(c, 2, t);
@@ -47236,7 +47238,7 @@ const BR_DATA = {
   thornguard: ['Long Haft|pierce .5 1; reach .25', 'Quickened Lunge|spcd .22; spshred 1.5 6', 'Spearwall|pierce .55 2'],
   gladebow: ['Longbow|reach .6', 'Thornseed Tips|shred 1.5 6', 'Piercing Shaft|pierce .45 2'],
   briarwarden: ['Grasping Echo|specho .25', 'Strangling Grip|spmark .12 2; spctl .2', 'Wither Spread|spjump .5; spshred 2 6'],
-  staglancer: ['Running Charge|pierce .5 2', 'Trample|stun .12 .5; nth 5 1.6', 'Long Gallop|reach .5; far .2'],
+  staglancer: ['Running Charge|pierce .5 2', 'Trample|slow .2 1.5; nth 5 1.6', 'Long Gallop|reach .5; far .2'],
   wayfarer: ['Keen Hawk|reach .5', 'Primal Fury|haste .2', "Stalker's Mark|mark .1 3"],
   bladedancer: ['Wide Arc|reach .35; splash .3', 'Encore Tempo|spcd .22; spslow .2 1.2', 'Corner Dancer|cover .05'],
   seedcaster: ['Wide Sowing|splash .35', 'Choking Spores|slow .3 1.5; sppow .1', 'Snapjaw Field|stun .1 .5; nth 5 1.6'],
@@ -47263,7 +47265,7 @@ const BR_DATA = {
   oathsworn: ['Shield Wall|guard .7; zone 1.3 .15', 'Rebuke|stun .12 .5; sppow .1', 'Rampart Aura|auraD .1 1.6'],
   silverbolt: ['Long Stock|reach .6', 'Consecrated Mark|mark .1 3', 'Witness Fire|cross .25'],
   lightbinder: ['Penance Echo|specho .25', 'Vigil Aura|aura .12 1.8', 'Shackle Spread|spjump .5; spctl .1'],
-  grailknight: ['Grail Line|pierce .5 2', 'Ride Down|stun .12 .5; sppow .1', 'Banner of the Vow|auraD .1 1.8'],
+  grailknight: ['Grail Line|pierce .5 2', 'Ride Down|slow .2 1.5; sppow .1', 'Banner of the Vow|auraD .1 1.8'],
   sunlance: ['Lance Echo|specho .25', 'Sunlance Line|pierce .45 2', 'Halo|aura .1 1.8; sppow .1'],
   templar: ['Hammer Fervour|haste .22', 'Crusher|shred 2 8', 'Hallowed Ground|zone 1.6 .15; sppow .1'],
   censer: ['Wide Thurible|splash .35', 'Incense Slow|slow .25 1.2; sppow .1', 'Procession|aura .1 1.6'],
@@ -47274,7 +47276,7 @@ const BR_DATA = {
   sb_hailshaman: ['Hail Echo|specho .25', 'Black Ice|spctl .3; sppow .1', 'Brittle Hail|spshred 2 8; spcd .1'],
   sb_spiritwalker: ['Spirit Echo|specho .25', "Ancestors' Due|spmark .12 3", 'Chain of Spirits|spjump .5; sppow .1'],
   sb_thundercaller: ['Longer Arc|jump 1', 'Charged|stun .1 .5; sppow .1', 'Storm Mark|mark .1 3'],
-  sb_earthbinder: ['Stone Ward|guard .6; zone 1.4 .15', 'Stonewake|stun .12 .5; sppow .1', 'Earth Aura|auraD .1 1.6'],
+  sb_earthbinder: ['Stone Ward|guard .6; zone 1.4 .15', 'Stonewake|slow .2 1.5; sppow .1', 'Earth Aura|auraD .1 1.6'],
   sb_clouddancer: ['Wide Cloud|splash .35', 'Downpour|slow .25 1.2; sppow .1', 'Thunderhead Spread|chain .4 1.6'],
   sb_skyhunter: ['Long Tether|reach .5', 'Ground Stake|stun .1 .5; spctl .2', 'Skyfall Line|pierce .45 2'],
   // ---- the Wardbound ----
@@ -47282,7 +47284,7 @@ const BR_DATA = {
   wb_maskedwarden: ['Long Ricochet|jump 1', 'Warding Mark|mark .1 3', 'Returning Line|pierce .45 2'],
   wb_frostbrand: ['Deep Frost|slow .35 1.8; sppow .1', 'Frostbite|bleed .3', 'Frozen Corner|cover .05'],
   wb_runecarver: ['Etch Echo|specho .25', 'Detonation Spread|spjump .5', 'Road Script|cover .03; sppow .1'],
-  wb_stormward: ['Thunder Lance|jump 1', 'Charge Stun|stun .12 .5; sppow .1', 'Skyfall Line|pierce .5 2'],
+  wb_stormward: ['Thunder Lance|jump 1', 'Storm Spur|slow .2 1.5; sppow .1', 'Skyfall Line|pierce .5 2'],
   wb_anvilguard: ['Shield Wall|guard .7; zone 1.3 .15', 'Quake Line|pierce .5 2', 'Anvil Aura|auraD .1 1.6'],
   wb_siegewarden: ['Wide Rune|splash .3', 'Pinning Bolt|stun .1 .5; nth 5 1.6', 'Rune Mark|mark .1 3'],
   wb_vowkeeper: ['Censer Smoke|zone 1.5 .15; sppow .1', 'Rite of Holding|stun .12 .5; spctl .2', 'Vow Mark|mark .12 3'],
@@ -50177,6 +50179,250 @@ const rideNote = unit => RIDE[unit] ? (RIDE[unit].basic ? RIDE_NOTE : RIDE_NOTE_
     const t0 = ab.text; ab.text = function () { return String(t0.apply(this, arguments)).replace(/\s+$/, '') + RIDE_AB_NOTE; }; ab._rideNote = 1;
     if (typeof ab.blurb === 'string' && !/block/.test(ab.blurb)) ab.blurb = ab.blurb.replace(/\s+$/, '') + RIDE_AB_NOTE;
   }
+}
+
+/* ================= LINE HOLDERS: one melee unit a force holds foes; the other melee damage units pay off on held foes =================
+   The owner (11 Nov 2026): "Looking for ways to lean into strategy more. Possibly removing root entirely from damage
+   melee units but a select few", then of docs/design/root_audit_2026-11-11.md: "this is good".
+   THE RULE
+   - One melee LINE HOLDER a force keeps its hold: Thornguard Spears, Oathsworn Shieldbearers, Ironbreakers (the shove and
+     the vent's stun), Golem Wardens, Wolfguard, Oathbound. Spellblades (Stagger) and Frostbrand Sentries (the Wardbound's
+     control slot) are as they were.
+   - Nine melee damage units hold nothing any more (NO_HOLD): Stag Lancers, Blade Dancers, the Grove Shifters on the
+     ground, Grail Knights, Templars of the Ford, Steam Hammers, Earthbinders (but Sinkhole), Stormward Lancers, Anvil
+     Guard. A root, pin, stun, daze, knockdown or freeze that their own strike, spell or talent would lay is not laid
+     (holdStop below: stun, rootFoe and freezeFoe are wrapped and ask whose code is running). Where the audit gave the
+     hold's place to a shove, the hold becomes that shove (Grail Knights drive their foe back; the bear bowls it back).
+     Shoves and slows are not holds. A hold an ITEM gives (itemProcHit) is the item's, and stays.
+   - In exchange each pays off on a foe SOMEONE ELSE holds (HOLD_PAY: its hits land harder on a held foe; these units
+     cannot hold, so a held foe is always another unit's doing): post them beside the line holder or the control unit.
+   WHO IS ACTING (holdAct): VET_ACT (xp.js: updateTowers, impact, a hazard's tick) covers what runs at once; a delayed
+   call is tagged with the unit whose strike or cast pushed it (fire, castAbility, impact and delayedRun are wrapped).
+   Check and numbers: node tools/check_line_holders.js -v */
+const NO_HOLD = {
+  staglancer: {},
+  bladedancer: {},
+  wayfarer: { ok: c => !!(c.def && c.def.fly), shove: .3 },          // the hawk still stuns and drags down flyers; the bear bowls a ground foe back
+  grailknight: { shove: .1, noShove: ['so_ridedown'] },              // the lance drives its foe back along the charge
+  templar: {},
+  steamhammer: {},
+  sb_earthbinder: { abs: ['sb_herd'] },                                // Sinkhole is a hold you place on the road: kept
+  wb_stormward: {},
+  wb_anvilguard: {},
+};
+// what each pays on a held foe: k (its hit lands k times as hard), not: spells with a held rule of their own
+const HOLD_PAY = {
+  staglancer: { k: 1.6, not: ['runthrough'] },
+  bladedancer: { k: 1.3, not: ['harvest'] },
+  wayfarer: { k: 1.4, when: (t, c) => !(c.def && c.def.fly) },
+  grailknight: { k: 1.5 },
+  templar: { k: 1.4 },
+  steamhammer: { k: 1.4 },
+  sb_earthbinder: { k: 1.35, not: ['sb_herd'] },
+  wb_stormward: { k: 1.5 },
+  wb_anvilguard: { k: 1.3 },
+};
+// the units that hold: each force's melee line holder, and its control unit (the bot posts the payoff units beside them)
+const HOLD_LINE = ['thornguard', 'oathsworn', 'ironbreaker', 'cc_golemwarden', 'sb_wolfguard', 'wb_oathbound', 'briarwarden', 'lightbinder', 'chaintrapper', 'cc_rimeweaver', 'sb_hailshaman', 'wb_siegewarden', 'wb_frostbrand'];
+const holdHeld = c => !!c && !c.dead && ((c.rootT || 0) > G.time || c.stunT > 0);
+// n more armour cracked off a foe for 5s (what several hold talents do now)
+function holdCrack(c, n) { if (!c || c.dead || !(n > 0)) return; c.shred = Math.min(Math.max(c.armor || 0, n), (c.shredT > 0 ? c.shred || 0 : 0) + n); c.shredT = Math.max(c.shredT || 0, 5); }
+let HOLD_ACT = null, HOLD_ITEM = 0;
+const HOLD_STEAM = .08;   // of a full gauge, for a Steam Hammer's slam that lands on a held foe
+const holdAct = src => { const a = (src && src.def && src.invested !== undefined ? src : null) || HOLD_ACT || (typeof VET_ACT !== 'undefined' ? VET_ACT : null); return a && a.def ? a : null; };
+const holdNow = () => typeof AB_NOW !== 'undefined' ? AB_NOW : null;
+// is the hold now being laid on c one a no-hold unit's own code is laying? Returns its NO_HOLD entry, or null
+function holdStop(c, src) {
+  if (HOLD_ITEM || typeof G === 'undefined' || !G || !G.force) return null;
+  // whose code: the unit acting, or (a spell's late call that no unit was tagged on) the unit that spell belongs to
+  const a = holdAct(src), ab = holdNow(), u = a ? a.def.unit : ab && typeof ABIL !== 'undefined' && ABIL[ab] ? ABIL[ab].unit : null, N = u && NO_HOLD[u]; if (!N) return null;
+  if (N.ok && N.ok(c)) return null;
+  if (ab && N.abs && N.abs.includes(ab)) return null;
+  return N;
+}
+// the shove that takes a hold's place, once a foe at a time (a spell that would hold it twice shoves it once)
+function holdShove(c, N) {
+  if (!N.shove || c.dead || (c._hsGd || 0) > G.time) return;
+  const ab = holdNow(); if (ab && N.noShove && N.noShove.includes(ab)) return;
+  c._hsGd = G.time + .5; if (typeof shove === 'function') shove(c, N.shove);
+}
+if (typeof stun === 'function' && !stun._hold) {
+  const _hStun = stun;
+  stun = function (c, dur, bossF, elem) { const N = c && !(dur <= 0) ? holdStop(c, null) : null; if (N) return holdShove(c, N); return _hStun.apply(this, arguments); };
+  stun._hold = 1;
+}
+if (typeof rootFoe === 'function' && !rootFoe._hold) {
+  const _hRoot = rootFoe;
+  rootFoe = function (c, dur, src) { const N = c ? holdStop(c, src) : null; if (N) return holdShove(c, N); return _hRoot.apply(this, arguments); };
+  rootFoe._hold = 1;
+}
+if (typeof freezeFoe === 'function' && !freezeFoe._hold) {
+  const _hFrz = freezeFoe;
+  freezeFoe = function (c, dur, src) { const N = c ? holdStop(c, src) : null; if (N) return holdShove(c, N); return _hFrz.apply(this, arguments); };
+  freezeFoe._hold = 1;
+}
+// an item's own hold is the item's
+if (typeof itemProcHit === 'function' && !itemProcHit._hold) {
+  const _hProc = itemProcHit;
+  itemProcHit = function () { HOLD_ITEM++; try { return _hProc.apply(this, arguments); } finally { HOLD_ITEM--; } };
+  itemProcHit._hold = 1;
+}
+// whose delayed calls are these: everything a unit's strike or cast (or one of its delayed calls) pushes is its own
+function holdAs(t, fn, self, args) {
+  if (!t || !t.def || typeof G === 'undefined' || !G || !G.delayed) return fn.apply(self, args);
+  const p = HOLD_ACT, L = G.delayed, n = L.length; HOLD_ACT = t;
+  try { return fn.apply(self, args); } finally { HOLD_ACT = p; if (G.delayed === L) for (let i = n; i < L.length; i++) if (!L[i].hb) L[i].hb = t; }
+}
+if (typeof fire === 'function' && !fire._hold) { const f0 = fire; fire = function (t) { return holdAs(t, f0, this, arguments); }; fire._hold = 1; }
+if (typeof castAbility === 'function' && !castAbility._hold) { const f0 = castAbility; castAbility = function (t) { return holdAs(t, f0, this, arguments); }; castAbility._hold = 1; }
+if (typeof abilityTick === 'function' && !abilityTick._hold) { const f0 = abilityTick; abilityTick = function (t) { return holdAs(t, f0, this, arguments); }; abilityTick._hold = 1; }
+if (typeof impact === 'function' && !impact._hold) { const f0 = impact; impact = function (p) { return holdAs(p && p.src && p.src.def ? p.src : null, f0, this, arguments); }; impact._hold = 1; }
+if (typeof delayedRun === 'function' && !delayedRun._hold) { const f0 = delayedRun; delayedRun = function (d) { return holdAs(d && d.hb, f0, this, arguments); }; delayedRun._hold = 1; }
+
+// the Wardbound's own zones and quakes run from the force's tick: they are their unit's too
+if (typeof wbZoneTick === 'function' && !wbZoneTick._hold) { const f0 = wbZoneTick; wbZoneTick = function (z) { return holdAs(z && z.src, f0, this, arguments); }; wbZoneTick._hold = 1; }
+if (typeof wbQuakeStep === 'function' && !wbQuakeStep._hold) { const f0 = wbQuakeStep; wbQuakeStep = function (p) { return holdAs(p && p.t, f0, this, arguments); }; wbQuakeStep._hold = 1; }
+
+/* ---------- the payoff: a held foe takes more from the units that cannot hold ---------- */
+// how much harder unit t's hit lands on c right now (1: no more)
+function holdPayK(t, c) {
+  const P = t && t.def && HOLD_PAY[t.def.unit]; if (!P || !holdHeld(c) || typeof G === 'undefined' || !G.force) return 1;
+  const ab = holdNow(); if (ab && P.not && P.not.includes(ab)) return 1;
+  if (P.when && !P.when(t, c)) return 1;
+  return P.k;
+}
+if (typeof hurt === 'function' && !hurt._hold) {
+  const _hHurt = hurt;
+  hurt = function (c, amt, type, src, dot) {
+    if (src && src.def && !dot && !HOLD_ITEM && HOLD_PAY[src.def.unit]) { const k = holdPayK(src, c); if (k !== 1) { arguments[1] = amt * k; if (src.def.unit === 'steamhammer' && !((src._hpGd || 0) > G.time) && typeof ihHeatAdd === 'function') { src._hpGd = G.time + .3; ihHeatAdd(src, src.st || {}, HOLD_STEAM); } else if (src.def.unit === 'wb_stormward' && holdNow() && !((c._hrGd || 0) > G.time) && typeof wbcRoadRune === 'function') { c._hrGd = G.time + 3; wbcRoadRune(src, src.st || {}, c.x, c.y, 'storm'); } } }   // (the Hammers: a slam on a held foe builds pressure too)
+    return _hHurt.apply(this, arguments);
+  };
+  hurt._hold = 1;
+}
+
+/* ================= LINE HOLDERS, THE WORDS: cards, spells, talents and Blooms say what the nine units now do =================
+   forces_zzzzzzzzzzzzzzzzzzzz_holds.js changes what happens (the nine melee damage units lay no hold and hit a held foe
+   harder); these tables change what is promised, in one place, after every other file has had its say (this file loads
+   last). A spell's words are rewritten where it named its own hold; a talent that added to a hold gets the effect
+   docs/design/root_audit_2026-11-11.md gave it instead. Saves: every talent keeps its name and its place, so picks load.
+   Check: node tools/check_line_holders.js (no card, spell or talent of the nine promises a hold). */
+const hNf = v => String(Math.round(v * 100) / 100);
+if (typeof SP_RIDE !== 'undefined') SP_RIDE.shove = (c, v) => { if (typeof shove === 'function') shove(c, v); };   // a spell talent's rider: thrown back along the road
+// what each unit's card says of the payoff
+const HOLD_SAY = {
+  staglancer: 'They hold no foe themselves: a foe another unit holds takes ×1.6 from the lance.',
+  bladedancer: 'They hold no foe themselves: a foe another unit holds takes ×1.3 from their blades.',
+  wayfarer: 'The bear holds no foe itself: a ground foe another unit holds takes ×1.4 from it.',
+  grailknight: 'They hold no foe themselves: a foe another unit holds takes half again as much from them.',
+  templar: 'They hold no foe themselves: a foe another unit holds takes ×1.4 from them.',
+  steamhammer: 'They hold no foe themselves: a foe another unit holds takes ×1.4 from them, and a slam on one builds more pressure.',
+  sb_earthbinder: 'Their stomps hold no foe: a foe another unit holds takes ×1.35 from them.',
+  wb_stormward: 'They hold no foe themselves: a foe another unit holds takes half again as much from the lance and its lightning, and their spells leave a storm rune under it.',
+  wb_anvilguard: 'They shove but hold no foe: a foe another unit holds takes ×1.3 from them.',
+};
+// a card's own words about a hold it no longer lays: [pattern, replacement]
+const HOLD_CARD = {
+  staglancer: [[/ and pin it to the ground \(rooted 1s:[^)]*\), then wheel back to their post\./, ', then wheel back to their post.']],
+  wb_anvilguard: [[/staggering ground foes and leaving stone runes/, 'striking ground foes and leaving stone runes']],
+  grailknight: [[/the lance knocks its foe down \(stunned [^)]*\), and a charge/, 'the lance drives its foe a little way back along the charge (bosses stand), and a charge']],
+};
+// a spell's words (its text and its autocast line): [pattern, replacement]
+const HOLD_SPELL = {
+  // the Grove
+  heroiccharge: [[/ and a [\d.]+s stun\./, '.']],
+  stampede: [[/, rooted [\d.]+s\./, '.']],
+  runthrough: [[/Each charge roots a free foe [\d.]+s for (.+?), or runs a held one through for (.+?\))\./, 'Each charge strikes for $1; a foe another unit holds is run through for $2.']],
+  leafdance: [[/rooting every foe it cut for [\d.]+s\./, 'slowing every foe it cut 30% for 2s.']],
+  wildstrike: [[/rooted [\d.]+s\)/, 'bowled 0.3 cells back)']],
+  wildsurge: [[/the bear roots the toughest ground foe [\d.]+s/, 'the bear bowls the toughest ground foe 0.3 cells back']],
+  // the Silver Order
+  so_grail: [[/, a Verdict at double strength, and a [\d.]+s stun \(bosses 40%\)\./, ', and a Verdict at double strength. Its foe is driven 0.1 cells back (bosses stand).']],
+  so_ridedown: [[/, knocks it down [\d.]+s and Judges it,/, ' and Judges it,']],
+  so_vow: [[/knocked down and Judged/, 'driven a little way back and Judged']],
+  so_crush: [[/, is stunned [\d.]+s, and any Judgement/, ', and any Judgement']],
+  so_hammerfall: [[/, stunned [\d.]+s and a Verdict/, ' and a Verdict'], [/The shock knocks down and Judges/, 'The shock Judges']],
+  // Ironhold
+  ih_pressureslam: [[/ more at a full gauge, a [\d.]+s stun and (\d+) armour off\./, ' more at a full gauge, and $1 armour off.']],
+  ih_steamvent: [[/ and stuns [\d.]+s\. Every stroke/, '. Every stroke']],
+  ih_pistondrive: [[/ and are stunned [\d.]+s\. A boss is stunned [\d.]+s instead\./, '. A boss is too heavy to throw.']],
+  // the Wardbound
+  wb_charge: [[/, is stunned [\d.]+s and arced with lightning/, ' and is arced with lightning']],
+  wb_skyfall: [[/ and is stunned [\d.]+s \(twice at most\)/, ' (twice at most)']],
+  wb_shieldwall: [[/, is stunned [\d.]+s and shoved ([\d.]+) cells/, ' and is shoved $1 cells']],
+  wb_quakeline: [[/ for as much and staggering it [\d.]+s;/, ' for as much;']],
+  wb_anvil: [[/, shoved ([\d.]+) cells and staggered [\d.]+s\)/, ' and shoved $1 cells)']],
+};
+// a talent, by its tree and name: pro (its words), tag, sp (its spell rule), fix(t) for anything else
+const HOLD_TAL = {
+  'grove.arcane': {
+    'Bowl Over': { tag: 'Control', pro: n => `Bounding Leap throws the ground foes it lands on ${hNf(.2 * n)} cells back.`, sp: n => ({ ab: 'stampede', rider: { shove: .2 * n } }) },
+    'Run to Ground': { tag: 'Damage', pro: "White Hart's Hunt rides 2 more charges." },
+    'Hooves of Thunder': { tag: 'Damage', pro: 'Each charge ends in a stomp, hitting ground foes within 1 cell for 50% of the lance, and held ones for all of it.' },
+  },
+  'grove.storm': {
+    'Wing-Clipper': { tag: 'Control', pro: n => `Primal Pounce drags a flyer down ${hNf(.75 * n)}s longer.` },
+  },
+  'silver.arcane': {
+    'Unhorse': { tag: 'Control', pro: 'The lance also drives back every ground foe within a cell of its foe.' },
+    'Unhorsing Ride': { tag: 'Control', pro: 'Tourney Passes slows every ground foe it tramples 30% for 1.5s.', sp: { ab: 'so_ridedown', rider: { slow: [.3, 1.5] } } },
+  },
+  'silver.earth': {
+    'Tremor': { tag: 'Damage', pro: n => `Sanctified Slam cracks ${n} armour off every foe it strikes.`, sp: n => ({ ab: 'so_crush', rider: { shred: [n, 6] } }) },
+    'Blade of Judgement': { tag: 'Spell', pro: n => `Sword of Heaven's shock reaches ${hNf(.25 * n)} cells wider.` },
+  },
+  'ironhold.earth': {
+    'Rivet Popper': { tag: 'Damage', pro: n => `A slam that cracks a foe's last armour fills ${10 * n}% of its gauge, once a foe.` },
+    'Groundsplitter': { tag: 'Damage', pro: 'Every 4th slam hits 2.5× as hard.' },
+    'Hammer Home': { tag: 'Damage', pro: n => `Its slams crack ${n} more armour off held foes, once every 2s a foe.` },
+    'Piledriven': { tag: 'Damage', pro: "Ground foes caught by both of Pile Driver's first two slams lose 2 more armour." },
+  },
+  // the Ironbreakers stay Ironhold's line holder (the shove, the vent's stun, Hold the Pass, Knock Them Flat); four of
+  // their six hold talents now shove or crack armour instead of adding another hold
+  'ironhold.glaive': {
+    'Shield Rush': { tag: 'Control', pro: 'Every 4th shove is a charge that also throws back ground foes within 1 cell.' },
+    'Breach the Line': { tag: 'Control', pro: "Breaker's Blow ends in a free Shield Shove that bowls back the ground foes behind." },
+    'Hot Shards': { tag: 'Damage', pro: "Breaker's Blow's shards fly 1 cell farther and strip all the armour of the ground foes they strike." },
+    'Caught Between Shields': { tag: 'Damage', pro: n => `A foe chopped by two Ironbreakers within 1s loses ${n} more armour, once every 3s.` },
+  },
+  'stormborn.earth': {
+    'Ground Gives Way': { tag: 'Control', pro: n => `Its stomps throw slowed ground foes ${hNf(.1 * n)} cells back, once every 3s each.` },
+  },
+  'wardbound.storm': {
+    'Spur and Lance': { tag: 'Mana', pro: n => `Thunder Charge restores ${2 * n} mana for each branded ground foe it strikes.` },
+    "Sky's Answer": { tag: 'Control', pro: n => `Skyfall slows every foe it strikes ${10 + 10 * n}% for 2s.`, sp: n => ({ ab: 'wb_skyfall', rider: { slow: [.1 + .1 * n, 2] } }) },
+  },
+  'wardbound.earth': {
+    'Braced Shove': { tag: 'Control', pro: n => `Shield Wall shoves foes that attack your units ${hNf(.2 * n)} cells farther.` },
+    "Mountain's Weight": { tag: 'Control', pro: 'Its quakes run twice as far and slow each ground foe they strike 30% for 2s.' },
+  },
+};
+{
+  const each = fn => { if (typeof FORCES !== 'undefined') for (const f in FORCES) { const U = FORCES[f].units; if (U) for (const s in U) fn(U[s]); } if (typeof TOWERS !== 'undefined') for (const s in TOWERS) fn(TOWERS[s]); };
+  each(d => {
+    const u = d && (d.unit || d.id); if (!u || !HOLD_SAY[u] || !d.blurb || d._holdSay) return;
+    let b = String(d.blurb); for (const [re, to] of HOLD_CARD[u] || []) b = b.replace(re, to);
+    // the payoff, before the lane note if the card has one
+    const note = typeof rideNote === 'function' ? rideNote(u) : '', i = note ? b.indexOf(note) : -1;
+    d.blurb = i >= 0 ? b.slice(0, i).replace(/\s+$/, '') + ' ' + HOLD_SAY[u] + ' ' + note : b.replace(/\s+$/, '') + ' ' + HOLD_SAY[u];
+    d._holdSay = 1;
+  });
+  if (typeof ABIL !== 'undefined') for (const id in HOLD_SPELL) {
+    const ab = ABIL[id]; if (!ab || ab._holdSay) continue; ab._holdSay = 1;
+    const re = s => { let o = String(s); for (const [p, to] of HOLD_SPELL[id]) o = o.replace(p, to); return o; };
+    if (typeof ab.text === 'function') { const t0 = ab.text; ab.text = function () { return re(t0.apply(this, arguments)); }; }
+    for (const k of ['auto', 'blurb', 'none']) if (typeof ab[k] === 'string') ab[k] = re(ab[k]);
+  }
+  if (typeof FORCES !== 'undefined') for (const key in HOLD_TAL) {
+    const [f, slot] = key.split('.'), T = FORCES[f] && FORCES[f].talents && FORCES[f].talents[slot], L = T && T.list;
+    if (!L) { console.warn('line holders: no tree ' + key); continue; }
+    for (const name in HOLD_TAL[key]) {
+      const t = L.find(q => q.name === name), o = HOLD_TAL[key][name]; if (!t) { console.warn(`line holders: no talent ${key} ${name}`); continue; }
+      for (const k of ['pro', 'tag', 'sp', 'cap', 'mod']) if (k in o) t[k] = (k === 'pro' || k === 'sp') && typeof o[k] !== 'function' && o[k] != null ? (s => () => s)(o[k]) : o[k];   // (the trees keep words and spell rules as functions of the rank)
+      if (o.fix) o.fix(t);
+    }
+  }
+  // the Stag Lancers' Bloom no longer holds its foe: it lands harder instead
+  if (typeof GW_BLOOM !== 'undefined' && GW_BLOOM.staglancer) { GW_BLOOM.staglancer.k = 3; GW_BLOOM.staglancer.say = (t, st, B) => `the lance strikes for ${gwDmg(st, B.k)}, and ×1.6 that on a foe another unit holds`; }
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
@@ -79600,13 +79846,13 @@ const SPELL_BRIEFS = {
   thicket: 'Roots erupt, dealing {d} and rooting ground enemies within {rr} cells for {root} sec.',
   constrict: 'Releases moths for {dur} sec. Enemies inside are slowed 30% and take {d} every sec, and support casters can\'t cast. If one dies inside, the swarm spreads to the next group.',
   briarfield: 'Curses for {dur} sec, stripping armour, slowing and dealing increasing damage each sec (from {d}). If it dies cursed, it crumbles and curses nearby enemies for 2 sec.',
-  heroiccharge: 'Charges up to 1.5 cells past its range, dealing {d} (50% more to bosses and elites), stunning for {stun} sec and rooting for 1 sec.',
-  stampede: ({ d, v, full }) => { const m = /up to ([\d.]+) cells away/.exec(String(full).replace(/<[^>]+>/g, '')); return `Leaps onto a ground enemy up to ${m ? m[1] : '4'} cells away (your units and walls block it), dealing ${d(1)}. Ground enemies within 0.8 cells take ${d(2)}, and all are rooted for ${v('root')} sec.`; },
-  runthrough: 'Charges {n} times. Each deals {d} and roots for 0.6 sec, or {d2} if already rooted or stunned.',
-  wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Pounces in the form needed. Hawk: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: ${d(2)} to a ground enemy, rooting for ${+(h * .6).toFixed(2)} sec. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
-  wildsurge: 'Strikes once in each form. Hawk: {d}, dragging down for 2 sec. Bear: {d2} to the toughest ground enemy, rooting for 1 sec. Sage: {d3} to every enemy in a line, slowing {slowPct} for 2 sec.',
+  heroiccharge: 'Charges up to 1.5 cells past its range, dealing {d} (50% more to bosses and elites). An enemy another unit holds takes ×1.6.',
+  stampede: ({ d, v, full }) => { const m = /up to ([\d.]+) cells away/.exec(String(full).replace(/<[^>]+>/g, '')); return `Leaps onto a ground enemy up to ${m ? m[1] : '4'} cells away (your units and walls block it), dealing ${d(1)}. Ground enemies within 0.8 cells take ${d(2)}.`; },
+  runthrough: 'Charges {n} times. Each deals {d}, or {d2} to an enemy another unit has rooted or stunned.',
+  wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Pounces in the form needed. Hawk: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: ${d(2)} to a ground enemy, bowling it 0.3 cells back. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
+  wildsurge: 'Strikes once in each form. Hawk: {d}, dragging down for 2 sec. Bear: {d2} to the toughest ground enemy, bowling it 0.3 cells back. Sage: {d3} to every enemy in a line, slowing {slowPct} for 2 sec.',
   whirlwind: 'Spins {n} times, 0.5 sec apart. Each deals {d} to every ground enemy in range and slows 25%. No basic attacks while spinning.',
-  leafdance: 'Darts through up to {n} ground enemies within 2.2 cells, dealing {d} each, then roots them all for {root} sec.',
+  leafdance: 'Darts through up to {n} ground enemies within 2.2 cells, dealing {d} each, then slows them all 30% for 2 sec.',
   harvest: 'Afterimages strike every ground enemy the Dancers hit in the last 6 sec for {d} (double if rooted). Each strike gives the Dancers 4 Growth.',
   haze: 'Lobs a pod bursting into a 1-cell spore cloud for {dur} sec. Every 0.5 sec, enemies inside catch spores 1.5 times as strong as a normal pod\'s.',
   barrage: 'Sows {n} puffcaps for 8 sec. A ground enemy stepping on one bursts it, dealing {d} and spores to ground enemies within 0.8 cells.',
@@ -79623,15 +79869,15 @@ const SPELL_BRIEFS = {
   so_bind: 'Binds up to {n} enemies with chains of light, toughest first, dealing {d}, adding a Judgement and stunning {dur} sec (less on bosses).',
   so_flare: 'Chains it to a nearby Oath-Stone or Order unit for {dur} sec, dealing {d} and Blinding {blind} sec. It is held within {slack} cell (bosses only slowed) and Judged every sec; the chain then snaps for {d2}.',
   so_shackle: 'Strings chains of light to up to {n} Oath-Stones or Order units within {r} cells for {dur} sec. Ground enemies crossing a chain take {d} and a Judgement, are stunned {bind} sec and Blinded 1.5 sec.',
-  so_grail: 'Charges, dealing {d} (25% more to bosses and elites), stunning {stun} sec (less on bosses) and delivering its Verdict at double strength.',
-  so_ridedown: 'Rides {n} passes. Each deals {d}, stuns {kd} sec and adds a Judgement; ground enemies in the way take {d2} and a Judgement. The last pass delivers its Verdict.',
-  so_vow: 'Makes itself and Order units within 2 cells Radiant for {dur} sec. A phantom knight rides from up to {riders} of them at the nearest ground enemy, dealing {d}, stunning briefly and adding a Judgement.',
+  so_grail: 'Charges, dealing {d} (25% more to bosses and elites), driving its enemy 0.1 cells back (bosses stand) and delivering its Verdict at double strength.',
+  so_ridedown: 'Rides {n} passes. Each deals {d} and adds a Judgement; ground enemies in the way take {d2} and a Judgement. The last pass delivers its Verdict.',
+  so_vow: 'Makes itself and Order units within 2 cells Radiant for {dur} sec. A phantom knight rides from up to {riders} of them at the nearest ground enemy, dealing {d}, driving it a little way back and adding a Judgement.',
   so_sunlance: 'Fires a lance of sunlight down a 4-cell line, dealing {d} and a Judgement to each enemy. Flying enemies take double and are dragged down 2 sec. Casters take up to double, the more mana they hold.',
   so_halo: ({ d, v, full }) => { const m = /(\d+)° arc/.exec(full); return `Sweeps a beam across a ${m ? m[1] + '°' : 'wide'} arc, dealing ${d(1)} and a Judgement to each enemy crossed. Flying enemies take double and are dragged down ${v('low')} sec.`; },
   so_dawnfall: 'Drags flying enemies down for {dur} sec, dealing {d} and Blinding as long (less on bosses). Each crash deals {d2} to ground enemies beneath, Blinds {crash} sec and adds a Judgement.',
-  so_crush: 'After a long wind-up, slams the ground, dealing {d} to ground enemies and stunning {stun} sec. Judged enemies hit hear their full Verdict.',
+  so_crush: 'After a long wind-up, slams the ground, dealing {d} to ground enemies. Judged enemies hit hear their full Verdict.',
   so_hallow: 'Slams {n} times in quick succession, each dealing {d} and a Judgement to ground enemies. The last slam delivers each one\'s Verdict at {vkPct} strength.',
-  so_hammerfall: 'Hurls its sword into the sky, landing 1 sec later for {d}, stunning {stun} sec and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2}, a Judgement and a 0.5 sec stun.',
+  so_hammerfall: 'Hurls its sword into the sky, landing 1 sec later for {d} and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2} and a Judgement.',
   so_sweep: 'Swings the censer in a circle, dealing {d} and a Judgement to ground enemies within 1.5 cells. Incense around the bearer for {dur} sec burns enemies every 0.5 sec and Judges them every sec.',
   so_smoke: 'Lays incense along {n} cells of road, dealing {d} and a Judgement to each ground enemy hit. For {dur} sec, ground enemies in it are slowed {slowPct}, burned every 0.5 sec and Judged every sec.',
   so_embers: 'Ignites up to {n} incense patches in range, using them up. Ground enemies in one take {d} and a Judgement; those with 3 or more Judgement first hear a 50% Verdict. With no incense, it first throws a coal.',
@@ -79653,9 +79899,9 @@ const SPELL_BRIEFS = {
   ih_flakscreen: 'Fills 1.4 cells of sky with flak for {dur} sec. Every 0.5 sec, flying enemies in it take {d} and are slowed 35%. Ground enemies take half.',
   ih_grapnel: 'Deals {d}, doubled against flying. A flying enemy is pulled down for {down} sec (less on bosses) and slammed onto the road, dealing {d2} to ground enemies beneath. A ground enemy is pinned 0.8 sec.',
   ih_airburst: 'Bursts a starshell, dealing {d} within 1.2 cells, doubled against flying. Its flare lights the area for {dur} sec: lit flying enemies fly low enough for every unit to reach, and lit enemies lose 3 armour.',
-  ih_pressureslam: 'Slams every ground enemy in reach for {d}, stunning 0.5 sec and stripping 3 armour. Spends all heat, adding up to {d2} at full heat.',
-  ih_steamvent: 'Slams {n} times, dealing {d} to every ground enemy in reach and stripping 1 armour per slam (up to 4). The last slam deals {d2} and stuns 0.5 sec. Each slam builds heat.',
-  ih_pistondrive: ({ v, d }) => `Uppercuts for ${d(1)}, throwing it ${+(v('kb') * 2).toFixed(2)} cell${+(v('kb') * 2).toFixed(2) === 1 ? '' : 's'} back. Where it lands, ground enemies within 0.9 cells take ${d(2)} and are stunned 0.4 sec. Bosses are stunned, not thrown.`,
+  ih_pressureslam: 'Slams every ground enemy in reach for {d}, stripping 3 armour. Spends all heat, adding up to {d2} at full heat.',
+  ih_steamvent: 'Slams {n} times, dealing {d} to every ground enemy in reach and stripping 1 armour per slam (up to 4). The last slam deals {d2}. Each slam builds heat.',
+  ih_pistondrive: ({ v, d }) => `Uppercuts for ${d(1)}, throwing it ${+(v('kb') * 2).toFixed(2)} cell${+(v('kb') * 2).toFixed(2) === 1 ? '' : 's'} back. Where it lands, ground enemies within 0.9 cells take ${d(2)}. Bosses are too heavy to throw.`,
   ih_incendiary: 'Fires a firebomb with twice the usual blast, dealing {d} to ground enemies.',
   ih_shrapnelround: 'Fires a shell skipping back along the road, bursting 3 times. Each burst deals {d} to ground enemies within 0.65 cells and strips 2 armour; the last, larger burst deals {d2}.',
   ih_bombard: 'Fires a huge shell landing 1.6 sec later, dealing {d} to ground enemies within 1.3 cells (less at the edge), knocking them back and stunning 0.5 sec. Its crater slows them 40% for 5 sec.',
@@ -79702,7 +79948,7 @@ const SPELL_BRIEFS = {
   sb_thunderbird: 'Links to a Stormborn unit or Standing Stone within 3.6 cells by lightning for {dur} sec. Enemies crossing take {d} and are soaked 2 sec, up to twice each.',
   sb_stormtotem: 'Spikes the target for {dur} sec. Each sec lightning deals {d} to it and arcs to 3 nearby enemies. Other Stormborn lightning within 2.5 cells jumps to it for 25% damage.',
   sb_stonetotem: 'Plants a stone totem for {dur} sec. Each sec it deals {d} to ground enemies within 1 cell and slows them by 40%. Units casting near it channel their power through it.',
-  sb_fissure: 'Every wall and stone within 2.2 cells (or this unit, if none) bursts, dealing {d} to adjacent ground enemies and stunning {stun} sec. A second burst deals {d2}.',
+  sb_fissure: 'Every wall and stone within 2.2 cells (or this unit, if none) bursts, dealing {d} to adjacent ground enemies and soaking them 3 sec. A second burst deals {d2}.',
   sb_herd: 'Opens a pit for {dur} sec. Ground enemies fall in, stunned 1.2 sec, soaked and dealt {d}; bosses and elites wade, slowed by 60%. Closing deals {d2} to all inside and stuns 0.5 sec.',
   sb_thunderhead: 'For {dur} sec, a storm cloud soaks enemies under it and every 0.5 sec strikes a random one for {d}.',
   sb_downpour: 'Dances {n} beats of 0.6 sec. Each soaks all enemies, slows them by 20% and raises the Storm by 2.5. A new Storm level strikes the 6 toughest for {d}.',
@@ -79735,7 +79981,7 @@ const SPELL_BRIEFS = {
   ch_morningstar: 'Fires a dawn beam bouncing between up to {n} Oath-Stones, dealing {d}, a Judgement and a {blind} sec Blind to each enemy crossed. With no Oath-Stone, it fires one beam.',
   ch_highnoon: ({ v }) => `For ${v('dur')} sec, a sun Blinds all enemies in range every ${v('pulse') === 1 ? '' : v('pulse') + ' '}sec, and each attack also hits up to 5 other Blinded enemies for 60% damage.`,
   ch_sentence: 'Every Judged enemy hears its Verdict at once, taking {d} per Judgement (40% on bosses).',
-  ch_summons: 'Pulls all Judgement within {r} cells onto one enemy, stunning {bind} sec and dealing {d}. Each stack over its limit deals {d2} extra.',
+  ch_summons: 'Pulls all Judgement within {r} cells onto one enemy, dealing {d}. Each stack over its limit deals {d2} extra.',
   ch_verdict: 'Marks for {dur} sec and adds 2 Judgement. If it dies, its Judgement spreads within {r} cells and each hears a {passPct} Verdict; if it survives, it hears its Verdict at {gavelPct} strength.',
   /* conclave */
   cc_sunder: 'Breaks every ward and shield, then strikes for {d} plus stored Severance. Its ward stays cracked open {open} sec.',
@@ -79789,12 +80035,12 @@ const SPELL_BRIEFS = {
   wb_etch: 'Deals {d} to the {n} toughest enemies and carves 2 Sigils into each.',
   wb_detonate: 'Detonates all Sigils, dealing {d} per Sigil and half that within 0.9 cells.',
   wb_scribe: 'Carves a great sigil rune for {dur} sec. Ground enemies on it take {d} and gain a Sigil, then another every 0.6 sec.',
-  wb_charge: 'Charges along a line, dealing {d} to each ground enemy, stunning {stun} sec and arcing lightning through it for {d2}, jumping to 1 more enemy. Leaves storm runes in its trail.',
+  wb_charge: 'Charges along a line, dealing {d} to each ground enemy and arcing lightning through it for {d2}, jumping to 1 more enemy. Leaves storm runes in its trail.',
   wb_stormbanner: 'Strikes with lightning for {d}, jumping to 4 more enemies. For {dur} sec, chain lightning from Wardbound units within 2 cells jumps 1 extra time.',
-  wb_skyfall: 'Calls lightning onto every storm rune up to 1.5 cells beyond reach. Enemies within 0.85 cells take {d} and are stunned 0.25 sec (at most twice). With no storm rune, first lays one under the toughest enemy.',
-  wb_shieldwall: 'Slams its shield, dealing {d} to ground enemies in the cone, stunning {stun} sec and shoving 0.4 cells back. Lays a stone rune.',
-  wb_quakeline: 'Slams the nearest ground enemy for {d}, stunning {stun} sec. A quake runs both ways to runes within 3 cells, doing the same to ground enemies passed and laying stone runes. Runes it reaches trigger again.',
-  wb_anvil: 'Braces {dur} sec and can\'t fall. Ground enemies within 1.15 cells take {d}, are shoved 0.6 cells and stunned 0.3 sec, once per sec each.',
+  wb_skyfall: 'Calls lightning onto every storm rune up to 1.5 cells beyond reach. Enemies within 0.85 cells take {d} (at most twice). With no storm rune, first lays one under the toughest enemy.',
+  wb_shieldwall: 'Slams its shield, dealing {d} to ground enemies in the cone and shoving them 0.7 cells back. Lays a stone rune.',
+  wb_quakeline: 'Slams the nearest ground enemy for {d}. A quake runs both ways to runes within 3 cells, doing the same to ground enemies passed and laying stone runes. Runes it reaches trigger again.',
+  wb_anvil: 'Braces {dur} sec and can\'t fall. Ground enemies within 1.15 cells take {d} and are shoved 0.6 cells, once per sec each.',
   wb_pinbolt: 'Fires a bolt down a line, dealing {d} to the first 3 ground enemies, rooting {pin} sec and laying a pin rune under each.',
   wb_runeshot: 'Every rune within 1.4 cells of the spot bursts, used up, dealing {d} to adjacent enemies (at most twice each) and applying its effects. With no rune, deals {d2} to ground enemies there and lays a pin rune.',
   wb_chainbolt: 'Strikes the 2 enemies nearest the gate for {d}, rooting 0.5 sec and chaining them {dur} sec: half the damage one takes is dealt to the other.',
@@ -81198,7 +81444,7 @@ const AFF_MODS = {
   ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within a Runesmith’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Runesmiths: Tovin already favours the Mortar Crew)
     up: { glaive: { k: 'rate', v: .06 }, earth: { k: 'reach', v: .1 } }, dn: { arrow: { k: 'range', v: -.2 }, storm: { k: 'rate', v: -.05 } } },
   // ---- the Silver Order ----
-  so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its slams Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back, dazes and Judges up to 4 ground foes it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
+  so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its slams Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back and Judges up to 4 ground foes it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
     up: { glaive: { k: 'reach', v: .1 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
   so_dawn: { fav: 'cannon', sig: { name: 'Dawn Knell', t: 'Every 4th swing of a Censer Bearer rings out like a bell, Blinding every foe it strikes for 1.5 seconds.' },
     up: { frost: { k: 'range', v: .2 }, storm: { k: 'crit', v: .05 } }, dn: { arcane: { k: 'range', v: -.2 }, earth: { k: 'rate', v: -.05 } } },
@@ -82160,204 +82406,94 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -82366,207 +82502,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -83389,6 +83393,15 @@ function bindKeys() {
       // Range arrows, Home/End and select keys belong to the control, never to the camera or build hotkeys.
       if (e.key !== 'Escape' && e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     }
+    if (!ov.hidden && ovp.classList.contains('title2') && ovp.menuBack) {   // a title window (Saved games, Top scores) is open
+      if (e.key === 'Escape') { e.preventDefault(); ovp.menuBack(); return; }
+      if (e.key === 'Tab') {
+        const items = Array.from(ovp.querySelectorAll('.t2-win:not([hidden]) button:not(:disabled)')).filter(n => n.getClientRects().length);
+        const first = items[0], last = items[items.length - 1], inside = items.includes(document.activeElement);
+        if (first && (!inside || (e.shiftKey ? document.activeElement === first : document.activeElement === last))) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+        return;
+      }
+    }
     if (G.state !== 'play' || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!G.paused && PAN_K[k] && CAM.zoom.z > 1.01 && !(e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) && (k.startsWith('Arrow') || !(G.sel && (G.sel.kind === 'tower' || G.sel.kind === 'box')))) {
@@ -83481,6 +83494,7 @@ const HOW_F = `<ul>
 <li>Double-tap a unit to select every unit of the same kind and tier, then upgrade them all at once.</li>
 <li>Press Space, or tap the pause button above the zoom buttons, to freeze the battle. You can still build and upgrade while it's paused. Enter sounds the horn.</li>
 <li>Flyers ignore the maze and cut straight down the middle. Only units that reach the air can hit them.</li>
+<li>One melee unit in each army holds foes in place: its line holder (Thornguard Spears, Oathsworn Shieldbearers, Ironbreakers, Golem Wardens, Wolfguard or Oathbound). The army's other melee units hold nothing and hit a held foe harder, so post them beside the line holder or beside the unit that roots, binds or nets.</li>
 <li>Mounted units charge out from their post in a straight line, and your other units and walls block the charge. Give a rider a clear lane to the road, such as the end of a straight run: select or place one and the ground shows where it can ride, with what its neighbours block cut away. A charge of 2 cells or more hits harder.</li>
 <li>Anything built since the last wave sells for a full refund.</li>
 <li>Sound the horn early to earn bonus gold. During a wave, the horn sends the next wave on top of it for even more.</li>
@@ -83523,36 +83537,25 @@ function hideOverlay() { if (titlePanelStop) { titlePanelStop(); titlePanelStop 
 const fmtPlay = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : sec ? '<1m' : ''; };
 const fmtDay = t => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
 const mapThumb = k => k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
-/* The main menu: a quiet navigation column and taller save/score lists.
-   Phones use the same lists as independent click-to-expand sections. */
-let titlePanelStop = null;
-const titleMobilePanels = { saves: false, scores: false };
-function titlePanelsInit(host) {
-  if (titlePanelStop) titlePanelStop();
-  const media = matchMedia('(max-width: 900px), (max-height: 500px) and (max-width: 1100px)');
-  const panels = Array.from(host.querySelectorAll('[data-title-panel]'));
-  const sync = () => {
-    if (!host.isConnected) { stop(); return; }
-    for (const panel of panels) {
-      const summary = panel.querySelector('summary');
-      panel.open = !media.matches || titleMobilePanels[panel.dataset.titlePanel];
-      summary.tabIndex = media.matches ? 0 : -1;
-      summary.setAttribute('aria-expanded', String(panel.open));
-      summary.setAttribute('aria-disabled', String(!media.matches));
-    }
+/* The main menu: one stacked column of buttons. Saved games and Top scores are windows over it (owner, 11 Nov 2026:
+   "all buttons stacked on one menu with saved games and top scores being their own windows on click"). */
+let titlePanelStop = null;   // closes the open title window, if any (showOverlay and hideOverlay call it)
+function titleWinOpen(id, opener) {
+  const host = ovp.querySelector('.t2'), win = host && host.querySelector('#' + id); if (!win) return;
+  titleWinClose();
+  win.hidden = false; host.classList.add('t2-winopen');
+  const close = () => {
+    if (win.hidden) return;
+    win.hidden = true; host.classList.remove('t2-winopen'); ovp.menuBack = null; titlePanelStop = null;
+    for (const r of win.querySelectorAll('.t2-save.ask')) saveAskEnd(r);
+    if (opener && opener.isConnected) opener.focus({ preventScroll: true });
   };
-  const stop = () => { media.removeEventListener('change', sync); };
-  titlePanelStop = stop;
-  for (const panel of panels) {
-    const summary = panel.querySelector('summary');
-    summary.onclick = e => { if (!media.matches) e.preventDefault(); };
-    panel.addEventListener('toggle', () => {
-      if (media.matches) titleMobilePanels[panel.dataset.titlePanel] = panel.open;
-      summary.setAttribute('aria-expanded', String(panel.open));
-    });
-  }
-  media.addEventListener('change', sync); sync();
+  titlePanelStop = close; ovp.menuBack = () => { sfx('click'); close(); };
+  win.onclick = e => { if (e.target === win) ovp.menuBack(); };   // a click or tap on the dimmed menu behind
+  for (const b of win.querySelectorAll('[data-win-close]')) b.onclick = () => ovp.menuBack();
+  win.querySelector('.t2-x').focus({ preventScroll: true });
 }
+function titleWinClose() { if (titlePanelStop) { const f = titlePanelStop; titlePanelStop = null; f(); } }
 function titleScreen(opt) {
   twStop();
   G.paused = false;
@@ -83569,27 +83572,36 @@ function titleScreen(opt) {
           <button type="button" class="t2-btn t2-begin" id="oNew"><span>Begin</span>${R.pick ? `<small>${riteName(R.pick)}</small>` : ''}</button>
           <button type="button" class="t2-btn" id="oClassic" title="The elemental towers, on the old waves">Classic</button>
           <button type="button" class="t2-btn" id="oRites" title="${esc(typeof campTitleLine === 'function' ? campTitleLine() : R.max ? `${riteName(R.pick)} chosen · ${RITE_ROMAN[R.max]} of ${RITE_MAX} unlocked` : 'Win a run to open the first')}">Chronicles</button>
+          <button type="button" class="t2-btn" id="oSaves" aria-haspopup="dialog"><span>Saved games</span><small id="t2SaveCount"></small></button>
+          <button type="button" class="t2-btn" id="oScores" aria-haspopup="dialog">Top scores</button>
           <button type="button" class="t2-btn" id="oSet">Settings</button>
         </nav>
       </section>
-      <details class="t2-p t2-saves" data-title-panel="saves" open>
-        <summary aria-controls="t2SavedContent"><h2>Saved games <span class="t2-count" id="t2SaveCount"></span></h2><span class="t2-caret" aria-hidden="true"></span></summary>
-        <div class="t2-panel-content" id="t2SavedContent"><div class="t2-list" id="tSaves"></div><p class="t2-list-foot" id="t2SaveFoot"></p></div>
-      </details>
-      <details class="t2-p t2-scores" data-title-panel="scores" open>
-        <summary aria-controls="t2ScoreContent"><h2>Top scores</h2><span class="t2-caret" aria-hidden="true"></span></summary>
-        <div class="t2-panel-content" id="t2ScoreContent">
+    </div>
+    <div class="t2-win" id="t2WinSaves" role="dialog" aria-modal="true" aria-labelledby="t2WinSavesT" hidden>
+      <section class="t2-p t2-saves">
+        <header class="t2-winhead"><h2 id="t2WinSavesT">Saved games</h2><button type="button" class="t2-x" data-win-close aria-label="Close saved games" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+        <div class="t2-panel-content"><div class="t2-list" id="tSaves"></div></div>
+        <button type="button" class="t2-more t2-back" data-win-close><span aria-hidden="true">‹</span> Back to menu</button>
+      </section>
+    </div>
+    <div class="t2-win" id="t2WinScores" role="dialog" aria-modal="true" aria-labelledby="t2WinScoresT" hidden>
+      <section class="t2-p t2-scores">
+        <header class="t2-winhead"><h2 id="t2WinScoresT">Top scores</h2><button type="button" class="t2-x" data-win-close aria-label="Close top scores" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+        <div class="t2-panel-content">
           <div class="t2-sc-head" aria-hidden="true"><span>Rank</span><span>Player</span><span>Run</span><span>Wave</span></div>
           <ol class="t2-sc" id="tScores" aria-label="Top eight scores"><li class="t2-note">Loading…</li></ol>
           <button type="button" class="t2-more" id="oBoard">All scores <span aria-hidden="true">›</span></button>
         </div>
-      </details>
+        <button type="button" class="t2-more t2-back" data-win-close><span aria-hidden="true">‹</span> Back to menu</button>
+      </section>
     </div>
-    <footer class="t2-footer" id="t2Footer"></footer>
   </div>`, 'title2');
   ovp.setAttribute('aria-label', 'Main menu');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
-  titleSaves(); titlePanelsInit(ovp.querySelector('.t2'));
+  titleSaves();
+  $('#oSaves').onclick = e => { AudioSys.init(); sfx('click'); titleSaves(); titleWinOpen('t2WinSaves', e.currentTarget); };
+  $('#oScores').onclick = e => { AudioSys.init(); sfx('click'); titleBoardLine(); titleWinOpen('t2WinScores', e.currentTarget); };
   $('#oNew').onclick = () => { AudioSys.init(); sfx('click'); openHeroPicker(() => beginGame(), null, false); };
   $('#oClassic').onclick = () => { AudioSys.init(); sfx('click'); openHeroPicker(() => beginGame(), null, true); };
   $('#oRites').onclick = () => { AudioSys.init(); sfx('click'); if (typeof openCampaign === 'function') openCampaign(titleScreen); else openRites(titleScreen); };
@@ -83597,20 +83609,14 @@ function titleScreen(opt) {
   $('#oBoard').onclick = () => { AudioSys.init(); sfx('click'); openBoard(titleScreen); };
   boardInit(); titleBoardLine();
   if (typeof titleFxStart === 'function') titleFxStart(ovp.querySelector('.t2'));
-  // Tutorial and playtest wrappers append their buttons after this function returns.
-  const host = ovp.querySelector('.t2');
-  queueMicrotask(() => {
-    if (!host.isConnected) return;
-    const tutorial = host.querySelector('#oTut'), footer = host.querySelector('#t2Footer');
-    if (tutorial && footer) footer.appendChild(tutorial);
-  });
 }
-// Up to three existing runs. Resuming and deleting retain their original storage behavior.
+// Up to three existing runs. The bin asks in the row, in words, and Delete removes the run for good. (It used to arm
+// silently and want a second click within 2.5 s, which read as a button that did nothing: owner, 11 Nov 2026.)
+function saveAskEnd(row) { const q = row.querySelector('.t2-ask'); if (q) q.remove(); row.classList.remove('ask'); const d = row.querySelector('.t2-del'); if (d) d.setAttribute('aria-expanded', 'false'); }
 function titleSaves() {
   const box = document.getElementById('tSaves'); if (!box) return;
-  const a = savesGet(), count = document.getElementById('t2SaveCount'), foot = document.getElementById('t2SaveFoot');
-  if (count) count.textContent = a.length ? String(a.length) : '';
-  if (foot) foot.textContent = a.length ? a.length + (a.length === 1 ? ' saved game' : ' saved games') : '';
+  const a = savesGet(), count = document.getElementById('t2SaveCount');
+  if (count) count.textContent = a.length ? a.length + ' in progress' : 'None yet';
   if (!a.length) { box.innerHTML = '<p class="t2-note">No runs in progress. Choose Begin to raise the keep.</p>'; return; }
   box.innerHTML = a.map(x => {
     const s = x.s, m = MAPS[s.map] ? s.map : 'meadow', h = typeof HERO_BY !== 'undefined' && HERO_BY[s.hero];
@@ -83620,19 +83626,26 @@ function titleSaves() {
       <span class="t2-tx"><b>${esc(name)}</b><span>Wave ${s.wave}${s.rite ? ' · ' + riteName(s.rite) : ''} · ${s.lives} lives</span><span>${[fmtDay(x.at), fmtPlay(s.playT)].filter(Boolean).join(' · ')}</span></span>
       ${h ? `<img class="t2-hero" alt="" title="${esc(h.name)}" src="${heroFaceURL(h)}">` : '<span class="t2-hero t2-hero-empty" aria-hidden="true"></span>'}
       <span class="t2-continue" aria-hidden="true">›</span></button>
-      <button type="button" class="t2-del" aria-label="${esc('Delete saved game ' + name)}" title="Delete saved game"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v7M14 10v7"/></svg></button></div>`;
+      <button type="button" class="t2-del" aria-expanded="false" aria-label="${esc('Delete saved game ' + name + ', wave ' + s.wave)}" title="Delete saved game"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v7M14 10v7"/></svg></button></div>`;
   }).join('');
   for (const row of box.querySelectorAll('.t2-save')) {
     const x = a.find(q => q.id === row.dataset.id);
     row.querySelector('.t2-go').onclick = () => { AudioSys.init(); twStop(); restore(x.s); G.runId = x.id; afterStart(`Wave ${G.wave}`, 'Your maze stands as you left it.'); };
-    const del = row.querySelector('.t2-del'), label = del.getAttribute('aria-label'); let armedUntil = 0;
+    const del = row.querySelector('.t2-del');
     del.onclick = () => {
       sfx('click');
-      if (performance.now() >= armedUntil) {
-        armedUntil = performance.now() + 2500; del.classList.add('arm'); del.setAttribute('aria-label', 'Activate again to delete this saved game');
-        setTimeout(() => { del.classList.remove('arm'); del.setAttribute('aria-label', label); }, 2500); return;
-      }
-      saveDrop(x.id); titleSaves();
+      if (row.classList.contains('ask')) { saveAskEnd(row); return; }
+      for (const r of box.querySelectorAll('.t2-save.ask')) saveAskEnd(r);
+      row.classList.add('ask'); del.setAttribute('aria-expanded', 'true');
+      const q = document.createElement('div'); q.className = 't2-ask'; q.setAttribute('role', 'group'); q.setAttribute('aria-label', 'Delete this saved game?');
+      q.innerHTML = '<span>Delete this saved game?</span><button type="button" class="t2-yes">Delete</button><button type="button" class="t2-no">Keep</button>';
+      row.appendChild(q);
+      q.querySelector('.t2-yes').onclick = () => {
+        sfx('click'); saveDrop(x.id); titleSaves();
+        const f = box.querySelector('.t2-go') || document.querySelector('.t2-win:not([hidden]) .t2-x, #svBack'); if (f) f.focus({ preventScroll: true });
+      };
+      q.querySelector('.t2-no').onclick = () => { sfx('click'); saveAskEnd(row); del.focus({ preventScroll: true }); };
+      q.querySelector('.t2-no').focus({ preventScroll: true });
     };
   }
 }
@@ -84687,6 +84700,9 @@ function startUp(data) {
   window.addEventListener('orientationchange', () => setTimeout(layoutAll, 250));
   bindCanvas(); bindKeys();
   $('#bSpeed').onclick = () => { AudioSys.init(); G.speed = G.speed >= 3 ? 1 : G.speed + 1; sfx('click'); };
+  // desktop (deskhud.css): the speed button sits with the big pause/play button beside the card; anywhere else it is back in the top bar
+  { const dock = () => { const sp = $('#bSpeed'), z = $('#zoomUI'), bar = $('#bar'), d = deskHud(); if (!sp || !z || !bar) return; if (d && sp.parentNode !== z) z.insertBefore(sp, z.firstChild); else if (!d && sp.parentNode !== bar) bar.insertBefore(sp, $('#bMenu')); };
+    dock(); try { matchMedia(DESK_MQ).addEventListener('change', dock); } catch (e) {} window.addEventListener('resize', dock); }
   $('#bBag').onclick = () => { AudioSys.init(); if (G.state !== 'play') return; sfx('click'); if (bagOpen && bagTab === 'bag') resumeGame(); else openBag(null, 0, 'bag'); };   // the Bag (the Shop has its own button beside it)
   $('#bShop').onclick = () => { AudioSys.init(); if (G.state !== 'play') return; sfx('click'); if (bagOpen && bagTab === 'shop') resumeGame(); else openShop(); };   // the Shop button (O)
   $('#bTal').onclick = () => { AudioSys.init(); if (G.state !== 'play') return; sfx('click'); if (talOpen) resumeGame(); else openTalents(); };
@@ -97736,19 +97752,19 @@ const SPELL_HELP = {
   briarfield: { when: "Any foe within {reach} cells that is not already withered (a manual cast may wither one again).", aim: "A boss or elite in reach first, the toughest of them; otherwise the toughest foe in reach.", ctl: "Not a hold: the foe keeps walking, slower each second. Its armour falls a point a second, so every unit striking it hits harder as it goes.", tips: ["Save it for bosses and elites: its damage rises each second, so it does most to a foe that lives through all of it.", "Its falling armour helps every unit striking the foe: post the Wardens where your heavy hitters reach.", "If the withered foe dies inside a crowd, its crumble withers the ground foes round it for 2s."] },
 
   // Stag Lancers (staglancer)
-  heroiccharge: { when: "One ground foe within {reach} cells is enough.", aim: "The ground foe in reach with the most health.", tips: ["It needs a clear lane: post the Lancers at the end of a straight run, with no unit or wall between them and the road.", "Its stun and half again on bosses and elites make it a boss opener; the stunned foe is ready for White Hart's Hunt.", "Ground foes only: flyers are out of its reach."] },
-  stampede: { when: "A ground foe beyond its reach (up to {reach+1.5} cells) with a clear lane to it, or two or more ground foes bunched within 0.8 cells, or a boss or elite.", aim: "The ground foe that is farthest out first, then the one in the thickest knot of ground foes, then a boss or elite.", tips: ["Your units and walls block the leap: post the Lancers at the end of a straight run, and it lands on foes far down it.", "Its landing roots the ground foes round its foe, which sets up White Hart's Hunt's run-throughs.", "It reaches 1.5 cells past the Lancers' charge, so it catches ground foes that slip by out of range."] },
-  runthrough: { when: "A boss or elite in reach, or two or more ground foes within {reach} cells.", aim: "Each charge: the toughest ground foe in reach. A free foe is pinned; a held one is run through for double.", ctl: "Hunts for about 2s: no other strikes meanwhile.", tips: ["Cast it on a boss: the first charge pins it and every charge after runs it through for double.", "Post the Lancers within the Briarwardens' roots: every charge at a held ground foe is a run-through.", "Heroic Charge's stun counts as held too, so it opens a hunt well."] },
+  heroiccharge: { when: "One ground foe within {reach} cells is enough.", aim: "The ground foe in reach with the most health.", tips: ["It needs a clear lane: post the Lancers at the end of a straight run, with no unit or wall between them and the road.", "Half again on bosses and elites, and ×1.6 on a foe another unit holds: charge the boss the Thornguard has pinned.", "Ground foes only: flyers are out of its reach."] },
+  stampede: { when: "A ground foe beyond its reach (up to {reach+1.5} cells) with a clear lane to it, or two or more ground foes bunched within 0.8 cells, or a boss or elite.", aim: "The ground foe that is farthest out first, then the one in the thickest knot of ground foes, then a boss or elite.", tips: ["Your units and walls block the leap: post the Lancers at the end of a straight run, and it lands on foes far down it.", "It holds no foe: land it on ground foes the Briarwardens have rooted and every one takes ×1.6.", "It reaches 1.5 cells past the Lancers' charge, so it catches ground foes that slip by out of range."] },
+  runthrough: { when: "A boss or elite in reach, or two or more ground foes within {reach} cells.", aim: "Each charge: the toughest ground foe in reach. One another unit holds is run through for double.", ctl: "Hunts for about 2s: no other strikes meanwhile.", tips: ["Cast it on a boss another unit holds: every charge runs it through for double.", "Post the Lancers within the Briarwardens' roots: every charge at a held ground foe is a run-through.", "The Lancers hold nothing themselves: without a Thornguard pin or a root beside them, each charge is a plain one."] },
 
   // Grove Shifters (wayfarer)
   shift: { when: "When what is in sight (up to 1.6 cells past its range) calls for another form. Hawk: flyers are a third of it. Bear: 3 or more soft ground foes within 2.2 cells. Sage: anything else.", aim: "Itself. Arriving, the hawk drags the 2 nearest flyers down, the bear roars at ground foes within 1.6 cells, the sage bursts moonlight round the toughest armoured foe or caster.", ctl: "Tap Shift to hold Hawk, Bear or Sage (it shifts as soon as mana and cooldown allow); Auto lets it choose again.", tips: ["Leave it on Auto for mixed waves; hold Hawk for flyer waves so it doesn't fall back to sage between flocks.", "Hold Bear at a tight bend right beside the path: its mauls cleave ground foes, but it cannot reach flyers.", "Every shift costs mana, so a held form saves mana for Primal Pounce and Shapestorm."] },
-  wildstrike: { when: "One foe within {reach} cells plus half a cell is enough (a little farther from bear form).", aim: "A flyer still in the air first (the hawk), then the toughest armoured foe or caster (the sage), then the toughest ground foe (the bear); it takes that foe's form as it pounces.", ctl: "A held form pounces in that form, at that form's quarry.", tips: ["Leave the form on Auto: the pounce shifts it for free, so Shift Form's mana goes further.", "As bear it pins its foe under its paw: a held foe for White Hart's Hunt and Encore.", "As hawk it drags a flyer low enough for every unit to reach: the answer to a lone flying boss."] },
-  wildsurge: { when: "Three or more foes within {reach+1.5} cells, or a boss or elite there.", aim: "The hawk: the toughest flyer still in the air, else the toughest foe. The bear: the toughest ground foe. The sage: the straight lane out to {reach} cells through the most foes.", ctl: "About 1.5s: no basic attacks meanwhile. It ends in the form the fight wants (or the held form).", tips: ["Post the Shifters where flyers, ground foes and plate all pass, beside a straight run for the sage's lane.", "The hawk grounds and the bear roots, so the sage's moon-thorns strike held foes: take Grounded Prey.", "It costs no Shift Form mana to wear all three shapes, so it suits a Shifter held in one form."] },
+  wildstrike: { when: "One foe within {reach} cells plus half a cell is enough (a little farther from bear form).", aim: "A flyer still in the air first (the hawk), then the toughest armoured foe or caster (the sage), then the toughest ground foe (the bear); it takes that foe's form as it pounces.", ctl: "A held form pounces in that form, at that form's quarry.", tips: ["Leave the form on Auto: the pounce shifts it for free, so Shift Form's mana goes further.", "As bear it bowls its foe back up the road, and hits a foe another unit holds harder.", "As hawk it drags a flyer low enough for every unit to reach: the answer to a lone flying boss."] },
+  wildsurge: { when: "Three or more foes within {reach+1.5} cells, or a boss or elite there.", aim: "The hawk: the toughest flyer still in the air, else the toughest foe. The bear: the toughest ground foe. The sage: the straight lane out to {reach} cells through the most foes.", ctl: "About 1.5s: no basic attacks meanwhile. It ends in the form the fight wants (or the held form).", tips: ["Post the Shifters where flyers, ground foes and plate all pass, beside a straight run for the sage's lane.", "The hawk grounds flyers, so the sage's moon-thorns strike grounded foes: take Grounded Prey.", "It costs no Shift Form mana to wear all three shapes, so it suits a Shifter held in one form."] },
 
   // Blade Dancers (bladedancer)
   whirlwind: { when: "Two or more ground foes within {reach} cells, or a boss or leader among them.", aim: "Itself: every ground foe within its reach, at every whirl.", ctl: "Spins 1.5s (3s by tier VI): no basic attacks or other spells while it spins.", tips: ["Best where the path wraps round the Dancers, so ground foes stay in reach for every whirl.", "Its 25% slow keeps them in the spin; Thornhedge or Grasp of the Deep nearby holds them longer.", "Ground foes only: leave flyers to the Rangers and the Shifters' hawk."] },
-  leafdance: { when: "Two or more ground foes within 2.2 cells.", aim: "The toughest ground foe within 2.2 cells first, then each next the ground foe nearest the last (up to 3; 4 from tier III, 5 from tier V).", ctl: "Darts for about a second: no basic attacks or other spells meanwhile.", tips: ["Post the Dancers where the road doubles back round them: the thread binds ground foes on both lanes.", "Every foe on the thread is rooted at once: cast Whirlwind next and they stay in every whirl.", "Rooted, they are cut through twice as hard by Encore."] },
-  harvest: { when: "Three or more ground foes it has cut in the last 6s still within {reach} cells plus one, or a rooted one, or a boss.", aim: "Every ground foe it cut in the last 6s within its reach plus one cell (up to 10), the toughest first.", tips: ["Best at a corner or chokepoint: every ground foe its whirls struck is a target for the encore.", "Rooted foes take double: cast it after Threading Dance, Thornhedge or the Briarwardens' roots.", "Each afterimage fills the Dancers' Growth bar 4, so a big encore brings their Bloom on."] },
+  leafdance: { when: "Two or more ground foes within 2.2 cells.", aim: "The toughest ground foe within 2.2 cells first, then each next the ground foe nearest the last (up to 3; 4 from tier III, 5 from tier V).", ctl: "Darts for about a second: no basic attacks or other spells meanwhile.", tips: ["Post the Dancers where the road doubles back round them: the thread slows ground foes on both lanes.", "Every foe on the thread is slowed at once: cast Whirlwind next and they stay in more of its whirls.", "The Dancers root nothing themselves: Encore's double needs the Thornguard's pins or the Briarwardens' roots."] },
+  harvest: { when: "Three or more ground foes it has cut in the last 6s still within {reach} cells plus one, or a rooted one, or a boss.", aim: "Every ground foe it cut in the last 6s within its reach plus one cell (up to 10), the toughest first.", tips: ["Best at a corner or chokepoint: every ground foe its whirls struck is a target for the encore.", "Rooted foes take double: cast it after Thornhedge or the Briarwardens' roots.", "Each afterimage fills the Dancers' Growth bar 4, so a big encore brings their Bloom on."] },
 
   // Seedcasters (seedcaster)
   haze: { when: "Three or more ground foes within 1 cell of one ground foe within {reach} cells, or that busiest spot is centred on a boss or elite.", aim: "The densest spot: the ground foe with the most ground foes within 1 cell (ties: nearest the gate).", tips: ["Aim it at a corner or switchback where ground foes bunch and slow.", "Spores spread when their host falls, so the haze keeps working through a dense column.", "Its spores are the ones Nyssa's Full Bloom bursts, if she leads the run."] },
@@ -97788,8 +97804,8 @@ const SPELL_HELP = {
 
   // Grail Knights (grailknight)
   so_grail: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The ground foe with the most health in reach.", tips: ["Its Verdict is double strength: Judge the big foe first with Consecrated Bolt or Rebuke, then charge.", "On a Condemned foe (Mark of Witness) the Verdict strikes half again as hard: the Order's best boss burst.", "Its reach is 1.5 cells past its range: with a clear lane down a straight run it hits a boss before it reaches the Knights."] },
-  so_ridedown: { when: "One foe is enough: the toughest ground foe within {reach} cells, if it is a boss or elite, carries 2 or more Judgement, or three or more ground foes are in reach.", aim: "The toughest ground foe in reach; if it falls, the next pass rides at the toughest left.", tips: ["Its last pass delivers the Verdict: let the Crossbows Judge the boss first.", "Ground foes between the knight and its foe are trampled each pass: post it so the road runs between it and the gate.", "Each pass knocks its foe down, so a boss stands still for most of the joust."] },
-  so_vow: { when: "Two or more units within 2 cells of the knight are fighting, or a unit within 2 cells and three or more ground foes near them.", aim: "Itself and every unit within 2 cells: each rides a phantom knight at the ground foe nearest it.", tips: ["Build a cluster of different units round the knight: each sends its own phantom rider.", "Radiant units' strikes lay Judgement: cast it as the Templars and Censers start slamming.", "The phantom riders knock ground foes down: a cheap hold for a whole crowd at a corner."] },
+  so_ridedown: { when: "One foe is enough: the toughest ground foe within {reach} cells, if it is a boss or elite, carries 2 or more Judgement, or three or more ground foes are in reach.", aim: "The toughest ground foe in reach; if it falls, the next pass rides at the toughest left.", tips: ["Its last pass delivers the Verdict: let the Crossbows Judge the boss first.", "Ground foes between the knight and its foe are trampled each pass: post it so the road runs between it and the gate.", "The Knights hold nothing themselves: joust a boss a Shieldbearer has dazed or a Sister has bound, and every pass hits it harder."] },
+  so_vow: { when: "Two or more units within 2 cells of the knight are fighting, or a unit within 2 cells and three or more ground foes near them.", aim: "Itself and every unit within 2 cells: each rides a phantom knight at the ground foe nearest it.", tips: ["Build a cluster of different units round the knight: each sends its own phantom rider.", "Radiant units' strikes lay Judgement: cast it as the Templars and Censers start slamming.", "The phantom riders drive ground foes a little way back up the road: cast it as a crowd reaches the corner."] },
 
   // Sunlance Clerics (sunlance)
   so_sunlance: { when: "Any flyer within {reach} cells; else a 4-cell line through two or more foes, or one aimed at a boss or elite.", aim: "The toughest flyer in reach; with none, the foe whose 4-cell line holds the most foes.", tips: ["Flyers take double and are pulled down for 2 seconds, where Shieldbearers, Knights and Templars can strike them.", "Place it at the end of a straight stretch so the 4-cell line runs down the road through a column.", "Fires at a single flyer: keep it on for air waves, and pair with Dawnfall when flyers come in flocks."] },
@@ -97797,9 +97813,9 @@ const SPELL_HELP = {
   so_dawnfall: { when: "Two or more flyers still in the air within {reach} cells, or a flying boss or leader.", aim: "Every flyer in reach that is still in the air.", tips: ["Dragged-down flyers can be struck by the ground-only units: post it beside the Templars.", "Each flyer crashes onto the road and Blinds the ground foes under it: best when a flock flies over a column.", "Save it for flying waves: it does nothing without flyers."] },
 
   // Templars of the Ford (templar)
-  so_crush: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe within {range} cells.", tips: ["Every stack of Judgement turns into a full Verdict: cast after Rebuke, Hail, Flare or Halo have marked the pack.", "Place it in the middle of a switchback so its slam reaches two stretches of road at once.", "It stuns everything around it, buying a breather near the gate."] },
+  so_crush: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe within {range} cells.", tips: ["Every stack of Judgement turns into a full Verdict: cast after Rebuke, Hail, Flare or Halo have marked the pack.", "Place it in the middle of a switchback so its slam reaches two stretches of road at once.", "The Templars hold nothing themselves: slam foes a Shieldbearer has dazed or a Sister has bound and each takes more."] },
   so_hallow: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe in its reach, slam after slam.", tips: ["Place it where the road wraps round it, so ground foes stay in reach for every slam.", "Each slam lays a Judgement and the last delivers them: five or more stacks give the full Verdict.", "Pair it with Oath of Challenge or Vigil Chains: held ground foes take every slam."] },
-  so_hammerfall: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The armoured ground foe nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["It falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock knocks every ground foe round its foe down: aim it at a boss walking in a crowd.", "Its Verdict is half again as strong: Judge the foe before it falls."] },
+  so_hammerfall: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The armoured ground foe nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["It falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock Judges every ground foe round its foe: aim it at a boss walking in a crowd.", "Its Verdict is half again as strong: Judge the foe before it falls."] },
 
   // Censer Bearers (censer)
   so_sweep: { when: "Two or more ground foes within 1.5 cells.", aim: "Itself: every ground foe within 1.5 cells, and incense round it.", tips: ["Place it right beside the road at a corner, so two or more ground foes pass within 1.5 cells.", "The incense left behind keeps Judging ground foes that come after.", "Good beside the Templars: the Sweep's Judgement sets up their Slam."] },
@@ -97899,9 +97915,9 @@ const SPELL_HELP = {
   ih_airburst: { when: "Two or more flyers within 1.5 cells of one in reach (or a flying boss), else three or more foes within 1.2 cells of one in reach.", aim: "Over the thickest flock of flyers, else the thickest crowd.", tips: ["Fire it ahead of a flock: while the flare hangs, every flyer under it flies low enough for every unit.", "Lit plate shows its joints: the clan's steel strikes lit foes as if 3 armour were already gone.", "Post the Flak where flyers and ground foes meet: the light works on both."] },
 
   // Steam Hammers (steamhammer)
-  ih_pressureslam: { when: "Two or more ground foes within {reach} cells, or a boss or leader among the ground foes there.", aim: "Itself: every ground foe within its range, a little less at the edge.", tips: ["It deals double with a full heat gauge: it hits hardest after the unit has struck for a while.", "Post right beside the road at a switchback, so foes pass within range twice.", "Each slam stuns and strips 3 armour, a good opener for Thunderguns and Mortar Crew posted nearby."] },
+  ih_pressureslam: { when: "Two or more ground foes within {reach} cells, or a boss or leader among the ground foes there.", aim: "Itself: every ground foe within its range, a little less at the edge.", tips: ["It deals double with a full heat gauge: it hits hardest after the unit has struck for a while.", "Post right beside the road at a switchback, so foes pass within range twice.", "Each slam strips 3 armour, a good opener for Thunderguns and Mortar Crew posted nearby; on foes the Ironbreakers hold it hits harder."] },
   ih_steamvent: { when: "Two or more ground foes within {range} cells, or a boss or leader there.", aim: "Itself: every ground foe in its hammer's reach, for every slam.", tips: ["Post the Hammers beside a bend or a choke where ground foes bunch inside the hammer's reach.", "Each slam cracks another plate: a full rhythm leaves a column bare for the guns behind it.", "Every slam builds pressure, so a long rhythm usually ends in a Steam Burst."] },
-  ih_pistondrive: { when: "Two or more ground foes within {range+0.2} cells, or a boss or elite there.", aim: "The toughest ground foe in reach (bosses and elites first).", tips: ["Throw the column's toughest ground foe back over its own column: it crashes down among the ground foes behind.", "Thrown back down the road, it walks past every unit again: best near the start of a long maze.", "A boss is too heavy to fly: it is stunned instead."] },
+  ih_pistondrive: { when: "Two or more ground foes within {range+0.2} cells, or a boss or elite there.", aim: "The toughest ground foe in reach (bosses and elites first).", tips: ["Throw the column's toughest ground foe back over its own column: it crashes down among the ground foes behind.", "Thrown back down the road, it walks past every unit again: best near the start of a long maze.", "A boss is too heavy to fly: it only takes the blow."] },
 
   // Mortar Crew (mortarcrew)
   ih_incendiary: { when: "Three or more ground foes within 1 cell of one ground foe in {reach} cells, or that densest spot is a boss or elite.", aim: "The densest pack of ground foes: the spot with the most ground foes within 1 cell.", tips: ["The blast is double size: lob it into corners and switchbacks where packs bunch up.", "Pair with Chain Net or Bulwark: held packs stand still under the shell's long flight.", "It can't reach flyers until they are dragged down by a Grapnel Shot or Chain Net."] },
@@ -97985,7 +98001,7 @@ const SPELL_HELP = {
   // Stormward Lancers (wb_stormward)
   wb_charge: { when: "A line from the unit through two or more ground foes within {reach} cells, or a boss or elite.", aim: "The line through the most ground foes, then the one nearest the gate.", tips: ["Post the Lancers at the end of a straight run: the charge goes through the whole column, and stops at the first unit or wall.", "Each foe it strikes is arced with lightning, and its trail lays storm runes for Skyfall.", "Cast Storm Pennant first: every arc jumps once more."] },
   wb_stormbanner: { when: "Two or more foes within {reach} cells (flyers too), or a boss or elite.", aim: "The toughest foe in reach, bosses and elites first.", tips: ["Raise it among several Lancers: every chain from units within 2 cells jumps once more.", "Its own bolt jumps on: cast it into a crowd.", "Lancers' lightning reaches flyers: it works on a flying wave too."] },
-  wb_skyfall: { when: "Two or more foes within 0.85 cells of storm runes within {reach+1.5} cells, or a boss or elite near one.", aim: "Every storm rune in range at once; on a tap with none, a rune under the toughest foe first.", tips: ["Lay storm runes first with Thunder Charge and the Lancers' thrusts.", "A storm rune merged into a Bound rune is struck too: Bound runes sit where ground foes bunch.", "Each bolt stuns: it stops a crowd for the units round it."] },
+  wb_skyfall: { when: "Two or more foes within 0.85 cells of storm runes within {reach+1.5} cells, or a boss or elite near one.", aim: "Every storm rune in range at once; on a tap with none, a rune under the toughest foe first.", tips: ["Lay storm runes first with Thunder Charge and the Lancers' thrusts.", "A storm rune merged into a Bound rune is struck too: Bound runes sit where ground foes bunch.", "The Lancers hold nothing themselves: strike runes under foes an Oathbound has rooted and each takes more."] },
   // Anvil Guard (wb_anvilguard)
   wb_shieldwall: { when: "Two or more ground foes in a cone within {reach} cells, or a boss or elite there.", aim: "The cone toward the most ground foes.", tips: ["Post Anvil Guard facing down the road: the cone catches the column as it comes.", "It shoves ground foes back up the road over the runes and lines they just crossed.", "Its stone rune staggers ground foes: lay it in front of an Oathbound's oath runes."] },
   wb_quakeline: { when: "Two or more ground foes within {reach} cells with a rune within 3 cells of the unit, three or more ground foes, or a boss or elite.", aim: "The ground foe nearest the unit: the quake runs along the road from it both ways.", tips: ["The quake runs as far as the runes round the unit: lay runes up and down the road first.", "Every rune it reaches touches the foes on it again: Bound runes give all their kinds.", "It lays stone runes as it goes: they link into ward-lines with the rest."] },
@@ -98319,7 +98335,7 @@ function kwBuild() {
   // ---- the Silver Order: Judgement and Verdict ----
   const SV = kwForceName('silver') || 'The Silver Order', so = typeof SO !== 'undefined' ? SO : null;
   kwAdd({ key: 'so:judgement', name: 'Judgement', alias: ['Judged', 'judgement'], cat: 'force', sub: SV, col: '#ffd77a',
-    def: () => `Light marks a foe, up to ${so ? so.J_MAX : 5} stacks, for ${so ? so.J_T : 6}s (${so ? so.J_TBIG : 10}s on bosses and elites). Each stack makes the Order's strikes on it ${so ? kwPct(so.J_AMP) : '4%'} harder, and the Order's holds last longer on a Judged foe: the Shieldbearers' daze 1.5s, not 1s; the Grail Knights' knockdown 1s, not 0.5s.` });
+    def: () => `Light marks a foe, up to ${so ? so.J_MAX : 5} stacks, for ${so ? so.J_T : 6}s (${so ? so.J_TBIG : 10}s on bosses and elites). Each stack makes the Order's strikes on it ${so ? kwPct(so.J_AMP) : '4%'} harder, and the Shieldbearers' daze lasts longer on a Judged foe: 1.5s, not 1s.` });
   kwAdd({ key: 'so:witness', name: 'Witness', alias: ['witnesses'], cat: 'force', sub: SV, col: '#dfe4ff',
     def: 'Bear Witness: each unit of the Order that strikes the condemned foe swears as a witness (a thread of silver light to it, up to 6). When the time is up its Verdict is read, a fifth stronger for each witness.' });
   kwAdd({ key: 'so:verdict', name: 'Verdict', alias: ['Verdicts'], cat: 'force', sub: SV, col: '#fff4cc',
@@ -100296,23 +100312,26 @@ const tutOn = () => typeof G !== 'undefined' && !!G && !!G.tut;
   if (typeof itipShow === 'function') { const _it = itipShow; itipShow = function () { if (TUT.cur) TUT.cur.flags.tip = 1; return _it.apply(this, arguments); }; }
   if (typeof rnLootPick === 'function') { const _lp = rnLootPick; rnLootPick = function () { const r = _lp.apply(this, arguments); if (r && TUT.cur) TUT.cur.flags.loot = 1; return r; }; }
 }
-// the title: a Tutorial button in the corner (the frame's planks stay as they are); How to Play: a button under the rules
+// the title: a Tutorial row, last in the main menu's column; How to Play: a button under the rules
+function tutTitleButton() {
+  try {
+    const menu = typeof ovp !== 'undefined' && ovp && ovp.querySelector('.t2 .t2-menu');
+    if (!menu || document.getElementById('oTut')) return;
+    const n = tutDoneN(), b = document.createElement('button'); b.type = 'button'; b.id = 'oTut'; b.className = 't2-btn t2-tut';
+    b.innerHTML = `<span>Tutorial</span><small>${n >= TUT_CH.length ? '✓ Complete' : n ? `${n} of ${TUT_CH.length} done` : 'New here? Start here'}</small>`;
+    b.onclick = () => { if (typeof AudioSys !== 'undefined' && AudioSys.init) AudioSys.init(); if (typeof sfx === 'function') sfx('click'); tutList(); };
+    menu.appendChild(b);
+  } catch (e) { console.warn('tutorial:', e); }
+}
 if (typeof titleScreen === 'function') {
   const _ts = titleScreen;
   titleScreen = function () {
     if (TUT.cur || (typeof G !== 'undefined' && G && G.tut)) { TUT.cur = null; if (G) G.tut = null; tutHide(); if (typeof PL !== 'undefined' && TUT.pl0 != null) { PL.off = TUT.pl0; TUT.pl0 = null; } }
     const r = _ts.apply(this, arguments);
-    try {
-      const host = typeof ovp !== 'undefined' && ovp && ovp.querySelector('.t2');
-      if (host && !document.getElementById('oTut')) {
-        const n = tutDoneN(), b = document.createElement('button'); b.type = 'button'; b.id = 'oTut'; b.className = 't2-tut';
-        b.innerHTML = `<span>Tutorial</span><small>${n >= TUT_CH.length ? '✓ Complete' : n ? `${n} of ${TUT_CH.length} done` : 'New here? Start here'}</small>`;
-        b.onclick = () => { if (typeof AudioSys !== 'undefined' && AudioSys.init) AudioSys.init(); if (typeof sfx === 'function') sfx('click'); tutList(); };
-        host.appendChild(b);
-      }
-    } catch (e) {}
+    tutTitleButton();
     return r;
   };
+  tutTitleButton();   // a title already on screen when this file loads
 }
 if (typeof openHow === 'function') {
   const _oh = openHow;
