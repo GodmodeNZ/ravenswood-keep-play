@@ -1,4 +1,4 @@
-const BUILD_TAG = '5bf1ecf@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4734313@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -40,9 +40,21 @@ function crestAt(x) {
   for (let i = 1; i < C.length; i++) if (x <= C[i][0]) { const a = C[i - 1], b = C[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0] || 1); }
   return C[C.length - 1][1];
 }
+const pastCrest = (x, z) => { const zc = crestAt(x); return zc != null && z < zc - .03; };
 const CREST_RUN = .5, CREST_PACE = [.6, .35, .9];   // (CREST_PACE: a foe's pace climbing up over a crest, of its own; how far past the crest it keeps it; over how far past that it eases up to its own pace)
 const crestPace = c => { const u = c.y - c.crest - CREST_PACE[1]; return u <= 0 ? CREST_PACE[0] : CREST_PACE[0] + (1 - CREST_PACE[0]) * Math.min(1, u / CREST_PACE[2]); };   // how far behind the crest a foe starts its climb (cells)
-const resAt = k => wideMap() ? k === SPAWN_K : !!RES[k];
+/* Where a road is measured from (its length, the forecast, the bot, the save check, "is there still a way through"):
+   SPAWN_K, or on a wide front (Mistfall Ledge, owner: "theres a square you cant build on?") a hidden point above the top
+   row joined to every top cell: the open top cell nearest the foot (the middle one on a tie), so no cell the player can
+   see is kept back, and the only refusal left is sealing the last way through. */
+function spawnK(dist) {
+  if (!wideMap() || !dist) return SPAWN_K;
+  let best = SPAWN_K, bv = dist[SPAWN_K];
+  for (let i = 0; i < COLS; i++) { const k = idx(i, 0), v = dist[k]; if (v < bv || (v === bv && Math.abs(i - 5) < Math.abs(best % COLS - 5))) { bv = v; best = k; } }
+  return best;
+}
+const atSpawn = d => d ? d[spawnK(d)] : Infinity;
+const resAt = k => wideMap() ? false : !!RES[k];
 const DIRS = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,-1,Math.SQRT2]];
 
 /* ---- Towers ---- */
@@ -1562,13 +1574,13 @@ function nextField(dist, blk) {
 }
 function tracePath(dist, nx) {
   const pts = [[PORTAL.x, PORTAL.y + .3]];
-  let k = SPAWN_K, guard = 0;
+  let k = spawnK(dist), guard = 0;
   if (!isFinite(dist[k])) return { pts, len: 0 };
-  pts.push([5.5, .5]);
+  pts.push([k % COLS + .5, .5]);
   while (dist[k] > 0 && guard++ < N) { k = nx[k]; if (k < 0) break; pts.push([k % COLS + .5, ((k / COLS) | 0) + .5]); }
   const last = pts[pts.length - 1];
   pts.push([last[0] + (5.5 - last[0]) * .5, GATE_Y - .1]);
-  return { pts, len: Math.round(dist[SPAWN_K] + 1) };
+  return { pts, len: Math.round(atSpawn(dist) + 1) };
 }
 
 /* ---------- Rites of Passage: a ladder of harder runs, after Slay the Spire's Ascensions ----------
@@ -1767,7 +1779,7 @@ function makeTower(type, i, j, tier = 0) {
 function canBuild(i, j) {
   if (!inGrid(i, j)) return { ok: false, msg: 'Build inside the field.' };
   const k = idx(i, j);
-  if (resAt(k)) return { ok: false, msg: wideMap() ? 'Leave this one cell open: the way in must never be sealed.' : 'The road must stay clear.' };
+  if (resAt(k)) return { ok: false, msg: 'The road must stay clear.' };
   if (G.blk[k] || G.tAt[k]) return { ok: false, msg: 'Something is already built there.' };
   return canBlock(i, j);
 }
@@ -1781,7 +1793,7 @@ function canBlock(i, j) {
   }
   const blk = G.blk.slice(); blk[k] = 1;
   const dist = flowField(blk);
-  if (!isFinite(dist[SPAWN_K])) return { ok: false, msg: "You can't block the path!" };
+  if (!isFinite(atSpawn(dist))) return { ok: false, msg: "You can't block the path!" };
   for (const c of G.creeps) {
     if (c.fly || c.dead || c.state === 'exit' || c.atk) continue;   // siege troops smash their way out
     if (!isFinite(dist[idx(c.ti, c.tj)])) return { ok: false, msg: 'That would trap a creep.' };
@@ -1829,7 +1841,7 @@ function wallLinePlan(cells, type) {
     else if (gold < cost) st = 'poor';
     else {
       blk[k] = 1; const d = flowField(blk);
-      if (!isFinite(d[SPAWN_K]) || G.creeps.some(c => !c.fly && !c.dead && c.state !== 'exit' && !c.atk && !isFinite(d[idx(c.ti, c.tj)]))) { blk[k] = 0; st = 'block'; }
+      if (!isFinite(atSpawn(d)) || G.creeps.some(c => !c.fly && !c.dead && c.state !== 'exit' && !c.atk && !isFinite(d[idx(c.ti, c.tj)]))) { blk[k] = 0; st = 'block'; }
       else { gold -= cost; spent += cost; n++; dist = d; }
     }
     out.push({ i, j, st });
@@ -3125,7 +3137,7 @@ function trophyMark(c) {
   if (!c || c.trophyAt == null) return null;
   if (c.fly || c.pile) { const x = c.bx != null ? c.bx : c.x; return { x, z: GATE_Y - c.trophyAt, rot: 0 }; }
   const sf = c.atk && G.state === 'play' ? siegeField() : null, dist = sf ? sf.dist : G.dist, nx = sf ? sf.next : G.next;
-  let k = SPAWN_K, guard = 0;
+  let k = spawnK(dist), guard = 0;
   if (!isFinite(dist[k]) || dist[k] <= c.trophyAt) return null;
   while (guard++ < N) {
     const n = nx[k]; if (n < 0) return null;
@@ -3144,7 +3156,7 @@ function bossCry(c) { const d = c.def, k = d.cry != null ? d.cry : BOSS_CRY[c.ty
 function leaderArrive(c) {
   const d = c.def, k = c4hex(d.tint);
   if (!G.vs && G.state === 'play' && G.chal !== 'relicless' && !c.splitCopy && typeof trophyOf === 'function' && trophyWave(c.wv || G.wave) && trophyOf(c.type)) {   // (trophies are retired: trophyWave is always false)
-    const road = c.fly ? GATE_Y - c.y : (c.atk ? siegeField().dist : G.dist)[SPAWN_K] + Math.hypot(c.tx - c.x, c.ty - c.y);
+    const road = c.fly ? GATE_Y - c.y : atSpawn(c.atk ? siegeField().dist : G.dist) + Math.hypot(c.tx - c.x, c.ty - c.y);
     if (isFinite(road) && road > 2) { c.trophy = trophyOf(c.type); c.trophyAt = road * .5; }
   }
   c.introT = 0;   // no standing about at the portal: the leader walks straight out with his army
@@ -3355,7 +3367,7 @@ function leak(c) {
   if (G.state === 'demo') return;
   if (typeof vetLeak === 'function') vetLeak(c);   // veterancy: the damage the units did to it still counts, at half (xp.js)
   if (G.wl && G.wl.leaks.length < 80) {   // what got through: its health left and where on its road it was last hurt
-    const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && G.dist[SPAWN_K]) || 0, R_ = c.lhR, fr = R_ == null || !isFinite(R_) || R_ >= 99 || !(road > 0) ? -1 : clamp(1 - R_ / road, 0, 1);
+    const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && atSpawn(G.dist)) || 0, R_ = c.lhR, fr = R_ == null || !isFinite(R_) || R_ >= 99 || !(road > 0) ? -1 : clamp(1 - R_ / road, 0, 1);
     G.wl.leaks.push({ t: c.type, hp: Math.max(0, c.hp) / Math.max(1, c.maxHp), seg: fr < 0 ? 'untouched' : fr < 1 / 3 ? 'entry' : fr < 2 / 3 ? 'middle' : 'gate', big: !!(c.def.boss || c.def.lead), elite: !!c.elite });
     if ((c.def.boss || c.def.lead) && !c.kid && !c.splitCopy) G.wl.boss = c;
   }
@@ -5426,7 +5438,7 @@ function restore(s) {
   if (typeof vetSync === 'function') vetSync();   // (what each unit has already opened: no unlock cue for it)
   xpRestore(s);   // the XP bar, or an older run's points turned into its level (after the paths: Scholar ranks pay their own)
   refreshField();
-  if (!isFinite(G.dist[SPAWN_K])) { G.towers = []; G.blk.fill(0); G.tAt.fill(null); refreshField(); }
+  if (!isFinite(atSpawn(G.dist))) { G.towers = []; G.blk.fill(0); G.tAt.fill(null); refreshField(); }
 }
 
 /* ---- the newer relics: what they do on the tower's own clock, and the live bonuses ---- */
@@ -5598,7 +5610,7 @@ function brForge(c, st) {
 }
 // where the marked ground lies: part way down the line a siege troop takes
 function bossGroundZone() {
-  const sf = siegeField(), pts = []; let k = SPAWN_K, guard = 0;
+  const sf = siegeField(), pts = []; let k = spawnK(sf.dist), guard = 0;
   while (k >= 0 && sf.dist[k] > 0 && guard++ < N) { pts.push(k); k = sf.next[k]; }
   if (!pts.length) return { x: COLS / 2, z: ROWS / 2, r: BR.groundR };
   const q = pts[Math.floor(pts.length * BR.groundAt)];
@@ -10045,12 +10057,12 @@ function waystoneAct(t) {
 function canMoveTo(t, i, j) {
   if (!inGrid(i, j)) return { ok: false, msg: 'Move it inside the field.' };
   const k = idx(i, j), k0 = idx(t.i, t.j);
-  if (resAt(k)) return { ok: false, msg: wideMap() ? 'Leave this one cell open: the way in must never be sealed.' : 'The road must stay clear.' };
+  if (resAt(k)) return { ok: false, msg: 'The road must stay clear.' };
   if (G.blk[k] || G.tAt[k]) return { ok: false, msg: 'Something is already built there.' };
   for (const c of G.creeps) if (!c.fly && !c.dead && ((c.state !== 'exit' && idx(c.ti, c.tj) === k) || (Math.floor(c.x) === i && Math.floor(c.y) === j))) return { ok: false, msg: 'A creep is in the way.' };
   const blk = G.blk.slice(); blk[k0] = t.wrecked ? 0 : 0; blk[k] = 1;
   const dist = flowField(blk);
-  if (!isFinite(dist[SPAWN_K])) return { ok: false, msg: "You can't block the path!" };
+  if (!isFinite(atSpawn(dist))) return { ok: false, msg: "You can't block the path!" };
   for (const c of G.creeps) if (!c.fly && !c.dead && c.state !== 'exit' && !c.atk && !isFinite(dist[idx(c.ti, c.tj)])) return { ok: false, msg: 'That would trap a creep.' };
   return { ok: true, blk, dist };
 }
@@ -47878,7 +47890,7 @@ function shrnLoad(rows) {
     const [type, i, j, lv, inv, fresh, freshW] = r, k = inGrid(i, j) ? idx(i, j) : -1;
     if (!SHRN_TYPES[type] || k < 0) { back += inv | 0; continue; }
     if (resAt(k) || G.blk[k] || G.tAt[k] || G.shrines.length >= SHRN_RULE.capMax) { back += inv | 0; continue; }
-    const blk = G.blk.slice(); blk[k] = 1; if (!isFinite(flowField(blk)[SPAWN_K])) { back += inv | 0; continue; }
+    const blk = G.blk.slice(); blk[k] = 1; if (!isFinite(atSpawn(flowField(blk)))) { back += inv | 0; continue; }
     G.blk[k] = 1;
     G.shrines.push({ id: ++G.uid, type, i, j, x: i + .5, y: j + .5, lv: clamp(lv | 0, 1, 3), inv: inv | 0, fresh: fresh | 0, freshW: freshW | 0, at: 0 });
   }
@@ -50284,7 +50296,7 @@ const rideNote = unit => RIDE[unit] ? (RIDE[unit].basic ? RIDE_NOTE : RIDE_NOTE_
 
    Off: ?edgefall=0, the Settings switch (localStorage runehold.edgefall = 0), Graphics Low, Tower Wars.
    Look at it without a kill: edgeFallDemo() in the console throws a few bodies over the lip (nothing in the game changes). */
-const EF = { crestV: .9, crestG: 0, near: 1.5, push: 2, jit: .8, lean: .9, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: -.2, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2 };
+const EF = { crestV: .9, crestG: 0, crestSp: 3, crestUp: 1.2, near: 1.5, push: 2, jit: .8, lean: .9, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: -.2, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2, heavy: 1.2 };
 const EF_Q = (() => { try { return new URLSearchParams(location.search).get('edgefall'); } catch (e) { return null; } })();
 let EF_SET = true; try { EF_SET = localStorage.getItem('runehold.edgefall') !== '0'; } catch (e) {}
 let EF_SHOT = null;   // the shot whose landing is being resolved (impact, pierceFly, glaiveFly)
@@ -50395,6 +50407,7 @@ function efRag(k, f) {
   const hy = k.he[1] * .4, top = k.topW || 2, wp = Math.max(top + .9 + .8 * imp, hy * sp * k.Ii[0] * .5) * (f.over ? 1.4 : 1), tw = k.w[1];   // the impulse at the struck point turns it about its heels; never less than it takes to go over, and a body bound for the lip is on its back by the time it gets there
   const rr = [-d[0] * e, k.he[1], -d[1] * e], pv = efCross([ax[0] * wp, 0, ax[2] * wp], rr);
   k.v = [d[0] * sp + pv[0], Math.min(1.8, pv[1]) + (f.kind === 'ball' ? 2.6 : .5) + 1.9 * Math.min(1, Math.max(0, imp - .9)), d[1] * sp + pv[2]];   // (a heavy blow lifts the feet)
+  if (f.over && typeof crestAt === 'function' && crestAt(k.p[0]) != null) { const h = Math.hypot(k.v[0], k.v[2]), cap = EF.crestSp; if (h > cap) { k.v[0] *= cap / h; k.v[2] *= cap / h; } k.v[1] = Math.min(k.v[1], EF.crestUp); }   // (over a crest, seen from up here: a body flung hard back reads as flying up into the sky, so it goes over at a stagger's pace and barely leaves the ground)
   k.w = [ax[0] * wp, tw * (.4 + .6 * Math.abs(db[0])), ax[2] * wp];   // (a blow from the side twists it more)
   for (const q of k.limbs) { const aw = ragMul(k.R, q.ax, [0, 0, 0]), c = aw[0] * ax[0] + aw[2] * ax[2]; q.w = -c * (3 + 4 * imp) + (Math.random() - .5) * 2; q.efc = c; q.a1 = q.a; }   // the limbs are left behind as the torso goes
   if (T) k.fl = { T, ang, step, ax, d, R0: k.R.slice(), p0: k.p.slice(), piv: [k.p[0] + d[0] * e, 0, k.p[2] + d[1] * e] };
@@ -50449,17 +50462,26 @@ function efDraw(k) {
   if ((k.p[1] < -drop && e.snd) || u > 1.4 + (e.tc != null ? e.tc - e.t0 + .6 : 0)) return false;
   const q = Math.min(1, u / .5); return [1 - .15 * q, 1 - .4 * q];
 }
+// which of the gnoll's falls over the lip (models_lead8_mobs.js EF_REAR: 0 the arrow's stagger, 1 the heavy knockback, 2 the
+// stagger and twist, 3 the backward tumble): a heavy blow (a lobbed shell, or a great weight for his bulk) knocks him off his
+// feet; the rest vary body to body, by his seed. n.v asks for one (edgeFallDemo's v)
+function efVariant(f, n) {
+  if (n.v != null) return Math.max(0, Math.min(3, n.v | 0));
+  if (n.kind === 'ball' || n.w / n.m > EF.heavy) return 1;
+  const h = Math.sin((f.seed || 0) * 12.9898 + 4.1) * 43758.5453; return [0, 2, 3][Math.floor((h - Math.floor(h)) * 3) % 3];
+}
 // the rigged gnoll's fall (models_lead8_mobs.js pickFall's f): the fall that goes the way the blow went, along the blow
 function efFallRig(f, n, yaw) {
   if (!n || !n.E) return;
   if (yaw != null) { const cy = Math.cos(yaw), sy = Math.sin(yaw); f.lx = cy * n.d[0] - sy * n.d[1]; f.lz = sy * n.d[0] + cy * n.d[1]; }   // the way the body goes, in his own frame (+z ahead of him)
   f.kind = Math.abs(f.lx) > .8 ? 'spin' : f.lz <= 0 ? 'back' : 'skid'; if (f.kind === 'spin') f.side = f.lx > 0 ? 1 : -1;
   f.dx = n.d[0]; f.dz = n.d[1]; f.big = Math.min(1.6, Math.max(f.big, .5 * Math.min(2, n.w / n.m) - .2));
-  f.ef = { E: n.E, L: n.L, over: n.over, T: EF_MODE === 'physics' ? 0 : EF_MODE === 'anim' ? .2 : .11, step: Math.min(.3, .08 + .1 * n.w / n.m) * Math.min(1, n.L / .3), tc: null, snd: false };
+  f.ef = { E: n.E, L: n.L, over: n.over, T: EF_MODE === 'physics' ? 0 : EF_MODE === 'anim' ? .2 : .11, step: Math.min(.3, .08 + .1 * n.w / n.m) * Math.min(1, n.L / .3), tc: null, snd: false, v: efVariant(f, n) };
   f.reach = n.over ? 9 : Math.min(f.reach, Math.max(0, n.L - f.ef.step - .3));
 }
 // a look at it with no kill: n bodies struck at the current map's lip, one after another. o: { type, side: 1 (struck from
-// the side), weak: 1 (too weak to go over), back: cells from the lip, heavy: 1 (a lobbed shell) }
+// the side), weak: 1 (too weak to go over), back: cells from the lip, heavy: 1 (a lobbed shell), v: 0..3 (which of the
+// rigged gnoll's falls: efVariant) }
 function edgeFallDemo(n, o) {
   o = o || {};
   const E = (typeof MAPS !== 'undefined' && MAPS[G.map] && MAPS[G.map].fallEdge) || null; if (!E || typeof ragNew !== 'function') return 'no edge on this map';
@@ -50471,7 +50493,7 @@ function edgeFallDemo(n, o) {
     const c = { type: ty, def: CREEPS[ty], x: a[0] + (b[0] - a[0]) * u - ov[0] * back, y: a[1] + (b[1] - a[1]) * u - ov[1] * back, ox: 0, oy: 0, age: 1, anim: Math.random() * 9, spdM: 1, dieFx: o.heavy ? 'blast' : 'cut', overK: o.weak ? 0 : .3, hitK: o.weak ? .35 : 1, poison: [], id: i };
     c.hdx = d[0] / dl; c.hdz = d[1] / dl;
     const to = c.hdx * ov[0] + c.hdz * ov[1], p = { k: o.heavy ? 'ball' : 'arrow' }, w = efWeight(c, p), m = efBulk(c);
-    c.efall = { d: [c.hdx, c.hdz], L: back / Math.max(.3, to), carry: 9, over: !o.weak, w, m, kind: p.k, E };
+    c.efall = { d: [c.hdx, c.hdz], L: back / Math.max(.3, to), carry: 9, over: !o.weak, w, m, kind: p.k, E, v: o.v };
     corpses.push(ragNew(c, { yaw: o.yaw || 0 }));
   }, i * (o.gap || 900));
   return n + ' bodies';
@@ -70804,7 +70826,7 @@ const ARACHNARA = (() => {
 
 /* ================= the Gnoll Raider: baked pose frames ================= */
 const GNOLL = (() => {
-  const { rx, ry, rz, sm, win } = MOBRIG;
+  const { rot, rx, ry, rz, sm, win } = MOBRIG;
   const FOOT_DOWN = .025;   // model units: a foot whose middle is this close to its lowest is on the road
   // the run is the owner's Mixamo clip "Unarmed Walk Forward" (MALGRATH_WALK, the walk Malgrath has; owner, 7 Nov 2026: "give
   // him the same run as Malgrath"), retargeted onto his rig at load (clipFor); without its data, the old hand-made run
@@ -71163,6 +71185,29 @@ const GNOLL = (() => {
   const FALLS = ['skid', 'back', 'spin', 'knees'];
   const RAG_CAP = () => typeof GFX === 'undefined' ? 12 : GFX === 'low' ? 3 : GFX === 'medium' ? 7 : 12;
   const RAG_T = 1.35, RAG_SINK0 = 1.05, RAG_DIE = 1.75;
+  /* the falls off a map's lip, each after one of the owner's clips (e.v, picked by efFallRig from the blow):
+       0  Mob_Arrow_Hit_Cliff_Fall: struck, he rears up, arms flung wide, staggers back step by step to the lip, tips over
+          backwards on its edge and drops
+       1  Mob_01_Heavy_Knockback: a heavy blow lifts him off his feet; he flies back over the lip sitting in the air, knees
+          up, and falls behind it
+       2  Mob_02_Stagger_and_Fall: staggers back, loses his footing at the lip, twists round and topples over it sideways,
+          bent double, one arm flung up
+       3  Mob_03_Backward_Tumble: staggers, goes down flat on his back across the lip and rolls on over it, legs in the
+          air, head first
+     react: the blow's jolt before his first step; stepT, stepL: a step's seconds and its length in cells (nMin..nMax steps
+     to the lip, longer ones if it is far); slow: how much the steps slow toward the lip; stride: the thighs' swing per cell
+     of step; knee, lift: the stepping leg's knee and thigh; lean, lean2: his lean back as he rears and by the lip; legs:
+     how much of it his legs do not share (they stay under him); sway: the rock of each step; arms: flung wide; wind:
+     their windmilling; turn: he turns his back to the way he goes (side-on blows); over, tip, hold: how far over he
+     tips, how long it takes, how long before he drops; out: his way on past the lip; g: gravity; plant: his feet kept
+     where they stand under the lean. The knockback, k*: its flight's seconds (T, and L per cell), when it peaks (A, of
+     the flight), how fast its way on dies past the lip (D), how far he lies back at once and by the end (R, R2), how far he
+     folds about the blow (F). The twist, w*: how far round he turns (R), how far over (O), in how long (T), the hold before
+     he drops (H), how far he bends double (B). The tumble, t*: how far short of the lip he goes down (Sh), the
+     seconds to his back (F) and on over (R), how far over (O), the hold before he drops (H) */
+  const EF_REAR = { react: .16, stepT: .25, stepL: .17, nMin: 4, nMax: 8, slow: .3, stride: 1, knee: 1.0, lift: .55, lean: .75, lean2: 1.0, legs: .85, sway: .09, arms: 1.15, wind: .5, turn: 1,
+    over: 1.0, tip: .5, hold: .1, out: .4, g: 11, plant: 1,
+    kT: .5, kL: .12, kA: .6, kD: 2.5, kR: 1.1, kR2: .45, kF: .12, wR: 2.2, wO: 1.0, wT: .6, wH: .16, wB: .35, tSh: .6, tF: .36, tR: .6, tO: 1.45, tH: .75 };
   const rnd = s => { const h = Math.sin(s * 91.7 + 17.3) * 43758.5453; return h - Math.floor(h); };
   // the fall for a creep killed facing `yaw`: its kind, the blow in world and in his own frame, how hard, and its seeds
   function pickFall(c, yaw, seed) {
@@ -71259,33 +71304,95 @@ const GNOLL = (() => {
     // e: struck by a map's lip (efFallRig): a flinch and a step back first, then the fall along the blow; if the blow carries
     // him over (e.tc: when he crossed the lip) he tips on over it and drops behind it, the ground hiding him
     const e = f.ef || null, gone = e && e.tc != null, tf = e ? Math.max(0, t - e.T) : t;
-    if (gone ? t - e.tc > 1.4 : t > RAG_DIE) { k.done = true; return false; }
+    if (gone ? t - e.tc > 1.4 : t > (e && e.over ? 6 : RAG_DIE)) { k.done = true; return false; }   // (a long stagger to a far lip outlasts an ordinary fall)
     const s = k.slot; s.k = k; s.vt = vt;
     /* (over the lip: owner, "get shot by arrow, stagger back or leap off the back and fall naturally as if it were a real
        cliff they fell off". He stays on his feet as he staggers back, only starting to go over; past the lip he keeps his
        way out, drops under gravity and goes on over backwards, his own fall played on as he goes) */
-    const ov = e && e.over, SV = 1.9;   // (SV: how fast the blow carries him back, cells a second: kept as he goes over, never eased to a stop at the lip; owner, "they stop almost in mid air")
-    const poseT = !ov ? tf : e.tc == null ? t * .38 : e.tc * .38 + (t - e.tc) * 1.3;
-    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(poseT, RAG_T), e ? (e.T && t < e.T ? Math.sin(t / e.T * Math.PI / 2) : Math.max(0, 1 - tf / .2)) * 1.6 : 0));   // (the old set's run under the fall, whatever the global set)
-    let dd = S.d, drop = 0;
+    /* (then to the owner's own clip, Mob_Arrow_Hit_Cliff_Fall.mp4: struck, he rears up tall, arms flung wide, and staggers
+       back on his feet to the lip (EF_REAR.stg seconds), tips over backwards on its edge and drops out of sight) */
+    const ov = e && e.over, RE = EF_REAR;
+    const poseT = !ov ? tf : 0;
+    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(poseT, RAG_T), ov ? 0 : e ? (e.T && t < e.T ? Math.sin(t / e.T * Math.PI / 2) : Math.max(0, 1 - tf / .2)) * 1.6 : 0));   // (the old set's run under the fall, whatever the global set)
+    let dd = S.d, drop = 0, yawE = 0, pin = 0, pinW = 0;
     if (e) {
       dd += e.step * (e.T ? sm(0, e.T, t) : 1);
-      if (ov) dd = SV * Math.max(0, t - .04);   // staggered back to the lip and over it at the blow's pace
-      if (!gone && ov && dd >= e.L + .1) { e.tc = t; k.thud = true; if (typeof efLipFx === 'function') efLipFx(k.x + f.dx * dd, k.z + f.dz * dd, [f.dx, f.dz]); }
-      if (e.tc != null) { const u = t - e.tc, tip = Math.min(2.6, .3 + 4 * u); dd = SV * (e.tc - .04) + .9 * u; drop = 16 * u * u;   // (from the camera's height, going away reads as rising: so little way on and full gravity, or he seems to hang)   // (off the edge: his way out kept, gravity, and on over backwards)
-        if (S.pitch) rx(p, R.bix.root, S.pitch * tip); else rz(p, R.bix.root, -S.roll * tip); if (!e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); } }
+      if (ov) {
+        const I = R.bix, v = e.v || 0, Lw = e.L + .12, hp = R.bones[I.pelvis].h[1], lip = () => { e.tc = t; k.thud = true; if (typeof efLipFx === 'function') efLipFx(k.x + f.dx * Lw, k.z + f.dz * Lw, [f.dx, f.dz]); };
+        // side-on: he turns his back to the way he is going as he takes his first steps
+        if (e.dy == null) { const d = Math.atan2(-f.dx, -f.dz) - k.yaw; e.dy = Math.atan2(Math.sin(d), Math.cos(d)) * RE.turn; }
+        yawE = e.dy * sm(0, .18 + .22 * Math.abs(e.dy), t);
+        if (v === 1) {
+          // knocked off his feet: thrown up and back, over the lip past the top of his flight, and on down behind it
+          const T1 = RE.kT + RE.kL * Math.min(2.5, Lw), v0 = Lw / T1, u = Math.max(0, t - T1);
+          if (!gone && t >= T1) lip();
+          dd = t < T1 ? v0 * t : Lw + v0 * (1 - Math.exp(-RE.kD * u)) / RE.kD;
+          drop = -(RE.g * RE.kA * T1 * t - RE.g * t * t / 2);
+          if (e.tc != null && !e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); }
+          const a = sm(0, .2, t), b = sm(.08, .45, t), lean = RE.kR * a + RE.kR2 * sm(.15, T1 + .35, t), fl = Math.sin(t * 13);
+          rx(p, I.root, -lean); p.root[2] += hp * Math.sin(lean);   // (about his hips, not the ground)
+          pin = hp * .95; pinW = sm(0, .08, t);
+          rx(p, I.spine, RE.kF * a); rx(p, I.chest, RE.kF * a); rx(p, I.head, .3 * a); rx(p, I.mane, -.3 * a);   // folded about the blow
+          rz(p, I.armR, -(1 + .15 * fl) * a); rz(p, I.armL, (1 - .15 * fl) * a); rx(p, I.armR, -.5 * b); rx(p, I.armL, -.5 * b); rx(p, I.foreR, -.5 * a); rx(p, I.foreL, -.5 * a);
+          rx(p, I.thighR, -(1.2 + .12 * fl) * b); rx(p, I.thighL, -(1.05 - .12 * fl) * b); rx(p, I.shinR, 1.1 * b); rx(p, I.shinL, .95 * b); rz(p, I.thighR, -.15 * b); rz(p, I.thighL, .15 * b);   // knees up ahead of him
+        } else {
+          const Ls = v === 3 ? Math.max(0, Lw - RE.tSh) : Lw;   // (the tumble: he goes down short of the lip, his back across it)
+          const ns = Math.max(v === 3 ? 2 : RE.nMin, Math.min(RE.nMax, Math.round(Ls / RE.stepL))), stg = RE.react + ns * RE.stepT;
+          const rear = sm(0, .3, t), jolt = win(t, 0, .1, .16, .5);
+          // the stagger: ns steps back to the lip, each a lurch (the body goes fastest mid-step), slowing as he gets there
+          const q = Math.min(1, Math.max(0, (t - RE.react) / (ns * RE.stepT))), sN = ns * q * (1 + RE.slow - RE.slow * q);
+          const si = Math.min(ns - 1, Math.floor(sN)), ph = Math.min(1, sN - si), gl = ph - .11 * Math.sin(TAU * ph);
+          dd = Ls * (si + gl) / ns;
+          if (!gone && t >= stg) lip();
+          const u = e.tc != null ? t - e.tc : 0, k0 = v ? 0 : 1;
+          // leaving the lip. tip: how far gone he is (his steps and his balance go with it); th: how far over, on top of his lean
+          let tip, th, hold, psi = 0, roll = 0;
+          if (v === 2) { const w = Math.min(1, u / RE.wT); tip = sm(0, RE.wT, u); th = RE.wO * w * w; hold = RE.wH; psi = f.side * RE.wR * sm(stg - RE.stepT, stg + RE.wT * .8, t); }
+          else if (v === 3) { const w = Math.min(1, u / RE.tF); tip = w * w; roll = sm(RE.tF, RE.tF + RE.tR, u); hold = RE.tH; th = 0; }
+          else { tip = sm(0, RE.tip, u); th = RE.over * tip; hold = RE.hold; }
+          const on = 1 - tip; yawE += psi;
+          if (e.tc != null) { dd = v === 3 ? Ls + RE.out * Math.max(0, u - RE.tF) : Lw + RE.out * u; const ud = Math.max(0, u - hold); drop = RE.g * ud * ud; if (!e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); } }   // over the edge: tipping first, then gravity
+          // reared back and rocking with each step, more as he nears the lip, then over; his legs stay under him till he goes
+          const rock = RE.sway * Math.sin(TAU * ph) * rear * on, lean = (RE.lean + (RE.lean2 - RE.lean) * q * q) * (v === 2 ? .8 : 1) * rear + .18 * jolt + rock, lg = RE.legs * lean * (1 - (v ? 1 : .7) * tip);
+          const cps = Math.cos(psi), sps = Math.sin(psi), sh = hp * Math.sin(lg) * RE.plant;   // (psi: the twist. He goes on tipping toward the lip as he turns, so the lean's axis turns back against it)
+          if (v === 3) { const a = lean + (1.5 - lean) * tip + RE.tO * roll; rx(p, I.root, -a); if (roll > 0) p.root[2] -= hp * (Math.sin(1.5) - Math.sin(a)); pin = hp * .3; pinW = sm(RE.tF * .7, RE.tF * 1.1, u); }   // (flat on his back, then on over about his hips, which stay where they came down)
+          else rot(p, I.root, cps, 0, sps, -(lean + th));
+          p.root[0] -= sps * sh; p.root[2] += cps * sh;   // (the root turns about the ground under him, which carries his hips back: his feet are kept where they stood)
+          const hu = v === 2 ? tip : 0, fb = v === 3 ? tip : 0;   // (bent double as he twists; chin tucked as he goes down on his back)
+          rx(p, I.spine, -.22 * rear - .12 * jolt + RE.wB * hu); rx(p, I.chest, -.18 * rear - .1 * jolt + RE.wB * hu); rx(p, I.head, -.3 * rear - .2 * jolt + .25 * tip * k0 + .3 * hu + .5 * fb); rx(p, I.mane, -.35 * rear);
+          const sd = si % 2 ? -1 : 1, tw = sd * Math.cos(Math.PI * ph) * rear * on;   // (which leg is stepping; the hips and shoulders turning against each other)
+          ry(p, I.pelvis, .16 * tw); ry(p, I.chest, -.2 * tw); rz(p, I.spine, .06 * tw);
+          // arms flung wide and windmilling against the steps, the cleaver held out
+          const w1 = Math.PI * sN, wd = RE.wind * rear * (.6 + .4 * on), ar = RE.arms * (v === 2 ? .8 : 1), upR = v === 3 ? .7 * tip : v === 2 && f.side < 0 ? 1.1 * tip : 0, upL = v === 3 ? .7 * tip : v === 2 && f.side > 0 ? 1.1 * tip : 0;
+          rz(p, I.armR, -(ar + .22 * Math.sin(w1 + .6) + upR) * rear); rz(p, I.armL, (ar + .22 * Math.sin(w1 + .6 + Math.PI) + upL) * rear);
+          rx(p, I.armR, wd * Math.sin(w1) - .35 * tip * k0); rx(p, I.armL, -wd * Math.sin(w1) - .35 * tip * k0);
+          rx(p, I.foreR, (-.3 + .25 * Math.sin(w1 - .9)) * rear); rx(p, I.foreL, (-.3 - .25 * Math.sin(w1 - .9)) * rear); rx(p, I.handR, -.25 * rear);
+          // the steps: the stepping leg lifts its knee and reaches back, the standing leg sweeps under him as he goes over it
+          const A = Math.min(.6, RE.stride * Ls / ns), s0 = si ? 1 : 0, live = t > RE.react ? 1 : 0, sw = sm(0, 1, ph), up = Math.sin(Math.PI * ph) * (e.tc != null ? 0 : live);
+          const thS = A * (s0 - (s0 + 1) * gl) * live, thW = A * ((s0 + 1) * sw - s0) * live;   // (thigh: negative reaches ahead of him)
+          const [tS, sS, tW, sW, fW] = sd > 0 ? [I.thighL, I.shinL, I.thighR, I.shinR, I.footR] : [I.thighR, I.shinR, I.thighL, I.shinL, I.footL];
+          rot(p, tS, cps, 0, sps, lg); rot(p, tW, cps, 0, sps, lg);
+          rx(p, tS, thS * on - .5 * tip * k0 - .45 * fb); rx(p, sS, .12 * rear * on + .7 * tip * k0 + .5 * hu + .3 * fb * (1 - roll));
+          rx(p, tW, thW * on - RE.lift * up - .9 * tip * k0 - .65 * fb); rx(p, sW, RE.knee * up + .12 * rear * on + .4 * tip * k0 + .3 * hu + .45 * fb * (1 - roll)); rx(p, fW, .3 * up);
+          if (roll > 0) { rz(p, I.thighR, -.28 * roll); rz(p, I.thighL, .28 * roll); }   // (legs apart in the air)
+        }
+      } else if (e.tc != null) { const u = t - e.tc, tip = Math.min(1.25, 3.4 * u); drop = 8 * u * u; if (S.pitch) rx(p, R.bix.root, S.pitch * tip); else rz(p, R.bix.root, -S.roll * tip); }
     }
-    const su = gone ? 0 : Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - (ov ? 0 : S.h) / k.sc + drop / k.sc;   // (over a lip: no hop of the fall's own, he just goes over and down)
-    MOBRIG.posed(R, p, s.M, s.P, s.N, sink);
+    const su = gone || ov ? 0 : Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - (ov ? 0 : S.h) / k.sc + drop / k.sc;   // (over a lip: no hop of the fall's own, he just goes over and down)
+    const low = MOBRIG.posed(R, p, s.M, s.P, s.N, sink);
+    if (pinW > 0) {   // (off his feet: his hips are held at a height, pin, of their own, not whatever is lowest stood on the ground)
+      const b = R.bix.pelvis * 12, h = R.bones[R.bix.pelvis].h, M = s.M, P = s.P, d = pinW * (pin - drop / k.sc - (M[b + 1] * h[0] + M[b + 4] * h[1] + M[b + 7] * h[2] + M[b + 10] - low - sink));
+      for (let i = 1; i < P.length; i += 3) P[i] += d;
+    }
     s.ver++; MOBRIG.refill(s.body, R, ['body'], s.P, s.N); s.body.ver = s.ver;
     if (!k.thud && S.landT >= 0 && t > S.landT) { k.thud = true; MOBRIG.thud(k, 4, false); }
     const x = k.x + f.dx * dd, z = k.z + f.dz * dd;
-    M4.trs(_m, x, k.y, z, k.yaw + S.ys, 0, 0, k.sc);
+    M4.trs(_m, x, k.y, z, k.yaw + S.ys + yawE, 0, 0, k.sc);
     const c = k.c, t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0], fl = Math.max(0, 1 - t / .14), dk = gone ? 1 - .4 * Math.min(1, (t - e.tc) / .5) : 1 - .35 * Math.min(1, su * 2.5);
     const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * fl) * dk, t0[1] * (.8 + .25 * fl) * dk, t0[2] * (.75 + .25 * fl) * dk, Math.max(t0[3] * dk, .08 * fl)];
     const o = { tint, shadow: su < .2 && !gone };
     item(s.body, _m, o);
-    if (!f.fly) { MOBRIG.refill(s.cl, R, ['cleaver'], s.P, s.N); s.cl.ver = s.ver; item(s.cl, _m, o); }
+    if (!f.fly || ov) { MOBRIG.refill(s.cl, R, ['cleaver'], s.P, s.N); s.cl.ver = s.ver; item(s.cl, _m, o); }
     else if (CLEAVER) {   // the cleaver flying out of his hand: from his grip as he died, spinning, one bounce, flat on the road
       const gp = k.grip || (k.grip = M4.xf(_m, ...R.bones[R.bix.cleaver].h)); let ct = cleaverAt(f, t, gp[1]);
       const zc = typeof crestAt === 'function' ? crestAt(gp[0] + ct.x) : null, off = zc != null && gp[2] + ct.z < zc;   // (Mistfall Ledge: thrown over the crest, it drops behind it: greatroot.js, the crest mask)
@@ -77092,8 +77199,7 @@ function drawKeepFx() {
 function drawGridFx() {
   for (let k = 0; k < N; k++) {
     const i = k % COLS, j = (k / COLS) | 0;
-    if (wideMap() && resAt(k)) QG.ground(i + .5, j + .5, .03, .3, .3, [.8, .95, 1, .16], 1, 0);   // (a wide front: no red road cells; the one cell kept open is a faint pale mark)
-    else if (!wideMap() && RES[k]) QG.ground(i + .5, j + .5, .03, .48, .48, [.85, .25, .2, .28], 7, 0);
+    if (!wideMap() && RES[k]) QG.ground(i + .5, j + .5, .03, .48, .48, [.85, .25, .2, .28], 7, 0);   // (a wide front keeps no cell back: core.js spawnK)
     else if (!G.blk[k]) QG.ground(i + .5, j + .5, .03, .48, .48, [1, .95, .75, .07], 7, 0);
   }
 }
@@ -77607,7 +77713,8 @@ function ragStep(k, h) {
       _ra[0] = (n & 1 ? 1 : -1) * k.he[0]; _ra[1] = (n & 2 ? 1 : -1) * k.he[1]; _ra[2] = (n & 4 ? 1 : -1) * k.he[2];
       const r = ragMul(k.R, _ra, _rb), y = k.p[1] + r[1];
       if (y >= 0) continue;
-      if (k.ef && efOff(k, k.p[0] + r[0], k.p[2] + r[2])) continue;   // (past a map's lip there is no ground: the body tips over it)
+      if (k.ef && efOff(k, k.p[0] + r[0], k.p[2] + r[2])) continue;
+      if (pastCrest(k.p[0] + r[0], k.p[2] + r[2])) continue;   // (beyond a map's crest there is no ground at all: a body thrown there drops, it never lies on thin air over the valley)   // (past a map's lip there is no ground: the body tips over it)
       k.ground = true; if (it === 0) low = Math.min(low, y);
       // velocity of that corner: v + w x r
       const vx = k.v[0] + k.w[1] * r[2] - k.w[2] * r[1], vy = k.v[1] + k.w[2] * r[0] - k.w[0] * r[2], vz = k.v[2] + k.w[0] * r[1] - k.w[1] * r[0];
@@ -80559,7 +80666,7 @@ function twMakeAI(S, L) {
 }
 // how far the leading foe has got along the maze, 0 at the portal and 1 at the gate
 function twProgress() {
-  let m = 0; const d0 = G.dist[SPAWN_K] || 1;
+  let m = 0; const d0 = atSpawn(G.dist) || 1;
   for (const c of G.creeps) {
     if (c.dead) continue;
     const p = c.fly ? clamp(c.y / ROWS, 0, 1) : c.state === 'exit' ? 1 : inGrid(c.ti, c.tj) ? 1 - clamp(G.dist[idx(c.ti, c.tj)] / d0, 0, 1) : 0;
@@ -100165,7 +100272,7 @@ function rnNextBoss(from) { for (let n = Math.max(1, from); n < from + RN.every 
 // how far along its road a creep is (0 at the portal, 1 at the gate), off the same distances it walks by
 function rnRoadFrac(c) {
   if (!isFinite(c.remain) || c.remain >= 99) return 0;
-  const road = c.fly ? GATE_Y - PORTAL.y : (c.atk && typeof siegeField === 'function' ? siegeField().dist : G.dist)[SPAWN_K];
+  const road = c.fly ? GATE_Y - PORTAL.y : atSpawn(c.atk && typeof siegeField === 'function' ? siegeField().dist : G.dist);
   return !isFinite(road) || road <= 0 ? 0 : clamp(1 - c.remain / road, 0, 1);
 }
 const rnBossPay = f => RN.boss.find(b => f < b[0]);
@@ -101661,7 +101768,7 @@ function huntWalls() {
     G.towers.push(t); G.blk[k] = 1; G.tAt[k] = t; placed.push(t);
   }
   refreshField();
-  if (!isFinite(G.dist[SPAWN_K])) { for (const t of placed) { const k = idx(t.i, t.j); G.blk[k] = 0; G.tAt[k] = null; } G.towers = G.towers.filter(t => !placed.includes(t)); refreshField(); return; }
+  if (!isFinite(atSpawn(G.dist))) { for (const t of placed) { const k = idx(t.i, t.j); G.blk[k] = 0; G.tAt[k] = null; } G.towers = G.towers.filter(t => !placed.includes(t)); refreshField(); return; }
   if (typeof wallsTouch === 'function') for (const t of placed) wallsTouch(t.i, t.j);
 }
 
@@ -102112,7 +102219,7 @@ window.PLAYLOG = {
     if (alive && on && PL.W) safe(() => {
       if (c.purse) { PL.W.thief = 'escaped'; return; }
       const cost = l0 - G.lives; if (!(cost > 0)) return;
-      const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && G.dist[SPAWN_K]) || 0;
+      const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && atSpawn(G.dist)) || 0;
       const fr = c.plR == null || !isFinite(c.plR) || c.plR >= 99 || !(road > 0) ? -1 : clamp(1 - c.plR / road, 0, 1);
       const seg = fr < 0 ? 'untouched' : fr < 1 / 3 ? 'entry' : fr < 2 / 3 ? 'middle' : 'gate';
       if (PL.W.leaks.length < 60) PL.W.leaks.push({ t: c.type, c: cost, seg, hp: Math.round(Math.max(0, c.hp) / Math.max(1, c.maxHp) * 100), air: c.fly ? 1 : 0, boss: c.def && c.def.boss ? 1 : 0 });
@@ -102125,7 +102232,7 @@ window.PLAYLOG = {
   W('kill', f => function (c) {
     const was = c && !c.dead, r = f.apply(this, arguments);
     if (was && c.dead && PL.W && plOn() && c.def && (c.def.boss || c.def.lead || c.elite) && !c.kid && !c.splitCopy) safe(() => {
-      const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && G.dist[SPAWN_K]) || 0, fr = !isFinite(c.remain) || c.remain >= 99 || !(road > 0) ? 0 : clamp(1 - c.remain / road, 0, 1);
+      const road = c.fly ? GATE_Y - PORTAL.y : (G.dist && atSpawn(G.dist)) || 0, fr = !isFinite(c.remain) || c.remain >= 99 || !(road > 0) ? 0 : clamp(1 - c.remain / road, 0, 1);
       const k = { name: plFoe(c.type), t: Math.round(c.age || 0), road: Math.round(fr * 100) };
       if (c.def.boss) k.boss = 1; else if (c.def.lead) k.lead = 1;
       const L = c.dmgLog;
