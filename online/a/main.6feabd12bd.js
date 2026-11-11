@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a0debba@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b56d224@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -40,7 +40,7 @@ function crestAt(x) {
   for (let i = 1; i < C.length; i++) if (x <= C[i][0]) { const a = C[i - 1], b = C[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0] || 1); }
   return C[C.length - 1][1];
 }
-const CREST_RUN = .5;   // how far behind the crest a foe starts its climb (cells)
+const CREST_RUN = .5, CREST_PACE = .55;   // (CREST_PACE: a foe's pace up over a crest and on to its column, of its own)   // how far behind the crest a foe starts its climb (cells)
 const resAt = k => wideMap() ? k === SPAWN_K : !!RES[k];
 const DIRS = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,-1,Math.SQRT2]];
 
@@ -2184,7 +2184,7 @@ function spawn(s) {
       // of the crest nearest its column (crestOpen: where the painted edge is bare grass, not a trunk's foot), then across to
       // the column; it hurries over the extra ground (entK, at most 2.2 times), so the wave keeps its time but for the far columns)
       if (zc != null) { const far = Math.hypot(cx - c.x, zc - c.y), near = Math.abs(zc - c.y);
-        c.crest = zc; c.ent = [[cx, zc], [c.x, c.y]]; c.entK = Math.min(2.2, (CREST_RUN + far) / (CREST_RUN + near)); c.x = cx; c.y = zc - CREST_RUN; }
+        c.crest = zc; c.ent = [[cx, zc], [c.x, c.y]]; c.x = cx; c.y = zc - CREST_RUN; }
       else { c.ent = [[c.x, c.y]]; c.y = ent[0][1]; } }
     else if (ent) { if (c.fly) c.y = ent[0][1]; else { c.ent = ent.slice(1).map(p => [p[0] + R(-.15, .15), p[1]]).concat([[c.x, c.y]]); c.x = ent[0][0] + R(-.2, .2); c.y = ent[0][1]; } } }
   if (G.hero === 'frost' && !G.vs) c.spdM *= .97;   // the Frostwarden's cold
@@ -3298,7 +3298,7 @@ const tunP = () => (typeof MAPS !== 'undefined' && G && MAPS[G.map] && MAPS[G.ma
 const exitY = () => walkOff() ? ROWS + 2.6 : GATE_Y;
 function moveCreep(c, d) {
   if (c.ent && walkOff()) d *= .45 + .55 / (1 + tunP()[0] * clamp((tunZ() - c.y) / tunP()[1], 0, 1));   // far off up the tunnel each step covers less ground, as it looks (the same perspective as their size)
-  if (c.ent && c.entK) d *= c.entK;
+  if (c.ent && c.crest != null) d *= CREST_PACE;   // (up over a map's crest and on to its column at a walk, slow enough to be seen and shot off the lip; owner: "units run over the crest too fast for me to see them get shot off")
   while (c.ent && d > 0) {   // still on the way in out of the woods, to the field's head
     const p = c.ent[0], dx = p[0] - c.x, dy = p[1] - c.y, L = Math.hypot(dx, dy);
     if (Math.abs(dx) > .02) c.face = dx > 0 ? 1 : -1;
@@ -3903,7 +3903,7 @@ function kill(c, src, elem) {
   c.dieFx = dieFxOf(c, src, elem);
   fxDeath(c);
   addText(c.x, c.y, hitH(c) + .5, '+' + c.bounty, streakN() ? '#ffe27a' : '#ffd76a');
-  sfx('die', { t: c.def.voice || c.type, x: c.x, big: !!(c.def.lead || c.def.boss), rag: typeof VLIVE !== 'undefined' && VLIVE });   // rag: its ragdoll's landing plays the body fall
+  sfx('die', { t: c.def.voice || c.type, x: c.x, big: !!(c.def.lead || c.def.boss), rag: typeof VLIVE !== 'undefined' && VLIVE, fall: !!(c.efall && c.efall.over) });   // (fall: knocked over a map's lip: a longer tail as it drops, audio.js)   // rag: its ragdoll's landing plays the body fall
   if ((c.def.boss || c.def.lead) && !c.splitCopy) { G.shake = Math.max(G.shake, c.def.boss ? .6 : .4); sfx('bossDie', bossCry(c)); }   // a great fall: its kind's death cry, the crash, the dust settling
   if (c.key && G.state === 'play') keyWin(c);
   rollDrop(c);   // bosses and leaders often, elites now and then, the rank and file rarely
@@ -3920,9 +3920,11 @@ function kill(c, src, elem) {
   onDirty();
 }
 
+// a foe on its way in over a map's crest that has come up over it (it may be shot, and knocked back off the lip)
+const overCrest = c => c.crest != null && c.y >= c.crest - .05;
 // can tower t (with stats st) attack creep c at all?
 function canTarget(t, st, c) {
-  if (c.ent || (c.fly && c.y < PORTAL.y)) return false;   // not yet out of the woods
+  if ((c.ent && !overCrest(c)) || (c.fly && c.y < PORTAL.y)) return false;   // not yet out of the woods (a foe over a map's crest may be shot at once)
   if (c.dead || ((c.phased || (c.burT > 0 && (t.type !== 'earth' || t.def.force))) && !st.caps.truesight)) return false;   // a Truesight Lens sees through phasing and digs out burrowers (a force's earth-slot unit is no Quake Totem: its hits can't reach below ground, so it doesn't waste them there)
   if (c.def.lead === 'unseen' && !c.seen && Math.hypot(c.x - t.x, c.y - t.y) > 1.5) return false;   // the Grey Ghost: true sight finds her, and any tower she passes close by
   if (c.fly && !(c.lowT > G.time) ? !((t.def.air && !st.noAir) || st.caps.uproot || st.caps.flak) : !t.def.ground) return false;   // (st.noAir: a Grove Shifter in bear form)
@@ -4405,7 +4407,7 @@ function ccDR(c) {
   return k;
 }
 function shove(c, d) {
-  if (c.dead || d <= 0 || c.state === 'exit' || c.burT > 0 || c.ent) return;
+  if (c.dead || d <= 0 || c.state === 'exit' || c.burT > 0 || (c.ent && !overCrest(c))) return;
   { const w = kbWeight(c); if (!w) return; d *= w * ccDR(c); if (d <= .01) return; }
   if (c.fly) { c.y = Math.max(PORTAL.y, c.y - d); c.remain = GATE_Y - c.y; return; }
   let left = d;
@@ -50281,7 +50283,7 @@ const rideNote = unit => RIDE[unit] ? (RIDE[unit].basic ? RIDE_NOTE : RIDE_NOTE_
 
    Off: ?edgefall=0, the Settings switch (localStorage runehold.edgefall = 0), Graphics Low, Tower Wars.
    Look at it without a kill: edgeFallDemo() in the console throws a few bodies over the lip (nothing in the game changes). */
-const EF = { near: 1.5, push: 2, jit: .8, lean: .9, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: -.2, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2 };
+const EF = { crestV: 1.6, crestG: .45, near: 1.5, push: 2, jit: .8, lean: .9, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: -.2, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2 };
 const EF_Q = (() => { try { return new URLSearchParams(location.search).get('edgefall'); } catch (e) { return null; } })();
 let EF_SET = true; try { EF_SET = localStorage.getItem('runehold.edgefall') !== '0'; } catch (e) {}
 let EF_SHOT = null;   // the shot whose landing is being resolved (impact, pierceFly, glaiveFly)
@@ -50426,14 +50428,16 @@ function efStep(k, h) {
     else if (k.t > 1) k.ef = null;   // it never got there: an ordinary body
     return;
   }
-  /* Behind a map's crest (core.js crestAt; Mistfall Ledge, owner: "make sure it cleanly falls behind the ridge"): the body is
-     carried on, above the lip, until the whole of it is past the crest, and only then drops: so the crest hides it from
-     the feet up, never cutting through a body that lies across the lip. */
-  const zc = typeof crestAt === 'function' ? crestAt(k.p[0]) : null;
-  if (zc != null) { const need = Math.max(k.he[0], k.he[1], k.he[2]) + .2, ol = Math.hypot(e.E.over[0], e.E.over[1]) || 1, oz = e.E.over[1] / ol, clear = (k.p[2] - zc) * (oz || -1);
-    if (clear < need) { const want = 2.6, vo = k.v[2] * (oz || -1); if (vo < want) k.v[2] += (want - vo) * (oz || -1) * Math.min(1, 12 * h);
-      const low = k.p[1] - need; if (low < 0) { k.p[1] -= low * Math.min(1, 10 * h); if (k.v[1] < 0) k.v[1] *= 1 - Math.min(1, 14 * h); } k.v[0] *= 1 - 2.2 * h; e.tc = null; return; }
-    if (e.tc == null) e.tc = k.t; }
+  /* Behind a map's crest (core.js crestAt; Mistfall Ledge, owner: "not seeing natural physics as they fall off"): the body
+     keeps the blow's way out over the lip (at least EF.crestV), tips over the edge about the part still on the ground
+     (ragStep: no ground past the lip) and drops under a little less than the ragdoll's own snap of gravity, the crest
+     hiding it as it goes (greatroot.js, the crest mask and its soft lip). No holding up, no extra drag. */
+  if (typeof crestAt === 'function' && crestAt(k.p[0]) != null) {
+    const ol = Math.hypot(e.E.over[0], e.E.over[1]) || 1, ox = e.E.over[0] / ol, oz = e.E.over[1] / ol;
+    if (!e.kick) { e.kick = 1; const vo = k.v[0] * ox + k.v[2] * oz; if (vo < EF.crestV) { k.v[0] += (EF.crestV - vo) * ox; k.v[2] += (EF.crestV - vo) * oz; } }
+    if (k.v[1] < 0 || k.p[1] < k.he[1]) k.v[1] += RAG_G * h * EF.crestG;   // (a fall that can be followed: the ragdoll's gravity, eased a little)
+    return;
+  }
   const f = 1 - 2.2 * h; k.v[0] *= f; k.v[2] *= f;   // over the lip it drops, it does not sail on
   if (k.p[1] < k.he[1] + .2 && k.v[1] < 0) k.v[1] += RAG_G * h * EF.ease;   // and it tips over the lip slowly enough to be seen going (the ragdoll's own gravity would take it in a blink)
 }
@@ -55508,8 +55512,9 @@ const AudioSys = (() => {
   const prng = a => () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   function seeded(key, fn) { const mr = Math.random; Math.random = prng(seedOf(key)); try { return fn(); } finally { Math.random = mr; } }
   /* Each foe type has five takes of its death, never the same one twice running (owner, 11 Nov 2026: "vary the monsters dying
-     sounds"): a different seed for the made sounds, and a recorded cry played a little slower or faster (mostly lower, nothing shrill). */
-  const DIE_RATES = [1, .93, 1.05, .88, .97], DIE_LAST = {}; let DVAR = 1;
+     sounds"): a different seed for the made sounds. (The recorded cries were also played slower or faster, down to .88 and,
+     on the wolves' own turning pitches, .70: gone. A recorded voice now varies by its takes, see DVOX.) */
+  const DIE_LAST = {};
   function dieVar(type) { let k = Math.floor(Math.random() * 5); if (k === DIE_LAST[type]) k = (k + 1 + Math.floor(Math.random() * 4)) % 5; DIE_LAST[type] = k; return k; }
   let DTYPE = '', BIGD = true;   // the creep type whose death is being played, and whether it is a leader or boss
 
@@ -55652,7 +55657,8 @@ const AudioSys = (() => {
     }
     n.connect(o.demo ? E.demoIn : o.mus ? E.musIn : E.die ? E.dieIn : E.raw ? E.rawIn : E.bright ? E.brightIn : E.sfxIn);
     if (o.room) { const s = gn(o.room); n.connect(s); s.connect(o.mus ? E.musHall : E.sfxRoom); R.push(s); }
-    if (o.hall) { const s = gn(o.hall); n.connect(s); s.connect(o.mus ? E.musHall : E.sfxHall); R.push(s); }
+    const hl = E.fall && !o.mus ? Math.max(o.hall || 0, FALL_HALL) : o.hall;   // (a foe falling from a cliff: every layer of its death rings long in the hall)
+    if (hl) { const s = gn(hl); n.connect(s); s.connect(o.mus ? E.musHall : E.sfxHall); R.push(s); }
     E.reap.push(R);
     return g;
   }
@@ -56322,9 +56328,54 @@ const AudioSys = (() => {
     thief: SD(30), ogre: SD(34, .15), grakk: SD(34, .15), overlord: SD(34, .5),
   };
   const CRY_G = SD(29), CRY_T = SD(33);   // the rest of the gnoll and troll kin
+  /* The death voices cut from the owner's ZapSplat monster pack (deathsfxdata.js, tools/make_deathsfx.py; 11 Nov 2026, after
+     "dont sound good" of the deaths before). DVOX: which voice a foe dies with; a leader or boss of a troop's kind takes the
+     bigger voice (DBIG). A voice's takes are the keys d_<voice>_<n>: one plays, never the same twice running, as recorded or
+     up to 3% faster (and no more than 1.5% slower: never heard as slowed). They replace the cry only: gear, the body's
+     fall, the ragdoll's landing and each death's other layers are as they were. Left as they were: the wolves (the owner's
+     own recordings), the stone folk, the wisps, and the made bursts and wails (bloat, egg sac, totem, banshee, the Mire).
+     DLVL: each voice's level, measured to sit under the units' strikes. AudioFX.deathTakes(false) plays the old cries. */
+  const DVOX = {
+    gnoll: 'gnoll', sapper: 'gnoll', mender: 'gnoll', warcaller: 'gnoll', shaman: 'gnoll', torchbearer: 'gnoll', thief: 'gnoll', necro: 'gnoll', warmage: 'gnoll', skirmisher: 'gnoll', acolyte: 'gnoll',
+    rattlefang: 'gnollbig', beastmaster: 'gnollbig', mirrorwitch: 'gnollbig',
+    troll: 'troll', axe: 'troll', warden: 'troll', shieldbearer: 'troll', berserker: 'troll', carrion: 'troll', ironclad: 'troll', mauler: 'troll',
+    tunnelking: 'trollbig', brakka: 'trollbig', tuskmother: 'trollbig', varn: 'trollbig', vorrith: 'trollbig', morbus: 'trollbig',
+    ogre: 'ogre', grakk: 'ogre', gorr: 'ogre',
+    spider: 'bug', beetle: 'bug', magma: 'bug', burrower: 'bug', broodmother: 'brood', silkweb: 'brood', arachnara: 'brood', ironshell: 'brood', sandmaw: 'brood',
+    bat: 'bat', stormbat: 'bat', nightwing: 'batbig',
+    wraith: 'dead', shade: 'dead', ghoul: 'dead', risen: 'dead', rotshaman: 'dead', lich: 'deadbig', abbess: 'deadbig', greyghost: 'deadbig', bonewarden: 'deadbig', rotfather: 'deadbig',
+    bonedrake: 'drake', cavewyrm: 'drake', voidwyrm: 'drake', ossyra: 'drake', overlord: 'lord', abyss: 'lord', malgrath: 'lord',
+  };
+  const DBIG = { gnoll: 'gnollbig', troll: 'trollbig', bug: 'brood', bat: 'batbig', dead: 'deadbig' };
+  const DLVL = { gnoll: .2, gnollbig: .3, troll: .22, trollbig: .32, ogre: .4, bug: .14, brood: .3, bat: .18, batbig: .22, dead: .17, deadbig: .3, drake: .45, lord: .4 };
+  const DNONE = { bloat: 1, banshee: 1, eggsac: 1, golem: 1, matriarch: 1 };   // (their own made sound, whatever body they borrow)
+  /* A foe shot over a cliff's edge (die's a.fall; owner, 11 Nov 2026: "a longer reverb as they fall that would help sell it"):
+     its cry goes far into the hall (a two-second tail) and the voice itself recedes, fading and dulling as it drops. */
+  const FALL_HALL = .65, FALL_DRY = .3, FALL_LP = [3600, 800];
+  const DV_LAST = {}, DV_KEYS = {}, DLOG = []; let DTK = '', DVX = '', DDONE = false, DTAKES = true;
+  function deathPick(type, big) {
+    fireLoad(); if (!DTAKES || DNONE[type]) return '';
+    const m = typeof mdlOf === 'function' ? mdlOf(type) : ''; let v = DVOX[type] || DVOX[m] || (DX[type] || DX[m] ? '' : 'gnoll'); if (!v) return '';   // (a foe with no death of its own dies as a gnoll, as before)
+    if (big && DBIG[v]) v = DBIG[v];
+    const all = DV_KEYS[v] || (DV_KEYS[v] = Object.keys(fxTakes()).filter(k => k.indexOf('d_' + v + '_') === 0)), L = all.filter(k => fireBufs[k]); if (!L.length) return '';
+    let i = Math.floor(Math.random() * L.length); if (L.length > 1 && L[i] === DV_LAST[v]) i = (i + 1 + Math.floor(Math.random() * (L.length - 1))) % L.length;
+    DV_LAST[v] = L[i]; DVX = v; return L[i];
+  }
+  function deathRec(t, pan) {
+    if (DDONE) return true;   // (one voice a death)
+    const B = fireBufs[DTK], F = fxTakes()[DTK]; if (!B || !F) return false;
+    const r = .985 + Math.random() * .045, end = t + F.len / r + .03, s = C.createBufferSource(), g = gn(1), v = DLVL[DVX] || .2;
+    s.buffer = B; s.playbackRate.value = r; s.start(t, F.at, F.len + .02); s.stop(end); track(s, end);
+    if (E.fall) { const f = bq('lowpass', FALL_LP[0], .6), d = F.len / r; f.frequency.setValueAtTime(FALL_LP[0], t); f.frequency.exponentialRampToValueAtTime(FALL_LP[1], t + d); g.gain.setValueAtTime(1, t + .05); g.gain.linearRampToValueAtTime(FALL_DRY, t + d); s.connect(f); f.connect(g); }
+    else s.connect(g);
+    const die = E.die; E.die = false;   // (cut and low-passed already: the sfx bus, not the duller death bus)
+    try { out(g, v * (E.lvCry || 1) / (E.trim || 1), { pan, room: BIGD ? .12 : .06, hall: BIGD ? .1 : 0 }, t, end); } finally { E.die = die; }
+    DDONE = true; DLOG.push([DTYPE, DTK, +r.toFixed(3), v, E.fall ? 1 : 0]); if (DLOG.length > 400) DLOG.shift();
+    return true;
+  }
   function cryRec(t, c, v, pan, room) {
+    if (DTK && deathRec(t, pan)) return true;
     const b = c && CRYB[c[0]]; if (!b) return false;
-    if (DVAR !== 1) { c = c.slice(); c[1] *= DVAR; }
     const s = C.createBufferSource(); s.buffer = b; s.playbackRate.value = c[1];
     const len = Math.min(b.duration / c[1], c[4] || 9), end = t + len + .05; s.start(t); s.stop(end); track(s, end);
     let n = gn(0); s.connect(n); n.gain.setValueAtTime(0, t); n.gain.linearRampToValueAtTime(1, t + .025);   // eased in: no hard hit at the start
@@ -57387,13 +57438,13 @@ const AudioSys = (() => {
       }
       PAN0 = a && a.x != null ? lim((a.x - 5.5) / 7, -.6, .6) : sp(.3);
       E.trim *= X[0];
-      E.die = true; E.rag = !big && !!(a && a.rag) && matOf(type) !== 'ghost'; DTYPE = type; BIGD = !!big;
+      E.die = true; E.fall = !!(a && a.fall); E.rag = !big && !!(a && a.rag) && matOf(type) !== 'ghost'; DTYPE = type; BIGD = !!big;
       try {
-        const vk = dieVar(type); DVAR = DIE_RATES[vk];
+        const vk = dieVar(type); DTK = deathPick(type, big); DDONE = false;
         seeded('die|' + type + (vk ? '|' + vk : ''), () => {   // one of five takes for this type
           X[1]();
         });
-      } finally { DVAR = 1; E.die = false; E.rag = false; DTYPE = ''; BIGD = true; DO = { p: 1, k: 1, w: 1, len: 1 }; }
+      } finally { DTK = ''; E.die = false; E.fall = false; E.rag = false; DTYPE = ''; BIGD = true; DO = { p: 1, k: 1, w: 1, len: 1 }; }
     },
     // a ragdoll hitting the ground. a: { t: type, x, s: how fast it hit, w: its size (0 small .. 1.5 huge) }
     land(a) {
@@ -59103,7 +59154,7 @@ const AudioSys = (() => {
   // peak (optional): seconds from now when the take's loudest moment should land (a swing's whoosh on the blow)
   const fireBufs = {}; let fireWait = 0;
   function fireLoad() {
-    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined')) return; fireWait = 1;
+    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined')) return; fireWait = 1;
     for (const k in fxTakes()) {
       try {
         const d = fxTakes()[k].d, s = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
@@ -59113,7 +59164,7 @@ const AudioSys = (() => {
   }
   // (the glaive's spinning-blade takes, bladesfxdata.js, are cut the same way and play through the same loader)
   let fxAll = null;
-  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}));
+  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
   function firePlay(k, vol, gap, peak, lp, rate) {
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
     let at = F.at, len = F.len;
@@ -59478,6 +59529,7 @@ const AudioSys = (() => {
     },
     songInfo: () => ({ mine: !!SONG_MINE, name: SONG_MINE ? String(SONG_MINE.name || 'Untitled').slice(0, 40) : 'Ravenswood: Deepwood Path' }),
     buses: () => L && { sfx: L.sfxIn.gain.value, bright: L.brightIn.gain.value, raw: L.rawIn.gain.value, room: L.sfxRoom.gain.value, music: L.musIn.gain.value },
+    deathTakes: v => { DTAKES = v !== false; }, deathLog: () => DLOG.slice(), deathLoaded: () => Object.keys(fxTakes()).filter(k => k.indexOf('d_') === 0).map(k => [k, fireBufs[k] ? +fireBufs[k].duration.toFixed(3) : 0]),
     drops: () => Object.assign({}, DROPS), voices: () => (L && L.ends ? L.ends.filter(e => e > L.c.currentTime).length : 0),
   };
 })();
@@ -66928,7 +66980,8 @@ function buildGreatrootPainted(rect, occs, crest, softX) {   // (rect, occs, cre
     for (let u = xa; u < xb - 1e-6; u += .25) { const ua = u, ub = Math.min(xb, u + .25), za = cz(clamp(ua, cx0, cx1)), zb = cz(clamp(ub, cx0, cx1)), D = GR_DEEP, K = GR_VIEW_K;
       gr.quad([ua, 0, za], [ua, 0, zB], [ub, 0, zB], [ub, 0, zb], G0);                                          // the ledge
       gr.quad([ua, -D, zA - D * K], [ua, -D, za - D * K], [ub, -D, zb - D * K], [ub, -D, zA - D * K], G0);     // the valley, far behind
-      gr.quad([ua, 0, za], [ub, 0, zb], [ub, -D, zb], [ua, -D, za], G0); gr.quad([ub, 0, zb], [ua, 0, za], [ua, -D, za], [ub, -D, zb], G0);   // the face under the lip (both sides)
+      const ft = softX && ub > softX[0] && ua < softX[1] ? -GR_SOFT_D : 0;   // (over the soft lip the face starts a little below the crest: the see-through strips above it)
+      gr.quad([ua, ft, za], [ub, ft, zb], [ub, -D, zb], [ua, -D, za], G0); gr.quad([ub, ft, zb], [ua, ft, za], [ua, -D, za], [ub, -D, zb], G0);   // the face under the lip (both sides)
     } }
   let occ = null;
   const OC = occs || (rect ? null : typeof GR_OCC !== 'undefined' ? GR_OCC : null);
@@ -66940,20 +66993,21 @@ function buildGreatrootPainted(rect, occs, crest, softX) {   // (rect, occs, cre
     }
     occ = g.finish();
   }
-  /* a soft lip (owner: "add a slight blur so that monsters falling dont have a sharp edge along the crest"): thin upright
-     strips standing on the crest over the open lip, each showing the same picture, drawn see-through over what is behind
-     them (view.js); stacked from the crest up, so a body sinking past the lip fades out over a few pixels instead of
-     being cut off. Over open ground they change nothing to the eye. */
+  /* a soft lip (owner: "add a slight blur so that monsters falling dont have a sharp edge along the crest"; then "there is
+     now a line above the crest": so all of it below the crest line): over the open lip the face starts GR_SOFT_D below
+     the crest, and thin upright strips hang there, each showing the same picture, drawn see-through over what is behind
+     them (view.js); more of them overlap lower down, so a body sinking past the crest fades out over a few pixels, from
+     the crest line down. Nothing above the crest line covers anything. */
   let soft = null;
   if (crest && softX) {
     soft = GR_SOFT_H.map(h => { const g = new Geo(1); g.jit = 0;
       for (let u = softX[0]; u < softX[1] - 1e-6; u += .25) { const ub = Math.min(softX[1], u + .25), za = cz(u), zb = cz(ub);
-        g.quad([u, 0, za], [u, h, za], [ub, h, zb], [ub, 0, zb], G0); g.quad([ub, 0, zb], [ub, h, zb], [u, h, za], [u, 0, za], G0); }
+        g.quad([u, -GR_SOFT_D, za], [u, -h, za], [ub, -h, zb], [ub, -GR_SOFT_D, zb], G0); g.quad([ub, -GR_SOFT_D, zb], [ub, -h, zb], [u, -h, za], [u, -GR_SOFT_D, za], G0); }
       return g.finish(); });
   }
   return { ground: gr.finish(), wild: [], deco: new Geo(73).finish(), trees: [], occ, soft, fx: null };
 }
-const GR_SOFT_H = [.05, .1, .16, .23, .3], GR_SOFT_A = .38;   // the soft lip's strips (their heights) and how much each covers
+const GR_SOFT_D = .22, GR_SOFT_H = [0, .05, .1, .15, .19], GR_SOFT_A = .38;   // the soft lip: its depth below the crest, its strips' tops (how far below the crest) and how much each covers
 
 /* ---------- the 3D version's valley below the cliff, and its sky: one painting behind the world ----------
    Owner: "perhaps the land below can be a painting". Painted once for the fitted view (view.js paintBackdrop: it stays under
@@ -71206,13 +71260,19 @@ const GNOLL = (() => {
     const e = f.ef || null, gone = e && e.tc != null, tf = e ? Math.max(0, t - e.T) : t;
     if (gone ? t - e.tc > 1.4 : t > RAG_DIE) { k.done = true; return false; }
     const s = k.slot; s.k = k; s.vt = vt;
-    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(tf, RAG_T), e ? (e.T && t < e.T ? Math.sin(t / e.T * Math.PI / 2) : Math.max(0, 1 - tf / .2)) * 1.6 : 0));   // (the old set's run under the fall, whatever the global set)
+    /* (over the lip: owner, "get shot by arrow, stagger back or leap off the back and fall naturally as if it were a real
+       cliff they fell off". He stays on his feet as he staggers back, only starting to go over; past the lip he keeps his
+       way out, drops under gravity and goes on over backwards, his own fall played on as he goes) */
+    const ov = e && e.over, stT = ov ? .26 + .12 * Math.min(1.5, e.L) : 0;
+    const poseT = !ov ? tf : e.tc == null ? t * .38 : e.tc * .38 + (t - e.tc) * 1.3;
+    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(poseT, RAG_T), e ? (e.T && t < e.T ? Math.sin(t / e.T * Math.PI / 2) : Math.max(0, 1 - tf / .2)) * 1.6 : 0));   // (the old set's run under the fall, whatever the global set)
     let dd = S.d, drop = 0;
     if (e) {
       dd += e.step * (e.T ? sm(0, e.T, t) : 1);
-      if (e.over) dd = Math.max(dd, (e.L + .45) * sm(0, .4 + .25 * e.L, tf));   // carried to the lip and a little past it
-      if (!gone && e.over && dd >= e.L + .15) { e.tc = t; k.thud = true; if (typeof efLipFx === 'function') efLipFx(k.x + f.dx * dd, k.z + f.dz * dd, [f.dx, f.dz]); }
-      if (e.tc != null) { const u = t - e.tc, tip = Math.min(1.25, 3.4 * u); drop = 8 * u * u; if (S.pitch) rx(p, R.bix.root, S.pitch * tip); else rz(p, R.bix.root, -S.roll * tip); if (!e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); } }
+      if (ov) { const a = Math.min(1, t / stT); dd = (e.L + .2) * (1 - (1 - a) * (1 - a)); }   // staggered back to the lip and over it, quick then slowing
+      if (!gone && ov && dd >= e.L + .1) { e.tc = t; k.thud = true; if (typeof efLipFx === 'function') efLipFx(k.x + f.dx * dd, k.z + f.dz * dd, [f.dx, f.dz]); }
+      if (e.tc != null) { const u = t - e.tc, tip = Math.min(2.6, .3 + 4 * u); dd = e.L + .2 + .55 * u; drop = 12 * u * u;   // (off the edge: his way out kept, gravity, and on over backwards)
+        if (S.pitch) rx(p, R.bix.root, S.pitch * tip); else rz(p, R.bix.root, -S.roll * tip); if (!e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); } }
     }
     const su = gone ? 0 : Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - S.h / k.sc + drop / k.sc;
     MOBRIG.posed(R, p, s.M, s.P, s.N, sink);
