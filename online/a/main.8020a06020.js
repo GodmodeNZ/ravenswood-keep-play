@@ -1,4 +1,4 @@
-const BUILD_TAG = '2313ca0+@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1f96b45+@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -11932,8 +11932,8 @@ function itemCardHTML(it, o) {
   const sub = itemKindLine(it) + (it.hone && !ilb ? ` · Honed +${it.hone}` : '') + (it.lv > 1 ? ` · Level ${ROMAN[it.lv - 1]}` : '') + (ilb ? ' · ' + ilb : '');
   const abl = ab.map(a => `<div class="itc-ab${a.kind === 'Active' ? ' act' : ''}"><b>${a.kind}${a.name ? ': ' + iEsc(a.name) : ''}</b> ${iEsc(a.text)}${a.cd ? ` <i>Cooldown ${a.cd}s</i>` : ''}</div>`).join('');
   const fl = d.flavor || (it.leg && d.combo && !d.build ? `Try it with ${d.combo}` : '');
-  // a force legendary: the way it changes its unit (twist), then what to build round it (build)
-  const tw = it.leg && d.twist ? `<p class="itc-tw">${iEsc(d.twist)}</p>` : '', bd = it.leg && d.build ? `<p class="itc-bd"><b>Build around it:</b> ${iEsc(d.build)}</p>` : '';
+  // a force legendary: what to build round it (build). Its twist line is no longer shown: the passive under it says the same (owner, 11 Nov 2026: "dont need this additional description on legendaries")
+  const tw = '', bd = it.leg && d.build ? `<p class="itc-bd"><b>Build around it:</b> ${iEsc(d.build)}</p>` : '';
   return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${iEsc(gearName(it))}${typeof rnAwkMark === 'function' ? rnAwkMark(it) : ''}</h5><p class="itc-k">${iEsc(sub)}</p>${clsCardLine(it)}`
     + (st.length || old ? `<ul class="itc-s">${old}${st.map(([k, v]) => `<li>${statHTML(k, v)}</li>`).join('')}</ul>` : '')
     + tw + abl + bd + (d.tome ? `<div class="itc-ab">${iEsc(tomeText(it))}</div>` : '')
@@ -21339,7 +21339,7 @@ FORCE_ATTACK.sbThunder = (t, st, tg, pow) => {
   if (C.sbFork && r && !first.dead) G.delayed.push({ t: .06, fn: () => { if (sbAlive(t)) { const o = nearest(first.x, first.y, 2.2, 1, first, q => !q.phased && !r.hit.has(q))[0]; if (o) sbChain(t, t.st || st, o, m * .6, { from: [first.x, hitH(first), first.y], jumps: 2, w: .9 }); } } });   // Forked Lightning
   sbFeed(t, .3 * (1 + .5 * (C.sbFeed || 0)) + (C.sbTempestC ? 1 : 0));
   t.recoil = 1;
-  if (Math.random() < .35) sfx('quake', .3);
+  sfx('arcbolt', Math.random() < .35 ? 1 : 0);   // (lightning's own crack: audio.js; it was an earth rumble, one strike in three)
 };
 // Earthbinders: a stomp that shakes every walker around (and any burrower up out of the ground); every third opens a fissure along the path
 FORCE_ATTACK.sbStomp = (t, st, tg, pow) => {
@@ -22063,7 +22063,7 @@ const SB_KITS = {
           if (c.dead || !abLive(t)) return; const s = t.st || st;
           sbSkyBolt(c, 2.8); sbZap(t, s, c, s.dmg * m); if (!c.dead) stun(c, .4, .4, null);
           for (const o of nearest(c.x, c.y, 2, 8, c, q => sbCond(q) && !q.phased)) { sbZap(t, s, o, s.dmg * .6); if (G.bolts.length < 60) G.bolts.push({ pts: [[c.x, hitH(c), c.y], [o.x, hitH(o), o.y]], life: .2, max: .2, w: .9, col: SB_COL.bolt }); }
-          G.shake = Math.max(G.shake, .08); sfx('quake', .7);
+          G.shake = Math.max(G.shake, .08); sfx('thunder', 1);
         } });
       } },
     { id: 'sb_thunderbird', name: 'Thunderbird', short: 'Bird', glyph: 'wings', hue: '#bcd8ff', mana: 130, cd: 18, len: 3.6, research: { cost: 110, time: 20 },
@@ -33408,7 +33408,7 @@ sbcSet('sb_thunderbird', { name: 'Arc Bridge', short: 'Arc', glyph: 'arcs', hue:
   cast(t, st, p, ab) {
     const dur = byT(ab.by.dur, t), o = p.o || null, bx = o ? o.x : p.bx, bz = o ? o.y : p.bz;
     const z = sbZone(t, st, 'sb_thunderbird', (t.x + bx) / 2, (t.y + bz) / 2, Math.hypot(bx - t.x, bz - t.y) / 2, dur, .1, { o, bx, bz, hits: new Map(), _sfx: 1 });
-    sfx('quake', .4); sfx('zap', 1);
+    sfx('thunder', 0); sfx('arcbolt', 1);
     const end = () => z.o ? [z.o.x, towerTop(z.o) * (z.o.def.wall ? .8 : .9), z.o.y] : [z.bx, .55, z.bz];
     sbcFx('sb_thunderbird', t, p, C => { const K = sbcK(), alive = () => G.hazards.includes(z) && z.t > 0 && abLive(t) && (!z.o || (G.towers.includes(z.o) && !z.o.wrecked));
       sfxAdd({ k: 'sbcarc', p0: () => sbcTip(t), p1: end, w: .05, cH: K.bolt, cC: K.hot, jag: .12, n: 12, br: 2, fl: 18, seed: Math.floor(R(1e3)), life: dur + .3, alive });
@@ -33425,7 +33425,7 @@ sbcSet('sb_thunderbird', { name: 'Arc Bridge', short: 'Arc', glyph: 'arcs', hue:
       const [d, u] = sbcSegD(c.x, c.y, t.x, t.y, bx, bz); if (d > SBC.arc.w + (c.def.r || .3) * .4) continue;
       const rec = z.hits.get(c) || { n: 0, at: -9 }; if (rec.n >= SBC.arc.max || G.time - rec.at < SBC.arc.gap) continue;
       rec.n++; rec.at = G.time; z.hits.set(c, rec);
-      sbZap(t, st, c, abD(st) * m, true); if (!c.dead) sbSoak(c, 2); sbFeed(t, .4); sfx('zap', 0);
+      sbZap(t, st, c, abD(st) * m, true); if (!c.dead) sbSoak(c, 2); sbFeed(t, .4); sfx('arcbolt', 0);
       const ax = t.x + (bx - t.x) * u, az = t.y + (bz - t.y) * u;
       if (!sbcFx('sb_thunderbird', t, c, C => { v2Bolt(C, ax, .7, az, c.x, hitH(c), c.y, { w: .05, life: .18, jag: .2, n: 7, br: 1, foe: c }); v2Spray(C, 'spark', c.x, c.y, hitH(c), 5, { sp: 1 }); }) && G.bolts.length < 60) G.bolts.push({ pts: [[ax, .7, az], [c.x, hitH(c), c.y]], life: .16, max: .16, w: .8, col: SB_COL.bolt });
     }
@@ -33473,7 +33473,7 @@ sbcSet('sb_stormtotem', { name: 'Lightning Rod', short: 'Rod', glyph: 'boltplus'
       sbSkyBolt(c, 2.2); sbZap(t, st, c, abD(st) * SBC.rod.sky);
       for (const o of nearest(c.x, c.y, 1.4, 3, c, q => !q.phased && !q.ent)) { sbZap(t, st, o, abD(st) * SBC.rod.arc, true); if (!sbcFx('sb_stormtotem', t, o, C => v2Bolt(C, c.x, hitH(c) + .5, c.y, o.x, hitH(o), o.y, { w: .045, life: .2, jag: .2, n: 7, br: 1, foe: o })) && G.bolts.length < 60) G.bolts.push({ pts: [[c.x, hitH(c) + .5, c.y], [o.x, hitH(o), o.y]], life: .18, max: .18, w: .8, col: SB_COL.bolt }); }
     } finally { SBC_ROD_IN--; }
-    sbFeed(t, .5); sfx('quake', .45);
+    sbFeed(t, .5); sfx('thunder', 0);
   },
 });
 SBC_CAST.sb_stormtotem = C => { const t = C.t; v2Wind(C, { wu: .16, n: 6, hk: 1 }); sfxAdd({ k: 'vflash', x: t.x, z: t.y, h: towerTop(t) + .3, s: .35, life: .2, col: sbcK().copperH, a: .5 * sfxZk() }); };
@@ -55490,7 +55490,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -56618,6 +56618,25 @@ const AudioSys = (() => {
       nhit(t + .01, { n: 'b', type: 'lowpass', fp: [[0, 560], [.4, 180]], q: .6, pts: [[.02, 1], [.14, .5], [.5, 0]], v: .4, pan, room: .12 });
       const lf = []; for (let i = 0; i < 12; i++) { const u = Math.pow(Math.random(), 1.2); lf.push([t + .06 + u * .6, (1 - u * .6) * rnd(.3, .8), rnd(300, 620)]); }
       train(lf, { n: 'p', type: 'bandpass', q: 1.2, d: .028, v: .22, pan: sp(.5), room: .12 });
+    },
+    /* --- the Thunder Callers (unit three of the spell effects pass): lightning that sounds like lightning heard from a
+       little way off, not an earth tremor and not a fizz. Low: a dull crack and the air rolling after it. --- */
+    // a bolt leaping from the staff through its chain: a short dull crack, a breath of torn air. arg 1: a harder one
+    arcbolt(hard) {
+      if (!ok('arb', .07, 200)) return; const t = now(), lv = E.lv, p = rnd(.9, 1.1) * (1 - .05 * lv), pan = sp(.35), v = hard ? 1 : .7;
+      nhit(t, { n: 'p', type: 'bandpass', fp: [[0, 900 * p], [.05, 420 * p]], q: 1.2, pts: [[.002, 1], [.03, .35], [.09, 0]], v: .5 * v, pan });
+      thump(t, 150 * p, 62 * p, .09, .34 * v, { pan, drive: 1.3 });
+      nhit(t + .012, { n: 'b', type: 'lowpass', fp: [[0, 520], [.2, 180]], q: .6, pts: [[.01, .8], [.07, .35], [.24, 0]], v: .3 * v, pan, room: .15 });
+      if (hard) train([[t + .03, .5, 520 * p], [t + .055, .35, 430 * p]], { n: 'p', type: 'bandpass', q: 1.6, d: .016, v: .3, pan });
+    },
+    // the sky's bolt: a hard low crack on the instant, then thunder rolling away. arg 1: Call Lightning (bigger, longer)
+    thunder(big) {
+      if (!ok('thn', .12, 200)) return; const t = now(), lv = E.lv, p = rnd(.92, 1.08) * (1 - .05 * lv), pan = sp(.25), s = big ? 1 : .68;
+      nhit(t, { n: 'p', type: 'bandpass', fp: [[0, 760 * p], [.07, 300 * p]], q: 1, pts: [[.002, 1], [.04, .4], [.13, 0]], v: .6 * s, pan });
+      thump(t, 118 * p, 40 * p, .22, .6 * s, { pan, drive: 1.6, room: .15 });
+      // (the roll: a low rumble that swells and falls twice as it goes)
+      nhit(t + .04, { n: 'b', type: 'lowpass', fp: [[0, 300], [.5, 150], [1.4, 90]], q: .7, pts: [[.05, 1], [.3, .45], [.55, .7], [.9, .3], [big ? 1.5 : 1.05, 0]], v: .5 * s, pan, room: .3, hall: .2 * s });
+      nhit(t + .1, { n: 'b', type: 'bandpass', f: 82, q: .8, pts: [[.1, .8], [.5, .5], [big ? 1.3 : .9, 0]], v: .5 * s, pan: -pan, room: .25 });
     },
     /* --- earth --- */
     quake(m) {
@@ -94627,6 +94646,194 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof efxSync === 'function') efxSync();
 }
 
+/* ================= THE THUNDER CALLERS' LIGHTNING: forked, solid, struck again and again =================
+   Unit three of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules for it: solid
+   things are real meshes fixed in the world, never camera-facing cards ("dont use flat planes", "spell also turns with the
+   camera"); nothing is a mark on the ground; never too flashy. Until now a Stormborn bolt was a flat ribbon between the
+   points of its chain with a hair of jitter, a sky bolt landed in a ring on the ground, and lightning sounded like an
+   earth tremor.
+     a bolt            a jagged, forked channel in three dimensions: a white-hot core of short glowing rods, its kinks and
+                       forks thrown afresh twenty times a second while it lasts (a real stroke flickers as it re-strikes),
+                       thinning as it dies
+     the strike        that channel leaping from the staff through its chain of foes
+     Call Lightning    a great trunk down out of the sky with long forks, a short hard light on what it hits, no ring
+     Arc Bridge        a standing arc between the caller and its partner that never holds one shape, bolts leaping off it
+                       to whoever crosses
+     Lightning Rod     the sky's bolt into the spike each second, arcing on to the foes round it
+   Every Stormborn bolt takes this look (the chains of the Stormward Lancers' and Wolfguard's kind draw through the same
+   seam). It uses the Seedcasters' switch: SD.off (the Element Lab's "Old look") or no toolkit brings the ribbons back.
+   Gameplay, timing and balance are untouched. Tuning: the Element Lab's entries stormbolt, sb_calllightning,
+   sb_thunderbird (Arc Bridge), sb_stormtotem (Lightning Rod). */
+const THF = { bolts: [], chains: [], arcs: new Set(), quiet: 0, n: 0, cap: 260 };
+const THF_SKY = [.75, .88, 1.4];
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { THF.bolts.length = 0; THF.chains.length = 0; THF.arcs.clear(); });
+const thfOn = () => typeof sdOn === 'function' && sdOn();
+const thfHash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+const thfIsStorm = b => !!(b && b.col && typeof SB_COL !== 'undefined' && (b.col === SB_COL.bolt || (b.col[0] === THF_SKY[0] && b.col[1] === THF_SKY[1] && b.col[2] === THF_SKY[2])));
+
+if (typeof SD_MESH !== 'undefined') Object.assign(SD_MESH, {
+  // a length of the channel: 1 long up +Y, 1 in radius, glowing white-blue
+  boltc: g => { g.smooth = 0; g.em = 1; g.jit = 0; g.cyl(0, 0, 0, 1, 1, 1, 5, '#dfeaff', { capT: false, alt: '#a9c6ff' }); g.em = 0; },
+});
+
+/* ---- one stroke from A to B, drawn now: kinked in three dimensions, forked; w its core's radius, a 0..1 how alive ---- */
+const _thfM = new Float32Array(16);
+function thfRod(k, A, B, r) {
+  if (THF.n >= THF.cap) return; THF.n++;
+  const y = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], L = Math.hypot(y[0], y[1], y[2]); if (L < 1e-4) return;
+  const n = [y[0] / L, y[1] / L, y[2] / L], ref = Math.abs(n[1]) > .9 ? [1, 0, 0] : [0, 1, 0];
+  let x = [ref[1] * n[2] - ref[2] * n[1], ref[2] * n[0] - ref[0] * n[2], ref[0] * n[1] - ref[1] * n[0]]; const xl = Math.hypot(x[0], x[1], x[2]) || 1; x = [x[0] / xl * r, x[1] / xl * r, x[2] / xl * r];
+  const z = [(x[1] * n[2] - x[2] * n[1]), (x[2] * n[0] - x[0] * n[2]), (x[0] * n[1] - x[1] * n[0])], m = _thfM;
+  m[0] = x[0]; m[1] = x[1]; m[2] = x[2]; m[3] = 0; m[4] = y[0]; m[5] = y[1]; m[6] = y[2]; m[7] = 0; m[8] = z[0]; m[9] = z[1]; m[10] = z[2]; m[11] = 0; m[12] = A[0]; m[13] = A[1]; m[14] = A[2]; m[15] = 1;
+  item(sdMesh(k), m, { shadow: false });
+}
+function thfStroke(A, B, w, a, seed, o) {
+  o = o || {};
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]); if (L < .02 || a <= .02) return;
+  const lv = sdLv(), n = Math.max(2, Math.min(o.n || 14, Math.round(L * (o.dens || 4) * [.6, .8, 1][lv]))), jag = (o.jag == null ? .1 : o.jag) * Math.min(1.2, L);
+  const pt = i => { const u = i / n, env = Math.sin(Math.PI * u), e = i && i < n ? jag * (.35 + .65 * env) : 0; return [A[0] + (B[0] - A[0]) * u + (thfHash(seed, i * 3 + 1) - .5) * 2 * e, A[1] + (B[1] - A[1]) * u + (thfHash(seed, i * 3 + 2) - .5) * 2 * e, A[2] + (B[2] - A[2]) * u + (thfHash(seed, i * 3 + 3) - .5) * 2 * e]; };
+  let P = pt(0); const r = w * a, forks = lv ? (o.br == null ? 1 : o.br) : 0;
+  for (let i = 1; i <= n; i++) {
+    const Q = pt(i); thfRod('boltc', P, Q, r);
+    // (its light: soft blue light at every joint and a wider, fainter halo round it: owner, "needs more flash of light around it")
+    if (o.glow !== 0 && (lv || i % 2 === 0)) { const gk = (o.glow == null ? 1 : o.glow) * a * Math.min(1, 9 / n), gs = r * 26; QADD.bill(RD, Q[0], Q[1], Q[2], gs, gs, [.4, .6, 1.3, .3 * gk], 1, 0); if (lv > 1 && i % 2) QADD.bill(RD, Q[0], Q[1], Q[2], gs * 2.6, gs * 2.6, [.3, .45, 1.1, .1 * gk], 1, 0); }
+    // a fork: a few short kinked lengths off this joint, thinner, leaning the way the stroke runs
+    if (forks > 0 && i > 1 && i < n && thfHash(seed + 9, i) < forks * 1.6 / n) {
+      let F0 = Q; const fl = Math.min(.9, L * (.08 + .1 * thfHash(seed + 5, i))), dir = [(thfHash(seed, i + 40) - .5) * 2.6, (thfHash(seed, i + 50) - .5) * 1.2 - (o.down ? .5 : 0), (thfHash(seed, i + 60) - .5) * 2.6];
+      for (let k = 1; k <= 3; k++) { const F1 = [F0[0] + dir[0] * fl / 3 + (B[0] - A[0]) / L * fl * .25 + (thfHash(seed + k, i + 70) - .5) * jag * .6, F0[1] + dir[1] * fl / 3 + (B[1] - A[1]) / L * fl * .25, F0[2] + dir[2] * fl / 3 + (B[2] - A[2]) / L * fl * .25 + (thfHash(seed + k, i + 80) - .5) * jag * .6]; thfRod('boltc', F0, F1, r * (.5 - .12 * k)); F0 = F1; }
+    }
+    P = Q;
+  }
+}
+// a path of points (a chain), each leg a stroke
+function thfChain(pts, w, a, seed, o) { for (let i = 0; i < pts.length - 1; i++) thfStroke(pts[i], pts[i + 1], w, a, seed + i * 17, o); }
+// how alive a stroke is, u through its life: it snaps on, flickers as it re-strikes, and dies away
+const thfLife = (u, seed, st) => Math.max(0, (u < .08 ? u / .08 : 1 - Math.pow(u, 1.6)) * (.7 + .3 * thfHash(st, seed)));
+
+/* ---- the game's own bolts (G.bolts): a Stormborn one is taken over, the rest are drawn as before.
+   The game holds a bolt for a quarter of a second, every leg of a chain at once (owner: "chain lightning is too fast and
+   disappears too fast"). Drawn, a chain now LEAPS: each leg strikes a beat after the one before it (hop), reaching its foe
+   in a few frames, with a flash of light where it lands, and every leg hangs in the air, flickering as it re-strikes, for
+   hold seconds before it thins away. Only the drawing is slower: the hits land when the game says. ---- */
+function thfKeep(b) {
+  b._thfK = 1;
+  const sky = b.col !== SB_COL.bolt, s = sky ? 'sb_calllightning' : 'stormbolt', V = sdV(s, 'bolt'), small = !sky && b.pts.length <= 2 && (b.w || 1) < 1 && b.max < .12;
+  if (THF.chains.length > 30) THF.chains.shift();
+  // (a chain's points are the middles of its foes: lifted to run over their backs, where it can be seen)
+  const pts = sky ? [b.pts[0], b.pts[b.pts.length - 1]] : b.pts.map((q, i) => i && !small ? [q[0], q[1] + V.lift, q[2]] : q.slice());
+  THF.chains.push({ pts, sky, small, s, w: Math.sqrt(b.w || 1), at: G.time, hop: small || sky ? 0 : V.hop, hold: small ? b.max : V.hold, seed: 1 + Math.floor(Math.random() * 900), lit: 0 });
+}
+function thfChains(now) {
+  THF.chains = THF.chains.filter(c => now < c.at + c.hop * (c.pts.length - 2) + c.hold);
+  for (const c of THF.chains) {
+    if (sdOnL(c.s, 'bolt') == null) continue;
+    const V = sdV(c.s, 'bolt'), st = Math.floor(now * V.restrike);
+    for (let i = 0; i < c.pts.length - 1; i++) {
+      const t0 = c.at + i * c.hop, el = now - t0; if (el < 0 || el > c.hold) continue;
+      const u = el / c.hold, grow = c.small ? 1 : Math.min(1, el / (c.sky ? .05 : V.leap)), A = c.pts[i], B0 = c.pts[i + 1], B = grow < 1 ? [A[0] + (B0[0] - A[0]) * grow, A[1] + (B0[1] - A[1]) * grow, A[2] + (B0[2] - A[2]) * grow] : B0;
+      const a = thfLife(u, c.seed + i, st);
+      thfStroke(A, B, V.w * c.w, a, c.seed + i * 17 + st * 13, c.sky ? { jag: V.jag, n: 16, dens: 3.2, br: V.forks, down: 1, glow: V.glow } : { jag: V.jag, br: c.small ? 0 : V.forks, n: 10, glow: c.small ? .5 : V.glow });
+      if (c.small) continue;
+      // where the leg lands: a flash of light round the foe as it arrives (and real light on the ground and on bodies)
+      if (grow >= 1) {
+        const f = Math.max(0, 1 - (el - (c.sky ? .05 : V.leap)) / V.flashT);
+        if (f > 0) { const fs = V.flash * (c.sky ? 1.5 : 1) * (.6 + .4 * f); QADD.bill(RD, B0[0], B0[1], B0[2], fs, fs, [.55, .72, 1.4, .55 * f], 1, 0); QADD.bill(RD, B0[0], B0[1], B0[2], fs * .4, fs * .4, [1.2, 1.3, 1.6, .7 * f], 1, 0); }
+        if (!(c.lit & (1 << i)) && i < 30) { c.lit |= 1 << i; if (!c.sky && typeof flashLight === 'function' && G.flashes && G.flashes.length < 6) flashLight(B0[0], B0[2], B0[1], [.5, .7, 1.5], V.light, .2); }
+      }
+    }
+  }
+}
+if (typeof sfxBasicBolt === 'function') { const _bb = sfxBasicBolt; sfxBasicBolt = function (b) { if (thfOn() && thfIsStorm(b) && b.pts && b.pts.length > 1) { try { if (!b._thfK) thfKeep(b); } catch (e) {} return true; } return _bb.apply(this, arguments); }; }
+
+/* ---- the toolkit's bolts and the standing arc (Arc Bridge, Lightning Rod): kept here, drawn with the game's bolts ---- */
+const THF_IDS = new Set(['sb_thunderbird', 'sb_stormtotem', 'sb_calllightning']);
+if (typeof v2Bolt === 'function') {
+  const _vb = v2Bolt;
+  v2Bolt = function (C, x0, h0, z0, x1, h1, z1, o) {
+    if (!thfOn() || !C || !THF_IDS.has(C.id)) return _vb.apply(this, arguments);
+    if (C.id === 'sb_calllightning') return null;   // (the game's own sky bolt is the one trunk: not a second beside it)
+    o = o || {}; if (THF.bolts.length > 40) THF.bolts.shift();
+    THF.bolts.push({ A: [x0, h0, z0], B: [x1, h1, z1], foe: o.foe || null, at: G.time + (o.delay || 0), life: o.life || .26, w: (o.w || .05) / .05, jag: o.jag, br: o.br, s: C.id, seed: 1 + Math.floor(Math.random() * 900) });
+    return null;
+  };
+}
+if (typeof SFX_DRAW !== 'undefined') {
+  // (the cool file fills SFX_DRAW after load: take the arc over once it is there)
+  const take = () => { const d0 = SFX_DRAW.sbcarc; if (!d0 || d0._thf) return !!d0; const f = function (q) { if (!thfOn()) return d0.apply(this, arguments); q._thfT = G.time; THF.arcs.add(q); }; f._thf = 1; SFX_DRAW.sbcarc = f; return true; };
+  if (!take() && typeof setTimeout === 'function') { let n = 0; const again = () => { if (!take() && n++ < 40) setTimeout(again, 250); }; setTimeout(again, 0); }
+}
+function thfDraw() {
+  THF.n = 0;
+  if (!thfOn() || (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask)) return;
+  const now = G.time; THF.cap = [90, 170, 260][sdLv()];
+  thfChains(now);
+  THF.bolts = THF.bolts.filter(b => now < b.at + b.life * 1.8);
+  for (const b of THF.bolts) {
+    if (now < b.at) continue; const V = sdV(b.s, b.s === 'sb_calllightning' ? 'bolt' : 'arcs'); if (sdOnL(b.s, b.s === 'sb_calllightning' ? 'bolt' : 'arcs') == null) continue;
+    const u = (now - b.at) / (b.life * 1.8), st = Math.floor(now * V.restrike), B = b.foe && !b.foe.dead ? [b.foe.x, b.B[1], b.foe.y] : b.B;
+    thfStroke(b.A, B, V.w * Math.sqrt(b.w), thfLife(u, b.seed, st), b.seed + st * 13, { jag: b.jag == null ? V.jag : b.jag * .7, br: b.br == null ? 1 : Math.min(2, b.br), n: 12, glow: V.glow });
+  }
+  // the standing arc: never one shape for long; it breathes thicker and thinner
+  for (const q of THF.arcs) {
+    if (!(now - q._thfT < .12) || q.dying) { THF.arcs.delete(q); continue; }
+    const A = q.p0 && q.p0(), B = q.p1 && q.p1(); if (!A || !B || sdOnL('sb_thunderbird', 'bridge') == null) continue;
+    const V = sdV('sb_thunderbird', 'bridge'), st = Math.floor(now * V.restrike), e = Math.min(1, (q.age || 0) / .1) * Math.min(1, Math.max(0, (q.life - (q.age || 0)) / .25));
+    // (it sags a little in its middle, as a slack arc does: two strokes meeting there)
+    const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 - V.sag, (A[2] + B[2]) / 2];
+    thfStroke(A, M, V.w, e * (.75 + .25 * thfHash(st, q.seed)), q.seed + st * 7, { jag: V.jag, br: V.forks, n: 9, glow: V.glow });
+    thfStroke(M, B, V.w, e * (.75 + .25 * thfHash(st + 3, q.seed)), q.seed + st * 11, { jag: V.jag, br: V.forks, n: 9, glow: V.glow });
+  }
+}
+if (typeof drawBolts === 'function') { const _db = drawBolts; drawBolts = function () { const r = _db.apply(this, arguments); try { thfDraw(); } catch (e) { if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.errs) ELEMLAB.errs.push('thunder fx: ' + e.message); } return r; }; }
+
+/* ---- where the sky's bolt lands: no ring on the ground; a short hard light and thrown sparks (the game's), a puff of
+   scorched dust rolling out low ---- */
+if (typeof fxRing === 'function') { const _fr = fxRing; fxRing = function () { if (THF.quiet > 0 && thfOn()) return; return _fr.apply(this, arguments); }; }
+if (typeof sbSkyBolt === 'function') {
+  const _sk = sbSkyBolt;
+  sbSkyBolt = function (c, w) {
+    THF.quiet++; try { _sk.apply(this, arguments); } finally { THF.quiet--; }
+    if (c && thfOn() && typeof sdShot === 'function' && sdOnL('sb_calllightning', 'strike') != null) {
+      const V = sdV('sb_calllightning', 'strike'), n = Math.round(V.dust * [.5, .75, 1][sdLv()]), a0 = Math.random() * TAU;
+      for (let k = 0; k < n; k++) { const a = a0 + k / n * TAU, v = V.reach * 4.5; sdShot('spore', c.x, .12, c.y, V.reach * .7, R(.45, .7), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.05, .2), drag: 4.5, grow: .6, p0: .5, a: .55, col: [.36, .36, .42] }, 'sb_calllightning', 'strike'); }
+    }
+  };
+}
+// the Arc Bridge's ground rod where it has no partner, and the spike of Lightning Rod, keep their toolkit drawing
+
+/* ---- the Element Lab's entries ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    stormbolt: { unit: 'sb_thundercaller', force: 'stormborn', el: 'seed', name: 'Chain Lightning', basic: 1, layers: ['bolt'] },
+    sb_calllightning: { unit: 'sb_thundercaller', force: 'stormborn', el: 'seed', name: 'Call Lightning', layers: ['bolt', 'strike'] },
+    sb_thunderbird: { unit: 'sb_thundercaller', force: 'stormborn', el: 'seed', name: 'Arc Bridge', layers: ['bridge', 'arcs'], partner: [3, 0] },
+    sb_stormtotem: { unit: 'sb_thundercaller', force: 'stormborn', el: 'seed', name: 'Lightning Rod', layers: ['arcs'] },
+  });
+  Object.assign(ELEM_FX_DEF, {
+    // a bolt: its core's radius, how far its kinks stray (x its length), forks, how often it re-strikes (a second), how far
+    // over the middles of its foes a chain runs, the beat between one leg of a chain and the next (s), how long a leg takes
+    // to reach its foe (s), how long each leg hangs in the air (s), the light round the channel (x), the flash where a leg
+    // lands (its width, how long), the real light it throws there (radius)
+    stormbolt: { bolt: { w: .03, jag: .12, forks: 1, restrike: 18, lift: .28, hop: .09, leap: .06, hold: .6, glow: 1.1, flash: .75, flashT: .2, light: 1.6 } },
+    sb_calllightning: {
+      bolt: { w: .038, jag: .14, forks: 2, restrike: 20, hold: .55, glow: .6, flash: .9, flashT: .16, light: 0 },
+      // where it lands: billows of scorched dust, how far they roll (cells)
+      strike: { dust: 5, reach: .55 },
+    },
+    sb_thunderbird: {
+      // the standing arc: its radius, kinks, forks, re-strikes a second, how far it sags in its middle
+      bridge: { w: .026, jag: .1, forks: 1, restrike: 16, sag: .12, glow: 1.2 },
+      arcs: { w: .022, jag: .12, forks: 1, restrike: 18, glow: 1.2 },
+    },
+    sb_stormtotem: { arcs: { w: .022, jag: .12, forks: 1, restrike: 18, glow: 1.2 } },
+  });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { jag: ['Kinks (x its length)', 0, .4, .005], forks: ['Forks', 0, 4, .1], restrike: ['Re-strikes a second', 4, 40, 1], sag: ['Sag in its middle', 0, .5, .01], hop: ['Beat between a chain\u2019s legs (s)', 0, .4, .01], hold: ['Hangs in the air for (s)', .1, 1.5, .02], leap: ['A leg reaches its foe in (s)', .01, .3, .005], flash: ['Flash where it lands (width)', 0, 3, .05], flashT: ['Flash lasts (s)', .05, .8, .01], light: ['Light thrown where it lands (radius)', 0, 4, .1] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { bolt: 'The bolt (a kinked, forked channel)', strike: 'Where it lands (scorched dust; no ring)', bridge: 'The standing arc', arcs: 'Bolts leaping off it' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { bolt: 'c', strike: 'c', bridge: 'c', arcs: 'c' });
+  if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['sb_thundercaller', 'Thunder Callers']);
+  if (typeof efxSync === 'function') efxSync();
+}
+
 /* ELEMENT FX hooks (elemfx.js): the drawing primitives asked about the Pyroclasts' and Frostweavers' layers. Loaded after every
    effect module (pyrofire.js, labfx.js, the unit models), so each wrapper sits outside theirs. Every wrapper looks first at
    EFX.on: with nothing tuned (no lab, no Use in game, nothing baked) it calls straight through, so normal play is unchanged. */
@@ -95896,6 +96103,8 @@ if (typeof applyLight === 'function') {
       applyForce(FORCE(), heroC()); G.force = FORCE(); G.hero = heroC();
       const i = Math.floor(CX), j = Math.floor(CZ), t = makeTower(slot[0], i, j, L.tier); t.build = 0; G.towers.push(t); G.tAt[idx(i, j)] = t;
       t.st = effStats(t); t.ang = Math.PI / 2; L.t = t;
+      // (a spell that needs a second unit of its force to work with, an Arc Bridge's far end: its cell from the caster's)
+      if (SP().partner) { const pi = i + SP().partner[0], pj = j + SP().partner[1], p2 = makeTower(slot[0], pi, pj, L.tier); p2.build = 0; G.towers.push(p2); G.tAt[idx(pi, pj)] = p2; p2.st = effStats(p2); p2.cd = 1e9; L.t2 = p2; } else L.t2 = null;
       const kit = typeof abilKit === 'function' && abilKit(t) ? abilKit(t).abilities : [];
       const A = typeof abilEnsure === 'function' && kit.length ? abilEnsure(t) : null;
       if (A) { A.learned = kit.map(a => a.id); A.mode = 'rotate'; for (const a of kit) { A.auto[a.id] = false; try { loreGet().done[loreKey(t.def.unit, a.id)] = true; } catch (e) {} } }
@@ -95917,6 +96126,7 @@ if (typeof applyLight === 'function') {
     for (const c of L.foes) if (!c.dead) { c.x = c.__ax; c.y = c.__ay; c.hp = c.maxHp; c.state = 'walk'; c.remain = 10; c.leaked = false; c.abT = 1e9; }
     const t = L.t; if (!t) return;
     t.hp = t.maxHp; t.wrecked = false; t.silT = 0; if (t.ab) t.ab.mana = abMax(t);
+    if (L.t2) { L.t2.cd = 1e9; L.t2.hp = L.t2.maxHp; L.t2.wrecked = false; }
     if (!SP().basic || (!L.loop && !(L.elFireT > G.time))) t.cd = Math.max(t.cd || 0, .5);
   }
   function cast() {
@@ -95926,7 +96136,7 @@ if (typeof applyLight === 'function') {
     const A = abilEnsure(t); A.mana = abMax(t); A.cd[ab.id] = 0; A.busyT = 0; A.cast = null;
     for (const c of L.foes) if (L.spell === 'cc_rimelance' && c.stunT > 0) { c.stunT = 0; c.ccCoffin = null; }   // (a fresh coffin each time)
     const st = t.st || effStats(t); let tg = null; try { tg = abPick(t, st, ab, true); } catch (e) {}
-    if (!tg && L.foes[0] && !L.foes[0].dead) tg = L.foes[0];
+    if (!tg && L.foes[0] && !L.foes[0].dead && !SP().partner) tg = L.foes[0];
     if (!tg) { L.note = 'No target in reach: bring the foes nearer.'; return info(); }
     try { (typeof castStart === 'function' ? castStart : castAbility)(t, ab, tg, st, true); } catch (e) { L.errs.push('cast: ' + e.message); info(); }
     // Shatterbloom bursts when its foe dies (the lab's foes don't): burst it a moment after it blooms
