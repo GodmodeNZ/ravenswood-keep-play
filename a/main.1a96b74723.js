@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ee058f8@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '8135276@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -21410,7 +21410,7 @@ function sbCloudStrike(t, st, x, z, pow, r, tg) {
     });
   } finally { SB_BOLT--; }
   flashLight(x, z, 1, [.6, .8, 1.5], 2.4, .12);
-  if (Math.random() < .3) sfx('quake', .3);
+  sfx('arcbolt', Math.random() < .3 ? 1 : 0);   // (lightning's own crack: audio.js; it was an earth rumble, one strike in three)
 }
 // a lingering storm cloud over a spot: it strikes a foe beneath it every 0.75s (hazard k 'sb_cloud')
 function sbCloudAt(t, st, x, z, r, dur, o = {}) {
@@ -21427,7 +21427,7 @@ function sbCloudTick(z, dt) {
   if (z.t <= dt && C.sbBurst && !z.burst) {   // Cloudburst
     z.burst = 1; SB_BOLT++; try { inSplash(z.x, z.z, z.r, false, c => { if (!c.ent && !c.phased && canTarget(t, st, c)) hurt(c, st.dmg * 1.5, 'magic', t, false, null, null); }); } finally { SB_BOLT--; }
     for (let q = 0; q < 3; q++) G.bolts.push({ pts: [[z.x + R(-.4, .4), 3, z.z + R(-.4, .4)], [z.x + R(-.5, .5), .2, z.z + R(-.5, .5)]], life: .25, max: .25, w: 1.6, col: SB_COL.bolt });
-    fxRing(z.x, z.z, z.r, '#e0ecff'); sfx('quake', .6);
+    fxRing(z.x, z.z, z.r, '#e0ecff'); sfx('thunder', 0);
   }
   if (z.tick > 0) return;
   z.tick = z.every;
@@ -22135,7 +22135,7 @@ const SB_KITS = {
       auto: 'the spot in range with three or more foes within 1.2 cells (or a boss or elite)',
       text: (t, st, ab) => `A storm cloud hangs over a 1.2-cell spot for ${byT(ab.by.dur, t)}s: every half second lightning strikes a foe beneath it for ${xD(st, .5)}, and the rain soaks everything under it.`,
       pick: (t, st, ab, man) => sbCrowdAt(t, st, ab, ab.rr, 3, man),
-      cast(t, st, p, ab) { sbCloudAt(t, st, p.x, p.y, ab.rr, byT(ab.by.dur, t), { every: .5, m: .5, big: 1, soak: 1 }); sfx('quake', .4); } },
+      cast(t, st, p, ab) { sbCloudAt(t, st, p.x, p.y, ab.rr, byT(ab.by.dur, t), { every: .5, m: .5, big: 1, soak: 1 }); sfx('thunder', 0); sfx('rainfall', 1); } },
     { id: 'sb_downpour', name: 'Downpour', short: 'Pour', glyph: 'rain', hue: '#a8c8f0', mana: 90, cd: 12, rr: 1.4, research: { cost: 50, time: 20 },
       by: { soak: [6, 6, 7, 7, 8, 8] },
       auto: 'the spot in range with three or more foes within 1.4 cells',
@@ -23096,6 +23096,7 @@ function sbDrawField(S) {
       const col = z.kind === 'rime' ? [.7, .88, 1.2] : z.kind === 'storm' ? [.55, .72, 1.3] : z.kind === 'spirit' ? [.75, .65, 1.2] : [1, .85, .55];
       QADD.ground(z.x, z.z, .04, z.r, z.r, [col[0], col[1], col[2], .2 * fade], 3, .06, n * .5);
       if (z.chAt && n - z.chAt < .3) QADD.bill(RD, z.x, 1, z.z, .8, .8, [col[0], col[1], col[2], .8 * (1 - (n - z.chAt) / .3)], 1, 0);
+    } else if (z.k === 'sb_cloud' && typeof cdfOn === 'function' && cdfOn()) {   // (drawn by cloudfx.js: a cloud with body and rain; no disc on the ground)
     } else if (z.k === 'sb_cloud') {   // a lingering storm cloud
       const fade = Math.min(1, z.t / .5, (z.T - z.t) / .3 + .2), big = z.big ? 1.35 : 1, h = 1.7 + .1 * big;
       for (let q = 0; q < 6; q++) { const a = q * 1.05 + z.seed, rr = z.r * .5 * ((q % 3) / 3 + .4); QA.bill(RD, z.x + Math.cos(a + n * .2) * rr, h + .06 * Math.sin(n + q), z.z + Math.sin(a + n * .2) * rr, .55 * big * z.r, .32 * big * z.r, [.36, .38, .48, .82 * fade], 2, 0, a); }
@@ -33568,7 +33569,7 @@ sbcSet('sb_downpour', { name: 'Rain Dance', short: 'Dance', glyph: 'rain', hue: 
       if (!abLive(t)) return; const s = t.st || st;
       sbFeed(t, SBC.dance.feed);
       for (const c of abFoes(t, s, r, c => !c.ent)) { sbSoak(c, 6); chill(c, { slow: .2, slowT: .8 }, null, t); }
-      sfx('splat', 0);
+      sfx('rainfall', 0);
       sbcFx('sb_downpour', t, null, C => { for (let q = 0; q < 4; q++) { const a = R(TAU), d = Math.sqrt(Math.random()) * r; v2Spray(C, 'spark', t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, .08, 2, { sp: .4, up: .6, col: '#9cc8f0' }); } });
     } });
     G.delayed.push({ t: T + .05, fn: () => {
@@ -33576,7 +33577,7 @@ sbcSet('sb_downpour', { name: 'Rain Dance', short: 'Dance', glyph: 'rain', hue: 
       if (lv1 <= lv0) return;
       const L = abFoes(t, s, r, c => !c.ent && !c.phased).sort(abByTough).slice(0, 6);
       L.forEach((c, i) => G.delayed.push({ t: i * .06, fn: () => { if (c.dead || !abLive(t)) return; sbSkyBolt(c, 2); sbZap(t, t.st || s, c, abD(t.st || s) * SBC.dance.bolt); } }));
-      sfx('boom', .9); if (typeof onToastSoft === 'function') onToastSoft('The sky answers the dance.');
+      sfx('thunder', 1); if (typeof onToastSoft === 'function') onToastSoft('The sky answers the dance.');
     } });
     sbcFx('sb_downpour', t, null, C => { const K = sbcK(), obj = { x: t.x, z: t.y, t: T };
       v2Rain(C, t.x, t.y, r, { obj, n: 36, life: T + .3, top: 2.8, col: K.rain, spd: 2.6 });
@@ -33606,7 +33607,7 @@ sbcSet('sb_stormdance', { name: 'Skyleap', short: 'Leap', glyph: 'wings', hue: '
       for (const o of hit) if (!o.dead) sbSoak(o, 4);
       const nf = sbLevel() * (1 + fk); let cur = on;
       for (let k = 0; k < nf; k++) { const o = nearest(cur.x, cur.y, 2.5, 1, null, q => !q.dead && !hit.has(q) && !q.phased && !q.ent && canTarget(t, s, q))[0]; if (!o) break; hit.add(o); sbZap(t, s, o, abD(s) * SBC.leap.fork, true); if (G.bolts.length < 60) G.bolts.push({ pts: [[cur.x, hitH(cur), cur.y], [o.x, hitH(o), o.y]], life: .2, max: .2, w: 1, col: SB_COL.bolt }); cur = o; }
-      G.shake = Math.max(G.shake, .14); sfx('boom', 1.1); sfx('quake', .7);
+      G.shake = Math.max(G.shake, .14); sfx('thunder', 1); sfx('arcbolt', 1);
       sbcFx('sb_stormdance', t, on, C => { const K = sbcK(); v2Bolt(C, P.x + R(-.2, .2), 5.5, P.z + R(-.3, 0), P.x, hitH(on), P.z, { w: .12, life: .35, jag: .12, n: 16, br: 3 }); v2Area(C, P.x, P.z, SBC.leap.r, { sp: 'spark', n: 10, sp2: 'feather', n2: 6, hold: .5, shake: .12 }); v2Rain(C, P.x, P.z, SBC.leap.r, { n: 24, life: .7, top: 2.2, col: K.rain, spd: 3 }); });
     } });
   },
@@ -55646,7 +55647,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -56793,6 +56794,14 @@ const AudioSys = (() => {
       // (the roll: a low rumble that swells and falls twice as it goes)
       nhit(t + .04, { n: 'b', type: 'lowpass', fp: [[0, 300], [.5, 150], [1.4, 90]], q: .7, pts: [[.05, 1], [.3, .45], [.55, .7], [.9, .3], [big ? 1.5 : 1.05, 0]], v: .5 * s, pan, room: .3, hall: .2 * s });
       nhit(t + .1, { n: 'b', type: 'bandpass', f: 82, q: .8, pts: [[.1, .8], [.5, .5], [big ? 1.3 : .9, 0]], v: .5 * s, pan: -pan, room: .25 });
+    },
+    // rain coming down (the Cloud Dancers): heavy drops pattering on earth and leaves over a soft low wash; no hiss.
+    // arg 1: a long fall (a storm cloud opening), 0: a gust
+    rainfall(long) {
+      if (!ok('rnf', long ? .4 : .2, 200)) return; const t = now(), D = long ? 1.6 : .55, pan = sp(.3), dr = [];
+      for (let i = 0; i < (long ? 34 : 14); i++) { const u = Math.random(); dr.push([t + u * D, (.4 + .6 * Math.sin(Math.PI * u)) * rnd(.3, .8), rnd(260, 620)]); }
+      train(dr, { n: 'p', type: 'bandpass', q: 1.3, d: .02, v: .2, pan: sp(.5), room: .15 });
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 380], [D * .5, 520], [D, 300]], q: .5, pts: [[D * .2, .7], [D * .6, .6], [D, 0]], v: long ? .24 : .18, pan, room: .2 });
     },
     /* --- earth --- */
     quake(m) {
@@ -93792,6 +93801,7 @@ const SD = { parts: [], shots: [], puffs: [], jaws: [], st: new WeakMap(), cards
 const SD_COL = { pod: [.3, .47, .14], spore: [.76, .7, .2], seed: [.34, .25, .12], stem: [.3, .4, .17], leaf: [.27, .5, .17], petal: [.84, .36, .3], jaw: [.3, .44, .17], cap: [.74, .42, .2], stalk: [.8, .74, .56], mote: [.86, .88, .46] };
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { SD.shots.length = 0; SD.puffs.length = 0; SD.jaws.length = 0; });
 // other units built on this kit (briarfx.js): their per-frame drawing, the recipes they replace, their lab rows
+const SD_NOSHADOW = new Set();   // meshes that cast no shadow (rain)
 const SD_FRAMES = [], SD_NORUN = new Set(['haze']), ELEM_FX_ROWS = [['seedcaster', 'Seedcasters']];
 const sdLv = () => typeof GFX === 'undefined' ? 2 : GFX === 'low' ? 0 : GFX === 'medium' ? 1 : 2;
 const sdLive = () => typeof G !== 'undefined' && G && G.time != null && G.state !== 'title';
@@ -94169,10 +94179,11 @@ if (typeof podBurst === 'function') {
     sfx('podburst', great ? 1 : 0);
   };
 }
+const SD_NOSH = { shadow: false };
 // the frame's solid parts, drawn with the view's projectiles as ordinary lit items (listed by sdFrame the frame before)
 function sdMeshes() {
   if (!SD.parts.length || !sdOn() || (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.mask)) return;
-  for (let i = 0; i < SD.parts.length; i += 2) item(sdMesh(SD.parts[i]), SD.parts[i + 1]);
+  for (let i = 0; i < SD.parts.length; i += 2) item(sdMesh(SD.parts[i]), SD.parts[i + 1], SD_NOSHADOW.has(SD.parts[i]) ? SD_NOSH : undefined);
 }
 if (typeof drawProjs === 'function') { const _dp = drawProjs; drawProjs = function () { const r = _dp.apply(this, arguments); try { sdMeshes(); } catch (e) { if (typeof ELEMLAB !== 'undefined' && ELEMLAB && ELEMLAB.errs) ELEMLAB.errs.push('seed mesh: ' + e.message); } return r; }; }
 // a pod in flight: no trail of the toolkit's (the mesh is left out in view.js drawProjs)
@@ -94631,7 +94642,8 @@ const thfLife = (u, seed, st) => Math.max(0, (u < .08 ? u / .08 : 1 - Math.pow(u
    hold seconds before it thins away. Only the drawing is slower: the hits land when the game says. ---- */
 function thfKeep(b) {
   b._thfK = 1;
-  const sky = b.col !== SB_COL.bolt, s = sky ? 'sb_calllightning' : 'stormbolt', V = sdV(s, 'bolt'), small = !sky && b.pts.length <= 2 && (b.w || 1) < 1 && b.max < .12;
+  // (a bolt of the sky's colour, or one that starts high overhead and comes down: a Cloud Dancer's strike)
+  const P0 = b.pts[0], P1 = b.pts[b.pts.length - 1], sky = b.col !== SB_COL.bolt || (P0[1] > 2.4 && P0[1] - P1[1] > 1.5 && Math.hypot(P0[0] - P1[0], P0[2] - P1[2]) < 1.2), s = sky ? 'sb_calllightning' : 'stormbolt', V = sdV(s, 'bolt'), small = !sky && b.pts.length <= 2 && (b.w || 1) < 1 && b.max < .12;
   if (THF.chains.length > 30) THF.chains.shift();
   // (a chain's points are the middles of its foes: lifted to run over their backs, where it can be seen)
   const pts = sky ? [b.pts[0], b.pts[b.pts.length - 1]] : b.pts.map((q, i) => i && !small ? [q[0], q[1] + V.lift, q[2]] : q.slice());
@@ -94660,12 +94672,12 @@ function thfChains(now) {
 if (typeof sfxBasicBolt === 'function') { const _bb = sfxBasicBolt; sfxBasicBolt = function (b) { if (thfOn() && thfIsStorm(b) && b.pts && b.pts.length > 1) { try { if (!b._thfK) thfKeep(b); } catch (e) {} return true; } return _bb.apply(this, arguments); }; }
 
 /* ---- the toolkit's bolts and the standing arc (Arc Bridge, Lightning Rod): kept here, drawn with the game's bolts ---- */
-const THF_IDS = new Set(['sb_thunderbird', 'sb_stormtotem', 'sb_calllightning']);
+const THF_IDS = new Set(['sb_thunderbird', 'sb_stormtotem', 'sb_calllightning', 'sb_stormdance']);
 if (typeof v2Bolt === 'function') {
   const _vb = v2Bolt;
   v2Bolt = function (C, x0, h0, z0, x1, h1, z1, o) {
     if (!thfOn() || !C || !THF_IDS.has(C.id)) return _vb.apply(this, arguments);
-    if (C.id === 'sb_calllightning') return null;   // (the game's own sky bolt is the one trunk: not a second beside it)
+    if (C.id === 'sb_calllightning' || C.id === 'sb_stormdance') return null;   // (the game's own sky bolt is the one trunk: not a second beside it)
     o = o || {}; if (THF.bolts.length > 40) THF.bolts.shift();
     THF.bolts.push({ A: [x0, h0, z0], B: [x1, h1, z1], foe: o.foe || null, at: G.time + (o.delay || 0), life: o.life || .26, w: (o.w || .05) / .05, jag: o.jag, br: o.br, s: C.id, seed: 1 + Math.floor(Math.random() * 900) });
     return null;
@@ -94745,6 +94757,176 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { bolt: 'The bolt (a kinked, forked channel)', strike: 'Where it lands (scorched dust; no ring)', bridge: 'The standing arc', arcs: 'Bolts leaping off it' });
   if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { bolt: 'c', strike: 'c', bridge: 'c', arcs: 'c' });
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['sb_thundercaller', 'Thunder Callers']);
+  if (typeof efxSync === 'function') efxSync();
+}
+
+/* ================= THE CLOUD DANCERS' STORM: a cloud with body, rain that falls, lightning out of it =================
+   Unit four of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules for it: solid things
+   are real meshes fixed in the world ("dont use flat planes", "spell also turns with the camera"); nothing is a mark on the
+   ground; a spell's real area is shown by the effect itself. Until now a storm cloud was six flat grey cards over a dark
+   disc and a turning ring painted on the ground, rain was a few falling specks, Rain Dance a ring fan on the road, Skyleap
+   a streak sprite and a ring, and every strike sounded like the earth shaking.
+     the strike       lightning down out of the sky (the Thunder Callers' channel, thunderfx.js), scorched dust rolling out
+                      to the real edge of its splash; no ring
+     Thunderhead      a fine mist hanging over its real radius (the owner tried a solid heaped storm cloud and did not
+                      like it: "dont like the clouds, just do a fine mist"), lit from inside when it flickers; rain
+                      falling through it across that radius
+     Rain Dance       rain over the dancer's whole reach, in gusts that follow the beats; no ring on the road
+     Skyleap          the dancer's spirit goes up as a bolt and comes down as one great trunk; rain and dust burst out to
+                      its real splash
+   Cloud and rain are meshes (SD_MESH cloud, rain: seedfx.js's kit); lightning is thunderfx.js's. The switch is the
+   Seedcasters': SD.off (the Element Lab's "Old look") or no toolkit brings the older drawing back. Gameplay, timing and
+   balance are untouched. Tuning: the Element Lab's entries cloudstrike, sb_thunderhead, sb_downpour (Rain Dance),
+   sb_stormdance (Skyleap). */
+const CDF = { rains: [], dives: new Set(), quiet: 0 };
+const CDF_MIST = [.5, .58, .74];
+const CDF_IDS = new Set(['sb_downpour', 'sb_stormdance']);
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { CDF.rains.length = 0; CDF.dives.clear(); });
+const cdfOn = () => typeof sdOn === 'function' && sdOn();
+const cdfHash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+if (typeof SD_MESH !== 'undefined') Object.assign(SD_MESH, {
+  // a billow of storm cloud: 1 across, flat-bottomed, heaped on top; slate, paler on its crown, dark underneath
+  cloud: g => { g.smooth = 60; g.jit = .04; const top = lin3('#5a6076'), mid = lin3('#3a3f54'), low = lin3('#20243a');
+    const lump = (x, y, z, r) => g.sphere(x, y, z, r, r * .78, r, 9, 6, mid, { colFn: j => j < 2 ? top : j < 4 ? mid : low });
+    lump(0, 0, 0, .5); lump(.3, .1, .12, .3); lump(-.28, .06, -.1, .32); lump(.05, .16, -.26, .27); },
+  // a streak of rain: 1 long up +Y, 1 in radius; a clear blue that shows on sunlit sand and in shade alike (pale
+  // white streaks vanished on Greatroot Way's bright ground)
+  rain: g => { g.smooth = 0; g.jit = 0; g.em = .35; g.cyl(0, 0, 0, 1, .3, 1, 3, '#4f86d6', { capT: false }); g.em = 0; },
+});
+if (typeof SD_NOSHADOW !== 'undefined') SD_NOSHADOW.add('rain');
+
+/* ---- rain over a disc: x, z its middle (or obj to follow), r its real radius, top where it falls from ---- */
+function cdfRainAt(x, z, r, top, n, seed, a, V, now) {
+  const lv = sdLv(), N = Math.round(n * [.4, .7, 1][lv] * (SD.load > .7 ? .6 : 1));
+  for (let i = 0; i < N; i++) {
+    const sp = V.speed * (.8 + .4 * cdfHash(seed, i * 3 + 1)), ph = (now * sp / top + cdfHash(seed, i * 3 + 2)), cyc = Math.floor(ph), u = ph - cyc;
+    const an = cdfHash(seed + cyc * 7.3, i * 5 + 3) * TAU, d = r * Math.sqrt(cdfHash(seed + cyc * 3.1, i * 5 + 4)), px = x + Math.cos(an) * d, pz = z + Math.sin(an) * d, y = top * (1 - u), len = V.len * (.7 + .6 * cdfHash(seed, i));
+    if (y < .03) continue;
+    // (it slants a little, all one way: the wind)
+    sdSpan('rain', [px + V.slant * (y + len), y + len, pz], [px + V.slant * y, y, pz], V.w * a, V.w * a, 0);
+  }
+}
+/* ---- Thunderhead, and the clouds a third strike leaves: storm clouds over their real radius ---- */
+function cdfClouds(now) {
+  if (!G.hazards) return;
+  const V = sdV('sb_thunderhead', 'cloud'), Vr = sdV('sb_thunderhead', 'rain'), lv = sdLv(), kC = sdOnL('sb_thunderhead', 'cloud'), kR = sdOnL('sb_thunderhead', 'rain');
+  for (const z of G.hazards) {
+    if (z.k !== 'sb_cloud' || !(z.t > 0)) continue;
+    const st = sdSt(z); if (st.born == null) { st.born = now; st.seed = Math.floor(Math.random() * 900) + 1; }
+    const fade = Math.min(1, (now - st.born) / .5) * Math.min(1, z.t / .5), big = z.big ? 1 : 0, H = V.h + .12 * big;
+    if (fade <= .01) continue;
+    if (kC != null) {
+      // a fine mist (owner: "dont like the clouds, just do a fine mist"): thin, pale veils hanging over its real radius,
+      // each rolling slowly where it is, thinning and gathering again somewhere else in it; a little of it low, round the
+      // feet. Soft cards, thin enough to see everything through
+      const n = Math.max(3, Math.round(V.count * [.5, .75, 1][lv] * (SD.load > .7 ? .7 : 1))), w = z.r * V.w;
+      for (let i = 0; i < n; i++) {
+        const per = V.roll * (.8 + .5 * cdfHash(st.seed, i)), ph = (now - st.born) / per + cdfHash(st.seed, i * 3 + 1), cyc = Math.floor(ph), u = ph - cyc;
+        const a = cdfHash(st.seed + cyc * 13.7, i * 7 + 3) * TAU, rr = Math.max(0, z.r - w * .36) * Math.sqrt(.1 + .9 * cdfHash(st.seed + cyc * 3.3, i * 5 + 9)), low = i % 3 === 2;
+        sdBill(SDT_SH.SPORE, [z.x + Math.cos(a) * rr, (low ? .22 : H * (.8 + .3 * cdfHash(st.seed, i + 40))) + u * .1, z.z + Math.sin(a) * rr], w, w * .7,
+          { age: .08 + u * .36, seed: i * 5 + cyc * 3 + st.seed, a: fade * V.a * (low ? .7 : 1) * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)) * kC, p0: V.thick, p1: 0, col: CDF_MIST, soft: .12, sp: .6, pull: .1 }, 'sb_thunderhead', 'cloud');
+      }
+      // lit from inside when it flickers
+      const fl = Math.sin(now * 17 + st.seed * 5); if (fl > .88 && lv) QADD.bill(RD, z.x + Math.cos(now * 3) * z.r * .3, H, z.z + Math.sin(now * 2.3) * z.r * .3, z.r * 1.5, z.r * 1.1, [.55, .7, 1.3, .22 * fade * V.flicker], 1, 0);
+    }
+    if (kR != null) cdfRainAt(z.x, z.z, z.r * .92, 2.2, Vr.count * z.r * z.r, st.seed, fade * kR, Vr, now);
+  }
+}
+/* ---- Rain Dance and Skyleap's cloudburst: rain kept here (the toolkit's v2Rain is handed over) ---- */
+function cdfRains(now) {
+  CDF.rains = CDF.rains.filter(q => now < q.at + q.life);
+  for (const q of CDF.rains) {
+    const el = now - q.at; if (el < 0) continue;
+    const V = sdV(q.s, 'rain'), k = sdOnL(q.s, 'rain'); if (k == null) continue;
+    const x = q.obj ? q.obj.x : q.x, z = q.obj ? (q.obj.z != null ? q.obj.z : q.obj.y) : q.z, fade = Math.min(1, el / .2) * Math.min(1, (q.life - el) / .3);
+    // (Rain Dance: it comes in gusts with the beats)
+    const gust = q.s === 'sb_downpour' ? .65 + .35 * Math.max(0, Math.sin(el * TAU / V.beat)) : 1;
+    cdfRainAt(x, z, q.r, q.top, V.count * q.r * q.r * gust, q.seed, fade * k, V, now);
+  }
+}
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { cdfClouds(now); cdfRains(now); });
+
+/* ---- the older drawing stepped aside ---- */
+// the toolkit's rain, its ring fan on the road and its area ring, while a Cloud Dancer's spell draws
+if (typeof v2Rain === 'function') {
+  const _vr = v2Rain;
+  v2Rain = function (C, x, z, r, o) {
+    if (!cdfOn() || !C || !CDF_IDS.has(C.id)) return _vr.apply(this, arguments);
+    o = o || {}; if (CDF.rains.length > 12) CDF.rains.shift();
+    CDF.rains.push({ s: C.id, x, z, r, obj: o.obj || null, top: o.top || 2.6, at: G.time + (o.delay || 0), life: o.life || 1, seed: 1 + Math.floor(Math.random() * 900) });
+    if (C.id === 'sb_stormdance' && typeof sdShot === 'function' && sdOnL('sb_stormdance', 'burst') != null) {
+      // Skyleap's landing: rain-dark dust thrown out low to its real splash
+      const V = sdV('sb_stormdance', 'burst'), n = Math.round(V.dust * [.5, .75, 1][sdLv()]), a0 = Math.random() * TAU, w = r * .6;
+      for (let k = 0; k < n; k++) { const a = a0 + k / n * TAU, reach = Math.max(0, r - w * .34), v = reach * 4.5; sdShot('spore', x, w * .3, z, w, R(.6, .9), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.05, .2), drag: 4.5, grow: .6, p0: .55, a: .6, col: [.4, .42, .5] }, 'sb_stormdance', 'burst'); }
+    }
+    return null;
+  };
+}
+if (typeof sfxAdd === 'function') { const _sa = sfxAdd; sfxAdd = function (o) { if (o && o.k === 'sbcring' && cdfOn() && typeof SFX_NOW !== 'undefined' && CDF_IDS.has(SFX_NOW)) return null; return _sa.apply(this, arguments); }; }
+if (typeof v2Area === 'function') { const _va = v2Area; v2Area = function (C) { if (cdfOn() && C && C.id === 'sb_stormdance') return null; return _va.apply(this, arguments); }; }
+// a storm cloud's own ring and crackle on the ground (the toolkit's lingering zone)
+if (typeof sfxZone === 'function') { const _sz = sfxZone; sfxZone = function (C, z) { if (z && z.k === 'sb_cloud' && cdfOn()) { z._sfx = 1; return; } return _sz.apply(this, arguments); }; }
+// the strike: no ring where it lands; dust rolling out to the real edge of its splash
+if (typeof part === 'function') { const _pt = part; part = function (o) { if (CDF.quiet > 0 && o && o.k === 'ring' && cdfOn()) return; return _pt.apply(this, arguments); }; }
+if (typeof sbCloudStrike === 'function') {
+  const _cs = sbCloudStrike;
+  sbCloudStrike = function (t, st, x, z, pow, r) {
+    CDF.quiet++; try { _cs.apply(this, arguments); } finally { CDF.quiet--; }
+    if (cdfOn() && typeof sdShot === 'function' && sdOnL('cloudstrike', 'burst') != null) {
+      const V = sdV('cloudstrike', 'burst'), n = Math.round(V.dust * [.5, .75, 1][sdLv()] * (pow < .6 ? .6 : 1)), a0 = Math.random() * TAU, w = r * .62;
+      for (let k = 0; k < n; k++) { const a = a0 + k / n * TAU, reach = Math.max(0, r * V.reach - w * .34), v = reach * 4.5; sdShot('spore', x, w * .3, z, w, R(.5, .75), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.05, .2), drag: 4.5, grow: .6, p0: .5, a: .55, col: [.38, .38, .44] }, 'cloudstrike', 'burst'); }
+    }
+  };
+}
+// Skyleap's spirit, going up and coming down: a stroke of the Thunder Callers' lightning in place of the streak sprite
+if (typeof SFX_DRAW !== 'undefined') {
+  const take = () => { const d0 = SFX_DRAW.sbcdive; if (!d0 || d0._cdf) return !!d0; const f = function (q) { if (!cdfOn() || typeof thfStroke !== 'function') return d0.apply(this, arguments); q._cdfT = G.time; CDF.dives.add(q); }; f._cdf = 1; SFX_DRAW.sbcdive = f; return true; };
+  if (!take() && typeof setTimeout === 'function') { let n = 0; const again = () => { if (!take() && n++ < 40) setTimeout(again, 250); }; setTimeout(again, 0); }
+}
+function cdfDives() {
+  if (!CDF.dives.size || !cdfOn()) return;
+  const now = G.time, V = sdV('sb_stormdance', 'spirit'); if (sdOnL('sb_stormdance', 'spirit') == null) return;
+  for (const q of CDF.dives) {
+    if (!(now - q._cdfT < .12) || q.age > q.T) { CDF.dives.delete(q); continue; }
+    const v = Math.min(1, q.age / q.T), at = u => [q.x0 + (q.x1 - q.x0) * u, q.h0 + (q.h1 - q.h0) * u * u, q.z0 + (q.z1 - q.z0) * u];
+    thfStroke(at(Math.max(0, v - V.len)), at(v), V.w, 1, Math.floor(now * 24) * 13 + 5, { jag: .08, br: 1, n: 8, glow: V.glow });
+  }
+}
+if (typeof drawBolts === 'function') { const _db = drawBolts; drawBolts = function () { const r = _db.apply(this, arguments); try { cdfDives(); } catch (e) {} return r; }; }
+
+/* ---- the Element Lab's entries ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    cloudstrike: { unit: 'sb_clouddancer', force: 'stormborn', el: 'seed', name: 'Sky Strike', basic: 1, layers: ['burst'] },
+    sb_thunderhead: { unit: 'sb_clouddancer', force: 'stormborn', el: 'seed', name: 'Thunderhead', layers: ['cloud', 'rain'] },
+    sb_downpour: { unit: 'sb_clouddancer', force: 'stormborn', el: 'seed', name: 'Rain Dance', layers: ['rain'] },
+    sb_stormdance: { unit: 'sb_clouddancer', force: 'stormborn', el: 'seed', name: 'Skyleap', layers: ['spirit', 'rain', 'burst'] },
+  });
+  Object.assign(ELEM_FX_DEF, {
+    // where a strike lands: billows of scorched dust, how far they roll (x the real splash). (Its bolt is the Thunder
+    // Callers': Call Lightning's values)
+    cloudstrike: { burst: { dust: 5, reach: 1 } },
+    sb_thunderhead: {
+      // the mist: veils, how high it hangs, a veil's width (x the radius), how long one rolls before it gathers again
+      // elsewhere (s), its thickness, its opacity, the flicker of light inside it
+      cloud: { count: 10, h: 1.1, w: 1.2, roll: 3, thick: .62, a: .8, flicker: 1 },
+      // its rain: streaks per square cell, a streak's length and width, how fast it falls, its slant
+      rain: { count: 24, len: .32, w: .022, speed: 5.5, slant: .12 },
+    },
+    // Rain Dance: rain over the whole reach, in gusts (beat: seconds a gust)
+    sb_downpour: { rain: { count: 10, len: .34, w: .022, speed: 6, slant: .14, beat: .5 } },
+    sb_stormdance: {
+      // the spirit's bolt: how much of its path it spans, its radius, its light
+      spirit: { len: .3, w: .035, glow: 1.2 },
+      rain: { count: 22, len: .32, w: .022, speed: 6.5, slant: .1 },
+      burst: { dust: 6 },
+    },
+  });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { spread: ['Sit out from the middle (x the radius)', 0, 1.5, .02], turn: ['Turns (radians a second)', 0, 1, .01], flicker: ['Light inside it', 0, 3, .05], slant: ['Slant (the wind)', -.5, .5, .01], beat: ['A gust every (s)', .1, 2, .02] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { cloud: 'The mist (thin veils over its real radius)', rain: 'Rain (falling streaks across the real area)', spirit: 'The spirit (a bolt up and a bolt down)' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { cloud: 'c', rain: 'c', spirit: 'c' });
+  if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['sb_clouddancer', 'Cloud Dancers']);
   if (typeof efxSync === 'function') efxSync();
 }
 
