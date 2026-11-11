@@ -1,4 +1,4 @@
-const BUILD_TAG = '43546e7+@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '72109d5@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -65052,7 +65052,7 @@ if (typeof POOL_STILL !== 'undefined') MAPS.mistfall = { name: 'Mistfall Ledge',
   // the cliff's lip along the field's head (the picture's top edge between the trunks, source row 300: world z -1.27), for
   // foes killed by a shot there to be knocked back over it (the edge-fall branch: line, the direction over, how near in cells
   // a kill must be, how far the body drops out of sight). The top edge only: the right-hand cliff is six cells from the field.
-  fallEdge: { line: [[0, -1.27], [11, -1.27]], over: [0, -1], near: 1.5, drop: 1.3 } };   // (wide: foes in at any column along the top, out anywhere along the foot: core.js wideMap)
+  fallEdge: { line: [[0, -1.27], [11, -1.27]], over: [0, -1], near: 2.3, drop: 1.3 } };   // (near 2.3: the first row of the field is 1.8 cells from the lip, and that is where foes are shot)   // (wide: foes in at any column along the top, out anywhere along the foot: core.js wideMap)
 const MAP_TRY = (() => { try { const q = new URLSearchParams(location.search).get('trymap'); return q && MAPS[q] ? q : null; } catch (e) { return null; } })();
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
 /* Tunable light schemes. Colours are sRGB hex, strengths multiply them in linear light. The Lighting panel edits a copy per map. */
