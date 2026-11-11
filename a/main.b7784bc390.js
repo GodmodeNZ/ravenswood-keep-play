@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a144c0b@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4eeb11c@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -19037,7 +19037,7 @@ function soLobLand(z) {
   part({ k: 'flare', x, z: y, h: .25, life: .3, max: .3, size: .9 + sp * .5, col: '#ffcf70' });
   for (let k = 0; k < 10; k++) part({ k: 'ember', x: x + R(-.2, .2), z: y + R(-.2, .2), h: .15, vx: R(-1.4, 1.4) * sp, vz: R(-1.4, 1.4) * sp, vh: R(.8, 2), g: 4, life: .5, max: .5, size: R(.08, .13), col: k % 2 ? '#ffb040' : '#ffe08a' });
   for (let k = 0; k < 5; k++) part({ k: 'smoke', x: x + R(-.3, .3), z: y + R(-.3, .3), h: .2, vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.3, .7), drag: 1.5, life: .9, max: .9, size: R(.16, .26), col: '#e8e0f0' });
-  if (o.sfx) sfx(o.sfx, 1); else sfx('boom', o.small ? .4 : .55, 0);
+  if (o.sfx) sfx(o.sfx, 1); else sfx('censerpuff', o.small ? 0 : 1);   // (a coal bedding into earth and its smoke: audio.js; it was the cannon shell's landing)
 }
 // the incense on the road: smoulders, Judges every walker once a second, and burns lightly every half second
 function soIncenseTick(z, dt) {
@@ -55677,7 +55677,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, sunbeam: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, sunbeam: .8, censerpuff: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -56841,6 +56841,15 @@ const AudioSys = (() => {
       const o2 = osc('triangle', 294 * p, t, e1), g2 = gn(0); shape(g2.gain, t, [[.06, 1], [.18, .35], [.4, 0]]); const f2 = bq('lowpass', 700, .7); o2.connect(f2); f2.connect(g2); out(g2, .07, { pan, room: .2 }, t, e1);
       nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 300], [.1, 520], [.35, 240]], q: .6, pts: [[.05, .8], [.18, .4], [.4, 0]], v: .2, pan });
       thump(t + .05, 132 * p, 80 * p, .08, .2, { pan });
+    },
+    // a censer's coal landing: a dull knock as it beds into the earth, a soft low puff of smoke, a few embers ticking
+    // as they cool. arg 1: a full coal, 0: a small one
+    censerpuff(full) {
+      if (!ok('cnp', .07, 200)) return; const t = now(), p = rnd(.92, 1.08), pan = sp(.35), s = full ? 1 : .65;
+      thump(t, 118 * p, 62 * p, .12, .36 * s, { pan });
+      nhit(t + .006, { n: 'b', type: 'lowpass', fp: [[0, 520], [.3, 200]], q: .6, pts: [[.02, 1], [.1, .5], [.4, 0]], v: .36 * s, pan, room: .12 });
+      const em = []; for (let i = 0; i < (full ? 5 : 3); i++) { const u = Math.random(); em.push([t + .12 + u * .5, (1 - u * .6) * rnd(.3, .7), rnd(380, 640)]); }
+      train(em, { n: 'p', type: 'bandpass', q: 2, d: .014, v: .18 * s, pan: sp(.5) });
     },
     /* --- earth --- */
     quake(m) {
@@ -94145,6 +94154,7 @@ function sdShots(now) {
     }
     const u = el / e.dur;
     if (e.kind === 'spore') { const W = e.w * (1 + e.grow * u); sdBill(SDT_SH.SPORE, [e.x, e.y, e.z], W, W, { age: u, seed: e.seed, k: e.k, a: e.a, p0: e.p0, p1: e.p1, col: e.col || SD_COL.spore, soft: .07 }, e.s, e.l); }
+    else if (e.kind === 'flare') { const f = 1 - u; sdBill(SDT_SH.FLARE, [e.x, e.y, e.z], e.w * (.7 + .5 * f), e.w * (.7 + .5 * f), { seed: e.seed, a: f * e.a, p0: .8, col: e.col || SD_COL.mote, pull: .15 }, e.s, e.l); }
     else if (e.kind === 'mesh') { const k = sdOnL(e.s, e.l); if (k != null) sdPlace(e.mesh, [e.x, e.y, e.z], e.rot, e.rot * .7 + .6, e.w * k * (1 - sdSs(.75, 1, u))); }
     else if (e.kind === 'husk') { const k = sdOnL(e.s, e.l); if (k != null) sdPlace('husk', [e.x, e.y, e.z], e.rot, e.rot * .7 + 1.2, e.w * 1.5 * k * (1 - sdSs(.75, 1, u))); }
     else {
@@ -95325,6 +95335,153 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { shaft: 'The shaft of light', motes: 'Motes of light', pillar: 'The pillar out of the sky' });
   if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { shaft: 'c', motes: 'c', pillar: 'c' });
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['sunlance', 'Sunlance Clerics']);
+  if (typeof efxSync === 'function') efxSync();
+}
+
+/* ================= THE CENSER BEARERS' INCENSE: a glowing coal, rolling smoke, embers =================
+   Unit six of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md). The owner's rules as they stand after the
+   Sunlance Clerics: nothing is a mark on the ground; a spell's real area is shown by the effect itself; never too flashy;
+   and effects are to look realistic, to match the better unit models that are coming ("this looks like a low poly model"
+   was said of faceted meshes): so smoke, glow and embers here are smooth shader cards (seedtex.js SPORE, FLARE, MOTE,
+   BEAM), nothing faceted. Until now a coal was a flare sprite with puffs, it landed in a brown puddle painted on the
+   ground with a ring, and incense was a few flat puffs under the feet.
+     the strike              a glowing coal flies straight from the censer, trailing a thread of incense smoke and a few
+                             embers; where it lands, smoke rolls out low to the real edge of its splash and embers scatter
+     incense on the road     one slow rolling bank of pale smoke over the patch's real radius, embers drifting up through
+                             it (every patch: the strike's, Thurible Sweep's, Procession of Incense's, the items')
+     Thurible Sweep          smoke thrown out all round the bearer to its real reach, embers flung off the swing
+     Procession of Incense   its patches, laid down the road one after another (the bank above)
+     Kindle the Censers      each patch flares: a short pillar of firelight, a flare at its foot, embers thrown up
+   The switch is the Seedcasters': SD.off (the Element Lab's "Old look") or no toolkit brings the older drawing back.
+   Gameplay, timing and balance are untouched. Tuning: the Element Lab's entries censercoal, so_sweep, so_smoke, so_embers. */
+const CNF = { quiet: 0, flares: [] };
+const CNF_SMOKE = [.9, .86, .96], CNF_EMBER = [1, .62, .22], CNF_FIRE = [1, .7, .34];
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { CNF.flares.length = 0; });
+const cnfOn = () => typeof sdOn === 'function' && sdOn();
+const cnfHash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+// embers: small bright streaks thrown on little arcs (up: how hard they are thrown up; out: outward)
+function cnfEmbers(x, y, z, n, out, up, s, l) {
+  if (typeof sdShot !== 'function') return;
+  for (let k = 0; k < n; k++) { const an = R(TAU), v = R(.3, 1) * out; sdShot('mote', x, y, z, R(.03, .05), R(.4, .8), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.5, 1) * up, g: 4, col: CNF_EMBER, k: 1.5 }, s, l); }
+}
+// incense smoke rolling out low from x, z to a real radius
+function cnfRoll(x, z, rad, n, s, l, a) {
+  const a0 = R(TAU), w = Math.max(.25, rad * .62), drag = 4.5;
+  for (let k = 0; k < n; k++) { const an = a0 + (k + R(-.3, .3)) / n * TAU, reach = Math.max(0, rad - w * .34) * R(.8, 1), v = reach * drag; sdShot('spore', x, w * .3, z, w * R(.85, 1.1), R(.8, 1.2), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.08, .25), drag, grow: .7, p0: 1, p1: 0, a: a == null ? .9 : a, col: CNF_SMOKE, delay: R(.04) }, s, l); }
+}
+
+/* ---- each frame: coals in flight, incense on the road, patches flaring ---- */
+function cnfFrame(now) {
+  if (!G.hazards) return;
+  const lv = sdLv();
+  for (const z of G.hazards) {
+    if (z.k === 'so_lob') {
+      // a coal in flight: it glows, and flies straight (the game moves it on a lob; drawn, it keeps none of the arc)
+      const V = sdV('censercoal', 'coal'), k = sdOnL('censercoal', 'coal'); if (k == null) continue;
+      const u = Math.min(1, z.age / z.T), h = z.h0 + (.2 - z.h0) * u, st = sdSt(z), sz = V.w * (z.o.small ? .7 : z.o.big ? 1.4 : 1) * k;
+      if (st.seed == null) { st.seed = Math.random() * 97; st.shed = 0; }
+      sdBill(SDT_SH.FLARE, [z.x, h, z.z], sz, sz, { seed: st.seed, a: 1, p0: V.rays, col: CNF_FIRE }, 'censercoal', 'coal');
+      if (now - st.shed > V.every) { st.shed = now; sdShot('spore', z.x, h, z.z, V.trail, .6, { vy: .25, grow: 1.1, p0: .9, p1: 0, a: .85, col: CNF_SMOKE }, 'censercoal', 'coal'); if (lv && Math.random() < .5) cnfEmbers(z.x, h, z.z, 1, .3, .2, 'censercoal', 'coal'); }
+    } else if (z.k === 'so_incense' && !z.hallow && z.t > 0) {
+      // a patch of incense: one slow bank of pale smoke over its real radius, embers drifting up through it
+      const V = sdV('so_smoke', 'smoke'), k = sdOnL('so_smoke', 'smoke'), st = sdSt(z); if (st.born == null) { st.born = now; st.seed = 1 + Math.floor(Math.random() * 900); st.em = now; }
+      const fade = Math.min(1, (now - st.born) / .5) * Math.min(1, z.t / .6); if (fade <= .01) continue;
+      if (k != null) {
+        const n = Math.max(3, Math.round(V.count * (z.r > .8 ? 1.5 : 1) * [.5, .75, 1][lv] * (SD.load > .7 ? .7 : 1))), w = Math.max(.4, z.r * V.w);
+        for (let i = 0; i < n; i++) {
+          const per = V.roll * (.8 + .5 * cnfHash(st.seed, i)), ph = (now - st.born) / per + cnfHash(st.seed, i * 3 + 1), cyc = Math.floor(ph), uu = ph - cyc;
+          const a = cnfHash(st.seed + cyc * 13.7, i * 7 + 3) * TAU, rr = Math.max(0, z.r - w * .36) * Math.sqrt(.1 + .9 * cnfHash(st.seed + cyc * 3.3, i * 5 + 9));
+          sdBill(SDT_SH.SPORE, [z.x + Math.cos(a) * rr, V.h * (.6 + .8 * cnfHash(st.seed, i + 40)) + uu * .18, z.z + Math.sin(a) * rr], w, w * .72,
+            { age: .08 + uu * .36, seed: i * 5 + cyc * 3 + st.seed, a: fade * V.a * sdSs(0, .22, uu) * (1 - sdSs(.68, 1, uu)) * k, p0: V.thick, p1: 0, col: CNF_SMOKE, soft: .1, sp: .6, pull: .12 }, 'so_smoke', 'smoke');
+        }
+      }
+      const Ve = sdV('so_smoke', 'embers');
+      if (lv && sdOnL('so_smoke', 'embers') != null && now - st.em > 1 / (Ve.rate * Math.max(.5, z.r))) { st.em = now; const a = R(TAU), d = z.r * Math.sqrt(R(1)) * .9; sdShot('mote', z.x + Math.cos(a) * d, R(.05, .2), z.z + Math.sin(a) * d, R(.03, .045), R(.8, 1.4), { vy: R(.3, .6), vx: R(-.1, .1), vz: R(-.1, .1), drag: .5, col: CNF_EMBER, k: 1.4 }, 'so_smoke', 'embers'); }
+    }
+  }
+  // patches flaring (Kindle the Censers): a short pillar of firelight, a flare at its foot
+  CNF.flares = CNF.flares.filter(q => now < q.at + q.life);
+  const Vk = sdV('so_embers', 'flare'), kk = sdOnL('so_embers', 'flare');
+  if (kk != null) for (const q of CNF.flares) {
+    const el = now - q.at; if (el < 0) continue;
+    const u = el / q.life, a = (u < .12 ? u / .12 : 1 - Math.pow((u - .12) / .88, 1.5)) * kk, H = Vk.h * Math.min(1, el / .08), w = Vk.w * 16;
+    sdSeg(SDT_SH.BEAM, [q.x, .04, q.z], [q.x, H, q.z], w * 1.2, w * .5, { seed: q.seed, k: 1, a, p0: 1, p1: 1.4, p2: H, col: CNF_FIRE, sp: 1.6 }, 'so_embers', 'flare');
+    sdBill(SDT_SH.FLARE, [q.x, .22, q.z], Vk.foot * (.7 + .5 * a), Vk.foot * (.7 + .5 * a), { seed: q.seed, a, p0: .8, col: CNF_FIRE, pull: .15 }, 'so_embers', 'flare');
+    if (!q.lit) { q.lit = 1; cnfEmbers(q.x, .2, q.z, Math.round(Vk.embers * [.4, .7, 1][lv]), 1.2, 3, 'so_embers', 'flare'); }
+  }
+}
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(cnfFrame);
+
+/* ---- the older drawing stepped aside ---- */
+// the game's own sprites for a coal in flight, its landing and a smouldering patch (drawn inside the Order's hazard tick)
+if (typeof part === 'function') { const _pt = part; part = function (o) { if (CNF.quiet > 0 && o && (o.k === 'flare' || o.k === 'smoke' || o.k === 'ember') && cnfOn()) return; return _pt.apply(this, arguments); }; }
+if (typeof decal === 'function') { const _dc = decal; decal = function () { if (CNF.quiet > 0 && cnfOn()) return; return _dc.apply(this, arguments); }; }
+if (typeof FORCE_HOOKS !== 'undefined' && FORCE_HOOKS.silver && typeof FORCE_HOOKS.silver.hazard === 'function') {
+  const _hz = FORCE_HOOKS.silver.hazard;
+  FORCE_HOOKS.silver.hazard = function (z) { const mine = z && (z.k === 'so_lob' || (z.k === 'so_incense' && !z.hallow)); if (!mine) return _hz.apply(this, arguments); CNF.quiet++; try { return _hz.apply(this, arguments); } finally { CNF.quiet--; } };
+}
+// a coal's landing: smoke rolled out to the real edge of its splash, embers scattered, a brief warm flare
+if (typeof soLobLand === 'function') {
+  const _ll = soLobLand;
+  soLobLand = function (z) {
+    const r = _ll.apply(this, arguments);
+    if (cnfOn() && z && sdOnL('censercoal', 'burst') != null) {
+      const V = sdV('censercoal', 'burst'), lv = sdLv(), sp = (z.o && z.o.sp) || (z.st && z.st.splash) || .9;
+      cnfRoll(z.x1, z.z1, sp, Math.round(V.smoke * [.6, .8, 1][lv] * (z.o && z.o.small ? .6 : 1)), 'censercoal', 'burst');
+      cnfEmbers(z.x1, .15, z.z1, Math.round(V.embers * [.4, .7, 1][lv] * (z.o && z.o.small ? .5 : 1)), sp * 1.6, 2.2, 'censercoal', 'burst');
+      sdShot('flare', z.x1, .25, z.z1, V.flare * (z.o && z.o.small ? .6 : 1), .3, { col: CNF_FIRE }, 'censercoal', 'burst');
+    }
+    return r;
+  };
+}
+// the toolkit's lingering zone on a patch (its flat puffs)
+if (typeof sfxZone === 'function') { const _sz = sfxZone; sfxZone = function (C, z) { if (z && z.k === 'so_incense' && !z.hallow && cnfOn()) { z._sfx = 1; return; } return _sz.apply(this, arguments); }; }
+// Thurible Sweep: smoke thrown out to its real reach and embers flung off the swing, in place of the ring
+if (typeof ABIL !== 'undefined' && ABIL.so_sweep && typeof ABIL.so_sweep.cast === 'function') {
+  const _sw = ABIL.so_sweep.cast;
+  ABIL.so_sweep.cast = function (t, st, _, ab) {
+    const r = _sw.apply(this, arguments);
+    G.delayed.push({ t: .36, fn: () => { if (!cnfOn() || !G.towers.includes(t) || sdOnL('so_sweep', 'burst') == null) return; const V = sdV('so_sweep', 'burst'), lv = sdLv(); cnfRoll(t.x, t.y, ab.r, Math.round(V.smoke * [.6, .8, 1][lv]), 'so_sweep', 'burst', .7); for (let k = 0; k < Math.round(V.embers * [.4, .7, 1][lv]); k++) { const a = k / 14 * TAU; sdShot('mote', t.x + Math.cos(a) * .7, .5, t.y + Math.sin(a) * .7, .045, R(.4, .7), { vx: -Math.sin(a) * 2.4 + Math.cos(a) * .8, vz: Math.cos(a) * 2.4 + Math.sin(a) * .8, vy: R(.3, 1), g: 3, col: CNF_EMBER, k: 1.5 }, 'so_sweep', 'burst'); } } });
+    return r;
+  };
+}
+if (typeof fxRing === 'function') { const _fr = fxRing; fxRing = function (x, z, r, col) { if (col === '#e0c8ff' && typeof G !== 'undefined' && G && G.force === 'silver' && cnfOn()) return; return _fr.apply(this, arguments); }; }
+if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('so_sweep');
+// Kindle the Censers: its column and ring handed over
+if (typeof v2Shaft === 'function') { const _vs = v2Shaft; v2Shaft = function (C, x, z) { if (!cnfOn() || !C || C.id !== 'so_embers') return _vs.apply(this, arguments); CNF.flares.push({ x, z, at: G.time, life: sdV('so_embers', 'flare').secs, seed: Math.random() * 97 }); return null; }; }
+if (typeof v2Hit === 'function') { const _vh = v2Hit; v2Hit = function (C, x, z, h, s, o) { if (cnfOn() && C && C.id === 'so_embers' && o) { o = Object.assign({}, o, { ring: 0 }); return _vh.call(this, C, x, z, h, s, o); } return _vh.apply(this, arguments); }; }
+
+/* ---- the Element Lab's entries ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    censercoal: { unit: 'censer', force: 'silver', el: 'seed', name: 'Censer Coal', basic: 1, layers: ['coal', 'burst'] },
+    so_sweep: { unit: 'censer', force: 'silver', el: 'seed', name: 'Thurible Sweep', layers: ['burst'] },
+    so_smoke: { unit: 'censer', force: 'silver', el: 'seed', name: 'Incense (Procession)', layers: ['smoke', 'embers'] },
+    so_embers: { unit: 'censer', force: 'silver', el: 'seed', name: 'Kindle the Censers', layers: ['flare'] },
+  });
+  Object.assign(ELEM_FX_DEF, {
+    censercoal: {
+      // the coal in flight: its glow's width, its rays, smoke shed every (s), a puff's size
+      coal: { w: .7, rays: .8, every: .035, trail: .26 },
+      // its landing: billows of smoke rolled to the real splash, embers scattered, the flare's width
+      burst: { smoke: 7, embers: 12, flare: 1.3 },
+    },
+    so_sweep: { burst: { smoke: 9, embers: 14 } },
+    so_smoke: {
+      // a patch of incense: billows, a billow's width (x the radius), how high it lies, how long one rolls (s), its
+      // thickness, its opacity
+      smoke: { count: 7, w: 1.3, h: .34, roll: 3, thick: 1, a: .9 },
+      // embers drifting up through it (a second, per cell of radius)
+      embers: { rate: 8 },
+    },
+    // a patch flaring: the pillar's height and radius, its foot's flare, embers thrown up, how long (s)
+    so_embers: { flare: { h: 2, w: .1, foot: 1.4, embers: 12, secs: .7 } },
+  });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { smoke: ['Billows of smoke', 0, 20, 1], foot: ['Flare at its foot (width)', 0, 3, .02] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { smoke: 'Incense smoke (a rolling bank over the patch)', embers: 'Embers drifting up', coal: 'The coal in flight (glow, a thread of smoke)', flare: 'The patch flaring (firelight, embers)' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { coal: 'c', flare: 'c', smoke: 'c', embers: 'c' });
+  if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['censer', 'Censer Bearers']);
   if (typeof efxSync === 'function') efxSync();
 }
 
