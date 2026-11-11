@@ -1,4 +1,4 @@
-const BUILD_TAG = '864090a@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4c694ba@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -28215,7 +28215,7 @@ FORCE_ATTACK.chWeaveBolt = function (t, st, tg, pow) {
 };
 champAdd('cc_arch', { force: 'conclave', he: 'she', glyph: 'missiles',
   unit: { id: 'ch_maelis', name: 'Maelis, the Spellweaver', short: 'Maelis', proj: 'force', attack: 'chWeaveBolt', dmgType: 'arcane', ccSchool: 'arcane', air: true, ground: true, top: [1.6, 1.68, 1.76, 1.84, 1.92, 2],
-    blurb: 'The Archmage of the College on a floating dais of books. Her bolt marks Arcane, then Frost, then Fire in turn, so she sets off reactions on her own. Each strike adds an Arcane Charge; her spells spend them.',
+    blurb: 'The Archmage of the College. Her bolt marks Arcane, then Frost, then Fire in turn, so she sets off reactions on her own. Each strike adds an Arcane Charge; her spells spend them.',
     tiers: [{ dmg: 24, rate: 1.1, range: 3 }, { dmg: 55, rate: 1.05, range: 3.2 }, { dmg: 128, rate: 1, range: 3.4 }] },
   trait: { name: 'Archmage’s Mantle', t: 'She holds 3 more Arcane Charges, and every 4th bolt gives her an extra one.' },   // (ccQMax, ccChampFire)
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
@@ -28281,7 +28281,7 @@ champAdd('cc_arch', { force: 'conclave', he: 'she', glyph: 'missiles',
 /* ---------- Aurel, the Timekeeper ---------- */
 champAdd('cc_chrono', { force: 'conclave', he: 'he', glyph: 'hourglass',
   unit: { id: 'ch_aurel', name: 'Aurel, the Timekeeper', short: 'Aurel', proj: 'force', attack: 'cc_chrono', dmgType: 'arcane', ccSchool: 'chrono', air: true, ground: true, prio: 2, top: [1.6, 1.68, 1.76, 1.84, 1.92, 2],
-    blurb: 'The College’s eldest, a great orrery-hourglass on his back: his chrono-bolts slow, and the slow stacks. Each strike adds an Arcane Charge; his spells spend them.',
+    blurb: 'The College’s eldest. His chrono-bolts slow, and the slow stacks. Each strike adds an Arcane Charge; his spells spend them.',
     tiers: [{ dmg: 22, rate: 1.2, range: 3, slow: .3, slowT: 2 }, { dmg: 50, rate: 1.15, range: 3.2, slow: .33, slowT: 2.2 }, { dmg: 116, rate: 1.1, range: 3.4, slow: .36, slowT: 2.4 }] },
   trait: { name: 'Borrowed Moment', t: 'His abilities recharge 20% faster, and every 4th bolt slows its foe 40% for 2 seconds.' },   // (forces_conclave_e.js live, ccChampFire)
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
@@ -28357,7 +28357,7 @@ FORCE_ATTACK.chVeyCut = function (t, st, tg, pow) {
 };
 champAdd('cc_maren', { force: 'conclave', he: 'she', glyph: 'sword',
   unit: { id: 'ch_maren', name: 'Maren Vey, Blade of the Conclave', short: 'Maren', proj: 'force', attack: 'chVeyCut', dmgType: 'phys', ccSchool: 'arcane', air: false, ground: true, top: [1.55, 1.63, 1.71, 1.79, 1.87, 1.95],
-    blurb: 'The Conclave’s duellist, white-haired in a fur mantle, a long riftsteel blade in her hands, red at one end and pink at the other. She left the College’s halls to master riftsteel, and the College sends her where spells fail: she steps through the rift her blade opens to her foe and back with every cut, and each cut Staggers. Her element is Arcane. Each strike adds an Arcane Charge; her spells spend them. Cannot reach flyers.',
+    blurb: 'The Conclave’s duellist, sent where spells fail. She steps through a rift to her foe and back with every cut, and each cut Staggers. Each strike adds an Arcane Charge; her spells spend them. Cannot reach flyers.',
     tiers: [{ dmg: 30, rate: 1.2, range: 2.2 }, { dmg: 68, rate: 1.15, range: 2.35 }, { dmg: 158, rate: 1.1, range: 2.5 }] },
   // (ccChampFire, ccSeamcut)
   trait: { name: 'Seamcut', t: 'Every 4th cut opens a seam of light in its foe that tears a second later: it is struck again for the cut’s full damage and Staggered.' },
@@ -28567,7 +28567,7 @@ FORCE_ATTACK.chLash = (t, st, tg, pow) => {   // a vine whips up out of the grou
 const CH_GROVE_RS = { cost: 50, time: 0 };   // (spells 2 and 3: a talent opens them, the Champion learns each for gold: forces_zy_spells.js)
 champAdd('rootmother', { force: 'grove', he: 'she', glyph: 'uproot',
   unit: { id: 'ch_elowen', name: 'Elowen, Heart of the Wood', short: 'Elowen', proj: 'force', attack: 'chLash', dmgType: 'magic', air: false, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The Rootmother herself, antler-crowned, with a living staff: her vines lash the foe furthest along. Every third lash roots it. Cannot reach flyers.',
+    blurb: 'The Rootmother herself. Her vines lash the foe furthest along, and every third lash roots it. Cannot reach flyers.',
     tiers: [{ dmg: 26, rate: 1.2, range: 2.8 }, { dmg: 60, rate: 1.15, range: 3 }, { dmg: 140, rate: 1.1, range: 3.2 }] },
   trait: { name: 'Heartroot', t: 'Every third lash roots its foe for half a second.' },   // (heroOnHit: rootmother)
   kit: { mana: { max: 130, regen: 1.2, hit: .6 }, abilities: [
@@ -28640,7 +28640,7 @@ function chSapling(g) {   // a young oak of the old wood: a twisted trunk, a cro
 /* ---------- Faelan, Warden of the Long Watch (the Thornbow) ---------- */
 champAdd('thornbow', { force: 'grove', he: 'he', glyph: 'bow',
   unit: { id: 'ch_faelan', name: 'Faelan, Warden of the Long Watch', short: 'Faelan', proj: 'arrow', pspd: 16, dmgType: 'phys', vsRooted: .5, air: true, ground: true, top: [1.7, 1.8, 1.9],
-    blurb: 'The Thornbow on his root platform with a great bow: the longest, slowest, heaviest shot in the Grove. His first arrow at each foe finds its weak point.',
+    blurb: 'The Thornbow: the longest, slowest, heaviest shot in the Grove. His first arrow at each foe finds its weak point.',
     tiers: [{ dmg: 44, rate: 1.6, range: 3.6 }, { dmg: 100, rate: 1.55, range: 3.8 }, { dmg: 230, rate: 1.5, range: 4 }] },
   trait: { name: 'Keen Eye', t: 'His first arrow at each foe strikes its weak point for double damage, four times on a rooted foe.' },
   kit: { mana: { max: 120, regen: 1, hit: 1 }, abilities: [
@@ -28713,7 +28713,7 @@ let CH_BOUNCE = 0;
 /* ---------- Nyssa, the Bloom (the Seedmother) ---------- */
 champAdd('hivemother', { force: 'grove', he: 'she', glyph: 'spores',
   unit: { id: 'ch_nyssa', name: 'Nyssa, the Bloom', short: 'Nyssa', proj: 'ball', pod: true, dmgType: 'magic', air: false, ground: true, top: [1.5, 1.6, 1.7],
-    blurb: 'The Seedmother with her great seed sack, seed-moths circling her: she lobs bursting spore pods whose spores choke and spread. Cannot reach flyers.',
+    blurb: 'The Seedmother. She lobs bursting spore pods whose spores choke and spread. Cannot reach flyers.',
     tiers: [{ dmg: 22, rate: 1.4, range: 2.9, splash: .85, slowOn: [.2, 1.2] }, { dmg: 52, rate: 1.35, range: 3.1, splash: .95, slowOn: [.25, 1.4] }, { dmg: 120, rate: 1.3, range: 3.3, splash: 1.05, slowOn: [.3, 1.6] }] },
   trait: { name: 'Bloom Heart', t: 'Her hits leave spores on their foe, and spores whose host falls drift on to the nearest foe.' },   // (heroOnHit: hivemother)
   kit: { mana: { max: 130, regen: 1.2, hit: .6 }, abilities: [
@@ -28873,7 +28873,7 @@ IH_MUZZLE.ch_tovin = [.8, .75];
 /* ---------- Haldra Stonebrace, the Shield-Thane ---------- */
 champAdd('ih_thane', { force: 'ironhold', he: 'she', glyph: 'shield', k: 1.75,
   unit: { id: 'ch_haldra', name: 'Haldra Stonebrace, the Shield-Thane', short: 'Haldra', proj: 'force', attack: 'ironbreaker', dmgType: 'phys', air: false, ground: true, top: [1.2, 1.28, 1.36],
-    blurb: 'The Shield-Thane in steel behind a great shield, a war-hammer in her fist: she strikes the foes that pass her, chipping their plate, and shoves them back. Foes she strikes stop to hammer at her shield. Cannot reach flyers.',
+    blurb: 'The Shield-Thane. She strikes the foes that pass her, chipping their plate, and shoves them back; foes she strikes stop to hammer at her shield. Cannot reach flyers.',
     tiers: [{ dmg: 30, rate: 1.1, range: 1.5 }, { dmg: 68, rate: 1.05, range: 1.55 }, { dmg: 160, rate: 1, range: 1.6 }] },
   trait: { name: 'Stand Fast', t: 'Foes she strikes stop to hammer at her shield for half a second (bosses are slowed instead), each at most once every 3 seconds.' },
   kit: { mana: { max: 130, regen: .8, hit: 1.2 }, abilities: [
@@ -28950,7 +28950,7 @@ champAdd('ih_thane', { force: 'ironhold', he: 'she', glyph: 'shield', k: 1.75,
 /* ---------- Tovin Gearwright, the Artificer ---------- */
 champAdd('ih_artificer', { force: 'ironhold', he: 'he', glyph: 'mortar', k: 1.75,
   unit: { id: 'ch_tovin', name: 'Tovin Gearwright, the Artificer', short: 'Tovin', proj: 'force', attack: 'thundergun', dmgType: 'phys', air: true, ground: true, top: [1.25, 1.33, 1.41],
-    blurb: 'The Artificer with his crane-armed workbench and a rivet gun of his own make: heavy rivets that build heat, and at full heat a Thunderpeal through the whole line.',
+    blurb: 'The Artificer. His heavy rivets build heat, and at full heat a Thunderpeal runs through the whole line.',
     tiers: [{ dmg: 34, rate: 1.3, range: 3, heat: .25 }, { dmg: 78, rate: 1.25, range: 3.2, heat: .25 }, { dmg: 180, rate: 1.2, range: 3.4, heat: .25 }] },
   trait: { name: 'Tinkered', t: 'He strikes 12% faster and builds heat half again as fast.' },   // (ihHeroLive, ihHeatRate: G.champ)
   kit: { mana: { max: 120, regen: 1, hit: .8 }, abilities: [
@@ -29037,7 +29037,7 @@ FORCE_ATTACK.chJug = (t, st, tg, pow) => {
 };
 champAdd('ih_brewer', { force: 'ironhold', he: 'she', glyph: 'barrel', k: 1.75,
   unit: { id: 'ch_grenna', name: 'Grenna Barleymaul, the Alewife', short: 'Grenna', proj: 'force', attack: 'chJug', dmgType: 'phys', air: false, ground: true, top: [1.25, 1.33, 1.41],
-    blurb: 'The Alewife with a keg on her back and a ladle in her fist: she lobs stoneware jugs that splash every ground foe near and leave sticky puddles of ale that slow them. Cannot reach flyers.',
+    blurb: 'The Alewife. Her jugs splash every ground foe near and leave puddles of ale that slow them. Cannot reach flyers.',
     tiers: [{ dmg: 22, rate: 1.3, range: 2.8, splash: .7 }, { dmg: 50, rate: 1.25, range: 3, splash: .75 }, { dmg: 118, rate: 1.2, range: 3.2, splash: .8 }] },
   trait: { name: 'Fire-Spitter', t: 'Every 5th throw she breathes fire on its foe: it and every foe within 0.8 cells burn for 30% of the throw a second for 3s.' },   // (ihHeroFire: G.champ)
   kit: { mana: { max: 120, regen: 1, hit: .8 }, abilities: [
@@ -29239,7 +29239,7 @@ const CH_SO_M = new Float32Array(16);
 FORCE_ATTACK.so_blade = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, {});
 champAdd('so_lion', { force: 'silver', he: 'he', glyph: 'swords', k: 1.45,
   unit: { id: 'ch_aurelian', name: 'Aurelian, the Lion of the Ford', short: 'Aurelian', proj: 'force', attack: 'so_blade', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
-    blurb: 'Aurelian on foot in white and gold, sword in hand and the crest shield on his arm: he steps out shield-first to the strongest foe in reach, cuts, and falls back into the line, every blow hearing a Verdict. He is always Radiant, and his own Templars of the Ford fight best beside him. Cannot reach flyers.',
+    blurb: 'Aurelian steps out to the strongest foe in reach, cuts, and falls back into the line, every blow hearing a Verdict. He is always Radiant, and his own Templars of the Ford fight best beside him. Cannot reach flyers.',
     tiers: [{ dmg: 64, rate: 2.2, range: 2.8 }, { dmg: 150, rate: 2.1, range: 3 }, { dmg: 350, rate: 2, range: 3.2 }] },
   trait: { name: 'Lionheart', t: 'He is always Radiant: he strikes faster, and every strike lays Judgement.' },   // (soRadiant: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: 1.2 }, abilities: [
@@ -29284,7 +29284,7 @@ champAdd('so_lion', { force: 'silver', he: 'he', glyph: 'swords', k: 1.45,
 /* ---------- Celestine, the Dawnsinger ---------- */
 champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
   unit: { id: 'ch_celestine', name: 'Celestine, the Dawnsinger', short: 'Celestine', proj: 'force', attack: 'so_beam', dmgType: 'magic', air: true, ground: true, top: [1.6, 1.7, 1.8],
-    blurb: 'The Dawnsinger with her sunburst staff: a beam of dawnlight at a foe on the ground or in the air, and every fourth one Blinds.',
+    blurb: 'The Dawnsinger. Her beam of dawnlight reaches foes on the ground or in the air, and every fourth one Blinds.',
     tiers: [{ dmg: 26, rate: 1.1, range: 2.9 }, { dmg: 60, rate: 1.05, range: 3.1 }, { dmg: 140, rate: 1, range: 3.3 }] },
   trait: { name: 'Halo', t: 'Every 4th beam Blinds its foe for 2 seconds.' },   // (soOnHit: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1.3, hit: .3 }, abilities: [
@@ -29352,7 +29352,7 @@ champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
 /* ---------- Morrow, the Grey Justicar ---------- */
 champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
   unit: { id: 'ch_morrow', name: 'Morrow, the Grey Justicar', short: 'Morrow', proj: 'force', attack: 'so_lance', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
-    blurb: 'The Grey Justicar on a grey destrier leads the Grail Knights\' charge, his great ledger on his arm: he rides out with a couched lance at the strongest foe in reach and back, knocking it down and laying Judgement, two to a strike. Cannot reach flyers.',
+    blurb: 'The Grey Justicar leads the Grail Knights’ charge: he rides out at the strongest foe in reach and back, knocking it down and laying Judgement, two to a strike. Cannot reach flyers.',
     tiers: [{ dmg: 34, rate: 1.3, range: 3.2 }, { dmg: 78, rate: 1.25, range: 3.4 }, { dmg: 180, rate: 1.2, range: 3.6 }] },
   trait: { name: 'Writ', t: 'His strikes lay one more Judgement, and his Verdicts strike 25% harder.' },   // (soOnHit, soVerdict: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: .8 }, abilities: [
@@ -29554,7 +29554,7 @@ const chSbFx = (t, x, z, yaw, K) => {
 /* ---------- Tarka Stormbrow, the Storm Caller ---------- */
 champAdd('sb_caller', { force: 'stormborn', he: 'she', glyph: 'thunder', k: 1.6,
   unit: { id: 'ch_tarka', name: 'Tarka Stormbrow, the Storm Caller', short: 'Tarka', proj: 'force', attack: 'sbThunder', dmgType: 'magic', air: true, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The Storm Caller with her storm drum and copper lightning staff: chain lightning leaps foe to foe, further through soaked or chilled foes, and every fourth hit calls a thunderbolt down. Every bolt feeds the Storm.',
+    blurb: 'The Storm Caller. Her chain lightning leaps foe to foe, further through soaked or chilled foes, and every fourth hit calls a thunderbolt down. Every bolt feeds the Storm.',
     tiers: [{ dmg: 24, rate: 1.45, range: 2.9, chain: 3 }, { dmg: 56, rate: 1.4, range: 3.1, chain: 3 }, { dmg: 130, rate: 1.35, range: 3.3, chain: 4 }] },
   trait: { name: 'Stormcrown', t: 'Every 4th hit calls a thunderbolt down on its foe for 60% of the hit, leaping on to a soaked or chilled foe.' },   // (sbChampHit)
   kit: { mana: { max: 130, regen: 1.1, hit: .6 }, abilities: [
@@ -29614,7 +29614,7 @@ champAdd('sb_caller', { force: 'stormborn', he: 'she', glyph: 'thunder', k: 1.6,
 /* ---------- Elder Oshana, the Windspeaker ---------- */
 champAdd('sb_wind', { force: 'stormborn', he: 'she', glyph: 'swirl', k: 1.6,
   unit: { id: 'ch_oshana', name: 'Elder Oshana, the Windspeaker', short: 'Oshana', proj: 'force', attack: 'chWindBlade', dmgType: 'magic', air: true, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The Windspeaker in her great feathered cloak: wind blades cut through a short line of foes and nudge the ground foes back up the road. Every fourth hit blows its foe a step back.',
+    blurb: 'The Windspeaker. Her wind blades cut through a short line of foes and nudge the ground foes back up the road. Every fourth hit blows its foe a step back.',
     tiers: [{ dmg: 28, rate: 1.3, range: 3 }, { dmg: 64, rate: 1.25, range: 3.2 }, { dmg: 150, rate: 1.2, range: 3.4 }] },
   trait: { name: 'Tailwind', t: 'She strikes 12% faster, and every 4th hit blows its foe a step back up the path.' },   // (FORCE_HOOKS.stormborn.live, sbChampHit)
   kit: { mana: { max: 130, regen: 1.1, hit: .6 }, abilities: [
@@ -29677,7 +29677,7 @@ champAdd('sb_wind', { force: 'stormborn', he: 'she', glyph: 'swirl', k: 1.6,
 /* ---------- Huri Wolfsong, the Beastcaller ---------- */
 champAdd('sb_beast', { force: 'stormborn', he: 'she', glyph: 'antler', k: 1.6,
   unit: { id: 'ch_huri', name: 'Huri Wolfsong, the Beastcaller', short: 'Huri', proj: 'force', attack: 'chBoneSpear', dmgType: 'phys', air: true, ground: true, prio: 2, top: [1.6, 1.7, 1.8],
-    blurb: 'The Beastcaller, a thunderbird carved on her staff and a spirit wolf at her heel: she hurls bone spears at the toughest foe while the wolf bites whatever she strikes.',
+    blurb: 'The Beastcaller. She hurls bone spears at the toughest foe while her spirit wolf bites whatever she strikes.',
     tiers: [{ dmg: 40, rate: 1.6, range: 3.1 }, { dmg: 92, rate: 1.55, range: 3.3 }, { dmg: 215, rate: 1.5, range: 3.5 }] },
   trait: { name: 'Spirit Companion', t: 'A spirit wolf runs at her side and bites her foe every 1.5s for 50% of her damage.' },   // (sbPulse)
   kit: { mana: { max: 130, regen: 1.1, hit: .8 }, abilities: [
@@ -29892,7 +29892,7 @@ function chVaricAnim(kind, o) {
 /* ---------- Varic Dunmoor, the Last Warden ---------- */
 champAdd('wb_varic', { force: 'wardbound', he: 'he', glyph: 'sword', k: 1.6,
   unit: { id: 'ch_varic', name: 'Varic Dunmoor, the Last Warden', short: 'Varic', proj: 'force', attack: 'chWardenCut', dmgType: 'phys', air: false, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The Last Warden with his long gold-runed greatsword: a wide cut on the ground foe beside him catches the one next to it too, and carves an oath rune into the road. Foes he strikes on a rune or a ward-line are rooted. Cannot reach flyers.',
+    blurb: 'The Last Warden. His wide cut on the ground foe beside him catches the one next to it too, and carves an oath rune into the road. Foes he strikes on a rune or a ward-line are rooted. Cannot reach flyers.',
     tiers: [{ dmg: 32, rate: 1.1, range: 1.55 }, { dmg: 74, rate: 1.05, range: 1.6 }, { dmg: 170, rate: 1, range: 1.7 }] },
   trait: { name: 'The Last Warden', t: 'Foes he strikes while they stand on a rune or a ward-line are rooted for 0.6s, each at most once every 3 seconds.' },
   hit(c, st, t) { if (!c.dead && !c.fly && !(c.wbWardT > G.time) && wbeOnRune(c)) { c.wbWardT = G.time + 3; rootFoe(c, .6, t); } },
@@ -29962,7 +29962,7 @@ champAdd('wb_varic', { force: 'wardbound', he: 'he', glyph: 'sword', k: 1.6,
 /* ---------- Lord Aedric Solmane, the Sun-Sworn (mounted) ---------- */
 champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
   unit: { id: 'ch_aedric', name: 'Lord Aedric Solmane, the Sun-Sworn', short: 'Aedric', proj: 'force', attack: 'wbLance', dmgType: 'magic', air: false, ground: true, top: [1.7, 1.8, 1.9],
-    blurb: 'The young high lord on a black destrier, white cape flying: his lance thrusts at a ground foe in reach and its light chains on to more foes, flyers too, leaving a storm rune. He presses hard, and pays for it.',
+    blurb: 'The young high lord. His lance thrusts at a ground foe in reach and its light chains on to more foes, flyers too, leaving a storm rune. He presses hard, and pays for it.',
     tiers: [{ dmg: 30, rate: 1.4, range: 2, chain: 2 }, { dmg: 70, rate: 1.35, range: 2.1, chain: 3 }, { dmg: 165, rate: 1.3, range: 2.2, chain: 3 }] },
   trait: { name: 'Sun-Mark', t: 'Every 3rd hit of his on a branded foe brands it again and sets it burning for half the hit over 3s; each foe he slays adds a second Momentum.' },
   hit(c, st, t, amt) { if (c.dead || !(wbBrandOf(c) > 0) || (t.wbSunN = (t.wbSunN || 0) + 1) % 3) return; wbBrand(c, 1, t); ignite(c, amt * .5 / 3, 3, t); fxSpark(c.x, c.y, hitH(c), '#fff4c8', 4); },
@@ -30034,7 +30034,7 @@ WB_ONHIT.push((c, st, t) => { if (t && t.wbGloryT > G.time && t.def.unit === 'ch
 /* ---------- Lady Isaura Vell, the Veiled Oath ---------- */
 champAdd('wb_isaura', { force: 'wardbound', he: 'she', glyph: 'chains', k: 1.6,
   unit: { id: 'ch_isaura', name: 'Lady Isaura Vell, the Veiled Oath', short: 'Isaura', proj: 'force', attack: 'chOathSweep', dmgType: 'magic', air: false, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The keeper of the order’s vows, with a slender runed sword: each sweep cuts up to three ground foes in her reach and roots them a moment; every second one leaves an oath rune. Cannot reach flyers.',
+    blurb: 'The keeper of the order’s vows. Each sweep cuts up to three ground foes in her reach and roots them a moment; every second one leaves an oath rune. Cannot reach flyers.',
     tiers: [{ dmg: 22, rate: 1.25, range: 1.8 }, { dmg: 52, rate: 1.2, range: 1.9 }, { dmg: 120, rate: 1.15, range: 2 }] },
   trait: { name: 'Veil of Oaths', t: 'Her sweeps root each foe they cut for 0.4s, at most once every 3 seconds each.' },
   hit(c, st, t) { if (!c.dead && !c.fly && !(c.wbVeilT > G.time)) { c.wbVeilT = G.time + 3; rootFoe(c, .4, t); } },
