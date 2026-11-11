@@ -1,4 +1,4 @@
-const BUILD_TAG = '7fbdf90@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '186910d@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -6081,7 +6081,7 @@ const tomeKnown = it => { const tl = tomeTalent(it); return !!tl && talRankOf(ta
 function tomeText(it) {
   const tl = tomeTalent(it); if (!tl) return '';
   const con = tl.con(tl.max);
-  return `Teaches this ${uw(1)} ${tl.name}: ${tl.pro(tl.max)}${con ? ` (${con})` : ''}` + (tomeKnown(it) ? ` Your ${TALENTS[it.tome[0]].name} tree already knows it, so this tome does nothing for now.` : '');
+  return `While socketed, this ${uw(1)} has the talent ${tl.name} at full rank, with no talent points spent: ${tl.pro(tl.max)}${con ? ` (${con})` : ''}` + (tomeKnown(it) ? ` Your ${TALENTS[it.tome[0]].name} tree already knows it, so this tome does nothing for now.` : '');
 }
 // a relic's definition, whatever kind it is
 function gearDef(it) {
@@ -21352,7 +21352,7 @@ function sbHailStone(t, st, c, x, z, pow, r, n) {
       if (C.sbDeepFreeze && wasCond && !(o.sbDfT > G.time)) { o.sbDfT = G.time + 4; freezeFoe(o, .8, t); }   // Frozen Through
     });
     fxShards(cx, cz, .2, 5); part({ k: 'ring', x: cx, z: cz, h: .05, life: .35, max: .35, size: rr, col: '#dff0ff' });
-    if (Math.random() < .5) sfx('thwack', 0);
+    if (Math.random() < .5) sfx('hailhit');   // (was 'thwack': an arrow into wood)
   } });
 }
 // Spirit Walkers: an ancestor spirit flies at its foe; it strikes (arcane) and hexes
@@ -22046,7 +22046,7 @@ const SB_KITS = {
       auto: 'the spot in range with two or more foes within 1 cell (or a boss or elite)',
       text: (t, st, ab) => `A cloud of freezing rain hangs over a 1-cell spot for ${byT(ab.by.dur, t)}s: everything under it is soaked, chilled (30% slow) and takes ${xDt(st, .5)} a second.`,
       pick: (t, st, ab, man) => sbCrowdAt(t, st, ab, ab.rr, 2, man),
-      cast(t, st, p, ab) { sbZone(t, st, 'sb_freezingrain', p.x, p.y, ab.rr, byT(ab.by.dur, t), .5); sfx('heal', 0); },
+      cast(t, st, p, ab) { sbZone(t, st, 'sb_freezingrain', p.x, p.y, ab.rr, byT(ab.by.dur, t), .5); sfx('rainfall', 1); },   // (was 'heal': an enemy healer's chime)
       zone(t, st, z) {
         inSplash(z.x, z.z, z.r, false, c => { if (c.ent) return; sbSoak(c, 1.5); chill(c, { slow: .3, slowT: .8 }, 'frost', t); hurt(c, st.dmg * .25, 'magic', t, true, null, null); });
       } },
@@ -55928,7 +55928,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, sunbeam: .8, censerpuff: .8, arcmissile: .8, arcgather: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, sunbeam: .8, censerpuff: .8, arcmissile: .8, arcgather: .8, hailhit: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -57114,6 +57114,15 @@ const AudioSys = (() => {
       if (!ok('agt', .2, 200)) return; const t = now(), p = rnd(.96, 1.04), pan = sp(.3), D = big ? 1.1 : .6;
       for (const [f, v] of [[110, .14], [165, .08], [220, .05]]) { const o = osc('sine', f * p, t, t + D + .05), g = gn(0); o.frequency.linearRampToValueAtTime(f * p * 1.12, t + D); shape(g.gain, t, [[D * .6, 1], [D * .85, .7], [D, 0]]); o.connect(g); out(g, v, { pan, room: .25 }, t, t + D + .05); }
       nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 240], [D * .7, 520], [D, 260]], q: .5, pts: [[D * .5, .6], [D, 0]], v: .14, pan, room: .2 });
+    },
+    // a hailstone landing (the Hail Shamans' strike played 'thwack', an arrow into wood): a dull knock of ice on earth,
+    // a short low crunch as it breaks, a few chips skittering
+    hailhit() {
+      if (!ok('hlh', .08, 200)) return; const t = now(), p = rnd(.9, 1.1), pan = sp(.35);
+      thump(t, 150 * p, 72 * p, .08, .3, { pan });
+      nhit(t + .004, { n: 'b', type: 'lowpass', fp: [[0, 900], [.12, 300]], q: .7, pts: [[.006, 1], [.05, .45], [.2, 0]], v: .3, pan, room: .1 });
+      const ch = []; for (let i = 0; i < 4; i++) { const u = Math.random(); ch.push([t + .05 + u * .28, (1 - u * .6) * rnd(.3, .7), rnd(420, 760)]); }
+      train(ch, { n: 'p', type: 'bandpass', q: 2.2, d: .012, v: .16, pan: sp(.5) });
     },
     /* --- earth --- */
     quake(m) {
@@ -96246,12 +96255,12 @@ function mgfCurtain(q) {
     // the veil: faint light falling from it to the road (the line a foe must cross)
     if (V.veil > 0) sdSeg(SDT_SH.BEAM, P, [m.x, .06, m.z], w * 2.2, w * 1.4, { seed: j * 7 + 1, k: 1, a: a * V.veil, p0: .6, p1: 1.5, p2: h, col: MGF_VIO, sp: .8 }, 'cc_sparks', 'hang');
     // a short tail above it: it hangs nose-down
-    sdSeg(SDT_SH.BEAM, [m.x, h + .3, m.z], P, w * .8, w * 2.6, { seed: j * 7 + 2, k: 1, a: a * .8, p0: 1, p1: 1, p2: .3, col: MGF_VIO, sp: .5 }, 'cc_sparks', 'hang');
+    sdSeg(SDT_SH.BEAM, [m.x, h + .3, m.z], P, w * .4, w * 1.3, { seed: j * 7 + 2, k: 1, a: a * .8, p0: 1, p1: 1, p2: .3, col: MGF_VIO, sp: .5 }, 'cc_sparks', 'hang');
     mgfBody(P, w * 2.2, a * .5, j * 5 + 3, 'cc_sparks', 'hang');
     sdBill(SDT_SH.GLOW, P, w * 2.4, w * 2.4, { seed: j, a: a * .7, col: MGF_VIO }, 'cc_sparks', 'hang');
     sdBill(SDT_SH.GLOW, P, w * .8, w * .8, { seed: j + 9, a: a * .9, col: MGF_HOT }, 'cc_sparks', 'hang');
     mgfBall(P, w * .8, a, MGF_VIO, j * 3, sdLv(), 'cc_sparks', 'hang');
-    if (prev && sdLv()) sdSeg(SDT_SH.BEAM, prev, P, w * 2.2, w * 2.2, { seed: j, k: 1, a: a * V.thread, p0: 1, p1: .6, p2: .22, col: MGF_VIO, sp: .3 }, 'cc_sparks', 'hang');
+    if (prev && sdLv()) sdSeg(SDT_SH.BEAM, prev, P, w * .9, w * .9, { seed: j, k: 1, a: a * V.thread, p0: 1, p1: .6, p2: .22, col: MGF_VIO, sp: .3 }, 'cc_sparks', 'hang');
     prev = P;
   }
 }
@@ -96355,7 +96364,7 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
     // the light gathered at her hand: its width, its rays
     cc_barrage: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks), gather: { flare: .55, rays: .8 } },
     // a hung missile: its width, its rays, the veil under it (opacity), the thread between them (opacity)
-    cc_sparks: { hang: { w: .3, veil: .22, thread: .4 }, missile: Object.assign({}, bolt, { w: .22 }), sparks: Object.assign({}, sparks) },
+    cc_sparks: { hang: { w: .3, veil: .2, thread: .25 }, missile: Object.assign({}, bolt, { w: .22 }), sparks: Object.assign({}, sparks) },
     cc_grandorb: {
       // the orb: its size (x), its rays, the width of the light fed to it
       orb: { w: 1, feed: .22 },
@@ -96367,6 +96376,288 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { missile: 'The missile', sparks: 'Its wake of motes, and its landing', gather: 'Light at her hand', hang: 'The hung missiles', orb: 'The orb' });
   if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { missile: 'c', sparks: 'c', gather: 'c', hang: 'c', orb: 'c' });
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['cc_mageling', 'Magelings']);
+  if (typeof efxSync === 'function') efxSync();
+}
+
+/* ================= THE HAIL SHAMANS' ICE: real hailstones, freezing rain, rime on the road, a stone out of the sky =================
+   Unit eight of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules so far: solid things
+   are real meshes fixed in the world (ice is solid); soft things are soft cards (mist); nothing is a mark on the ground;
+   one effect a spell, showing its real area; never too flashy. Until now a hailstone was three flat shard sprites and a
+   ring; Freezing Rain flat grey cloud cards over a blue disc; Black Ice a glowing glaze painted along the road; Skystone
+   a crystal sprite over a growing shadow blob, landing in a ring of spikes.
+     the strike      a lump of ice falls straight down on its foe, tumbling, cold air drawn after it; it shatters into
+                     chunks that scatter and skitter, and a breath of cold mist rolls out to the real splash (no ring)
+     Freezing Rain   a fine cold mist hanging over its real radius, rain falling through it, ice pellets bouncing off the road
+     Black Ice       rime grown along the stretch of road: clusters of ice spikes standing out of it, cold mist creeping
+                     low over them; where a foe slips, chips of ice fly (nothing painted on the road)
+     Skystone        the great hailstone itself falls (the same mesh that then stands on the road), mist torn off behind
+                     it; it lands in a burst of ice chunks and a wave of mist out to its real reach (no ring, no spikes)
+   Meshes go through the Seedcasters' kit (seedfx.js: SD_MESH, sdPlace, sdShot); mist is the plant shader's SPORE; the rain
+   is the Cloud Dancers' (cloudfx.js cdfRainAt). The switch is theirs: SD.off (the Element Lab's "Old look") or no toolkit
+   brings the older drawing back. Gameplay, timing and balance are untouched. Tuning: the Element Lab's entries hailstone,
+   sb_freezingrain, sb_hailstorm (Black Ice), sb_rimetotem (Skystone). */
+const HLF = { quiet: 0, stones: [] };
+const HLF_MIST = [.6, .7, .86], HLF_GLINT = [.9, .97, 1];
+const HLF_IDS = new Set(['sb_freezingrain', 'sb_hailstorm', 'sb_rimetotem']);
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { HLF.stones.length = 0; });
+const hlfOn = () => typeof sdOn === 'function' && sdOn();
+const hlfSB = () => typeof G !== 'undefined' && G && G.force === 'stormborn';
+const hlfHash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+if (typeof SD_MESH !== 'undefined') Object.assign(SD_MESH, {
+  // a hailstone: a lump of clouded ice, 1 in radius
+  hail: g => { g.smooth = 60; g.jit = .12; g.em = .3; g.sphere(0, 0, 0, 1, .86, .92, 8, 6, '#dcecf8', { colFn: j => j < 2 ? lin3('#f4fbff') : j < 4 ? lin3('#d2e6f6') : lin3('#a8c8e2') }); g.em = 0; g.jit = 0; },
+  // a chunk of broken ice: sharp, 1 in radius
+  hailc: g => { g.smooth = 0; g.jit = .25; g.em = .35; g.sphere(0, 0, 0, 1, .7, .8, 4, 3, '#e8f5ff'); g.em = 0; g.jit = 0; },
+  // rime: a cluster of ice spikes standing out of the road, 1 tall
+  rime: g => { g.smooth = 0; g.jit = 0; g.em = .3;
+    const sp = [[0, 0, 1, .2, 0, 0], [.16, .05, .7, .16, .35, .3], [-.14, .1, .62, .15, -.4, .2], [.04, -.17, .5, .13, .1, -.5], [-.08, -.12, .4, .12, -.3, -.4]];
+    for (const [x, z, h, r, tx, tz] of sp) g.with(T(x, 0, z, 0, tz, -tx, 1), () => g.cyl(0, 0, 0, r, 0, h, 5, '#dff0fc', { alt: '#b4d2ea' }));
+    g.em = 0; },
+});
+if (typeof SD_MESH !== 'undefined' && typeof sbHailRockMesh === 'function') SD_MESH.skystone = g => sbHailRockMesh(g);
+
+// chunks of ice thrown out of a point, bouncing and skittering to rest
+function hlfChunks(x, y, z, n, out, w0, w1, s, l) {
+  if (typeof sdShot !== 'function') return;
+  for (let k = 0; k < n; k++) { const an = R(TAU), v = R(.4, 1) * out; sdShot('mesh', x, y, z, R(w0, w1), R(.7, 1.3), { mesh: 'hailc', vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(1, 2.6), g: 9, rot: R(TAU), vr: R(-12, 12) }, s, l); }
+}
+// cold mist rolled out low from x, z to a real radius
+function hlfRoll(x, z, rad, n, a, s, l) {
+  if (typeof sdShot !== 'function') return;
+  const a0 = R(TAU), w = Math.max(.22, rad * .62), drag = 4.5;
+  for (let k = 0; k < n; k++) { const an = a0 + (k + R(-.3, .3)) / n * TAU, reach = Math.max(0, rad - w * .34) * R(.8, 1), v = reach * drag; sdShot('spore', x, w * .3, z, w * R(.85, 1.1), R(.6, 1), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.04, .15), drag, grow: .6, p0: .6, p1: 0, a, col: HLF_MIST, delay: R(.04) }, s, l); }
+}
+function hlfGlints(x, y, z, n, out, s, l) {
+  if (typeof sdShot !== 'function') return;
+  for (let k = 0; k < n; k++) { const an = R(TAU), v = R(.3, 1) * out; sdShot('mote', x, y, z, R(.025, .04), R(.25, .5), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.4, 1.6), g: 5, col: HLF_GLINT, k: 1.3 }, s, l); }
+}
+// a breath of mist at a point (cold air behind something falling)
+const hlfBreath = (P, w, h, a, seed, u, s, l) => sdBill(SDT_SH.SPORE, P, w, h, { age: .15 + .3 * u, seed, a, p0: .6, p1: 0, col: HLF_MIST, soft: .1, sp: .5 }, s, l);
+
+/* ---- the strike: a hailstone falling straight down, shattering where it lands ---- */
+function hlfStones(now) {
+  HLF.stones = HLF.stones.filter(q => now < q.at + q.T);
+  const V = sdV('hailstone', 'stone'), k = sdOnL('hailstone', 'stone'); if (k == null) return;
+  for (const q of HLF.stones) {
+    const c = q.c && !q.c.dead ? q.c : null; if (c) { q.x = c.x; q.z = c.y; q.y1 = c.fly ? hitH(c) : .15; }
+    const u = (now - q.at) / q.T, y = q.y1 + (2.6 - q.y1) * (1 - u), w = V.w * q.s * k;
+    sdPlace('hail', [q.x, y, q.z], q.seed + now * 9, q.seed * .7 + now * 6, w);
+    if (V.trail > 0) for (let i = 1; i <= 3; i++) hlfBreath([q.x, y + i * V.trail * .33, q.z], w * (2.4 - i * .4), w * 4, .32 * (1 - i / 4) * Math.min(1, u * 4), q.seed + i, i / 3, 'hailstone', 'stone');
+  }
+}
+function hlfLand(x, y, z, rr, s) {
+  if (sdOnL('hailstone', 'burst') == null) return;
+  const V = sdV('hailstone', 'burst'), lv = sdLv(), w = sdV('hailstone', 'stone').w * s;
+  hlfChunks(x, y + .1, z, Math.round(V.clods * [.5, .75, 1][lv] * (SD.load > .7 ? .6 : 1)), 1.5, w * .22, w * .42, 'hailstone', 'burst');
+  hlfRoll(x, z, rr, Math.round(V.dust * [.6, .8, 1][lv]), .5, 'hailstone', 'burst');
+  if (lv) hlfGlints(x, y + .15, z, 4, 1.4, 'hailstone', 'burst');
+}
+if (typeof sbHailStone === 'function') {
+  const _hs = sbHailStone;
+  sbHailStone = function (t, st, c, x, z, pow, r, n) {
+    if (!hlfOn()) return _hs.apply(this, arguments);
+    const n0 = G.delayed.length; HLF.quiet++; try { _hs.apply(this, arguments); } finally { HLF.quiet--; }
+    const s = r < .5 ? .75 : 1, d = G.delayed.length > n0 ? G.delayed[G.delayed.length - 1] : null;
+    if (HLF.stones.length > 40) HLF.stones.shift();
+    HLF.stones.push({ x, z, c, y1: c && c.fly ? hitH(c) : .15, at: G.time, T: .32, seed: Math.random() * 97, s });
+    if (d && typeof d.fn === 'function') {
+      const f = d.fn;
+      d.fn = function () {
+        HLF.quiet++; try { f.apply(this, arguments); } finally { HLF.quiet--; }
+        if (G.state !== 'play' || !G.towers.includes(t)) return;
+        const live = c && !c.dead, sv = t.st || st;
+        try { hlfLand(live ? c.x : x, live && c.fly ? hitH(c) : .1, live ? c.y : z, r + ((sv.pw && sv.pw.sbShaker) || 0) * .3, s); } catch (e) {}
+      };
+    }
+  };
+}
+// the game's own shard sprites and its ring where a stone lands
+if (typeof part === 'function') { const _pt = part; part = function (o) { if (HLF.quiet > 0 && o && (o.k === 'shard' || o.k === 'ring') && hlfOn()) return; return _pt.apply(this, arguments); }; }
+
+/* ---- each frame: stones falling, Freezing Rain hanging ---- */
+function hlfFrame(now) {
+  if (!hlfSB()) return;
+  hlfStones(now);
+  if (!G.hazards) return;
+  const lv = sdLv();
+  for (const z of G.hazards) {
+    if (z.k === 'sb_totem' && z.stone && z.t > 0) {
+      // a standing Skystone: cold mist creeping low round it, out to the reach of its chill
+      const V = sdV('sb_rimetotem', 'cloud'), k = sdOnL('sb_rimetotem', 'cloud'); if (k == null) continue;
+      const st = sdSt(z); if (st.seed == null) st.seed = 1 + Math.floor(Math.random() * 900);
+      const fade = Math.min(1, z.t / .5), n = Math.max(2, Math.round(V.count * [.5, .75, 1][lv])), w = z.r * V.w;
+      for (let i = 0; i < n; i++) {
+        const per = V.roll * (.8 + .5 * hlfHash(st.seed, i)), ph = now / per + hlfHash(st.seed, i * 3 + 1), cyc = Math.floor(ph), u = ph - cyc, a = hlfHash(st.seed + cyc * 13.7, i * 7 + 3) * TAU, rr = Math.max(0, z.r - w * .36) * (.25 + .75 * u);
+        sdBill(SDT_SH.SPORE, [z.x + Math.cos(a) * rr, .14 + u * .06, z.z + Math.sin(a) * rr], w, w * .5, { age: .08 + u * .36, seed: i * 5 + cyc * 3 + st.seed, a: fade * V.a * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)) * k, p0: V.thick, p1: 0, col: HLF_MIST, soft: .12, sp: .5, pull: .1 }, 'sb_rimetotem', 'cloud');
+      }
+      continue;
+    }
+    if (z.k !== 'sb_zone' || z.ab !== 'sb_freezingrain' || !(z.t > 0)) continue;
+    const st = sdSt(z); if (st.born == null) { st.born = now; st.seed = 1 + Math.floor(Math.random() * 900); st.pel = now; }
+    const fade = Math.min(1, (now - st.born) / .5) * Math.min(1, z.t / .5); if (fade <= .01) continue;
+    const V = sdV('sb_freezingrain', 'cloud'), kC = sdOnL('sb_freezingrain', 'cloud');
+    if (kC != null) {
+      const n = Math.max(3, Math.round(V.count * [.5, .75, 1][lv] * (SD.load > .7 ? .7 : 1))), w = z.r * V.w;
+      for (let i = 0; i < n; i++) {
+        const per = V.roll * (.8 + .5 * hlfHash(st.seed, i)), ph = (now - st.born) / per + hlfHash(st.seed, i * 3 + 1), cyc = Math.floor(ph), u = ph - cyc;
+        const a = hlfHash(st.seed + cyc * 13.7, i * 7 + 3) * TAU, rr = Math.max(0, z.r - w * .36) * Math.sqrt(.1 + .9 * hlfHash(st.seed + cyc * 3.3, i * 5 + 9)), low = i % 3 === 2;
+        sdBill(SDT_SH.SPORE, [z.x + Math.cos(a) * rr, (low ? .2 : V.h * (.8 + .3 * hlfHash(st.seed, i + 40))) + u * .1, z.z + Math.sin(a) * rr], w, w * .7,
+          { age: .08 + u * .36, seed: i * 5 + cyc * 3 + st.seed, a: fade * V.a * (low ? .7 : 1) * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)) * kC, p0: V.thick, p1: 0, col: HLF_MIST, soft: .12, sp: .6, pull: .1 }, 'sb_freezingrain', 'cloud');
+      }
+    }
+    const Vr = sdV('sb_freezingrain', 'rain'), kR = sdOnL('sb_freezingrain', 'rain');
+    if (kR != null) {
+      if (typeof cdfRainAt === 'function') cdfRainAt(z.x, z.z, z.r * .92, 2.2, Vr.count * z.r * z.r, st.seed, fade * kR, Vr, now);
+      // ice pellets bouncing off the road under it
+      if (lv && Vr.rate > 0 && now - st.pel > 1 / (Vr.rate * z.r * z.r)) { st.pel = now; const a = R(TAU), d = z.r * Math.sqrt(R(1)) * .9; sdShot('mesh', z.x + Math.cos(a) * d, .05, z.z + Math.sin(a) * d, R(.014, .024), R(.35, .6), { mesh: 'hailc', vx: R(-.4, .4), vz: R(-.4, .4), vy: R(.8, 1.6), g: 9, rot: R(TAU), vr: R(-14, 14) }, 'sb_freezingrain', 'rain'); }
+    }
+  }
+}
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(hlfFrame);
+
+/* ---- Black Ice: rime grown along the stretch of road, cold mist creeping low over it ---- */
+function hlfIce(q) {
+  const z = q.zone, P = z && z.pts; if (!P) return;
+  const e = Math.min(1, q.age / .35, Math.max(0, q.life - q.age) / .45) * (q.alive && !q.alive() ? Math.max(0, 1 - (q._hlGone == null ? (q._hlGone = q.age, 0) : (q.age - q._hlGone) / .4)) : 1); if (e <= .01) return;
+  const V = sdV('sb_hailstorm', 'rime'), k = sdOnL('sb_hailstorm', 'rime'), now = G.time, lv = sdLv(), seed = q.seed || 1;
+  if (k != null) {
+    const n = Math.max(1, Math.round(V.count * [.5, .75, 1][lv]));
+    for (let i = 0; i < P.length; i++) for (let j = 0; j < n; j++) {
+      const a = hlfHash(seed + i, j * 3 + 1) * TAU, d = z.r * .95 * Math.sqrt(hlfHash(seed + i * 7, j * 5 + 2)), g = sdBack(Math.min(1, Math.max(0, (q.age - (i * .04 + j * .05)) / .3))) * e;
+      if (g <= .01) continue;
+      const s = V.w * (.6 + .7 * hlfHash(seed + i * 3, j + 9)) * k;
+      sdPlace('rime', [P[i][0] + Math.cos(a) * d, 0, P[i][1] + Math.sin(a) * d], hlfHash(seed, i * 11 + j) * TAU, 0, s * g, V.h / V.w * s * g, s * g);
+    }
+  }
+  const Vc = sdV('sb_hailstorm', 'cloud'), kC = sdOnL('sb_hailstorm', 'cloud');
+  if (kC != null) {
+    const n = Math.max(1, Math.round(Vc.count * [.5, .75, 1][lv])), w = z.r * 2 * Vc.w;
+    for (let i = 0; i < P.length; i++) for (let j = 0; j < n; j++) {
+      const per = Vc.roll * (.8 + .5 * hlfHash(seed + i, j)), ph = now / per + hlfHash(seed + i, j * 3 + 1), cyc = Math.floor(ph), u = ph - cyc;
+      const a = hlfHash(seed + i + cyc * 13.7, j * 7 + 3) * TAU, d = z.r * .6 * hlfHash(seed + cyc * 3.3, i * 5 + j);
+      sdBill(SDT_SH.SPORE, [P[i][0] + Math.cos(a) * d, .14 + u * .08, P[i][1] + Math.sin(a) * d], w, w * .5,
+        { age: .08 + u * .36, seed: i * 5 + j + cyc * 3, a: e * Vc.a * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)) * kC, p0: Vc.thick, p1: 0, col: HLF_MIST, soft: .12, sp: .5, pull: .1 }, 'sb_hailstorm', 'cloud');
+    }
+  }
+}
+/* ---- Skystone: the great hailstone itself falling, mist torn off behind it ---- */
+function hlfStone(q) {
+  if (q.age > q.T + .05) return;
+  const V = sdV('sb_rimetotem', 'stone'), k = sdOnL('sb_rimetotem', 'stone'); if (k == null) return;
+  const v = Math.min(1, q.age / q.T), y = 6 * (1 - v * v), s = V.w * k;
+  if (q._hlSeed == null) q._hlSeed = Math.random() * 97;
+  sdPlace(SD_MESH.skystone ? 'skystone' : 'hail', [q.x, y, q.z], q._hlSeed + q.age * 1.5, 0, SD_MESH.skystone ? s : s * .35);
+  if (V.trail > 0) for (let i = 1; i <= 4; i++) hlfBreath([q.x, y + .5 + i * V.trail * .45, q.z], .9 - i * .12, 1.3, .4 * (1 - i / 5) * Math.min(1, v * 3), q._hlSeed + i, i / 4, 'sb_rimetotem', 'stone');
+}
+function hlfBurst(x, z, r) {
+  if (sdOnL('sb_rimetotem', 'burst') == null) return;
+  const V = sdV('sb_rimetotem', 'burst'), lv = sdLv();
+  hlfChunks(x, .3, z, Math.round(V.clods * [.5, .75, 1][lv]), r * 2.2, .035, .085, 'sb_rimetotem', 'burst');
+  hlfRoll(x, z, r, Math.round(V.dust * [.6, .8, 1][lv]), .6, 'sb_rimetotem', 'burst');
+  if (lv) hlfGlints(x, .4, z, 8, r * 2, 'sb_rimetotem', 'burst');
+}
+
+/* ---- the older drawing stepped aside ---- */
+// (the Stormborn keep their draws in SBC_DRAW and copy them into SFX_DRAW when the toolkit first draws: both are taken)
+{
+  const take = (D, id, fn) => { const d0 = D && D[id]; if (!d0 || d0._hlf) return; const f = function (q) { if (!hlfOn()) return d0.apply(this, arguments); try { fn(q); } catch (e) {} }; f._hlf = 1; D[id] = f; };
+  for (const D of [typeof SBC_DRAW !== 'undefined' ? SBC_DRAW : null, typeof SFX_DRAW !== 'undefined' ? SFX_DRAW : null]) { take(D, 'sbcice', hlfIce); take(D, 'sbcstone', hlfStone); }
+}
+// the toolkit's rain, rings, bands, spikes and sprite sprays while one of these three spells draws
+if (typeof v2Rain === 'function') { const _vr = v2Rain; v2Rain = function (C) { if (hlfOn() && C && C.id === 'sb_freezingrain') return null; return _vr.apply(this, arguments); }; }
+if (typeof v2Area === 'function') { const _va = v2Area; v2Area = function (C, x, z, r) { if (hlfOn() && C && HLF_IDS.has(C.id)) { if (C.id === 'sb_rimetotem') { try { hlfBurst(x, z, r); } catch (e) {} } return null; } return _va.apply(this, arguments); }; }
+if (typeof v2Spikes === 'function') { const _vs = v2Spikes; v2Spikes = function (C) { if (hlfOn() && C && C.id === 'sb_rimetotem') return null; return _vs.apply(this, arguments); }; }
+if (typeof v2Band === 'function') { const _vb = v2Band; v2Band = function (C) { if (hlfOn() && C && C.id === 'sb_hailstorm') return null; return _vb.apply(this, arguments); }; }
+if (typeof v2Spray === 'function') {
+  const _sp = v2Spray;
+  v2Spray = function (C, kind, x, z, h, n) {
+    if (!hlfOn() || !C || !HLF_IDS.has(C.id)) return _sp.apply(this, arguments);
+    // (sprite crystals and shards become real chips of ice; the sprite snow is the mist's job)
+    if ((kind === 'crys' || kind === 'shard') && C.id === 'sb_hailstorm' && sdOnL('sb_hailstorm', 'rime') != null) hlfChunks(x, (h || .1) + .05, z, Math.max(1, Math.round(n * .6 * [.5, .75, 1][sdLv()])), 1.1, .02, .04, 'sb_hailstorm', 'rime');
+    return null;
+  };
+}
+if (typeof sfxZone === 'function') { const _sz = sfxZone; sfxZone = function (C, z) { if (z && ((z.k === 'sb_zone' && z.ab === 'sb_freezingrain') || (z.k === 'sb_totem' && z.stone)) && hlfOn()) { z._sfx = 1; return; } return _sz.apply(this, arguments); }; }
+if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('sb_freezingrain');
+// the ring the game draws as a Skystone lands and stands (its colour)
+if (typeof fxRing === 'function') { const _fr = fxRing; fxRing = function (x, z, r, col) { if (col === '#cfe8ff' && hlfSB() && hlfOn()) return; return _fr.apply(this, arguments); }; }
+// the field's own flat cloud cards and blue disc under Freezing Rain
+if (typeof sbDrawField === 'function') {
+  const _df = sbDrawField;
+  sbDrawField = function () {
+    if (!hlfOn()) return _df.apply(this, arguments);
+    const all = G.hazards, g0 = QADD.ground, rain = z => z.k === 'sb_zone' && z.ab === 'sb_freezingrain';
+    if (all && all.some(rain)) G.hazards = all.filter(z => !rain(z));
+    // (the blue puddle under a soaked foe: radius .3, at height .04)
+    // (and the ring round a standing Skystone: its reach is shown by the mist creeping round it)
+    QADD.ground = function (x, z, y, rx, rz) { if (y === .04 && ((rx === .3 && rz === .3) || (all && all.some(h => h.k === 'sb_totem' && h.stone && h.x === x && h.z === z)))) return; return g0.apply(this, arguments); };
+    try { return _df.apply(this, arguments); } finally { G.hazards = all; QADD.ground = g0; }
+  };
+}
+
+/* ---- chilled and soaked foes in a Stormborn run: the game marks them with a ring of rime and a blue puddle on the ground
+   under them. In their place: cold mist sinking off a chilled foe (ice at the feet of a frozen one), drops falling off a
+   soaked one ---- */
+HLF.chilled = [];
+if (typeof drawFrostOn === 'function') { const _fo = drawFrostOn; drawFrostOn = function (c, r) { if (!hlfOn() || !hlfSB()) return _fo.apply(this, arguments); if (HLF.chilled.length < 60) HLF.chilled.push(c, r); }; }
+function hlfFoes(now) {
+  const L = HLF.chilled, lv = sdLv();
+  for (let i = 0; i < L.length; i += 2) {
+    const c = L[i], r = L[i + 1]; if (!c || c.dead) continue;
+    const x = c.x + (c.ox || 0) + (c.kbx || 0), z = c.y + (c.oy || 0) + (c.kbz || 0), by = typeof creepBaseY === 'function' ? creepBaseY(c) : 0, hh = typeof creepH === 'function' ? creepH(c) : .6, fz = c.stunT > 0 && c.stunEl === 'frost', id = c.id || 1;
+    const n = (fz ? 3 : 2) - (lv ? 0 : 1);
+    for (let k = 0; k < n; k++) { const ph = now / 1.6 + hlfHash(id, k), cyc = Math.floor(ph), u = ph - cyc, a = hlfHash(id + cyc * 7, k * 3) * TAU; sdBill(SDT_SH.SPORE, [x + Math.cos(a) * r * .6, by + hh * (.75 - .55 * u), z + Math.sin(a) * r * .6], r * 1.5, r * 1.1, { age: .1 + u * .4, seed: id + k + cyc, a: (fz ? .45 : .32) * sdSs(0, .2, u) * (1 - sdSs(.6, 1, u)), p0: .5, p1: 0, col: HLF_MIST, soft: .1, sp: .5 }); }
+    if (fz && !c.fly) for (let k = 0; k < 3; k++) { const a = hlfHash(id, k + 20) * TAU; sdPlace('rime', [x + Math.cos(a) * r * .8, by, z + Math.sin(a) * r * .8], a, 0, r * .45, r * .7, r * .45); }
+  }
+  L.length = 0;
+  if (!lv) return;
+  for (const c of G.creeps) {
+    if (c.dead || !(c.sbWetT > now)) continue;
+    const hh = typeof creepH === 'function' ? creepH(c) : .6, by = typeof creepBaseY === 'function' ? creepBaseY(c) : 0, r = (c.def && c.def.r) || .3, id = c.id || 1;
+    for (let k = 0; k < 2; k++) { const ph = now * 1.7 + hlfHash(id, k + 5), cyc = Math.floor(ph), u = ph - cyc, a = hlfHash(id + cyc * 3, k) * TAU, px = c.x + Math.cos(a) * r * .7, pz = c.y + Math.sin(a) * r * .7, y = by + hh * .8 * (1 - u * u); if (y > by + .06) sdSpan('rain', [px, y + .07, pz], [px, y, pz], .012, .012, 0); }
+  }
+}
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { if (hlfSB() && hlfOn()) { try { hlfFoes(now); } catch (e) {} } else HLF.chilled.length = 0; });
+
+/* ---- the Element Lab's entries ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    hailstone: { unit: 'sb_hailshaman', force: 'stormborn', el: 'seed', name: 'Hailstone', basic: 1, layers: ['stone', 'burst'] },
+    sb_freezingrain: { unit: 'sb_hailshaman', force: 'stormborn', el: 'seed', name: 'Freezing Rain', layers: ['cloud', 'rain'] },
+    sb_hailstorm: { unit: 'sb_hailshaman', force: 'stormborn', el: 'seed', name: 'Black Ice', layers: ['rime', 'cloud'] },
+    sb_rimetotem: { unit: 'sb_hailshaman', force: 'stormborn', el: 'seed', name: 'Skystone', layers: ['stone', 'burst', 'cloud'] },
+  });
+  Object.assign(ELEM_FX_DEF, {
+    hailstone: {
+      // the stone: its radius, the cold air drawn after it (length)
+      stone: { w: .15, trail: .45 },
+      // where it lands: chunks of ice thrown out, billows of mist rolled to the real splash
+      burst: { clods: 7, dust: 5 },
+    },
+    sb_freezingrain: {
+      // the mist: veils, a veil's width (x the radius), how high it hangs, how long one rolls (s), thickness, opacity
+      cloud: { count: 7, w: 1.1, h: 1.5, roll: 3, thick: .5, a: .38 },
+      // the rain: streaks (a cell of area), their length, width, fall (cells a second), slant; pellets bouncing (a second)
+      rain: { count: 26, len: .26, w: .02, speed: 6.5, slant: .08, rate: 14 },
+    },
+    sb_hailstorm: {
+      // rime: clusters at each point of the road, a cluster's width, its height
+      rime: { count: 5, w: .26, h: .36 },
+      // the mist creeping over it: veils at each point, width (x the lane), how long one rolls (s), thickness, opacity
+      cloud: { count: 2, w: .9, roll: 3, thick: .7, a: .4 },
+    },
+    sb_rimetotem: {
+      // the falling stone: its size (x the stone that stays), the mist torn off behind it (length)
+      stone: { w: 1.25, trail: 1 },
+      burst: { clods: 14, dust: 8 },
+      // the mist creeping round the stone that stays: veils, width (x its reach), how long one rolls (s), thickness, opacity
+      cloud: { count: 5, w: .7, roll: 3, thick: .5, a: .38 },
+    },
+  });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { stone: 'The stone of ice', rime: 'Rime (spikes of ice out of the road)' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { stone: 'c', rime: 'c' });
+  if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['sb_hailshaman', 'Hail Shamans']);
   if (typeof efxSync === 'function') efxSync();
 }
 
