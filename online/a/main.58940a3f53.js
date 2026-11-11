@@ -1,4 +1,4 @@
-const BUILD_TAG = '4c694ba@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '3da7147@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13211,6 +13211,7 @@ FORCE_ATTACK.cc_missile = function (t, st, tg, pow, echo) {
     for (let q = 0; q < 6 && pool.length; q++) { const c = pool[q % pool.length]; G.delayed.push({ t: q * .05, fn: () => { if (ccAlive(t) && !c.dead) ccMissile(t, t.st || st, c, pow * .8, { spread: 1.6 }); } }); }
     t.ccTorrentAt = G.time; t.recoil = 1; ccEv('cap:ccTorrent'); return;
   }
+  if (!echo) sfx('arcmissile');   // (the strike was silent)
   L.forEach((c, v) => ccMissile(t, st, c, v ? 1 : pow));
   if (C.ccTwin && !echo && n % (6 - C.ccTwin) === 0) G.delayed.push({ t: .09, fn: () => { if (ccAlive(t) && !tg.dead) ccMissile(t, t.st || st, tg, 1); } });   // Twin Casting
   const p = st.pw || {};
@@ -31862,7 +31863,7 @@ ccxSwap('cc_mageling', { id: 'cc_sparks', name: 'Missile Curtain', short: 'Curta
     const zn = { k: ab.id, x, z, ms, until: G.time + CCX.CURT_WAIT, tick: 0, every: .05, ck: k, _sfx: 1, born: G.time, per: new Map() };
     abZone(t, zn);
     ccxFx(ab.id, t, c, C => CCX_FX.curtainHang(C, t, zn));
-    sfx('arcane', 0);
+    sfx('arcgather', 0);   // (was 'arcane': high-pitched)
   },
   zone(t, st, z) {
     const last = z.until - G.time <= .11;
@@ -31921,7 +31922,7 @@ ccxSwap('cc_mageling', { id: 'cc_grandorb', name: 'Gathering Orb', short: 'Orb',
     (G.ccxOrbs || (G.ccxOrbs = [])).push(orb); t.ccxOrbT = orb.until;
     ccxFx(ab.id, t, t, C => CCX_FX.orbGather(C, t, orb));
     G.delayed.push({ t: g, fn: () => ccxOrbThrow(orb) });
-    sfx('arcane', 1);
+    sfx('arcgather', 1);   // (was 'arcane': high-pitched)
   } });
 
 /* =====================================================================================================
@@ -55695,7 +55696,7 @@ const AudioSys = (() => {
   let FROST_UP = .62;   // the frost hiss's pitch: it scales every band (1 was too high; .62 is about eight steps down)
   /* ---------- mix trims (measured offline: loud transients ~-6 dBFS pre-compressor, UI ticks ~-20) ---------- */
   const LV = { bossIn: .8, bossDie: .85, leaderArrive: .75, leaderRage: .8, leaderCast: .9, click: .71, select: .77, nogold: .52, build: .42, wallup: .6, upgrade: .6, sell: .66, coin: 1.13, cash: 1.75, talentBuy: .6, heal: 1, ward: 1, wail: 1, raise: 1, phase: 1, lootDrop: .9, lootGet: 1.5, empower: 1.2, equip: .8, onhit: .8, bowDraw: 1.2, arrow: 1.0, thwack: .8, slice: 1.25, arrowIn: 1.25, thiefIn: 1, thiefOut: 1,
-    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, sunbeam: .8, censerpuff: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
+    cannon: .63, seedcast: .8, podburst: .8, jawsnap: .8, sprout: .8, rootrise: .8, mothswarm: .9, wither: .8, crumble: .8, arcbolt: .7, thunder: .7, rainfall: .8, sunbeam: .8, censerpuff: .8, arcmissile: .8, arcgather: .8, boom: .54, frost: .6, shatter: 1.05, fireHit: .65, zap: .62, venom: 1.4, splat: 1.2, quake: .34, arcane: .6, holy: .78,
     curse: 1.3, curseHit: 1.3, glaive: 1.8, glaiveHit: 2, axe: 1.4, towerHit: .6, wreck: .55, leak: .65, horn: .44, clear: .52, victory: .38, defeat: .57, talent: .64 };
   const DLV = { gnoll: .62, wolf: 1, beetle: .86, bat: .6, spider: .82, wraith: .5, troll: .47, ogre: .5, colossus: .36, broodmother: .7, bonedrake: .7, overlord: .4 };
 
@@ -56868,6 +56869,19 @@ const AudioSys = (() => {
       nhit(t + .006, { n: 'b', type: 'lowpass', fp: [[0, 520], [.3, 200]], q: .6, pts: [[.02, 1], [.1, .5], [.4, 0]], v: .36 * s, pan, room: .12 });
       const em = []; for (let i = 0; i < (full ? 5 : 3); i++) { const u = Math.random(); em.push([t + .12 + u * .5, (1 - u * .6) * rnd(.3, .7), rnd(380, 640)]); }
       train(em, { n: 'p', type: 'bandpass', q: 2, d: .014, v: .18 * s, pan: sp(.5) });
+    },
+    // an arcane missile let go (the Magelings' strike, which was silent): a soft low "whup" falling in pitch, a breath of air
+    arcmissile() {
+      if (!ok('amz', .07, 200)) return; const t = now(), p = rnd(.92, 1.08), pan = sp(.3);
+      const e1 = t + .22, o1 = osc('sine', 233 * p, t, e1), g1 = gn(0); o1.frequency.exponentialRampToValueAtTime(150 * p, t + .16); shape(g1.gain, t, [[.012, 1], [.08, .4], [.2, 0]]); o1.connect(g1); out(g1, .13, { pan, room: .15 }, t, e1);
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 700], [.15, 260]], q: .6, pts: [[.01, .8], [.06, .35], [.18, 0]], v: .16, pan });
+    },
+    // arcane light gathered (Missile Curtain hung, the Gathering Orb begun): a low hum swelling and let go, in place of
+    // the high sweep of 'arcane'. arg 1: the orb's longer swell
+    arcgather(big) {
+      if (!ok('agt', .2, 200)) return; const t = now(), p = rnd(.96, 1.04), pan = sp(.3), D = big ? 1.1 : .6;
+      for (const [f, v] of [[110, .14], [165, .08], [220, .05]]) { const o = osc('sine', f * p, t, t + D + .05), g = gn(0); o.frequency.linearRampToValueAtTime(f * p * 1.12, t + D); shape(g.gain, t, [[D * .6, 1], [D * .85, .7], [D, 0]]); o.connect(g); out(g, v, { pan, room: .25 }, t, t + D + .05); }
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 240], [D * .7, 520], [D, 260]], q: .5, pts: [[D * .5, .6], [D, 0]], v: .14, pan, room: .2 });
     },
     /* --- earth --- */
     quake(m) {
@@ -83097,94 +83111,204 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -83193,75 +83317,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -95500,6 +95756,296 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { smoke: 'Incense smoke (a rolling bank over the patch)', embers: 'Embers drifting up', coal: 'The coal in flight (glow, a thread of smoke)', flare: 'The patch flaring (firelight, embers)' });
   if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { coal: 'c', flare: 'c', smoke: 'c', embers: 'c' });
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['censer', 'Censer Bearers']);
+  if (typeof efxSync === 'function') efxSync();
+}
+
+/* ================= THE MAGELINGS' ARCANE LIGHT: missiles, a curtain of them hung over the road, a gathering orb =================
+   Unit seven of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules so far: light and
+   energy are smooth shader effects, not faceted meshes ("needs to look like a holy laser ... more realistic to match the
+   [new] model"); nothing is a mark on the ground; never too flashy; projectiles fly straight and level. Until now a missile
+   was a glow sprite with a spinning star and four dots behind it, swerving out sideways before it turned in; the Curtain
+   small darts on a thread; the Orb a few sprites over the hat, lobbed on an arc into a ring and a burst of runes.
+     the strike       a comet of violet light: a white-hot head, a tapering tail of light behind it, a few sparks shed; it
+                      flies straight from her hand to its foe (the game still moves it its own way and lands it when it
+                      always did); a small flare and a scatter of sparks where it lands
+     Arcane Barrage   the same missiles in a stream, light gathered at her hand while she looses them (no glyph under her)
+     Missile Curtain  the missiles hung across the road as points of light, each with a faint veil of light falling from
+                      it to the road, so the curtain's real line shows; a thread of light between them; each dives straight
+     Gathering Orb    a ball of light over her hat that swells with every missile fed to it, light drawn in from each
+                      Mageling feeding it; thrown straight; where it lands, a burst of light out to its real reach (no ring)
+   All of it is cards of the plant shader (seedtex.js: BEAM, FLARE, GLOW, MOTE), through the Seedcasters' kit (seedfx.js).
+   The switch is theirs: SD.off (the Element Lab's "Old look") or no toolkit brings the older drawing back. Gameplay,
+   timing and balance are untouched. Tuning: the Element Lab's entries arcmissile, cc_barrage, cc_sparks, cc_grandorb. */
+const MGF = { quiet: 0, casts: [], streaks: [], throws: [], bursts: [] };
+const MGF_VIO = [.66, .42, 1], MGF_HOT = [.93, .88, 1], MGF_DEEP = [.4, .2, .78];
+// a soft body of deep violet behind a light: added light alone is lost on Greatroot Way's pale sunlit sand, this is not
+const mgfBody = (P, w, a, seed, s, l) => sdBill(SDT_SH.SPORE, P, w, w, { age: .25, seed, a, p0: .55, p1: 0, col: MGF_DEEP, soft: .1, sp: .4 }, s, l);
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { if (MGF.dust) MGF.dust.length = 0; MGF.casts.length = 0; MGF.streaks.length = 0; MGF.throws.length = 0; MGF.bursts.length = 0; });
+const mgfOn = () => typeof sdOn === 'function' && sdOn();
+const mgfCC = () => typeof G !== 'undefined' && G && G.force === 'conclave';
+const _mgfC = new Map();
+// a missile's colour: arcane violet, or the element it carries (a split missile), lifted towards white so it reads as light
+function mgfCol(hex) {
+  if (!hex || hex === CC_COL.arcane) return MGF_VIO;
+  let c = _mgfC.get(hex); if (!c) { const n = parseInt(hex.slice(1), 16); c = [.35 + .65 * (n >> 16) / 255, .35 + .65 * (n >> 8 & 255) / 255, .35 + .65 * (n & 255) / 255]; _mgfC.set(hex, c); }
+  return c;
+}
+const mgfHand = t => (typeof sfxMuzzle === 'function' && sfxMuzzle(t)) || ccHand(t);
+
+/* ---- a bolt of arcane light with its head at P, come from the direction of A: a tail of light, a soft glow, a hot head ---- */
+function mgfBolt(A, P, w, tail, rays, a, col, seed, s, l) {
+  if (a <= .02) return;
+  const dx = P[0] - A[0], dy = P[1] - A[1], dz = P[2] - A[2], L = Math.hypot(dx, dy, dz);
+  if (L > .03) { const tl = Math.min(tail, L), k = tl / L, T = [P[0] - dx * k, P[1] - dy * k, P[2] - dz * k]; sdSeg(SDT_SH.BEAM, T, P, w * .5, w * 2.2, { seed, k: 1, a: a * .9, p0: 1, p1: 1.2, p2: tl, col, sp: 2 }, s, l); }
+  mgfBody(P, w * 2.4, a * .5, seed, s, l);
+  sdBill(SDT_SH.GLOW, P, w * 3, w * 3, { seed, a: a * .7, col }, s, l);
+  sdBill(SDT_SH.FLARE, P, w * 1.9, w * 1.9, { seed, a, p0: rays, col: MGF_HOT, pull: .1 }, s, l);
+}
+// sparks thrown off a point
+function mgfSparks(x, y, z, n, out, col, s, l) {
+  if (typeof sdShot !== 'function') return;
+  for (let k = 0; k < n; k++) { const an = R(TAU), v = R(.4, 1) * out; sdShot('mote', x, y, z, R(.028, .042), R(.25, .5), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.2, 1.4), g: 5, col: col || MGF_HOT, k: 1.5 }, s, l); }
+}
+
+/* ---- a ball of arcane light at P, w across: a deep violet body, light swelling out of it to a pale heart, motes
+   turning inside it (no rays: a ball, not a star) ---- */
+function mgfBall(P, w, a, col, seed, lv, s, l) {
+  const now = G.time, br = 1 + .07 * Math.sin(now * 17 + seed);
+  mgfBody(P, w * 2.1, a * .5, seed, s, l);
+  sdBill(SDT_SH.GLOW, P, w * 2.6 * br, w * 2.6 * br, { seed, a: a * .5, col }, s, l);
+  sdBill(SDT_SH.GLOW, P, w * 1.5 * br, w * 1.5 * br, { seed: seed + 1, a: a * .9, col }, s, l);
+  sdBill(SDT_SH.GLOW, P, w * .75, w * .75, { seed: seed + 2, a: a * .95, col: MGF_HOT }, s, l);
+  const n = [2, 4, 6][lv];
+  for (let i = 0; i < n; i++) { const an = now * (9 + i * 1.7) + i * TAU / n + seed, r = w * (.3 + .1 * Math.sin(now * 6 + i)), ti = Math.sin(i * 2.4 + seed); sdBill(SDT_SH.MOTE, [P[0] + Math.cos(an) * r, P[1] + Math.sin(an * 1.3 + i) * r * ti, P[2] + Math.sin(an) * r], w * .2, w * .2, { seed: i, a, k: 1.5, col: MGF_HOT }, s, l); }
+}
+/* ---- motes of arcane light left in the air: each drifts out from where it was let go, slows, twinkles and goes out ---- */
+MGF.dust = [];
+function mgfBasis(A, T) {
+  let d = [T[0] - A[0], T[1] - A[1], T[2] - A[2]]; const L = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / L, d[1] / L, d[2] / L];
+  const r = Math.abs(d[1]) > .9 ? [1, 0, 0] : [0, 1, 0]; let u = [r[1] * d[2] - r[2] * d[1], r[2] * d[0] - r[0] * d[2], r[0] * d[1] - r[1] * d[0]]; const ul = Math.hypot(u[0], u[1], u[2]) || 1; u = [u[0] / ul, u[1] / ul, u[2] / ul];
+  return { d, u, v: [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]] };
+}
+function mgfPush(q) { const cap = [220, 420, 700][sdLv()]; if (MGF.dust.length >= cap) MGF.dust.splice(0, MGF.dust.length - cap + 1); MGF.dust.push(q); }
+// one mote of a missile's wake at X: an angle round the line of flight B, the missile's width w, how long it lives (x)
+function mgfMote(X, B, an, w, lifeK, col) {
+  const c = Math.cos(an), sn = Math.sin(an), r0 = w * .3, out = R(.15, .5), tan = R(.5, 1.1), fw = R(-.2, .9);
+  mgfPush({ x: X[0] + (B.u[0] * c + B.v[0] * sn) * r0, y: X[1] + (B.u[1] * c + B.v[1] * sn) * r0, z: X[2] + (B.u[2] * c + B.v[2] * sn) * r0,
+    vx: (B.u[0] * c + B.v[0] * sn) * out + (-B.u[0] * sn + B.v[0] * c) * tan + B.d[0] * fw + R(-.12, .12), vy: (B.u[1] * c + B.v[1] * sn) * out + (-B.u[1] * sn + B.v[1] * c) * tan + B.d[1] * fw + R(0, .25), vz: (B.u[2] * c + B.v[2] * sn) * out + (-B.u[2] * sn + B.v[2] * c) * tan + B.d[2] * fw + R(-.12, .12),
+    at: G.time, life: R(.3, .6) * lifeK, w: w * R(.14, .3), drag: 3.5, col: Math.random() < .28 ? MGF_HOT : col, seed: Math.random() * 97 });
+}
+function mgfDust(now) {
+  if (!MGF.dust.length) return;
+  MGF.dust = MGF.dust.filter(q => now - q.at < q.life);
+  for (const q of MGF.dust) {
+    const t = now - q.at, u = t / q.life, e = (1 - Math.exp(-q.drag * t)) / q.drag, a = Math.pow(1 - u, 1.4) * (.7 + .3 * Math.sin(now * 38 + q.seed)), w = q.w * (1 - .55 * u);
+    sdBill(SDT_SH.MOTE, [q.x + q.vx * e, q.y + q.vy * e + .12 * t * t, q.z + q.vz * e], w, w, { seed: q.seed, a, k: 1.5, col: q.col });
+  }
+}
+
+/* ---- the missiles (the Conclave's shots of kind 'missile'): drawn straight from where they were loosed to their foe ---- */
+function mgfMissile(p) {
+  const s = p._mgs || 'arcmissile', V = sdV(s, 'missile'), k = sdOnL(s, 'missile'); if (k == null) return;
+  const tg = p.tg, M = p._mg || (p._mg = { A: [p.x, p.h, p.z], seed: Math.random() * 97, shed: 0, u: 0, T: null });
+  if (tg && !tg.dead) M.T = [tg.x, hitH(tg), tg.y]; else if (!M.T) M.T = [p.x, p.h, p.z];
+  // (how far along it is: what it has flown against what is left, so it leaves and lands with the game's own missile)
+  const d = Math.hypot(M.T[0] - p.x, M.T[1] - p.h, M.T[2] - p.z), flown = p.age * (p.spd || 7.4), u = Math.max(M.u, flown / Math.max(.001, flown + d)); M.u = u;
+  const P = [M.A[0] + (M.T[0] - M.A[0]) * u, M.A[1] + (M.T[1] - M.A[1]) * u, M.A[2] + (M.T[2] - M.A[2]) * u], sz = (p.sz || 1), col = mgfCol(p.col);
+  M.P = P;
+  // (owner: "looks like a moving sprite rather than arcane magic ... more moving particle effect", then "the orb should look
+  // like a ball of arcane light and the tail should be more organic looking like the tail of light": a ball of light with
+  // motes turning inside it; behind it a tail that sways and tapers like a comet's, and a wake of motes let go into the air)
+  const now = G.time, a = Math.min(1, p.age / .04 + .3) * k, w = V.w * sz, B = M.B || (M.B = mgfBasis(M.A, M.T)), lv = sdLv();
+  // the tail: a chain of soft light along the way it has come, swaying more the further back, thinning to nothing
+  const gone = Math.hypot(P[0] - M.A[0], P[1] - M.A[1], P[2] - M.A[2]), tl = Math.min(V.trail, gone);
+  if (tl > .04) {
+    const n = [6, 9, 12][lv]; let prev = P;
+    for (let i = 1; i <= n; i++) {
+      const f = i / n, back = tl * f, sw = w * V.sway * Math.pow(f, 1.3), ph = now * 13 - f * 5.5 + M.seed, ox = Math.sin(ph) * sw, oy = Math.cos(ph * .8 + 1.3) * sw * .7;
+      const X = [P[0] - B.d[0] * back + B.u[0] * ox + B.v[0] * oy, P[1] - B.d[1] * back + B.u[1] * ox + B.v[1] * oy, P[2] - B.d[2] * back + B.u[2] * ox + B.v[2] * oy];
+      const th = 1 - f, g = w * (.35 + 1.5 * th * th), al = a * Math.pow(th, 1.2);
+      sdBill(SDT_SH.GLOW, X, g, g, { seed: M.seed + i, a: al * .55, col }, s, 'missile');
+      sdSeg(SDT_SH.BEAM, X, prev, w * (.25 + 1.6 * (1 - f)), w * (.25 + 1.6 * (1 - (i - 1) / n)), { seed: M.seed, k: 1, a: al * .75, p0: .7, p1: 1.2, p2: tl / n, col, sp: 1.5 }, s, 'missile');
+      prev = X;
+    }
+  }
+  mgfBall(P, w, a, col, M.seed, lv, s, 'missile');
+  // the wake: motes let go along the path it has flown since the last frame, on two strands winding round it
+  const Vs = sdV(s, 'sparks');
+  if (sdOnL(s, 'sparks') != null && Vs.rate > 0) {
+    const Q = M.Q || P, dt = Math.min(.05, now - (M.last || now)); M.acc = (M.acc || 0) + dt * Vs.rate * [.35, .65, 1][lv] * (SD.load > .7 ? .6 : 1);
+    const n = Math.floor(M.acc); M.acc -= n;
+    for (let j = 0; j < n; j++) { const f = (j + Math.random()) / n, X = [Q[0] + (P[0] - Q[0]) * f, Q[1] + (P[1] - Q[1]) * f, Q[2] + (P[2] - Q[2]) * f]; M.ph = (M.ph || 0) + 1.1; mgfMote(X, B, M.ph + (j % 2) * Math.PI, w, 1, col); }
+  }
+  M.Q = P; M.last = now;
+}
+function mgfLand(p, hit) {
+  const s = p._mgs || 'arcmissile'; if (sdOnL(s, 'sparks') == null) return;
+  const V = sdV(s, 'sparks'), lv = sdLv(), col = mgfCol(p.col), x = hit ? hit.x : p.x, y = hit ? hitH(hit) : p.h, z = hit ? hit.y : p.z, sz = p.sz || 1;
+  sdShot('flare', x, y, z, V.flare * sz * .8, .18, { col, a: .8 }, s, 'sparks');
+  // it bursts into motes: thrown out all round, slowing at once, hanging a moment and going out
+  const n = Math.round(V.count * [.4, .7, 1][lv] * (SD.load > .7 ? .5 : 1));
+  for (let i = 0; i < n; i++) { const an = R(TAU), el = R(-.5, 1.1), ce = Math.cos(el), v = R(1.2, 3.4); mgfPush({ x, y, z, vx: Math.cos(an) * ce * v, vy: Math.sin(el) * v, vz: Math.sin(an) * ce * v, at: G.time, life: R(.3, .65), w: R(.035, .07) * sz, drag: 6, col: i % 3 ? col : MGF_HOT, seed: Math.random() * 97 }); }
+}
+if (typeof sfxBasicCC === 'function') { const _b = sfxBasicCC; sfxBasicCC = function (p) { if (p && p.k === 'missile' && mgfOn()) return true;   /* (drawn with the frame's cards below: cards queued from here are not gathered) */ return _b.apply(this, arguments); }; }
+if (typeof sfxBasicLandCC === 'function') { const _l = sfxBasicLandCC; sfxBasicLandCC = function (p, hit) { if (p && p.k === 'missile' && mgfOn()) { try { mgfLand(p, hit); } catch (e) {} return; } return _l.apply(this, arguments); }; }
+// the game's own flare sprite where a missile lands
+if (typeof ccMissileHit === 'function') { const _mh = ccMissileHit; ccMissileHit = function () { MGF.quiet++; try { return _mh.apply(this, arguments); } finally { MGF.quiet--; } }; }
+if (typeof part === 'function') { const _pt = part; part = function (o) { if (MGF.quiet > 0 && o && o.k === 'flare' && mgfOn()) return; return _pt.apply(this, arguments); }; }
+// which spell loosed a missile (so the lab tunes the Barrage's and the Curtain's apart from the strike's)
+if (typeof ccShoot === 'function') { const _cs = ccShoot; ccShoot = function (p) { if (p && p.k === 'missile' && typeof AB_NOW !== 'undefined' && (AB_NOW === 'cc_barrage' || AB_NOW === 'cc_sparks')) p._mgs = AB_NOW; return _cs.apply(this, arguments); }; }
+
+/* ---- Arcane Barrage: light gathered at her hand while the missiles leave (the recipe's glyph and ribbons handed over) ---- */
+if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('cc_barrage');
+if (typeof ABIL !== 'undefined' && ABIL.cc_barrage && typeof ABIL.cc_barrage.cast === 'function') {
+  const _bc = ABIL.cc_barrage.cast;
+  ABIL.cc_barrage.cast = function (t, st, L, ab) {
+    if (mgfOn()) { let n = 5; try { n = byT(ab.by.n, t); } catch (e) {} if (MGF.casts.length > 12) MGF.casts.shift(); MGF.casts.push({ t, at: G.time, life: .2 + n * .07 + .25, seed: Math.random() * 97 }); }
+    return _bc.apply(this, arguments);
+  };
+}
+// (the recipe's own ribbons behind the Barrage's missiles and its rune-burst where each lands: spellfx.js watches the
+// shots a cast looses whether or not its recipe ran)
+if (typeof SFX_V2 !== 'undefined' && SFX_V2.cc_barrage) { const V2 = SFX_V2.cc_barrage; for (const k of ['trail', 'land', 'hit', 'cast']) { const f = V2[k]; if (typeof f === 'function') V2[k] = function () { if (mgfOn()) return; return f.apply(this, arguments); }; } }
+function mgfCasts(now) {
+  MGF.casts = MGF.casts.filter(q => now < q.at + q.life && G.towers.includes(q.t));
+  const V = sdV('cc_barrage', 'gather'), k = sdOnL('cc_barrage', 'gather'); if (k == null) return;
+  for (const q of MGF.casts) {
+    const u = (now - q.at) / q.life, a = (u < .15 ? u / .15 : 1 - Math.pow((u - .15) / .85, 2)) * k, m = mgfHand(q.t), w = V.flare * (.8 + .2 * Math.sin(now * 40 + q.seed));
+    sdBill(SDT_SH.GLOW, m, w * 1.6, w * 1.6, { seed: q.seed, a: a * .4, col: MGF_VIO }, 'cc_barrage', 'gather');
+    sdBill(SDT_SH.FLARE, m, w, w, { seed: q.seed, a, p0: V.rays, col: MGF_HOT, pull: .1 }, 'cc_barrage', 'gather');
+  }
+}
+
+/* ---- Missile Curtain: the missiles hung across the road, a veil of light under each ---- */
+function mgfCurtain(q) {
+  const z = q.zone, e = Math.min(1, q.age / .3, Math.max(0, z.until - G.time) / .25 + (z.ms.some(m => m.live) ? .2 : 0)); if (e <= .01) return;
+  const V = sdV('cc_sparks', 'hang'), k = sdOnL('cc_sparks', 'hang'); if (k == null) return;
+  const M = z.ms, now = G.time; let prev = null;
+  for (let j = 0; j < M.length; j++) {
+    const m = M[j], g = Math.max(0, Math.min(1, (q.age - m.at) / .25)); if (!m.live || g <= 0) { prev = null; continue; }
+    const h = m.h + .04 * Math.sin(now * 3 + j * 1.7), P = [m.x, h, m.z], a = e * g * k, w = V.w * (.9 + .1 * Math.sin(now * 9 + j * 2.3));
+    // the veil: faint light falling from it to the road (the line a foe must cross)
+    if (V.veil > 0) sdSeg(SDT_SH.BEAM, P, [m.x, .06, m.z], w * 4, w * 3, { seed: j * 7 + 1, k: 1, a: a * V.veil, p0: .6, p1: 1.5, p2: h, col: MGF_VIO, sp: .8 }, 'cc_sparks', 'hang');
+    // a short tail above it: it hangs nose-down
+    sdSeg(SDT_SH.BEAM, [m.x, h + .3, m.z], P, w * .8, w * 2.6, { seed: j * 7 + 2, k: 1, a: a * .8, p0: 1, p1: 1, p2: .3, col: MGF_VIO, sp: .5 }, 'cc_sparks', 'hang');
+    mgfBody(P, w * 2.2, a * .5, j * 5 + 3, 'cc_sparks', 'hang');
+    sdBill(SDT_SH.GLOW, P, w * 2.4, w * 2.4, { seed: j, a: a * .7, col: MGF_VIO }, 'cc_sparks', 'hang');
+    sdBill(SDT_SH.GLOW, P, w * .8, w * .8, { seed: j + 9, a: a * .9, col: MGF_HOT }, 'cc_sparks', 'hang');
+    sdBill(SDT_SH.FLARE, P, w * 1.7, w * 1.7, { seed: j * 3, a, p0: V.rays, col: MGF_HOT, pull: .1 }, 'cc_sparks', 'hang');
+    if (prev && sdLv()) sdSeg(SDT_SH.BEAM, prev, P, w * 2.2, w * 2.2, { seed: j, k: 1, a: a * V.thread, p0: 1, p1: .6, p2: .22, col: MGF_VIO, sp: .3 }, 'cc_sparks', 'hang');
+    prev = P;
+  }
+}
+// light running from her hand to where a missile will hang, and from each Mageling to the orb it feeds
+function mgfStreaks(now) {
+  MGF.streaks = MGF.streaks.filter(q => now < q.at + q.life);
+  for (const q of MGF.streaks) {
+    const el = now - q.at; if (el < 0 || sdOnL(q.s, q.l) == null) continue;
+    const u = el / q.life, hd = Math.min(1, u * 1.6), P = [q.A[0] + (q.B[0] - q.A[0]) * hd, q.A[1] + (q.B[1] - q.A[1]) * hd, q.A[2] + (q.B[2] - q.A[2]) * hd];
+    mgfBolt(q.A, P, q.w, .5, .4, 1 - Math.max(0, (u - .6) / .4), MGF_VIO, q.seed, q.s, q.l);
+  }
+}
+const mgfStreak = (A, B, w, life, delay, s, l) => { if (MGF.streaks.length > 40) MGF.streaks.shift(); MGF.streaks.push({ A: [A[0], A[1], A[2]], B, w, life, at: G.time + (delay || 0), seed: Math.random() * 97, s, l }); };
+
+/* ---- Gathering Orb: a ball of light over her hat, thrown straight, bursting out to its real reach ---- */
+const mgfOrbAt = t => [t.x, towerTop(t) + .55, t.y];
+const mgfOrbSize = (o, V) => (.3 + .07 * Math.min(10, o.n)) * V.w;
+function mgfOrbBall(P, s, a, pulse, seed, V, lv) { mgfBall(P, s * (1 + .3 * pulse), a, MGF_VIO, seed, lv, 'cc_grandorb', 'orb'); }
+function mgfOrb(q) {
+  const o = q.orb, t = o.t; if (!t || !G.towers.includes(t) || G.time >= o.until) return;
+  const V = sdV('cc_grandorb', 'orb'), k = sdOnL('cc_grandorb', 'orb'); if (k == null) return;
+  const e = Math.min(1, q.age / .3) * k, pulse = Math.max(0, 1 - (G.time - (o.lastT || -9)) / .2);
+  if (q._mgSeed == null) q._mgSeed = Math.random() * 97;
+  mgfOrbBall(mgfOrbAt(t), mgfOrbSize(o, V) * (.5 + .5 * e), e, pulse, q._mgSeed, V, sdLv());
+}
+function mgfThrows(now) {
+  MGF.throws = MGF.throws.filter(q => now < q.at + q.T + .02);
+  const V = sdV('cc_grandorb', 'orb'), k = sdOnL('cc_grandorb', 'orb'), lv = sdLv();
+  if (k != null) for (const q of MGF.throws) {
+    const u = Math.min(1, (now - q.at) / q.T), P = [q.A[0] + (q.B[0] - q.A[0]) * u, q.A[1] + (q.B[1] - q.A[1]) * u, q.A[2] + (q.B[2] - q.A[2]) * u];
+    const L = Math.hypot(P[0] - q.A[0], P[1] - q.A[1], P[2] - q.A[2]);
+    if (L > .05) { const tl = Math.min(1.1, L), f = tl / L; sdSeg(SDT_SH.BEAM, [P[0] - (P[0] - q.A[0]) * f, P[1] - (P[1] - q.A[1]) * f, P[2] - (P[2] - q.A[2]) * f], P, q.s * .5, q.s * 2.2, { seed: q.seed, k: 1, a: .8 * k, p0: 1, p1: 1.3, p2: tl, col: MGF_VIO, sp: 2 }, 'cc_grandorb', 'orb'); }
+    mgfOrbBall(P, q.s, k, 0, q.seed, V, lv);
+    if (lv && now - q.shed > .03) { q.shed = now; sdShot('mote', P[0], P[1], P[2], R(.03, .045), R(.3, .5), { vx: R(-.3, .3), vz: R(-.3, .3), vy: R(-.1, .3), drag: 2, col: MGF_VIO, k: 1.3 }, 'cc_grandorb', 'orb'); }
+  }
+  // the burst: a flare at its heart, a shell of light swelling to the real reach and thinning as it goes
+  MGF.bursts = MGF.bursts.filter(q => now < q.at + q.life);
+  const Vb = sdV('cc_grandorb', 'burst'), kb = sdOnL('cc_grandorb', 'burst'); if (kb == null) return;
+  for (const q of MGF.bursts) {
+    const u = (now - q.at) / q.life, g = 1 - Math.pow(1 - u, 3), a = (1 - u) * (1 - u) * kb, P = [q.x, .4, q.z];
+    sdBill(SDT_SH.GLOW, P, q.r * 2.3 * g, q.r * 2.3 * g, { seed: q.seed, a: a * Vb.a, col: MGF_VIO }, 'cc_grandorb', 'burst');
+    sdBill(SDT_SH.FLARE, P, Vb.flare * q.big * (.6 + .6 * g), Vb.flare * q.big * (.6 + .6 * g), { seed: q.seed, a: Math.max(0, 1 - u * 1.6) * kb, p0: 1, col: MGF_HOT, pull: .15 }, 'cc_grandorb', 'burst');
+  }
+}
+function mgfBurst(x, z, r, orb) {
+  if (sdOnL('cc_grandorb', 'burst') == null) return;
+  const V = sdV('cc_grandorb', 'burst'), lv = sdLv(), big = Math.min(1.6, 1 + .06 * orb.n), drag = 4.5;
+  if (MGF.bursts.length > 6) MGF.bursts.shift();
+  MGF.bursts.push({ x, z, r, big, at: G.time, life: .55, seed: Math.random() * 97 });
+  // sparks and a thin haze of light thrown out low, stopping at its real edge
+  const n = Math.round(V.count * [.4, .7, 1][lv]), a0 = R(TAU);
+  for (let i = 0; i < n; i++) { const an = a0 + (i + R(-.3, .3)) / n * TAU, v = r * R(.75, 1) * drag; sdShot('mote', x, R(.25, .5), z, R(.035, .055), R(.45, .8), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.1, .9), drag, g: 1.5, col: i % 3 ? MGF_VIO : MGF_HOT, k: 1.6 }, 'cc_grandorb', 'burst'); }
+  const nh = Math.round(V.dust * [.5, .75, 1][lv]), w = r * .62;
+  for (let i = 0; i < nh; i++) { const an = a0 + i / Math.max(1, nh) * TAU, v = Math.max(0, r - w * .34) * drag; sdShot('spore', x, w * .3, z, w, R(.45, .7), { vx: Math.cos(an) * v, vz: Math.sin(an) * v, vy: R(.05, .2), drag, grow: .6, p0: .45, a: .4, col: [.7, .58, .95] }, 'cc_grandorb', 'burst'); }
+  if (typeof flashLight === 'function' && G.flashes && G.flashes.length < 6) flashLight(x, z, .5, [1.1, .85, 1.6], 2.2 * big, .35);
+}
+
+/* ---- the Conclave's own drawing of these handed over ---- */
+if (typeof SFX_DRAW !== 'undefined') {
+  const take = (id, fn) => { const d0 = SFX_DRAW[id]; if (!d0 || d0._mgf) return !!d0; const f = function (q) { if (!mgfOn()) return d0.apply(this, arguments); try { fn(q); } catch (e) {} }; f._mgf = 1; SFX_DRAW[id] = f; return true; };
+  const all = () => take('ccx_curtain', mgfCurtain) & take('ccx_orb', mgfOrb);
+  if (!all() && typeof setTimeout === 'function') { let n = 0; const again = () => { if (!all() && n++ < 60) setTimeout(again, 250); }; setTimeout(again, 0); }
+}
+if (typeof CCX_FX !== 'undefined') {
+  const X = CCX_FX, o = { curtainHang: X.curtainHang, curtainDive: X.curtainDive, orbGather: X.orbGather, orbFeed: X.orbFeed, orbThrow: X.orbThrow, orbBurst: X.orbBurst, orbFizzle: X.orbFizzle };
+  const K = C => (typeof v2K === 'function' ? v2K(C) : { a: [1, 1, 1], hot: [1, 1, 1] });
+  X.curtainHang = function (C, t, zn) {
+    if (!mgfOn()) return o.curtainHang.apply(this, arguments);
+    const k = K(C), m = mgfHand(t), V = sdV('cc_sparks', 'hang');
+    sfxAdd({ k: 'ccx_curtain', zone: zn, col: k.a, hot: k.hot, life: CCX.CURT_WAIT + .4 });
+    for (const q of zn.ms) mgfStreak(m, [q.x, q.h, q.z], V.w * .8, .22, q.at, 'cc_sparks', 'hang');
+  };
+  X.curtainDive = function (C, m) { if (!mgfOn()) return o.curtainDive.apply(this, arguments); if (sdOnL('cc_sparks', 'hang') != null) sdShot('flare', m.x, m.h, m.z, sdV('cc_sparks', 'hang').w * 2.2, .16, { col: MGF_HOT }, 'cc_sparks', 'hang'); };
+  X.orbGather = function (C, t, orb) { if (!mgfOn()) return o.orbGather.apply(this, arguments); const k = K(C); sfxAdd({ k: 'ccx_orb', orb, S: C.S * C.T.glow, col: k.a, hot: k.hot, life: (orb.until - G.time) + .1 }); };
+  X.orbFeed = function (C, t, orb) { if (!mgfOn()) return o.orbFeed.apply(this, arguments); const V = sdV('cc_grandorb', 'orb'); mgfStreak(mgfHand(t), mgfOrbAt(orb.t), V.feed, .22, 0, 'cc_grandorb', 'orb'); };
+  X.orbThrow = function (C, t, orb, x, z, T) {
+    if (!mgfOn()) return o.orbThrow.apply(this, arguments);
+    if (MGF.throws.length > 6) MGF.throws.shift();
+    MGF.throws.push({ A: mgfOrbAt(t), B: [x, .4, z], T, at: G.time, s: mgfOrbSize(orb, sdV('cc_grandorb', 'orb')), seed: Math.random() * 97, shed: 0 });
+  };
+  X.orbBurst = function (C, x, z, r, orb) { if (!mgfOn()) return o.orbBurst.apply(this, arguments); mgfBurst(x, z, r, orb); };
+  X.orbFizzle = function (C, orb) { if (!mgfOn()) return o.orbFizzle.apply(this, arguments); const t = orb.t; if (t) { const P = mgfOrbAt(t); mgfSparks(P[0], P[1], P[2], 6, .8, MGF_VIO, 'cc_grandorb', 'orb'); } };
+}
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { if (!mgfCC()) return; mgfDust(now); if (G.ccP) for (const p of G.ccP) if (p.k === 'missile' && !p.done) { try { mgfMissile(p); } catch (e) {} } mgfCasts(now); mgfStreaks(now); mgfThrows(now); });
+
+/* ---- the Element Lab's entries ---- */
+if (typeof ELEM_FX_SPELLS !== 'undefined') {
+  Object.assign(ELEM_FX_SPELLS, {
+    arcmissile: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Missile', basic: 1, layers: ['missile', 'sparks'] },
+    cc_barrage: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Barrage', layers: ['missile', 'sparks', 'gather'] },
+    cc_sparks: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Missile Curtain', layers: ['hang', 'missile', 'sparks'] },
+    cc_grandorb: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Gathering Orb', layers: ['orb', 'burst'] },
+  });
+  // a missile: its head's width, its tail's length, its head's rays; sparks it sheds (a second), sparks where it lands,
+  // the flare there (width)
+  const bolt = { w: .24, trail: .9, sway: .55 }, sparks = { rate: 70, count: 18, flare: .5 };
+  Object.assign(ELEM_FX_DEF, {
+    arcmissile: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks) },
+    // the light gathered at her hand: its width, its rays
+    cc_barrage: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks), gather: { flare: .55, rays: .8 } },
+    // a hung missile: its width, its rays, the veil under it (opacity), the thread between them (opacity)
+    cc_sparks: { hang: { w: .3, rays: .6, veil: .55, thread: .5 }, missile: Object.assign({}, bolt, { w: .22 }), sparks: Object.assign({}, sparks) },
+    cc_grandorb: {
+      // the orb: its size (x), its rays, the width of the light fed to it
+      orb: { w: 1, rays: .7, feed: .16 },
+      // the burst: its flare (width), the shell of light (opacity), sparks thrown out, billows of haze
+      burst: { flare: 1.8, a: .55, count: 16, dust: 6 },
+    },
+  });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { veil: ['Veil of light under it (opacity)', 0, 1, .01], thread: ['Thread between them (opacity)', 0, 1, .01], feed: ['Light fed to it (width)', .02, .5, .01], sway: ['Its tail sways (x its width)', 0, 2, .05] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { missile: 'The missile', sparks: 'Its wake of motes, and its landing', gather: 'Light at her hand', hang: 'The hung missiles', orb: 'The orb' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { missile: 'c', sparks: 'c', gather: 'c', hang: 'c', orb: 'c' });
+  if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['cc_mageling', 'Magelings']);
   if (typeof efxSync === 'function') efxSync();
 }
 
