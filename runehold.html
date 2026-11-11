@@ -2838,70 +2838,107 @@ body.tut-on #toast{bottom:calc(var(--tutH,0px) + 20px)}
      - the level and Renown strips along the window's foot, as they sat along the bar's top.
    --dkb: a card button; --dkw: the info pane's width. Both shrink with the window. */
 @media (min-width:1000px) and (min-height:561px) and (min-aspect-ratio:5/4) and (hover:hover) and (pointer:fine){
-  #app{--dkb:clamp(40px,min(3.3vw,6.4vh),58px);--dkw:clamp(214px,22vw,330px);--dkcard:calc(var(--dkb) * 4 + 22px);--dkfoot:28px;
-    grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bar" "stage"}
-  #console{--btn:var(--dkb);position:fixed;left:0;right:0;bottom:0;height:0;display:block;padding:0;border:0;background:none;box-shadow:none;pointer-events:none;z-index:5}
+  #app{--dkb:clamp(34px,min(calc((35vw - 56px) / 12),6.4vh),58px);--dkw:clamp(214px,22vw,330px);--dkcard:calc(var(--dkb) * 4 + 22px);--dkfoot:28px;--dkrow:38px;
+    grid-template-rows:minmax(0,1fr) var(--dkrow);grid-template-areas:"stage" "row"}
+  #console{--btn:var(--dkb);position:fixed;left:0;right:0;bottom:var(--dkrow);height:0;display:block;padding:0;border:0;background:none;box-shadow:none;pointer-events:none;z-index:5}
   #console>*{pointer-events:auto}
   #card,#info{position:absolute;right:max(10px,var(--sa-r));background:linear-gradient(180deg,rgba(9,26,28,.84),rgba(4,12,13,.88));
     box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.6),0 0 12px rgba(63,224,214,.12),0 4px 14px rgba(0,0,0,.55);border-radius:8px}
-  #card{bottom:var(--dkfoot);padding:6px}
+  #card{bottom:var(--dkfoot);padding:6px;grid-template-columns:none;grid-template-rows:var(--dkb);grid-auto-flow:column;grid-auto-columns:var(--dkb);grid-auto-rows:auto}
+  #card .cmd.empty{display:none}   /* one row, as long as its buttons (owner's mock-up, 11 Nov 2026) */
   .cmd.empty{background:rgba(6,14,15,.5);box-shadow:inset 0 0 0 1px rgba(0,0,0,.6),inset 0 0 0 2px rgba(29,66,70,.45)}
-  #info{bottom:calc(var(--dkfoot) + var(--dkb) * 3 + 20px + 8px);width:var(--dkw);height:auto;contain:none;container-type:inline-size;padding:9px 10px;
-    max-height:calc(100dvh - var(--dkb) * 3 - 180px);overflow:hidden}
+  #info{bottom:calc(var(--dkfoot) + var(--dkb) + 12px + 6px);width:var(--dkw);height:auto;contain:none;container-type:inline-size;padding:9px 10px;
+    max-height:calc(100dvh - var(--dkb) - 200px);overflow:hidden}
   #info:has(#infoBody:empty){display:none}
   #pcv{width:48px}
   /* nothing selected: the wave in one line; the rest only on a click (owner, 11 Nov 2026: "remove these giant tooltips", seen on hover) */
   #info.wv{cursor:pointer}
-  #info.wv:not(.open){width:var(--dkcard);padding:7px 9px}
+  #info.wv:not(.open){width:max-content;contain:none;container-type:normal;max-width:calc(var(--dkb) * 12 + 56px);padding:7px 9px}
   #info.wv:not(.open) #pcv,#info.wv:not(.open) #infoBody>:not(h3):not(.aff){display:none!important}
   #info.wv:not(.open) #infoBody h3{margin:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #info.wv:not(.open) #infoBody .aff{margin:5px 0 0}
   #info.wv.open{box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(240,205,121,.85),0 0 12px rgba(63,224,214,.12),0 4px 14px rgba(0,0,0,.55)}
-  /* the corner card (ui.js deskCardHTML: #info.cmp): a unit, a foe or the unit being placed, the command card's width.
-     --uc: the unit kind's colour (a foe: red). Labels are one size (10px, muted), values one size (13px). .last: the last
-     unit shown, kept up dimmed. */
-  #info.cmp{width:var(--dkcard);padding:8px 9px 9px;cursor:pointer;box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px color-mix(in srgb,var(--uc) 70%,#1a1206),0 4px 14px rgba(0,0,0,.55)}
+  /* the unit strip (ui.js deskCardHTML: #info.cmp), one line on top of the command row (owner's mock-up, 11 Nov 2026): the
+     portrait, the name and stars, three numbers between thin dividers, then the bars side by side, each with its label over
+     its left end and its value over its right. --uc: the unit kind's colour (a foe: red). .last: the last unit shown, dimmed. */
+  #info.cmp{display:flex;align-items:center;gap:8px;width:auto;contain:none;container-type:normal;max-width:max(calc(var(--dkb) * 12 + 56px),36vw);height:44px;padding:0 10px 0 6px;cursor:pointer;
+    box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px color-mix(in srgb,var(--uc) 70%,#1a1206),0 4px 14px rgba(0,0,0,.55)}
   #info.cmp.foe{cursor:default}
-  #info.cmp #pcv{width:42px;margin:0 8px 0 0;border-radius:6px;box-shadow:0 0 0 2px var(--uc),0 0 0 3px rgba(0,0,0,.7)}
-  #info.cmp #infoBody{font:700 13px/1 var(--f-ui);color:var(--parch)}
-  #info.cmp .dk-h{display:flex;flex-direction:column;justify-content:center;gap:5px;min-height:42px}
-  #info.cmp .dk-n{font:400 14.5px/1.1 var(--f-display);letter-spacing:.03em;color:color-mix(in srgb,var(--uc) 55%,#fff);text-wrap:balance}
-  #info.cmp .dk-st{display:flex;gap:1px}
-  #info.cmp .dk-k{align-self:flex-start;font:800 10px/1 var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--gold-hi)}
+  #info.cmp #pcv{flex:none;float:none;width:32px;height:32px;margin:0;border-radius:5px;box-shadow:0 0 0 2px var(--uc),0 0 0 3px rgba(0,0,0,.7)}
+  #info.cmp #infoBody{display:flex;align-items:center;gap:0;min-width:0;font:700 13px/1 var(--f-ui);color:var(--parch);white-space:nowrap}
+  #info.cmp .dk-h{display:flex;align-items:center;gap:7px;min-width:0}
+  #info.cmp .dk-n{font:400 14.5px/1 var(--f-display);letter-spacing:.03em;color:color-mix(in srgb,var(--uc) 55%,#fff);min-width:56px;overflow:hidden;text-overflow:ellipsis}
+  #info.cmp .dk-st{display:flex;gap:1px;flex:none}
+  #info.cmp .dk-k{font:800 10px/1 var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--gold-hi)}
   #info.cmp .dk-cost::after{content:' gold'}
-  #info.cmp .dk-nums{clear:left;display:grid;grid-template-columns:repeat(3,1fr);gap:0 6px;margin:8px 0 0;padding:6px 0 0;border-top:1px solid color-mix(in srgb,var(--uc) 45%,transparent)}
-  #info.cmp .dk-nums span{display:flex;flex-direction:column;gap:3px;min-width:0}
-  #info.cmp .dk-nums i,#info.cmp .dk-bar i{font:700 10px/1 var(--f-ui);font-style:normal;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-  #info.cmp .dk-nums b,#info.cmp .dk-bar b{font:700 13px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--parch);white-space:nowrap}
-  #info.cmp .dk-bar{position:relative;display:flex;align-items:center;justify-content:space-between;height:16px;margin:6px 0 0;padding:0 6px;border-radius:3px;overflow:hidden;background:rgba(0,0,0,.45);box-shadow:inset 0 0 0 1px rgba(0,0,0,.8)}
-  #info.cmp .dk-bar u{position:absolute;left:0;top:0;bottom:0;background:var(--bc,#3d6fd0);opacity:.8;transition:width .2s linear}
-  #info.cmp .dk-bar i,#info.cmp .dk-bar b{position:relative;text-shadow:0 1px 2px #000,0 0 3px rgba(0,0,0,.8)}
+  #info.cmp .dk-nums{display:flex;align-items:center;flex:none;margin-left:clamp(7px,.6vw,12px)}
+  #info.cmp .dk-nums span{display:flex;align-items:baseline;gap:4px;padding:0 clamp(7px,.6vw,12px);border-left:1px solid color-mix(in srgb,var(--uc) 45%,transparent);line-height:18px}
+  #info.cmp .dk-nums i,#info.cmp .dk-bar i{font:700 11px/1 var(--f-ui);font-style:normal;color:var(--muted)}
+  #info.cmp .dk-nums b,#info.cmp .dk-bar b{font:700 13px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--parch)}
+  #info.cmp .dk-bars{display:flex;align-items:center;gap:10px;flex:none;padding-left:clamp(7px,.6vw,12px);border-left:1px solid color-mix(in srgb,var(--uc) 45%,transparent)}
+  #info.cmp .dk-bar{display:flex;flex-direction:column;gap:3px;width:clamp(78px,5vw,104px)}
+  #info.cmp .dk-bar span{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
   #info.cmp .dk-bar i{color:#e6ecea}
-  #info.cmp .dk-bar.mana{--bc:#3d6fd0}#info.cmp .dk-bar.hp{--bc:#b8402f}#info.cmp .dk-bar.ward{--bc:#8a93a0}
+  #info.cmp .dk-bar b{font-size:11.5px}
+  #info.cmp .dk-bar em{display:block;height:5px;border-radius:3px;overflow:hidden;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.8)}
+  #info.cmp .dk-bar u{display:block;height:100%;background:var(--bc,#3d6fd0);transition:width .2s linear}
+  #info.cmp .dk-bar.mana{--bc:#3d8fe0}#info.cmp .dk-bar.hp{--bc:#c8483a}#info.cmp .dk-bar.ward{--bc:#8a93a0}
   #info.cmp .dk-bar.gauge u{background:var(--bc,#6ab040)}
-  #info.cmp .dk-w{margin:7px 0 0;font:700 12px/1.1 var(--f-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #toast{bottom:calc(var(--dkfoot) + var(--dkb) + 76px)}
   #info.last{opacity:.72;filter:saturate(.7)}
   #info.last:hover{opacity:1;filter:none}
-  #zoomUI{right:calc(max(10px,var(--sa-r)) + var(--dkcard) + 8px);bottom:var(--dkfoot)}
-  #zoomUI button{width:36px;height:36px;font-size:22px}
-  /* one pause/play control, a card button's size, beside the card and the horn (owner: "keep the pause/play button handy on the
-     hud"): Space toggles it, gold with a play arrow and PAUSED under it while the field is held. Above it the speed button
-     (moved here from the top bar by ui.js), then the zoom buttons. The top bar's own button is the menu, so it wears a menu icon. */
-  #zoomUI{align-items:center;gap:6px}
-  #zoomUI #zIn{order:1}#zoomUI #zOut{order:2}#zoomUI #bSpeed{order:3}#zoomUI #bHold{order:4}
-  #zoomUI #bHold{position:relative;width:var(--dkb);height:var(--dkb);margin:2px 0 0;border-radius:9px;color:var(--gold-hi);
-    background:linear-gradient(180deg,rgba(23,57,61,.95),rgba(8,24,26,.95));box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px rgba(201,160,90,.85),inset 0 2px 0 rgba(255,255,255,.08),0 3px 10px rgba(0,0,0,.6)}
-  #zoomUI #bHold svg{width:46%;height:46%}
-  #zoomUI #bHold:hover{box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px var(--gold-hi),0 0 12px rgba(63,224,214,.45),0 3px 10px rgba(0,0,0,.6)}
-  #zoomUI #bHold.on{color:#1a1206;background:linear-gradient(180deg,#ffe9a0,#d9a83a);box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px #fff1c0,0 0 18px rgba(255,210,110,.85);animation:dkHold 1.4s ease-in-out infinite}
-  #zoomUI #bHold.on svg{margin-top:12%}
-  #zoomUI #bHold.on::after{content:'PAUSED';position:absolute;left:0;right:0;bottom:11%;text-align:center;font:800 clamp(7.5px,calc(var(--dkb) * .17),10px)/1 var(--f-ui);letter-spacing:.06em;color:#3a2606}
-  #zoomUI #bSpeed{width:var(--dkb);min-width:0;height:30px;padding:0;border-radius:7px;font-size:15px}
+  /* no top bar (owner, 11 Nov 2026: "just have the wave and the minions at the top. then have the other icons as just icons
+     without words as well as gold at the bottom under the xp bar"). ui.js deskBarDock moves the bar's own elements:
+       #dkTop  the wave count, the timer / foes left, the run's progress line, the forecast portraits under it: top centre;
+       #dkRow  a slim row (--dkrow) along the window's foot, under the level and Renown strips: gold and lives at the left,
+               the buttons at the right as icons only. The field ends above it, so nothing here stands over the map. */
+  #bar{display:none}
+  #dkTop[hidden],#dkRow[hidden]{display:none}
+  #dkTop{position:absolute;left:50%;top:0;transform:translateX(-50%);z-index:6;display:flex;flex-direction:column;align-items:center;pointer-events:none}
+  #dkTop .dk-wv{pointer-events:auto;position:relative;display:flex;align-items:center;justify-content:center;gap:12px;min-width:236px;padding:9px 28px 14px;border-radius:0 0 12px 12px;
+    background:linear-gradient(180deg,rgba(18,50,54,.95),rgba(7,21,23,.95));box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.75),0 0 12px rgba(63,224,214,.12),0 4px 14px rgba(0,0,0,.55)}
+  #dkTop .res{background:none;box-shadow:none;padding:0;gap:7px;font-size:18px}
+  #dkTop .res .k{font-size:16px;color:var(--parch);letter-spacing:.05em}
+  #dkTop #hOf{margin-left:-2px;color:var(--muted)}
+  #dkTop .dk-sep{flex:none;width:1px;height:17px;background:rgba(201,160,90,.55)}
+  #dkTop .dk-sep:has(+ .tm:empty){display:none}
+  #dkTop .tm{font-size:14.5px;opacity:1}
+  #dkTop .dk-pg{position:absolute;left:24px;right:24px;bottom:6px;height:3px;border-radius:2px;overflow:hidden;background:rgba(0,0,0,.65);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  #dkTop .dk-pg u{display:block;height:100%;width:0;background:linear-gradient(90deg,#2fb8a6,#74ecd4);transition:width .4s ease}
+  #dkTop #fcast{position:static;flex-wrap:nowrap;justify-content:center;gap:6px;max-width:none;margin-top:-1px;padding:6px 9px 8px;border-radius:0 0 10px 10px;
+    background:linear-gradient(180deg,rgba(7,21,23,.92),rgba(4,12,13,.86));box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.55),0 4px 12px rgba(0,0,0,.5)}
+  #dkTop #fcast .fc-m{width:38px;height:38px}
+  #dkTop #fcast .fc-m.k-boss{width:44px;height:44px}
+  #holdBadge{top:118px}
+  #dkRow{grid-area:row;position:relative;z-index:6;display:flex;align-items:center;justify-content:flex-start;gap:18px;min-width:0;padding:0 max(10px,var(--sa-r)) 0 max(10px,var(--sa-l));
+    background:linear-gradient(180deg,#10282b,#071517);box-shadow:inset 0 1px 0 rgba(201,160,90,.5),0 -2px 8px rgba(0,0,0,.5)}
+  #dkRow .dk-l,#dkRow .dk-r{display:flex;align-items:center;gap:6px;min-width:0}
+  #dkRow .dk-l{gap:12px}
+  #dkRow .res:not(.ptx-tag){background:none;box-shadow:none;padding:0}
+  #dkRow .hbtn{position:relative;display:grid;place-items:center;width:38px;min-width:38px;height:30px;padding:0}
+  #dkRow .hbtn .hl,#dkRow .hbtn .sl{display:none!important}
+  #dkRow .hbtn svg,#dkRow .hbtn img{width:20px;height:20px}
+  #dkRow .hbtn[hidden]{display:none}
+  #dkRow #rLives .lv-pop{top:auto;bottom:calc(100% + 8px)}
+  /* zoom, speed and one pause/play control (owner: "keep the pause/play button handy on the hud"; Space toggles it, gold with a
+     play arrow while the field is held) at the foot row's right end: ui.js deskBarDock moves #zoomUI there. The old top bar's
+     own button is the menu, so it wears a menu icon. */
+  #dkRow #zoomUI{position:static;margin-left:auto;display:flex;flex-direction:row;align-items:center;gap:6px}
+  #dkRow #zoomUI button{width:30px;height:30px;font-size:19px}
+  #zoomUI #zOut{order:1}#zoomUI #zIn{order:2}#zoomUI #bSpeed{order:3}#zoomUI #bHold{order:4}
+  #zoomUI #bSpeed{width:40px;min-width:0;height:30px;padding:0;border-radius:7px;font-size:14px}
+  #dkRow #zoomUI #bHold{position:relative;width:54px;height:30px;border-radius:7px;color:var(--gold-hi);
+    background:linear-gradient(180deg,rgba(23,57,61,.95),rgba(8,24,26,.95));box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px rgba(201,160,90,.85),inset 0 2px 0 rgba(255,255,255,.08)}
+  #zoomUI #bHold svg{width:16px;height:16px}
+  #dkRow #zoomUI #bHold:hover{box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px var(--gold-hi),0 0 12px rgba(63,224,214,.45)}
+  #dkRow #zoomUI #bHold.on{color:#1a1206;background:linear-gradient(180deg,#ffe9a0,#d9a83a);box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px #fff1c0,0 0 14px rgba(255,210,110,.85);animation:dkHold 1.4s ease-in-out infinite}
   #bMenu svg{display:none}
   #bMenu::before{content:'';display:block;width:16px;height:12px;background:linear-gradient(#f5e09a,#f5e09a) 0 0/100% 2.5px no-repeat,linear-gradient(#f5e09a,#f5e09a) 0 50%/100% 2.5px no-repeat,linear-gradient(#f5e09a,#f5e09a) 0 100%/100% 2.5px no-repeat}
   @keyframes dkHold{50%{box-shadow:0 0 0 1px #02090a,inset 0 0 0 2px #fff1c0,0 0 8px rgba(255,210,110,.5)}}
 }
 @media (prefers-reduced-motion:reduce){#zoomUI #bHold.on{animation:none}}
+/* a narrower desktop window: the strip's three numbers go without their words (each keeps its hover title), so the name fits */
+@media (min-width:1000px) and (max-width:1599px) and (hover:hover) and (pointer:fine){#info.cmp .dk-nums i{display:none}}
 
 .gp-more p{margin:0 0 5px;font-size:12.5px;line-height:1.3;color:var(--muted)}
 .gp-more p b{color:var(--parch)}
@@ -3167,7 +3204,7 @@ var MAP_LITE = (function () {
 </script>
 <script id="assets">
 (function () {
-  var A = [["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/berthasfxdata.1464d64e21.js",145397],["a/firesfxdata.4051387a8a.js",551894],["a/pyrosfx2data.e9a6cff4eb.js",227063],["a/bladesfxdata.818b19f400.js",22637],["a/frostsfxdata.9e637df558.js",49593],["a/deathsfxdata.458cf5e8f2.js",399169],["a/labfxdata.95ef851e40.js",3168802],["a/glintdata.fb95083a62.js",771859],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/tfforge.27a3324b27.js",9111859],["a/terraintex.7cb95904da.js",4301861],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/grpaint.fb39aadf6f.js",484672],["a/poolpaint.819a733d22.js",4151613],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.06cbba0c80.js",2366878],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.1a73bcaf58.js",4055194],["a/talentbg.ee828498ff.js",2165702],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.e7a7747c20.js",996205],["a/completionart.1.fcf285eaed.js",1090460],["a/completionart.2.31cc95af76.js",1089265],["a/completionart.3.829c7de133.js",1086248],["a/completionart.4.721377697b.js",1092355],["a/completionart.5.a8091647b0.js",1084589],["a/completionart.6.9b211962d3.js",1082461],["a/completionart.7.e71e6c00a2.js",1095079],["a/completionart.8.405ccfed44.js",1097542],["a/completionart.9.b02608515b.js",1086048],["a/completionart.10.37aa5d4275.js",1095626],["a/completionart.11.e5e65daee6.js",1099494],["a/completionart.12.d941a7d3a7.js",1094609],["a/completionart.13.ca81bb1afb.js",1095150],["a/completionart.14.0707927aef.js",1095009],["a/completionart.15.4239787241.js",1089989],["a/completionart.16.c0ac0609d3.js",1091537],["a/completionart.17.db87ea03a4.js",1093829],["a/completionart.18.27d89beefe.js",1094097],["a/completionart.19.78b4aa0d08.js",1087290],["a/completionart.20.2a42544c57.js",1099395],["a/completionart.21.76110e325f.js",1094345],["a/completionart.22.f8ceed82ac.js",824180],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_torchbearer.6a29a3a9aa.js",639207],["a/model_malgrath.6c12796111.js",735733],["a/model_mauler.9760a49c78.js",807575],["a/model_unit_gladebow.1993718f13.js",544805],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.3824cefb7c.js",644681],["a/model_unit_faelan_lb.1c1087ed50.js",710941],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.d849804ee3.js",1106383],["a/model_unit_thundergun.fce4f00910.js",946301],["a/model_unit_bladedancer.0d2f750fb4.js",1332874],["a/model_unit_thornguard.c64bf0a583.js",1275642],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/model_unit_astrologer.98ad0d6ac6.js",1336541],["a/model_unit_pyroclast.25ad2b371f.js",1126711],["a/model_unit_mageling.77ab002a64.js",1240605],["a/model_mageling2.d4c1faf4ba.js",848425],["a/model_faelan2.dda99f829d.js",905914],["a/model_ranger2.54a58422b8.js",713817],["a/model_bd2.483822b55c.js",908448],["a/model_seed2.6e4ac21e65.js",916486],["a/model_nyssa2.3bda138f44.js",996378],["a/model_pyro2.25360734be.js",870776],["a/model_tg2.fccf11eef2.js",887821],["a/model_unit_aurelian.5419360e90.js",1273453],["a/model_unit_aurelian_kimodo.6f71254edc.js",512189],["a/model_unit_frostweaver.978f1ad1b4.js",1231188],["a/main.028803d3ee.js",11413842]], T = 143867978, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
+  var A = [["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/berthasfxdata.1464d64e21.js",145397],["a/firesfxdata.4051387a8a.js",551894],["a/pyrosfx2data.e9a6cff4eb.js",227063],["a/bladesfxdata.818b19f400.js",22637],["a/frostsfxdata.9e637df558.js",49593],["a/deathsfxdata.458cf5e8f2.js",399169],["a/labfxdata.95ef851e40.js",3168802],["a/glintdata.fb95083a62.js",771859],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/tfforge.27a3324b27.js",9111859],["a/terraintex.7cb95904da.js",4301861],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/grpaint.fb39aadf6f.js",484672],["a/poolpaint.819a733d22.js",4151613],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.06cbba0c80.js",2366878],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.1a73bcaf58.js",4055194],["a/talentbg.ee828498ff.js",2165702],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.e7a7747c20.js",996205],["a/completionart.1.fcf285eaed.js",1090460],["a/completionart.2.31cc95af76.js",1089265],["a/completionart.3.829c7de133.js",1086248],["a/completionart.4.721377697b.js",1092355],["a/completionart.5.a8091647b0.js",1084589],["a/completionart.6.9b211962d3.js",1082461],["a/completionart.7.e71e6c00a2.js",1095079],["a/completionart.8.405ccfed44.js",1097542],["a/completionart.9.b02608515b.js",1086048],["a/completionart.10.37aa5d4275.js",1095626],["a/completionart.11.e5e65daee6.js",1099494],["a/completionart.12.d941a7d3a7.js",1094609],["a/completionart.13.ca81bb1afb.js",1095150],["a/completionart.14.0707927aef.js",1095009],["a/completionart.15.4239787241.js",1089989],["a/completionart.16.c0ac0609d3.js",1091537],["a/completionart.17.db87ea03a4.js",1093829],["a/completionart.18.27d89beefe.js",1094097],["a/completionart.19.78b4aa0d08.js",1087290],["a/completionart.20.2a42544c57.js",1099395],["a/completionart.21.76110e325f.js",1094345],["a/completionart.22.f8ceed82ac.js",824180],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_torchbearer.6a29a3a9aa.js",639207],["a/model_malgrath.6c12796111.js",735733],["a/model_mauler.9760a49c78.js",807575],["a/model_unit_gladebow.1993718f13.js",544805],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.3824cefb7c.js",644681],["a/model_unit_faelan_lb.1c1087ed50.js",710941],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.d849804ee3.js",1106383],["a/model_unit_thundergun.fce4f00910.js",946301],["a/model_unit_bladedancer.0d2f750fb4.js",1332874],["a/model_unit_thornguard.c64bf0a583.js",1275642],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/model_unit_astrologer.98ad0d6ac6.js",1336541],["a/model_unit_pyroclast.25ad2b371f.js",1126711],["a/model_unit_mageling.77ab002a64.js",1240605],["a/model_mageling2.d4c1faf4ba.js",848425],["a/model_faelan2.dda99f829d.js",905914],["a/model_ranger2.54a58422b8.js",713817],["a/model_bd2.483822b55c.js",908448],["a/model_seed2.6e4ac21e65.js",916486],["a/model_nyssa2.3bda138f44.js",996378],["a/model_pyro2.25360734be.js",870776],["a/model_tg2.fccf11eef2.js",887821],["a/model_unit_aurelian.5419360e90.js",1273453],["a/model_unit_aurelian_kimodo.6f71254edc.js",512189],["a/model_unit_frostweaver.978f1ad1b4.js",1231188],["a/main.7b3c08ae49.js",11415749]], T = 143869885, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
   // painted-only maps (src/maplite.js: phones and tablets): the 3D map dressing's data is never downloaded
   if (window.MAP_LITE) { var LS = ["tfforge","tfassets","terraintex"]; window.__liteSkipped = [];
     A = A.filter(function (f) { var n = f[0].split('/').pop().split('.')[0]; if (LS.indexOf(n) < 0) return true; window.__liteSkipped.push(f[0]); T -= f[1]; return false; }); }
