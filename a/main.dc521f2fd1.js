@@ -1,4 +1,4 @@
-const BUILD_TAG = '1f96b45@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '770c9cb@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -11932,8 +11932,8 @@ function itemCardHTML(it, o) {
   const sub = itemKindLine(it) + (it.hone && !ilb ? ` · Honed +${it.hone}` : '') + (it.lv > 1 ? ` · Level ${ROMAN[it.lv - 1]}` : '') + (ilb ? ' · ' + ilb : '');
   const abl = ab.map(a => `<div class="itc-ab${a.kind === 'Active' ? ' act' : ''}"><b>${a.kind}${a.name ? ': ' + iEsc(a.name) : ''}</b> ${iEsc(a.text)}${a.cd ? ` <i>Cooldown ${a.cd}s</i>` : ''}</div>`).join('');
   const fl = d.flavor || (it.leg && d.combo && !d.build ? `Try it with ${d.combo}` : '');
-  // a force legendary: the way it changes its unit (twist), then what to build round it (build)
-  const tw = it.leg && d.twist ? `<p class="itc-tw">${iEsc(d.twist)}</p>` : '', bd = it.leg && d.build ? `<p class="itc-bd"><b>Build around it:</b> ${iEsc(d.build)}</p>` : '';
+  // a force legendary: what to build round it (build). Its twist line is no longer shown: the passive under it says the same (owner, 11 Nov 2026: "dont need this additional description on legendaries")
+  const tw = '', bd = it.leg && d.build ? `<p class="itc-bd"><b>Build around it:</b> ${iEsc(d.build)}</p>` : '';
   return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${iEsc(gearName(it))}${typeof rnAwkMark === 'function' ? rnAwkMark(it) : ''}</h5><p class="itc-k">${iEsc(sub)}</p>${clsCardLine(it)}`
     + (st.length || old ? `<ul class="itc-s">${old}${st.map(([k, v]) => `<li>${statHTML(k, v)}</li>`).join('')}</ul>` : '')
     + tw + abl + bd + (d.tome ? `<div class="itc-ab">${iEsc(tomeText(it))}</div>` : '')
