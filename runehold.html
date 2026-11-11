@@ -3171,6 +3171,140 @@ body.tut-on #toast{bottom:calc(var(--tutH,0px) + 20px)}
   .panel.clean-menu.endp .es2-btns .btn.ghost small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .es-sec .es2-bar i { transition: none; } }
+/* The Forces page (forcecodex.js): force tabs, a short story, the commanders, the units in build order.
+   Dark pine panels with fine bronze rules, as menus.css; loaded after it. */
+.panel.clean-menu.fcxp {
+  width: min(1320px, calc(var(--vw-safe) - 32px)); max-width: 100%; height: min(900px, calc(var(--vh-safe) - 32px));
+  max-height: none; padding: 0; overflow: hidden; display: flex;
+}
+.fcx { display: flex; flex-direction: column; min-width: 0; min-height: 0; width: 100%; }
+.fcx-hd { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 22px 8px; }
+.panel.clean-menu.fcxp .ttl { margin: 0 0 2px; font-size: clamp(24px, 2.6vw, 32px); }
+.panel.clean-menu.fcxp .sub { margin: 0; font-size: 13.5px; }
+.panel.clean-menu.fcxp .tx { position: static; flex: none; width: 40px; height: 40px; display: grid; place-items: center; padding: 0; }
+.panel.clean-menu.fcxp .tx svg { width: 16px; height: 16px; }
+
+/* the six forces */
+.fcx-tabs { flex: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 6px 22px 12px; border-bottom: 1px solid var(--cm-rule); }
+.fcx-tab {
+  display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 52px; padding: 6px 10px; text-align: left;
+  color: var(--cm-muted); background: #0b1512; border: 1px solid var(--cm-rule); border-radius: 2px; font: 600 14.5px/1.2 var(--f-ui);
+}
+.fcx-tab img, .fcx-tab .fcx-noart { flex: none; width: 36px; height: 36px; object-fit: cover; border-radius: 50%; border: 1px solid #a58b5680; background: #101e18; }
+.fcx-tab b { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.fcx-tab.on { color: var(--cm-text); background: linear-gradient(90deg, #7c895143, #7c895114); border-color: #a58b56b0; box-shadow: inset 0 -2px var(--fh); }
+.fcx-tab.on img { border-color: var(--fh); }
+
+.fcx-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px 22px 22px; scrollbar-color: #68745b #0c1412; scrollbar-width: thin; outline: 0; }
+.fcx-body h4 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; font: 600 13px/1.4 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: #cdbd8e; }
+.fcx-body h4 small { font: 400 12.5px/1.4 var(--f-ui); letter-spacing: 0; text-transform: none; color: var(--cm-muted); }
+
+/* the story and the commanders */
+.fcx-about { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--cm-rule); }
+.fcx-story { display: flex; gap: 16px; align-items: flex-start; min-width: 0; }
+.fcx-crest { flex: none; width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 4px 10px #0009); }
+.fcx-story h3 { margin: 0; font: 500 26px/1.15 var(--f-display); color: var(--cm-text); letter-spacing: -.01em; }
+.fcx-title { margin: 2px 0 8px; font: 500 13.5px/1.4 var(--f-ui); color: var(--fh); }
+.fcx-tale { margin: 0; max-width: 64ch; font: 400 15px/1.55 var(--f-ui); color: #dcd8ca; }
+.fcx-cmds { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fcx-cmd {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-height: 62px; padding: 5px 10px 5px 5px;
+  text-align: left; color: var(--cm-text); background: #0b1512; border: 1px solid var(--cm-rule); border-radius: 2px; font-family: var(--f-ui);
+}
+.fcx-cmd-p { width: 52px; height: 52px; object-fit: cover; object-position: center 18%; border-radius: 2px; border: 1px solid var(--hc, #a58b56); background: #101e18; }
+.fcx-cmd-t { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: baseline; min-width: 0; }
+.fcx-cmd-t b { font: 600 15.5px/1.3 var(--f-ui); }
+.fcx-cmd-t small { font: 400 12.5px/1.3 var(--f-ui); color: var(--cm-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fcx-cmd-t em { grid-column: 1 / -1; font: 400 13px/1.35 var(--f-ui); font-style: normal; color: #cfd3c4; }
+
+/* the units */
+.fcx-units { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.fcx-u { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; min-width: 0; background: #0b1512; border: 1px solid var(--cm-rule); border-radius: 2px; }
+.fcx-u-main {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; min-height: 84px; padding: 8px 10px;
+  text-align: left; color: var(--cm-text); background: none; border: 0; border-radius: 0; font-family: var(--f-ui);
+}
+.fcx-u-main:disabled { opacity: 1; }
+.fcx-u-p { width: 64px; height: 64px; object-fit: cover; object-position: center 20%; border-radius: 2px; border: 1px solid #a58b5680; background: #101e18; }
+.fcx-u-t { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fcx-u-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.fcx-n { flex: none; min-width: 16px; font: 400 12px/1 var(--f-ui); font-style: normal; color: #8d957f; font-variant-numeric: tabular-nums; }
+.fcx-n:empty { display: none; }
+.fcx-u-h b { font: 600 16px/1.25 var(--f-ui); }
+.fcx-role { padding: 2px 8px; border: 1px solid #c8b58380; border-radius: 2px; background: #a58b5626; color: #f0e4bd; font: 600 12px/1.3 var(--f-ui); letter-spacing: .02em; white-space: nowrap; }
+.fcx-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fcx-chip { padding: 1px 7px; border: 1px solid #ffffff1f; border-radius: 2px; color: #b9c0b0; font: 400 11.5px/1.4 var(--f-ui); white-space: nowrap; }
+.fcx-chip.both { color: #a9d3ee; border-color: #6fa6c866; }
+.fcx-chip.gnd { color: #cdb894; border-color: #a58b5655; }
+.fcx-chip.mag { color: #c9b6f2; border-color: #8f7ad066; }
+.fcx-say { font: 400 13.5px/1.4 var(--f-ui); color: #d2d6c8; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.fcx-go { align-self: center; padding: 4px 2px; color: #cdbd8e; font: 500 12.5px/1.2 var(--f-ui); white-space: nowrap; }
+.fcx-abs { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 8px 6px 0; }
+.fcx-ab { width: 34px; height: 34px; padding: 0; border: 1px solid #a58b5680; border-radius: 2px; background: #101e18; overflow: hidden; }
+.fcx-ab img, .fcx-ab .fcx-noart { display: block; width: 100%; height: 100%; object-fit: cover; }
+.fcx-ab:hover, .fcx-ab[aria-describedby] { border-color: #f0e4bd; }
+.fcx-u.wall .fcx-u-main { min-height: 64px; }
+.fcx-u.wall .fcx-u-p { width: 48px; height: 48px; justify-self: center; object-fit: contain; border: 0; background: none; }
+
+/* the read-only tree: the talent panel's own look, with a way back where the points were */
+.fcx-ft .tc-btn { flex: none; min-height: 40px; padding: 6px 14px; }
+.fcx-ft .tc-hint { flex: 1 1 auto; text-align: right; }
+.fcx-tc .tc-tab.fcx-champ { margin-left: 2px; }
+.fcx-tc .tc-tab.fcx-champ i img { object-position: center 15%; }
+.fcx-tc .tc-tree.wow .tn { cursor: help; }
+.wtip .wt-need.fcx-need { color: #d8bf82; }
+
+/* the main menu with a fifth entry */
+@media (min-width: 901px) and (max-width: 1150px) and (min-height: 501px) { .t2-menu:has(#oForces) { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (max-width: 900px), (max-height: 500px) and (max-width: 1100px) {
+  .t2-menu:has(#oForces) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .t2-menu:has(#oForces) #ptxNew { grid-row: 4; }
+}
+@media (max-height: 500px) and (max-width: 1100px) { .t2-menu:has(#oForces) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+@media (max-width: 1180px) {
+  .fcx-units { grid-template-columns: minmax(0, 1fr); }
+  .fcx-abs { flex-direction: row; align-items: center; padding: 6px 10px 6px 0; }
+  .fcx-ab { width: 40px; height: 40px; }
+}
+@media (max-width: 900px) {
+  .panel.clean-menu.fcxp { width: calc(var(--vw-safe) - 8px); height: calc(var(--vh-safe) - 8px); }
+  .fcx-hd { padding: 12px 12px 6px; }
+  .panel.clean-menu.fcxp .sub { font-size: 12.5px; }
+  .fcx-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px 12px 10px; }
+  .fcx-tab { min-height: 44px; padding: 4px 5px; gap: 5px; font-size: 13px; }
+  .fcx-tab img, .fcx-tab .fcx-noart { width: 24px; height: 24px; }
+  .fcx-tab b { overflow-wrap: normal; font-size: 12.5px; }
+  .fcx-the { display: none; }
+  .fcx-body { padding: 12px; }
+  .fcx-about { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .fcx-crest { width: 56px; height: 56px; }
+  .fcx-story h3 { font-size: 22px; }
+  .fcx-tale { font-size: 14.5px; }
+}
+@media (max-width: 620px) {
+  .fcx-story { gap: 10px; }
+  .fcx-u { grid-template-columns: minmax(0, 1fr); }
+  .fcx-u-main { grid-template-columns: 52px minmax(0, 1fr); gap: 10px; min-height: 0; padding: 8px 8px 4px; align-items: start; }
+  .fcx-u-p { width: 52px; height: 52px; }
+  .fcx-go { display: none; }
+  .fcx-abs { padding: 2px 8px 8px 70px; gap: 8px; }
+  .fcx-abs::after { content: 'Talents ›'; margin-left: auto; color: #cdbd8e; font: 500 12.5px/1.2 var(--f-ui); pointer-events: none; }
+  .fcx-ab { width: 44px; height: 44px; }
+  .fcx-say { -webkit-line-clamp: 4; }
+  .fcx-ft .tc-hint { display: none; }
+}
+/* a phone on its side: the header gives its room to the list */
+@media (max-height: 500px) {
+  .panel.clean-menu.fcxp .sub { display: none; }
+  .fcx-hd { padding: 6px 12px 2px; }
+  .panel.clean-menu.fcxp .ttl { font-size: 20px; }
+  .fcx-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 2px 12px 6px; }
+  .fcx-tab { min-height: 36px; }
+  .fcx-tab b { font-size: 12px; }
+  .fcx-about { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .fcx-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 </style>
 <script>
 /* The Ravenswood Keep logo (generated by tools/make_brand.py from assets/brand/ravenswood_logo.webp). */
@@ -3208,7 +3342,7 @@ var MAP_LITE = (function () {
 </script>
 <script id="assets">
 (function () {
-  var A = [["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/berthasfxdata.1464d64e21.js",145397],["a/firesfxdata.4051387a8a.js",551894],["a/pyrosfx2data.e9a6cff4eb.js",227063],["a/bladesfxdata.818b19f400.js",22637],["a/frostsfxdata.9e637df558.js",49593],["a/deathsfxdata.458cf5e8f2.js",399169],["a/labfxdata.95ef851e40.js",3168802],["a/glintdata.fb95083a62.js",771859],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/tfforge.27a3324b27.js",9111859],["a/terraintex.7cb95904da.js",4301861],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/grpaint.fb39aadf6f.js",484672],["a/poolpaint.6e498a6f6a.js",4151613],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.06cbba0c80.js",2366878],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.1a73bcaf58.js",4055194],["a/talentbg.ee828498ff.js",2165702],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.e7a7747c20.js",996205],["a/completionart.1.fcf285eaed.js",1090460],["a/completionart.2.31cc95af76.js",1089265],["a/completionart.3.829c7de133.js",1086248],["a/completionart.4.721377697b.js",1092355],["a/completionart.5.a8091647b0.js",1084589],["a/completionart.6.9b211962d3.js",1082461],["a/completionart.7.e71e6c00a2.js",1095079],["a/completionart.8.405ccfed44.js",1097542],["a/completionart.9.b02608515b.js",1086048],["a/completionart.10.37aa5d4275.js",1095626],["a/completionart.11.e5e65daee6.js",1099494],["a/completionart.12.d941a7d3a7.js",1094609],["a/completionart.13.ca81bb1afb.js",1095150],["a/completionart.14.0707927aef.js",1095009],["a/completionart.15.4239787241.js",1089989],["a/completionart.16.c0ac0609d3.js",1091537],["a/completionart.17.db87ea03a4.js",1093829],["a/completionart.18.27d89beefe.js",1094097],["a/completionart.19.78b4aa0d08.js",1087290],["a/completionart.20.2a42544c57.js",1099395],["a/completionart.21.76110e325f.js",1094345],["a/completionart.22.f8ceed82ac.js",824180],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_torchbearer.6a29a3a9aa.js",639207],["a/model_malgrath.6c12796111.js",735733],["a/model_mauler.9760a49c78.js",807575],["a/model_unit_gladebow.1993718f13.js",544805],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.3824cefb7c.js",644681],["a/model_unit_faelan_lb.1c1087ed50.js",710941],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.d849804ee3.js",1106383],["a/model_unit_thundergun.fce4f00910.js",946301],["a/model_unit_bladedancer.0d2f750fb4.js",1332874],["a/model_unit_thornguard.c64bf0a583.js",1275642],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/model_unit_astrologer.98ad0d6ac6.js",1336541],["a/model_unit_pyroclast.25ad2b371f.js",1126711],["a/model_unit_mageling.77ab002a64.js",1240605],["a/model_mageling2.d4c1faf4ba.js",848425],["a/model_faelan2.dda99f829d.js",905914],["a/model_ranger2.54a58422b8.js",713817],["a/model_bd2.483822b55c.js",908448],["a/model_seed2.6e4ac21e65.js",916486],["a/model_nyssa2.3bda138f44.js",996378],["a/model_pyro2.25360734be.js",870776],["a/model_tg2.fccf11eef2.js",887821],["a/model_unit_aurelian.5419360e90.js",1273453],["a/model_unit_aurelian_kimodo.6f71254edc.js",512189],["a/model_unit_frostweaver.978f1ad1b4.js",1231188],["a/main.66d0f382d1.js",11421863]], T = 143875999, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
+  var A = [["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/berthasfxdata.1464d64e21.js",145397],["a/firesfxdata.4051387a8a.js",551894],["a/pyrosfx2data.e9a6cff4eb.js",227063],["a/bladesfxdata.818b19f400.js",22637],["a/frostsfxdata.9e637df558.js",49593],["a/deathsfxdata.458cf5e8f2.js",399169],["a/labfxdata.95ef851e40.js",3168802],["a/glintdata.fb95083a62.js",771859],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/tfforge.27a3324b27.js",9111859],["a/terraintex.7cb95904da.js",4301861],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/grpaint.fb39aadf6f.js",484672],["a/poolpaint.6e498a6f6a.js",4151613],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.06cbba0c80.js",2366878],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.1a73bcaf58.js",4055194],["a/talentbg.ee828498ff.js",2165702],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.e7a7747c20.js",996205],["a/completionart.1.fcf285eaed.js",1090460],["a/completionart.2.31cc95af76.js",1089265],["a/completionart.3.829c7de133.js",1086248],["a/completionart.4.721377697b.js",1092355],["a/completionart.5.a8091647b0.js",1084589],["a/completionart.6.9b211962d3.js",1082461],["a/completionart.7.e71e6c00a2.js",1095079],["a/completionart.8.405ccfed44.js",1097542],["a/completionart.9.b02608515b.js",1086048],["a/completionart.10.37aa5d4275.js",1095626],["a/completionart.11.e5e65daee6.js",1099494],["a/completionart.12.d941a7d3a7.js",1094609],["a/completionart.13.ca81bb1afb.js",1095150],["a/completionart.14.0707927aef.js",1095009],["a/completionart.15.4239787241.js",1089989],["a/completionart.16.c0ac0609d3.js",1091537],["a/completionart.17.db87ea03a4.js",1093829],["a/completionart.18.27d89beefe.js",1094097],["a/completionart.19.78b4aa0d08.js",1087290],["a/completionart.20.2a42544c57.js",1099395],["a/completionart.21.76110e325f.js",1094345],["a/completionart.22.f8ceed82ac.js",824180],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_torchbearer.6a29a3a9aa.js",639207],["a/model_malgrath.6c12796111.js",735733],["a/model_mauler.9760a49c78.js",807575],["a/model_unit_gladebow.1993718f13.js",544805],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.3824cefb7c.js",644681],["a/model_unit_faelan_lb.1c1087ed50.js",710941],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.d849804ee3.js",1106383],["a/model_unit_thundergun.fce4f00910.js",946301],["a/model_unit_bladedancer.0d2f750fb4.js",1332874],["a/model_unit_thornguard.c64bf0a583.js",1275642],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/model_unit_astrologer.98ad0d6ac6.js",1336541],["a/model_unit_pyroclast.25ad2b371f.js",1126711],["a/model_unit_mageling.77ab002a64.js",1240605],["a/model_mageling2.d4c1faf4ba.js",848425],["a/model_faelan2.dda99f829d.js",905914],["a/model_ranger2.54a58422b8.js",713817],["a/model_bd2.483822b55c.js",908448],["a/model_seed2.6e4ac21e65.js",916486],["a/model_nyssa2.3bda138f44.js",996378],["a/model_pyro2.25360734be.js",870776],["a/model_tg2.fccf11eef2.js",887821],["a/model_unit_aurelian.5419360e90.js",1273453],["a/model_unit_aurelian_kimodo.6f71254edc.js",512189],["a/model_unit_frostweaver.978f1ad1b4.js",1231188],["a/main.080a9faccb.js",11450486]], T = 143904622, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
   // painted-only maps (src/maplite.js: phones and tablets): the 3D map dressing's data is never downloaded
   if (window.MAP_LITE) { var LS = ["tfforge","tfassets","terraintex"]; window.__liteSkipped = [];
     A = A.filter(function (f) { var n = f[0].split('/').pop().split('.')[0]; if (LS.indexOf(n) < 0) return true; window.__liteSkipped.push(f[0]); T -= f[1]; return false; }); }
