@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a67c178@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd19d81f@2026-11-12';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -3715,6 +3715,7 @@ function hurt(c, amt, type, src, dot, kb, elem) {
   if (c.ward > 0) { const a = Math.min(c.ward, amt); c.ward -= a; wlAside('Shields (wards and bulwarks)', a); amt -= a; credit(src, a, dot, rxK); vetDmg(c, src, a); if (amt <= 0) { if (!dot) c.hit = .1; return; } }
   if (c.apMax > 0 && !oldRules()) { const r = epAbsorb(c, amt, type, ss, dot); amt = r[0]; wlAside('Armour bars', r[1]); if (r[1] > 0) { credit(src, r[1], dot, rxK); vetDmg(c, src, r[1]); } if (amt <= 0) { if (!dot) c.hit = .1; return; } }   // the armour bar first (enemypools.js)
   if (c.mwMax > 0 && !oldRules()) { const r = epWardAbsorb(c, amt, type, ss, dot); amt = r[0]; wlAside('Ward bars', r[1]); if (r[1] > 0) { credit(src, r[1], dot, rxK); vetDmg(c, src, r[1]); } if (amt <= 0) { if (!dot) c.hit = .1; return; } }   // then the ward bar (enemypools.js)
+  if (c.def.a2 && typeof a2Hit === 'function') { amt = a2Hit(c, amt, type, src, dot, elem); if (!(amt > 0)) { if (!dot) c.hit = .1; return; } }   // Act II foes' own rules on a hit: a capped hit, a shared pool, a held life (forces_..._act2foes.js)
   c.hp -= amt; if (G.wl) G.wl.dealt += Math.min(amt, c.hp + amt);
   if (c.def.boss || c.def.lead) bossDmgNote(c, src, amt, dot);   // the boss's damage ledger (below)
   if (c.def.brule) bossRuleDealt(c, amt, type, dot);
@@ -51280,6 +51281,274 @@ if (typeof spawn === 'function') {
   })(spawn);
 }
 
+/* ---- Act II's foes: the Gloam Host (11 Nov 2026; owner: "create some new mobs with some not yet seen mechanics to keep the
+   player guessing a bit more"; the hub: Act II's foes are one host, the power behind Act I's local threats, and some are the
+   homeland's own creatures turned). Pitches, counters and wave slots: docs/design/act_two_foes_2026-11-11.md.
+   Every Gloam foe wears the host's mark (a dusk-violet ring at its feet, act2foes_ui.js) and its own rule, told on its forecast
+   card and wave card before it marches. Rules hook in by wrapping (refreshField, effStats, kill, leak, waveSpec, waveProblem,
+   updateCreeps) and one line in game.js hurt (a2Hit). In no wave of the first act: Act II places them (A2_FOES[..].slot).
+   See one: ?act2foe=<id> (act2foes_ui.js) or a2Wave('<id>') in a run. Check: node tools/check_act2_foes.js -v ---- */
+
+const A2 = {
+  bridge: { lay: 1.6, life: 14, gain: 4, hp: .6 },        // Gloamwright: seconds to lay, seconds it stands, steps it must save, its health x the wright's
+  hide: { cap: .06 },                                     // Gloamhide: the most one hit takes, of its health
+  lull: { k: .06, max: 8, t: 4, quick: .2 },              // Lullcap: slower attacks a stack, stacks, seconds, its own quickening
+  chain: { n: 4 },                                        // Gloam Thralls: a chain's length
+  horn: { at: .5, call: 5, max: 3 },                      // Gloamhorn: share of the road, raiders called, horns a wave
+  mask: { at: [.66, .33], n: 3, life: 7, vanish: .5 },    // Gloam Mummer: thresholds, decoys, their life, the vanish
+  dusk: { near: 1.5, crowd: 3, k: .65, min: 1.15 },       // Umbrielle: who counts as crowded, the reach left, the reach never cut below
+};
+const A2_MARK = [.52, .3, .82];   // the Gloam Host's colour: a dusk violet (the mark at their feet, their tints lean to it)
+
+/* the foes. a2: { card: [wave card's name, the problem, the ways through], counter: the forecast's counter line, slot: Act II's suggested waves, test: a test wave } */
+const A2_FOES = {
+  plankrunner: { name: 'Gloamwright', base: 'gnoll', scl: 1.05, hp: 1, spd: 1.05, r: .34, voice: 'gnoll', roles: 'light', tint: [1.2, .95, 1.1, .16],
+    trait: 'Bridges your walls',
+    eco: 'Lays a plank bridge over one of your walls: a short cut for every foe behind it. A homeland gnoll turned by the Gloam: when a wall stands between it and a stretch of road at least 4 steps nearer the gate, it stops for 1.6 seconds to lay planks over that one wall. For 14 seconds every walking foe takes the short cut. Stun it while it lays and the planks fall; smash the bridge (it is frail) or build the turn two walls thick.',
+    a2: { card: ['The Short Cut', 'Gloamwrights lay plank bridges over single walls, and the whole column follows them over.', 'Stun or kill them before your thin walls · smash the bridges · make the turns two walls thick'], counter: 'Stuns while it lays, damage before your thin walls, or turns two walls thick.', slot: '57 small, 66 strong', test: 'gnoll*6+plankrunner*2+gnoll*6' } },
+  a2bridge: { name: 'Gloam Bridge', base: 'hextotem', scl: .9, hp: .6, spd: 0, r: .34, bounty: .5, noCorpse: true, roles: 'support', tint: [.95, .7, .45, .2], a2b: true,
+    trait: 'A short cut over your wall', eco: 'Planks over one of your walls: every walking foe crosses here until it breaks or rots away.' },
+  knotback: { name: 'Gloamhide Aurochs', base: 'carrion', scl: 1.3, hp: 2.3, spd: .72, r: .42, bounty: 1.6, voice: 'carrion', roles: 'heavy', tint: [.85, .78, .95, .2],
+    trait: 'No hit takes more than 6%',
+    eco: 'No single hit takes more than 6% of its health. Its knotted hide stops a great blow as deep as a small one; burns, poison and bleeds go through untouched. Fast strikers, many-hit spells and damage over time bring it down.',
+    a2: { card: ['The Thick Hide', 'Gloamhide Aurochs: no single hit takes more than 6% of one.', 'Fast strikers · many-hit spells · burns, poison and bleeds'], counter: 'Fast strikers, many-hit spells, damage over time.', slot: '53 small, 61 strong', test: 'knotback*4+troll*3' } },
+  lullcap: { name: 'Lullcap', base: 'mender', scl: .9, hp: .85, spd: .95, r: .33, voice: 'mender', roles: 'cloth', tint: [1.25, .95, 1.55, .3],
+    trait: 'Its pollen slows those who strike it',
+    eco: 'Every strike that lands on it makes the striker attack 6% slower (up to 8 times) for 4 seconds. A spore-priest of the Gloam: each strike also quickens it for a moment. Spells, area blasts that are not strikes, and damage over time do not stir the pollen; slow heavy hitters gather few stacks.',
+    a2: { card: ['Heavy Arms', 'Lullcaps make every unit that strikes them attack slower, up to half as fast.', 'Spells and damage over time · slow heavy hitters · area damage'], counter: 'Spells, damage over time, or slow heavy hitters.', slot: '56 small, 63 strong (with Gloamhides)', test: 'lullcap*4+gnoll*6' } },
+  thrall: { name: 'Gloam Thrall', base: 'gnoll', scl: 1, hp: 1.1, spd: .9, r: .34, voice: 'gnoll', roles: 'light', tint: [.78, .78, .92, .22],
+    trait: 'Chained: shares every wound',
+    eco: 'It shares every wound with the thralls chained to it. Homeland gnolls the Gloam has put in chains of four: whatever hits one is split evenly along the chain, so none falls until all do. Area damage fills the shared wound four times as fast; picking off one does nothing.',
+    a2: { card: ['The Chain Gang', 'Gloam Thralls march in chains of four that share one wound: none falls until all fall.', 'Area damage hits the whole pool at once · steady damage along a long road'], counter: 'Area damage: each thrall it hits adds to the shared wound.', slot: '54 small, 62 strong', test: 'thrall*8+gnoll*2' } },
+  urnbearer: { name: 'Gloam Urnbearer', base: 'shaman', scl: .95, hp: .8, spd: .9, r: .34, voice: 'shaman', roles: 'cloth support', tint: [.75, 1.15, 1.15, .24],
+    link: { kind: 'urn', r: 5, who: 'hollow', col: [.35, .95, .85], say: 'holds the lives of the Hollowguards around it: they cannot fall while it stands. Kill or stun it and they can' },
+    trait: 'Holds the Hollowguards\' lives',
+    eco: 'Hollowguards within 5 cells of it cannot fall below 1 health while it stands. It walks behind them with their lives in its urn; kill it or stun it and they die to the next blow. Target Support, or reach the back of the column.',
+    a2: { card: ['The Urn', 'Hollowguards cannot die while the Urnbearer behind them stands.', 'Target Support · reach the back of the column · stun the Urnbearer'], counter: 'Kill it first (target order Support): the Hollowguards then fall.', slot: '59 small (1 urn, 2 guards), 67 strong', test: 'hollowguard*4+urnbearer*2+gnoll*4' } },
+  hollowguard: { name: 'Hollowguard', base: 'troll', scl: 1.2, hp: 1.6, spd: .85, r: .4, bounty: 1.4, voice: 'troll', roles: 'heavy', tint: [.75, .82, .9, .3],
+    trait: 'Cannot die while its Urnbearer stands',
+    eco: 'Cannot fall below 1 health while a Gloam Urnbearer within 5 cells holds its life. The teal tether shows it; kill or stun the Urnbearer and the next blow finishes it.',
+    a2: { card: ['The Urn', 'Hollowguards cannot die while the Urnbearer behind them stands.', 'Target Support · reach the back of the column · stun the Urnbearer'], counter: 'Kill its Urnbearer first; then any blow finishes it.', slot: 'with the Urnbearer', test: 'hollowguard*4+urnbearer*2+gnoll*4' } },
+  hornrunner: { name: 'Gloamhorn', base: 'gnoll', scl: .9, hp: .6, spd: 1.35, r: .32, bounty: .8, voice: 'gnoll', roles: 'light', tint: [1.3, 1.05, .8, .14],
+    trait: 'Calls raiders at the road\'s halfway',
+    eco: 'If it gets halfway down your road it sounds its horn: 5 Gnoll Raiders join the wave. A homeland gnoll running for the Gloam; the gold ring on the road marks the halfway point, and the first three horns of a wave count. Kill it on the first half of the road.',
+    a2: { card: ['The Horn Line', 'Gloamhorns that get halfway down your road call five more raiders each.', 'Damage and slows on the first half of the road · target First · a longer road'], counter: 'Damage on the first half of the road; target order First.', slot: '52 small, 58 strong', test: 'hornrunner*4+gnoll*4' } },
+  mummer: { name: 'Gloam Mummer', base: 'wolf', scl: 1.15, hp: 1.3, spd: 1.25, r: .36, bounty: 1.4, voice: 'wolf', wolfkin: true, roles: 'light', tint: [1.45, .72, .55, .2],
+    trait: 'Splits off decoys when hurt',
+    eco: 'At two-thirds and one-third health it splits off three decoys that burst at a touch. A homeland wolf in a Gloam mask: it vanishes in smoke for half a second and comes back among copies with its health bar. Decoys pay nothing and cost no life; burns, poison, marks and slows stay on the real one. Area, chain and piercing damage clear them.',
+    a2: { card: ['The Masquerade', 'Gloam Mummers split off three decoys at two-thirds and one-third health.', 'Area, chain and piercing damage · a burn or mark shows the real one'], counter: 'Area, chain or piercing damage clears the decoys.', slot: '64 small (1 elite), 72 strong', test: 'mummer*3+wolf*4' } },
+  a2decoy: { name: 'Gloam Mummer', base: 'wolf', scl: 1.15, hp: .01, spd: 1.25, r: .36, bounty: 0, voice: 'wolf', wolfkin: true, noCorpse: true, roles: 'light', tint: [1.45, .72, .55, .2], a2decoy: true,
+    trait: 'Splits off decoys when hurt', eco: '' },
+  lampeater: { name: 'Umbrielle', title: 'the Lamp-Eater', base: 'wraith', scl: 1.5, hp: 7, spd: .85, r: .4, mres: .3, lead: 'dusk', voice: 'wraith', roles: 'heavy', cry: 2, flat: 24, life: 3, tint: [.62, .45, .95, .34],
+    yell: 'Your lanterns gutter. The Gloam has come.', kit: [{ s: 'summon', name: 'Gloam Court', type: 'lullcap', n: 2, cd: 14 }],
+    abil: ['Long Dusk', 'While she is on the field, units crowded together (3 or more others within 1.5 cells) reach 35% less far.'],
+    trait: 'Leader: crowded units reach less far',
+    eco: 'While she is on the field, every unit with three or more other units within 1.5 cells is Benighted: it reaches 35% less far (never under 1.15 cells). The herald of the Gloam Host. Walls do not count. Units posted in lines with walls between keep their reach; kill her early on the road and the dusk lifts.',
+    a2: { card: ['The Long Dusk', 'Umbrielle shortens the reach of every unit standing in a crowd while she lives.', 'Units in lines, walls between · reach at the head of the road · a Farsight Shrine'], counter: 'Spread your units (walls between); kill her at the head of the road.', slot: 'a leader for 68 or 73', test: 'lullcap*4+lampeater*1+gnoll*6' } },
+};
+const A2_GAP = { plankrunner: .9, a2bridge: 1, knotback: 1.2, lullcap: .9, thrall: .32, urnbearer: 1, hollowguard: 1.05, hornrunner: .55, mummer: .8, a2decoy: .5, lampeater: 1.3 };
+for (const k in A2_FOES) {
+  const d = Object.assign({}, A2_FOES[k]); d.roles = d.roles.split(' '); d.rk = {}; for (const r of d.roles) d.rk[r] = 1;
+  if (!d.a2) d.a2 = { card: null, counter: '', helper: true };
+  CREEPS[k] = d; GAP[k] = A2_GAP[k] || .9;
+}
+// the foes a player meets as foes (the helpers, a bridge and a decoy, are parts of them)
+const A2_IDS = Object.keys(A2_FOES).filter(k => !CREEPS[k].a2.helper);
+LINK_WHO.hollow = o => o.type === 'hollowguard';
+
+const a2S = () => { if (!G.a2 || G.a2.g !== G) G.a2 = { g: G, bridges: [], chains: 0, horns: {}, half: null, dusk: false, at: -1 }; return G.a2; };
+const a2Fx = (x, z, col, n) => { if (typeof fxSpark === 'function') fxSpark(x, z, .6, col, n || 6); };
+
+/* ---- the Gloamwright's bridge: while it stands its wall's cell is open to walking foes (G.blk 0, the wall still in G.tAt, so
+   nothing can be built there). The player's own building is judged as if the bridge were not there, so taking it away never
+   seals the road; a foe on the planks finishes the crossing ---- */
+const a2Bridged = () => G.a2 && G.a2.g === G && G.a2.bridges.length ? G.a2.bridges : null;
+{ const _cb = canBlock; canBlock = function (i, j) {
+  const B = a2Bridged(); if (!B) return _cb.apply(this, arguments);
+  const ks = new Set(B.map(b => b.k)), hid = [];
+  for (const b of B) G.blk[b.k] = 1;
+  for (const c of G.creeps) if (!c.dead && !c.fly && c.state !== 'exit' && (c.def.a2b || ks.has(idx(c.ti, c.tj)) || ks.has(idx(Math.floor(c.x), Math.floor(c.y))))) { hid.push([c, c.state]); c.state = 'exit'; }
+  let r; try { r = _cb.apply(this, arguments); } finally { for (const b of B) G.blk[b.k] = 0; for (const [c, st] of hid) c.state = st; }
+  if (r && r.ok && r.blk) { for (const b of B) r.blk[b.k] = 0; r.dist = flowField(r.blk); }
+  return r;
+}; }
+function a2BridgeAt(c) {   // the best wall beside it to bridge: [wall cell, far cell, steps saved]
+  const i = Math.floor(c.x), j = Math.floor(c.y); if (!inGrid(i, j)) return null;
+  const here = G.dist[idx(i, j)]; if (!isFinite(here)) return null;
+  let best = null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const wi = i + dx, wj = j + dy, bi = i + 2 * dx, bj = j + 2 * dy; if (!inGrid(wi, wj) || !inGrid(bi, bj)) continue;
+    const w = idx(wi, wj), b = idx(bi, bj), t = G.tAt[w];
+    if (!t || !t.def || !t.def.wall || t.wrecked || G.blk[b] || a2S().bridges.some(x => x.k === w)) continue;
+    const gain = here - G.dist[b] - 2; if (isFinite(gain) && gain >= A2.bridge.gain && (!best || gain > best[2])) best = [w, b, gain];
+  }
+  return best;
+}
+function a2BridgeUp(c) {
+  const L = c.a2lay; c.a2lay = null; c.a2used = 1;
+  if (!G.tAt[L.w] || !G.tAt[L.w].def.wall) return;
+  const wi = L.w % COLS, wj = (L.w / COLS) | 0;
+  const b = spawn({ type: 'a2bridge', hp: c.maxHp * A2.bridge.hp, bounty: 1, wv: c.wv, at: { x: wi + .5, y: wj + .5, ti: wi, tj: wj, tx: wi + .5, ty: wj + .5, state: 'walk' } });
+  b.spdM = 0; b.ox = 0; b.oy = 0; b.a2t = A2.bridge.life;
+  a2S().bridges.push({ k: L.w, kb: L.b, c: b });
+  G.blk[L.w] = 0; refreshField();
+  if (typeof fxDust === 'function') fxDust(wi + .5, wj + .5, 10);
+  if (typeof sfx === 'function') sfx('block', 0);
+  G.ecoSeen = G.ecoSeen || {}; if (!G.ecoSeen.a2bridge && typeof onToast === 'function') { G.ecoSeen.a2bridge = 1; onToast('A Gloamwright bridged your wall: foes cross it until it breaks.'); }
+}
+function a2BridgeDown(b) {
+  const S = a2S(); S.bridges = S.bridges.filter(x => x !== b);
+  if (b.c && !b.c.dead) b.c.dead = true;
+  for (const o of G.creeps) {   // anyone on or stepping onto the planks finishes the crossing (or steps back)
+    if (o.dead || o.fly || o.def.a2b) continue;
+    const f = idx(Math.floor(o.x), Math.floor(o.y));
+    if (f === b.k) { o.ti = b.kb % COLS; o.tj = (b.kb / COLS) | 0; o.tx = o.ti + .5; o.ty = o.tj + .5; }
+    else if (idx(o.ti, o.tj) === b.k && inGrid(Math.floor(o.x), Math.floor(o.y))) { o.ti = Math.floor(o.x); o.tj = Math.floor(o.y); o.tx = o.ti + .5; o.ty = o.tj + .5; }
+  }
+  if (G.tAt[b.k] && G.tAt[b.k].def.wall) G.blk[b.k] = 1;
+  refreshField();
+}
+
+/* ---- the clock: lays, bridges, chains, horns, decoys, the dusk ---- */
+function a2Tick(dt) {
+  if (!G || G.state !== 'play' || !G.creeps) return;
+  const S = a2S();
+  let dusk = false, horns = 0, unchained = null;
+  for (const c of G.creeps) {
+    if (c.dead) continue; const d = c.def; if (!d.a2) continue;
+    if (c.type === 'plankrunner') {
+      if (c.a2lay) {
+        if (c.stunT > 0) { c.a2lay = null; c.a2used = 1; c.eatT = 0; a2Fx(c.x, c.y, '#d8b070', 8); if (typeof addText === 'function') addText(c.x, c.y, hitH(c) + .5, 'spoiled', '#e8d0a0'); }
+        else { c.eatT = Math.max(c.eatT || 0, .1); if ((c.a2lay.t -= dt) <= 0) a2BridgeUp(c); }
+      } else if (!c.a2used && !c.ent && c.state === 'walk' && !(c.stunT > 0) && G.dist) {
+        const w = a2BridgeAt(c); if (w) { c.a2lay = { w: w[0], b: w[1], t: A2.bridge.lay, T: A2.bridge.lay }; c.eatT = A2.bridge.lay; }
+      }
+    } else if (c.type === 'thrall' && !c.a2ch) (unchained = unchained || []).push(c);
+    else if (c.type === 'hornrunner') { horns++; if (!c.a2horned && !c.ent && c.state === 'walk' && G.dist) { const road = atSpawn(G.dist); if (isFinite(road) && road > 2 && c.remain <= road * A2.horn.at) a2Horn(c); } }
+    else if (c.type === 'lampeater' && !c.ent) dusk = true;
+    if (c.a2van > 0 && (c.a2van -= dt) <= 0) c.phased = false;
+    if (d.a2decoy && (c.a2life -= dt) <= 0) a2Pop(c);
+  }
+  if (unchained) a2Chain(unchained);
+  for (const b of S.bridges.slice()) {
+    if (b.c.dead || !G.tAt[b.k] || !G.tAt[b.k].def.wall) { a2BridgeDown(b); continue; }
+    if ((b.c.a2t -= dt) <= 0) a2BridgeDown(b);
+  }
+  if (S.dusk !== dusk) { S.dusk = dusk; if (dusk && typeof onToast === 'function') { const n = G.towers.filter(t => a2Crowded(t)).length; onToast(`The Long Dusk: ${n} of your units stand crowded and reach 35% less far.`); } }
+  if (horns && G.path && G.path.pts && (S.at !== G.dist)) { S.at = G.dist; S.half = a2HalfPoint(); }
+}
+{ const _uc = updateCreeps; updateCreeps = function (dt) { a2Tick(dt); return _uc.apply(this, arguments); }; }
+
+// chains of four among thralls marching near each other (in a mixed column they come spread out: a thrall that has waited
+// 3s, or the last of the wave's, chains with whoever is near, alone at worst)
+function a2Chain(L) {
+  const more = G.spawnQ && G.spawnQ.some(s => s.type === 'thrall');
+  L.sort((a, b) => a.id - b.id);
+  while (L.length) {
+    const s = L[0], near = L.slice(1).filter(o => Math.hypot(o.x - s.x, o.y - s.y) <= 2.5).slice(0, A2.chain.n - 1);
+    if (near.length + 1 < A2.chain.n && more && s.age < 3) { L.shift(); continue; }
+    const m = [s].concat(near), ch = { id: ++a2S().chains, m };
+    for (const o of m) { o.a2ch = ch; L.splice(L.indexOf(o), 1); }
+  }
+}
+function a2HalfPoint() {   // the point on the road where a Gloamhorn sounds: half its length from the gate
+  const P = G.path.pts; let left = atSpawn(G.dist) * A2.horn.at, acc = 0;
+  for (let k = P.length - 1; k > 0; k--) { const a = P[k], b = P[k - 1], L = Math.hypot(a[0] - b[0], a[1] - b[1]); if (acc + L >= left) { const u = (left - acc) / (L || 1); return { x: a[0] + (b[0] - a[0]) * u, z: a[1] + (b[1] - a[1]) * u }; } acc += L; }
+  return null;
+}
+function a2Horn(c) {
+  c.a2horned = 1; const S = a2S(), w = G.wave; S.horns[w] = (S.horns[w] || 0) + 1;
+  if (S.horns[w] > A2.horn.max) return;
+  const hp = c.maxHp / c.def.hp * CREEPS.gnoll.hp;
+  for (let k = 0; k < A2.horn.call; k++) G.spawnQ.push({ t: G.waveT + .3 + k * .45, type: 'gnoll', hp, bounty: 1, wv: c.wv || w, a2call: 1 });
+  G.spawnQ.sort((a, b) => a.t - b.t); G.waveLeft = (G.waveLeft || 0) + A2.horn.call;
+  if (typeof sfx === 'function') sfx('warcry', 0);
+  if (typeof fxRing === 'function') fxRing(c.x, c.y, 1.2, '#ffd76a');
+  if (typeof onToast === 'function') onToast(`A Gloamhorn sounded: ${A2.horn.call} Gnoll Raiders join the wave.`);
+}
+function a2Pop(c) {   // a decoy bursts: smoke, no gold, no life
+  if (c.dead) return 0; c.dead = true; c.hp = 0;
+  if (typeof part === 'function') for (let k = 0; k < 6; k++) part({ k: 'smoke', x: c.x + R(-.2, .2), z: c.y + R(-.2, .2), h: hitH(c), vh: R(.3, .7), drag: 1, life: .6, max: .6, size: R(.12, .2), col: '#a890c8' });
+  return 0;
+}
+function a2Split(c, hp) {
+  c.a2s = (c.a2s || 0) + 1; c.phased = true; c.a2van = A2.mask.vanish;
+  for (let k = 0; k < A2.mask.n; k++) {
+    const o = spawn({ type: 'a2decoy', hp, bounty: 0, wv: c.wv, elite: c.elite, eliteX: c.eliteX, at: { x: c.x, y: c.y, ti: c.ti, tj: c.tj, tx: c.tx, ty: c.ty, state: c.state } });
+    o.maxHp = c.maxHp; o.hp = hp; o.a2life = A2.mask.life; o.phased = true; o.a2van = A2.mask.vanish; o.ox = R(-.32, .32); o.oy = R(-.3, .3); o.kbx = R(-.6, .6); o.kbz = R(-.6, .6); o.spdM = c.spdM * R(.92, 1.08);
+  }
+  c.ox = R(-.32, .32); c.oy = R(-.3, .3);
+  if (typeof part === 'function') for (let k = 0; k < 10; k++) part({ k: 'smoke', x: c.x + R(-.3, .3), z: c.y + R(-.3, .3), h: hitH(c), vh: R(.3, .8), drag: 1, life: .7, max: .7, size: R(.14, .24), col: '#9a80c0' });
+  if (typeof fxRing === 'function') fxRing(c.x, c.y, .9, '#b08ae8');
+  if (typeof sfx === 'function') sfx('phase', 0);
+}
+
+/* ---- on a hit (game.js hurt, after the bars, before health): returns what reaches its health ---- */
+function a2Hit(c, amt, type, src, dot, elem) {
+  const d = c.def;
+  if (d.a2decoy) return a2Pop(c);
+  if (c.type === 'knotback' && !dot) { const cap = c.maxHp * A2.hide.cap; if (amt > cap) { amt = cap; if ((c.a2gl || 0) < G.time) { c.a2gl = G.time + .35; immuneText(c); a2Fx(c.x, c.y, '#d8d0e8', 4); } } }
+  if (c.type === 'lullcap' && !dot && !DTAG && src && src.def && !src.def.wall && src.x != null) {
+    const D = src.a2dr && src.a2dr.until > G.time ? src.a2dr : (src.a2dr = { n: 0, until: 0 });
+    D.n = Math.min(A2.lull.max, D.n + 1); D.until = G.time + A2.lull.t;
+    c.rageT = Math.max(c.rageT || 0, .6); c.rageK = Math.max(c.rageK || 0, A2.lull.quick);
+    if ((c.a2th || 0) < G.time && G.bolts) { c.a2th = G.time + .25; G.bolts.push({ pts: [[c.x, hitH(c), c.y], [src.x, 1, src.y]], life: .25, max: .25, col: [.8, .6, 1.1] }); }
+  }
+  if (c.type === 'thrall' && c.a2ch) {
+    const live = c.a2ch.m.filter(o => !o.dead && o.hp > 0), n = live.length;
+    if (n > 1) {
+      const share = amt / n;
+      for (const o of live) { if (o === c) continue; o.hp -= share; o.hit = Math.max(o.hit || 0, .08); if (typeof credit === 'function') credit(src, Math.min(share, o.hp + share), dot, 0); if (o.hp <= 0) kill(o, src, elem); }
+      amt = share;
+    }
+  }
+  if (c.type === 'hollowguard' && G.creeps.some(u => !u.dead && u.type === 'urnbearer' && u.links && u.links.includes(c))) {
+    if (amt >= c.hp - 1) { amt = Math.max(0, c.hp - 1); c.a2held = G.time + .4; if (!dot) immuneText(c); }
+  }
+  if (c.type === 'mummer' && (c.a2s || 0) < A2.mask.at.length) {
+    const th = c.maxHp * A2.mask.at[c.a2s || 0];
+    if (c.hp - amt < th) { amt = Math.max(0, c.hp - th); a2Split(c, th); return amt; }
+  }
+  return amt;
+}
+
+/* ---- on a unit: the Lullcap's drowsiness (slower attacks), Umbrielle's dusk (shorter reach) ---- */
+function a2Crowded(t) {
+  if (!t || !t.def || t.def.wall || t.wrecked) return false;
+  if (t.a2crT === G.time) return t.a2cr;
+  let n = 0; for (const o of G.towers) if (o !== t && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= A2.dusk.near + .01) n++;
+  t.a2crT = G.time; t.a2cr = n >= A2.dusk.crowd; return t.a2cr;
+}
+{ const _es = effStats; effStats = function (t) {
+  const st = _es.apply(this, arguments);
+  if (!st || !t || !t.def || typeof G === 'undefined' || !G) return st;
+  if (t.a2dr && t.a2dr.until > G.time && st.rate) { st.rate *= 1 + A2.lull.k * t.a2dr.n; st.a2drow = t.a2dr.n; }
+  if (G.a2 && G.a2.g === G && G.a2.dusk && st.range && a2Crowded(t)) { st.range = Math.max(A2.dusk.min, Math.min(st.range, st.range * A2.dusk.k)); st.a2dusk = 1; }
+  return st;
+}; }
+
+/* ---- deaths and the gate: a bridge that breaks, a decoy that slips through ---- */
+{ const _kill = kill; kill = function (c) { if (c && c.def && c.def.a2decoy) { a2Pop(c); return; } const r = _kill.apply(this, arguments); if (c && c.def && c.def.a2b && G.a2) { const b = G.a2.bridges.find(x => x.c === c); if (b) a2BridgeDown(b); } return r; }; }
+{ const _leak = leak; leak = function (c) { if (c && c.def && (c.def.a2decoy || c.def.a2b)) { c.dead = true; return; } return _leak.apply(this, arguments); }; }
+
+/* ---- a test wave (?act2foe=<id>, a2Wave(id)): wave n becomes that foe's test wave; its card is the foe's ---- */
+let A2_TEST = null;
+const A2_TEST_ALL = 'hornrunner*2+thrall*4+knotback*2+lullcap*2+hollowguard*2+urnbearer*1+plankrunner*1+mummer*1';
+function a2TestSpec(id) {
+  const s = id === 'all' ? A2_TEST_ALL : (CREEPS[id] && CREEPS[id].a2 && CREEPS[id].a2.test) || null; if (!s) return null;
+  return s.split('+').map(p => { const [main, tag] = p.split('!'), [type, c] = main.split('*'); return { type, count: +c, swift: tag === 'swift', siege: false }; });
+}
+{ const _ws = waveSpec; waveSpec = function (n) { if (A2_TEST && n === A2_TEST.wave && typeof G !== 'undefined' && G && !G.vs) { const g = a2TestSpec(A2_TEST.id); if (g) return g; } return _ws.apply(this, arguments); }; }
+// the wave card: a wave with Gloam foes and no problem of its own reads the first one's card (Act II can set its own in WAVE_PROBLEM)
+function a2Card(n) { for (const g of waveSpec(n)) { const d = CREEPS[g.type]; if (d && d.a2 && d.a2.card) return { name: d.a2.card[0], text: d.a2.card[1], ways: d.a2.card[2] }; } return null; }
+{ const _wp = waveProblem; waveProblem = function (n) { if (A2_TEST && n === A2_TEST.wave) { const c = a2Card(n); if (c) return c; } return _wp.apply(this, arguments) || (oldRules() ? null : a2Card(n)); }; }
+function a2Wave(id, n) {   // in a run: the next wave (or wave n) is this foe's test wave
+  if (!a2TestSpec(id)) return 'unknown: ' + ['all'].concat(A2_IDS).join(', ');
+  A2_TEST = { id, wave: n || (G.phase === 'build' ? G.wave : G.wave + 1) };
+  if (typeof onDirty === 'function') onDirty();
+  return A2_TEST;
+}
+
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
      cast    on the unit: a sigil at its feet and a glyph rising over it (a caster), or a flash of steel (a fighter)
@@ -81001,7 +81270,7 @@ function twView(v) {
   if (TW.view === 'E') { TW.E._vs = new Map(); TW.E._corpses = []; } else { VS.clear(); corpses.length = 0; }   // no ghosts of foes that died while you looked away
   if (TW.view === 'E') { G.buildType = null; G.ghost = null; }
   TW.scoutEl.hidden = TW.view !== 'E'; document.body.classList.toggle('tw-scout', TW.view === 'E');
-  TW.scoutEl.innerHTML = `Watching <b>${esc(TW.ai.name)}</b>'s keep · <span>tap to go back</span>`;
+  TW.scoutEl.innerHTML = `Watching <b>${esc(TW.ai.name)}</b>'s ${TW.coop ? 'field' : 'keep'} · <span>tap to go back</span>`;
   TW.mapCv.setAttribute('aria-label', TW.view === 'E' ? 'Your keep. Tap to go back to it.' : 'The enemy keep. Tap to watch it.');
   TW.mapCv.title = TW.view === 'E' ? 'Back to your keep [V]' : 'Watch the enemy keep [V]';
   TW.mapT = 0; sfx('click'); if (typeof markDirty === 'function') markDirty();
@@ -81056,7 +81325,7 @@ function twDrawMap() {
     g.beginPath(); g.arc(ox + c.x * cs, oy + clamp(c.y, -.4, ROWS + .4) * cs, r, 0, TAU); g.fill();
   }
   g.font = `700 ${Math.round(hdr * .6)}px Cinzel, Georgia, serif`; g.textBaseline = 'middle';
-  g.fillStyle = '#f2dc9a'; g.textAlign = 'left'; g.fillText(S === TW.E ? 'Enemy' : 'You', ox, hdr * .55);
+  g.fillStyle = '#f2dc9a'; g.textAlign = 'left'; g.fillText(S === TW.E ? (TW.coop ? 'Partner' : 'Enemy') : 'You', ox, hdr * .55);
   g.textAlign = 'right'; g.fillStyle = S.lives <= 5 ? '#ff8a78' : '#f2dc9a'; g.fillText('♥ ' + Math.max(0, S.lives), ox + cs * COLS, hdr * .55);
 }
 // the command card while the send menu is open: ten kinds of minion, Back, and the Send button itself
@@ -84883,7 +85152,7 @@ function hud() {
   setText('hWave', play ? String(TW ? Math.max(1, TW.wave) : G.wave) : '—');
   { const sk = play && !TW && G.state === 'play' ? streakN() : 0; setText('hStk', sk ? '+' + sk * 10 + '%' : ''); if (hudCache.stkOn !== !!sk) { hudCache.stkOn = !!sk; document.getElementById('hStk').hidden = !sk; } }
   xpHud();   // the XP bar (force runs)
-  setText('hOf', TW ? '/' + TW_LAST : play && (G.endless || G.wave > MAX_WAVE) ? '' : '/' + MAX_WAVE);
+  setText('hOf', TW ? '/' + (TW.coop && typeof CO_WAVES !== 'undefined' ? CO_WAVES.length : TW_LAST) : play && (G.endless || G.wave > MAX_WAVE) ? '' : '/' + MAX_WAVE);
   let tm = '';
   if (play && G.state === 'play') {
     if (G.phase === 'build') tm = (G.wave === 1 || G.calm) && G.countdown <= 0 ? 'Ready' : Math.ceil(G.countdown) + 's';
@@ -108468,4 +108737,76 @@ if (typeof fcCardHTML === 'function') { const _cuC = fcCardHTML; fcCardHTML = fu
 if (typeof openSettings === 'function') { const _cuS = openSettings; openSettings = function () { const r = _cuS.apply(this, arguments); try { calmSettingsRow(); } catch (e) { console.warn('calm pace', e); } return r; }; }
 // the play log says which pace the run was played at (playlog.js plHeader)
 if (typeof plHeader === 'function') { const _cuP = plHeader; plHeader = function () { const h = _cuP.apply(this, arguments); try { if (h && typeof calmOn === 'function' && calmOn()) { h.calm = 1; h.heroName = `${h.heroName || 'no hero'} [Calm pace]`; } } catch (e) {} return h; }; }
+
+/* ---- Act II's Gloam Host: what you see of them (the rules are in forces_zzzzzzzzzzzzzzzzzzzzzzz_act2foes.js).
+   The host's mark at every Gloam foe's feet, each one's tell, the forecast's counter and trait, the wave card's advice, and the
+   test stage: ?act2foe=<id> (or 'all') opens a force run at wave 40 with a small maze, units and gold, and that foe's test wave
+   as the next; a2Wave('<id>') in any run. Kept quiet: thin rings and beads, no flashes (owner: spells never too flashy). ---- */
+
+const A2_TEST_WAVE = 40;
+// every Gloam foe: a thin dusk-violet ring at its feet (the host's mark), and its tell
+function a2DrawFx(c, r) {
+  const d = c.def, x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), p = .5 + .5 * Math.sin(vt * 2 + (c.anim || 0)), M = A2_MARK;
+  if (!d.a2b) QG.ground(x, z, .034, r * 1.35, r * 1.35, [M[0], M[1], M[2], .42 + .12 * p], 4, .07);
+  if (c.a2lay) {   // the Gloamwright's chosen wall: a ring closing on it as it lays
+    const w = c.a2lay.w, wx = w % COLS + .5, wz = ((w / COLS) | 0) + .5, u = clamp(c.a2lay.t / c.a2lay.T, 0, 1);
+    QADD.ground(wx, wz, .05, .35 + .45 * u, .35 + .45 * u, [1, .72, .35, .6], 4, .1);
+  }
+  if (d.a2b) { const k = clamp((c.a2t || 0) / A2.bridge.life, 0, 1); QADD.ground(c.x, c.y, .045, .62, .62, [1, .72, .35, .25 + .35 * k], 4, .09); }
+  if (c.type === 'thrall' && c.a2ch) {   // the chain: grey beads to the next living thrall on it
+    const m = c.a2ch.m, i = m.indexOf(c); let o = null; for (let k = i + 1; k < m.length; k++) if (!m[k].dead) { o = m[k]; break; }
+    if (o) { const y0 = creepBaseY(c) + .35, y1 = creepBaseY(o) + .35, dd = Math.hypot(o.x - c.x, o.y - c.y), n = Math.min(14, Math.max(3, Math.ceil(dd / .16)));
+      for (let q = 1; q < n; q++) { const u = q / n; QA.bill(RD, lerp(x, o.x + (o.ox || 0), u), lerp(y0, y1, u) - Math.sin(u * Math.PI) * .12, lerp(z, o.y + (o.oy || 0), u), .07, .07, [.62, .64, .72, .95], 1, 0); } }
+  }
+  if (c.type === 'hollowguard' && c.a2held > G.time) { const y = creepBaseY(c) + creepH(c) * .5, s = r * 2.1; QADD.bill(RD, x, y, z, s, s, [.35, .95, .85, .25], 3, .06); }
+  if (G.a2 && G.a2.g === G && G.a2.fr !== vt) {   // once a frame: the horn line, drowsy units, benighted units
+    G.a2.fr = vt;
+    if (G.a2.half && G.creeps.some(o => !o.dead && o.type === 'hornrunner' && !o.a2horned)) { const h = G.a2.half; QG.ground(h.x, h.z, .036, .7, .7, [1, .84, .4, .45 + .2 * p], 4, .08); }
+    for (const t of G.towers) {
+      if (t.def.wall || t.wrecked) continue;
+      if (t.a2dr && t.a2dr.until > G.time) { const n = t.a2dr.n, top = towerTop(t) + .25; for (let q = 0; q < Math.min(4, 1 + (n >> 1)); q++) { const a = vt * 1.4 + q * 1.6; QADD.bill(RD, t.x + Math.cos(a) * .22, top + .08 * Math.sin(vt * 3 + q), t.y + Math.sin(a) * .22, .09, .09, [.82, .62, 1, .7], 1, 0); } }
+      if (G.a2.dusk && t.st && t.st.a2dusk) QG.ground(t.x, t.y, .035, .5, .5, [.42, .3, .7, .55], 4, .1);
+    }
+  }
+}
+{ const _dcf = drawCreepFx; drawCreepFx = function (c, r) { const v = _dcf.apply(this, arguments); if (c && c.def && c.def.a2) { try { a2DrawFx(c, r); } catch (e) {} } return v; }; }
+
+// the forecast card: the foe's own counter line, and the host's trait first
+if (typeof fcCounter === 'function') { const _fc = fcCounter; fcCounter = function (d) { return d && d.a2 && d.a2.counter ? d.a2.counter : _fc.apply(this, arguments); }; }
+if (typeof FC_TRAIT !== 'undefined') FC_TRAIT.unshift({ n: 'Gloam Host', icon: 'hexeye', hue: '#4a2a6a', f: d => !!d.a2 });
+// the wave card's advice: each Gloam foe's counter after the usual strong / weak units
+if (typeof adviceText === 'function') { const _at = adviceText; adviceText = function (n) {
+  const base = _at.apply(this, arguments), seen = new Set(), add = [];
+  try { for (const g of waveSpec(n)) { const d = CREEPS[g.type]; if (d && d.a2 && d.a2.counter && !seen.has(g.type)) { seen.add(g.type); add.push(`${d.name}: ${d.a2.counter.replace(/\.$/, '')}`); } } } catch (e) {}
+  return [base].concat(add).filter(Boolean).join(' · ');
+}; }
+
+/* ---- the test stage ---- */
+function a2Demo(id) {   // a small switchback maze, the force's units along it, and the foe's test wave next
+  G.gold = Math.max(G.gold, 6000); G.phase = 'build';
+  const kinds = BUILD_ORDER.filter(ty => TOWERS[ty] && !TOWERS[ty].wall); if (Array.isArray(G.unlocked)) G.unlocked = [...new Set(G.unlocked.concat(kinds))];
+  const say = onToast; onToast = () => {};
+  try {
+    for (const [j, gap] of [[4, COLS - 1], [8, 0], [11, COLS - 1]]) for (let i = 0; i < COLS; i++) if (i !== gap) tryBuild('wall', i, j);
+    let n = 0; for (const [i, j] of [[2, 3], [6, 3], [3, 7], [7, 7], [4, 10], [8, 10], [5, 3], [6, 7], [2, 12], [9, 12]]) if (tryBuild(kinds[n % kinds.length], i, j)) n++;
+  } catch (e) {} finally { onToast = say; }
+  G.gold = Math.max(G.gold, 3000);
+  a2Wave(id, G.wave);
+  onToast(`Test wave ${G.wave}: ${id === 'all' ? 'the Gloam Host' : CREEPS[id].name}. Call it when ready.`);
+}
+function a2StageUrl() {
+  let id = ''; try { id = new URLSearchParams(location.search).get('act2foe') || ''; } catch (e) {}
+  if (!id || !(id === 'all' || A2_IDS.includes(id))) return;
+  let n = 0; const iv = setInterval(() => {
+    if (++n > 600) return clearInterval(iv);
+    if (!document.getElementById('oNew') || typeof beginGame !== 'function') return;
+    clearInterval(iv);
+    try {
+      const H = HEROES.find(h => h.force); if (H) heroPickId = H.id;
+      beginGame();
+      setTimeout(() => { if (!G || !G.force) return; G.wave = A2_TEST_WAVE; a2Demo(id); if (typeof onDirty === 'function') onDirty(); }, 400);
+    } catch (e) { console.error(e); }
+  }, 100);
+}
+a2StageUrl();
 
