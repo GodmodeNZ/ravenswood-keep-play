@@ -1,4 +1,4 @@
-const BUILD_TAG = '4734313@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9ff23bc@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -83640,8 +83640,8 @@ function ulTotals() {
   return (G.towers || []).filter(t => t.def && !t.def.wall).map(t => ({ t, dmg: sum(U[t.id]) + sum(Wt[t.id]) })).sort((a, b) => b.dmg - a.dmg || a.t.id - b.t.id);
 }
 function ulIcon(t) {
-  const key = 't:' + t.type + ':' + t.tier; if (UL.ico[key]) return UL.ico[key];
-  try { const c = document.createElement('canvas'); c.width = c.height = 120; iconPaint(c, key); return (UL.ico[key] = c.toDataURL()); } catch (e) { return ''; }
+  const key = 't:' + t.type + ':' + t.tier, ck = (G.force || '') + '|' + (G.hero || '') + '|' + key; if (UL.ico[ck]) return UL.ico[ck];   /* (cached per force and commander: the slots are shared, so a Grove run's portraits showed in a Silver run. Owner, 11 Nov 2026) */
+  try { const c = document.createElement('canvas'); c.width = c.height = 120; iconPaint(c, key); return (UL.ico[ck] = c.toDataURL()); } catch (e) { return ''; }
 }
 function unitListTick() {
   const on = typeof deskHud === 'function' && deskHud() && typeof G !== 'undefined' && G && G.state === 'play' && Array.isArray(G.towers) && !(typeof TW !== 'undefined' && TW);
