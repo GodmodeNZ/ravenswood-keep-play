@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd19d81f@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b2b3208@2026-11-12';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -499,8 +499,9 @@ const WAVE_PROBLEM = {
 };
 // the old march: Tower Wars and Classic (the keep's elemental towers, no force) keep the old waves and rules: no formations, ties or role damage
 function oldRules() { return typeof G !== 'undefined' && !!G && (!!G.vs || !G.force); }
-// the word for what the player builds, for text only: 'tower(s)' in Classic and Tower Wars, 'unit(s)' in a force run. cap: capitalised
-const uw = (n, cap) => { const w = oldRules() ? (n === 1 ? 'tower' : 'towers') : (n === 1 ? 'unit' : 'units'); return cap ? w[0].toUpperCase() + w.slice(1) : w; };
+// the word for what the player builds, for text only: 'tower(s)' in Classic, 'unit(s)' in a force run and in Bannerwars (Tower Wars in the code;
+// owner, 12 Nov 2026: tomes there say "this unit"). cap: capitalised
+const uw = (n, cap) => { const w = oldRules() && !(typeof G !== 'undefined' && G && G.vs) ? (n === 1 ? 'tower' : 'towers') : (n === 1 ? 'unit' : 'units'); return cap ? w[0].toUpperCase() + w.slice(1) : w; };
 function waveProblem(n) { if (oldRules()) return null; const p = WAVE_PROBLEM[((n - 1) % WAVES.length) + 1]; return p ? { name: p[0], text: p[1], ways: p[2] } : null; }
 // the ties a wave's casters keep, for the wave card: who covers whom and what cutting it does
 function waveTies(n) { if (oldRules()) return []; const out = []; for (const g of waveSpec(n)) { const d = CREEPS[g.type]; if (!d || !d.link) continue; const o = out.find(x => x.type === g.type); if (o) o.count += g.count; else out.push({ type: g.type, name: d.name, say: d.link.say, col: d.link.col, count: g.count }); } return out; }
@@ -1295,8 +1296,11 @@ function talNodeState(type, picks, i) {
   return 'avail';
 }
 // the Champion's talents open with the Champion itself (player level CHAMP_LEVEL in a force run, or once one stands on the field)
+// TAL_REPLAY: a save's talents are being replayed (game.js restore). The player's level comes back later in restore (xpRestore),
+// so the lock would read level 1 and refund every Champion talent; a save's picks were legal when they were taken
+let TAL_REPLAY = false;
 function champTalLocked(type) {
-  return !!(TOWERS[type] && TOWERS[type].champ && typeof G !== 'undefined' && G && G.force && !G.vs && typeof CHAMP_LEVEL !== 'undefined'
+  return !TAL_REPLAY && !!(TOWERS[type] && TOWERS[type].champ && typeof G !== 'undefined' && G && G.force && !G.vs && typeof CHAMP_LEVEL !== 'undefined'
     && (G.lvl | 0) < CHAMP_LEVEL && !(G.towers || []).some(t => t.def && t.def.champ));
 }
 function talCanLearn(type, picks, i) {
@@ -1787,7 +1791,7 @@ function canBuild(i, j) {
 function canBlock(i, j) {
   const k = idx(i, j);
   for (const c of G.creeps) {
-    if (c.fly || c.dead) continue;
+    if (c.fly || c.dead || c.camp) continue;   // (Tower Wars: a camp's guardians stand off the field)
     if (c.state !== 'exit' && idx(c.ti, c.tj) === k) return { ok: false, msg: 'A creep is in the way.' };
     if (Math.floor(c.x) === i && Math.floor(c.y) === j) return { ok: false, msg: 'A creep is in the way.' };
   }
@@ -1795,7 +1799,7 @@ function canBlock(i, j) {
   const dist = flowField(blk);
   if (!isFinite(atSpawn(dist))) return { ok: false, msg: "You can't block the path!" };
   for (const c of G.creeps) {
-    if (c.fly || c.dead || c.state === 'exit' || c.atk) continue;   // siege troops smash their way out
+    if (c.fly || c.dead || c.state === 'exit' || c.atk || c.camp) continue;   // siege troops smash their way out
     if (!isFinite(dist[idx(c.ti, c.tj)])) return { ok: false, msg: 'That would trap a creep.' };
   }
   return { ok: true, blk, dist };
@@ -1841,7 +1845,7 @@ function wallLinePlan(cells, type) {
     else if (gold < cost) st = 'poor';
     else {
       blk[k] = 1; const d = flowField(blk);
-      if (!isFinite(atSpawn(d)) || G.creeps.some(c => !c.fly && !c.dead && c.state !== 'exit' && !c.atk && !isFinite(d[idx(c.ti, c.tj)]))) { blk[k] = 0; st = 'block'; }
+      if (!isFinite(atSpawn(d)) || G.creeps.some(c => !c.fly && !c.dead && !c.camp && c.state !== 'exit' && !c.atk && !isFinite(d[idx(c.ti, c.tj)]))) { blk[k] = 0; st = 'block'; }
       else { gold -= cost; spent += cost; n++; dist = d; }
     }
     out.push({ i, j, st });
@@ -2245,7 +2249,7 @@ function update(dt) {
   updateProjs(dt);
   updateEProjs(dt);
   updateFx(dt);
-  if (G.state === 'play' && G.phase === 'wave' && !G.spawnQ.length && !G.creeps.length) waveCleared();
+  if (G.state === 'play' && G.phase === 'wave' && !G.spawnQ.length && !(G.creeps.length && (!G.camps || G.creeps.some(c => !c.camp)))) waveCleared();   // (Tower Wars: a camp's guardians beside the maze are not the wave's)
 }
 
 /* Attract mode behind the title screen */
@@ -2534,7 +2538,8 @@ function updateCreeps(dt) {
     if (c.stunT > 0) { c.stunT -= dt; continue; }
     const d = c.def;
     if (d.egg) { if ((c.hatchT -= dt) <= 0) hatchEgg(c); continue; }   // egg sacs sit still until they hatch
-    if (d.totem) { totemTick(c, dt); continue; }   // Hex Totems: rooted to the road, mending what stands near them
+    if (d.totem) { totemTick(c, dt); continue; }
+    if (c.camp) { if (typeof twmCampTick === 'function') twmCampTick(c, dt); continue; }   // Tower Wars: a camp's guardian holds its ground beside the maze (versus_modes.js)   // Hex Totems: rooted to the road, mending what stands near them
     if (c.introT > 0) { c.introT -= dt; if (Math.random() < dt * 8) part({ k: 'ember', x: c.x + R(-.4, .4), z: c.y + R(-.2, .2), h: R(.1, 1), vh: R(.5, 1.2), drag: 1, life: .6, max: .6, size: R(.06, .1), col: '#ff7a3a' }); continue; }   // the arrival: it stands in the portal a moment
     if (c.trophy && !c.trophyLost) trophyTick(c);
     if (d.lead && leaderTick(c, dt)) continue;   // true: the leader holds still this frame (landed, turned to stone, tunnelling); it casts on the move
@@ -4421,7 +4426,7 @@ function ccDR(c) {
   return k;
 }
 function shove(c, d) {
-  if (c.dead || d <= 0 || c.state === 'exit' || c.burT > 0 || (c.ent && !overCrest(c))) return;
+  if (c.dead || d <= 0 || c.state === 'exit' || c.burT > 0 || c.camp || (c.ent && !overCrest(c))) return;   // (a Tower Wars camp's guardians hold their ground)
   { const w = kbWeight(c); if (!w) return; d *= w * ccDR(c); if (d <= .01) return; }
   if (c.fly) { c.y = Math.max(PORTAL.y, c.y - d); c.remain = GATE_Y - c.y; return; }
   let left = d;
@@ -5377,7 +5382,8 @@ function restore(s) {
   // ftv 5 (7 Nov 2026): the capstones were reworked; saves carry their trees' names, older ones read them from TAL_NAMES_V4
   const talN = !G.force || typeof talNamesOld !== 'function' ? null : s.taln || ((s.ftv | 0) === 4 ? talNamesOld(G.force, s.hero) : null);
   if (talN && s.plan && s.plan.tal && typeof talRemapByName === 'function') for (const k in s.plan.tal) if (talN[k] && TALENTS[k]) s.plan.tal[k] = talRemapByName(s.plan.tal[k], talN[k], TALENTS[k].list);
-  const mt = migrateTal(tal0, s.v, oldForceTal, talN); G.tal = mt.tal; G.tp = (s.tp || 0) + mt.refund + holyPts;
+  TAL_REPLAY = true; let mt; try { mt = migrateTal(tal0, s.v, oldForceTal, talN); } finally { TAL_REPLAY = false; }   // (the Champion's lock off while a save's picks replay: core.js TAL_REPLAY)
+  G.tal = mt.tal; G.tp = (s.tp || 0) + mt.refund + holyPts;
   // ftv 4 (6 Nov 2026): the spell talents moved to each tree's own rows (forces_zy_spells.js). The picks keep their talents
   // (a tree's list order is unchanged); migrateTal replays them on the new layout, and a rank that no longer fits is refunded
   // ftv 6 (10 Nov 2026): every force tree spread over six rows (forces_zzzzzzzzzzzzzzzzz_spread.js), the list order kept: the
@@ -10060,11 +10066,11 @@ function canMoveTo(t, i, j) {
   const k = idx(i, j), k0 = idx(t.i, t.j);
   if (resAt(k)) return { ok: false, msg: 'The road must stay clear.' };
   if (G.blk[k] || G.tAt[k]) return { ok: false, msg: 'Something is already built there.' };
-  for (const c of G.creeps) if (!c.fly && !c.dead && ((c.state !== 'exit' && idx(c.ti, c.tj) === k) || (Math.floor(c.x) === i && Math.floor(c.y) === j))) return { ok: false, msg: 'A creep is in the way.' };
+  for (const c of G.creeps) if (!c.fly && !c.dead && !c.camp && ((c.state !== 'exit' && idx(c.ti, c.tj) === k) || (Math.floor(c.x) === i && Math.floor(c.y) === j))) return { ok: false, msg: 'A creep is in the way.' };
   const blk = G.blk.slice(); blk[k0] = t.wrecked ? 0 : 0; blk[k] = 1;
   const dist = flowField(blk);
   if (!isFinite(atSpawn(dist))) return { ok: false, msg: "You can't block the path!" };
-  for (const c of G.creeps) if (!c.fly && !c.dead && c.state !== 'exit' && !c.atk && !isFinite(dist[idx(c.ti, c.tj)])) return { ok: false, msg: 'That would trap a creep.' };
+  for (const c of G.creeps) if (!c.fly && !c.dead && !c.camp && c.state !== 'exit' && !c.atk && !isFinite(dist[idx(c.ti, c.tj)])) return { ok: false, msg: 'That would trap a creep.' };
   return { ok: true, blk, dist };
 }
 function moveTowerTo(t, i, j) {
@@ -26625,7 +26631,7 @@ WB_HOOK.fire.push((t, st, tg, pow) => { if (typeof sfxBasicWb === 'function' && 
    The owner (6 Nov 2026): every force fields a specialist, one unit built to answer one kind of foe, essential against it
    and modest otherwise:
      the Silver Order  Magebane Inquisitors   casters        (forces_zs_silver.js)
-     the Grove         Thornwarden Stalkers   healers, support (forces_zs_grove.js)
+     the Grove         Bogwitches             armour         (forces_zs_grove.js; were the Thornwarden Stalkers)
      the Conclave      Arcane Severers        wards, shields (forces_zs_conclave.js)
      Ironhold          Siege Breakers         heavy, armoured (forces_zs_ironhold.js)
      the Stormborn     Skyhunters             flyers         (forces_zs_stormborn.js)
@@ -26742,7 +26748,6 @@ SPEC_BUFF.push(['sx_hushed', { name: 'Silenced caster', kw: 'sx:hushed', kind: '
 // what each specialist answers, by foe type (the bot and the forecast weigh a wave's share of it)
 const SPEC_COUNTERS = {
   so_inquisitor: (ty, d) => !!(typeof EP_CASTERS !== 'undefined' && EP_CASTERS[ty]) || !!(d.kit && d.kit.length),
-  thornwarden: (ty, d) => !!(d.rk && d.rk.support) || !!d.heal || !!d.regen,
   cc_severer: (ty, d) => !!(d.rk && d.rk.mres) || !!d.ward || !!d.guard || ty === 'warmage' || ty === 'mender',
   siegebreaker: (ty, d) => !!(d.rk && (d.rk.armoured || d.rk.heavy)) || (d.armor || 0) >= 6,
   sb_skyhunter: (ty, d) => !!d.fly,
@@ -26999,219 +27004,529 @@ SPEC_BUFF.push(['cc_severance', { who: 'unit', name: 'Severance', kw: 'cc:severa
   def: 'Stored from the wards it broke: its next spell\'s first hit carries it as magic damage.',
   get: t => t.ccsStore > 0 ? { n: bfInt(t.ccsStore), say: `${bfInt(t.ccsStore)} magic damage on its next spell.` } : null }]);
 
-/* ================= THE GROVE'S SPECIALIST: the Thornwarden Stalkers =================
-   Elf hunters of the deep briars in wine-dark leather and moss, masked in bark, who hunt the foe's HEALERS AND SUPPORT:
-   - the strike: a thorn dart (steel, air and ground) thrown from a spear-thrower, that seeks support foes (st.hunt). A
-     support foe it strikes is Thornmarked (forces_zs_base.js specNoHeal: it can't heal or be healed, its mending and
-     shielding spells don't cast) for a few seconds, and one standing alone, with no ally beside it, takes 1.75× the dart.
-   - Severing Thorn (innate): a heavy thorn through a support foe: a hit, a root, a long Thornmark, and its ties are cut
-     (specHush: its mending link, ward or banner haste drop while the mark lasts).
-   - Bramble Snare (row II): a briar net drags a support foe back down the road and roots it, so its column walks on
-     without it: alone, it takes the Stalkers' full edge.
-   - Wither Bloom (row III): a bloom of withering thorns on the road: walkers in it are hurt and Thornmarked while they
-     stand there, so no heal lands on them.
-   - Growth: its Bloom (Hunter's Bloom) strikes harder and spreads the Thornmark to every support foe near its foe.
-   Drawn in one piece with posed parts (plain: true), as the other forces' units are. */
-const GVS_U = 'thornwarden';
-const GVS = { MARK: [4, 4, 4.5, 5, 5.5, 6], ALONE: 1.75, COL: { thorn: '#c84a6a', mark: '#ff6a8a', briar: '#5a7a2a' } };
-specAdd('grove', { id: GVS_U, name: 'Thornwarden Stalkers', short: 'Stalkers', key: '9', plain: true, proj: 'force', attack: 'gv_thorndart', elem: null, dmgType: 'phys', air: true, ground: true, top: [1.05, 1.1, 1.15],
-  blurb: 'Masked hunters of the deep briars who throw thorn darts from a spear-thrower. They hunt healers and support casters: a support foe they strike can\'t heal or be healed for a few seconds, and one standing alone takes far more. Air and ground.',
-  tiers: [{ cost: 32, dmg: 9, rate: 1, range: 2.7 }, { cost: 58, dmg: 22, rate: .95, range: 2.9 }, { cost: 120, dmg: 50, rate: .9, range: 3.1 }] });
-FORCE_GLYPH[GVS_U] = 'spikes';
-const gvsIs = t => !!(t && t.def && t.def.unit === GVS_U);
-// alone: no ally within its reach (a support caster's own tether: supportTick), or none within 1.5 cells
-const gvsAlone = c => !!c && (c.alone || !G.creeps.some(o => o !== c && !o.dead && !o.ent && Math.hypot(o.x - c.x, o.y - c.y) <= 1.5));
-const gvsMarkT = (t, st) => GVS.MARK[Math.min(5, t.tier | 0)] + .5 * ((st && st.caps && st.caps.gvs_barb) || 0);
-const gvsAloneK = st => GVS.ALONE + .25 * ((st && st.caps && st.caps.gvs_lone) || 0);
-function gvsMark(c, T, t) {
-  if (!c || c.dead) return;
-  const fresh = !(c.nohealT > G.time); specNoHeal(c, T); c.gvsBy = t;
-  if (fresh && G.state === 'play') { part({ k: 'ring', x: c.x, z: c.y, h: .06, life: .45, max: .45, size: .5, col: GVS.COL.mark }); for (let k = 0; k < 5; k++) part({ k: 'chunk', x: c.x + R(-.15, .15), z: c.y + R(-.15, .15), h: hitH(c), vh: R(.3, .8), g: 4, life: .35, max: .35, size: R(.025, .04), col: k % 2 ? GVS.COL.thorn : GVS.COL.briar }); }
+/* ================= THE GROVE'S EIGHTH UNIT: the Bogwitches =================
+   Crones of the Deepwood's fens (owner, 11 Nov 2026: "bogwitches sound cool, dont like the cauldron", "bog body sounds
+   cool, bog takes its due", "just call it insect swarm"; the brief: docs/design/bogwitch_brief_2026-11-11.md). They took
+   the Thornwarden Stalkers' slot (the specialist's, SPEC_SLOT 'venom'); a save with Stalkers loads them as Bogwitches
+   (units are saved by slot, the Stalkers' talents are refunded by name, their spells and weapon are mapped below).
+   - The strike: she drives her staff down and spits a gout of black water at one ground foe (magic, armour does not stop
+     it): slowed 20% for 1 second.
+   - Insect Swarm (innate): a cloud of biting insects on one foe, ground or air, for 6s: it bites every half second and the
+     foe can't be healed while covered; when the host dies it flies on, once. A flyer under it is pulled low and slowed.
+   - Bog Body (row II): something old and preserved climbs out of the road in her reach. Ground foes can't pass it and hack
+     at it; when its time is up or it is cut down it sinks and drags the nearest ground foe under for 1s. A boss wades past.
+   - The Bog Takes Its Due (row IV, the signature): a bog opens under the toughest foe in reach; drowned arms drag it down
+     to the waist (it stays in sight), hold it 3s while its armour is pulled off piece by piece, then let it climb out with
+     none. Ground foes crossing the bog are slowed and lose armour. A boss is held to the knees and loses half.
+   - Growth: her Bloom, Hatching: her next Insect Swarm costs no mana and lands on two foes.
+   The live pieces (swarms, bodies, bogs) are G.bwFx, ticked by the Grove's tick hook; their looks are drawn by the spell
+   toolkit (SFX_DRAW kinds bwbog, bwbody, bwarms, bwswarm). Drawn in one piece with posed parts (plain: true): a stand-in
+   body built from the Grove's parts until she has a sculpted model. */
+const BW_U = 'bogwitch';
+const BW = {
+  spitSlow: .2, spitT: 1, biteEvery: .5, biteK: .3, moveR: 2.5,
+  bodyR: .55, bodyDragK: 1.5, bodyDragT: 1, blowRate: 1,
+  dueK: .8 / 1.5, dueHold: 3, bossHold: 1.5, outSlow: .3, outSlowT: 2, bogR: .55, crossSlow: .3, handsHold: 1.5, handsR: 1.3, queenMana: 4,
+  COL: { water: '#1a2420', peat: '#4a3624', bone: '#d8d0b8', reed: '#4a5a2a', weed: '#5a7a2a', swarm: '#2a2a1a', arm: '#b8bca4', sick: '#9ab040' },
+};
+specAdd('grove', { id: BW_U, name: 'Bogwitches', short: 'Bogwitch', key: '9', plain: true, visTiers: 6, proj: 'force', attack: 'bw_spit', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.0, 1.02, 1.05, 1.08, 1.11, 1.15],
+  blurb: 'Crones of the Deepwood\'s fens who spit black water from the road and call up what lives in the bog: biting swarms that leave no room for healing, a drowned body that blocks the road, and arms that drag the toughest foe down and tear its armour off. Magic that armour does not stop; ground foes, and flyers for her swarm.',
+  tiers: [{ cost: 32, dmg: 11, rate: 1.3, range: 2.6 }, { cost: 56, dmg: 24, rate: 1.25, range: 2.8 }, { cost: 115, dmg: 58, rate: 1.2, range: 3 }] });
+FORCE_GLYPH[BW_U] = 'puddle';
+const bwIs = t => !!(t && t.def && t.def.unit === BW_U);
+const bwCap = (t, k) => (t && t.st && t.st.caps && t.st.caps[k]) || 0;
+const bwFx = () => G.bwFx || (G.bwFx = []);
+const bwWalker = c => !!c && !c.dead && !c.ent && !c.phased && (!c.fly || c.lowT > G.time);
+// a foe her swarm can settle on: anything she could strike, and flyers in the open too
+const bwSwarmable = (t, st, c) => !!c && !c.dead && (canTarget(t, st, c) || (c.fly && !c.ent && !c.phased && !(c.burT > 0) && (typeof PORTAL === 'undefined' || c.y >= PORTAL.y)));
+function bwFoesAny(t, st, r, filt) {
+  const out = AB_CAP = [];
+  for (const c of G.creeps) { if (!bwSwarmable(t, st, c) || Math.hypot(c.x - t.x, c.y - t.y) > r + (c.fly ? .3 : 0) || (filt && !filt(c))) continue; out.push(c); }
+  return out;
 }
-// a dart's hit: steel, through onHit (relics, items, the Grove's own on-hit rules)
-function gvsHit(t, st, c, amt) { if (!c || c.dead || !(amt > 0)) return 0; hurt(c, amt, 'phys', t, false, null, null); if (!c.dead) onHit(c, st, t, amt); return amt; }
-const gvsDartFx = (t, c, col) => { const tip = typeof unitTip === 'function' ? unitTip(t) : null; rfx({ k: 'streak', x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t), z0: tip ? tip[2] : t.y, c, col: col || GVS.COL.thorn, w: .03, trav: .12, life: .3 }); };
+const bwSwarmOn = (c, t) => bwFx().some(e => e.k === 'swarm' && e.c === c && !e.done && (!t || e.t === t));
+const bwHasSwarm = t => !!G && bwFx().some(e => e.k === 'swarm' && e.t === t && !e.done && e.c && !e.dead);
+// how far the foe sinks: to the waist (about half its height), a boss to the knees
+const bwSinkH = (c, knees) => -(typeof creepH === 'function' ? creepH(c) : hitH(c) * 1.6) * (knees ? .22 : .5);
+function bwSink(c, d, knees) { if (!c || c.dead || c.fly || !(d > .05) || typeof liftFoe !== 'function') return; liftFoe(c, d, bwSinkH(c, knees), 'cyc'); }
+// armour pulled off: a share of the armour bar (force runs) and, for a foe that keeps its own armour, that share of it
+// opened for s seconds. Returns the armour points taken (the Drowned Queen's mana).
+function bwStrip(c, share, s) {
+  if (!c || c.dead || !(share > 0)) return 0;
+  const A = Math.max(0, c.armor || c.def.armor || 0); let took = 0;
+  if (c.apMax > 0 && c.ap > 0 && !c.epTemp) { const a = Math.min(c.ap, c.apMax * share); c.ap -= a; took += A * a / c.apMax; }
+  else if (A > 0) { const was = c.shredT > 0 ? c.shred : 0, v = Math.min(A, was + A * share); took += v - was; c.shred = v; c.shredT = Math.max(c.shredT || 0, s || 6); }
+  return took;
+}
+// "loses N armour": as the Spears' Spearwood Rising says it (shred; on an armour bar a fresh shred breaks a piece off)
+function bwShred(c, n) { if (!c || c.dead || !(n > 0)) return; c.shred = (c.shredT > 0 ? c.shred : 0) + n; c.shredT = Math.max(c.shredT || 0, 5); }
+const bwSt = t => t.st || effStats(t);
+const bwLive = t => G.state === 'play' && G.towers.includes(t) && !t.wrecked;
 
-/* ---------- the strike: a thorn dart ---------- */
-FORCE_ATTACK.gv_thorndart = (t, st, tg, pow, echo) => {
-  const C = st.caps || {}, sup = specSupport(tg), lone = sup && (gvsAlone(tg) || (C.gvs_unseen && !(tg.gvsSeen && tg.gvsSeen.has(t))));
-  if (C.gvs_unseen && sup) (tg.gvsSeen || (tg.gvsSeen = new Set())).add(t);
-  gvsDartFx(t, tg);
-  G.delayed.push({ t: Math.min(.25, .05 + Math.hypot(tg.x - t.x, tg.y - t.y) / 16), fn: () => {
-    if (tg.dead || G.state !== 'play') return; const s = t.st || st;
-    gvsHit(t, s, tg, s.dmg * pow * (lone ? gvsAloneK(s) : 1)); if (tg.dead) return;
-    if (sup) { gvsMark(tg, gvsMarkT(t, s), t); if (C.gvs_seal && tg.mpMax > 0) tg.epSealT = Math.max(tg.epSealT || 0, G.time + 2); if (lone && C.gvs_apex && !tg.fly) rootFoe(tg, .8, t); }
-    fxSpark(tg.x, tg.y, hitH(tg), lone ? GVS.COL.mark : '#e8d8b0', lone ? 9 : 4);
+/* ---------- the strike: a gout of black water ---------- */
+FORCE_ATTACK.bw_spit = (t, st, tg, pow, echo) => {
+  const tip = typeof unitTip === 'function' ? unitTip(t) : null;
+  rfx({ k: 'streak', x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t) * .8, z0: tip ? tip[2] : t.y, c: tg, col: BW.COL.water, w: .05, trav: .14, life: .32 });
+  G.delayed.push({ t: Math.min(.25, .06 + Math.hypot(tg.x - t.x, tg.y - t.y) / 14), fn: () => {
+    if (tg.dead || G.state !== 'play') return; const s = t.st || st, C = s.caps || {};
+    const hit = [tg];
+    if (C.bwQueen) for (const e of bwFx()) if (e.k === 'bog' && e.t === t && !e.done && e.c && !e.c.dead && G.time < e.holdEnd) for (const o of G.creeps) if (o !== tg && bwWalker(o) && !hit.includes(o) && Math.hypot(o.x - e.x, o.y - e.z) <= BW.bogR) hit.push(o);   // the Drowned Queen
+    for (const c of hit) {
+      const amt = s.dmg * pow; hurt(c, amt, 'magic', t, false, null, null); if (c.dead) continue; onHit(c, s, t, amt);
+      chill(c, { slow: BW.spitSlow, slowT: BW.spitT + .5 * (C.bwMud || 0) }, null, t);
+      part({ k: 'smoke', x: c.x, z: c.y, h: hitH(c) * .7, vh: -.3, drag: 2, life: .35, max: .35, size: .16, col: BW.COL.water });
+      for (let k = 0; k < 4; k++) part({ k: 'chunk', x: c.x + R(-.1, .1), z: c.y + R(-.1, .1), h: hitH(c), vh: R(.2, .7), g: 5, life: .35, max: .35, size: R(.02, .035), col: k % 2 ? BW.COL.water : BW.COL.peat });
+    }
   } });
-  t.recoil = 1; sfx('glaiveHit', 0);
+  t.recoil = 1; sfx('splat', 0);
 };
 
+/* ---------- the live pieces: swarms, bog bodies, bogs (ticked by the Grove's tick hook) ---------- */
+function bwSwarmStart(t, c, dur, o = {}) {
+  if (!c || c.dead) return null;
+  const e = { k: 'swarm', t, c, until: G.time + dur, biteIn: .25, moves: 0, carried: 0, fever: false, at: G.time, x: c.x, z: c.y };
+  bwFx().push(e); bwLook('bwswarm', { e, x0: o.x0, h0: o.h0, z0: o.z0 });
+  return e;
+}
+function bwSwarmTick(e, dt) {
+  const t = e.t; if (!bwLive(t)) { e.done = 1; return; }
+  const c = e.c, st = bwSt(t), C = st.caps || {};
+  if (c && !c.dead && !G.creeps.includes(c)) { e.done = 1; return; }   // (through the gate: gone with it)
+  if (!c || c.dead) {   // the host is down: it flies on, once (twice with Second Brood)
+    const cap = 1 + (C.bwBrood ? 1 : 0); if (e.moves >= cap || G.time >= e.until) { e.done = 1; return; }
+    const n = nearest(e.x, e.z, BW.moveR, 1, c, q => bwSwarmable(t, st, q) && !bwSwarmOn(q, t))[0];
+    if (!n) { e.done = 1; return; }
+    rfx({ k: 'streak', x0: e.x, h0: .5, z0: e.z, c: n, col: BW.COL.swarm, w: .05, life: .4 });
+    e.c = n; e.moves++; e.carried = 0; e.fever = false; e.until = Math.max(e.until, G.time + 2); e.biteIn = .2;
+    if (C.bwFed && t.ab && typeof abMax === 'function') t.ab.mana = Math.min(abMax(t), t.ab.mana + 10 * C.bwFed);   // Fed Swarm
+    bwLook('bwswarm', { e, x0: e.x, h0: .5, z0: e.z });
+    return;
+  }
+  e.x = c.x; e.z = c.y;
+  if (G.time >= e.until) { e.done = 1; return; }
+  e.carried += dt;
+  specNoHeal(c, .6);
+  if (c.fly && !c.def.boss) { c.lowT = Math.max(c.lowT || 0, G.time + .3); chill(c, { slow: .25, slowT: .4 }, null, t); }
+  if (C.bwFever && !e.fever && e.carried >= 3) { e.fever = true; woundFoe(c, 4 * C.bwFever); }   // Marsh Fever
+  if ((e.biteIn -= dt) > 0) return;
+  const held = c.rootT > G.time || c.stunT > 0 || bwInBog(c);
+  e.biteIn = BW.biteEvery / (held && C.bwScent ? 1 + .2 * C.bwScent : 1);   // Blood Scent
+  abRun('bw_swarm', () => { hurt(c, abD(st) * BW.biteK, 'magic', t, true, null, null); });
+}
+const bwInBog = c => bwFx().some(e => e.k === 'bog' && !e.done && G.time < e.until && Math.hypot(c.x - e.x, c.y - e.z) <= BW.bogR);
+
+// a Bog Body at (x, z) for dur seconds, standing `blows` blows; n foes go under with it when it sinks
+function bwBodyStart(t, x, z, dur, blows, n, o = {}) {
+  const e = { k: 'body', t, x, z, at: G.time, until: G.time + dur, hp: blows, hp0: blows, n, on: new Set(), seized: null, risen: !!o.risen };
+  for (const c of G.creeps) if (!c.dead && Math.hypot(c.x - x, c.y - z) <= BW.bodyR + ((c.def && c.def.r) || .3) * .5) e.on.add(c);   // (those it rose under walk on: it stops what comes to it)
+  bwFx().push(e); bwLook('bwbody', { e });
+  sfx('burrow', 1); sfx('splat', 0);
+  return e;
+}
+function bwBodyTick(e, dt) {
+  const t = e.t; if (!bwLive(t)) { e.done = 1; return; }
+  const st = bwSt(t), C = st.caps || {};
+  let hackers = 0;
+  for (const c of G.creeps) {
+    if (!bwWalker(c)) continue;
+    const d = Math.hypot(c.x - e.x, c.y - e.z), r = BW.bodyR + ((c.def && c.def.r) || .3) * .5;
+    if (d > r) { e.on.delete(c); continue; }
+    if (e.on.has(c)) continue;
+    c.bwBlockT = G.time + .12; c.bwWade = !!c.def.boss; c.bwBlockBy = e;
+    if (c.def.boss) continue;
+    hackers += c.elite || c.def.lead ? 2 : 1;
+    if (C.bwGrasp && !e.seized) { e.seized = c; rootFoe(c, Math.max(.3, e.until - G.time), t); }   // Grasping Dead
+  }
+  e.hp -= hackers * BW.blowRate * dt;
+  if (e.hp <= 0 || G.time >= e.until) bwBodySink(e);
+}
+function bwBodySink(e) {
+  if (e.done) return; e.done = 1; e.sankAt = G.time;
+  const t = e.t, st = bwSt(t); if (!bwLive(t)) return;
+  const L = []; if (e.seized && bwWalker(e.seized) && Math.hypot(e.seized.x - e.x, e.seized.y - e.z) <= 1.2) L.push(e.seized);
+  for (const c of nearest(e.x, e.z, 1.2, e.n + 2, null, q => bwWalker(q))) if (L.length < e.n && !L.includes(c)) L.push(c);
+  abRun('bw_bogbody', () => { for (const c of L) {
+    if (c.dead) continue;
+    abHit(t, st, c, BW.bodyDragK, 'magic', null); if (c.dead) continue;
+    rootFoe(c, BW.bodyDragT, t); bwSink(c, Math.max(.3, c.rootT - G.time), !!c.def.boss);
+    if (typeof dragFx === 'function') dragFx(c, e.x, e.z, BW.COL.peat);
+  } });
+  e.dragged = L; bwLook('bwsink', { e }); sfx('splat', 1); sfx('quake', .3);
+}
+
+// The Bog Takes Its Due: a bog under c; the arms hold it while its armour comes off
+function bwBogStart(t, c, ab) {
+  const st = bwSt(t), C = st.caps || {}, boss = !!c.def.boss, hold = boss ? BW.bossHold : BW.dueHold;
+  rootFoe(c, boss ? hold / .45 : hold, t);
+  const d = Math.max(.3, Math.min(hold, (c.rootT || 0) - G.time));
+  const e = { k: 'bog', t, c, x: c.x, z: c.y, at: G.time, holdEnd: G.time + d, until: G.time + d + byT(ab.by.open, t), boss, bwPull: G.time + .5, share: (boss ? .5 : 1) / Math.max(1, Math.round(d / .5)), crossed: new Set([c]), risen: false, hands: [] };
+  bwSink(c, d, boss);
+  const nh = Math.round(byT(ab.by.n, t)); if (nh > 0) for (const o of nearest(c.x, c.y, BW.handsR, nh, c, q => bwWalker(q))) {   // Many Hands
+    rootFoe(o, BW.handsHold, t); bwSink(o, Math.max(.3, Math.min(BW.handsHold, o.rootT - G.time)), true); e.hands.push(o); e.crossed.add(o);
+  }
+  bwFx().push(e); bwLook('bwbog', { e }); bwLook('bwarms', { e, c, d, knees: boss });
+  for (const o of e.hands) bwLook('bwarms', { e, c: o, d: Math.max(.3, o.rootT - G.time), knees: true, small: 1 });
+  sfx('splat', 1); sfx('burrow', 0);
+  return e;
+}
+function bwBogTick(e, dt) {
+  const t = e.t; if (!bwLive(t)) { e.done = 1; return; }
+  const st = bwSt(t), C = st.caps || {}, c = e.c;
+  if (G.time < e.holdEnd && c && !c.dead) {
+    if (G.time >= e.bwPull) {
+      e.bwPull += .5;
+      abRun('bw_bogdue', () => { abHit(t, st, c, BW.dueK * .5, 'magic', null); });   // (0.8x her strike a second, in half-second pulls)
+      const took = c.dead ? 0 : bwStrip(c, e.share, 8);
+      if (took > 0 && C.bwQueen && t.ab && typeof abMax === 'function') t.ab.mana = Math.min(abMax(t), t.ab.mana + BW.queenMana * took);   // the Drowned Queen
+      if (!c.dead) { fxSpark(c.x, c.y, .15, '#c8ccd4', 3); if (typeof fxShards === 'function') fxShards(c.x, c.y, .2, 2); }
+    }
+  } else if (!e.out) {   // the arms let go: it climbs out with none
+    e.out = 1;
+    if (c && !c.dead) {
+      if (!e.boss && c.apMax > 0) c.ap = 0; chill(c, { slow: BW.outSlow, slowT: BW.outSlowT }, null, t);
+      const S = typeof FSET_BY !== 'undefined' && FSET_BY.fe_gv_stalk;   // Weeds of the Drowned Fen (2): it comes up crawling
+      if (S && typeof fsetN === 'function' && fsetN(t, S) >= 2 && !bwSwarmOn(c, t)) bwSwarmStart(t, c, byT(ABIL.bw_swarm.by.dur, t), { x0: c.x, h0: .1, z0: c.y });
+    }
+  }
+  for (const o of G.creeps) {   // the bog itself: foes crossing it while it is open
+    if (!bwWalker(o) || Math.hypot(o.x - e.x, o.y - e.z) > BW.bogR) continue;
+    chill(o, { slow: BW.crossSlow, slowT: .3 }, null, t);
+    if (!e.crossed.has(o)) { e.crossed.add(o); bwShred(o, C.bwDeep ? 2 : 1); }
+    o.bwBogBy = e; o.bwBogAt = G.time;
+  }
+  if (G.time >= e.until) e.done = 1;
+}
+function bwTick(dt) {
+  const L = G.bwFx; if (!L || !L.length) return;
+  for (const e of L) { if (e.done) continue; try { if (e.k === 'swarm') bwSwarmTick(e, dt); else if (e.k === 'body') bwBodyTick(e, dt); else if (e.k === 'bog') bwBogTick(e, dt); } catch (x) { e.done = 1; console.error(x); } }
+  if (L.some(e => e.done)) G.bwFx = L.filter(e => !e.done);
+}
+// a Bog Body blocks the road: a foe at it stands and hacks (a boss wades past at half speed)
+if (typeof moveCreep === 'function') { const _bwMove = moveCreep; moveCreep = function (c, d) { if (c && c.bwBlockT > G.time) { if (!c.bwWade) return; d *= .5; } return _bwMove.call(this, c, d); }; }
+
+// where a Bog Body rises: the road cell in her reach just ahead of the most ground foes still coming to it (within 3
+// cells of road), the nearest of them first; { x, y, n, big } or null
+function bwBodySpot(t, st, ab) {
+  const P = (G.path && G.path.pts) || [], r = abReach(t, st, ab); if (P.length < 3) return null;
+  const idx = (x, z) => { let b = -1, bd = 1e9; for (let i = 1; i < P.length - 1; i++) { const d = (P[i][0] - x) ** 2 + (P[i][1] - z) ** 2; if (d < bd) { bd = d; b = i; } } return b; };
+  const W = G.creeps.filter(c => bwWalker(c) && canTarget(t, st, c)).map(c => [c, idx(c.x, c.y)]);
+  let best = null;
+  for (let i = 2; i < P.length - 1; i++) {
+    if (Math.hypot(P[i][0] - t.x, P[i][1] - t.y) > r) continue;
+    let n = 0, big = false; for (const [c, k] of W) if (k <= i - 2 && i - k <= 5) { n++; if (abBig(c)) big = true; }
+    if (n && (!best || n > best.n)) best = { x: P[i][0], y: P[i][1], i, n, big };
+  }
+  return best;
+}
 /* ---------- the kit ---------- */
-const GVS_KIT = {
-  thornwarden: { slot: SPEC_SLOT, mana: { max: 100, regen: .8, hit: .7 }, abilities: [
-    { id: 'gv_sever', name: 'Severing Thorn', short: 'Sever', glyph: 'spikes', hue: '#e0708a', mana: 70, cd: 10, research: null,
-      by: { mark: [5, 5, 6, 6, 7, 7], root: [1, 1.1, 1.2, 1.3, 1.4, 1.5] },
-      auto: 'a support foe in reach (one mending, shielding or holding a tie first)',
-      text: (t, st, ab) => `A heavy thorn through a support foe: ${xD(st, 2)}, rooted for ${byT(ab.by.root, t)}s, and Thornmarked for ${byT(ab.by.mark, t)}s: it can't heal or be healed, and its ties to its allies are cut.`,
+const BW_KIT = {
+  bogwitch: { slot: SPEC_SLOT, mana: { max: 120, regen: .7, hit: .7 }, abilities: [
+    { id: 'bw_swarm', name: 'Insect Swarm', short: 'Swarm', glyph: 'spores', hue: '#8a9a4a', mana: 65, cd: 9, research: null,
+      by: { dur: [6, 6, 6.5, 6.5, 7, 7] },
+      auto: 'the toughest foe in reach, ground or air, not already carrying her swarm',
+      text: (t, st, ab) => `A dark cloud of biting insects streams onto one foe, ground or air, for ${gNf(byT(ab.by.dur, t))}s: every half second it bites for ${xDt(st, BW.biteK)}, and the foe can't be healed while covered. When it dies the swarm flies on to the nearest foe, once. A flyer under it is pulled low and slowed 25%.${t && t.bwHatch ? ' <b>Hatching:</b> the next one costs no mana and lands on two foes.' : ''}`,
       pick(t, st, ab, man) {
-        const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null;
-        const S = L.filter(specSupport).sort((a, b) => ((b.links && b.links.length) || 0) - ((a.links && a.links.length) || 0) || (!!b.epC - !!a.epC) || (a.remain - b.remain));
-        return S[0] || (man ? abToughest(L) : null);
+        const L = bwFoesAny(t, st, abReach(t, st, ab)); if (!L.length) return null;
+        const free = L.filter(c => !bwSwarmOn(c, t)), S = free.length ? free : (man ? L : []); if (!S.length) return null;
+        const a = abToughest(S); if (!t.bwHatch) return a;
+        const b = abToughest(S.filter(c => c !== a)); return b ? [a, b] : [a];
       },
-      cast(t, st, c, ab) {
-        gvsDartFx(t, c, '#ff9ab0');
-        G.delayed.push({ t: .18, fn: () => {
-          if (c.dead || !abLive(t)) return; const s = t.st || st, m = byT(ab.by.mark, t);
-          abHit(t, s, c, 2, 'phys', null); if (c.dead) return;
-          if (!c.fly) rootFoe(c, byT(ab.by.root, t), t);
-          gvsMark(c, m, t); if (specSupport(c)) specHush(c, m, t);
-          abRootFx(c.x, c.y, 8); fxRing(c.x, c.y, .5, GVS.COL.mark); sfx('burrow', 0);
-        } });
+      cast(t, st, tg, ab) {
+        const L = (Array.isArray(tg) ? tg : [tg]).filter(c => c && !c.dead).slice(0, t.bwHatch ? 2 : 1), C = st.caps || {};
+        t.bwHatch = false;
+        const tip = typeof unitTip === 'function' ? unitTip(t) : null, dur = byT(ab.by.dur, t);
+        const hosts = []; for (const c of L) { hosts.push(c); if (C.bwPlague) for (const o of nearest(c.x, c.y, 1, 6, c, q => bwSwarmable(t, st, q))) if (!hosts.includes(o)) hosts.push(o); }   // Plague of the Fen
+        hosts.slice(0, 8).forEach((c, k) => G.delayed.push({ t: .15 + .05 * k, fn: () => { if (c.dead || !bwLive(t)) return; bwSwarmStart(t, c, dur, { x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t), z0: tip ? tip[2] : t.y }); } }));
+        sfx('mothswarm');
       } },
-    { id: 'gv_snare', name: 'Bramble Snare', short: 'Snare', glyph: 'web', hue: '#a8486a', mana: 80, cd: 12, research: { cost: 60, time: 20 },
-      by: { pull: [.8, .8, .9, .9, 1, 1.1], n: [1, 1, 1, 1, 1, 1] },
-      auto: 'a ground support foe in reach with allies around it (its column is about to walk on without it)',
-      text: (t, st, ab) => `A briar net drags ${byT(ab.by.n, t) > 1 ? `up to ${byT(ab.by.n, t)} support foes` : 'a support foe'} ${byT(ab.by.pull, t)} cells back down the road: ${xD(st, 1.5)}, rooted 1.2s and Thornmarked 3s, so its column walks on without it.`,
+    { id: 'bw_bogbody', name: 'Bog Body', short: 'Bog Body', glyph: 'statue', hue: '#6a5a3a', mana: 90, cd: 14, research: { cost: 60, time: 20 },
+      by: { dur: [4, 4, 4.5, 4.5, 5, 5], blows: [10, 10, 12, 12, 14, 14], n: [1, 1, 1, 1, 1, 1] },
+      auto: 'the road in reach ahead of two or more ground foes coming down it (or a boss or elite)',
+      text: (t, st, ab) => { const n = byT(ab.by.n, t); return `The road splits and something old and preserved climbs out of it, anywhere in her reach, for ${gNf(byT(ab.by.dur, t))}s. Ground foes can't pass it and hack at it instead (it stands ${byT(ab.by.blows, t)} blows; it does not strike back). When its time is up or it is cut down it sinks and drags ${n > 1 ? `the ${n} nearest ground foes` : 'the nearest ground foe'} under for ${BW.bodyDragT}s: held, ${xD(st, BW.bodyDragK)}. A boss is not stopped: it wades past at half speed.`; },
       pick(t, st, ab, man) {
-        const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null;
-        const S = L.filter(c => specSupport(c) && !gvsAlone(c)).sort((a, b) => a.remain - b.remain);
-        if (S.length) return S.slice(0, byT(ab.by.n, t));
-        const S2 = L.filter(specSupport); return S2.length && man ? S2.slice(0, 1) : man ? [abToughest(L)] : null;
-      },
-      cast(t, st, L, ab) {
-        sfx('burrow', 1);
-        L.slice(0, byT(ab.by.n, t)).forEach((c, k) => G.delayed.push({ t: .15 + .12 * k, fn: () => {
-          if (c.dead || !abLive(t)) return; const s = t.st || st;
-          abHit(t, s, c, 1.5, 'phys', null); if (c.dead) return;
-          const x0 = c.x, z0 = c.y; if (kbWeight(c) > 0) shove(c, byT(ab.by.pull, t)); dragFx(c, x0, z0, GVS.COL.briar);
-          if (!c.fly) rootFoe(c, 1.2, t); gvsMark(c, 3, t);
-          abRootFx(c.x, c.y, 7); fxRing(c.x, c.y, .5, GVS.COL.briar);
-        } }));
-      } },
-    { id: 'gv_wither', name: 'Wither Bloom', short: 'Wither', glyph: 'wither', hue: '#c86a8a', mana: 100, cd: 14, rr: 1, research: { cost: 110, time: 30 },
-      by: { dur: [4, 4, 5, 5, 6, 6] },
-      auto: 'the spot in reach with a ground support foe within 1 cell, or three or more ground foes (or a boss or elite)',
-      text: (t, st, ab) => `A bloom of withering thorns opens on a ${ab.rr}-cell patch of the road for ${byT(ab.by.dur, t)}s: every half second each ground foe in it takes ${xDt(st, .25)} and is Thornmarked while it stands there (no heal or shield lands on it).`,
-      pick(t, st, ab, man) {
-        const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null;
-        const ks = abCrowd(L, ab.rr, specSupport); if (ks && ks.n >= 1 && specSupport(ks.c)) return { x: ks.c.x, y: ks.c.y };
-        const k = abCrowd(L, ab.rr); return k && (k.n >= (man ? 1 : 3) || abBig(k.c)) ? { x: k.c.x, y: k.c.y } : null;
+        const sp = bwBodySpot(t, st, ab); if (!sp) return null;
+        return sp.n >= (man ? 1 : 2) || sp.big ? sp : null;
       },
       cast(t, st, p, ab) {
-        abZone(t, { k: 'gv_wither', x: p.x, z: p.y, r: ab.rr, until: G.time + byT(ab.by.dur, t), tick: .5, every: .5 });
-        abRootFx(p.x, p.y, 10); fxRing(p.x, p.y, ab.rr, ab.hue); rfx({ k: 'rune', x: p.x, z: p.y, r: ab.rr, col: ab.hue, life: byT(ab.by.dur, t) }); sfx('burrow', 0);
+        const dur = byT(ab.by.dur, t), blows = byT(ab.by.blows, t), n = byT(ab.by.n, t);
+        G.delayed.push({ t: .25, fn: () => { if (!bwLive(t)) return; bwBodyStart(t, p.x, p.y, dur, blows, n); } });
+        abRootFx(p.x, p.y, 6);
+      } },
+    { id: 'bw_bogdue', name: 'The Bog Takes Its Due', short: 'Its Due', glyph: 'hand', hue: '#4a6a5a', mana: 100, cd: 14.5, rr: .55, research: { cost: 110, time: 30 },
+      by: { hold: [3, 3, 3, 3, 3, 3], n: [0, 0, 0, 0, 0, 0], open: [.4, .4, .4, .4, .4, .4] },
+      auto: 'the toughest ground foe in reach behind armour (or a boss or elite), else three or more ground foes close together',
+      text: (t, st, ab) => `A bog a cell wide opens under the toughest ground foe in her reach. Drowned arms rise, seize it and drag it down to the waist: for ${BW.dueHold}s it is held, takes ${xDt(st, BW.dueK)} each second and its armour is pulled off piece by piece. Then it climbs out with none, slowed ${Math.round(BW.outSlow * 100)}% for ${BW.outSlowT}s.${Math.round(byT(ab.by.n, t)) > 0 ? ` The arms also catch the ${Math.round(byT(ab.by.n, t))} ground foes nearest it and hold them to the knees for ${BW.handsHold}s.` : ''} Other ground foes crossing the bog while it is open${byT(ab.by.open, t) > 1 ? ` (and ${gNf(byT(ab.by.open, t))}s after)` : ''} are slowed ${Math.round(BW.crossSlow * 100)}% and lose ${t && bwCap(t, 'bwDeep') ? 2 : 1} armour. A boss is held to the knees for ${BW.bossHold}s and loses half its armour.`,
+      pick(t, st, ab, man) {
+        const L = abFoes(t, st, abReach(t, st, ab), c => bwWalker(c) && !(c.burT > 0)); if (!L.length) return null;
+        const plated = L.filter(c => (c.apMax > 0 && c.ap > c.apMax * .3) || (!(c.apMax > 0) && (c.armor || 0) > 2 && !(c.shredT > 0)));
+        if (plated.length) return abToughest(plated);
+        if (L.some(abBig)) return abToughest(L.filter(abBig));
+        const k = abCrowd(L, 1); if (k && k.n >= 3) return abToughest(L);
+        return man ? abToughest(L) : null;
       },
-      zone(t, st, z) {
-        inSplash(z.x, z.z, z.r, true, c => { if (c.phased || c.ent || !canTarget(t, st, c)) return; hurt(c, abD(st) * .25, 'phys', t, true, null, null); if (!c.dead) gvsMark(c, .6, t); });
-        for (let k = 0; k < 3; k++) { const a = R(TAU), d = R(0, z.r); part({ k: 'chunk', x: z.x + Math.cos(a) * d, z: z.z + Math.sin(a) * d, h: .02, vh: R(.4, .9), g: 6, life: .4, max: .4, size: R(.03, .05), col: k ? GVS.COL.thorn : GVS.COL.briar }); }
+      cast(t, st, c, ab) {
+        G.delayed.push({ t: .3, fn: () => { if (c.dead || !bwLive(t) || !bwWalker(c)) return; bwBogStart(t, c, ab); } });
       } },
   ] },
 };
-Object.assign(UNIT_KITS, GVS_KIT);
-for (const u in GVS_KIT) for (const ab of GVS_KIT[u].abilities) { if (ABIL[ab.id]) console.warn('abilities: duplicate id', ab.id); ab.unit = u; ABIL[ab.id] = ab; }
-specPref(['gv_sever', 'gv_snare', 'gv_wither'], 'healer');
-Object.assign(SP_SHAPE, { gv_snare: 'a', gv_wither: 'a z.5' });
+Object.assign(UNIT_KITS, BW_KIT);
+for (const u in BW_KIT) for (const ab of BW_KIT[u].abilities) { if (ABIL[ab.id]) console.warn('abilities: duplicate id', ab.id); ab.unit = u; ABIL[ab.id] = ab; }
+specPref(['bw_bogdue'], 'plated');
+Object.assign(SP_SHAPE, { bw_swarm: 'h:dur/.5', bw_bogbody: 'a', bw_bogdue: 'h6' });
 
-/* ---------- the hooks: its quarry, and the Thornmark trail ---------- */
+/* ---------- the hooks: her tick, Fen Sight, the Fen Remembers ---------- */
 {
-  const H = FORCE_HOOKS.grove || (FORCE_HOOKS.grove = {}), live0 = H.live, kill0 = H.kill;
-  H.live = function (t, st) { const r = live0 ? live0.call(this, t, st) : undefined; if (gvsIs(t)) st.hunt = 'healerFree'; return r; };
+  const H = FORCE_HOOKS.grove || (FORCE_HOOKS.grove = {}), live0 = H.live, kill0 = H.kill, tick0 = H.tick;
+  H.live = function (t, st) { const r = live0 ? live0.call(this, t, st) : undefined; if (bwIs(t) && st.caps && st.caps.bwSight && bwHasSwarm(t)) st.range = (st.range || 2.6) + .3 * st.caps.bwSight; return r; };   // Fen Sight
+  H.tick = function (dt) { const r = tick0 ? tick0.call(this, dt) : undefined; bwTick(dt); return r; };
   H.kill = function (c, src) {
     const r = kill0 ? kill0.call(this, c, src) : undefined;
-    const by = c.gvsBy; if (by && c.nohealT > G.time && G.towers.includes(by) && by.st && by.st.caps && by.st.caps.gvs_trail && G.state === 'play')   // Thornmark Trail
-      for (const o of nearest(c.x, c.y, 2, 4, c, q => specSupport(q))) { gvsMark(o, gvsMarkT(by, by.st), by); rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: o, col: GVS.COL.mark, w: .03, life: .3 }); }
+    const e = c.bwBogBy; if (e && !e.done && !e.risen && G.time - (c.bwBogAt || 0) < .3 && bwLive(e.t) && bwCap(e.t, 'bwRemember') && G.state === 'play' && !c.fly) {   // the Fen Remembers
+      e.risen = true; const ab = ABIL.bw_bogbody, t = e.t;
+      bwBodyStart(t, c.x, c.y, byT(ab.by.dur, t), byT(ab.by.blows, t), byT(ab.by.n, t), { risen: true });
+    }
     return r;
   };
 }
-SPEC_INFO[GVS_U] = t => { const st = t.st || effStats(t); return `Thornmark <b>${gvsMarkT(t, st)}s</b> on every support foe it strikes (no heals or shields land). A support foe standing alone takes <b>${gvsAloneK(st)}×</b> its dart (${specN((st.dmg || 0) * gvsAloneK(st))} damage).`; };
+SPEC_INFO[BW_U] = t => { const st = t.st || effStats(t), C = st.caps || {}; return `Her spit slows <b>${Math.round(BW.spitSlow * 100)}%</b> for <b>${gNf(BW.spitT + .5 * (C.bwMud || 0))}s</b>. Magic: an armour bar does not stop it.${t.bwHatch ? ' <b>Hatching</b>: her next Insect Swarm is free and lands on two foes.' : ''}`; };
+SPEC_COUNTERS[BW_U] = (ty, d) => !!(d.rk && (d.rk.armoured || d.rk.heavy)) || (d.armor || 0) >= 6;
+delete SPEC_COUNTERS.thornwarden;
 
-/* ---------- the tree: Stalking (spells on rows II and III) ---------- */
-const GVS_TREE = { name: 'Stalking', hue: '#a8486a', list: [
-  GT('Hunter\'s Patience', 'eye', 0, 0, 2, n => `+${gNf(.25 * n)} range, for its darts and its spells.`, n => ({ range: .25 * n })),
-  GT('Barbed Darts', 'spikes', 0, 1, 3, n => `The Thornmark of its darts lasts ${gNf(.5 * n)}s longer.`, {}, { cap: 'gvs_barb' }),
-  GT('Quick Quiver', 'quick', 0, 3, 3, n => `Its darts come ${4 * n}% faster.`, n => gHaste(.04 * n)),
-  GT('Lone Prey', 'target', 1, 0, 2, n => `A support foe standing alone takes ${gNf(GVS.ALONE + .25 * n)}× its dart, not ${GVS.ALONE}×.`, {}, { cap: 'gvs_lone' }),
-  GT('Long Severance', 'snare', 1, 1, 2, n => `Severing Thorn's Thornmark, and its cut ties, last ${n}s longer.`, {}, { sp: n => ({ ab: 'gv_sever', by: { mark: n } }) }),
-  GT('Sap Thief', 'leaf', 1, 2, 2, n => `Each foe it slays restores ${7 * n} mana.`, {}, { mana: { slay: 7 } }),
-  GS('gv_snare', 1, 3),
-  GS('gv_wither', 2, 1),
-  GT('Silent Stalk', 'cloud', 2, 2, 1, 'A caster its darts Thornmark can\'t regain mana for 2s.', {}, { cap: 'gvs_seal' }),
-  GT('Deep Snare', 'web', 2, 3, 1, 'Bramble Snare drags one more support foe.', {}, { sp: { ab: 'gv_snare', by: { n: 1 } }, req: [1, 3] }),
-  GT('Thornmark Trail', 'bounce', 3, 0, 1, 'A Thornmarked foe that dies passes its mark to up to 4 support foes within 2 cells.', {}, { cap: 'gvs_trail' }),
-  GT('Choking Thorns', 'spikes', 3, 1, 1, 'Each Wither Bloom brings Severing Thorn 3s nearer.', {}, { sp: { ab: 'gv_wither', ready: ['gv_sever', 3] }, req: [2, 1] }),
-  GT('Snare Line', 'chain', 3, 3, 2, n => `Every ${gOrd(4 - n)} Bramble Snare costs no mana.`, {}, { sp: n => ({ ab: 'gv_snare', every: 4 - n }) }),
-  GT('Apex Stalker', 'antler', 4, 0, 1, 'A dart at a support foe standing alone roots it for 0.8s, and a second dart follows it at once.', {}, { cap: 'gvs_apex' }),
-  GT('Gallows Briar', 'wither', 4, 1, 1, 'When Briar Gibbet drops its foe, the briars leap to the nearest support foe within 2.5 cells (else the toughest ground foe there) and cage it too, once a cast. A foe slain in the cage gives 15 mana back.', {}, { cap: 'gvsGallows', sp: { ab: 'gv_wither', kill: { mana: 15 } }, req: [3, 1] }),
-  GT('Torn Ties', 'chain', 4, 2, 1, 'A support foe its darts strike gives up those it covers: every foe tied to it (mended, warded or hasted by it) is Thornmarked too and takes half a dart.', {}, { cap: 'gvsTies' }),
+/* ---------- the tree: Fencraft (spells on rows II and IV; three capstones on row VI) ---------- */
+const BW_TREE = { name: 'Fencraft', hue: '#4a6a3a', list: [
+  GT('Clinging Mud', 'puddle', 0, 1, 3, n => `A foe her spit strikes stays slowed ${gNf(.5 * n)}s longer.`, {}, { cap: 'bwMud' }),
+  GT('Thick Swarm', 'cloudg', 0, 2, 3, n => `Insect Swarm stays on its host ${n}s longer.`, {}, { sp: n => ({ ab: 'bw_swarm', by: { dur: n } }) }),
+  GT('Fen Sight', 'eye', 0, 0, 2, n => `She reaches ${gNf(.3 * n)} cells further while one of her swarms is on a foe.`, {}, { cap: 'bwSight' }),
+  GS('bw_bogbody', 1, 1),
+  GT('Blood Scent', 'drop', 1, 2, 2, n => `The swarm bites ${20 * n}% faster on a foe that is held: rooted, stunned or in a bog.`, {}, { cap: 'bwScent' }),
+  GT('Second Brood', 'bounce', 1, 3, 1, 'Insect Swarm moves on twice, not once, as its hosts die.', {}, { cap: 'bwBrood' }),
+  GT('Grasping Dead', 'hand', 2, 1, 1, 'The Bog Body seizes the first foe to reach it and holds it fast until it sinks, then drags that one under first and holds it 1s longer.', {}, { cap: 'bwGrasp', req: [1, 1], sp: { ab: 'bw_bogbody', rider: { bwHeld: 1 } } }),
+  GT('Peat-Bound', 'statue', 2, 0, 2, n => `The Bog Body stands ${n}s longer.`, {}, { sp: n => ({ ab: 'bw_bogbody', by: { dur: n } }) }),
+  GT('Marsh Fever', 'biohazard', 2, 2, 2, n => `A foe that has carried the swarm for 3 seconds is Wounded for ${4 * n}s: heals on it are halved.`, {}, { cap: 'bwFever' }),
+  GT('Old Hunger', 'chains', 3, 1, 2, n => `When it sinks, the Bog Body drags ${n} more foe${n > 1 ? 's' : ''} under with it.`, {}, { sp: n => ({ ab: 'bw_bogbody', by: { n } }) }),
+  GS('bw_bogdue', 3, 2),
+  GT('Fed Swarm', 'vial', 3, 3, 2, n => `Each time a swarm flies on to a new host she regains ${10 * n} mana.`, {}, { cap: 'bwFed' }),
+  GT('Many Hands', 'fist', 4, 1, 1, 'The Bog Takes Its Due: the drowned arms also catch the two ground foes nearest their victim and hold them to the knees for 1.5 seconds.', {}, { sp: { ab: 'bw_bogdue', by: { n: 2 } } }),
+  GT('Deep Water', 'ripple', 4, 2, 1, 'The Bog Takes Its Due: the bog stays open 3 seconds after the arms let go, and foes crossing it lose 2 armour, not 1.', {}, { cap: 'bwDeep', req: [3, 2], sp: { ab: 'bw_bogdue', by: { open: 3 } } }),
+  GT('Plague of the Fen', 'spores', 5, 1, 1, 'Insect Swarm also settles on every foe within a cell of its host, each cloud its own.', {}, { cap: 'bwPlague' }),
+  GT('The Fen Remembers', 'skull', 5, 2, 1, 'A foe that dies in her bog rises where it fell as a Bog Body, once a cast, and one the arms of The Bog Takes Its Due slay readies it 4s sooner.', {}, { cap: 'bwRemember', req: [4, 2], sp: { ab: 'bw_bogdue', kill: { cd: 4 } } }),
+  GT('The Drowned Queen', 'skullg', 5, 3, 1, 'While the arms hold a foe, her spit also strikes every foe standing in the bog, and each point of armour the arms strip returns 4 mana.', {}, { cap: 'bwQueen' }),
 ] };
-GVS_TREE.list.forEach((t, i) => t.id = i);
-FORCES.grove.talents[SPEC_SLOT] = GVS_TREE;
-FORCES.grove.talFlavor[SPEC_SLOT] = ['Cut the healer from the herd, and the herd falls.', 'No mending. No ward. Only the thorn.'];
-FORCES.grove.talEmblem[SPEC_SLOT] = GVS_TREE.list.findIndex(t => t.name === 'Apex Stalker');
+BW_TREE.list.forEach((t, i) => t.id = i);
+{ const tags = { 'Clinging Mud': 'Control', 'Thick Swarm': 'Spell', 'Fen Sight': 'Damage', 'Blood Scent': 'Damage', 'Second Brood': 'Spell', 'Grasping Dead': 'Control', 'Peat-Bound': 'Control', 'Marsh Fever': 'Control', 'Old Hunger': 'Control', 'Fed Swarm': 'Mana', 'Many Hands': 'Control', 'Deep Water': 'Spell', 'Plague of the Fen': 'Spell', 'The Fen Remembers': 'Spell', 'The Drowned Queen': 'Mana' };
+  for (const t of BW_TREE.list) if (tags[t.name]) t.tag = tags[t.name]; }
+BW_TREE.rows = 6; BW_TREE.tiers = [0, 2, 4, 7, 10, 12]; BW_TREE._spread = 1;   // (laid out on the six rows already: forces_zzzzzzzzzzzzzzzzz_spread.js leaves it)
+FORCES.grove.talents[SPEC_SLOT] = BW_TREE;
+FORCES.grove.talFlavor[SPEC_SLOT] = ['The fen keeps what falls in it.', 'Bog takes its due.'];
+FORCES.grove.talEmblem[SPEC_SLOT] = BW_TREE.list.findIndex(t => t.name === 'The Fen Remembers');
 
-/* ---------- late: cast times, the body's life, its Bloom ---------- */
+/* ---------- late: cast times, the body's life, her Bloom, Hatching's free swarm ---------- */
 SPEC_REG.push(() => {
-  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { gv_sever: .4, gv_snare: .5, gv_wither: .8 });
-  if (typeof LIFE_KIND !== 'undefined') LIFE_KIND[GVS_U] = 'throw';
-  if (typeof GW_BLOOM !== 'undefined') GW_BLOOM[GVS_U] = { name: 'Hunter\'s Bloom', k: 2, r: 2.5,
-    say: (t, st, B) => `the dart strikes for ${gwDmg(st, B.k)} and the Thornmark spreads to every support foe within ${B.r} cells of its foe`,
-    fn: (t, st, tg, B) => { for (const o of [tg].concat(nearest(tg.x, tg.y, B.r, 8, tg, q => specSupport(q)))) { if (!specSupport(o)) continue; gvsMark(o, gvsMarkT(t, st), t); if (o !== tg) rfx({ k: 'streak', x0: tg.x, h0: hitH(tg), z0: tg.y, c: o, col: GVS.COL.mark, w: .03, life: .35 }); } } };
+  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { bw_swarm: .5, bw_bogbody: .7, bw_bogdue: .8 });
+  if (typeof LIFE_KIND !== 'undefined') LIFE_KIND[BW_U] = 'caster';
+  if (typeof GW_BLOOM !== 'undefined') GW_BLOOM[BW_U] = { name: 'Hatching', k: 1,
+    say: () => 'the fen hatches: her next Insect Swarm costs no mana and lands on two foes',
+    fn: t => { t.bwHatch = true; if (G.sel && G.sel.ref === t && typeof onDirty === 'function') onDirty(); } };
+  if (typeof manaCostK === 'function') { const _bwCost = manaCostK; manaCostK = function (t, ab, c) { if (t && t.bwHatch && ab && ab.id === 'bw_swarm') return 0; return _bwCost.apply(this, arguments); }; }
+  if (typeof SFX_CUSTOM !== 'undefined') for (const id of ['bw_swarm', 'bw_bogbody', 'bw_bogdue']) SFX_CUSTOM[id] = () => {};   // (her looks are her own: bwLook)
 });
 
-/* ---------- the body: a masked briar hunter with a spear-thrower and thorn darts ---------- */
-Object.assign(UNIT_PAL, { [GVS_U]: { cloak: '#5a2a38', cloakD: '#3e1c28', robe: '#4a2a2c', leaf: '#4a5a2a', leafL: '#6a7e38', leaf2: '#3a4a22', leaf3: '#56682e', legs: '#2e2420', hood: '#4e2432', hair: '#c8c0a8', hairD: '#9a9078', mask: '#8a6a46', thorn: '#d8c8a0', berry: '#c8384a' } });
-const gvsArm = (g, hand) => huArm(g, hand, { w: .026, cloth: WE.robe, cuff: WE.legs, skin: WE.skin, hr: .034 });
-FORCE_BUILD[GVS_U] = (g, tier) => {
-  groveBase(g, .3, tier);
-  const { y0, hy } = elfBody(g, tier, { legs: true, hood: true, stance: 'wide' });
-  mat(g, 'cloth', () => g.with(T(0, hy + .035, -.045), () => g.sphere(0, 0, 0, .112, .105, .112, 9, 6, WE.hood, { v1: .6 })));   // a deep wine-dark hood
-  mat(g, 'bark', () => { g.with(T(0, hy - .01, .072), () => g.sphere(0, 0, 0, .07, .05, .03, 8, 4, WE.mask)); for (const sd of [-1, 1]) g.box(sd * .028, hy + .004, .1, .022, .008, .006, '#1a1410'); });   // a bark mask over the eyes
-  mat(g, 'leafmail', () => { for (let k = 0; k < 9 + tier; k++) { const a = -2.6 + k * (5.2 / (8 + tier)); g.with(T(Math.cos(a) * .13, hy - .1 - Math.abs(Math.sin(k * 1.7)) * .03, Math.sin(a) * .12 - .02, -a + Math.PI / 2, -.9), () => g.cyl(0, 0, 0, .012, 0, .07 + .006 * tier, 4, WE.thorn)); } });   // a collar of thorns round the shoulders
-  mat(g, 'leather', () => { g.torus(-.11, y0 - .04, .04, .05, .012, 10, 4, WE.leaf); g.torus(-.11, y0 - .04, .04, .035, .01, 10, 4, WE.leaf2); });   // a coiled briar snare at the hip
-  for (let k = 0; k < 3 + tier; k++) { g.em = .3; g.ico(-.12 + R(-.03, .03), y0 - .02 + R(-.02, .02), .07, .012, WE.berry); g.em = 0; }   // red briar berries on the coil
-  g.with(T(.1, y0 + .08, -.17, 0, .2, .25), () => { mat(g, 'leather', () => g.cyl(0, -.12, 0, .03, .034, .22, 8, WE.legs)); for (let k = 0; k < 4 + tier; k++) mat(g, 'woodgrain', () => g.seg([Math.cos(k * 1.6) * .012, .08, Math.sin(k * 1.6) * .012], [Math.cos(k * 1.6) * .016, .16, Math.sin(k * 1.6) * .016], .006, WE.thorn)); });   // a quiver of thorn darts
+/* ---------- the looks: first versions (the spell pass will rebuild them). Solid things in the world (the bog's water,
+   the body, the arms) are ribbons and flats fixed on the ground; the swarm is small dark specks; glow only faint. ---------- */
+let BW_K = null;
+function bwLookInit() {
+  if (BW_K || typeof SFX_DRAW === 'undefined' || typeof vfxC !== 'function') return !!BW_K;
+  BW_K = { water: vfxC('#0e1612'), sheen: vfxC('#3a5a4a'), peat: vfxC('#3a2a1a'), hide: vfxC('#ffe0b8', 1.1), hideD: vfxC('#c09870'), arm: vfxC('#fff6ea', 1.5), armD: vfxC('#d8d0c0', 1.15), fly: vfxC('#141410'), glow: vfxC('#6a8a4a'), weed: vfxC('#3a5a22') };
+  Object.assign(SFX_DRAW, BW_DRAW);
+  return true;
+}
+function bwLook(kind, o) {
+  if (typeof sfxLive !== 'function' || !sfxLive() || typeof vfxReady !== 'function' || !vfxReady() || !bwLookInit()) return;
+  const e = o.e;
+  if (kind === 'bwswarm') sfxAdd({ k: 'bwswarm', e, x0: o.x0, h0: o.h0, z0: o.z0, life: 60, seed: R(TAU), n: vfxLite() ? 12 : 22 });
+  else if (kind === 'bwbody') sfxAdd({ k: 'bwbody', e, x: e.x, z: e.z, life: 60, seed: R(TAU) });
+  else if (kind === 'bwsink') { if (typeof v2Spray === 'function') try { v2Spray(null, 'dust', e.x, e.z, .05, 3, { r: .3 }); } catch (x) { /* the toolkit's context is optional */ } for (let k = 0; k < 6; k++) part({ k: 'chunk', x: e.x + R(-.2, .2), z: e.z + R(-.2, .2), h: .05, vh: R(.5, 1.1), g: 6, life: .45, max: .45, size: R(.03, .05), col: k % 2 ? BW.COL.water : BW.COL.peat }); }
+  else if (kind === 'bwbog') sfxAdd({ k: 'bwbog', e, x: e.x, z: e.z, life: 60, seed: R(TAU) });
+  else if (kind === 'bwarms') sfxAdd({ k: 'bwarms', e, c: o.c, x: o.c.x, z: o.c.y, d: o.d, knees: !!o.knees, s: o.small ? .7 : 1, life: o.d + .8, seed: R(TAU), r: Math.max(.22, ((o.c.def && o.c.def.r) || .3) * .9) });
+}
+const _bwP = [];
+const BW_DRAW = {
+  // the swarm: a loose cloud of dark specks streaming from her staff, then circling its host's head
+  bwswarm(q) {
+    const e = q.e, K = BW_K, lite = vfxLite();
+    const gone = e.done || !e.c || e.c.dead ? (q.goneAt == null ? (q.goneAt = q.age) : q.goneAt) : null;
+    if (gone != null && q.age - gone > .5) { q.life = 0; return; }
+    const fade = gone != null ? 1 - (q.age - gone) / .5 : Math.min(1, q.age / .2);
+    const c = e.c && !e.c.dead ? e.c : null, x = c ? c.x : e.x, z = c ? c.y : e.z, h = c ? hitH(c) + .15 : .5;
+    const fly = Math.min(1, q.age / .35);
+    for (let k = 0; k < q.n; k++) {
+      const a = q.seed + k * 2.39 + G.time * (1.6 + (k % 3) * .7) * (k % 2 ? 1 : -1), rr = .14 + .1 * vtHash(k, 3) + .04 * Math.sin(G.time * 3 + k);
+      let px = x + Math.cos(a) * rr, py = h + .12 * Math.sin(G.time * 4.3 + k * 1.3), pz = z + Math.sin(a) * rr;
+      if (fly < 1 && q.x0 != null) { const u = Math.max(0, Math.min(1, fly * 1.3 - k / q.n * .3)); px = q.x0 + (px - q.x0) * u; py = q.h0 + (py - q.h0) * u + Math.sin(u * Math.PI) * .25; pz = q.z0 + (pz - q.z0) * u; }
+      vfxSprite(VX, px, py, pz, .05, .05, 0, K.fly, .95 * fade, VT.SOLID, 0);
+    }
+    if (!lite) vfxSprite(VX, x, h, z, .5, .4, 0, K.peat, .18 * fade, VT.SMOKE, 0, .04);   // a faint dark haze about it
+  },
+  // the bog body: a dark leathery figure climbing to the waist out of a split in the road, then sinking back
+  bwbody(q) {
+    const e = q.e, K = BW_K, px = vfxPx();
+    const up = Math.min(1, q.age / .45), sinkU = e.sankAt != null ? Math.min(1, (G.time - e.sankAt) / .6) : 0;
+    if (sinkU >= 1 || (e.done && e.sankAt == null)) { q.life = 0; return; }
+    const rise = sfxEaseBack ? sfxEaseBack(up) : up, s = (1 - sinkU) * rise, x = q.x, z = q.z;
+    vfxFlat(VX, x, z, .03, .9, .9, q.seed, K.peat, .85 * Math.min(1, up * 3), VT.DIRT, 0);
+    vfxFlat(VX, x, z, .033, .6, .6, q.seed + 1, K.water, .8 * Math.min(1, up * 3), VT.DIRT, 0);
+    const hurtK = e.hp0 > 0 ? Math.max(0, e.hp / e.hp0) : 1, sway = .05 * Math.sin(G.time * 1.7 + q.seed), H = .95 * s;
+    vfxRb.begin(VX, VT.BARK, 0, .03);
+    for (let j = 0; j <= 5; j++) { const v = j / 5; vfxRb.pt(x + sway * v, v * H - .05, z, (.24 - .06 * v + .03 * Math.sin(v * 7)) * px, K.hide, 1, v * 3); }
+    vfxRb.end();
+    // the head: hunched forward, and the two long arms hanging
+    vfxSprite(VX, x + sway, H + .04, z + .03, .22 * s, .2 * s, 0, K.hideD, 1, VT.SOLID, 0);
+    for (const sd of [-1, 1]) {
+      vfxRb.begin(VX, VT.BARK, 0, .03);
+      for (let j = 0; j <= 4; j++) { const v = j / 4; vfxRb.pt(x + sd * (.16 + .1 * v) + sway, H * (.85 - .5 * v), z + .06 + .08 * v, .08 * px * (1 - .4 * v), K.hideD, 1, v * 2); }
+      vfxRb.end();
+    }
+    if (hurtK < .5) vfxSprite(VX, x, H * .6, z, .2, .2, 0, K.peat, .3 * (1 - hurtK), VT.SMOKE, 0);   // shedding peat as it is cut down
+  },
+  // the bog: a dark pool a cell wide with a faint sheen, open while it lasts
+  bwbog(q) {
+    const e = q.e, K = BW_K; if (e.done && q.endAt == null) q.endAt = q.age;
+    const out = q.endAt != null ? Math.min(1, (q.age - q.endAt) / .5) : 0; if (out >= 1) { q.life = 0; return; }
+    const a = Math.min(1, q.age / .25) * (1 - out), r = BW.bogR * 2.1;
+    vfxFlat(VX, q.x, q.z, .028, r * 1.15, r * 1.15, q.seed, K.peat, .7 * a, VT.DIRT, 0);
+    vfxFlat(VX, q.x, q.z, .031, r, r, q.seed + 2, K.water, .92 * a, VT.DIRT, 0);
+    vfxFlat(VX, q.x, q.z, .034, r * .8, r * .8, G.time * .2, K.sheen, .18 * a, VT.RING, 1);
+  },
+  // the drowned arms: pale long-fingered arms in a ring, rising round the foe, gripping, dragging it down, letting go
+  bwarms(q) {
+    const K = BW_K, c = q.c && !q.c.dead ? q.c : null; if (c) { q.x = c.x; q.z = c.y; }
+    const n = q.knees ? 3 : 5, px = vfxPx(), up = Math.min(1, q.age / .3), let0 = Math.max(0, Math.min(1, (q.age - q.d) / .5));
+    if (let0 >= 1) { q.life = 0; return; }
+    const H = (q.knees ? .45 : .75) * q.s * (sfxEaseBack ? sfxEaseBack(up) : up) * (1 - let0), pull = Math.min(1, q.age / .6);
+    const ink = typeof SFX_INK !== 'undefined' ? SFX_INK : K.water;
+    for (let k = 0; k < n; k++) {
+      const a = q.seed + k / n * TAU, r0 = q.r * 2.1, r1 = q.r * (1.1 - .3 * pull);
+      for (const [L, wk, col, al] of [[VT.SOLID, 1.35, ink, .6], [VT.BARK, 1, K.arm, 1]]) {   // (a dark edge, then the pale arm: bark under a near-white tint)
+        vfxRb.begin(VX, L, 0, .03);
+        for (let j = 0; j <= 6; j++) { const v = j / 6, rr = r0 + (r1 - r0) * v, hh = H * Math.sin(v * 1.4) / Math.sin(1.4) - pull * .08 * v;
+          vfxRb.pt(q.x + Math.cos(a + .2 * v) * rr, Math.max(.01, hh), q.z + Math.sin(a + .2 * v) * rr, (.13 - .06 * v) * px * q.s * wk, col === ink ? col : v > .85 ? K.armD : col, al, v * 2); }
+        vfxRb.end();
+      }
+      const hh = H - pull * .08, bx = q.x + Math.cos(a + .2) * r1, bz = q.z + Math.sin(a + .2) * r1;
+      for (let f = -1; f <= 1; f++) {   // three long fingers hooked over it
+        const ia = a + .2 + Math.PI + f * .4;
+        vfxRb.begin(VX, VT.BARK, 0, .03); vfxRb.pt(bx, hh, bz, .03 * px * q.s, K.arm, 1, 0); vfxRb.pt(bx + Math.cos(ia) * .1, hh + .02, bz + Math.sin(ia) * .1, .02 * px * q.s, K.arm, 1, .5); vfxRb.pt(bx + Math.cos(ia) * .16, hh - .06, bz + Math.sin(ia) * .16, .008 * px * q.s, K.armD, 1, 1); vfxRb.end();
+      }
+    }
+    vfxFlat(VX, q.x, q.z, .036, q.r * 3.6, q.r * 3.6, q.seed, K.water, .55 * up * (1 - let0), VT.DIRT, 0);
+  },
 };
-FORCE_PARTS[GVS_U] = [
-  { k: 'thrower', piv: [.12, .64, 0], build(g, tier) {   // the right arm and the spear-thrower, a long thorn dart laid in it
-      gvsArm(g, [.02, -.06, .15]);
-      mat(g, 'woodgrain', () => { g.seg([.02, -.06, .13], [.02, .1, .02], .012, WE.wood || '#6a4a30'); g.ico(.02, .1, .02, .018, WE.mask); });
-      mat(g, 'woodgrain', () => g.seg([.02, .08, .03], [.02, -.08, .45 + .03 * tier], .007, WE.thorn));
-      mat(g, 'leafblade', () => g.with(T(.02, -.08, .45 + .03 * tier, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .018, 0, .07, 4, WE.berry)));
+
+/* ---------- the body: a hunched, hooded crone with a crooked staff, fen colours (a stand-in until her sculpted model) ---------- */
+Object.assign(UNIT_PAL, { [BW_U]: { cloak: '#2e3c28', cloakD: '#1e2a1a', robe: '#5a4430', leaf: '#3a4a22', leafL: '#56682e', leaf2: '#2e3a1a', leaf3: '#4a5a2a', legs: '#2a2018', hood: '#28341f', skin: '#a8ae96', bone: '#e4dcc4', reed: '#6a7a3a', weed: '#7a9a3a', peat: '#5a4430', alder: '#6a4a2c', water: '#121a16' } });
+const BW_HUNCH = .5, BW_WAIST = .38;
+// a point in the hunched upper body's frame (its origin at the waist), in the body's own
+const bwHp = (x, y, z) => [x, BW_WAIST + y * Math.cos(BW_HUNCH) - z * Math.sin(BW_HUNCH), y * Math.sin(BW_HUNCH) + z * Math.cos(BW_HUNCH)];
+FORCE_BUILD[BW_U] = (g, tier) => {
+  groveBase(g, .3, Math.min(tier, 2));
+  const P = UNIT_PAL[BW_U];
+  if (tier >= 5) mat(g, 'moss', () => { g.cyl(0, .041, 0, .28, .28, .006, 16, P.water); for (let k = 0; k < 7; k++) { const a = k * 2.39 + .4, d = .2 + .05 * (k % 2); g.seg([Math.cos(a) * d, .045, Math.sin(a) * d], [Math.cos(a) * d * 1.08, .16 + .04 * (k % 3), Math.sin(a) * d * 1.08], .006, P.reed); } });   // black water spreading round her feet (VI)
+  huRobe(g, BW_WAIST + .02, .04, .085, .17, { col: P.robe, folds: 7, amp: .1, trail: .05, rows: 4 });   // a sodden robe, peat brown, to the ground
+  // the cloak of wet reeds and pond weed, from the hunched shoulders down to the road, trailing behind
+  mat(g, 'leafmail', () => {
+    const N = 15;
+    for (let k = 0; k < N; k++) {
+      const a = -2.5 + k * 5 / (N - 1), top = bwHp(Math.sin(a) * .12, .2, -Math.cos(a) * .1), foot = [Math.sin(a) * .21, .035, -Math.cos(a) * .2 - .07 + .05 * (1 - Math.abs(Math.cos(a)))];
+      const mid = [(top[0] + foot[0]) / 2 * 1.12, (top[1] + foot[1]) / 2, (top[2] + foot[2]) / 2 - .03];
+      const col = k % 3 === 0 ? P.weed : k % 3 === 1 ? P.reed : P.cloak;
+      huTube(g, [top, mid, foot], [.02, .022, .012], col, 4);
+    }
+  });
+  g.with(T(0, BW_WAIST, 0, 0, BW_HUNCH), () => {   // the upper body, stooped forward from the waist
+    mat(g, 'cloth', () => huLathe(g, 0, 0, 0, [[.075, -.02], [.09, .07], [.1, .15], [.07, .22]], 10, P.cloak, { sz: .85 }));
+    mat(g, 'cloth', () => g.sphere(0, .16, -.07, .12, .1, .1, 9, 6, P.cloakD, { v1: .7 }));   // the hump of the cloak over her back
+    mat(g, 'skin', () => g.cyl(0, .2, .02, .026, .024, .06, 6, P.skin));
+    const F = huFace(g, [0, .3, .045], .066, { skin: P.skin, ears: 'elf', jaw: .8, chin: 1.3, brow: '#2a2a1a', eye: '#1a2a14' });
+    huHood(g, [0, .312, .03], .092, { col: P.hood, colIn: '#0a100a', peak: .05, cowl: .45, open: .7, drop: 1.3, edgeIn: true });
+    mat(g, 'hair', () => { for (let k = 0; k < 7; k++) { const sd = k % 2 ? 1 : -1, x = sd * (.03 + .008 * k); huTube(g, [[x, .28, .08], [x * 1.2, .19, .1], [x * 1.3, .1, .09]], [.008, .007, .003], k % 3 ? P.weed : '#2a3a1a', 3); } });   // lank hair like water weed
+    // a heron's skull worn as a mask: a pale dome over the face, the long beak down past the chin, dark eye holes
+    mat(g, 'bark', () => {
+      g.with(T(0, .345, .085, 0, .15), () => g.sphere(0, 0, 0, .056, .042, .06, 8, 5, P.bone));   // (over the hood's brow: pale from above)
+      g.with(T(0, .33, .135, 0, Math.PI / 2 + .3), () => g.cyl(0, 0, 0, .021, .003, .21, 6, P.bone));
+      for (const sd of [-1, 1]) g.ico(sd * .026, .345, .135, .012, '#0a0a08');
+    });
+    mat(g, 'leafmail', () => { for (let k = 0; k < 9; k++) g.ico(-.04 + k * .01, .24 + .012 * Math.sin(k * 2.1), .1 + .008 * (k % 2), .009, k % 2 ? P.weed : '#6a8a32'); });   // a veil of duckweed under the mask
+    if (tier >= 2) { g.em = .15; for (let k = 0; k < 8 + tier; k++) { const a = k * 2.1, r = .16 + .03 * (k % 3); g.ico(Math.cos(a) * r, .34 + .06 * Math.sin(k * 1.3), Math.sin(a) * r, .007, '#14140e'); } g.em = 0; }   // insects circling her (III+)
+    if (tier >= 5) antlers(g, 0, .37, -.03, 1.25, 3, '#2e2a1e', false);   // drowned branches rising from her shoulders (VI)
+  });
+};
+const bwArm = (g, hand) => huArm(g, hand, { w: .021, cloth: UNIT_PAL[BW_U].cloak, cuff: UNIT_PAL[BW_U].cloakD, skin: UNIT_PAL[BW_U].skin, hr: .027 });
+const BW_SH = bwHp(.1, .19, .02), BW_SHL = bwHp(-.1, .19, .02);
+FORCE_PARTS[BW_U] = [
+  { k: 'staff', piv: BW_SH, build(g, tier) {   // the right arm and the crooked alder staff, as tall as she is, hung with fish bones (and reed dolls from III)
+      const P = UNIT_PAL[BW_U], hy = -.13;
+      bwArm(g, [.03, hy, .13]);
+      mat(g, 'woodgrain', () => huTube(g, [[.04, -BW_SH[1] + .04, .15], [.02, -.2, .14], [.05, hy, .13], [.02, .05, .13], [.05, .18, .11], [.01, .27, .12]], [.019, .019, .02, .018, .016, .013], P.alder, 5));
+      mat(g, 'bark', () => { for (let k = 0; k < 3 + tier; k++) { const y = .1 + .05 * (k % 3), sd = k % 2 ? 1 : -1; g.seg([.03, y, .12], [.03 + sd * .03, y - .07, .12 + .01 * k], .004, P.bone); for (let j = 1; j < 3; j++) g.seg([.03 + sd * .01 * j, y - .02 * j, .12], [.03 + sd * (.01 * j + .015), y - .02 * j + .01, .12], .002, P.bone); } });
+      if (tier >= 2) mat(g, 'cloth', () => { for (let k = 0; k < tier - 1; k++) { const y = .2 - .06 * k, x = .06 - .05 * (k % 2); g.cyl(x, y - .05, .12, .012, .009, .045, 5, P.reed); g.ico(x, y + .003, .12, .011, P.peat); } });
     }, pose(t) {
-      const c = soCastU(t, { gv_sever: .8, gv_snare: .9, gv_wither: 1.1 }), w = t.windup || 0;
-      if (c && c.id === 'gv_sever') { const k = soPop(c.u, .3, .65); return [-1.1 * k + 1.5 * soBump(c.u, .3, .45), 0, -.1 * k, 0, .05 * k, 0]; }   // drawn far back, then the heavy thorn hurled
-      if (c && c.id === 'gv_snare') { const k = soPop(c.u, .2, .7); return [.4 * k, .5 * k, 0, 0, 0, .06 * k]; }   // swept round to cast the net
-      if (c && c.id === 'gv_wither') { const k = soPop(c.u, .3, .75); return [.6 * k, 0, .2 * k, 0, -.06 * k, .05 * k]; }   // the dart driven down into the road
-      return [lfSwing(t, 0, -.9, 1.1, .07, .1, .45), 0, 0, 0, .03 * lfE(w), 0];   // the throw
+      const c = soCastU(t, { bw_swarm: .9, bw_bogbody: 1.1, bw_bogdue: 1.2 });
+      if (c && c.id === 'bw_swarm') { const k = soPop(c.u, .2, .7); return [-.35 * k, 0, .9 * k, 0, .02 * k, 0]; }   // arms flung wide, the cloak open
+      if (c && c.id === 'bw_bogbody') { const k = soPop(c.u, .25, .75); return [.25 * k, 0, .15 * k, 0, -.05 * k, .02 * k]; }   // leaning on the staff as she reaches to the road
+      if (c && c.id === 'bw_bogdue') { const up = soBump(c.u, .1, .35), dn = soPop(c.u, .35, .85); return [-.9 * up + .7 * dn, 0, .1, 0, .03 * up - .06 * dn, 0]; }   // both hands up, then dragging down
+      const s = lfSwing(t, 0, 1, -1, .07, .1, .45);
+      return [-.12 * s, 0, 0, 0, .045 * s, 0];   // the staff lifted, then driven down into the road
     } },
-  { k: 'hand', piv: [-.12, .64, 0], build(g, tier) {   // the left hand, a bundle of darts and the snare's loose end
-      gvsArm(g, [-.03, -.12, .12]);
-      for (let k = 0; k < 3; k++) mat(g, 'woodgrain', () => g.seg([-.03 + k * .01, -.12, .12], [-.03 + k * .012, .06, .16], .006, WE.thorn));
+  { k: 'hand', piv: BW_SHL, build(g, tier) {   // the left arm: long and thin, a bare clawed hand
+      const P = UNIT_PAL[BW_U];
+      bwArm(g, [-.04, -.2, .14]);
+      mat(g, 'skin', () => { for (let k = 0; k < 4; k++) g.seg([-.04 + (k - 1.5) * .008, -.22, .155], [-.04 + (k - 1.5) * .013, -.27, .175], .0035, P.skin); });
     }, pose(t) {
-      const c = soCastU(t, { gv_sever: .8, gv_snare: .9, gv_wither: 1.1 });
-      if (c && c.id === 'gv_sever') { const k = soPop(c.u, .2, .6); return [-.7 * k, -.3 * k, 0, 0, 0, .06 * k]; }   // pointing out the quarry
-      if (c && c.id === 'gv_snare') { const k = soPop(c.u, .2, .7); return [-.9 * k, -.6 * k, 0, 0, .04 * k, .05 * k]; }   // the net flung out
-      if (c && c.id === 'gv_wither') { const k = soPop(c.u, .25, .75); return [-1.6 * k, 0, .2 * k, 0, .06 * k, 0]; }   // raised, calling the bloom
-      return [-.12 * lfE(t.windup || 0), 0, 0, 0, 0, 0];
+      const c = soCastU(t, { bw_swarm: .9, bw_bogbody: 1.1, bw_bogdue: 1.2 });
+      if (c && c.id === 'bw_swarm') { const k = soPop(c.u, .2, .7); return [-.35 * k, 0, -.9 * k, 0, .02 * k, 0]; }
+      if (c && c.id === 'bw_bogbody') { const k = soPop(c.u, .2, .75); return [.95 * k, 0, -.1 * k, 0, -.12 * k, .06 * k]; }   // a palm down to the road
+      if (c && c.id === 'bw_bogdue') { const up = soBump(c.u, .1, .35), dn = soPop(c.u, .35, .85); return [-1.1 * up + .9 * dn, 0, -.1, 0, .03 * up - .07 * dn, 0]; }
+      return [.1 * lfE(t.windup || 0), 0, 0, 0, 0, 0];
     } },
 ];
+if (typeof UNIT_TIP !== 'undefined') UNIT_TIP[BW_U] = { k: 'staff', p: () => [.01, .29, .12] };   // (the staff's head: where the spit and the swarm leave)
 
 /* ---------- the Spellbook and the keywords ---------- */
 Object.assign(SPEC_HELP, {
-  gv_sever: { when: "Any support foe within {reach} cells: a healer, a warden, a banner captain, a necromancer.", aim: "The support foe holding the most ties first, then one winding up a spell, then the one nearest the gate.",
-    tips: ["Cut the priest from a boss's escort: the mark stops every heal on it, and its tie to the boss drops.", "Pair with Briarwardens: a rooted, Thornmarked healer can neither follow nor mend."] },
-  gv_snare: { when: "A ground support foe within {reach} cells that still has allies around it.", aim: "The ground support foe nearest the gate whose column is around it.",
-    tips: ["Post the Stalkers beside a straight run: the dragged healer is left behind its column, alone.", "Alone, it takes the darts' full edge: follow with Severing Thorn."] },
-  gv_wither: { when: "A ground support foe within 1 cell of a spot within {reach} cells, or three or more ground foes there, or a boss or elite.", aim: "The ground support foe with the most support foes around it; else the densest spot.",
-    tips: ["Lay it where a formation slows at a corner: nobody inside it can be healed.", "It counters troll regeneration too: their mending is a heal."] },
+  bw_swarm: { when: "Any foe within {reach} cells, ground or air.", aim: "The toughest foe in reach that is not already carrying one of her swarms.",
+    tips: ["Lay it on a foe a priest is mending: no heal lands while it is covered.", "On a flyer it pulls it low, where your ground units can reach it."] },
+  bw_bogbody: { when: "Two or more ground foes coming down the road towards a spot within {reach} cells, or a boss or elite.", aim: "The road cell in reach just ahead of the most ground foes still to cross it.",
+    tips: ["Post her behind the Thornguard: the column stops at the body, packed for the bog and the swarm.", "It blocks; it does not strike. Bring units that strike a crowd."] },
+  bw_bogdue: { when: "A ground foe within {reach} cells behind armour, or a boss or elite, or three ground foes close together.", aim: "The toughest armoured ground foe; else the toughest boss or elite; else the toughest foe.",
+    tips: ["Its armour comes off for good: pair her with weapon units that armour stops.", "Foes walking through the open bog lose armour too: cast it where the road narrows."] },
 });
 SPEC_KW.push(
-  { key: 'gv:thornmark', name: 'Thornmark', alias: ['Thornmarked', 'thornmark', 'Thornmarks'], cat: 'status', force: 'grove', col: '#ff6a8a', def: 'A Thornwarden Stalker\'s mark on a foe: while it lasts, no heal or shield lands on it (mending, troll blood, wards, regeneration), and its own mending and shielding spells don\'t cast. Bosses carry it half as long.' },
-  { key: 'gv:alone', name: 'standing alone', alias: ['stands alone', 'Standing alone'], cat: 'status', force: 'grove', col: '#ff9ab0', def: () => `A support foe with no ally beside it (none within its tether's reach, or within 1.5 cells). Thornwarden Stalkers' darts strike it ${GVS.ALONE}×, and every other hit on it lands harder too (a support foe's weakness).` },
+  { key: 'bw:swarm', name: 'Insect Swarm', alias: ['swarm', 'swarmed', 'Swarmed', 'her swarm', 'her swarms'], cat: 'status', force: 'grove', col: '#9ab040', def: 'A Bogwitch\'s cloud of biting insects on a foe: it bites every half second, and no heal lands on the foe while it is covered. When the foe dies it flies on to the nearest foe. A flyer under it is pulled low and slowed.' },
+  { key: 'bw:bogbody', name: 'Bog Body', alias: ['the Bog Body'], cat: 'status', force: 'grove', col: '#8a7a5a', def: 'An old preserved body risen out of the road. Ground foes can\'t pass it and hack at it; when it sinks it drags the nearest ground foe under. A boss wades past it at half speed.' },
+  { key: 'bw:bog', name: 'bog', alias: ['her bog', 'in a bog', 'the bog'], cat: 'status', force: 'grove', col: '#4a6a5a', def: 'Black water a cell wide opened by The Bog Takes Its Due. Ground foes crossing it are slowed 30% and lose armour.' },
 );
-SPEC_BUFF.push(['gv_thornmark', { name: 'Thornmark', kw: 'gv:thornmark', kind: 'debuff', pri: 3, icon: 'spikes', hue: '#a83a5a', f: ['nohealT'],
-  def: 'No heal or shield lands on it, and its own mending and shielding spells don\'t cast.',
-  get: c => c.nohealT > bfNow() ? { t: bfLeft(c.nohealT), src: c.gvsBy, say: 'No heals or shields land on it.' } : null }]);
+SPEC_REG.push(() => { if (typeof SP_RIDE !== 'undefined') SP_RIDE.bwHeld = (c, v, s) => { if (!c.fly && c.rootT > G.time) { rootFoe(c, (c.rootT - G.time) + v, s); bwSink(c, Math.max(.3, c.rootT - G.time), !!c.def.boss); } }; });   // Grasping Dead: the one dragged under stays down longer
+SPEC_BUFF.push(['bw_blocked', { name: 'Bog Body', kw: 'bw:bogbody', kind: 'debuff', pri: 3, icon: 'statue', hue: '#6a5a3a', f: ['bwBlockT'],
+  def: 'A Bog Body stands in its way: it cannot pass and hacks at it (a boss wades past at half speed).',
+  get: c => c.bwBlockT > bfNow() ? { t: c.bwBlockBy ? bfLeft(c.bwBlockBy.until) : 0, src: c.bwBlockBy ? c.bwBlockBy.t : null, say: c.bwWade ? 'It wades past at half speed.' : 'It hacks at the Bog Body.' } : null }]);
+SPEC_BUFF.push(['bw_swarm', { name: 'Insect Swarm', kw: 'bw:swarm', kind: 'debuff', pri: 3, icon: 'spores', hue: '#6a7a3a', f: ['nohealT'],
+  def: 'Biting insects: it takes a bite every half second and no heal lands on it.',
+  get: c => { const e = typeof G !== 'undefined' && G && G.bwFx ? G.bwFx.find(q => q.k === 'swarm' && q.c === c && !q.done) : null; return e ? { t: bfLeft(e.until), src: e.t, say: 'No heals land on it.' } : null; } }]);
+
+/* ---------- old saves: the Stalkers' learned spells and their weapons carry over to the Bogwitches ---------- */
+const BW_OLD_SPELL = { gv_sever: 'bw_swarm', gv_snare: 'bw_bogbody', gv_wither: 'bw_bogdue' };
+if (typeof abilLoad === 'function') {
+  const _bwLoad = abilLoad;
+  abilLoad = (t, o) => {
+    if (o && typeof o === 'object' && t && bwIs(t)) {
+      const fix = v => (BW_OLD_SPELL[v] || v);
+      if (Array.isArray(o.l)) o.l = o.l.map(fix);
+      if (Array.isArray(o.o)) o.o = o.o.map(fix);
+      if (typeof o.f === 'string') o.f = fix(o.f);
+    }
+    return _bwLoad(t, o);
+  };
+}
 
 /* ================= IRONHOLD'S SPECIALIST: the Siege Breakers =================
    Clan sappers in soot-black leather aprons and riveted iron, a satchel of black-powder charges and a long charge-pole:
@@ -30414,8 +30729,7 @@ if (typeof SP_SHAPE !== 'undefined') Object.assign(SP_SHAPE, { ch_wardensoath: '
                          Encore (IV): afterimages strike again every foe it has cut in the last seconds
      Seedcasters         Puffcap Sowing (II): puffball mushrooms sprout on the road and burst under the walkers
                          Snapjaw Bloom (III): a carnivorous bloom on the road that snaps up the nearest walker each second
-     Thornwarden Stalkers  Bramble Snare (II): kept (it already cuts the healer from its column)
-                         Briar Gibbet (III): the support foe is hoisted into a cage of briars over the road
+     (the specialist's slot: the Bogwitches, forces_zs_grove.js, with their own spells)
      Elowen              Rootway (II): kept; The Old Wood Walks (III): an ancient tree walks up the road into the foes
      Faelan              Farshot (II): the farther the shot flies, the harder it lands; Hunter's Moon (IV): kept
      Nyssa               Moth Swarm (II): seed-moths settle on the walkers and feed on them; Full Bloom (IV): kept
@@ -30428,7 +30742,7 @@ const GVC = {
   col: { bark: '#3a2a18', sap: '#a6ff5a', tip: '#f4ffc8', glow: '#62d83a', thorn: '#ecf0b0', moon: '#cfeaff', spore: '#c8d860', moth: '#f6e8a8', petal: '#ffd0e4', hush: '#e8f0d0', gold: '#ffe08a' },
   hedgeK: 2, wavePace: 7, seedSpeed: 16, seedK: 1.3, seedT: 8, seedEnd: .6, seedNear: 1, nailWall: 1.5, nailSplinter: .7, spearK: 1.6,
   mothK: .35, witherK: .3, leapK: 2, leapRingK: 1,
-  huntK: .65, huntHeld: 2, huntGap: .62, encoreMem: 6, encoreGrow: 4, puffK: 1.4, jawK: .5, jawEvery: .7, cageK: .5, cageDrop: 1.5, treeK: 3, treeSpeed: .9,
+  huntK: .65, huntHeld: 2, huntGap: .62, encoreMem: 6, encoreGrow: 4, puffK: 1.4, jawK: .5, jawEvery: .7, treeK: 3, treeSpeed: .9,
 };
 const gvcWalker = c => !c.dead && !c.ent && !c.phased && abWalker(c);
 const gvcTop = t => (typeof towerTop === 'function' ? towerTop(t) : 1);
@@ -31072,37 +31386,6 @@ gvcSet('bindseed', { name: 'Snapjaw Bloom', short: 'Snapjaw', glyph: 'spores', h
   } });
 
 /* =====================================================================================================
-   THORNWARDEN STALKERS (the specialist): the support foe hoisted out of its column in a cage of briars
-   ===================================================================================================== */
-gvcSet('gv_wither', { name: 'Briar Gibbet', short: 'Gibbet', glyph: 'wither', hue: '#c86a8a', mana: 100, cd: 14,
-  by: { hold: [2, 2, 2.2, 2.4, 2.6, 2.8] },
-  auto: 'a ground support foe in reach (one mending, shielding or holding a tie first), else a boss or elite',
-  text: (t, st, ab) => `Cages a support foe in briars for ${gNf(byT(ab.by.hold, t))}s: Thornmarked, its ties cut, torn for ${xD(st, GVC.cageK)} every half second. Then it drops behind its column for ${xD(st, GVC.cageDrop)}.`,
-  pick(t, st, ab, man) {
-    const L = abFoes(t, st, abReach(t, st, ab), gvcWalker); if (!L.length) return null;
-    const S = L.filter(c => specSupport(c) && abHoldable(c)).sort((a, b) => ((b.links && b.links.length) || 0) - ((a.links && a.links.length) || 0) || (!!b.epC - !!a.epC) || (a.remain - b.remain));
-    return S[0] || (man || L.some(abBig) ? abToughest(L) : null);
-  },
-  cast(t, st, c, ab) {
-    gvsDartFx(t, c, '#ff9ab0');
-    G.delayed.push({ t: .2, fn: () => {
-      if (c.dead || !abLive(t)) return; const hold = byT(ab.by.hold, t);
-      rootFoe(c, hold, t); const d = c.rootT > G.time ? Math.min(hold, c.rootT - G.time) : 0; if (d <= .05) return;
-      if (typeof liftFoe === 'function') liftFoe(c, d, .42, 'cyc');
-      c.gvcCageT = G.time + d; c.gvcCageBy = t;
-      gvsMark(c, d + 2, t); if (specSupport(c)) specHush(c, d + 2, t);
-      abZone(t, gvcFresh({ k: 'gv_wither', foe: c, until: G.time + d + .05, end: G.time + d, tick: .5, every: .5 }));
-      gvcFx('gibbet', t, ab, { c, d }); sfx('burrow', 1);
-    } });
-  },
-  zone(t, st, z) {
-    const c = z.foe; if (!c || c.dead) return;
-    if (G.time < z.end - .02) { abHit(t, st, c, GVC.cageK, 'phys', null); return; }
-    if (z.drop) return; z.drop = 1; abHit(t, st, c, GVC.cageDrop, 'phys', null); gvcFx('drop', t, ABIL.gv_wither, { c }); sfx('glaiveHit', 1);
-  } });
-if (typeof SP_SHAPE !== 'undefined') SP_SHAPE.gv_wither = 'a h:hold/.5';
-
-/* =====================================================================================================
    THE CHAMPIONS
    ===================================================================================================== */
 // Elowen: The Old Wood Walks. An ancient tree tears itself up out of the road in her reach, just ahead of the walkers coming, and walks up it, into the foes
@@ -31224,10 +31507,6 @@ function gvcTal(tree, name, o) {
   gvcTal(T.cannon, 'Burrowing Pods', { pro: n => `Puffcap Sowing's puffcaps root the ground foes they burst under for ${gNf(.3 * n)}s.` });
   gvcTal(T.cannon, 'Clinging Spores', { pro: n => `Snapjaw Bloom's roots hold ${gNf(.2 * n)}s longer and its bites strike spored foes ${20 * n}% harder.` });
   gvcTal(T.cannon, 'Rootmark Seed', { pro: 'Every ground foe Snapjaw Bloom bites is marked for 4s: it takes 10% more from every unit.' });
-}
-{
-  const S = FORCES.grove.talents[SPEC_SLOT];
-  gvcTal(S, 'Choking Thorns', { pro: 'Briar Gibbet holds its foe 0.5s longer, and each one brings Severing Thorn 3s nearer.', sp: { ab: 'gv_wither', by: { hold: .5 }, ready: ['gv_sever', 3] } });
 }
 if (typeof CHAMPS !== 'undefined') {
   const E = CHAMPS.rootmother && CHAMPS.rootmother.tree, F = CHAMPS.thornbow && CHAMPS.thornbow.tree, N = CHAMPS.hivemother && CHAMPS.hivemother.tree;
@@ -31415,9 +31694,6 @@ const GVC_FX = {
     sfxAdd({ k: 'gvcjaw', zr: z, x: z.x, z: z.z, born: G.time + o.T, life: o.T + o.dur + .6, seed: R(TAU), S: C.S });
     gvcAt(C, o.T, () => { v2Spray(C, 'chip', z.x, z.z, .1, 6, { r: .2, sp: 1 }); v2Spray(C, 'dust', z.x, z.z, .05, 4, { r: .3 }); gvcLeaves(C, z.x, z.z, .3, 4); });
   },
-  /* ---- Briar Gibbet ---- */
-  gibbet(C, t, o) { const c = o.c; gvcCage(C, c, o.d, { n: 7, h: 2.1, r: 1.25, w: .11, s: 1.05 }); v2Mark(C, c, { L: VT.RUNE, s: .2, ring: .36, life: o.d + .5, col: GVC_K.pink, hot: vfxC('#ffc0d0', 1.3) }); v2Spray(C, 'thorn', c.x, c.y, .3, 6, { r: .2, sp: .8 }); },
-  drop(C, t, o) { const c = o.c; v2Hit(C, c.x, c.y, .2, C.S * .6, { sp: 'dust', n: 5, sp2: 'thorn', n2: 3, ring: 0, col: GVC_K.pink }); },
   /* ---- The Old Wood Walks ---- */
   treerise(C, t, o) { v2Area(C, o.x, o.z, .8, { sp: 'chip', n: 10, rim: 'dust', rn: 8, L: VT.CRACK, shake: .1 }); gvcLeaves(C, o.x, o.z, .8, 8); },
   treestep(C, t, o) { const z = o.z; v2Spray(C, 'dust', z.x, z.z, .04, 2, { r: .25 }); if (Math.random() < .5) gvcLeaves(C, z.x, z.z, 1.1, 1, { sp: .3 }); },
@@ -31711,32 +31987,17 @@ if (typeof ABANIM !== 'undefined' && typeof chAnim === 'function') {
   ABANIM.ch_oldwood = chAnim('slam', { T: 1.2, tip: ['staff', [0, .56, 0]], col: [.55, 1, .35], on: [.45, .9] });
   ABANIM.ch_pinarrow = chAnim('draw', { T: 1.1, tip: ['main', [.05, -.01, .3]], col: [1, .92, .55], on: [.2, .7] });
 }
-// the specialist's Briar Gibbet: the spear-thrower swung up and both hands hauled skyward, hoisting the cage
-if (typeof FORCE_PARTS !== 'undefined' && FORCE_PARTS.thornwarden) for (const p of FORCE_PARTS.thornwarden) {
-  const pose0 = p.pose;
-  p.pose = function (t) {
-    const c = typeof soCastU === 'function' ? soCastU(t, { gv_wither: 1.1 }) : null;
-    if (c && c.id === 'gv_wither') { const k = soPop(c.u, .2, .8), h = soBump(c.u, .3, .55); return p.k === 'thrower' ? [-1.5 * k - .3 * h, .2 * k, 0, 0, .06 * k, .02 * k] : [-1.7 * k - .3 * h, -.2 * k, 0, 0, .06 * k, .02 * k]; }
-    return pose0.call(this, t);
-  };
-}
 
 /* ---------- late: cast times (forces_zz_casttimes.js loads after this file) ---------- */
 if (typeof SPEC_REG !== 'undefined') SPEC_REG.push(() => {
-  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { brambleguard: .3, sunder: .4, volley: .4, arrowrain: 1, constrict: .6, briarfield: .9, stampede: 0, runthrough: 0, wildstrike: .2, wildsurge: 0, leafdance: 0, harvest: .3, barrage: .7, bindseed: .7, gv_wither: .8 });
+  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { brambleguard: .3, sunder: .4, volley: .4, arrowrain: 1, constrict: .6, briarfield: .9, stampede: 0, runthrough: 0, wildstrike: .2, wildsurge: 0, leafdance: 0, harvest: .3, barrage: .7, bindseed: .7 });
 });
 
 /* ---------- the specialist's own words: its Spellbook help, its keyword and status (forces_zs_base.js registries) ---------- */
-if (typeof SPEC_HELP !== 'undefined') SPEC_HELP.gv_wither = { when: "A ground support foe within {reach} cells that roots can still hold, else (a tap, or a boss or elite in reach) the toughest ground foe.", aim: "The ground support foe holding the most ties first, then one winding up a spell, then the one nearest the gate.",
-  tips: ["Cage the priest of a boss's escort: no heal lands on it, its ties drop, and its column walks on without it.", "Caged, it can't heal or be healed: pair it with Severing Thorn for a second support foe.", "Post the Stalkers where the column walks fast: the caged foe lands behind it, alone."] };
-if (typeof SPEC_KW !== 'undefined') SPEC_KW.push({ key: 'gv:gibbet', name: 'Caged', alias: ['caged', 'Gibbeted'], cat: 'status', force: 'grove', col: '#c86a8a', def: 'Hoisted over the road in a cage of briars by the Thornwarden Stalkers: it can\'t move, it is Thornmarked, and its ties to its allies are cut. When the cage drops it lands on the road behind its column.' });
 if (typeof SPEC_KW !== 'undefined') SPEC_KW.push({ key: 'gv:thornseed', name: 'Thornseeded', alias: ['thornseeded'], cat: 'status', force: 'grove', col: '#8ad84a', def: "A thorn seed planted by the Gladebow Rangers' Thornseed Arrow. The next time the foe casts, the spell fizzles and roots hold it, its ties to its allies cut. Unspent, it bursts after 8s for a short hold." });
 if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_thornseed', { name: 'Thornseeded', kw: 'gv:thornseed', kind: 'debuff', pri: 2, icon: 'arrowhead', hue: '#6ab83a', f: ['gvcSeedT', 'gvcSeedBy'],
   def: 'A thorn seed waits in it: its next spell fizzles and roots hold it, its ties cut.',
   get: c => c.gvcSeedT > bfNow() ? { t: bfLeft(c.gvcSeedT), T: GVC.seedT, src: bfFrom(c.gvcSeedBy), say: 'A thorn seed waits in it: its next spell fizzles and roots hold it, its ties cut.' } : null }]);
-if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_caged', { name: 'Caged', kw: 'gv:gibbet', kind: 'debuff', pri: 2, icon: 'wither', hue: '#a83a5a', f: ['gvcCageT', 'gvcCageBy'],
-  def: 'Hoisted in a cage of briars: it can\'t move, and no heal or shield lands on it.',
-  get: c => c.gvcCageT > bfNow() ? { t: bfLeft(c.gvcCageT), src: bfFrom(c.gvcCageBy), say: 'Hoisted in a cage of briars: it can\'t move, and no heal or shield lands on it.' } : null }]);
 
 /* ================= THE CONCLAVE: the cool-factor pass on the second and third spells =================
    The owner (6 Nov 2026): "do a pass on all second and third spells making each unique and interesting, aim for the cool
@@ -39567,20 +39828,14 @@ if (typeof fsetAdd === 'function') {
     },
     cast(t, ab, tg, n) { if (n >= 2 && ab.id === 'haze') { const S = this; fsLater(.5, () => { if (fsFreeCast(t, 'bindseed')) fsGlint(t, S); }); } } });
 
-  /* ---------- Thornwarden Stalkers: the mark spreads as the marked fall ---------- */
-  fsetAdd({ id: 'fe_gv_stalk', epic: 1, spells: ['gv_sever', 'gv_snare'], force: 'grove', unit: 'venom', name: 'Vestments of the Briar Hunt',
-    pieces: [['fe_gv_dartcase', 'Bloodthorn Dartcase', 3, 'spikes', '#a8486a', 'dmg crit'], ['fe_gv_redcloak', 'Cloak of Red Bramble', 3, 'snare', '#8a3a5a', 'as range']],
-    old: [['fe_gv_briarmask', 'Briar-Mask of the Stalk', 3, 'eye', '#c86a8a', 'dmg as pen'], ['fe_gv_rosebead', 'Rosethorn Bead', 3, 'drop', '#e0708a', 'cd regen']],
-    b2: 'Severing Thorn also Thornmarks the support foe nearest its target for 3s. A foe it Thornmarked bursts into thorns as it dies: every ground foe within 1 cell is rooted 1s and Thornmarked 3s, and Bramble Snare comes 4s nearer.',
-    hit(t, c, amt, sp) {
-      if (sp !== 'gv_sever' || typeof gvsMark !== 'function' || !fsOnce(t, 'feSever')) return;
-      const o = nearest(c.x, c.y, 2.5, 1, c, q => !q.dead && specSupport(q))[0]; if (o) { gvsMark(o, 3, t); fsGlint(t, this); }
-    },
-    kill(t, c, n) {
-      if (n < 2 || c.gvsBy !== t || !(c.nohealT > G.time) || typeof gvsMark !== 'function') return;
-      for (const o of fsNear(c, 1.05, 8)) { rootFoe(o, 1, t); gvsMark(o, 3, t); }
-      fsReady(t, 'gv_snare', 4); abRootFx(c.x, c.y, 8); fxRing(c.x, c.y, 1, '#ff6a8a'); fsGlint(t, this);
-    } });
+  /* ---------- Bogwitches: the swarm hurries the bog, and what the arms let go comes up crawling ---------- */
+  // (the set and its old pieces keep the Stalkers' ids, so a save that held them still loads: the pieces cut are below)
+  fsetAdd({ id: 'fe_gv_stalk', epic: 1, spells: ['bw_swarm', 'bw_bogdue'], force: 'grove', unit: 'venom', name: 'Weeds of the Drowned Fen',
+    pieces: [['fe_gv_heronmask', 'Heron-Skull Mask', 3, 'skull', '#c8c0a8', 'sp mana'], ['fe_gv_reedcloak', 'Cloak of Wet Reeds', 3, 'puddle', '#4a5a2a', 'regen cd']],
+    old: [['fe_gv_dartcase', 'Bloodthorn Dartcase', 3, 'spikes', '#a8486a', 'dmg crit'], ['fe_gv_redcloak', 'Cloak of Red Bramble', 3, 'snare', '#8a3a5a', 'as range'],
+      ['fe_gv_briarmask', 'Briar-Mask of the Stalk', 3, 'eye', '#c86a8a', 'dmg as pen'], ['fe_gv_rosebead', 'Rosethorn Bead', 3, 'drop', '#e0708a', 'cd regen']],
+    b2: 'Each Insect Swarm brings The Bog Takes Its Due 2s nearer. A foe the drowned arms let go climbs out carrying an Insect Swarm.',
+    cast(t, ab, tg, n) { if (n >= 2 && ab.id === 'bw_swarm') { fsReady(t, 'bw_bogdue', 2); fsGlint(t, this); } } });
 }
 
 /* ================= IRONHOLD'S EPIC SETS: one a unit, two epic pieces =================
@@ -40717,11 +40972,10 @@ function cxBurst(t, c) {
      castAbility        Splitting Shaft, Curtain Call, White Hart's Hunt's tally, Rootmother, Twin Elders, Watchtower
                         Bough, Moonlit Aim, Seedmother
      abHit              Run to Ground (a held foe run through is held again)
-     zones              Gallows Briar (Briar Gibbet), Thousand Roots (Rootway)
+     zones              Thousand Roots (Rootway)
      gvcCrumble         The Deep Hungers (Wither leaps on when its foe crumbles); Overgrowth is in forces.js rootStrike
      FORCE_HOOKS.grove  kill: Hunter's Finish, Reaper's Step, Bursting Rot; fire: Puffcap Trail; tick: Wild Heart's
                         shifts, Rootmother's lingering roots
-     FORCE_ATTACK       the Stalkers' dart: Apex Stalker's second dart, Torn Ties
      the Champions      Faelan's ricochet (Blood Moon), Full Bloom's cast (Overripe, Bloom of Moths)
    Grove runs only: every rule asks gcOn() and the unit's own talent (talentHas). The looks reuse the Grove's small
    effects (sparks, chunks, streaks, the spells' own moments): nothing screen-filling. */
@@ -40840,24 +41094,6 @@ if (typeof gvcCrumble === 'function' && ABIL.briarfield) {   // Wither: The Deep
     const d = byT(ab.by.dur, t), T = .3;
     gvcFx('wither', t, ab, { c: c2, T, d, o: [x, hitH(c), z] });
     G.delayed.push({ t: T, abId: ab.id, fn: () => { if (c2.dead || !G.creeps.includes(c2) || !gcLive(t)) return; abRun(ab.id, () => gvcWither(t, gcSt(t), [c2], d, 1, c2)); } });
-    return r;
-  };
-}
-if (ABIL.gv_wither && ABIL.gv_wither.zone) {   // Briar Gibbet: Gallows Briar
-  const z0 = ABIL.gv_wither.zone;
-  ABIL.gv_wither.zone = function (t, st, z) {
-    const r = z0.apply(this, arguments);
-    const c = z.foe;
-    if (!z.gcG && c && (z.drop || c.dead) && gcOn()) {
-      z.gcG = 1;
-      const chained = c.gcGallowsAt && G.time - c.gcGallowsAt < 8;
-      if (!chained && gcHas(t, 'gvsGallows')) {
-        const L = G.creeps.filter(o => o !== c && gcWalk(o) && abHoldable(o) && canTarget(t, st, o) && Math.hypot(o.x - c.x, o.y - c.y) <= 2.5);
-        const S = L.filter(specSupport).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y));
-        const c2 = S[0] || abToughest(L);
-        if (c2) { c2.gcGallowsAt = G.time; gcStreak(c, c2, GVS.COL.mark); G.delayed.push({ t: .15, abId: 'gv_wither', fn: () => { if (!abLive(t) || c2.dead) return; ABIL.gv_wither.cast(t, gcSt(t), c2, ABIL.gv_wither); } }); }
-      }
-    }
     return r;
   };
 }
@@ -40982,25 +41218,6 @@ function gcTick(dt) {
     }
     if (Math.random() < .3) { const a = R(TAU), d = R(0, f.r); abRootFx(f.x + Math.cos(a) * d, f.z + Math.sin(a) * d, 1); }
   }
-}
-
-/* ---------- the Stalkers' dart: Apex Stalker's second dart, Torn Ties ---------- */
-if (FORCE_ATTACK.gv_thorndart) {
-  const d0 = FORCE_ATTACK.gv_thorndart;
-  FORCE_ATTACK.gv_thorndart = function (t, st, tg, pow, echo) {
-    const C = (st && st.caps) || {}, sup = gcOn() && specSupport(tg), lone = sup && gvsAlone(tg), ties = sup && C.gvsTies ? (tg.links || []).filter(o => o && o !== tg && !o.dead).slice(0, 8) : [];
-    const r = d0.apply(this, arguments);
-    const T = Math.min(.25, .05 + Math.hypot(tg.x - t.x, tg.y - t.y) / 16);
-    if (lone && C.gvs_apex && !echo) G.delayed.push({ t: .18, fn: () => {   // Apex Stalker: a second dart
-      if (tg.dead || !gcLive(t) || G.state !== 'play') return; gvsDartFx(t, tg, GVS.COL.mark);
-      G.delayed.push({ t: T, fn: () => { if (tg.dead || G.state !== 'play') return; const s = gcSt(t); gvsHit(t, s, tg, s.dmg * pow * gvsAloneK(s)); if (!tg.dead) fxSpark(tg.x, tg.y, hitH(tg), GVS.COL.mark, 6); } });
-    } });
-    if (ties.length) G.delayed.push({ t: T + .05, fn: () => {   // Torn Ties: what it covered is marked too
-      if (!gcLive(t) || G.state !== 'play') return; const s = gcSt(t);
-      for (const o of ties) { if (o.dead) continue; gcStreak(tg, o, GVS.COL.mark); gvsMark(o, gvsMarkT(t, s), t); gvsHit(t, s, o, s.dmg * pow * .5); }
-    } });
-    return r;
-  };
 }
 
 /* ---------- Faelan: Blood Moon's ricochets hunt on ---------- */
@@ -43092,7 +43309,6 @@ const ccfCaster = u => (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER && C
                         look at the foes in the spell's area when it is cast)
      abHit              which spell struck a foe (snagged on Thornhedge, Thornseeded, a quarry named, petals)
      gwBloom            Living Haft (mana from the walkers Briar Brace holds), Honey Store (Nyssa drinks the Blooms)
-     gvsMark            Sap Thief (a fresh Thornmark pays the Stalkers mana)
      rootFoe            Rootmark Seed (a seed-marked foe is rooted longer)
    Grove runs only (G.force 'grove', not Tower Wars); each rule asks the unit's own talent (talentHas, by cap). The looks
    are the Grove's small ones (sparks, root chunks, a sparkle): nothing over the road. Foe statuses it sets are shown by
@@ -43210,14 +43426,6 @@ function gfRe(list, old, o) {
   gfRe(C, 'Seed Scatter', { pro: 'Puffcap Sowing sows one more puffcap, and each ground foe a puffcap bursts on fills the Seedcaster\'s Growth bar 5.', sp: { ab: 'barrage', by: { n: 1 } }, cap: 'gfScatter' });
   gfRe(C, 'Rootmark Seed', { pro: 'Every ground foe Snapjaw Bloom bites is Seed-marked for 5s: any root that takes it holds 0.5s longer.', sp: { ab: 'bindseed', rider: { gfRootmark: 5 } } });
 
-  /* ---- Thornwarden Stalkers: the hunt for the healer ---- */
-  const V = T.venom.list;
-  gfRe(V, "Hunter's Patience", { pro: n => `It waits in the briars: while no support foe is within its reach, +${gNf(.25 * n)} range, until one is.`, cap: 'gfWait' });
-  gfRe(V, 'Quick Quiver', { pro: n => `Its darts come ${6 * n}% faster while its quarry is Thornmarked.`, cap: 'gfQuiver' });
-  gfRe(V, 'Sap Thief', { pro: n => `It steals the healer's sap: each support foe it Thornmarks afresh (not marked already) gives it ${6 * n} mana.`, cap: 'gfThief' });
-  gfRe(V, 'Choking Thorns', { pro: 'Briar Gibbet holds its foe 0.5s longer and leaves it Wounded for 3s, and every support foe within 1.5 cells of the cage is Thornmarked while it hangs.', sp: { ab: 'gv_wither', by: { hold: .5 }, rider: { wound: 3 } }, cap: 'gfChoke' });
-  gfRe(V, 'Snare Line', { pro: n => `Every foe Bramble Snare drags is Wounded for ${4 * n}s: its heals and shields stay halved after the Thornmark fades.`, sp: n => ({ ab: 'gv_snare', rider: { wound: 4 * n } }) });
-
   /* ---- Elowen, the Rootmother: the earth that keeps what it takes ---- */
   const E = CH.rootmother && CH.rootmother.tree.list;
   gfRe(E, 'Patient Earth', { pro: n => `Each second a ground foe stays held by her roots brings Entangle ${gNf(.2 * n)}s nearer, for up to 3 at once.`, cap: 'gfEarth' });
@@ -43267,10 +43475,6 @@ Object.assign(SP_RIDE, {
   gfSeed: (c, v, s) => { c.gfSeededT = G.time + v; c.gfSeededBy = s; },   // Still Quarry
   gfFlush: (c, v, s) => { c.gfFlushT = G.time + v; c.gfFlushBy = s; },   // Mark of the Hunt
   gfPetal: (c, v, s) => { c.gfPetalT = G.time + 6; c.gfPetalK = v; c.gfPetalBy = s; },   // Petal Cuts
-  gfChoke: (c, v, s) => {   // Choking Thorns: while the cage hangs, every support foe within v cells of it is Thornmarked (plain-text pass: a rider, was a cast rule with a longer hold and a wound)
-    const hold = ABIL.gv_wither && ABIL.gv_wither.by ? byT(ABIL.gv_wither.by.hold, s) : 2;
-    for (let k = 0; k * .5 <= hold; k++) G.delayed.push({ t: k * .5, fn: () => { if (c.dead || !abLive(s)) return; for (const o of nearest(c.x, c.y, v, 6, c, q => specSupport(q))) gvsMark(o, .7, s); } });
-  },
   gfRootmark: (c, v, s) => { if (!c.fly) { c.gfRootmarkT = G.time + v; c.gfRootmarkBy = s; } },   // Rootmark Seed
   gfSnap: (c, v, s) => { if (!c.fly && c._gfSnapBy !== s) { c._gfSnapBy = s; c._gfSnapK = v; c._gfHeld = 0; c._gfSnapped = 0; } },   // Strangling Hold
   gfSong: (c, v, s) => { for (const o of abAllies(s, 1.6)) if (o.maxHp > 0 && o.hp < o.maxHp) { o.hp = Math.min(o.maxHp, o.hp + o.maxHp * v); if (Math.random() < .5) fxSparkle(o.x, o.y, towerTop(o), '#9be06a'); } },   // Sap Song
@@ -43323,10 +43527,6 @@ function gfLive(t, st) {
     if ((n = has('gfStep'))) { const r = st.range || 1.45; if (gfQ(t, 'wound', () => gfCount(t.x, t.y, r + .1, c => c.woundT > G.time, 1))) gfFaster(st, .04 * n); }   // Quickstep
   }
   else if (u === 'seedcaster' && (n = has('gfDrift')) && t.gfHazeAt != null && G.time - t.gfHazeAt < (t.gfHazeD || 0)) st.range = (st.range || 0) + .3 * n;   // Far Cast
-  else if (u === 'thornwarden') {
-    if ((n = has('gfWait'))) { const r = st.range || 2.7; if (!gfQ(t, 'sup', () => gfCount(t.x, t.y, r, c => specSupport(c), 1))) st.range = r + .25 * n; }   // Hunter's Patience
-    if ((n = has('gfQuiver')) && t.tg && !t.tg.dead && t.tg.nohealT > G.time) gfFaster(st, .06 * n);   // Quick Quiver
-  }
   else if (u === 'ch_elowen' && (n = has('gfTendril'))) { const r = st.range || 2.8; if (gfQ(t, 'own', () => gfCount(t.x, t.y, r, c => gfOwnRooted(c, t), 1))) gfFaster(st, .05 * n); }   // Quick Tendrils
   else if (u === 'ch_faelan' && (n = has('gfBough')) && gfQ(t, 'arch', () => typeof spArchers === 'function' ? spArchers(t) : 0) >= 1) st.range = (st.range || 0) + .2 * n;   // High Boughs
   else if (u === 'ch_nyssa') {
@@ -43566,16 +43766,6 @@ if (typeof gwBloom === 'function') {
         for (const o of G.towers) if (gfIs(o, 'ch_nyssa') && (n = gfHas(o, 'gfHoney')) && Math.hypot(o.x - t.x, o.y - t.y) <= 1.6) gfMana(o, 6 * n);   // Honey Store
       } catch (e) { console.error(e); }
     }
-    return r;
-  };
-}
-
-/* ---------- Sap Thief: a fresh Thornmark pays ---------- */
-if (typeof gvsMark === 'function') {
-  const _gfMark = gvsMark;
-  gvsMark = function (c, T, t) {
-    const fresh = !!c && !c.dead && !(c.nohealT > G.time), r = _gfMark.apply(this, arguments);
-    let n; if (fresh && gfPlay() && t && (n = gfHas(t, 'gfThief')) && specSupport(c)) gfMana(t, 6 * n);
     return r;
   };
 }
@@ -46365,7 +46555,7 @@ const KIND_LABEL = {
 const UNIT_KIND = {
   // the Grove
   thornguard: ['melee', 'polearm'], gladebow: ['bow'], briarwarden: ['caster'], staglancer: ['melee', 'polearm', 'rider'],
-  wayfarer: ['caster'], bladedancer: ['melee', 'blade'], seedcaster: ['caster'], thornwarden: [], ch_elowen: ['caster'],
+  wayfarer: ['caster'], bladedancer: ['melee', 'blade'], seedcaster: ['caster'], bogwitch: ['caster'], ch_elowen: ['caster'],
   // the Conclave (the Golem Warden is a College mage; the Spellblade fights with steel)
   cc_spellblade: ['melee', 'blade'], cc_mageling: ['caster'], cc_rimeweaver: ['caster'], cc_chronomancer: ['caster'],
   cc_astrologer: ['caster'], cc_golemwarden: ['caster', 'melee'], cc_pyroclast: ['caster'], cc_severer: ['caster'], ch_maelis: ['caster'],
@@ -46581,7 +46771,7 @@ const WPN_CLASS = {
     ['staffsling', 'Staff Sling', .9, .16, 'a sling on the end of a short staff'],
     ['podthrower', 'Pod Thrower', .86, .18, 'a hollow gourd launcher on a strap'],
     ['reedsling', 'Reed Sling', 1.12, .1, 'a light sling of plaited reeds']] },
-  thrower: { icon: 'spikes', hue: '#6a4a3a', size: 'a quiver or bundle of darts at the hip, one in hand', bases: [
+  thrower: { retired: 'staff', icon: 'spikes', hue: '#6a4a3a', size: 'a quiver or bundle of darts at the hip, one in hand', bases: [
     ['darts', 'Thorn Darts', 1, .12, 'a bundle of black thorn darts'],
     ['javelins', 'Short Javelins', .88, .16, 'three short barbed javelins in a sling'],
     ['knives', 'Throwing Knives', 1.14, .1, 'a bandolier of leaf-bladed knives'],
@@ -46684,7 +46874,7 @@ const WPN_CLASS = {
 };
 // each force unit's class (its look; casters' classes carry Spell Damage)
 const WPN_UNIT = {
-  thornguard: 'spear', gladebow: 'bow', briarwarden: 'staff', staglancer: 'lance', wayfarer: 'druidbow', bladedancer: 'daggers', seedcaster: 'sling', thornwarden: 'thrower', ch_elowen: 'staff',
+  thornguard: 'spear', gladebow: 'bow', briarwarden: 'staff', staglancer: 'lance', wayfarer: 'druidbow', bladedancer: 'daggers', seedcaster: 'sling', bogwitch: 'staff', ch_elowen: 'staff',
   oathsworn: 'sword', silverbolt: 'xbow', lightbinder: 'staff', grailknight: 'lance', sunlance: 'staff', templar: 'sword', censer: 'censer', so_inquisitor: 'tome', ch_aurelian: 'sword',
   cc_spellblade: 'sword', cc_mageling: 'orb', cc_rimeweaver: 'staff', cc_chronomancer: 'orb', cc_astrologer: 'orb', cc_golemwarden: 'golem', cc_pyroclast: 'orb', cc_severer: 'riftglaive', ch_maelis: 'staff',
   ironbreaker: 'axe', thundergun: 'rifle', chaintrapper: 'chain', runesmith: 'runehammer', flakgunner: 'cannon', steamhammer: 'hammer', mortarcrew: 'mortar', siegebreaker: 'pole', ch_haldra: 'hammer',
@@ -46713,8 +46903,8 @@ const WPN_LEGS = [
   ['bladedancer', 'wl_encore', 'Encore Blades', 'two thin blades with ribbons that trail as they turn', ['spell', 'harvest', 'frenzy']],
   ['seedcaster', 'wl_puffcap', 'Puffcap Sling', 'a sling whose pouch is a giant mushroom cap', ['hit', 'splash', 3]],
   ['seedcaster', 'wl_snapjaw', 'Snapjaw Launcher', 'a staff-sling with a toothed seed pod at the end', ['spell', 'bindseed', 'echo']],
-  ['thornwarden', 'wl_gibbet', 'Gibbet Darts', 'a bundle of long black thorns bound with red cord', ['hit', 'shred', 3]],
-  ['thornwarden', 'wl_severquill', 'Severing Quill-Case', 'a quiver of hooked thorns like small sickles', ['spell', 'gv_sever', 'reset']],
+  ['bogwitch', 'wl_gibbet', 'Heron-Skull Crook', 'a crooked alder staff topped with a heron skull, its beak a hook', ['hit', 'shred', 3]],   // (the Stalkers' ids: a save that held one keeps it)
+  ['bogwitch', 'wl_severquill', 'Staff of the Drowned Hives', 'a black bog-oak staff riddled with holes that hum', ['spell', 'bw_swarm', 'echo']],
   ['ch_elowen', 'wl_heartwood', 'Heartwood Staff of Elowen', 'a tall living staff in leaf, a heartwood glow in its knot', ['spell', 'ch_rootway', 'echo']],
   // ---- the Silver Order ----
   ['oathsworn', 'wl_dawnbrand', 'Dawnbrand', 'a broad holy sword with a sunburst cross guard', ['hit', 'daze', 4]],
@@ -46837,6 +47027,8 @@ for (const [u, id, name, look, fx] of WPN_LEGS) {
   const cls = WPN_UNIT[u], b0 = WPN_CLASS[cls] ? WPN_CLASS[cls].bases[0] : null;
   WPN_LEG[id] = { id, u, cls, name, look, fx, sk: 1, spr: b0 ? b0[3] : .12, mdl: id, leg: 1 };
 }
+// the Bogwitches' two keep the Stalkers' ids (saves); their paintings were of darts, so they draw as their own until painted
+for (const [id, m] of [['wl_gibbet', 'wl_heroncrook'], ['wl_severquill', 'wl_drownedhives']]) if (WPN_LEG[id]) WPN_LEG[id].mdl = m;
 /* ---------- each unit's ISSUED weapon, and each force's own make of the shared classes ----------
    The owner (9 Nov 2026): "make the baseline swords etc match the equipped sword. shouldn't be called a worn arming sword,
    its a spellblade, so should allude to that and starting weapons shouldn't be called worn". A unit with an empty slot
@@ -46847,7 +47039,7 @@ const WPN_ISSUED = {
   thornguard: ['Thornguard Spear', '#6a7a3a', 'her dark heartwood spear, a long thorn for its head'], gladebow: ['Gladebow Longbow', '#7a6a3a', 'a tall pale longbow wound with green cord'],
   briarwarden: ['Briarwarden\'s Crystal Staff', '#4a9a7a', 'a living staff crowned with a sea-green crystal'], staglancer: ['Stag Lancer\'s Ashwood Lance', '#9a8a5a', 'a white ash lance with an antler guard'],
   wayfarer: ['Shifter\'s Antler Bow', '#6a8a5a', 'a bow of curved antler and living wood'], bladedancer: ['Blade Dancer\'s Leaf Pair', '#8aa04a', 'two leaf-shaped daggers of green-tinted steel'],
-  seedcaster: ['Seedcaster\'s Pod Sling', '#7a9a4a', 'a woven sling with a pouch of seed pods'], thornwarden: ['Stalker\'s Thorn Darts', '#5a3a2a', 'a bundle of black thorn darts'],
+  seedcaster: ['Seedcaster\'s Pod Sling', '#7a9a4a', 'a woven sling with a pouch of seed pods'], bogwitch: ['Bogwitch\'s Alder Crook', '#3a2a1c', 'a crooked alder staff hung with fish bones'],
   ch_elowen: ['Elowen\'s Living Staff', '#4a9a4a', 'a tall living staff in leaf'], ch_faelan: ['Faelan\'s Thorned Greatbow', '#4a4024', 'a great bow of black heartwood, thorns along its back'],
   ch_nyssa: ['Nyssa\'s Seedpod Staff', '#7aa840', 'a short gnarled staff crowned with a seed pod'],
   // the Silver Order
@@ -47333,7 +47525,7 @@ const BR_DATA = {
   wayfarer: ['Keen Hawk|reach .5', 'Primal Fury|haste .2', "Stalker's Mark|mark .1 3"],
   bladedancer: ['Wide Arc|reach .35; splash .3', 'Encore Tempo|spcd .22; spslow .2 1.2', 'Corner Dancer|cover .05'],
   seedcaster: ['Wide Sowing|splash .35', 'Choking Spores|slow .3 1.5; sppow .1', 'Snapjaw Field|stun .1 .5; nth 5 1.6'],
-  thornwarden: ['Severing Edge|exec .6 .3', 'Snare Line|slow .25 1.2; spcd .12', "Gibbet's Mark|mark .1 3"],
+  bogwitch: ['Long Spit|reach .4', 'Hungry Fen|specho .25', 'Black Water|spshred 2 8'],
   // ---- the Conclave ----
   cc_spellblade: ['Riftreach|reach .3; chain .35 1.4', 'Rift Surge|spcd .22; spslow .2 1.2', 'Spectral Edge|pierce .5 2'],
   cc_mageling: ['Farsight|reach .6', 'Splitting Missile|chain .4 1.6', 'Missile Curtain Line|pierce .45 2'],
@@ -48347,7 +48539,6 @@ const TAL_SPREAD = {
   "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Pounce":[1,2],"Hawk's Mark":[2,3],"Grounded Prey":[4,0],"Moonsap Bolts":[2,0],"Skyfall":[5,2],"Shapestorm":[3,0],"Second Skin":[1,1],"Harrier's Cry":[4,2],"Hawk Lord":[5,1],"Wild Heart":[5,3],"Wild Pace":[0,0],"Druid's Patience":[0,1],"Talon Rend":[3,2]},
   "grove.earth": {"Leaf-Edged Blades":[0,1],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,2],"Blade Rhythm":[1,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,1],"Encore":[4,2],"Twin Whirl":[3,0],"Gale of Blades":[4,1],"Reaper's Step":[5,3],"Quickstep":[2,2],"Dancer's Breath":[0,3],"Petal Cuts":[3,2]},
   "grove.cannon": {"Potent Spores":[1,1],"Ripe Pods":[1,0],"Choking Spores":[0,2],"Seed Scatter":[3,0],"Hard Husk":[4,2],"Clinging Spores":[4,3],"Puffcap Sowing":[2,0],"Snapjaw Bloom":[3,3],"Spore Cloud":[5,0],"Bursting Rot":[5,1],"Puffcap Trail":[5,2],"Rootmark Seed":[4,1],"Drifting Spores":[1,3],"Far Cast":[2,2],"Seedwell":[2,3],"Thorned Husks":[0,1],"Burrowing Pods":[3,1]},
-  "grove.venom": {"Hunter's Patience":[0,1],"Barbed Darts":[0,2],"Quick Quiver":[0,3],"Lone Prey":[1,0],"Long Severance":[2,1],"Sap Thief":[2,0],"Bramble Snare":[1,3],"Briar Gibbet":[3,1],"Silent Stalk":[1,2],"Deep Snare":[2,3],"Thornmark Trail":[4,2],"Choking Thorns":[4,1],"Snare Line":[3,0],"Apex Stalker":[5,2],"Gallows Briar":[5,1],"Torn Ties":[5,0]},
   "champ:rootmother": {"Patient Earth":[0,1],"Long Vines":[0,2],"Deep Grip":[0,0],"Twin Elders":[5,1],"Rootway":[1,1],"Bramble Grasp":[2,1],"Thorned Roots":[1,2],"Sap Song":[3,0],"Heartwood Sapling":[3,2],"Strangling Hold":[4,3],"Sapling Warden":[4,0],"Rootmother":[5,3],"The Old Wood Walks":[2,2],"Thousand Roots":[5,2],"Quick Tendrils":[1,3],"Deep Sap":[3,3],"Sapling Song":[4,1]},
   "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,2],"Snaring Rain":[0,3],"Root Platform":[2,0],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[1,0],"Hunter’s Patience":[4,2],"Blood Moon":[5,3],"Snarled Ground":[3,1],"Running Shafts":[3,3],"Warden’s Mark":[3,0],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,2],"Captain's Share":[4,0],"Moonlit Aim":[5,2]},
   "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[2,0],"Passing Spores":[1,3],"Compost":[3,1],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[4,1],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[0,1],"Seedmother":[5,2],"Full Bloom":[4,3],"Rotfeast":[4,0],"Busy Hive":[0,2],"Honey Store":[1,0]},
@@ -48790,8 +48981,6 @@ function talRankSteps(t) {
      Clinging Spores      Snapjaw Bloom bites spored foes 30% harder a rank (was 20% + its roots 0.2s longer)
      Drifting Spores      spores drift on to 3 foes (was 2 + Burstpod's spores 0.6 cells farther)
      Thorned Husks        a pod at a held walker gives it 1 more spore a rank (its 5% ward pen a rank cut)
-     Choking Thorns       Briar Gibbet Thornmarks the support foes within 2 cells of the cage (was 1.5, + a longer hold and
-                          a wound); a rider now (SP_RIDE.gfChoke, forces_zzzzzzzzzz_fresh_grove.js)
    The code those lines name: forces.js (rootBurst, rootStrike's Overgrowth, the drift), forces_zz_growth.js (the riders),
    forces_grove_druid.js (Bramble Claws), forces_zzzzzzzzz_caps_grove.js (Wild Heart),
    forces_zzzzzzzzzz_fresh_grove.js (Hawk's Reach, Bramble Claws, Mark the Quarry, Heavy Lance, Wounded Prey, Choking
@@ -48965,27 +49154,6 @@ function talRankSteps(t) {
     // one effect: more spores on held walkers (its ward pen cut)
     'Thorned Husks': { tag: 'Damage', pro: n => `Its thorned pods and spells ignore ${8 * n}% of wards.`, mod: n => ({ magicPen: .08 * n }), cap: null },
     'Burrowing Pods': { tag: 'Control', pro: n => `Puffcap Sowing's bursts root ground foes for ${n2(.3 * n)}s.` },
-  });
-
-  /* ---- Thornwarden Stalkers ---- */
-  talPlain('grove', 'venom', {
-    'Hunter\'s Patience': { tag: 'Damage', pro: n => `Reaches ${n2(.25 * n)} cells farther while no support foe is in reach.` },
-    'Barbed Darts': { tag: 'Control', pro: n => `Its darts' Thornmark lasts ${n2(.5 * n)}s longer.` },
-    'Quick Quiver': { tag: 'Damage', pro: n => `Its darts come ${6 * n}% faster at a Thornmarked foe.` },
-    'Lone Prey': { tag: 'Damage', pro: n => `A lone support foe takes ${n2(GVS.ALONE + .25 * n)}× its dart, not ${GVS.ALONE}×.` },
-    'Long Severance': { tag: 'Spell', pro: n => `Severing Thorn's mark and cut ties last ${n}s longer.` },
-    'Sap Thief': { tag: 'Mana', pro: n => `Each support foe it newly Thornmarks gives it ${6 * n} mana.` },
-    'Bramble Snare': { tag: 'Control' },
-    'Briar Gibbet': { tag: 'Control' },
-    'Silent Stalk': { tag: 'Control', pro: 'Casters its darts Thornmark regain no mana for 2s.' },
-    'Deep Snare': { tag: 'Control', pro: 'Bramble Snare drags one more support foe.' },
-    'Thornmark Trail': { tag: 'Control', pro: 'Thornmarked foes pass their mark on death to 4 support foes within 2 cells.' },
-    // one effect: the cage Thornmarks the support foes round it, now a rider (its longer hold and wound cut, 1.5 -> 2 cells)
-    'Choking Thorns': { tag: 'Spell', pro: 'Briar Gibbet Thornmarks every support foe within 2 cells of the cage while it hangs.', cap: null, sp: { ab: 'gv_wither', rider: { gfChoke: 2 } } },
-    'Snare Line': { tag: 'Control', pro: n => `Foes Bramble Snare drags stay Wounded for ${4 * n}s.` },
-    'Apex Stalker': { tag: 'Control', pro: 'A dart at a lone support foe roots it 0.8s, and a second dart follows at once.' },
-    'Gallows Briar': { tag: 'Spell', pro: 'Briar Gibbet leaps to cage a second foe nearby when it opens, support foes first. Its kills refund 15 mana.' },
-    'Torn Ties': { tag: 'Damage', pro: 'Darts at a support foe also hit each foe it is helping for half, Thornmarking them.' },
   });
 
   /* ---- Elowen, Heart of the Wood ---- */
@@ -60701,6 +60869,36 @@ void skinned(inout vec3 p, inout vec3 n){
   p = bxf(b0, p, 1.)*w + bxf(b1, p, 1.)*(1. - w);
   n = normalize(bxf(b0, n, 0.)*w + bxf(b1, n, 0.)*(1. - w));
 }`;
+/* Cloth in the wind on a sculpted unit (unitmodels_cloth.js; weights from tools/make_cloth.py): aExt.y carries a cloth
+   weight a vertex (its fraction: 0 the body and anything rigid, rising to the free hem) and the side the cloth may swing
+   to (its whole part: a horizontal direction away from the body in the rest pose, 0 for no limit). After skinning, in
+   world space, so it follows the pose: a slow sway along the wind with a little twist across it and lift, a small
+   faster ripple running down to the hem, the unit's own motion trailing behind (uClA.xyz, a damped spring kept per unit),
+   all growing toward the hem; what would push the cloth into the body is turned back out, so a cape pressed to a back
+   by the wind lies still and lifts a little instead of passing through. uClA.w 0 (Graphics Low, icons): nothing moves. */
+const CLOTH_GLSL = `
+uniform vec4 uWind, uClA, uClB;   // uWind: xy the wind's direction (world x, z), z its clock; uClA: xyz the unit's own lag, w the amount (0: off); uClB: x the unit's phase, y its gust 0..1, z the ripple's share, w the model's height in the world
+vec3 clothSway(vec3 w, mat4 M){
+  float v = aExt.y*256., cw = fract(v)/.98;
+  if(uClA.w <= 0. || cw <= .004) return w;
+  float q = floor(v + .001), t = uWind.z, ph = uClB.x, g = uClB.y, s = uClB.w;
+  vec3 wd = vec3(uWind.x, 0., uWind.y), sd = vec3(-wd.z, 0., wd.x);
+  float sway = .6*sin(t*2.1 + ph - cw*2.4) + .4*sin(t*1.33 + ph*1.7 - cw*1.5);
+  float twist = sin(t*1.57 + ph*1.3 + 1.7 - cw*1.9);
+  float rip = sin(t*6.8 + ph*2.3 - cw*7. + dot(w.xz, sd.xz)*9./s)*uClB.z;
+  float k = .35 + .65*g;
+  vec3 d = wd*(.45*g + sway*k*.6 + rip*k*.14) + sd*(twist*k*.32 + rip*k*.08);
+  d *= uClA.w*s*cw;
+  d += uClA.xyz*cw;
+  if(q > .5){   // kept on its own side of the body
+    float a = (q - 1.)/254.*6.2831853; vec3 o = vec3(sin(a), 0., cos(a));
+    if(uSkinOn > .5){ int b0 = int(aBone.x + .5), b1 = int(aBone.y + .5); o = bxf(b0, o, 0.)*aBW + bxf(b1, o, 0.)*(1. - aBW); }
+    o = mat3(M)*o; o.y = 0.; o = normalize(o + vec3(1e-5, 0., 0.));
+    float inw = dot(d, o); if(inw < 0.) d -= o*inw*1.2;
+  }
+  d.y += length(d.xz)*.28;   // swung out, the hem rises a little
+  return w + d;
+}`;
 const VS_SSH = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=4) in vec4 iM0; layout(location=5) in vec4 iM1; layout(location=6) in vec4 iM2; layout(location=7) in vec4 iM3; uniform mat4 uLVP;
 ${SKIN_GLSL}
@@ -60718,10 +60916,12 @@ uniform mat4 uVP, uLVP; uniform float uTime;
 out vec3 vNor, vCol, vW, vOP; out vec2 vUV; out vec4 vL; out float vEm; flat out vec4 vTint; flat out vec4 vX;
 ${BEND_GLSL}
 ${SKIN_GLSL}
+${CLOTH_GLSL}
 void main(){
   mat4 uModel = mat4(iM0, iM1, iM2, iM3); vTint = iTint; vX = iX;
   vec3 sp = aPos, sn = aNor; skinned(sp, sn);
   vec4 w = uModel*vec4(sp,1.); vOP = aPos; vUV = aUV;
+  w.xyz = clothSway(w.xyz, uModel);
   vW = w.xyz; vNor = mat3(uModel)*sn; vCol = aCol; vEm = aExt.x; vL = uLVP*w; gl_Position = uVP*vec4(bendW(w.xyz), 1.);
 }`;
 const FS_STY = `#version 300 es
@@ -61479,6 +61679,7 @@ function createRenderer(canvas, opt = {}) {
         gl.bindBuffer(gl.ARRAY_BUFFER, h.bufs[0]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, mesh.pos);
         gl.bindBuffer(gl.ARRAY_BUFFER, h.bufs[1]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, mesh.nor); h.ver = mesh.ver;
       }
+      if (mesh.extVer !== undefined && h.extVer !== mesh.extVer) { gl.bindBuffer(gl.ARRAY_BUFFER, h.bufs[3]); gl.bufferSubData(gl.ARRAY_BUFFER, 0, mesh.ext); h.extVer = mesh.extVer; }   // (a sculpted unit's cloth weights, painted once its model is known: unitmodels_cloth.js)
       return h;
     }
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -61493,7 +61694,7 @@ function createRenderer(canvas, opt = {}) {
     for (let l = 4; l <= 9; l++) { gl.enableVertexAttribArray(l); gl.vertexAttribDivisor(l, 1); }
     instPtr(0);
     gl.bindVertexArray(null);
-    h = { vao, count: mesh.count, bufs, ver: mesh.ver, ptr: 0 }; mesh.gl.set(gl, h); return h;
+    h = { vao, count: mesh.count, bufs, ver: mesh.ver, extVer: mesh.extVer, ptr: 0 }; mesh.gl.set(gl, h); return h;
   }
 
   function b64buf(str) { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
@@ -61803,6 +62004,8 @@ function createRenderer(canvas, opt = {}) {
       let P; try { P = styProg(); } catch (e) { if (!this._styErr) { this._styErr = 1; console.warn('Sculpted models: shader failed:', e.message); } return; }
       gl.useProgram(P.p); this.litUniforms(P.u); gl.uniform3fv(P.u.uCamR, this.right); gl.uniform1f(P.u.uSty, this.sty == null ? 1 : this.sty);
       gl.uniform1i(P.u.uTex, 7); gl.uniform1f(P.u.uSkinOn, 0);
+      const CLF = typeof clothFrame === 'function' && P.u.uClA ? clothFrame(this, gl, P.u) : 0;   // (the wind on the units' cloth: 0 when off)
+      if (!CLF && P.u.uClA) gl.uniform4f(P.u.uClA, 0, 0, 0, 0);
       const fb = this._fbl === list;   // (the opaque ones from the frame's batch, when render packed it; the see-through by their own, in order)
       for (const op of [1, 0]) {
         let groups;
@@ -61814,6 +62017,7 @@ function createRenderer(canvas, opt = {}) {
         if (!groups.length) continue;
         if (!op) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); }
         for (const [mesh, start, n, its] of groups) {
+          const clm = CLF && mesh.bone ? clothMesh(mesh) : null;   // (painted before its upload)
           const h = upload(mesh);
           if (!h.tex) {   // its texture, once the image has decoded
             const img = mesh.tex; if (!img.complete || !img.naturalWidth) continue;
@@ -61828,7 +62032,8 @@ function createRenderer(canvas, opt = {}) {
           if (mesh.bone) {   // a rigged model: each its own pose, one draw each
             gl.uniform1f(P.u.uSkinOn, 1);
             const L = its;
-            for (let q = 0; q < n; q++) { const it = L ? L[q] : null; if (!it || !it.bones) continue; gl.uniform4fv(P.u.uBones, it.bones); ptr(h, (start + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); this.stats.draws++; }
+            for (let q = 0; q < n; q++) { const it = L ? L[q] : null; if (!it || !it.bones) continue; gl.uniform4fv(P.u.uBones, it.bones); if (clm) clothItem(this, gl, P.u, clm, it); ptr(h, (start + q) * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, 1); this.stats.draws++; }
+            if (clm) gl.uniform4f(P.u.uClA, 0, 0, 0, 0);
             gl.uniform1f(P.u.uSkinOn, 0);
           } else { ptr(h, start * IB); gl.drawArraysInstanced(gl.TRIANGLES, 0, h.count, n); this.stats.draws++; }
         }
@@ -80918,27 +81123,34 @@ const twNoop = () => {};
 const twPick = a => a[Math.floor(Math.random() * a.length)];
 
 // run fn with G pointed at one keep. The enemy's hooks are silenced so nothing of its game reaches your screen.
+/* Online (twnet.js): inside the lockstep (twnSim) a keep's own seeded generator stands in for Math.random, and the other
+   player's keep (S.quiet) is silenced as the warlord's is. */
 function withSide(S, fn) {
-  if (!S || G === S) return fn();
-  const g0 = G, h = [onToast, onBanner, onEnd, onDirty, onSave, onLoot, onJournal];
+  const rng = S && S.rngF && typeof twnSim !== 'undefined' && twnSim;
+  if (!S || (G === S && !rng)) return fn();
+  const g0 = G, h = [onToast, onBanner, onEnd, onDirty, onSave, onLoot, onJournal], r0 = Math.random;
   G = S;
-  if (S.ai) { onToast = twNoop; onBanner = twNoop; onEnd = twNoop; onDirty = twNoop; onSave = twNoop; onLoot = twNoop; onJournal = twNoop; }
+  if (S.ai || S.quiet) { onToast = twNoop; onBanner = twNoop; onEnd = twNoop; onDirty = twNoop; onSave = twNoop; onLoot = twNoop; onJournal = twNoop; }
+  if (rng) Math.random = S.rngF;
   try { return fn(); }
-  finally { G = g0; [onToast, onBanner, onEnd, onDirty, onSave, onLoot, onJournal] = h; }
+  finally { G = g0; [onToast, onBanner, onEnd, onDirty, onSave, onLoot, onJournal] = h; Math.random = r0; }
 }
+// a tower's target order (the card's Target button): a function, so an online match can send it
+function setPrio(t, v) { if (t && G.towers.includes(t)) t.prio = v | 0; }
 
 /* ---------- the match ---------- */
 function twStart(lvl = 'knight', map = 'meadow', opts = {}) {
   twStop();
   setMap(map);
-  newGame('normal');
+  newGame('normal', null, opts.hero || null);   // (a banner's commander: its force's army takes the towers' place, versus_modes.js)
   const P = G;
   Object.assign(P, { vs: true, endless: true, income: 0, sendQ: [], sentN: 0, sentGold: 0 });
   const E = { state: 'title', speed: 1 };
-  withSide(E, () => newGame('normal'));
+  withSide(E, () => newGame('normal', null, opts.eHero || null));
   Object.assign(E, { vs: true, ai: true, mute: true, endless: true, income: 0, sendQ: [], sentN: 0, sentGold: 0, map: P.map, uid: 1000000, time: 50000.5 });
   const L = TW_LEVELS[lvl] || TW_LEVELS.knight;
-  TW = { P, E, L, clock: TW_FIRST, wave: 0, view: 'P', menu: false, over: false, eLives: E.lives, mapT: 0, feed: [] };
+  TW = { P, E, L, clock: TW_FIRST, wave: 0, view: 'P', menu: false, over: false, eLives: E.lives, mapT: 0, feed: [], time: 0, log: [], seed: (opts.seed >>> 0) || ((Date.now() ^ 0x5bd1e995) >>> 0) };
+  P.banner = opts.banner || 'free'; E.banner = opts.eBanner || (typeof twmPickBanner === 'function' ? twmPickBanner(P.banner) : 'free');   // whose foes each keep sends (versus_modes.js)
   TW.ai = twMakeAI(E, L);
   if (opts.selfPlay) TW.aiP = twMakeAI(P, TW_LEVELS[opts.selfPlay] || L);
   if (opts.noSend) for (const A of [TW.ai, TW.aiP]) if (A) A.L = Object.assign({}, A.L, { send: 0 });   // tests: defence only
@@ -80948,6 +81160,7 @@ function twStart(lvl = 'knight', map = 'meadow', opts = {}) {
 }
 function twStop() {
   if (!TW) return;
+  if (TW.net && typeof twnLeave === 'function') twnLeave();
   if (G !== TW.P && TW.P) G = TW.P;
   TW = null;
   if (typeof twUI === 'function') twUI(false);
@@ -80972,11 +81185,11 @@ function twStep(dt) {
 function twLaunch() {
   TW.wave++;
   const n = TW.wave;
-  for (const S of [TW.P, TW.E]) withSide(S, () => {
+  for (const S of TW.order || [TW.P, TW.E]) withSide(S, () => {
     if (S.state !== 'play') return;
     S.vsGo = true;
     try { if (S.phase === 'build') callWave(); else sendNextWave(); } finally { S.vsGo = false; }
-    const A = S === TW.E ? TW.ai : S === TW.P ? TW.aiP : null;
+    const A = TW.net ? null : S === TW.E ? TW.ai : S === TW.P ? TW.aiP : null;
     let inc = S.income || 0;
     if (A) { inc += Math.round((A.L.gold - 1) * (30 + 7 * n));   // its handicap or its edge, roughly a share of what a wave earns
       A.bank = Math.min(A.bank + A.L.send * Math.max(0, inc + 22 + 4.5 * n), 40 + 30 * n); }   // a capped war chest: what it can't send in time goes to defence
@@ -80999,11 +81212,11 @@ function twFinish(won) {
 const twWaveNow = () => Math.max(1, TW ? TW.wave : 1);
 function twSendCost(d, n = twWaveNow()) { return Math.round(d.cost * (1 + .1 * (n - 1))); }
 function twIncomeGain(d, n = twWaveNow()) { return Math.max(1, Math.round(twSendCost(d, n) * .14)); }
-function twUnlocked(d) { return twWaveNow() >= d.from; }
+function twUnlocked(d, S) { return twWaveNow() >= d.from && (!d.sig || typeof twmSigReady !== 'function' || twmSigReady(S || (TW && TW.P))); }   // (a signature send: once every few waves, versus_modes.js)
 function twSend(from, id) {
-  const d = TW_SEND_BY[id]; if (!d || !TW || TW.over || from.state !== 'play') return false;
+  const d = typeof twSendDef === 'function' ? twSendDef(from, id) : TW_SEND_BY[id]; if (!d || !TW || TW.over || from.state !== 'play') return false;
   const human = from === TW.P && !TW.aiP, to = from === TW.P ? TW.E : TW.P, n = twWaveNow();
-  if (!twUnlocked(d)) { if (human) { toast(`${d.name} can be sent from wave ${d.from}.`); sfx('error'); } return false; }
+  if (!twUnlocked(d, from)) { if (human) { toast(d.sig && twWaveNow() >= d.from ? `${d.name} can be sent again from wave ${twmSigNext(from)}.` : `${d.name} can be sent from wave ${d.from}.`); sfx('error'); } return false; }
   const cost = twSendCost(d, n), gain = twIncomeGain(d, n);
   if (from.gold < cost) { if (human) { toast('Not enough gold.'); sfx('nogold'); } return false; }
   from.gold -= cost; from.income = (from.income || 0) + gain; from.sentN += d.n; from.sentGold += cost;
@@ -81011,7 +81224,10 @@ function twSend(from, id) {
   const bounty = Math.max(1, Math.round(bountyFor(n, def) * .5)), atk = def.atk || null;
   let t = 1.4 + (to.sendQ.length ? to.sendQ[to.sendQ.length - 1].t : 0);
   for (let k = 0; k < d.n; k++) { to.sendQ.push({ t, type: d.type, hp, bounty, spdM: 1, atk, atkM: atk ? siegeMult(n) : 0 }); t += GAP[d.type] || .55; }
-  const what = `${d.n > 1 ? d.n + ' ' : ''}${d.n > 1 ? d.name : CREEPS[d.type].name}`;
+  if (d.with) for (const w of d.with) { const wd = CREEPS[w.type], wh = waveHP(n, 'normal') * wd.hp * (wd.boss ? bossFactor(n) : minionHP(n, wd.fly)), wa = wd.atk || null;   // a signature send's escort
+    for (let k = 0; k < w.n; k++) { to.sendQ.push({ t, type: w.type, hp: wh, bounty: Math.max(1, Math.round(bountyFor(n, wd) * .5)), spdM: 1, atk: wa, atkM: wa ? siegeMult(n) : 0 }); t += GAP[w.type] || .55; } }
+  if (d.sig) from.sigAt = n;
+  const what = d.sig ? d.name : `${d.n > 1 ? d.n + ' ' : ''}${d.n > 1 ? d.name : CREEPS[d.type].name}`;
   if (from === TW.P) {
     twFeed(`Sent ${what} · +${gain} income`, 'out');
     if (human) { sfx('warcry', 0); if (typeof markDirty === 'function') markDirty(); }
@@ -81020,8 +81236,7 @@ function twSend(from, id) {
     if (typeof AudioSys !== 'undefined' && !TW.P.mute) AudioSys.play('howl', 0);
     (TW.seenIn = TW.seenIn || {})[d.id] = ((TW.seenIn || {})[d.id] || 0) + d.n;
   }
-  if (to === TW.E) { const A = TW.ai; A.seen[d.id] = (A.seen[d.id] || 0) + d.n; }
-  else if (TW.aiP) { const A = TW.aiP; A.seen[d.id] = (A.seen[d.id] || 0) + d.n; }
+  { const A = to === TW.E ? TW.ai : TW.aiP; if (A) { A.seen[d.type] = (A.seen[d.type] || 0) + d.n; if (d.with) for (const w of d.with) A.seen[w.type] = (A.seen[w.type] || 0) + w.n; } }   // (by creep kind, whatever banner sent it)
   return true;
 }
 function twFeed(s, kind) {
@@ -81123,24 +81338,24 @@ function twCover(x, y, r, air, A) {
 }
 // how much of its damage should reach the sky: more when flyers are in the next waves, or the foe keeps sending them
 function twAirWant(A) {
-  const fl = (A.seen.bat || 0) + (A.seen.drake || 0) * 4, all = Object.values(A.seen).reduce((a, b) => a + b, 0);
+  let fl = 0, all = 0; for (const k in A.seen) { const d = CREEPS[k], v = A.seen[k] * (d && d.boss ? 4 : 1); all += v; if (d && d.fly) fl += v; }
   let soon = 0; for (let k = 0; k < 3; k++) if (describeWave(G.wave + k).fly) soon = .3;
   return clamp(.25 + soon + (all ? fl / all * .5 : 0), .25, .8);
 }
 function twAiTypeWeights(A) {
-  const types = A.build.types.filter(t => !chalBlocks(t)), w = {};
+  const types = G.force ? COMBAT_TYPES.filter(t => !TOWERS[t].champ && !chalBlocks(t)) : A.build.types.filter(t => !chalBlocks(t)), w = {};   // an army weighs every unit it has (versus_modes.js)
   const n = {}; let tot = 0; for (const t of G.towers) if (!t.def.wall) { n[t.type] = (n[t.type] || 0) + 1; tot++; }
   const supportOk = ty => !TW_SUPPORT[ty] || (tot >= 4 && (n[ty] || 0) < 1 + tot * .12);   // a few slows or curses help; a field of them doesn't
   if (Math.random() > A.L.smart) { for (const t of types) if (supportOk(t)) w[t] = R(.5, 1.5); return w; }   // a guess
   let air = 0, all = 0;
   for (const t of G.towers) if (!t.def.wall && !t.wrecked) { const d = towerDps(t.type, t.st || effStats(t)); all += d; if (t.def.air) air += d; }
   const needAir = all > 0 && air / all < twAirWant(A) + .1;
-  let armored = (A.seen.beetle || 0) + (A.seen.ogre || 0) * 3, warded = A.seen.wraith || 0;
+  let armored = 0, warded = 0; for (const k in A.seen) { const d = CREEPS[k]; if (!d) continue; const v = A.seen[k] * (d.boss ? 3 : 1); if (d.armor >= 6) armored += v; if (d.mres >= .3) warded += v; }
   for (let k = 0; k < 3; k++) for (const ty of describeWave(G.wave + k).types) { const d = CREEPS[ty]; if (d.armor >= 6) armored += 4; if (d.mres >= .3) warded += 4; }   // what the next waves bring
   types.forEach((ty, k) => {
     if (!supportOk(ty)) return;
     const T = TOWERS[ty];
-    let v = (A.build.w && A.build.w[k]) || 1;
+    let v = (A.build.w && A.build.w[A.build.types.indexOf(ty)]) || 1;
     if (TW_SUPPORT[ty]) v *= 2.2;   // their worth isn't in their own damage
     if (G.wave <= 3) v = Math.min(v, 1);   // the opening is about cheap damage
     if (needAir && T.air) v *= 1.6;
@@ -81150,11 +81365,11 @@ function twAiTypeWeights(A) {
     w[ty] = v;
   });
   // the coming dungeons: make sure their answer stands somewhere on the field
-  if (tot >= 3) for (let k = 0; k < 2; k++) { const D = dungeonOf(G.wave + k); if (D) for (const ty of D.counter) if (!chalBlocks(ty)) { const have = n[ty] || 0, want = 1 + Math.floor(tot / 8); if (have < want) w[ty] = Math.max(w[ty] || 0, (have === 0 ? 2.6 : 1.6) * (TW_SUPPORT[ty] ? 2.2 : 1)); } }   // once a defence stands: enough of the dungeon's answer to matter
+  if (tot >= 3) for (let k = 0; k < 2; k++) { const D = dungeonOf(G.wave + k); if (D) for (const ty of D.counter) if (!chalBlocks(ty) && COMBAT_TYPES.includes(ty) && !TOWERS[ty].champ) { const have = n[ty] || 0, want = 1 + Math.floor(tot / 8); if (have < want) w[ty] = Math.max(w[ty] || 0, (have === 0 ? 2.6 : 1.6) * (TW_SUPPORT[ty] ? 2.2 : 1)); } }   // once a defence stands: enough of the dungeon's answer to matter
   return w;
 }
 function twAiBestBuy(A, budget, urgent) {
-  const cand = [], airW = twAirWant(A), late = urgent ? 1 : 0;
+  let cand = []; const airW = twAirWant(A), late = urgent ? 1 : 0;
   const near = j => late ? .6 + .8 * (j / ROWS) : 1;   // under pressure, cover the road near the gate
   // new towers: on the maze's own cells (empty, or a wall to convert)
   const W = twAiTypeWeights(A), info = {}, boss = describeWave(G.wave).boss || describeWave(G.wave + 1).boss;   // a boss is coming: concentrate the damage
@@ -81166,20 +81381,24 @@ function twAiBestBuy(A, budget, urgent) {
     const i = k % COLS, j = (k / COLS) | 0;
     for (const ty in info) {
       const f = info[ty], cost = tw ? convertCost(ty) : TOWERS[ty].tiers[0].cost;
-      if (cost > budget) continue;
+      if (cost > budget && !A.save) continue;
       const cov = twCover(i + .5, j + .5, f.r, f.air, A) * near(j);
-      cand.push({ v: f.d * cov / cost, ok: () => !!tw || canBuild(i, j).ok, go: () => tw ? convert(tw, ty) : tryBuild(ty, i, j) });
+      cand.push({ v: f.d * cov / cost, cost, ok: () => !!tw || canBuild(i, j).ok, go: () => tw ? convert(tw, ty) : tryBuild(ty, i, j) });
     }
   }
   // upgrades
   for (const t of G.towers) {
     if (t.def.wall || t.wrecked || ageLocked(t)) continue;
-    const c = upgradeCost(t); if (!c || c > budget) continue;
+    const c = upgradeCost(t); if (!c || (c > budget && !A.save)) continue;
     const g = upgradeGain(t); if (!g) continue;
     const cov = twCover(t.x, t.y, g.b.range || 2.5, mid(t.def), A) * near(t.y);
-    cand.push({ v: (g.d1 - g.d0) * (W[t.type] || .8) * cov / c * (boss ? 1.35 : 1.05), ok: () => true, go: () => upgrade(t) });
+    cand.push({ v: (g.d1 - g.d0) * (W[t.type] || .8) * cov / c * (boss ? 1.35 : 1.05), cost: c, ok: () => true, go: () => upgrade(t) });
   }
   cand.sort((a, b) => b.v - a.v);
+  if (A.save && cand.length) {   // an army saves for its best buy (within about a wave's earnings) rather than grab the cheapest (versus_modes.js sets A.save)
+    if (!urgent && cand[0].v > 0 && cand[0].cost > budget && cand[0].cost <= budget + 30 + 5 * G.wave) return null;
+    cand = cand.filter(c => c.cost <= budget);
+  }
   for (const c of cand.slice(0, 6)) if (c.v > 0 && c.ok()) return c.go;   // only the few best are checked against the maze (each check is a path search)
   return null;
 }
@@ -81220,15 +81439,15 @@ function twAiRelics(A) {
 }
 // what to throw at you: whatever your towers handle worst, saved up for and sent in bursts
 function twAiSend(A) {
-  const opts = TW_SENDS.filter(twUnlocked); if (!opts.length) return;
-  if (!A.next || !twUnlocked(A.next)) A.next = twAiPickSend(A, opts);
+  const opts = twSendsOf(G).filter(d => twUnlocked(d, G)); if (!opts.length) return;
+  if (!A.next || !twUnlocked(A.next, G)) A.next = twAiPickSend(A, opts);
   const d = A.next, n = A.burst || 1, cost = twSendCost(d) * n;
   if (A.bank < cost || G.gold < cost) return;
-  for (let k = 0; k < n; k++) if (twSend(G, d.id)) A.bank -= twSendCost(d);
+  for (let k = 0; k < (d.sig ? 1 : n); k++) if (twAct(twSide(G), 'send', { id: d.id })) A.bank -= twSendCost(d);
   A.next = null; A.burst = 1 + Math.floor(R(A.L.smart > .6 ? 3 : 2));
 }
 function twAiPickSend(A, opts) {
-  if (Math.random() > A.L.smart) return twPick(opts.filter(d => !CREEPS[d.type].boss));
+  if (Math.random() > A.L.smart) return twPick(opts.filter(d => !CREEPS[d.type].boss && !d.sig));
   const foe = A.S === TW.E ? TW.P : TW.E;
   let air = 0, all = 0, phys = 0, slow = 0;
   withSide(foe, () => { for (const t of G.towers) if (!t.def.wall && !t.wrecked) { const d = towerDps(t.type, t.st || effStats(t)); all += d; if (t.def.air) air += d; if (t.def.dmgType === 'phys') phys += d; if (t.type === 'frost' || t.type === 'earth') slow++; } });
@@ -81243,6 +81462,7 @@ function twAiPickSend(A, opts) {
     if (def.spd > 1.5 && slow < 2) w *= 1.6;
     if (def.atk) w *= 1.3;
     if (def.boss) w *= A.bank > twSendCost(d) * 1.5 ? 1.2 : .2;
+    if (d.sig) w = 0;   // its signature send has its own rule (versus_modes.js twmAiSig)
     if (w > bw) { bw = w; best = d; }
   }
   return best;
@@ -81331,11 +81551,12 @@ function twDrawMap() {
 // the command card while the send menu is open: ten kinds of minion, Back, and the Send button itself
 function twSlots(s) {
   const P = TW.P, n = twWaveNow();
-  TW_SENDS.forEach((d, k) => {
-    const un = twUnlocked(d), cost = twSendCost(d, n), inc = twIncomeGain(d, n);
-    s[k] = un ? { key: `c:${d.type}`, lbl: d.name, cost, on: P.gold >= cost, name: `Send ${d.n > 1 ? d.n + ' ' : 'a '}${d.n > 1 ? d.name : CREEPS[d.type].name}: +${inc} income`, act: () => twSend(P, d.id) }
-              : { key: `c:${d.type}:off`, lbl: 'Wave ' + d.from, on: false, name: `${d.name} can be sent from wave ${d.from}`, act: () => { toast(`${d.name} can be sent from wave ${d.from}.`); sfx('error'); } };
+  twSendsOf(P).forEach((d, k) => {
+    const un = twUnlocked(d, P), cost = twSendCost(d, n), inc = twIncomeGain(d, n), late = d.sig && n >= d.from;
+    s[k] = un ? { key: `c:${d.type}`, lbl: d.name, cost, on: P.gold >= cost, pulse: !!d.sig, name: d.sig ? `Signature: ${d.name}: ${d.say} +${inc} income. Once every ${TWM.sigEvery} waves.` : `Send ${d.n > 1 ? d.n + ' ' : 'a '}${d.n > 1 ? d.name : CREEPS[d.type].name}: +${inc} income`, act: () => twAct('P', 'send', { id: d.id }) }
+              : { key: `c:${d.type}:off`, lbl: late ? 'Wave ' + twmSigNext(P) : 'Wave ' + d.from, on: false, name: late ? `${d.name} can be sent again from wave ${twmSigNext(P)}` : `${d.sig ? 'Signature: ' : ''}${d.name} can be sent from wave ${d.from}`, act: () => { toast(late ? `${d.name} can be sent again from wave ${twmSigNext(P)}.` : `${d.name} can be sent from wave ${d.from}.`); sfx('error'); } };
   });
+  for (let k = twSendsOf(P).length; k < 10; k++) s[k] = null;   // (a banner's list is shorter than the Free Companies')
   s[10] = { key: 'x', lbl: 'Back', on: true, name: 'Close the send menu', hk: 'Esc', act: () => twMenu(false) };
   return s;
 }
@@ -81345,7 +81566,7 @@ function twSendSlot() {
 // the info pane: the send menu explains itself; otherwise a line on income and the clock
 function twInfoHTML() {
   const P = TW.P, E = TW.E, n = twWaveNow();
-  const rows = TW_SENDS.filter(twUnlocked).slice(-3).reverse().map(d => `<span>${d.name} <b>${twSendCost(d, n)}</b> → +${twIncomeGain(d, n)}</span>`).join('');
+  const rows = twSendsOf(P).filter(d => twUnlocked(d, P) && !d.sig).slice(-3).reverse().map(d => `<span>${d.name} <b>${twSendCost(d, n)}</b> → +${twIncomeGain(d, n)}</span>`).join('');
   return `<h3>Send minions</h3><p>Income <b>+${P.income}</b> a wave · next wave in <b>${Math.ceil(TW.clock)}s</b></p>`
     + `<p class="mut" data-d="1">Each send marches on ${esc(TW.ai.name)}'s keep and raises your income for the rest of the match. Sent minions grow with the waves.</p>`
     + `<div class="st" data-d="2">${rows}</div>`
@@ -81353,15 +81574,16 @@ function twInfoHTML() {
 }
 function twLine() {
   const P = TW.P, E = TW.E;
-  return `<p class="mut int" data-d="1"><b>Tower Wars</b> income +${P.income} a wave · next wave in ${Math.ceil(TW.clock)}s · enemy ♥ ${Math.max(0, E.lives)}</p>`;
+  return `<p class="mut int" data-d="1"><b>Bannerwars</b> income +${P.income} a wave · next wave in ${Math.ceil(TW.clock)}s · enemy ♥ ${Math.max(0, E.lives)}</p>`;
 }
 function twEndScreen(won) {
+  if (TW.net && typeof twnEndScreen === 'function') { twnEndScreen(); return; }
   const P = TW.P, E = TW.E, A = TW.ai, lvl = TW.L, fin = P.lives > 0 && E.lives > 0;
   TW.view = 'P'; if (TW.scoutEl) TW.scoutEl.hidden = true; document.body.classList.remove('tw-scout');
   setTimeout(() => {
     showOverlay(`
       <h2 class="ttl ${won ? 'win' : won === false ? 'lose' : ''}">${won ? 'Victory' : won === false ? 'The keep has fallen' : 'Stalemate'}</h2>
-      <p class="sub">${fin ? `The war ended after wave ${TW_LAST}${won == null ? ' with both keeps equal' : won ? ' with your keep the stronger' : ` with ${esc(A.name)}'s keep the stronger`}` : won ? `${esc(A.name)}'s keep fell on wave ${TW.wave}` : `${esc(A.name)} broke through on wave ${TW.wave}`} · Tower Wars · ${lvl.name}</p>
+      <p class="sub">${fin ? `The war ended after wave ${TW_LAST}${won == null ? ' with both keeps equal' : won ? ' with your keep the stronger' : ` with ${esc(A.name)}'s keep the stronger`}` : won ? `${esc(A.name)}'s keep fell on wave ${TW.wave}` : `${esc(A.name)} broke through on wave ${TW.wave}`} · Bannerwars · ${lvl.name}</p>
       <dl class="stats tw-stats">
         <dt></dt><dd><b>You</b> · <b>${esc(A.name)}</b></dd>
         <dt>Lives left</dt><dd>${Math.max(0, P.lives)} · ${Math.max(0, E.lives)}</dd>
@@ -81369,9 +81591,9 @@ function twEndScreen(won) {
         <dt>Gold spent on sends</dt><dd>${P.sentGold} · ${E.sentGold}</dd>
         <dt>Income</dt><dd>+${P.income} · +${E.income}</dd>
         <dt>Creeps slain</dt><dd>${P.stats.kills} · ${E.stats.kills}</dd>
-        <dt>Towers raised</dt><dd>${P.stats.built} · ${E.stats.built}</dd>
+        <dt>Units raised</dt><dd>${P.stats.built} · ${E.stats.built}</dd>
       </dl>
-      <p class="sub">${esc(A.name)} fought as a ${A.build.name}: ${A.build.types.filter(t => !TW_SUPPORT[t]).map(t => TOWERS[t].short).join(', ')}.</p>
+      <p class="sub">${esc(A.name)} fought as a ${A.build.name}${E.force && typeof FORCES !== 'undefined' && FORCES[E.force] ? ` with ${esc(FORCES[E.force].name)}` : `: ${A.build.types.filter(t => !TW_SUPPORT[t]).map(t => TOWERS[t].short).join(', ')}`}.</p>
       <button class="btn" id="twAgain">Rematch<small>${lvl.name} · ${MAPS[P.map] ? MAPS[P.map].name : ''}</small></button>
       <button class="btn ghost" id="twSetup">Change opponent</button>
       <button class="btn ghost" id="eTitle">Title screen</button>`);
@@ -81385,21 +81607,23 @@ const TW_LVL_KEY = 'runehold.twlvl';
 function twSetupScreen() {
   let lv = TW_LEVELS[lsGet(TW_LVL_KEY)] ? lsGet(TW_LVL_KEY) : 'knight';
   showOverlay(`
-    <h2 class="ttl">Tower Wars</h2>
+    <h2 class="ttl">Bannerwars</h2>
     <p class="sub">Two keeps, one clock. Hold yours, break theirs.</p>
     <div class="opts">
     <div class="seg" role="group" aria-label="Opponent">
       ${Object.values(TW_LEVELS).map(L => `<button type="button" data-lv="${L.id}" aria-pressed="${lv === L.id}">${L.name}<small>${L.blurb}</small></button>`).join('')}
     </div>
+    ${typeof twmBannerSeg === 'function' ? twmBannerSeg() : ''}
     <div class="seg" role="group" aria-label="Map">
       ${Object.keys(MAPS).map(k => `<button type="button" data-map="${k}" aria-pressed="${mapPick === k}">${MAPS[k].name}<small>${MAPS[k].blurb}</small></button>`).join('')}
     </div>
     <button class="btn" id="twGo">To war</button>
-    <details class="how"><summary>How Tower Wars works</summary><ul>
-      <li>An AI warlord holds a keep of its own, with the same towers, talents and relics you have.</li>
+    <details class="how"><summary>How Bannerwars works</summary><ul>
+      <li>An AI warlord holds a keep of its own, with units, talents and relics as yours are (its banner's army, or the keep's own with Free Companies).</li>
       <li>Both keeps face the same waves, launched together every ${TW_EVERY} seconds. The first comes after ${TW_FIRST} seconds to build.</li>
       <li>Tap <b>Send</b> to buy minions that march on the enemy keep. Every send raises your <b>income</b>, paid each time a wave sets out.</li>
-      <li>The warlord sends minions at you too, aimed at whatever your towers handle worst.</li>
+      <li>The warlord sends minions at you too, aimed at whatever your units handle worst.</li>
+      ${typeof twmHowHTML === 'function' ? twmHowHTML() : ''}
       <li>Tap the little map to watch the enemy keep. The first keep to fall loses. If both stand after wave ${TW_LAST}, the one with more lives left wins.</li>
     </ul></details>
     <button class="btn ghost" id="twBack">Back</button>
@@ -81410,13 +81634,603 @@ function twSetupScreen() {
     for (const o of ovp.querySelectorAll('[data-map]')) o.setAttribute('aria-pressed', o === b);
     AudioSys.init(); sfx('click'); markDirty();
   };
+  if (typeof twmBannerWire === 'function') twmBannerWire();
   $('#twGo').onclick = () => { AudioSys.init(); twBegin(lv, mapPick); };
   $('#twBack').onclick = () => { sfx('click'); titleScreen(); };
 }
 function twBegin(lv, map) {
-  twStart(lv, map);
-  afterStart('Tower Wars', `${TW.ai.name}, a ${TW.ai.build.name}, holds the keep across the field. The first wave sets out in ${TW_FIRST} seconds.`);
+  twStart(lv, map, { banner: typeof twmBannerPick === 'function' ? twmBannerPick() : 'free' });
+  afterStart('Bannerwars', `${TW.ai.name}, a ${TW.ai.build.name}, holds the keep across the field${TW.E.banner !== 'free' && typeof twmBannerName === 'function' ? ` and sends ${twmBannerName(TW.E.banner)}'s foes` : ''}. The first wave sets out in ${TW_FIRST} seconds.`);
 }
+
+/* ================= TOWER WARS MODES: contested bosses, an open loot draft, banner sends, camps =================
+   Design and numbers: docs/design/tw_modes_2026-11-11.md.
+   Every new action goes through one door, twAct(side, kind, data): 'P' is your keep, 'E' the rival's. Each event is stamped with
+   the match tick (twTick(), TWM.tps a second) and kept in TW.log (side letters are this browser's: 'P' is always the local keep).
+   Online (twnet.js lockstep, glue in versus_modes_net.js) both browsers run both keeps from one seed, so nothing is sent but the
+   players' own choices: sends (twSend), raids (twmRaidAct) and draft picks (twmPickAct) are routed actions; the boss, the draft's
+   relics, camps and their loot are rolled on both sides inside the keeps' steps (each keep's seeded Math.random inside withSide).
+   twRng() (TW.seed) only drives the offline warlord. TW_NET, when set, only sees the events (a log tap). */
+const TWM = {
+  tps: 30,   // ticks a second of match time
+  cbFirst: 6, cbEvery: 6, cbDelay: 8, warn: 2,   // contested bosses: waves 6, 12 ... 36; it sets out 8s after its horn; on the forecast from 2 waves ahead
+  cbHp: 2.2, cbSpd: 1.35, cbLife: 3, cbLifeEnr: 4,   // its health x a wave boss's; an enraged one's speed; lives it costs at the gate
+  pickT: 15, aiPickT: [2, 3.5],   // seconds to pick in the draft; the warlord's think
+  sigFrom: 16, sigEvery: 4, sigCost: 50,   // a banner's signature send: from wave 16, once every 4 waves, 50 gold at wave 1 (x2.5 by wave 16: 125)
+  campBack: 3, campHitEvery: 3, campHit: .05, campReach: 1.9,
+  armyHp: .5,   // foes on an army keep's road (waves, sends, contested bosses) have this share of their health: Tower Wars' waves were made for the keep's towers, and an army there has no Growth, sets or Champion   // a cleared camp returns after 3 waves; guardians strike a unit in reach every 3s for 5% of its health
+};
+let TW_NET = null;   // the online layer: { out(ev) } receives every event
+const twTick = () => TW ? Math.round((TW.time || 0) * TWM.tps) : 0;
+const twSide = S => TW && S === TW.E ? 'E' : 'P';
+const twS = k => k === 'E' ? TW.E : TW.P;
+const twOther = k => k === 'E' ? 'P' : 'E';
+const twAiOf = k => TW.net ? null : k === 'E' ? TW.ai : TW.aiP;   // (online: both keeps are players; a pick runs out on its timer)
+function twRng() {   // mulberry32 on TW.seed
+  let t = (TW.seed = (TW.seed + 0x6D2B79F5) >>> 0);
+  t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/* ---------- the door ---------- */
+const TWM_ACT = {
+  send: (k, d) => twSend(twS(k), d.id),
+  raid: (k, d) => twmRaid(k, d.camp, d.on, d),
+  pick: (k, d) => twmPick(k, d.i, d.auto),
+  cbWarn: (k, d) => twmCbWarn(d.n),
+  cbSpawn: (k, d) => twmCbQueue(k, d.n, d.hp),
+  cbKill: (k, d) => twmCbDown(k, true),
+  cbLeak: (k, d) => twmCbDown(k, false),
+  cbEnrage: (k, d) => twmCbEnrage(k),
+  draft: (k, d) => twmDraftOpen(k, d.n, d.items),
+  campSpawn: (k, d) => twmCampSpawn(k, d.camp, d.hp),
+  campClear: (k, d) => twmCampClear(k, d.camp),
+};
+// what a player (or the warlord, inside withSide) chooses: on the keep G points at. Online these travel (versus_modes_net.js).
+function twmRaidAct(id, on) { return twAct(twSide(G), 'raid', on == null ? { camp: id } : { camp: id, on: !!on }); }
+function twmPickAct(i) { return twAct(twSide(G), 'pick', { i: i | 0 }); }
+function twAct(k, kind, data = {}, o = {}) {
+  if (!TW || !TWM_ACT[kind]) return false;
+  const ev = { tick: twTick(), side: k, kind, data };
+  const ok = TWM_ACT[kind](k, data, o);
+  if (ok === false) return false;
+  TW.log.push(ev); if (TW.log.length > 5000) TW.log.shift();
+  if (TW_NET && TW_NET.out && !o.remote) { try { TW_NET.out(ev); } catch (e) { console.warn('TW_NET', e); } }
+  return ok === undefined ? true : ok;
+}
+
+/* ---------- banners: whose foes a keep sends ---------- */
+const twmS = (type, n, cost, from, name, o) => Object.assign({ id: type + (o && o.idx ? o.idx : ''), type, n, cost, from, name }, o || {});
+const TWM_BANNERS = {
+  free: { name: 'Free Companies', foes: 'sellswords and strays', sends: TW_SENDS },
+  grove: { name: 'The Grove', foes: 'beasts of the Deepwood', sends: [
+    twmS('wolf', 4, 14, 1, 'Dire Wolves'), twmS('spider', 7, 12, 1, 'Spiderlings'), twmS('bat', 3, 16, 3, 'Cave Bats'), twmS('beetle', 3, 18, 4, 'Shellbacks'),
+    twmS('carrion', 2, 26, 7, 'Carrion Beasts'), twmS('icewolf', 4, 26, 9, 'Frost Wolves'), twmS('alpha', 1, 30, 12, 'Pack Alpha'), twmS('broodmother', 1, 85, 15, 'Brood Mother'),
+    twmS('beastmaster', 1, TWM.sigCost, TWM.sigFrom, "Korra's Hunt", { id: 'sig', sig: true, with: [{ type: 'wolf', n: 4 }], say: 'Korra, Beastmaster of the Wild Hunt, mends her pack and calls more wolves, with 4 Dire Wolves.' })] },
+  ironhold: { name: 'Ironhold', foes: 'deep-dwellers', sends: [
+    twmS('bat', 3, 16, 1, 'Cave Bats'), twmS('beetle', 3, 18, 1, 'Shellbacks'), twmS('magma', 3, 22, 5, 'Magma Beetles'), twmS('burrower', 2, 24, 7, 'Sand Burrowers'),
+    twmS('sapper', 3, 26, 9, 'Gnoll Sappers'), twmS('golem', 2, 34, 12, 'Rock Golems'), twmS('bloat', 3, 30, 14, 'Bloat Beetles'), twmS('colossus', 1, 95, 17, 'Stone Colossus'),
+    twmS('tunnelking', 1, TWM.sigCost, TWM.sigFrom, 'The Undermine', { id: 'sig', sig: true, with: [{ type: 'burrower', n: 2 }], say: 'The Tunnel King digs under your walls, with 2 Sand Burrowers.' })] },
+  silver: { name: 'The Silver Order', foes: 'the restless dead', sends: [
+    twmS('ghoul', 4, 13, 1, 'Plague Ghouls'), twmS('risen', 6, 12, 1, 'Risen Dead'), twmS('wraith', 3, 22, 4, 'Wraiths'), twmS('shade', 3, 24, 7, 'Shades'),
+    twmS('banshee', 2, 28, 9, 'Banshees'), twmS('necro', 2, 30, 11, 'Necromancers'), twmS('ghoul', 6, 30, 13, 'Ghoul Horde', { idx: 2 }), twmS('bonedrake', 1, 110, 16, 'Bone Drake'),
+    twmS('abbess', 1, TWM.sigCost, TWM.sigFrom, 'The Pale Procession', { id: 'sig', sig: true, with: [{ type: 'wraith', n: 3 }], say: 'The Pale Abbess calls and mends her wraiths, with 3 Wraiths.' })] },
+  conclave: { name: 'The Conclave', foes: 'things from the rifts', sends: [
+    twmS('acolyte', 4, 14, 1, 'Hex Acolytes'), twmS('stalker', 3, 20, 2, 'Void Stalkers'), twmS('stormwisp', 3, 22, 4, 'Storm Wisps'), twmS('shade', 3, 24, 6, 'Shades'),
+    twmS('banshee', 2, 28, 9, 'Banshees'), twmS('bloat', 3, 30, 11, 'Bloat Beetles'), twmS('ironclad', 2, 30, 12, 'Ironclads'), twmS('overlord', 1, 120, 18, 'Dread Overlord'),
+    twmS('mirrorwitch', 1, TWM.sigCost, TWM.sigFrom, 'The Glass Court', { id: 'sig', sig: true, with: [{ type: 'shade', n: 3 }], say: 'The Mirror Witch steps through glass and calls her court, with 3 Shades.' })] },
+  stormborn: { name: 'The Stormborn', foes: 'the sky and its storms', sends: [
+    twmS('skirmisher', 4, 13, 1, 'Skirmishers'), twmS('bat', 3, 16, 1, 'Cave Bats'), twmS('stormbat', 3, 20, 4, 'Storm Bats'), twmS('stormwisp', 3, 22, 6, 'Storm Wisps'),
+    twmS('icewolf', 4, 26, 9, 'Frost Wolves'), twmS('berserker', 3, 30, 11, 'Berserkers'), twmS('stalker', 3, 30, 12, 'Void Stalkers'), twmS('bonedrake', 1, 110, 16, 'Bone Drake'),
+    twmS('nightwing', 1, TWM.sigCost, TWM.sigFrom, 'The Roost', { id: 'sig', sig: true, with: [{ type: 'stormbat', n: 4 }], say: 'Nightwing, Queen of the Roost, cloaks and calls her flock, with 4 Storm Bats.' })] },
+  wardbound: { name: 'The Wardbound', foes: 'raiders of the last roads', sends: [
+    twmS('gnoll', 4, 12, 1, 'Gnoll Raiders'), twmS('troll', 3, 24, 3, 'Troll Brutes'), twmS('axe', 2, 28, 6, 'Axethrowers'), twmS('shieldbearer', 2, 30, 8, 'Shieldbearers'),
+    twmS('sapper', 3, 26, 9, 'Gnoll Sappers'), twmS('ironclad', 2, 30, 10, 'Ironclads'), twmS('berserker', 3, 30, 12, 'Berserkers'), twmS('ogre', 1, 80, 14, 'Ogre Warlord'),
+    twmS('varn', 1, TWM.sigCost, TWM.sigFrom, 'Shield Wall', { id: 'sig', sig: true, with: [{ type: 'shieldbearer', n: 2 }], say: 'Captain Varn forms up his shields, with 2 Shieldbearers.' })] },
+};
+for (const k in TWM_BANNERS) if (k !== 'free' && (typeof FORCES === 'undefined' || !FORCES[k])) delete TWM_BANNERS[k];
+for (const k in TWM_BANNERS) TWM_BANNERS[k].sends = TWM_BANNERS[k].sends.filter(d => CREEPS[d.type] && (!d.with || d.with.every(w => CREEPS[w.type])));
+const twmBannerName = b => (TWM_BANNERS[b] || TWM_BANNERS.free).name;
+function twSendsOf(S) { return (TWM_BANNERS[(S && S.banner) || 'free'] || TWM_BANNERS.free).sends; }
+function twSendDef(S, id) { return twSendsOf(S).find(d => d.id === id) || null; }
+function twmSigNext(S) { return S && S.sigAt ? S.sigAt + TWM.sigEvery : TWM.sigFrom; }
+function twmSigReady(S) { return twWaveNow() >= twmSigNext(S); }
+function twmPickBanner(mine) { const ks = Object.keys(TWM_BANNERS).filter(k => k !== 'free' && k !== mine); return ks.length ? ks[Math.floor(Math.random() * ks.length)] : 'free'; }
+const TWM_BANNER_KEY = 'runehold.twbanner';
+function twmBannerPick() {
+  const q = typeof location !== 'undefined' && location.search ? /[?&]twbanner=(\w+)/.exec(location.search) : null;   // (?twbanner=grove: a test tab's own banner)
+  const b = q ? q[1] : typeof lsGet === 'function' ? lsGet(TWM_BANNER_KEY) : null; return TWM_BANNERS[b] ? b : 'free';
+}
+function twmBannerSeg() {
+  const cur = twmBannerPick(); twmCss();
+  return `<p class="twm-banl">Your banner: whose foes you send</p><div class="seg twm-ban" role="group" aria-label="Banner: whose foes you send">${Object.keys(TWM_BANNERS).map(k => `<button type="button" data-ban="${k}" aria-pressed="${k === cur}">${esc(TWM_BANNERS[k].name.replace(/^The /, ''))}<small>${esc(TWM_BANNERS[k].foes)}</small></button>`).join('')}</div>`;
+}
+function twmBannerWire() {
+  for (const b of ovp.querySelectorAll('[data-ban]')) b.onclick = () => { lsSet(TWM_BANNER_KEY, b.dataset.ban); for (const o of ovp.querySelectorAll('[data-ban]')) o.setAttribute('aria-pressed', o === b); if (typeof AudioSys !== 'undefined') AudioSys.init(); sfx('click'); };
+}
+function twmHowHTML() {
+  return `<li>Your <b>banner</b> sets whose foes you send. Each banner has eight kinds and a <b>signature send</b> from wave ${TWM.sigFrom}, once every ${TWM.sigEvery} waves.</li>
+      <li>Every ${TWM.cbEvery}th wave a <b>contested boss</b> walks both roads at once. The first keep to slay its own picks first from its relics, shown to both; the slower keep's boss <b>enrages</b>: faster, with a second rule. The forecast shows it two waves ahead.</li>
+      <li><b>Camps</b> sit beside your maze. Tap a flag to raid it: units in reach fight only the camp until it falls (or you call it off), for gold or recruits sent at the rival.</li>`;
+}
+
+/* ---------- the contested boss ---------- */
+const TWM_CB = [
+  { type: 'broodmother', start: 'Armour 2', enr: 'bursts into 5 spiderlings when slain', base: { spawn: null }, more: { spawn: ['spider', 5, .14] } },
+  { type: 'voidwyrm', start: 'Flies over the maze; every 10s it phases out of reach for a moment', enr: 'blinks ahead each time it loses a quarter of its health', base: { blink: 0 }, more: { blink: .25 } },
+  { type: 'lich', start: 'Silences units within 2.2 cells every 6s; Frost cannot touch it', enr: 'raises 3 Risen Dead every 6s', base: { raise: null }, more: { raise: [6, 3, 'risen'] } },
+  { type: 'abyss', start: 'Calls 2 Shades every 8s', enr: 'Aegis: turns aside all harm for 3s at two-thirds and one-third health', base: { aegis: null }, more: { aegis: [.66, .33] } },
+];
+const TWM_CB_ORDER = [0, 1, 2, 3, 1, 2];
+const twmCbWave = n => n >= TWM.cbFirst && (n - TWM.cbFirst) % TWM.cbEvery === 0 && n < TW_LAST;
+const twmCbOf = n => TWM_CB[TWM_CB_ORDER[Math.min(TWM_CB_ORDER.length - 1, Math.floor((n - TWM.cbFirst) / TWM.cbEvery))]];
+function twmNextCb(from) { for (let n = Math.max(TWM.cbFirst, from); n < TW_LAST; n++) if (twmCbWave(n)) return n; return 0; }
+const _twmDefs = {};
+function twmCbDef(B, enr) {
+  const key = B.type + (enr ? ':e' : '');
+  return _twmDefs[key] || (_twmDefs[key] = Object.assign(Object.create(CREEPS[B.type]), B.base, enr ? B.more : null, { cb: true, life: enr ? TWM.cbLifeEnr : TWM.cbLife, trait: `Contested boss${enr ? ', enraged' : ''}` }));
+}
+function twmCbHp(n, B) { return Math.round(waveHP(n, 'normal') * CREEPS[B.type].hp * bossFactor(n) * TWM.cbHp); }
+// seconds until wave n's boss sets out
+function twmCbIn(n) { return Math.max(0, TW.clock + (n - TW.wave - 1) * TW_EVERY + TWM.cbDelay); }
+function twmCbWarn(n) {
+  const B = twmCbOf(n);
+  twFeed(`Contested boss in ${n - TW.wave} wave${n - TW.wave > 1 ? 's' : ''}: ${CREEPS[B.type].name}`, 'in');
+  return true;
+}
+function twmCbQueue(k, n, hp) {
+  const S = twS(k), B = twmCbOf(n), def = CREEPS[B.type];
+  if (!TW.cb || TW.cb.n !== n) TW.cb = { n, B, res: { P: null, E: null }, first: null, enr: { P: false, E: false }, hp: { P: 1, E: 1 } };
+  const s = { t: TWM.cbDelay, type: B.type, hp, bounty: Math.max(1, Math.round(bountyFor(n, def))), spdM: 1, cb: n, cbB: B };
+  let i = S.sendQ.findIndex(q => q.t > s.t); if (i < 0) i = S.sendQ.length;
+  S.sendQ.splice(i, 0, s);
+  return true;
+}
+function twmCbEnrage(k) {
+  const cb = TW.cb; if (!cb || cb.enr[k]) return false;
+  cb.enr[k] = true;
+  const S = twS(k), c = S.creeps.find(o => o.cb === cb.n && !o.dead);
+  if (c) withSide(S, () => twmEnrageOn(c));
+  else { const q = S.sendQ.find(s => s.cb === cb.n); if (q) q.cbEnr = true; }
+  const B = cb.B, nm = CREEPS[B.type].name;
+  if (k === 'P') { onBanner(`${nm} enrages`, `Your rival slew theirs first · faster, and it ${B.enr}`); sfx('bossIn', 1); }
+  twFeed(k === 'P' ? `Your ${nm} enrages` : `Their ${nm} enrages`, k === 'P' ? 'in' : 'out');
+  return true;
+}
+function twmEnrageOn(c) {
+  if (c.cbEnr) return;
+  c.cbEnr = 1; c.def = twmCbDef(c.cbB, true); c.spdM *= TWM.cbSpd;
+  if (c.def.blink) c.blinkAt = Math.max(.05, c.hp / c.maxHp - .1);
+  if (c.def.raise) c.rsT = Math.min(c.rsT || 9, 1.5);
+  if (G.state === 'play') { fxRing(c.x, c.y, 1.4, '#ff5a3a'); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .5, max: .5, size: 1.2, col: '#ff6a40' }); G.shake = Math.max(G.shake, .2); }
+}
+// the boss on side k fell (killed) or got through (leaked)
+function twmCbDown(k, killed) {
+  const cb = TW.cb; if (!cb || cb.res[k]) return false;
+  cb.res[k] = killed ? 'kill' : 'leak';
+  const nm = CREEPS[cb.B.type].name, o = twOther(k);
+  if (killed && !cb.first) {
+    cb.first = k;
+    if (!cb.res[o]) twAct(o, 'cbEnrage', {});
+    twAct(k, 'draft', { n: cb.n, items: twmRollDraft(k, cb.n) });
+    if (k === 'P') { onBanner(`${nm} slain first`, 'You pick first from its relics'); sfx('victory'); }
+    else onBanner(`${TW.ai.name} slew ${nm} first`, cb.res.P ? 'Their pick first' : 'Your boss enrages: kill it to take what they leave');
+    twFeed(k === 'P' ? `${nm} slain first: your pick` : `Rival slew ${nm} first`, k === 'P' ? 'out' : 'in');
+  } else if (killed) {
+    twFeed(k === 'P' ? `${nm} slain: the leftover pick` : `Rival slew ${nm}`, k === 'P' ? 'out' : 'in');
+    if (k === 'P') onBanner(`${nm} slain`, 'Take one of the relics left');
+    twmDraftNext();
+  } else {
+    twFeed(k === 'P' ? `${nm} broke through: no relic` : `Their ${nm} broke through`, k === 'P' ? 'in' : 'out');
+    if (TW.draft && TW.draft.n === cb.n && TW.draft.first !== k) twmDraftNext();
+  }
+  return true;
+}
+
+/* ---------- the draft ---------- */
+// contests 1-2: two epics and a rare (the first pick is a choice of fit); 3-4: a legendary and two epics (the race is for the legendary); 5-6: two legendaries and an epic
+const TWM_DRAFT = [[3, 3, 2], [3, 3, 2], [4, 3, 3], [4, 3, 3], [4, 4, 3], [4, 4, 3]];
+function twmDraftRars(n) { return TWM_DRAFT[Math.min(TWM_DRAFT.length - 1, Math.floor((n - TWM.cbFirst) / TWM.cbEvery))]; }
+// three relics: the first and the third for the killer's army, the second for the rival's (each from its own keep's pool, on its
+// own field). With two different armies the first pick is a choice: your best, or the one meant for the rival, to deny it.
+const twmItemId = o => o.leg || o.base || (o.tome && o.tome.join(':'));
+function twmRollDraft(k, n) {
+  const out = [], rs = twmDraftRars(n), whose = [k, twOther(k), k];
+  rs.forEach((r, i) => {
+    const S = twS(whose[i]);
+    withSide(S, () => {
+      let it = null;
+      for (let g = 0; g < 8; g++) { it = rollGear(Math.max(n, r >= 4 ? LEG_FROM : r >= 3 ? EPIC_FROM : 1), true, r); if (!out.some(o => twmItemId(o) === twmItemId(it))) break; }
+      out.push(Object.assign({}, it, { isNew: true, twFor: twfKey(S) }));
+    });
+  });
+  return out;
+}
+const twmUsable = (k, it) => it.twFor == null || it.twFor === twfKey(twS(k));
+function twmDraftOpen(k, n, items) {
+  TW.draft = { n, items, first: k, turn: k, t: TWM.pickT, got: { P: null, E: null }, done: false, aiT: null, shut: 0 };
+  sfx('lootDrop', Math.max(...items.map(i => i.rar)));
+  twmDraftDirty();
+  return true;
+}
+// after a pick or a boss's end: whose turn is next
+function twmDraftNext() {
+  const D = TW.draft, cb = TW.cb; if (!D || D.done) return;
+  if (D.got[D.first] == null) return;   // the first pick still to come
+  const o = twOther(D.first);
+  if (D.got[o] != null || !cb || cb.n !== D.n || cb.res[o] === 'leak') { twmDraftClose(); return; }
+  if (cb.res[o] === 'kill' && D.turn !== o) { D.turn = o; D.t = TWM.pickT; D.aiT = null; }
+  else if (!cb.res[o]) D.turn = null;   // waiting on its boss
+  twmDraftDirty();
+}
+function twmDraftClose() { const D = TW.draft; if (!D) return; D.done = true; D.turn = null; D.shut = 3; twmDraftDirty(); }
+function twmPick(k, i, auto) {
+  const D = TW.draft; if (!D || D.done || D.turn !== k) return false;
+  const taken = Object.values(D.got); if (i == null || !D.items[i] || taken.includes(i)) return false;
+  const S = twS(k), it = Object.assign({}, D.items[i]);
+  withSide(S, () => { it.id = ++G.gearUid; it.isNew = true; G.loot.push(it); G.lootNew = (G.lootNew || 0) + 1; G.stats.relics = (G.stats.relics || 0) + 1; });
+  D.got[k] = i;
+  const nm = withSide(it.twFor != null && it.twFor === twfKey(TW.E) ? TW.E : TW.P, () => gearName(it));
+  twFeed(k === 'P' ? `You took ${nm}${auto ? ' (time ran out)' : ''}` : `${TW.ai.name} took ${nm}`, k === 'P' ? 'out' : 'in');
+  if (k === 'P') { sfx('lootDrop', it.rar); if (typeof markDirty === 'function') markDirty(); }
+  twmDraftNext();
+  return true;
+}
+// how much a relic is worth to keep S: rarity first, then whether it fits the towers it fields most
+function twmPickScore(S, it, k) {
+  if (k && !twmUsable(k, it)) { const A = twAiOf(k), mine = TW.draft.items.filter((o, i) => twmUsable(k, o) && !Object.values(TW.draft.got).includes(i)); return mine.length && A && it.rar > Math.max(...mine.map(o => o.rar)) && twRng() < A.L.smart * .6 ? it.rar * 10 + 3 : -1; }   // the rival's: only to deny it a better relic than any left for you
+  let fit = 0;
+  withSide(S, () => { const W = fieldWeights(), tot = Object.values(W).reduce((a, b) => a + b, 0) || 1; for (const t of G.towers) if (!t.def.wall && gearFits(it, t)) fit = Math.max(fit, (W[t.type] || 0) / tot); });
+  return it.rar * 10 + fit * 6;
+}
+function twmBestPick(k) {
+  const D = TW.draft, S = twS(k), taken = Object.values(D.got);
+  let best = -1, bv = -2; D.items.forEach((it, i) => { if (taken.includes(i)) return; const v = twmPickScore(S, it, k); if (v > bv) { bv = v; best = i; } });
+  return best;
+}
+function twmDraftTick(dt) {
+  const D = TW.draft; if (!D) return;
+  if (D.done) { if ((D.shut -= dt) <= 0) { TW.draft = null; twmDraftDirty(); } return; }
+  if (!D.turn) return;
+  const k = D.turn, A = twAiOf(k);
+  if (A) { if (D.aiT == null) D.aiT = A.L.think + TWM.aiPickT[0] + twRng() * (TWM.aiPickT[1] - TWM.aiPickT[0]); if ((D.aiT -= dt) <= 0) { const i = twmBestPick(k); withSide(twS(k), () => twmPickAct(i)); } return; }
+  if ((D.t -= dt) <= 0) twAct(k, 'pick', { i: twmBestPick(k), auto: true });
+}
+
+/* ---------- camps ---------- */
+const TWM_CAMPS = [
+  { id: 'den', name: 'Gnoll Den', type: 'gnoll', n: 3, hpK: 2.5, x: -.72, y: 3.5, from: 1, gold: [20, 3] },
+  { id: 'run', name: 'Wolf Run', type: 'wolf', n: 3, hpK: 2.5, x: COLS + .72, y: 7.5, from: 1, recruit: { type: 'wolf', n: 4 } },
+  { id: 'hold', name: 'Troll Hold', type: 'troll', n: 2, hpK: 3, x: -.72, y: 11.5, from: 10, gold: [35, 5] },
+];
+function twmCampsInit(S) { S.camps = TWM_CAMPS.map(C => ({ id: C.id, C, raid: false, up: false, back: C.from })); }
+function twmCampReward(C, n) { return C.gold ? `${C.gold[0] + C.gold[1] * n} gold` : `${C.recruit.n} ${CREEPS[C.recruit.type].name}s sent at your rival, free`; }
+function twmCampHp(C, n) { const d = CREEPS[C.type]; return Math.round(waveHP(n, 'normal') * d.hp * minionHP(n, d.fly) * C.hpK); }
+function twmCampSpawn(k, id, hp) {
+  const S = twS(k), cp = S.camps.find(c => c.id === id); if (!cp || cp.up) return false;
+  cp.up = true; cp.raid = false; cp.hitT = TWM.campHitEvery; cp.n = twWaveNow();
+  withSide(S, () => {
+    const C = cp.C;
+    for (let j = 0; j < C.n; j++) {
+      const a = (j / C.n) * TAU + .4, x = C.x + Math.cos(a) * .16, y = C.y + Math.sin(a) * .3;
+      const c = spawn({ type: C.type, hp: S.force ? hp * TWM.armyHp : hp, bounty: 0, at: { x, y, ti: -1, tj: Math.floor(y), tx: x, ty: y, state: 'walk' } });
+      c.camp = cp; c.face = C.x < 0 ? 1 : -1; c.ten = 1;
+    }
+  });
+  return true;
+}
+const twmCampAlive = (S, cp) => S.creeps.filter(c => c.camp === cp && !c.dead);
+function twmRaid(k, id, on, d) {
+  const S = twS(k), cp = S.camps && S.camps.find(c => c.id === id); if (!cp || !cp.up) return false;
+  on = on == null ? !cp.raid : !!on; if (cp.raid === on) return false;
+  if (d) d.on = on;   // (the event carries what it did)
+  cp.raid = on; cp.hitT = TWM.campHitEvery;
+  if (!on) for (const c of twmCampAlive(S, cp)) { c.hp = c.maxHp; c.poison = []; c.burnT = 0; c.bleedT = 0; }   // called off: the guardians mend
+  if (k === 'P') { sfx(on ? 'warcry' : 'click', 0); twFeed(on ? `Raiding the ${cp.C.name}` : `Raid on the ${cp.C.name} called off`, 'out'); }
+  else if (on) twFeed(`${TW.ai.name} raids its ${cp.C.name}: its units there are busy`, 'out');
+  return true;
+}
+function twmCampClear(k, id) {
+  const S = twS(k), cp = S.camps.find(c => c.id === id); if (!cp || !cp.up) return false;
+  cp.up = false; cp.raid = false; cp.back = twWaveNow() + TWM.campBack;
+  const C = cp.C, n = cp.n || twWaveNow();
+  if (C.gold) { const g = C.gold[0] + C.gold[1] * n; withSide(S, () => { G.gold += g; G.stats.gold += g; if (G === TW.P) addText(C.x, C.y, 1.4, `+${g}`, '#ffd76a'); }); }
+  if (C.recruit) twmFreeSend(k, C.recruit.type, C.recruit.n);
+  if (k === 'P') { sfx('clear'); twFeed(`${C.name} cleared: ${twmCampReward(C, n)}`, 'out'); }
+  else twFeed(`Rival cleared its ${C.name}`, 'in');
+  return true;
+}
+function twmFreeSend(k, type, nn) {
+  const to = twS(twOther(k)), n = twWaveNow(), def = CREEPS[type], hp = waveHP(n, 'normal') * def.hp * minionHP(n, def.fly);
+  let t = 1.4 + (to.sendQ.length ? to.sendQ[to.sendQ.length - 1].t : 0);
+  for (let j = 0; j < nn; j++) { to.sendQ.push({ t, type, hp, bounty: Math.max(1, Math.round(bountyFor(n, def) * .5)), spdM: 1, atk: null, atkM: 0 }); t += GAP[type] || .55; }
+  const A = twAiOf(twOther(k)); if (A) A.seen[type] = (A.seen[type] || 0) + nn;
+  if (k === 'E') twFeed(`Incoming: ${nn} ${def.name}s, recruited`, 'in');
+}
+// once a frame for each guardian (game.js updateCreeps): it holds its ground, and strikes back while raided
+function twmCampTick(c, dt) {
+  const cp = c.camp; c.curSp = 0;
+  if (!cp.raid || G.state !== 'play') return;
+  if ((c.cbHitT = (c.cbHitT == null ? R(.5, TWM.campHitEvery) : c.cbHitT) - dt) > 0) return;
+  c.cbHitT = TWM.campHitEvery;
+  let best = null, bd = TWM.campReach;
+  for (const t of G.towers) { if (t.def.wall || t.wrecked || t.wounded) continue; const d = Math.hypot(t.x - c.x, t.y - c.y); if (d < bd) { bd = d; best = t; } }
+  if (!best) return;
+  c.face = best.x > c.x ? 1 : -1; c.lunge = .25;
+  damageTower(best, best.maxHp * TWM.campHit);
+  if (typeof rfx === 'function') rfx({ k: 'streak', x0: c.x, h0: .5, z0: c.y, x1: best.x, h1: .6, z1: best.y, col: '#d9a35a', w: .05, trav: .2, life: .3 });
+}
+// how many units are tied to a raided camp (shown on its flag)
+function twmCampReach(S, cp) { let n = 0; withSide(S, () => { for (const t of G.towers) if (!t.def.wall && !t.wrecked && t.st && twmTied(t, t.st)) { for (const c of G.creeps) if (c.camp === cp && !c.dead && Math.hypot(c.x - t.x, c.y - t.y) <= t.st.range) { n++; break; } } }); return n; }
+// is tower t (stats st) tied up by a raided camp in its reach? Then it strikes only the camp.
+function twmTied(t, st) {
+  if (t._twmT === G.time) return t._twmV;
+  let v = false;
+  if (G.camps && !t.def.wall) for (const cp of G.camps) { if (!cp.raid || !cp.up) continue; for (const c of G.creeps) if (c.camp === cp && !c.dead && Math.hypot(c.x - t.x, c.y - t.y) <= st.range && _twmCanTarget(t, st, c)) { v = true; break; } if (v) break; }
+  t._twmT = G.time; t._twmV = v; return v;
+}
+const _twmCanTarget = canTarget;
+canTarget = function (t, st, c) {
+  if (c.camp) return !!c.camp.raid && _twmCanTarget(t, st, c);
+  if (G.camps && TW && twmTied(t, st)) return false;
+  return _twmCanTarget(t, st, c);
+};
+
+/* ---------- armies: each keep fields its banner's force ---------- */
+// A banner that is a force brings that force's army (a commander of it: yours is the one you last led, else its first). The force
+// tables (units in the slots, talents, item pool, build order) are global, so withSide swaps in the keep's own set from a snapshot
+// taken once at the start of the match. Free Companies keep the keep's towers.
+const TWF = { snaps: {}, now: null };
+const twfKey = S => (S && S.force) || '';
+function twmHeroFor(force, mine) {
+  if (!force || typeof FORCES === 'undefined' || !FORCES[force]) return null;
+  const list = (typeof HEROES !== 'undefined' ? HEROES : Object.values(HERO_BY)).filter(h => forceOfHero(h.id) === force).map(h => h.id);
+  if (!list.length) return null;
+  const last = mine && typeof lsGet === 'function' ? lsGet('runehold.twhero.' + force) : null;
+  return list.includes(last) ? last : mine ? list[0] : list[Math.floor(Math.random() * list.length)];
+}
+function twfSnap(S) {
+  const g0 = G; G = S;
+  try { applyForce(S.force || null, S.hero || null); } finally { G = g0; }
+  TWF.snaps[twfKey(S)] = { T: Object.assign({}, TOWERS), E: Object.assign({}, ELEM), top: Object.assign({}, TOWER_TOP), tal: Object.assign({}, TALENTS), pool: LOOT_POOL,
+    specs: typeof SPECS !== 'undefined' ? Object.assign({}, SPECS) : null, order: BUILD_ORDER.slice(), combat: COMBAT_TYPES.slice(), start: START_SCHOOLS.slice(), fnow: FORCE_NOW };
+  TWF.now = twfKey(S);
+}
+const twfObj = (o, src) => { for (const k in o) if (!(k in src)) delete o[k]; Object.assign(o, src); };
+const twfArr = (a, src) => { a.length = 0; a.push(...src); };
+function twfUse(key) {
+  if (TWF.now === key) return;
+  const s = TWF.snaps[key]; if (!s) return;
+  twfObj(TOWERS, s.T); twfObj(ELEM, s.E); twfObj(TOWER_TOP, s.top); twfObj(TALENTS, s.tal); LOOT_POOL = s.pool;
+  if (s.specs && typeof SPECS !== 'undefined') twfObj(SPECS, s.specs);
+  twfArr(BUILD_ORDER, s.order); twfArr(COMBAT_TYPES, s.combat); twfArr(START_SCHOOLS, s.start);
+  FORCE_NOW = s.fnow; TWF.now = key;
+}
+const twfOn = () => TW && TW.P && TW.E && twfKey(TW.P) !== twfKey(TW.E);
+const _twmWithSide = withSide;
+withSide = function (S, fn) {
+  if (!S || G === S || !twfOn()) return _twmWithSide(S, fn);
+  const k0 = TWF.now; twfUse(twfKey(S));
+  try { return _twmWithSide(S, fn); } finally { twfUse(k0); }
+};
+
+// an army's warlord fields a mix: a kind past 30% of its units weighs less (squared), a kind it has none of a little more
+// (its damage sums miss what spells do, so left alone it fields one kind of unit; one kind should never be enough)
+const _twmTypeW = twAiTypeWeights;
+twAiTypeWeights = function (A) {
+  const w = _twmTypeW.apply(this, arguments); if (!G.force) return w;
+  const n = {}; let tot = 0; for (const t of G.towers) if (!t.def.wall) { n[t.type] = (n[t.type] || 0) + 1; tot++; }
+  if (tot >= 4) for (const ty in w) { const sh = (n[ty] || 0) / tot; if (sh > .3) w[ty] *= Math.pow(.3 / sh, 2); else if (!n[ty]) w[ty] *= 1.4; }
+  return w;
+};
+
+/* ---------- hooks into the game ---------- */
+const _twmSpawn = spawn;
+spawn = function (s) {
+  const c = _twmSpawn(s);
+  if (TW && G.force && !s.at && !c.camp) { c.hp *= TWM.armyHp; c.maxHp *= TWM.armyHp; if (c.shield) { c.shield *= TWM.armyHp; c.shieldMax *= TWM.armyHp; } }   // (a guardian or a foe born on the field already has its share)
+  if (s.cb && TW) { c.cb = s.cb; c.cbB = s.cbB; c.def = twmCbDef(s.cbB, false); c.blinkAt = 1 - (c.def.blink || 0); c.ten = .3; if (s.cbEnr) twmEnrageOn(c); if (G === TW.P) { onBanner(c.def.name, 'Contested boss · the first keep to slay its own picks first'); sfx('bossIn', 1); } }
+  return c;
+};
+const _twmKill = kill;
+kill = function (c, src, elem) {
+  const was = c.dead, r = _twmKill.apply(this, arguments);
+  if (!was && TW && G.vs) {
+    if (c.cb && TW.cb && c.cb === TW.cb.n) twmDefer(twSide(G), 'cbKill', {});
+    if (c.camp && c.camp.up && !G.creeps.some(o => o.camp === c.camp && !o.dead)) twmDefer(twSide(G), 'campClear', { camp: c.camp.id });
+  }
+  return r;
+};
+const _twmLeak = leak;
+leak = function (c) {
+  const was = c.dead, r = _twmLeak.apply(this, arguments);
+  if (!was && c.dead && c.cb && TW && TW.cb && c.cb === TW.cb.n) twmDefer(twSide(G), 'cbLeak', {});
+  return r;
+};
+// what happens inside one keep's update is acted on after both have run, outside either (so the banners reach your screen)
+function twmDefer(k, kind, data) { (TW.pend = TW.pend || []).push([k, kind, data]); }
+function twmFlush() { const q = TW.pend; if (!q || !q.length) return; TW.pend = []; for (const [k, kind, data] of q) twAct(k, kind, data); }
+// a contest wave: the contested boss takes the place of the wave's own boss or leader
+const _twmMakeWave = makeWave;
+makeWave = function (n) {
+  const q = _twmMakeWave.apply(this, arguments);
+  if (!TW || !G.vs || !twmCbWave(n)) return q;
+  return q.filter(s => { const d = CREEPS[s.type]; return !(d && (d.boss || d.lead)); });
+};
+const _twmRollDrop = rollDrop;
+rollDrop = function (c) { if (c.cb || c.camp) return; return _twmRollDrop.apply(this, arguments); };   // its relics are the draft's
+
+const _twmStart = twStart;
+twStart = function (lvl, map, opts = {}) {
+  const pb = opts.banner || 'free', eb = opts.eBanner || twmPickBanner(pb);
+  opts = Object.assign({}, opts, { banner: pb, eBanner: eb, hero: opts.hero || twmHeroFor(pb, true), eHero: opts.eHero || twmHeroFor(eb, false) });
+  TWF.snaps = {}; TWF.now = null;
+  const r = _twmStart.call(this, lvl, map, opts);
+  twfSnap(TW.E); twfSnap(TW.P);   // (P's set last: it stays in place outside withSide)
+  for (const A of [TW.ai, TW.aiP]) if (A && A.S.force) A.save = true;   // an army's warlord saves for its best unit (versus.js twAiBestBuy)
+  for (const S of [TW.P, TW.E]) { twmCampsInit(S); }
+  TW.cb = null; TW.draft = null; TW.cbWarned = 0;
+  twmCampsDue();
+  twmHud(true);
+  return r;
+};
+const _twmStop = twStop;
+twStop = function () { twmHud(false); return _twmStop.apply(this, arguments); };
+const _twmLaunch = twLaunch;
+twLaunch = function () {
+  const r = _twmLaunch.apply(this, arguments), n = TW.wave;
+  const nx = twmNextCb(n + 1);
+  if (nx && nx - n <= TWM.warn && TW.cbWarned !== nx) { TW.cbWarned = nx; twAct('P', 'cbWarn', { n: nx }); }
+  if (twmCbWave(n)) { const B = twmCbOf(n), hp = twmCbHp(n, B); for (const S of TW.order || [TW.P, TW.E]) twAct(twSide(S), 'cbSpawn', { n, hp }); }
+  twmCampsDue();
+  return r;
+};
+function twmCampsDue() {
+  const n = twWaveNow();
+  for (const S of TW.order || [TW.P, TW.E]) { const k = twSide(S); for (const cp of S.camps || []) if (!cp.up && n >= cp.back) twAct(k, 'campSpawn', { camp: cp.id, hp: twmCampHp(cp.C, n) }); }
+}
+const _twmStep = twStep;
+twStep = function (dt) {
+  if (!TW || TW.over) return _twmStep.apply(this, arguments);
+  TW.time = (TW.time || 0) + dt;
+  const r = _twmStep.apply(this, arguments);
+  if (TW) twmTick(dt);
+  return r;
+};
+// after each step of both keeps (offline twStep; online twnStepTick, versus_modes_net.js): the events they raised, the draft's clock
+function twmTick(dt) {
+  twmFlush();
+  if (TW.over) return;
+  twmDraftTick(dt);
+  if (TW.cb && TW.cb.res.P && TW.cb.res.E && (!TW.draft || TW.draft.n !== TW.cb.n)) TW.cb = null;
+  if (TW.cb) for (const k of ['P', 'E']) { const c = twS(k).creeps.find(o => o.cb === TW.cb.n && !o.dead); TW.cb.hp[k] = c ? c.hp / c.maxHp : TW.cb.res[k] ? 0 : 1; if (c && c.cbEnr && (c._enrFx = (c._enrFx || 0) - dt) <= 0) { c._enrFx = .7; withSide(twS(k), () => part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .6, max: .6, size: .9, col: '#ff5a3a' })); } }
+}
+
+/* ---------- the warlord ---------- */
+// a contest soon or under way: hold the sends and build up the road
+function twmAiHold(A) {
+  const n = TW.wave, k = twSide(A.S);
+  if (TW.cb && !TW.cb.res[k]) return true;   // its boss still walks
+  return twmNextCb(n + 1) === n + 1;   // the contest's horn is next
+}
+const _twmThink = twThink;
+twThink = function (A) {
+  const k = twSide(A.S), hold = twmAiHold(A), bank = A.bank;
+  if (hold) A.bank = 0;   // the war chest goes to the road
+  _twmThink.apply(this, arguments);
+  if (hold) A.bank = Math.min(bank, G.gold);
+  twmAiCamps(A, k, hold);
+  if (!hold) twmAiSig(A, k);
+  if (!hold && (twS(twOther(k)).camps || []).some(cp => cp.raid && cp.up) && twRng() < A.L.smart) { A.burst = Math.max(A.burst || 1, 2); _twmAiSend(A); }   // the rival's units are busy with a camp: send now
+};
+const _twmAiSend = twAiSend;
+twAiSend = function (A) { if (twmAiHold(A)) return; return _twmAiSend.apply(this, arguments); };
+// its signature send: as soon as it is open and the war chest and the purse both hold its price
+function twmAiSig(A, k) {
+  const d = twSendDef(G, 'sig'); if (!d || !twUnlocked(d, G) || A.danger >= A.L.react) return;
+  const cost = twSendCost(d); if (A.bank < cost * .8 || G.gold < cost) return;
+  if (twSend(G, 'sig')) A.bank = Math.max(0, A.bank - cost);
+}
+function twmAiCamps(A, k, hold) {
+  const S = A.S; if (!S.camps) return;
+  const prog = twProgress(), raided = S.camps.filter(c => c.raid && c.up), road = G.creeps.some(c => !c.dead && !c.camp), soon = G.sendQ.length && G.sendQ[0].t < 6;
+  for (const cp of raided) if (prog > .2 || hold || A.danger > .05) twmRaidAct(cp.id, false);   // a foe is getting down the road: back to it
+  if (raided.length || hold || road || soon || A.danger > 0 || TW.clock < 12 || G.towers.filter(t => !t.def.wall).length < 8) return;   // only an empty road, and a defence worth the name
+  if (twRng() > A.L.smart * .6) return;   // a squire seldom thinks of it
+  const reach = cp => { let n = 0; for (const t of G.towers) if (!t.def.wall && !t.wrecked && Math.hypot(t.x - cp.C.x, t.y - cp.C.y) <= ((t.st && t.st.range) || 2.5) + .3) n++; return n; };
+  const opts = S.camps.filter(cp => cp.up && reach(cp) >= 1).sort((a, b) => reach(b) - reach(a));
+  if (opts.length) twmRaidAct(opts[0].id, true);
+}
+
+/* ---------- on screen: the forecast strip, the draft, the camps' flags ---------- */
+const TWM_CSS = `
+#twmBar{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:7;max-width:min(560px,70%);padding:5px 12px;border-radius:6px;background:rgba(3,13,15,.86);box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.45);font:600 12px/1.35 var(--f-ui);color:#e9dcb8;pointer-events:none;text-align:center}
+#twmBar b{color:#f4d77e}#twmBar .en{color:#ff8f6e}#twmBar .mut{color:#a99d82;font-weight:500}
+#twmBar .hp{display:inline-block;width:70px;height:6px;border-radius:3px;background:#2a2218;vertical-align:middle;margin:0 4px;overflow:hidden}#twmBar .hp i{display:block;height:100%;background:#d9b25a}#twmBar .hp.e i{background:#ff6a4a}
+#twmDraft{position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:8;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;background:rgba(3,13,15,.92);box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.55),0 6px 18px rgba(0,0,0,.6);font:600 12px/1.3 var(--f-ui);color:#e9dcb8;max-width:min(760px,94%)}
+#twmDraft h4{margin:0;font:700 14px/1.2 var(--f-display);color:#f4d77e;letter-spacing:.04em}
+#twmDraft .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+#twmDraft .it{width:220px;display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:6px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+#twmDraft .it.tk{opacity:.45}#twmDraft .it .who{font-size:11px;color:#a99d82}
+#twmDraft .it .nm{font:700 13px/1.2 var(--f-ui)}#twmDraft .it .tx{font-weight:500;font-size:11.5px;color:#cfc4a6;max-height:6.5em;overflow:hidden}
+#twmDraft button{padding:5px 8px;border:0;border-radius:4px;cursor:pointer;font:700 12px var(--f-ui);background:#c9a05a;color:#1a1208}#twmDraft button:disabled{background:#3a3326;color:#7d7462;cursor:default}
+#twmLayer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.twm-flag{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;padding:2px 7px;border-radius:5px;background:rgba(3,13,15,.84);box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.5);font:700 11px/1.25 var(--f-ui);color:#f2dc9a;white-space:nowrap;text-align:center}
+.twm-flag small{display:block;font-weight:500;color:#bfb291}.twm-flag.raid{box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px #ff8a5a;color:#ffb08a}.twm-flag.down{opacity:.6;cursor:default}
+body.tw-scout .twm-flag{pointer-events:none}
+.seg.twm-ban{flex-wrap:wrap}.seg.twm-ban button{flex:1 1 23%}.twm-ban button small{font-size:10.5px}.twm-banl{margin:12px 0 -6px;font:600 12px var(--f-ui);color:var(--muted)}
+`;
+function twmCss() { if (typeof document === 'undefined' || document.getElementById('twmCss')) return; const css = document.createElement('style'); css.id = 'twmCss'; css.textContent = TWM_CSS; document.head.appendChild(css); }
+function twmHud(on) {
+  if (typeof document === 'undefined') return;
+  for (const id of ['twmBar', 'twmDraft', 'twmLayer']) { const el = document.getElementById(id); if (el) el.remove(); }
+  if (!on) return;
+  const st = document.getElementById('stage'); if (!st) return;
+  twmCss();
+  const bar = document.createElement('div'); bar.id = 'twmBar'; bar.hidden = true; bar.setAttribute('aria-live', 'polite');
+  const dr = document.createElement('div'); dr.id = 'twmDraft'; dr.hidden = true;
+  dr.addEventListener('click', e => { const b = e.target.closest('[data-pick]'); if (b && !b.disabled) { e.stopPropagation(); twmPickAct(+b.dataset.pick); } });
+  const ly = document.createElement('div'); ly.id = 'twmLayer';
+  ly.addEventListener('click', e => { const f = e.target.closest('[data-camp]'); if (f && TW && TW.view === 'P') { e.stopPropagation(); const ok = twmRaidAct(f.dataset.camp); if (!ok) sfx('error'); twmFlagSig = ''; } });
+  st.append(ly, bar, dr);
+  TW.hud = { bar, dr, ly, flags: {}, barSig: '', drSig: '' };
+}
+let twmFlagSig = '';
+const twmDraftDirty = () => { if (TW && TW.hud) TW.hud.drSig = ''; };
+const twmClock = s => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+function twmBarHTML() {
+  const cb = TW.cb;
+  if (cb) {
+    const B = cb.B, nm = CREEPS[B.type].name, hp = k => cb.res[k] === 'kill' ? 'slain' : cb.res[k] === 'leak' ? 'through' : `<span class="hp${cb.enr[k] ? ' e' : ''}"><i style="width:${Math.round(cb.hp[k] * 100)}%"></i></span>`;
+    return `<b>${esc(nm)}</b> on both roads · You ${hp('P')}${cb.enr.P ? '<span class="en"> enraged</span>' : ''} · Rival ${hp('E')}${cb.enr.E ? '<span class="en"> enraged</span>' : ''}`
+      + `<br><span class="mut">${esc(B.start)} · the slower keep's enrages: faster, and it ${esc(B.enr)}</span>`;
+  }
+  const nx = twmNextCb(TW.wave + 1);
+  if (nx && nx - TW.wave <= TWM.warn) { const B = twmCbOf(nx); return `Contested boss <b>${esc(CREEPS[B.type].name)}</b> in <b>${twmClock(twmCbIn(nx))}</b> (wave ${nx})<br><span class="mut">${esc(B.start)} · first kill picks first · the slower keep's enrages: faster, and it ${esc(B.enr)}</span>`; }
+  return '';
+}
+function twmDraftHTML() {
+  const D = TW.draft; if (!D) return '';
+  const nm = TW.cb ? CREEPS[TW.cb.B.type].name : 'the boss', who = k => k === 'P' ? 'You' : esc(TW.ai.name);
+  const head = D.done ? 'The draft is done' : D.turn === 'P' ? `Your pick · <span>${Math.ceil(D.t)}s</span>` : D.turn === 'E' ? `${who('E')} is picking` : `${who(twOther(D.first))} picks when its ${esc(nm)} falls`;
+  const cards = D.items.map((it, i) => {
+    const by = D.got.P === i ? 'P' : D.got.E === i ? 'E' : null, col = (RARITY[it.rar] || RARITY[2]).col;
+    const side = it.twFor != null && it.twFor === twfKey(TW.E) && it.twFor !== twfKey(TW.P) ? TW.E : TW.P;   // (read in its own army's tables)
+    let tx = '', nm = ''; withSide(side, () => { try { tx = gearText(it); } catch (e) { tx = ''; } nm = gearName(it); });
+    return `<div class="it${by ? ' tk' : ''}" data-it="${i}"><span class="nm" style="color:${col}">${esc(nm)}</span><span class="who">${(RARITY[it.rar] || RARITY[2]).name}${it.twFor != null && twfOn() ? (twmUsable('P', it) ? ' · for your army' : ' · for their army') : ''}${by ? ` · taken by ${who(by)}` : ''}</span><span class="tx">${esc(String(tx).replace(/<[^>]+>/g, ''))}</span>`
+      + `<button type="button" data-pick="${i}" ${D.turn === 'P' && !by && !D.done ? '' : 'disabled'}>${by ? 'Taken' : 'Take'}</button></div>`;
+  }).join('');
+  return `<h4>${esc(nm)}'s relics · ${who(D.first)} slew it first</h4><div class="mut">${head}</div><div class="row">${cards}</div>`;
+}
+function twmFrame(dt) {
+  if (!TW || !TW.hud) return;
+  const H = TW.hud;
+  const b = twmBarHTML(); if (b !== H.barSig) { H.barSig = b; H.bar.innerHTML = b; H.bar.hidden = !b; }
+  const D = TW.draft, ds = D ? `${D.turn}|${D.done}|${D.got.P}|${D.got.E}|${D.turn === 'P' ? Math.ceil(D.t) : ''}` : '';
+  if (ds !== H.drSig) { H.drSig = ds; H.dr.innerHTML = twmDraftHTML(); H.dr.hidden = !D; }
+  twmFlags();
+}
+function twmFlags() {
+  const H = TW.hud, S = TW.view === 'E' ? TW.E : TW.P;
+  if (!S.camps || typeof toScreen !== 'function') return;
+  for (const cp of S.camps) {
+    const key = (TW.view) + cp.id; let el = H.flags[cp.id];
+    if (!el) { el = H.flags[cp.id] = document.createElement('div'); el.className = 'twm-flag'; el.dataset.camp = cp.id; H.ly.appendChild(el); }
+    const n = twWaveNow(), alive = cp.up ? S.creeps.filter(c => c.camp === cp && !c.dead).length : 0, reach = cp.raid ? twmCampReach(S, cp) : -1;
+    const sig = key + '|' + cp.up + '|' + cp.raid + '|' + alive + '|' + (cp.up ? n : cp.back) + '|' + reach;
+    if (el._sig !== sig) {
+      el._sig = sig; el.classList.toggle('raid', !!cp.raid); el.classList.toggle('down', !cp.up);
+      el.innerHTML = cp.up ? `${esc(cp.C.name)} · ${cp.raid ? 'Raiding' : 'Raid'}<small>${esc(twmCampReward(cp.C, n))}${cp.raid ? (reach ? ` · ${reach} unit${reach > 1 ? 's' : ''} on it · tap to call off` : ' · no unit in reach') : ''}</small>`
+        : `${esc(cp.C.name)}<small>back at wave ${cp.back}</small>`;
+      el.title = cp.up ? `${cp.C.name}: ${cp.C.n} guardians. Raid it: units in reach strike only the camp until it falls, and the guardians strike back. Reward: ${twmCampReward(cp.C, n)}.` : `Cleared. It returns at wave ${cp.back}.`;
+    }
+    const p = twRender(() => toScreen(cp.C.x, 1.15, cp.C.y));
+    if (!p.ok) { el.style.display = 'none'; continue; }
+    el.style.display = ''; el.style.left = p.x.toFixed(1) + 'px'; el.style.top = p.y.toFixed(1) + 'px';
+  }
+}
+const _twmFrame = twFrame;
+twFrame = function (dt) { const r = _twmFrame.apply(this, arguments); twmFrame(dt); return r; };
 
 /* Painted roster art. Explicit faction lookup keeps commander browsing side-effect free. */
 function unitArtURL(type, force = FORCE_NOW) {
@@ -81584,9 +82398,9 @@ const SPELL_BRIEFS = {
   sb_ancestorgift: 'Nearby allies gain {mana} mana. Cooldowns advance 2s; adds eight Storm.',
   /* grove */
   shift: 'Shifts into the form the fight needs (tap to hold one), striking on arrival. Hawk: drags the 2 nearest flying enemies down for {dur} sec ({d}). Bear: {d2} and a 35% slow to nearby ground enemies. Sage: {d3} around its target, stripping 2 armour.',
-  gv_sever: 'Throws a heavy thorn, dealing {d} and rooting for {root} sec. It is Thornmarked for {mark} sec: no healing, silenced, its ties to allies cut.',
-  gv_snare: 'Nets and drags it {pull} cells back down the road, dealing {d}, rooting 1.2 sec and Thornmarking for 3 sec, so its group walks on without it.',
-  gv_wither: 'Cages in briars for {hold} sec (shorter on bosses), dealing {d} every 0.5 sec. It is Thornmarked, its ties to allies cut. When the cage opens, it takes {d2}.',
+  bw_swarm: 'Sends biting insects onto one enemy, ground or air, for {dur} sec: {d} every 0.5 sec, and it cannot be healed. When it dies they fly on to the nearest enemy, once.',
+  bw_bogbody: 'Raises a Bog Body on the road for {dur} sec. Ground enemies cannot pass it and hack at it ({blows} blows). When it sinks it drags the nearest {n} under, held 1 sec, dealing {d}. Bosses wade past at half speed.',
+  bw_bogdue: 'Opens a bog under the toughest ground enemy. Drowned arms drag it to the waist for {hold} sec, dealing {d} a second and pulling all its armour off; it climbs out slowed. Enemies crossing the bog are slowed and lose armour.',
   ch_entangle: ({ d, full }) => { const f = String(full).replace(/<[^>]+>/g, ''), m = /([\d.]+)-cell/.exec(f); return `Deals ${d(1)} in a ${m ? m[1] : '1.7'}-cell area and roots ground enemies for 2 sec. Bosses take less and are rooted briefly.${/Roots Remember/.test(f) ? ' A weaker grip follows 2 sec later.' : ''}`; },
   ch_rootway: 'For {dur} sec, every 0.5 sec roots seize the unrooted ground enemy nearest the gate, dealing {d} and rooting {root} sec.',
   ch_oldwood: 'An ancient tree walks up the road for {dur} sec. Each ground enemy it meets takes {d} and is rooted for 1.2 sec.',
@@ -81709,9 +82523,9 @@ const SPELL_TARGETS = {
   haze: 'the densest group of ground enemies',
   barrage: 'the road ahead of ground enemies',
   bindseed: 'the densest group of ground enemies',
-  gv_sever: 'support casters first',
-  gv_snare: 'support enemies with a group around them',
-  gv_wither: 'support enemies with the most ties first',
+  bw_swarm: 'the toughest enemy not yet swarmed, ground or air',
+  bw_bogbody: 'the road ahead of ground enemies',
+  bw_bogdue: 'armoured enemies first, then bosses and elites',
   ch_entangle: 'the densest group of enemies',
   ch_rootway: 'the free ground enemy nearest the gate',
   ch_oldwood: 'the road ahead of ground enemies',
@@ -84643,7 +85457,7 @@ function infoHTML() {
     + `<p class="mut" data-d="2">Maze length <b>${G.path.len}</b> steps${G.ageRes ? ` · Keep upgrading to a ${AGES[G.ageRes.to].name}` : ageCanStart() ? ' · Keep upgrade ready' : ''}${G.wave === 1 && G.towers.length < 3 ? '<span data-d="1"> · Build a maze, then sound the horn</span>' : ''}</p>`;
 }
 function prioSlot(t) {
-  return { key: 'tgt', lbl: PRIO[t.prio], on: true, name: 'Target priority: ' + PRIO[t.prio] + (t.def.force ? '. First to Weak let its spells steer its strikes; a role order overrides them.' : ''), act: () => { t.prio = (t.prio + 1) % (oldRules() ? 4 : PRIO.length); sfx('click'); toast(`Targeting ${PRIO_SAY[t.prio]}.`); } };
+  return { key: 'tgt', lbl: PRIO[t.prio], on: true, name: 'Target priority: ' + PRIO[t.prio] + (t.def.force ? '. First to Weak let its spells steer its strikes; a role order overrides them.' : ''), act: () => { const v = (t.prio + 1) % (oldRules() ? 4 : PRIO.length); setPrio(t, v); sfx('click'); toast(`Targeting ${PRIO_SAY[v]}.`); } };
 }
 // the wave card's problem: what this wave asks, who covers whom, and the ways through
 /* ---- the wave's strength (the wave card): its total health against the last wave's, and against your army: the same
@@ -85563,7 +86377,7 @@ function pauseMenu() {
   showOverlay(`<div class="cm-pause">
     <section class="cm-nav" aria-label="Pause menu">
       <header class="cm-heading"><h2 class="ttl">Paused</h2>
-        <p class="sub">${TW ? `Tower Wars · wave ${Math.max(1, TW.wave)} · against ${esc(TW.ai.name)} (${esc(TW.L.name)})` : `Wave ${G.wave} · ${esc(typeof campSaveName === 'function' && campSaveName(G) || (MAPS[G.map] ? MAPS[G.map].name : MAPS.meadow.name))}${G.rite ? ' · ' + riteName(G.rite) : G.diff !== 'normal' ? ' · ' + DIFFS[G.diff].name : ''}${G.chal ? ' · ' + CHAL_BY[G.chal].name : ''}`}</p>
+        <p class="sub">${TW ? `Bannerwars · wave ${Math.max(1, TW.wave)} · against ${esc(TW.ai.name)} (${esc(TW.L.name)})` : `Wave ${G.wave} · ${esc(typeof campSaveName === 'function' && campSaveName(G) || (MAPS[G.map] ? MAPS[G.map].name : MAPS.meadow.name))}${G.rite ? ' · ' + riteName(G.rite) : G.diff !== 'normal' ? ' · ' + DIFFS[G.diff].name : ''}${G.chal ? ' · ' + CHAL_BY[G.chal].name : ''}`}</p>
       </header>
       <div class="cm-nav-main">
         <button type="button" class="btn cm-resume" id="pRes"><span>Resume game</span><kbd>Esc</kbd></button>
@@ -86315,7 +87129,9 @@ function frame(now) {
   if (G.state === 'play' && !G.paused && !TW && !document.hidden) G.playT = (G.playT || 0) + Math.min(real, 1);   // the run's playing time, for its saved game
   if (!document.hidden && real < .5) { perfAcc += real; perfN++; if (perfN >= 120) { if (GFX === 'auto' && perfAcc / perfN > .027 && qScale > .55) { qScale = Math.max(.5, qScale - .2); layoutAll(); } perfAcc = 0; perfN = 0; } }
   syncHold();
-  if ((G.state === 'play' && !G.paused && !G.hold) || G.state === 'demo') {
+  // Tower Wars online: fixed ticks in lockstep, never paused (twnet_ui.js)
+  if (TW && TW.net && typeof twnFrame === 'function') twnFrame(real);
+  else if ((G.state === 'play' && !G.paused && !G.hold) || G.state === 'demo') {
     const steps = G.state === 'demo' ? 1 : G.speed;
     for (let s = 0; s < steps; s++) { update(raw); if (TW) twStep(raw); if (G.state !== 'play' && G.state !== 'demo') break; }
   } else if (G.parts) updateFx(raw * .5);
@@ -93844,6 +94660,151 @@ const TG2 = (() => {
   }
   return { S, CL, load, hot, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
 })();
+
+/* Cloth weights for the sculpted units' wind sway, a vertex each (w: 0 rigid .. 255 the free hem; a: the side it may
+   swing to, 0 for no limit), in each model's own vertex order. Generated by tools/make_cloth.py from its CLOTH
+   rules: do not edit; rerun it after a model is re-baked. Read by src/unitmodels_cloth.js. */
+const CLOTH_DATA = {"ranger2":{"nv":2693,"w":"HikAAAAANQBfWVuWea9tAADLqOjj+gAAy+n41vCoc+iu9/d6fVVmQzxKRyRLTh4nKCkqDg8LCg4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD+/v7///+zg1ExRByBrZi73BLjFxcXFBIRCQwKBgQAAACGxOLj28rv9DH6+fr8/HCJkZyho6Wlg2iBHk06GD1EUFRVV9zMbi4AAAAAAAAAAAAAAAAAAAAAAAAAAABXAAAqALOh1QAVABYgIgAAAAABHCEcGxgLBiIgICIlAAAAAAAAAAAAAAAARiUmAAAAAAAAAAAABAMAAAAHAAAOCRYZEA8YGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGB8eHyIjJAAAACEAAABGUVJVVrZa0+SQiXqhpaqora6v5eXv4s/r67ULAAAAAAAAAAAAGBYaExkGAAAAAAAAAAAAAAAAAAAAAAAAAAAAFgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACJvUeHAAAAAADw7Ono8PXw9fj8/f7+9fn4+/v4+v39/v//+vv9/v7/TgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4bAAAAFyAAJx0ADgoZHQAAABcADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","a":"s7QAAAAAtwC1qqSjqaSpAACkqqSnpAAAnJyckpCVlYCAipCAa66woqmplKGAbKeUgGxfaYCXpFwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACen6KfoZ1rXV9YWllUV1JdXFpkWFhXWFdXWFdXVlYAAAC8ubu8vL+/vbW+vb++vrW1sbaztbW0t7e4r6ytr6+uqausq8DCwboAAAAAAAAAAAAAAAAAAAAAAAAAAADGAADIAMTGxQCwALCurQAAAACxqq2srq2sqqioqKurAAAAAAAAAAAAAAAAr6mqAAAAAAAAAAAAq6sAAACqAACoqqmpqqqpqgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMTCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVlhZVlVXVgAAAFQAAABXWFZXSE1CV1JRTUhNUU5NUE5PTE9MRkJFQj9UAAAAAAAAAAAAVFNSU1NTAAAAAAAAAAAAAAAAAAAAAAAAAAAARgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8PDs7AAAAAABTVlhcYGFiZW1obWtqcXB1cnV4gHl+fHp8hoWJh4qIWgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJiVAAAAk4AAgIAAgG1tbAAAAGoAZwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","probe":[-0.0057,0.1457,-0.0804],"bone":3,"amp":1,"h":1.0,"what":"the cloak, from the shoulders to its ragged hem"},"thundergun":{"nv":8347,"w":"qImiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFEAUV8AAABRYIl4WntRiV97iaiKenhlaWBlemAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHtfUSRfMV+KMQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHxwAAB8AAAAAAAAAAAAAAHJKUFAAaVAAADYAZXqAZTxAABwmACY6MlpPAAAeNAAAAAAAJiYALyYvHgAvAC0iLTcALS0AIC0tAAAAIDQrNAYHAAYxACRNMYoAMQBNMy8tLS0mLTQtLQAxOTQ3My0mAEw2U0UkJDwyHjA7NzdFGxswNx8mNCUeHjI0FhseGBQeHiUYFBEeERYeXV9JSXp4K11JU4V4eBUAAAAVAAAAAAAAAAAARUxVVXqFAAAAAAAAAAAAAAAqAAAAAAAAAAIAAAACAAACAgAAAgAARUVGRSQqRUUqN0U9QUM1OQBDRj03GyEhGwAbAAAAAAAAAC4AJwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAQEAAAAAAgEBAgECAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4LCwgNCA8ODQoECgYNCAYNDQgFAwYCCg0dAAACAAAGAAAKAAoHBAAFAAAAAgAEBgsQDg4ICxYRCwsGCRYJAAAAAAAAAAAAAAYEAwUAAAAAHgAAAAQCAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKikiaKxqKixqIqolJeol4qXioWdip2Rip2FipFNqaCko6SgkZ2kkaCQo7GRv8emscq6zb+60c3N1Mp4qsOqeGTDysrDZLKqfsrLyn69ssKmzcmmpsvCpr/Llb+mv4x+PAC/yb+8v7y/vL2/vc6/yLG/yL+xjMLRvYHRvJituby8ua6+u4Svrby7oq63v5O8wZjBwbiYhsHBxb7FxbjFxb7Hu76+u7vIvsW/uL/Fhrm/hW2ipsfM0NC5x6a7x12Fa3ddPAA8XYxNkQBNADtNjDsAeAAAAAAAhDuMWU0uWU08UzxrWQAAAAAAADuEQYRBAEJCgQAAAEMANEMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANBQoKDQ0ICgUFAAUFDw0FAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAABQ0ABQIAAgAAAAAAAAAALg0NAwYIAAADAAAAAAAAAAAAAAAAAAAAAAAAAG80QwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASAAAoACgSNyg3XCgAAAAAJQAAOwA7ADtAADVAOwAAOygAO4aCOzuCYiiGOwAAAIKXlZiJlZWXmJd7iX5XgIl7YW1UbV1dAA0TEw0AAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAkAGQkALlE7aRkAADZRaWI2GWI2N2RiN1w3BwASBxoNGhkhNTU2NjU2NTY1NjM0NA0AAEAqJTMzMzM0MzQ3hpiGloOZhoaZipOWhoaUkycYGzUnJxsXiZiWjxERAAYNBQ4QCwkNDg4NEA4LAA4ACQoLACIjIiIjIiIiIyIiIyAgICEgIAsAACUkJR0eJSQlHiUbHCMcGyIjIhsKAAAgICEgISEAHBshADQzMwAFCAAFAAUPCAsPDhsYAAAAAAAAAAAGBQAAAAAAAAYKBwgIBQMCBQADAgYIDAgFCBANDA4RERUQDhAJBAQJExUtEi0VES0RJQUDBAkFBQQEAgQDDAYGAAIAAAAAAA8HBgAAAAQEAAADAgAGBAMEAgMCAwIAAQIAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgIAAAAAAAEBAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADDt7W3w7qvuoS6wsOizMPAtsLCusDDzLq6uoq6wsCKhLrDtqKixcyMgNHZ1b+/utGK2dW+v769v73Gv7+9vcafv7+fisC2tra2jLWK09PFvoC1zMPD1MzMzNSKtcPMtcKfxsTEvZ/Gxp+mip+Dg5+gnsqmv8qXwsrFjISejISgjACEnougiwCDAHeDjHcAuoydd4y6naurl3Oig3OHg6Khg6GgnaGdpIOhmZOPlp2rcwAAEgAAAEI+QoqDPoo+AKKMUwBBQ0EAAABTQQA0UwBVMV1YWHEAAJOPbgBQMgAAADA5OQAAACswADEJEwAAAAATCQgAAAAMEBAMEBMGCAYTDBAQEAwICAwGAwQGBAMGDAYDAAIABAACAwACAAACAAICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAImBogAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH2lKckppAAAefYE6AAAAAAAAAAYRAAYHAAAAACAeNC9JSSsreFNfACQVVUVFAAAkAAAAAEE5QzkmMT45MTsyOzA3G0UAAAgbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQECAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsGAAUAAAAEBwYICwgGAwQAAAAGAQEAAAAAAAAAAAAAAAAAAAIAAgIFAAcABAEDAAAAAAALDRIRDQgSEQcNAAAAAAIAAAIACwYCHgQGDAYEAAcABQIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJSJoHcAAAAAAKOditHD1NTN0QAAAAAAAAAAAMLLvc7CvLzByMG4xb+5zIl3UZAAAACVXWs8PAAAAAAApoVtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCgUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0KDQMCAwMIAwAAAAAAAwUAPAAAAAAAAAIAAAAAAAACDwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgAEntXYYmAfoBtfgAAABQAFAAVFBQAFBMUFTNCJzIAAAAAACc3AAAAAAAADTcoACEZOzQ1NA0AAAAAAAAAABIAAA8AAB01NDM2NDQ1OSwxOUAxIBYVEQ0UExIRFQsTDQYCAgIWFREYEQggGiEiICEkJRwiIiEgIiEiISIiISEeABwOAAALCAULCAUAAAAAAAAAAAAABQUFBQAAAwEBBgUDCAoNCAUDDA0JBQ4REAMDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAECAgEAAgICAgIBAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADV2cXF09XM1MMAAAAAAAAAAAAAxcq/oqSgh3GrnboAAAAAAJNvQyiDhlCKRRyfVTJjVy0lbjEtXTFFAAAAAAAAAAAAAAAAAAAAExAQAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAICAAACAAEAAAABAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB6YIByUDw2U4GJJkA2HFFRNkBRPDYAQEo6T1BPZVBPZXgAAAAAAAAAAAAAJhwAAABfAAAAAAAeIBEAAAAAAAYABgAAAAAGAAAHBgAAAAAAAAAAAAAAAAAAABEAADYtNCIrABEkESQkPE9PMwAAACYnHCQAAFMvXyUAHCQAAAAAAB8tAC1VTFMAAC1MLTYtHwAVAIV6eAAACAAACAgAAAgAAAAAAAAAAAAiAAArADEmACpBRTdFPUVDNUNDOz5FPUY+Pjs8EiUAACoAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAICAQACAgIBAQEAAAAAAAAAAAEBAAABAQACAQECAAACAwIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgYDBgYEAwYIAAcKBgAAAAAAAAAGAAUAAAYAAgUAAAAGBgUZFycmBQ4QFxkRFBQYFxELDhcQFBcYJScLCBQUEBEQAgMAAwABAwQAAwQECAAAAAEABwICBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAABQEBCA4LAAMDAAAABQMGBgAAAAAIAAAADQ0LEhMACw0HEQsAAAIAAAIAAAAAAAAhMjAbCAAZEwwRExkfHgwGCxEABAwTHxMGAgUNBAARCA0TAAACAgAAEgUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKSxon0AAAAAAAAAAAAAqKixpImkoKmXlKioAAAAAAAAAAAAAAAAAAAAAACpo6OKl6mQoImxx83Kur/Hv7p4w9FRAACqysOyywAAAAAAAAAAAAAAAAAAAADNps3Lycuyvb28vwAAAAAAAAAAAAC8rry8AAAAAAAAALHIwb4AAAAAws7RyMzMx77IzLnQu7uXlFEAkIldAAM8AwAAAACMpgAAADwdZAAAPAAAAAAACAAAAAAAAISMsb5vbYYAQ4UAAG00AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgEBAgEBAAAAAAEAAQAAAAAAAAMIAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAuAwUEAw4PDQ0PDQgNCgBRPAAIBAUFAgMNAAAAAAAAAwAAAAAAAAA0AA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBiiYCVFQAAAA0UACcyQjNUXQAAAAACAAAAAAAAAAAAAAADAAAAAAAAAgAAAAIAAAAAAAAAAAAAAAAAAAAACQAAAAAnLgAAZHJyaWJyADcANw0ANTYNAABcN2QAAAAAAAAAAAAAAAAADwAXEgAPEhcUAAAAAAAUNTMzNQAAEigoEomPVzE3JzEVFBMVFBETFBUUDRMVFBQWERUVFREAFREAERYaGAAUGBENGBQIEAsKCyIiAAsNCSMkJSIQIiIhCwoAAAAeHRwdIBgeNBgOERgAAAAJIAAgGgsaGjEFAAsaFw8AAAAAAAAGAAUHAAAAFBgAAAAHCggADAgREAMJDgQQFRIRBwgFABIFBgUGBw8RCAAAAAAAAAAFBAMABAQABQAEAgMDAQQEAwMAAgEDAwAAAAAAAAEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMCAwMCAQMCAwMDAgIAAAAAAAIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALe8v7yuvwAAAAAAAAAAAAAAAAAAAACTt7cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMPRw8zRtYrZwrbCusK1tsDMw7UAAAAAAADGxsbExsrCxr2fxp6fvb2evb6AhACLnsW/oqChi6KHoJmknYqdoJSGin6dc4N3j5R+AwMAAAAAAACukwAAAAAUFxIAAACAnj6iPlCMpp+eVYw5Y5d+imNxh0WTfjJDAJOUjw8CAAAAAAAAAAAAAAAAABITHBwlAAAEBgMDAAAGCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIDAAAAAAEBAgEDBgMBAQIAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","a":"v8G/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL8Av74AAAC/w8G/wb6/wb6+wb+8wr/BxMPBwsMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL6+v8K+wL68wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4eAAAOEAAAAAAAAAAAAAAMTFxMQAxMQAAMsAwcLCwcvNANLQANDNwMHCAADKwgAAAAAA0NIA0dDR3QDRANnf294A29kA3dnZAAAA3d7f3srIAMrAAMK3wLwAwAC30tHZ29vh2d3b2QDh4d3e0tvWANza3OLY4uPl4eXl3t7k5+fl3trWwsS6usDCubu6xMS6usTExMS6xLm66/Tq6u7y6+vq8+/v8uMAAADjAAAAAAAAAAAA5Nzd3e7vAAAAAAAAAAAAAADxAAAAAAAAAMsAAADLAADLIgAAywAA4uTk4uLx5OLx5OLl6+fm6QDl5OXk5+jo5wDnAAAAAAAAABcAHQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwMO8u8AAAAAAxMfFvrq7vQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDCxMDBxrzAu7zEvsG7uLi8u8C8xsHGvru9AADGAADbAADcANzXwwDdAAAAxgDDxcrKzc3SyrnEwsLAubm5AAAAAAAAAAAAAM3UzcYAAAAA4QAAAO/oAADoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALy9vL+9v7+9vby9u7y9vLy8vL27vLu1vLu9vLW3u7q5t7m6tbu5tbq3t7a1trautrCztLazs7S0srCzrrKus66yr7CyrqyurK+tsKysrK6urquurquurqirp6aupqesrwCmq6ilqKWmpaKmoqKmoqKmoqaip6ChoqOhoKCPiYaGiXyPiZdxj3uJjHx0eXOgoKCdoJugmp2dmo+bmpuam4+Nh4+Ph4mTj5uYm5ibmo+Yj4+Mi42PjY2PjYuHjbq9urm6twC3uqe3tQC3AKy3p6wAswAAAAAAl6ynu728u723wLe6uwAAAAAAAKyXgGiAAFRUowAAAJUAkZUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC5uLq6vLm4uri5ALi5vLy4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAuwAAubsAubsAuwAAAAAAAAAAvLu5tbi4AAC1AAAAAAAAAAAAAAAAAAAAAAAAAIKRbwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA5AAAxADE5KzErJkAAAAAAPAAAPwA/AD86AEA8PwAAP0AAP0RBPz9BQEBEPwAAAEFBP0A/Pz9BQEERFBQQFBQRERgZGBkZAAwQEAwAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAACcAJicAFx4iIRcAACAeISIgJiIgKCYiKCYrNgA4NhYCFhcXJSgmKSUmJyknJjMzMSsAADo1PC8wMzAxMzM9REBEQ0tFRERFRUNDREREQz5FRkA+PkY+P0BDQQcOAAMHERsfHhsdGxsdHxseABsAGygqACAfHyEfIiEfHyAiHyspLS0rLSoAACUiIiQmIiIiJiUwLy0wMC4tLjAoAAAtKSotKi0ALzAtADEvMwAtIAAmAC0+NTc+QUZFAAAAAAAAAAA0MAAAAAAAADQzLDk5NzIzMAAyMzo7OTk3Oz45OTk8QEI+OUE8PDo8RUJEQkRCQERAREA9PDxAQEA8OTw8Q0READMAAAAAAEE7OgAAADU6AAA8OQBEQ0BERD9CP0QAODsAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7OzwAAAAAADtAPjtDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB3dXV1d3FxcWhxZmNgYGNlZWZmcWV3cXFxX1lxbGVZaHFjZWBgYGBmX15fX1tbX15ZX19eW15cW1lWW1tcWVZTW1tTWWVoZWVoZmxwX19gXl91cXdwcXFwcXFwbHBwbGxTU1ZWWVNSU1NVWVNLS1NLSlVVVFVTVFVTUkxKUkxLUgBMSkpLSgBOAE5OUk4AUlJOTlJSTlJSU05LS05JTktIS0hGRUhFRUtIRUNBQ05STgAASQAAAFRJVFlLSVlJAGBmYgBrb2sAAABiawBdYgBZSEZGRkgAAENERABUUwAAAFBRUQAAAE1QAEhKRQAAAABFSkoAAABDQURGRUVJSklFRkRERUZGRkZIR0RESEdIRklHAEgASABERwBEAABFAEZFAAAAAAAAAAAAAAAAAAAAAAAAAABDAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMHBvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4cTFxMXEAADKv8HNAAAAAAAAAMrVAMjIAAAAAN3d3vLq6uvr8vP0ANzj3eLkAADiAAAAAOvp5+Hh4ePh4eXl5eXk5+QAAOrnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAxAAAwL7BwMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMTdAN0AAADD183HwsfAy8oAAADIxscAAAAAAAAAAAAAAAAAAMcAxsfBAMAA1MfHAAAAAAD7+QUF+fgFAvkCAAAAAAUAAAUAAgMF4e/g4ODvAPkA2egAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALu4urkAAAAAALu7vLOysrK0swAAAAAAAAAAAK6trKKgoKCgop2bmpiPj7i5tbcAAACnurq3twAAAAAAi4+PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC4urgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALy6u8C9vLW4twAAAAAAv8EArQAAAAAAAIEAAAAAAACBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAOREQERQUFBQYFAAAAAgABwAPBxAACBAQDxgZEhIAAAAAAB0oAAAAAAAAAigxABcXIjMoMSsAAAAAAAAAADgAAD8AACQnMTApMzEnNSo3NTw3Lw4NAgIHBQUFBwIHBwMFBQUODQ0aFSAiFhcgKy0iJTAuHyopISofLSIiLS0mADAkAAA3NSY3NS0AAAAAAAAAAAAAESYwMAAAKy4uLDArMjM5MjcyOTk2Nzk8QTIyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADs7PDsAO0I/Qj87P0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABfX2BgX19wcXAAAAAAAAAAAAAAU1VUSUVGSUhSTlIAAAAAAHOCb0BLRFRFS0dTWVNSQEREREhERkhLAAAAAAAAAAAAAAAAAAAARUVEAAAAAEoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEVIAABGAEUAQwBFRQAAAAAAAEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCw8LExMvLwMHB0s3L0szMy83My8sAzcXNxsTCwcTGwb8AAAAAAAAAAAAA0tIAAAC+AAAAAADd3dUAAAAAAMgAyAAAAADIAADIygAAAAAAAAAAAAAAAAAAAM8AANrb3t/fAM/Yz9jix8LG0gAAANbK4NwAAPPy9PEA4NwAAAAAAOHbANvd3NwAANvc29rb4QDjAO/u7wAA0gAAt7cAANIAAAAAAAAAAADfAADfAOHhAPHr4uTk5eTl5uXn5ePk5eTj4+Xj6/EAAPEAAAAAAADqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMHBxAC+wcG+xMAAAAAAAAAAAMXHAADExQDDxsfEAADBwL7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAx8jLyMfKxsjGANfc2wAAAAAAAADbAMYAAMUAxsYAAADdxcbaycrW3c3KydraycTEydrazcnKycnExMrKx8TJysTKw8QAywDHxMQAwMDAwAAAAMcAwMfGwQAAAAAAAAAAAAAAAAAAAAAAAAAAAADZAAAAwcfH0s3aAMfNAAAAxr/AwAAAAAD4AAAA+fr7BQUA+/r5AgIAAAUAAAUAAAAAAADo5eXn6gDa4ODa4Nra4eDg2toA7+Dg2uDg6NkC7wAF+PoFAAAFBQAA69kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL29v78AAAAAAAAAAAAAvL29vby9uru8u728AAAAAAAAAAAAAAAAAAAAAAC7u7u8vLu3uri2trSws7a2trOzsrO/AACur7KsrQAAAAAAAAAAAAAAAAAAAACurq6rq62srKKlqAAAAAAAAAAAAACGfHuGAAAAAAAAAKKinY8AAAAAoKKhk4+PjY+Tj4+NiYe8u7UAt7i6ALavtgAAAACnrgAAAK29rgAArwAAAAAAtwAAAAAAAJenoo+Cj5oAlY8AAI+RAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAvry6vru8AAAAALsAvAAAAMAAALe4AAAAAAAAAAAAtwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC8vLzAwMC8u7u8vLi7ugC1twDAwLy5u7y7AAAAAAAAvwAAAAAAAACRAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAA4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD9APz8/DwAAAAwQABISGRgZGQAAAAAOAAAAAAAAAAAAAABFAAAAAAAAIgAAACIAAAAAAAAAAAAAAAAAAAAAJwAAAAAdFwAAJiMjISIjACgAKysAJSkrAAAmKyYAAAAAAAAAAAAAAAAAPwBDOAA/OENFAAAAAABFJzAvJQAAOTFAOT9BQDc9PjcPEAcHGgcHBwcHBwcHBwcODgcNBwcABw0ADg4WFQAHFRUHGhogHyooHiAfACodGy0iJS4fISItHigAAAAmJC8kIiMmMSMkFRUAAAAbLwAvNTc1NTctADc1Pj4AAAAAAAAsACYsAAAAGhoAAAAsMzIAOTtAPjI2OTU+QkI8Ozs3AEIwOjA6O0FAOwAAAAAAAAA3NT0AOjwANwA1OTw9OjxAQDwAOTpAPwAAAAAAADo4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD07PT87OD87Qz9DQj8AAAAAAEIAPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHR7eXt8eQAAAAAAAAAAAAAAAAAAAABzdHUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGNeY2BedXBfZmVscWxsaGVwcGwAAAAAAABTUlZWU1VUUllTUlpTWVxaXF5fTABKSlNUSUZISklJRkVFRUVFRkRERUVOTk5ORERFRUUAAAAAAAB8cwAAAABFQ0kAAABfWklgSVRSVVNaWVJRUlNFRVJISUtDRVNvAENERICBAAAAAAAAAAAAAAAAAEJFR0dEAABEREdGAABJSgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEJDAAAAAEVFRkVDSENFQEIAAABFREMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","probe":[-0.0007,0.227,-0.0772],"bone":0,"amp":1,"h":0.961,"what":"the teal cloak below the shoulders, front flaps and back"},"aurelian":{"nv":7697,"w":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAtrWrtbYAmIepr4VoYAAAAAAAAAAAAAAAAAAlABpCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAQAAAAAAAAAAAAAAAAAAAAAIAwAIAAAAAAAAAAAHAAgJAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAECAQEAAAICAQAAAQAAAAABAAACAgEAAAECAAIAAAIAAQAAAAEAAAAAAAAAAAABAAAAAAAAAAIAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKYAybvCsK6kiapKaFdXYWuuAEhhT60QAAA/EzEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAQAAAAAAAAAAACQbLyQ/QwABAQAvAQAAAAAAAAABAAAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAIAAAEBAAEAAQAAAQAAAAAAAAAAAAAAAAAAAAAAAAIEAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAIAAgEBAAAAAwIAAgIAAAMCAAAuAAIAAAAAAAAAAgAAAAEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAEAwEAAAAAAQAAAgQAAAACAAAAAAIAAAAAAQAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAEAgAAAgACAAAAAAAAAAAAAAAAAQEAAAIAAAACAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB+AAAAANXNqpSiqZ9PY3erkAEAqaC1ta++taCvvrO1rr5Bd4WIiAEBAAAAcZiQYAAAAAABAAAgGVUlRgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARE1UAAACAQIBAgECAAAAAgABAQIAAAEAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMACAAAAAAAAAAAAAAAAAwHCQAAAAAAAAkABwAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAh8AAgIBAAMCAwEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAQACAgAAAgAAAAAAAAEAAAABAAAAAQIBAAIAAgIAAAAAAQAAAAACAwIBAAIAAAAAAAAAAAACAAAAAAABAAAAAAAAAAAAAAEAAAEAAAEAAAADAgACAQABAQAAAAACAgMCAgIAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBAAACAwEAAgAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAo6a3t6MAa6KXYM541piYiaS1d2RPYQEAAGRoeDksAAAQAD8xMRMAJgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","a":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAq7CpsKsAlKeFip+kmwAAAAAAAAAAAAAAAACgAJSTAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA5AAA5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAmADAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACoAACMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGFeVlFXVVgAaWVlYWN7AF1hZVJtAABXAFMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMwAAMwAAADLAAAAAADLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPPoAfMA/gAAAAABAADMAAAAAAAAAAAAAAAAAADMAMoAAMfLygAAAAAAAMoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAvQAAAAAA2tAA2wAAANrbAAANANsAAAAAAAAA2wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2gAAAAAAAAAAAAAAAAAAAAAAANwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3ADcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAvQAAAAAAAAAAvQAAAAAAAAAAAAAAAL0AAL0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALwAAAC9AAAAAAAAAAAAAAAAAAAAvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADt7vAA7gAAAAAAAO0AAO4AAAAAAAAAAAAAAAABAAAAAAAAAQAAAP4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACnAAAAAK6ur52blQAAowCalwAAko2KAIqGio2KhoSAe3yvsJ+TjAAAAAAAlZSXmwAAAAAAAACsAK6gqQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACsAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFgkTAAAALgAAAAAAAAAAAAApLgAAAC4AAAAAAAAAAAAAAAAANQAAAAA1OQAAAAAAADUAADkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAmABgAACYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3AAAAAAAAACYwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKgAAIwAAAAAAAAAAADIAAAAAAAAAAAAAAAAAAAAAAAAAABUPAAAAAA8AFQAAAAAVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIwAAAB8jAAAAAAAAADIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEMAAAAAAAAAAEQAAAAARAAAAEMAQwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAB7e3gAY11iAFNtVFpaVVdabWtlYQAAAGtpbW1iAABtAFdTUwAAUwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","probe":[0.0005,0.2194,-0.0905],"bone":0,"amp":1,"h":1.0,"what":"the cape from the shoulders down; the tabard below the belt"},"faelan2":{"nv":3897,"w":"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","a":"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","probe":[-0.0354,0.2042,-0.0363],"bone":3,"amp":1,"h":1.0,"what":"the leaf cloak from the shoulders down; the tabard at his belt"},"bd2":{"nv":3802,"w":"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","a":"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","probe":[0.0001,0.1386,-0.0211],"bone":1,"amp":1,"h":0.998,"what":"the leaf skirt's panels; her hair, a little"},"seed2":{"nv":4604,"w":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMTCwszMzAAAAAAAAAAAAAAAAAAAAAAAAACZn5+coXl8dnV7eGZfZWFnOz8+QkQuN0FGSSwlMyArPTJFN0Y1UTYlTVNQUj8qJhUTFBcWGhwWGElLSDEwKx4uExMXAAoJAAoJBwiTk5VjYl5bsbealpyVs6uIenprXgAAAFxNYjZCXF5eV1VhAAAAADApIR4xMzMyMzI0MTQxMDE0NRgYGBoUHwoKLjIzKis7NSgoJyQWHQkKCjgbGRk6NTAuLgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADQ0NBgUDAAEDBgAMACMkJQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHRsXHx4WAAAAAAAAAAAAAAAICAcHBgcICAcEBAIECAMHCAcIAgMCBAMEAAAAAAAAAAgJCQsJCgYFBQAAAAAAAAEAAQAAAAAAABANCAAMAwAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIiOlIqNf0E+Pz4/P0A/PzE0NjE2HR0cHhsZHF9rcWNnXFRZqKKZnag1NzM2Kio3NTYpDAkLCgk0NTY1Pz9GT0lJO0oeEx8VAAAAAAAAAAAAAAAAAAAAAAAAADY2Nj05OTQtOTw+MjIwIi8oHEVDQydHAAAAAAAAAAAAHxgYHh0eAAAAAAAAAAAAABEOCQYHBgcFBgVTUlNISElIUVFPREhLSEoRGRoKJSkrNzg4TSAdREc4ODkPEg0TDQgOCwUFBQUqKioAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH1/gVZYWQAAAI6ciJySrrCxoKOlAAAARldRLi4zLyceTDY3ODc2Njc3NisvMC0wKi4qLSwuOzYhISUlKkglJyQoJyUkLDEsKig/QkUpJwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUGBQYHBQQGBwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI+UlJCKfHB4cnh3U2JfIyEkI0slOzlCPzAAAC4tPTtFRD8/NkpEQDcyLismIStMOUlKSywrLAYGBQgIBgZVVVZJTEgqKCQ+KSopGxgABw8IDxYWGggKDg0RCBkSFRARBwIAAgQEAAMAAAAAAAAAAAAAABEzMzMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADMzMzMy8vGyQC+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKNoaOkpaGHgmxva2pqa2dZVmhqa2xqP0A+Ok1RXFZDQjszMxMFCwuOjoeIZn2BeXRwbGdiuaicfAAAAAAAAAAAAAAAAAAAAAAAMS8vMB0dMzEAAAAADAwLFxgXMQBFSzooAColAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKDAwKCAUCBQUAGBYHBgQCAQEAABsiJSIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB8hAAAAAAAAAAAABgYGBgYGBgYGAAAAAAAAAAAABgYAAAAAAAAAAAAAAAAAAAUEAAgFCAYIBAQEJyUkJQAAAQEAAAAAAAAAAAAAAAAAAAAAIBUAAAAAAAAAAgAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJ6bmp87Ozt9uby7ubSxiod7bWxdoJKEdVJJYFA7Ozs7OzQXGC8vJyYmJyYnJycnJSUlJiYmJycpKg0NCwo/KB4sOlVSMAAAAAAAAAAAAABISUpKRUU6Ojg3Ozs7PEI/MC8tLCgpAAAAAAAAACYnGxsWGBIUAAAAAAQER0ZPUUpNQ0UJCAhNPDUzLy80My4wKzc2CApGNwkfXl1YV1NOQTAjLSELEQAKBAQHAAISCwUeHiMAEQAAAAIaERYLBgQEAwMoKSUnIyIdHxcaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABra2hnAAAAAAAAAAAAUFN3dm1nX1cAgqaqfABubmIAIzg4KhkLAABISVEzMzMzMjIUCC8oJyAhISEgISEgICAgIDIQBzIvADMzIiMjIyIUS0pLTEhGRkRGR0cGAAAAAAAAAAAAAAAAAAAAAAAAAAAABAMCAwMFAggAAAQEBAUEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKeqqqZWV1xXWVxRlpWGgmNlaFkzHBpIPmVlZGNhZGVjPk9QUlFMTEVIAABaYFNPUVZUWVxeWV9hYWAiKigmAABJSEZHRAYJCVNSUFBMTk1KT09CSEhFRjI1Ljc6Jz49O0JCNzY5Oz0/Ly8vLygnAyUKDBAOExMfGCEhICAeHRsbFxgFBQADBCMhHhsYFjIxJicmJCUhIR4eGxsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","a":"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","probe":[-0.0377,0.2915,0.0122],"bone":1,"amp":1,"h":1.0,"what":"the leaf skirt; her long hair, a little"},"nyssa2":{"nv":4738,"w":"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","a":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALyyusq+wgCnqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMoAAAAAAAAAAAAAuLi1tbq4tb4AAAAAAAAAAAAAAAAAAAAAAAAAAAAA7vkBBwDhAAAAAAAAAAAAAAAAx8K9ALOzsrsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACckYaHgHp5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABGPkZETjc3AFlYABQAAAAAAAAAAAAAAAAADQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEZCOUNLS01NSEhOS0hFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG9kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","probe":[-0.0023,0.064,-0.0024],"bone":1,"amp":1,"h":0.949,"what":"the gown below the hips; the arm drapes; her hair, a little"},"pyro2":{"nv":3339,"w":"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","a":"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","probe":[-0.0006,0.1778,0.0041],"bone":1,"amp":1,"h":0.999,"what":"the robe below the hips; the sleeves' drapes"},"tg2":{"nv":4151,"w":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVGdxAD4mAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABbSFZYSSwwKC8tGykLIUBAACEjAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK2ZuLe8hLy9qbW9p7CYaKOUhYsU6e7s2+bdop2boY7NrL+Wl5OFZm6ZkaWYa5CJlqOmaltfV2BeQT8rUHIHGBIADSQAADUAAAAAX0M9SkYtAAATAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAACAAABwAAAAVNS0lKTExJRkBGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAMDBAIAAAAAAAAoJyYqKSgQEA0JAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgAmAAAAAAAAAAAAAAAAAEAqS0JQTTU9AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","a":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/r9AJ+hAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD29/Tw8Obn6Orq7fDq7+TjAKelAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADsAAAAAAAAiwAAjAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALe3tbaytbS0qqytpaair6KhqqOpjo2PjpGUmpiYmpmWloyMn56ipKibnJuHgYB7gImGtrO4ubq6sbKymJqxsLQAp6QAAJkAAAAAlpaUlJeWAACWAI8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYQBfAAAAAAAAAAAAAAAAAAwPFxISGx0PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfXUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABubnVubHFxcABXa2xra2thYV5jVlhXZGZhaWppaWdfWlVZX1RUUVRNT0pKbmxqAABrbm1wbl9OAFJUUE4AAHFoagAAAGgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEIAAAAAKzx8gDj5er37OvsAgAAAAAAAAAA8wAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC3t7a2sLGwsK2xrKwAq6aop6alAAAAAACjpqOYlnWOrrG4uKUAAKYAAJuPcoEAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABZAAAAAAAAAAAAAAALERITERQXGBoXDxAWAAAAAAAAAAAAAABUEgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcnNvdG51AAAAAAAAAABdXVVaXF1cW1xcU1NTTU1KS0xNTk1MWwAAAHBaXgBKR0cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","probe":[-0.0027,0.1686,-0.0645],"bone":1,"amp":1,"h":1.0,"what":"the leaf kilt's panels; his hair, a little"},"mageling2":{"nv":3098,"w":"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","a":"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","probe":[0.0013,0.1425,-0.0478],"bone":1,"amp":1,"h":1.0,"what":"the robe below the hips; the sleeves' drapes"},"elowen":{"nv":8332,"w":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANLPmZCNlbdTJmlRUwAAw7XExb/FvbEAABEAAMLCwK/Ky8Gtwo1WTlZtcy8qLQAvLyMAAAAtIyM9OlmiKg8RBgUHLQAAAAAjMgAAAAAAAAACAwkRAA4kAAAABwAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC/AAC1ugAAAABaLbrY212Kjk1RMQAAEQAlrzAmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgoAAAAAAQAAJ2AMIQ8AAAwAAAAAAAAAAAAAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","a":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE8AAAAAAAAAAAAAAAAAAAAAAAAAAAAASkoASkoAAAAASkxKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKansK6wsKitsqqvrQAAl5qVkIiRjn4AALIAAJKSkoqHgoGBfpaxsqqnpLGzsACsrKoAAACwr6qKmZeWrK2qr62wpgAAAACvqwAAAAAAAACoq6BwAJmVAAAAqQAAAAAAAAChAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB+AABmYAAAAABhX2B8cU1UUkpNWgAAWQBZVllMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUFMAAAAAUAAAVFZ2dnoAAHYAAAAAAAAAAAAAAAAAAAAAUABPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASgAAAEoATABKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","probe":[-0.0177,0.159,-0.1134],"bone":3,"amp":1,"h":1.0,"what":"the long cape behind her"},"treewizard":{"nv":8101,"w":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMCAgcEAAAACAcABQcHCAgABQcAAAAAAAAAAAAAAAAAAAAHBQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMCw4LDAUFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAgAAAAAAAAAFAAAAAAQAERAPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIEAgAGAAAAAAAAAAAAAAEBAAAAAAAAABQaCwAADQAAAAAQFwAAAAAAAAAcFBcaFxAAADUoNkA+QjU+NSRAQhsAGxERDgALEgAACwAABggAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIFAAAFAgUCGRgVDAcFBwIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAkXDg4IBwgEAAkRBA0IBwAACAAAAAcAAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADcrXDs1RAAAAAAWADVENVQ7VHB/in+L3gAAAAAAAAAAAACijZ+NeYCin7ars6aTo5+VjYB2mwAAAAAAAAAsAAAAABZsbHF5bHNzeXNTUzsuAwAAAAAAAAAAAAAFFQAAAAAAAAAAAAAAAAAAAAAAAAAAAQABAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAABBAAAAAAAAAAAAAEAAAACAQAAAAAAAAAAAAAAAAAAAAAAAC4oOysoGhgREwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAnHxYAKSgpJSIZHhUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMPDwkJCw8AAAAAAAACAwUACQMAAwIHAAAAAAMAAgIDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACsd14ALQBeAC2WAAAAAAAAU3Y/UUAANBolAAAAUV5iQDQlBQAIO0IjCTMxAQAAAQAAAAAAAAAAAAAAAAAAAAAaFwgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAABAAAEQAAAAAAAAYHAAAAGgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQUaEQYHAAAAAAAQERANCAkFCAAAAAAAAAUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQO1wrOxYAAER/i48AAAAAiX+JpJurjXMAAE5gcYBWLgAAAAAAAAAAAAAAAAAAAAAAAAABAAEAAAAAAAAAAAABAAABAQAAAAAAAAAAAAAAAAAAAAAAAAAAFwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHKso54AMVMxAEBRCAgAADYAAAAAAAAAAAArAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","a":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALi3tra4tQAAAAC4ALi1uLO2s7SvrK+qnQAAAAAAAAAAAACWkIqQnJaWioiIhYF9e4qNkpaGggAAAAAAAACsAAAAAK2inZ2cnZqTnJqZmYuiuQAAAAAAAAAAALewsAC3ALQAAAAAAAAAAAAAAAAAAAAAtwC3AAAAAAAAAAAAtrQAALcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqq8AAAAAAACvqgAAAAAAAAAAAKoAAACiqgAAAAAAAAAAAAAAAAAAAAAAAKKPi3iPd5KXoQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABzb2AATwBgAE9sAAAAAAAAdYBpdGkAVlJUAAAAW2BdW1ZUTABOcGxWS3pzSwAASwAAAAAAAAAAAAAAAAAAAAB3aFgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC5tra3trgAALWuqqwAAAAAoqGiiYKIkJMAAKejnZaIogAAt7cAALQAAAAAAAAAAAAAAACzr7MArwAAAAAAAACvrwCqr6oAAAAAAAAAAAAAAAAAAAAAAAAAmQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG5ze3UAUXVRAFtbTk4AAHYAAAAAAAAAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","probe":[-0.0277,0.1389,-0.1525],"bone":3,"amp":1,"h":0.992,"what":"the leaf mantle behind him; his beard, a little"},"steamhammer":{"nv":10173,"w":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoJAAjDR4NBwkJBAcAAAAAAEdMBgUENAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAACAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEBQC85AAAABQQAAAAgJQ4IBAgIFg4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADtdLQAAAAAAAAAACxkWAAAHBgYGRDgxGTEzEQcICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAfAAAAKB8sAAAAAAAAAAoAAAAAAAAAAAAAAAAAAAAACgEECgMGDSIeACoDBQ0aABsEBgAAAQABAAAAnY12TUlMTQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADM1NzAoKCgpMy41LC8oKSgpMygaIiUNIgAAAAAAAAAAAAANAw0HAAAHBAUAAGkAAAABAAAAAAAAAwAAAAADBBIiAwUEACUYAAAiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUDIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAALwAnOTc0AAAlAAAAAAAACQAJAAAgFwkyAABBPkMAAAcJIAAWAAIBAAIDAAAAAAICAxEOFgMECAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXFsAAAAAAAAAAAAtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQGBAABAAQAAAAAAAAAAAAAAAABAQAAAAAAAwcHAAAAV0xDByItJzgUESIUBxEAGRoAGRkWMzYtMREHAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","a":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACvrQCqAKYAAKOtmAAAAAAAAIiJm5aTiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANCwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACoAAAAAAAAAAAArRioAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUABMAAAANEYAAABIRgBRRkdRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHd5AAAAAAAAAAAAgAAAAABcaGVtUgAAUgAAVFxRUQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACvAAAAAAAArwCyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC5AADIALy7ALqptACvALW5yAAAAAAAAAAACQn19PPz9AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApaesAACwAAAAsrGssKywAKyvqKQAqAAAAAAAAAAAAAAAkQAAAAAAmJYAAHkAAAAAAAAAAAAAkQAAAACJiosAiZaYAIuKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAADRMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAArAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADQrAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABLTEUAAABGAAAAAAAAAAAAAABGSgBFAABDQkIAAAAASAAASFkASEYAAAAAAFlGAFQAAABGUQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAe34AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGpodgAAAHYAAAAAAAAAAAAAAABlAAAAAAAAAFxcAAAAV1laXFgAXABWVFhWAFQAUk4AUlIAAFoAAFQAAFwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","probe":[0.0072,0.1509,0.2057],"bone":0,"amp":1,"h":0.714,"what":"the red cloth strips hanging from his belt"},"oathbound":{"nv":7010,"w":"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AAAAAAAAAAAAAA4AAA4AAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","a":"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AAAAAAAAAAAAAFQAAFQAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","probe":[0.012,0.211,-0.0122],"bone":0,"amp":1,"h":0.999,"what":"the cape behind his shoulder; the skirt's panels below the belt"},"maren":{"nv":6296,"w":"AAAdJB0AAAAdAAAkHgAAAAABAAsAAAsAAAAECgQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIANkc8HBsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANABUAE8AAE8/AD8AAIaOoadRoY7FsMgAkq8AAADFr8qvjakAFlEGABYAADRgLIQtORYALQAALQAALQAAAAAAAAAAAAAAAAgJAAgAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAsAAA8AABiOQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIic/K0Y/RkNDRkMAIAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAhAAAAAAAAAAAAIAEAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANAAAAAAAADsAADwyAAAAAAIAAAAAAAAAAAAAAAAAOzgAAAAAEAAAAEcnAAAAAAAAAAAAAAAAACUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANABUmchRmaEAAAAAAADKksUZAG4AYIanfwAAqX+nPFGGAAAAsAAAAAAAAAAAAAAtABYAAAAAAAAAAAAAACw8AAA/AAAAAAAAAAAAAAAAAAA8JScAAAAAAAAAAACNRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEQAADkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACEhIgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcACIAAAAAAAAAAAAAAAAAAAAAAAAAABAbICs/GyAAAABDK0NDNTAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFgAAABYeAB0AAAAAAAoAAAAAAAACAAEAAAAFAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAARwAyAAAAAAAAAAAAAAA2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQACcAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4AALCpmciwoa+psAAAmQCvAJkAAAAAAAAAAAAAxZKEAACSbo4tBgAAAAAAAAAGYjkAAAAAAAAAAAAAAAAAAAAAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIgAAAAAAAAAAAAAAAAAAAAAAAAA/QyAAAAArADVGMAAARgAAICsAAAArAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","a":"AAAAwAAAAAAAAADAAAAAAAAAAAAAAAAAAADh3uEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoKEAAH0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAdQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALwA4AAAAAABDAEMAAA0RGBEVGBEAHQAAJiEAAAAAIQAcGQAAABUAAAAAAC8AACAAIQAAAAAAAAAAAAAAAAAAAAAAAAAAADEAAAAAKwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATAAAAIQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFkAAGgAaAAAaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACrAAAAAAAAAAAAxQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAmwAAAAAAAI8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAh4IAAAAAAAAAAJecAAAAAAAAAAAAAAAAAIsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALwA4GwAVGxgAAAAAAAAAJgAhAD0AAA0REwAAABMRExUNAAAAHQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABDAABDAAAAAAAAAAAAAAAAAABDVVkAAAAAAAAAAAAZGgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABoAACEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHFxZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHVhAAAAYQAAAAAAYAAAZ2QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoQAAAAAAAAAAAAAAAACgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMAAB0AGwAdGBwAHQAAGwAhABsAAAAAAAAAAAAAACYgAAAmPREAAAAAAAAAAAAAACEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGdoZAAAaAAAAGAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","probe":[0.0634,0.3497,0.0978],"bone":0,"amp":1,"h":0.999,"what":"the coat's skirts below the belt; the sash's tails"},"varic":{"nv":6035,"w":"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","a":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAExZAAAAAHQAAAAAAFlQAAAAAAAATExRUEQASElTUFBQfG9nZ3R7VF1bUFNUU4BTSFBNAAAAU1NRUlNTVE9ST1AAAAAAAAB7gAAAAAAAUwAASgBLT1MAAAAATwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","probe":[-0.0451,0.184,0.0039],"bone":25,"amp":1,"h":0.997,"what":"the long coat below the belt"},"astrologer":{"nv":7111,"w":"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","a":"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AAAAwsEAAAAAAAAAAAAAAMUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqaesrgAAp6EAAAC6AAC1tAAArQCvrrSrrqkAAACpqQCtAKkAAKmpq6yrrK+mtKmpqbWoqrG5qLCmn5+quLGxqaapo5+to5Ooq7q1tAAAs7Wvp6aVlKemp56irKans7WAlIKAAIKikwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKqtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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","probe":[0.002,0.3099,0.0077],"bone":0,"amp":1,"h":1.8,"what":"the layered robe below the hips; the capelet under the arms"},"frostweaver":{"nv":7990,"w":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","a":"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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKYAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/gEIDAsMCAcHEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATwA8PAAAPAAAAABKT0BBRCwuPDxAQTxKQUA9REREREpIREREAAAAAAAAAEZGAAA8PwAAAAAADA84QT9CE0E9QBceACcALAAnADg4PD9AR0BARwAAAEIAAABAPEIAQgA8PgAAAEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB3fX4AAABwb24AAAAAAAAAAAAAAAAAAABTAABTU0lGRkZTVk1fYmViX2BdX2BPSm1vcIBMRUZJUEpMU09MT09NTVRfY09MS05PTE5Pc3t6dntzdm5taWRcYGdoAFZMAABMRwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","probe":[-0.0021,0.1955,-0.0184],"bone":0,"amp":1,"h":1.0,"what":"the robe below the hips; the wide sleeves"}};
+// each model's own data, where its vertices' rest positions are read from
+const CLOTH_SRC = {
+  ranger2: () => typeof RANGER2_MDL !== 'undefined' ? RANGER2_MDL : null,
+  thundergun: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['thundergun'] || null : null,
+  aurelian: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['aurelian'] || null : null,
+  faelan2: () => typeof FAELAN2_MDL !== 'undefined' ? FAELAN2_MDL : null,
+  bd2: () => typeof BD2_MDL !== 'undefined' ? BD2_MDL : null,
+  seed2: () => typeof SEED2_MDL !== 'undefined' ? SEED2_MDL : null,
+  nyssa2: () => typeof NYSSA2_MDL !== 'undefined' ? NYSSA2_MDL : null,
+  pyro2: () => typeof PYRO2_MDL !== 'undefined' ? PYRO2_MDL : null,
+  tg2: () => typeof TG2_MDL !== 'undefined' ? TG2_MDL : null,
+  mageling2: () => typeof MAGELING2_MDL !== 'undefined' ? MAGELING2_MDL : null,
+  elowen: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['elowen'] || null : null,
+  treewizard: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['treewizard'] || null : null,
+  steamhammer: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['steamhammer'] || null : null,
+  oathbound: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['oathbound'] || null : null,
+  maren: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['maren'] || null : null,
+  varic: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['varic'] || null : null,
+  astrologer: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['astrologer'] || null : null,
+  frostweaver: () => typeof UNIT_MDL !== 'undefined' ? UNIT_MDL['frostweaver'] || null : null,
+};
+
+/* ================= CLOTH IN THE WIND on the sculpted units =================
+   Owner: "make cloth sway naturally in the wind on units". Capes, cloaks, robes' hems, sleeves' drapes, tabards and
+   sashes on the sculpted, rigged units move in a light wind: a slow sway that grows toward the free hem, a small ripple,
+   gusts that cross the field over seconds, each unit on its own phase, and the unit's own motion (a strike, a turn)
+   swinging the cloth the other way and letting it settle. Restrained on purpose: it must read at the game's camera with
+   dozens of units on screen and never look like flags.
+   - The weights: tools/make_cloth.py paints one a vertex from each model's own data (its cloth bones where the rig has
+     them, else the cloth's colour and place in the rest pose), 0 on the body and rising to the hem, and the side each
+     vertex may swing to; src/unitmodels_clothdata.js (CLOTH_DATA). No model file is changed. They are matched to a
+     unit's mesh by its vertices' rest positions the first time it is drawn (clothMesh) and ride in the mesh's spare
+     attribute (aExt.y); a model re-baked with other vertices simply goes without until the tool is run again.
+   - The motion: gl.js CLOTH_GLSL, in the sculpted units' vertex shader, after skinning. Here: the wind (its direction
+     wanders slowly, its strength comes and goes over ten to twenty seconds, and a gust front travels down the wind so
+     neighbours are not in step), and each unit's lag: a point on the body where the cloth hangs is followed by a damped
+     spring, and the spring's distance behind is the cloth's swing (clothItem).
+   - The body is not passed through: the shader turns back whatever would push a vertex toward the body (the side
+     painted with its weight), and the lag is capped.
+   - Cost: a few sines a cloth vertex in the vertex shader; on the CPU one spring a unit a frame. Graphics Low: off.
+     Medium: a smaller sway, no ripple and no lag. High / Auto: all of it. Icons and portraits stay still; the gear
+     sheet and the Model Lab show it.
+   - Switches: ?cloth=0 turns it off (?cloth=1 on again; kept in localStorage runehold.cloth). In the console: CLOTH.on,
+     CLOTH.amp (the sway's size, in model heights at the hem in a full gust), CLOTH.lagK, CLOTH.gust (null: the wind's
+     own; 0..1 holds it there, to look at a calm or a gust), CLOTH.speed. */
+const CLOTH = {
+  on: (() => {
+    let v = null;
+    try { const q = new URLSearchParams(location.search).get('cloth'); if (q != null) { v = q === '0' ? 0 : 1; localStorage.setItem('runehold.cloth', String(v)); } } catch (e) {}
+    if (v == null) try { v = localStorage.getItem('runehold.cloth') === '0' ? 0 : 1; } catch (e) { v = 1; }
+    return v;
+  })(),
+  amp: .1, rip: 1, lagK: 1.25, lagMax: .1, om: 8.5, zeta: .38, gust: null, speed: 1, dir: .9,
+  st: new Map(), frame: 0, now: 0, lvl: 1, wx: 0, wz: 1, env: 0, inGp: 0, n: 0, maps: {},
+};
+function clothLevel() {
+  if (!CLOTH.on || typeof CLOTH_DATA === 'undefined') return 0;
+  const g = typeof GFX !== 'undefined' ? GFX : 'auto';
+  return g === 'low' ? 0 : g === 'medium' ? .65 : 1;
+}
+const clothSm = x => { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3 - 2 * x); };
+// the frame's wind, set on the sculpt shader; 0 when nothing should move (off, Graphics Low, an icon or a portrait)
+function clothFrame(rd, gl, u) {
+  const lvl = clothLevel(); if (!lvl) return 0;
+  if (typeof RD !== 'undefined' && rd !== RD && !CLOTH.inGp) return 0;
+  const C = CLOTH, t = (rd.time || 0) * C.speed, a = C.dir + .45 * Math.sin(t * .071) + .22 * Math.sin(t * .173 + 1.3);
+  C.wx = Math.sin(a); C.wz = Math.cos(a); C.now = t; C.lvl = lvl; C.frame++;
+  // calm, then a gust, then calm: slow, never regular
+  C.env = C.gust != null ? C.gust : .18 + .82 * clothSm(.5 + .46 * Math.sin(t * .21 + 2.1 * Math.sin(t * .057)) + .2 * Math.sin(t * .49 + 1.1));
+  gl.uniform4f(u.uWind, C.wx, C.wz, t, 0);
+  if (C.frame % 900 === 0) for (const [k, s] of C.st) if (C.frame - s.f > 600) C.st.delete(k);
+  return 1;
+}
+// a model's weights by its vertices' places (their quantised rest positions, as baked)
+function clothMapOf(id) {
+  const C = CLOTH; if (id in C.maps) return C.maps[id];
+  C.maps[id] = null;
+  try {
+    const d = CLOTH_DATA[id], D = CLOTH_SRC[id] ? CLOTH_SRC[id]() : null; if (!d || !D || D.nv !== d.nv || !D.pos) return null;
+    const B = s => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+    const pb = B(D.pos), q = new Uint16Array(pb.buffer), w = B(d.w), an = B(d.a), off = D.v === 1 ? 32768 : 0, m = new Map();
+    if (q.length !== d.nv * 3 || w.length !== d.nv || an.length !== d.nv) return null;
+    for (let i = 0; i < d.nv; i++) { if (!w[i]) continue; m.set(((q[i * 3] + off) & 65535) + ((q[i * 3 + 1] + off) & 65535) * 65536 + ((q[i * 3 + 2] + off) & 65535) * 4294967296, (an[i] + w[i] / 255 * .98) / 256); }
+    return C.maps[id] = { m, min: D.min, max: D.max, d, n: ++C.n };
+  } catch (e) { return null; }
+}
+// a mesh's cloth, painted the first time it is drawn: null when it has none (or its model is not one of ours)
+function clothMesh(mesh) {
+  if (mesh._cl !== undefined) return mesh._cl;
+  mesh._cl = null;
+  if (!mesh.bone || !mesh.ext || typeof CLOTH_DATA === 'undefined') return null;
+  try {
+    for (const id in CLOTH_DATA) {
+      const M = clothMapOf(id); if (!M) continue;
+      const mn = M.min, sx = 65535 / (M.max[0] - mn[0]), sy = 65535 / (M.max[1] - mn[1]), sz = 65535 / (M.max[2] - mn[2]), p = mesh.pos, e = mesh.ext, n = mesh.count;
+      let hit = 0;
+      for (let k = 0; k < n; k++) {
+        const v = M.m.get(Math.round((p[k * 3] - mn[0]) * sx) + Math.round((p[k * 3 + 1] - mn[1]) * sy) * 65536 + Math.round((p[k * 3 + 2] - mn[2]) * sz) * 4294967296);
+        if (v) { e[k * 2 + 1] = v; hit++; }
+      }
+      if (hit < 30) { if (hit) for (let k = 0; k < n; k++) e[k * 2 + 1] = 0; continue; }   // (not this model: a stray match or two)
+      mesh.extVer = (mesh.extVer || 0) + 1;
+      return mesh._cl = { id, probe: M.d.probe, bone: M.d.bone, amp: M.d.amp || 1, n: M.n, hit };
+    }
+  } catch (e) { if (typeof console !== 'undefined') console.warn('Cloth weights failed:', e.message); }
+  return null;
+}
+// one unit's draw: its phase, its gust and its lag (a spring following the body where its cloth hangs)
+function clothItem(rd, gl, u, cl, it) {
+  const C = CLOTH, m = it.m, b = it.bones, k = cl.bone * 12, p = cl.probe;
+  const s = Math.hypot(m[4], m[5], m[6]), px = m[12], pz = m[14];
+  const h = Math.sin(px * 12.9898 + pz * 78.233) * 43758.5453, ph = (h - Math.floor(h)) * 6.2832;
+  const al = px * C.wx + pz * C.wz, ac = pz * C.wx - px * C.wz, t = C.now;
+  const g = C.gust != null ? C.gust : Math.max(0, Math.min(1, C.env * (.62 + .38 * Math.sin(al * .55 - t * .85 + .7 * Math.sin(t * .31 + ac * .4) + ph * .15))));
+  let lx = 0, ly = 0, lz = 0;
+  if (C.lvl >= 1 && k + 11 < b.length) {
+    const x = b[k] * p[0] + b[k + 4] * p[1] + b[k + 8] * p[2] + b[k + 3], y = b[k + 1] * p[0] + b[k + 5] * p[1] + b[k + 9] * p[2] + b[k + 7], z = b[k + 2] * p[0] + b[k + 6] * p[1] + b[k + 10] * p[2] + b[k + 11];
+    const X = m[0] * x + m[4] * y + m[8] * z + m[12], Y = m[1] * x + m[5] * y + m[9] * z + m[13], Z = m[2] * x + m[6] * y + m[10] * z + m[14];
+    const key = cl.n * 1e9 + (C.inGp ? 5e8 : 0) + Math.round(px * 8) * 20011 + Math.round(pz * 8);
+    let S = C.st.get(key);
+    if (!S) C.st.set(key, S = { x: X, y: Y, z: Z, vx: 0, vy: 0, vz: 0, t, f: 0 });
+    let dt = t - S.t; const far = Math.abs(S.x - X) + Math.abs(S.y - Y) + Math.abs(S.z - Z) > .6 * s;
+    if (dt < 0 || dt > .4 || far) { S.x = X; S.y = Y; S.z = Z; S.vx = S.vy = S.vz = 0; dt = 0; }
+    for (let left = dt; left > 1e-5; left -= 1 / 90) {   // (small steps: the spring stays stable on a slow frame)
+      const e = Math.min(left, 1 / 90), o2 = C.om * C.om, c = 2 * C.zeta * C.om;
+      S.vx += (o2 * (X - S.x) - c * S.vx) * e; S.vy += (o2 * (Y - S.y) - c * S.vy) * e; S.vz += (o2 * (Z - S.z) - c * S.vz) * e;
+      S.x += S.vx * e; S.y += S.vy * e; S.z += S.vz * e;
+    }
+    S.t = t; S.f = C.frame;
+    lx = (S.x - X) * C.lagK; ly = (S.y - Y) * C.lagK * .5; lz = (S.z - Z) * C.lagK;
+    const L = Math.hypot(lx, ly, lz), mx = C.lagMax * s; if (L > mx) { const f = mx / L; lx *= f; ly *= f; lz *= f; }
+  }
+  gl.uniform4f(u.uClA, lx, ly, lz, C.amp * cl.amp * C.lvl);
+  gl.uniform4f(u.uClB, ph, g, C.lvl >= 1 ? C.rip : 0, s);
+}
+// the gear sheet draws on a renderer of its own: its unit sways too (icons and portraits do not)
+if (typeof gpDraw === 'function') {
+  const _clGp = gpDraw;
+  gpDraw = function () { CLOTH.inGp = 1; try { return _clGp.apply(this, arguments); } finally { CLOTH.inGp = 0; } };
+}
 
 /* ================= THE FROSTWEAVERS' ICE SHADER: faceted ice, cold mist and glints, drawn live =================
    The cold counterpart of the Pyroclasts' flame shader (pyrotex.js), for the owner's "get another agent to work alongside
@@ -101816,7 +102777,8 @@ function campCarryIn(B, hero) {
   // the warband's picks follow their talents by name (forces_zzzzzzzzzz_talnames.js; a band saved before names were kept: the v4 trees)
   const talN = B.taln || (typeof talNamesOld === 'function' ? talNamesOld(B.force || G.force, B.hero) : null);
   if (talN && B.plan && B.plan.tal && typeof talRemapByName === 'function') for (const k in B.plan.tal) if (talN[k] && TALENTS[k]) B.plan.tal[k] = talRemapByName(B.plan.tal[k], talN[k], TALENTS[k].list);
-  const mt = typeof migrateTal === 'function' ? migrateTal(B.tal, 8, false, talN) : { tal: B.tal, refund: 0 };
+  if (typeof TAL_REPLAY !== 'undefined') TAL_REPLAY = true;   // (the Champion's lock off while the warband's picks replay: its level is set below; core.js TAL_REPLAY)
+  let mt; try { mt = typeof migrateTal === 'function' ? migrateTal(B.tal, 8, false, talN) : { tal: B.tal, refund: 0 }; } finally { if (typeof TAL_REPLAY !== 'undefined') TAL_REPLAY = false; }
   G.tal = mt.tal; G.tp = (B.tp | 0) + mt.refund; G.tpEarned = B.tpEarned | 0;
   if (mt.refund > 0 && typeof onToast === 'function') setTimeout(() => onToast(`The talent trees were rearranged: ${mt.refund} of the warband's talent point${mt.refund > 1 ? 's' : ''} came back to spend.`), 1800);
   if (B.hero && hero && B.hero !== hero && Array.isArray(G.tal.holy)) {   // a new commander takes the warband: the old Champion's talents come back as points
@@ -102379,6 +103341,553 @@ function huntPanelBind(B, k, redraw) {
   const go = document.getElementById('hnGo');
   if (go) go.onclick = () => { AudioSys.init(); sfx('click'); huntStart(B.force, k, cmState.hunt, cmState.lvl); };
 }
+
+/* ================= REGION MAP (prototype, the title's Homeland button): a force's homeland, Act I =================
+   Design: docs/design/region_map_2026-11-11.md. One region is built: the Grove's homeland, the Greatroot Marches.
+   THE LOOP. A map of 12 places joined by roads. Each trouble shows its foe family (campaign.js CAMP_FAMILIES), its waves (a
+     slice of the 50-wave curve), its boss, how far it has grown, its reward and what a broken line costs, before you commit.
+     A battle is that slice, 5-7 waves, on the place's own field, run as a Hunt is (hunts.js): the warband (level, talents,
+     items, Renown, opened units) carries in through campCarryIn and out through campBandFromRun; the maze, units and gold start
+     fresh, the gold being what a run has earned by that wave (huntGold).
+   THE REGION'S OWN STATE (localStorage RG_KEY, one run a force, written after every change): the host's lives (a battle stakes
+     a line of at most RG_LINE of them), the war chest (gold for towns and events), wounded unit kinds, the threat clock, each
+     place's state (open, held, lost) and growth, the roads' danger and events, the lord's helpers.
+   LOSING COSTS, IT DOES NOT END THE RUN. A broken line: the line's lives, the strongest unit kind wounded for 2 battles, a third
+     of the chest, the place falls and its trouble spreads to its neighbours, the clock +2, a fall back to the nearest held town.
+     Sounding the retreat (the pause menu) keeps the lives left and wounds nobody, but the trouble grows. The run ends at 0 lives
+     or a broken line with no held town to fall back to; Hardcore ends it at the first broken line.
+   Hooks: wrappers set at load (newGame, serialize, restore, waveHP, makeWave, waveCleared, update, callWave, canSendNext,
+     tryBuild, endScreen / onEnd, pauseMenu, titleScreen, campSaveName). Nothing runs unless G.region is set, and G.region is
+     only set by a battle started from the region map (or a save of one). */
+
+const RG_KEY = 'runehold.region.v1';
+// on in every build since 12 Nov 2026 (owner: "fold it in as it is into the main game"); ?region=0 hides the title's button
+const rgOn = () => !(typeof location !== 'undefined' && /[?&]region=0\b/.test(location.search));
+const RG_LIVES = 30, RG_LINE = 10, RG_CLOCK = 12, RG_MARKS = [4, 8, 12], RG_GROW = 3, RG_PATROLS = 3;
+// the chance to be waylaid on a road by its danger (0-3), and the first wave of a waylay by the road's tier
+const RG_WAY = [0, .25, .45, .65];
+const RG_TIER_W = { 1: 2, 2: 9, 3: 18, 4: 28, 5: 36 };
+// a step of growth: waves 2 later, foes 8% more health, reward 25% more; a patrol's reward by how many came before it
+const RG_STEP = { w: 2, hp: .08, pay: .25 };
+const RG_PATROL_PAY = [.4, .2, .1];
+const RG_PRICE = { life: 6, tend: 40, respec: 80, alms: 40, offering: 30 };
+// the Grove's homeland. kind: town (start: held at the start; else enemy-held, freed by a battle), trouble, lair.
+// w: the waves of its battle; map: its field; x, y on a 1000 x 620 board
+const RG_REGIONS = {
+  grove: {
+    id: 'marches', name: 'The Greatroot Marches', lord: 'grakk',
+    say: 'The Grove’s homeland. Packs and raiders press in from every side while the ogre warlord Grakk gathers his host in Gloamfen.',
+    nodes: [
+      { id: 'thornwick', name: 'Thornwick', kind: 'town', start: 1, tier: 1, x: 105, y: 520, say: 'The Grove’s last walled village before the deep wood. Where the host musters.' },
+      { id: 'mossford', name: 'Mossford', kind: 'trouble', tier: 1, w: [1, 6], map: 'greatroot', x: 255, y: 470, say: 'Raiders have taken the ford and the road home with it.' },
+      { id: 'fernwatch', name: 'Fernwatch', kind: 'trouble', tier: 1, w: [2, 7], map: 'clearing', x: 175, y: 345, say: 'The watch-glade has gone quiet. Something holds it.' },
+      { id: 'brightwater', name: 'Brightwater Mill', kind: 'town', tier: 2, w: [8, 13], map: 'meadow', x: 395, y: 395, say: 'The mill town fell in the first week. Free it and its granary feeds the host.' },
+      { id: 'barrows', name: 'Hollowell Barrows', kind: 'trouble', tier: 2, w: [9, 15], map: 'moonwood', x: 300, y: 225, say: 'Old mounds under the trees, broken open from below.' },
+      { id: 'weir', name: 'The Old Weir', kind: 'trouble', tier: 2, w: [11, 17], map: 'meadow', x: 520, y: 520, say: 'The weir holds back the river. Whoever holds the weir holds the lowlands.' },
+      { id: 'greywood', name: 'Greywood Crossing', kind: 'trouble', tier: 3, w: [17, 23], map: 'greatroot', x: 480, y: 270, say: 'Four roads meet under grey trees. Every column on the march passes here.' },
+      { id: 'stagrun', name: 'Stagrun Heath', kind: 'trouble', tier: 3, w: [19, 25], map: 'meadow', x: 660, y: 410, say: 'Open heath where the white harts ran. Now it is a camp.' },
+      { id: 'briarfast', name: 'Briarfast', kind: 'town', tier: 3, w: [21, 27], map: 'clearing', x: 640, y: 175, say: 'A thorn-walled hold, taken from within. Free it and the road to Gloamfen opens.' },
+      { id: 'rootdeep', name: 'Rootdeep Hollow', kind: 'trouble', tier: 4, w: [29, 35], map: 'moonwood', x: 800, y: 300, say: 'A hollow under the oldest roots. The warlord’s allies den here.' },
+      { id: 'cinder', name: 'Cinderbrake', kind: 'trouble', tier: 4, w: [32, 38], map: 'clearing', x: 800, y: 520, say: 'A burned brake on the fen’s edge. The smoke never clears.' },
+      { id: 'gloam', name: 'Gloamfen Lair', kind: 'lair', tier: 5, w: [44, 50], map: 'moonwood', x: 925, y: 150, say: 'The warlord’s lair in the fen. Strip his helpers before you storm it.' },
+    ],
+    roads: [['thornwick', 'mossford'], ['thornwick', 'fernwatch'], ['mossford', 'fernwatch'], ['mossford', 'brightwater'], ['fernwatch', 'barrows'],
+      ['brightwater', 'barrows'], ['brightwater', 'weir'], ['brightwater', 'greywood'], ['barrows', 'greywood'], ['weir', 'stagrun'], ['greywood', 'stagrun'],
+      ['greywood', 'briarfast'], ['briarfast', 'rootdeep'], ['stagrun', 'rootdeep'], ['stagrun', 'cinder'], ['rootdeep', 'gloam'], ['cinder', 'gloam'], ['briarfast', 'gloam']],
+    // the families a trouble of each tier may hold (a run draws them, no repeat within a tier)
+    pools: { 1: ['beast', 'horde'], 2: ['dead', 'brood', 'iron', 'horde'], 3: ['iron', 'sky', 'choir', 'forge'], 4: ['hollow', 'forge', 'brood', 'sky'] },
+  },
+};
+const RG_EVENTS = {
+  refugees: { name: 'Refugees on the road', icon: '⌂' },
+  shrine: { name: 'A wayside shrine', icon: '✦' },
+};
+const rgEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+/* ---- the seeded dice: a run's draws never change on a reload ---- */
+function rgRand(seed, key) {
+  let h = (seed | 0) ^ 0x9e3779b9;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 2654435761);
+  h ^= h >>> 15; h = Math.imul(h, 2246822507); h ^= h >>> 13; h = Math.imul(h, 3266489909); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function rgShuffle(seed, key, a) { const o = a.slice(); for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(rgRand(seed, key + i) * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } return o; }
+
+/* ---- the runs on this device ---- */
+function rgAll() { let s = null; try { s = JSON.parse(localStorage.getItem(RG_KEY) || 'null'); } catch (e) {} return s && s.runs && typeof s.runs === 'object' ? s : { v: 1, runs: {} }; }
+function rgGet(force) { const s = rgAll(), R = force && s.runs[force]; return R && R.st && RG_REGIONS[force] ? R : null; }
+function rgPut(R) { const s = rgAll(); R.at2 = Date.now(); s.runs[R.force] = R; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); return true; } catch (e) { return false; } }
+function rgDrop(force) { const s = rgAll(); delete s.runs[force]; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); } catch (e) {} }
+const rgDef = R => RG_REGIONS[R.force];
+const rgNode = (R, id) => rgDef(R).nodes.find(n => n.id === id);
+const rgRoadIx = (R, a, b) => R.roads.findIndex(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
+const rgNb = (R, id) => R.roads.filter(r => r.a === id || r.b === id).map(r => r.a === id ? r.b : r.a);
+const rgHeldTown = (R, id) => { const n = rgNode(R, id); return n && n.kind === 'town' && R.st[id].s === 'held'; };
+const rgSettled = R => rgDef(R).nodes.filter(n => n.kind !== 'town' && R.st[n.id].s === 'held').length;
+function rgLog(R, t) { R.log.unshift(t); R.log = R.log.slice(0, 8); }
+
+// a new run: the seed draws each trouble's family, the roads' danger and waylayers, the two helpers and the two events
+function rgNew(force, hero, hard) {
+  const D = RG_REGIONS[force], seed = (Math.random() * 2 ** 31) | 0;
+  const R = { v: 1, force, hero, seed, hard: !!hard, at: D.nodes.find(n => n.start).id, lives: RG_LIVES, chest: 0, clock: 0, wounded: {}, band: null, rnBank: 0,
+    st: {}, roads: [], helpers: [], log: [], pending: null, battle: null, battles: 0, moves: 0, over: '', done: false, t0: Date.now() };
+  const left = {};
+  for (const n of D.nodes) {
+    const st = { s: n.kind === 'town' && n.start ? 'held' : 'open', g: 0, p: 0, fam: null };
+    if (n.kind !== 'lair' && !(n.kind === 'town' && n.start)) {
+      const pool = D.pools[n.tier] || D.pools[1];
+      if (!left[n.tier] || !left[n.tier].length) left[n.tier] = rgShuffle(seed, 'fam' + n.tier + (left[n.tier] ? 'b' : ''), pool);
+      st.fam = left[n.tier].shift();
+    }
+    R.st[n.id] = st;
+  }
+  const tier = id => D.nodes.find(n => n.id === id).tier;
+  D.roads.forEach(([a, b], i) => {
+    const t = (tier(a) + tier(b)) / 2, d = clamp(Math.round(t - 1.2 + (rgRand(seed, 'd' + i) * 2 - 1)), 0, 3);
+    const fa = R.st[a].fam || R.st[b].fam || 'beast', fb = R.st[b].fam || fa;
+    R.roads.push({ a, b, d, fam: rgRand(seed, 'f' + i) < .5 ? fa : fb, ev: null, evDone: 0 });
+  });
+  // two events on roads that leave the first two tiers, never on the same place twice
+  const evRoads = rgShuffle(seed, 'ev', R.roads.map((r, i) => i).filter(i => Math.max(tier(R.roads[i].a), tier(R.roads[i].b)) <= 3 && Math.min(tier(R.roads[i].a), tier(R.roads[i].b)) >= 1));
+  const kinds = rgShuffle(seed, 'evk', ['refugees', 'shrine']); let used = [];
+  for (const i of evRoads) { if (!kinds.length) break; const r = R.roads[i]; if (used.includes(r.a) || used.includes(r.b)) continue; r.ev = kinds.shift(); used.push(r.a, r.b); }
+  // the lord's two helpers sit at two troubles of tiers 3-4
+  R.helpers = rgShuffle(seed, 'help', D.nodes.filter(n => n.kind === 'trouble' && n.tier >= 3).map(n => n.id)).slice(0, 2).map(id => ({ node: id, fam: R.st[id].fam }));
+  rgLog(R, `${HERO_BY[hero] ? HERO_BY[hero].name : 'The commander'} musters the host at ${rgNode(R, R.at).name}.`);
+  return R;
+}
+
+/* ---- the clock, growth, spread and the fall back ---- */
+function rgGrow(R, id) { const st = R.st[id]; if (st.s === 'held') return false; st.g = Math.min(RG_GROW, (st.g | 0) + 1); return true; }
+function rgClock(R, n, out) {
+  for (let i = 0; i < n; i++) {
+    R.clock++;
+    if (RG_MARKS.includes(R.clock)) {
+      const grew = rgDef(R).nodes.filter(nd => R.st[nd.id].s !== 'held' && R.st[nd.id].g < RG_GROW && rgGrow(R, nd.id));
+      if (grew.length) out.push(`The threat clock reaches ${R.clock}: every unsettled trouble grows (${grew.length > 4 ? grew.length + ' places' : grew.map(nd => nd.name).join(', ')}).`);
+    }
+    if (R.clock >= RG_CLOCK) {
+      const t = rgNearest(R, rgDef(R).nodes.find(nd => nd.kind === 'lair').id, id => rgHeldTown(R, id));
+      if (t) { R.st[t].s = 'lost'; R.st[t].g = 0; out.push(`The warlord’s host raids ${rgNode(R, t).name}: the town falls. Free it again to use it.`); }
+      R.clock = RG_MARKS[RG_MARKS.length - 2];
+    }
+  }
+}
+// the nearest place by roads that passes the test (breadth first from id)
+function rgNearest(R, id, ok) {
+  const seen = new Set([id]), q = [id];
+  while (q.length) { const c = q.shift(); if (ok(c)) return c; for (const nb of rgNb(R, c)) if (!seen.has(nb)) { seen.add(nb); q.push(nb); } }
+  return null;
+}
+function rgFallBack(R, out) {
+  const t = rgNearest(R, R.at, id => rgHeldTown(R, id));
+  if (!t) { R.over = 'A line broke with no held town to fall back to.'; return; }
+  if (t !== R.at) out.push(`The host falls back to ${rgNode(R, t).name}.`);
+  R.at = t;
+}
+const rgHelpersUp = R => R.helpers.filter(h => R.st[h.node].s !== 'held');
+
+/* ---- what a battle is, before you commit ---- */
+// kind: trouble (a trouble, an enemy-held town, the lair), patrol (a held place again), waylay (a road)
+function rgSpec(R, id, kind, road) {
+  const D = rgDef(R);
+  if (kind === 'waylay') {
+    const rd = R.roads[road], t = Math.min(rgNode(R, rd.a).tier, rgNode(R, rd.b).tier), w0 = RG_TIER_W[t] || 2, from = R.at, to = rd.a === from ? rd.b : rd.a;
+    return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgNode(R, from).map || rgNode(R, to).map || 'greatroot', fam: rd.fam, extra: [], hpK: 1, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
+  }
+  const n = rgNode(R, id), st = R.st[id], len = n.w[1] - n.w[0], patrol = kind === 'patrol';
+  const g = patrol ? (st.p | 0) + 1 : st.g | 0, w0 = Math.min(50 - len, n.w[0] + RG_STEP.w * g);
+  const up = n.kind === 'lair' ? rgHelpersUp(R) : [];
+  const pay = Math.round((40 + 10 * n.w[0]) * (1 + RG_STEP.pay * (patrol ? 0 : g)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
+  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: n.map, fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length), g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
+}
+// the bosses in a battle's waves (the standard march's; the lair's last is its lord)
+function rgBosses(S) { const out = []; for (let w = S.w0; w <= S.w1; w++) { const b = w === 50 && S.lord ? S.lord : CAMP_BOSS0[w]; if (b && CREEPS[b]) out.push([w, b]); } return out; }
+// the unit kind a broken line wounds: the one that did the most damage this battle
+function rgStrongest() {
+  const by = {}, n = {};
+  for (const t of G.towers || []) if (t && !t.def.wall && t.type !== 'holy') { by[t.type] = (by[t.type] || 0) + (t.dmg || 0); n[t.type] = (n[t.type] || 0) + 1; }
+  // (most damage; with none dealt, the kind fielded most)
+  return Object.keys(by).sort((a, b) => by[b] - by[a] || n[b] - n[a])[0] || null;
+}
+
+/* ---- the waves of a region battle ---- */
+let RG_NEXT = null, RG_TOUCHED = false, RG_SWAP = null;
+function rgApplyWaves(S) {
+  RG_SWAP = null;
+  for (let n = S.w0; n <= Math.min(S.w1, WAVES.length); n++) {
+    let groups = WAVES[n - 1].split('+');
+    if (n === 50 && S.lord && S.lord !== 'abyss' && CREEPS[S.lord]) {
+      const from = 'abyss', to = S.lord;
+      groups = groups.map(p => { const [main, tag] = p.split('!'), [ty, c] = main.split('*'); if (ty !== from) return p; const siege = tag === 'siege' && (SIEGE_BOSS[to] || CREEPS[to].atk); return to + '*' + c + (siege ? '!siege' : tag && tag !== 'siege' ? '!' + tag : ''); });
+      RG_SWAP = { n, from, to, k: campHpW(from) / campHpW(to), g: (CREEPS[from].flat || 1) / (CREEPS[to].flat || 1) };
+      const d = CREEPS[to], r = d.brule;
+      WAVE_PROBLEM[n] = [`Boss: ${d.name}`, `${d.name}${d.title ? ', ' + d.title : ''}: ${r ? r.text : d.abil ? d.abil[1] : d.trait || ''}`, r ? r.ways.join(' · ') : 'Read its card before it comes'];
+    }
+    const tot = groups.reduce((a, p) => { const [main] = p.split('!'), [ty, c] = main.split('*'); return a + (CREEPS[ty] && !CREEPS[ty].boss && !CREEPS[ty].lead ? +c : 0); }, 0);
+    for (const fam of [S.fam].concat(S.extra || [])) {
+      const foe = fam && campFamFoe(fam, n);
+      if (foe && CREEPS[foe]) groups.push(foe + '*' + Math.max(1, Math.round(tot * CAMP_FAMILIES[fam].share)));
+    }
+    WAVES[n - 1] = groups.join('+');
+  }
+  RG_TOUCHED = true;
+  if (typeof _rnBoss !== 'undefined') _rnBoss.clear();
+  if (typeof _brAt !== 'undefined') _brAt.clear();
+  if (typeof fcKey !== 'undefined') fcKey = '';
+}
+
+/* ---- starting a battle ---- */
+function rgStart(R, S) {
+  if (typeof twStop === 'function') twStop();
+  heroPickId = R.hero; try { localStorage.setItem('runehold.hero', R.hero); } catch (e) {}
+  mapPick = S.map; setMap(S.map);
+  S.line = Math.min(RG_LINE, R.lives); S.wounded = Object.keys(R.wounded); S.hard = R.hard;
+  RG_NEXT = S;
+  newGame('normal', null, R.hero, 0);
+  campCarryIn(R.band, R.hero); G.camp = null;
+  if (R.rnBank && typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) { rnS().v = clamp(rnS().v + R.rnBank, 0, RN.cap); R.rnBank = 0; }
+  G.wave = S.w0; G.gold = Math.max(DIFFS.normal.gold, huntGold(S.w0));
+  G.lives = G.maxLives = S.line;
+  G.region.uid0 = G.gearUid | 0;
+  G.runId = newRunId(); G.playT = 0;
+  R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1 }; R.pending = null;
+  rgPut(R);
+  const F = S.fam && CAMP_FAMILIES[S.fam];
+  afterStart(S.kind === 'waylay' ? `Waylaid · ${rgNode(R, S.to).name}` : `${S.name} · waves ${S.w0}-${S.w1}`,
+    `${F ? F.name + '. ' : ''}${S.line} lives on the line. ${S.kind === 'waylay' ? 'Two waves: break through' : 'Plant a maze, then sound the horn'}`);
+  saveNow();
+}
+
+/* ---- the end of a battle: the result on the map ---- */
+function rgEnd(won, retreat) {
+  const S = G.region, R = S && rgGet(G.force);
+  saveDrop(G.runId);
+  if (!R) { titleScreen(); return; }
+  const out = [], got = campItemsNow().filter(it => (it.id | 0) > (S.uid0 | 0)), node = rgNode(R, S.node);
+  R.band = campBandFromRun(R.band);
+  const left = won || retreat ? Math.max(0, G.lives | 0) : 0, lost = Math.max(0, S.line - left);
+  R.lives = clamp(R.lives - S.line + left, 0, RG_LIVES);
+  R.battle = null; R.battles++;
+  // the wounded mend a battle; a new wound is added after, so it lasts its two battles
+  for (const k of Object.keys(R.wounded)) if (--R.wounded[k].n <= 0) { out.push(`The ${R.wounded[k].name} have mended.`); delete R.wounded[k]; }
+  if (lost) out.push(`${lost} ${lost === 1 ? 'life' : 'lives'} lost on the line (the host has ${R.lives}).`);
+  if (won) {
+    R.chest += S.reward; out.push(`+${S.reward} gold to the war chest.`);
+    if (S.kind === 'waylay') { R.at = S.to; out.push(`The host breaks through and reaches ${node.name}.`); }
+    else if (S.kind === 'patrol') { R.st[S.node].p = (R.st[S.node].p | 0) + 1; rgClock(R, 1, out); out.push(`${node.name} is patrolled (${R.st[S.node].p} of ${RG_PATROLS}).`); }
+    else {
+      R.st[S.node].s = 'held'; R.st[S.node].g = 0;
+      out.push(node.kind === 'town' ? `${node.name} is free: rest, tend the wounded and re-spec there.` : node.kind === 'lair' ? `${node.name} falls. The Marches are settled.` : `${node.name} is settled.`);
+      const h = R.helpers.find(x => x.node === S.node); if (h) out.push(`The warlord loses a helper: ${CAMP_FAMILIES[h.fam].name} no longer march in his lair.`);
+      rgClock(R, 1, out);
+      if (node.kind === 'lair') R.done = true;
+    }
+  } else if (S.kind === 'waylay') {
+    R.at = S.from; out.push(`The host is thrown back to ${rgNode(R, S.from).name}.`);
+    if (S.hard) R.over = 'Hardcore: the first broken line ends the run.';
+  } else if (retreat) {
+    rgGrow(R, S.node); out.push(`The retreat is sounded. ${node.name}’s trouble grows a step.`);
+    rgClock(R, 1, out); rgFallBack(R, out);
+  } else {
+    const k = rgStrongest();
+    if (k) { R.wounded[k] = { n: 2, name: TOWERS[k].name }; out.push(`The ${TOWERS[k].name} are wounded: they cannot take the field for 2 battles (a town can tend them).`); }
+    const cut = Math.floor(R.chest / 3); if (cut) { R.chest -= cut; out.push(`${cut} gold of the war chest is lost.`); }
+    R.st[S.node].s = 'lost'; rgGrow(R, S.node);
+    const spread = rgNb(R, S.node).filter(id => rgNode(R, id).kind !== 'town' || !rgHeldTown(R, id)).filter(id => rgGrow(R, id));
+    out.push(`${node.name} falls to the enemy${spread.length ? `, and its trouble spreads: ${spread.map(id => rgNode(R, id).name).join(', ')} grow${spread.length === 1 ? 's' : ''}` : ''}.`);
+    rgClock(R, 2, out); rgFallBack(R, out);
+    if (S.hard) R.over = 'Hardcore: the first broken line ends the run.';
+  }
+  if (R.lives <= 0 && !R.done) R.over = R.over || 'The host has no lives left.';
+  for (const t of out) rgLog(R, t);
+  rgPut(R); rgSel = null;
+  if (typeof AudioSys !== 'undefined') AudioSys.intense(false);
+  const title = won ? (S.kind === 'waylay' ? 'Through the ambush' : R.done ? 'The Marches are settled' : `${node.name}: held`) : retreat ? 'The retreat is sounded' : S.kind === 'waylay' ? 'Thrown back' : 'The line breaks';
+  setTimeout(() => {
+    showOverlay(`<h2 class="ttl ${won ? 'win' : 'lose'}">${rgEsc(title)}</h2><p class="sub">${rgEsc(S.name)} · waves ${S.w0}-${S.w1}</p>
+      <ul class="rg-out">${out.map(t => `<li>${rgEsc(t)}</li>`).join('')}${got.length ? `<li>Spoils kept: ${got.map(it => `<span style="color:${RARITY[it.rar].col}">${rgEsc(gearName(it))}</span>`).join(', ')}.</li>` : ''}<li>The warband keeps its XP, talents, items and Renown.</li></ul>
+      ${R.over ? `<p class="rg-over">${rgEsc(R.over)} The run is over.</p>` : ''}
+      <button class="btn" id="rgBack">${R.over ? 'The run’s end' : R.done ? 'The muster calls' : 'Back to the Marches'}</button>`, 'rgend');
+    $('#rgBack').onclick = () => { sfx('click'); rgOpen(); };
+  }, won ? 900 : 1300);
+}
+
+/* ---- marching: waylays and events are rolled and saved before they are shown ---- */
+function rgMarch(R, to) {
+  const i = rgRoadIx(R, R.at, to); if (i < 0 || R.pending || R.battle) return;
+  const rd = R.roads[i], from = R.at, roll = rgRand(R.seed, 'w' + R.moves); R.moves++;
+  if (rd.ev && !rd.evDone) { rd.evDone = 1; R.pending = { kind: 'event', ev: rd.ev, from, to, road: i }; }
+  else if (roll < RG_WAY[rd.d]) { R.pending = { kind: 'waylay', from, to, road: i }; rgLog(R, `Waylaid on the road to ${rgNode(R, to).name} by ${CAMP_FAMILIES[rd.fam].name}.`); }
+  else { R.at = to; rgLog(R, `The host marches to ${rgNode(R, to).name}.`); }
+  rgPut(R);
+}
+// an event's choices: [label, what it costs and gives, can, apply]
+function rgEventOpts(R, P) {
+  const to = rgNode(R, P.to), wn = Object.keys(R.wounded);
+  if (P.ev === 'refugees') return [
+    ['Share your stores', `−${RG_PRICE.alms} gold · +3 lives (they join the line)`, R.chest >= RG_PRICE.alms && R.lives < RG_LIVES, () => { R.chest -= RG_PRICE.alms; R.lives = Math.min(RG_LIVES, R.lives + 3); return 'The refugees join the host: +3 lives.'; }],
+    ['Escort them', `The clock moves a step · every road from ${to.name} is one danger lower (they know the ways)`, true, () => { const out = []; rgClock(R, 1, out); for (const r of R.roads) if (r.a === P.to || r.b === P.to) r.d = Math.max(0, r.d - 1); return ['The host escorts the refugees; they show the safe ways.'].concat(out).join(' '); }],
+    ['Press on', 'Nothing gained, nothing spent', true, () => 'The host presses on.'],
+  ];
+  return [
+    ['Pray', '+1 Renown', true, () => { if (R.band && R.band.raised) R.band.rn = clamp((R.band.rn | 0) + 1, 0, typeof RN !== 'undefined' ? RN.cap : 10); else R.rnBank = (R.rnBank | 0) + 1; return 'The host prays at the shrine: +1 Renown.'; }],
+    ['Leave an offering', `−${RG_PRICE.offering} gold · every wounded unit mends`, R.chest >= RG_PRICE.offering && wn.length > 0, () => { R.chest -= RG_PRICE.offering; R.wounded = {}; return 'An offering is left: the wounded mend.'; }],
+    ['Pass by', 'Nothing gained, nothing spent', true, () => 'The host passes the shrine by.'],
+  ];
+}
+function rgResolveEvent(R, k) {
+  const P = R.pending, o = rgEventOpts(R, P)[k]; if (!o || !o[2]) return;
+  rgLog(R, o[3]()); R.at = P.to; R.pending = null; rgLog(R, `The host reaches ${rgNode(R, P.to).name}.`);
+  rgPut(R);
+}
+// the town's services, for war-chest gold
+function rgTownOpts(R) {
+  const miss = RG_LIVES - R.lives, wn = Object.keys(R.wounded), B = R.band;
+  const spent = B && B.tal ? Object.values(B.tal).reduce((a, v) => a + (Array.isArray(v) ? v.reduce((x, y) => x + (y | 0), 0) : 0), 0) : 0;
+  return [
+    ['rest', 'Rest', miss ? `${RG_PRICE.life} gold a life: ${Math.min(miss, Math.floor(R.chest / RG_PRICE.life))} of ${miss} missing for ${Math.min(miss, Math.floor(R.chest / RG_PRICE.life)) * RG_PRICE.life} gold` : 'The host is at full strength', miss > 0 && R.chest >= RG_PRICE.life],
+    ['tend', 'Tend the wounded', wn.length ? `${wn.map(k => R.wounded[k].name).join(', ')}: ${RG_PRICE.tend} gold each` : 'No one is wounded', wn.length > 0 && R.chest >= RG_PRICE.tend * wn.length],
+    ['respec', 'Re-spec talents', spent ? `${spent} talent points back to spend, for ${RG_PRICE.respec} gold` : 'No talent points spent yet', spent > 0 && R.chest >= RG_PRICE.respec],
+  ];
+}
+function rgTown(R, k) {
+  const o = rgTownOpts(R).find(x => x[0] === k); if (!o || !o[3]) return;
+  if (k === 'rest') { const m = Math.min(RG_LIVES - R.lives, Math.floor(R.chest / RG_PRICE.life)); R.chest -= m * RG_PRICE.life; R.lives += m; rgLog(R, `The host rests at ${rgNode(R, R.at).name}: ${m} lives back.`); }
+  if (k === 'tend') { R.chest -= RG_PRICE.tend * Object.keys(R.wounded).length; rgLog(R, `The wounded are tended: ${Object.values(R.wounded).map(w => w.name).join(', ')} can take the field.`); R.wounded = {}; }
+  if (k === 'respec') { const B = R.band; let n = 0; for (const t in B.tal) if (Array.isArray(B.tal[t])) n += B.tal[t].reduce((x, y) => x + (y | 0), 0); B.tal = {}; B.plan = null; B.tp = (B.tp | 0) + n; R.chest -= RG_PRICE.respec; rgLog(R, `The commander rethinks the host: ${n} talent points to spend again.`); }
+  rgPut(R);
+}
+
+/* ---- the region map screen ---- */
+let rgSel = null, rgPick = { hero: null, hard: false };
+function rgClockSVG(R) {
+  const cx = 62, cy = 62, out = [];
+  for (let i = 1; i <= RG_CLOCK; i++) {
+    const a = -Math.PI / 2 + (i - .5) / RG_CLOCK * Math.PI * 2, x = cx + Math.cos(a) * 38, y = cy + Math.sin(a) * 38;
+    out.push(`<circle class="rg-tick${i <= R.clock ? ' on' : ''}${RG_MARKS.includes(i) ? ' mark' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${RG_MARKS.includes(i) ? 7 : 5}"/>`);
+  }
+  return `<g class="rg-clock" aria-label="Threat clock ${R.clock} of ${RG_CLOCK}"><circle cx="${cx}" cy="${cy}" r="52" class="rg-clockbg"/>${out.join('')}<text x="${cx}" y="${cy + 6}" class="rg-clockn">${R.clock}</text><text x="${cx}" y="${cy + 70}" class="rg-clockl">Threat</text></g>`;
+}
+function rgMapSVG(R) {
+  const D = rgDef(R), nb = rgNb(R, R.at);
+  const roads = R.roads.map((r, i) => {
+    const A = rgNode(R, r.a), B = rgNode(R, r.b), mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, live = (r.a === R.at || r.b === R.at);
+    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1, px = -dy / L, py = dx / L;
+    const marks = Array.from({ length: r.d }, (_, k) => { const o = (k - (r.d - 1) / 2) * 11, x = mx + dx / L * o, y = my + dy / L * o; return `<path class="rg-dm d${r.d}" d="M${(x - px * 6).toFixed(1)},${(y - py * 6).toFixed(1)}L${(x + px * 6).toFixed(1)},${(y + py * 6).toFixed(1)}"/>`; }).join('');
+    const ev = r.ev && !r.evDone ? `<g class="rg-ev" transform="translate(${(A.x + dx * .3).toFixed(1)} ${(A.y + dy * .3).toFixed(1)})"><circle r="10"/><text y="4">${RG_EVENTS[r.ev].icon}</text></g>` : '';
+    return `<g class="rg-road${live ? ' live' : ''}"><path d="M${A.x},${A.y}L${B.x},${B.y}"/>${marks}${ev}</g>`;
+  }).join('');
+  const nodes = D.nodes.map(n => {
+    const st = R.st[n.id], here = R.at === n.id, help = R.helpers.find(h => h.node === n.id && st.s !== 'held');
+    const cls = `rg-n ${n.kind} ${st.s}${here ? ' here' : ''}${rgSel === n.id ? ' sel' : ''}${nb.includes(n.id) ? ' near' : ''}`;
+    const shape = n.kind === 'town' ? '<path class="rg-sh" d="M-17,14V-4L0,-18L17,-4V14Z"/>' : n.kind === 'lair' ? '<path class="rg-sh" d="M0,-24L7,-9L23,-11L13,2L21,16L5,11L0,25L-5,11L-21,16L-13,2L-23,-11L-7,-9Z"/>' : '<path class="rg-sh" d="M0,-18L18,0L0,18L-18,0Z"/>';
+    const pips = st.s !== 'held' && st.g ? `<g class="rg-grow">${Array.from({ length: st.g }, (_, k) => `<circle cx="${(k - (st.g - 1) / 2) * 9}" cy="-28" r="3.5"/>`).join('')}</g>` : '';
+    const wv = n.w && st.s !== 'held' ? `<text class="rg-w" y="45">waves ${rgSpec(R, n.id, 'trouble').w0}-${rgSpec(R, n.id, 'trouble').w1}</text>` : '';
+    return `<g class="${cls}" data-id="${n.id}" transform="translate(${n.x} ${n.y})" role="button" tabindex="0" aria-label="${rgEsc(n.name)}"><circle class="rg-halo" r="30"/>${shape}${st.s === 'lost' ? '<path class="rg-x" d="M-8,-8L8,8M8,-8L-8,8"/>' : ''}${pips}${help ? '<text class="rg-help" x="20" y="-14">☗</text>' : ''}
+      <text class="rg-nm" y="32">${rgEsc(n.name)}</text>${wv}${here ? '<g class="rg-flag"><path d="M-22,-40V-12"/><path class="rg-fl" d="M-22,-40L-4,-34L-22,-28Z"/></g>' : ''}</g>`;
+  }).join('');
+  return `<svg class="rg-svg" viewBox="0 0 1000 620" role="group" aria-label="${rgEsc(D.name)}">
+    <defs><radialGradient id="rgGround" cx="40%" cy="55%" r="80%"><stop offset="0" stop-color="#3f4c32"/><stop offset=".7" stop-color="#26301f"/><stop offset="1" stop-color="#141a12"/></radialGradient></defs>
+    <rect width="1000" height="620" fill="url(#rgGround)"/><path class="rg-fen" d="M840,40 C900,80 990,60 1000,120 L1000,260 C940,250 880,220 840,170 Z"/>
+    ${roads}${nodes}${rgClockSVG(R)}</svg>`;
+}
+function rgLossLines(R, S) {
+  if (S.kind === 'waylay') return ['the lives you lose', `thrown back to ${rgNode(R, S.from).name}`];
+  const fb = rgNearest(R, R.at, id => rgHeldTown(R, id) && id !== S.node) || rgNearest(R, R.at, id => rgHeldTown(R, id));
+  return [`the line's lives (${Math.min(RG_LINE, R.lives)})`, 'your strongest unit kind wounded for 2 battles', 'a third of the war chest', `${rgNode(R, S.node).name} falls and its trouble spreads to its neighbours`, 'the threat clock +2', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
+}
+function rgBattleCard(R, S, btn) {
+  const F = S.fam && CAMP_FAMILIES[S.fam], bosses = rgBosses(S);
+  return `<div class="rg-bt"><p><b>${F ? rgEsc(F.name) : 'The warlord’s host'}.</b> ${F ? rgEsc(F.say) : ''}</p>
+    ${S.extra && S.extra.length ? `<p><b>His helpers march too:</b> ${S.extra.map(f => rgEsc(CAMP_FAMILIES[f].name)).join(', ')} (+${Math.round(10 * S.extra.length)}% health).</p>` : ''}
+    <p class="rg-nums"><span>Waves <b>${S.w0}-${S.w1}</b></span><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Reward <b>${S.reward} gold</b></span></p>
+    ${bosses.length ? `<p>Boss: ${bosses.map(([w, b]) => `${rgEsc(CREEPS[b].name)} on wave ${w}`).join(', ')}.</p>` : ''}
+    <p class="rg-risk"><b>If the line breaks:</b> ${rgLossLines(R, S).join(' · ')}.${R.hard ? ' <b>Hardcore: it ends the run.</b>' : ''}</p>${btn || ''}</div>`;
+}
+function rgNodeHTML(R, id) {
+  const n = rgNode(R, id), st = R.st[id], here = R.at === id, i = rgRoadIx(R, R.at, id);
+  const state = st.s === 'held' ? (n.kind === 'town' ? 'Held town' : 'Settled') : st.s === 'lost' ? 'Lost to the enemy' : n.kind === 'town' ? 'Enemy-held town' : n.kind === 'lair' ? 'The warlord’s lair' : 'Trouble';
+  let body = '';
+  if (st.s !== 'held') {
+    const S = rgSpec(R, id, 'trouble');
+    body += `${st.g ? `<p class="rg-grew">Grown ${st.g} of ${RG_GROW}: waves ${RG_STEP.w * st.g} later, foes +${Math.round(RG_STEP.hp * 100 * st.g)}% health, reward +${Math.round(RG_STEP.pay * 100 * st.g)}%.</p>` : ''}`;
+    if (n.kind === 'lair') body += `<p><b>Helpers:</b> ${R.helpers.map(h => `${rgEsc(CAMP_FAMILIES[h.fam].name)} at ${rgEsc(rgNode(R, h.node).name)} ${R.st[h.node].s === 'held' ? '<i>(stripped)</i>' : '<i>(standing)</i>'}`).join(' · ')}</p>`;
+    const h = R.helpers.find(x => x.node === id); if (h) body += `<p class="rg-grew">The warlord’s helper is here: settle it and ${rgEsc(CAMP_FAMILIES[h.fam].name)} leave his lair.</p>`;
+    body += rgBattleCard(R, S, here && !R.battle && !R.pending ? `<button class="btn" id="rgFight">Fight at ${rgEsc(n.name)}<small>${S.line || Math.min(RG_LINE, R.lives)} lives on the line, of ${R.lives}</small></button>` : '');
+  } else if (n.kind === 'trouble') {
+    const p = st.p | 0;
+    body += p < RG_PATROLS ? rgBattleCard(R, rgSpec(R, id, 'patrol'), here && !R.battle && !R.pending ? `<button class="btn ghost" id="rgPatrol">Patrol ${rgEsc(n.name)}<small>Patrol ${p + 1} of ${RG_PATROLS}: harder, a smaller reward, the clock moves a step</small></button>` : `<p class="rg-note">Patrol ${p + 1} of ${RG_PATROLS} can be fought from here.</p>`) : `<p class="rg-note">Patrolled ${RG_PATROLS} times: nothing left to gain here.</p>`;
+  } else if (n.kind === 'town' && here) {
+    body += `<h4>The town</h4><div class="rg-town">${rgTownOpts(R).map(o => `<button class="btn ghost" data-town="${o[0]}" ${o[3] ? '' : 'disabled'}>${o[1]}<small>${rgEsc(o[2])}</small></button>`).join('')}</div>`;
+  }
+  let road = '';
+  if (!here && i >= 0) {
+    const r = R.roads[i];
+    road = `<p class="rg-road-card"><b>The road from ${rgEsc(rgNode(R, R.at).name)}:</b> danger ${r.d} of 3 · ${Math.round(RG_WAY[r.d] * 100)}% to be waylaid${r.d ? ` by ${rgEsc(CAMP_FAMILIES[r.fam].name)} (a 2-wave skirmish)` : ''}${r.ev && !r.evDone ? ` · <b>${RG_EVENTS[r.ev].name}</b> on the way (a choice)` : ''}.</p>
+      ${!R.battle && !R.pending ? `<button class="btn" id="rgGo">March to ${rgEsc(n.name)}</button>` : ''}`;
+  } else if (!here) road = `<p class="rg-note">No road from ${rgEsc(rgNode(R, R.at).name)}. March along the roads to reach it.</p>`;
+  return `<section class="cm-loc rg-card"><h3><span>${state}</span>${rgEsc(n.name)}</h3><p class="cm-say">${rgEsc(n.say)}</p>${here ? '<p class="rg-here">Your host is here.</p>' : ''}${road}${body}</section>`;
+}
+function rgPendingHTML(R) {
+  const P = R.pending;
+  if (P.kind === 'waylay') {
+    const S = rgSpec(R, null, 'waylay', P.road); S.line = Math.min(RG_LINE, R.lives);
+    return `<section class="cm-loc rg-card rg-alarm"><h3><span>Ambush</span>Waylaid on the road</h3><p class="cm-say">${rgEsc(CAMP_FAMILIES[S.fam].name)} fall on the column on the road to ${rgEsc(rgNode(R, P.to).name)}.</p>
+      ${rgBattleCard(R, S, `<button class="btn" id="rgFight">Fight through<small>${S.line} lives on the line · win and reach ${rgEsc(rgNode(R, P.to).name)}</small></button><button class="btn ghost" id="rgBackOff">Fall back to ${rgEsc(rgNode(R, P.from).name)}<small>No fight · the threat clock moves a step</small></button>`)}</section>`;
+  }
+  const E = RG_EVENTS[P.ev];
+  return `<section class="cm-loc rg-card rg-evcard"><h3><span>On the road to ${rgEsc(rgNode(R, P.to).name)}</span>${E.name}</h3>
+    <p class="cm-say">${P.ev === 'refugees' ? 'Families from the burned farms, with what they could carry. They ask for bread and safe roads.' : 'A moss-grown shrine of the old wood, a bowl of rainwater before it.'}</p>
+    <div class="rg-town">${rgEventOpts(R, P).map((o, k) => `<button class="btn ghost" data-ev="${k}" ${o[2] ? '' : 'disabled'}>${o[0]}<small>${rgEsc(o[1])}</small></button>`).join('')}</div></section>`;
+}
+const rgFace = h => (typeof COMMANDER_ART !== 'undefined' && COMMANDER_ART[h.id]) || (typeof HERO_ART !== 'undefined' && HERO_ART[h.id]) || heroFaceURL(h);
+function rgBandHTML(R) {
+  const h = HERO_BY[R.hero], B = R.band, lv = B && B.raised ? xpLevelOf(B.xp || 0) : 1;
+  const wn = Object.keys(R.wounded);
+  return `<section class="cm-band"><img class="cm-face" alt="" src="${rgFace(h)}"><div class="cm-bi"><h3>${rgEsc(h.name)}<small>${rgEsc(FORCES[R.force].name)}${R.hard ? ' · Hardcore' : ''}</small></h3>
+    <p class="cm-stats"><span><b>${R.lives}/${RG_LIVES}</b>Lives</span><span><b>${R.chest}</b>War chest</span><span><b>${lv}</b>Level</span><span><b>${B && B.raised ? B.loot.length : 0}</b>Items</span><span><b>${rgSettled(R)}</b>Settled</span></p>
+    <p class="cm-at">Threat clock ${R.clock} of ${RG_CLOCK}: at ${RG_MARKS.join(', ')} every unsettled trouble grows; at ${RG_CLOCK} the warlord raids the town nearest his lair.${wn.length ? ` <b>Wounded:</b> ${wn.map(k => `${rgEsc(R.wounded[k].name)} (${R.wounded[k].n} battle${R.wounded[k].n > 1 ? 's' : ''})`).join(', ')}.` : ''}</p></div></section>`;
+}
+function rgResumeHTML(R) {
+  const has = savesGet().some(x => x.id === R.battle.runId);
+  return `<section class="cm-loc rg-card rg-alarm"><h3><span>A battle is under way</span>${rgEsc(R.battle.name)}</h3><p class="cm-say">Waves ${R.battle.w0}-${R.battle.w1}. ${has ? 'It was saved between waves.' : 'No save of it was found.'}</p>
+    ${has ? '<button class="btn" id="rgResume">Resume the battle</button>' : ''}<button class="btn ghost" id="rgForfeit">${has ? 'Sound the retreat instead' : 'Count it as a retreat'}<small>The place’s trouble grows, the clock moves a step, the host falls back</small></button></section>`;
+}
+function rgStartHTML(force) {
+  const D = RG_REGIONS[force], hs = HEROES.filter(h => h.force === force);
+  if (!hs.some(h => h.id === rgPick.hero)) rgPick.hero = hs[0].id;
+  return `<div class="cm rg"><header class="cm-hd"><h2 class="ttl">${rgEsc(D.name)}</h2><p class="sub">${rgEsc(D.say)} A prototype of the region map: choose where to fight, march the roads, fall back and fight again.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
+    <div class="rg-start"><h4>Commander</h4><div class="rg-heroes">${hs.map(h => `<button type="button" class="rg-hero${h.id === rgPick.hero ? ' on' : ''}" data-h="${h.id}"><img alt="" src="${rgFace(h)}"><span>${rgEsc(h.name)}<small>${rgEsc(h.title)}</small></span></button>`).join('')}</div>
+    <label class="rg-hard"><input type="checkbox" id="rgHard" ${rgPick.hard ? 'checked' : ''}> Hardcore: the first broken line ends the run</label>
+    <ul class="rg-rules"><li>${RG_LIVES} lives for the whole act; each battle stakes a line of up to ${RG_LINE}.</li><li>A broken line costs, it does not end the run: lives, a wounded unit, gold, the place, time on the clock, and a fall back to the nearest town.</li><li>The run ends at 0 lives, or a broken line with no town to fall back to.</li><li>It saves itself on the map; battles save between waves.</li></ul>
+    <button class="btn" id="rgBegin">Muster the host<small>at ${rgEsc(D.nodes.find(n => n.start).name)}</small></button></div></div>`;
+}
+function rgOpen(force) {
+  force = force || 'grove';
+  if (typeof twStop === 'function') twStop();
+  G.paused = false; startDemo();
+  markDirty();
+  const R = rgGet(force);
+  if (!R) {
+    showOverlay(rgStartHTML(force), 'campaign');
+    for (const b of ovp.querySelectorAll('.rg-hero')) b.onclick = () => { rgPick.hero = b.dataset.h; sfx('click'); rgOpen(force); };
+    $('#rgHard').onchange = e => { rgPick.hard = e.target.checked; };
+    $('#rgBegin').onclick = () => { AudioSys.init(); sfx('click'); const N = rgNew(force, rgPick.hero, rgPick.hard); rgPut(N); rgSel = N.at; rgOpen(force); };
+    $('#rgX').onclick = () => { sfx('click'); titleScreen(); };
+    return;
+  }
+  if (R.over || R.done) {
+    showOverlay(`<div class="cm rg"><header class="cm-hd"><h2 class="ttl ${R.done ? 'win' : 'lose'}">${R.done ? 'The Marches are settled' : 'The host is broken'}</h2><p class="sub">${R.done ? 'Gloamfen Lair has fallen and the homeland is quiet. The muster for Act II calls (not built in this prototype).' : rgEsc(R.over)}</p></header>
+      <ul class="rg-out">${R.log.map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul><p class="sub">${R.battles} battles · ${rgSettled(R)} places settled · level ${R.band && R.band.raised ? xpLevelOf(R.band.xp || 0) : 1}</p>
+      <button class="btn" id="rgAgain">A new run</button><button class="btn ghost" id="rgTitle">Title screen</button></div>`, 'campaign');
+    $('#rgAgain').onclick = () => { sfx('click'); rgDrop(force); rgOpen(force); };
+    $('#rgTitle').onclick = () => { sfx('click'); titleScreen(); };
+    return;
+  }
+  if (!rgSel || !rgNode(R, rgSel)) rgSel = R.at;
+  const side = R.battle ? rgResumeHTML(R) : R.pending ? rgPendingHTML(R) : rgNodeHTML(R, rgSel);
+  showOverlay(`<div class="cm rg"><header class="cm-hd"><h2 class="ttl">${rgEsc(rgDef(R).name)}</h2><p class="sub">Choose where the host fights. Every trouble shows its foes, waves, reward and what a broken line costs. Roads show their danger. The map saves itself.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
+    <div class="cm-body"><div class="cm-map">${rgMapSVG(R)}</div><aside class="cm-side">${rgBandHTML(R)}${side}
+    <section class="rg-log"><h4>The march so far</h4><ul>${R.log.slice(0, 6).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></section></aside></div>
+    <footer class="cm-ft"><button type="button" class="btn ghost" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost" id="rgTitleB">Title screen<small>The run is saved</small></button></footer></div>`, 'campaign');
+  ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
+  for (const nd of ovp.querySelectorAll('.rg-n')) { const go = () => { rgSel = nd.dataset.id; sfx('click'); rgOpen(force); }; nd.onclick = go; nd.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; }
+  const on = (id, f) => { const b = document.getElementById(id); if (b) b.onclick = () => { AudioSys.init(); sfx('click'); f(); }; };
+  on('rgGo', () => { rgMarch(R, rgSel); rgSel = R.pending ? R.pending.to : R.at; rgOpen(force); });
+  on('rgFight', () => rgStart(R, R.pending && R.pending.kind === 'waylay' ? rgSpec(R, null, 'waylay', R.pending.road) : rgSpec(R, R.at, 'trouble')));
+  on('rgPatrol', () => rgStart(R, rgSpec(R, R.at, 'patrol')));
+  on('rgBackOff', () => { const out = []; rgClock(R, 1, out); rgLog(R, `The host falls back to ${rgNode(R, R.pending.from).name} rather than fight.`); for (const t of out) rgLog(R, t); R.pending = null; rgPut(R); rgOpen(force); });
+  on('rgResume', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (!x) return rgOpen(force); restore(x.s); G.runId = x.id; afterStart(`Wave ${G.wave}`, `${R.battle.name}: the maze stands as you left it.`); });
+  on('rgForfeit', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (x) { restore(x.s); G.runId = x.id; rgEnd(false, true); } else { const S = Object.assign(rgSpec(R, R.battle.node, 'trouble'), { line: 0 }); R.battle = null; const out = []; rgGrow(R, S.node); rgClock(R, 1, out); rgFallBack(R, out); for (const t of out) rgLog(R, t); rgPut(R); rgOpen(force); } });
+  on('rgX', () => titleScreen());
+  on('rgTitleB', () => titleScreen());
+  const dr = document.getElementById('rgDropB');
+  if (dr) dr.onclick = () => { sfx('click'); if (!dr.classList.contains('arm')) { dr.classList.add('arm'); dr.textContent = 'Tap again: the run is lost'; return; } rgDrop(force); rgOpen(force); };
+  for (const b of ovp.querySelectorAll('[data-town]')) b.onclick = () => { sfx('click'); rgTown(R, b.dataset.town); rgOpen(force); };
+  for (const b of ovp.querySelectorAll('[data-ev]')) b.onclick = () => { sfx('click'); rgResolveEvent(R, +b.dataset.ev); rgSel = R.at; rgOpen(force); };
+  const L = rgNode(R, rgSel); if (L && L.map && MAPS[L.map] && !R.battle) { mapPick = L.map; setMap(L.map); }
+}
+
+/* ---- the hooks ---- */
+{
+  const _ng = newGame;
+  newGame = function () {
+    const nx = RG_NEXT; RG_NEXT = null;
+    // a region battle bent the waves: put the march back (campaign.js rebuilds it when its location changes)
+    if (RG_TOUCHED) { RG_TOUCHED = false; RG_SWAP = null; CAMP_CUR = -1; }
+    const r = _ng.apply(this, arguments);
+    G.region = nx && G.force ? JSON.parse(JSON.stringify(nx)) : null;
+    if (G.region) rgApplyWaves(G.region);
+    return r;
+  };
+  const _ser = serialize;
+  serialize = function () { const s = _ser.apply(this, arguments); if (s && G.region) s.region = JSON.parse(JSON.stringify(G.region)); return s; };
+  const _res = restore;
+  restore = function (s) { RG_NEXT = s && s.region && s.region.w1 ? s.region : null; const r = _res.apply(this, arguments); RG_NEXT = null; if (G.region) G.maxLives = Math.max(1, G.region.line | 0); return r; };
+  const _hp = waveHP;
+  waveHP = function () { return _hp.apply(this, arguments) * (G && G.region && !G.vs ? G.region.hpK || 1 : 1); };
+  const _mw = makeWave;
+  makeWave = function (n) {
+    const q = _mw.apply(this, arguments), sw = G && G.region && RG_SWAP && RG_SWAP.n === n ? RG_SWAP : null;
+    if (sw) for (const e of q) if (e.type === sw.to) { e.hp *= sw.k; e.bounty = Math.max(1, Math.round(e.bounty * sw.g)); }
+    return q;
+  };
+  const _wc = waveCleared;
+  waveCleared = function () {
+    const S = G.region;
+    if (S && Math.max(G.wave, ...(G.inFlight || [])) >= S.w1) {
+      G.inFlight = []; G.phase = 'build'; G.countdown = 0; S.won = true;
+      if (typeof AudioSys !== 'undefined' && !G.mute) AudioSys.intense(false);
+      onBanner(`${S.kind === 'waylay' ? 'The ambush is broken' : 'The last wave is down'}`, 'The battle is won');
+      onDirty(); return;
+    }
+    return _wc.apply(this, arguments);
+  };
+  const _upd = update;
+  update = function (dt) {
+    const r = _upd.apply(this, arguments), S = G.region;
+    if (S && S.won && G.state === 'play' && !(typeof rnS === 'function' && rnS().loots && rnS().loots.length) && typeof ov !== 'undefined' && ov.hidden) { S.won = false; victory(); }
+    return r;
+  };
+  const _cw = callWave;
+  callWave = function () { return G.region && (G.region.won || G.wave > G.region.w1) ? undefined : _cw.apply(this, arguments); };
+  const _csn = canSendNext;
+  canSendNext = function () { return G.region && G.wave >= G.region.w1 ? false : _csn.apply(this, arguments); };
+  const _tb = tryBuild;
+  tryBuild = function (type) {
+    if (G.region && (G.region.wounded || []).includes(type)) { onToast(`The ${TOWERS[type].name} are wounded and cannot take the field this battle. A town can tend them.`); sfx('error'); return null; }
+    return _tb.apply(this, arguments);
+  };
+  const _es = endScreen;
+  endScreen = function (won) { if (G.region && !(typeof TW !== 'undefined' && TW)) { rgEnd(won, false); return; } return _es.apply(this, arguments); };
+  // (ui.js may have bound onEnd to the old endScreen before this file loaded)
+  const _oe = onEnd;
+  onEnd = function (won) { if (G.region && !(typeof TW !== 'undefined' && TW)) { rgEnd(won, false); return; } return _oe.apply(this, arguments); };
+  const _pm = pauseMenu;
+  pauseMenu = function () {
+    const r = _pm.apply(this, arguments), b = G.region && document.getElementById('pQuit');
+    if (b) {
+      b.textContent = 'Sound the retreat'; b.title = 'Keep the lives you still hold; no unit is wounded. The trouble grows a step and the host falls back.';
+      let armed = false;
+      b.onclick = e => { if (!armed) { armed = true; e.currentTarget.textContent = 'Click again to retreat'; e.currentTarget.classList.add('danger'); return; } G.state = 'lost'; hideOverlay(); rgEnd(false, G.region.kind !== 'waylay'); };
+    }
+    return r;
+  };
+  const _sn = campSaveName;
+  campSaveName = function (s) { try { if (s && s.region && s.region.name) return `Marches: ${s.region.name}`; } catch (e) {} return _sn.apply(this, arguments); };
+  const _ts = titleScreen;
+  titleScreen = function () { const r = _ts.apply(this, arguments); rgTitleInject(); return r; };
+}
+// the title's Homeland button (hidden with ?region=0)
+function rgTitleInject() {
+  if (!rgOn() || document.getElementById('oRegion')) return;
+  const ref = document.getElementById('oRites'); if (!ref) return;
+  const R = rgGet('grove');
+  ref.insertAdjacentHTML('beforebegin', `<button type="button" class="t2-btn" id="oRegion"><span>Homeland</span><small>${R && !R.over && !R.done ? `${rgEsc(rgNode(R, R.at).name)} · ${R.lives} lives` : 'Prototype'}</small></button>`);
+  document.getElementById('oRegion').onclick = () => { AudioSys.init(); sfx('click'); rgOpen('grove'); };
+}
+if (typeof document !== 'undefined') setTimeout(rgTitleInject, 0);
 
 /* ================= PLAY LOG: an always-on watcher for playtests (force runs and Classic; never Tower Wars or the demo) =================
    window.PLAYLOG records each run so a playtest can be read back afterwards (in the browser pane, the console, or a file):
@@ -103509,7 +105018,7 @@ const FC_STORY = {
 };
 // each unit's job in a few words (the unit niche audit's tags), by unit id; a unit not listed gets its slot's (FC_SLOT_ROLE)
 const FC_ROLE = {
-  thornguard: 'Line holder', gladebow: 'Single target', briarwarden: 'Control', staglancer: 'Boss killer', wayfarer: 'Anti-air', bladedancer: 'Crowd clearer', seedcaster: 'Splash', thornwarden: 'Caster hunter',
+  thornguard: 'Line holder', gladebow: 'Single target', briarwarden: 'Control', staglancer: 'Boss killer', wayfarer: 'Anti-air', bladedancer: 'Crowd clearer', seedcaster: 'Splash', bogwitch: 'Armour bane',
   oathsworn: 'Line holder', silverbolt: 'Single target', lightbinder: 'Control', grailknight: 'Boss killer', sunlance: 'Anti-air', templar: 'Crowd clearer', censer: 'Splash', so_inquisitor: 'Caster hunter',
   cc_spellblade: 'Ward cutter', cc_mageling: 'Single target', cc_rimeweaver: 'Control', cc_chronomancer: 'Support', cc_astrologer: 'Anti-air', cc_golemwarden: 'Line holder', cc_pyroclast: 'Splash', cc_severer: 'Ward breaker',
   ironbreaker: 'Line holder', thundergun: 'Boss killer', chaintrapper: 'Control', runesmith: 'Support', flakgunner: 'Anti-air', steamhammer: 'Crowd clearer', mortarcrew: 'Splash', siegebreaker: 'Armour breaker',
@@ -103521,7 +105030,7 @@ const FC_ROLE_SAY = {
   'Line holder': 'Stands on the road and holds foes in place for the rest of the army.', 'Single target': 'Steady damage on one foe at a time.', 'Control': 'Slows and holds foes so the others can strike.',
   'Boss killer': 'One heavy blow at the strongest foe in reach.', 'Anti-air': 'Strikes flyers hardest and brings them down.', 'Crowd clearer': 'Strikes every ground foe around it at once.', 'Splash': 'Bursts over a group from range.',
   'Caster hunter': 'Shuts down enemy healers and casters.', 'Ward cutter': 'Steel for warded and spell-proof foes.', 'Ward breaker': 'Tears wards and shields apart.', 'Support': 'Makes the units near it stronger.',
-  'Armour breaker': 'Blows plate off heavy foes.', 'Chain damage': 'Lightning that leaps from foe to foe.', 'Flyer hunter': 'Hauls flyers down to the ground.', 'Specialist': 'Answers one kind of foe.', 'Champion': 'Your commander in person.', 'Maze wall': 'Cheap blocks to shape the road.',
+  'Armour breaker': 'Blows plate off heavy foes.', 'Armour bane': 'Magic that armour does not stop, and a curse that tears armour off.', 'Chain damage': 'Lightning that leaps from foe to foe.', 'Flyer hunter': 'Hauls flyers down to the ground.', 'Specialist': 'Answers one kind of foe.', 'Champion': 'Your commander in person.', 'Maze wall': 'Cheap blocks to shape the road.',
 };
 const FC = { f: null, sel: null, back: null, scroll: 0, ro: null };
 const fcE = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -108496,6 +110005,790 @@ if (typeof openSettings === 'function') { const _cuS = openSettings; openSetting
 // the play log says which pace the run was played at (playlog.js plHeader)
 if (typeof plHeader === 'function') { const _cuP = plHeader; plHeader = function () { const h = _cuP.apply(this, arguments); try { if (h && typeof calmOn === 'function' && calmOn()) { h.calm = 1; h.heroName = `${h.heroName || 'no hero'} [Calm pace]`; } } catch (e) {} return h; }; }
 
+/* ================= TOWER WARS ONLINE: the lockstep (twnet.js) =================
+   Two players, one match: each browser simulates both keeps, and only the players' actions travel. The design note is
+   docs/design/tw_online_2026-11-11.md. This file holds no page or network code (twnet_ui.js has the lobby and the
+   transports), so tools/check_tw_lockstep.js runs it in node.
+   - Fixed ticks of TWN_DT; a turn is TWN_TURN ticks. An action made during turn T is stamped T + TWN_DELAY and applied
+     at the start of that turn on both browsers, the host's (side 0) first.
+   - Each keep has its own seeded generator (S.rngS), installed as Math.random by withSide while that keep's simulation
+     runs (twnSim). Visual functions (particles, flashes, sounds) are wrapped to use the browser's own Math.random.
+   - The functions a player calls (twnRoute) are wrapped: from the page they are queued and sent; inside the lockstep
+     they run as ever.
+   - Every TWN_CK turns each side hashes both keeps (twnHash) and sends it; a mismatch stops the match ("Out of sync"). */
+const TWN_DT = 1 / 30, TWN_TURN = 6, TWN_DELAY = 2, TWN_CK = 10;
+const TWN_NATIVE = Math.random;
+let TWN = null, twnSim = false;
+
+/* ---------- seeded randomness, one stream per keep ---------- */
+function twnSeedOf(seed, side) { let h = (seed ^ 0x9E3779B9) | 0; h = Math.imul(h ^ (side + 1) * 0x85EBCA6B, 0xC2B2AE35); return (h ^ h >>> 16) | 0; }
+function twnRngFor(S) {
+  return function () {
+    let a = S.rngS = (S.rngS + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+// run fn as the lockstep: the keeps' generators are live inside withSide
+function twnInSim(fn) { const s0 = twnSim; twnSim = true; try { return fn(); } finally { twnSim = s0; } }
+
+/* ---------- visuals keep the browser's randomness ---------- */
+const TWN_VISUAL = ['part', 'decal', 'addText', 'flashLight', 'rfx', 'relicGlint', 'spellFxCast', 'updateFx', 'empower', 'fxBlood', 'fxDeath'];
+function twnVisualWrap() {
+  const g = typeof globalThis !== 'undefined' ? globalThis : window;
+  const names = new Set(TWN_VISUAL.concat(Object.keys(g).filter(k => /^fx[A-Z]/.test(k))));
+  const wrap = f => function () {
+    if (!twnSim) return f.apply(this, arguments);
+    const r = Math.random; Math.random = TWN_NATIVE;
+    try { return f.apply(this, arguments); } finally { Math.random = r; }
+  };
+  for (const n of names) { const f = g[n]; if (typeof f === 'function' && !f.twnVis) { const w = wrap(f); w.twnVis = 1; g[n] = w; } }
+  if (typeof AudioSys !== 'undefined' && AudioSys && typeof AudioSys.play === 'function' && !AudioSys.play.twnVis) { const w = wrap(AudioSys.play); w.twnVis = 1; AudioSys.play = w; }
+}
+
+/* ---------- the actions a player takes ---------- */
+// name -> { f: the real function, enc(args): what travels, apply(S, args): run it on keep S }
+const TWN_ACTS = {};
+function twnRoute(name, opt) {
+  const g = typeof globalThis !== 'undefined' ? globalThis : window, f = g[name];
+  if (typeof f !== 'function' || TWN_ACTS[name]) return false;
+  const R = TWN_ACTS[name] = Object.assign({ f, ret: true }, opt || {});
+  g[name] = function () {
+    if (!TWN || !TWN.live || twnSim) return f.apply(this, arguments);
+    if (TW && G !== TW.P) { console.warn('[twnet] ' + name + ' called on the other keep outside the lockstep: dropped'); return false; }
+    if (TWN.botThink && TWN.pending.length) return false;
+    const a = R.enc ? R.enc(Array.from(arguments)) : Array.from(arguments);
+    if (a === null) return false;
+    TWN.pending.push([name, a.map(twnEnc)]);
+    if (TWN.onQueue) TWN.onQueue(name);
+    return typeof R.ret === 'function' ? R.ret.apply(this, arguments) : R.ret;
+  };
+  return true;
+}
+// what travels: plain values as they are, a keep as its side, a tower by its id, a relic by its id
+function twnEnc(v) {
+  if (v == null || typeof v !== 'object') return v === undefined ? null : v;
+  if (TW && (v === TW.P || v === TW.E)) return { $s: 1 };
+  if (Array.isArray(v)) return v.map(twnEnc);
+  if (v.def && v.tier != null && v.id != null) return { $t: v.id };
+  if (v.rar != null && v.id != null) return { $i: v.id };
+  return JSON.parse(JSON.stringify(v));
+}
+function twnFindItem(S, id) {
+  for (const it of S.loot || []) if (it && it.id === id) return it;
+  for (const t of S.towers) { if (t.charm && t.charm.id === id) return t.charm; for (const it of t.gear || []) if (it && it.id === id) return it; }
+  return null;
+}
+function twnDec(v, S) {
+  if (v == null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(x => twnDec(x, S));
+  if (v.$s) return S;
+  if (v.$t != null) return S.towers.find(t => t.id === v.$t) || null;
+  if (v.$i != null) return twnFindItem(S, v.$i);
+  return v;
+}
+function twnApply(S, act) {
+  const R = TWN_ACTS[act[0]]; if (!R) { console.warn('[twnet] unknown action ' + act[0]); return; }
+  const args = twnDec(act[1], S);
+  if (args.some((a, k) => a === null && act[1][k] !== null)) return;
+  withSide(S, () => { try { const r = R.apply ? R.apply(S, args) : R.f.apply(null, args); if (TWN.onApply) TWN.onApply(S, act[0], r); } catch (e) { console.error('[twnet] action ' + act[0] + ' failed', e); } });
+}
+// what the page can do in a Tower Wars match. upgradeGroup reads the selection: the selection travels with it
+function twnRouteAll() {
+  for (const n of ['tryBuild', 'placeWallLine', 'upgrade', 'convert', 'sell', 'sellGroup', 'repairTower', 'advanceAge', 'buyTalent', 'buyFusion', 'resetFusions', 'resetTree',
+    'buyPath', 'resetPaths', 'openSchool', 'equipGear', 'salvageGear', 'upgradeRelic', 'chooseSpec', 'useAct', 'moveTowerTo', 'shopBuy', 'shopSell', 'shopLevelUp', 'setPrio', 'twSend']) twnRoute(n);
+  twnRoute('upgradeGroup', {
+    enc: () => { const s = G.sel; return s && s.ref && s.group ? [s.ref, s.group] : null; },
+    apply: (S, a) => { const keep = S.sel; S.sel = { kind: 'tower', ref: a[0], group: (a[1] || []).filter(Boolean) }; try { TWN_ACTS.upgradeGroup.f(); } finally { const g = S.sel.group; S.sel = keep; if (keep && keep.ref === a[0]) keep.group = g; } },
+  });
+}
+
+/* ---------- the state both browsers must agree on ---------- */
+const _twnF = new Float64Array(1), _twnI = new Int32Array(_twnF.buffer);
+function twnHash(sides, extra) {
+  let h = 0x811C9DC5 | 0;
+  const mix = x => { h = Math.imul(h ^ (x | 0), 0x01000193); };
+  const num = x => { if (typeof x !== 'number') { if (x == null) mix(7); else str(String(x)); return; } _twnF[0] = x; mix(_twnI[0]); mix(_twnI[1]); };
+  const str = s => { mix(s.length); for (let k = 0; k < s.length; k++) mix(s.charCodeAt(k)); };
+  for (const x of extra || []) num(x);
+  for (const S of sides) {
+    for (const k of ['gold', 'lives', 'wave', 'phase', 'state', 'tp', 'pp', 'income', 'sentN', 'uid', 'gearUid', 'rngS', 'time', 'countdown', 'waveT', 'age', 'keys']) num(S[k]);
+    str(JSON.stringify(S.tal || {})); str(JSON.stringify(S.paths || {})); str((S.unlocked || []).join());
+    mix(S.towers.length);
+    for (const t of S.towers) { num(t.id); str(t.type); num(t.tier); num(t.i); num(t.j); num(t.hp); num(t.wrecked ? 1 : 0); num(t.prio); num(t.spec); num(t.invested); num(t.kills);
+      for (const it of t.gear || []) num(it ? it.id : -1); }
+    mix(S.creeps.length);
+    for (const c of S.creeps) { str(c.type); num(c.x); num(c.y); num(c.hp); num(c.dead ? 1 : 0); }
+    for (const it of S.loot || []) num(it.id);
+    mix((S.projs || []).length); mix((S.sendQ || []).length); mix((S.spawnQ || []).length);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/* ---------- the match ---------- */
+/* opts: { seed, side (0 host, 1 guest), map, names: [host, guest], send(msg): the transport, bot: play my keep (tests) }
+   Returns TW. The local keep is always TW.P; TW.order is [side 0, side 1] whichever is local. */
+function twnStart(opts) {
+  twnStop();
+  const seed = opts.seed | 0, me = opts.side ? 1 : 0;
+  twnVisualWrap(); twnRouteAll();
+  twStop();
+  if (typeof setMap === 'function') setMap(opts.map || 'meadow');
+  // both keeps are fresh games (no field left over from an earlier run on either), each from its own stream, host first
+  const sides = [{ state: 'title', speed: 1 }, { state: 'title', speed: 1 }];
+  twnSim = true;
+  try {
+    for (let s = 0; s < 2; s++) {
+      const S = sides[s];
+      S.rngS = twnSeedOf(seed, s); S.rngF = twnRngFor(S);
+      withSide(S, () => newGame('normal'));
+      Object.assign(S, { vs: true, endless: true, income: 0, sendQ: [], sentN: 0, sentGold: 0, map: opts.map || 'meadow', side: s, plan: null, planAuto: false, speed: 1, paused: false, hold: false,
+        uid: s ? 1000000 : 0, time: s ? 50000.5 : 0, mute: s !== me, quiet: s !== me, ai: false });
+    }
+  } finally { twnSim = false; }
+  G = sides[me];
+  const P = G, E = sides[1 - me], names = opts.names || ['Host', 'Guest'];
+  TW = { P, E, L: { id: 'online', name: 'Online' }, clock: TW_FIRST, wave: 0, view: 'P', menu: false, over: false, eLives: E.lives, mapT: 0, feed: [], order: sides, net: true };
+  TW.ai = { name: names[1 - me] || 'Opponent', build: { name: 'player', types: [] }, seen: {}, L: { gold: 1, send: 0, name: 'Online' }, bank: 0, online: true };
+  TWN = { live: true, seed, me, sides, names, send: opts.send || (() => {}), turn: 0, tick: 0, acc: 0, pending: [],
+    log: [new Map(), new Map()], upTo: [TWN_DELAY - 1, TWN_DELAY - 1], sealed: TWN_DELAY - 1, hashes: new Map(), theirs: new Map(),
+    stall: 0, heard: 0, rt: 0, needAt: -9, over: false, result: null, desync: null, onQueue: null, onEnd: opts.onEnd || null, onDesync: opts.onDesync || null, ticks: 0 };
+  if (opts.bot) twnBot(opts.bot);
+  if (typeof twUI === 'function' && typeof document !== 'undefined') twUI(true);
+  return TW;
+}
+function twnStop() { if (TWN) TWN.live = false; TWN = null; }
+
+// seal my actions for turn T + delay and send them, with my latest hash
+function twnSeal() {
+  const T = TWN.turn + TWN_DELAY; if (TWN.sealed >= T) return;
+  const acts = TWN.pending; TWN.pending = [];
+  if (acts.length) TWN.log[TWN.me].set(T, acts);
+  TWN.sealed = TWN.upTo[TWN.me] = T;
+  const msg = { k: 'turn', s: TWN.me, from: T, upTo: T, acts: acts.length ? [[T, acts]] : [] };
+  const ck = TWN.lastCk; if (ck) msg.ck = ck;
+  TWN.send(msg);
+}
+// a message from the other side (or a resend asked for)
+function twnRecv(m) {
+  if (!TWN || !m) return;
+  TWN.heard = 0;
+  if (m.k === 'need') { twnResend(m.from | 0); return; }
+  if (m.k !== 'turn') return;
+  const s = m.s ? 1 : 0; if (s === TWN.me) return;
+  if (m.from > TWN.upTo[s] + 1) { twnNeed(s); return; }
+  for (const [t, acts] of m.acts || []) if (t > TWN.upTo[s] && acts && acts.length) TWN.log[s].set(t, acts);
+  if (m.upTo > TWN.upTo[s]) TWN.upTo[s] = m.upTo;
+  if (m.ck) { TWN.theirs.set(m.ck[0], m.ck[1]); twnCompare(m.ck[0]); }
+}
+function twnNeed(s) {
+  if (TWN.rt - TWN.needAt < .5) return;
+  TWN.needAt = TWN.rt;
+  TWN.send({ k: 'need', s: TWN.me, from: TWN.upTo[s] + 1 });
+}
+// everything I have sealed from turn `from` on, in one message
+function twnResend(from) {
+  const acts = [];
+  for (const [t, a] of TWN.log[TWN.me]) if (t >= from) acts.push([t, a]);
+  acts.sort((a, b) => a[0] - b[0]);
+  const msg = { k: 'turn', s: TWN.me, from: Math.max(0, from), upTo: TWN.sealed, acts };
+  if (TWN.lastCk) msg.ck = TWN.lastCk;
+  TWN.send(msg);
+}
+function twnCompare(t) {
+  const a = TWN.hashes.get(t), b = TWN.theirs.get(t);
+  if (a == null || b == null) return;
+  if (a !== b && !TWN.desync) {
+    TWN.desync = t; TWN.over = true; TWN.live = false;
+    console.error(`[twnet] out of sync at turn ${t}: ${a} here, ${b} there`);
+    if (TWN.onDesync) TWN.onDesync(t);
+    return;
+  }
+  TWN.hashes.delete(t); TWN.theirs.delete(t);
+}
+
+// one tick of both keeps, host first. Keeps' end-of-game hooks are held: the match decides the end itself
+function twnStepTick() {
+  const S0 = TWN.sides[0], S1 = TWN.sides[1], e0 = onEnd;
+  onEnd = twNoop;
+  try {
+    for (const S of TWN.sides) withSide(S, () => { if (S.state === 'play') { update(TWN_DT); empowerTick(TWN_DT); } });
+  } finally { onEnd = e0; }
+  TW.clock -= TWN_DT;
+  if (TW.clock <= 0) {
+    TW.clock += TW_EVERY;
+    if (TW.wave >= TW_LAST) { const d = S0.lives - S1.lives; twnFinish(d > 0 ? 0 : d < 0 ? 1 : -1, 'last'); return; }
+    twLaunch();
+  }
+  if (TW.E.lives < TW.eLives) { twFeed(`${TW.ai.name}'s keep −${TW.eLives - TW.E.lives}`, 'hit'); TW.eLives = TW.E.lives; }
+  const l0 = S0.state === 'lost' || S0.lives <= 0, l1 = S1.state === 'lost' || S1.lives <= 0;
+  if (l0 || l1) twnFinish(l0 && l1 ? -1 : l0 ? 1 : 0, 'fell');
+}
+// the winner by side (-1: a draw)
+function twnFinish(win, how) {
+  if (TWN.over) return;
+  TWN.over = true; TWN.result = { win, how, wave: TW.wave, lives: TWN.sides.map(S => Math.max(0, S.lives)), hash: twnHash(TWN.sides, [TW.clock, TW.wave]), turn: TWN.turn };
+  const mine = win < 0 ? null : win === TWN.me;
+  TW.over = true; TW.view = 'P'; TW.menu = false;
+  if (typeof document !== 'undefined') {
+    const P = TW.P;
+    if (mine !== false) { P.state = 'won'; sfx(mine ? 'victory' : 'clear'); }
+    else { P.state = 'lost'; sfx('defeat'); }
+    if (typeof AudioSys !== 'undefined' && AudioSys.intense) AudioSys.intense(false);
+  }
+  if (TWN.onEnd) TWN.onEnd(TWN.result);
+}
+// the other side has gone: the match is mine
+function twnForfeit(by) {
+  if (!TWN || TWN.over) return;
+  twnFinish(by ? 0 : 1, 'forfeit');
+}
+
+/* ---------- each frame: as many ticks as real time (and the other side's actions) allow ---------- */
+// real: seconds since the last call. maxTicks: how far one call may catch up
+function twnAdvance(real, maxTicks = 8) {
+  if (!TWN || !TWN.live || TWN.over) return 0;
+  TWN.acc = Math.min(TWN.acc + Math.max(0, real), 1);
+  TWN.heard += real; TWN.rt += real;
+  let n = 0;
+  twnInSim(() => {
+    while (TWN.acc >= TWN_DT && n < maxTicks && !TWN.over) {
+      if (TWN.tick === 0 && !twnTurnStart()) { TWN.stall += real / Math.max(1, n + 1); TWN.acc = Math.min(TWN.acc, TWN_DT * 2); return; }
+      twnStepTick();
+      TWN.acc -= TWN_DT; TWN.ticks++; n++;
+      if (TWN.over) break;
+      if (++TWN.tick === TWN_TURN) { TWN.tick = 0; twnTurnEnd(); TWN.turn++; }
+    }
+  });
+  if (n) TWN.stall = 0;
+  return n;
+}
+// the start of a turn: seal mine, wait for theirs, then apply both in order
+function twnTurnStart() {
+  twnSeal();
+  const T = TWN.turn, other = 1 - TWN.me;
+  if (TWN.upTo[other] < T) { twnNeedIfLate(other); return false; }
+  for (let s = 0; s < 2; s++) { const acts = TWN.log[s].get(T); if (acts) for (const a of acts) twnApply(TWN.sides[s], a); }
+  return true;
+}
+function twnNeedIfLate(s) { if (TWN.heard > 1.5) twnNeed(s); }
+function twnTurnEnd() {
+  const T = TWN.turn;
+  if (T % TWN_CK === 0) { const h = twnHash(TWN.sides, [TW.clock, TW.wave]); TWN.hashes.set(T, h); TWN.lastCk = [T, h]; twnCompare(T); }
+  if (TWN.onTurn) TWN.onTurn(T);
+  // old turns are kept for resends; hashes for a minute
+  for (const k of TWN.hashes.keys()) if (k < T - 300) TWN.hashes.delete(k);
+}
+
+/* ---------- a bot that plays my keep through the same actions a player sends (tests, ?twbot=1) ---------- */
+function twnBot(lv) {
+  const L = Object.assign({}, TW_LEVELS[lv] || TW_LEVELS.knight, { smart: .5 });
+  TWN.bot = twMakeAI(TW.P, L);
+}
+// one action at a time: it thinks again once its last one has landed (a queued call can't tell it what happened)
+function twnBotTick(dt) {
+  if (!TWN || !TWN.bot || TWN.over || !TWN.live) return;
+  if (TWN.pending.length || TWN.sealed > TWN.turn && [...TWN.log[TWN.me].keys()].some(t => t >= TWN.turn)) return;
+  const A = TWN.bot;
+  if (A.wave !== TW.wave) { A.wave = TW.wave; const n = TW.wave; if (n >= 3) A.bank = Math.min(A.bank + A.L.send * Math.max(0, (TW.P.income || 0) + 22 + 4.5 * n), 40 + 30 * n); }
+  A.thinkT = Math.min(A.thinkT, .3);
+  TWN.botThink = true;
+  try { twAiTick(TWN.bot, dt); } finally { TWN.botThink = false; }
+}
+
+/* ================= TOWER WARS ONLINE: lobby, connection, the match on screen (twnet_ui.js) =================
+   The lockstep itself is twnet.js. Here:
+   - two transports with one shape ({ send(o), close() }, messages to onMsg): Supabase Realtime broadcast over a plain
+     WebSocket (the Phoenix protocol; no library, the web build's security policy allows only its own scripts), and a
+     BroadcastChannel between two tabs of one browser (local tests, no server)
+   - the lobby: create a match and get a code, join by code, both ready, the host starts
+   - the match: fixed ticks each frame (and from a timer while the tab is hidden), "Waiting for opponent", forfeit after
+     TWN_GONE seconds of silence, "Out of sync", the end screen, the result written to Supabase when signed in
+   - a reload keeps the match in sessionStorage; Bannerwars > Online offers to rejoin it (the other side resends both
+     logs and this browser replays the match from its seed)
+   Supabase tables and functions: web/supabase/tw_online.sql (optional: matches play without them, unrecorded). */
+const TWN_CODE_CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', TWN_GONE = 90, TWN_HELLO = 1.5, TWN_SAVE = 'rk.twn', TWN_NAME = 'rk.twname';
+const TWNL = { tx: null, id: '', code: '', host: false, peer: null, ready: false, map: 'meadow', matchId: null, local: false, started: false, startT: 0, helloT: 0, status: '', note: '', bot: false, rejoin: null };
+const twnRand = n => { const a = new Uint32Array(n); (typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto.getRandomValues(a) : a.forEach((v, k) => { a[k] = Math.random() * 4294967296; })); return a; };
+const twnMakeCode = () => Array.from(twnRand(6), v => TWN_CODE_CH[v % TWN_CODE_CH.length]).join('');
+const twnBuild = () => typeof BUILD_TAG !== 'undefined' ? String(BUILD_TAG).replace(/@.*$/, '') : 'dev';
+const twnSbOn = () => typeof SB !== 'undefined' && SB && SB.on;
+const twnSignedIn = () => twnSbOn() && typeof SESS !== 'undefined' && !!SESS;
+// signed in: the board's name; else the one typed here (kept for this tab, and as the next default)
+function twnMyName() {
+  const me = typeof BOARD !== 'undefined' && BOARD.me && (BOARD.me.name || BOARD.me.displayName);
+  if (!me && !TWNL.name) TWNL.name = (typeof lsGet === 'function' ? lsGet(TWN_NAME) : '') || 'Player';
+  let n = me || TWNL.name || 'Player';
+  return String(n).replace(/[\u0000-\u001f<>]/g, '').slice(0, 20) || 'Player';
+}
+
+/* ---------- transports ---------- */
+function twnLocalTx(code, onMsg, onStatus) {
+  const bc = new BroadcastChannel('rk-tw-' + code);
+  bc.onmessage = e => onMsg(e.data);
+  setTimeout(() => onStatus('open'), 0);
+  return { kind: 'local', send: o => bc.postMessage(o), close: () => bc.close() };
+}
+// Supabase Realtime: join the channel realtime:rk-tw-<code>, broadcast event 'tw'. Reconnects by itself (1, 2, 4 .. 10 s)
+function twnSbTx(code, onMsg, onStatus) {
+  const topic = 'realtime:rk-tw-' + code.toLowerCase();
+  const url = SB.url.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(SB.key) + '&vsn=1.0.0';
+  let ws = null, ref = 0, joinRef = null, hb = 0, closed = false, joined = false, back = 1;
+  const push = (event, payload, r) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ topic, event, payload, ref: r || String(++ref), join_ref: joinRef })); };
+  async function open() {
+    if (closed) return;
+    try { ws = new WebSocket(url); } catch (e) { onStatus('error'); retry(); return; }
+    ws.onopen = async () => {
+      let tok = null;
+      try { if (typeof sbToken === 'function' && typeof SESS !== 'undefined' && SESS) tok = await sbToken(); } catch (e) { tok = null; }
+      if (!tok && /^eyJ/.test(SB.key)) tok = SB.key;
+      joinRef = String(++ref);
+      const p = { config: { broadcast: { self: false, ack: false }, presence: { key: '' }, postgres_changes: [], private: false } };
+      if (tok) p.access_token = tok;
+      push('phx_join', p, joinRef);
+      clearInterval(hb); hb = setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) })); }, 25000);
+    };
+    ws.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.topic !== topic) return;
+      if (m.event === 'phx_reply' && m.ref === joinRef) {
+        if (m.payload && m.payload.status === 'ok') { joined = true; back = 1; onStatus('open'); }
+        else { onStatus('error', m.payload && m.payload.response); try { ws.close(); } catch (x) {} }
+      } else if (m.event === 'broadcast' && m.payload) onMsg(m.payload.payload);
+      else if (m.event === 'phx_error' || m.event === 'phx_close') { try { ws.close(); } catch (x) {} }
+    };
+    ws.onclose = () => { joined = false; clearInterval(hb); if (!closed) { onStatus('down'); retry(); } };
+    ws.onerror = () => {};
+  }
+  function retry() { setTimeout(open, back * 1000); back = Math.min(10, back * 2); }
+  open();
+  return { kind: 'supabase', send: o => { if (joined) push('broadcast', { type: 'broadcast', event: 'tw', payload: o }); }, close: () => { closed = true; clearInterval(hb); try { if (ws) ws.close(); } catch (e) {} } };
+}
+function twnConnect(code, local) {
+  if (TWNL.tx) TWNL.tx.close();
+  TWNL.code = code; TWNL.local = !!local; TWNL.status = 'connecting';
+  const onMsg = m => twnOnMsg(m), onStatus = (s, why) => { TWNL.status = s; if (s === 'error') TWNL.note = 'The match server turned the connection down' + (why && why.reason ? ` (${why.reason})` : '') + '.'; if (s === 'open') twnHello(true); twnLobbyPaint(); };
+  TWNL.tx = local || !twnSbOn() ? twnLocalTx(code, onMsg, onStatus) : twnSbTx(code, onMsg, onStatus);
+}
+const twnSendRaw = o => { if (TWNL.tx) TWNL.tx.send(Object.assign({ id: TWNL.id, c: TWNL.code }, o)); };
+
+/* ---------- the lobby ---------- */
+function twnHello(force) {
+  if (!TWNL.tx) return;
+  const now = performance.now() / 1000;
+  if (!force && now - TWNL.helloT < TWN_HELLO) return;
+  TWNL.helloT = now;
+  twnSendRaw({ k: 'hello', name: twnMyName(), host: TWNL.host, ready: TWNL.ready, map: TWNL.host ? TWNL.map : undefined, build: twnBuild(), banner: typeof twmBannerPick === 'function' ? twmBannerPick() : 'free', peer: TWNL.peer ? TWNL.peer.id : null, started: TWNL.started, side: TWNL.started && TWN ? TWN.me : undefined });
+}
+function twnOnMsg(m) {
+  if (!m || typeof m !== 'object' || m.id === TWNL.id || (m.c && m.c !== TWNL.code)) return;
+  const P = TWNL.peer;
+  // the match: only the opponent's messages count
+  if (TWNL.started) {
+    if (!P || m.id !== P.id) return;
+    P.at = performance.now() / 1000;
+    if (TWN) TWN.heard = 0;
+    if (m.k === 'turn' || m.k === 'need') twnRecv(m);
+    else if (m.k === 'bye' && TWN && !TWN.over) { toast(`${P.name} left the match.`); twnForfeit(TWN.me ? 0 : 1); }
+    else if (m.k === 'start' && !TWNL.host) twnSendRaw({ k: 'go', to: m.id });
+    else if (m.k === 'sync?' && TWN) twnSendRaw({ k: 'sync', to: m.id, logs: TWN.log.map(L => [...L]), upTo: TWN.upTo.slice(), turn: TWN.turn });
+    else if (m.k === 'sync' && m.to === TWNL.id && TWNL.rejoin) twnRejoinGo(m);
+    return;
+  }
+  // the guest started but its 'go' was lost: its first turn starts the host too
+  if (m.k === 'turn' && TWNL.host && TWNL.pendingStart && P && m.id === P.id) { const s = TWNL.pendingStart; TWNL.pendingStart = null; twnBegin(s); twnRecv(m); return; }
+  if (m.k === 'hello') {
+    if (TWNL.host && m.host) return;
+    if (!TWNL.host && !m.host) return;
+    if (P && P.id !== m.id) { if (TWNL.host) twnSendRaw({ k: 'full', to: m.id }); return; }
+    if (!TWNL.host && m.peer && m.peer !== TWNL.id) { TWNL.note = 'That match already has two players.'; twnLobbyPaint(); return; }
+    TWNL.peer = { id: m.id, name: String(m.name || 'Player').slice(0, 20), ready: !!m.ready, build: m.build, banner: String(m.banner || 'free'), at: performance.now() / 1000 };
+    if (!TWNL.host && m.map && MAPS[m.map]) TWNL.map = m.map;
+    if (!P) twnHello(true);
+    twnLobbyPaint();
+    if (TWNL.host) twnMaybeStart();
+  } else if (m.k === 'bye' && P && m.id === P.id) { TWNL.peer = null; TWNL.ready = false; twnLobbyPaint(); }
+  else if (m.k === 'full' && m.to === TWNL.id) { TWNL.note = 'That match already has two players.'; twnLobbyPaint(); }
+  else if (m.k === 'start' && !TWNL.host && P && m.id === P.id) { twnSendRaw({ k: 'go', to: m.id }); twnBegin({ seed: m.seed, side: 1, map: m.map, names: m.names, banners: m.banners }); }
+  else if (m.k === 'go' && TWNL.host && P && m.id === P.id && TWNL.pendingStart) { const s = TWNL.pendingStart; TWNL.pendingStart = null; twnBegin(s); }
+}
+function twnMaybeStart() {
+  const P = TWNL.peer;
+  if (!TWNL.host || !P || !P.ready || !TWNL.ready || TWNL.started || TWNL.pendingStart) return;
+  if (P.build && P.build !== twnBuild()) { TWNL.note = `${P.name} has a different version of the game. Both of you, refresh the page.`; twnLobbyPaint(); return; }
+  const seed = twnRand(1)[0] | 0, names = [twnMyName(), P.name], banners = [typeof twmBannerPick === 'function' ? twmBannerPick() : 'free', P.banner || 'free'];   // (each player's banner: whose army and foes, versus_modes.js)
+  TWNL.pendingStart = { seed, side: 0, map: TWNL.map, names, banners };
+  const send = () => { if (TWNL.pendingStart) { twnSendRaw({ k: 'start', to: P.id, seed, map: TWNL.map, names, banners }); setTimeout(send, 1000); } };
+  send();
+  if (TWNL.matchId) twnRpc('tw_start', { p_match: TWNL.matchId, p_seed: seed });
+}
+// the server's record of the match (signed in, and the owner has run tw_online.sql); a no-op otherwise
+async function twnRpc(fn, args) {
+  if (!twnSignedIn() || typeof sbRpc !== 'function') return null;
+  try { return await sbRpc(fn, args); } catch (e) { if (e.status === 404) TWNL.noServer = true; return null; }
+}
+async function twnCreate(local) {
+  TWNL.host = true; TWNL.peer = null; TWNL.ready = false; TWNL.started = false; TWNL.note = ''; TWNL.matchId = null;
+  TWNL.id = TWNL.id || Array.from(twnRand(2), v => v.toString(36)).join('');
+  let code = twnMakeCode();
+  if (!local && twnSignedIn()) for (let k = 0; k < 3; k++) {
+    const r = await twnRpc('tw_create', { p_code: code, p_map: TWNL.map, p_version: twnBuild() });
+    if (r && r.ok) { TWNL.matchId = r.match; break; }
+    if (r && r.reason === 'code') { code = twnMakeCode(); continue; }
+    break;
+  }
+  twnConnect(code, local);
+  twnLobbyPaint();
+}
+async function twnJoin(code, local) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 6) { TWNL.note = 'A match code has six letters and numbers.'; twnLobbyPaint(); return; }
+  TWNL.host = false; TWNL.peer = null; TWNL.ready = false; TWNL.started = false; TWNL.note = ''; TWNL.matchId = null;
+  TWNL.id = TWNL.id || Array.from(twnRand(2), v => v.toString(36)).join('');
+  twnConnect(code, local);
+  if (!local && twnSignedIn()) { const r = await twnRpc('tw_join', { p_code: code }); if (r && r.ok) TWNL.matchId = r.match; }
+  twnLobbyPaint();
+}
+function twnLobbyLeave() {
+  if (TWNL.tx) { twnSendRaw({ k: 'bye' }); const tx = TWNL.tx; setTimeout(() => tx.close(), 300); }
+  TWNL.tx = null; TWNL.peer = null; TWNL.ready = false; TWNL.code = ''; TWNL.started = false; TWNL.pendingStart = null;
+}
+// the lobby's timer: hellos, a peer that went quiet
+setInterval(() => {
+  if (!TWNL.tx) return;
+  twnHello(false);
+  const P = TWNL.peer;
+  if (!TWNL.started && P && performance.now() / 1000 - P.at > 8) { TWNL.peer = null; twnLobbyPaint(); }
+}, 500);
+
+function twnLobbyScreen() {
+  const saved = twnSaved(), local = TWNL.local || !twnSbOn();
+  showOverlay(`
+    <h2 class="ttl">Bannerwars online</h2>
+    <p class="sub">Two players, two keeps, one clock.</p>
+    <div class="opts twn-lobby" id="twnLobby"></div>`, 'title');
+  TWNL.localPick = local;
+  if (saved) TWNL.rejoin = saved;
+  twnLobbyPaint();
+}
+function twnLobbyPaint() {
+  const box = document.getElementById('twnLobby'); if (!box || TWNL.started) return;
+  const P = TWNL.peer, code = TWNL.code, sb = twnSbOn(), signed = twnSignedIn();
+  const note = TWNL.note ? `<p class="twn-note">${esc(TWNL.note)}</p>` : '';
+  const who = sb ? (signed ? `Playing as <b>${esc(twnMyName())}</b>.` : `Playing as <b>${esc(twnMyName())}</b> · <button type="button" class="twn-link" id="twnSignIn">Sign in with Discord</button> to have your matches recorded.`) : 'This copy of the game has no match server: it can only play two tabs of this browser against each other.';
+  if (!code) {
+    const rj = TWNL.rejoin ? `<button class="btn" id="twnRejoin">Rejoin match ${esc(TWNL.rejoin.code)}<small>against ${esc(TWNL.rejoin.names[1 - TWNL.rejoin.side] || 'your opponent')}</small></button>` : '';
+    box.innerHTML = `${rj}
+      <button class="btn" id="twnCreate">Create a match<small>Get a code to give your opponent</small></button>
+      <div class="twn-join"><input id="twnCode" maxlength="7" autocomplete="off" spellcheck="false" placeholder="CODE" aria-label="Match code"><button class="btn" id="twnJoin">Join</button></div>
+      <label class="twn-name">Your name <input id="twnName" maxlength="20" value="${esc(twnMyName())}"${signed ? ' disabled' : ''}></label>
+      ${sb ? `<label class="twn-chk"><input type="checkbox" id="twnLocal"${TWNL.localPick ? ' checked' : ''}> Local test: two tabs of this browser, no server</label>` : ''}
+      <p class="sub twn-who">${who}</p>${note}
+      <button class="btn ghost" id="twnBack">Back</button>`;
+    const loc = () => !sb || !!(document.getElementById('twnLocal') || {}).checked;
+    $('#twnCreate').onclick = () => { AudioSys.init(); sfx('click'); twnCreate(loc()); };
+    $('#twnJoin').onclick = () => { AudioSys.init(); sfx('click'); twnJoin($('#twnCode').value, loc()); };
+    $('#twnCode').onkeydown = e => { if (e.key === 'Enter') $('#twnJoin').click(); };
+    const nm = $('#twnName'); if (nm) nm.onchange = () => { TWNL.name = nm.value.trim().slice(0, 20) || 'Player'; if (typeof lsSet === 'function') lsSet(TWN_NAME, TWNL.name); };
+    const lc = document.getElementById('twnLocal'); if (lc) lc.onchange = () => { TWNL.localPick = lc.checked; };
+    const si = document.getElementById('twnSignIn'); if (si) si.onclick = () => { if (typeof sbSignIn === 'function') sbSignIn(); };
+    const rj2 = document.getElementById('twnRejoin'); if (rj2) rj2.onclick = () => { AudioSys.init(); sfx('click'); twnRejoin(TWNL.rejoin); };
+    $('#twnBack').onclick = () => { sfx('click'); twSetupScreen(); };
+    return;
+  }
+  const st = TWNL.status === 'open' ? '' : TWNL.status === 'down' ? 'Reconnecting...' : TWNL.status === 'error' ? 'Not connected.' : 'Connecting...';
+  const maps = TWNL.host ? `<div class="seg twn-maps" role="group" aria-label="Map">${Object.keys(MAPS).map(k => `<button type="button" data-map="${k}" aria-pressed="${TWNL.map === k}">${MAPS[k].name}</button>`).join('')}</div>`
+                         : `<p class="sub">Map: <b>${esc(MAPS[TWNL.map] ? MAPS[TWNL.map].name : TWNL.map)}</b> (the host picks)</p>`;
+  const rec = TWNL.local ? 'Local test match.' : TWNL.matchId ? 'This match will be recorded.' : twnSignedIn() ? (TWNL.noServer ? 'Not recorded: the server has no online tables yet.' : 'Not recorded.') : 'Not recorded (signed out).';
+  box.innerHTML = `
+    <p class="twn-code" aria-label="Match code">${esc(code)}</p>
+    <p class="sub">${TWNL.host ? 'Give this code to your opponent.' : 'Joined.'} ${esc(st)}</p>
+    ${maps}
+    ${typeof twmBannerSeg === 'function' ? twmBannerSeg() : ''}
+    <div class="twn-players">
+      <p><b>${esc(twnMyName())}</b> (you${TWNL.host ? ', host' : ''}) <span class="${TWNL.ready ? 'on' : ''}">${TWNL.ready ? 'Ready' : 'Not ready'}</span></p>
+      <p>${P ? `<b>${esc(P.name)}</b>${typeof twmBannerName === 'function' ? ` · ${esc(twmBannerName(P.banner))}` : ''} <span class="${P.ready ? 'on' : ''}">${P.ready ? 'Ready' : 'Not ready'}</span>` : `<i>${TWNL.host ? 'Waiting for an opponent...' : 'Looking for the host...'}</i>`}</p>
+    </div>
+    <button class="btn" id="twnReady"${P ? '' : ' disabled'}>${TWNL.ready ? 'Not ready' : 'Ready'}</button>
+    <p class="sub">${esc(rec)}</p>${note}
+    <button class="btn ghost" id="twnLeave">Leave</button>`;
+  for (const b of box.querySelectorAll('[data-map]')) b.onclick = () => { TWNL.map = b.dataset.map; TWNL.ready = false; if (typeof setMap === 'function') setMap(TWNL.map); sfx('click'); twnHello(true); twnLobbyPaint(); };
+  for (const b of box.querySelectorAll('[data-ban]')) b.onclick = () => { lsSet(TWM_BANNER_KEY, b.dataset.ban); TWNL.ready = false; sfx('click'); twnHello(true); twnLobbyPaint(); };   // (your banner: versus_modes.js)
+  $('#twnReady').onclick = () => { TWNL.ready = !TWNL.ready; sfx('click'); twnHello(true); twnLobbyPaint(); twnMaybeStart(); };
+  $('#twnLeave').onclick = () => { sfx('click'); twnLobbyLeave(); twnLobbyPaint(); };
+}
+
+/* ---------- the match ---------- */
+function twnBegin(o) {
+  if (TWNL.started) return;
+  TWNL.started = true; TWNL.pendingStart = null;
+  const P = TWNL.peer;
+  twnStart({ seed: o.seed, side: o.side, map: o.map, names: o.names, banners: o.banners, send: m => twnSendRaw(m), bot: TWNL.bot || /[?&]twbot=1\b/.test(location.search) ? 'knight' : null,
+    onEnd: r => twnMatchEnd(r), onDesync: t => twnDesync(t) });
+  TWN.onQueue = () => { if (typeof markDirty === 'function') markDirty(); };
+  if (TWNL.mute) TW.P.mute = true;
+  TWN.save = { code: TWNL.code, side: o.side, seed: o.seed, map: o.map, names: o.names, banners: o.banners, local: TWNL.local, id: TWNL.id, peer: P ? P.id : null, peerName: P ? P.name : '', host: TWNL.host, matchId: TWNL.matchId, at: Date.now() };
+  twnSave(true);
+  twnPumpT = performance.now();
+  afterStart('Bannerwars', `Against ${P ? P.name : 'your opponent'}. The first wave sets out in ${TW_FIRST} seconds.`);
+}
+// the frame loop (ui.js frame) and, while the tab is hidden, a timer: real time since the last pump
+let twnPumpT = 0;
+function twnPump(maxTicks) {
+  const now = performance.now(), dt = twnPumpT ? Math.min(5, (now - twnPumpT) / 1000) : 0;
+  twnPumpT = now;
+  if (!TWN || TWN.over) return 0;
+  if (TWN.bot) twnBotTick(dt);
+  const n = twnAdvance(dt, maxTicks);
+  TWN.waitT = n ? 0 : (TWN.waitT || 0) + dt;
+  if (TWN.live && !TWN.over && TWN.heard > TWN_GONE) { toast(`${TWNL.peer ? TWNL.peer.name : 'Your opponent'} is gone.`); twnForfeit(TWN.me ? 0 : 1); }
+  if (n) twnSave(false);
+  return n;
+}
+// the timer keeps the match going when frames stop: a hidden tab, or a pane the browser doesn't paint (rAF never ticks)
+let twnFrameAt = 0;
+function twnFrame() { twnFrameAt = performance.now(); twnPump(8); twnWaitPaint(); twnHello(false); }
+setInterval(() => { if (TWN && TW && TW.net && performance.now() - twnFrameAt > 250) { twnPump(60); twnHello(false); } }, 200);
+function twnWaitPaint() {
+  let el = document.getElementById('twnWait');
+  const name = TWNL.peer ? TWNL.peer.name : 'your opponent';
+  const show = TWN && !TWN.over && TWN.waitT > 1;
+  if (!show) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'twnWait'; el.setAttribute('role', 'status'); (document.getElementById('stage') || document.body).append(el); }
+  el.hidden = false;
+  const left = Math.max(0, Math.ceil(TWN_GONE - TWN.heard));
+  el.textContent = TWN.heard > 10 ? `Lost touch with ${name}. Waiting ${left}s before the match is yours...` : `Waiting for ${name}...`;
+}
+function twnMatchEnd(r) {
+  twnSave(null);
+  const mine = r.win < 0 ? 'draw' : r.win === TWN.me ? (r.how === 'forfeit' ? 'forfeit' : 'won') : 'lost';
+  if (TWNL.matchId) twnRpc('tw_report', { p_match: TWNL.matchId, p_result: mine, p_wave: r.wave, p_lives: r.lives[TWN.me], p_foe_lives: r.lives[1 - TWN.me], p_hash: r.hash });
+  setTimeout(() => twnEndScreen(), r.how === 'forfeit' ? 300 : 900);
+}
+function twnDesync(t) {
+  twnSave(null);
+  if (TWNL.matchId) twnRpc('tw_report', { p_match: TWNL.matchId, p_result: 'desync', p_wave: TW ? TW.wave : 0, p_lives: TW ? TW.P.lives : 0, p_foe_lives: TW ? TW.E.lives : 0, p_hash: String(t) });
+  if (TW) { TW.over = true; TW.view = 'P'; }
+  showOverlay(`
+    <h2 class="ttl lose">Out of sync</h2>
+    <p class="sub">Your game and ${esc(TWNL.peer ? TWNL.peer.name : 'your opponent')}'s stopped agreeing (turn ${t}, wave ${TW ? TW.wave : '?'}), so the match was stopped rather than letting you play two different wars.</p>
+    <p class="sub">Usually this is a bug in the game. Playing on the same kind of browser (both Chrome, say) makes it rarer.</p>
+    <button class="btn" id="twnLobbyB">Back to the lobby</button>
+    <button class="btn ghost" id="eTitle">Title screen</button>`);
+  $('#twnLobbyB').onclick = () => { twnAfterMatch(); twnLobbyScreen(); };
+  $('#eTitle').onclick = () => { twnAfterMatch(); titleScreen(); };
+}
+function twnEndScreen() {
+  if (!TW || !TWN) return;
+  const r = TWN.result || {}, P = TW.P, E = TW.E, foe = TW.ai.name, mine = r.win < 0 ? null : r.win === TWN.me;
+  const how = r.how === 'forfeit' ? (mine ? `${esc(foe)} left the match` : 'You left the match') : r.how === 'last' ? `The war ended after wave ${TW_LAST}${mine == null ? ' with both keeps equal' : mine ? ' with your keep the stronger' : ` with ${esc(foe)}'s keep the stronger`}` : mine ? `${esc(foe)}'s keep fell on wave ${r.wave}` : mine === false ? `${esc(foe)} broke through on wave ${r.wave}` : 'Both keeps fell together';
+  showOverlay(`
+    <h2 class="ttl ${mine ? 'win' : mine === false ? 'lose' : ''}">${mine ? 'Victory' : mine === false ? 'The keep has fallen' : 'Stalemate'}</h2>
+    <p class="sub">${how} · Bannerwars online</p>
+    <dl class="stats tw-stats">
+      <dt></dt><dd><b>You</b> · <b>${esc(foe)}</b></dd>
+      <dt>Lives left</dt><dd>${Math.max(0, P.lives)} · ${Math.max(0, E.lives)}</dd>
+      <dt>Minions sent</dt><dd>${P.sentN} · ${E.sentN}</dd>
+      <dt>Gold spent on sends</dt><dd>${P.sentGold} · ${E.sentGold}</dd>
+      <dt>Income</dt><dd>+${P.income} · +${E.income}</dd>
+      <dt>Creeps slain</dt><dd>${P.stats.kills} · ${E.stats.kills}</dd>
+      <dt>Units raised</dt><dd>${P.stats.built} · ${E.stats.built}</dd>
+    </dl>
+    <p class="sub">${TWNL.local ? 'A local test match: not recorded.' : TWNL.matchId ? 'The result has been sent to the server. It counts once both sides have reported the same result.' : 'Not recorded.'}</p>
+    <button class="btn" id="twnLobbyB">Back to the lobby</button>
+    <button class="btn ghost" id="eTitle">Title screen</button>`);
+  $('#twnLobbyB').onclick = () => { twnAfterMatch(); twnLobbyScreen(); };
+  $('#eTitle').onclick = () => { twnAfterMatch(); titleScreen(); };
+}
+// the match is over: back to an empty lobby (the channel is left; a rematch is a new code)
+function twnAfterMatch() { twnLobbyLeave(); TWNL.rejoin = null; }
+// leaving a match that is still on (Abandon, the title screen): tell them, and count it as a forfeit
+function twnLeave() {
+  if (!TWN) return;
+  if (TWN.live && !TWN.over) {
+    if (TWNL.matchId) twnRpc('tw_report', { p_match: TWNL.matchId, p_result: 'lost', p_wave: TW ? TW.wave : 0, p_lives: TW ? TW.P.lives : 0, p_foe_lives: TW ? TW.E.lives : 0, p_hash: 'left' });
+    TWN.over = true;
+  }
+  twnSave(null);
+  twnLobbyLeave();
+  const w = document.getElementById('twnWait'); if (w) w.hidden = true;
+  twnStop();
+}
+
+/* ---------- a reload: the match is kept in sessionStorage, and replayed from its seed ---------- */
+let twnSaveT = 0;
+function twnSave(force) {
+  try {
+    if (force === null) { sessionStorage.removeItem(TWN_SAVE); return; }
+    if (!TWN || !TWN.save || TWN.over) return;
+    const now = performance.now();
+    if (!force && now - twnSaveT < 1000) return;
+    twnSaveT = now;
+    sessionStorage.setItem(TWN_SAVE, JSON.stringify(Object.assign({}, TWN.save, { log: [...TWN.log[TWN.me]], sealed: TWN.sealed })));
+  } catch (e) {}
+}
+function twnSaved() {
+  try { const s = JSON.parse(sessionStorage.getItem(TWN_SAVE) || 'null'); return s && s.code && Date.now() - s.at < 3 * 3600e3 ? s : null; } catch (e) { return null; }
+}
+function twnRejoin(s) {
+  TWNL.rejoin = s; TWNL.host = s.host; TWNL.id = s.id; TWNL.matchId = s.matchId || null; TWNL.map = s.map;
+  TWNL.peer = s.peer ? { id: s.peer, name: s.peerName || 'Opponent', ready: true, at: performance.now() / 1000 } : null;
+  TWNL.started = true;
+  twnConnect(s.code, s.local);
+  TWNL.note = 'Asking your opponent for the match so far...';
+  showOverlay(`<h2 class="ttl">Rejoining</h2><p class="sub" id="twnRj">Asking ${esc(TWNL.peer ? TWNL.peer.name : 'your opponent')} for the match so far...</p><button class="btn ghost" id="twnRjX">Give up</button>`, 'title');
+  $('#twnRjX').onclick = () => { twnSave(null); TWNL.rejoin = null; twnLobbyLeave(); twnLobbyScreen(); };
+  const ask = () => { if (TWNL.rejoin && !TWN) { twnSendRaw({ k: 'sync?' }); setTimeout(ask, 1500); } };
+  ask();
+}
+// their logs arrived: start the same match, take both logs, replay to where they are
+function twnRejoinGo(m) {
+  const s = TWNL.rejoin; if (!s || TWN) return;
+  TWNL.rejoin = null;
+  twnStart({ seed: s.seed, side: s.side, map: s.map, names: s.names, banners: s.banners, send: x => twnSendRaw(x), onEnd: r => twnMatchEnd(r), onDesync: t => twnDesync(t) });
+  TWN.save = Object.assign({}, s, { at: Date.now() });
+  const me = TWN.me, them = 1 - me;
+  // their own actions as they sent them; mine as they received them, then anything I sealed that they never saw
+  for (const [t, a] of m.logs[them] || []) TWN.log[them].set(t, a);
+  for (const [t, a] of m.logs[me] || []) TWN.log[me].set(t, a);
+  for (const [t, a] of s.log || []) if (t > (m.upTo[me] | 0)) TWN.log[me].set(t, a);
+  TWN.upTo[them] = m.upTo[them] | 0;
+  TWN.sealed = TWN.upTo[me] = Math.max(s.sealed | 0, m.upTo[me] | 0);
+  twnResend((m.upTo[me] | 0) + 1);
+  const target = Math.max(0, (m.turn | 0) - 1), el = () => document.getElementById('twnRj');
+  const step = () => {
+    if (!TWN) return;
+    const t0 = performance.now();
+    while (TWN.turn < target && !TWN.over && performance.now() - t0 < 40) { TWN.acc = TWN_DT * 30; if (!twnAdvance(0, 30)) break; }
+    if (el()) el().textContent = `Catching up: turn ${TWN.turn} of ${target}...`;
+    if (TWN.turn < target && !TWN.over) { setTimeout(step, 0); return; }
+    twnPumpT = performance.now();
+    afterStart('Bannerwars', `Back in the match against ${s.names[them] || 'your opponent'}.`);
+  };
+  step();
+}
+
+/* ---------- the way in: Tower Wars on the title menu, and Online on its setup screen ---------- */
+// (the title menu can be drawn before this file has loaded: a watch on the page adds the button whenever the menu appears)
+function twnTitleButton() {
+  const after = document.getElementById('oRites') || document.getElementById('oClassic');
+  if (!after || document.getElementById('oTW')) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 't2-btn'; b.id = 'oTW'; b.title = 'Your keep against an AI warlord, or another player online'; b.textContent = 'Bannerwars';
+  b.onclick = () => { AudioSys.init(); sfx('click'); twSetupScreen(); };
+  after.after(b);
+}
+(function () {
+  if (typeof twSetupScreen !== 'function' || typeof document === 'undefined') return;
+  twnTitleButton();
+  new MutationObserver(() => { if (document.getElementById('oRites') && !document.getElementById('oTW')) twnTitleButton(); }).observe(document.body, { childList: true, subtree: true });
+  // online, the menu doesn't stop the match: say so
+  if (typeof pauseMenu === 'function') {
+    const p0 = pauseMenu;
+    pauseMenu = function () {
+      const r = p0.apply(this, arguments);
+      try { if (TW && TW.net) { const h = document.querySelector('.cm-heading .ttl'); if (h) h.textContent = 'Menu'; const sub = document.querySelector('.cm-heading .sub'); if (sub) sub.textContent = `Bannerwars online · wave ${Math.max(1, TW.wave)} · against ${TW.ai.name} · the match keeps going`; } } catch (e) { console.error(e); }
+      return r;
+    };
+  }
+  const s0 = twSetupScreen;
+  twSetupScreen = function () {
+    const r = s0.apply(this, arguments);
+    try {
+      const go = document.getElementById('twGo');
+      if (go && !document.getElementById('twOnline')) {
+        const b = document.createElement('button'); b.className = 'btn'; b.id = 'twOnline'; b.innerHTML = 'Play online<small>Against another player</small>';
+        b.onclick = () => { AudioSys.init(); sfx('click'); twnLobbyScreen(); };
+        go.after(b);
+      }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+})();
+// tests: ?twlocal=<code>&twhost=1 creates (or joins) a local match straight away; ?twbot=1 lets a bot play your keep
+function twnAutoJoin() {
+  const q = new URLSearchParams(location.search), code = (q.get('twlocal') || '').toUpperCase();
+  if (!code) return;
+  TWNL.bot = q.get('twbot') === '1';
+  // test tabs are silent (no music, no sound)
+  try { if (typeof AudioSys !== 'undefined' && AudioSys.suspend) AudioSys.suspend(); } catch (e) {}
+  TWNL.mute = true;
+  TWNL.id = Array.from(twnRand(2), v => v.toString(36)).join('');
+  if (q.get('twhost') === '1') { TWNL.host = true; TWNL.peer = null; TWNL.ready = true; twnConnect(code, true); }
+  else { TWNL.host = false; TWNL.ready = true; twnConnect(code, true); }
+  twnLobbyScreen();
+}
+if (typeof document !== 'undefined') {
+  const st = document.createElement('style');
+  st.textContent = `.twn-lobby .twn-code{font:700 44px/1 var(--f-display);letter-spacing:.18em;text-align:center;color:var(--gold-hi);margin:14px 0 4px}
+.twn-join{display:flex;gap:8px;align-items:stretch}.twn-join input{flex:1;min-width:0;margin-top:10px;padding:10px 12px;font:700 22px/1 var(--f-display);letter-spacing:.2em;text-transform:uppercase;text-align:center;border-radius:6px;border:1px solid rgba(232,200,120,.4);background:rgba(3,13,15,.7);color:var(--gold-hi)}
+.twn-join .btn{width:auto;padding:12px 20px}.twn-name{display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--muted)}.twn-name input{flex:1;padding:8px;border-radius:4px;border:1px solid rgba(232,200,120,.3);background:rgba(3,13,15,.6);color:inherit}
+.twn-chk{display:block;margin-top:10px;color:var(--muted);font-size:14px}.twn-link{background:none;border:0;padding:0;color:var(--gold-hi);text-decoration:underline;cursor:pointer;font:inherit}
+.twn-note{color:#ffb4a0;margin-top:10px}.twn-players p{display:flex;justify-content:space-between;gap:8px;margin:8px 0;padding:8px 10px;border-radius:6px;background:rgba(3,13,15,.55)}
+.twn-players span{color:var(--muted)}.twn-players span.on{color:#9be08a}.twn-maps{flex-wrap:wrap}
+#twnWait{position:absolute;left:50%;top:18%;transform:translateX(-50%);z-index:30;padding:10px 18px;border-radius:8px;background:rgba(3,13,15,.88);color:#f2dc9a;font:600 16px/1.3 var(--f-display);pointer-events:none;text-align:center;max-width:80vw}`;
+  document.head.append(st);
+  setTimeout(twnAutoJoin, 1500);
+}
+
+/* ================= TOWER WARS MODES ONLINE: the modes inside the lockstep (loaded after twnet.js) =================
+   versus_modes.js holds the modes; twnet.js the lockstep. Here:
+   - twnRouteAll also routes the modes' player choices: twmRaidAct (raid a camp, or call it off) and twmPickAct (a draft pick).
+     Sends already travel as twSend.
+   - twnStart takes each player's banner (opts.banners, [host, guest]): a force banner gives that keep its army (the force's first
+     commander, the same on both browsers) and its send list. Then the modes' state is set up inside the lockstep: camps, the boss
+     schedule, the draft. Nothing the host rolls travels: both browsers roll the same from each keep's seeded generator.
+   - twnStepTick runs the modes' tick (events raised in the keeps' steps, the draft's clock) after both keeps have stepped.
+   - twnHash also covers the modes' state: banners, signature cooldowns, camps, the contested boss and the draft. */
+{
+  const _r = twnRouteAll;
+  twnRouteAll = function () { const v = _r.apply(this, arguments); twnRoute('twmRaidAct'); twnRoute('twmPickAct'); return v; };
+
+  const _s = twnStart;
+  twnStart = function (opts = {}) {
+    const bn = [0, 1].map(s => { const b = opts.banners && opts.banners[s]; return TWM_BANNERS[b] ? b : 'free'; });
+    const hero = b => { if (b === 'free' || typeof FORCES === 'undefined' || !FORCES[b]) return null; const l = (typeof HEROES !== 'undefined' ? HEROES : Object.values(HERO_BY)).filter(h => forceOfHero(h.id) === b); return l.length ? l[0].id : null; };
+    const heroes = bn.map(hero), ng = newGame; let s = 0;
+    newGame = function (d, c, h) { return ng.call(this, d, c, h || heroes[s++] || null); };   // (twnStart makes the host's keep first, then the guest's)
+    let r;
+    try { r = _s.apply(this, arguments); } finally { newGame = ng; }
+    const sides = TWN.sides;
+    twnInSim(() => {
+      Object.assign(TW, { time: 0, log: [], seed: (TWN.seed ^ 0x51ED270B) >>> 0, cb: null, draft: null, cbWarned: 0, pend: [] });
+      sides.forEach((S, k) => { S.banner = bn[k]; });
+      TWF.snaps = {}; TWF.now = null;
+      twfSnap(TW.E); twfSnap(TW.P);   // (the local keep's set last: it stays in place outside withSide)
+      for (const S of sides) twmCampsInit(S);
+      twmCampsDue();
+    });
+    twmHud(true);
+    return r;
+  };
+
+  const _t = twnStepTick;
+  twnStepTick = function () {
+    if (TW && !TW.over) TW.time = (TW.time || 0) + TWN_DT;
+    const v = _t.apply(this, arguments);
+    if (TW && TWN && !TWN.over) twmTick(TWN_DT);
+    return v;
+  };
+
+  const _h = twnHash;
+  twnHash = function (sides, extra) {
+    const x = (extra || []).slice(), cb = TW && TW.cb, D = TW && TW.draft;
+    for (const S of sides) {
+      const k = twSide(S);
+      x.push(S.banner || 'free', S.force || '', S.sigAt || 0);
+      for (const cp of S.camps || []) x.push(cp.id, cp.up ? 1 : 0, cp.raid ? 1 : 0, cp.back || 0);
+      if (cb) x.push(cb.res[k] || '-', cb.enr[k] ? 1 : 0, cb.first === k ? 1 : 0);
+      if (D) x.push(D.got[k] == null ? -1 : D.got[k], D.turn === k ? 1 : 0, D.first === k ? 1 : 0);
+    }
+    if (cb) x.push(cb.n);
+    if (D) { x.push(D.n, D.done ? 1 : 0, Math.round(D.t * 1000)); for (const it of D.items) x.push(it.rar, it.base || it.leg || (it.tome ? it.tome.join(':') : '')); }
+    return _h.call(this, sides, x);
+  };
+}
+
 /* ---- Act II's Gloam Host: what you see of them (the rules are in forces_zzzzzzzzzzzzzzzzzzzzzzz_act2foes.js).
    The host's mark at every Gloam foe's feet, each one's tell, the forecast's counter and trait, the wave card's advice, and the
    test stage: ?act2foe=<id> (or 'all') opens a force run at wave 40 with a small maze, units and gold, and that foe's test wave
@@ -108567,4 +110860,1436 @@ function a2StageUrl() {
   }, 100);
 }
 a2StageUrl();
+
+/* ================= ACT II: waves 51 to 100 (a prototype behind a switch; docs/design/act_two_2026-11-11.md) =================
+   The owner's framing (11 Nov 2026): each force defends its own homeland against local foes in waves 1-50; in Act II the
+   forces take up positions on one shared front against what may be the same enemy. The words are data (ACT2_TEXT,
+   ACT2_FRONT) for the owner to rewrite.
+   - The switch (a2Allowed): ?act2=1, any playtest run, or a save already in Act II. ?act2=0 turns it off. Without it a run
+     ends at wave 50 exactly as before, and saves carry nothing new.
+   - The break: wave 50 cleared (its boss's loot taken first) opens the interlude: the narrative, what carries, the first
+     Corruption offer; march on, or end the run as a victory. Marching moves the run to the Act II field (ACT2.map, or the
+     force's own front: ACT2_FRONT[force].map) and sets the army down as it stood at wave 50 (same cells, the nearest free
+     cell where one is taken; a unit with no room waits in camp, placed again free by building its type). Until the horn,
+     units and walls move free (Move on the card) and walls sell for their full price (owner, 12 Nov 2026).
+   - Talents are kept (owner: "players will want to continue with what they have"). Two Act II rows open at the foot of a
+     unit's tree with points earned in Act II (A2_ROWS, data): row VII one new spell (A2_SPELL), row VIII two ways to shape
+     it (take one). Act II pays a talent point at the march and at each of its bosses (ACT2.tp).
+   - Waves 51-100: ACT2_WAVES (existing foes, harder formations; '@A'..'@D' are the slots for act-two-foes' new foes,
+     filled by ACT2_SLOT_FILL until they land), a boss every 5th wave, five boss pairs bound by Blood-bond (ACT2_PAIR).
+     Health continues the curve from wave 50 at ACT2.grow a wave (endless mode's 6% taken out), eased on 51-53.
+   - Corruption: before 51, 61, 71, 81, 91 take up to two of three (CORRUPT). Each: +1 choice in the block's boss
+     offers, +1 Renown and +1 Starglass at each of its bosses. Shown on the wave card, the forecast cards and a chip row.
+   - Awakening (AWAKEN, data): once a unit, after the break, for ACT2.awk gold + Starglass: one spell transformed, a choice
+     of two forms (owner: "choice of 2"), final.
+   - ?act2start=1 (on this machine, or beside the playtest key): straight to the break with a generated wave-50 army.
+   Saves: s.a2 (state; awakened units and their forms by cell; the Act II rows' picks ride in G.tal like any talent). While veterans wait in camp the run is not saved (the save stays at the break).
+   Check: node tools/check_act_two.js -v. Wrappers only; the wrapped files are untouched. */
+const ACT2 = { first: 51, last: 100, map: 'mistfall', grow: 1.03, ease: { 51: .8, 52: .88, 53: .95 }, blocks: [51, 61, 71, 81, 91], pick: 2, offerN: 3, awk: { gold: 400, sg: 2 }, sgBreak: 2, bondR: 3, bondK: .5, tp: { march: 1, boss: 1 }, rows: [1, 3] };   // rows: Act II points earned that open row VII and row VIII
+// the owner's words: rewrite freely (the interlude reads them as they are)
+const ACT2_TEXT = {
+  title: 'Act II · The Shared Front',
+  interlude: 'The last of the homeland\'s invaders lies still, and on every warlord you felled was the same mark: a black sigil burned into the hide. The raids were never local. Something drove them. Riders come from the other realms with the same news, and the same mark. The forces muster at one front, each to hold its own stretch of it, against the power behind the mark.',
+  orders: 'The army marches as it stands: its talents, its gear and its spoils of the homeland war. At the front, two new rows open at the foot of each unit\'s talents as the points of Act II come in, each tree with a new spell.',
+};
+// each force's homeland (Act I) and its stretch of the shared front (Act II); map: that stretch's field (null: ACT2.map)
+const ACT2_FRONT = {
+  grove: { home: 'The Deepwood', front: 'The Mistfall Ledge, over the valley the enemy climbs out of', map: null },
+  silver: { home: 'The River Kingdoms', front: 'The ford below the ledge (placeholder)', map: null },
+  conclave: { home: 'The Drifting College', front: 'The broken observatory (placeholder)', map: null },
+  ironhold: { home: 'The Deep Holds', front: 'The pass the dwarves wall shut (placeholder)', map: null },
+  stormborn: { home: 'The High Plateaus', front: 'The storm-cliffs (placeholder)', map: null },
+  wardbound: { home: 'The Last Roads', front: 'The road through the front (placeholder)', map: null },
+};
+// what @A-@D in a formation stand for (the Gloam Host, act2foes.js): change one to move a foe through the later waves
+const ACT2_SLOT_FILL = { A: 'thrall', B: 'hornrunner', C: 'knotback', D: 'lullcap' };   // (the Gloam Host, act2foes.js: later waves bring them back)
+// waves 51-100: [formation, name, the problem, the ways through]. An elite wave (every 3rd) gets "Elites: " before its name
+const ACT2_WAVES = [
+  ['gnoll*14+warcaller*2+alpha*2+wolf*8', 'The Muster Road', 'The front\'s first column: gnolls and wolves driven by captains and alphas, on a field with no single gate.', 'Captains and alphas first · splash the column · cover every way out'],
+  ["hornrunner*1+gnoll*10+ironclad*4+warmage*1+mender*1", null, null, null],
+  ["knotback*2+magma*3+beetle*2", null, null, null],
+  ["thrall*4+gnoll*8+skirmisher*6", null, null, null],
+  ['grakk*1+troll*6+gnoll*10+shaman*1', 'Boss: the Ogre Warlord', 'Grakk marches with trolls and gnolls, and a Hexweaver to wash your burns off them.', 'Stun his wind-up · keep casters back · Hexweaver first'],
+  ["lullcap*2+knotback*1+icewolf*2", null, null, null],
+  ["plankrunner*2+gnoll*10+ghoul*6+necro*2", null, null, null],
+  ["hornrunner*3+gnoll*8+bat*6+stormbat*4", "Horns and Wings", "Three Gloamhorns call raiders at half the road while bats and Storm Bats fly over the walls: the first flyers of the front.", "Damage on the first half of the road · target First · anti-air down the middle"],
+  ["urnbearer*1+hollowguard*2+mender*1", null, null, null],
+  ['titan*1+kragmor*1+golem*6+mender*2+sapper*4', 'Boss pair: Forge and Breaker', 'The Magma Titan and Kragmor march together, blood-bonded: within 3 cells of each other each takes half damage. Each keeps its own rule.', 'Split them: slow one, rush the other · both physical and magic units'],
+  ["knotback*5+lullcap*3+stalker*8+warcaller*2", "Thick Hides", "Gloamhide Aurochs no single hit can hurt for more than a little, Lullcaps that slow your strikers, and phasing stalkers under captains.", "Fast strikes, many-hit spells and burns on the hides · spells on the Lullcaps · captains first"],
+  ["thrall*4+banshee*2+wraith*1", "The Chained Choir", "Gloam Thralls share every wound along their chains while banshees silence your units.", "Area damage on the chains · long range on the banshees"],
+  ["lullcap*4+knotback*3+golem*6+warden*2", "The Drowsing Wall", "Lullcaps slow every unit that strikes them, behind Gloamhides and shielded golems.", "Spells and burns, not basic strikes, on the Lullcaps · stop the Wardens"],
+  ["mummer*1+bloat*8+matriarch*2+spider*10", null, null, null],
+  ['voidwyrm*1+stormbat*6+stalker*6', 'Boss: the Void Wyrm Returns', 'The Void Wyrm flies the front with an elite escort of Storm Bats and stalkers.', 'Anti-air down the middle · burst when it comes back into reach'],
+  ["plankrunner*4+berserker*8+warcaller*3+mender*2", "Bridges and Blood", "Gloamwrights bridge your walls for the berserkers behind them, captains and priests driving them on.", "Stun a Gloamwright as it lays a plank · two-thick turns · captains first"],
+  ["urnbearer*3+hollowguard*6+icewolf*6+alpha*2", "Three Urns", "Three Urnbearers keep their Hollowguard from falling, with a frost pack running beside them.", "Target Support: the urns first · stun an urn to free its guards · area for the pack"],
+  ['troll*4+shaman*2+mender*1', 'Unkillable', 'Trolls that regenerate, healed by a priest, cleansed by Hexweavers.', 'Wounded halves the heals · finish what you start'],
+  ['axe*8+sapper*6+shieldbearer*4+mender*2', 'The Siege Line', 'Axe throwers and sappers break your units and walls behind a shield wall.', 'Axes first · keep gold to repair'],
+  ['lich*1+ossyra*1+wraith*8+banshee*4+necro*2', 'Boss pair: the Two Crowns', 'The Lich and Ossyra, blood-bonded: within 3 cells of each other each takes half damage. Each keeps its own rule.', 'Split them · smash the bone pile · a stun for the toll'],
+  ['ghoul*16!swift+necro*4+rotshaman*2', 'The Charnel Flood', 'Swift ghouls with necromancers to raise them and Rot Shamans to mend them.', 'Necromancers first · burning or frozen kills leave no body'],
+  ["mummer*4+stormwisp*8+shade*6+acolyte*2", "The Masque", "Gloam Mummers split into bursting decoys among warded wisps and blinking shades.", "Area, chains and piercing for the decoys · steel through the wards"],
+  ["lampeater*1+lullcap*4+golem*8+warden*2+warmage*2", null, null, null],
+  ['magma*8+banshee*4+warmage*3+stormbat*8', 'Fire and Silence', 'Warded magma, silencing banshees and Storm Bats overhead.', 'Long range on the banshees · kill the mages · anti-air'],
+  ['brakka*1+malgrath*1+axe*6+mender*2+warmage*2', 'Boss pair: the Sapper and the Legion', 'Brakka and Malgrath, blood-bonded: within 3 cells of each other each takes half damage. Each keeps its own rule.', 'Split them · stun Brakka before the fuse · spread your damage'],
+  ['wolf*12+alpha*4+stalker*8+@A*4', 'The Great Hunt', 'Alphas drive wolves and phasing stalkers.', 'Kill the alphas · area and fast hitters'],
+  ['shieldbearer*8+mender*6+shaman*3+skirmisher*10', 'The Shield Choir', 'Shields, priests and Hexweavers cover a stream of runners.', 'Area around the shields · priests first'],
+  ['burrower*8+beetle*6+mender*3+matriarch*2', 'Hollow Ground', 'Burrowers and beetles with priests, and Matriarchs to burst.', 'Steady damage · priests first · area past the Matriarchs'],
+  ['banshee*10+necro*6+wraith*10+@B*3', 'The Dirge', 'Banshees, necromancers and wraiths in one long column.', 'Reach the banshees first · steel through the wraiths'],
+  ['kragmor*1+sapper*6+axe*6+mender*2+colossus*1!siege', 'Boss: the Breaker Returns', 'Kragmor shatters your walls while the siege is healed, and the Colossus marches with him.', 'Stun Kragmor · kill priests · rebuild'],
+  ['golem*10+warden*4+mender*4+warmage*4', 'The Fortress Front', 'Wardens, priests and mages all stack on golems.', 'Cut ties one by one · isolate the golems with control'],
+  ['bat*12!swift+stormbat*8+berserker*6', 'The Black Sky', 'Swift bats and Storm Bats overhead while berserkers run below.', 'Anti-air down the middle · slow the berserkers'],
+  ['icewolf*6+alpha*2+warcaller*2', 'The Glacier Pass', 'Frost wolves driven by alphas and captains.', 'Captains and alphas first · area'],
+  ['carrion*4+bloat*10+magma*8+matriarch*3+@C*3', 'The Rot Tide', 'Bursting bloats, Matriarchs and armoured magma.', 'Splash · magic on the magma'],
+  ['malgrath*1+ossyra*1+wraith*8+necro*3+shaman*2', 'Boss pair: Legion and Bone', 'Malgrath and Ossyra, blood-bonded: within 3 cells of each other each takes half damage. Each keeps its own rule.', 'Split them · spread your damage · smash the bone pile'],
+  ['stalker*10+shade*8+warcaller*3', 'Blinking Ranks', 'Stalkers phase and shades blink, captains hasting them.', 'Captains first · burst damage'],
+  ["shieldbearer*6+mender*4+warmage*3+golem*8+urnbearer*2+hollowguard*4", "The Iron Hymn", "Shields, priests and mages over golems, and Urnbearers keeping their Hollowguard up.", "Urns and casters first · area around the shields"],
+  ['ghoul*14+necro*6+rotshaman*3+shaman*2+@D*3', 'The Unending', 'Ghouls raised again and again, mended and cleansed.', 'Casters first · leave no bodies'],
+  ['berserker*14+warcaller*4+mender*3', 'Last Blood', 'A wall of berserkers, captains and priests driving it.', 'Captains first · then slow them hard'],
+  ['titan*1+berserker*6+golem*6+warmage*2+mender*2', 'Boss: the Living Forge, Awake', 'The Magma Titan with berserkers, golems, a War Mage and priests.', 'Mage first · magic on its plate, steel on its furnace'],
+  ["axe*10+sapper*8+plankrunner*3+warden*4+warmage*2", "The Breach Column", "Axe throwers and sappers break your line while Gloamwrights bridge your walls, under Wardens' shields.", "Stun the Gloamwrights · axes first · keep gold to repair"],
+  ["banshee*12+necro*6+wraith*8+mummer*3", "The Black Choir", "A dozen banshees, necromancers and wraiths, and Mummers splitting among them.", "Reach them first · area for the decoys"],
+  ['golem*4+beetle*3+warden*1', 'The Stone Host', 'Golems and beetles, a Warden to shield them.', 'Stop the Warden · magic or penetration on the plate'],
+  ['stormwisp*12+shade*10+acolyte*4+@A*4', 'Ward and Phase', 'Warded wisps and Acolytes, blinking shades.', 'Steel through the wards · burst the shades'],
+  ['lich*1+brakka*1+banshee*4+axe*4+mender*2', 'Boss pair: Toll and Fuse', 'The Lich and Brakka, blood-bonded: within 3 cells of each other each takes half damage. Each keeps its own rule.', 'Split them · a stun for the toll · stun Brakka before the fuse'],
+  ["lampeater*1+troll*10+shaman*4+mender*4+golem*8", "The Mending Wall", "Umbrielle the Lamp-Eater shortens the reach of crowded units while trolls and golems are healed and cleansed without end.", "Spread your units · kill her early · priests and Hexweavers first"],
+  ['alpha*4+wolf*10+icewolf*10+stalker*8+@B*4', 'The Whole Pack', 'Every wolf of the front, and stalkers among them.', 'Alphas first · area'],
+  ['necro*4+banshee*3+rotshaman*1', 'The Mourners', 'Necromancers, banshees and a Rot Shaman.', 'Long range on the banshees · casters first'],
+  ['shieldbearer*8+mender*6+shaman*4+warmage*4+golem*10+banshee*6+@C*4', 'Every Answer at Once', 'Every support caster of the front, in one army.', 'Read the ties · cut the one your units can reach'],
+  ['abyss*1!siege+shade*8+axe*8+sapper*6+banshee*6+warmage*2+mender*2', 'Boss: the Power Behind the Mark', 'The Abyssal King himself, whose mark was on every warlord: siege, silence, wards, and his two laws.', 'Field steel and magic · hold a stun for the toll · hold fire for his aegis'],
+];
+const ACT2_PAIR = { 60: 1, 70: 1, 75: 1, 85: 1, 95: 1 };
+/* ACT2_TUNE: each wave's health on top of the curve (as FORM_TUNE is for waves 1-50), so a formation's size does not set its weight:
+   plain waves sit on wave 41-49's mean grown ACT2.grow a wave, elite waves at 0.5 of it, boss waves 1.6, boss-and-elite waves 1.0,
+   pair waves 1.6 (the bond is their extra weight) (Act I's own ratios, roughly). Written by node tools/check_act_two.js --tune; retune after changing a row */
+const ACT2_TUNE = [1.01, 1.4, 1.28, 1.54, 1.6, 2.74, 1.16, 1.7, 2.85, 1.58, 1.12, 1.62, 1.02, 1.23, 2.75, 1.24, 1.23, 1.36, 1.08, 1.84, 0.54, 1.33, 0.95, 0.69, 2.68, 1, 0.54, 0.96, 0.84, 1.26, 0.8, 1.59, 1.34, 0.53, 2.46, 0.81, 0.65, 0.74, 0.49, 1.46, 0.85, 0.46, 1.96, 0.95, 2.26, 0.62, 0.9, 1.55, 0.41, 1.04];
+const ACT2_BOND = { kind: 'bond', name: 'Blood-bond', text: 'While the two bosses stand within 3 cells of each other, each takes half damage (a red tether shows it).', ways: ['Slow one and rush the other', 'Kill one while the other is still behind'] };
+// Corruption: foe affixes the player chooses for a block of ten waves (Hunt affixes where they fit: hunts.js HUNT_AFFIX)
+const CORRUPT = {
+  swift: { name: 'Swift', who: 'all', text: 'Every foe moves 15% faster.' },
+  regen: { name: 'Regenerating', who: 'all', text: 'Every foe mends 1% of its health a second. Wounded halves it.' },
+  shielded: { name: 'Shielded', who: 'big', text: 'Bosses and elites carry a barrier worth 25% of their health that takes every hit first.' },
+  splitting: { name: 'Splitting', who: 'elite', text: 'Slain, an elite splits into two lesser copies with 30% of its health each.' },
+  summoner: { name: 'Summoner', who: 'boss', text: 'Every 10 seconds a boss calls two of its wave\'s troops to its side.' },
+};
+const CORRUPT_PAY = 'Each one taken: one more choice in each boss\'s loot offer of the block, and +1 Renown and +1 Starglass at each of its two bosses.';
+// Awakening: one spell a unit transformed, a choice of two forms, final (owner, 12 Nov 2026: "choice of 2"). A unit's entry:
+// { ab: the spell, forms: [{ name, text, after(t, st, target, ab) }, ...] }; after runs right after the spell's own cast
+const a2SlowFoe = (c, f, s) => { if (!c || c.dead) return; if (f >= (c.slowF || 0) || !(c.slowT > 0)) c.slowF = f; c.slowT = Math.max(c.slowT || 0, s); };
+const AWAKEN = {
+  thornguard: { ab: 'lunge', forms: [
+    { name: 'Impaling Lunge', text: 'the lunge runs on through every foe in a line 2.5 cells behind its target, each struck for 60% of the lunge and rooted for 1s.',
+      after(t, st, c, ab) {
+        if (!c || c.x == null) return; const [ux, uz] = abDir(t, c), m = byT(ab.by.mult, t) * .6;
+        const L = abLine(t, st, c.x, c.y, ux, uz, 2.5, .45).filter(o => o !== c);
+        rfx({ k: 'drag', x0: c.x, z0: c.y, x1: c.x + ux * 2.5, z1: c.y + uz * 2.5, h: .3, col: '#f0e0a0', life: .4 });
+        L.forEach((o, i) => G.delayed.push({ t: .06 + i * .05, fn: () => { if (o.dead || !G.towers.includes(t)) return; abAoe(() => abHit(t, t.st || st, o, m, 'phys', [ux * .1, uz * .1])); if (!o.dead) rootFoe(o, 1, t); abRootFx(o.x, o.y, 5); } }));
+      } },
+    { name: 'Thornburst Lunge', text: 'the pinned foe bursts with thorns: every other ground foe within 1 cell of it is struck for 50% of the lunge and rooted for 1.5s.',
+      after(t, st, c, ab) {
+        if (!c || c.x == null) return; const m = byT(ab.by.mult, t) * .5, x = c.x, z = c.y;
+        G.delayed.push({ t: .12, fn: () => { if (!G.towers.includes(t)) return; abRootFx(x, z, 12); if (typeof fxRing === 'function') fxRing(x, z, 1, '#a8d070');
+          for (const o of G.creeps) if (o !== c && !o.dead && !o.fly && Math.hypot(o.x - x, o.y - z) <= 1) { abAoe(() => abHit(t, t.st || st, o, m, 'phys', null)); if (!o.dead) rootFoe(o, 1.5, t); } } });
+      } },
+  ] },
+  gladebow: { ab: 'aimedshot', forms: [
+    { name: 'Returning Shot', text: 'the arrow turns at the end of its line and flies back through it, striking each foe still standing again for 60%.',
+      after(t, st, c, ab) {
+        const L = (typeof AS_LINE !== 'undefined' && AS_LINE.last || []).slice().reverse(), m = byT(ab.by.mult, t) * .6; if (!L.length) return;
+        G.delayed.push({ t: .4, fn: () => { if (!G.towers.includes(t)) return; const a = L[0]; rfx({ k: 'drag', x0: a.x, z0: a.y, x1: t.x, z1: t.y, h: towerTop(t) * .8, col: '#f8ffc0', life: .35 }); } });
+        L.forEach((o, i) => G.delayed.push({ t: .45 + i * .04, fn: () => { if (o.dead || !G.towers.includes(t)) return; abAoe(() => abHit(t, t.st || st, o, m, 'phys', null)); abLeafFx(o.x, o.y, hitH(o), 4); } }));
+      } },
+    { name: 'Splitting Shot', text: 'at the end of its line the arrow splits in three, each flying 2.5 cells on at an angle and striking every foe in its way for 50%.',
+      after(t, st, c, ab) {
+        if (!c || c.x == null) return; const [ux, uz] = abDir(t, c), len = abReach(t, st, ab) + (typeof AS_LINE !== 'undefined' ? AS_LINE.add : .5), m = byT(ab.by.mult, t) * .5;
+        const x0 = t.x + ux * len, z0 = t.y + uz * len, hit = new Set();
+        for (const a of [-.45, 0, .45]) {
+          const vx = ux * Math.cos(a) - uz * Math.sin(a), vz = ux * Math.sin(a) + uz * Math.cos(a);
+          rfx({ k: 'drag', x0, z0, x1: x0 + vx * 2.5, z1: z0 + vz * 2.5, h: towerTop(t) * .7, col: '#e8f8a0', life: .35 });
+          for (const o of abLine(t, st, x0, z0, vx, vz, 2.5, .4)) {
+            if (hit.has(o)) continue; hit.add(o);
+            G.delayed.push({ t: .3 + Math.hypot(o.x - x0, o.y - z0) / 18, fn: () => { if (o.dead || !G.towers.includes(t)) return; abAoe(() => abHit(t, t.st || st, o, m, 'phys', null)); abLeafFx(o.x, o.y, hitH(o), 3); } });
+          }
+        }
+      } },
+  ] },
+  cc_astrologer: { ab: 'cc_fallingstar', forms: [
+    { name: 'Constellation', text: 'two more stars fall a moment later, each on another foe in reach (the toughest first), at 60% of the first.',
+      after(t, st, c, ab) {
+        const L = abFoes(t, st, abReach(t, st, ab)).filter(o => o !== c).sort(abByTough).slice(0, 2);
+        L.forEach((o, i) => G.delayed.push({ t: .35 + i * .3, fn: () => { if (o.dead || !G.towers.includes(t) || typeof ccStarDrop !== 'function') return; ccStarDrop(t, t.st || st, o, 3 * .6, { low: byT(ab.by.low, t), splash: true }); } }));
+      } },
+    { name: 'Gravity Well', text: 'where the star lands it leaves a well 1.2 cells across for 4s: foes in it are slowed by 45%, and a flyer that crosses it is dragged down for 1s.',
+      after(t, st, c, ab) {
+        if (!c || c.x == null) return; const x = c.x, z = c.y, until = G.time + 4;
+        const tick = () => {
+          if (G.time > until || !G.towers.includes(t)) return;
+          for (const o of G.creeps) if (!o.dead && Math.hypot(o.x - x, o.y - z) <= 1.2) { a2SlowFoe(o, .45, .6); if (o.fly) o.lowT = Math.max(o.lowT || 0, G.time + 1); }
+          if (typeof fxRing === 'function') fxRing(x, z, 1.2, '#b8c0ff');
+          G.delayed.push({ t: .5, fn: tick });
+        };
+        G.delayed.push({ t: .2, fn: tick });
+      } },
+  ] },
+};
+/* Act II's talent rows (owner, 12 Nov 2026: "keep talent points, but add an extra couple rows with one additional spell for each unit"):
+   per unit, row VII holds its new spell (A2_SPELL), row VIII two talents that each reshape it (take one). The rows open with
+   talent points earned in Act II (ACT2.rows). The spell is cast on its own (autocast; its card slot casts it now), no mana. */
+const A2_SPELL = {
+  thornguard: { id: 'a2_rootline', name: 'Rootsnare Line', icon: 'a:sunder:1', cd: 14,
+    base: { len: 2.6, root: 1.5, mult: 1.2, cd: 0 },
+    text: s => `Roots every ground foe in a line ${+s.len.toFixed(1)} cells long, from the spear toward the toughest foe in reach, for ${+s.root.toFixed(1)}s, striking each for ${s.mult}x its strike${s.wound ? ', and Wounds them for 4s' : ''}.`,
+    pick: (t, st) => abToughest(abFoes(t, st, (st.range || 2) + .4, abWalker)),
+    cast(t, st, c, s) {
+      const [ux, uz] = abDir(t, c), L = abLine(t, st, t.x, t.y, ux, uz, s.len, .45, abWalker);
+      rfx({ k: 'drag', x0: t.x, z0: t.y, x1: t.x + ux * s.len, z1: t.y + uz * s.len, h: .15, col: '#8fd05a', life: .5 });
+      for (const o of L) { abHit(t, st, o, s.mult, 'phys', null); if (!o.dead) { rootFoe(o, s.root, t); if (s.wound && typeof woundFoe === 'function') woundFoe(o, 4, t); } abRootFx(o.x, o.y, 6); }
+    } },
+  gladebow: { id: 'a2_pinshot', name: 'Pinning Shot', icon: 'a:aimedshot:1', cd: 12,
+    base: { mult: 3, root: 1.2, cd: 0 },
+    text: s => `A heavy arrow at the toughest foe in reach: ${s.mult}x its strike, and it is pinned in place for ${+s.root.toFixed(1)}s${s.mark ? '; the next hit on it from another unit lands twice' : ''}.`,
+    pick: (t, st) => abToughest(abFoes(t, st, st.range || 3)),
+    cast(t, st, c, s) {
+      rfx({ k: 'drag', x0: t.x, z0: t.y, x1: c.x, z1: c.y, h: towerTop(t) * .8, col: '#f0f8b0', life: .3 });
+      abHit(t, st, c, s.mult, 'phys', null);
+      if (!c.dead) { if (!c.fly) rootFoe(c, s.root, t); if (s.mark) c.a2Mark = { by: t, until: G.time + 6 }; }
+      abLeafFx(c.x, c.y, hitH(c), 8);
+    } },
+  cc_astrologer: { id: 'a2_eclipse', name: 'Eclipse', icon: 'a:cc_omen:1', cd: 16,
+    base: { r: 1.2, dur: 4, slow: .35, mult: .4, cd: 0 },
+    text: s => `Darkens a ${+s.r.toFixed(1)}-cell circle on the thickest crowd in reach for ${s.dur}s: foes in it are slowed by ${Math.round(s.slow * 100)}% and take ${s.mult}x its strike each second${s.ground ? '; flyers in it are dragged down' : ''}.`,
+    pick: (t, st) => { const b = abCrowd(abFoes(t, st, st.range || 3), 1.2); return b && b.c; },
+    cast(t, st, c, s) {
+      const x = c.x, z = c.y, until = G.time + s.dur;
+      const tick = () => {
+        if (G.time > until || !G.towers.includes(t)) return;
+        for (const o of G.creeps) if (!o.dead && Math.hypot(o.x - x, o.y - z) <= s.r) { a2SlowFoe(o, s.slow, 1.1); abHit(t, t.st || st, o, s.mult, 'magic', null); if (s.ground && o.fly) o.lowT = Math.max(o.lowT || 0, G.time + 1.1); }
+        if (typeof fxRing === 'function') fxRing(x, z, s.r, '#6a6aa8');
+        G.delayed.push({ t: 1, fn: tick });
+      };
+      G.delayed.push({ t: .1, fn: tick });
+    } },
+};
+// row VII: the spell; row VIII: two shapes of it (mod adds to its numbers or turns on a rule). They change what it does, never "+X% damage"
+const A2_ROWS = {
+  thornguard: { spell: { icon: 'spikes' }, shapes: [
+    { name: 'Long Snare', icon: 'spikes', pro: 'Rootsnare Line runs 1.4 cells farther and holds 0.5s longer.', mod: { len: 1.4, root: .5 } },
+    { name: 'Bleeding Roots', icon: 'drop', pro: 'Foes caught by Rootsnare Line are Wounded for 4s: heals on them are halved.', mod: { wound: 1 } } ] },
+  gladebow: { spell: { icon: 'eye' }, shapes: [
+    { name: 'Marked Quarry', icon: 'eye', pro: 'The pinned foe is marked: the next hit on it from another unit lands twice.', mod: { mark: 1 } },
+    { name: 'Quick Nock', icon: 'boltup', pro: 'Pinning Shot comes back 4s sooner and pins 0.4s longer.', mod: { cd: -4, root: .4 } } ] },
+  cc_astrologer: { spell: { icon: 'eye' }, shapes: [
+    { name: 'Grounding Dark', icon: 'eye', pro: 'A flyer in Eclipse is dragged down while it stays in it, so ground strikes reach it.', mod: { ground: 1 } },
+    { name: 'Long Night', icon: 'stars', pro: 'Eclipse is 0.4 cells wider and lasts 2s longer.', mod: { r: .4, dur: 2 } } ] },
+};
+const a2Esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const a2Url = k => { try { return new URLSearchParams(location.search).get(k); } catch (e) { return null; } };
+const a2Local = () => { try { return location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname); } catch (e) { return false; } };
+// may this run go on past wave 50 into Act II?
+function a2Allowed() {
+  if (typeof G === 'undefined' || !G || !G.force || G.vs || G.hunt) return false;
+  if (G.act2) return true;
+  const q = a2Url('act2'); if (q === '0') return false;
+  return q === '1' || (typeof ptOn === 'function' && ptOn());
+}
+const a2On = () => typeof G !== 'undefined' && !!G && !!G.act2;   // the run is at the break or in Act II
+const a2In = () => a2On() && G.act2.act === 2;   // marched: on the Act II field
+const a2Row = n => n >= ACT2.first && n <= ACT2.last ? ACT2_WAVES[n - ACT2.first] : null;
+const a2Block = n => { let b = 0; for (const s of ACT2.blocks) if (n >= s) b = s; return b; };
+const a2Corr = n => (a2On() && n >= ACT2.first && G.act2.corr[a2Block(n)]) || [];
+const a2Fill = spec => spec.replace(/@([A-Z])/g, (m, k) => ACT2_SLOT_FILL[k] || 'golem');
+function a2Fresh() { return { v: 1, act: 1, pending: true, camp: [], corr: {}, offers: {}, sg: ACT2.sgBreak, paid: {}, awkN: 0 }; }
+
+/* ---- the wave table ---- */
+{
+  const _ws = waveSpec;
+  waveSpec = function (n) {
+    const r = a2On() && a2Row(n); if (!r) return _ws.apply(this, arguments);
+    const k = (n - 1) % WAVES.length, keep = WAVES[k];
+    WAVES[k] = a2Fill(r[0]);
+    try { return _ws.apply(this, arguments); } finally { WAVES[k] = keep; }
+  };
+  const _wp = waveProblem;
+  waveProblem = function (n) {
+    const r = a2On() && a2Row(n); if (!r || oldRules()) return _wp.apply(this, arguments);
+    const el = eliteWave(n) && !bossWave(n);
+    if (r[1] == null) { const c = typeof a2Card === 'function' ? a2Card(n) : null; return c ? Object.assign({}, c, { name: (el ? 'Elites: ' : '') + c.name }) : _wp.apply(this, arguments); }   // (a Gloam foe's first wave: its own card, act2foes.js)
+    return { name: (el ? 'Elites: ' : '') + r[1], text: r[2], ways: r[3] };
+  };
+  // flyers take only FLY_FORM of a wave's tune, as in waves 1-50 (core.js flyFormK): a flyer wave asks for anti-air, not more of it
+  const _ffk = flyFormK;
+  flyFormK = function (n) { if (!(a2On() && n > MAX_WAVE)) return _ffk.apply(this, arguments); const F = ACT2_TUNE[n - ACT2.first] || 1; return (1 + (F - 1) * FLY_FORM) / F; };
+  const _hp = waveHP;
+  waveHP = function (n) {
+    const h = _hp.apply(this, arguments);
+    return a2On() && n > MAX_WAVE ? h * Math.pow(ACT2.grow / 1.06, n - MAX_WAVE) * (ACT2.ease[n] || 1) * (ACT2_TUNE[n - ACT2.first] || 1) : h;
+  };
+}
+// a pair wave's second boss rule, for the wave card
+function a2PairRules(n) {
+  if (!ACT2_PAIR[n] || !a2On()) return [];
+  return waveSpec(n).filter(g => CREEPS[g.type] && CREEPS[g.type].boss && CREEPS[g.type].brule).map(g => Object.assign({ type: g.type }, CREEPS[g.type].brule));
+}
+
+/* ---- the break at wave 50 ---- */
+{
+  const _wc = waveCleared;
+  waveCleared = function () {
+    const n = G.wave;
+    if (!G.endless && n >= MAX_WAVE && !G.act2 && a2Allowed()) {
+      G.endless = true;   // (the cleared wave's rewards run as usual; the act break stands in for the victory)
+      const r = _wc.apply(this, arguments);
+      G.act2 = a2Fresh(); G.countdown = 0;
+      if (typeof _rnBoss !== 'undefined') _rnBoss.clear(); if (typeof _brAt !== 'undefined') _brAt.clear();
+      saveNow();
+      return r;
+    }
+    if (a2In() && n >= ACT2.last) { G.endless = false; G.act2.fin = true; }   // wave 100 cleared: the run is won
+    return _wc.apply(this, arguments);
+  };
+  const _cw = callWave;
+  callWave = function () {
+    if (a2On() && G.phase === 'build' && G.state === 'play') {
+      if (G.act2.pending) { a2Interlude(); return; }
+      if (G.act2.camp.length) { onToast(`${G.act2.camp.length} veteran${G.act2.camp.length > 1 ? 's wait' : ' waits'} in camp: build their unit to place them, or send the rest home.`); sfx('error'); return; }
+      if (a2BlockDue()) { a2CorruptPick(); return; }
+    }
+    return _cw.apply(this, arguments);
+  };
+  if (typeof campRunEnd === 'function') { const _cre = campRunEnd; campRunEnd = function () { if (a2On() && G.act2.fin) return null; return _cre.apply(this, arguments); }; }   // (the march was recorded at the break)
+  if (typeof endScreenHTML === 'function') { const _esh = endScreenHTML; endScreenHTML = function () { const h = _esh.apply(this, arguments); return a2On() && G.act2.fin && typeof h === 'string' ? h.replace(`All ${MAX_WAVE} waves repelled`, 'Both acts held: 100 waves') : h; }; }
+}
+const a2BlockDue = () => a2In() && ACT2.blocks.includes(G.wave) && !(G.wave in G.act2.corr);
+function a2Offer(w) {
+  const A = G.act2; if (A.offers[w]) return A.offers[w];
+  const keys = Object.keys(CORRUPT), out = [];
+  let s = (w * 2654435761 + (G.runId ? String(G.runId).length * 977 : 0)) >>> 0;
+  while (out.length < Math.min(ACT2.offerN, keys.length)) { s = (Math.imul(s, 1103515245) + 12345) >>> 0; const k = keys[s % keys.length]; if (!out.includes(k)) out.push(k); }
+  return (A.offers[w] = out);
+}
+function a2CorrHTML(w, chosen) {
+  return `<div class="a2-corr-pick" data-w="${w}"><h3>Corruption · waves ${w}-${w + 9} <small>take up to ${ACT2.pick}, or none</small></h3>
+    <div class="a2-cards">${a2Offer(w).map(k => `<button type="button" class="a2-cc${chosen.includes(k) ? ' on' : ''}" data-k="${k}" aria-pressed="${chosen.includes(k)}"><b>${a2Esc(CORRUPT[k].name)}</b><span>${a2Esc(CORRUPT[k].text)}</span></button>`).join('')}</div>
+    <p class="a2-pay">${a2Esc(CORRUPT_PAY)}</p></div>`;
+}
+function a2WireCorr(root, chosen, after) {
+  for (const b of root.querySelectorAll('.a2-cc')) b.onclick = () => {
+    const k = b.dataset.k, at = chosen.indexOf(k);
+    if (at >= 0) chosen.splice(at, 1); else if (chosen.length < ACT2.pick) chosen.push(k); else { sfx('error'); return; }
+    sfx('click'); for (const o of root.querySelectorAll('.a2-cc')) { const on = chosen.includes(o.dataset.k); o.classList.toggle('on', on); o.setAttribute('aria-pressed', on); }
+    if (after) after();
+  };
+}
+function a2Interlude() {
+  const A = G.act2; if (!A || !A.pending) return;
+  A.open = true; G.paused = true;
+  const F = ACT2_FRONT[G.force] || { home: 'your homeland', front: 'your stretch of the front' }, chosen = [];
+  const units = G.towers.filter(t => !t.def.wall).length + A.camp.length, rowsN = a2RowUnits().length;
+  showOverlay(`<div class="a2-int">
+    <h2 class="ttl">${a2Esc(ACT2_TEXT.title)}</h2>
+    <p class="a2-route"><span>${a2Esc(F.home)}</span> → <b>${a2Esc(F.front)}</b></p>
+    <p class="a2-story">${a2Esc(ACT2_TEXT.interlude)}</p>
+    <p class="a2-orders">${a2Esc(ACT2_TEXT.orders)}</p>
+    <div class="a2-carry"><div><h4>Marches with you</h4><ul><li>${units} unit${units === 1 ? '' : 's'}: tiers, veterancy, spells, gear, charms and weapons</li><li>The bag, the weapon rack, ${G.gold | 0} gold, Renown, your level</li><li>Your talents, as you took them</li><li>${A.sg} Starglass, to awaken units</li></ul></div>
+      <div><h4>At the front</h4><ul><li>A new field: foes come in all along its head and leave anywhere along its foot</li><li>Your units and walls stand where they stood; until the horn, move any of them free (Move) and walls sell for their full price</li><li>Two new talent rows${rowsN ? `, a new spell, for ${rowsN} of your unit types` : ''}, opened by Act II's points (one now, one at each boss)</li><li>Shrines come back as gold</li></ul></div></div>
+    ${a2CorrHTML(ACT2.first, chosen)}
+    <div class="a2-btns"><button type="button" class="btn" id="a2Go">March to the front<small>Wave ${ACT2.first}</small></button><button type="button" class="btn ghost" id="a2End">End the run here<small>A victory at wave ${MAX_WAVE}</small></button></div></div>`, 'a2ov');
+  a2WireCorr(ovp, chosen);
+  $('#a2Go').onclick = () => { sfx('click'); a2March(chosen); };
+  $('#a2End').onclick = () => { sfx('click'); A.open = false; G.act2 = null; G.endless = false; G.wave = MAX_WAVE; G.phase = 'build'; G.paused = false; hideOverlay(); victory(); };
+}
+function a2March(chosen) {
+  const A = G.act2; if (!A) return;
+  if (typeof campRunEnd === 'function' && !(typeof ptOn === 'function' && ptOn())) { const e = G.endless; G.endless = false; try { campRunEnd(true); } catch (e2) {} G.endless = e; }   // the Chronicles: wave 50 held
+  // the army as it stood at wave 50 (talents kept: owner, 12 Nov 2026), set down on the new field
+  const lay = G.towers.map(t => ({ t, i: t.i, j: t.j })).concat(A.camp.map(t => ({ t, i: t.i, j: t.j }))); A.camp = [];
+  let gold = 0; for (const s of (G.shrines || [])) gold += s.inv | 0;
+  G.towers = []; G.shrines = []; G.blk = new Uint8Array(N); G.tAt = new Array(N).fill(null);
+  G.creeps = []; G.projs = []; G.eprojs = []; G.hazards = []; G.corpses = []; G.delayed = [];
+  if (typeof shrnTouch === 'function') shrnTouch();
+  const F = ACT2_FRONT[G.force], m = a2Url('act2map') || (F && F.map) || ACT2.map;
+  if (MAPS[m]) setMap(m); else if (typeof applyTheme === 'function') applyTheme(G.map);
+  refreshField();
+  const r = a2SetDown(lay); gold += r.gold;
+  G.gold += gold;
+  a2RowsAdd(); A.tpA2 = (A.tpA2 | 0) + ACT2.tp.march; G.tp = (G.tp | 0) + ACT2.tp.march; G.tpEarned = (G.tpEarned | 0) + ACT2.tp.march; G.talV = (G.talV | 0) + 1;
+  A.corr[ACT2.first] = chosen.slice(); A.act = 2; A.pending = false; A.open = false; A.free = true; G.sel = null; G.buildType = null;
+  if (typeof _rnBoss !== 'undefined') _rnBoss.clear(); if (typeof _brAt !== 'undefined') _brAt.clear(); if (typeof fcKey !== 'undefined') fcKey = '';
+  G.paused = false; hideOverlay();
+  afterStart(ACT2_TEXT.title, `Your army stands as it did at wave 50${r.moved ? ` (${r.moved} moved to the nearest free cell)` : ''}${r.camp ? `, ${r.camp} waiting in camp` : ''}. Until the horn, Move any unit or wall free; walls sell for their full price. +${ACT2.tp.march} talent point for the Act II rows`);
+  saveNow(); onDirty();
+}
+// set down each piece at its cell, or the nearest free cell within 3 (units first, highest tier first; walls after). A unit with
+// no room waits in camp (placed again free by building its type); a wall with none comes back as gold
+function a2SetDown(lay) {
+  const out = { moved: 0, camp: 0, gold: 0 }, A = G.act2;
+  lay.sort((a, b) => (a.t.def.wall ? 1 : 0) - (b.t.def.wall ? 1 : 0) || (b.t.tier | 0) - (a.t.tier | 0));
+  const near = (i0, j0) => { const L = []; for (let di = -3; di <= 3; di++) for (let dj = -3; dj <= 3; dj++) L.push([i0 + di, j0 + dj, di * di + dj * dj]); return L.sort((a, b) => a[2] - b[2]); };
+  for (const { t, i, j } of lay) {
+    let at = null; if (inGrid(i, j)) for (const [ci, cj] of near(i, j)) if (inGrid(ci, cj) && canBuild(ci, cj).ok) { at = [ci, cj]; break; }
+    if (!at) { if (t.def.wall) out.gold += t.invested | 0; else { A.camp.push(t); out.camp++; } continue; }
+    if (at[0] !== i || at[1] !== j) out.moved++;
+    Object.assign(t, { i: at[0], j: at[1], x: at[0] + .5, y: at[1] + .5, build: .6, cd: .3, wrecked: false, st: null });
+    t.hp = t.maxHp; if (t.def.wall) t.fresh = t.invested | 0;   // (walls sell for their full price until the horn)
+    const k = idx(at[0], at[1]); G.towers.push(t); G.blk[k] = 1; G.tAt[k] = t;
+    refreshField();
+  }
+  if (typeof wallsTouch === 'function') for (const t of G.towers) if (t.def.wall) wallsTouch(t.i, t.j);
+  for (const t of G.towers) if (!t.def.wall) t.st = effStats(t);
+  A.camp.sort((a, b) => (b.tier | 0) - (a.tier | 0)); a2OpenCamp();
+  return out;
+}
+// the free window ends with the first horn of Act II
+function a2FreeEnd() { if (!G.act2 || !G.act2.free) return; G.act2.free = false; for (const t of G.towers) if (t.def.wall) t.fresh = 0; G.moveT = null; }
+// ending the break's interlude from a save: reopened once the overlay is clear and no boss loot waits
+function a2Poll() {
+  if (typeof G === 'undefined' || !G || G.state !== 'play' || !G.act2) return a2Chips();
+  const A = G.act2, free = typeof ov !== 'undefined' && ov.hidden && !(typeof rnS === 'function' && G.force && rnS().loots && rnS().loots.length);
+  if (A.pending && !A.open && free) a2Interlude();
+  else if (!A.pending && free && G.phase === 'build' && a2BlockDue() && !A.picking) a2CorruptPick();
+  a2Chips(); a2CampStrip();
+}
+function a2CorruptPick() {
+  const A = G.act2, w = G.wave, chosen = []; A.picking = true; G.paused = true;
+  showOverlay(`<div class="a2-int">${a2CorrHTML(w, chosen)}<div class="a2-btns"><button type="button" class="btn" id="a2Take">Take them<small>Wave ${w}</small></button></div></div>`, 'a2ov');
+  a2WireCorr(ovp, chosen);
+  $('#a2Take').onclick = () => { sfx('click'); A.corr[w] = chosen.slice(); A.picking = false; G.paused = false; hideOverlay(); if (typeof fcKey !== 'undefined') fcKey = ''; onBanner(`Waves ${w}-${w + 9}`, chosen.length ? 'Corruption: ' + chosen.map(k => CORRUPT[k].name).join(' · ') : 'No Corruption taken'); saveNow(); onDirty(); };
+}
+
+/* ---- the muster: veterans placed again by building their type ---- */
+{
+  const _tb = tryBuild;
+  tryBuild = function (type, i, j) {
+    const A = a2In() && G.act2, c = A && A.camp.find(o => o.type === type);
+    if (!c) return _tb.apply(this, arguments);
+    const cost = TOWERS[type].tiers[0].cost; G.gold += cost;
+    const t = _tb.apply(this, arguments);
+    if (!t) { G.gold -= cost; return null; }
+    const at = G.towers.indexOf(t), k = idx(i, j);
+    Object.assign(c, { i, j, x: i + .5, y: j + .5, build: 1, cd: .3, wrecked: false, st: null, fresh: 0 });
+    G.towers[at] = c; G.tAt[k] = c; A.camp.splice(A.camp.indexOf(c), 1);
+    c.st = effStats(c);
+    if (!A.camp.length) { onBanner('The army stands', 'Every veteran is at its post. Sound the horn when ready'); saveNow(); }
+    return c;
+  };
+  const _sl = slotsNow;
+  slotsNow = function () {
+    const s = _sl.apply(this, arguments); if (!a2In()) return s;
+    const sel = G.sel, t = sel && sel.kind === 'tower' && !sel.page ? sel.ref : null;
+    if (t && G.towers.includes(t)) {
+      const free = [6, 7, 9].filter(k => !s[k]), put = o => { const k = free.shift(); if (k != null) s[k] = o; };
+      if (G.act2.free && G.phase === 'build') put({ key: a2MoveKey(), lbl: 'Move', on: true, active: G.moveT === t, hk: 'M', name: `Move this ${t.def.wall ? 'wall' : 'unit'} to another cell, free, until the horn sounds`, act: () => { if (G.moveT === t) { G.moveT = null; onToast('Move cancelled.'); } else { G.moveT = t; onToast(`Tap an empty cell to move the ${t.def.name} there.`); } onDirty(); } });
+      const D = a2AwkDef(t);
+      if (D && !t.a2awk) { const C = ACT2.awk, why = a2AwkWhy(t);
+        put({ key: `a:${D.ab}:1`, lbl: 'Awaken', cost: C.gold, on: !why, name: `Awaken (once, a choice of two): ${ABIL[D.ab].name} becomes ${D.forms.map(f => f.name).join(' or ')}. ${C.gold} gold and ${C.sg} Starglass.${why ? ' ' + why : ''}`, act: () => { if (why) { onToast(why); sfx('error'); } else a2AwkChoose(t); } }); }
+      const S = a2SpellOn(t) && A2_SPELL[t.def.unit];
+      if (S) { const left = () => Math.max(0, t.a2sT || 0), cd = a2SpellCd(t);
+        put({ key: S.icon, lbl: S.name.split(' ')[0], on: left() <= 0 && !t.wrecked, cd: left() > 0, cost: left() > 0 ? Math.ceil(left()) + 's' : null, cdOf: () => clamp(left() / cd, 0, 1), left, name: `${S.name} (Act II, casts itself): ${S.text(a2SpellStats(t))} Every ${cd}s.`, act: () => a2SpellNow(t) }); }
+    }
+    if (!G.act2.camp.length) return s;
+    for (let k = 0; k < s.length; k++) { const o = s[k]; if (!o || !o.key || !o.key.startsWith('t:')) continue; const ty = o.key.split(':')[1], c = G.act2.camp.find(q => q.type === ty); if (c) s[k] = Object.assign({}, o, { cost: 0, on: true, name: `Place your veteran ${c.def.name} (tier ${ROMAN[c.tier]}), free` }); }
+    return s;
+  };
+  if (typeof moveTowerTo === 'function') {
+    const _mt = moveTowerTo;
+    moveTowerTo = function (t, i, j) {
+      if (!(a2In() && G.act2.free && G.phase === 'build')) return _mt.apply(this, arguments);
+      const chk = canMoveTo(t, i, j); if (!chk.ok) { onToast(chk.msg); sfx('error'); return false; }
+      const i0 = t.i, j0 = t.j;
+      G.tAt[idx(i0, j0)] = null; G.blk[idx(i0, j0)] = 0;
+      Object.assign(t, { i, j, x: i + .5, y: j + .5, build: .4 }); G.tAt[idx(i, j)] = t; G.blk[idx(i, j)] = 1;
+      if (typeof wallsTouch === 'function') { wallsTouch(i0, j0); wallsTouch(i, j); }
+      refreshField(); G.moveT = null; t.st = t.def.wall ? t.st : effStats(t);
+      if (typeof fxRing === 'function') fxRing(t.x, t.y, .9, '#9ab0ff');
+      sfx('select'); onDirty(); onSave(); return true;
+    };
+  }
+  const _cw2 = callWave;
+  callWave = function () { const was = G.phase, r = _cw2.apply(this, arguments); if (a2In() && was === 'build' && G.phase === 'wave') a2FreeEnd(); return r; };
+  const _sv = saveNow;
+  saveNow = function () { if (a2On() && G.act2.camp.length) return; return _sv.apply(this, arguments); };   // (the save stays at the break until the camp is empty)
+}
+// a veteran's unit type is open (it fought in Act I; the generated test army may hold types the run never opened)
+const a2MoveKey = () => { try { return typeof gearKey === 'function' ? gearKey({ shop: 'waystone', lv: 1, rar: 1 }) : 'x'; } catch (e) { return 'x'; } };
+function a2OpenCamp() { if (!G.act2 || !Array.isArray(G.unlocked)) return; for (const t of G.act2.camp) if (!G.unlocked.includes(t.type)) G.unlocked.push(t.type); }
+function a2SendHome() {
+  const A = G.act2; if (!A || !A.camp.length) return;
+  let g = 0;
+  for (const t of A.camp) { unsocketAll(t); if (t.weapon && !t.weapon.hero && Array.isArray(G.wbag)) G.wbag.push(t.weapon); t.weapon = null; g += Math.floor((t.invested | 0) * .75); }
+  const n = A.camp.length; A.camp = []; G.gold += g;
+  onToast(`${n} veteran${n > 1 ? 's' : ''} sent home: +${g} gold, their gear to the bag.`); saveNow(); onDirty();
+}
+
+/* ---- Corruption and Blood-bond on the field ---- */
+{
+  const _sp = spawn;
+  spawn = function (s) {
+    const c = _sp.apply(this, arguments);
+    if (!c || !a2On() || !(s.wv > MAX_WAVE)) return c;
+    const C = a2Corr(s.wv), big = c.def.boss || c.def.lead || c.elite;
+    if (C.includes('swift')) c.spdM *= 1.15;
+    if (C.includes('regen')) c.a2Regen = .01;
+    if (C.includes('shielded') && big && !s.at) { c.hxSh = c.hxShMax = c.maxHp * .25; }
+    if (C.includes('splitting') && c.elite && !c.splitCopy) c.a2SplitFoe = true;
+    if (C.includes('summoner') && c.def.boss) c.a2SumT = 10;
+    if (!c.def.boss && !c.def.lead && !c.kid) (G.act2.esc || (G.act2.esc = {}))[s.wv] = { type: c.type, hp: s.hp };
+    if (c.def.boss && ACT2_PAIR[s.wv]) c.a2Bond = s.wv;
+    return c;
+  };
+  const _hu = hurt;
+  hurt = function (c, amt, type, src) {
+    if (!c || c.dead || !(amt > 0) || !a2On()) return _hu.apply(this, arguments);
+    let k = 1;
+    if (c.a2Bond && a2Mate(c)) k *= ACT2.bondK;
+    if (c.a2Mark && src && src.def && src !== c.a2Mark.by) { if (G.time <= c.a2Mark.until) k *= 2; c.a2Mark = null; }   // (Marked Quarry: the next hit from another unit lands twice)
+    if (k === 1) return _hu.apply(this, arguments);
+    const a = Array.prototype.slice.call(arguments); a[1] = amt * k; return _hu.apply(this, a);
+  };
+  const _ki = kill;
+  kill = function (c) {
+    const was = c && !c.dead, r = _ki.apply(this, arguments);
+    if (!was || !a2On() || G.state !== 'play') return r;
+    if (c.a2SplitFoe && !c.splitCopy) a2SplitFoe(c);
+    if (c.def.boss && c.wv > MAX_WAVE && !c.splitCopy && typeof rnBossType === 'function' && rnBossType(c.wv) === c.type && !G.act2.paid[c.wv]) {
+      G.act2.paid[c.wv] = 1; const n = a2Corr(c.wv).length, sg = 1 + n;
+      G.act2.sg += sg; if (n && typeof rnGain === 'function') rnGain(n, 'Corruption borne');
+      const tp = ACT2.tp.boss; G.act2.tpA2 = (G.act2.tpA2 | 0) + tp; G.tp = (G.tp | 0) + tp; G.tpEarned = (G.tpEarned | 0) + tp; G.talV = (G.talV | 0) + 1;
+      onToast(`+${sg} Starglass${n ? ' (Corruption)' : ''}, ${G.act2.sg} held · +${tp} talent point (Act II rows)`);
+    }
+    return r;
+  };
+  const _up = update;
+  update = function (dt) {
+    const r = _up.apply(this, arguments);
+    if (a2On() && G.state === 'play' && !G.paused) a2FieldTick(dt);
+    return r;
+  };
+  if (typeof rnRollOffer === 'function') { const _ro = rnRollOffer; rnRollOffer = function (type, n, k) { const a = Array.prototype.slice.call(arguments); if (a2On() && n > MAX_WAVE && k === RN_LOOT.offer) a[2] = k + a2Corr(n).length; return _ro.apply(this, a); }; }
+}
+const a2Mate = c => G.creeps.find(o => o !== c && !o.dead && o.a2Bond === c.a2Bond && Math.hypot(o.x - c.x, o.y - c.y) <= ACT2.bondR);
+function a2FieldTick(dt) {
+  if (a2In() && G.phase === 'wave') for (const t of G.towers) {
+    if (t.def.wall || !A2_SPELL[t.def.unit] || !a2SpellOn(t)) continue;
+    if ((t.a2sT = (t.a2sT || 0) - dt) > 0 || t.wrecked || t.silT > 0 || t.build > .5) continue;
+    if (!a2SpellCast(t)) t.a2sT = .3;
+  }
+  G.act2.tetherT = (G.act2.tetherT || 0) - dt;
+  const tether = G.act2.tetherT <= 0; if (tether) G.act2.tetherT = .3;
+  for (const c of G.creeps) {
+    if (c.dead) continue;
+    if (c.a2Regen && c.hp < c.maxHp) { c.a2RA = (c.a2RA || 0) + dt; if (c.a2RA >= .5) { healFoe(c, c.maxHp * c.a2Regen * c.a2RA); c.a2RA = 0; } }
+    if (c.a2SumT != null && (c.a2SumT -= dt) <= 0) { c.a2SumT = 10; a2Summon(c); }
+    if (tether && c.a2Bond) { const o = a2Mate(c); if (o && o.id > c.id) rfx({ k: 'drag', x0: c.x, z0: c.y, x1: o.x, z1: o.y, h: .5, col: '#d03a3a', life: .3 }); }
+  }
+}
+function a2Summon(c) {
+  const e = G.act2.esc && G.act2.esc[c.wv]; if (!e || !(e.hp > 0) || G.creeps.length > 90) return;
+  for (let n = 0; n < 2; n++) { const s = { type: e.type, hp: e.hp * .6, bounty: 1 }; if (!c.fly && !CREEPS[e.type].fly && c.ti != null) s.at = { x: c.x, y: c.y, ti: c.ti, tj: c.tj, tx: c.tx, ty: c.ty, state: c.state || 'walk' }; const o = spawn(s); o.kid = 1; }
+  if (typeof fxRing === 'function') fxRing(c.x, c.y, 1, '#b070e0');
+}
+function a2SplitFoe(c) {
+  for (let n = 0; n < 2; n++) {
+    const s = { type: c.type, hp: c.maxHp * .3, bounty: 0 }; if (!c.fly && c.ti != null) s.at = { x: c.x, y: c.y, ti: c.ti, tj: c.tj, tx: c.tx, ty: c.ty, state: c.state || 'walk' };
+    const o = spawn(s); o.kid = 1; o.splitCopy = true; o.grow = .75; o.maxHp = o.hp = c.maxHp * .3; o.ox = n ? .3 : -.3;
+  }
+}
+
+/* ---- Awakening: a choice of two forms, final ---- */
+const a2AwkDef = t => t && t.def && !t.def.wall && AWAKEN[t.def.unit] || null;
+const a2AwkForm = t => { const D = a2AwkDef(t); return D && t.a2awk ? D.forms[(t.a2awk | 0) - 1] || D.forms[0] : null; };
+function a2AwkWhy(t) {
+  const D = a2AwkDef(t), C = ACT2.awk; if (!D) return 'This unit has no awakening yet.';
+  if (!a2In()) return 'Units awaken in Act II.'; if (t.a2awk) return 'It has awakened.';
+  if (!(t.ab && t.ab.learned.includes(D.ab))) return `Learn ${ABIL[D.ab].name} first.`;
+  if (G.phase !== 'build') return 'Between waves only.';
+  if (G.gold < C.gold) return `Awakening needs ${C.gold} gold.`;
+  if (G.act2.sg < C.sg) return `Awakening needs ${C.sg} Starglass (you hold ${G.act2.sg}; Act II's bosses give it).`;
+  return '';
+}
+function a2Awaken(t, k) {
+  const D = a2AwkDef(t), C = ACT2.awk, f = D && D.forms[k | 0]; if (!f || a2AwkWhy(t)) return false;
+  G.gold -= C.gold; G.act2.sg -= C.sg; t.a2awk = (k | 0) + 1; G.act2.awkN++;
+  if (typeof fxRing === 'function') fxRing(t.x, t.y, 1.4, '#c8b0ff'); if (typeof fxSparkle === 'function') fxSparkle(t.x, t.y, towerTop(t), '#e8d8ff');
+  onBanner(`${t.def.name} awakens`, `${ABIL[D.ab].name} becomes ${f.name}: ${f.text}`); sfx('upgrade'); saveNow(); onDirty();
+  return true;
+}
+// the choice: two cards, each its form and what it does; the choice is final
+function a2AwkChoose(t) {
+  const D = a2AwkDef(t), C = ACT2.awk; if (!D || a2AwkWhy(t)) return;
+  const back = !ov.hidden && ovp.querySelector('.gp-ttl') ? () => openGearPanel(t) : null;
+  G.paused = true;
+  showOverlay(`<div class="a2-int a2-awk-pick"><h2 class="ttl">Awaken ${a2Esc(t.def.name)}</h2>
+    <p class="a2-orders">${a2Esc(ABIL[D.ab].name)} transforms. Choose one form: the choice is final for this unit. ${C.gold} gold and ${C.sg} Starglass.</p>
+    <div class="a2-cards">${D.forms.map((f, k) => `<button type="button" class="a2-cc" data-k="${k}"><b>${a2Esc(f.name)}</b><span>${a2Esc(f.text.charAt(0).toUpperCase() + f.text.slice(1))}</span></button>`).join('')}</div>
+    <div class="a2-btns"><button type="button" class="btn ghost" id="a2AwkNo">Not now</button></div></div>`, 'a2ov');
+  for (const b of ovp.querySelectorAll('.a2-cc')) b.onclick = () => { sfx('click'); const ok = a2Awaken(t, +b.dataset.k); if (back && ok) back(); else { G.paused = false; hideOverlay(); } };
+  $('#a2AwkNo').onclick = () => { sfx('click'); if (back) back(); else { G.paused = false; hideOverlay(); } };
+}
+{
+  const _ca = castAbility;
+  castAbility = function (t, ab, tg, st) {
+    const r = _ca.apply(this, arguments), f = r && t && t.a2awk && a2AwkForm(t), D = f && a2AwkDef(t);
+    if (f && ab && ab.id === D.ab) { try { f.after(t, st || t.st || effStats(t), tg, ab); } catch (e) { console.warn('awakening', e); } }
+    return r;
+  };
+  for (const u in AWAKEN) { const ab = typeof ABIL !== 'undefined' && ABIL[AWAKEN[u].ab]; if (!ab || ab.a2Text) continue; const f0 = ab.text; ab.a2Text = 1; ab.text = function (t) { const s = f0.apply(this, arguments), f = t && t.def && t.def.unit === u && a2AwkForm(t); return f ? `${s} Awakened, ${f.name}: ${f.text.charAt(0).toUpperCase() + f.text.slice(1)}` : s; }; }
+}
+function a2AwkLine(t) {
+  const D = a2AwkDef(t); if (!D || !a2In()) return '';
+  const f = a2AwkForm(t); if (f) return `<p class="mut a2-awk on" data-d="2">✦ Awakened: <b>${a2Esc(f.name)}</b> (${a2Esc(ABIL[D.ab].name)}): ${a2Esc(f.text)}</p>`;
+  const C = ACT2.awk, why = a2AwkWhy(t);
+  return `<p class="mut a2-awk" data-d="2">Can awaken once: ${a2Esc(ABIL[D.ab].name)} becomes <b>${a2Esc(D.forms[0].name)}</b> or <b>${a2Esc(D.forms[1].name)}</b> (your choice, final) <button type="button" class="a2-awk-b" data-a2awk="${t.id}"${why ? ' disabled' : ''}>Awaken · ${C.gold} gold, ${C.sg} Starglass${why ? ` · ${a2Esc(why)}` : ''}</button></p>`;
+}
+function a2SpellLine(t) {
+  const S = a2In() && A2_SPELL[t.def.unit]; if (!S) return '';
+  if (!a2SpellOn(t)) return `<p class="mut a2-awk" data-d="3">Act II spell: <b>${a2Esc(S.name)}</b>, in the Act II rows of its talents.</p>`;
+  return `<p class="mut a2-awk on" data-d="2">Act II spell, <b>${a2Esc(S.name)}</b> (casts itself every ${a2SpellCd(t)}s): ${a2Esc(S.text(a2SpellStats(t)))}</p>`;
+}
+if (typeof infoHTML === 'function') {
+  const _ih = infoHTML;
+  infoHTML = function () {
+    const h = _ih.apply(this, arguments), s = G.sel, t = s && s.kind === 'tower' ? s.ref : null;
+    if (typeof h !== 'string' || !t || !t.def || t.def.wall) return h;
+    const ln = a2AwkLine(t) + a2SpellLine(t); if (!ln) return h;
+    const at = h.indexOf('<p class="up"'); return at >= 0 ? h.slice(0, at) + ln + h.slice(at) : h + ln;
+  };
+}
+if (typeof deskCardHTML === 'function') {   // desktop's unit strip: a mark on an awakened unit
+  const _dc = deskCardHTML;
+  deskCardHTML = function (S) { const h = _dc.apply(this, arguments), t = S && S.kind === 'tower' ? S.ref : null, f = t && t.a2awk && a2AwkForm(t); return f && typeof h === 'string' && h ? h + `<span class="a2-awk-s" title="${a2Esc(f.name)}: ${a2Esc(f.text)}">✦ ${a2Esc(f.name)}</span>` : h; };
+}
+if (typeof openGearPanel === 'function') {
+  const _og = openGearPanel;
+  openGearPanel = function (t) {
+    const r = _og.apply(this, arguments);
+    if (t && t.def && !t.def.wall && a2In() && typeof ovp !== 'undefined') { const tl = ovp.querySelector('.gp-ttl'); if (tl) { const p = document.createElement('div'); p.innerHTML = a2AwkLine(t) + a2SpellLine(t); while (p.firstChild) tl.appendChild(p.firstChild); } }
+    return r;
+  };
+}
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('click', e => {
+  const b = e.target && e.target.closest && e.target.closest('[data-a2awk]'); if (!b) return;
+  const t = G.towers && G.towers.find(o => o.id === +b.dataset.a2awk); if (!t) return;
+  e.preventDefault(); e.stopPropagation(); a2AwkChoose(t);
+}, true);
+
+/* ---- the Act II talent rows and their spells (A2_ROWS, A2_SPELL) ---- */
+let A2_RESTORING = false;   // (a save is loading: the rows are in the trees and open, so its picks replay)
+const a2RowUnits = () => Object.keys(TALENTS || {}).filter(ty => TOWERS[ty] && TOWERS[ty].unit && A2_ROWS[TOWERS[ty].unit] && A2_SPELL[TOWERS[ty].unit]);
+// add the two rows to each tree that has them (after applyForce builds the trees); new talents go at the end of the list, so saved picks keep their places
+function a2RowsAdd() {
+  for (const ty of a2RowUnits()) {
+    const tl = TALENTS[ty]; if (tl.a2r != null) continue;
+    const u = TOWERS[ty].unit, R = A2_ROWS[u], S = A2_SPELL[u], r0 = talRowsOf(ty);
+    tl.a2r = r0;
+    tl.list.push({ name: S.name, icon: R.spell.icon, r: r0, c: 1, max: 1, id: tl.list.length, pro: () => `Act II. ${S.text(S.base)} It casts itself every ${S.cd}s.`, con: null, mod: () => ({}), a2: 'spell', tag: 'act2' });
+    R.shapes.forEach((q, k) => tl.list.push({ name: q.name, icon: q.icon, r: r0 + 1, c: k ? 2 : 0, max: 1, id: tl.list.length, pro: () => `Act II. ${q.pro} (Take one of the two.)`, con: null, mod: () => ({}), req: [r0, 1], a2: 'shape', a2k: k, tag: 'act2' }));
+    tl.rows = r0 + 2;
+  }
+}
+const a2TalOf = (ty, kind, k) => { const tl = TALENTS[ty]; return tl && tl.a2r != null ? tl.list.find(q => q.a2 === kind && (k == null || q.a2k === k)) : null; };
+const a2SpellOn = t => { const q = t && t.def && a2TalOf(t.type, 'spell'); return !!q && (talPicks(t.type)[q.id] | 0) > 0; };
+function a2SpellStats(t) {
+  const S = A2_SPELL[t.def.unit], s = Object.assign({}, S.base), R = A2_ROWS[t.def.unit], pk = talPicks(t.type);
+  R.shapes.forEach((q, k) => { const tq = a2TalOf(t.type, 'shape', k); if (!tq || !(pk[tq.id] | 0)) return; for (const key in q.mod) s[key] = (s[key] || 0) + q.mod[key]; });
+  return s;
+}
+const a2SpellCd = t => Math.max(4, A2_SPELL[t.def.unit].cd + (a2SpellStats(t).cd || 0));
+function a2SpellCast(t, manual) {
+  const S = A2_SPELL[t.def.unit], st = t.st || effStats(t), c = S.pick(t, st); if (!c) return false;
+  const s = a2SpellStats(t);
+  abRun(S.id, () => S.cast(t, st, c, s));
+  t.a2sT = a2SpellCd(t); t.shotT = 0; t.recoil = 1;
+  part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) + .15, life: .2, max: .2, size: .35, col: '#c8e0a0' });
+  if (G.sel && G.sel.ref === t) onDirty();
+  return true;
+}
+function a2SpellNow(t) {
+  const S = A2_SPELL[t.def.unit]; if (!S || !a2SpellOn(t)) return;
+  if (G.phase !== 'wave' || !G.creeps.length) { onToast(`${S.name}: nothing to aim at.`); sfx('error'); return; }
+  if ((t.a2sT || 0) > 0) { onToast(`${S.name} is ready in ${Math.ceil(t.a2sT)}s.`); sfx('error'); return; }
+  if (t.silT > 0 || t.wrecked) { onToast('It cannot cast now.'); sfx('error'); return; }
+  if (!a2SpellCast(t, true)) { onToast(`${S.name}: nothing in reach.`); sfx('error'); }
+}
+{
+  if (typeof applyForce === 'function') { const _af = applyForce; applyForce = function () { const r = _af.apply(this, arguments); try { if (A2_RESTORING || (typeof G !== 'undefined' && G && G.act2 && G.act2.act === 2)) a2RowsAdd(); } catch (e) { console.warn('act two rows', e); } return r; }; }
+  const _ro = talRowOpen;
+  talRowOpen = function (r, type) {
+    const tl = type && TALENTS[type]; if (!tl || tl.a2r == null || r < tl.a2r) return _ro.apply(this, arguments);
+    if (A2_RESTORING) return true;
+    return a2In() && (G.act2.tpA2 | 0) >= ACT2.rows[Math.min(ACT2.rows.length - 1, r - tl.a2r)];
+  };
+  // a tree's capstone row stays one-of (it is no longer the last row), and the shape row is one-of too
+  const _ct = talCapTaken;
+  talCapTaken = function (type, picks, i) {
+    const tl = TALENTS[type], t = tl && tl.list[i]; if (!t || tl.a2r == null) return _ct.apply(this, arguments);
+    if (t.r !== tl.a2r - 1 && t.r !== tl.a2r + 1) return null;
+    if (talRankOf(picks, i) > 0) return null;
+    const got = tl.list.filter(q => q.r === t.r && q.id !== t.id && talRankOf(picks, q.id) > 0); return got.length ? got[0] : null;
+  };
+}
+
+/* ---- what the player sees: the wave card, the forecast cards, the chips, the camp ---- */
+if (typeof problemHTML === 'function') {
+  const _ph = problemHTML;
+  problemHTML = function (w) {
+    const h = _ph.apply(this, arguments), n = (w && w.n) || G.wave; if (!a2On() || n < ACT2.first || typeof h !== 'string') return h;
+    const C = a2Corr(n), pr = a2PairRules(n);
+    const corr = C.length ? `<p class="prob a2-corr"><b>Corruption.</b> ${C.map(k => `<b>${a2Esc(CORRUPT[k].name)}</b>: ${a2Esc(CORRUPT[k].text)}`).join(' ')}</p>` : '';
+    const bond = ACT2_PAIR[n] ? `<p class="prob a2-bond"><b>${ACT2_BOND.name}.</b> ${ACT2_BOND.text}</p><p class="ways">${ACT2_BOND.ways.join(' · ')}</p>` + pr.slice(1).map(r => bossRuleHTML(r)).join('') : '';
+    return corr + h + bond;
+  };
+}
+if (typeof fcCardHTML === 'function') {
+  const _fc = fcCardHTML;
+  fcCardHTML = function (spec) {
+    const h = _fc.apply(this, arguments); if (!h || !a2On()) return h;
+    const n = typeof fcWaves === 'function' ? fcWaves()[0] : G.wave, ty = String(spec || '').split(':')[1], C = CREEPS[ty]; if (!C || !(n >= ACT2.first)) return h;
+    const big = C.boss || C.lead || (eliteWave(n) && !C.boss), L = a2Corr(n).filter(k => { const o = CORRUPT[k].who; return o === 'all' || (o === 'big' && big) || (o === 'elite' && eliteWave(n) && !C.boss && !C.lead) || (o === 'boss' && C.boss); });
+    return h + (L.length ? `<p class="fcc-c a2-fcc"><b>Corruption:</b> ${L.map(k => a2Esc(CORRUPT[k].name)).join(' · ')}</p>` : '') + (C.boss && ACT2_PAIR[n] ? `<p class="fcc-c a2-fcc"><b>${ACT2_BOND.name}:</b> ${a2Esc(ACT2_BOND.text)}</p>` : '');
+  };
+}
+let a2ChipEl = null, a2CampEl = null, a2ChipKey = '', a2CampKey = '';
+function a2Chips() {
+  if (typeof document === 'undefined') return;
+  const on = a2On() && G.state === 'play';
+  if (!a2ChipEl) { const st = document.getElementById('stage'); if (!st || !on) return; a2ChipEl = document.createElement('div'); a2ChipEl.id = 'a2Chips'; st.appendChild(a2ChipEl); }
+  const n = G.phase === 'build' ? G.wave : G.wave + 1, C = on ? a2Corr(n) : [], key = on ? [n, C.join(','), G.act2.sg, G.act2.act].join('|') : '';
+  if (key === a2ChipKey) return; a2ChipKey = key;
+  a2ChipEl.hidden = !on;
+  if (on) a2ChipEl.innerHTML = `<span class="a2-act">Act II</span>${C.map(k => `<span class="a2-chip" title="${a2Esc(CORRUPT[k].text)}">${a2Esc(CORRUPT[k].name)}</span>`).join('')}<span class="a2-sg" title="Starglass: awakens a unit (with gold). From Act II's bosses, more under Corruption.">✦ ${G.act2.sg}</span>`;
+}
+function a2CampStrip() {
+  if (typeof document === 'undefined') return;
+  const on = a2In() && G.act2.camp.length > 0 && G.state === 'play';
+  if (!a2CampEl) { const st = document.getElementById('stage'); if (!st || !on) return; a2CampEl = document.createElement('div'); a2CampEl.id = 'a2Camp'; st.appendChild(a2CampEl);
+    a2CampEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.home) { a2SendHome(); return; } const ty = b.dataset.ty; if (ty) { G.sel = null; G.buildType = ty; G.ghost = null; sfx('click'); onDirty(); } }); }
+  const key = on ? G.act2.camp.map(t => t.type + t.tier).join(',') + '|' + G.buildType : '';
+  if (key === a2CampKey) return; a2CampKey = key;
+  a2CampEl.hidden = !on; if (!on) return;
+  const by = new Map(); for (const t of G.act2.camp) { const o = by.get(t.type) || { t, n: 0 }; o.n++; by.set(t.type, o); }   // (one button a type: its best veteran is placed first)
+  a2CampEl.innerHTML = `<b>In camp</b>${[...by.values()].map(({ t, n }) => `<button type="button" data-ty="${t.type}" class="${G.buildType === t.type ? 'on' : ''}" title="Place them: build a ${a2Esc(t.def.name)} (free), the highest tier first">${a2Esc(t.def.short || t.def.name)} ${ROMAN[t.tier]}${n > 1 ? ` ×${n}` : ''}${t.a2awk ? ' ✦' : ''}</button>`).join('')}<button type="button" data-home="1" class="home" title="Sell the rest: 75% of what they cost, their gear to the bag">Send the rest home</button>`;
+}
+if (typeof setInterval === 'function' && typeof document !== 'undefined') setInterval(() => { try { a2Poll(); } catch (e) { console.warn('act two', e); } }, 400);
+
+/* ---- saves, and a new run ---- */
+{
+  const _ng = newGame;
+  newGame = function () { const r = _ng.apply(this, arguments); if (typeof G !== 'undefined' && G) G.act2 = null; return r; };
+  const _se = serialize;
+  serialize = function () {
+    const s = _se.apply(this, arguments); if (!s || !a2On()) return s;
+    const A = G.act2;
+    s.a2 = { v: 2, act: A.act, pending: !!A.pending, corr: A.corr, offers: A.offers, sg: A.sg, paid: A.paid, awkN: A.awkN, tpA2: A.tpA2 | 0, free: !!A.free, awk: G.towers.filter(t => t.a2awk).map(t => [t.i, t.j, t.a2awk | 0]) };
+    return s;
+  };
+  const _re = restore;
+  restore = function (s) {
+    A2_RESTORING = !!(s && s.a2 && s.a2.act === 2);
+    let r; try { r = _re.apply(this, arguments); } finally { A2_RESTORING = false; }
+    const a = s && s.a2;
+    if (a && typeof a === 'object' && G.force) {
+      G.act2 = Object.assign(a2Fresh(), { act: a.act === 2 ? 2 : 1, pending: !!a.pending, corr: a.corr || {}, offers: a.offers || {}, sg: a.sg | 0, paid: a.paid || {}, awkN: a.awkN | 0, tpA2: a.tpA2 | 0, free: !!a.free && G.phase === 'build' });
+      for (const [i, j, f] of a.awk || []) { const t = inGrid(i, j) && G.tAt[idx(i, j)]; if (t && !t.def.wall) t.a2awk = f | 0 || 1; }
+      if (G.act2.free) for (const t of G.towers) if (t.def.wall) t.fresh = t.invested | 0;
+      if (typeof _rnBoss !== 'undefined') _rnBoss.clear(); if (typeof _brAt !== 'undefined') _brAt.clear();
+    } else G.act2 = null;
+    return r;
+  };
+}
+
+/* ---- ?act2start=1: straight to the break with a generated wave-50 army (this machine, or beside the playtest key) ---- */
+const ACT2_GEN = { spend: .8, per: 4 };
+function a2StartTest(hero) {
+  hero = hero || a2Url('hero') || (typeof heroForRun === 'function' && heroForRun()) || null;
+  if (!hero || !forceOfHero(hero)) hero = (typeof HEROES !== 'undefined' ? HEROES : []).map(h => h.id).find(h => forceOfHero(h)) || Object.keys(HERO_BY).find(h => forceOfHero(h));
+  if (typeof ptStart !== 'function') return false;
+  ptStart(hero, MAX_WAVE, 'strong');
+  const types = COMBAT_TYPES.filter(ty => TOWERS[ty] && !TOWERS[ty].wall);
+  // the army a typical player has bought by wave 50: ACT2_GEN.spend of the playtest's purse (ptGold: what an army has had to spend)
+  // on units at tiers V-VI, round the unit types, up to ACT2_GEN.per of a type and one Champion; the rest stays as gold
+  const army = [], cost = (ty, tier) => TOWERS[ty].tiers.slice(0, tier + 1).reduce((a, x) => a + (x.cost | 0), 0);
+  let budget = Math.round(G.gold * ACT2_GEN.spend), k = 0;
+  for (let round = 0; round < ACT2_GEN.per; round++) for (const ty of types) {
+    if (TOWERS[ty].champ && round) continue;
+    const top = TOWERS[ty].tiers.length - 1, tier = Math.max(0, top - ((k + round) % 2)), c = cost(ty, tier); if (c > budget) continue;
+    const t = makeTower(ty, 0, 0, tier); budget -= c; G.gold -= c; k++;
+    t.invested = c; t.build = 0; t.bornW = 1; t.vx = 400 + 10 * k; t.kills = 250 + 10 * k;
+    const kit = abilKit(t), A = abilEnsure(t, kit); if (kit && A) for (const ab of kit.abilities) if (!A.learned.includes(ab.id)) A.learned.push(ab.id);
+    t.maxHp = t.hp = typeof towerMaxHp === 'function' ? towerMaxHp(t, effStats(t)) : t.hp;
+    if (G.hero && TOWERS[ty].champ) G.champ = t.id;
+    army.push(t);
+  }
+  G.act2 = a2Fresh(); G.act2.camp = army.slice();   // (first: a camp with veterans in it holds every save, so the half-made army is never written; the camp empties below)
+  G.towers = army;   // (briefly, for the gear and weapons below)
+  for (const t of army) { for (const it of G.loot.slice()) { if (isCharm(it)) { if (!t.charm && t.tier >= 1 && typeof equipCharm === 'function') equipCharm(t, it); continue; } const free = Array.from({ length: gearSlots(t) }, (_, i) => i).find(i => !(t.gear || [])[i]); if (free != null && gearFits(it, t)) equipGear(t, free, it); } }
+  if (typeof wpnAutoEquip === 'function') try { wpnAutoEquip(); } catch (e) {}
+  // a plain serpentine for it to stand in (rows 3, 6, 9 and 12, a gap at alternating ends): units fill the rows first, walls the rest
+  const pieces = army.sort((a, b) => (b.tier | 0) - (a.tier | 0)).slice(), placed = [];
+  for (const [j, gap] of [[3, COLS - 1], [6, 0], [9, COLS - 1], [12, 0]]) for (let i = 0; i < COLS; i++) {
+    if (i === gap) continue;
+    const t = pieces.shift() || Object.assign(makeTower('wall', i, j), { invested: TOWERS.wall.tiers[0].cost, build: 0 });
+    Object.assign(t, { i, j, x: i + .5, y: j + .5 }); placed.push(t);
+  }
+  G.towers = placed; G.act2.camp = pieces;
+  G.wave = MAX_WAVE + 1; G.endless = true; G.phase = 'build';
+  G.act2.sg += 2; a2OpenCamp();
+  if (typeof _rnBoss !== 'undefined') _rnBoss.clear(); if (typeof _brAt !== 'undefined') _brAt.clear();
+  setTimeout(a2Interlude, 900);
+  return true;
+}
+(function a2StartUrl() {
+  if (a2Url('act2start') !== '1' || typeof document === 'undefined') return;
+  if (!(a2Local() || (typeof ptUrlOn === 'function' && ptUrlOn()))) return;
+  let n = 0; const iv = setInterval(() => {
+    if (++n > 600) return clearInterval(iv);
+    if (!document.getElementById('oNew')) return;
+    clearInterval(iv);
+    try { a2StartTest(); } catch (e) { console.warn('act2start:', e); }
+  }, 200);
+})();
+
+/* ================= CO-OP: THE BOSS GAUNTLET (prototype, 11 Nov 2026) =================
+   Two players, two fields side by side, one schedule of 30 waves and one pool of lives. Every 5th wave a boss splits:
+   its body walks one road, its summons or its rule land on the other (CO_SPLIT), so it falls only if both players cover
+   their half. A player can lend a unit to the other for one wave, or pay gold to send a buff; each boss's loot is drafted,
+   the player whose units did less damage picking first. Design note: docs/design/coop_gauntlet_2026-11-11.md.
+   Built on Tower Wars' two fields (versus.js): TW.P is you (side 0), TW.E your partner (side 1), played today by an AI.
+   Every action either side takes goes through coopAct(side, kind, args) as a tick-stamped event (the game's own build,
+   sell, upgrade... functions are wrapped while co-op runs), so a remote player can take the AI's seat: see coopRecv.
+   Open with ?coop=1, or coopBegin() in the console. */
+const CO_FIRST = 45, CO_EVERY = 40, CO_LIVES = 30, CO_DT = 1 / 30;
+const CO_TUNE = { body: 1 };   // body: a scale on every boss body's own hp (CO_SPLIT[w].hp: its health against one Tower Wars boss)
+const CO_WAVES = [
+  'gnoll*10', 'wolf*10', 'spider*12', 'ghoul*9+bat*3', 'gnoll*8+grakk*1',
+  'magma*5+cinderlord*1+magma*5', 'troll*5+tuskmother*1+troll*6', 'beetle*8+gnoll*7', 'wraith*5+mirrorwitch*1+wraith*5', 'spider*10+arachnara*1+spider*10',
+  'spider*14+gorr*1+spider*14+carrion*2', 'bloat*12+bat*12', 'bat*7!swift+nightwing*1+bat*7!swift', 'wraith*7+abbess*1+wraith*7', 'stormbat*6+ghoul*8+ossyra*1+stormbat*6',
+  'shieldbearer*1+gnoll*4+shieldbearer*1+varn*1+gnoll*4+shieldbearer*1+gnoll*5', 'stormwisp*5+voltaris*1+stormwisp*5+stormbat*8', 'beetle*7+gravelmaw*1+beetle*7+golem*4', 'icewolf*5+frostfang*1+icewolf*5+torchbearer*3+gnoll*8', 'troll*6+golem*4+gnoll*6+shieldbearer*2+malgrath*1',
+  'icewolf*7+magma*4+vorrith*1+warden*3+magma*4+icewolf*7', 'burrower*5+beetle*4+sandmaw*1+beetle*4+burrower*5', 'ghoul*8+shaman*2+rotfather*1+ghoul*8+shaman*2', 'gnoll*7+burrower*3+tunnelking*1+gnoll*7+burrower*3', 'stalker*12+stormbat*14+voidwyrm*1',
+  'ghoul*10!swift+morbus*1+ghoul*10!swift+necro*3', 'spider*12+bloat*4+mire*1+bloat*4+spider*12', 'magma*6+banshee*2+keening*1+magma*6+banshee*1+stormbat*10', 'wolf*8+alpha*2+greyghost*1+icewolf*10+stalker*6', 'banshee*8+wraith*10+lich*1',
+];
+/* how each boss splits. body: the side its body walks (0 you, 1 partner). On the other side: rule (what lands there), with
+   its numbers. say: the forecast's line for each side */
+const CO_SPLIT = {
+  5: { boss: 'grakk', body: 0, hp: 2, rule: 'drums', haste: .2, name: 'War Camp',
+    say: 'His Call the Camp gnolls come out on the other road, and while he lives the foes there run 20% faster.' },
+  10: { boss: 'arachnara', body: 1, hp: 2.5, rule: 'bond', per: .06, cap: .6, name: 'Brood Bond',
+    say: 'Her Endless Brood hatches on the other road. Every spiderling of hers alive there hardens her 6% (up to 60%).' },
+  15: { boss: 'ossyra', body: 0, hp: 2.2, rule: 'bones', bones: .3, name: 'Bones Walk',
+    say: 'Her bats fly at the other field. When she falls her bones walk the other road: kill them and she stays dead; let them through and she rises at half health.' },
+  20: { boss: 'malgrath', body: 1, hp: 3, rule: 'tether', heal: .15, name: 'Legion Tithe',
+    say: 'His legion marches on the other road. Every legionnaire that gets through heals him 15%.' },
+  25: { boss: 'voidwyrm', body: 0, hp: 1.1, rule: 'anchor', dr: .8, gap: 14, anchor: .4, name: 'Void Anchor',
+    say: 'An anchor walks the other road. While it stands the Wyrm takes 80% less damage; slain, the Wyrm is exposed for 14 seconds, then a new anchor comes.' },
+  30: { boss: 'lich', body: 1, hp: 5, rule: 'knell', every: 9, n: 3, per: .04, cap: .4, heal: .1, name: 'Death Knell',
+    say: 'Every 9 seconds three Risen Dead climb out on the other road. Each alive hardens him 4% (up to 40%), each that gets through heals him 10%.' },
+};
+// two spells each (Tower Wars has no heroes): the hero spell they borrow, and its cooldown
+const CO_SPELLS = [
+  [{ id: 'blizzard', hero: 'frost', cd: 45, kind: 'hold' }, { id: 'volley', hero: 'thornbow', cd: 40, kind: 'hit' }],
+  [{ id: 'entangle', hero: 'rootmother', cd: 40, kind: 'hold' }, { id: 'rockslide', hero: 'arch', cd: 50, kind: 'hit' }],
+];
+const CO_BUFFS = {
+  horn: { name: 'Warhorn', glyph: 'ascend', hue: '#ffcf6a', dur: 15, cost: n => 40 + 6 * n, say: 'Your partner’s units attack 25% faster for 15 seconds.' },
+  bane: { name: 'Bane Oil', glyph: 'target', hue: '#ff7a5a', dur: 20, cost: n => 50 + 8 * n, say: 'Your partner’s units deal 35% more damage to bosses for 20 seconds.' },
+};
+const CO_NAMES = ['Captain Ilsa', 'Brother Hale', 'Warden Osric', 'Lady Merrow', 'Old Tamsin'];
+let CO = null;
+
+/* ---------- the match ---------- */
+function coopBegin(map) {
+  map = map || 'meadow';   // (the warlord's serpentine maze is built for the open meadow; a map picker can come with the lobby)
+  twStart('knight', map, { noSend: true });
+  const P = TW.P, E = TW.E;
+  TW.coop = true; TW.clock = CO_FIRST;
+  TW.ai.name = CO_NAMES[Math.floor(Math.random() * CO_NAMES.length)];
+  CO = { tick: 0, delay: 0, seq: 0, q: [], log: [], applying: 0, net: null, seat: ['local', 'ai'],
+    lives: CO_LIVES, last: [CO_LIVES, CO_LIVES], boss: null, lend: [null, null], draft: null, drafted: {}, menu: false,
+    spellT: [[0, 0], [0, 0]], dmg: [0, 0], dmgSeen: [new Map(), new Map()], dmgAt: [0, 0], stats: [{ lends: 0, buffs: 0, picks: [], spells: 0 }, { lends: 0, buffs: 0, picks: [], spells: 0 }],
+    ai: { thinkT: 2, hornT: 0, lastLives: CO_LIVES, hurtT: 0 }, over: false };
+  for (const S of [P, E]) { S.lives = S.maxLives = CO_LIVES; S.coHorn = 0; S.coBane = 0; }
+  coUI(true);
+  if (typeof afterStart === 'function') afterStart('Co-op: the Boss Gauntlet', `${TW.ai.name} holds the field beside yours. Thirty waves, one pool of ${CO_LIVES} lives; a boss every 5th wave splits across both roads. The first wave sets out in ${CO_FIRST} seconds.`);
+  return CO;
+}
+const coKeep = side => side ? TW.E : TW.P;
+const coSide = S => S === TW.E ? 1 : 0;
+const coOn = () => !!(CO && TW && TW.coop);
+const coSecs = ticks => Math.max(0, Math.ceil(ticks * CO_DT));
+
+/* ---------- the one door: every action is a tick-stamped event ---------- */
+// what travels: plain values; a unit by id, a relic by id, a keep as its side
+function coEnc(v) {
+  if (v == null || typeof v !== 'object') return v === undefined ? null : v;
+  if (TW && (v === TW.P || v === TW.E)) return { $s: coSide(v) };
+  if (Array.isArray(v)) return v.map(coEnc);
+  if (v.def && v.tier != null && v.id != null) return { $t: v.id };
+  if (v.rar != null && v.id != null) return { $i: v.id };
+  return JSON.parse(JSON.stringify(v));
+}
+function coDec(v, S) {
+  if (v == null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(x => coDec(x, S));
+  if (v.$s != null) return coKeep(v.$s);
+  if (v.$t != null) return S.towers.find(t => t.id === v.$t) || null;
+  if (v.$i != null) { for (const it of S.loot || []) if (it && it.id === v.$i) return it; for (const t of S.towers) for (const it of t.gear || []) if (it && it.id === v.$i) return it; return null; }
+  return v;
+}
+// the game's own functions a player calls, and the co-op ones
+const CO_FN = {};
+const CO_ACTS = {
+  cast: (S, [k, x, y]) => coCastNow(S, k, x, y),
+  lend: (S, [t]) => coLendNow(S, t),
+  buff: (S, [id]) => coBuffNow(S, id),
+  pick: (S, [i]) => coPickNow(S, i),
+};
+function coopAct(side, kind, args) {
+  if (!coOn() || CO.over) return false;
+  const ev = { t: CO.tick + CO.delay, side, kind, args: (args || []).map(coEnc), n: CO.seq++ };
+  CO.log.push(ev); if (CO.log.length > 4000) CO.log.shift();
+  if (CO.net && CO.seat[side] === 'local' && typeof CO.net.send === 'function') CO.net.send(ev);
+  if (ev.t <= CO.tick) return coApply(ev);
+  CO.q.push(ev); return true;
+}
+// an event from the other browser (online): it applies on its own tick
+function coopRecv(ev) { if (coOn() && ev && (CO_ACTS[ev.kind] || CO_FN[ev.kind])) CO.q.push(ev); }
+function coApplyDue() {
+  if (!CO.q.length) return;
+  const due = CO.q.filter(e => e.t <= CO.tick).sort((a, b) => a.t - b.t || a.side - b.side || a.n - b.n);
+  if (!due.length) return;
+  CO.q = CO.q.filter(e => e.t > CO.tick);
+  for (const e of due) coApply(e);
+}
+function coApply(ev) {
+  const S = coKeep(ev.side), f = CO_ACTS[ev.kind] || CO_FN[ev.kind];
+  if (!f) return false;
+  return withSide(S, () => {
+    const a = coDec(ev.args, S);
+    if (CO_FN[ev.kind] && coLocked(a)) return CO_FN[ev.kind] === CO_FN.tryBuild ? null : false;
+    CO.applying++;
+    try { return CO_ACTS[ev.kind] ? f(S, a) : f.apply(null, a); } finally { CO.applying--; }
+  });
+}
+// a lent unit (yours on loan, or your partner's standing in for a barricade) can't be sold, upgraded or changed
+function coLocked(a) {
+  const t = a && a.find(x => x && x.def && x.tier != null);
+  if (!t || !(t.coLoan || t.coLent)) return false;
+  if (!G.ai) { toast(t.coLoan ? 'On loan from your partner: it goes home at the horn after next.' : 'Lent to your partner: it comes home at the horn after next.'); sfx('error'); }
+  return true;
+}
+function coRoute() {
+  for (const name of ['tryBuild', 'placeWallLine', 'upgrade', 'convert', 'sell', 'repairTower', 'buyTalent', 'buyPath', 'equipGear', 'advanceAge']) {
+    const f = window[name]; if (typeof f !== 'function' || CO_FN[name]) continue;
+    CO_FN[name] = f;
+    window[name] = function () {
+      if (!coOn() || CO.applying) return f.apply(this, arguments);
+      const side = G === TW.P ? 0 : G === TW.E ? 1 : -1;
+      if (side < 0) return f.apply(this, arguments);
+      return coopAct(side, name, Array.from(arguments));
+    };
+  }
+}
+
+/* ---------- one simulation step (the frame loop calls twStep; co-op takes it over) ---------- */
+function coStep(dt) {
+  if (!TW || TW.over || CO.over) return;
+  const { P, E } = TW;
+  withSide(E, () => { update(dt); empowerTick(dt); });
+  CO.tick++;
+  coApplyDue();
+  TW.clock -= dt;
+  if (TW.clock <= 0) {
+    if (TW.wave < CO_WAVES.length) { TW.clock += CO_EVERY; twLaunch(); coAfterLaunch(); }
+    else TW.clock = 1e9;
+  }
+  if (CO.seat[1] === 'ai') { twAiTick(TW.ai, dt); coAiTick(dt); }
+  coBossTick(dt);
+  coLendTick();
+  if (CO.tick % 15 === 0) coDmgSample();
+  coDraftTick(dt);
+  coLives();
+  if (CO.lives <= 0) { coFinish(false); return; }
+  if (TW.wave >= CO_WAVES.length && !CO.draft && [P, E].every(S => !S.spawnQ.length && !S.creeps.some(c => !c.dead))) coFinish(true);
+}
+// the shared pool: whatever either field lost since the last step comes out of it, and both fields show what is left
+function coLives() {
+  const { P, E } = TW;
+  let lost = 0;
+  [P, E].forEach((S, k) => { const d = CO.last[k] - S.lives; if (d > 0) { lost += d; if (k === 1) twFeed(`${TW.ai.name}'s road −${d} ♥`, 'in'); else CO.ai.hurtT = CO.tick; } });
+  if (!lost) return;
+  CO.lives = Math.max(0, CO.lives - lost);
+  for (const S of [P, E]) { S.lives = CO.lives; if (CO.lives > 0 && S.state === 'lost') S.state = 'play'; }
+  CO.last = [CO.lives, CO.lives];
+  if (typeof markDirty === 'function') markDirty();
+}
+function coFinish(won) {
+  if (CO.over) return;
+  CO.over = true; coDraftClose();
+  twFinish(won);
+}
+
+/* ---------- the horn: the boss's split, lends coming home ---------- */
+function coAfterLaunch() {
+  const w = TW.wave, sp = CO_SPLIT[w];
+  // lends end at the horn after next
+  for (const side of [0, 1]) { const L = CO.lend[side]; if (L && w >= L.until) coLendEnd(side); }
+  if (sp) {
+    CO.boss = { w, sp, c: null, body: sp.body, done: false, anchorT: 0, knellT: sp.every ? 3 / CO_DT : 0 };
+    // its body walks one road only: the other field's copy of it never sets out
+    withSide(coKeep(1 - sp.body), () => { const n0 = G.spawnQ.length; G.spawnQ = G.spawnQ.filter(s => !(s.type === sp.boss && s.wv === w)); G.waveLeft = Math.max(0, (G.waveLeft || 0) - (n0 - G.spawnQ.length)); });
+    twFeed(`Wave ${w}: ${CREEPS[sp.boss].name} on ${sp.body ? TW.ai.name + '’s road' : 'your road'}`, 'hit');
+  }
+  if (CO.seat[1] === 'ai') coAiHorn();
+}
+
+/* ---------- the bosses' split ---------- */
+function coLinked(S, B) { return S.creeps.filter(o => !o.dead && o.coBy === B.c.id); }
+function coBossTick(dt) {
+  const B = CO.boss; if (!B || !B.c || B.done) return;
+  const c = B.c, sp = B.sp, body = coKeep(B.body), other = coKeep(1 - B.body), alive = !c.dead;
+  if (sp.rule === 'drums') for (const o of other.creeps) {
+    if (alive && !o.dead && !o.coHaste) { o.coHaste = 1; o.spdM *= 1 + sp.haste; }
+    else if (!alive && o.coHaste === 1) { o.coHaste = 2; o.spdM /= 1 + sp.haste; }
+  }
+  if (sp.rule === 'bond' || sp.rule === 'knell') c.coDR = alive ? Math.min(sp.cap, coLinked(other, B).length * sp.per) : 0;
+  if (sp.rule === 'anchor' && alive) {
+    const a = other.creeps.find(o => !o.dead && o.coAnchor === c.id);
+    c.coDR = a ? sp.dr : 0;
+    if (!a && !B.anchorT) { B.anchorT = CO.tick + sp.gap / CO_DT; twFeed('Void Anchor down: the Wyrm is exposed', 'out'); }
+    if (!a && B.anchorT && CO.tick >= B.anchorT) { B.anchorT = 0; coSpawnAnchor(B); }
+  }
+  if (sp.rule === 'knell' && alive && (B.knellT -= 1) <= 0) {
+    B.knellT = sp.every / CO_DT;
+    withSide(other, () => { const n = G.wave, d = CREEPS.risen; for (let k = 0; k < sp.n; k++) coSpawnLinked(other, B, 'risen', waveHP(n, G.diff) * d.hp * minionHP(n, false) * 1.6, k * .5); });
+  }
+  // what holds the boss, readable on both fields: a ring under each linked foe, and one under the boss while it is hardened
+  if (CO.tick % 12 === 0) {
+    const col = sp.rule === 'drums' ? '#ffb070' : sp.rule === 'tether' ? '#ff6a5a' : '#c8a0ff';
+    withSide(other, () => { for (const o of G.creeps) if (!o.dead && (o.coBy === c.id || o.coAnchor === c.id || o.coBones === c.id)) part({ k: 'ring', x: o.x, z: o.y, h: .05, life: .45, max: .45, size: o.coAnchor || o.coBones ? 1 : .6, col }); });
+    if (alive && c.coDR > 0) withSide(body, () => part({ k: 'ring', x: c.x, z: c.y, h: .06, life: .45, max: .45, size: 1.1 + c.coDR, col: '#c8a0ff' }));
+  }
+  if (!alive && !other.creeps.some(o => !o.dead && (o.coBy === c.id || o.coAnchor === c.id || o.coBones === c.id)) && !c.coImm) coBossDone();
+}
+function coSpawnLinked(S, B, type, hp, delay) {
+  return withSide(S, () => {
+    const o = spawn({ type, hp, bounty: 1, wv: B.w });
+    o.coBy = B.c.id; o.age = .1;
+    return o;
+  });
+}
+function coSpawnAnchor(B) {
+  const S = coKeep(1 - B.body);
+  withSide(S, () => {
+    const n = B.w, d = CREEPS.golem, o = spawn({ type: 'golem', hp: waveHP(n, G.diff) * d.hp * minionHP(n, false) * B.sp.anchor * 4, bounty: 6, wv: n });
+    o.coAnchor = B.c.id;
+    if (S === TW.P) toast('A Void Anchor walks your road: while it stands, the Wyrm on your partner’s road is out of reach.');
+  });
+}
+function coBossDone() {
+  const B = CO.boss; B.done = true;
+  twFeed(B.c.leaked ? `${CREEPS[B.sp.boss].name} got through` : `${CREEPS[B.sp.boss].name} has fallen`, B.c.leaked ? 'in' : 'out');
+  coDraftOpen(B.w);
+}
+// the body: tougher (one boss for two fields), marked, and announced on both fields
+function coOnBossSpawn(c) {
+  const B = CO.boss; if (!B || B.c || c.type !== B.sp.boss) return;
+  B.c = c; c.coSplit = B.w; const k = (B.sp.hp || 1) * CO_TUNE.body; c.hp *= k; c.maxHp *= k;
+  const mine = B.body === 0, nm = CREEPS[B.sp.boss].name;
+  banner(nm + ': ' + B.sp.name, mine ? `Its body is on your road. ${TW.ai.name} must cover the other half.` : `Its body is on ${TW.ai.name}'s road. The other half lands on yours.`);
+  if (B.sp.rule === 'anchor') coSpawnAnchor(B);
+}
+// its summons go to the other road (Grakk's camp, Arachnara's brood, Ossyra's bats, Malgrath's legion)
+function coSummonWrap() {
+  const S0 = SPELLS.summon, can0 = S0.can, go0 = S0.go;
+  S0.can = (c, k) => !(c.coSplit && coOn() && CO.boss && CO.boss.c === c) ? can0(c, k) : coKeep(1 - CO.boss.body).creeps.filter(o => !o.dead && o.coBy === c.id).length < (k.n || 3) * 2;
+  S0.go = (c, k) => {
+    if (!(c.coSplit && coOn() && CO.boss && CO.boss.c === c)) return go0(c, k);
+    const S = coKeep(1 - CO.boss.body);
+    withSide(S, () => { const n = G.wave, d = CREEPS[k.type], hp = waveHP(n, G.diff) * d.hp * minionHP(n, !!d.fly) * .6 * (CO.boss.sp.rule === 'tether' ? 1.5 : 1); for (let q = 0; q < (k.n || 3); q++) coSpawnLinked(S, CO.boss, k.type, hp, q * .35); });
+    fxRing(c.x, c.y, 1.2, '#c8a0ff');
+    if (S === TW.P) twFeed(`${c.def.name} sends ${k.n || 3} ${CREEPS[k.type].name}s to your road`, 'in');
+  };
+}
+
+/* ---------- lending a unit for one wave ---------- */
+// where a lent unit stands on field S: in place of the barricade that covers most of the road, else an open cell beside it
+function coLendSpot(S, t) {
+  const st = effStats(t), r = st.range || 2.5, air = t.def.air ? .5 : 0;
+  let best = null, bv = -1;
+  for (const w of G.towers) if (w.def.wall && !w.wrecked && !w.coLoan) { const v = twCover(w.x, w.y, r, air, null); if (v > bv) { bv = v; best = { wall: w, i: w.i, j: w.j }; } }
+  if (best) return best;
+  const cand = [];
+  for (let j = 1; j < ROWS - 1; j++) for (let i = 0; i < COLS; i++) if (!G.blk[idx(i, j)] && !G.tAt[idx(i, j)]) cand.push({ i, j, v: twCover(i + .5, j + .5, r, air, null) });
+  cand.sort((a, b) => b.v - a.v);
+  for (const c of cand.slice(0, 12)) { const ok = canBuild(c.i, c.j); if (ok.ok) return { i: c.i, j: c.j, chk: ok }; }
+  return null;
+}
+function coLendNow(S, t) {
+  const side = coSide(S), T = coKeep(1 - side);
+  const say = m => { if (!S.ai) { toast(m); sfx('error'); } return false; };
+  if (!t || t.def.wall || t.wrecked) return say('Only a standing unit can be lent.');
+  if (t.coLoan) return say('That one is on loan to you already.');
+  if (CO.lend[side]) return say('One lend at a time: your last one comes home at the horn after next.');
+  let copy = null;
+  const ok = withSide(T, () => {
+    const sp = coLendSpot(T, t); if (!sp) return false;
+    copy = makeTower(t.type, sp.i, sp.j, t.tier);
+    Object.assign(copy, { spec: t.spec || null, gear: (t.gear || []).slice(), prio: t.prio, build: .6, coLoan: { side, src: t.id } });
+    const k = idx(sp.i, sp.j);
+    if (sp.wall) { copy.coWall = sp.wall; G.towers.splice(G.towers.indexOf(sp.wall), 1, copy); G.tAt[k] = copy; }
+    else { G.towers.push(copy); G.blk[k] = 1; G.tAt[k] = copy; G.dist = sp.chk.dist; G.next = nextField(G.dist, G.blk); G.path = tracePath(G.dist, G.next); }
+    fxRing(copy.x, copy.y, 1, '#8fe0ff'); fxSparkle(copy.x, copy.y, 1, '#8fe0ff');
+    return true;
+  });
+  if (!ok) return say('There is nowhere on your partner’s field for it to stand.');
+  t.coLent = { copy: copy.id }; CO.lend[side] = { t: t.id, copy: copy.id, until: TW.wave + 2 };
+  CO.stats[side].lends++;
+  const nm = `${t.def.short || t.def.name} ${ROMAN[t.tier]}`;
+  if (side === 0) { twFeed(`Lent your ${nm} to ${TW.ai.name}`, 'out'); sfx('select'); }
+  else { const an = /^[AEIOU]/.test(nm) ? 'an' : 'a'; twFeed(`${TW.ai.name} lent you ${an} ${nm}`, 'out'); toast(`${TW.ai.name} lent you ${an} ${nm} for the next wave: it ${copy.coWall ? 'stands in for one of your barricades' : 'stands beside your road'}.`); }
+  return true;
+}
+function coLendEnd(side) {
+  const L = CO.lend[side]; CO.lend[side] = null; if (!L) return;
+  const S = coKeep(side), T = coKeep(1 - side);
+  const t = S.towers.find(o => o.id === L.t); if (t) { t.coLent = null; t.silT = 0; }
+  withSide(T, () => {
+    const c = G.towers.find(o => o.id === L.copy); if (!c) return;
+    const k = idx(c.i, c.j);
+    if (c.coWall) { G.towers.splice(G.towers.indexOf(c), 1, c.coWall); G.tAt[k] = c.coWall; }
+    else { G.towers.splice(G.towers.indexOf(c), 1); G.blk[k] = 0; G.tAt[k] = null; refreshField(); }
+    if (G.sel && G.sel.ref === c) G.sel = null;
+    fxDust(c.x, c.y, 10);
+  });
+  if (side === 0) twFeed('Your lent unit is home', 'out');
+}
+// a lent unit's own post stands silent
+function coLendTick() { for (const side of [0, 1]) { const L = CO.lend[side]; if (!L) continue; const t = coKeep(side).towers.find(o => o.id === L.t); if (t) { t.silT = Math.max(t.silT || 0, .25); t.windup = 0; } } }
+
+/* ---------- buffs sent for gold ---------- */
+function coBuffNow(S, id) {
+  const d = CO_BUFFS[id], side = coSide(S), T = coKeep(1 - side); if (!d) return false;
+  const cost = d.cost(Math.max(1, TW.wave)), key = id === 'horn' ? 'coHorn' : 'coBane';
+  if (T[key] > CO.tick) { if (!S.ai) { toast(`${d.name} is already on your partner’s units.`); sfx('error'); } return false; }
+  if (S.gold < cost) { if (!S.ai) { toast('Not enough gold.'); sfx('nogold'); } return false; }
+  S.gold -= cost; T[key] = CO.tick + d.dur / CO_DT; CO.stats[side].buffs++;
+  withSide(T, () => { for (const t of G.towers) if (!t.def.wall && !t.wrecked) part({ k: 'ring', x: t.x, z: t.y, h: .05, life: .6, max: .6, size: .7, col: d.hue }); });
+  if (side === 0) { twFeed(`Sent ${d.name} to ${TW.ai.name}`, 'out'); sfx('upgrade'); }
+  else { twFeed(`${TW.ai.name} sent you ${d.name}`, 'out'); banner(d.name, `From ${TW.ai.name}: ${d.say.replace('Your partner’s units', 'your units')}`); }
+  return true;
+}
+function coEffWrap() {
+  const f = effStats;
+  effStats = function (t) {
+    const st = f(t);
+    if (coOn() && G && !t.def.wall) {
+      if (G.coHorn > CO.tick && st.rate) st.rate /= 1.25;
+      if (G.coBane > CO.tick) st.vsBoss = (st.vsBoss || 1) * 1.35;
+    }
+    return st;
+  };
+}
+
+/* ---------- spells ---------- */
+function coSpell(side, k) { const s = CO_SPELLS[side][k], h = HERO_BY[s.hero]; return { s, h, r: h.spell.r || 1.6 }; }
+function coSpellLeft(side, k) { return coSecs(CO.spellT[side][k] - CO.tick); }
+function coCastNow(S, k, x, y) {
+  const side = coSide(S), q = CO_SPELLS[side] && CO_SPELLS[side][k]; if (!q) return false;
+  if (CO.spellT[side][k] > CO.tick) { if (!S.ai) { toast(`${HERO_BY[q.hero].spell.name} is ready in ${coSpellLeft(side, k)} s.`); sfx('error'); } return false; }
+  const { h, r } = coSpell(side, k), p = { x: clamp(x, 0, COLS), y: clamp(y, 0, ROWS) };
+  const pre = typeof spellFxPre === 'function' ? spellFxPre(null, h.spell.id) : null;
+  if (heroSpellFx(h, p, r, typicalHP()) === false) return false;
+  if (pre && typeof spellFxHero === 'function') try { spellFxHero(h, p, r, pre); } catch (e) {}
+  CO.spellT[side][k] = CO.tick + q.cd / CO_DT; CO.stats[side].spells++;
+  sfx('upgrade');
+  return true;
+}
+function coCastPick(k) {
+  if (CO.spellT[0][k] > CO.tick) { toast(`${coSpell(0, k).h.spell.name} is ready in ${coSpellLeft(0, k)} s.`); sfx('error'); return; }
+  const { h, r } = coSpell(0, k);
+  G.cast = { r, hue: h.hue, co: k }; G.buildType = null; G.sel = null; G.ghost = null; CO.menu = false; TW.menu = false;
+  toast(`${h.spell.name}: tap the field to aim. Tap the spell again to cancel.`); markDirty();
+}
+function coCastWrap() {
+  const f = heroCastAt;
+  heroCastAt = function (x, y) {
+    if (!coOn() || !G.cast || G.cast.co == null) return f(x, y);
+    const k = G.cast.co; G.cast = null;
+    coopAct(0, 'cast', [k, x, y]); markDirty();
+  };
+}
+
+/* ---------- the draft ---------- */
+function coDmgSample() {
+  [TW.P, TW.E].forEach((S, side) => { const seen = CO.dmgSeen[side]; for (const t of S.towers) { if (t.def.wall) continue; const d = t.dmg || 0, was = seen.get(t.id) || 0; if (d > was) CO.dmg[side] += d - was; seen.set(t.id, d); } });
+}
+function coDraftOpen(w) {
+  if (CO.drafted[w]) return; CO.drafted[w] = 1;
+  coDmgSample();
+  const got = [CO.dmg[0] - CO.dmgAt[0], CO.dmg[1] - CO.dmgAt[1]]; CO.dmgAt = CO.dmg.slice();
+  const first = got[0] <= got[1] ? 0 : 1, second = 1 - first;
+  const items = [];
+  for (let k = 0; k < 4; k++) { const S = coKeep(k % 2); withSide(S, () => { const it = rollGear(w, true, k === 0 ? 3 : null); it.isNew = true; items.push({ it, rolled: k % 2, taken: -1 }); }); }
+  CO.draft = { w, items, order: [first, second, second, first], k: 0, got, aiT: 2.2 / CO_DT };
+  twFeed(`Draft: ${first === 0 ? 'you pick' : TW.ai.name + ' picks'} first (less damage)`, 'out');
+  coDraftDraw();
+}
+function coPickNow(S, i) {
+  const D = CO.draft, side = coSide(S);
+  if (!D || D.order[D.k] !== side) { if (!S.ai) { toast('Not your pick yet.'); sfx('error'); } return false; }
+  const e = D.items[i]; if (!e || e.taken >= 0) return false;
+  e.taken = side; D.k++;
+  const it = e.it; it.id = ++S.gearUid; S.loot.push(it); S.lootNew = (S.lootNew || 0) + 1;
+  CO.stats[side].picks.push(gearName(it));
+  if (side === 0) sfx('lootDrop', it.rar); else twFeed(`${TW.ai.name} took ${gearName(it)}`, 'out');
+  if (D.k >= D.order.length) { coDraftClose(); twFeed('The draft is done: relics are in your bag', 'out'); }
+  else coDraftDraw();
+  return true;
+}
+function coDraftTick() {
+  const D = CO.draft; if (!D || CO.seat[1] !== 'ai' || D.order[D.k] !== 1) return;
+  if ((D.aiT -= 1) > 0) return;
+  D.aiT = 1.6 / CO_DT;
+  coopAct(1, 'pick', [coAiPick(D)]);
+}
+
+/* ---------- the partner AI: spells, lends, buffs, draft (its building is Tower Wars' own warlord, sends off) ---------- */
+function coAiTick() {
+  const A = CO.ai, E = TW.E;
+  if ((A.thinkT -= CO_DT) > 0) return; A.thinkT = 1 + Math.random();
+  const dg = TW.ai.danger || 0;
+  // spells: hold the lead foe when the road is in trouble; strike the boss, its half, or a crowd
+  withSide(E, () => {
+    const foes = G.creeps.filter(c => !c.dead && c.state !== 'exit' && !c.coImm);
+    if (!foes.length) return;
+    const lead = foes.reduce((a, c) => (c.remain < a.remain ? c : a), foes[0]);
+    if (CO.spellT[1][0] <= CO.tick && (dg > .45 || (lead.def.boss && lead.remain < 30))) coopAct(1, 'cast', [0, lead.x, lead.y]);
+    const big = foes.find(c => c.def.boss || c.coBy || c.coAnchor || c.coBones);
+    let tg = big;
+    if (!tg) { let bn = 3; for (const c of foes) { const n = foes.filter(o => Math.hypot(o.x - c.x, o.y - c.y) < 1.5).length; if (n > bn) { bn = n; tg = c; } } }
+    if (tg && CO.spellT[1][1] <= CO.tick) coopAct(1, 'cast', [1, tg.x, tg.y]);
+  });
+  // buffs: Bane Oil while a boss's body walks your road; a Warhorn when your road is leaking
+  if (CO.ai.help === false) return;
+  const B = CO.boss, reserve = 60 + 4 * TW.wave;
+  if (B && B.c && !B.c.dead && B.body === 0 && TW.P.coBane <= CO.tick && E.gold >= CO_BUFFS.bane.cost(TW.wave) + reserve) coopAct(1, 'buff', ['bane']);
+  if (CO.ai.hurtT && CO.tick - CO.ai.hurtT < 4 / CO_DT && TW.P.coHorn <= CO.tick && E.gold >= CO_BUFFS.horn.cost(TW.wave) + reserve) { coopAct(1, 'buff', ['horn']); CO.ai.hurtT = 0; }
+}
+// at the horn: before a boss whose body walks your road, it lends you its best unit (if its own road is holding)
+function coAiHorn() {
+  const nx = CO_SPLIT[TW.wave + 1];
+  if (!nx || nx.body !== 0 || CO.ai.help === false || CO.lend[1] || (TW.ai.danger || 0) > .5) return;
+  const E = TW.E; let best = null, bv = 0;
+  withSide(E, () => { for (const t of G.towers) if (!t.def.wall && !t.wrecked && !t.coLoan) { const v = towerDps(t.type, t.st || effStats(t)); if (v > bv) { bv = v; best = t; } } });
+  if (best && E.towers.filter(t => !t.def.wall).length >= 4) coopAct(1, 'lend', [best]);
+}
+function coAiPick(D) {
+  let bi = -1, bv = -1;
+  withSide(TW.E, () => { const W = fieldWeights(); D.items.forEach((e, i) => { if (e.taken >= 0) return; const v = e.it.rar * 10 + (typeof fieldFitW === 'function' ? fieldFitW(e.it, W) : 0) + (e.rolled === 1 ? 1 : 0); if (v > bv) { bv = v; bi = i; } }); });
+  return bi;
+}
+
+/* ---------- wrappers on the shared game ---------- */
+function coWraps() {
+  coRoute(); coSummonWrap(); coEffWrap(); coCastWrap();
+  const step = twStep; twStep = function (dt) { if (coOn()) return coStep(dt); return step(dt); };
+  const ws = waveSpec; waveSpec = function (n, plain) {
+    if (!coOn()) return ws(n, plain);
+    const s = CO_WAVES[Math.min(n, CO_WAVES.length) - 1];
+    return s.split('+').map(p => { const [main, tag] = p.split('!'), [type, c] = main.split('*'); return { type, count: +c, swift: tag === 'swift', siege: tag === 'siege' }; });
+  };
+  const dg = dungeonOf; dungeonOf = function (n) { return coOn() ? null : dg(n); };
+  const hu = hurt; hurt = function (c, amt) {
+    if (!coOn() || !c) return hu.apply(this, arguments);
+    if (c.coImm) return;
+    const a = Array.from(arguments); if (c.coDR > 0) a[1] = amt * (1 - c.coDR);
+    return hu.apply(this, a);
+  };
+  const sp = spawn; spawn = function (s) {
+    const c = sp.apply(this, arguments);
+    if (coOn() && c && c.def.boss && !s.at && CO.boss && !CO.boss.c && G === coKeep(CO.boss.body)) coOnBossSpawn(c);
+    return c;
+  };
+  const rd = rollDrop; rollDrop = function (c) { if (coOn() && c && (c.coSplit || c.coBy || c.coAnchor || c.coBones)) return; return rd.apply(this, arguments); };
+  // Ossyra's bones walk the other road
+  const cr = leaderCrumble; leaderCrumble = function (c) {
+    cr.apply(this, arguments);
+    if (!(coOn() && c.coSplit && CO.boss && CO.boss.c === c)) return;
+    c.pileT = 1e9; c.coImm = true;
+    const S = coKeep(1 - CO.boss.body);
+    withSide(S, () => { const o = spawn({ type: 'risen', hp: c.maxHp * CO.boss.sp.bones, bounty: 8, wv: CO.boss.w }); o.coBones = c.id; });
+    twFeed(S === TW.P ? 'Ossyra’s bones walk your road: kill them!' : `Ossyra’s bones walk ${TW.ai.name}’s road`, 'in');
+    if (S === TW.P) banner('Bones Walk', 'Ossyra’s bones walk your road. Kill them before the gate, or she rises again.');
+  };
+  const kl = kill; kill = function (c) {
+    const r = kl.apply(this, arguments);
+    if (coOn() && c && c.coSplit && c.dead && !c.coShared && CO.boss && CO.boss.c === c) { c.coShared = 1; const T = coKeep(1 - CO.boss.body), g = Math.round((c.bounty || 0) / 2); if (g > 0) { T.gold += g; T.stats.gold += g; if (T === TW.P) twFeed(`+${g} gold: your share of ${c.def.name}`, 'out'); } }
+    if (coOn() && c && c.coBones && c.dead && !c.leaked && CO.boss && CO.boss.c && CO.boss.c.id === c.coBones) {
+      const b = CO.boss.c; withSide(coKeep(CO.boss.body), () => { b.coImm = false; b.pile = false; kl(b, null); });
+      twFeed('The bones are smashed: Ossyra stays dead', 'out');
+    }
+    return r;
+  };
+  const lk = leak; leak = function (c) {
+    const was = c && c.dead, r = lk.apply(this, arguments);
+    if (!coOn() || !c || was || !c.leaked || !CO.boss || !CO.boss.c) return r;
+    const B = CO.boss, b = B.c, body = coKeep(B.body);
+    if (c.coBones === b.id) { withSide(body, () => { b.coImm = false; leaderRise(b); }); twFeed('The bones got through: Ossyra rises', 'in'); }
+    else if (c.coBy === b.id && !b.dead && B.sp.heal) { withSide(body, () => { healFoe(b, b.maxHp * B.sp.heal); part({ k: 'ring', x: b.x, z: b.y, h: .06, life: .6, max: .6, size: 1.4, col: '#ff6a5a' }); }); twFeed(`${b.def.name} drinks a leak: +${Math.round(B.sp.heal * 100)}%`, 'in'); }
+    return r;
+  };
+  const sl = twSendSlot; twSendSlot = function () { return coOn() ? { key: 'g:ascend:8fe0ff:4', lbl: 'Aid', on: !TW.over, active: TW.menu, name: 'Your spells, and buffs to send your partner', hk: 'Enter', act: () => twMenu() } : sl(); };
+  const ss = twSlots; twSlots = function (s) { return coOn() ? coSlots(s) : ss(s); };
+  const ih = twInfoHTML; twInfoHTML = function () { return coOn() ? coInfoHTML() : ih(); };
+  const ln = twLine; twLine = function () { return coOn() ? coLineHTML() : ln(); };
+  const es = twEndScreen; twEndScreen = function (won) { return coOn() ? coEndScreen(won) : es(won); };
+  const tu = twUI; twUI = function (on) { const r = tu(on); if (!on) coUI(false); return r; };
+  const sn = slotsNow; slotsNow = function () { const s = sn(); return coOn() ? coUnitSlots(s) : s; };
+}
+
+/* ---------- on screen ---------- */
+const coBossOf = n => { for (let w = n; w <= Math.min(CO_WAVES.length, n + 5); w++) if (CO_SPLIT[w]) return w; return 0; };
+function coSlots(s) {
+  for (let k = 0; k < 11; k++) s[k] = null;
+  CO_SPELLS[0].forEach((q, k) => {
+    const h = HERO_BY[q.hero], left = coSpellLeft(0, k);
+    s[k] = { key: `g:${h.spell.glyph}:${h.hue.slice(1)}:4`, lbl: h.spell.name, on: left <= 0, cd: left > 0, cost: left > 0 ? left + 's' : null, name: `${h.spell.name}: ${h.spell.t}`, hk: 'QW'[k], act: () => coCastPick(k) };
+  });
+  Object.keys(CO_BUFFS).forEach((id, k) => {
+    const d = CO_BUFFS[id], c = d.cost(Math.max(1, TW.wave)), up = TW.E[id === 'horn' ? 'coHorn' : 'coBane'] > CO.tick;
+    s[4 + k] = { key: `g:${d.glyph}:${d.hue.slice(1)}:4`, lbl: d.name, cost: c, on: TW.P.gold >= c && !up, active: up, name: `${d.name} for ${TW.ai.name}: ${d.say}`, act: () => coopAct(0, 'buff', [id]) };
+  });
+  s[10] = { key: 'x', lbl: 'Back', on: true, name: 'Close', hk: 'Esc', act: () => twMenu(false) };
+  return s;
+}
+// a unit of yours: Lend (or how long it is away); your partner's unit on loan: when it goes home
+function coUnitSlots(s) {
+  const sel = G.sel; if (!sel || sel.kind !== 'tower' || G !== TW.P) return s;
+  const t = sel.ref; if (!t || t.def.wall) return s;
+  const at = [3, 7, 9, 1].find(k => !s[k]); if (at == null) return s;
+  const L = CO.lend[0];
+  if (t.coLoan) s[at] = { key: 'g:swords:8fe0ff:4', lbl: 'On loan', on: false, name: `${TW.ai.name}'s unit, on loan: it goes home at the horn after next`, act: () => toast('On loan from your partner: it goes home at the horn after next.') };
+  else if (t.coLent) s[at] = { key: 'g:swords:8fe0ff:4', lbl: 'Lent', on: false, active: true, name: 'Lent to your partner: it comes home at the horn after next', act: () => toast('Lent: it comes home at the horn after next.') };
+  else s[at] = { key: 'g:swords:8fe0ff:4', lbl: 'Lend', on: !L && !t.wrecked, name: L ? 'One lend at a time' : `Lend to ${TW.ai.name} for one wave: a copy stands on their field in place of a barricade, and this one stands silent until the horn after next`, act: () => coopAct(0, 'lend', [t]) };
+  return s;
+}
+function coSplitLine(w, side) {
+  const sp = CO_SPLIT[w]; if (!sp) return '';
+  const nm = CREEPS[sp.boss].name;
+  return sp.body === side ? `<b>${esc(nm)}</b> walks this road` : `<b>${esc(sp.name)}</b>: ${esc(sp.say)}`;
+}
+function coInfoHTML() {
+  return `<h3>Aid</h3><p>Your spells hit your own field. Buffs cost your gold and land on ${esc(TW.ai.name)}'s units.</p>`
+    + Object.values(CO_BUFFS).map(d => `<p class="mut" data-d="1"><b>${d.name}</b> ${d.cost(Math.max(1, TW.wave))} gold: ${esc(d.say)}</p>`).join('')
+    + `<p class="mut" data-d="2">Select one of your units to lend it for a wave.</p>`;
+}
+function coLineHTML() {
+  return `<p class="mut int" data-d="1"><b>Co-op</b> wave ${Math.max(1, TW.wave)}/${CO_WAVES.length} · next wave in ${Math.ceil(TW.clock)}s · shared ♥ ${CO.lives} · ${esc(TW.ai.name)} ${TW.E.gold} gold</p>`;
+}
+// the bar over the field: the shared lives, the next waves, the coming boss's split on each road, the partner's state
+function coBarHTML() {
+  const n = Math.max(1, TW.wave + 1), bw = coBossOf(Math.max(1, TW.wave)), B = CO.boss, live = B && B.c && !B.done;
+  const next = [];
+  for (let w = n; w <= Math.min(CO_WAVES.length, n + 2); w++) {
+    const sp = waveSpec(w), boss = sp.find(g => CREEPS[g.type].boss);
+    next.push(`<span class="${boss ? 'bw' : ''}">${w}: ${esc(boss ? CREEPS[boss.type].name : CREEPS[sp[0].type].name + (sp.length > 1 ? ' +' : ''))}</span>`);
+  }
+  let boss = '';
+  if (live) {
+    const c = B.c, sp = B.sp, dr = Math.round((c.coDR || 0) * 100), hp = Math.round(clamp(c.hp / c.maxHp, 0, 1) * 100);
+    boss = `<div class="co-boss on"><b>${esc(c.def.name)}</b> ${c.coImm ? 'bones walking' : hp + '%'} on ${B.body ? esc(TW.ai.name) + '’s road' : 'your road'}${dr ? ` · hardened ${dr}%` : ''}${sp.rule === 'anchor' && !dr && B.anchorT ? ` · exposed ${coSecs(B.anchorT - CO.tick)}s` : ''}</div>`;
+  } else if (bw && bw >= n) {
+    boss = `<div class="co-boss"><div class="co-h">Wave ${bw} boss: ${esc(CREEPS[CO_SPLIT[bw].boss].name)}${bw === n ? ' · <i>next</i>' : ''}</div><div class="co-two"><div><u>Your road</u> ${coSplitLine(bw, 0)}</div><div><u>${esc(TW.ai.name)}</u> ${coSplitLine(bw, 1)}</div></div></div>`;
+  }
+  const bf = [TW.P.coHorn > CO.tick && 'Warhorn ' + coSecs(TW.P.coHorn - CO.tick) + 's', TW.P.coBane > CO.tick && 'Bane Oil ' + coSecs(TW.P.coBane - CO.tick) + 's'].filter(Boolean).join(' · ');
+  const L0 = CO.lend[0], L1 = CO.lend[1];
+  const lend = [L0 && `your unit lent until wave ${L0.until}`, L1 && `${esc(TW.ai.name)}'s unit with you until wave ${L1.until}`].filter(Boolean).join(' · ');
+  return `<div class="co-top"><span class="co-lv">♥ ${CO.lives}</span><span>shared</span><span>Wave ${Math.max(1, TW.wave)}/${CO_WAVES.length} · horn ${Math.max(0, Math.ceil(TW.clock > 1e8 ? 0 : TW.clock))}s</span><span>${esc(TW.ai.name)} ${TW.E.gold}g</span></div>`
+    + `<div class="co-next">${next.join('')}</div>${boss}${bf || lend ? `<div class="co-st">${[bf && 'On you: ' + bf, lend].filter(Boolean).join(' · ')}</div>` : ''}`;
+}
+function coDraftDraw() {
+  const D = CO.draft, el = CO.draftEl; if (!el) return;
+  if (!D) { el.hidden = true; el.innerHTML = ''; return; }
+  const turn = D.order[D.k], mine = turn === 0;
+  el.hidden = false;
+  el.innerHTML = `<div class="co-dh"><b>${esc(CREEPS[CO_SPLIT[D.w].boss].name)}'s loot</b> · ${mine ? 'your pick' : esc(TW.ai.name) + ' is picking…'}</div>`
+    + `<div class="co-dsub">Damage since the last boss: you ${dmgFmt(D.got[0])}, ${esc(TW.ai.name)} ${dmgFmt(D.got[1])}. Less damage picks first; then ${D.order.map(s => s ? 'them' : 'you').join(', ')}.</div>`
+    + `<div class="co-di">${D.items.map((e, i) => { const it = e.it, R = RARITY[it.rar]; return `<button type="button" data-i="${i}" ${e.taken >= 0 || !mine ? 'disabled' : ''} style="--rc:${R.col}"><b>${esc(gearName(it))}</b><small>${R.name}${e.taken >= 0 ? ' · ' + (e.taken ? esc(TW.ai.name) : 'yours') : ''}</small><span>${esc(String(gearText(it) || '').slice(0, 140))}</span></button>`; }).join('')}</div>`;
+  for (const b of el.querySelectorAll('button[data-i]')) b.onclick = () => coopAct(0, 'pick', [+b.dataset.i]);
+}
+function coDraftClose() { if (!CO) return; CO.draft = null; coDraftDraw(); }
+function coUI(on) {
+  for (const id of ['coBar', 'coDraft']) { const el = document.getElementById(id); if (el) el.remove(); }
+  document.body.classList.toggle('co', !!on);
+  if (!on || !CO) return;
+  const st = document.getElementById('stage'); if (!st) return;
+  if (!document.getElementById('coCss')) { const css = document.createElement('style'); css.id = 'coCss'; css.textContent = CO_CSS; document.head.appendChild(css); }
+  const bar = document.createElement('div'); bar.id = 'coBar'; bar.setAttribute('aria-live', 'polite');
+  const dr = document.createElement('div'); dr.id = 'coDraft'; dr.hidden = true;
+  st.append(bar, dr); CO.barEl = bar; CO.draftEl = dr; CO.barT = 0;
+}
+const CO_CSS = `
+#coBar{position:absolute;left:50%;top:34px;transform:translateX(-50%);z-index:6;width:min(560px,calc(100% - 200px));padding:6px 10px;border-radius:8px;background:rgba(3,13,15,.84);box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(201,160,90,.35);font:600 12px/1.3 var(--f-ui);color:#e8dcc0;pointer-events:none}
+#coBar .co-top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+#coBar .co-lv{font:700 16px var(--f-display);color:#ff9a8a}
+#coBar .co-next{display:flex;gap:8px;margin-top:3px;color:#b8b098;flex-wrap:wrap}
+#coBar .co-next .bw{color:#ff9a7a;font-weight:700}
+#coBar .co-boss{margin-top:5px;padding-top:5px;border-top:1px solid rgba(201,160,90,.25)}
+#coBar .co-boss.on{color:#e8c8ff}
+#coBar .co-h{color:#ffcfa0;font-weight:700}
+#coBar .co-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:3px;font-weight:500}
+#coBar u{text-decoration:none;display:block;color:#f2dc9a;font-weight:700}
+#coBar .co-st{margin-top:4px;color:#a4f2c4}
+#coDraft{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:8;width:min(620px,calc(100% - 24px));padding:10px 12px;border-radius:10px;background:rgba(3,13,15,.93);box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(232,200,120,.55),0 6px 20px rgba(0,0,0,.6);font:600 12px/1.3 var(--f-ui);color:#e8dcc0}
+#coDraft .co-dh{font:700 14px var(--f-display);color:#f2dc9a}
+#coDraft .co-dsub{margin:3px 0 8px;color:#b8b098;font-weight:500}
+#coDraft .co-di{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#coDraft button{display:flex;flex-direction:column;gap:3px;text-align:left;padding:7px;border:0;border-radius:7px;cursor:pointer;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--rc);color:#e8dcc0;font:500 11px/1.25 var(--f-ui)}
+#coDraft button b{color:var(--rc);font-size:12px}
+#coDraft button small{color:#b8b098}
+#coDraft button:disabled{opacity:.45;cursor:default}
+#coDraft button:not(:disabled):hover{background:rgba(255,255,255,.12)}
+@media (max-width:720px){#coBar{top:auto;bottom:118px;width:calc(100% - 24px)}#coDraft .co-di{grid-template-columns:1fr 1fr}#coBar .co-two{grid-template-columns:1fr}}
+body.co.tw-scout #vig{background:radial-gradient(ellipse 75% 70% at 50% 46%,rgba(0,0,0,0) 50%,rgba(10,50,70,.6) 100%)}
+`;
+// once a frame: the bar (it changes every second at most)
+function coFrame(dt) {
+  if (!coOn() || !CO.barEl) return;
+  if ((CO.barT -= dt) > 0) return; CO.barT = .25;
+  const h = coBarHTML(); if (h !== CO.barH) { CO.barH = h; CO.barEl.innerHTML = h; }
+}
+function coEndScreen(won) {
+  const P = TW.P, E = TW.E, S0 = CO.stats[0], S1 = CO.stats[1]; coDmgSample(); CO.over = true; coDraftClose();
+  TW.view = 'P'; if (TW.scoutEl) TW.scoutEl.hidden = true; document.body.classList.remove('tw-scout');
+  const beat = Object.keys(CO_SPLIT).filter(w => CO.drafted[w]).map(w => CREEPS[CO_SPLIT[w].boss].name);
+  setTimeout(() => {
+    showOverlay(`
+      <h2 class="ttl ${won ? 'win' : 'lose'}">${won ? 'The gauntlet is run' : 'The gates have fallen'}</h2>
+      <p class="sub">${won ? `All ${CO_WAVES.length} waves held with ${CO.lives} of ${CO_LIVES} lives left` : `The shared lives ran out on wave ${TW.wave}`} · Co-op with ${esc(TW.ai.name)}</p>
+      <dl class="stats tw-stats">
+        <dt></dt><dd><b>You</b> · <b>${esc(TW.ai.name)}</b></dd>
+        <dt>Damage</dt><dd>${dmgFmt(CO.dmg[0])} · ${dmgFmt(CO.dmg[1])}</dd>
+        <dt>Foes slain</dt><dd>${P.stats.kills} · ${E.stats.kills}</dd>
+        <dt>Units lent</dt><dd>${S0.lends} · ${S1.lends}</dd>
+        <dt>Buffs sent</dt><dd>${S0.buffs} · ${S1.buffs}</dd>
+        <dt>Spells cast</dt><dd>${S0.spells} · ${S1.spells}</dd>
+        <dt>Relics drafted</dt><dd>${S0.picks.length} · ${S1.picks.length}</dd>
+      </dl>
+      <p class="sub">${beat.length ? 'Bosses beaten: ' + beat.join(', ') : 'No boss beaten'}.</p>
+      <button class="btn" id="coAgain">Again<small>${MAPS[P.map] ? MAPS[P.map].name : ''}</small></button>
+      <button class="btn ghost" id="eTitle">Title screen</button>`);
+    const map = P.map || 'meadow';
+    $('#coAgain').onclick = () => { AudioSys.init(); coopBegin(map); };
+    $('#eTitle').onclick = () => { CO = null; titleScreen(); };
+  }, won ? 900 : 1300);
+}
+
+/* ---------- start-up ---------- */
+(function () {
+  if (typeof window === 'undefined' || typeof twStep !== 'function') return;
+  coWraps();
+  // the bar redraws with the frame: piggy-back on Tower Wars' own per-frame call
+  const fr = twFrame; twFrame = function (dt) { fr(dt); coFrame(dt); };
+  // twStop leaves co-op too
+  const stop = twStop; twStop = function () { if (CO) { CO = null; coUI(false); } return stop(); };
+  let q = null; try { q = new URLSearchParams(location.search).get('coop'); } catch (e) {}
+  if (q) { const go = () => { if (!document.getElementById('oNew') || typeof RD === 'undefined' || !RD) return setTimeout(go, 300); setTimeout(() => { if (typeof AudioSys !== 'undefined') try { AudioSys.init(); } catch (e) {} coopBegin(); }, 200); }; go(); }
+})();
 
