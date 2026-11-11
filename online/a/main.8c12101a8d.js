@@ -1,4 +1,4 @@
-const BUILD_TAG = '770c9cb@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ee058f8@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1303,11 +1303,12 @@ function waveSpec(n, plain) {   // plain: as if it were not an elite wave (the e
   if (!(typeof G !== 'undefined' && G && G.vs)) {
     const tr = g.filter(o => { const d = CREEPS[o.type]; return d && !d.boss && !d.lead; }), T = tr.reduce((a, o) => a + o.count, 0);
     if (T > 0) {
-      const want = eliteWave(n) && !plain ? Math.max(tr.length, ELITE_TROOPS + (n >= 30 ? 1 : 0)) : Math.max(tr.length, Math.round((WAVE_TROOPS + Math.floor(Math.max(0, n - 30) / 5)) * TROOP_MORE));
+      const want0 = eliteWave(n) && !plain ? Math.max(tr.length, ELITE_TROOPS + (n >= 30 ? 1 : 0)) : Math.max(tr.length, Math.round((WAVE_TROOPS + Math.floor(Math.max(0, n - 30) / 5)) * TROOP_MORE));
+      const want = typeof calmOn === 'function' && calmOn() ? calmTroops(want0, tr.length, eliteWave(n) && !plain) : want0;   // Calm pace: fewer, heavier troops (forces_..._calm.js); the health and gold below follow the count
       for (const o of tr) { const x = o.count * want / T; o.nc = Math.max(1, Math.floor(x)); o.rem = x - Math.floor(x); }
       let left = want - tr.reduce((a, o) => a + o.nc, 0);
       for (const o of tr.slice().sort((a, b) => b.rem - a.rem)) { if (left <= 0) break; o.nc++; left--; }
-      for (const o of tr) { o.hpK = o.count / o.nc * TROOP_MORE; o.count = o.nc; delete o.nc; delete o.rem; }
+      for (const o of tr) { o.hpK = o.count / o.nc * TROOP_MORE; o.count = o.nc; delete o.nc; delete o.rem; if (want < want0) o.calmK = want0 / want; }
     }
   }
   return g;
@@ -2038,6 +2039,7 @@ function waveCleared() {
   const ws = G.inFlight && G.inFlight.length ? G.inFlight : [G.wave], n = G.wave;
   let bonus = 0, pts = 0; for (const w of ws) { bonus += G.vs ? 12 + 2 * w : Math.round((12 + 2 * w) * econK(w) * streakK()); if (w % TP_EVERY === 0 && !xpOn()) pts++; }
   if (pts) { G.tp += pts; G.tpEarned += pts; }
+  if (G.calm && typeof calmClearGold === 'function') bonus += calmClearGold(ws);   // Calm pace: the horn's early-call gold, folded into the wave's reward
   G.gold += bonus; G.stats.gold += bonus; G.inFlight = [];
   woundsMend();   // Wounded units recover for free; walls and towers stay as they are
   // damage stays: wrecks remain rubble (an open breach) and battered towers stay battered until they are paid for
@@ -2063,7 +2065,7 @@ function waveCleared() {
   if (typeof manaWaveEnd === 'function') manaWaveEnd();
   if (typeof AudioSys !== 'undefined' && !G.mute) AudioSys.intense(false);
   if (n >= MAX_WAVE && !G.endless) { G.phase = 'build'; victory(); return; }
-  G.wave++; G.phase = 'build'; G.countdown = G.vs ? 0 : 30;
+  G.wave++; G.phase = 'build'; G.countdown = G.vs || (typeof calmOn === 'function' && calmOn()) ? 0 : 30;   // (Calm pace: the next wave waits for the horn)
   sfx(pts ? 'talent' : 'clear');
   onBanner(ws.length > 1 ? `Waves ${ws[0]}–${n} cleared` : `Wave ${n} cleared`, `+${bonus} gold` + (pts ? ` · +${pts} talent point${pts > 1 ? 's' : ''}` : '') + (bw ? ` · +${bw} path point${bw > 1 ? 's' : ''}` : '') + stTxt + (intr ? ` · +${intr} interest` : '') + (aid ? ` · +${aid} war aid` : '') + (lvBack ? ` · clean wave: +${lvBack} ${lvBack > 1 ? 'lives' : 'life'}` : '') + (dmgd ? ` · ${dmgd} damaged` : ''));
   onDirty(); onSave();
@@ -3298,6 +3300,7 @@ function leak(c) {
     if ((c.def.boss || c.def.lead) && !c.kid && !c.splitCopy) G.wl.boss = c;
   }
   let cost = Math.min(c.def.life || 1, pathOn('ward', 5) ? 2 : 99);   // Unbreakable Gate
+  if (c.calmK && typeof calmLeak === 'function') cost = calmLeak(c, cost);   // Calm pace: a heavy foe costs what the foes it stands for would have
   if (G.qx && typeof qxLeak === 'function') cost = qxLeak(c, cost);   // a challenge's toll, the Gatewarden's Oath (quests.js)
   G.lives -= cost; G.stats.leaks += cost;
   if (G.hero) heroOnLeak(c, cost);
@@ -4033,7 +4036,7 @@ function onHit(c, st, src, amt) {
   if (st.stunCh && Math.random() < st.stunCh[0]) stun(c, st.stunCh[1], false, el);
   if (st.mark) { c.markAmp = Math.max(c.markAmp, st.mark[0]); c.markT = Math.max(c.markT, st.mark[1]); }
   if (st.shredOn) { const was = c.shredT > 0 ? c.shred : 0; c.shred = Math.min(st.shredOn[1], was + st.shredOn[0]); c.shredT = 5; if (st.pw && st.pw.rend && c.armor > 0 && c.shred > was) rendFx(c, src, was); }
-  if (st.bleed && amt > 0) { c.bleedDps = Math.max(c.bleedT > 0 ? c.bleedDps : 0, amt * st.bleed / 3); c.bleedT = 3; c.bleedSrc = src; }
+  if (st.bleed && amt > 0) { const ck = typeof calmHitK === 'function' ? calmHitK() : 1; c.bleedDps = Math.max(c.bleedT > 0 ? c.bleedDps : 0, amt * st.bleed / 3 / ck); c.bleedT = 3 * ck; c.bleedSrc = src; }   // (Calm pace: the same bleed a second, for longer)
   if (st.wound && amt > 0 && !c.dead) woundFoe(c, st.wound);   // Wounded: talents and items that halve its healing (woundFoe)
   if (st.pw && amt > 0 && src) { const pt = DTAG; DTAG = 'relic'; relicOnHit(c, st, src, amt); DTAG = pt; }
   if (G.force && amt > 0 && src && typeof bsOnHit === 'function') { const tag0 = DTAG; tagged('relic', () => bsOnHit(c, st, src, amt, tag0)); }   // the bosses' signature relics (bossitems.js)
@@ -10576,7 +10579,7 @@ const LEARN = {
 const abilKit = t => (t && t.def && t.def.unit && UNIT_KITS[t.def.unit]) || null;
 const abMax = t => { const k = abilKit(t); if (!k) return 0; const m = manaTal(t), it = (t.st && t.st.manaMax) || 0; return (m ? Math.round(k.mana.max * (1 + m.pool)) : k.mana.max) + it; };   // (+ the items' Mana lines: itempower.js)
 const abCost = (t, ab) => { const c = manaCostK(t, ab, typeof charmCost === 'function' ? charmCost(t, ab) : ab.mana), k = typeof spCostK === 'function' ? spCostK(t, ab) : 1; return k === 1 ? c : Math.round(c * k); };   // (a charm can make it cheaper: groveitems.js; a talent too: forces_zz_mana.js)
-const abCd = (t, ab) => ab.cd * ((t.st && t.st.sh && t.st.sh.cdK) || 1) * (typeof charmCdK === 'function' ? charmCdK(t) : 1) * (typeof spCdK === 'function' ? spCdK(t, ab) : 1) * (typeof champCdK === 'function' ? champCdK(t, ab) : 1);     // items that shorten cooldowns (actCd's cdK) shorten these too, and charms
+const abCd = (t, ab) => ab.cd * ((t.st && t.st.sh && t.st.sh.cdK) || 1) * (typeof charmCdK === 'function' ? charmCdK(t) : 1) * (typeof spCdK === 'function' ? spCdK(t, ab) : 1) * (typeof champCdK === 'function' ? champCdK(t, ab) : 1) * (typeof calmCdK === 'function' ? calmCdK() : 1);     // items that shorten cooldowns (actCd's cdK) shorten these too, and charms
 const abLeft = (t, ab) => Math.max(0, ((t.ab && t.ab.cd[ab.id]) || 0) - G.time);
 function abilEnsure(t, kit) {
   kit = kit || abilKit(t); if (!kit) return null;
@@ -50732,6 +50735,159 @@ if (typeof newGame === 'function') {
   newGame = function () { const r = _ohNew.apply(this, arguments); if (typeof G !== 'undefined' && G) { G.ohSeen = 0; G.ohStat = {}; G.ohDmg = {}; } return r; };
 }
 
+/* ================= CALM PACE: a switchable test mode (11 Nov 2026; owner: "explore the idea of making the game calmer,
+   slower and more methodical") =================
+   One flag, G.calm, saved with the run, off by default. With it off nothing here changes a number: every wrapper below
+   returns the wrapped function's own result. Switches: Settings > Calm pace (new runs, and the run in hand between waves),
+   ?calm=1 in the address, calmSet(true | false) in the console. The UI half is src/calm_ui.js.
+
+   What it changes (CALM holds every number; docs/design/calm_pace_2026-11-11.md has the reasoning and the measurements):
+   1. Breathing room: no wave starts by itself and none can be sent on top of another; the gold the horn paid for calling
+      early (up to 10 a wave) is folded into the wave's own reward.
+   2. Fewer, heavier foes: a wave fields about a third of its troops (an elite wave half), each as much tougher and richer,
+      so the wave's health and gold are as they were (core.js waveSpec). They leave the portal evenly spread over the time
+      the normal column takes, so the wave is as long as it was. A foe through the gate costs as many lives as the foes it
+      stands for; its worth in veterancy, its relic odds, its count toward Renown and a siege troop's blows follow. Bosses
+      and leaders keep their count and health.
+   3. Slower: the troops walk at CALM.pace (70%) of their speed; bosses and leaders keep their stride.
+   4. Heavier strikes: a unit strikes CALM.hit (2) times less often and as much harder. Slows, stuns and roots from strikes
+      last as much longer, burns, poisons, bleeds and curses from strikes keep their damage a second and last as much
+      longer, so each does the same work a second. Counted mechanics (every Nth strike, Growth) are left alone: they come
+      as much rarer and hit as much harder.
+   5. Heavier spells: a spell is cast CALM.cast (1.5) times less often (cooldown up, mana flowing in slower, the wave's
+      refill smaller) and hits as much harder; its slows, stuns and roots last as much longer.
+   Hooks outside this file, each a no-op with the mode off: core.js waveSpec (the count), game.js leak (lives), waveCleared
+   (the folded gold, no countdown), the bleed line in onHit; abilities.js abCd; renown.js (foes slain). */
+const CALM = { pace: .7, hp: 1.15, troops: 3, elite: 2, gapMin: .5, hit: 2, cast: 1.5, clearGold: 10, key: 'runehold.calm' };   // hp: the troops' health on top (slower troops spend longer under fire)
+let CALM_PEEK = false;   // true while the normal wave is being read for its length (makeWave below)
+function calmOn() { return typeof G !== 'undefined' && !!G && !!G.calm && !G.vs && !G.tut && !CALM_PEEK; }   // (Tower Wars and the tutorial keep their own pace)
+function calmHitK() { return calmOn() ? CALM.hit : 1; }
+function calmCastK() { return calmOn() ? CALM.cast : 1; }
+function calmCdK() { return calmCastK(); }
+// is a unit's ability running now (its cast, a zone's tick, something it scheduled)?
+function calmInAbil() { return typeof DTAG !== 'undefined' && typeof AB_TAG !== 'undefined' && DTAG === AB_TAG; }
+// how much longer a slow, stun or root lasts: a strike's by the strikes' factor, a spell's by the spells'
+function calmHoldK() { return !calmOn() ? 1 : calmInAbil() ? CALM.cast : CALM.hit; }
+// the player's wish for the next run: the address, else this device's setting
+function calmWanted() {
+  try { if (typeof location !== 'undefined' && location.search) { const m = /[?&]calm=([^&]*)/.exec(location.search); if (m) return m[1] !== '0' && m[1] !== 'off'; } } catch (e) {}
+  try { return typeof localStorage !== 'undefined' && localStorage.getItem(CALM.key) === '1'; } catch (e) { return false; }
+}
+// core.js waveSpec: how many troops the wave fields
+function calmTroops(want, kinds, elite) { return Math.max(kinds, 1, Math.round(want / (elite ? CALM.elite : CALM.troops))); }
+// game.js leak: a heavy foe through the gate costs what the foes it stands for would have
+function calmLeak(c, cost) { return c && c.calmK > 1 ? Math.max(1, Math.round(cost * c.calmK)) : cost; }
+// game.js waveCleared: the horn's early-call gold, folded into the wave's reward
+function calmClearGold(ws) { return calmOn() ? CALM.clearGold * ((ws && ws.length) || 1) : 0; }
+// switch the run in hand (between waves only: a wave on the field keeps the rules it began with)
+function calmSet(on) {
+  on = !!on;
+  if (typeof G === 'undefined' || !G || G.state !== 'play' || G.vs) return false;
+  if (G.phase !== 'build') { if (typeof onToast === 'function') onToast('Calm pace can be switched between waves.'); return false; }
+  if (!!G.calm === on) return true;
+  G.calm = on; G.countdown = 0;
+  for (const t of G.towers || []) { try { t.st = effStats(t); } catch (e) {} }
+  if (typeof onDirty === 'function') onDirty();
+  if (typeof onSave === 'function') onSave();
+  return true;
+}
+
+(function () {
+  /* ---- the flag: set when a run begins, saved and restored with it ---- */
+  newGame = (f => function () { G.calm = false; const r = f.apply(this, arguments); G.calm = !G.vs && calmWanted(); if (G.calm) G.countdown = 0; return r; })(newGame);
+  serialize = (f => function () { const s = f.apply(this, arguments); if (s && G.calm) s.calm = 1; return s; })(serialize);
+  restore = (f => function (s) { G.calm = !!(s && s.calm); const r = f.apply(this, arguments); G.calm = !!(s && s.calm) && !G.vs; if (G.calm) { G.countdown = 0; for (const t of G.towers || []) { try { t.st = effStats(t); } catch (e) {} } } return r; })(restore);
+
+  /* ---- 1. no wave starts by itself, none is sent on top of another ---- */
+  update = (f => function () { if (calmOn() && G.phase === 'build') G.countdown = 0; return f.apply(this, arguments); })(update);
+  canSendNext = (f => function () { return calmOn() ? false : f.apply(this, arguments); })(canSendNext);
+  sendNextWave = (f => function () { return calmOn() ? false : f.apply(this, arguments); })(sendNextWave);
+
+  /* ---- 2. the wave: its troops evenly spread over the time the normal column takes to leave the portal ---- */
+  const chief = s => { const d = CREEPS[s.type]; return !!d && !!(d.boss || d.lead); };
+  makeWave = (f => function (n) {
+    const q = f.apply(this, arguments);
+    if (!calmOn() || !q || !q.length) return q;
+    const K = {}; try { for (const g of waveSpec(n)) if (g.calmK > 1 && !K[g.type]) K[g.type] = g.calmK; } catch (e) {}
+    let qn = null; CALM_PEEK = true; try { qn = f.apply(this, arguments); } catch (e) { qn = null; } finally { CALM_PEEK = false; }
+    const troops = q.filter(s => !chief(s)), chiefs = q.filter(chief);
+    for (const s of troops) { const k = K[s.type]; if (k) { s.calmK = k; if (s.atkM) s.atkM *= k; } if (CALM.hp !== 1) s.hp *= CALM.hp; }
+    if (qn) {   // the wave pays what the normal one pays (a small bounty rounds differently on a heavy foe)
+      const Bn = qn.reduce((a, s) => a + (chief(s) ? 0 : s.bounty || 0), 0), Bc = troops.reduce((a, s) => a + (s.bounty || 0), 0);
+      if (Bn > 0 && Bc > 0 && Bn !== Bc) { let left = Bn; troops.forEach((s, i) => { s.bounty = i === troops.length - 1 ? Math.max(1, left) : Math.max(1, Math.round(s.bounty * Bn / Bc)); left -= s.bounty; }); }
+    }
+    if (qn && troops.length > 1) {
+      let a = Infinity, b = -Infinity, k = 0; for (const s of qn) if (!chief(s) && isFinite(s.t)) { a = Math.min(a, s.t); b = Math.max(b, s.t); k++; }
+      const Tn = k > 1 ? b - a : 0, gap = Math.max(CALM.gapMin, Tn / (troops.length - 1));
+      troops.forEach((s, i) => { s.t = i * gap; });
+      const end = (troops.length - 1) * gap; chiefs.forEach((s, i) => { s.t = end + 1 + i * .9; });
+      q.sort((x, y) => x.t - y.t);
+    }
+    return q;
+  })(makeWave);
+  // the troops walk slower (bosses and leaders keep their stride: they march alone, and a slower one would only be easier)
+  spawn = (f => function (s) {
+    const c = f.apply(this, arguments);
+    if (c && calmOn() && G.state === 'play' && !c.def.boss && !c.def.lead && !c.purse) { c.spdM *= CALM.pace; if (s && s.calmK > 1 && !s.at) c.calmK = s.calmK; }
+    return c;
+  })(spawn);
+  /* a random elite adds what it adds in the normal game (its extra health and gold are those of one normal troop made elite),
+     so a wave with elites weighs what it did; its tag shows the multiple it really has */
+  promoteElites = (f => function (q) {
+    if (!calmOn() || !q) return f.apply(this, arguments);
+    const was = new Map(); for (const s of q) was.set(s, [s.hp, s.bounty, !!s.elite, s.eliteX]);
+    const r = f.apply(this, arguments);
+    for (const s of q) { const w = was.get(s); if (!w || w[2] || !s.elite || !(s.calmK > 1) || !(w[0] > 0)) continue;
+      const X = s.hp / w[0], x = 1 + (X - 1) / s.calmK; s.hp = w[0] * x; s.eliteX = (w[3] || 1) * x; s.bounty = Math.round(w[1] + 2 * w[1] / s.calmK + 2); }
+    return r;
+  })(promoteElites);
+  dropOdds = (f => function (c) { const v = f.apply(this, arguments); return calmOn() && c && c.calmK > 1 && !c.elite && !c.def.boss && !c.def.lead ? v * c.calmK : v; })(dropOdds);
+  vetW = (f => function (c) { const v = f.apply(this, arguments); return calmOn() && c && c.calmK > 1 ? v * Math.pow(c.calmK, 1 - (typeof VET_W_POW === 'number' ? VET_W_POW : .75)) : v; })(vetW);
+
+  /* ---- 4. heavier strikes ---- */
+  effStats = (f => function () {
+    const st = f.apply(this, arguments);
+    if (!calmOn() || !st) return st;
+    const A = CALM.hit;
+    if (st.rate) st.rate *= A;
+    dmgMul(st, A);   // the strike, a smite, and what its burn, poison and drain deal a second (ignite, dose and hex below turn those back into time)
+    if (st.manaRegen) st.manaRegen /= CALM.cast;
+    st.calm = A;
+    return st;
+  })(effStats);
+  stun = (f => function (c, dur, bossF, elem) { return calmOn() ? f.call(this, c, dur * calmHoldK(), bossF, elem) : f.apply(this, arguments); })(stun);
+  rootFoe = (f => function (c, dur, src) { return calmOn() ? f.call(this, c, dur * calmHoldK(), src) : f.apply(this, arguments); })(rootFoe);
+  chill = (f => function (c, st, elem, src) { return calmOn() && st ? f.call(this, c, Object.assign({}, st, { slowT: (st.slowT || 0) * calmHoldK() }), elem, src) : f.apply(this, arguments); })(chill);
+  // a strike's burn, poison or curse: the damage a second it had, for CALM.hit times as long (a spell's keep their length: its weight below sizes them)
+  ignite = (f => function (c, dps, dur, src, hell, stoke) { return calmOn() && !calmInAbil() ? f.call(this, c, dps / CALM.hit, dur * CALM.hit, src, hell, stoke) : f.apply(this, arguments); })(ignite);
+  dose = (f => function (c, st, src) { return calmOn() && !calmInAbil() && st && st.poison ? f.call(this, c, Object.assign({}, st, { poison: st.poison / CALM.hit, poisonT: (st.poisonT || 0) * CALM.hit }), src) : f.apply(this, arguments); })(dose);
+  hex = (f => function (c, st, src) { return calmOn() && !calmInAbil() && st ? f.call(this, c, Object.assign({}, st, { drain: (st.drain || 0) / CALM.hit, ampT: (st.ampT || 0) * CALM.hit }), src) : f.apply(this, arguments); })(hex);
+
+  /* ---- 5. heavier spells: a spell's damage is a multiple of the strike (now CALM.hit times it), so its weight is turned
+     to CALM.cast times the normal spell; Spell Damage's flat share grows by the same ---- */
+  const forceUnit = t => !!(t && t.def && t.def.force) && !oldRules();
+  spellWeight = (f => function (t) { const v = f.apply(this, arguments); return calmOn() && forceUnit(t) ? v * CALM.cast / CALM.hit : v; })(spellWeight);
+  manaSpellK = (f => function (src, dot) { const v = f.apply(this, arguments); return calmOn() && dot && calmInAbil() && forceUnit(src) ? v * CALM.cast / CALM.hit : v; })(manaSpellK);
+  spellPowerAdd = (f => function () { const v = f.apply(this, arguments); return calmOn() && v ? v * CALM.cast : v; })(spellPowerAdd);
+  spellPowerDot = (f => function () { const v = f.apply(this, arguments); return calmOn() && v ? v * CALM.cast : v; })(spellPowerDot);
+  manaFlow = (f => function () { const v = f.apply(this, arguments); return calmOn() ? v / CALM.cast : v; })(manaFlow);
+  // a strike's mana: strikes come CALM.hit times rarer, spells CALM.cast times rarer
+  abilityOnAttack = (f => function (t) {
+    if (!calmOn() || !t || !t.ab) return f.apply(this, arguments);
+    const m0 = t.ab.mana, r = f.apply(this, arguments), d = t.ab.mana - m0;
+    if (d > 0) t.ab.mana = Math.min(abMax(t), m0 + d * CALM.hit / CALM.cast);
+    return r;
+  })(abilityOnAttack);
+  // the wave's refill: as many casts' worth as the normal refill
+  manaWaveEnd = (f => function () {
+    if (!calmOn()) return f.apply(this, arguments);
+    const was = new Map(); for (const t of G.towers) if (t.ab) was.set(t, t.ab.mana);
+    const r = f.apply(this, arguments);
+    for (const t of G.towers) { if (!t.ab || !was.has(t)) continue; const m0 = was.get(t), full = t.ab.mana; if (full > m0) { t.ab.mana = m0 + (full - m0) / CALM.cast; t._qm = t.ab.mana; } }
+    return r;
+  })(manaWaveEnd);
+})();
+
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
      cast    on the unit: a sigil at its feet and a glyph rising over it (a caster), or a flash of steel (a fighter)
@@ -55029,7 +55185,7 @@ const AudioSys = (() => {
   // lightning alone runs on a bright bus with a much higher ceiling, because its crack and crackle live in the top octaves
   let ctx = null, L = null;         // live context + its engine
   let E = null, C = null;           // engine / context the builders currently target
-  let wantInt = false, timer = 0;
+  let wantInt = false, wantCalm = false, timer = 0; const CALM_SLOW = 1.22, CALM_REST = 3;   // Calm pace (calm_ui.js): while a calm run plans, the score plays slower, one part in CALM_REST rests each four bars and the drums stay out
   const use = e => { E = e; C = e ? e.c : null; };
 
   /* ---------- small helpers ---------- */
@@ -57456,7 +57612,7 @@ const AudioSys = (() => {
     if (E.M.kind === 'theme') return themeRun(until);
     const M = E.M, tr = E.trim; E.trim = 1;   // the score plays at its own level, not the last sound effect's trim
     if (M.next < now() - .25) M.next = now() + .05;   // fell behind (tab hidden / context suspended): resync
-    const ether = M.kind === 'ether', song = M.kind === 'song', step = song ? songStep : ether ? eStep : mStep, dt = song ? M.S.spb / 4 : ether ? EQ : E8;
+    const ether = M.kind === 'ether', song = M.kind === 'song', step = song ? songStep : ether ? eStep : mStep, dt = (song ? M.S.spb / 4 : ether ? EQ : E8) * (M.calm ? CALM_SLOW : 1);
     try { while (M.next < until) { step(M.next); M.next += dt; } } finally { E.trim = tr; }
   }
 
@@ -57996,9 +58152,9 @@ const AudioSys = (() => {
     const M = E.M, S = M.S, i = M.step % S.steps;
     if (M.int && M.lvl < .12) M.lvl = .12;
     M.lvl = lim(M.lvl + (M.int ? 1 / 50 : -1 / 120), 0, 1);
-    if (i % 16 === 0) { M.bar++; if (M.drums) for (const d of M.drums) d.gain.setTargetAtTime(M.X.calm + (1 - M.X.calm) * smooth(M.lvl, 0, 1), t, .8);   // a wave: the drums come up
+    if (i % 16 === 0) { M.bar++; if (M.drums) for (const d of M.drums) d.gain.setTargetAtTime(M.calm ? 0 : M.X.calm + (1 - M.X.calm) * smooth(M.lvl, 0, 1), t, .8);   // a wave: the drums come up
       if (E.log) E.log.push([+t.toFixed(2), 'SBAR', M.bar, i / 16, +M.lvl.toFixed(2)]); }
-    for (const [k, o] of S.slots[i] || []) { const T = S.tr[k], tt = t + o.off;
+    for (const [k, o] of S.slots[i] || []) { const T = S.tr[k], tt = t + o.off; if (M.calm && !T.kit && (k + (M.bar >> 2)) % CALM_REST === 0) continue;
       if (T.kit) songDrum(o, tt, T.p, M.tr[k]); else if (T.S.synth === 'wind') songWind(o, tt, T.p, M.tr[k]); else if (T.S.synth === 'birds') songBirds(o, tt, T.p, M.tr[k]);
       else if (T.S.drone) songDroneFlute(M, T.S, o, tt, T.p, M.tr[k]); else songVoice(M, T.S, o, tt, T.p, M.tr[k]); }
     M.step++;
@@ -58079,7 +58235,7 @@ const AudioSys = (() => {
     if (pref.sfx && !bgTab) try { ambRun(ctx.currentTime + .4); } catch (e) {}
     const M = L.M;
     if (!pref.music) { M.next = Math.max(M.next, ctx.currentTime + .1); reap(); return; }
-    M.int = wantInt;
+    M.int = wantInt; M.calm = wantCalm && !wantInt;
     try { reap(); musicRun(ctx.currentTime + (bgTab ? 2.6 : .35)); } catch (e) {}
   }
   let bgTab = false;
@@ -58914,7 +59070,7 @@ const AudioSys = (() => {
       const l = lim(lv | 0, 0, 2);
       try { use(L); L.tOff = 0; L.lv = l; L.trim = (LV[name] || 1) * (1 + .12 * l); L.bright = BRIGHT.has(name); f(arg); } catch (e) {} finally { L.lv = 0; L.bright = false; }
     },
-    intense(b) { wantInt = !!b; },
+    intense(b) { wantInt = !!b; }, calm(b) { wantCalm = !!b; },
     ambience(k) { ambKind = k === 'night' ? 'night' : 'day'; },
     set(k, v) {
       if (k === 'musicVolume' || k === 'sfxVolume') v = volume(v);
@@ -72668,7 +72824,7 @@ function qxHud(P, hpEl) {
   }
   const qp = v ? (v.done ? 1 : Math.min(1, v.p)) : -1;
   if (hpEl._qp !== qp) { hpEl._qp = qp; hpEl.classList.toggle('hasq', qp >= 0); P.face.style.setProperty('--qp', Math.max(0, qp).toFixed(3)); P.face.classList.toggle('qdone', qp >= 1); }
-  if (G.phase === 'build' && !G.paused && ov && ov.hidden) {
+  if (G.phase === 'build' && !G.paused && ov && ov.hidden && !(typeof calmBusy === 'function' && calmBusy())) {
     if (G.qx && G.qx.pick) openQxPick();
     else if (G.qx && G.qx.offer && G.qx.offer.at === G.wave) openQxOffer();
   }
@@ -82742,7 +82898,7 @@ function forecastTick() {
   if (fcEl.classList.contains('ghost') !== ghost) fcEl.classList.toggle('ghost', ghost);
   const now = typeof performance !== 'undefined' ? performance.now() : 0;
   if (fcRepaint.length && now >= fcRepaint[0]) { fcRepaint.shift(); fcPaint(fcEl, false); }
-  const key = [G.wave, G.phase, ws.join(','), fcOld(), fcPhone(), G.endless ? 1 : 0].join('|');
+  const key = [G.wave, G.phase, ws.join(','), fcOld(), fcPhone(), G.endless ? 1 : 0, G.calm ? 1 : 0].join('|');
   if (key === fcKey) return;
   fcKey = key;
   const h = ws.length ? forecastHTML() : '';
@@ -82848,94 +83004,204 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -82944,75 +83210,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -83115,7 +83513,7 @@ function slotsNow() {
   const canHorn = G.state === 'play' && G.phase === 'build', canSend = canSendNext(), armed = sendArm > performance.now();
   s[11] = canHorn || !canSend
     ? { key: canHorn ? 'horn' : 'horn:off', lbl: 'Wave', on: canHorn, pulse: canHorn && G.wave === 1 && G.towers.length > 2, name: 'Sound the horn', hk: 'Enter',
-        act: () => { if (canHorn) callWave(); else toast('The last wave is already on the field.'); } }
+        act: () => { if (canHorn) callWave(); else toast(G.calm && typeof calmOn === 'function' && calmOn() && (G.endless || G.wave < MAX_WAVE) ? 'Calm pace: the next wave waits until this one is done.' : 'The last wave is already on the field.'); } }
     : { key: 'horn', lbl: armed ? 'Sure?' : 'Next', on: true, warn: armed, name: `Send wave ${G.wave + 1} early`, hk: 'Enter', cost: '+' + sendBonus(G.wave + 1), act: sendEarly };
   if (TW) { s[11] = twSendSlot(); if (TW.menu && !G.sel && !G.buildType) return twSlots(s); }   // Tower Wars: the horn is the shared clock's; this slot sends minions
   const sel = G.sel;
@@ -83430,7 +83828,7 @@ function prioSlot(t) {
    weak/resist ×AFF), next to how well it fitted the last wave. Cached per wave and army. ---- */
 const WS_C = {};
 function waveTotalHP(n) {
-  const k = (G.force || '') + ':' + (G.hero || '') + ':' + (G.camp ? G.camp.loc + ':' + (G.camp.L0 | 0) + ':' + Math.round(G.camp.P0 || 0) : '') + ':' + G.diff + ':' + G.wave + ':' + n;   // (G.wave: a challenge taken since changes the waves)
+  const k = (G.force || '') + ':' + (G.hero || '') + ':' + (G.camp ? G.camp.loc + ':' + (G.camp.L0 | 0) + ':' + Math.round(G.camp.P0 || 0) : '') + ':' + G.diff + ':' + (G.calm ? 'c' : '') + G.wave + ':' + n;   // (G.wave: a challenge taken since changes the waves)
   if (WS_C[k] == null) { let t = 0; try { for (const e of makeWave(n, G.diff)) t += e.hp; } catch (e) { t = 0; } WS_C[k] = t; }
   return WS_C[k];
 }
@@ -83558,7 +83956,7 @@ function hud() {
   setText('hOf', TW ? '/' + TW_LAST : play && (G.endless || G.wave > MAX_WAVE) ? '' : '/' + MAX_WAVE);
   let tm = '';
   if (play && G.state === 'play') {
-    if (G.phase === 'build') tm = G.wave === 1 && G.countdown <= 0 ? 'Ready' : Math.ceil(G.countdown) + 's';
+    if (G.phase === 'build') tm = (G.wave === 1 || G.calm) && G.countdown <= 0 ? 'Ready' : Math.ceil(G.countdown) + 's';
     else tm = (G.creeps.length + G.spawnQ.length) + ' left';
   }
   if (TW && play) tm = TW.over ? '' : Math.ceil(TW.clock) + 's';   // Tower Wars: the shared clock to the next wave
@@ -97835,8 +98233,8 @@ function rnOnKill(c) {
   }
   if (c.kid || c.sent || c.echo || !rnOn()) return;
   if (c.def.thief) rnGain(RN.thief, `${c.def.name} caught`);
-  R.kills = (R.kills | 0) + 1;
-  if (R.kills % RN.killEach === 0) rnGain(1, `${R.kills} foes slain`);
+  { const k0 = R.kills | 0, add = c.calmK > 1 ? Math.round(c.calmK) : 1; R.kills = k0 + add;   // (Calm pace: a heavy foe counts for the foes it stands for)
+    if (Math.floor(R.kills / RN.killEach) > Math.floor(k0 / RN.killEach)) rnGain(1, add > 1 ? 'foes slain' : `${R.kills} foes slain`); }
   const blk = 'b' + Math.ceil(w / RN.every);   // once between bosses
   if (c.elite && rnCanAct(c) && !c.rnActed && !R.prW[blk]) { R.prW[blk] = 1; rnGain(RN.precise, `elite ${c.def.name} slain before it acted`); }
 }
@@ -97942,7 +98340,7 @@ function rnHud() {
   if (rnEl.hidden !== !on) rnEl.hidden = !on;
   const R = rnS();
   // the boss-loot panel: a moment after the kill, once the screen is clear (it pauses the game while it is open)
-  if (R.loots.length && rnLootOn() && G.state === 'play' && !G.paused && typeof ov !== 'undefined' && ov.hidden && rnNow() >= rnLootAt && !(typeof window !== 'undefined' && window.RN_BOT)) rnLootScreen();
+  if (R.loots.length && rnLootOn() && G.state === 'play' && !G.paused && typeof ov !== 'undefined' && ov.hidden && !(typeof calmBusy === 'function' && calmBusy()) && rnNow() >= rnLootAt && !(typeof window !== 'undefined' && window.RN_BOT)) rnLootScreen();
   if (!on) return;
   if (rnEl._v !== R.v) {
     const up = rnEl._v != null && R.v > rnEl._v; rnEl._v = R.v;
@@ -105121,4 +105519,99 @@ if (typeof document !== 'undefined' && document.head) {
 @media (prefers-reduced-motion:reduce){.oh-pulse{animation:none}}`;
   document.head.appendChild(s);
 }
+
+/* ================= CALM PACE: the UI half (the rules are in forces_zzzzzzzzzzzzzzzzzzzzz_calm.js) =================
+   Loaded last, wrappers only; with G.calm off every wrapper passes straight through.
+   - Settings > Calm pace: this device's wish for new runs (localStorage CALM.key; ?calm=1 or ?calm=0 in the address wins),
+     and it switches the run in hand when that run is between waves.
+   - A "Calm pace" label on the top bar while a calm run is played.
+   - One thing at a time between waves: banners and toasts raised in the build phase of a calm run queue up and show one
+     after another, and the panels that open by themselves (a boss's loot, a challenge's offer: renown.js, quests.js ask
+     calmBusy()) wait until the queue is empty. During a wave everything shows at once, as it always did.
+   - The music: while a calm run plans, the score plays slower with one part in three resting and no drums
+     (audio.js AudioSys.calm); it returns with the horn. */
+const CALMQ = { q: [], until: 0, toast0: null, banner0: null, max: 6 };
+function calmPlanning() { return typeof calmOn === 'function' && calmOn() && G.state === 'play' && G.phase === 'build' && !G.paused; }
+// renown.js, quests.js: is something still on screen or waiting its turn?
+function calmBusy() {
+  if (typeof calmOn !== 'function' || !calmOn() || G.state !== 'play' || G.phase !== 'build') return false;
+  return CALMQ.q.length > 0 || (typeof performance !== 'undefined' && performance.now() < CALMQ.until);
+}
+function calmQPump() {
+  if (!CALMQ.q.length || typeof performance === 'undefined') return;
+  const now = performance.now();
+  if (typeof calmOn !== 'function' || !calmOn() || G.state !== 'play' || G.phase !== 'build') {   // the horn has sounded (or the run is over): the queue lets go, its newest banner first
+    const L = CALMQ.q.splice(0), b = L.filter(x => x.k === 'b').pop(), t = L.filter(x => x.k === 't').pop();
+    if (t && CALMQ.toast0) CALMQ.toast0.apply(null, t.a);
+    if (b && CALMQ.banner0 && G.phase !== 'wave') CALMQ.banner0.apply(null, b.a);
+    CALMQ.until = 0; return;
+  }
+  if (now < CALMQ.until || G.paused || (typeof ov !== 'undefined' && ov && !ov.hidden)) return;   // a panel is open: it has the screen
+  const x = CALMQ.q.shift();
+  if (x.k === 'b') { CALMQ.banner0.apply(null, x.a); CALMQ.until = now + (x.a[2] ? 7000 : 2800) + 250; }
+  else { CALMQ.toast0.apply(null, x.a); CALMQ.until = now + Math.max(1900, Math.min(7000, String(x.a[0]).length * 55)) + 250; }
+}
+function calmQPush(k, a) {
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  if (!CALMQ.q.length && now >= CALMQ.until && !(typeof ov !== 'undefined' && ov && !ov.hidden)) { CALMQ.q.push({ k, a }); calmQPump(); return; }   // nothing showing: at once
+  if (k === 't' && CALMQ.q.some(x => x.k === 't' && String(x.a[0]) === String(a[0]))) return;   // the same toast twice says nothing new
+  CALMQ.q.push({ k, a });
+  while (CALMQ.q.length > CALMQ.max) { const i = CALMQ.q.findIndex(x => x.k === 't'); CALMQ.q.splice(i < 0 ? 0 : i, 1); }   // never a backlog: the oldest toast gives way
+}
+// the game's toast and banner callbacks, taken over once the UI has set them (ui.js init: onToast = toast ...)
+function calmQHook() {
+  if (typeof onToast !== 'function' || typeof onBanner !== 'function') return;
+  if (onToast.calmQ && onBanner.calmQ) return;
+  if (!onToast.calmQ) { const f = onToast; CALMQ.toast0 = f; onToast = function () { if (calmPlanning()) calmQPush('t', Array.from(arguments)); else f.apply(this, arguments); }; onToast.calmQ = 1; }
+  if (!onBanner.calmQ) { const f = onBanner; CALMQ.banner0 = f; onBanner = function () { if (calmPlanning()) calmQPush('b', Array.from(arguments)); else f.apply(this, arguments); }; onBanner.calmQ = 1; }
+}
+function calmHud() {
+  if (typeof document === 'undefined') return;
+  const on = typeof calmOn === 'function' && calmOn() && G.state === 'play';
+  let el = document.getElementById('calmTag');
+  if (!el) {
+    if (!on) return;
+    const bar = document.getElementById('bar'), wv = document.getElementById('hWave'); if (!bar) return;
+    el = document.createElement('div'); el.id = 'calmTag'; el.className = 'res ptx-tag'; el.textContent = 'Calm pace';
+    el.title = 'Calm pace (a test mode): waves wait for your horn, a third as many foes that are each as much tougher, foes walk slower, and your units strike and cast less often but harder. Switch it in Settings, between waves.';
+    const at = wv && wv.closest('.res'); if (at) at.after(el); else bar.prepend(el);
+  }
+  if (el.hidden === on) el.hidden = !on;
+}
+const calmPref = () => { try { return localStorage.getItem(CALM.key) === '1'; } catch (e) { return false; } };
+const calmUrl = () => { try { const m = /[?&]calm=([^&]*)/.exec(location.search || ''); return m ? (m[1] !== '0' && m[1] !== 'off' ? 1 : -1) : 0; } catch (e) { return 0; } };
+function calmSettingsRow() {
+  const sb = document.getElementById('sBack'); if (!sb || document.getElementById('calmTog')) return;
+  const run = () => typeof G !== 'undefined' && G && G.state === 'play' && !G.vs && G.towers;
+  const lbl = () => (run() ? (G.calm ? 'On for this run' : 'Off for this run') : calmWanted() ? 'On for new runs' : 'Off') + (calmUrl() ? ' (set by the address)' : '');
+  const d = document.createElement('div'); d.className = 'seg'; d.setAttribute('role', 'group'); d.setAttribute('aria-label', 'Calm pace');
+  d.innerHTML = `<button type="button" id="calmTog" aria-pressed="${run() ? !!G.calm : calmWanted()}" title="A test mode to play beside the normal game. Waves wait for your horn and none can be sent early (that gold is paid with each wave instead). A wave fields a third as many foes, each as much tougher and worth as much more, walking slower. Your units strike half as often and twice as hard, and cast less often and harder. Saved with the run; switch a run between waves.">Calm pace<small></small></button>`;
+  sb.before(d);
+  const b = document.getElementById('calmTog'); b.querySelector('small').textContent = lbl();
+  b.onclick = () => {
+    const want = run() ? !G.calm : !calmWanted();
+    if (run() && !calmSet(want)) { if (typeof toast === 'function') toast('Calm pace can be switched between waves.'); if (typeof sfx === 'function') sfx('error'); return; }
+    try { if (want) localStorage.setItem(CALM.key, '1'); else localStorage.removeItem(CALM.key); } catch (e) {}
+    b.setAttribute('aria-pressed', want); b.querySelector('small').textContent = lbl(); if (typeof sfx === 'function') sfx('click');
+    if (typeof markDirty === 'function') markDirty();
+  };
+}
+function calmUiTick() {
+  calmQHook(); calmQPump(); calmHud();
+  if (typeof AudioSys !== 'undefined' && AudioSys.calm) AudioSys.calm(calmPlanning() || (typeof calmOn === 'function' && calmOn() && G.state === 'play' && G.phase === 'build'));
+}
+if (typeof forecastTick === 'function') { const _cuF = forecastTick; forecastTick = function () { _cuF.apply(this, arguments); try { calmUiTick(); } catch (e) { if (!CALMQ.err) { CALMQ.err = 1; console.warn('calm pace', e); } } }; }
+// the forecast's card says what a heavy foe stands for (its count on the row is already the calm one: forecast.js reads waveSpec)
+if (typeof fcCardHTML === 'function') { const _cuC = fcCardHTML; fcCardHTML = function (spec) {
+  const h = _cuC.apply(this, arguments);
+  try {
+    if (!h || typeof calmOn !== 'function' || !calmOn()) return h;
+    const ty = String(spec || '').split(':')[1], ws = fcWaves(), g = ws.length && waveSpec(ws[0]).find(x => x.type === ty && x.calmK > 1); if (!g) return h;
+    const k = Math.round(g.calmK * CALM.hp * 10) / 10, n = Math.max(1, Math.round(g.calmK));
+    return h + `<p class="fcc-c"><b>Calm pace:</b> about ${k} times a normal one's health, ${n} times its gold, and ${n} lives if it reaches the gate.</p>`;
+  } catch (e) { return h; }
+}; }
+if (typeof openSettings === 'function') { const _cuS = openSettings; openSettings = function () { const r = _cuS.apply(this, arguments); try { calmSettingsRow(); } catch (e) { console.warn('calm pace', e); } return r; }; }
+// the play log says which pace the run was played at (playlog.js plHeader)
+if (typeof plHeader === 'function') { const _cuP = plHeader; plHeader = function () { const h = _cuP.apply(this, arguments); try { if (h && typeof calmOn === 'function' && calmOn()) { h.calm = 1; h.heroName = `${h.heroName || 'no hero'} [Calm pace]`; } } catch (e) {} return h; }; }
 
