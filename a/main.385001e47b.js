@@ -1,4 +1,4 @@
-const BUILD_TAG = '1b30f0d@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '539709e@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -50230,6 +50230,186 @@ const rideNote = unit => RIDE[unit] ? (RIDE[unit].basic ? RIDE_NOTE : RIDE_NOTE_
   }
 }
 
+/* Edge falls: a trial (owner, 11 Nov 2026: "when a minion dies just as coming up over the crest at the top if they get hit
+   by an arrow or projectile spell they can be pushed over the edge of the map where it falls off").
+
+   A map may say where its ground ends: MAPS.<id>.fallEdge = { line: [[x0, z0], [x1, z1]], over: [dx, dz], near, drop }
+     line   the lip, a segment in world cells (x, z)
+     over   the way off the map, across the lip (need not be unit length)
+     near   how close to the lip, in cells along the blow, a foe must die to go over (default EF.near)
+     drop   how far below the lip the body falls before it is taken away (default EF.drop)
+   A map without one behaves as it always did.
+
+   The rule (efRule): a ground foe that is no boss and no leader, slain by a shot in flight (an arrow, a bolt, a thrown or
+   lobbed spell: whatever game.js impact, pierceFly or glaiveFly lands; never a beam, a zone, damage over time, a relic's
+   proc or a melee blow), whose blow heads for the lip and would carry the body past it. How far a blow carries a body:
+   EF.push cells x the hit's weight (the share of its health the blow took, the overkill, the kind of shot) / the foe's
+   bulk (its size and health class, more for an elite). A foe within its own length of the lip (EF.tall x its size) goes
+   over however light the blow: toppled that way it would lie across the lip. So an arrow topples a gnoll or a troll
+   standing at the lip, carries a gnoll a cell to it, and does not move a troll a cell from it. A shot kill by the lip that
+   does not go over still gets the hit's reaction, and falls short of the lip.
+
+   It is only a look. kill() is wrapped to leave a note on the dead foe (c.efall) and nothing else: who dies, the gold,
+   the loot (dropped where the foe died, on the field), XP, veterancy, on-death effects, the corpse a Necromancer may
+   raise (G.corpses, where the foe died) and leaks are untouched, and nothing of it is saved. The body itself is the
+   view's ragdoll (view.js ragNew, ragStep, drawCorpses), which is given the push, has no ground under it past the lip,
+   and so tips over and drops behind it: the painted ground hides what is below it, as it hides a foe coming up over a
+   rise on the way in, so nothing is drawn over units or the HUD.
+
+   Off: ?edgefall=0, the Settings switch (localStorage runehold.edgefall = 0), Graphics Low, Tower Wars.
+   Look at it without a kill: edgeFallDemo() in the console throws a few bodies over the lip (nothing in the game changes). */
+const EF = { near: 1.5, push: 1, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: .35, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2 };
+const EF_Q = (() => { try { return new URLSearchParams(location.search).get('edgefall'); } catch (e) { return null; } })();
+let EF_SET = true; try { EF_SET = localStorage.getItem('runehold.edgefall') !== '0'; } catch (e) {}
+let EF_SHOT = null;   // the shot whose landing is being resolved (impact, pierceFly, glaiveFly)
+function efSet(on) { EF_SET = !!on; try { localStorage.setItem('runehold.edgefall', on ? '1' : '0'); } catch (e) {} }
+// the current map's lip, or null: switched off, Graphics Low, Tower Wars, or a map with no edge
+function efEdge() {
+  if (EF_Q === '0' || !EF_SET || (typeof GFX !== 'undefined' && GFX === 'low')) return null;
+  if (typeof G === 'undefined' || !G || G.vs || typeof MAPS === 'undefined') return null;
+  const m = MAPS[G.map]; return (m && m.fallEdge) || null;
+}
+// how far past the lip a point is, along `over` (negative: still on the map); null if it is beside the lip, not at it
+function efPast(E, x, z) {
+  const a = E.line[0], b = E.line[1], ol = Math.hypot(E.over[0], E.over[1]) || 1, ox = E.over[0] / ol, oz = E.over[1] / ol;
+  const lx = b[0] - a[0], lz = b[1] - a[1], ll = lx * lx + lz * lz || 1, u = ((x - a[0]) * lx + (z - a[1]) * lz) / ll;
+  if (u < -.05 || u > 1.05) return null;
+  return (x - a[0] - lx * u) * ox + (z - a[1] - lz * u) * oz;
+}
+// a foe's bulk: 1 is a Gnoll Raider
+function efBulk(c) { const d = c.def || {}, r = (d.r || .34) * (c.grow || 1); return (r / .34) * (r / .34) * Math.min(3, Math.max(.5, Math.sqrt(d.hp || 1))) * (c.elite ? EF.elite : 1); }
+// a blow's weight: the share of the foe's health it took (c.hitK, set by hurt), the overkill, the kind of shot
+function efWeight(c, p) { const hs = Math.min(1, Math.max(0, ((c.hitK || .35) - .35) / 1.05)), k = EF.kind[p && p.k] || EF.kindDef; return k * (.55 + .35 * hs + .5 * Math.min(1, (c.overK || 0) * 2)); }
+// the blow's direction along the ground: the shot's flight for the foe it struck, out from where it burst for the others
+function efDir(c, p) {
+  let dx = 0, dz = 0;
+  if (p.tg !== c || p.k === 'ball') { dx = c.x - (p.ax != null ? p.ax : p.x); dz = c.y - (p.az != null ? p.az : p.z); }
+  if (Math.hypot(dx, dz) < .05 && p.dir) { dx = p.dir[0]; dz = p.dir[2]; }
+  if (Math.hypot(dx, dz) < 1e-4 && p.k === 'ball' && p.x0 != null) { dx = p.ax - p.x0; dz = p.az - p.z0; }
+  if (Math.hypot(dx, dz) < 1e-4 && p.src && p.src.x != null) { dx = c.x - p.src.x; dz = c.y - p.src.y; }
+  const l = Math.hypot(dx, dz); return l < 1e-4 ? null : [dx / l, dz / l];
+}
+// a shot's kill by the lip. E: the lip, c: the foe (dead or dying), p: the shot. Returns null (nothing to do with the lip) or
+// { d: the blow, L: cells to the lip along it, carry: how far the blow carries the body, over: it goes over, w, m, kind, E }
+function efRule(E, c, p) {
+  if (!E || !c || !p || !c.def) return null;
+  if (c.fly || c.def.boss || c.def.lead || c.def.noCorpse || c.noCorpse || c.burT > 0 || !(c.def.spd > 0) || c.type === 'wraith') return null;
+  const d = efDir(c, p); if (!d) return null;
+  const ol = Math.hypot(E.over[0], E.over[1]) || 1, to = (d[0] * E.over[0] + d[1] * E.over[1]) / ol;
+  if (to < EF.toward) return null;   // the blow must head for the lip
+  const s = efPast(E, c.x, c.y); if (s == null || s > 0) return null;   // beside the lip, or already behind it (still on the way in)
+  const near = E.near || EF.near, L = -s / to; if (L > near) return null;
+  if (efPast(E, c.x + d[0] * L, c.y + d[1] * L) == null) return null;   // the blow's line misses the lip
+  const w = efWeight(c, p), m = efBulk(c), carry = Math.min(near, EF.push * w / m), tall = EF.tall * (c.def.r || .34) / .34 * (c.grow || 1);
+  return { d, L, carry, over: carry >= L || L <= tall, w, m, kind: p.k, E };   // (within its own length of the lip a body that topples that way goes over, however light the blow)
+}
+// ---- the game's side: know the shot that is landing, and note the fall on the foe it kills
+if (typeof impact === 'function') { const f0 = impact; impact = function (p) { const s = EF_SHOT; EF_SHOT = p; try { return f0.apply(this, arguments); } finally { EF_SHOT = s; } }; }
+if (typeof pierceFly === 'function') { const f0 = pierceFly; pierceFly = function (p) { const s = EF_SHOT; EF_SHOT = p; try { return f0.apply(this, arguments); } finally { EF_SHOT = s; } }; }
+if (typeof glaiveFly === 'function') { const f0 = glaiveFly; glaiveFly = function (p) { const s = EF_SHOT; EF_SHOT = p; try { return f0.apply(this, arguments); } finally { EF_SHOT = s; } }; }
+if (typeof kill === 'function') {
+  const f0 = kill;
+  kill = function (c) {
+    if (EF_SHOT && c && !c.dead && (typeof DTAG === 'undefined' || (DTAG !== 'relic' && DTAG !== 'rx'))) { try { const E = efEdge(); if (E) c.efall = efRule(E, c, EF_SHOT); } catch (e) { console.error(e); } }
+    return f0.apply(this, arguments);
+  };
+}
+// ---- the view's side (called from view.js and the gnoll's rig; k is a body)
+/* How the hit reads (owner: "maybe test with an animation or physics so that they look correct when getting hit").
+   EF_MODE, three ways to compare (?edgefall=physics | anim | blend, or set EF_MODE in the console):
+     physics  the box ragdoll alone: the blow is an impulse at the point it struck (chest high, on the side it came
+              from), so the body turns about its feet and the limbs, loose on their joints, lag behind it
+     anim     an authored topple: the body is leaned back about its heels and walked back a step over EF_FL.anim seconds,
+              then handed to the ragdoll
+     blend    (the default) a short authored flinch, the torso snapped back about the heels and a half step back, the
+              limbs left behind, then the physics as above, starting from that pose
+   The rigged Gnoll Raider has its own authored falls (models_lead8_mobs.js): it flinches, then takes the fall that goes
+   the way the blow went (knocked backward, pitched forward or spun aside), slides to the lip and tips over it. */
+const EF_FL = { blend: [.11, .14, .2, .5], anim: [.3, .75, .1, 1], physics: [0, 0, 0, 0] };   // [seconds, lean (radians), more lean per weight / bulk, the most]
+let EF_MODE = EF_FL[EF_Q] ? EF_Q : 'blend';
+const efCross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+// the body takes the blow: f is the foe's note (efRule), k the box ragdoll as ragNew made it
+function efRag(k, f) {
+  if (!k.R || !f || !f.E) return;
+  const d = f.d, imp = Math.min(2.2, Math.max(.3, f.w / f.m)), ax = [d[1], 0, -d[0]], P = EF_FL[EF_MODE] || EF_FL.blend;
+  const db = ragMulT(k.R, [d[0], 0, d[1]], [0, 0, 0]), e = k.he[0] * Math.abs(db[0]) + k.he[2] * Math.abs(db[2]);   // the footprint's reach along the blow
+  const T = P[0], ang = T ? Math.min(P[3], P[1] + P[2] * imp) : 0, step = T ? Math.min(.36, .07 + .13 * imp) * Math.min(1, f.L / .3) : 0, room = f.L - step;
+  // along the blow: what it takes to reach the lip if the blow carries it over, else what the blow gives, stopping short of the lip
+  const sp = f.over ? Math.max(.7, room / .55 + .5 + .3 * Math.random()) : Math.max(.15, Math.min(.5 + .9 * imp, (room - .25) / .28));
+  const hy = k.he[1] * .4, top = k.topW || 2, wp = Math.max(top + .9 + .8 * imp, hy * sp * k.Ii[0] * .5) * (f.over ? 1.4 : 1), tw = k.w[1];   // the impulse at the struck point turns it about its heels; never less than it takes to go over, and a body bound for the lip is on its back by the time it gets there
+  const rr = [-d[0] * e, k.he[1], -d[1] * e], pv = efCross([ax[0] * wp, 0, ax[2] * wp], rr);
+  k.v = [d[0] * sp + pv[0], Math.min(1.8, pv[1]) + (f.kind === 'ball' ? 2.6 : .5) + 1.9 * Math.min(1, Math.max(0, imp - .9)), d[1] * sp + pv[2]];   // (a heavy blow lifts the feet)
+  k.w = [ax[0] * wp, tw * (.4 + .6 * Math.abs(db[0])), ax[2] * wp];   // (a blow from the side twists it more)
+  for (const q of k.limbs) { const aw = ragMul(k.R, q.ax, [0, 0, 0]), c = aw[0] * ax[0] + aw[2] * ax[2]; q.w = -c * (3 + 4 * imp) + (Math.random() - .5) * 2; q.efc = c; q.a1 = q.a; }   // the limbs are left behind as the torso goes
+  if (T) k.fl = { T, ang, step, ax, d, R0: k.R.slice(), p0: k.p.slice(), piv: [k.p[0] + d[0] * e, 0, k.p[2] + d[1] * e] };
+  if (f.over) k.ef = { E: f.E, d, t0: null, snd: false };
+}
+// the authored part: the body leaned back about its heels and stepped back, eased out; true while it runs
+function efFlinch(k) {
+  const F = k.fl, u = Math.min(1, k.t / F.T), q = 1 - (1 - u) * (1 - u), a = F.ang * q, s = F.step * q;
+  k.R = F.R0.slice(); ragRot(k.R, F.ax, a);
+  const M = [1, 0, 0, 0, 1, 0, 0, 0, 1]; ragRot(M, F.ax, a);
+  const r = ragMul(M, [F.p0[0] - F.piv[0], F.p0[1], F.p0[2] - F.piv[2]], [0, 0, 0]);
+  k.p[0] = F.piv[0] + r[0] + F.d[0] * s; k.p[1] = r[1]; k.p[2] = F.piv[2] + r[2] + F.d[1] * s;
+  for (const l of k.limbs) l.a = l.a1 - l.efc * a * .9;
+  if (u >= 1) { k.fl = null; return false; }
+  return true;
+}
+// is this corner of the body past the lip (no ground under it)?
+function efOff(k, x, z) { const s = efPast(k.ef.E, x, z); return s != null && s > 0; }
+// a little earth knocked off the lip as a body goes over
+function efLipFx(x, z, d) {
+  if (typeof part !== 'function' || typeof VLIVE === 'undefined' || !VLIVE) return;
+  for (let i = 0; i < 4; i++) part({ k: i < 2 ? 'chunk' : 'smoke', x: x + (Math.random() - .5) * .3, z: z + (Math.random() - .5) * .2, h: .05, vx: d[0] * .6 + (Math.random() - .5) * .5, vz: d[1] * .6 + (Math.random() - .5) * .5, vh: .4 + Math.random() * .5, g: i < 2 ? 7 : 0, drag: 3, life: .4, max: .4, size: i < 2 ? .04 : .13, col: i < 2 ? '#6a5a3c' : '#b8a888' });
+}
+// far below, late and soft: the body's landing
+function efLandSnd(c, x) { if (typeof sfx === 'function' && typeof VLIVE !== 'undefined' && VLIVE) sfx('land', { t: c.def.voice || c.type, x, s: EF.sndS, w: Math.min(.6, .35 * efBulk(c)) }); }
+// once a step: has the body gone over? (its middle past the lip by a little)
+function efStep(k, h) {
+  const e = k.ef;
+  if (e.t0 == null) {
+    const s = efPast(e.E, k.p[0], k.p[2]);
+    if (s != null && s > EF.lip) { e.t0 = k.t; k.sleep = false; efLipFx(k.p[0], k.p[2], e.d); }
+    else if (k.t > 1) k.ef = null;   // it never got there: an ordinary body
+    return;
+  }
+  const f = 1 - 2.2 * h; k.v[0] *= f; k.v[2] *= f;   // over the lip it drops, it does not sail on
+  if (k.p[1] < k.he[1] + .2 && k.v[1] < 0) k.v[1] += RAG_G * h * EF.ease;   // and it tips over the lip slowly enough to be seen going (the ragdoll's own gravity would take it in a blink)
+}
+// drawing a body that has gone over: [scale, darkening], and false once it is out of sight
+function efDraw(k) {
+  const e = k.ef, u = k.t - e.t0, drop = e.E.drop || EF.drop;
+  if (!e.snd && u > EF.sndAt) { e.snd = true; efLandSnd(k.c, k.p[0]); }
+  if ((k.p[1] < -drop && e.snd) || u > 1.4) return false;
+  const q = Math.min(1, u / .5); return [1 - .15 * q, 1 - .4 * q];
+}
+// the rigged gnoll's fall (models_lead8_mobs.js pickFall's f): the fall that goes the way the blow went, along the blow
+function efFallRig(f, n) {
+  if (!n || !n.E) return;
+  f.kind = Math.abs(f.lx) > .8 ? 'spin' : f.lz <= 0 ? 'back' : 'skid'; if (f.kind === 'spin') f.side = f.lx > 0 ? 1 : -1;
+  f.dx = n.d[0]; f.dz = n.d[1]; f.big = Math.min(1.6, Math.max(f.big, .5 * Math.min(2, n.w / n.m) - .2));
+  f.ef = { E: n.E, L: n.L, over: n.over, T: EF_MODE === 'physics' ? 0 : EF_MODE === 'anim' ? .2 : .11, step: Math.min(.3, .08 + .1 * n.w / n.m) * Math.min(1, n.L / .3), tc: null, snd: false };
+  f.reach = n.over ? 9 : Math.min(f.reach, Math.max(0, n.L - f.ef.step - .3));
+}
+// a look at it with no kill: n bodies struck at the current map's lip, one after another. o: { type, side: 1 (struck from
+// the side), weak: 1 (too weak to go over), back: cells from the lip, heavy: 1 (a lobbed shell) }
+function edgeFallDemo(n, o) {
+  o = o || {};
+  const E = (typeof MAPS !== 'undefined' && MAPS[G.map] && MAPS[G.map].fallEdge) || null; if (!E || typeof ragNew !== 'function') return 'no edge on this map';
+  const a = E.line[0], b = E.line[1], ol = Math.hypot(E.over[0], E.over[1]) || 1, ov = [E.over[0] / ol, E.over[1] / ol], types = o.type ? [o.type] : ['gnoll', 'wolf', 'spider', 'troll', 'gnoll'];
+  n = n || 5;
+  for (let i = 0; i < n; i++) setTimeout(() => {
+    const u = n > 1 ? .2 + .6 * i / (n - 1) : .5, back = o.back != null ? o.back : .3 + .7 * Math.random(), ty = types[i % types.length];
+    const sk = o.side ? (i % 2 ? 1 : -1) * .9 : (Math.random() - .5) * .3, d = [ov[0] - ov[1] * sk, ov[1] + ov[0] * sk], dl = Math.hypot(d[0], d[1]);
+    const c = { type: ty, def: CREEPS[ty], x: a[0] + (b[0] - a[0]) * u - ov[0] * back, y: a[1] + (b[1] - a[1]) * u - ov[1] * back, ox: 0, oy: 0, age: 1, anim: Math.random() * 9, spdM: 1, dieFx: o.heavy ? 'blast' : 'cut', overK: o.weak ? 0 : .3, hitK: o.weak ? .35 : 1, poison: [], id: i };
+    c.hdx = d[0] / dl; c.hdz = d[1] / dl;
+    const to = c.hdx * ov[0] + c.hdz * ov[1], p = { k: o.heavy ? 'ball' : 'arrow' }, w = efWeight(c, p), m = efBulk(c);
+    c.efall = { d: [c.hdx, c.hdz], L: back / Math.max(.3, to), carry: 9, over: !o.weak, w, m, kind: p.k, E };
+    corpses.push(ragNew(c, { yaw: o.yaw || 0 }));
+  }, i * (o.gap || 900));
+  return n + ' bodies';
+}
+
 /* ================= LINE HOLDERS: one melee unit a force holds foes; the other melee damage units pay off on held foes =================
    The owner (11 Nov 2026): "Looking for ways to lean into strategy more. Possibly removing root entirely from damage
    melee units but a select few", then of docs/design/root_audit_2026-11-11.md: "this is good".
@@ -64849,7 +65029,8 @@ const MAPS = {
   // the forest clearing: foes come out of the dark tunnel of trees at its head (entry: world x, z waypoints to the field)
   clearing: { name: 'Sunfall Glade', blurb: 'Dappled light in the deep wood', entry: typeof CL_ENTRY !== 'undefined' ? CL_ENTRY : null },
   // Greatroot Way, the default map (the standard run and the Chronicles' first location): the notes are below
-  greatroot: { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: typeof GR_ENTRY !== 'undefined' ? GR_ENTRY : null, tun: typeof GR_TUN !== 'undefined' ? GR_TUN : null },
+  greatroot: { name: 'Greatroot Way', blurb: 'The elves’ road home, under the old trees', entry: typeof GR_ENTRY !== 'undefined' ? GR_ENTRY : null, tun: typeof GR_TUN !== 'undefined' ? GR_TUN : null ,
+    fallEdge: { line: [[3.4, -6.2], [5.8, -6.2]], over: [0, -1], near: 1.5, drop: 1.3 } },   // (the crest the road comes up over at the head of the painting: a foe slain at it by a shot may be knocked back over it, forces_zzzzzzzzzzzzzzzzzzzz_edgefall.js)
 };
 /* Greatroot Way: the elves' road home under the old trees. The owner's painting is the map (grpaint.js from
    tools/make_grpaint.py: a sunlit grass road between great trees, running away to a point between two trunks at the
@@ -64867,7 +65048,11 @@ const GR3_ENTRY = [[3.5, -7.2], [4.5, -6.25], [5.9, -5.55], [6.75, -4.3], [6.5, 
    tools/make_poolmap.py: a grass ledge among giant trees over a misty valley, a stream and pool whose water moves), the
    field set high on the ledge under the cliff's edge. Beside Greatroot Way, not in place of it: in the map pickers, and
    for any run with ?trymap=mistfall (MAP_TRY). ?video=0 shows its still instead, to compare. */
-if (typeof POOL_STILL !== 'undefined') MAPS.mistfall = { name: 'Mistfall Ledge', blurb: 'A grass ledge over the misty valley (trial)', entry: typeof POOL_ENTRY !== 'undefined' ? POOL_ENTRY : null, tun: typeof POOL_TUN !== 'undefined' ? POOL_TUN : null, wide: true };   // (wide: foes in at any column along the top, out anywhere along the foot: core.js wideMap)
+if (typeof POOL_STILL !== 'undefined') MAPS.mistfall = { name: 'Mistfall Ledge', blurb: 'A grass ledge over the misty valley (trial)', entry: typeof POOL_ENTRY !== 'undefined' ? POOL_ENTRY : null, tun: typeof POOL_TUN !== 'undefined' ? POOL_TUN : null, wide: true,
+  // the cliff's lip along the field's head (the picture's top edge between the trunks, source row 300: world z -1.27), for
+  // foes killed by a shot there to be knocked back over it (the edge-fall branch: line, the direction over, how near in cells
+  // a kill must be, how far the body drops out of sight). The top edge only: the right-hand cliff is six cells from the field.
+  fallEdge: { line: [[0, -1.27], [11, -1.27]], over: [0, -1], near: 1.5, drop: 1.3 } };   // (wide: foes in at any column along the top, out anywhere along the foot: core.js wideMap)
 const MAP_TRY = (() => { try { const q = new URLSearchParams(location.search).get('trymap'); return q && MAPS[q] ? q : null; } catch (e) { return null; } })();
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
 /* Tunable light schemes. Colours are sRGB hex, strengths multiply them in linear light. The Lighting panel edits a copy per map. */
@@ -70860,9 +71045,9 @@ const GNOLL = (() => {
     return { th, pitch, roll, d: Math.min(d, f.reach), h, ys, landT, limbs: a, run: Math.max(0, 1 - t / .25) };
   }
   // the pose of a fall at time t (on top of the run he died in, blending out)
-  function ragPose(R, f, t) {
+  function ragPose(R, f, t, hit) {
     const S = fallAt(f, t), I = R.bix;
-    const p = pose(R, { ph: f.ph, walk: S.run, stride: 1, hit: 0, death: null, t: 0 });
+    const p = pose(R, { ph: f.ph, walk: S.run, stride: 1, hit: hit || 0, death: null, t: 0 });
     if (S.pitch) rx(p, I.root, S.pitch * S.th); else rz(p, I.root, -S.roll * S.th);
     if (f.kind === 'spin' || f.kind === 'knees') rx(p, I.root, f.kind === 'spin' ? .25 * Math.min(1, S.th) : 0);
     for (let i = 0; i < NL; i++) { const [b, ax] = LOOSE[i]; if (ax === 'x') rx(p, I[b], S.limbs[i]); else rz(p, I[b], S.limbs[i]); }
@@ -70889,18 +71074,28 @@ const GNOLL = (() => {
   const _cm = new Float32Array(16), _cr = new Float32Array(16);   // (_lm: the lean's scratch, free during deaths)
   function ragDie(k) {
     const L = LODS[LODS.length - 1], R = L.R, f = k.fall, t = k.t;
-    if (t > RAG_DIE) { k.done = true; return false; }
+    // e: struck by a map's lip (efFallRig): a flinch and a step back first, then the fall along the blow; if the blow carries
+    // him over (e.tc: when he crossed the lip) he tips on over it and drops behind it, the ground hiding him
+    const e = f.ef || null, gone = e && e.tc != null, tf = e ? Math.max(0, t - e.T) : t;
+    if (gone ? t - e.tc > 1.4 : t > RAG_DIE) { k.done = true; return false; }
     const s = k.slot; s.k = k; s.vt = vt;
-    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(t, RAG_T)));   // (the old set's run under the fall, whatever the global set)
-    const su = Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - S.h / k.sc;
+    const { p, S } = inSet('old', () => ragPose(R, f, Math.min(tf, RAG_T), e ? (e.T && t < e.T ? Math.sin(t / e.T * Math.PI / 2) : Math.max(0, 1 - tf / .2)) * 1.6 : 0));   // (the old set's run under the fall, whatever the global set)
+    let dd = S.d, drop = 0;
+    if (e) {
+      dd += e.step * (e.T ? sm(0, e.T, t) : 1);
+      if (e.over) dd = Math.max(dd, (e.L + .45) * sm(0, .4 + .25 * e.L, tf));   // carried to the lip and a little past it
+      if (!gone && e.over && dd >= e.L + .15) { e.tc = t; k.thud = true; if (typeof efLipFx === 'function') efLipFx(k.x + f.dx * dd, k.z + f.dz * dd, [f.dx, f.dz]); }
+      if (e.tc != null) { const u = t - e.tc, tip = Math.min(1.25, 3.4 * u); drop = 8 * u * u; if (S.pitch) rx(p, R.bix.root, S.pitch * tip); else rz(p, R.bix.root, -S.roll * tip); if (!e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); } }
+    }
+    const su = gone ? 0 : Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - S.h / k.sc + drop / k.sc;
     MOBRIG.posed(R, p, s.M, s.P, s.N, sink);
     s.ver++; MOBRIG.refill(s.body, R, ['body'], s.P, s.N); s.body.ver = s.ver;
     if (!k.thud && S.landT >= 0 && t > S.landT) { k.thud = true; MOBRIG.thud(k, 4, false); }
-    const x = k.x + f.dx * S.d, z = k.z + f.dz * S.d;
+    const x = k.x + f.dx * dd, z = k.z + f.dz * dd;
     M4.trs(_m, x, k.y, z, k.yaw + S.ys, 0, 0, k.sc);
-    const c = k.c, t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0], fl = Math.max(0, 1 - t / .14), dk = 1 - .35 * Math.min(1, su * 2.5);
+    const c = k.c, t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0], fl = Math.max(0, 1 - t / .14), dk = gone ? 1 - .4 * Math.min(1, (t - e.tc) / .5) : 1 - .35 * Math.min(1, su * 2.5);
     const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * fl) * dk, t0[1] * (.8 + .25 * fl) * dk, t0[2] * (.75 + .25 * fl) * dk, Math.max(t0[3] * dk, .08 * fl)];
-    const o = { tint, shadow: su < .2 };
+    const o = { tint, shadow: su < .2 && !gone };
     item(s.body, _m, o);
     if (!f.fly) { MOBRIG.refill(s.cl, R, ['cleaver'], s.P, s.N); s.cl.ver = s.ver; item(s.cl, _m, o); }
     else if (CLEAVER) {   // the cleaver flying out of his hand: from his grip as he died, spinning, one bounce, flat on the road
@@ -71012,6 +71207,7 @@ const GNOLL = (() => {
       if (on < RAG_CAP() && LODS.length) {
         const c = k.c, f = pickFall(c, k.yaw, (c && c.id || 0) * 1.37 + (c && c.anim || 0) + k.x * 3.1);
         const gs = c && GT.get(c); f.ph = gs ? gs.ph : k.ph; f.reach = reachOf(k.x, k.z, f.dx, f.dz);
+        if (c && c.efall && typeof efFallRig === 'function') { efFallRig(f, c.efall); if (!f.ef.over) f.reach = Math.min(f.reach, reachOf(k.x, k.z, f.dx, f.dz)); }   // slain by a map's lip by a shot (the edge-fall trial: forces_zzzzzzzzzzzzzzzzzzzz_edgefall.js)
         k.fall = f; k.slot = ragSlot(LODS[LODS.length - 1].R); k.slot.k = k; k.slot.vt = vt;
       }
     }
@@ -77190,7 +77386,9 @@ function ragNew(c, s) {
     return { L, rc, far, a, a0: 0, w: R_(-1, 1) * (big ? 3 : 9) * hard, om: null, ax: L.axis === 'x' ? [1, 0, 0] : L.axis === 'y' ? [0, 1, 0] : [0, 0, 1] };
   });
   const py = k.y + cw[1];
-  return Object.assign(k, { R, p: [k.x + cw[0], pivot ? Math.min(py, he[1] + .01) : py, k.z + cw[2]], v, w, he, com, Ii: Ib.map(x => 1 / Math.max(1e-4, x)), limbs, rest: 0, sleep: false, ground: false, gilded: c.gilded });
+  Object.assign(k, { R, p: [k.x + cw[0], pivot ? Math.min(py, he[1] + .01) : py, k.z + cw[2]], v, w, he, com, Ii: Ib.map(x => 1 / Math.max(1e-4, x)), limbs, rest: 0, sleep: false, ground: false, gilded: c.gilded });
+  if (c.efall && !big && typeof efRag === 'function') { k.topW = top; efRag(k, c.efall); }   // slain at a map's lip by a shot that carries it over (the edge-fall trial: forces_zzzzzzzzzzzzzzzzzzzz_edgefall.js)
+  return k;
 }
 // a model-space point to world, through the ragdoll's body (no limb)
 function ragPt(k, P, o) { _rv[0] = (P[0] - k.com[0]) * k.sc; _rv[1] = (P[1] - k.com[1]) * k.sc; _rv[2] = (P[2] - k.com[2]) * k.sc; ragMul(k.R, _rv, o); o[0] += k.p[0]; o[1] += k.p[1]; o[2] += k.p[2]; return o; }
@@ -77207,6 +77405,7 @@ function ragStep(k, h) {
       _ra[0] = (n & 1 ? 1 : -1) * k.he[0]; _ra[1] = (n & 2 ? 1 : -1) * k.he[1]; _ra[2] = (n & 4 ? 1 : -1) * k.he[2];
       const r = ragMul(k.R, _ra, _rb), y = k.p[1] + r[1];
       if (y >= 0) continue;
+      if (k.ef && efOff(k, k.p[0] + r[0], k.p[2] + r[2])) continue;   // (past a map's lip there is no ground: the body tips over it)
       k.ground = true; if (it === 0) low = Math.min(low, y);
       // velocity of that corner: v + w x r
       const vx = k.v[0] + k.w[1] * r[2] - k.w[2] * r[1], vy = k.v[1] + k.w[2] * r[0] - k.w[0] * r[2], vz = k.v[2] + k.w[0] * r[1] - k.w[1] * r[0];
@@ -77223,15 +77422,16 @@ function ragStep(k, h) {
         const tx = sx / sl, tz = sz / sl;
         _rc[0] = r[1] * tz; _rc[1] = r[2] * tx - r[0] * tz; _rc[2] = -r[1] * tx;   // r x t
         const it2 = ragIinv(k, _rc, _rd), cx = it2[1] * r[2] - it2[2] * r[1], cz = it2[0] * r[1] - it2[1] * r[0];
-        const kt = 1 + tx * cx + tz * cz, jt = Math.max(-RAG_MU * j, -sl / kt);
+        const kt = 1 + tx * cx + tz * cz, jt = Math.max(-(k.ef ? .3 : RAG_MU) * j, -sl / kt);   // (a body on its way over a lip slides on)
         k.v[0] += tx * jt; k.v[2] += tz * jt; k.w[0] += it2[0] * jt; k.w[1] += it2[1] * jt; k.w[2] += it2[2] * jt;
       }
     }
     if (low < 0) k.p[1] -= low * .8;   // out of the ground
     if (k.land) { ragThud(k); k.land = null; }
     const wl = Math.hypot(k.w[0], k.w[1], k.w[2]), dmp = k.ground ? 1 - (wl < 2 && k.t > .25 ? 6 : .8) * h : 1 - .3 * h;   // rolling dies away once it slows (not while it's still going over) k.w[0] *= dmp; k.w[1] *= dmp; k.w[2] *= dmp;
-    if (k.ground) { const f = 1 - 2.5 * h; k.v[0] *= f; k.v[2] *= f; }
-    const still = k.ground && Math.hypot(k.v[0], k.v[1], k.v[2]) < .2 && Math.hypot(k.w[0], k.w[1], k.w[2]) < .5;
+    if (k.ground && !k.ef) { const f = 1 - 2.5 * h; k.v[0] *= f; k.v[2] *= f; }
+    if (k.ef) efStep(k, h);
+    const still = !k.ef && k.ground && Math.hypot(k.v[0], k.v[1], k.v[2]) < .2 && Math.hypot(k.w[0], k.w[1], k.w[2]) < .5;
     k.rest = still ? k.rest + h : 0; if (k.rest > .12) k.sleep = true;
   }
   // limbs: gravity on each limb's mass, the lag of the turning body, soft joint limits, and never through the ground
@@ -77246,7 +77446,7 @@ function ragStep(k, h) {
     acc -= q.w * (k.ground ? 6 : 1.2);
     const a1 = q.a, w1 = q.w;
     q.w += acc * h; q.a += q.w * h;
-    if (ragPt(k, ragLimbPt(q, q.a, q.far, _rb), _rc)[1] < 0 && ragPt(k, ragLimbPt(q, a1, q.far, _rb), _rd)[1] >= _rc[1]) { q.a = a1; q.w = -w1 * .2; }   // the foot hits the ground: it stops there
+    if (!(k.ef && k.ef.t0 != null) && ragPt(k, ragLimbPt(q, q.a, q.far, _rb), _rc)[1] < 0 && ragPt(k, ragLimbPt(q, a1, q.far, _rb), _rd)[1] >= _rc[1]) { q.a = a1; q.w = -w1 * .2; }   // the foot hits the ground: it stops there
   }
 }
 // a body slamming down: a burst of dust round where it struck, a scuff on the ground, and under a big one the field shakes
@@ -77288,10 +77488,12 @@ function drawCorpses(dt) {
       }
       continue;
     }
-    if (k.t > RAG_T) { corpses.splice(i, 1); continue; }
-    if (dt > 0) { const n = Math.min(6, Math.ceil(dt * 150)), hd = Math.min(dt, .05) * RAG_TS / n; for (let s = 0; s < n; s++) ragStep(k, hd); }
+    const over = k.ef && k.ef.t0 != null ? efDraw(k) : null;   // gone over a map's lip: [its size, its shade] as it drops behind it, false once out of sight
+    if (over === false || (!over && k.t > RAG_T)) { corpses.splice(i, 1); continue; }
+    if (k.fl && efFlinch(k)) {}   // (struck by a map's lip: a short flinch and a step back before the fall)
+    else if (dt > 0) { const n = Math.min(6, Math.ceil(dt * 150)), hd = Math.min(dt, .05) * RAG_TS / n; for (let s = 0; s < n; s++) ragStep(k, hd); }
     if (k.deep == null) { const b = k.model.bounds; k.deep = Math.max(b[1][0] - b[0][0], b[1][1] - b[0][1], b[1][2] - b[0][2]) * k.sc + .15; }   // deep enough that nothing (a spear, a wing) is left poking out
-    const sk = k.fx === 'burn' ? RAG_SINK - .12 : RAG_SINK, su = clamp((k.t - sk) / (RAG_T - sk), 0, 1), sink = su * su * k.deep, R = k.R, sc = k.sc * (1 + .2 * clamp(1 - k.t / .09, 0, 1));   // the kill pops it a touch bigger for a blink
+    const sk = k.fx === 'burn' ? RAG_SINK - .12 : RAG_SINK, su = over ? 0 : clamp((k.t - sk) / (RAG_T - sk), 0, 1), sink = su * su * k.deep, R = k.R, sc = k.sc * (1 + .2 * clamp(1 - k.t / .09, 0, 1)) * (over ? over[0] : 1);   // the kill pops it a touch bigger for a blink
     if (k.fx === 'burn' && su > 0 && !k.ash) { k.ash = true; for (let q = 0; q < 6; q++) part({ k: 'smoke', x: k.p[0] + R_(-.2, .2), z: k.p[2] + R_(-.2, .2), h: .1, vh: R_(.3, .7), drag: 2, life: .5, max: .5, size: R_(.12, .2), col: '#3a302a' }); }   // it crumbles to ash
     if (k.fx === 'burn') rpart(18 * (1 - su), { k: 'ember', x: k.p[0] + R_(-.15, .15), z: k.p[2] + R_(-.15, .15), h: Math.max(.05, k.p[1]), vh: R_(.4, 1), life: .45, max: .45, size: R_(.04, .07), col: '#ff8a2a' });
     else if (k.fx === 'zap' && k.t < .35) rpart(30, { k: 'spark', x: k.p[0] + R_(-.15, .15), z: k.p[2] + R_(-.15, .15), h: Math.max(.05, k.p[1]) + R_(0, .3), vx: R_(-1, 1), vz: R_(-1, 1), vh: R_(0, 1), drag: 3, life: .18, max: .18, size: .05, col: '#d8ecff' });
@@ -77299,11 +77501,11 @@ function drawCorpses(dt) {
     _m[0] = R[0] * sc; _m[1] = R[1] * sc; _m[2] = R[2] * sc; _m[3] = 0; _m[4] = R[3] * sc; _m[5] = R[4] * sc; _m[6] = R[5] * sc; _m[7] = 0;
     _m[8] = R[6] * sc; _m[9] = R[7] * sc; _m[10] = R[8] * sc; _m[11] = 0; _m[12] = k.p[0] - _ra[0]; _m[13] = k.p[1] - _ra[1] - sink; _m[14] = k.p[2] - _ra[2]; _m[15] = 1;
     // the killing blow's flash burns off the body as it goes down, then it darkens into a corpse
-    const f = clamp(1 - k.t / .14, 0, 1), dk = k.t > sk ? 1 - .35 * Math.min(1, (k.t - sk) / .35) : 1;
+    const f = clamp(1 - k.t / .14, 0, 1), dk = over ? over[1] : k.t > sk ? 1 - .35 * Math.min(1, (k.t - sk) / .35) : 1;
     let tint = k.gilded ? [1.5, 1.15, .45, .45] : [(.6 + .9 * f) * dk, (.55 + .85 * f) * dk, (.5 + .8 * f) * dk, .65 * f];
     if (!k.gilded && k.fx === 'burn') { const g = clamp(1 - k.t / .55, 0, 1); tint = [.22 + .5 * f, .13 + .35 * f, .08 + .25 * f, .15 + .55 * g]; }   // charred black, glowing out like a coal
     else if (!k.gilded && k.fx === 'zap') tint = k.t < .35 ? ((k.t * 28 | 0) & 1 ? [.8, .95, 1.7, 1] : [.25, .25, .3, 0]) : [.4 * dk, .4 * dk, .45 * dk, 0];   // it strobes as it fries, then lies scorched
-    const o = { tint, alpha: k.model.alpha < 1 ? k.model.alpha : null, shadow: k.t < sk };
+    const o = { tint, alpha: k.model.alpha < 1 ? k.model.alpha : null, shadow: !over && k.t < sk };
     item(k.model.body, _m, o);
     for (const q of k.limbs) { const L = q.L; M4.trs(_m2, L.piv[0], L.piv[1], L.piv[2], L.axis === 'y' ? q.a : 0, L.axis === 'x' ? q.a : 0, L.axis === 'z' ? q.a : 0); M4.mul(_m3, _m, _m2); item(L.mesh, _m3, o); }
     if (k.gilded && k.t < 1.4) QADD.bill(RD, k.p[0], k.p[1] + .2, k.p[2], .7, .7, [1, .8, .3, .3 * (1 - k.t / 1.4)], 1, 0);
@@ -84560,6 +84762,7 @@ function openSettings(back) {
         <button type="button" class="cm-setting" id="sDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
         <div class="cm-setting"><label for="sGfx">Graphics</label>${menuGraphicsHTML('sGfx')}</div>
         <button type="button" class="cm-setting" id="sMap" title="Changing map detail reloads the game">Map detail<small>${mapDetailName()}</small></button>
+        ${typeof efSet === 'function' ? `<button type="button" class="cm-setting" id="sEdge" aria-pressed="${EF_SET}" title="A foe slain at a map's edge by an arrow or a thrown spell may be knocked over it. A look only: gold, loot and kills are the same.">Falls from ledges<small>${EF_SET ? 'On' : 'Off'}</small></button>` : ''}
       </section>
     </div>
     <nav class="cm-links" aria-label="More settings">
@@ -84570,6 +84773,7 @@ function openSettings(back) {
     <button type="button" class="btn ghost" id="sBack">Back</button>`, 'setp');
   menuAudioBind('s');
   $('#sGfx').onchange = e => { gfxSet(e.target.value); sfx('click'); };
+  if ($('#sEdge')) $('#sEdge').onclick = () => { efSet(!EF_SET); const b = $('#sEdge'); b.setAttribute('aria-pressed', EF_SET); b.querySelector('small').textContent = EF_SET ? 'On' : 'Off'; sfx('click'); };
   $('#sMap').onclick = () => { sfx('click'); const lite = !mapLite(); lsSet('runehold.maplite', lite ? '1' : '0');
     $('#sMap').querySelector('small').textContent = (lite ? 'Painted' : 'Full 3D') + ' · reloading';
     let href = location.href; try { const u = new URL(href); u.searchParams.delete('maplite'); href = u.href; } catch (e) {}
@@ -95643,6 +95847,20 @@ function mgfBall(P, w, a, col, seed, lv, s, l) {
   const n = [2, 4, 6][lv];
   for (let i = 0; i < n; i++) { const an = now * (9 + i * 1.7) + i * TAU / n + seed, r = w * (.3 + .1 * Math.sin(now * 6 + i)), ti = Math.sin(i * 2.4 + seed); sdBill(SDT_SH.MOTE, [P[0] + Math.cos(an) * r, P[1] + Math.sin(an * 1.3 + i) * r * ti, P[2] + Math.sin(an) * r], w * .2, w * .2, { seed: i, a, k: 1.5, col: MGF_HOT }, s, l); }
 }
+// a tail of light behind a head at P, back along B.d for tl: a chain of soft light swaying more the further back,
+// thinning to nothing
+function mgfTail(P, B, tl, w, sway, a, col, seed, lv, s, l) {
+  if (tl <= .04) return;
+  const now = G.time, n = [6, 9, 12][lv]; let prev = P;
+  for (let i = 1; i <= n; i++) {
+    const f = i / n, back = tl * f, sw = w * sway * Math.pow(f, 1.3), ph = now * 13 - f * 5.5 + seed, ox = Math.sin(ph) * sw, oy = Math.cos(ph * .8 + 1.3) * sw * .7;
+    const X = [P[0] - B.d[0] * back + B.u[0] * ox + B.v[0] * oy, P[1] - B.d[1] * back + B.u[1] * ox + B.v[1] * oy, P[2] - B.d[2] * back + B.u[2] * ox + B.v[2] * oy];
+    const th = 1 - f, g = w * (.35 + 1.5 * th * th), al = a * Math.pow(th, 1.2);
+    sdBill(SDT_SH.GLOW, X, g, g, { seed: seed + i, a: al * .55, col }, s, l);
+    sdSeg(SDT_SH.BEAM, X, prev, w * (.25 + 1.6 * (1 - f)), w * (.25 + 1.6 * (1 - (i - 1) / n)), { seed, k: 1, a: al * .75, p0: .7, p1: 1.2, p2: tl / n, col, sp: 1.5 }, s, l);
+    prev = X;
+  }
+}
 /* ---- motes of arcane light left in the air: each drifts out from where it was let go, slows, twinkles and goes out ---- */
 MGF.dust = [];
 function mgfBasis(A, T) {
@@ -95682,17 +95900,7 @@ function mgfMissile(p) {
   const now = G.time, a = Math.min(1, p.age / .04 + .3) * k, w = V.w * sz, B = M.B || (M.B = mgfBasis(M.A, M.T)), lv = sdLv();
   // the tail: a chain of soft light along the way it has come, swaying more the further back, thinning to nothing
   const gone = Math.hypot(P[0] - M.A[0], P[1] - M.A[1], P[2] - M.A[2]), tl = Math.min(V.trail, gone);
-  if (tl > .04) {
-    const n = [6, 9, 12][lv]; let prev = P;
-    for (let i = 1; i <= n; i++) {
-      const f = i / n, back = tl * f, sw = w * V.sway * Math.pow(f, 1.3), ph = now * 13 - f * 5.5 + M.seed, ox = Math.sin(ph) * sw, oy = Math.cos(ph * .8 + 1.3) * sw * .7;
-      const X = [P[0] - B.d[0] * back + B.u[0] * ox + B.v[0] * oy, P[1] - B.d[1] * back + B.u[1] * ox + B.v[1] * oy, P[2] - B.d[2] * back + B.u[2] * ox + B.v[2] * oy];
-      const th = 1 - f, g = w * (.35 + 1.5 * th * th), al = a * Math.pow(th, 1.2);
-      sdBill(SDT_SH.GLOW, X, g, g, { seed: M.seed + i, a: al * .55, col }, s, 'missile');
-      sdSeg(SDT_SH.BEAM, X, prev, w * (.25 + 1.6 * (1 - f)), w * (.25 + 1.6 * (1 - (i - 1) / n)), { seed: M.seed, k: 1, a: al * .75, p0: .7, p1: 1.2, p2: tl / n, col, sp: 1.5 }, s, 'missile');
-      prev = X;
-    }
-  }
+  mgfTail(P, B, tl, w, V.sway, a, col, M.seed, lv, s, 'missile');
   mgfBall(P, w, a, col, M.seed, lv, s, 'missile');
   // the wake: motes let go along the path it has flown since the last frame, on two strands winding round it
   const Vs = sdV(s, 'sparks');
@@ -95737,7 +95945,7 @@ function mgfCasts(now) {
   for (const q of MGF.casts) {
     const u = (now - q.at) / q.life, a = (u < .15 ? u / .15 : 1 - Math.pow((u - .15) / .85, 2)) * k, m = mgfHand(q.t), w = V.flare * (.8 + .2 * Math.sin(now * 40 + q.seed));
     sdBill(SDT_SH.GLOW, m, w * 1.6, w * 1.6, { seed: q.seed, a: a * .4, col: MGF_VIO }, 'cc_barrage', 'gather');
-    sdBill(SDT_SH.FLARE, m, w, w, { seed: q.seed, a, p0: V.rays, col: MGF_HOT, pull: .1 }, 'cc_barrage', 'gather');
+    mgfBall(m, w * .45, a, MGF_VIO, q.seed, sdLv(), 'cc_barrage', 'gather');
   }
 }
 
@@ -95750,13 +95958,13 @@ function mgfCurtain(q) {
     const m = M[j], g = Math.max(0, Math.min(1, (q.age - m.at) / .25)); if (!m.live || g <= 0) { prev = null; continue; }
     const h = m.h + .04 * Math.sin(now * 3 + j * 1.7), P = [m.x, h, m.z], a = e * g * k, w = V.w * (.9 + .1 * Math.sin(now * 9 + j * 2.3));
     // the veil: faint light falling from it to the road (the line a foe must cross)
-    if (V.veil > 0) sdSeg(SDT_SH.BEAM, P, [m.x, .06, m.z], w * 4, w * 3, { seed: j * 7 + 1, k: 1, a: a * V.veil, p0: .6, p1: 1.5, p2: h, col: MGF_VIO, sp: .8 }, 'cc_sparks', 'hang');
+    if (V.veil > 0) sdSeg(SDT_SH.BEAM, P, [m.x, .06, m.z], w * 2.2, w * 1.4, { seed: j * 7 + 1, k: 1, a: a * V.veil, p0: .6, p1: 1.5, p2: h, col: MGF_VIO, sp: .8 }, 'cc_sparks', 'hang');
     // a short tail above it: it hangs nose-down
     sdSeg(SDT_SH.BEAM, [m.x, h + .3, m.z], P, w * .8, w * 2.6, { seed: j * 7 + 2, k: 1, a: a * .8, p0: 1, p1: 1, p2: .3, col: MGF_VIO, sp: .5 }, 'cc_sparks', 'hang');
     mgfBody(P, w * 2.2, a * .5, j * 5 + 3, 'cc_sparks', 'hang');
     sdBill(SDT_SH.GLOW, P, w * 2.4, w * 2.4, { seed: j, a: a * .7, col: MGF_VIO }, 'cc_sparks', 'hang');
     sdBill(SDT_SH.GLOW, P, w * .8, w * .8, { seed: j + 9, a: a * .9, col: MGF_HOT }, 'cc_sparks', 'hang');
-    sdBill(SDT_SH.FLARE, P, w * 1.7, w * 1.7, { seed: j * 3, a, p0: V.rays, col: MGF_HOT, pull: .1 }, 'cc_sparks', 'hang');
+    mgfBall(P, w * .8, a, MGF_VIO, j * 3, sdLv(), 'cc_sparks', 'hang');
     if (prev && sdLv()) sdSeg(SDT_SH.BEAM, prev, P, w * 2.2, w * 2.2, { seed: j, k: 1, a: a * V.thread, p0: 1, p1: .6, p2: .22, col: MGF_VIO, sp: .3 }, 'cc_sparks', 'hang');
     prev = P;
   }
@@ -95767,7 +95975,9 @@ function mgfStreaks(now) {
   for (const q of MGF.streaks) {
     const el = now - q.at; if (el < 0 || sdOnL(q.s, q.l) == null) continue;
     const u = el / q.life, hd = Math.min(1, u * 1.6), P = [q.A[0] + (q.B[0] - q.A[0]) * hd, q.A[1] + (q.B[1] - q.A[1]) * hd, q.A[2] + (q.B[2] - q.A[2]) * hd];
-    mgfBolt(q.A, P, q.w, .5, .4, 1 - Math.max(0, (u - .6) / .4), MGF_VIO, q.seed, q.s, q.l);
+    const B = q.Bs || (q.Bs = mgfBasis(q.A, q.B)), a = 1 - Math.max(0, (u - .7) / .3), lv = sdLv(), gone = Math.hypot(P[0] - q.A[0], P[1] - q.A[1], P[2] - q.A[2]);
+    mgfTail(P, B, Math.min(.7, gone), q.w, .55, a, MGF_VIO, q.seed, lv, q.s, q.l); mgfBall(P, q.w, a, MGF_VIO, q.seed, lv, q.s, q.l);
+    if (hd < 1 && lv) { q.ph = (q.ph || 0) + 1.1; mgfMote(P, B, q.ph, q.w, 1, MGF_VIO); mgfMote(P, B, q.ph + Math.PI, q.w, 1, MGF_VIO); }
   }
 }
 const mgfStreak = (A, B, w, life, delay, s, l) => { if (MGF.streaks.length > 40) MGF.streaks.shift(); MGF.streaks.push({ A: [A[0], A[1], A[2]], B, w, life, at: G.time + (delay || 0), seed: Math.random() * 97, s, l }); };
@@ -95789,9 +95999,9 @@ function mgfThrows(now) {
   if (k != null) for (const q of MGF.throws) {
     const u = Math.min(1, (now - q.at) / q.T), P = [q.A[0] + (q.B[0] - q.A[0]) * u, q.A[1] + (q.B[1] - q.A[1]) * u, q.A[2] + (q.B[2] - q.A[2]) * u];
     const L = Math.hypot(P[0] - q.A[0], P[1] - q.A[1], P[2] - q.A[2]);
-    if (L > .05) { const tl = Math.min(1.1, L), f = tl / L; sdSeg(SDT_SH.BEAM, [P[0] - (P[0] - q.A[0]) * f, P[1] - (P[1] - q.A[1]) * f, P[2] - (P[2] - q.A[2]) * f], P, q.s * .5, q.s * 2.2, { seed: q.seed, k: 1, a: .8 * k, p0: 1, p1: 1.3, p2: tl, col: MGF_VIO, sp: 2 }, 'cc_grandorb', 'orb'); }
+    const B = q.Bs || (q.Bs = mgfBasis(q.A, q.B)); mgfTail(P, B, Math.min(1.3, L), q.s, .5, k, MGF_VIO, q.seed, lv, 'cc_grandorb', 'orb');   // (the same swaying tail as a missile's; it was a straight streak)
     mgfOrbBall(P, q.s, k, 0, q.seed, V, lv);
-    if (lv && now - q.shed > .03) { q.shed = now; sdShot('mote', P[0], P[1], P[2], R(.03, .045), R(.3, .5), { vx: R(-.3, .3), vz: R(-.3, .3), vy: R(-.1, .3), drag: 2, col: MGF_VIO, k: 1.3 }, 'cc_grandorb', 'orb'); }
+    if (lv) { q.ph = (q.ph || 0) + 1.1; for (let j = 0; j < 3; j++) mgfMote(P, B, q.ph + j * 2.1, q.s, 1.2, MGF_VIO); }
   }
   // the burst: a flare at its heart, a shell of light swelling to the real reach and thinning as it goes
   MGF.bursts = MGF.bursts.filter(q => now < q.at + q.life);
@@ -95849,7 +96059,7 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
     arcmissile: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Missile', basic: 1, layers: ['missile', 'sparks'] },
     cc_barrage: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Barrage', layers: ['missile', 'sparks', 'gather'] },
     cc_sparks: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Missile Curtain', layers: ['hang', 'missile', 'sparks'] },
-    cc_grandorb: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Gathering Orb', layers: ['orb', 'burst'] },
+    cc_grandorb: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Gathering Orb', layers: ['orb', 'burst'], strikes: 1 },
   });
   // a missile: its head's width, its tail's length, its head's rays; sparks it sheds (a second), sparks where it lands,
   // the flare there (width)
@@ -95859,10 +96069,10 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
     // the light gathered at her hand: its width, its rays
     cc_barrage: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks), gather: { flare: .55, rays: .8 } },
     // a hung missile: its width, its rays, the veil under it (opacity), the thread between them (opacity)
-    cc_sparks: { hang: { w: .3, rays: .6, veil: .55, thread: .5 }, missile: Object.assign({}, bolt, { w: .22 }), sparks: Object.assign({}, sparks) },
+    cc_sparks: { hang: { w: .3, veil: .22, thread: .4 }, missile: Object.assign({}, bolt, { w: .22 }), sparks: Object.assign({}, sparks) },
     cc_grandorb: {
       // the orb: its size (x), its rays, the width of the light fed to it
-      orb: { w: 1, rays: .7, feed: .16 },
+      orb: { w: 1, feed: .22 },
       // the burst: its flare (width), the shell of light (opacity), sparks thrown out, billows of haze
       burst: { flare: 1.8, a: .55, count: 16, dust: 6 },
     },
@@ -97168,7 +97378,7 @@ if (typeof applyLight === 'function') {
     const t = L.t; if (!t) return;
     t.hp = t.maxHp; t.wrecked = false; t.silT = 0; if (t.ab) t.ab.mana = abMax(t);
     if (L.t2) { L.t2.cd = 1e9; L.t2.hp = L.t2.maxHp; L.t2.wrecked = false; }
-    if (!SP().basic || (!L.loop && !(L.elFireT > G.time))) t.cd = Math.max(t.cd || 0, .5);
+    if (!SP().strikes && (!SP().basic || (!L.loop && !(L.elFireT > G.time)))) t.cd = Math.max(t.cd || 0, .5);   // (strikes: a spell fed by the unit's own strikes, the Gathering Orb: it keeps striking)
   }
   function cast() {
     const t = L.t; if (!t) return;
