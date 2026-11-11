@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b56d224@2026-11-11';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5bf1ecf@2026-11-11';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -40,7 +40,8 @@ function crestAt(x) {
   for (let i = 1; i < C.length; i++) if (x <= C[i][0]) { const a = C[i - 1], b = C[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0] || 1); }
   return C[C.length - 1][1];
 }
-const CREST_RUN = .5, CREST_PACE = .55;   // (CREST_PACE: a foe's pace up over a crest and on to its column, of its own)   // how far behind the crest a foe starts its climb (cells)
+const CREST_RUN = .5, CREST_PACE = [.6, .35, .9];   // (CREST_PACE: a foe's pace climbing up over a crest, of its own; how far past the crest it keeps it; over how far past that it eases up to its own pace)
+const crestPace = c => { const u = c.y - c.crest - CREST_PACE[1]; return u <= 0 ? CREST_PACE[0] : CREST_PACE[0] + (1 - CREST_PACE[0]) * Math.min(1, u / CREST_PACE[2]); };   // how far behind the crest a foe starts its climb (cells)
 const resAt = k => wideMap() ? k === SPAWN_K : !!RES[k];
 const DIRS = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,Math.SQRT2],[-1,1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,-1,Math.SQRT2]];
 
@@ -3298,7 +3299,7 @@ const tunP = () => (typeof MAPS !== 'undefined' && G && MAPS[G.map] && MAPS[G.ma
 const exitY = () => walkOff() ? ROWS + 2.6 : GATE_Y;
 function moveCreep(c, d) {
   if (c.ent && walkOff()) d *= .45 + .55 / (1 + tunP()[0] * clamp((tunZ() - c.y) / tunP()[1], 0, 1));   // far off up the tunnel each step covers less ground, as it looks (the same perspective as their size)
-  if (c.ent && c.crest != null) d *= CREST_PACE;   // (up over a map's crest and on to its column at a walk, slow enough to be seen and shot off the lip; owner: "units run over the crest too fast for me to see them get shot off")
+  if (c.crest != null && c.y < c.crest + CREST_PACE[1] + CREST_PACE[2]) d *= crestPace(c);   // (a little slower up over a map's crest, where it can be shot off the lip, then up to its own pace on the flat; owner: "slowly come up then can more likely get hit then speed up as they hit the flat land", "not really slow but slower")
   while (c.ent && d > 0) {   // still on the way in out of the woods, to the field's head
     const p = c.ent[0], dx = p[0] - c.x, dy = p[1] - c.y, L = Math.hypot(dx, dy);
     if (Math.abs(dx) > .02) c.face = dx > 0 ? 1 : -1;
@@ -3921,7 +3922,7 @@ function kill(c, src, elem) {
 }
 
 // a foe on its way in over a map's crest that has come up over it (it may be shot, and knocked back off the lip)
-const overCrest = c => c.crest != null && c.y >= c.crest - .05;
+const overCrest = c => c.crest != null && c.y >= c.crest - .2;   // (from when its head shows over the crest)
 // can tower t (with stats st) attack creep c at all?
 function canTarget(t, st, c) {
   if ((c.ent && !overCrest(c)) || (c.fly && c.y < PORTAL.y)) return false;   // not yet out of the woods (a foe over a map's crest may be shot at once)
@@ -50283,7 +50284,7 @@ const rideNote = unit => RIDE[unit] ? (RIDE[unit].basic ? RIDE_NOTE : RIDE_NOTE_
 
    Off: ?edgefall=0, the Settings switch (localStorage runehold.edgefall = 0), Graphics Low, Tower Wars.
    Look at it without a kill: edgeFallDemo() in the console throws a few bodies over the lip (nothing in the game changes). */
-const EF = { crestV: 1.6, crestG: .45, near: 1.5, push: 2, jit: .8, lean: .9, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: -.2, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2 };
+const EF = { crestV: .9, crestG: 0, near: 1.5, push: 2, jit: .8, lean: .9, tall: .7, ease: .62, drop: 1.3, lip: .12, toward: -.2, kind: { ball: 1.35, arrow: 1, glaive: 1 }, kindDef: .9, elite: 1.6, sndAt: .42, sndS: 1.2 };
 const EF_Q = (() => { try { return new URLSearchParams(location.search).get('edgefall'); } catch (e) { return null; } })();
 let EF_SET = true; try { EF_SET = localStorage.getItem('runehold.edgefall') !== '0'; } catch (e) {}
 let EF_SHOT = null;   // the shot whose landing is being resolved (impact, pierceFly, glaiveFly)
@@ -50434,7 +50435,7 @@ function efStep(k, h) {
      hiding it as it goes (greatroot.js, the crest mask and its soft lip). No holding up, no extra drag. */
   if (typeof crestAt === 'function' && crestAt(k.p[0]) != null) {
     const ol = Math.hypot(e.E.over[0], e.E.over[1]) || 1, ox = e.E.over[0] / ol, oz = e.E.over[1] / ol;
-    if (!e.kick) { e.kick = 1; const vo = k.v[0] * ox + k.v[2] * oz; if (vo < EF.crestV) { k.v[0] += (EF.crestV - vo) * ox; k.v[2] += (EF.crestV - vo) * oz; } }
+    if (!e.kick) { e.kick = 1; const vo = k.v[0] * ox + k.v[2] * oz, to = vo < EF.crestV ? EF.crestV : Math.min(vo, 1.6); k.v[0] += (to - vo) * ox; k.v[2] += (to - vo) * oz; if (k.v[1] > 1) k.v[1] = 1; }   // (little way on and no more rise: going away reads as rising from up here)
     if (k.v[1] < 0 || k.p[1] < k.he[1]) k.v[1] += RAG_G * h * EF.crestG;   // (a fall that can be followed: the ragdoll's gravity, eased a little)
     return;
   }
@@ -71263,18 +71264,18 @@ const GNOLL = (() => {
     /* (over the lip: owner, "get shot by arrow, stagger back or leap off the back and fall naturally as if it were a real
        cliff they fell off". He stays on his feet as he staggers back, only starting to go over; past the lip he keeps his
        way out, drops under gravity and goes on over backwards, his own fall played on as he goes) */
-    const ov = e && e.over, stT = ov ? .26 + .12 * Math.min(1.5, e.L) : 0;
+    const ov = e && e.over, SV = 1.9;   // (SV: how fast the blow carries him back, cells a second: kept as he goes over, never eased to a stop at the lip; owner, "they stop almost in mid air")
     const poseT = !ov ? tf : e.tc == null ? t * .38 : e.tc * .38 + (t - e.tc) * 1.3;
     const { p, S } = inSet('old', () => ragPose(R, f, Math.min(poseT, RAG_T), e ? (e.T && t < e.T ? Math.sin(t / e.T * Math.PI / 2) : Math.max(0, 1 - tf / .2)) * 1.6 : 0));   // (the old set's run under the fall, whatever the global set)
     let dd = S.d, drop = 0;
     if (e) {
       dd += e.step * (e.T ? sm(0, e.T, t) : 1);
-      if (ov) { const a = Math.min(1, t / stT); dd = (e.L + .2) * (1 - (1 - a) * (1 - a)); }   // staggered back to the lip and over it, quick then slowing
+      if (ov) dd = SV * Math.max(0, t - .04);   // staggered back to the lip and over it at the blow's pace
       if (!gone && ov && dd >= e.L + .1) { e.tc = t; k.thud = true; if (typeof efLipFx === 'function') efLipFx(k.x + f.dx * dd, k.z + f.dz * dd, [f.dx, f.dz]); }
-      if (e.tc != null) { const u = t - e.tc, tip = Math.min(2.6, .3 + 4 * u); dd = e.L + .2 + .55 * u; drop = 12 * u * u;   // (off the edge: his way out kept, gravity, and on over backwards)
+      if (e.tc != null) { const u = t - e.tc, tip = Math.min(2.6, .3 + 4 * u); dd = SV * (e.tc - .04) + .9 * u; drop = 16 * u * u;   // (from the camera's height, going away reads as rising: so little way on and full gravity, or he seems to hang)   // (off the edge: his way out kept, gravity, and on over backwards)
         if (S.pitch) rx(p, R.bix.root, S.pitch * tip); else rz(p, R.bix.root, -S.roll * tip); if (!e.snd && u > .42) { e.snd = true; efLandSnd(k.c, k.x); } }
     }
-    const su = gone ? 0 : Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - S.h / k.sc + drop / k.sc;
+    const su = gone ? 0 : Math.max(0, (t - RAG_SINK0) / (RAG_DIE - RAG_SINK0)), sink = su * su * .5 - (ov ? 0 : S.h) / k.sc + drop / k.sc;   // (over a lip: no hop of the fall's own, he just goes over and down)
     MOBRIG.posed(R, p, s.M, s.P, s.N, sink);
     s.ver++; MOBRIG.refill(s.body, R, ['body'], s.P, s.N); s.body.ver = s.ver;
     if (!k.thud && S.landT >= 0 && t > S.landT) { k.thud = true; MOBRIG.thud(k, 4, false); }
