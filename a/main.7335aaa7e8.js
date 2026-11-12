@@ -1,4 +1,4 @@
-const BUILD_TAG = '582c132@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'e2775c1+@2026-11-12';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -32265,8 +32265,7 @@ ccxSwap('cc_rimeweaver', { id: 'cc_rimelance', name: 'Hoarfrost Trail', short: '
     chill(c, { slow: .3, slowT: 2 }, 'frost', t);
     c.ccxBrandT = G.time + n * CCX.PRINT_GAP + .25; c.ccxBrand = { t, k, left: n, nx: G.time + .15 };
     (G.ccxBrands || (G.ccxBrands = [])).push(c);
-    ccxFx(ab.id, t, c, C => CCX_FX.trailBrand(C, t, c));
-    sfx('frost', 0);
+    ccxFx(ab.id, t, c, C => CCX_FX.trailBrand(C, t, c));   // (silent: the Frostweaver's frost sounds are out until new ones are found)
   } });
 // the prints: laid as the branded foe walks, biting the first walker after it (or it, held in place)
 function ccxTrailTick() {
@@ -59691,7 +59690,11 @@ const AudioSys = (() => {
   // (the glaive's spinning-blade takes, bladesfxdata.js, are cut the same way and play through the same loader)
   let fxAll = null;
   const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
-  function firePlay(k, vol, gap, peak, lp, rate) {
+  // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
+  // under the other weapons, so they were lost in the mix)
+  const PYRO_GAIN = 3;
+  function firePlay(k, vol, gap, peak, lp, rate) {
+    if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
     let at = F.at, len = F.len;
     if (peak != null) { const skip = Math.max(0, F.pk - peak); at += skip; len -= skip; }   // (started late enough that its peak lands on time)
@@ -59740,10 +59743,9 @@ const AudioSys = (() => {
   S.pyroSkipCast = () => firePlay('pyroSkipCast', .087, .4);
   // the Frostweavers' spells, from three recordings the owner chose (frostsfxdata.js, tools/make_frostsfx.py): an ice blast for
   // Frost Spear, ice freezing over for Ice Coffin, a cold whoosh for Shatterbloom; until a take has loaded, the synth frost
-  S.frostBolt = () => { if (!firePlay('frBolt', .075, .09)) S.frost(0); };
-  S.frostSpear = () => { if (!firePlay('frSpear', .11, .25)) S.frost(0); };
-  S.frostCoffin = () => { if (!firePlay('frCoffin', .16, .3)) S.frost(1); };
-  S.frostBloom = () => { if (!firePlay('frBloom', .12, .4)) S.frost(1); };
+  // (owner, 12 Nov 2026: "remove the frost sound, we'll need to find something else for frostweavers": her bolt and spells
+  // are silent until new takes are chosen; the old ones were frBolt / frSpear / frCoffin / frBloom in frostsfxdata.js)
+  S.frostBolt = S.frostSpear = S.frostCoffin = S.frostBloom = () => {};
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
@@ -84836,6 +84838,17 @@ function ulTotals() {
   const U = (G.run && G.run.u) || {}, Wt = (G.wstat && G.wstat.t) || {}, sum = r => r ? DKEYS.reduce((a, k) => a + (r[k] || 0), 0) : 0;
   return (G.towers || []).filter(t => t.def && !t.def.wall).map(t => ({ t, dmg: sum(U[t.id]) + sum(Wt[t.id]) })).sort((a, b) => b.dmg - a.dmg || a.t.id - b.t.id);
 }
+/* DPS beside the damage (owner, 12 Nov 2026: "would also like to see dps not just total damage with the bars"): each unit's
+   damage over the game time it has spent in a fight (a foe on the field), so the quiet build time between waves doesn't
+   water it down. Counted from when the list first sees the unit (ulD0: its damage then), so a loaded save starts afresh;
+   shown once it has a few seconds of fighting behind it. */
+function ulFightTick(L) {
+  const now = G.time || 0, dt = UL.gt != null ? now - UL.gt : 0; UL.gt = now;
+  const fight = dt > 0 && dt < 1 && (G.creeps || []).some(c => !c.dead && !c.ent);
+  for (const r of L) { const t = r.t; if (t.ulD0 == null) { t.ulD0 = r.dmg; t.ulFt = 0; } if (fight) t.ulFt += dt; }
+}
+const ulDps = r => r.t.ulFt >= 3 ? Math.max(0, r.dmg - r.t.ulD0) / r.t.ulFt : null;
+const ulDpsTxt = v => v == null ? '' : v >= 1000 ? fmtK(v) : v >= 100 ? String(Math.round(v)) : v.toFixed(1);
 function ulIcon(t) {
   const key = 't:' + t.type + ':' + t.tier, ck = (G.force || '') + '|' + (G.hero || '') + '|' + key; if (UL.ico[ck]) return UL.ico[ck];   /* (cached per force and commander: the slots are shared, so a Grove run's portraits showed in a Silver run. Owner, 11 Nov 2026) */
   try { const c = document.createElement('canvas'); c.width = c.height = 120; iconPaint(c, key); return (UL.ico[ck] = c.toDataURL()); } catch (e) { return ''; }
@@ -84862,6 +84875,7 @@ function unitListTick() {
   if (!show) { UL.hov = null; if (!UL.ring.hidden) UL.ring.hidden = true; return; }
   // under the boss card when that is up
   { const bc = document.getElementById('bossCard'), top = bc && !bc.hidden && bc.offsetHeight ? bc.offsetTop + bc.offsetHeight + 8 : 10; if (UL.top !== top) { UL.top = top; el.style.top = top + 'px'; } }
+  ulFightTick(L);
   const now = performance.now();
   if (now - UL.t > 400) {
     UL.t = now;
@@ -84869,12 +84883,12 @@ function unitListTick() {
     const head = `${L.length}|${fmtK(all)}|${UL.fold ? 1 : 0}`;
     if (UL.hd !== head) { UL.hd = head; const hb = el.querySelector('.ul-head'); hb.setAttribute('aria-expanded', String(!UL.fold)); hb.setAttribute('aria-label', UL.fold ? 'Show your units' : 'Hide your units'); hb.title = `${L.length} ${typeof uw === 'function' ? uw(L.length) : 'units'} · ${fmtK(all)} damage this run`; el.classList.toggle('fold', !!UL.fold); }
     const vOn = typeof vetOn === 'function' && vetOn() && typeof vetNext === 'function';
-    const h = UL.fold ? '' : L.map(({ t, dmg }) => {
+    const h = UL.fold ? '' : L.map(r => { const { t, dmg } = r, dps = ulDps(r);
       const n = clamp((t.tier | 0) + 1, 1, 6), share = all > 0 ? Math.round(100 * dmg / all) : 0, kills = t.kills | 0;
       const col = (TALENTS[t.type] && TALENTS[t.type].hue) || '#c9a95c';
       const vn = vOn ? vetNext(t) : null, vf = vn != null ? clamp(vetPts(t) / vetNeed(vn), 0, 1) : -1;
-      const tip = `${t.def.name} ${ROMAN[t.tier]} · ${fmtK(dmg)} damage, ${share}% of your army's · ${kills} kill${kills === 1 ? '' : 's'}` + (vf >= 0 ? ` · veterancy ${Math.round(vf * 100)}% of the way to tier ${ROMAN[vn]}` : '');
-      return `<button type="button" role="listitem" class="ul-r${t === selT ? ' sel' : ''}" data-id="${t.id}" title="${esc(tip)}" style="--uc:${col}"><span class="ul-p"><img alt="" draggable="false" src="${ulIcon(t)}"><span class="ul-s">${'<i></i>'.repeat(n)}</span></span><span class="ul-b"><span class="ul-d" style="width:${(100 * dmg / top).toFixed(1)}%"><b>${fmtK(dmg)}</b></span>${vf >= 0 ? `<span class="ul-v" style="width:${(4 + 56 * vf).toFixed(1)}%"></span>` : ''}</span></button>`;
+      const tip = `${t.def.name} ${ROMAN[t.tier]} · ${fmtK(dmg)} damage${dps != null ? `, ${ulDpsTxt(dps)} a second in a fight` : ''}, ${share}% of your army's · ${kills} kill${kills === 1 ? '' : 's'}` + (vf >= 0 ? ` · veterancy ${Math.round(vf * 100)}% of the way to tier ${ROMAN[vn]}` : '');
+      return `<button type="button" role="listitem" class="ul-r${t === selT ? ' sel' : ''}" data-id="${t.id}" title="${esc(tip)}" style="--uc:${col}"><span class="ul-p"><img alt="" draggable="false" src="${ulIcon(t)}"><span class="ul-s">${'<i></i>'.repeat(n)}</span></span><span class="ul-b"><span class="ul-d" style="width:${(100 * dmg / top).toFixed(1)}%"><b>${fmtK(dmg)}</b>${dps != null ? `<small>${ulDpsTxt(dps)} dps</small>` : ''}</span>${vf >= 0 ? `<span class="ul-v" style="width:${(4 + 56 * vf).toFixed(1)}%"></span>` : ''}</span></button>`;
     }).join('');
     if (UL.h !== h) { UL.h = h; const rows = el.querySelector('.ul-rows'), sc = rows.scrollTop; rows.innerHTML = h; rows.scrollTop = sc; }
   }
