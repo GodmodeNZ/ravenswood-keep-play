@@ -1,4 +1,4 @@
-const BUILD_TAG = '92e624a@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4cb1433@2026-11-12';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13669,7 +13669,7 @@ function ccDrawGlyph(z) {
 function ccDrawFoe(c) {
   const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), base = c.fly && !(c.lowT > G.time) ? .9 : .06;
   if (c.ccR) {
-    const rs = ccMarksOn(c);
+    const rs = ccMarksOn(c).filter(s => s !== 'frost'); // Frost stays on the foe's body; no floating frost badge.
     if (rs.length && !(typeof sfxMarks === 'function' && sfxMarks(c, rs, x, z))) {   /* (the marks' own icons over the health bar: spellfx.js) */
       const top = (typeof creepBaseY === 'function' ? creepBaseY(c) + creepH(c) : hitH(c) + .3) + .34, n = rs.length;   /* (one small icon a mark, over the health bar) */
       rs.forEach((s, i) => { const col = c4(CC_COL[s]), left = Math.min(1, (c.ccR[s] - G.time) * 1.5), px = x + (i - (n - 1) / 2) * .17;
@@ -54844,7 +54844,7 @@ function sfxMarks(c, rs, x, z) {
   return true;
 }
 // a mark's place over the foe's health bar (for its flight into the reaction)
-function ccMarkPos(c, s) { const rs = typeof ccMarksOn === 'function' ? ccMarksOn(c) : [s], n = Math.max(1, rs.length), i = Math.max(0, rs.indexOf(s)); return [c.x + ccMarkX(c, i, n), ccMarkY(c), c.y]; }
+function ccMarkPos(c, s) { if (s === 'frost') return [c.x, hitH(c), c.y]; const rs = typeof ccMarksOn === 'function' ? ccMarksOn(c).filter(k => k !== 'frost') : [s], n = Math.max(1, rs.length), i = Math.max(0, rs.indexOf(s)); return [c.x + ccMarkX(c, i, n), ccMarkY(c), c.y]; }
 let _ccRxWords = [];
 // a reaction set off (ccReact tells): the other mark flies in, the reaction's burst plays, its name floats up, the first one says how
 function sfxReact(t, c, id, el, other) {
@@ -90960,6 +90960,352 @@ if (typeof castAbility === 'function') {
 // Furnace Breath and Phoenix are painted (docs/conclave_art.md)
 if (typeof UI_ART !== 'undefined' && typeof MISSING_ART !== 'undefined') for (const id of ['cc_pyresigil', 'cc_flamewave']) if (UI_ART[id] && UI_ART[id] === MISSING_ART.abilities[id]) delete UI_ART[id];
 
+/* Pyroclast H3 fire, 12 Nov 2026.
+ * Replace flame surfaces only. pyrofire.js still owns spells, paths, timings,
+ * lights, smoke and sparks. The native LAB_EXT pass depth-tests premultiplied
+ * color + soft coverage; no scene-sized overlay or per-unit video player.
+ * ?pyrofx=legacy is a comparison switch for local regression captures.
+ */
+const PYRO_H3 = { on: typeof location === 'undefined' || !/[?&]pyrofx=legacy\b/.test(location.search), counts: {}, version: 7 };
+if (PYRO_H3.on && typeof PYRO_H3_DATA !== 'undefined' && typeof LAB_FX !== 'undefined') {
+  Object.assign(LAB_FX, PYRO_H3_DATA);
+  // Keep these native entry points: pfTune already applies the Element Lab knobs.
+  const queue = labQueue, pin = labPin;
+  const key = name => 'pyroh3_' + name;
+  const tint = (list, o) => {
+    if (!o.tg || !list.length) return;
+    const t = o.tg, c = [];
+    for (const h of [t.c0, t.c1, t.c2]) c.push(...pyfHex(h), 1);
+    list[list.length - 1].tg = { id: t.c0 + t.c1 + t.c2, c };
+  };
+  function axial(name, P, dir, len, o) {
+    const ok = queue(key(name), P, dir, len, { k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a,
+      seed: o.seed || 0, speed: o.sp || 1, pull: Math.min(.12, o.pull || 0), fr: o.fr });
+    if (ok) {
+      if (o.loopFrame != null) {
+        // A cast-relative frame with native last-to-first interpolation. Freeze
+        // the renderer clock: this queue entry is rebuilt at every game frame.
+        const e = LABF.q[LABF.q.length - 1];
+        e.fr = undefined; e.sp = 0; e.ph = o.loopFrame * (o.sp || 1) / LAB_FX[key(name)].n;
+      }
+      tint(LABF.q, o); PYRO_H3.counts[name] = (PYRO_H3.counts[name] || 0) + 1;
+    }
+    return ok;
+  }
+  function bill(name, P, width, o, frame) {
+    const f = frame == null ? ((G.time * 24 * (o.sp || 1) + (o.seed || 0) * 7.31) % 64 + 64) % 64 : Math.max(0, Math.min(63, frame));
+    const ok = pin(key(name), f, P, width, { k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a,
+      loop: frame == null, pull: Math.min(.12, o.pull || 0), mir: false });
+    if (ok) { tint(LABF.list, o); PYRO_H3.counts[name] = (PYRO_H3.counts[name] || 0) + 1; }
+    return ok;
+  }
+  PYRO_H3.axial = axial; PYRO_H3.bill = bill;
+
+  pfFlame = function (P, dir, len, o, s, l) {
+    const z = pfTune(s, l, len, o); if (z == null) return false;
+    return axial(l === 'ground' ? 'ground_fire' : 'hand_flame', P, dir, z, o);
+  };
+  // One authored flame replaces the old stack of three procedural cards.
+  pfFire = function (P, dir, len, o, s, l) { return pfFlame(P, dir, len, o, s, l); };
+  pfBall = function (P, w, o, s, l) {
+    const z = pfTune(s, l, w, o); if (z == null) return false;
+    return bill('hand_flame', P, z, o);
+  };
+  pfJet = function (P, dir, len, wid, o, s) {
+    const z = pfTune(s, 'core', len, o); if (z == null) return false;
+    // A single cone has its own billowing detail; retain the original cone's
+    // directions, growth and extinction, but avoid stacking opaque fire.
+    return axial('furnace_breath', P, dir, z, o);
+  };
+  const ballAt = pfBallAt;
+  pfBallAt = function (x, y, z, d, len, C, T, s, seed, o, now) {
+    if(typeof PYRO_SEQ!=='undefined'&&PYRO_SEQ.on&&PYRO_SEQ.flight(x,y,z,d,len,C,T,s,seed,o,now))return;
+    // Keep flight lighting, but the authored head and tail travel as one body.
+    // Detached trail puffs made Fireball look like separate flame effects.
+    ballAt(x, y, z, d, len, Object.assign({}, C, { on: false }), (s === 'cc_kindle' || s === 'cc_fireball') ? Object.assign({}, T, {on:false}) : T, s, seed, o, now);
+    if (!C.on) return;
+    const opts = { k: C.k, seed, pull: .06, sp: s === 'cc_fireball' ? 1.6 : 1 };
+    if (s === 'cc_kindle') {
+      const st = pfSt(o), dt = Math.max(0, Math.min(.1, now - (st.h3At == null ? now : st.h3At)));
+      st.h3At = now;
+      st.h3Len = st.h3Len == null ? len : st.h3Len + (len - st.h3Len) * (1 - Math.exp(-dt * 16));
+      st.h3Dir = st.h3Dir || d.slice();
+      if (o.ending) d = st.h3Dir;
+      const k = 1 - Math.exp(-dt * 24);
+      st.h3Dir = pfNorm(st.h3Dir.map((v, i) => v + (d[i] - v) * k));
+      d = st.h3Dir; len = st.h3Len;
+      opts.fr = Math.min(62.99, Math.max(0, (now - o.born) * 24));
+      opts.a = o.ending ? 1 - pfSs(0, .22, now - o.at) : 1;
+      // The same flame compresses and brightens on a bounce, then lifts again.
+      const pulse = o.hitAt == null ? 0 : Math.max(0, 1 - (now - o.hitAt) / .13);
+      opts.k *= 1 + .22 * pulse; len *= 1 + .12 * pulse;
+    }
+    const size = pfTune(s, 'core', len * (s === 'cc_fireball' ? 1.45 : 1.15), opts);
+    if (size != null) axial(s === 'cc_kindle' ? 'skipping_flame' : 'fireball', [x, y, z], d, size, opts);
+  };
+  // A dedicated one-shot charge replaces the stack of unrelated hand flames
+  // and inward puff particles. Follow the currently drawn palm, not a socket
+  // from the release pose, until the real projectile takes over.
+  pfHands = function(now) {
+    const H=efx('cc_fireball','hand'); if(!H.on) return;
+    for(const t of G.towers) {
+      if(!pfIsPyro(t)||t.wrecked||t.build>0) continue;
+      if(typeof PYRO_SEQ!=='undefined'&&PYRO_SEQ.on&&PYRO_SEQ.hand(t,now))continue;
+      if(t.ccxBreath&&now<t.ccxBreath.until+.3) continue;
+      const A=typeof PYRO2!=='undefined'&&PYRO2.anchors(t), p=A?A.palmR:ccHand(t,towerTop(t)*.8);
+      const st=pfSt(t), ac=t.ab&&t.ab.cast, ctl=typeof PYRO2!=='undefined'?PYRO2.ctl(t,true):null;
+      let charge=null;
+      if(ac && PF_IDS.includes(ac.id)) {
+        charge=Math.max(0,Math.min(1,(now-ac.at)/Math.max(.05,ac.T)));
+        st.h3ChargedUntil=now+.35;
+      } else if(ctl && ['cast','skip','phoenix'].includes(ctl.c)) {
+        const release=PYRO2.CL[ctl.c].rel/30;
+        if(ctl.s>=0 && ctl.s<release) charge=now<(st.h3ChargedUntil||0)?1:ctl.s/release;
+      }
+      const seed=((t.i|0)*5+(t.j|0))%97;
+      if(charge!=null && LAB_FX.pyroh3_palm_charge) {
+        const C=efx('cc_fireball','core'), o={k:H.k*(.8+.2*charge),a:1,seed,pull:.025};
+        const size=pfTune('cc_fireball','hand',C.ball*.7*Math.max(.1,H.charge||1),o);
+        if(size!=null) bill('palm_charge',[p[0],p[1]+.06,p[2]],size,o,charge*63);
+      } else {
+        const len=(H.flame+H.tier*(t.tier|0))*.8;
+        pfFire([p[0],p[1]-.05*len,p[2]],PF_UP,len,{k:H.k,seed,pull:.025,sp:1.1},'cc_fireball','hand');
+      }
+    }
+  };
+  // One persistent visual per caster follows all hops. Keep gameplay callbacks
+  // intact, but do not spawn a new burst, plume or trail cloud at every bounce.
+  const skipChains = new WeakMap();
+  CCX_FX.skipHop = function (C, x0, h0, z0, foe, x, z, T, j) {
+    const core = efx('cc_kindle', 'core');
+    let h = skipChains.get(C.t);
+    if (!j || !h || G.time < h.born) {
+      h = {born:G.time, seed:(Math.random()*97)|0}; skipChains.set(C.t,h);
+    }
+    Object.assign(h,{x0,h0,z0,x,z,T,at:G.time,arc:j?core.arc:core.arc0,s:Math.pow(core.shrink,j),ending:false,j});
+    PF.hops = PF.hops.filter(q=>q!==h);
+    if (PF.hops.length < 24) PF.hops.push(h);
+  };
+  CCX_FX.skipLand = function (C,x,z,j,n) {
+    const h=skipChains.get(C.t); if(!h) return;
+    h.hitAt=G.time;
+    if(j===n-1) {
+      Object.assign(h,{x0:x,h0:.2,z0:z,x,z,at:G.time,T:.22,arc:0,ending:true});
+      PF.hops=PF.hops.filter(q=>q!==h); PF.hops.push(h);
+    }
+  };
+  // All shed flame, cast gathering, and impact billows use the new burst.
+  // Smoke and thin spark streaks retain their lightweight original renderer.
+  const proceduralBill = pyfBill;
+  pyfBill = function (shape, P, w, h, uv, o) {
+    if (shape === PYF_SH.PUFF) return bill('impact_burst', P, w * 1.25, o || {}, (o && o.age || 0) * 63);
+    return proceduralBill.apply(this, arguments);
+  };
+  pfPatch = function (x, z, r, e, tall, Gd, s, seed, now, dt, st) {
+    // Skipping Flame's damaging patches keep a restrained ground cue, without
+    // separate upright flame animations competing with the one traveling flame.
+    if (s === 'cc_kindle') {
+      if (Gd.disc > 0) vfxFlat(VX,x,z,.026,r*2,r*2,0,PF_WARM,Gd.disc*.45*e,VT.GLOW,1);
+      return;
+    }
+    const o = { k: .9, a: e * .8, seed, pull: .07 }, size = pfTune(s, 'ground', r * 2.2, o);
+    if (size != null) {
+      // Use an upright, broad patch rooted on the ground instead of a decal.
+      const B = LAB_FX[key('ground_fire')], h = size / B.aspect;
+      bill('ground_fire', [x, h * .38 * RD.up[1] + .025, z], size, o);
+    }
+    if (Gd.disc > 0) {
+      vfxFlat(VX, x, z, .026, r * 2, r * 2, 0, PF_WARM, Gd.disc * .5 * e, VT.GLOW, 1);
+      pfKeepLight(st, x, .35, z, Gd.disc * 2 * e, r * 2 + .7, s, 'ground', 4);
+    }
+    if (Gd.ember > 0 && Math.random() < Gd.ember * dt * e) {
+      const a = Math.random() * TAU;
+      pfEmber(x + Math.cos(a) * r * .5, .15, z + Math.sin(a) * r * .5, 0, .8, 0, { life: .6, w: .04, lift: .5 }, s);
+    }
+  };
+  // The Phoenix replacement below retains the original rise/dive/path math.
+pfPhoenixes = function (now) {
+  const lv = pfLv(), s = 'cc_flamewave', Cb = efx(s, 'core'), Fw = efx(s, 'flames'), Tr = efx(s, 'trail'), L = efx(s, 'light');
+  PF.phx = PF.phx.filter(F => (now - F.at) * F.spd < F.tot + .05);
+  for (const F of PF.phx) {
+    const d = (now - F.at) * F.spd; if (d < 0) continue;
+    const [x, z, hx, hz] = ccxAlong(F.R, d), d1 = Math.hypot(F.R[1][0] - F.R[0][0], F.R[1][1] - F.R[0][1]) || 1, end = F.tot - d;
+    const rise = Math.min(1, d / Math.max(.6, d1 * .7)), dive = end < .9 ? 1 - end / .9 : 0;
+    const y = (F.h0 + (1.15 - F.h0) * (1 - (1 - rise) * (1 - rise))) * (1 - dive) + .2 * dive + .05 * Math.sin(now * 6);
+    const vh = dive ? -1.1 : (rise < 1 ? .45 : .05 * Math.cos(now * 6)), fwd = pfNorm([hx, vh, hz]), g = Math.min(1, d / .5) * .65 + .35, bl = Cb.body * g, rx = -hz, rz = hx;
+    let tipL = null, tipR = null;
+    if (Cb.on || Fw.on) {
+      const opts = { k: Cb.k, a: .95, seed: F.seed, pull: .08 }, size = pfTune(s, 'core', Math.max(bl * 2, Fw.wing * 1.45) * g, opts);
+      if (size != null) PYRO_H3.axial('phoenix', [x, y, z], fwd, size, opts);
+    }
+    // shed behind it, from its wingtips and its tail: fire that hangs where it was left and goes to smoke, and sparks
+    if (Tr.on && now >= (F.em || 0)) {
+      F.em = now + Tr.every * [2.6, 1.5, 1][lv] * pfThin();
+      const pk = Math.random(), P = pk < .33 && tipL ? tipL : pk < .66 && tipR ? tipR : [x - hx * bl * .7 + (Math.random() - .5) * .3, y - .05, z - hz * bl * .7 + (Math.random() - .5) * .3];
+      pfShot('puff', P[0], P[1], P[2], Tr.w * (.9 + .6 * Math.random()), .36 + .2 * Math.random(), { vx: hx * F.spd * .2, vz: hz * F.spd * .2, rise: .25, drag: 4, buoy: .6, grow: 1.1, hot: .9, soot: .8, pull: .14 }, s, 'trail');
+      pfEmber(x - hx * .3, y, z - hz * .3, -hx * .8 + (Math.random() - .5) * .8, Math.random() * .6, -hz * .8 + (Math.random() - .5) * .8, { life: .55, w: .05, lift: .2 }, s);
+      if (lv) pfSparks(x - hx * .3, y, z - hz * .3, .8, { shape: 'point', sp: [.2, .9], up: [-.2, .4], vx: -hx, vz: -hz, life: [.3, .6], grav: 1.2 }, s);
+    }
+    if (L.on && d > .8 && now >= (F.li || 0)) { F.li = now + L.every; pfLight(x, z, y, .75, L.rad, .2, s); }
+  }
+};
+
+pfBreaths = function(now, dt) {
+  const lv = pfLv(), s = 'cc_pyresigil', Cc = efx(s, 'core'), E = efx(s, 'embers'), S = efx(s, 'smoke'), Gl = efx(s, 'glow'), L = efx(s, 'light');
+  PF.breath = PF.breath.filter(e => G.towers.includes(e.t) && e.t.ccxBreath === e.B && now < e.B.until + .35);
+  for (const e of PF.breath) {
+    const { t, B } = e, el = now - B.at, R0 = B.r, k = R0 / 2.4; if (el < .05) continue;
+    // how far it has reached, how much has died from the hands, how much of it shows
+    const reach = pfSs(0, .22, el - .05), died = pfSs(0, .32, now - (B.until - .05)), on = reach * (1 - died);
+    const palms = typeof PYRO2 !== 'undefined' && PYRO2.anchors(t);
+    const h = palms ? palms.palmR.map((v,i)=>(v+palms.palmL[i])*.5) : ccHand(t, towerTop(t) * .8), a0 = Math.atan2(B.uz, B.ux), half = Math.acos(CCX.BR_COS) * Cc.cone, drop = (h[1] - .22) * Cc.drop / R0, len = R0 * Cc.len;
+    // Twice the internal flame motion, using the seamless atlas loop. The
+    // cast's reach, duration and extinction envelope stay unchanged.
+    if (Cc.on && on > .01) pfJet(h, pfNorm([B.ux,-drop,B.uz]), len * reach, len * .65, {k:Cc.k, a:on, seed:e.seed, pull:0, loopFrame:126 * Math.max(0, (el - .05) / Math.max(.1, B.until - B.at + .22))}, s);
+    if (on <= 0) continue;
+    // The authored cone already contains moving billows. Emitting the legacy
+    // puff stream here doubles the flame and obscures the new animation.
+    // a low glow under the cone, its light where it strikes, sparks blown down it, embers off the burning foes, smoke where it ends
+    const cx = t.x + B.ux * R0 * .55, cz = t.y + B.uz * R0 * .55;
+    if (Gl.on && Gl.a > 0 && typeof vfxFlat === 'function') vfxFlat(VX, cx, cz, .027, R0 * .55, R0 * Gl.w, Math.atan2(B.uz, B.ux), PF_WARM, Gl.a * on * (.85 + .15 * Math.sin(now * 11)), VT.GLOW, 1);
+    if (L.on && now >= (e.li || 0)) { e.li = now + L.every; pfLight(t.x + B.ux * R0 * .65, t.y + B.uz * R0 * .65, .3, .8, L.rad, .3, s); }
+    if (E.on && now >= (e.em || 0)) {
+      e.em = now + E.every * (lv ? 1 : 2);
+      const F2 = G.creeps.filter(c => !c.dead && !c.fly && Math.hypot(c.x - t.x, c.y - t.y) <= R0 && ((c.x - t.x) * B.ux + (c.y - t.y) * B.uz) / (Math.hypot(c.x - t.x, c.y - t.y) || 1) >= CCX.BR_COS);
+      const c = F2.length ? F2[(Math.random() * F2.length) | 0] : null, fx = c ? c.x : t.x + B.ux * R0 * .7, fz = c ? c.y : t.y + B.uz * R0 * .7;
+      for (let i = 0; i < E.count; i++) pfEmber(fx + (Math.random() - .5) * .3, .3 + Math.random() * .4, fz + (Math.random() - .5) * .3, B.ux * .6 + (Math.random() - .5) * .8, .8 + Math.random(), B.uz * .6 + (Math.random() - .5) * .8, { life: .6, w: .05, lift: .5 }, s);
+      pfSparks(h[0], h[1], h[2], E.sparks || 0, { shape: 'cone', ux: B.ux, uy: -drop, uz: B.uz, ang: half * .8, sp: [R0 * .8, R0 * 1.9], up: [0, .3], life: [.3, .6], drag: 1.8, grav: -.6, curl: .5 }, s);
+    }
+    if (lv && S.on && S.every > 0 && now >= (e.sm || 0)) { e.sm = now + S.every * (lv === 1 ? 1.5 : 1); const a = a0 + (Math.random() * 2 - 1) * half * .6; pfShot('smoke', t.x + Math.cos(a) * R0 * .92, .55, t.y + Math.sin(a) * R0 * .92, S.w * k * 1.2, 1, { rise: .5, vx: B.ux * .4, vz: B.uz * .4, grow: .6, a: .65 }, s, 'smoke'); }
+  }
+}
+
+/* ---- Phoenix: a bird of flame, seen from above ---- */;
+}
+
+/* Whole H3 spell films. Game callbacks still own damage, targets and timing. */
+const PYRO_SEQ = {on:PYRO_H3.on, version:1, states:[], counts:{}, samples:[], hand:()=>false, flight:()=>false};
+if(PYRO_SEQ.on) {
+  Object.assign(LAB_FX,PYRO_SEQUENCE_DATA);
+  const S=PYRO_SEQ, key=n=>'pyroseq_'+n, clamp01=x=>Math.max(0,Math.min(1,x));
+  const charges=new WeakMap(), skip=new WeakMap(), birds=new WeakMap();
+  const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+  const palm=t=>{const a=typeof PYRO2!=='undefined'&&PYRO2.anchors(t);return a?a.palmR:ccHand(t,towerTop(t)*.8);};
+  function count(n){S.counts[n]=(S.counts[n]||0)+1;}
+  function sprite(n,frame,P,width,alpha=1,dir=null) {
+    const B=LAB_FX[key(n)], f=Math.max(0,Math.min(B.n-1,frame)),i=Math.floor(f),a=mix(B.track[i],B.track[Math.min(i+1,B.n-1)],f-i);
+    const h=width/B.aspect;
+    if(dir) {
+      const fw=[RD.view[2],RD.view[6],RD.view[10]],dot=dir.reduce((a,v,i)=>a+v*fw[i],0),axis=dir.map((v,i)=>v-fw[i]*dot),al=Math.hypot(...axis);
+      const U=al>.001?axis.map(v=>v/al):RD.right,V=[fw[2]*U[1]-fw[1]*U[2],fw[0]*U[2]-fw[2]*U[0],fw[1]*U[0]-fw[0]*U[1]];
+      const center=P.map((v,j)=>v-U[j]*(a[0]-.5)*width-V[j]*(a[1]-.5)*h);
+      if(labQueue(key(n),center,dir,width/Math.max(.35,al),{a:alpha,k:1,pull:.025,fr:f}))count(n);
+      return;
+    }
+    const r=RD.right,u=RD.up;
+    const center=P.map((v,j)=>v-r[j]*(a[0]-.5)*width-u[j]*(a[1]-.5)*h);
+    if(labPin(key(n),f,center,width,{a:alpha,k:1,pull:.025}))count(n);
+  }
+  S.hand=function(t,now) {
+    const ac=t.ab&&t.ab.cast,ctl=typeof PYRO2!=='undefined'&&PYRO2.ctl(t,true);
+    let n=null,u=0;
+    if(ac&&ac.id==='cc_flamewave'){n='phoenix';u=clamp01((now-ac.at)/Math.max(.05,ac.T));}
+    else if(ctl&&ctl.c==='cast'&&ctl.s<PYRO2.CL.cast.rel/30){n='fireball';u=clamp01(ctl.s/(PYRO2.CL.cast.rel/30));}
+    if(n){charges.set(t,{name:n,at:now,u});sprite(n,LAB_FX[key(n)].release*u,palm(t),n==='fireball'?efx('cc_fireball','core').ball*5.3:4);return true;}
+    if(birds.has(t)&&now<birds.get(t).at)return true;
+    return ctl&&((ctl.c==='cast'&&ctl.s>=PYRO2.CL.cast.rel/30)||(ctl.c==='phoenix'));
+  };
+  let owner=null,impactNow=null;
+  const attack=FORCE_ATTACK.cc_fireball;
+  FORCE_ATTACK.cc_fireball=function(t){const was=owner;owner=t;try{return attack.apply(this,arguments);}finally{owner=was;}};
+  const shoot=ccShoot;
+  ccShoot=function(p) {
+    if(owner&&p.k==='lob'&&p.col===CC_COL.fire&&p.lob) {
+      const q=p._pySeq={name:'fireball',owner,at:G.time,p,width:efx('cc_fireball','core').ball*5.3*(p.sz||1),P:[p.x,p.h,p.z]};
+      S.states.push(q);labLoad(key('fireball'));
+      const hit=p.fn;p.fn=function(){q.hit=G.time;const old=impactNow;impactNow=q;try{return hit.apply(this,arguments);}finally{impactNow=old;}};
+    }
+    return shoot.apply(this,arguments);
+  };
+  S.flight=function(x,y,z,d,len,C,T,s,seed,p,now) {
+    if(s!=='cc_fireball'||!p._pySeq)return false;
+    const q=p._pySeq,B=LAB_FX[key('fireball')],u=clamp01(p.lob.t/p.lob.T);
+    q.P=[x,y,z];q.dir=d;sprite('fireball',B.release+(B.impact-B.release)*u,q.P,q.width,1,d);
+    const L=efx(s,'light');if(L.on)pfFlyLight(p,x,y,z,L.fly,L.rad,s);
+    return true;
+  };
+  const impact=pfImpact;
+  pfImpact=function(x,z,sp,o,s){if(s==='cc_fireball'&&impactNow)return;return impact.apply(this,arguments);};
+  CCX_FX.skipHop=function(C,x0,h0,z0,foe,x,z,T,j) {
+    let q=skip.get(C.t);
+    if(!j||!q){const n=Math.max(1,Math.round(byT(ABIL.cc_kindle.by.n,C.t)));q={name:n>4?'skip5':'skip',owner:C.t,points:[],times:[],at:G.time,n};skip.set(C.t,q);S.states.push(q);}
+    q.j=j;q.hopAt=G.time;q.T=T;q.start=[x0,h0,z0];q.end=[x,.025,z];q.points[j]=q.end.slice();
+    labLoad(key(q.name));
+  };
+  CCX_FX.skipLand=function(C,x,z,j,n){const q=skip.get(C.t);if(!q)return;q.points[j]=[x,.025,z];q.times[j]=G.time;pfLight(x,z,.25,j===n-1?.95:.7,1.3,.18,'cc_kindle');if(j===n-1)q.hit=G.time;};
+  pfPhoenixes=function(){};
+  CCX_FX.phoenix=function(C,t,F){const q={name:'phoenix',owner:t,...F,width:5.3};q.precharged=charges.has(t)&&G.time-charges.get(t).at<.2;birds.set(t,q);S.states.push(q);labLoad(key('phoenix'));};
+  CCX_FX.phoenixBoom=function(C,x,z){const q=birds.get(C.t);if(q){q.hit=G.time;q.P=[x,.5,z];}};
+  const oldPatch=pfPatch;
+  pfPatch=function(x,z,r,e,tall,Gd,s){if(s==='cc_kindle')return;return oldPatch.apply(this,arguments);};
+  const oldFrame=pfFrame;
+  pfFrame=function(){oldFrame.apply(this,arguments);if(!pfLive()||!RD||!RD.vfx)return;const now=G.time;
+    S.states=S.states.filter(q=>G.towers.includes(q.owner)&&(!q.hit||now-q.hit<(q.name.startsWith('skip')?2:.8))&&(now-q.at<10));
+    for(const q of S.states){
+      const B=LAB_FX[key(q.name)];
+      if(q.name==='fireball'){if(q.hit!=null)sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width,1,q.dir);continue;}
+      if(q.name==='phoenix'){
+        if(q.hit!=null){sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width);continue;}
+        if(now<q.at){const u=q.precharged?1:clamp01(1-(q.at-now)/CCX.PHX_LIFT);sprite(q.name,B.release*u,palm(q.owner),q.width);continue;}
+        const d=Math.min(q.tot,(now-q.at)*q.spd),p=ccxAlong(q.R,d),u=clamp01(d/q.tot),h=q.h0+(1.15-q.h0)*clamp01(d/.7);
+        q.P=[p[0],h*(1-pfSs(.85,1,u))+.5*pfSs(.85,1,u),p[1]];
+        sprite(q.name,B.release+(B.impact-B.release)*u,q.P,q.width,1,[p[2],0,p[3]]);continue;
+      }
+      const j=Math.min(q.j,B.lands.length-1),u=clamp01((now-q.hopAt)/q.T),f0=j?B.lands[j-1]:0;
+      let frame=f0+(B.lands[j]-f0)*u;
+      if(q.hit!=null){const age=now-q.hit;frame=age<.45?B.lands[j]+(100-B.lands[j])*age/.45:100+((age-.45)*24)%24;}
+      if(j===0&&q.hit==null&&u<1){
+        const pos=mix(q.start,q.end,u);pos[1]+=Math.sin(u*Math.PI)*efx('cc_kindle','core').arc0;
+        sprite(q.name,frame,pos,5.8);continue;
+      }
+      const pts=q.points.map(p=>p.slice());
+      let dir=pts.length>1?[pts.at(-1)[0]-pts.at(-2)[0],pts.at(-1)[2]-pts.at(-2)[2]]:[q.end[0]-q.start[0],q.end[2]-q.start[2]];
+      const dl=Math.hypot(...dir)||1;dir=dir.map(v=>v/dl);
+      while(pts.length<B.landX.length){const p=pts.at(-1);pts.push([p[0]+dir[0],.025,p[2]+dir[1]]);}
+      SEQ_MESH.queue.push({name:key(q.name),frame,points:pts,x:B.landX,baseline:B.baseline,height:2.5,times:q.times,alpha:1});
+      SEQ_MESH.n=1;
+      if(!RD.vfx.ext.includes(SEQ_MESH))RD.vfx.ext.push(SEQ_MESH);count(q.name);
+    }
+  };
+  if(typeof HF_RESETS!=='undefined')HF_RESETS.push(()=>{S.states.length=0;SEQ_MESH.queue.length=0;});
+}
+
+/* A single continuous filmed sheet, bent along the actual landing locations.
+ * UVs remain continuous across the mesh; this is not separate landing sprites. */
+const SEQ_MESH={queue:[],n:1,P:null,draw(bloom){
+  if(bloom||!this.queue.length)return;
+  const gl=RD.vfx.gl,X=RD.vfx;
+  if(!this.P){this.P=X.prog(LAB_VS,LAB_FS);this.vao=gl.createVertexArray();this.vb=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.vb);for(const [i,n,off] of [[0,3,0],[1,4,12],[2,4,28]]){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,n,gl.FLOAT,false,44,off);}gl.bindVertexArray(null);}
+  gl.useProgram(this.P.p);const u=this.P.u;gl.uniformMatrix4fv(u.uVP,false,X.R.vp);if(u.uBend)gl.uniform3fv(u.uBend,X.R.bend);if(u.uTgOn)gl.uniform1f(u.uTgOn,0);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.enable(gl.DEPTH_TEST);gl.depthMask(false);gl.bindVertexArray(this.vao);
+  for(const q of this.queue){const B=LAB_FX[q.name],tex=LAB_EXT.texOf(q.name);if(!tex)continue;const f=Math.min(122.999,Math.max(0,q.frame)),f0=Math.floor(f),f1=f0+1,bl=f-f0,verts=[];
+    const point=x=>{let j=0;while(j<q.x.length-2&&x>q.x[j+1])j++;const t=(x-q.x[j])/(q.x[j+1]-q.x[j]);return q.points[j].map((v,i)=>v+(q.points[j+1][i]-v)*t);};
+    const vertex=(x,y)=>{
+      let nearest=0;for(let j=1;j<q.x.length;j++)if(Math.abs(q.x[j]-x)<Math.abs(q.x[nearest]-x))nearest=j;
+      // Broaden each filmed flame around its landing while leaving the landing
+      // centres and the boundaries between them fixed on the gameplay route.
+      const c=q.x[nearest],span=(x<c?(nearest?q.x[nearest]-q.x[nearest-1]:q.x[1]-c):(nearest<q.x.length-1?q.x[nearest+1]-c:c-q.x[nearest-1]))*.5;
+      const off=x-c,w=Math.abs(off)<span?Math.cos(off/span*Math.PI*.5)**2:0,p=point(x+off*.3*w);
+      const age=q.times[nearest]==null?99:G.time-q.times[nearest],pulse=age>=0?Math.exp(-age*12):0;
+      p[1]+=(q.baseline-y)*q.height*(1+.22*pulse);let a=q.alpha;
+      if(q.times[nearest]!=null)a*=1-pfSs(1.6,2,G.time-q.times[nearest]);
+      const uv=ff=>[(ff%B.cols+x)/B.cols,(Math.floor(ff/B.cols)+y)/(B.rows*2)];const A=uv(f0),C=uv(f1);verts.push(...p,...A,...C,1.08+.25*pulse,bl,0,a);};
+    const cuts=[0,...q.x,1];for(let j=0;j<cuts.length-1;j++){const a=cuts[j],b=cuts[j+1];for(let k=0;k<4;k++){const l=a+(b-a)*k/4,r=a+(b-a)*(k+1)/4;for(const [x,y] of [[l,0],[r,0],[r,1],[l,0],[r,1],[l,1]])vertex(x,y);}}
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.DYNAMIC_DRAW);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(u.uT,0);gl.uniform1f(u.uHalf,.5);gl.uniform2f(u.uGrid,B.cols,B.rows*2);gl.drawArrays(gl.TRIANGLES,0,verts.length/11);
+  }
+  this.queue.length=0;gl.bindVertexArray(null);
+}};
+
 /* The dwarf, sculpted (behind the Sculpted units switch, unitmodels.js): the owner's dwarf (assets/unit-art/dwarf: a white-
    bearded engineer in riveted plate, twin boiler tanks on his back; decimated to 4,429 triangles and rigged on Mixamo's
    skeleton by its scripts/rig.py, the owner's two Mixamo clips retargeted, in place) drawn as Ironhold's Steam Hammers
@@ -92568,7 +92914,8 @@ function fwCtl(t, live, M) {
   if (!live) { const sf = umShowF(M, 'idle'); return { f: sf != null ? sf : fwClip(M, 'ready', 0), rate: 0 }; }
   const now = G.time, A = UNIT_MDL[M.S.mdl].anim.clips;
   if (t._fwCast && t._fwCastAt != null) { const u = now - t._fwCastAt; if (u >= 0 && u < fwLen(M, t._fwCast)) return { f: fwClip(M, t._fwCast, u * 30), rate: FW.RATE.move, clip: t._fwCast, u: u * 30 }; }
-  const rb = fwRel(M, 'bolt'), s = t._fwShotAt == null ? 9 : now - t._fwShotAt, fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+  const labBolt = typeof ELEMLAB !== 'undefined' && ELEMLAB.t === t && ELEMLAB.spell === 'cc_rime' && ELEMLAB.elFireT > now;
+  const rb = fwRel(M, 'bolt'), s = t._fwShotAt == null ? 9 : now - t._fwShotAt, fight = (G.phase === 'wave' || labBolt) && t.tg && !t.tg.dead;
   if (s >= 0 && s < fwLen(M, 'bolt') - rb / 30) return { f: fwClip(M, 'bolt', rb + s * 30), rate: FW.RATE.move, clip: 'bolt', u: rb + s * 30 };
   // the wind-up as the next bolt comes due: its release lands on the shot
   const cd = t.cd || 0;
@@ -94388,7 +94735,7 @@ const PYRO2 = (() => {
     }
     // the strike: the wind-up over the reload's last part (the release frame as the fireball is loosed), the follow-through after
     const st = t.st, rate = Math.max(.5, (st && st.rate) || 1.5), r = (CL.cast.rel || 0) / 30, pre = Math.min(r, rate * .45), post = Math.max(.3, Math.min(CL.cast.len - r, rate - pre - .05));
-    const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+    const fight = (G.phase === 'wave' || (typeof ELEMLAB !== 'undefined' && ELEMLAB.ready && ELEMLAB.t === t && ELEMLAB.spell === 'cc_fireball')) && t.tg && !t.tg.dead;
     if (fight && t.cd > 0 && t.cd < pre) return { c: 'cast', s: r * (1 - t.cd / pre), rate: RATE.cast, gl: 1 - t.cd / pre };
     const s = t.shotT == null ? 9 : t.shotT;
     if (s >= 0 && s < post && t.shots) return { c: 'cast', s: r + (CL.cast.len - r) * s / post, rate: RATE.cast, gl: 0 };
@@ -95865,6 +96212,94 @@ if (typeof SFX_CUSTOM !== 'undefined' && typeof sfxRun === 'function') for (cons
 if (typeof drawFrostOn === 'function') { const _f = drawFrostOn; drawFrostOn = function () { if (ffOn()) return; return _f.apply(this, arguments); }; }
 // the motes at her hands (unitmodels_frostweaver.js fwMote): her staff's own frost is drawn above
 if (typeof fwMote === 'function') { const _m = fwMote; fwMote = function () { if (ffOn()) return; return _m.apply(this, arguments); }; }
+
+/* Continuous H3 ice films; the existing frost kit owns every hit, freeze and expiry. */
+const FROST_SEQ = {on:!(typeof location!=='undefined'&&new URLSearchParams(location.search).get('frostSequences')==='0'),version:3,states:[],counts:{},events:[]};
+if(FROST_SEQ.on) {
+  Object.assign(LAB_FX,FROST_SEQUENCE_DATA);
+  const S=FROST_SEQ, key=n=>'frostseq_'+n, clamp=x=>Math.max(0,Math.min(1,x));
+  const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+  let coffins=new WeakMap(),blooms=new WeakMap();
+  function event(n){S.events.push({name:n,time:G.time});if(S.events.length>64)S.events.shift();}
+  function sprite(n,f,P,w,a=1,dir=null,pull=.045,k=1) {
+    const B=LAB_FX[key(n)];f=Math.max(0,Math.min(123,f));const i=Math.floor(f),anchor=mix(B.track[i],B.track[Math.min(123,i+1)],f-i),h=w/B.aspect;
+    let U=RD.right,V=RD.up,al=1;
+    if(dir){const fw=[RD.view[2],RD.view[6],RD.view[10]],dot=dir.reduce((v,x,j)=>v+x*fw[j],0),axis=dir.map((x,j)=>x-fw[j]*dot);al=Math.hypot(...axis);U=al>.001?axis.map(x=>x/al):RD.right;V=[fw[2]*U[1]-fw[1]*U[2],fw[0]*U[2]-fw[2]*U[0],fw[1]*U[0]-fw[0]*U[1]];}
+    const C=P.map((v,j)=>v-U[j]*(anchor[0]-.5)*w-V[j]*(anchor[1]-.5)*h);
+    const ok=dir?labQueue(key(n),C,dir,w/Math.max(.35,al),{fr:f,a,k,pull}):labPin(key(n),f,C,w,{a,k,pull});
+    if(ok)S.counts[n]=(S.counts[n]||0)+1;
+  }
+  const shoot=ccShoot;
+  ccShoot=function(p){
+    if(p&&p.k==='ice'){
+      const n=p.spd>=12?'spear':'bolt';
+      p._frostSeq={name:n,at:G.time,p,P:[p.x,p.h,p.z],width:(n==='spear'?4.6:3.6)*(n==='spear'?(p.sz||1.7)/1.7:Math.sqrt(p.sz||1))};
+      S.states.push(p._frostSeq);labLoad(key(n));event(n+'-release');
+    }
+    return shoot.apply(this,arguments);
+  };
+  ffBolts=function(now){
+    for(const p of G.ccP||[]){if(p.done||p.k!=='ice'||!p._frostSeq)continue;
+      const q=p._frostSeq,F=ffFlight(p),B=LAB_FX[key(q.name)],d0=Math.hypot(p.x-F.x0,p.z-F.z0),d1=Math.hypot(F.tx-p.x,F.tz-p.z),u=clamp(d0/Math.max(.001,d0+d1));
+      q.P=F.pos.slice();q.dir=F.dir.slice();q.frame=B.release+(B.impact-B.release)*u;
+      sprite(q.name,q.frame,q.P,q.width,1,q.dir);
+      const L=efx(F.s,'light');if(L.on)ffFlyLight(p,...q.P,L.fly,L.rad,F.s);
+    }
+  };
+  const land=ffLand;
+  ffLand=function(p,hit){
+    const q=p._frostSeq;if(!q)return land.apply(this,arguments);
+    const F=ffFlight(p),r=hit?ffFoeR(hit)*.5:0;
+    q.P=[p.x-F.dir[0]*r,F.aim,p.z-F.dir[2]*r];q.dir=F.dir.slice();q.pull=hit?ffFoeR(hit)+.15:.25;q.hit=G.time;q.duration=q.name==='spear'?1.0:.95;event(q.name+'-impact');
+    ffLight(q.P[0],q.P[2],q.P[1],q.name==='spear'?1:.8,q.name==='spear'?2:1.4,.22,F.s);
+  };
+  ffStaffs=function(now){
+    for(const t of G.towers){if(!ffIsFw(t)||t.wrecked||t.build>0)continue;
+      const M=umModel(FW_UNIT),ctl=M&&fwCtl(t,true,M),P=ccHand(t,towerTop(t)*.95);
+      let n=null,u=0;
+      if(ctl&&(ctl.clip==='bolt'||ctl.clip==='spear')){const rel=fwRel(M,ctl.clip);if(ctl.u<rel){n=ctl.clip==='spear'?'spear':'bolt';u=clamp(ctl.u/rel);}}
+      if(n){const B=LAB_FX[key(n)],tg=t.tg,dir=tg?ffNorm([tg.x-P[0],Math.min(P[1],ffFoeH(tg)*.75)-P[1],tg.y-P[2]]):null;sprite(n,B.release*u,P,n==='spear'?4.6:3.6,1,dir);}
+      else {const H=efx('cc_rime','hand');if(H.on)ffBill(FRT_SH.GLOW,P,H.w,{k:H.k*.35,pull:.08},'cc_rime','hand');}
+    }
+  };
+  function heldFrame(q,now){const B=LAB_FX[key(q.name)],age=now-q.at;if(age<.48)return B.holdStart*clamp(age/.48);const span=B.holdEnd-B.holdStart,t=(age-.48)*18%(span*2);return B.holdStart+(t<span?t:span*2-t);}
+  function coffin(c,now){
+    let q=coffins.get(c);if(q&&q.token===c.ccCoffin&&q.hit==null)return q;
+    q={name:'coffin',c,token:c.ccCoffin,at:now,width:Math.max(.65,ffFoeH(c))*2.25,P:[ffFoeX(c),ffFoeY(c),ffFoeZ(c)]};
+    coffins.set(c,q);c._ffC=q;q.pull=ffFoeR(c)+.12;S.states.push(q);labLoad(key(q.name));event('coffin-form');return q;
+  }
+  function bloom(c,now){
+    let q=blooms.get(c);if(q&&q.token===c.ccBloom&&q.hit==null)return q;
+    q={name:'bloom',c,token:c.ccBloom,at:now,width:4.0,P:ffBloomAt(c)};blooms.set(c,q);S.states.push(q);labLoad(key(q.name));event('bloom-form');return q;
+  }
+  ffCoffins=function(now){
+    for(const c of G.ccCoffins||[])if(c.ccCoffin&&!c.dead)coffin(c,now);
+    for(const q of S.states){if(q.name!=='coffin'||q.hit!=null)continue;const c=q.c;
+      if(c.dead||c.ccCoffin!==q.token||!ffFrozen(c)||c.ccCoffin.until<=now){q.hit=now;if(c._ffC===q)c._ffC=null;event('coffin-shatter');continue;}
+      q.P=[ffFoeX(c),ffFoeY(c),ffFoeZ(c)];q.frame=heldFrame(q,now);sprite(q.name,q.frame,q.P,q.width*(.7+.3*clamp((now-q.at)/.3)),.88*clamp((now-q.at)/.16),null,q.pull);
+    }
+  };
+  ffBlooms=function(now){
+    for(const c of G.ccBlooms||[])if(c.ccBloom&&!c.dead)bloom(c,now);
+    for(const q of S.states){if(q.name!=='bloom'||q.hit!=null)continue;const c=q.c;
+      if(c.dead||c.ccBloom!==q.token||c.ccBloom.until<=now){q.expire=now;q.hit=now;event('bloom-expire');continue;}
+      q.P=ffBloomAt(c);q.frame=heldFrame(q,now);sprite(q.name,q.frame,q.P,q.width*(.65+.35*clamp((now-q.at)/.4)),clamp((now-q.at)/.16));
+    }
+  };
+  ffBloomBurst=function(x,y,z){
+    let q=S.states.find(q=>q.name==='bloom'&&q.hit==null&&Math.hypot(q.P[0]-x,q.P[2]-z)<.2);
+    if(!q){q={name:'bloom',at:G.time,P:[x,y,z],width:4.0};S.states.push(q);}
+    q.P=[x,y,z];q.hit=G.time;event('bloom-shatter');ffLight(x,z,y,.8,1.5,.2,'cc_hoarbloom');
+  };
+  const frame=ffFrame;
+  ffFrame=function(){frame.apply(this,arguments);if(!ffLive()||G.force!=='conclave'||!RD||!RD.vfx||(typeof ELEMLAB!=='undefined'&&ELEMLAB.mask))return;
+    const now=G.time;S.states=S.states.filter(q=>now-q.at<20&&(q.hit==null||now-q.hit<(q.duration||.9))&&(!q.p||!q.p.done||q.hit!=null));
+    for(const q of S.states){if(q.hit==null)continue;const B=LAB_FX[key(q.name)],u=clamp((now-q.hit)/(q.duration||.9));
+      sprite(q.name,q.expire?q.frame:B.impact+(123-B.impact)*u,q.P,q.width,q.expire?1-u:q.name==='coffin'?.88:1,q.dir||null,q.pull||.045,1);
+    }
+  };
+  HF_RESETS.push(()=>{for(const q of S.states)if(q.c&&q.c._ffC===q)q.c._ffC=null;S.states.length=0;S.counts={};S.events.length=0;coffins=new WeakMap();blooms=new WeakMap();});
+}
 
 /* ================= THE SEEDCASTERS' PLANT SHADER: pods, husks, spores, stems, leaves and caps, drawn live =================
    The owner (11 Nov 2026): "audit all spell animations and improve them, start with one unit ... would like the seedcasters
@@ -99827,7 +100262,12 @@ if (typeof applyLight === 'function') {
   }
   function cast() {
     const t = L.t; if (!t) return;
-    if (SP().basic) { t.cd = 0; L.elFireT = G.time + .25; return; }
+    if (SP().basic) {
+      // Preview each mage's real pre-release wind-up at the animated casting anchor.
+      const frostModel = L.spell === 'cc_rime' && typeof umModel === 'function' ? umModel('cc_rimeweaver') : null;
+      const windup = L.spell === 'cc_fireball' ? Math.min(.3, Math.max(.5, (t.st && t.st.rate) || 1.5) * .45) : frostModel ? fwRel(frostModel, 'bolt') / 30 : 0;
+      t.cd = windup; L.elFireT = G.time + windup + .25; return;
+    }
     const ab = ABIL[L.spell]; if (!ab || typeof abilEnsure !== 'function') return;
     const A = abilEnsure(t); A.mana = abMax(t); A.cd[ab.id] = 0; A.busyT = 0; A.cast = null;
     for (const c of L.foes) if (L.spell === 'cc_rimelance' && c.stunT > 0) { c.stunT = 0; c.ccCoffin = null; }
