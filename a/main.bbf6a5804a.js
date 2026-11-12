@@ -1,4 +1,4 @@
-const BUILD_TAG = '0f2910d@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4a0ab23@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -59734,12 +59734,26 @@ const AudioSys = (() => {
   // matched in loudness by tools/make_firesfx.py (the owner's "fire whooshes" and "fireball and flame whooshes" packs). The
   // strike is a short warm burst as the ball is loosed and a soft fireball boom where it lands, each round three takes (no
   // flight whoosh between them: two layers a shot, so a fast-firing Pyroclast never tires the ear)
-  // (owner, 13 Nov 2026: his fireball whoosh-and-explosion recording for the auto attack, its whoosh as the ball is loosed and
-  // its blast where it lands, fireballsfxdata.js; the three-take rounds stay as the fallback)
-  const PY_FB = () => !!fxTakes().pyroFbCast;
-  S.pyroCast = () => PY_FB() ? firePlay('pyroFbCast', .1, .3) : fireNext('pyroCast', [['pyroCast', .067], ['pyroCast2', .087], ['pyroCast3', .058]], .3);
+  // the auto-attack Fireball from the owner's own three recordings (13 Nov 2026, fireballsfxdata.js, played as recorded): the
+  // simmering build-up over his wind-up (S.pyroCharge, below), the whoosh of its flight started so it ends as the ball bursts
+  // (T: its flight time, from pyrofire.js; F.pk: that moment in the take; a short flight starts a little into it), and the
+  // impact explosion as it bursts (S.pyroLand). The three-take rounds stay as the fallback.
+  const PY_FB = () => !!fxTakes().pyroFbWhoosh;
+  S.pyroCast = (T) => {
+    if (!PY_FB()) return S.pyroCastOld();
+    const pk = fxTakes().pyroFbWhoosh.pk, f = T > 0 ? T : pk;
+    if (f > pk) later(f - pk, () => firePlay('pyroFbWhoosh', .075, .25)); else firePlay('pyroFbWhoosh', .075, .25, f);
+  };
+  // the build-up (owner: "use this as the build up sound between the fireball leaving his hand"): the simmering, crackling fire
+  // swelling in as the ball grows in his palm (unitmodels_pyroclast2.js passes how long the wind-up has left), cut off with a
+  // short fade as he throws
+  S.pyroCharge = (len) => {
+    fireLoad(); const B = fireBufs.pyroFbSimmer; if (!B || !ok('fire_pyroFbSimmer', .2)) return false;
+    morPlay(B, 0, Math.min(B.duration, Math.max(.2, (len || .5) + .06)), .045 * PYRO_GAIN); return true;
+  };
+  S.pyroCastOld = () => fireNext('pyroCast', [['pyroCast', .067], ['pyroCast2', .087], ['pyroCast3', .058]], .3);
   const PY_LAND = [['pyroLand', .097], ['pyroLand2', .089], ['pyroLand3', .12]], PY_LAND_BIG = PY_LAND.map(([k, v]) => [k, v * 1.35]);
-  S.pyroLand = (big) => PY_FB() ? firePlay('pyroFbLand', big ? .13 : .1, .25) : fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
+  S.pyroLand = (big) => fxTakes().pyroFbImpact ? firePlay('pyroFbImpact', big ? .12 : .095, .2) : fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
   // Furnace Breath: a flame spat from its hands over the steady roar of the pouring cone (the roar fades out by ~2.4 s)
   S.pyroBreath = () => { firePlay('pyroBreathCast', .09, .5); firePlay('pyroBreath', .15, 1.2); };
   // Skipping Flame: the throw, a short burst at each skip (three takes in turn, each a touch higher or lower) and a bigger
@@ -90972,7 +90986,7 @@ if (typeof CCX_FX !== 'undefined') {
    (above), each spell its own take ---- */
 if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_fireball) {
   const _pfAtk = FORCE_ATTACK.cc_fireball;
-  FORCE_ATTACK.cc_fireball = function () { const r = _pfAtk.apply(this, arguments); if (typeof sfx === 'function') sfx('pyroCast'); return r; };
+  FORCE_ATTACK.cc_fireball = function (t, st, tg) { const r = _pfAtk.apply(this, arguments); if (typeof sfx === 'function') sfx('pyroCast', t && tg ? .32 + Math.hypot(tg.x - t.x, tg.y - t.y) * .055 : 0); return r; };   // (its flight time, forces_conclave_a.js: the flight's whoosh ends as the ball bursts)
 }
 if (typeof castAbility === 'function') {
   const _pfCast = castAbility, PF_SND = { cc_pyresigil: 'pyroBreath', cc_flamewave: 'pyroPhx', cc_kindle: 'pyroSkipCast' };
@@ -94793,7 +94807,10 @@ const PYRO2 = (() => {
     // the strike: the wind-up over the reload's last part (the release frame as the fireball is loosed), the follow-through after
     const st = t.st, rate = Math.max(.5, (st && st.rate) || 1.5), r = (CL.cast.rel || 0) / 30, pre = Math.min(r, rate * .45), post = Math.max(.3, Math.min(CL.cast.len - r, rate - pre - .05));
     const fight = (G.phase === 'wave' || (typeof ELEMLAB !== 'undefined' && ELEMLAB.ready && ELEMLAB.t === t && ELEMLAB.spell === 'cc_fireball')) && t.tg && !t.tg.dead;
-    if (fight && t.cd > 0 && t.cd < pre) return { c: 'cast', s: r * (1 - t.cd / pre), rate: RATE.cast, gl: 1 - t.cd / pre };
+    if (fight && t.cd > 0 && t.cd < pre) {
+      if (t._p2Sim !== t.shots && t.cd > pre * .5) { t._p2Sim = t.shots; if (typeof sfx === 'function') sfx('pyroCharge', t.cd); }   // the build-up's sound, once a wind-up (audio.js S.pyroCharge)
+      return { c: 'cast', s: r * (1 - t.cd / pre), rate: RATE.cast, gl: 1 - t.cd / pre };
+    }
     const s = t.shotT == null ? 9 : t.shotT;
     if (s >= 0 && s < post && t.shots) return { c: 'cast', s: r + (CL.cast.len - r) * s / post, rate: RATE.cast, gl: 0 };
     if (t.wounded || S.wound) return { c: 'wounded', s: ph, rate: RATE.idle, gl: 0 };
