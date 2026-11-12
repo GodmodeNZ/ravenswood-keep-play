@@ -116,7 +116,7 @@ button{font:inherit;color:inherit}
 .bg-head{flex:none;display:flex;align-items:center;gap:10px;padding:0 2px 6px}
 /* a unit's character sheet (gearpanel.js): the unit on its dais between its sockets, its stats, abilities and gear */
 .ov.ov-gearp{padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
-.panel.gearp{width:min(980px,calc(var(--vw-safe) - 16px));max-height:calc(var(--vh-safe) - 16px);display:flex;flex-direction:column;padding:10px 12px 12px;text-align:left;
+.panel.gearp{width:min(1100px,calc(var(--vw-safe) - 16px));max-height:calc(var(--vh-safe) - 16px);display:flex;flex-direction:column;padding:10px 12px 12px;text-align:left;
   background:var(--noise),linear-gradient(#182527,#0b1212);box-shadow:inset 0 0 0 1px #000,inset 0 0 0 3px #28676e,inset 0 0 0 4px #000,0 18px 50px rgba(0,0,0,.8)}
 .panel.gearp::before{display:none}
 .gp-ttl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -148,18 +148,22 @@ button{font:inherit;color:inherit}
 .gp-st span{flex:1;min-width:0;color:var(--muted)}
 .gp-st b{color:#f2ead8}.gp-st b.bo{color:#8fe07a}.gp-st b.neg{color:#ff9a7a}.gp-st.gp-aff{align-items:flex-start}.gp-st.gp-aff span{flex:0 0 auto}.gp-st.gp-aff b{flex:1;font-weight:600;font-size:12px;line-height:1.3;text-align:right}
 .gp-st i{font-style:normal;font-size:11px;color:#7c8a86;text-decoration:line-through}
-.gp-mana p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.gp-abh{display:flex;align-items:center;gap:10px;margin-top:2px}
+.gp-abh h3{flex:none}
+.gp-mana{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.gp-mana .gp-mbar{flex:1;min-width:90px}
+.gp-mana p{margin:0;flex:none;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .gp-mbar{position:relative;height:16px;border-radius:3px;overflow:hidden;background:rgba(40,80,160,.18);box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px #23406e}
 .gp-mbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(#5aa0ff,#2a5ec8)}
 .gp-mbar span{position:relative;display:block;text-align:center;font:700 11px/16px var(--f-ui);color:#eaf2ff;text-shadow:0 1px 2px #000}
 .gp-abils{display:flex;flex-direction:column;gap:6px}
-.gp-ab{display:flex;gap:9px;padding:6px;border-radius:5px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.gp-ab{display:flex;align-items:center;gap:9px;padding:5px 8px 5px 5px;border-radius:5px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
 .gp-ab.off{opacity:.72}
-.gp-ab h4{margin:0;font:700 14px/1.2 var(--f-ui);color:#f2ead8}
+.gp-abm{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.gp-ab h4{margin:0;font:700 14px/1.2 var(--f-ui);color:#f2ead8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gp-ab h4 small{margin-left:4px;padding:0 4px;border-radius:3px;font-size:10px;color:#071517;background:#c9b88a}
-.gp-ab p{margin:2px 0 4px;font-size:12.5px;line-height:1.3;color:#d6cfbe}
-.gp-ic{position:relative;flex:none;width:48px;height:48px}
-.gp-ic canvas{width:48px;height:48px;display:block;box-shadow:0 0 0 1px #000,0 0 0 2px #3b2f1d}
+.gp-ic{position:relative;flex:none;width:44px;height:44px}
+.gp-ic canvas{width:44px;height:44px;display:block;box-shadow:0 0 0 1px #000,0 0 0 2px #3b2f1d}
 .gp-cd{position:absolute;inset:0;display:grid;place-items:center;font:800 15px/1 var(--f-ui);font-style:normal;color:#fff;text-shadow:0 1px 2px #000;
   background:conic-gradient(rgba(0,0,0,.62) calc(var(--cd,0) * 360deg),transparent 0)}
 .gp-tags{display:flex;flex-wrap:wrap;gap:4px}
@@ -1886,14 +1890,34 @@ p.mut.ist b { color: #f0f0f0; }
 .gp-side h3 .gp-pvh { font: 500 11.5px/1.2 var(--f-ui); color: #8fe07a; letter-spacing: 0; margin-left: 6px; }
 .gp-sth { margin: 6px 0 0; font: 400 12px/1.2 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: #c9b48a; }
 .gp-st.gp-tx b { font-weight: 600; font-size: 12.5px; }
-.gp-dmg { margin: 1px 0 2px; font: 600 13px/1.25 var(--f-ui); color: #e9e0c8; }
-.gp-dmg b { font-size: 15px; color: #fff3d0; }
+/* a spell's damage: the row's big figure, on its right (owner, 12 Nov 2026: "better vision of the spells damage") */
+.gp-dmg { flex: none; display: flex; flex-direction: column; align-items: flex-end; text-align: right; font: 600 13px/1.1 var(--f-ui); color: #e9e0c8; }
+.gp-dmg:empty { display: none; }
+.gp-dn { white-space: nowrap; }
+.gp-dmg b { font: 800 22px/1 var(--f-ui); color: #fff3d0; }
 .gp-dmg b.bo { color: #8fe07a; } .gp-dmg b.neg { color: #ff9a7a; }
-.gp-dmg .gp-why { display: block; font: 500 11.5px/1.3 var(--f-ui); color: #b9c4c8; }
-.gp-dmg i { font-style: normal; color: #7c8a86; text-decoration: line-through; font-size: 12px; }
-.gp-dmg small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.gp-dmg u { text-decoration: none; font-size: 14px; color: #9aa6a4; }
+.gp-dmg s { text-decoration: none; margin: 0 4px; font-size: 13px; color: #7c8a86; }
+.gp-dmg em { font-style: normal; margin: 0 5px; color: #7c8a86; }
+.gp-dmg i { font-style: normal; color: #7c8a86; text-decoration: line-through; font-size: 13px; margin-right: 2px; }
+.gp-dmg small { margin-top: 2px; color: var(--muted); font-weight: 500; font-size: 10.5px; letter-spacing: .04em; }
+/* the stats, tight (they sit under the spells without pushing them off the sheet) */
+.gp-stats { gap: 2px 10px; }
+.gp-stats .gp-st { padding: 1px 6px; font-size: 12.5px; line-height: 19px; }
+.gp-stats .gp-st b { white-space: nowrap; }
+.gp-stats .gp-sth { margin: 3px 0 0; font-size: 11px; line-height: 15px; }
+.gp-stats .gp-st.gp-aff { align-items: baseline; }
+.gp-stats .gp-st.gp-aff b { min-width: 0; white-space: normal; font-size: 12px; line-height: 1.35; }
+.gp-st.gp-ist b { white-space: normal; }
+/* Now and next: folded */
+.gp-nx { border-radius: 4px; background: rgba(255, 255, 255, .025); }
+.gp-nx summary { cursor: pointer; padding: 3px 6px; font: 400 15px/1.2 var(--f-display); letter-spacing: .04em; color: var(--gold-hi); list-style: none; }
+.gp-nx summary::-webkit-details-marker { display: none; }
+.gp-nx summary::before { content: '▸'; display: inline-block; width: 14px; color: #c9b48a; font-size: 12px; transition: transform .15s; }
+.gp-nx[open] summary::before { transform: rotate(90deg); }
+.gp-nx .gp-more { padding: 2px 8px 4px; }
 .gp-body { scrollbar-gutter: stable; }   /* (a preview that adds rows must not bring in a scrollbar and move the bag under the cursor) */
-.gp-st.gp-ist { flex-wrap: wrap; } .gp-st.gp-ist span { flex: 0 0 auto; } .gp-st.gp-ist b { flex: 1 1 100%; font-size: 12.5px; }
+.gp-st.gp-ist span { flex: 0 0 auto; } .gp-st.gp-ist b { flex: 1 1 auto; text-align: right; font-size: 12px; }
 .gp-bgrid .gp-bc { width: 46px; height: 46px; aspect-ratio: auto; }   /* (fixed: a cell sized by its canvas could grow taller than wide) */
 .gp-bgrid .gp-bc canvas { width: 46px; height: 46px; }
 
@@ -3434,7 +3458,7 @@ var MAP_LITE = (function () {
 <script src="config.js"></script>
 <script id="assets">
 (function () {
-  var A = [["a/frostsequencedata.032fe6a232.js",17730167],["a/pyrosequencedata.75243ffbfc.js",15264829],["a/pyroh3data.d25c0d29b7.js",10446576],["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/berthasfxdata.1464d64e21.js",145397],["a/firesfxdata.4051387a8a.js",551894],["a/pyrosfx2data.e9a6cff4eb.js",227063],["a/bladesfxdata.818b19f400.js",22637],["a/frostsfxdata.9e637df558.js",49593],["a/deathsfxdata.458cf5e8f2.js",399169],["a/labfxdata.95ef851e40.js",3168802],["a/glintdata.fb95083a62.js",771859],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/tfforge.27a3324b27.js",9111859],["a/terraintex.7cb95904da.js",4301861],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/grpaint.fb39aadf6f.js",484672],["a/poolpaint.6e498a6f6a.js",4151613],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.06cbba0c80.js",2366878],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.1a73bcaf58.js",4055194],["a/talentbg.50b015cb08.js",2165692],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.e7a7747c20.js",996205],["a/completionart.1.fcf285eaed.js",1090460],["a/completionart.2.31cc95af76.js",1089265],["a/completionart.3.829c7de133.js",1086248],["a/completionart.4.721377697b.js",1092355],["a/completionart.5.a8091647b0.js",1084589],["a/completionart.6.9b211962d3.js",1082461],["a/completionart.7.e71e6c00a2.js",1095079],["a/completionart.8.405ccfed44.js",1097542],["a/completionart.9.b02608515b.js",1086048],["a/completionart.10.37aa5d4275.js",1095626],["a/completionart.11.e5e65daee6.js",1099494],["a/completionart.12.d941a7d3a7.js",1094609],["a/completionart.13.ca81bb1afb.js",1095150],["a/completionart.14.0707927aef.js",1095009],["a/completionart.15.4239787241.js",1089989],["a/completionart.16.c0ac0609d3.js",1091537],["a/completionart.17.db87ea03a4.js",1093829],["a/completionart.18.27d89beefe.js",1094097],["a/completionart.19.78b4aa0d08.js",1087290],["a/completionart.20.2a42544c57.js",1099395],["a/completionart.21.76110e325f.js",1094345],["a/completionart.22.f8ceed82ac.js",824180],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_torchbearer.6a29a3a9aa.js",639207],["a/model_malgrath.6c12796111.js",735733],["a/model_mauler.9760a49c78.js",807575],["a/model_unit_gladebow.1993718f13.js",544805],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.3824cefb7c.js",644681],["a/model_unit_faelan_lb.1c1087ed50.js",710941],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.d849804ee3.js",1106383],["a/model_unit_thundergun.fce4f00910.js",946301],["a/model_unit_bladedancer.0d2f750fb4.js",1332874],["a/model_unit_thornguard.c64bf0a583.js",1275642],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/model_unit_astrologer.98ad0d6ac6.js",1336541],["a/model_unit_pyroclast.25ad2b371f.js",1126711],["a/model_unit_mageling.77ab002a64.js",1240605],["a/model_mageling2.d4c1faf4ba.js",848425],["a/model_faelan2.dda99f829d.js",905914],["a/model_ranger2.54a58422b8.js",713817],["a/model_bd2.483822b55c.js",908448],["a/model_seed2.6e4ac21e65.js",916486],["a/model_nyssa2.3bda138f44.js",996378],["a/model_pyro2.25360734be.js",870776],["a/model_tg2.fccf11eef2.js",887821],["a/model_unit_aurelian.5419360e90.js",1273453],["a/model_unit_aurelian_kimodo.6f71254edc.js",512189],["a/model_unit_frostweaver.978f1ad1b4.js",1231188],["a/main.f7be881503.js",12126332]], T = 188022030, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
+  var A = [["a/frostsequencedata.032fe6a232.js",17730167],["a/pyrosequencedata.fea53ab9ad.js",12977501],["a/pyroh3data.d25c0d29b7.js",10446576],["a/gunsfxdata.8855cff001.js",38357],["a/gunshotsdata.98d155a5e1.js",176776],["a/gatsfxdata.c040379cc3.js",1412075],["a/mortarsfxdata.02bd71209d.js",6155900],["a/berthasfxdata.1464d64e21.js",145397],["a/firesfxdata.4051387a8a.js",551894],["a/pyrosfx2data.e9a6cff4eb.js",227063],["a/bladesfxdata.818b19f400.js",22637],["a/frostsfxdata.9e637df558.js",49593],["a/deathsfxdata.458cf5e8f2.js",399169],["a/labfxdata.95ef851e40.js",3168802],["a/glintdata.fb95083a62.js",771859],["a/hawksfxdata.6bc218d0e0.js",85258],["a/marensfxdata.8c1b6bab13.js",173288],["a/swordsfxdata.4cb0a516fd.js",4353505],["a/hitsfxdata.517fe4b530.js",4034742],["a/unitvoice.7e0aff61ec.js",3080123],["a/voxdata.1.35b5fe359a.js",1033103],["a/voxdata.2.6b71400d2d.js",685009],["a/voxdata.3.cd547cde73.js",1416608],["a/voxdata.4.2483e402e1.js",1216533],["a/voxdata.5.b5f8030c5a.js",906697],["a/songdata.65773096c2.js",1272819],["a/themesong.973e000039.js",7972119],["a/tfassets.1.7da9039f9a.js",961245],["a/tfassets.2.92bf20a6be.js",1085470],["a/tfassets.3.2614749ec6.js",643313],["a/tfforge.27a3324b27.js",9111859],["a/terraintex.7cb95904da.js",4301861],["a/mwpaint.787af1a557.js",528785],["a/kmpaint.662c0421dc.js",492089],["a/clpaint.952cae678d.js",477308],["a/grpaint.fb39aadf6f.js",484672],["a/poolpaint.6e498a6f6a.js",4151613],["a/talart.c0ca282f5c.js",867854],["a/relicart.a5c2e89c05.js",231489],["a/artx.06cbba0c80.js",2366878],["a/bossart.18ad904616.js",237155],["a/titleart.325c3787bc.js",1099930],["a/heroart.6b54429514.js",100604],["a/uiart.e881691af7.js",245487],["a/forceart_silver.88bd421c60.js",688680],["a/missingart.ac0ccc1011.js",2496850],["a/talentpaint.1a73bcaf58.js",4055194],["a/talentbg.50b015cb08.js",2165692],["a/uibadges.99b22945c7.js",244833],["a/commanderart.522a27645c.js",3305944],["a/unitart.e7a7747c20.js",996205],["a/completionart.1.fcf285eaed.js",1090460],["a/completionart.2.31cc95af76.js",1089265],["a/completionart.3.829c7de133.js",1086248],["a/completionart.4.721377697b.js",1092355],["a/completionart.5.a8091647b0.js",1084589],["a/completionart.6.9b211962d3.js",1082461],["a/completionart.7.e71e6c00a2.js",1095079],["a/completionart.8.405ccfed44.js",1097542],["a/completionart.9.b02608515b.js",1086048],["a/completionart.10.37aa5d4275.js",1095626],["a/completionart.11.e5e65daee6.js",1099494],["a/completionart.12.d941a7d3a7.js",1094609],["a/completionart.13.ca81bb1afb.js",1095150],["a/completionart.14.0707927aef.js",1095009],["a/completionart.15.4239787241.js",1089989],["a/completionart.16.c0ac0609d3.js",1091537],["a/completionart.17.db87ea03a4.js",1093829],["a/completionart.18.27d89beefe.js",1094097],["a/completionart.19.78b4aa0d08.js",1087290],["a/completionart.20.2a42544c57.js",1099395],["a/completionart.21.76110e325f.js",1094345],["a/completionart.22.f8ceed82ac.js",824180],["a/model_brakka.4dee313813.js",107175],["a/model_arachnara.21b8741951.js",190247],["a/model_gnoll.74b95fa152.js",90119],["a/model_rotfather.b767f17237.js",143339],["a/model_mire.a5eb5ef781.js",74978],["a/model_torchbearer.6a29a3a9aa.js",639207],["a/model_malgrath.6c12796111.js",735733],["a/model_mauler.9760a49c78.js",807575],["a/model_unit_gladebow.1993718f13.js",544805],["a/model_unit_elowen.3d08efb4c1.js",548544],["a/model_unit_faelan.3824cefb7c.js",644681],["a/model_unit_faelan_lb.1c1087ed50.js",710941],["a/model_unit_treewizard.9478697347.js",587576],["a/model_unit_steamhammer.d849804ee3.js",1106383],["a/model_unit_thundergun.fce4f00910.js",946301],["a/model_unit_bladedancer.0d2f750fb4.js",1332874],["a/model_unit_thornguard.c64bf0a583.js",1275642],["a/model_unit_oathbound.e07a0089a4.js",923635],["a/model_unit_maren.14869af75f.js",877749],["a/model_unit_varic.0d9b3dca73.js",1948937],["a/model_unit_astrologer.98ad0d6ac6.js",1336541],["a/model_unit_pyroclast.25ad2b371f.js",1126711],["a/model_unit_mageling.77ab002a64.js",1240605],["a/model_mageling2.d4c1faf4ba.js",848425],["a/model_faelan2.dda99f829d.js",905914],["a/model_ranger2.54a58422b8.js",713817],["a/model_bd2.483822b55c.js",908448],["a/model_seed2.6e4ac21e65.js",916486],["a/model_nyssa2.3bda138f44.js",996378],["a/model_pyro2.25360734be.js",870776],["a/model_tg2.fccf11eef2.js",887821],["a/model_unit_aurelian.5419360e90.js",1273453],["a/model_unit_aurelian_kimodo.6f71254edc.js",512189],["a/model_unit_frostweaver.978f1ad1b4.js",1231188],["a/main.adfff275d7.js",12129806]], T = 185738176, done = {}, nd = 0, got = 0, shown = 0, last = Date.now(), failed = false;
   // painted-only maps (src/maplite.js: phones and tablets): the 3D map dressing's data is never downloaded
   if (window.MAP_LITE) { var LS = ["tfforge","tfassets","terraintex"]; window.__liteSkipped = [];
     A = A.filter(function (f) { var n = f[0].split('/').pop().split('.')[0]; if (LS.indexOf(n) < 0) return true; window.__liteSkipped.push(f[0]); T -= f[1]; return false; }); }

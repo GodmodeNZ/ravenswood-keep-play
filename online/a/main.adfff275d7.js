@@ -1,4 +1,4 @@
-const BUILD_TAG = '7d1ef45@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c9d4a48@2026-11-12';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13156,6 +13156,7 @@ function ccProjTick(dt) {
     if (p.tr.length > 5) p.tr.shift(); p.tr.push([p.x, p.h, p.z]);
     if (p.lob) {
       const b = p.lob; b.t += dt; const u = Math.min(1, b.t / b.T);
+      if (b.tg && !b.tg.dead && !b.tg.phased && !b.tg.ent) { b.ax = b.tg.x; b.az = b.tg.y; }   // (a lob that follows its foe)
       p.x = b.x0 + (b.ax - b.x0) * u; p.z = b.z0 + (b.az - b.z0) * u; p.h = b.h0 + (.12 - b.h0) * u + Math.sin(u * Math.PI) * b.arc;
       if (p.k === 'lob' && Math.random() < .6) {
         const e0 = p._efs && typeof efxPush === 'function' ? efxPush(p._efs, 'trail') : null;   // (the Element Lab: the fireball's trail layer, elemfx.js)
@@ -13431,9 +13432,12 @@ FORCE_ATTACK.cc_fireball = function (t, st, tg, pow, echo) {
   const C = st.caps, p = st.pw || {}, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t) * .85);
   if (C.ccGreat && pow > 1.01) ccEv('cap:ccGreat');
   const great = C.ccGreat && pow > 1.01, glyph = !echo && (n % (C.ccPyre2 ? 2 : 3) === 0), small = p.ccBrazier && !glyph && !echo;
-  const ax = tg.x, az = tg.y, d = Math.hypot(ax - t.x, az - t.y), T = .45 + d * .07;
-  ccShoot({ k: 'lob', x: hx, h: hh, z: hz, sz: great ? 1.8 : 1, col: CC_COL.fire, lob: { x0: hx, z0: hz, h0: hh, ax, az, T, arc: .7 + d * .12 }, fn: () => {
-    const s = t.st || st; ccFireBurst(t, s, ax, az, pow, { great, glyph, small });
+  const ax = tg.x, az = tg.y, d = Math.hypot(ax - t.x, az - t.y), T = .32 + d * .055;   // (owner, 12 Nov 2026: "a bit faster": a quarter quicker than .45 + d * .07)
+  // (it follows its foe while it flies, lob.tg: it bursts on the foe where it is when it lands, not where it stood at the throw;
+  // a foe that dies first leaves it to land where it fell. Owner, 12 Nov 2026: "the explosion on the mob ... doesnt connect")
+  const L = { x0: hx, z0: hz, h0: hh, ax, az, T, arc: .7 + d * .12, tg };
+  ccShoot({ k: 'lob', x: hx, h: hh, z: hz, sz: great ? 1.8 : 1, col: CC_COL.fire, lob: L, fn: () => {
+    const s = t.st || st; ccFireBurst(t, s, L.ax, L.az, pow, { great, glyph, small });
   } });
   t.recoil = 1;
 };
@@ -84298,6 +84302,7 @@ function gpStats(t, alt) {
   num('Chance on Hit', s => Math.min(100, s.coh || 0), v => '+' + Math.round(v) + '%', typeof ISTAT !== 'undefined' && ISTAT.coh ? ISTAT.coh.say : '');
   num('Crit damage', s => s.critM && s.critM !== 2.5 ? s.critM : 0, X, 'A crit’s multiple of the strike (x2.5 unless something changes it)');
   out.push(gpStat('Range', st.range, b.range, gpF, hint('Its reach in cells', on('range'))));
+  out.push(`<div class="gp-st" title="What it can strike"><span>Targets</span><b>${d.air ? 'Ground, air' : 'Ground'}</b></div>`);
   if (st.airR || (alt && b.airR)) out.push(gpStat('Reach vs flyers', st.range + (st.airR || 0), (b.range || 0) + (b.airR || 0), gpF, 'How far it reaches at flyers'));
   num('Splash', s => s.splash || 0, gpF, hint('The burst round each strike, in cells', on('splash')));
   if (st.multi) out.push(gpStat('Targets', 1 + st.multi, 1 + (b.multi || 0), String, 'Foes each strike hits at once'));
@@ -84313,11 +84318,10 @@ function gpStats(t, alt) {
   // ---- Spells and mana ----
   const kit = abilKit(t);
   if (kit) {
-    grp('Spells');
+    grp('Spells and mana');
     num('Spell Damage', s => s.spDmg || 0, PL, ISTAT.sp.say, alt ? cur.spDmg || 0 : 0);
     num('Cooldown Reduction', s => 1 - ((s.sh && s.sh.cdK) || 1), P, 'Its spells and its items’ taps come this much sooner', alt ? 1 - ((cur.sh && cur.sh.cdK) || 1) : 0);
     const m0 = manaSheet(t, kit), poolOf = s => abMax(t) - ((t.st && t.st.manaMax) || 0) + (s.manaMax || 0), rgOf = s => kit.mana.regen * (typeof manaRegenK === 'function' ? manaRegenK(t, s) : 1) + (s.manaRegen || 0);
-    grp('Mana');
     out.push(gpStat('Mana pool', poolOf(st), alt ? poolOf(cur) : kit.mana.max, v => String(Math.round(v)), 'The most mana it can hold: its dearest spell, and more from talents and items'));
     out.push(gpStat('Mana a second', rgOf(st), alt ? rgOf(cur) : kit.mana.regen, gpF, `Mana it regains each second in a wave (between waves ${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast)`));
     if (m0.hit) txt('Mana a strike', '+' + m0.hit, 'Mana each basic strike gives back');
@@ -84339,44 +84343,37 @@ function gpStats(t, alt) {
   if (st.auraS) fx.push(() => out.push(gpStat('Aura haste', st.auraS, b.auraS, v => '+' + P(v), 'Speed it lends the units round it')));
   if (st.auraR) fx.push(() => out.push(gpStat('Aura radius', st.auraR, b.auraR, gpF, hint('How far its aura reaches', on('aura')))));
   if (fx.length) { grp('Effects'); for (const f of fx) f(); }
-  if (st.ist) { const sum = itemStatSum(st.ist); if (sum) out.push(`<div class="gp-st gp-ist" style="grid-column:1/-1" title="${gpE('What its items add up to (each line: ' + IST_ORDER.filter(k => st.ist[k]).map(k => ISTAT[k].name + ', ' + ISTAT[k].say).join('; ') + ')')}"><span>From its items</span><b class="bo">${gpE(sum)}</b></div>`); }
-  out.push(`<div class="gp-st"><span>Targets</span><b>${d.air ? 'Ground and air' : 'Ground only'}</b></div>`);
+  if (st.ist) { const sum = itemStatSum(st.ist); if (sum) out.push(`<div class="gp-st gp-ist" style="grid-column:1/-1" title="${gpE('What its items add up to (each line: ' + IST_ORDER.filter(k => st.ist[k]).map(k => ISTAT[k].name + ', ' + ISTAT[k].say).join('; ') + ')')}"><span>Items</span><b class="bo">${gpE(sum)}</b></div>`); }
   return out.filter(Boolean).join('');
 }
+// the mana bar in the Abilities heading: its pool, its income and how it casts, on one line
 function gpMana(t) {
   const kit = abilKit(t); if (!kit) return '';
   const A = abilEnsure(t, kit), m = manaSheet(t, kit), max = abMax(t), cur = A ? A.mana : 0;
   return `<div class="gp-mana"><div class="gp-mbar"><i id="gpMb" style="width:${Math.round(100 * clamp(cur / max, 0, 1))}%"></i><span id="gpMt">${Math.floor(cur)} / ${max} mana</span></div>
-    <p>+${m.regen} a second${m.hit ? ` · +${m.hit} a strike` : ''} · ${A.mode === 'focus' ? `Focus: ${ABIL[A.focus] ? ABIL[A.focus].name : '—'}` : 'Rotate: in turn'}</p></div>`;
+    <p>+${m.regen}/s${m.hit ? ` · +${m.hit} a strike` : ''} · ${A.mode === 'focus' ? `Focus: ${ABIL[A.focus] ? ABIL[A.focus].name : '—'}` : 'Rotate'}</p></div>`;
 }
-/* A spell's damage as it stands, the prominent figure (its tooltip's "2.3× damage (41)" numbers, read with the unit's live
-   stats, items in): "41 damage", or each hit it names, "41 · 14 damage". With alt (a preview), each number now is struck
-   through beside the new one, green or red. */
+/* A spell's damage as it stands, the row's big figure (its tooltip's "2.3× damage (41)" numbers, read with the unit's live
+   stats, items in): "41", or each hit it names, "41 · 14". Once Spell Damage adds to it, the plain spell's figure stands
+   before it, "30 → 38" (owner, 12 Nov 2026: the sheet shows the damage, not the sum; the sum is in the spell's tooltip).
+   With alt (a preview), each number now is struck through beside the new one, green or red. */
 // a spell whose text names a flat figure ("2296 damage", as the commander's spell on its Champion) shows that instead (owner: Severing Arc)
 const gpDmgNums = (t, st, ab) => { let s = ''; try { s = abText(t, st, ab); } catch (e) {} const a = [...s.matchAll(/× damage \((\d+)\)/g)].map(m => +m[1]); return a.length ? a : [...s.matchAll(/(?:^|[\s:(])(\d{2,}) damage/g)].map(m => +m[1]); };
 function gpDmgHTML(t, ab, alt) {
   const st = t.st || effStats(t), a = gpDmgNums(t, st, ab); if (!a.length) return '';
-  const b = alt ? gpDmgNums(t, alt, ab) : null;
-  const up = !b && gpDmgUp(t, st, ab);
-  const one = (v, i) => { const w = b ? b[i] : null; return w == null || w === v ? `<b${up ? ' class="bo"' : ''}>${v}</b>` : `<i>${v}</i> <b class="${w > v ? 'bo' : 'neg'}">${w}</b>`; };
-  return `${a.map(one).join(' · ')} damage${a.length > 1 ? ' <small>(each hit it names)</small>' : ''}` + gpDmgWhy(t, ab, alt || st);
+  const b = alt ? gpDmgNums(t, alt, ab) : null, e = b ? null : gpDmgBase(t, st, ab);
+  const one = (v, i) => {
+    if (b) { const w = b[i]; return w == null || w === v ? `<b>${v}</b>` : `<i>${v}</i> <b class="${w > v ? 'bo' : 'neg'}">${w}</b>`; }
+    return i === 0 && e != null && e < v ? `<u>${e}</u><s>→</s><b class="bo">${v}</b>` : `<b>${v}</b>`;
+  };
+  return `<span class="gp-dn">${a.map(one).join('<em>·</em>')}</span><small>damage</small>`;
 }
-// the number is green once Spell Damage adds to it (owner, 6 Nov 2026: "show the magic number as green if its been improved")
-function gpDmgUp(t, st, ab) {
-  const sp = st.spDmg || 0; if (!(sp > 0) || typeof abTipLog !== 'function') return false;
-  try { const e = abTipLog(t, st, ab).find(x => x.lbl); return !!e && e.bonus > 0; } catch (x) { return false; }
+// the spell's first figure without its Spell Damage (null when Spell Damage adds nothing to it): the green number's "from"
+function gpDmgBase(t, st, ab) {
+  const sp = st.spDmg || 0; if (!(sp > 0) || typeof abTipLog !== 'function') return null;
+  try { const e = abTipLog(t, st, ab).find(x => x.lbl); return e && e.bonus > 0 ? Math.round(e.base) : null; } catch (x) { return null; }
 }
-/* where the number comes from: the spell's multiple of the strike, then its share of Spell Damage added on top (never
-   multiplied): "2.3× strike (41) + 50% of 9 Spell Damage (5) = 46"; shown once Spell Damage is in play, or in a preview
-   that changes it. The first number the text names (abilities.js abTipLog), the same one the tooltip shows. */
-function gpDmgWhy(t, ab, st) {
-  const sp = st.spDmg || 0; if (!(sp > 0)) return '';
-  const e = abTipLog(t, st, ab).find(x => x.lbl); if (!e) return '';
-  // whole numbers when they add up; else a decimal each (small hits), so the sum always reads true
-  let bs = Math.round(e.base), bt = Math.round(e.bonus), tot = Math.round(e.base + e.bonus);
-  if (bs + bt !== tot) { const f1 = v => +v.toFixed(1); bs = f1(e.base); bt = f1(e.bonus); tot = f1(bs + bt); }
-  return `<small class="gp-why">${e.lbl} strike (${bs}) + ${typeof spPct === 'function' ? spPct(e.k) : Math.round(e.k * 100) + '%'} of ${Math.round(sp)} Spell Damage (${bt}) = ${tot}</small>`;
-}
+// one compact row a spell: its icon, name and key over its mana, recharge and how it casts; its damage large on the right
 function gpAbils(t) {
   const kit = abilKit(t); if (!kit) return '';
   const A = abilEnsure(t, kit), u = t.def.unit;
@@ -84388,8 +84385,9 @@ function gpAbils(t) {
       : typeof spNew === 'function' && spNew() ? spSheetState(t, ab)
       : LEARN.unlocked(u, ab) ? (abilPointsFree(t) > 0 && (t.tier | 0) >= (ab.minTier || 0) ? 'Ready to learn' : `Learns at tier ${ROMAN[LEARN.nextAt(t)] || '—'}`) : ab.research ? `Research: ${ab.research.cost} gold` : 'Innate';
     return `<div class="gp-ab${known ? '' : ' off'}" data-ab="${ab.id}"><span class="gp-ic"><canvas width="96" height="96" data-key="${abIconKey(ab, known)}"></canvas><i class="gp-cd" id="gpCd${n}"></i></span>
-      <div><h4>${gpE(ab.name)} <small>${'QWE'[n]}</small></h4><div class="gp-dmg" data-dab="${ab.id}">${gpDmgHTML(t, ab)}</div><p>${gpE(abTip(t, ab))}</p>
-      <div class="gp-tags"><span class="mana">${cost} mana</span><span>${gpF(cd)}s recharge</span>${typeof castLabel === 'function' ? `<span>${castLabel(t, ab)}</span>` : ''}<span class="st">${state}</span></div></div></div>`;
+      <div class="gp-abm"><h4>${gpE(ab.name)} <small>${'QWE'[n]}</small></h4>
+      <div class="gp-tags"><span class="mana">${cost} mana</span><span>${gpF(cd)}s</span>${typeof castLabel === 'function' ? `<span>${castLabel(t, ab)}</span>` : ''}<span class="st">${state}</span></div></div>
+      <div class="gp-dmg" data-dab="${ab.id}">${gpDmgHTML(t, ab)}</div></div>`;
   }).join('');
 }
 function gpGearList(t) {
@@ -84536,10 +84534,11 @@ function gpWire(t, socks) {
 let gpSwallowT = 0;
 const gpSock = (s, i) => `<button type="button" class="gp-sock${s.off ? ' off' : ''}${s.empty ? ' empty' : ''}" data-i="${i}" ${s.it ? '' : ` title="${gpE(s.tip || '')}"`}><canvas width="112" height="112" data-key="${s.key}"></canvas><small${s.col ? ` style="color:${s.col}"` : ''}>${gpE(s.lbl)}</small></button>`;
 // what the desktop corner card no longer says (ui.js deskCardHTML): the force's gauge and what it builds to, the next talent, the next tier
+let gpNxOpen = false;   // (folded unless opened: kept while the sheet redraws)
 function gpMore(t) {
   let h = '';
   try { h = (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '') + (typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : '') + (t.def.support || typeof milestoneHTML !== 'function' ? '' : milestoneHTML(t.type)) + (typeof upgradeLine === 'function' ? upgradeLine(t) : ''); } catch (e) { h = ''; }
-  return h ? `<h3>Now and next</h3><div class="gp-more">${h}</div>` : '';
+  return h ? `<details class="gp-nx"${gpNxOpen ? ' open' : ''}><summary>Now and next</summary><div class="gp-more">${h}</div></details>` : '';
 }
 function openGearPanel(t) {
   if (!t || G.state !== 'play' || !G.towers.includes(t)) return;
@@ -84550,7 +84549,7 @@ function openGearPanel(t) {
   showOverlay(`<div class="bg-head"><div class="gp-ttl"><div class="gp-tl"><h2 class="ttl">${gpE(t.def.name)}</h2><b class="gp-tier">${ROMAN[t.tier]}</b></div>
       <span>Kills ${t.kills || 0} · Dealt ${fmt(t.dmg || 0)}${champ ? ` · <b class="gp-champ">${gpE(h.name)}’s Champion</b>` : ''}</span>${typeof vetInfoHTML === 'function' ? vetInfoHTML(t).replace('<p class="mut vet-row"', '<p class="mut vet-row gp-vet"') : ''}</div>
       <button type="button" class="tx" id="gpClose" aria-label="Close and resume">${X_SVG}</button></div>
-    <div class="gp-body">
+    <div class="gp-body" data-kw-noside>
       <div class="gp-doll">
         <div class="gp-col">${S.rel.map((s, i) => gpSock(s, i)).join('')}</div>
         <div class="gp-stage"><canvas id="gpCv" width="560" height="560" aria-label="${gpE(t.def.name)}, drag to turn"></canvas><small>Drag to turn and move · scroll to zoom</small></div>
@@ -84558,13 +84557,14 @@ function openGearPanel(t) {
         <div class="gp-bag"><h3>Bag <small>${canHover() ? 'Drag an item onto a socket, or a socketed one back here' : 'Drag, or tap an item then a socket'}${typeof ilOn === 'function' && ilOn() ? '; onto a row under Gear to infuse it' : ''}</small></h3><div class="gp-bgrid" role="listbox" aria-label="Bag">${gpBagCells(t)}</div></div>
       </div>
       <div class="gp-side">
+        ${abilKit(t) ? `<div class="gp-abh"><h3>Abilities</h3>${gpMana(t)}</div><div class="gp-abils">${gpAbils(t)}</div>` : ''}
         <h3>Stats <small class="gp-pvh"></small></h3><div class="gp-stats">${gpStats(t)}</div>
         ${gpMore(t)}
-        ${abilKit(t) ? `<h3>Abilities</h3>${gpMana(t)}<div class="gp-abils">${gpAbils(t)}</div>` : ''}
         <h3>Gear</h3><div class="gp-gear">${gpGearList(t)}</div>
       </div>
     </div>`, 'gearp');
   for (const c of ovp.querySelectorAll('canvas[data-key]')) iconPaint(c, c.dataset.key);
+  { const nx = ovp.querySelector('.gp-nx'); if (nx) nx.ontoggle = () => { gpNxOpen = nx.open; }; }
   $('#gpClose').onclick = () => { sfx('click'); gpT = null; resumeGame(); };
   { const gb = ovp.querySelector('.gp-body'); if (gb) { gb.style.height = gb.getBoundingClientRect().height + 'px'; gb.style.flex = 'none'; } }   // (pinned: a preview that adds rows scrolls the sheet, it does not re-centre the panel and move the bag under the cursor)
   const sockTap = gpWire(t, socks);   // the bag on the sheet: drag and drop, pick and place, the preview
@@ -84580,7 +84580,7 @@ function openGearPanel(t) {
   for (const b of ovp.querySelectorAll('.gp-act')) b.onclick = () => { const it = acts[+b.dataset.act]; if (!it) return; gpT = null; resumeGame(); useAct(t, it); };
   // every item on the sheet shows its card on hover, or on a long press (itemtip.js)
   const gear = (t.gear || []).filter(Boolean).concat(t.charm ? [t.charm] : []);
-  itipBind(ovp.querySelector('.gp-body'), '.gp-sock[data-i], .gp-act, .gp-it, .gp-bc', el => { if (gpDrag && gpDrag.on) return ''; if (el.dataset.bi != null) { const it = G.loot.find(q => q.id === +el.dataset.bi); if (!it) return ''; const why = gpWhyNot(t, it, gpAutoSlot(t, it)); return itemCardHTML(it, { note: why ? `<p class="itc-no">${why}</p>` : `<p class="itc-hint">${canHover() ? 'Drag it onto a socket, or click it and then a socket' : 'Drag it onto a socket, or tap it and then a socket'}</p>` }); } const it = el.dataset.i != null ? (socks[+el.dataset.i] || {}).it : el.dataset.act != null ? acts[+el.dataset.act] : gear[+el.dataset.gi]; return it ? itemCardHTML(it) : ''; });
+  itipBind(ovp.querySelector('.gp-body'), '.gp-sock[data-i], .gp-act, .gp-it, .gp-bc', el => { if (gpDrag && gpDrag.on) return ''; if (el.dataset.bi != null) { const it = G.loot.find(q => q.id === +el.dataset.bi); if (!it) return ''; const why = gpWhyNot(t, it, gpAutoSlot(t, it)); return itemCardHTML(it, why ? { note: `<p class="itc-no">${why}</p>` } : undefined); } const it = el.dataset.i != null ? (socks[+el.dataset.i] || {}).it : el.dataset.act != null ? acts[+el.dataset.act] : gear[+el.dataset.gi]; return it ? itemCardHTML(it) : ''; });
   const cv = $('#gpCv');
   cv.onpointerdown = e => { gpDragX = e.clientX; gpDragY = e.clientY; gpSpin = false; cv.setPointerCapture(e.pointerId); };
   /* a drag with either mouse button: across turns the unit, up and down moves along it (owner, 11 Nov 2026: "let me hold right click on mouse to go up and down a 3d model to see it better", "or left click") */
@@ -89944,11 +89944,11 @@ function labPlay(name, x, z, w, o) {
 // a looping bake on a card this frame (a jet, a ball in flight): its anchor (the bake's own, labfxdata.js: the jet's root, the
 // ball's centre) at P, its axis (the jet's way, the ball's flight) along dir, len world units along it; o: { k, a, seed, speed,
 // pull: world units the card is drawn toward the camera, so fire among the foes isn't swallowed by their bodies; fr: a one-shot
-// bake's frame instead of the loop's clock (the muzzle blast, played along its shot) }
+// bake's frame instead of the loop's clock (the muzzle blast, played along its shot); vflip: the picture mirrored top to bottom }
 function labQueue(name, P, dir, len, o) {
   if (typeof LAB_FX === 'undefined' || !LAB_FX[name] || typeof RD === 'undefined' || !RD || !RD.vfx || LABF.q.length >= LABF.QMAX) return false;
   labLoad(name); o = o || {}; const sd = o.seed | 0;
-  LABF.q.push({ name, P, dir, len, pull: o.pull || 0, top: !!o.top, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, ph: (sd * 7.31) % 1, mir: !!(sd & 1), sp: o.speed || 1, fr: o.fr });
+  LABF.q.push({ name, P, dir, len, pull: o.pull || 0, top: !!o.top, k: o.k == null ? 1 : o.k, a: o.a == null ? 1 : o.a, ph: (sd * 7.31) % 1, mir: !!(sd & 1), sp: o.speed || 1, fr: o.fr, vflip: !!o.vflip });
   const X = RD.vfx; if (!X.ext.includes(LAB_EXT)) X.ext.push(LAB_EXT); LAB_EXT.n = 1;
   return true;
 }
@@ -90075,7 +90075,8 @@ const LAB_EXT = {
         const corner = (sx, sy) => {
           const P = [C[0] + U[0] * sx * Wd * .5 + V[0] * sy * Ht * .5, C[1] + U[1] * sx * Wd * .5 + V[1] * sy * Ht * .5, C[2] + U[2] * sx * Wd * .5 + V[2] * sy * Ht * .5];
           const ux = (sx > 0) !== m ? 1 : 0, vy = sy > 0 ? 0 : 1;
-          _labV.set([P[0], P[1], P[2], ux ? A[2] : A[0], vy ? A[3] : A[1], ux ? Bq[2] : Bq[0], vy ? Bq[3] : Bq[1], e.k, bl, 0, e.a], o); o += 11;
+          const vv = e.vflip ? !vy : vy;   // (vflip: a 'right' bake heading left on screen is mirrored, not turned upside down)
+          _labV.set([P[0], P[1], P[2], ux ? A[2] : A[0], vv ? A[3] : A[1], ux ? Bq[2] : Bq[0], vv ? Bq[3] : Bq[1], e.k, bl, 0, e.a], o); o += 11;
         };
         corner(-1, -1); corner(1, -1); corner(1, 1); corner(-1, 1); q++;
       }
@@ -91269,7 +91270,7 @@ if (PYRO_H3.on && typeof PYRO_H3_DATA !== 'undefined' && typeof LAB_FX !== 'unde
     // Detached trail puffs made Fireball look like separate flame effects.
     ballAt(x, y, z, d, len, Object.assign({}, C, { on: false }), (s === 'cc_kindle' || s === 'cc_fireball') ? Object.assign({}, T, {on:false}) : T, s, seed, o, now);
     if (!C.on) return;
-    const opts = { k: C.k, seed, pull: .06, sp: s === 'cc_fireball' ? 1.6 : 1 };
+    const opts = { k: C.k, seed, pull: .06 };
     if (s === 'cc_kindle') {
       const st = pfSt(o), dt = Math.max(0, Math.min(.1, now - (st.h3At == null ? now : st.h3At)));
       st.h3At = now;
@@ -91395,6 +91396,9 @@ pfPhoenixes = function (now) {
   }
 };
 
+// where the Furnace Breath film's flame ends along its card (measured: the coverage over a third ends at 0.57-0.85, 0.74 on
+// average; faint fire runs on to 0.83)
+const BREATH_TIP = .8;
 pfBreaths = function(now, dt) {
   const lv = pfLv(), s = 'cc_pyresigil', Cc = efx(s, 'core'), E = efx(s, 'embers'), S = efx(s, 'smoke'), Gl = efx(s, 'glow'), L = efx(s, 'light');
   PF.breath = PF.breath.filter(e => G.towers.includes(e.t) && e.t.ccxBreath === e.B && now < e.B.until + .35);
@@ -91403,7 +91407,10 @@ pfBreaths = function(now, dt) {
     // how far it has reached, how much has died from the hands, how much of it shows
     const reach = pfSs(0, .22, el - .05), died = pfSs(0, .32, now - (B.until - .05)), on = reach * (1 - died);
     const palms = typeof PYRO2 !== 'undefined' && PYRO2.anchors(t);
-    const h = palms ? palms.palmR.map((v,i)=>(v+palms.palmL[i])*.5) : ccHand(t, towerTop(t) * .8), a0 = Math.atan2(B.uz, B.ux), half = Math.acos(CCX.BR_COS) * Cc.cone, drop = (h[1] - .22) * Cc.drop / R0, len = R0 * Cc.len;
+    const h = palms ? palms.palmR.map((v,i)=>(v+palms.palmL[i])*.5) : ccHand(t, towerTop(t) * .8), a0 = Math.atan2(B.uz, B.ux), half = Math.acos(CCX.BR_COS) * Cc.cone, drop = (h[1] - .22) * Cc.drop / R0;
+    // its seen tip reaches as far as it burns (Cc.len x the cone's reach B.r, from the Pyroclast's middle, as abCone measures):
+    // the film's flame shows to BREATH_TIP of its card, which starts at the anchor, and the jet dips as it goes
+    const fwd = (h[0] - t.x) * B.ux + (h[2] - t.y) * B.uz, len = Math.max(.3, R0 * Cc.len - fwd) * Math.hypot(1, drop) / (BREATH_TIP - LAB_FX.pyroh3_furnace_breath.anchor[0]);
     // Twice the internal flame motion, using the seamless atlas loop. The
     // cast's reach, duration and extinction envelope stay unchanged.
     if (Cc.on && on > .01) pfJet(h, pfNorm([B.ux,-drop,B.uz]), len * reach, len * .65, {k:Cc.k, a:on, seed:e.seed, pull:0, loopFrame:126 * Math.max(0, (el - .05) / Math.max(.1, B.until - B.at + .22))}, s);
@@ -91429,7 +91436,9 @@ pfBreaths = function(now, dt) {
 }
 
 /* Whole H3 spell films. Game callbacks still own damage, targets and timing. */
-const PYRO_SEQ = {on:PYRO_H3.on, version:1, states:[], counts:{}, samples:[], hand:()=>false, flight:()=>false};
+// rate: film frames a second in flight (the films are 24 fps; owner, 12 Nov 2026: "the fireball effect is burning fast but the
+// projectile is slow"), bloom: seconds at the throw in which a short flight runs through the film's early frames
+const PYRO_SEQ = {on:PYRO_H3.on, version:2, states:[], counts:{}, samples:[], hand:()=>false, flight:()=>false, rate:27, bloom:.12};
 if(PYRO_SEQ.on) {
   Object.assign(LAB_FX,PYRO_SEQUENCE_DATA);
   const S=PYRO_SEQ, key=n=>'pyroseq_'+n, clamp01=x=>Math.max(0,Math.min(1,x));
@@ -91437,26 +91446,43 @@ if(PYRO_SEQ.on) {
   const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
   const palm=t=>{const a=typeof PYRO2!=='undefined'&&PYRO2.anchors(t);return a?a.palmR:ccHand(t,towerTop(t)*.8);};
   function count(n){S.counts[n]=(S.counts[n]||0)+1;}
-  function sprite(n,frame,P,width,alpha=1,dir=null) {
+  // The film's frame el seconds into a flight of T seconds that plays frames f0 (thrown) to f1 (arrives): at most S.rate frames a
+  // second, so the fire inside keeps its own pace however short the flight; a short flight runs through the early frames (the
+  // ball still forming) in its first S.bloom seconds instead, and always reaches f1 as it arrives.
+  function filmAt(el,T,f0,f1) {
+    T=Math.max(.05,T);el=Math.max(0,Math.min(T,el));
+    if(f1-f0<=T*S.rate)return f0+(f1-f0)*el/T;
+    const b=Math.min(S.bloom,T*.3),fb=f1-(T-b)*S.rate;
+    return el<b?f0+(fb-f0)*el/b:f1-(T-el)*S.rate;
+  }
+  S.filmAt=filmAt;
+  // flip: mirrored left to right (a billboard after a flight that headed left on screen); returns whether it was mirrored
+  function sprite(n,frame,P,width,alpha=1,dir=null,flip=false) {
     const B=LAB_FX[key(n)], f=Math.max(0,Math.min(B.n-1,frame)),i=Math.floor(f),a=mix(B.track[i],B.track[Math.min(i+1,B.n-1)],f-i);
+    width/=B.fit||1;   // (a film shrunk into its cells so its whole burst fits, make_pyrosequence.py: shown at its old size)
     const h=width/B.aspect;
     if(dir) {
       const fw=[RD.view[2],RD.view[6],RD.view[10]],dot=dir.reduce((a,v,i)=>a+v*fw[i],0),axis=dir.map((v,i)=>v-fw[i]*dot),al=Math.hypot(...axis);
       const U=al>.001?axis.map(v=>v/al):RD.right,V=[fw[2]*U[1]-fw[1]*U[2],fw[0]*U[2]-fw[2]*U[0],fw[1]*U[0]-fw[0]*U[1]];
-      const center=P.map((v,j)=>v-U[j]*(a[0]-.5)*width-V[j]*(a[1]-.5)*h);
-      if(labQueue(key(n),center,dir,width/Math.max(.35,al),{a:alpha,k:1,pull:.025,fr:f}))count(n);
-      return;
+      // (heading left on screen the card turns half round: its picture is flipped top to bottom again, so fire and smoke still
+      // rise and the bird flies the right way up)
+      const vf=U[0]*RD.right[0]+U[1]*RD.right[1]+U[2]*RD.right[2]<0;
+      const center=P.map((v,j)=>v-U[j]*(a[0]-.5)*width-V[j]*(a[1]-.5)*h*(vf?-1:1));
+      if(labQueue(key(n),center,dir,width/Math.max(.35,al),{a:alpha,k:1,pull:.025,fr:f,vflip:vf}))count(n);
+      return vf;
     }
     const r=RD.right,u=RD.up;
-    const center=P.map((v,j)=>v-r[j]*(a[0]-.5)*width-u[j]*(a[1]-.5)*h);
-    if(labPin(key(n),f,center,width,{a:alpha,k:1,pull:.025}))count(n);
+    const center=P.map((v,j)=>v-r[j]*(a[0]-.5)*width*(flip?-1:1)-u[j]*(a[1]-.5)*h);
+    if(labPin(key(n),f,center,width,{a:alpha,k:1,pull:.025,mir:flip}))count(n);
+    return flip;
   }
   S.hand=function(t,now) {
     const ac=t.ab&&t.ab.cast,ctl=typeof PYRO2!=='undefined'&&PYRO2.ctl(t,true);
     let n=null,u=0;
-    if(ac&&ac.id==='cc_flamewave'){n='phoenix';u=clamp01((now-ac.at)/Math.max(.05,ac.T));}
-    else if(ctl&&ctl.c==='cast'&&ctl.s<PYRO2.CL.cast.rel/30){n='fireball';u=clamp01(ctl.s/(PYRO2.CL.cast.rel/30));}
-    if(n){charges.set(t,{name:n,at:now,u});sprite(n,LAB_FX[key(n)].release*u,palm(t),n==='fireball'?efx('cc_fireball','core').ball*5.3:4);return true;}
+    let T=0;
+    if(ac&&ac.id==='cc_flamewave'){n='phoenix';T=Math.max(.05,ac.T);u=clamp01((now-ac.at)/T);}
+    else if(ctl&&ctl.c==='cast'&&ctl.s<PYRO2.CL.cast.rel/30){n='fireball';T=PYRO2.CL.cast.rel/30;u=clamp01(ctl.s/T);}
+    if(n){charges.set(t,{name:n,at:now,u});sprite(n,filmAt(u*T,T,0,LAB_FX[key(n)].release),palm(t),n==='fireball'?efx('cc_fireball','core').ball*5.3:4);return true;}
     if(birds.has(t)&&now<birds.get(t).at)return true;
     return ctl&&((ctl.c==='cast'&&ctl.s>=PYRO2.CL.cast.rel/30)||(ctl.c==='phoenix'));
   };
@@ -91468,14 +91494,17 @@ if(PYRO_SEQ.on) {
     if(owner&&p.k==='lob'&&p.col===CC_COL.fire&&p.lob) {
       const q=p._pySeq={name:'fireball',owner,at:G.time,p,width:efx('cc_fireball','core').ball*5.3*(p.sz||1),P:[p.x,p.h,p.z]};
       S.states.push(q);labLoad(key('fireball'));
-      const hit=p.fn;p.fn=function(){q.hit=G.time;const old=impactNow;impactNow=q;try{return hit.apply(this,arguments);}finally{impactNow=old;}};
+      // (it bursts where the ball meets the foe, as the damage lands: the lob follows its foe, forces_conclave_a.js, at the
+      // height pyrofire.js flies it, into the foe's body)
+      const hit=p.fn;p.fn=function(){q.hit=G.time;const L=p.lob;q.P=[L.ax,p._pfAim!=null?p._pfAim:q.P[1],L.az];if(!q.dir)q.dir=pfNorm([L.ax-L.x0,0,L.az-L.z0]);
+        const old=impactNow;impactNow=q;try{return hit.apply(this,arguments);}finally{impactNow=old;}};
     }
     return shoot.apply(this,arguments);
   };
   S.flight=function(x,y,z,d,len,C,T,s,seed,p,now) {
     if(s!=='cc_fireball'||!p._pySeq)return false;
     const q=p._pySeq,B=LAB_FX[key('fireball')],u=clamp01(p.lob.t/p.lob.T);
-    q.P=[x,y,z];q.dir=d;sprite('fireball',B.release+(B.impact-B.release)*u,q.P,q.width,1,d);
+    q.P=[x,y,z];q.dir=d;sprite('fireball',filmAt(p.lob.t,p.lob.T,B.release,B.impact),q.P,q.width,1,d);
     const L=efx(s,'light');if(L.on)pfFlyLight(p,x,y,z,L.fly,L.rad,s);
     return true;
   };
@@ -91484,7 +91513,7 @@ if(PYRO_SEQ.on) {
   CCX_FX.skipHop=function(C,x0,h0,z0,foe,x,z,T,j) {
     let q=skip.get(C.t);
     if(!j||!q){const n=Math.max(1,Math.round(byT(ABIL.cc_kindle.by.n,C.t)));q={name:n>4?'skip5':'skip',owner:C.t,points:[],times:[],at:G.time,n};skip.set(C.t,q);S.states.push(q);}
-    q.j=j;q.hopAt=G.time;q.T=T;q.start=[x0,h0,z0];q.end=[x,.025,z];q.points[j]=q.end.slice();
+    q.j=j;q.hopAt=G.time;q.T=T;q.start=[x0,h0,z0];q.end=[x,.025,z];q.points[j]=q.end.slice();q.foe=foe||null;
     labLoad(key(q.name));
   };
   CCX_FX.skipLand=function(C,x,z,j,n){const q=skip.get(C.t);if(!q)return;q.points[j]=[x,.025,z];q.times[j]=G.time;pfLight(x,z,.25,j===n-1?.95:.7,1.3,.18,'cc_kindle');if(j===n-1)q.hit=G.time;};
@@ -91494,18 +91523,23 @@ if(PYRO_SEQ.on) {
   const oldPatch=pfPatch;
   pfPatch=function(x,z,r,e,tall,Gd,s){if(s==='cc_kindle')return;return oldPatch.apply(this,arguments);};
   const oldFrame=pfFrame;
+  let preloaded=false;
   pfFrame=function(){oldFrame.apply(this,arguments);if(!pfLive()||!RD||!RD.vfx)return;const now=G.time;
+    // (the films decode while a Pyroclast stands, not at its first cast: a film still loading drew nothing for its whole flight)
+    if(!preloaded&&G.towers.some(t=>pfIsPyro(t))){preloaded=true;for(const n of ['fireball','skip','skip5','phoenix'])labLoad(key(n));}
     S.states=S.states.filter(q=>G.towers.includes(q.owner)&&(!q.hit||now-q.hit<(q.name.startsWith('skip')?2:.8))&&(now-q.at<10));
     for(const q of S.states){
       const B=LAB_FX[key(q.name)];
       if(q.name==='fireball'){if(q.hit!=null)sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width,1,q.dir);continue;}
       if(q.name==='phoenix'){
-        if(q.hit!=null){sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width);continue;}
-        if(now<q.at){const u=q.precharged?1:clamp01(1-(q.at-now)/CCX.PHX_LIFT);sprite(q.name,B.release*u,palm(q.owner),q.width);continue;}
+        if(q.hit!=null){sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width,1,null,!!q.flip);continue;}
+        if(now<q.at){const u=q.precharged?1:clamp01(1-(q.at-now)/CCX.PHX_LIFT);sprite(q.name,filmAt(u*CCX.PHX_LIFT,CCX.PHX_LIFT,0,B.release),palm(q.owner),q.width);continue;}
         const d=Math.min(q.tot,(now-q.at)*q.spd),p=ccxAlong(q.R,d),u=clamp01(d/q.tot),h=q.h0+(1.15-q.h0)*clamp01(d/.7);
         q.P=[p[0],h*(1-pfSs(.85,1,u))+.5*pfSs(.85,1,u),p[1]];
-        sprite(q.name,B.release+(B.impact-B.release)*u,q.P,q.width,1,[p[2],0,p[3]]);continue;
+        q.flip=sprite(q.name,filmAt(d/q.spd,q.tot/q.spd,B.release,B.impact),q.P,q.width,1,[p[2],0,p[3]]);continue;
       }
+      // (a skip in flight comes down on its foe where it is now, as the game's skip does, forces_zxc_conclave_cool.js)
+      if(q.hit==null&&q.foe&&!q.foe.dead&&q.times[q.j]==null){q.end=[q.foe.x,.025,q.foe.y];q.points[q.j]=q.end.slice();}
       const j=Math.min(q.j,B.lands.length-1),u=clamp01((now-q.hopAt)/q.T),f0=j?B.lands[j-1]:0;
       let frame=f0+(B.lands[j]-f0)*u;
       if(q.hit!=null){const age=now-q.hit;frame=age<.45?B.lands[j]+(100-B.lands[j])*age/.45:100+((age-.45)*24)%24;}
@@ -106415,6 +106449,8 @@ function kwSidePlace() {
 function kwSideCheck() {
   if (typeof document === 'undefined') return;
   let T = null; for (const el of document.querySelectorAll(KW_SIDE_OF)) if (kwShown(el)) { T = el; break; }
+  // an item card over a place that wants it alone (the gear sheet's bag, owner: fewer popups): no cards beside it
+  if (T && T.id === 'itip' && typeof itipAnchor !== 'undefined' && itipAnchor && itipAnchor.closest && itipAnchor.closest('[data-kw-noside]')) T = null;
   const keys = T ? [...new Set([...T.querySelectorAll('.kw[data-kw]')].map(s => s.dataset.kw))].slice(0, innerWidth < 560 ? 2 : 3) : [];
   const sig = keys.join('|');
   if (!T || !keys.length) { kwSideHide(); return; }
