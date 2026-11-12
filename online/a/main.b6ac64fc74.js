@@ -1,4 +1,4 @@
-const BUILD_TAG = '1b274d4@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'eadc73c@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1609,7 +1609,8 @@ const RITE_ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 
 // each rite is fought on its own field (index = rite; 0 the standard run). For now the clearing by day and Moonwood by
 // night in turn; a new map for a rite goes in its place here (Kingsmeadow stays for older saves and Tower Wars)
 // (the standard run, no rite, is on Greatroot Way: owner, 10 Nov 2026, "commit so that map is the new default"; riteMap falls back to Kingsmeadow where a map is missing)
-const RITE_MAPS = ['greatroot', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing'];
+// (then Mistfall Ledge: owner, 13 Nov 2026, "Yes, Mistfall" for Classic runs; Greatroot Way stays on the region map's roads)
+const RITE_MAPS = ['mistfall', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing', 'moonwood', 'clearing'];
 const riteMap = n => { const m = RITE_MAPS[n | 0]; return typeof MAPS !== 'undefined' && MAPS[m] ? m : 'meadow'; };
 const riteName = n => n ? `Rite ${RITE_ROMAN[n]}` : 'No rite';
 // what the current run's rite does to the numbers (0 outside a campaign run)
@@ -86408,7 +86409,7 @@ function showOverlay(html, cls) {
 function hideOverlay() { if (titlePanelStop) { titlePanelStop(); titlePanelStop = null; } if (typeof itipHide === 'function') itipHide(); if (typeof hideSpellHud === 'function') hideSpellHud(); talOpen = false; warOpen = false; if (bagOpen) { bagOpen = false; for (const it of G.loot || []) it.isNew = false; }  ov.hidden = true; ovp.innerHTML = ''; ov.className = 'ov'; ovp.className = 'panel'; }
 const fmtPlay = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : sec ? '<1m' : ''; };
 const fmtDay = t => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
-const mapThumb = k => k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
+const mapThumb = k => k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'mistfall' ? (typeof POOL_STILL !== 'undefined' ? POOL_STILL : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
 /* The main menu: one stacked column of buttons. Saved games and Top scores are windows over it (owner, 11 Nov 2026:
    "all buttons stacked on one menu with saved games and top scores being their own windows on click"). */
 let titlePanelStop = null;   // closes the open title window, if any (showOverlay and hideOverlay call it)
@@ -103326,7 +103327,7 @@ if (typeof document !== 'undefined' && document.createElement) {
        Moonwood Hollow's warlord and marches in the other locations' rotations.
        A boss moved to another wave keeps that wave's boss health budget (CAMP_SWAP: its health is scaled by the
        health of the boss it replaced), so the curve holds.
-     Location 0 (Greatroot Way; it was Sunfall Glade until 10 Nov 2026, its id is still 'sunfall') is the standard march, exactly as before.
+     Location 0 (Mistfall Ledge since 13 Nov 2026, Greatroot Way before; it was Sunfall Glade until 10 Nov 2026, its id is still 'sunfall') is the standard march, exactly as before.
    THE WARBAND. Winning wave 50 at a location marches the army on to the next one. It keeps (per force, on this device,
      CAMP_KEY): the commander (and so the Champion), level and XP, talent picks and unspent points, every item (the ones
      socketed come back to the bag), the units it has opened, its plan and its Renown. It rebuilds the maze, the units and
@@ -103364,7 +103365,7 @@ const CAMP_FAMILIES = {
 /* the chain. map: the field; rite: its hardships; fam: its family; lord: its warlord (wave 50's boss); x, y: on the region
    map (a 1000 x 620 board) */
 const CAMP_LOCS = [
-  { id: 'sunfall', name: 'Greatroot Way', map: 'greatroot', rite: 0, fam: null, lord: 'abyss', x: 120, y: 520, say: 'Where every warband is raised. The standard march: the waves as you know them.' },
+  { id: 'sunfall', name: 'Mistfall Ledge', map: 'mistfall', rite: 0, fam: null, lord: 'abyss', x: 120, y: 520, say: 'Where every warband is raised. The standard march: the waves as you know them.' },
   { id: 'hollow', name: 'Moonwood Hollow', map: 'moonwood', rite: 1, fam: 'beast', lord: 'grakk', x: 250, y: 430, say: 'Packs howl under the pale trees, and the ogre camp drives them on.' },
   { id: 'fords', name: 'Kingsmeadow Fords', map: 'meadow', rite: 2, fam: 'horde', lord: 'kragmor', x: 150, y: 300, say: 'The horde crosses the river at the old fords, and the Unbroken comes last.' },
   { id: 'ember', name: 'Emberfall Glade', map: 'clearing', rite: 3, fam: 'forge', lord: 'titan', x: 300, y: 200, say: 'The glade burns. The forge-host marches out of the smoke behind the Living Forge.' },
@@ -103733,7 +103734,7 @@ function campLocHTML(B, k) {
 }
 function campBandHTML(B, force) {
   const F = FORCES[force];
-  if (!B || !B.hero) return `<section class="cm-band empty"><h3>${cmEsc(F.name)}</h3><p>No warband yet. Raise one at Greatroot Way: win all 50 waves there and it marches on, keeping its level, talents and items.</p></section>`;
+  if (!B || !B.hero) return `<section class="cm-band empty"><h3>${cmEsc(F.name)}</h3><p>No warband yet. Raise one at Mistfall Ledge: win all 50 waves there and it marches on, keeping its level, talents and items.</p></section>`;
   const h = HERO_BY[B.hero], lv = B.raised ? xpLevelOf(B.xp || 0) : 1, k = Math.min(B.loc, CAMP_LOCS.length - 1);
   const art = (typeof COMMANDER_ART !== 'undefined' && COMMANDER_ART[h.id]) || (typeof HERO_ART !== 'undefined' && HERO_ART[h.id]) || heroFaceURL(h);
   return `<section class="cm-band"><img class="cm-face" alt="" src="${art}"><div class="cm-bi"><h3>${cmEsc(h.name)}<small>${cmEsc(F.name)}</small></h3>
