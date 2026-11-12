@@ -1,4 +1,4 @@
-const BUILD_TAG = '2521b89@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0f2910d@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -59694,7 +59694,7 @@ const AudioSys = (() => {
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
   const PYRO_GAIN = 3;
-  function firePlay(k, vol, gap, peak, lp, rate) {
+  function firePlay(k, vol, gap, peak, lp, rate) {
     if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
     let at = F.at, len = F.len;
@@ -59734,9 +59734,12 @@ const AudioSys = (() => {
   // matched in loudness by tools/make_firesfx.py (the owner's "fire whooshes" and "fireball and flame whooshes" packs). The
   // strike is a short warm burst as the ball is loosed and a soft fireball boom where it lands, each round three takes (no
   // flight whoosh between them: two layers a shot, so a fast-firing Pyroclast never tires the ear)
-  S.pyroCast = () => fireNext('pyroCast', [['pyroCast', .067], ['pyroCast2', .087], ['pyroCast3', .058]], .3);
+  // (owner, 13 Nov 2026: his fireball whoosh-and-explosion recording for the auto attack, its whoosh as the ball is loosed and
+  // its blast where it lands, fireballsfxdata.js; the three-take rounds stay as the fallback)
+  const PY_FB = () => !!fxTakes().pyroFbCast;
+  S.pyroCast = () => PY_FB() ? firePlay('pyroFbCast', .1, .3) : fireNext('pyroCast', [['pyroCast', .067], ['pyroCast2', .087], ['pyroCast3', .058]], .3);
   const PY_LAND = [['pyroLand', .097], ['pyroLand2', .089], ['pyroLand3', .12]], PY_LAND_BIG = PY_LAND.map(([k, v]) => [k, v * 1.35]);
-  S.pyroLand = (big) => fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
+  S.pyroLand = (big) => PY_FB() ? firePlay('pyroFbLand', big ? .13 : .1, .25) : fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
   // Furnace Breath: a flame spat from its hands over the steady roar of the pouring cone (the roar fades out by ~2.4 s)
   S.pyroBreath = () => { firePlay('pyroBreathCast', .09, .5); firePlay('pyroBreath', .15, 1.2); };
   // Skipping Flame: the throw, a short burst at each skip (three takes in turn, each a touch higher or lower) and a bigger
@@ -94682,6 +94685,8 @@ const PYRO2 = (() => {
      of his sound slots, at the loudness of the take it replaces): put in place of his earlier takes before any sound is
      played, so audio.js plays them through the same calls at the same levels. ?pyrosfx=old keeps the earlier ones. */
   S.sfx = false;
+  // his auto-attack Fireball's own whoosh and blast (fireballsfxdata.js; owner, 13 Nov 2026), played by audio.js S.pyroCast / pyroLand
+  try { if (typeof FIREBALL_SFX !== 'undefined' && typeof FIRE_SFX !== 'undefined') Object.assign(FIRE_SFX, FIREBALL_SFX); } catch (e) {}
   try { if (typeof PYRO2_SFX !== 'undefined' && typeof FIRE_SFX !== 'undefined' && !/[?&]pyrosfx=old/.test(location.search)) { S.sfxOld = {}; for (const k in PYRO2_SFX) if (FIRE_SFX[k]) { S.sfxOld[k] = FIRE_SFX[k]; FIRE_SFX[k] = PYRO2_SFX[k]; } S.sfx = true; } } catch (e) {}
   const CL = {}, REL = {};
   const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
