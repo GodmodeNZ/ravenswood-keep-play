@@ -1,4 +1,4 @@
-const BUILD_TAG = '14be955@2026-11-12';   // the play log's build version (playlog.js)
+const BUILD_TAG = '582c132@2026-11-12';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -91281,7 +91281,10 @@ if(PYRO_SEQ.on) {
   const oldPatch=pfPatch;
   pfPatch=function(x,z,r,e,tall,Gd,s){if(s==='cc_kindle')return;return oldPatch.apply(this,arguments);};
   const oldFrame=pfFrame;
+  let preloaded=false;
   pfFrame=function(){oldFrame.apply(this,arguments);if(!pfLive()||!RD||!RD.vfx)return;const now=G.time;
+    // (the films decode while a Pyroclast stands, not at its first cast: a film still loading drew nothing for its whole flight)
+    if(!preloaded&&G.towers.some(t=>pfIsPyro(t))){preloaded=true;for(const n of ['fireball','skip','skip5','phoenix'])labLoad(key(n));}
     S.states=S.states.filter(q=>G.towers.includes(q.owner)&&(!q.hit||now-q.hit<(q.name.startsWith('skip')?2:.8))&&(now-q.at<10));
     for(const q of S.states){
       const B=LAB_FX[key(q.name)];
