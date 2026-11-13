@@ -1,4 +1,4 @@
-const BUILD_TAG = '9d7e985@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ed2b85c+@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -51801,19 +51801,21 @@ function a2Wave(id, n) {   // in a run: the next wave (or wave n) is this foe's 
    - BURNS (column 3, red): Slow-Burning Ink, Leaping Cinders, then the lock-in, Stoked Fire (his hits stack burns, 4 / 6
      deep) and Banked Heat (burns grow the longer they tick), and the capstone Pyre Bloom (a deep burn bursts every 2s and
      catches the foes beside it).
-   - Each capstone needs both of its path's lock-in talents at full rank (2 + 2 = 4 points), and the capstone row is one-of,
-     so a hybrid can hold both lock-ins but only one payoff.
+   - Each capstone needs both of its path's lock-in talents at full rank (crits 1 + 3 = 4 points, burns 1 + 2 = 3), and the
+     capstone row is one-of, so a hybrid can hold both lock-ins but only one payoff. Ranks vary (owner, 14 Nov 2026: "some
+     should be 4 points to max it out, some 3"): Counted Coals 3, Sunburst 4, Molten Brand 1, Flashover 3; Slow-Burning
+     Ink 4, Leaping Cinders 1, Stoked Fire 1, Banked Heat 2. A save's ranks above a new max are refunded (game.js migrateTal).
    - Crits here are never random: a count of fireballs, or a state (Molten). Items' crit chance still rolls its own crits
      in game.js fire(); those don't count for this path.
-   - The tree's paths are data (tree.paths, talent.path): ui.js colours each path's column, labels it and says in a
-     talent's tooltip which path it belongs to. */
+   - The paths read only through the talents' own text and arrows (owner, 14 Nov 2026: "don't outline the 2 talent tracks,
+     or name what they do outside of the talents themselves"); talent.path is kept as data only. */
 const PYP = {
   CRIT_M: 2, SUN_M: 2.5, SUN_EVERY: 3, SUN_W: .75,  // a counted crit strikes x2; Sunfall's x2.5, every 3rd fireball, its great burst 1.5x as wide (2 x .75)
-  WIDE: .3,                                        // Sunburst: +30% burst radius a rank on a crit
-  MOLTEN_T: [0, 3, 4],                             // Molten Brand: seconds a crit's foes stay Molten, by rank
+  WIDE: .15,                                       // Sunburst: +15% burst radius a rank on a crit (4 ranks)
+  MOLTEN_T: [0, 4],                                // Molten Brand: seconds a crit's foes stay Molten (1 rank)
   SPELL_CRIT: 1,                                   // his spells hit Molten foes +100% (x2: a crit)
-  FLASH_K: .2, FLASH_R: .8, FLASH_GAP: .5,         // Flashover: 30% of the crit a rank, to foes within 0.8 cells, once a foe each 0.5s
-  STOKE: [0, 2, 3],                                // Stoked Fire: burn stacks, by rank
+  FLASH_K: .4 / 3, FLASH_R: .8, FLASH_GAP: .5,     // Flashover: 13/27/40% of the crit (3 ranks), to foes within 0.8 cells, once a foe each 0.5s
+  STOKE: [0, 3],                                   // Stoked Fire: burn stacks (1 rank)
   GROW: .05, GROW_MAX: .4,                         // Banked Heat: +5% a rank each second a burn ticks, up to +40%
   BLOOM_N: 3, BLOOM_T: 4, BLOOM_S: 1, BLOOM_R: 1,  // Pyre Bloom: at 3+ stacks, every 4s, 1s of the burn at once, within 1 cell
   CRIT_HUE: '#ffd34a', BURN_HUE: '#ff5a2a',
@@ -51835,24 +51837,24 @@ if (typeof SP_COND !== 'undefined') SP_COND.molten = pyMolten;
   const L = [
     // row I: the baseline, and each path's first taste
     keep('Kindled Fingers', 0, 0, { max: 2 }),
-    GT('Counted Coals', 'crosshair', 0, 1, 2, n => `Every ${gOrd(7 - n)} fireball he throws is a crit: it strikes ×${PYP.CRIT_M}.`, {}, { cap: 'ccPyCount' }),
-    keep('Slow-Burning Ink', 0, 2, { pro: n => `His fireballs' burns last ${n}s longer.` }),
+    GT('Counted Coals', 'crosshair', 0, 1, 3, n => `Every ${gOrd(8 - n)} fireball he throws is a crit: it strikes ×${PYP.CRIT_M}.`, {}, { cap: 'ccPyCount' }),
+    keep('Slow-Burning Ink', 0, 2, { max: 4, capK: .5, pro: n => `His fireballs' burns last ${f(.5 * n)}s longer.` }),
     // row II
     keep(SF, 1, 0, { req: [0, 0] }),
-    GT('Sunburst', 'sunburst', 1, 1, 2, n => `His crit fireballs burst ${Math.round(PYP.WIDE * 100 * n)}% wider.`, {}, { cap: 'ccPySunburst' }),
+    GT('Sunburst', 'sunburst', 1, 1, 4, n => `His crit fireballs burst ${Math.round(PYP.WIDE * 100 * n)}% wider.`, {}, { cap: 'ccPySunburst' }),
     keep('Wardburn', 1, 3, { max: 2, pro: n => `His fireballs and spells ignore ${10 * n}% of wards.`, mod: n => ({ magicPen: .1 * n }) }),
     // row III
     keep('Cinder Charge', 2, 0, { req: [1, 0] }),
-    keep('Leaping Cinders', 2, 2),
+    keep('Leaping Cinders', 2, 2, { max: 1, capK: 2, pro: () => 'Each burning foe it slays throws its fire to the nearest ground foe within 1.2 cells.' }),
     keep(PX, 2, 3, { req: [1, 3] }),
     // row IV: the lock-in, first half
-    GT('Molten Brand', 'firering', 3, 1, 2, n => `A crit fireball leaves every foe it strikes Molten for ${PYP.MOLTEN_T[n]}s. ${SF}, ${BR} and ${PX} crit Molten foes: ×2.`, {}, { cap: 'ccPyMolten',
+    GT('Molten Brand', 'firering', 3, 1, 1, n => `A crit fireball leaves every foe it strikes Molten for ${PYP.MOLTEN_T[n]}s. ${SF}, ${BR} and ${PX} crit Molten foes: ×2.`, {}, { cap: 'ccPyMolten',
       sp: () => Object.keys(PY_SPELLS).map(ab => ({ ab, vs: ['molten', PYP.SPELL_CRIT] })) }),
-    GT('Stoked Fire', 'stoke', 3, 2, 2, n => `His fireballs and spells stoke burns: each hit on a burning foe adds a stack, up to ${PYP.STOKE[n]}.`, {}, { cap: 'ccPyStoke' }),
+    GT('Stoked Fire', 'stoke', 3, 2, 1, n => `His fireballs and spells stoke burns: each hit on a burning foe adds a stack, up to ${PYP.STOKE[n]}.`, {}, { cap: 'ccPyStoke' }),
     keep('Rolling Inferno', 3, 3, { req: [2, 3] }),
     // row V: the lock-in, second half
     keep('Fire Feeds Mana', 4, 0),
-    GT('Flashover', 'flash', 4, 1, 2, n => `A crit on a Molten foe flashes: every foe within ${f(PYP.FLASH_R)} cells of it takes ${Math.round(PYP.FLASH_K * 100 * n)}% of the crit.`, {}, { cap: 'ccPyFlash', req: [3, 1] }),
+    GT('Flashover', 'flash', 4, 1, 3, n => `A crit on a Molten foe flashes: every foe within ${f(PYP.FLASH_R)} cells of it takes ${Math.round(PYP.FLASH_K * 100 * n)}% of the crit.`, {}, { cap: 'ccPyFlash', req: [3, 1] }),
     GT('Banked Heat', 'heat', 4, 2, 2, n => `His burns grow ${Math.round(PYP.GROW * 100 * n)}% stronger for every second they keep burning, up to ×${1 + PYP.GROW_MAX}.`, {}, { cap: 'ccPyBank', req: [3, 2] }),
     // row VI: the capstones, one of them
     GT('Sunfall', 'meteor', 5, 1, 1, `Every ${gOrd(PYP.SUN_EVERY)} fireball is a Sunfall: a great fireball that bursts half again as wide and crits ×${PYP.SUN_M}.`, {}, { cap: 'ccPySun', reqs: [[3, 1], [4, 1]] }),
@@ -51869,17 +51871,13 @@ if (typeof SP_COND !== 'undefined') SP_COND.molten = pyMolten;
   for (const t of L) if (t.spell && typeof ABIL !== 'undefined' && ABIL[t.spell]) { const ab = ABIL[t.spell]; if (ab.row !== t.r) { if (ab.rowPre == null) ab.rowPre = ab.row; ab.row = t.r; } }
   L.forEach((t, i) => { t.id = i; });
   T.list = L;
-  T.paths = [
-    { id: 'crit', name: 'Crits', hue: PYP.CRIT_HUE, col: 1, label: [2, 1], cap: 'Sunfall', lock: ['Molten Brand', 'Flashover'] },
-    { id: 'burn', name: 'Burns', hue: PYP.BURN_HUE, col: 2, label: [1, 2], cap: 'Pyre Bloom', lock: ['Stoked Fire', 'Banked Heat'] },
-  ];
   if (F.talEmblem) F.talEmblem.cannon = Math.max(0, L.findIndex(t => t.name === 'Leaping Cinders'));
 })();
 
 /* ---------- crits: counted fireballs, Sunburst, Molten, Flashover, Sunfall ---------- */
 const PYS = { crit: null, burst: null, in: false, sndAt: 0 };
 // every Nth fireball crits: Counted Coals (5th, 4th), Sunfall (3rd); 0 = none
-const pyCritEvery = C => { let n = C.ccPyCount ? 7 - C.ccPyCount : 0; if (C.ccPySun) n = n ? Math.min(n, PYP.SUN_EVERY) : PYP.SUN_EVERY; return n; };
+const pyCritEvery = C => { let n = C.ccPyCount ? 8 - C.ccPyCount : 0; if (C.ccPySun) n = n ? Math.min(n, PYP.SUN_EVERY) : PYP.SUN_EVERY; return n; };
 // a counted crit's multiple: x2 (Sunfall x3), plus whatever items add to the crit multiple (game.js: crits strike st.critM, 2.5 by default)
 const pyCritM = (st, sun) => (sun ? PYP.SUN_M : PYP.CRIT_M) + Math.max(0, ((st && st.critM) || 2.5) - 2.5);
 if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_fireball) {
@@ -51910,7 +51908,7 @@ if (typeof ccFireBurst === 'function') {
   };
 }
 function pyCritLanded(t, st, hit, x, z, r, K) {
-  const C = (st && st.caps) || {}, mt = PYP.MOLTEN_T[Math.min(2, C.ccPyMolten | 0)] || 0;
+  const C = (st && st.caps) || {}, mt = PYP.MOLTEN_T[Math.min(1, C.ccPyMolten | 0)] || 0;
   if (typeof ccEv === 'function') ccEv(K.sun ? 'cap:ccPySun' : 'tal:ccPyCount');
   for (const [c, amt, was] of hit) {
     if (mt && !c.dead) { c.pyMoltenT = Math.max(c.pyMoltenT || 0, G.time + mt); c.pyMoltBy = t; }
@@ -51961,7 +51959,7 @@ if (typeof ignite === 'function') {
   ignite = function (c, dps, dur, src, hell, stoke) {
     if (!pyIs(src) || !c || c.dead) return i0.apply(this, arguments);
     const C = (src.st && src.st.caps) || {};
-    if (C.ccPyStoke) stoke = Math.max(stoke || 0, PYP.STOKE[Math.min(2, C.ccPyStoke)]);
+    if (C.ccPyStoke) stoke = Math.max(stoke || 0, PYP.STOKE[Math.min(1, C.ccPyStoke)]);
     const r = i0.call(this, c, dps, dur, src, hell, stoke);
     if (C.ccPyBank && c.burnT > 0 && c.burnSrc === src) { c.burnGrow = Math.max(c.burnGrow || 0, PYP.GROW * C.ccPyBank); c.burnGrowMax = PYP.GROW_MAX; }
     return r;
@@ -87279,8 +87277,7 @@ function buildTree() {
   const pc = $('#tPort'), ps = Math.round((pc.clientWidth || 56) * sc); pc.width = pc.height = ps; pc.getContext('2d').drawImage(talIcon(talTab), 0, 0, ps, ps);
   tree.classList.toggle('art', !!talBgURL(talTab));   // (the owner's painting: quiet in the middle, so it is dimmed evenly)
   $('#tBg').style.backgroundImage = `url(${talSceneURL(talTab, true)})`;
-  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}${talPathOf(tl, t) ? `;--pth:${talPathOf(tl, t).hue}` : ''}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span></button>`).join('')
-    + (tl.paths || []).map(P => P.label ? `<div class="tpath-lb" style="grid-row:${P.label[0] + 1};grid-column:${P.label[1] + 1};--pth:${P.hue}"><b>${P.name}</b><small>${talPathNeed(P)} pts: ${P.cap}</small></div>` : '').join('');
+  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span></button>`).join('');
   const rows = talRowsOf(talTab);   // (a force's trees have six rows, the towers' four)
   const cols = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(TAL_COLS, ...tl.list.map(t => t.c + 1));
   grid.style.gridTemplateColumns = `repeat(${cols}, var(--n))`; grid.style.gridTemplateRows = `repeat(${rows}, var(--n))`;
@@ -87327,21 +87324,10 @@ function placeArrows() {
     if (len < 5) continue;
     const ux = dx / L, uy = dy / L, s = clamp(len * .3, 3, 6), hx = x2 - ux * s * 1.5, hy = y2 - uy * s * 1.5;   // the head: s wide each side, 1.5 s long
     const d = `M${r1(x1)} ${r1(y1)}L${r1(hx)} ${r1(hy)}`, hd = `M${r1(hx - uy * s)} ${r1(hy + ux * s)}L${r1(x2)} ${r1(y2)}L${r1(hx + uy * s)} ${r1(hy - ux * s)}Z`;
-    const pth = talPathOf(tl, t) && talPathOf(tl, t) === talPathOf(tl, q) ? talPathOf(tl, t) : null;
-    h += `<g class="lkg${talRankOf(pk, q.id) >= q.max ? ' lit' : ''}${pth ? ' pth' : ''}" data-i="${t.id}" data-q="${q.id}"${pth ? ` style="--pth:${pth.hue}"` : ''}><path class="lk o" d="${d}"/><path class="lk f" d="${d}"/><path class="hd" d="${hd}"/></g>`;
+    h += `<g class="lkg${talRankOf(pk, q.id) >= q.max ? ' lit' : ''}" data-i="${t.id}" data-q="${q.id}"><path class="lk o" d="${d}"/><path class="lk f" d="${d}"/><path class="hd" d="${hd}"/></g>`;
   }
-  let band = '';
-  for (const P of tl.paths || []) {   // a path's column: a tinted band from its first talent to its capstone (Pyroclasts, forces_zzzzzzzzzzzzzzzzzzzzzzzz_pyropaths.js)
-    const N = tl.list.filter(t => t.path === P.id).map(t => grid.querySelector(`.tn[data-i="${t.id}"]`)).filter(Boolean); if (!N.length) continue;
-    const x0 = Math.min(...N.map(e => grid.offsetLeft + e.offsetLeft)), x1 = Math.max(...N.map(e => grid.offsetLeft + e.offsetLeft + e.offsetWidth));
-    const y0 = Math.min(...N.map(e => grid.offsetTop + e.offsetTop)), y1 = Math.max(...N.map(e => grid.offsetTop + e.offsetTop + e.offsetHeight)), m = Math.max(4, Math.round((x1 - x0) * .14));
-    band += `<rect class="tpath-band" style="--pth:${P.hue}" x="${r1(x0 - m)}" y="${r1(y0 - m)}" width="${r1(x1 - x0 + 2 * m)}" height="${r1(y1 - y0 + 2 * m)}" rx="${m + 2}"/>`;
-  }
-  svg.innerHTML = band + h;
+  svg.innerHTML = h;
 }
-// a tree's paths (tree.paths, talent.path): the path a talent belongs to, and the points its capstone's lock-in asks
-const talPathOf = (tl, t) => (t && t.path && tl && tl.paths && tl.paths.find(P => P.id === t.path)) || null;
-function talPathNeed(P) { const tl = TALENTS[talTab]; return (P.lock || []).reduce((a, n) => { const q = tl.list.find(t => t.name === n); return a + (q ? q.max : 0); }, 0); }
 function tapNode(type, i) {
   const can = type === 'paths' ? pathNodeCan(i) : type === 'fusion' ? fusState(FUSIONS[i]) === 'avail' : G.tp > 0 && talCanLearn(type, talPicks(type), i);
   if (canHover()) { talSel = { t: type, i }; if (can) { learnSel(); return; } sfx((type === 'paths' ? pathRank(pathsNow()[Math.floor(i / PATH_RANKS)].id) > i % PATH_RANKS : type === 'fusion' ? G.fus[FUSIONS[i].id] : talPicks(type)[i]) ? 'select' : 'error'); refreshTalents(); return; }
@@ -87384,7 +87370,7 @@ function refreshTalents() {
   for (const n of ovp.querySelectorAll('.tn')) {
     const i = +n.dataset.i, t = tl.list[i], s = talState(ty, i), on = !!talSel && talSel.t === ty && talSel.i === i, r = talRankOf(pk, i);
     // state only: locked | req | excl (greyscale), open (no point to spend), avail (full colour, plain frame), has (ranks in it: yellow outline), maxed (orange outline)
-    n.className = `tn ${s}${r > 0 ? ' has' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}${t.path ? ' pth' : ''}`;
+    n.className = `tn ${s}${r > 0 ? ' has' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}`;
     n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank in the corner: grey at 0, gold while it can be learned, orange when full
     const why = s === 'locked' || s === 'req' ? 'locked' : s === 'excl' ? 'closed by your capstone' : s.includes('avail') ? 'can be learned' : s === 'maxed' ? 'full' : '';
     n.setAttribute('aria-label', `${t.name}${t.spell ? ', spell' : talTagOf(t) ? ', ' + talTagOf(t) : ''}, rank ${r} of ${t.max}${why ? ', ' + why : ''}. ${t.pro(Math.max(1, r))}`);
@@ -87578,9 +87564,7 @@ function talTipHTML(ty, ci) {
   // a spell talent: its spell's own tooltip, marked "Spell" with its rank where a talent shows "Rank"
   if (ab && typeof spellTipHTML === 'function') { try { return spellTipHTML(ab, spellSample(ab, ty), { tag: `Spell · ${n}/${t.max}` }) + state; } catch (e) { /* the plain talent below */ } }
   const k = Math.max(1, n), con = r => { const c = t.con(r); return c && c !== 'undefined' ? c : ''; }, c = con(k);
-  const P = talPathOf(tl, t), pk = talPicks(ty), lockHave = P ? (P.lock || []).reduce((a, nm) => { const q = tl.list.find(o => o.name === nm); return a + (q ? Math.min(talRankOf(pk, q.id), q.max) : 0); }, 0) : 0;
-  const pathLine = P ? `<div class="wt-path" style="--pth:${P.hue}">${P.name} path${t.name === P.cap ? ` · capstone: ${lockHave}/${talPathNeed(P)} lock-in points` : (P.lock || []).includes(t.name) ? ` · lock-in for ${P.cap}` : ''}</div>` : '';
-  return `<div class="wt-h"><i class="wt-n">${t.name}</i><i class="wt-k">Rank ${n}/${t.max}</i></div>${talTagLine(t)}${pathLine}<div class="wt-d">${t.pro(k)}</div>`
+  return `<div class="wt-h"><i class="wt-n">${t.name}</i><i class="wt-k">Rank ${n}/${t.max}</i></div>${talTagLine(t)}<div class="wt-d">${t.pro(k)}</div>`
     + (c ? `<div class="wt-c">${c}</div>` : '') + talRankHTML(t, n) + state;
 }
 function renderTip() {
@@ -99101,6 +99085,250 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['cc_mageling', 'Magelings']);
   if (typeof efxSync === 'function') efxSync();
 }
+
+/* One coordinated Barrage mesh: curved ribbons, their tiny heads and their
+   unraveling ends share a cast clock. No copies of the Arcane Missile movie.
+   The actual seeking projectiles still own targets, damage and hit timing. */
+const MAGE_BARRAGE={casts:[],events:[],draws:0,serial:0};
+const mbOn=()=>MAGE_SEQ.on&&mgfOn();
+const mbClamp=x=>Math.max(0,Math.min(1,x));
+let mbCasting=null;
+const mbCast=ABIL.cc_barrage.cast;
+ABIL.cc_barrage.cast=function(){
+  if(!mbOn())return mbCast.apply(this,arguments);
+  const cast={id:++MAGE_BARRAGE.serial,at:G.time,lanes:[]},before=G.delayed.length;
+  MAGE_BARRAGE.casts.push(cast);
+  const result=mbCast.apply(this,arguments);
+  // Preserve the ability's delayed callbacks, including its talent missile count.
+  for(const d of G.delayed.slice(before)){const fn=d.fn;d.fn=function(){const prev=mbCasting;mbCasting=cast;try{return fn.apply(this,arguments);}finally{mbCasting=prev;}};}
+  return result;
+};
+const mbShoot=ccShoot;
+ccShoot=function(p){
+  if(mbOn()&&mbCasting&&p.k==='missile'&&(!p.col||p.col===CC_COL.arcane)){
+    const q={p,index:mbCasting.lanes.length,cast:mbCasting,A:[p.x,p.h,p.z],T:[p.tg.x,hitH(p.tg),p.tg.y],u:0,at:G.time};
+    p._mageBarrage=q;mbCasting.lanes.push(q);
+    MAGE_BARRAGE.events.push({cast:mbCasting.id,lane:q.index,phase:'release',time:G.time});
+  }
+  return mbShoot.apply(this,arguments);
+};
+const mbMissile=mgfMissile;
+mgfMissile=function(p){if(!mbOn()||!p._mageBarrage)return mbMissile.apply(this,arguments);};
+const mbLand=mgfLand;
+mgfLand=function(p,hit){
+  if(!mbOn()||!p._mageBarrage)return mbLand.apply(this,arguments);
+  const q=p._mageBarrage;q.T=[p.x,p.h,p.z];q.hit=G.time;q.pull=hit?(hit.def.r||.3)+.07:.1;
+  MAGE_BARRAGE.events.push({cast:q.cast.id,lane:q.index,phase:'impact',time:G.time});
+};
+function mbPoint(q,u){
+  const B=mgfBasis(q.A,q.T),side=(q.index%2?1:-1)*(.65+.24*Math.floor(q.index/2)),fan=Math.sin(Math.PI*u)*Math.pow(1-u,.25);
+  return q.A.map((v,j)=>v+(q.T[j]-v)*u+B.u[j]*side*fan+(j===1?.27*Math.sin(Math.PI*u):0));
+}
+const MB_FS=`#version 300 es
+precision highp float;
+in vec4 vUV; in vec4 vCol; out vec4 o;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
+void main(){
+ float x=vUV.x,y=vUV.y,t=vUV.z,seed=vUV.w;
+ float n=noise(vec2(x*11.-t*13.,y*3.+seed));
+ float curl=.16*sin(x*17.-t*19.+seed)+.09*sin(x*31.+t*7.);
+ float edge=pow(max(0.,1.-abs(y)),1.7);
+ float filament=exp(-pow((y-curl)*6.,2.));
+ float tip=exp(-pow((x-.86)*9.,2.))*exp(-pow(y*3.8,2.));
+ float taper=smoothstep(0.,.22,x)*(1.-smoothstep(.90,1.,x));
+ float a=clamp((edge*(.12+.20*n)+filament*.42+tip*.7)*taper*vCol.w,0.,.94);
+ vec3 col=mix(vec3(.36,.13,.67),vec3(.73,.43,1.),filament);
+ col=mix(col,vec3(.92,.79,1.),tip*.8);
+ if(a<.003)discard;o=vec4(col*a,a);
+}`;
+const MB_MAX=16000,MB_VERT=new Float32Array(MB_MAX*11);
+const MB_EXT={n:0,P:null,vao:null,vb:null,count:0,
+ build(){const X=RD.vfx,g=X.gl;this.P=X.prog(LAB_VS,MB_FS);this.vao=g.createVertexArray();this.vb=g.createBuffer();g.bindVertexArray(this.vao);g.bindBuffer(g.ARRAY_BUFFER,this.vb);g.bufferData(g.ARRAY_BUFFER,MB_VERT.byteLength,g.DYNAMIC_DRAW);for(const [i,n,off] of [[0,3,0],[1,4,12],[2,4,28]]){g.enableVertexAttribArray(i);g.vertexAttribPointer(i,n,g.FLOAT,false,44,off);}g.bindVertexArray(null);},
+ draw(bloom){if(bloom||!this.count)return;if(!this.P)this.build();const X=RD.vfx,g=X.gl,u=this.P.u;g.bindVertexArray(this.vao);g.bindBuffer(g.ARRAY_BUFFER,this.vb);g.bufferSubData(g.ARRAY_BUFFER,0,MB_VERT,0,this.count*11);g.useProgram(this.P.p);g.uniformMatrix4fv(u.uVP,false,X.R.vp);if(u.uBend)g.uniform3fv(u.uBend,X.R.bend);g.enable(g.BLEND);g.blendFunc(g.ONE,g.ONE_MINUS_SRC_ALPHA);g.depthMask(false);g.enable(g.DEPTH_TEST);g.drawArrays(g.TRIANGLES,0,this.count);g.bindVertexArray(null);MAGE_BARRAGE.draws++;}
+};
+function mbRibbon(points,widths,alpha,clock,seed,pull){
+  const fw=[RD.view[2],RD.view[6],RD.view[10]],pairs=[];
+  for(let i=0;i<points.length;i++){
+    const A=points[Math.max(0,i-1)],B=points[Math.min(points.length-1,i+1)],d=B.map((v,j)=>v-A[j]);
+    let cross=[fw[1]*d[2]-fw[2]*d[1],fw[2]*d[0]-fw[0]*d[2],fw[0]*d[1]-fw[1]*d[0]],l=Math.hypot(...cross)||1;
+    pairs.push([-1,1].map(s=>[...points[i].map((v,j)=>v+cross[j]/l*s*widths[i]+fw[j]*pull),i/(points.length-1),s,clock,seed,0,0,0,alpha]));
+  }
+  for(let i=0;i<pairs.length-1&&MB_EXT.count+6<=MB_MAX;i++)for(const v of [pairs[i][0],pairs[i+1][0],pairs[i+1][1],pairs[i][0],pairs[i+1][1],pairs[i][1]]){MB_VERT.set(v,MB_EXT.count*11);MB_EXT.count++;}
+}
+SD_FRAMES.push(now=>{
+  MB_EXT.count=0;if(!mbOn()||!mgfCC())return;
+  MAGE_BARRAGE.casts=MAGE_BARRAGE.casts.filter(c=>now-c.at<8&& (now-c.at<1.2||c.lanes.some(q=>q.hit!=null?now-q.hit<.34:!q.p.done)));
+  for(const cast of MAGE_BARRAGE.casts)for(const q of cast.lanes){
+    const p=q.p,age=now-q.at;
+    if(q.hit==null){
+      if(p.done)continue;if(p.tg&&!p.tg.dead)q.T=[p.tg.x,hitH(p.tg),p.tg.y];
+      const left=Math.hypot(p.x-q.T[0],p.h-q.T[1],p.z-q.T[2]),flown=p.age*p.spd;
+      q.u=Math.max(q.u,mbClamp(flown/Math.max(.001,flown+left)));q.P=mbPoint(q,q.u);
+    }
+    const hitAge=q.hit==null?0:now-q.hit;if(hitAge>=.34)continue;
+    const u=q.hit==null?q.u:1,span=Math.min(u,.42),points=[],widths=[],fade=q.hit==null?mbClamp(age/.035):1-hitAge/.34;
+    for(let j=0;j<=28;j++){
+      const f=j/28,along=Math.max(0,u-span*(1-f)),P=mbPoint(q,along);
+      // After contact the same ribbon curls outward and evaporates, no new ball.
+      if(q.hit!=null){const B=mgfBasis(q.A,q.T),r=hitAge*.9*f,an=f*5+q.index*1.7;for(let k=0;k<3;k++)P[k]+=(B.u[k]*Math.sin(an)+B.v[k]*Math.cos(an))*r;}
+      points.push(P);widths.push(1.35*(.055+.055*f)*(1+hitAge*2));
+    }
+    mbRibbon(points,widths,fade,now-cast.at,q.index*2.17,q.pull||.07);
+  }
+  if(MB_EXT.count){if(!RD.vfx.ext.includes(MB_EXT))RD.vfx.ext.push(MB_EXT);MB_EXT.n=1;}
+  if(MAGE_BARRAGE.events.length>256)MAGE_BARRAGE.events.splice(0,MAGE_BARRAGE.events.length-256);
+});
+HF_RESETS.push(()=>{MAGE_BARRAGE.casts.length=0;MAGE_BARRAGE.events.length=0;MAGE_BARRAGE.draws=0;MB_EXT.count=0;});
+
+/* Continuous H3 arcane films. Gameplay still owns missile seeking, Curtain dives,
+   stored Orb damage and every contact. Each head, wake and impact is one film. */
+const MAGE_SEQ = {on:!(typeof location!=='undefined'&&new URLSearchParams(location.search).get('mageSequences')==='0'),states:[],counts:{},events:[],serial:0};
+if(MAGE_SEQ.on){
+  Object.assign(LAB_FX,MAGE_SEQUENCE_DATA);
+  const S=MAGE_SEQ,clamp=x=>Math.max(0,Math.min(1,x)),mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t),key=n=>'mageseq_'+n;
+  const active=()=>S.on&&mgfOn(),direction=(a,b)=>mgfBasis(a,b).d;
+  // Visual contact follows the rendered torso, including crowd/knockback offsets.
+  // Gameplay continues to use its own hitH and collision position.
+  function missileContact(c,origin){
+    const P=[ffFoeX(c),ffFoeY(c)+ffFoeH(c)*.62,ffFoeZ(c)],dx=P[0]-origin[0],dz=P[2]-origin[2],len=Math.hypot(dx,dz)||1,r=ffFoeR(c)*.45;
+    return [P[0]-dx/len*r,P[1],P[2]-dz/len*r];
+  }
+  let handRelease=null,curtainSource=null,curtains=new WeakMap(),orbs=new WeakMap();
+  function event(q,phase){S.events.push({id:q.id,name:q.name+'-'+phase,spell:q.spell,time:G.time});if(S.events.length>256)S.events.shift();}
+  function add(name,spell,P,width){const q={id:++S.serial,name,spell,P:P.slice(0,3),width,at:G.time,frame:0};S.states.push(q);labLoad(key(name));return q;}
+  function sprite(q,f,P,w,a=1,origin=null){
+    const B=LAB_FX[key(q.name)];f=Math.max(0,Math.min(B.n-1,f));q.frame=f;
+    const i=Math.floor(f),anchor=mix(B.track[i],B.track[Math.min(B.n-1,i+1)],f-i),h=w/B.aspect;
+    const dir=q.dir||[1,0,0],fw=[RD.view[2],RD.view[6],RD.view[10]],dot=dir.reduce((v,x,j)=>v+x*fw[j],0),axis=dir.map((x,j)=>x-fw[j]*dot),al=Math.hypot(...axis);
+    const U=al>.001?axis.map(x=>x/al):RD.right,V=[fw[2]*U[1]-fw[1]*U[2],fw[0]*U[2]-fw[2]*U[0],fw[1]*U[0]-fw[0]*U[1]];
+    const C=P.map((v,j)=>v-U[j]*(anchor[0]-.5)*w-V[j]*(anchor[1]-.5)*h);
+    const clipStart=origin?clamp(anchor[0]+(.015-P.reduce((v,x,j)=>v+(x-origin[j])*U[j],0))/w):undefined;
+    if(clipStart>=1||a<=0)return;
+    if(labQueue(key(q.name),C,dir,w/Math.max(.35,al),{fr:f,a,pull:q.pull||.045,clipStart}))S.counts[q.spell]=(S.counts[q.spell]||0)+1;
+  }
+  function held(q,age){const B=LAB_FX[key(q.name)];if(age<.35)return B.holdStart*clamp(age/.35);const span=B.holdEnd-B.holdStart,t=(age-.35)*18%(span*2);return B.holdStart+(t<span?t:span*2-t);}
+  function impact(q,P,duration=.45){if(q.hit!=null)return;q.P=P.slice();q.hit=G.time;q.duration=duration;q.tailOrigin=q.p&&q.origin?q.origin.slice():q.tailOrigin||null;q.origin=null;event(q,'impact');}
+  const hand=ccHand;
+  ccHand=function(t){const P=hand.apply(this,arguments);handRelease=t&&t.def&&t.def.unit==='cc_mageling'?{t,P:P.slice(),at:G.time}:null;return P;};
+  // Missile Curtain was replaced by the orb spell; wrap its shot only where it still exists.
+  if(typeof ccxCurtainShot==='function'){const curtainShot=ccxCurtainShot;
+  ccxCurtainShot=function(t,st,z,m){const before=curtainSource;curtainSource=m;try{return curtainShot.apply(this,arguments);}finally{curtainSource=before;}};}
+  const shoot=ccShoot;
+  ccShoot=function(p){
+    const result=shoot.apply(this,arguments);
+    if(!active()||!p||p._mageBarrage||p.k!=='missile'||(p.col&&p.col!==CC_COL.arcane))return result;
+    const spell=p._mgs||(curtainSource?'cc_sparks':'arcmissile'),name=spell==='cc_sparks'?'curtain':'missile',P=[p.x,p.h,p.z];
+    // A hung missile becomes the diving missile, retaining its film and width.
+    let q=curtainSource&&curtains.get(curtainSource);
+    if(!q||q.p)q=add(name,spell,P,(name==='curtain'?2.5:1.8)*Math.sqrt(p.sz||1));
+    q.releaseFrame=q.hanging?q.frame:LAB_FX[key(q.name)].release;
+    q.p=p;q.P=P.slice();q.origin=P.slice();q.flightAt=G.time;q.progress=0;q.hanging=false;
+    q.owner=handRelease&&handRelease.at===G.time&&Math.hypot(...P.map((v,i)=>v-handRelease.P[i]))<.12?handRelease.t:null;
+    q.dir=direction(P,p.tg?[p.tg.x,hitH(p.tg),p.tg.y]:[P[0]+1,P[1],P[2]]);
+    p._mageSeq=q;event(q,'release');return result;
+  };
+  const missile=mgfMissile;
+  mgfMissile=function(p){
+    const q=p._mageSeq;if(!active()||!q)return missile.apply(this,arguments);
+    const B=LAB_FX[key(q.name)],tg=p.tg;
+    if(tg&&!tg.dead)q.target=q.spell==='arcmissile'?missileContact(tg,q.origin):[tg.x,hitH(tg),tg.y];
+    const T=q.target||[p.x,p.h,p.z],collision=tg&&!tg.dead?[tg.x,hitH(tg),tg.y]:[p.lx??T[0],p.lh??T[1],p.lz??T[2]],left=Math.hypot(p.x-collision[0],p.h-collision[1],p.z-collision[2]),flown=p.age*p.spd;
+    q.progress=Math.max(q.progress,clamp(flown/Math.max(.001,flown+left)));
+    q.P=mix(q.origin,T,q.progress);q.dir=direction(q.origin,T);
+    const gap=Math.hypot(...q.P.map((v,i)=>v-q.origin[i]));
+    // The whole moving film advances with distance. No stationary ball at the palm.
+    sprite(q,q.releaseFrame+(B.impact-1-q.releaseFrame)*q.progress,q.P,q.width,clamp(gap/.13),q.origin);
+  };
+  const land=mgfLand;
+  mgfLand=function(p,hit){
+    const q=p._mageSeq;if(!active()||!q)return land.apply(this,arguments);
+    if(q.hit!=null)return;
+    q.pull=hit?(hit.def.r||.3)+.08:.1;
+    if(hit&&q.spell==='arcmissile'){
+      q.pull=Math.max(ffFoeR(hit)*1.6,ffFoeH(hit)*.55)+.08;
+      q.contactOrigin=q.origin.slice();q.hitUnit=hit;
+      const P=missileContact(hit,q.contactOrigin);q.dir=direction(q.contactOrigin,P);impact(q,P);
+    }else impact(q,[p.x,p.h,p.z]);
+  };
+  const casts=mgfCasts;
+  mgfCasts=function(){if(!active())return casts.apply(this,arguments);MGF.casts.length=0;};
+  const X=CCX_FX,old={};
+  for(const name of ['curtainHang','curtainDive','orbGather','orbFeed','orbThrow','orbBurst','orbFizzle'])old[name]=X[name];
+  if(old.curtainHang)X.curtainHang=function(C,t,z){
+    if(!active())return old.curtainHang.apply(this,arguments);
+    for(const m of z.ms){const q=add('curtain','cc_sparks',[m.x,m.h,m.z],2.5*Math.sqrt(1.1));q.zone=z;q.m=m;q.hanging=true;q.owner=t;q.dir=[0,-1,0];curtains.set(m,q);event(q,'hang');}
+  };
+  if(old.curtainDive)X.curtainDive=function(){if(!active())return old.curtainDive.apply(this,arguments);};
+  X.orbGather=function(C,t,o){
+    if(!active())return old.orbGather.apply(this,arguments);
+    const q=add('orb','cc_grandorb',mgfOrbAt(t),3.25);q.orb=o;q.owner=t;q.gathering=true;q.dir=[Math.sin(t.ang||0),0,Math.cos(t.ang||0)];orbs.set(o,q);event(q,'gather');
+  };
+  X.orbFeed=function(C,t,o){
+    if(!active())return old.orbFeed.apply(this,arguments);
+    // sfxMuzzle also returns two facing components; only XYZ belongs in a position.
+    const A=mgfHand(t).slice(0,3),B=mgfOrbAt(o.t);if(Math.hypot(...A.map((v,i)=>v-B[i]))<.08)return;
+    const q=add('missile','cc_grandorb',A,1.4);q.feed=true;q.origin=A.slice();q.target=B;q.duration=.23;q.dir=direction(A,B);event(q,'feed');
+  };
+  X.orbThrow=function(C,t,o,x,z,T){
+    if(!active())return old.orbThrow.apply(this,arguments);
+    let q=orbs.get(o);if(!q){q=add('orb','cc_grandorb',mgfOrbAt(t),3.25);orbs.set(o,q);}
+    q.releaseFrame=q.gathering?q.frame:LAB_FX[key(q.name)].release;
+    q.gathering=false;q.throwing=true;q.origin=mgfOrbAt(t);q.P=q.origin.slice();q.target=[x,.4,z];q.dir=direction(q.origin,q.target);q.tailOrigin=q.origin.map((v,i)=>v-q.dir[i]*.45);q.flightAt=G.time;q.flightDuration=T;event(q,'release');
+  };
+  X.orbBurst=function(C,x,z,r,o){
+    if(!active())return old.orbBurst.apply(this,arguments);
+    let q=orbs.get(o);if(!q){q=add('orb','cc_grandorb',[x,.4,z],4);q.dir=[1,0,0];}
+    q.throwing=false;q.gathering=false;q.burstWidth=Math.min(6.8,Math.max(q.width,r*3.8));q.pull=.25;impact(q,[x,.4,z],.8);
+  };
+  X.orbFizzle=function(C,o){if(!active())return old.orbFizzle.apply(this,arguments);const q=orbs.get(o);if(q){q.gathering=false;q.fade=G.time;event(q,'fizzle');}};
+  SD_FRAMES.push(now=>{
+    if(!active()||!mgfCC())return;
+    S.states=S.states.filter(q=>now-q.at<12&&(!q.p||!q.p.done||q.hit!=null)&&(q.hit==null||now-q.hit<q.duration)&&(q.fade==null||now-q.fade<.25)&&(!q.feed||now-q.at<q.duration));
+    for(const q of S.states){const B=LAB_FX[key(q.name)];
+      if(q.hit!=null){if(q.hitUnit&&!q.hitUnit.dead)q.P=missileContact(q.hitUnit,q.contactOrigin);const u=clamp((now-q.hit)/q.duration),w=q.width+((q.burstWidth||q.width)-q.width)*clamp(u/.22),phase=q.name==='orb'?Math.sqrt(u):u;sprite(q,B.impact+(B.n-1-B.impact)*phase,q.P,w,1,q.tailOrigin);}
+      else if(q.fade!=null)sprite(q,q.frame,q.P,q.width,1-clamp((now-q.fade)/.25));
+      else if(q.hanging){const age=now-q.zone.born-q.m.at;if(!q.m.live||now>=q.zone.until||!G.towers.includes(q.owner)){q.fade=now;continue;}if(age>=0)sprite(q,held(q,age),q.P,q.width,clamp(age/.12));}
+      else if(q.gathering){const o=q.orb;if(!G.towers.includes(o.t)||now>o.until+.2){q.fade=now;continue;}q.P=mgfOrbAt(o.t);q.width=3.25+Math.min(8,o.n)*.075;sprite(q,held(q,now-o.at),q.P,q.width,clamp((now-o.at)/.12));}
+      else if(q.throwing){const u=clamp((now-q.flightAt)/q.flightDuration);q.P=mix(q.origin,q.target,u);sprite(q,q.releaseFrame+(B.impact-1-q.releaseFrame)*u,q.P,q.width,1,q.tailOrigin);}
+      else if(q.feed){const u=clamp((now-q.at)/q.duration);q.P=mix(q.origin,q.target,u);sprite(q,B.release+(B.impact-1-B.release)*u,q.P,q.width,clamp(u/.12)*clamp((1-u)/.22),q.origin);}
+    }
+  });
+  HF_RESETS.push(()=>{S.states.length=0;S.counts={};S.events.length=0;handRelease=curtainSource=null;curtains=new WeakMap();orbs=new WeakMap();});
+}
+
+/* Visual-only pulling orb. The gameplay owner supplies position, radius and life;
+   this module never selects, moves, slows or damages an enemy. */
+const MAGE_PULL_ORB={
+ states:[],serial:0,draws:0,
+ play(x,z,o={}){
+  if(!Number.isFinite(x)||!Number.isFinite(z))throw new Error('Arcane orb requires a finite centre');
+  const q={id:++this.serial,x,z,y:o.height??.7,radius:o.radius??1.5,at:G.time,duration:o.duration??4};
+  if(![q.y,q.radius,q.duration].every(Number.isFinite)||q.radius<=0||q.duration<=0)throw new Error('Invalid arcane orb dimensions or duration');
+  this.states.push(q);Object.keys(MAGE_PULL_ORB_DATA).forEach(labLoad);return q;
+ },
+ move(q,x,z,height=q.y){if(![x,z,height].every(Number.isFinite))throw new Error('Invalid arcane orb centre');q.x=x;q.z=z;q.y=height;},
+ stop(q){if(q.endAt==null){q.endAt=G.time;q.stopAge=G.time-q.at;}},
+ clear(){this.states.length=0;this.draws=0;}
+};
+Object.assign(LAB_FX,MAGE_PULL_ORB_DATA);
+SD_FRAMES.push(now=>{
+ const S=MAGE_PULL_ORB,D=MAGE_PULL_ORB_DATA.magepull_full,L=MAGE_PULL_ORB_DATA.magepull_loop;
+ const intro=D.introEnd/D.fps,ending=(D.n-1-D.endStart)/D.fps;
+ S.states=S.states.filter(q=>!q.done&&now-q.at<q.duration+ending+.1&&(q.endAt==null||now-q.endAt<ending));
+ if(!mgfOn())return;
+ for(const q of S.states){
+  const age=Math.max(0,now-q.at);if(age>=q.duration&&q.endAt==null){q.endAt=q.at+q.duration;q.stopAge=q.duration;}
+  const loop=Math.max(0,(age-intro)*L.fps)%L.n,w=Math.max(1.2,Math.min(4.5,q.radius*1.8));
+  // Square camera-facing film: no horizontal travel or spinning billboard.
+  const draw=(name,frame,a)=>{if(a<=0)return;const P=[q.x,q.y,q.z];if(labQueue(name,P,RD.right,w,{fr:frame,a,pull:.12}))S.draws++;};
+  if(q.endAt!=null&&q.stopAge<intro){const t=(now-q.endAt)/.25;draw('magepull_full',q.stopAge*D.fps,Math.max(0,1-t)*Math.min(1,q.stopAge/.16));if(t>=1)q.done=true;}
+  else if(q.endAt!=null){const t=now-q.endAt,blend=Math.min(1,t/.16);draw('magepull_loop',loop,1-blend);draw('magepull_full',Math.min(D.n-1,D.endStart+t*D.fps),blend);}
+  else if(age<intro)draw('magepull_full',age*D.fps,Math.min(1,age/.16));
+  else draw('magepull_loop',loop,1);
+ }
+});
+HF_RESETS.push(()=>MAGE_PULL_ORB.clear());
 
 /* ================= THE HAIL SHAMANS' ICE: real hailstones, freezing rain, rime on the road, a stone out of the sky =================
    Unit eight of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules so far: solid things
