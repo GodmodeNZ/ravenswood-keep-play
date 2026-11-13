@@ -1,4 +1,4 @@
-const BUILD_TAG = '7fe044d@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = '59f2bf5@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -56039,7 +56039,7 @@ const SOUND_TIMING = {
     layers: [
       { id: 'simmer', take: 'pyroFbSimmer', name: 'Build-up', at: 'windup', off: 0, in: 0, out: 1.541, end: 'release', endOff: .45, fi: .447, fo: .17, vol: .325, hall: .24, gap: .2, comp: { on: 1, th: -27, ratio: 2.5, att: .051, rel: .42, knee: 20, mk: 3.5 }, verb: { on: 1, size: 2.3, decay: 1.3, pre: .02, tone: 5550, mix: .31 }, env: { vol: [[.357, .158]], comp: [[.26, .384], [1.223, .61]] } },
       { id: 'whoosh', take: 'pyroFbWhoosh', name: 'Flight whoosh', at: 'burst', off: -.461, in: 0, out: .496, fi: 0, fo: .121, vol: .365, hall: .52, gap: .25, comp: { on: 1, th: -37, ratio: 6.2, att: .066, rel: .2, knee: 6, mk: 0 }, verb: { on: 1, size: 1.7, decay: 3.9, pre: .035, tone: 4000, mix: .49 }, env: { vol: [[.217, 1]], wet: [[.089, .41], [.198, .566], [.384, .775]] } },
-      { id: 'impact', take: 'pyroFbImpact2', name: 'Impact', at: 'burst', off: 0, in: 0, out: 3.15, fi: .091, fo: 1.031, vol: .4, hall: .48, gap: .2, comp: { on: 1, th: -46, ratio: 3.9, att: .029, rel: .01, knee: 13, mk: 2 }, verb: { on: 1, size: .85, decay: .9, pre: .03, tone: 3150, mix: .26 }, env: { vol: [[.287, 1.5], [.966, 1]], comp: [[.057, .815], [.205, .38]] } },
+      { id: 'impact', take: 'pyroFbImpact2', name: 'Impact', at: 'burst', off: 0, in: 0, out: 3.15, fi: .091, fo: 1.031, vol: .6, hall: .48, gap: .2, comp: { on: 0, th: -46, ratio: 3.9, att: .029, rel: .01, knee: 13, mk: 2 }, verb: { on: 1, size: .85, decay: .9, pre: .03, tone: 3150, mix: .26 }, env: { vol: [[.287, 1.5], [.966, 1]], comp: [[.057, .815], [.205, .38]] } },
     ],
   },
 };
