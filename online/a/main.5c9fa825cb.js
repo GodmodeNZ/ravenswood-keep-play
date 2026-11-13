@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f3dcc0d@2026-11-14';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c2477db@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -10771,7 +10771,7 @@ for (const [p, ids] of Object.entries({
   high: 'heroiccharge so_witness so_grail cc_grandorb ih_runebrand sb_spiritbear',
   afflicted: 'runthrough harvest cc_hoarbloom cc_kindle ih_forgeburst sb_reckoning',
   first: 'lunge briarfield barrage so_shackle so_embers so_dawnfall ih_shieldshove ih_caltropfield ih_grapnel ih_steamvent sb_rimetotem sb_stormtotem sb_stonetotem',
-  grouped: 'brambleguard arrowrain thicket stampede whirlwind haze bindseed dread so_rebuke so_flare so_ridedown so_sunlance so_halo so_crush so_hallow so_sweep so_smoke so_knell cc_sigilcleave cc_spectral cc_undertow cc_glacialglyph cc_rimelance cc_dilation cc_orrery cc_seismic cc_tremorglyph cc_pyresigil cc_flamewave ih_bulwark ih_slug ih_chainnet ih_flakscreen ih_airburst ih_pressureslam ih_pistondrive ih_incendiary ih_shrapnelround ih_bombard sb_packhowl sb_stormspear sb_galearrow sb_crosswind sb_freezingrain sb_hailstorm sb_thunderbird sb_herd sb_thunderhead sb_downpour',
+  grouped: 'brambleguard arrowrain thicket stampede whirlwind haze bindseed dread so_rebuke so_flare so_ridedown so_sunlance so_halo so_crush so_hallow so_sweep so_smoke so_knell cc_sigilcleave cc_spectral cc_tidemoon cc_glacialglyph cc_rimelance cc_dilation cc_orrery cc_seismic cc_tremorglyph cc_pyresigil cc_flamewave ih_bulwark ih_slug ih_chainnet ih_flakscreen ih_airburst ih_pressureslam ih_pistondrive ih_incendiary ih_shrapnelround ih_bombard sb_packhowl sb_stormspear sb_galearrow sb_crosswind sb_freezingrain sb_hailstorm sb_thunderbird sb_herd sb_thunderhead sb_downpour',
 })) for (const id of ids.split(' ')) AB_PREF[id] = p;
 // the ability's own rule says whether it casts; its preference says who at
 function abPick(t, st, ab, man) {
@@ -11039,13 +11039,15 @@ function abilSave(t) {
   if (t.form) o.fm = t.form; if (A.formLock) o.fk = A.formLock;   // a Grove Shifter's form, and the one it holds
   return o;
 }
+// a spell renamed in place: a save's learned id follows it (the Mageling's Undertow Rune became the Tidemoon, 14 Nov 2026)
+const AB_RENAMED = { cc_undertow: 'cc_tidemoon' };
 function abilLoad(t, o) {
   const kit = abilKit(t); if (!kit || !o || typeof o !== 'object') return;
   const A = abilEnsure(t, kit), ids = kit.abilities.map(ab => ab.id), cap = LEARN.points(t);
   const was = { hawkstrike: 'shift', spot: 'wildstrike', flock: 'wildsurge' }, id0 = id => was[id] && ids.includes(was[id]) ? was[id] : id;   // (the Wayfarers' spells, now the Shifters')
   if (Array.isArray(o.l)) o.l = o.l.map(id0); if (Array.isArray(o.o)) o.o = o.o.map(id0); o.f = id0(o.f);
   if (typeof DRUID_FORMS !== 'undefined') { if (DRUID_FORMS[o.fm]) t.form = o.fm; if (DRUID_FORMS[o.fk]) A.formLock = o.fk; }
-  for (const id of Array.isArray(o.l) ? o.l : []) if (ids.includes(id) && !A.learned.includes(id) && A.learned.length < cap && LEARN.unlocked(t.def.unit, ABIL[id])) A.learned.push(id);   // (force runs: the talents load first, so a spell whose talent is gone is dropped)
+  for (const id0 of Array.isArray(o.l) ? o.l : []) { const id = AB_RENAMED[id0] || id0; if (ids.includes(id) && !A.learned.includes(id) && A.learned.length < cap && LEARN.unlocked(t.def.unit, ABIL[id])) A.learned.push(id); }   // (force runs: the talents load first, so a spell whose talent is gone is dropped)
   for (const id of Array.isArray(o.o) ? o.o : []) if (ids.includes(id)) A.auto[id] = false;
   A.mode = o.m ? 'focus' : 'rotate'; A.focus = A.learned.includes(o.f) ? o.f : A.learned[0] || null;
   if (isFinite(o.n)) A.mana = clamp(+o.n, 0, abMax(t));
@@ -11770,7 +11772,7 @@ const ABIL_SCHOOL = Object.assign({},
   schoolList('attack', 'lunge brambleguard sunder aimedshot volley arrowrain heroiccharge stampede runthrough hawkstrike spot flock whirlwind leafdance harvest'),
   schoolList('nature', 'thicket constrict briarfield haze barrage bindseed callarms renewal dread'),
   // the Conclave
-  schoolList('arcane', 'cc_blinkstrike cc_sigilcleave cc_spectral cc_barrage cc_undertow cc_grandorb cc_dilation cc_quicken cc_echo cc_fallingstar cc_omen cc_orrery cc_manasurge cc_conduit cc_overchannel'),
+  schoolList('arcane', 'cc_blinkstrike cc_sigilcleave cc_spectral cc_barrage cc_tidemoon cc_grandorb cc_dilation cc_quicken cc_echo cc_fallingstar cc_omen cc_orrery cc_manasurge cc_conduit cc_overchannel'),
   schoolList('frost', 'cc_glacialglyph cc_rimelance cc_hoarbloom'),
   schoolList('fire', 'cc_pyresigil cc_kindle cc_flamewave'),
   schoolList('attack', 'cc_seismic cc_tremorglyph cc_boulder'),
@@ -12091,7 +12093,7 @@ const SP_SHAPE = {
   so_sunlance: 'a', so_halo: 'a', so_dawnfall: 'a', so_crush: 'a', so_hallow: 'a h:n', so_hammerfall: 'a', so_sweep: 'a', so_smoke: 'a', so_embers: 'a h2',
   ch_lioncharge: 'a', ch_fordstandard: 'a', ch_lionsdue: 'a', ch_dawnbreak: 'a', ch_morningstar: 'a', ch_highnoon: 'x', ch_sentence: 'a', ch_verdict: 'a',
   // ---- the Conclave ----
-  cc_blinkstrike: 'h2', cc_sigilcleave: 'a', cc_spectral: 'x', cc_barrage: 'a h:n', cc_undertow: 'a', cc_grandorb: 'a', cc_glacialglyph: 'a', cc_rimelance: 'a',
+  cc_blinkstrike: 'h2', cc_sigilcleave: 'a', cc_spectral: 'x', cc_barrage: 'a h:n', cc_tidemoon: 'a', cc_grandorb: 'a', cc_glacialglyph: 'a', cc_rimelance: 'a',
   cc_hoarbloom: 'a', cc_dilation: 'x', cc_quicken: 'x', cc_echo: 'x', cc_fallingstar: 'a', cc_omen: 'a', cc_orrery: 'a h:dur*3', cc_seismic: 'a',
   cc_tremorglyph: 'a z.4', cc_boulder: 'a', cc_pyresigil: 'a h:dur/.25 b5', cc_kindle: 'a L3', cc_flamewave: 'a h2',
   ch_thousandfold: 'a h24', ch_unravel: 'a', ch_mirrorweave: 'x', ch_stoppedhour: 'a', ch_hourlead: 'x', ch_severing: 'a', ch_riftchain: 'a', ch_unbound: 'a',
@@ -14073,14 +14075,14 @@ const CC_PARTS = {
       ccEm(g, 1, () => { for (const [z, R] of [[.27, .085 + .006 * Math.min(tier, 4)], [.35, .12 + .008 * Math.min(tier, 4)]]) g.with(T(.03, 0, z, 0, Math.PI / 2), () => { g.torus(0, 0, 0, R, .009, 20, 3, CP.glow); const m = 6 + 2 * Math.min(tier, 3); for (let k = 0; k < m; k++) { const a = k / m * TAU; g.box(Math.cos(a) * R, 0, Math.sin(a) * R, .02, .008, .02, CP.star); } });   // rings of glowing runes before the open hand
         g.ico(.03, 0, .31, .03 + .004 * tier, '#ffffff', .1); });
     }, t => {
-      const w = t.windup || 0, s = ccShot(t), bar = ccAge(t, 'cc_barrage'), spk = ccAge(t, 'cc_undertow'), orb = ccAge(t, 'cc_grandorb');
+      const w = t.windup || 0, s = ccShot(t), bar = ccAge(t, 'cc_barrage'), spk = ccAge(t, 'cc_tidemoon'), orb = ccAge(t, 'cc_grandorb');
       if (orb < 1.1) { const v = ccEase(ccIn(orb, 0, .3)) * (1 - ccEase(ccIn(orb, .75, 1.1))); return [-.4 - 2.2 * v + 1.6 * ccPop(orb, .6, .85), 0, -.2 * v, 0, .06 * v, 0]; }   // Grand Orb: the wand straight up, then flung forward
-      if (spk < .6) { const v = ccPop(spk, 0, .6); return [-.1 - .2 * v, -.2 * v, 0, 0, .02, .14 * v]; }   // Undertow Rune: a thrust forward, the snare cast down the road
+      if (spk < .7) { const v = ccEase(ccIn(spk, 0, .2)) * (1 - ccEase(ccIn(spk, .45, .7))); return [-.4 - 1 * v + 1.4 * ccPop(spk, .1, .4), 0, -.15 * v, 0, .05 * v, 0]; }   // Tidemoon: the wand drawn back, then flung forward, the orb sent out
       if (bar < .9) { const v = ccPop(bar, 0, .9); return [-.5 - 1.3 * v + .5 * Math.sin(bar * 30) * v, .2 * v, .4 * v, 0, .05 * v, 0]; }   // Arcane Barrage: wand raised and conducting
       return [lfSwing(t, -.4, -.95, .5, .06, .08, .35), 0, -.1 * lfE(w), 0, 0, .05 * lfStrike(s, .06, .08, .35)];   // drawn back, then the flick, the wand carried on and back
     }),
     ccPart('book', [-.2, .58, .08], (g, tier) => { ccBook(g, .55, CP.hatD); }, t => {
-      const bar = ccAge(t, 'cc_barrage'), orb = ccAge(t, 'cc_grandorb'), spk = ccAge(t, 'cc_undertow'), bob = .025 * Math.sin(vt * 2.2 + (t.anim || 0));
+      const bar = ccAge(t, 'cc_barrage'), orb = ccAge(t, 'cc_grandorb'), spk = ccAge(t, 'cc_tidemoon'), bob = .025 * Math.sin(vt * 2.2 + (t.anim || 0));
       if (orb < 1.1) { const v = ccEase(ccIn(orb, 0, .3)) * (1 - ccEase(ccIn(orb, .8, 1.1))); return ccCarry(-.3 * v, 1.2 * v, 0, [.2 * v, .42 * v + bob, -.05 * v]); }   // the book lifts over the head
       if (bar < .9) { const v = ccBump(bar, 0, .9); return ccCarry(-.9 * v, 0, .25 * Math.sin(bar * 24) * v, [0, .16 * v + bob, .08 * v]); }   // pages flying, tipped toward the foe
       if (spk < .6) { const v = ccBump(spk, 0, .6); return ccCarry(-.3 * v, .5 * v, 0, [.05 * v, bob, .1 * v]); }
@@ -14383,7 +14385,7 @@ Object.assign(UNIT_KITS, {
       } },
   ] },
 
-  /* ---- Magelings: a barrage of missiles, a great orb (Undertow Rune: forces_zxc_conclave_cool.js) ---- */
+  /* ---- Magelings: a barrage of missiles, a great orb (Tidemoon: forces_zxc_conclave_cool.js) ---- */
   cc_mageling: { slot: 'arrow', mana: { max: 110, regen: .65, hit: .2 }, abilities: [
     { id: 'cc_barrage', name: 'Arcane Barrage', short: 'Barrage', glyph: 'missiles', hue: '#c9a0ff', mana: 55, cd: 6, research: null,
       by: { n: [5, 5, 6, 6, 7, 7] },
@@ -14736,7 +14738,7 @@ const CC_TALENTS = {
     GT('Swift Recovery', 'flash', 1, 1, 2, n => `Blinkstrike comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_blinkstrike', cd: -.06 * n }) }),
   ] },
 
-  /* ---- Magelings (arrow): Arcane Barrage (innate), Grand Orb, Undertow Rune (the deepest spell talent) ---- */
+  /* ---- Magelings (arrow): Arcane Barrage (innate), Grand Orb, Tidemoon (the deepest spell talent: an orb sent out over the road) ---- */
   arrow: { name: 'Missilecraft', hue: '#c8a8ff', list: [
     GT('Twin Casting', 'missiles', 0, 1, 3, n => `Every ${gOrd(6 - n)} cast looses a second missile at the same foe.`, {}, { cap: 'ccTwin' }),
     GT('Scrying Lens', 'spyglass', 0, 0, 2, n => `+${gNf(.2 * n)} range, for its bolts and its spells.`, n => ({ range: .2 * n })),
@@ -14755,9 +14757,9 @@ const CC_TALENTS = {
     GT('Inkwell', 'potion', 0, 3, 2, n => `While it saves for its next spell, its mana flows back ${50 * n}% faster.`, {}, { mana: { saving: .5 } }),
     GT('Barrage Drill', 'missiles', 0, 2, 2, n => `Arcane Barrage comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_barrage', cd: -.06 * n }) }),
     GT('Static Sparks', 'boltup', 3, 1, 2, n => `Arcane Barrage's missiles stun the foes they strike for ${gNf(.1 * n)}s.`, {}, { sp: n => ({ ab: 'cc_barrage', rider: { stun: .1 * n } }) }),
-    // (appended, so a saved pick keeps its place: G.tal[slot][i]) Undertow Rune, the deep spell talent, and its capstone
-    GS('cc_undertow', 3, 2),
-    GT('Drawstring', 'chain', 4, 2, 1, 'Undertow Rune springs 0.3 cells wider, and its snap stuns every foe it strikes for 0.6s.', {}, { sp: { ab: 'cc_undertow', by: { r: .3 }, rider: { stun: .6 } }, req: [3, 2] }),
+    // (appended, so a saved pick keeps its place: G.tal[slot][i]) Tidemoon, the deep spell talent, and its capstone
+    GS('cc_tidemoon', 3, 2),
+    GT('Drawstring', 'chain', 4, 2, 1, "Tidemoon's field reaches 0.3 cells wider, and its collapse stuns every foe it strikes for 0.6s.", {}, { sp: { ab: 'cc_tidemoon', by: { r: .3 }, rider: { stun: .6 } }, req: [3, 2] }),
   ] },
 
   /* ---- Frostweavers (frost): Glacial Glyph (innate), Rime Lance (row III), Hoarfrost Bloom (capstone) ---- */
@@ -32020,7 +32022,7 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_thornseed', { name: 'T
    schools) and a reason to stand somewhere in the maze. Ids are kept, so the trees, items, sets and saves still bind.
      Spellblades     Riposte Stance (a duellist's stance: every walker that steps into reach is cut, each riposte an
                      Arcane Charge)              Crosscut Sigil (the blade driven into the road: a cross along the grid)
-     Magelings       Undertow Rune (a snare sprung on the road, drawing every foe it catches along the road to its heart)
+     Magelings       Tidemoon (an orb sent out to hover over the road, drawing every foe in its field along the road to it)
                      Gathering Orb (every Mageling missile near it curves into a growing orb, then it is hurled)
      Frostweavers     Hoarfrost Trail (a branded walker leaves frost prints that bite those behind it)
                      Rime Lattice (every frost glyph in reach erupts, and ice bridges join them)
@@ -32042,7 +32044,7 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_thornseed', { name: 'T
    (spellfx.js, vfx.js, loaded later): registered the first time it is needed (ccxReg), each spell drawing its own moments
    from its own logic (as Rattlegun's bullets do), so an echoed cast draws too. Balance: sim/cc_cool_sim.js. */
 
-const CCX = { RIP_GAP: .12, CROSS_W: .42, SN_ARM: .35, SN_PULL: 1.1, SN_SPD: 2.4, SN_ROAD: 3.5, SN_HEART: .15, PRINT_GAP: .45, ORB_R: 1.15, ORB_SHARE: .8, ORB_STORE: 1.2,
+const CCX = { RIP_GAP: .12, CROSS_W: .42, SN_ARM: .35, SN_PULL: 1.1, SN_SPD: 2.4, SN_ROAD: 3.5, SN_HEART: .15, SN_FILM_H: .7, PRINT_GAP: .45, ORB_R: 1.15, ORB_SHARE: .8, ORB_STORE: 1.2,
   ORR_R: [.35, .8, 1.25], ORR_W: [9.578, 5.389, 1.2], ORR_SYZ: 1.5, HAND_T: 2.4, LODE_T: 2.2, LODE_R: 1.4, BUL_HOLD: .62 };
 const ccxPathPts = () => (G.path && G.path.pts) || [];
 // the road cell nearest (x, z): its index on G.path.pts (portal to gate), or -1
@@ -32082,7 +32084,7 @@ function ccxSwap(unit, ab) {
   if (ab.pref && typeof AB_PREF !== 'undefined') AB_PREF[ab.id] = ab.pref;
   if (ab.anim && typeof ABANIM !== 'undefined') ABANIM[ab.id] = ab.anim;
 }
-// a spell added to its kit and the registry (the Mageling's Undertow Rune, its third spell: it took Missile Curtain's place)
+// a spell added to its kit and the registry (the Mageling's Tidemoon, its third spell: it took Missile Curtain's place)
 function ccxAdd(unit, ab) {
   const kit = UNIT_KITS[unit]; if (!kit) return console.warn('conclave cool: no kit', unit);
   if (kit.abilities.some(a => a.id === ab.id)) return;
@@ -32171,12 +32173,16 @@ ccxSwap('cc_spellblade', { id: 'cc_spectral', name: 'Crosscut Sigil', short: 'Cr
 /* =====================================================================================================
    MAGELINGS: the apprentices' storm of seeking missiles
    ===================================================================================================== */
-/* Undertow Rune (the Mageling's deepest spell talent, owner 13 Nov 2026: "an arcane snare and pulls all units caught in it
-   towards it"). A sigil written on the road: it springs after SN_ARM, and every foe inside its radius then, or walking into
-   it while it pulls, is caught on a thread and drawn ALONG THE ROAD to the snare's road cell (never across a wall or off the
-   road: a foe more than SN_ROAD road cells from it is not caught, however near it stands across a wall). The heavy are drawn
-   less (ccxWeight: bosses a third), and crowd control wears (ccDR, once a foe). Flyers are caught too and drawn along their
-   own line. When the pull ends the snare snaps shut: its damage to every foe it caught still near it. */
+/* Tidemoon (the Mageling's deepest spell talent, owner 13 Nov 2026: "an arcane snare and pulls all units caught in it
+   towards it"; 14 Nov: "don't make it a rune, make it an orb that gets placed"). She sends an orb of arcane light out
+   to a road cell: it settles there in SN_ARM and hangs at chest height over the road, and every foe inside its field
+   then, or walking into it while it pulls, is caught and drawn ALONG THE ROAD to the cell under it (never across a wall or
+   off the road: a foe more than SN_ROAD road cells from it is not caught, however near it stands across a wall). The heavy
+   are drawn less (ccxWeight: bosses a third), and crowd control wears (ccDR, once a foe). Flyers are caught too and drawn
+   along their own line. When the pull ends the moon collapses: its damage to every foe it caught still near it.
+   Its look is the owner's film (magepullorb.js, docs/arcane-pull-orb.md: visual only): ccxMoonFilm below starts it where
+   the cast bar begins (its forming takes longer than the spell lives), moves it to the cell the cast lands on, and stops
+   it (an inward collapse) when the pull ends, the caster is lost, or the cast is interrupted or fizzles. */
 const ccxSnFld = c => (c.atk && typeof siegeField === 'function' ? siegeField().dist : G.dist);
 // forward along the road (toward the gate) by d cells: ccxPush's walk, downhill
 function ccxDraw(c, d) {
@@ -32200,20 +32206,39 @@ function ccxDraw(c, d) {
   c.ti = clamp(Math.floor(c.x), 0, COLS - 1); c.tj = clamp(Math.floor(c.y), 0, ROWS - 1); c.tx = c.ti + .5; c.ty = c.tj + .5;
   c.remain = F[idx(c.ti, c.tj)] + .5;
 }
-// how far along the road a foe stands from the snare: + upstream of it (to be drawn on), - past it (to be drawn back)
+// how far along the road a foe stands from the moon: + upstream of it (to be drawn on), - past it (to be drawn back)
 function ccxSnGap(c, z) {
   if (c.fly) return z.z - c.y;
   const F = ccxSnFld(c), r0 = F[z.cell]; if (!isFinite(r0)) return null;
   return c.remain - (r0 + .5);
 }
-ccxAdd('cc_mageling', { id: 'cc_undertow', name: 'Undertow Rune', short: 'Undertow', glyph: 'snare', hue: '#d2a8ff', mana: 80, cd: 14, research: { cost: 90, time: 25 }, pref: 'grouped',
+// the film: begun with the cast bar (t.ab.moonFilm) and moved to where the cast lands, or begun at the cast, run on so its
+// forming is done before the pull starts (an instant or free cast); a cast bar that is interrupted or fizzles stops it
+const CCX_FILM = () => (typeof MAGE_PULL_ORB !== 'undefined' && typeof MAGE_PULL_ORB_DATA !== 'undefined' && MAGE_PULL_ORB_DATA.magepull_full ? MAGE_PULL_ORB : null);
+// the films in play with their casters: one whose Mageling is sold or wrecked collapses at once (magefx.js checks each frame)
+const CCX_MOONS = [];
+function ccxMoonsCheck() {
+  for (let i = CCX_MOONS.length - 1; i >= 0; i--) { const m = CCX_MOONS[i]; if (m.q.done || m.q.endAt != null) { CCX_MOONS.splice(i, 1); continue; } if (!G.towers.includes(m.t) || m.t.wrecked) { ccxMoonStop(m.q); CCX_MOONS.splice(i, 1); } }
+}
+function ccxMoonStop(q) { const F = CCX_FILM(); if (F && q) { try { F.stop(q); } catch (e) {} } }
+function ccxMoonPlay(x, z, r, life) { const F = CCX_FILM(); if (!F) return null; try { return F.play(x, z, { height: CCX.SN_FILM_H, radius: r, duration: life }); } catch (e) { return null; } }
+function ccxMoonFilm(t, x, z, r) {
+  const F = CCX_FILM(); if (!F) return null; const A = t.ab, f = A && A.moonFilm; if (A) A.moonFilm = null;
+  if (f && f.q && f.q.endAt == null && G.time - f.at < f.T + .25) { try { F.move(f.q, x, z, CCX.SN_FILM_H); f.q.radius = r; } catch (e) {} return f.q; }
+  ccxMoonStop(f && f.q);
+  const life = CCX.SN_ARM + CCX.SN_PULL, q = ccxMoonPlay(x, z, r, life); if (!q) return null;
+  const D = MAGE_PULL_ORB_DATA.magepull_full, lead = Math.max(0, D.introEnd / D.fps + .25 - life);
+  q.at -= lead; q.duration += lead;   // (run on: it starts part-formed, so it is whole before the pull begins)
+  return q;
+}
+ccxAdd('cc_mageling', { id: 'cc_tidemoon', name: 'Tidemoon', short: 'Tidemoon', glyph: 'spiral', hue: '#d2a8ff', mana: 80, cd: 14, research: { cost: 90, time: 25 }, pref: 'grouped',
   by: { r: [1.6, 1.6, 1.75, 1.75, 1.9, 1.9], mult: [.7, .7, .8, .8, .9, .9] },
   auto: 'three or more foes spread out in reach, flyers too', none: 'too few foes in reach to gather',
-  text: (t, st, ab) => `Carves a rune on the road; after ${CCX.SN_ARM}s it springs and catches every foe within ${+byT(ab.by.r, t).toFixed(2)} cells, flyers too, drawing them along the road to its heart for ${CCX.SN_PULL}s (bosses a third as far). Then it snaps shut: ${xD(st, byT(ab.by.mult, t))} to each foe it caught.`,
+  text: (t, st, ab) => `Sends a small moon of arcane light out over the road. It settles in ${CCX.SN_ARM}s and draws every foe within ${+byT(ab.by.r, t).toFixed(2)} cells, flyers too, along the road in under it for ${CCX.SN_PULL}s (bosses a third as far). Then it collapses: ${xD(st, byT(ab.by.mult, t))} to each foe it held.`,
   pick(t, st, ab, man) {
     const reach = abReach(t, st, ab), L = abFoes(t, st, reach); if (L.length < (man ? 1 : 3)) return null;
     const r = byT(ab.by.r, t), P = ccxPathPts(); let best = null, bn = 0, bd = 1e9;
-    // the road cell in reach whose snare would catch the most (ties: the one nearest their middle)
+    // the road cell in reach whose moon would catch the most (ties: the one nearest their middle)
     for (let i = 1; i < P.length - 1; i++) {
       const x = P[i][0], z = P[i][1]; if (Math.hypot(x - t.x, z - t.y) > reach + .5) continue;
       let n = 0, d = 0; for (const q of L) { const e = Math.hypot(q.x - x, q.y - z); if (e <= r) { n++; d += e; } }
@@ -32231,20 +32256,20 @@ ccxAdd('cc_mageling', { id: 'cc_undertow', name: 'Undertow Rune', short: 'Undert
     const zn = { k: ab.id, x, z, r, cell, at: G.time, spring: G.time + CCX.SN_ARM, until: G.time + CCX.SN_ARM + CCX.SN_PULL, tick: 0, every: .05, ck: k, _sfx: 1, caught: new Map() };
     t.ang = Math.atan2(x - t.x, z - t.y);
     abZone(t, zn);
-    ccxFx(ab.id, t, null, C => CCX_FX.snareLay(C, t, zn));
-    ccxLater(ab.id, CCX.SN_ARM + CCX.SN_PULL, () => {   // the snap
-      if (!abLive(t)) return; const s = t.st || st, m = byT(ab.by.mult, t);
+    zn.vfx = ccxMoonFilm(t, x, z, r); if (zn.vfx) { CCX_MOONS.push({ t, q: zn.vfx }); if (CCX_MOONS.length > 16) CCX_MOONS.shift(); }
+    ccxLater(ab.id, CCX.SN_ARM + CCX.SN_PULL, () => {   // the collapse
+      ccxMoonStop(zn.vfx); if (!abLive(t)) return; const s = t.st || st, m = byT(ab.by.mult, t);
       abAoe(() => { for (const [c] of zn.caught) { if (c.dead || c.ent || !canTarget(t, s, c) || Math.hypot(c.x - x, c.y - z) > r + .8) continue; ccAb(t, s, c, m, k, { type: 'arcane' }); } });
-      ccxFx(ab.id, t, null, C => CCX_FX.snareSnap(C, zn));
       G.shake = Math.max(G.shake, .07); sfx('glaiveHit', 1);
     });
     sfx('arcgather', 0);
   },
   zone(t, st, z) {
     if (G.time < z.spring) return;
-    if (!z.sprung) { z.sprung = 1; ccxFx('cc_undertow', t, null, C => CCX_FX.snareSpring(C, z)); sfx('phase', 1); }
+    if (!z.sprung) { z.sprung = 1; sfx('phase', 1); }
+    if (!abLive(t)) { ccxMoonStop(z.vfx); return; }   // (the caster lost: the film collapses at once)
     const dt = z.every;
-    for (const c of G.creeps) {   // caught: inside its radius and near it along the road
+    for (const c of G.creeps) {   // caught: inside its field and near it along the road
       if (c.dead || c.ent || z.caught.has(c) || c.state === 'exit' || !canTarget(t, st, c) || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue;
       const g = ccxSnGap(c, z); if (g == null || Math.abs(g) > CCX.SN_ROAD) continue;
       z.caught.set(c, { k: ccxWeight(c) * ccDR(c), moved: 0, at: G.time });
@@ -32950,7 +32975,7 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
    LATE REGISTRATIONS (after every force file): cast times, the body's move for each, the Spellbook's help
    ===================================================================================================== */
 SPEC_REG.push(() => {
-  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { cc_sigilcleave: 0, cc_spectral: .3, cc_undertow: .4, cc_grandorb: 0, cc_rimelance: .5, cc_hoarbloom: .8, cc_quicken: .6, cc_omen: .6, cc_orrery: .9,
+  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { cc_sigilcleave: 0, cc_spectral: .3, cc_tidemoon: .4, cc_grandorb: 0, cc_rimelance: .5, cc_hoarbloom: .8, cc_quicken: .6, cc_omen: .6, cc_orrery: .9,
     cc_tremorglyph: 0, cc_boulder: 0, cc_pyresigil: .3, cc_kindle: .4, cc_flamewave: .5, cc_shards: .3, cc_nullfield: .4 });
   if (typeof LIFE_CAST !== 'undefined' && typeof LF_ARCH !== 'undefined') for (const [id, kind, T] of [['cc_sigilcleave', 'thrust', .6], ['cc_spectral', 'slam', 1], ['cc_grandorb', 'channel', 2.6], ['cc_omen', 'raise', 1],
     ['cc_tremorglyph', 'thrust', 1], ['cc_boulder', 'raise', 1], ['cc_pyresigil', 'thrust', 1.6], ['cc_flamewave', 'raise', 1.1], ['cc_kindle', 'sweep', .7], ['cc_shards', 'sweep', .7], ['cc_nullfield', 'stoop', 1.1]]) {
@@ -32967,7 +32992,7 @@ SPEC_REG.push(() => {
    follow vfxFid. Each spell's moments are SFX_DRAW kinds of its own (ccx_*); the recipe's generic layer is switched off
    for these ids (SFX_CUSTOM), as the spells draw themselves.
    ===================================================================================================== */
-const CCX_IDS = ['cc_sigilcleave', 'cc_spectral', 'cc_undertow', 'cc_grandorb', 'cc_rimelance', 'cc_hoarbloom', 'cc_quicken', 'cc_omen', 'cc_orrery', 'cc_tremorglyph', 'cc_boulder', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave', 'cc_shards', 'cc_nullfield', 'ch_mirrorweave', 'ch_rewind', 'ch_hourlead'];
+const CCX_IDS = ['cc_sigilcleave', 'cc_spectral', 'cc_tidemoon', 'cc_grandorb', 'cc_rimelance', 'cc_hoarbloom', 'cc_quicken', 'cc_omen', 'cc_orrery', 'cc_tremorglyph', 'cc_boulder', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave', 'cc_shards', 'cc_nullfield', 'ch_mirrorweave', 'ch_rewind', 'ch_hourlead'];
 let CCX_REG = 0;
 const ccxC = (hex, k) => vfxC(hex, k || 1);
 const ccxE = (q, fin, fout) => Math.max(0, Math.min(1, q.age / (fin || .15), (q.life - q.age) / (fout || .3)));
@@ -32996,22 +33021,6 @@ function ccxReg() {
     }
     vfxFlat(VX, q.x, q.z, .055, .5, .5, q.seed - q.age * 1.5, q.col, .8 * e, VT.RUNE, 1);
     if (!lite) vfxFlat(VX, q.x, q.z, .05, .9, .9, 0, q.col, .25 * e, VT.GLOW, 1);
-  };
-  // Undertow Rune: its sigil written on the road (a ring at its real radius, runes round it), drawn in while it pulls, a thread
-  // of light from its heart to each foe it holds
-  SFX_DRAW.ccx_snare = q => {
-    const z = q.zone, now = G.time, arm = Math.min(1, (now - z.at) / CCX.SN_ARM), pull = Math.max(0, Math.min(1, (now - z.spring) / CCX.SN_PULL));
-    const e = Math.min(1, q.age / .15, Math.max(0, z.until + .05 - now) / .12); if (e <= .01) return;
-    const lite = vfxLite(), r = z.r * (1 - .55 * v2Ease(pull)), sprung = now >= z.spring, fl = .85 + .15 * Math.sin(now * 14);
-    vfxFan(VX, z.x, .046, z.z, r - .05, r, 0, TAU * v2Ease(arm), lite ? 20 : 40, sprung ? q.hot : q.col, .55 * e * fl, VT.FAN, 1, now * .6, 3);
-    if (!lite) vfxFan(VX, z.x, .044, z.z, r * .6, r, 0, TAU, 28, q.col, .12 * e, VT.GLOW, 1);
-    const n = 6; for (let k = 0; k < n; k++) { const a = k / n * TAU - now * .8; vfxSprite(VX, z.x + Math.cos(a) * r, .08, z.z + Math.sin(a) * r, .06, .06, a, q.hot, .8 * e * arm, VT.STAR, 1); }
-    vfxFlat(VX, z.x, z.z, .055, .55 * (1 - .3 * pull), .55 * (1 - .3 * pull), -now * 2, q.col, .7 * e, VT.RUNE, 1);
-    if (!sprung) return;
-    for (const [c] of z.caught) {
-      if (c.dead) continue; const h = ccxFoeH(c);
-      vfxRb.begin(VX, VT.ENERGY, 1, 0); vfxRb.pt(z.x, .3, z.z, .035, q.hot, .75 * e, now * 2); vfxRb.pt((z.x + c.x) / 2, (.3 + h) / 2 + .08, (z.z + c.y) / 2, .03, q.col, .6 * e, now * 2 + .5); vfxRb.pt(c.x, h, c.y, .025, q.col, .55 * e, now * 2 + 1); vfxRb.end();
-    }
   };
   // Gathering Orb: the orb over the hat, swelling with each missile it takes in, wisps turning round it, then gone
   SFX_DRAW.ccx_orb = q => {
@@ -33168,18 +33177,6 @@ const CCX_FX = {
     flashLight(x, z, .5, C.P.light, 2.4 * S, .3); sfxShake(C, .1);
   },
   // ---- Magelings ----
-  snareLay(C, t, zn) {
-    const K = v2K(C), m = sfxMuzzle(t);
-    sfxAdd({ k: 'ccx_snare', zone: zn, col: K.a, hot: K.hot, life: CCX.SN_ARM + CCX.SN_PULL + .2 });
-    if (m) sfxAdd({ k: 'ccx_streak', x0: m[0], h0: m[1], z0: m[2], x1: zn.x, h1: .1, z1: zn.z, w: .06 * C.S, col: K.a, hot: K.hot, life: .2 * C.T.dur });
-    v2Wind(C, { wu: .06, r: .45 });
-  },
-  snareSpring(C, zn) { const K = v2K(C); sfxAdd({ k: 'vflash', x: zn.x, z: zn.z, h: .2, s: .35 * C.S, life: .12, col: K.hot, a: .6 * sfxZk() }); },
-  snareSnap(C, zn) {
-    const K = v2K(C); sfxAdd({ k: 'vflash', x: zn.x, z: zn.z, h: .35, s: .6 * C.S, life: .16, col: K.hot, a: .9 * sfxZk() });
-    v2Spray(C, 'spark', zn.x, zn.z, .35, 8, { sp: 1.2 });
-    if (typeof flashLight === 'function' && G.flashes && G.flashes.length < 6) flashLight(zn.x, zn.z, .5, [1.1, .85, 1.6], 1.8, .3);
-  },
   orbGather(C, t, orb) { const K = v2K(C); sfxAdd({ k: 'ccx_orb', orb, S: C.S * C.T.glow, col: K.a, hot: K.hot, life: (orb.until - G.time) + .1 }); v2Wind(C, { wu: .3, r: .55, n: 8, hk: 1.15 }); },
   orbFeed(C, t, orb) {
     const K = v2K(C), m = sfxMuzzle(t), o = orb.t, h = towerTop(o) + .55; if (!m) return;
@@ -33301,7 +33298,25 @@ const CCX_FX = {
 };
 
 // Spell Damage shapes (itempower.js SP_SHAPE): the snare's snap strikes each foe it caught once; the Bulwark pounds every half second
-if (typeof SP_SHAPE !== 'undefined') { SP_SHAPE.cc_undertow = 'a'; SP_SHAPE.cc_boulder = 'a h:dur/.5'; }
+// Tidemoon's film begins with its cast bar, at the cell its pick would land on; an interrupt or fizzle stops it
+if (typeof castStart === 'function') {
+  const cs0 = castStart;
+  castStart = function (t, ab, tg) {
+    const ok = cs0.apply(this, arguments), A = t && t.ab, C = A && A.cast;
+    if (ok && ab && ab.id === 'cc_tidemoon' && C && C.id === ab.id && C.at === G.time && tg && tg.x != null) {
+      const P = ccxPathPts(), i = ccxPathIdx(tg.x, tg.y), x = i > 0 && P[i] ? P[i][0] : tg.x, z = i > 0 && P[i] ? P[i][1] : tg.y;
+      ccxMoonStop(A.moonFilm && A.moonFilm.q);
+      const q = ccxMoonPlay(x, z, byT(ab.by.r, t), C.T + CCX.SN_ARM + CCX.SN_PULL);
+      A.moonFilm = q ? { q, at: G.time, T: C.T } : null;
+    }
+    return ok;
+  };
+}
+if (typeof castFizzled === 'function') {
+  const cf0 = castFizzled;
+  castFizzled = function (t, A, ab) { if (ab && ab.id === 'cc_tidemoon' && A && A.moonFilm) { ccxMoonStop(A.moonFilm.q); A.moonFilm = null; } return cf0.apply(this, arguments); };
+}
+if (typeof SP_SHAPE !== 'undefined') { SP_SHAPE.cc_tidemoon = 'a'; SP_SHAPE.cc_boulder = 'a h:dur/.5'; }
 
 /* ================= THE STORMBORN: every second and third spell made a signature move (the "cool" pass, 6 Nov 2026) =================
    The owner: "do a pass on all second and third spells making each unique and interesting, aim for the cool factor like the
@@ -34900,7 +34915,7 @@ const CAST_T = {
   so_toll: .8, so_peal: 1.2, so_knell: 1,
   // the Conclave
   cc_blinkstrike: 0, cc_sigilcleave: .4, cc_spectral: .5,
-  cc_barrage: .6, cc_undertow: .5, cc_grandorb: 0,
+  cc_barrage: .6, cc_tidemoon: .5, cc_grandorb: 0,
   cc_glacialglyph: .8, cc_rimelance: .8, cc_hoarbloom: 1,
   cc_dilation: .9, cc_quicken: .5, cc_echo: .8,
   cc_fallingstar: 1, cc_omen: .5, cc_orrery: 1,
@@ -35546,7 +35561,7 @@ const LF_ARCH = {
 };
 for (const [kind, list] of Object.entries({
   raise: 'so_rebuke .9 so_flare 1 so_vow 1.4 so_halo 1.2 so_embers 1.2 cc_grandorb 1.1 cc_hoarbloom 1 cc_quicken .8 cc_fallingstar 1 sb_packhowl 1.4 sb_spiritbear 1.6 sb_calllightning .9 sb_thunderbird 1.3 sb_herd 1.4',
-  thrust: 'so_bash .6 so_witness 1.2 so_bind 1 so_sunlance 1.1 so_hammerfall 1.6 cc_spectral .8 cc_undertow .6 cc_rimelance .6 cc_boulder 1 cc_kindle .7 sb_pounce .7 sb_stormspear 1 sb_spiritchains 1.1',
+  thrust: 'so_bash .6 so_witness 1.2 so_bind 1 so_sunlance 1.1 so_hammerfall 1.6 cc_spectral .8 cc_tidemoon .6 cc_rimelance .6 cc_boulder 1 cc_kindle .7 sb_pounce .7 sb_stormspear 1 sb_spiritchains 1.1',
   slam: 'so_dawnfall 1.2 so_crush 1.1 cc_glacialglyph 1 cc_seismic 1 sb_reckoning .9 sb_stonetotem 1',
   shoot: 'so_sanct 1 sb_galearrow .9 sb_skyshot 1',
   sweep: 'so_hail .8 so_sweep .9 cc_sigilcleave .8 cc_flamewave 1 sb_crosswind 1.1 sb_stormdance 1.3',
@@ -39602,7 +39617,7 @@ function fshopCats() {
    The rules, drops and UI are forces_zzzz_sets.js and fsets_ui.js (S.epic). Each set's (2) leans on one of the unit's
    spells; its (4) changes how the unit plays: a spell that casts another, a state that spreads. Pieces: [id, name, 3, icon,
    hue, 'stat weights']; the fourth is the charm. Loaded after every other forces_* file, so the spells are their final
-   selves (forces_zxc_conclave_cool.js: Riposte Stance, Crosscut Sigil, Undertow Rune, Gathering Orb, Hoarfrost Trail,
+   selves (forces_zxc_conclave_cool.js: Riposte Stance, Crosscut Sigil, Tidemoon, Gathering Orb, Hoarfrost Trail,
    Rime Lattice, Backward Hour, Lodestar, Grand Orrery, Heave, Living Bulwark, Skipping Flame, Phoenix, Returning
    Crescent, Rend the Veil). */
 
@@ -39644,17 +39659,17 @@ if (typeof fsetAdd === 'function') {
       });
     } });
 
-  /* ---------- Magelings: the undertow and the orb feed each other ---------- */
-  fsetAdd({ id: 'fe_cc_orb', epic: 1, spells: ['cc_undertow', 'cc_grandorb'], force: 'conclave', unit: 'arrow', name: 'The Prodigy’s Overflow',
+  /* ---------- Magelings: the Tidemoon and the Gathering Orb feed each other ---------- */
+  fsetAdd({ id: 'fe_cc_orb', epic: 1, spells: ['cc_tidemoon', 'cc_grandorb'], force: 'conclave', unit: 'arrow', name: 'The Prodigy’s Overflow',
     pieces: [['fe_cc_orbwand', 'Wand of Brimming Light', 3, 'stars', '#c9a0ff', 'sp as'], ['fe_cc_inkcuffs', 'Ink-Starred Cuffs', 3, 'feather', '#d8c8ff', 'sp mana']],
     old: [['fe_cc_hatband', 'Hatband of Hung Missiles', 3, 'halo', '#e0c8ff', 'sp cd range'], ['fe_cc_marblebag', 'Pouch of Glass Marbles', 3, 'ring', '#b0a0ff', 'mana regen']],
-    b2: 'Each Undertow Rune that snaps shut on a foe brings Gathering Orb 2s nearer. When Gathering Orb’s burst strikes, it casts Undertow Rune at once, free, and every foe the burst strikes takes a seeking missile for each element mark it bears or just lost (up to 3).',
+    b2: 'Each Tidemoon that collapses on a foe brings Gathering Orb 2s nearer. When Gathering Orb’s burst strikes, it casts Tidemoon at once, free, and every foe the burst strikes takes a seeking missile for each element mark it bears or just lost (up to 3).',
     hit(t, c, amt, sp, n) {
-      if (sp === 'cc_undertow' && !((t.feSnT || 0) > G.time)) { t.feSnT = G.time + .5; fsReady(t, 'cc_grandorb', 2); }
+      if (sp === 'cc_tidemoon' && !((t.feSnT || 0) > G.time)) { t.feSnT = G.time + .5; fsReady(t, 'cc_grandorb', 2); }
       if (n < 2 || sp !== 'cc_grandorb') return;
       if (!((t.feOrbT || 0) > G.time)) {
         t.feOrbT = G.time + 3; const S = this;
-        fsLater(.25, () => { if (fsFreeCast(t, 'cc_undertow')) fsGlint(t, S); });
+        fsLater(.25, () => { if (fsFreeCast(t, 'cc_tidemoon')) fsGlint(t, S); });
       }
       if (c.dead) return;
       const k = Math.min(3, ccMarksRecent(c, .5).length);
@@ -40544,7 +40559,7 @@ const cxChamp = (u, cap) => { for (const o of G.towers) if (o.def && o.def.unit 
 
   // Magelings: Missile Swarm | Lecture Hall | Unstable Charge
   put(T.arrow.list, 'Missile Swarm', GT('Missile Swarm', 'arrows2', 4, 0, 1, `Arcane Barrage becomes a stream: for 3s it looses a missile every ${CX.STREAM_GAP}s at the toughest foes in range, ${CX.STREAM_N} in all, each as hard as a Barrage missile.`, {}, { cap: 'ccxStream' }));
-  put(T.arrow.list, 'Arcane Torrent', GT('Lecture Hall', 'orb', 4, 1, 1, 'Gathering Orb draws on the whole Conclave: while it gathers, every strike of a Conclave unit within 2 cells of the Mageling also pours half its blow into the orb, and each Undertow Rune brings Gathering Orb 3s nearer.', {}, { cap: 'ccxHall', sp: { ab: 'cc_undertow', ready: ['cc_grandorb', 3] } }));
+  put(T.arrow.list, 'Arcane Torrent', GT('Lecture Hall', 'orb', 4, 1, 1, 'Gathering Orb draws on the whole Conclave: while it gathers, every strike of a Conclave unit within 2 cells of the Mageling also pours half its blow into the orb, and each Tidemoon brings Gathering Orb 3s nearer.', {}, { cap: 'ccxHall', sp: { ab: 'cc_tidemoon', ready: ['cc_grandorb', 3] } }));
 
   // Frostweavers: Flash Freeze | Glacier Script | Lingering Rime (Scrivener's Hand to row IV)
   put(T.frost.list, 'Flash Freeze', GT('Flash Freeze', 'iceblock', 4, 0, 1, 'Rime Lattice spends no glyphs: each erupts and stays to erupt again. Its ice bridges freeze the ground foes they cross for 0.6s, and each Rime Lattice brings Glacial Glyph 2s nearer.', {}, { cap: 'ccxBridgeFrz', sp: { ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', 2] } })).capK = 2;
@@ -46241,6 +46256,7 @@ function talNamesOld(force, hero) {
 // one tree's saved ranks, moved from the old names to the tree in play (a talent not found by name loses its ranks)
 // a talent renamed in place (the same talent, a new name): its saved ranks follow it
 const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (the Pyroclasts' spell row, 8 Nov 2026)
+  'Undertow Rune': 'Tidemoon',   // (the Mageling's rune became an orb sent out over the road, 14 Nov 2026)
   // (the Wardbound's Masked Wardens became the Glaive Wardens, 8 Nov 2026: their arrow talents and spells renamed in place)
   'Rune-Etched Heads': 'Rune-Etched Edge', 'Pinning Draw': 'Branding Edge', 'Falling Stars': 'Branding Rite', 'Line Shot': 'Line Cut', 'Long Shaft': 'Dragging Edge',
   'Nocked Again': 'Caught Again', 'Arrow of Judgement': 'Glaive of Judgement', 'Piercing Shaft': 'Returning Oath', 'Warding Arrow': 'Warding Glaive',
@@ -48612,7 +48628,7 @@ const TAL_SPREAD = {
   "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,2],"Snaring Rain":[0,3],"Root Platform":[2,0],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[1,0],"Hunter’s Patience":[4,2],"Blood Moon":[5,3],"Snarled Ground":[3,1],"Running Shafts":[3,3],"Warden’s Mark":[3,0],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,2],"Captain's Share":[4,0],"Moonlit Aim":[5,2]},
   "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[2,0],"Passing Spores":[1,3],"Compost":[3,1],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[4,1],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[0,1],"Seedmother":[5,2],"Full Bloom":[4,3],"Rotfeast":[4,0],"Busy Hive":[0,2],"Honey Store":[1,0]},
   "conclave.glaive": {"Measured Cuts":[0,1],"Opening Salute":[1,3],"Lone Duel":[2,3],"Riftsteel Edge":[1,2],"Ward-Splitter":[1,1],"Charged Edge":[2,1],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[4,1],"Thrown Riftblade":[4,0],"Fifth Form":[4,3],"Phase Dancer":[3,1],"Ghostblade Rush":[5,1],"Weaver's Blade":[5,2],"Press the Opening":[0,0],"Binding Cut":[0,2],"Guard Broken":[3,2]},
-  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Weighted Missiles":[2,2],"Apprentice's Zeal":[4,3],"Long Recital":[1,2],"Echoing Missiles":[3,2],"Charged Missiles":[3,0],"Gathering Orb":[3,3],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,3],"Cold Focus":[0,3],"Lecture Hall":[5,3],"Margin Notes":[1,1],"Recitation":[1,0],"Static Sparks":[2,1],"Undertow Rune":[4,0],"Drawstring":[5,0]},
+  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Weighted Missiles":[2,2],"Apprentice's Zeal":[4,3],"Long Recital":[1,2],"Echoing Missiles":[3,2],"Charged Missiles":[3,0],"Gathering Orb":[3,3],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,3],"Cold Focus":[0,3],"Lecture Hall":[5,3],"Margin Notes":[1,1],"Recitation":[1,0],"Static Sparks":[2,1],"Tidemoon":[4,0],"Drawstring":[5,0]},
   "conclave.frost": {"Spreading Frost":[0,3],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,3],"Entomb":[1,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,1],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[1,0],"Needle Frost":[0,2],"Brittle Coffin":[3,3]},
   "conclave.arcane": {"Lagging Hour":[2,0],"Tick Forward":[3,3],"Borrowed Time":[3,1],"Heavy Hours":[0,1],"Backward Hour":[2,1],"Paradox":[2,3],"Stopped Clock":[4,2],"Quickening Bell":[5,2],"Frozen Moment":[5,1],"Hourglass Heart":[4,0],"Recurrence":[4,3],"Rewound Wounds":[1,1],"Arcane Clockwork":[3,2],"Borrowed Hour":[5,3],"Pendulum Swing":[1,2],"Stolen Sand":[0,0],"Patient Hours":[0,2]},
   "conclave.storm": {"Wide Heavens":[0,0],"Star-Chart":[1,3],"Constellation":[5,1],"Skybreaker":[1,1],"Comet":[2,1],"Lodestar":[2,3],"Grounded Stars":[4,0],"Zodiac":[4,2],"Starfall Sky":[5,2],"Twin Stars":[5,3],"Grand Orrery":[3,0],"Twinkling Ice":[2,0],"Frost Lens":[3,3],"Turning Spheres":[4,1],"Night Sight":[0,1],"Cold Starlight":[0,2],"Ill Omen":[3,2]},
@@ -48825,13 +48841,13 @@ function talRankSteps(t) {
     'Orb Lattice': { tag: 'Elements', pro: "Gathering Orb marks foes with each nearby school's element, and readies Arcane Barrage 2s sooner." },
     'Study the Reaction': { tag: 'Mana', pro: n => `Each reaction it sets off gives it ${10 * n} mana.` },
     'Cold Focus': { tag: 'Damage', pro: n => `Its missiles land crits on Frozen foes ${15 * n}% of the time.` },
-    'Lecture Hall': { tag: 'Spell', pro: 'While Gathering Orb gathers, Conclave units within 2 cells pour half their blows into it, and each Undertow Rune readies Gathering Orb 3s sooner.',
-      sp: { ab: 'cc_undertow', ready: ['cc_grandorb', 3] } },
+    'Lecture Hall': { tag: 'Spell', pro: 'While Gathering Orb gathers, Conclave units within 2 cells pour half their blows into it, and each Tidemoon readies Gathering Orb 3s sooner.',
+      sp: { ab: 'cc_tidemoon', ready: ['cc_grandorb', 3] } },
     'Margin Notes': { tag: 'Mana', pro: n => `Gains ${6 * n} mana when another unit reacts with an Arcane mark it laid.` },
     'Recitation': { tag: 'Spell', pro: n => `Arcane Barrage adds a missile for each other element marked in range, up to ${n}.` },
     'Static Sparks': { tag: 'Control', pro: n => `Arcane Barrage's missiles stun the foes they hit for ${f(.1 * n)}s.` },
-    'Drawstring': { tag: 'Control', pro: 'Undertow Rune springs 0.3 cells wider, and its snap stuns every foe it caught for 0.6s.' },
-    'Undertow Rune': { tag: 'Spell' }, 'Gathering Orb': { tag: 'Spell' },
+    'Drawstring': { tag: 'Control', pro: "Tidemoon's field reaches 0.3 cells wider, and its collapse stuns every foe it held for 0.6s." },
+    'Tidemoon': { tag: 'Spell' }, 'Gathering Orb': { tag: 'Spell' },
   });
 
   /* ---- Frostweavers ---- */
@@ -52170,7 +52186,7 @@ const SFX_R = {};
     cc_sigilcleave: T('arcane', 'strike', 'none', 'nova', 2, { self: 1 }),
     cc_spectral: T('arcane', 'glyph', 'none', 'buff', 3, { r: .5 }),
     cc_barrage: T('arcane', 'glyph', 'orb', 'burst', 1),
-    cc_undertow: T('arcane', 'glyph', 'none', 'burst', 2),
+    cc_tidemoon: T('arcane', 'glyph', 'none', 'burst', 2),
     cc_grandorb: T('arcane', 'glyph', 'orb', 'nova', 3, { r: .8 }),
     cc_glacialglyph: T('frost', 'glyph', 'none', 'nova', 1, { spike: 1, pre: 'sigil' }),
     cc_rimelance: T('frost', 'glyph', 'line', 'burst', 2, { spike: 1 }),
@@ -54151,7 +54167,7 @@ SFX_V2_DEF.push(() => {
     hit: C => { const t = C.t; if (t) sfxAdd({ k: 'vflash', x: t.x, z: t.y, h: towerTop(t) + .1, s: .25 * C.S, life: .1, col: v2K(C).hot, a: .8 * sfxZk() }); },
     trail: (C, p, k, cc) => v2Trail(C, p, { w: .07, cc }),
     land: (C, x, z, h, k) => v2Hit(C, x, z, Math.max(.3, h), C.S * .5, { star: k % 3 ? 0 : 1, sp: 'wisp', n: 3, light: 0, ring: k % 2 ? 0 : 1 }) };
-  // (Undertow Rune draws itself: forces_zxc_conclave_cool.js ccx_snare, magefx.js)
+  // (Tidemoon draws itself: forces_zxc_conclave_cool.js ccx_tidemoon, magefx.js)
   // Grand Orb: the orb swells over the hat, then rolls down the exact line, a band of arcana under it, runes shed behind it,
   // a great burst where it ends
   SFX_V2.cc_grandorb = { cast: C => v2Wind(C, { wu: .5, r: .6, n: 9, hk: 1.1 }), steps: 1, hit: () => {},
@@ -55824,7 +55840,7 @@ const EP_ABIL = {
   so_rebuke: { drain: 40, say: 'The light burns away 40 mana from each caster it strikes.' },
   so_sunlance: { vsMana: 1, say: 'Sunlight feeds on stored magic: against a caster it hits up to double at a full pool.' },
   // the Conclave
-  cc_undertow: { drain: 20, say: 'Its snap tears 20 mana from each caster it caught.' },
+  cc_tidemoon: { drain: 20, say: 'Its collapse tears 20 mana from each caster it held.' },
   cc_barrage: { vsMana: 1, say: 'The missiles seek stored magic: against a caster each hits up to double at a full pool.' },
   // Ironhold
   ih_runebrand: { drain: 50, seal: 8, say: 'The brand burns 50 mana from a caster and seals it: no mana comes back for 8s.' },
@@ -58030,7 +58046,7 @@ const AudioSys = (() => {
       const e1 = t + .22, o1 = osc('sine', 233 * p, t, e1), g1 = gn(0); o1.frequency.exponentialRampToValueAtTime(150 * p, t + .16); shape(g1.gain, t, [[.012, 1], [.08, .4], [.2, 0]]); o1.connect(g1); out(g1, .13, { pan, room: .15 }, t, e1);
       nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 700], [.15, 260]], q: .6, pts: [[.01, .8], [.06, .35], [.18, 0]], v: .16, pan });
     },
-    // arcane light gathered (Undertow Rune written, the Gathering Orb begun): a low hum swelling and let go, in place of
+    // arcane light gathered (Tidemoon sent out, the Gathering Orb begun): a low hum swelling and let go, in place of
     // the high sweep of 'arcane'. arg 1: the orb's longer swell
     arcgather(big) {
       if (!ok('agt', .2, 200)) return; const t = now(), p = rnd(.96, 1.04), pan = sp(.3), D = big ? 1.1 : .6;
@@ -82827,7 +82843,7 @@ const SPELL_BRIEFS = {
   cc_sigilcleave: 'Cuts a warded, shielded, plated or magic-resistant enemy in reach for {d} and splits it open for {dur} sec: shield broken, ward cracked, armour stripped, so every spell and reaction strikes it whole.',
   cc_spectral: 'Hurls a spectral copy of its blade through a line of ground enemies for {d} each, with a stack of Stagger; it returns through the rift, cutting each again for half.',
   cc_barrage: 'Fires {n} seeking missiles, {d} each. Each tears 12% off a ward and hits casters up to twice as hard at full mana.',
-  cc_undertow: 'Carves a rune on the road that springs after 0.35 sec. Every enemy within {r} cells, flyers too, is drawn along the road to its heart for 1.1 sec (bosses a third as far), then it snaps shut for {d} each.',
+  cc_tidemoon: 'Sends a small moon of arcane light out to hang over the road. After 0.35 sec every enemy within {r} cells, flyers too, is drawn along the road in under it for 1.1 sec (bosses a third as far), then it collapses for {d} each.',
   cc_grandorb: 'For {gather} sec, Magelings\' missiles within 2 cells feed an orb. It then hurls the orb, dealing {d} plus 120% of stored damage, 80% to nearby enemies, each marked Arcane.',
   cc_glacialglyph: 'Hurls a spear of ice at the toughest enemy in range, air or ground, dealing {d}, marking it Frost and slowing it for a few sec.',
   cc_rimelance: 'Locks the toughest enemy in range in a block of ice for {dur} sec (bosses less): it is Frozen and cannot move, and takes {d} of cold over the hold.',
@@ -83015,7 +83031,7 @@ const SPELL_TARGETS = {
   cc_sigilcleave: 'a warded or magic-resistant enemy, else the toughest',
   cc_spectral: 'the line through the most ground enemies',
   cc_barrage: 'the three toughest enemies in range',
-  cc_undertow: 'the densest spread-out group of enemies',
+  cc_tidemoon: 'the densest spread-out group of enemies',
   cc_grandorb: 'the densest group of enemies',
   cc_glacialglyph: 'the toughest enemy in range',
   cc_rimelance: 'the toughest enemy in range not already frozen',
@@ -93318,7 +93334,7 @@ if (typeof pauseMenu === 'function') {
        attack    the one-hand cast: the wind-up plays over the game's own wind-up (t.windup), so the release frame (meta.rel)
                  lands on the shot; then the follow-through
        barrage   Arcane Barrage: the step-in push, the right hand held out trembling while the missiles stream from it
-       curtain   Undertow Rune: she squares up and the left hand leads, sweeping wide across the road (the snare cast)
+       Tidemoon  the hurl of orbthrow: drawn back over the cast bar, the orb sent out on the release
        orbstart / orbhold / orbthrow   Gathering Orb: down into a crouch, the cupped hands circling while the orb gathers,
                  then the rise and the fling, its release frame on the hurl (t.ccxOrbThrowAt)
    - Every move is eased into from where she was (a per-unit pose followed at a rate by kind).
@@ -93326,7 +93342,7 @@ if (typeof pauseMenu === 'function') {
    - The hand's faint glow (emw on its vertices) brightens a moment at each release; nothing else is drawn round her. */
 const ML_UNIT = 'cc_mageling';
 UM_UNITS[ML_UNIT] = { mdl: 'mageling', k: .82, rig: 'mage', trim: .32 };   // (trim: her white robe, held back from the sculpt shader's boost so its folds read)
-const ML = { CAST: { cc_barrage: 'barrage', cc_undertow: 'curtain', cc_grandorb: 'orbstart' }, RATE: { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW: .1 };
+const ML = { CAST: { cc_barrage: 'barrage', cc_tidemoon: 'orbthrow', cc_grandorb: 'orbstart' }, RATE: { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW: .1 };
 // her shots (each missile of a strike, Twin Casting's second, the Starry Hat's: one release a strike) and her casts
 if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_missile) {
   const _mlAtk = FORCE_ATTACK.cc_missile;
@@ -93336,7 +93352,7 @@ if (typeof castAbility === 'function') {
   const _mlCast = castAbility;
   castAbility = function (t, ab) {
     const r = _mlCast.apply(this, arguments);
-    try { if (r && t && t.def && t.def.unit === ML_UNIT && ab && ML.CAST[ab.id] && typeof G !== 'undefined') { t._mlCastAt = G.time; t._mlCast = ML.CAST[ab.id]; } } catch (e) {}
+    try { if (r && t && t.def && t.def.unit === ML_UNIT && ab && ML.CAST[ab.id] && typeof G !== 'undefined') { t._mlCastAt = G.time; t._mlCast = ML.CAST[ab.id]; t._mlFromRel = ab.id === 'cc_tidemoon'; } } catch (e) {}
     return r;
   };
 }
@@ -93375,7 +93391,7 @@ function mlCtl(t, live, M) {
   const C = t.ab && t.ab.cast, cm = C && ML.CAST[C.id];
   if (cm && cm !== 'orbstart' && C.T > 0) { const u = Math.max(0, Math.min(1, (now - C.at) / C.T)); return { f: mlClip(M, cm, mlRel(M, cm) * u), rate: ML.RATE.move * .6, glow: .3 + .4 * u }; }
   if (t._mlCast && t._mlCast !== 'orbstart' && t._mlCastAt != null) {
-    const u = now - t._mlCastAt, rel = mlRel(M, t._mlCast) / 30;
+    const rel = mlRel(M, t._mlCast) / 30, u = now - t._mlCastAt + (t._mlFromRel ? rel : 0);   // (Tidemoon: its lead-in played over the cast bar, so on from the release)
     if (u >= 0 && u < mlLen(M, t._mlCast)) return { f: mlClip(M, t._mlCast, u * 30), rate: ML.RATE.move, glow: .45 + (u > rel ? .6 * Math.max(0, 1 - (u - rel) / .5) : 0) };
   }
   // the strike: the wind-up over the game's own (t.windup, 0..1 to the shot), the release on the shot, the follow-through
@@ -94090,15 +94106,15 @@ if (typeof towerTop === 'function') {
      attack     her missile: the hand drawn back by her ear over the game's own wind-up (t.windup), thrown straight out so the
                 release frame lands on the shot, the arm straight; the follow-through after
      barrage    Arcane Barrage: a step in, the right hand thrust out and held, kicking with each missile (0.1 to 0.6 s)
-     curtain    Undertow Rune: the LEFT hand snapped out at the road as the snare leaves it, then drawn across before her
+     curtain    (unused since Missile Curtain left; Tidemoon plays orbthrow's hurl: drawn back over its cast bar, the orb sent out on the release)
      orbstart / orbhold / orbthrow   Gathering Orb: both hands raised to the orb gathering over her head, circling under
                 it; then drawn back and hurled forward with a step, the release on the hurl (t.ccxOrbThrowAt)
    Every move is eased into from where she was (the pose followed at a rate by kind, bone by bone, by quaternion).
-   Her missiles and sparks leave the casting hand where it is drawn (t.tipW: the right palm; Undertow Rune the left).
+   Her missiles and sparks leave the casting hand where it is drawn (t.tipW: the right palm).
    Checks: `python tools/make_mageling2.py --check`. Notes: docs/model_pilot/mageling2.md. */
 const MAGE2 = (() => {
   const U = typeof ML_UNIT !== 'undefined' ? ML_UNIT : 'cc_mageling';
-  const CAST = { cc_barrage: 'barrage', cc_undertow: 'curtain', cc_grandorb: 'orbstart' }, RATE = { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW = .1, K0 = .82, TRIM = .32;
+  const CAST = { cc_barrage: 'barrage', cc_tidemoon: 'orbthrow', cc_grandorb: 'orbstart' }, RATE = { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW = .1, K0 = .82, TRIM = .32;
   const S = { on: true };
   try { S.on = !/[?&]mage=old\b/.test(location.search); } catch (e) {}
   let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1;
@@ -94203,7 +94219,7 @@ const MAGE2 = (() => {
     const C = t.ab && t.ab.cast, cm = C && CAST[C.id];
     if (cm && cm !== 'orbstart' && C.T > 0) { const u = Math.max(0, Math.min(1, (now - C.at) / C.T)); return { c: cm, s: rel(cm) * u, rate: RATE.move * .6, glow: .3 + .4 * u, hand: cm === 'curtain' ? 'L' : 'R' }; }
     if (t._mlCast && t._mlCast !== 'orbstart' && t._mlCastAt != null && CL[t._mlCast]) {
-      const u = now - t._mlCastAt, r = rel(t._mlCast);
+      const r = rel(t._mlCast), u = now - t._mlCastAt + (t._mlFromRel ? r : 0);   // (Tidemoon: its lead-in played over the cast bar)
       if (u >= 0 && u < CL[t._mlCast].len) return { c: t._mlCast, s: u, rate: RATE.move, glow: .45 + (u > r ? .6 * Math.max(0, 1 - (u - r) / .5) : 0), hand: t._mlCast === 'curtain' ? 'L' : 'R' };
     }
     const r = rel('attack'), s = t._mlShotAt == null ? 9 : now - t._mlShotAt, wind = t.tg && t.windup > 0 ? t.windup : 0, flash = s >= 0 ? Math.max(0, 1 - s / .18) : 0;
@@ -99016,28 +99032,27 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof efxSync === 'function') efxSync();
 }
 
-/* ================= THE MAGELINGS' ARCANE LIGHT: missiles, a snare sprung on the road, a gathering orb =================
+/* ================= THE MAGELINGS' ARCANE LIGHT: missiles and a gathering orb =================
    Unit seven of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules so far: light and
    energy are smooth shader effects, not faceted meshes ("needs to look like a holy laser ... more realistic to match the
    [new] model"); nothing is a mark on the ground; never too flashy; projectiles fly straight and level. Until now a missile
-   was a glow sprite with a spinning star and four dots behind it, swerving out sideways before it turned in; the Curtain (now the Undertow Rune)
+   was a glow sprite with a spinning star and four dots behind it, swerving out sideways before it turned in; the Curtain (now the Tidemoon)
    small darts on a thread; the Orb a few sprites over the hat, lobbed on an arc into a ring and a burst of runes.
      the strike       a comet of violet light: a white-hot head, a tapering tail of light behind it, a few sparks shed; it
                       flies straight from her hand to its foe (the game still moves it its own way and lands it when it
                       always did); a small flare and a scatter of sparks where it lands
      Arcane Barrage   the same missiles in a stream, light gathered at her hand while she looses them (no glyph under her)
-     Undertow Rune     a ring of light on the road at its real radius, written round as it arms, drawn in as it pulls; a
-                      thin thread of light from its heart to each foe it holds; a flare and sparks as it snaps shut
+     Tidemoon         not here: the owner's film, magepullorb.js (forces_zxc_conclave_cool.js ccxMoonFilm)
      Gathering Orb    a ball of light over her hat that swells with every missile fed to it, light drawn in from each
                       Mageling feeding it; thrown straight; where it lands, a burst of light out to its real reach (no ring)
    All of it is cards of the plant shader (seedtex.js: BEAM, FLARE, GLOW, MOTE), through the Seedcasters' kit (seedfx.js).
    The switch is theirs: SD.off (the Element Lab's "Old look") or no toolkit brings the older drawing back. Gameplay,
-   timing and balance are untouched. Tuning: the Element Lab's entries arcmissile, cc_barrage, cc_undertow, cc_grandorb. */
-const MGF = { quiet: 0, casts: [], streaks: [], throws: [], bursts: [], runes: [] };
+   timing and balance are untouched. Tuning: the Element Lab's entries arcmissile, cc_barrage, cc_grandorb. */
+const MGF = { quiet: 0, casts: [], streaks: [], throws: [], bursts: [] };
 const MGF_VIO = [.66, .42, 1], MGF_HOT = [.93, .88, 1], MGF_DEEP = [.4, .2, .78];
 // a soft body of deep violet behind a light: added light alone is lost on Greatroot Way's pale sunlit sand, this is not
 const mgfBody = (P, w, a, seed, s, l) => sdBill(SDT_SH.SPORE, P, w, w, { age: .25, seed, a, p0: .55, p1: 0, col: MGF_DEEP, soft: .1, sp: .4 }, s, l);
-if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { if (MGF.dust) MGF.dust.length = 0; MGF.casts.length = 0; MGF.streaks.length = 0; MGF.throws.length = 0; MGF.bursts.length = 0; MGF.runes.length = 0; });
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { if (typeof CCX_MOONS !== 'undefined') CCX_MOONS.length = 0; if (MGF.dust) MGF.dust.length = 0; MGF.casts.length = 0; MGF.streaks.length = 0; MGF.throws.length = 0; MGF.bursts.length = 0; });
 const mgfOn = () => typeof sdOn === 'function' && sdOn();
 const mgfCC = () => typeof G !== 'undefined' && G && G.force === 'conclave';
 const _mgfC = new Map();
@@ -99157,6 +99172,7 @@ if (typeof ccShoot === 'function') { const _cs = ccShoot; ccShoot = function (p)
 
 /* ---- Arcane Barrage: light gathered at her hand while the missiles leave (the recipe's glyph and ribbons handed over) ---- */
 if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('cc_barrage');
+if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('cc_tidemoon');   // (Tidemoon: nothing of the recipe's, the film is its whole look)
 if (typeof ABIL !== 'undefined' && ABIL.cc_barrage && typeof ABIL.cc_barrage.cast === 'function') {
   const _bc = ABIL.cc_barrage.cast;
   ABIL.cc_barrage.cast = function (t, st, L, ab) {
@@ -99177,38 +99193,6 @@ function mgfCasts(now) {
   }
 }
 
-/* ---- Undertow Rune: a ring of light written on the road at its real radius, drawn in as it pulls; a thread of light from
-   its heart to every foe it holds; a hot knot at its heart that snaps shut (the foes stay in plain sight: thin light) ---- */
-function mgfSnare(q) {
-  const z = q.zone, now = G.time; q.age = now - z.at;
-  const arm = Math.min(1, (now - z.at) / CCX.SN_ARM), pull = Math.max(0, Math.min(1, (now - z.spring) / CCX.SN_PULL));
-  const e = Math.min(1, q.age / .15, Math.max(0, z.until + .05 - now) / .12); if (e <= .01) return;
-  const V = sdV('cc_undertow', 'sigil'), k = sdOnL('cc_undertow', 'sigil'), lv = sdLv(); if (k == null) return;
-  const sprung = now >= z.spring, r = z.r * (1 - .55 * pull * pull * (3 - 2 * pull)), a = e * k * (sprung ? 1 : .55 + .45 * arm), h = .18;
-  // the ring: arcs of light, written round as it arms, turning slowly
-  const n = [10, 14, 18][lv], drawn = Math.ceil(n * arm), spin = now * .5;
-  for (let j = 0; j < drawn; j++) {
-    const a0 = spin + j / n * TAU, a1 = spin + (j + .8) / n * TAU;
-    const A0 = [z.x + Math.cos(a0) * r, h, z.z + Math.sin(a0) * r], A1 = [z.x + Math.cos(a1) * r, h, z.z + Math.sin(a1) * r];
-    // (a deep violet body under the light: added light alone is lost on sunlit grass and sand)
-    mgfBody([(A0[0] + A1[0]) / 2, h, (A0[2] + A1[2]) / 2], V.w * 3.2, a * .55, j * 3 + 1, 'cc_undertow', 'sigil');
-    sdSeg(SDT_SH.BEAM, A0, A1, V.w, V.w, { seed: j, k: 1, a: a * V.a, p0: 1, p1: .6, p2: .2, col: sprung ? MGF_HOT : MGF_VIO, sp: .4 }, 'cc_undertow', 'sigil');
-  }
-  // runes round the ring and the knot at its heart
-  const m = Math.round(V.runes); for (let j = 0; j < m; j++) { const an = -now * .9 + j / m * TAU; sdBill(SDT_SH.GLOW, [z.x + Math.cos(an) * r, h + .04, z.z + Math.sin(an) * r], V.w * 3, V.w * 3, { seed: j + 3, a: a * .8, col: MGF_VIO }, 'cc_undertow', 'sigil'); }
-  mgfBall([z.x, .3, z.z], V.w * (1.6 + 1.6 * pull), a, MGF_VIO, 11, lv, 'cc_undertow', 'sigil');
-  if (!sprung) return;
-  const T = sdV('cc_undertow', 'tether'), kt = sdOnL('cc_undertow', 'tether'); if (kt == null) return;
-  for (const [c] of z.caught) {
-    if (c.dead) continue; const H = [c.x, (typeof v2FoeH === 'function' ? v2FoeH(c, hitH(c)) : hitH(c)), c.y], P0 = [z.x, .28, z.z];
-    const mid = [(P0[0] + H[0]) / 2, Math.max(P0[1], H[1]) * .5 + .12, (P0[2] + H[2]) / 2], w = T.w * (.9 + .1 * Math.sin(now * 20 + c.x));
-    for (const f of [.3, .6, .85]) mgfBody([P0[0] + (H[0] - P0[0]) * f, P0[1] + (H[1] - P0[1]) * f + .06, P0[2] + (H[2] - P0[2]) * f], w * 3, e * kt * .45, 9 + f * 10, 'cc_undertow', 'tether');
-    sdSeg(SDT_SH.BEAM, P0, mid, w * 1.2, w, { seed: 5, k: 1, a: e * kt * T.a, p0: 1, p1: .8, p2: .3, col: MGF_HOT, sp: 1.5 }, 'cc_undertow', 'tether');
-    sdSeg(SDT_SH.BEAM, mid, H, w, w * .7, { seed: 6, k: 1, a: e * kt * T.a * .85, p0: 1, p1: .8, p2: .3, col: MGF_VIO, sp: 1.5 }, 'cc_undertow', 'tether');
-    sdBill(SDT_SH.GLOW, H, w * 4, w * 4, { seed: 7, a: e * kt * .6, col: MGF_VIO }, 'cc_undertow', 'tether');
-  }
-}
-function mgfRunes(now) { MGF.runes = MGF.runes.filter(q => now < q.zone.until + .1); for (const q of MGF.runes) { try { mgfSnare(q); } catch (e) {} } }
 // light running from her hand to where a missile will hang, and from each Mageling to the orb it feeds
 function mgfStreaks(now) {
   MGF.streaks = MGF.streaks.filter(q => now < q.at + q.life);
@@ -99268,24 +99252,12 @@ function mgfBurst(x, z, r, orb) {
 /* ---- the Conclave's own drawing of these handed over ---- */
 if (typeof SFX_DRAW !== 'undefined') {
   const take = (id, fn) => { const d0 = SFX_DRAW[id]; if (!d0 || d0._mgf) return !!d0; const f = function (q) { if (!mgfOn()) return d0.apply(this, arguments); try { fn(q); } catch (e) {} }; f._mgf = 1; SFX_DRAW[id] = f; return true; };
-  const all = () => take('ccx_snare', mgfSnare) & take('ccx_orb', mgfOrb);
+  const all = () => take('ccx_orb', mgfOrb);
   if (!all() && typeof setTimeout === 'function') { let n = 0; const again = () => { if (!all() && n++ < 60) setTimeout(again, 250); }; setTimeout(again, 0); }
 }
 if (typeof CCX_FX !== 'undefined') {
-  const X = CCX_FX, o = { snareLay: X.snareLay, snareSnap: X.snareSnap, orbGather: X.orbGather, orbFeed: X.orbFeed, orbThrow: X.orbThrow, orbBurst: X.orbBurst, orbFizzle: X.orbFizzle };
+  const X = CCX_FX, o = { orbGather: X.orbGather, orbFeed: X.orbFeed, orbThrow: X.orbThrow, orbBurst: X.orbBurst, orbFizzle: X.orbFizzle };
   const K = C => (typeof v2K === 'function' ? v2K(C) : { a: [1, 1, 1], hot: [1, 1, 1] });
-  X.snareLay = function (C, t, zn) {
-    if (!mgfOn()) return o.snareLay.apply(this, arguments);
-    if (MGF.runes.length > 6) MGF.runes.shift(); MGF.runes.push({ zone: zn });   // (drawn with the frame's cards: SD_FRAMES below)
-    mgfStreak(mgfHand(t), [zn.x, .28, zn.z], sdV('cc_undertow', 'sigil').w * 2, .2, 0, 'cc_undertow', 'sigil');
-  };
-  X.snareSnap = function (C, zn) {
-    if (!mgfOn()) return o.snareSnap.apply(this, arguments);
-    if (sdOnL('cc_undertow', 'snap') == null) return; const V = sdV('cc_undertow', 'snap');
-    sdShot('flare', zn.x, .3, zn.z, V.flare, .2, { col: MGF_HOT }, 'cc_undertow', 'snap');
-    mgfSparks(zn.x, .3, zn.z, Math.round(V.count * [.4, .7, 1][sdLv()]), 1.6, MGF_HOT, 'cc_undertow', 'snap');
-    if (typeof flashLight === 'function' && G.flashes && G.flashes.length < 6) flashLight(zn.x, zn.z, .5, [1.1, .85, 1.6], 1.8, .3);
-  };
   X.orbGather = function (C, t, orb) { if (!mgfOn()) return o.orbGather.apply(this, arguments); const k = K(C); sfxAdd({ k: 'ccx_orb', orb, S: C.S * C.T.glow, col: k.a, hot: k.hot, life: (orb.until - G.time) + .1 }); };
   X.orbFeed = function (C, t, orb) { if (!mgfOn()) return o.orbFeed.apply(this, arguments); const V = sdV('cc_grandorb', 'orb'); mgfStreak(mgfHand(t), mgfOrbAt(orb.t), V.feed, .22, 0, 'cc_grandorb', 'orb'); };
   X.orbThrow = function (C, t, orb, x, z, T) {
@@ -99296,14 +99268,13 @@ if (typeof CCX_FX !== 'undefined') {
   X.orbBurst = function (C, x, z, r, orb) { if (!mgfOn()) return o.orbBurst.apply(this, arguments); mgfBurst(x, z, r, orb); };
   X.orbFizzle = function (C, orb) { if (!mgfOn()) return o.orbFizzle.apply(this, arguments); const t = orb.t; if (t) { const P = mgfOrbAt(t); mgfSparks(P[0], P[1], P[2], 6, .8, MGF_VIO, 'cc_grandorb', 'orb'); } };
 }
-if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { if (!mgfCC()) return; mgfDust(now); if (G.ccP) for (const p of G.ccP) if (p.k === 'missile' && !p.done) { try { mgfMissile(p); } catch (e) {} } mgfCasts(now); mgfStreaks(now); mgfThrows(now); mgfRunes(now); });
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { if (!mgfCC()) return; mgfDust(now); if (G.ccP) for (const p of G.ccP) if (p.k === 'missile' && !p.done) { try { mgfMissile(p); } catch (e) {} } mgfCasts(now); mgfStreaks(now); mgfThrows(now); if (typeof ccxMoonsCheck === 'function') ccxMoonsCheck(); });
 
 /* ---- the Element Lab's entries ---- */
 if (typeof ELEM_FX_SPELLS !== 'undefined') {
   Object.assign(ELEM_FX_SPELLS, {
     arcmissile: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Missile', basic: 1, layers: ['missile', 'sparks'] },
     cc_barrage: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Barrage', layers: ['missile', 'sparks', 'gather'] },
-    cc_undertow: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Undertow Rune', layers: ['sigil', 'tether', 'snap'] },
     cc_grandorb: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Gathering Orb', layers: ['orb', 'burst'], strikes: 1 },
   });
   // a missile: its head's width, its tail's length, its head's rays; sparks it sheds (a second), sparks where it lands,
@@ -99313,9 +99284,6 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
     arcmissile: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks) },
     // the light gathered at her hand: its width, its rays
     cc_barrage: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks), gather: { flare: .55, rays: .8 } },
-    // the snare: its ring (width, opacity, runes round it), the threads to the foes it holds (width, opacity), its snap
-    // (the flare's width, sparks thrown)
-    cc_undertow: { sigil: { w: .13, a: 1, runes: 6 }, tether: { w: .09, a: 1 }, snap: { flare: 1.6, count: 16 } },
     cc_grandorb: {
       // the orb: its size (x), its rays, the width of the light fed to it
       orb: { w: 1, feed: .22 },
@@ -99323,9 +99291,9 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
       burst: { flare: 1.8, a: .55, count: 16, dust: 6 },
     },
   });
-  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { runes: ['Runes round the ring', 0, 12, 1], feed: ['Light fed to it (width)', .02, .5, .01], sway: ['Its tail sways (x its width)', 0, 2, .05] });
-  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { missile: 'The missile', sparks: 'Its wake of motes, and its landing', gather: 'Light at her hand', sigil: 'The rune on the road', tether: 'The threads', snap: 'The snap', orb: 'The orb' });
-  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { missile: 'c', sparks: 'c', gather: 'c', sigil: 'c', tether: 'c', snap: 'c', orb: 'c' });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { feed: ['Light fed to it (width)', .02, .5, .01], sway: ['Its tail sways (x its width)', 0, 2, .05] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { missile: 'The missile', sparks: 'Its wake of motes, and its landing', gather: 'Light at her hand', orb: 'The orb' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { missile: 'c', sparks: 'c', gather: 'c', orb: 'c' });
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['cc_mageling', 'Magelings']);
   if (typeof efxSync === 'function') efxSync();
 }
@@ -106726,7 +106694,7 @@ const SPELL_HELP = {
 
     // Magelings (cc_mageling)
     cc_barrage: { when: "One foe is enough: any foe, flyers too, within {reach} cells.", aim: "Up to three foes share the missiles: armoured foes in reach first, nearest the gate; with no armoured foe, the three toughest (bosses and elites first).", tips: ["Its seeking missiles hit air and ground, so it is a steady answer to flying waves.", "Golem Warden slams crack armour plate open, so the barrage on armoured foes bites harder after a slam.", "Cheap and quick: leave it on alongside Gathering Orb so the Magelings never sit idle."] },
-    cc_undertow: { when: "Three or more foes within {reach} cells, flyers too, still spread out (a knot already tight is left alone).", aim: "The road under the biggest group in reach: the rune is carved on the road cell nearest them, and pulls along the road, never across a wall.", tips: ["Cast it just before Gathering Orb: the undertow bunches the column, the orb's burst then strikes all of them.", "Foes a wall away from it are not caught, however close they stand: the threads follow the road.", "Bosses are drawn only a third as far, and a foe pulled again and again is drawn less each time."] },
+    cc_tidemoon: { when: "Three or more foes within {reach} cells, flyers too, still spread out (a knot already tight is left alone).", aim: "The road under the biggest group in reach: the moon is sent to hang over the road cell nearest them, and pulls along the road, never across a wall.", tips: ["Cast it just before Gathering Orb: the moon bunches the column, the orb's burst then strikes all of them.", "Foes a wall away from it are not caught, however close they stand: the threads follow the road.", "Bosses are drawn only a third as far, and a foe pulled again and again is drawn less each time."] },
     cc_grandorb: { when: "Any foe within {reach+0.5} cells.", aim: "Itself while it gathers; then the orb is hurled at the thickest knot of foes in reach.", tips: ["Stand Magelings together: every Mageling within 2 cells feeds its missiles into the orb.", "Their strikes stop landing while the orb gathers: cast it as a crowd comes, not as one foe slips past.", "The burst marks each foe Arcane, for the Conclave to react with."] },
 
     // Frostweavers (cc_rimeweaver)
