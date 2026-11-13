@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b13c6ea@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a93139c@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -91431,7 +91431,7 @@ if(PYRO_SEQ.on) {
     let T=0;
     if(ac&&ac.id==='cc_flamewave'){n='phoenix';T=Math.max(.05,ac.T);u=clamp01((now-ac.at)/T);}
     else if(ctl&&ctl.c==='cast'&&ctl.s<PYRO2.CL.cast.rel/30){n='fireball';T=PYRO2.CL.cast.rel/30;u=clamp01(ctl.s/T);}
-    if(n){charges.set(t,{name:n,at:now,u});sprite(n,filmAt(u*T,T,0,LAB_FX[key(n)].release),palm(t),n==='fireball'?efx('cc_fireball','core').ball*5.3:4);return true;}
+    if(n){charges.set(t,{name:n,at:now,u});sprite(n,filmAt(u*T,T,0,LAB_FX[key(n)].release),palm(t),n==='fireball'?efx('cc_fireball','core').ball*5.3*.7:4);return true;}
     if(birds.has(t)&&now<birds.get(t).at)return true;
     return ctl&&((ctl.c==='cast'&&ctl.s>=PYRO2.CL.cast.rel/30)||(ctl.c==='phoenix'));
   };
@@ -91445,16 +91445,32 @@ if(PYRO_SEQ.on) {
       S.states.push(q);labLoad(key('fireball'));
       // (it bursts where the ball meets the foe, as the damage lands: the lob follows its foe, forces_conclave_a.js, at the
       // height pyrofire.js flies it, into the foe's body)
-      const hit=p.fn;p.fn=function(){q.hit=G.time;const L=p.lob;q.P=[L.ax,p._pfAim!=null?p._pfAim:q.P[1],L.az];if(!q.dir)q.dir=pfNorm([L.ax-L.x0,0,L.az-L.z0]);
+      const hit=p.fn;p.fn=function(){q.hit=G.time;const L=p.lob,b=fbBody(p);q.P=[L.ax,b,L.az];if(!q.dir)q.dir=pfNorm([L.ax-L.x0,0,L.az-L.z0]);
         const old=impactNow;impactNow=q;try{return hit.apply(this,arguments);}finally{impactNow=old;}};
     }
     return shoot.apply(this,arguments);
   };
+  // The Fireball's ball is the projectile (owner, 13 Nov 2026: "on close enemies it doesnt look good, can you make it a bit
+  // smaller, maybe add a ball inside it and set it as the projectile, the animation can work around it. it never convincingly
+  // hit the enemy either"): a white-hot ball (pyrotex.js BALL) drawn at the lob's true place, flying from the hand into the middle
+  // of its foe's body (fbBody, followed while the foe lives), the film's flame laid round it at a size that grows with the throw
+  // (S.fbW: x the film's old width at 1 cell, at 4 and more), and the burst played from where the ball went in, as the damage lands.
+  S.fbW=[.42,.62];S.fbCore=.34;S.fbBoom=.72;
+  function fbBody(p){const L=p.lob,c=L.tg;
+    if(c&&!c.dead)p._pyBody=typeof creepBaseY==='function'&&typeof creepH==='function'?creepBaseY(c)+creepH(c)*.5:hitH(c);
+    return p._pyBody!=null?p._pyBody:.6;}
   S.flight=function(x,y,z,d,len,C,T,s,seed,p,now) {
     if(s!=='cc_fireball'||!p._pySeq)return false;
-    const q=p._pySeq,B=LAB_FX[key('fireball')],u=clamp01(p.lob.t/p.lob.T);
-    q.P=[x,y,z];q.dir=d;sprite('fireball',filmAt(p.lob.t,p.lob.T,B.release,B.impact),q.P,q.width,1,d);
-    const L=efx(s,'light');if(L.on)pfFlyLight(p,x,y,z,L.fly,L.rad,s);
+    const q=p._pySeq,B=LAB_FX[key('fireball')],L=p.lob,u=clamp01(L.t/L.T),b=fbBody(p);
+    if(q.d0==null)q.d0=Math.hypot(L.ax-L.x0,L.az-L.z0);
+    y=L.h0+(b-L.h0)*u;const dd=[L.ax-x,b-y,L.az-z];if(Math.hypot(...dd)>.02)d=pfNorm(dd);
+    const wk=S.fbW[0]+(S.fbW[1]-S.fbW[0])*clamp01((q.d0-1)/3),core=S.fbCore*(p.sz||1);
+    q.P=[x,y,z];q.dir=d;sprite('fireball',filmAt(L.t,L.T,B.release,B.impact),q.P,q.width*wk,1,d);
+    // (its first moment grows out of the hand's charge, so no ball pops in at the palm)
+    const g=Math.min(1,.45+L.t/.12),k=C.k||1;
+    pyfBill(PYF_SH.GLOW,[x,y,z],core*2.4*g,core*2.4*g,PF_SQ,{k:.55*k,pull:.1,soft:.1});
+    pyfBill(PYF_SH.BALL,[x,y,z],core*g,core*g,PF_SQ,{k:1.15*k,seed,sp:1.2,p1:.6,pull:.14,soft:.05});
+    const Lt=efx(s,'light');if(Lt.on)pfFlyLight(p,x,y,z,Lt.fly,Lt.rad,s);
     return true;
   };
   const impact=pfImpact;
@@ -91479,7 +91495,8 @@ if(PYRO_SEQ.on) {
     S.states=S.states.filter(q=>G.towers.includes(q.owner)&&(!q.hit||now-q.hit<(q.name.startsWith('skip')?2:.8))&&(now-q.at<10));
     for(const q of S.states){
       const B=LAB_FX[key(q.name)];
-      if(q.name==='fireball'){if(q.hit!=null)sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width,1,q.dir);continue;}
+      // (the burst about as wide as the splash it deals, S.fbBoom x the film's old width, so the foe still shows through it)
+      if(q.name==='fireball'){if(q.hit!=null)sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width*S.fbBoom,.92,q.dir);continue;}
       if(q.name==='phoenix'){
         if(q.hit!=null){sprite(q.name,B.impact+(123-B.impact)*clamp01((now-q.hit)/.8),q.P,q.width,1,null,!!q.flip);continue;}
         if(now<q.at){const u=q.precharged?1:clamp01(1-(q.at-now)/CCX.PHX_LIFT);sprite(q.name,filmAt(u*CCX.PHX_LIFT,CCX.PHX_LIFT,0,B.release),palm(q.owner),q.width);continue;}
