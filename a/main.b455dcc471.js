@@ -1,4 +1,4 @@
-const BUILD_TAG = '59f2bf5@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0a4e79a@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13153,6 +13153,21 @@ function ccShoot(p) {
   else if (p.vx == null && p.tg) { const dx = p.tg.x - p.x, dz = p.tg.y - p.z, L2 = Math.hypot(dx, dz) || 1; p.vx = dx / L2; p.vz = dz / L2; p.vh = 0; }
   L.push(p); return p;
 }
+// where a foe will be in T seconds at its present pace, walked along its road (its way in, its cells to the gate, a flyer
+// straight on): a lob aimed there flies a straight line and lands on it (owner, 13 Nov 2026: the fireball "looks a bit funny
+// when the fireball changes course mid flight"). Reads only; nothing random.
+function ccLeadAt(c, T) {
+  let d = Math.max(0, (c.curSp || 0) * T), x = c.x, z = c.y;
+  if (d <= 0 || c.stunT > 0 || c.eatT > 0 || c.siegeTg) return [x, z];
+  if (c.fly) return [x, z + d];
+  const go = (tx, tz) => { const L = Math.hypot(tx - x, tz - z); if (L >= d) { x += (tx - x) / L * d; z += (tz - z) / L * d; d = 0; return false; } x = tx; z = tz; d -= L; return true; };
+  const E = c.ent || c.entX; if (E) { for (const p of E) if (!go(p[0], p[1])) return [x, z]; return [x, z]; }
+  if (c.tx == null || !go(c.tx, c.ty) || c.state === 'exit') return [x, z];
+  const sf = c.atk && G.state === 'play' && typeof siegeField === 'function' ? siegeField() : null, nx = sf ? sf.next : G.next;
+  let k = idx(c.ti, c.tj);
+  for (let g = 0; g < 12 && d > 0; g++) { const n = nx && nx[k]; if (n == null || n < 0) break; k = n; if (!go(n % COLS + .5, ((n / COLS) | 0) + .5)) break; }
+  return [x, z];
+}
 function ccProjTick(dt) {
   const L = G.ccP; if (!L || !L.length) return;
   for (const p of L) {
@@ -13160,7 +13175,7 @@ function ccProjTick(dt) {
     if (p.tr.length > 5) p.tr.shift(); p.tr.push([p.x, p.h, p.z]);
     if (p.lob) {
       const b = p.lob; b.t += dt; const u = Math.min(1, b.t / b.T);
-      if (b.tg && !b.tg.dead && !b.tg.phased && !b.tg.ent) { b.ax = b.tg.x; b.az = b.tg.y; }   // (a lob that follows its foe)
+      if (b.tg && !b.tg.dead && !b.tg.phased && !b.tg.ent) { const a = ccLeadAt(b.tg, b.T - b.t); b.ax = a[0]; b.az = a[1]; }   // (a lob that follows its foe: aimed where it will be when the lob lands, so its path barely bends; at landing that is where it is)
       p.x = b.x0 + (b.ax - b.x0) * u; p.z = b.z0 + (b.az - b.z0) * u; p.h = b.h0 + (.12 - b.h0) * u + Math.sin(u * Math.PI) * b.arc;
       if (p.k === 'lob' && Math.random() < .6) {
         const e0 = p._efs && typeof efxPush === 'function' ? efxPush(p._efs, 'trail') : null;   // (the Element Lab: the fireball's trail layer, elemfx.js)
@@ -13436,7 +13451,8 @@ FORCE_ATTACK.cc_fireball = function (t, st, tg, pow, echo) {
   const C = st.caps, p = st.pw || {}, n = t.shots + 1, [hx, hh, hz] = ccHand(t, towerTop(t) * .85);
   if (C.ccGreat && pow > 1.01) ccEv('cap:ccGreat');
   const great = C.ccGreat && pow > 1.01, glyph = !echo && (n % (C.ccPyre2 ? 2 : 3) === 0), small = p.ccBrazier && !glyph && !echo;
-  const ax = tg.x, az = tg.y, d = Math.hypot(ax - t.x, az - t.y), T = .32 + d * .055;   // (owner, 12 Nov 2026: "a bit faster": a quarter quicker than .45 + d * .07)
+  let ax = tg.x, az = tg.y, d = Math.hypot(ax - t.x, az - t.y), T = .32 + d * .055;
+  for (let k = 0; k < 2; k++) { [ax, az] = ccLeadAt(tg, T); d = Math.hypot(ax - t.x, az - t.y); T = .32 + d * .055; }   // (led: thrown where the foe will be when it lands)   // (owner, 12 Nov 2026: "a bit faster": a quarter quicker than .45 + d * .07)
   // (it follows its foe while it flies, lob.tg: it bursts on the foe where it is when it lands, not where it stood at the throw;
   // a foe that dies first leaves it to land where it fell. Owner, 12 Nov 2026: "the explosion on the mob ... doesnt connect")
   const L = { x0: hx, z0: hz, h0: hh, ax, az, T, arc: .7 + d * .12, tg };
@@ -91469,7 +91485,20 @@ if(PYRO_SEQ.on) {
   // hit the enemy either"): a white-hot ball (pyrotex.js BALL) drawn at the lob's true place, flying from the hand into the middle
   // of its foe's body (fbBody, followed while the foe lives), the film's flame laid round it at a size that grows with the throw
   // (S.fbW: x the film's old width at 1 cell, at 4 and more), and the burst played from where the ball went in, as the damage lands.
-  S.fbW=[.42,.62];S.fbCore=.34;S.fbBoom=.72;
+  S.fbW=[.42,.62];S.fbCore=.34;S.fbBoom=.72;S.fbTurn=.12;S.fbTrail=.2;
+  // the ball's own trail: where it was these last S.fbTrail seconds (kept a frame), drawn as glow cooling to a thread of smoke
+  function fbTrail(q,x,y,z,now,core,k,seed){
+    const T=q.tr||(q.tr=[]);if(!T.length||now>T[T.length-1][3])T.push([x,y,z,now]);
+    while(T.length>2&&now-T[1][3]>S.fbTrail)T.shift();
+    if(T.length<2)return;
+    let len=0;for(let i=1;i<T.length;i++)len+=Math.hypot(T[i][0]-T[i-1][0],T[i][1]-T[i-1][1],T[i][2]-T[i-1][2]);
+    const n=Math.min(9,Math.max(2,Math.round(len/(core*.35))));
+    for(let j=1;j<=n;j++){const at=len*j/n;let s=0,P=T[T.length-1];   // (walked back from the ball along the real path)
+      for(let i=T.length-1;i>0;i--){const A=T[i],Bp=T[i-1],l=Math.hypot(A[0]-Bp[0],A[1]-Bp[1],A[2]-Bp[2]);if(s+l>=at){const f=(at-s)/(l||1);P=[A[0]+(Bp[0]-A[0])*f,A[1]+(Bp[1]-A[1])*f,A[2]+(Bp[2]-A[2])*f];break;}s+=l;P=Bp;}
+      const u=j/n,w=core*(1.5-.9*u);
+      pyfBill(PYF_SH.GLOW,P,w*1.6,w*1.6,PF_SQ,{k:.4*k*(1-u),pull:.08,soft:.1});
+      if(u>.35)pyfBill(PYF_SH.SMOKE,P,w*1.2,w*1.2,PF_SQ,{k:.35*(u-.35),a:.35*(1-u),pull:.05,soft:.1,seed:seed+j,age:.3+u*.5});}
+  }
   function fbBody(p){const L=p.lob,c=L.tg;
     if(c&&!c.dead)p._pyBody=typeof creepBaseY==='function'&&typeof creepH==='function'?creepBaseY(c)+creepH(c)*.5:hitH(c);
     return p._pyBody!=null?p._pyBody:.6;}
@@ -91479,7 +91508,16 @@ if(PYRO_SEQ.on) {
     if(q.d0==null)q.d0=Math.hypot(L.ax-L.x0,L.az-L.z0);
     y=L.h0+(b-L.h0)*u;const dd=[L.ax-x,b-y,L.az-z];if(Math.hypot(...dd)>.02)d=pfNorm(dd);
     const wk=S.fbW[0]+(S.fbW[1]-S.fbW[0])*clamp01((q.d0-1)/3),core=S.fbCore*(p.sz||1);
-    q.P=[x,y,z];q.dir=d;sprite('fireball',filmAt(L.t,L.T,B.release,B.impact),q.P,q.width*wk,1,d);
+    // (owner, 13 Nov 2026: "fireball looks a bit funny when the fireball changes course mid flight": the lob is led now, so its
+    // path barely bends, and the film is a card laid along its heading with a straight trail baked in. Its heading eases toward the
+    // flight's over S.fbTurn seconds instead of snapping, the film thins while it is turning, and the ball leaves a trail of its own
+    // along where it truly went (fbTrail), so a curve shows as a curve)
+    const dt=q.lastNow==null?0:Math.max(0,Math.min(.1,now-q.lastNow));q.lastNow=now;
+    if(!q.ds)q.ds=d.slice();
+    else if(dt>0){const e=1-Math.exp(-dt/S.fbTurn);q.ds=pfNorm(q.ds.map((v,i)=>v+(d[i]-v)*e));}
+    const tc=Math.max(-1,Math.min(1,q.ds[0]*d[0]+q.ds[1]*d[1]+q.ds[2]*d[2])),tk=clamp01(1-Math.acos(tc)/.5);
+    q.P=[x,y,z];q.dir=q.ds;sprite('fireball',filmAt(L.t,L.T,B.release,B.impact),q.P,q.width*wk*(.8+.2*tk),.5+.5*tk,q.ds);
+    fbTrail(q,x,y,z,now,S.fbCore*(p.sz||1),C.k||1,seed);
     // (its first moment grows out of the hand's charge, so no ball pops in at the palm)
     const g=Math.min(1,.45+L.t/.12),k=C.k||1;
     pyfBill(PYF_SH.GLOW,[x,y,z],core*2.4*g,core*2.4*g,PF_SQ,{k:.55*k,pull:.1,soft:.1});
