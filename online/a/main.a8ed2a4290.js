@@ -1,4 +1,4 @@
-const BUILD_TAG = '095e877@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9d7e985@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -10771,7 +10771,7 @@ for (const [p, ids] of Object.entries({
   high: 'heroiccharge so_witness so_grail cc_grandorb ih_runebrand sb_spiritbear',
   afflicted: 'runthrough harvest cc_hoarbloom cc_kindle ih_forgeburst sb_reckoning',
   first: 'lunge briarfield barrage so_shackle so_embers so_dawnfall ih_shieldshove ih_caltropfield ih_grapnel ih_steamvent sb_rimetotem sb_stormtotem sb_stonetotem',
-  grouped: 'brambleguard arrowrain thicket stampede whirlwind haze bindseed dread so_rebuke so_flare so_ridedown so_sunlance so_halo so_crush so_hallow so_sweep so_smoke so_knell cc_sigilcleave cc_spectral cc_sparks cc_glacialglyph cc_rimelance cc_dilation cc_orrery cc_seismic cc_tremorglyph cc_pyresigil cc_flamewave ih_bulwark ih_slug ih_chainnet ih_flakscreen ih_airburst ih_pressureslam ih_pistondrive ih_incendiary ih_shrapnelround ih_bombard sb_packhowl sb_stormspear sb_galearrow sb_crosswind sb_freezingrain sb_hailstorm sb_thunderbird sb_herd sb_thunderhead sb_downpour',
+  grouped: 'brambleguard arrowrain thicket stampede whirlwind haze bindseed dread so_rebuke so_flare so_ridedown so_sunlance so_halo so_crush so_hallow so_sweep so_smoke so_knell cc_sigilcleave cc_spectral cc_undertow cc_glacialglyph cc_rimelance cc_dilation cc_orrery cc_seismic cc_tremorglyph cc_pyresigil cc_flamewave ih_bulwark ih_slug ih_chainnet ih_flakscreen ih_airburst ih_pressureslam ih_pistondrive ih_incendiary ih_shrapnelround ih_bombard sb_packhowl sb_stormspear sb_galearrow sb_crosswind sb_freezingrain sb_hailstorm sb_thunderbird sb_herd sb_thunderhead sb_downpour',
 })) for (const id of ids.split(' ')) AB_PREF[id] = p;
 // the ability's own rule says whether it casts; its preference says who at
 function abPick(t, st, ab, man) {
@@ -11770,7 +11770,7 @@ const ABIL_SCHOOL = Object.assign({},
   schoolList('attack', 'lunge brambleguard sunder aimedshot volley arrowrain heroiccharge stampede runthrough hawkstrike spot flock whirlwind leafdance harvest'),
   schoolList('nature', 'thicket constrict briarfield haze barrage bindseed callarms renewal dread'),
   // the Conclave
-  schoolList('arcane', 'cc_blinkstrike cc_sigilcleave cc_spectral cc_barrage cc_sparks cc_grandorb cc_dilation cc_quicken cc_echo cc_fallingstar cc_omen cc_orrery cc_manasurge cc_conduit cc_overchannel'),
+  schoolList('arcane', 'cc_blinkstrike cc_sigilcleave cc_spectral cc_barrage cc_undertow cc_grandorb cc_dilation cc_quicken cc_echo cc_fallingstar cc_omen cc_orrery cc_manasurge cc_conduit cc_overchannel'),
   schoolList('frost', 'cc_glacialglyph cc_rimelance cc_hoarbloom'),
   schoolList('fire', 'cc_pyresigil cc_kindle cc_flamewave'),
   schoolList('attack', 'cc_seismic cc_tremorglyph cc_boulder'),
@@ -12091,7 +12091,7 @@ const SP_SHAPE = {
   so_sunlance: 'a', so_halo: 'a', so_dawnfall: 'a', so_crush: 'a', so_hallow: 'a h:n', so_hammerfall: 'a', so_sweep: 'a', so_smoke: 'a', so_embers: 'a h2',
   ch_lioncharge: 'a', ch_fordstandard: 'a', ch_lionsdue: 'a', ch_dawnbreak: 'a', ch_morningstar: 'a', ch_highnoon: 'x', ch_sentence: 'a', ch_verdict: 'a',
   // ---- the Conclave ----
-  cc_blinkstrike: 'h2', cc_sigilcleave: 'a', cc_spectral: 'x', cc_barrage: 'a h:n', cc_sparks: 'a', cc_grandorb: 'a', cc_glacialglyph: 'a', cc_rimelance: 'a',
+  cc_blinkstrike: 'h2', cc_sigilcleave: 'a', cc_spectral: 'x', cc_barrage: 'a h:n', cc_undertow: 'a', cc_grandorb: 'a', cc_glacialglyph: 'a', cc_rimelance: 'a',
   cc_hoarbloom: 'a', cc_dilation: 'x', cc_quicken: 'x', cc_echo: 'x', cc_fallingstar: 'a', cc_omen: 'a', cc_orrery: 'a h:dur*3', cc_seismic: 'a',
   cc_tremorglyph: 'a z.4', cc_boulder: 'a', cc_pyresigil: 'a h:dur/.25 b5', cc_kindle: 'a L3', cc_flamewave: 'a h2',
   ch_thousandfold: 'a h24', ch_unravel: 'a', ch_mirrorweave: 'x', ch_stoppedhour: 'a', ch_hourlead: 'x', ch_severing: 'a', ch_riftchain: 'a', ch_unbound: 'a',
@@ -14073,14 +14073,14 @@ const CC_PARTS = {
       ccEm(g, 1, () => { for (const [z, R] of [[.27, .085 + .006 * Math.min(tier, 4)], [.35, .12 + .008 * Math.min(tier, 4)]]) g.with(T(.03, 0, z, 0, Math.PI / 2), () => { g.torus(0, 0, 0, R, .009, 20, 3, CP.glow); const m = 6 + 2 * Math.min(tier, 3); for (let k = 0; k < m; k++) { const a = k / m * TAU; g.box(Math.cos(a) * R, 0, Math.sin(a) * R, .02, .008, .02, CP.star); } });   // rings of glowing runes before the open hand
         g.ico(.03, 0, .31, .03 + .004 * tier, '#ffffff', .1); });
     }, t => {
-      const w = t.windup || 0, s = ccShot(t), bar = ccAge(t, 'cc_barrage'), spk = ccAge(t, 'cc_sparks'), orb = ccAge(t, 'cc_grandorb');
+      const w = t.windup || 0, s = ccShot(t), bar = ccAge(t, 'cc_barrage'), spk = ccAge(t, 'cc_undertow'), orb = ccAge(t, 'cc_grandorb');
       if (orb < 1.1) { const v = ccEase(ccIn(orb, 0, .3)) * (1 - ccEase(ccIn(orb, .75, 1.1))); return [-.4 - 2.2 * v + 1.6 * ccPop(orb, .6, .85), 0, -.2 * v, 0, .06 * v, 0]; }   // Grand Orb: the wand straight up, then flung forward
-      if (spk < .6) { const v = ccPop(spk, 0, .6); return [-.1 - .2 * v, -.2 * v, 0, 0, .02, .14 * v]; }   // Mana Sparks: a thrust forward
+      if (spk < .6) { const v = ccPop(spk, 0, .6); return [-.1 - .2 * v, -.2 * v, 0, 0, .02, .14 * v]; }   // Undertow Rune: a thrust forward, the snare cast down the road
       if (bar < .9) { const v = ccPop(bar, 0, .9); return [-.5 - 1.3 * v + .5 * Math.sin(bar * 30) * v, .2 * v, .4 * v, 0, .05 * v, 0]; }   // Arcane Barrage: wand raised and conducting
       return [lfSwing(t, -.4, -.95, .5, .06, .08, .35), 0, -.1 * lfE(w), 0, 0, .05 * lfStrike(s, .06, .08, .35)];   // drawn back, then the flick, the wand carried on and back
     }),
     ccPart('book', [-.2, .58, .08], (g, tier) => { ccBook(g, .55, CP.hatD); }, t => {
-      const bar = ccAge(t, 'cc_barrage'), orb = ccAge(t, 'cc_grandorb'), spk = ccAge(t, 'cc_sparks'), bob = .025 * Math.sin(vt * 2.2 + (t.anim || 0));
+      const bar = ccAge(t, 'cc_barrage'), orb = ccAge(t, 'cc_grandorb'), spk = ccAge(t, 'cc_undertow'), bob = .025 * Math.sin(vt * 2.2 + (t.anim || 0));
       if (orb < 1.1) { const v = ccEase(ccIn(orb, 0, .3)) * (1 - ccEase(ccIn(orb, .8, 1.1))); return ccCarry(-.3 * v, 1.2 * v, 0, [.2 * v, .42 * v + bob, -.05 * v]); }   // the book lifts over the head
       if (bar < .9) { const v = ccBump(bar, 0, .9); return ccCarry(-.9 * v, 0, .25 * Math.sin(bar * 24) * v, [0, .16 * v + bob, .08 * v]); }   // pages flying, tipped toward the foe
       if (spk < .6) { const v = ccBump(spk, 0, .6); return ccCarry(-.3 * v, .5 * v, 0, [.05 * v, bob, .1 * v]); }
@@ -14383,7 +14383,7 @@ Object.assign(UNIT_KITS, {
       } },
   ] },
 
-  /* ---- Magelings: a barrage of missiles, sparks that leap, a great orb ---- */
+  /* ---- Magelings: a barrage of missiles, a great orb (Undertow Rune: forces_zxc_conclave_cool.js) ---- */
   cc_mageling: { slot: 'arrow', mana: { max: 110, regen: .65, hit: .2 }, abilities: [
     { id: 'cc_barrage', name: 'Arcane Barrage', short: 'Barrage', glyph: 'missiles', hue: '#c9a0ff', mana: 55, cd: 6, research: null,
       by: { n: [5, 5, 6, 6, 7, 7] },
@@ -14393,20 +14393,6 @@ Object.assign(UNIT_KITS, {
       cast(t, st, L, ab) {
         const k = ccCast(t, ab), n = byT(ab.by.n, t);
         for (let q = 0; q < n; q++) { const c = L[q % L.length]; G.delayed.push({ t: .1 + q * .07, fn: () => { if (!c.dead && abLive(t)) ccMissile(t, t.st || st, c, .3 * k, { spread: 1.8 }); } }); }
-      } },
-    { id: 'cc_sparks', name: 'Mana Sparks', short: 'Sparks', glyph: 'chain', hue: '#b0c8ff', mana: 75, cd: 10, research: { cost: 45, time: 20 },
-      by: { n: [4, 4, 5, 5, 6, 6] },
-      auto: 'three or more foes in range',
-      text: (t, st, ab) => `A spark leaps from foe to foe: ${byT(ab.by.n, t)} strikes, each on a new foe within 1.6 cells of the last, for ${xD(st, 1.1)} each.`,
-      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (L.length < (man ? 1 : 3)) return null; const k = abCrowd(L, 1.6); return k ? k.c : null; },
-      cast(t, st, c, ab) {
-        const k = ccCast(t, ab), n = byT(ab.by.n, t), hit = new Set(); let cur = c, prev = ccHand(t);
-        for (let q = 0; q < n; q++) G.delayed.push({ t: q * .12, fn: () => {
-          if (!abLive(t) || !cur || cur.dead) return; const s = t.st || st, a = prev;
-          G.bolts.push({ pts: [a, [(a[0] + cur.x) / 2, Math.max(a[1], hitH(cur)) + .25, (a[2] + cur.y) / 2], [cur.x, hitH(cur), cur.y]], life: .2, max: .2, col: [.75, .7, 1.25] });
-          ccAb(t, s, cur, 1.1, k); hit.add(cur); prev = [cur.x, hitH(cur), cur.y];
-          cur = nearest(cur.x, cur.y, 1.6, 1, cur, o => !hit.has(o) && canTarget(t, s, o))[0];
-        } });
       } },
     { id: 'cc_grandorb', name: 'Grand Orb', short: 'Orb', glyph: 'orbbig', hue: '#e0c8ff', mana: 110, cd: 14, busy: .7, research: { cost: 90, time: 30 },
       by: { mult: [3, 3, 3.25, 3.25, 3.5, 3.5] },
@@ -14750,25 +14736,28 @@ const CC_TALENTS = {
     GT('Swift Recovery', 'flash', 1, 1, 2, n => `Blinkstrike comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_blinkstrike', cd: -.06 * n }) }),
   ] },
 
-  /* ---- Magelings (arrow): Arcane Barrage (innate), Mana Sparks (row III), Grand Orb (capstone) ---- */
+  /* ---- Magelings (arrow): Arcane Barrage (innate), Grand Orb, Undertow Rune (the deepest spell talent) ---- */
   arrow: { name: 'Missilecraft', hue: '#c8a8ff', list: [
     GT('Twin Casting', 'missiles', 0, 1, 3, n => `Every ${gOrd(6 - n)} cast looses a second missile at the same foe.`, {}, { cap: 'ccTwin' }),
     GT('Scrying Lens', 'spyglass', 0, 0, 2, n => `+${gNf(.2 * n)} range, for its bolts and its spells.`, n => ({ range: .2 * n })),
     GT('Missile Swarm', 'arrows2', 4, 0, 1, 'Arcane Barrage looses two more missiles and costs 30% less.', {}, { sp: { ab: 'cc_barrage', by: { n: 2 }, cost: -.3 } }),
-    GT('Homing Missiles', 'orb', 2, 0, 2, n => `Mana Sparks leaps ${n === 1 ? 'once' : n + ' times'} more.`, {}, { sp: n => ({ ab: 'cc_sparks', by: { n } }), req: [1, 0] }),
+    GT('Weighted Missiles', 'orb', 2, 0, 2, n => `Arcane Barrage's missiles slow the foes they strike ${10 * n}% for 1.5s.`, {}, { sp: n => ({ ab: 'cc_barrage', rider: { slow: [.1 * n, 1.5] } }), req: [1, 0] }),
     GT('Apprentice\'s Zeal', 'quick', 3, 3, 2, n => `Grand Orb's burst slows every foe it strikes ${15 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_grandorb', rider: { slow: [.15 * n, 2] } }), req: [2, 3] }),
-    GS('cc_sparks', 1, 0),
+    GT('Long Recital', 'spyglass', 1, 0, 1, 'Arcane Barrage reaches 0.5 cells farther.', {}, { sp: { ab: 'cc_barrage', reach: .5 } }),
     GT('Echoing Missiles', 'echo', 3, 0, 1, 'Each Echo its missiles set off sends the missile again 0.4s later, for 70% of its strike.', {}, { cap: 'ccEcho' }),
-    GT('Spark Battery', 'boltup', 2, 2, 1, 'Each Arcane Barrage brings Mana Sparks 2s nearer.', {}, { sp: { ab: 'cc_barrage', ready: ['cc_sparks', 2] } }),
+    GT('Charged Missiles', 'boltup', 2, 2, 1, 'An Arcane Barrage that strikes a foe marked with another element gives it an Arcane Charge.', {}, { cap: 'ccfCurtain', sp: { ab: 'cc_barrage' } }),
     GS('cc_grandorb', 2, 3),
     GT('Unstable Charge', 'burst', 4, 3, 1, 'When its Arcane Charge fills, it bursts into a free Arcane Barrage at 60% and keeps 2 charges.', {}, { cap: 'ccUnstable' }),
-    GT('Orb Lattice', 'orbbig', 3, 2, 1, 'Grand Orb marks every foe it strikes Arcane, for the Conclave to react with.', {}, { sp: { ab: 'cc_grandorb', rider: { element: 'arcane' } } }),
+    GT('Orb Lattice', 'orbbig', 2, 1, 1, 'Grand Orb marks every foe it strikes Arcane, for the Conclave to react with.', {}, { sp: { ab: 'cc_grandorb', rider: { element: 'arcane' } } }),
     GT('Study the Reaction', 'rune', 1, 3, 2, n => `Each reaction it sets off gives it ${10 * n} mana.`, {}, { cap: 'ccStudy' }),
     GT('Keen Reader', 'eye', 1, 1, 2, n => `Its missiles hit foes marked Time or Frost ${12 * n}% harder.`, {}, { cap: 'ccReader' }),
     GT('Arcane Torrent', 'nova', 4, 1, 1, 'Every 5th cast is a torrent: six missiles fan out over the foes in range at 80% each.', {}, { cap: 'ccTorrent' }),
     GT('Inkwell', 'potion', 0, 3, 2, n => `While it saves for its next spell, its mana flows back ${50 * n}% faster.`, {}, { mana: { saving: .5 } }),
     GT('Barrage Drill', 'missiles', 0, 2, 2, n => `Arcane Barrage comes ${6 * n}% sooner.`, {}, { sp: n => ({ ab: 'cc_barrage', cd: -.06 * n }) }),
-    GT('Static Sparks', 'boltup', 3, 1, 2, n => `Mana Sparks stuns each foe it leaps to for ${gNf(.2 * n)}s.`, {}, { sp: n => ({ ab: 'cc_sparks', rider: { stun: .2 * n } }) }),
+    GT('Static Sparks', 'boltup', 3, 1, 2, n => `Arcane Barrage's missiles stun the foes they strike for ${gNf(.1 * n)}s.`, {}, { sp: n => ({ ab: 'cc_barrage', rider: { stun: .1 * n } }) }),
+    // (appended, so a saved pick keeps its place: G.tal[slot][i]) Undertow Rune, the deep spell talent, and its capstone
+    GS('cc_undertow', 3, 2),
+    GT('Drawstring', 'chain', 4, 2, 1, 'Undertow Rune springs 0.3 cells wider, and its snap stuns every foe it strikes for 0.6s.', {}, { sp: { ab: 'cc_undertow', by: { r: .3 }, rider: { stun: .6 } }, req: [3, 2] }),
   ] },
 
   /* ---- Frostweavers (frost): Glacial Glyph (innate), Rime Lance (row III), Hoarfrost Bloom (capstone) ---- */
@@ -32031,7 +32020,7 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_thornseed', { name: 'T
    schools) and a reason to stand somewhere in the maze. Ids are kept, so the trees, items, sets and saves still bind.
      Spellblades     Riposte Stance (a duellist's stance: every walker that steps into reach is cut, each riposte an
                      Arcane Charge)              Crosscut Sigil (the blade driven into the road: a cross along the grid)
-     Magelings       Missile Curtain (missiles hung across the road, each diving at the first foe under it)
+     Magelings       Undertow Rune (a snare sprung on the road, drawing every foe it catches along the road to its heart)
                      Gathering Orb (every Mageling missile near it curves into a growing orb, then it is hurled)
      Frostweavers     Hoarfrost Trail (a branded walker leaves frost prints that bite those behind it)
                      Rime Lattice (every frost glyph in reach erupts, and ice bridges join them)
@@ -32053,7 +32042,7 @@ if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['gv_thornseed', { name: 'T
    (spellfx.js, vfx.js, loaded later): registered the first time it is needed (ccxReg), each spell drawing its own moments
    from its own logic (as Rattlegun's bullets do), so an echoed cast draws too. Balance: sim/cc_cool_sim.js. */
 
-const CCX = { RIP_GAP: .12, CROSS_W: .42, CURT_WAIT: 4, PRINT_GAP: .45, ORB_R: 1.15, ORB_SHARE: .8, ORB_STORE: 1.2,
+const CCX = { RIP_GAP: .12, CROSS_W: .42, SN_ARM: .35, SN_PULL: 1.1, SN_SPD: 2.4, SN_ROAD: 3.5, SN_HEART: .15, PRINT_GAP: .45, ORB_R: 1.15, ORB_SHARE: .8, ORB_STORE: 1.2,
   ORR_R: [.35, .8, 1.25], ORR_W: [9.578, 5.389, 1.2], ORR_SYZ: 1.5, HAND_T: 2.4, LODE_T: 2.2, LODE_R: 1.4, BUL_HOLD: .62 };
 const ccxPathPts = () => (G.path && G.path.pts) || [];
 // the road cell nearest (x, z): its index on G.path.pts (portal to gate), or -1
@@ -32090,6 +32079,14 @@ function ccxSwap(unit, ab) {
   const kit = UNIT_KITS[unit]; if (!kit) return console.warn('conclave cool: no kit', unit);
   const i = kit.abilities.findIndex(a => a.id === ab.id); if (i < 0) return console.warn('conclave cool: no spell', ab.id);
   ab.unit = unit; kit.abilities[i] = ab; ABIL[ab.id] = ab;
+  if (ab.pref && typeof AB_PREF !== 'undefined') AB_PREF[ab.id] = ab.pref;
+  if (ab.anim && typeof ABANIM !== 'undefined') ABANIM[ab.id] = ab.anim;
+}
+// a spell added to its kit and the registry (the Mageling's Undertow Rune, its third spell: it took Missile Curtain's place)
+function ccxAdd(unit, ab) {
+  const kit = UNIT_KITS[unit]; if (!kit) return console.warn('conclave cool: no kit', unit);
+  if (kit.abilities.some(a => a.id === ab.id)) return;
+  ab.unit = unit; kit.abilities.push(ab); ABIL[ab.id] = ab;
   if (ab.pref && typeof AB_PREF !== 'undefined') AB_PREF[ab.id] = ab.pref;
   if (ab.anim && typeof ABANIM !== 'undefined') ABANIM[ab.id] = ab.anim;
 }
@@ -32174,50 +32171,92 @@ ccxSwap('cc_spellblade', { id: 'cc_spectral', name: 'Crosscut Sigil', short: 'Cr
 /* =====================================================================================================
    MAGELINGS: the apprentices' storm of seeking missiles
    ===================================================================================================== */
-function ccxCurtainShot(t, st, z, m, c) {
-  m.live = 0; const k = z.ck; z.per.set(c, (z.per.get(c) || 0) + 1);
-  const rs = ccMarksOn(c).filter(s => s !== 'arcane');   /* (read before the dive: its own hit may react with them) */
-  ccShoot({ k: 'missile', x: m.x, h: m.h, z: m.z, tg: c, spd: 8.5, turn: 9, seek: true, vx: 0, vz: 0, vh: -.6, col: CC_COL.arcane, sz: 1.1, fn: (q) => {
-    if (!q || !abLive(t)) return; const s = t.st || st;
-    ccAb(t, s, q, 1.1, k, {});
-    if (rs.length && !q.dead) {   /* a missile that lands on another element's mark splits: its twin seeks the next foe */
-      const o = nearest(q.x, q.y, 1.6, 1, q, w => canTarget(t, s, w))[0];
-      if (o) ccShoot({ k: 'missile', x: q.x, h: hitH(q), z: q.y, tg: o, spd: 8, turn: 8, seek: true, col: CC_COL[rs[0]] || CC_COL.arcane, sz: .8, fn: w => { if (w && abLive(t)) ccAb(t, t.st || s, w, .66, k, { noRx: true }); } });
+/* Undertow Rune (the Mageling's deepest spell talent, owner 13 Nov 2026: "an arcane snare and pulls all units caught in it
+   towards it"). A sigil written on the road: it springs after SN_ARM, and every foe inside its radius then, or walking into
+   it while it pulls, is caught on a thread and drawn ALONG THE ROAD to the snare's road cell (never across a wall or off the
+   road: a foe more than SN_ROAD road cells from it is not caught, however near it stands across a wall). The heavy are drawn
+   less (ccxWeight: bosses a third), and crowd control wears (ccDR, once a foe). Flyers are caught too and drawn along their
+   own line. When the pull ends the snare snaps shut: its damage to every foe it caught still near it. */
+const ccxSnFld = c => (c.atk && typeof siegeField === 'function' ? siegeField().dist : G.dist);
+// forward along the road (toward the gate) by d cells: ccxPush's walk, downhill
+function ccxDraw(c, d) {
+  if (c.dead || !(d > .004) || c.state === 'exit' || c.burT > 0 || c.ent) return;
+  if (c.fly) { c.y = Math.min(GATE_Y - .3, c.y + d); c.remain = GATE_Y - c.y; return; }
+  const F = ccxSnFld(c); let left = d;
+  for (let g = 0; g < 4 && left > .01; g++) {
+    const ci = clamp(Math.floor(c.x), 0, COLS - 1), cj = clamp(Math.floor(c.y), 0, ROWS - 1), dk = F[idx(ci, cj)];
+    let best = null, bd = dk;
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= COLS || nj >= ROWS) continue;
+      const nk = idx(ni, nj); if (G.blk[nk] || !isFinite(F[nk])) continue;
+      if (F[nk] < bd) { bd = F[nk]; best = [ni + .5, nj + .5]; }
     }
-  } });
-  ccxFx('cc_sparks', t, c, C => CCX_FX.curtainDive(C, m, c));
+    if (!best) break;
+    const dx = best[0] - c.x, dy = best[1] - c.y, L = Math.hypot(dx, dy);
+    if (L < .02) { c.x = best[0]; c.y = best[1]; left -= .02; continue; }
+    const m = Math.min(left, L); c.x += dx / L * m; c.y += dy / L * m; left -= m;
+    if (m < L) break;
+  }
+  c.ti = clamp(Math.floor(c.x), 0, COLS - 1); c.tj = clamp(Math.floor(c.y), 0, ROWS - 1); c.tx = c.ti + .5; c.ty = c.tj + .5;
+  c.remain = F[idx(c.ti, c.tj)] + .5;
 }
-ccxSwap('cc_mageling', { id: 'cc_sparks', name: 'Missile Curtain', short: 'Curtain', glyph: 'missiles', hue: '#c9a0ff', mana: 75, cd: 10, research: { cost: 45, time: 20 }, pref: 'grouped',
-  by: { n: [4, 4, 5, 5, 6, 6] },
-  auto: 'two or more foes in reach, flyers too', none: 'no foes in reach',
-  text: (t, st, ab) => `Hangs ${byT(ab.by.n, t)} arcane missiles across the road for ${CCX.CURT_WAIT}s; each dives at the first foe under it for ${xD(st, 1.1)}. A missile landing on a foe marked with another element splits in two.`,
-  pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (L.length < (man ? 1 : 2)) return null; const k = abCrowd(L, 1.6); return k ? k.c : null; },
-  cast(t, st, c, ab) {
-    const k = ccCast(t, ab), n = Math.max(1, Math.round(byT(ab.by.n, t))), P = ccxPathPts(), reach = abReach(t, st, ab);
-    let x = c.x, z = c.y, px = 1, pz = 0;
-    if (!c.fly) {   // the cell just ahead of it on the road, the curtain drawn across the road there
-      const i = ccxPathIdx(c.x, c.y), j = Math.min(P.length - 2, i + 1);
-      if (i > 0 && j > i && Math.hypot(P[j][0] - t.x, P[j][1] - t.y) <= reach + .5) { x = P[j][0]; z = P[j][1]; }
-      const a = P[Math.max(1, i)], b = P[Math.min(P.length - 2, i + 1)];
-      if (a && b) { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; px = -dz / l; pz = dx / l; }
-    } else z = c.y + .7;
-    const ms = []; for (let j = 0; j < n; j++) { const o = (j - (n - 1) / 2) * .22; ms.push({ x: x + px * o, z: z + pz * o, h: .95 + .06 * Math.sin(j * 2.1), live: 1, at: .05 * j }); }
-    const zn = { k: ab.id, x, z, ms, until: G.time + CCX.CURT_WAIT, tick: 0, every: .05, ck: k, _sfx: 1, born: G.time, per: new Map() };
+// how far along the road a foe stands from the snare: + upstream of it (to be drawn on), - past it (to be drawn back)
+function ccxSnGap(c, z) {
+  if (c.fly) return z.z - c.y;
+  const F = ccxSnFld(c), r0 = F[z.cell]; if (!isFinite(r0)) return null;
+  return c.remain - (r0 + .5);
+}
+ccxAdd('cc_mageling', { id: 'cc_undertow', name: 'Undertow Rune', short: 'Undertow', glyph: 'snare', hue: '#d2a8ff', mana: 80, cd: 14, research: { cost: 90, time: 25 }, pref: 'grouped',
+  by: { r: [1.6, 1.6, 1.75, 1.75, 1.9, 1.9], mult: [.7, .7, .8, .8, .9, .9] },
+  auto: 'three or more foes spread out in reach, flyers too', none: 'too few foes in reach to gather',
+  text: (t, st, ab) => `Carves a rune on the road; after ${CCX.SN_ARM}s it springs and catches every foe within ${+byT(ab.by.r, t).toFixed(2)} cells, flyers too, drawing them along the road to its heart for ${CCX.SN_PULL}s (bosses a third as far). Then it snaps shut: ${xD(st, byT(ab.by.mult, t))} to each foe it caught.`,
+  pick(t, st, ab, man) {
+    const reach = abReach(t, st, ab), L = abFoes(t, st, reach); if (L.length < (man ? 1 : 3)) return null;
+    const r = byT(ab.by.r, t), P = ccxPathPts(); let best = null, bn = 0, bd = 1e9;
+    // the road cell in reach whose snare would catch the most (ties: the one nearest their middle)
+    for (let i = 1; i < P.length - 1; i++) {
+      const x = P[i][0], z = P[i][1]; if (Math.hypot(x - t.x, z - t.y) > reach + .5) continue;
+      let n = 0, d = 0; for (const q of L) { const e = Math.hypot(q.x - x, q.y - z); if (e <= r) { n++; d += e; } }
+      if (n > bn || (n === bn && n && d < bd)) { bn = n; bd = d; best = { x, y: z }; }
+    }
+    if (!best) { const k = abCrowd(L, r); if (!k) return null; best = { x: k.c.x, y: k.c.y }; bn = k.n; bd = 0; }
+    if (bn < (man ? 1 : 3)) return null;
+    if (!man && bd / bn < .55) return null;   // worth it only on a pack still spread out: its foes over 0.55 cells from its heart on average
+    return best;
+  },
+  cast(t, st, p, ab) {
+    const k = ccCast(t, ab), P = ccxPathPts(), i = ccxPathIdx(p.x, p.y), r = byT(ab.by.r, t);
+    const x = i > 0 && P[i] ? P[i][0] : p.x, z = i > 0 && P[i] ? P[i][1] : p.y;
+    const cell = idx(clamp(Math.floor(x), 0, COLS - 1), clamp(Math.floor(z), 0, ROWS - 1));
+    const zn = { k: ab.id, x, z, r, cell, at: G.time, spring: G.time + CCX.SN_ARM, until: G.time + CCX.SN_ARM + CCX.SN_PULL, tick: 0, every: .05, ck: k, _sfx: 1, caught: new Map() };
+    t.ang = Math.atan2(x - t.x, z - t.y);
     abZone(t, zn);
-    ccxFx(ab.id, t, c, C => CCX_FX.curtainHang(C, t, zn));
-    sfx('arcgather', 0);   // (was 'arcane': high-pitched)
+    ccxFx(ab.id, t, null, C => CCX_FX.snareLay(C, t, zn));
+    ccxLater(ab.id, CCX.SN_ARM + CCX.SN_PULL, () => {   // the snap
+      if (!abLive(t)) return; const s = t.st || st, m = byT(ab.by.mult, t);
+      abAoe(() => { for (const [c] of zn.caught) { if (c.dead || c.ent || !canTarget(t, s, c) || Math.hypot(c.x - x, c.y - z) > r + .8) continue; ccAb(t, s, c, m, k, { type: 'arcane' }); } });
+      ccxFx(ab.id, t, null, C => CCX_FX.snareSnap(C, zn));
+      G.shake = Math.max(G.shake, .07); sfx('glaiveHit', 1);
+    });
+    sfx('arcgather', 0);
   },
   zone(t, st, z) {
-    const last = z.until - G.time <= .11;
-    for (const m of z.ms) {
-      if (!m.live || G.time - z.born < m.at + .25) continue;
-      let c = null;
-      for (const q of G.creeps) if (!q.dead && !q.ent && (z.per.get(q) || 0) < 2 && canTarget(t, st, q) && Math.hypot(q.x - m.x, q.y - m.z) <= (q.fly ? .6 : .45) + (q.def.r || .3) * .3) { c = q; break; }
-      if (!c && last) c = nearest(m.x, m.z, abReach(t, st, ABIL.cc_sparks) + 1, 1, null, q => (z.per.get(q) || 0) < 2 && canTarget(t, st, q))[0];
-      if (c) ccxCurtainShot(t, st, z, m, c);
+    if (G.time < z.spring) return;
+    if (!z.sprung) { z.sprung = 1; ccxFx('cc_undertow', t, null, C => CCX_FX.snareSpring(C, z)); sfx('phase', 1); }
+    const dt = z.every;
+    for (const c of G.creeps) {   // caught: inside its radius and near it along the road
+      if (c.dead || c.ent || z.caught.has(c) || c.state === 'exit' || !canTarget(t, st, c) || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue;
+      const g = ccxSnGap(c, z); if (g == null || Math.abs(g) > CCX.SN_ROAD) continue;
+      z.caught.set(c, { k: ccxWeight(c) * ccDR(c), moved: 0, at: G.time });
+    }
+    for (const [c, q] of z.caught) {
+      if (c.dead || c.ent) continue;
+      const g = ccxSnGap(c, z); if (g == null) continue;
+      const step = Math.min(Math.abs(g) - CCX.SN_HEART, CCX.SN_SPD * dt * q.k, CCX.SN_ROAD - q.moved);
+      if (step > .004) { if (g > 0) ccxDraw(c, step); else ccxPush(c, step); q.moved += step; }
+      chill(c, { slow: .4, slowT: .3 }, null, t);   // held on the thread: it barely walks while drawn in
     }
   } });
-
 // Gathering Orb: the orbs gathering now, and the Magelings' strikes that feed them
 const ccxOrbOf = t => (G.ccxOrbs || []).find(o => o.until > G.time && o.t && G.towers.includes(o.t) && Math.hypot(o.t.x - t.x, o.t.y - t.y) <= 2.05) || null;
 { const m0 = ccMissile;
@@ -32789,11 +32828,8 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
   ccxTal(T.glaive.list, 'Spectral Gift', GT('Long Sigil', 'cross', 4, 0, 2, n => `Crosscut Sigil's arms reach ${gNf(.5 * n)} cells farther, its cross stays ${n}s longer, and each Crosscut Sigil brings Blinkstrike ${n}s nearer.`, {}, { cap: 'ccxCrossLong', sp: n => ({ ab: 'cc_spectral', by: { arm: .5 * n }, ready: ['cc_blinkstrike', n] }) }));
   ccxTal(T.glaive.list, 'Ghostblade Rush', GT('Ghostblade Rush', 'glaive2', 4, 3, 1, 'Each riposte of Riposte Stance leaves an afterimage that cuts the same foe again 0.4s later, half as hard, and each Riposte Stance brings Crosscut Sigil 1s nearer.', {}, { cap: 'ccxGhostRip', sp: { ab: 'cc_sigilcleave', ready: ['cc_spectral', 1] } }));
   // Magelings
-  ccxTal(T.arrow.list, 'Homing Missiles', GT('Homing Missiles', 'orb', 2, 0, 2, n => `Missile Curtain hangs ${n === 1 ? 'one more missile' : n + ' more missiles'}.`, {}, { sp: n => ({ ab: 'cc_sparks', by: { n } }) }));
-  ccxTal(T.arrow.list, 'Static Sparks', GT('Static Sparks', 'boltup', 3, 1, 2, n => `Each Missile Curtain missile stuns the foe it dives on for ${gNf(.2 * n)}s.`, {}, { sp: n => ({ ab: 'cc_sparks', rider: { stun: .2 * n } }) }));
-  ccxTal(T.arrow.list, 'Spark Battery', GT('Spark Battery', 'boltup', 2, 2, 1, 'Each Arcane Barrage brings Missile Curtain 2s nearer.', {}, { sp: { ab: 'cc_barrage', ready: ['cc_sparks', 2] } }));
   ccxTal(T.arrow.list, 'Apprentice\'s Zeal', GT('Apprentice\'s Zeal', 'quick', 3, 3, 2, n => `Gathering Orb gathers ${gNf(.5 * n)}s longer, and its burst slows every foe it strikes ${15 * n}% for 2s.`, {}, { sp: n => ({ ab: 'cc_grandorb', by: { gather: .5 * n }, rider: { slow: [.15 * n, 2] } }) }));
-  ccxTal(T.arrow.list, 'Orb Lattice', GT('Orb Lattice', 'orbbig', 3, 2, 1, "Gathering Orb's burst marks every foe it strikes with the element of each Conclave school standing within 2 cells of the Mageling, setting off their reactions, and each Gathering Orb brings Missile Curtain 2s nearer.", {}, { cap: 'ccxOrbMarks', sp: { ab: 'cc_grandorb', ready: ['cc_sparks', 2] } }));
+  ccxTal(T.arrow.list, 'Orb Lattice', GT('Orb Lattice', 'orbbig', 3, 2, 1, "Gathering Orb's burst marks every foe it strikes with the element of each Conclave school standing within 2 cells of the Mageling, setting off their reactions, and each Gathering Orb brings Arcane Barrage 2s nearer.", {}, { cap: 'ccxOrbMarks', sp: { ab: 'cc_grandorb', ready: ['cc_barrage', 2] } }));
   // Frostweavers
   ccxTal(T.frost.list, 'Brittle Rime', GT('Brittle Rime', 'cracked', 2, 3, 2, n => `Frozen foes take ${6 * n}% more damage from every unit, and Hoarfrost Trail's brand and prints strike them ${20 * n}% harder.`, {}, { cap: 'ccBrittle', sp: n => ({ ab: 'cc_rimelance', vs: ['frozen', .2 * n] }) }));
   ccxTal(T.frost.list, 'Splintering Lance', GT('Splintering Rime', 'icicle', 2, 2, 2, n => `Hoarfrost Trail's brand and prints strip ${2 * n} armour from every ground foe they strike.`, {}, { sp: n => ({ ab: 'cc_rimelance', rider: { shred: [2 * n, 2 * n] } }) }));
@@ -32914,7 +32950,7 @@ ccxSwap('ch_aurel', { id: 'ch_hourlead', name: 'The Hour Strikes', short: 'Hour'
    LATE REGISTRATIONS (after every force file): cast times, the body's move for each, the Spellbook's help
    ===================================================================================================== */
 SPEC_REG.push(() => {
-  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { cc_sigilcleave: 0, cc_spectral: .3, cc_sparks: .5, cc_grandorb: 0, cc_rimelance: .5, cc_hoarbloom: .8, cc_quicken: .6, cc_omen: .6, cc_orrery: .9,
+  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { cc_sigilcleave: 0, cc_spectral: .3, cc_undertow: .4, cc_grandorb: 0, cc_rimelance: .5, cc_hoarbloom: .8, cc_quicken: .6, cc_omen: .6, cc_orrery: .9,
     cc_tremorglyph: 0, cc_boulder: 0, cc_pyresigil: .3, cc_kindle: .4, cc_flamewave: .5, cc_shards: .3, cc_nullfield: .4 });
   if (typeof LIFE_CAST !== 'undefined' && typeof LF_ARCH !== 'undefined') for (const [id, kind, T] of [['cc_sigilcleave', 'thrust', .6], ['cc_spectral', 'slam', 1], ['cc_grandorb', 'channel', 2.6], ['cc_omen', 'raise', 1],
     ['cc_tremorglyph', 'thrust', 1], ['cc_boulder', 'raise', 1], ['cc_pyresigil', 'thrust', 1.6], ['cc_flamewave', 'raise', 1.1], ['cc_kindle', 'sweep', .7], ['cc_shards', 'sweep', .7], ['cc_nullfield', 'stoop', 1.1]]) {
@@ -32931,7 +32967,7 @@ SPEC_REG.push(() => {
    follow vfxFid. Each spell's moments are SFX_DRAW kinds of its own (ccx_*); the recipe's generic layer is switched off
    for these ids (SFX_CUSTOM), as the spells draw themselves.
    ===================================================================================================== */
-const CCX_IDS = ['cc_sigilcleave', 'cc_spectral', 'cc_sparks', 'cc_grandorb', 'cc_rimelance', 'cc_hoarbloom', 'cc_quicken', 'cc_omen', 'cc_orrery', 'cc_tremorglyph', 'cc_boulder', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave', 'cc_shards', 'cc_nullfield', 'ch_mirrorweave', 'ch_rewind', 'ch_hourlead'];
+const CCX_IDS = ['cc_sigilcleave', 'cc_spectral', 'cc_undertow', 'cc_grandorb', 'cc_rimelance', 'cc_hoarbloom', 'cc_quicken', 'cc_omen', 'cc_orrery', 'cc_tremorglyph', 'cc_boulder', 'cc_pyresigil', 'cc_kindle', 'cc_flamewave', 'cc_shards', 'cc_nullfield', 'ch_mirrorweave', 'ch_rewind', 'ch_hourlead'];
 let CCX_REG = 0;
 const ccxC = (hex, k) => vfxC(hex, k || 1);
 const ccxE = (q, fin, fout) => Math.max(0, Math.min(1, q.age / (fin || .15), (q.life - q.age) / (fout || .3)));
@@ -32961,18 +32997,20 @@ function ccxReg() {
     vfxFlat(VX, q.x, q.z, .055, .5, .5, q.seed - q.age * 1.5, q.col, .8 * e, VT.RUNE, 1);
     if (!lite) vfxFlat(VX, q.x, q.z, .05, .9, .9, 0, q.col, .25 * e, VT.GLOW, 1);
   };
-  // Missile Curtain: the missiles hanging across the road, each a violet dart nose-down, a faint thread between them
-  SFX_DRAW.ccx_curtain = q => {
-    const z = q.zone, e = Math.min(1, q.age / .3, Math.max(0, z.until - G.time) / .25 + (z.ms.some(m => m.live) ? .2 : 0)); if (e <= .01) return;
-    const lite = vfxLite(), M = z.ms; let prev = null;
-    for (let j = 0; j < M.length; j++) {
-      const m = M[j], g = v2Ease((q.age - m.at) / .25); if (!m.live || g <= 0) { prev = null; continue; }
-      const h = m.h + .04 * Math.sin(vt * 3 + j * 1.7), s = .07 * g;
-      vfxSprite(VX, m.x, h, m.z, s * 2.6, s * 2.6, 0, q.col, .45 * e, VT.GLOW, 1);
-      vfxStreak(VX, m.x, h - .02, m.z, 0, -1, 0, .16 * g, .045, q.hot, .9 * e, VT.SPARK, 1);
-      vfxSprite(VX, m.x, h, m.z, s, s, vt * 4 + j, q.hot, e, VT.STAR, 1);
-      if (prev && !lite) { vfxRb.begin(VX, VT.ENERGY, 1, 0); vfxRb.pt(prev[0], prev[1], prev[2], .025, q.col, .35 * e, vt * .5); vfxRb.pt(m.x, h, m.z, .025, q.col, .35 * e, vt * .5 + 1); vfxRb.end(); }
-      prev = [m.x, h, m.z];
+  // Undertow Rune: its sigil written on the road (a ring at its real radius, runes round it), drawn in while it pulls, a thread
+  // of light from its heart to each foe it holds
+  SFX_DRAW.ccx_snare = q => {
+    const z = q.zone, now = G.time, arm = Math.min(1, (now - z.at) / CCX.SN_ARM), pull = Math.max(0, Math.min(1, (now - z.spring) / CCX.SN_PULL));
+    const e = Math.min(1, q.age / .15, Math.max(0, z.until + .05 - now) / .12); if (e <= .01) return;
+    const lite = vfxLite(), r = z.r * (1 - .55 * v2Ease(pull)), sprung = now >= z.spring, fl = .85 + .15 * Math.sin(now * 14);
+    vfxFan(VX, z.x, .046, z.z, r - .05, r, 0, TAU * v2Ease(arm), lite ? 20 : 40, sprung ? q.hot : q.col, .55 * e * fl, VT.FAN, 1, now * .6, 3);
+    if (!lite) vfxFan(VX, z.x, .044, z.z, r * .6, r, 0, TAU, 28, q.col, .12 * e, VT.GLOW, 1);
+    const n = 6; for (let k = 0; k < n; k++) { const a = k / n * TAU - now * .8; vfxSprite(VX, z.x + Math.cos(a) * r, .08, z.z + Math.sin(a) * r, .06, .06, a, q.hot, .8 * e * arm, VT.STAR, 1); }
+    vfxFlat(VX, z.x, z.z, .055, .55 * (1 - .3 * pull), .55 * (1 - .3 * pull), -now * 2, q.col, .7 * e, VT.RUNE, 1);
+    if (!sprung) return;
+    for (const [c] of z.caught) {
+      if (c.dead) continue; const h = ccxFoeH(c);
+      vfxRb.begin(VX, VT.ENERGY, 1, 0); vfxRb.pt(z.x, .3, z.z, .035, q.hot, .75 * e, now * 2); vfxRb.pt((z.x + c.x) / 2, (.3 + h) / 2 + .08, (z.z + c.y) / 2, .03, q.col, .6 * e, now * 2 + .5); vfxRb.pt(c.x, h, c.y, .025, q.col, .55 * e, now * 2 + 1); vfxRb.end();
     }
   };
   // Gathering Orb: the orb over the hat, swelling with each missile it takes in, wisps turning round it, then gone
@@ -33130,13 +33168,18 @@ const CCX_FX = {
     flashLight(x, z, .5, C.P.light, 2.4 * S, .3); sfxShake(C, .1);
   },
   // ---- Magelings ----
-  curtainHang(C, t, zn) {
+  snareLay(C, t, zn) {
     const K = v2K(C), m = sfxMuzzle(t);
-    sfxAdd({ k: 'ccx_curtain', zone: zn, col: K.a, hot: K.hot, life: CCX.CURT_WAIT + .4 });
-    if (m) for (const q of zn.ms) sfxAdd({ k: 'ccx_streak', delay: q.at, x0: m[0], h0: m[1], z0: m[2], x1: q.x, h1: q.h, z1: q.z, w: .05 * C.S, col: K.a, hot: K.hot, life: .18 * C.T.dur });
+    sfxAdd({ k: 'ccx_snare', zone: zn, col: K.a, hot: K.hot, life: CCX.SN_ARM + CCX.SN_PULL + .2 });
+    if (m) sfxAdd({ k: 'ccx_streak', x0: m[0], h0: m[1], z0: m[2], x1: zn.x, h1: .1, z1: zn.z, w: .06 * C.S, col: K.a, hot: K.hot, life: .2 * C.T.dur });
     v2Wind(C, { wu: .06, r: .45 });
   },
-  curtainDive(C, m, c) { const K = v2K(C); sfxAdd({ k: 'vflash', x: m.x, z: m.z, h: m.h, s: .22 * C.S, life: .1, col: K.hot, a: .8 * sfxZk() }); v2Spray(C, 'spark', m.x, m.z, m.h, 3, { sp: .6 }); },
+  snareSpring(C, zn) { const K = v2K(C); sfxAdd({ k: 'vflash', x: zn.x, z: zn.z, h: .2, s: .35 * C.S, life: .12, col: K.hot, a: .6 * sfxZk() }); },
+  snareSnap(C, zn) {
+    const K = v2K(C); sfxAdd({ k: 'vflash', x: zn.x, z: zn.z, h: .35, s: .6 * C.S, life: .16, col: K.hot, a: .9 * sfxZk() });
+    v2Spray(C, 'spark', zn.x, zn.z, .35, 8, { sp: 1.2 });
+    if (typeof flashLight === 'function' && G.flashes && G.flashes.length < 6) flashLight(zn.x, zn.z, .5, [1.1, .85, 1.6], 1.8, .3);
+  },
   orbGather(C, t, orb) { const K = v2K(C); sfxAdd({ k: 'ccx_orb', orb, S: C.S * C.T.glow, col: K.a, hot: K.hot, life: (orb.until - G.time) + .1 }); v2Wind(C, { wu: .3, r: .55, n: 8, hk: 1.15 }); },
   orbFeed(C, t, orb) {
     const K = v2K(C), m = sfxMuzzle(t), o = orb.t, h = towerTop(o) + .55; if (!m) return;
@@ -33257,8 +33300,8 @@ const CCX_FX = {
   hourStop(C, c) { const h = ccxFoeH(c); v2Clock(C, c.x, c.y, .42, { spin: .05, life: .9 }); sfxAdd({ k: 'vstar', x: c.x, z: c.y, h, s: .4 * C.T.glow, life: .25, col: v2K(C).hot, rot: R(TAU) }); v2Spray(C, 'gold', c.x, c.y, h, 4, { sp: .3 }); },
 };
 
-// Spell Damage shapes (itempower.js SP_SHAPE): a curtain lands at most two missiles on a foe; the Bulwark pounds every half second
-if (typeof SP_SHAPE !== 'undefined') { SP_SHAPE.cc_sparks = 'a h2'; SP_SHAPE.cc_boulder = 'a h:dur/.5'; }
+// Spell Damage shapes (itempower.js SP_SHAPE): the snare's snap strikes each foe it caught once; the Bulwark pounds every half second
+if (typeof SP_SHAPE !== 'undefined') { SP_SHAPE.cc_undertow = 'a'; SP_SHAPE.cc_boulder = 'a h:dur/.5'; }
 
 /* ================= THE STORMBORN: every second and third spell made a signature move (the "cool" pass, 6 Nov 2026) =================
    The owner: "do a pass on all second and third spells making each unique and interesting, aim for the cool factor like the
@@ -34857,7 +34900,7 @@ const CAST_T = {
   so_toll: .8, so_peal: 1.2, so_knell: 1,
   // the Conclave
   cc_blinkstrike: 0, cc_sigilcleave: .4, cc_spectral: .5,
-  cc_barrage: .6, cc_sparks: .7, cc_grandorb: 0,
+  cc_barrage: .6, cc_undertow: .5, cc_grandorb: 0,
   cc_glacialglyph: .8, cc_rimelance: .8, cc_hoarbloom: 1,
   cc_dilation: .9, cc_quicken: .5, cc_echo: .8,
   cc_fallingstar: 1, cc_omen: .5, cc_orrery: 1,
@@ -35503,7 +35546,7 @@ const LF_ARCH = {
 };
 for (const [kind, list] of Object.entries({
   raise: 'so_rebuke .9 so_flare 1 so_vow 1.4 so_halo 1.2 so_embers 1.2 cc_grandorb 1.1 cc_hoarbloom 1 cc_quicken .8 cc_fallingstar 1 sb_packhowl 1.4 sb_spiritbear 1.6 sb_calllightning .9 sb_thunderbird 1.3 sb_herd 1.4',
-  thrust: 'so_bash .6 so_witness 1.2 so_bind 1 so_sunlance 1.1 so_hammerfall 1.6 cc_spectral .8 cc_sparks .6 cc_rimelance .6 cc_boulder 1 cc_kindle .7 sb_pounce .7 sb_stormspear 1 sb_spiritchains 1.1',
+  thrust: 'so_bash .6 so_witness 1.2 so_bind 1 so_sunlance 1.1 so_hammerfall 1.6 cc_spectral .8 cc_undertow .6 cc_rimelance .6 cc_boulder 1 cc_kindle .7 sb_pounce .7 sb_stormspear 1 sb_spiritchains 1.1',
   slam: 'so_dawnfall 1.2 so_crush 1.1 cc_glacialglyph 1 cc_seismic 1 sb_reckoning .9 sb_stonetotem 1',
   shoot: 'so_sanct 1 sb_galearrow .9 sb_skyshot 1',
   sweep: 'so_hail .8 so_sweep .9 cc_sigilcleave .8 cc_flamewave 1 sb_crosswind 1.1 sb_stormdance 1.3',
@@ -39559,7 +39602,7 @@ function fshopCats() {
    The rules, drops and UI are forces_zzzz_sets.js and fsets_ui.js (S.epic). Each set's (2) leans on one of the unit's
    spells; its (4) changes how the unit plays: a spell that casts another, a state that spreads. Pieces: [id, name, 3, icon,
    hue, 'stat weights']; the fourth is the charm. Loaded after every other forces_* file, so the spells are their final
-   selves (forces_zxc_conclave_cool.js: Riposte Stance, Crosscut Sigil, Missile Curtain, Gathering Orb, Hoarfrost Trail,
+   selves (forces_zxc_conclave_cool.js: Riposte Stance, Crosscut Sigil, Undertow Rune, Gathering Orb, Hoarfrost Trail,
    Rime Lattice, Backward Hour, Lodestar, Grand Orrery, Heave, Living Bulwark, Skipping Flame, Phoenix, Returning
    Crescent, Rend the Veil). */
 
@@ -39601,17 +39644,17 @@ if (typeof fsetAdd === 'function') {
       });
     } });
 
-  /* ---------- Magelings: the orb bursts into a curtain of missiles ---------- */
-  fsetAdd({ id: 'fe_cc_orb', epic: 1, spells: ['cc_sparks', 'cc_grandorb'], force: 'conclave', unit: 'arrow', name: 'The Prodigy’s Overflow',
+  /* ---------- Magelings: the undertow and the orb feed each other ---------- */
+  fsetAdd({ id: 'fe_cc_orb', epic: 1, spells: ['cc_undertow', 'cc_grandorb'], force: 'conclave', unit: 'arrow', name: 'The Prodigy’s Overflow',
     pieces: [['fe_cc_orbwand', 'Wand of Brimming Light', 3, 'stars', '#c9a0ff', 'sp as'], ['fe_cc_inkcuffs', 'Ink-Starred Cuffs', 3, 'feather', '#d8c8ff', 'sp mana']],
     old: [['fe_cc_hatband', 'Hatband of Hung Missiles', 3, 'halo', '#e0c8ff', 'sp cd range'], ['fe_cc_marblebag', 'Pouch of Glass Marbles', 3, 'ring', '#b0a0ff', 'mana regen']],
-    b2: 'Each Missile Curtain missile that sets off a reaction brings Gathering Orb 1s nearer. When Gathering Orb’s burst strikes, it casts Missile Curtain at once, free, and every foe the burst strikes takes a seeking missile for each element mark it bears or just lost (up to 3).',
+    b2: 'Each Undertow Rune that snaps shut on a foe brings Gathering Orb 2s nearer. When Gathering Orb’s burst strikes, it casts Undertow Rune at once, free, and every foe the burst strikes takes a seeking missile for each element mark it bears or just lost (up to 3).',
     hit(t, c, amt, sp, n) {
-      if (sp === 'cc_sparks' && !c.dead && ccWillReact(c, 'arcane')) fsReady(t, 'cc_grandorb', 1);
+      if (sp === 'cc_undertow' && !((t.feSnT || 0) > G.time)) { t.feSnT = G.time + .5; fsReady(t, 'cc_grandorb', 2); }
       if (n < 2 || sp !== 'cc_grandorb') return;
       if (!((t.feOrbT || 0) > G.time)) {
         t.feOrbT = G.time + 3; const S = this;
-        fsLater(.25, () => { if (fsFreeCast(t, 'cc_sparks')) fsGlint(t, S); });
+        fsLater(.25, () => { if (fsFreeCast(t, 'cc_undertow')) fsGlint(t, S); });
       }
       if (c.dead) return;
       const k = Math.min(3, ccMarksRecent(c, .5).length);
@@ -40501,7 +40544,7 @@ const cxChamp = (u, cap) => { for (const o of G.towers) if (o.def && o.def.unit 
 
   // Magelings: Missile Swarm | Lecture Hall | Unstable Charge
   put(T.arrow.list, 'Missile Swarm', GT('Missile Swarm', 'arrows2', 4, 0, 1, `Arcane Barrage becomes a stream: for 3s it looses a missile every ${CX.STREAM_GAP}s at the toughest foes in range, ${CX.STREAM_N} in all, each as hard as a Barrage missile.`, {}, { cap: 'ccxStream' }));
-  put(T.arrow.list, 'Arcane Torrent', GT('Lecture Hall', 'orb', 4, 1, 1, 'Gathering Orb draws on the whole Conclave: while it gathers, every strike of a Conclave unit within 2 cells of the Mageling also pours half its blow into the orb.', {}, { cap: 'ccxHall' }));
+  put(T.arrow.list, 'Arcane Torrent', GT('Lecture Hall', 'orb', 4, 1, 1, 'Gathering Orb draws on the whole Conclave: while it gathers, every strike of a Conclave unit within 2 cells of the Mageling also pours half its blow into the orb, and each Undertow Rune brings Gathering Orb 3s nearer.', {}, { cap: 'ccxHall', sp: { ab: 'cc_undertow', ready: ['cc_grandorb', 3] } }));
 
   // Frostweavers: Flash Freeze | Glacier Script | Lingering Rime (Scrivener's Hand to row IV)
   put(T.frost.list, 'Flash Freeze', GT('Flash Freeze', 'iceblock', 4, 0, 1, 'Rime Lattice spends no glyphs: each erupts and stays to erupt again. Its ice bridges freeze the ground foes they cross for 0.6s, and each Rime Lattice brings Glacial Glyph 2s nearer.', {}, { cap: 'ccxBridgeFrz', sp: { ab: 'cc_hoarbloom', ready: ['cc_glacialglyph', 2] } })).capK = 2;
@@ -42862,7 +42905,7 @@ function ccfTal(list, name, nt) {
   ccfTal(T.arrow.list, 'Scrying Lens', GT('Copied Lesson', 'rune', 0, 0, 2, n => `When a Conclave unit of another school casts within ${CCF.COPY_R} cells of it, its next ${2 * n} missiles mark their foes with that school's element too.`, {}, { cap: 'ccfCopy' }));
   ccfTal(T.arrow.list, 'Barrage Drill', GT('Recitation', 'missiles', 0, 2, 2, n => `Arcane Barrage recites the elements it sees: one more missile for each other element marked on the foes in range (up to ${n}).`, {}, { cap: 'ccfRecite', sp: { ab: 'cc_barrage' } }));
   ccfTal(T.arrow.list, 'Inkwell', GT('Margin Notes', 'potion', 0, 3, 2, n => `Each time another unit sets off a reaction with an Arcane mark its missiles laid, it takes notes: ${6 * n} mana.`, {}, { cap: 'ccfNotes' }));
-  ccfTal(T.arrow.list, 'Spark Battery', GT('Charged Curtain', 'boltup', 2, 2, 1, "Each Missile Curtain missile that dives on a foe marked with another element gives it an Arcane Charge.", {}, { cap: 'ccfCurtain', sp: { ab: 'cc_sparks' } }));
+  ccfTal(T.arrow.list, 'Charged Missiles', GT('Charged Missiles', 'boltup', 2, 2, 1, "An Arcane Barrage that strikes a foe marked with another element gives it an Arcane Charge (one a cast).", {}, { cap: 'ccfCurtain', sp: { ab: 'cc_barrage' } }));
   // Frostweavers: cold written on the road
   ccfTal(T.frost.list, 'Biting Cold', GT('Hoar Ink', 'snowflake', 0, 0, 3, n => `Its bolts on a frozen ground foe write a small frost glyph under it that lasts ${1 + n}s (once a foe every ${CCF.INK_GAP}s).`, {}, { cap: 'ccfInk' }));
   ccfTal(T.frost.list, 'Steady Glyphwork', GT('Practised Hand', 'rune', 0, 1, 2, n => `Each frost glyph it writes brings Glacial Glyph ${gNf(.5 * n)}s nearer.`, {}, { cap: 'ccfHand' }));
@@ -42980,7 +43023,7 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
   if (ab && !o.dot && ccUnit(t) && pre.slowed && c.ccfSlowBy && c.ccfSlowByT > G.time && ccfLive(c.ccfSlowBy) && ccfCap(c.ccfSlowBy, 'ccfSand') && !((c.ccfSandT || 0) > G.time)) { c.ccfSandT = G.time + CCF.SAND_GAP; gainMana(c.ccfSlowBy, 2 * ccfCap(c.ccfSlowBy, 'ccfSand')); ccEv('tal:ccfSand'); }
   if (u === 'cc_mageling') {
     if (basic && t.ccfCopyN > 0 && t.ccfCopyS && !c.dead) { t.ccfCopyN--; ccMark(c, t.ccfCopyS, t); ccEv('tal:ccfCopy'); }   /* Copied Lesson */
-    if (ab === 'cc_sparks' && C.ccfCurtain && pre.marks.some(s => s !== 'arcane')) { ccGain(t, 1); ccEv('tal:ccfCurtain'); }   /* Charged Curtain */
+    if (ab === 'cc_barrage' && C.ccfCurtain && !o.dot && pre.marks.some(s => s !== 'arcane') && !((t.ccfChgT || 0) > G.time)) { t.ccfChgT = G.time + .9; ccGain(t, 1); ccEv('tal:ccfCurtain'); }   /* Charged Missiles: one charge a Barrage */
   } else if (u === 'cc_rimeweaver' && basic) {
     if (C.ccfInk && pre.frozen && ccWalker(c) && !c.dead && !((c.ccfInkT || 0) > G.time)) { c.ccfInkT = G.time + CCF.INK_GAP; ccFrostGlyph(t, st, c.x, c.y, 1, { r: .45, t: 1 + C.ccfInk }); ccEv('tal:ccfInk'); }   // Hoar Ink
     if (C.ccfNeedle && pre.frozen) {   // Needle Frost
@@ -47554,7 +47597,7 @@ const BR_DATA = {
   bogwitch: ['Long Spit|reach .4', 'Hungry Fen|specho .25', 'Black Water|spshred 2 8'],
   // ---- the Conclave ----
   cc_spellblade: ['Riftreach|reach .3; chain .35 1.4', 'Rift Surge|spcd .22; spslow .2 1.2', 'Spectral Edge|pierce .5 2'],
-  cc_mageling: ['Farsight|reach .6', 'Splitting Missile|chain .4 1.6', 'Missile Curtain Line|pierce .45 2'],
+  cc_mageling: ['Farsight|reach .6', 'Splitting Missile|chain .4 1.6', 'Missile Line|pierce .45 2'],
   cc_rimeweaver: ['Frost Echo|specho .25', 'Brittle Frost|spshred 2 8; spcd .1', 'Shatter Spread|spjump .5; sppow .1'],
   cc_chronomancer: ['Recurrence|specho .25', 'Quickened Allies|aura .12 1.8', 'Stopped Moment|spmark .12 3; spctl .2'],
   cc_astrologer: ['Falling Echo|specho .25', 'Lodestar Mark|spmark .12 3', 'Comet Spread|spjump .5; sppow .1'],
@@ -48569,7 +48612,7 @@ const TAL_SPREAD = {
   "champ:thornbow": {"Steady Draw":[0,1],"High Boughs":[0,2],"Snaring Rain":[0,3],"Root Platform":[2,0],"Farshot":[1,1],"Barbed Shafts":[2,1],"Thorn Rain":[1,0],"Hunter’s Patience":[4,2],"Blood Moon":[5,3],"Snarled Ground":[3,1],"Running Shafts":[3,3],"Warden’s Mark":[3,0],"Hunter’s Moon":[4,3],"Watchtower Bough":[5,1],"Fletcher's Pace":[1,2],"Captain's Share":[4,0],"Moonlit Aim":[5,2]},
   "champ:hivemother": {"Ripe Seeds":[1,2],"Drifting Pods":[2,0],"Passing Spores":[1,3],"Compost":[3,1],"Moth Swarm":[2,2],"Thick Garden":[3,2],"Sticky Pollen":[3,3],"Pollen Drift":[4,1],"Overripe":[5,3],"Bloom of Moths":[5,1],"Swarm Song":[0,1],"Seedmother":[5,2],"Full Bloom":[4,3],"Rotfeast":[4,0],"Busy Hive":[0,2],"Honey Store":[1,0]},
   "conclave.glaive": {"Measured Cuts":[0,1],"Opening Salute":[1,3],"Lone Duel":[2,3],"Riftsteel Edge":[1,2],"Ward-Splitter":[1,1],"Charged Edge":[2,1],"Twin Riftblades":[5,0],"Unbroken Step":[3,0],"Thousand Edges":[4,1],"Thrown Riftblade":[4,0],"Fifth Form":[4,3],"Phase Dancer":[3,1],"Ghostblade Rush":[5,1],"Weaver's Blade":[5,2],"Press the Opening":[0,0],"Binding Cut":[0,2],"Guard Broken":[3,2]},
-  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Homing Missiles":[2,2],"Apprentice's Zeal":[4,3],"Missile Curtain":[1,2],"Echoing Missiles":[3,2],"Charged Curtain":[3,0],"Gathering Orb":[3,3],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,3],"Cold Focus":[0,3],"Lecture Hall":[5,3],"Margin Notes":[1,1],"Recitation":[1,0],"Static Sparks":[2,1]},
+  "conclave.arrow": {"Twin Casting":[0,1],"Copied Lesson":[0,2],"Missile Swarm":[5,2],"Weighted Missiles":[2,2],"Apprentice's Zeal":[4,3],"Long Recital":[1,2],"Echoing Missiles":[3,2],"Charged Missiles":[3,0],"Gathering Orb":[3,3],"Unstable Charge":[5,1],"Orb Lattice":[4,1],"Study the Reaction":[2,3],"Cold Focus":[0,3],"Lecture Hall":[5,3],"Margin Notes":[1,1],"Recitation":[1,0],"Static Sparks":[2,1],"Undertow Rune":[4,0],"Drawstring":[5,0]},
   "conclave.frost": {"Spreading Frost":[0,3],"Biting Spear":[1,1],"Frozen Lance":[5,2],"Second Spear":[4,3],"Entomb":[1,3],"Cold Eye":[3,1],"Ice Coffin":[2,1],"Winter's Garden":[5,0],"Shatterbloom":[4,0],"Deep Chill":[4,2],"Coffin Burst":[5,1],"Cold Library":[2,2],"Absolute Stillness":[3,0],"Practised Hand":[0,1],"Singing Ice":[1,0],"Needle Frost":[0,2],"Brittle Coffin":[3,3]},
   "conclave.arcane": {"Lagging Hour":[2,0],"Tick Forward":[3,3],"Borrowed Time":[3,1],"Heavy Hours":[0,1],"Backward Hour":[2,1],"Paradox":[2,3],"Stopped Clock":[4,2],"Quickening Bell":[5,2],"Frozen Moment":[5,1],"Hourglass Heart":[4,0],"Recurrence":[4,3],"Rewound Wounds":[1,1],"Arcane Clockwork":[3,2],"Borrowed Hour":[5,3],"Pendulum Swing":[1,2],"Stolen Sand":[0,0],"Patient Hours":[0,2]},
   "conclave.storm": {"Wide Heavens":[0,0],"Star-Chart":[1,3],"Constellation":[5,1],"Skybreaker":[1,1],"Comet":[2,1],"Lodestar":[2,3],"Grounded Stars":[4,0],"Zodiac":[4,2],"Starfall Sky":[5,2],"Twin Stars":[5,3],"Grand Orrery":[3,0],"Twinkling Ice":[2,0],"Frost Lens":[3,3],"Turning Spheres":[4,1],"Night Sight":[0,1],"Cold Starlight":[0,2],"Ill Omen":[3,2]},
@@ -48772,20 +48815,23 @@ function talRankSteps(t) {
     'Twin Casting': { tag: 'Damage', pro: n => `Every ${ord(6 - n)} cast looses a second missile at the same foe.` },
     'Copied Lesson': { tag: 'Elements', pro: n => `After another school casts within 2 cells, its next ${2 * n} missiles carry that element.` },
     'Missile Swarm': { tag: 'Spell', pro: 'Arcane Barrage becomes a 3s stream of 15 missiles at the toughest foes.' },
-    'Homing Missiles': { tag: 'Spell', pro: n => `Missile Curtain hangs ${n} more missile${n > 1 ? 's' : ''}.` },
+    'Weighted Missiles': { tag: 'Control', pro: n => `Arcane Barrage's missiles slow foes ${10 * n}% for 1.5s.` },
+    'Long Recital': { tag: 'Spell', pro: 'Arcane Barrage reaches 0.5 cells farther.' },
     "Apprentice's Zeal": { tag: 'Control', pro: n => `Gathering Orb's burst slows foes ${20 * n}% for 2s.`,
       sp: n => ({ ab: 'cc_grandorb', rider: { slow: [.2 * n, 2] } }) },
     'Echoing Missiles': { tag: 'Elements', pro: 'Each Echo its missiles set off repeats the missile 0.4s later for 70%.' },
-    'Charged Curtain': { tag: 'Elements', pro: 'Missile Curtain gives an Arcane Charge for each foe it hits bearing another element.' },
+    'Charged Missiles': { tag: 'Elements', pro: 'Arcane Barrage gives an Arcane Charge when it hits a foe bearing another element (one a cast).' },
     'Unstable Charge': { tag: 'Elements', pro: 'A full Arcane Charge fires a free Arcane Barrage at 60%, keeping 2 charges.' },
-    'Orb Lattice': { tag: 'Elements', pro: "Gathering Orb marks foes with each nearby school's element, and readies Missile Curtain 2s sooner." },
+    'Orb Lattice': { tag: 'Elements', pro: "Gathering Orb marks foes with each nearby school's element, and readies Arcane Barrage 2s sooner." },
     'Study the Reaction': { tag: 'Mana', pro: n => `Each reaction it sets off gives it ${10 * n} mana.` },
     'Cold Focus': { tag: 'Damage', pro: n => `Its missiles land crits on Frozen foes ${15 * n}% of the time.` },
-    'Lecture Hall': { tag: 'Spell', pro: 'While Gathering Orb gathers, Conclave units within 2 cells pour half their blows into it.' },
+    'Lecture Hall': { tag: 'Spell', pro: 'While Gathering Orb gathers, Conclave units within 2 cells pour half their blows into it, and each Undertow Rune readies Gathering Orb 3s sooner.',
+      sp: { ab: 'cc_undertow', ready: ['cc_grandorb', 3] } },
     'Margin Notes': { tag: 'Mana', pro: n => `Gains ${6 * n} mana when another unit reacts with an Arcane mark it laid.` },
     'Recitation': { tag: 'Spell', pro: n => `Arcane Barrage adds a missile for each other element marked in range, up to ${n}.` },
-    'Static Sparks': { tag: 'Control', pro: n => `Missile Curtain's missiles stun the foes they hit for ${f(.2 * n)}s.` },
-    'Missile Curtain': { tag: 'Spell' }, 'Gathering Orb': { tag: 'Spell' },
+    'Static Sparks': { tag: 'Control', pro: n => `Arcane Barrage's missiles stun the foes they hit for ${f(.1 * n)}s.` },
+    'Drawstring': { tag: 'Control', pro: 'Undertow Rune springs 0.3 cells wider, and its snap stuns every foe it caught for 0.6s.' },
+    'Undertow Rune': { tag: 'Spell' }, 'Gathering Orb': { tag: 'Spell' },
   });
 
   /* ---- Frostweavers ---- */
@@ -50555,7 +50601,7 @@ function efStats(reset) { const r = Object.assign({}, EF_STAT), n = r.over + r.s
 /* The ability shots that are not G.projs projectiles (their hits land through hurt alone): arrows, bolts, lances and thrown
    or lobbed things, by ability id. A hand list: add an id here for a new shot spell. Beams, zones, storms, slams and anything
    that falls from above stay out. Their blow comes from the caster. */
-const EF_ABIL = { aimedshot: 'arrow', volley: 'arrow', barrage: 'ball', ch_thornvolley: 'arrow', so_sunlance: 'bolt', so_flare: 'bolt', cc_barrage: 'bolt', cc_sparks: 'bolt', cc_grandorb: 'bolt', cc_rimelance: 'bolt', cc_boulder: 'ball',
+const EF_ABIL = { aimedshot: 'arrow', volley: 'arrow', barrage: 'ball', ch_thornvolley: 'arrow', so_sunlance: 'bolt', so_flare: 'bolt', cc_barrage: 'bolt', cc_grandorb: 'bolt', cc_rimelance: 'bolt', cc_boulder: 'ball',
   ih_slug: 'bolt', ih_rollingvolley: 'bolt', ih_shrapnelround: 'ball', ih_incendiary: 'ball', ih_bombard: 'ball', ch_rollkeg: 'ball', ch_firebrew: 'ball', sb_stormspear: 'bolt', sb_galearrow: 'arrow', sb_skyshot: 'arrow' };
 let EF_DOT = false;   // inside a hurt that is damage over time
 // ---- the game's side: know the shot that is landing, and note the fall on the foe it kills
@@ -52126,7 +52172,7 @@ const SFX_R = {};
     cc_sigilcleave: T('arcane', 'strike', 'none', 'nova', 2, { self: 1 }),
     cc_spectral: T('arcane', 'glyph', 'none', 'buff', 3, { r: .5 }),
     cc_barrage: T('arcane', 'glyph', 'orb', 'burst', 1),
-    cc_sparks: T('arcane', 'glyph', 'none', 'burst', 2),
+    cc_undertow: T('arcane', 'glyph', 'none', 'burst', 2),
     cc_grandorb: T('arcane', 'glyph', 'orb', 'nova', 3, { r: .8 }),
     cc_glacialglyph: T('frost', 'glyph', 'none', 'nova', 1, { spike: 1, pre: 'sigil' }),
     cc_rimelance: T('frost', 'glyph', 'line', 'burst', 2, { spike: 1 }),
@@ -54107,9 +54153,7 @@ SFX_V2_DEF.push(() => {
     hit: C => { const t = C.t; if (t) sfxAdd({ k: 'vflash', x: t.x, z: t.y, h: towerTop(t) + .1, s: .25 * C.S, life: .1, col: v2K(C).hot, a: .8 * sfxZk() }); },
     trail: (C, p, k, cc) => v2Trail(C, p, { w: .07, cc }),
     land: (C, x, z, h, k) => v2Hit(C, x, z, Math.max(.3, h), C.S * .5, { star: k % 3 ? 0 : 1, sp: 'wisp', n: 3, light: 0, ring: k % 2 ? 0 : 1 }) };
-  // Arcane Sparks: violet lightning leaps foe to foe, crackling, a spark-burst on each
-  SFX_V2.cc_sparks = { cast: C => { v2Wind(C, { wu: .05, r: .5 }); ccSparkArcs(C); }, steps: 8, hit: (C, k) => ccSparkArcs(C) };
-  function ccSparkArcs(C) { v2NewBolts(C, (a, b) => { v2Bolt(C, a[0], a[1], a[2], b[0], b[1], b[2], { w: .035, life: .22, br: 1, jag: .2 }); v2Hit(C, b[0], b[2], b[1], C.S * .45, { star: 0, sp: 'spark', n: 3, light: 0, ring: 0 }); }); C.nb = G.bolts.length; }
+  // (Undertow Rune draws itself: forces_zxc_conclave_cool.js ccx_snare, magefx.js)
   // Grand Orb: the orb swells over the hat, then rolls down the exact line, a band of arcana under it, runes shed behind it,
   // a great burst where it ends
   SFX_V2.cc_grandorb = { cast: C => v2Wind(C, { wu: .5, r: .6, n: 9, hk: 1.1 }), steps: 1, hit: () => {},
@@ -55782,7 +55826,7 @@ const EP_ABIL = {
   so_rebuke: { drain: 40, say: 'The light burns away 40 mana from each caster it strikes.' },
   so_sunlance: { vsMana: 1, say: 'Sunlight feeds on stored magic: against a caster it hits up to double at a full pool.' },
   // the Conclave
-  cc_sparks: { drain: 25, say: 'Each spark drinks 25 mana from the caster it strikes.' },
+  cc_undertow: { drain: 20, say: 'Its snap tears 20 mana from each caster it caught.' },
   cc_barrage: { vsMana: 1, say: 'The missiles seek stored magic: against a caster each hits up to double at a full pool.' },
   // Ironhold
   ih_runebrand: { drain: 50, seal: 8, say: 'The brand burns 50 mana from a caster and seals it: no mana comes back for 8s.' },
@@ -57988,7 +58032,7 @@ const AudioSys = (() => {
       const e1 = t + .22, o1 = osc('sine', 233 * p, t, e1), g1 = gn(0); o1.frequency.exponentialRampToValueAtTime(150 * p, t + .16); shape(g1.gain, t, [[.012, 1], [.08, .4], [.2, 0]]); o1.connect(g1); out(g1, .13, { pan, room: .15 }, t, e1);
       nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 700], [.15, 260]], q: .6, pts: [[.01, .8], [.06, .35], [.18, 0]], v: .16, pan });
     },
-    // arcane light gathered (Missile Curtain hung, the Gathering Orb begun): a low hum swelling and let go, in place of
+    // arcane light gathered (Undertow Rune written, the Gathering Orb begun): a low hum swelling and let go, in place of
     // the high sweep of 'arcane'. arg 1: the orb's longer swell
     arcgather(big) {
       if (!ok('agt', .2, 200)) return; const t = now(), p = rnd(.96, 1.04), pan = sp(.3), D = big ? 1.1 : .6;
@@ -82783,7 +82827,7 @@ const SPELL_BRIEFS = {
   cc_sigilcleave: 'Cuts a warded, shielded, plated or magic-resistant enemy in reach for {d} and splits it open for {dur} sec: shield broken, ward cracked, armour stripped, so every spell and reaction strikes it whole.',
   cc_spectral: 'Hurls a spectral copy of its blade through a line of ground enemies for {d} each, with a stack of Stagger; it returns through the rift, cutting each again for half.',
   cc_barrage: 'Fires {n} seeking missiles, {d} each. Each tears 12% off a ward and hits casters up to twice as hard at full mana.',
-  cc_sparks: 'Hangs {n} missiles for 4 sec. Each dives at the first enemy under it for {d} and drains 25 mana from casters. A missile hitting a foe marked with another element splits and hits a second enemy.',
+  cc_undertow: 'Carves a rune on the road that springs after 0.35 sec. Every enemy within {r} cells, flyers too, is drawn along the road to its heart for 1.1 sec (bosses a third as far), then it snaps shut for {d} each.',
   cc_grandorb: 'For {gather} sec, Magelings\' missiles within 2 cells feed an orb. It then hurls the orb, dealing {d} plus 120% of stored damage, 80% to nearby enemies, each marked Arcane.',
   cc_glacialglyph: 'Hurls a spear of ice at the toughest enemy in range, air or ground, dealing {d}, marking it Frost and slowing it for a few sec.',
   cc_rimelance: 'Locks the toughest enemy in range in a block of ice for {dur} sec (bosses less): it is Frozen and cannot move, and takes {d} of cold over the hold.',
@@ -82971,7 +83015,7 @@ const SPELL_TARGETS = {
   cc_sigilcleave: 'a warded or magic-resistant enemy, else the toughest',
   cc_spectral: 'the line through the most ground enemies',
   cc_barrage: 'the three toughest enemies in range',
-  cc_sparks: 'the densest group of enemies',
+  cc_undertow: 'the densest spread-out group of enemies',
   cc_grandorb: 'the densest group of enemies',
   cc_glacialglyph: 'the toughest enemy in range',
   cc_rimelance: 'the toughest enemy in range not already frozen',
@@ -85322,94 +85366,204 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -85418,75 +85572,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -93046,7 +93332,7 @@ if (typeof pauseMenu === 'function') {
        attack    the one-hand cast: the wind-up plays over the game's own wind-up (t.windup), so the release frame (meta.rel)
                  lands on the shot; then the follow-through
        barrage   Arcane Barrage: the step-in push, the right hand held out trembling while the missiles stream from it
-       curtain   Missile Curtain: she squares up and the left hand leads, sweeping wide across the road
+       curtain   Undertow Rune: she squares up and the left hand leads, sweeping wide across the road (the snare cast)
        orbstart / orbhold / orbthrow   Gathering Orb: down into a crouch, the cupped hands circling while the orb gathers,
                  then the rise and the fling, its release frame on the hurl (t.ccxOrbThrowAt)
    - Every move is eased into from where she was (a per-unit pose followed at a rate by kind).
@@ -93054,7 +93340,7 @@ if (typeof pauseMenu === 'function') {
    - The hand's faint glow (emw on its vertices) brightens a moment at each release; nothing else is drawn round her. */
 const ML_UNIT = 'cc_mageling';
 UM_UNITS[ML_UNIT] = { mdl: 'mageling', k: .82, rig: 'mage', trim: .32 };   // (trim: her white robe, held back from the sculpt shader's boost so its folds read)
-const ML = { CAST: { cc_barrage: 'barrage', cc_sparks: 'curtain', cc_grandorb: 'orbstart' }, RATE: { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW: .1 };
+const ML = { CAST: { cc_barrage: 'barrage', cc_undertow: 'curtain', cc_grandorb: 'orbstart' }, RATE: { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW: .1 };
 // her shots (each missile of a strike, Twin Casting's second, the Starry Hat's: one release a strike) and her casts
 if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_missile) {
   const _mlAtk = FORCE_ATTACK.cc_missile;
@@ -93818,15 +94104,15 @@ if (typeof towerTop === 'function') {
      attack     her missile: the hand drawn back by her ear over the game's own wind-up (t.windup), thrown straight out so the
                 release frame lands on the shot, the arm straight; the follow-through after
      barrage    Arcane Barrage: a step in, the right hand thrust out and held, kicking with each missile (0.1 to 0.6 s)
-     curtain    Mana Sparks: the LEFT hand snapped out at the foes as the spark leaves it, then drawn across before her
+     curtain    Undertow Rune: the LEFT hand snapped out at the road as the snare leaves it, then drawn across before her
      orbstart / orbhold / orbthrow   Gathering Orb: both hands raised to the orb gathering over her head, circling under
                 it; then drawn back and hurled forward with a step, the release on the hurl (t.ccxOrbThrowAt)
    Every move is eased into from where she was (the pose followed at a rate by kind, bone by bone, by quaternion).
-   Her missiles and sparks leave the casting hand where it is drawn (t.tipW: the right palm; Mana Sparks the left).
+   Her missiles and sparks leave the casting hand where it is drawn (t.tipW: the right palm; Undertow Rune the left).
    Checks: `python tools/make_mageling2.py --check`. Notes: docs/model_pilot/mageling2.md. */
 const MAGE2 = (() => {
   const U = typeof ML_UNIT !== 'undefined' ? ML_UNIT : 'cc_mageling';
-  const CAST = { cc_barrage: 'barrage', cc_sparks: 'curtain', cc_grandorb: 'orbstart' }, RATE = { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW = .1, K0 = .82, TRIM = .32;
+  const CAST = { cc_barrage: 'barrage', cc_undertow: 'curtain', cc_grandorb: 'orbstart' }, RATE = { idle: 4, ready: 8, atk: 45, move: 30 }, FOLLOW = .1, K0 = .82, TRIM = .32;
   const S = { on: true };
   try { S.on = !/[?&]mage=old\b/.test(location.search); } catch (e) {}
   let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1;
@@ -98744,28 +99030,28 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof efxSync === 'function') efxSync();
 }
 
-/* ================= THE MAGELINGS' ARCANE LIGHT: missiles, a curtain of them hung over the road, a gathering orb =================
+/* ================= THE MAGELINGS' ARCANE LIGHT: missiles, a snare sprung on the road, a gathering orb =================
    Unit seven of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules so far: light and
    energy are smooth shader effects, not faceted meshes ("needs to look like a holy laser ... more realistic to match the
    [new] model"); nothing is a mark on the ground; never too flashy; projectiles fly straight and level. Until now a missile
-   was a glow sprite with a spinning star and four dots behind it, swerving out sideways before it turned in; the Curtain
+   was a glow sprite with a spinning star and four dots behind it, swerving out sideways before it turned in; the Curtain (now the Undertow Rune)
    small darts on a thread; the Orb a few sprites over the hat, lobbed on an arc into a ring and a burst of runes.
      the strike       a comet of violet light: a white-hot head, a tapering tail of light behind it, a few sparks shed; it
                       flies straight from her hand to its foe (the game still moves it its own way and lands it when it
                       always did); a small flare and a scatter of sparks where it lands
      Arcane Barrage   the same missiles in a stream, light gathered at her hand while she looses them (no glyph under her)
-     Missile Curtain  the missiles hung across the road as points of light, each with a faint veil of light falling from
-                      it to the road, so the curtain's real line shows; a thread of light between them; each dives straight
+     Undertow Rune     a ring of light on the road at its real radius, written round as it arms, drawn in as it pulls; a
+                      thin thread of light from its heart to each foe it holds; a flare and sparks as it snaps shut
      Gathering Orb    a ball of light over her hat that swells with every missile fed to it, light drawn in from each
                       Mageling feeding it; thrown straight; where it lands, a burst of light out to its real reach (no ring)
    All of it is cards of the plant shader (seedtex.js: BEAM, FLARE, GLOW, MOTE), through the Seedcasters' kit (seedfx.js).
    The switch is theirs: SD.off (the Element Lab's "Old look") or no toolkit brings the older drawing back. Gameplay,
-   timing and balance are untouched. Tuning: the Element Lab's entries arcmissile, cc_barrage, cc_sparks, cc_grandorb. */
-const MGF = { quiet: 0, casts: [], streaks: [], throws: [], bursts: [] };
+   timing and balance are untouched. Tuning: the Element Lab's entries arcmissile, cc_barrage, cc_undertow, cc_grandorb. */
+const MGF = { quiet: 0, casts: [], streaks: [], throws: [], bursts: [], runes: [] };
 const MGF_VIO = [.66, .42, 1], MGF_HOT = [.93, .88, 1], MGF_DEEP = [.4, .2, .78];
 // a soft body of deep violet behind a light: added light alone is lost on Greatroot Way's pale sunlit sand, this is not
 const mgfBody = (P, w, a, seed, s, l) => sdBill(SDT_SH.SPORE, P, w, w, { age: .25, seed, a, p0: .55, p1: 0, col: MGF_DEEP, soft: .1, sp: .4 }, s, l);
-if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { if (MGF.dust) MGF.dust.length = 0; MGF.casts.length = 0; MGF.streaks.length = 0; MGF.throws.length = 0; MGF.bursts.length = 0; });
+if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { if (MGF.dust) MGF.dust.length = 0; MGF.casts.length = 0; MGF.streaks.length = 0; MGF.throws.length = 0; MGF.bursts.length = 0; MGF.runes.length = 0; });
 const mgfOn = () => typeof sdOn === 'function' && sdOn();
 const mgfCC = () => typeof G !== 'undefined' && G && G.force === 'conclave';
 const _mgfC = new Map();
@@ -98880,8 +99166,8 @@ if (typeof sfxBasicLandCC === 'function') { const _l = sfxBasicLandCC; sfxBasicL
 // the game's own flare sprite where a missile lands
 if (typeof ccMissileHit === 'function') { const _mh = ccMissileHit; ccMissileHit = function () { MGF.quiet++; try { return _mh.apply(this, arguments); } finally { MGF.quiet--; } }; }
 if (typeof part === 'function') { const _pt = part; part = function (o) { if (MGF.quiet > 0 && o && o.k === 'flare' && mgfOn()) return; return _pt.apply(this, arguments); }; }
-// which spell loosed a missile (so the lab tunes the Barrage's and the Curtain's apart from the strike's)
-if (typeof ccShoot === 'function') { const _cs = ccShoot; ccShoot = function (p) { if (p && p.k === 'missile' && typeof AB_NOW !== 'undefined' && (AB_NOW === 'cc_barrage' || AB_NOW === 'cc_sparks')) p._mgs = AB_NOW; return _cs.apply(this, arguments); }; }
+// which spell loosed a missile (so the lab tunes the Barrage's apart from the strike's)
+if (typeof ccShoot === 'function') { const _cs = ccShoot; ccShoot = function (p) { if (p && p.k === 'missile' && typeof AB_NOW !== 'undefined' && AB_NOW === 'cc_barrage') p._mgs = AB_NOW; return _cs.apply(this, arguments); }; }
 
 /* ---- Arcane Barrage: light gathered at her hand while the missiles leave (the recipe's glyph and ribbons handed over) ---- */
 if (typeof SD_NORUN !== 'undefined') SD_NORUN.add('cc_barrage');
@@ -98905,26 +99191,38 @@ function mgfCasts(now) {
   }
 }
 
-/* ---- Missile Curtain: the missiles hung across the road, a veil of light under each ---- */
-function mgfCurtain(q) {
-  const z = q.zone, e = Math.min(1, q.age / .3, Math.max(0, z.until - G.time) / .25 + (z.ms.some(m => m.live) ? .2 : 0)); if (e <= .01) return;
-  const V = sdV('cc_sparks', 'hang'), k = sdOnL('cc_sparks', 'hang'); if (k == null) return;
-  const M = z.ms, now = G.time; let prev = null;
-  for (let j = 0; j < M.length; j++) {
-    const m = M[j], g = Math.max(0, Math.min(1, (q.age - m.at) / .25)); if (!m.live || g <= 0) { prev = null; continue; }
-    const h = m.h + .04 * Math.sin(now * 3 + j * 1.7), P = [m.x, h, m.z], a = e * g * k, w = V.w * (.9 + .1 * Math.sin(now * 9 + j * 2.3));
-    // the veil: faint light falling from it to the road (the line a foe must cross)
-    if (V.veil > 0) sdSeg(SDT_SH.BEAM, P, [m.x, .06, m.z], w * 2.2, w * 1.4, { seed: j * 7 + 1, k: 1, a: a * V.veil, p0: .6, p1: 1.5, p2: h, col: MGF_VIO, sp: .8 }, 'cc_sparks', 'hang');
-    // a short tail above it: it hangs nose-down
-    sdSeg(SDT_SH.BEAM, [m.x, h + .3, m.z], P, w * .4, w * 1.3, { seed: j * 7 + 2, k: 1, a: a * .8, p0: 1, p1: 1, p2: .3, col: MGF_VIO, sp: .5 }, 'cc_sparks', 'hang');
-    mgfBody(P, w * 2.2, a * .5, j * 5 + 3, 'cc_sparks', 'hang');
-    sdBill(SDT_SH.GLOW, P, w * 2.4, w * 2.4, { seed: j, a: a * .7, col: MGF_VIO }, 'cc_sparks', 'hang');
-    sdBill(SDT_SH.GLOW, P, w * .8, w * .8, { seed: j + 9, a: a * .9, col: MGF_HOT }, 'cc_sparks', 'hang');
-    mgfBall(P, w * .8, a, MGF_VIO, j * 3, sdLv(), 'cc_sparks', 'hang');
-    if (prev && sdLv()) sdSeg(SDT_SH.BEAM, prev, P, w * .9, w * .9, { seed: j, k: 1, a: a * V.thread, p0: 1, p1: .6, p2: .22, col: MGF_VIO, sp: .3 }, 'cc_sparks', 'hang');
-    prev = P;
+/* ---- Undertow Rune: a ring of light written on the road at its real radius, drawn in as it pulls; a thread of light from
+   its heart to every foe it holds; a hot knot at its heart that snaps shut (the foes stay in plain sight: thin light) ---- */
+function mgfSnare(q) {
+  const z = q.zone, now = G.time; q.age = now - z.at;
+  const arm = Math.min(1, (now - z.at) / CCX.SN_ARM), pull = Math.max(0, Math.min(1, (now - z.spring) / CCX.SN_PULL));
+  const e = Math.min(1, q.age / .15, Math.max(0, z.until + .05 - now) / .12); if (e <= .01) return;
+  const V = sdV('cc_undertow', 'sigil'), k = sdOnL('cc_undertow', 'sigil'), lv = sdLv(); if (k == null) return;
+  const sprung = now >= z.spring, r = z.r * (1 - .55 * pull * pull * (3 - 2 * pull)), a = e * k * (sprung ? 1 : .55 + .45 * arm), h = .18;
+  // the ring: arcs of light, written round as it arms, turning slowly
+  const n = [10, 14, 18][lv], drawn = Math.ceil(n * arm), spin = now * .5;
+  for (let j = 0; j < drawn; j++) {
+    const a0 = spin + j / n * TAU, a1 = spin + (j + .8) / n * TAU;
+    const A0 = [z.x + Math.cos(a0) * r, h, z.z + Math.sin(a0) * r], A1 = [z.x + Math.cos(a1) * r, h, z.z + Math.sin(a1) * r];
+    // (a deep violet body under the light: added light alone is lost on sunlit grass and sand)
+    mgfBody([(A0[0] + A1[0]) / 2, h, (A0[2] + A1[2]) / 2], V.w * 3.2, a * .55, j * 3 + 1, 'cc_undertow', 'sigil');
+    sdSeg(SDT_SH.BEAM, A0, A1, V.w, V.w, { seed: j, k: 1, a: a * V.a, p0: 1, p1: .6, p2: .2, col: sprung ? MGF_HOT : MGF_VIO, sp: .4 }, 'cc_undertow', 'sigil');
+  }
+  // runes round the ring and the knot at its heart
+  const m = Math.round(V.runes); for (let j = 0; j < m; j++) { const an = -now * .9 + j / m * TAU; sdBill(SDT_SH.GLOW, [z.x + Math.cos(an) * r, h + .04, z.z + Math.sin(an) * r], V.w * 3, V.w * 3, { seed: j + 3, a: a * .8, col: MGF_VIO }, 'cc_undertow', 'sigil'); }
+  mgfBall([z.x, .3, z.z], V.w * (1.6 + 1.6 * pull), a, MGF_VIO, 11, lv, 'cc_undertow', 'sigil');
+  if (!sprung) return;
+  const T = sdV('cc_undertow', 'tether'), kt = sdOnL('cc_undertow', 'tether'); if (kt == null) return;
+  for (const [c] of z.caught) {
+    if (c.dead) continue; const H = [c.x, (typeof v2FoeH === 'function' ? v2FoeH(c, hitH(c)) : hitH(c)), c.y], P0 = [z.x, .28, z.z];
+    const mid = [(P0[0] + H[0]) / 2, Math.max(P0[1], H[1]) * .5 + .12, (P0[2] + H[2]) / 2], w = T.w * (.9 + .1 * Math.sin(now * 20 + c.x));
+    for (const f of [.3, .6, .85]) mgfBody([P0[0] + (H[0] - P0[0]) * f, P0[1] + (H[1] - P0[1]) * f + .06, P0[2] + (H[2] - P0[2]) * f], w * 3, e * kt * .45, 9 + f * 10, 'cc_undertow', 'tether');
+    sdSeg(SDT_SH.BEAM, P0, mid, w * 1.2, w, { seed: 5, k: 1, a: e * kt * T.a, p0: 1, p1: .8, p2: .3, col: MGF_HOT, sp: 1.5 }, 'cc_undertow', 'tether');
+    sdSeg(SDT_SH.BEAM, mid, H, w, w * .7, { seed: 6, k: 1, a: e * kt * T.a * .85, p0: 1, p1: .8, p2: .3, col: MGF_VIO, sp: 1.5 }, 'cc_undertow', 'tether');
+    sdBill(SDT_SH.GLOW, H, w * 4, w * 4, { seed: 7, a: e * kt * .6, col: MGF_VIO }, 'cc_undertow', 'tether');
   }
 }
+function mgfRunes(now) { MGF.runes = MGF.runes.filter(q => now < q.zone.until + .1); for (const q of MGF.runes) { try { mgfSnare(q); } catch (e) {} } }
 // light running from her hand to where a missile will hang, and from each Mageling to the orb it feeds
 function mgfStreaks(now) {
   MGF.streaks = MGF.streaks.filter(q => now < q.at + q.life);
@@ -98984,19 +99282,24 @@ function mgfBurst(x, z, r, orb) {
 /* ---- the Conclave's own drawing of these handed over ---- */
 if (typeof SFX_DRAW !== 'undefined') {
   const take = (id, fn) => { const d0 = SFX_DRAW[id]; if (!d0 || d0._mgf) return !!d0; const f = function (q) { if (!mgfOn()) return d0.apply(this, arguments); try { fn(q); } catch (e) {} }; f._mgf = 1; SFX_DRAW[id] = f; return true; };
-  const all = () => take('ccx_curtain', mgfCurtain) & take('ccx_orb', mgfOrb);
+  const all = () => take('ccx_snare', mgfSnare) & take('ccx_orb', mgfOrb);
   if (!all() && typeof setTimeout === 'function') { let n = 0; const again = () => { if (!all() && n++ < 60) setTimeout(again, 250); }; setTimeout(again, 0); }
 }
 if (typeof CCX_FX !== 'undefined') {
-  const X = CCX_FX, o = { curtainHang: X.curtainHang, curtainDive: X.curtainDive, orbGather: X.orbGather, orbFeed: X.orbFeed, orbThrow: X.orbThrow, orbBurst: X.orbBurst, orbFizzle: X.orbFizzle };
+  const X = CCX_FX, o = { snareLay: X.snareLay, snareSnap: X.snareSnap, orbGather: X.orbGather, orbFeed: X.orbFeed, orbThrow: X.orbThrow, orbBurst: X.orbBurst, orbFizzle: X.orbFizzle };
   const K = C => (typeof v2K === 'function' ? v2K(C) : { a: [1, 1, 1], hot: [1, 1, 1] });
-  X.curtainHang = function (C, t, zn) {
-    if (!mgfOn()) return o.curtainHang.apply(this, arguments);
-    const k = K(C), m = mgfHand(t), V = sdV('cc_sparks', 'hang');
-    sfxAdd({ k: 'ccx_curtain', zone: zn, col: k.a, hot: k.hot, life: CCX.CURT_WAIT + .4 });
-    for (const q of zn.ms) mgfStreak(m, [q.x, q.h, q.z], V.w * .8, .22, q.at, 'cc_sparks', 'hang');
+  X.snareLay = function (C, t, zn) {
+    if (!mgfOn()) return o.snareLay.apply(this, arguments);
+    if (MGF.runes.length > 6) MGF.runes.shift(); MGF.runes.push({ zone: zn });   // (drawn with the frame's cards: SD_FRAMES below)
+    mgfStreak(mgfHand(t), [zn.x, .28, zn.z], sdV('cc_undertow', 'sigil').w * 2, .2, 0, 'cc_undertow', 'sigil');
   };
-  X.curtainDive = function (C, m) { if (!mgfOn()) return o.curtainDive.apply(this, arguments); if (sdOnL('cc_sparks', 'hang') != null) sdShot('flare', m.x, m.h, m.z, sdV('cc_sparks', 'hang').w * 2.2, .16, { col: MGF_HOT }, 'cc_sparks', 'hang'); };
+  X.snareSnap = function (C, zn) {
+    if (!mgfOn()) return o.snareSnap.apply(this, arguments);
+    if (sdOnL('cc_undertow', 'snap') == null) return; const V = sdV('cc_undertow', 'snap');
+    sdShot('flare', zn.x, .3, zn.z, V.flare, .2, { col: MGF_HOT }, 'cc_undertow', 'snap');
+    mgfSparks(zn.x, .3, zn.z, Math.round(V.count * [.4, .7, 1][sdLv()]), 1.6, MGF_HOT, 'cc_undertow', 'snap');
+    if (typeof flashLight === 'function' && G.flashes && G.flashes.length < 6) flashLight(zn.x, zn.z, .5, [1.1, .85, 1.6], 1.8, .3);
+  };
   X.orbGather = function (C, t, orb) { if (!mgfOn()) return o.orbGather.apply(this, arguments); const k = K(C); sfxAdd({ k: 'ccx_orb', orb, S: C.S * C.T.glow, col: k.a, hot: k.hot, life: (orb.until - G.time) + .1 }); };
   X.orbFeed = function (C, t, orb) { if (!mgfOn()) return o.orbFeed.apply(this, arguments); const V = sdV('cc_grandorb', 'orb'); mgfStreak(mgfHand(t), mgfOrbAt(orb.t), V.feed, .22, 0, 'cc_grandorb', 'orb'); };
   X.orbThrow = function (C, t, orb, x, z, T) {
@@ -99007,14 +99310,14 @@ if (typeof CCX_FX !== 'undefined') {
   X.orbBurst = function (C, x, z, r, orb) { if (!mgfOn()) return o.orbBurst.apply(this, arguments); mgfBurst(x, z, r, orb); };
   X.orbFizzle = function (C, orb) { if (!mgfOn()) return o.orbFizzle.apply(this, arguments); const t = orb.t; if (t) { const P = mgfOrbAt(t); mgfSparks(P[0], P[1], P[2], 6, .8, MGF_VIO, 'cc_grandorb', 'orb'); } };
 }
-if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { if (!mgfCC()) return; mgfDust(now); if (G.ccP) for (const p of G.ccP) if (p.k === 'missile' && !p.done) { try { mgfMissile(p); } catch (e) {} } mgfCasts(now); mgfStreaks(now); mgfThrows(now); });
+if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => { if (!mgfCC()) return; mgfDust(now); if (G.ccP) for (const p of G.ccP) if (p.k === 'missile' && !p.done) { try { mgfMissile(p); } catch (e) {} } mgfCasts(now); mgfStreaks(now); mgfThrows(now); mgfRunes(now); });
 
 /* ---- the Element Lab's entries ---- */
 if (typeof ELEM_FX_SPELLS !== 'undefined') {
   Object.assign(ELEM_FX_SPELLS, {
     arcmissile: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Missile', basic: 1, layers: ['missile', 'sparks'] },
     cc_barrage: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Arcane Barrage', layers: ['missile', 'sparks', 'gather'] },
-    cc_sparks: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Missile Curtain', layers: ['hang', 'missile', 'sparks'] },
+    cc_undertow: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Undertow Rune', layers: ['sigil', 'tether', 'snap'] },
     cc_grandorb: { unit: 'cc_mageling', force: 'conclave', el: 'seed', name: 'Gathering Orb', layers: ['orb', 'burst'], strikes: 1 },
   });
   // a missile: its head's width, its tail's length, its head's rays; sparks it sheds (a second), sparks where it lands,
@@ -99024,8 +99327,9 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
     arcmissile: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks) },
     // the light gathered at her hand: its width, its rays
     cc_barrage: { missile: Object.assign({}, bolt), sparks: Object.assign({}, sparks), gather: { flare: .55, rays: .8 } },
-    // a hung missile: its width, its rays, the veil under it (opacity), the thread between them (opacity)
-    cc_sparks: { hang: { w: .3, veil: .2, thread: .25 }, missile: Object.assign({}, bolt, { w: .22 }), sparks: Object.assign({}, sparks) },
+    // the snare: its ring (width, opacity, runes round it), the threads to the foes it holds (width, opacity), its snap
+    // (the flare's width, sparks thrown)
+    cc_undertow: { sigil: { w: .13, a: 1, runes: 6 }, tether: { w: .09, a: 1 }, snap: { flare: 1.6, count: 16 } },
     cc_grandorb: {
       // the orb: its size (x), its rays, the width of the light fed to it
       orb: { w: 1, feed: .22 },
@@ -99033,9 +99337,9 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
       burst: { flare: 1.8, a: .55, count: 16, dust: 6 },
     },
   });
-  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { veil: ['Veil of light under it (opacity)', 0, 1, .01], thread: ['Thread between them (opacity)', 0, 1, .01], feed: ['Light fed to it (width)', .02, .5, .01], sway: ['Its tail sways (x its width)', 0, 2, .05] });
-  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { missile: 'The missile', sparks: 'Its wake of motes, and its landing', gather: 'Light at her hand', hang: 'The hung missiles', orb: 'The orb' });
-  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { missile: 'c', sparks: 'c', gather: 'c', hang: 'c', orb: 'c' });
+  if (typeof EFX_INFO !== 'undefined') Object.assign(EFX_INFO, { runes: ['Runes round the ring', 0, 12, 1], feed: ['Light fed to it (width)', .02, .5, .01], sway: ['Its tail sways (x its width)', 0, 2, .05] });
+  if (typeof EFX_LNAME_SEED !== 'undefined') Object.assign(EFX_LNAME_SEED, { missile: 'The missile', sparks: 'Its wake of motes, and its landing', gather: 'Light at her hand', sigil: 'The rune on the road', tether: 'The threads', snap: 'The snap', orb: 'The orb' });
+  if (typeof EFX_LKIND_SEED !== 'undefined') Object.assign(EFX_LKIND_SEED, { missile: 'c', sparks: 'c', gather: 'c', sigil: 'c', tether: 'c', snap: 'c', orb: 'c' });
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['cc_mageling', 'Magelings']);
   if (typeof efxSync === 'function') efxSync();
 }
@@ -106182,7 +106486,7 @@ const SPELL_HELP = {
 
     // Magelings (cc_mageling)
     cc_barrage: { when: "One foe is enough: any foe, flyers too, within {reach} cells.", aim: "Up to three foes share the missiles: armoured foes in reach first, nearest the gate; with no armoured foe, the three toughest (bosses and elites first).", tips: ["Its seeking missiles hit air and ground, so it is a steady answer to flying waves.", "Golem Warden slams crack armour plate open, so the barrage on armoured foes bites harder after a slam.", "Cheap and quick: leave it on alongside Gathering Orb so the Magelings never sit idle."] },
-    cc_sparks: { when: "Two or more foes within {reach} cells, flyers too.", aim: "The road just ahead of the densest crowd: the missiles hang there and dive at the first foes that pass under them.", tips: ["Hang it on the stretch the column is about to walk: every missile finds a foe.", "A missile that lands on a foe marked with another element splits, and its twin seeks the next foe.", "Missiles left when the curtain falls seek the foes in reach, so none are wasted."] },
+    cc_undertow: { when: "Three or more foes within {reach} cells, flyers too, still spread out (a knot already tight is left alone).", aim: "The road under the biggest group in reach: the rune is carved on the road cell nearest them, and pulls along the road, never across a wall.", tips: ["Cast it just before Gathering Orb: the undertow bunches the column, the orb's burst then strikes all of them.", "Foes a wall away from it are not caught, however close they stand: the threads follow the road.", "Bosses are drawn only a third as far, and a foe pulled again and again is drawn less each time."] },
     cc_grandorb: { when: "Any foe within {reach+0.5} cells.", aim: "Itself while it gathers; then the orb is hurled at the thickest knot of foes in reach.", tips: ["Stand Magelings together: every Mageling within 2 cells feeds its missiles into the orb.", "Their strikes stop landing while the orb gathers: cast it as a crowd comes, not as one foe slips past.", "The burst marks each foe Arcane, for the Conclave to react with."] },
 
     // Frostweavers (cc_rimeweaver)
