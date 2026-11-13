@@ -1,4 +1,4 @@
-const BUILD_TAG = '189a7e3@2026-11-13';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'fdae3f1@2026-11-13';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -56002,6 +56002,38 @@ ROLE_WEAK_BIG.mres = `it resists magic (Magic Penetration cuts through); steel h
 for (const id in EP_ABIL) { const ab = typeof ABIL !== 'undefined' && ABIL[id]; if (!ab || !ab.text) continue; const f = ab.text, s = EP_ABIL[id].say; ab.text = (...a) => f(...a) + (epOn() && s ? ' ' + s : ''); }
 for (const id in EP_WARD_ABIL) { const ab = typeof ABIL !== 'undefined' && ABIL[id]; if (!ab || !ab.text) continue; const f = ab.text, s = EP_WARD_ABIL[id].say; ab.text = (...a) => f(...a) + (epOn() ? ' ' + s : ''); }
 
+/* ================= SOUND TIMING: where each layer of a sound plays against its animation =================
+   One entry a sound (by spell / attack id), a list of layers. The Sound Lab (soundlab.js, runehold.html?soundlab=1) edits
+   these live; its "Copy values" gives back this same object: paste it over the entry here and rebuild, and the game plays
+   exactly what the lab played. audio.js reads it at play time (stEvent / stPlay).
+
+   marks: the moments a layer can be placed against (the animation's events), in the order they happen.
+   A layer:
+     take    the recording (a key of FIRE_SFX / FIREBALL_SFX ...)
+     at      the mark it starts from;  off: seconds after it (negative: before)
+     in/out  the part of the take played (seconds into the take)
+     end     optional: a mark it is cut at, endOff seconds after it (the take's own end otherwise, whichever comes first)
+     fi/fo   fade in / fade out (s);  vol: loudness (the take's own gain included);  hall: the send to the hall's reverb
+     gap     the least time between two plays of this layer (a busy field is thinned by it)
+   In the game each layer is started by the event that first knows its time: the wind-up (knows wind-up and release), the
+   throw (release and burst), the landing (burst). A layer that would start before its event is started part way in. */
+const SOUND_TIMING = {
+  // the Pyroclast's auto-attack Fireball (fireballsfxdata.js, the owner's three recordings; 13 Nov 2026)
+  cc_fireball: {
+    name: 'Pyroclast: Fireball (strike)',
+    marks: { windup: 'Wind-up', release: 'Release', burst: 'Burst' },
+    bigK: 1.263,   // a great fireball's landing (layers started by the landing), louder by this much
+    layers: [
+      { id: 'simmer', take: 'pyroFbSimmer', name: 'Build-up', at: 'windup', off: 0, in: 0, out: 1.5, end: 'release', endOff: .45, fi: 0, fo: .5, vol: .135, hall: 0, gap: .2 },
+      { id: 'whoosh', take: 'pyroFbWhoosh', name: 'Flight whoosh', at: 'burst', off: -.47, in: 0, out: .47, fi: 0, fo: .12, vol: .225, hall: 0, gap: .25 },
+      { id: 'impact', take: 'pyroFbImpact', name: 'Impact', at: 'burst', off: 0, in: 0, out: 1.39, fi: 0, fo: .35, vol: .285, hall: .5, gap: .2 },
+    ],
+  },
+};
+const SOUND_TIMING_FILE = JSON.parse(JSON.stringify(SOUND_TIMING));   // (the file's own values: the Sound Lab's Reset)
+/* the Sound Lab's "Use in game" (this device only): the lab's edited entries over the file's */
+try { const u = JSON.parse(localStorage.getItem('runehold.soundlab.use') || 'null'); if (u && typeof u === 'object') for (const k in u) if (SOUND_TIMING[k] && u[k] && Array.isArray(u[k].layers)) SOUND_TIMING[k] = u[k]; } catch (e) {}
+
 /* ================= AUDIO: synthesized SFX + generative music =================
    Web Audio effects and music, with one embedded rifle sample (no network requests).
    The signal chain lives in an "engine" that can be built on any BaseAudioContext: the live AudioContext,
@@ -59646,10 +59678,13 @@ const AudioSys = (() => {
   function morPlay(B, at, len, vol, lp, rate, dt, x) {   // (x: { fo: fade-out length (s, .12 by default), hall: a send to the hall's reverb })   // (lp: a low-pass's cutoff in Hz, softening a take's bright top at play time; rate: played a touch faster or slower; dt: start that much later)
     const r = rate || 1, t = now() + (dt || 0), d0 = Math.min(len, B.duration - at); if (d0 <= .05) return; const d = d0 / r;
     const src = C.createBufferSource(), g = gn(1); src.buffer = B; if (r !== 1) src.playbackRate.value = r;
-    const fo = (x && x.fo) || .12; g.gain.setValueAtTime(1, t); g.gain.setValueAtTime(1, t + Math.max(0, d - fo)); g.gain.linearRampToValueAtTime(0, t + d);
+    const fo = (x && x.fo) || .12, fi = Math.min(d, (x && x.fi) || 0);   // (fi: a fade in, the Sound Lab's layers)
+    if (fi > 0) { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + fi); } else g.gain.setValueAtTime(1, t);
+    g.gain.setValueAtTime(1, t + Math.max(fi, d - fo)); g.gain.linearRampToValueAtTime(0, t + d);
     let f = null; if (lp) { f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = .5; src.connect(f); f.connect(g); } else src.connect(g);
     out(g, vol / (E.trim || 1), { pan: sp(.25), hall: x && x.hall }, t, t + d);
     src.onended = () => { src.disconnect(); g.disconnect(); if (f) f.disconnect(); }; src.start(t, at, d0 + .02); track(src, t + d);
+    if (x && x.reg) x.reg.push(src);   // (the Sound Lab keeps what it started, to stop it on pause or scrub)
   }
   S.mortarFire = () => { morLoad(); const B = morBufs.set; if (!B) return S.cannon(0); if (!ok('mortarFire', .12)) return; const L = MORTAR_SFX.launch; morPlay(B, L[0], L[1], .2); };
   S.mortarWhistle = () => { morLoad(); const B = morBufs.set; if (!B || !ok('mortarWhistle', .35)) return; const w = MORTAR_SFX.whistles[Math.floor(Math.random() * MORTAR_SFX.whistles.length)]; morPlay(B, w[0], w[1], .09); };
@@ -59719,6 +59754,46 @@ const AudioSys = (() => {
     const i = fireRound[name] = ((fireRound[name] == null ? Math.floor(Math.random() * L.length) : fireRound[name]) + 1 + (L.length > 2 && Math.random() < .3 ? 1 : 0)) % L.length;
     return firePlay(L[i][0], L[i][1], 0, null, null, rate);
   }
+  /* ---- timed layers (SOUND_TIMING, soundtiming.js; the Sound Lab edits them) ---- */
+  // one layer: start / end in seconds from now (end: null for the take's end); a start already past plays it part way in
+  function stLayer(Ly, start, end, k, reg) {
+    fireLoad(); const B = fireBufs[Ly.take]; if (!B) return false;
+    const tin = Math.max(0, +Ly.in || 0), tout = Math.min(B.duration, Ly.out == null ? B.duration : +Ly.out);
+    let at = tin, s = start; if (s < 0) { at -= s; s = 0; }
+    let len = tout - at; if (end != null) len = Math.min(len, end - s);
+    if (len <= .05 || at >= tout) return false;
+    morPlay(B, at, len, (+Ly.vol || 0) * (k || 1), 0, 0, s, { fo: Ly.fo > 0 ? Ly.fo : .005, fi: Ly.fi, hall: Ly.hall, reg }); return true;
+  }
+  // which event starts a layer: the first that knows its start, unless that start is still to come and a later event knows it too
+  const ST_EV = { charge: 0, cast: 1, land: 2 }, ST_KNOW = { windup: [0, 0], release: [0, 1], burst: [1, 2] };
+  function stOwner(Ly) {
+    const K = ST_KNOW[Ly.at] || [0, 0]; if (K[0] === K[1]) return K[0];
+    return (+Ly.off || 0) < 0 ? K[0] : K[1];
+  }
+  // an event of a sound's animation: A holds the marks it knows, in seconds from now
+  function stEvent(id, ev, A, k) {
+    const E0 = SOUND_TIMING[id]; if (!E0) return false; let any = false;
+    for (const Ly of E0.layers) {
+      if (stOwner(Ly) !== ST_EV[ev] || A[Ly.at] == null || !ok('st_' + id + '_' + Ly.id, Ly.gap || 0)) continue;
+      const end = Ly.end && A[Ly.end] != null ? A[Ly.end] + (+Ly.endOff || 0) : null;
+      any = stLayer(Ly, A[Ly.at] + (+Ly.off || 0), end, k, null) || any;
+    }
+    return any;
+  }
+  // the Sound Lab: every layer at once, against marks given in seconds of its loop, from 'from' on (on: which layers sound)
+  // (as the game plays it: a layer that would start before the event that starts it is started part way in, and it is cut at
+  // its end mark only if that event knows the mark)
+  const ST_MARK = ['windup', 'release', 'burst'], ST_SEES = [['windup', 'release'], ['release', 'burst'], ['burst']];
+  function stPlay(id, A, from, on, reg) {
+    const E0 = SOUND_TIMING[id]; if (!E0) return;
+    for (const Ly of E0.layers) {
+      if (on && !on(Ly) || A[Ly.at] == null) continue;
+      const ow = stOwner(Ly), evT = A[ST_MARK[ow]]; let s = A[Ly.at] + (+Ly.off || 0), L2 = Ly;
+      if (evT != null && s < evT) { L2 = Object.assign({}, Ly, { in: (+Ly.in || 0) + evT - s }); s = evT; }
+      const end = Ly.end && A[Ly.end] != null && ST_SEES[ow].includes(Ly.end) ? A[Ly.end] + (+Ly.endOff || 0) - from : null;
+      stLayer(L2, s - from, end, 1, reg);
+    }
+  }
   // the Steam Hammer: its takes cut and softened like the rest (owner), at the loudness they played at before
   S.hamSwing = (peak) => { const a = Math.random() < .5; firePlay(a ? 'hamSwing' : 'hamSwing2', a ? .133 : .13, .25, peak); };
   S.hamBurst = (big) => firePlay('hamBurst', big ? .136 : .093, .2);
@@ -59738,22 +59813,16 @@ const AudioSys = (() => {
   // simmering build-up over his wind-up (S.pyroCharge, below), the whoosh of its flight started so it ends as the ball bursts
   // (T: its flight time, from pyrofire.js; F.pk: that moment in the take; a short flight starts a little into it), and the
   // impact explosion as it bursts (S.pyroLand). The three-take rounds stay as the fallback.
-  const PY_FB = () => !!fxTakes().pyroFbWhoosh;
-  S.pyroCast = (T) => {
-    if (!PY_FB()) return S.pyroCastOld();
-    const pk = fxTakes().pyroFbWhoosh.pk, f = T > 0 ? T : pk;
-    if (f > pk) later(f - pk, () => firePlay('pyroFbWhoosh', .075, .25)); else firePlay('pyroFbWhoosh', .075, .25, f);
-  };
-  // the build-up (owner: "use this as the build up sound between the fireball leaving his hand"): the simmering, crackling fire
-  // swelling in as the ball grows in his palm (unitmodels_pyroclast2.js passes how long the wind-up has left), cut off with a
-  // long fade past the throw, under the flight's whoosh (owner: "start sound should fade into the next sound more")
-  S.pyroCharge = (len) => {
-    fireLoad(); const B = fireBufs.pyroFbSimmer; if (!B || !ok('fire_pyroFbSimmer', .2)) return false;
-    morPlay(B, 0, Math.min(B.duration, Math.max(.2, (len || .5) + .45)), .045 * PYRO_GAIN, 0, 0, 0, { fo: .5 }); return true;
-  };
+  // the layers come from SOUND_TIMING.cc_fireball (soundtiming.js), tuned in the Sound Lab (soundlab.js): each layer is started
+  // by the event that first knows when it plays (stEvent, below)
+  const PY_FB = () => !!fxTakes().pyroFbWhoosh && typeof SOUND_TIMING !== 'undefined' && !!SOUND_TIMING.cc_fireball;
+  S.pyroCast = (T) => { if (!PY_FB()) return S.pyroCastOld(); stEvent('cc_fireball', 'cast', { release: 0, burst: T > 0 ? T : .47 }); };
+  // the build-up (owner: "use this as the build up sound between the fireball leaving his hand"): unitmodels_pyroclast2.js
+  // passes how long the wind-up has left
+  S.pyroCharge = (len) => { if (!PY_FB()) return false; fireLoad(); if (!fireBufs.pyroFbSimmer) return false; stEvent('cc_fireball', 'charge', { windup: 0, release: len || .5 }); return true; };
   S.pyroCastOld = () => fireNext('pyroCast', [['pyroCast', .067], ['pyroCast2', .087], ['pyroCast3', .058]], .3);
   const PY_LAND = [['pyroLand', .097], ['pyroLand2', .089], ['pyroLand3', .12]], PY_LAND_BIG = PY_LAND.map(([k, v]) => [k, v * 1.35]);
-  S.pyroLand = (big) => fxTakes().pyroFbImpact ? firePlay('pyroFbImpact', big ? .12 : .095, .2, null, 0, 0, { fo: .35, hall: .5 }) : fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
+  S.pyroLand = (big) => PY_FB() ? stEvent('cc_fireball', 'land', { burst: 0 }, big ? SOUND_TIMING.cc_fireball.bigK || 1 : 1) : fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
   // Furnace Breath: a flame spat from its hands over the steady roar of the pouring cone (the roar fades out by ~2.4 s)
   S.pyroBreath = () => { firePlay('pyroBreathCast', .09, .5); firePlay('pyroBreath', .15, 1.2); };
   // Skipping Flame: the throw, a short burst at each skip (three takes in turn, each a touch higher or lower) and a bigger
@@ -60035,6 +60104,7 @@ const AudioSys = (() => {
     if (ctx.sampleRate) { decodeCries(ctx.sampleRate); decodeSong(ctx.sampleRate); }   // match the sound card, so the recordings play without resampling
     if (ctx.state !== 'running') ctx.resume().catch(() => {});
   }
+  const stRegs = [];
   function savePref() { try { localStorage.setItem('runehold.audio', JSON.stringify(pref)); } catch (e) {} }
   return {
     init, pref, unitVoice: playUnitVoice, stopUnitVoice, wolfDie: v => { WOLF_DIE = v; }, frostUp: v => { FROST_UP = v; }, frostWind: v => { FROST_WIND = v; }, frostLow: v => { FROST_LOWV = v; },
@@ -60076,6 +60146,12 @@ const AudioSys = (() => {
     songInfo: () => ({ mine: !!SONG_MINE, name: SONG_MINE ? String(SONG_MINE.name || 'Untitled').slice(0, 40) : 'Ravenswood: Deepwood Path' }),
     buses: () => L && { sfx: L.sfxIn.gain.value, bright: L.brightIn.gain.value, raw: L.rawIn.gain.value, room: L.sfxRoom.gain.value, music: L.musIn.gain.value },
     deathTakes: v => { DTAKES = v !== false; }, deathLog: () => DLOG.slice(), deathLoaded: () => Object.keys(fxTakes()).filter(k => k.indexOf('d_') === 0).map(k => [k, fireBufs[k] ? +fireBufs[k].duration.toFixed(3) : 0]),
+    // the Sound Lab (soundlab.js): a take's decoded buffer (for its waveform), all layers of a sound against the loop's marks,
+    // and a stop for what it started
+    stBuf(k) { if (!ctx || !L) return null; use(L); fireLoad(); return fireBufs[k] || null; },   // (only once there is a context: fireLoad decodes once)
+    stPlay(id, A, from, on) { if (!ctx || !L || ctx.state !== 'running') return false; use(L); L.tOff = 0; L.lv = 0; L.trim = 1; L.bright = false; if (stRegs.length > 60) stRegs.splice(0, stRegs.length - 60); try { stPlay(id, A, from || 0, on, stRegs); } catch (e) {} return true; },
+    stStop() { for (const s of stRegs) try { s.stop(); } catch (e) {} stRegs.length = 0; },
+    stNow: () => ctx ? ctx.currentTime : 0,
     drops: () => Object.assign({}, DROPS), voices: () => (L && L.ends ? L.ends.filter(e => e > L.c.currentTime).length : 0),
   };
 })();
@@ -100655,6 +100731,407 @@ body.elab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:au
     for (const f of ['drawPath', 'drawWallZone', 'drawAmbient', 'drawKeepAge', 'drawPortalFx', 'drawMapFx']) if (typeof window[f] === 'function') window[f] = function () {};
     if (typeof drawSelection === 'function') drawSelection = function () { try { stageMarks(); } catch (e) {} };
     L.ready = true; stage(); panel(); pointer();
+    requestAnimationFrame(labFrame);
+  }
+  boot();
+})();
+
+/* ================= THE SOUND LAB (runehold.html?soundlab=1&spell=cc_fireball) =================
+   The owner's sound timeline (owner, 13 Nov 2026: "an audio editor with each bar representing a sound with the animation
+   shown above it so i can gauge it better"). Above: the real unit throwing at a held foe on a loop, on a black stage. Below:
+   one bar a sound layer (SOUND_TIMING, soundtiming.js) with its waveform, against the animation's marks (wind-up, release,
+   burst), a playhead that runs with the loop.
+   - Drag a bar to move it, its edges to trim the take, the small squares on its top corners to fade in / out; Alt while
+     dragging turns snapping to the marks off. Click a bar for its numbers (below the bars). Click or drag the ruler to scrub.
+   - Each row: mute (M), solo (S), volume and hall reverb.
+   - Space plays / pauses, Home goes back to the start. The sound plays at 1x only (slow motion is silent).
+   - Edits are kept on this device (localStorage runehold.soundlab.v1) with Reset back to the file's values. Copy values: the
+     entry as JS, to paste over SOUND_TIMING.<id> in src/soundtiming.js (the game then plays it the same). Use in game: this
+     device's normal play takes the lab's values (runehold.soundlab.use).
+   - More sounds: an entry in SOUND_TIMING, and a stage here (SL_STAGES: the unit, how its loop is armed and where its marks
+     fall). Outside ?soundlab=1 this file does nothing. */
+const SL_STAGES = {
+  cc_fireball: {
+    force: 'conclave', unit: 'cc_pyroclast', lead: .35,
+    // how long his wind-up is (unitmodels_pyroclast2.js: the hand drawn back over the reload's last part)
+    pre(t) { const r = typeof PYRO2 !== 'undefined' && PYRO2.CL.cast ? (PYRO2.CL.cast.rel || 0) / 30 : .3; return Math.min(r, Math.max(.5, (t.st && t.st.rate) || 1.5) * .45); },
+    flight: d => .32 + d * .055,   // forces_conclave_a.js FORCE_ATTACK.cc_fireball
+  },
+};
+(function () {
+  const Q = new URLSearchParams(location.search);
+  if (Q.get('soundlab') !== '1') return;
+  const K = 'runehold.soundlab.';
+  const get = (k, d) => { try { const v = localStorage.getItem(K + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+  const set = (k, v) => { try { if (v == null) localStorage.removeItem(K + k); else localStorage.setItem(K + k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+  // nothing the game saves is kept while the lab runs: only the lab's own keys (and the audio settings' own)
+  try { const sp = Storage.prototype.setItem, rm = Storage.prototype.removeItem;
+    Storage.prototype.setItem = function (k) { if (String(k).startsWith(K) || k === 'runehold.audio') return sp.apply(this, arguments); };
+    Storage.prototype.removeItem = function (k) { if (String(k).startsWith(K)) return rm.apply(this, arguments); }; } catch (e) {}
+
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const id = SOUND_TIMING[Q.get('spell')] && SL_STAGES[Q.get('spell')] ? Q.get('spell') : 'cc_fireball';
+  const FILE = clone(SOUND_TIMING_FILE[id]);   // the file's values (Reset), from before Use in game's were put over them
+  const saved = get('v1', {}); if (saved[id] && Array.isArray(saved[id].layers)) SOUND_TIMING[id] = saved[id];
+  const ENT = () => SOUND_TIMING[id], STG = SL_STAGES[id];
+  const SL = window.SOUNDLAB = {
+    id, ready: false, t: null, foe: null, dist: get('dist', 3), tier: get('tier', 2), A: { windup: 0, release: .3, burst: .8 }, len: 2.6,
+    playing: false, loop: true, slow: 1, gt0: 0, c0: 0, clk: null, ct: 0, sel: get('sel', 0), mute: {}, solo: {}, errs: [], note: '',
+    rel: null, bur: null, peaks: {},
+  };
+  const CX = 3.5, CZ = 7.5;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const f2 = v => (Math.round(v * 100) / 100).toFixed(2);
+
+  /* ---- the stage ---- */
+  const heroC = () => { const h = HEROES.find(q => q.force === STG.force); return h ? h.id : null; };
+  function clearStage() {
+    for (const t of G.towers.slice()) G.tAt[idx(t.i, t.j)] = null;
+    G.towers.length = 0; for (const c of G.creeps) c.dead = true; G.creeps.length = 0; SL.t = null; SL.foe = null;
+    G.parts.length = 0; if (G.projs) G.projs.length = 0; if (G.ccP) G.ccP.length = 0; if (G.hazards) G.hazards.length = 0; G.delayed.length = 0;
+    if (typeof SFX !== 'undefined') SFX.list.length = 0; if (typeof PF !== 'undefined' && PF.shots) PF.shots.length = 0;
+    if (G.flashes) G.flashes.length = 0;
+  }
+  function stage() {
+    try {
+      clearStage();
+      const slot = Object.entries(FORCES[STG.force].units).find(([s, d]) => d && d.id === STG.unit);
+      applyForce(STG.force, heroC()); G.force = STG.force; G.hero = heroC();
+      const i = Math.floor(CX), j = Math.floor(CZ), t = makeTower(slot[0], i, j, SL.tier); t.build = 0; G.towers.push(t); G.tAt[idx(i, j)] = t;
+      t.st = effStats(t); t.ang = Math.PI / 2; SL.t = t;
+      const A = typeof abilEnsure === 'function' ? abilEnsure(t) : null; if (A) for (const k in A.auto) A.auto[k] = false;
+      const range = (t.st && t.st.range) || 4; SL.maxD = Math.max(1.2, Math.floor((range - .15) * 10) / 10); SL.dist = Math.min(SL.dist, SL.maxD);
+      const fx = CX + SL.dist, c = spawn({ type: CREEPS.gnoll ? 'gnoll' : Object.keys(CREEPS)[0], hp: 1e9, bounty: 0, at: { x: fx, y: CZ, ti: Math.floor(fx), tj: Math.floor(CZ), tx: fx, ty: CZ + 1, state: 'walk' } });
+      c.abT = 1e9; c.hp = c.maxHp = 1e9; c.__ax = fx; c.__ay = CZ; SL.foe = c;
+      if (G.path) G.path.pts = Array.from({ length: 12 }, (_, k) => [fx + 8 - k, CZ]);
+      window.ELEMLAB = { ready: true, t, spell: id, errs: SL.errs, mask: null };   // (the model's wind-up and the fire's lab path read it)
+      marks(); arm();
+    } catch (e) { SL.errs.push('stage: ' + e.message); }
+  }
+  // the marks where they fall: from the stage's rules until the loop has measured them
+  function marks() {
+    const t = SL.t; if (!t) return; const pre = STG.pre(t), T = STG.flight(SL.dist);
+    const rel = SL.rel != null ? SL.rel : STG.lead + pre, bur = SL.bur != null ? SL.bur : rel + T;
+    SL.A = { windup: Math.max(0, rel - pre), release: rel, burst: bur };
+    let e = SL.A.burst + .6; for (const Ly of ENT().layers) e = Math.max(e, clip(Ly).e + .15); SL.len = Math.min(8, e);
+  }
+  // the loop's start: the unit's reload set so its wind-up starts at the lead
+  function arm() { const t = SL.t; if (!t) return; SL.gt0 = G.time; t.cd = STG.lead + STG.pre(t); t.shotT = null; SL.armed = true; }
+  function hold() {
+    G.lives = 1e6; G.maxLives = 1e6; G.gold = 1e9; G.phase = 'build'; G.countdown = 0; if (G.spawnQ) G.spawnQ.length = 0;
+    const c = SL.foe; if (c && !c.dead) { c.x = c.__ax; c.y = c.__ay; c.hp = c.maxHp; c.state = 'walk'; c.remain = 10; c.leaked = false; c.abT = 1e9; }
+    const t = SL.t; if (!t) return; t.hp = t.maxHp; t.wrecked = false; t.silT = 0;
+    if (!SL.armed) t.cd = Math.max(t.cd || 0, 5);   // (one throw a loop)
+  }
+  const ct = () => G.time - SL.gt0;
+  // step the game to the loop time asked (1/60 s steps)
+  function simTo(target, max) { let n = 0; while (ct() < target - 1e-6 && n++ < (max || 12)) { hold(); update(Math.min(1 / 60, target - ct() + 1e-4)); hold(); } }
+  // jump to a loop time: the stage set again and run up to it, silently
+  function scrubTo(x) {
+    stopAudio(); x = Math.max(0, Math.min(SL.len, x));
+    stage(); simTo(x, 2000); SL.ct = x; if (SL.playing) startAudio();
+  }
+
+  /* ---- sound ---- */
+  const clock = () => SL.clk === 'a' ? AudioSys.stNow() : performance.now() / 1000;
+  const on = Ly => { const anyS = Object.values(SL.solo).some(Boolean); return !SL.mute[Ly.id] && (!anyS || SL.solo[Ly.id]); };
+  function audioOk() { try { AudioSys.init(); } catch (e) {} return AudioSys.ready && AudioSys.ready() && AudioSys.pref.sfx; }
+  function startAudio() {
+    SL.clk = audioOk() ? 'a' : 'p'; SL.c0 = clock() - SL.ct / SL.slow;
+    if (SL.clk === 'a' && SL.slow === 1) AudioSys.stPlay(id, SL.A, SL.ct, on);
+  }
+  function stopAudio() { try { AudioSys.stStop(); } catch (e) {} }
+  function play(v) { SL.playing = v; stopAudio(); if (v) { if (SL.ct >= SL.len - .01) scrubTo(0); startAudio(); } bar(); }
+  function restartAudio() { if (SL.playing) { stopAudio(); startAudio(); } }
+
+  /* ---- a layer on the timeline (loop seconds): its start, end, and the part the game cuts (before the event that starts it) ---- */
+  const EVT = ['windup', 'release', 'burst'], OWN = { windup: ['windup', 'windup'], release: ['windup', 'release'], burst: ['release', 'burst'] }, SEES = { windup: ['windup', 'release'], release: ['release', 'burst'], burst: ['burst'] };   // (audio.js stOwner / ST_SEES)
+  function clip(Ly) {
+    const A = SL.A, B = AudioSys.stBuf ? AudioSys.stBuf(Ly.take) : null, dur = B ? B.duration : (Ly.out || 1);
+    const tin = Math.max(0, +Ly.in || 0), tout = Math.min(dur, Ly.out == null ? dur : +Ly.out);
+    const s = (A[Ly.at] || 0) + (+Ly.off || 0), own = OWN[Ly.at] || ['windup', 'windup'], evK = (+Ly.off || 0) < 0 ? own[0] : own[1], ev = A[evK];
+    let e = s + (tout - tin), cut = false; if (Ly.end && A[Ly.end] != null && SEES[evK].includes(Ly.end)) { const ce = A[Ly.end] + (+Ly.endOff || 0); if (ce < e) { e = ce; cut = true; } }
+    return { s, e, tin, tout, dur, ev: Math.max(s, Math.min(ev, e)), evK, cut, B };
+  }
+
+  /* ---- the timeline ---- */
+  const LANE = 58, RUL = 24, PADL = 12;
+  let cv = null, cx = null, drag = null, hov = null;
+  const t0 = -.15;
+  const pps = () => (cv.clientWidth - PADL - 16) / (SL.len - t0);
+  const X = t => PADL + (t - t0) * pps(), T = x => t0 + (x - PADL) / pps();
+  function peaks(Ly, B, n) {
+    const key = Ly.take + ':' + n; if (SL.peaks[key]) return SL.peaks[key];
+    const d = B.getChannelData(0), P = new Float32Array(n), step = d.length / n;
+    for (let i = 0; i < n; i++) { let m = 0; const a = Math.floor(i * step), b = Math.min(d.length, Math.floor((i + 1) * step)); for (let k = a; k < b; k++) { const v = Math.abs(d[k]); if (v > m) m = v; } P[i] = m; }
+    return (SL.peaks[key] = P);
+  }
+  const COL = ['#e0904a', '#d8b860', '#e05a3a', '#8fb0e0', '#a0d070', '#c890e0'];
+  function draw() {
+    if (!cv) return; const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, Ls = ENT().layers, h = RUL + LANE * Ls.length + 6;
+    if (cv.height !== Math.round(h * dpr) || cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px'; }
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, w, h);
+    // ruler
+    cx.fillStyle = '#16151a'; cx.fillRect(0, 0, w, RUL); cx.font = '11px system-ui,sans-serif'; cx.textBaseline = 'middle';
+    for (let s = 0; s <= SL.len + 1e-6; s += .1) { const x = X(s), big = Math.abs(s * 2 - Math.round(s * 2)) < 1e-6; cx.fillStyle = big ? '#6a6458' : '#3a3730'; cx.fillRect(x, big ? 12 : 17, 1, big ? 12 : 7); if (big) { cx.fillStyle = '#9a917e'; cx.fillText(s.toFixed(1) + 's', x + 3, 7); } }
+    // lanes
+    Ls.forEach((Ly, i) => {
+      const y = RUL + i * LANE; cx.fillStyle = i === SL.sel ? '#1d1b22' : (i % 2 ? '#121116' : '#0f0e12'); cx.fillRect(0, y, w, LANE);
+      const C = clip(Ly), col = COL[i % COL.length], x0 = X(C.s), x1 = X(C.e), live = on(Ly);
+      if (!C.B) { cx.fillStyle = '#555'; cx.fillText('(loading the take…)', x0 + 4, y + LANE / 2); return; }
+      const top = y + 6, hh = LANE - 12, mid = top + hh / 2;
+      // the whole take, faint, where trimmed away
+      const gx0 = X(C.s - C.tin), gx1 = X(C.s - C.tin + C.dur), P = peaks(Ly, C.B, 600);
+      cx.fillStyle = 'rgba(255,255,255,.05)';
+      for (let k = 0; k < P.length; k++) { const x = gx0 + (gx1 - gx0) * k / P.length; if (x >= x0 && x <= x1) continue; const a = P[k] * hh / 2; cx.fillRect(x, mid - a, Math.max(1, (gx1 - gx0) / P.length), a * 2); }
+      // the clip
+      cx.globalAlpha = live ? 1 : .35;
+      cx.fillStyle = col + '30'; cx.fillRect(x0, top, x1 - x0, hh);
+      cx.fillStyle = col;
+      const vk = Math.min(1.6, .45 + (+Ly.vol || 0) / .3);   // (the bar's waveform grows with its volume)
+      for (let k = 0; k < P.length; k++) { const x = gx0 + (gx1 - gx0) * k / P.length; if (x < x0 || x > x1) continue; const tt = C.s - C.tin + C.dur * k / P.length; let g = 1; if (Ly.fi > 0) g = Math.min(g, (tt - C.s) / Ly.fi); if (Ly.fo > 0) g = Math.min(g, (C.e - tt) / Ly.fo); g = Math.max(0, Math.min(1, g)); const a = Math.min(hh / 2, P[k] * hh / 2 * g * vk); cx.fillRect(x, mid - a, Math.max(1, (gx1 - gx0) / P.length), a * 2); }
+      // the part the game cuts (starts before its event): hatched
+      if (C.ev > C.s + 1e-4) { cx.fillStyle = 'rgba(0,0,0,.55)'; cx.fillRect(x0, top, X(C.ev) - x0, hh); cx.strokeStyle = 'rgba(255,90,60,.6)'; cx.beginPath(); for (let x = x0; x < X(C.ev); x += 6) { cx.moveTo(x, top + hh); cx.lineTo(Math.min(X(C.ev), x + hh * .5), top); } cx.stroke(); }
+      // the gain line: fade in, held, fade out
+      cx.strokeStyle = '#fff8'; cx.lineWidth = 1.2; cx.beginPath(); cx.moveTo(x0, top + hh); cx.lineTo(X(C.s + Math.min(Ly.fi || 0, C.e - C.s)), top + 1); cx.lineTo(X(C.e - Math.min(Ly.fo || 0, C.e - C.s)), top + 1); cx.lineTo(x1, top + hh); cx.stroke(); cx.lineWidth = 1;
+      // the frame, edges and fade handles
+      cx.strokeStyle = i === SL.sel ? '#fff' : col; cx.strokeRect(x0 + .5, top + .5, x1 - x0 - 1, hh - 1);
+      cx.fillStyle = '#fff'; cx.fillRect(X(C.s + (Ly.fi || 0)) - 4, top - 4, 8, 8); cx.fillRect(X(C.e - (Ly.fo || 0)) - 4, top - 4, 8, 8);
+      if (C.cut) { cx.fillStyle = '#ffd27a'; cx.fillText('✂ ' + (ENT().marks[Ly.end] || Ly.end) + (Ly.endOff ? (Ly.endOff > 0 ? ' +' : ' ') + f2(Ly.endOff) : ''), x1 - 70, top + hh - 7); }
+      cx.globalAlpha = 1;
+      cx.fillStyle = '#e8dfc8'; cx.fillText(Ly.name, Math.max(4, x0 + 4), top + 8);
+    });
+    // marks
+    for (const k of EVT) { const x = X(SL.A[k]); cx.fillStyle = '#7fd0ff'; cx.fillRect(x, 0, 1, h); cx.fillStyle = '#7fd0ff'; cx.fillText(ENT().marks[k] || k, x + 3, 18); }
+    // playhead
+    const px = X(SL.ct); cx.fillStyle = '#ff5050'; cx.fillRect(px - .5, 0, 2, h); cx.beginPath(); cx.moveTo(px - 6, 0); cx.lineTo(px + 7, 0); cx.lineTo(px + .5, 8); cx.fill();
+  }
+  // what the pointer is on
+  function hit(x, y) {
+    if (y < RUL) return { k: 'scrub' };
+    const i = Math.floor((y - RUL) / LANE), Ly = ENT().layers[i]; if (!Ly) return { k: 'scrub' };
+    const C = clip(Ly), x0 = X(C.s), x1 = X(C.e), top = RUL + i * LANE + 6;
+    if (Math.abs(y - top) < 7 && Math.abs(x - X(C.s + (Ly.fi || 0))) < 7) return { k: 'fi', i };
+    if (Math.abs(y - top) < 7 && Math.abs(x - X(C.e - (Ly.fo || 0))) < 7) return { k: 'fo', i };
+    if (x > x0 - 5 && x < x0 + 6) return { k: 'l', i };
+    if (x > x1 - 6 && x < x1 + 5) return { k: 'r', i };
+    if (x >= x0 && x <= x1) return { k: 'm', i };
+    return { k: 'scrub', i };
+  }
+  const CUR = { fi: 'ew-resize', fo: 'ew-resize', l: 'col-resize', r: 'col-resize', m: 'grab', scrub: 'text' };
+  const snap = (t, alt) => { if (alt) return t; for (const k of EVT) if (Math.abs(X(t) - X(SL.A[k])) < 7) return SL.A[k]; return t; };
+  const r3 = v => Math.round(v * 1000) / 1000;
+  function onDown(e) {
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, H = hit(x, y);
+    if (H.i != null && H.k !== 'scrub') { SL.sel = H.i; set('sel', SL.sel); insp(); }
+    if (H.k === 'scrub') { drag = { k: 'scrub', was: SL.playing }; SL.playing = false; stopAudio(); scrubTo(T(x)); bar(); }
+    else { const Ly = ENT().layers[H.i]; drag = Object.assign({ x0: x, L0: clone(Ly), C0: clip(Ly) }, H); cv.style.cursor = H.k === 'm' ? 'grabbing' : CUR[H.k]; }
+    cv.setPointerCapture(e.pointerId); e.preventDefault(); draw();
+  }
+  function onMove(e) {
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (!drag) { const H = hit(x, y); cv.style.cursor = CUR[H.k] || 'default'; return; }
+    if (drag.k === 'scrub') { scrubTo(T(x)); return; }
+    const Ly = ENT().layers[drag.i], L0 = drag.L0, C0 = drag.C0, dt = (x - drag.x0) / pps(), alt = e.altKey;
+    if (drag.k === 'm') { const s = snap(C0.s + dt, alt); Ly.off = r3(L0.off + s - C0.s); }
+    else if (drag.k === 'l') { const s = snap(Math.max(C0.s - C0.tin, Math.min(C0.e - .05, C0.s + dt)), alt), d = s - C0.s; Ly.in = r3(Math.max(0, L0.in + d)); Ly.off = r3(L0.off + d); }
+    else if (drag.k === 'r') {   // (cut at a mark: the cut moves; else the take's end)
+      const e1 = snap(Math.max(C0.s + .05, C0.e + dt), alt);
+      if (C0.cut) Ly.endOff = r3((+L0.endOff || 0) + e1 - C0.e); else Ly.out = r3(Math.min(C0.dur, Math.max(C0.tin + .05, C0.tout + e1 - C0.e)));
+    }
+    else if (drag.k === 'fi') Ly.fi = r3(Math.max(0, Math.min(C0.e - C0.s, T(x) - C0.s)));
+    else if (drag.k === 'fo') Ly.fo = r3(Math.max(0, Math.min(C0.e - C0.s, C0.e - T(x))));
+    marks(); insp(true); draw();
+  }
+  function onUp() { if (!drag) return; const d = drag; drag = null; cv.style.cursor = 'default'; if (d.k === 'scrub') { if (d.was) play(true); } else { changed(); restartAudio(); } }
+
+  /* ---- saving ---- */
+  let saveT = 0;
+  function changed() {
+    marks(); clearTimeout(saveT);
+    saveT = setTimeout(() => { const o = get('v1', {}); o[id] = ENT(); set('v1', o); if (get('useOn', 0)) useIt(true); }, 200);
+  }
+  function useIt(v) { set('useOn', v ? 1 : null); try { const u = JSON.parse(localStorage.getItem('runehold.soundlab.use') || '{}') || {}; if (v) u[id] = ENT(); else delete u[id]; if (Object.keys(u).length) localStorage.setItem('runehold.soundlab.use', JSON.stringify(u)); else localStorage.removeItem('runehold.soundlab.use'); } catch (e) {} }
+  // the entry as src/soundtiming.js writes it: one layer a line
+  function jsVal(v) { return typeof v === 'number' ? String(Math.round(v * 1000) / 1000).replace(/^(-?)0\./, '$1.') : JSON.stringify(v).replace(/"/g, "'"); }
+  function jsObj(o) { return '{ ' + Object.keys(o).filter(k => o[k] != null && o[k] !== '').map(k => k + ': ' + (o[k] && typeof o[k] === 'object' ? jsObj(o[k]) : jsVal(o[k]))).join(', ') + ' }'; }
+  function copyJS() {
+    const E = ENT(), rest = Object.keys(E).filter(k => k !== 'layers');
+    return '  ' + id + ': {\n' + rest.map(k => '    ' + k + ': ' + (typeof E[k] === 'object' ? jsObj(E[k]) : jsVal(E[k])) + ',').join('\n')
+      + '\n    layers: [\n' + E.layers.map(Ly => '      ' + jsObj(Ly) + ',').join('\n') + '\n    ],\n  },';
+  }
+  function copyText(txt) {
+    const ta = $('#slJs'); ta.value = txt; ta.hidden = false;
+    const ok = () => { SL.note = 'Copied: paste it over SOUND_TIMING.' + id + ' in src/soundtiming.js.'; bar(); };
+    try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, () => { ta.select(); try { document.execCommand('copy'); ok(); } catch (e) {} }); else { ta.select(); document.execCommand('copy'); ok(); } } catch (e) { ta.select(); }
+  }
+
+  /* ---- the panel: the bar, the rows, the selected layer's numbers ---- */
+  function rowsHTML() {
+    return ENT().layers.map((Ly, i) => `<div class="sl-row${i === SL.sel ? ' on' : ''}" data-i="${i}" style="height:${LANE}px">
+      <div class="sl-nm"><i style="background:${COL[i % COL.length]}"></i>${esc(Ly.name)}<small>${esc(Ly.take)}</small></div>
+      <div class="sl-ms"><button data-m="${i}" class="${SL.mute[Ly.id] ? 'on m' : ''}" title="Mute">M</button><button data-s="${i}" class="${SL.solo[Ly.id] ? 'on s' : ''}" title="Solo">S</button></div>
+      <label title="Volume">Vol<input type="range" data-k="vol" data-i="${i}" min="0" max="1" step=".005" value="${Ly.vol}"><b>${f2(Ly.vol)}</b></label>
+      <label title="Hall reverb send">Hall<input type="range" data-k="hall" data-i="${i}" min="0" max="1" step=".01" value="${Ly.hall || 0}"><b>${f2(Ly.hall || 0)}</b></label>
+    </div>`).join('');
+  }
+  function insp(quiet) {
+    const el = $('#slInsp'), Ly = ENT().layers[SL.sel]; if (!el || !Ly) return;
+    if (quiet && el.dataset.i === String(SL.sel)) { for (const x of el.querySelectorAll('[data-f]')) if (document.activeElement !== x) x.value = x.tagName === 'SELECT' ? (Ly[x.dataset.f] || '') : (Ly[x.dataset.f] == null ? '' : Ly[x.dataset.f]); return; }
+    el.dataset.i = SL.sel; const M = ENT().marks, C = clip(Ly);
+    const opt = (sel, none) => (none ? `<option value=""${!sel ? ' selected' : ''}>${none}</option>` : '') + Object.keys(M).map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(M[k])}</option>`).join('');
+    const n = (f, lab, st, tip) => `<label title="${esc(tip || '')}">${lab}<input type="number" data-f="${f}" step="${st || .01}" value="${Ly[f] == null ? '' : Ly[f]}"></label>`;
+    el.innerHTML = `<b style="color:${COL[SL.sel % COL.length]}">${esc(Ly.name)}</b>
+      <label>Starts at<select data-f="at">${opt(Ly.at)}</select></label>${n('off', '+ s', .01, 'Seconds after the mark (negative: before)')}
+      ${n('in', 'Take from', .01, 'Seconds into the recording')}${n('out', 'to', .01, 'Seconds into the recording (its length: ' + (C.B ? C.dur.toFixed(2) : '?') + ' s)')}
+      <label title="Cut it at a mark (or play the take to its end)">Cut at<select data-f="end">${opt(Ly.end, 'take end')}</select></label>${Ly.end ? n('endOff', '+ s', .01) : ''}
+      ${n('fi', 'Fade in', .01)}${n('fo', 'Fade out', .01)}${n('gap', 'Min gap', .01, 'The least time between two plays in the game (a busy field is thinned by it)')}
+      <span class="note">${C.ev > C.s + 1e-4 ? 'Hatched: it starts before the ' + esc(M[C.evK] || C.evK) + ', the moment the game starts it, so the game plays it from there.' : ''}${Ly.end && !SEES[C.evK].includes(Ly.end) ? ' The game starts it at the ' + esc(M[C.evK]) + ', before it knows when the ' + esc(M[Ly.end]) + ' is: it is not cut there.' : ''}</span>`;
+    for (const x of el.querySelectorAll('[data-f]')) x.onchange = () => {
+      const f = x.dataset.f; let v = x.value;
+      if (x.tagName === 'SELECT') v = v || null; else v = v === '' ? null : r3(+v);
+      if (f === 'end' && v && Ly.endOff == null) Ly.endOff = 0;
+      Ly[f] = v; if (f === 'end' && !v) delete Ly.endOff;
+      changed(); insp(); draw(); restartAudio();
+    };
+  }
+  function bar() {
+    const b = $('#slBar'); if (!b) return; const t = SL.t, T_ = STG.flight(SL.dist), snd = AudioSys.pref && AudioSys.pref.sfx;
+    b.innerHTML = `<span class="sl-t">Sound Lab · ${esc(ENT().name)}</span>
+      <button data-a="play" class="pri">${SL.playing ? '❚❚ Pause' : '▶ Play'}</button><button data-a="home" title="Back to the start (Home)">⏮</button>
+      <button data-a="loop" class="${SL.loop ? 'on' : ''}">Loop</button>
+      <span class="sl-g">${[1, .5, .25].map(v => `<button data-slow="${v}" class="${SL.slow === v ? 'on' : ''}">${v}x</button>`).join('')}</span>
+      <label class="sl-d">Distance <input type="range" id="slDist" min="1" max="${SL.maxD || 4}" step=".1" value="${SL.dist}"><b>${SL.dist.toFixed(1)} cells · flight ${T_.toFixed(2)} s</b></label>
+      <span class="sl-g">${[0, 1, 2, 3, 4, 5].map(v => `<button data-tier="${v}" class="${SL.tier === v ? 'on' : ''}" title="Tier">${['I', 'II', 'III', 'IV', 'V', 'VI'][v]}</button>`).join('')}</span>
+      <span class="sl-time">${SL.ct.toFixed(2)} s</span>
+      <span class="sl-sp"></span>
+      <button data-a="copy" title="The values as JS, for src/soundtiming.js">Copy values</button>
+      <button data-a="reset" title="Back to the file's values">Reset</button>
+      <label title="This device's normal play uses the lab's values"><input type="checkbox" id="slUse"${get('useOn', 0) ? ' checked' : ''}> Use in game</label>
+      <button data-a="exit">Leave</button>
+      <div class="sl-note">${!snd ? '<b style="color:#ff8a6a">Sound effects are off.</b> <button data-a="snd">Turn on</button> ' : ''}${SL.slow !== 1 ? 'Slow motion is silent. ' : ''}${esc(SL.note)}${SL.errs.length ? ' <span style="color:#f88">' + esc(SL.errs.slice(-2).join(' | ')) + '</span>' : ''}</div>`;
+    for (const x of b.querySelectorAll('[data-a]')) x.onclick = () => {
+      const a = x.dataset.a;
+      if (a === 'play') play(!SL.playing);
+      else if (a === 'home') { scrubTo(0); }
+      else if (a === 'loop') SL.loop = !SL.loop;
+      else if (a === 'copy') { copyText(copyJS()); return; }
+      else if (a === 'reset') { if (!confirm('Put this sound back to the file’s values? Your edits here are lost.')) return; SOUND_TIMING[id] = clone(FILE); changed(); rows(); insp(); restartAudio(); SL.note = 'Back to the file’s values.'; }
+      else if (a === 'snd') { AudioSys.set('sfx', true); audioOk(); }
+      else if (a === 'exit') { const q = new URLSearchParams(location.search); q.delete('soundlab'); q.delete('spell'); location.search = q.toString() ? '?' + q.toString() : ''; return; }
+      bar(); draw();
+    };
+    for (const x of b.querySelectorAll('[data-slow]')) x.onclick = () => { SL.slow = +x.dataset.slow; stopAudio(); if (SL.playing) startAudio(); bar(); };
+    for (const x of b.querySelectorAll('[data-tier]')) x.onclick = () => { SL.tier = +x.dataset.tier; set('tier', SL.tier); SL.rel = SL.bur = null; scrubTo(0); bar(); };
+    const d = $('#slDist'); d.oninput = () => { SL.dist = +d.value; d.nextElementSibling.textContent = SL.dist.toFixed(1) + ' cells · flight ' + STG.flight(SL.dist).toFixed(2) + ' s'; };
+    d.onchange = () => { set('dist', SL.dist); SL.rel = SL.bur = null; scrubTo(0); draw(); };
+    $('#slUse').onchange = e => { useIt(e.target.checked); SL.note = e.target.checked ? 'Normal play on this device now uses these values.' : 'Normal play uses the file’s values.'; bar(); };
+  }
+  function rows() {
+    const el = $('#slRows'); el.innerHTML = rowsHTML();
+    for (const x of el.querySelectorAll('.sl-row')) x.onclick = e => { if (e.target.closest('button,input')) return; SL.sel = +x.dataset.i; set('sel', SL.sel); rows(); insp(); draw(); };
+    for (const x of el.querySelectorAll('[data-m]')) x.onclick = () => { const Ly = ENT().layers[+x.dataset.m]; SL.mute[Ly.id] = !SL.mute[Ly.id]; rows(); draw(); restartAudio(); };
+    for (const x of el.querySelectorAll('[data-s]')) x.onclick = () => { const Ly = ENT().layers[+x.dataset.s]; SL.solo[Ly.id] = !SL.solo[Ly.id]; rows(); draw(); restartAudio(); };
+    for (const x of el.querySelectorAll('input[type=range]')) { x.oninput = () => { const Ly = ENT().layers[+x.dataset.i]; Ly[x.dataset.k] = +x.value; x.nextElementSibling.textContent = f2(+x.value); draw(); }; x.onchange = () => { changed(); restartAudio(); }; }
+  }
+
+  /* ---- the camera: the stage from the side, in the space above the panel ---- */
+  if (typeof setCam === 'function') {
+    const s0 = setCam;
+    setCam = function (tz, oh, aspect) {
+      if (!SL.ready) return s0.apply(this, arguments);
+      const D = 40, yaw = .32, pitch = .42, T0 = [CX + SL.dist * .5, .5, CZ], cp = Math.cos(pitch), sp = Math.sin(pitch);
+      CAM.tgt = T0.slice(); CAM.eye = [T0[0] + Math.sin(yaw) * cp * D, T0[1] + sp * D, T0[2] + Math.cos(yaw) * cp * D];
+      const ph = ($('#slab') || {}).offsetHeight || 0, hh = Math.max(1, window.innerHeight), share = 1 - ph / hh;   // (the panel's share of the window, at the foot)
+      RD.setCamera(CAM.eye, CAM.tgt, CAM.fov, aspect, 1, 160, (1.1 + SL.dist * .35) / Math.max(.3, share), { z: 1.0001, cx: 0, cy: -(1 - share) });
+    };
+  }
+  function voidScene() {
+    RD.bg = null; RD.fg = null; RD.terrain = null; RD.water = null; if (RD.trees && RD.trees.length) RD.trees = [];
+    RD.clear = [0, 0, 0]; RD.fogCol = [0, 0, 0]; RD.fog = [400, 500]; RD.look = null;
+    ENV.ground = null; ENV.wild = []; ENV.fx = null; ENV.edgeGiants = null; SCENE_OFF = true; TH.noKeep = true; TH.shafts = 'none';
+    if (MAPS[G.map]) MAPS[G.map].entry = MAPS[G.map].entry || 1;
+  }
+
+  /* ---- each frame ---- */
+  let last = 0, barT = 0;
+  function labFrame(now) {
+    const real = Math.max(0, (now - (last || now)) / 1000), dt = Math.min(.05, real); last = now;
+    try {
+      if (SL.ready && G.state === 'play') {
+        if (SL.playing && !drag) {
+          let target = (clock() - SL.c0) * SL.slow;
+          if (target >= SL.len) {
+            if (SL.loop) { simTo(SL.len); stopAudio(); arm(); marks(); SL.ct = 0; SL.c0 = clock(); if (SL.clk === 'a' && SL.slow === 1) AudioSys.stPlay(id, SL.A, 0, on); target = 0; }
+            else { SL.playing = false; target = SL.len; bar(); }
+          }
+          simTo(target); SL.ct = Math.max(0, ct());
+        } else hold();
+        if (SL.ct > SL.A.release + .15) SL.armed = false;
+        voidScene(); renderView(SL.playing ? dt * SL.slow : 0);
+        draw(); barT -= real; if (barT <= 0) { barT = .15; const s = $('.sl-time'); if (s) s.textContent = SL.ct.toFixed(2) + ' s'; }
+      }
+    } catch (e) { SL.errs.push(String(e && e.message || e)); if (SL.errs.length > 20) SL.errs.shift(); }
+    requestAnimationFrame(labFrame);
+  }
+  // the marks as the loop measures them (the throw, the burst)
+  function measure() {
+    const fa = FORCE_ATTACK.cc_fireball;
+    if (fa) FORCE_ATTACK.cc_fireball = function (t) { const r = fa.apply(this, arguments); if (t === SL.t && SL.armed) { const v = ct(); if (SL.rel == null || Math.abs(SL.rel - v) > .02) { SL.rel = v; marks(); } } return r; };
+    if (typeof ccFireBurst === 'function') { const fb = ccFireBurst; ccFireBurst = function (t) { const r = fb.apply(this, arguments); if (t === SL.t) { const v = ct(); if (v > 0 && (SL.bur == null || Math.abs(SL.bur - v) > .02)) { SL.bur = v; marks(); } } return r; }; }
+  }
+
+  const CSS = `#slab{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(10,10,12,.97);border-top:1px solid #5a4a2e;color:#e8dfc8;font:12.5px/1.3 system-ui,sans-serif;padding:6px 10px 8px}
+#slab button{background:#222027;border:1px solid #4a4236;color:#e8dfc8;border-radius:5px;padding:3px 9px;font:inherit;cursor:pointer}#slab button.on{background:#5a4320;border-color:#c8a050}#slab button.pri{background:#6a3a18;border-color:#e0904a;min-width:78px}
+#slBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-bottom:6px}.sl-t{font-weight:600;color:#f0c880;margin-right:6px}.sl-g{display:inline-flex;gap:2px}.sl-g button{padding:3px 6px}.sl-sp{flex:1}.sl-time{font-variant-numeric:tabular-nums;color:#ff8080;min-width:52px}
+.sl-d{display:inline-flex;align-items:center;gap:5px}.sl-d input{width:110px}.sl-d b{font-weight:400;color:#bba}.sl-note{flex-basis:100%;color:#a9a08c;min-height:16px}
+#slMain{display:flex;border:1px solid #2c2a30;border-radius:6px;overflow:hidden}#slRows{width:300px;flex:none;padding-top:24px;background:#0c0b0e;border-right:1px solid #2c2a30}
+.sl-row{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:2px 6px;padding:5px 8px;box-sizing:border-box;cursor:pointer;border-bottom:1px solid #1a191d}.sl-row.on{background:#1d1b22}
+.sl-nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sl-nm i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}.sl-nm small{color:#776f62;font-weight:400;margin-left:6px}
+.sl-ms{display:flex;gap:3px}.sl-ms button{padding:1px 7px!important}.sl-ms button.m{background:#6a2020!important}.sl-ms button.s{background:#5a5a10!important}
+.sl-row label{display:inline-flex;align-items:center;gap:4px;color:#a9a08c}.sl-row input[type=range]{width:78px}.sl-row b{font-weight:400;color:#e8dfc8;width:30px}
+#slCv{flex:1;min-width:0;display:block;touch-action:none}#slInsp{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:7px 2px 0}
+#slInsp label{display:inline-flex;align-items:center;gap:4px;color:#a9a08c}#slInsp input{width:62px;background:#18171c;border:1px solid #3a3530;color:#e8dfc8;border-radius:4px;padding:2px 4px;font:inherit}#slInsp select{background:#18171c;border:1px solid #3a3530;color:#e8dfc8;border-radius:4px;font:inherit}
+#slInsp .note{flex-basis:100%;color:#d08a6a}#slJs{width:100%;height:120px;margin-top:6px;background:#0c0b0e;color:#cfc6b0;border:1px solid #3a3530;font:11px/1.35 ui-monospace,monospace}`;
+  const HIDE = `body.slab>*:not(#app):not(#slab):not(script):not(style),body.slab #app>*:not(#stage),body.slab #stage>*:not(#cv),body.slab #ov,body.slab #banner,body.slab #toast,body.slab #zoomUI,body.slab #synBar,body.slab #holdBadge{display:none!important}
+body.slab #stage{position:fixed!important;left:0;top:0;right:0;bottom:0;width:auto!important;height:auto!important;margin:0!important}body.slab #app{display:block!important}body.slab{background:#000}`;
+
+  /* ---- start, once the game has loaded ---- */
+  function boot() {
+    if (typeof G === 'undefined' || !G || G.state !== 'title' || typeof renderView !== 'function' || !RD || !RD.gl
+      || (typeof UNIT_MDL !== 'undefined' && !UNIT_MDL.pyroclast && (boot.n = (boot.n || 0) + 1) < 150)) { setTimeout(boot, 200); return; }
+    try { if (typeof hideOverlay === 'function') hideOverlay(); } catch (e) {}
+    try { if (AudioSys.pref) AudioSys.pref.music = false; } catch (e) {}
+    const st = document.createElement('style'); st.textContent = CSS + HIDE; document.head.appendChild(st); document.body.classList.add('slab');
+    const p = document.createElement('div'); p.id = 'slab';
+    p.innerHTML = '<div id="slBar"></div><div id="slMain"><div id="slRows"></div><canvas id="slCv"></canvas></div><div id="slInsp"></div><textarea id="slJs" hidden spellcheck="false"></textarea>';
+    document.body.appendChild(p);
+    cv = $('#slCv'); cx = cv.getContext('2d');
+    cv.addEventListener('pointerdown', onDown); cv.addEventListener('pointermove', onMove); cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onUp);
+    p.addEventListener('pointerdown', () => audioOk(), true);   // (the browser lets sound start on a click)
+    window.addEventListener('keydown', e => {
+      if (!SL.ready || (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && e.target.type !== 'range' && e.target.type !== 'checkbox')) return;
+      if (e.key === ' ') { audioOk(); play(!SL.playing); } else if (e.key === 'Home') scrubTo(0); else return;
+      e.preventDefault(); e.stopImmediatePropagation();
+    }, true);
+    for (const t of ['click', 'mousedown', 'pointerdown', 'wheel', 'contextmenu']) window.addEventListener(t, e => { if (SL.ready && e.target === RD.gl.canvas) e.stopImmediatePropagation(); }, true);
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    frame = function () {};   // the game's own loop stops; the lab drives the clock
+    try { setMap('meadow'); } catch (e) { SL.errs.push('map: ' + e.message); }
+    newGame('normal', null, heroC(), 0);
+    Object.assign(G, { paused: false, hold: false, phase: 'build', countdown: 0, mute: true });   // (G.mute: the game's own calls stay silent; the lab plays the layers)
+    if (typeof DMG_NUMS !== 'undefined') DMG_NUMS = false;
+    try { layoutAll(); } catch (e) {}
+    for (const f of ['drawPath', 'drawWallZone', 'drawAmbient', 'drawKeepAge', 'drawPortalFx', 'drawMapFx']) if (typeof window[f] === 'function') window[f] = function () {};
+    if (typeof drawSelection === 'function') drawSelection = function () { try { if (SL.foe) QG.ground(CX + SL.dist * .5, CZ, .004, SL.dist + 2.2, 2.4, [.075, .075, .085, 1], 1, 0); } catch (e) {} };
+    measure();
+    SL.api = { scrub: scrubTo, play, copy: copyJS, draw };   // (for tests)
+    SL.ready = true; stage(); bar(); rows(); insp(); draw();
+    // the waveforms once the takes are decoded
+    const wait = () => { if (ENT().layers.every(Ly => AudioSys.stBuf(Ly.take))) { marks(); draw(); insp(); } else setTimeout(wait, 250); };
+    try { AudioSys.init(); } catch (e) {} wait();
+    window.addEventListener('resize', () => draw());
     requestAnimationFrame(labFrame);
   }
   boot();
