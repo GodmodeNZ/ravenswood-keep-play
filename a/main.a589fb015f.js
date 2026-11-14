@@ -1,4 +1,4 @@
-const BUILD_TAG = '74c02b6@2026-11-14';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c713e27@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -3334,6 +3334,7 @@ function moveCreep(c, d) {
     if (c.y >= exitY()) leak(c);
     return;
   }
+  if (c.state !== 'exit') stepOffBlock(c);
   let guard = 6;
   while (d > 0 && guard-- > 0) {
     const dx = c.tx - c.x, dy = c.ty - c.y, L = Math.hypot(dx, dy);
@@ -3343,6 +3344,28 @@ function moveCreep(c, d) {
     if (!arrive(c)) break;
   }
   c.remain = c.state === 'exit' ? (GATE_Y - c.y) * .5 : (c.atk ? siegeField().dist : G.dist)[idx(c.ti, c.tj)] + Math.hypot(c.tx - c.x, c.ty - c.y);
+}
+/* A walker whose next step is a cell it can never leave: a unit's or wall's cell (G.blk), or open ground the road no longer
+   reaches. Pushes, pulls and drags (the Stormborn's wind, shove, a black hole, a pull to one spot, the Gale's slam against
+   a stone) move a foe in a straight line or from the cell it stands in, so one can be left standing on a unit; its next
+   step was then that unit's own cell, from which no road leads (G.next -1), and it stood there for good (owner, 14 Nov
+   2026: "mobs jumped onto the wolf units and are stuck there?"). It steps instead to the nearest open cell the road
+   reaches, in front of the unit, and walks on from there. Siege troops go by their own field (they may cross a Wounded
+   unit's cell), so only a cell that field cannot reach moves them. */
+function stepOffBlock(c) {
+  if (c.ti == null || !G.dist) return;
+  const sf = c.atk && G.state === 'play' ? siegeField() : null, F = sf ? sf.dist : G.dist, k = idx(c.ti, c.tj);
+  if (inGrid(c.ti, c.tj) && isFinite(F[k]) && (sf || !G.blk[k])) return;
+  let best = -1, bd = Infinity;
+  for (let r = 1; r <= 6 && best < 0; r++) {
+    const i0 = Math.floor(c.x), j0 = Math.floor(c.y);
+    for (let i = i0 - r; i <= i0 + r; i++) for (let j = j0 - r; j <= j0 + r; j++) {
+      if (!inGrid(i, j)) continue; const q = idx(i, j); if (G.blk[q] || !isFinite(F[q])) continue;
+      const dd = Math.hypot(i + .5 - c.x, j + .5 - c.y) + F[q] * 1e-3; if (dd < bd) { bd = dd; best = q; }
+    }
+  }
+  if (best < 0) return;
+  c.ti = best % COLS; c.tj = (best / COLS) | 0; c.tx = c.ti + .5; c.ty = c.tj + .5;
 }
 function arrive(c) {
   if (c.state === 'exit') { leak(c); return false; }
