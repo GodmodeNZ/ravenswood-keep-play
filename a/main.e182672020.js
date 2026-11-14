@@ -1,4 +1,4 @@
-const BUILD_TAG = '84ad2bf@2026-11-14';   // the play log's build version (playlog.js)
+const BUILD_TAG = '594e343@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16209,6 +16209,8 @@ function ihShieldShove(t, st, tg, ux, uz, extra) {
 }
 
 // ---- Thunderguns: one heavy armour-piercing shot; at full heat a Thunderpeal through the whole line ----
+// Concussion Rounds (a Thunderguns talent, cap ihConc: 5% a rank): a bullet that is a heavy round hits again as hard and jolts its foe 0.1s
+function ihConcRoll(t, st, o, amt) { const n = st.caps && st.caps.ihConc; if (!n || !o || o.dead || Math.random() >= .05 * n) return false; ihHit(t, st, o, amt, 'phys'); if (!o.dead) stun(o, .1, .5); return true; }
 FORCE_ATTACK.thundergun = function (t, st, tg, pow, echo) {
   const C = st.caps, mz = ihMuzzle(t), dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
   const lord = st.pw && st.pw.ihThunderlord;   // Old Grumbler: every shot a clap, never hot
@@ -16232,7 +16234,7 @@ FORCE_ATTACK.thundergun = function (t, st, tg, pow, echo) {
   let k = pow;
   if (C.ihFar && L > 2.5) k *= 1 + .12 * C.ihFar;   // Range-Finder
   const amt = st.dmg * k;
-  ihHit(t, st, tg, amt, 'phys');
+  ihHit(t, st, tg, amt, 'phys'); ihConcRoll(t, st, tg, amt);
   // the ball dents the plate: 1 armour a shot, up to 3 (owner: the gunline must be able to open armour on its own)
   if (!tg.dead && (tg.armor || 0) > 0) { const cur = tg.shredT > 0 ? tg.shred : 0; tg.shred = Math.max(cur, Math.min(3, cur + 1)); tg.shredT = Math.max(tg.shredT, 5); }
   if (C.ihSilver && st.nth && pow >= (st.nthM || 9) && !tg.dead) ihBrand(tg, .15, 5, t);   // Silver Bullet
@@ -16716,7 +16718,7 @@ const IH_TALENTS = {
 
   /* ---- Thunderguns (arrow): Long Shot (innate), Rattlegun (row II), Breaching Slug (row III) ---- */
   arrow: { name: 'Gunlore', hue: '#5a7ab8', list: [
-    GT('Powder Smoke', 'cloud', 0, 0, 2, n => `A Thunderpeal leaves its powder smoke hanging along its line for 2s: ground foes in it are slowed ${15 * n}%, and Long Shot strikes slowed foes ${15 * n}% harder.`, {}, { cap: 'ihfSmoke', sp: n => ({ ab: 'ih_longshot', vs: ['slowed', .15 * n] }) }),
+    GT('Concussion Rounds', 'missiles', 0, 0, 4, n => `Every bullet it fires, bursts included, has a ${5 * n}% chance to be a concussion round: it hits twice as hard and stuns its foe for 0.1s. Long Shot's round can stun too.`, {}, { cap: 'ihConc', sp: n => ({ ab: 'ih_longshot', rider: { ihConc: .05 * n } }) }),   // (owner, 14 Nov 2026: replaces Powder Smoke as the lead-in to Rattlegun, "make it 4 points, mini stun chance on hit with damage", "each point increase the chance": its rifle and Rattlegun roll it a bullet, forces_ironhold_a.js ihConcRoll)
     GT('Range-Finder', 'crosshair', 0, 1, 2, n => `Shots at a foe more than 2.5 cells away hit ${12 * n}% harder.`, {}, { cap: 'ihFar' }),
     GT('Long Belt', 'arrowhead', 2, 0, 2, n => `Rattlegun's belt holds ${2 * n} more bullets, so each burst runs longer.`, {}, { sp: n => ({ ab: 'ih_rollingvolley', by: { n: 2 * n } }), req: [1, 0] }),
     GT('Called Shot', 'target', 4, 2, 1, 'Each Thunderpeal splits the plate of every foe it punches through: all its armour gone for 4s.', {}, { cap: 'ihCalled' }),
@@ -16954,6 +16956,7 @@ const IH_KITS = {
           if (!o) return;
           t.ang = Math.atan2(o.x - t.x, o.y - t.y); t.ihGatAt = G.time;
           abHit(t, s, o, IH_GAT.mult * K, 'phys', null); B.last = o; B.hits++;
+          if (s.caps && s.caps.ihConc && !o.dead && Math.random() < .05 * s.caps.ihConc) { abHit(t, s, o, IH_GAT.mult * K, 'phys', null); if (!o.dead) stun(o, .1, .5); }   // Concussion Rounds: a heavy round, twice the hit and a jolt
           if (!o.dead && (o.armor || 0) > 0) { const was = o.shredT > 0 ? o.shred : 0; o.shred = Math.max(was, Math.min(cap, was + 1)); o.shredT = Math.max(o.shredT || 0, 5); }   // a little armour a bullet, stacking
           ihHeatAdd(t, s, (s.heat || .25) * IH_GAT.heat * ihHeatRate(t, s));
           if (pinN && B.hits % pinN === 0 && !o.dead) ihPin(o, pinS, t);
@@ -48665,7 +48668,7 @@ const TAL_SPREAD = {
   "champ:cc_chrono": {"Patient Hands":[0,1],"Long Pendulum":[0,2],"Weighted Hour":[1,0],"Gathered Ghosts":[5,2],"Recall":[1,1],"Long Way Back":[2,1],"Leaden Minutes":[2,2],"Lent Time":[2,0],"Endless Hour":[4,2],"Late Arrival":[3,3],"Second Hand":[3,0],"Timekeeper":[5,1],"The Hour Strikes":[3,2],"Twelve Strokes":[5,0],"Ticking Hand":[0,3],"Saved Seconds":[4,3],"Leaden Pull":[4,1]},
   "champ:cc_maren": {"Quick Draw":[0,0],"Passing Cut":[0,1],"Follow-Through":[0,2],"Practice Yard":[4,3],"Rift Chain":[1,0],"Long Chain":[2,0],"Opened Guard":[2,2],"Shared Edge":[2,1],"Bursting Seams":[5,2],"Cut the Fallen":[3,3],"Flourish":[3,2],"Blade of the Conclave":[5,0],"Unbound Blade":[4,2],"Duelling Ground":[4,0],"Flowing Cuts":[1,1],"Steady Breath":[3,1],"Chain to Blade":[5,1]},
   "ironhold.glaive": {"Heavy Shoulders":[1,3],"Bearded Axe":[2,2],"Ringing Rim":[4,2],"Off Balance":[0,1],"Bowling Shove":[2,3],"Spinning Shield":[3,2],"Hot Shards":[5,0],"Shield Rush":[2,1],"Armourbreaker":[5,1],"Breaker's Blow":[4,0],"Brace and Shove":[3,0],"Shield Signal":[4,3],"Breach the Line":[5,2],"Hold the Pass":[3,1],"Caught Between Shields":[1,2],"Plate Salvage":[0,2],"Knock Them Flat":[0,0]},
-  "ironhold.arrow": {"Powder Smoke":[1,1],"Range-Finder":[1,2],"Long Belt":[3,1],"Called Shot":[5,2],"Rattlegun":[2,1],"Sighting In":[0,2],"Kneecapper":[4,3],"Thunder Belt":[5,1],"Gatling Crank":[5,3],"Breaching Slug":[3,3],"Quick Swab":[1,3],"Hard Kick":[2,0],"Case-Hardened":[4,2],"Quick Reload":[0,1],"Powder Tally":[2,3],"Pinning Rounds":[4,0],"Called Volley":[3,2]},
+  "ironhold.arrow": {"Concussion Rounds":[1,1],"Range-Finder":[1,2],"Long Belt":[3,1],"Called Shot":[5,2],"Rattlegun":[2,1],"Sighting In":[0,2],"Kneecapper":[4,3],"Thunder Belt":[5,1],"Gatling Crank":[5,3],"Breaching Slug":[3,3],"Quick Swab":[1,3],"Hard Kick":[2,0],"Case-Hardened":[4,2],"Quick Reload":[0,1],"Powder Tally":[2,3],"Pinning Rounds":[4,0],"Called Volley":[3,2]},
   "ironhold.frost": {"Weighted Chains":[1,3],"Third Wrap":[0,1],"Trap Line":[3,3],"Tangle":[0,2],"Tripwire":[2,3],"Bound and Broken":[4,2],"Twin Nets":[5,3],"Double Line":[5,2],"Harpoon Winch":[3,2],"Bear Trap":[5,1],"Wide Nets":[1,0],"Hooked Chain":[4,0],"Spiked Caltrops":[2,2],"Wing Cords":[2,0],"Trapper's Haul":[1,1],"Barbed Chain":[3,1],"Caltrop Bed":[4,1]},
   "ironhold.arcane": {"Searing Brand":[1,3],"Deep Brand":[0,2],"Brand Chain":[2,3],"Swift Inscription":[2,2],"Ringing Anvil":[5,0],"Masterwork Strike":[4,3],"Rune of Making":[1,2],"Rune of Unmaking":[4,0],"Rune Lord":[5,2],"Answering Rune":[2,1],"Runic Overflow":[0,1],"Forge Heat":[3,0],"Runebrand Detonation":[5,1],"Kinsmark":[0,3],"Paid in Kind":[3,1],"Quench":[1,0]},
   "ironhold.storm": {"Torn Wings":[1,0],"Scorched Barrel":[1,2],"Spent Flare":[5,1],"Chain-Fed":[3,2],"Sky Shatter":[0,2],"Grapnel Shot":[2,2],"Tracer Rounds":[3,1],"Starshell":[4,1],"Endless Belt":[5,3],"Shellstorm":[5,2],"Reel In":[4,0],"Ground Burst":[1,1],"Hot Shrapnel":[2,0],"Barbed Shrapnel":[0,1],"Sky Watch":[0,3]},
@@ -49383,7 +49386,7 @@ talPlain('ironhold', 'glaive', {
 });
 
 talPlain('ironhold', 'arrow', {
-  'Powder Smoke': { tag: 'Control', sp: { ab: 'ih_longshot', rider: { ihfSmokeL: 1 } }, pro: n => `Long Shot leaves smoke along its line for 3s, slowing ground foes ${20 * n}%.` },
+  'Concussion Rounds': { tag: 'Control', pro: n => `Every bullet it fires, bursts included, has a ${5 * n}% chance to hit twice as hard and stun its foe 0.1s. Long Shot can stun too.` },
   'Range-Finder': { tag: 'Damage', pro: n => `Shots at foes over 2.5 cells away hit ${12 * n}% harder.` },
   'Long Belt': { tag: 'Spell', pro: n => `Rattlegun fires ${2 * n} more bullets a burst.` },
   'Called Shot': { tag: 'Damage', pro: 'Thunderpeals strip all armour from every foe they pass through for 4s.' },
@@ -49570,6 +49573,8 @@ talPlain('ironhold', 'champ:ih_brewer', {
   'Last Orders': { tag: 'Spell' },
   'Topped Up': { tag: 'Spell', pro: n => `Jugs landing in her ale puddles make them last ${n}s longer, up to double.` },
 });
+// Concussion Rounds on Long Shot: its round's chance to stun (the rider; SP_RIDE is up by now)
+if (typeof SP_RIDE !== 'undefined') SP_RIDE.ihConc = (c, v) => { if (!c.dead && Math.random() < v) stun(c, .1, .5); };
 
 /* ================= THE SILVER ORDER: plain talent text (the talent clarity pass, owner 10 Nov 2026) =================
    The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and
