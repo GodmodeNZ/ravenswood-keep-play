@@ -1,4 +1,4 @@
-const BUILD_TAG = 'c713e27@2026-11-14';   // the play log's build version (playlog.js)
+const BUILD_TAG = '74108f9@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13350,7 +13350,7 @@ FORCE_ATTACK.cc_rime = function (t, st, tg, pow, echo) {
   // "need a different sound on frost auto": a short cut of the ice blast recording, frostsfxdata.js)
   if (!echo) sfx('frostBolt');
   ccShoot({ k: 'ice', x: hx, h: hh, z: hz, tg, spd: 9.6, col: CC_COL.frost, sz: still ? 1.5 : 1, fn: c => {
-    const s = t.st || st; if (!c) return;
+    const s = t.st || st; if (!c) return; if (!echo) sfx('frostHit');   // (her bolt's hit, audio.js)
     const amt = s.dmg * pow * (C.ccColdStone && ccHas(c, 'stone') ? 1 + .15 * C.ccColdStone : 1);   // Cold Stone
     ccHit(t, s, c, amt, {});   /* (Entomb: ccRidersOf) */
     if (c.dead) return;
@@ -60070,7 +60070,7 @@ const AudioSys = (() => {
   const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
-  const PYRO_GAIN = 3, FR_ICE_VOL = .3;   // (her bolt: peak about .15, near the cannon's .12, as it fires often)
+  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2;   // (her whoosh and hit each peak about .14, as her bolt fires often; the Breath about .2, a spell)   // (her bolt: peak about .15, near the cannon's .12, as it fires often)
   function firePlay(k, vol, gap, peak, lp, rate, x) {
     if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
@@ -60233,7 +60233,8 @@ const AudioSys = (() => {
   const PY_LAND = [['pyroLand', .097], ['pyroLand2', .089], ['pyroLand3', .12]], PY_LAND_BIG = PY_LAND.map(([k, v]) => [k, v * 1.35]);
   S.pyroLand = (big) => PY_FB() ? stEvent('cc_fireball', 'land', { burst: 0 }, big ? SOUND_TIMING.cc_fireball.bigK || 1 : 1) : fireNext('pyroLand', big ? PY_LAND_BIG : PY_LAND, .25);   // (big: a great fireball, a little louder)
   // Furnace Breath: a flame spat from its hands over the steady roar of the pouring cone (the roar fades out by ~2.4 s)
-  S.pyroBreath = () => { firePlay('pyroBreathCast', .09, .5); firePlay('pyroBreath', .15, 1.2); };
+  // (owner, 14 Nov 2026: "use this one as the new pyro furnace breath": a flame thrower with a long tail, fireballsfxdata.js pyroFurnace)
+  S.pyroBreath = () => { firePlay('pyroFurnace', PY_FURNACE_VOL, 1.2); };
   // Skipping Flame: the throw, a short burst at each skip (three takes in turn, each a touch higher or lower) and a bigger
   // burst at the last
   S.pyroSkipCast = () => firePlay('pyroSkipCast', .087, .4);
@@ -60243,7 +60244,11 @@ const AudioSys = (() => {
   // are silent until new takes are chosen; the old ones were frBolt / frSpear / frCoffin / frBloom in frostsfxdata.js)
   S.frostSpear = S.frostCoffin = S.frostBloom = () => {};
   // her bolt: an icy rise and crack (owner, 14 Nov 2026: "this might work for frost bolt", iced magic 6, fireballsfxdata.js frIceBolt)
-  S.frostBolt = () => { firePlay('frIceBolt', FR_ICE_VOL, .25); };
+  // (owner, 14 Nov 2026: "try this as the frostbolt pojectile sound": two cold whooshes in turn, tunnel wind and a cold gush;
+  // iced magic 6, frIceBolt, stays in fireballsfxdata.js)
+  S.frostBolt = () => { fireNext('frostBolt', [['frWhoosh1', FR_WH_VOL[0]], ['frWhoosh2', FR_WH_VOL[1]]], .25); };
+  // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
+  S.frostHit = () => { if (!ok('frostHit', .2)) return; firePlay('frHitIce', FR_HIT_VOL[0], 0); firePlay('frHitBreath', FR_HIT_VOL[1], 0); };
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
