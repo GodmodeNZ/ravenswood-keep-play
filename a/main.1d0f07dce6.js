@@ -1,4 +1,4 @@
-const BUILD_TAG = '74108f9@2026-11-14';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'decc55f@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -46337,7 +46337,7 @@ function ccrSpear(t, st, c, m, k, free) {
   if (!c || c.dead) return;
   const [hx, hh, hz] = ccHand(t, towerTop(t) * .95), ab = ABIL.cc_glacialglyph;
   ccShoot({ k: 'ice', x: hx, h: hh, z: hz, tg: c, spd: 16.8, col: '#dff6ff', sz: free ? 1.2 : 1.7, tag: 'abil', fn: q => {
-    if (!q || !ccAlive(t)) return; const s = t.st || st, frz = ccFrozen(q), lance = frz && ccrCap(s, 'ccrLance');
+    if (!q || !ccAlive(t)) return; sfx('frostSpearHit'); const s = t.st || st, frz = ccFrozen(q), lance = frz && ccrCap(s, 'ccrLance');
     ccAb(t, s, q, m, k, { crit: lance ? 1 : 0 });
     if (q.dead) return;
     const pw = s.pw || {}, sl = byT(ab.by.slow, t) + (pw.ccCirclet || 0);
@@ -60070,7 +60070,7 @@ const AudioSys = (() => {
   const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
-  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2;   // (her whoosh and hit each peak about .14, as her bolt fires often; the Breath about .2, a spell)   // (her bolt: peak about .15, near the cannon's .12, as it fires often)
+  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.36, .3], FR_SPEAR_VOL = [.3, .3];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
   function firePlay(k, vol, gap, peak, lp, rate, x) {
     if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
@@ -60242,13 +60242,18 @@ const AudioSys = (() => {
   // Frost Spear, ice freezing over for Ice Coffin, a cold whoosh for Shatterbloom; until a take has loaded, the synth frost
   // (owner, 12 Nov 2026: "remove the frost sound, we'll need to find something else for frostweavers": her bolt and spells
   // are silent until new takes are chosen; the old ones were frBolt / frSpear / frCoffin / frBloom in frostsfxdata.js)
-  S.frostSpear = S.frostCoffin = S.frostBloom = () => {};
+  S.frostCoffin = S.frostBloom = () => {};
+  // Frost Spear, the owner's mixes (14 Nov 2026): the throw and the hit, every one played so they stack
+  S.frostSpear = () => { firePlay('frSpearMix', FR_SPEAR_VOL[0], 0); };
+  S.frostSpearHit = () => { firePlay('frSpearHitMix', FR_SPEAR_VOL[1], 0); };
   // her bolt: an icy rise and crack (owner, 14 Nov 2026: "this might work for frost bolt", iced magic 6, fireballsfxdata.js frIceBolt)
   // (owner, 14 Nov 2026: "try this as the frostbolt pojectile sound": two cold whooshes in turn, tunnel wind and a cold gush;
   // iced magic 6, frIceBolt, stays in fireballsfxdata.js)
-  S.frostBolt = () => { fireNext('frostBolt', [['frWhoosh1', FR_WH_VOL[0]], ['frWhoosh2', FR_WH_VOL[1]]], .25); };
+  // (then the owner's own mixes, 14 Nov 2026: frBoltMix in flight, frHitMix on contact; "duplicate sounds should be stacked":
+  // no gap, every bolt and every hit plays its own, so a volley stacks up; the whooshes and the layered hit stay in the data)
+  S.frostBolt = () => { firePlay('frBoltMix', FR_MIX_VOL[0], 0); };
   // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
-  S.frostHit = () => { if (!ok('frostHit', .2)) return; firePlay('frHitIce', FR_HIT_VOL[0], 0); firePlay('frHitBreath', FR_HIT_VOL[1], 0); };
+  S.frostHit = () => { firePlay('frHitMix', FR_MIX_VOL[1], 0); };
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
