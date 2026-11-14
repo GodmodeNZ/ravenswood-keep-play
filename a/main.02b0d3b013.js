@@ -1,4 +1,4 @@
-const BUILD_TAG = 'decc55f@2026-11-14';   // the play log's build version (playlog.js)
+const BUILD_TAG = '84ad2bf@2026-11-14';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -46422,7 +46422,7 @@ function ccrBloom(t, c, k, gen) {
 function ccrBloomBurst(c) {
   const b = c.ccBloom; if (!b) return; c.ccBloom = null; G.ccBlooms = (G.ccBlooms || []).filter(o => o !== c);
   const t = b.t; if (!G.towers.includes(t) || t.wrecked) return;
-  ccEv('bloom');
+  ccEv('bloom'); sfx('frostBloomBurst');
   const st = t.st || effStats(t), ab = ABIL.cc_hoarbloom, m = byT(ab.by.mult, t), frz = byT(ab.by.frz, t), x = c.x, z = c.y, froze = [];
   abRun('cc_hoarbloom', () => abAoe(() => inSplash(x, z, CCR.BLOOM_R, false, o => {
     if (o.ent || o.dead) return;
@@ -60070,7 +60070,7 @@ const AudioSys = (() => {
   const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
-  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.36, .3], FR_SPEAR_VOL = [.3, .3];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
+  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.36, .3], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
   function firePlay(k, vol, gap, peak, lp, rate, x) {
     if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
@@ -60242,7 +60242,11 @@ const AudioSys = (() => {
   // Frost Spear, ice freezing over for Ice Coffin, a cold whoosh for Shatterbloom; until a take has loaded, the synth frost
   // (owner, 12 Nov 2026: "remove the frost sound, we'll need to find something else for frostweavers": her bolt and spells
   // are silent until new takes are chosen; the old ones were frBolt / frSpear / frCoffin / frBloom in frostsfxdata.js)
-  S.frostCoffin = S.frostBloom = () => {};
+  // Ice Coffin and Shatterbloom, the owner's mixes (14 Nov 2026): the coffin's two layered as it locks; the bloom forming on the
+  // cast and its burst when it bursts. Every one plays, so they stack
+  S.frostCoffin = () => { firePlay('frCoffinMix', FR_COFFIN_VOL[0], 0); firePlay('frCoffinHitMix', FR_COFFIN_VOL[1], 0); };
+  S.frostBloom = () => { firePlay('frBloomMix', FR_BLOOM_VOL[0], 0); };
+  S.frostBloomBurst = () => { firePlay('frBloomBurstMix', FR_BLOOM_VOL[1], 0); };
   // Frost Spear, the owner's mixes (14 Nov 2026): the throw and the hit, every one played so they stack
   S.frostSpear = () => { firePlay('frSpearMix', FR_SPEAR_VOL[0], 0); };
   S.frostSpearHit = () => { firePlay('frSpearHitMix', FR_SPEAR_VOL[1], 0); };
