@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ea4dcc2@2026-11-15';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd5092cc@2026-11-15';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -32345,7 +32345,7 @@ function ccxOrbThrow(orb) {
     ccxFx(ab.id, t, null, C => CCX_FX.orbBurst(C, x, z, R0, orb));
     G.shake = Math.max(G.shake, .1); sfx('boom', .7);
   });
-  sfx('phase', 1);
+  sfx('arcOrbThrow');
 }
 ccxSwap('cc_mageling', { id: 'cc_grandorb', name: 'Gathering Orb', short: 'Orb', glyph: 'orbbig', hue: '#e0c8ff', mana: 110, cd: 14, noLock: 1, research: { cost: 90, time: 30 }, pref: 'grouped',
   by: { mult: [2.8, 2.8, 3, 3, 3.2, 3.2], gather: [2.5, 2.5, 2.5, 2.5, 2.5, 2.5] },
@@ -60077,11 +60077,22 @@ const AudioSys = (() => {
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
   const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.25, .4], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
+  // (owner, 15 Nov 2026: "lower the arcane missile stacking, cap it at a few", "same with other spells, have a certain max"): at most
+  // TAKE_CAP of one take sounding at once (TAKE_CAPS: its own); a new one is skipped until one has ended
+  const TAKE_CAP = 3, TAKE_CAPS = {}, TAKE_LIVE = {};
+  function takeRoom(k, len) {
+    const t = C.currentTime, q = TAKE_LIVE[k] || (TAKE_LIVE[k] = []);
+    for (let i = q.length - 1; i >= 0; i--) if (q[i] <= t) q.splice(i, 1);
+    if (q.length >= (TAKE_CAPS[k] || TAKE_CAP)) { DROPS[k + ':cap'] = (DROPS[k + ':cap'] || 0) + 1; return false; }
+    q.push(t + len); return true;
+  }
   function firePlay(k, vol, gap, peak, lp, rate, x) {
     if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
-    fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
+    fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F) return false;
     let at = F.at, len = F.len;
     if (peak != null) { const skip = Math.max(0, F.pk - peak); at += skip; len -= skip; }   // (started late enough that its peak lands on time)
+    if (!takeRoom(k, len / (rate || 1))) return true;   // (true: the take is there, only held back; no stand-in sound)
+    if (!ok('fire_' + k, gap)) { TAKE_LIVE[k].pop(); return false; }
     morPlay(B, at, len, vol, lp, rate, 0, x); return true;
   }
   // the glaive's throw (owner: "glaive throw on glaive units sounds like flame sound. can you find spinning blade sound
@@ -60206,6 +60217,7 @@ const AudioSys = (() => {
       const ow = stOwner(Ly), evT = A[ST_MARK[ow]]; let s = A[Ly.at] + (+Ly.off || 0), L2 = Ly;
       if (evT != null && s < evT) { L2 = Object.assign({}, Ly, { in: (+Ly.in || 0) + evT - s }); s = evT; }
       const end = Ly.end && A[Ly.end] != null && ST_SEES[ow].includes(Ly.end) ? A[Ly.end] + (+Ly.endOff || 0) - from : null;
+      const F2 = Ly.take && fxTakes()[Ly.take]; if (F2 && !reg && !takeRoom(Ly.take, end != null ? Math.max(0, end - (s - from)) : (+Ly.out || F2.len))) continue;   // (the take cap, above)
       stLayer(L2, s - from, end, 1, reg, id);
     }
   }
@@ -60273,6 +60285,8 @@ const AudioSys = (() => {
   const AB_VOL = [.24, .22];
   S.arcBarrage = () => { firePlay('arcBarMix', AB_VOL[0], .5); };
   S.arcBarrageHit = () => { firePlay('arcBarHitMix', AB_VOL[1], 1); };
+  // the Gathering Orb hurled (owner, 15 Nov 2026: "Grand Orb - Sound Mixes"), in place of 'phase'; the gather hum and the burst stay
+  S.arcOrbThrow = () => { if (!firePlay('arcOrbMix', .26, .3)) S.phase && S.phase(1); };
   S.frostBolt = () => { firePlay('frBoltMix2', FR_MIX_VOL[0], 0); };   // (owner, 15 Nov 2026: second mix; frBoltMix stays in the Take list)
   // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
   S.frostHit = () => { firePlay('frHitMix2', FR_MIX_VOL[1], 0); };
