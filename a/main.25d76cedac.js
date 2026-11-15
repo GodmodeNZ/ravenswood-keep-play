@@ -1,4 +1,4 @@
-const BUILD_TAG = '7e9f873@2026-11-15';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ea4dcc2@2026-11-15';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13302,7 +13302,7 @@ function ccMissileHit(t, st, c, pow, p, o) {
   ccHit(t, st, c, amt, o.noRx ? { noRx: true } : {});   /* (Echoing Missiles: ccRidersOf) */
   if (marks && marks.length) ccGrimoire(t, st, c, marks, pow);
   part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .16, max: .16, size: .5, col: CC_COL.arcane });
-  if (!o.split && !o.noRx) sfx('arcMissileHit');
+  if (o.barrage) sfx('arcBarrageHit'); else if (!o.split && !o.noRx) sfx('arcMissileHit');
   if (was && c.dead && C.ccSeek && (p.kn || 0) < C.ccSeek) {   /* Homing Missiles: a killing missile flies on */
     const hit = p.hit || new Set(); hit.add(c);
     const o2 = nearest(c.x, c.y, 2, 1, c, q => !hit.has(q) && canTarget(t, st, q))[0];
@@ -14417,8 +14417,8 @@ Object.assign(UNIT_KITS, {
       text: (t, st, ab) => `Looses ${byT(ab.by.n, t)} seeking missiles at the toughest foes in range: ${xD(st, .3)} each.`,
       pick(t, st, ab) { const L = abFoes(t, st, abReach(t, st, ab)); return L.length ? L.sort(abByTough).slice(0, 3) : null; },
       cast(t, st, L, ab) {
-        const k = ccCast(t, ab), n = byT(ab.by.n, t);
-        for (let q = 0; q < n; q++) { const c = L[q % L.length]; G.delayed.push({ t: .1 + q * .07, fn: () => { if (!c.dead && abLive(t)) ccMissile(t, t.st || st, c, .3 * k, { spread: 1.8 }); } }); }
+        const k = ccCast(t, ab), n = byT(ab.by.n, t); sfx('arcBarrage');
+        for (let q = 0; q < n; q++) { const c = L[q % L.length]; G.delayed.push({ t: .1 + q * .07, fn: () => { if (!c.dead && abLive(t)) ccMissile(t, t.st || st, c, .3 * k, { spread: 1.8, barrage: 1 }); } }); }
       } },
     { id: 'cc_grandorb', name: 'Grand Orb', short: 'Orb', glyph: 'orbbig', hue: '#e0c8ff', mana: 110, cd: 14, busy: .7, research: { cost: 90, time: 30 },
       by: { mult: [3, 3, 3.25, 3.25, 3.5, 3.5] },
@@ -60263,9 +60263,16 @@ const AudioSys = (() => {
   // no gap, every bolt and every hit plays its own, so a volley stacks up; the whooshes and the layered hit stay in the data)
   // the Magelings' arcane missile (owner, 15 Nov 2026: "Arcane Missile - Sound Mixes"; "try to arrange sounds so they sit in the mix nicely and dont
   // overpower other sounds"): its most frequent sound, so cut short, kept well under the spells, and a gap so a volley does not pile up
-  const AM_VOL = [.2, .18], AM_GAP = [.08, .11];
+  // (owner, 15 Nov 2026: "needed to have both the projectile and impact sound... needed the longer tail too", "try it as i had it"): both whole,
+  // stacking, at the owner's own balance (the takes are each set to the same peak, the impact peaked 5.7 dB over the projectile)
+  const AM_VOL = [.13, .25], AM_GAP = [0, 0];
   { const _am = S.arcmissile; S.arcmissile = () => { if (!firePlay('arcMisMix', AM_VOL[0], AM_GAP[0])) _am && _am(); }; }
   S.arcMissileHit = () => { firePlay('arcMisHitMix', AM_VOL[1], AM_GAP[1]); };
+  // Arcane Barrage (owner, 15 Nov 2026: "bit strange sounding, but try it"): one let-go as the volley starts, one landing for the volley
+  // (its missiles' own hit sound held back), set a little over the missile and under the big spells
+  const AB_VOL = [.24, .22];
+  S.arcBarrage = () => { firePlay('arcBarMix', AB_VOL[0], .5); };
+  S.arcBarrageHit = () => { firePlay('arcBarHitMix', AB_VOL[1], 1); };
   S.frostBolt = () => { firePlay('frBoltMix2', FR_MIX_VOL[0], 0); };   // (owner, 15 Nov 2026: second mix; frBoltMix stays in the Take list)
   // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
   S.frostHit = () => { firePlay('frHitMix2', FR_MIX_VOL[1], 0); };
@@ -94589,7 +94596,14 @@ const RANGER2 = (() => {
    Checks: `python tools/make_bd2.py --check`. Notes: docs/model_pilot/bladedancer2.md. */
 const BD2 = (() => {
   const U = typeof BD_UNIT !== 'undefined' ? BD_UNIT : 'bladedancer', NAMES = ['idle', 'ready', 'spin', 'fan', 'backhand', 'whirl', 'whirlout', 'dart', 'dartout', 'dartoutL', 'reap'];
-  const ATK = ['spin', 'fan', 'backhand'], EASE = .25, BLOW = .42, K0 = .95, HOP = .22;
+  const ATK = ['spin', 'fan', 'backhand'], EASE = .25, BLOW = .3, K0 = .95, HOP = .22;
+  /* (the owner, 15 Nov: "speed up blade dancer animations and make them a bit more flashy") Her clips play faster than baked:
+     SPD (x real time). A strike's cut is its frame 4 (HIT): it is now begun HIT early, in the last of the wind-up, so the cut
+     itself lands on the game's blow; and it plays quicker still when she strikes faster than her base 0.75 s (haste, Blade
+     Rhythm). Whirl at 2x is still in step with Whirlwind's half-second cuts (two turns a cut) and Bladestorm's quarter-second ones.
+     The darts stay locked to Leaf Dance's hops. No damage, cue or sound time is changed. */
+  const SPD = { spin: 1.5, fan: 1.5, backhand: 1.5, whirl: 2, whirlout: 1.4, dartout: 1.3, dartoutL: 1.3, reap: 1.5 }, HIT = 4 / 30, BASE_IV = .75;
+  const atkSpd = t => SPD.spin * Math.min(1.6, Math.max(1, t._b2Iv ? BASE_IV / t._b2Iv : 1));
   const S = { on: true };
   try { S.on = !/[?&]bd=old\b/.test(location.search); } catch (e) {}
   let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, MK = null, BI = null;
@@ -94685,24 +94699,101 @@ const BD2 = (() => {
       const u = now - at;
       if (cast === 'flurry') {   // Whirlwind: the game cuts every half second until t.stormT
         const T = Math.max(.5, (t.stormT > at + .3 ? t.stormT : at + 1.5) - at);
-        if (u < T) return { c: 'whirl', s: u, rate: 40, mv: 'whirl' + at };
-        if (u < T + CL.whirlout.len) return { c: 'whirlout', s: u - T, rate: 40, mv: 'whirl' + at };
+        if (u < T) return { c: 'whirl', s: u * SPD.whirl, rate: 40, mv: 'whirl' + at };
+        if (u < T + CL.whirlout.len / SPD.whirlout) return { c: 'whirlout', s: (u - T) * SPD.whirlout, rate: 40, mv: 'whirl' + at };
       } else if (cast === 'leap') {   // Leaf Dance: a dart every HOP seconds until t.ab.busyT (less its closing fifth of a second)
         const T = Math.max(HOP, (t.ab && t.ab.busyT > at + .2 ? t.ab.busyT : at + .86) - at - .2 + .06);
         if (u < T) return { c: 'dart', s: u, rate: 40, mv: 'dart' + at, dart: 1 };
         /* (out of the lunge she ended in: the left knife's when the darts were an odd number) */
-        if (u < T + CL.dartout.len) return { c: Math.round((T - .06) / HOP) % 2 ? 'dartoutL' : 'dartout', s: u - T, rate: 40, mv: 'dart' + at, dart: 1 };
-      } else if (cast === 'cross') { if (u < CL.reap.len) return { c: 'reap', s: u, rate: 40, mv: 'reap' + at }; }   // Harvest
+        if (u < T + CL.dartout.len / SPD.dartout) return { c: Math.round((T - .06) / HOP) % 2 ? 'dartoutL' : 'dartout', s: (u - T) * SPD.dartout, rate: 40, mv: 'dart' + at, dart: 1 };
+      } else if (cast === 'cross') { if (u < CL.reap.len / SPD.reap) return { c: 'reap', s: u * SPD.reap, rate: 40, mv: 'reap' + at }; }   // Harvest
     }
     /* (her Bladestorm: two seconds' spinning that no cast began) */
-    if (t.stormT > now) { t._b2Storm = t.stormT; return { c: 'whirl', s: Math.max(0, now - (t.stormT - 2)), rate: 40, mv: 'storm' + t.stormT }; }
-    if (t._b2Storm != null && now >= t._b2Storm && now - t._b2Storm < CL.whirlout.len) return { c: 'whirlout', s: now - t._b2Storm, rate: 40, mv: 'storm' + t._b2Storm };
-    const w = G.phase === 'wave' && t.tg && !t.tg.dead ? t.windup || 0 : 0;
-    if (w > 0 && (t._bdAtkAt == null || now - t._bdAtkAt > BLOW)) { const nx = ATK[((t._bdAtkN | 0) + 1) % ATK.length]; return { c: nx, s: 0, rate: Math.max(9, 3 / Math.max(.05, t.cd || 0)), mv: 'wind' + nx, wind: 1 }; }
-    if (t._bdAtkAt != null) { const mv = ATK[t._bdAtkN | 0], u = now - t._bdAtkAt; if (u >= 0 && u < CL[mv].len) return { c: mv, s: u, rate: 40, mv: mv + t._bdAtkAt }; }
+    if (t.stormT > now) { t._b2Storm = t.stormT; return { c: 'whirl', s: Math.max(0, now - (t.stormT - 2)) * SPD.whirl, rate: 40, mv: 'storm' + t.stormT }; }
+    if (t._b2Storm != null && now >= t._b2Storm && now - t._b2Storm < CL.whirlout.len / SPD.whirlout) return { c: 'whirlout', s: (now - t._b2Storm) * SPD.whirlout, rate: 40, mv: 'storm' + t._b2Storm };
+    /* (how often she really strikes: the time between her last two blows) */
+    if (t._bdAtkAt != null && t._bdAtkAt !== t._b2At) { if (t._b2At != null && t._bdAtkAt - t._b2At < 2) t._b2Iv = t._bdAtkAt - t._b2At; t._b2At = t._bdAtkAt; }
+    const spd = atkSpd(t), w = G.phase === 'wave' && t.tg && !t.tg.dead ? t.windup || 0 : 0;
+    if (w > 0 && (t._bdAtkAt == null || now - t._bdAtkAt > BLOW)) {
+      const nx = ATK[((t._bdAtkN | 0) + 1) % ATK.length], cd = t.cd || 0;
+      if (cd < HIT / spd) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx };   // (the strike begun: its cut on the blow)
+      return { c: nx, s: 0, rate: Math.max(9, 3 / Math.max(.05, cd)), mv: 'wind' + nx, wind: 1 };
+    }
+    if (t._bdAtkAt != null) { const mv = ATK[t._bdAtkN | 0], u = now - t._bdAtkAt; if (u >= 0 && u < (CL[mv].len - HIT) / spd) return { c: mv, s: HIT + u * spd, rate: 40, mv: mv + t._bdAtkAt, atk: 1 }; }
     const fight = G.phase === 'wave' && t.tg && !t.tg.dead, ph = now + (t.anim || 0) * 3;
     if (fight || (t._bdAtkAt != null && now - t._bdAtkAt < 1.5)) return { c: 'ready', s: ph, rate: 9, mv: 'ready' };
     return { c: 'idle', s: 0, rate: 5, mv: 'idle' };
+  }
+  /* ---- the flash (owner: "a bit more flashy"; and never too flashy: the map, foes and units stay visible) ----
+     trails  each knife sweeps a pale silvery smear behind it (laid over: an added light vanished on the bright grass) with a thin added light along the points' path,, from a third of the way up the blade to just past its point, over the
+             last TR seconds of its path (VT.FAN: a bright leading rim, a frayed smear behind), drawn only while the knife
+             moves fast, so the idle and guard stay plain; at most ~.45 alpha, fading out along its age
+     cuts    on each of the game's whirls, every foe cut gets a thin crescent of light across it along the knife's way round
+             (VT.SLASH) and two or three sparks flung on along it (capped at five foes a whirl) */
+  const TR = .11, TRN = 14, TR_F = 8, TR_C = [.9, 1, .84], TR_H = [.93, 1, .86], TR_W = [1.5, 1.7, 1.35];
+  function markW(M, nm, bn) {
+    const m = MK[nm], o = BI[bn] * 12, O = OUT;
+    return M4.xf(M, O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]);
+  }
+  function trails(t, M) {
+    const now = G.time; let T = t._b2Tr;
+    if (!T) T = t._b2Tr = [{ a: new Float32Array(TRN * TR_F), n: 0, i: 0 }, { a: new Float32Array(TRN * TR_F), n: 0, i: 0 }];
+    [['gripR', 'tipR', 'bladeR'], ['gripL', 'tipL', 'bladeL']].forEach((k, s) => {
+      const H = T[s], g = markW(M, k[0], k[2]), p = markW(M, k[1], k[2]);
+      const last = H.n ? ((H.i - 1 + TRN) % TRN) * TR_F : -1;
+      if (last >= 0 && now - H.a[last] < 1e-4) return;   // (drawn twice a frame, or paused: the same sample)
+      let v = 0; if (last >= 0) { const dt = Math.max(1e-3, now - H.a[last]); v = Math.hypot(p[0] - H.a[last + 4], p[1] - H.a[last + 5], p[2] - H.a[last + 6]) / dt; }
+      const o = H.i * TR_F; H.a[o] = now; H.a[o + 1] = g[0]; H.a[o + 2] = g[1]; H.a[o + 3] = g[2]; H.a[o + 4] = p[0]; H.a[o + 5] = p[1]; H.a[o + 6] = p[2];
+      H.a[o + 7] = Math.min(1, Math.max(0, (v - 2.2) / 4.5));   // (how fast the point went: no light under ~2 units a second)
+      H.i = (H.i + 1) % TRN; H.n = Math.min(TRN, H.n + 1);
+    });
+    if (typeof vfxReady !== 'function' || typeof VX === 'undefined' || !vfxReady()) return;
+    const B = VX, lite = typeof vfxLite === 'function' && vfxLite(), C = lite ? TR_C : TR_H;
+    for (const H of T) {
+      let m = 0; const idx = [];
+      for (let q = 0; q < H.n; q++) { const o = ((H.i - 1 - q + TRN * 2) % TRN) * TR_F; if (now - H.a[o] > TR) break; idx.push(o); m = Math.max(m, H.a[o + 7]); }
+      if (idx.length < 3 || m < .05 || !B.room(idx.length * 2, (idx.length - 1) * 6)) continue;
+      let p = -1;
+      for (let q = 0; q < idx.length; q++) {
+        const o = idx[q], f = (now - H.a[o]) / TR, e = H.a[o + 7], a = .55 * e * Math.pow(1 - f, 1.3) * Math.min(1, q * .5 + .5);
+        const gx = H.a[o + 1], gy = H.a[o + 2], gz = H.a[o + 3], px = H.a[o + 4], py = H.a[o + 5], pz = H.a[o + 6];
+        const ix = gx + (px - gx) * .32, iy = gy + (py - gy) * .32, iz = gz + (pz - gz) * .32, ox = gx + (px - gx) * 1.08, oy = gy + (py - gy) * 1.08, oz = gz + (pz - gz) * 1.08;
+        const i = B.vert(ix, iy, iz, f, .2, C[0], C[1], C[2], a * .6, VT.FAN, 0, 0);
+        B.vert(ox, oy, oz, f, .96, C[0], C[1], C[2], a, VT.FAN, 0, 0);
+        if (p >= 0) B.tri2(p, i, i + 1, p + 1);
+        p = i;
+      }
+      /* (and a thin bright edge along the points' path, tapered at both ends: what reads at the game's zoom) */
+      vfxRb.begin(B, VT.GLOW, 1, 0);
+      for (let q = 0; q < idx.length; q++) { const o = idx[q], f = (now - H.a[o]) / TR; vfxRb.pt(H.a[o + 4], H.a[o + 5], H.a[o + 6], .06 * (typeof vfxPx === 'function' ? vfxPx() : 1), TR_W, .7 * H.a[o + 7] * (1 - f), q / (idx.length - 1)); }
+      vfxRb.end();
+    }
+  }
+  const CUT_C = [1.1, 1.25, .95];
+  if (typeof SFX_DRAW !== 'undefined') SFX_DRAW.bdcut = (q, u, a) => {   // a thin crescent of light across a cut foe, along the knife's way round
+    if (typeof VX === 'undefined' || typeof vfxReady !== 'function' || !vfxReady()) return;
+    const f = q.foe && !q.foe.dead ? q.foe : null; if (f) { q.x = f.x; q.z = f.y; }
+    const r = RD.right, up = RD.up, rot = Math.atan2(q.tx * up[0] + q.tz * up[2], q.tx * r[0] + q.tz * r[2]) + (q.sg < 0 ? Math.PI : 0);
+    const e = (u < .2 ? u / .2 : 1) * a * a, s = q.s * (.8 + .4 * Math.min(1, u * 3));
+    vfxSprite(VX, q.x, q.h, q.z, s, s * .7, rot, CUT_C, .7 * e, VT.SLASH, 1);
+  };
+  function cuts(t, st) {
+    if (typeof sfxAdd !== 'function' || typeof inSplash !== 'function' || typeof SFX_OFF !== 'undefined' && SFX_OFF) return;
+    let n = 0; const sg = (t._bdAtkN | 0) === 2 ? -1 : 1;   // (the backhand turns the other way)
+    inSplash(t.x, t.y, st.range, true, (c, d) => {
+      if (n >= 5 || c.phased || c.ent) return; n++;
+      const dx = (c.x - t.x) / (d || 1), dz = (c.y - t.y) / (d || 1), tx = -dz * sg, tz = dx * sg, h = typeof hitH === 'function' ? hitH(c) : .5;
+      sfxAdd({ k: 'bdcut', x: c.x, z: c.y, h, foe: c, tx, tz, sg, s: .32, life: .2 });
+      if (typeof part === 'function') for (let q = 0; q < 2 + (n < 3 ? 1 : 0); q++) { const k = 2.2 + Math.random() * 1.8; part({ k: 'xspark', x: c.x, z: c.y, h, vx: tx * k + (Math.random() - .5), vz: tz * k + (Math.random() - .5), vh: Math.random() * 1.2, g: 4, life: .2, max: .2, size: .035, col: '#e8ffc8', hot: 1.3 }); }
+    });
+  }
+  if (typeof bladeWhirl === 'function') {
+    const _bw = bladeWhirl;
+    bladeWhirl = function (t, st) {
+      const r = _bw.apply(this, arguments);
+      try { if (S.on && t && t.def && t.def.unit === U && typeof NEWMODELS !== 'undefined' && NEWMODELS && MESH_) cuts(t, st); } catch (e) {}
+      return r;
+    };
   }
   let PT = null, OUT = null;
   const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
@@ -94732,7 +94823,7 @@ const BD2 = (() => {
     toBones(pose, OUT);
     const it = item(MESH_, _c, opts); it.sec = [0, US.trim || 0]; it.bones = OUT.slice();
     if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
-    if (live) { const mk = MK.tipR, o = BI.bladeR * 12; t.tipW = M4.xf(_c, OUT[o] * mk[0] + OUT[o + 4] * mk[1] + OUT[o + 8] * mk[2] + OUT[o + 3], OUT[o + 1] * mk[0] + OUT[o + 5] * mk[1] + OUT[o + 9] * mk[2] + OUT[o + 7], OUT[o + 2] * mk[0] + OUT[o + 6] * mk[1] + OUT[o + 10] * mk[2] + OUT[o + 11]); t.tipYaw = ang; t.tipAt = G.time; t._b2Clip = P.c; }
+    if (live) { const mk = MK.tipR, o = BI.bladeR * 12; t.tipW = M4.xf(_c, OUT[o] * mk[0] + OUT[o + 4] * mk[1] + OUT[o + 8] * mk[2] + OUT[o + 3], OUT[o + 1] * mk[0] + OUT[o + 5] * mk[1] + OUT[o + 9] * mk[2] + OUT[o + 7], OUT[o + 2] * mk[0] + OUT[o + 6] * mk[1] + OUT[o + 10] * mk[2] + OUT[o + 11]); t.tipYaw = ang; t.tipAt = G.time; t._b2Clip = P.c; try { trails(t, _c); } catch (e) { if (!S.terr) { S.terr = e.message; console.warn('bd2 trails:', e); } } }
     return true;
   }
   try { load(typeof BD2_MDL !== 'undefined' ? BD2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Blade Dancer rig:', e.message); }
