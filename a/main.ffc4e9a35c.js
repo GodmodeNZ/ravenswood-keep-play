@@ -1,4 +1,4 @@
-const BUILD_TAG = '9afd276@2026-11-15';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7e9f873@2026-11-15';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13302,6 +13302,7 @@ function ccMissileHit(t, st, c, pow, p, o) {
   ccHit(t, st, c, amt, o.noRx ? { noRx: true } : {});   /* (Echoing Missiles: ccRidersOf) */
   if (marks && marks.length) ccGrimoire(t, st, c, marks, pow);
   part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .16, max: .16, size: .5, col: CC_COL.arcane });
+  if (!o.split && !o.noRx) sfx('arcMissileHit');
   if (was && c.dead && C.ccSeek && (p.kn || 0) < C.ccSeek) {   /* Homing Missiles: a killing missile flies on */
     const hit = p.hit || new Set(); hit.add(c);
     const o2 = nearest(c.x, c.y, 2, 1, c, q => !hit.has(q) && canTarget(t, st, q))[0];
@@ -56361,8 +56362,8 @@ const SOUND_TIMING = {
     master: { comp: { on: 0, th: -18, ratio: 3, att: .01, rel: .2, knee: 6, mk: 0 }, verb: { on: 0, size: 1.6, decay: 3, pre: .02, tone: 4000, mix: .25 } },
     layers: [
       { id: 'simmer', take: 'pyroFbSimmer', name: 'Build-up', at: 'windup', off: 0, in: 0, out: 1.541, end: 'release', endOff: .45, fi: .447, fo: .17, vol: .325, hall: .24, gap: .2, comp: { on: 1, th: -27, ratio: 2.5, att: .051, rel: .42, knee: 20, mk: 3.5 }, verb: { on: 1, size: 2.3, decay: 1.3, pre: .02, tone: 5550, mix: .31 }, env: { vol: [[.357, .158]], comp: [[.26, .384], [1.223, .61]] } },
-      { id: 'whoosh', take: 'pyroFbFlyMix', name: 'Flight', at: 'release', off: 0, in: 0, out: 1.3, end: 'burst', endOff: .3, fi: .003, fo: .25, vol: .5, hall: 0, gap: 0, comp: { on: 0, th: -37, ratio: 6.2, att: .066, rel: .2, knee: 6, mk: 0 }, verb: { on: 0, size: 1.7, decay: 3.9, pre: .035, tone: 4000, mix: .49 } },   // (owner, 15 Nov 2026: "Fireball - Sound Mixes" Projectile, from the moment the ball leaves his hand; the older whoosh is pyroFbWhoosh in the Take list)
-      { id: 'impact', take: 'pyroFbImpactMix', name: 'Impact', at: 'burst', off: 0, in: 0, out: 1.8, fi: .003, fo: .3, vol: .53, hall: 0, gap: 0, comp: { on: 0, th: -46, ratio: 3.9, att: .029, rel: .01, knee: 13, mk: 2 }, verb: { on: 0, size: .85, decay: .9, pre: .03, tone: 3150, mix: .26 } },   // (owner, 15 Nov 2026: "Fireball - Sound Mixes" Impact; fire magic 6 and the older takes stay in the Sound Lab's Take list)
+      { id: 'whoosh', take: 'pyroFbFlyMix', name: 'Flight', at: 'release', off: 0, in: 0, out: 1.3, end: 'burst', endOff: .3, fi: .003, fo: .25, vol: .36, hall: 0, gap: 0, comp: { on: 0, th: -37, ratio: 6.2, att: .066, rel: .2, knee: 6, mk: 0 }, verb: { on: 0, size: 1.7, decay: 3.9, pre: .035, tone: 4000, mix: .49 } },   // (owner, 15 Nov 2026: "Fireball - Sound Mixes" Projectile, from the moment the ball leaves his hand; the older whoosh is pyroFbWhoosh in the Take list)
+      { id: 'impact', take: 'pyroFbImpactMix', name: 'Impact', at: 'burst', off: 0, in: 0, out: 1.8, fi: .003, fo: .3, vol: .33, hall: 0, gap: 0, comp: { on: 0, th: -46, ratio: 3.9, att: .029, rel: .01, knee: 13, mk: 2 }, verb: { on: 0, size: .85, decay: .9, pre: .03, tone: 3150, mix: .26 } },   // (owner, 15 Nov 2026: "Fireball - Sound Mixes" Impact; fire magic 6 and the older takes stay in the Sound Lab's Take list)
     ],
   },
 };
@@ -60075,7 +60076,7 @@ const AudioSys = (() => {
   const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
-  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.36, .45], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
+  const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.25, .4], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
   function firePlay(k, vol, gap, peak, lp, rate, x) {
     if (k.indexOf('pyro') === 0) vol *= PYRO_GAIN;
     fireLoad(); const B = fireBufs[k], F = fxTakes()[k]; if (!B || !F || !ok('fire_' + k, gap)) return false;
@@ -60260,6 +60261,11 @@ const AudioSys = (() => {
   // iced magic 6, frIceBolt, stays in fireballsfxdata.js)
   // (then the owner's own mixes, 14 Nov 2026: frBoltMix in flight, frHitMix on contact; "duplicate sounds should be stacked":
   // no gap, every bolt and every hit plays its own, so a volley stacks up; the whooshes and the layered hit stay in the data)
+  // the Magelings' arcane missile (owner, 15 Nov 2026: "Arcane Missile - Sound Mixes"; "try to arrange sounds so they sit in the mix nicely and dont
+  // overpower other sounds"): its most frequent sound, so cut short, kept well under the spells, and a gap so a volley does not pile up
+  const AM_VOL = [.2, .18], AM_GAP = [.08, .11];
+  { const _am = S.arcmissile; S.arcmissile = () => { if (!firePlay('arcMisMix', AM_VOL[0], AM_GAP[0])) _am && _am(); }; }
+  S.arcMissileHit = () => { firePlay('arcMisHitMix', AM_VOL[1], AM_GAP[1]); };
   S.frostBolt = () => { firePlay('frBoltMix2', FR_MIX_VOL[0], 0); };   // (owner, 15 Nov 2026: second mix; frBoltMix stays in the Take list)
   // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
   S.frostHit = () => { firePlay('frHitMix2', FR_MIX_VOL[1], 0); };
