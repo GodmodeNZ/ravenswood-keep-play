@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd5092cc@2026-11-15';   // the play log's build version (playlog.js)
+const BUILD_TAG = '2493da6@2026-11-15';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13627,6 +13627,7 @@ FORCE_HOOKS.conclave = {
     if (typeof ccItemsTick === 'function') ccItemsTick(dt);
   },
   wave(n) {
+    for (const p of G.ccP || []) p.done = true;   // (missiles still in the air end here: marked, so their looks let go of them too, not hang in the air; owner, 15 Nov 2026)
     G.ccP = []; G.ccOmens = []; G.ccKindles = []; G.ccLens = G.towers.filter(t => t.st && t.st.pw && t.st.pw.ccLens);
     for (const t of G.towers) { t.ccMtn = 0; t.ccChalkW = n; t.ccChalkN = 0; }
   },
@@ -98249,6 +98250,19 @@ const EFX_LKIND_SEED = { core: 'c', trail: 'c', burst: 'c', spores: 'c', seeds: 
    Tuning: the Element Lab's entries rootstrike, thicket, constrict (Mothcloud) and briarfield (Wither). */
 const BRW = { rooted: [], thickets: [], moths: [], withers: [], st: new WeakMap(), quiet: 0 };
 const BRW_COL = { earth: [.42, .34, .22], dust: [.6, .56, .46], veil: [.9, .86, .7], ash: [.5, .48, .4] };
+// Reveal a connected stem along its curve, tip first; never inflate a finished root mesh.
+function brGrowVine(point, growth, width, thorn, seed, fade=1) {
+  const n=[4,6,8][sdLv()], end=Math.max(0,Math.min(1,growth));
+  for(let j=0;j<n&&j/n<end;j++) {
+    const a=j/n,b=Math.min(end,(j+1)/n),w=width*(1-.78*a)*fade;
+    if(w<.002||b-a<.001)continue;
+    sdSpan(thorn?'segT':'brRootSeg',point(a),point(b),w,w,seed+j*1.4);
+    if(thorn&&j%3===2&&end>b+.06&&sdLv()) {
+      const p=point(b),s=.16*fade*sdSs(b,b+.12,end);
+      sdPlace('leaf',p,seed+j*2.4,-.3,s);
+    }
+  }
+}
 if (typeof HF_RESETS !== 'undefined') HF_RESETS.push(() => { BRW.rooted.length = 0; BRW.thickets.length = 0; BRW.moths.length = 0; BRW.withers.length = 0; });
 const brwOn = () => typeof sdOn === 'function' && sdOn();
 function brSt(o) { let s = BRW.st.get(o); if (!s) BRW.st.set(o, s = {}); return s; }
@@ -98267,6 +98281,7 @@ function brTubeGeo(g, C, Rr, n, sides, col) {
   for (let i = 1; i <= n; i++) { const B = ring(i); for (let k = 0; k < sides; k++) { const k2 = (k + 1) % sides; g.quad(A[k], B[k], B[k2], A[k2], col(i, k)); } A = B; }
 }
 if (typeof SD_MESH !== 'undefined') Object.assign(SD_MESH, {
+  brRootSeg:g=>{g.smooth=50;g.cyl(0,0,0,1,.84,1,6,'#65462d',{capT:false,alt:'#443522'});},
   // a root: out of the ground at the origin, up +Y and hooking over toward +Z (what it grips), 1 tall; bark to a green tip
   root: g => { g.smooth = 50; const b1 = lin3('#5a4326'), b2 = lin3('#463420'), tip = lin3('#5c7a2c');
     brTubeGeo(g, v => [.05 * Math.sin(v * 5), Math.sin(v * 1.7) * .92, (1 - Math.cos(v * 2.2)) * .3], v => .13 * Math.pow(1 - v, .7) + .014, 8, 5, (i, k) => _sdMx(k % 2 ? b1 : b2, tip, Math.max(0, (i - 5) / 3) * .8));
@@ -98318,6 +98333,16 @@ function brRooted(now) {
     const k = sdBack(Math.max(0, Math.min(1, (now - st.born) / V.grow))) * Math.max(0, Math.min(1, left / .25));
     if (k <= .01) continue;
     const n = Math.max(3, Math.round(V.count * [.6, .8, 1][lv] * (SD.load > .7 ? .7 : 1))), fh = typeof creepH === 'function' ? creepH(c) : .9, H = Math.max(.3, fh * V.h) * kL;
+    if(c.rootBy&&c.rootBy.def&&c.rootBy.def.unit==='briarwarden') {
+      const fade=sdSs(0,.3,left),grow=Math.max(.18,V.grow*1.8);
+      const count=L.length>3?Math.min(n,3):n;
+      for(let i=0;i<count;i++) {
+        const a=st.seed+i*TAU/count,rr=Math.max(.18,e.r*V.grip),hh=H*(.8+.25*sdRnd(i+st.seed));
+        const u=sdSs(i*.025,grow+i*.025,now-st.born);
+        brGrowVine(v=>{const turn=a+v*2.05,r=rr*(1.28-.5*v);return [c.x+Math.cos(turn)*r,hh*Math.sin(v*1.55)*fade-.025,c.y+Math.sin(turn)*r];},u,.055*kL,false,a,fade);
+      }
+      continue;
+    }
     for (let i = 0; i < n; i++) {
       const a = st.seed + i * TAU / n + (sdRnd(i * 3 + st.seed) - .5) * .5, rr = e.r * V.grip, hh = H * (.75 + .5 * sdRnd(i * 7 + st.seed)) * k, tight = .08 * Math.sin(now * 2.2 + i);
       sdPlace('root', [c.x + Math.cos(a) * rr, -.02, c.y + Math.sin(a) * rr], Math.atan2(-Math.cos(a), -Math.sin(a)), .12 + tight, hh * .85, hh, hh * .85);
@@ -98338,9 +98363,13 @@ function brThickets(now) {
       const onRim = i < rim, a = onRim ? q.seed + i * TAU / rim : sdRnd(i * 5.3 + q.seed) * TAU, d = onRim ? q.r * .94 : q.r * .8 * Math.sqrt(.08 + .92 * sdRnd(i * 9.1 + q.seed));
       const born = d / Math.max(.1, q.r) * V.spread, k = sdBack(Math.max(0, Math.min(1, (el - born) / V.grow))) * (1 - sdSs(q.dur, q.dur + .5, el));
       if (k <= .01) continue;
-      const x = q.x + Math.cos(a) * d, z = q.z + Math.sin(a) * d, hh = V.h * (.7 + .6 * sdRnd(i * 2.7 + q.seed)) * k * kL, yaw = onRim ? Math.atan2(-Math.cos(a), -Math.sin(a)) + (sdRnd(i + q.seed) - .5) : sdRnd(i * 4.1 + q.seed) * TAU;
-      sdPlace('bramble', [x, -.02, z], yaw, .1 + .05 * Math.sin(now * 1.7 + i), hh * .9, hh, hh * .9);
-      if (lv && i % 2 === 0) sdPlace('leaf', [x, .02, z], yaw + 2.2, -.3, hh * .45, hh * .45, hh * .45);
+      const x=q.x+Math.cos(a)*d,z=q.z+Math.sin(a)*d,hh=V.h*(.7+.4*sdRnd(i*2.7+q.seed))*kL;
+      const fade=1-sdSs(q.dur,q.dur+.5,el),growth=sdSs(born,born+Math.max(.35,V.grow*1.7),el);
+      brGrowVine(v=>{
+        const rise=sdSs(.32,1,v),turn=a+.42*Math.sin(v*Math.PI)*rise;
+        const r=d*Math.min(1,v/.35)*(1-.18*rise);
+        return [q.x+Math.cos(turn)*r,hh*Math.sin(rise*2.1)*fade-.02,q.z+Math.sin(turn)*r];
+      },growth,.045*kL,true,a,fade);
       if (!q['e' + i] && el >= born) { q['e' + i] = 1; if (i % 3 === 0) brErupt(x, z, .15, 2, 'thicket', 'burst'); }
     }
   }
@@ -98357,18 +98386,28 @@ function brMoths(now) {
     const fe = q.end == null ? 1 : Math.max(0, 1 - (now - q.end) / .6); if (fe <= 0) { q.dead = 1; continue; }
     const dt = Math.max(0, Math.min(.05, now - (q.lt == null ? now : q.lt))); q.lt = now;
     // (the swarm leaves the staff and settles: its middle follows the zone, a little behind it)
-    let top = 0; if (z.in && typeof creepH === 'function') for (const c of z.in) if (!c.dead) top = Math.max(top, creepH(c));
+    let top = 0; if (typeof creepH === 'function') for (const c of G.creeps) if (!c.dead && ((z.in&&z.in.has(c)) || Math.hypot(c.x-z.tx,c.y-z.tz)<z.r+ .5)) top=Math.max(top,creepH(c));
     q.top = q.top == null ? top : q.top + (top - q.top) * Math.min(1, dt * 3);   // (they fly over the heads of what is under them, never inside it)
-    const fly = Math.max(0, Math.min(1, (now - q.at) / Math.max(.15, q.T))), hz = q.h0 + (Math.max(V.h, q.top * 1.08 + .12) - q.h0) * sdSs(0, 1, fly);
-    if (q.cx == null) { q.cx = q.x0; q.cz = q.z0; }
-    q.cx += (z.x - q.cx) * Math.min(1, dt * 6); q.cz += (z.z - q.cz) * Math.min(1, dt * 6);
-    const r = z.r * (.25 + .75 * fly), n = kL == null ? 0 : Math.max(4, Math.round(V.count * [.45, .7, 1][lv] * (SD.load > .7 ? .7 : 1)));
+    const fly=sdSs(0,Math.max(.15,q.T),now-q.at),hz=Math.max(V.h,q.top*1.08+.12);
+    if(q.cx==null){q.cx=z.x;q.cz=z.z;}
+    const follow=now-q.at<q.T?1:Math.min(1,dt*8);
+    q.cx+=(z.x-q.cx)*follow;q.cz+=(z.z-q.cz)*follow;
+    const r=z.r,n=kL==null?0:Math.max(4,Math.round(V.count*[.45,.7,1][lv]*(SD.load>.7?.7:1)));
     for (let k = 0; k < n; k++) {
-      // each on its own loop round the middle (some near, some at the rim: the rim is its real reach), bobbing
-      const ph = q.seed + k * 2.39996, rr = r * (.4 + .65 * ((k * .618) % 1)), sp = (.8 + .5 * ((k * .29) % 1)) * (k % 2 ? 1 : -1) * V.speed, an = ph + now * sp;
-      const x = q.cx + Math.cos(an) * rr, zz = q.cz + Math.sin(an) * rr * .9, y = Math.max(.12, hz * (.9 + .35 * ((k * .37) % 1)) + .08 * Math.sin(now * 3 + k)), s = V.wing * (.8 + .4 * ((k * .53) % 1)) * fe * kL;
-      // (it faces the way it flies; its wings beat about its length)
-      const hd = an + (sp > 0 ? Math.PI / 2 : -Math.PI / 2), F = [Math.cos(hd), 0, Math.sin(hd)], Rt = [F[2], 0, -F[0]], f = Math.sin(now * 34 + k * 1.7) * .7 + .2, cf = Math.cos(f), sf = Math.sin(f);
+      // A staggered flight from ONE staff anchor fans into a coherent, breathing swarm.
+      // Each moth keeps its own path through arrival; no separate arrival swarm is spawned.
+      const delay=k/n*Math.min(.18,q.T*.3),el=now-q.at-delay;if(el<=0)continue;
+      const ph=q.seed+k*2.39996,rr=r*(.3+.65*((k*.618)%1)),sp=(.65+.25*((k*.29)%1))*V.speed;
+      function position(time){
+        const f=sdSs(delay,Math.max(delay+.1,q.T),time-q.at),an=ph+(time-q.at)*sp;
+        const dx=q.cx+Math.cos(an)*rr,dz=q.cz+Math.sin(an)*rr*.85;
+        const dy=hz*(.92+.22*((k*.37)%1))+.06*Math.sin(time*3+k);
+        const arc=Math.sin(Math.PI*f),side=(k%2?1:-1)*.18;
+        return [q.x0+(dx-q.x0)*f+arc*side,q.h0+(dy-q.h0)*f+arc*.22,q.z0+(dz-q.z0)*f-arc*side];
+      }
+      const P=position(now),N=position(now+.012),[x,y,zz]=P;
+      const s=V.wing*(.8+.4*((k*.53)%1))*fe*kL*sdSs(0,.09,el);
+      const hd=Math.atan2(N[2]-zz,N[0]-x),F=[Math.cos(hd),0,Math.sin(hd)],Rt=[F[2],0,-F[0]],f=Math.sin(now*34+k*1.7)*.7+.2,cf=Math.cos(f),sf=Math.sin(f);
       for (const sd of [-1, 1]) { const X = [Rt[0] * cf * sd * s, sf * s, Rt[2] * cf * sd * s], Z = [F[0] * s, 0, F[2] * s], Y = [(Z[1] * X[2] - Z[2] * X[1]) / s, (Z[2] * X[0] - Z[0] * X[2]) / s, (Z[0] * X[1] - Z[1] * X[0]) / s]; sdPart('mothw', sdBasis([x, y, zz], X, Y, Z)); }
       if (lv) sdPart('mothb', sdBasis([x, y, zz], [Rt[0] * s, 0, Rt[2] * s], [0, s, 0], [F[0] * s, 0, F[2] * s]));
     }
@@ -98376,7 +98415,7 @@ function brMoths(now) {
     const nv = Math.round(Vc.count * [.5, .75, 1][lv]);
     for (let k = 0; k < nv; k++) {
       const per = 2.8 * (.8 + .5 * sdRnd(k + q.seed)), ph = (now - q.at) / per + sdRnd(k * 3.1 + q.seed), cyc = Math.floor(ph), u = ph - cyc, a = sdRnd(k * 7.3 + cyc * 13.7 + q.seed) * TAU, rr = r * .6 * Math.sqrt(sdRnd(k * 5.9 + cyc * 3.3 + q.seed));
-      sdBill(SDT_SH.SPORE, [q.cx + Math.cos(a) * rr, hz * (.85 + .3 * sdRnd(k * 2.3 + cyc)), q.cz + Math.sin(a) * rr], z.r * Vc.w, z.r * Vc.w * .8, { age: .08 + u * .36, seed: k * 5 + cyc * 3, a: fe * fly * Vc.a * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)), p0: Vc.thick, p1: 1.5, col: BRW_COL.veil, soft: .1, sp: .7, pull: .15 }, 'constrict', 'veil');
+      sdBill(SDT_SH.SPORE, [q.cx + Math.cos(a) * rr, hz * (.85 + .3 * sdRnd(k * 2.3 + cyc)), q.cz + Math.sin(a) * rr], z.r * Vc.w, z.r * Vc.w * .8, { age: .08 + u * .36, seed: k * 5 + cyc * 3, a: .38*fe * fly * Vc.a * sdSs(0, .22, u) * (1 - sdSs(.68, 1, u)), p0: Vc.thick, p1: 1.5, col: BRW_COL.veil, soft: .1, sp: .7, pull: .15 }, 'constrict', 'veil');
     }
   }
 }
@@ -98390,14 +98429,24 @@ function brWithers(now) {
     const c = q.c, el = now - q.at;
     if (!c || c.dead) { q.dead = 1; continue; }
     const h = hitH(c), kS = sdOnL('briarfield', 'stream');
-    if (el < q.T + .25 && kS != null) {
-      // the stream: leaves leave the staff one after another and fly straight to it
-      const n = Math.round(V.leaves * [.6, .8, 1][lv]), A = q.A;
-      for (let i = 0; i < n; i++) { const u = (el - i * .035) / q.T; if (u <= 0 || u >= 1) continue; const wob = Math.sin(u * 9 + i) * .05;
-        sdPlace('dleaf', [A[0] + (c.x - A[0]) * u + wob, A[1] + (h - A[1]) * u + wob, A[2] + (c.y - A[2]) * u], now * 9 + i, now * 7 + i * 2, V.w * kS); }
-      if (now - (q.shed || 0) > .05) { q.shed = now; const u = Math.min(1, el / q.T); sdShot('spore', A[0] + (c.x - A[0]) * u, A[1] + (h - A[1]) * u, A[2] + (c.y - A[2]) * u, .16, .4, { vy: .1, grow: .9, p0: .5, a: .6, col: BRW_COL.ash }, 'briarfield', 'stream'); }
-      continue;
+    if(el<q.T+1.2&&kS!=null) {
+      const n=Math.round(V.leaves*[.6,.8,1][lv]),A=q.A,fr=Math.max(.25,((c.def&&c.def.r)||.3)*1.1);
+      for(let i=0;i<n;i++) {
+        const age=el-i*.025,u=age/Math.max(.1,q.T);if(u<=0)continue;
+        const settle=Math.max(0,age-q.T),a=q.seed+i*1.1+Math.min(1,u)*7+settle*5;
+        let P,fade=sdSs(0,.08,age)*(1-sdSs(.65,1,settle));if(fade<=0)continue;
+        if(u<1) {
+          const r=(.08+.13*Math.sin(Math.PI*u))*u;
+          P=[A[0]+(c.x-A[0])*u+Math.cos(a)*r,A[1]+(h-A[1])*u+Math.sin(a)*r*Math.sin(Math.PI*u),A[2]+(c.y-A[2])*u+Math.sin(a)*r];
+        }else{
+          const r=.08+(fr-.08)*sdSs(0,.3,settle);
+          P=[c.x+Math.cos(a)*r,Math.max(.04,h-settle*settle*.8),c.y+Math.sin(a)*r];
+        }
+        sdPlace('dleaf',P,a+Math.PI/2,now*5+i,V.w*kS*fade);
+        if(lv&&i%3===0)sdBill(SDT_SH.SPORE,P,.28,.22,{age:.18,seed:i+q.seed,a:.18*fade,p0:.35,col:BRW_COL.ash,soft:.12,sp:1.2},'briarfield','stream');
+      }
     }
+    if(el<q.T+.55)continue;
     if (!(c.gvcWithT > now)) { if (el > q.T + .4) q.dead = 1; continue; }
     // while it ages: dead leaves let go of it and fall, more of them as it weakens
     const kL = sdOnL('briarfield', 'leaves'); if (kL == null) continue;
@@ -98515,6 +98564,136 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
   if (typeof ELEM_FX_ROWS !== 'undefined') ELEM_FX_ROWS.push(['briarwarden', 'Briarwardens']);
   if (typeof efxSync === 'function') efxSync();
 }
+
+/* H3 video-authored Briarwarden spells. Full emergence/flight, seamless living hold,
+   then the same film's withdrawal/decay. Gameplay alone owns every hit and root. */
+const BRIAR_VIDEO={on:!(typeof location!=='undefined'&&new URLSearchParams(location.search).get('briarVideo')==='0'),roots:new Map(),ends:[],counts:{}};
+if(typeof BRIAR_VIDEO_DATA!=='undefined')(()=>{
+  Object.assign(LAB_FX,BRIAR_VIDEO_DATA);
+  const S=BRIAR_VIDEO,key=(n,k='full')=>'briarvideo_'+n+'_'+k,clamp=x=>Math.max(0,Math.min(1,x));
+  const active=n=>S.on&&brwOn()&&!!LAB_FX[key(n)];
+  const mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+  const ground=c=>[typeof ffFoeX==='function'?ffFoeX(c):c.x,.025,typeof ffFoeZ==='function'?ffFoeZ(c):c.y];
+  const torso=c=>{const p=ground(c);p[1]=hitH(c);return p;};
+  function pin(name,kind,frame,P,w,alpha=1,pull=.12){
+    const id=key(name,kind),B=LAB_FX[id];if(!B||alpha<=0)return;
+    frame=Math.max(0,Math.min(B.n-1,frame));const i=Math.floor(frame),a=mix(B.track[i],B.track[Math.min(i+1,B.n-1)],frame-i),h=w/B.aspect;
+    const C=P.map((v,j)=>v-RD.right[j]*(a[0]-.5)*w-RD.up[j]*(a[1]-.5)*h);
+    if(labPin(id,frame,C,w,{a:alpha,k:1,pull}))S.counts[name]=(S.counts[name]||0)+1;
+  }
+  function held(name,age,until,P,w,enter=.65,pull=.12){
+    const B=LAB_FX[key(name)],L=LAB_FX[key(name,'loop')],out=.65;
+    if(age<0)return;
+    if(age>=until){pin(name,'full',B.endStart+(B.n-1-B.endStart)*clamp((age-until)/out),P,w,1,pull);return;}
+    if(age<enter){pin(name,'full',B.introEnd*clamp(age/enter),P,w,clamp(age/.07),pull);return;}
+    pin(name,'loop',((age-enter)*24)%L.n,P,w,1,pull);
+  }
+  const roots=brRooted;
+  brRooted=function(now){
+    if(!active('roots'))return roots(now);
+    const keep=[];
+    for(const e of BRW.rooted){
+      const c=e.c;
+      if(!c||!c.rootBy||!c.rootBy.def||c.rootBy.def.unit!=='briarwarden'){keep.push(e);continue;}
+      if(active('thicket')&&BRW.thickets.some(q=>now<q.at+q.dur&&Math.hypot(c.x-q.x,c.y-q.z)<=q.r+.1))continue;
+      let q=S.roots.get(c);if(!q){q={at:now,until:c.rootT,P:ground(c),w:Math.max(.75,creepH(c))*3.8};S.roots.set(c,q);labLoad(key('roots'));labLoad(key('roots','loop'));}
+      q.until=Math.max(q.until,c.rootT);
+    }
+    BRW.rooted=keep;roots(now);
+    const k=sdOnL('rootstrike','roots');
+    for(const [c,q] of S.roots){
+      if(c.dead&&q.dead==null)q.dead=now;
+      const end=q.dead==null?q.until:Math.min(q.until,q.dead);
+      if(now>end+.65){S.roots.delete(c);continue;}
+      if(!c.dead)q.P=ground(c);
+      if(k!=null)held('roots',now-q.at,end-q.at,q.P,q.w*k,Math.min(.65,(end-q.at)*.45),Math.max(.15,(c.def.r||.3)*.75));
+    }
+  };
+  const thickets=brThickets;
+  brThickets=function(now){
+    if(!active('thicket'))return thickets(now);
+    BRW.thickets=BRW.thickets.filter(q=>now<q.at+q.dur+.65);
+    const k=sdOnL('thicket','brambles');if(k==null)return;
+    for(const q of BRW.thickets)held('thicket',now-q.at,q.dur,[q.x,.025,q.z],q.r*3.2*k,.75,Math.max(.25,q.r*1.2));
+  };
+  const moths=brMoths;
+  const smooth=x=>{x=clamp(x);return x*x*x*(x*(x*6-15)+10);};
+  function mothLine(q,age,end,P){
+    const B=LAB_FX[key('moths')],L=LAB_FX[key('moths','loop')];
+    const enter=B.introEnd/24,ending=age>=end;
+    const kind=age<enter?'full':'loop';
+    const frame=age<enter?age*24:((age-enter)*24)%(L.loopFrames||L.n);
+    // The movie contains the whole procession and loose flutter. Fix both ends in world
+    // space instead of moving or growing a card containing the entire swarm.
+    const A=q.videoA,delta=P.map((v,i)=>v-A[i]),len=Math.hypot(...delta)||.001,dir=delta.map(v=>v/len);
+    const fw=[RD.view[2],RD.view[6],RD.view[10]],dot=dir.reduce((v,x,i)=>v+x*fw[i],0);
+    const axis=dir.map((x,i)=>x-fw[i]*dot),al=Math.hypot(...axis),U=al>.001?axis.map(x=>x/al):RD.right;
+    const V=[fw[2]*U[1]-fw[1]*U[2],fw[0]*U[2]-fw[2]*U[0],fw[1]*U[0]-fw[0]*U[1]];
+    const w=len*Math.max(.05,al)/(B.flightTo[0]-B.flightFrom[0]),h=w/B.aspect;
+    const C=P.map((v,i)=>v-U[i]*(B.flightTo[0]-.5)*w-V[i]*(B.flightTo[1]-.5)*h);
+    // Fade the current wing/orbit phase on expiry rather than jumping to a
+    // different formation in the full film's pre-recorded ending.
+    const alpha=clamp(age/.07)*(ending?1-smooth((age-end)/.65):1);
+    if(labQueue(key('moths',kind),C,dir,w/Math.max(.35,al),{fr:frame,a:alpha,k:1,pull:.85}))S.counts.moths=(S.counts.moths||0)+1;
+  }
+  brMoths=function(now){
+    if(!active('moths'))return moths(now);
+    BRW.moths=BRW.moths.filter(q=>!q.dead);const k=sdOnL('constrict','moths');
+    for(const q of BRW.moths){
+      const z=q.z,alive=q.t&&q.t.ab&&q.t.ab.zones.includes(z);
+      if(!alive&&q.end==null)q.end=now;
+      if(q.end!=null&&now>q.end+.65){q.dead=1;continue;}
+      // Capture the free palm once: the departing swarm must not follow the returning hand.
+      if(!q.videoA){const t=q.t;q.videoA=t&&t._wizPalm&&now-t._wizSeen<.3?t._wizPalm.slice():sdAnchor(t).hand.slice();}
+      const age=Math.max(0,now-q.at),T=Math.max(.1,q.T),u=clamp(age/T),f=smooth(u);
+      const dt=Math.max(0,Math.min(.1,now-(q.videoAt??now)));q.videoAt=now;
+      const top=Math.max(.9,...G.creeps.filter(c=>!c.dead&&Math.hypot(c.x-z.tx,c.y-z.tz)<z.r+.5).map(creepH));
+      q.videoTop=q.videoTop==null?top:q.videoTop+(top-q.videoTop)*(1-Math.exp(-dt*5));
+      const h=q.videoTop*.88+.05;
+      const B=LAB_FX[key('moths')];
+      if(B.flightFrom){
+        const target=[z.tx,q.videoTop+.18,z.tz];q.videoTarget=q.videoTarget?mix(q.videoTarget,target,1-Math.exp(-dt*6)):target;
+        if(k!=null)mothLine(q,age,(q.end??z.until)-q.at,q.videoTarget);
+        continue;
+      }
+      // Aim directly at the destination; z.x/z.z already interpolate the gameplay flight.
+      // The zero-slope arc joins the settled swarm without a sudden change of velocity.
+      const target=[z.tx,h,z.tz];
+      const P=u<1?mix(q.videoA,target,f):mix(q.videoP||target,target,1-Math.exp(-dt*6));
+      const arc=16*u*u*(1-u)*(1-u);P[1]+=.18*arc;
+      const dx=z.tx-q.videoA[0],dz=z.tz-q.videoA[2],len=Math.hypot(dx,dz)||1;
+      P[0]+=-dz/len*.12*arc;P[2]+=dx/len*.12*arc;
+      q.videoP=P;
+      // Let the authored wingbeats play at their natural rate. The same film opens
+      // from a small hand-sized stream into a broad orbit, including after arrival.
+      const enter=B.introEnd/24;
+      const w=(.42+(z.r*3.8-.42)*smooth(age/Math.max(1.4,T+.55)))*(k??1);
+      if(k!=null)held('moths',age,(q.end??z.until)-q.at,P,w,enter,.12);
+    }
+  };
+  const withers=brWithers;
+  brWithers=function(now){
+    if(!active('wither'))return withers(now);
+    BRW.withers=BRW.withers.filter(q=>!q.dead);const k=sdOnL('briarfield','stream');
+    for(const q of BRW.withers){
+      const c=q.c;if(!c||c.dead){q.dead=1;continue;}
+      const age=now-q.at,u=clamp(age/Math.max(.1,q.T)),P=mix(q.A,torso(c),u);
+      const end=Math.max(q.at+q.T+.15,c.gvcWithT||0);
+      if(now>end+.65){q.dead=1;continue;}
+      if(k!=null){
+        const B=LAB_FX[key('wither')],w=Math.max(.8,creepH(c))*2.5*k;
+        // Age the same film forward through green -> ochre -> falling leaves; never reset its colour in a hold loop.
+        if(now<end){const f=age<q.T?B.introEnd*clamp(age/q.T):B.introEnd+(B.endStart-B.introEnd)*clamp((age-q.T)/Math.max(.1,end-q.at-q.T));pin('wither','full',f,P,w,clamp(age/.07),.22);}
+        else held('wither',age,end-q.at,P,w,q.T,.22);
+      }
+    }
+    S.ends=S.ends.filter(q=>now<q.at+.65);
+    for(const q of S.ends)held('wither',now-q.at,0,q.P,q.w,0,.18);
+  };
+  const crumble=GVC_FX.crumble;
+  GVC_FX.crumble=function(C,t,o){if(!active('wither'))return crumble.apply(this,arguments);S.ends.push({at:G.time,P:[o.x,o.h*.5,o.z],w:3});};
+  HF_RESETS.push(()=>{S.roots.clear();S.ends.length=0;});
+})();
 
 /* ================= THE THUNDER CALLERS' LIGHTNING: forked, solid, struck again and again =================
    Unit three of the spell effects pass (docs/design/spell_fx_audit_2026-11-11.md), on the owner's rules for it: solid
@@ -99558,11 +99737,11 @@ function mbRibbon(points,widths,alpha,clock,seed,pull){
 }
 SD_FRAMES.push(now=>{
   MB_EXT.count=0;if(!mbOn()||!mgfCC())return;
-  MAGE_BARRAGE.casts=MAGE_BARRAGE.casts.filter(c=>now-c.at<8&& (now-c.at<1.2||c.lanes.some(q=>q.hit!=null?now-q.hit<.34:!q.p.done)));
+  MAGE_BARRAGE.casts=MAGE_BARRAGE.casts.filter(c=>now-c.at<8&& (now-c.at<1.2||c.lanes.some(q=>q.hit!=null?now-q.hit<.34:!q.p.done&&(!G.ccP||G.ccP.includes(q.p)))));
   for(const cast of MAGE_BARRAGE.casts)for(const q of cast.lanes){
     const p=q.p,age=now-q.at;
     if(q.hit==null){
-      if(p.done)continue;if(p.tg&&!p.tg.dead)q.T=[p.tg.x,hitH(p.tg),p.tg.y];
+      if(p.done||(G.ccP&&!G.ccP.includes(p))){if(!p.done)q.hit=now-.34;continue;}if(p.tg&&!p.tg.dead)q.T=[p.tg.x,hitH(p.tg),p.tg.y];
       const left=Math.hypot(p.x-q.T[0],p.h-q.T[1],p.z-q.T[2]),flown=p.age*p.spd;
       q.u=Math.max(q.u,mbClamp(flown/Math.max(.001,flown+left)));q.P=mbPoint(q,q.u);
     }
@@ -99687,7 +99866,7 @@ if(MAGE_SEQ.on)(()=>{
   X.orbFizzle=function(C,o){if(!active())return old.orbFizzle.apply(this,arguments);const q=orbs.get(o);if(q){q.gathering=false;q.fade=G.time;event(q,'fizzle');}};
   SD_FRAMES.push(now=>{
     if(!active()||!mgfCC())return;
-    S.states=S.states.filter(q=>now-q.at<12&&(!q.p||!q.p.done||q.hit!=null)&&(q.hit==null||now-q.hit<q.duration)&&(q.fade==null||now-q.fade<.25)&&(!q.feed||now-q.at<q.duration));
+    S.states=S.states.filter(q=>now-q.at<12&&(!q.p||(!q.p.done&&(!G.ccP||G.ccP.includes(q.p)))||q.hit!=null)&&(q.hit==null||now-q.hit<q.duration)&&(q.fade==null||now-q.fade<.25)&&(!q.feed||now-q.at<q.duration));
     for(const q of S.states){const B=LAB_FX[key(q.name)];
       if(q.hit!=null){if(q.hitUnit&&!q.hitUnit.dead)q.P=missileContact(q.hitUnit,q.contactOrigin);const u=clamp((now-q.hit)/q.duration),w=q.width+((q.burstWidth||q.width)-q.width)*clamp(u/.22),phase=q.name==='orb'?Math.sqrt(u):u;sprite(q,B.impact+(B.n-1-B.impact)*phase,q.P,w,1,q.tailOrigin);}
       else if(q.fade!=null)sprite(q,q.frame,q.P,q.width,1-clamp((now-q.fade)/.25));
