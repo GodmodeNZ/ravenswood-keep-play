@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ffbf081@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'bd768de@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -85473,7 +85473,11 @@ function gpTick() {
    surprises): a boss (red, skull), a dungeon leader (gold, crown), flyers (sky blue, wings), siege troops (orange, hammer),
    burrowers (earth, arrow down), swift troops (yellow, chevrons); an elite wave's troops wear a plain gold frame. A type
    marching for the first time has a small teal dot. Hover (tap on touch) any of them for a small card: the name and count,
-   what it does in a line, its traits as the buff bar's icons, and the counter in a line. The boss's loot table is not shown.
+   what it does in a line, its traits as the buff bar's icons, and the counter in a line. The boss's loot table is not on
+   the row: a small Loot button at its end (force runs, which have boss loot tables; Classic's bosses drop at random, so
+   none there) opens the next boss's loot in a panel under it (fcLootOpen; renown.js rnLootBossHTML): its relics, the
+   weapons it may offer, its Tome of Mastery when it carries one. The panel never pauses: X, Escape, the button again or a
+   tap anywhere else closes it, and it closes by itself when that boss is past or a unit is being placed.
    Everything is read from the wave definitions (waveSpec, CREEPS, bossRuleAt), so it stays right when they change.
    ui.js calls forecastTick once a frame. Force runs and Classic get it; Tower Wars none. */
 // the new mechanics worth a word the first time they march (troop types speak for themselves through their own text)
@@ -85537,6 +85541,7 @@ const FC_GLYPH = {   // small drawn badges, SVG paths in a 12-unit box
   siege: 'M1.4 1.8h6.8v3.4H1.4zM4.2 5.2h1.6V11H4.2z',
   dig: 'M6 11 1.8 6.3h2.7V1.2h3V6.3h2.7z',
   swift: 'M1.5 2.2 5.4 6 1.5 9.8h2.6L8 6 4.1 2.2zM5.6 2.2 9.5 6l-3.9 3.8h2.6L12 6 8.2 2.2z',
+  chest: 'M1 5.3C1 3.1 2.7 1.7 6 1.7s5 1.4 5 3.6v.4H1zM1 6.6h10v4H1zM5.1 5h1.8v2.9H5.1z',
 };
 const FC_KIND = [
   { k: 'boss', n: 'Boss', c: '#ff6a4a', f: g => g.boss },
@@ -85605,7 +85610,10 @@ function fcIconHTML(g) {
   const lbl = `${g.name}${g.count > 1 ? ' ×' + g.count : ''}${kn ? ', ' + kn : ''}${g.elite ? ', elite' : ''}${g.isNew ? ', new' : ''}`;
   return `<button type="button" class="fc-m${K ? ' k-' + K.k : ''}${g.elite ? ' el' : ''}${g.isNew ? ' nw' : ''}"${c ? ` style="--c:${c}"` : ''} data-fc="${fcSpec(g)}" aria-label="${fcEsc(lbl)}">${fcPt(g.type)}${K ? `<i class="fc-bg" aria-hidden="true">${fcSvg(K.k)}</i>` : ''}${!g.boss && !g.lead && g.count > 1 ? `<b>×${g.count}</b>` : ''}</button>`;
 }
-function forecastHTML() { const ws = fcWaves(); return ws.length ? fcIcons(ws[0]).map(fcIconHTML).join('') : ''; }
+// the next boss whose loot the Loot button opens (force runs: renown.js rnLootOn), or 0
+const fcLootWave = () => { try { if (typeof rnLootOn !== 'function' || !rnLootOn() || typeof rnNextBoss !== 'function') return 0; const ws = fcWaves(); return ws.length ? rnNextBoss(ws[0]) : 0; } catch (e) { return 0; } };
+const fcLootBtn = n => n ? `<button type="button" class="fc-lt" data-loot="${n}" aria-haspopup="dialog" aria-label="${fcEsc(`Boss loot: ${rnBossName(rnBossType(n))}, wave ${n}`)}">${fcSvg('chest')}<span>Loot</span></button>` : '';
+function forecastHTML() { const ws = fcWaves(); return ws.length ? fcIcons(ws[0]).map(fcIconHTML).join('') + fcLootBtn(fcLootWave()) : ''; }
 // the portraits: painted once when the row is drawn, and again a moment later for a painting that was still loading
 function fcPaint(root, all) {
   const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
@@ -85628,6 +85636,7 @@ function forecastTick() {
     st.append(fcEl);
     fcEl.addEventListener('click', e => {
       e.stopPropagation();
+      const lb = e.target.closest('[data-loot]'); if (lb) { fcHideCard(); fcLootOpen(+lb.dataset.loot, lb); if (typeof sfx === 'function') sfx('click'); return; }
       const c = e.target.closest('[data-fc]'); if (c) { if (c === fcCardFor && e.pointerType !== 'mouse') fcHideCard(); else fcShowCard(c); } else fcHideCard();
     });
     fcEl.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const c = e.target.closest('[data-fc]'); if (c) { if (c !== fcCardFor) fcShowCard(c); } else if (fcCardFor) fcHideCard(); });
@@ -85636,22 +85645,75 @@ function forecastTick() {
     fcEl.addEventListener('keydown', e => { if (e.key === 'Escape') fcHideCard(); });
     document.addEventListener('pointerdown', e => { if (fcCardFor && !fcEl.contains(e.target) && !(fcCard && fcCard.contains(e.target))) fcHideCard(); }, true);
   }
-  if (!on) { if (!fcEl.hidden) { fcEl.hidden = true; fcHideCard(); fcKey = ''; } return; }
+  if (!on) { if (!fcEl.hidden) { fcEl.hidden = true; fcHideCard(); fcKey = ''; } fcLootClose(); return; }
   const ws = fcWaves();
-  // placing a unit: the row fades and lets taps through, so it never blocks a build spot
+  // placing a unit: the row fades and lets taps through, so it never blocks a build spot (the loot panel closes)
   const ghost = !!G.buildType || !!G.cast;
   if (fcEl.classList.contains('ghost') !== ghost) fcEl.classList.toggle('ghost', ghost);
+  if (ghost) fcLootClose();
   const now = typeof performance !== 'undefined' ? performance.now() : 0;
   if (fcRepaint.length && now >= fcRepaint[0]) { fcRepaint.shift(); fcPaint(fcEl, false); }
-  const key = [G.wave, G.phase, ws.join(','), fcOld(), fcPhone(), G.endless ? 1 : 0, G.calm ? 1 : 0].join('|');
+  const lw = fcLootWave(), key = [G.wave, G.phase, ws.join(','), fcOld(), fcPhone(), G.endless ? 1 : 0, G.calm ? 1 : 0, lw].join('|');
   if (key === fcKey) return;
   fcKey = key;
+  if (fcLootFor) { if (fcLootFor !== lw) fcLootClose(); else fcLootFill(); }   // (that boss past: it closes; else its contents are redrawn: a pledge, a tome)
   const h = ws.length ? forecastHTML() : '';
   const at = fcCardFor && fcCardFor.dataset.fc;
   fcEl.hidden = !h; fcEl.innerHTML = h;
   fcEl.className = ghost ? 'ghost' : '';
   if (h) { fcPaint(fcEl, true); fcRepaint = [now + 400, now + 1500, now + 4000]; }
   if (at) { const n = fcEl.querySelector(`[data-fc="${at}"]`); if (n) fcShowCard(n); else fcHideCard(); }
+  if (fcLootFor) fcLootPlace();
+}
+
+/* ---- the boss's loot panel: opened by the row's Loot button; never pauses, never stops the game's own taps ---- */
+let fcLootEl = null, fcLootFor = 0;
+const fcLootBtnEl = () => fcEl && fcEl.querySelector('[data-loot]');
+function fcLootOpen(n, btn) {
+  if (fcLootFor === n) { fcLootClose(); return; }   // (the button again: closes it)
+  if (typeof rnLootBossHTML !== 'function' || !n) return;
+  if (!fcLootEl) {
+    fcLootEl = document.createElement('div'); fcLootEl.id = 'fcLoot'; fcLootEl.setAttribute('role', 'dialog'); fcLootEl.hidden = true;
+    document.body.appendChild(fcLootEl);
+    fcLootEl.addEventListener('click', e => {
+      e.stopPropagation();
+      if (e.target.closest('.fl-x')) { fcLootClose(); if (typeof sfx === 'function') sfx('click'); return; }
+      // a tap on an icon reads its card (a mouse reads it on hover: itemtip.js itipBind, bound on the document for these icons)
+      const ic = e.target.closest('.rn-ii');
+      if (ic && e.pointerType !== 'mouse' && typeof PointerEvent === 'function') { const r = ic.getBoundingClientRect(); ic.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse', clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 })); }
+    });
+    // a tap or click anywhere else closes it (and still does what it does there); Escape closes it
+    document.addEventListener('pointerdown', e => { if (!fcLootFor || fcLootEl.contains(e.target) || (e.target.closest && e.target.closest('[data-loot], #itip'))) return; fcLootClose(); }, true);
+    document.addEventListener('keydown', e => { if (fcLootFor && e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); fcLootClose(); } }, true);
+    if (typeof window !== 'undefined') window.addEventListener('resize', () => { if (fcLootFor) fcLootPlace(); });
+  }
+  fcLootFor = n;
+  if (!fcLootFill()) { fcLootClose(); return; }
+  fcLootEl.hidden = false;
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  fcLootPlace();
+}
+function fcLootFill() {
+  let h = ''; try { h = rnLootBossHTML(fcLootFor); } catch (e) { console.error(e); h = ''; }
+  if (!h) return false;
+  fcLootEl.setAttribute('aria-label', `Boss loot, wave ${fcLootFor}`);
+  fcLootEl.innerHTML = `<button type="button" class="fl-x" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button><h4>Boss loot</h4>${h}`;
+  return true;
+}
+// under the Loot button, its right edges lined up, kept on screen
+function fcLootPlace() {
+  if (!fcLootEl || fcLootEl.hidden) return;
+  const b = fcLootBtnEl(); if (!b || !b.offsetParent) { fcLootClose(); return; }
+  const r = b.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight, w = fcLootEl.offsetWidth, h = fcLootEl.offsetHeight;
+  const x = clamp(r.right - w, 8, Math.max(8, W - w - 8)), y = r.bottom + 8 + h <= H - 8 ? r.bottom + 8 : Math.max(8, H - h - 8);
+  fcLootEl.style.left = Math.round(x) + 'px'; fcLootEl.style.top = Math.round(y) + 'px';
+  b.setAttribute('aria-expanded', 'true');
+}
+function fcLootClose() {
+  if (!fcLootFor) return;
+  fcLootFor = 0;
+  if (fcLootEl) { if (typeof itipAnchor !== 'undefined' && itipAnchor && fcLootEl.contains(itipAnchor) && typeof itipHide === 'function') itipHide(); fcLootEl.hidden = true; fcLootEl.innerHTML = ''; }
+  const b = fcLootBtnEl(); if (b) b.setAttribute('aria-expanded', 'false');
 }
 
 /* ---- the hover / tap card: the name, how many, what it does, the counter ---- */
@@ -105330,10 +105392,32 @@ function rnLootListHTML(from) {
   const R = rnS(), out = [], tomeW = typeof tomeBossWaves === 'function' ? tomeBossWaves(from, n => !!rnBossType(n)) : [];   // the bosses that carry a Tome of Mastery this run (loot.js)
   for (let n = Math.ceil(Math.max(1, from) / RN.every) * RN.every; n <= MAX_WAVE; n += RN.every) {
     const t = rnBossType(n); if (!t) continue;
-    const tm = tomeW.includes(n) ? `<p class="rn-tml"><img alt="" src="${typeof tomeBookURL === 'function' ? tomeBookURL() : ''}"><span><b>Tome of Mastery</b> It has one this run, for a unit type you field: read it to unlock a second capstone for every unit of that type.</span></p>` : '';
+    const tm = tomeW.includes(n) ? rnTomeLine() : '';
     out.push(`<div class="rn-bl"><p><b>Wave ${n}: ${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<small>${rnEsc(rnTable(t).say)}</small></p>${rnIconsHTML(t, 'ri')}${tm}</div>`);
   }
   return out.join('') || '<p>No bosses left.</p>';
+}
+const rnTomeLine = () => `<p class="rn-tml"><img alt="" src="${typeof tomeBookURL === 'function' ? tomeBookURL() : ''}"><span><b>Tome of Mastery</b> It has one this run, for a unit type you field: read it to unlock a second capstone for every unit of that type.</span></p>`;
+// ONE boss's loot, for the forecast's Loot button (forecast.js fcLootOpen; force runs only, rnLootOn): the relics it can
+// offer, the weapons it may offer in place of one (WPN_BOSS_OFFER, weapons_ui.js), the commander's next weapon stage, and
+// the tome line when it carries this run's Tome of Mastery. The icons are rnIconsHTML's (with its wrappers: set pieces,
+// weapons, hero weapon), the weapons split off into their own row; their cards come from the same itipBind bindings.
+function rnLootBossHTML(n) {
+  const t = rnBossType(n); if (!t) return '';
+  const R = rnS(), from = G.phase === 'build' ? G.wave : G.wave + 1, k = n - from;
+  const tomeW = typeof tomeBossWaves === 'function' ? tomeBossWaves(from, w => !!rnBossType(w)) : [];
+  const all = rnIconsHTML(t, 'ri'), grab = re => all.match(re) || [];
+  const wre = /<button[^>]*data-wbt="[^"]*"[^>]*>[\s\S]*?<\/button>/g, hre = /<button[^>]*data-hwo="[^"]*"[^>]*>[\s\S]*?<\/button>/g;
+  const wp = grab(wre), hw = grab(hre);
+  const rel = all.replace(wre, '').replace(hre, '').replace(/<span class="rn-icons wp-icons"><\/span>/g, '');
+  const pct = Math.round((typeof WPN_BOSS_OFFER !== 'undefined' ? WPN_BOSS_OFFER : .4) * 100), off = RN_LOOT.offer;
+  const sec = (h, body, icons) => `<div class="rn-lp-s"><h5>${h}</h5>${body ? `<p>${body}</p>` : ''}${icons}</div>`;
+  return `<p class="rn-lp-t"><small>${k <= 0 ? 'Boss this wave' : k === 1 ? 'Boss next wave' : `Boss in ${k} waves`} · wave ${n}</small><b>${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<i>${rnEsc(rnTable(t).say)}</i></p>`
+    + sec('Relics', `When it falls it offers ${off} of these, free: take one.`, rel)
+    + (wp.length ? sec('Weapons', `A ${pct}% chance one of the ${off} is a weapon instead, made for one of these units.`, `<span class="rn-icons">${wp.join('')}</span>`) : '')
+    + (hw.length ? sec('Hero weapon', 'Your commander\'s next weapon stage can be one of the choices.', `<span class="rn-icons">${hw.join('')}</span>`) : '')
+    + (tomeW.includes(n) ? rnTomeLine() : '')
+    + `<p class="rn-lp-h">${typeof canHover === 'function' && canHover() ? 'Hover' : 'Tap'} an icon for its card.</p>`;
 }
 function rnIconCard(el) { const [, k] = (el.dataset.ri || el.dataset.rb || '').split('|'); if (!k) return ''; const it = rnItem(k.startsWith('L:') ? { l: k.slice(2) } : { b: k }, true), sg = it.base && GEAR_BASES[it.base].bsig; return itemCardHTML(it, { note: `<p class="itc-eq">${sg ? 'Its own relic: found nowhere else' : it.leg ? 'Its signature legendary' : 'From its loot table'}</p>` }); }
 if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '.rn-ii[data-ri], .rn-ii[data-rb]', rnIconCard);
@@ -105499,6 +105583,15 @@ if (typeof document !== 'undefined' && document.head) {
 .rn-three.rn-n2{grid-template-columns:repeat(2,minmax(0,1fr));max-width:600px;margin:0 auto}
 .rn-tml{display:flex;align-items:center;gap:8px;margin:6px 0 0;font-size:12.5px;color:#e8dcb8}.rn-tml img{width:30px;height:30px;border-radius:4px;box-shadow:0 0 0 1px #000,0 0 0 2px #e0a93a;flex:none}.rn-tml b{color:#ffd76a;margin-right:4px}
 .rn-ic.rn-leg{box-shadow:0 0 0 2px #ff8c1a,0 0 12px rgba(255,140,26,.45)}
+#fcLoot{position:fixed;z-index:119;box-sizing:border-box;width:min(300px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;padding:10px 12px 9px;border-radius:9px;font:500 12.5px/1.38 var(--f-ui);color:#efe4c8;text-align:left;background:linear-gradient(180deg,#14261f,#08130f);box-shadow:0 0 0 1px #02090a,inset 0 0 0 1px rgba(242,210,122,.55),0 10px 24px rgba(0,0,0,.7)}
+#fcLoot[hidden]{display:none}
+#fcLoot .fl-x{all:unset;position:absolute;right:4px;top:4px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;color:#e8dcb8;font:700 17px/1 var(--f-ui);touch-action:manipulation}
+#fcLoot .fl-x:hover,#fcLoot .fl-x:focus-visible{background:rgba(242,210,122,.15)}#fcLoot .fl-x svg{width:14px;height:14px}
+#fcLoot h4{margin:0 30px 6px 0;font:800 10.5px/1.2 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;color:#f2d27a}
+#fcLoot .rn-lp-t{margin:0 0 8px}#fcLoot .rn-lp-t small{display:block;color:#c9b98a;font-size:11px}#fcLoot .rn-lp-t b{font-size:14px;color:#ffe3a0}#fcLoot .rn-lp-t i{display:block;color:#c9b98a;font-size:11.5px}
+#fcLoot .rn-lp-s{margin:0 0 8px;padding-top:6px;border-top:1px solid rgba(242,210,122,.18)}#fcLoot .rn-lp-s h5{margin:0 0 2px;font:800 10px/1.2 var(--f-ui);letter-spacing:.09em;text-transform:uppercase;color:#d8c08a}#fcLoot .rn-lp-s p{margin:0 0 5px;color:#d8d0b8;font-size:12px}
+#fcLoot .rn-icons{gap:6px}#fcLoot .rn-ii{width:38px;height:38px;touch-action:manipulation}#fcLoot .rn-tml{padding-top:6px;border-top:1px solid rgba(242,210,122,.18)}
+#fcLoot .rn-lp-h{margin:6px 0 0;font-size:11px;color:#9c9478}
 .rn-note{margin:0 0 8px;font:600 13px/1.35 var(--f-ui);color:#f2d27a}
 .rn-btn small{display:block;font:600 11px var(--f-ui);color:#c9b98a}#rnReroll{flex-direction:column;gap:2px}
 .rn-tab>small{display:block;margin:2px 0 4px;font:700 10.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;color:#c9b98a}
