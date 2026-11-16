@@ -1,4 +1,4 @@
-const BUILD_TAG = 'bd768de@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = '093b887@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -89894,53 +89894,78 @@ UM_UNITS[WIZ_UNIT] = { mdl: 'treewizard', tip: [-.236, .9, .141], sink: .5, k: .
                         crystal; held a moment, then lowered and planted again
      the strike         (his basic attack, roots lashing up under the foe) the free hand raised beside his head and the
                         staff lifted over the reload; on the shot the staff thumps down and the hand thrusts at the foe ---- */
+/* (17 Nov 2026, owner: "stiff"): every move now has weight. Two more controls: dip (the knees bend, the hips sink; the
+   feet stay planted by the legs' own IK) and sway (his weight onto his left foot, + / right, -: the hips shift and tip).
+   Keys take an ease (queenClip: 'o' snaps out and settles, 'i' gathers slowly, else in and out). Each move: an
+   anticipation away from the blow (a sink and a coil), the blow (eased out, so it arrives fast and decelerates), an
+   overshoot past it (the knees give, the head nods on after the body), a hold that still lives, and a settle that sinks
+   onto the staff before he straightens. Every timing the game reads is where it was: wT, shift and each move's first
+   release key (the moment his light leaves the crystal) are unchanged. */
 const WIZ_PLANT = { wr: [-.21, .66, .16], foot: [-.225, 0, .22] };   // the staff planted a little before him
 // Mothcloud: the staff drawn in low, then raised high and tipped toward the foes, the free hand lifted beside it, as the
 // moths pour from the crystal; held while they stream out, then lowered and planted
 const WIZ_LIFT = { wl: [.22, .83, .17], wr: [-.2, .74, .14], foot: [-.25, .16, -.04], lean: -.1, head: -.16, tw: .08 };
 const WIZ_CLIPS = {
   thicket: { T: 1.3, wT: .28, shift: .28,
-    wk: [[.22, { wl: [.2, .64, .1], wr: [-.2, .6, .12], foot: [-.2, 0, .12], lean: .16, head: .12, tw: -.12, glow: .35 }],   // (the dip)
-      [.78, { wl: [.22, .97, .08], wr: [-.19, .82, .08], foot: [-.25, .15, .01], lean: -.14, head: -.22, tw: .05, glow: .9 }],   // (hoisted, tipped back)
-      [1, { wl: [.21, .99, .06], wr: [-.185, .84, .07], foot: [-.245, .18, 0], lean: -.17, head: -.24, tw: .06, glow: 1 }]],   // (held: the light pinches)
-    keys: [[.06, { wl: [.24, .66, .32], wr: [-.21, .6, .27], foot: [-.22, 0, .44], lean: .3, head: .13, tw: -.1, glow: 1 }],   // (driven down: the cast)
-      [.3, { wl: [.25, .64, .3], wr: [-.21, .61, .26], foot: [-.22, 0, .42], lean: .26, head: .1, tw: -.08, glow: .85 }],
-      [.75, { wl: [.24, .72, .2], wr: [-.21, .64, .21], foot: [-.225, 0, .3], lean: .1, head: .03, glow: .5 }]] },
+    wk: [[.3, { wl: [.2, .65, .1], wr: [-.2, .61, .12], foot: [-.2, 0, .14], lean: .17, head: .14, tw: -.14, dip: .022, sway: -.004, glow: .35 }],   // (the dip: sunk and coiled over the staff)
+      [.8, { wl: [.22, .97, .08], wr: [-.19, .82, .08], foot: [-.25, .15, .01], lean: -.15, head: -.23, tw: .05, dip: -.006, sway: .002, glow: .9 }],   // (hoisted, tipped back, up on his toes)
+      [1, { wl: [.21, .99, .06], wr: [-.185, .84, .07], foot: [-.245, .18, 0], lean: -.17, head: -.25, tw: .06, dip: -.007, glow: 1 }]],   // (held: the light pinches)
+    keys: [[.06, { wl: [.24, .66, .32], wr: [-.21, .6, .27], foot: [-.22, 0, .44], lean: .3, head: .12, tw: -.1, dip: .026, sway: -.006, glow: 1 }, 'o'],   // (driven down: the cast)
+      [.17, { wl: [.25, .64, .31], wr: [-.21, .6, .27], foot: [-.22, 0, .45], lean: .31, head: .19, tw: -.11, dip: .031, sway: -.007, glow: 1 }, 'o'],   // (the knees give, the head nods on)
+      [.45, { wl: [.25, .65, .29], wr: [-.21, .61, .26], foot: [-.22, 0, .42], lean: .25, head: .1, tw: -.08, dip: .022, sway: -.005, glow: .8 }],   // (leaning on it while the roots rise)
+      [.85, { wl: [.24, .73, .2], wr: [-.21, .64, .21], foot: [-.225, 0, .3], lean: .09, head: .03, dip: .008, glow: .45 }, 'i'],   // (pushing himself up)
+      [1.08, { wl: [.25, .77, .13], lean: -.03, head: -.04, dip: -.002, glow: .2 }, 'i']] },   // (a stretch back as he straightens)
   constrict: { T: 1.7, wT: .2, shift: .2,
-    wk: [[.4, { wl: [.2, .7, .1], wr: [-.2, .63, .13], foot: [-.21, 0, .3], lean: .12, head: .1, tw: -.1, glow: .4 }],   // (drawn in low)
-      [1, { ...WIZ_LIFT, glow: 1 }]],   // (raised, tipped toward the foes)
-    keys: [[.08, { ...WIZ_LIFT, foot: [-.25, .2, -.08], lean: -.06, head: -.1, tw: .12, glow: 1 }],   // (the pour: the staff thrust a little further over)
-      [.55, { ...WIZ_LIFT, foot: [-.25, .18, -.06], lean: -.08, glow: .8 }],
-      [1.1, { wl: [.24, .76, .16], ...WIZ_PLANT, lean: .04, glow: .4 }]] },
-  // Wither: the staff levelled at the foe (its foot swung up behind his hand)
-  briarfield: { T: 1.5, wT: .16, shift: .16,
-    wk: [[.45, { wl: [.2, .72, .1], wr: [-.21, .7, .12], foot: [-.22, .28, .36], lean: -.06, head: -.04, tw: -.14, glow: .4 }],   // (drawn back)
-      [1, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .42, -.14], lean: .09, head: .03, tw: .09, glow: 1 }]],   // (levelled at the foe)
-    keys: [[.08, { wl: [.18, .75, .11], wr: [-.2, .69, .2], foot: [-.21, .46, -.17], lean: .11, head: .04, tw: .1, glow: 1 }],   // (the decay flows: a little further)
-      [.55, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .4, -.13], lean: .09, tw: .09, glow: .8 }],
-      [1.1, { wl: [.24, .76, .16], ...WIZ_PLANT, lean: .04, glow: .4 }]] },
-  strike: { wind: { wl: [.2, .88, .06], wr: [-.2, .72, .13], foot: [-.225, .06, .14], tw: -.12, lean: -.04, head: -.04 },
-    hit: { wl: [.2, .67, .22], wr: [-.21, .66, .15], foot: [-.225, 0, .21], tw: .12, lean: .12, head: .06, glow: .4 } },
+    wk: [[.38, { wl: [.2, .69, .1], wr: [-.2, .63, .13], foot: [-.21, 0, .3], lean: .12, head: .1, tw: -.1, dip: .016, sway: -.003, glow: .4 }],   // (drawn in low)
+      [1, { ...WIZ_LIFT, dip: -.004, sway: .003, glow: 1 }]],   // (raised, tipped toward the foes)
+    keys: [[.08, { ...WIZ_LIFT, foot: [-.25, .2, -.08], lean: -.06, head: -.1, tw: .12, dip: -.002, glow: 1 }, 'o'],   // (the pour: the staff thrust a little further over)
+      [.32, { ...WIZ_LIFT, foot: [-.27, .19, -.03], lean: -.07, head: -.08, tw: .05, hy: -.12, glow: .9 }],   // (wafting the swarm out: the staff swung one way,
+      [.6, { ...WIZ_LIFT, foot: [-.23, .2, -.08], lean: -.08, head: -.1, tw: .12, hy: .1, glow: .85 }],   //  then back, his look following it)
+      [.9, { ...WIZ_LIFT, foot: [-.245, .17, -.05], lean: -.06, head: -.06, glow: .7 }],
+      [1.18, { wl: [.24, .75, .16], ...WIZ_PLANT, lean: .07, head: .07, dip: .014, sway: -.004, glow: .4 }, 'o'],   // (planted: his weight onto it)
+      [1.45, { wl: [.25, .76, .14], lean: .02, head: .02, dip: .004, glow: .15 }, 'i']] },
+  // Wither: the staff levelled at the foe (its foot swung up behind his hand); held while the decay flows, with a tremor
+  // of effort through the staff (shake), then lowered and planted
+  briarfield: { T: 1.5, wT: .16, shift: .16, shake: [.1, .95, .012],
+    wk: [[.45, { wl: [.2, .72, .1], wr: [-.21, .7, .12], foot: [-.22, .28, .36], lean: -.07, head: -.05, tw: -.15, dip: .01, sway: .006, glow: .4 }],   // (drawn back, his weight on his back foot)
+      [1, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .42, -.14], lean: .09, head: .04, tw: .09, dip: .012, sway: -.004, glow: 1 }]],   // (levelled at the foe, stepping into it)
+    keys: [[.08, { wl: [.18, .75, .11], wr: [-.2, .69, .2], foot: [-.21, .46, -.17], lean: .11, head: .06, tw: .1, dip: .014, sway: -.005, glow: 1 }, 'o'],   // (the decay flows: a little further)
+      [.35, { wl: [.18, .74, .11], wr: [-.2, .69, .2], foot: [-.21, .45, -.16], lean: .105, head: .1, tw: .095, dip: .015, sway: -.005, glow: .95 }],   // (glaring down the staff)
+      [.7, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .4, -.13], lean: .1, head: .07, tw: .09, dip: .012, glow: .8 }],
+      [.98, { wl: [.22, .75, .14], wr: [-.205, .67, .17], foot: [-.22, .14, .08], lean: .05, head: .02, tw: .03, dip: .006, glow: .55 }, 'i'],   // (lowered)
+      [1.18, { wl: [.24, .76, .16], ...WIZ_PLANT, lean: .06, head: .05, dip: .012, sway: -.003, glow: .35 }, 'o']] },   // (planted with a little weight)
+  // the strike: over the reload a small sink (gathering), then the hand raised beside his head and the staff lifted, up on
+  // his toes; on the shot the staff thumps down (eased out: fast, then slowing), the knees give and the head nods on after
+  // the body (follow), then he rises back to rest
+  strike: { pre: { wl: [.22, .73, .12], wr: [-.205, .66, .13], foot: [-.225, 0, .17], lean: .05, head: .05, tw: .03, dip: .01 },
+    wind: { wl: [.2, .88, .06], wr: [-.2, .72, .13], foot: [-.225, .06, .14], tw: -.13, lean: -.05, head: -.05, dip: -.004, sway: .003 },
+    hit: { wl: [.2, .67, .22], wr: [-.21, .66, .15], foot: [-.225, 0, .21], tw: .12, lean: .12, head: .06, dip: .012, sway: -.003, glow: .4 },
+    follow: { wl: [.2, .665, .225], wr: [-.21, .658, .152], foot: [-.225, 0, .23], tw: .14, lean: .15, head: .11, dip: .02, sway: -.004, glow: .35 } },
 };
+// the body's share of every move, over the keys as written: the hands can travel only a little (WIZ_REACH: the bake fuses
+// his forearms to the robe), so the body (turned, leaned and sunk, carrying the arms with the chest) does the acting
+let WIZ_AMP = { lean: 1.35, head: 1.3, tw: 1.35, dip: 1.5, sway: 1.3 };
+const WIZ_EASE = (e, u) => (QEASE[e] ? QEASE[e](u) : umSm(0, 1, u));
 // the wind-up at u (0..1 of the cast bar): from rest through its keys, eased, held at the last
 function wizWind(C, rest, u) {
   let a = [0, rest];
-  for (const [k, o] of C.wk) { const b = [k, queenOver(rest, o)]; if (u <= k) return queenMix(a[1], b[1], umSm(a[0], b[0], u)); a = b; }
+  for (const [k, o, e] of C.wk) { const b = [k, queenOver(rest, o)]; if (u <= k) return queenMix(a[1], b[1], WIZ_EASE(e, Math.max(0, Math.min(1, (u - a[0]) / Math.max(1e-4, k - a[0]))))); a = b; }
   return a[1];
 }
 const wizHeld = (C, rest) => queenOver(rest, C.wk[C.wk.length - 1][1]);   // (its last key: where the release starts)
 // an instant cast's whole move: the wind-up squeezed into wT seconds, then the release (its keys `shift` later)
 function wizInst(C) {
   if (C._inst) return C._inst;
-  const keys = C.wk.map(([u, o]) => [u * C.wT, o]).concat(C.keys.map(([s, o]) => [s + C.shift, o]).filter(k => k[0] > C.wT + .001));
-  return (C._inst = { T: C.T + C.shift, keys });
+  const keys = C.wk.map(([u, o, e]) => [u * C.wT, o, e]).concat(C.keys.map(([s, o, e]) => [s + C.shift, o, e]).filter(k => k[0] > C.wT + .001));
+  return (C._inst = { T: C.T + C.shift, keys, shake: C.shake && [C.shake[0] + C.shift, C.shake[1] + C.shift, C.shake[2]] });
 }
-// the clip's pose at el seconds (keys from `from`, eased in and out), ending at rest
-const wizClip = (C, rest, from, el) => queenClip({ T: C.T, keys: C.keys }, rest, from, el);
+// the clip's pose at el seconds (keys from `from`, each eased by its own ease), ending at rest
+const wizClip = (C, rest, from, el, q) => queenClip({ T: C.T, keys: C.keys }, rest, from, el, q);
 /* ---- the springs: every control follows its target on a damped spring (ease in and out, an overshoot and a settle),
    each at its own rate, so the body never moves as one block: the hands lead, the chest follows, the head trails it, the
    staff swings with its weight, and the cloak and beard hang after the body and sway. [stiffness (rad/s), damping] ---- */
 const WIZ_SPR = { tw: [15, .6], lean: [15, .58], head: [12, .55], hy: [5, .7], roll: [3.5, .9], glow: [22, 1],
+  dip: [12, .5], sway: [6, .8],   // (the knees: a little bounce as they take a blow; the weight: slow, no bounce)
   wl: [26, .5], wr: [22, .52], foot: [13, .42], pl: [12, .7], pr: [12, .7],
   htw: [9, .5], hl: [9, .48], cl: [5, .45], bp: [5.5, .28], brl: [5, .3] };
 const WIZ_V = ['wl', 'wr', 'foot', 'pl', 'pr'];
@@ -89959,6 +89984,35 @@ function wizSpring(S, k, target, dt, m = 1) {
 let WIZ_REACH_L = .09, WIZ_REACH_R = .05, WIZ_GRIP = .45;
 function wizReach(w, r, lim) { const d = UMX.sub(w, r), l = Math.hypot(d[0], d[1], d[2]); if (l <= lim * .6) return w.slice(); const k = lim * (.6 + .4 * Math.tanh((l / lim - .6) / .4)) / l; return UMX.add(r, UMX.sc(d, k)); }   // (soft: eased into the limit)
 const wizHash = (a, b) => { const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return s - Math.floor(s); };
+/* his habits at rest: the idle's time cut into beats of 4.6-7s (each its own length), each beat one habit or none:
+     glance       a look aside down the road, the shoulders turning a little after the head
+     replant      the staff lifted a hand's breadth and set down again a little aside, his weight dropping onto it
+     lean         he leans on his staff a while, his weight on it, the head bowed: an old man resting
+     crystal      a look up at the crystal, which brightens for a moment, the free hand lifting
+     palm         the free hand raised and turned up, his look on it
+     stretch      the back straightened and the head lifted, a deep breath, then settled
+   Each eases in and out over the beat (never a snap), all scaled by iw (none under a move). */
+const WIZ_ACTS = [['glance', .24], ['replant', .18], ['lean', .14], ['crystal', .12], ['palm', .1], ['stretch', .1], ['none', .12]];
+function wizIdleAct(P, lv, seed, iw) {
+  if (iw <= .001) return;
+  let tl = lv + seed * 37, b = 0, len = 0;   // (the beat: walk the beats' own lengths from the clock's start, cheaply)
+  const base = 5.8, bn = Math.floor(tl / base); tl -= bn * base; b = bn;
+  len = 4.6 + 2.4 * wizHash(b, seed * 13); const u = tl * len / base;   // (stretched to its own length)
+  let r = wizHash(b * 1.31, seed * 97), act = 'none';
+  for (const [n, w] of WIZ_ACTS) { if (r < w) { act = n; break; } r -= w; }
+  const sd = wizHash(b * 2.3, seed * 7) - .5, d = 2 + 1.2 * wizHash(b * .7, seed), e = umSm(.15, .15 + d * .35, u) * (1 - umSm(.15 + d * .7, .15 + d, u)) * iw;
+  if (e <= 0) return;
+  if (act === 'glance') { const g = (sd < 0 ? -1 : 1) * (.32 + .3 * Math.abs(sd)); P.hy += g * e; P.tw += g * .22 * e; P.head += .04 * e; }
+  else if (act === 'replant') {   // up and over (a little aside), then down: the plant lands with his weight
+    const up = umSm(.15, .5, u) * (1 - umSm(.75, 1.15, u)) * iw, land = umSm(1, 1.15, u) * (1 - umSm(1.25, 1.9, u)) * iw, side = umSm(.3, .9, u) * (1 - umSm(2.4, 3.2, u)) * iw;
+    P.wr = UMX.add(P.wr, [0, .03 * up, .012 * up]); P.foot = UMX.add(P.foot, [.06 * sd * side, .055 * up, .02 * up]);
+    P.tw += .05 * up - .02 * land; P.head += .05 * up + .05 * land; P.dip += .009 * land; P.lean += .03 * land;
+  }
+  else if (act === 'lean') { P.sway -= .008 * e; P.lean += .05 * e; P.head += .09 * e; P.dip += .009 * e; P.tw -= .05 * e; P.wr = UMX.add(P.wr, [0, -.008 * e, .006 * e]); P.wl = UMX.add(P.wl, [-.01 * e, -.015 * e, -.01 * e]); }
+  else if (act === 'crystal') { P.head -= .1 * e; P.hy -= .14 * e; P.tw -= .04 * e; P.lean -= .03 * e; P.glow = Math.max(P.glow || 0, .35 * e); P.wl = UMX.add(P.wl, [-.01 * e, .03 * e, .01 * e]); }
+  else if (act === 'palm') { P.wl = UMX.add(P.wl, [-.035 * e, .045 * e, .03 * e]); P.head += .12 * e; P.hy += .26 * e; P.tw += .05 * e; P.pl = UMX.add(P.pl || [0, 0, 0], [0, -.3 * e, .3 * e]); }
+  else if (act === 'stretch') { P.lean -= .07 * e; P.head -= .1 * e; P.dip -= .005 * e; P.wl = UMX.add(P.wl, [.01 * e, .02 * e, -.01 * e]); }
+}
 // his controls this frame: the move's target, the living idle on top, then the springs
 function wizCtl(t, live, q) {
   const rest = queenBase(q), now = live ? G.time : 0, A = live ? t.ab : null;
@@ -89969,33 +90023,52 @@ function wizCtl(t, live, q) {
   } else if (A && A.last && t._wizAt != null && t._wizId === A.last && WIZ_CLIPS[A.last] && WIZ_CLIPS[A.last].keys) {
     // the release: from the wind-up's held pose after a cast bar; an instant cast plays its quick wind-up first
     const id = A.last, C0 = WIZ_CLIPS[id], bar = t._wizBar && t._wizW === id, C = bar ? C0 : wizInst(C0), el = now - t._wizAt, from = bar ? wizHeld(C0, rest) : rest;
-    const o = el < 0 || el >= C.T ? null : wizClip(C, rest, from, el);
-    if (o) { P = o; spell = true; } else if (el >= 0) t._wizW = null;
+    const o = el < 0 || el >= C.T ? null : wizClip(C, rest, from, el, q);
+    if (o) {
+      P = o; spell = true;
+      if (C.shake && el > C.shake[0] && el < C.shake[1]) {   // a tremor of effort through the staff while the spell flows
+        const e = umSm(C.shake[0], C.shake[0] + .15, el) * (1 - umSm(C.shake[1] - .2, C.shake[1], el)) * C.shake[2];
+        P.foot = UMX.add(P.foot, [e * Math.sin(el * 37), e * .7 * Math.sin(el * 29 + 1.3), e * .5 * Math.sin(el * 43 + 2.1)]);
+        P.glow = Math.min(1, P.glow + .12 * Math.sin(el * 11) * e / C.shake[2]);
+      }
+    } else if (el >= 0) t._wizW = null;
   }
   let busy = spell;
-  if (!spell && live) {   // the strike: the hand raised and the staff lifted over the reload, thumped down on the shot
+  if (!spell && live) {   // the strike: a small sink, then the hand raised and the staff lifted over the reload; thumped
+    // down on the shot (eased out), the knees giving and the head nodding on (follow), then back up to rest
     const L = WIZ_CLIPS.strike, w = t.windup || 0, s = t.shotT != null ? t.shotT : 9;
     if (w > .05 || s < .8) busy = true;
-    P = queenMix(rest, queenOver(rest, L.wind), umSm(.15, .95, w));
-    if (s < .8) P = queenMix(P, queenOver(rest, L.hit), s < .05 ? s / .05 : 1 - umSm(.25, .8, s));
+    P = queenMix(rest, queenOver(rest, L.pre), umSm(0, .3, w));
+    P = queenMix(P, queenOver(rest, L.wind), QEASE.i(umSm(.28, .96, w)));
+    if (s < .8) {
+      const H = queenOver(rest, L.hit), F = queenOver(rest, L.follow);
+      const at = s < .06 ? queenMix(P, H, QEASE.o(s / .06)) : s < .2 ? queenMix(H, F, QEASE.o((s - .06) / .14)) : F;
+      P = s < .2 ? at : queenMix(F, P, QEASE.i(umSm(.2, .78, s)));
+    }
   }
-  P = { ...P, wl: wizReach(P.wl, rest.wl, WIZ_REACH_L), wr: wizReach(P.wr, rest.wr, WIZ_REACH_R), foot: P.foot.slice(), hy: 0, roll: 0 };
-  // the living idle, its phase his own (a row of them never moves in step): a slow breath, the weight shifting between
-  // his feet, the free hand drifting, the crystal bobbing; now and then a glance aside or the staff lifted and re-planted
+  if (busy) for (const k in WIZ_AMP) P[k] = (P[k] || 0) * WIZ_AMP[k];   // (the body carries the move: see WIZ_AMP)
+  P = { ...P, wl: wizReach(P.wl, rest.wl, WIZ_REACH_L), wr: wizReach(P.wr, rest.wr, WIZ_REACH_R), foot: P.foot.slice(), hy: P.hy || 0, roll: 0, dip: P.dip || 0, sway: P.sway || 0 };
+  // the living idle, its phase his own (a row of them never moves in step), faded under a move (iw):
+  // - the breath: a quicker draw in and a slow let out, the chest lifting and opening, the shoulders and free hand rising
+  // - the weight drifting from foot to foot, lingering on each and quicker across (the hips shift and tip, the shoulders
+  //   turn after it, the robe swings with it; the feet stay planted)
+  // - the head looking about on its own slow beat, the free hand in small arcs, the staff's head wandering a little
+  // - and every few seconds one of his habits (wizIdleAct), each its own length
   const lv = typeof vt !== 'undefined' ? vt : now;
   const seed = t._wizSeed != null ? t._wizSeed : (t._wizSeed = wizHash((t.x || 0) + (t.anim || 0) * 7.3, (t.y || 0) * 1.37 + 5.1));
-  const ph = seed * 6.283, br = Math.sin(lv * 1.05 + ph);
+  const ph = seed * 6.283, bu = (lv * .23 + seed) % 1, bi = bu < .4 ? umSm(0, .4, bu) : 1 - umSm(.4, 1, bu), br = bi * 2 - 1;
   const iw = t._wizI == null ? 1 : t._wizI;
+  const wv = Math.sin(lv * .66 + ph), sh = Math.sign(wv) * Math.pow(Math.abs(wv), .55);
   P.br = br; P.cape = Math.sin(lv * .7 + ph * 1.3) * .8 + (spell ? .6 * P.glow : 0);
-  P.roll = .035 * Math.sin(lv * .42 + ph * 2.1) * iw;
-  P.wl = UMX.add(P.wl, UMX.sc([.005 * Math.sin(lv * .6 + ph), .008 * br, .006 * Math.sin(lv * .5 + ph + 1)], iw));
-  P.foot = UMX.add(P.foot, UMX.sc([.006 * Math.sin(lv * 1.3 + ph), 0, .005 * Math.cos(lv * 1.1 + ph * 1.7)], iw));
-  const per = 5.2, tl = lv + seed * 11, slot = Math.floor(tl / per), u = tl - slot * per, r = wizHash(slot, seed * 97);
-  if (r < .45) P.hy = (wizHash(slot * 1.7, seed * 31) - .5) * 1.1 * umSm(.2, .8, u) * (1 - umSm(2.3, 3, u)) * iw;   // a glance
-  else if (r < .7) {   // the staff lifted a hand's breadth and planted again, a little aside
-    const e = umSm(.2, .55, u) * (1 - umSm(.9, 1.4, u)) * iw, sd = wizHash(slot * 2.3, seed * 7) - .5;
-    P.wr = UMX.add(P.wr, [0, .03 * e, .01 * e]); P.foot = UMX.add(P.foot, [.05 * sd * e, .05 * e, .02 * e]); P.tw += .05 * e; P.head += .05 * e;
-  }
+  P.sway += .008 * sh * iw; P.roll = .024 * sh * iw;
+  P.tw += (.045 * Math.sin(lv * .66 + ph - .9)) * iw;
+  P.lean += -.012 * br * iw; P.dip += (.004 * (1 - Math.abs(sh)) - .0025 * br) * iw;
+  P.hy += (.13 * Math.sin(lv * .31 + ph * 1.7) + .05 * Math.sin(lv * .83 + ph)) * iw;
+  P.head += .028 * Math.sin(lv * .47 + ph + 2) * iw;
+  P.wl = UMX.add(P.wl, UMX.sc([.01 * Math.sin(lv * .5 + ph), .007 * bi + .005 * Math.sin(lv * .37 + ph), .012 * Math.sin(lv * .5 + ph + 1.3)], iw));
+  P.wr = UMX.add(P.wr, [0, .004 * bi * iw, 0]);
+  P.foot = UMX.add(P.foot, UMX.sc([.008 * Math.sin(lv * .45 + ph), 0, .007 * Math.cos(lv * .38 + ph * 1.7)], iw));
+  wizIdleAct(P, lv, seed, iw);
   if (!live) return { ...P, htw: P.tw, hl: P.lean, cl: P.lean, bp: P.lean * .6 + P.head, brl: P.tw };
   const dt = Math.max(0, Math.min(.1, now - (t._wizT == null ? now : t._wizT))); t._wizT = now;
   t._wizI = Math.max(0, Math.min(1, iw + (busy ? -dt / .25 : dt / .8)));
@@ -90003,7 +90076,7 @@ function wizCtl(t, live, q) {
   const S = t._wizK || (t._wizK = { x: {}, v: {} }), o = { br: P.br, cape: P.cape };
   const n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n;
   for (let i = 0; i < n; i++) {
-    for (const k of ['tw', 'lean', 'head', 'hy', 'roll', 'glow', 'wl', 'wr', 'foot', 'pl', 'pr']) o[k] = wizSpring(S, k, P[k], h, spell && k !== 'glow' ? 1.6 : 1);   // (a spell's quick wind-up: the body follows faster)
+    for (const k of ['tw', 'lean', 'head', 'hy', 'roll', 'dip', 'sway', 'glow', 'wl', 'wr', 'foot', 'pl', 'pr']) o[k] =wizSpring(S, k, P[k], h, spell && k !== 'glow' ? (k === 'hy' ? 3 : 1.6) : 1);   // (a spell's quick wind-up: the body follows faster)
     o.htw = wizSpring(S, 'htw', o.tw, h); o.hl = wizSpring(S, 'hl', o.lean, h); o.cl = wizSpring(S, 'cl', o.lean, h);
     o.bp = wizSpring(S, 'bp', o.lean * .6 + o.head, h); o.brl = wizSpring(S, 'brl', o.tw + o.hy * .5, h);
   }
@@ -90017,7 +90090,7 @@ function wizCtl(t, live, q) {
 const _wizRz = a => UMX.rot(0, 0, 1, a);
 function wizPose(R, P, q) {
   const { B, bix, nb } = R, X = UMX, Q = new Array(nb), H = new Array(nb), L = new Array(nb).fill(null);
-  const tw = P.tw, lean = P.lean, br = P.br || 0, roll = P.roll || 0, hy = P.hy || 0;
+  const tw = P.tw, lean = P.lean, br = P.br || 0, hy = P.hy || 0, dip = P.dip || 0, sway = P.sway || 0, roll = (P.roll || 0) + sway * 1.6;
   const htw = P.htw != null ? P.htw : tw, hl = P.hl != null ? P.hl : lean, cl = P.cl != null ? P.cl : lean;
   L[bix.hips] = X.mul(X.ry(tw * .25), _wizRz(roll));
   L[bix.spine] = X.mul(X.mul(X.ry(tw * .3), X.rx(.01 * br + lean * .45)), _wizRz(-roll * .55));
@@ -90031,7 +90104,8 @@ function wizPose(R, P, q) {
     L[bix.beard] = X.mul(X.rx(Math.max(-.18, Math.min(.05, (bp - hp) * .6 - .01 * br))), _wizRz(Math.max(-.12, Math.min(.12, (brl - tw - hy * .5) * .5))));
   }
   const fk = b => { const p = B[b].p; if (p < 0) { Q[b] = L[b] || X.I(); H[b] = B[b].h.slice(); return; }
-    Q[b] = L[b] ? X.mul(Q[p], L[b]) : Q[p]; H[b] = X.add(H[p], X.mv(Q[p], X.sub(B[b].h, B[p].h))); };
+    Q[b] = L[b] ? X.mul(Q[p], L[b]) : Q[p]; H[b] = X.add(H[p], X.mv(Q[p], X.sub(B[b].h, B[p].h)));
+    if (b === bix.hips) H[b] = X.add(H[b], [sway, -dip, 0]); };   // (the hips sink with the knees and shift with his weight)
   const at = (b, p) => X.add(H[b], X.mv(Q[b], X.sub(p, B[b].h)));
   const arm = (up, fo, ha, T_, pole) => {   // two-bone IK in model space (the arm stays one limb: lengths kept)
     fk(up); const S = H[up], l1 = Math.hypot(...X.sub(B[fo].h, B[up].h)), l2 = Math.hypot(...X.sub(B[ha].h, B[fo].h));
