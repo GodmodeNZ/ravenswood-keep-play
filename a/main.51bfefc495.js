@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd2cdd58@2026-11-16';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4433b6b@2026-11-16';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -60219,7 +60219,7 @@ const AudioSys = (() => {
   // peak (optional): seconds from now when the take's loudest moment should land (a swing's whoosh on the blow)
   const fireBufs = {}; let fireWait = 0;
   function fireLoad() {
-    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined')) return; fireWait = 1;
+    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined' && typeof ARCMIS_SFX === 'undefined')) return; fireWait = 1;
     for (const k in fxTakes()) {
       try {
         const d = fxTakes()[k].d, s = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
@@ -60229,7 +60229,7 @@ const AudioSys = (() => {
   }
   // (the glaive's spinning-blade takes, bladesfxdata.js, are cut the same way and play through the same loader)
   let fxAll = null;
-  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}));
+  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}, typeof ARCMIS_SFX !== 'undefined' ? ARCMIS_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
   const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.25, .4], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
@@ -60434,12 +60434,19 @@ const AudioSys = (() => {
   // (owner, 15 Nov 2026: "needed to have both the projectile and impact sound... needed the longer tail too", "try it as i had it"): both whole,
   // stacking, at the owner's own balance (the takes are each set to the same peak, the impact peaked 5.7 dB over the projectile)
   const AM_VOL = [.13, .25], AM_GAP = [0, 0];
-  { const _am = S.arcmissile; S.arcmissile = () => { if (!firePlay('arcMisMix', AM_VOL[0], AM_GAP[0])) _am && _am(); }; }
+  // a trial (owner, 16 Nov 2026: "arcane missile.wav", "quite a long sound but want to see how it sounds"): her let-go plays three short
+  // cuts of that recording in turn (arcmissilesfxdata.js, tools/make_arcmissilesfx.py: amzA/B/C, 0.4-0.6 s, low and soft-topped), never the
+  // same twice running, each up to 4% faster or slower; the hit stays the owner's mix. AM_TRIAL = 0 puts the let-go back to the owner's
+  // mix (arcMisMix), which also plays if the cuts are missing; the synth 'whup' only if no take has loaded
+  const AM_TRIAL = 1, AM_CUTS = [['amzA', .24], ['amzB', .24], ['amzC', .24]];   // (.24: between the old let-go's peak and its A-weighted loudness; the cuts sit an octave lower)
+  { const _am = S.arcmissile; S.arcmissile = () => {
+    if (AM_TRIAL && fxTakes().amzA) { fireLoad(); if (fireBufs.amzA) { fireNext('amz', AM_CUTS, 0, .96 + Math.random() * .08); return; } }
+    if (!firePlay('arcMisMix', AM_VOL[0], AM_GAP[0])) _am && _am(); }; }
   S.arcMissileHit = () => { firePlay('arcMisHitMix', AM_VOL[1], AM_GAP[1]); };
   // Arcane Barrage (owner, 15 Nov 2026: "bit strange sounding, but try it"): one let-go as the volley starts, one landing for the volley
   // (its missiles' own hit sound held back), set a little over the missile and under the big spells
   const AB_VOL = [.24, .22];
-  S.arcBarrage = () => { firePlay('arcBarMix', AB_VOL[0], .5); };
+  S.arcBarrage = () => { firePlay('arcBarMix', AB_VOL[0], .5); };   // (owner, 16 Nov 2026, of the new missile recording: "i meant it for the auto attack missile": not used here)
   S.arcBarrageHit = () => { firePlay('arcBarHitMix', AB_VOL[1], 1); };
   // the Gathering Orb hurled (owner, 15 Nov 2026: "Grand Orb - Sound Mixes"), in place of 'phase'; the gather hum and the burst stay
   S.arcOrbThrow = () => { if (!firePlay('arcOrbMix', .26, .3)) S.phase && S.phase(1); };
