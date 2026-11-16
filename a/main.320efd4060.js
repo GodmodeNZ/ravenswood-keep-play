@@ -1,4 +1,4 @@
-const BUILD_TAG = '093b887@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6dc49ea@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12170,7 +12170,6 @@ function itemCardHTML(it, o) {
   const tw = '', bd = it.leg && d.build ? `<p class="itc-bd"><b>Build around it:</b> ${iEsc(d.build)}</p>` : '';
   return `<div class="itc" style="--rc:${col}"><h5 class="itc-n">${iEsc(gearName(it))}${typeof rnAwkMark === 'function' ? rnAwkMark(it) : ''}</h5><p class="itc-k">${iEsc(sub)}</p>${clsCardLine(it)}`
     + (st.length || old ? `<ul class="itc-s">${old}${st.map(([k, v]) => `<li>${statHTML(k, v)}</li>`).join('')}</ul>` : '')
-    + (st.some(([k]) => k === 'hit') ? '<p class="itc-k">Hit Chance: a unit misses 5% of its strikes and spell hits on ordinary foes, 9% on bosses; each point takes 1% off. Past that it does nothing.</p>' : '')
     + tw + abl + bd + (d.tome ? `<div class="itc-ab">${iEsc(tomeText(it))}</div>` : '')
     + (fl ? `<p class="itc-fl">“${iEsc(fl)}”</p>` : '') + (o.note || '') + (o.price ? `<p class="itc-pr">${o.price}</p>` : '') + '</div>';
 }
