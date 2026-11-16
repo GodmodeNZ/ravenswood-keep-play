@@ -1,4 +1,4 @@
-const BUILD_TAG = '6dc49ea@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b42a8dc@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -38326,6 +38326,12 @@ function fsetBossPieces(type) {
     for (let i = 0; i < 2; i++) for (const S of sets) if (S.pieces[i]) deal.push(S.pieces[i][0]);
     const bosses = []; for (let n = 5; n <= 50; n += 5) { const b = rnBossType(n); if (b && !bosses.includes(b)) bosses.push(b); }
     const m = {}; bosses.forEach((b, i) => { m[b] = [deal[(2 * i) % deal.length], deal[(2 * i + 1) % deal.length]]; });
+    // (never both pieces of one set on the same boss: the second swaps with the next boss's, owner 17 Nov 2026)
+    const setOf = id => { const S = FSETS.find(S => S.pieces.some(p => p[0] === id)); return S ? S.id || S.name : id; };
+    const same = P => P[0] && P[1] && setOf(P[0]) === setOf(P[1]);
+    for (let i = 0; i < bosses.length; i++) { const A = m[bosses[i]]; if (!same(A)) continue;
+      swap: for (let j = 1; j < bosses.length; j++) { const Bp = m[bosses[(i + j) % bosses.length]]; if (Bp === A) continue;
+        for (const k of [0, 1]) { const x = A[1]; A[1] = Bp[k]; Bp[k] = x; if (!same(A) && !same(Bp)) break swap; Bp[k] = A[1]; A[1] = x; } } }
     _fsBoss[f] = m;
   }
   return _fsBoss[f][type] || [];
@@ -85422,7 +85428,7 @@ function openGearPanel(t) {
         ${abilKit(t) ? `<div class="gp-abh"><h3>Abilities</h3>${gpMana(t)}</div><div class="gp-abils">${gpAbils(t)}</div>` : ''}
         <h3>Stats <small class="gp-pvh"></small></h3><div class="gp-stats">${gpStats(t)}</div>
         ${gpMore(t)}
-        <h3>Gear</h3><div class="gp-gear">${gpGearList(t)}</div>
+        <div class="gp-gear" hidden>${gpGearList(t)}</div>
       </div>
     </div>`, 'gearp');
   for (const c of ovp.querySelectorAll('canvas[data-key]')) iconPaint(c, c.dataset.key);
@@ -105601,9 +105607,12 @@ function fsWhere(t) {
 }
 const fsUnitLabel = t => `${(t.def && t.def.name) || 'a unit'} ${ROMAN[Math.max(0, Math.min(5, t.tier | 0))]}`;
 // the bosses whose tables list a piece (their names, in the order they march)
+// the bosses still to come that carry piece id, with their wave (owner, 17 Nov 2026: "i just killed arachnara, so the other set
+// piece dropping from the same boss isnt helpful"): a boss already beaten this run is not named
 function fsDroppers(id) {
   const out = []; if (typeof rnBossType !== 'function') return out;
-  for (let n = 5; n <= 50; n += 5) { const b = rnBossType(n); if (b && fsetBossPieces(b).includes(id)) { const nm = (CREEPS[b] && CREEPS[b].name) || b; if (!out.includes(nm)) out.push(nm); } }
+  const now = (typeof G !== 'undefined' && G && G.wave) | 0;
+  for (let n = 5; n <= 50; n += 5) { if (n <= now) continue; const b = rnBossType(n); if (b && fsetBossPieces(b).includes(id)) { const nm = ((CREEPS[b] && CREEPS[b].name) || b) + ' (wave ' + n + ')'; if (!out.some(x => x.startsWith((CREEPS[b] && CREEPS[b].name) || b))) out.push(nm); } }
   return out;
 }
 // the partner of piece id: { id, name, units (wearing it), bag (items in the bag or on their way), text }
@@ -105620,7 +105629,7 @@ function fsPartnerInfo(id) {
   let text;
   if (units.length) text = `held by ${units.map(t => `${fsUnitLabel(t)} (${fsWhere(t)})`).join(' and ')}`;
   else if (bag.length) text = 'in your bag';
-  else { const B = fsDroppers(pid); text = `not found yet (dropped by ${B.length ? B.join(', ') + ' or an elite' : 'an elite, or in a boss’s offer'})`; }
+  else { const B = fsDroppers(pid); text = `not found yet: ${B.length ? 'dropped by ' + B.join(', ') + ', by elites, and favoured in any boss’s offer' : 'dropped by elites, and favoured in any boss’s offer'}`; }
   return { id: pid, name, units, bag, text };
 }
 const fsTouch = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
