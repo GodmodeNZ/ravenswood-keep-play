@@ -1,4 +1,4 @@
-const BUILD_TAG = '16198fb@2026-11-16';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ffbf081@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1270,6 +1270,20 @@ const SET_MODS = { nth: 1, nthM: 1, nthStun: 1, critM: 1, minR: 1, slowOn: 1, sh
 // the learned ranks of a tower type's tree: an array with one rank per talent in TALENTS[type].list
 function talPicks(type) { return typeof G !== 'undefined' && G.tal && Array.isArray(G.tal[type]) ? G.tal[type] : []; }
 function talRankOf(picks, i) { return picks[i] | 0; }
+/* Tomes of Mastery (loot.js): a tome is read once and teaches a whole unit type one more capstone of its own tree, for the
+   rest of the run. G.tomes[type] = [talent index]: known at full rank with no talent points spent, so it is no part of
+   the picks (points spent, rows opened, the respec's refund): a respec keeps it. talKnown is what the unit type knows
+   (its picks plus its tome's capstone): everything that reads a talent's EFFECT asks talKnown, everything that spends
+   or counts points asks talPicks. */
+function tomeCaps(type) { return typeof G !== 'undefined' && G && G.tomes && Array.isArray(G.tomes[type]) ? G.tomes[type] : _noTome; }
+const _noTome = [], _knC = {};
+const tomeHas = (type, i) => tomeCaps(type).includes(i);
+function talKnown(type) {
+  const pk = talPicks(type), tc = tomeCaps(type); if (!tc.length || !TALENTS[type]) return pk;
+  const c = _knC[type]; if (c && c.pk === pk && c.tc === tc && c.n === pk.length && c.v === G.talV) return c.out;
+  const L = TALENTS[type].list, out = L.map((q, i) => pk[i] | 0); for (const i of tc) if (L[i]) out[i] = Math.max(out[i], L[i].max);
+  _knC[type] = { pk, tc, n: pk.length, v: G.talV, out }; return out;
+}
 function talSpent(picks) { let s = 0; for (const v of picks) s += v | 0; return s; }
 // rows in a tree: the towers' trees have TAL_ROWS; a force's spell trees five (forces_zy_spells.js sets tree.rows)
 const talRowsOf = type => (typeof TALENTS !== 'undefined' && TALENTS[type] && TALENTS[type].rows) || TAL_ROWS;
@@ -1290,6 +1304,7 @@ function talNodeState(type, picks, i) {
   const t = TALENTS[type].list[i], n = talRankOf(picks, i);
   if (n >= t.max) return 'maxed';
   if (n) return 'partial';
+  if (tomeHas(type, i)) return 'maxed';   // learned from a Tome of Mastery
   if (talCapTaken(type, picks, i)) return 'excl';
   if (!talRowOpen(t.r, type, picks) || (typeof schoolOpen === 'function' && !schoolOpen(type))) return 'locked';
   if (!talReqMet(type, picks, t)) return 'req';
@@ -1305,7 +1320,7 @@ function champTalLocked(type) {
 }
 function talCanLearn(type, picks, i) {
   const t = TALENTS[type].list[i];
-  return !!t && !champTalLocked(type) && talRankOf(picks, i) < t.max && talRowOpen(t.r, type, picks) && talReqMet(type, picks, t) && !talCapTaken(type, picks, i) && !(t.spell && oldRules());   // (a force's spell talents: force runs only)
+  return !!t && !champTalLocked(type) && !tomeHas(type, i) && talRankOf(picks, i) < t.max && talRowOpen(t.r, type, picks) && talReqMet(type, picks, t) && !talCapTaken(type, picks, i) && !(t.spell && oldRules());   // (a force's spell talents: force runs only)
 }
 // tier stats with the learned talents applied (picks defaults to the current run's choices)
 function talentStats(type, tier, picks, spec) {
@@ -1314,7 +1329,7 @@ function talentStats(type, tier, picks, spec) {
   // a tower's path: its tier IV-VI perks stack
   if (spec && tier >= 3 && typeof specApply === 'function') specApply(st, type, spec, tier);
   if (!tl) return st;
-  if (!Array.isArray(picks)) picks = talPicks(type);
+  if (!Array.isArray(picks)) picks = talKnown(type);
   for (let i = 0; i < tl.list.length; i++) {
     const op = tl.list[i], n = Math.min(talRankOf(picks, i), op.max);
     if (!n) continue;
@@ -1654,7 +1669,7 @@ function newGame(diff = 'normal', chal = null, hero = null, rite = 0) {
     champ: null, champBoost: 1, champKills: 0, champTrophy: 0, heroBwW: 0, heroPhW: 0, heroSmug: 0, heroTk: 0, quest: null, questOffer: null, questOffered: [], questsDone: [], sagaR: {}, qSpawnW: 0, lives: DIFFS[diff].lives, maxLives: DIFFS[diff].lives,
     wave: 1, phase: 'build', countdown: 0, endless: false,
     towers: [], creeps: [], projs: [], eprojs: [], parts: [], decals: [], texts: [], bolts: [], beams: [], flashes: [], rfx: [], rgRecent: [], spawnQ: [], delayed: [], hazards: [], corpses: [], guards: [], ecoSeen: {}, fus: {}, rxSeen: {}, shieldWave: 0, shieldN: 0,
-    tp: 0, tal: {}, talV: 0, tpEarned: 0, hitStop: 0, pactN: 0, loot: [], drops: [], lootNew: 0, gearUid: 0, age: 0, ageRes: null, ageHint: 0, lore: null,
+    tp: 0, tal: {}, talV: 0, tomes: {}, tomeS: null, tpEarned: 0, hitStop: 0, pactN: 0, loot: [], drops: [], lootNew: 0, gearUid: 0, age: 0, ageRes: null, ageHint: 0, lore: null,
     waveT: 0, time: 0, uid: 0, blk: new Uint8Array(N), tAt: new Array(N).fill(null),
     stats: { kills: 0, gold: 0, leaks: 0, built: 0 }, flash: 0, shake: 0,
     sel: null, buildType: null, ghost: null,
@@ -1681,7 +1696,7 @@ function tierOf(t) { return t.def.tiers[t.tier]; }
    maze covers the flight path down the middle (flyers were a gear-check on range, not a planned answer) */
 const FORCE_AIR_R = .5;
 function effStats(t) {
-  const st = talentStats(t.type, t.tier, talPicks(t.type), t.spec);
+  const st = talentStats(t.type, t.tier, talKnown(t.type), t.spec);   // (talKnown: its picks and its tome's capstone, core.js)
   if (t.weapon && typeof wpnApply === 'function') wpnApply(t, st);   // its weapon sets the strike and the speed; everything below multiplies on top (forces_zzzzzzzzzzzzz_weapons.js)
   if (t.gear && t.gear.length) gearStats(st, t.gear, t);
   schoolRelicStats(t, st);   // a school relic socketed in any tower of this school
@@ -1715,9 +1730,8 @@ function talentHas(type, cap) {
   if (_capCache.t !== G.time || _capCache.v !== G.talV || _capCache.ref !== G.tal) { _capCache.t = G.time; _capCache.v = G.talV; _capCache.ref = G.tal; _capCache.m = {}; }
   const key = type + ':' + cap;
   if (key in _capCache.m) return _capCache.m[key];
-  const tl = TALENTS[type], pk = talPicks(type); let n = 0;
+  const tl = TALENTS[type], pk = talKnown(type); let n = 0;   // (a capstone read from a Tome of Mastery counts: talKnown)
   if (tl) for (let i = 0; i < tl.list.length; i++) if (tl.list[i].cap === cap && pk[i]) { n = pk[i] * (tl.list[i].capK || 1); break; }
-  if (!n) n = tomeTeaches(type, cap);   // or a Tome of Mastery socketed in one of them
   return (_capCache.m[key] = n);
 }
 // learn one rank of talent i in a tower type's tree
@@ -1879,7 +1893,7 @@ function wallLineStep(a, b) {
 }
 function upgradeCost(t) {
   if (t.tier >= t.def.tiers.length - 1) return 0;
-  const m = TALENTS[t.type] ? talentStats(t.type, t.tier, talPicks(t.type)).upCost || 1 : 1;   // some talents make upgrades dearer
+  const m = TALENTS[t.type] ? talentStats(t.type, t.tier, talKnown(t.type)).upCost || 1 : 1;   // some talents make upgrades dearer
   return Math.round(t.def.tiers[t.tier + 1].cost * m * (pathOn('war', 2) ? .85 : 1) * (G.hero ? heroUpK() : 1));
 }
 // tower toughness: the tier's base, scaled by talents that cost durability
@@ -5366,7 +5380,7 @@ function updateFx(dt) {
 /* ---- Save / restore ---- */
 function serialize() {
   if (!G.towers || (G.state !== 'play') || G.vs) return null;   // a Tower Wars match is not saved over your campaign
-  return { v: 8, ftv: 7, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, fus: G.fus || {}, tpEarned: G.tpEarned,
+  return { v: 8, ftv: 7, cv: 1, taln: typeof talNamesNow === 'function' && G.force ? talNamesNow() : null, diff: G.diff, rite: G.rite | 0, runId: G.runId || null, playT: Math.round(G.playT || 0), map: G.map || 'meadow', gold: G.gold, lives: G.lives, wave: G.wave, endless: G.endless, stats: G.stats, tp: G.tp, tal: G.tal, tomes: tomesSave(), tomeS: G.tomeS || null, fus: G.fus || {}, tpEarned: G.tpEarned,
     towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0, t.def.wall ? 0 : Math.round((t.vx || 0) * 100) / 100, t.bornW | 0, t.vSeed | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
@@ -5420,6 +5434,8 @@ function restore(s) {
   G.fus = {}; for (const k in s.fus || {}) if (s.fus[k]) { if (FUS_BY[k] && !G.force) G.fus[k] = 1; else G.tp++; }   // a fusion that no longer exists (the Shadow ones), or one a force run bought before they left it, gives its point back
   const okGear = it => !!(((s.v | 0) >= 6 || remapTome(it)) && ((s.v | 0) >= 8 || remapTome8(it)) && migrateGear(it)) && RARITY[it.rar];
   G.loot = Array.isArray(s.loot) ? s.loot.filter(okGear) : []; G.gearUid = s.gearUid || 0;
+  tomesLoad(s.tomes);   // the capstones its Tomes of Mastery taught (loot.js)
+  G.tomeS = s.tomeS && Array.isArray(s.tomeS.due) ? { due: s.tomeS.due.map(w => w | 0).filter(w => w > 0).sort((a, b) => a - b), n: s.tomeS.n | 0 } : null;   // (none saved: tomePlan rolls the bosses still ahead)
   G.trophies = {}; for (const k in s.trophies || {}) if (TROPHY[k] && GEAR_BASES[s.trophies[k]]) G.trophies[k] = s.trophies[k];   // this run's trophy picks
   G.chalSchools = Array.isArray(s.chalSchools) ? s.chalSchools.map(t => t === 'shadow' ? 'glaive' : t).filter(t => TOWERS[t]) : [];
   // schools opened so far (a save from before schools had to be opened keeps every school it could build)
@@ -5454,7 +5470,8 @@ function restore(s) {
     if (G.hero && s.champAt && s.champAt[0] === i && s.champAt[1] === j && !t.def.wall) G.champ = t.id;   // (before its sockets are counted)
     Object.assign(t, { invested: inv, kills: kills || 0, dmg: dmg || 0, prio: prio || 0, build: 0, ast: ast | 0, vx: vx != null ? +vx || 0 : (kills | 0) + (typeof VET_AST !== 'undefined' ? VET_AST : 1) * (ast | 0), bornW: bornW | 0, vSeed: vSeed | 0 });   // (a save from before the catch-up: what it earned is its kills + assists)
     if (spec && SPEC_BY[type + ':' + spec] && t.tier >= 3) t.spec = spec;   // (a tier IV+ tower from before paths chooses one when tapped)
-    if (Array.isArray(gear)) { t.gear = gear.slice(0, gearSlots(t)).map(it => okGear(it) ? it : null); for (const it of gear.slice(gearSlots(t))) if (okGear(it)) G.loot.push(it); }
+    if (Array.isArray(gear)) { t.gear = gear.slice(0, gearSlots(t)).map(it => !okGear(it) ? null : it.tome ? (G.loot.push(it), null) : it);   // (a tome an old save had socketed: an unread tome in the bag, its socket free)
+      for (const it of gear.slice(gearSlots(t))) if (okGear(it)) G.loot.push(it); }
     if (ab && typeof abilLoad === 'function') abilLoad(t, ab);   // a force unit's learned abilities, autocast, mode and mana
     if (charm && okGear(charm) && isCharm(charm)) { if (typeof charmOpen === 'function' && charmOpen(t)) t.charm = charm; else G.loot.push(charm); }   // its charm (or back to the bag)
     G.towers.push(t); G.tAt[idx(i, j)] = t;
@@ -5728,9 +5745,10 @@ function bossRuleMarks() {
    drop a relic. Every relic is a hand-made named item with one rule you can say in a sentence and an effect you can
    see in play; there are no random stats. Rarity decides which relics can drop and how dramatic they are: commons
    sharpen what a tower already does, uncommons add a habit, rares bend the rules, epics make moments, and legendaries
-   change how a tower plays. Some are made for one tower: signature legendaries (one per tower type), Tomes of Mastery
-   (teach a capstone of the tower's own tree) and reaction relics (a twist on one reaction). Those only fit their
-   towers, and drop for the towers you field. Every relic but a tome can be honed three times with gold: each hone
+   change how a tower plays. Some are made for one tower: signature legendaries (one per tower type) and reaction relics
+   (a twist on one reaction). Those only fit their towers, and drop for the towers you field. A Tome of Mastery is not
+   socketed: it is a book a wave boss drops, read once to teach a whole tower type a second capstone (see TOME below).
+   Every relic can be honed three times with gold: each hone
    makes its numbers 20% bigger (a relic whose rule has no number gains damage instead). */
 const RARITY = [
   { id: 'common', name: 'Common', col: '#cfc8b8', w: 50 },
@@ -6120,8 +6138,118 @@ function legOf(t) {
   return null;
 }
 const legText = it => { const L = LEGENDS[it.leg]; return L ? L.text(relicK(it), it) : ''; };
-/* Tomes of Mastery: an epic relic that teaches the tower it sits in one capstone of its own tree, exactly as the talent
-   (upside and downside), on top of whichever capstone you chose. it.tome = [tower type, talent index]. */
+/* Tomes of Mastery (owner, 16 Nov 2026: "better as a one time use that grants all units the talent ... give people a goal
+   to work towards"). A tome is a book for ONE unit type (it.tome = [type]); it sits in the bag, never in a socket. Read
+   once, it is used up and every unit of that type, standing now or built later, knows one more capstone of its own tree
+   for the rest of the run: the player picks which, among the capstones of that tree they have not chosen. It costs no
+   talent points and a respec keeps it (core.js tomeCaps / talKnown; G.tomes[type] = [talent index]).
+     One tome a unit type a run: a second for the same type never drops, and one held anyway (an old save) can only be
+   salvaged. A tome with nothing to teach salvages for TOME.salvage gold, as does any tome (its card says so).
+     Drops only, from wave bosses only (never bought): the run rolls its tomes when it starts (tomePlan): one (or, at
+   TOME.two, two) on boss waves TOME.from..TOME.last. A force run's boss offers its tome as one of its loot cards
+   (renown.js: L.tome) and the boss's row in the Loot list says it carries one (tomeBossWaves); Classic's boss drops it
+   beside its relic. A boss that got through, or an army with nothing left to learn, passes its tome on to the next boss.
+     Old saves held tomes as socketed epic relics that taught one unit one fixed capstone (it.tome = [type, talent index];
+   remapTome / remapTome8 below keep those indices sound): each becomes an unread tome in the bag for the same unit type
+   (migrateGear drops the index; game.js restore frees the socket). */
+const TOME = { from: 20, last: 45, firstBy: 35, two: .45, salvage: 150 };
+const tomeType = it => (it && it.tome && it.tome[0]) || null;
+// "Blade Dancers" / "Arrow Towers" / the Champion by name; and "all your Blade Dancers" / "every Arrow Tower"
+const tomeUnits = type => { const d = TOWERS[type] || {}; return d.champ ? String(d.name).split(',')[0] : d.force ? d.name : d.name + 's'; };
+const tomeWho = type => { const d = TOWERS[type] || {}; return d.champ ? tomeUnits(type) : d.force ? 'all your ' + d.name : 'every ' + d.name; };
+const tomeOne = type => !!(TOWERS[type] && TOWERS[type].champ);   // (a Champion is one unit: "has", "knows")
+const tomeFielded = type => !!(typeof G !== 'undefined' && G && (G.towers || []).some(t => t.type === type));
+// the capstones a tome could teach this tree now: the ones the player has not chosen (none once a tome has been read for it)
+function tomeOpts(type) {
+  const tl = TALENTS[type]; if (!tl || tomeCaps(type).length) return [];
+  const R = talRowsOf(type) - 1, pk = talPicks(type);
+  return tl.list.filter(q => q.r === R && !q.spell && !talRankOf(pk, q.id)).map(q => q.id);
+}
+// an unread tome for this type in the bag
+const tomeHeld = type => (typeof G !== 'undefined' && G && (G.loot || []).find(it => it && tomeType(it) === type)) || null;
+// why this tome can't be read ('' if it can)
+function tomeWhyNot(it) {
+  const ty = tomeType(it); if (!ty || !TALENTS[ty] || !TOWERS[ty]) return 'It has nothing to teach';
+  if (tomeCaps(ty).length) return `${tomeUnits(ty)} ${tomeOne(ty) ? 'has' : 'have'} already read a Tome of Mastery`;
+  if (!tomeOpts(ty).length) return `${tomeUnits(ty)} ${tomeOne(ty) ? 'has' : 'have'} no capstone left to learn`;
+  return '';
+}
+// read it: talent i (one of tomeOpts; may be left out when only one is left) is known by the whole type from now on, and the tome is used up
+function tomeRead(it, i) {
+  const ty = tomeType(it), at = (G.loot || []).indexOf(it); if (at < 0 || tomeWhyNot(it)) return false;
+  const opts = tomeOpts(ty); if (i == null && opts.length === 1) i = opts[0];
+  if (!opts.includes(i)) return false;
+  G.loot.splice(at, 1);
+  G.tomes = Object.assign({}, G.tomes, { [ty]: [i] }); G.talV = (G.talV || 0) + 1;
+  if (G.stats) G.stats.tomes = (G.stats.tomes || 0) + 1;
+  const tl = TALENTS[ty].list[i], who = tomeWho(ty);
+  if (typeof empowerType === 'function') empowerType(ty);
+  onBanner('Tome of Mastery read', `${who[0].toUpperCase() + who.slice(1)} now ${tomeOne(ty) || /^every/.test(who) ? 'knows' : 'know'} ${tl.name}`);
+  sfx('talentBuy'); onDirty(); onSave();
+  return true;
+}
+// a new, unread tome for a unit type
+const tomeMake = type => ({ id: ++G.gearUid, rar: 3, hone: 0, isNew: true, tome: [type] });
+// the unit type a tome dropped now would be for: one the player fields, with a capstone left and no tome read, held or
+// already on offer (weighted by what stands on the field), or null
+function tomeDropType() {
+  const W = fieldWeights(), busy = ty => !!tomeHeld(ty) || (G.drops || []).some(d => d.item && tomeType(d.item) === ty) || !!(G.rn && (G.rn.loots || []).some(L => L.tome === ty));
+  const opts = Object.keys(W).filter(ty => TALENTS[ty] && tomeOpts(ty).length && !busy(ty));
+  return opts.length ? pickW(opts.map(ty => [ty, W[ty]])) : null;
+}
+// this run's tomes: the boss waves that carry one, rolled once and saved (due: not handed out yet; n: handed out)
+function tomePlan() {
+  if (G.tomeS && Array.isArray(G.tomeS.due)) return G.tomeS;
+  const ws = []; for (let w = TOME.from; w <= TOME.last; w += 5) if (w >= (G.wave | 0)) ws.push(w);   // (an older save: only the bosses still ahead)
+  const a = ws.filter(w => w <= TOME.firstBy), b = ws.filter(w => w > TOME.firstBy), due = [];
+  if (ws.length) {
+    if (Math.random() < TOME.two && a.length > 1 && b.length) { due.push(lootPick(a.slice(0, -1))); due.push(lootPick(b)); }   // two: one early in the span, one late
+    else due.push(lootPick(a.length ? a : b));
+  }
+  return (G.tomeS = { due: due.sort((x, y) => x - y), n: 0 });
+}
+// a boss falls on this wave: the unit type its tome is for, or null (none due yet, or nothing to teach: it waits for the next boss)
+function tomeForBoss(wave) {
+  if (typeof G === 'undefined' || !G || G.vs || G.state !== 'play' || G.chal === 'relicless' || !poolHas('tomes')) return null;
+  const S = tomePlan(); if (!S.due.length || S.due[0] > wave) return null;
+  const ty = tomeDropType(); if (!ty) return null;
+  S.due.shift(); S.n = (S.n | 0) + 1;
+  return ty;
+}
+// the boss waves from `from` on that carry a tome, as the plan stands (one tome a boss: a late one moves on to the next boss)
+function tomeBossWaves(from, isBoss) {
+  if (typeof G === 'undefined' || !G || G.vs || !poolHas('tomes')) return [];
+  const S = tomePlan(), out = []; let k = 0;
+  for (let n = Math.max(1, from | 0); n <= MAX_WAVE && k < S.due.length; n++) if ((isBoss ? isBoss(n) : n % 5 === 0) && S.due[k] <= n) { out.push(n); k++; }
+  return out;
+}
+/* the talent tree's second-capstone slot (ui.js draws it): which trees show one, where on the capstone row it sits, and its state */
+const tomeSlotOn = type => !!TALENTS[type] && !(typeof G !== 'undefined' && G && G.vs) && poolHas('tomes') && TALENTS[type].list.filter(q => q.r === talRowsOf(type) - 1 && !q.spell).length > 1;
+// the column (0-based) of the capstone row's free cell: right of the capstones if there is room, else a gap in the row, else one more column
+function tomeSlotCol(type, cols) {
+  const R = talRowsOf(type) - 1, used = new Set(TALENTS[type].list.filter(q => q.r === R).map(q => q.c));
+  for (let c = Math.max(-1, ...used) + 1; c < cols; c++) if (!used.has(c)) return c;
+  for (let c = cols - 1; c >= 0; c--) if (!used.has(c)) return c;
+  return cols;
+}
+// 'read' (a tome was read: the slot is filled) | 'none' (no capstone left to teach) | 'ready' (an unread tome for it is held) | 'empty'
+function tomeState(type) {
+  if (tomeCaps(type).length) return 'read';
+  if (!tomeOpts(type).length) return 'none';
+  const it = tomeHeld(type); return it && !tomeWhyNot(it) ? 'ready' : 'empty';
+}
+const tomeSalvage = () => TOME.salvage * (typeof pathOn === 'function' && pathOn('gold', 4) ? 3 : 1);
+// the names a save keeps for the capstones its tomes taught, and back (a capstone that no longer exists hands its tome back to the bag)
+function tomesSave() { const o = {}; for (const ty in G.tomes || {}) { const tl = TALENTS[ty]; if (tl) o[ty] = tomeCaps(ty).filter(i => tl.list[i]).map(i => tl.list[i].name); } return o; }
+function tomesLoad(o) {
+  G.tomes = {};
+  for (const ty in o || {}) {
+    const tl = TALENTS[ty], nm = Array.isArray(o[ty]) ? o[ty][0] : null; if (!tl || !TOWERS[ty] || nm == null) continue;
+    const q = tl.list.find(x => x.r === talRowsOf(ty) - 1 && x.name === nm && !x.spell);
+    if (q && !talRankOf(talPicks(ty), q.id)) G.tomes[ty] = [q.id]; else G.loot.push(tomeMake(ty));
+  }
+  G.talV = (G.talV || 0) + 1;
+}
 // saves before the either/or trees (v6) indexed tomes into the old full trees: point them at the same capstone if it
 // survived, else that tree's first capstone. Always true (only remaps).
 function remapTome(it) {
@@ -6139,19 +6267,23 @@ function remapTome8(it) {
   it.tome[1] = ix >= 0 ? ix : tl.list.findIndex(q => q.r === TAL_ROWS - 1);
   return true;
 }
-const tomeTalent = it => it && it.tome && TALENTS[it.tome[0]] ? TALENTS[it.tome[0]].list[it.tome[1]] : null;
-const tomeKnown = it => { const tl = tomeTalent(it); return !!tl && talRankOf(talPicks(it.tome[0]), it.tome[1]) > 0; };
+// what a tome's card says: what reading it does, or why it can only be salvaged
 function tomeText(it) {
-  const tl = tomeTalent(it); if (!tl) return '';
-  const con = tl.con(tl.max);
-  return `While socketed, this ${uw(1)} has the talent ${tl.name} at full rank, with no talent points spent: ${tl.pro(tl.max)}${con ? ` (${con})` : ''}` + (tomeKnown(it) ? ` Your ${TALENTS[it.tome[0]].name} tree already knows it, so this tome does nothing for now.` : '');
+  const ty = tomeType(it), tl = ty && TALENTS[ty]; if (!tl || !TOWERS[ty]) return '';
+  const why = tomeWhyNot(it);
+  if (why) return `${why}, so this tome has nothing to teach. Salvage it for ${tomeSalvage()} gold.`;
+  const opts = tomeOpts(ty).map(i => tl.list[i]), who = tomeWho(ty), names = opts.map(q => q.name);
+  const what = opts.length === 1 ? `Read it to teach ${who} the capstone ${names[0]}: ${opts[0].pro(opts[0].max)}`
+    : `Read it to unlock a second capstone for ${who}: you choose ${opts.length === 2 ? 'between' : 'among'} ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`;
+  return `${what} It costs no talent points, a respec keeps it, and it lasts the whole run. The tome is used up.`
+    + (tomeFielded(ty) ? '' : ` You field no ${tomeUnits(ty)} now: read it for the ones you field later, or salvage it for ${tomeSalvage()} gold.`);
 }
 // a relic's definition, whatever kind it is
 function gearDef(it) {
   if (!it) return null;
   if (it.shop) return SHOP[it.shop] || null;
   if (it.leg) return LEGENDS[it.leg] || null;
-  if (it.tome) { const tl = tomeTalent(it); return tl ? { name: 'Tome of ' + tl.name, icon: tl.icon, hue: TALENTS[it.tome[0]].hue, tome: 1 } : null; }
+  if (it.tome) { const tl = TALENTS[it.tome[0]]; return tl && TOWERS[it.tome[0]] ? { name: 'Tome of Mastery: ' + tomeUnits(it.tome[0]), icon: 'stars', hue: tl.hue, tome: 1 } : null; }
   return GEAR_BASES[it.base] || null;
 }
 const catRx = it => { const d = it && GEAR_BASES[it.base]; return d && d.rx ? REACTIONS.find(r => r.id === d.rx) : null; };
@@ -6183,14 +6315,15 @@ function fieldFitW(it, W) {
 }
 // a charm (a force unit's mana and abilities: groveitems.js) sits in its own socket, never a relic socket
 const isCharm = it => !!(it && it.base && GEAR_BASES[it.base] && GEAR_BASES[it.base].charm);
-const gearFits = (it, t) => { if (isCharm(it)) return false; const f = gearFor(it); return !f || (!!t && f.includes(t.type)); };
+const gearFits = (it, t) => { if (isCharm(it) || (it && it.tome)) return false;   // (a tome is read, never socketed)
+  const f = gearFor(it); return !f || (!!t && f.includes(t.type)); };
 const gearForText = it => { const c = gearCls(it); if (c) return typeof kindLabel === 'function' ? kindLabel(c) : c; const f = gearFor(it); return f ? f.map(ty => TOWERS[ty].name).join(' or ') : ''; };
 const anA = w => (/^[AEIOU]/i.test(w) ? 'an ' : 'a ') + w;
 const gearForA = it => { if (gearCls(it)) return gearForText(it); const f = gearFor(it); return f && f.every(ty => TOWERS[ty] && TOWERS[ty].force) ? gearForText(it) : anA(gearForText(it)); };   // (a force's units go by plural names: "Briarwardens")
 const gearBase = it => gearDef(it) || GEAR_BASES.whet;
 // the painted icon, when there is one
 const gearArt = it => { const d = gearDef(it); return (d && d.art) || it.leg || it.base || (it.shop ? 'shop-' + it.shop : ''); };
-const tomeArtId = it => 'tome-' + (typeof FORCE_NOW !== 'undefined' && FORCE_NOW ? FORCE_NOW + '-' : '') + (it.tome || []).join('-');
+const tomeArtId = it => 'tome-' + (typeof FORCE_NOW !== 'undefined' && FORCE_NOW ? FORCE_NOW + '-' : '') + tomeType(it);
 const gearKey = it => { if (it.tome && typeof tomeArt === 'function') tomeArt(it); const b = gearBase(it), id = gearArt(it) || tomeArtId(it); return `g:${b.icon}:${b.hue.slice(1)}:${it.rar}:${id}:${typeof RELIC_IMG !== 'undefined' && RELIC_IMG[id] ? 1 : 0}`; };
 const gearSlots = t => t.def.wall ? 0 : Math.min(3, (t.tier >= 4 ? 3 : t.tier >= 2 ? 2 : 1) + (typeof pathOn === 'function' && pathOn('art', 3) ? 1 : 0) + (G && G.champ && t.id === G.champ ? 1 : 0));
 const gearName = it => gearBase(it).name;
@@ -6214,7 +6347,7 @@ const gearLines = it => [gearText(it)];
 const gearKind = it => it.shop ? 'item' : it.tome ? 'tome' : isCharm(it) ? 'charm' : 'relic';
 // the tier word shown with a relic or a shop item (a shop item: Part, Item or Artifact)
 const gearTierName = it => it && it.shop && typeof shopTierName === 'function' ? shopTierName(it) : typeof isSchoolRelic === 'function' && isSchoolRelic(it) ? `${TOWERS[LEGENDS[it.leg].school].short} school relic` : RARITY[(it && it.rar) | 0].name;
-function gearValue(it) { if (it.shop) return shopSellValue(it); if (it.paid) return it.fresh ? it.paid : Math.floor(it.paid / 2); return ([8, 16, 30, 55, 100][it.rar] || 8) * (typeof pathOn === 'function' && pathOn('gold', 4) ? 3 : 1); }   // salvage price
+function gearValue(it) { if (it.tome) return tomeSalvage(); if (it.shop) return shopSellValue(it); if (it.paid) return it.fresh ? it.paid : Math.floor(it.paid / 2); return ([8, 16, 30, 55, 100][it.rar] || 8) * (typeof pathOn === 'function' && pathOn('gold', 4) ? 3 : 1); }   // salvage price
 function rollRarity(wave, boss) {
   // rare is the floor; epics and legendaries grow more likely as the waves go on, and a boss or leader rolls a little higher
   const L = clamp((wave - 1) / 29, 0, 1), w = [0, 0, 14 * (1 - .3 * L), 4.6 * (1 + 1.5 * L), .5 * (1 + 3 * L)];
@@ -6248,11 +6381,7 @@ function rollGear(wave, boss, forceRar, kind) {
     const id = pickW(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].charm && GEAR_BASES[id].rar === rar && inPool('bases', id)).map(id => [id, ownedRelic(id) ? .25 : 1]));
     if (id) { it.base = id; return it; }
   }
-  if (rar === 3 && types.length && poolHas('tomes') && (kind === 'tome' || (kind == null && Math.random() < .3))) {   // tomes: a capstone your tree hasn't learned
-    const opts = [];
-    for (const ty of types) { const tl = TALENTS[ty]; if (tl) tl.list.forEach((q, i) => { if (q.r === talRowsOf(ty) - 1 && !q.spell && !talRankOf(talPicks(ty), i)) opts.push([ty + ':' + i, W[ty]]); }); }
-    const k = pickW(opts); if (k) { const [ty, i] = k.split(':'); it.tome = [ty, +i]; return it; }
-  }
+  if (rar === 3 && kind === 'tome' && poolHas('tomes')) { const ty = tomeDropType(); if (ty) { it.tome = [ty]; return it; } }   // (only when asked for: tomes come from wave bosses alone, tomeForBoss)
   if (rar === 2 && types.length && poolHas('cat') && (kind === 'cat' || (kind == null && Math.random() < .3))) {   // reaction relics: reactions your towers can set off
     const opts = Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].rx).map(id => { const f = GEAR_BASES[id].for, have = f.filter(ty => W[ty]), sum = have.reduce((a, ty) => a + W[ty], 0); return [id, f.length === 1 || have.length >= 2 ? sum : sum * .2]; });
     const id = pickW(opts); if (id) { it.base = id; return it; }
@@ -6264,41 +6393,18 @@ function rollGear(wave, boss, forceRar, kind) {
 // stats with a tower's relics applied (called from effStats). t: the tower, so relics made for another tower stay inert.
 // Some fx also set a marker in st.pw that only the view reads (seer, hawk, rend, seek, gcan, winter): what to show, not what to do.
 function gearStats(st, gear, t) {
-  const taught = new Set();
   for (const it of gear) {
     if (!it) continue;
     if (t && !gearFits(it, t)) continue;
     if (it.shop) { shopStats(st, it, t); continue; }   // a shop item: just what it says (no relic power spike)
     const pow = powerOn() || (typeof itemSpec === 'function' && !!itemSpec(it));   // a force item: flat stat lines instead of the spike and the hone's damage (itempower.js itemStatsApply)
     if (!pow) dmgMul(st, 1 + relicDmg(it));   // the power spike
-    if (it.tome) { if (!tomeKnown(it) && !taught.has(it.tome[1])) { taught.add(it.tome[1]); tomeApply(st, it); } continue; }
+    if (it.tome) continue;   // (a tome is read from the bag; it never sits in a socket)
     const d = gearDef(it); if (!d) continue;
     const k = relicK(it);
     if (!(typeof statOnly === 'function' && statOnly(it))) d.fx(st, k, it, t);   // (a stats-only rare has no rule: itempower.js)
     if (d.hb && !pow) { const b = honeBonus(k); if (b > 0) dmgMul(st, 1 + b); }
   }
-}
-// a tome's capstone, applied the way talentStats applies a learned talent
-function tomeApply(st, it) {
-  const tl = tomeTalent(it); if (!tl) return;
-  const m = tl.mod(tl.max);
-  if (tl.cap) st.caps[tl.cap] = tl.max * (tl.capK || 1);
-  for (const k in m) {
-    const v = m[k];
-    if (k in SET_MODS) st[k] = v;
-    else if (k in MULT_MODS) { if (k === 'rangeM') st.range = (st.range || 0) * v; else st[k] = (st[k] == null ? 1 : st[k]) * v; }
-    else st[k] = (st[k] || 0) + v;
-  }
-  if (st.slow != null) st.slow = clamp(st.slow, 0, .8);
-  if (st.crit != null) st.crit = clamp(st.crit, 0, .9);
-  if (st.range != null) st.range = Math.max(.8, st.range);
-}
-// a capstone taught by a tome socketed in any tower of that type (for capstones that act type-wide)
-function tomeTeaches(type, cap) {
-  for (const t of (typeof G !== 'undefined' && G.towers) || []) if (t.type === type && t.gear) for (const it of t.gear) {
-    const q = it && it.tome && it.tome[0] === type ? tomeTalent(it) : null; if (q && q.cap === cap) return q.max * (q.capK || 1);
-  }
-  return 0;
 }
 // retired items an older save may hold, and what each becomes: the same rarity, level and hones, for the same units (owner,
 // 9 Nov 2026: "removes shields as an item type that can drop": the two shield-boss rares, melee damage relics, become the
@@ -6313,11 +6419,11 @@ function migrateGear(it) {
   // the Shadow Obelisk became the Glaive Thrower: its legendary, tomes and the Blight catalyst carry over
   if (it.leg === 'hollow') it.leg = 'moonfang';
   if (it.base === 'cat_blight') it.base = 'cat_exposed';
-  if (it.tome && it.tome[0] === 'shadow') it.tome = ['glaive', TALENTS.glaive.list.findIndex(q => q.r === TAL_ROWS - 1)];
+  if (it.tome && it.tome[0] === 'shadow') it.tome = ['glaive'];
   delete it.afx; delete it.pw; delete it.cat;
   if (it.leg && !LEGENDS[it.leg]) return null;
   if (!it.leg && !it.tome && !GEAR_BASES[it.base]) return null;
-  if (it.tome && !tomeTalent(it)) return null;
+  if (it.tome) { if (!Array.isArray(it.tome) || !TALENTS[it.tome[0]] || !TOWERS[it.tome[0]] || TOWERS[it.tome[0]].wall) return null; it.tome = [it.tome[0]]; it.hone = 0; delete it.il; delete it.awk; }   // (an old save's tome named one capstone: now its reader chooses)
   it.rar = it.leg ? 4 : it.tome ? 3 : GEAR_BASES[it.base].rar;
   it.hone = Math.min(3 + (it.awk | 0), it.hone | 0);   // (awk: steps awakened with Renown, renown.js)
   return it;
@@ -6376,6 +6482,10 @@ function dropOdds(c) {
 function dropNote() { G.lastDropW = G.wave; if (G.dropW !== G.wave) { G.dropW = G.wave; G.dropN = 0; } G.dropN++; }
 function rollDrop(c) {
   if (G.state !== 'play' || !G.drops || G.chal === 'relicless' || c.splitCopy) return;   // Mother Mire's second half carries nothing of her own
+  if (c.def.boss && !c.kid && !c.echo && !(typeof rnLootOn === 'function' && rnLootOn())) {   // a boss's Tome of Mastery, when one is due (a force run's boss offers its on the loot screen: renown.js)
+    const ty = tomeForBoss(c.wv || G.wave);
+    if (ty) { G.drops.push({ item: tomeMake(ty), x: c.x, z: c.y, tx: clamp(c.x - .4, .2, COLS - .2), tz: clamp(c.y + .5, -1, ROWS - .2), t: 0, life: 2.4 }); sfx('lootDrop', 4); onBanner('Tome of Mastery', `${c.def.name} drops a tome for ${tomeWho(ty)}`); }
+  }
   const big = !!(c.def.boss || c.def.lead);
   if (!big && !c.elite && (c.kid || c.def.egg || c.echo || c.sent || c.type === 'risen' || c.purse)) return;
   const wb = isWaveBoss(c), sure = wb || (c.def.boss && pathOn('art', 4));   // a wave's boss always drops (LOOT_RULES); Empowered Abilities: every boss an epic or better
@@ -6401,10 +6511,10 @@ function updateDrops(dt) {
 function collectDrop(d) {
   if (d.key) { keyGot(false); return; }   // a School Key
   const it = d.item;
-  if (G.loot.length >= LOOT_CAP) {
-    // a full bag salvages the weakest relic to make room
-    let lo = 0; for (let i = 1; i < G.loot.length; i++) if (G.loot[i].rar < G.loot[lo].rar) lo = i;
-    if (G.loot[lo].rar <= it.rar) { const old = G.loot.splice(lo, 1)[0], v = gearValue(old); G.gold += v; onToast(`Bag full: salvaged ${gearName(old)} for ${v} gold.`); }
+  if (G.loot.length >= LOOT_CAP && !it.tome) {   // (a tome always fits: it is a book to read, not one more relic)
+    // a full bag salvages the weakest relic to make room (never a tome)
+    let lo = -1; for (let i = 0; i < G.loot.length; i++) if (!G.loot[i].tome && (lo < 0 || G.loot[i].rar < G.loot[lo].rar)) lo = i;
+    if (lo >= 0 && G.loot[lo].rar <= it.rar) { const old = G.loot.splice(lo, 1)[0], v = gearValue(old); G.gold += v; onToast(`Bag full: salvaged ${gearName(old)} for ${v} gold.`); }
     else { const v = gearValue(it); G.gold += v; onToast(`Bag full: salvaged ${gearName(it)} for ${v} gold.`); return; }
   }
   G.loot.push(it); G.lootNew = (G.lootNew || 0) + 1; G.stats.relics = (G.stats.relics || 0) + 1;
@@ -6414,6 +6524,7 @@ function collectDrop(d) {
 }
 function equipGear(t, slot, it) {
   if (!t || slot >= gearSlots(t)) return false;
+  if (it && it.tome) { onToast(`${gearName(it)} is read, not socketed: read it from your bag or in the talent tree.`); sfx('nogold'); return false; }
   if (it && isCharm(it)) { onToast(`${gearName(it)} is a charm: it goes in a unit's charm socket (its Gear page, from tier II).`); sfx('nogold'); return false; }
   if (it && !gearFits(it, t)) { onToast(`${gearName(it)} only fits ${gearForA(it)}.`); sfx('nogold'); return false; }
   t.gear = t.gear || [];
@@ -6424,7 +6535,6 @@ function equipGear(t, slot, it) {
   t.gear[slot] = it || null;
   if (it) it.isNew = false;
   if (it) empower([t], RARITY[it.rar].col);
-  G.talV = (G.talV || 0) + 1;   // tomes can teach type-wide capstones: refresh the capstone cache
   sfx('equip', it ? it.rar : 0); onDirty(); onSave();
   return true;
 }
@@ -7070,9 +7180,6 @@ function relicPreviewHTML(t, slot, it) {
   const a = effStats(t), g = (t.gear || []).slice(); g[slot] = it;
   const b = withGear(t, g, () => effStats(t));
   let h = diffHTML(t.type, a, b, `In this ${TOWERS[t.type].name}`);
-  const tl = it && it.tome ? tomeTalent(it) : null;   // what the damage model can't see
-  const note = tl && !tomeKnown(it) ? `Not counted above: what ${tl.name} itself does.` : '';
-  if (note) h = h.replace(/<\/div>$/, `<p class="pv-n">${note}</p></div>`);
   return h;
 }
 
@@ -7139,7 +7246,7 @@ function milestoneHTML(type) {
   return `<p class="mile" data-d="2"><b>Next</b> ${m.t.name}: ${m.t.pro(1).replace(/\.$/, '')} · ${when}</p>`;
 }
 
-/* ---------- honing: every relic but a tome can be honed three times with gold, each hone 20% stronger ---------- */
+/* ---------- honing: every relic (a tome is no relic: it is read) can be honed three times with gold, each hone 20% stronger ---------- */
 const HONE_COST = [[20, 40, 60], [35, 70, 105], [60, 120, 180], [100, 200, 300], [150, 300, 450]], HONE_MAX = 3;
 function relicUpgradeCost(it) {
   const h = (it && it.hone | 0) - (it && it.awk | 0);   // an awakened step (Renown, renown.js) is not a gold hone
@@ -12041,6 +12148,7 @@ const iEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&
 // what the item is and what it fits, in small grey under its name
 function itemKindLine(it) {
   const d = gearDef(it); if (!d) return '';
+  if (it.tome) return `Tome · read once · ${tomeUnits(it.tome[0])}`;   // (a book for one unit type, never socketed: loot.js)
   const kind = it.shop ? `${shopTierName(it)} · shop` : isCharm(it) ? 'Charm · charm socket' : it.tome ? 'Tome' : `${typeof isSchoolRelic === 'function' && isSchoolRelic(it) ? 'School relic' : (it.leg ? 'Legendary' : RARITY[it.rar | 0].name) + (!it.leg && it.base && GEAR_BASES[it.base] && GEAR_BASES[it.base].fset ? ' set piece' : ' relic')}`;
   const f = gearFor(it);
   if (d.spell && f && typeof ABIL !== 'undefined' && ABIL[d.spell]) return `${kind} · ${gearForText(it)} · ${ABIL[d.spell].name}`;   // an item that reshapes one spell (forces_zzz_procs.js)
@@ -34577,7 +34685,7 @@ function spMods(id) {
   if (id in _spC.m) return _spC.m[id];
   const slot = spSlotOf(id), tl = slot && TALENTS[slot]; let M = null;
   if (tl) {
-    const pk = talPicks(slot);
+    const pk = talKnown(slot);   // (and its tome's capstone: core.js)
     for (const t of tl.list) {
       const n = Math.min(pk[t.id] | 0, t.max); if (!n || !t.sp) continue;
       for (const e of [].concat(t.sp(n))) {
@@ -35032,7 +35140,7 @@ function castTalK(t, ab) {   // the talents' share off, for this ability
   if (_castCache.ref !== G.tal || _castCache.v !== G.talV || _castCache.f !== G.force) { _castCache.ref = G.tal; _castCache.v = G.talV; _castCache.f = G.force; _castCache.m = {}; }
   const ty = t.type;
   if (!(ty in _castCache.m)) {
-    const tl = TALENTS[ty], pk = talPicks(ty), L = [];
+    const tl = TALENTS[ty], pk = talKnown(ty), L = [];
     if (tl) tl.list.forEach((x, i) => { const r = CAST_OF.get(x), n = pk[i] | 0; if (n && r) L.push([r.k * n, r.ids || null]); });
     _castCache.m[ty] = L;
   }
@@ -35766,7 +35874,7 @@ function manaTal(t) {
   if (_manaCache.ref !== G.tal || _manaCache.v !== G.talV || _manaCache.f !== G.force) { _manaCache.ref = G.tal; _manaCache.v = G.talV; _manaCache.f = G.force; _manaCache.m = {}; }
   const ty = t.type;
   if (ty in _manaCache.m) return _manaCache.m[ty];
-  const tl = TALENTS[ty], pk = talPicks(ty); let M = null;
+  const tl = TALENTS[ty], pk = talKnown(ty); let M = null;
   if (tl) tl.list.forEach((x, i) => {
     const r = MANA_OF.get(x), n = pk[i] | 0; if (!n || !r) return;
     M = M || { pool: 0, cheap: {}, strike: [], near: [], saving: 0, slay: 0, dregs: 0, first: 0, aura: 0, beat: null };
@@ -79468,7 +79576,7 @@ const _cap = { v: -1, ref: null, m: {} };
 function schoolMarks(type) {
   if (_cap.v !== G.talV || _cap.ref !== G.tal) { _cap.v = G.talV; _cap.ref = G.tal; _cap.m = {}; }
   let m = _cap.m[type];
-  if (!m) { const tl = TALENTS[type], pk = talPicks(type); m = _cap.m[type] = { pts: talentRank(type), cap: !!tl && tl.list.some(q => q.r === talRowsOf(type) - 1 && pk[q.id]), col: c4(tl ? tl.hue : '#ffffff') }; }
+  if (!m) { const tl = TALENTS[type], pk = talKnown(type); m = _cap.m[type] = { pts: talentRank(type), cap: !!tl && tl.list.some(q => q.r === talRowsOf(type) - 1 && pk[q.id]), col: c4(tl ? tl.hue : '#ffffff') }; }
   return m;
 }
 // a school relic empowers this tower: a slow ring of its colour at the tower's foot (brighter on the one that holds it)
@@ -81760,7 +81868,7 @@ function synLinks(A) {
 // the tower being placed (at the ghost) or the selected tower
 function synSource() {
   if (G.state !== 'play') return null;
-  if (G.buildType && G.buildType !== 'wall' && G.ghost && G.ghost.in) { const st = talentStats(G.buildType, 0, talPicks(G.buildType)); return { type: G.buildType, tier: 0, x: G.ghost.i + .5, y: G.ghost.j + .5, range: st.range || 0, ref: null }; }
+  if (G.buildType && G.buildType !== 'wall' && G.ghost && G.ghost.in) { const st = talentStats(G.buildType, 0, talKnown(G.buildType)); return { type: G.buildType, tier: 0, x: G.ghost.i + .5, y: G.ghost.j + .5, range: st.range || 0, ref: null }; }
   if (G.sel && G.sel.kind === 'tower' && !G.sel.ref.def.wall && !G.sel.ref.wrecked) { const t = G.sel.ref; return { type: t.type, tier: t.tier, x: t.x, y: t.y, range: (t.st && t.st.range) || tierOf(t).range || 0, ref: t }; }
   return null;
 }
@@ -85174,6 +85282,7 @@ function gpBag(t, slot, tab) { gpReturn = t; openBag(t, slot, tab); }
 let gpPick = null, gpDrag = null;
 // can socket i (0-2 relic, 3 the charm) take this item? '' if so, else why not
 function gpWhyNot(t, it, i) {
+  if (it && it.tome) return 'A Tome of Mastery is read, not socketed: read it from your bag or the talent tree';
   if (i === 3) return !charmOpen(t) ? 'Its charm socket opens at tier II' : !isCharm(it) ? 'Only a charm fits the charm socket' : '';
   if (isCharm(it)) return 'A charm: it goes in the charm socket';
   if (i >= gearSlots(t)) return 'That socket is locked: it opens at a higher tier';
@@ -85196,7 +85305,8 @@ function gpPreview(t, alt, say) {
 }
 function gpBagCells(t) {
   const il = it => typeof ilOn === 'function' && ilOn() && (typeof ilSortLv !== 'function' || ilSortLv()) ? ilOf(it) : 0;
-  const L = G.loot.slice().sort((a, b) => (!!gpWhyNot(t, a, gpAutoSlot(t, a)) - !!gpWhyNot(t, b, gpAutoSlot(t, b))) || il(b) - il(a) || b.rar - a.rar || a.id - b.id);
+  const L = G.loot.filter(it => !it.tome).sort((a, b) => (!!gpWhyNot(t, a, gpAutoSlot(t, a))   // (a Tome of Mastery is no gear: it is read from the bag or the talent tree)
+  - !!gpWhyNot(t, b, gpAutoSlot(t, b))) || il(b) - il(a) || b.rar - a.rar || a.id - b.id);
   if (!L.length) return `<p class="gp-none">Your bag is empty. Elites and bosses drop relics; every wave boss offers its loot.</p>`;
   return L.map(it => `<button type="button" class="bg-cell gp-bc${gpWhyNot(t, it, gpAutoSlot(t, it)) ? ' nofit' : ''}${gpPick === it ? ' on' : ''}" data-bi="${it.id}" aria-label="${gpE(gearName(it))}"><canvas width="96" height="96" data-key="${gearKey(it)}"></canvas>${it.isNew ? '<i class="nw"></i>' : ''}${il(it) && !it.tome ? `<b class="il">${ilOf(it)}</b>` : ''}</button>`).join('');
 }
@@ -87096,7 +87206,7 @@ const HOW = `<ul>
 <li>Every row of a talent tree is a choice of two ways the tower can work, so each tree is five decisions. Learn one and the other is locked; reset the tree between waves to choose again.</li>
 <li>Gold you don't spend earns interest when a wave is cleared, and the more you hold the higher the rate: nothing under 100 gold, 5% at 100, then +1% for every further 100, up to 12% at 800 (each payout is capped at 20 + 8 per wave). The green number beside your gold is what you will earn. Saving pays, but towers win waves.</li>
 <li>Paths (in Talents) are six short tracks, each built around one system: reactions and fusions, relics, talents, towers and the keep, the maze, and gold. You get a path point at the start and one for every boss beaten (waves 5, 10, 15 ...). Spend each on the next rank of any path; ten points over a full game finish two paths.</li>
-<li>Some relics are made for one tower (marked with a blue dot, and they only fit that tower). Signature relics are legendaries forged for one tower type. Tomes of Mastery teach a tower one capstone of its own tree on top of the capstone you chose. Catalysts make one reaction stronger whenever the tower holding them sets it off. These drops lean toward the towers you have on the field.</li>
+<li>Some relics are made for one tower (marked with a blue dot, and they only fit that tower). Signature relics are legendaries forged for one tower type. A Tome of Mastery is a book, not a relic: bosses sometimes drop one from wave 20 on, and reading it (from the bag or the talent tree) teaches every tower of one type a second capstone of its tree, at no talent points. Catalysts make one reaction stronger whenever the tower holding them sets it off. These drops lean toward the towers you have on the field.</li>
 <li>Base relics belong to sets. Socket two or three different pieces of a set, in any towers they fit, and the towers holding them get the set bonus. Every tower type also has a rare and an epic relic of its own, which only work in that tower; most of them pair up, or join pieces for other towers, in sets.</li>
 <li>The War Room (the book in the top bar, or J) shows a battle report after every wave: which towers did the work and how much came from direct hits, burns and poison, reactions and fusions, and relic powers. It also names your build, keeps your combo journal across runs and scouts the waves ahead.</li>
 <li>Every wave has towers that answer it and towers it shrugs off: armor blunts Arrow, Cannon and Earth, magic resistance blunts Frost, Flame and Storm, and elementals shrug off some of their own element (it lands at 60%). Nothing is immune: the wrong tower only makes a fight harder. The wave panel, the wave banner and Scouting in the War Room say which towers are strong or weak against what is coming, and a tower you are about to build shows how it fares against the next wave.</li>
@@ -87125,7 +87235,7 @@ const HOW_F = `<ul>
 <li>Elemental creeps shrug off their own element: frost wolves barely feel chills, magma beetles barely burn, plague ghouls barely sicken.</li>
 <li>Units climb to tier VI, but tiers IV to VI must be unlocked first. Tap your keep to upgrade it: a Castle opens tier IV, a Fortress tier V and a Citadel tier VI. Each upgrade costs a lot of gold, takes effect at once and only becomes available after a certain wave. Tiers IV to VI hit far harder.</li>
 <li>Falling behind? Below half your lives you make a Last Stand: kills pay 25% more gold and your units deal 15% more damage (the lives counter glows red). After any wave that lets foes through, the realm sends war aid: gold for every foe that got past.</li>
-<li>Items come from foes: elites and bosses drop relics, every wave boss offers a pick of its loot table, and challenges pay relics and charms. The Shop (the Shop button at the top, or O) sells your force's own items and charms, priced about like an upgrade: a common like a tier II-III upgrade, a rare like a tier III-IV one, an epic like a tier IV-V one. Anything bought sells back in full until the next wave starts, and at half after that. Items wait in the Bag (the pouch at the top) until you put them in a unit's sockets (its gear sheet, G); every unit has a charm socket from tier II for its mana and spells. Hone an item with gold to raise its numbers, or salvage one you don't need for gold. Selling a unit returns its items.</li>
+<li>Items come from foes: elites and bosses drop relics, every wave boss offers a pick of its loot table, and challenges pay relics and charms. The Shop (the Shop button at the top, or O) sells your force's own items and charms, priced about like an upgrade: a common like a tier II-III upgrade, a rare like a tier III-IV one, an epic like a tier IV-V one. Anything bought sells back in full until the next wave starts, and at half after that. A boss from wave 20 on sometimes offers a Tome of Mastery: read it (in the Bag, or in the talent tree's empty capstone slot) and every unit of that type learns a second capstone, at no talent points; a respec keeps it. Items wait in the Bag (the pouch at the top) until you put them in a unit's sockets (its gear sheet, G); every unit has a charm socket from tier II for its mana and spells. Hone an item with gold to raise its numbers, or salvage one you don't need for gold. Selling a unit returns its items.</li>
 <li>Fast creeps shrug off slows and stuns. Casters heal, shield, silence units or raise the dead, so kill them first. Fifty waves stand between you and victory.</li>
 <li>Creeps fight as a warband. Warcallers whip their neighbours into a frenzy, Shieldbearers block shots at the allies behind them, Menders heal, Shamans wash off roots, chills, burns and poison, and Torchbearers thaw frozen allies. Pack Alphas speed up their wolves, and the pack panics when the alpha falls. Burrowers dive underground when focused and stay out of reach until they surface.</li>
 <li>The fallen leave corpses. Necromancers raise them and Carrion Beasts eat them to grow, but burned or shattered corpses are no use to either. Tap any creep to read what it does.</li>
@@ -87433,7 +87543,7 @@ const bagFits = it => !bagCtx || (bagCtx.slot === 'charm' ? isCharm(it) && (type
 const bagEquip = it => bagCtx.slot === 'charm' ? equipCharm(bagCtx.t, it) : equipGear(bagCtx.t, bagCtx.slot, it);
 // done in the bag: back to the unit's sheet when it was opened from there, else back to the game
 function bagDone() { if (typeof gpReturn !== 'undefined' && gpReturn && G.towers.includes(gpReturn)) { const t = gpReturn; gpReturn = null; openGearPanel(t); } else resumeGame(); }
-const bagNoFit = it => bagCtx && bagCtx.slot === 'charm' ? 'Only a charm fits a charm socket' : isCharm(it) ? 'A charm: it goes in a unit\u2019s charm socket' : `Only fits ${gearForA(it)}`;
+const bagNoFit = it => it && it.tome ? 'A tome is read, not socketed' : bagCtx && bagCtx.slot === 'charm' ? 'Only a charm fits a charm socket' : isCharm(it) ? 'A charm: it goes in a unit\u2019s charm socket' : `Only fits ${gearForA(it)}`;
 // the Shop button and O: the bag on its Shop tab (with a unit picked, what you buy goes straight into it)
 function openShop() { if (G.state !== 'play') return; openBag(null, 0, 'shop'); }
 function openBag(t, slot, tab) {
@@ -87512,6 +87622,7 @@ function renderBag() {
   if (inf && typeof bagInfPop === 'function') { bagInfPop(inf); return; }
   if (!bagSel) { bagPop(null); return; }
   if (bagSel.shop) { renderBagItem(); return; }
+  if (bagSel.tome) { bagTomeActs(bagSel); return; }   // a Tome of Mastery: read it, or salvage it
   const cur = bagCur(), it = bagSel, eq = !!bagCtx && cur === it;
   const acts = [];
   if (bagCtx && eq) acts.push(`<button type="button" id="gUn">Unsocket</button>`);
@@ -87569,8 +87680,8 @@ function bagCardOf(el) {
   const cur = bagCur(), ilc = typeof ilCompareHTML === 'function' && show && cur && cur !== it ? ilCompareHTML(it, cur) : '';
   const note = (x.eq ? '<p class="itc-eq">Socketed here</p>' : bagCtx && !fits ? `<p class="itc-no">${bagNoFit(it)}</p>` : '') + ilc
     + (show ? relicPreviewHTML(bagCtx.t, bagCtx.slot, it) : '') + (paidRun('g:' + it.id) > 0 ? `<p class="td-paid">Added <b>${dmgFmt(paidRun('g:' + it.id))}</b> damage this run</p>` : '') + setInfo(it)
-    + `<p class="itc-hint">${bagCtx && !x.eq && fits ? (canHover() ? 'Click to socket it; right-click for more' : 'Tap to socket it; hold for more') : canHover() ? 'Click or right-click for its actions' : 'Tap or hold for its actions'}</p>`;
-  return itemCardHTML(it, { price: it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : it.tome ? '' : `Salvage: ${gearValue(it)} gold`, note });
+    + `<p class="itc-hint">${it.tome ? (canHover() ? 'Click it to read it or salvage it' : 'Tap it to read it or salvage it') : bagCtx && !x.eq && fits ? (canHover() ? 'Click to socket it; right-click for more' : 'Tap to socket it; hold for more') : canHover() ? 'Click or right-click for its actions' : 'Tap or hold for its actions'}</p>`;
+  return itemCardHTML(it, { price: it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : `Salvage: ${gearValue(it)} gold`, note });
 }
 // a base relic's set: which pieces are socketed and which bonuses are lit
 function setInfo(it) {
@@ -87580,12 +87691,101 @@ function setInfo(it) {
     + `<p class="${k >= 2 ? 'on' : ''}">(2) ${S.b2[0]}</p>${S.b3 ? `<p class="${k >= 3 ? 'on' : ''}">(3) ${S.b3[0]}</p>` : ''}<small>Pieces count in any towers they fit.</small></div>`;
 }
 // a dropped relic flies from the field up to the bag button
-// a Tome of Mastery wears the painting of the talent it teaches (made ready the first time the tome is drawn)
+/* ---------- Tomes of Mastery (loot.js): the book, the bag's actions, and its slot in the talent tree ----------
+   A tome is read, never socketed. The tree shows an empty second-capstone slot on its capstone row from the start (the
+   goal: "a Tome of Mastery unlocks a second capstone"); while the player holds an unread tome for that unit type the slot
+   glows and reads it right there: the capstones not chosen light up, one is picked and confirmed in the footer. The
+   capstone it taught then shows as learned, with a small book on its corner. */
+const TOME_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h11.6a2 2 0 0 1 2 2V20.5H7.2a2.2 2.2 0 0 1-2.2-2.2z" fill="#6a3fb0" stroke="#000" stroke-width="1"/><path d="M5 18.3a2.2 2.2 0 0 1 2.2-2.2h11.4v4.4H7.2A2.2 2.2 0 0 1 5 18.3z" fill="#f3e6c0" stroke="#000" stroke-width="1"/><path d="M12 6l1.3 2.6 2.9.4-2.1 2 .5 2.9-2.6-1.4-2.6 1.4.5-2.9-2.1-2 2.9-.4z" fill="#ffd76a" stroke="#000" stroke-width=".6"/></svg>';
+const _tomeURL = {};
+// the tome's picture in a unit type's colour (the bag, the loot card)
+function tomeBookURL(hue) {
+  hue = /^#[0-9a-f]{6}$/i.test(hue || '') ? hue : '#6a3fb0';
+  if (_tomeURL[hue]) return _tomeURL[hue];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="192" height="192"><defs><radialGradient id="g" cx=".5" cy=".42" r=".7"><stop offset="0" stop-color="#3a2a12"/><stop offset="1" stop-color="#0c0906"/></radialGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></linearGradient></defs>`
+    + `<rect width="96" height="96" fill="url(#g)"/><ellipse cx="48" cy="46" rx="34" ry="34" fill="#ffd76a" opacity=".13"/>`
+    + `<path d="M22 14h46a7 7 0 0 1 7 7v61H29a7 7 0 0 1-7-7z" fill="${hue}" stroke="#000" stroke-width="2.5"/><path d="M22 14h46a7 7 0 0 1 7 7v61H29a7 7 0 0 1-7-7z" fill="url(#c)"/>`
+    + `<path d="M22 75a7 7 0 0 1 7-7h46v14H29a7 7 0 0 1-7-7z" fill="#f3e6c0" stroke="#000" stroke-width="2.5"/><path d="M30 73h42M30 77.5h42" stroke="#b9a373" stroke-width="1.5"/>`
+    + `<path d="M28 14v54" stroke="#000" stroke-opacity=".45" stroke-width="3"/><path d="M62 14h9a4 4 0 0 1 4 4v8zM75 56v12H63z" fill="#e0a93a" stroke="#000" stroke-width="1.5"/>`
+    + `<path d="M50 24l5.2 10.6 11.7 1.7-8.5 8.2 2 11.6L50 50.6l-10.4 5.5 2-11.6-8.5-8.2 11.7-1.7z" fill="#ffd76a" stroke="#000" stroke-width="2"/>`
+    + `<path d="M56 68h8v20l-4-4-4 4z" fill="#c8382c" stroke="#000" stroke-width="1.5"/></svg>`;
+  return _tomeURL[hue] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
 const tomeArtP = {};
 function tomeArt(it) {
   const id = tomeArtId(it); if (typeof RELIC_IMG === 'undefined' || RELIC_IMG[id] || tomeArtP[id]) return; tomeArtP[id] = 1;
-  const tl = tomeTalent(it); if (!tl) return;
-  const im = new Image(); im.onload = () => { RELIC_IMG[id] = im; markDirty(); if (bagOpen) renderBag(); }; im.src = talIconOf(it.tome[0], tl);
+  const tl = TALENTS[tomeType(it)]; if (!tl) return;
+  const im = new Image(); im.onload = () => { RELIC_IMG[id] = im; markDirty(); if (bagOpen) renderBag(); }; im.src = tomeBookURL(tl.hue);
+}
+// the bag's buttons for a tome: Read (or why not), and Salvage
+function bagTomeActs(it) {
+  const why = tomeWhyNot(it), armed = bagArm > performance.now();
+  bagPop([`<button type="button" class="pri" id="gRead"${why ? ' disabled' : ''}>${why ? 'Nothing left to teach' : 'Read the tome'}</button>`,
+    `<button type="button" id="gSalv"${armed ? ' class="warn"' : ''}>${armed ? 'Tap again to salvage' : `Salvage · ${gearValue(it)} gold`}</button>`]);
+  const q = id => document.getElementById(id);
+  if (q('gRead')) q('gRead').onclick = () => { sfx('click'); tomeOpenRead(it); };
+  if (q('gSalv')) q('gSalv').onclick = () => {
+    if (bagArm <= performance.now()) { bagArm = performance.now() + 2500; sfx('click'); renderBag(); setTimeout(() => { if (bagOpen && bagSel === it) renderBag(); }, 2600); return; }
+    const v = salvageGear(it); toast(`Salvaged for ${v} gold.`); bagArm = 0; bagSel = null; renderBag();
+  };
+}
+// read a tome: its unit type's talent tree opens with the capstones to choose from lit
+function tomeOpenRead(it) {
+  const ty = tomeType(it); if (!ty || tomeWhyNot(it)) { sfx('error'); return false; }
+  it.isNew = false;
+  openTalents(ty); if (!talOpen || talTab !== ty) return false;
+  tomeChoose(ty); return true;
+}
+let talTome = null;   // a tome being read in the tree: { type, sel: the capstone picked so far (or null) }
+// the slot's state: tomeState (loot.js: 'read' | 'none' | 'ready' | 'empty'), or 'choose' while its capstone is being picked
+function tomeSlotState(type) { const s = tomeState(type); return s === 'ready' && talTome && talTome.type === type ? 'choose' : s; }
+function tomeChoose(type) {
+  if (tomeSlotState(type) !== 'ready') return false;
+  const o = tomeOpts(type); talTome = { type, sel: o.length === 1 ? o[0] : null }; talSel = o.length === 1 ? { t: type, i: o[0] } : { t: type, i: 'tome' }; talHover = null;
+  refreshTalents(); return true;
+}
+function tomeSlotTap() {
+  const ty = talTab, st = tomeSlotState(ty);
+  talSel = { t: ty, i: 'tome' };
+  if (st === 'ready') { sfx('select'); tomeChoose(ty); return; }
+  sfx(st === 'empty' || st === 'none' ? 'error' : 'select'); refreshTalents();
+}
+// a capstone tapped while a tome is being read: pick it (the footer confirms)
+function tomePickTap(i) {
+  const ty = talTome.type, ok = tomeOpts(ty).includes(i);
+  talSel = { t: ty, i }; if (ok) talTome.sel = i;
+  sfx(ok ? 'select' : 'error'); refreshTalents();
+}
+function tomeConfirm() {
+  if (!talTome) return;
+  const ty = talTome.type, i = talTome.sel, it = tomeHeld(ty);
+  if (i == null || !it || !tomeRead(it, i)) { sfx('error'); return; }
+  talTome = null; talSel = { t: ty, i }; refreshTalents();
+  const nd = ovp.querySelector(`.tn[data-i="${i}"]`); if (nd) { nd.classList.remove('pop'); void nd.offsetWidth; nd.classList.add('pop'); }
+}
+function tomeSlotRefresh(slot, ty) {
+  const st = tomeSlotState(ty), tl = TALENTS[ty], cap = tomeCaps(ty).length ? tl.list[tomeCaps(ty)[0]] : null;
+  slot.className = `tn-tome ${st}${talSel && talSel.t === ty && talSel.i === 'tome' ? ' sel' : ''}`;
+  slot.querySelector('.tt-l').textContent = st === 'ready' ? 'Read' : st === 'choose' ? 'Choose' : '';
+  slot.setAttribute('aria-label', st === 'read' ? `Second capstone, from a Tome of Mastery: ${cap ? cap.name : ''}` : st === 'ready' ? 'Second capstone: you hold a Tome of Mastery. Read the tome.' : st === 'choose' ? 'Reading a Tome of Mastery: choose a capstone' : 'Second capstone, empty: a Tome of Mastery unlocks it. Bosses sometimes drop one.');
+}
+// the next boss wave that carries a tome this run, in words (or '')
+function tomeNextLine() {
+  if (oldRules() || typeof rnBossType !== 'function') return '';
+  const from = G.phase === 'build' ? G.wave : G.wave + 1, ws = tomeBossWaves(from, n => !!rnBossType(n));
+  return ws.length ? `This run, the boss of wave ${ws[0]} has one${ws.length > 1 ? `, and so has wave ${ws[1]}'s` : ''}: it is for a unit type you field then.` : '';
+}
+function tomeSlotTipHTML(ty) {
+  const st = tomeSlotState(ty), tl = TALENTS[ty], who = tomeWho(ty), one = tomeOne(ty), cap = tomeCaps(ty).length ? tl.list[tomeCaps(ty)[0]] : null;
+  const two = typeof pathOn === 'function' && pathOn('sch', 5), nth = two ? 'another' : 'a second';
+  const head = k => `<div class="wt-h"><i class="wt-n">${two ? 'Tome capstone' : 'Second capstone'}</i><i class="wt-k">${k}</i></div>`;
+  const free = '<div class="wt-t">It costs no talent points, and a respec keeps it.</div>';
+  if (st === 'read') return head('Tome read') + `<div class="wt-d">${who[0].toUpperCase() + who.slice(1)} ${one || /^every/.test(who) ? 'knows' : 'know'} ${cap ? esc(cap.name) : 'it'} from a Tome of Mastery, for the rest of the run.</div>` + free;
+  if (st === 'none') return head('Nothing to add') + `<div class="wt-d">Every capstone of this tree is already yours.</div>`;
+  if (st === 'choose') return head('Reading') + `<div class="wt-d">Choose one of the glowing capstones for ${who}, then confirm below. The tome is used up.</div>` + free;
+  if (st === 'ready') return head('Tome ready') + `<div class="wt-d">You hold a Tome of Mastery for ${esc(tomeUnits(ty))}. Read it and ${who} ${one || /^every/.test(who) ? 'learns' : 'learn'} ${nth} capstone of your choice.</div>` + free + `<div class="wt-go">${canHover() ? 'Click to read the tome' : 'Tap to read the tome'}</div>`;
+  const nx = tomeNextLine();
+  return head('Empty') + `<div class="wt-d">A Tome of Mastery unlocks ${nth} capstone for ${who}. Bosses sometimes drop one, from wave ${TOME.from} on.</div>` + (nx ? `<div class="wt-up">${nx}</div>` : '') + free;
 }
 function lootFly(d, it) {
   const r = RARITY[it.rar];
@@ -87637,8 +87837,8 @@ const talTipText = t => { const con = t.con(t.max); return `${t.name}: ${t.pro(t
 // deep-row talents the player has learned, as info-pane tags
 function capTag(type) {
   const tl = TALENTS[type]; if (!tl) return '';
-  const pk = talPicks(type);
-  return tl.list.filter(t => t.r >= talRowsOf(type) - 1 && pk[t.id]).map(t => tagTip('cap', t.name, talTipText(t))).join('');
+  const pk = talKnown(type);   // (and the capstone its Tome of Mastery taught)
+  return tl.list.filter(t => t.r >= talRowsOf(type) - 1 && pk[t.id]).map(t => tagTip('cap', t.name, talTipText(t) + (tomeHas(type, t.id) ? '\nFrom a Tome of Mastery.' : ''))).join('');
 }
 // flavour for each tree: a subtitle under the tower's name and a line of lore in the talent card
 const TAL_FLAVOR = {
@@ -87755,7 +87955,7 @@ function openTalents(type) {
   if (G.force && (type === 'fusion' || talTab === 'fusion')) { if (type === 'fusion') type = null; talTab = null; }
   if (pathsOff() && (type === 'paths' || talTab === 'paths')) { if (type === 'paths') type = null; talTab = null; }   // (no Paths in a force run: meta.js pathsOff)
   talTab = (typeof type === 'string' && (TALENTS[type] || type === 'fusion' || type === 'paths') ? type : null) || (!(G.tp > 0) && G.pp > 0 ? 'paths' : null) || selT || (talTab === 'paths' && !(G.pp > 0) && G.tp > 0 ? null : talTab) || COMBAT_TYPES.find(t => talentRank(t) > 0) || 'arrow';
-  talSel = null; talHover = null;
+  talSel = null; talHover = null; talTome = null;
   const tabs = COMBAT_TYPES.map(ty => `<button type="button" class="tc-tab" role="tab" data-t="${ty}" title="${TOWERS[ty].name}: ${TALENTS[ty].name}" aria-label="${TALENTS[ty].name}, ${TOWERS[ty].name}"><i><img alt="" draggable="false" src="${talEmblemURL(ty)}"></i><b>${TOWERS[ty].short}</b><em></em></button>`).join('')
     + (G.force ? '' : `<button type="button" class="tc-tab fz" role="tab" data-t="fusion" title="Fusions and reactions" aria-label="Fusions and reactions"><i>${fusIc('frost', 'flame')}</i><b>Fusion</b><em></em></button>`)   // (the classic towers' fusions: not in a force run, owner 5 Nov 2026)
     + (pathsOff() ? '' : `<button type="button" class="tc-tab fz pt" role="tab" data-t="paths" title="Paths" aria-label="Paths"><i><img alt="" draggable="false" src="${RELICART.chrono}"></i><b>Paths</b><em></em></button>`);
@@ -87773,15 +87973,17 @@ function openTalents(type) {
   talOpen = true;
   for (const b of ovp.querySelectorAll('.tc-tab')) hueVars(b, 'th', b.dataset.t === 'fusion' || b.dataset.t === 'paths' ? FUS_HUE : TALENTS[b.dataset.t].hue);
   $('#tClose').onclick = () => { sfx('click'); resumeGame(); };
-  $('#tTabs').onclick = e => { const b = e.target.closest('.tc-tab'); if (!b || b.dataset.t === talTab) return; talTab = b.dataset.t; talSel = null; talHover = null; sfx('select'); buildTree(); refreshTalents(); };
+  $('#tTabs').onclick = e => { const b = e.target.closest('.tc-tab'); if (!b || b.dataset.t === talTab) return; talTab = b.dataset.t; talSel = null; talHover = null; talTome = null; sfx('select'); buildTree(); refreshTalents(); };
   const gridEl = $('#tGrid');
   gridEl.onclick = e => { const fz = e.target.closest('.fzf-c'); if (fz) { const s = fz.dataset.s || null; if (s !== fusFilter) { fusFilter = s; sfx('select'); refreshFusion(); } return; }
+    if (e.target.closest('.tn-tome')) { tomeSlotTap(); return; }   // the second-capstone slot (a Tome of Mastery)
     const n = e.target.closest('.tn,.fc'); if (n) tapNode(talTab, +n.dataset.i); else if (talSel) { talSel = null; refreshTalents(); } };
   gridEl.oncontextmenu = e => e.preventDefault();
-  gridEl.onpointerover = e => { if (!canHover()) return; const n = e.target.closest('.tn,.fc'); const h = n ? +n.dataset.i : null; if (h !== talHover) { talHover = h; renderTip(); } };
+  gridEl.onpointerover = e => { if (!canHover()) return; const n = e.target.closest('.tn,.fc,.tn-tome'); const h = n ? (n.classList.contains('tn-tome') ? 'tome' : +n.dataset.i) : null; if (h !== talHover) { talHover = h; renderTip(); } };
   gridEl.onpointerleave = () => { if (talHover != null) { talHover = null; renderTip(); } };
   $('#tTip').onclick = e => { if (e.target.closest('#tLearn')) learnSel(); };
-  $('#tFoot').onclick = e => { if (e.target.closest('#tOpenSch')) { if (openSchool(talTab)) { buildTree(); refreshTalents(); } return; } if (e.target.closest('#tGoPaths')) { talTab = 'paths'; talSel = null; talHover = null; sfx('select'); buildTree(); refreshTalents(); return; } if (e.target.closest('#tReset')) { if (talTab === 'paths' ? resetPaths() : talTab === 'fusion' ? resetFusions() : resetTree(talTab)) { talSel = null; refreshTalents(); } else sfx('error'); } };
+  $('#tFoot').onclick = e => { if (e.target.closest('#tTomeRead')) { tomeSlotTap(); return; } if (e.target.closest('#tTomeGo')) { tomeConfirm(); return; } if (e.target.closest('#tTomeNo')) { talTome = null; talSel = null; sfx('click'); refreshTalents(); return; }
+    if (e.target.closest('#tOpenSch')) { if (openSchool(talTab)) { buildTree(); refreshTalents(); } return; } if (e.target.closest('#tGoPaths')) { talTab = 'paths'; talSel = null; talHover = null; sfx('select'); buildTree(); refreshTalents(); return; } if (e.target.closest('#tReset')) { if (talTab === 'paths' ? resetPaths() : talTab === 'fusion' ? resetFusions() : resetTree(talTab)) { talSel = null; talTome = null; refreshTalents(); } else sfx('error'); } };
   refreshTalents();   // header, card and footer first, so the tree is measured at its final size
   buildTree();
   refreshTalents();
@@ -87806,9 +88008,11 @@ function buildTree() {
   const pc = $('#tPort'), ps = Math.round((pc.clientWidth || 56) * sc); pc.width = pc.height = ps; pc.getContext('2d').drawImage(talIcon(talTab), 0, 0, ps, ps);
   tree.classList.toggle('art', !!talBgURL(talTab));   // (the owner's painting: quiet in the middle, so it is dimmed evenly)
   $('#tBg').style.backgroundImage = `url(${talSceneURL(talTab, true)})`;
-  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span></button>`).join('');
   const rows = talRowsOf(talTab);   // (a force's trees have six rows, the towers' four)
-  const cols = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(TAL_COLS, ...tl.list.map(t => t.c + 1));
+  const cols0 = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(TAL_COLS, ...tl.list.map(t => t.c + 1));
+  const slotC = tomeSlotOn(talTab) ? tomeSlotCol(talTab, cols0) : -1, cols = Math.max(cols0, slotC + 1);   // the second-capstone slot a Tome of Mastery fills: a free cell of the capstone row
+  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span><span class="tb" aria-hidden="true">${TOME_SVG}</span></button>`).join('')
+    + (slotC >= 0 ? `<button type="button" class="tn-tome" id="tTomeSlot" style="grid-row:${rows};grid-column:${slotC + 1}">${TOME_SVG}<span class="tt-l"></span></button>` : '');
   grid.style.gridTemplateColumns = `repeat(${cols}, var(--n))`; grid.style.gridTemplateRows = `repeat(${rows}, var(--n))`;
   // one size for every icon, as big as the room allows up to TW_MAX; the same space across and down, so arrows read alike
   const availH = tree.clientHeight - (tree.clientHeight < 300 ? 14 : 30), availW = tree.clientWidth - 24;   // (a phone on its side: every pixel of height goes to the icons)
@@ -87858,8 +88062,9 @@ function placeArrows() {
   svg.innerHTML = h;
 }
 function tapNode(type, i) {
+  if (talTome && talTome.type === type) { tomePickTap(i); return; }   // reading a Tome of Mastery: this tap picks its capstone
   const can = type === 'paths' ? pathNodeCan(i) : type === 'fusion' ? fusState(FUSIONS[i]) === 'avail' : G.tp > 0 && talCanLearn(type, talPicks(type), i);
-  if (canHover()) { talSel = { t: type, i }; if (can) { learnSel(); return; } sfx((type === 'paths' ? pathRank(pathsNow()[Math.floor(i / PATH_RANKS)].id) > i % PATH_RANKS : type === 'fusion' ? G.fus[FUSIONS[i].id] : talPicks(type)[i]) ? 'select' : 'error'); refreshTalents(); return; }
+  if (canHover()) { talSel = { t: type, i }; if (can) { learnSel(); return; } sfx((type === 'paths' ? pathRank(pathsNow()[Math.floor(i / PATH_RANKS)].id) > i % PATH_RANKS : type === 'fusion' ? G.fus[FUSIONS[i].id] : talPicks(type)[i] || tomeHas(type, i)) ? 'select' : 'error'); refreshTalents(); return; }
   const again = talSel && talSel.t === type && talSel.i === i;
   if (again && can) { learnSel(); return; } // tapping the selected talent again learns the next rank
   talSel = { t: type, i }; sfx('select'); refreshTalents();
@@ -87896,21 +88101,32 @@ function refreshTalents() {
   if (ty === 'paths') return refreshPaths();
   const tl = TALENTS[ty], pk = talPicks(ty), spent = talSpent(pk), shut = !schoolOpen(ty);
   $('#tSub').innerHTML = shut ? (oldRules() ? `${TOWERS[ty].name} · school not open yet` : `${TOWERS[ty].name} · locked`) : `${TOWERS[ty].name} · <b>${spent}</b> point${spent === 1 ? '' : 's'} spent`;
+  const tmOn = !!talTome && talTome.type === ty && tomeSlotState(ty) === 'choose', tmOpts = tmOn ? tomeOpts(ty) : []; if (talTome && !tmOn) talTome = null;
+  { const g = $('#tGrid'); if (g) g.classList.toggle('tome-choose', tmOn); }
   for (const n of ovp.querySelectorAll('.tn')) {
-    const i = +n.dataset.i, t = tl.list[i], s = talState(ty, i), on = !!talSel && talSel.t === ty && talSel.i === i, r = talRankOf(pk, i);
+    const i = +n.dataset.i, t = tl.list[i], s = talState(ty, i), on = !!talSel && talSel.t === ty && talSel.i === i, tm = tomeHas(ty, i), r = tm ? t.max : talRankOf(pk, i);   // (tm: learned from a Tome of Mastery, no point spent)
     // state only: locked | req | excl (greyscale), open (no point to spend), avail (full colour, plain frame), has (ranks in it: yellow outline), maxed (orange outline)
-    n.className = `tn ${s}${r > 0 ? ' has' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}`;
+    n.className = `tn ${s}${r > 0 ? ' has' : ''}${tm ? ' tome' : ''}${tmOpts.includes(i) ? ' tpick' : ''}${tmOn && talTome.sel === i ? ' tsel' : ''}${on ? ' sel' : ''}${planWant(ty, i) > r ? ' plan' : ''}${t.spell ? ' spell' : ''}`;
     n.querySelector('.rk').textContent = `${r}/${t.max}`;   // the rank in the corner: grey at 0, gold while it can be learned, orange when full
-    const why = s === 'locked' || s === 'req' ? 'locked' : s === 'excl' ? 'closed by your capstone' : s.includes('avail') ? 'can be learned' : s === 'maxed' ? 'full' : '';
+    const why = tm ? 'learned from a Tome of Mastery' : tmOpts.includes(i) ? 'your Tome of Mastery can teach it' : s === 'locked' || s === 'req' ? 'locked' : s === 'excl' ? 'closed by your capstone' : s.includes('avail') ? 'can be learned' : s === 'maxed' ? 'full' : '';
     n.setAttribute('aria-label', `${t.name}${t.spell ? ', spell' : talTagOf(t) ? ', ' + talTagOf(t) : ''}, rank ${r} of ${t.max}${why ? ', ' + why : ''}. ${t.pro(Math.max(1, r))}`);
     n.setAttribute('aria-pressed', on);
   }
   for (const a of ovp.querySelectorAll('.lkg')) { const q = tl.list[+a.dataset.q]; a.classList.toggle('lit', !!q && talRankOf(pk, q.id) >= q.max); }
+  const slot = $('#tTomeSlot'), tmSt = slot ? tomeSlotState(ty) : ''; if (slot) tomeSlotRefresh(slot, ty);
   const cost = respecCost(ty), canReset = spent > 0 && G.phase === 'build' && G.gold >= cost;
+  if (tmOn) {   // reading a Tome of Mastery: the footer names the choice and confirms it
+    const q = talTome.sel != null ? tl.list[talTome.sel] : null;
+    $('#tFoot').innerHTML = `<div class="tc-pts" id="tPtsBox"><i><b id="tPts">${tp}</b></i><span>Talent point${tp === 1 ? '' : 's'}</span></div>`
+      + `<span class="tc-hint tome">Tome of Mastery: ${q ? `${esc(tomeWho(ty))} will know ${esc(q.name)}` : `choose a glowing capstone for ${esc(tomeWho(ty))}`}</span>`
+      + `<button type="button" class="tc-btn tome" id="tTomeGo"${q ? '' : ' disabled'}>${TOME_SVG}${q ? `Learn ${esc(q.name)}` : 'Choose a capstone'}</button><button type="button" class="tc-btn reset" id="tTomeNo">Cancel</button>`;
+    renderTip(); return;
+  }
   $('#tFoot').innerHTML = `<div class="tc-pts" id="tPtsBox"><i><b id="tPts">${tp}</b></i><span>Talent point${tp === 1 ? '' : 's'}</span></div>`
     + (shut ? `<span class="tc-hint">${keysHeld() ? 'Use a School Key to build its towers and learn its talents.' : `Locked. The boss of every 5th wave carries a School Key${nextKeyWave() ? ` (next: wave ${nextKeyWave()})` : ''}.`}</span><button type="button" class="tc-btn open" id="tOpenSch"${keysHeld() ? '' : ' disabled'}>Open <small>key</small></button>`
       : `<span class="tc-hint">${tp > 0 ? (canHover() ? 'Click a coloured talent to learn it' : 'Tap a coloured talent twice to learn it') : G.pp > 0 ? pathNudge() : `Next talent point ${xpNextPoint()}`}</span>`)
-    + `<button type="button" class="tc-btn reset" id="tReset"${canReset ? '' : ' disabled'} title="${G.phase === 'build' ? 'Refund every point in this tree' : 'Only between waves'}">Reset${spent ? ` <small>${cost}g</small>` : ''}</button>`;
+    + (tmSt === 'ready' ? `<button type="button" class="tc-btn tome" id="tTomeRead">${TOME_SVG}Read the tome</button>` : '')
+    + `<button type="button" class="tc-btn reset" id="tReset"${canReset ? '' : ' disabled'} title="${G.phase === 'build' ? `Refund every point in this tree${tmSt === 'read' ? ' (the capstone from your tome stays)' : ''}` : 'Only between waves'}">Reset${spent ? ` <small>${cost}g</small>` : ''}</button>`;
   renderTip();
 }
 function refreshFusion() {
@@ -88068,6 +88284,12 @@ function talRankHTML(t, n) {
 // it), the spell it improves, the capstone row's "pick one", and how to learn it (green)
 function talTipState(ty, ci) {
   const tl = TALENTS[ty], t = tl.list[ci], pk = talPicks(ty), n = talRankOf(pk, ci), rows = talRowsOf(ty), need = [];
+  if (tomeHas(ty, ci)) return `<div class="wt-tome">${TOME_SVG}<span>From a Tome of Mastery: no talent point spent, and a respec keeps it</span></div>`;
+  if (talTome && talTome.type === ty && tomeOpts(ty).includes(ci)) {   // a capstone the tome being read can teach
+    const miss = talUpgrades(tl, t).filter(q => !talRankOf(talKnown(ty), q.id)).map(q => q.name);
+    return (miss.length ? `<div class="wt-need">It improves ${miss.join(' and ')}, which you have not learned yet</div>` : '')
+      + `<div class="wt-cap">Capstone · from your Tome of Mastery</div><div class="wt-go">${talTome.sel === ci ? 'Chosen: confirm below to learn it' : canHover() ? 'Click to choose it' : 'Tap to choose it'}</div>`;
+  }
   if (n < t.max) {
     if (typeof schoolOpen === 'function' && !schoolOpen(ty)) need.push(oldRules() ? 'This school is not open yet' : 'This unit is locked');
     else if (typeof champTalLocked === 'function' && champTalLocked(ty)) need.push(`Opens with your Champion${typeof CHAMP_LEVEL !== 'undefined' ? ` (level ${CHAMP_LEVEL})` : ''}`);
@@ -88088,7 +88310,7 @@ function talTipState(ty, ci) {
     + (can ? `<div class="wt-go">${canHover() ? 'Click to learn' : 'Tap again to learn'}</div>` : !need.length && n < t.max ? '<div class="wt-t">No talent point to spend</div>' : '');
 }
 function talTipHTML(ty, ci) {
-  const tl = TALENTS[ty], t = tl.list[ci], n = talRankOf(talPicks(ty), ci), state = talTipState(ty, ci);
+  const tl = TALENTS[ty], t = tl.list[ci], n = tomeHas(ty, ci) ? t.max : talRankOf(talPicks(ty), ci), state = talTipState(ty, ci);
   const ab = t.spell && typeof ABIL !== 'undefined' ? ABIL[t.spell] : null;
   // a spell talent: its spell's own tooltip, marked "Spell" with its rank where a talent shows "Rank"
   if (ab && typeof spellTipHTML === 'function') { try { return spellTipHTML(ab, spellSample(ab, ty), { tag: `Spell · ${n}/${t.max}` }) + state; } catch (e) { /* the plain talent below */ } }
@@ -88099,12 +88321,12 @@ function talTipHTML(ty, ci) {
 function renderTip() {
   if (!talOpen || typeof spellTipShow !== 'function') return;
   const ty = talTab, sel = talSel && talSel.t === ty ? talSel.i : null, ci = canHover() ? talHover : (talHover != null ? talHover : sel);
-  const node = ci == null ? null : ovp.querySelector(`.tn[data-i="${ci}"], .fc[data-i="${ci}"]`);
+  const node = ci == null ? null : ci === 'tome' ? ovp.querySelector('.tn-tome') : ovp.querySelector(`.tn[data-i="${ci}"], .fc[data-i="${ci}"]`);
   if (!node) { if (spellHudActive && spellHudActive.tal) hideSpellHud(); return; }
   let html = '';
   try {
     if (ty === 'fusion' || ty === 'paths') { const d = document.createElement('div'); (ty === 'fusion' ? renderFusionTip : renderPathTip)(d, ci); html = `<div class="tal-old">${d.innerHTML}</div>`; }
-    else html = talTipHTML(ty, ci);
+    else html = ci === 'tome' ? tomeSlotTipHTML(ty) : talTipHTML(ty, ci);
   } catch (e) { html = ''; }
   if (html) spellTipShow(node, html, { tal: true }); else hideSpellHud();
 }
@@ -104914,6 +105136,7 @@ function rnLootOpen(c, w) {
   const R = rnS(), type = c.type, pl = !!(R.pledge[w] && !R.pgot[w]);
   const L = { w, type, items: rnRollOffer(type, w, RN_LOOT.offer, [], pl), reroll: 0, legGot: pl ? 'pledge' : false, dmg: typeof bossDmgHtml === 'function' ? bossDmgHtml(c, 'What brought it down') : '' };
   L.seen = L.items.filter(k => !String(k).startsWith('L:'));
+  L.tome = typeof tomeForBoss === 'function' ? tomeForBoss(w) : null;   // its Tome of Mastery, when this run's plan has one due (loot.js): one more card to choose from
   if (pl) { R.pgot[w] = 1; G.legN = (G.legN | 0) + 1; collectDrop({ item: rnItem({ l: R.pledge[w] }) }); }
   if (typeof dropNote === 'function') dropNote();
   R.loots.push(L); rnLootAt = rnNow() + 1400;   // the slain banner first
@@ -104932,8 +105155,15 @@ function rnLootReroll() {
   if (!rnSpend('reroll', CREEPS[L.type] ? CREEPS[L.type].name : L.type)) return false;
   L.items = rnRollOffer(L.type, L.w, RN_LOOT.reroll, L.seen, !!L.legGot); L.seen = L.seen.concat(L.items.filter(k => !String(k).startsWith('L:'))); L.reroll++; rnDirty(); return true;
 }
-// closed without a pick: the first offer is taken (nothing is lost by closing)
-function rnLootDone() { if (rnLootCur()) rnLootPick(0); }
+// take the boss's Tome of Mastery in place of an item: an unread tome in the bag (read it there or in the talent tree)
+function rnLootPickTome() {
+  const R = rnS(), L = rnLootCur(); if (!L || !L.tome || !TALENTS[L.tome] || typeof tomeMake !== 'function') return false;
+  const ty = L.tome; collectDrop({ item: tomeMake(ty) }); R.loots.shift(); R.log.push({ w: L.w, k: 'loot', what: 'tome:' + ty, reroll: L.reroll }); rnDirty();
+  if (typeof onToast === 'function') onToast(`Tome of Mastery: ${tomeUnits(ty)} is in your bag. Read it there, or in their talent tree.`);
+  return true;
+}
+// closed without a pick: its tome is taken if it has one, else the first offer (nothing is lost by closing)
+function rnLootDone() { const L = rnLootCur(); if (!L) return; if (!(L.tome && rnLootPickTome())) rnLootPick(0); }
 
 /* ---- spending elsewhere ---- */
 function rnPledgeWave() { return G.phase === 'build' ? rnNextBoss(G.wave) : rnNextBoss(G.wave + 1); }
@@ -104964,7 +105194,7 @@ function rnLoad(s) {
     const R = G.rn; R.v = clamp(s.v | 0, 0, RN.cap); R.earned = s.earned | 0; R.over = s.over | 0; R.streak = s.streak | 0;
     for (const k of ['buys', 'pledge', 'pgot', 'bossW', 'prW']) R[k] = s[k] && typeof s[k] === 'object' ? s[k] : {};
     R.loots = Array.isArray(s.loots) ? s.loots.filter(L => L && CREEPS[L.type] && Array.isArray(L.items) && L.items.length && L.items.every(rnEntOk) && !(L.took && L.took.length)) : [];   // (took: an older screen already paid out)
-    for (const L of R.loots) { L.reroll = L.reroll | 0; L.seen = Array.isArray(L.seen) ? L.seen : L.items.slice(); }
+    for (const L of R.loots) { L.reroll = L.reroll | 0; L.seen = Array.isArray(L.seen) ? L.seen : L.items.slice(); L.tome = L.tome && TALENTS[L.tome] && TOWERS[L.tome] ? L.tome : null; }
     if (R.loots.length) rnLootAt = 0;
     R.log = Array.isArray(s.log) ? s.log.slice(-80) : [];
     return;
@@ -105032,15 +105262,19 @@ function rnLootScreen() {
   G.paused = true; G.ghost = null;
   const T = rnTable(L.type), d = CREEPS[L.type], its = L.items.map(k => rnItem(k, true)), ren = rnOn();
   const card = (it, i) => `<button type="button" class="rn-pick" data-rp="${i}">${rnItemCard(it, `<span class="sp-go">Take it</span>`, it.leg ? 'rn-leg' : '')}</button>`;
+  // its Tome of Mastery, when it carries one: the first card (taken in place of an item)
+  const tm = L.tome && TALENTS[L.tome] ? { id: -1, rar: 3, hone: 0, tome: [L.tome] } : null;
+  const tmCard = tm ? `<button type="button" class="rn-pick tm-pick" data-rpt="1"><div class="sp-card qx-pc rn-ic rn-tome" style="--sc:#ffd76a"><img alt="" src="${typeof tomeBookURL === 'function' ? tomeBookURL(TALENTS[L.tome].hue) : rnArtURL(tm)}">${itemCardHTML(tm)}<span class="sp-go">Take it</span></div></button>` : '';
   const rr = !ren ? '' : L.reroll >= RN_LOOT.rerolls ? `<p class="rn-note">Rerolled: these are the last ${RN_LOOT.reroll}.</p>`
     : `<button type="button" class="lb-link rn-btn" id="rnReroll"${rnCan('reroll') ? '' : ' disabled'} title="${rnCan('reroll') ? '' : `You have ${rnS().v} Renown`}">Reroll for ${rnCostTag('reroll')} Renown<small>${RN_LOOT.reroll} fresh choices in place of these</small></button>`;
-  showOverlay(`<div class="bg-head hs-head rn-head"><h2 class="ttl">${rnEsc(d.name)} falls <small class="qk-ch">Wave ${L.w}</small></h2><span class="qk-line">${rnEsc(T.say)}. Take one; the ${its.length > 2 ? 'others are' : 'other is'} lost.${ren ? ' ' + rnBar() : ''}</span></div>
+  showOverlay(`<div class="bg-head hs-head rn-head"><h2 class="ttl">${rnEsc(d.name)} falls <small class="qk-ch">Wave ${L.w}</small></h2><span class="qk-line">${rnEsc(T.say)}. Take one; the ${its.length + (tm ? 1 : 0) > 2 ? 'others are' : 'other is'} lost.${ren ? ' ' + rnBar() : ''}</span></div>
     ${L.legGot === 'pledge' ? `<p class="rn-note">Your pledge is honoured: ${rnEsc(gearName(rnItem({ l: T.leg }, true)))} is in your bag.</p>` : ''}
-    <div class="rn-three rn-n${its.length}">${its.map(card).join('')}</div>
+    <div class="rn-three rn-n${its.length + (tm ? 1 : 0)}">${tmCard}${its.map(card).join('')}</div>
     <div class="rn-more">${rr ? `<div class="rn-acts">${rr}</div>` : ''}
     ${L.dmg ? `<div class="rn-dmg">${L.dmg}</div>` : ''}</div>`, 'bag rn-ov');
   if (its.some(i => i.leg) && !L.legFx) { L.legFx = 1; if (typeof sfx === 'function') sfx('lootDrop', 4); }   // a legendary on offer: its fanfare, once (owner, 5 Nov 2026)
   for (const b of ovp.querySelectorAll('[data-rp]')) b.onclick = () => { if (rnLootPick(+b.dataset.rp)) { if (typeof sfx === 'function') sfx('lootGet', 3); resumeGame(); } else if (typeof sfx === 'function') sfx('nogold'); };
+  for (const b of ovp.querySelectorAll('[data-rpt]')) b.onclick = () => { if (rnLootPickTome()) { if (typeof sfx === 'function') sfx('lootGet', 4); resumeGame(); } else if (typeof sfx === 'function') sfx('nogold'); };
   const q = id => document.getElementById(id);
   if (q('rnReroll')) q('rnReroll').onclick = () => { if (rnLootReroll()) { sfx('click'); rnLootScreen(); } else sfx('nogold'); };
   rnDetBind();
@@ -105067,7 +105301,7 @@ function rnMenu(tab) {
       locked.length ? `<span class="rn-units">${locked.map(t => `<button type="button" class="rn-u" data-ru="${t}"${rnCan('unit') || (G.keys | 0) > 0 ? '' : ' disabled'}>${rnEsc(TOWERS[t].short || TOWERS[t].name)}</button>`).join('')}</span>` : ''),
     row('respec', 'Respec a talent tree', G.phase === 'build' && rnCan('respec'), 'Refund one unit type\'s talent points. Opens the talents: use Reset on a tree.', 'rnRs'),
     row('awaken', 'Awaken an item', rnCan('awaken'), 'Raise an item (not a legendary) to the current wave’s Item Level, at no gold. Opens the bag: pick an item.', 'rnAw'),
-    `<div class="rn-row off"><div><b>At a boss</b><small>A fallen boss offers ${RN_LOOT.offer} items from its table, free; take one. Once a boss, reroll them into ${RN_LOOT.reroll} fresh ones ${rnCostTag('reroll')}</small></div></div>`,
+    `<div class="rn-row off"><div><b>At a boss</b><small>A fallen boss offers ${RN_LOOT.offer} items from its table, free; take one. From wave ${typeof TOME !== 'undefined' ? TOME.from : 20} on, one or two bosses a run also have a Tome of Mastery (a second capstone for one unit type): it is one more card to choose from. Once a boss, reroll them into ${RN_LOOT.reroll} fresh ones ${rnCostTag('reroll')}</small></div></div>`,
   ].join('');
   const p = nb ? rnBossPay(0) : null, streakTo = RN.streak - (R.streak % RN.streak);
   const earn = `<ul class="rn-earn">
@@ -105093,10 +105327,11 @@ function rnMenu(tab) {
 }
 // every boss still to come, with its table (the next one first)
 function rnLootListHTML(from) {
-  const R = rnS(), out = [];
+  const R = rnS(), out = [], tomeW = typeof tomeBossWaves === 'function' ? tomeBossWaves(from, n => !!rnBossType(n)) : [];   // the bosses that carry a Tome of Mastery this run (loot.js)
   for (let n = Math.ceil(Math.max(1, from) / RN.every) * RN.every; n <= MAX_WAVE; n += RN.every) {
     const t = rnBossType(n); if (!t) continue;
-    out.push(`<div class="rn-bl"><p><b>Wave ${n}: ${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<small>${rnEsc(rnTable(t).say)}</small></p>${rnIconsHTML(t, 'ri')}</div>`);
+    const tm = tomeW.includes(n) ? `<p class="rn-tml"><img alt="" src="${typeof tomeBookURL === 'function' ? tomeBookURL() : ''}"><span><b>Tome of Mastery</b> It has one this run, for a unit type you field: read it to unlock a second capstone for every unit of that type.</span></p>` : '';
+    out.push(`<div class="rn-bl"><p><b>Wave ${n}: ${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<small>${rnEsc(rnTable(t).say)}</small></p>${rnIconsHTML(t, 'ri')}${tm}</div>`);
   }
   return out.join('') || '<p>No bosses left.</p>';
 }
@@ -105262,6 +105497,7 @@ if (typeof document !== 'undefined' && document.head) {
 .rn-awk{margin-left:3px;font-style:normal;color:#ffd76a;text-shadow:0 0 4px rgba(255,200,80,.8);font-size:.85em}
 .rn-rw b{color:#f2d27a}
 .rn-three.rn-n2{grid-template-columns:repeat(2,minmax(0,1fr));max-width:600px;margin:0 auto}
+.rn-tml{display:flex;align-items:center;gap:8px;margin:6px 0 0;font-size:12.5px;color:#e8dcb8}.rn-tml img{width:30px;height:30px;border-radius:4px;box-shadow:0 0 0 1px #000,0 0 0 2px #e0a93a;flex:none}.rn-tml b{color:#ffd76a;margin-right:4px}
 .rn-ic.rn-leg{box-shadow:0 0 0 2px #ff8c1a,0 0 12px rgba(255,140,26,.45)}
 .rn-note{margin:0 0 8px;font:600 13px/1.35 var(--f-ui);color:#f2d27a}
 .rn-btn small{display:block;font:600 11px var(--f-ui);color:#c9b98a}#rnReroll{flex-direction:column;gap:2px}
@@ -105875,7 +106111,7 @@ function campBandFromRun(B) {
   return Object.assign({}, B || { v: 1, force: G.force, loc: 0, cleared: {}, best: {}, beat: {}, hunts: {}, marches: 0, huntsWon: 0 }, {
     force: G.force, hero: G.hero, raised: true,
     xp: Math.round((G.xp || 0) * 100) / 100, xpRn: G.xpRn | 0, tp: G.tp | 0, tpEarned: G.tpEarned | 0,
-    tal: JSON.parse(JSON.stringify(G.tal || {})), taln: typeof talNamesNow === 'function' ? talNamesNow() : null, heroTal: (G.heroTal || []).slice(), plan: G.plan ? JSON.parse(JSON.stringify(G.plan)) : null,
+    tal: JSON.parse(JSON.stringify(G.tal || {})), tomes: typeof tomesSave === 'function' ? tomesSave() : {}, taln: typeof talNamesNow === 'function' ? talNamesNow() : null, heroTal: (G.heroTal || []).slice(), plan: G.plan ? JSON.parse(JSON.stringify(G.plan)) : null,
     loot, gearUid: G.gearUid | 0, rn: typeof rnS === 'function' && G.rn ? rnS().v | 0 : 0,
     unlocked: (G.unlocked || []).filter(t => TOWERS[t] && !TOWERS[t].wall),
   });
@@ -105898,6 +106134,7 @@ function campCarryIn(B, hero) {
   }
   G.xp = B.xp || 0; G.lvl = xpLevelOf(G.xp); G.xpRn = B.xpRn | 0;
   G.loot = JSON.parse(JSON.stringify(B.loot || [])); G.gearUid = Math.max(G.gearUid | 0, B.gearUid | 0);
+  if (typeof tomesLoad === 'function') tomesLoad(B.tomes);   // the capstones the warband's Tomes of Mastery taught march on with its talents (loot.js)
   if (Array.isArray(B.heroTal)) G.heroTal = [0, 1, 2, 3, 4].map(r => B.heroTal[r] === 1 || B.heroTal[r] === 2 ? B.heroTal[r] : 0);
   if (B.plan && B.plan.tal) G.plan = B.plan;
   G.unlocked = [...new Set((G.unlocked || []).concat((B.unlocked || []).filter(t => TOWERS[t] && !TOWERS[t].wall && COMBAT_TYPES.includes(t))))];
@@ -108206,14 +108443,15 @@ function fcAs(f, slot, hero, fn) {
   const base = TOWERS_BASE[slot] || {}, { id, ...own } = U;
   const def = Object.assign({}, base, own, { unit: id, force: f, tiers: (U.tiers || base.tiers || []).map(o => Object.assign({}, o)) });
   const had = Object.prototype.hasOwnProperty.call(talIcons, slot);
-  const K = { tow: TOWERS[slot], tal: TALENTS[slot], now: FORCE_NOW, gf: G.force, gtal: G.tal, gtp: G.tp, plan: G.plan, tab: talTab, ft: F.talents[slot], fu: F.units[slot], ic: talIcons[slot],
+  const K = { tow: TOWERS[slot], tal: TALENTS[slot], now: FORCE_NOW, gf: G.force, gtal: G.tal, gtomes: G.tomes, gtp: G.tp, plan: G.plan, tab: talTab, ft: F.talents[slot], fu: F.units[slot], ic: talIcons[slot],
     fl: F.talFlavor ? F.talFlavor[slot] : undefined, em: F.talEmblem ? F.talEmblem[slot] : undefined };
-  TOWERS[slot] = def; TALENTS[slot] = tree; FORCE_NOW = f; G.force = f; G.tal = {}; G.tp = 0; G.plan = null; talTab = slot; F.talents[slot] = tree; F.units[slot] = U;
+  TOWERS[slot] = def; TALENTS[slot] = tree; FORCE_NOW = f; G.force = f; G.tal = {}; G.tomes = {}; G.tp = 0; G.plan = null; talTab = slot;   // (tomes: no run's Tome of Mastery in the codex's trees)
+  F.talents[slot] = tree; F.units[slot] = U;
   if (C && F.talFlavor) F.talFlavor[slot] = C.flavor; if (C && F.talEmblem) F.talEmblem[slot] = C.emblemIdx;
   const blank = document.createElement('canvas'); blank.width = blank.height = 8; talIcons[slot] = blank;   // (the crest is drawn from the unit's painting below, not rendered)
   try { return fn(U, tree); }
   finally {
-    TOWERS[slot] = K.tow; TALENTS[slot] = K.tal; FORCE_NOW = K.now; G.force = K.gf; G.tal = K.gtal; G.tp = K.gtp; G.plan = K.plan; talTab = K.tab; F.talents[slot] = K.ft; F.units[slot] = K.fu;
+    TOWERS[slot] = K.tow; TALENTS[slot] = K.tal; FORCE_NOW = K.now; G.force = K.gf; G.tal = K.gtal; G.tomes = K.gtomes; G.tp = K.gtp; G.plan = K.plan; talTab = K.tab; F.talents[slot] = K.ft; F.units[slot] = K.fu;
     if (F.talFlavor) F.talFlavor[slot] = K.fl; if (F.talEmblem) F.talEmblem[slot] = K.em;
     if (had) talIcons[slot] = K.ic; else delete talIcons[slot];
   }
@@ -108327,6 +108565,7 @@ function fcTreeDraw() {
       let say = ''; try { say = String(t.pro(1)).replace(/<[^>]+>/g, ''); } catch (e) { say = ''; }
       n.setAttribute('aria-label', `${t.name}${t.spell ? ', spell' : ''}, ${t.max} rank${t.max > 1 ? 's' : ''}. ${say}`);
     }
+    { const sl = $('#tTomeSlot'); if (sl) { sl.className = 'tn-tome'; sl.title = 'A Tome of Mastery unlocks a second capstone. Bosses sometimes drop one.'; sl.setAttribute('aria-label', sl.title); } }   // (the second-capstone slot: ui.js)
     const fl = talFlavor(T.slot);
     $('#tSub').textContent = `${U.name}${fl && fl[0] ? ' · ' + fl[0] : ''}`;
   });
@@ -108617,6 +108856,9 @@ function kwBuild() {
     def: `At half your lives or fewer the keep rallies: kills pay ${Math.round((ral.gold - 1) * 100)}% more gold and your units strike ${Math.round((ral.dmg - 1) * 100)}% harder.` });
   kwAdd({ key: 'sy:set', name: 'Set bonus', alias: ['set bonus', 'set bonuses', 'Set bonuses'], cat: 'system', col: (typeof FSET_COL !== 'undefined' && FSET_COL) || '#4de8b0',
     def: 'Matched pieces give bonuses when 2 or 3 are worn. A unit set counts on one unit; an army set counts across different units.' });
+  { const tf = typeof TOME !== 'undefined' ? TOME : { from: 20, salvage: 150 };
+    kwAdd({ key: 'sy:tome', name: 'Tome of Mastery', alias: ['Tomes of Mastery', 'tome of mastery'], cat: 'system', col: '#ffd76a',
+      def: `A book for one unit type, dropped by a wave boss (never before wave ${tf.from}; one or two a run). Read it once, from the bag or the empty capstone slot of that unit's talent tree, and every unit of that type knows a second capstone of your choice for the rest of the run. It costs no talent points and a respec keeps it. One with nothing left to teach salvages for ${tf.salvage} gold.` }); }
   kwAdd({ key: 'sy:legendary', name: 'Legendary', alias: ['legendary', 'legendaries', 'Legendaries'], cat: 'system', col: '#ff8c1a',
     def: 'The rarest items, named in orange, each with a rule of its own. None drops before wave 11, and a run finds only a few.' });
   return KW;
@@ -111799,9 +112041,9 @@ if (typeof rnLootScreen === 'function') {
     try {
       const L = typeof rnLootCur === 'function' ? rnLootCur() : null, box = ovp && ovp.querySelector('.rn-three'); if (!L || !box || !wpnOn()) return r;
       const w = wpOfferFor(L); if (!w) return r;
-      const b = wpBestFor(w), t = b && b.t, picks = box.querySelectorAll('.rn-pick');
+      const b = wpBestFor(w), t = b && b.t, picks = [...box.querySelectorAll('.rn-pick')].filter(p => !p.classList.contains('tm-pick'));   // (a Tome of Mastery's card is no relic: it stays)
       if (picks.length > 1) picks[picks.length - 1].remove();   // two choices: the weapon takes the last relic's place
-      else box.className = box.className.replace(/rn-n\d+/, 'rn-n' + (picks.length + 1));
+      else box.className = box.className.replace(/rn-n\d+/, 'rn-n' + (box.querySelectorAll('.rn-pick').length + 1));
       box.insertAdjacentHTML('beforeend', `<button type="button" class="rn-pick wp-pick" data-rpw="1"><div class="sp-card qx-pc rn-ic${w.rar >= 4 ? ' rn-leg' : ''}" style="--sc:${wpnCol(w)}"><img alt="" src="${wpIconURL(w)}">${wpnCardHTML(w, t || null, { offer: 1 })}<span class="sp-go">Take it</span></div></button>`);
       const btn = box.querySelector('[data-rpw]');
       btn.onclick = () => {
@@ -112059,7 +112301,7 @@ if (typeof rnLootScreen === 'function') {
       if (!L || !L.hwo || !box || !hwOn()) return r;
       const h = hwState(L.hwo.u), nx = hwNext(h), t = hwHeroT(); if (!nx) return r;
       // it takes a relic's place (a legendary's never; one relic always stays)
-      const relics = [...box.querySelectorAll('.rn-pick')].filter(b => !b.classList.contains('wp-pick') && !b.querySelector('.rn-leg'));
+      const relics = [...box.querySelectorAll('.rn-pick')].filter(b => !b.classList.contains('wp-pick') && !b.classList.contains('tm-pick') && !b.querySelector('.rn-leg'));
       if (relics.length > 1) relics[relics.length - 1].remove();
       else box.className = box.className.replace(/rn-n\d+/, 'rn-n' + (box.querySelectorAll('.rn-pick').length + 1));
       const note = `<p class="itc-k">Taking it consumes ${hwE(wpnName(h))}: the same weapon, a stage up.</p>`;
@@ -112809,6 +113051,7 @@ function icSocket(t, it, cyc) {
 }
 // the double-click in a screen: socket it, say what happened, redraw
 function icDouble(t, it, where) {
+  if (it && it.tome) { if (typeof tomeOpenRead === 'function' && tomeOpenRead(it)) return true; onToast(`${tomeWhyNot(it) || 'It can not be read now'}. Salvage it for ${gearValue(it)} gold.`); sfx('nogold'); return false; }   // a Tome of Mastery: a double-click reads it
   const nm = it ? (icIsWpn(it) ? wpnName(it) : gearName(it)) : '';
   if (!t) {
     const b = icBestUnit(it);
@@ -112843,6 +113086,7 @@ function icBagCard(el) {
   if (typeof bagTab !== 'undefined' && bagTab === 'shop') return '';
   if (typeof bagInf !== 'undefined' && bagInf) return '';
   const it = icCellItem(el); if (!it) return '';
+  if (it.tome) return itemCardHTML(it, { price: `Salvage: ${gearValue(it)} gold`, note: `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Click it to read it or salvage it; double-click reads it' : 'Tap it to read it or salvage it'}</p>` });   // a Tome of Mastery: read, never socketed (nothing to compare)
   const t = icBagT(), k = icKind(it);
   if (t && typeof bagCtx !== 'undefined' && !bagCtx.auto && k !== 'weapon' && (bagCtx.slot === 'charm') === (k === 'charm') && !icWhyNot(t, it)) {
     // a socket tapped on purpose: that socket, no cycling
@@ -112850,11 +113094,11 @@ function icBagCard(el) {
     IC.key = icKeyOf(t, it); IC.cyc = 0;
     const a = icNow(t), b = gpStatsWith(t, slot, it), C = { t, how: 'here', p: { slot, cur, n: 1, i: 0, free: !cur, kind: k }, rows: icDeltas(t, a, b), spells: icSpellDeltas(t, a, b) };
     IC.cur = { it, n: 1, t };
-    const price = it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : it.tome ? '' : `Salvage: ${gearValue(it)} gold`;
+    const price = it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : `Salvage: ${gearValue(it)} gold`;
     return `<div class="icmp"><div class="icmp-c"><p class="icmp-l">This item</p>${itemCardHTML(it, { price, note: icDeltaHTML(C, it) + (typeof setInfo === 'function' ? setInfo(it) : '') + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Click to socket it; right-click for more' : 'Tap to socket it; hold for more'}</p>` })}</div><div class="icmp-c icmp-eq"><p class="icmp-l">Equipped</p>${icEquippedHTML(C)}</div></div>`;
   }
   if (t) icHover(t, it); else { const u = icUnitFor(it, {}); if (u.t) icHover(u.t, it); }
-  const price = icIsWpn(it) ? `Salvage: ${WPN_SALVAGE[it.rar | 0]} gold` : it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : it.tome ? '' : `Salvage: ${gearValue(it)} gold`;
+  const price = icIsWpn(it) ? `Salvage: ${WPN_SALVAGE[it.rar | 0]} gold` : it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : `Salvage: ${gearValue(it)} gold`;
   return icHTML(it, { t, price, note: !icIsWpn(it) && typeof setInfo === 'function' ? setInfo(it) : '', hint: t ? icHint() + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Click or right-click for its actions' : 'Tap or hold for its actions'}</p>` : `<p class="itc-hint">Pick a unit, then double-click to socket it</p>` });
 }
 // a boss's loot offer: what it would do to the selected unit, else the unit it suits best
