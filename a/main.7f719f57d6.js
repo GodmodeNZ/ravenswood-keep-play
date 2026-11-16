@@ -1,4 +1,4 @@
-const BUILD_TAG = '8da67eb@2026-11-16';   // the play log's build version (playlog.js)
+const BUILD_TAG = '16198fb@2026-11-16';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47239,7 +47239,7 @@ const WEAPON_MDL = {};
 /* ---------- the numbers ---------- */
 // RARER BUT BIGGER (owner, 9 Nov 2026: "players remember damage spike increases so I'd like to design for that although it
 // should be rarer"): about a dozen weapons a run, and wide steps between rarities, so each new one is a spike you feel
-const WPN_RAR_M = [1.08, 1.2, 1.45, 1.8, 2.25];        // a weapon's DPS over the unit's starter, by rarity, at Item Level 1
+const WPN_RAR_M = [1.08, 1.3, 1.5, 1.8, 2.25];        // a weapon's DPS over the unit's starter, by rarity, at Item Level 1
 const WPN_IL_GROW = .01;                            // and 1% more for each Item Level above 1 (x1.49 at 50)
 const WPN_Q = .08;                                  // two weapons of a rarity and level differ by up to this much (the roll)
 const WPN_CAST_STRIKE = .5;                         // a caster weapon keeps this share of the strike's growth ...
@@ -47496,6 +47496,9 @@ const WPN_HP_TAB = [[1, 1], [10, 1.08], [15, 1.13], [20, 1.19], [25, 1.25], [30,
 // how much of it the foes carry: all of it (the table already counts the forge, so an ordinary run that forges as most do
 // keeps pace, one that forges more or finds better pulls ahead; 9 Nov 2026, with the forge)
 const WPN_HP_SHARE = 1;
+// the foes' health was left where it stood when uncommon and rare weapons were made stronger (owner, 16 Nov 2026: "leave foe
+// health"): the table may sit this far under the ordinary run before check_weapons calls it stale
+const WPN_HP_HOLD = .1;
 const wpnArmyK = w => wpnLerp(WPN_HP_TAB, Math.max(1, Math.min(50, w | 0)));
 function wpnHpK(n) {
   n = Math.max(1, n | 0); if (n < WPN_HP_FROM) return 1;
@@ -94817,7 +94820,7 @@ const RANGER2 = (() => {
    page has ?bd=old, or the Model Lab's "Blade Dancer rig" row is set to Old (runehold.html?lab=1&unit=bladedancer).
    Her moves go by unitmodels_bladedancer.js's own cues (its hooks set t._bdAtkAt, t._bdAtkN, t._bdCastAt, t._bdCast) and
    by what each ability does in the game (src/abilities.js), so every cut is drawn when the game deals it:
-     idle (10 s)  a dancer's stance: her weight on her left leg, the right foot light; the knives low and not alike; once a loop one roll of the right wrist.
+     idle (10 s)  a dancer's stance: her weight on her left leg, the right foot light; her arms close at her sides, the knives low, not alike and still (only her breath and a settle of her weight move).
                   On the field she holds its first frame (the owner had the idles frozen); the loop plays on the unit sheet, and on the field with ?bdidle=live
      ready (2 s)  a foe in reach: a light guard
      spin / fan / backhand   her three strikes (a whirl through every foe beside her), taken in turn: a full turn on her
