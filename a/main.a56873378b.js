@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b42a8dc@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'fe41f94@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -11884,7 +11884,7 @@ function groveHazard(z, dt) {
                      the spell's multiple of the strike, never multiplied by it (its basic strikes stay as they are).
      Mana            +N to its mana pool.          Mana Regen   +N mana a second, on top of its own.
      Cooldown Reduction  N%: its spells and its items' taps come N% sooner (items add up, to 50% at most).
-     Range           +N cells.                     Crit Chance  +N% chance a strike crits (x2.5).
+     Range           +N cells.                     Crit Chance  +N% chance a strike or a spell hit crits (x2).
      Armour Penetration  N% of each physical hit goes straight past the armour bar (enemypools.js; 90% at most in all).
      Magic Penetration   N% of each magic or Arcane hit goes straight past a ward bar, and cuts a boss's resistance (90% at most).
      Splash          +N cells on the burst of a unit whose strikes already splash (siege).
@@ -11931,7 +11931,7 @@ const ISTAT = {
   cd: { name: 'Cooldown Reduction', say: 'its spells and its items’ taps come this much sooner (50% at most)', fmt: v => v + '%' },
   range: { name: 'Range', say: 'cells added to its reach', fmt: v => '+' + (+v.toFixed(2)) },
   hit: { name: 'Hit Chance', say: 'each point takes 1% off its chance to miss (5% against an ordinary foe, 8% an elite or a leader, 9% a boss, 1% more a flyer); past that it does nothing', fmt: v => '+' + v + '%' },
-  crit: { name: 'Crit Chance', say: 'the chance a strike crits for x2.5', fmt: v => '+' + v + '%' },
+  crit: { name: 'Crit Chance', say: 'the chance a strike or a spell hit crits for x2', fmt: v => '+' + v + '%' },
   pen: { name: 'Armour Penetration', say: 'that share of each physical hit goes straight past the armour bar', fmt: v => '+' + v + '%' },
   mpen: { name: 'Magic Penetration', say: 'that share of each magic or Arcane hit goes straight past a ward bar', fmt: v => '+' + v + '%' },
   splash: { name: 'Splash', say: 'cells added to the burst of strikes that already splash', fmt: v => '+' + (+v.toFixed(2)) },
@@ -11952,7 +11952,7 @@ const ISB_DREF = [16, 18, 20, 28, 40];        // a typical unit's strike when th
    a relic carries about twice the Spell Damage for the same points (a rare's adds roughly 10-20% to a typical caster's
    spell hits by mid-game: sim/spell_power_report.js). The shop's and the sets' stated Spell Damage doubled with it. */
 const SP_POINT = .5;
-const ISB_COST = { pen: () => .5, mpen: () => .4, dmg: r => 100 / ISB_DREF[r], sp: r => 35 * SP_POINT / ISB_DREF[r], as: () => 1, crit: () => 1.5, hit: () => 1.2,   // (Hit Chance: a point is about 1% more damage until the cap, a little dearer than Attack Speed's for the waste past it; forces_zzzzzzzzzzzzzzzzzzzzzzz_hit.js)
+const ISB_COST = { pen: () => .5, mpen: () => .4, dmg: r => 100 / ISB_DREF[r], sp: r => 35 * SP_POINT / ISB_DREF[r], as: () => 1, crit: () => 1, hit: () => 1.2,   // (Hit Chance: a point is about 1% more damage until the cap, a little dearer than Attack Speed's for the waste past it; forces_zzzzzzzzzzzzzzzzzzzzzzz_hit.js)
   range: () => 45, mana: () => .4, regen: () => 12, cd: () => .8, splash: () => 35 };
 const ISB_ROUND = { dmg: v => Math.max(1, Math.round(v)), sp: v => Math.max(1, Math.round(v)), as: v => Math.max(1, Math.round(v)), crit: v => Math.max(1, Math.round(v)), hit: v => Math.max(1, Math.round(v)), cd: v => Math.max(1, Math.round(v)),
   mana: v => Math.max(5, Math.round(v / 5) * 5), regen: v => Math.max(.1, Math.round(v * 10) / 10), range: v => Math.max(.05, Math.round(v * 20) / 20), splash: v => Math.max(.05, Math.round(v * 20) / 20), pen: v => Math.max(1, Math.round(v)), mpen: v => Math.max(1, Math.round(v)) };
@@ -11962,6 +11962,10 @@ const ITEM_PEN = [0, .04, .08, .12, .18];   // common, uncommon, rare, epic, leg
 const SHOP_PEN = [0, .06, .12];             // part, item, artifact
 /* MAGIC PENETRATION the same way (and paid for the same way) on the spell items: every relic with a Spell Damage line (not charms: their rule is
    their power), by rarity, +20% a hone; the shop's spell items state theirs (mpen=N). With the unit's talents', 90% at most. */
+/* CRIT CHANCE, WoW style (forces_zzzzzzzzzzzzzzzzzzzzzzzzz_crit.js): a relic with a Crit Chance line carries a small fixed one,
+   this many points at Item Level 1 by rarity (x1 to x3 by level 50: IL_CLASS h), paid for out of its points as penetration is;
+   its shares of the budget go to its other lines. A crit is x2, so a point is about 1% more damage (ISB_COST.crit). */
+const ITEM_CRIT = [.7, .7, 1, 1.2, 1.5];
 const ITEM_MPEN = [0, .04, .08, .12, .18];  // common, uncommon, rare, epic, legendary
 /* STATS-ONLY RARES (the owner, 5 Nov: "passive bonuses should be fairly rare on rare items, just give stats"). A force's
    rare relics are stats only, their rule switched off (gearRule says none, gearStats skips its fx, and a unit relic fits
@@ -12092,16 +12096,17 @@ function itemStats(it) {
   const S = itemSpec(it); if (!S) return [];
   const rar = Math.max(0, Math.min(4, it.rar | 0)), lk = typeof ilOn === 'function' && ilOn(), hk0 = 1 + .2 * (it.hone | 0), out = {};
   const hk = k => lk ? ilStatK(it, k) : hk0;   // a force run: the item's level (forces_zzzzzzzzz_ilvl.js); else the hone
-  let B = itemPoints(it); const W = S.w.reduce((a, [, w]) => a + w, 0);
+  let B = itemPoints(it); const fixC = S.w.some(([k]) => k === 'crit'), W = S.w.reduce((a, [k, w]) => a + (k === 'crit' ? 0 : w), 0);   // (Crit Chance: a fixed line, below)
   // penetration first, at its rarity's size, paid for out of the points (at most half of them)
   const pens = [];
   if (S.pen && ITEM_PEN[rar]) pens.push(['pen', 100 * ITEM_PEN[rar]]);
   if (ITEM_MPEN[rar] && S.w.some(([k]) => k === 'sp') && ISB_KIND(it) !== .5) pens.push(['mpen', 100 * ITEM_MPEN[rar]]);   // a spell relic (not a charm)
+  if (fixC && ITEM_CRIT[rar]) pens.push(['crit', ITEM_CRIT[rar]]);
   const hv = typeof itemHitBase === 'function' ? itemHitBase(it) : 0; if (hv) pens.push(['hit', hv]);   // Hit Chance on about one relic in four, paid for the same way (forces_zzzzzzzzzzzzzzzzzzzzzzz_hit.js HIT_ON)
   const pc = pens.reduce((a, [k, v]) => a + v * ISB_COST[k](rar), 0), pk = pc > B / 2 ? B / 2 / pc : 1;
   for (const [k, v] of pens) out[k] = ISB_ROUND[k](v * pk * hk(k));
   B -= pc * pk;
-  for (const [k, w] of S.w) out[k] = ISB_ROUND[k](B * w / W / ISB_COST[k](rar) * hk(k));
+  for (const [k, w] of S.w) if (k !== 'crit' && W > 0) out[k] = ISB_ROUND[k](B * w / W / ISB_COST[k](rar) * hk(k));
   for (const [k, v] of S.fix) out[k] = lk ? ISB_ROUND[k](v * hk(k)) : v;
   return IST_ORDER.filter(k => out[k]).map(k => [k, out[k]]);
 }
@@ -42845,7 +42850,7 @@ function ilCurve(L) {
   return 1;
 }
 // which way each stat grows: s (the strike's curve), f (fixed), anything else the gentle percentage
-const IL_CLASS = { dmg: 's', sp: 's', range: 'f', splash: 'f', hit: 'h' };   // (h: Hit Chance, three times as much by level 50: +1% to about +4%)
+const IL_CLASS = { dmg: 's', sp: 's', range: 'f', splash: 'f', hit: 'h', crit: 'h', mana: 'm', regen: 'm', cd: 'c' };   // (h: Hit Chance and Crit, three times as much by level 50, +1% to about +4%, WoW style; m: Mana and Mana Regen, twice as much by level 50; c: Cooldown Reduction, +60% by level 50: owner, 17 Nov 2026, "those stats should get bigger per item level")
 const ilOn = () => typeof G !== 'undefined' && !!G && !!G.force && !G.vs;
 const ilNow = () => Math.max(1, (typeof G !== 'undefined' && G && G.wave) | 0);
 const ilCap = () => ilNow() + IL.boss;
@@ -42868,7 +42873,7 @@ const ilBase = it => it && it.shop ? 1 : IL0[Math.max(0, Math.min(4, (it && it.r
 function ilStatK(it, k) {
   if (!ilOn() || !it) return 1;
   const L = ilEff(it), L0 = ilBase(it), c = IL_CLASS[k];
-  const m = c === 's' ? Math.pow(ilCurve(L) / ilCurve(L0), IL.pow) : c === 'f' ? 1 : c === 'h' ? 1 + 2 * Math.max(0, L - L0) / 49 : Math.max(.5, 1 + IL.pct * (L - L0) / 49);
+  const m = c === 's' ? Math.pow(ilCurve(L) / ilCurve(L0), IL.pow) : c === 'f' ? 1 : c === 'h' ? 1 + 2 * Math.max(0, L - L0) / 49 : c === 'm' ? 1 + Math.max(0, L - L0) / 49 : c === 'c' ? 1 + .6 * Math.max(0, L - L0) / 49 : Math.max(.5, 1 + IL.pct * (L - L0) / 49);
   return m * (1 + IL.rite * Math.max(0, it.rf | 0));
 }
 const IL_ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -47709,7 +47714,7 @@ const BR_MECH = {
   haste: { g: 'haste', apply(st, a) { if (st.rate) st.rate /= 1 + a; }, say: (a, b, A, B) => `Attacks every ${brR(A.rate)}s → ${brR(B.rate)}s` },
   splash: { g: 'splash', apply(st, a, b, t, x) { if (st.splash) st.splash += a; else x.chain = Math.max(x.chain || 0, .35), x.chainR = 1.4; },
     say: (a, b, A, B) => A.splash ? `Splash ${brR(A.splash)} → ${brR(B.splash)} cells` : `Each strike splashes a foe within 1.4 cells for ${brF(brHit(B) * .35)}` },
-  crit: { g: 'crit', apply(st, a) { st.crit = Math.min(.9, (st.crit || 0) + a); }, say: (a, b, A, B) => `Crit chance ${Math.round((A.crit || 0) * 100)}% → ${Math.round(B.crit * 100)}% (crits strike ${brX(B.critM || 2.5)})` },
+  crit: { g: 'crit', apply(st, a) { st.crit = Math.min(.9, (st.crit || 0) + a); }, say: (a, b, A, B) => `Crit chance ${Math.round((A.crit || 0) * 100)}% → ${Math.round(B.crit * 100)}% (crits strike ${brX(B.critM || (typeof critM0 === 'function' ? critM0() : 2.5))})` },
   nth: { g: 'nth', apply(st, a, b) { if (!st.nth) { st.nth = a; st.nthM = b; } }, say: (a, b, A, B) => `Every ${a === 3 ? '3rd' : a + 'th'} strike hits ${brX(b)}: ${brF(brHit(B))} → ${brF(brHit(B) * b)}` },
   guard: { g: 'guard', apply(st, a) { st.hpM = (st.hpM || 1) * (1 + a); }, say: (a, b, A, B, t) => `Health ${towerMaxHp(t, A)} → ${towerMaxHp(t, B)} (siege foes take longer to break it)` },
   stun: { g: 'stun', apply(st, a, b) { st.stunCh = [Math.max(a, st.stunCh ? st.stunCh[0] : 0), Math.max(b, st.stunCh ? st.stunCh[1] : 0)]; }, say: (a, b) => `${Math.round(a * 100)} strikes in 100 stun their foe for ${brR(b)}s` },
@@ -52322,6 +52327,84 @@ if (typeof FORCE_HOOKS !== 'undefined' && FORCE_HOOKS.conclave) {
       if (pyMolten(c) && Math.random() < dt * 5) part({ k: 'ember', x: c.x + R(-.12, .12), z: c.y + R(-.12, .12), h: hitH(c) * .6 + R(0, .2), vh: R(.3, .7), vx: R(-.1, .1), life: .5, max: .5, size: R(.05, .08), col: '#ffd34a' });
     }
     return r;
+  };
+}
+
+/* ================= CRIT, WoW style (force runs) =================
+   The owner (17 Nov 2026), of the crit chances on gear: "these are really high crit chances, does crit work the same as in
+   wow" -> "Yes, WoW-style crit". So, as in WoW:
+   - Every force unit has a 5% chance to crit (CRIT.base), and a crit deals x2 (CRIT.m). A talent, an item's rule or a
+     legendary weapon that sets its own multiple (Headshot, a crit legendary's x3) keeps it.
+   - Spells crit too: each spell hit (abHit, and every ability hit through hurt with DTAG AB_TAG) rolls the unit's crit
+     chance and strikes x2, shown as a strike's crit is (the damage number's crit, a crit mark). Damage over time never
+     crits, nor an item's own hit ('relic') or a reaction ('rx').
+   - Crit Chance on gear is small now, like Hit Chance: a relic with a Crit Chance line carries +1% at Item Level 1, up to
+     +3% (rare, epic) or +4% (legendary) by level 50 (itempower.js ITEM_CRIT, paid for like Armour Penetration, and the
+     points it no longer takes go to the relic's other lines). Every other source of crit (talents, a hero's favour, a
+     branch, a crit legendary weapon) gives half what it said before (CRIT.addK), and a unit's crit chance is CRIT.cap at
+     most.
+   - Balance is neutral: 5% at x2 is 5% more damage from every unit, so every wave foe comes with 5% more health (makeWave).
+   Classic and Tower Wars (oldRules) are unchanged: their towers keep their own crits at x2.5.
+   Check: node tools/check_crit.js -v */
+const CRIT = { on: true, base: .05, m: 2, addK: .5, cap: .5 };
+const critOn = () => CRIT.on && typeof G !== 'undefined' && !!G && !!G.force && !G.vs && !(typeof oldRules === 'function' && oldRules());
+// a crit's multiple when nothing sets its own (for the cards and the sheet)
+const critM0 = () => critOn() ? CRIT.m : 2.5;
+// may this unit crit? a force unit that strikes (not a wall, not an aura-only unit)
+const critUnit = t => !!(t && t.def && t.def.force && !t.def.wall);
+// a unit's crit chance from its stats: the base, its items' lines, everything else at half, the cap
+function critOf(st) {
+  const itemC = ((st && st.ist && st.ist.crit) || 0) / 100, other = Math.max(0, ((st && st.crit) || 0) - itemC);
+  return Math.min(CRIT.cap, CRIT.base + itemC + other * CRIT.addK);
+}
+if (typeof effStats === 'function') {
+  const _critStats = effStats;
+  effStats = function (t) {
+    const st = _critStats.apply(this, arguments);
+    if (st && critUnit(t) && critOn() && !st.critDone) { st.crit = critOf(st); if (!st.critM) st.critM = CRIT.m; st.critDone = 1; }
+    return st;
+  };
+}
+/* ---------- spells crit ---------- */
+function critSpellOk(c, amt, src, dot) {
+  if (dot || !(amt > 0) || !c || c.dead || !critUnit(src) || !src.st || DTAG !== AB_TAG) return false;
+  if ((c.critT || 0) >= G.time + .85) return false;   // (already a crit this instant: a spell's own sure crit)
+  return critOn();
+}
+if (typeof hurt === 'function') {
+  const _critHurt = hurt;
+  hurt = function (c, amt, type, src, dot) {
+    if (critSpellOk(c, amt, src, dot) && Math.random() < (src.st.crit || 0)) {
+      const was = c.critT; c.critT = G.time + .9;
+      const a = Array.prototype.slice.call(arguments); a[1] = amt * (src.st.critM || CRIT.m);
+      const r = _critHurt.apply(this, a);
+      if (c.missAt === G.time && c.missBy === src) c.critT = was;   // (it missed after all: Hit Chance)
+      else {
+        if (G.stats) G.stats.spellCrits = (G.stats.spellCrits || 0) + 1;
+        if (typeof fxMark === 'function' && (c.critFxT || 0) <= G.time) { c.critFxT = G.time + .3; fxMark(c, 'crit'); }
+      }
+      return r;
+    }
+    return _critHurt.apply(this, arguments);
+  };
+}
+/* ---------- the crit legendary weapon: x3, and its extra chance halved with the rest ---------- */
+if (typeof wpnRuleText === 'function') {
+  const _critRule = wpnRuleText;
+  wpnRuleText = function (d) {
+    if (d && d.fx && d.fx[0] === 'crit' && critOn()) return `${Math.round(15 * CRIT.addK)}% more chance to crit, and its crits strike x3.`;
+    return _critRule.apply(this, arguments);
+  };
+}
+/* ---------- balance: each wave foe carries 5% more health (5% crits at x2) ---------- */
+const critHpK = () => 1 + CRIT.base * (CRIT.m - 1);
+if (typeof makeWave === 'function') {
+  const _critWave = makeWave;
+  makeWave = function () {
+    const q = _critWave.apply(this, arguments);
+    if (!critOn() || !Array.isArray(q)) return q;
+    for (const s of q) if (s && s.hp > 0) s.hp *= critHpK();
+    return q;
   };
 }
 
@@ -60535,11 +60618,14 @@ const AudioSys = (() => {
   // Ice Coffin and Shatterbloom, the owner's mixes (14 Nov 2026): the coffin's two layered as it locks; the bloom forming on the
   // cast and its burst when it bursts. Every one plays, so they stack
   S.frostCoffin = () => { firePlay('frCoffinMix', FR_COFFIN_VOL[0], 0); firePlay('frCoffinHitMix', FR_COFFIN_VOL[1], 0); };
-  S.frostBloom = () => { firePlay('frBloomMix', FR_BLOOM_VOL[0], 0); };
-  S.frostBloomBurst = () => { firePlay('frBloomBurstMix', FR_BLOOM_VOL[1], 0); };
+  // Shatterbloom (owner, 17 Nov 2026: a second mix; the planting about a fifth of the burst, as the owner balanced them)
+  const FR_BLOOM2_VOL = [.075, .35];
+  S.frostBloom = () => { firePlay('frBloomMix2', FR_BLOOM2_VOL[0], 0); };
+  S.frostBloomBurst = () => { firePlay('frBloomBurstMix2', FR_BLOOM2_VOL[1], 0); };
   // Frost Spear, the owner's mixes (14 Nov 2026): the throw and the hit, every one played so they stack
-  S.frostSpear = () => { firePlay('frSpearMix', FR_SPEAR_VOL[0], 0); };
-  S.frostSpearHit = () => { firePlay('frSpearHitMix', FR_SPEAR_VOL[1], 0); };
+  // (owner, 17 Nov 2026: a second mix, throw and hit in one take, started so its peak meets the hit; the hit plays nothing of its own)
+  S.frostSpear = () => { firePlay('frSpearMix2', .35, 0); };
+  S.frostSpearHit = () => {};
   // her bolt: an icy rise and crack (owner, 14 Nov 2026: "this might work for frost bolt", iced magic 6, fireballsfxdata.js frIceBolt)
   // (owner, 14 Nov 2026: "try this as the frostbolt pojectile sound": two cold whooshes in turn, tunnel wind and a cold gush;
   // iced magic 6, frIceBolt, stays in fireballsfxdata.js)
@@ -60570,9 +60656,11 @@ const AudioSys = (() => {
   // mix, its own timing kept, played as the spell is cast; the old sound only if the take is missing
   const BRW_VOL = { brMothMix: .22, brThicketMix: .2, brWitherMix: .16 };
   S.briarSpell = (k) => { if (!firePlay(k, BRW_VOL[k] || .2, .3)) S[{ brMothMix: 'mothswarm', brThicketMix: 'roots', brWitherMix: 'wither' }[k]] && S[{ brMothMix: 'mothswarm', brThicketMix: 'roots', brWitherMix: 'wither' }[k]](k === 'brThicketMix' ? 1 : 0); };
-  S.frostBolt = () => { firePlay('frBoltMix2', FR_MIX_VOL[0], 0); };   // (owner, 15 Nov 2026: second mix; frBoltMix stays in the Take list)
+  // (owner, 17 Nov 2026: third mix, "try these as new sounds"; the flight a quarter of the hit, as the owner balanced them; mix2 stays in the Take list)
+  const FR_MIX3_VOL = [.1, .4];
+  S.frostBolt = () => { firePlay('frBoltMix3', FR_MIX3_VOL[0], 0); };   // (owner, 15 Nov 2026: second mix; frBoltMix stays in the Take list)
   // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
-  S.frostHit = () => { firePlay('frHitMix2', FR_MIX_VOL[1], 0); };
+  S.frostHit = () => { firePlay('frHitMix3', FR_MIX3_VOL[1], 0); };
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
@@ -85141,6 +85229,11 @@ function gpStat(lbl, v, b, f, tip) {
   const up = b != null && isFinite(b) && Math.abs(v - b) > 1e-6, cls = up ? (v > b ? ' bo' : ' neg') : '';
   return `<div class="gp-st"${tip ? ` title="${gpE(tip)}"` : ''}><span>${lbl}</span><b class="${cls.trim()}">${f(v)}</b>${up ? `<i>${f(b)}</i>` : ''}</div>`;
 }
+// the Hit Chance row: its chance against an ordinary foe, the old one struck through (short), a boss's on a small second line
+function gpHitRow(st, was, tip) {
+  const H = hitShow(st), B = hitShow(was), up = H.foe !== B.foe || H.boss !== B.boss, cls = up ? (H.foe > B.foe || H.boss > B.boss ? 'bo' : 'neg') : '';
+  return `<div class="gp-st gp-hit" title="${gpE(tip)}"><span>Hit Chance</span><b class="${cls}">${H.foe}%</b>${up ? `<i>${B.foe}%</i>` : ''}<em>${H.boss}% vs bosses${up ? ` <s>${B.boss}%</s>` : ''}</em></div>`;
+}
 // alt: the stats with a different item in (the preview while an item is dragged or hovered): then the struck-through
 // value is the unit's stats now, and the new one is alt's. Grouped: Offence, Spells, Mana, Effects; each row has a hint.
 function gpStats(t, alt) {
@@ -85164,9 +85257,11 @@ function gpStats(t, alt) {
   if (!d.support || st.smite) out.push(gpStat('Damage', st.dmg || st.smite, b.dmg || b.smite, gpF, 'Each basic strike, before the foe’s armour; its spells are multiples of it'));
   if (st.rate && (!d.support || st.smite)) out.push(gpStat('Attacks a second', 1 / st.rate, b.rate ? 1 / b.rate : null, gpF, hint('How often it strikes', on('rate'))));
   num('Attack Speed (items)', s => (s.ist && s.ist.as) || 0, PL, ISTAT.as.say, alt ? (cur.ist && cur.ist.as) || 0 : 0);
-  num('Crit Chance', s => s.crit || 0, P, hint('The chance a strike crits', on('crit')));
-  if (typeof hitShow === 'function' && G.force && !oldRules() && (!d.support || st.smite)) out.push(gpStat('Hit Chance', hitPts(st), alt ? hitPts(cur) : 0, h => { const H = hitShow({ hit: h }); return `${H.foe}% (vs bosses ${H.boss}%)`; }, 'Its chance to hit an ordinary foe, and a boss (elites and leaders between); Hit Chance on its gear raises it, to 100% at most'));
-  num('Crit damage', s => s.critM && s.critM !== 2.5 ? s.critM : 0, X, 'A crit’s multiple of the strike (x2.5 unless something changes it)');
+  const core = typeof critOn === 'function' && critOn() && d.force && !d.wall && (!d.support || st.smite);   // (crit and hit chance: every force unit's core stats, WoW style)
+  if (core) out.push(gpStat('Crit Chance', st.crit || 0, alt ? cur.crit || 0 : CRIT.base, P, hint('The chance a strike or a spell hit crits (x2): 5% to start, its gear and talents add to it', on('crit'))));
+  else num('Crit Chance', s => s.crit || 0, P, hint('The chance a strike crits', on('crit')));
+  if (core && typeof hitShow === 'function') out.push(gpHitRow(st, alt ? cur : {}, 'Its chance to hit an ordinary foe, and a boss (elites and leaders between); Hit Chance on its gear raises it, to 100% at most'));
+  num('Crit damage', s => s.critM && s.critM !== (typeof critM0 === 'function' ? critM0() : 2.5) ? s.critM : 0, X, `A crit’s multiple of the hit (x${(typeof critM0 === 'function' ? critM0() : 2.5)} unless something changes it)`);
   out.push(gpStat('Range', st.range, b.range, gpF, hint('Its reach in cells', on('range'))));
   out.push(`<div class="gp-st" title="What it can strike"><span>Targets</span><b>${d.air ? 'Ground, air' : 'Ground'}</b></div>`);
   if (st.airR || (alt && b.airR)) out.push(gpStat('Reach vs flyers', st.range + (st.airR || 0), (b.range || 0) + (b.airR || 0), gpF, 'How far it reaches at flyers'));
@@ -86279,15 +86374,18 @@ const STAT_DEFS = [
   ['dmg', 'Damage', dmgF], ['smite', 'Smite', dmgF], ['range', 'Range', n2], ['rate', 'Every', v => n2(v) + 's'],
   ['splash', 'Splash', n2], ['slow', 'Slow', pct], ['slowT', 'Chill', v => n2(v) + 's', 1], ['burn', 'Burn', v => dmgF(v) + '/s'],
   ['chain', 'Jumps', String], ['bounce', 'Bounces', String], ['poison', 'Poison', v => dmgF(v) + '/s'], ['stacks', 'Stacks', String, 1], ['stun', 'Stun', v => n2(v) + 's'],
-  ['crit', 'Crit', pct], ['armorPen', 'Armour pen', v => pct(Math.min(.9, v))], ['amp', 'Curse', v => '+' + pct(v)], ['ampT', 'Lasts', v => n2(v) + 's', 1], ['drain', 'Drain', v => dmgF(v) + '/s'],
+  ['crit', 'Crit', pct], ['hit', 'Hit', pct], ['armorPen', 'Armour pen', v => pct(Math.min(.9, v))], ['amp', 'Curse', v => '+' + pct(v)], ['ampT', 'Lasts', v => n2(v) + 's', 1], ['drain', 'Drain', v => dmgF(v) + '/s'],
   ['auraD', 'Aura', v => '+' + pct(v) + ' dmg'], ['auraS', 'Haste', v => '+' + pct(v)], ['auraR', 'Radius', n2],
 ];
 const shrineAttacks = (tier, st) => tier >= 2 || !!st.caps.wrath || !!st.caps.consecrate;
 // eff = live/talent stats, base = plain tier stats; boosted values are green with the base after them
 function statLine(type, tier, eff, base) {
   const d = TOWERS[type], out = [], attacks = !d.support || shrineAttacks(tier, eff);
+  const core = typeof critOn === 'function' && critOn() && d.force && !d.wall && attacks;   // (a force unit's crit and hit chance: core stats, WoW style)
   for (const [k, lbl, f, opt] of STAT_DEFS) {
     let ev = eff[k], bv = base[k];
+    if (k === 'crit' && core) { if (!eff.critDone) ev = CRIT.base; bv = CRIT.base; }
+    if (k === 'hit') { if (!core || typeof hitShow !== 'function') continue; ev = hitShow(eff).foe / 100; bv = hitShow({}).foe / 100; }
     if (k === 'stacks') { if (type !== 'venom') continue; ev = 3 + (ev || 0); bv = 3; }
     if (ev == null || (!ev && !bv)) continue;
     if (d.support && !attacks && (k === 'smite' || k === 'range' || k === 'rate')) continue;
@@ -89911,50 +90009,54 @@ const WIZ_PLANT = { wr: [-.21, .66, .16], foot: [-.225, 0, .22] };   // the staf
 // moths pour from the crystal; held while they stream out, then lowered and planted
 const WIZ_LIFT = { wl: [.22, .83, .17], wr: [-.2, .74, .14], foot: [-.25, .16, -.04], lean: -.1, head: -.16, tw: .08 };
 const WIZ_CLIPS = {
+  // (17 Nov, owner: "more dramatic": the whole body commits, rp / ry, and the dips are deep; the release keys' times kept)
   thicket: { T: 1.3, wT: .28, shift: .28,
-    wk: [[.3, { wl: [.2, .65, .1], wr: [-.2, .61, .12], foot: [-.2, 0, .14], lean: .17, head: .14, tw: -.14, dip: .022, sway: -.004, glow: .35 }],   // (the dip: sunk and coiled over the staff)
-      [.8, { wl: [.22, .97, .08], wr: [-.19, .82, .08], foot: [-.25, .15, .01], lean: -.15, head: -.23, tw: .05, dip: -.006, sway: .002, glow: .9 }],   // (hoisted, tipped back, up on his toes)
-      [1, { wl: [.21, .99, .06], wr: [-.185, .84, .07], foot: [-.245, .18, 0], lean: -.17, head: -.25, tw: .06, dip: -.007, glow: 1 }]],   // (held: the light pinches)
-    keys: [[.06, { wl: [.24, .66, .32], wr: [-.21, .6, .27], foot: [-.22, 0, .44], lean: .3, head: .12, tw: -.1, dip: .026, sway: -.006, glow: 1 }, 'o'],   // (driven down: the cast)
-      [.17, { wl: [.25, .64, .31], wr: [-.21, .6, .27], foot: [-.22, 0, .45], lean: .31, head: .19, tw: -.11, dip: .031, sway: -.007, glow: 1 }, 'o'],   // (the knees give, the head nods on)
-      [.45, { wl: [.25, .65, .29], wr: [-.21, .61, .26], foot: [-.22, 0, .42], lean: .25, head: .1, tw: -.08, dip: .022, sway: -.005, glow: .8 }],   // (leaning on it while the roots rise)
-      [.85, { wl: [.24, .73, .2], wr: [-.21, .64, .21], foot: [-.225, 0, .3], lean: .09, head: .03, dip: .008, glow: .45 }, 'i'],   // (pushing himself up)
-      [1.08, { wl: [.25, .77, .13], lean: -.03, head: -.04, dip: -.002, glow: .2 }, 'i']] },   // (a stretch back as he straightens)
+    wk: [[.4, { wl: [.2, .65, .1], wr: [-.2, .61, .12], foot: [-.2, 0, .1], lean: .2, head: .16, tw: -.16, dip: .045, sway: -.006, rp: .1, ry: -.24, glow: .35 }],   // (coiled low, turned away, hunched over the staff)
+      [.86, { wl: [.22, .97, .08], wr: [-.19, .82, .08], foot: [-.25, .16, .01], lean: -.16, head: -.26, tw: .05, dip: -.022, sway: .003, rp: -.14, ry: -.06, glow: .9 }],   // (hoisted, up on his toes, thrown back)
+      [1, { wl: [.21, .99, .06], wr: [-.185, .84, .07], foot: [-.245, .19, 0], lean: -.18, head: -.28, tw: .06, dip: -.025, rp: -.16, ry: -.05, glow: 1 }]],   // (held: the light pinches)
+    keys: [[.06, { wl: [.24, .66, .32], wr: [-.21, .6, .27], foot: [-.22, 0, .46], lean: .32, head: .14, tw: -.1, dip: .055, sway: -.008, rp: .2, ry: .14, glow: 1 }, 'o'],   // (driven down: the whole body behind it)
+      [.17, { wl: [.25, .64, .31], wr: [-.21, .6, .27], foot: [-.22, 0, .47], lean: .33, head: .22, tw: -.11, dip: .064, sway: -.009, rp: .23, ry: .15, glow: 1 }, 'o'],   // (the knees give, the head nods on)
+      [.55, { wl: [.25, .65, .29], wr: [-.21, .61, .26], foot: [-.22, 0, .44], lean: .27, head: .12, tw: -.08, dip: .056, sway: -.007, rp: .19, ry: .12, glow: .8 }],   // (held in the lunge while the roots rise)
+      [.75, { wl: [.24, .7, .23], wr: [-.21, .63, .23], foot: [-.225, 0, .36], lean: .15, head: .03, dip: .03, rp: .1, ry: .07, glow: .55 }, 'o'],   // (a push back up off the staff)
+      [.95, { wl: [.24, .74, .18], wr: [-.21, .65, .2], foot: [-.225, 0, .28], lean: .07, head: .02, dip: .012, rp: .03, ry: .02, glow: .35 }, 'i'],
+      [1.12, { wl: [.25, .77, .13], lean: -.03, head: -.05, dip: -.004, rp: -.04, glow: .2 }, 'i']] },   // (a stretch back as he straightens)
   constrict: { T: 1.7, wT: .2, shift: .2,
-    wk: [[.38, { wl: [.2, .69, .1], wr: [-.2, .63, .13], foot: [-.21, 0, .3], lean: .12, head: .1, tw: -.1, dip: .016, sway: -.003, glow: .4 }],   // (drawn in low)
-      [1, { ...WIZ_LIFT, dip: -.004, sway: .003, glow: 1 }]],   // (raised, tipped toward the foes)
-    keys: [[.08, { ...WIZ_LIFT, foot: [-.25, .2, -.08], lean: -.06, head: -.1, tw: .12, dip: -.002, glow: 1 }, 'o'],   // (the pour: the staff thrust a little further over)
-      [.32, { ...WIZ_LIFT, foot: [-.27, .19, -.03], lean: -.07, head: -.08, tw: .05, hy: -.12, glow: .9 }],   // (wafting the swarm out: the staff swung one way,
-      [.6, { ...WIZ_LIFT, foot: [-.23, .2, -.08], lean: -.08, head: -.1, tw: .12, hy: .1, glow: .85 }],   //  then back, his look following it)
-      [.9, { ...WIZ_LIFT, foot: [-.245, .17, -.05], lean: -.06, head: -.06, glow: .7 }],
-      [1.18, { wl: [.24, .75, .16], ...WIZ_PLANT, lean: .07, head: .07, dip: .014, sway: -.004, glow: .4 }, 'o'],   // (planted: his weight onto it)
-      [1.45, { wl: [.25, .76, .14], lean: .02, head: .02, dip: .004, glow: .15 }, 'i']] },
-  // Wither: the staff levelled at the foe (its foot swung up behind his hand); held while the decay flows, with a tremor
-  // of effort through the staff (shake), then lowered and planted
-  briarfield: { T: 1.5, wT: .16, shift: .16, shake: [.1, .95, .012],
-    wk: [[.45, { wl: [.2, .72, .1], wr: [-.21, .7, .12], foot: [-.22, .28, .36], lean: -.07, head: -.05, tw: -.15, dip: .01, sway: .006, glow: .4 }],   // (drawn back, his weight on his back foot)
-      [1, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .42, -.14], lean: .09, head: .04, tw: .09, dip: .012, sway: -.004, glow: 1 }]],   // (levelled at the foe, stepping into it)
-    keys: [[.08, { wl: [.18, .75, .11], wr: [-.2, .69, .2], foot: [-.21, .46, -.17], lean: .11, head: .06, tw: .1, dip: .014, sway: -.005, glow: 1 }, 'o'],   // (the decay flows: a little further)
-      [.35, { wl: [.18, .74, .11], wr: [-.2, .69, .2], foot: [-.21, .45, -.16], lean: .105, head: .1, tw: .095, dip: .015, sway: -.005, glow: .95 }],   // (glaring down the staff)
-      [.7, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .4, -.13], lean: .1, head: .07, tw: .09, dip: .012, glow: .8 }],
-      [.98, { wl: [.22, .75, .14], wr: [-.205, .67, .17], foot: [-.22, .14, .08], lean: .05, head: .02, tw: .03, dip: .006, glow: .55 }, 'i'],   // (lowered)
-      [1.18, { wl: [.24, .76, .16], ...WIZ_PLANT, lean: .06, head: .05, dip: .012, sway: -.003, glow: .35 }, 'o']] },   // (planted with a little weight)
+    wk: [[.38, { wl: [.2, .69, .1], wr: [-.2, .63, .13], foot: [-.21, 0, .3], lean: .14, head: .12, tw: -.1, dip: .05, sway: -.005, rp: .16, ry: -.26, glow: .4 }],   // (crouched low over the staff, turned away)
+      [1, { ...WIZ_LIFT, dip: -.022, sway: .004, rp: -.12, ry: .04, glow: 1 }]],   // (risen tall on his toes, the staff raised high)
+    keys: [[.08, { ...WIZ_LIFT, foot: [-.25, .21, -.09], lean: -.04, head: -.08, tw: .12, dip: .01, rp: .12, ry: .16, glow: 1 }, 'o'],   // (the pour: the staff and the whole body thrust over at the foes)
+      [.22, { ...WIZ_LIFT, foot: [-.25, .19, -.05], lean: -.09, head: -.16, tw: .08, dip: -.012, rp: -.1, ry: .1, glow: .95 }, 'o'],   // (thrown back as the swarm bursts out)
+      [.45, { ...WIZ_LIFT, foot: [-.27, .19, -.03], lean: -.07, head: -.08, tw: .05, hy: -.14, dip: -.006, rp: -.04, ry: -.28, glow: .9 }],   // (wafting the swarm out: the whole body swung one way,
+      [.72, { ...WIZ_LIFT, foot: [-.23, .2, -.08], lean: -.08, head: -.1, tw: .12, hy: .12, dip: -.006, rp: -.02, ry: .26, glow: .85 }],   //  then back, his look following it)
+      [.95, { ...WIZ_LIFT, foot: [-.245, .17, -.05], lean: -.06, head: -.06, dip: -.004, rp: -.05, ry: .02, glow: .7 }],
+      [1.18, { wl: [.24, .75, .16], ...WIZ_PLANT, lean: .08, head: .12, dip: .05, sway: -.006, rp: .16, ry: .06, glow: .4 }, 'o'],   // (planted hard: his weight onto it)
+      [1.45, { wl: [.25, .76, .14], lean: .02, head: .02, dip: .01, rp: .03, glow: .15 }, 'i']] },
+  // Wither: wound right round away from the foe, then snapped round into it, the staff levelled; held, the whole body
+  // leaning down the staff while the decay flows, with a tremor of effort (shake); a recoil as it ends (the staff kicks
+  // up), then lowered and planted
+  briarfield: { T: 1.5, wT: .16, shift: .16, shake: [.1, .9, .014],
+    wk: [[.45, { wl: [.2, .72, .1], wr: [-.21, .7, .12], foot: [-.22, .3, .36], lean: -.07, head: -.05, tw: -.15, dip: .025, sway: .01, rp: -.1, ry: -.34, glow: .4 }],   // (wound away, weight on the back foot)
+      [1, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .42, -.14], lean: .09, head: .04, tw: .09, dip: .035, sway: -.006, rp: .14, ry: .16, glow: 1 }]],   // (snapped round into the foe)
+    keys: [[.08, { wl: [.18, .75, .11], wr: [-.2, .69, .2], foot: [-.21, .46, -.17], lean: .1, head: .06, tw: .1, dip: .04, sway: -.007, rp: .19, ry: .2, glow: 1 }],   // (the decay flows: further)
+      [.35, { wl: [.18, .74, .11], wr: [-.2, .69, .2], foot: [-.21, .45, -.16], lean: .105, head: .12, tw: .095, dip: .042, sway: -.007, rp: .16, ry: .18, glow: .95 }],   // (glaring down the staff)
+      [.7, { wl: [.19, .75, .12], wr: [-.2, .69, .19], foot: [-.21, .43, -.14], lean: .1, head: .09, tw: .09, dip: .04, rp: .15, ry: .16, glow: .85 }],
+      [.9, { wl: [.21, .75, .13], wr: [-.205, .68, .17], foot: [-.215, .34, .04], lean: -.02, head: -.04, tw: .04, dip: .008, rp: -.07, ry: .06, glow: .6 }, 'o'],   // (the recoil: thrown back, the staff kicking up)
+      [1.18, { wl: [.24, .76, .16], ...WIZ_PLANT, lean: .06, head: .05, dip: .02, sway: -.003, rp: .06, ry: .02, glow: .35 }, 'o']] },   // (planted)
   // the strike: over the reload a small sink (gathering), then the hand raised beside his head and the staff lifted, up on
   // his toes; on the shot the staff thumps down (eased out: fast, then slowing), the knees give and the head nods on after
   // the body (follow), then he rises back to rest
-  strike: { pre: { wl: [.22, .73, .12], wr: [-.205, .66, .13], foot: [-.225, 0, .17], lean: .05, head: .05, tw: .03, dip: .01 },
-    wind: { wl: [.2, .88, .06], wr: [-.2, .72, .13], foot: [-.225, .06, .14], tw: -.13, lean: -.05, head: -.05, dip: -.004, sway: .003 },
-    hit: { wl: [.2, .67, .22], wr: [-.21, .66, .15], foot: [-.225, 0, .21], tw: .12, lean: .12, head: .06, dip: .012, sway: -.003, glow: .4 },
-    follow: { wl: [.2, .665, .225], wr: [-.21, .658, .152], foot: [-.225, 0, .23], tw: .14, lean: .15, head: .11, dip: .02, sway: -.004, glow: .35 } },
+  strike: { pre: { wl: [.22, .73, .12], wr: [-.205, .66, .13], foot: [-.225, 0, .17], lean: .05, head: .05, tw: .03, dip: .015 },
+    wind: { wl: [.2, .88, .06], wr: [-.2, .72, .13], foot: [-.225, .06, .14], tw: -.13, lean: -.05, head: -.05, dip: -.006, sway: .003 },
+    hit: { wl: [.2, .67, .22], wr: [-.21, .66, .15], foot: [-.225, 0, .21], tw: .12, lean: .12, head: .06, dip: .018, sway: -.003, glow: .4 },
+    follow: { wl: [.2, .665, .225], wr: [-.21, .658, .152], foot: [-.225, 0, .23], tw: .14, lean: .15, head: .11, dip: .030, sway: -.004, glow: .35 } },
 };
 // the body's share of every move, over the keys as written: the hands can travel only a little (WIZ_REACH: the bake fuses
 // his forearms to the robe), so the body (turned, leaned and sunk, carrying the arms with the chest) does the acting
-let WIZ_AMP = { lean: 1.35, head: 1.3, tw: 1.35, dip: 1.5, sway: 1.3 };
+let WIZ_AMP = { lean: 1.35, head: 1.3, tw: 1.35, sway: 1.3 };   // (dip is written as meant: 17 Nov)
 const WIZ_EASE = (e, u) => (QEASE[e] ? QEASE[e](u) : umSm(0, 1, u));
 // the wind-up at u (0..1 of the cast bar): from rest through its keys, eased, held at the last
 function wizWind(C, rest, u) {
   let a = [0, rest];
-  for (const [k, o, e] of C.wk) { const b = [k, queenOver(rest, o)]; if (u <= k) return queenMix(a[1], b[1], WIZ_EASE(e, Math.max(0, Math.min(1, (u - a[0]) / Math.max(1e-4, k - a[0]))))); a = b; }
+  for (const [k, o, e] of C.wk) { const b = [k, queenOver(rest, o)]; if (u <= k) return wizMix(a[1], b[1], WIZ_EASE(e, Math.max(0, Math.min(1, (u - a[0]) / Math.max(1e-4, k - a[0]))))); a = b; }
   return a[1];
 }
 const wizHeld = (C, rest) => queenOver(rest, C.wk[C.wk.length - 1][1]);   // (its last key: where the release starts)
@@ -89965,12 +90067,30 @@ function wizInst(C) {
   return (C._inst = { T: C.T + C.shift, keys, shake: C.shake && [C.shake[0] + C.shift, C.shake[1] + C.shift, C.shake[2]] });
 }
 // the clip's pose at el seconds (keys from `from`, each eased by its own ease), ending at rest
-const wizClip = (C, rest, from, el, q) => queenClip({ T: C.T, keys: C.keys }, rest, from, el, q);
+/* (owner, 17 Nov: "more dramatic") two whole-body controls on top: rp (the whole body tipped forward about his feet, +, or
+   back, -) and ry (the whole body turned toward his left, +). Rigid (the root bone): the body commits to a move without
+   bending the arm/robe seam any further. queenMix knows only Elowen's fields, so these are mixed here. */
+const WIZ_RIG = ['rp', 'ry'];
+function wizMix(a, b, k, q, arc) {
+  const o = queenMix(a, b, k, q, arc), kk = Math.max(0, Math.min(1, k));
+  for (const f of WIZ_RIG) o[f] = (a[f] || 0) + ((b[f] || 0) - (a[f] || 0)) * kk;
+  return o;
+}
+// the clip's pose at el seconds (keys from `from`, each eased by its own ease), ending at rest (queenClip, with wizMix)
+function wizClip(C, rest, from, el, q) {
+  if (el >= C.T) return rest;
+  const K = [[0, from]].concat(C.keys.map(([s, o, e]) => [s, queenOver(rest, o), e])).concat([[C.T, rest, 'i']]);
+  for (let i = 1; i < K.length; i++) if (el <= K[i][0]) {
+    const a = K[i - 1], b = K[i], u = Math.max(0, Math.min(1, (el - a[0]) / Math.max(1e-4, b[0] - a[0])));
+    return wizMix(a[1], b[1], WIZ_EASE(b[2], u));
+  }
+  return rest;
+}
 /* ---- the springs: every control follows its target on a damped spring (ease in and out, an overshoot and a settle),
    each at its own rate, so the body never moves as one block: the hands lead, the chest follows, the head trails it, the
    staff swings with its weight, and the cloak and beard hang after the body and sway. [stiffness (rad/s), damping] ---- */
 const WIZ_SPR = { tw: [15, .6], lean: [15, .58], head: [12, .55], hy: [5, .7], roll: [3.5, .9], glow: [22, 1],
-  dip: [12, .5], sway: [6, .8],   // (the knees: a little bounce as they take a blow; the weight: slow, no bounce)
+  dip: [12, .5], sway: [6, .8], rp: [11, .5], ry: [10, .55],   // (the whole body: heavy, a little overshoot)   // (the knees: a little bounce as they take a blow; the weight: slow, no bounce)
   wl: [26, .5], wr: [22, .52], foot: [13, .42], pl: [12, .7], pr: [12, .7],
   htw: [9, .5], hl: [9, .48], cl: [5, .45], bp: [5.5, .28], brl: [5, .3] };
 const WIZ_V = ['wl', 'wr', 'foot', 'pl', 'pr'];
@@ -90052,7 +90172,7 @@ function wizCtl(t, live, q) {
     }
   }
   if (busy) for (const k in WIZ_AMP) P[k] = (P[k] || 0) * WIZ_AMP[k];   // (the body carries the move: see WIZ_AMP)
-  P = { ...P, wl: wizReach(P.wl, rest.wl, WIZ_REACH_L), wr: wizReach(P.wr, rest.wr, WIZ_REACH_R), foot: P.foot.slice(), hy: P.hy || 0, roll: 0, dip: P.dip || 0, sway: P.sway || 0 };
+  P = { ...P, wl: wizReach(P.wl, rest.wl, WIZ_REACH_L), wr: wizReach(P.wr, rest.wr, WIZ_REACH_R), foot: P.foot.slice(), hy: P.hy || 0, roll: 0, dip: P.dip || 0, sway: P.sway || 0, rp: P.rp || 0, ry: P.ry || 0 };
   // the living idle, its phase his own (a row of them never moves in step), faded under a move (iw):
   // - the breath: a quicker draw in and a slow let out, the chest lifting and opening, the shoulders and free hand rising
   // - the weight drifting from foot to foot, lingering on each and quicker across (the hips shift and tip, the shoulders
@@ -90081,7 +90201,7 @@ function wizCtl(t, live, q) {
   const S = t._wizK || (t._wizK = { x: {}, v: {} }), o = { br: P.br, cape: P.cape };
   const n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n;
   for (let i = 0; i < n; i++) {
-    for (const k of ['tw', 'lean', 'head', 'hy', 'roll', 'dip', 'sway', 'glow', 'wl', 'wr', 'foot', 'pl', 'pr']) o[k] =wizSpring(S, k, P[k], h, spell && k !== 'glow' ? (k === 'hy' ? 3 : 1.6) : 1);   // (a spell's quick wind-up: the body follows faster)
+    for (const k of ['tw', 'lean', 'head', 'hy', 'roll', 'dip', 'sway', 'rp', 'ry', 'glow', 'wl', 'wr', 'foot', 'pl', 'pr']) o[k] =wizSpring(S, k, P[k], h, spell && k !== 'glow' ? (k === 'hy' ? 3 : 1.6) : 1);   // (a spell's quick wind-up: the body follows faster)
     o.htw = wizSpring(S, 'htw', o.tw, h); o.hl = wizSpring(S, 'hl', o.lean, h); o.cl = wizSpring(S, 'cl', o.lean, h);
     o.bp = wizSpring(S, 'bp', o.lean * .6 + o.head, h); o.brl = wizSpring(S, 'brl', o.tw + o.hy * .5, h);
   }
@@ -90097,6 +90217,8 @@ function wizPose(R, P, q) {
   const { B, bix, nb } = R, X = UMX, Q = new Array(nb), H = new Array(nb), L = new Array(nb).fill(null);
   const tw = P.tw, lean = P.lean, br = P.br || 0, hy = P.hy || 0, dip = P.dip || 0, sway = P.sway || 0, roll = (P.roll || 0) + sway * 1.6;
   const htw = P.htw != null ? P.htw : tw, hl = P.hl != null ? P.hl : lean, cl = P.cl != null ? P.cl : lean;
+  const rp = P.rp || 0, rY = P.ry || 0;
+  if (rp || rY) L[bix.root] = X.mul(X.ry(rY), X.rx(rp));   // (the whole body tipped and turned about his feet)
   L[bix.hips] = X.mul(X.ry(tw * .25), _wizRz(roll));
   L[bix.spine] = X.mul(X.mul(X.ry(tw * .3), X.rx(.01 * br + lean * .45)), _wizRz(-roll * .55));
   L[bix.chest] = X.mul(X.mul(X.ry(tw * .4), X.rx(.018 * br + lean * .55)), _wizRz(-roll * .35));
@@ -90130,7 +90252,7 @@ function wizPose(R, P, q) {
     const n = B[b].n;
     if (n === 'upper_arm.R') {
       arm(b, bix['forearm.R'], iR, carry(P.wr), X.mv(Q[B[b].p] || X.I(), X.add(q.poleR, P.pr)));
-      const g = at(iR, B[iS].h), up = X.nrm(X.sub(g, P.foot)), qs = X.mul(X.arc(d0, up), X.I());
+      const g = at(iR, B[iS].h), up = X.nrm(X.sub(g, L[bix.root] ? X.mv(L[bix.root], P.foot) : P.foot)), qs = X.mul(X.arc(d0, up), X.I());
       Q[iR] = X.blend(Q[iR], qs, WIZ_GRIP); H[iS] = at(iR, B[iS].h); Q[iS] = qs;   // (the hand turns part way with the staff: the rest is the grip's give)
     } else if (n === 'upper_arm.L') arm(b, bix['forearm.L'], bix['hand.L'], carry(P.wl), X.mv(Q[B[b].p] || X.I(), X.add(q.poleL, P.pl)));
     else if (n === 'forearm.R' || n === 'hand.R' || n === 'forearm.L' || n === 'hand.L' || n === 'staff') continue;   // (set with their arm)
