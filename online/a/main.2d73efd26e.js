@@ -1,4 +1,4 @@
-const BUILD_TAG = '9791599@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1e81512@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16093,7 +16093,7 @@ if (typeof ABIL_SCHOOL !== 'undefined') Object.assign(ABIL_SCHOOL, { shift: 'nat
      effect, then a short overheat pause before the gun or hammer is ready again. Heat, then vent, then heat again.
    - COLD BOILERS (the weakness): every unit starts each wave cold, its strikes 30% slower, warming a quarter with each
      strike (a vent, or a Champion's spell with the right tankard, warms it at once). Slow to start, strong in a long fight.
-   - RUNES: Runesmiths inscribe a rune on a nearby unit (t.ihRune). Its next ability spends it: +50% to what it does.
+   - RUNES: Anvilwrights inscribe a rune on a nearby unit (t.ihRune). Its next ability spends it: +50% to what it does.
    - HELD foes: pinned by chain nets, shoved by shields, stunned by slams (c.ihHeldT). The Thane's people pay off on them.
    - CONSTRUCTS: caltrops, bear traps, steam vents, pitch fires and sentries stand on the path a while (G.hazards with an
      ih_ kind, run by the hazard hook and drawn by their owner, see _f).
@@ -16116,7 +16116,7 @@ FORCES[IH_ID] = { name: 'Ironhold', title: 'Clanhost of the Iron Peaks', hue: '#
     frost: { id: 'chaintrapper', name: 'Chain Trappers', short: 'Trappers', key: '3', proj: 'force', attack: 'chaintrapper', elem: null, dmgType: 'phys', air: true, ground: true, top: [.8, .86, .92],
       blurb: 'Fur-clad trappers with bolas and weighted chain nets. Bolas slow the foe furthest along; every 4th throw is a net that pins it in place (a flyer is dragged down instead). Air and ground.',
       tiers: [{ cost: 30, dmg: 6, rate: 1.5, range: 2.6, ihSlow: .3, pin: .7 }, { cost: 55, dmg: 14, rate: 1.4, range: 2.8, ihSlow: .35, pin: .8 }, { cost: 115, dmg: 33, rate: 1.3, range: 3, ihSlow: .4, pin: .9 }] },
-    arcane: { id: 'runesmith', name: 'Runesmiths', short: 'Runes', key: '4', proj: 'force', attack: 'runesmith', elem: null, dmgType: 'arcane', air: true, ground: true, prio: 2, top: [.82, .88, .95],
+    arcane: { id: 'runesmith', name: 'Anvilwrights', short: 'Anvils', key: '4', proj: 'force', attack: 'runesmith', elem: null, dmgType: 'arcane', air: true, ground: true, prio: 2, top: [.82, .88, .95],
       blurb: 'Elders at a portable anvil. Each hammer-stroke hurls a rune-brand at the strongest foe (branded foes take more from every unit), and every 3rd stroke inscribes a rune on a unit nearby: its next ability is half again as strong.',
       tiers: [{ cost: 40, dmg: 36, rate: 2, range: 3, brand: .08 }, { cost: 75, dmg: 85, rate: 1.9, range: 3.3, brand: .08 }, { cost: 160, dmg: 200, rate: 1.8, range: 3.6, brand: .1 }] },
     storm: { id: 'flakgunner', name: 'Flak Cannoneers', short: 'Flak', key: '5', proj: 'force', attack: 'flakgunner', elem: null, dmgType: 'phys', air: true, ground: true, top: [.9, .96, 1.02],
@@ -16188,7 +16188,7 @@ function ihHeatRate(t, st) {
   if (st.pw && st.pw.ihBellows) k += .25 * st.pw.ihBellows;
   return k;
 }
-function ihHeatAdd(t, st, frac) {   // frac: of a full gauge, straight in (a Runesmith's forge, a whistle, a round of ale)
+function ihHeatAdd(t, st, frac) {   // frac: of a full gauge, straight in (a Anvilwright's forge, a whistle, a round of ale)
   if (!ihHot(t)) return;
   t.ihHeat = Math.min(1, (t.ihHeat || 0) + frac);
 }
@@ -16220,7 +16220,7 @@ function ihBoilerChain(t) {
 }
 
 /* ---------- runes ---------- */
-// t.ihRune: { k (the boost), at, by (the Runesmith), refund (Runic Overflow), fury (Rune of Fury) }
+// t.ihRune: { k (the boost), at, by (the Anvilwright), refund (Runic Overflow), fury (Rune of Fury) }
 function ihInscribe(o, by, k, more) {
   if (!o || o.wrecked) return false;
   o.ihRune = Object.assign({ k: k || 1.5, at: G.time, by }, more || {});
@@ -16262,7 +16262,7 @@ function ihShove(c, d, src, col) {
   c.ihHeldT = Math.max(c.ihHeldT || 0, G.time + .8); c.ihShovedT = G.time;
 }
 function ihStun(c, d, bossF) { if (!c || c.dead) return; const s0 = c.stunT; stun(c, d, bossF == null ? .4 : bossF, null); if (c.stunT > s0) c.ihHeldT = Math.max(c.ihHeldT || 0, G.time + c.stunT); }
-// the Runesmiths' brand: +k damage from every unit while it lasts (the amp hook reads it)
+// the Anvilwrights' brand: +k damage from every unit while it lasts (the amp hook reads it)
 function ihBrand(c, k, dur, src) {
   if (!c || c.dead) return;
   const fresh = !(c.ihBrandT > G.time);
@@ -16406,7 +16406,7 @@ function ihCaltrops(t, st, x, z, r, dur, slow, shred, more) {
   return z0;
 }
 
-// ---- Runesmiths: a rune-brand hurled at the strongest foe; every 3rd stroke inscribes a rune on a unit nearby ----
+// ---- Anvilwrights: a rune-brand hurled at the strongest foe; every 3rd stroke inscribes a rune on a unit nearby ----
 FORCE_ATTACK.runesmith = function (t, st, tg, pow, echo) {
   const C = st.caps, d = Math.hypot(tg.x - t.x, tg.y - t.y), trav = .08 + d / 14, h0 = towerTop(t) - .2;
   rfx({ k: 'streak', x0: t.x, h0, z0: t.y, c: tg, col: IH_COL.rune, w: .05, trav, life: trav + .15 });
@@ -16602,7 +16602,7 @@ FORCE_HOOKS[IH_ID] = {
   // damage taken: brands, pins, cracks, the burning (and items and commanders)
   amp(c, src, dot) {
     let a = 0;
-    if (c.ihBrandT > G.time) a += c.ihBrandK || 0;   // the Runesmiths' brand
+    if (c.ihBrandT > G.time) a += c.ihBrandK || 0;   // the Anvilwrights' brand
     if (c.ihPinT > G.time && c.stunT > 0) a += .08 * talentHas('frost', 'ihPinAmp');   // Bound and Broken
     if (c.ihCrackT > G.time) a += .2 * talentHas('earth', 'ihMolten');   // Molten Rivets
     const ss = src && src.st, C = ss && ss.caps;
@@ -16874,7 +16874,7 @@ const IH_TALENTS = {
     GT('Caltrop Bed', 'spikes', 3, 0, 1, 'Each ground foe Harpoon Winch hauls is dropped on a bed of caltrops: a patch of them is left where it lands for 3s.', {}, { sp: { ab: 'ih_grapple', rider: { ihfBed: 1 } } }),
   ] },
 
-  /* ---- Runesmiths (arcane): Runebrand (innate), Rune of Making (row II), Rune of Unmaking (row IV) ---- */
+  /* ---- Anvilwrights (arcane): Runebrand (innate), Rune of Making (row II), Rune of Unmaking (row IV) ---- */
   arcane: { name: 'Runecraft', hue: '#e07a2a', list: [
     GT('Searing Brand', 'ember', 0, 3, 2, n => `Brands sear: the foe burns for ${10 * n}% of the strike a second for 3s.`, {}, { cap: 'ihSear' }),
     GT('Deep Brand', 'rune', 0, 0, 3, n => `Brands last ${n}s longer, and the branded foe takes ${2 * n}% more besides.`, {}, { cap: 'ihDeepBrand' }),
@@ -16889,8 +16889,8 @@ const IH_TALENTS = {
     GT('Runic Overflow', 'potion', 1, 3, 2, n => `An ability cast on a rune gives back ${30 * n}% of its mana.`, {}, { cap: 'ihRefund' }),
     GT('Forge Heat', 'heat', 2, 3, 2, n => `Each stroke stokes the engines: the coolest heat unit within 2 cells gains ${10 * n}% heat.`, {}, { cap: 'ihStoke' }),
     GT('Runebrand Detonation', 'burst', 4, 0, 1, 'A branded foe that dies bursts in runes: every foe within 1 cell takes 2× a stroke and is branded. One that dies Unmade by Rune of Unmaking passes the Unmaking on to every foe its burst catches.', {}, { cap: 'ihDetonate', sp: { ab: 'ih_forgeburst', rider: { ihcDet: 1 } } }),
-    GT('Kinsmark', 'rune', 0, 2, 3, n => `Its strokes ignore ${5 * n}% of wards, and its runes hum on the units that carry them: each strike they make brands its foe for ${n}s (a light brand, half a Runesmith's).`, n => ({ magicPen: .05 * n }), { cap: 'ihfKin' }),
-    GT('Paid in Kind', 'gem', 1, 2, 2, n => `Each time a unit spends one of its runes on a spell, it pays the Runesmith ${6 * n} mana.`, {}, { cap: 'ihfKind' }),
+    GT('Kinsmark', 'rune', 0, 2, 3, n => `Its strokes ignore ${5 * n}% of wards, and its runes hum on the units that carry them: each strike they make brands its foe for ${n}s (a light brand, half a Anvilwright's).`, n => ({ magicPen: .05 * n }), { cap: 'ihfKin' }),
+    GT('Paid in Kind', 'gem', 1, 2, 2, n => `Each time a unit spends one of its runes on a spell, it pays the Anvilwright ${6 * n} mana.`, {}, { cap: 'ihfKind' }),
     GT('Quench', 'heat', 0, 1, 3, n => `When a unit spends one of its runes on a spell, the rune's heat floods its boiler: an engine gains ${20 * n}% heat.`, {}, { cap: 'ihfQuench' }),
   ] },
 
@@ -16978,7 +16978,7 @@ FORCES[IH_ID].talents = IH_TALENTS; FORCES[IH_ID].talFlavor = IH_TAL_FLAVOR; FOR
 
 /* ================= IRONHOLD: abilities (mana, autocast and lore, as abilities.js runs them) =================
    Three per unit: the first innate, the other two studied at the keep and learned at tiers II and IV. Damage is a
-   multiple of the unit's live damage D. Every cast goes through ihCastWrap: a rune on the unit (a Runesmith's, a
+   multiple of the unit's live damage D. Every cast goes through ihCastWrap: a rune on the unit (a Anvilwright's, a
    charm's, a relic's) is spent for K = +50% (or more) on what the ability does, and the clan's charms answer the cast.
    Each ability has its own pose in forces_ironhold_f.js (read from t.ab.last / t.ab.lastAt; anim: its length). */
 const IH_ABK = (st, m, K) => abD(st) * m * (K || 1);
@@ -17151,7 +17151,7 @@ const IH_KITS = {
       } },
   ] },
 
-  /* ---- Runesmiths: brand the mighty, wake the runes in their kin, a forge-burst at their feet ---- */
+  /* ---- Anvilwrights: brand the mighty, wake the runes in their kin, a forge-burst at their feet ---- */
   runesmith: { slot: 'arcane', mana: { max: 130, regen: 1.5, hit: 0 }, abilities: [
     { id: 'ih_runebrand', name: 'Runebrand', short: 'Brand', glyph: 'rune', hue: '#ff9a3a', mana: 90, cd: 10, rAdd: .5, research: null, anim: .8,
       by: { amp: [.15, .15, .2, .2, .25, .25] },
@@ -17467,7 +17467,7 @@ const IH_LEGENDS = {
     build: 'Bound and Broken, Dragnet and Wide Nets; Thunderguns and Mortar Crew behind to strike the caught foes.',
     fx: (st, k) => ihPw(st, 'ihGreatNet', .2 * k) },
   ih_firstforge: { for: 'arcane', name: 'Heart of the First Forge', icon: 'sun', hue: '#ff8a3a',
-    twist: 'The Runesmith carves a rune with every hammer stroke, so the clan round it casts rune-empowered again and again.',
+    twist: 'The Anvilwright carves a rune with every hammer stroke, so the clan round it casts rune-empowered again and again.',
     text: () => 'It carves a rune on a unit beside it with every stroke, not every 3rd.',
     combo: 'Runic Overflow, Rune of Fury and a ring of units round it.',
     build: 'Runic Overflow, Rune of Fury and Answering Rune; a ring of costly casters round it: Mortar Crew, Steam Hammers, Thunderguns.',
@@ -17488,7 +17488,7 @@ const IH_LEGENDS = {
     twist: 'Every Big Bertha walks a creeping barrage back down the path, leaving a lane of burning pitch.',
     text: k => `Each Big Bertha (its vented shell) is followed by ${ihGrandN(k)} more shells that walk back down the path toward the portal, 1 cell apart, each leaving burning pitch for 3s.`,
     combo: 'Big Bertha, Napalm and a long straight lane.',
-    build: 'Big Bertha, Ringing Ears and Napalm; the Boiler of Endless Steam or a Runesmith stoking its heat; a long straight lane.',
+    build: 'Big Bertha, Ringing Ears and Napalm; the Boiler of Endless Steam or a Anvilwright stoking its heat; a long straight lane.',
     fx: (st, k) => ihPw(st, 'ihGrand', ihGrandN(k)) },
   ih_bottomless: { for: 'holy', name: 'The Bottomless Keg', icon: 'barrel', hue: '#e0a040',
     twist: 'Your Champion pours a round for the whole clan with every spell: every engine on the field heats up and fills its mana.',
@@ -17498,7 +17498,7 @@ const IH_LEGENDS = {
     fx: (st, k) => { chPw(st, 'chFieldWarm', Math.min(.6, .3 * k)); chPw(st, 'chFieldMana', Math.round(15 * k)); } },
   // ---- for any unit ----
   ih_kingrune: { name: 'Rune of the Old King', icon: 'stars', hue: '#ffb050',
-    twist: 'Any unit becomes a Runesmith: every ability it casts carves a rune on the clan beside it.',
+    twist: 'Any unit becomes a Anvilwright: every ability it casts carves a rune on the clan beside it.',
     text: k => `Each ability it casts carves a rune on the nearest ${ihKingN(k) === 1 ? 'unit' : ihKingN(k) + ' units'} of the clan within 2.5 cells that bear none: their next ability is rune-empowered.`,
     combo: 'quick, cheap casters beside units with costly finishers.',
     build: 'a quick, cheap caster (Rattlegun, Chain Net, Pile Driver) beside costly finishers (The Long Drop, Steam Uppercut, Breaching Slug); the Twin Anvil charm.',
@@ -17687,7 +17687,7 @@ function ihItemsPostCast(t, ab, st, tg, K) {
     } });
   if (p && p.ihChip) { for (const c of ihFoes(t, st, t.x, t.y, (st.range || 2.5) + .3)) ihBrand(c, p.ihChip, 4, t); relicGlint(t, 'ih_anvilchip'); }   // Anvil Chip
   if (p && p.ihBoiler) ihBoilerChain(t);   // Boiler of Endless Steam
-  // Rune of the Old King: the cast carves a rune on the nearest clan units beside it that bear none (as a Runesmith's)
+  // Rune of the Old King: the cast carves a rune on the nearest clan units beside it that bear none (as a Anvilwright's)
   if (p && p.ihKingRune) {
     const L = ihAllies(t, 2.55, o => ihIs(o) && !o.ihRune && !!(typeof abilKit === 'function' && abilKit(o))).sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y));
     for (const o of L.slice(0, p.ihKingRune)) ihInscribe(o, t, 1.5);
@@ -38029,7 +38029,7 @@ const FSETS = [
     } },
   { id: 'fs_haul', spells: ['ih_chainnet'], force: 'ironhold', unit: 'frost', name: 'Trapper’s Long Haul',
     pieces: [['fs_ih_coil', 'Weighted Chain-Coil', 3, 'chain', '#5a5e66', 'range as'], ['fs_ih_jaws', 'Bear-Trap Jaws', 3, 'spikes', '#8a7a6a', 'dmg sp pen']],
-    b2: 'Every foe Chain Net catches is branded for 4s, as by a Runesmith, and each foe slain while caught in its nets gives it 10 mana.',
+    b2: 'Every foe Chain Net catches is branded for 4s, as by a Anvilwright, and each foe slain while caught in its nets gives it 10 mana.',
     hit(t, c, amt, sp) { if (sp === 'ih_chainnet' && c.hp > 0) ihBrand(c, .08, 4, t); },
     kill(t, c) { if (c.ihNetBy === t && c.ihHeldT > G.time) { gainMana(t, 10); fsGlint(t, this); } } },
   { id: 'fs_heirloom', spells: [], force: 'ironhold', unit: null, name: 'Clan-Forge Heirlooms',
@@ -38375,7 +38375,7 @@ for (const fn of SPEC_REG) { try { fn(); } catch (e) { console.warn('specialists
      Ironbreakers   Spinning Shield (a shield thrown down the corridor and back)    Breaker's Blow (the plate bursts out behind)
      Thunderguns    Rattlegun (unchanged)                                            Breaching Slug (the plate it tears off drives it on)
      Chain Trappers Tripwire (a chain across the road, wall to wall)                 Harpoon Winch (reeled back through its column)
-     Runesmiths     Rune of Making (struck runes fly to the clan)                    Rune of Unmaking (every hit strips plate, then it bursts)
+     Anvilwrights     Rune of Making (struck runes fly to the clan)                    Rune of Unmaking (every hit strips plate, then it bursts)
      Flak           Grapnel Shot (a flyer winched down onto the walkers)             Starshell (a hanging flare: flyers dragged low, plate laid bare)
      Steam Hammers  Pile Driver (a rhythm of slams that heats the boiler)            Steam Uppercut (one foe thrown back over its column)
      Mortar Crew    Skipping Shell (skips back along the road)                       The Long Drop (one huge shell, its shadow first, a crater)
@@ -40140,12 +40140,12 @@ if (typeof fsetAdd === 'function') {
       ihSparks(o.x, o.y, hitH(o), 6, '#d8dce4'); sfx('glaiveHit', 1); fsGlint(t, this);
     } });
 
-  /* ---------- Runesmiths: the Unmaking spreads from every rune that bursts ---------- */
+  /* ---------- Anvilwrights: the Unmaking spreads from every rune that bursts ---------- */
   const IH_RUNESET = 'fe_ih_rune';
   fsetAdd({ id: IH_RUNESET, epic: 1, spells: ['ih_runebrand', 'ih_forgeburst'], force: 'ironhold', unit: 'arcane', name: 'Tools of the Last Forge-Rune',
     pieces: [['fe_ih_chisel', 'Rune-Chisel of Black Iron', 3, 'rune', '#ff8a3a', 'sp mana'], ['fe_ih_apron', 'Forgemaster’s Scorched Apron', 3, 'ember', '#a0603a', 'sp regen']],
     old: [['fe_ih_goggles', 'Ember-Glass Goggles', 3, 'lens', '#ffb060', 'sp cd range'], ['fe_ih_cinder', 'Cinder-Rune Pendant', 3, 'stars', '#ffc060', 'sp cd']],
-    b2: 'Runebrand also Unmakes its foe for 4s, as Rune of Unmaking does. When an Unmade foe’s rune bursts, every ground foe within 1 cell of it is Unmade for 4s, and a rune flies to a unit within 2 cells of the Runesmiths that has none: its next spell is half again as strong (at most once every 4s).',
+    b2: 'Runebrand also Unmakes its foe for 4s, as Rune of Unmaking does. When an Unmade foe’s rune bursts, every ground foe within 1 cell of it is Unmade for 4s, and a rune flies to a unit within 2 cells of the Anvilwrights that has none: its next spell is half again as strong (at most once every 4s).',
     hit(t, c, amt, sp) {
       if (sp !== 'ih_runebrand' || !feIhLive(c)) return;
       c.ihcUnT = Math.max(c.ihcUnT || 0, G.time + 4); c.ihcUnBy = t; c.ihcUnK = c.ihcUnK || 1;
@@ -41488,7 +41488,7 @@ if (typeof CHAMPS !== 'undefined' && CHAMPS.thornbow && CHAMPS.thornbow.hit) {
      Ironbreakers   Hot Shards (the shards split the plate behind)       Breach the Line (a free Shield Shove that bowls the line)
      Thunderguns    Thunder Belt (Rattlegun fills the barrel: Thunderpeals mid-burst)
      Chain Trappers Twin Nets (a second Chain Net, free)                  Double Line (a second Tripwire further down the road)
-     Runesmiths     Runebrand Detonation (branded foes burst, Unmaking)  Ringing Anvil (the great rune stays on the road)
+     Anvilwrights     Runebrand Detonation (branded foes burst, Unmaking)  Ringing Anvil (the great rune stays on the road)
      Flak           Endless Belt (barrage shells heat the gun)           Shellstorm (clusters in Starshell's light)   Spent Flare
      Steam Hammers  Molten Rivets (cracked foes burst as they die)       Piston Rhythm (Pile Driver slams on while crowded)
      Mortar Crew    Walking Fire (The Long Drop walks up the road)       Red-Hot Tube (two Big Berthas after it)
@@ -41595,7 +41595,7 @@ ihcWrapCast('ih_caltropfield', (raw, t, st, p, ab, again) => {
   return r;
 });
 
-/* ---------- Runesmiths: Ringing Anvil (the great rune stays) ---------- */
+/* ---------- Anvilwrights: Ringing Anvil (the great rune stays) ---------- */
 ihcWrapCast('ih_forgeburst', (raw, t, st, p, ab, again) => {
   const r = raw(); if (r === false || again || !p || !ihcCap('arcane', 'ihcAnvil')) return r;
   const x = p.x, z = p.y;
@@ -44062,7 +44062,7 @@ SPEC_BUFF.push(
                     Case-Hardened (its daze: forces_zzzzzz_ironhold_cool.js)
      Chain Trappers Third Wrap ihfWrap, Wing Cords ihfWing, Trapper's Haul ihfHaul (mana), Bound and Broken (rider
                     ihfLandPin), Hooked Chain ihfHook, Caltrop Bed (rider ihfBed)
-     Runesmiths     Kinsmark ihfKin, Quench ihfQuench, Paid in Kind ihfKind (mana), Answering Rune ihfAnswer, Masterwork
+     Anvilwrights     Kinsmark ihfKin, Quench ihfQuench, Paid in Kind ihfKind (mana), Answering Rune ihfAnswer, Masterwork
                     Strike (rider ihfMasterRB on Runebrand)
      Flak           Torn Wings ihfTorn, Scorched Barrel ihfScorch, Sky Watch ihfSky (mana)
      Steam Hammers  Packed Crowd ihfCrowd, Steam in the Cracks ihfCracks, Hammer Home ihfHome, Pressure Gauge ihfGauge
@@ -44584,7 +44584,7 @@ ihcWrapCast('ch_firebrew', (raw, t, st, c, ab, again) => {
     }
     return r;
   };
-  // Kinsmark: a unit carrying a Runesmith's rune brands the foe it strikes
+  // Kinsmark: a unit carrying a Anvilwright's rune brands the foe it strikes
   H.fire = function (t, st, tg, pow, echo) {
     const p = fire0 ? fire0.apply(this, arguments) : pow;
     if (ihfOn() && !echo && tg && !tg.dead && t.ihRune && t.ihRune.by) {
@@ -47298,7 +47298,7 @@ const WPN_ISSUED = {
   ch_maren: ['Maren\'s Twin Rift-Blade', '#d05a8a', 'two long blades, red and pink, on one grip'],
   // Ironhold
   ironbreaker: ['Ironbreaker\'s Axe', '#9a7a5a', 'a stout dwarf axe'], thundergun: ['Thundergun Rifle', '#8a6a4a', 'a long scoped rifle'], chaintrapper: ['Trapper\'s Chain Net', '#7a7a8a', 'a net of iron rings and a bola'],
-  runesmith: ['Runesmith\'s Forge Hammer', '#6a8ac0', 'a forge hammer with a glowing rune'], flakgunner: ['Flak Cannon', '#7a6a5a', 'a stubby wide-bore gun'],
+  runesmith: ['Anvilwright\'s Forge Hammer', '#6a8ac0', 'a forge hammer with a glowing rune'], flakgunner: ['Flak Cannon', '#7a6a5a', 'a stubby wide-bore gun'],
   steamhammer: ['Steam Hammer\'s Lava Maul', '#d0602a', 'an iron war hammer with a molten lava face'], mortarcrew: ['Crew Mortar', '#6a5a4a', 'a short fat mortar tube'],
   siegebreaker: ['Siege Breaker\'s Pole', '#7a6a5a', 'a long breaching pole'], ch_haldra: ['Haldra\'s War Hammer', '#a06040', 'a heavy dwarf war hammer'],
   ch_tovin: ['Tovin\'s Copper Gauntlet', '#b0703a', 'a great copper gauntlet with a violet coil'], ch_grenna: ['Grenna\'s Great Ladle', '#b08a4a', 'a great copper ladle'],
@@ -49477,7 +49477,7 @@ function talRankSteps(t) {
                     Kneecapper (slows only, 25% a rank), Case-Hardened (no daze; 3 armour, not 2)
      Chain Trappers Tangle (bounces to any foe), Bound and Broken (the haul's landing pin only, 0.6s a rank; no amp on
                     pinned foes), Hooked Chain (the net at once; no mark)
-     Runesmiths     Deep Brand (deeper brands, 3% a rank; no longer brands), Swift Inscription (Rune of Making only; no
+     Anvilwrights     Deep Brand (deeper brands, 3% a rank; no longer brands), Swift Inscription (Rune of Making only; no
                     rune reach), Masterwork Strike (Runebrand brands the foes round its target), Runebrand Detonation
                     (a branded foe's death Unmakes the foes round it), Kinsmark (no ward pen; three-quarter brands)
      Flak           Tracer Rounds (the mark only, 4s), Endless Belt (no haste; shells heat 15%), Shellstorm (clusters only
@@ -84861,7 +84861,7 @@ const AFF_MODS = {
     up: { glaive: { k: 'reach', v: .1 }, frost: { k: 'range', v: .2 } }, dn: { storm: { k: 'rate', v: -.05 }, cannon: { k: 'range', v: -.2 } } },
   ih_artificer: { fav: 'cannon', sig: { name: 'Hot Barrels', t: 'A Mortar Crew reaches up to 0.6 cells further as its heat gauge fills.' },
     up: { storm: { k: 'range', v: .2 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'rate', v: -.05 }, arcane: { k: 'rate', v: -.05 } } },
-  ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within a Runesmith’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Runesmiths: Tovin already favours the Mortar Crew)
+  ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within a Anvilwright’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Anvilwrights: Tovin already favours the Mortar Crew)
     up: { glaive: { k: 'rate', v: .06 }, earth: { k: 'reach', v: .1 } }, dn: { arrow: { k: 'range', v: -.2 }, storm: { k: 'rate', v: -.05 } } },
   // ---- the Silver Order ----
   so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its slams Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back and Judges up to 4 ground foes it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
@@ -85076,7 +85076,7 @@ function heroAffKill(c, src) {
     for (const t of G.towers) if (t.type === M.fav && !t.wrecked && !(t.build > .5)) { const d = Math.hypot(t.x - c.x, t.y - c.y); if (d < bd) { bd = d; best = t; } }
     if (best && (best.affCh || 0) < 3) { best.affCh = (best.affCh || 0) + 1; part({ k: 'flare', x: best.x, z: best.y, h: towerTop(best), life: .3, max: .3, size: .45, col: h.hue }); }
   }
-  if (h.id === 'ih_brewer') {   // Last Orders: every Runesmith the foe fell within reach of counts it
+  if (h.id === 'ih_brewer') {   // Last Orders: every Anvilwright the foe fell within reach of counts it
     for (const t of G.towers) {
       if (t.type !== M.fav || t.wrecked || t.build > .5) continue;
       const r = ((t.st && t.st.range) || 2.6); if (Math.hypot(t.x - c.x, t.y - c.y) > r) continue;
@@ -108312,7 +108312,7 @@ const SPELL_HELP = {
   ih_caltropfield: { when: "A ground foe within {reach} cells with another ground foe within 1.5 cells of it, or a boss.", aim: "The road just ahead of the ground foe nearest the gate; the chain runs across the road from wall to wall.", tips: ["A narrow corridor makes the best tripwire: the chain spans it wall to wall and nothing walks round it.", "Each ground foe that trips is pinned in front of the next: lay it where your Mortar Crew and Steam Hammers reach.", "Flyers pass over it: pair it with Chain Net or Flak for the sky."] },
   ih_grapple: { when: "One foe is enough: the ground foe nearest the gate within {reach} cells that can still be moved (a boss only when tapped).", aim: "A support caster in reach first (nearest the gate), else the ground foe nearest the gate.", tips: ["Haul the lead ground foe back through its own column: every ground foe it is dragged through is bowled over.", "A boss won't budge, it is only pinned: let it haul the ground foes instead.", "Dragged back, it walks past your guns again: post the Trappers before a long killing ground."] },
 
-  // Runesmiths (runesmith)
+  // Anvilwrights (runesmith)
   ih_runebrand: { when: "One foe is enough: a foe within {reach} cells not already carrying a brand this strong with over 2s left.", aim: "The foe in reach with the most health that is not already deeply branded.", tips: ["The brand makes the foe take more from every unit for 8s: brand the boss before the clan's big spells land.", "Post them centrally so the brand reaches the foes your Thunderguns and Mortar Crew are already firing on.", "Rune of Unmaking seeks out branded foes: brand first, then unmake."] },
   ih_runeofpower: { when: "Two or more of your units within 2.4 cells that have spells and no rune yet.", aim: "Up to the listed number of those units, highest rank first.", ctl: "Works on your own units: a tap needs just one unit with spells and no rune within 2.4 cells.", tips: ["Post in the middle of a cluster of spellcasters: every rune makes that unit's next spell half again as strong.", "Best beside Mortar Crew and Chain Trappers, whose costly crowd spells gain the most from a rune.", "It also gives each unit mana, so it gets their next spells out sooner."] },
   ih_forgeburst: { when: "Three or more foes within 1.2 cells of a foe within {reach} cells, or a branded foe, a boss or an elite there.", aim: "The ground under the thickest crowd in reach.", tips: ["Cast it where the clan's guns and axes are already hitting: every hit on an Unmade foe strips another plate.", "Unarmoured foes burst at once; plate must be hit bare in time, or it never bursts.", "Its bursts splash the ground foes beside them: a packed column bursts in a chain."] },
@@ -108334,7 +108334,7 @@ const SPELL_HELP = {
 
   // Haldra Stonebrace, the Shield-Thane (ih_thane)
   ch_ironwall: { when: "Three or more foes within 1.4 cells of one foe in {reach} cells (a little wider at higher ranks), or a boss or elite in reach.", aim: "The densest pack: the wall drops across the road where the most foes stand.", tips: ["Post her by a straight stretch near the gate: ground foes at the wall are held fast while every unit hits them.", "When the wall falls it throws ground foes back: lay a Tripwire behind them.", "Mortar Crew and Pressure Slam fit a held pack perfectly; time them for the moment the wall lands."] },
-  ch_anvil: { when: "Two or more clan engines within its call not yet near full heat, or two or more ground foes within 1.4 cells of her (or a boss).", aim: "Herself: every clan unit within its call.", tips: ["Post her at the heart of the line, among the guns and hammers: every engine she reaches vents at once.", "Sound it as a crowd reaches the guns: a ripple of Thunderpeals, Steam Bursts and Big Berthas.", "Non-engine units gain mana instead: Runesmiths and Trappers cast sooner."] },
+  ch_anvil: { when: "Two or more clan engines within its call not yet near full heat, or two or more ground foes within 1.4 cells of her (or a boss).", aim: "Herself: every clan unit within its call.", tips: ["Post her at the heart of the line, among the guns and hammers: every engine she reaches vents at once.", "Sound it as a crowd reaches the guns: a ripple of Thunderpeals, Steam Bursts and Big Berthas.", "Non-engine units gain mana instead: Anvilwrights and Trappers cast sooner."] },
   ch_oath: { when: "A cone in front of her over two or more ground foes within its depth (a boss counts alone).", aim: "The cone over the most ground foes, then over the most road.", tips: ["Post her at a corner, facing down the road: the cone runs into the column.", "Held foes take it half again as hard: cast it while Iron Wall holds them.", "Each ground foe loses 4 armour: the clan's steel follows it in."] },
 
   // Tovin Gearwright, the Artificer (ih_artificer)
@@ -109823,7 +109823,7 @@ bfAdd('calledout', { name: 'Called out', kw: 'st:calledout', kind: 'debuff', pri
   def: 'Marked: it takes more from every unit for a few seconds.',
   get: c => c.markT > 0 ? { t: c.markT, say: `It takes ${bfPct(c.markAmp || 0)} more from every unit.` } : null });
 bfAdd('branded', { name: 'Branded', kind: 'debuff', pri: 9, icon: 'rune', hue: '#8a5a10', f: ['ihBrandT', 'ihBrandK', 'ihBrandBy'],
-  def: 'A Runesmith\'s brand: it takes more from every unit.',
+  def: 'A Anvilwright\'s brand: it takes more from every unit.',
   get: c => c.ihBrandT > bfNow() ? { t: bfLeft(c.ihBrandT), src: bfFrom(c.ihBrandBy), say: `It takes ${bfPct(c.ihBrandK || 0)} more from every unit.` } : null });
 bfAdd('taunted', { name: 'Taunted', kind: 'debuff', pri: 9, icon: 'shield', hue: '#6a4a20', f: ['ihWallT'],
   def: 'Held against the Iron Wall: it takes more from every unit.',
@@ -111773,7 +111773,7 @@ const WPN_START_ART = {
     "issued": 1
   },
   "runesmith": {
-    "name": "Runesmith's Hammer",
+    "name": "Anvilwright's Hammer",
     "look": "Short heavy forge hammer, dark steel square head with cyan carved runes and copper bindings.",
     "mdl": "issued_runesmith",
     "issued": 1
