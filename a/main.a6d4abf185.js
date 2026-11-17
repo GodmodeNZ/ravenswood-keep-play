@@ -1,4 +1,4 @@
-const BUILD_TAG = '1e81512@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f44ed81@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16117,7 +16117,7 @@ FORCES[IH_ID] = { name: 'Ironhold', title: 'Clanhost of the Iron Peaks', hue: '#
       blurb: 'Fur-clad trappers with bolas and weighted chain nets. Bolas slow the foe furthest along; every 4th throw is a net that pins it in place (a flyer is dragged down instead). Air and ground.',
       tiers: [{ cost: 30, dmg: 6, rate: 1.5, range: 2.6, ihSlow: .3, pin: .7 }, { cost: 55, dmg: 14, rate: 1.4, range: 2.8, ihSlow: .35, pin: .8 }, { cost: 115, dmg: 33, rate: 1.3, range: 3, ihSlow: .4, pin: .9 }] },
     arcane: { id: 'runesmith', name: 'Anvilwrights', short: 'Anvils', key: '4', proj: 'force', attack: 'runesmith', elem: null, dmgType: 'arcane', air: true, ground: true, prio: 2, top: [.82, .88, .95],
-      blurb: 'Elders at a portable anvil. Each hammer-stroke hurls a rune-brand at the strongest foe (branded foes take more from every unit), and every 3rd stroke inscribes a rune on a unit nearby: its next ability is half again as strong.',
+      blurb: 'Elders at a portable anvil. Each hammer-stroke hurls a brand at the strongest foe (branded foes take more from every unit), and every 3rd stroke tempers a unit nearby: its next ability is half again as strong.',
       tiers: [{ cost: 40, dmg: 36, rate: 2, range: 3, brand: .08 }, { cost: 75, dmg: 85, rate: 1.9, range: 3.3, brand: .08 }, { cost: 160, dmg: 200, rate: 1.8, range: 3.6, brand: .1 }] },
     storm: { id: 'flakgunner', name: 'Flak Cannoneers', short: 'Flak', key: '5', proj: 'force', attack: 'flakgunner', elem: null, dmgType: 'phys', air: true, ground: true, top: [.9, .96, 1.02],
       blurb: 'A swivel flak cannon and its crew. Shells burst among flyers (twice as hard on them, and they see flyers from further off), the burst catching anything near. When the gun runs hot it fires a rattling barrage.',
@@ -16188,7 +16188,7 @@ function ihHeatRate(t, st) {
   if (st.pw && st.pw.ihBellows) k += .25 * st.pw.ihBellows;
   return k;
 }
-function ihHeatAdd(t, st, frac) {   // frac: of a full gauge, straight in (a Anvilwright's forge, a whistle, a round of ale)
+function ihHeatAdd(t, st, frac) {   // frac: of a full gauge, straight in (an Anvilwright's forge, a whistle, a round of ale)
   if (!ihHot(t)) return;
   t.ihHeat = Math.min(1, (t.ihHeat || 0) + frac);
 }
@@ -16875,23 +16875,23 @@ const IH_TALENTS = {
   ] },
 
   /* ---- Anvilwrights (arcane): Runebrand (innate), Rune of Making (row II), Rune of Unmaking (row IV) ---- */
-  arcane: { name: 'Runecraft', hue: '#e07a2a', list: [
+  arcane: { name: 'Smithcraft', hue: '#e07a2a', list: [
     GT('Searing Brand', 'ember', 0, 3, 2, n => `Brands sear: the foe burns for ${10 * n}% of the strike a second for 3s.`, {}, { cap: 'ihSear' }),
     GT('Deep Brand', 'rune', 0, 0, 3, n => `Brands last ${n}s longer, and the branded foe takes ${2 * n}% more besides.`, {}, { cap: 'ihDeepBrand' }),
     GT('Brand Chain', 'chains', 3, 2, 1, 'When a branded foe dies, its brand leaps to the 2 foes nearest it.', {}, { cap: 'ihBrandLeap' }),
-    GT('Swift Inscription', 'quick', 2, 0, 2, n => `Runes reach units ${gNf(.4 * n)} cells further off, and Rune of Making inscribes ${n === 1 ? 'one more unit' : n + ' more units'}.`, {}, { cap: 'ihRuneR', sp: n => ({ ab: 'ih_runeofpower', by: { n } }), req: [1, 0] }),
-    GT('Ringing Anvil', 'ripple', 4, 3, 1, 'Rune of Unmaking\'s great rune stays on the road for 4s: every foe that steps onto it is branded and Unmade too.', {}, { cap: 'ihcAnvil', sp: { ab: 'ih_forgeburst', rider: { ihcAnvil: 1 } }, req: [3, 3] }),
-    GT('Masterwork Strike', 'hammer', 3, 1, 1, 'Every 4th stroke is a masterwork: it brands every foe within 0.8 cells of its target too, and Runebrand strikes held foes (pinned, stunned or shoved) 20% harder.', {}, { cap: 'ihfMaster', sp: { ab: 'ih_runebrand', vs: ['held', .2] } }),
+    GT('Swift Tempering', 'quick', 2, 0, 2, n => `Tempers reach units ${gNf(.4 * n)} cells further off, and Tempering reaches ${n === 1 ? 'one more unit' : n + ' more units'}.`, {}, { cap: 'ihRuneR', sp: n => ({ ab: 'ih_runeofpower', by: { n } }), req: [1, 0] }),
+    GT('Ringing Anvil', 'ripple', 4, 3, 1, 'Unmaking Blow\'s hammer-mark stays on the road for 4s: every foe that steps onto it is branded and Unmade too.', {}, { cap: 'ihcAnvil', sp: { ab: 'ih_forgeburst', rider: { ihcAnvil: 1 } }, req: [3, 3] }),
+    GT('Masterwork Strike', 'hammer', 3, 1, 1, 'Every 4th stroke is a masterwork: it brands every foe within 0.8 cells of its target too, and Anvilbrand strikes held foes (pinned, stunned or shoved) 20% harder.', {}, { cap: 'ihfMaster', sp: { ab: 'ih_runebrand', vs: ['held', .2] } }),
     GS('ih_runeofpower', 1, 0),
     GS('ih_forgeburst', 3, 3),
-    GT('Rune Lord', 'stars', 4, 2, 1, 'Every 3rd stroke inscribes a rune on every unit in reach at once.', {}, { cap: 'ihRuneAll' }),
-    GT('Answering Rune', 'stars', 2, 1, 1, 'Each unit Rune of Making inscribes swings at once: its next strike comes straight away.', {}, { cap: 'ihfAnswer', sp: { ab: 'ih_runeofpower', rider: { ihfAnswer: 1 } } }),
-    GT('Runic Overflow', 'potion', 1, 3, 2, n => `An ability cast on a rune gives back ${30 * n}% of its mana.`, {}, { cap: 'ihRefund' }),
+    GT('Forgelord', 'stars', 4, 2, 1, 'Every 3rd stroke tempers every unit in reach at once.', {}, { cap: 'ihRuneAll' }),
+    GT('Answering Ring', 'stars', 2, 1, 1, 'Each unit Tempering tempers swings at once: its next strike comes straight away.', {}, { cap: 'ihfAnswer', sp: { ab: 'ih_runeofpower', rider: { ihfAnswer: 1 } } }),
+    GT('Banked Embers', 'potion', 1, 3, 2, n => `An ability cast on a temper gives back ${30 * n}% of its mana.`, {}, { cap: 'ihRefund' }),
     GT('Forge Heat', 'heat', 2, 3, 2, n => `Each stroke stokes the engines: the coolest heat unit within 2 cells gains ${10 * n}% heat.`, {}, { cap: 'ihStoke' }),
-    GT('Runebrand Detonation', 'burst', 4, 0, 1, 'A branded foe that dies bursts in runes: every foe within 1 cell takes 2× a stroke and is branded. One that dies Unmade by Rune of Unmaking passes the Unmaking on to every foe its burst catches.', {}, { cap: 'ihDetonate', sp: { ab: 'ih_forgeburst', rider: { ihcDet: 1 } } }),
-    GT('Kinsmark', 'rune', 0, 2, 3, n => `Its strokes ignore ${5 * n}% of wards, and its runes hum on the units that carry them: each strike they make brands its foe for ${n}s (a light brand, half a Anvilwright's).`, n => ({ magicPen: .05 * n }), { cap: 'ihfKin' }),
-    GT('Paid in Kind', 'gem', 1, 2, 2, n => `Each time a unit spends one of its runes on a spell, it pays the Anvilwright ${6 * n} mana.`, {}, { cap: 'ihfKind' }),
-    GT('Quench', 'heat', 0, 1, 3, n => `When a unit spends one of its runes on a spell, the rune's heat floods its boiler: an engine gains ${20 * n}% heat.`, {}, { cap: 'ihfQuench' }),
+    GT('Brand Detonation', 'burst', 4, 0, 1, 'A branded foe that dies bursts in sparks: every foe within 1 cell takes 2× a stroke and is branded. One that dies Unmade by Unmaking Blow passes the Unmaking on to every foe its burst catches.', {}, { cap: 'ihDetonate', sp: { ab: 'ih_forgeburst', rider: { ihcDet: 1 } } }),
+    GT('Kinsmark', 'rune', 0, 2, 3, n => `Its strokes ignore ${5 * n}% of wards, and its tempers glow on the units that carry them: each strike they make brands its foe for ${n}s (a light brand, half an Anvilwright's).`, n => ({ magicPen: .05 * n }), { cap: 'ihfKin' }),
+    GT('Paid in Kind', 'gem', 1, 2, 2, n => `Each time a unit spends one of its tempers on a spell, it pays the Anvilwright ${6 * n} mana.`, {}, { cap: 'ihfKind' }),
+    GT('Quench', 'heat', 0, 1, 3, n => `When a unit spends one of its tempers on a spell, the temper's heat floods its boiler: an engine gains ${20 * n}% heat.`, {}, { cap: 'ihfQuench' }),
   ] },
 
   /* ---- Flak Gunners (storm): Flak Screen (innate), Grapnel Shot (row III), Starshell (row IV) ---- */
@@ -16966,7 +16966,7 @@ const IH_TAL_FLAVOR = {
   glaive: ['Plant the shields, swing the axes, and give no ground.', 'A mountain does not step aside.'],
   arrow: ['One shot, one foe, and the thunder that follows.', 'Measure twice. Fire once. Then fire again.'],
   frost: ['Bolas, nets and caltrops: nothing gets past the trappers.', 'Run all you like. The chain is longer.'],
-  arcane: ['Brand the foe and wake the runes in your kin.', 'Every rune is a promise the mountain keeps.'],
+  arcane: ['Brand the foe and temper your kin.', 'Every hammer-stroke is a promise the mountain keeps.'],
   storm: ['Fill the sky with iron and bring the flyers down.', 'If it flies, it falls.'],
   earth: ['Build the pressure, swing the hammer, let the steam out.', 'Iron breaks. Steam does not care.'],
   cannon: ['Lob the shells long and let the ground shake.', 'Range, elevation, and a little patience.'],
@@ -16978,7 +16978,7 @@ FORCES[IH_ID].talents = IH_TALENTS; FORCES[IH_ID].talFlavor = IH_TAL_FLAVOR; FOR
 
 /* ================= IRONHOLD: abilities (mana, autocast and lore, as abilities.js runs them) =================
    Three per unit: the first innate, the other two studied at the keep and learned at tiers II and IV. Damage is a
-   multiple of the unit's live damage D. Every cast goes through ihCastWrap: a rune on the unit (a Anvilwright's, a
+   multiple of the unit's live damage D. Every cast goes through ihCastWrap: a rune on the unit (an Anvilwright's, a
    charm's, a relic's) is spent for K = +50% (or more) on what the ability does, and the clan's charms answer the cast.
    Each ability has its own pose in forces_ironhold_f.js (read from t.ab.last / t.ab.lastAt; anim: its length). */
 const IH_ABK = (st, m, K) => abD(st) * m * (K || 1);
@@ -17153,10 +17153,10 @@ const IH_KITS = {
 
   /* ---- Anvilwrights: brand the mighty, wake the runes in their kin, a forge-burst at their feet ---- */
   runesmith: { slot: 'arcane', mana: { max: 130, regen: 1.5, hit: 0 }, abilities: [
-    { id: 'ih_runebrand', name: 'Runebrand', short: 'Brand', glyph: 'rune', hue: '#ff9a3a', mana: 90, cd: 10, rAdd: .5, research: null, anim: .8,
+    { id: 'ih_runebrand', name: 'Anvilbrand', short: 'Brand', glyph: 'rune', hue: '#ff9a3a', mana: 90, cd: 10, rAdd: .5, research: null, anim: .8,
       by: { amp: [.15, .15, .2, .2, .25, .25] },
       auto: 'the toughest foe within reach + 0.5 not already branded as deep (bosses and elites first)',
-      text: (t, st, ab) => `A great rune burned into a foe for 8s: it takes ${abPct(byT(ab.by.amp, t))} more damage from everything, and ${xD(st, 1.5)} now.`,
+      text: (t, st, ab) => `A white-hot brand hammered into a foe for 8s: it takes ${abPct(byT(ab.by.amp, t))} more damage from everything, and ${xD(st, 1.5)} now.`,
       pick(t, st, ab, man) { const a = byT(ab.by.amp, t); return abToughest(ihPick(t, st, abReach(t, st, ab), man ? null : c => !(c.ihBrandT > G.time + 2 && c.ihBrandK >= a))); },
       cast(t, st, c, ab, K) {
         abHit(t, st, c, 1.5 * K, 'arcane', null);
@@ -17164,10 +17164,10 @@ const IH_KITS = {
         rfx({ k: 'streak', x0: t.x, h0: towerTop(t) + .1, z0: t.y, c, col: '#ff9a3a', w: .07, life: .35 }); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .3, max: .3, size: 1.1, col: '#ff9a3a' });
         t.ihBrandCastAt = G.time; sfx('glaiveHit', 0);
       } },
-    { id: 'ih_runeofpower', name: 'Rune of Making', short: 'Runes', glyph: 'stars', hue: '#ffc060', mana: 130, cd: 16, r: 2.4, none: 'no unit without a rune within 2.4 cells', research: { cost: 80, time: 20 }, anim: 1.2,
+    { id: 'ih_runeofpower', name: 'Tempering', short: 'Temper', glyph: 'stars', hue: '#ffc060', mana: 130, cd: 16, r: 2.4, none: 'no untempered unit within 2.4 cells', research: { cost: 80, time: 20 }, anim: 1.2,
       by: { n: [3, 3, 4, 4, 5, 5] },
-      auto: 'two or more units within 2.4 cells without a rune',
-      text: (t, st, ab) => `Inscribes a rune on up to ${byT(ab.by.n, t)} units within 2.4 cells (their next ability is half again as strong) and gives each 15 mana.`,
+      auto: 'two or more untempered units within 2.4 cells',
+      text: (t, st, ab) => `Tempers up to ${byT(ab.by.n, t)} units within 2.4 cells (their next ability is half again as strong) and gives each 15 mana.`,
       pick(t, st, ab, man) { const L = ihAllies(t, ab.r, o => !!abilKit(o) && !o.ihRune); return L.length >= (man ? 1 : 2) ? L : null; },
       cast(t, st, L, ab, K) {
         const k = 1.5 + .25 * (K - 1) + (st.pw && st.pw.ihChisel ? .5 : 0);
@@ -17177,7 +17177,7 @@ const IH_KITS = {
     { id: 'ih_forgeburst', name: 'Forgeburst', short: 'Forge', glyph: 'sun', hue: '#ff7a2a', mana: 110, cd: 12, r: 1.6, research: { cost: 130, time: 30 }, anim: .9,
       by: { mult: [2.5, 2.5, 3, 3, 3.5, 3.5] },
       auto: 'three or more foes within 1.6 cells, or a branded foe or a boss',
-      text: (t, st, ab) => `The hammer whirls and strikes the ground: a ring of forge-runes erupts, ${xD(st, byT(ab.by.mult, t))} to every foe within 1.6 cells (branded foes take double), slowing them 30% for 1.5s and branding them all.`,
+      text: (t, st, ab) => `The hammer whirls and strikes the ground: a ring of forge-fire erupts, ${xD(st, byT(ab.by.mult, t))} to every foe within 1.6 cells (branded foes take double), slowing them 30% for 1.5s and branding them all.`,
       pick(t, st, ab, man) { const L = ihPick(t, st, ab.r); return L.length && (L.length >= (man ? 1 : 3) || L.some(c => c.ihBrandT > G.time || c.def.lead || c.def.boss)) ? t : null; },
       cast(t, st, _, ab, K) {
         t.ihForgeAt = G.time;
@@ -17410,7 +17410,7 @@ const IH_RELICS = {
     text: k => `Its nets drag their catch ${nf1(.3 * k)} cells back down the path.`,
     fx: (st, k) => ihPw(st, 'ihHook', .3 * k) },
   ih_chisel: { rar: 2, for: ['arcane'], name: "Master's Chisel", icon: 'rune', hue: '#e0a050', theme: 'runes', hb: 1,
-    text: () => 'Runes it inscribes are worth double: the next ability is twice as strong, not half again.',
+    text: () => 'Its tempers are worth double: the next ability is twice as strong, not half again.',
     fx: st => ihPw(st, 'ihChisel', 1) },
   ih_drum: { rar: 3, for: ['storm'], name: 'Belt-Fed Drum', icon: 'barrel', hue: '#6a8a7a', theme: 'heat',
     text: k => `Its barrages fire ${Math.max(1, Math.round(2 * k))} more shells.`,
@@ -17434,7 +17434,7 @@ const IH_CHARMS = {
   ihc_ledger: { rar: 2, kx: 1.6, name: 'Thrift Ledger', icon: 'scales', hue: '#a08a5a', text: k => `Its abilities give back ${P_(Math.min(.6, .2 * k))} of their mana.` },
   ihc_spring: { rar: 2, kx: 1.6, name: 'Spring-Wound Gear', icon: 'quick', hue: '#c0a050', text: k => `Its abilities recharge ${P_(.25 * k)} faster.` },
   ihc_tally: { rar: 2, kx: 1.35, name: 'Grudge Tally', icon: 'skull', hue: '#a05a4a', text: k => `Each foe it slays gives it ${Math.round(12 * k)} mana.` },
-  ihc_token: { rar: 2, kx: 1.35, name: 'First-Round Token', icon: 'coin', hue: '#e0b050', text: k => `Its first ${ihTokenN(k)} casts each wave are rune-empowered: half again as strong.` },
+  ihc_token: { rar: 2, kx: 1.35, name: 'First-Round Token', icon: 'coin', hue: '#e0b050', text: k => `Its first ${ihTokenN(k)} casts each wave are half again as strong.` },
   ihc_tinder: { rar: 2, name: 'Tinder Box', icon: 'ember', hue: '#e08a3a', text: k => `When it casts an ability, every unit within 1.5 cells warms up at once and gains ${P_(.2 * k)} heat.` },
   ihc_stone: { rar: 2, name: 'Stubborn Stone', icon: 'mountain', hue: '#8a8a90', text: () => 'From 20s into each wave, its abilities give back half their mana.' },
   ihc_twinanvil: { rar: 3, name: 'Twin Anvil', icon: 'hammer', hue: '#ff9a4a', text: k => `Every ${ordN(ihTwinN(k))} ability it casts strikes again at once, free.` },
@@ -17467,10 +17467,10 @@ const IH_LEGENDS = {
     build: 'Bound and Broken, Dragnet and Wide Nets; Thunderguns and Mortar Crew behind to strike the caught foes.',
     fx: (st, k) => ihPw(st, 'ihGreatNet', .2 * k) },
   ih_firstforge: { for: 'arcane', name: 'Heart of the First Forge', icon: 'sun', hue: '#ff8a3a',
-    twist: 'The Anvilwright carves a rune with every hammer stroke, so the clan round it casts rune-empowered again and again.',
-    text: () => 'It carves a rune on a unit beside it with every stroke, not every 3rd.',
-    combo: 'Runic Overflow, Rune of Fury and a ring of units round it.',
-    build: 'Runic Overflow, Rune of Fury and Answering Rune; a ring of costly casters round it: Mortar Crew, Steam Hammers, Thunderguns.',
+    twist: 'The Anvilwright tempers a unit with every hammer stroke, so the clan round it casts tempered again and again.',
+    text: () => 'It tempers a unit beside it with every stroke, not every 3rd.',
+    combo: 'Banked Embers, Answering Ring and a ring of units round it.',
+    build: 'Banked Embers, Answering Ring and Paid in Kind; a ring of costly casters round it: Mortar Crew, Steam Hammers, Thunderguns.',
     fx: st => ihPw(st, 'ihFirstForge', 1) },
   ih_skybreaker: { for: 'storm', name: 'Cloudsplitter Cannon', icon: 'wings', hue: '#5aa090', atk: 1,
     twist: 'Flak bursts drag flyers out of the sky, so the clan\'s ground-only units can fight the bat waves.',
@@ -17488,7 +17488,7 @@ const IH_LEGENDS = {
     twist: 'Every Big Bertha walks a creeping barrage back down the path, leaving a lane of burning pitch.',
     text: k => `Each Big Bertha (its vented shell) is followed by ${ihGrandN(k)} more shells that walk back down the path toward the portal, 1 cell apart, each leaving burning pitch for 3s.`,
     combo: 'Big Bertha, Napalm and a long straight lane.',
-    build: 'Big Bertha, Ringing Ears and Napalm; the Boiler of Endless Steam or a Anvilwright stoking its heat; a long straight lane.',
+    build: 'Big Bertha, Ringing Ears and Napalm; the Boiler of Endless Steam or an Anvilwright stoking its heat; a long straight lane.',
     fx: (st, k) => ihPw(st, 'ihGrand', ihGrandN(k)) },
   ih_bottomless: { for: 'holy', name: 'The Bottomless Keg', icon: 'barrel', hue: '#e0a040',
     twist: 'Your Champion pours a round for the whole clan with every spell: every engine on the field heats up and fills its mana.',
@@ -17498,7 +17498,7 @@ const IH_LEGENDS = {
     fx: (st, k) => { chPw(st, 'chFieldWarm', Math.min(.6, .3 * k)); chPw(st, 'chFieldMana', Math.round(15 * k)); } },
   // ---- for any unit ----
   ih_kingrune: { name: 'Rune of the Old King', icon: 'stars', hue: '#ffb050',
-    twist: 'Any unit becomes a Anvilwright: every ability it casts carves a rune on the clan beside it.',
+    twist: 'Any unit becomes an Anvilwright: every ability it casts carves a rune on the clan beside it.',
     text: k => `Each ability it casts carves a rune on the nearest ${ihKingN(k) === 1 ? 'unit' : ihKingN(k) + ' units'} of the clan within 2.5 cells that bear none: their next ability is rune-empowered.`,
     combo: 'quick, cheap casters beside units with costly finishers.',
     build: 'a quick, cheap caster (Rattlegun, Chain Net, Pile Driver) beside costly finishers (The Long Drop, Steam Uppercut, Breaching Slug); the Twin Anvil charm.',
@@ -17687,7 +17687,7 @@ function ihItemsPostCast(t, ab, st, tg, K) {
     } });
   if (p && p.ihChip) { for (const c of ihFoes(t, st, t.x, t.y, (st.range || 2.5) + .3)) ihBrand(c, p.ihChip, 4, t); relicGlint(t, 'ih_anvilchip'); }   // Anvil Chip
   if (p && p.ihBoiler) ihBoilerChain(t);   // Boiler of Endless Steam
-  // Rune of the Old King: the cast carves a rune on the nearest clan units beside it that bear none (as a Anvilwright's)
+  // Rune of the Old King: the cast carves a rune on the nearest clan units beside it that bear none (as an Anvilwright's)
   if (p && p.ihKingRune) {
     const L = ihAllies(t, 2.55, o => ihIs(o) && !o.ihRune && !!(typeof abilKit === 'function' && abilKit(o))).sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y));
     for (const o of L.slice(0, p.ihKingRune)) ihInscribe(o, t, 1.5);
@@ -38029,13 +38029,13 @@ const FSETS = [
     } },
   { id: 'fs_haul', spells: ['ih_chainnet'], force: 'ironhold', unit: 'frost', name: 'Trapper’s Long Haul',
     pieces: [['fs_ih_coil', 'Weighted Chain-Coil', 3, 'chain', '#5a5e66', 'range as'], ['fs_ih_jaws', 'Bear-Trap Jaws', 3, 'spikes', '#8a7a6a', 'dmg sp pen']],
-    b2: 'Every foe Chain Net catches is branded for 4s, as by a Anvilwright, and each foe slain while caught in its nets gives it 10 mana.',
+    b2: 'Every foe Chain Net catches is branded for 4s, as by an Anvilwright, and each foe slain while caught in its nets gives it 10 mana.',
     hit(t, c, amt, sp) { if (sp === 'ih_chainnet' && c.hp > 0) ihBrand(c, .08, 4, t); },
     kill(t, c) { if (c.ihNetBy === t && c.ihHeldT > G.time) { gainMana(t, 10); fsGlint(t, this); } } },
   { id: 'fs_heirloom', spells: [], force: 'ironhold', unit: null, name: 'Clan-Forge Heirlooms',
     pieces: [['fs_ih_locket', 'Forge-Ember Locket', 3, 'ember', '#ff8a2a', 'sp regen'], ['fs_ih_band', 'Riveted Oath-Band', 3, 'ring', '#c8a050', 'dmg as']],
     old: [['fs_ih_hearth', 'Hearthstone of the Clan', 3, 'rune', '#ff9a3a', 'sp mana cd']],
-    b2: 'A wearer starts every wave with its boiler warm. When a wearer vents, it inscribes a rune on the nearest other wearer: its next spell is half again as strong.',
+    b2: 'A wearer starts every wave with its boiler warm. When a wearer vents, it tempers the nearest other wearer: its next spell is half again as strong.',
     wave(t) { if (ihIs(t)) t.ihWarm = 1; },
     vent(t, n) {
       if (n < 2) return;
@@ -38815,7 +38815,7 @@ ihcPose('chaintrapper', 'arm', t => {
 // (the highest rank first): its next ability half again as strong, and 30 mana
 const IHC_RM = { gap: .24, fly: .38, heat: .34, mana: 30 };
 ihcPatch('ih_runeofpower', { anim: 1.4,
-  text: (t, st, ab) => `Flings ${byT(ab.by.n, t)} runes to units within 2.4 cells, highest rank first: each one's next ability is half again as strong, and it gains ${IHC_RM.mana} mana.`,
+  text: (t, st, ab) => `Flings ${byT(ab.by.n, t)} tempering sparks to units within 2.4 cells, highest rank first: each one's next ability is half again as strong, and it gains ${IHC_RM.mana} mana.`,
   cast(t, st, L, ab, K) {
     const k = 1.5 + .25 * (K - 1) + (st.pw && st.pw.ihChisel ? .5 : 0), more = { refund: st.caps.ihRefund ? .3 * st.caps.ihRefund : 0, fury: !!st.caps.ihFury };
     const T = L.slice().sort((a, b) => (b.tier || 0) - (a.tier || 0)).slice(0, byT(ab.by.n, t));
@@ -38863,10 +38863,10 @@ ihcPose('runesmith', 'tongs', t => { const u = ihcU(t, 'ih_runeofpower'); if (u 
 // each hit the clan lands on it strips another plate, and when its armour is gone (at once on an unarmoured foe) the rune
 // bursts in it. One that keeps its plate the whole 6s does not burst
 const IHC_UN = { r: 1.2, hit: 1, burst: 1.6, splash: .8, splashK: .5, dur: 6 };
-ihcPatch('ih_forgeburst', { name: 'Rune of Unmaking', short: 'Unmaking', glyph: 'rune', hue: '#ff7a2a', r: undefined, rr: IHC_UN.r, anim: 1,
+ihcPatch('ih_forgeburst', { name: 'Unmaking Blow', short: 'Unmaking', glyph: 'rune', hue: '#ff7a2a', r: undefined, rr: IHC_UN.r, anim: 1,
   by: { dur: [6, 6, 6, 7, 7, 8] },
   auto: 'the spot in range with three or more foes within 1.2 cells (or a branded foe, a boss or an elite)',
-  text: (t, st, ab) => `Brands every foe within ${IHC_UN.r} cells (${xD(st, IHC_UN.hit)}) and Unmakes it for ${byT(ab.by.dur, t)}s: each clan hit strips 1 armour, and once the armour is gone the rune bursts: ${xD(st, IHC_UN.burst)}, half that to ground foes beside it.`,
+  text: (t, st, ab) => `Brands every foe within ${IHC_UN.r} cells (${xD(st, IHC_UN.hit)}) and Unmakes it for ${byT(ab.by.dur, t)}s: each clan hit strips 1 armour, and once the armour is gone it bursts: ${xD(st, IHC_UN.burst)}, half that to ground foes beside it.`,
   pick(t, st, ab, man) { const L = ihPick(t, st, abReach(t, st, ab)), k = abCrowd(L, IHC_UN.r); return k && (k.n >= (man ? 1 : 3) || abBig(k.c) || L.some(c => c.ihBrandT > G.time && (c.x - k.c.x) ** 2 + (c.y - k.c.y) ** 2 < 1.44)) ? { x: k.c.x, y: k.c.y } : null; },
   cast(t, st, p, ab, K) {
     t.ihForgeAt = G.time; const x = p.x, z = p.y, dur = byT(ab.by.dur, t);
@@ -40142,10 +40142,10 @@ if (typeof fsetAdd === 'function') {
 
   /* ---------- Anvilwrights: the Unmaking spreads from every rune that bursts ---------- */
   const IH_RUNESET = 'fe_ih_rune';
-  fsetAdd({ id: IH_RUNESET, epic: 1, spells: ['ih_runebrand', 'ih_forgeburst'], force: 'ironhold', unit: 'arcane', name: 'Tools of the Last Forge-Rune',
-    pieces: [['fe_ih_chisel', 'Rune-Chisel of Black Iron', 3, 'rune', '#ff8a3a', 'sp mana'], ['fe_ih_apron', 'Forgemaster’s Scorched Apron', 3, 'ember', '#a0603a', 'sp regen']],
-    old: [['fe_ih_goggles', 'Ember-Glass Goggles', 3, 'lens', '#ffb060', 'sp cd range'], ['fe_ih_cinder', 'Cinder-Rune Pendant', 3, 'stars', '#ffc060', 'sp cd']],
-    b2: 'Runebrand also Unmakes its foe for 4s, as Rune of Unmaking does. When an Unmade foe’s rune bursts, every ground foe within 1 cell of it is Unmade for 4s, and a rune flies to a unit within 2 cells of the Anvilwrights that has none: its next spell is half again as strong (at most once every 4s).',
+  fsetAdd({ id: IH_RUNESET, epic: 1, spells: ['ih_runebrand', 'ih_forgeburst'], force: 'ironhold', unit: 'arcane', name: 'Tools of the Last Forge',
+    pieces: [['fe_ih_chisel', 'Hot-Chisel of Black Iron', 3, 'rune', '#ff8a3a', 'sp mana'], ['fe_ih_apron', 'Forgemaster’s Scorched Apron', 3, 'ember', '#a0603a', 'sp regen']],
+    old: [['fe_ih_goggles', 'Ember-Glass Goggles', 3, 'lens', '#ffb060', 'sp cd range'], ['fe_ih_cinder', 'Cinder Pendant', 3, 'stars', '#ffc060', 'sp cd']],
+    b2: 'Anvilbrand also Unmakes its foe for 4s, as Unmaking Blow does. When an Unmade foe bursts, every ground foe within 1 cell of it is Unmade for 4s, and a tempering spark flies to an untempered unit within 2 cells of the Anvilwrights: its next spell is half again as strong (at most once every 4s).',
     hit(t, c, amt, sp) {
       if (sp !== 'ih_runebrand' || !feIhLive(c)) return;
       c.ihcUnT = Math.max(c.ihcUnT || 0, G.time + 4); c.ihcUnBy = t; c.ihcUnK = c.ihcUnK || 1;
@@ -44584,7 +44584,7 @@ ihcWrapCast('ch_firebrew', (raw, t, st, c, ab, again) => {
     }
     return r;
   };
-  // Kinsmark: a unit carrying a Anvilwright's rune brands the foe it strikes
+  // Kinsmark: a unit carrying an Anvilwright's rune brands the foe it strikes
   H.fire = function (t, st, tg, pow, echo) {
     const p = fire0 ? fire0.apply(this, arguments) : pow;
     if (ihfOn() && !echo && tg && !tg.dead && t.ihRune && t.ihRune.by) {
@@ -46387,7 +46387,9 @@ if (ABIL.ch_summons) {
 // (the new shield talents, Shoulder to Shoulder, Shield Wall, Burnished Shields and Swift Reprisal, are drawn until painted)
 const TAL_ART_ALIAS = { 'Lowered Shield': 'Lowered Lance', 'Wide Sweep': 'Wide Wedge', 'Shields Raised': 'Standard-Bearer', 'Rally to the Shield': 'Rallying Banner',
   'The Far Bank': 'Royal Due', 'Debt of Oaths': 'Debt of Lions', 'Unbroken': 'Pride', 'Ride Them Down': 'Bailiff',
-  'Ringing Steel': 'Anvil', 'Blade of Judgement': 'Hammer of Judgement', 'Marked by the Blade': 'Marked by the Hammer', 'Censed Blade': 'Censed Hammer' };
+  'Ringing Steel': 'Anvil', 'Blade of Judgement': 'Hammer of Judgement', 'Marked by the Blade': 'Marked by the Hammer', 'Censed Blade': 'Censed Hammer',
+  // (the Anvilwrights' talents renamed off runes, 17 Nov 2026)
+  'Swift Tempering': 'Swift Inscription', 'Forgelord': 'Rune Lord', 'Banked Embers': 'Runic Overflow', 'Brand Detonation': 'Runebrand Detonation', 'Answering Ring': 'Answering Rune' };
 
 /* ================= TALENT NAMES: a saved run's talent picks follow their talents by name =================
    Picks are saved by a talent's place in its tree (G.tal[slot][i]). The capstone and wall-talent rework (7 Nov 2026)
@@ -46412,6 +46414,9 @@ function talNamesOld(force, hero) {
 // a talent renamed in place (the same talent, a new name): its saved ranks follow it
 const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (the Pyroclasts' spell row, 8 Nov 2026)
   'Undertow Rune': 'Tidemoon',   // (the Mageling's rune became an orb sent out over the road, 14 Nov 2026)
+  // (the Anvilwrights' talents and spells off runes, onto the forge, 17 Nov 2026)
+  'Swift Inscription': 'Swift Tempering', 'Rune of Making': 'Tempering', 'Rune of Unmaking': 'Unmaking Blow', 'Rune Lord': 'Forgelord',
+  'Answering Rune': 'Answering Ring', 'Runic Overflow': 'Banked Embers', 'Runebrand Detonation': 'Brand Detonation',
   // (the Wardbound's Masked Wardens became the Glaive Wardens, 8 Nov 2026: their arrow talents and spells renamed in place)
   'Rune-Etched Heads': 'Rune-Etched Edge', 'Pinning Draw': 'Branding Edge', 'Falling Stars': 'Branding Rite', 'Line Shot': 'Line Cut', 'Long Shaft': 'Dragging Edge',
   'Nocked Again': 'Caught Again', 'Arrow of Judgement': 'Glaive of Judgement', 'Piercing Shaft': 'Returning Oath', 'Warding Arrow': 'Warding Glaive',
@@ -47057,9 +47062,9 @@ const WPN_CLASS = {
     ['mallet', 'Mallet', 1.1, .1, 'a short fat mallet banded in brass'],
     ['greathammer', 'Great Hammer', .9, .16, 'a great hammer with a carved stone head']] },
   runehammer: { icon: 'hammer', hue: '#6a8ac0', cast: 1, size: 'a forge hammer, half the unit\'s height', bases: [
-    ['forgehammer', 'Forge Hammer', 1, .12, 'a smith\'s hammer with a rune on each face'],
+    ['forgehammer', 'Forge Hammer', 1, .12, 'a smith\'s hammer, both faces worn bright'],
     ['rivet', 'Riveting Hammer', 1.1, .1, 'a small hammer with a long thin peen'],
-    ['sledge', 'Rune Sledge', .88, .16, 'a heavy sledge with glowing runes round the head'],
+    ['sledge', 'Ember Sledge', .88, .16, 'a heavy sledge with an ember glow round the head'],
     ['anvilhead', 'Anvil-Head', .92, .14, 'a hammer whose head is a small anvil']] },
   golem: { icon: 'gem', hue: '#8a7a5a', cast: 1, size: 'a fist-sized focus stone in the hand (the golem stays the golem)', bases: [
     ['wardstone', 'Ward Stone', 1, .12, 'a flat river stone carved with a ward'],
@@ -47192,7 +47197,7 @@ const WPN_LEGS = [
   ['chaintrapper', 'wl_deepmine', 'Deep-Mine Chain', 'a black chain with hooked links, wet with mine water', ['hit', 'chill', 3]],
   ['chaintrapper', 'wl_winch', 'Winch of the Drowned', 'a hand winch on a long hooked chain', ['spell', 'ih_grapple', 'reset']],
   ['runesmith', 'wl_anvilsong', 'Anvilsong Hammer', 'a forge hammer that rings blue when it strikes', ['hit', 'arc', 3]],
-  ['runesmith', 'wl_unmakinghammer', 'Hammer of Unmaking', 'a hammer whose rune burns red and cracks the head', ['spell', 'ih_forgeburst', 'echo']],
+  ['runesmith', 'wl_unmakinghammer', 'Hammer of Unmaking', 'a hammer whose face burns red-hot and cracks as it strikes', ['spell', 'ih_forgeburst', 'echo']],
   ['flakgunner', 'wl_skyrender', 'Skyrender', 'a wide flak cannon with three barrels', ['hit', 'splash', 3]],
   ['flakgunner', 'wl_starshell', 'Starshell Gun', 'a long bronze gun with stars stamped on the barrel', ['spell', 'ih_airburst', 'echo']],
   ['steamhammer', 'wl_boilerheart', 'Boilerheart Maul', 'a maul with a small boiler in its head, venting steam', ['hit', 'shove', 3]],
@@ -47298,7 +47303,7 @@ const WPN_ISSUED = {
   ch_maren: ['Maren\'s Twin Rift-Blade', '#d05a8a', 'two long blades, red and pink, on one grip'],
   // Ironhold
   ironbreaker: ['Ironbreaker\'s Axe', '#9a7a5a', 'a stout dwarf axe'], thundergun: ['Thundergun Rifle', '#8a6a4a', 'a long scoped rifle'], chaintrapper: ['Trapper\'s Chain Net', '#7a7a8a', 'a net of iron rings and a bola'],
-  runesmith: ['Anvilwright\'s Forge Hammer', '#6a8ac0', 'a forge hammer with a glowing rune'], flakgunner: ['Flak Cannon', '#7a6a5a', 'a stubby wide-bore gun'],
+  runesmith: ['Anvilwright\'s Forge Hammer', '#6a8ac0', 'a forge hammer glowing at the face'], flakgunner: ['Flak Cannon', '#7a6a5a', 'a stubby wide-bore gun'],
   steamhammer: ['Steam Hammer\'s Lava Maul', '#d0602a', 'an iron war hammer with a molten lava face'], mortarcrew: ['Crew Mortar', '#6a5a4a', 'a short fat mortar tube'],
   siegebreaker: ['Siege Breaker\'s Pole', '#7a6a5a', 'a long breaching pole'], ch_haldra: ['Haldra\'s War Hammer', '#a06040', 'a heavy dwarf war hammer'],
   ch_tovin: ['Tovin\'s Copper Gauntlet', '#b0703a', 'a great copper gauntlet with a violet coil'], ch_grenna: ['Grenna\'s Great Ladle', '#b08a4a', 'a great copper ladle'],
@@ -47782,7 +47787,7 @@ const BR_DATA = {
   ironbreaker: ['Iron Wall|guard .7; zone 1.3 .15', 'Plate Crusher|shred 2 8', 'Shield Line|auraD .1 1.6'],
   thundergun: ['Long Barrel|reach .6', 'Breaching Round|pierce .5 2', 'Crossfire Nest|cross .25'],
   chaintrapper: ['Snap Trap|stun .1 .5; nth 5 1.6', 'Barbed Chain|bleed .3', 'Trap Field|zone 1.6 .15; sppow .1'],
-  runesmith: ['Rune Echo|specho .25', 'Rune of Making|aura .12 1.8', 'Runic Spread|spjump .5; sppow .1'],
+  runesmith: ['Ringing Echo|specho .25', 'Forge-Blessing|aura .12 1.8', 'Spreading Sparks|spjump .5; sppow .1'],
   flakgunner: ['Wide Burst|splash .3', 'Grapnel Drag|slow .25 1.2; spcd .1', 'Starshell Mark|mark .1 3'],
   steamhammer: ['Piston Speed|haste .22', 'Plate Crack|shred 2 8', 'Pile Driver Line|pierce .5 2'],
   mortarcrew: ['Big Shell|splash .35', 'Spotter Round|mark .1 3', 'Skipping Shell|pierce .45 2'],
@@ -48799,7 +48804,7 @@ const TAL_SPREAD = {
   "ironhold.glaive": {"Heavy Shoulders":[1,3],"Bearded Axe":[2,2],"Ringing Rim":[4,2],"Off Balance":[0,1],"Bowling Shove":[2,3],"Spinning Shield":[3,2],"Hot Shards":[5,0],"Shield Rush":[2,1],"Armourbreaker":[5,1],"Breaker's Blow":[4,0],"Brace and Shove":[3,0],"Shield Signal":[4,3],"Breach the Line":[5,2],"Hold the Pass":[3,1],"Caught Between Shields":[1,2],"Plate Salvage":[0,2],"Knock Them Flat":[0,0]},
   "ironhold.arrow": {"Concussion Rounds":[1,1],"Range-Finder":[1,2],"Long Belt":[3,1],"Called Shot":[5,2],"Rattlegun":[2,1],"Sighting In":[0,2],"Kneecapper":[4,3],"Thunder Belt":[5,1],"Gatling Crank":[5,3],"Breaching Slug":[3,3],"Quick Swab":[1,3],"Hard Kick":[2,0],"Case-Hardened":[4,2],"Quick Reload":[0,1],"Powder Tally":[2,3],"Pinning Rounds":[4,0],"Called Volley":[3,2]},
   "ironhold.frost": {"Weighted Chains":[1,3],"Third Wrap":[0,1],"Trap Line":[3,3],"Tangle":[0,2],"Tripwire":[2,3],"Bound and Broken":[4,2],"Twin Nets":[5,3],"Double Line":[5,2],"Harpoon Winch":[3,2],"Bear Trap":[5,1],"Wide Nets":[1,0],"Hooked Chain":[4,0],"Spiked Caltrops":[2,2],"Wing Cords":[2,0],"Trapper's Haul":[1,1],"Barbed Chain":[3,1],"Caltrop Bed":[4,1]},
-  "ironhold.arcane": {"Searing Brand":[1,3],"Deep Brand":[0,2],"Brand Chain":[2,3],"Swift Inscription":[2,2],"Ringing Anvil":[5,0],"Masterwork Strike":[4,3],"Rune of Making":[1,2],"Rune of Unmaking":[4,0],"Rune Lord":[5,2],"Answering Rune":[2,1],"Runic Overflow":[0,1],"Forge Heat":[3,0],"Runebrand Detonation":[5,1],"Kinsmark":[0,3],"Paid in Kind":[3,1],"Quench":[1,0]},
+  "ironhold.arcane": {"Searing Brand":[1,3],"Deep Brand":[0,2],"Brand Chain":[2,3],"Swift Tempering":[2,2],"Ringing Anvil":[5,0],"Masterwork Strike":[4,3],"Tempering":[1,2],"Unmaking Blow":[4,0],"Forgelord":[5,2],"Answering Ring":[2,1],"Banked Embers":[0,1],"Forge Heat":[3,0],"Brand Detonation":[5,1],"Kinsmark":[0,3],"Paid in Kind":[3,1],"Quench":[1,0]},
   "ironhold.storm": {"Torn Wings":[1,0],"Scorched Barrel":[1,2],"Spent Flare":[5,1],"Chain-Fed":[3,2],"Sky Shatter":[0,2],"Grapnel Shot":[2,2],"Tracer Rounds":[3,1],"Starshell":[4,1],"Endless Belt":[5,3],"Shellstorm":[5,2],"Reel In":[4,0],"Ground Burst":[1,1],"Hot Shrapnel":[2,0],"Barbed Shrapnel":[0,1],"Sky Watch":[0,3]},
   "ironhold.earth": {"Packed Crowd":[1,1],"Steam in the Cracks":[0,1],"Scalding Steam":[3,1],"Rivet Popper":[0,0],"Piston Rhythm":[5,1],"Pile Driver":[2,1],"Echoing Slam":[4,0],"Groundsplitter":[5,3],"Molten Rivets":[5,2],"Steam Uppercut":[3,0],"Tremor Step":[2,2],"Safety Valve":[4,3],"Line Them Up":[4,2],"Hammer Home":[0,2],"Pressure Gauge":[2,0],"Steam Jacket":[1,3],"Piledriven":[3,3]},
   "ironhold.cannon": {"Glowing Casings":[0,1],"Whistling Shells":[1,3],"Rattling Blast":[2,1],"Pitch-Soaked Wadding":[2,0],"Skipping Shell":[1,1],"Double Crew":[3,2],"Red-Hot Tube":[5,2],"Big Bertha":[3,3],"Clinging Fire":[0,2],"The Long Drop":[4,2],"Shrapnel Casing":[2,2],"Quake Shell":[4,0],"Walking Fire":[5,1],"Napalm":[5,3],"Ringing Ears":[0,0],"Powder Runners":[1,0]},
@@ -49558,19 +49563,19 @@ talPlain('ironhold', 'arcane', {
   'Searing Brand': { tag: 'Damage', pro: n => `Its strokes burn foes for ${10 * n}% of the stroke a second for 3s.` },
   'Deep Brand': { tag: 'Damage', pro: n => `Its brands make foes take ${3 * n}% more from every unit.` },
   'Brand Chain': { tag: 'Damage', pro: 'A dying foe passes its brand to the 2 foes nearest it.' },
-  'Swift Inscription': { tag: 'Support', cap: null, pro: n => `Rune of Making inscribes ${n} more unit${n > 1 ? 's' : ''}.` },
-  'Ringing Anvil': { tag: 'Spell', pro: 'Rune of Unmaking stays on the road 4s, Unmaking every foe that steps onto it.' },
-  'Masterwork Strike': { tag: 'Spell', cap: null, sp: { ab: 'ih_runebrand', rider: { ihfMasterRB: 1 } }, pro: 'Runebrand also brands every foe within 1 cell of its target.' },
-  'Rune of Making': { tag: 'Spell' },
-  'Rune of Unmaking': { tag: 'Spell' },
-  'Rune Lord': { tag: 'Support', pro: 'Every 3rd stroke inscribes a rune on every unit in reach at once.' },
-  'Answering Rune': { tag: 'Support', pro: 'Units Rune of Making inscribes strike again at once.' },
-  'Runic Overflow': { tag: 'Mana', pro: n => `A spell cast on one of its runes gives back ${30 * n}% of its mana.` },
+  'Swift Tempering': { tag: 'Support', cap: null, pro: n => `Tempering reaches ${n} more unit${n > 1 ? 's' : ''}.` },
+  'Ringing Anvil': { tag: 'Spell', pro: 'Unmaking Blow leaves its hammer-mark on the road 4s, Unmaking every foe that steps onto it.' },
+  'Masterwork Strike': { tag: 'Spell', cap: null, sp: { ab: 'ih_runebrand', rider: { ihfMasterRB: 1 } }, pro: 'Anvilbrand also brands every foe within 1 cell of its target.' },
+  'Tempering': { tag: 'Spell' },
+  'Unmaking Blow': { tag: 'Spell' },
+  'Forgelord': { tag: 'Support', pro: 'Every 3rd stroke tempers every unit in reach at once.' },
+  'Answering Ring': { tag: 'Support', pro: 'Units Tempering tempers strike again at once.' },
+  'Banked Embers': { tag: 'Mana', pro: n => `A spell cast on one of its tempers gives back ${30 * n}% of its mana.` },
   'Forge Heat': { tag: 'Heat', pro: n => `Each stroke gives the coolest engine within 2 cells ${10 * n}% heat.` },
-  'Runebrand Detonation': { tag: 'Damage', pro: 'Branded foes burst as they die, Unmaking every foe within 1 cell, as Rune of Unmaking does.' },
+  'Brand Detonation': { tag: 'Damage', pro: 'Branded foes burst as they die, Unmaking every foe within 1 cell, as Unmaking Blow does.' },
   'Kinsmark': { tag: 'Damage', cap: null, mod: n => ({ magicPen: .08 * n }), pro: n => `Its strokes and spells ignore ${8 * n}% of wards.` },
-  'Paid in Kind': { tag: 'Mana', pro: n => `It gains ${6 * n} mana each time a unit spends one of its runes.` },
-  'Quench': { tag: 'Heat', pro: n => `Engines that spend one of its runes gain ${20 * n}% heat.` },
+  'Paid in Kind': { tag: 'Mana', pro: n => `It gains ${6 * n} mana each time a unit spends one of its tempers.` },
+  'Quench': { tag: 'Heat', pro: n => `Engines that spend one of its tempers gain ${20 * n}% heat.` },
 });
 
 talPlain('ironhold', 'storm', {
@@ -83295,8 +83300,8 @@ const SPELL_BRIEFS = {
   ih_caltropfield: 'Strings a chain across the road for {dur} sec. The first {trips} ground enemies crossing it trip, taking {d}, losing 2 armour and pinned for 0.6 sec.',
   ih_grapple: 'Deals {d}, strips 2 armour and winches it {pull} cells back. Enemies dragged through take {d2} and are stunned for 0.3 sec. Bosses are pinned instead.',
   ih_runebrand: 'Brands for 8 sec, dealing {d}. It takes {ampPct} more damage from every unit. A caster also loses 50 mana and cannot regain mana for 8 sec.',
-  ih_runeofpower: 'Flings runes to up to {n} allies within 2.4 cells. Each gains 30 mana and its next ability is 50% stronger.',
-  ih_forgeburst: 'Brands enemies within 1.2 cells, dealing {d}, and Unmakes them for {dur} sec: each Ironhold hit strips 1 armour. At no armour the rune bursts for {d2}, half that to neighbours.',
+  ih_runeofpower: 'Tempers up to {n} allies within 2.4 cells. Each gains 30 mana and its next ability is 50% stronger.',
+  ih_forgeburst: 'Brands enemies within 1.2 cells, dealing {d}, and Unmakes them for {dur} sec: each Ironhold hit strips 1 armour. At no armour it bursts for {d2}, half that to neighbours.',
   ih_flakscreen: 'Fills 1.4 cells of sky with flak for {dur} sec. Every 0.5 sec, flying enemies in it take {d} and are slowed 35%. Ground enemies take half.',
   ih_grapnel: 'Deals {d}, doubled against flying. A flying enemy is pulled down for {down} sec (less on bosses) and slammed onto the road, dealing {d2} to ground enemies beneath. A ground enemy is pinned 0.8 sec.',
   ih_airburst: 'Bursts a starshell, dealing {d} within 1.2 cells, doubled against flying. Its flare lights the area for {dur} sec: lit flying enemies fly low enough for every unit to reach, and lit enemies lose 3 armour.',
@@ -84861,7 +84866,7 @@ const AFF_MODS = {
     up: { glaive: { k: 'reach', v: .1 }, frost: { k: 'range', v: .2 } }, dn: { storm: { k: 'rate', v: -.05 }, cannon: { k: 'range', v: -.2 } } },
   ih_artificer: { fav: 'cannon', sig: { name: 'Hot Barrels', t: 'A Mortar Crew reaches up to 0.6 cells further as its heat gauge fills.' },
     up: { storm: { k: 'range', v: .2 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'rate', v: -.05 }, arcane: { k: 'rate', v: -.05 } } },
-  ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within a Anvilwright’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Anvilwrights: Tovin already favours the Mortar Crew)
+  ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within an Anvilwright’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Anvilwrights: Tovin already favours the Mortar Crew)
     up: { glaive: { k: 'rate', v: .06 }, earth: { k: 'reach', v: .1 } }, dn: { arrow: { k: 'range', v: -.2 }, storm: { k: 'rate', v: -.05 } } },
   // ---- the Silver Order ----
   so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its slams Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back and Judges up to 4 ground foes it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
@@ -85924,204 +85929,94 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -86130,207 +86025,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -108313,8 +108076,8 @@ const SPELL_HELP = {
   ih_grapple: { when: "One foe is enough: the ground foe nearest the gate within {reach} cells that can still be moved (a boss only when tapped).", aim: "A support caster in reach first (nearest the gate), else the ground foe nearest the gate.", tips: ["Haul the lead ground foe back through its own column: every ground foe it is dragged through is bowled over.", "A boss won't budge, it is only pinned: let it haul the ground foes instead.", "Dragged back, it walks past your guns again: post the Trappers before a long killing ground."] },
 
   // Anvilwrights (runesmith)
-  ih_runebrand: { when: "One foe is enough: a foe within {reach} cells not already carrying a brand this strong with over 2s left.", aim: "The foe in reach with the most health that is not already deeply branded.", tips: ["The brand makes the foe take more from every unit for 8s: brand the boss before the clan's big spells land.", "Post them centrally so the brand reaches the foes your Thunderguns and Mortar Crew are already firing on.", "Rune of Unmaking seeks out branded foes: brand first, then unmake."] },
-  ih_runeofpower: { when: "Two or more of your units within 2.4 cells that have spells and no rune yet.", aim: "Up to the listed number of those units, highest rank first.", ctl: "Works on your own units: a tap needs just one unit with spells and no rune within 2.4 cells.", tips: ["Post in the middle of a cluster of spellcasters: every rune makes that unit's next spell half again as strong.", "Best beside Mortar Crew and Chain Trappers, whose costly crowd spells gain the most from a rune.", "It also gives each unit mana, so it gets their next spells out sooner."] },
+  ih_runebrand: { when: "One foe is enough: a foe within {reach} cells not already carrying a brand this strong with over 2s left.", aim: "The foe in reach with the most health that is not already deeply branded.", tips: ["The brand makes the foe take more from every unit for 8s: brand the boss before the clan's big spells land.", "Post them centrally so the brand reaches the foes your Thunderguns and Mortar Crew are already firing on.", "Unmaking Blow seeks out branded foes: brand first, then unmake."] },
+  ih_runeofpower: { when: "Two or more of your units within 2.4 cells that have spells and are not yet tempered.", aim: "Up to the listed number of those units, highest rank first.", ctl: "Works on your own units: a tap needs just one untempered unit with spells within 2.4 cells.", tips: ["Post in the middle of a cluster of spellcasters: every temper makes that unit's next spell half again as strong.", "Best beside Mortar Crew and Chain Trappers, whose costly crowd spells gain the most from a temper.", "It also gives each unit mana, so it gets their next spells out sooner."] },
   ih_forgeburst: { when: "Three or more foes within 1.2 cells of a foe within {reach} cells, or a branded foe, a boss or an elite there.", aim: "The ground under the thickest crowd in reach.", tips: ["Cast it where the clan's guns and axes are already hitting: every hit on an Unmade foe strips another plate.", "Unarmoured foes burst at once; plate must be hit bare in time, or it never bursts.", "Its bursts splash the ground foes beside them: a packed column bursts in a chain."] },
 
   // Flak Cannoneers (flakgunner)
@@ -109011,7 +108774,7 @@ function kwBuild() {
   kwAdd({ key: 'ih:bigbertha', name: 'Big Bertha', alias: ['Big Berthas'], cat: 'force', sub: IH, col: '#ff8a2a',
     def: 'The Mortar Crew\'s vent at full heat: an extra-heavy shell at 2.5× its strike, with a wider blast.' });
   kwAdd({ key: 'ih:unmade', name: 'Unmade', alias: ['unmade'], cat: 'force', sub: IH, col: '#ff7a2a',
-    def: 'Rune of Unmaking\'s mark on a foe: every hit the clan lands on it strips 1 more armour, and when its armour is gone the rune bursts in it.' });
+    def: 'Unmaking Blow\'s mark on a foe: every hit the clan lands on it strips 1 more armour, and when its armour is gone it bursts.' });
   kwAdd({ key: 'ih:lit', name: 'Lit', alias: ['lit'], cat: 'force', sub: IH, col: '#fff0b0',
     def: 'In a Starshell\'s glare: a lit flyer flies low enough for every unit to reach, and a lit foe\'s plate shows its joints (3 armour cracked while it is lit).' });
   kwAdd({ key: 'ih:lodestone', name: 'Lodestone Pull', cat: 'force', sub: IH, col: '#9ab8d8',
@@ -109823,14 +109586,14 @@ bfAdd('calledout', { name: 'Called out', kw: 'st:calledout', kind: 'debuff', pri
   def: 'Marked: it takes more from every unit for a few seconds.',
   get: c => c.markT > 0 ? { t: c.markT, say: `It takes ${bfPct(c.markAmp || 0)} more from every unit.` } : null });
 bfAdd('branded', { name: 'Branded', kind: 'debuff', pri: 9, icon: 'rune', hue: '#8a5a10', f: ['ihBrandT', 'ihBrandK', 'ihBrandBy'],
-  def: 'A Anvilwright\'s brand: it takes more from every unit.',
+  def: 'An Anvilwright\'s brand: it takes more from every unit.',
   get: c => c.ihBrandT > bfNow() ? { t: bfLeft(c.ihBrandT), src: bfFrom(c.ihBrandBy), say: `It takes ${bfPct(c.ihBrandK || 0)} more from every unit.` } : null });
 bfAdd('taunted', { name: 'Taunted', kind: 'debuff', pri: 9, icon: 'shield', hue: '#6a4a20', f: ['ihWallT'],
   def: 'Held against the Iron Wall: it takes more from every unit.',
   get: c => c.ihWallT > bfNow() ? { t: bfLeft(c.ihWallT), say: 'Held against the Iron Wall: it takes 15% more from every unit.' } : null });
 bfAdd('unmade', { name: 'Unmade', kw: 'ih:unmade', kind: 'debuff', pri: 8, icon: 'rune', hue: '#8a4010', f: ['ihcUnT', 'ihcUnBy'],
-  def: 'Rune of Unmaking: every hit the clan lands strips another plate; when its armour is gone the rune bursts in it.',
-  get: c => c.ihcUnT > bfNow() ? { t: bfLeft(c.ihcUnT), src: bfFrom(c.ihcUnBy), say: (c.armor || 0) > 0 ? 'Every hit the clan lands strips another plate; when its armour is gone the rune bursts in it.' : 'Its armour is gone: the rune is about to burst in it.' } : null });
+  def: 'Unmaking Blow: every hit the clan lands strips another plate; when its armour is gone it bursts.',
+  get: c => c.ihcUnT > bfNow() ? { t: bfLeft(c.ihcUnT), src: bfFrom(c.ihcUnBy), say: (c.armor || 0) > 0 ? 'Every hit the clan lands strips another plate; when its armour is gone it bursts.' : 'Its armour is gone: it is about to burst.' } : null });
 bfAdd('lit', { name: 'Lit', kw: 'ih:lit', kind: 'debuff', pri: 8, icon: 'sun', hue: '#8a7a30', f: ['ihcLitT', 'ihcLitBy'],
   def: 'In a Starshell\'s glare: a flyer flies low enough for every unit, and its plate shows its joints.',
   get: c => c.ihcLitT > bfNow() ? { t: bfLeft(c.ihcLitT), src: bfFrom(c.ihcLitBy), say: c.fly ? 'In the starshell\'s glare: it flies low enough for every unit to reach, and 3 of its armour is cracked.' : 'In the starshell\'s glare: 3 of its armour is cracked while it stays in the light.' } : null });
@@ -111774,7 +111537,7 @@ const WPN_START_ART = {
   },
   "runesmith": {
     "name": "Anvilwright's Hammer",
-    "look": "Short heavy forge hammer, dark steel square head with cyan carved runes and copper bindings.",
+    "look": "Short heavy forge hammer, dark steel square head with glowing cyan hammer-marks and copper bindings.",
     "mdl": "issued_runesmith",
     "issued": 1
   },
