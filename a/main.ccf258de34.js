@@ -1,4 +1,4 @@
-const BUILD_TAG = 'fe41f94@2026-11-17';   // the play log's build version (playlog.js)
+const BUILD_TAG = '82d8bc1@2026-11-17';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -85713,7 +85713,8 @@ function fcIconHTML(g) {
 // the next boss whose loot the Loot button opens (force runs: renown.js rnLootOn), or 0
 const fcLootWave = () => { try { if (typeof rnLootOn !== 'function' || !rnLootOn() || typeof rnNextBoss !== 'function') return 0; const ws = fcWaves(); return ws.length ? rnNextBoss(ws[0]) : 0; } catch (e) { return 0; } };
 const fcLootBtn = n => n ? `<button type="button" class="fc-lt" data-loot="${n}" aria-haspopup="dialog" aria-label="${fcEsc(`Boss loot: ${rnBossName(rnBossType(n))}, wave ${n}`)}">${fcSvg('chest')}<span>Loot</span></button>` : '';
-function forecastHTML() { const ws = fcWaves(); return ws.length ? fcIcons(ws[0]).map(fcIconHTML).join('') + fcLootBtn(fcLootWave()) : ''; }
+// (no Loot button: the owner, 17 Nov 2026, "dont show loot table"; fcLootBtn is kept unused)
+function forecastHTML() { const ws = fcWaves(); return ws.length ? fcIcons(ws[0]).map(fcIconHTML).join('') : ''; }
 // the portraits: painted once when the row is drawn, and again a moment later for a painting that was still loading
 function fcPaint(root, all) {
   const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
