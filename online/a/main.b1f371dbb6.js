@@ -1,4 +1,4 @@
-const BUILD_TAG = '5aeb803@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = '8da6681@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -99738,6 +99738,243 @@ const IB2 = (() => {
     if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('ib2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
   }
   const anchors = t => mine(t) ? { head: t.tipW, edge: t._ibEdge, shield: t._ibShield, clip: t._ibClip, at: t._ibDrawn } : null;
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Anvilwrights on a rig and clips made from scratch (the owner, 19 Nov 2026: a new model for the Dwarven Anvilwright, the
+   unit once called the Runesmith: "rig and skin ... idle, walk, attack and spell animations that fit a forge smith"). His mesh
+   is the owner's "Dwarven Anvilwright" (an old grey smith, hair swept back, a braided beard with a brass bead, a scorched
+   leather apron over a red skirt), his forge hammer and the Great Forge Anvil; tools/make_aw.py -> src/model_aw2.js: 30 bones
+   (the apron's front and the skirt's back on panels of their own; a hammer bone in his right fist; the anvil on the root,
+   standing before him), 9,399 triangles, 8 clips at 30 fps. ON by default in place of his code-built body; ?aw=old (or the
+   Model Lab's "Anvilwright rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: at his anvil, the hammer's face resting on it, his left fist on its face by the horn; two
+               light taps now and then, his head cocked to the ring
+     ready     a foe in reach: the hammer lifted a hand's breadth over the anvil
+     strikeA/B his blows, taken in turn: over the game's wind-up (t.windup) he heaves the hammer up; the blow is begun HIT
+               early so the face lands flat on the anvil on the game's strike (t.shotT = 0, the rune-brand leaves), then bounces
+     temper    Tempering (ih_runeofpower, t.ihRunesAt): a stroke on the anvil at each of the game's tempering sparks (0.12 s, then
+               every 0.24 s, t.ihcRuneN of them); the strokes not cast are skipped
+     brand     Anvilbrand (ih_runebrand, t.ihBrandCastAt): the hammer flung up and out at the foe as the brand leaves
+     unmake    Unmaking Blow (ih_forgeburst, t.ihForgeAt): both hands overhead, down on the anvil just after the cast, when the
+               game's rune leaves the anvil
+     walk      baked for the Model Lab; units stand in the game
+   The rune flings and the anvil's glow come from the real anvil's face (ihcAnvil and IH_EXTRA.runesmith are answered from
+   it while he is drawn). He stands on the clan's hexagonal flagstone (ihBase), sized by the shared rule as a dwarf.
+   Checks: `python tools/make_aw.py --check`. Notes: docs/model_pilot/anvilwright2.md. */
+const AW2 = (() => {
+  const U = 'runesmith', NAMES = ['idle', 'ready', 'strikeA', 'strikeB', 'temper', 'brand', 'unmake', 'walk'];
+  const ATK = ['strikeB', 'strikeA'], EASE = .2, BLOW = .3, HIT = 6 / 30, BASE_IV = .9, SPD = 1.1;
+  const TOP = 3 / 30, BRAND0 = 6 / 30, UNMAKE0 = 12 / 30, TAP0 = .12, TAP = .24, TAPS = 5, BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]aw=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .88, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'aw2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('aw2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'hammer', 'anvil', 'handL']) { if (R_.bix[nm] == null) throw new Error('aw2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'head', 'face', 'spot', 'avTop']) if (!mk || !mk[nm]) throw new Error('aw2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('aw2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('aw2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('aw2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.8, -.02, -.8]; m.max = [.8, 1.3, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('AW2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'aw2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, ph = now + (t.anim || 0) * 3;
+    // the spells that began most recently win: Unmaking Blow, Anvilbrand, Tempering (its strokes: those not cast are skipped)
+    const ev = [];
+    if (t.ihForgeAt != null && now >= t.ihForgeAt && now - t.ihForgeAt < CL.unmake.len - UNMAKE0) ev.push([t.ihForgeAt, { c: 'unmake', s: UNMAKE0 + now - t.ihForgeAt, rate: 40, mv: 'unmake' + t.ihForgeAt }]);
+    if (t.ihBrandCastAt != null && now >= t.ihBrandCastAt && now - t.ihBrandCastAt < CL.brand.len - BRAND0) ev.push([t.ihBrandCastAt, { c: 'brand', s: BRAND0 + now - t.ihBrandCastAt, rate: 40, mv: 'brand' + t.ihBrandCastAt }]);
+    if (t.ihRunesAt != null && now >= t.ihRunesAt) {
+      const u = now - t.ihRunesAt, n = Math.max(1, Math.min(TAPS, t.ihcRuneN || 3)), last = TAP0 + (n - 1) * TAP + .06;
+      const s = u < last ? u : u + (TAPS - n) * TAP;
+      if (s < CL.temper.len) ev.push([t.ihRunesAt, { c: 'temper', s, rate: 40, mv: 'temper' + t.ihRunesAt }]);
+    }
+    if (ev.length) { ev.sort((a, b) => b[0] - a[0]); return ev[0][1]; }
+    // the blows: how fast he really strikes (the time between his last two) quickens them with him
+    if (t.shots && t._awShots !== t.shots) { if (t._awAt != null && now - t._awAt < 2.5) t._awIv = now - t._awAt; t._awAt = now - (t.shotT || 0); t._awShots = t.shots; }
+    const spd = SPD * Math.min(1.6, Math.max(1, t._awIv ? BASE_IV / t._awIv : 1));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    if (fight && (t.windup || 0) > 0 && s > BLOW) {
+      const nx = ATK[((t.shots | 0) + 1) % 2], cd = t.cd || 0;
+      // (the heave up follows the game's wind-up to the top of the blow (frame TOP); the drop from there is timed so the face
+      // lands flat on the anvil on the strike; one move id through it all, so the pose is never smoothed mid-blow)
+      if (cd < (HIT - TOP) / spd) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'atk' + nx + t.shots };
+      return { c: nx, s: TOP * Math.min(1, (t.windup || 0) / .9), rate: 40, mv: 'atk' + nx + t.shots };
+    }
+    if (t.shots) { const mv = ATK[(t.shots | 0) % 2]; if (s >= 0 && s < (CL[mv].len - HIT) / spd) return { c: mv, s: HIT + s * spd, rate: 40, mv: 'atk' + mv + ((t.shots | 0) - 1) }; }
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: 8, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 4, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._awDrawn != null && typeof G !== 'undefined' && G && G.time - t._awDrawn < .3 && G.time >= t._awDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the clan's hexagonal flagstone under him, as under every Ironhold unit (ihBase), and he stands on it
+    const bm = typeof ihBase === 'function' && typeof ihPal === 'function' ? dynMesh('aw_base', g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ihPal(U, () => ihBase(g))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    // his size by the shared rule (unitmodels_size.js): a dwarf's head joint over the ground at tier I, growing by UM_TIER
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.07) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._awT == null ? 1 : Math.max(0, Math.min(.1, now - t._awT)); t._awT = now;
+      if (!t._awP || t._awP.q.length !== NB * 4) { t._awP = newPose(); t._awP.q.set(PT.q); t._awP.t.set(PT.t); }
+      if (P.mv !== t._awMv) { t._awMv = P.mv; t._awSw = now; }
+      const k = P.wind || now - t._awSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._awP, PT, k); pose = t._awP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) {
+      t.tipW = w(BI.hammer, MK.head); t.tipYaw = yaw; t.tipAt = G.time; t._awDrawn = G.time; t._awClip = P.c;
+      t._awFace = w(BI.hammer, MK.face); t._awAnvil = w(BI.anvil, MK.avTop); t._awSpot = w(BI.anvil, MK.spot);
+    }
+    return true;
+  }
+  try { load(typeof AW2_MDL !== 'undefined' ? AW2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Anvilwright rig:', e.message); }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+        try {
+          if (draw(t, tier, sx, sy, sz, wob, opts)) {
+            // (the clan's live extras: runes, rank trim; the anvil's glow from the real anvil's face, not the code-built one's)
+            const X = typeof IH_EXTRA !== 'undefined' ? IH_EXTRA : null, x0 = X && X[U];
+            if (X) X[U] = anvilGlow;
+            try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { if (X) X[U] = x0; }
+            return;
+          }
+        } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('aw2:', e); } }
+      }
+      return _plain.apply(this, arguments);
+    };
+  }
+  /* the anvil breathes forge-orange at its face, flaring as he strikes; Tempering's sparks circle him (IH_EXTRA.runesmith's,
+     moved onto the anvil he stands at) */
+  function anvilGlow(t, tier, x, z, yaw, K, now) {
+    const A = t._awAnvil; if (!A || typeof QADD === 'undefined') return;
+    const st = typeof ihSince === 'function' ? ihSince(t, 'ihStrikeAt') : 9, f = Math.max(0, 1 - st * 3), r = (.10 + .10 * f) * (S.scale || 1);
+    QADD.bill(RD, A[0], A[1] + .02, A[2], r, r, [1, .5, .15, .25 + .45 * f], 1, 0);
+    const rp = typeof ihAbU === 'function' ? ihAbU(t, 'ih_runeofpower') : -1, vt_ = typeof vt !== 'undefined' ? vt : now;
+    if (rp >= 0) for (let k = 0; k < 6; k++) { const a = vt_ * 3 + k * TAU / 6; QADD.bill(RD, x + Math.cos(a) * .4, .7 + .1 * Math.sin(vt_ * 5 + k), z + Math.sin(a) * .4, .1, .1, [1, .6, .2, .9 * (1 - rp / 1.4)], 4, .12, a); }
+  }
+  // the runes struck on the anvil (Tempering's flings, the Unmaking's rune) leave from the real anvil's face
+  if (MESH_ && typeof ihcAnvil === 'function') {
+    const _anv = ihcAnvil;
+    ihcAnvil = function (t) { return mine(t) && t._awSpot ? [t._awSpot[0], t._awSpot[1] + .03, t._awSpot[2]] : _anv.apply(this, arguments); };
+  }
+  // his size and crown by the shared rule (unitmodels_size.js): a dwarf, as the Steam Hammers and the Thunderguns
+  if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
+    UM_UNITS[U] = { mdl: 'aw2', k: 1 };
+    if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+    if (typeof UM_KIND !== 'undefined' && !UM_KIND[U]) UM_KIND[U] = 'dwarf';
+    if (typeof UM_TOPK !== 'undefined' && UM_TOPK[U] == null) UM_TOPK[U] = 1.15;
+  }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('aw2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'aw2Row';
+    box.innerHTML = '<h3>Anvilwright rig</h3><div class="row">' + `<button data-a2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?aw=old)">Old (code-built)</button><button data-a2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-a2]')) x.onclick = () => { S.on = x.dataset.a2 === '1'; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('aw2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  const anchors = t => mine(t) ? { head: t.tipW, face: t._awFace, anvil: t._awAnvil, spot: t._awSpot, clip: t._awClip, at: t._awDrawn } : null;
   return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
 
