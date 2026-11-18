@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f50fb2f@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = '59e623e@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7769,7 +7769,7 @@ function rootFoe(c, dur, src) {   // held in place (its own hold, not a stun: a 
 function rootStrike(t, st, tg, pow) {   // the Rootweaver: vines out of the ground under the foe furthest along that is not yet held
   const C = st.caps;
   if (tg.rootT > G.time + .15) { const o = G.creeps.filter(o => !o.dead && !(o.rootT > G.time) && canTarget(t, st, o) && inRange(t, st, o)).sort((a, b) => a.remain - b.remain)[0]; if (o) tg = o; }
-  const n = (st.rootN || 1) + (C.snare2 ? 1 : 0);   // Second Snare
+  const n = (st.rootN || 1) + (C.snare2 >= 2 || (C.snare2 && (t.shots | 0) % 2 === 0) ? 1 : 0);   // Second Snare
   const hit = [tg].concat(n > 1 ? nearest(tg.x, tg.y, 1.6, n - 1, tg, o => !o.fly && !(o.rootT > G.time) && canTarget(t, st, o)) : []);
   if (C.overgrow && (t.shots + 1) % 2 === 0) {   // Overgrowth: every 2nd strike erupts wide (plain-text pass: was every 3rd, and every strike on a foe under Mothcloud or Wither)
     inSplash(tg.x, tg.y, 1.2, true, o => { if (!hit.includes(o) && canTarget(t, st, o)) hit.push(o); });
@@ -7787,7 +7787,7 @@ function rootStrike(t, st, tg, pow) {   // the Rootweaver: vines out of the grou
       } });
       if (C.rootspread) G.delayed.push({ t: .5, fn: () => {   // Spreading Roots: the hold creeps outward
         if (c.dead || !(c.rootT > G.time) || G.state !== 'play') return;
-        for (const o of nearest(c.x, c.y, 1, 4, c, o => !o.fly && !(o.rootT > G.time) && canTarget(t, st, o))) { rootFoe(o, st.root * .5, t); G.bolts.push({ pts: [[c.x, .08, c.y], [(c.x + o.x) / 2, .14, (c.y + o.y) / 2], [o.x, .08, o.y]], life: .25, max: .25, col: [.45, 1, .35] }); }
+        for (const o of nearest(c.x, c.y, 1, 4, c, o => !o.fly && !(o.rootT > G.time) && canTarget(t, st, o))) { rootFoe(o, st.root * .25 * Math.min(2, C.rootspread), t); G.bolts.push({ pts: [[c.x, .08, c.y], [(c.x + o.x) / 2, .14, (c.y + o.y) / 2], [o.x, .08, o.y]], life: .25, max: .25, col: [.45, 1, .35] }); }
       } });
     }
     for (let k = 0; k < 6; k++) part({ k: 'chunk', x: c.x + R(-.2, .2), z: c.y + R(-.2, .2), h: .05, vh: R(.8, 1.6), vx: R(-.4, .4), vz: R(-.4, .4), g: 7, life: .4, max: .4, size: R(.03, .06), col: k % 2 ? '#4a7a2a' : '#5a4430' });
@@ -7803,7 +7803,7 @@ function rootBurst(c) {
   G.delayed.push({ t: .1, fn: () => {
     G.rbN = 0; if (G.state !== 'play') return;
     // (.8s: its Strangling Bloom rider folded in, plain-text pass)
-    inSplash(x, z, 1.2, true, o => { hurt(o, s.dmg * 2, 'magic', t, false, null, null); if (!o.dead) rootFoe(o, .8, t); });
+    inSplash(x, z, 1.2, true, o => { hurt(o, s.dmg * Math.min(2, (s.caps && s.caps.rootburst) || 2), 'magic', t, false, null, null); if (!o.dead) rootFoe(o, .8, t); });
     fxRing(x, z, 1.2, '#9be06a'); fxDust(x, z, 6);
     for (let k = 0; k < 10; k++) part({ k: 'chunk', x, z, h: .05, vh: R(1, 2), vx: R(-1.4, 1.4), vz: R(-1.4, 1.4), g: 7, life: .45, max: .45, size: R(.03, .06), col: k % 2 ? '#4a7a2a' : '#5a4430' });
   } });
@@ -7815,7 +7815,7 @@ function spearThrust(t, st, tg, pow) {   // Thornguard: a spear thrust at the fo
   const C = st.caps, dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, struck = [];
   const ok = o => !o.fly && canTarget(t, st, o);
   let k = 1;
-  if (C.phalanx) { let n = 0; for (const o of G.towers) if (o !== t && o.type === t.type && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 1.5 && ++n >= 2) break; k += .08 * C.phalanx * n; }   // Phalanx
+  if (C.phalanx) { let n = 0; for (const o of G.towers) if (o !== t && o.type === t.type && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 1.5 && ++n >= 2) break; k += .04 * Math.min(2, C.phalanx) * n; }   // Phalanx (two ranks, 4% each)
   const amt = st.dmg * pow * k, share = .5 + .15 * (C.deepthrust || 0) + ((st.pw && st.pw.haft) || 0);   // Deep Thrust (and the Ashwood Haft): the foe behind takes more
   const strike = (c, a, kb) => { hurt(c, a, 'phys', t, false, [ux * kb, uz * kb]); onHit(c, st, t, a); struck.push([c, a]); };
   strike(tg, amt, .1);
@@ -7831,7 +7831,7 @@ function spearThrust(t, st, tg, pow) {   // Thornguard: a spear thrust at the fo
     if (o) {
       strike(o, amt * share, .08);
       const o2 = C.skewer && nearest(o.x + ux * .5, o.y + uz * .5, .55, 1, o, q => q !== tg && ok(q))[0];   // Skewer: on through a third
-      if (o2) strike(o2, amt * share, .06);
+      if (o2) strike(o2, amt * share * Math.min(2, C.skewer) / 2, .06);   // (two ranks: half the share, then all of it)
     }
   }
   // Pin: every 4th thrust roots its foe (Impaler: and every foe the spear ran through; fire() already made it the ×3 power shot)
@@ -7856,13 +7856,13 @@ function bladeWhirl(t, st, pow, sub) {   // Blade Dancers: a whirl of both blade
   for (const [c, d] of cut) { const amt = st.dmg * k; hurt(c, amt, 'phys', t, false, [(c.x - t.x) / (d || 1) * .06, (c.y - t.y) / (d || 1) * .06]); onHit(c, st, t, amt); if (!c.dead) fxSpark(c.x, c.y, hitH(c), '#d8ffb0', 4); }
   for (let q = 0; q < 10; q++) { const a = q / 10 * TAU; part({ k: 'spark', x: t.x + Math.cos(a) * .45, z: t.y + Math.sin(a) * .45, h: .7, vx: -Math.sin(a) * 2.2, vz: Math.cos(a) * 2.2, vh: 0, g: 0, life: .22, max: .22, size: .05, col: '#c8f0a0' }); }
   if (C.gale) {   // Gale of Blades: a ring of leaf-blades a full cell past the reach
-    inSplash(t.x, t.y, R0 + 1, true, (c, d) => { if (d > R0 && !c.phased && !c.ent) { const a = st.dmg * k * .5; hurt(c, a, 'phys', t, false, null); onHit(c, st, t, a); } });
+    inSplash(t.x, t.y, R0 + 1, true, (c, d) => { if (d > R0 && !c.phased && !c.ent) { const a = st.dmg * k * .25 * Math.min(2, C.gale); hurt(c, a, 'phys', t, false, null); onHit(c, st, t, a); } });
     fxRing(t.x, t.y, R0 + 1, '#c8f0a0');
     for (let q = 0; q < 14; q++) { const a = q / 14 * TAU; part({ k: 'spark', x: t.x + Math.cos(a) * R0, z: t.y + Math.sin(a) * R0, h: .5, vx: Math.cos(a) * 3, vz: Math.sin(a) * 3, vh: 0, g: 0, life: .3, max: .3, size: .06, col: '#a8e070' }); }
   }
   if (!sub) {
     if (C.bladerhythm && cut.length >= 3) t.rhythm = 1;   // Blade Rhythm (updateTowers readies the next attack 25% sooner and clears it)
-    if (C.twinwhirl && (t.shots + 1) % 3 === 0) G.delayed.push({ t: .25, fn: () => { if (G.towers.includes(t) && !t.wrecked && G.state === 'play') { t.shotT = 0; bladeWhirl(t, t.st || st, pow, .6); } } });   // Twin Whirl (shotT = 0 replays the spin)
+    if (C.twinwhirl && (t.shots + 1) % 3 === 0) G.delayed.push({ t: .25, fn: () => { if (G.towers.includes(t) && !t.wrecked && G.state === 'play') { t.shotT = 0; bladeWhirl(t, t.st || st, pow, .3 * Math.min(2, C.twinwhirl)); } } });   // Twin Whirl (shotT = 0 replays the spin)
     if (C.bladestorm && (t.shots + 1) % 5 === 0) {   // Bladestorm: 2s of spinning (the view spins the dancer while t.stormT runs)
       t.stormT = G.time + 2;
       for (let q = 1; q <= 8; q++) G.delayed.push({ t: q * .25, fn: () => { if (G.towers.includes(t) && !t.wrecked && G.state === 'play') bladeWhirl(t, t.st || st, 1, .4); } });
@@ -7887,7 +7887,7 @@ function stagCharge(t, st, tg, pow, again) {   // Stag Lancers: out to the foe, 
   } });
   G.delayed.push({ t: .26, fn: () => {
     if (G.state !== 'play') return;
-    const mx = tg.x, mz = tg.y, big = tg.def.boss || tg.def.lead || tg.elite, amt = st.dmg * pow * (big ? (C.glade ? 2.25 : 1.5) : 1);   // Lord of the Glade
+    const mx = tg.x, mz = tg.y, big = tg.def.boss || tg.def.lead || tg.elite, amt = st.dmg * pow * (big ? (C.glade ? 1.5 + .375 * Math.min(2, C.glade) : 1.5) : 1);   // Lord of the Glade
     if (!tg.dead) {
       hurt(tg, amt, 'phys', t, false, [ux * .3, uz * .3]); onHit(tg, st, t, amt);
       fxSpark(tg.x, tg.y, hitH(tg), '#f4ecc8', 12); fxDust(tg.x, tg.y, 4); sfx('glaiveHit', 1);
@@ -7909,7 +7909,7 @@ function stagCharge(t, st, tg, pow, again) {   // Stag Lancers: out to the foe, 
       stagCharge(t, s2, o, pow, 'stag');
     } });
   } });
-  if (!again && (C.charge2 || (C.recharge && (t.shots + 1) % 3 === 0)))   // Endless Hunt / Second Charge: wheel and ride again at another foe
+  if (!again && (C.charge2 || (C.recharge && (t.shots + 1) % (C.recharge >= 2 ? 3 : 4) === 0)))   // Endless Hunt / Second Charge: wheel and ride again at another foe
     G.delayed.push({ t: .8, fn: () => {
       if (!G.towers.includes(t) || t.wrecked || G.state !== 'play') return;
       const s2 = t.st || st, o = acquire(t, s2, new Set([tg])) || (!tg.dead && inRange(t, s2, tg) ? tg : null);
@@ -7941,7 +7941,7 @@ function podBurst(x, z, sp) {   // a Thornspitter's seed pod bursting: green spr
 function swarmMove(c) {   // a host of spores (a Seedcaster's, the Seedmother's) has fallen: they drift on to the nearest foe
   let best = null; for (const q of c.poison) if ((q.src === HERO_SRC || (q.src && q.src.def && (q.src.def.swarm || q.src.def.pod))) && (!best || q.dps > best.dps)) best = q;
   if (!best) return;
-  const bs = best.src && best.src.st, n = Math.max((G.hero === 'hivemother' && sagaHas('fin') ? 2 : 1) + (bs && bs.caps && bs.caps.drift ? 2 : 0), (bs && bs.pw && bs.pw.bloom) || 0);   // Drifting Spores, Heart of the Bloom
+  const bs = best.src && best.src.st, n = Math.max((G.hero === 'hivemother' && sagaHas('fin') ? 2 : 1) + (bs && bs.caps && bs.caps.drift ? Math.min(2, bs.caps.drift) : 0), (bs && bs.pw && bs.pw.bloom) || 0);   // Drifting Spores, Heart of the Bloom
   for (const o of nearest(c.x, c.y, 1.9, n, c, o => !isImmune(o, 'poison'))) {
     dose(o, { poison: best.dps, poisonT: Math.max(2, best.t), caps: {} }, best.src); o.swarmOn = true;
     for (let k = 0; k < 7; k++) part({ k: 'spark', x: c.x, z: c.y, h: hitH(c), vx: (o.x - c.x) * 2.6 + R(-.3, .3), vz: (o.y - c.y) * 2.6 + R(-.3, .3), vh: R(.2, .7), g: 1, life: .4, max: .4, size: .045, col: '#c8d860' });
@@ -27257,7 +27257,7 @@ function bwSwarmTick(e, dt) {
   const c = e.c, st = bwSt(t), C = st.caps || {};
   if (c && !c.dead && !G.creeps.includes(c)) { e.done = 1; return; }   // (through the gate: gone with it)
   if (!c || c.dead) {   // the host is down: it flies on, once (twice with Second Brood)
-    const cap = 1 + (C.bwBrood ? 1 : 0); if (e.moves >= cap || G.time >= e.until) { e.done = 1; return; }
+    const cap = 1 + (C.bwBrood >= 2 ? 1 : 0); if (e.moves >= cap || G.time >= e.until) { e.done = 1; return; }
     const n = nearest(e.x, e.z, BW.moveR, 1, c, q => bwSwarmable(t, st, q) && !bwSwarmOn(q, t))[0];
     if (!n) { e.done = 1; return; }
     rfx({ k: 'streak', x0: e.x, h0: .5, z0: e.z, c: n, col: BW.COL.swarm, w: .05, life: .4 });
@@ -27355,7 +27355,7 @@ function bwBogTick(e, dt) {
   for (const o of G.creeps) {   // the bog itself: foes crossing it while it is open
     if (!bwWalker(o) || Math.hypot(o.x - e.x, o.y - e.z) > BW.bogR) continue;
     chill(o, { slow: BW.crossSlow, slowT: .3 }, null, t);
-    if (!e.crossed.has(o)) { e.crossed.add(o); bwShred(o, C.bwDeep ? 2 : 1); }
+    if (!e.crossed.has(o)) { e.crossed.add(o); bwShred(o, C.bwDeep >= 2 ? 2 : 1); }
     o.bwBogBy = e; o.bwBogAt = G.time;
   }
   if (G.time >= e.until) e.done = 1;
@@ -40919,7 +40919,7 @@ function cxEchoOn(t, o, a2, k) {
 cxWrap('cc_echo', (cast0, t, st, e, ab) => {
   const r = cast0(t, st, e, ab); if (r === false || !e || !e.o) return r;
   const k = cxK(t) * byT(ab.by.k, t);
-  if (ccxCap(st, 'ccxEcho2')) G.delayed.push({ t: 1.25, fn: () => cxEchoOn(t, e.o, e.ab, k) });
+  /* (Quickening Bell rings Backward Hour twice since 19 Nov 2026: forces_zzz..._chains.js) */
   if (ccxCap(st, 'ccxEchoAll')) {
     let i = 0;
     for (const o of abAllies(t, ab.r)) {
@@ -40948,8 +40948,7 @@ function cxConstellation(t, st, c, k) {
 ccFallingStar = function (t, st, c, k, free) {
   const ab = ABIL.cc_fallingstar, C = st.caps || {}, low = byT(ab.by.low, t);
   ccStarDrop(t, st, c, 3 * k, { low, splash: true, frag: C.ccFrag });
-  if (C.ccTwinStar) {
-    ccEv('cap:ccTwinStar');
+  if (0) {   /* (Twin Stars opens Grand Orrery twice since 19 Nov 2026: forces_zzz..._chains.js) */
     G.delayed.push({ t: .4, fn: () => {
       if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || st;
       const q = !c.dead ? c : abToughest(G.creeps.filter(o => !o.dead && !o.ent && canTarget(t, s, o) && Math.hypot(o.x - c.x, o.y - c.y) <= CX.TWIN_R));
@@ -41083,7 +41082,7 @@ function cxSpill(t, F) {
 cxWrap('cc_nullfield', (cast0, t, st, L, ab) => {
   const F = (L || []).filter(c => c && !c.dead), r = cast0(t, st, L, ab); if (r === false || !F.length) return r;
   const k = cxK(t), m = byT(ab.by.mult, t), sev = byT(ab.by.sev, t);
-  if (ccxCap(st, 'ccxRendSpill')) G.delayed.push({ t: .56, fn: () => cxSpill(t, F) });
+  /* (Unravelling Veil spills the marks of Sundering Glyph's foe since 19 Nov 2026: forces_zzz..._chains.js) */
   if (ccxCap(st, 'ccxRendChain')) G.delayed.push({ t: 1, fn: () => cxRendOn(t, new Set(F), F, k, m, sev, CX.REND_MORE) });
   return r;
 });
@@ -41131,7 +41130,7 @@ cxWrap('ch_unravel', (cast0, t, st, p, ab) => {
       const m = cxChamp('ch_maelis', 'ccxWeaveCharge');
       if (m && !(G.time - (m.cxWvAt == null ? -99 : m.cxWvAt) < CX.WEAVE_GAP) && Math.hypot(c.x - m.x, c.y - m.y) <= ((m.st && m.st.range) || 3) + .2) {
         m.cxWvAt = G.time;
-        if (m.ab && m.ab.cd.ch_mirrorweave > G.time) m.ab.cd.ch_mirrorweave = Math.max(G.time, m.ab.cd.ch_mirrorweave - 1);
+        if (m.ab && m.ab.cd.ch_thousandfold > G.time) m.ab.cd.ch_thousandfold = Math.max(G.time, m.ab.cd.ch_thousandfold - 1);   /* (Thousandfold Barrage since 19 Nov 2026; it was Sixfold Loom) */
       }
     }
     return r;
@@ -41310,8 +41309,13 @@ function gcOnCast(t, ab, tg, st) {
   }
   if (id === 'ch_oldwood' && tg && tg.x != null && gcHas(t, 'gcTwin'))   // Twin Elders: a second tree, 1s behind
     G.delayed.push({ t: 1, fn: () => { if (!abLive(t)) return; abRun(id, () => ab.cast(t, gcSt(t), tg, ab)); } });
+  if (id === 'ch_thornvolley' && tg && tg.x != null && gcHas(t, 'gcWatch')) {   // Watchtower Bough (under Thorn Volley since 19 Nov 2026): every archer beside him looses at the toughest foe it falls on
+    const tz = tg.y != null ? tg.y : tg.z, c0 = tg.def ? tg : G.creeps.filter(o => !o.dead && !o.ent && Math.hypot(o.x - tg.x, o.y - tz) <= 1.5).sort((a, b) => b.hp - a.hp)[0];
+    const A = c0 ? G.towers.filter(o => o !== t && !o.def.wall && !o.wrecked && (o.def.proj === 'arrow' || o.def.unit === 'gladebow') && Math.hypot(o.x - t.x, o.y - t.y) <= 2).slice(0, 4) : [];
+    A.forEach((o, k) => G.delayed.push({ t: .1 + .07 * k, fn: () => { if (c0.dead || !gcLive(o) || G.state !== 'play') return; fire(o, gcSt(o), c0, true); } }));
+  }
   if (id === 'ch_pinarrow' && tg && tg.x != null) {
-    if (gcHas(t, 'gcWatch')) {   // Watchtower Bough: every archer beside him looses at Farshot's foe
+    if (0) {   // (Watchtower Bough was here, under Farshot)
       const A = G.towers.filter(o => o !== t && !o.def.wall && !o.wrecked && (o.def.proj === 'arrow' || o.def.unit === 'gladebow') && Math.hypot(o.x - t.x, o.y - t.y) <= 2).slice(0, 4);
       A.forEach((o, k) => G.delayed.push({ t: .1 + .07 * k, fn: () => { if (tg.dead || !gcLive(o) || G.state !== 'play') return; fire(o, gcSt(o), tg, true); } }));
     }
@@ -41432,12 +41436,12 @@ function gcBloomAfter(t, st, ab, pre) {
 }
 function gcKill(c, src) {
   const by = src && src.def && src.def.force === 'grove' ? src : null;
-  if (by && AB_NOW === 'runthrough' && by.def.unit === 'staglancer' && by.gcHunt && by.gcHunt.add < 3 && gcHas(by, 'gcFinish')) {   // Hunter's Finish: one more charge
+  if (by && AB_NOW === 'runthrough' && by.def.unit === 'staglancer' && by.gcHunt && by.gcHunt.add < 3 && false && gcHas(by, 'gcFinish')) {   // (Hunter's Finish readies Heroic Charge since 19 Nov 2026: forces_zzz..._chains.js)
     const H = by.gcHunt, ab = ABIL.runthrough, at = Math.max(.15, H.end + H.add * GVC.huntGap - G.time); H.add++;
     by.ab.busyT = Math.max(by.ab.busyT, G.time + at + GVC.huntGap); by.cd = Math.max(by.cd, at + GVC.huntGap);
     G.delayed.push({ t: at, abId: ab.id, fn: () => gcHuntCharge(by, ab) });
   }
-  if (by && AB_NOW === 'harvest' && by.def.unit === 'bladedancer' && gcHas(by, 'gcReap')) {   // Reaper's Step: an afterimage whirls where it fell
+  if (by && AB_NOW === 'leafdance' && by.def.unit === 'bladedancer' && gcHas(by, 'gcReap')) {   // Reaper's Step (Threading Dance's kills since 19 Nov 2026; they were Encore's): an afterimage whirls where it fell
     const x = c.x, z = c.y;
     G.delayed.push({ t: .15, fn: () => {
       if (!gcLive(by) || G.state !== 'play') return; const s = gcSt(by);
@@ -43901,13 +43905,13 @@ function gfAmp(c, src) {
   const u = src.def.unit, spell = gfSpell(); let a = 0, n;
   if (c.gfPetalT > G.time && src.def.force === 'grove' && !(spell && AB_NOW === 'leafdance')) { a += c.gfPetalK || 0; c.gfPetalT = 0; }   // Petal Cuts: the guard dropped, once
   // Wounded Prey (plain-text pass)
-  if (u === 'gladebow' && gfHas(src, 'gfPrey') && (c.bleedT > 0 || (typeof gwSpored === 'function' && gwSpored(c)))) a += .45;
+  if (u === 'gladebow' && gfHas(src, 'gfPrey') && (c.bleedT > 0 || (typeof gwSpored === 'function' && gwSpored(c)))) a += .225 * Math.min(2, gfHas(src, 'gfPrey'));
   if (spell) return a;
   if (u === 'thornguard' && c.gfSnagT > G.time && (n = gfHas(src, 'gfSnag'))) a += .15 * n;   // Thornwall Ward
   else if (u === 'gladebow') {
     // Mark the Quarry (plain-text pass: no reset, 15% -> 25%)
-    if (c.gfQuarryT > G.time && gfHas(src, 'gfQuarry')) a += .25;
-    if (c.gfFlushT > G.time && typeof talentHas === 'function' && talentHas('arcane', 'gfFlush')) a += .2;   // Mark of the Hunt
+    if (c.gfQuarryT > G.time && gfHas(src, 'gfQuarry')) a += .125 * Math.min(2, gfHas(src, 'gfQuarry'));
+    if (c.gfFlushT > G.time && typeof talentHas === 'function' && talentHas('arcane', 'gfFlush')) a += .1 * Math.min(2, talentHas('arcane', 'gfFlush'));   // Mark of the Hunt
   }
   // (gfHeavy: no talent carries it now; Heavy Lance is plain armour pen, talent clarity)
   else if (u === 'staglancer' && (c.stunT > 0 || c.rootT > G.time) && (n = gfHas(src, 'gfHeavy'))) a += .12 * n;
@@ -44007,10 +44011,10 @@ function gfOnCast(t, ab, tg, st, pre) {
   }
   else if (id === 'ch_thornvolley') {
     if ((n = gfHas(t, 'gfSnareRain')) && pre.slowed && pre.slowed.length) G.delayed.push({ t: .45, fn: () => { if (!abLive(t)) return; for (const c of pre.slowed) if (!c.dead) rootFoe(c, .3 * n, t); } });   // Snaring Rain
-    if (gfHas(t, 'gfWard') && p) { const R = pre.R || 1.5; G.delayed.push({ t: .4, fn: () => { for (const c of G.creeps) if (!c.dead && Math.hypot(c.x - p.x, c.y - p.y) <= R) { c.gfWardT = G.time + 4; c.gfWardBy = t; } } }); }   // Warden's Mark
+    if (gfHas(t, 'gfWard') && p) { const R = pre.R || 1.5; G.delayed.push({ t: .4, fn: () => { for (const c of G.creeps) if (!c.dead && Math.hypot(c.x - p.x, c.y - p.y) <= R) { c.gfWardT = G.time + 2 * Math.min(2, gfHas(t, 'gfWard')); c.gfWardBy = t; } } }); }   // Warden's Mark
   }
   else if (id === 'ch_pinarrow' && tg && tg.x != null) {
-    if (gfHas(t, 'gfPatient') && pre.still) { const back = abCost(t, ab) * .5; G.delayed.push({ t: 0, fn: () => { if (t.ab) gfMana(t, back); } }); }   // Hunter's Patience
+    if (gfHas(t, 'gfPatient') && pre.still) { const back = abCost(t, ab) * .25 * Math.min(2, gfHas(t, 'gfPatient')); G.delayed.push({ t: 0, fn: () => { if (t.ab) gfMana(t, back); } }); }   // Hunter's Patience
     if ((n = gfHas(t, 'gfRun'))) t.gfRunN = 2 * n;   // Running Shafts
     if ((n = gfHas(t, 'gfSnarl'))) {   // Snarled Ground
       const c = tg, pin = byT(ab.by.pin, t);
@@ -44025,7 +44029,7 @@ function gfOnCast(t, ab, tg, st, pre) {
     } }); }
     if ((n = gfHas(t, 'gfStir'))) for (const o of G.towers) if (gfIs(o, 'seedcaster') && o.ab && o.ab.cd && o.ab.cd.haze > G.time && Math.hypot(o.x - t.x, o.y - t.y) <= 2) o.ab.cd.haze = Math.max(G.time, o.ab.cd.haze - 2 * n);   // Swarm Song
   }
-  else if (id === 'ch_garden' && gfHas(t, 'gfPollen')) for (const o of abAllies(t, 1.6)) if (typeof gwUnit === 'function' && gwUnit(o)) { o.gfPollenN = 3; o.gfPollenBy = t; }   // Pollen Drift
+  else if (id === 'ch_garden' && gfHas(t, 'gfPollen')) for (const o of abAllies(t, 1.6)) if (typeof gwUnit === 'function' && gwUnit(o)) { o.gfPollenN = 1 + Math.min(2, gfHas(t, 'gfPollen')); o.gfPollenBy = t; }   // Pollen Drift
 }
 
 /* ---------- Growth: Living Haft, Honey Store ---------- */
@@ -52580,7 +52584,7 @@ function tchTree(tree, rows, opts) {
   }
   tree.chained = true; if (opts && opts.capTodo) tree.capTodo = opts.capTodo;
 }
-/* The ultimate: a unit's third spell. o: { cd, mana, by: { key: factor } } retunes it (a longer cooldown, more mana, and
+/* The ultimate: a unit's third spell. o: { cd, mana, by: { key: factor }, set: { key: [by tier] } } retunes it (a longer cooldown, more mana, and
    its strength raised by about as much, so its damage a second stays where it was); every ultimate says so in its words
    (the spell card: ab.text; the short line: spellhud.js reads ab.ult) and its autocast waits for a worthy moment:
    need (3) foes within its reach + 1 cell, or a boss, leader or elite. A cast by hand is never held back. */
@@ -52597,6 +52601,7 @@ function tchUlt(id, o) {
   o = o || {};
   if (o.cd) ab.cd = o.cd; if (o.mana) ab.mana = o.mana;
   for (const k in o.by || {}) if (ab.by && Array.isArray(ab.by[k])) ab.by[k] = ab.by[k].map(v => +(v * o.by[k]).toFixed(3));
+  for (const k in o.set || {}) if (ab.by) ab.by[k] = o.set[k].slice();   // (a count by tier, written out)
   ab.ult = true;
   if (typeof ab.blurb === 'string' && !/ultimate/i.test(ab.blurb)) ab.blurb = 'Its ultimate. ' + ab.blurb;
   if (typeof ab.text === 'function') { const t0 = ab.text; ab.text = function () { const s = t0.apply(this, arguments); return typeof s === 'string' && !/^Ultimate\./.test(s) ? 'Ultimate. ' + s : s; }; }
@@ -52691,8 +52696,8 @@ function tchUlt(id, o) {
     ['Hourglass Heart', 4, 2, { req: [3, 2], max: 2, pro: n => `Every 10s in a fight, it readies nearby Conclave spells ${n}s sooner, its own ${2 * n}s.` }],
     ['Borrowed Hour', 5, 0, { req: [4, 0] }],
     ['Frozen Moment', 5, 1, { req: [4, 1] }],
-    ['Quickening Bell', 5, 2, { reqs: [[4, 2], [4, 0]] }],
-  ], { capTodo: "Quickening Bell and Borrowed Hour both shape Recurrence" });
+    ['Quickening Bell', 5, 2, { req: [4, 2], pro: () => 'Backward Hour turns back twice, 1s apart, and quickens its bolts 30% for 4s.', sp: () => ({ ab: 'cc_quicken', haste: [.3, 4] }) }],
+  ]);
   tchTree(FORCES["conclave"].talents["storm"], [   // conclave.storm
     ['Cold Starlight', 0, 1],
     ['Star-Chart', 0, 2],
@@ -52708,10 +52713,10 @@ function tchUlt(id, o) {
     ['Turning Spheres', 4, 0, { req: [3, 0], max: 2, pro: n => `Grand Orrery's planets drag the flyers they strike down for ${gNf(.5 * n)}s.`, sp: n => ({ ab: 'cc_orrery', rider: { low: .5 * n } }) }],
     ['Zodiac', 4, 1, { req: [3, 1], max: 2, pro: n => `Every ${n >= 2 ? '12th' : '18th'} bolt calls a free Falling Star down on its foe.` }],
     ['Comet', 4, 2, { req: [3, 2], max: 2, pro: n => `Each Pull its bolts set off bursts into a chilling comet for ${30 * n}%.` }],
-    ['Twin Stars', 5, 0, { req: [4, 0] }],
+    ['Twin Stars', 5, 0, { req: [4, 0], pro: () => 'Grand Orrery opens twice, the second 1s later for 70%.', sp: () => ({ ab: 'cc_orrery' }) }],
     ['Constellation', 5, 1, { req: [4, 1] }],
     ['Starfall Sky', 5, 2, { req: [4, 2] }],
-  ], { capTodo: "Twin Stars and Constellation both shape Falling Star" });
+  ]);
   tchTree(FORCES["conclave"].talents["earth"], [   // conclave.earth
     ['Second Tremor', 0, 1],
     ['Ley Reservoir', 0, 2],
@@ -52747,8 +52752,8 @@ function tchUlt(id, o) {
     ['Arcane Memory', 4, 3, { req: [3, 3] }],
     ['Wardbreaker', 5, 1, { req: [4, 1] }],
     ['Void Ground', 5, 2, { req: [4, 2] }],
-    ['Unravelling Veil', 5, 3, { reqs: [[4, 3], [4, 2]] }],
-  ], { capTodo: "Unravelling Veil and Void Ground both shape Rend the Veil" });
+    ['Unravelling Veil', 5, 3, { req: [4, 3], pro: () => "Sundering Glyph spreads its foe's element marks nearby, and Rend the Veil readies it 3s sooner.", sp: () => [{ ab: 'cc_sunder' }, { ab: 'cc_nullfield', ready: ['cc_sunder', 3] }] }],
+  ]);
   tchTree(CHAMPS["cc_arch"].tree, [   // conclave.champ:cc_arch
     ['Flicked Pages', 0, 1],
     ['Quick Quill', 0, 2],
@@ -52765,8 +52770,8 @@ function tchUlt(id, o) {
     ['Read the Marks', 4, 3, { req: [3, 3], max: 2, pro: n => `Thousandfold Barrage and Unravel cost ${gNf(12.5 * n)}% less with 3 marked foes in her reach.`, sp: n => ['ch_thousandfold', 'ch_unravel'].map(ab => ({ ab, at: 'foes', foes: { n: 3, cond: 'elmarked' }, cost: -.125 * n })) }],
     ['Deeper Loom', 5, 1, { req: [4, 1] }],
     ['Rewoven Threads', 5, 2, { req: [4, 2] }],
-    ['Spellweaver', 5, 3, { reqs: [[4, 3], [4, 1]] }],
-  ], { capTodo: "Spellweaver and Deeper Loom both shape Sixfold Loom" });
+    ['Spellweaver', 5, 3, { req: [4, 3], pro: () => 'Every reaction near her brings Thousandfold Barrage 1s nearer, and each Barrage readies Unravel 2s sooner.', sp: () => ({ ab: 'ch_thousandfold', ready: ['ch_unravel', 2] }) }],
+  ]);
   tchTree(CHAMPS["cc_chrono"].tree, [   // conclave.champ:cc_chrono
     ['Patient Hands', 0, 1],
     ['Long Pendulum', 0, 2],
@@ -52824,10 +52829,253 @@ function tchUlt(id, o) {
     if (r !== false && x != null && z != null && ccxCap(st, 'ccxCrack')) G.delayed.push({ t: .37, fn: () => cxCrack(t, x, z) });
     return r;
   });
+  // Four capstones moved off a spell another capstone already shapes (owner: "capstones should effect different spells"),
+  // each onto a spell of its own chain. A second cast is a recast: no mana, no cooldown, and it rings no third.
+  const again = (id, flag, gap, k) => { if (typeof cxWrap === 'function' && ABIL[id]) cxWrap(id, (cast0, t, st, c, ab) => {
+    const r = cast0(t, st, c, ab);
+    if (r !== false && !t.tchAgain && ccxCap(st, flag)) G.delayed.push({ t: gap, fn: () => {
+      if (!abLive(t) || G.state !== 'play') return; const s = t.st || st, tg = ab.pick(t, s, ab, true); if (!tg) return;
+      t.tchAgain = 1; try { ccRecast(t, ab, tg, cxK(t) * k, s); if (typeof ccEv === 'function') ccEv('cap:' + flag); } finally { t.tchAgain = 0; }
+    } });
+    return r;
+  }); };
+  again('cc_quicken', 'ccxEcho2', 1, 1);     // Quickening Bell: Backward Hour turns back twice (it was Recurrence casting twice)
+  again('cc_orrery', 'ccTwinStar', 1, .7);   // Twin Stars: a second Grand Orrery, for 70% (it was a second Falling Star)
+  // Unravelling Veil: the marks of Sundering Glyph's foe spill onto the foes round it (it was each foe Rend the Veil tore)
+  if (typeof cxWrap === 'function' && ABIL.cc_sunder) cxWrap('cc_sunder', (cast0, t, st, c, ab) => {
+    const F = [].concat(c || []).filter(o => o && o.x != null && !o.dead), r = cast0(t, st, c, ab);
+    if (r !== false && F.length && ccxCap(st, 'ccxRendSpill')) G.delayed.push({ t: .3, fn: () => cxSpill(t, F.filter(o => !o.dead)) });
+    return r;
+  });
+  // (Spellweaver: reactions near Maelis ready Thousandfold Barrage, in forces_zzzzzzzzz_caps_conclave.js)
   // The Pyroclasts: the owner's own two paths and ranks stand (13-14 Nov 2026). One row-V talent had no prerequisite.
   const P = FORCES.conclave.talents && FORCES.conclave.talents.cannon;
   if (P) { const by = n => P.list.find(t => t.name === n), f = by('Fire Feeds Mana'), c = by('Cinder Charge'); if (f && c) { f.req = null; f.reqs = [[c.r, c.c]]; } P.chained = true; P.ownerRanks = true; }
 })();
+
+/* ---------- the Grove: its ultimates ---------- */
+(function tchGroveMore() {
+  if (typeof FORCES === 'undefined' || !FORCES.grove || typeof ABIL === 'undefined') return;
+  // Five were no slower than their unit's other spells and are retuned (a longer wait, more mana, and as much more of what
+  // they do, so each does about what it did over a fight):
+  tchUlt('sunder', { cd: 18, mana: 120, by: { len: 1.3, shred: 1.5 } });                       // Spearwood Rising: 10.5s, 85 mana
+  tchUlt('runthrough', { cd: 18, mana: 130, set: { n: [5, 5, 5, 6, 6, 6] } });                  // White Hart's Hunt: 10s, 95 mana, 3-4 charges
+  tchUlt('wildsurge', { cd: 20, mana: 140, by: { mult: 1.4 } });                               // Shapestorm: 14.5s, 110 mana
+  tchUlt('harvest', { cd: 20, mana: 140, by: { mult: 1.7 } });                                 // Encore: 11s, 110 mana
+  tchUlt('bindseed', { cd: 20, mana: 145, by: { dur: 1.4, root: 1.3 } });                      // Snapjaw Bloom: 12.5s, 110 mana
+  // the rest already wait 1.6 to 2.4 times as long as their unit's other spells (15.5-26.5s) and keep their numbers
+  for (const id of ['arrowrain', 'briarfield', 'bw_bogdue', 'ch_oldwood', 'ch_huntermoon', 'ch_fullbloom']) tchUlt(id);
+})();
+/* <chains grove> */
+(function tch_grove() {
+  if (typeof FORCES === 'undefined' || !FORCES.grove) return;
+  tchTree(FORCES["grove"].talents["glaive"], [   // grove.glaive
+    ['Deep Thrust', 0, 1],
+    ['Long Haft', 0, 2],
+    ['Hold the Line', 0, 3],
+    ['Shieldsplitter', 1, 0],
+    ['Bloodthorn', 1, 1],
+    ['Thornhedge', 1, 2, { req: [0, 2] }],
+    ['Spearwood Rising', 2, 1, { req: [1, 1] }],
+    ['Set Spears', 2, 2, { req: [1, 2] }],
+    ['Skewer', 3, 0, { max: 2, pro: n => `Thrusts run on through a third foe in line, at ${n >= 2 ? '' : 'half '}the second foe's share.` }],
+    ['Splintered Line', 3, 1, { req: [2, 1] }],
+    ['Thornwall Ward', 3, 2, { req: [2, 2] }],
+    ['Phalanx', 4, 0, { req: [3, 0], max: 2, pro: n => `Thrusts ${4 * n}% harder for each other Thornguard within 1.5 cells, up to two.` }],
+    ['Rootbreaker', 4, 1, { req: [3, 1] }],
+    ['Living Haft', 4, 2, { req: [3, 2] }],
+    ['Impaler', 5, 0, { req: [4, 0] }],
+    ['Wall of Spears', 5, 1, { req: [4, 1] }],
+    ['Living Palisade', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["grove"].talents["arrow"], [   // grove.arrow
+    ['Canopy Sight', 0, 1],
+    ['Thornpoint Arrows', 0, 2],
+    ['Quick Nock', 0, 3],
+    ['Thornseed Arrow', 1, 1, { req: [0, 1] }],
+    ['Patient Hunter', 1, 2],
+    ["Hunter's Rhythm", 2, 0],
+    ['Paired Shafts', 2, 1, { req: [1, 1], max: 2, pro: n => `Thornseed Arrow's roots hold ${gNf(.15 * n)}s longer${n >= 2 ? ', and it seeds one more foe' : ''}.`, sp: n => ({ ab: 'volley', by: n >= 2 ? { n: 1, hold: .3 } : { hold: .15 } }) }],
+    ['Heartseeker', 2, 2],
+    ['Wounded Prey', 3, 0, { req: [2, 0], max: 2, pro: n => `Arrows hit bleeding or spored foes ${gNf(22.5 * n)}% harder.` }],
+    ['Hushed Quarry', 3, 1, { req: [2, 1], max: 2, pro: n => `Thornseed Arrow's burst roots ground foes within ${gNf(.5 * n)} cells of its foe, half as long.`, sp: n => ({ ab: 'volley', by: { near: .5 * n } }) }],
+    ['Snaring Shot', 3, 2, { req: [2, 2] }],
+    ['Nailing Shaft', 4, 0, { req: [3, 0] }],
+    ['Still Quarry', 4, 1, { req: [3, 1], max: 2, pro: n => `Aimed Shot hits foes struck by Thornseed Arrow ${25 * n}% harder for 4s.`, sp: n => [{ ab: 'volley', rider: { gfSeed: 4 } }, { ab: 'aimedshot', vs: ['gfSeeded', .25 * n] }] }],
+    ['Mark the Quarry', 4, 2, { req: [3, 2], max: 2, pro: n => `Rangers hit the first foe each Aimed Shot pierces ${gNf(12.5 * n)}% harder for 5s.` }],
+    ['Splitting Shaft', 5, 0, { req: [4, 0] }],
+    ['Pinning Shot', 5, 1, { req: [4, 1] }],
+    ['Thornrain', 5, 2, { req: [4, 2], on: 'arrows' }],
+  ]);
+  tchTree(FORCES["grove"].talents["frost"], [   // grove.frost
+    ['Deep Roots', 0, 1],
+    ['Quickening Sap', 0, 2],
+    ['Mothcloud', 1, 1, { req: [0, 1] }],
+    ['Thorned Vines', 1, 2],
+    ['Thorn Hold', 1, 3],
+    ['Spreading Roots', 2, 0, { max: 2, pro: n => `Roots spread to ground foes within 1 cell of a held foe, for ${n >= 2 ? 'half' : 'a quarter'} as long.` }],
+    ['Clinging Briars', 2, 1, { req: [1, 1] }],
+    ['Sapwell', 2, 2],
+    ['Rootburst', 3, 0, { req: [2, 0], max: 2, pro: n => `A held foe that dies bursts for ${n} strike${n > 1 ? 's' : ''}, rooting ground foes within 1.2 cells 0.8s.` }],
+    ['Bloodbriar', 3, 1, { req: [2, 1] }],
+    ["Warden's Reach", 3, 2],
+    ['Wither', 4, 0, { req: [3, 0] }],
+    ['Bramble Squeeze', 4, 1, { req: [3, 1], max: 2, pro: n => `Mothcloud makes the ground foes it stings bleed for ${20 * n}% of a strike over 3s.`, sp: n => ({ ab: 'constrict', rider: { bleed: .2 * n } }) }],
+    ['Second Snare', 4, 2, { req: [3, 2], max: 2, pro: n => `${n >= 2 ? 'Its roots seize' : 'Every other strike, its roots seize'} one more foe near the first.` }],
+    ['The Deep Hungers', 5, 0, { req: [4, 0] }],
+    ['Overgrowth', 5, 1, { req: [4, 1] }],
+    ['Strangleroot', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["grove"].talents["arcane"], [   // grove.arcane
+    ['Goring Antlers', 0, 1],
+    ['Heavy Lance', 0, 2],
+    ["Stag's Wind", 1, 1],
+    ['Trample', 1, 2],
+    ['Long Gallop', 2, 1],
+    ['Bounding Leap', 2, 2, { req: [1, 2] }],
+    ['Wheel About', 2, 3],
+    ['Mark of the Hunt', 3, 1, { req: [2, 1], max: 2, pro: n => `Gladebow Rangers hit the foe of each Heroic Charge ${10 * n}% harder for 6s.` }],
+    ['Bowl Over', 3, 2, { req: [2, 2] }],
+    ['Lord of the Glade', 3, 3, { req: [2, 3], max: 2, pro: n => `The lance hits bosses and elites ×${gNf(1.5 + .375 * n)}, not ×1.5.` }],
+    ["White Hart's Hunt", 4, 1, { req: [3, 1] }],
+    ['Herd Instinct', 4, 2, { req: [3, 2] }],
+    ['Second Charge', 4, 3, { req: [3, 3], max: 2, pro: n => `Every ${n >= 2 ? '3rd' : '4th'} charge is followed at once by another at a second foe, for 70%.` }],
+    ['Run to Ground', 5, 1, { req: [4, 1] }],
+    ['Hooves of Thunder', 5, 2, { req: [4, 2] }],
+    ["Hunter's Finish", 5, 3, { req: [4, 3], pro: () => 'A foe Heroic Charge slays readies it again at once and refunds 10 mana.', sp: () => ({ ab: 'heroiccharge', kill: { cd: 10, mana: 10 } }) }],
+  ]);
+  tchTree(FORCES["grove"].talents["storm"], [   // grove.storm
+    ['Wild Pace', 0, 0, { on: 'bear' }],
+    ["Druid's Patience", 0, 1, { on: 'sage' }],
+    ['Wildwood Tithe', 0, 2],
+    ['Second Skin', 1, 1],
+    ['Primal Swipe', 1, 2, { req: [0, 2] }],
+    ['Shapestorm', 2, 1, { req: [1, 1] }],
+    ['Wing-Clipper', 2, 2, { req: [1, 2] }],
+    ['Moonsap Bolts', 2, 3, { on: 'sage' }],
+    ['Grounded Prey', 3, 1, { req: [2, 1] }],
+    ['Talon Rend', 3, 2, { req: [2, 2] }],
+    ["Owl's Reach", 3, 3, { req: [2, 3], on: 'owl' }],
+    ["Harrier's Cry", 4, 1, { req: [3, 1] }],
+    ["Owl's Mark", 4, 2, { req: [3, 2], max: 2, pro: n => `Each Primal Swipe readies Shift Form, ${n >= 2 ? 'free' : 'at half cost'} for the next 4s.`, sp: n => [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -.5 * n }] }],
+    ['Bramble Claws', 4, 3, { req: [3, 3], on: 'bear' }],
+    ['Owl Lord', 5, 1, { req: [4, 1] }],
+    ['Wild Heart', 5, 2, { req: [4, 2], on: 'shift' }],
+    ['Skyfall', 5, 3, { req: [4, 3], on: 'owl' }],
+  ]);
+  tchTree(FORCES["grove"].talents["earth"], [   // grove.earth
+    ['Leaf-Edged Blades', 0, 1],
+    ['Tripping Blades', 0, 2],
+    ['Wide Whirl', 1, 1],
+    ["Dancer's Breath", 1, 3],
+    ['Blade Rhythm', 2, 0, { max: 2, pro: n => `Whirlwind comes ${5 * n}% sooner${n >= 2 ? ' and spins one more whirl' : ''}.`, sp: n => ({ ab: 'whirlwind', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
+    ['Threading Dance', 2, 1, { req: [1, 1] }],
+    ['Twin Whirl', 3, 0, { req: [2, 0], max: 2, pro: n => `Every 3rd whirl spins again 0.25s later, for ${30 * n}%.` }],
+    ['Flowing Steps', 3, 1, { req: [2, 1] }],
+    ['Quickstep', 3, 2],
+    ['Gale of Blades', 4, 0, { req: [3, 0], max: 2, pro: n => `Each whirl flings leaf-blades a cell past its reach, cutting foes there for ${25 * n}%.` }],
+    ['Petal Cuts', 4, 1, { req: [3, 1] }],
+    ['Encore', 4, 2, { req: [3, 2] }],
+    ['Bladestorm', 5, 0, { req: [4, 0] }],
+    ["Reaper's Step", 5, 1, { req: [4, 1], pro: () => 'Each foe Threading Dance slays leaves a whirling afterimage cutting ground foes within 1 cell. Kills ready it 2s sooner.', sp: () => ({ ab: 'leafdance', kill: { cd: 2 } }) }],
+    ['Curtain Call', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["grove"].talents["cannon"], [   // grove.cannon
+    ['Choking Spores', 0, 0],
+    ['Thorned Husks', 0, 1],
+    ['Ripe Pods', 0, 2],
+    ['Puffcap Sowing', 1, 2, { req: [0, 2] }],
+    ['Seedwell', 1, 3],
+    ['Potent Spores', 2, 1],
+    ['Seed Scatter', 2, 2, { req: [1, 2], max: 2, pro: n => `Puffcap Sowing comes ${5 * n}% sooner${n >= 2 ? ' and sows one more, 4 in all' : ''}.`, sp: n => ({ ab: 'barrage', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
+    ['Snapjaw Bloom', 2, 3, { req: [1, 3] }],
+    ['Hard Husk', 3, 1, { req: [2, 1] }],
+    ['Burrowing Pods', 3, 2, { req: [2, 2] }],
+    ['Clinging Spores', 3, 3, { req: [2, 3] }],
+    ['Drifting Spores', 4, 1, { req: [3, 1], max: 2, pro: n => `When a spored foe dies, its spores drift on to ${1 + n} foes, not 1.` }],
+    ['Far Cast', 4, 2, { req: [3, 2] }],
+    ['Rootmark Seed', 4, 3, { req: [3, 3], max: 2, pro: n => `For ${gNf(2.5 * n)}s, roots hold ground foes bitten by Snapjaw Bloom's jaws 0.5s longer.`, sp: n => ({ ab: 'bindseed', rider: { gfRootmark: 2.5 * n } }) }],
+    ['Spore Cloud', 5, 1, { req: [4, 1] }],
+    ['Puffcap Trail', 5, 2, { req: [4, 2] }],
+    ['Bursting Rot', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(FORCES["grove"].talents["venom"], [   // grove.venom
+    ['Fen Sight', 0, 0],
+    ['Clinging Mud', 0, 1],
+    ['Thick Swarm', 0, 2],
+    ['Bog Body', 1, 1, { req: [0, 1] }],
+    ['Marsh Fever', 1, 2],
+    ['Grasping Dead', 2, 1, { req: [1, 1], max: 2, pro: n => `The Bog Body seizes the first foe to reach it until it sinks, then drags that one under first and holds it ${gNf(.5 * n)}s longer.`, sp: n => ({ ab: 'bw_bogbody', rider: { bwHeld: .5 * n } }) }],
+    ['The Bog Takes Its Due', 2, 2, { req: [1, 2] }],
+    ['Blood Scent', 2, 3],
+    ['Peat-Bound', 3, 1, { req: [2, 1], on: 'bw_bogbody' }],
+    ['Deep Water', 3, 2, { req: [2, 2], max: 2, pro: n => `The Bog Takes Its Due: the bog stays open ${gNf(1.5 * n)}s after the arms let go${n >= 2 ? ', and foes crossing it lose 2 armour, not 1' : ''}.`, sp: n => ({ ab: 'bw_bogdue', by: { open: 1.5 * n } }) }],
+    ['Second Brood', 3, 3, { req: [2, 3], max: 2, pro: n => `Insect Swarm comes ${5 * n}% sooner${n >= 2 ? ', and moves on twice, not once, as its hosts die' : ''}.`, sp: n => ({ ab: 'bw_swarm', cd: -.05 * n }) }],
+    ['Old Hunger', 4, 1, { req: [3, 1], on: 'bw_bogbody' }],
+    ['Many Hands', 4, 2, { req: [3, 2], max: 2, pro: n => `The Bog Takes Its Due: the drowned arms also catch the ${n >= 2 ? 'two ground foes' : 'ground foe'} nearest their victim, held to the knees 1.5s.`, sp: n => ({ ab: 'bw_bogdue', by: { n } }) }],
+    ['Fed Swarm', 4, 3, { req: [3, 3] }],
+    ['The Fen Remembers', 5, 1, { req: [4, 1], on: 'bw_bogbody', sp: () => [{ ab: 'bw_bogbody' }, { ab: 'bw_bogdue', kill: { cd: 4 } }] }],
+    ['The Drowned Queen', 5, 2, { req: [4, 2], on: 'bw_bogdue' }],
+    ['Plague of the Fen', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(CHAMPS["rootmother"].tree, [   // grove.champ:rootmother
+    ['Patient Earth', 0, 1, { on: 'ch_entangle' }],
+    ['Long Vines', 0, 2],
+    ['Quick Tendrils', 0, 3],
+    ['Rootway', 1, 1, { req: [0, 1] }],
+    ['Deep Grip', 1, 2, { on: 'ch_entangle' }],
+    ['Bramble Grasp', 2, 1, { req: [1, 1] }],
+    ['The Old Wood Walks', 2, 2, { req: [1, 2] }],
+    ['Thorned Roots', 2, 3],
+    ['Sap Song', 3, 1, { req: [2, 1], max: 2, pro: n => `Units within 1.6 cells of her heal ${gNf(1.5 * n)}% for each ground foe Rootway seizes.`, sp: n => ({ ab: 'ch_rootway', rider: { gfSong: .015 * n } }) }],
+    ['Heartwood Sapling', 3, 2, { req: [2, 2], max: 2, pro: n => `The Old Wood Walks lasts ${n}s longer, walking farther up the road.`, sp: n => ({ ab: 'ch_oldwood', by: { dur: n } }) }],
+    ['Deep Sap', 3, 3, { req: [2, 3], on: 'ch_entangle' }],
+    ['Strangling Hold', 4, 1, { req: [3, 1] }],
+    ['Sapling Song', 4, 2, { req: [3, 2], max: 2, pro: n => `Grove units near her gain ${4 * n} Growth for each ground foe The Old Wood Walks strikes.`, sp: n => ({ ab: 'ch_oldwood', rider: { gfGrove: 4 * n } }) }],
+    ['Sapling Warden', 4, 3, { req: [3, 3], on: 'ch_entangle' }],
+    ['Thousand Roots', 5, 1, { req: [4, 1] }],
+    ['Twin Elders', 5, 2, { req: [4, 2] }],
+    ['Rootmother', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(CHAMPS["thornbow"].tree, [   // grove.champ:thornbow
+    ['Steady Draw', 0, 1, { on: 'ch_thornvolley' }],
+    ["Fletcher's Pace", 0, 2],
+    ["Captain's Share", 1, 0],
+    ['Farshot', 1, 1, { req: [0, 1] }],
+    ['Snaring Rain', 1, 3],
+    ['Barbed Shafts', 2, 1, { req: [1, 1] }],
+    ['Thorn Rain', 2, 2],
+    ['High Boughs', 2, 3],
+    ['Snarled Ground', 3, 1, { req: [2, 1], on: 'ch_pinarrow' }],
+    ['Warden’s Mark', 3, 2, { req: [2, 2], on: 'ch_thornvolley', max: 2, pro: n => `For ${2 * n}s, archers within 2 cells of him shoot the foes Thorn Volley struck first.` }],
+    ['Running Shafts', 3, 3, { req: [2, 3], on: 'arrows' }],
+    ['Root Platform', 4, 1, { req: [3, 1], max: 2, pro: n => `With 2 archers near him, Farshot costs ${15 * n}% less and comes ${10 * n}% sooner.`, sp: n => ({ ab: 'ch_pinarrow', at: 'archers', cost: -.15 * n, cd: -.1 * n }) }],
+    ['Hunter’s Patience', 4, 2, { req: [3, 2], on: 'mana', max: 2, pro: n => `Farshot refunds ${n >= 2 ? 'half' : 'a quarter of'} its mana when its foe is already held or slowed.` }],
+    ['Hunter’s Moon', 4, 3, { req: [3, 3] }],
+    ['Moonlit Aim', 5, 1, { req: [4, 1], sp: () => [{ ab: 'ch_pinarrow' }, { ab: 'ch_huntermoon', ready: ['ch_pinarrow', 60] }] }],
+    ['Watchtower Bough', 5, 2, { req: [4, 2], pro: () => 'Thorn Volley hits 8% harder for each archer within 2 cells, up to 4. Each looses an arrow with it.', sp: () => ({ ab: 'ch_thornvolley', at: 'archers', archers: [.08, 4] }) }],
+    ['Blood Moon', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(CHAMPS["hivemother"].tree, [   // grove.champ:hivemother
+    ['Busy Hive', 0, 1],
+    ['Ripe Seeds', 0, 2, { on: 'ch_sporecloud' }],
+    ['Swarm Song', 1, 1, { on: 'ch_sporecloud' }],
+    ['Moth Swarm', 1, 2, { req: [0, 2] }],
+    ['Passing Spores', 2, 1, { on: 'ch_sporecloud' }],
+    ['Thick Garden', 2, 2, { req: [1, 2] }],
+    ['Honey Store', 2, 3],
+    ['Sticky Pollen', 3, 1, { req: [2, 1] }],
+    ['Rotfeast', 3, 2, { req: [2, 2], max: 2, pro: n => `Moth Swarm's moths feed ${15 * n}% harder on foes with 3 or more spores.`, sp: n => ({ ab: 'ch_garden', vs: ['gfSpore3', .15 * n] }) }],
+    ['Drifting Pods', 3, 3, { req: [2, 3] }],
+    ['Compost', 4, 1, { req: [3, 1], max: 2, pro: n => `Spore Cloud and Moth Swarm cost ${gNf(12.5 * n)}% less with 3 spored foes in her reach.`, sp: n => ['ch_sporecloud', 'ch_garden'].map(ab => ({ ab, at: 'foes', foes: { n: 3, cond: 'spored' }, cost: -.125 * n })) }],
+    ['Pollen Drift', 4, 2, { req: [3, 2], on: 'ch_garden', max: 2, pro: n => `After each Moth Swarm, nearby Grove units' next ${1 + n} strikes spore their foe.` }],
+    ['Full Bloom', 4, 3, { req: [3, 3] }],
+    ['Seedmother', 5, 1, { req: [4, 1], on: 'ch_sporecloud', sp: () => [{ ab: 'ch_sporecloud' }, { ab: 'ch_fullbloom', ready: ['ch_sporecloud', 60] }] }],
+    ['Bloom of Moths', 5, 2, { req: [4, 2], on: 'ch_garden', pro: () => "Full Bloom's bursts free Moth Swarm moths that spore and slow foes for 4s. It hits slowed foes 30% harder.", sp: () => [{ ab: 'ch_garden' }, { ab: 'ch_fullbloom', vs: ['slowed', .3] }] }],
+    ['Overripe', 5, 3, { req: [4, 3] }],
+  ]);
+})();
+/* </chains grove> */
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
