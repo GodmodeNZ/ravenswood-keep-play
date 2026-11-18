@@ -1,4 +1,4 @@
-const BUILD_TAG = '22a8426@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b2c6d10@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -98517,7 +98517,8 @@ const SB2 = (() => {
     // thin and along the blade only: never a flash round him or a wash over the map)
     if (live && typeof QADD !== 'undefined' && typeof RD !== 'undefined' && RD) {
       const now = G.time, kk = t._sbGl = (t._sbGl || 0) + ((P.cut ? 1 : 0) - (t._sbGl || 0)) * .25;
-      const gp = S.gp ? .28 : 1, a = (.8 + .12 * Math.sin(now * 2.3 + (t.anim || 0)) + .2 * kk) * gp,   // (gp: the Gear sheet, close up on black: the glow kept low so the crystal itself shows, not a white bar)
+      const gp = S.gp ? 0 : .32,   // (the Amethyst Spellblade, 19 Nov 2026: its colour and light are in its own texture, so only a faint violet halo is left on the map, and none in the Gear sheet)
+      _was = 1, a = (.8 + .12 * Math.sin(now * 2.3 + (t.anim || 0)) + .2 * kk) * gp,   // (gp: the Gear sheet, close up on black: the glow kept low so the crystal itself shows, not a white bar)
       gx = g[0] + (p[0] - g[0]) * .08, gy = g[1] + (p[1] - g[1]) * .08, gz = g[2] + (p[2] - g[2]) * .08;
       // (owner: "deeper purple", "make its glow stand out on the battlefield". The blade is two pixels wide in a run and added
       // light over sunlit grass only went pale, so: a deep violet aura laid OVER the map along the blade (blended, not added:
@@ -98528,14 +98529,14 @@ const SB2 = (() => {
       try {
         const mx = (gx + p[0]) / 2, my = (gy + p[1]) / 2, mz = (gz + p[2]) / 2, len = Math.hypot(p[0] - gx, p[1] - gy, p[2] - gz);
         if (typeof QA !== 'undefined') {
-          if (!S.gp) QA.ground(mx, mz, lift + .03, len * .62, len * .62, [.42, .08, .92, .20 * a], 1, 0);
-          if (!S.gp) QA.bill(RD, mx, my, mz, len * .62, len * .62, [.40, .07, .90, .26 * a], 1, 0);
+          if (0) QA.ground(mx, mz, lift + .03, len * .62, len * .62, [.42, .08, .92, .20 * a], 1, 0);
+          if (0) QA.bill(RD, mx, my, mz, len * .62, len * .62, [.40, .07, .90, .26 * a], 1, 0);
           QA.beam(RD, [gx, gy, gz], p, .19 * s, [.38, .06, .86, .30 * a]); QA.beam(RD, [gx, gy, gz], p, .10 * s, [.46, .08, .96, .50 * a]); QA.beam(RD, [gx, gy, gz], p, .05 * s, [.55, .12, 1, .75 * a]);
         }
         QADD.beam(RD, [gx, gy, gz], p, .075 * s, [.48, .12, 1, .30 * a * gp]); QADD.beam(RD, [gx, gy, gz], p, .022 * s, [.74, .42, 1, .7 * a * gp]);
         const u = (now * .9 + (t.anim || 0)) % 1.6, u0 = Math.min(1, u), u1 = Math.min(1, u + .3), L = (k) => [gx + (p[0] - gx) * k, gy + (p[1] - gy) * k, gz + (p[2] - gz) * k];
-        if (u < 1) QADD.beam(RD, L(u0), L(u1), .03 * s, [.92, .80, 1, .75 * a * gp]);
-        QADD.bill(RD, p[0], p[1], p[2], .07 * s, .07 * s, [.80, .55, 1, .5 * a], 1, 0);
+        if (0 && u < 1) QADD.beam(RD, L(u0), L(u1), .03 * s, [.92, .80, 1, .75 * a * gp]);
+
       } catch (e) {}
     }
     if (live) { try { arc(t, g, p, P, s); } catch (e) { S.err = S.err || ('arc: ' + e.message); } }
