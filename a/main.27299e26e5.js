@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a4ddb80@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c8d1354@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -19043,7 +19043,7 @@ const SO_DAZE = [1, 1.5], SO_KNOCK = [.5, 1];
 const soDaze = (c, t) => { if (c.dead) return; stun(c, SO_DAZE[soJ(c) > 0 ? 1 : 0], false, null); soJudge(c, 1, t); };
 FORCE_ATTACK.so_shield = (t, st, tg, pow, echo) => {
   // (Vigil: while Radiant, every blow is a bash)
-  const C = st.caps, n = t.shots + 1, every = C.so_vigil && soRadiant(t) ? 1 : C.so_bash2 ? 2 : 3, bash = !echo && n % every === 0;
+  const C = st.caps, n = t.shots + 1, every = C.so_vigil && soRadiant(t) ? 1 : C.so_bash2 >= 2 ? 2 : 3, bash = !echo && n % every === 0;
   let amt = st.dmg * pow;
   if (C.so_edge && soJ(tg)) amt *= 1 + .08 * C.so_edge;   // Edge of Dawn
   const [ux, uz] = soDir(t, tg);
@@ -19108,7 +19108,7 @@ FORCE_ATTACK.so_chain = (t, st, tg, pow, echo) => {
     if (c.dead) continue;
     chill(c, { slow: st.slow || .3, slowT: st.slowT || 1.5 }, null, t);
     soJudge(c, 1 + (C.so_litany && lash % (5 - C.so_litany) === 0 ? 1 : 0), t);
-    if (bind) { soBindFoe(t, st, c, .35 + .1 * (C.so_bind_long || 0)); if (C.so_blind_bind) { soBlind(c, 1.5, t); soEv('cap:so_blind_bind'); } fxRing(c.x, c.y, .45, SO.COL.light); }
+    if (bind) { soBindFoe(t, st, c, .35 + .1 * (C.so_bind_long || 0)); if (C.so_blind_bind) { soBlind(c, .75 * Math.min(2, C.so_blind_bind), t); soEv('cap:so_blind_bind'); } fxRing(c.x, c.y, .45, SO.COL.light); }
     soChainFx(from ? from.x : hx, from ? hitH(from) : hh, from ? from.y : hz, c, bind);
     from = c;
     if (C.so_j_chain && !echo && soJ(c) >= soJMax()) {   // Chain of Judgement: the full mark leaps on
@@ -19160,7 +19160,7 @@ function soCharge(t, st, tg, pow, o) {
       if (!tg.dead && o.stun) stun(tg, o.stun, .4, null);
       if (!tg.dead && down) stun(tg, down, false, null);
       // Unhorse: the walkers beside it go down too
-      if (down && C.so_unhorse) for (const q of nearest(mx, mz, 1, 6, tg, q => !q.fly && !q.phased && !q.ent && canTarget(t, st, q))) { stun(q, down, false, null); fxDust(q.x, q.y, 2); }
+      if (down && C.so_unhorse) for (const q of nearest(mx, mz, .5 * Math.min(2, C.so_unhorse), 6, tg, q => !q.fly && !q.phased && !q.ent && canTarget(t, st, q))) { stun(q, down, false, null); fxDust(q.x, q.y, 2); }
     }
     if (C.so_glory) {   // Glory of the Charge: the ground at the mark flares
       inSplash(mx, mz, 1, true, q => { if (q === tg || q.phased || q.ent || !canTarget(t, st, q)) return; soStrike(t, st, q, amt * .4, 'phys'); soJudge(q, 2, t); });
@@ -19181,7 +19181,7 @@ FORCE_ATTACK.so_beam = (t, st, tg, pow, echo) => {
   if (st.pw && st.pw.so_zenith && tg.fly) for (const o of nearest(tg.x, tg.y, 1.5, 6, tg, q => q.fly && canTarget(t, st, q))) { soStrike(t, st, o, st.dmg * pow * st.pw.so_zenith, 'magic'); soEv('item:so_zenith'); soStreak(tg.x, hitH(tg), tg.y, o, SO.COL.gold, .035, .25); }   // the Staff of the Zenith
   if (C.so_kindled && !echo && n % 4 === 0 && !tg.dead && soJ(tg) >= 3 && soVerdict(tg, t, 1)) soEv('cap:so_kindled');   // Kindled Faith (before this beam's own Judgement)
   if (n % 2 === 0 || (C.so_sky_mark && tg.fly)) soJudge(tg, 1, t);
-  if (C.so_prism && !echo && n % 3 === 0) { const o = acquire(t, st, new Set([tg])); if (o) G.delayed.push({ t: .08, fn: () => { if (!o.dead && soAlive(t)) { soBeamAt(t, t.st || st, o, (t.st || st).dmg * .6, sh, false); soJudge(o, 1, t); } } }); }   // Prism
+  if (C.so_prism && !echo && n % 3 === 0) { const o = acquire(t, st, new Set([tg])); if (o) G.delayed.push({ t: .08, fn: () => { if (!o.dead && soAlive(t)) { soBeamAt(t, t.st || st, o, (t.st || st).dmg * .3 * Math.min(2, C.so_prism), sh, false); soJudge(o, 1, t); } } }); }   // Prism
   if (C.so_sunburst && !echo && n % 5 === 0) {   // Sunburst
     const x = tg.x, z = tg.y; inSplash(x, z, 1, false, o => { if (o.phased || o.ent || !canTarget(t, st, o)) return; if (o !== tg) soStrike(t, st, o, st.dmg * pow, 'magic'); if (!o.dead) soJudge(o, 1, t); });
     fxRing(x, z, 1, SO.COL.gold); part({ k: 'flare', x, z, h: hitH(tg), life: .3, max: .3, size: 1.4, col: SO.COL.gold }); soEv('cap:so_sunburst');
@@ -19190,7 +19190,7 @@ FORCE_ATTACK.so_beam = (t, st, tg, pow, echo) => {
   t.recoil = 1;
 };
 function soBeamAt(t, st, c, amt, sh, main) {
-  if (st.caps && st.caps.so_ray && soJ(c)) { amt *= 1 + .06 * soJ(c); soEv('cap:so_ray'); }   // Judgement Ray
+  if (st.caps && st.caps.so_ray && soJ(c)) { amt *= 1 + .03 * Math.min(2, st.caps.so_ray) * soJ(c); soEv('cap:so_ray'); }   // Judgement Ray
   soStrike(t, st, c, amt, 'magic');
   G.beams.push({ k: 'arcane', a: [t.x, sh, t.y], b: [c.x, hitH(c), c.y], hit: [c.x, hitH(c), c.y], life: .28, max: .28, crit: true, lv: Math.min(t.tier, 2) });
   if (main) { flashLight(c.x, c.y, hitH(c), [1.6, 1.4, .8], 1.8, .15); sfx('sunbeam', 0); }   // (the strike was silent: audio.js)
@@ -19211,7 +19211,7 @@ function soSlam(t, st, pow, mult, o) {
     if (c.dead) continue;
     chill(c, C.so_crush_slow ? { slow: .25 + .15 * C.so_crush_slow, slowT: 1 } : { slow: .25, slowT: .6 }, null, t);   // Crushing Weight
     if (o.stun) stun(c, o.stun, .4, null); else if (tremor) stun(c, .25 * C.so_tremor, .4, null);   // Tremor
-    if (C.so_sunder) soJudge(c, 1, t);   // Sundering Blow: the slam marks before it judges
+    if (C.so_sunder >= 2 || (C.so_sunder && (t.shots | 0) % 2 === 0)) soJudge(c, 1, t);   // Sundering Blow (every other slam at rank 1): the slam marks before it judges
     if (p.so_lasthammer) { soJudge(c, 2, t); soEv('item:so_lasthammer'); }   // the Hammer of the Last Verdict
     if (soJ(c) >= vMin) soVerdict(c, t, vK);
   }
@@ -19250,9 +19250,9 @@ function soLobLand(z) {
   inSplash(x, y, sp, true, (c, d) => {
     if (c.phased || c.ent || !canTarget(t, st, c)) return;
     const amt = soD(st) * z.pow * (1 - .4 * d / sp) * (C.so_direct_coal && c === o.tg ? 1 + .15 * C.so_direct_coal : 1);
-    if (C.so_censer_verdict && soJ(c) >= 3) soVerdict(c, t, .4);   // Purging Fire
+    if (C.so_censer_verdict && soJ(c) >= 3) soVerdict(c, t, .2 * Math.min(2, C.so_censer_verdict));   // Purging Fire
     soStrike(t, st, c, amt, 'magic'); if (!c.dead) soJudge(c, 1, t);
-    else if (C.so_rekindle && (G.soRkN = (G.soRkN || 0) + 1) < 6) { const q = nearest(c.x, c.y, 1.8, 1, c, w => !w.fly && canTarget(t, st, w))[0]; if (q) { soEv('cap:so_rekindle'); soLob(t, st, q.x, q.y, z.pow * .5, { tg: q, sp: sp * .6, zone: 1.2, small: true, from: { x: c.x, z: c.y } }); } }   // Rekindling
+    else if (C.so_rekindle && (G.soRkN = (G.soRkN || 0) + 1) < 6) { const q = nearest(c.x, c.y, 1.8, 1, c, w => !w.fly && canTarget(t, st, w))[0]; if (q) { soEv('cap:so_rekindle'); soLob(t, st, q.x, q.y, z.pow * .25 * Math.min(2, C.so_rekindle), { tg: q, sp: sp * .6, zone: 1.2, small: true, from: { x: c.x, z: c.y } }); } }   // Rekindling
   });
   G.soRkN = 0;
   if (G.hazards.length < 46) G.hazards.push({ k: 'so_incense', x, z: y, r: Math.max(.45, sp * .8), t: (o.zone || 2.5) + (p.so_thurible || 0), tick: .25, jt: 0, src: t, st, small: o.small, sentence: p.so_saintcenser && !o.small ? p.so_saintcenser : 0, slow: Math.max(C.so_choking ? .1 * C.so_choking : 0, o.zslow || 0, p.so_thurible ? .15 : 0) });
@@ -19271,7 +19271,7 @@ function soIncenseTick(z, dt) {
   if (z.tick > 0) return true;
   z.tick = .5; z.jt = (z.jt || 0) + 1;
   const t = z.src, st = z.st; if (!t || !st) return true;
-  const D = soD(st), C = st.caps || {}, judge = z.jt % 2 === 0 || C.so_thick || z.sentence;   // Thick Smoke (and the Censer of the Saints' smoke): every half second
+  const D = soD(st), C = st.caps || {}, judge = z.jt % 2 === 0 || C.so_thick >= 2 || (C.so_thick && z.jt % 4 === 1) || z.sentence;   // Thick Smoke (and the Censer of the Saints' smoke): every half second
   tagged('dot', () => inSplash(z.x, z.z, z.r, true, c => {
     if (c.phased || c.ent || !canTarget(t, st, c)) return;
     if (!z.hallow) hurt(c, D * .12, 'magic', t, true, null, null);
@@ -19330,7 +19330,7 @@ FORCE_HOOKS.silver = {
     if (tg.dead) return;
     soJudge(tg, 1 + (p.soHeavy ? 2 : 0) + (C.so_heavy_bolt && p.soHq ? 1 : 0), src);
     if (C.so_heavy_bolt && p.soHq && !tg.dead) woundFoe(tg);   // Heavy Quarrel: serrated, it Wounds
-    if (p.soPierce) { const o = nearest(tg.x, tg.y, 1.4, 1, tg, q => canTarget(src, st, q) && !(p.hit && p.hit.has(q)))[0]; if (o) { const hit = p.hit || new Set(); hit.add(tg); G.projs.push({ k: 'arrow', x: tg.x, z: tg.y, h: hitH(tg), tg: o, st, src, lx: o.x, lz: o.y, lh: hitH(o), spd: 16, pow: pow * .6, crit: false, lv: p.lv || 0, soBolt: 1, hit, soPierce: (p.soPierce || 1) - 1 }); } }
+    if (p.soPierce) { const o = nearest(tg.x, tg.y, 1.4, 1, tg, q => canTarget(src, st, q) && !(p.hit && p.hit.has(q)))[0]; if (o) { const hit = p.hit || new Set(); hit.add(tg); G.projs.push({ k: 'arrow', x: tg.x, z: tg.y, h: hitH(tg), tg: o, st, src, lx: o.x, lz: o.y, lh: hitH(o), spd: 16, pow: pow * .3 * Math.min(2, (st.caps && st.caps.so_pierce_bolt) || 2), crit: false, lv: p.lv || 0, soBolt: 1, hit, soPierce: (p.soPierce || 1) - 1 }); } }
     if (C.so_shatter && tg.armor > 0 && soJ(tg) >= 3) { tg.shred = Math.max(tg.shredT > 0 ? tg.shred : 0, Math.min(tg.armor, 2 * C.so_shatter)); tg.shredT = Math.max(tg.shredT, 3); }   // Armour-Breaker
     for (let k = 0; k < 4; k++) part({ k: 'spark', x: tg.x, z: tg.y, h: hitH(tg), vx: R(-1, 1), vz: R(-1, 1), vh: R(-.2, 1), g: 3, life: .25, max: .25, size: .05, col: SO.COL.silver });
   },
@@ -19357,7 +19357,7 @@ FORCE_HOOKS.silver = {
     if (t.def.wall) return;
     const u = t.def.unit;
     if (u === 'bell') soToll(t, st, dt);
-    if (st.caps.so_shield_aura || st.caps.so_bastion) { if ((t.soAuT = (t.soAuT || 0) - dt) <= 0) { t.soAuT = .25; const r = st.caps.so_bastion ? 1.55 : 1.15; for (const o of soUnitsNear(t.x, t.y, r)) { soWard(o, .4); if (st.caps.so_bastion && o !== t) soEv('cap:so_bastion'); } } }   // Shield of Faith / Unbroken Oath
+    if (st.caps.so_shield_aura || st.caps.so_bastion) { if ((t.soAuT = (t.soAuT || 0) - dt) <= 0) { t.soAuT = .25; const r = st.caps.so_bastion ? (st.caps.so_bastion >= 2 ? 1.55 : 1.35) : st.caps.so_shield_aura >= 2 ? 1.15 : .9; for (const o of soUnitsNear(t.x, t.y, r)) { soWard(o, .4); if (st.caps.so_bastion && o !== t) soEv('cap:so_bastion'); } } }   // Shield of Faith / Unbroken Oath
     if (st.caps.so_halo_chains && (t.soHcT = (t.soHcT == null ? 3 : t.soHcT) - dt) <= 0) soHaloChains(t, st);
     if (st.caps.so_heaven && (t.soHvT = (t.soHvT == null ? 3 : t.soHvT) - dt) <= 0) soHeaven(t, st);
     if (t.ab && t.ab.lastAt != null && t.ab.lastAt !== t.soCastSeen) { t.soCastSeen = t.ab.lastAt; soOnCast(t, ABIL[t.ab.last], st); }
@@ -28067,7 +28067,7 @@ Object.assign(SP_SHAPE, { so_edict: 'a', so_seize: 'a', so_pyre: 'a H z.5' });
   H.live = function (t, st) {
     const r = live0 ? live0.call(this, t, st) : undefined;
     if (t.def.wall) return r;
-    const shrug = sxsIs(t) || ((t.silT > 0 || t.hexUntil > G.time) && G.towers.some(o => sxsIs(o) && !o.wrecked && o.st && o.st.caps && o.st.caps.sxs_doctrine && Math.hypot(o.x - t.x, o.y - t.y) <= 1.5));   // Shield of Doctrine
+    const shrug = sxsIs(t) || ((t.silT > 0 || t.hexUntil > G.time) && G.towers.some(o => sxsIs(o) && !o.wrecked && o.st && o.st.caps && o.st.caps.sxs_doctrine && Math.hypot(o.x - t.x, o.y - t.y) <= .75 * Math.min(2, o.st.caps.sxs_doctrine)));   // Shield of Doctrine
     if (shrug && (t.silT > 0 || t.hexUntil > G.time)) { t.silT = 0; t.hexUntil = 0; if ((t.sxsShrugT || 0) < G.time) { t.sxsShrugT = G.time + 1; fxSpark(t.x, t.y, towerTop(t), SXS.COL.hush, 8); } }
     if (!sxsIs(t)) return r;
     st.hunt = 'manaful';
@@ -37573,7 +37573,7 @@ socDef('ch_fordstandard', { name: 'Bulwark Slam', short: 'Slam', glyph: 'shield'
       const S = socShields(t);
       for (const o of S) soWard(o, socBy(ab, 'ward', t) + socBy(ab, 'wardS', t));   // the shields beside him lock with his
       // Shield Wall: every Templar of the Ford beside him slams with him
-      if (st.caps && st.caps.sofWall) for (const o of S) {
+      if (st.caps && st.caps.sofWall >= 2) for (const o of S) {
         const s2 = o.st || effStats(o); o.shotT = 0; soSlam(o, s2, 1, 1, { sub: 1 }); soEv('fresh:sofWall');
       }
       G.shake = Math.max(G.shake, .07);
@@ -42007,7 +42007,7 @@ if (ABIL.ch_fordstandard) {
     if (G.hero !== 'so_lion' || !src || !src.def) return;
     const L = G.towers.find(o => o.id === G.champ && !o.wrecked); if (!L || !L.ab || !socxCaps(L).so_lion_debt) return;
     if (Math.hypot(L.x - x, L.y - z) > 2 || !socxGate(L, 'debt', .5)) return;
-    const A = L.ab; if (A.cd.ch_lionsdue > G.time) { A.cd.ch_lionsdue = Math.max(G.time, A.cd.ch_lionsdue - 1.5); soEv('cap:so_lion_debt'); }
+    const A = L.ab; if (A.cd.ch_lioncharge > G.time) { A.cd.ch_lioncharge = Math.max(G.time, A.cd.ch_lioncharge - 1); soEv('cap:so_lion_debt'); }   /* (Debt of Oaths readies Dawnsweep since 19 Nov 2026; it was The Crossing, 1.5s) */
   };
 }
 
@@ -42058,7 +42058,7 @@ function socxOnKill(c, src) {
     G.delayed.push({ t: .15, fn: () => { if (soAlive(src)) { soEv('cap:so_anvil_ring'); soSlam(src, src.st || effStats(src), 1, 1, { sub: 1 }); } } });
   }
   // Censer Bearers' Ember Psalm: a walker Kindle the Censers slays throws a burning coal onto the nearest walker (6 a cast)
-  if (C.so_psalm && AB_NOW === 'so_embers' && src.ab && soAlive(src)) {
+  if (C.so_psalm && AB_NOW === 'so_sweep' && src.ab && soAlive(src)) {   /* (Ember Psalm: Thurible Sweep's kills since 19 Nov 2026; they were Kindle the Censers') */
     const id = src.ab.lastAt; if (src.socPsAt !== id) { src.socPsAt = id; src.socPsN = 0; }
     const q = src.socPsN < 6 ? nearest(c.x, c.y, 2.2, 1, c, w => socFoe(w) && abWalker(w) && canTarget(src, src.st, w))[0] : null;
     if (q) { src.socPsN++; soEv('cap:so_psalm'); soLob(src, src.st, q.x, q.y, .5, { tg: q, sp: (src.st.splash || .9) * .7, zone: 2.5, from: { x: c.x, z: c.y } }); }
@@ -44861,7 +44861,7 @@ if (ABIL.so_vow) {
   ab.cast = function (t, st, p, ab2) {
     const C = (st && st.caps) || {}, U = [t].concat(abAllies(t, (ab2 && ab2.r) || 2));
     const r0 = cast0.call(this, t, st, p, ab2); if (r0 === false) return r0;
-    if (C.sofRally) { for (const o of U.slice(0, socBy(ab2 || ab, 'riders', t))) soWard(o, 4); soEv('fresh:sofRally'); }
+    if (C.sofRally) { for (const o of U.slice(0, socBy(ab2 || ab, 'riders', t))) soWard(o, 2 * Math.min(2, C.sofRally)); soEv('fresh:sofRally'); }
     if (C.sofVowJ) { for (const o of U) inSplash(o.x, o.y, 1, true, c => { if (sofFoe(c)) soJudge(c, C.sofVowJ, t); }); soEv('fresh:sofVowJ'); }
     return r0;
   };
@@ -44930,7 +44930,7 @@ let SOF_STILL = null;
   const sb0 = soBlind;
   soBlind = function (c, dur, src) {
     const was = !!c && soBlinded(c), r = sb0.call(this, c, dur, src);
-    if (was && SOF_STILL && SOF_STILL.t === src && SOF_STILL.S.has(c) && !c.dead) { SOF_STILL.S.delete(c); stun(c, .6, .4, null); soEv('fresh:sofStill'); }
+    if (was && SOF_STILL && SOF_STILL.t === src && SOF_STILL.S.has(c) && !c.dead) { SOF_STILL.S.delete(c); stun(c, .3 * Math.min(2, (src.st && src.st.caps && src.st.caps.sofStill) || 2), .4, null); soEv('fresh:sofStill'); }
     return r;
   };
 }
@@ -44954,7 +44954,7 @@ if (ABIL.ch_highnoon) {
     const r0 = cast0.call(this, t, st, p, ab2); if (r0 === false || !(st && st.caps && st.caps.sofBell)) return r0;
     G.delayed.push({ t: Math.max(.1, (t.chNoonT || G.time) - G.time), fn: () => {
       if (!abLive(t)) return; const s = t.st || effStats(t); let n = 0;
-      for (const c of G.creeps.slice()) if (sofFoe(c) && soJ(c) > 0 && canTarget(t, s, c) && inRange(t, s, c) && soVerdict(c, t, 1)) n++;
+      for (const c of G.creeps.slice()) if (sofFoe(c) && soJ(c) > 0 && canTarget(t, s, c) && inRange(t, s, c) && soVerdict(c, t, .5 * Math.min(2, (s.caps && s.caps.sofBell) || 2))) n++;
       if (n) { fxRing(t.x, t.y, 1, SO.COL.gold); sfx('ward', 1); soEv('fresh:sofBell'); }
     } });
     return r0;
@@ -44999,7 +44999,7 @@ if (ABIL.ch_fordstandard) {
       if (!abLive(t)) return;
       for (const o of soUnitsNear(t.x, t.y, 1.6, t)) {
         if (C.sofStandard) { soRadiate(o, 1.5 * C.sofStandard, SO.RAD_K); soEv('fresh:sofStandard'); }
-        if (C.sofRallyB) { o.cd = 0; soEv('fresh:sofRallyB'); }
+        if (C.sofRallyB >= 2) { o.cd = 0; soEv('fresh:sofRallyB'); }
       }
     } });
     return r0;
@@ -45045,7 +45045,7 @@ if (ABIL.so_hallow) {
   ab.cast = function (t, st, p, ab2) {
     const r0 = cast0.call(this, t, st, p, ab2);
     if (r0 !== false && st && st.caps && st.caps.sofHallow && G.hazards.length < 46) {
-      G.hazards.push({ k: 'so_incense', x: t.x, z: t.y, r: (st.range || 1.5) * .9, t: 5, tick: .25, jt: 0, src: t, st, slow: 0, hallow: 1 });
+      G.hazards.push({ k: 'so_incense', x: t.x, z: t.y, r: (st.range || 1.5) * .9, t: 2.5 * Math.min(2, st.caps.sofHallow), tick: .25, jt: 0, src: t, st, slow: 0, hallow: 1 });
       soEv('fresh:sofHallow');
     }
     return r0;
@@ -45084,7 +45084,7 @@ if (ABIL.so_smoke) {
     const r0 = cast0.call(this, t, st, p, ab2);
     if (r0 === false || !run || !(st && st.caps && st.caps.sofCense)) return r0;
     const P = socPts(), pts = run.map(k => P[k]).filter(Boolean);
-    for (const o of G.towers) if (soUnit(o) && !o.def.wall && !o.wrecked && pts.some(q => Math.hypot(o.x - q[0], o.y - q[1]) <= 1)) { soWard(o, 4); soEv('fresh:sofCense'); }
+    for (const o of G.towers) if (soUnit(o) && !o.def.wall && !o.wrecked && pts.some(q => Math.hypot(o.x - q[0], o.y - q[1]) <= 1)) { soWard(o, 2 * Math.min(2, st.caps.sofCense)); soEv('fresh:sofCense'); }
     return r0;
   };
 }
@@ -46386,7 +46386,7 @@ if (ABIL.ch_summons) {
       if (G.state !== 'play' || c.dead || c.fly) return;
       for (const k of G.towers) {
         if (!k.def || k.def.unit !== 'grailknight' || k.wrecked || (k.build > .5) || Math.hypot(k.x - t.x, k.y - t.y) > 2) continue;
-        const s2 = k.st || effStats(k); if (!canTarget(k, s2, c) || Math.hypot(c.x - k.x, c.y - k.y) > s2.range + 1 || !socxGate(k, 'sofFord', 4)) continue;
+        const s2 = k.st || effStats(k); if (!canTarget(k, s2, c) || Math.hypot(c.x - k.x, c.y - k.y) > s2.range + 1 || !socxGate(k, 'sofFord', C.sofFord >= 2 ? 4 : 8)) continue;
         k.ang = Math.atan2(c.x - k.x, c.y - k.y); soCharge(k, s2, c, 1, { down: true }); soEv('fresh:sofFord');
       }
     } });
@@ -53306,6 +53306,223 @@ function tchUlt(id, o) {
   ]);
 })();
 /* </chains ironhold> */
+
+/* ---------- the Silver Order: its ultimates ---------- */
+(function tchSilverMore() {
+  if (typeof FORCES === 'undefined' || !FORCES.silver || typeof ABIL === 'undefined') return;
+  // Three were no slower than their unit's other spells and are retuned (a longer wait, more mana, as much more of what they do):
+  tchUlt('so_rebuke', { cd: 22, mana: 120, by: { dur: 1.4 } });                    // Oath of Challenge: 14.5s, 90 mana
+  tchUlt('so_hammerfall', { cd: 20, mana: 125, by: { stun: 1.3, wave: 1.3 } });    // Sword of Heaven: 12.5s, 90 mana
+  tchUlt('so_embers', { cd: 22, mana: 155, set: { n: [7, 7, 8, 8, 9, 9] } });      // Kindle the Censers: 15.5s, 120 mana, 5-7 patches
+  // the rest keep their numbers (15.5-24s): they say Ultimate and hold for a worthy moment
+  for (const id of ['so_witness', 'so_shackle', 'so_vow', 'so_dawnfall', 'so_pyre', 'ch_lionsdue', 'ch_highnoon', 'ch_verdict']) tchUlt(id);
+})();
+/* <chains silver> */
+(function tch_silver() {
+  if (typeof FORCES === 'undefined' || !FORCES.silver) return;
+  tchTree(FORCES["silver"].talents["glaive"], [   // silver.glaive
+    ['Shield-Ward', 0, 1],
+    ['Pommel Blow', 0, 2],
+    ['Staggering Bash', 0, 3],
+    ['Rampart of Dawn', 1, 2, { req: [0, 2] }],
+    ['Edge of Dawn', 1, 3],
+    ['Shield of Faith', 2, 0, { max: 2, pro: n => `Units within ${n >= 2 ? '1.15' : '0.9'} cells of it are Warded.` }],
+    ['Dawn Shield', 2, 2, { req: [1, 2] }],
+    ['Unbroken Oath', 3, 0, { req: [2, 0], max: 2, pro: n => `Every unit within ${n >= 2 ? '1.5' : '1.3'} cells of it is Warded.` }],
+    ['Witness the Blow', 3, 1],
+    ['Ringing Rampart', 3, 2, { req: [2, 2], max: 2, pro: n => `Rampart of Dawn dazes every ground foe it catches for ${gNf(.4 * n)}s.`, sp: n => ({ ab: 'so_aegis', rider: { sofDaze: .4 * n } }) }],
+    ['Oath of Challenge', 4, 0, { req: [3, 0] }],
+    ['Unyielding', 4, 1, { req: [3, 1], max: 2, pro: n => `Bulwark Bash comes ${5 * n}% sooner${n >= 2 ? '; every 2nd blow is a shield bash, not 3rd' : ''}.`, sp: n => ({ ab: 'so_bash', cd: -.05 * n }) }],
+    ['The Line Held', 4, 2, { req: [3, 2] }],
+    ['Oath of Rebuke', 5, 0, { req: [4, 0] }],
+    ['Vigil', 5, 1, { req: [4, 1], on: 'radiance' }],
+    ['Wall of Shields', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["silver"].talents["arrow"], [   // silver.arrow
+    ['Mark of the Accused', 0, 0],
+    ['First Testimony', 0, 1],
+    ['Witnessed', 0, 2],
+    ['Flare Bolt', 1, 1, { req: [0, 1] }],
+    ['Crank on the Verdict', 1, 2],
+    ['Bodkin Heads', 1, 3],
+    ['Slow Match', 2, 1, { req: [1, 1] }],
+    ['Bear Witness', 2, 2, { req: [1, 2] }],
+    ['Through and Through', 3, 0, { max: 2, pro: n => `Each bolt runs on into the next foe within 1.5 cells, for ${30 * n}%.` }],
+    ['Pinning Light', 3, 1, { req: [2, 1] }],
+    ['Deep Mark', 3, 2, { req: [2, 2] }],
+    ['Heavy Quarrel', 4, 0, { req: [3, 0], max: 2, pro: n => `Every 4th bolt hits ${gNf(1 + .75 * n)}× as hard and Wounds its foe for 4s.`, mod: n => ({ nth: 4, nthM: 1 + .75 * n }) }],
+    ['Testimony Heard', 4, 1, { req: [3, 1] }],
+    ['Sworn Witnesses', 4, 2, { req: [3, 2] }],
+    ['Storm of Silver', 5, 0, { req: [4, 0] }],
+    ['Twin Quarrels', 5, 1, { req: [4, 1] }],
+    ['Writ of Execution', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["silver"].talents["frost"], [   // silver.frost
+    ['Tight Bindings', 0, 1],
+    ['Tightening Links', 0, 2],
+    ['Chain of Penance', 1, 2, { req: [0, 2] }],
+    ['Vigil Lamp', 1, 3],
+    ['Dazzle', 2, 1],
+    ['Scouring Light', 2, 2, { req: [1, 2] }],
+    ['Glinting Links', 2, 3],
+    ['Last Rites', 3, 1, { req: [2, 1], on: 'so_bind' }],
+    ['Glare of Dawn', 3, 2, { req: [2, 2], max: 2, pro: n => `Chain of Penance lays ${n} more Judgement on its foe.`, sp: n => ({ ab: 'so_flare', rider: { judge: n } }) }],
+    ['Blinding Chains', 3, 3, { req: [2, 3], max: 2, pro: n => `Its binds also Blind their foe for ${gNf(.75 * n)}s.` }],
+    ['Vigil Chains', 4, 1, { req: [3, 1] }],
+    ['Swift Lash', 4, 2, { req: [3, 2] }],
+    ['Twin Chains', 4, 3, { req: [3, 3], max: 2, pro: n => `Binding Light comes ${5 * n}% sooner${n >= 2 ? ' and seizes one more foe' : ''}.`, sp: n => ({ ab: 'so_bind', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
+    ['Shackle Litany', 5, 1, { req: [4, 1] }],
+    ['Chain of Judgement', 5, 2, { req: [4, 2] }],
+    ['Quick Binding', 5, 3, { req: [4, 3], on: 'lash' }],
+  ]);
+  tchTree(FORCES["silver"].talents["arcane"], [   // silver.arcane
+    ['Full Gallop', 0, 1],
+    ['Shield and Spur', 0, 2],
+    ['Grail Quest', 1, 0],
+    ['Tourney Passes', 1, 1, { req: [0, 1] }],
+    ["Grail's Grace", 1, 3],
+    ['Spurs', 2, 1, { req: [1, 1] }],
+    ['Trampling Hooves', 2, 2],
+    ['Charge of the Vow', 2, 3, { req: [1, 3] }],
+    ['Unhorsing Ride', 3, 1, { req: [2, 1], max: 2, pro: n => `Tourney Passes slows every ground foe it tramples ${15 * n}% for 1.5s.`, sp: n => ({ ab: 'so_ridedown', rider: { slow: [.15 * n, 1.5] } }) }],
+    ['Rallying Vow', 3, 2, { req: [2, 2], on: 'allies', max: 2, pro: n => `Charge of the Vow Wards each unit its knights ride out from for ${2 * n}s.` }],
+    ['Shining Example', 3, 3, { req: [2, 3], max: 2, pro: n => `Charge of the Vow lasts ${n >= 2 ? '1s longer and sends one more phantom knight' : '0.5s longer'}.`, sp: n => ({ ab: 'so_vow', by: n >= 2 ? { dur: 1, riders: 1 } : { dur: .5 } }) }],
+    ['Unhorse', 4, 1, { req: [3, 1], max: 2, pro: n => `The lance also drives back every ground foe within ${n >= 2 ? 'a cell' : 'half a cell'} of its foe.` }],
+    ['Couched Lance', 4, 2, { req: [3, 2] }],
+    ['Vowkeeper', 4, 3, { req: [3, 3] }],
+    ['Glory of the Charge', 5, 1, { req: [4, 1] }],
+    ['Echoing Verdict', 5, 2, { req: [4, 2] }],
+    ['Part the Ranks', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(FORCES["silver"].talents["storm"], [   // silver.storm
+    ['Searing Eye', 0, 1],
+    ['Piercing Dawn', 0, 2],
+    ['Burning Pinions', 0, 3],
+    ['Zenith', 1, 0],
+    ['Morning Rays', 1, 1],
+    ['Noon Sweep', 2, 0, { req: [1, 0] }],
+    ['Prism', 2, 2, { max: 2, pro: n => `Every 3rd beam splits to a second foe for ${30 * n}% and Judges it.` }],
+    ['Fall from Grace', 3, 0, { req: [2, 0] }],
+    ['Sky Verdict', 3, 1],
+    ['Sunburst', 3, 2, { req: [2, 2], max: 2, pro: n => `Every 5th beam bursts, hitting foes within a cell for ${50 * n}% and a Judgement.` }],
+    ['Sun Wheel', 4, 0, { req: [3, 0] }],
+    ['Judgement Ray', 4, 1, { req: [3, 1], max: 2, pro: n => `Beams hit ${3 * n}% harder for each Judgement stack on their foe.` }],
+    ['Dawnfall', 4, 2, { req: [3, 2] }],
+    ['Lance of Heaven', 5, 0, { req: [4, 0], on: 'light' }],
+    ['Kindled Faith', 5, 1, { req: [4, 1] }],
+    ['Dawnward', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["silver"].talents["earth"], [   // silver.earth
+    ['Crushing Weight', 0, 1],
+    ['Censed Blade', 0, 2],
+    ['Tremor', 0, 3],
+    ['Sundering Blow', 1, 0, { max: 2, pro: n => `${n >= 2 ? 'Each slam' : 'Every other slam'} lays a Judgement just before it strikes.` }],
+    ['Shield Fervour', 1, 1, { req: [0, 1] }],
+    ['Sword of Heaven', 2, 0, { req: [1, 0] }],
+    ['Zeal', 2, 1, { req: [1, 1] }],
+    ['Sundered Plate', 2, 2],
+    ['Blade of Judgement', 3, 0, { req: [2, 0] }],
+    ['Consecrated Earth', 3, 1, { req: [2, 1], max: 2, pro: n => `Shield Fervour hallows the ground for ${gNf(2.5 * n)}s, laying Judgement on ground foes there each second.` }],
+    ['Marked by the Blade', 3, 2, { req: [2, 2], on: 'allies', max: 2, pro: n => `Sword of Heaven's foe takes ${5 * n}% more from every unit for 4s.`, sp: n => ({ ab: 'so_hammerfall', rider: { mark: [.05 * n, 4] } }) }],
+    ['Hurled Verdict', 4, 0, { req: [3, 0], max: 2, pro: n => `Sword of Heaven lays ${n} Judgement on its foe.`, sp: n => ({ ab: 'so_hammerfall', rider: { judge: n } }) }],
+    ['Press of Battle', 4, 1, { req: [3, 1] }],
+    ['Reliquary', 4, 2, { req: [3, 2] }],
+    ['Final Judgement', 5, 0, { req: [4, 0] }],
+    ['Shockwave', 5, 1, { req: [4, 1] }],
+    ['Ringing Steel', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(FORCES["silver"].talents["cannon"], [   // silver.cannon
+    ['Pall of Smoke', 0, 1],
+    ['Choking Smoke', 0, 2],
+    ['Lingering Smoke', 1, 0],
+    ['Procession of Incense', 1, 2, { req: [0, 2] }],
+    ['Ash in the Eyes', 2, 1],
+    ['Swift Swing', 2, 2, { req: [1, 2] }],
+    ['Fanned Embers', 2, 3],
+    ['Thick Smoke', 3, 1, { req: [2, 1], max: 2, pro: n => `Incense lays Judgement ${n >= 2 ? 'every half second' : 'three times every 2 seconds'}, not every second.` }],
+    ['Censing Prayer', 3, 2, { req: [2, 2], max: 2, pro: n => `Procession of Incense Wards Order units within a cell of its path for ${2 * n}s.` }],
+    ['Rekindling', 3, 3, { req: [2, 3], max: 2, pro: n => `Each foe its bursts slay throws a ${25 * n}% coal at the nearest ground foe.` }],
+    ['Purging Fire', 4, 1, { req: [3, 1], max: 2, pro: n => `Its bursts deliver a ${20 * n}% Verdict on foes with 3+ stacks.` }],
+    ['Offering Bowl', 4, 2, { req: [3, 2] }],
+    ['Kindle the Censers', 4, 3, { req: [3, 3] }],
+    ['Ember Psalm', 5, 1, { req: [4, 1], pro: () => 'Each ground foe Thurible Sweep slays throws a burning coal at the nearest ground foe.', sp: () => ({ ab: 'so_sweep', rider: { fresh: 1 } }) }],
+    ['Censing of the Faithful', 5, 2, { req: [4, 2] }],
+    ['Glowing Coal', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(FORCES["silver"].talents["venom"], [   // silver.venom
+    ['Forfeit', 0, 1],
+    ['Scorching Seal', 0, 2],
+    ['Writ of Seizure', 1, 2, { req: [0, 2] }],
+    ['Dry Well', 1, 3],
+    ['Broken Litany', 2, 0],
+    ['Heavy Silence', 2, 1],
+    ['Writ of Iron', 2, 2, { req: [1, 2], max: 2, pro: n => `Writ of Seizure comes ${5 * n}% sooner${n >= 2 ? ' and seizes one more caster near the first' : ''}.`, sp: n => ({ ab: 'so_seize', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
+    ["Zealot's Vow", 3, 0, { req: [2, 0] }],
+    ['Sealed Tongues', 3, 1, { req: [2, 1] }],
+    ['Confession', 3, 2, { req: [2, 2] }],
+    ["Heretic's Stake", 4, 0, { req: [3, 0] }],
+    ['Shield of Doctrine', 4, 1, { req: [3, 1], max: 2, pro: n => `Units within ${gNf(.75 * n)} cells of it shrug off silences and hexes.` }],
+    ['Penitent Chains', 4, 2, { req: [3, 2] }],
+    ['Pyre Eternal', 5, 0, { req: [4, 0] }],
+    ['Ashes Speak', 5, 1, { req: [4, 1], on: 'so_edict', sp: () => [{ ab: 'so_edict' }, { ab: 'so_pyre', rider: { fresh: 1 } }] }],
+    ['Grand Inquest', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(CHAMPS["so_lion"].tree, [   // silver.champ:so_lion
+    ['Swift Reprisal', 0, 1],
+    ['Shoulder to Shoulder', 0, 2],
+    ['Bulwark Slam', 1, 1, { req: [0, 1] }],
+    ['Wide Sweep', 1, 2],
+    ['Shields Raised', 2, 1, { req: [1, 1] }],
+    ['Hearts Lifted', 2, 3],
+    ['Rally to the Shield', 3, 1, { req: [2, 1], max: 2, pro: n => `Bulwark Slam comes ${5 * n}% sooner${n >= 2 ? ' and readies Order units within 1.6 cells to strike' : ''}.`, sp: n => ({ ab: 'ch_fordstandard', cd: -.05 * n, rider: { fresh: 1 } }) }],
+    ['Burnished Shields', 3, 2, { on: 'ch_lioncharge' }],
+    ['Lowered Shield', 3, 3, { req: [2, 3] }],
+    ['Shield Wall', 4, 1, { req: [3, 1], max: 2, pro: n => `Bulwark Slam costs ${5 * n}% less${n >= 2 ? '; Templars of the Ford within 2 cells slam with him' : ''}.`, sp: n => ({ ab: 'ch_fordstandard', cost: -.05 * n, rider: { fresh: 1 } }) }],
+    ['Unbroken', 4, 2, { req: [3, 2], on: 'ch_lioncharge' }],
+    ['The Crossing', 4, 3, { req: [3, 3] }],
+    ['The Ford Itself', 5, 1, { req: [4, 1] }],
+    ['Debt of Oaths', 5, 2, { req: [4, 2], pro: () => 'Each Verdict the Order lands within 2 cells of him brings Dawnsweep 1s nearer, twice a second at most.', sp: () => ({ ab: 'ch_lioncharge', rider: { fresh: 1 } }) }],
+    ['The Far Bank', 5, 3, { req: [4, 3] }],
+  ]);
+  tchTree(CHAMPS["so_dawn"].tree, [   // silver.champ:so_dawn
+    ['Clear Sky', 0, 1],
+    ['Early Dawn', 0, 2],
+    ['Bright Halo', 0, 3],
+    ['Dawn Chorus', 1, 1],
+    ['Prism of Dawn', 1, 2, { req: [0, 2] }],
+    ['First Light', 2, 0],
+    ['High Noon', 2, 1, { req: [1, 1] }],
+    ['Lingering Star', 2, 2, { req: [1, 2] }],
+    ['Radiant Hymn', 3, 0, { req: [2, 0] }],
+    ['Noonday', 3, 1, { req: [2, 1], max: 2, pro: n => `High Noon's sun flares every ${gNf(1 - .2 * n)}s, not every second.`, sp: n => ({ ab: 'ch_highnoon', by: { pulse: -.2 * n } }) }],
+    ['Be Still', 3, 2, { req: [2, 2], max: 2, pro: n => `Prism of Dawn binds already Blinded foes it crosses for ${gNf(.3 * n)}s.` }],
+    ['Searing Light', 4, 0, { req: [3, 0] }],
+    ['Noon Bell', 4, 1, { req: [3, 1], max: 2, pro: n => `As High Noon ends, every foe in her reach hears its Verdict${n >= 2 ? '' : ' at half strength'}.` }],
+    ['Blinding Glare', 4, 2, { req: [3, 2] }],
+    ['Spilled Light', 5, 0, { req: [4, 0] }],
+    ['Dawnsinger', 5, 1, { req: [4, 1] }],
+    ['Cloister Wall', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(CHAMPS["so_judge"].tree, [   // silver.champ:so_judge
+    ['Long Arm of the Law', 0, 0],
+    ['Swift Justice', 0, 1],
+    ['Summary Ruling', 0, 2],
+    ['Ready Ledger', 1, 0],
+    ['Debt Collection', 1, 1, { req: [0, 1] }],
+    ['Witnesses Called', 2, 1, { req: [1, 1], max: 2, pro: n => `Debt Collection dazes every foe it takes Judgement from for ${gNf(.3 * n)}s.`, sp: n => ({ ab: 'ch_summons', by: { daze: .3 * n } }) }],
+    ['Ride Them Down', 2, 3],
+    ['Trampling Host', 3, 1, { req: [2, 1] }],
+    ['Clerk’s Quill', 3, 2, { on: 'charges' }],
+    ['Mark of Guilt', 3, 3, { req: [2, 3] }],
+    ['Riders of the Ford', 4, 1, { req: [3, 1], max: 2, pro: n => `Each Debt Collection sends Grail Knights within 2 cells charging its foe, every ${n >= 2 ? 4 : 8}s each.` }],
+    ['Court Fines', 4, 2, { req: [3, 2] }],
+    ['Final Verdict', 4, 3, { req: [3, 3] }],
+    ['Grey Justicar', 5, 1, { req: [4, 1] }],
+    ['Wide Reckoning', 5, 2, { reqs: [[4, 2], [4, 3]] }],
+    ['Iron Chains', 5, 3, { req: [4, 3] }],
+  ], { capTodo: "Wide Reckoning and Iron Chains both shape Final Verdict" });
+})();
+/* </chains silver> */
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
