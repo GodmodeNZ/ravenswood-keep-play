@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd5de6f7+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'e956096@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7702,7 +7702,7 @@ const FORCES = {
         blurb: 'Elite riders on forest stags. Charge out to lance the strongest foe in reach and pin it to the ground (rooted 1s: it feeds their Growth and every strike that hits rooted foes harder), then wheel back to their post. Half again as hard on bosses and elites. Cannot reach flyers.',
         tiers: [{ cost: 50, dmg: 52, rate: 2.4, range: 2.6 }, { cost: 90, dmg: 115, rate: 2.3, range: 2.8 }, { cost: 190, dmg: 275, rate: 2.2, range: 3 }] },
       storm: { id: 'wayfarer', name: 'Grove Shifters', short: 'Shifter', key: '5', proj: 'shift', elem: null, dmgType: 'phys', air: true, ground: true, top: [.75, .8, .85],   // (the id stays 'wayfarer': saves, voices, art keys)
-        blurb: 'Druids who take the shape the fight needs. A great hawk against flyers, a mossback bear that mauls the ground foes on the road (it cannot reach flyers), a moon-sage whose magic goes straight through armour. They shift by themselves; tap Shift Form to hold a form.',
+        blurb: 'Druids who take the shape the fight needs. A great owl against flyers, a mossback bear that mauls the ground foes on the road (it cannot reach flyers), a moon-sage whose magic goes straight through armour. They shift by themselves; tap Shift Form to hold a form.',
         tiers: [{ cost: 26, dmg: 9, rate: .8, range: 2.6, airR: .8, vsAir: 2 }, { cost: 47, dmg: 22, rate: .75, range: 2.8, airR: .9, vsAir: 2 }, { cost: 98, dmg: 50, rate: .7, range: 3.1, airR: 1, vsAir: 2 }] },
       earth: { id: 'bladedancer', name: 'Blade Dancers', short: 'Blades', key: '6', proj: 'whirl', elem: null, dmgType: 'phys', air: false, ground: true, top: [.9, .95, 1],
         blurb: 'Swift elven warriors with twin leaf-blades. They whirl, cutting every ground foe on the cells around them. Cannot reach flyers.',
@@ -9273,19 +9273,19 @@ const GROVE_TALENTS = {
   /* ---- Grove Shifters (storm): Shift Form (innate), Primal Strike (row II), Wild Surge (row III). Columns, roughly:
      the hawk (I), the shift (II), the bear (III), the sage (IV) ---- */
   storm: { name: 'Shapelore', hue: '#86b2d6', list: [
-    GT('Hawk\'s Reach', 'spyglass', 3, 1, 2, n => `Keen eyes: +${gNf(.3 * n)} reach against flyers.`, n => ({ airR: .3 * n })),
+    GT('Owl\'s Reach', 'spyglass', 3, 1, 2, n => `Keen eyes: +${gNf(.3 * n)} reach against flyers.`, n => ({ airR: .3 * n })),
     GT('Ground Watch', 'arrowhead', 0, 3, 2, n => `${n >= 2 ? 'Each strike' : 'Every 2nd strike'} restores 1 mana.`, {}, { mana: { beat: [2, 1] } }),
-    GT('Wing-Clipper', 'snare', 2, 3, 2, n => `In hawk form talons drag flyers down ${gNf(.6 * n)}s, and Primal Strike holds ${gNf(.5 * n)}s longer.`, {}, { cap: 'grounder', sp: n => ({ ab: 'wildstrike', by: { hold: .5 * n } }), req: [1, 3] }),
+    GT('Wing-Clipper', 'snare', 2, 3, 2, n => `In owl form talons drag flyers down ${gNf(.6 * n)}s, and Primal Strike holds ${gNf(.5 * n)}s longer.`, {}, { cap: 'grounder', sp: n => ({ ab: 'wildstrike', by: { hold: .5 * n } }), req: [1, 3] }),
     GT('Bramble Claws', 'drop', 0, 1, 2, n => `In bear form its mauls ignore ${5 * n}% of armour and bleed the foe for ${15 * n}% of the hit over 3s.`, n => ({ armorPen: .05 * n }), { cap: 'bramclaw' }),
     GS('wildstrike', 1, 3),
-    GT("Hawk's Mark", 'eye', 2, 1, 1, 'Primal Strike costs 25% less, and each one brings Shift Form 3s nearer.', {}, { sp: { ab: 'wildstrike', cost: -.25, ready: ['shift', 3] } }),
+    GT("Owl's Mark", 'eye', 2, 1, 1, 'Primal Strike costs 25% less, and each one brings Shift Form 3s nearer.', {}, { sp: { ab: 'wildstrike', cost: -.25, ready: ['shift', 3] } }),
     GT('Grounded Prey', 'uproot', 3, 0, 2, n => `Wild Surge hits grounded flyers and held foes ${25 * n}% harder, and slows ${5 * n}% more.`, {}, { sp: n => [{ ab: 'wildsurge', vs: ['grounded', .25 * n], by: { slow: .05 * n } }, { ab: 'wildsurge', vs: ['held', .25 * n] }], req: [2, 0] }),
     GT('Moonsap Bolts', 'moon', 1, 0, 2, n => `In sage form each bolt strips 1 armour for 4s, up to ${2 * n}.`, {}, { cap: 'moonsap' }),
-    GT('Skyfall', 'wings', 4, 2, 1, 'In hawk form every 4th talon strike at a flyer hits ×3, stuns it 1s and grounds it 2.5s.', {}, { cap: 'skyfall' }),
+    GT('Skyfall', 'wings', 4, 2, 1, 'In owl form every 4th talon strike at a flyer hits ×3, stuns it 1s and grounds it 2.5s.', {}, { cap: 'skyfall' }),
     GS('wildsurge', 2, 0),
     GT('Second Skin', 'swirl', 1, 2, 2, n => `Shift Form comes ${15 * n}% sooner, and what its arrival does lasts ${gNf(.5 * n)}s longer.`, {}, { sp: n => ({ ab: 'shift', cd: -.15 * n, by: { dur: .5 * n } }) }),
     GT("Harrier's Cry", 'wings', 3, 2, 2, n => `Wild Surge comes ${10 * n}% sooner, and each one gives every unit within 1.6 cells ${8 * n} mana.`, {}, { sp: n => ({ ab: 'wildsurge', cd: -.1 * n, ally: 8 * n }) }),
-    GT('Hawk Lord', 'crosshair', 4, 0, 1, 'A spirit hawk hunts beside it: every 1.5s it dives on a foe in reach, flyers first, for 150% of a strike.', {}, { cap: 'hawklord' }),
+    GT('Owl Lord', 'crosshair', 4, 0, 1, 'A spirit owl hunts beside it: every 1.5s it dives on a foe in reach, flyers first, for 150% of a strike.', {}, { cap: 'hawklord' }),
     GT('Wild Heart', 'surge', 4, 1, 1, 'Every change of form fills its Growth bar 30, and its Bloom, Kindred Echo, strikes 2 more foes.', {}, { cap: 'gcWild' }),
     GT('Wild Pace', 'quick', 0, 0, 3, n => `Its strikes come ${4 * n}% faster.`, n => gHaste(.04 * n)),
     GT('Druid\'s Patience', 'hourglass', 0, 2, 2, n => `While it saves for its next spell, its mana flows back ${40 * n}% faster.`, {}, { mana: { saving: .4 } }),
@@ -9352,7 +9352,7 @@ const GROVE_TAL_FLAVOR = {
   arrow: ['Loose leaf-fletched arrows from the boughs, swift and sure.', 'Let the roots hold them. Then loose.'],
   frost: ['Wake the roots beneath the road and hold the horde fast.', 'Every root is patient. Every root is strong.'],
   arcane: ['Ride out on the great stags and bring down the mighty.', 'The stag does not ask the hunter. It decides.'],
-  storm: ['Take the shape the fight needs: hawk, bear or sage.', 'The wood wears many skins. So do we.'],
+  storm: ['Take the shape the fight needs: owl, bear or sage.', 'The wood wears many skins. So do we.'],
   earth: ['Whirl through the horde on twin leaf-blades.', 'Never stop moving. The dance is the blade.'],
   cannon: ['Sow bursting seedpods and let the spores do the rest.', 'Plant once. The wood will finish it.'],
 };
@@ -10670,19 +10670,19 @@ const UNIT_KITS = {
   wayfarer: { slot: 'storm', mana: { max: 110, regen: 1.5, hit: .9, paced: 1 }, abilities: [   // (paced by hand: its innate spell is cheap, so the usual pacing would starve the other two)
     { id: 'shift', name: 'Shift Form', short: 'Shift', glyph: 'swirl', hue: '#9fd8a0', mana: 35, cd: 8, research: null, none: 'it is already in the form for what is in sight',
       by: { dur: [2, 2, 2.5, 2.5, 3, 3] },
-      auto: 'the form for what is in sight: flyers (a third of it), hawk; armoured foes or casters (two in five of the ground foes), sage; other ground foes, bear (a held form always)',
+      auto: 'the form for what is in sight: flyers (a third of it), owl; armoured foes or casters (two in five of the ground foes), sage; other ground foes, bear (a held form always)',
       text: (t, st, ab) => druidShiftText(t, st, ab),
       pick: (t, st, ab, man) => druidShiftPick(t, st, ab, man),
       cast: (t, st, tg, ab) => druidShiftCast(t, st, tg, ab) },
     { id: 'wildstrike', name: 'Primal Strike', short: 'Strike', glyph: 'flash', hue: '#d8c070', mana: 70, cd: 10, research: { cost: 70, time: 20 },
       by: { mult: [2, 2.25, 2.5, 2.75, 3, 3.25], hold: [1.5, 1.5, 2, 2, 2.5, 2.5] },
-      auto: 'hawk: the toughest flyer still in the air (else any foe); bear: the toughest ground foe in reach not already stunned; sage: the toughest armoured foe or caster',
+      auto: 'owl: the toughest flyer still in the air (else any foe); bear: the toughest ground foe in reach not already stunned; sage: the toughest armoured foe or caster',
       text: (t, st, ab) => druidWildText(t, st, ab),
       pick: (t, st, ab, man) => druidWildPick(t, st, ab, man, abReach(t, st, ab)),
       cast: (t, st, c, ab) => druidWildCast(t, st, c, ab) },
     { id: 'wildsurge', name: 'Wild Surge', short: 'Surge', glyph: 'wings', hue: '#b8d890', mana: 100, cd: 14, research: { cost: 120, time: 30 }, none: 'no foe in reach',
       by: { slow: [.3, .3, .35, .35, .4, .4], n: [6, 6, 6, 6, 7, 7] },
-      auto: 'the lane out from it through the most foes (three or more, two flyers for the hawk, or a boss); ties: over the most path',
+      auto: 'the lane out from it through the most foes (three or more, two flyers for the owl, or a boss); ties: over the most path',
       text: (t, st, ab) => druidSurgeText(t, st, ab),
       pick: (t, st, ab, man) => druidSurgePick(t, st, ab, man, abReach(t, st, ab)),
       cast: (t, st, p, ab) => druidSurgeCast(t, st, p, ab),
@@ -11553,7 +11553,7 @@ const GV_LEGENDS = {
     twist: 'In hawk form the Shifter\'s strikes rake every flyer in its reach, turning hawk form into the army\'s answer to the air.',
     text: k => `In hawk form, every strike at a flyer also strikes every other flyer in its reach for ${P_(.6 * k)} of its strike.`,
     combo: 'Wing-Clipper, Skyfall, and the bat waves.',
-    build: 'Hawk\'s Reach, Wing-Clipper and Skyfall; hold the hawk form on its form page for the air waves.',
+    build: 'Owl\'s Reach, Wing-Clipper and Skyfall; hold the owl form on its form page for the air waves.',
     fx: (st, k) => gvPw(st, 'hawkmother', .6 * k) },
   gv_dancesash: { for: 'earth', name: 'Sash of the Endless Dance', icon: 'vortex', hue: '#5ab08a', atk: 1,
     twist: 'Every kill readies the Blade Dancer\'s next Whirlwind at once, so a crowd keeps it spinning without pause.',
@@ -15521,8 +15521,8 @@ function ccChampFire(t, st, tg, pow, echo) {
    (the owner swaps in his own models later). */
 
 const DRUID_FORMS = {
-  hawk: { name: 'Hawk', glyph: 'wing', hue: '#e8b860', model: 'druid_hawk',
-    say: 'a great hawk: long reach at flyers and twice as hard on them; every 3rd talon strike drags a flyer low' },
+  hawk: { name: 'Owl', glyph: 'wing', hue: '#e8b860', model: 'druid_hawk',
+    say: 'a great owl: long reach at flyers and twice as hard on them; every 3rd talon strike drags a flyer low' },
   bear: { name: 'Bear', glyph: 'fist', hue: '#8fcf5a', model: 'druid_bear',
     say: 'a mossback bear: short reach, heavy mauls that also cleave the ground foes round its target; it cannot reach flyers' },
   sage: { name: 'Sage', glyph: 'moon', hue: '#a8d8ff', model: 'druid_sage',
@@ -15672,7 +15672,7 @@ function druidHawkAt(t, now) {
   const S = DSORT.get(t); if (!S) return null;
   const du = now - S.at;
   if (du < S.out + DS_HOLD && S.tg && !S.tg.dead) S.tp = [S.tg.x, hitH(S.tg) + DS_ABOVE, S.tg.y];   // (it follows its flyer till it has struck)
-  if (du >= S.out + DS_HOLD && !S.h) { S.h = [S.tp[0], S.tp[1] + .03, S.tp[2]]; const P = dsPerch(t).p; S.back = .45 + .09 * Math.min(8, Math.hypot(P[0] - S.h[0], P[2] - S.h[2])); }
+  if (du >= S.out + DS_HOLD && !S.h) { S.h = [S.tp[0], S.tp[1] + .03, S.tp[2]]; const P = dsPerch(t).p; S.back = Math.min(S.backMax || 9, .45 + .09 * Math.min(8, Math.hypot(P[0] - S.h[0], P[2] - S.h[2]))); }   // (backMax: a spell's quick hop home, Shapestorm)
   if (S.back && du >= S.out + DS_HOLD + S.back) return null;
   const p = dsPos(t, S, now), b = dsPos(t, S, now - .03), vx = p[0] - b[0], vy = p[1] - b[1], vz = p[2] - b[2], hz = Math.hypot(vx, vz);
   let yaw = hz > 1e-4 ? Math.atan2(vx, vz) : S.syaw, pitch = Math.max(-.7, Math.min(1.1, Math.atan2(-vy, Math.max(hz, 1e-4)) * .9)), open = true, flap;
@@ -15701,7 +15701,7 @@ const druidHex = h => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5)
 function druidShiftText(t, st, ab) {
   const f = t && DRUID_FORMS[t.form], d = byT(ab.by.dur, t);
   return `Shifts to the form the fight needs${f ? ` (now ${f.name.toLowerCase()})` : ''}; tap to hold one. `
-    + `Arriving, the hawk drags 2 flyers down ${d}s (${xD(st, 1)}), the bear slows nearby ground foes 35% (${xD(st, .6)}), the sage strips 2 armour round its foe (${xD(st, .8)} magic).`;
+    + `Arriving, the owl drags 2 flyers down ${d}s (${xD(st, 1)}), the bear slows nearby ground foes 35% (${xD(st, .6)}), the sage strips 2 armour round its foe (${xD(st, .8)} magic).`;
 }
 // a form it shifted into by itself is kept at least DRUID_DWELL s before autocast shifts again (a held form is the player's call)
 const DRUID_DWELL = 6;
@@ -15756,7 +15756,7 @@ function druidShiftFx(t, to) {
 function druidWildText(t, st, ab) {
   const m = byT(ab.by.mult, t), h = byT(ab.by.hold, t), f = t && t.form;
   const L = {
-    hawk: `Hawk: a stoop on the toughest flyer still in the air, out to ${HAWK_REACH} cells past its reach: ${xD(st, m)} (doubled on flyers), and the flyer is dragged down for ${gNf(h + 1)}s (bosses 40%), low enough for every unit to reach.`,
+    hawk: `Owl: a stoop on the toughest flyer still in the air, out to ${HAWK_REACH} cells past its reach: ${xD(st, m)} (doubled on flyers), and the flyer is dragged down for ${gNf(h + 1)}s (bosses 40%), low enough for every unit to reach.`,
     bear: `Bear: a crushing maul on the toughest ground foe in reach: ${xD(st, m)}, and it is stunned for ${gNf(h * .5)}s.`,
     sage: `Sage: a lance of thorns at the toughest armoured foe or caster: ${xD(st, m * .9)} magic; it loses 3 armour for 6s, so steel bites too, and a caster loses 30 mana.`,
   };
@@ -15787,7 +15787,7 @@ const druidSurgeLen = (t, reach, f) => f === 'hawk' ? reach + HAWK_REACH : f ===
 function druidSurgeText(t, st, ab) {
   const r = abReach(t, st, ab), sl = abPct(byT(ab.by.slow, t)), n = byT(ab.by.n, t), f = t && t.form;
   const L = {
-    hawk: `Hawk: a flock sweeps a 1-cell lane out to ${gNf(r + HAWK_REACH)} cells and harries up to ${n} foes in it, flyers first: ${xD(st, 1.5)} each (doubled on flyers), slowed ${sl} for 3s.`,
+    hawk: `Owl: a flock sweeps a 1-cell lane out to ${gNf(r + HAWK_REACH)} cells and harries up to ${n} foes in it, flyers first: ${xD(st, 1.5)} each (doubled on flyers), slowed ${sl} for 3s.`,
     bear: `Bear: it charges 2.4 cells down a lane and back, bowling over every ground foe on it: ${xD(st, 2)} each, knocked back and slowed ${sl} for 1.5s.`,
     sage: `Sage: moonlit thorns line a 1-cell lane out to ${gNf(r)} cells for 4s: every half second each foe on it takes ${xDt(st, .35)} magic and is slowed ${sl}.`,
   };
@@ -15854,7 +15854,7 @@ function druidFormSlots(t, A, s) {
       act: () => druidChoose(t, f) };
   });
   s[3] = { key: 'g:swirl:9fd8a0:1', lbl: 'Auto', on: true, active: !A.formLock, hk: 'F',
-    name: 'Auto: he stays a sage (his normal form) and shifts only when it pays: flyers (a third of what is in sight), hawk; a pack of unarmoured ground foes right on top of him, bear; then back to the sage.', act: () => druidChoose(t, null) };
+    name: 'Auto: he stays a sage (his normal form) and shifts only when it pays: flyers (a third of what is in sight), owl; a pack of unarmoured ground foes right on top of him, bear; then back to the sage.', act: () => druidChoose(t, null) };
 }
 // hold a form (null: Auto) for the selected Shifters; those that can afford it shift at once, the rest when they can
 function druidTryShift(t, f) {
@@ -31365,6 +31365,7 @@ const GVC_CLAW = { main: .8, side: .5, reach: .6, cos: Math.cos(75 * Math.PI / 1
 // three claw streaks raked across the bear's front, one after another (see-through, quick: the field stays readable)
 function gvcClawFx(t, ux, uz) {
   if (typeof rfx !== 'function') return;
+  if (typeof BEAR2 !== 'undefined' && BEAR2.trails && BEAR2.trails()) return;   // (the sculpted bear draws its streaks along its paw's own path: unitmodels_bear.js)
   const a = Math.atan2(ux, uz);
   for (let k = 0; k < 3; k++) G.delayed.push({ t: .025 * k, fn: () => { if (!G.towers.includes(t)) return;
     rfx({ k: 'slash', x: t.x + ux * (.42 + .07 * k), h: .26 + .04 * k, z: t.y + uz * (.42 + .07 * k), a: a + .35 - .12 * k, r: .34 + .05 * k, col: '#7a6448', life: .24 }); } });   // (dim warm streaks: the sprite adds light, so a pale colour three deep glares)
@@ -31373,7 +31374,7 @@ gvcSet('wildstrike', { name: 'Primal Swipe', short: 'Swipe',   // (owner, 18 Nov
   glyph: 'flash', hue: '#d8c070', mana: 70, cd: 10,
   by: { mult: [2, 2.25, 2.5, 2.75, 3, 3.25], hold: [1.5, 1.5, 2, 2, 2.5, 2.5] },
   auto: 'the toughest foe in reach + 0.5: a flyer in the air first, then plate or a caster, then any ground foe; it takes the form that foe calls for',
-  text: (t, st, ab) => { const m = byT(ab.by.mult, t), h = byT(ab.by.hold, t); return `Strikes in the form its quarry calls for: hawk at a flyer (${xD(st, m)}, dragged down ${gNf(h + 1)}s), bear rakes a wide claw arc in front of it (${xD(st, m * GVC_CLAW.main)} to its quarry, rooted ${gNf(h * .6)}s, and ${xD(st, m * GVC_CLAW.side)} to every other ground foe in the arc), sage at plate or a caster (${xD(st, m * .9)} magic, 3 armour off for 6s).`; },
+  text: (t, st, ab) => { const m = byT(ab.by.mult, t), h = byT(ab.by.hold, t); return `Strikes in the form its quarry calls for: owl at a flyer (${xD(st, m)}, dragged down ${gNf(h + 1)}s), bear rakes a wide claw arc in front of it (${xD(st, m * GVC_CLAW.main)} to its quarry, rooted ${gNf(h * .6)}s, and ${xD(st, m * GVC_CLAW.side)} to every other ground foe in the arc), sage at plate or a caster (${xD(st, m * .9)} magic, 3 armour off for 6s).`; },
   pick(t, st, ab, man) {
     const L = abFoes(t, st, abReach(t, st, ab) + .5 + (druidForm(t) === 'bear' ? 1 : 0)); if (!L.length) return null;
     const lock = gvcHeldForm(t);
@@ -31403,32 +31404,37 @@ gvcSet('wildstrike', { name: 'Primal Swipe', short: 'Swipe',   // (owner, 18 Nov
     } });
   } });
 
-// Shapestorm: hawk, bear and sage in one breath, each striking its own quarry; it lands in the form the fight wants
-const GVC_STORM = [['hawk', 0], ['bear', .5], ['sage', 1]];
+// Shapestorm: owl, bear and sage in turn, each striking its own quarry; it lands in the form the fight wants. Each form has
+// a beat of its own (owner, 18 Nov 2026: "make each form's strike clearer"): the shift's pop, then its strike, then the
+// next. [form, the beat's start, its hit after that]: the owl flies out from its stump as it blooms and rakes its flyer
+// (back on the stump before the bear's beat), the bear rears and crashes down on its ground foe, the sage sweeps its staff
+// down the lane. The runtimes (unitmodels_owl.js, _bear.js, _sage.js) read these to time each form's own clip.
+const GVC_STORM = [['hawk', 0, .42], ['bear', .75, .36], ['sage', 1.5, .3]], GVC_STORM_T = 2.2, GVC_STORM_FLY = .15;
 gvcSet('wildsurge', { name: 'Shapestorm', short: 'Storm', glyph: 'wings', hue: '#b8d890', mana: 100, cd: 14,
   by: { mult: [1, 1, 1.1, 1.1, 1.2, 1.2], slow: [.3, .3, .35, .35, .4, .4] },
   auto: 'three or more foes in reach, or a boss or elite',
-  text: (t, st, ab) => { const m = byT(ab.by.mult, t); return `Strikes once in each form: the hawk drags the toughest flyer down 2s (${xD(st, m * .45)}), the bear roots the toughest ground foe 1s (${xD(st, m * .55)}), the sage hits a lane for ${xD(st, m * .6)} magic, slowing ${abPct(byT(ab.by.slow, t))}.`; },
+  text: (t, st, ab) => { const m = byT(ab.by.mult, t); return `Becomes owl, bear and sage in turn, striking once in each form: the owl stoops on the toughest flyer and drags it down 2s (${xD(st, m * .45)}), the bear crashes down on the toughest ground foe and roots it 1s (${xD(st, m * .55)}), the sage sweeps a moonlit lane for ${xD(st, m * .6)} magic, slowing ${abPct(byT(ab.by.slow, t))}.`; },
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab) + HAWK_REACH); return L.length && (man || L.length >= 3 || L.some(abBig)) ? abToughest(L) : null; },
   cast(t, st, c0, ab) {
-    const T = 1.45, m = byT(ab.by.mult, t), from = druidForm(t);
+    const T = GVC_STORM_T, m = byT(ab.by.mult, t), from = druidForm(t);
     t.ab.busyT = Math.max(t.ab.busyT, G.time + T); t.cd = Math.max(t.cd, T); t.gvcStormAt = G.time;
-    for (const [f, at] of GVC_STORM) G.delayed.push({ t: at + .01, fn: () => {
+    for (const [f, at, hit] of GVC_STORM) G.delayed.push({ t: at + .01, fn: () => {
       if (!abLive(t)) return;
       gvcShiftTo(t, f); const s = t.st || st, r = abReach(t, s, ab);
       if (f === 'hawk') {
         const L = abFoes(t, s, r + HAWK_REACH), c = abToughest(L.filter(o => o.fly && !(o.lowT > G.time))) || abToughest(L); if (!c) return;
-        gvcFx('stormhawk', t, ab, { c });
-        G.delayed.push({ t: .2, fn: () => { if (c.dead || !abLive(t)) return; abHit(t, t.st || s, c, m * .45, 'phys', null); if (!c.dead && c.fly) c.lowT = Math.max(c.lowT || 0, G.time + 2 * (c.def.boss ? .4 : 1)); sfx('hawkStrike'); } });
+        G.delayed.push({ t: GVC_STORM_FLY, fn: () => {   // (once it has bloomed on its stump: off at its flyer, its talons landing on the hit, home before the bear's beat)
+          if (c.dead || !abLive(t) || druidForm(t) !== 'hawk') return;
+          druidSortie(t, c, hit - GVC_STORM_FLY - .01); const S = typeof DSORT !== 'undefined' && DSORT.get(t); if (S) S.backMax = .2;
+        } });
+        G.delayed.push({ t: hit - .01, fn: () => { if (c.dead || !abLive(t)) return; abHit(t, t.st || s, c, m * .45, 'phys', null); if (!c.dead && c.fly) c.lowT = Math.max(c.lowT || 0, G.time + 2 * (c.def.boss ? .4 : 1)); gvcFx('stormhawk', t, ab, { c }); sfx('hawkStrike'); } });
       } else if (f === 'bear') {
         const c = abToughest(abFoes(t, s, r + .5, gvcWalker)); if (!c) return;
-        gvcFx('stormbear', t, ab, { c });
-        G.delayed.push({ t: .16, fn: () => { if (c.dead || !abLive(t)) return; const [ux, uz] = abDir(t, c); abHit(t, t.st || s, c, m * .55, 'phys', [ux * .2, uz * .2]); if (!c.dead) rootFoe(c, 1, t); G.shake = Math.max(G.shake || 0, .07); sfx('quake', .8); } });
+        G.delayed.push({ t: hit - .01, fn: () => { if (c.dead || !abLive(t)) return; const [ux, uz] = abDir(t, c); abHit(t, t.st || s, c, m * .55, 'phys', [ux * .2, uz * .2]); if (!c.dead) rootFoe(c, 1, t); gvcFx('stormbear', t, ab, { c }); G.shake = Math.max(G.shake || 0, .07); sfx('quake', .8); } });
       } else {
         const b = abBestLine(t, s, abFoes(t, s, r), r, .5); if (!b) return;
         const sl = byT(ab.by.slow, t);
-        gvcFx('stormsage', t, ab, { ux: b.ux, uz: b.uz, len: r });
-        G.delayed.push({ t: .15, fn: () => { if (!abLive(t)) return; abAoe(() => { for (const o of abLine(t, t.st || s, t.x, t.y, b.ux, b.uz, r, .5)) { abHit(t, t.st || s, o, m * .6, 'magic', null); if (!o.dead) chill(o, { slow: sl, slowT: 2 }, null, t); } }); sfx('arcane', 1); } });
+        G.delayed.push({ t: hit - .01, fn: () => { if (!abLive(t)) return; gvcFx('stormsage', t, ab, { ux: b.ux, uz: b.uz, len: r }); abAoe(() => { for (const o of abLine(t, t.st || s, t.x, t.y, b.ux, b.uz, r, .5)) { abHit(t, t.st || s, o, m * .6, 'magic', null); if (!o.dead) chill(o, { slow: sl, slowT: 2 }, null, t); } }); sfx('arcane', 1); } });
       }
     } });
     G.delayed.push({ t: T - .02, fn: () => { if (!abLive(t)) return; const s = t.st || st, w = gvcHeldForm(t) || druidWant(t, s) || from; gvcShiftTo(t, w); } });
@@ -31680,10 +31686,10 @@ function gvcTal(tree, name, o) {
   gvcTal(T.arcane, 'Bowl Over', { pro: n => `Bounding Leap lands harder: every ground foe its landing strikes is stunned ${gNf(.3 * n)}s too, and it roots them ${gNf(.15 * n)}s longer.`, sp: n => ({ ab: 'stampede', rider: { stun: .3 * n }, by: { root: .15 * n } }) });
   gvcTal(T.arcane, 'Herd Instinct', { pro: n => `Each Bounding Leap brings Heroic Charge ${2 * n}s nearer.` });
   // Grove Shifters
-  gvcTal(T.storm, 'Wing-Clipper', { pro: n => `In hawk form talons drag flyers down ${gNf(.6 * n)}s, and Primal Swipe holds ${gNf(.5 * n)}s longer (the flyer dragged down, the ground foe pinned under the paw).` });
-  gvcTal(T.storm, "Hawk's Mark", { pro: 'Primal Swipe costs 25% less, and each one brings Shift Form 3s nearer.' });
+  gvcTal(T.storm, 'Wing-Clipper', { pro: n => `In owl form talons drag flyers down ${gNf(.6 * n)}s, and Primal Swipe holds ${gNf(.5 * n)}s longer (the flyer dragged down, the ground foe pinned under the paw).` });
+  gvcTal(T.storm, "Owl's Mark", { pro: 'Primal Swipe costs 25% less, and each one brings Shift Form 3s nearer.' });
   gvcTal(T.storm, 'Talon Rend', { pro: n => `Primal Swipe leaves its foe bleeding for ${40 * n}% of a strike over 3s.` });
-  gvcTal(T.storm, 'Grounded Prey', { pro: n => `Shapestorm strikes grounded flyers and held foes ${25 * n}% harder (its hawk grounds and its bear roots, so its sage cashes in), and its moon-thorns slow ${5 * n}% more.`, sp: n => [{ ab: 'wildsurge', vs: ['grounded', .25 * n], by: { slow: .05 * n } }, { ab: 'wildsurge', vs: ['held', .25 * n] }] });
+  gvcTal(T.storm, 'Grounded Prey', { pro: n => `Shapestorm strikes grounded flyers and held foes ${25 * n}% harder (its owl grounds and its bear roots, so its sage cashes in), and its moon-thorns slow ${5 * n}% more.`, sp: n => [{ ab: 'wildsurge', vs: ['grounded', .25 * n], by: { slow: .05 * n } }, { ab: 'wildsurge', vs: ['held', .25 * n] }] });
   gvcTal(T.storm, "Harrier's Cry", { pro: n => `Shapestorm comes ${10 * n}% sooner, and each one gives every unit within 1.6 cells ${8 * n} mana.` });
   // Blade Dancers
   gvcTal(T.earth, 'Flowing Steps', { pro: n => `Threading Dance costs ${10 * n}% less and its thread holds ${gNf(.2 * n)}s longer; each foe it slays gives ${6 * n} mana.`, sp: n => ({ ab: 'leafdance', cost: -.1 * n, by: { root: .2 * n }, kill: { mana: 6 * n } }) });
@@ -31851,11 +31857,20 @@ const GVC_FX = {
     else if (o.f === 'bear') { v2Area(C, c.x, c.y, .7, { sp: 'dust', n: 6, rim: 'chip', rn: 6, L: VT.CRACK, shake: .06, minor: 1 }); if (c.rootT > G.time) gvcCage(C, c, c.rootT - G.time, { n: 4, s: .9 }); }
     else { v2Hit(C, c.x, c.y, h, C.S * .7, { sp: 'crys', n: 6, col: GVC_K.moon, hot: GVC_K.moonHot, ring: 0 }); v2Spikes(C, c.x, c.y, .22, 4, 0, { ring: 1, h: .45, hold: .6, col: GVC_K.moon }); }
   },
-  stormhawk(C, t, o) { GVC_FX.pounce(C, t, { c: o.c, f: 'hawk' }); gvcAt(C, .2, () => { if (!o.c.dead) GVC_FX.pouncehit(C, t, { c: o.c, f: 'hawk' }); }); },
-  stormbear(C, t, o) { gvcAt(C, .17, () => { if (!o.c.dead) GVC_FX.pouncehit(C, t, { c: o.c, f: 'bear' }); }); },
+  // Shapestorm's beats, each at its strike and in its form's own colour (DRUID_FORMS' hues), quick and dim enough to keep
+  // the foes in view: the owl's three talon streaks raked across its flyer; the bear's crack and root under its foe with
+  // a ring of its moss-green; the sage's moonlit lane and a beam of its pale blue laid down it from the staff
+  stormhawk(C, t, o) {
+    const c = o.c, h = gvcH(c), ux = c.x - t.x, uz = c.y - t.y, l = Math.hypot(ux, uz) || 1, px = -uz / l, pz = ux / l;
+    for (let k = -1; k <= 1; k++) gvcAt(C, .03 * (k + 1), () => { if (!c.dead) v2Slash(C, c.x + px * k * .07, c.y + pz * k * .07, h + k * .02, ux, uz, .34 * C.S, { flip: 1, life: .22, col: vfxC('#e8b860', .8), hot: vfxC('#fff0c8', 1.1) }); });
+    GVC_FX.pouncehit(C, t, { c, f: 'hawk' });
+  },
+  stormbear(C, t, o) { const c = o.c; GVC_FX.pouncehit(C, t, { c, f: 'bear' }); if (typeof fxRing === 'function') fxRing(c.x, c.y, .55, DRUID_FORMS.bear.hue); },
   stormsage(C, t, o) {
-    v2Band(C, t.x, t.y, o.ux, o.uz, o.len, .5, { col: GVC_K.moon, hot: GVC_K.moonHot, al: .35, sweep: .15, life: .9, L: VT.ENERGY });
-    v2Spikes(C, t.x + o.ux * .3, t.y + o.uz * .3, .35, 12, 0, { len: o.len - .3, ux: o.ux, uz: o.uz, h: .5, hold: 1.2, stag: .015, delay: .05, col: GVC_K.moon });
+    v2Band(C, t.x, t.y, o.ux, o.uz, o.len, .5, { col: GVC_K.moon, hot: GVC_K.moonHot, al: .2, sweep: .12, life: .6, L: VT.ENERGY });
+    const p = typeof unitTip === 'function' && unitTip(t), x0 = p ? p[0] : t.x, h0 = p ? p[1] : gvcTop(t), z0 = p ? p[2] : t.y;
+    v2Beam(C, x0, h0, z0, t.x + o.ux * o.len, .25, t.y + o.uz * o.len, { w: .028, life: .26, grow: .1, col: vfxC(DRUID_FORMS.sage.hue, .7), ccol: vfxC(DRUID_FORMS.sage.hue) });
+    v2Spikes(C, t.x + o.ux * .3, t.y + o.uz * .3, .35, 12, 0, { len: o.len - .3, ux: o.ux, uz: o.uz, h: .5, hold: 1.2, stag: .015, delay: .03, col: GVC_K.moon });
   },
   /* ---- Threading Dance: a streak to each foe, a vine woven through them, pulled taut ---- */
   thread(C, t, o) { sfxAdd({ k: 'gvcthread', th: o.th, life: 9, S: C.S, seed: R(TAU) }); },
@@ -32147,7 +32162,7 @@ if (typeof ABANIM !== 'undefined') Object.assign(ABANIM, {
   }, fx(t, C, x, z, yaw, K) { const e = fxEnv(C.u, .02, .98, .08); if (!e) return; glowB(x, .45 * K, z, .55 * K, [1, .97, .88], .3 * e); glowB(x, .7 * K, z, .3 * K, [1, 1, 1], .25 * e);
     if (FXLIVE() && Math.random() < .5 * e) part({ k: 'xmote', x: x + R(-.25, .25), z: z + R(-.25, .25), h: R(.3, .8) * K, vx: 0, vz: 0, vh: .4, drag: 1, life: .6, max: .6, size: R(.03, .05), col: '#fff8e8' }); } },
   // Shapestorm: three beats in one breath: the hawk's stoop, the bear's crash, the sage's sweep of the staff down the lane
-  wildsurge: { T: 1.45, keys: [.12, .45, .78], f(u, B, t) {
+  wildsurge: { T: 2.2, keys: [.12, .45, .78], f(u, B, t) {
     const f = typeof druidFormNow === 'function' ? druidFormNow(t) : 'sage';
     if (f === 'hawk') { const v = clamp01(u / .33); B.z = kf(v, [[0, 0], [.3, .3, 'out'], [.6, .25], [1, 0]]); B.rx = kf(v, [[0, 0], [.3, .45, 'out'], [1, 0]]); const w = kf(v, [[0, .3], [.2, 1.1], [.4, -.35, 'in'], [.55, 1.2, 'out'], [1, .4]]); B.parts.wingL = [0, 0, w, 0, 0, 0]; B.parts.wingR = [0, 0, -w, 0, 0, 0]; }
     else if (f === 'bear') { const v = clamp01((u - .33) / .33); B.rx = kf(v, [[0, 0], [.35, -.5], [.55, .3, 'in'], [1, 0]]); B.dy = kf(v, [[0, 0], [.35, .07], [.55, 0, 'in'], [1, 0]]); B.parts.paw = kf(v, [[0, Z0], [.35, [-1.7, 0, 0, 0, .06, .05]], [.55, [-.15, 0, 0, 0, 0, .07], 'in'], [1, Z0]]); }
@@ -43663,13 +43678,13 @@ function gfRe(list, old, o) {
   const W = T.storm.list;
   gfRe(W, 'Ground Watch', { name: 'Wildwood Tithe', icon: 'leaf', pro: n => `The wood feeds the shape: each strike at a foe held by roots or carrying the Grove's spores restores ${n} mana.`, cap: 'gfTithe' });
   gfRe(W, 'Bramble Claws', { pro: n => `In bear form its mauls bleed the foe for ${15 * n}% of the hit over 3s, and a maul at a foe already bleeding strips 1 armour from it, up to ${2 * n}.`, cap: 'bramclaw' });
-  gfRe(W, "Hawk's Mark", { pro: 'The hunter takes whatever shape the kill needs: each Primal Swipe readies Shift Form at once, and for 4s after it Shift Form costs 70% less.', sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -.7 }] });
+  gfRe(W, "Owl's Mark", { pro: 'The hunter takes whatever shape the kill needs: each Primal Swipe readies Shift Form at once, and for 4s after it Shift Form costs 70% less.', sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -.7 }] });
   gfRe(W, 'Second Skin', { pro: n => `Shift Form's arrival lasts ${gNf(.5 * n)}s longer, and the Shifter's first strike in each new form lands twice.`, sp: n => ({ ab: 'shift', by: { dur: .5 * n } }), cap: 'gfSkin' });
   gfRe(W, 'Wild Pace', { pro: n => `The bear in the pack: in bear form, while 2 or more ground foes are within its reach, its mauls come ${5 * n}% faster.`, cap: 'gfPace' });
   gfRe(W, "Druid's Patience", { pro: n => `In sage form it breathes with the wood: +${gNf(.4 * n)} mana a second while it wears the sage.`, cap: 'gfSage' });
   gfRe(W, "Harrier's Cry", { pro: n => `The storm and the shapes feed each other: each Shapestorm brings Shift Form ${2 * n}s nearer, and Shapestorm comes ${2 * n}s sooner each time the Shifter takes a form it hasn't worn since its last Shapestorm.`, sp: n => ({ ab: 'wildsurge', ready: ['shift', 2 * n] }), cap: 'gfForms' });
-  gfRe(W, "Hawk's Reach", { pro: n => `In hawk form its talons reach ${gNf(.3 * n)} cells farther at flyers, and the first flyer it strikes in each new hawk form is dragged down for 1s.`, cap: 'gfHawk' });
-  gfRe(W, 'Grounded Prey', { pro: n => `Shapestorm strikes grounded flyers and held foes ${25 * n}% harder (its hawk grounds and its bear roots, so its sage cashes in).`,
+  gfRe(W, "Owl's Reach", { pro: n => `In owl form its talons reach ${gNf(.3 * n)} cells farther at flyers, and the first flyer it strikes in each new owl form is dragged down for 1s.`, cap: 'gfHawk' });
+  gfRe(W, 'Grounded Prey', { pro: n => `Shapestorm strikes grounded flyers and held foes ${25 * n}% harder (its owl grounds and its bear roots, so its sage cashes in).`,
     sp: n => [{ ab: 'wildsurge', vs: ['grounded', .25 * n] }, { ab: 'wildsurge', vs: ['held', .25 * n] }] });
 
   /* ---- Blade Dancers: the dance that never stops ---- */
@@ -46422,7 +46437,7 @@ const TAL_ART_ALIAS = { 'Lowered Shield': 'Lowered Lance', 'Wide Sweep': 'Wide W
    talent is gone comes back as a point. Saves from before (ftv 4, and warbands without names) read their names from
    TAL_NAMES_V4: every force tree and Champion tree as they stood on playbuild at f6f805d.
    talNamesNow(): the trees in play, { slot: [names] }. talNamesOld(force, hero): the v4 names for that run. */
-const TAL_NAMES_V4 = {"f":{"grove":{"glaive":["Long Haft","Hold the Line","Set Spears","Shieldsplitter","Thornhedge","Bloodthorn","Rootbreaker","Phalanx","Wall of Spears","Impaler","Spearwood Rising","Thornburst","Skewer","Splintered Line","Deep Thrust","Living Haft","Thornwall Ward"],"arrow":["Patient Hunter","Canopy Sight","Mark the Quarry","Thornpoint Arrows","Paired Shafts","Thornseed Arrow","Heartseeker","Snaring Shot","Pinning Shot","Thornrain","Nailing Shaft","Still Quarry","Wounded Prey","Canopy Volley","Quick Nock","Hunter's Rhythm","Hushed Quarry"],"frost":["Deep Roots","Thorned Vines","Clinging Briars","Thorn Hold","Sapdraw","Heartwood Staff","Grasp of the Deep","Second Snare","Bramble Squeeze","Spreading Roots","Bloodbriar","Rootburst","Overgrowth","Strangleroot","Warden's Reach","Sapwell","Quickening Sap"],"arcane":["Heavy Lance","Trample","Wheel About","Bowl Over","Run to Ground","Mark of the Hunt","Bounding Leap","White Hart's Hunt","Lord of the Glade","Hooves of Thunder","Hunter's Finish","Second Charge","Goring Antlers","Long Gallop","Stag's Wind","Herd Instinct"],"storm":["Hawk's Reach","Ground Watch","Wing-Clipper","Bramble Claws","Primal Pounce","Hawk's Mark","Grounded Prey","Moonsap Bolts","Skyfall","Shapestorm","Second Skin","Harrier's Cry","Hawk Lord","Ever-Changing","Wild Pace","Druid's Patience","Talon Rend"],"earth":["Leaf-Edged Blades","Wide Whirl","Flowing Steps","Tripping Blades","Blade Rhythm","Threading Dance","Thorn Dance","Bladestorm","Encore","Twin Whirl","Gale of Blades","Reaper's Step","Quickstep","Dancer's Breath","Petal Cuts"],"cannon":["Potent Spores","Ripe Pods","Choking Spores","Seed Scatter","Hard Husk","Clinging Spores","Puffcap Sowing","Snapjaw Bloom","Spore Cloud","Bursting Rot","Bramble Patch","Rootmark Seed","Drifting Spores","Far Cast","Seedwell","Thorned Husks","Burrowing Pods"],"venom":["Hunter's Patience","Barbed Darts","Quick Quiver","Lone Prey","Long Severance","Sap Thief","Bramble Snare","Briar Gibbet","Silent Stalk","Deep Snare","Thornmark Trail","Choking Thorns","Snare Line","Apex Stalker","Barren Ground","Unseen Hunter"]},"conclave":{"glaive":["Measured Cuts","Long Step","Lone Duel","Starsteel","Riposte Stance","Charged Edge","Long Sigil","Blinkstep","Thousand Edges","Crosscut Sigil","Fifth Form","Phase Dancer","Ghostblade Rush","Weaver's Blade","Runed Edge","Binding Cut","Swift Recovery"],"arrow":["Twin Casting","Scrying Lens","Missile Swarm","Homing Runes","Apprentice's Zeal","Missile Curtain","Echoing Missiles","Spark Battery","Gathering Orb","Unstable Charge","Orb Lattice","Study the Weave","Rune Reader","Arcane Torrent","Inkwell","Barrage Drill","Static Sparks"],"frost":["Biting Cold","Wide Glyphs","Flash Freeze","Scrivener's Hand","Entomb","Brittle Rime","Hoarfrost Trail","Glacier Script","Rime Lattice","Rime Field","Lingering Rime","Cold Library","Absolute Stillness","Steady Glyphwork","Rimewell","Needle Rime","Splintering Rime"],"arcane":["Long Second","Tick Forward","Borrowed Time","Heavy Hours","Backward Hour","Paradox","Stopped Clock","Quickening Bell","Frozen Moment","Hourglass Heart","Echo","Rewound Wounds","Arcane Clockwork","Borrowed Hour","Pendulum Swing","Hourglass Reserve","Patient Hours"],"storm":["Wide Heavens","Star-Chart","Falling Fragments","Skybreaker","Comet","Lodestar","Grounded Stars","Zodiac","Starfall Sky","Twin Stars","Grand Orrery","Twinkling Ice","Frost Lens","Turning Spheres","Night Sight","Starwell","Ill Omen"],"earth":["Broad Palms","Second Tremor","Staggering Blow","Mana Quarry","Heave","Shatterground","Magma","Runic Core","Living Bulwark","Fault Line","Obsidian","Avalanche Arm","Ember Stone","Living Mountain","Granite Fists","Runic Reservoir","Glyph Anchor"],"cannon":["Slow-Burning Ink","Wide Blast","Pyre Scribe","Fire Feeds Mana","Firewalk","Cinder Charge","Skipping Flame","Road of Embers","Ember Heart","Pyre Lord","Rolling Inferno","Hearthguard","Searing Tide","Long Throw","Ember Breath","Wardburn","Kindled Fingers"],"venom":["Keen Crescent","Long Reach","Rune of Undoing","Quick Severing","Ward Feedback","Returning Crescent","Splintering","Sever the Link","Seeking Edge","Arcane Memory","Rend the Veil","Shatterpoint","Brimming Severance","Void Ground","Unravelling Veil","Wardbreaker"]},"ironhold":{"glaive":["Heavy Shoulders","Bearded Axe","Ringing Rim","Through the Plate","Bowling Shove","Spinning Shield","Hot Shards","Shield Rush","Armourbreaker","Breaker's Blow","Brace and Shove","Locked Line","Plate-Splitter","Hold the Pass","Steady Axe","Miner's Wind","Shove Drill"],"arrow":["Rifled Bores","Range-Finder","Long Belt","Called Shot","Rattlegun","Hot Loads","Kneecapper","Black Powder","Gatling Crank","Breaching Slug","Quick Swab","Ramrod Rhythm","Case-Hardened","Quick Reload","Powder Pouch","Pinning Rounds","Called Volley"],"frost":["Weighted Chains","Leaded Bolas","Trap Line","Tangle","Tripwire","Bound and Broken","Fast Knots","Dragnet","Harpoon Winch","Bear Trap","Wide Nets","Hooked Chain","Spiked Caltrops","Strong Arm","Trapper's Patience","Barbed Chain","Reeling Chain"],"arcane":["Searing Brand","Deep Brand","Brand Chain","Swift Inscription","Ringing Anvil","Masterwork Strike","Rune of Making","Rune of Unmaking","Rune Lord","Forgefire Ring","Runic Overflow","Forge Heat","Runebrand Detonation","Steady Hammer","Rune Reservoir","Unwarding Runes","Shared Runes"],"storm":["Tall Elevation","Fast Fuses","Wing Shredder","Chain-Fed","Sky Shatter","Grapnel Shot","Tracer Rounds","Starshell","Endless Belt","Shellstorm","High Fuse","Ground Burst","Hot Shrapnel","Shrapnel Cones","Belt Feed","Reel In"],"earth":["Tight Valves","Cracking Blows","Scalding Steam","Rivet Popper","Piston Rhythm","Pile Driver","Echoing Slam","Groundsplitter","Molten Rivets","Steam Uppercut","Tremor Step","Safety Valve","Ram Line","Wide Anvil","Pressure Gauge","Quick Hammer","Venting Pipes"],"cannon":["Heavy Charges","Elevation Tables","Rattling Blast","Pitch-Soaked Wadding","Skipping Shell","Double Crew","Firestorm","Big Bertha","Creeping Barrage","The Long Drop","Shrapnel Casing","Quake Shell","Walking Fire","Napalm","Quick Loader","Powder Store","Clinging Fire"],"venom":["Long Pole","Shaped Charges","Quick Hands","Sapper's Ration","Black Powder Pack","Cracked Plate","Powder Trail","Rubble","Short Fuse","Steady Crew","Long Trail","Demolition","Siege Master","Collapse","Breach and Clear","Chain Demolition"]},"silver":{"glaive":["Braced Line","Witness the Blow","Staggering Bash","Shield of Faith","Vigil","Edge of Dawn","Rampart of Dawn","Oath of Challenge","Wall of Shields","Oath of Rebuke","Unyielding","Ringing Shield","Unbroken Oath","Drilled Swordarm","Squire's Prayer","Dawn Shield","Rising Aegis"],"arrow":["Windlass","Witnessed","Twin Quarrels","Armour-Breaker","Flare Bolt","Heavy Quarrel","Slow Match","Deep Mark","Writ of Execution","Bear Witness","Through and Through","Bodkin Heads","Open Ledger","Storm of Silver","Quick Crank","Steady Prayer","Pinning Light"],"frost":["Heavy Links","Long Chains","Tight Bindings","Dazzle","Twin Chains","Chain of Penance","Scouring Light","Sister's Patience","Blinding Chains","Chain of Judgement","Vigil Chains","Quick Binding","Shackle Litany","Shackled Road","Swift Lash","Vigil Lamp","Glare of Dawn"],"arcane":["Destrier's Stride","Couched Lance","Spurs","Grail Quest","Tourney Passes","Shining Example","Trampling Hooves","Charge of the Vow","Echoing Verdict","Glory of the Charge","Rallying Vow","Vowkeeper","Unhorse","Fresh Mounts","Rider's Prayer","Unhorsing Ride"],"storm":["Zenith","Morning Rays","Sky Verdict","Fall from Grace","Prism","Kindled Faith","Noon Sweep","Dawnfall","Lance of Heaven","Noon Descent","Dawnward","Sunburst","Judgement Ray","Far Sight","Dawn Prayer","Piercing Dawn","Sun Wheel"],"earth":["Broad Swing","Crushing Weight","Tremor","Anvil","Zeal","Hammer Fervour","Hammer of Judgement","Shockwave","Final Judgement","Hammer of Heaven","Sundering Blow","Marked by the Hammer","Hurled Verdict","Hammer Drill","Reliquary","Templar's Rhythm","Consecrated Earth"],"cannon":["Wide Censer","Lingering Smoke","Glowing Coal","Swift Swing","Scattered Coals","Procession of Incense","Choking Smoke","Kindle the Censers","Censing of the Faithful","Ember Psalm","Thick Smoke","Purging Fire","Rekindling","Long Chain","Incense Store","Swinging Chain","Censing Prayer"],"venom":["Long Seal-Chain","Scorching Seal","Heavy Silence","Swift Censure","Zealot's Vow","Writ of Seizure","Prayer of Silence","Sealed Tongues","Shield of Doctrine","Writ of Iron","Heretic's Stake","Penitent Chains","Confession","Pyre Eternal","Inquisitor General","Ashes Speak","Grand Inquest"]},"stormborn":{"glaive":["Long Ash Spear","Hunting Bond","Hock Bite","Storm-Iron Tips","Pack Tactics","Scent of Rain","Gathered Charge","Wolf and Spear","Spirit Pack","Moonfang Pounce","Stormpin","Guard the Pass","Grounding Spear","Thunder Haft","Storm-Iron Points","Hunting Lope","Howl of Haste"],"arrow":["Long Draw","Through and Through","Quick Wind","Gust Fletching","Headwind","Driving Wind","Featherfall","Skyward Gust","Skyrend","Lightning Fletch","Rain Arrows","Rainshot","Hurricane Volley","Sky-Eyes","Windwell","Gale Eddy"],"frost":["Heavy Hail","Cold Snap","Brittle Cold","Sleet","Glacial Totems","Bitter Rain","Black Ice","Skystone","Frozen Through","Frostbound Totem","Ice Crust","Frost Lightning","Hail Shatter","Cold Clouds","Hailwell","Shattering Hail","Totem Chill"],"arcane":["Long Gaze","Deep Hex","Lingering Spirits","Spirit Weight","Judgment","Ancestors' Toll","Ancestral Patience","The Long Memory","Spirit Host","Spirit Walk","Renewed Hex","Spirit Echo","Den Mother","Spirit Draw","Ancestor's Store","Ancestral Focus","Final Reckoning"],"storm":["Rolling Thunder","Static Field","Conductor","Overcharge","Skybolt","Arc Bridge","Stormcaller","Living Storm","Last Spark","Lightning Rod","Ground Current","Split Sky","Copper Crown","Long Leap","Thunderwell","Wardsplitter Bolts","Thunder Wings"],"earth":["Heavy Tread","Deep Fissures","Earthen Totems","Rattled","Stonewake","Shake Loose","Rolling Earth","Riftmaker","Sinkhole","Thunderstomp","Rift Rhythm","Mud and Rain","Bison Run","Second Tremor","Slow Stone","Drumming Feet","Deep Rift"],"cannon":["Long Clouds","Wide Clouds","Gathering Cloud","Heavy Rain","Storm Dance","Static Clouds","Rain Dance","Skyleap","Cloudburst","Rolling Clouds","Leaping Squall","Sky Strike","Sky Lattice","Far Dance","Cloudwell","Drenching Pour","Rainmaker"],"venom":["Eagle Eye","Long Cord","Quick Cast","Sky Lore","Ground Stake","Charged Harpoons","Drenching Barbs","Heavy Air","Many Cords","Skyfall Harpoon","Pinned to Earth","Thunderhead","Fallen Sky","Storm-Tethered","Master of the Sky"]},"wardbound":{"glaive":["Long Greatsword","Deep Carving","Heavy Edge","Oathsworn Cut","Sword and Stone","Vigil Breath","Rune Cleave","Unbroken Line","Hold Fast","Bright Wards","Final Oath","Oath of Iron","Linebreaker","Unyielding","Oathfire","Graven Oaths","Wide Wards"],"arrow":["Great Longbow","Masked Sight","Rune-Etched Heads","Pinning Draw","Quiet Breath","Volley Drill","Piercing Shaft","Falling Stars","Line Shot","Long Shaft","Nocked Again","Warding Arrow","Twin Shafts","Arrow of Judgement","Sentinel's Arrow","Beacon Arrow"],"frost":["Heavy Halberd","Wide Sweep","Long Frost","Bitter Steel","Rime Drill","Snowmelt","Frostbite","Winter Ward","Rimecut","Deep Bite","Long Winter","Shatter Oath","Cold Vigil","Biting Wind","Winter's Line","Glacial Brand","Rime Crown"],"arcane":["Long Stylus","Lingering Ink","Ward-Cutting Script","Deep Script","Quick Etching","Inkwell","Detonate","Ink of Binding","Sigil Ward","Chain Reaction","Scribe the Road","Double Stroke","Volatile Script","Great Script","Cascade","Road of Sigils","Runesight"],"storm":["Long Lance","Thunder Hooves","Branding Sparks","Forked Pennon","Storm Pennant","Stormdraught","Spur and Lance","Cracking Pennant","Thunderbrand","Skyfall","Charge Through","Pennant Call","Gathering Storm","Sky's Answer","Thunder Oath","Stormwake","Eye of the Storm"],"earth":["Broad Shield","Iron Rhythm","Deep Quake","Restless Earth","Braced Shove","Anvil Breath","Quake Line","Wall of Shields","Shield Brand","Fault Line","Anvil Stance","Rune-Shaker","Aftershock","Unmoving","Great Anvil","Anvil Oath","Mountain's Weight"],"cannon":["Long Windlass","Wide Blast","Heavy Bolts","Long Pin","Crank Drill","Steady Crew","Rune Shot","Chain Bolt","Pinned and Branded","Kindled Runes","Iron Tether","Bolt Sequence","Shatter Shot","Rearm","Tethering Spikes","Ballista Volley","Burning Pins"],"venom":["Wide Censer","Steady Cuts","Deep Mending","Thick Smoke","Sworn Vow","Chaplain's Breath","Siege-Ward","Oath Renewed","Censer Brand","Rite of Holding","Vow of Iron","Ember Vow","Long Rite","Keeper of Vows","Sanctuary","Holy Ground"]}},"h":{"cc_arch":["Quick Quill","Starlit Reach","Wide Barrage","Library Wall","Unravel","Loose Threads","Runic Drag","Shared Lesson","Deeper Loom","Woven Edge","Charged Hands","Spellweaver","Sixfold Loom","Ley Road","Flicked Pages","Deep Inkwell"],"cc_chrono":["Patient Hands","Long Pendulum","Wider Hour","Belfry Clock","Recall","Long Way Back","Leaden Minutes","Lent Time","Endless Hour","Late Arrival","Second Hand","Timekeeper","The Hour Strikes","Road of Hours","Ticking Hand","Saved Seconds","Leaden Pull"],"cc_maren":["Quick Draw","Long Step","Wide Arc","Practice Yard","Rift Chain","Long Chain","Hamstring","Shared Edge","Long Unbinding","Cut the Fallen","Light Feet","Blade of the Conclave","Unbound Blade","Duelling Ground","Flowing Cuts","Steady Breath","Chain to Blade"],"rootmother":["Patient Earth","Long Vines","Deep Grip","Old Stones","Rootway","Bramble Grasp","Thorned Roots","Sap Song","Heartwood Sapling","Strangling Hold","Sap Rising","Rootmother","The Old Wood Walks","Ancient Ground","Quick Tendrils","Deep Sap","Sapling Song"],"thornbow":["Steady Draw","High Boughs","Wide Rain","Root Platform","Farshot","Barbed Shafts","Thorn Rain","Hunter’s Patience","Blood Moon","Rooted Quarry","Second Wind","Warden’s Mark","Hunter’s Moon","Watchtower Bough","Fletcher's Pace","Forest Breath","Moonlit Aim"],"hivemother":["Ripe Seeds","Drifting Pods","Wide Haze","Compost","Moth Swarm","Thick Garden","Sticky Pollen","Pollen Drift","Overripe","Rot Bloom","Swarm Song","Seedmother","Full Bloom","Old Growth","Busy Hive","Honey Store"],"ih_thane":["Locked Shields","Iron Reach","Wall of the Clan","Stonefoot","Horn of the Hold","Braced Heels","Dented Plate","Shield-Brother","Deep Roots","Hammer on Anvil","War Cry","Unbroken Line","Rising Peaks","Holds the Pass","Clan Drill","Thane's Reserve"],"ih_artificer":["Quick Assembly","Rifled Bore","Wider Arc","Workbench","Lodestone","Stronger Field","Barbed Rivets","Oil Can","Counterweight","Magnetised","Overpressure","Chain Drive","Wrecking Ball","Firing Line","Oiled Gears","Spare Cells"],"ih_brewer":["Short Fuse","Strong Arm","Heavy Barrel","Cellar Door","Firewater Breath","Double Measure","Sticky Stout","Free Round","Brimming Keg","Tavern Brawl","Last Call","Landlady","Last Orders","Beer Garden","Quick Pour","Cask Reserve"],"so_lion":["Spurred On","Long Lance","Wide Wedge","Ford Stones","Lion's Roar","Standard-Bearer","Trampling Host","Rallying Banner","Royal Due","Debt of Lions","Pride","Lion of the Ford","The Lion's Due","The Ford Itself","Lion's Pace","Prayer at Arms"],"so_dawn":["Early Dawn","Clear Sky","Wide Dawn","Cloister Wall","Prism of Dawn","Lingering Star","Searing Light","Hymn of Mending","Noonday","Blinding Glare","Radiant Hymn","Dawnsinger","High Noon","Sunlit Road","Morning Haste","First Light Store","Noon Bell"],"so_judge":["Swift Justice","Long Arm of the Law","Ready Ledger","Court of Stone","Debt Collection","Iron Chains","Mark of Guilt","Witnesses Called","Wide Reckoning","Proof","Clerk’s Haste","Grey Justicar","Final Verdict","The King’s Road","Swift Gavel","Patient Court","Quick Ruling"],"sb_caller":["Heavy Clouds","Long Staff","Wide Sky","Standing Stone","Thunder Drum","Long Roll","Drenching Storm","Drum of the Host","Gathering Thunder","Conduction","Quickening Gale","Storm Caller","Tomorrow's Storm","High Plateau","Gusting Staff","Rainwell"],"sb_wind":["Patient Wind","Far Winds","Wide Funnel","Windbreak","Stoneward Gale","Wide Gale","Biting Gale","Feather Gift","Long Road Back","Hard Landing","Rising Gust","Windspeaker","Turn the Road","Wind Along the Road","Whirling Steps","Calm Eye","Rising Air"],"sb_beast":["Old Calls","Keen Nose","Long Hunt","Den Stone","Wolfsong","Heel Biters","Pack Hunger","Shared Kill","Storm Wings","Sky Hunter","Spirit Run","Beastcaller","Thunderbird’s Talons","Hunting Ground","Pack Pace","Hunter's Breath","Hunter's Stride"],"wb_varic":["Patient Oath","Long Reach","Wide Ring","Oathstone Ward","Hold Fast","Long Vigil","Heavy Hand","Shared Watch","Wider Gate","Measured Blow","Steady Pace","Last Warden","The Last Gate","The Road Remembers","Old Discipline","Spare Breath"],"wb_aedric":["Eager Sun","Long Lance","Wide Wheel","Banner Post","Sun Charge","Longer Ride","Searing Wheel","Rallying Cry","Brighter Blaze","Ride Them Down","Hot Blood","Sun-Sworn","Blaze of Glory","Open Road","Spurs","Battle Fever"],"wb_isaura":["Ready Vow","Long Blade","Wide Vow","Stone Witness","Binding Sweep","Tighter Bonds","Heavy Vow","Shared Vow","Wider Toll","Held Fast","Quiet Step","Veiled Oath","Oath Turned","Sworn Road","Measured Sweeps","Calm Breath"]}};
+const TAL_NAMES_V4 = {"f":{"grove":{"glaive":["Long Haft","Hold the Line","Set Spears","Shieldsplitter","Thornhedge","Bloodthorn","Rootbreaker","Phalanx","Wall of Spears","Impaler","Spearwood Rising","Thornburst","Skewer","Splintered Line","Deep Thrust","Living Haft","Thornwall Ward"],"arrow":["Patient Hunter","Canopy Sight","Mark the Quarry","Thornpoint Arrows","Paired Shafts","Thornseed Arrow","Heartseeker","Snaring Shot","Pinning Shot","Thornrain","Nailing Shaft","Still Quarry","Wounded Prey","Canopy Volley","Quick Nock","Hunter's Rhythm","Hushed Quarry"],"frost":["Deep Roots","Thorned Vines","Clinging Briars","Thorn Hold","Sapdraw","Heartwood Staff","Grasp of the Deep","Second Snare","Bramble Squeeze","Spreading Roots","Bloodbriar","Rootburst","Overgrowth","Strangleroot","Warden's Reach","Sapwell","Quickening Sap"],"arcane":["Heavy Lance","Trample","Wheel About","Bowl Over","Run to Ground","Mark of the Hunt","Bounding Leap","White Hart's Hunt","Lord of the Glade","Hooves of Thunder","Hunter's Finish","Second Charge","Goring Antlers","Long Gallop","Stag's Wind","Herd Instinct"],"storm":["Owl's Reach","Ground Watch","Wing-Clipper","Bramble Claws","Primal Pounce","Owl's Mark","Grounded Prey","Moonsap Bolts","Skyfall","Shapestorm","Second Skin","Harrier's Cry","Owl Lord","Ever-Changing","Wild Pace","Druid's Patience","Talon Rend"],"earth":["Leaf-Edged Blades","Wide Whirl","Flowing Steps","Tripping Blades","Blade Rhythm","Threading Dance","Thorn Dance","Bladestorm","Encore","Twin Whirl","Gale of Blades","Reaper's Step","Quickstep","Dancer's Breath","Petal Cuts"],"cannon":["Potent Spores","Ripe Pods","Choking Spores","Seed Scatter","Hard Husk","Clinging Spores","Puffcap Sowing","Snapjaw Bloom","Spore Cloud","Bursting Rot","Bramble Patch","Rootmark Seed","Drifting Spores","Far Cast","Seedwell","Thorned Husks","Burrowing Pods"],"venom":["Hunter's Patience","Barbed Darts","Quick Quiver","Lone Prey","Long Severance","Sap Thief","Bramble Snare","Briar Gibbet","Silent Stalk","Deep Snare","Thornmark Trail","Choking Thorns","Snare Line","Apex Stalker","Barren Ground","Unseen Hunter"]},"conclave":{"glaive":["Measured Cuts","Long Step","Lone Duel","Starsteel","Riposte Stance","Charged Edge","Long Sigil","Blinkstep","Thousand Edges","Crosscut Sigil","Fifth Form","Phase Dancer","Ghostblade Rush","Weaver's Blade","Runed Edge","Binding Cut","Swift Recovery"],"arrow":["Twin Casting","Scrying Lens","Missile Swarm","Homing Runes","Apprentice's Zeal","Missile Curtain","Echoing Missiles","Spark Battery","Gathering Orb","Unstable Charge","Orb Lattice","Study the Weave","Rune Reader","Arcane Torrent","Inkwell","Barrage Drill","Static Sparks"],"frost":["Biting Cold","Wide Glyphs","Flash Freeze","Scrivener's Hand","Entomb","Brittle Rime","Hoarfrost Trail","Glacier Script","Rime Lattice","Rime Field","Lingering Rime","Cold Library","Absolute Stillness","Steady Glyphwork","Rimewell","Needle Rime","Splintering Rime"],"arcane":["Long Second","Tick Forward","Borrowed Time","Heavy Hours","Backward Hour","Paradox","Stopped Clock","Quickening Bell","Frozen Moment","Hourglass Heart","Echo","Rewound Wounds","Arcane Clockwork","Borrowed Hour","Pendulum Swing","Hourglass Reserve","Patient Hours"],"storm":["Wide Heavens","Star-Chart","Falling Fragments","Skybreaker","Comet","Lodestar","Grounded Stars","Zodiac","Starfall Sky","Twin Stars","Grand Orrery","Twinkling Ice","Frost Lens","Turning Spheres","Night Sight","Starwell","Ill Omen"],"earth":["Broad Palms","Second Tremor","Staggering Blow","Mana Quarry","Heave","Shatterground","Magma","Runic Core","Living Bulwark","Fault Line","Obsidian","Avalanche Arm","Ember Stone","Living Mountain","Granite Fists","Runic Reservoir","Glyph Anchor"],"cannon":["Slow-Burning Ink","Wide Blast","Pyre Scribe","Fire Feeds Mana","Firewalk","Cinder Charge","Skipping Flame","Road of Embers","Ember Heart","Pyre Lord","Rolling Inferno","Hearthguard","Searing Tide","Long Throw","Ember Breath","Wardburn","Kindled Fingers"],"venom":["Keen Crescent","Long Reach","Rune of Undoing","Quick Severing","Ward Feedback","Returning Crescent","Splintering","Sever the Link","Seeking Edge","Arcane Memory","Rend the Veil","Shatterpoint","Brimming Severance","Void Ground","Unravelling Veil","Wardbreaker"]},"ironhold":{"glaive":["Heavy Shoulders","Bearded Axe","Ringing Rim","Through the Plate","Bowling Shove","Spinning Shield","Hot Shards","Shield Rush","Armourbreaker","Breaker's Blow","Brace and Shove","Locked Line","Plate-Splitter","Hold the Pass","Steady Axe","Miner's Wind","Shove Drill"],"arrow":["Rifled Bores","Range-Finder","Long Belt","Called Shot","Rattlegun","Hot Loads","Kneecapper","Black Powder","Gatling Crank","Breaching Slug","Quick Swab","Ramrod Rhythm","Case-Hardened","Quick Reload","Powder Pouch","Pinning Rounds","Called Volley"],"frost":["Weighted Chains","Leaded Bolas","Trap Line","Tangle","Tripwire","Bound and Broken","Fast Knots","Dragnet","Harpoon Winch","Bear Trap","Wide Nets","Hooked Chain","Spiked Caltrops","Strong Arm","Trapper's Patience","Barbed Chain","Reeling Chain"],"arcane":["Searing Brand","Deep Brand","Brand Chain","Swift Inscription","Ringing Anvil","Masterwork Strike","Rune of Making","Rune of Unmaking","Rune Lord","Forgefire Ring","Runic Overflow","Forge Heat","Runebrand Detonation","Steady Hammer","Rune Reservoir","Unwarding Runes","Shared Runes"],"storm":["Tall Elevation","Fast Fuses","Wing Shredder","Chain-Fed","Sky Shatter","Grapnel Shot","Tracer Rounds","Starshell","Endless Belt","Shellstorm","High Fuse","Ground Burst","Hot Shrapnel","Shrapnel Cones","Belt Feed","Reel In"],"earth":["Tight Valves","Cracking Blows","Scalding Steam","Rivet Popper","Piston Rhythm","Pile Driver","Echoing Slam","Groundsplitter","Molten Rivets","Steam Uppercut","Tremor Step","Safety Valve","Ram Line","Wide Anvil","Pressure Gauge","Quick Hammer","Venting Pipes"],"cannon":["Heavy Charges","Elevation Tables","Rattling Blast","Pitch-Soaked Wadding","Skipping Shell","Double Crew","Firestorm","Big Bertha","Creeping Barrage","The Long Drop","Shrapnel Casing","Quake Shell","Walking Fire","Napalm","Quick Loader","Powder Store","Clinging Fire"],"venom":["Long Pole","Shaped Charges","Quick Hands","Sapper's Ration","Black Powder Pack","Cracked Plate","Powder Trail","Rubble","Short Fuse","Steady Crew","Long Trail","Demolition","Siege Master","Collapse","Breach and Clear","Chain Demolition"]},"silver":{"glaive":["Braced Line","Witness the Blow","Staggering Bash","Shield of Faith","Vigil","Edge of Dawn","Rampart of Dawn","Oath of Challenge","Wall of Shields","Oath of Rebuke","Unyielding","Ringing Shield","Unbroken Oath","Drilled Swordarm","Squire's Prayer","Dawn Shield","Rising Aegis"],"arrow":["Windlass","Witnessed","Twin Quarrels","Armour-Breaker","Flare Bolt","Heavy Quarrel","Slow Match","Deep Mark","Writ of Execution","Bear Witness","Through and Through","Bodkin Heads","Open Ledger","Storm of Silver","Quick Crank","Steady Prayer","Pinning Light"],"frost":["Heavy Links","Long Chains","Tight Bindings","Dazzle","Twin Chains","Chain of Penance","Scouring Light","Sister's Patience","Blinding Chains","Chain of Judgement","Vigil Chains","Quick Binding","Shackle Litany","Shackled Road","Swift Lash","Vigil Lamp","Glare of Dawn"],"arcane":["Destrier's Stride","Couched Lance","Spurs","Grail Quest","Tourney Passes","Shining Example","Trampling Hooves","Charge of the Vow","Echoing Verdict","Glory of the Charge","Rallying Vow","Vowkeeper","Unhorse","Fresh Mounts","Rider's Prayer","Unhorsing Ride"],"storm":["Zenith","Morning Rays","Sky Verdict","Fall from Grace","Prism","Kindled Faith","Noon Sweep","Dawnfall","Lance of Heaven","Noon Descent","Dawnward","Sunburst","Judgement Ray","Far Sight","Dawn Prayer","Piercing Dawn","Sun Wheel"],"earth":["Broad Swing","Crushing Weight","Tremor","Anvil","Zeal","Hammer Fervour","Hammer of Judgement","Shockwave","Final Judgement","Hammer of Heaven","Sundering Blow","Marked by the Hammer","Hurled Verdict","Hammer Drill","Reliquary","Templar's Rhythm","Consecrated Earth"],"cannon":["Wide Censer","Lingering Smoke","Glowing Coal","Swift Swing","Scattered Coals","Procession of Incense","Choking Smoke","Kindle the Censers","Censing of the Faithful","Ember Psalm","Thick Smoke","Purging Fire","Rekindling","Long Chain","Incense Store","Swinging Chain","Censing Prayer"],"venom":["Long Seal-Chain","Scorching Seal","Heavy Silence","Swift Censure","Zealot's Vow","Writ of Seizure","Prayer of Silence","Sealed Tongues","Shield of Doctrine","Writ of Iron","Heretic's Stake","Penitent Chains","Confession","Pyre Eternal","Inquisitor General","Ashes Speak","Grand Inquest"]},"stormborn":{"glaive":["Long Ash Spear","Hunting Bond","Hock Bite","Storm-Iron Tips","Pack Tactics","Scent of Rain","Gathered Charge","Wolf and Spear","Spirit Pack","Moonfang Pounce","Stormpin","Guard the Pass","Grounding Spear","Thunder Haft","Storm-Iron Points","Hunting Lope","Howl of Haste"],"arrow":["Long Draw","Through and Through","Quick Wind","Gust Fletching","Headwind","Driving Wind","Featherfall","Skyward Gust","Skyrend","Lightning Fletch","Rain Arrows","Rainshot","Hurricane Volley","Sky-Eyes","Windwell","Gale Eddy"],"frost":["Heavy Hail","Cold Snap","Brittle Cold","Sleet","Glacial Totems","Bitter Rain","Black Ice","Skystone","Frozen Through","Frostbound Totem","Ice Crust","Frost Lightning","Hail Shatter","Cold Clouds","Hailwell","Shattering Hail","Totem Chill"],"arcane":["Long Gaze","Deep Hex","Lingering Spirits","Spirit Weight","Judgment","Ancestors' Toll","Ancestral Patience","The Long Memory","Spirit Host","Spirit Walk","Renewed Hex","Spirit Echo","Den Mother","Spirit Draw","Ancestor's Store","Ancestral Focus","Final Reckoning"],"storm":["Rolling Thunder","Static Field","Conductor","Overcharge","Skybolt","Arc Bridge","Stormcaller","Living Storm","Last Spark","Lightning Rod","Ground Current","Split Sky","Copper Crown","Long Leap","Thunderwell","Wardsplitter Bolts","Thunder Wings"],"earth":["Heavy Tread","Deep Fissures","Earthen Totems","Rattled","Stonewake","Shake Loose","Rolling Earth","Riftmaker","Sinkhole","Thunderstomp","Rift Rhythm","Mud and Rain","Bison Run","Second Tremor","Slow Stone","Drumming Feet","Deep Rift"],"cannon":["Long Clouds","Wide Clouds","Gathering Cloud","Heavy Rain","Storm Dance","Static Clouds","Rain Dance","Skyleap","Cloudburst","Rolling Clouds","Leaping Squall","Sky Strike","Sky Lattice","Far Dance","Cloudwell","Drenching Pour","Rainmaker"],"venom":["Eagle Eye","Long Cord","Quick Cast","Sky Lore","Ground Stake","Charged Harpoons","Drenching Barbs","Heavy Air","Many Cords","Skyfall Harpoon","Pinned to Earth","Thunderhead","Fallen Sky","Storm-Tethered","Master of the Sky"]},"wardbound":{"glaive":["Long Greatsword","Deep Carving","Heavy Edge","Oathsworn Cut","Sword and Stone","Vigil Breath","Rune Cleave","Unbroken Line","Hold Fast","Bright Wards","Final Oath","Oath of Iron","Linebreaker","Unyielding","Oathfire","Graven Oaths","Wide Wards"],"arrow":["Great Longbow","Masked Sight","Rune-Etched Heads","Pinning Draw","Quiet Breath","Volley Drill","Piercing Shaft","Falling Stars","Line Shot","Long Shaft","Nocked Again","Warding Arrow","Twin Shafts","Arrow of Judgement","Sentinel's Arrow","Beacon Arrow"],"frost":["Heavy Halberd","Wide Sweep","Long Frost","Bitter Steel","Rime Drill","Snowmelt","Frostbite","Winter Ward","Rimecut","Deep Bite","Long Winter","Shatter Oath","Cold Vigil","Biting Wind","Winter's Line","Glacial Brand","Rime Crown"],"arcane":["Long Stylus","Lingering Ink","Ward-Cutting Script","Deep Script","Quick Etching","Inkwell","Detonate","Ink of Binding","Sigil Ward","Chain Reaction","Scribe the Road","Double Stroke","Volatile Script","Great Script","Cascade","Road of Sigils","Runesight"],"storm":["Long Lance","Thunder Hooves","Branding Sparks","Forked Pennon","Storm Pennant","Stormdraught","Spur and Lance","Cracking Pennant","Thunderbrand","Skyfall","Charge Through","Pennant Call","Gathering Storm","Sky's Answer","Thunder Oath","Stormwake","Eye of the Storm"],"earth":["Broad Shield","Iron Rhythm","Deep Quake","Restless Earth","Braced Shove","Anvil Breath","Quake Line","Wall of Shields","Shield Brand","Fault Line","Anvil Stance","Rune-Shaker","Aftershock","Unmoving","Great Anvil","Anvil Oath","Mountain's Weight"],"cannon":["Long Windlass","Wide Blast","Heavy Bolts","Long Pin","Crank Drill","Steady Crew","Rune Shot","Chain Bolt","Pinned and Branded","Kindled Runes","Iron Tether","Bolt Sequence","Shatter Shot","Rearm","Tethering Spikes","Ballista Volley","Burning Pins"],"venom":["Wide Censer","Steady Cuts","Deep Mending","Thick Smoke","Sworn Vow","Chaplain's Breath","Siege-Ward","Oath Renewed","Censer Brand","Rite of Holding","Vow of Iron","Ember Vow","Long Rite","Keeper of Vows","Sanctuary","Holy Ground"]}},"h":{"cc_arch":["Quick Quill","Starlit Reach","Wide Barrage","Library Wall","Unravel","Loose Threads","Runic Drag","Shared Lesson","Deeper Loom","Woven Edge","Charged Hands","Spellweaver","Sixfold Loom","Ley Road","Flicked Pages","Deep Inkwell"],"cc_chrono":["Patient Hands","Long Pendulum","Wider Hour","Belfry Clock","Recall","Long Way Back","Leaden Minutes","Lent Time","Endless Hour","Late Arrival","Second Hand","Timekeeper","The Hour Strikes","Road of Hours","Ticking Hand","Saved Seconds","Leaden Pull"],"cc_maren":["Quick Draw","Long Step","Wide Arc","Practice Yard","Rift Chain","Long Chain","Hamstring","Shared Edge","Long Unbinding","Cut the Fallen","Light Feet","Blade of the Conclave","Unbound Blade","Duelling Ground","Flowing Cuts","Steady Breath","Chain to Blade"],"rootmother":["Patient Earth","Long Vines","Deep Grip","Old Stones","Rootway","Bramble Grasp","Thorned Roots","Sap Song","Heartwood Sapling","Strangling Hold","Sap Rising","Rootmother","The Old Wood Walks","Ancient Ground","Quick Tendrils","Deep Sap","Sapling Song"],"thornbow":["Steady Draw","High Boughs","Wide Rain","Root Platform","Farshot","Barbed Shafts","Thorn Rain","Hunter’s Patience","Blood Moon","Rooted Quarry","Second Wind","Warden’s Mark","Hunter’s Moon","Watchtower Bough","Fletcher's Pace","Forest Breath","Moonlit Aim"],"hivemother":["Ripe Seeds","Drifting Pods","Wide Haze","Compost","Moth Swarm","Thick Garden","Sticky Pollen","Pollen Drift","Overripe","Rot Bloom","Swarm Song","Seedmother","Full Bloom","Old Growth","Busy Hive","Honey Store"],"ih_thane":["Locked Shields","Iron Reach","Wall of the Clan","Stonefoot","Horn of the Hold","Braced Heels","Dented Plate","Shield-Brother","Deep Roots","Hammer on Anvil","War Cry","Unbroken Line","Rising Peaks","Holds the Pass","Clan Drill","Thane's Reserve"],"ih_artificer":["Quick Assembly","Rifled Bore","Wider Arc","Workbench","Lodestone","Stronger Field","Barbed Rivets","Oil Can","Counterweight","Magnetised","Overpressure","Chain Drive","Wrecking Ball","Firing Line","Oiled Gears","Spare Cells"],"ih_brewer":["Short Fuse","Strong Arm","Heavy Barrel","Cellar Door","Firewater Breath","Double Measure","Sticky Stout","Free Round","Brimming Keg","Tavern Brawl","Last Call","Landlady","Last Orders","Beer Garden","Quick Pour","Cask Reserve"],"so_lion":["Spurred On","Long Lance","Wide Wedge","Ford Stones","Lion's Roar","Standard-Bearer","Trampling Host","Rallying Banner","Royal Due","Debt of Lions","Pride","Lion of the Ford","The Lion's Due","The Ford Itself","Lion's Pace","Prayer at Arms"],"so_dawn":["Early Dawn","Clear Sky","Wide Dawn","Cloister Wall","Prism of Dawn","Lingering Star","Searing Light","Hymn of Mending","Noonday","Blinding Glare","Radiant Hymn","Dawnsinger","High Noon","Sunlit Road","Morning Haste","First Light Store","Noon Bell"],"so_judge":["Swift Justice","Long Arm of the Law","Ready Ledger","Court of Stone","Debt Collection","Iron Chains","Mark of Guilt","Witnesses Called","Wide Reckoning","Proof","Clerk’s Haste","Grey Justicar","Final Verdict","The King’s Road","Swift Gavel","Patient Court","Quick Ruling"],"sb_caller":["Heavy Clouds","Long Staff","Wide Sky","Standing Stone","Thunder Drum","Long Roll","Drenching Storm","Drum of the Host","Gathering Thunder","Conduction","Quickening Gale","Storm Caller","Tomorrow's Storm","High Plateau","Gusting Staff","Rainwell"],"sb_wind":["Patient Wind","Far Winds","Wide Funnel","Windbreak","Stoneward Gale","Wide Gale","Biting Gale","Feather Gift","Long Road Back","Hard Landing","Rising Gust","Windspeaker","Turn the Road","Wind Along the Road","Whirling Steps","Calm Eye","Rising Air"],"sb_beast":["Old Calls","Keen Nose","Long Hunt","Den Stone","Wolfsong","Heel Biters","Pack Hunger","Shared Kill","Storm Wings","Sky Hunter","Spirit Run","Beastcaller","Thunderbird’s Talons","Hunting Ground","Pack Pace","Hunter's Breath","Hunter's Stride"],"wb_varic":["Patient Oath","Long Reach","Wide Ring","Oathstone Ward","Hold Fast","Long Vigil","Heavy Hand","Shared Watch","Wider Gate","Measured Blow","Steady Pace","Last Warden","The Last Gate","The Road Remembers","Old Discipline","Spare Breath"],"wb_aedric":["Eager Sun","Long Lance","Wide Wheel","Banner Post","Sun Charge","Longer Ride","Searing Wheel","Rallying Cry","Brighter Blaze","Ride Them Down","Hot Blood","Sun-Sworn","Blaze of Glory","Open Road","Spurs","Battle Fever"],"wb_isaura":["Ready Vow","Long Blade","Wide Vow","Stone Witness","Binding Sweep","Tighter Bonds","Heavy Vow","Shared Vow","Wider Toll","Held Fast","Quiet Step","Veiled Oath","Oath Turned","Sworn Road","Measured Sweeps","Calm Breath"]}};
 
 function talNamesNow() {
   const o = {}; if (typeof TALENTS === 'undefined') return o;
@@ -46438,6 +46453,7 @@ function talNamesOld(force, hero) {
 // a talent renamed in place (the same talent, a new name): its saved ranks follow it
 const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (the Pyroclasts' spell row, 8 Nov 2026)
   'Primal Pounce': 'Primal Swipe',   // (the Grove Shifters' spell 2, renamed 18 Nov 2026)
+  "Hawk's Reach": "Owl's Reach", "Hawk's Mark": "Owl's Mark", 'Hawk Lord': 'Owl Lord',   // (the Shifters' bird form became an owl, 18 Nov 2026)
   'Undertow Rune': 'Tidemoon',   // (the Mageling's rune became an orb sent out over the road, 14 Nov 2026)
   // (the Anvilwrights' talents and spells off runes, onto the forge, 17 Nov 2026)
   'Swift Inscription': 'Swift Tempering', 'Rune of Making': 'Tempering', 'Rune of Unmaking': 'Unmaking Blow', 'Rune Lord': 'Forgelord',
@@ -47796,7 +47812,7 @@ const BR_DATA = {
   gladebow: ['Longbow|reach .6', 'Thornseed Tips|shred 1.5 6', 'Piercing Shaft|pierce .45 2'],
   briarwarden: ['Grasping Echo|specho .25', 'Strangling Grip|spmark .12 2; spctl .2', 'Wither Spread|spjump .5; spshred 2 6'],
   staglancer: ['Running Charge|pierce .5 2', 'Trample|slow .2 1.5; nth 5 1.6', 'Long Gallop|reach .5; far .2'],
-  wayfarer: ['Keen Hawk|reach .5', 'Primal Fury|haste .2', "Stalker's Mark|mark .1 3"],
+  wayfarer: ['Keen Owl|reach .5', 'Primal Fury|haste .2', "Stalker's Mark|mark .1 3"],
   bladedancer: ['Wide Arc|reach .35; splash .3', 'Encore Tempo|spcd .22; spslow .2 1.2', 'Corner Dancer|cover .05'],
   seedcaster: ['Wide Sowing|splash .35', 'Choking Spores|slow .3 1.5; sppow .1', 'Snapjaw Field|stun .1 .5; nth 5 1.6'],
   bogwitch: ['Long Spit|reach .4', 'Hungry Fen|specho .25', 'Black Water|spshred 2 8'],
@@ -48833,7 +48849,7 @@ const TAL_SPREAD = {
   "grove.arrow": {"Patient Hunter":[2,1],"Canopy Sight":[1,3],"Mark the Quarry":[2,2],"Thornpoint Arrows":[0,2],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[1,0],"Snaring Shot":[3,2],"Pinning Shot":[5,1],"Thornrain":[5,2],"Nailing Shaft":[4,0],"Still Quarry":[4,3],"Wounded Prey":[4,1],"Splitting Shaft":[5,0],"Quick Nock":[0,1],"Hunter's Rhythm":[1,1],"Hushed Quarry":[3,0]},
   "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[2,2],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[3,3],"Bramble Squeeze":[4,2],"Spreading Roots":[1,2],"Bloodbriar":[2,1],"Rootburst":[3,1],"Overgrowth":[5,0],"Strangleroot":[5,2],"Warden's Reach":[3,0],"Sapwell":[4,3],"Quickening Sap":[0,1]},
   "grove.arcane": {"Heavy Lance":[0,2],"Trample":[2,2],"Wheel About":[0,0],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[1,3],"Hooves of Thunder":[5,2],"Hunter's Finish":[5,3],"Second Charge":[3,3],"Goring Antlers":[0,1],"Long Gallop":[2,3],"Stag's Wind":[1,1],"Herd Instinct":[4,0]},
-  "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Swipe":[1,2],"Hawk's Mark":[2,3],"Grounded Prey":[4,0],"Moonsap Bolts":[2,0],"Skyfall":[5,2],"Shapestorm":[3,0],"Second Skin":[1,1],"Harrier's Cry":[4,2],"Hawk Lord":[5,1],"Wild Heart":[5,3],"Wild Pace":[0,0],"Druid's Patience":[0,1],"Talon Rend":[3,2]},
+  "grove.storm": {"Owl's Reach":[4,1],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Swipe":[1,2],"Owl's Mark":[2,3],"Grounded Prey":[4,0],"Moonsap Bolts":[2,0],"Skyfall":[5,2],"Shapestorm":[3,0],"Second Skin":[1,1],"Harrier's Cry":[4,2],"Owl Lord":[5,1],"Wild Heart":[5,3],"Wild Pace":[0,0],"Druid's Patience":[0,1],"Talon Rend":[3,2]},
   "grove.earth": {"Leaf-Edged Blades":[0,1],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,2],"Blade Rhythm":[1,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,1],"Encore":[4,2],"Twin Whirl":[3,0],"Gale of Blades":[4,1],"Reaper's Step":[5,3],"Quickstep":[2,2],"Dancer's Breath":[0,3],"Petal Cuts":[3,2]},
   "grove.cannon": {"Potent Spores":[1,1],"Ripe Pods":[1,0],"Choking Spores":[0,2],"Seed Scatter":[3,0],"Hard Husk":[4,2],"Clinging Spores":[4,3],"Puffcap Sowing":[2,0],"Snapjaw Bloom":[3,3],"Spore Cloud":[5,0],"Bursting Rot":[5,1],"Puffcap Trail":[5,2],"Rootmark Seed":[4,1],"Drifting Spores":[1,3],"Far Cast":[2,2],"Seedwell":[2,3],"Thorned Husks":[0,1],"Burrowing Pods":[3,1]},
   "champ:rootmother": {"Patient Earth":[0,1],"Long Vines":[0,2],"Deep Grip":[0,0],"Twin Elders":[5,1],"Rootway":[1,1],"Bramble Grasp":[2,1],"Thorned Roots":[1,2],"Sap Song":[3,0],"Heartwood Sapling":[3,2],"Strangling Hold":[4,3],"Sapling Warden":[4,0],"Rootmother":[5,3],"The Old Wood Walks":[2,2],"Thousand Roots":[5,2],"Quick Tendrils":[1,3],"Deep Sap":[3,3],"Sapling Song":[4,1]},
@@ -49386,24 +49402,24 @@ function talRankSteps(t) {
 
   /* ---- Grove Shifters ---- */
   talPlain('grove', 'storm', {
-    'Hawk\'s Reach': { tag: 'Damage', pro: n => `In hawk form its talons reach ${n2(.4 * n)} cells farther at flyers.` },
+    'Owl\'s Reach': { tag: 'Damage', pro: n => `In owl form its talons reach ${n2(.4 * n)} cells farther at flyers.` },
     'Wildwood Tithe': { tag: 'Mana', pro: n => `Each strike at a held or spored foe restores ${n} mana.` },
     // one effect: Primal Swipe's hold, 0.75s a rank (its hawk talons' grounding cut; it is the spell's upgrade below it)
     'Wing-Clipper': { tag: 'Control', pro: n => `Primal Swipe holds its foe ${n2(.75 * n)}s longer.`, cap: null, sp: n => ({ ab: 'wildstrike', by: { hold: .75 * n } }) },
     'Bramble Claws': { tag: 'Damage', pro: n => `In bear form its mauls bleed the foe for ${20 * n}% of the hit over 3s.` },
     'Primal Swipe': { tag: 'Control' },
     // one effect: a free Shift Form after each Swipe (was readied, then 70% cheaper for 4s)
-    'Hawk\'s Mark': { tag: 'Spell', pro: 'Each Primal Swipe readies Shift Form, free for the next 4s.',
+    'Owl\'s Mark': { tag: 'Spell', pro: 'Each Primal Swipe readies Shift Form, free for the next 4s.',
       sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -1 }] },
     'Grounded Prey': { tag: 'Spell', pro: n => `Shapestorm hits grounded flyers and held foes ${25 * n}% harder.` },
     'Moonsap Bolts': { tag: 'Damage', pro: n => `In sage form each bolt strips 1 armour for 4s, up to ${2 * n}.` },
-    'Skyfall': { tag: 'Control', pro: 'In hawk form, every 4th strike at a flyer hits ×3, stuns it 1s and drags it down 2.5s.' },
+    'Skyfall': { tag: 'Control', pro: 'In owl form, every 4th strike at a flyer hits ×3, stuns it 1s and drags it down 2.5s.' },
     'Shapestorm': { tag: 'Damage' },
     // one effect: the first strike in each new form lands twice (Shift Form's longer arrival cut)
     'Second Skin': { tag: 'Damage', pro: 'Its first strike in each new form lands twice.', sp: null },
     // one effect: each Shapestorm brings Shift Form 4s nearer a rank (Shapestorm sooner for each new form cut)
     'Harrier\'s Cry': { tag: 'Spell', pro: n => `Each Shapestorm takes ${4 * n}s off Shift Form's wait.`, cap: null, sp: n => ({ ab: 'wildsurge', ready: ['shift', 4 * n] }) },
-    'Hawk Lord': { tag: 'Damage', pro: 'A spirit hawk dives on a foe in reach every 1.5s, flyers first, for 150% of a strike.' },
+    'Owl Lord': { tag: 'Damage', pro: 'A spirit owl dives on a foe in reach every 1.5s, flyers first, for 150% of a strike.' },
     'Wild Heart': { tag: 'Growth', pro: 'Each change of form adds 40 Growth.' },
     'Wild Pace': { tag: 'Damage', pro: n => `In bear form its mauls come ${5 * n}% faster while 2 or more ground foes are in reach.` },
     'Druid\'s Patience': { tag: 'Mana', pro: n => `Gains ${n2(.4 * n)} mana a second in sage form.` },
@@ -83338,8 +83354,8 @@ const SPELL_BRIEFS = {
   heroiccharge: 'Charges up to 1.5 cells past its range, dealing {d} (50% more to bosses and elites). An enemy another unit holds takes ×1.6.',
   stampede: ({ d, v, full }) => { const m = /up to ([\d.]+) cells away/.exec(String(full).replace(/<[^>]+>/g, '')); return `Leaps onto a ground enemy up to ${m ? m[1] : '4'} cells away (your units and walls block it), dealing ${d(1)}. Ground enemies within 0.8 cells take ${d(2)}.`; },
   runthrough: 'Charges {n} times. Each deals {d}, or {d2} to an enemy another unit has rooted or stunned.',
-  wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Strikes in the form needed. Hawk: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: a wide claw swipe across its front, hitting its target and every ground enemy in the arc. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
-  wildsurge: 'Strikes once in each form. Hawk: {d}, dragging down for 2 sec. Bear: {d2} to the toughest ground enemy, bowling it 0.3 cells back. Sage: {d3} to every enemy in a line, slowing {slowPct} for 2 sec.',
+  wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Strikes in the form needed. Owl: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: a wide claw swipe across its front, hitting its target and every ground enemy in the arc. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
+  wildsurge: 'Becomes owl, bear and sage in turn, striking once in each form. Owl: {d} to the toughest flyer, dragging it down for 2 sec. Bear: {d2} to the toughest ground enemy, rooting it for 1 sec. Sage: {d3} to every enemy in a line, slowing {slowPct} for 2 sec.',
   whirlwind: 'Spins {n} times, 0.5 sec apart. Each deals {d} to every ground enemy in range and slows 25%. No basic attacks while spinning.',
   leafdance: 'Darts through up to {n} ground enemies within 2.2 cells, dealing {d} each, then slows them all 30% for 2 sec.',
   harvest: 'Afterimages strike every ground enemy the Dancers hit in the last 6 sec for {d} (double if rooted). Each strike gives the Dancers 4 Growth.',
@@ -83446,7 +83462,7 @@ const SPELL_BRIEFS = {
   sb_spiritshield: 'Nearby allies gain a {kPct} durability shield for {dur}s. Clears silence and hex.',
   sb_ancestorgift: 'Nearby allies gain {mana} mana. Cooldowns advance 2s; adds eight Storm.',
   /* grove */
-  shift: 'Shifts into the form the fight needs (tap to hold one), striking on arrival. Hawk: drags the 2 nearest flying enemies down for {dur} sec ({d}). Bear: {d2} and a 35% slow to nearby ground enemies. Sage: {d3} around its target, stripping 2 armour.',
+  shift: 'Shifts into the form the fight needs (tap to hold one), striking on arrival. Owl: drags the 2 nearest flying enemies down for {dur} sec ({d}). Bear: {d2} and a 35% slow to nearby ground enemies. Sage: {d3} around its target, stripping 2 armour.',
   bw_swarm: 'Sends biting insects onto one enemy, ground or air, for {dur} sec: {d} every 0.5 sec, and it cannot be healed. When it dies they fly on to the nearest enemy, once.',
   bw_bogbody: 'Raises a Bog Body on the road for {dur} sec. Ground enemies cannot pass it and hack at it ({blows} blows). When it sinks it drags the nearest {n} under, held 1 sec, dealing {d}. Bosses wade past at half speed.',
   bw_bogdue: 'Opens a bog under the toughest ground enemy. Drowned arms drag it to the waist for {hold} sec, dealing {d} a second and pulling all its armour off; it climbs out slowed. Enemies crossing the bog are slowed and lose armour.',
@@ -84933,7 +84949,7 @@ const AFF_MODS = {
   // ---- the Grove ----
   rootmother: { fav: 'earth', sig: { name: 'Thorn Waltz', t: 'Blade Dancers cut rooted foes half again as hard.' },
     up: { frost: { k: 'root', v: .2 }, glaive: { k: 'reach', v: .1 } }, dn: { arrow: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
-  thornbow: { fav: 'storm', sig: { name: 'Hawk’s Stoop', t: 'Every 3rd strike a Grove Shifter lands on a flyer drags it low for 1.5 seconds, where every unit can reach it.' },
+  thornbow: { fav: 'storm', sig: { name: 'Owl’s Stoop', t: 'Every 3rd strike a Grove Shifter lands on a flyer drags it low for 1.5 seconds, where every unit can reach it.' },
     up: { arrow: { k: 'crit', v: .05 }, arcane: { k: 'range', v: .2 } }, dn: { cannon: { k: 'splash', v: -.1 }, earth: { k: 'reach', v: -.1 } } },
   hivemother: { fav: 'cannon', sig: { name: 'Spore Harvest', t: 'Each foe that dies carrying spores feeds the nearest Seedcaster, whose next pod strikes half again as hard (it stores up to 3).' },
     up: { arrow: { k: 'range', v: .2 }, frost: { k: 'spore', v: .25 } }, dn: { glaive: { k: 'rate', v: -.05 }, arcane: { k: 'range', v: -.2 } } },
@@ -86012,94 +86028,204 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -86108,75 +86234,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -87874,9 +88132,9 @@ const talArt = {};
 // a talent's painted icon (TALART, indexed by the talent's place in the old full tree, t.art); trees without paintings
 // use faction-specific paintings first, then existing paintings; unknown future entries retain a drawn fallback
 function talIconOf(type, t) {
-  // Exact close-up art for all six factions take priority for every node, including spells and shared trees.
-  const gk = FORCE_NOW + ':' + type + ':' + t.name;
-  if ((FORCE_NOW === 'grove' || FORCE_NOW === 'conclave' || FORCE_NOW === 'ironhold' || FORCE_NOW === 'stormborn' || FORCE_NOW === 'wardbound' || FORCE_NOW === 'silver') && typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents[gk]) return talArt[gk] = TALENT_PAINT.talents[gk];
+  // the Grove's spell talents show their own talent painting (the 9 Nov Grove handoff) ahead of the spell's art
+  const gk = 'grove:' + type + ':' + t.name;
+  if (t.spell && FORCE_NOW === 'grove' && talForce(type) && typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents[gk]) return talArt[gk] = TALENT_PAINT.talents[gk];
   if (t.spell && typeof ABIL !== 'undefined' && ABIL[t.spell]) {   // a spell talent shows its spell's painting (or its glyph)
     const ab = ABIL[t.spell], k = 'spell:' + ab.id;
     if (typeof UI_ART !== 'undefined' && UI_ART[ab.art || ab.id]) return UI_ART[ab.art || ab.id];
@@ -92805,7 +93063,9 @@ const SEQ_MESH={queue:[],n:1,P:null,draw(bloom){
                       (owner: "give his hits more weight")
        Pressure Slam  the melee combo's leap and ground smash: the hammer raised high, then smashed into the road ahead
                       at 0.35s (when the cast's blow lands), held there, and back
-       Steam Vent     the club clip's second blow, driving the pipe in, held on the road, heaved back up
+       Pile Driver    (dwPile) the hammer hefted up over his head, then driven down in short piston strokes, one onto
+                      the road on each of the spell's slams, his knees braced, steam venting from his tanks on each; the
+                      last slam's stroke lifted higher and held, then heaved back up
        Piston Drive   the melee combo's straight thrust, the head driven out level at 0.18s (when the line is struck)
      Every move is eased into from where he was (a per-unit pose followed at a rate by kind: quick in a blow, slow into rest).
    - The fire (hammerfire.js: the lab's solver, its flame and its grey smoke) comes out of the claw at the back of the head
@@ -92819,7 +93079,6 @@ const DW_UNIT = 'steamhammer';   // which unit the dwarf draws (one line: change
 UM_UNITS[DW_UNIT] = { mdl: 'steamhammer', k: 1.08, rig: 'dwarf' };
 const DW_CAST = {
   ih_pressureslam: { clip: 'combo', T: .95, land: .35, flare: 1.7, yaw: .84, keys: [[0, 50], [.2, 68], [.35, 81], [.58, 84], [.95, 100]] },
-  ih_steamvent: { clip: 'club', T: .8, land: .3, flare: 1, keys: [[0, 74], [.22, 84], [.3, 90], [.5, 90], [.8, 95]] },   // (held on the road, then heaved up: the clip's quick rebound off it, 90-92, read light)
   ih_pistondrive: { clip: 'combo', T: .75, land: .18, flare: 1.1, yaw: 1, keys: [[0, 12], [.18, 30], [.42, 31], [.75, 37]] },
 };
 // the strike, made heavy (owner: "give his hits more weight", then "could be smoother and carry more weight, dont like how he
@@ -92858,7 +93117,10 @@ if (typeof castAbility === 'function') {
   const _dwCast = castAbility;
   castAbility = function (t, ab) {
     const r = _dwCast.apply(this, arguments);
-    if (r && t && t.def && t.def.unit === DW_UNIT && t.ab && t.ab.last && typeof G !== 'undefined' && t.ab.lastAt === G.time) { t._dwAt = G.time; t._dwId = t.ab.last; }
+    if (r && t && t.def && t.def.unit === DW_UNIT && t.ab && t.ab.last && typeof G !== 'undefined' && t.ab.lastAt === G.time) {
+      t._dwAt = G.time; t._dwId = t.ab.last;
+      if (t._dwId === 'ih_steamvent') dwPileStart(t);
+    }
     return r;
   };
 }
@@ -92872,6 +93134,7 @@ function dwCtl(t, live, M) {
     if (t._dwAt != null && DW_CAST[t._dwId]) fl(t._dwAt + DW_CAST[t._dwId].land, DW_CAST[t._dwId].flare);
   }
   if (!live) return UM_SHOW != null ? { f: dwF(M, DW_REST.clip, DW_REST.f), rate: 0, flare: 0, act: 0, rest: 1, yaw: 0 } : { f: dwF(M, 'club', 0), rate: 0, flare: 0, act: 0 };   // (on the character sheet: his rest, the hammer over his shoulder, breathing)
+  const Q = dwPileNow(t); if (Q) return dwPile(t, M, Q, flare);
   const C = t._dwAt != null ? DW_CAST[t._dwId] : null, cu = C ? now - t._dwAt : 9;
   if (C && cu >= 0 && cu < C.T) { t._dwSt = ['cast', null]; return { f: dwF(M, C.clip, dwKeys(C.keys, cu)), rate: cu < .1 ? 18 : 40, flare, act: 1, yaw: C.yaw || 0 }; }
   const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, w = t.windup || 0, Y = DW_YAW.strike;
@@ -92909,6 +93172,85 @@ function dwKnee(s) {
   const a = Math.min(1, (s - DW_HIT) / .05), r = s < DW_HOLD ? 1 : Math.max(0, 1 - (s - DW_HOLD) / .45);
   return a * r * r * (3 - 2 * r);
 }
+// Pile Driver (ih_steamvent; the game's slams: forces_zzzzzz_ironhold_cool.js IHC_PD, the first 0.22s after the cast, then one
+// every 0.3s, 3 to 5 of them; Piston Rhythm's up to 4 more, each decided at the slam before) (owner: "need a new pile driver
+// animation that better illustrates the spell"). Its old move was one slam over 0.8s for a spell that slams up to five times:
+//   heft      over the cast bar the hammer is hefted up over his head (the club clip's back-swing to its top, 42), cocked
+//   drive     each slam a short piston stroke: down onto the road (51) in DW_PILE.drop, accelerating, landing on the slam;
+//             held a moment, then pumped back up to chest height (46) for the next; the last stroke of the cast is lifted
+//             high (43) for a heavier blow
+//   brace     his knees bent the whole time, as if planted over a pile, giving a little more on every stroke (all the
+//             way on the last), his back sinking over each blow
+//   vent      a jet of steam out of each of his twin tanks on every stroke (DW_PILE.tanks: their caps, model space)
+//   recover   after the last slam, held, then heaved back up (to the top in a fight, as after a blow; else to the guard)
+// His facing and the body's turn hold still from the heft to the end, so every stroke lands on the same spot.
+const DW_PILE = { first: .22, gap: .3, drop: .07, hold: .05, hi: 46, big: 43, end: .34, rec: .65, brace: .32, tanks: [[.105, .7, -.14], [-.105, .7, -.14]] };
+function dwPileStart(t) {   // at the cast: the slams it will make
+  const P = typeof IHC_PD !== 'undefined' ? IHC_PD : DW_PILE, n = Math.max(1, t.ihcPileN || 3), now = G.time;
+  t._dwPiles = []; for (let k = 0; k < n; k++) t._dwPiles.push(now + P.first + k * P.gap);
+  t._dwPileN = n; t._dwPileLA = t.ab.lastAt; t._dwPileVent = -1;
+  t._dwPileH0 = t._dwPileBar != null && now - t._dwPileBar < 2.5 ? t._dwPileBar : now; t._dwPileBar = null;
+}
+// the strokes now: { B (the slams' times), h0 (when the heft began), n (the cast's own slams) }, or null
+function dwPileNow(t) {
+  const now = G.time, A = t.ab, P = typeof IHC_PD !== 'undefined' ? IHC_PD : DW_PILE;
+  if (A && A.cast && A.cast.id === 'ih_steamvent' && now < A.cast.end) {   // (the cast bar: hefting already)
+    if (t._dwPileBar == null || t._dwPileBar < A.cast.at) t._dwPileBar = A.cast.at;
+    return { B: [A.cast.end + P.first], h0: A.cast.at, n: 1, bar: 1 };
+  }
+  const B = t._dwPiles; if (!B || !B.length) return null;
+  // (Piston Rhythm: the game moves the cast's moment on to say the hammer rises again, its slam 0.22s after)
+  if (A && A.last === 'ih_steamvent' && A.lastAt != null && A.lastAt !== t._dwPileLA && A.lastAt > B[0] - P.first + .05) { t._dwPileLA = A.lastAt; B.push(A.lastAt + P.first); }
+  if (now > B[B.length - 1] + DW_PILE.end + DW_PILE.rec || (G.phase !== 'wave' && now > B[B.length - 1] + DW_PILE.end)) { t._dwPiles = null; return null; }
+  return { B, h0: t._dwPileH0, n: t._dwPileN };
+}
+const dwSm = u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+// his move while driving piles (dwCtl's answer), and t._dwSt for the flame and the next blow
+function dwPile(t, M, Q, flare) {
+  const now = G.time, B = Q.B, D = DW_PILE;
+  let i = -1; while (i + 1 < B.length && B[i + 1] <= now) i++;
+  const brace = D.brace * dwSm((now - Q.h0) / .3), fight = G.phase === 'wave' && t.tg && !t.tg.dead;
+  const hiOf = j => j === Q.n - 1 && !Q.bar ? D.big : D.hi;   // (the stroke up to slam j)
+  // the drop onto slam j from F0: straight down, accelerating
+  const drop = (j, F0, knee) => {
+    const q = Math.max(0, (now - (B[j] - D.drop)) / D.drop), F = F0 + (DW_DOWN - F0) * q * q; t._dwSt = ['pdown', F];
+    if (t._dwPileSw !== B[j] && (j === 0 || j === Q.n - 1) && typeof sfx === 'function') { t._dwPileSw = B[j]; sfx('hamSwing', D.drop); }
+    return { f: dwF(M, 'club', F), rate: 0, flare, act: 1, yaw: DW_YAW.strike, knee };
+  };
+  if (i < 0) {   // the heft: up over his head, cocked, then the first stroke
+    const dAt = B[0] - D.drop;
+    if (now >= dAt) return drop(0, DW_TOP, brace);
+    const u = dwSm((now - Q.h0) / Math.max(.12, dAt - .04 - Q.h0)), F = DW_TOP * u; t._dwSt = ['pheft', F];
+    return { f: dwF(M, 'club', F), rate: u > .7 ? 24 : 12, flare, act: 1, yaw: DW_YAW.strike, cock: u > .9 ? (u - .9) / .1 : 0, knee: brace };
+  }
+  const s = now - B[i], last = i === B.length - 1, bigK = i === Q.n - 1 || last ? 1 : .55;
+  // the stroke landing: knees giving under it (in fast, let go over the stroke; the last held), the back sunk over it
+  const kick = Math.min(1, s / .04) * (last ? (s < D.end ? 1 : Math.max(0, 1 - (s - D.end) / D.rec)) : Math.max(0, 1 - s / .24));
+  const knee = brace * (last ? dwSm(1 - (s - D.end) / D.rec) : 1) + .75 * bigK * kick;
+  const imp = Math.max(0, 1 - s / (last ? D.end : .2)) * (.6 + .4 * bigK);
+  flare = Math.max(flare, (bigK === 1 ? 1.3 : .8) * Math.exp(-s / .22));
+  if (!last) {
+    const dAt = B[i + 1] - D.drop, l0 = B[i] + D.hold, hi = hiOf(i + 1), lift = v => DW_DOWN - (DW_DOWN - hi) * dwSm((v - l0) / Math.max(.05, dAt - .02 - l0));
+    if (now >= dAt) return drop(i + 1, lift(dAt), knee);
+    const F = s < D.hold ? DW_DOWN : lift(now); t._dwSt = [s < D.hold ? 'phold' : 'plift', F, s];
+    return { f: dwF(M, 'club', F), rate: 0, flare, act: 1, yaw: DW_YAW.strike, imp, knee };
+  }
+  // the last: held on the road, then heaved slowly back up (to the top if a foe is left, as after his blow; else the guard)
+  if (s < D.end) { t._dwSt = ['phold', DW_DOWN, s]; return { f: dwF(M, 'club', DW_DOWN), rate: 0, flare, act: 1, yaw: DW_YAW.strike, imp, knee }; }
+  if (fight) { const F = DW_DOWN - (DW_DOWN - DW_TOP) * dwSm((s - D.end) / D.rec); t._dwSt = ['prise', F, s]; return { f: dwF(M, 'club', F), rate: 14, flare, act: 1, yaw: DW_YAW.strike, knee }; }
+  t._dwSt = ['prec', DW_DOWN]; return { f: dwF(M, 'club', 0), rate: DW_UP, flare, act: 1, yaw: DW_YAW.strike, knee };
+}
+// the steam out of his tanks on each stroke (from his draw: the posed bones and his model-to-world matrix)
+function dwPileVent(t, o, W, M) {
+  const B = t._dwPiles; if (!B || typeof part !== 'function') return;
+  let i = -1; while (i + 1 < B.length && B[i + 1] <= G.time) i++;
+  if (i < 0 || i === t._dwPileVent || G.time - B[i] > .1) return; t._dwPileVent = i;
+  const big = i === t._dwPileN - 1 || i === B.length - 1, sp = M.R.bix.Spine2, low = typeof hfLoad === 'function' && hfLoad() > .6;
+  for (const c of DW_PILE.tanks) {
+    const p = umXf(o, sp, c), w = M4.xf(W, p[0], p[1], p[2]), n = (big ? 4 : 2) + (low ? 0 : 1);
+    for (let k = 0; k < n; k++) part({ k: 'smoke', x: w[0] + R_(-.02, .02), z: w[2] + R_(-.02, .02), h: w[1], vx: R_(-.25, .25), vz: R_(-.25, .25), vh: R_(1.1, 1.9) * (big ? 1.2 : 1), drag: 2.6, life: R_(.35, .6), max: .6, size: R_(.06, .1) * (big ? 1.3 : 1), col: '#ecebe6' });
+  }
+}
 // his facing as drawn: the game's (t.ang, turned to his foe as it moves) followed smoothly, but held still from the top of the
 // wind-up through the smash, the impact and most of the lift, so the blow lands where he stands and he turns to the next foe
 // only while the hammer goes back up
@@ -92920,7 +93262,7 @@ function dwFace(t, live) {
   const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, C = t._dwAt != null ? DW_CAST[t._dwId] : null, cu = C ? now - t._dwAt : 9;
   const fight = G.phase === 'wave' && t.tg && !t.tg.dead;
   // (held only for the last instant of the wind-up, so the blow comes down on where the foe is, not where it was)
-  const hold = (s >= 0 && s < DW_HOLD + DW_LIFT * .55) || (fight && (t.windup || 0) > .93) || (C && cu >= 0 && cu < C.T);
+  const hold = (s >= 0 && s < DW_HOLD + DW_LIFT * .55) || (fight && (t.windup || 0) > .93) || (C && cu >= 0 && cu < C.T) || (t._dwSt && t._dwSt[0][0] === 'p' && t._dwSt[0] !== 'prec');   // (and through Pile Driver)
   if (!hold) { const d = Math.atan2(Math.sin(a - t._dwAng), Math.cos(a - t._dwAng)); t._dwAng += d * (1 - Math.exp(-dt * 14)); }
   return t._dwAng;
 }
@@ -93007,6 +93349,7 @@ function dwDraw(t, tier, sx, sy, sz, wob, opts) {
     t._dwHV = t._dwHV ? t._dwHV.map((a, k) => a + (v[k] - a) * .5) : v; t._dwHP = hw; t._dwHT = G.time;
     t.tipW = hw; t.tipYaw = yaw; t.tipAt = G.time;
   }
+  if (live) dwPileVent(t, o, _dwC, M);
   const vw = H.vents.map(p => M4.xf(_dwC, p[0], p[1], p[2]));
   if (!icon) dwFire(t, hw, vw, s, P, heat, live);
   // (the gear sheet and the card's portraits draw no spells: there the hammer's red-hot lava face and iron alone show its heat;
@@ -93027,9 +93370,9 @@ const DWF = { RATE: 70, HEAT: 45, FLARE: 160, BALL: 3.6 };
 // The move's own clock, as the bake recorded it (sim/dw_tracks.py): a blow's wind-up is 0.6 s, the head lands at 0.6 s.
 const DWB = { FPS: 20, SCALE: .36, TRACK_S: 1.557, UP: .05, CAST: { ih_pressureslam: 'pressure', ih_steamvent: 'vent', ih_pistondrive: 'piston' } };
 // (the bakes follow the old timing: the wind-up the club clip's frames 0-47 eased over 0.6 s, then DW_BAKE_SLAM from the shot;
-// Steam Vent DW_BAKE_VENT. The moves were re-timed for weight (DW_TOP, DW_HOLD; Steam Vent's keys): each bake is read at the
+// Pile Driver reads the strike's (dwMoveNow). The moves were re-timed for weight (DW_TOP, DW_HOLD): each bake is read at the
 // moment its swing had the hammer where it is now, creeping on through a hold so the flame never stands still)
-const DW_BAKE_SLAM = [[0, 47], [.075, 51], [.22, 52], [.5, 58]], DW_BAKE_VENT = [[0, 74], [.22, 84], [.3, 89], [.5, 92], [.8, 99]];
+const DW_BAKE_SLAM = [[0, 47], [.075, 51], [.22, 52], [.5, 58]];
 function dwKeysInv(K, f) {   // a clip frame -> the seconds at which keys K first reached it
   if (f <= K[0][1]) return K[0][0];
   for (let i = 1; i < K.length; i++) if (f <= K[i][1]) { const a = K[i - 1], b = K[i]; return a[0] + (b[0] - a[0]) * (f - a[1]) / ((b[1] - a[1]) || 1); }
@@ -93039,11 +93382,13 @@ const dwInvS = y => .5 - Math.sin(Math.asin(1 - 2 * Math.max(0, Math.min(1, y)))
 const dwStrikeU = f => f <= 47 ? .6 * dwInvS(f / 47) : .6 + dwKeysInv(DW_BAKE_SLAM, f);
 function dwMoveNow(t) {
   const now = G.time, C = t._dwAt != null ? DW_CAST[t._dwId] : null, cu = C ? now - t._dwAt : 9;
-  if (C && cu >= 0 && cu < C.T) {
-    if (t._dwId !== 'ih_steamvent') return [DWB.CAST[t._dwId], cu];
-    const f = dwKeys(C.keys, cu), u = dwKeysInv(DW_BAKE_VENT, f);
-    return [DWB.CAST[t._dwId], cu <= .3 ? Math.min(.3, u) : cu < .5 ? .3 + (u - .3) * (cu - .3) / .2 : u];   // (the hold on the road: crept through to where the bake reached frame 90)
+  const S0 = t._dwSt;
+  if (S0 && S0[0][0] === 'p') {   // (Pile Driver: the strike's bake, each stroke down read at its frame, the hold and pump creeping on)
+    if (S0[0] === 'pdown' || S0[0] === 'pheft' || S0[0] === 'prise') return ['strike', dwStrikeU(S0[1])];
+    if (S0[0] === 'phold' || S0[0] === 'plift') return ['strike', .675 + .05 * Math.min(1, S0[2] / .3)];
+    return ['ready', -1];
   }
+  if (C && cu >= 0 && cu < C.T) return [DWB.CAST[t._dwId], cu];
   // (the strike as dwCtl last set it, t._dwSt: the smash and the impact read the bake's own blow; the slow lift the guard's
   // loop; the top, cocked, the bake's top creeping on)
   const s = t.ihSlamAt != null ? now - t.ihSlamAt : 9, mv = t._dwVent === t.ihSlamAt ? 'vstrike' : 'strike', S = t._dwSt;
@@ -93115,11 +93460,16 @@ function dwFire(t, hw, vw, s, P, heat, live) {
   if (RD && RD.lights && RD.lights.length < 6) { const I = .3 + .25 * heat + .7 * fl; RD.lights.push([hw[0], hw[1] + .05, hw[2], .7 + .3 * fl, 1.2 * I, .5 * I, .15 * I]); }   // (a modest pool: the field must stay readable)
 }
 // the landing of each blow: a puff of the lab's smoke and dust, a flash of the head's light, a crack under the face that struck
-function dwLand(t, K, big) {
+function dwLand(t, K, big, lite) {
   const hw = t._dwHP; if (!hw) return;
   // a puff of hot-iron dust and ash billowing out from under the face that struck (owner: "a puff of smoke (from the lab i
   // gave) when it smashes down": hammerfire.js's smoke, the lab's solver baked once)
   const fp = t._dwFace || [hw[0], 0, hw[2]];
+  if (lite) {   // (a pile stroke between: the flash and the sparks)
+    if (typeof flashLight === 'function' && G.flashes.length < 4) flashLight(hw[0], hw[2], hw[1] + .1, [.9, .3, .08], .45, .14);
+    if (typeof vfxBurst === 'function' && !(typeof hfLoad === 'function' && hfLoad() > .6)) vfxBurst({ x: fp[0], y: .06, z: fp[2], shape: 'point', sp: [.7, 1.8], up: [.5, 1.5], life: [.25, .5], size: [.009, .015], c0: vfxC('#ffa040', 1.15), c1: vfxC('#e0300a'), a0: 1, a1: 0, drag: 1.2, grav: 3.2, stretch: .035 }, 6);
+    return;
+  }
   if (typeof sfx === 'function') sfx('hamBurst', big > 1.2);
   // the steam gauge's payoff (a vented blow, Pressure Slam): the lab's fire bursting up into a column of smoke and sparks
   // (labfxdata.js ventplume, baked from its WebGPU fire), over the face that struck, not round him
@@ -93144,12 +93494,16 @@ if (typeof IH_EXTRA !== 'undefined' && IH_EXTRA[DW_UNIT]) {
     if (!VLIVE) return;
     if (t.ihSlamAt != null && t._dwLand !== t.ihSlamAt && now - t.ihSlamAt >= DW_HIT) { t._dwLand = t.ihSlamAt; if (now - t.ihSlamAt < .5) dwLand(t, K, t._dwVent === t.ihSlamAt ? 1.6 : 1); }
     if (t._dwAt != null && t._dwCastLand !== t._dwAt && DW_CAST[t._dwId] && now - t._dwAt >= DW_CAST[t._dwId].land) { t._dwCastLand = t._dwAt; if (now - t._dwAt < 1) dwLand(t, K, t._dwId === 'ih_pressureslam' ? 1.8 : 1.1); }
+    // (Pile Driver: each stroke's landing; the spell's own crack, dust and quake ring land with it, under the face. The
+    // strokes between are light, sparks and a flash only, so five in a row don't bury the field in smoke)
+    const B = t._dwPiles;
+    if (B) { let i = -1; while (i + 1 < B.length && B[i + 1] <= now) i++; if (i >= 0 && t._dwPileLand !== B[i]) { t._dwPileLand = B[i]; if (now - B[i] < .15) dwLand(t, K, i === t._dwPileN - 1 || i === B.length - 1 ? 1.2 : .7, i !== t._dwPileN - 1 && i !== B.length - 1); } }
   };
 }
 // the landing's dust goes under the face that struck (shSlamFx asks shFaceAt)
 if (typeof shFaceAt === 'function') {
   const _dwFaceAt = shFaceAt;
-  shFaceAt = function (t) { if (t && t._dwFace && typeof G !== 'undefined' && G && t._dwFaceAt === G.time) return t._dwFace; return _dwFaceAt.apply(this, arguments); };
+  shFaceAt = function (t) { if (t && t._dwFace && typeof G !== 'undefined' && G && G.time - t._dwFaceAt >= 0 && G.time - t._dwFaceAt < .07) return t._dwFace; return _dwFaceAt.apply(this, arguments); };   // (within a frame or so: the game's slams run in its update, after his last draw)
 }
 if (typeof drawForceUnitPlain === 'function') {
   const _dwPlain = drawForceUnitPlain;
@@ -96792,10 +97146,10 @@ const BEAR2 = (() => {
       if (s < CL.claw.len) return { c: 'claw', s: Math.max(0, s), rate: s < CH + .15 ? 0 : 18 };
     }
     if (!P_ && A && A.last === 'wildstrike' && A.lastAt != null && now - A.lastAt >= 0 && now - A.lastAt < CL.claw.len) return { c: 'claw', s: now - A.lastAt + CH - .15, rate: 0 };
-    const sb = t.gvcStormAt != null ? now - t.gvcStormAt - .5 : -9;   // Shapestorm's bear beat (.5 s in, its hit .16 s later): the slam's crash on it
-    if (t.form === 'bear' && sb >= 0 && sb < .5) return { c: 'slam', s: (CL.slam.hit || .6) - .16 + sb, rate: sb < .2 ? 0 : 18 };
+    const SB = typeof GVC_STORM !== 'undefined' ? GVC_STORM[1] : ['bear', .75, .36], sb = t.gvcStormAt != null ? now - t.gvcStormAt - SB[1] : -9;   // Shapestorm's bear beat: the slam's rear and crash, the crash on its hit
+    if (t.form === 'bear' && sb >= 0 && sb < .75) return { c: 'slam', s: (CL.slam.hit || .6) - SB[2] + sb, rate: sb < .45 ? 0 : 18 };
     const sh = t.shiftAt != null ? now - t.shiftAt - .12 : 9;   // (the bear blooms in from .15 s into the shift)
-    const spellShift = t.shiftAt != null && ((P_ && Math.abs(t.shiftAt - P_.at) < .02) || (t.gvcStormAt != null && t.shiftAt >= t.gvcStormAt - .01 && t.shiftAt <= t.gvcStormAt + 1.5));   // (a shift a spell made: no roar after its own move)
+    const spellShift = t.shiftAt != null && ((P_ && Math.abs(t.shiftAt - P_.at) < .02) || (t.gvcStormAt != null && t.shiftAt >= t.gvcStormAt - .01 && t.shiftAt <= t.gvcStormAt + (typeof GVC_STORM_T !== 'undefined' ? GVC_STORM_T : 2.2)));   // (a shift a spell made: no roar after its own move)
     if (t.form === 'bear' && !spellShift && sh >= 0 && sh < CL.roar.len) return { c: 'roar', s: sh, rate: sh < .1 ? 0 : 20 };
     // the mauls: which strike went (read the moment it goes) and which the next wind-up is for
     const n = t.maulN || 0;
@@ -96832,7 +97186,31 @@ const BEAR2 = (() => {
     const it = item(MESH_, _c, opts); it.sec = [0, US.trim != null ? US.trim : .08]; it.bones = OUT.slice();
     if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
     if (live) { const g = at(OUT, HEAD, TIP); t.tipW = M4.xf(_c, g[0], g[1], g[2]); t.tipYaw = ang; t.tipAt = G.time; t._brClipNow = P.c; }
+    if (live) clawTrail(t, P, K);
     return true;
+  }
+  /* Primal Swipe's claw streaks (owner, 18 Nov 2026: "the claw streaks following the paw's real path"): while the claw
+     clip rakes, the right forepaw's tip is sampled every frame, and three thin dim streaks are drawn along where it went
+     (one a claw, side by side across the paw), fading in a quarter second. They replace the three set sprites
+     forces_zx_grove_cool.js gvcClawFx draws for the code-built bear. */
+  const TRAIL_LIFE = .28, TRAIL_COL = [.62, .5, .36, 0], _ta = [0, 0, 0], _tb = [0, 0, 0];
+  function clawTrail(t, P, K) {
+    const now = G.time, Tr = t._clTr || (t._clTr = []);
+    if (P.c === 'claw' && P.s >= .12 && P.s <= .4 && R.bix.pawR != null) {
+      const b = R.bix.pawR, g = at(OUT, b, R.bones[b].t), w = M4.xf(_c, g[0], g[1], g[2]);
+      const l = Tr[Tr.length - 1]; if (!l || now - l.at > .004) Tr.push({ p: w, at: now });
+    }
+    while (Tr.length && now - Tr[0].at > TRAIL_LIFE) Tr.shift();
+    if (Tr.length < 2 || typeof QADD === 'undefined' || typeof RD === 'undefined' || !RD) return;
+    for (let i = 1; i < Tr.length; i++) {
+      const A = Tr[i - 1], B = Tr[i], dx = B.p[0] - A.p[0], dz = B.p[2] - A.p[2], dl = Math.hypot(dx, dz) || 1, sx = -dz / dl * .035 * K, sz = dx / dl * .035 * K;
+      const e = 1 - (now - B.at) / TRAIL_LIFE; if (e <= 0) continue;
+      TRAIL_COL[3] = .5 * e;
+      for (let k = -1; k <= 1; k++) {
+        _ta[0] = A.p[0] + sx * k; _ta[1] = A.p[1]; _ta[2] = A.p[2] + sz * k; _tb[0] = B.p[0] + sx * k; _tb[1] = B.p[1]; _tb[2] = B.p[2] + sz * k;
+        QADD.beam(RD, _ta, _tb, .014 * K * (.6 + .4 * e), TRAIL_COL);
+      }
+    }
   }
   try { load(typeof BEAR_MDL !== 'undefined' ? BEAR_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No sculpted bear:', e.message); }
   if (MESH_ && typeof umDraw === 'function') {
@@ -96842,7 +97220,7 @@ const BEAR2 = (() => {
       return _um.apply(this, arguments);
     };
   }
-  return { S, CL, load, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+  return { S, CL, load, ctl, draw, ready, trails: () => !!(MESH_ && S.on && ready() && typeof NEWMODELS !== 'undefined' && NEWMODELS), get R() { return R; }, get mesh() { return MESH_; } };
 })();
 // the Shifters' spell 2 was renamed Primal Swipe (owner, 18 Nov 2026): its talent's painting follows it (talentpaint.js is keyed
 // by the talent's name; this file loads after it)
@@ -97197,8 +97575,9 @@ const SAGE2 = (() => {
   function ctl(t, live) {
     if (!live || t._ghost) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : (typeof vt !== 'undefined' ? vt : 0), rate: 0 };
     const now = G.time, A = t.ab, sage = t.form === 'sage' || !t.form;
-    const st = t.gvcStormAt != null ? now - t.gvcStormAt - 1 : -9;   // Shapestorm: its sage beat, from the moment she appears
-    if (sage && st >= -.02 && st < CL.sweep.len) return { c: 'sweep', s: Math.max(0, st), rate: 0 };
+    const SG = typeof GVC_STORM !== 'undefined' ? GVC_STORM[2] : ['sage', 1.5, .3], st = t.gvcStormAt != null ? now - t.gvcStormAt - SG[1] : -9;   // Shapestorm: its sage beat; she arrives, then the sweep lands on its hit
+    const sw = st - (SG[2] - (CL.sweep.hit || .15));
+    if (sage && sw >= 0 && sw < CL.sweep.len) return { c: 'sweep', s: sw, rate: 0 };
     const P_ = t.gvcPounce;
     if (sage && P_ && P_.f === 'sage' && now - P_.at >= 0 && now - P_.at < CL.lance.len + .12) {   // Primal Pounce: the lance lands with the hit (.18 s, or .3 s when it shifted to strike)
       const sh = t.shiftAt != null && Math.abs(t.shiftAt - P_.at) < .02, s = now - P_.at - (sh ? .12 : 0);
@@ -97207,7 +97586,8 @@ const SAGE2 = (() => {
     if (sage && !P_ && A && A.last === 'wildstrike' && A.lastAt != null && now - A.lastAt >= 0 && now - A.lastAt < CL.lance.len) return { c: 'lance', s: now - A.lastAt, rate: 0 };
     const sh = t.shiftAt != null ? now - t.shiftAt : 9;
     if (!sage && sh >= 0 && sh < .2) return { c: 'shift', s: sh * 1.4, rate: 0 };           // folding away: the staff starts up
-    if (sage && sh >= 0 && sh < CL.shift.len + .12) return { c: 'shift', s: Math.max(0, sh - .12), rate: sh < .2 ? 0 : 18 };   // arriving: staff and hand raised
+    const stormShift = t.gvcStormAt != null && t.shiftAt != null && t.shiftAt >= t.gvcStormAt - .01 && t.shiftAt <= t.gvcStormAt + (typeof GVC_STORM_T !== 'undefined' ? GVC_STORM_T : 2.2);   // (Shapestorm's own shift: her arrival only until the sweep, none after it)
+    if (sage && sh >= 0 && sh < CL.shift.len + .12 && !(stormShift && sw >= 0)) return { c: 'shift', s: Math.max(0, sh - .12), rate: sh < .2 ? 0 : 18 };   // arriving: staff and hand raised
     // her strike: the bolt clip, its wind-up over t.windup and its flick from the moment the strike goes
     const s = t.shotT != null ? t.shotT : 9, w = t.tg ? t.windup || 0 : 0, W = CL.bolt.wind || .5;
     if (s < CL.bolt.len - W && !(w > .02 && s > .25)) return { c: 'bolt', s: W + s, rate: s < .15 ? 0 : 22 };
@@ -97272,6 +97652,237 @@ const SAGE2 = (() => {
   }
   return { S, CL, load, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
 })();
+
+/* The Grove Shifters' bird form on the owner's sculpted owl (18 Nov 2026: "new owl ... for shifter"). tools/make_owl.py ->
+   src/model_owl.js: the sculpt ("Woodland Owl - Feather Relief") decimated to 6,000 triangles on a 1024 atlas, a 14-bone
+   bird rig made from scratch, 8 clips at 30 frames a second. It draws in place of the code-built great hawk (model
+   'druid_hawk', forces_grove_druid.js) wherever that is drawn: over its mossy stump at the post, out on a sortie
+   (druidSortie: the bird itself flies at the flyer it strikes), the gear sheet and the build ghost. The form's name, its
+   text and its gameplay are untouched: this file only draws. `?owl=old` shows the code-built hawk.
+   Its moves, by the cues the game already keeps:
+     idle    over its stump, nothing in reach: a slow hover, two deep beats then a glide, its head snapping round (4 s loop)
+     ready   a foe in reach: hovering hard, quicker beats, talons a little forward (1.2 s loop)
+     cast    over t.windup before a strike, its first .12 s (wings gathered up and back), then the sortie leaves; Primal
+             Swipe as the bird and Shapestorm's bird beat: up, and the wings snapped down as the hit lands (.2 s in)
+     shift   Shift Form: arriving wings wide and high, settling into the hover; the same rise as it folds away
+   On a sortie (forces_grove_druid.js druidHawkAt places and turns it along the flight; these are the body's moves):
+     fly     the beats out and home          stoop   the last of the dive: wings tucked, talons thrown forward
+     rake    from the moment the talons land: raked through, the wings flared over its quarry
+     grab    every 3rd talon strike at a flyer (the one that drags it low): talons locked on, borne down on heavy beats
+   Every move is eased into from where it was (bone by bone), except a strike's own frames, which snap. */
+const OWL2 = (() => {
+  const U = 'druid_hawk', NAMES = ['idle', 'ready', 'fly', 'stoop', 'rake', 'grab', 'cast', 'shift'];
+  const K0 = .95;                // its wingspan in the unit's own size (K): about a cell across
+  const PERCH = .44, LIFT = -.05;  // (in K) its hips' height over the stump (the hawk's: DRUID_HAWK_Y), a little under that: its talons just clear of the stump's top
+  const S = { on: true };
+  try { S.on = !/[?&]owl=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, SPAN = 1;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2] + out[g + 3], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2] + out[g + 7], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2] + out[g + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'owl', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('owl: too many bones');
+    if (R_.bix.hips == null || R_.bix.head == null) throw new Error('owl: no hips or head');
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('owl: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('owl: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    SPAN = 2 * Math.abs(R.bones[R.bix.wingCL].t[0]) || 1;
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('owl: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.75, -.3, -.75]; m.max = [.75, .9, .75];   // (room for the beats and a level flight along z)
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+  const idleNow = () => ({ c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : (typeof vt !== 'undefined' ? vt : 0), rate: 0 });
+
+  /* over its stump: { c: clip, s: seconds into it, rate (the ease toward it, per second; 0 snaps) } */
+  function ctl(t, live) {
+    if (!live || t._ghost) return idleNow();
+    const now = G.time, A = t.ab, bird = t.form === 'hawk', HT = CL.cast.hit || .2;
+    const sh = t.shiftAt != null ? now - t.shiftAt : 9;
+    if (!bird && sh >= 0 && sh < .2) return { c: 'shift', s: sh * 1.4, rate: 0 };   // folding away: the wings start up
+    const P_ = t.gvcPounce;   // Primal Swipe as the bird: the downstroke as the hit lands (.18 s; .3 s when it shifted to strike)
+    if (bird && P_ && P_.f === 'hawk' && now - P_.at >= 0) {
+      const shifted = t.shiftAt != null && Math.abs(t.shiftAt - P_.at) < .02, s = now - P_.at + HT - (shifted ? .3 : .18);
+      if (s < CL.cast.len) return { c: 'cast', s: Math.max(0, s), rate: s < HT + .1 ? 0 : 18 };
+    }
+    const st = t.gvcStormAt != null ? now - t.gvcStormAt - .01 : -9;   // Shapestorm's bird beat: it blooms on its stump gathering its wings, then flies out at its flyer (a sortie: druidExtra draws it)
+    if (bird && st >= 0 && st < .5) return { c: 'cast', s: Math.min(st, CL.cast.wind || .12), rate: 14 };
+    if (bird && !P_ && A && A.last === 'wildstrike' && A.lastAt != null && now - A.lastAt >= 0 && now - A.lastAt < CL.cast.len) return { c: 'cast', s: now - A.lastAt + HT - .2, rate: 0 };
+    const spellShift = t.shiftAt != null && ((P_ && Math.abs(t.shiftAt - P_.at) < .02) || (t.gvcStormAt != null && t.shiftAt >= t.gvcStormAt - .01 && t.shiftAt <= t.gvcStormAt + (typeof GVC_STORM_T !== 'undefined' ? GVC_STORM_T : 2.2)));
+    if (bird && !spellShift && sh >= 0 && sh < CL.shift.len + .12) return { c: 'shift', s: Math.max(0, sh - .12), rate: sh < .2 ? 0 : 18 };   // arriving: wings wide and high
+    const w = t.tg ? t.windup || 0 : 0;
+    if (w > 0) return { c: 'cast', s: (CL.cast.wind || .12) * w, rate: 20 };   // gathering to fly
+    const s = t.shotT != null ? t.shotT : 9;
+    const engaged = G.phase === 'wave' && ((t.tg && !t.tg.dead) || s < 2.5);
+    if (engaged) return { c: 'ready', s: now + (t.anim || 0) * 3, rate: 6 };
+    return { c: 'idle', s: now + (t.anim || 0) * 7, rate: 3 };
+  }
+  /* out on a sortie (DSORT, forces_grove_druid.js): its body's move along the flight, and whether the path's pitch tilts it */
+  function ctlFly(t, now) {
+    const Sx = typeof DSORT !== 'undefined' && DSORT.get(t); if (!Sx) return { c: 'fly', s: now, rate: 0, tilt: 1 };
+    const du = now - Sx.at;
+    if (du < Sx.out) { const u = du / Sx.out; return u < .72 ? { c: 'fly', s: du * 1.2, rate: 25, tilt: 1 } : { c: 'stoop', s: (u - .72) / .28 * CL.stoop.len, rate: 30, tilt: 1 }; }
+    const k = Sx.grab ? 'grab' : 'rake', s = du - Sx.out;
+    if (s < CL[k].len) return { c: k, s, rate: s < .05 ? 0 : 30, tilt: 0 };
+    return { c: 'fly', s: du * 1.2, rate: 8, tilt: 1 };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const scaleOf = (K, tr) => { const US = (typeof UM_UNITS !== 'undefined' && UM_UNITS[U]) || {}; return K * (US.k != null ? US.k : K0) / SPAN * (1 + .025 * Math.max(0, tr - 2)); };
+  const place = s => M4.trs(_b, -H[HIPS * 3] * s, -H[HIPS * 3 + 1] * s, -H[HIPS * 3 + 2] * s, 0, 0, 0, s, s, s);   // (its hips at the place given)
+  // pose t's bird by clip P (eased on t from where it was) and draw it with the model matrix _c
+  function pose(t, P, live, opts) {
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    sample(CL[P.c], P.s, PT);
+    let p = PT;
+    if (live && !t._ghost) {
+      const now = G.time, dt = t._owT == null ? 1 : Math.max(0, Math.min(.1, now - t._owT)); t._owT = now;
+      if (!t._owP || t._owP.q.length !== NB * 4) { t._owP = newPose(); t._owP.q.set(PT.q); t._owP.t.set(PT.t); }
+      follow(t._owP, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); p = t._owP;
+      t._owClip = P.c;
+    }
+    toBones(p, OUT);
+    const US = (typeof UM_UNITS !== 'undefined' && UM_UNITS[U]) || {};
+    const it = item(MESH_, _c, opts); it.sec = [0, US.trim != null ? US.trim : .1]; it.bones = OUT.slice();
+  }
+  // on its stump at the post: the stump (the code-built body's base and its low layer), the bird hovering over it
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    if (L && L.base && L.base.count) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(L.base, _a, opts); }
+    if (L && L.low && L.low.count) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(L.low, _a, opts); }
+    if (live && !t._ghost && typeof druidAway === 'function' && druidAway(t)) return true;   // (out on a sortie: druidExtra draws it in flight)
+    const s = scaleOf(K, tr);
+    M4.trs(_a, x, (PERCH + LIFT) * K * sy, z, yaw + wob, 0, 0, sx, sy, sz); place(s); M4.mul(_c, _a, _b);
+    pose(t, ctl(t, live), live, opts);
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    return true;
+  }
+  // in flight (druidHawkAt: where it is, its heading and the path's pitch): its hips where the hawk's body was
+  function drawFly(t, h, K) {
+    if (!ready()) return false;
+    const P = ctlFly(t, G.time), s = scaleOf(K, t.tier | 0);
+    M4.trs(_a, h.p[0], h.p[1] + LIFT * K, h.p[2], h.yaw, P.tilt ? h.pitch * .8 : 0, 0, 1, 1, 1); place(s); M4.mul(_c, _a, _b);
+    pose(t, P, true);
+    return true;
+  }
+  try { load(typeof OWL_MDL !== 'undefined' ? OWL_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No sculpted owl:', e.message); }
+  const on = () => MESH_ && S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS;
+  const oops = e => { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('owl:', e); } };
+  if (MESH_ && typeof umDraw === 'function') {
+    const _um = umDraw;
+    umDraw = function (t, u) {
+      if (u === U && on()) { try { if (draw.apply(this, arguments)) return true; } catch (e) { oops(e); } }
+      return _um.apply(this, arguments);
+    };
+  }
+  // the sortie: whether this strike is the grab (every 3rd talon strike at a flyer drags it low), and the bird in flight
+  let CUR = null;
+  if (MESH_ && typeof druidSortie === 'function' && typeof druidExtra === 'function' && typeof druidDrawHawk === 'function') {
+    const _so = druidSortie, _ex = druidExtra, _dh = druidDrawHawk;
+    druidSortie = function (t, tg) {
+      _so.apply(this, arguments);
+      const Sx = typeof DSORT !== 'undefined' && DSORT.get(t); if (Sx) Sx.grab = !!(tg && tg.fly && !(tg.lowT > G.time) && ((t.talonN || 0) + 1) % 3 === 0);
+    };
+    druidExtra = function (t) { CUR = t; try { return _ex.apply(this, arguments); } finally { CUR = null; } };
+    druidDrawHawk = function (h, K) {
+      if (CUR && on()) { try { if (drawFly(CUR, h, K)) return; } catch (e) { oops(e); } }
+      return _dh.apply(this, arguments);
+    };
+  }
+  // the build ghost (view.js drawGhost): when the next wave calls for the bird, the owl over its stump, see-through
+  if (MESH_ && typeof druidGhostMesh === 'function') {
+    const _gm = druidGhostMesh; let EMPTY = null, GT = null;
+    druidGhostMesh = function (ty) {
+      const m = _gm.apply(this, arguments); if (!m || !on() || !ready() || typeof G === 'undefined' || !G || !G.ghost) return m;
+      if (DRUID_FORMS[druidWaveForm()].model !== U) return m;
+      try {
+        const ok = G.ghost.ok, x = G.ghost.i + .5, zz = G.ghost.j + .5, K = unitK(U, 0);
+        if (typeof druidMesh === 'function') druidMesh(U, 0);
+        GT = GT || { _ghost: true, ang: 0, tier: 0 }; GT.x = x; GT.y = zz; GT.def = TOWERS[ty];
+        const opts = { alpha: .55, shadow: false, tint: ok ? [.9, 1.15, .9, .05] : [1.3, .6, .55, .05] };
+        if (!draw(GT, U, 0, K, { y: 0 }, x, zz, 0, 0, 0, 1, 1, 1, opts, (typeof FSPLIT !== 'undefined' && FSPLIT[U + 0]) || null, m)) return m;
+        if (!EMPTY) EMPTY = new Geo(1).finish();
+        return EMPTY;
+      } catch (e) { return m; }
+    };
+  }
+  return { S, CL, load, ctl, ctlFly, draw, drawFly, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+// the Shifters' bird form became an owl (owner, 18 Nov 2026: "yes rename it to owl"): its talents' paintings follow their new
+// names (talentpaint.js is keyed by the talent's name; this file loads after it)
+try {
+  const P_ = typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents;
+  if (P_) for (const [o, n] of [["Hawk's Reach", "Owl's Reach"], ["Hawk's Mark", "Owl's Mark"], ['Hawk Lord', 'Owl Lord']]) { const a = 'grove:storm:' + o, b = 'grove:storm:' + n; if (P_[a] && !P_[b]) P_[b] = P_[a]; }
+} catch (e) {}
 
 /* The Ironbreakers on a rig and clips made from scratch (the owner, 18 Nov 2026: "shieldbreaker model", rigged and animated:
    the dwarf, his axe in his right hand, his shield on his left arm). His mesh is the owner's "Dwarven Shieldbreaker" (a
@@ -108944,9 +109555,9 @@ const SPELL_HELP = {
   runthrough: { when: "A boss or elite in reach, or two or more ground foes within {reach} cells.", aim: "Each charge: the toughest ground foe in reach. One another unit holds is run through for double.", ctl: "Hunts for about 2s: no other strikes meanwhile.", tips: ["Cast it on a boss another unit holds: every charge runs it through for double.", "Post the Lancers within the Briarwardens' roots: every charge at a held ground foe is a run-through.", "The Lancers hold nothing themselves: without a Thornguard pin or a root beside them, each charge is a plain one."] },
 
   // Grove Shifters (wayfarer)
-  shift: { when: "When what is in sight (up to 1.6 cells past its range) calls for another form. Hawk: flyers are a third of it. Bear: 3 or more soft ground foes within 2.2 cells. Sage: anything else.", aim: "Itself. Arriving, the hawk drags the 2 nearest flyers down, the bear roars at ground foes within 1.6 cells, the sage bursts moonlight round the toughest armoured foe or caster.", ctl: "Tap Shift to hold Hawk, Bear or Sage (it shifts as soon as mana and cooldown allow); Auto lets it choose again.", tips: ["Leave it on Auto for mixed waves; hold Hawk for flyer waves so it doesn't fall back to sage between flocks.", "Hold Bear at a tight bend right beside the path: its mauls cleave ground foes, but it cannot reach flyers.", "Every shift costs mana, so a held form saves mana for Primal Swipe and Shapestorm."] },
-  wildstrike: { when: "One foe within {reach} cells plus half a cell is enough (a little farther from bear form).", aim: "A flyer still in the air first (the hawk), then the toughest armoured foe or caster (the sage), then the toughest ground foe (the bear); it takes that foe's form as it strikes.", ctl: "A held form swipes in that form, at that form's quarry.", tips: ["Leave the form on Auto: the swipe shifts it for free, so Shift Form's mana goes further.", "As bear it rakes a wide claw arc across its front: its quarry is rooted, and every ground foe in the arc is clawed too. Best when they bunch up in front of it.", "As hawk it drags a flyer low enough for every unit to reach: the answer to a lone flying boss."] },
-  wildsurge: { when: "Three or more foes within {reach+1.5} cells, or a boss or elite there.", aim: "The hawk: the toughest flyer still in the air, else the toughest foe. The bear: the toughest ground foe. The sage: the straight lane out to {reach} cells through the most foes.", ctl: "About 1.5s: no basic attacks meanwhile. It ends in the form the fight wants (or the held form).", tips: ["Post the Shifters where flyers, ground foes and plate all pass, beside a straight run for the sage's lane.", "The hawk grounds flyers, so the sage's moon-thorns strike grounded foes: take Grounded Prey.", "It costs no Shift Form mana to wear all three shapes, so it suits a Shifter held in one form."] },
+  shift: { when: "When what is in sight (up to 1.6 cells past its range) calls for another form. Owl: flyers are a third of it. Bear: 3 or more soft ground foes within 2.2 cells. Sage: anything else.", aim: "Itself. Arriving, the owl drags the 2 nearest flyers down, the bear roars at ground foes within 1.6 cells, the sage bursts moonlight round the toughest armoured foe or caster.", ctl: "Tap Shift to hold Owl, Bear or Sage (it shifts as soon as mana and cooldown allow); Auto lets it choose again.", tips: ["Leave it on Auto for mixed waves; hold Owl for flyer waves so it doesn't fall back to sage between flocks.", "Hold Bear at a tight bend right beside the path: its mauls cleave ground foes, but it cannot reach flyers.", "Every shift costs mana, so a held form saves mana for Primal Swipe and Shapestorm."] },
+  wildstrike: { when: "One foe within {reach} cells plus half a cell is enough (a little farther from bear form).", aim: "A flyer still in the air first (the owl), then the toughest armoured foe or caster (the sage), then the toughest ground foe (the bear); it takes that foe's form as it strikes.", ctl: "A held form swipes in that form, at that form's quarry.", tips: ["Leave the form on Auto: the swipe shifts it for free, so Shift Form's mana goes further.", "As bear it rakes a wide claw arc across its front: its quarry is rooted, and every ground foe in the arc is clawed too. Best when they bunch up in front of it.", "As owl it drags a flyer low enough for every unit to reach: the answer to a lone flying boss."] },
+  wildsurge: { when: "Three or more foes within {reach+1.5} cells, or a boss or elite there.", aim: "The owl: the toughest flyer still in the air, else the toughest foe. The bear: the toughest ground foe. The sage: the straight lane out to {reach} cells through the most foes.", ctl: "About 2.2s, a beat for each form (owl, then bear, then sage): no basic attacks meanwhile. It ends in the form the fight wants (or the held form).", tips: ["Post the Shifters where flyers, ground foes and plate all pass, beside a straight run for the sage's lane.", "The owl grounds flyers, so the sage's moon-thorns strike grounded foes: take Grounded Prey.", "It costs no Shift Form mana to wear all three shapes, so it suits a Shifter held in one form."] },
 
   // Blade Dancers (bladedancer)
   whirlwind: { when: "Two or more ground foes within {reach} cells, or a boss or leader among them.", aim: "Itself: every ground foe within its reach, at every whirl.", ctl: "Spins 1.5s (3s by tier VI): no basic attacks or other spells while it spins.", tips: ["Best where the path wraps round the Dancers, so ground foes stay in reach for every whirl.", "Its 25% slow keeps them in the spin; Thornhedge or Grasp of the Deep nearby holds them longer.", "Ground foes only: leave flyers to the Rangers and the Shifters' hawk."] },
@@ -111290,7 +111901,7 @@ const TUT_CH = [
     intro: 'Bats come. Your maze is all ground fighters. Sound the horn and see what they do.',
     pre: { grove: [['glaive', 5, 3, 0], ['earth', 4, 3, 0], ['frost', 6, 7, 0], ['glaive', 5, 7, 0]], ironhold: [['glaive', 5, 3, 0], ['earth', 4, 3, 0], ['cannon', 6, 7, 0], ['glaive', 5, 7, 0]] },
     lesson: { all: 'Flyers fly straight down the middle, over every wall. Only units that reach the air can hit them. A flyer dragged low can be hit by anyone for a moment.',
-      grove: 'Build {arrow} or {storm} near the middle. The {storm} hawk form drags flyers low.',
+      grove: 'Build {arrow} or {storm} near the middle. The {storm} owl form drags flyers low.',
       ironhold: 'Build {arrow}, {storm} or {frost} near the middle. {frost} nets drag a flyer low; [ih_grapnel] hauls them down.' },
     fix: { gold: 150, grove: { slots: ['arrow', 'storm'], need: 3, build: [['storm', 6, 3], ['storm', 4, 7], ['arrow', 7, 7], ['arrow', 3, 3], ['arrow', 3, 7]] },
       ironhold: { slots: ['arrow', 'storm', 'frost', 'arcane'], need: 2, build: [['arrow', 6, 3], ['storm', 4, 7], ['arrow', 7, 7], ['arrow', 3, 3]] } },
