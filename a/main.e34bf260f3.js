@@ -1,4 +1,4 @@
-const BUILD_TAG = 'e956096@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'e956096+@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -87890,9 +87890,9 @@ const talArt = {};
 // a talent's painted icon (TALART, indexed by the talent's place in the old full tree, t.art); trees without paintings
 // use faction-specific paintings first, then existing paintings; unknown future entries retain a drawn fallback
 function talIconOf(type, t) {
-  // the Grove's spell talents show their own talent painting (the 9 Nov Grove handoff) ahead of the spell's art
-  const gk = 'grove:' + type + ':' + t.name;
-  if (t.spell && FORCE_NOW === 'grove' && talForce(type) && typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents[gk]) return talArt[gk] = TALENT_PAINT.talents[gk];
+  // Exact close-up art for all six factions take priority for every node, including spells and shared trees.
+  const gk = FORCE_NOW + ':' + type + ':' + t.name;
+  if ((FORCE_NOW === 'grove' || FORCE_NOW === 'conclave' || FORCE_NOW === 'ironhold' || FORCE_NOW === 'stormborn' || FORCE_NOW === 'wardbound' || FORCE_NOW === 'silver') && typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents[gk]) return talArt[gk] = TALENT_PAINT.talents[gk];
   if (t.spell && typeof ABIL !== 'undefined' && ABIL[t.spell]) {   // a spell talent shows its spell's painting (or its glyph)
     const ab = ABIL[t.spell], k = 'spell:' + ab.id;
     if (typeof UI_ART !== 'undefined' && UI_ART[ab.art || ab.id]) return UI_ART[ab.art || ab.id];
