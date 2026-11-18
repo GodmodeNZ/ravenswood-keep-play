@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ef052b8+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9f504c1+@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16365,7 +16365,7 @@ FORCE_ATTACK.thundergun = function (t, st, tg, pow, echo) {
   ihFlash(mz[0], mz[2], mz[1], .7); ihSmokePuff(mz[0], mz[2], mz[1], 3);
   if (!tg.dead) ihSparks(tg.x, tg.y, hitH(tg), 4, '#ffe8c0');
   if (!echo) { ihHeatStrike(t, st); if (t.ihSwab > 0) { t.ihSwab--; st.rate *= .5; } }
-  t.recoil = 1; sfx('rifle', 0);
+  t.recoil = 1; sfx('tgShot');
 };
 
 // ---- Chain Trappers: a bola that slows the foe furthest along; every 4th throw a chain net that pins ----
@@ -17054,7 +17054,7 @@ const IH_KITS = {
           const mz = ihMuzzle(t);
           rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#ffe08a', w: .07, life: .3 }); ihFlash(mz[0], mz[2], mz[1], 1.3, '#fff0c0'); ihSmokePuff(mz[0], mz[2], mz[1], 8);
           part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .25, max: .25, size: 1, col: '#ffe08a' }); ihSparks(c.x, c.y, hitH(c), 12, '#fff0c0');
-          G.shake = Math.max(G.shake, .08); sfx('heavyShot', 2);
+          G.shake = Math.max(G.shake, .08); sfx('tgLong');
         } });
       } },
     { id: 'ih_rollingvolley', name: 'Rattlegun', short: 'Rattle', glyph: 'missiles', hue: '#ffc070', mana: 75, cd: 9, research: { cost: 45, time: 20 }, anim: 2.2, noLock: 1,   // (id kept from Rolling Volley: talents, items and saves bind to it)
@@ -17068,7 +17068,7 @@ const IH_KITS = {
         if (M) for (const r of M.rider) { if (r.burstPin) { pinN = pinN ? Math.min(pinN, r.burstPin[0]) : r.burstPin[0]; pinS = Math.max(pinS, r.burstPin[1]); } if (r.burstMark && (!mark || r.burstMark[0] > mark[0])) mark = r.burstMark; }
         const B = { o: c, last: null, hits: 0 };
         t.ihGatOn = G.time; t.ihGatEnd = G.time + IH_GAT.spin + n * iv;
-        G.delayed.push({ t: IH_GAT.spin, fn: () => { if (abLive(t)) sfx('gatBurst', n * iv); } });   /* the owner's machine-gun recording, for the burst's length */
+        G.delayed.push({ t: IH_GAT.spin, fn: () => { if (abLive(t)) sfx('tgRattle', n * iv); } });   /* the owner's machine-gun recording, for the burst's length */
         for (let k = 0; k < n; k++) G.delayed.push({ t: IH_GAT.spin + k * iv, fn: () => {
           if (!abLive(t)) return; const s = t.st || st, reach = abReach(t, s, ab) + .3;
           let o = B.o;
@@ -38679,7 +38679,7 @@ ihcPatch('ih_slug', { name: 'Breaching Slug', short: 'Breach', glyph: 'beam', hu
       v2Muzzle(C, m[0], m[2], m[1], ux, uz, 1.2);
       sfxAdd({ k: 'ihcSlug', pts: R0.pts.map(p => [p[0], p[1]]), len: R0.len, h: m[1], speed: IHC_RS.speed, life: R0.len / IHC_RS.speed + .25, w: .055 * C.T.glow, hot: ihcC('#fff0c8', 1.6), col: ihcC('#ff9a40', 1.2) });
     });
-    ihFlash(mz[0], mz[2], mz[1], 1.5, '#ffd090'); ihSmokePuff(mz[0], mz[2], mz[1], 10); G.shake = Math.max(G.shake, .1); sfx('heavyShot', 2);
+    ihFlash(mz[0], mz[2], mz[1], 1.5, '#ffd090'); ihSmokePuff(mz[0], mz[2], mz[1], 10); G.shake = Math.max(G.shake, .1); sfx('tgSlug');
   } });
 // the slug's flight along its corners: a white-hot head, a tracer tail a cell long that bends round each ricochet
 const _ihcP = [0, 0];
@@ -60333,7 +60333,7 @@ const AudioSys = (() => {
   S.gatling = () => {
     // while the owner's machine-gun take plays the burst (S.gatBurst) the cracks keep quiet; if it was still loading
     // when the burst began, the cracks play instead, so a burst is never silent
-    gatLoad(); if (gatBuf && (E.gatBurstEnd || 0) > now()) return;
+    gatLoad(); if ((gatBuf || fxTakes().tgRattleMix) && (E.gatBurstEnd || 0) > now()) return;
     gunLoad();
     const B = gunBufs.shots; if (!B) return;
     const t = now(), on = E.gatEnds = (E.gatEnds || []).filter(end => end > t), guns = (E.gunEnds || []).filter(end => end > t).length;
@@ -60680,6 +60680,13 @@ const AudioSys = (() => {
   S.ibShove = () => ibPlay('ibShoveMix', .1, 1);
   S.ibSpin = () => ibPlay('ibSpinMix', .2, 1);
   S.ibBlow = () => ibPlay('ibBlowMix', .2, 2);
+  // Thunderguns (owner, 18 Nov 2026, "new sounds": the four Thunderguns mixes): the shot, Long Shot, Breaching Slug and the
+  // Rattlegun burst; each falls back to the old recordings until its take has loaded
+  const TG_VOL = { tgShotMix: .28, tgLongMix: .4, tgSlugMix: .4, tgRattleMix: .34 };
+  S.tgShot = () => { if (!firePlay('tgShotMix', TG_VOL.tgShotMix, .1)) gunShot(false); };
+  S.tgLong = () => { if (!firePlay('tgLongMix', TG_VOL.tgLongMix, .2)) gunShot(true); };
+  S.tgSlug = () => { if (!firePlay('tgSlugMix', TG_VOL.tgSlugMix, .2)) gunShot(true); };
+  S.tgRattle = (len) => { if (firePlay('tgRattleMix', TG_VOL.tgRattleMix, .3)) E.gatBurstEnd = now() + Math.max(len || 0, 2.2); else S.gatBurst(len); };   // (the bullets' cracks keep quiet under the mix)
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
