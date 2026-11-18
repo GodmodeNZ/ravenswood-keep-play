@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b16c348+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd8a3a74@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -6228,14 +6228,7 @@ function tomeBossWaves(from, isBoss) {
 }
 /* the talent tree's second-capstone slot (ui.js draws it): which trees show one, where on the capstone row it sits, and its state */
 const tomeSlotOn = type => !!TALENTS[type] && !(typeof G !== 'undefined' && G && G.vs) && poolHas('tomes') && TALENTS[type].list.filter(q => q.r === talRowsOf(type) - 1 && !q.spell).length > 1;
-// the column (0-based) of the capstone row's free cell: right of the capstones if there is room, else a gap in the row, else one more column
-function tomeSlotCol(type, cols) {
-  const R = talRowsOf(type) - 1, used = new Set(TALENTS[type].list.filter(q => q.r === R).map(q => q.c));
-  for (let c = Math.max(-1, ...used) + 1; c < cols; c++) if (!used.has(c)) return c;
-  for (let c = cols - 1; c >= 0; c--) if (!used.has(c)) return c;
-  return cols;
-}
-// 'read' (a tome was read: the slot is filled) | 'none' (no capstone left to teach) | 'ready' (an unread tome for it is held) | 'empty'
+// 'read' (a tome was read) | 'none' (no capstone left to teach) | 'ready' (an unread tome for it is held) | 'empty'
 function tomeState(type) {
   if (tomeCaps(type).length) return 'read';
   if (!tomeOpts(type).length) return 'none';
@@ -13225,7 +13218,7 @@ function ccRidersOf(t, st) {
   if (!u) return CC_NORIDE;
   const out = [];
   if (u === 'cc_spellblade') {
-    if (C.ccStarsteel) out.push([['overload'], 'starsteel', (id, e, c) => { part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .4, life: .3, max: .3, size: 1, col: CC_COL.star }); return 1.3; }]);   /* Starsteel */
+    if (C.ccStarsteel) out.push([['overload'], 'starsteel', (id, e, c) => { part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .4, life: .3, max: .3, size: 1, col: CC_COL.star }); return .65 * Math.min(2, C.ccStarsteel); }]);   /* Starsteel / Riftsteel Edge: two ranks, 65% a rank (forces_zzz..._chains.js) */
     if (C.ccWeaverBlade) out.push(['*', 'weaver', (id, e, c, S) => { ccTouch(t, c, e, S); return .6; }]);   /* Weaver's Blade */
   }
   if (u === 'cc_mageling' && C.ccEcho) out.push([['echo'], 'echo', (id, e, c, S) => {   /* Echoing Missiles */
@@ -13352,7 +13345,7 @@ function ccHand(t, h) { const a = t.ang == null ? 0 : t.ang; return [t.x + Math.
 FORCE_ATTACK.cc_blade = function (t, st, tg, pow, echo) {
   const C = st.caps, n = t.shots + 1;
   let c = tg, k = pow;
-  const blinkN = C.ccPhase ? 3 : C.ccBlinkstep ? 4 : 0;
+  const blinkN = C.ccPhase >= 2 ? 3 : C.ccPhase ? 4 : C.ccBlinkstep ? 4 : 0;   /* Phase Dancer: every 4th cut at rank 1, every 3rd at rank 2 */
   if (blinkN && !echo && n % blinkN === 0) {   // Blinkstep / Phase Dancer: a hop to the foe furthest along within reach + 1
     const o = G.creeps.filter(q => !q.dead && ccWalker(q) && canTarget(t, st, q) && Math.hypot(q.x - t.x, q.y - t.y) <= st.range + 1).sort((a, b) => a.remain - b.remain)[0];
     if (o) { c = o; k *= C.ccPhase ? 1.8 : 1.5; ccBlinkTo(t, o, .38); if (C.ccPhase) { ccGain(t, 1); ccEv('cap:ccPhase'); } else ccEv('tal:ccBlinkstep'); }
@@ -13362,7 +13355,7 @@ FORCE_ATTACK.cc_blade = function (t, st, tg, pow, echo) {
   if (!c.dead && t.def.unit === 'cc_spellblade') ccStaggerFoe(c, t);
   if (C.ccChEdge && ccFull(t)) inSplash(c.x, c.y, .8, true, o => { if (o !== c && canTarget(t, st, o)) ccHit(t, st, o, st.dmg * k * .2 * C.ccChEdge, { type: 'phys', noRx: true }); });   /* Charged Edge */
   if (C.ccThousand && !echo && n % 6 === 0) {   // Thousand Edges: three afterimages, each through every walker in reach for 40%
-    for (let q = 0; q < 3; q++) G.delayed.push({ t: .12 + q * .12, fn: () => { if (!ccAlive(t)) return; const s2 = t.st || st; inSplash(t.x, t.y, s2.range + .1, true, o => { if (canTarget(t, s2, o) && !o.ent) { ccHit(t, s2, o, s2.dmg * .45, { type: 'phys', noRx: q > 0 }); } }); ccRingFx(t.x, t.y, s2.range, CC_COL.arcane); } });
+    for (let q = 0; q < 3; q++) G.delayed.push({ t: .12 + q * .12, fn: () => { if (!ccAlive(t)) return; const s2 = t.st || st; inSplash(t.x, t.y, s2.range + .1, true, o => { if (canTarget(t, s2, o) && !o.ent) { ccHit(t, s2, o, s2.dmg * (.05 + .2 * Math.min(2, (s2.caps && s2.caps.ccThousand) || 2)), { type: 'phys', noRx: q > 0 }); } }); ccRingFx(t.x, t.y, s2.range, CC_COL.arcane); } });
     t.ccThousandAt = G.time; ccEv('cap:ccThousand');
   }
   if (t.ccSpecT > G.time && !echo) {   // Spectral Edge: a ghost blade at another foe within 3 cells (flyers too)
@@ -43301,7 +43294,7 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
   ccStaggerFoe = function (c, t) {
     const pre = c && !c.dead ? (c.ccStagT > G.time ? c.ccStagN | 0 : 0) : -9, r = s0.apply(this, arguments);
     if (pre + 1 >= CC_STAGGER.n && t && t.def) {
-      if (ccfIs(t, 'cc_spellblade') && ccfCap(t, 'ccfGuard')) { ccfReady(t, 'cc_blinkstrike', ccfCap(t, 'ccfGuard')); ccEv('tal:ccfGuard'); }
+      if (ccfIs(t, 'cc_spellblade') && ccfCap(t, 'ccfGuard')) { ccfReady(t, 'cc_blinkstrike', ccfCap(t, 'ccfGuard')); ccfReady(t, 'cc_spectral', ccfCap(t, 'ccfGuard')); ccEv('tal:ccfGuard'); }   /* (and Thrown Riftblade, its ultimate: forces_zzz..._chains.js) */
       if (ccfIs(t, 'ch_maren') && ccfCap(t, 'ccfBreathM')) { gainMana(t, 4 * ccfCap(t, 'ccfBreathM')); ccEv('tal:ccfBreathM'); }
     }
     return r;
@@ -46700,7 +46693,7 @@ function ccrCritFx(t, c, amt) {
      cc_spectral     Thrown Riftblade       a spectral copy of the blade thrown down a line of foes and back through the rift
    Also: each Conclave unit's role line on its build card (ROLE), and the wave card's one-line tips for a force run's
    counters (forceTipLine, ui.js). Every number is in CRF. */
-const CRF = { LUNGE_FAR: 1.6, RIFT_R: .4, RIFT_T: 2, STEP_R: 1.5, STEP_K: .4, SPLIT_R: .3, THROW_LEN: 1.5, THROW_W: .4, THROW_BACK: .5, TWIN_GAP: .4, GHOST_FAR: 1.2 };
+const CRF = { LUNGE_FAR: 1.6, RIFT_R: .4, RIFT_T: 2, STEP_R: 1.5, STEP_K: .4, SPLIT_R: .3, THROW_LEN: 2, THROW_W: .4, THROW_BACK: .5, TWIN_GAP: .4, GHOST_FAR: 1.2 };
 function crfSpell(id, o) {
   const ab = ABIL[id]; if (!ab) return console.warn('conclave rift: no spell', id);
   for (const k of ['zone', 'every', 'rr', 'len', 'r']) delete ab[k];
@@ -46714,12 +46707,12 @@ function crfLunge(t, st, c, k, m, step) {
   ccBlinkTo(t, c, .3);
   G.delayed.push({ t: .17, fn: () => {
     if (c.dead || !abLive(t)) return; const s = t.st || st, ab = ABIL.cc_blinkstrike;
-    ccAb(t, s, c, m, k, { type: 'phys' }); if (!c.dead) ccStaggerFoe(c, t);
+    abRun(ab.id, () => ccAb(t, s, c, m, k, { type: 'phys' })); if (!c.dead) ccStaggerFoe(c, t);   /* (abRun: the talents' riders on Rift Lunge land with its cut, e.g. Weaver's Blade) */
     fxSpark(c.x, c.y, hitH(c), '#e8d8ff');
     if (!step) ccGlyph({ s: 'arcane', sub: 'glyph', x: x0, z: z0, r: CRF.RIFT_R, t: CRF.RIFT_T, src: t, st: s, every: .3, dmg: (s.dmg || 0) * byT(ab.by.after, t) * .5, type: 'phys', tag: 'abil' });
     if (!step && ccrCap(s, 'ccfStep')) {   /* Unbroken Step: on through the rift to the next walker, every lunge */
       const o = nearest(c.x, c.y, CRF.STEP_R, 1, c, q => !q.dead && !q.ent && abWalker(q) && canTarget(t, s, q))[0];
-      if (o) { ccEv('tal:ccfStep'); G.delayed.push({ t: .2, fn: () => { if (!o.dead && abLive(t)) crfLunge(t, s, o, k, m * CRF.STEP_K, true); } }); }
+      if (o) { ccEv('tal:ccfStep'); G.delayed.push({ t: .2, fn: () => { if (!o.dead && abLive(t)) crfLunge(t, s, o, k, m * CRF.STEP_K * Math.min(2, ccrCap(s, 'ccfStep')) / 2, true); } }); }
     }
   } });
 }
@@ -46770,16 +46763,19 @@ function crfThrow(t, st, c, k, ab, twin) {
   G.delayed.push({ t: len / 9 + .15, fn: () => { if (abLive(t)) rfx({ k: 'streak', x0: t.x + ux * len, h0: .5, z0: t.y + uz * len, x1: t.x, h1: h, z1: t.y, col: '#ecdcff', w: .06, life: .4 }); } });
   if (!twin && Math.round(byT(ab.by.n, t)) > 1) { ccEv('cap:ccxEight'); G.delayed.push({ t: CRF.TWIN_GAP, fn: () => { if (!c.dead && abLive(t)) crfThrow(t, t.st || st, c, k, ab, true); } }); }
 }
-crfSpell('cc_spectral', { name: 'Thrown Riftblade', short: 'Throw', glyph: 'glaive2', hue: '#ecdcff', mana: 110, cd: 16, pref: 'grouped',
-  by: { mult: [2.4, 2.4, 2.6, 2.6, 2.8, 2.8], n: [1, 1, 1, 1, 1, 1] },
-  auto: 'two or more ground foes in a line within its reach + 1.5 cells, or a boss or elite', none: 'no ground foes in reach',
-  blurb: 'Hurls a spectral copy of its riftsteel blade through a line of foes; it comes back through the rift, cutting again.',
-  text: (t, st, ab) => `Hurls a spectral copy of its blade at a ground foe and ${CRF.THROW_LEN} cells beyond: every foe on the line takes ${xD(st, byT(ab.by.mult, t))} and a stack of Stagger, and the blade comes back through the rift, cutting each again for ${xD(st, byT(ab.by.mult, t) * CRF.THROW_BACK)}.`,
+/* The ultimate (owner, 18 Nov 2026: "the 3rd spell of a unit should be their ultimate that has a longer cooldown but a bigger
+   impact"): cooldown 16s -> 24s, mana 110 -> 150, each cut x1.5 (2.4-2.8 -> 3.6-4.2), the line half a cell longer; autocast
+   waits for three foes in the line (it was two), or a boss or elite. Damage per cooldown is what it was. */
+crfSpell('cc_spectral', { name: 'Thrown Riftblade', short: 'Throw', glyph: 'glaive2', hue: '#ecdcff', mana: 150, cd: 24, pref: 'grouped', ult: true,
+  by: { mult: [3.6, 3.6, 3.9, 3.9, 4.2, 4.2], n: [1, 1, 1, 1, 1, 1] },
+  auto: 'three or more ground foes in a line within its reach + 2 cells, or a boss or elite', none: 'no ground foes in reach',
+  blurb: 'Its ultimate. Hurls a spectral copy of its riftsteel blade through a line of foes; it comes back through the rift, cutting again.',
+  text: (t, st, ab) => `Ultimate. Hurls a spectral copy of its blade at a ground foe and ${CRF.THROW_LEN} cells beyond: every foe on the line takes ${xD(st, byT(ab.by.mult, t))} and a stack of Stagger, and the blade comes back through the rift, cutting each again for ${xD(st, byT(ab.by.mult, t) * CRF.THROW_BACK)}.`,
   pick(t, st, ab, man) {
     const L = abFoes(t, st, (st.range || 1.4) + CRF.THROW_LEN, abWalker); if (!L.length) return null;
     let best = null, bn = 0;
     for (const c of L) { const dx = c.x - t.x, dz = c.y - t.y, D = Math.hypot(dx, dz) || 1, n = abLine(t, st, t.x, t.y, dx / D, dz / D, D + CRF.THROW_LEN, CRF.THROW_W).length; if (n > bn) { bn = n; best = c; } }
-    return man || bn >= 2 || L.some(abBig) ? best : null;
+    return man || bn >= 3 || L.some(abBig) ? best : null;
   },
   cast(t, st, c, ab) { const k = ccCast(t, ab); t.ang = Math.atan2(c.x - t.x, c.y - t.y); crfThrow(t, st, c, k, ab, false); sfx('glaiveHit', 0); } });
 
@@ -52548,6 +52544,62 @@ if (typeof makeWave === 'function') {
     return q;
   };
 }
+
+/* ================= TALENT CHAINS: fantasies you commit to, not a menu (owner, 18 Nov 2026) =================
+   The owner, on the Spellblades' tree: "cant have all these powerful 1 cost tallents at the bottom of the tree, we need
+   more dependencies so you cant just buy them all easily. find talents like these across all trees and adjust them,
+   1 cost talents should generally only be capstone or spells."
+   The rules a chained tree keeps (tools/check_talent_chains.js checks them; a tree says so with tree.chained = true):
+   - A one-rank talent is a spell or a capstone. Every other talent has 2 or more ranks, its effect spread over them
+     (the full rank does what the one rank did).
+   - Every capstone needs the last talent of its own chain, and that talent needs the one above it: arrows straight down
+     a column (a capstone may also need the talent beside its chain's end, e.g. a spell it builds on).
+   - Every talent on row V needs the talent above it, so reaching a row no longer opens everything on it.
+   - The capstone row stays one-of (core.js talCapTaken), so a tree gives one fantasy's payoff.
+   - Each capstone shapes a different spell of the unit (owner, 18 Nov 2026: "capstones should effect different spells
+     rather than the same spell in different ways").
+   This file loads after every other forces_* file and re-places a tree's talents IN PLACE: the list keeps its order, so a
+   save's picks still name the same talents; game.js migrateTal replays them and gives back any rank whose new row or
+   prerequisite it no longer meets. A talent that went from 1 rank to 2 keeps its 1 rank (now half the effect).
+   Done so far: the Spellblades (conclave.glaive). The other trees are listed by the checker as still to do. */
+function tchTree(tree, rows) {
+  const by = n => tree.list.find(t => t.name === n);
+  for (const [name, r, c, o] of rows) {
+    const t = by(name); if (!t) { console.warn('talent chains: no talent ' + name); continue; }
+    t.r = r; t.c = c; t.req = null; t.reqs = null; Object.assign(t, o || {});
+    const ab = t.spell && typeof ABIL !== 'undefined' && ABIL[t.spell];   // a spell follows its talent's row; its strength stays with rowPre (forces_zy_spells.js SP_DEPTH)
+    if (ab && ab.row != null && ab.row !== r) { if (ab.rowPre == null) ab.rowPre = ab.row; ab.row = r; }
+  }
+  tree.chained = true;
+}
+(function tchSpellblades() {
+  const T = typeof FORCES !== 'undefined' && FORCES.conclave && FORCES.conclave.talents && FORCES.conclave.talents.glaive;
+  if (!T) { console.warn('talent chains: no conclave glaive tree'); return; }
+  tchTree(T, [
+    // row I: the baseline
+    ['Press the Opening', 0, 0], ['Measured Cuts', 0, 1], ['Binding Cut', 0, 2],
+    // row II
+    ['Opening Salute', 1, 0], ['Ward-Splitter', 1, 1, { req: [0, 1] }],
+    ['Riftsteel Edge', 1, 3, { max: 2, pro: n => `Each Overload its cuts set off strikes ${65 * n}% harder.` }],
+    // row III
+    ['Charged Edge', 2, 1, { req: [1, 1] }],
+    ['Unbroken Step', 2, 2, { max: 2, pro: n => `Rift Lunge also cuts a second foe within 1.5 cells for ${20 * n}%.` }],
+    // row IV: the three chains (column 1 the duelist's Ward-Splitter, 2 the thrown blade, 3 the flurry of cuts)
+    ['Lone Duel', 3, 1, { req: [2, 1] }],
+    ['Thrown Riftblade', 3, 2, { req: [2, 2] }],   // the ultimate, with a row under it for the talent that feeds it
+    ['Phase Dancer', 3, 3, { max: 2, pro: n => `Every ${n >= 2 ? '3rd' : '4th'} cut blinks to the foe furthest along and gains an Arcane Charge.` }],
+    // row V
+    ['Fifth Form', 4, 1, { req: [3, 1], max: 2, pro: n => `Casting Ward-Splitter readies Rift Lunge ${n}s sooner.`, sp: n => ({ ab: 'cc_sigilcleave', ready: ['cc_blinkstrike', n] }) }],
+    ['Guard Broken', 4, 2, { req: [3, 2], pro: n => `Each foe its Stagger breaks brings Rift Lunge and Thrown Riftblade ${n}s nearer.`, sp: () => [{ ab: 'cc_blinkstrike' }, { ab: 'cc_spectral' }] }],
+    ['Thousand Edges', 4, 3, { req: [3, 3], max: 2, pro: n => `Every 6th cut sends three afterimages through every foe in its reach for ${5 + 20 * n}%.` }],
+    // row VI: the capstones, one of them
+    ['Ghostblade Rush', 5, 1, { req: [4, 1] }],
+    ['Twin Riftblades', 5, 2, { req: [4, 2] }],
+    // (each capstone shapes a different spell, owner 18 Nov 2026: Ward-Splitter, Thrown Riftblade, and Weaver's Blade moved
+    // from Thrown Riftblade onto Rift Lunge)
+    ["Weaver's Blade", 5, 3, { req: [4, 3], pro: () => 'Rift Lunge also marks the foe it cuts Stone, so the cut Overloads it.', sp: () => ({ ab: 'cc_blinkstrike', rider: { element: 'stone' } }) }],
+  ]);
+})();
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
@@ -83473,7 +83525,7 @@ const SPELL_BRIEFS = {
   ih_firewater: 'Nearby heat units vent on their next strike. Other allies strike immediately.',
   cc_blinkstrike: 'Steps through a rift to the ground enemy nearest the gate up to 1.6 cells beyond its reach and cuts it for {d}. The rift it stepped from stays 2 sec and cuts each ground enemy passing it.',
   cc_sigilcleave: 'Cuts a warded, shielded, plated or magic-resistant enemy in reach for {d} and splits it open for {dur} sec: shield broken, ward cracked, armour stripped, so every spell and reaction strikes it whole.',
-  cc_spectral: 'Hurls a spectral copy of its blade through a line of ground enemies for {d} each, with a stack of Stagger; it returns through the rift, cutting each again for half.',
+  cc_spectral: 'Ultimate. Hurls a spectral copy of its blade through a line of ground enemies for {d} each, with a stack of Stagger; it returns through the rift, cutting each again for half.',
   cc_barrage: 'Fires {n} seeking missiles, {d} each. Each tears 12% off a ward and hits casters up to twice as hard at full mana.',
   cc_tidemoon: 'Sends a small moon of arcane light out to hang over the road. After 0.35 sec every enemy within {r} cells, flyers too, is drawn along the road in under it for 1.1 sec (bosses a third as far), then it collapses for {d} each.',
   cc_grandorb: 'For {gather} sec, Magelings\' missiles within 2 cells feed an orb. It then hurls the orb, dealing {d} plus 120% of stored damage, 80% to nearby enemies, each marked Arcane.',
@@ -87995,11 +88047,12 @@ function setInfo(it) {
     + `<p class="${k >= 2 ? 'on' : ''}">(2) ${S.b2[0]}</p>${S.b3 ? `<p class="${k >= 3 ? 'on' : ''}">(3) ${S.b3[0]}</p>` : ''}<small>Pieces count in any towers they fit.</small></div>`;
 }
 // a dropped relic flies from the field up to the bag button
-/* ---------- Tomes of Mastery (loot.js): the book, the bag's actions, and its slot in the talent tree ----------
-   A tome is read, never socketed. The tree shows an empty second-capstone slot on its capstone row from the start (the
-   goal: "a Tome of Mastery unlocks a second capstone"); while the player holds an unread tome for that unit type the slot
-   glows and reads it right there: the capstones not chosen light up, one is picked and confirmed in the footer. The
-   capstone it taught then shows as learned, with a small book on its corner. */
+/* ---------- Tomes of Mastery (loot.js): the book, the bag's actions, and reading it in the talent tree ----------
+   A tome is read, never socketed: from the bag, or with the tree's footer button while the player holds an unread tome
+   for that unit type. The capstones not chosen light up, one is picked and confirmed in the footer. The capstone it
+   taught then shows as learned, with a small book on its corner.
+   (Until 18 Nov 2026 the tree also drew an empty second-capstone slot on its capstone row; the owner: "remove the tome of
+   mastery talent slot on talent trees".) */
 const TOME_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h11.6a2 2 0 0 1 2 2V20.5H7.2a2.2 2.2 0 0 1-2.2-2.2z" fill="#6a3fb0" stroke="#000" stroke-width="1"/><path d="M5 18.3a2.2 2.2 0 0 1 2.2-2.2h11.4v4.4H7.2A2.2 2.2 0 0 1 5 18.3z" fill="#f3e6c0" stroke="#000" stroke-width="1"/><path d="M12 6l1.3 2.6 2.9.4-2.1 2 .5 2.9-2.6-1.4-2.6 1.4.5-2.9-2.1-2 2.9-.4z" fill="#ffd76a" stroke="#000" stroke-width=".6"/></svg>';
 const _tomeURL = {};
 // the tome's picture in a unit type's colour (the bag, the loot card)
@@ -88066,30 +88119,6 @@ function tomeConfirm() {
   if (i == null || !it || !tomeRead(it, i)) { sfx('error'); return; }
   talTome = null; talSel = { t: ty, i }; refreshTalents();
   const nd = ovp.querySelector(`.tn[data-i="${i}"]`); if (nd) { nd.classList.remove('pop'); void nd.offsetWidth; nd.classList.add('pop'); }
-}
-function tomeSlotRefresh(slot, ty) {
-  const st = tomeSlotState(ty), tl = TALENTS[ty], cap = tomeCaps(ty).length ? tl.list[tomeCaps(ty)[0]] : null;
-  slot.className = `tn-tome ${st}${talSel && talSel.t === ty && talSel.i === 'tome' ? ' sel' : ''}`;
-  slot.querySelector('.tt-l').textContent = st === 'ready' ? 'Read' : st === 'choose' ? 'Choose' : '';
-  slot.setAttribute('aria-label', st === 'read' ? `Second capstone, from a Tome of Mastery: ${cap ? cap.name : ''}` : st === 'ready' ? 'Second capstone: you hold a Tome of Mastery. Read the tome.' : st === 'choose' ? 'Reading a Tome of Mastery: choose a capstone' : 'Second capstone, empty: a Tome of Mastery unlocks it. Bosses sometimes drop one.');
-}
-// the next boss wave that carries a tome this run, in words (or '')
-function tomeNextLine() {
-  if (oldRules() || typeof rnBossType !== 'function') return '';
-  const from = G.phase === 'build' ? G.wave : G.wave + 1, ws = tomeBossWaves(from, n => !!rnBossType(n));
-  return ws.length ? `This run, the boss of wave ${ws[0]} has one${ws.length > 1 ? `, and so has wave ${ws[1]}'s` : ''}: it is for a unit type you field then.` : '';
-}
-function tomeSlotTipHTML(ty) {
-  const st = tomeSlotState(ty), tl = TALENTS[ty], who = tomeWho(ty), one = tomeOne(ty), cap = tomeCaps(ty).length ? tl.list[tomeCaps(ty)[0]] : null;
-  const two = typeof pathOn === 'function' && pathOn('sch', 5), nth = two ? 'another' : 'a second';
-  const head = k => `<div class="wt-h"><i class="wt-n">${two ? 'Tome capstone' : 'Second capstone'}</i><i class="wt-k">${k}</i></div>`;
-  const free = '<div class="wt-t">It costs no talent points, and a respec keeps it.</div>';
-  if (st === 'read') return head('Tome read') + `<div class="wt-d">${who[0].toUpperCase() + who.slice(1)} ${one || /^every/.test(who) ? 'knows' : 'know'} ${cap ? esc(cap.name) : 'it'} from a Tome of Mastery, for the rest of the run.</div>` + free;
-  if (st === 'none') return head('Nothing to add') + `<div class="wt-d">Every capstone of this tree is already yours.</div>`;
-  if (st === 'choose') return head('Reading') + `<div class="wt-d">Choose one of the glowing capstones for ${who}, then confirm below. The tome is used up.</div>` + free;
-  if (st === 'ready') return head('Tome ready') + `<div class="wt-d">You hold a Tome of Mastery for ${esc(tomeUnits(ty))}. Read it and ${who} ${one || /^every/.test(who) ? 'learns' : 'learn'} ${nth} capstone of your choice.</div>` + free + `<div class="wt-go">${canHover() ? 'Click to read the tome' : 'Tap to read the tome'}</div>`;
-  const nx = tomeNextLine();
-  return head('Empty') + `<div class="wt-d">A Tome of Mastery unlocks ${nth} capstone for ${who}. Bosses sometimes drop one, from wave ${TOME.from} on.</div>` + (nx ? `<div class="wt-up">${nx}</div>` : '') + free;
 }
 function lootFly(d, it) {
   const r = RARITY[it.rar];
@@ -88280,10 +88309,9 @@ function openTalents(type) {
   $('#tTabs').onclick = e => { const b = e.target.closest('.tc-tab'); if (!b || b.dataset.t === talTab) return; talTab = b.dataset.t; talSel = null; talHover = null; talTome = null; sfx('select'); buildTree(); refreshTalents(); };
   const gridEl = $('#tGrid');
   gridEl.onclick = e => { const fz = e.target.closest('.fzf-c'); if (fz) { const s = fz.dataset.s || null; if (s !== fusFilter) { fusFilter = s; sfx('select'); refreshFusion(); } return; }
-    if (e.target.closest('.tn-tome')) { tomeSlotTap(); return; }   // the second-capstone slot (a Tome of Mastery)
     const n = e.target.closest('.tn,.fc'); if (n) tapNode(talTab, +n.dataset.i); else if (talSel) { talSel = null; refreshTalents(); } };
   gridEl.oncontextmenu = e => e.preventDefault();
-  gridEl.onpointerover = e => { if (!canHover()) return; const n = e.target.closest('.tn,.fc,.tn-tome'); const h = n ? (n.classList.contains('tn-tome') ? 'tome' : +n.dataset.i) : null; if (h !== talHover) { talHover = h; renderTip(); } };
+  gridEl.onpointerover = e => { if (!canHover()) return; const n = e.target.closest('.tn,.fc'); const h = n ? +n.dataset.i : null; if (h !== talHover) { talHover = h; renderTip(); } };
   gridEl.onpointerleave = () => { if (talHover != null) { talHover = null; renderTip(); } };
   $('#tTip').onclick = e => { if (e.target.closest('#tLearn')) learnSel(); };
   $('#tFoot').onclick = e => { if (e.target.closest('#tTomeRead')) { tomeSlotTap(); return; } if (e.target.closest('#tTomeGo')) { tomeConfirm(); return; } if (e.target.closest('#tTomeNo')) { talTome = null; talSel = null; sfx('click'); refreshTalents(); return; }
@@ -88314,9 +88342,8 @@ function buildTree() {
   $('#tBg').style.backgroundImage = `url(${talSceneURL(talTab, true)})`;
   const rows = talRowsOf(talTab);   // (a force's trees have six rows, the towers' four)
   const cols0 = tl.list.some(t => t.spell) ? TAL_COLS : Math.max(TAL_COLS, ...tl.list.map(t => t.c + 1));
-  const slotC = tomeSlotOn(talTab) ? tomeSlotCol(talTab, cols0) : -1, cols = Math.max(cols0, slotC + 1);   // the second-capstone slot a Tome of Mastery fills: a free cell of the capstone row
-  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span><span class="tb" aria-hidden="true">${TOME_SVG}</span></button>`).join('')
-    + (slotC >= 0 ? `<button type="button" class="tn-tome" id="tTomeSlot" style="grid-row:${rows};grid-column:${slotC + 1}">${TOME_SVG}<span class="tt-l"></span></button>` : '');
+  const cols = cols0;
+  grid.innerHTML = tl.list.map(t => `<button type="button" class="tn" data-i="${t.id}" style="grid-row:${t.r + 1};grid-column:${t.c + 1}"><img alt="" draggable="false" src="${talIconURL(talTab, t.id)}"><span class="pl"></span><span class="rk"></span><span class="tb" aria-hidden="true">${TOME_SVG}</span></button>`).join('');
   grid.style.gridTemplateColumns = `repeat(${cols}, var(--n))`; grid.style.gridTemplateRows = `repeat(${rows}, var(--n))`;
   // one size for every icon, as big as the room allows up to TW_MAX; the same space across and down, so arrows read alike
   const availH = tree.clientHeight - (tree.clientHeight < 300 ? 14 : 30), availW = tree.clientWidth - 24;   // (a phone on its side: every pixel of height goes to the icons)
@@ -88417,7 +88444,7 @@ function refreshTalents() {
     n.setAttribute('aria-pressed', on);
   }
   for (const a of ovp.querySelectorAll('.lkg')) { const q = tl.list[+a.dataset.q]; a.classList.toggle('lit', !!q && talRankOf(pk, q.id) >= q.max); }
-  const slot = $('#tTomeSlot'), tmSt = slot ? tomeSlotState(ty) : ''; if (slot) tomeSlotRefresh(slot, ty);
+  const tmSt = tomeSlotOn(ty) ? tomeSlotState(ty) : '';   // (a tome held for this tree: the footer offers to read it)
   const cost = respecCost(ty), canReset = spent > 0 && G.phase === 'build' && G.gold >= cost;
   if (tmOn) {   // reading a Tome of Mastery: the footer names the choice and confirms it
     const q = talTome.sel != null ? tl.list[talTome.sel] : null;
@@ -88625,12 +88652,12 @@ function talTipHTML(ty, ci) {
 function renderTip() {
   if (!talOpen || typeof spellTipShow !== 'function') return;
   const ty = talTab, sel = talSel && talSel.t === ty ? talSel.i : null, ci = canHover() ? talHover : (talHover != null ? talHover : sel);
-  const node = ci == null ? null : ci === 'tome' ? ovp.querySelector('.tn-tome') : ovp.querySelector(`.tn[data-i="${ci}"], .fc[data-i="${ci}"]`);
+  const node = ci == null || ci === 'tome' ? null : ovp.querySelector(`.tn[data-i="${ci}"], .fc[data-i="${ci}"]`);
   if (!node) { if (spellHudActive && spellHudActive.tal) hideSpellHud(); return; }
   let html = '';
   try {
     if (ty === 'fusion' || ty === 'paths') { const d = document.createElement('div'); (ty === 'fusion' ? renderFusionTip : renderPathTip)(d, ci); html = `<div class="tal-old">${d.innerHTML}</div>`; }
-    else html = ci === 'tome' ? tomeSlotTipHTML(ty) : talTipHTML(ty, ci);
+    else html = talTipHTML(ty, ci);
   } catch (e) { html = ''; }
   if (html) spellTipShow(node, html, { tal: true }); else hideSpellHud();
 }
@@ -97321,8 +97348,8 @@ try { const P_ = typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents, o 
    His moves, by the game's own cues (nothing in the game is changed):
      idle      no foe in reach: at ease, the sword low in his right hand, breathing, the blade swaying a little
      ready     a foe in reach: side-on, the sword up before his chest, the left hand raised behind him
-     cutA/B/C  his strikes, taken in turn (owner: "faster and more sweeping, a different fighting style"): a flat sweeping
-               forehand, a rising backhand return, a full spin cut; each leaves a sweeping violet arc along the blade's path
+     cutA/B/C  his strikes, taken in turn (owner: "fast sweeping strikes almost like a jedi", no twirl): a flat forehand,
+               a falling backhand return, a rising diagonal, each stopped dead; each leaves a sweeping violet arc along the blade's path
                and the free hand flares a little as it cuts. Over the game's wind-up (t.windup) he eases into the next cut's
                (short) wind-up pose; the cut is begun its own hit frame early
                so the blade is through the foe on the game's blow (t.shotT = 0); then the follow-through and his guard
@@ -97341,7 +97368,7 @@ try { const P_ = typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents, o 
    Checks: `python tools/make_sb2.py --check`. Notes: docs/model_pilot/spellblade2.md. */
 const SB2 = (() => {
   const U = 'cc_spellblade', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'lunge', 'split', 'throw', 'cast'];
-  const ATK = ['cutC', 'cutA', 'cutB'], EASE = .2, BLOW = .3, BASE_IV = .8, SPD = { cut: 1.3, lunge: 1, split: 1, throw: 1, cast: 1 };
+  const ATK = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, BASE_IV = .8, SPD = { cut: 1.3, lunge: 1, split: 1, throw: 1, cast: 1 };
   const MV = { cc_blinkstrike: 'lunge', cc_sigilcleave: 'split', cc_spectral: 'throw' }, START = { lunge: 0, split: 5 / 30, throw: 4 / 30, cast: .2 };
   const GLOW = [.15, .025, .36], GLOW_EM = 1,   // (hue 268: the Weapon slot's Violet Runeblade painting; kept low because the shader lifts it x3-x6 before the tone curve, which bleached the first try to silver-white in a run)
   BASE_H = .045;
@@ -97511,10 +97538,10 @@ const SB2 = (() => {
     }
     // the free hand's arcane light (owner: the off hand "alive", "flaring with arcane light on the big cut"): a small violet
     // mote resting in his open palm, brighter while he cuts, flaring on the spin cut and as a spell leaves his hand
-    const want = P.c === 'cutC' ? (P.s > .1 && P.s < .5 ? 2 : .8) : cut ? (P.s < .4 ? 1.1 : .5) : P.c === 'cast' ? (P.s > .15 && P.s < .62 ? 2.2 : .6) : /lunge|split|throw/.test(P.c) ? .8 : .38;
+    const want = cut ? (P.s < .3 ? 1.2 : .5) : P.c === 'cast' ? (P.s > .15 && P.s < .62 ? 2.2 : .6) : /lunge|split|throw/.test(P.c) ? .8 : P.c === 'ready' ? .3 : 0;   // (none at rest: the open hand held a thing unseen)
     const fl = t._sbFl = (t._sbFl || 0) + (want - (t._sbFl || 0)) * .22, q = t._sbPalmL;
     if (q && fl > .03 && typeof QADD !== 'undefined' && RD) {
-      const pu = 1 + .12 * Math.sin(now * 5.1 + (t.anim || 0) * 9), r = (.05 + .035 * Math.min(2.2, fl)) * s * pu, y = q[1] + .035 * s, f1 = Math.min(1, fl);
+      const pu = 1 + .12 * Math.sin(now * 5.1 + (t.anim || 0) * 9), r = (.05 + .035 * Math.min(2.2, fl)) * s * pu, y = q[1], f1 = Math.min(1, fl);
       if (typeof QA !== 'undefined') QA.bill(RD, q[0], y, q[2], r * 1.5, r * 1.5, [.40, .08, .90, .34 * f1], 1, 0);
       QADD.bill(RD, q[0], y, q[2], r, r, [.55, .18, 1, .5 * f1], 1, 0);
       QADD.bill(RD, q[0], y, q[2], r * .4, r * .4, [.85, .65, 1, .7 * f1], 1, 0);
@@ -110687,7 +110714,6 @@ function fcTreeDraw() {
       let say = ''; try { say = String(t.pro(1)).replace(/<[^>]+>/g, ''); } catch (e) { say = ''; }
       n.setAttribute('aria-label', `${t.name}${t.spell ? ', spell' : ''}, ${t.max} rank${t.max > 1 ? 's' : ''}. ${say}`);
     }
-    { const sl = $('#tTomeSlot'); if (sl) { sl.className = 'tn-tome'; sl.title = 'A Tome of Mastery unlocks a second capstone. Bosses sometimes drop one.'; sl.setAttribute('aria-label', sl.title); } }   // (the second-capstone slot: ui.js)
     const fl = talFlavor(T.slot);
     $('#tSub').textContent = `${U.name}${fl && fl[0] ? ' · ' + fl[0] : ''}`;
   });
@@ -110980,7 +111006,7 @@ function kwBuild() {
     def: 'Matched pieces give bonuses when 2 or 3 are worn. A unit set counts on one unit; an army set counts across different units.' });
   { const tf = typeof TOME !== 'undefined' ? TOME : { from: 20, salvage: 150 };
     kwAdd({ key: 'sy:tome', name: 'Tome of Mastery', alias: ['Tomes of Mastery', 'tome of mastery'], cat: 'system', col: '#ffd76a',
-      def: `A book for one unit type, dropped by a wave boss (never before wave ${tf.from}; one or two a run). Read it once, from the bag or the empty capstone slot of that unit's talent tree, and every unit of that type knows a second capstone of your choice for the rest of the run. It costs no talent points and a respec keeps it. One with nothing left to teach salvages for ${tf.salvage} gold.` }); }
+      def: `A book for one unit type, dropped by a wave boss (never before wave ${tf.from}; one or two a run). Read it once, from the bag or that unit's talent tree, and every unit of that type knows a second capstone of your choice for the rest of the run. It costs no talent points and a respec keeps it. One with nothing left to teach salvages for ${tf.salvage} gold.` }); }
   kwAdd({ key: 'sy:legendary', name: 'Legendary', alias: ['legendary', 'legendaries', 'Legendaries'], cat: 'system', col: '#ff8c1a',
     def: 'The rarest items, named in orange, each with a rule of its own. None drops before wave 11, and a run finds only a few.' });
   return KW;
