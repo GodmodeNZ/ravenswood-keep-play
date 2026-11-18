@@ -1,4 +1,4 @@
-const BUILD_TAG = '732b709+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ef052b8+@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -97025,7 +97025,7 @@ const SB2 = (() => {
      shift   Shift Form: the staff and her free hand raised as she arrives; the same rise in the moment before she folds away
    Every move is eased into from where she was, except a strike's own frames, which snap. */
 const SAGE2 = (() => {
-  const U = 'druid_sage', NAMES = ['idle', 'ready', 'bolt', 'lance', 'sweep', 'shift'], K0 = 1.12;
+  const U = 'druid_sage', NAMES = ['idle', 'ready', 'bolt', 'lance', 'sweep', 'shift'], K0 = 1.12, SINK = .5;
   const S = { on: true };
   try { S.on = !/[?&]sage=old\b/.test(location.search); } catch (e) {}
   let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, STAFF = 0, TIP = null;
@@ -97142,7 +97142,7 @@ const SAGE2 = (() => {
     const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
     const US = (typeof UM_UNITS !== 'undefined' && UM_UNITS[U]) || {}, base = L && L.base && L.base.count ? L.base : null;
     if (base) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _a, opts); }
-    const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / HGT * (US.k != null ? US.k : K0) * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - (US.sink || 0)) : 0;
+    const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / HGT * (US.k != null ? US.k : K0) * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - (US.sink != null ? US.sink : SINK)) : 0;   // (SINK: her soles in the moss, not on its highest tuft)
     M4.trs(_a, x, lift * sy, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
     if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
     const P = ctl(t, live); sample(CL[P.c], P.s, PT);
@@ -97156,6 +97156,8 @@ const SAGE2 = (() => {
     const it = item(MESH_, _c, opts); it.sec = [0, US.trim != null ? US.trim : .15]; it.bones = OUT.slice();
     const tp = at(OUT, STAFF, TIP), tw = M4.xf(_c, tp[0], tp[1], tp[2]);
     if (typeof FX_PM !== 'undefined') { FX_PM.root = FX_PM.torso = _c; M4.trs(_s, tw[0], tw[1] - .55 * K, tw[2], 0, 0, 0, 1, 1, 1); FX_PM.staff = _s; }   // (the staff's glow, druidExtra: fxAt('staff', [0, .55, 0], K))
+    // the staff's glow on the gear sheet's dais (druidExtra draws it on the map, never in the icon renderer the sheet uses)
+    if (icon && typeof UM_SHOW !== 'undefined' && UM_SHOW != null && typeof QADD !== 'undefined' && typeof IR !== 'undefined' && IR) { const r = (.15 + .02 * Math.sin(UM_SHOW * 3)) * K; QADD.bill(IR, tw[0], tw[1], tw[2], r, r, [.75, .9, 1, .5], 1, 0); }
     if (live && !t._ghost) { t.tipW = tw; t.tipYaw = ang; t.tipAt = G.time; t._sgClip = P.c; }
     return true;
   }
