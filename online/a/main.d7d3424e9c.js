@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b6d51a2+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = '732b709+@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16311,7 +16311,7 @@ FORCE_ATTACK.ironbreaker = function (t, st, tg, pow, echo) {
     } else ihHeatStrike(t, st);
     if (n % every === 0 && !tg.dead) ihShieldShove(t, st, tg, ux, uz);
   }
-  ihSparks(tg.x, tg.y, hitH(tg), 5, '#f0e8d8'); t.recoil = 1; sfx('glaiveHit', 0);
+  ihSparks(tg.x, tg.y, hitH(tg), 5, '#f0e8d8'); t.recoil = 1; sfx('ibChop');
 };
 function ihShieldShove(t, st, tg, ux, uz, extra) {
   const C = st.caps, d = (.3 + .1 * (C.ihShoveD || 0)) * (G.hero === 'ih_thane' ? 1.3 : 1) * (extra || 1);
@@ -17005,7 +17005,7 @@ const IH_KITS = {
       cast(t, st, c, ab, K) {
         abHit(t, st, c, 2 * K, 'phys', null);
         if (!c.dead) { ihShove(c, byT(ab.by.push, t) * K, t, '#e8d0a0'); ihStun(c, .4); }
-        t.ihShoveAt = G.time; fxDust(c.x, c.y, 5); ihSparks(c.x, c.y, hitH(c), 10, '#ffe8b0'); G.shake = Math.max(G.shake, .05); sfx('glaiveHit', 1);
+        t.ihShoveAt = G.time; fxDust(c.x, c.y, 5); ihSparks(c.x, c.y, hitH(c), 10, '#ffe8b0'); G.shake = Math.max(G.shake, .05); sfx('ibShove');
       } },
     { id: 'ih_bulwark', name: 'Bulwark', short: 'Bulwark', glyph: 'shield', hue: '#c0a070', mana: 90, cd: 14, r: 1.4, research: { cost: 60, time: 20 }, anim: 1,
       by: { dur: [4, 4, 5, 5, 6, 6] },
@@ -38510,7 +38510,7 @@ ihcPatch('ih_bulwark', { name: 'Spinning Shield', short: 'Shield', glyph: 'shiel
       if (k === steps) { sfx('block', 0); ihSparks(t.x + ux * .3, t.y + uz * .3, towerTop(t) * .55, 4, '#ffe8b0'); }
     } });
     ihcFx(ab.id, t, c, C => sfxAdd({ k: 'ihcShield', S, life: Tout + Tb + .02, s: .2 * Math.min(1.3, C.S) * C.T.scale, g: C.T.glow, steel: ihcC('#d8dce4', 1.05), rim: ihcC('#ffd080', 1.3), hot: ihcC('#ffb050', 1.4), glow: ihcC('#ffcf80'), h: towerTop(t) * .55, seed: R(TAU), C }));
-    sfx('glaive', 1);
+    sfx('ibSpin');
   } });
 function ihcShieldHit(C, o, ux, uz, back) {
   const h = v2FoeH(o, hitH(o));
@@ -38555,7 +38555,7 @@ ihcPatch('ih_breakerblow', { anim: .9,
   by: { mult: [2.7, 2.7, 3.2, 3.2, 3.6, 3.6] },
   text: (t, st, ab) => { const n = ihcRider(t, ab.id, 'shards'); return `Splits off the foe's plate (all its armour, 6s), then strikes for ${xD(st, byT(ab.by.mult, t))}. Red-hot shards fly ${gNf(IHC_BB.len + .5 * n)} cells behind it, hitting each ground foe there for ${xD(st, IHC_BB.base)} plus ${xD(st, IHC_BB.per)} per armour lost${n ? ` and pinning it ${gNf(.15 * n)}s` : ''}.`; },
   cast(t, st, c, ab, K) {
-    t.ihBlowAt = G.time; t.cd = Math.max(t.cd, .45);
+    t.ihBlowAt = G.time; t.cd = Math.max(t.cd, .45); sfx('ibBlow');   // (the owner's mix: its blow lands with the hit, 0.3s on)
     const [ux, uz] = abDir(t, c), n = ihcRider(t, ab.id, 'shards');
     G.delayed.push({ t: .3, fn: () => {
       if (c.dead || !abLive(t)) return; const s = t.st || st, lost = Math.max(0, ihArmor(c));
@@ -38568,7 +38568,7 @@ ihcPatch('ih_breakerblow', { anim: .9,
         G.delayed.push({ t: .04 + d * .06, fn: () => { if (o.dead || !abLive(t)) return; abHit(t, t.st || s, o, sh, 'phys', null); if (!o.dead && n) ihPin(o, .15 * n, t); } });
       }));
       ihcFx(ab.id, t, c, C => ihcPlateBurst(C, c, x, z, ux, uz, len, cosH, lost));
-      G.shake = Math.max(G.shake, .1); if (abBig(c)) G.hitStop = Math.max(G.hitStop || 0, .04); sfx('glaiveHit', 2); if (lost > 0) sfx('shieldBreak', 0);
+      G.shake = Math.max(G.shake, .1); if (abBig(c)) G.hitStop = Math.max(G.hitStop || 0, .04); if (lost > 0) sfx('shieldBreak', 0);
     } });
   } });
 function ihcPlateBurst(C, c, x, z, ux, uz, len, cosH, lost) {
@@ -60672,6 +60672,14 @@ const AudioSys = (() => {
   S.frostBolt = () => { firePlay('frBoltMix3', FR_MIX3_VOL[0], 0); };   // (owner, 15 Nov 2026: second mix; frBoltMix stays in the Take list)
   // ...and its hit: ice breaking with a cold breath over it, layered (owner: "see what these sound like layered as the impact sound")
   S.frostHit = () => { firePlay('frHitMix3', FR_MIX3_VOL[1], 0); };
+  // Ironbreakers (owner, 18 Nov 2026, "sounds": the four Ironbreakers mixes): the chop, Shield Shove, Spinning Shield and
+  // Breaker's Blow; each falls back to the old steel hit until its take has loaded
+  const IB_VOL = { ibChopMix: .3, ibShoveMix: .34, ibSpinMix: .3, ibBlowMix: .4 };
+  const ibPlay = (k, gap, lv) => { if (!firePlay(k, IB_VOL[k], gap)) S.glaiveHit(lv); };
+  S.ibChop = () => ibPlay('ibChopMix', .12, 0);
+  S.ibShove = () => ibPlay('ibShoveMix', .1, 1);
+  S.ibSpin = () => ibPlay('ibSpinMix', .2, 1);
+  S.ibBlow = () => ibPlay('ibBlowMix', .2, 2);
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
