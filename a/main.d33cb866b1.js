@@ -1,4 +1,4 @@
-const BUILD_TAG = '975cae1+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a11b6d1+@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -96752,6 +96752,429 @@ const BEAR2 = (() => {
     umDraw = function (t, u) {
       if (u === U && S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS) { try { if (draw.apply(this, arguments)) return true; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('bear:', e); } } }
       return _um.apply(this, arguments);
+    };
+  }
+  return { S, CL, load, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Spellblades on a rig and clips made from scratch (the owner, 18 Nov 2026: a new model for the Spellblade, rigged and
+   animated, his crystal sword in his right hand). His mesh is the owner's grey-bearded battle-mage in an aubergine robe and
+   cape ("Spellblade_OutfitRefined_8K") and his sword the blue crystal blade ("Spellblade_Azure"); tools/make_sb2.py ->
+   src/model_sb2.js: 33 bones (the robe and cape below his belt on four panels of their own, each in two lengths, kept plumb
+   and clear of his legs; a sword bone in his right fist), 6,419 triangles, 8 clips baked at 30 frames a second.
+   ON by default in place of his code-built body; ?sb=old (or the Model Lab's "Spellblade rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: at ease, the sword low in his right hand, breathing, the blade swaying a little
+     ready     a foe in reach: side-on, the sword up before his chest, the left hand raised behind him
+     cutA/cutB his strikes, taken in turn: a forehand falling from his right shoulder to his left hip, then a backhand rising
+               back. Over the game's wind-up (t.windup) he eases into the next cut's wind-up pose; the cut is begun HIT early
+               so the blade is through the foe on the game's blow (t.shotT = 0); then the follow-through and his guard
+   His spells are the Riftsteel kit (forces_zzzzzzzzzzz_rift_conclave.js):
+     lunge     Rift Lunge (cc_blinkstrike): the game steps him through a rift to the foe (t.chg) and cuts 0.17 s after the
+               cast: the lunge's thrust (frame 5)
+     split     Ward-Splitter (cc_sigilcleave): the game cuts on the cast, so the clip starts at its frame 5, the blade high, and
+               chops down through the foe 0.1 s later; then the flat wrench across the wound that splits it open
+     throw     Thrown Riftblade (cc_spectral): drawn back past his ear and hurled; the release (frame 6) 0.07 s after the cast.
+               The game's streak of the thrown blade leaves his sword's point
+     cast      any other spell: the left palm thrust out at the foe, its release 0.1 s after the cast
+   The blade glows lavender (a light in its own vertices, a faint soft beam along it, a little brighter as it cuts); kept low
+   around him (the rule: spells never too flashy around the unit). His sword's point is t.tipW (unitTip), and the Conclave's
+   ccHand (where his talents' ghost blades leave) answers his sword's middle while he is drawn.
+   Checks: `python tools/make_sb2.py --check`. Notes: docs/model_pilot/spellblade2.md. */
+const SB2 = (() => {
+  const U = 'cc_spellblade', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'lunge', 'split', 'throw', 'cast'];
+  const ATK = ['cutB', 'cutA'], EASE = .2, BLOW = .3, HIT = 5 / 30, BASE_IV = .8, SPD = { cut: 1.3, lunge: 1, split: 1, throw: 1, cast: 1 };
+  const MV = { cc_blinkstrike: 'lunge', cc_sigilcleave: 'split', cc_spectral: 'throw' }, START = { lunge: 0, split: 5 / 30, throw: 4 / 30, cast: .2 };
+  const GLOW = [.92, .60, 1.25], GLOW_EM = .28, BASE_H = .045;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]sb=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .878, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'sb2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('sb2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'sword', 'handL']) { if (R_.bix[nm] == null) throw new Error('sb2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'tip', 'grd', 'palmL']) if (!mk || !mk[nm]) throw new Error('sb2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('sb2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('sb2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('sb2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    // the blade's lavender: its vertices tinted and given a little light of their own (FS_STY mixes vCol x 2.6 in by ext.x)
+    const gw = D.glow ? new Uint8Array(b64(D.glow)) : null;
+    for (let k = 0; k < nc; k++) {
+      const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v];
+      const g = gw ? gw[v] / 255 : 0; if (g > 0) { for (let a = 0; a < 3; a++) col[k * 3 + a] = 1 + (GLOW[a] - 1) * g; ext[k * 2] = GLOW_EM * g; }
+    }
+    m.min = [-.8, -.02, -.8]; m.max = [.8, 1.3, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('SB2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'sb2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into), cut (the blade is cutting: brighter) } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt) {
+      const u = now - A.lastAt, m = MV[A.last] || 'cast';
+      const c0 = CL[m], s0 = START[m] || 0;
+      if (c0 && u < (c0.len - s0) / SPD[m]) return { c: m, s: s0 + u * SPD[m], rate: 40, mv: 'ab' + A.lastAt, cut: m !== 'cast' && u < .4 ? 1 : 0 };
+    }
+    // the strikes: how fast he really strikes (the time between his last two blows) quickens the cuts with him
+    if (t.shots && t._sbShots !== t.shots) { if (t._sbAt != null && now - t._sbAt < 2) t._sbIv = now - t._sbAt; t._sbAt = now - (t.shotT || 0); t._sbShots = t.shots; }
+    const spd = SPD.cut * Math.min(1.6, Math.max(1, t._sbIv ? BASE_IV / t._sbIv : 1));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    if (fight && (t.windup || 0) > 0 && s > BLOW) {
+      const nx = ATK[((t.shots | 0) + 1) % 2], cd = t.cd || 0;
+      if (cd < HIT / spd) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots, cut: 1 };   // (the cut begun: through the foe on the blow)
+      return { c: nx, s: 0, rate: Math.max(8, 3 / Math.max(.05, cd)), mv: 'wind' + nx + t.shots, wind: 1 };
+    }
+    if (t.shots) { const mv = ATK[(t.shots | 0) % 2]; if (s >= 0 && s < (CL[mv].len - HIT) / spd) return { c: mv, s: HIT + s * spd, rate: 40, mv: mv + t.shots, cut: s < .12 ? 1 : 0 }; }
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._sbDrawn != null && typeof G !== 'undefined' && G && G.time - t._sbDrawn < .3 && G.time >= t._sbDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), [x, z] = live && t.chg ? chargeAt(t) : [t.x, t.y], yaw = t.ang == null ? 0 : t.ang;
+    // the Conclave's rune slate under him, as under every scholar, and he stands on it
+    const sz0 = typeof CC_SZ !== 'undefined' ? CC_SZ[tr] : 1;
+    const bm = typeof ccBase === 'function' && typeof ccWith === 'function' ? dynMesh('sb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * sz0), () => ccWith(U, () => ccBase(g, tr))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sz0 * sy : 0;
+    // his size by the shared rule (unitmodels_size.js): his head joint at UM_EVEN_HEAD over the ground at tier I, growing by UM_TIER
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._sbT == null ? 1 : Math.max(0, Math.min(.1, now - t._sbT)); t._sbT = now;
+      if (!t._sbP || t._sbP.q.length !== NB * 4) { t._sbP = newPose(); t._sbP.q.set(PT.q); t._sbP.t.set(PT.t); }
+      if (P.mv !== t._sbMv) { t._sbMv = P.mv; t._sbSw = now; }
+      const k = P.wind || now - t._sbSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._sbP, PT, k); pose = t._sbP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = m => { const q = at(OUT, BI.sword, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    const g = w(MK.grd), p = w(MK.tip);
+    if (live) {
+      t.tipW = p; t.tipYaw = yaw; t.tipAt = G.time; t._sbDrawn = G.time; t._sbClip = P.c;
+      t._sbMid = [(g[0] + p[0]) / 2, (g[1] + p[1]) / 2, (g[2] + p[2]) / 2];
+      const hq = at(OUT, BI.handL, MK.palmL); t._sbPalmL = M4.xf(_c, hq[0], hq[1], hq[2]);
+      t._sbGrip = w(MK.grip); (t._sbMat || (t._sbMat = new Float32Array(16))).set(_c);
+    }
+    // the blade's soft lavender light along it (faint at rest, a little brighter as it cuts; never a flash round him)
+    if (live && typeof QADD !== 'undefined' && typeof RD !== 'undefined' && RD) {
+      const now = G.time, kk = t._sbGl = (t._sbGl || 0) + ((P.cut ? 1 : 0) - (t._sbGl || 0)) * .25;
+      const a = .09 + .025 * Math.sin(now * 2.3 + (t.anim || 0)) + .09 * kk, gx = g[0] + (p[0] - g[0]) * .08, gy = g[1] + (p[1] - g[1]) * .08, gz = g[2] + (p[2] - g[2]) * .08;
+      try { QADD.beam(RD, [gx, gy, gz], p, .065 * s, [.76, .58, 1, a]); QADD.beam(RD, [gx, gy, gz], p, .02 * s, [.82, .64, 1, a * .9]); } catch (e) {}
+    }
+    return true;
+  }
+  try { load(typeof SB2_MDL !== 'undefined' ? SB2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Spellblade rig:', e.message); }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+        try { if (draw(t, tier, sx, sy, sz, wob, opts)) { const [x, z] = typeof G !== 'undefined' && G && G.time != null && t.chg ? chargeAt(t) : [t.x, t.y]; forceExtra(t, tier, x, z, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('sb2:', e); } }
+      }
+      return _plain.apply(this, arguments);
+    };
+  }
+  // his size and crown by the shared rule (unitmodels_size.js: towerTop over his head; the slate fitted to a unit's base)
+  if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'sb2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+  /* Thrown Riftblade: the game's streak of the thrown blade (rfx 'streak' from the unit's middle, crfThrow) leaves his sword's
+     point as it stands at the throw's release (its return streak, drawn later, still ends at his chest). Only the look moves:
+     the line it strikes along is the game's own */
+  let THROWN = null; const PF = { P: null, O: null };
+  function releaseTip(t) {
+    if (!PF.P) { PF.P = newPose(); PF.O = new Float32Array(NB * 12); }
+    sample(CL.throw, CL.throw.hit / 30, PF.P); toBones(PF.P, PF.O); const q = at(PF.O, BI.sword, MK.tip); return M4.xf(t._sbMat, q[0], q[1], q[2]);
+  }
+  if (MESH_ && typeof crfThrow === 'function' && typeof rfx === 'function') {
+    const _throw = crfThrow; crfThrow = function (t) { const was = THROWN; THROWN = t && t.def && t.def.unit === U && mine(t) && t._sbMat ? t : null; try { return _throw.apply(this, arguments); } finally { THROWN = was; } };
+    const _rfx = rfx; rfx = function (o) {
+      try {
+        const t = THROWN;
+        if (t && o && o.k === 'streak') {
+          if (Math.abs(o.x0 - t.x) < 1e-6 && Math.abs(o.z0 - t.y) < 1e-6) { const p = releaseTip(t); o.x0 = p[0]; o.h0 = p[1]; o.z0 = p[2]; }
+        }
+      } catch (e) {}
+      return _rfx.apply(this, arguments);
+    };
+  }
+  // where the Conclave's sword-hand effects leave from (Spectral Edge's ghost blades): his sword's middle while he is drawn
+  if (MESH_ && typeof ccHand === 'function') { const _hand = ccHand; ccHand = function (t) { if (t && t.def && t.def.unit === U && mine(t) && t._sbMid) return t._sbMid.slice(); return _hand.apply(this, arguments); }; }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('sb2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'sb2Row';
+    box.innerHTML = '<h3>Spellblade rig</h3><div class="row">' + `<button data-s2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?sb=old)">Old (code-built)</button><button data-s2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-s2]')) x.onclick = () => { S.on = x.dataset.s2 === '1'; labRow(); };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('sb2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, mid: t._sbMid, palmL: t._sbPalmL, clip: t._sbClip, at: t._sbDrawn } : null;
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Grove Shifters' sage form on the owner's sculpted antlered druid and her staff (18 Nov 2026: "new shifter model").
+   tools/make_sage.py -> src/model_sage.js: her sculpt decimated to 6,000 triangles and the staff to 900, on one atlas; a
+   26-bone humanoid rig made from scratch (the skirt on four panels, the cape's top on her arm and its fall from her
+   shoulder, the staff on a bone of its own in her right fist), 6 clips at 30 frames a second. It draws in place of the
+   code-built moon-sage (model 'druid_sage', forces_grove_druid.js) wherever that is drawn, the build ghost included (and
+   the sculpted bear's ghost too, src/unitmodels_bear.js). Gameplay is untouched. `?sage=old` shows the code-built sage.
+   Her moves, by the cues the game already keeps:
+     idle    nothing in reach: breathing, the staff swaying in her fist, her head turning (4 s loop)
+     ready   a foe in reach: the staff angled at the road, her free hand open (2 s loop)
+     bolt    her strike: over t.windup the staff drawn up and back, then flicked at her foe as the strike goes (the bolt
+             leaves the staff's head, t.tipW), held, recovered
+     lance   Primal Pounce as the sage: the staff levelled and driven home as the hit lands (.18 s; .3 s after a shift)
+     sweep   Shapestorm's sage beat: the staff raised and swept down the lane (.15 s after she appears)
+     shift   Shift Form: the staff and her free hand raised as she arrives; the same rise in the moment before she folds away
+   Every move is eased into from where she was, except a strike's own frames, which snap. */
+const SAGE2 = (() => {
+  const U = 'druid_sage', NAMES = ['idle', 'ready', 'bolt', 'lance', 'sweep', 'shift'], K0 = 1.12;
+  const S = { on: true };
+  try { S.on = !/[?&]sage=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, STAFF = 0, TIP = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (out, b, p) => { const g = b * 12; return [out[g] * p[0] + out[g + 4] * p[1] + out[g + 8] * p[2] + out[g + 3], out[g + 1] * p[0] + out[g + 5] * p[1] + out[g + 9] * p[2] + out[g + 7], out[g + 2] * p[0] + out[g + 6] * p[1] + out[g + 10] * p[2] + out[g + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'sage', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('sage: too many bones');
+    if (R_.bix.hips == null || R_.bix.staff == null || !data.marks || !data.marks.tip) throw new Error('sage: no hips, staff or tip');
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('sage: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('sage: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; HGT = R.height || 1; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; STAFF = R.bix.staff; TIP = data.marks.tip;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('sage: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.7, -.02, -.7]; m.max = [.7, 1.35, .9];   // (room for the staff raised high and levelled)
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what she does now: { c: clip, s: seconds into it, rate (the ease toward it, per second; 0 snaps) } */
+  function ctl(t, live) {
+    if (!live || t._ghost) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : (typeof vt !== 'undefined' ? vt : 0), rate: 0 };
+    const now = G.time, A = t.ab, sage = t.form === 'sage' || !t.form;
+    const st = t.gvcStormAt != null ? now - t.gvcStormAt - 1 : -9;   // Shapestorm: its sage beat, from the moment she appears
+    if (sage && st >= -.02 && st < CL.sweep.len) return { c: 'sweep', s: Math.max(0, st), rate: 0 };
+    const P_ = t.gvcPounce;
+    if (sage && P_ && P_.f === 'sage' && now - P_.at >= 0 && now - P_.at < CL.lance.len + .12) {   // Primal Pounce: the lance lands with the hit (.18 s, or .3 s when it shifted to strike)
+      const sh = t.shiftAt != null && Math.abs(t.shiftAt - P_.at) < .02, s = now - P_.at - (sh ? .12 : 0);
+      if (s < CL.lance.len) return { c: 'lance', s: Math.max(0, s), rate: s < .25 ? 0 : 20 };
+    }
+    if (sage && !P_ && A && A.last === 'wildstrike' && A.lastAt != null && now - A.lastAt >= 0 && now - A.lastAt < CL.lance.len) return { c: 'lance', s: now - A.lastAt, rate: 0 };
+    const sh = t.shiftAt != null ? now - t.shiftAt : 9;
+    if (!sage && sh >= 0 && sh < .2) return { c: 'shift', s: sh * 1.4, rate: 0 };           // folding away: the staff starts up
+    if (sage && sh >= 0 && sh < CL.shift.len + .12) return { c: 'shift', s: Math.max(0, sh - .12), rate: sh < .2 ? 0 : 18 };   // arriving: staff and hand raised
+    // her strike: the bolt clip, its wind-up over t.windup and its flick from the moment the strike goes
+    const s = t.shotT != null ? t.shotT : 9, w = t.tg ? t.windup || 0 : 0, W = CL.bolt.wind || .5;
+    if (s < CL.bolt.len - W && !(w > .02 && s > .25)) return { c: 'bolt', s: W + s, rate: s < .15 ? 0 : 22 };
+    if (w > 0) return { c: 'bolt', s: W * w, rate: 20 };
+    const engaged = G.phase === 'wave' && ((t.tg && !t.tg.dead) || s < 2.5);
+    if (engaged) return { c: 'ready', s: now + (t.anim || 0) * 3, rate: 5 };
+    return { c: 'idle', s: now + (t.anim || 0) * 7, rate: 3 };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16), _s = new Float32Array(16);
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const US = (typeof UM_UNITS !== 'undefined' && UM_UNITS[U]) || {}, base = L && L.base && L.base.count ? L.base : null;
+    if (base) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _a, opts); }
+    const refH = Math.max(.3, full.max[1] - (base ? base.max[1] * .4 : 0)), s = refH / HGT * (US.k != null ? US.k : K0) * (1 + .025 * Math.max(0, tr - 2)), lift = base ? base.max[1] * (1 - (US.sink || 0)) : 0;
+    M4.trs(_a, x, lift * sy, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live && !t._ghost) {
+      const now = G.time, dt = t._sgT == null ? 1 : Math.max(0, Math.min(.1, now - t._sgT)); t._sgT = now;
+      if (!t._sgP || t._sgP.q.length !== NB * 4) { t._sgP = newPose(); t._sgP.q.set(PT.q); t._sgP.t.set(PT.t); }
+      follow(t._sgP, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._sgP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, US.trim != null ? US.trim : .15]; it.bones = OUT.slice();
+    const tp = at(OUT, STAFF, TIP), tw = M4.xf(_c, tp[0], tp[1], tp[2]);
+    if (typeof FX_PM !== 'undefined') { FX_PM.root = FX_PM.torso = _c; M4.trs(_s, tw[0], tw[1] - .55 * K, tw[2], 0, 0, 0, 1, 1, 1); FX_PM.staff = _s; }   // (the staff's glow, druidExtra: fxAt('staff', [0, .55, 0], K))
+    if (live && !t._ghost) { t.tipW = tw; t.tipYaw = ang; t.tipAt = G.time; t._sgClip = P.c; }
+    return true;
+  }
+  try { load(typeof SAGE_MDL !== 'undefined' ? SAGE_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No sculpted sage:', e.message); }
+  if (MESH_ && typeof umDraw === 'function') {
+    const _um = umDraw;
+    umDraw = function (t, u) {
+      if (u === U && S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS) { try { if (draw.apply(this, arguments)) return true; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('sage:', e); } } }
+      return _um.apply(this, arguments);
+    };
+  }
+  /* the build ghost (view.js drawGhost draws druidGhostMesh's one mesh): the sculpted form it will start in, see-through,
+     at the ghost's cell, and an empty mesh handed back so the code-built body is not drawn over it */
+  if (typeof druidGhostMesh === 'function') {
+    const _gm = druidGhostMesh; let EMPTY = null, GT = null;
+    const DRAW = { druid_sage: () => MESH_ && S.on && draw, druid_bear: () => typeof BEAR2 !== 'undefined' && BEAR2.S.on && BEAR2.ready() && BEAR2.draw };
+    druidGhostMesh = function (ty) {
+      const m = _gm.apply(this, arguments); if (!m || typeof NEWMODELS === 'undefined' || !NEWMODELS || typeof G === 'undefined' || !G || !G.ghost) return m;
+      const u = DRUID_FORMS[druidWaveForm()].model, f = DRAW[u] && DRAW[u](); if (!f) return m;
+      try {
+        const ok = G.ghost.ok, x = G.ghost.i + .5, zz = G.ghost.j + .5, K = unitK(u, 0);
+        GT = GT || { _ghost: true, ang: 0, tier: 0 }; GT.x = x; GT.y = zz; GT.def = TOWERS[ty];
+        const opts = { alpha: .55, shadow: false, tint: ok ? [.9, 1.15, .9, .05] : [1.3, .6, .55, .05] };
+        if (!f(GT, u, 0, K, { y: 0 }, x, zz, 0, 0, 0, 1, 1, 1, opts, null, m)) return m;
+        if (!EMPTY) EMPTY = new Geo(1).finish();
+        return EMPTY;
+      } catch (e) { return m; }
     };
   }
   return { S, CL, load, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
