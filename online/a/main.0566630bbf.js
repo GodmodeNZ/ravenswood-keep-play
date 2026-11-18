@@ -1,4 +1,4 @@
-const BUILD_TAG = '9f504c1+@2026-11-18';   // the play log's build version (playlog.js)
+const BUILD_TAG = '332715a+@2026-11-18';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -30890,7 +30890,7 @@ if (typeof SP_SHAPE !== 'undefined') Object.assign(SP_SHAPE, { ch_wardensoath: '
                          crumbles into dead leaves when it dies, withering those near it (in place of Grasp of the Deep)
      Stag Lancers        Bounding Leap (III): the stag clears walls and units to land on a foe beyond its reach
                          White Hart's Hunt (IV): a run of charges; the first pins, every next one runs the pinned through
-     Grove Shifters      Primal Pounce (II): it takes the shape its quarry calls for, mid-leap, and strikes with it
+     Grove Shifters      Primal Swipe (II): it takes the shape its quarry calls for and strikes with it (the bear: a wide claw rake)
                          Shapestorm (III): hawk, bear and sage in one breath, each striking its own quarry
      Blade Dancers       Threading Dance (II): it darts foe to foe, weaving a vine through them, then pulls it taut
                          Encore (IV): afterimages strike again every foe it has cut in the last seconds
@@ -31358,10 +31358,22 @@ function gvcShiftTo(t, f) {
   return true;
 }
 const gvcHeldForm = t => t.ab && DRUID_FORMS[t.ab.formLock] ? t.ab.formLock : null;
-gvcSet('wildstrike', { name: 'Primal Pounce', short: 'Pounce', glyph: 'flash', hue: '#d8c070', mana: 70, cd: 10,
+// the bear's Primal Swipe: a claw rake across its front. Its quarry takes main x the spell's multiplier (and the root), every other
+// ground foe within its reach + reach and inside the arc (cos: 150 degrees wide) side x; one foe alone takes a little less
+// than the old single blow, two or more take more in all
+const GVC_CLAW = { main: .8, side: .5, reach: .6, cos: Math.cos(75 * Math.PI / 180) };
+// three claw streaks raked across the bear's front, one after another (see-through, quick: the field stays readable)
+function gvcClawFx(t, ux, uz) {
+  if (typeof rfx !== 'function') return;
+  const a = Math.atan2(ux, uz);
+  for (let k = 0; k < 3; k++) G.delayed.push({ t: .025 * k, fn: () => { if (!G.towers.includes(t)) return;
+    rfx({ k: 'slash', x: t.x + ux * (.42 + .07 * k), h: .26 + .04 * k, z: t.y + uz * (.42 + .07 * k), a: a + .35 - .12 * k, r: .34 + .05 * k, col: '#7a6448', life: .24 }); } });   // (dim warm streaks: the sprite adds light, so a pale colour three deep glares)
+}
+gvcSet('wildstrike', { name: 'Primal Swipe', short: 'Swipe',   // (owner, 18 Nov 2026: "change the name to swipe ... remove any mention of pounce")
+  glyph: 'flash', hue: '#d8c070', mana: 70, cd: 10,
   by: { mult: [2, 2.25, 2.5, 2.75, 3, 3.25], hold: [1.5, 1.5, 2, 2, 2.5, 2.5] },
   auto: 'the toughest foe in reach + 0.5: a flyer in the air first, then plate or a caster, then any ground foe; it takes the form that foe calls for',
-  text: (t, st, ab) => { const m = byT(ab.by.mult, t), h = byT(ab.by.hold, t); return `Pounces in the form its quarry calls for: hawk at a flyer (${xD(st, m)}, dragged down ${gNf(h + 1)}s), bear at a ground foe (${xD(st, m)}, rooted ${gNf(h * .6)}s), sage at plate or a caster (${xD(st, m * .9)} magic, 3 armour off for 6s).`; },
+  text: (t, st, ab) => { const m = byT(ab.by.mult, t), h = byT(ab.by.hold, t); return `Strikes in the form its quarry calls for: hawk at a flyer (${xD(st, m)}, dragged down ${gNf(h + 1)}s), bear rakes a wide claw arc in front of it (${xD(st, m * GVC_CLAW.main)} to its quarry, rooted ${gNf(h * .6)}s, and ${xD(st, m * GVC_CLAW.side)} to every other ground foe in the arc), sage at plate or a caster (${xD(st, m * .9)} magic, 3 armour off for 6s).`; },
   pick(t, st, ab, man) {
     const L = abFoes(t, st, abReach(t, st, ab) + .5 + (druidForm(t) === 'bear' ? 1 : 0)); if (!L.length) return null;
     const lock = gvcHeldForm(t);
@@ -31377,8 +31389,14 @@ gvcSet('wildstrike', { name: 'Primal Pounce', short: 'Pounce', glyph: 'flash', h
     G.delayed.push({ t: shifted ? .3 : .18, fn: () => {
       if (c.dead || !abLive(t)) return; const s = t.st || st;
       if (f === 'hawk') { abHit(t, s, c, m, 'phys', [ux * .1, uz * .1]); if (!c.dead && c.fly) c.lowT = Math.max(c.lowT || 0, G.time + (h + 1) * (c.def.boss ? .4 : 1)); sfx('hawkStrike'); }
-      else if (f === 'bear') {
-        abHit(t, s, c, m, 'phys', [ux * .2, uz * .2]); if (!c.dead) rootFoe(c, h * .6, t);
+      else if (f === 'bear') {   // a wide claw rake (owner, 18 Nov 2026: "aoe swipe with claw"): its quarry, and every ground foe in the arc in front
+        const [ax, az] = abDir(t, c), r = abReach(t, s, ab) + GVC_CLAW.reach;
+        abHit(t, s, c, m * GVC_CLAW.main, 'phys', [ux * .2, uz * .2]); if (!c.dead) rootFoe(c, h * .6, t);
+        abAoe(() => { for (const o of abFoes(t, s, r, gvcWalker)) {
+          if (o === c) continue; const dx = o.x - t.x, dz = o.y - t.y, dl = Math.hypot(dx, dz) || 1;
+          if ((dx * ax + dz * az) / dl >= GVC_CLAW.cos) abHit(t, s, o, m * GVC_CLAW.side, 'phys', [dx / dl * .12, dz / dl * .12]);
+        } });
+        gvcClawFx(t, ax, az);
         G.shake = Math.max(G.shake || 0, .06); sfx('quake', .7);
       } else { abHit(t, s, c, m * .9, 'magic', null); if (!c.dead) { c.shred = Math.max(c.shredT > 0 ? c.shred : 0, 3); c.shredT = Math.max(c.shredT || 0, 6); } sfx('arcane', 0); }
       gvcFx('pouncehit', t, ab, { c, f, ux, uz });
@@ -31662,9 +31680,9 @@ function gvcTal(tree, name, o) {
   gvcTal(T.arcane, 'Bowl Over', { pro: n => `Bounding Leap lands harder: every ground foe its landing strikes is stunned ${gNf(.3 * n)}s too, and it roots them ${gNf(.15 * n)}s longer.`, sp: n => ({ ab: 'stampede', rider: { stun: .3 * n }, by: { root: .15 * n } }) });
   gvcTal(T.arcane, 'Herd Instinct', { pro: n => `Each Bounding Leap brings Heroic Charge ${2 * n}s nearer.` });
   // Grove Shifters
-  gvcTal(T.storm, 'Wing-Clipper', { pro: n => `In hawk form talons drag flyers down ${gNf(.6 * n)}s, and Primal Pounce holds ${gNf(.5 * n)}s longer (the flyer dragged down, the ground foe pinned under the paw).` });
-  gvcTal(T.storm, "Hawk's Mark", { pro: 'Primal Pounce costs 25% less, and each one brings Shift Form 3s nearer.' });
-  gvcTal(T.storm, 'Talon Rend', { pro: n => `Primal Pounce leaves its foe bleeding for ${40 * n}% of a strike over 3s.` });
+  gvcTal(T.storm, 'Wing-Clipper', { pro: n => `In hawk form talons drag flyers down ${gNf(.6 * n)}s, and Primal Swipe holds ${gNf(.5 * n)}s longer (the flyer dragged down, the ground foe pinned under the paw).` });
+  gvcTal(T.storm, "Hawk's Mark", { pro: 'Primal Swipe costs 25% less, and each one brings Shift Form 3s nearer.' });
+  gvcTal(T.storm, 'Talon Rend', { pro: n => `Primal Swipe leaves its foe bleeding for ${40 * n}% of a strike over 3s.` });
   gvcTal(T.storm, 'Grounded Prey', { pro: n => `Shapestorm strikes grounded flyers and held foes ${25 * n}% harder (its hawk grounds and its bear roots, so its sage cashes in), and its moon-thorns slow ${5 * n}% more.`, sp: n => [{ ab: 'wildsurge', vs: ['grounded', .25 * n], by: { slow: .05 * n } }, { ab: 'wildsurge', vs: ['held', .25 * n] }] });
   gvcTal(T.storm, "Harrier's Cry", { pro: n => `Shapestorm comes ${10 * n}% sooner, and each one gives every unit within 1.6 cells ${8 * n} mana.` });
   // Blade Dancers
@@ -40038,11 +40056,11 @@ if (typeof fsetAdd === 'function') {
       }
     } });
 
-  /* ---------- Grove Shifters: every shift ends in a pounce ---------- */
+  /* ---------- Grove Shifters: every shift ends in a swipe ---------- */
   fsetAdd({ id: 'fe_gv_shift', epic: 1, spells: ['shift', 'wildstrike'], force: 'grove', unit: 'storm', name: 'Skins of the Many-Shaped',
     pieces: [['fe_gv_moontalon', 'Talon of the Turning Moon', 3, 'feather', '#c8b890', 'dmg crit'], ['fe_gv_bearpelt', 'Bearhide Shoulder-Pelt', 3, 'shield', '#7a5a3a', 'dmg as']],
     old: [['fe_gv_sagetotem', 'Sage-Bark Totem', 3, 'rune', '#8ab070', 'sp mana cd'], ['fe_gv_shedskin', 'Shed-Skin Locket', 3, 'ring', '#a0c080', 'regen cd']],
-    b2: 'Each Shift Form brings Primal Pounce 3s nearer. Every Shift Form ends in a pounce: it casts Primal Pounce at once, free, and a ground foe that pounce strikes is bowled back up the road.',
+    b2: 'Each Shift Form brings Primal Swipe 3s nearer. Every Shift Form ends in a swipe: it casts Primal Swipe at once, free, and a ground foe that swipe strikes is held fast for 1s.',
     cast(t, ab, tg, n) {
       if (ab.id !== 'shift') return;
       fsReady(t, 'wildstrike', 3);
@@ -43645,7 +43663,7 @@ function gfRe(list, old, o) {
   const W = T.storm.list;
   gfRe(W, 'Ground Watch', { name: 'Wildwood Tithe', icon: 'leaf', pro: n => `The wood feeds the shape: each strike at a foe held by roots or carrying the Grove's spores restores ${n} mana.`, cap: 'gfTithe' });
   gfRe(W, 'Bramble Claws', { pro: n => `In bear form its mauls bleed the foe for ${15 * n}% of the hit over 3s, and a maul at a foe already bleeding strips 1 armour from it, up to ${2 * n}.`, cap: 'bramclaw' });
-  gfRe(W, "Hawk's Mark", { pro: 'The hunter takes whatever shape the kill needs: each Primal Pounce readies Shift Form at once, and for 4s after it Shift Form costs 70% less.', sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -.7 }] });
+  gfRe(W, "Hawk's Mark", { pro: 'The hunter takes whatever shape the kill needs: each Primal Swipe readies Shift Form at once, and for 4s after it Shift Form costs 70% less.', sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -.7 }] });
   gfRe(W, 'Second Skin', { pro: n => `Shift Form's arrival lasts ${gNf(.5 * n)}s longer, and the Shifter's first strike in each new form lands twice.`, sp: n => ({ ab: 'shift', by: { dur: .5 * n } }), cap: 'gfSkin' });
   gfRe(W, 'Wild Pace', { pro: n => `The bear in the pack: in bear form, while 2 or more ground foes are within its reach, its mauls come ${5 * n}% faster.`, cap: 'gfPace' });
   gfRe(W, "Druid's Patience", { pro: n => `In sage form it breathes with the wood: +${gNf(.4 * n)} mana a second while it wears the sage.`, cap: 'gfSage' });
@@ -46419,6 +46437,7 @@ function talNamesOld(force, hero) {
 // one tree's saved ranks, moved from the old names to the tree in play (a talent not found by name loses its ranks)
 // a talent renamed in place (the same talent, a new name): its saved ranks follow it
 const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (the Pyroclasts' spell row, 8 Nov 2026)
+  'Primal Pounce': 'Primal Swipe',   // (the Grove Shifters' spell 2, renamed 18 Nov 2026)
   'Undertow Rune': 'Tidemoon',   // (the Mageling's rune became an orb sent out over the road, 14 Nov 2026)
   // (the Anvilwrights' talents and spells off runes, onto the forge, 17 Nov 2026)
   'Swift Inscription': 'Swift Tempering', 'Rune of Making': 'Tempering', 'Rune of Unmaking': 'Unmaking Blow', 'Rune Lord': 'Forgelord',
@@ -48790,7 +48809,7 @@ const TAL_SPREAD = {
   "grove.arrow": {"Patient Hunter":[2,1],"Canopy Sight":[1,3],"Mark the Quarry":[2,2],"Thornpoint Arrows":[0,2],"Paired Shafts":[3,3],"Thornseed Arrow":[2,3],"Heartseeker":[1,0],"Snaring Shot":[3,2],"Pinning Shot":[5,1],"Thornrain":[5,2],"Nailing Shaft":[4,0],"Still Quarry":[4,3],"Wounded Prey":[4,1],"Splitting Shaft":[5,0],"Quick Nock":[0,1],"Hunter's Rhythm":[1,1],"Hushed Quarry":[3,0]},
   "grove.frost": {"Deep Roots":[0,0],"Thorned Vines":[0,2],"Clinging Briars":[2,0],"Thorn Hold":[2,2],"Mothcloud":[1,0],"The Deep Hungers":[5,1],"Wither":[4,1],"Second Snare":[3,3],"Bramble Squeeze":[4,2],"Spreading Roots":[1,2],"Bloodbriar":[2,1],"Rootburst":[3,1],"Overgrowth":[5,0],"Strangleroot":[5,2],"Warden's Reach":[3,0],"Sapwell":[4,3],"Quickening Sap":[0,1]},
   "grove.arcane": {"Heavy Lance":[0,2],"Trample":[2,2],"Wheel About":[0,0],"Bowl Over":[4,2],"Run to Ground":[5,1],"Mark of the Hunt":[3,1],"Bounding Leap":[3,2],"White Hart's Hunt":[4,1],"Lord of the Glade":[1,3],"Hooves of Thunder":[5,2],"Hunter's Finish":[5,3],"Second Charge":[3,3],"Goring Antlers":[0,1],"Long Gallop":[2,3],"Stag's Wind":[1,1],"Herd Instinct":[4,0]},
-  "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Pounce":[1,2],"Hawk's Mark":[2,3],"Grounded Prey":[4,0],"Moonsap Bolts":[2,0],"Skyfall":[5,2],"Shapestorm":[3,0],"Second Skin":[1,1],"Harrier's Cry":[4,2],"Hawk Lord":[5,1],"Wild Heart":[5,3],"Wild Pace":[0,0],"Druid's Patience":[0,1],"Talon Rend":[3,2]},
+  "grove.storm": {"Hawk's Reach":[4,1],"Wildwood Tithe":[0,2],"Wing-Clipper":[2,2],"Bramble Claws":[1,3],"Primal Swipe":[1,2],"Hawk's Mark":[2,3],"Grounded Prey":[4,0],"Moonsap Bolts":[2,0],"Skyfall":[5,2],"Shapestorm":[3,0],"Second Skin":[1,1],"Harrier's Cry":[4,2],"Hawk Lord":[5,1],"Wild Heart":[5,3],"Wild Pace":[0,0],"Druid's Patience":[0,1],"Talon Rend":[3,2]},
   "grove.earth": {"Leaf-Edged Blades":[0,1],"Wide Whirl":[1,1],"Flowing Steps":[3,1],"Tripping Blades":[0,2],"Blade Rhythm":[1,3],"Threading Dance":[2,1],"Curtain Call":[5,2],"Bladestorm":[5,1],"Encore":[4,2],"Twin Whirl":[3,0],"Gale of Blades":[4,1],"Reaper's Step":[5,3],"Quickstep":[2,2],"Dancer's Breath":[0,3],"Petal Cuts":[3,2]},
   "grove.cannon": {"Potent Spores":[1,1],"Ripe Pods":[1,0],"Choking Spores":[0,2],"Seed Scatter":[3,0],"Hard Husk":[4,2],"Clinging Spores":[4,3],"Puffcap Sowing":[2,0],"Snapjaw Bloom":[3,3],"Spore Cloud":[5,0],"Bursting Rot":[5,1],"Puffcap Trail":[5,2],"Rootmark Seed":[4,1],"Drifting Spores":[1,3],"Far Cast":[2,2],"Seedwell":[2,3],"Thorned Husks":[0,1],"Burrowing Pods":[3,1]},
   "champ:rootmother": {"Patient Earth":[0,1],"Long Vines":[0,2],"Deep Grip":[0,0],"Twin Elders":[5,1],"Rootway":[1,1],"Bramble Grasp":[2,1],"Thorned Roots":[1,2],"Sap Song":[3,0],"Heartwood Sapling":[3,2],"Strangling Hold":[4,3],"Sapling Warden":[4,0],"Rootmother":[5,3],"The Old Wood Walks":[2,2],"Thousand Roots":[5,2],"Quick Tendrils":[1,3],"Deep Sap":[3,3],"Sapling Song":[4,1]},
@@ -49226,9 +49245,9 @@ function talRankSteps(t) {
      Heavy Lance          the lance hits a stunned or held foe 12% harder a rank (was 8% + 8% armour pen a rank)
      Bowl Over            Bounding Leap stuns 0.4s a rank (was 0.3s + its root 0.15s longer)
      Hawk's Reach         0.4 cells a rank (was 0.3 + the first flyer of each hawk form dragged down)
-     Wing-Clipper         Primal Pounce holds 0.75s longer a rank (was 0.5s + hawk talons dragging flyers down 0.6s)
+     Wing-Clipper         Primal Swipe holds 0.75s longer a rank (was 0.5s + hawk talons dragging flyers down 0.6s)
      Bramble Claws        bear mauls bleed for 20% a rank (was 15% + an armour strip on bleeding foes)
-     Hawk's Mark          Primal Pounce readies a free Shift Form for 4s (was readied + 70% cheaper for 4s)
+     Hawk's Mark          Primal Swipe readies a free Shift Form for 4s (was readied + 70% cheaper for 4s)
      Second Skin          the first strike in each new form lands twice (Shift Form's longer arrival cut)
      Harrier's Cry        Shapestorm brings Shift Form 4s nearer a rank (was 2s + Shapestorm sooner for each new form)
      Wild Heart           each change of form adds 40 Growth (was 30 + Kindred Echo's 2 more foes)
@@ -49345,12 +49364,12 @@ function talRankSteps(t) {
   talPlain('grove', 'storm', {
     'Hawk\'s Reach': { tag: 'Damage', pro: n => `In hawk form its talons reach ${n2(.4 * n)} cells farther at flyers.` },
     'Wildwood Tithe': { tag: 'Mana', pro: n => `Each strike at a held or spored foe restores ${n} mana.` },
-    // one effect: Primal Pounce's hold, 0.75s a rank (its hawk talons' grounding cut; it is the spell's upgrade below it)
-    'Wing-Clipper': { tag: 'Control', pro: n => `Primal Pounce holds its foe ${n2(.75 * n)}s longer.`, cap: null, sp: n => ({ ab: 'wildstrike', by: { hold: .75 * n } }) },
+    // one effect: Primal Swipe's hold, 0.75s a rank (its hawk talons' grounding cut; it is the spell's upgrade below it)
+    'Wing-Clipper': { tag: 'Control', pro: n => `Primal Swipe holds its foe ${n2(.75 * n)}s longer.`, cap: null, sp: n => ({ ab: 'wildstrike', by: { hold: .75 * n } }) },
     'Bramble Claws': { tag: 'Damage', pro: n => `In bear form its mauls bleed the foe for ${20 * n}% of the hit over 3s.` },
-    'Primal Pounce': { tag: 'Control' },
-    // one effect: a free Shift Form after each Pounce (was readied, then 70% cheaper for 4s)
-    'Hawk\'s Mark': { tag: 'Spell', pro: 'Each Primal Pounce readies Shift Form, free for the next 4s.',
+    'Primal Swipe': { tag: 'Control' },
+    // one effect: a free Shift Form after each Swipe (was readied, then 70% cheaper for 4s)
+    'Hawk\'s Mark': { tag: 'Spell', pro: 'Each Primal Swipe readies Shift Form, free for the next 4s.',
       sp: [{ ab: 'wildstrike', ready: ['shift', 60] }, { ab: 'shift', at: 'gfAfter', after: 'wildstrike', cast: 4, cost: -1 }] },
     'Grounded Prey': { tag: 'Spell', pro: n => `Shapestorm hits grounded flyers and held foes ${25 * n}% harder.` },
     'Moonsap Bolts': { tag: 'Damage', pro: n => `In sage form each bolt strips 1 armour for 4s, up to ${2 * n}.` },
@@ -49364,7 +49383,7 @@ function talRankSteps(t) {
     'Wild Heart': { tag: 'Growth', pro: 'Each change of form adds 40 Growth.' },
     'Wild Pace': { tag: 'Damage', pro: n => `In bear form its mauls come ${5 * n}% faster while 2 or more ground foes are in reach.` },
     'Druid\'s Patience': { tag: 'Mana', pro: n => `Gains ${n2(.4 * n)} mana a second in sage form.` },
-    'Talon Rend': { tag: 'Spell', pro: n => `Primal Pounce leaves its foe bleeding for ${40 * n}% of a strike over 3s.` },
+    'Talon Rend': { tag: 'Spell', pro: n => `Primal Swipe leaves its foe bleeding for ${40 * n}% of a strike over 3s.` },
   });
 
   /* ---- Blade Dancers ---- */
@@ -51110,7 +51129,7 @@ const HOLD_TAL = {
     'Hooves of Thunder': { tag: 'Damage', pro: 'Each charge ends in a stomp, hitting ground foes within 1 cell for 50% of the lance, and held ones for all of it.' },
   },
   'grove.storm': {
-    'Wing-Clipper': { tag: 'Control', pro: n => `Primal Pounce drags a flyer down ${hNf(.75 * n)}s longer.` },
+    'Wing-Clipper': { tag: 'Control', pro: n => `Primal Swipe drags a flyer down ${hNf(.75 * n)}s longer.` },
   },
   'silver.arcane': {
     'Unhorse': { tag: 'Control', pro: 'The lance also drives back every ground foe within a cell of its foe.' },
@@ -83276,7 +83295,7 @@ const SPELL_BRIEFS = {
   heroiccharge: 'Charges up to 1.5 cells past its range, dealing {d} (50% more to bosses and elites). An enemy another unit holds takes ×1.6.',
   stampede: ({ d, v, full }) => { const m = /up to ([\d.]+) cells away/.exec(String(full).replace(/<[^>]+>/g, '')); return `Leaps onto a ground enemy up to ${m ? m[1] : '4'} cells away (your units and walls block it), dealing ${d(1)}. Ground enemies within 0.8 cells take ${d(2)}.`; },
   runthrough: 'Charges {n} times. Each deals {d}, or {d2} to an enemy another unit has rooted or stunned.',
-  wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Pounces in the form needed. Hawk: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: ${d(2)} to a ground enemy, bowling it 0.3 cells back. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
+  wildstrike: ({ d, v }) => { const h = v('hold') || 1.5; return `Strikes in the form needed. Hawk: ${d(1)} to a flying enemy, dragging it down for ${+(h + 1).toFixed(2)} sec. Bear: a wide claw swipe across its front, hitting its target and every ground enemy in the arc. Sage: ${d(3)} to an armoured enemy or caster, stripping 3 armour for 6 sec.`; },
   wildsurge: 'Strikes once in each form. Hawk: {d}, dragging down for 2 sec. Bear: {d2} to the toughest ground enemy, bowling it 0.3 cells back. Sage: {d3} to every enemy in a line, slowing {slowPct} for 2 sec.',
   whirlwind: 'Spins {n} times, 0.5 sec apart. Each deals {d} to every ground enemy in range and slows 25%. No basic attacks while spinning.',
   leafdance: 'Darts through up to {n} ground enemies within 2.2 cells, dealing {d} each, then slows them all 30% for 2 sec.',
@@ -85950,94 +85969,204 @@ function unitListTick() {
 }
 if (typeof forecastTick === 'function') { const _ulF = forecastTick; forecastTick = function () { _ulF.apply(this, arguments); try { unitListTick(); } catch (e) { if (!UL.err) { UL.err = 1; console.warn('unit list', e); } } }; }
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -86046,75 +86175,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -96622,12 +96883,15 @@ const TG2 = (() => {
      swipeL / swipeR   its maul, paw by paw: over t.windup it rises and cocks a forepaw up and out, then rakes it in across
              the front and down to the road (the hit lands .1 s after the strike goes: the clip's impact frame), holds, recovers
      slam    every 4th maul (the one that staggers its foe): it rears on its hind legs, both forepaws high, and crashes down
-     bite    Primal Strike: a coil, a lunge, the jaws snapping shut as the hit lands (.15 s), a shake, the release
+     claw    Primal Swipe as the bear (an area claw rake, forces_zx_grove_cool.js): it rears a little, cocks a forepaw high out
+             to its right and rakes it flat across its whole front, the claws crossing the middle as the hit lands (.18 s, or
+             .3 s when it shifted to strike), follows through far to its left, holds and settles
+     (Shapestorm's bear beat plays the slam, its crash on that beat's hit)
      roar    Shift Form into the bear: it rears up on its hind legs and roars, then drops onto all fours
      charge  Wild Surge: a bounding run out along the lane, and back (the clip run backwards)
    Every move is eased into from where it was (bone by bone, by quaternion), except a strike's own frames, which snap. */
 const BEAR2 = (() => {
-  const U = 'druid_bear', NAMES = ['idle', 'ready', 'swipeL', 'swipeR', 'slam', 'bite', 'roar', 'charge'], K0 = 1.25;
+  const U = 'druid_bear', NAMES = ['idle', 'ready', 'swipeL', 'swipeR', 'slam', 'claw', 'roar', 'charge'], K0 = 1.25;
   const S = { on: true };
   try { S.on = !/[?&]bear=old\b/.test(location.search); } catch (e) {}
   let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HGT = 1, HEAD = 0, TIP = null;
@@ -96721,9 +96985,17 @@ const BEAR2 = (() => {
       const u = (now - t.chg.at) / t.chg.T, ph = (now - t.chg.at) * (u < .5 ? 1 : -1);
       if (u >= 0 && u < 1) return { c: 'charge', s: ph, rate: 30 };
     }
-    if (A && A.last === 'wildstrike' && A.lastAt != null && now - A.lastAt >= 0 && now - A.lastAt < CL.bite.len) return { c: 'bite', s: now - A.lastAt, rate: 0 };
+    const P_ = t.gvcPounce, CH = CL.claw.hit || .2;
+    if (P_ && P_.f === 'bear' && now - P_.at >= 0) {   // Primal Swipe: the rake's claws cross its front as the hit lands (.18 s; .3 s when it shifted to strike)
+      const shifted = t.shiftAt != null && Math.abs(t.shiftAt - P_.at) < .02, s = now - P_.at + CH - (shifted ? .3 : .18);
+      if (s < CL.claw.len) return { c: 'claw', s: Math.max(0, s), rate: s < CH + .15 ? 0 : 18 };
+    }
+    if (!P_ && A && A.last === 'wildstrike' && A.lastAt != null && now - A.lastAt >= 0 && now - A.lastAt < CL.claw.len) return { c: 'claw', s: now - A.lastAt + CH - .15, rate: 0 };
+    const sb = t.gvcStormAt != null ? now - t.gvcStormAt - .5 : -9;   // Shapestorm's bear beat (.5 s in, its hit .16 s later): the slam's crash on it
+    if (t.form === 'bear' && sb >= 0 && sb < .5) return { c: 'slam', s: (CL.slam.hit || .6) - .16 + sb, rate: sb < .2 ? 0 : 18 };
     const sh = t.shiftAt != null ? now - t.shiftAt - .12 : 9;   // (the bear blooms in from .15 s into the shift)
-    if (t.form === 'bear' && sh >= 0 && sh < CL.roar.len) return { c: 'roar', s: sh, rate: sh < .1 ? 0 : 20 };
+    const spellShift = t.shiftAt != null && ((P_ && Math.abs(t.shiftAt - P_.at) < .02) || (t.gvcStormAt != null && t.shiftAt >= t.gvcStormAt - .01 && t.shiftAt <= t.gvcStormAt + 1.5));   // (a shift a spell made: no roar after its own move)
+    if (t.form === 'bear' && !spellShift && sh >= 0 && sh < CL.roar.len) return { c: 'roar', s: sh, rate: sh < .1 ? 0 : 20 };
     // the mauls: which strike went (read the moment it goes) and which the next wind-up is for
     const n = t.maulN || 0;
     if (t._brShots !== t.shots) { t._brShots = t.shots; t._brClip = n % 4 === 0 && n ? 'slam' : n % 2 ? 'swipeL' : 'swipeR'; }
@@ -96771,6 +97043,9 @@ const BEAR2 = (() => {
   }
   return { S, CL, load, ctl, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
 })();
+// the Shifters' spell 2 was renamed Primal Swipe (owner, 18 Nov 2026): its talent's painting follows it (talentpaint.js is keyed
+// by the talent's name; this file loads after it)
+try { const P_ = typeof TALENT_PAINT !== 'undefined' && TALENT_PAINT.talents, o = 'grove:storm:Primal Pounce', n = 'grove:storm:Primal Swipe'; if (P_ && P_[o] && !P_[n]) P_[n] = P_[o]; } catch (e) {}
 
 /* The Spellblades on a rig and clips made from scratch (the owner, 18 Nov 2026: a new model for the Spellblade, rigged and
    animated, his crystal sword in his right hand). His mesh is the owner's grey-bearded battle-mage in an aubergine robe and
@@ -108638,8 +108913,8 @@ const SPELL_HELP = {
   runthrough: { when: "A boss or elite in reach, or two or more ground foes within {reach} cells.", aim: "Each charge: the toughest ground foe in reach. One another unit holds is run through for double.", ctl: "Hunts for about 2s: no other strikes meanwhile.", tips: ["Cast it on a boss another unit holds: every charge runs it through for double.", "Post the Lancers within the Briarwardens' roots: every charge at a held ground foe is a run-through.", "The Lancers hold nothing themselves: without a Thornguard pin or a root beside them, each charge is a plain one."] },
 
   // Grove Shifters (wayfarer)
-  shift: { when: "When what is in sight (up to 1.6 cells past its range) calls for another form. Hawk: flyers are a third of it. Bear: 3 or more soft ground foes within 2.2 cells. Sage: anything else.", aim: "Itself. Arriving, the hawk drags the 2 nearest flyers down, the bear roars at ground foes within 1.6 cells, the sage bursts moonlight round the toughest armoured foe or caster.", ctl: "Tap Shift to hold Hawk, Bear or Sage (it shifts as soon as mana and cooldown allow); Auto lets it choose again.", tips: ["Leave it on Auto for mixed waves; hold Hawk for flyer waves so it doesn't fall back to sage between flocks.", "Hold Bear at a tight bend right beside the path: its mauls cleave ground foes, but it cannot reach flyers.", "Every shift costs mana, so a held form saves mana for Primal Pounce and Shapestorm."] },
-  wildstrike: { when: "One foe within {reach} cells plus half a cell is enough (a little farther from bear form).", aim: "A flyer still in the air first (the hawk), then the toughest armoured foe or caster (the sage), then the toughest ground foe (the bear); it takes that foe's form as it pounces.", ctl: "A held form pounces in that form, at that form's quarry.", tips: ["Leave the form on Auto: the pounce shifts it for free, so Shift Form's mana goes further.", "As bear it bowls its foe back up the road, and hits a foe another unit holds harder.", "As hawk it drags a flyer low enough for every unit to reach: the answer to a lone flying boss."] },
+  shift: { when: "When what is in sight (up to 1.6 cells past its range) calls for another form. Hawk: flyers are a third of it. Bear: 3 or more soft ground foes within 2.2 cells. Sage: anything else.", aim: "Itself. Arriving, the hawk drags the 2 nearest flyers down, the bear roars at ground foes within 1.6 cells, the sage bursts moonlight round the toughest armoured foe or caster.", ctl: "Tap Shift to hold Hawk, Bear or Sage (it shifts as soon as mana and cooldown allow); Auto lets it choose again.", tips: ["Leave it on Auto for mixed waves; hold Hawk for flyer waves so it doesn't fall back to sage between flocks.", "Hold Bear at a tight bend right beside the path: its mauls cleave ground foes, but it cannot reach flyers.", "Every shift costs mana, so a held form saves mana for Primal Swipe and Shapestorm."] },
+  wildstrike: { when: "One foe within {reach} cells plus half a cell is enough (a little farther from bear form).", aim: "A flyer still in the air first (the hawk), then the toughest armoured foe or caster (the sage), then the toughest ground foe (the bear); it takes that foe's form as it strikes.", ctl: "A held form swipes in that form, at that form's quarry.", tips: ["Leave the form on Auto: the swipe shifts it for free, so Shift Form's mana goes further.", "As bear it rakes a wide claw arc across its front: its quarry is rooted, and every ground foe in the arc is clawed too. Best when they bunch up in front of it.", "As hawk it drags a flyer low enough for every unit to reach: the answer to a lone flying boss."] },
   wildsurge: { when: "Three or more foes within {reach+1.5} cells, or a boss or elite there.", aim: "The hawk: the toughest flyer still in the air, else the toughest foe. The bear: the toughest ground foe. The sage: the straight lane out to {reach} cells through the most foes.", ctl: "About 1.5s: no basic attacks meanwhile. It ends in the form the fight wants (or the held form).", tips: ["Post the Shifters where flyers, ground foes and plate all pass, beside a straight run for the sage's lane.", "The hawk grounds flyers, so the sage's moon-thorns strike grounded foes: take Grounded Prey.", "It costs no Shift Form mana to wear all three shapes, so it suits a Shifter held in one form."] },
 
   // Blade Dancers (bladedancer)
