@@ -1,4 +1,4 @@
-const BUILD_TAG = '7a33849@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f3c1ca9@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -61797,7 +61797,10 @@ const AudioSys = (() => {
   // while a take has not loaded at all, never when a take is merely held back by its spacing)
   const fxHas = k => !!fxTakes()[k];
   const fxOr = (k, vol, gap, old) => { if (!firePlay(k, vol, gap) && !fxHas(k)) old && old(); };
-  S.tgShot = () => { fxOr('tgShotProj', .17, .06, () => gunShot(false)); fxOr('tgShotImp', .3, .06); };
+  // (owner, 19 Nov 2026: "thunderguns basic attack sounds a lot softer in game, and not hearing an impact sound": both raised, the
+  // impact kept at the owner's 1.7x over the crack, and up to 5 copies of each at once so a firing line isn't thinned to three)
+  TAKE_CAPS.tgShotProj = TAKE_CAPS.tgShotImp = 5;
+  S.tgShot = () => { fxOr('tgShotProj', .28, .05, () => gunShot(false)); fxOr('tgShotImp', .48, .05); };
   S.tgLong = () => { fxOr('tgLongProj', .23, .2, () => gunShot(true)); fxOr('tgLongImp', .4, .2); };
   S.tgSlug = () => { fxOr('tgSlugMix', .4, .2, () => gunShot(true)); };
   S.tgRattle = (len) => { if (!fxHas('tgRattleProj')) { S.gatBurst(len); return; } fxOr('tgRattleProj', .3, .3); fxOr('tgRattleImp', .31, .3); E.gatBurstEnd = now() + Math.max(len || 0, 2.2); };   // (the bullets' cracks keep quiet under it)
