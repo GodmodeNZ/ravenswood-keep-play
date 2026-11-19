@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ff37080@2026-11-20';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6610714@2026-11-20';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -112015,6 +112015,12 @@ const RG_WAY = [0, .25, .45, .65];
 const RG_TIER_W = { 1: 2, 2: 9, 3: 18, 4: 28, 5: 36 };
 // a step of growth: waves 2 later, foes 8% more health, reward 25% more; a patrol's reward by how many came before it
 const RG_STEP = { w: 2, hp: .08, pay: .25 };
+/* The first places (tier 1: Mossford, Fernwatch, the roads between them) are where a new player learns the map (owner, 20 Nov
+   2026: "difficulty for fernwatch and mossford are too difficult"; the first ten waves are easy, with no surprises): no boss
+   (its wave brings a few more of the rank and file), only the faction's melee and quick foes and at most one armoured foe a
+   wave (casters, slingers, flyers and the rest march as melee), foes at hp of their health, a line of `line` lives, at least
+   `gold` to plant the maze from nothing, and a retreat from one does not move the threat clock. Growth still applies on top. */
+const RG_GENTLE = { tier: 1, hp: .8, line: 15, gold: 200, bossFill: 4 };
 const RG_PATROL_PAY = [.4, .2, .1];
 const RG_PRICE = { life: 6, tend: 40, respec: 80, alms: 40, offering: 30 };
 // the field every region battle is fought on: the game's current one, Mistfall Ledge (a wide map: foes in along the whole
@@ -112111,13 +112117,31 @@ function rgNew(force, hero, hard) {
 }
 
 /* ---- the clock, growth, spread and the fall back ---- */
-function rgGrow(R, id) { const st = R.st[id]; if (st.s === 'held') return false; st.g = Math.min(RG_GROW, (st.g | 0) + 1); return true; }
+// a place grows a step (at most RG_GROW): why is kept with it (st.why, newest last), for its card (owner, 20 Nov 2026: "its also not
+// clear how difficulty works"); a win that holds the place clears both
+function rgGrow(R, id, why) { const st = R.st[id]; if (st.s === 'held' || (st.g | 0) >= RG_GROW) return false; st.g = (st.g | 0) + 1; st.why = (st.why || []).concat(why ? [why] : []).slice(-RG_GROW); return true; }
+// how hard a place's battle is, in one word and stars (1 Easy .. 5 Deadly): its tier (a first place 1, the lair 5) and its growth
+const RG_DIFF_W = ['', 'Easy', 'Normal', 'Hard', 'Deadly', 'Deadly'];
+function rgDiff(R, S) {
+  const n = rgNode(R, S.node), base = S.kind === 'waylay' ? (S.gentle ? 1 : 2) : n.kind === 'lair' ? 5 : S.gentle ? 1 : clamp(n.tier || 2, 2, 4);
+  const k = clamp(base + (S.g | 0), 1, 5);
+  return { k, word: RG_DIFF_W[k], stars: '★'.repeat(k) + '☆'.repeat(5 - k) };
+}
+// its causes, in a line: growth and why, a first place, the boss (the foes' health and the waves are on the line below it)
+function rgDiffWhy(R, S) {
+  const st = S.node && R.st[S.node], b = rgBosses(S), parts = [];
+  if (S.kind !== 'waylay' && S.g) parts.push(`Grown ${S.g} of ${RG_GROW}${st && st.why && st.why.length ? ` (${st.why.join('; ')})` : S.kind === 'patrol' ? ' (a patrol)' : ''}: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health`);
+  if (S.gentle) parts.push('A first place: no boss, gentle foes');
+  if (!parts.length) parts.push('As it first stood');
+  parts.push(b.length ? `Boss: ${b.map(([w, x]) => `${CREEPS[x].name} on wave ${w}`).join(', ')}` : 'No boss');
+  return parts.join(' · ');
+}
 function rgClock(R, n, out) {
   for (let i = 0; i < n; i++) {
     R.clock++;
     if (RG_MARKS.includes(R.clock)) {
-      const grew = rgDef(R).nodes.filter(nd => R.st[nd.id].s !== 'held' && R.st[nd.id].g < RG_GROW && rgGrow(R, nd.id));
-      if (grew.length) out.push(`The threat clock reaches ${R.clock}: every unsettled trouble grows (${grew.length > 4 ? grew.length + ' places' : grew.map(nd => nd.name).join(', ')}).`);
+      const grew = rgDef(R).nodes.filter(nd => R.st[nd.id].s !== 'held' && R.st[nd.id].g < RG_GROW && rgGrow(R, nd.id, `threat clock ${R.clock}`));
+      if (grew.length) out.push(`The threat clock reaches ${R.clock}: every unsettled place grows a step harder (${grew.length > 4 ? grew.length + ' places' : grew.map(nd => nd.name).join(', ')}).`);
     }
     if (R.clock >= RG_CLOCK) {
       const t = rgNearest(R, rgDef(R).nodes.find(nd => nd.kind === 'lair').id, id => rgHeldTown(R, id));
@@ -112146,16 +112170,19 @@ function rgSpec(R, id, kind, road) {
   const D = rgDef(R);
   if (kind === 'waylay') {
     const rd = R.roads[road], t = Math.min(rgNode(R, rd.a).tier, rgNode(R, rd.b).tier), w0 = RG_TIER_W[t] || 2, from = R.at, to = rd.a === from ? rd.b : rd.a;
-    return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgField(rgNode(R, from).map ? rgNode(R, from) : rgNode(R, to)), fam: rd.fam, extra: [], hpK: 1, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
+    const gentle = t <= RG_GENTLE.tier;
+    return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgField(rgNode(R, from).map ? rgNode(R, from) : rgNode(R, to)), fam: rd.fam, extra: [], hpK: gentle ? RG_GENTLE.hp : 1, gentle, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
   }
   const n = rgNode(R, id), st = R.st[id], len = n.w[1] - n.w[0], patrol = kind === 'patrol';
   const g = patrol ? (st.p | 0) + 1 : st.g | 0, w0 = Math.min(50 - len, n.w[0] + RG_STEP.w * g);
   const up = n.kind === 'lair' ? rgHelpersUp(R) : [];
   const pay = Math.round((40 + 10 * n.w[0]) * (1 + RG_STEP.pay * (patrol ? 0 : g)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
-  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length), g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
+  const gentle = n.kind === 'trouble' && n.tier <= RG_GENTLE.tier;
+  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle ? RG_GENTLE.hp : 1), gentle, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
 }
 // the bosses in a battle's waves (the standard march's; the lair's last is its lord)
-function rgBosses(S) { const out = []; for (let w = S.w0; w <= S.w1; w++) { const b = w === 50 && S.lord ? S.lord : CAMP_BOSS0[w]; if (b && CREEPS[b]) out.push([w, b]); } return out; }
+function rgBosses(S) { const out = []; if (S.gentle) return out;   // (a first place has no boss)
+  for (let w = S.w0; w <= S.w1; w++) { const b = w === 50 && S.lord ? S.lord : CAMP_BOSS0[w]; if (b && CREEPS[b]) out.push([w, b]); } return out; }
 // the unit kind that did the most damage this battle (it chose the kind a broken line wounded; unused since wounds went, 19 Nov 2026)
 function rgStrongest() {
   const by = {}, n = {};
@@ -112178,7 +112205,7 @@ function rgApplyWaves(S) {
       WAVE_PROBLEM[n] = [`Boss: ${d.name}`, `${d.name}${d.title ? ', ' + d.title : ''}: ${r ? r.text : d.abil ? d.abil[1] : d.trait || ''}`, r ? r.ways.join(' · ') : 'Read its card before it comes'];
     }
     const tot = groups.reduce((a, p) => { const [main] = p.split('!'), [ty, c] = main.split('*'); return a + (CREEPS[ty] && !CREEPS[ty].boss && !CREEPS[ty].lead ? +c : 0); }, 0);
-    for (const fam of [S.fam].concat(S.extra || [])) {
+    for (const fam of S.gentle ? [] : [S.fam].concat(S.extra || [])) {   // (a first place: the march's own troops only, none added for its family)
       const foe = fam && campFamFoe(fam, n);
       if (foe && CREEPS[foe]) groups.push(foe + '*' + Math.max(1, Math.round(tot * CAMP_FAMILIES[fam].share)));
     }
@@ -112190,21 +112217,38 @@ function rgApplyWaves(S) {
   if (typeof fcKey !== 'undefined') fcKey = '';
 }
 
+// a first place's wave: the boss gives way to a few more of the rank and file; every foe but melee and quick ones marches as
+// melee, but for one armoured foe a wave (the one gentle new face)
+function rgGentleWave(groups) {
+  const role = t => typeof ffRoleOf === 'function' ? ffRoleOf(t) : (CREEPS[t] && CREEPS[t].fly ? 'fly' : 'melee');
+  const mel = (groups.find(g => role(g.type) === 'melee') || {}).type || 'gnoll', out = []; let arm = false;
+  for (const g of groups) {
+    const d = CREEPS[g.type]; if (!d) { out.push(g); continue; }
+    if (d.boss) { out.push({ type: mel, count: RG_GENTLE.bossFill, swift: false, siege: false, hpK: 1 }); continue; }
+    if (d.lead) { out.push(g); continue; }
+    const r = role(g.type);
+    if (r === 'melee' || r === 'fast' || r == null) { out.push(g); continue; }
+    if (r === 'armoured' && !arm) { arm = true; out.push(Object.assign({}, g, { count: 1 })); if (g.count > 1) out.push(Object.assign({}, g, { type: mel, count: g.count - 1, siege: false, hpK: 1 })); continue; }
+    out.push(Object.assign({}, g, { type: mel, siege: false, hpK: 1 }));
+  }
+  return out;
+}
+
 /* ---- starting a battle ---- */
 function rgStart(R, S) {
   if (typeof twStop === 'function') twStop();
   heroPickId = R.hero; try { localStorage.setItem('runehold.hero', R.hero); } catch (e) {}
   mapPick = S.map; setMap(S.map);
-  S.line = Math.min(RG_LINE, R.lives); S.wounded = []; S.hard = R.hard;   // (no unit is ever kept off the field: no wounds on the home map)
+  S.line = Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives); S.wounded = []; S.hard = R.hard;   // (no unit is ever kept off the field: no wounds on the home map)
   RG_NEXT = S;
   newGame('normal', null, R.hero, 0);
   campCarryIn(R.band, R.hero); G.camp = null;
   if (R.rnBank && typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) { rnS().v = clamp(rnS().v + R.rnBank, 0, RN.cap); R.rnBank = 0; }
-  G.wave = S.w0; G.gold = Math.max(DIFFS.normal.gold, huntGold(S.w0));
+  G.wave = S.w0; G.gold = Math.max(DIFFS.normal.gold, huntGold(S.w0), S.gentle ? RG_GENTLE.gold : 0);
   G.lives = G.maxLives = S.line;
   G.region.uid0 = G.gearUid | 0;
   G.runId = newRunId(); G.playT = 0;
-  R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1 }; R.pending = null;
+  R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1 }; R.pending = null; R.notice = '';
   rgPut(R);
   const F = S.fam && CAMP_FAMILIES[S.fam];
   afterStart(S.kind === 'waylay' ? `Waylaid · ${rgNode(R, S.to).name}` : `${S.name} · waves ${S.w0}-${S.w1}`,
@@ -112229,7 +112273,7 @@ function rgEnd(won, retreat) {
     if (S.kind === 'waylay') { R.at = S.to; out.push(`The host breaks through and reaches ${node.name}.`); }
     else if (S.kind === 'patrol') { R.st[S.node].p = (R.st[S.node].p | 0) + 1; rgClock(R, 1, out); out.push(`${node.name} is patrolled (${R.st[S.node].p} of ${RG_PATROLS}).`); }
     else {
-      R.st[S.node].s = 'held'; R.st[S.node].g = 0;
+      R.st[S.node].s = 'held'; R.st[S.node].g = 0; R.st[S.node].why = [];
       out.push(node.kind === 'town' ? `${node.name} is free: rest and re-spec there.` : node.kind === 'lair' ? `${node.name} falls. The Marches are settled.` : `${node.name} is settled.`);
       const h = R.helpers.find(x => x.node === S.node); if (h) out.push(`The warlord loses a helper: ${CAMP_FAMILIES[h.fam].name} no longer march in his lair.`);
       rgClock(R, 1, out);
@@ -112239,18 +112283,20 @@ function rgEnd(won, retreat) {
     R.at = S.from; out.push(`The host is thrown back to ${rgNode(R, S.from).name}.`);
     if (S.hard) R.over = 'Hardcore: the first broken line ends the run.';
   } else if (retreat) {
-    rgGrow(R, S.node); out.push(`The retreat is sounded. ${node.name}’s trouble grows a step.`);
-    rgClock(R, 1, out); rgFallBack(R, out);
+    rgGrow(R, S.node, 'your retreat from here'); out.push(`The retreat is sounded. Retreating made ${node.name} harder: grown ${R.st[S.node].g} of ${RG_GROW} (${RG_STEP.w * R.st[S.node].g} waves later, foes +${Math.round(RG_STEP.hp * 100 * R.st[S.node].g)}% health).`);
+    if (!S.gentle) rgClock(R, 1, out); else out.push('A first place: the threat clock does not move for this retreat.');
+    rgFallBack(R, out);
   } else {
     const cut = Math.floor(R.chest / 3); if (cut) { R.chest -= cut; out.push(`${cut} gold of the war chest is lost.`); }
-    R.st[S.node].s = 'lost'; rgGrow(R, S.node);
-    const spread = rgNb(R, S.node).filter(id => rgNode(R, id).kind !== 'town' || !rgHeldTown(R, id)).filter(id => rgGrow(R, id));
-    out.push(`${node.name} falls to the enemy${spread.length ? `, and its trouble spreads: ${spread.map(id => rgNode(R, id).name).join(', ')} grow${spread.length === 1 ? 's' : ''}` : ''}.`);
+    R.st[S.node].s = 'lost'; rgGrow(R, S.node, 'the line broke here');
+    const spread = rgNb(R, S.node).filter(id => rgNode(R, id).kind !== 'town' || !rgHeldTown(R, id)).filter(id => rgGrow(R, id, `spread from ${node.name}`));
+    out.push(`${node.name} falls to the enemy and grows a step harder${spread.length ? `, and its trouble spreads: ${spread.map(id => rgNode(R, id).name).join(', ')} grow${spread.length === 1 ? 's' : ''} a step harder too` : ''}.`);
     rgClock(R, 2, out); rgFallBack(R, out);
     if (S.hard) R.over = 'Hardcore: the first broken line ends the run.';
   }
   if (R.lives <= 0 && !R.done) R.over = R.over || 'The host has no lives left.';
   for (const t of out) rgLog(R, t);
+  R.notice = rgNotice(out);
   rgPut(R); rgSel = null;
   if (typeof AudioSys !== 'undefined') AudioSys.intense(false);
   // a lost or abandoned battle offers to fight it again at once (owner: "should just have to retry on home map"); not when the run is over
@@ -112266,6 +112312,9 @@ function rgEnd(won, retreat) {
     if (retry) $('#rgRetry').onclick = () => { sfx('click'); hideOverlay(); rgRetry(R, retry); };
   }, won ? 900 : 1300);
 }
+
+// what grew, in one line for the map (shown until the next battle starts): the result lines that made a place harder
+function rgNotice(out) { const t = out.filter(x => /harder|grows a step/.test(x)); return t.length ? t.join(' ') : ''; }
 
 // Retry: the host goes back to where the battle was (a waylay's road from where it set out) and fights it again, at once, as it
 // now stands (a fallen place has grown); the fall back and costs already taken stay taken
@@ -112319,6 +112368,13 @@ function rgTown(R, k) {
 }
 
 /* ---- the region map screen ---- */
+// how difficulty works, on the map and the start screen
+const RG_HOW = `<details class="rg-how"><summary>How difficulty works</summary><ul>
+  <li>Each place shows how hard it is (Easy, Normal, Hard, Deadly) and why. The first places are Easy: no boss and gentle foes.</li>
+  <li>A place <b>grows</b> a step harder (at most ${RG_GROW}) when you retreat from it, when the line breaks there, when a broken line next door spreads to it, and every time the threat clock reaches ${RG_MARKS.join(', ')}.</li>
+  <li>Each step: its waves start ${RG_STEP.w} later, its foes have ${Math.round(RG_STEP.hp * 100)}% more health, and its reward is ${Math.round(RG_STEP.pay * 100)}% bigger. The starting gold follows the starting wave, so a grown place starts with a little more gold: that pays for the harder fight, it is not a bonus.</li>
+  <li>The clock moves a step for every battle you fight at a place and two for a broken line (a retreat from a first place does not move it).</li>
+  <li>Winning a place holds it and clears its growth. Settle the troubles you can before the clock reaches its marks.</li></ul></details>`;
 let rgSel = null, rgPick = { hero: null, hard: false };
 function rgClockSVG(R) {
   const cx = 62, cy = 62, out = [];
@@ -112354,14 +112410,15 @@ function rgMapSVG(R) {
 function rgLossLines(R, S) {
   if (S.kind === 'waylay') return ['the lives you lose', `thrown back to ${rgNode(R, S.from).name}`];
   const fb = rgNearest(R, R.at, id => rgHeldTown(R, id) && id !== S.node) || rgNearest(R, R.at, id => rgHeldTown(R, id));
-  return [`the line's lives (${Math.min(RG_LINE, R.lives)})`, 'a third of the war chest', `${rgNode(R, S.node).name} falls and its trouble spreads to its neighbours`, 'the threat clock +2', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
+  return [`the line's lives (${Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives)})`, 'a third of the war chest', `${rgNode(R, S.node).name} falls and its trouble spreads to its neighbours`, 'the threat clock +2', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
 }
 function rgBattleCard(R, S, btn) {
   const F = S.fam && CAMP_FAMILIES[S.fam], bosses = rgBosses(S);
-  return `<div class="rg-bt"><p><b>${F ? rgEsc(F.name) : 'The warlord’s host'}.</b> ${F ? rgEsc(F.say) : ''}</p>
+  const D = rgDiff(R, S), grown = S.kind === 'trouble' && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
+  return `<div class="rg-bt"><p class="rg-diff rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p><p class="rg-why">${rgEsc(rgDiffWhy(R, S))}</p>
+    <p><b>${F ? rgEsc(F.name) : 'The warlord’s host'}.</b> ${F ? rgEsc(F.say) : ''}</p>
     ${S.extra && S.extra.length ? `<p><b>His helpers march too:</b> ${S.extra.map(f => rgEsc(CAMP_FAMILIES[f].name)).join(', ')} (+${Math.round(10 * S.extra.length)}% health).</p>` : ''}
-    <p class="rg-nums"><span>Waves <b>${S.w0}-${S.w1}</b></span><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Reward <b>${S.reward} gold</b></span></p>
-    ${bosses.length ? `<p>Boss: ${bosses.map(([w, b]) => `${rgEsc(CREEPS[b].name)} on wave ${w}`).join(', ')}.</p>` : ''}
+    <p class="rg-nums"><span>Waves <b>${S.w0}-${S.w1}</b></span><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Reward <b>${S.reward} gold</b>${grown ? ` (+${grown}% for its growth)` : ''}</span></p>
     <p class="rg-risk"><b>If the line breaks:</b> ${rgLossLines(R, S).join(' · ')}.${R.hard ? ' <b>Hardcore: it ends the run.</b>' : ''}</p>${btn || ''}</div>`;
 }
 function rgNodeHTML(R, id) {
@@ -112370,10 +112427,9 @@ function rgNodeHTML(R, id) {
   let body = '';
   if (st.s !== 'held') {
     const S = rgSpec(R, id, 'trouble');
-    body += `${st.g ? `<p class="rg-grew">Grown ${st.g} of ${RG_GROW}: waves ${RG_STEP.w * st.g} later, foes +${Math.round(RG_STEP.hp * 100 * st.g)}% health, reward +${Math.round(RG_STEP.pay * 100 * st.g)}%.</p>` : ''}`;
     if (n.kind === 'lair') body += `<p><b>Helpers:</b> ${R.helpers.map(h => `${rgEsc(CAMP_FAMILIES[h.fam].name)} at ${rgEsc(rgNode(R, h.node).name)} ${R.st[h.node].s === 'held' ? '<i>(stripped)</i>' : '<i>(standing)</i>'}`).join(' · ')}</p>`;
     const h = R.helpers.find(x => x.node === id); if (h) body += `<p class="rg-grew">The warlord’s helper is here: settle it and ${rgEsc(CAMP_FAMILIES[h.fam].name)} leave his lair.</p>`;
-    body += rgBattleCard(R, S, here && !R.battle && !R.pending ? `<button class="btn" id="rgFight">Fight at ${rgEsc(n.name)}<small>${S.line || Math.min(RG_LINE, R.lives)} lives on the line, of ${R.lives}</small></button>` : '');
+    body += rgBattleCard(R, S, here && !R.battle && !R.pending ? `<button class="btn" id="rgFight">Fight at ${rgEsc(n.name)}<small>${S.line || Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives)} lives on the line, of ${R.lives}</small></button>` : '');
   } else if (n.kind === 'trouble') {
     const p = st.p | 0;
     body += p < RG_PATROLS ? rgBattleCard(R, rgSpec(R, id, 'patrol'), here && !R.battle && !R.pending ? `<button class="btn ghost" id="rgPatrol">Patrol ${rgEsc(n.name)}<small>Patrol ${p + 1} of ${RG_PATROLS}: harder, a smaller reward, the clock moves a step</small></button>` : `<p class="rg-note">Patrol ${p + 1} of ${RG_PATROLS} can be fought from here.</p>`) : `<p class="rg-note">Patrolled ${RG_PATROLS} times: nothing left to gain here.</p>`;
@@ -112418,7 +112474,7 @@ function rgStartHTML(force) {
   return `<div class="cm rg"><header class="cm-hd"><h2 class="ttl">${rgEsc(D.name)}</h2><p class="sub">${rgEsc(D.say)} A prototype of the region map: choose where to fight, march the roads, fall back and fight again.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
     <div class="rg-start"><h4>Commander</h4><div class="rg-heroes">${hs.map(h => `<button type="button" class="rg-hero${h.id === rgPick.hero ? ' on' : ''}" data-h="${h.id}"><img alt="" src="${rgFace(h)}"><span>${rgEsc(h.name)}<small>${rgEsc(h.title)}</small></span></button>`).join('')}</div>
     <label class="rg-hard"><input type="checkbox" id="rgHard" ${rgPick.hard ? 'checked' : ''}> Hardcore: the first broken line ends the run</label>
-    <ul class="rg-rules"><li>${RG_LIVES} lives for the whole act; each battle stakes a line of up to ${RG_LINE}.</li><li>A broken line costs, it does not end the run: lives, gold, the place, time on the clock, and a fall back to the nearest town; no unit is wounded, and you can retry the battle at once.</li><li>The run ends at 0 lives, or a broken line with no town to fall back to.</li><li>It saves itself on the map; battles save between waves.</li></ul>
+    <ul class="rg-rules"><li>${RG_LIVES} lives for the whole act; each battle stakes a line of up to ${RG_LINE}.</li><li>A broken line costs, it does not end the run: lives, gold, the place, time on the clock, and a fall back to the nearest town; no unit is wounded, and you can retry the battle at once.</li><li>The run ends at 0 lives, or a broken line with no town to fall back to.</li><li>It saves itself on the map; battles save between waves.</li></ul>${RG_HOW}
     <button class="btn" id="rgBegin">Muster the host<small>at ${rgEsc(D.nodes.find(n => n.start).name)}</small></button></div></div>`;
 }
 function rgOpen(force) {
@@ -112446,7 +112502,9 @@ function rgOpen(force) {
   if (!rgSel || !rgNode(R, rgSel)) rgSel = R.at;
   const side = R.battle ? rgResumeHTML(R) : R.pending ? rgPendingHTML(R) : rgNodeHTML(R, rgSel);
   showOverlay(`<div class="cm rg"><header class="cm-hd"><h2 class="ttl">${rgEsc(rgDef(R).name)}</h2><p class="sub">Choose where the host fights. Every trouble shows its foes, waves, reward and what a broken line costs. Roads show their danger. The map saves itself.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
+    ${R.notice ? `<p class="rg-notice">${rgEsc(R.notice)}</p>` : ''}
     <div class="cm-body"><div class="cm-map">${rgMapSVG(R)}</div><aside class="cm-side">${rgBandHTML(R)}${side}
+    ${RG_HOW}
     <section class="rg-log"><h4>The march so far</h4><ul>${R.log.slice(0, 6).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></section></aside></div>
     <footer class="cm-ft"><button type="button" class="btn ghost" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost" id="rgTitleB">Title screen<small>The run is saved</small></button></footer></div>`, 'campaign');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
@@ -112457,7 +112515,7 @@ function rgOpen(force) {
   on('rgPatrol', () => rgStart(R, rgSpec(R, R.at, 'patrol')));
   on('rgBackOff', () => { const out = []; rgClock(R, 1, out); rgLog(R, `The host falls back to ${rgNode(R, R.pending.from).name} rather than fight.`); for (const t of out) rgLog(R, t); R.pending = null; rgPut(R); rgOpen(force); });
   on('rgResume', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (!x) return rgOpen(force); restore(x.s); G.runId = x.id; afterStart(`Wave ${G.wave}`, `${R.battle.name}: the maze stands as you left it.`); });
-  on('rgForfeit', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (x) { restore(x.s); G.runId = x.id; rgEnd(false, true); } else { const S = Object.assign(rgSpec(R, R.battle.node, 'trouble'), { line: 0 }); R.battle = null; const out = []; rgGrow(R, S.node); rgClock(R, 1, out); rgFallBack(R, out); for (const t of out) rgLog(R, t); rgPut(R); rgOpen(force); } });
+  on('rgForfeit', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (x) { restore(x.s); G.runId = x.id; rgEnd(false, true); } else { const S = Object.assign(rgSpec(R, R.battle.node, 'trouble'), { line: 0 }); R.battle = null; const out = []; rgGrow(R, S.node, 'your retreat from here'); out.push(`Retreating made ${rgNode(R, S.node).name} harder: grown ${R.st[S.node].g} of ${RG_GROW}.`); if (!S.gentle) rgClock(R, 1, out); rgFallBack(R, out); R.notice = rgNotice(out); for (const t of out) rgLog(R, t); rgPut(R); rgOpen(force); } });
   on('rgX', () => titleScreen());
   on('rgTitleB', () => titleScreen());
   const dr = document.getElementById('rgDropB');
@@ -112483,6 +112541,16 @@ function rgOpen(force) {
   serialize = function () { const s = _ser.apply(this, arguments); if (s && G.region) s.region = JSON.parse(JSON.stringify(G.region)); return s; };
   const _res = restore;
   restore = function (s) { RG_NEXT = s && s.region && s.region.w1 ? s.region : null; const r = _res.apply(this, arguments); RG_NEXT = null; if (G.region) G.maxLives = Math.max(1, G.region.line | 0); return r; };
+  // a first place's waves (RG_GENTLE): the march's own wave, sorted to the gentle roles, then fielded by the faction as ever
+  const _ws = waveSpec;
+  waveSpec = function (n) {
+    const S = G && G.region;
+    if (!S || !S.gentle || G.vs || n < S.w0 || n > S.w1) return _ws.apply(this, arguments);
+    const a = arguments, base = typeof ffBase === 'function' ? ffBase(() => _ws.apply(this, a)) : _ws.apply(this, a), g = rgGentleWave(base);
+    let F = null; try { F = typeof ffAt === 'function' ? ffAt(n) : null; } catch (e) { F = null; }
+    try { return F && typeof ffSpec === 'function' ? ffSpec(n, g, F) : g; } catch (e) { return g; }
+  };
+  if (typeof ffBossWave === 'function') { const _fb = ffBossWave; ffBossWave = function (n) { return G && G.region && G.region.gentle ? false : _fb.apply(this, arguments); }; }   // (no boss banner, card or boss on a first place)
   const _hp = waveHP;
   waveHP = function () { return _hp.apply(this, arguments) * (G && G.region && !G.vs ? G.region.hpK || 1 : 1); };
   const _mw = makeWave;
