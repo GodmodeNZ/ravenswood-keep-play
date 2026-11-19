@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f3c1ca9@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd7067b0@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -61799,8 +61799,12 @@ const AudioSys = (() => {
   const fxOr = (k, vol, gap, old) => { if (!firePlay(k, vol, gap) && !fxHas(k)) old && old(); };
   // (owner, 19 Nov 2026: "thunderguns basic attack sounds a lot softer in game, and not hearing an impact sound": both raised, the
   // impact kept at the owner's 1.7x over the crack, and up to 5 copies of each at once so a firing line isn't thinned to three)
-  TAKE_CAPS.tgShotProj = TAKE_CAPS.tgShotImp = 5;
-  S.tgShot = () => { fxOr('tgShotProj', .28, .05, () => gunShot(false)); fxOr('tgShotImp', .48, .05); };
+  TAKE_CAPS.tgShotProj = TAKE_CAPS.tgShotImp = TAKE_CAPS.tgShotMid8 = TAKE_CAPS.tgShotMid9 = 5;
+  // (owner, 19 Nov 2026: "try these 2 gun shots instead of the current one", "normal attack": Gun Shot Mid Range 8 and 9 in turn,
+  // in place of the Projectile and Impact layers, which stay in the Take list and play only if the new takes are missing)
+  const TG_MID = [['tgShotMid8', .44], ['tgShotMid9', .38]];   // (9 sits a touch louder, so evened out)
+  S.tgShot = () => { if (fxHas('tgShotMid8')) { fireNext('tgMid', TG_MID, .05, .97 + Math.random() * .06); return; }
+    fxOr('tgShotProj', .28, .05, () => gunShot(false)); fxOr('tgShotImp', .48, .05); };
   S.tgLong = () => { fxOr('tgLongProj', .23, .2, () => gunShot(true)); fxOr('tgLongImp', .4, .2); };
   S.tgSlug = () => { fxOr('tgSlugMix', .4, .2, () => gunShot(true)); };
   S.tgRattle = (len) => { if (!fxHas('tgRattleProj')) { S.gatBurst(len); return; } fxOr('tgRattleProj', .3, .3); fxOr('tgRattleImp', .31, .3); E.gatBurstEnd = now() + Math.max(len || 0, 2.2); };   // (the bullets' cracks keep quiet under it)
