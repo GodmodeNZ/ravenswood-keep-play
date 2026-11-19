@@ -1,4 +1,4 @@
-const BUILD_TAG = '3bbe349@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5a0523e@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -54023,6 +54023,7 @@ function rcYsraTick(c, dt) {
   }
   if (c.ysFlood > G.time) for (const o of rcNear(c, F.r, true)) { o.rageT = Math.max(o.rageT, .3); o.rageK = Math.max(o.rageK || 0, F.k); }
   // Marsh Hymn: a wind-up a stun breaks
+  if (c.ent || c.y < .5) return;   // (never on the way in, where nothing can reach her to break it)
   if (c.ysT == null) c.ysT = H.first;
   if (c.ysW > 0) {
     if (c.stunT > 0) { c.ysW = 0; c.ysT = H.every; c.ysSpoiled = (c.ysSpoiled || 0) + 1; if (c.ysMk) c.ysMk.life = 0; part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .2, life: .35, max: .35, size: 1.2, col: RCT.col.spoil }); sfx('shieldBreak', 0); return; }
