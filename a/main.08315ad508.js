@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a99097f@2026-11-19';   // the play log's build version (playlog.js)
+const BUILD_TAG = '478e81e@2026-11-19';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -2213,7 +2213,8 @@ function spawn(s) {
     if (riteOn(4)) c.spdM *= 1.06;
   }
   { const ent = !s.at && !G.vs && MAPS[G.map] && MAPS[G.map].entry;   // a map foes walk into: they come out of the woods first
-    if (ent && c.wideIn) { const M = MAPS[G.map], sp = M.crestOpen, cx = sp ? clamp(c.x, sp[0], sp[1]) : c.x, zc = crestAt(cx);
+    if (ent && c.wideIn && !MAPS[G.map].pathIn) {   // (pathIn: a wide front whose foes walk in down one painted path, then spread to their columns: the branch below, Oakmere Glade)
+      const M = MAPS[G.map], sp = M.crestOpen, cx = sp ? clamp(c.x, sp[0], sp[1]) : c.x, zc = crestAt(cx);
       // (a wide front: in at its own column. Over a crest: up from behind and below it (view.js creepBaseY), at the open part
       // of the crest nearest its column (crestOpen: where the painted edge is bare grass, not a trunk's foot), then across to
       // the column; it hurries over the extra ground (entK, at most 2.2 times), so the wave keeps its time but for the far columns)
@@ -54006,6 +54007,10 @@ if (typeof setTimeout === 'function') setTimeout(() => { try { htLate(); } catch
                       foe within RCT.hymn.r cells is mended RCT.hymn.k of its health. A stun in the wind-up breaks it. She never mends herself.
        The Floodmark  once, at half health: for RCT.flood.t s she and every foe within RCT.flood.r cells run RCT.flood.k faster.
    Bodies: the owner's sculpts (models_lead9d_reedcourt.js); until that file is in the build each borrows a body (fallback). ---- */
+/* Ysra's size (owner, 19 Nov 2026, of the live build: "new boss is a little too big"): her drawn height is her model's (1.54) x
+   the boss scale (1.25) x scl. At scl 1.7 she stood 3.29 cells, against 2.2-2.6 for the march's walking bosses and Orragar's 2.19;
+   scl 1.37 puts her at 2.65 (19% smaller): the tallest boss still, by a head, no longer half again the next. Her ring and hit
+   circle (r) follow: .5 -> .44. */
 const RCT = {
   shelf: { rest: 3, k: .1 },                                  // the Shelfback's plate: seconds without a blow, share of the bar a second
   hymn: { first: 6, every: 12, wind: 2, r: 3, k: .2 },
@@ -54065,7 +54070,7 @@ forestFaction({
       eco: 'Its Marsh Hymn mends 6% of the health of every wounded ally within 3 cells every 4 seconds, so damage spread across the court melts away. It sings from mana. Kill it first (target order Support), stun it, or Wound its allies to halve the mending.' },
     rc_slinger: { name: 'Seed Slinger', fallback: 'gnoll', scl: .92, hp: .8, spd: 1, r: .32, role: 'light', gap: .85, atk: { r: 2.2, rate: 2.6, dmg: 5, kind: 'axe' }, tint: [1.15, .9, .75, .1], trait: 'Reed Court: ranged, slings seed pods at units',
       eco: 'It slings hard seed pods at the unit or wall nearest its road, from 2.2 cells away: a light blow every 2.6 seconds. It is frail. Kill it before it walks into reach of your line, or build back from the road.' },
-    rc_ysra: { name: 'Ysra of the Floodmark', title: 'Queen of the Reed Court', ffCast: c => c.ysW > 0, fallback: 'shaman', scl: 1.7, hp: 16, spd: .6, r: .5, boss: true, flat: 100, life: 5, gap: 3, tint: [.8, 1.1, 1.3, .16],
+    rc_ysra: { name: 'Ysra of the Floodmark', title: 'Queen of the Reed Court', ffCast: c => c.ysW > 0, fallback: 'shaman', scl: 1.37, hp: 16, spd: .6, r: .44, boss: true, flat: 100, life: 5, gap: 3, tint: [.8, 1.1, 1.3, .16],
       yell: 'The water remembers where it stood.', abil: ['Marsh Hymn', `Every ${RCT.hymn.every}s she stops and sings for ${RCT.hymn.wind}s, then mends every other foe within ${RCT.hymn.r} cells ${Math.round(RCT.hymn.k * 100)}% of its health. A stun breaks the song.`],
       trait: 'Boss: her hymn mends her court, and the flood rises at half health',
       eco: `Two rules. Marsh Hymn: every ${RCT.hymn.every} seconds she stops, lifts her arms and sings for ${RCT.hymn.wind} seconds (the green ring shows the reach); when the song ends, every other foe within ${RCT.hymn.r} cells is mended ${Math.round(RCT.hymn.k * 100)}% of its health. A stun during the song breaks it, and she never mends herself. The Floodmark: once, when she falls to half health, the flood rises for ${RCT.flood.t} seconds and she and every foe within ${RCT.flood.r} cells run ${Math.round(RCT.flood.k * 100)}% faster. She never touches your units or walls.` },
@@ -54125,6 +54130,10 @@ forestFaction({
         a flier            drifts on along the blow, rolls and spins as it comes down
         fire               writhes (the clip slowed), less thrown;  lightning: held rigid and shaking, then drops
         frost              (shattered) as before
+        a runner           (its own momentum, c.fpV: from a jog up to a sprint) trips: the feet catch, the trunk pitches over
+                           the toes, it goes down face first the way it was running (the blow blended in: shot from the side,
+                           it goes down on the diagonal) and skids on; at a sprint a light one may roll over once first. A slow
+                           one crumples about where it stood. The code-built foes' box ragdoll carries the same momentum.
       Bodies stay on the ground (never below it), are held inside the field and short of a map's crest, and fade as before.
    Off: ?foephys=0, or FPH.on = false in the console. Tuning: FPH.k (springs), FPH.d (deaths). Inspect: FPH.stats(). */
 const FPH = (() => {
@@ -54159,8 +54168,8 @@ const FPH = (() => {
       sp.push({ b: i, n: b.n, kd, K: K[kd], h: b.h, t: b.t, len, sub: Int16Array.from(sub) });
     });
     const arms = ['armL', 'armR'].map(n => R.bix[n]).filter(i => i != null);
-    const spineI = sp.findIndex(q => q.n === 'spine');
-    return { R, NB, sp, arms, model, h: R.height || 1, spineI: spineI < 0 ? null : spineI, hipsB: R.bix.hips != null ? R.bix.hips : R.bix.pelvis };
+    const spineI = sp.findIndex(q => q.n === 'spine'), chestI = sp.findIndex(q => q.n === 'chest');
+    return { R, NB, sp, arms, model, h: R.height || 1, spineI: spineI < 0 ? null : spineI, chestI: chestI < 0 ? null : chestI, hipsB: R.bix.hips != null ? R.bix.hips : R.bix.pelvis };
   }
   /* the way the death clip throws the body (model space x, z): the head at the clip's end from the hips at its start */
   function fallDir(R, CL) {
@@ -54250,7 +54259,7 @@ const FPH = (() => {
     let ix = 0, iz = 0;
     const EX = st.ex; EX.fill(0);
     const Q = c.fpQ, q0 = Q && Q.length ? Q.filter(h => vt - h.t < .3) : null; if (Q) Q.length = 0;
-    if (!dying && q0 && q0.length) for (const h of q0) react(st, rg, EX, h, m, W);   // each blow its own reaction (1b)
+    if (q0 && q0.length) for (const h of q0) if (!dying || h.cls === 'spear' || h.cls === 'lance') react(st, rg, EX, h, m, W);   // each blow its own reaction (1b); a killing thrust still folds the body (1c)
     else if (!dying && (c.hit || 0) > st.hit + .02 && c.hdx != null) { const j = Math.min(1.5, c.hitK || .6) * 3.2 / W; ix = c.hdx * j; iz = c.hdz * j; }
     if (dying && !st.dead) { st.dead = true; const j = Math.min(1.6, (c.hitK || .7) * (1 + (c.overK || 0) * .6)) * 2.6 / W; if (c.hdx != null) { ix = c.hdx * j; iz = c.hdz * j; } }
     st.hit = c.hit || 0;
@@ -54309,7 +54318,7 @@ const FPH = (() => {
 
   /* ---------------- 1b. what struck it: each blow its own reaction (owner: "same with their animations when hit with
      arrows or swords etc"). Impulses add into the springs, so blows in a row stack and blend; the clip's walk goes on.
-       pierce  (arrows, bolts, shot, a spear's thrust) a sharp jolt on the part struck (a shoulder, the chest or the head):
+       pierce  (arrows, bolts, shot; a spear's thrust is its own, 1c) a sharp jolt on the part struck (a shoulder, the chest or the head):
                it snaps back and springs forward, the trunk twisting toward the side hit
        slash   (swords, axes, claws) a heavier stagger sideways along the swing: the trunk twists and leans first, the
                feet catch up (the body's own offset is a slower spring)
@@ -54318,7 +54327,7 @@ const FPH = (() => {
      Each by the blow's share of the foe's health (c.hitK) over its weight; a heavy blow sets the body back along its road a
      moment (a stagger, drawn only: the foe's place in the game is not touched). The kind comes from the striking unit's
      weapon (classfit.js unitKinds), a spell (DTAG), the element or a shell (hitCls). ---------------- */
-  const RK = { pierce: 1, slash: 1, blunt: 1, spell: 1, blast: 1 };   // (each kind's strength, for tuning: FPH.rk)
+  const RK = { pierce: 1, slash: 1, blunt: 1, spell: 1, blast: 1, spear: 1, lance: 1 };   // (each kind's strength, for tuning: FPH.rk)
   const OFF = { k: 30, z: .8, lim: .3 }, TW = { k: 95, z: .32, lim: .42 }, SQ = { k: 170, z: .28, lim: .16 };
   function addKind(rg, EX, kd, x, y, z) { for (let i = 0; i < rg.sp.length; i++) if (rg.sp[i].kd === kd) { const w = rg.sp[i].K.hit; EX[i * 3] += x * w; EX[i * 3 + 1] += y; EX[i * 3 + 2] += z * w; } }
   function addBone(rg, EX, n, x, y, z) { for (let i = 0; i < rg.sp.length; i++) if (rg.sp[i].n === n) { EX[i * 3] += x; EX[i * 3 + 1] += y; EX[i * 3 + 2] += z; return true; } return false; }
@@ -54326,7 +54335,13 @@ const FPH = (() => {
     const j = Math.min(1.6, h.k) / W * (RK[h.cls] || 1), dx = h.dx, dz = h.dz, fl = Math.hypot(m[8], m[10]) || 1;
     const side = Math.sign((m[8] / fl) * dz - (m[10] / fl) * dx) || 1;   // the blow from its left or its right
     S.hits[h.cls] = (S.hits[h.cls] || 0) + 1;
-    if (h.cls === 'pierce') {
+    if (h.cls === 'spear' || h.cls === 'lance') {   // skewered (1c): the fold is held by skewerFold; here the drive back and the hang
+      const L = h.cls === 'lance' ? 1.3 : 1, jj = Math.min(1.4, j * L);
+      const A = Math.min(.9, .3 + .45 * jj), prev = st.sk && vt - st.sk.t < .5 ? st.sk : null;   // (thrusts in a row: the deeper fold wins, the hang runs on)
+      st.sk = { t: prev ? Math.min(vt, prev.t + .03) : vt, A: Math.max(A, prev ? prev.A : 0), dx, dz, hold: .14 + .12 * Math.min(1, jj), hunch: jj > .7 ? .3 : 0, step: .7 * jj };
+      st.ov[0] += dx * 1.9 * jj; st.ov[2] += dz * 1.9 * jj;   // driven back along the thrust
+      addKind(rg, EX, 'head', -dx * 1.2 * jj, 0, -dz * 1.2 * jj); addKind(rg, EX, 'loose', dx * 2.6 * jj, 0, dz * 2.6 * jj); addKind(rg, EX, 'clav', -dx * 1.4 * jj, -.6 * jj, -dz * 1.4 * jj);   // (arms and head thrown forward over it, the cloth back)
+    } else if (h.cls === 'pierce') {
       const part = ['clavL', 'clavR', 'chest', 'head', 'chest'][Math.min(4, h.r * 5 | 0)];
       if (!addBone(rg, EX, part, dx * 4.6 * j, -.4 * j, dz * 4.6 * j)) addKind(rg, EX, 'chest', dx * 3 * j, 0, dz * 3 * j);
       addKind(rg, EX, 'chest', dx * 1.3 * j, 0, dz * 1.3 * j); addKind(rg, EX, 'loose', dx * 1.5 * j, 0, dz * 1.5 * j);
@@ -54363,6 +54378,7 @@ const FPH = (() => {
     st.tw = Math.max(-TW.lim, Math.min(TW.lim, st.tw)); st.sq = Math.max(-.08, Math.min(SQ.lim, st.sq));
     const ol = Math.hypot(st.o[0], st.o[2]); if (ol > OFF.lim) { st.o[0] *= OFF.lim / ol; st.o[2] *= OFF.lim / ol; } st.o[1] = Math.min(.25, st.o[1]);
     if (dying) { st.o[0] = st.o[1] = st.o[2] = 0; st.ov[0] = st.ov[1] = st.ov[2] = 0; }   // (the death moves the body itself)
+    skewerFold(st, rg, B, m, s2);
     const sp = rg.spineI;
     if (sp != null && Math.abs(st.tw) > .002) {
       const q = rg.sp[sp], o = q.b * 12; xf(B, o, q.h, _J); xf(B, o, q.t, _T);
@@ -54381,6 +54397,35 @@ const FPH = (() => {
       for (let b = 0; b < NB; b++) { B[b * 12 + 3] += mx; B[b * 12 + 7] += my; B[b * 12 + 11] += mz; }
     }
   }
+  /* ---------------- 1c. skewered (owner: "would like a good reaction when enemies get skewered by spears"): a spear's thrust
+     (a polearm unit's strike: the Thornguard, the Stag Lancer, the Grail Knight, the Wolfguard, the Skyhunter ...; a lunge,
+     a charge or a Lance spell, SPEAR_AB) folds the body round the point, doubled over at the waist toward the spear, drives it
+     back along the thrust, holds it there a beat, and as the point pulls out it staggers a step forward and recovers, or
+     walks on hunched after a heavy one. A charge or a Lance spell ('lance') hits harder. A killing thrust lifts the body a
+     little and carries it back along the thrust, then it slides off the point and drops (falling back the way it was
+     driven); a charge or Lance spell flings a small foe off it. By damage over weight; no gore. ---------------- */
+  const SPEAR_AB = /lance|spear|lunge|impale|skewer|joust|runthrough|charge|gore/i, SPEAR_NOT = /sunlance|rimelance|charges/i, CHARGE_AB = /charge|runthrough|joust|lance/i;
+  /* the fold, held, released (0..1) at t seconds after the thrust, and what it settles to (a hunch) */
+  function skewerF(sk, t) {
+    const r = .06, h = r + sk.hold, o = h + .22;
+    if (t < r) return { f: ease(t / r), out: false };
+    if (t < h) return { f: 1 + .04 * Math.sin((t - r) * 60), out: false };   // (a shudder on the point)
+    if (t < o) return { f: 1 + (sk.hunch - 1) * ease((t - h) / .22), out: true };
+    return { f: sk.hunch * Math.max(0, 1 - (t - o) / 1.1), out: true, done: t > o + 1.1 };
+  }
+  /* the body doubled over at the waist toward the spear: the spine's and the chest's subtrees turned about a level axis */
+  function skewerFold(st, rg, B, m, s2) {
+    const sk = st.sk; if (!sk) return;
+    const F = skewerF(sk, vt - sk.t);
+    if (F.out && !sk.pulled) { sk.pulled = true; st.ov[0] -= sk.dx * sk.step; st.ov[2] -= sk.dz * sk.step; }   // the point pulls out: a step forward
+    if (F.done) { st.sk = null; return; }
+    const ang = sk.A * F.f; if (Math.abs(ang) < .003) return;
+    let ax = -sk.dz, az = sk.dx;   // world: tips the top toward the spear (against the thrust)
+    let mx = (m[0] * ax + m[2] * az) / s2, my = (m[4] * ax + m[6] * az) / s2, mz = (m[8] * ax + m[10] * az) / s2; const ml = Math.hypot(mx, my, mz) || 1; mx /= ml; my /= ml; mz /= ml;
+    for (const [i, share] of [[rg.spineI, .55], [rg.chestI, .45]]) {
+      if (i == null) continue; const q = rg.sp[i]; xf(B, q.b * 12, q.h, _J); rotAbout(B, q.sub, _J, mx, my, mz, ang * share);
+    }
+  }
   /* a blow's kind, from what struck: the unit's weapon (classfit.js unitKinds), a spell (DTAG), an element, a shell */
   function hitCls(src, elem) {
     if (elem === 'earth' || (src && src.type === 'cannon')) return 'blast';
@@ -54389,9 +54434,11 @@ const FPH = (() => {
     const spell = typeof DTAG !== 'undefined' && typeof AB_TAG !== 'undefined' && DTAG === AB_TAG;
     if (ks.includes('hammer')) return 'blunt';
     if (ks.includes('bow') || ks.includes('gun')) return 'pierce';
+    const ab = spell && typeof AB_NOW !== 'undefined' && AB_NOW ? String(AB_NOW) : '';
+    if (ab && SPEAR_AB.test(ab) && !SPEAR_NOT.test(ab)) return CHARGE_AB.test(ab) || ks.includes('rider') ? 'lance' : 'spear';   // a lunge, a charge, a Lance spell
     if (spell || (elem && elem !== 'phys')) return 'spell';
     if (ks.includes('blade')) return 'slash';
-    if (ks.includes('polearm')) return 'pierce';   // a spear's thrust
+    if (ks.includes('polearm')) return 'spear';   // a spear's thrust: skewered (1c)
     if (ks.includes('melee')) return 'slash';
     if (ks.includes('caster')) return 'spell';
     if (!src || !src.type) return 'spell';
@@ -54399,7 +54446,7 @@ const FPH = (() => {
   }
 
   /* ---------------- 2. the deaths ---------------- */
-  const D = { g: 22, fric: 5.5, slide: .9, hop: 1.9, launch: 4.6, maxGo: 1.7 };
+  const D = { g: 22, fric: 5.5, slide: .9, hop: 1.9, launch: 4.6, maxGo: 2.7 };
   const _A = new Float32Array(16), _B2 = new Float32Array(16);
   let XF = null;   // a world transform laid over the items drawn inside a death (the tilt, the tumble, the lift)
   function plan(k, rg) {
@@ -54408,7 +54455,21 @@ const FPH = (() => {
     let dx = c.hdx, dz = c.hdz; if (dx == null) { const a = r1 * Math.PI * 2; dx = Math.sin(a); dz = Math.cos(a); }
     const ja = (r2 - .5) * .45, cj = Math.cos(ja), sj = Math.sin(ja); [dx, dz] = [dx * cj + dz * sj, -dx * sj + dz * cj];
     const ok = Math.min(2, c.overK || 0), S_ = Math.max(.4, Math.min(2.6, (c.hitK || .7) * (1 + .7 * ok))) * (.85 + .3 * r3);
-    const kind = fx === 'shatter' ? 'still' : fly ? 'fly' : big ? 'big' : fx === 'blast' && W < 1.5 ? 'launch' : fx === 'zap' ? 'zap' : ok > .3 + .4 * r1 && W < 1.6 ? 'hop' : 'slide';   // (a hop wants overkill: early foes' hitK is always high)
+    let kind = fx === 'shatter' ? 'still' : fly ? 'fly' : big ? 'big' : fx === 'blast' && W < 1.5 ? 'launch' : fx === 'zap' ? 'zap' : ok > .3 + .4 * r1 && W < 1.6 ? 'hop' : 'slide';   // (a hop wants overkill: early foes' hitK is always high)
+    /* its own momentum (owner: "more realistic stumble and fall death animations when running at higher speed"): how fast
+       it was going when it died (c.fpV, cells a second, measured as it was drawn), 0 at a walk (1.9 cells/s and under: an ordinary foe) to 1
+       at a sprint (3.3: a Rushfoot, a Skitter, a wolf, a hasted foe). A runner trips: its feet catch, the trunk pitches over
+       the toes, it goes down face first the way it was running and skids on; at a full sprint a light one may roll over once
+       first. The blow is blended in: a runner shot from the side twists and goes down on the diagonal. */
+    const fv = c.fpV, sp = fv ? Math.hypot(fv[0], fv[1]) : 0, mom = Math.max(0, Math.min(1, (sp - 1.9) / 1.4));
+    const ux = sp > .05 ? fv[0] / sp : dx, uz = sp > .05 ? fv[1] / sp : dz;
+    if ((kind === 'slide' || kind === 'hop' || kind === 'zap') && mom > .2) {
+      kind = mom > .8 && r3 < .3 && W < 1.6 && fx !== 'zap' ? 'tumble' : 'trip';
+      const bw = Math.min(1.2, S_ / W) * .6, fx_ = ux * (1 + 2 * mom) + dx * bw, fz_ = uz * (1 + 2 * mom) + dz * bw, fl = Math.hypot(fx_, fz_) || 1;
+      dx = fx_ / fl; dz = fz_ / fl;   // the way it goes down: mostly where it was running, pushed by the blow
+    }
+    const spear = c.fpLast === 'spear' || c.fpLast === 'lance';
+    if (spear && (kind === 'slide' || kind === 'hop' || kind === 'trip' || kind === 'tumble') && c.hdx != null) { kind = 'skewer'; dx = c.hdx; dz = c.hdz; }   // run through: the thrust decides (1c)
     S.deaths[kind] = (S.deaths[kind] || 0) + 1;
     const p = { kind, dx, dz, W, S: S_, x0: k.x, z0: k.z, yaw0: k.yaw, tc: 0, tp: 0, ox: 0, oy: 0, oz: 0, vx: 0, vy: 0, vz: 0, th: 0, om: 0, roll: 0, spin: 0, air: 0, airT: 0, big, fx, sc: k.sc, h: rg.h * k.sc };
     const go = S_ / W, burn = fx === 'burn' ? .55 : 1;
@@ -54418,25 +54479,55 @@ const FPH = (() => {
     else if (kind === 'big') { p.step = Math.min(.7, .5 * S_ / Math.sqrt(W)); p.om = .9 * go; }
     else if (kind === 'fly') { p.vx = dx * 1.5 * Math.min(1.6, S_); p.vz = dz * 1.5 * Math.min(1.6, S_); p.spin = (r1 < .5 ? -1 : 1) * (3 + 3 * r2); p.rollA = (r3 < .5 ? -1 : 1) * (.6 + .4 * r1); }
     else if (kind === 'zap') { p.om = 1.2 * go; }
+    else if (kind === 'trip') { const v = sp * .8; p.vx = ux * v + c.hdx * .45 * go * (c.hdx != null ? 1 : 0); p.vz = uz * v + (c.hdz || 0) * .45 * go; p.pitch = .2 + .5 * mom; p.mom = mom; }
+    else if (kind === 'tumble') { p.vy = 2.9 * (.9 + .2 * r1); p.vx = ux * sp * .85 + dx * .4; p.vz = uz * sp * .85 + dz * .4; p.airT = 2 * p.vy / D.g; p.flip = 1; p.mom = mom; }
+    if (kind === 'skewer') {   // lifted a little and carried back on the point, then off it (flung, for a small foe a charge or Lance spell ran through)
+      const L = c.fpLast === 'lance' ? 1.3 : 1;
+      p.carryT = .22 + .08 * Math.min(1, go); p.carry = Math.min(1.1, (.35 + .4 * go) * L); p.lift = Math.min(.18, .06 + .07 * go * L) * p.h;
+      p.fling = c.fpLast === 'lance' && W < 1.15; p.offV = p.fling ? Math.min(3.2, 2.2 + .8 * go) : Math.min(1.8, .6 + .7 * go);
+      p.vx = dx * (p.carry / p.carryT + p.offV * .5); p.vz = dz * (p.carry / p.carryT + p.offV * .5);   // (only for the bounds below)
+    }
+    if (mom > .05 && (kind === 'launch' || kind === 'fly')) { p.vx += ux * sp * (kind === 'fly' ? .7 : .5); p.vz += uz * sp * (kind === 'fly' ? .7 : .5); }   // (thrown or falling, it carries on the way it was going)
+    if (kind === 'slide' && mom < .05) { p.vx *= .6; p.vz *= .6; }   // a slow one crumples more or less where it stood
     // turn the clip so it falls the way it was struck (a part of the way, eased in)
     if (rg.fall && kind !== 'still' && kind !== 'fly') {
       const want = Math.atan2(dx, dz) - Math.atan2(rg.fall[0], rg.fall[1]); let dy = Math.atan2(Math.sin(want - k.yaw), Math.cos(want - k.yaw));
       p.twist = Math.abs(dy) > 2.2 ? 0 : Math.max(-P.twist, Math.min(P.twist, dy));
     } else p.twist = 0;
     // never thrown out of the field or past a map's crest: how far it would go is cut to fit
-    const T = kind === 'launch' ? p.airT + .25 : .45, ex = p.x0 + p.vx * T, ez = p.z0 + p.vz * T;
+    const v0 = Math.hypot(p.vx, p.vz), T = kind === 'launch' || kind === 'tumble' ? p.airT + .4 : kind === 'trip' && v0 > .01 ? (v0 * .14 + v0 * v0 / (2 * D.fric * .42)) / v0 : .45;   // (a trip's skid: friction, not a fixed time)
+    const ex = p.x0 + p.vx * T, ez = p.z0 + p.vz * T;
     const inX = Math.max(-.45, Math.min(COLS - .55, ex)), inZ = Math.max(Math.min(p.z0, -.4), Math.min(ROWS - .55, ez));
     let cut = Math.min(1, D.maxGo / (Math.hypot(ex - p.x0, ez - p.z0) || 1));
     if (p.x0 > -1 && p.x0 < COLS && Math.abs(ex - inX) + Math.abs(ez - inZ) > 1e-3) cut   // (a board drawn off to one side, Tower Wars', is left alone)
       = Math.min(cut, Math.max(0, Math.hypot(inX - p.x0, inZ - p.z0) / (Math.hypot(ex - p.x0, ez - p.z0) || 1)));
     if (typeof pastCrest === 'function' && pastCrest(ex, ez)) cut = 0;
+    if (kind === 'trip' && cut < 1 && v0 > .01) {   // (a skid's length goes with the speed squared: find the speed that skids the allowed length)
+      const a2 = 1 / (2 * D.fric * .42), L = cut * v0 * T, v1 = (-.14 + Math.sqrt(.0196 + 4 * a2 * L)) / (2 * a2); cut = Math.max(0, v1 / v0);
+    }
     p.vx *= cut; p.vz *= cut;
+    if (kind === 'skewer') { p.carry *= cut; p.offV *= cut; p.vx = p.vz = 0; }
     return p;
   }
   const ease = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
   function stepPlan(p, h, t) {
     let rate = 1;
-    if (p.kind === 'launch') {
+    if (p.kind === 'skewer') {
+      if (t < p.carryT) {   // on the point: carried back and lifted a little, the clip held (the springs hold the fold)
+        const u = t / p.carryT; p.ox = p.dx * p.carry * Math.sin(u * Math.PI * .5); p.oz = p.dz * p.carry * Math.sin(u * Math.PI * .5); p.oy = p.lift * Math.sin(Math.min(1, u * 1.6) * Math.PI * .5); rate = .15;
+      } else if (!p.off) {   // off the point
+        p.off = true; p.vx = p.dx * p.offV; p.vz = p.dz * p.offV;
+        if (p.fling) { p.vy = 3.2; p.airT = (p.vy + Math.sqrt(p.vy * p.vy + 2 * D.g * p.oy)) / D.g; p.air = 0; p.flip = 1; } else { p.vy = .4; p.om = 3.2; }
+      } else if (p.fling && p.air < p.airT) { p.air += h; rate = .35; p.vy -= D.g * h; p.oy += p.vy * h; p.ox += p.vx * h; p.oz += p.vz * h; if (p.oy <= 0 || p.air >= p.airT) { p.oy = 0; p.air = p.airT; p.vx *= .5; p.vz *= .5; p.vy = 0; } }
+      else { if (p.oy > 0 || p.vy > 0) { p.vy -= D.g * h; p.oy = Math.max(0, p.oy + p.vy * h); } slide(p, h, .9); rate = 1.4; }
+    } else if (p.kind === 'trip') {   // the feet catch (hard friction a moment), the trunk pitches over the toes, then the body skids on
+      slide(p, h, t < .14 ? 1.2 : .42);   // (a sprint skids most of a cell: 2.6 cells/s -> about 0.9)
+      const pk = .13, hmp = t < pk ? ease(t / pk) : Math.max(0, 1 - (t - pk) / .32); p.th = p.pitch * hmp; p.om = 0;
+      rate = t < .45 ? 1.7 : 1;   // (the clip's fall hurried: it is going down, not kneeling)
+    } else if (p.kind === 'tumble') {   // a full sprint: over once, landing in the fall, then a long skid
+      if (p.air < p.airT) { p.air += h; rate = .35; p.vy -= D.g * h; p.oy += p.vy * h; p.ox += p.vx * h; p.oz += p.vz * h; if (p.oy <= 0 || p.air >= p.airT) { p.oy = 0; p.air = p.airT; p.vx *= .6; p.vz *= .6; p.vy = 0; } }
+      else { slide(p, h, .8); rate = 1.3; }
+    } else if (p.kind === 'launch') {
       if (p.air < p.airT) { p.air += h; rate = .3; p.vy -= D.g * h; p.oy += p.vy * h; p.ox += p.vx * h; p.oz += p.vz * h; if (p.oy <= 0 || p.air >= p.airT) { p.oy = 0; p.air = p.airT; p.vx *= .35; p.vz *= .35; p.vy = 0; p.landed = true; } }
       else slide(p, h, 1.6);
     } else if (p.kind === 'hop') {
@@ -54450,7 +54541,7 @@ const FPH = (() => {
     } else if (p.kind === 'zap') { rate = t < .22 ? 0 : 1.1; if (t >= .22) slide(p, h, 1); }
     else if (p.kind === 'fly') { const f = Math.exp(-2.2 * h); p.vx *= f; p.vz *= f; p.ox += p.vx * h; p.oz += p.vz * h; p.spin *= Math.exp(-1.8 * h); p.yawS = (p.yawS || 0) + p.spin * h; }
     // the trunk knocked over the way of the blow: a spring about the feet, struck once
-    if (p.om || p.th) { const kk = p.big ? 14 : 34, cc = p.big ? 3 : 7; p.om += (-kk * p.th - cc * p.om) * h; p.th += p.om * h; if (p.big && t > .55) p.th = Math.min(.35, p.th + h * .12 * Math.min(1, (t - .55) * 2)); }
+    if (p.kind !== 'trip' && (p.om || p.th)) { const kk = p.big ? 14 : 34, cc = p.big ? 3 : 7; p.om += (-kk * p.th - cc * p.om) * h; p.th += p.om * h; if (p.big && t > .55) p.th = Math.min(.35, p.th + h * .12 * Math.min(1, (t - .55) * 2)); }
     return rate;
   }
   function slide(p, h, f) { const v = Math.hypot(p.vx, p.vz); if (v < 1e-4) return; const nv = Math.max(0, v - D.fric * f * h); p.vx *= nv / v; p.vz *= nv / v; p.ox += p.vx * h; p.oz += p.vz * h; }
@@ -54465,7 +54556,7 @@ const FPH = (() => {
       R[12] = cx - (R[0] * cx + R[4] * cy + R[8] * cz); R[13] = cy - (R[1] * cx + R[5] * cy + R[9] * cz); R[14] = cz - (R[2] * cx + R[6] * cy + R[10] * cz); R[15] = 1;
       M4.mul(_A, R, _A); any = true; };
     if (Math.abs(p.th) > .002) rot(p.th, x + p.dx * .12 * p.sc, k.y, z + p.dz * .12 * p.sc, ax, 0, az);
-    if (p.kind === 'launch' && p.air < p.airT) { const u = p.air / p.airT; rot(p.flip * Math.PI * 2 * ease(u), x, k.y + p.oy + p.h * .45, z, ax, 0, az); }
+    if ((p.kind === 'launch' || p.kind === 'tumble' || (p.kind === 'skewer' && p.fling && p.off)) && p.air < p.airT) { const u = p.air / p.airT; rot(p.flip * Math.PI * 2 * ease(u), x, k.y + p.oy + p.h * .45, z, ax, 0, az); }
     if (p.kind === 'fly') { const land = Math.min(1, t / (p.flyT || .9)); rot(p.rollA * Math.sin(land * Math.PI) * (1 - land * .3), x, k.y * Math.max(0, 1 - land * land) + p.h * .4, z, p.dx, 0, p.dz); }
     if (p.oy > 1e-4) { _A[13] += p.oy; any = true; }
     return any ? _A : null;
@@ -54509,6 +54600,35 @@ const FPH = (() => {
       return b;
     };
   }
+  /* each foe's velocity as it is drawn (cells a second of the view's clock, smoothed; c.fpV), for the momentum of its death */
+  if (typeof drawCreeps === 'function') {
+    const _dcr = drawCreeps;
+    drawCreeps = function (dt) {
+      if (P.on && dt > 0 && typeof G !== 'undefined' && G && G.creeps) for (const c of G.creeps) {
+        const L = c.fpL;
+        if (L) { const vx = (c.x - L[0]) / dt, vz = (c.y - L[1]) / dt; if (Math.abs(vx) + Math.abs(vz) < 12) { const v = c.fpV || (c.fpV = [0, 0]), f = Math.min(1, dt * 10); v[0] += (vx - v[0]) * f; v[1] += (vz - v[1]) * f; } }
+        else c.fpL = [0, 0];
+        c.fpL[0] = c.x; c.fpL[1] = c.y;
+      }
+      return _dcr(dt);
+    };
+  }
+  /* the code-built foes' box ragdoll (view.js ragNew) carries the same momentum: thrown on the way it was running, and tipped
+     over forward (its ground friction gives the skid) */
+  if (typeof ragNew === 'function') {
+    const _rn = ragNew;
+    ragNew = function (c, s) {
+      const k = _rn(c, s);
+      try {
+        if (P.on && k && k.R && k.v && k.w && !c.efall && c.fpV && !(c.def && (c.def.boss || c.def.lead))) {
+          const v = c.fpV, sp = Math.hypot(v[0], v[1]), mom = Math.max(0, Math.min(1, (sp - 1.9) / 1.4));
+          if (sp > .05) { k.v[0] += v[0] * .75; k.v[2] += v[1] * .75; }
+          if (mom > .05 && !c.fly) { const tip = 6 * mom; k.w[0] += v[1] / sp * tip; k.w[2] -= v[0] / sp * tip; S.deaths.ragRun = (S.deaths.ragRun || 0) + 1; }
+        }
+      } catch (e) {}
+      return k;
+    };
+  }
   /* each blow that lands queued on the foe with its kind, for the springs to take on its next frame (1b) */
   if (typeof hurt === 'function') {
     const _hu = hurt;
@@ -54517,7 +54637,8 @@ const FPH = (() => {
       try {
         if (P.on && c && !dot && amt > 0 && c.hit >= .099 && c.hdx != null) {
           const q = c.fpQ || (c.fpQ = []), gt = typeof G !== 'undefined' && G ? G.time || 0 : 0;
-          if (q.length < 6) q.push({ cls: hitCls(src, elem), k: (c.hitK || .6) * (c.hit < .139 ? .5 : 1), dx: c.hdx, dz: c.hdz, t: vt, r: hash(c.anim + q.length * 1.7 + gt * 3.1, 5), s: hash(c.anim + gt * 2.3, 6) < .5 ? -1 : 1 });
+          const cls = hitCls(src, elem); c.fpLast = cls;   // (the killing blow's kind, for the death: a skewer)
+          if (q.length < 6) q.push({ cls, k: (c.hitK || .6) * (c.hit < .139 ? .5 : 1), dx: c.hdx, dz: c.hdz, t: vt, r: hash(c.anim + q.length * 1.7 + gt * 3.1, 5), s: hash(c.anim + gt * 2.3, 6) < .5 ? -1 : 1 });
         }
       } catch (e) {}
       return r;
@@ -68519,6 +68640,22 @@ const POOL_OCC = [[-1.701, [[7.625, 9.75, -9.123], [7.625, 9.75, -6.738], [7.5, 
    direction x speed, the picture's x and y), over the picture's own rect (POOL_RECT): gl.js waterAt. */
 const POOL_FLOW = 'data:image/png;base64,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';
 
+/* Oakmere Glade: the way in down the painted path, and the view's centre (generated by tools/make_oakmere.py). */
+const OAK_ENTRY = [[7.455, -4.471], [7.364, -2.303], [7.091, -0.813], [6.773, -0.135]];   // world x, z: from above the picture's top edge down the path to the field's head
+const OAK_CAMX = 8.227;
+
+/* Oakmere Glade's pool and fall as a flow map on the painting (generated by tools/make_oakmere.py): R the water mask (0 .. 0.5
+   how much is water; above 0.5 how near the fall's foot), G B its flow (0.5 + 0.5 x direction x speed), over OAK_RECT: gl.js waterAt. */
+const OAK_FLOW = 'data:image/png;base64,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';
+
+/* Fern Brook: the way in down the painted path, and the view's centre (generated by tools/make_fernwatch.py). */
+const FERN_ENTRY = [[5.545, -4.471], [5.455, -2.303], [5.273, -0.948], [5.045, -0.19]];   // world x, z: from above the picture's top edge down the path to the field's head
+const FERN_CAMX = 6.864;
+
+/* Fern Brook's brook and falls as a flow map on the painting (generated by tools/make_fernwatch.py): R the water mask (0 .. 0.5
+   how much is water; above 0.5 how near a fall's foot), G B its flow (0.5 + 0.5 x direction x speed), over FERN_RECT: gl.js waterAt. */
+const FERN_FLOW = 'data:image/png;base64,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';
+
 /* The units' material textures (generated by tools/make_unittex.py from assets/units/tex/). A material missing here
    keeps its painted stand-in (matPaint in gl.js). When one has decoded, the material textures are built again. */
 const UNIT_TEX = {};
@@ -68902,6 +69039,18 @@ if (typeof POOL_STILL !== 'undefined') MAPS.mistfall = { name: 'Mistfall Ledge',
   // foes killed by a shot there to be knocked back over it (the edge-fall branch: line, the direction over, how near in cells
   // a kill must be, how far the body drops out of sight). The top edge only: the right-hand cliff is six cells from the field.
   fallEdge: { line: [[2.3, -1.95], [5.3, -1.95]], over: [0, -1], near: 3.3, drop: 3 } };   // (the lip as the painting has it, the field a row further down than at first: its first row 2.4 cells from the lip, so near 3.3)   // (wide: foes in at any column along the top, out anywhere along the foot: core.js wideMap)
+/* Oakmere Glade (owner, 19 Nov 2026: "make this one of the places on the map"): the owner's painting is the ground (oakpaint.js
+   from tools/make_oakmere.py: a sunlit glade, great mossy oaks and their roots on the left, a dirt path from top to foot through
+   the middle, a pool fed by a small fall on the right). A wide front (no red cells, no road line) on the open grass along the
+   path, the roots and the pool outside the field; foes walk in down the painted path (pathIn: game.js) and leave anywhere along
+   the foot, where the path runs out of the picture. The Greatroot Marches fight on it (region.js). */
+if (typeof OAK_STILL !== 'undefined') MAPS.oakmere = { name: 'Oakmere Glade', blurb: 'A sunlit path between the old oaks and a spring-fed pool', entry: typeof OAK_ENTRY !== 'undefined' ? OAK_ENTRY : null, wide: true, pathIn: true };
+/* Fern Brook, Fernwatch's own field (owner, 19 Nov 2026, "Fernwatch - Fern Brook"): the owner's painting is the ground
+   (fernpaint.js from tools/make_fernwatch.py: a sunlit glade, a dirt path wandering from top to foot, a brook with two small
+   falls down the left among ferns, a giant mossy tree and its roots on the right). Laid as Oakmere Glade is: a wide front on the
+   open grass along the path, the brook and the roots outside the field, foes in down the painted path (pathIn), out anywhere
+   along the foot. */
+if (typeof FERN_STILL !== 'undefined') MAPS.fernbrook = { name: 'Fern Brook', blurb: 'A path through the ferns, a brook falling beside it', entry: typeof FERN_ENTRY !== 'undefined' ? FERN_ENTRY : null, wide: true, pathIn: true };
 const WATER_TRY = (() => { try { return new URLSearchParams(location.search).get('water') === 'flow'; } catch (e) { return false; } })();   // (?water=flow: Mistfall Ledge's flow-map water trial)
 const MAP_TRY = (() => { try { const q = new URLSearchParams(location.search).get('trymap'); return q && MAPS[q] ? q : null; } catch (e) { return null; } })();
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
@@ -68975,9 +69124,30 @@ LOOK_DEF.clearing = {"fwd":{"shOn":1,"shFloor":0.3,"shSoft":1.2,"shBias":0.0016,
 LIGHT_DEF.greatroot = {"sun":"#ffd9a6","sunI":1.75,"az":-128,"el":50,"rim":0.3,"fill":0.14,"ground":1,"paint":1,"sky":"#9cd0c2","skyI":0.62,"gnd":"#5c7a4a","gndI":0.3,"fog":"#24463e","fogNear":0.98,"fogFar":2.4,"woods":0,"lamps":1,"expo":1,"rays":0.8,"ray":"#ffe6b0"};
 MAP_MOOD.greatroot = {"top":"#8fd8c8","topK":0.14,"key":"#ffd08c","keyK":0.2,"bounce":"#8cb85c","bounceK":0.16,"env":0};
 LOOK_DEF.greatroot = {"fwd":{"shOn":1,"shFloor":0.4,"shSoft":2,"shBias":0.0016,"shQ":1,"tm":0,"backOn":1,"back":"#ffd29a","backI":0.5,"backAz":-128,"backEl":22,"spec":1,"rough":1,"sharp":0.2,"fres":0.15,"gGlintOn":0,"gGlint":1.2,"gSharp":30},"post":{"on":1,"ao":{"on":1,"strength":0.7,"radius":0.45,"bias":0.03,"power":1.2,"ground":0.3},"bloom":{"on":1,"thr":0.92,"strength":0.1,"radius":1.6},"rays":{"on":0,"col":"#ffd9a0","strength":0.3,"len":0.2,"thr":0.6},"hfog":{"on":0,"col":"#3f8f86","dens":0.2,"top":1.2,"fall":1.6,"max":0.15,"noise":0.6},"tone":{"on":1,"ev":0,"contrast":1,"sat":1.02,"warm":0.03,"tint":0},"grade":{"on":0,"lift":0,"liftC":"#2f8f86","liftK":0,"gamma":1,"gammaC":"#ffffff","gammaK":0,"gain":1,"gainC":"#ffffff","gainK":0,"splS":"#1f7a78","splSK":0,"splH":"#ffb86a","splHK":0,"bal":0},"vig":{"on":1,"str":0.22,"rad":0.78,"soft":0.8},"sharp":{"on":1,"k":0.1}}};
-// Mistfall Ledge: Greatroot Way's light and look as they stand (the ground as made, no fog, the bloom nearly off, exposure 1)
+/* Each painted field's own light, read off its painting (owner, 19 Nov 2026: "ensure units are lit like the map is lit"), so a
+   unit or foe standing on it, and its shadow, looks part of the picture: the sun's direction from the painting's highlights and
+   cast shadows (az/el; the shadows and the back light follow it), its colour and strength, the shade's colour (sky: the ambient
+   from above; gnd: the bounce off the grass), the models' mood (MAP_MOOD) and the shadows' softness (LOOK_DEF fwd). Kept bright
+   enough that units and foes read from the top-down camera: the sun stays strong and the tints light (K .16-.26). */
+// Mistfall Ledge: shafts of cream-yellow sun from the upper left through the giants (lit stripes and shadows run down to the
+// right), lush yellow-green grass, a cool teal mist in the shade; Greatroot Way's look otherwise (no fog, bloom nearly off)
 WATER_DEF.mistfall = { shimmer: .25, warp: .75 };   // (its flow trial: little sparkle and a softer wobble, so the water reads as running, not twinkling)
-LIGHT_DEF.mistfall = Object.assign({}, LIGHT_DEF.greatroot, { rays: 0 }); MAP_MOOD.mistfall = Object.assign({}, MAP_MOOD.greatroot); LOOK_DEF.mistfall = JSON.parse(JSON.stringify(LOOK_DEF.greatroot));
+LIGHT_DEF.mistfall = Object.assign({}, LIGHT_DEF.greatroot, { sun: '#ffe7b0', sunI: 1.8, az: -124, el: 42, rim: .32, fill: .16, sky: '#a4d8d2', skyI: .62, gnd: '#6c9c42', gndI: .32, rays: 0 });
+MAP_MOOD.mistfall = { top: '#98d8d0', topK: .16, key: '#ffe2a4', keyK: .2, bounce: '#7ec24c', bounceK: .2, env: 0 };
+LOOK_DEF.mistfall = JSON.parse(JSON.stringify(LOOK_DEF.greatroot)); Object.assign(LOOK_DEF.mistfall.fwd, { back: '#ffe2a8', backI: .5, backAz: -124, backEl: 20, shSoft: 2, shFloor: .42 });
+// Oakmere Glade: a low golden sun from the upper left through the oaks (the rocks lit on their upper left, shadowed to the lower
+// right), soft dappled light under the canopy (dap: the sun broken into pools on every model), a gentle olive-green shade and a
+// green bounce off the grass; its water quiet (owner: keep the moving water subtle)
+// Fern Brook: a warm orange-gold sun low from the left (the great tree's bark glows on its left side, the ferns lit on their
+// upper left), dappled pools of light on the grass, deep green shade under the ferns; its brook quiet
+WATER_DEF.fernbrook = { speed: .8, shimmer: .2, warp: .5 };
+LIGHT_DEF.fernbrook = Object.assign({}, LIGHT_DEF.greatroot, { sun: '#ffc06a', sunI: 1.85, az: -118, el: 40, rim: .36, fill: .14, sky: '#b4cc84', skyI: .58, gnd: '#6e9a38', gndI: .34, rays: 0, dap: .34, dapS: 2.6, dapV: .4, dapE: .2 });
+MAP_MOOD.fernbrook = { top: '#bcd88a', topK: .16, key: '#ffbc64', keyK: .26, bounce: '#80b040', bounceK: .2, env: 0 };
+LOOK_DEF.fernbrook = JSON.parse(JSON.stringify(LOOK_DEF.greatroot)); Object.assign(LOOK_DEF.fernbrook.fwd, { back: '#ffc47c', backI: .55, backAz: -118, backEl: 20, shSoft: 2.4, shFloor: .45 });
+WATER_DEF.oakmere = { speed: .7, shimmer: .2, warp: .5 };
+LIGHT_DEF.oakmere = Object.assign({}, LIGHT_DEF.greatroot, { sun: '#ffc878', sunI: 1.85, az: -132, el: 44, rim: .34, fill: .14, sky: '#c2c88c', skyI: .58, gnd: '#7c8c3c', gndI: .34, rays: 0, dap: .32, dapS: 2.6, dapV: .4, dapE: .2 });
+MAP_MOOD.oakmere = { top: '#c4d890', topK: .16, key: '#ffc46c', keyK: .26, bounce: '#8cb048', bounceK: .2, env: 0 };
+LOOK_DEF.oakmere = JSON.parse(JSON.stringify(LOOK_DEF.greatroot)); Object.assign(LOOK_DEF.oakmere.fwd, { back: '#ffcc84', backI: .55, backAz: -132, backEl: 20, shSoft: 2.4, shFloor: .45 });
 /* Greatroot Way in full 3D (?map3d=greatroot): a late-morning sun slanting in from the upper left through the canopy (dap*: its dapple on everything the
    sun lights, gl.js shadowAt uCookie: strength, the pools' size in world units, their sway, the edge's softness), warm amber
    on the bark, teal-green shade and a teal haze into the distance. Tuned in the Light Lab and baked. */
@@ -69399,6 +69569,33 @@ if (typeof POOL_STILL !== 'undefined') {
     painted: { src: POOL_STILL, video: !WATER_TRY && typeof POOL_VIDEO !== 'undefined' ? POOL_VIDEO : null, rect: POOL_RECT, shade: POOL_SHADE_REF, edge: 2.5, glint: false,
       water: WATER_TRY && typeof POOL_FLOW !== 'undefined' ? POOL_FLOW : null, falls: true, bank: true },   // (?water=flow: the still with its water brought to life by a flow map instead of the video: tools/make_poolwater.py, gl.js waterAt mode 3)
     build: () => buildGreatrootPainted(POOL_RECT, typeof POOL_OCC !== 'undefined' ? POOL_OCC : null, typeof POOL_CREST !== 'undefined' ? POOL_CREST : null, [2, 5.6]),
+  };
+}
+// Fern Brook: as Oakmere Glade below; the view centred a little right of the field, so the falls on the left and the great tree's roots are in sight
+if (typeof FERN_STILL !== 'undefined') {
+  THEMES.fernbrook = {
+    id: 'fernbrook', sunDir: nrm3([-.54, .73, -.42]), sunCol: [1.6, 1.25, .8], sky: [.2, .3, .3], gnd: [.14, .16, .09], fogHex: '#24463e',
+    pitch: 57, fitTop: FERN_RECT[1] + .1, fitBot: FERN_RECT[1] + FERN_RECT[3] - .1, noKeep: true, h: () => 0, fly: [.85, 1, .45],
+    camX: FERN_CAMX, viewW: 2 * Math.min(FERN_CAMX - FERN_RECT[0], FERN_RECT[0] + FERN_RECT[2] - FERN_CAMX),
+    bendR: 1e5, shafts: 'none', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: 1, walkUpright: true, walkTilt: 0, walkRise: 0,
+    birdCol: [.95, .92, .78], birdSize: .85,
+    perch: [[[-8.6, -1.8, 4.5], [-11, 1, 4], [-6, -2.5, 4.8]], [[25.5, -.7, 5], [22, 2, 4.2], [27, 4, 4]], [[-6.3, 16.1, 2.4], [-9, 14, 2.8]]],   // (the left tree's crown, the great tree, the ferns at the foot: world [x, z, height])
+    painted: { src: FERN_STILL, rect: FERN_RECT, shade: FERN_SHADE_REF, edge: 2.5, glint: false, water: typeof FERN_FLOW !== 'undefined' ? FERN_FLOW : null, falls: true },   // (the brook and its falls run: tools/make_fernwatch.py, gl.js waterAt mode 2)
+    build: () => buildGreatrootPainted(FERN_RECT, null, null, null),
+  };
+}
+// Oakmere Glade: the owner's painting is the ground as painted (no bend, no fog, no glint), Mistfall Ledge's way; the view
+// fitted to the picture's top and foot, centred a little right of the field so the pool and its fall are in sight
+if (typeof OAK_STILL !== 'undefined') {
+  THEMES.oakmere = {
+    id: 'oakmere', sunDir: nrm3([-.54, .73, -.42]), sunCol: [1.6, 1.25, .8], sky: [.2, .3, .3], gnd: [.14, .16, .09], fogHex: '#24463e',
+    pitch: 57, fitTop: OAK_RECT[1] + .1, fitBot: OAK_RECT[1] + OAK_RECT[3] - .1, noKeep: true, h: () => 0, fly: [.85, 1, .45],
+    camX: OAK_CAMX, viewW: 2 * Math.min(OAK_CAMX - OAK_RECT[0], OAK_RECT[0] + OAK_RECT[2] - OAK_CAMX),   // (never past the picture's nearer side)
+    bendR: 1e5, shafts: 'none', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: 1, walkUpright: true, walkTilt: 0, walkRise: 0,
+    birdCol: [.95, .92, .78], birdSize: .85,
+    perch: [[[-9.5, .7, 4.5], [-5, -1.8, 5], [-12, 4, 3.6]], [[25.7, -1.8, 4.5], [23, 0, 4], [28, 3.4, 3.5]], [[-12.9, 14.2, 2.6], [-10, 12, 3]]],   // (the oaks' crowns, the right-hand tree, the bushes at the foot: world [x, z, height])
+    painted: { src: OAK_STILL, rect: OAK_RECT, shade: OAK_SHADE_REF, edge: 2.5, glint: false, water: typeof OAK_FLOW !== 'undefined' ? OAK_FLOW : null, falls: true },   // (the pool turns slowly and its fall runs: tools/make_oakmere.py, gl.js waterAt mode 2)
+    build: () => buildGreatrootPainted(OAK_RECT, null, null, null),
   };
 }
 /* ---------- painted backdrop for Moonwood ----------
@@ -88790,204 +88987,94 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -88996,207 +89083,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -90301,7 +90256,7 @@ function showOverlay(html, cls) {
 function hideOverlay() { if (titlePanelStop) { titlePanelStop(); titlePanelStop = null; } if (typeof itipHide === 'function') itipHide(); if (typeof hideSpellHud === 'function') hideSpellHud(); talOpen = false; warOpen = false; if (bagOpen) { bagOpen = false; for (const it of G.loot || []) it.isNew = false; }  ov.hidden = true; ovp.innerHTML = ''; ov.className = 'ov'; ovp.className = 'panel'; }
 const fmtPlay = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : sec ? '<1m' : ''; };
 const fmtDay = t => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
-const mapThumb = k => k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'mistfall' ? (typeof POOL_STILL !== 'undefined' ? POOL_STILL : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
+const mapThumb = k => k === 'fernbrook' ? (typeof FERN_STILL !== 'undefined' ? FERN_STILL : '') : k === 'oakmere' ? (typeof OAK_STILL !== 'undefined' ? OAK_STILL : '') : k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'mistfall' ? (typeof POOL_STILL !== 'undefined' ? POOL_STILL : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
 /* The main menu: one stacked column of buttons. Saved games and Top scores are windows over it (owner, 11 Nov 2026:
    "all buttons stacked on one menu with saved games and top scores being their own windows on click"). */
 let titlePanelStop = null;   // closes the open title window, if any (showOverlay and hideOverlay call it)
@@ -111998,7 +111953,9 @@ const RG_PRICE = { life: 6, tend: 40, respec: 80, alms: 40, offering: 30 };
 // the field every region battle is fought on: the game's current one, Mistfall Ledge (a wide map: foes in along the whole
 // top, out along the whole foot, so no reserved cells and no road line while placing). The Marches first named the older
 // painted fields (Greatroot Way, Sunfall Glade, Kingsmeadow, Moonwood), which showed the old red reserved cells and the road
-// line (owner, 19 Nov 2026: "has the old red squares and the line"). Greatroot Way if Mistfall Ledge is not loaded.
+// line (owner, 19 Nov 2026: "has the old red squares and the line"). Fernwatch fights on its own painting, Fern Brook;
+// Mossford, the Old Weir and Stagrun Heath on Oakmere Glade (both the owner's, both wide: maps.js); a place's field falls back
+// to Mistfall Ledge, then Greatroot Way, if not loaded.
 const rgField = n => { const m = n && n.map; return typeof MAPS !== 'undefined' && MAPS[m] ? m : typeof MAPS !== 'undefined' && MAPS.mistfall ? 'mistfall' : 'greatroot'; };
 // the Grove's homeland. kind: town (start: held at the start; else enemy-held, freed by a battle), trouble, lair.
 // w: the waves of its battle; map: its field; x, y on a 1000 x 620 board
@@ -112008,13 +111965,13 @@ const RG_REGIONS = {
     say: 'The Grove’s homeland. Packs and raiders press in from every side while the ogre warlord Grakk gathers his host in Gloamfen.',
     nodes: [
       { id: 'thornwick', name: 'Thornwick', kind: 'town', start: 1, tier: 1, x: 105, y: 520, say: 'The Grove’s last walled village before the deep wood. Where the host musters.' },
-      { id: 'mossford', name: 'Mossford', kind: 'trouble', tier: 1, w: [1, 6], map: 'mistfall', x: 255, y: 470, say: 'Raiders have taken the ford and the road home with it.' },
-      { id: 'fernwatch', name: 'Fernwatch', kind: 'trouble', tier: 1, w: [2, 7], map: 'mistfall', x: 175, y: 345, say: 'The watch-glade has gone quiet. Something holds it.' },
+      { id: 'mossford', name: 'Mossford', kind: 'trouble', tier: 1, w: [1, 6], map: 'oakmere', x: 255, y: 470, say: 'Raiders have taken the ford and the road home with it.' },
+      { id: 'fernwatch', name: 'Fernwatch', kind: 'trouble', tier: 1, w: [2, 7], map: 'fernbrook', x: 175, y: 345, say: 'The watch-glade has gone quiet. Something holds it.' },
       { id: 'brightwater', name: 'Brightwater Mill', kind: 'town', tier: 2, w: [8, 13], map: 'mistfall', x: 395, y: 395, say: 'The mill town fell in the first week. Free it and its granary feeds the host.' },
       { id: 'barrows', name: 'Hollowell Barrows', kind: 'trouble', tier: 2, w: [9, 15], map: 'mistfall', x: 300, y: 225, say: 'Old mounds under the trees, broken open from below.' },
-      { id: 'weir', name: 'The Old Weir', kind: 'trouble', tier: 2, w: [11, 17], map: 'mistfall', x: 520, y: 520, say: 'The weir holds back the river. Whoever holds the weir holds the lowlands.' },
+      { id: 'weir', name: 'The Old Weir', kind: 'trouble', tier: 2, w: [11, 17], map: 'oakmere', x: 520, y: 520, say: 'The weir holds back the river. Whoever holds the weir holds the lowlands.' },
       { id: 'greywood', name: 'Greywood Crossing', kind: 'trouble', tier: 3, w: [17, 23], map: 'mistfall', x: 480, y: 270, say: 'Four roads meet under grey trees. Every column on the march passes here.' },
-      { id: 'stagrun', name: 'Stagrun Heath', kind: 'trouble', tier: 3, w: [19, 25], map: 'mistfall', x: 660, y: 410, say: 'Open heath where the white harts ran. Now it is a camp.' },
+      { id: 'stagrun', name: 'Stagrun Heath', kind: 'trouble', tier: 3, w: [19, 25], map: 'oakmere', x: 660, y: 410, say: 'Open heath where the white harts ran. Now it is a camp.' },
       { id: 'briarfast', name: 'Briarfast', kind: 'town', tier: 3, w: [21, 27], map: 'mistfall', x: 640, y: 175, say: 'A thorn-walled hold, taken from within. Free it and the road to Gloamfen opens.' },
       { id: 'rootdeep', name: 'Rootdeep Hollow', kind: 'trouble', tier: 4, w: [29, 35], map: 'mistfall', x: 800, y: 300, say: 'A hollow under the oldest roots. The warlord’s allies den here.' },
       { id: 'cinder', name: 'Cinderbrake', kind: 'trouble', tier: 4, w: [32, 38], map: 'mistfall', x: 800, y: 520, say: 'A burned brake on the fen’s edge. The smoke never clears.' },
