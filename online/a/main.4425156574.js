@@ -1,4 +1,4 @@
-const BUILD_TAG = '091f503@2026-11-20';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1f49805@2026-11-21';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -112383,6 +112383,73 @@ const RG_STEP = { w: 2, hp: .08, pay: .25 };
    wave (casters, slingers, flyers and the rest march as melee), foes at hp of their health, a line of `line` lives, at least
    `gold` to plant the maze from nothing, and a retreat from one does not move the threat clock. Growth still applies on top. */
 const RG_GENTLE = { tier: 1, hp: .8, line: 15, gold: 200, bossFill: 4 };
+/* The step up from the first places (owner, 20 Nov 2026, from Fernwatch to Hollowell Barrows: "barely made a dent"), and the
+   maze that marches with the host ("Not sure if the game mode will work when you need to constantly remake teh maze, maybe
+   players can choose whether to keep the maze as is or redo it. if they redo it their gold and items get refunded as is";
+   "that way we can scale as we would in the normal mode"):
+   - R.maze: a won battle's maze (every unit and wall as a save holds them: tier, cell, gold paid, items, charm, abilities,
+     veterancy) and the gold left in hand, kept on the region state. The next battle starts from it: Keep your maze (each
+     piece on its own cell where that cell is open on the new field and the road still runs, else its gold and items back)
+     or Rebuild (every piece's gold back in full, its items to the bag). A lost battle or a retreat keeps the maze as it was
+     before that battle, for the retry.
+   - The waves between: a battle that starts later than the last one ended pays the income a run would have earned on the
+     waves skipped (rgEarned), as a normal run would have it.
+   - RG_START: a battle with no maze behind it (a fresh run's first) starts with gold for a maze for its first wave: k of
+     what a run has earned by then. k is the bot's (sim/region_bal.py): what it needs to hold a battle's first wave.
+   - RG_FAM_IN: a place's family takes its share of each wave's places rather than marching on top (rgApplyWaves).
+   - RG_EASE: the second tier's foes at hp of their health and a line of `line` lives (first: its first wave in the gentle
+     roles, off: 25 melee foes for the mixed wave flooded the bot's maze). The bot still hit a wall at Hollowell Barrows with
+     the maze carried (sim/region_bal.py --chain fernwatch,barrows:1), so these stay. */
+// a battle's line: the lives it stakes from the host's (a first place's longer, a second-tier place's as RG_EASE says)
+const rgLineOf = (R, S) => Math.min(S.gentle ? RG_GENTLE.line : S.ease && RG_EASE.line ? RG_EASE.line : RG_LINE, R.lives);
+const RG_EASE = { tier: 2, hp: .85, first: false, line: 15 }, RG_START = { k: 1.3 }, RG_MAZE = { on: true }, RG_FAM_IN = { on: true };
+// what a run has earned by wave w: the start, and every wave before it (its troops' bounties and its bonus)
+function rgEarned(w) { let g = DIFFS.normal.gold; for (let n = 1; n < w; n++) g += 26 * bountyFor(n, { bounty: 1 }) + Math.round((12 + 2 * n) * (typeof econK === 'function' ? econK(n) : 1)); return g; }
+// the gold paid for the maze's pieces (what Rebuild gives back), and their items
+const rgMazePaid = M => (M && M.rows || []).reduce((a, r) => a + (r[4] | 0), 0);
+const rgMazeItems = M => [].concat(...(M && M.rows || []).map(r => (Array.isArray(r[8]) ? r[8] : []).concat(r[12] ? [r[12]] : []))).filter(Boolean);
+// a battle's start gold: with a maze behind it, the gold left after the last win and the income of the waves skipped since;
+// with none, gold for a maze for its first wave
+function rgStartGold(R, S) {
+  const M = RG_MAZE.on && R.maze && R.maze.rows ? R.maze : null;
+  if (!M) return { maze: null, base: Math.max(DIFFS.normal.gold, huntGold(S.w0), S.gentle ? RG_GENTLE.gold : 0, Math.round(RG_START.k * rgEarned(S.w0) / 5) * 5), gap: 0, paid: 0 };
+  const gap = Math.max(0, Math.round((rgEarned(S.w0) - rgEarned((M.w | 0) + 1)) / 5) * 5);
+  return { maze: M, base: M.gold | 0, gap, paid: rgMazePaid(M), from: M.from || '', w: M.w | 0 };
+}
+// the won battle's maze, for the next: as serialize() holds the units (the rows restore() reads)
+function rgMazeSave(R, from, w) {
+  const st = G.state; let sv = null; G.state = 'play'; try { sv = typeof serialize === 'function' ? serialize() : null; } finally { G.state = st; }   // (serialize keeps a battle in play only: a won one reads as it stood)
+  if (!sv) return;
+  R.maze = { map: G.map, w: w | 0 || G.wave | 0, gold: Math.max(0, G.gold | 0), rows: JSON.parse(JSON.stringify(sv.towers || [])), champAt: sv.champAt || null, from };
+}
+// lay a maze on the field (Keep): each piece on its cell where the cell is open and the road still runs (units first, then
+// walls); a piece that cannot stand there gives its gold and items back. Returns what was laid and what came back
+function rgMazeLay(M) {
+  const out = { laid: 0, back: 0, gold: 0 }, wall = r => TOWERS[r[0]] && TOWERS[r[0]].wall ? 1 : 0, rows = (M.rows || []).slice().sort((a, b) => wall(a) - wall(b));
+  const okGear = it => !!it && !!RARITY[it.rar];
+  for (const [type, tier, i, j, inv, kills, dmg, prio, gear, , spec, ab, charm, ast, vx, bornW, vSeed] of rows) {
+    const refund = () => { out.back++; out.gold += inv | 0; G.gold += inv | 0; if (Array.isArray(gear)) for (const it of gear) if (okGear(it)) G.loot.push(it); if (okGear(charm)) G.loot.push(charm); };
+    if (!TOWERS[type]) { refund(); continue; }
+    const chk = canBuild(i, j); if (!chk.ok) { refund(); continue; }
+    const t = makeTower(type, i, j, Math.min(tier, TOWERS[type].tiers.length - 1));
+    if (G.hero && M.champAt && M.champAt[0] === i && M.champAt[1] === j && !t.def.wall) G.champ = t.id;
+    Object.assign(t, { invested: inv, kills: kills || 0, dmg: dmg || 0, prio: prio || 0, build: 0, ast: ast | 0, vx: +vx || 0, bornW: bornW | 0, vSeed: vSeed | 0 });
+    if (spec && typeof SPEC_BY !== 'undefined' && SPEC_BY[type + ':' + spec] && t.tier >= 3) t.spec = spec;
+    if (Array.isArray(gear)) { t.gear = gear.slice(0, gearSlots(t)).map(it => okGear(it) ? it : null); for (const it of gear.slice(gearSlots(t))) if (okGear(it)) G.loot.push(it); }
+    if (ab && typeof abilLoad === 'function') abilLoad(t, ab);
+    if (okGear(charm)) { if (typeof charmOpen === 'function' && charmOpen(t)) t.charm = charm; else G.loot.push(charm); }
+    G.towers.push(t); const k = idx(i, j); G.tAt[k] = t; G.blk[k] = 1; if (typeof wallsTouch === 'function') wallsTouch(i, j);
+    G.dist = chk.dist; G.next = nextField(G.dist, G.blk); G.path = tracePath(G.dist, G.next);
+    if (!t.def.wall && G.unlocked && !G.unlocked.includes(type)) G.unlocked.push(type);
+    out.laid++;
+  }
+  if (typeof runRekey === 'function') runRekey();
+  if (typeof vetSync === 'function') vetSync();
+  refreshField();
+  return out;
+}
+// Rebuild: the maze's items go back to the bag (its gold is rgStartGold's paid)
+function rgMazeRefund(M) { for (const it of rgMazeItems(M)) if (RARITY[it.rar]) G.loot.push(it); }
 const RG_PATROL_PAY = [.4, .2, .1];
 const RG_PRICE = { life: 6, tend: 40, respec: 80, alms: 40, offering: 30 };
 // the field every region battle is fought on: the game's current one, Mistfall Ledge (a wide map: foes in along the whole
@@ -112494,6 +112561,7 @@ function rgDiffWhy(R, S) {
   const st = S.node && R.st[S.node], b = rgBosses(S), parts = [];
   if (S.kind !== 'waylay' && S.g) parts.push(`Grown ${S.g} of ${RG_GROW}${st && st.why && st.why.length ? ` (${st.why.join('; ')})` : S.kind === 'patrol' ? ' (a patrol)' : ''}: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health`);
   if (S.gentle) parts.push('A first place: no boss, gentle foes');
+  else if (S.ease) parts.push(`A second-tier place: foes ×${RG_EASE.hp}${RG_EASE.line ? `, a line of ${RG_EASE.line}` : ''}${RG_EASE.first ? ', a gentle first wave' : ''}`);
   if (!parts.length) parts.push('As it first stood');
   parts.push(b.length ? `Boss: ${b.map(([w, x]) => `${CREEPS[x].name} on wave ${w}`).join(', ')}` : 'No boss');
   return parts.join(' · ');
@@ -112532,15 +112600,15 @@ function rgSpec(R, id, kind, road) {
   const D = rgDef(R);
   if (kind === 'waylay') {
     const rd = R.roads[road], t = Math.min(rgNode(R, rd.a).tier, rgNode(R, rd.b).tier), w0 = RG_TIER_W[t] || 2, from = R.at, to = rd.a === from ? rd.b : rd.a;
-    const gentle = t <= RG_GENTLE.tier;
-    return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgField(rgNode(R, from).map ? rgNode(R, from) : rgNode(R, to)), fam: rd.fam, extra: [], hpK: gentle ? RG_GENTLE.hp : 1, gentle, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
+    const gentle = t <= RG_GENTLE.tier, ease = !gentle && t === RG_EASE.tier;
+    return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgField(rgNode(R, from).map ? rgNode(R, from) : rgNode(R, to)), fam: rd.fam, extra: [], hpK: gentle ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1, gentle, ease, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
   }
   const n = rgNode(R, id), st = R.st[id], len = n.w[1] - n.w[0], patrol = kind === 'patrol';
   const g = patrol ? (st.p | 0) + 1 : st.g | 0, w0 = Math.min(50 - len, n.w[0] + RG_STEP.w * g);
   const up = n.kind === 'lair' ? rgHelpersUp(R) : [];
   const pay = Math.round((40 + 10 * n.w[0]) * (1 + RG_STEP.pay * (patrol ? 0 : g)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
-  const gentle = n.kind === 'trouble' && n.tier <= RG_GENTLE.tier;
-  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle ? RG_GENTLE.hp : 1), gentle, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
+  const gentle = n.kind === 'trouble' && n.tier <= RG_GENTLE.tier, ease = !gentle && n.kind !== 'lair' && n.tier === RG_EASE.tier;
+  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1), gentle, ease, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
 }
 // the bosses in a battle's waves (the standard march's; the lair's last is its lord)
 function rgBosses(S) { const out = []; if (S.gentle) return out;   // (a first place has no boss)
@@ -112569,7 +112637,14 @@ function rgApplyWaves(S) {
     const tot = groups.reduce((a, p) => { const [main] = p.split('!'), [ty, c] = main.split('*'); return a + (CREEPS[ty] && !CREEPS[ty].boss && !CREEPS[ty].lead ? +c : 0); }, 0);
     for (const fam of S.gentle ? [] : [S.fam].concat(S.extra || [])) {   // (a first place: the march's own troops only, none added for its family)
       const foe = fam && campFamFoe(fam, n);
-      if (foe && CREEPS[foe]) groups.push(foe + '*' + Math.max(1, Math.round(tot * CAMP_FAMILIES[fam].share)));
+      if (!foe || !CREEPS[foe]) continue;
+      const add = Math.max(1, Math.round(tot * CAMP_FAMILIES[fam].share));
+      // the place's own family takes its share of the wave's places, so the wave stands as a normal run's at that wave (owner,
+      // 20 Nov 2026: "that way we can scale as we would in the normal mode"; on top, Hollowell Barrows' wave 11 was 1.4 times
+      // a normal run's). A lair's helpers still march on top (their +10% health each is on its card)
+      if (fam === S.fam && RG_FAM_IN.on && tot > add) { const k = 1 - add / tot;
+        groups = groups.map(p => { const [main, tag] = p.split('!'), [ty, c] = main.split('*'); if (!CREEPS[ty] || CREEPS[ty].boss || CREEPS[ty].lead) return p; return ty + '*' + Math.max(1, Math.round(+c * k)) + (tag ? '!' + tag : ''); }); }
+      groups.push(foe + '*' + add);
     }
     WAVES[n - 1] = groups.join('+');
   }
@@ -112599,14 +112674,25 @@ function rgGentleWave(groups) {
 /* ---- starting a battle ---- */
 function rgStart(R, S) {
   if (typeof twStop === 'function') twStop();
+  // a maze behind it: Keep it or Rebuild (one pair of buttons), then the battle
+  if (RG_MAZE.on && R.maze && R.maze.rows && R.maze.rows.length && S.maze == null) {
+    const SG = rgStartGold(R, S);
+    showOverlay(`<h2 class="ttl">${rgEsc(S.name)}</h2><p class="sub">waves ${S.w0}-${S.w1}</p>
+      <button class="btn rg-go" id="rgKeep">Keep your maze</button><button class="btn ghost rg-sec" id="rgRedo">Rebuild: refund ${SG.paid} gold</button>`, 'rgmaze');
+    $('#rgKeep').onclick = () => { sfx('click'); hideOverlay(); S.maze = 'keep'; rgStart(R, S); };
+    $('#rgRedo').onclick = () => { sfx('click'); hideOverlay(); S.maze = 'redo'; rgStart(R, S); };
+    return;
+  }
   heroPickId = R.hero; try { localStorage.setItem('runehold.hero', R.hero); } catch (e) {}
   mapPick = S.map; setMap(S.map);
-  S.line = Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives); S.wounded = []; S.hard = R.hard;   // (no unit is ever kept off the field: no wounds on the home map)
+  S.line = rgLineOf(R, S); S.wounded = []; S.hard = R.hard;   // (no unit is ever kept off the field: no wounds on the home map)
   RG_NEXT = S;
   newGame('normal', null, R.hero, 0);
   campCarryIn(R.band, R.hero); G.camp = null;
   if (R.rnBank && typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) { rnS().v = clamp(rnS().v + R.rnBank, 0, RN.cap); R.rnBank = 0; }
-  G.wave = S.w0; G.gold = Math.max(DIFFS.normal.gold, huntGold(S.w0), S.gentle ? RG_GENTLE.gold : 0);
+  const SG = rgStartGold(R, S);
+  G.wave = S.w0; G.gold = SG.base + SG.gap; S.gap = SG.gap;
+  if (SG.maze) { if (S.maze === 'redo') { G.gold += SG.paid; rgMazeRefund(SG.maze); } else { const L = rgMazeLay(SG.maze); S.mazeBack = L.back; S.mazeBackGold = L.gold; } }
   G.lives = G.maxLives = S.line;
   G.region.uid0 = G.gearUid | 0;
   G.runId = newRunId(); G.playT = 0;
@@ -112625,6 +112711,10 @@ function rgEnd(won, retreat) {
   if (!R) { titleScreen(); return; }
   const out = [], got = campItemsNow().filter(it => (it.id | 0) > (S.uid0 | 0)), node = rgNode(R, S.node);
   R.band = campBandFromRun(R.band);
+  // a win: its maze and gold march on. The items on the maze's pieces travel with it, not in the bag (the maze this win left,
+  // or after a loss or a retreat the one from before this battle, kept for the retry)
+  if (won && RG_MAZE.on) rgMazeSave(R, S.kind === 'waylay' ? 'the road' : node.name, S.w1);
+  if (R.maze && R.maze.rows && R.band && R.band.loot) { const on = new Set(rgMazeItems(R.maze).map(it => it.id)); R.band.loot = R.band.loot.filter(it => !on.has(it.id)); }
   const left = won || retreat ? Math.max(0, G.lives | 0) : 0, lost = Math.max(0, S.line - left);
   R.lives = clamp(R.lives - S.line + left, 0, RG_LIVES);
   R.battle = null; R.battles++;
@@ -112632,6 +112722,7 @@ function rgEnd(won, retreat) {
   if (lost) out.push(`−${lost} ${lost === 1 ? 'life' : 'lives'} · ${R.lives} left`);
   if (won) {
     R.chest += S.reward; out.push(`+${S.reward} gold to the war chest`);
+    if (RG_MAZE.on && R.maze) out.push(`Your maze and ${R.maze.gold} gold march on to the next battle`);
     if (S.kind === 'waylay') { R.at = S.to; out.push(`Broke through to ${node.name}`); }
     else if (S.kind === 'patrol') { R.st[S.node].p = (R.st[S.node].p | 0) + 1; rgClock(R, 1, out); out.push(`${node.name} patrolled (${R.st[S.node].p}/${RG_PATROLS})`); }
     else {
@@ -112736,6 +112827,7 @@ const RG_HOW = `<details class="rg-how"><summary>How difficulty works</summary><
   <li>A place <b>grows</b> a step harder (at most ${RG_GROW}) when you retreat from it, when the line breaks there, when a broken line next door spreads to it, and every time the threat clock reaches ${RG_MARKS.join(', ')}.</li>
   <li>Each step: its waves start ${RG_STEP.w} later, its foes have ${Math.round(RG_STEP.hp * 100)}% more health, and its reward is ${Math.round(RG_STEP.pay * 100)}% bigger. The starting gold follows the starting wave, so a grown place starts with a little more gold: that pays for the harder fight, it is not a bonus.</li>
   <li>The clock moves a step for every battle you fight at a place and two for a broken line (a retreat from a first place does not move it).</li>
+  <li>Win a battle and your maze and gold march on: keep the maze, or rebuild it for all its gold back. Waves skipped between battles pay their gold.</li>
   <li>Winning a place holds it and clears its growth. Settle the troubles you can before the clock reaches its marks.</li></ul></details>`;
 let rgSel = null, rgPick = { hero: null, hard: false }, rgTap = { id: null, t: 0 };
 const RG_DBL = 450;   // ms between two clicks (taps) on one place that make a double-click
@@ -112781,7 +112873,7 @@ function rgMapSVG(R) {
 function rgLossLines(R, S) {
   if (S.kind === 'waylay') return ['the lives you lose', `thrown back to ${rgNode(R, S.from).name}`];
   const fb = rgNearest(R, R.at, id => rgHeldTown(R, id) && id !== S.node) || rgNearest(R, R.at, id => rgHeldTown(R, id));
-  return [`the line's lives (${Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives)})`, 'a third of the war chest', `${rgNode(R, S.node).name} falls and its trouble spreads to its neighbours`, 'the threat clock +2', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
+  return [`the line's lives (${rgLineOf(R, S)})`, 'a third of the war chest', `${rgNode(R, S.node).name} falls and its trouble spreads to its neighbours`, 'the threat clock +2', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
 }
 // a battle at a glance (owner, 20 Nov 2026: "less wordy. nice big buttons with clear call to action"): its rating, one line
 // of what you will fight, the reward; the rest (the causes, the field, what a broken line costs) behind Details
@@ -112793,13 +112885,14 @@ function rgBattleHead(R, S) {
   const D = rgDiff(R, S), b = rgBosses(S), grown = S.kind === 'trouble' && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
   return `<p class="rg-diff rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>
     <p class="rg-what">${rgEsc(rgFoeName(R, S))} · waves ${S.w0}-${S.w1} · ${b.length ? `boss: ${rgEsc(CREEPS[b[0][1]].name)}` : 'no boss'}</p>
-    <p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>`;
+    <p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>
+    ${(() => { const SG = rgStartGold(R, S); return `<p class="rg-gold">${SG.maze ? 'Your maze + ' : 'Start gold '}<b>${SG.base + SG.gap} gold</b>${SG.gap ? ` <small>(+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`})</small>` : ''}</p>`; })()}`;
 }
 function rgBattleMore(R, S) {
   const F = S.fam && CAMP_FAMILIES[S.fam];
   return `<p class="rg-why">${rgEsc(rgDiffWhy(R, S))}</p>
     ${S.extra && S.extra.length ? `<p><b>His helpers march too:</b> ${S.extra.map(f => rgEsc(CAMP_FAMILIES[f].name)).join(', ')} (+${Math.round(10 * S.extra.length)}% health).</p>` : ''}
-    <p class="rg-nums"><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Line <b>${S.line || Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives)} lives</b></span></p>
+    <p class="rg-nums"><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Line <b>${S.line || rgLineOf(R, S)} lives</b></span></p>
     ${F ? `<p class="rg-fam"><b>${rgEsc(F.name)}.</b> ${rgEsc(F.say)}</p>` : ''}
     <p class="rg-risk"><b>If the line breaks:</b> ${rgLossLines(R, S).join(' · ')}.${R.hard ? ' <b>Hardcore: it ends the run.</b>' : ''}</p>`;
 }
@@ -112813,7 +112906,7 @@ function rgPrimary(R, id, force) {
   if (R.battle) return no('A battle is under way: resume it or retreat first.');
   if (R.pending) return no('Deal with the road first.');
   if (here) {
-    if (st.s !== 'held') { const S = rgSpec(R, id, 'trouble'), line = Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives);
+    if (st.s !== 'held') { const S = rgSpec(R, id, 'trouble'), line = rgLineOf(R, S);
       return { can: true, fight: true, label: n.kind === 'town' ? 'Free the town' : n.kind === 'lair' ? 'Storm the lair' : 'Fight', sub: `${line} lives on the line`, run: () => rgStart(R, S) }; }
     if (n.kind === 'trouble') { const p = st.p | 0; if (p >= RG_PATROLS) return no(`${n.name} is patrolled out: nothing left to gain.`);
       return { can: true, fight: true, label: 'Patrol', sub: `${p + 1}/${RG_PATROLS} · a smaller reward`, run: () => rgStart(R, rgSpec(R, id, 'patrol')) }; }
@@ -112841,7 +112934,7 @@ function rgNodeHTML(R, id) {
 function rgPendingHTML(R) {
   const P = R.pending;
   if (P.kind === 'waylay') {
-    const S = rgSpec(R, null, 'waylay', P.road); S.line = Math.min(S.gentle ? RG_GENTLE.line : RG_LINE, R.lives);
+    const S = rgSpec(R, null, 'waylay', P.road); S.line = rgLineOf(R, S);
     return `<section class="cm-loc rg-card rg-alarm"><h3><span>Ambush</span>Waylaid on the road</h3>${rgBattleHead(R, S)}
       <button class="btn rg-go" id="rgFight">Fight through<small>${S.line} lives · then on to ${rgEsc(rgNode(R, P.to).name)}</small></button><button class="btn ghost rg-sec" id="rgBackOff">Fall back to ${rgEsc(rgNode(R, P.from).name)}<small>no fight · the clock moves a step</small></button>
       <details class="rg-more"><summary>Details</summary><p class="cm-say">${rgEsc(CAMP_FAMILIES[S.fam].name)} fall on the column on the road to ${rgEsc(rgNode(R, P.to).name)}.</p>${rgBattleMore(R, S)}</details></section>`;
@@ -112946,12 +113039,12 @@ function rgOpen(force) {
   const _ws = waveSpec;
   waveSpec = function (n) {
     const S = G && G.region;
-    if (!S || !S.gentle || G.vs || n < S.w0 || n > S.w1) return _ws.apply(this, arguments);
+    if (!S || G.vs || n < S.w0 || n > S.w1 || !(S.gentle || (S.ease && RG_EASE.first && n === S.w0))) return _ws.apply(this, arguments);   // (a second-tier battle: its first wave only)
     const a = arguments, base = typeof ffBase === 'function' ? ffBase(() => _ws.apply(this, a)) : _ws.apply(this, a), g = rgGentleWave(base);
     let F = null; try { F = typeof ffAt === 'function' ? ffAt(n) : null; } catch (e) { F = null; }
     try { return F && typeof ffSpec === 'function' ? ffSpec(n, g, F) : g; } catch (e) { return g; }
   };
-  if (typeof ffBossWave === 'function') { const _fb = ffBossWave; ffBossWave = function (n) { return G && G.region && G.region.gentle ? false : _fb.apply(this, arguments); }; }   // (no boss banner, card or boss on a first place)
+  if (typeof ffBossWave === 'function') { const _fb = ffBossWave; ffBossWave = function (n) { const S = G && G.region; return S && (S.gentle || (S.ease && RG_EASE.first && n === S.w0)) ? false : _fb.apply(this, arguments); }; }   // (no boss banner, card or boss on a first place)
   const _hp = waveHP;
   waveHP = function () { return _hp.apply(this, arguments) * (G && G.region && !G.vs ? G.region.hpK || 1 : 1); };
   const _mw = makeWave;
