@@ -1,4 +1,4 @@
-const BUILD_TAG = '8fdeaca@2026-11-20';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'baf302b@2026-11-20';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -69094,13 +69094,13 @@ if (typeof POOL_STILL !== 'undefined') MAPS.mistfall = { name: 'Mistfall Ledge',
    the middle, a pool fed by a small fall on the right). A wide front (no red cells, no road line) on the open grass along the
    path, the roots and the pool outside the field; foes walk in down the painted path (pathIn: game.js) and leave anywhere along
    the foot, where the path runs out of the picture. The Greatroot Marches fight on it (region.js). */
-assetReady('oakpaint', () => { if (typeof OAK_STILL !== 'undefined') MAPS.oakmere = { name: 'Oakmere Glade', blurb: 'A sunlit path between the old oaks and a spring-fed pool', entry: typeof OAK_ENTRY !== 'undefined' ? OAK_ENTRY : null, wide: true, pathIn: true }; });   // (its painting may arrive after the page, with the region map: src/lazyassets.js)
+assetReady('oakpaint', () => { if (typeof OAK_STILL !== 'undefined') MAPS.oakmere = { name: 'Oakmere Glade', blurb: 'A sunlit path between the old oaks and a spring-fed pool', entry: typeof OAK_ENTRY !== 'undefined' ? OAK_ENTRY : null, wide: true, pathIn: true, tun: [.12, 4.9] }; });   // (its painting may arrive after the page, with the region map: src/lazyassets.js)
 /* Fern Brook, Fernwatch's own field (owner, 19 Nov 2026, "Fernwatch - Fern Brook"): the owner's painting is the ground
    (fernpaint.js from tools/make_fernwatch.py: a sunlit glade, a dirt path wandering from top to foot, a brook with two small
    falls down the left among ferns, a giant mossy tree and its roots on the right). Laid as Oakmere Glade is: a wide front on the
    open grass along the path, the brook and the roots outside the field, foes in down the painted path (pathIn), out anywhere
    along the foot. */
-assetReady('fernpaint', () => { if (typeof FERN_STILL !== 'undefined') MAPS.fernbrook = { name: 'Fern Brook', blurb: 'A path through the ferns, a brook falling beside it', entry: typeof FERN_ENTRY !== 'undefined' ? FERN_ENTRY : null, wide: true, pathIn: true }; });   // (the same)
+assetReady('fernpaint', () => { if (typeof FERN_STILL !== 'undefined') MAPS.fernbrook = { name: 'Fern Brook', blurb: 'A path through the ferns, a brook falling beside it', entry: typeof FERN_ENTRY !== 'undefined' ? FERN_ENTRY : null, wide: true, pathIn: true, tun: [.12, 4.9] }; });   // (the same)   /* (tun: foes walk in down the path near their own size, a touch smaller at the top; the default shrank them to a fifth: owner, 20 Nov 2026, "minions on this map should just walk in normalish size as its a straight path in") */
 const WATER_TRY = (() => { try { return new URLSearchParams(location.search).get('water') === 'flow'; } catch (e) { return false; } })();   // (?water=flow: Mistfall Ledge's flow-map water trial)
 const MAP_TRY = (() => { try { const q = new URLSearchParams(location.search).get('trymap'); return q && MAPS[q] ? q : null; } catch (e) { return null; } })();
 const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
