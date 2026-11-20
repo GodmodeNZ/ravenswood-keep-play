@@ -1,4 +1,4 @@
-const BUILD_TAG = 'eaa7a61@2026-11-21';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6337a7e@2026-11-21';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7825,7 +7825,7 @@ function rootBurst(c) {
   G.delayed.push({ t: .1, fn: () => {
     G.rbN = 0; if (G.state !== 'play') return;
     // (.8s: its Strangling Bloom rider folded in, plain-text pass)
-    inSplash(x, z, 1.2, true, o => { hurt(o, s.dmg * Math.min(2, (s.caps && s.caps.rootburst) || 2), 'magic', t, false, null, null); if (!o.dead) rootFoe(o, .8, t); });
+    inSplash(x, z, 1.2, true, o => { hurt(o, s.dmg * 1.5 * Math.min(2, (s.caps && s.caps.rootburst) || 2), 'magic', t, false, null, null); if (!o.dead) rootFoe(o, .8, t); });
     fxRing(x, z, 1.2, '#9be06a'); fxDust(x, z, 6);
     for (let k = 0; k < 10; k++) part({ k: 'chunk', x, z, h: .05, vh: R(1, 2), vx: R(-1.4, 1.4), vz: R(-1.4, 1.4), g: 7, life: .45, max: .45, size: R(.03, .06), col: k % 2 ? '#4a7a2a' : '#5a4430' });
   } });
@@ -52930,23 +52930,23 @@ function tchUlt(id, o) {
     ['Thornrain', 5, 2, { req: [4, 2], on: 'arrows' }],
   ]);
   tchTree(FORCES["grove"].talents["frost"], [   // grove.frost
-    ['Deep Roots', 0, 1],
+    ['Thorned Vines', 0, 1, { pro: n => `Its roots bleed foes for ${20 * n}% of a strike over 3s, Grasping Thicket's for ${60 * n}%.`, mod: n => ({ bleed: .2 * n }), sp: n => ({ ab: 'thicket', rider: { bleed: .6 * n } }) }],
     ['Quickening Sap', 0, 2],
     ['Mothcloud', 1, 1, { req: [0, 1] }],
-    ['Thorned Vines', 1, 2],
+    ['Deep Roots', 1, 2],
     ['Thorn Hold', 1, 3],
-    ['Spreading Roots', 2, 0, { max: 2, pro: n => `Roots spread to ground foes within 1 cell of a held foe, for ${n >= 2 ? 'half' : 'a quarter'} as long.` }],
-    ['Clinging Briars', 2, 1, { req: [1, 1] }],
-    ['Sapwell', 2, 2],
-    ['Rootburst', 3, 0, { req: [2, 0], max: 2, pro: n => `A held foe that dies bursts for ${n} strike${n > 1 ? 's' : ''}, rooting ground foes within 1.2 cells 0.8s.` }],
-    ['Bloodbriar', 3, 1, { req: [2, 1] }],
-    ["Warden's Reach", 3, 2],
+    ['Sapwell', 2, 0],
+    ['Bloodbriar', 2, 1, { req: [1, 1], pro: n => `Mothcloud stings bleeding foes ${40 * n}% harder.`, sp: n => ({ ab: 'constrict', vs: ['bleeding', .4 * n] }) }],
+    ['Spreading Roots', 2, 2, { req: [1, 2], max: 2, pro: n => `Roots spread to ground foes within 1 cell of a held foe, for ${n >= 2 ? 'half' : 'a quarter'} as long.` }],
+    ["Warden's Reach", 3, 0, { req: [2, 0] }],
+    ['Bramble Squeeze', 3, 1, { req: [2, 1], max: 2, pro: n => `Mothcloud spreads ${gNf(.1 * n)} cells wider; its stings bleed for ${40 * n}% of a strike over 3s.`, sp: n => ({ ab: 'constrict', by: { r: .1 * n }, rider: { bleed: .4 * n } }) }],
+    ['Second Snare', 3, 2, { req: [2, 2], max: 2, pro: n => `${n >= 2 ? 'Its roots seize' : 'Every other strike, its roots seize'} one more foe near the first.` }],
     ['Wither', 4, 0, { req: [3, 0] }],
-    ['Bramble Squeeze', 4, 1, { req: [3, 1], max: 2, pro: n => `Mothcloud makes the ground foes it stings bleed for ${20 * n}% of a strike over 3s.`, sp: n => ({ ab: 'constrict', rider: { bleed: .2 * n } }) }],
-    ['Second Snare', 4, 2, { req: [3, 2], max: 2, pro: n => `${n >= 2 ? 'Its roots seize' : 'Every other strike, its roots seize'} one more foe near the first.` }],
+    ['Rootburst', 4, 1, { req: [3, 1], max: 2, pro: n => `A held foe that dies bursts for ${gNf(1.5 * n)} strikes, rooting ground foes within 1.2 cells 0.8s.` }],
+    ['Clinging Briars', 4, 2, { req: [3, 2] }],
     ['The Deep Hungers', 5, 0, { req: [4, 0] }],
-    ['Overgrowth', 5, 1, { req: [4, 1] }],
-    ['Strangleroot', 5, 2, { req: [4, 2] }],
+    ['Strangleroot', 5, 1, { req: [4, 1] }],
+    ['Overgrowth', 5, 2, { req: [4, 2] }],
   ]);
   tchTree(FORCES["grove"].talents["arcane"], [   // grove.arcane
     ['Goring Antlers', 0, 1],
@@ -102292,6 +102292,229 @@ const BW2 = (() => {
   if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
     let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
     if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('bw2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  });
+  return { S, CL, MV, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
+})();
+
+/* The Stag Lancers on the owner's sculpted model (21 Nov 2026: "Stag Lancer": an antler-crowned elf in leaf armour astride a
+   great cream stag, and his lance). tools/make_sl.py -> src/model_sl2.js: the sculpt whole (9,534 triangles) and the lance
+   (1,399) on one atlas; a 36-bone rig made from scratch (the stag: spine, neck, four legs of four bones, tail; the rider from
+   the belt up, his arms, his hair; the lance on a bone of its own in his right fist; both straps gathered in his left), 8
+   clips at 30 frames a second. ON by default in place of the code-built rider (forces.js FORCE_BUILD.staglancer);
+   ?sl=old (or the Model Lab's "Stag Lancer" row set to Old) draws that.
+   The moves, by the game's own cues (nothing in the game is changed):
+     idle    no foe in reach: the stag breathes, rests a hind leg on its toe and shifts its weight to the other, looks
+             down the road, drops its head and shakes out its neck; the rider easy in the saddle, the lance upright (8 s loop)
+     ready   a foe in reach: head up, the stag paws the ground twice; the rider leans to the charge
+     charge  the strike: over the wind-up (t.windup) the stag gathers on its haunches and the lance comes down to the couch;
+             on the charge (t.chg) one great bound out, the lance home .26 s in, a check on the hocks, the wheel, two bounds
+             home and the turn at the post
+     heroic  Heroic Charge: a flat-out bound, the lance home at .26 s, the stag rearing over the foe, pawing
+     leap    Bounding Leap (the game lifts the unit): sprung off the hocks, legs tucked, the lance over his shoulder and
+             driven down as the forefeet land (.32 s)
+     hunt    White Hart's Hunt: a low flat gallop, the rider down on the stag's neck, a charge every .62 s, the lance home
+             .19 s into each
+     hit     a blow taken (its health drops): the stag shies
+     death   Wounded: the stag goes down on its side, the rider with it; it lies there until it next rides out or is healed
+   The game turns the unit about halfway through a charge and snapped it round again at the end: here the second half-turn
+   is a turn on the hocks as it comes home.
+   ANCHORS (world space, every frame it is drawn live): t.slTip (the lance's point: t.tipW too), t.slGrip (his fist);
+   SL2.anchors(t). A faint gold light rides the lance's point through the three spells (kept low).
+   Sized by the shared rule (unitmodels_size.js): the rider's head joint at UM_EVEN_HEAD, as a standing unit's.
+   Checks: `python tools/make_sl.py --check`. Notes: docs/model_pilot/staglancer2.md. */
+const SL2 = (() => {
+  const U = 'staglancer', NAMES = ['idle', 'ready', 'charge', 'heroic', 'leap', 'hunt', 'hit', 'death'];
+  const MV = { heroiccharge: 'heroic', stampede: 'leap', runthrough: 'hunt' }, RATE = { idle: 4, ready: 7, move: 34, down: 9 }, SINK = .35, TRIM = .30, TURN = .3, HUNT_GAP = .62, CENTRE = .09;   // (CENTRE: the sculpt's origin is under the saddle; its middle, between fore and hind feet, stands over the post)
+  const S = { on: true, err: null, hold: null, wound: false };
+  try { S.on = !/[?&]sl=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .85, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'sl2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('sl2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'rHead', 'lance', 'handR']) { if (R_.bix[nm] == null) throw new Error('sl2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['tip', 'grip']) if (!mk || !mk[nm]) throw new Error('sl2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('sl2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('sl2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.rHead].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('sl2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1.1, -.05, -1.1]; m.max = [1.1, 1.7, 1.3]; m._um = 1;   // (room for the lance couched, raised and thrown wide, and the rear)
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('SL2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); reg(); return 'sl2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+  const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+
+  /* what it does now: { c: clip, s: seconds into it, rate (how fast the pose follows; 0 snaps), glow (the lance's point) } */
+  function ctl(t, live) {
+    if (S.hold && CL[S.hold.c]) return { c: S.hold.c, s: S.hold.s, rate: 0, glow: 0 };   // (the lab's and the tests': a clip held at a time)
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, glow: 0 };
+    const now = G.time, ph = now + (t.anim || 0) * 3, A = t.ab, W = CL.charge.wind || .4;
+    if (A && A.lastAt != null && A.lastAt !== t._slLastAt) { t._slLastAt = A.lastAt; if (MV[A.last]) { t._slRel = A.lastAt; t._slRelId = A.last; } }
+    if (t.chg && t.chg.at !== t._slChgAt) { t._slChgAt = t.chg.at; t._slChgT = t.chg.T; }
+    if (t.hp != null) { if (t._slHp != null && t.hp < t._slHp - 1e-6 && !t.wounded) t._slHitAt = now; t._slHp = t.hp; }
+    const m = t._slRelId ? MV[t._slRelId] : null, sc = t._slRel != null ? now - t._slRel : 9, q = t._slChgAt != null ? now - t._slChgAt : 9;
+    if (m === 'hunt' && sc >= 0 && sc < (t.gvcHuntLen || 2) + .05) return { c: 'hunt', s: t._slChgAt >= t._slRel - 1e-6 && q < HUNT_GAP * 1.5 ? q : Math.max(0, sc - .01), rate: RATE.move, glow: .8 };   // (each charge of the hunt from its own start)
+    if (m && m !== 'hunt' && sc >= 0 && sc < CL[m].len) return { c: m, s: sc, rate: RATE.move, glow: sc < CL[m].hit + .25 ? 1 : Math.max(0, 1 - (sc - CL[m].hit - .25) / .3) };
+    if (q >= 0 && q < CL.charge.len - W) return { c: 'charge', s: W + q, rate: RATE.move, glow: 0 };
+    const wind = t.tg && t.windup > 0 ? t.windup : 0;
+    if (wind > 0 && G.phase === 'wave') return { c: 'charge', s: W * Math.min(1, wind), rate: RATE.move, glow: 0 };
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: RATE.down, glow: 0 }; }
+    const h = t._slHitAt != null ? now - t._slHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: RATE.move, glow: 0 };
+    if ((G.phase === 'wave' && t.tg && !t.tg.dead) || (t.shotT != null && t.shotT < 1.5)) return { c: 'ready', s: ph, rate: RATE.ready, glow: 0 };
+    return { c: 'idle', s: ph, rate: RATE.idle, glow: 0 };
+  }
+  /* the unit's turn through a charge: about at the far end (as the game turns it), and round again on its hocks as it comes
+     home (the game snaps it back when the charge ends); the hunt's turns are quicker, one charge following the last */
+  function spin(t, live, P) {
+    if (!live || t._slChgAt == null) return 0;
+    const q = G.time - t._slChgAt, T = t._slChgT || .75, e = x => sm(0, 1, x), hunt = P.c === 'hunt';
+    if (q < 0 || q > T + TURN + .1) return 0;
+    const a = Math.PI * e((q / T - .42) / .16), t1 = hunt ? T * .84 : T * .97, d = hunt ? HUNT_GAP - t1 - .005 : TURN;
+    return a + Math.PI * e((q - t1) / d);
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t.slAt != null && typeof G !== 'undefined' && G && G.time - t.slAt < .3 && G.time >= t.slAt;
+  /* drawn as unitmodels.js umDraw draws a sculpted Grove unit (its root base at the post, the unit where the charge has it) */
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const base = L && L.base && L.base.count ? L.base : null;
+    if (base) { M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _a, opts); }
+    const lift = base ? base.max[1] * (1 - SINK) : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[Math.min(5, tr | 0)] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    const P = ctl(t, live), air = P.c === 'leap' && B ? Math.max(0, B.y - .035) * K : 0, out = live && t._slChgAt != null && G.time - t._slChgAt < (t._slChgT || .75) + .05;
+    M4.trs(_a, x, (lift * (out ? Math.max(0, 1 - Math.hypot(x - t.x, z - t.y) / .5) : 1) + air) * sy, z, ang + spin(t, live, P) + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, CENTRE * s, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);   // (off its base, it runs on the ground)
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._slT == null ? 1 : Math.max(0, Math.min(.1, now - t._slT)); t._slT = now;
+      if (!t._slP || t._slP.q.length !== NB * 4) { t._slP = newPose(); t._slP.q.set(PT.q); t._slP.t.set(PT.t); }
+      follow(t._slP, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._slP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, TRIM]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift; S.clip = P.c; S.clipS = P.s;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    const tip = w(BI.lance, MK.tip);
+    if (live) { t.slTip = tip; t.slGrip = w(BI.lance, MK.grip); t.slClip = P.c; t.slClipS = P.s; t.slAt = G.time; t.tipW = tip; t.tipYaw = ang; t.tipAt = G.time; }
+    /* the lance's point: a faint gold light through a spell (low: the unit and its foe stay readable) */
+    if (live && P.glow > .02 && typeof QADD !== 'undefined' && typeof RD !== 'undefined') { const r = .11 * s * (.8 + .2 * P.glow); QADD.bill(RD, tip[0], tip[1], tip[2], r, r, P.c === 'hunt' ? [1, .98, .9, .2 * P.glow] : [1, .86, .45, .22 * P.glow], 1, 0); }
+    return true;
+  }
+  const anchors = t => mine(t) ? { tip: t.slTip, grip: t.slGrip, clip: t.slClip, s: t.slClipS, at: t.slAt } : null;
+  /* told to the shared sculpted-unit code (the crown's height, the base's size) only while it is on */
+  function reg() {
+    if (typeof UM_UNITS === 'undefined') return;
+    if (S.on && MESH_) {
+      if (!UM_UNITS[U]) UM_UNITS[U] = { mdl: 'sl2', k: 1 };
+      if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+      if (typeof UM_TOPK !== 'undefined' && UM_TOPK[U] == null) UM_TOPK[U] = 1.2;   // (his antler crown stands a fifth over his head)
+      if (typeof UM !== 'undefined') UM[U] = { mesh: MESH_, h: 1, S: UM_UNITS[U], R: null };
+    } else if (UM_UNITS[U] && UM_UNITS[U].mdl === 'sl2') { delete UM_UNITS[U]; if (typeof UM_EVEN !== 'undefined') delete UM_EVEN[U]; if (typeof UM !== 'undefined') delete UM[U]; }
+  }
+  /* the Model Lab's rows: the code-built rider or the sculpted one; the fall held to look at */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('sl2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'sl2Row';
+    box.innerHTML = '<h3>Stag Lancer</h3><div class="row">' + `<button data-s2="0" class="${S.on ? '' : 'on'}" title="The rider built in code (?sl=old)">Old (code-built)</button><button data-s2="1" class="${S.on ? 'on' : ''}" title="The owner's sculpted rider and stag on their rig (the default)">New (sculpted)</button><button data-s2w="1" class="${S.wound ? 'on' : ''}" title="Hold it Wounded: the fall (the lab keeps units whole)">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-s2]')) x.onclick = () => { S.on = x.dataset.s2 === '1'; reg(); labRow(); };
+    for (const x of box.querySelectorAll('[data-s2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_sl2', () => {
+  try { load(typeof SL2_MDL !== 'undefined' ? SL2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No sculpted Stag Lancer:', e.message); }
+  reg();
+  if (MESH_ && typeof umDraw === 'function') {
+    const _um = umDraw;
+    umDraw = function (t, u) {
+      if (u === U) {
+        if (!S.on || typeof NEWMODELS === 'undefined' || !NEWMODELS || !UM_UNITS[U]) return false;   // (the code-built rider)
+        try { return draw.apply(this, arguments); } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('sl2:', e); } return false; }
+      }
+      return _um.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('sl2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
   }
   });
   return { S, CL, MV, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
