@@ -1,4 +1,4 @@
-const BUILD_TAG = 'baf302b@2026-11-20';   // the play log's build version (playlog.js)
+const BUILD_TAG = '091f503@2026-11-20';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -3397,6 +3397,7 @@ function arrive(c) {
   const n = sf ? sf.next[k] : G.next[k];
   if (n < 0) return false;
   if (sf && G.blk[n] && !(G.tAt[n] && G.tAt[n].wounded)) return false;   // a structure stands in the way: hold here until it falls (a Wounded unit is pushed past)
+  const T = c.trail || (c.trail = []); if (T[T.length - 1] !== k) { T.push(k); if (T.length > 8) T.shift(); }   // the cells it walked, for a shove back the way it came
   c.ti = n % COLS; c.tj = (n / COLS) | 0; c.tx = c.ti + .5; c.ty = c.tj + .5;
   return true;
 }
@@ -4478,14 +4479,26 @@ function shove(c, d) {
   { const w = kbWeight(c); if (!w) return; d *= w * ccDR(c); if (d <= .01) return; }
   if (c.fly) { c.y = Math.max(PORTAL.y, c.y - d); c.remain = GATE_Y - c.y; return; }
   let left = d;
+  /* back the way it came: the cells it walked (c.trail, arrive), newest first. It once went to whichever neighbour lay
+     farthest from the gate, which beside a hedge is often along the hedge, away from the gap: the foe was thrown sideways
+     and walked back (owner, 20 Nov 2026, Fern Brook: "it runs into one of my units then turn around the way it came then
+     comes back", "minions try to go one direction, find an obstacle then go another direction"). Without a trail (fresh
+     on the field, or the trail spent): a neighbour whose road leads into its cell, the one most behind it. */
+  const T = c.trail || (c.trail = []), here = () => idx(clamp(Math.floor(c.x), 0, COLS - 1), clamp(Math.floor(c.y), 0, ROWS - 1));
   for (let g = 0; g < 4 && left > .01; g++) {
     const ci = clamp(Math.floor(c.x), 0, COLS - 1), cj = clamp(Math.floor(c.y), 0, ROWS - 1), k = idx(ci, cj), dk = G.dist[k];
-    let best = null, bd = dk;
-    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {   // the neighbour it came from: walkable and farther from the gate
-      const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= COLS || nj >= ROWS) continue;
-      const nk = idx(ni, nj); if (G.blk[nk] || !isFinite(G.dist[nk])) continue;
-      if (G.dist[nk] > bd) { bd = G.dist[nk]; best = [ni + .5, nj + .5]; }
-    }
+    let best = null;
+    while (T.length && T[T.length - 1] === k) T.pop();
+    if (T.length) { const q = T[T.length - 1], qi = q % COLS, qj = (q / COLS) | 0;
+      if (Math.abs(qi - ci) <= 1 && Math.abs(qj - cj) <= 1 && passable(G.blk, ci, cj, qi - ci, qj - cj) && isFinite(G.dist[q]) && G.dist[q] > dk) best = [qi + .5, qj + .5];
+      else T.length = 0; }   // (the maze changed under it, or it was moved off its trail: the trail is no guide now)
+    if (!best && cj === 0 && !T.length) { if (c.y > PORTAL.y) c.y = Math.max(PORTAL.y, c.y - left); break; }   // (in the head row with no trail: it came in from above, so back up the way in)
+    if (!best) { let bs = -Infinity; const hx = c.tx - c.x, hy = c.ty - c.y, hl = Math.hypot(hx, hy) || 1;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {   // a walkable neighbour farther from the gate, those leading into this cell first, then the one most behind it
+        const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= COLS || nj >= ROWS) continue;
+        const nk = idx(ni, nj); if (G.blk[nk] || !isFinite(G.dist[nk]) || !(G.dist[nk] > dk)) continue;
+        const sc = (G.next[nk] === k ? 10 : 0) - (di * hx + dj * hy) / hl; if (sc > bs) { bs = sc; best = [ni + .5, nj + .5]; }
+      } }
     if (!best) { if (cj === 0 && c.y > PORTAL.y) { c.y = Math.max(PORTAL.y, c.y - left); } break; }
     const dx = best[0] - c.x, dy = best[1] - c.y, L = Math.hypot(dx, dy);
     if (L < .02) { c.x = best[0]; c.y = best[1]; left -= .02; continue; }
@@ -4493,6 +4506,7 @@ function shove(c, d) {
     if (m < L) break;
   }
   c.ti = clamp(Math.floor(c.x), 0, COLS - 1); c.tj = clamp(Math.floor(c.y), 0, ROWS - 1); c.tx = c.ti + .5; c.ty = c.tj + .5;
+  while (T.length && T[T.length - 1] === here()) T.pop();
   c.remain = (c.atk ? siegeField().dist : G.dist)[idx(c.ti, c.tj)] + .5;
 }
 // frozen solid: a frost stun with a chill under it, so Crush and Exposed see a frozen foe
