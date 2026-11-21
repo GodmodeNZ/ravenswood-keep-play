@@ -1,4 +1,4 @@
-const BUILD_TAG = '87283a5@2026-11-21';   // the play log's build version (playlog.js)
+const BUILD_TAG = '596ff58@2026-11-21';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -64223,6 +64223,7 @@ uniform float uGPE;   // how fast it blurs and sinks into the dark past its edge
 uniform sampler2D uGLT; uniform float uGLOn; uniform vec4 uGL;   // the ground's glint (glintdata.js): (strength, sharpness, world units a repeat, the blades' relief); mask scale in uGLK
 uniform float uGLK;
 uniform sampler2D uWM; uniform vec4 uWK;   // a painted map's moving water (tools/make_clwater.py: r the mask, gb the flow): (on, speed, warp, shimmer)
+uniform sampler2D uPatchT, uPatchM; uniform float uPatchOn; uniform vec4 uPatchR;   // a painted map's moving patch (view.js groundPatch: Fern Brook's brook, tools/make_fernstream.py): its video frame, its mask, (x0, z0, 1/width, 1/depth)
 uniform vec4 uWR[6];   // rings on a painted map's water (mode 3, view.js waterRings): (world x, z, the time it began, strength)
 uniform highp sampler2DArray uMT; uniform float uMTOn; uniform vec4 uMTR[${MAT_TEX.length}];
 const float MT_METAL[${MAT_TEX.length}] = float[${MAT_TEX.length}](${MAT_TEX.map(m => (m.metal || 0).toFixed(2)).join(', ')});   // textured materials (MAT_TEX): per layer, its average colour and scale
@@ -64423,6 +64424,8 @@ void main(){
     vec3 tx = texture(uGPT, uv, clamp(od*1.8*uGPE, 0., 5. + min(uGPE - 1., 1.5))).rgb*(1. - clamp(od*uGPE/3.6, 0., mix(.85, .95, clamp(uGPE - 1., 0., 1.))));
     if(uGPE > 1.01) tx *= mix(.22, 1., smoothstep(-.2, 2., min(uv.x, 1. - uv.x)/uGP.z));   // (such a map's painting also dims toward its left and right edges, so the seam with its mirrored copy lies in the dark)
     if(uWK.x > .5){ vec2 gx = dFdx(uv), gy = dFdy(uv); vec4 wm = texture(uWM, uv); if(od <= 0. && wm.r > .01) tx = waterAt(tx, uv, wm, gx, gy); }   // (the water: tools/make_clwater.py)
+    if(uPatchOn > .5){ vec2 pv = (gxz - uPatchR.xy)*uPatchR.zw, vx = dFdx(pv), vy = dFdy(pv);   // the moving patch over the still, through its feathered mask: lit below exactly as the painting
+      if(od <= 0. && min(pv.x, pv.y) > 0. && max(pv.x, pv.y) < 1.){ float m = textureGrad(uPatchM, pv, vx, vy).r; if(m > .002) tx = mix(tx, textureGrad(uPatchT, pv, vx, vy).rgb, m); } }
     float shp = uShadowOn>.5 && abs(vW.y) < .05 ? shadowAt(vL) : 1.;   // (a card stood on the painting takes no shadow: it only shows the painting behind it)
     if(uPLK.x > .5) shp = mix(1., shp, mix(.4, 1., paintSun(gxz)));   // (in the painting's shade a unit's own shadow is faint: no sun to cast it; crisp in its sun patches)
     vec3 pl = vec3(0.);
@@ -65639,6 +65642,9 @@ function createRenderer(canvas, opt = {}) {
       if (u.uGPT) { const gp = this.gpaint; gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, gp ? gp.tex : blank); gl.uniform1i(u.uGPT, 5); gl.uniform1f(u.uGPOn, gp ? 1 : 0); if (gp) { gl.uniform4f(u.uGP, gp.rect[0], gp.rect[1], 1 / gp.rect[2], 1 / gp.rect[3]); gl.uniform1f(u.uGPGain, gp.gain || 1); } if (u.uGPE) gl.uniform1f(u.uGPE, gp && gp.edge || 1); if (u.uGPS) gl.uniform2f(u.uGPS, gp && gp.shade ? 1 : 0, gp && gp.shade ? gp.shade : 1); }
       if (u.uWM) { const w = this.gwater, on = !!(w && w.tex && this.gpaint && !(typeof GFX !== 'undefined' && GFX === 'low')), k = on ? w.k || WATER_K1 : WATER_K1;   // (a painted map's moving water: off on Graphics Low)
         gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, on ? w.tex : blank); gl.uniform1i(u.uWM, 13); gl.uniform4f(u.uWK, on ? (w.bank ? 3 : w.falls ? 2 : 1) : 0, k[0], k[1], k[2]); if (u.uWR) gl.uniform4fv(u.uWR, on && w.bank && this.wrings ? this.wrings : WATER_R0); }
+      if (u.uPatchT) { const g = this.gpatch, on = !!(g && g.ok && g.tex && g.mask && this.gpaint && !(typeof GFX !== 'undefined' && GFX === 'low'));   // (the moving patch: only once it has a frame; off on Graphics Low)
+        gl.activeTexture(gl.TEXTURE15); gl.bindTexture(gl.TEXTURE_2D, on ? g.tex : blank); gl.uniform1i(u.uPatchT, 15); gl.activeTexture(gl.TEXTURE16); gl.bindTexture(gl.TEXTURE_2D, on ? g.mask : blank); gl.uniform1i(u.uPatchM, 16);
+        gl.uniform1f(u.uPatchOn, on ? 1 : 0); if (on) gl.uniform4f(u.uPatchR, g.rect[0], g.rect[1], 1 / g.rect[2], 1 / g.rect[3]); }
       if (u.uGLT) { const gl_ = this.glintTex(); gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, gl_ || blank); gl.uniform1i(u.uGLT, 8); gl.uniform1f(u.uGLOn, gl_ && this.glintOn && !(this.gpaint && this.gpaint.noGlint) && !(typeof vfxFid === 'function' && vfxFid().name === 'Low') ? 1 : 0); if (gl_) { const g = this.glint; gl.uniform4f(u.uGL, g.strength, g.sharpness, g.scale, g.relief); gl.uniform1f(u.uGLK, typeof GLINT_MASK_K !== 'undefined' ? GLINT_MASK_K : .31); } }
       if (u.uMT) { let mt = null; try { mt = matTexture(); } catch (e) {} gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D_ARRAY, mt || blankA); gl.uniform1i(u.uMT, 6); gl.uniform1f(u.uMTOn, mt ? 1 : 0); if (mt) gl.uniform4fv(u.uMTR, matRef); }
       if (u.uGT) { const gt = this.gtex; gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gt ? gt.tex : blank); gl.uniform1i(u.uGT, 4); gl.uniform1f(u.uGTOn, gt ? 1 : 0); if (gt) gl.uniform2f(u.uGTS, gt.scale, gt.gain); }
@@ -70108,7 +70114,8 @@ if (typeof FERN_STILL !== 'undefined') {
     bendR: 1e5, shafts: 'none', amb: 'forest', ward: [.42, .95, .78], wardBare: true, inShade: 1, walkUpright: true, walkTilt: 0, walkRise: 0,
     birdCol: [.95, .92, .78], birdSize: .85,
     perch: [[[-8.3, -3.4, 4.4], [-10.6, -0.6, 3.9], [-5.7, -4.0, 4.7]], [[25.1, -2.2, 4.9], [21.6, 0.4, 4.1], [26.5, 2.3, 3.9]], [[-6.1, 14.2, 2.3], [-8.7, 12.1, 2.8]]],   // (the left tree's crown, the great tree, the ferns at the foot: world [x, z, height])
-    painted: { src: FERN_STILL, rect: FERN_RECT, shade: FERN_SHADE_REF, sun: typeof FERN_SUN !== 'undefined' ? FERN_SUN : null, edge: 2.5, glint: false, water: typeof FERN_FLOW !== 'undefined' ? FERN_FLOW : null, falls: true },   // (the brook and its falls run: tools/make_fernwatch.py, gl.js waterAt mode 2)
+    painted: { src: FERN_STILL, rect: FERN_RECT, shade: FERN_SHADE_REF, sun: typeof FERN_SUN !== 'undefined' ? FERN_SUN : null, edge: 2.5, glint: false, water: typeof FERN_FLOW !== 'undefined' ? FERN_FLOW : null, falls: true,
+      patch: () => typeof FERN_STREAM !== 'undefined' ? { src: FERN_STREAM, mask: FERN_STREAM_MASK, rect: FERN_STREAM_RECT } : null, patchAsset: 'fernstream' },   // (the brook and its falls run: tools/make_fernwatch.py, gl.js waterAt mode 2; on a desktop the owner's video of them, cut down to the water, plays over it: tools/make_fernstream.py, view.js groundPatch)
     build: () => buildGreatrootPainted(FERN_RECT, null, null, null),
   };
 }
@@ -81548,9 +81555,9 @@ function buildThemeEnv(th) {
       E.gpaint = { tex: RD.texture(src, 'mirror', 8), rect: th.painted.rect, shade: th.painted.shade || 0, edge: th.painted.edge || 1, noGlint: th.painted.glint === false }; /* (glint: false = a painting shown with no sun glint on its grass) */ if (TH === th) applyLight();
       if (th.painted.shade) try {   // the painting's light, coarse, for what drifts through it (dust shows in the sunny patches)
         const N = 96, c = document.createElement('canvas'); c.width = N; c.height = Math.round(N * img.height / img.width);
-        const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data, L = new Float32Array(c.width * c.height);
-        for (let i = 0; i < L.length; i++) L[i] = (d[i * 4] * .3 + d[i * 4 + 1] * .59 + d[i * 4 + 2] * .11) / 255 / th.painted.shade;
-        E.plum = { w: c.width, h: c.height, L, rect: th.painted.rect };
+        const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data, L = new Float32Array(c.width * c.height), C = new Float32Array(c.width * c.height * 3);
+        for (let i = 0; i < L.length; i++) { L[i] = (d[i * 4] * .3 + d[i * 4 + 1] * .59 + d[i * 4 + 2] * .11) / 255 / th.painted.shade; C[i * 3] = d[i * 4] / 255; C[i * 3 + 1] = d[i * 4 + 1] / 255; C[i * 3 + 2] = d[i * 4 + 2] / 255; }
+        E.plum = { w: c.width, h: c.height, L, C, rect: th.painted.rect };
       } catch (e) {} };
     img.src = th.painted.src;
     /* A ground that moves (painted.video: Mistfall Ledge, the owner's looping video): the still above shows first, and
@@ -81560,6 +81567,10 @@ function buildThemeEnv(th) {
       const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
       v.addEventListener('error', () => { E.gvideo = null; }); v.src = th.painted.video; E.gvideo = { v, t: -1, ok: false };
     } catch (e) { E.gvideo = null; }
+    /* A moving patch over the still (painted.patch: Fern Brook's brook and falls, the owner's video cut down to the water,
+       tools/make_fernstream.py): desktop only, as the moving ground above; until it has a frame, and on phones, tablets,
+       Graphics Low and ?video=0, the painting's own flow-map water shows (painted.water). Its asset may come late. */
+    if (th.painted.patch && !mapLite() && !(typeof GFX !== 'undefined' && GFX === 'low') && !VIDEO_OFF) assetReady(th.painted.patchAsset || '', () => { if (!THENV[th.id] || THENV[th.id] === E) groundPatchMake(E, th); });
     if (th.painted.sun) { const si = new Image(); si.onload = () => { E.gsun = { tex: RD.texture(si, false), rect: th.painted.rect }; if (TH === th) applyLight(); }; si.src = th.painted.sun; }   // (its sun patches and shade, for the models on it: tools/paintlight.py)
     if (th.painted.water) { const wi = new Image(); wi.onload = () => { E.gwater = { tex: RD.texture(wi, false), falls: !!th.painted.falls, bank: !!th.painted.bank }; if (th.painted.bank) waterRingsMask(wi, th); /* (falls: its mask also holds its falls' feet, gl.js waterAt) */ if (TH === th) applyLight(); }; wi.src = th.painted.water; }   // (its moving water: gl.js waterAt, maps.js WATER_DEF)
   }
@@ -81592,14 +81603,34 @@ if (typeof impact === 'function') { const f0 = impact; impact = function (p) { t
 const VIDEO_OFF = (() => { try { return new URLSearchParams(location.search).get('video') === '0'; } catch (e) { return false; } })();   // (?video=0: a moving ground shown as its still, to compare)
 // a moving ground's next frame onto its texture (once a frame; nothing when the video has not moved on)
 function groundVideo() {
-  const E = THENV[TH.id], g = E && E.gvideo; if (!g || !E.gpaint) return;
+  const E = THENV[TH.id]; groundPatch(E); const g = E && E.gvideo; if (!g || !E.gpaint) return;
   const v = g.v;
   if (v.paused && v.readyState >= 2) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
   if (v.readyState < 2 || v.currentTime === g.t) return;
   g.t = v.currentTime; try { RD.texUpdate(E.gpaint.tex, v); g.ok = true; } catch (e) { E.gvideo = null; }
 }
+// a moving patch's next frame onto its own texture (only when the video has moved on: 24 a second)
+function groundPatch(E) {
+  const g = E && E.gpatch; if (!g || !E.gpaint || (typeof GFX !== 'undefined' && GFX === 'low')) { if (g && !g.v.paused) g.v.pause(); return; }
+  const v = g.v;
+  if (v.paused && v.readyState >= 2) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+  if (g.rvfc && !g.fresh && g.tex && performance.now() - g.at > 600) g.rvfc = false;   // (no frame callbacks where a video is off the page: by its clock instead)
+  if (v.readyState < 2 || (g.rvfc ? !g.fresh && g.tex : v.currentTime === g.t)) return;
+  g.fresh = false; g.t = v.currentTime; g.at = performance.now(); try { if (g.tex) RD.texUpdate(g.tex, v); else g.tex = RD.texture(v, false); g.ok = true; } catch (e) { E.gpatch = null; RD.gpatch = null; }
+}
+function groundPatchMake(E, th) {
+  const p = th.painted.patch(); if (!p || E.gpatch) return;
+  try {
+    const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
+    const g = E.gpatch = { v, t: -1, ok: false, tex: null, mask: null, rect: p.rect };
+    if (v.requestVideoFrameCallback) { const fr = () => { g.fresh = true; if (E.gpatch === g) v.requestVideoFrameCallback(fr); }; v.requestVideoFrameCallback(fr); g.rvfc = true; }   // (a new frame: Chrome's currentTime moves on between frames, so it alone would upload every frame drawn)
+    v.addEventListener('error', () => { if (E.gpatch === g) { E.gpatch = null; if (TH === th) applyLight(); } }); v.src = p.src;
+    const mi = new Image(); mi.onload = () => { g.mask = RD.texture(mi, false); }; mi.src = p.mask;
+    if (TH === th) applyLight();
+  } catch (e) { E.gpatch = null; }
+}
 // (leaving a map with a moving ground: its video rests)
-function groundVideoRest(th) { for (const k in THENV) { const g = THENV[k] && THENV[k].gvideo; if (g && THEMES[k] !== th && !g.v.paused) g.v.pause(); } }
+function groundVideoRest(th) { for (const k in THENV) for (const g of [THENV[k] && THENV[k].gvideo, THENV[k] && THENV[k].gpatch]) if (g && THEMES[k] !== th && !g.v.paused) g.v.pause(); }
 function applyTheme(id) {
   if (typeof M3D_FORCE !== 'undefined' && M3D_FORCE && THEMES[M3D_FORCE]) { id = M3D_FORCE; if (typeof G !== 'undefined' && G) G.map = id; }
   if (typeof MAP_TRY !== 'undefined' && MAP_TRY && THEMES[MAP_TRY]) { id = MAP_TRY; if (typeof G !== 'undefined' && G) G.map = id; }   // (?trymap=<id>: a trial map for any run, maps.js)
@@ -81636,6 +81667,7 @@ function applyLight() {
   RD.mood = moodGet(TH.id);   // the map's mood on every model (maps.js MAP_MOOD)
   const E = THENV[TH.id]; RD.gtex = E && E.gtex ? Object.assign(E.gtex, { gain: L.ground }) : null;
   RD.gpaint = E && E.gpaint ? Object.assign(E.gpaint, { gain: L.paint == null ? 1 : L.paint }) : null;
+  RD.gpatch = E && E.gpatch || null;   // (a moving patch over the painting: groundPatch)
   const wk = E && E.gwater ? waterK(TH.id) : null; RD.gwater = wk ? Object.assign(E.gwater, { k: wk }) : null;   // (the painting's moving water; gl.js leaves it out on Graphics Low)
   // the painting's sun patches and shade on the units and foes standing in them (maps.js LIGHT_DEF psun: the sun's share in the
   // deepest shade, in a full patch, how much cooler the fill is in shade; gl.js lightAt uPLK)
@@ -81950,6 +81982,17 @@ function paintLum(x, z) {
   const [x0, z0, wx, wz] = P.rect, i = clamp(Math.floor((x - x0) / wx * P.w), 0, P.w - 1), j = clamp(Math.floor((z - z0) / wz * P.h), 0, P.h - 1);
   return P.L[j * P.w + i];
 }
+// the painting's colour behind a point in the air (x, h, z): the ground spot at the same place on the screen (birds take the
+// shade of what is behind them: owner, 21 Nov 2026, "too many small little groups of birds and they're too dark ... should be
+// the same shade as the background")
+function paintBehind(x, h, z) {
+  const P = THENV[TH.id] && THENV[TH.id].plum; if (!P || !P.C) return null;
+  const sy = M4.proj(RD.vp, x, h, z)[1]; let lo = z - 40, hi = z + 40;
+  const yAt = zz => M4.proj(RD.vp, x, 0, zz)[1], up = yAt(lo) > yAt(hi);   // (which way the ground's screen row runs with z)
+  for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if ((yAt(m) > sy) === up) lo = m; else hi = m; }
+  const zg = (lo + hi) / 2, [x0, z0, wx, wz] = P.rect, i = clamp(Math.floor((x - x0) / wx * P.w), 0, P.w - 1), j = clamp(Math.floor((zg - z0) / wz * P.h), 0, P.h - 1), o = (j * P.w + i) * 3;
+  return [P.C[o], P.C[o + 1], P.C[o + 2]];
+}
 /* the clearing's own small life: dust drifting in the shafts of sun, leaves spinning down from the canopy at the edges,
    little clouds of gnats over the grass and by the bushes (dark specks, a glint when one crosses a sunny patch), and the
    pale spray off the falls */
@@ -81972,12 +82015,12 @@ const GLADE_PERCH = [[-5.4, -3.6, 3.4], [-3.4, -5.6, 3.6], [-6.6, 2.5, 3.0], [-5
 let gladeBirdT = 4; const BIRD_COL = [.07, .07, .06];
 function gladeBirds(dt) {
   if ((gladeBirdT -= dt) > 0) return;
-  gladeBirdT = R_(7, 15);
+  gladeBirdT = R_(14, 26);
   // (a map's own perches, TH.perch: sets of them, a flight staying within one set, so its birds keep to its corners: Greatroot Way)
   const PS = TH.perch ? TH.perch[Math.random() * TH.perch.length | 0] : GLADE_PERCH;
   const a = PS[Math.random() * PS.length | 0]; let b; do b = PS[Math.random() * PS.length | 0]; while (b === a);
-  if (TH.perch) gladeBirdT = R_(4, 9);
-  const n = 1 + (Math.random() < .5 ? 0 : Math.random() < .6 ? 1 : 2), L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (TH.perch) gladeBirdT = R_(10, 18);
+  const n = Math.random() < .75 ? 1 : 2, L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   for (let k = 0; k < n; k++) amb.push({ k: 'bird', a, b, t: -k * R_(.2, .45), life: L / R_(3.2, 4) + .4, ox: R_(-.35, .35), oz: R_(-.3, .3), up: Math.max(a[2], b[2]) + R_(.8, 1.8), ph: R_(0, 10), glide: 0 });
 }
 function drawBird(a, dt) {
@@ -81992,7 +82035,7 @@ function drawBird(a, dt) {
   const p = at(u), p2 = at(Math.min(1, u + .01)); p[1] += bob; p2[1] += bob;
   a.p = p;
   const q0 = M4.proj(RD.vp, p[0], p[1], p[2]), q1 = M4.proj(RD.vp, p2[0], p2[1], p2[2]), rot = Math.atan2(q1[1] - q0[1], (q1[0] - q0[0]) * W / H);
-  const fl = flap ? Math.sin(cyc * 34) : .08, al = Math.min(1, u * 10, (1 - u) * 10) * .92, bc = TH.birdCol || BIRD_COL, col = [bc[0], bc[1], bc[2], al], s = .13 * (TH.birdSize || 1);   // (a map's own: pale birds against Greatroot Way's dark trees)
+  const fl = flap ? Math.sin(cyc * 34) : .08, al = Math.min(1, u * 10, (1 - u) * 10) * .85, bg = paintBehind(p[0], p[1], p[2]), bc = bg ? [bg[0] * .78, bg[1] * .78, bg[2] * .78] : TH.birdCol || BIRD_COL, col = [bc[0], bc[1], bc[2], al], s = .13 * (TH.birdSize || 1);   // (a map's own: pale birds against Greatroot Way's dark trees)
   const cr = Math.cos(rot), sr = Math.sin(rot), px = -sr, py = cr;   // along the flight, and across it (on the screen)
   const R = RD.right, Uu = RD.up, off = (k) => [p[0] + (R[0] * px + Uu[0] * py) * k, p[1] + (R[1] * px + Uu[1] * py) * k, p[2] + (R[2] * px + Uu[2] * py) * k];
   QA.bill(RD, p[0], p[1], p[2], s * .55, s * .2, col, 5, 0, rot);   // the body
