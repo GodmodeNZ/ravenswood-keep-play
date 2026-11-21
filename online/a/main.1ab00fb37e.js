@@ -1,4 +1,4 @@
-const BUILD_TAG = '6db789e@2026-11-21';   // the play log's build version (playlog.js)
+const BUILD_TAG = '2c22e08@2026-11-22';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -17908,6 +17908,9 @@ function ihRifleFrom() {
   const P = G.path && G.path.pts, g = P && P.length ? P[P.length - 1] : [PORTAL.x, GATE_Y];
   return { x: g[0], z: g[1], h: .9, t: null };
 }
+// where the shot leaves, looked up when it fires: the Champion's muzzle as his model last drew it (unitTip, through
+// ihMuzzle), else his post's top; the gate when no Champion stands
+const ihGunAt = f => f.t && ihLive(f.t) ? ihMuzzle(f.t) : [f.x, f.h, f.z];
 const IH_FAR = { aim: 1.5, base: .4, cell: .05, cap: .9, loss: .2, stag: .6, cdK: .5, haste: .15, hasteT: 4 };
 function ihFarShot(p, R, hp, h) {
   const tg = p ? nearest(p.x, p.y, 99, 1, null, o => !o.ent && !o.phased && o.state !== 'exit')[0] : null;
@@ -17940,8 +17943,9 @@ function ihFarFire(z, tg, k0) {
     m *= 1 - loss; if (m < .05) break;
   }
   const end = Math.max(L + 1, line.length ? line[line.length - 1][1] + .6 : L + 1), ex = z.x + ux * Math.min(end, 30), ez = z.z + uz * Math.min(end, 30);
-  rfx({ k: 'streak', x0: z.x, h0: z.h0, z0: z.z, x1: ex, h1: .45, z1: ez, col: '#ffe2a8', w: .025, trav: .06, life: .22 });   // a thin tracer
-  ihSmokePuff(z.x, z.z, z.h0, 4, '#bdb6ac'); ihFlash(z.x, z.z, z.h0, .35, '#ffd890');   // muzzle smoke, a small flash
+  const M = ihGunAt({ t: z.ch, x: z.x, h: z.h0, z: z.z });
+  rfx({ k: 'streak', x0: M[0], h0: M[1], z0: M[2], x1: ex, h1: .45, z1: ez, col: '#ffe2a8', w: .025, trav: .06, life: .22 });   // a thin tracer
+  ihSmokePuff(M[0], M[2], M[1], 4, '#bdb6ac'); ihFlash(M[0], M[2], M[1], .35, '#ffd890');   // muzzle smoke, a small flash
   sfx('heavyShot', 1); G.shake = Math.max(G.shake, .05);
   return { killed, left };
 }
@@ -17953,7 +17957,7 @@ IH_HAZ.ih_aim = (z, dt) => {
   }
   if (z.ch && G.towers.includes(z.ch)) { z.x = z.ch.x; z.z = z.ch.y; z.h0 = towerTop(z.ch) - .1; z.ch.ang = Math.atan2(z.tg.x - z.x, z.tg.y - z.z); }
   if (z.t > 0) {   // the aim: a faint amber glint along the line
-    if ((z.tick -= dt) <= 0) { z.tick = .09; rfx({ k: 'streak', x0: z.x, h0: z.h0, z0: z.z, c: z.tg, col: '#c89040', w: .008, life: .1 }); }
+    if ((z.tick -= dt) <= 0) { z.tick = .09; const M = ihGunAt({ t: z.ch, x: z.x, h: z.h0, z: z.z }); rfx({ k: 'streak', x0: M[0], h0: M[1], z0: M[2], c: z.tg, col: '#c89040', w: .008, life: .1 }); }
     if (Math.random() < dt * 6) part({ k: 'spark', x: z.tg.x, z: z.tg.y, h: hitH(z.tg) + .05, vx: 0, vz: 0, vh: .2, g: 0, life: .18, max: .18, size: .05, col: '#ffcf70' });
     return true;
   }
@@ -17996,9 +18000,9 @@ function ihBattery(p, R, hp, h) {
   const ch = (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER) || null, C = (ch && ch.st && ch.st.caps) || {}, from = ihRifleFrom(), who = ch || G;
   const sky = G.creeps.some(c => !c.dead && !c.ent && ihAirborne(c) && Math.hypot(c.x - p.x, c.y - p.y) <= R + .3);
   const mode = sky ? 'sky' : 'ground', lay = (who.ihBatMode || 'sky') !== mode ? Math.max(.5, IH_BAT.sw - .5 * (C.ihhDrill || 0)) : 0;
-  who.ihBatMode = mode;
+  who.ihBatMode = mode; if (ch) ch.ang = Math.atan2(p.x - ch.x, p.y - ch.y);
   const more = (sagaHas('fin') ? 1.5 : 1), extra = C.ihhShells || 0, bossK = c => c.def.boss ? IH_BAT.boss : 1;
-  if (lay) { onToastSoft(mode === 'ground' ? 'Lower the Grudge! The battery is laid level.' : 'Raise the guns! The battery is laid for the sky.'); ihSmokePuff(from.x, from.z, from.h, 3, '#8a8478'); sfx('click'); }
+  if (lay) { onToastSoft(mode === 'ground' ? 'Lower the Grudge! The battery is laid level.' : 'Raise the guns! The battery is laid for the sky.'); { const M = ihGunAt(from); ihSmokePuff(M[0], M[2], M[1], 3, '#8a8478'); } sfx('click'); }
   if (mode === 'sky') {
     const n = Math.round(IH_BAT.skyN * more) + extra;
     for (let q = 0; q < n; q++) G.delayed.push({ t: lay + q * IH_BAT.skyGap, fn: () => {
@@ -18006,7 +18010,7 @@ function ihBattery(p, R, hp, h) {
       const F = G.creeps.filter(c => !c.dead && !c.ent && ihAirborne(c) && Math.hypot(c.x - p.x, c.y - p.y) <= R + .3), o = F.length ? F[(Math.random() * F.length) | 0] : null;
       const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * R * .6, x = o ? o.x + (Math.random() - .5) * .4 : p.x + Math.cos(a) * d, z = o ? o.y + (Math.random() - .5) * .4 : p.y + Math.sin(a) * d;
       for (const c of G.creeps) if (!c.dead && !c.ent && ihAirborne(c) && Math.hypot(c.x - x, c.y - z) <= IH_BAT.skyR) { hurt(c, hp * IH_BAT.skyK * bossK(c), 'phys', HERO_SRC, false, 0, null); c.ihGrudgeT = G.time; }
-      rfx({ k: 'streak', x0: from.x, h0: from.h, z0: from.z, x1: x, h1: 1.2, z1: z, col: '#d0c8b8', w: .02, trav: .12, life: .16 });
+      const M = ihGunAt(from); rfx({ k: 'streak', x0: M[0], h0: M[1], z0: M[2], x1: x, h1: 1.2, z1: z, col: '#d0c8b8', w: .02, trav: .12, life: .16 });
       ihFlakFx(x, z, 1.15, .45); sfx('cannon', 0);
     } });
   } else {
@@ -18019,8 +18023,8 @@ function ihBattery(p, R, hp, h) {
         const px = c.x - from.x, pz = c.y - from.z, a = px * ux + pz * uz;
         if (a >= 0 && a <= len && Math.abs(px * uz - pz * ux) <= IH_BAT.gW) { hurt(c, hp * IH_BAT.gK * k * bossK(c), 'phys', HERO_SRC, false, 0, null); ihSparks(c.x, c.y, hitH(c), 2, '#ffe0a8'); }
       }
-      rfx({ k: 'streak', x0: from.x, h0: from.h, z0: from.z, x1: from.x + ux * len, h1: .4, z1: from.z + uz * len, col: '#e8dcc4', w: .025, trav: .08, life: .18 });
-      ihFlash(from.x, from.z, from.h, .45, '#ffd890'); ihSmokePuff(from.x, from.z, from.h, 2, '#8a8478'); sfx('heavyShot', 0);
+      const M = ihGunAt(from); rfx({ k: 'streak', x0: M[0], h0: M[1], z0: M[2], x1: from.x + ux * len, h1: .4, z1: from.z + uz * len, col: '#e8dcc4', w: .025, trav: .08, life: .18 });
+      ihFlash(M[0], M[2], M[1], .45, '#ffd890'); ihSmokePuff(M[0], M[2], M[1], 2, '#8a8478'); sfx('heavyShot', 0);
     } });
   }
 }
@@ -30101,11 +30105,13 @@ function chRocket(t, st, p, ab, K) {
   const tgC = p.c && !p.c.dead ? p.c : null, air = tgC && tgC.fly && !(tgC.lowT > G.time), LIT = 1, FLY = 1.2, STEP = .06;
   const m = byT(ab.by.mult, t) * chIhK(K), r = byT(ab.by.r, t);
   let ex = p.x, ez = p.y;
-  ihSmokePuff(t.x, t.y, towerTop(t) * .6, 3, '#8a8478'); sfx('click');
-  for (let q = 0; q < 5; q++) G.delayed.push({ t: q * .2, fn: () => { if (ihLive(t)) part({ k: 'spark', x: t.x + R(-.1, .1), z: t.y + R(-.1, .1), h: towerTop(t) * .7, vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.4, .9), g: 3, life: .3, max: .3, size: .04, col: '#ffb050' }); } });   // the fuse
+  t.ang = Math.atan2(p.x - t.x, p.y - t.y);
+  const fuse = k => t._hfBreech && unitTip(t) ? t._hfBreech : [t.x, towerTop(t) * k, t.y];   // the breech, where his model draws it
+  { const B = fuse(.6); ihSmokePuff(B[0], B[2], B[1], 3, '#8a8478'); } sfx('click');
+  for (let q = 0; q < 5; q++) G.delayed.push({ t: q * .2, fn: () => { if (!ihLive(t)) return; const B = fuse(.7); part({ k: 'spark', x: B[0] + R(-.04, .04), z: B[2] + R(-.04, .04), h: B[1], vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.4, .9), g: 3, life: .3, max: .3, size: .04, col: '#ffb050' }); } });   // the fuse
   G.delayed.push({ t: LIT, fn: () => {
     if (G.state !== 'play') return;
-    const x0 = t.x, z0 = t.y, h0 = towerTop(t); sfx('cannon', 1);
+    const M = ihMuzzle(t), x0 = M[0], z0 = M[2], h0 = M[1]; sfx('cannon', 1); ihFlash(x0, z0, h0, .6, '#ffc070'); ihSmokePuff(x0, z0, h0, 5, '#8a8478');
     const N = Math.round(FLY / STEP);
     for (let q = 1; q <= N; q++) G.delayed.push({ t: q * STEP, fn: () => {
       if (G.state !== 'play') return;
@@ -34205,7 +34211,7 @@ const SBC = {
   pit: { r: .8, fall: .45, close: 1 },         // Sinkhole
   dance: { beat: .6, feed: 2.5, bolt: .8 },     // Rain Dance
   leap: { splash: 1.5, r: 1.4, fork: .8, T: .85 },// Skyleap
-  stake: { hit: .5, cord: .06, lash: .2 },       // Ground Stake
+  stake: { hit: 1.5, cord: .2, lash: .2 },   /* (was .5 and .06 at 85 mana: it starved Storm Tether and cut flyer damage by a third, 21 Nov 2026) */       // Ground Stake
 };
 const sbcWolfR = (t, st) => (st.range || 1.4) + .9;   // how far the spirit wolf runs from its warrior
 const sbcV = c => BASE_SPD * ((c.def && c.def.spd) || 1) * (c.spdM || 1);
@@ -34888,7 +34894,7 @@ SBC_CAST.sb_stormdance = C => { const t = C.t; sfxAdd({ k: 'vflash', x: t.x, z: 
 /* =====================================================================================================
    SKYHUNTERS: hunters of the sky's raiders. Fantasy: nothing that flies over the plateau gets away.
    ===================================================================================================== */
-sbcSet('sb_downdraft', { name: 'Ground Stake', short: 'Stake', glyph: 'chain', hue: '#9cc8f0', mana: 85, cd: 13,
+sbcSet('sb_downdraft', { name: 'Ground Stake', short: 'Stake', glyph: 'chain', hue: '#9cc8f0', mana: 45, cd: 13,
   by: { dur: [4, 4, 5, 5, 6, 6] },
   auto: 'the toughest flyer still in the air within reach',
   text: (t, st, ab) => `Harpoons the toughest flyer (${xD(st, SBC.stake.hit)}) and stakes it to the road for ${byT(ab.by.dur, t)}s: held low, it can't get a cell past the stake, and the cord shocks it and foes beside it, soaking them.`,
@@ -90376,94 +90382,204 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -90472,75 +90588,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -103404,6 +103652,477 @@ const SL2 = (() => {
   return { S, CL, MV, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
 })();
 
+/* The Oathsworn Shieldbearers on a rig and clips made from scratch (the owner, 21 Nov 2026: "Oathsworn Shieldbearer/Finished
+   Assets": the knight, his sword and his shield, un-rigged). tools/make_os2.py -> src/model_os2.js: 36 bones (the tabard and
+   the cape below his belt on four panels of their own, each in two lengths; a bone each for the sword in his right fist and
+   the shield on his left), 8,696 triangles on one 1024 x 1536 atlas, 11 clips baked at 30 frames a second.
+   ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.oathsworn and its shield and sword parts);
+   ?os=old (or the Model Lab's "Shieldbearer rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle       no foe in reach: at ease, the shield carried low before his left thigh, the sword's point down
+     ready      a foe in reach: the shield wall: braced behind the shield, the left foot forward, the sword cocked back over
+                his right shoulder
+     cutA/B/C   his blows (FORCE_ATTACK.so_shield), taken in turn: a falling diagonal, a flat cut, a chop over the shield's
+                rim. Each is begun its own hit frame early so the blade is through the foe on the game's blow; the edge
+                leads every cut (the bake turns the sword in his fist to it)
+     bash       every third blow (the game's bash: t.soBashAt on the blow): the shield driven into the foe, his shoulder
+                behind it, his left foot stamping forward
+     bulwark    Bulwark Bash (so_bash): a crouch, then a full-bodied drive and upward heave of the shield, 0.2 s after the cast
+     rampart    Rampart of Dawn (so_aegis): the shield heaved up and slammed down rim first into the road, 0.22 s after the cast
+     challenge  Oath of Challenge (so_rebuke): the sword raised to the sky, then beaten twice on the shield's rim
+     hit        his health drops: the blow taken on the shield, knocked back, braced again
+     death      wounded (t.wounded): down on one knee, the shield's rim and the sword's point to the ground; when he is whole
+                again he eases back up into his guard
+   His size is the shared rule (unitmodels_size.js); he stands on the Order's flagstone. The sculpted body is one look at every
+   tier (the code-built body's gilding at II and III is not on it); he grows by UM_TIER.
+   Checks: `python tools/make_os2.py --check`. Notes: docs/model_pilot/oathsworn2.md. */
+const OS2 = (() => {
+  const U = 'oathsworn', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'bash', 'bulwark', 'rampart', 'challenge', 'hit', 'death'];
+  const CUTS = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, WIND = .12, SPD_CUT = 1.1;
+  const MV = { so_bash: 'bulwark', so_aegis: 'rampart', so_rebuke: 'challenge' }, START = { bulwark: 0, rampart: 0, challenge: 0 };
+  const BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]os=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .872, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'os2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('os2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'sword', 'shield']) { if (R_.bix[nm] == null) throw new Error('os2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'tip', 'grd', 'shC', 'shF', 'shT']) if (!mk || !mk[nm]) throw new Error('os2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('os2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('os2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('os2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.8, -.02, -.8]; m.max = [.8, 1.3, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('OS2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'os2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  const hitOf = c => (CL[c] && CL[c].hit != null ? CL[c].hit : 7) / 30;
+  // the game's own count (FORCE_ATTACK.so_shield): every third blow is a bash (every second with Bulwark Drill II, every
+  // one while Radiant under Vigil)
+  function bashEvery(t) {
+    const C = (t.st && t.st.caps) || {};
+    try { if (C.so_vigil && typeof soRadiant === 'function' && soRadiant(t)) return 1; } catch (e) {}
+    return C.so_bash2 >= 2 ? 2 : 3;
+  }
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._osHp != null && t.hp < t._osHp - 1e-6 && !t.wounded) t._osHitAt = now; t._osHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
+    if (t._osMv === 'death') t._osRise = now;   // (whole again: eased back up)
+    const rise = t._osRise != null && now - t._osRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const u = now - A.lastAt, m = MV[A.last], c0 = CL[m], s0 = START[m] || 0;
+      if (c0 && u < c0.len - s0) return { c: m, s: s0 + u, rate: 40, mv: 'ab' + A.lastAt };
+    }
+    // the blows: a new one counted (a cut, or the bash when the game bashed on it)
+    if (t.shots && t._osShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._osAt != null && at - t._osAt < 2) t._osIv = at - t._osAt;
+      t._osAt = at; t._osShots = t.shots;
+      t._osLast = t.soBashAt != null && Math.abs(t.soBashAt - at) < .02 ? 'bash' : CUTS[(t._osCutN = ((t._osCutN || 0) + 1)) % 3];
+    }
+    const spd = t._osIv ? Math.min(1.8, Math.max(1, CL.cutA.len / t._osIv)) : SPD_CUT;
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const last = t.shots ? t._osLast : null, lh = last ? hitOf(last) : 0, inStrike = last && CL[last] && s >= 0 && s < (CL[last].len - lh) / spd;
+    if (fight) {
+      const nx = ((t.shots | 0) + 1) % bashEvery(t) === 0 ? 'bash' : CUTS[((t._osCutN || 0) + 1) % 3], cd = t.cd || 0, HIT = hitOf(nx);
+      if ((t.windup || 0) > 0 && cd < HIT / spd && !(inStrike && s < BLOW)) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (begun: through the foe on the blow)
+      if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t.shots };
+    } else if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t.shots };
+    const h = t._osHitAt != null ? now - t._osHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._osHitAt };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._osDrawn != null && typeof G !== 'undefined' && G && G.time - t._osDrawn < .3 && G.time >= t._osDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Order's flagstone under him, as under every knight of it, and he stands on it
+    const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
+    const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('os_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * bk * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._osT == null ? 1 : Math.max(0, Math.min(.1, now - t._osT)); t._osT = now;
+      if (!t._osP || t._osP.q.length !== NB * 4) { t._osP = newPose(); t._osP.q.set(PT.q); t._osP.t.set(PT.t); }
+      if (P.mv !== t._osMv) { t._osMv = P.mv; t._osSw = now; }
+      const k = now - t._osSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._osP, PT, k); pose = t._osP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) {
+      t.tipW = w(BI.sword, MK.tip); t.tipYaw = yaw; t.tipAt = G.time; t._osDrawn = G.time; t._osClip = P.c; t._osClipS = P.s;
+      t._osShield = w(BI.shield, MK.shC); t._osShieldF = w(BI.shield, MK.shF);
+    }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('os2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'os2Row';
+    box.innerHTML = '<h3>Shieldbearer rig</h3><div class="row">' + `<button data-o2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?os=old)">Old (code-built)</button><button data-o2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-o2]')) x.onclick = () => { S.on = x.dataset.o2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, shield: t._osShield, face: t._osShieldF, clip: t._osClip, at: t._osDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_os2', () => {
+    try { load(typeof OS2_MDL !== 'undefined' ? OS2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Shieldbearer rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('os2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'os2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('os2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* Hrolf Grudgebearer, the Skywarden (Ironhold's flak Champion, ch_hrolf), on a rig and clips made from scratch (the owner's
+   "Hrolf Grudgebearer/Finished Assets": a bald red-bearded dwarf in green goggles, a purple quilted coat and a tattered cape,
+   in a T-pose, and his fat iron hand-cannon); tools/make_hf.py -> src/model_hf2.js: 34 bones (the tunic and cape below his
+   belt on four panels, the beard on a bone of its own, the cannon on its own bone placed by each clip, seated on his right
+   shoulder under his right fist), 9,000 triangles, 11 clips at 30 fps.
+   He carries the gun himself: his arms are too short to hold it out before him, so it rides on his right shoulder, his
+   right fist on the grip under its rail, his left hand free to signal, shade his eyes, brace and cover his ear.
+   ON by default in place of his code-built body; ?hf=old (or the Model Lab's "Hrolf rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: the cannon at ease on his shoulder, scanning the sky
+     ready     a foe in reach: laid low on his shoulder, his left hand out flat
+     shot      his strike (t.shotT = 0 at the shot): fired at frame 2, the recoil through him, the breech worked
+     heavy     Grudge Shell (ch_grudgeshell): a heavy shot that shoves him back half a step
+     barrage   Battery Barrage over flyers: swung up to 55 degrees, eight bursts 0.18 s apart
+     ground    Battery Barrage laid level ("Lower the Grudge"): from a wide crouch, four flat shells 0.28 s apart
+     lower     the battery re-laid from the sky to level (the game's 1.5 s lay, shorter with Drilled Crew: fitted to it)
+     raise     re-laid from level to the sky
+     rocket    The Old Grudge (ch_oldgrudge): the fuse yanked, braced, his ear covered, the launch at 1.0 s (the game's)
+     hit       a blow taken (his health drops)
+     death     Wounded: down on his right knee, hung on the cannon stood up on its rod
+   He stands on a Champion's slate (chDais, fitted by unitmodels_size.js), sized by the hero rule on the dwarf rule. His
+   muzzle is t.tipW (unitTip, so ihMuzzle: his shots and Grudge Shell's streak leave the real barrel). Checks:
+   `python tools/make_hf.py --check`. Notes: docs/model_pilot/hrolf2.md. */
+const HF2 = (() => {
+  const U = 'ch_hrolf', NAMES = ['idle', 'ready', 'shot', 'heavy', 'barrage', 'ground', 'lower', 'raise', 'rocket', 'hit', 'death'];
+  const EASE = .2, BASE_H = .08, LAY_T = 1.5;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]hf=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, GUN = 0, HEADY = .86, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tr: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) { P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f; P.tr[k] = c.tr[i0 * 3 + k] + (c.tr[i1 * 3 + k] - c.tr[i0 * 3 + k]) * f; }
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tr[k] += (B.tr[k] - A.tr[k]) * w; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      else if (b === GUN) { j0 += P.tr[0]; j1 += P.tr[1]; j2 += P.tr[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'hf2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('hf2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'cannon', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('hf2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'muzzle', 'breech', 'seat']) if (!mk || !mk[nm]) throw new Error('hf2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('hf2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tr = new Float32Array(b64(c.tr));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tr.length !== c.n * 3) throw new Error('hf2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tr, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; GUN = R.bix.cannon; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('hf2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.02, -.9]; m.max = [.9, 1.3, 1.2]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('HF2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'hf2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  // Battery Barrage: the laying it was cast in and whether it had to be re-laid first (the game's ihBattery: a change of
+  // laying costs 1.5 s, less with Drilled Crew); t.ihBatMode is the laying after the cast, t._hfMode the one before it
+  function battery(t, A, now) {
+    const mode = t.ihBatMode || 'sky';
+    if (A && A.last === 'ch_battery' && A.lastAt != null && (!t._hfBat || t._hfBat.at !== A.lastAt)) {
+      const C = (t.st && t.st.caps) || {}, laid = (t._hfMode || 'sky') !== mode;
+      t._hfBat = { at: A.lastAt, mode, lay: laid ? Math.max(.5, LAY_T - .5 * (C.ihhDrill || 0)) : 0 };
+    }
+    t._hfMode = mode;
+    const B = t._hfBat; if (!B || now < B.at) return null;
+    const u = now - B.at;
+    if (u < B.lay) return { c: B.mode === 'ground' ? 'lower' : 'raise', s: u * LAY_T / B.lay, rate: 40, mv: 'lay' + B.at };
+    const c = B.mode === 'ground' ? 'ground' : 'barrage', v = u - B.lay;
+    return v < CL[c].len ? { c, s: v, rate: 40, mv: 'bat' + B.at } : null;
+  }
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._hfHp != null && t.hp < t._hfHp - 1e-6 && !t.wounded) t._hfHitAt = now; t._hfHp = t.hp; }
+    const bat = battery(t, A, now);
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 40, mv: 'death' }; }
+    const ev = [];
+    if (bat) ev.push([t._hfBat.at, bat]);
+    if (A && A.lastAt != null && now >= A.lastAt) {
+      const u = now - A.lastAt;
+      if (A.last === 'ch_grudgeshell' && u < CL.heavy.len - 2 / 30) ev.push([A.lastAt, { c: 'heavy', s: 2 / 30 + u, rate: 40, mv: 'heavy' + A.lastAt }]);
+      if (A.last === 'ch_oldgrudge' && u < CL.rocket.len) ev.push([A.lastAt, { c: 'rocket', s: u, rate: 40, mv: 'rocket' + A.lastAt }]);
+    }
+    if (ev.length) { ev.sort((a, b) => b[0] - a[0]); return ev[0][1]; }
+    const hh = t._hfHitAt != null ? now - t._hfHitAt : 9; if (hh >= 0 && hh < CL.hit.len) return { c: 'hit', s: hh, rate: 40, mv: 'hit' + t._hfHitAt };
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT, h0 = CL.shot.hit / 30;
+    if (t.shots && s >= 0 && s < CL.shot.len - h0) return { c: 'shot', s: h0 + s, rate: 40, mv: 'shot' + t.shots };
+    if (fight || s < 2) return { c: 'ready', s: ph, rate: 8, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 4, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._hfDrawn != null && typeof G !== 'undefined' && G && G.time - t._hfDrawn < .3 && G.time >= t._hfDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // a Champion's slate under him (chDais, his code-built body's: fitted across by the size rule) and he stands on it
+    const bm = typeof chDais === 'function' && typeof ihPal === 'function' ? dynMesh('hf_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ihPal(U, () => chDais(g, tr, '#6c665c', '#4e4a44', IHP.trim, '#ffc870'))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? (bm.max && bm.max[1] > 0 ? bm.max[1] : BASE_H * K) * sy : 0;
+    // his size: a hero's head (the hero rule) on a dwarf (the dwarf rule), growing by UM_TIER
+    const hk = typeof UM_EVEN_HEAD !== 'undefined' ? UM_EVEN_HEAD * UM_HEAD_K.hero * UM_HEAD_K.dwarf : 1.28;
+    const head = hk * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._hfT == null ? 1 : Math.max(0, Math.min(.1, now - t._hfT)); t._hfT = now;
+      if (!t._hfP || t._hfP.q.length !== NB * 4) { t._hfP = newPose(); t._hfP.q.set(PT.q); t._hfP.t.set(PT.t); t._hfP.tr.set(PT.tr); }
+      if (P.mv !== t._hfMv) { t._hfMv = P.mv; t._hfSw = now; }
+      const k = now - t._hfSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 14)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._hfP, PT, k); pose = t._hfP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(BI.cannon, MK.muzzle); t.tipYaw = yaw; t.tipAt = G.time; t._hfDrawn = G.time; t._hfClip = P.c; t._hfClipS = P.s; t._hfBreech = w(BI.cannon, MK.breech); }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('hf2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'hf2Row';
+    box.innerHTML = '<h3>Hrolf rig</h3><div class="row">' + `<button data-t2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?hf=old)">Old (code-built)</button><button data-t2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-t2h="1" title="A blow taken: his flinch">Hit</button><button data-t2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on his knee on the cannon">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-t2]')) x.onclick = () => { S.on = x.dataset.t2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-t2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._hfHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-t2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { muzzle: t.tipW, breech: t._hfBreech, clip: t._hfClip, at: t._hfDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_hf2', () => {
+  try { load(typeof HF2_MDL !== 'undefined' ? HF2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Hrolf rig:', e.message); }
+  // (a Champion is drawn by drawForceUnit's layered path, the Grove's; another force's units by drawForceUnitPlain: both are
+  // wrapped, so he is drawn whichever way the game takes)
+  const _du0 = typeof drawForceUnit === 'function' ? drawForceUnit : null;
+  const mineNow = t => S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked;
+  if (MESH_ && typeof drawForceUnit === 'function') {
+    const _du = drawForceUnit;
+    drawForceUnit = function (t, tier, sx, sy, sz, wob, opts) {
+      if (mineNow(t)) return drawForceUnitPlain.apply(this, arguments);
+      return _du.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (mineNow(t)) {
+        try {
+          if (draw(t, tier, sx, sy, sz, wob, opts)) {
+            // (his Champion's extras still draw: the Old Grudge's crater; the code-built cast glow at the old gun's
+            // tip is left out, it would float beside the real barrel)
+            const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+            try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+            return;
+          }
+        } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('hf2:', e); } }
+      }
+      if (t && t.def && t.def.unit === U && typeof _du0 === 'function' && typeof isGroveUnit === 'function' && isGroveUnit(U)) return _du0.apply(this, arguments);   // (the code-built body: his own path)
+      return _plain.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
+    UM_UNITS[U] = { mdl: 'hf2', k: 1 };
+    if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+    if (typeof UM_KIND !== 'undefined' && !UM_KIND[U]) UM_KIND[U] = 'dwarf';
+    if (typeof UM_TOPK !== 'undefined' && UM_TOPK[U] == null) UM_TOPK[U] = typeof UM_HEAD_K !== 'undefined' ? UM_HEAD_K.dwarf * 1.16 : 1;   // (the top of his bald head: the dwarf rule's under the hero's)
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('hf2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
 /* Torvald Emberbrand, the Longshot (Ironhold's marksman Champion, ch_torvald), on a rig and clips made from scratch (the
    owner, 21 Nov 2026: "here you go, get fable 5.2 to rig and animate"): his mesh is the owner's "Torvald Emberbrand -
    Finished Assets" (a broad grey-bearded dwarf in a spotted fur mantle, a long dark coat over a fur-lined robe, beaded
@@ -103643,6 +104362,238 @@ const TV2 = (() => {
     let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
     if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('tv2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
   }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Silverbolt Crossbows on a rig and clips made from scratch (the owner, 21 Nov 2026: "Silver Order - Lightbinder and
+   Silverbolt/Finished Assets": the soldier and his crossbow, un-rigged; the crossbow's string and its bolts are made by the
+   tool). tools/make_sv2.py -> src/model_sv2.js: 38 bones (the tabard and cape below his belt on four panels, each in two
+   lengths; the crossbow on a bone of its own that moves freely, both fists solved onto it; the string's middle sliding along
+   its groove; a bolt in the groove and one in his right fist), one 1024 x 1536 atlas, 10 clips at 30 frames a second.
+   ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.silverbolt and its xbow and lhand parts);
+   ?sv=old (or the Model Lab's "Crossbow rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle        no foe in reach: at ease, the crossbow carried low across him in both hands
+     ready       a foe in reach: aimed down the stock, his cheek on it (readyUp: at a flyer, the crossbow raised; blended by
+                 how high and near the flyer is)
+     shot        each bolt (t.shots): the trigger squeezed on the game's shot, the kick, then the reload: the crossbow
+                 brought down nose to the road, the string hooked at the prod and hauled back onto the nut, a bolt drawn
+                 from the quiver on his hip and laid in the groove, the fist back on the stock, raised and aimed. The
+                 reload is sped to the shots' own pace (a faster unit reloads faster). shotUp: the same aimed at a flyer
+     sanct       Consecrated Bolt (so_sanct): a long, still aim, the bolt on the game's 0.45 s, a big kick, the reload
+     hail        Hail of Silver (so_hail): swept across the arc, a bolt and a short kick at each of the game's bolts
+     witness     Mark of Witness (so_witness): the crossbow dropped to his side, his left arm out pointing at the foe
+     hit         his health drops: knocked back, the nose thrown off line, aimed again
+     death       wounded (t.wounded): down on his right knee, the crossbow across his thighs; eased back up when whole
+   The bolt leaves the crossbow's bolt tip (t.tipW, read by unitTip). His size is the shared rule (unitmodels_size.js); he
+   stands on the Order's flagstone. Checks: `python tools/make_sv2.py --check`. Notes: docs/model_pilot/silverbolt2.md. */
+const SV2 = (() => {
+  const U = 'silverbolt', NAMES = ['idle', 'ready', 'readyUp', 'shot', 'shotUp', 'sanct', 'hail', 'witness', 'hit', 'death'];
+  const EASE = .2, SPD_MAX = 1.8;
+  const MV = { so_sanct: 'sanct', so_hail: 'hail', so_witness: 'witness' };
+  const BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]sv=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, XB = 0, STR = 0, BX = 0, BH = 0, HEADY = .85, MK = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tx: new Float32Array(3), ts: new Float32Array(3), vis: [1, 0] });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) {
+      P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+      P.tx[k] = c.tx[i0 * 3 + k] + (c.tx[i1 * 3 + k] - c.tx[i0 * 3 + k]) * f;
+      P.ts[k] = c.ts[i0 * 3 + k] + (c.ts[i1 * 3 + k] - c.ts[i0 * 3 + k]) * f;
+    }
+    const iv = f < .5 ? i0 : i1; P.vis[0] = c.vis[iv * 2]; P.vis[1] = c.vis[iv * 2 + 1];   // (a bolt shows or not: no blend)
+    return P;
+  }
+  function follow(A, B, w, visToo) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tx[k] += (B.tx[k] - A.tx[k]) * w; A.ts[k] += (B.ts[k] - A.ts[k]) * w; }
+    if (visToo) { A.vis[0] = B.vis[0]; A.vis[1] = B.vis[1]; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      const tt = b === HIPS ? P.t : b === XB ? P.tx : b === STR ? P.ts : null;   // (the bones that move as well as turn)
+      if (tt) { j0 += tt[0]; j1 += tt[1]; j2 += tt[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    // a hidden bolt: its bone collapsed to its own joint (its triangles have no area and draw nothing)
+    for (const [b, v] of [[BX, P.vis[0]], [BH, P.vis[1]]]) if (!v) { const g = b * 12, jx = out[g] * H[b * 3] + out[g + 4] * H[b * 3 + 1] + out[g + 8] * H[b * 3 + 2] + out[g + 3], jy = out[g + 1] * H[b * 3] + out[g + 5] * H[b * 3 + 1] + out[g + 9] * H[b * 3 + 2] + out[g + 7], jz = out[g + 2] * H[b * 3] + out[g + 6] * H[b * 3 + 1] + out[g + 10] * H[b * 3 + 2] + out[g + 11]; for (let i = 0; i < 12; i++) out[g + i] = 0; out[g + 3] = jx; out[g + 7] = jy; out[g + 11] = jz; }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'sv2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('sv2: too many bones');
+    for (const nm of ['hips', 'head', 'xbow', 'strC', 'boltX', 'boltH']) if (R_.bix[nm] == null) throw new Error('sv2: no ' + nm);
+    const mk = data.marks; for (const nm of ['boltT', 'nose', 'grip']) if (!mk || !mk[nm]) throw new Error('sv2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('sv2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tx = new Float32Array(b64(c.tx)), ts = new Float32Array(b64(c.ts)), vis = new Uint8Array(b64(c.vis));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tx.length !== c.n * 3 || ts.length !== c.n * 3 || vis.length !== c.n * 2) throw new Error('sv2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tx, ts, vis, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; XB = R.bix.xbow; STR = R.bix.strC; BX = R.bix.boltX; BH = R.bix.boltH; HEADY = R.bones[R.bix.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('sv2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.8, -.02, -.8]; m.max = [.8, 1.3, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('SV2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'sv2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  // how far up he aims: 0 at a foe on the ground, toward 1 (the clips' EL_UP, 36 degrees) at a flyer, the nearer the higher
+  function aimUp(t) {
+    const c = t.tg; if (!c || c.dead || !c.fly) return 0;
+    const d = Math.hypot(c.x - t.x, c.y - t.y), k = Math.max(.55, Math.min(1, 1.6 - d / 2.5)); return Number.isFinite(k) ? k : .8;
+  }
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into), up } */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle', up: 0 };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._svHp != null && t.hp < t._svHp - 1e-6 && !t.wounded) t._svHitAt = now; t._svHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death', up: 0 }; }
+    if (t._svMv === 'death') t._svRise = now;   // (whole again: eased back up)
+    const rise = t._svRise != null && now - t._svRise < .9;
+    // the target's height: eased, so a flyer passing over does not snap the aim
+    const up0 = aimUp(t), dt = t._svUpT == null ? 1 : Math.max(0, Math.min(.1, now - t._svUpT)); t._svUpT = now;
+    t._svUp = !Number.isFinite(t._svUp) ? up0 : t._svUp + (up0 - t._svUp) * (1 - Math.exp(-dt * 6)); if (!Number.isFinite(t._svUp)) t._svUp = 0; const up = t._svUp;
+    // a spell: its move from the cast (and the bolts the game looses meanwhile are under it)
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const u = now - A.lastAt, m = MV[A.last], c0 = CL[m];
+      if (c0 && u < c0.len) { t._svAbEnd = A.lastAt + c0.len; return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt, up: 0 }; }
+    }
+    // the shots: the game's own count; each a release, a kick and the reload, paced to the shots' own interval
+    if (t.shots && t._svShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._svAt != null && at - t._svAt < 3) t._svIv = at - t._svAt;
+      t._svAt = at; t._svShots = t.shots;
+    }
+    const sh = CL.shot, HIT = (sh.hit || 2) / 30, rate = (t.st && t.st.rate) || 1, iv = Math.min(t._svIv || rate, rate * 1.05);
+    const spd = Math.max(1, Math.min(SPD_MAX, (sh.len - HIT) / Math.max(.2, iv * .94)));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const shotAt = t._svAt, afterAb = t._svAbEnd == null || shotAt == null || shotAt > t._svAbEnd - .05;
+    const inShot = t.shots && afterAb && s >= 0 && HIT + s * spd < sh.len;
+    if (inShot) return { c: 'shot', s: HIT + s * spd, rate: 40, mv: 'shot' + t.shots, up };
+    if (fight) { const cd = t.cd || 0; if ((t.windup || 0) > 0 && cd < HIT) return { c: 'shot', s: HIT - cd, rate: 40, mv: 'pre' + t.shots, up }; }
+    const h = t._svHitAt != null ? now - t._svHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._svHitAt, up: 0 };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready', up };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle', up: 0 };
+  }
+  let PT = null, PU = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const UPOF = { ready: 'readyUp', shot: 'shotUp' };
+  const mine = t => S.on && MESH_ && t && t._svDrawn != null && typeof G !== 'undefined' && G && G.time - t._svDrawn < .3 && G.time >= t._svDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Order's flagstone under him, as under every soldier of it, and he stands on it
+    const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
+    const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('sv_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * bk * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); PU = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    if (P.up > .01 && UPOF[P.c]) { sample(CL[UPOF[P.c]], P.s, PU); follow(PT, PU, P.up, false); }   // (at a flyer: the raised aim blended in)
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._svT == null ? 1 : Math.max(0, Math.min(.1, now - t._svT)); t._svT = now;
+      if (!t._svP || t._svP.q.length !== NB * 4) { t._svP = newPose(); t._svP.q.set(PT.q); t._svP.t.set(PT.t); t._svP.tx.set(PT.tx); t._svP.ts.set(PT.ts); }
+      if (P.mv !== t._svMv) { t._svMv = P.mv; t._svSw = now; }
+      const k = now - t._svSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._svP, PT, k, true); pose = t._svP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) {
+      t.tipW = w(XB, MK.boltT); t.tipYaw = yaw; t.tipAt = G.time; t._svDrawn = G.time; t._svClip = P.c; t._svClipS = P.s; t._svUpNow = P.up;
+      t._svNose = w(XB, MK.nose);
+    }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('sv2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'sv2Row';
+    box.innerHTML = '<h3>Crossbow rig</h3><div class="row">' + `<button data-v2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?sv=old)">Old (code-built)</button><button data-v2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-v2]')) x.onclick = () => { S.on = x.dataset.v2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, nose: t._svNose, clip: t._svClip, at: t._svDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_sv2', () => {
+    try { load(typeof SV2_MDL !== 'undefined' ? SV2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Silverbolt rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('sv2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'sv2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('sv2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
   });
   return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
