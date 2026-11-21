@@ -1,4 +1,4 @@
-const BUILD_TAG = '596ff58@2026-11-21';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5e5ea1d@2026-11-21';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12255,7 +12255,7 @@ const SP_SHAPE = {
   // ---- Ironhold ----
   ih_bulwark: 'a h2', ih_breakerblow: 'a', ih_rollingvolley: 'h:n', ih_slug: 'a', ih_chainnet: 'a', ih_caltropfield: 'a', ih_grapple: 'a h4', ih_runeofpower: 'x', ih_forgeburst: 'a h3',
   ih_flakscreen: 'a h:dur/.5', ih_grapnel: 'a', ih_airburst: 'a H z.24', ih_pressureslam: 'a', ih_steamvent: 'a h:n', ih_pistondrive: 'a h2', ih_incendiary: 'a', ih_shrapnelround: 'a h2', ih_bombard: 'a',
-  ch_ironwall: 'a', ch_anvil: 'a', ch_oath: 'a', ch_sentry: 'a h26', ch_coil: 'a', ch_barrage: 'a h:passes', ch_rollkeg: 'a', ch_firebrew: 'a h:n', ch_onthehouse: 'a',
+  ch_ironwall: 'a', ch_anvil: 'a', ch_oath: 'a', ch_sentry: 'a h26', ch_coil: 'a', ch_barrage: 'a h:passes', ch_rollkeg: 'a', ch_firebrew: 'a h:n', ch_onthehouse: 'a', ch_farshot: 'a', ch_flare: 'x', ch_headsman: '', ch_muster: 'x', ch_oathhammer: 'a', ch_mountaindue: 'a', ch_battery: 'a h4', ch_grudgeshell: 'a', ch_oldgrudge: 'a',
   // ---- the Stormborn ----
   sb_packhowl: 'a h:dur/.6', sb_stormspear: 'a h2', sb_galearrow: 'a', sb_crosswind: 'a h:dur/.5', sb_skyshot: 'a', sb_freezingrain: 'a z.5', sb_hailstorm: 'a h:n',
   sb_rimetotem: 'a', sb_spiritchains: 'a', sb_reckoning: 'a', sb_spiritbear: 'h3', sb_thunderbird: 'a', sb_stormtotem: 'a h:dur', sb_stonetotem: 'a h:dur',
@@ -13247,7 +13247,7 @@ function ccRidersOf(t, st) {
     G.delayed.push({ t: .4, fn: () => { if (!c.dead && ccAlive(t)) { tagged('rx', () => ccHit(t, t.st || st, c, S * .35 * Math.min(2, C.ccEcho), { noMark: true })); part({ k: 'ring', x: c.x, z: c.y, h: hitH(c), life: .3, max: .3, size: .4, col: CC_COL.chrono }); } } });
     return 0; }]);
   if (u === 'cc_rimeweaver' && C.ccEntomb) out.push([['encase'], 'entomb', (id, e, c) => { const k = Math.min(2, C.ccEntomb); ccFreeze(t, c, CC_RXK.encase + .5 * k); c.ccTombBy = t; return .25 * k; }]);   /* Entomb */
-  if (u === 'cc_chronomancer' && C.ccParadox) out.push([['echo'], 'paradox', (id, e, c, S) => { ccRewind(t, st, c, .45 * Math.min(2, C.ccParadox), S, false); return 0; }]);   /* Paradox */
+  if (u === 'cc_chronomancer' && C.ccParadox) out.push([['echo'], 'paradox', (id, e, c, S) => { ccRewind(t, st, c, .45 * Math.min(2, C.ccParadox), S, false); return .25 * Math.min(2, C.ccParadox); }]);   /* Paradox */
   if (u === 'cc_astrologer' && C.ccComet) out.push([['pull'], 'comet', (id, e, c, S) => { ccComet(t, st, c, S); return 0; }]);   /* Comet */
   if (u === 'cc_golemwarden' && C.ccMagma) out.push([['magma'], 'deepmagma', () => {   /* Deep Magma: the magma it just poured lasts longer and spreads */
     for (const g of G.hazards) if (g.k === 'cc_glyph' && g.s === 'magma' && g.src === t && g.born === G.time) { const k = Math.min(2, C.ccMagma) / 2; g.t += 3 * k; g.T += 3 * k; g.r += .3 * k; }
@@ -13516,7 +13516,7 @@ FORCE_ATTACK.cc_chrono = function (t, st, tg, pow, echo) {
   if (bell) t.ccBellT = G.time + 8;
   ccShoot({ k: 'chrono', x: hx, h: hh, z: hz, tg, spd: 6.5, col: CC_COL.chrono, sz: 1, fn: c => {
     const s = t.st || st; if (!c) return;
-    const amt = s.dmg * pow * (C.ccClockArc && ccHas(c, 'arcane') ? 1 + .12 * C.ccClockArc : 1);   // Arcane Clockwork
+    const amt = s.dmg * pow * (C.ccClockArc && (ccHas(c, 'arcane') || c.slowT > 0) ? 1 + .3 * C.ccClockArc : 1);   // Arcane Clockwork
     ccHit(t, s, c, amt, {});   /* (Paradox: ccRidersOf) */
     if (c.dead) return;
     chill(c, { slow: s.slow || .25, slowT: s.slowT || 1.8 }, null, t);
@@ -16425,7 +16425,7 @@ function ihBolaHit(t, st, c, amt, net) {
 // a patch of caltrops: slows, strips armour, maybe bites (a construct on the path)
 function ihCaltrops(t, st, x, z, r, dur, slow, shred, more) {
   if (G.hazards.length >= 40) return null;
-  const z0 = Object.assign({ k: 'ih_caltrops', x, z, r, t: dur, T: dur, tick: 0, src: t, st, slow, shred, bite: (st.caps && st.caps.ihSpikes) ? .3 * st.caps.ihSpikes : 0, mine: !!(st.caps && st.caps.ihMine), seed: R(10) }, more || {});
+  const z0 = Object.assign({ k: 'ih_caltrops', x, z, r, t: dur, T: dur, tick: 0, src: t, st, slow, shred, bite: (st.caps && st.caps.ihSpikes) ? .6 * st.caps.ihSpikes : 0, mine: !!(st.caps && st.caps.ihMine), seed: R(10) }, more || {});
   G.hazards.push(z0);
   for (let q = 0; q < 8; q++) part({ k: 'chunk', x: x + R(-r, r) * .7, z: z + R(-r, r) * .7, h: .3, vh: R(-1, 0), g: 6, life: .3, max: .3, size: .035, col: '#6a6e78' });
   return z0;
@@ -16763,7 +16763,7 @@ function ihHazard(z, dt) {
     for (const c of G.creeps) {
       if (c.dead || c.fly || c.ent || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue;
       z.armed = 0; z.snapAt = G.time; z.t = 1;
-      if (src && G.towers.includes(src)) ihHit(src, st, c, (st.dmg || 10) * 3, 'phys', true);
+      if (src && G.towers.includes(src)) ihHit(src, st, c, (st.dmg || 10) * 10, 'phys', true);
       if (!c.dead) ihPin(c, 1.5, src);
       ihSparks(c.x, c.y, .3, 8, '#d8d0c8'); fxRing(z.x, z.z, .5, '#9aa0aa'); sfx('glaiveHit', 1);
       break;
@@ -17723,9 +17723,12 @@ function ihItemsPostCast(t, ab, st, tg, K) {
 if (typeof istAdd === 'function') istAdd('ih_grandmortar', 'dmg as splash|Walking Barrage');
 
 /* ================= IRONHOLD: the commanders =================
-   Three commanders who bring the clan to the keep: each a passive, a spell (spell.cast), a Champion gift and a saga in
+   Six commanders who bring the clan to the keep: each a passive, a spell (spell.cast), a Champion gift and a saga in
    three chapters. Their rules run through the force hooks (forces_ironhold_a.js calls ihHero*), and their spells'
-   constructs (the Iron Wall, the Clockwork Sentry, the Rolling Keg) are hazards drawn by _f. */
+   constructs (the Iron Wall, the Clockwork Sentry, the Rolling Keg, Ridgeline Shot's aim) are hazards drawn by _f.
+   Torvald Emberbrand, Brannoc Goldvein and Hrolf Grudgebearer joined on 21 Nov 2026 (owner: "build torvald, Brannoc, give him a different
+   last name"): Torvald's Ridgeline Shot is the owner's "long shot spell that has a deep range" (the Thunderguns already
+   have a Long Shot), Hrolf's Battery Barrage lays itself for the sky or level (Lower the Grudge) by what is under it, Brannoc's Sworn ranks come from each unit's bornW, so a saved run keeps them. */
 const IH_HEROES = [
   { id: 'ih_thane', force: IH_ID, name: 'Haldra Stonebrace', title: 'the Shield-Thane', hue: '#d0603a', glyph: 'shield', role: 'Ironhold: the line that does not break', quote: "Let them come. They'll break on us like rain on the mountain.",
     aff: { earth: .1, glaive: .05, frost: .05, storm: -.05, cannon: -.05 },
@@ -17748,6 +17751,27 @@ const IH_HEROES = [
       cast: (p, R, hp, h) => ihRollKeg(p, R, hp, h) },
     champ: "Fire-Spitter: every 5th strike of the Champion breathes fire on its foe: it and every foe within 0.8 cells burn for 30% of the strike a second for 3s.",
     tree: [] },
+  { id: 'ih_marksman', force: IH_ID, name: 'Torvald Emberbrand', title: 'the Longshot', hue: '#e0a050', glyph: 'crosshair', role: 'Ironhold: one shot, one oathbreaker', quote: "I've been watching that one since the ridge. He just doesn't know it yet.",
+    aff: { storm: .1, arrow: .05, cannon: .05, glaive: -.05, earth: -.05 },   // (heroaff.js AFF_MODS rules)
+    passive: 'Steady Hands: a ranged unit that has kept to one target for 3 seconds reaches 10% further, and its next shot has 20% more chance to crit. Thunderguns reload 15% faster.',
+    spell: { id: 'ih_farshot', name: 'Ridgeline Shot', glyph: 'target', cd: 40, aim: true, r: .5, t: 'Tap any foe on the field: after a 1.5 second aim (a faint amber glint), one round strikes it for 40% of a foe’s health, 5% more for every cell between the rifle and the foe (up to 90%), and pierces every foe on its line, losing 20% for each one it passes. Bosses take the full hit and stagger for 0.6s. A kill halves the cooldown and quickens every ranged unit 15% for 4s.',
+      cast: (p, R, hp, h) => ihFarShot(p, R, hp, h) },
+    champ: 'Deadeye: every 4th shot of the Champion is a sure crit that pierces on to the foe behind.',
+    tree: [] },
+  { id: 'ih_king', force: IH_ID, name: 'Brannoc Goldvein', title: 'the Under-King', hue: '#d8b040', glyph: 'banner', role: 'Ironhold: the old blood of the mountain', quote: 'Every stone of this hall was paid for. Make them pay for it.',
+    aff: { earth: .1, glaive: .05, arcane: .05, storm: -.05, cannon: -.05 },   // (heroaff.js AFF_MODS rules)
+    passive: 'Royal Levy: every 5th wave each unit takes a Sworn rank (up to 3): each rank makes it strike 4% faster and gives it 6% more health. When a unit is lost, its ranks pass to the unit nearest it.',
+    spell: { id: 'ih_muster', name: 'The King’s Muster', glyph: 'horn', cd: 45, aim: true, r: 3, t: 'Every unit within 3 cells of where you tap strikes 25% faster for 6 seconds and cannot be stunned or knocked back. When the muster ends, each of their next strikes hits twice as hard.',
+      cast: (p, R, hp, h) => ihKingsMuster(p, R, hp, h) },
+    champ: 'Crowned Head: foes within 1.5 cells of the Champion are slowed 10%, and the Champion takes 25% less damage while a boss is in reach.',
+    tree: [] },
+  { id: 'ih_hrolf', force: IH_ID, name: 'Hrolf Grudgebearer', title: 'the Skywarden', hue: '#8aa0b8', glyph: 'burst', role: 'Ironhold: guns for the sky, and a grudge for the ground', quote: 'Every wing that crossed this mountain is written in my book. So is every boot.',
+    aff: { cannon: .1, storm: .05, frost: .05, glaive: -.05, arcane: -.05 },   // (heroaff.js AFF_MODS rules)
+    passive: 'Skywarden’s Due: Flak Cannoneers’ shells burst 0.15 cells wider, and strike ground foes that are slowed or held 30% harder.',
+    spell: { id: 'ih_battery', name: 'Battery Barrage', glyph: 'burst', cd: 45, aim: true, r: 1.4, t: 'The battery fires on where you tap. Over flyers it is laid for the sky: 8 air bursts wreck the flyers there, each 12% of a foe’s health. Over ground foes he calls Lower the Grudge: 4 flat shells pierce down the line from the guns through the spot, each striking every ground foe on it for 11% of a foe’s health. Changing the laying takes 1.5 seconds before it fires.',
+      cast: (p, R, hp, h) => ihBattery(p, R, hp, h) },
+    champ: 'Grudge Flak: every 3rd shell of the Champion bursts twice as wide and half again as hard.',
+    tree: [] },
 ];
 FORCE_HEROES.push(...IH_HEROES);
 Object.assign(FORCE_SAGAS, {
@@ -17763,6 +17787,18 @@ Object.assign(FORCE_SAGAS, {
     trials: ['First Round', 'Another Round', 'Last Orders'], ev: 'ih_ale', verb: g => `Slay ${g} burning foes, or foes the Rolling Keg has bowled over.`, goals: [40, 100, 180],
     fin: ['Last Orders', 'Rolling Keg rolls a second keg right behind the first.'],
     evFn: c => c.burnT > 0 || c.ihKegT > G.time },
+  ih_marksman: { name: 'The Long Watch', lines: ['Breathe out. Wait for the wind.', 'Further. I can see further than that.', 'One round. Make it count.'],
+    trials: ['First Sighting', 'Windage', 'One Shot'], ev: 'ih_far', verb: g => `Slay ${g} foes with a shot from 3 cells away or more, or with Ridgeline Shot.`, goals: [40, 100, 180],
+    fin: ['The Second Round', 'Ridgeline Shot fires a second round half a second after the first, at the strongest foe left on its line, half as hard.'],
+    evFn: c => c.ihFarT > G.time - .4 },
+  ih_king: { name: 'The Crown Under the Mountain', lines: ['Call the levy. Every clan owes the hall.', 'Swear it on the stone. Swear it again.', 'The king is in the hall. Let them come and kneel.'],
+    trials: ['The Levy', 'The Muster', 'The Crown'], ev: 'ih_sworn', verb: g => `Slay ${g} foes with units that hold a Sworn rank, or during The King's Muster.`, goals: [50, 130, 240],
+    fin: ['Long Live the King', "The King's Muster lasts 3 seconds longer, and when it ends each unit's next two strikes hit twice as hard."],
+    evFn: c => c.ihSwornT > G.time - .4 },
+  ih_hrolf: { name: 'The Book of Grudges', lines: ['Write it down. Every one of them.', 'Strike it through. The ink is still wet.', 'Settled. In full.'],
+    trials: ['Written Down', 'Struck Through', 'Settled in Full'], ev: 'ih_grudge', verb: g => `Slay ${g} flyers, or foes his flak brought down out of the sky.`, goals: [40, 100, 180],
+    fin: ['Settled in Full', 'Battery Barrage fires half again as many shells, either laying.'],
+    evFn: c => !!c.fly || c.lowT > G.time },
 });
 Object.assign(FORCE_GLYPH, { ironbreaker: 'shield', thundergun: 'crosshair', chaintrapper: 'chains', runesmith: 'rune', flakgunner: 'burst', steamhammer: 'hammer', mortarcrew: 'mortar', brewkeg: 'barrel', ironbarricade: 'shieldx' });
 
@@ -17862,18 +17898,164 @@ IH_HAZ.ih_keg = (z, dt) => {
   return true;
 };
 
+/* ---------- Torvald's Ridgeline Shot and Brannoc's The King's Muster ---------- */
+// where a commander's shot leaves from: the Champion casting it, else the Champion on the field, else the keep's gate
+function ihRifleFrom() {
+  const t = (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER) || (typeof champTower === 'function' && G.force ? champTower() : null);
+  if (t && !t.wrecked) return { x: t.x, z: t.y, h: towerTop(t) - .1, t };
+  const P = G.path && G.path.pts, g = P && P.length ? P[P.length - 1] : [PORTAL.x, GATE_Y];
+  return { x: g[0], z: g[1], h: .9, t: null };
+}
+const IH_FAR = { aim: 1.5, base: .4, cell: .05, cap: .9, loss: .2, stag: .6, cdK: .5, haste: .15, hasteT: 4 };
+function ihFarShot(p, R, hp, h) {
+  const tg = p ? nearest(p.x, p.y, 99, 1, null, o => !o.ent && !o.phased && o.state !== 'exit')[0] : null;
+  if (!tg) { if (!(typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER)) { onToast('No foe to aim at.'); sfx('error'); } return false; }
+  const from = ihRifleFrom(), ch = from.t, C = (ch && ch.st && ch.st.caps) || {};
+  const aim = Math.max(.6, IH_FAR.aim - .25 * (C.ihtAim || 0));
+  G.hazards.push({ k: 'ih_aim', x: from.x, z: from.z, h0: from.h, r: .3, t: aim, T: aim, tick: 0, tg, hp, src: HERO_SRC, st: HERO_SRC.st, ch, n: sagaHas('fin') ? 2 : 1 });
+  sfx('click');
+}
+// the round itself: from (x, z) through tg and on to the field's edge, every foe on the line struck, nearest first
+function ihFarFire(z, tg, k0) {
+  const ch = z.ch, C = (ch && ch.st && ch.st.caps) || {};
+  const dx = tg.x - z.x, dz = tg.y - z.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
+  const cap = IH_FAR.cap + .05 * (C.ihtRidge || 0), loss = Math.max(.05, IH_FAR.loss - .05 * (C.ihtRanks || 0));
+  const k = Math.min(cap, IH_FAR.base + IH_FAR.cell * L) * k0;
+  const line = [];
+  for (const c of G.creeps) {
+    if (c.dead || c.ent || c.phased || c.state === 'exit') continue;
+    const px = c.x - z.x, pz = c.y - z.z, a = px * ux + pz * uz;
+    if (a > -.2 && Math.abs(px * uz - pz * ux) <= .32 + (c.def.boss ? .15 : 0)) line.push([c, a]);
+  }
+  line.sort((a, b) => a[1] - b[1]);
+  const L2 = line.map(q => q[0]); if (!L2.includes(tg)) L2.unshift(tg);
+  let m = 1, killed = false; const left = [];
+  for (const c of L2) {
+    const amt = z.hp * k * m;   // (bosses take the full hit: no boss share here)
+    c.ihFarT = G.time; hurt(c, amt, 'phys', z.src || HERO_SRC, false, 0, null);
+    if (c.dead) killed = killed || c === tg; else { left.push(c); if (c.def.boss) stun(c, IH_FAR.stag, 1); }
+    ihSparks(c.x, c.y, hitH(c), 3, '#ffe0a8');
+    m *= 1 - loss; if (m < .05) break;
+  }
+  const end = Math.max(L + 1, line.length ? line[line.length - 1][1] + .6 : L + 1), ex = z.x + ux * Math.min(end, 30), ez = z.z + uz * Math.min(end, 30);
+  rfx({ k: 'streak', x0: z.x, h0: z.h0, z0: z.z, x1: ex, h1: .45, z1: ez, col: '#ffe2a8', w: .025, trav: .06, life: .22 });   // a thin tracer
+  ihSmokePuff(z.x, z.z, z.h0, 4, '#bdb6ac'); ihFlash(z.x, z.z, z.h0, .35, '#ffd890');   // muzzle smoke, a small flash
+  sfx('heavyShot', 1); G.shake = Math.max(G.shake, .05);
+  return { killed, left };
+}
+IH_HAZ.ih_aim = (z, dt) => {
+  if (z.done) return false;
+  if (!z.tg || z.tg.dead || z.tg.state === 'exit') {   // the foe it aimed at is gone: the nearest foe to where it stood
+    const o = z.tg ? nearest(z.tg.x, z.tg.y, 2, 1, null, q => !q.ent && !q.phased)[0] : null;
+    if (!o) { z.done = 1; z.t = 0; return false; } z.tg = o;
+  }
+  if (z.ch && G.towers.includes(z.ch)) { z.x = z.ch.x; z.z = z.ch.y; z.h0 = towerTop(z.ch) - .1; z.ch.ang = Math.atan2(z.tg.x - z.x, z.tg.y - z.z); }
+  if (z.t > 0) {   // the aim: a faint amber glint along the line
+    if ((z.tick -= dt) <= 0) { z.tick = .09; rfx({ k: 'streak', x0: z.x, h0: z.h0, z0: z.z, c: z.tg, col: '#c89040', w: .008, life: .1 }); }
+    if (Math.random() < dt * 6) part({ k: 'spark', x: z.tg.x, z: z.tg.y, h: hitH(z.tg) + .05, vx: 0, vz: 0, vh: .2, g: 0, life: .18, max: .18, size: .05, col: '#ffcf70' });
+    return true;
+  }
+  z.done = 1;
+  const r = ihFarFire(z, z.tg, 1);
+  if (r.killed) {   // a kill: the cooldown halved, the ranged units quickened
+    G.ihFarHasteT = G.time + IH_FAR.hasteT;
+    const ch = z.ch, ab = typeof ABIL !== 'undefined' && ABIL.ch_farshot;
+    if (ch && ch.ab && ab && ch.ab.cd[ab.id] > G.time) ch.ab.cd[ab.id] = G.time + (ch.ab.cd[ab.id] - G.time) * IH_FAR.cdK;
+    onToastSoft('Oathbreaker down! Every gun quickens.');
+  }
+  if (z.n > 1 && r.left.length) {   // The Second Round (the saga's finale): the strongest foe left on the line, half as hard
+    const o = r.left.slice().sort((a, b) => b.hp - a.hp)[0], z2 = Object.assign({}, z, { n: 1 });
+    G.delayed.push({ t: .5, fn: () => { if (G.state === 'play' && !o.dead) ihFarFire(z2, o, .5); } });
+  }
+  return false;
+};
+// The King's Muster: every unit near the spot strikes faster and stands firm, then hits twice as hard once
+const IH_MUSTER = { dur: 6, rate: 1.25, fin: 3 };
+function ihKingsMuster(p, R, hp, h) {
+  const ch = typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER, C = (ch && ch.st && ch.st.caps) || {};
+  const x = p ? p.x : ch ? ch.x : 5.5, z = p ? p.y : ch ? ch.y : 5;
+  const dur = IH_MUSTER.dur + (sagaHas('fin') ? IH_MUSTER.fin : 0) + (C.ihkLong || 0), until = G.time + dur, n = sagaHas('fin') ? 2 : 1;
+  let k = 0;
+  for (const t of G.towers) {
+    if (!ihIs(t) || t.def.wall || t.wrecked || t.build > .5 || Math.hypot(t.x - x, t.y - z) > R) continue;
+    t.ihMusterT = until; t.ihMusterEnd = until; t.ihMusterN = n; t.silT = 0; k++;
+    part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) + .05, life: .35, max: .35, size: .4, col: '#ffd070' });
+  }
+  G.ihMuster = { x, z, r: R, until };
+  fxRing(x, z, R, h.hue); sfx('upgrade');
+  onToastSoft(k ? `The King's Muster! ${k} unit${k > 1 ? 's' : ''} stand to.` : "The King's Muster: no units there.");
+}
+
+// Battery Barrage: laid for the sky over flyers, level ("Lower the Grudge") over ground foes; a change of laying costs 1.5s
+const IH_BAT = { sw: 1.5, skyN: 8, skyK: .12, skyR: .7, skyGap: .18, gN: 4, gK: .11, gW: .32, gGap: .28, boss: .4 };
+const ihAirborne = c => !!c.fly && !(c.lowT > G.time);
+function ihBattery(p, R, hp, h) {
+  if (!p) return false;
+  const ch = (typeof CHAMP_CASTER !== 'undefined' && CHAMP_CASTER) || null, C = (ch && ch.st && ch.st.caps) || {}, from = ihRifleFrom(), who = ch || G;
+  const sky = G.creeps.some(c => !c.dead && !c.ent && ihAirborne(c) && Math.hypot(c.x - p.x, c.y - p.y) <= R + .3);
+  const mode = sky ? 'sky' : 'ground', lay = (who.ihBatMode || 'sky') !== mode ? Math.max(.5, IH_BAT.sw - .5 * (C.ihhDrill || 0)) : 0;
+  who.ihBatMode = mode;
+  const more = (sagaHas('fin') ? 1.5 : 1), extra = C.ihhShells || 0, bossK = c => c.def.boss ? IH_BAT.boss : 1;
+  if (lay) { onToastSoft(mode === 'ground' ? 'Lower the Grudge! The battery is laid level.' : 'Raise the guns! The battery is laid for the sky.'); ihSmokePuff(from.x, from.z, from.h, 3, '#8a8478'); sfx('click'); }
+  if (mode === 'sky') {
+    const n = Math.round(IH_BAT.skyN * more) + extra;
+    for (let q = 0; q < n; q++) G.delayed.push({ t: lay + q * IH_BAT.skyGap, fn: () => {
+      if (G.state !== 'play') return;
+      const F = G.creeps.filter(c => !c.dead && !c.ent && ihAirborne(c) && Math.hypot(c.x - p.x, c.y - p.y) <= R + .3), o = F.length ? F[(Math.random() * F.length) | 0] : null;
+      const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * R * .6, x = o ? o.x + (Math.random() - .5) * .4 : p.x + Math.cos(a) * d, z = o ? o.y + (Math.random() - .5) * .4 : p.y + Math.sin(a) * d;
+      for (const c of G.creeps) if (!c.dead && !c.ent && ihAirborne(c) && Math.hypot(c.x - x, c.y - z) <= IH_BAT.skyR) { hurt(c, hp * IH_BAT.skyK * bossK(c), 'phys', HERO_SRC, false, 0, null); c.ihGrudgeT = G.time; }
+      rfx({ k: 'streak', x0: from.x, h0: from.h, z0: from.z, x1: x, h1: 1.2, z1: z, col: '#d0c8b8', w: .02, trav: .12, life: .16 });
+      ihFlakFx(x, z, 1.15, .45); sfx('cannon', 0);
+    } });
+  } else {
+    const dx = p.x - from.x, dz = p.y - from.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, len = L + R, k = 1 + .1 * (C.ihhLow || 0);
+    const n = Math.round(IH_BAT.gN * more) + extra;
+    for (let q = 0; q < n; q++) G.delayed.push({ t: lay + q * IH_BAT.gGap, fn: () => {
+      if (G.state !== 'play') return;
+      for (const c of G.creeps) {
+        if (c.dead || c.ent || ihAirborne(c)) continue;
+        const px = c.x - from.x, pz = c.y - from.z, a = px * ux + pz * uz;
+        if (a >= 0 && a <= len && Math.abs(px * uz - pz * ux) <= IH_BAT.gW) { hurt(c, hp * IH_BAT.gK * k * bossK(c), 'phys', HERO_SRC, false, 0, null); ihSparks(c.x, c.y, hitH(c), 2, '#ffe0a8'); }
+      }
+      rfx({ k: 'streak', x0: from.x, h0: from.h, z0: from.z, x1: from.x + ux * len, h1: .4, z1: from.z + uz * len, col: '#e8dcc4', w: .025, trav: .08, life: .18 });
+      ihFlash(from.x, from.z, from.h, .45, '#ffd890'); ihSmokePuff(from.x, from.z, from.h, 2, '#8a8478'); sfx('heavyShot', 0);
+    } });
+  }
+}
+
 /* ---------- the commanders at work (called from the force hooks) ---------- */
+const IH_STEADY = { t: 3, range: .1, crit: .2, gun: 1.15 };
+const ihRanged = (t, st) => !t.def.wall && (st.range || 0) > 1.8;
+const ihSteadyT = t => IH_STEADY.t - (G.champ === t.id && t.st && t.st.caps ? .5 * (t.st.caps.ihtBreath || 0) : 0);
+const ihSteady = t => !!(t.ihTg && !t.ihTg.dead && G.time - (t.ihTgAt || 0) >= ihSteadyT(t));
+// Royal Levy: a unit's Sworn ranks (one every 5th wave since it was raised, plus any passed on to it), up to 3
+const ihSworn = t => !t || !ihIs(t) || t.def.wall ? 0 : Math.max(0, Math.min(3, Math.floor((G.wave | 0) / 5) - Math.floor((t.bornW | 0) / 5) + (t.ihSwornX || 0)));
+const IH_LEVY = { rate: .04, hp: .06 };
 function ihHeroLive(t, st) {
   const h = G.hero; if (!h || !h.startsWith('ih_')) return;
   const champ = G.champ && G.towers.find(o => o.id === G.champ);
   if (h === 'ih_artificer' && champ === t && st.rate) st.rate /= 1.12;   // Tinkered
   if (h === 'ih_thane' && G.ihRallyT > G.time && st.rate) st.rate /= 1.15;   // Defiance: the line rallies after a breach
+  if (h === 'ih_marksman') {
+    if (t.def.unit === 'thundergun' && st.rate) st.rate /= IH_STEADY.gun;   // Steady Hands: Thunderguns reload faster
+    if (ihRanged(t, st)) {
+      if (ihSteady(t)) { st.range *= 1 + IH_STEADY.range; st.crit = Math.min(.95, (st.crit || 0) + IH_STEADY.crit); }   // Steady Hands
+      if (G.ihFarHasteT > G.time && st.rate) st.rate /= 1 + IH_FAR.haste;   // Ridgeline Shot's kill
+    }
+  }
+  if (h === 'ih_king' && !t.def.wall) {
+    const r = ihSworn(t); if (r) { if (st.rate) st.rate /= 1 + IH_LEVY.rate * r; st.hpM = (st.hpM || 1) * (1 + IH_LEVY.hp * r); }   // Royal Levy
+    if (t.ihMusterT > G.time) { if (st.rate) st.rate /= IH_MUSTER.rate; t.silT = 0; }   // The King's Muster: faster, and no stun takes
+    if (t.ihDueT > G.time && st.rate) st.rate /= 1.2;   // The King's Due
+  }
+  if (h === 'ih_hrolf' && t.def.unit === 'flakgunner' && st.splash) st.splash += .15;   // Skywarden's Due
 }
 function ihHeroAmp(c, src, dot) {
   const h = G.hero; if (!h || !h.startsWith('ih_')) return 0;
   let a = 0;
   if (h === 'ih_thane' && (c.ihHeldT > G.time || c.stunT > 0)) a += .1;   // Defiance
   if (c.ihWallT > G.time) a += .15;   // taunted at the Iron Wall
+  if (h === 'ih_hrolf' && !dot && src && src.def && src.def.unit === 'flakgunner' && !ihAirborne(c) && (c.slowT > 0 || c.stunT > 0 || c.ihHeldT > G.time || c.rootT > G.time)) a += .3;   // Skywarden's Due
   return a;
 }
 function ihHeroFire(t, st, tg, pow, echo) {
@@ -17882,10 +18064,36 @@ function ihHeroFire(t, st, tg, pow, echo) {
     rfx({ k: 'breath', x0: t.x, h0: towerTop(t) - .1, z0: t.y, c: tg, life: .35 });
     G.delayed.push({ t: .1, fn: () => { if (G.state !== 'play') return; inSplash(x, z, .85, false, c => { if (!c.ent) ignite(c, Math.max(1, d), 3, t, false); }); fxFire(x, z, .4, 1); } });
   }
+  if (G.hero === 'ih_marksman' && !echo) {
+    if (ihRanged(t, st)) {   // Steady Hands: the watch on one target; a steady shot spends it
+      if (tg !== t.ihTg) { if (ihSteady(t)) st.crit = Math.max(0, (st.crit || 0) - IH_STEADY.crit); t.ihTg = tg; t.ihTgAt = G.time; }
+      else if (ihSteady(t)) t.ihTgAt = G.time;
+      if (Math.hypot(tg.x - t.x, tg.y - t.y) >= 3) tg.ihFarT = G.time;
+    }
+    if (G.champ === t.id && (t.ihDeadN = (t.ihDeadN || 0) + 1) % 4 === 0 && !tg.dead) {   // Deadeye: a sure crit that pierces on
+      st.crit = 1;
+      const C = st.caps || {}, n = 1 + (C.ihtDeep || 0), dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, amt = (st.dmg || 0) * pow * (st.critM || 2.5);
+      const behind = ihLine(t, st, tg.x, tg.y, dx / L, dz / L, 1.6, .35, q => q !== tg).slice(0, n);
+      G.delayed.push({ t: .05, fn: () => { if (!ihLive(t)) return; for (const o of behind) if (!o.dead) { ihHit(t, st, o, amt, 'phys'); ihSparks(o.x, o.y, hitH(o), 3, '#ffe0a8'); } } });
+      ihFlash(t.x, t.y, towerTop(t), .5, '#ffe0a0');
+    }
+  }
+  if (G.hero === 'ih_king' && !echo && !t.def.wall) {
+    if (t.ihMusterEnd && G.time >= t.ihMusterEnd) {   // the muster ends: the next strike (two, with the saga's finale) hits twice as hard
+      pow *= 2; ihFlash(t.x, t.y, towerTop(t), .45, '#ffd070');
+      if (--t.ihMusterN <= 0) t.ihMusterEnd = 0;
+    }
+    if (ihSworn(t) || t.ihMusterT > G.time) tg.ihSwornT = G.time;
+  }
   return pow;
 }
-function ihHeroKill(c, src) {}
+function ihHeroKill(c, src) {
+  if (G.hero !== 'ih_king') return;
+  const ch = typeof champTower === 'function' ? champTower() : null, C = ch && ch.st && ch.st.caps;
+  if (C && C.ihkTithe && ch.ab && Math.hypot(c.x - ch.x, c.y - ch.y) <= 1.5) { const K = typeof abilKit === 'function' ? abilKit(ch) : null; ch.ab.mana = Math.min(K ? K.mana.max : 999, ch.ab.mana + 3 * C.ihkTithe); }   // Royal Tithe
+}
 function ihHeroTick(dt) {
+  if (G.hero === 'ih_king') { ihLevyTick(dt); ihCrownTick(dt); return; }
   if (G.hero !== 'ih_thane') return;
   if (G.ihLives != null && G.lives < G.ihLives && G.phase === 'wave') {   // Defiance: a foe broke through, the line rallies
     if (!(G.ihRallyT > G.time)) for (const t of G.towers) if (ihIs(t) && !t.def.wall && !t.wrecked) { part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t), life: .4, max: .4, size: .5, col: '#ffb070' }); t.recoil = 1; }
@@ -17893,8 +18101,49 @@ function ihHeroTick(dt) {
   }
   G.ihLives = G.lives;
 }
+// Royal Levy: a unit lost (sold, wrecked, gone) passes its ranks to the unit nearest it
+function ihLevyTick(dt) {
+  if ((G.ihLevyTk = (G.ihLevyTk || 0) - dt) > 0) return; G.ihLevyTk = .25;
+  const now = G.towers.filter(t => ihIs(t) && !t.def.wall && !t.wrecked), was = G.ihLevyL || [];
+  for (const o of was) {
+    if (now.includes(o)) continue;
+    let r = o.ihSwornR || 0; if (!r) continue;
+    const near = now.filter(q => ihSworn(q) < 3).sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y));
+    for (const q of near) { if (r <= 0) break; const g = Math.min(r, 3 - ihSworn(q)); q.ihSwornX = (q.ihSwornX || 0) + g; r -= g; part({ k: 'flare', x: q.x, z: q.y, h: towerTop(q) + .1, life: .5, max: .5, size: .45, col: '#e8c050' }); }
+    if (near.length) onToastSoft('A fallen oath passes on.');
+  }
+  for (const t of now) t.ihSwornR = ihSworn(t);
+  G.ihLevyL = now;
+}
+// Crowned Head: foes near the Champion are slowed
+function ihCrownTick(dt) {
+  if ((G.ihCrownTk = (G.ihCrownTk || 0) - dt) > 0) return; G.ihCrownTk = .25;
+  const ch = typeof champTower === 'function' ? champTower() : null; if (!ch || ch.wrecked || ch.def.unit !== 'ch_brannoc') return;
+  const C = (ch.st && ch.st.caps) || {}, r = 1.5 + .25 * (C.ihkCrown || 0);
+  for (const c of G.creeps) if (!c.dead && !c.ent && Math.hypot(c.x - ch.x, c.y - ch.y) <= r) chill(c, { slow: .1, slowT: .35 }, null, ch);
+}
+// Crowned Head: the Champion takes 25% less while a boss is in reach; Sworn Shield: mustered units take less
+{
+  const DT0 = damageTower;
+  damageTower = function (t, dmg) {
+    if (G.hero === 'ih_king' && t && t.def && !t.def.wall && dmg > 0) {
+      if (t.def.unit === 'ch_brannoc') { const r = ((t.st && t.st.range) || 1.5) + .5; if (G.creeps.some(c => !c.dead && c.def.boss && Math.hypot(c.x - t.x, c.y - t.y) <= r)) dmg *= .75; }
+      if (t.ihMusterT > G.time) { const ch = typeof champTower === 'function' ? champTower() : null, C = ch && ch.st && ch.st.caps; if (C && C.ihkShield) dmg *= 1 - .08 * C.ihkShield; }
+    }
+    return DT0.call(this, t, dmg);
+  };
+}
 function ihHeroWave(n) {
   if (G.hero === 'ih_brewer') for (const t of G.towers) if (ihIs(t) && !t.def.wall) t.ihWarm = .5;   // Warm Welcome
+  if (G.hero === 'ih_king') {
+    const ch = typeof champTower === 'function' ? champTower() : null, C = (ch && ch.st && ch.st.caps) || {};
+    if (C.ihkDebt) for (const t of G.towers) { const r = ihSworn(t); if (r) t.ihWarm = Math.max(t.ihWarm == null ? 0 : t.ihWarm, Math.min(1, .1 * C.ihkDebt * r)); }   // Old Debts
+    if (n > 0 && n % 5 === 0) {   // Royal Levy: the levy is called
+      for (const t of G.towers) if (ihIs(t) && !t.def.wall && !t.wrecked) part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) + .1, life: .6, max: .6, size: .5, col: '#e8c050' });
+      onToastSoft('Royal Levy! Every unit takes a Sworn rank.');
+    }
+    G.ihBloodW = 0;
+  }
 }
 
 // Faction-local surface mapping; geometry, colors and animation are unchanged.
@@ -19135,6 +19384,7 @@ FORCE_ATTACK.so_chain = (t, st, tg, pow, echo) => {
     from = c;
     if (C.so_j_chain && !echo && soJ(c) >= soJMax()) {   // Chain of Judgement: the full mark leaps on
       for (const o of nearest(c.x, c.y, 1.6, 3, c, q => !hit.includes(q) && canTarget(t, st, q))) { soEv('cap:so_j_chain'); soStrike(t, st, o, st.dmg * pow * .6, 'magic'); if (!o.dead) { chill(o, { slow: st.slow || .3, slowT: st.slowT || 1.5 }, null, t); soJudge(o, 1, t); } soChainFx(c.x, hitH(c), c.y, o, false); }
+      soVerdict(c, t, 5);   /* (and the full mark hears a fivefold Verdict, 21 Nov 2026) */
     }
   }
   t.recoil = 1; if (bind) sfx('ward', 0);
@@ -19272,9 +19522,9 @@ function soLobLand(z) {
   inSplash(x, y, sp, true, (c, d) => {
     if (c.phased || c.ent || !canTarget(t, st, c)) return;
     const amt = soD(st) * z.pow * (1 - .4 * d / sp) * (C.so_direct_coal && c === o.tg ? 1 + .15 * C.so_direct_coal : 1);
-    if (C.so_censer_verdict && soJ(c) >= 3) soVerdict(c, t, .2 * Math.min(2, C.so_censer_verdict));   // Purging Fire
+    if (C.so_censer_verdict && soJ(c) >= 3) soVerdict(c, t, .75 * Math.min(2, C.so_censer_verdict));   // Purging Fire
     soStrike(t, st, c, amt, 'magic'); if (!c.dead) soJudge(c, 1, t);
-    else if (C.so_rekindle && (G.soRkN = (G.soRkN || 0) + 1) < 6) { const q = nearest(c.x, c.y, 1.8, 1, c, w => !w.fly && canTarget(t, st, w))[0]; if (q) { soEv('cap:so_rekindle'); soLob(t, st, q.x, q.y, z.pow * .25 * Math.min(2, C.so_rekindle), { tg: q, sp: sp * .6, zone: 1.2, small: true, from: { x: c.x, z: c.y } }); } }   // Rekindling
+    else if (C.so_rekindle && (G.soRkN = (G.soRkN || 0) + 1) < 6) { const q = nearest(c.x, c.y, 1.8, 1, c, w => !w.fly && canTarget(t, st, w))[0]; if (q) { soEv('cap:so_rekindle'); soLob(t, st, q.x, q.y, z.pow * .5 * Math.min(2, C.so_rekindle), { tg: q, sp: sp * .6, zone: 1.2, small: true, from: { x: c.x, z: c.y } }); } }   // Rekindling
   });
   G.soRkN = 0;
   if (G.hazards.length < 46) G.hazards.push({ k: 'so_incense', x, z: y, r: Math.max(.45, sp * .8), t: (o.zone || 2.5) + (p.so_thurible || 0), tick: .25, jt: 0, src: t, st, small: o.small, sentence: p.so_saintcenser && !o.small ? p.so_saintcenser : 0, slow: Math.max(C.so_choking ? .1 * C.so_choking : 0, o.zslow || 0, p.so_thurible ? .15 : 0) });
@@ -21570,7 +21820,7 @@ function sbHailStone(t, st, c, x, z, pow, r, n) {
     const crust = C.sbCrust && n && n % 4 === 0;
     inSplash(cx, cz, rr, false, (o, d) => {
       if (o.ent || o.phased || !canTarget(t, s, o)) return;
-      const a = s.dmg * pow * (1 - .4 * d / rr);
+      const a = s.dmg * pow * (1 - .4 * d / rr) * (C.tchHeavy && o.stunT > 0 ? 1 + C.tchHeavy : 1);   /* (Heavy Hail: a stone a rank harder on frozen or fallen foes: the damage road, 21 Nov 2026) */
       // (Frozen Through: soaked is enough)
       const wasCond = o.sbWetT > G.time;
       sbHit(t, s, o, a, 'magic', null); if (o.dead) return;
@@ -21789,7 +22039,7 @@ FORCE_HOOKS.stormborn = {
     // Hail Shatter (Hail Shamans' capstone, tree-wide): a chilled foe that falls bursts into ice
     if (c.frostT > 0 && c.frostSrc && c.frostSrc.def && c.frostSrc.def.force === SB_ID && talentHas('frost', 'sbShatter') && (S.shN = (S.shN || 0) + 1) < 30) {
       const fs = c.frostSrc, st = fs.st || { dmg: 0, caps: {} }, x = c.x, z = c.y;
-      G.delayed.push({ t: .05, fn: () => { S.shN = 0; if (G.state !== 'play') return; inSplash(x, z, 1.1, false, o => { if (o.ent || o.phased) return; hurt(o, (st.dmg || 0) * 3, 'magic', fs, false, null, null); if (!o.dead) chill(o, { slow: st.slow || .25, slowT: 1.5 }, 'frost', fs); }); fxShards(x, z, .5, 14); fxRing(x, z, 1.1, '#dff6ff'); } });
+      G.delayed.push({ t: .05, fn: () => { S.shN = 0; if (G.state !== 'play') return; inSplash(x, z, 1.1, false, o => { if (o.ent || o.phased) return; hurt(o, (st.dmg || 0) * 5, 'magic', fs, false, null, null); if (!o.dead) chill(o, { slow: st.slow || .25, slowT: 1.5 }, 'frost', fs); }); fxShards(x, z, .5, 14); fxRing(x, z, 1.1, '#dff6ff'); } });
     }
     if (src === SB_STORM) S.n.wKills = (S.n.wKills || 0) + 1;
   },
@@ -24212,7 +24462,7 @@ WB_HOOK.amp.push((c, src, dot) => {
   if (dot || !src || !src.st || !src.st.caps || !wbNotSpell()) return 0;
   const C = src.st.caps; let a = 0;
   if (C.wbRimeCut && wbRunesNear(c.x, c.y, .55).some(z => z.kinds.includes('frost'))) a += .15 * C.wbRimeCut;
-  if (C.wbShatter && c.frostT > 0 && c.stunT > 0) a += .3 * C.wbShatter;
+  if (C.wbShatter && c.frostT > 0 && c.stunT > 0) a += C.wbShatter;   /* (Shatter Oath: 2x, 3x on frozen foes: the Sentries' damage road, 21 Nov 2026; it was 30% a rank) */
   if (C.wbThunderbrand && wbBrandOf(c) > 0) a += .15 * C.wbThunderbrand;
   return a;
 });
@@ -24463,7 +24713,7 @@ function wbVowWrap() {
   };
 }
 // Ember Vow: vow runes brand what steps on them
-WB_RUNE_HOOK.push((c, z, k) => { if (k === 'vow' && !c.dead && wbCap(wbZSt(z), 'wbvEmber')) wbBrand(c, 1, z.src); });
+/* (Ember Vow burns foes in Censer Smoke since 21 Nov 2026: forces_zzz..._chains.js; its vow runes no longer brand) */
 
 /* ================= THE WARDBOUND: abilities (mana, autocast and lore: abilities.js) =================
    Three per unit: the first innate, two unlocked by the unit's talent tree (forces_wardbound_b.js) and learned with gold.
@@ -27977,14 +28227,14 @@ specAdd('silver', { id: SXS_U, name: 'Magebane Inquisitors', short: 'Inquisitors
 FORCE_GLYPH[SXS_U] = 'scales';
 const sxsIs = t => !!(t && t.def && t.def.unit === SXS_U);
 const sxsMB = (t, st) => SXS.MB[Math.min(5, t.tier | 0)] + 3 * ((st && st.caps && st.caps.sxs_burn) || 0);
-const sxsZealMax = st => SXS.ZEAL + 2 * ((st && st.caps && st.caps.sxs_vow) || 0);
-const sxsZealPer = t => { const T = t.def.tiers, s = T && T[Math.min(T.length - 1, t.tier | 0)]; return Math.max(1, Math.round(((s && s.dmg) || 0) * SXS.ZEAL_K)); };
+const sxsZealMax = st => SXS.ZEAL + 3 * ((st && st.caps && st.caps.sxs_vow) || 0);
+const sxsZealPer = t => { const T = t.def.tiers, s = T && T[Math.min(T.length - 1, t.tier | 0)]; return Math.max(1, Math.round(((s && s.dmg) || 0) * SXS.ZEAL_K * (1 + .5 * ((t.st && t.st.caps && t.st.caps.sxs_vow) || 0)))); };   /* (Zealot's Vow: each Zeal worth 1.5x, 2x) */
 
 /* ---------- the strike: Censure ---------- */
 FORCE_ATTACK.so_censure = (t, st, tg, pow, echo) => {
   const C = st.caps || {}, D = st.dmg * pow, mb = sxsMB(t, st);
   let amt = D, burned = 0;
-  if (tg.mpMax > 0 && typeof epDrain === 'function') { burned = epDrain(tg, mb); amt += D * burned / mb; }
+  if (tg.mpMax > 0 && typeof epDrain === 'function') { burned = epDrain(tg, mb); amt += D * burned / mb + burned * (C.sxs_burn || 0); }   /* (Scorching Seal: the burnt mana scorches, its amount a rank: the damage road, 21 Nov 2026) */
   const tip = typeof unitTip === 'function' ? unitTip(t) : null;
   soStreak(tip ? tip[0] : t.x, tip ? tip[1] : towerTop(t) + .2, tip ? tip[2] : t.y, tg, burned > 0 ? SXS.COL.hush : SXS.COL.chain, .05, .28);
   soStrike(t, st, tg, amt, 'magic');
@@ -28098,7 +28348,7 @@ Object.assign(SP_SHAPE, { so_edict: 'a', so_seize: 'a', so_pyre: 'a H z.5' });
   };
   H.kill = function (c, src) {
     const r = kill0 ? kill0.call(this, c, src) : undefined;
-    if (sxsIs(src) && c.mpMax > 0 && G.state === 'play') {
+    if (sxsIs(src) && (c.mpMax > 0 || (src.st && src.st.caps && src.st.caps.sxs_vow)) && G.state === 'play') {   /* (Zealot's Vow: every foe it slays feeds its Zeal) */
       const mx = sxsZealMax(src.st); if ((src.spx | 0) < mx) { src.spx = (src.spx | 0) + 1; fxSparkle(src.x, src.y, towerTop(src), SXS.COL.hush); if (src.spx === 1) onToast(`${src.def.name}: a caster slain. Zeal grows: each adds ${sxsZealPer(src)} damage to its strikes (up to ${mx}).`); }
     }
     return r;
@@ -29414,7 +29664,7 @@ FORCE_PARTS.ch_nyssa = [
     pose(t) { const w = t.windup || 0, s = t.shotT == null ? 9 : t.shotT, th = s < .35 ? Math.sin(Math.PI * s / .35) : 0; return [-.5 * w - .9 * th, 0, .2 * th, 0, .04 * w, .06 * th]; } },   // the throw
 ];
 
-/* ================= IRONHOLD'S CHAMPIONS: Haldra, Tovin and Grenna in person =================
+/* ================= IRONHOLD'S CHAMPIONS: Haldra, Tovin, Grenna, Torvald, Brannoc and Hrolf in person =================
    As the Grove's (forces_zx_champ_grove.js, the template; the rules in forces_zw_champions.js). Each is a clan unit
    (def.force 'ironhold': cold boilers at a wave's start, warmth on every strike, runes and charms answer its casts
    through ihCastWrap), drawn with the clan's dwarf kit (ihDwarf, forces_ironhold_f.js) larger than the rank and file on
@@ -29665,6 +29915,296 @@ champAdd('ih_brewer', { force: 'ironhold', he: 'she', glyph: 'barrel', k: 1.75,
   },
 });
 
+/* ---------- Torvald Emberbrand, the Longshot ---------- */
+// Ridgeline Shot: any foe on the field (boss or leader first, else the one with the most health left)
+function chFarPick(t, st, ab, man) {
+  let best = null, bv = -1, n = 0;
+  for (const c of G.creeps) {
+    if (c.dead || c.state === 'exit' || !canTarget(t, st, c)) continue; n++;
+    const v = (abBig(c) ? 1e7 : 0) + c.hp; if (v > bv) { bv = v; best = c; }
+  }
+  return best && (man || abBig(best) || n >= ab.min) ? { x: best.x, y: best.y } : null;
+}
+// Headsman's Round: a 0.8s settle (a faint glint), then one heavy round; Oathbreaker's End fires once more on a kill
+function chHeadsman(t, c, m, ab, again) {
+  for (let q = 0; q < 4; q++) G.delayed.push({ t: q * .2, fn: () => { if (ihLive(t) && !c.dead) { const mz = ihMuzzle(t); rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#c89040', w: .008, life: .12 }); } } });
+  G.delayed.push({ t: .8, fn: () => {
+    if (!ihLive(t) || c.dead) return;
+    const st = t.st || effStats(t), k = m * (c.hp < c.maxHp * .5 ? 2 : 1);
+    t.ang = Math.atan2(c.x - t.x, c.y - t.y); t.shotT = 0; t.recoil = 1;
+    const mz = ihMuzzle(t);
+    abRun(ab.id, () => abHit(t, st, c, k, 'phys'));
+    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#ffe0a0', w: .035, life: .16 }); ihFlash(mz[0], mz[2], mz[1], .55); ihSmokePuff(mz[0], mz[2], mz[1], 4); sfx('heavyShot', 1);
+    if (!c.dead) ihSparks(c.x, c.y, hitH(c), 5, '#ffe0a8');
+    if (c.dead && again && st.caps && st.caps.ihtEnd) {
+      const L = abFoes(t, st, abReach(t, st, ab)), o = L.find(abBig) || L.sort((a, b) => b.hp - a.hp)[0];
+      if (o) chHeadsman(t, o, m, ab, 0);
+    }
+  } });
+}
+IH_MUZZLE.ch_torvald = [1, .72];
+champAdd('ih_marksman', { force: 'ironhold', he: 'he', glyph: 'crosshair', k: 1.75,
+  unit: { id: 'ch_torvald', name: 'Torvald Emberbrand, the Longshot', short: 'Torvald', proj: 'force', attack: 'thundergun', dmgType: 'phys', air: true, ground: true, top: [1.25, 1.33, 1.41],
+    blurb: 'The Longshot. One heavy armour-piercing round at a time from the longest rifle in the hall, from further off than any gun; every 4th is a sure crit that punches through to the foe behind.',
+    tiers: [{ dmg: 50, rate: 2, range: 3.6, armorPen: .5 }, { dmg: 114, rate: 1.95, range: 3.9, armorPen: .5 }, { dmg: 268, rate: 1.9, range: 4.2, armorPen: .5 }] },
+  trait: { name: 'Deadeye', t: 'Every 4th shot is a sure crit that pierces on to the foe behind.' },   // (ihHeroFire: G.champ)
+  kit: { mana: { max: 120, regen: 1, hit: .8 }, abilities: [
+    ihCastWrap(champQ('ih_marksman', { id: 'ch_farshot', name: 'Ridgeline Shot', short: 'Ridgeline', glyph: 'target', hue: '#e0a050', art: 'ih_farshot', mana: 90, cd: 13, school: 'attack', pref: 'high', qs: 4, qf: .6, min: 3,
+      none: 'no foes on the field', auto: 'a boss or leader anywhere on the field, or three or more foes',
+      blurb: 'He takes aim at any foe on the field; one round strikes it and every foe on its line.',
+      text: (t, st, ab) => `He aims 1.5s at a foe anywhere on the field, then one round strikes it for ${champQx(t, st, ab, .4)} and ${champQx(t, st, ab, .05)} more for every cell between them (up to ${champQx(t, st, ab, .9)}), piercing every foe on its line, 20% less for each one it passes. Bosses take the full hit and stagger 0.6s. A kill halves the cooldown and quickens every ranged unit 15% for 4s.`,
+      pick: chFarPick,
+      anim: chAnim('point', { T: 1.1, tip: ['main', [.02, -.06, .5]], col: [1, .85, .5], size: .3 }) })),
+    ihCastWrap({ id: 'ch_flare', name: 'Spotter\'s Flare', short: 'Flare', glyph: 'flash', hue: '#ffc870', mana: 80, cd: 12, research: CH_IH_RS, school: 'attack', pref: 'grouped',
+      by: { dur: [5, 5, 5, 6, 6, 6], r: [1.1, 1.1, 1.2, 1.2, 1.3, 1.3], amp: [.12, .12, .12, .15, .15, .15] },
+      auto: 'three or more foes bunched in reach, or a boss', blurb: 'A flare bursts over a crowd: the foes under it take more from every unit while it burns.',
+      text: (t, st, ab) => `Fires a flare over the thickest crowd in reach: for ${byT(ab.by.dur, t)}s every foe within ${gNf(byT(ab.by.r, t))} cells of it is marked, taking ${Math.round(byT(ab.by.amp, t) * 100)}% more from every unit.`,
+      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const c = abCrowd(L, byT(ab.by.r, t)); return c && (man || c.n >= 3 || L.some(abBig)) ? { x: c.c.x, y: c.c.y } : null; },
+      cast(t, st, p, ab, K) {
+        if (!p || p.x == null) return false;
+        const r = byT(ab.by.r, t), dur = byT(ab.by.dur, t), z = { k: 'ch_flare', x: p.x, z: p.y, r, amp: byT(ab.by.amp, t) * chIhK(K), until: G.time + dur, tick: 0, every: .5 };
+        abZone(t, z); ABIL.ch_flare.zone(t, st, z);
+        if (st.caps && st.caps.ihtSignal) {   // Signal Fire: the gunline near the flare fires at the foes under it at once
+          const L = G.creeps.filter(c => !c.dead && c.ihFlareBy === t && Math.hypot(c.x - p.x, c.y - p.y) <= r + .2);
+          let q = 0; if (L.length) for (const o of G.towers) if (o.def.unit === 'thundergun' && ihLive(o) && Math.hypot(o.x - p.x, o.y - p.y) <= 3.5) { const c = L[q++ % L.length]; G.delayed.push({ t: .1 + .08 * q, fn: () => { if (ihLive(o) && !c.dead) fire(o, o.st || effStats(o), c, true); } }); }
+        }
+        const mz = ihMuzzle(t); rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], x1: p.x, h1: 1.2, z1: p.y, col: '#ffd890', w: .02, trav: .25, life: .3 });
+        part({ k: 'flare', x: p.x, z: p.y, h: 1.2, life: .5, max: .5, size: .5, col: '#ffe0a0' }); sfx('click');
+      },
+      zone(t, st, z) { inSplash(z.x, z.z, z.r, false, c => { if (c.ent || !canTarget(t, st, c)) return; c.markAmp = Math.max(c.markT > 0 ? c.markAmp : 0, z.amp); c.markT = Math.max(c.markT, Math.min(1, z.until - G.time) + .1); c.ihFlareBy = t; }); },
+      anim: chAnim('sky', { T: 1.0, tip: ['main', [.02, -.06, .5]], col: [1, .85, .5], size: .35 }) }),
+    ihCastWrap({ id: 'ch_headsman', name: 'Headsman\'s Round', short: 'Headsman', glyph: 'skull', hue: '#ffb050', mana: 120, cd: 20, research: CH_IH_RS, school: 'attack', pref: 'high',
+      by: { mult: [3.5, 3.8, 4.1, 4.4, 4.7, 5] },
+      auto: 'a boss or leader in reach, or three or more foes', blurb: 'He settles on the strongest foe in reach and fires one heavy round; it hits twice as hard on a foe below half its health.',
+      text: (t, st, ab) => `He settles 0.8s on the strongest foe in reach, then fires one round for ${xD(st, byT(ab.by.mult, t))}, twice that on a foe below half its health.`,
+      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const c = L.find(abBig) || L.slice().sort((a, b) => b.hp - a.hp)[0]; return man || abBig(c) || L.length >= 3 ? c : null; },
+      cast(t, st, c, ab, K) { if (!c || c.dead || c === t) return false; chHeadsman(t, c, byT(ab.by.mult, t) * chIhK(K), ab, 1); sfx('click'); },
+      anim: chAnim('point', { T: 1.1, tip: ['main', [.02, -.06, .5]], col: [1, .75, .4], size: .3 }) }),
+  ] },
+  tree: { name: 'The Long Watch', hue: '#e0a050', list: [
+    CT('Patient Aim', 'eye', 0, 0, 2, n => `Ridgeline Shot takes ${gNf(.25 * n)}s less to aim.`, {}, { cap: 'ihtAim' }),
+    CT('Steady Breath', 'quick', 0, 3, 2, n => `Steady Hands settles on him ${gNf(.5 * n)}s sooner.`, {}, { cap: 'ihtBreath' }),
+    CT('Through the Ranks', 'crosshair', 0, 2, 2, n => `Ridgeline Shot's round loses ${20 - 5 * n}% for each foe it passes, not 20%.`, {}, { cap: 'ihtRanks' }),
+    CT('Wide Flare', 'sun', 3, 2, 1, 'Spotter\'s Flare lights 0.15 cells wider.', {}, { sp: { ab: 'ch_flare', by: { r: .15 } } }),
+    GS('ch_flare', 1, 0),
+    CT('Bright Flare', 'flash', 2, 0, 2, n => `Spotter's Flare burns ${n}s longer.`, {}, { sp: n => ({ ab: 'ch_flare', by: { dur: n } }), req: [1, 0] }),
+    CT('Ridge-Watch', 'spyglass', 2, 3, 2, n => `Ridgeline Shot can climb to ${90 + 5 * n}% of a foe's health, not 90%.`, {}, { cap: 'ihtRidge', sp: n => ({ ab: 'ch_farshot' }) }),
+    CT('Spotter\'s Tally', 'coin', 2, 1, 1, 'Every 3rd Spotter\'s Flare gives its mana back.', {}, { sp: { ab: 'ch_flare', every: 3 } }),
+    CT('Oathbreaker\'s End', 'skull', 4, 3, 1, 'When Headsman\'s Round kills its foe, he gains 20 mana and fires it once more at once at the strongest foe in reach, free.', {}, { cap: 'ihtEnd', sp: { ab: 'ch_headsman', kill: { mana: 20, cd: 0 } }, req: [3, 3] }),
+    CT('Signal Fire', 'firering', 4, 1, 1, 'Spotter\'s Flare calls the gunline: every Thundergun within 3.5 cells of it fires at once at a foe under it.', {}, { cap: 'ihtSignal', sp: { ab: 'ch_flare' } }),
+    CT('Punch-Through', 'arrowhead', 3, 0, 2, n => `Deadeye's round pierces on through ${n} more foe${n > 1 ? 's' : ''} behind.`, {}, { cap: 'ihtDeep' }),
+    CT('Spent Brass', 'gem', 1, 2, 2, n => `Each Deadeye shot gives him ${6 * n} mana.`, {}, { cap: 'ihtBrass' }),
+    GS('ch_headsman', 3, 3),
+    CT('Windage', 'target', 1, 1, 3, n => `His crits on foes 3 or more cells away strike ${gNf(.2 * n)}× harder.`, {}, { cap: 'ihtWind' }),
+  ] },
+  flavor: ['Torvald fights in person: one shot, one oathbreaker.', "I've been watching that one since the ridge. He just doesn't know it yet."], emblem: 'Oathbreaker\'s End',
+  fire(t, st, tg, pow, echo) {   // Windage, Spent Brass (Deadeye itself: ihHeroFire)
+    const C = st.caps || {};
+    if (C.ihtWind && Math.hypot(tg.x - t.x, tg.y - t.y) >= 3) st.critM = (st.critM || 2.5) + .2 * C.ihtWind;
+    if (C.ihtBrass && !echo && t.ihDeadN && t.ihDeadN % 4 === 0 && t.ab) t.ab.mana = Math.min((abilKit(t) || { mana: { max: 120 } }).mana.max, t.ab.mana + 6 * C.ihtBrass);
+    return pow;
+  },
+  extra(t, tier, x, z, yaw, K) {   // the flare's light on the road while it burns
+    if (!t.ab || inIcon) return;
+    for (const zn of t.ab.zones) { const left = zn.until - G.time; if (left <= 0 || zn.k !== 'ch_flare') continue; const a = Math.min(1, left * 2);
+      QG.ground(zn.x, zn.z, .02, zn.r, zn.r, [1, .82, .45, .16 * a], 4, .04); }
+  },
+});
+
+/* ---------- Brannoc Goldvein, the Under-King ---------- */
+champAdd('ih_king', { force: 'ironhold', he: 'he', glyph: 'banner', k: 1.8,
+  unit: { id: 'ch_brannoc', name: 'Brannoc Goldvein, the Under-King', short: 'Brannoc', proj: 'force', attack: 'ironbreaker', dmgType: 'phys', air: false, ground: true, top: [1.25, 1.33, 1.41],
+    blurb: 'The Under-King. He strikes the foes that pass him with the old king\'s hammer, chipping their plate; foes near him are slowed, and he stands hardest against a boss. Cannot reach flyers.',
+    tiers: [{ dmg: 34, rate: 1.2, range: 1.5 }, { dmg: 78, rate: 1.15, range: 1.55, }, { dmg: 182, rate: 1.1, range: 1.6 }] },
+  trait: { name: 'Crowned Head', t: 'Foes within 1.5 cells of him are slowed 10%, and he takes 25% less damage while a boss is in reach.' },   // (ihCrownTick, damageTower: forces_ironhold_e.js)
+  kit: { mana: { max: 130, regen: .8, hit: 1.2 }, abilities: [
+    ihCastWrap(champQ('ih_king', { id: 'ch_muster', name: 'The King\'s Muster', short: 'Muster', glyph: 'horn', hue: '#d8b040', art: 'ih_muster', mana: 100, cd: 18, school: 'attack', pref: 'grouped', qs: 1, qf: 1, min: 2,
+      auto: 'two or more foes bunched in reach, or a boss',
+      blurb: 'He calls the muster: every unit near the fight strikes faster and stands firm, then hits twice as hard.',
+      text: (t, st, ab) => `He calls the muster on the fight in reach: every unit within ${gNf(champQR(t, ab))} cells of it strikes 25% faster for ${6 + (sagaHas('fin') ? 3 : 0) + ((st.caps && st.caps.ihkLong) || 0)}s and cannot be stunned or knocked back. When it ends, each one's next strike${sagaHas('fin') ? 's' : ''} hit${sagaHas('fin') ? '' : 's'} twice as hard.`,
+      anim: chAnim('sky', { T: 1.2, tip: ['off', [-.03, -.1, .2]], col: [1, .85, .45], size: .45 }) })),
+    ihCastWrap({ id: 'ch_oathhammer', name: 'Oathhammer', short: 'Oathhammer', glyph: 'hammer', hue: '#e0b850', mana: 85, cd: 12, research: CH_IH_RS, school: 'attack', pref: 'high',
+      by: { mult: [2.4, 2.6, 2.8, 3, 3.2, 3.4], r: [.8, .8, .8, .9, .9, 1] },
+      auto: 'a foe in reach', blurb: 'One great overhead blow on his foe; the ground foes beside it are struck too.',
+      text: (t, st, ab) => `One great overhead blow: his foe takes ${xD(st, byT(ab.by.mult, t))}, and every other ground foe within ${gNf(byT(ab.by.r, t))} cells of it takes half that.`,
+      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; return L.find(abBig) || L.slice().sort((a, b) => b.hp - a.hp)[0]; },
+      cast(t, st, c, ab, K) {
+        if (!c || c.dead || c === t) return false;
+        const m = byT(ab.by.mult, t) * chIhK(K), r = byT(ab.by.r, t), x = c.x, z = c.y, big = abBig(c);
+        abHit(t, st, c, m, 'phys');
+        abAoe(() => inSplash(x, z, r, true, o => { if (o !== c && canTarget(t, st, o)) abHit(t, st, o, m * .5, 'phys'); }));
+        if (big && st.caps && st.caps.ihkDue) for (const o of G.towers) if (ihIs(o) && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2) { o.ihDueT = G.time + 3; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o), life: .35, max: .35, size: .4, col: '#ffd070' }); }   // The King's Due
+        fxDust(x, z, 10); fxRing(x, z, r, ab.hue); G.shake = Math.max(G.shake, .15); sfx('quake', 1);
+      },
+      anim: chAnim('slam', { T: 1.1, tip: ['main', [.02, .17, .14]], col: [1, .85, .45] }) }),
+    ihCastWrap({ id: 'ch_mountaindue', name: 'The Mountain\'s Due', short: 'Due', glyph: 'mountain', hue: '#c89a3a', mana: 130, cd: 22, research: CH_IH_RS, school: 'attack', pref: 'grouped', rr: 1.6,
+      by: { mult: [2, 2.2, 2.4, 2.6, 2.8, 3] },
+      auto: 'three or more ground foes within 1.6 cells, or a boss there', blurb: 'He strikes the hall floor: the mountain answers for every oath sworn round him.',
+      text: (t, st, ab) => `He strikes the floor: every ground foe within ${ab.rr} cells of him takes ${xD(st, byT(ab.by.mult, t))}, and ${xD(st, .25)} more for each Sworn rank held by units within 2 cells of him (up to 6 ranks).`,
+      pick(t, st, ab, man) { const L = abFoes(t, st, Math.min(abReach(t, st, ab), ab.rr), abWalker); return L.length && (man || L.length >= 3 || L.some(abBig)) ? t : null; },
+      cast(t, st, _, ab, K) {
+        let n = 0; for (const o of G.towers) if (Math.hypot(o.x - t.x, o.y - t.y) <= 2) n += ihSworn(o);
+        const m = (byT(ab.by.mult, t) + .25 * Math.min(6, n)) * chIhK(K);
+        abAoe(() => inSplash(t.x, t.y, ab.rr, true, c => { if (canTarget(t, st, c)) abHit(t, st, c, m, 'phys'); }));
+        if (st.caps && st.caps.ihkBlood && G.ihBloodW !== G.wave) {   // Blood of Kings: once a wave, a Sworn rank for the unit nearest him
+          const q = G.towers.filter(o => o !== t && ihIs(o) && !o.def.wall && !o.wrecked && ihSworn(o) < 3 && Math.hypot(o.x - t.x, o.y - t.y) <= 2.5).sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y))[0];
+          if (q) { G.ihBloodW = G.wave; q.ihSwornX = (q.ihSwornX || 0) + 1; part({ k: 'flare', x: q.x, z: q.y, h: towerTop(q) + .1, life: .6, max: .6, size: .5, col: '#e8c050' }); }
+        }
+        fxRing(t.x, t.y, ab.rr, ab.hue); fxDust(t.x, t.y, 16); G.shake = Math.max(G.shake, .25); sfx('quake', 2);
+      },
+      anim: chAnim('stomp', { T: 1.1, tip: ['main', [.02, .17, .14]], col: [1, .8, .4], size: .5 }) }),
+  ] },
+  tree: { name: 'The Old Blood', hue: '#d8b040', list: [
+    CT('Long Muster', 'horn', 0, 0, 2, n => `Units stay mustered ${n}s longer under The King's Muster.`, {}, { cap: 'ihkLong' }),
+    CT('Old Debts', 'heat', 0, 3, 2, n => `Units with a Sworn rank start each wave ${10 * n}% warm for each rank they hold.`, {}, { cap: 'ihkDebt' }),
+    CT('Muster Drums', 'banner', 0, 2, 2, n => `The King's Muster reaches ${gNf(.25 * n)} cells further.`, {}, { sp: n => ({ ab: 'ch_muster', by: { area: .25 * n } }) }),
+    CT('Hall-Breaker', 'shieldbreak', 3, 2, 1, 'Every foe Oathhammer strikes loses 2 armour for 5s.', {}, { sp: { ab: 'ch_oathhammer', rider: { shred: [2, 4] } } }),
+    GS('ch_oathhammer', 1, 0),
+    CT('Broad Head', 'hammer', 2, 0, 2, n => `Oathhammer strikes ${gNf(.1 * n)} cells wider.`, {}, { sp: n => ({ ab: 'ch_oathhammer', by: { r: .1 * n } }), req: [1, 0] }),
+    CT('Sworn Shield', 'shield', 2, 3, 2, n => `Units under The King's Muster take ${8 * n}% less damage.`, {}, { cap: 'ihkShield', sp: n => ({ ab: 'ch_muster' }) }),
+    CT('Kingsblood', 'drop', 2, 1, 1, 'Each foe Oathhammer slays gives him 8 mana.', {}, { sp: { ab: 'ch_oathhammer', kill: { mana: 8, cd: 0 } } }),
+    CT('Blood of Kings', 'heart', 4, 3, 1, 'The Mountain\'s Due quickens his strikes 15% for 4s, and once a wave it swears in the unit nearest him: it takes a Sworn rank (up to 3) for the rest of the run.', {}, { cap: 'ihkBlood', sp: { ab: 'ch_mountaindue', haste: [.15, 4] }, req: [3, 3] }),
+    CT('The King\'s Due', 'coin', 4, 1, 1, 'When Oathhammer strikes a boss, leader or elite, every unit within 2 cells of him strikes 20% faster for 3s.', {}, { cap: 'ihkDue', sp: { ab: 'ch_oathhammer' } }),
+    CT('Crown of Iron', 'ring', 3, 0, 2, n => `Crowned Head slows foes ${gNf(.25 * n)} cells further off.`, {}, { cap: 'ihkCrown' }),
+    CT('Royal Tithe', 'gem', 1, 2, 2, n => `Each foe that falls within 1.5 cells of him gives him ${3 * n} mana.`, {}, { cap: 'ihkTithe' }),
+    GS('ch_mountaindue', 3, 3),
+    CT('Throne Room', 'statue', 1, 1, 3, n => `While a boss is in his reach, each of his strikes cracks ${n} armour off its foe.`, {}, { cap: 'ihkThrone' }),
+  ] },
+  flavor: ['Brannoc fights in person: the old blood of the mountain.', 'Every stone of this hall was paid for. Make them pay for it.'], emblem: 'Blood of Kings',
+  fire(t, st, tg, pow, echo) {   // Throne Room: a boss in reach, every strike cracks plate
+    const C = st.caps || {};
+    if (C.ihkThrone && !tg.dead && (tg.armor || 0) > 0 && G.creeps.some(c => !c.dead && c.def.boss && Math.hypot(c.x - t.x, c.y - t.y) <= (st.range || 1.5) + .3)) { const cur = tg.shredT > 0 ? tg.shred : 0; tg.shred = Math.min(cur + C.ihkThrone, (tg.armor || 0)); tg.shredT = Math.max(tg.shredT, 5); }
+    return pow;
+  },
+  extra(t, tier, x, z, yaw, K) {   // the muster's ring on the ground while it lasts
+    if (inIcon || !G.ihMuster || G.ihMuster.until <= G.time) return;
+    const M = G.ihMuster, a = Math.min(1, (M.until - G.time) * 1.5);
+    QG.ground(M.x, M.z, .016, M.r, M.r, [1, .82, .35, .08 * a], 4, .03);
+  },
+});
+
+/* ---------- Hrolf Grudgebearer, the Skywarden ---------- */
+IH_HEATERS.ch_hrolf = 1;                   // his flak gun builds heat and vents its Barrage, as the Flak Cannoneers' do
+IH_MUZZLE.ch_hrolf = [.8, .8];
+// The Old Grudge: the best spot anywhere on the field for a 1.8-cell blast (flyers count twice, a boss three times)
+function chGrudgePick(t, st, ab, man) {
+  const r = byT(ab.by.r, t), L = G.creeps.filter(c => !c.dead && c.state !== 'exit' && canTarget(t, st, c)); if (!L.length) return null;
+  const w = c => c.def.boss ? 3 : c.fly && !(c.lowT > G.time) ? 2 : 1;
+  let best = null, bv = 0;
+  for (const c of L) { let v = 0; for (const o of L) if (Math.hypot(o.x - c.x, o.y - c.y) <= r * .8) v += w(o); if (v > bv) { bv = v; best = c; } }
+  return best && (man || bv >= 5 || best.def.boss) ? { x: best.x, y: best.y, c: best } : null;
+}
+// the rocket: lit at his post (1s), then up in an arc and down on its mark (1.2s in the air; a flyer is followed a little)
+function chRocket(t, st, p, ab, K) {
+  const tgC = p.c && !p.c.dead ? p.c : null, air = tgC && tgC.fly && !(tgC.lowT > G.time), LIT = 1, FLY = 1.2, STEP = .06;
+  const m = byT(ab.by.mult, t) * chIhK(K), r = byT(ab.by.r, t);
+  let ex = p.x, ez = p.y;
+  ihSmokePuff(t.x, t.y, towerTop(t) * .6, 3, '#8a8478'); sfx('click');
+  for (let q = 0; q < 5; q++) G.delayed.push({ t: q * .2, fn: () => { if (ihLive(t)) part({ k: 'spark', x: t.x + R(-.1, .1), z: t.y + R(-.1, .1), h: towerTop(t) * .7, vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.4, .9), g: 3, life: .3, max: .3, size: .04, col: '#ffb050' }); } });   // the fuse
+  G.delayed.push({ t: LIT, fn: () => {
+    if (G.state !== 'play') return;
+    const x0 = t.x, z0 = t.y, h0 = towerTop(t); sfx('cannon', 1);
+    const N = Math.round(FLY / STEP);
+    for (let q = 1; q <= N; q++) G.delayed.push({ t: q * STEP, fn: () => {
+      if (G.state !== 'play') return;
+      if (air && !tgC.dead && q < N * .8) { ex += (tgC.x - ex) * .25; ez += (tgC.y - ez) * .25; }   // a short homing correction on a flyer
+      const u = q / N, x = x0 + (ex - x0) * u, z = z0 + (ez - z0) * u, h = h0 + (hitHAt(air) - h0) * u + Math.sin(Math.PI * u) * 2.4;
+      part({ k: 'smoke', x, z, h, vx: R(-.1, .1), vz: R(-.1, .1), vh: R(0, .2), drag: 2, life: .7, max: .7, size: R(.06, .1), col: '#8a847a' });   // a thin smoke trail
+      part({ k: 'flare', x, z, h, life: STEP * 1.6, max: STEP * 1.6, size: .22, col: '#ffc070' });
+      if (q === N) chRocketBlast(t, ex, ez, m, r, ab);
+    } });
+  } });
+}
+const hitHAt = air => air ? 1.1 : .3;
+function chRocketBlast(t, x, z, m, r, ab) {
+  if (G.state !== 'play') return;
+  const st = t.st || effStats(t);
+  abRun(ab.id, () => abAoe(() => { for (const c of G.creeps) {
+    if (c.dead || c.ent || !canTarget(t, st, c)) continue;
+    const d = Math.hypot(c.x - x, c.y - z); if (d > r) continue;
+    const sky = c.fly && !(c.lowT > G.time), k = m * (1 - .5 * d / r);   // 100% at the centre, half at the edge (flyers take twice: his vsAir, game.js hurt)
+    abHit(t, st, c, k, 'phys'); if (c.dead) continue;
+    if (sky) { c.lowT = Math.max(c.lowT || 0, G.time + (c.def.boss ? 1.2 : 3)); c.ihGrudgeT = G.time; }   // knocked out of the sky
+    if (c.def.boss) stun(c, .8, 1);
+  } }));
+  const burn = 3 + (((t.st || {}).caps || {}).ihhLong ? 2 : 0);
+  abZone(t, { k: 'ch_oldgrudge', x, z, r: r * .6, until: G.time + burn, tick: 0, every: .25 });
+  fxExplode(x, z, .9, 1); fxDust(x, z, 10); G.shake = Math.max(G.shake, .22); sfx('boom', 1.2);   // one compact fireball
+}
+champAdd('ih_hrolf', { force: 'ironhold', he: 'he', glyph: 'burst', k: 1.75,
+  unit: { id: 'ch_hrolf', name: 'Hrolf Grudgebearer, the Skywarden', short: 'Hrolf', proj: 'force', attack: 'flakgunner', dmgType: 'phys', air: true, ground: true, top: [1.25, 1.33, 1.41],
+    blurb: 'The Skywarden. His flak gun bursts among flyers, twice as hard on them, the burst catching anything near; every 3rd shell is a grudge-shell, twice as wide.',
+    tiers: [{ dmg: 22, rate: 1.05, range: 3, airR: .9, vsAir: 2, splash: .6, heat: .2, huntAir: 1 }, { dmg: 51, rate: 1, range: 3.2, airR: 1, vsAir: 2, splash: .65, heat: .2, huntAir: 1 }, { dmg: 119, rate: .95, range: 3.4, airR: 1.1, vsAir: 2, splash: .7, heat: .2, huntAir: 1 }] },
+  trait: { name: 'Grudge Flak', t: 'Every 3rd shell bursts twice as wide and half again as hard.' },
+  kit: { mana: { max: 130, regen: 1, hit: .8 }, abilities: [
+    ihCastWrap(champQ('ih_hrolf', { id: 'ch_battery', name: 'Battery Barrage', short: 'Battery', glyph: 'burst', hue: '#8aa0b8', art: 'ih_battery', mana: 90, cd: 15, school: 'attack', pref: 'grouped', qs: 3.5, qf: .44,
+      blurb: 'The battery fires on a crowd: air bursts over flyers, or laid level ("Lower the Grudge") flat shells down a line of ground foes.',
+      text: (t, st, ab) => `The battery fires on the thickest crowd in reach. Over flyers it is laid for the sky: ${8 * (sagaHas('fin') ? 1.5 : 1)} air bursts, each ${champQx(t, st, ab, .12)} to the flyers there. Over ground foes, Lower the Grudge: ${4 * (sagaHas('fin') ? 1.5 : 1)} flat shells pierce down the line from him through the spot, each ${champQx(t, st, ab, .11)} to every ground foe on it. Changing the laying takes 1.5s before it fires.`,
+      anim: chAnim('point', { T: 1.0, tip: ['main', [.02, -.04, .36]], col: [1, .85, .55], size: .35 }) })),
+    ihCastWrap({ id: 'ch_grudgeshell', name: 'Grudge Shell', short: 'Grudge Shell', glyph: 'bomb', hue: '#b0a080', mana: 80, cd: 11, research: CH_IH_RS, school: 'attack', pref: 'high',
+      by: { mult: [2.2, 2.4, 2.6, 2.8, 3, 3.2], low: [2, 2, 2, 2.5, 2.5, 3] },
+      auto: 'a flyer in the air in reach, else a boss, leader or elite', blurb: 'One heavy shell with a name on it: a flyer is knocked out of the sky, a walker is struck and the ground round it shaken.',
+      text: (t, st, ab) => `One heavy shell at a foe in reach (a flyer in the air first, else the foe with the most health left) for ${xD(st, byT(ab.by.mult, t))}. A flyer is knocked out of the sky for ${gNf(byT(ab.by.low, t))}s (bosses less), where every unit can reach it; a ground foe's neighbours within 0.7 cells take half.`,
+      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const f = L.filter(ihAirborne); const c = f.sort((a, b) => b.hp - a.hp)[0] || L.find(abBig) || (man || L.length >= 3 ? L.slice().sort((a, b) => b.hp - a.hp)[0] : null); return c || null; },
+      cast(t, st, c, ab, K) {
+        if (!c || c.dead || c === t) return false;
+        const m = byT(ab.by.mult, t) * chIhK(K), low = byT(ab.by.low, t), mz = ihMuzzle(t), trav = .12 + Math.hypot(c.x - t.x, c.y - t.y) / 12;
+        rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#d0c8b8', w: .04, trav, life: trav + .05 }); ihFlash(mz[0], mz[2], mz[1], .6, '#ffd890'); sfx('cannon', 1); t.recoil = 1;
+        G.delayed.push({ t: trav, fn: () => {
+          if (!ihLive(t) || c.dead) return; const s = t.st || st, sky = ihAirborne(c), x = c.x, z = c.y;
+          abRun(ab.id, () => {
+            abHit(t, s, c, m, 'phys');
+            if (sky) {
+              if (!c.dead) { c.lowT = Math.max(c.lowT || 0, G.time + low * (c.def.boss ? .4 : 1)); c.ihGrudgeT = G.time; }
+              if (s.caps && s.caps.ihhWing) abAoe(() => inSplash(x, z, .8, true, o => { if (o !== c && canTarget(t, s, o)) abHit(t, s, o, m * .5, 'phys'); }));   // Wing-Breaker: it comes down on them
+            } else abAoe(() => inSplash(x, z, .7, true, o => { if (o !== c && canTarget(t, s, o)) abHit(t, s, o, m * .5, 'phys'); }));
+          });
+          ihFlakFx(x, z, sky ? hitH(c) : .4, .55);
+        } });
+      },
+      anim: chAnim('point', { T: .9, tip: ['main', [.02, -.04, .36]], col: [1, .8, .5], size: .35 }) }),
+    ihCastWrap({ id: 'ch_oldgrudge', name: 'The Old Grudge', short: 'Old Grudge', glyph: 'missiles', hue: '#ff9a50', mana: 150, cd: 24, research: CH_IH_RS, school: 'attack', pref: 'grouped',
+      by: { mult: [3.5, 3.8, 4.1, 4.4, 4.7, 5], r: [1.8, 1.8, 1.8, 1.8, 1.8, 1.8] }, none: 'no foes on the field',
+      auto: 'five or more foes bunched anywhere on the field (a flyer counts twice), or a boss', blurb: 'The crew lights a great war-rocket: it climbs in an arc and dives on any spot on the field.',
+      text: (t, st, ab) => `The crew lights a great war-rocket (1s); it arcs onto the best crowd anywhere on the field (1.2s, following a flyer a little) and bursts across ${gNf(byT(ab.by.r, t))} cells: ${xD(st, byT(ab.by.mult, t))} at the centre, half at the edge. Flyers in the blast take twice that and are knocked out of the sky for 3s; bosses stagger 0.8s. The crater burns for 3s, slowing ground foes in it 25%.`,
+      pick: chGrudgePick,
+      cast(t, st, p, ab, K) { if (!p || p.x == null) return false; chRocket(t, st, p, ab, K); },
+      zone(t, st, z) { inSplash(z.x, z.z, z.r, true, c => { if (c.ent || !canTarget(t, st, c)) return; chill(c, { slow: .25, slowT: .35 }, null, t); }); },
+      anim: chAnim('sky', { T: 1.2, tip: ['off', [-.03, -.1, .2]], col: [1, .7, .4], size: .45 }) }),
+  ] },
+  tree: { name: 'The Book of Grudges', hue: '#8aa0b8', list: [
+    CT('Ranging Fire', 'cloud', 0, 0, 2, n => `Battery Barrage covers ${gNf(.15 * n)} cells wider.`, {}, { sp: n => ({ ab: 'ch_battery', by: { area: .15 * n } }) }),
+    CT('Drilled Crew', 'quick', 0, 3, 2, n => `Changing the battery's laying takes ${gNf(.5 * n)}s less.`, {}, { cap: 'ihhDrill' }),
+    CT('Full Racks', 'bombs', 0, 2, 2, n => `Battery Barrage fires ${n} more shell${n > 1 ? 's' : ''}, either laying.`, {}, { cap: 'ihhShells' }),
+    CT('Grounding Shell', 'wing', 3, 2, 1, 'Grudge Shell knocks a flyer out of the sky 0.5s longer.', {}, { sp: { ab: 'ch_grudgeshell', by: { low: .5 } } }),
+    GS('ch_grudgeshell', 1, 0),
+    CT('Heavy Charge', 'bomb', 2, 0, 2, n => `Grudge Shell strikes for ${gNf(.2 * n)}× more of his strike.`, {}, { sp: n => ({ ab: 'ch_grudgeshell', by: { mult: .2 * n } }), req: [1, 0] }),
+    CT('Low Angle', 'crosshair', 2, 3, 2, n => `Laid level, Battery Barrage strikes ground foes ${10 * n}% harder.`, {}, { cap: 'ihhLow', sp: n => ({ ab: 'ch_battery' }) }),
+    CT('Spent Casings', 'coin', 2, 1, 1, 'A kill with Grudge Shell puts 12 mana back in his pouch.', {}, { sp: { ab: 'ch_grudgeshell', kill: { mana: 12, cd: 0 } } }),
+    CT('The Long Grudge', 'flame', 4, 3, 1, 'The Old Grudge\'s crater burns 2s longer, and each foe it kills gives him 10 mana.', {}, { cap: 'ihhLong', sp: { ab: 'ch_oldgrudge', kill: { mana: 10, cd: 0 } }, req: [3, 3] }),
+    CT('Wing-Breaker', 'wings', 4, 1, 1, 'A flyer Grudge Shell knocks down crashes onto the ground foes beneath it: those within 0.8 cells take half the shell, and lose 2 armour.', {}, { cap: 'ihhWing', sp: { ab: 'ch_grudgeshell', rider: { shred: [2, 4] } } }),
+    CT('Grudge-Fed', 'burst', 3, 0, 2, n => `Grudge Flak bursts ${gNf(.15 * n)} cells wider still.`, {}, { cap: 'ihhFed' }),
+    CT('Powder Ration', 'gem', 1, 2, 2, n => `Each flyer he kills gives him ${4 * n} mana.`, {}, { cap: 'ihhPowder' }),
+    GS('ch_oldgrudge', 3, 3),
+    CT('Skywarden\'s Watch', 'spyglass', 1, 1, 3, n => `Every flyer his shells strike loses ${n} armour for 3s.`, {}, { cap: 'ihhWatch' }),
+  ] },
+  flavor: ['Hrolf fights in person: guns for the sky, and a grudge for the ground.', 'Every wing that crossed this mountain is written in my book. So is every boot.'], emblem: 'Wing-Breaker',
+  fire(t, st, tg, pow, echo) {   // Grudge Flak: every 3rd shell twice as wide, half again as hard
+    if (echo) return pow;
+    if ((t.ihGrudgeN = (t.ihGrudgeN || 0) + 1) % 3 === 0) { st.splash = (st.splash || .6) * 2 + .15 * ((st.caps && st.caps.ihhFed) || 0); return pow * 1.5; }
+    return pow;
+  },
+  hit(c, st, t, amt) { const C = st.caps || {}; if (C.ihhWatch && c.fly && !c.dead && (c.armor || 0) > 0) { c.shred = Math.max(c.shredT > 0 ? c.shred : 0, C.ihhWatch); c.shredT = Math.max(c.shredT, 3); } },   // Skywarden's Watch
+  kill(c, src, t) { const C = t && t.st && t.st.caps; if (C && C.ihhPowder && src === t && c.fly && t.ab) t.ab.mana = Math.min((abilKit(t) || { mana: { max: 130 } }).mana.max, t.ab.mana + 4 * C.ihhPowder); },   // Powder Ration
+  extra(t, tier, x, z, yaw, K) {   // the crater's scorch while it burns
+    if (!t.ab || inIcon) return;
+    for (const zn of t.ab.zones) { const left = zn.until - G.time; if (left <= 0 || zn.k !== 'ch_oldgrudge') continue; const a = Math.min(1, left * 1.5);
+      QG.ground(zn.x, zn.z, .02, zn.r, zn.r, [.25, .15, .08, .35 * a], 5, 0);
+      QG.ground(zn.x, zn.z, .022, zn.r * .7, zn.r * .7, [1, .5, .15, .14 * a], 4, .04);
+      if (VLIVE && Math.random() < .12) part({ k: 'spark', x: zn.x + R(-.4, .4), z: zn.z + R(-.4, .4), h: .05, vx: 0, vz: 0, vh: R(.4, 1), g: -.2, life: .45, max: .45, size: .05, col: '#ffa050' }); }
+  },
+});
+
 /* ---------- their look: the clan's dwarves, larger, on a Champion's dais ---------- */
 Object.assign(IH_PAL, {
   ch_haldra: { cloth: '#9a2a22', clothD: '#641a16', torso: '#7e848c', metal: '#8a9098', metalD: '#50555e', trim: '#c8a04a', beard: '#c4602a', beardD: '#8e401a', skin: '#dcaa88', boot: '#3a2a20', trousers: '#4a2a22', leather: '#5a3a24', fur: '#a89070', furD: '#6e5a42' },
@@ -29769,6 +30309,90 @@ FORCE_PARTS.ch_grenna = [
       ihArtMat(g, 'stone', () => { g.lathe(-.03, -.12, .2, [[.0, 0], [.05, .01], [.06, .06], [.035, .1], [.02, .12]], 8, '#c8b89a'); g.torus(-.08, -.06, .2, .025, .008, 8, 3, '#a89878'); });
       if (tier >= 2) ihArtMat(g, 'cloth', () => g.ico(-.03, .01, .2, .02, IHP.foam));
     }); }, pose(t) { const w = t.windup || 0, s = t.shotT == null ? 9 : t.shotT, th = s < .35 ? Math.sin(Math.PI * s / .35) : 0; return [-.6 * w - 1 * th, 0, .2 * th, 0, .04 * w, .06 * th]; } },   // the throw
+];
+// Torvald and Brannoc (added 21 Nov 2026): the same kit, their own colours (placeholder portraits: forceart_ironhold.js)
+Object.assign(IH_PAL, {
+  ch_torvald: { cloth: '#6a4a2a', clothD: '#4a321c', torso: '#5e4a34', metal: '#6a6e76', metalD: '#40444a', trim: '#c8963a', beard: '#b8582a', beardD: '#82381a', skin: '#d8a684', boot: '#2e2418', trousers: '#3e3226', leather: '#6a4426', fur: '#8a7458', furD: '#5e4c38', wood: '#6a4224', woodD: '#4a2c16' },
+  ch_brannoc: { glow: '#ffd060', copper: '#c89a3a', cloth: '#6a1e2a', clothD: '#46121c', torso: '#8a8e96', metal: '#9a9ea6', metalD: '#5a5e66', trim: '#e0b040', beard: '#e8e2d6', beardD: '#b8b0a2', skin: '#d8a888', boot: '#2e2218', trousers: '#3a2228', leather: '#5a3a24', fur: '#e8e0d0', furD: '#b8ae9c' },
+});
+Object.assign(UNIT_PAL, {
+  ch_torvald: { cloakD: '#4a321c', leatherD: '#4a3016' },
+  ch_brannoc: { cloakD: '#46121c', leatherD: '#3a2a1c' },
+});
+for (const u of ['ch_torvald', 'ch_brannoc']) TORSO_PIV[u] = [0, .1, 0];
+FORCE_BUILD.ch_torvald = (g, tier) => ihPal('ch_torvald', () => {   // a long leather coat, a gunner's hat, a powder horn and cartridge belt, a rifle stand at his side
+  chDais(g, tier, '#6c665c', '#4e4a44', IHP.trim, '#ffc870');
+  lay(g, 'base', () => ihArtMat(g, 'woodgrain', () => { g.seg([-.26, .02, -.12], [-.22, .5, -.1], .014, IHP.woodD); g.seg([-.18, .02, -.16], [-.22, .5, -.1], .014, IHP.woodD); g.seg([-.24, .02, -.02], [-.22, .5, -.1], .014, IHP.woodD); }));   // the rifle stand
+  ihDwarf(g, tier, { coat: true, helm: 'gunhat', beardLen: 1.2, cape: tier >= 2 ? 'mantle' : false });
+  ihArtMat(g, 'leather', () => g.seg([-.15, .5, .1], [.14, .26, .15], .018, IHP.leather));   // the bandolier
+  ihArtMat(g, 'gilt', () => { for (let k = 0; k < 4 + tier; k++) { const u = (k + .5) / (4 + tier); g.ico(-.15 + .29 * u, .5 - .24 * u, .1 + .05 * u + .012, .012, IHP.trim); } });
+  ihArtMat(g, 'antler', () => g.with(T(.16, .34, -.06, 0, 0, .9), () => g.cyl(0, -.07, 0, .03, .012, .15, 8, '#e8dcc0')));   // the powder horn
+  if (tier >= 4) { g.em = .8; g.ico(-.22, .52, -.1, .02, '#ffc870', .2); g.em = 0; }
+});
+FORCE_BUILD.ch_brannoc = (g, tier) => ihPal('ch_brannoc', () => {   // the old king: plate, a crimson royal mantle trimmed in white fur, a gold crown on a circlet, a long white beard
+  chDais(g, tier, '#6c665c', '#4e4a44', IHP.trim, '#ffd060');
+  ihDwarf(g, tier, { plate: true, helm: 'circlet', beardLen: 1.5, cape: 'mantle' });
+  ihArtMat(g, 'hide', () => { for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; if (Math.sin(a) > .6) continue; g.ico(Math.cos(a) * .19, .52 + (k % 2) * .015, Math.sin(a) * .16 - .01, .065, k % 2 ? IHP.fur : IHP.furD, .5, .7); } });   // the ermine collar
+  ihArtMat(g, 'gilt', () => {   // the crown: a gold band and its points, more of them each tier
+    g.cyl(0, .655, -.004, .122, .118, .035, 12, IHP.trim, { capT: false });
+    const n = 5 + Math.min(3, tier >> 1);
+    for (let k = 0; k < n; k++) { const a = k / n * TAU; g.with(T(Math.sin(a) * .116, .685, Math.cos(a) * .116 - .004), () => g.cyl(0, 0, 0, .016, 0, .06 + .005 * tier, 4, IHP.trim)); }
+  });
+  if (tier >= 2) { g.em = .9; g.ico(0, .665, .118, .016, '#c83040', .2); g.em = 0; }   // a ruby at its brow
+  if (tier >= 4) ihArtMat(g, 'gilt', () => { for (const sd of [-1, 1]) g.box(sd * .17, .52, 0, .08, .02, .1, IHP.trim); });   // gilt pauldron rims
+});
+FORCE_PARTS.ch_torvald = [
+  { k: 'main', piv: [.17, .44, 0], arm: [.02, -.1, .16], aw: .034, build(g, tier) { ihPal('ch_torvald', () => {   // the long rifle, held level, its long barrel past the dais
+      chIhFist(g, [.02, -.1, .16], true);
+      const L = 1 + .05 * tier;
+      ihArtMat(g, 'woodgrain', () => { g.box(.02, -.1, .08, .04, .06, .22, IHP.wood); g.box(.02, -.13, -.06, .045, .09, .08, IHP.woodD); });   // the stock
+      ihArtMat(g, 'iron', () => { g.with(T(.02, -.07, .2, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .016, .014, .62 * L, 8, IHP.metalD)); g.box(.02, -.08, .18, .03, .03, .06, IHP.metal); });   // the long barrel, the lock
+      ihArtMat(g, 'gilt', () => { g.with(T(.02, -.04, .3, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .012, .012, .14, 8, IHP.trim)); for (const z of [.36, .6]) g.with(T(.02, -.07, z * L, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .02, .02, .015, 8, IHP.trim)); });   // the spyglass sight, brass bands
+      if (tier >= 3) { g.em = .7; g.ico(.02, -.04, .37, .01, '#ffc870'); g.em = 0; }
+    }); }, pose: t => { const w = t.windup || 0, s = t.shotT == null ? 9 : t.shotT, k = s < .25 ? 1 - s / .25 : 0; return [-.1 * w, 0, 0, 0, 0, -.06 * k]; } },
+  { k: 'off', piv: [-.17, .44, 0], arm: [-.03, -.08, .2], aw: .034, build(g, tier) { ihPal('ch_torvald', () => { chIhFist(g, [-.03, -.08, .2]); }); }, pose: t => [-.08 * (t.windup || 0), 0, 0, 0, 0, 0] },   // (his off hand under the barrel)
+];
+FORCE_PARTS.ch_brannoc = [
+  { k: 'main', piv: [.17, .44, 0], arm: [.02, -.16, .14], aw: .036, build(g, tier) { ihPal('ch_brannoc', () => {   // the old king's hammer: a long haft, a broad gilt-banded head
+      chIhFist(g, [.02, -.16, .14], true);
+      const hs = 1 + .06 * tier;
+      ihArtMat(g, 'woodgrain', () => g.seg([.02, -.3, .14], [.02, .16 * hs, .14], .022, '#4a2e1a'));
+      ihArtMat(g, 'iron', () => g.box(.02, .2 * hs, .14, .11 * hs, .1 * hs, .2 * hs, IHP.metal));
+      ihArtMat(g, 'gilt', () => { for (const sd of [-1, 1]) g.box(.02, .2 * hs, .14 + sd * .07 * hs, .12 * hs, .11 * hs, .02, IHP.trim); g.ico(.02, .27 * hs, .14, .025, IHP.trim); });
+      if (tier >= 4) { g.em = 1; g.box(.02, .2 * hs, .14 + .1 * hs, .04, .04, .006, '#ffd060'); g.em = 0; }
+    }); }, pose: chIhSwing },
+  { k: 'off', piv: [-.17, .44, 0], arm: [-.03, -.14, .12], aw: .034, build(g, tier) { ihPal('ch_brannoc', () => {   // a gold rod of rule, a hall-stone set in it
+      chIhFist(g, [-.03, -.14, .12], true);
+      ihArtMat(g, 'gilt', () => { g.seg([-.03, -.26, .12], [-.03, .08, .13], .012, IHP.trim); g.ico(-.03, .11, .13, .03, IHP.trim); });
+      g.em = .8; g.ico(-.03, .14, .13, .018, '#ffd060', .2); g.em = 0;
+    }); }, pose: t => [-.15 * (t.windup || 0), 0, 0, 0, 0, .03 * (t.windup || 0)] },
+];
+// Hrolf (added 21 Nov 2026): grey-blue steel, a horned war-helm, a stubby flak gun on his shoulder, his book of grudges chained at the hip
+Object.assign(IH_PAL, {
+  ch_hrolf: { glow: '#c8d8f0', cloth: '#3e5068', clothD: '#2a3648', torso: '#6e7680', metal: '#7a8490', metalD: '#4a525c', trim: '#b8a070', beard: '#8a8a8a', beardD: '#5e5e5e', skin: '#d6a684', boot: '#2a2420', trousers: '#34343a', leather: '#5a3e28', fur: '#8a8070', furD: '#5e564a', wood: '#5a3a20', woodD: '#3e2814' },
+});
+Object.assign(UNIT_PAL, { ch_hrolf: { cloakD: '#2a3648', leatherD: '#3a2a1c' } });
+TORSO_PIV.ch_hrolf = [0, .1, 0];
+FORCE_BUILD.ch_hrolf = (g, tier) => ihPal('ch_hrolf', () => {
+  chDais(g, tier, '#6c665c', '#4e4a44', IHP.trim, '#c8d8f0');
+  ihDwarf(g, tier, { plate: true, helm: 'warhelm', beardLen: 1.3, cape: tier >= 1 ? 'mantle' : false });
+  ihArtMat(g, 'leather', () => g.box(-.17, .26, .04, .05, .09, .07, IHP.leather));   // the book of grudges at his hip
+  ihArtMat(g, 'gilt', () => { g.box(-.17, .26, .077, .045, .08, .004, IHP.trim); g.seg([-.17, .3, .04], [-.12, .42, .1], .006, IHP.trim); });   // its brass clasp and chain
+  if (tier >= 2) ihArtMat(g, 'iron', () => { for (let k = 0; k < 3; k++) g.cyl(.12 + k * .04, .2, -.15, .018, .018, .1, 8, IHP.metalD); });   // spare shells on his back
+  if (tier >= 4) { g.em = .8; g.ico(0, .64, .125, .016, '#c8d8f0', .2); g.em = 0; }   // a pale stone at the helm's brow
+});
+FORCE_PARTS.ch_hrolf = [
+  { k: 'main', piv: [.17, .44, 0], arm: [.02, -.08, .14], aw: .036, build(g, tier) { ihPal('ch_hrolf', () => {   // a stubby wide-bore flak gun, braced on the forearm
+      chIhFist(g, [.02, -.08, .14], true);
+      const s = 1 + .05 * tier;
+      ihArtMat(g, 'iron', () => { g.with(T(.02, -.04, .24, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .05 * s, .045 * s, .3 * s, 10, IHP.metalD)); g.box(.02, -.06, .08, .07, .07, .12, IHP.metal); });
+      ihArtMat(g, 'gilt', () => { for (const z of [.18, .32]) g.with(T(.02, -.04, z * s, 0, Math.PI / 2), () => g.cyl(0, 0, 0, .056 * s, .056 * s, .016, 10, IHP.trim)); });
+    }); }, pose: t => { const w = t.windup || 0, sh = t.shotT == null ? 9 : t.shotT, k = sh < .2 ? 1 - sh / .2 : 0; return [-.12 * w, 0, 0, 0, 0, -.06 * k]; } },
+  { k: 'off', piv: [-.17, .44, 0], arm: [-.03, -.12, .14], aw: .034, build(g, tier) { ihPal('ch_hrolf', () => {   // a fuse-lighter
+      chIhFist(g, [-.03, -.12, .14]);
+      ihArtMat(g, 'woodgrain', () => g.seg([-.03, -.16, .14], [-.03, .06, .2], .01, IHP.wood));
+      g.em = .9; g.ico(-.03, .07, .2, .014, '#ffb050'); g.em = 0;
+    }); }, pose: t => [-.1 * (t.windup || 0), 0, 0, 0, 0, 0] },
 ];
 
 /* ================= THE SILVER ORDER'S CHAMPIONS: Aurelian, Celestine and Morrow in person =================
@@ -32646,6 +33270,7 @@ ccxSwap('cc_chronomancer', { id: 'cc_quicken', name: 'Backward Hour', short: 'Ba
     for (const c of G.creeps) {
       if (c.dead || c.ent || z.seen.has(c) || !ccWalker(c) || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue;
       z.seen.add(c);
+      { const tk = (st && st.caps && st.caps.tchTurn) || 0; if (tk) abRun('cc_quicken', () => ccAb(t, st, c, 2.5 * Math.min(2, tk), 1, {})); }   /* Borrowed Time: the turned hour wounds (the Chronomancers' damage road, forces_zzz..._chains.js) */
       const d = byT(ABIL.cc_quicken.by.back, t) * ccxWeight(c) * ccDR(c), steps = 10;
       c.ccxBackT = G.time + .85; chill(c, { slow: .6, slowT: .9 }, null, t);
       if (d > .01) for (let j = 1; j <= steps; j++) G.delayed.push({ t: j * .08, fn: () => { if (!c.dead) ccxPush(c, d / steps); } });
@@ -33927,7 +34552,7 @@ sbcSet('sb_hailstorm', { name: 'Black Ice', short: 'Ice', glyph: 'snowflake', hu
       if ((z.next.get(c) || 0) > now) continue;
       const wet = c.sbWetT > now; z.next.set(c, now + (wet ? SBC.ice.wet : SBC.ice.dry));
       stun(c, .35, .4, 'frost'); liftFoe(c, .3, .1, 'toss');
-      sbHit(t, st, c, abD(st) * SBC.ice.slip, 'magic', null); if (!c.dead) chill(c, { slow: .3, slowT: 1.2 }, 'frost', t);
+      sbHit(t, st, c, abD(st) * (SBC.ice.slip + 1.5 * ((st.caps && st.caps.tchFall) || 0)), 'magic', null); if (!c.dead) chill(c, { slow: .3, slowT: 1.2 }, 'frost', t);
       sbcFx('sb_hailstorm', t, c, C => { v2Spray(C, 'crys', c.x, c.y, .12, 4, { sp: .9 }); v2Spray(C, 'snow', c.x, c.y, .1, 3, { sp: .5 }); sfxAdd({ k: 'vflash', x: c.x, z: c.y, h: .15, s: .35, life: .12, col: sbcK().iceH, a: .5 * sfxZk() }); });
       if (Math.random() < .35) sfx('shatter', 0);
     }
@@ -37144,6 +37769,7 @@ function socLeashTick() {
     const t = Lk.by; if (!abLive(t)) continue; const s = t.st || effStats(t), sc = socBy(Lk.ab, 'scour', t);
     socAs('so_flare', () => {
       soAbHit(t, s, c, .9, 'magic');
+      if (s.caps && s.caps.tchGlare && !c.dead) soVerdict(c, t, 2.5 * s.caps.tchGlare);   /* (Glare of Dawn: the snap delivers a Verdict) */
       if (sc > 0) inSplash(c.x, c.y, .8, true, o => { if (!socFoe(o) || !canTarget(t, s, o)) return; soBlind(o, sc, t); });
     });
     sfx('ward', 1);
@@ -38787,6 +39413,7 @@ ihcPatch('ih_caltropfield', { name: 'Tripwire', short: 'Tripwire', glyph: 'chain
       z.hit.add(o); z.trips--; z.twang = G.time; z.tf = f;
       abAoe(() => abHit(t, st, o, IHC_TW.mult * (z.K || 1), 'phys', null));
       if (!o.dead) { ihPin(o, pin * (z.K > 1 ? 1.25 : 1), t); ihcShred(o, IHC_TW.crack, 10, 5); }
+      if (st.caps && st.caps.ihSpikes) ihCaltrops(t, st, o.x, o.y, .6, 3, .25, 1);   // Spiked Caltrops: caltrops where each foe trips
       ihcFx('ih_caltropfield', t, o, C => { const h = Math.min(.3, hitH(o) * .4); ihcPop(C, o.x, o.y, h, .7, ihcC('#c8c0b0'), ihcC('#fff4e0', 1.4)); ihcSpray(C, 'dust', o.x, o.y, .1, 4, { sp: .7 }); ihcSpray(C, 'spark', o.x, o.y, h, 4, { col: '#ffd890' }); });
       sfx('thwack', 0);
       if (z.trips <= 0) { z.until = G.time + .45; z.snapAt = G.time; sfx('shieldBreak', 0); break; }
@@ -42741,7 +43368,7 @@ wbkWrap('wb_vow', 'cast', function (c0, t, st, o, ab) {
   return r;
 });
 wbkWrap('wb_rite', 'cast', function (c0, t, st, tg, ab) {
-  const r = c0.call(this, t, st, tg, ab); if (r === false || !wbkHas(t, 'wbkHallow')) return r;
+  const r = c0.call(this, t, st, tg, ab); if (true) return r;   /* (Hallowed Road swings a hot Censer Smoke since 21 Nov 2026: forces_zzz..._chains.js; its vow runes no longer strike) */
   for (const z of wbRunesNear(t.x, t.y, abReach(t, st, ab) + .5)) if (z.kinds.includes('vow')) { z.wbkHalT = wbkAt(6); z.wbkHalBy = t; }
   return r;
 });
@@ -43267,7 +43894,7 @@ function ccfAfterHit(t, st, c, amt, o, pre) {
       c.ccfHvN = again ? Math.min(3, (c.ccfHvN | 0) + 1) : 0; c.ccfHvBy = t; c.ccfHvT = G.time + 2.5;
       if (c.ccfHvN > 0) { chill(c, { slow: Math.min(.8, (st.slow || .25) + .05 * C.ccfHeavy * c.ccfHvN), slowT: st.slowT || 1.8 }, null, t); ccEv('tal:ccfHeavy'); }
     }
-    if (C.ccfSwing && ((t.ccfSwN = (t.ccfSwN | 0) + 1) % (5 - C.ccfSwing) === 0)) { const q = nearest(c.x, c.y, CCF.SWING_R, 1, c)[0]; if (q) { ccMark(q, 'chrono', t); ccEv('tal:ccfSwing'); } }   /* Pendulum Swing */
+    if (C.ccfSwing && ((t.ccfSwN = (t.ccfSwN | 0) + 1) % (5 - C.ccfSwing) === 0)) { const q = nearest(c.x, c.y, CCF.SWING_R, 1, c)[0]; if (q) { ccMark(q, 'chrono', t); ccHit(t, st, q, st.dmg * .5, { noRx: true }); ccEv('tal:ccfSwing'); } }   /* Pendulum Swing */
   } else if (u === 'cc_astrologer') {
     if (basic && C.ccfNight && c.fly && !c.dead) {   // Night Sight
       const S = t.ccfSeen || (t.ccfSeen = new WeakSet());
@@ -44777,12 +45404,12 @@ SP_RIDE.sofCondemn = (c, v, s) => { if (!(c.soCondT > G.time)) c.soCondBy = s; c
   FORCE_ATTACK.so_chain = function (t, st, tg, pow, echo) {
     const C = (st && st.caps) || {}, blind = !!tg && soBlinded(tg);
     if (C.sofTighten && !echo) { t.sofTlN = t.sofTlTg === tg ? Math.min(3, (t.sofTlN || 0) + 1) : 0; t.sofTlTg = tg; }
-    const r = chn0.call(this, t, st, tg, pow, echo);
+    const r = chn0.call(this, t, st, tg, pow * (C.sofTighten && !echo ? 1 + C.sofTighten * (t.sofTlN || 0) : 1), echo);   /* (Tightening Links also strikes harder each lash in a row: the Sisters' damage road, 21 Nov 2026) */
     if (!tg) return r;
     if (C.sofTighten && !echo && t.sofTlN > 0 && !tg.dead) { chill(tg, { slow: (st.slow || .3) + .05 * C.sofTighten * t.sofTlN, slowT: st.slowT || 1.5 }, null, t); soEv('fresh:sofTighten'); }
-    if (C.sofGlint && blind && !echo) {
+    if (C.sofGlint && (blind || tg.stunT > 0) && !echo) {
       const o = nearest(tg.x, tg.y, 1.2, 1, tg, q => sofFoe(q) && canTarget(t, st, q))[0];
-      if (o) { soStrike(t, st, o, st.dmg * pow * .45 * C.sofGlint, 'magic'); soChainFx(tg.x, hitH(tg), tg.y, o, false); soEv('fresh:sofGlint'); }
+      if (o) { soStrike(t, st, o, st.dmg * pow * .5 * C.sofGlint, 'magic'); soChainFx(tg.x, hitH(tg), tg.y, o, false); soEv('fresh:sofGlint'); }
     }
     return r;
   };
@@ -45084,7 +45711,7 @@ if (ABIL.so_hallow) {
     if (inc && inc.length) {
       const sp = o.sp || st.splash || .9;
       // (Fanned Embers: a Judgement a rank; the smoke no longer smoulders on: the clarity pass, Nov 2026)
-      inSplash(x, y, sp, true, c => { if (sofFoe(c) && canTarget(t, st, c)) soJudge(c, C.sofFan, t); });
+      inSplash(x, y, sp, true, c => { if (sofFoe(c) && canTarget(t, st, c)) { soStrike(t, st, c, soD(st) * (z.pow || 1) * .3 * C.sofFan, 'magic'); if (!c.dead) soJudge(c, C.sofFan, t); } });   /* (and the coal bursts again, 30% a rank: the Censers' damage road, 21 Nov 2026) */
       soEv('fresh:sofFan');
     }
     if (C.sofAsh && !o.small && o.tg && sofFoe(o.tg) && !o.tg.fly && Math.hypot(o.tg.x - x, o.tg.y - y) <= .5) { soBlind(o.tg, .3 * C.sofAsh, t); soEv('fresh:sofAsh'); }
@@ -45927,7 +46554,7 @@ wbfWrap('wb_piercingshaft', function (c0, t, st, tg, ab) {
       if (c.dead) continue;
       if (C.wbfBrandRime && h.br > 0) chill(c, { slow: st.slow || .3, slowT: (st.slowT || 2) + .5 * C.wbfBrandRime * h.br }, 'frost', t);
       if (C.wbfBitter && h.fr) { const cur = c.shredT > 0 ? c.shred || 0 : 0; c.shred = Math.max(cur, Math.min(3 * C.wbfBitter, cur + C.wbfBitter)); c.shredT = Math.max(c.shredT || 0, 4); }
-      if (bite) wbBrand(c, 1, t);
+      if (bite) { wbBrand(c, 1, t); if (!echo) wbHit(t, st, c, st.dmg * pow, st.dmgType || 'magic'); }   /* (Biting Wind: those sweeps strike twice) */
     }
     return R.r;
   };
@@ -46535,6 +47162,7 @@ function ccrSpear(t, st, c, m, k, free) {
   ccShoot({ k: 'ice', x: hx, h: hh, z: hz, tg: c, spd: 16.8, col: '#dff6ff', sz: free ? 1.2 : 1.7, tag: 'abil', fn: q => {
     if (!q || !ccAlive(t)) return; sfx('frostSpearHit'); const s = t.st || st, frz = ccFrozen(q), lance = frz && ccrCap(s, 'ccrLance');
     ccAb(t, s, q, m, k, { crit: lance ? 1 : 0 });
+    if (lance) inSplash(q.x, q.y, .8, false, o => { if (o !== q && !o.dead && !o.ent) ccAb(t, s, o, m * .5, k, {}); });   /* Frozen Lance: the crit splinters (her damage road, 21 Nov 2026) */
     if (q.dead) return;
     const pw = s.pw || {}, sl = byT(ab.by.slow, t) + (pw.ccCirclet || 0);
     chill(q, { slow: sl, slowT: byT(ab.by.slowT, t) }, 'frost', t);
@@ -46641,7 +47269,7 @@ function ccrSecond(t, st, c) {
   if (pw.ccWinter && !c.dead && (t.ccrWinN = (t.ccrWinN | 0) + 1) % 4 === 0) { freezeFoe(c, pw.ccWinter, t); ccEv('item:cc_l_winter'); }   /* the Crown of the Long Winter */
   if (!ccrCap(st, 'ccrSecond')) return;
   if ((t.ccrSecN = (t.ccrSecN | 0) + 1) % (ccrCap(st, 'ccrSecond') >= 2 ? CCR.SECOND_N : CCR.SECOND_N + 2)) return;
-  ccEv('tal:ccrSecond'); abRun('cc_glacialglyph', () => ccrSpear(t, st, c, byT(ABIL.cc_glacialglyph.by.mult, t) * .5, 1, true));
+  ccEv('tal:ccrSecond'); abRun('cc_glacialglyph', () => ccrSpear(t, st, c, byT(ABIL.cc_glacialglyph.by.mult, t) * .75, 1, true));
 }
 
 /* =====================================================================================================
@@ -47191,7 +47819,7 @@ const WPN_UNIT = {
   ironbreaker: 'axe', thundergun: 'rifle', chaintrapper: 'chain', runesmith: 'runehammer', flakgunner: 'cannon', steamhammer: 'hammer', mortarcrew: 'mortar', siegebreaker: 'pole', ch_haldra: 'hammer',
   sb_wolfguard: 'spear', sb_windrunner: 'bow', sb_hailshaman: 'staff', sb_spiritwalker: 'rattle', sb_thundercaller: 'staff', sb_earthbinder: 'hammer', sb_clouddancer: 'fans', sb_skyhunter: 'harpoon', ch_tarka: 'staff',
   // the Champions not leading by default (CHAMPS: one of each force's three stands in its holy slot)
-  ch_aurel: 'staff', ch_maren: 'twinblade', ch_faelan: 'bow', ch_nyssa: 'staff', ch_tovin: 'gauntlet', ch_grenna: 'ladle',
+  ch_aurel: 'staff', ch_maren: 'twinblade', ch_faelan: 'bow', ch_nyssa: 'staff', ch_tovin: 'gauntlet', ch_grenna: 'ladle', ch_torvald: 'rifle', ch_brannoc: 'hammer', ch_hrolf: 'cannon',
   ch_celestine: 'staff', ch_morrow: 'lance', ch_oshana: 'staff', ch_huri: 'spear', ch_aedric: 'lance', ch_isaura: 'sword',
   wb_oathbound: 'sword', wb_maskedwarden: 'glaive', wb_frostbrand: 'halberd', wb_runecarver: 'tome', wb_stormward: 'stormlance', wb_anvilguard: 'hammer', wb_siegewarden: 'ballista', wb_vowkeeper: 'sword', ch_varic: 'sword',
 };
@@ -47298,6 +47926,9 @@ const WPN_LEGS = [
   ['ch_nyssa', 'wl_mothbough', 'Mothqueen\'s Bough', 'a gnarled staff in bloom, pale moths resting on it', ['spell', 'ch_sporecloud', 'echo']],
   ['ch_tovin', 'wl_firstengine', 'Coil of the First Engine', 'a huge copper gauntlet with a glass coil full of violet lightning', ['hit', 'arc', 3]],
   ['ch_grenna', 'wl_lastorders', 'Ladle of Last Orders', 'a great copper ladle that never runs dry', ['spell', 'ch_rollkeg', 'echo']],
+  ['ch_torvald', 'wl_ridgewatch', 'Ridgewatch Long Rifle', 'a very long rifle with a brass spyglass and an ember-red stock', ['crit']],
+  ['ch_hrolf', 'wl_grudgegun', 'The Grudge-Gun', 'a stubby flak gun with names scratched along its barrel', ['hit', 'splash', 3]],
+  ['ch_brannoc', 'wl_kingshammer', 'Hammer of the Under-King', 'a broad gilt war hammer with a hall-stone set in its head', ['spell', 'ch_oathhammer', 'echo']],
   ['ch_celestine', 'wl_sunstaff', 'Dawnsinger\'s Sunstaff', 'a tall gold staff crowned with a full sunburst', ['spell', 'ch_dawnbreak', 'echo']],
   ['ch_morrow', 'wl_justicar', 'Justicar\'s Lance', 'a long ash-grey lance with the scales of judgement worked on its guard', ['crit']],   // (Morrow rides at the head of the Grail Knights' charge now: owner, 9 Nov 2026)
   ['ch_oshana', 'wl_driftwood', 'Windspeaker\'s Driftwood', 'a pale driftwood staff hung with wind-chimes and white feathers', ['hit', 'shove', 4]],
@@ -47373,6 +48004,8 @@ const WPN_ISSUED = {
   steamhammer: ['Steam Hammer\'s Lava Maul', '#d0602a', 'an iron war hammer with a molten lava face'], mortarcrew: ['Crew Mortar', '#6a5a4a', 'a short fat mortar tube'],
   siegebreaker: ['Siege Breaker\'s Pole', '#7a6a5a', 'a long breaching pole'], ch_haldra: ['Haldra\'s War Hammer', '#a06040', 'a heavy dwarf war hammer'],
   ch_tovin: ['Tovin\'s Copper Gauntlet', '#b0703a', 'a great copper gauntlet with a violet coil'], ch_grenna: ['Grenna\'s Great Ladle', '#b08a4a', 'a great copper ladle'],
+  ch_torvald: ['Torvald\'s Long Rifle', '#a0703a', 'a long rifle with a brass spyglass'], ch_brannoc: ['Brannoc\'s Kingly Hammer', '#c0a040', 'a broad gilt war hammer'],
+  ch_hrolf: ['Hrolf\'s Flak Gun', '#7a8490', 'a stubby wide-bore flak gun'],
   // the Stormborn
   sb_wolfguard: ['Wolfguard Spear', '#7a8a9a', 'an ash spear with a bone-lashed head'], sb_windrunner: ['Windrunner\'s Bow', '#9aa0a8', 'a grey ash bow with feathers at its tips'],
   sb_hailshaman: ['Hail Shaman\'s Staff', '#8ab8d8', 'a staff hung with hailstone beads'], sb_spiritwalker: ['Spirit Walker\'s Rattle', '#a08a5a', 'a gourd rattle on a bone handle'],
@@ -48628,6 +49261,12 @@ const HW = {
     ult: ['The First Engine', 'a gauntlet with a heart of caged violet lightning', [['hit', 'arc', 2], ['spell', 'ch_sentry', 'echo']]], art: 'the coil crackles violet, brighter each stage; at IV sparks run along the fingers' },
   ch_grenna: { glow: '#ff9a40', n: ['Grenna\'s Great Ladle', 'Great Ladle, Seasoned', 'Great Ladle of the Long Table', 'Last Orders, Grenna\'s Ladle'], fx: [['hit', 'burn', 4], ['spell', 'ch_firebrew', 'burn'], ['spell', 'ch_rollkeg', 'echo']],
     ult: ['The Bottomless Ladle', 'a ladle that never runs dry, fire-brew dripping from it', [['spell', 'ch_firebrew', 'echo'], ['hit', 'burn', 2]]], art: 'the copper warms, then the bowl holds glowing firebrew; at IV flames lick the rim' },
+  ch_torvald: { glow: '#ffc060', n: ['Torvald\'s Long Rifle', 'Long Rifle, Sighted', 'Long Rifle of the Ridge', 'Ridgewatch, Torvald\'s Rifle'], fx: [['crit'], ['spell', 'ch_flare', 'echo'], ['spell', 'ch_headsman', 'reset']],
+    ult: ['The Last Light on the Ridge', 'a rifle whose spyglass catches the last of the sunset', [['spell', 'ch_farshot', 'echo'], ['crit']]], art: 'the brass sight warms, then the barrel glows ember-red along its length; at IV a spark rides the muzzle' },
+  ch_hrolf: { glow: '#c8d8f0', n: ['Hrolf\'s Flak Gun', 'Flak Gun, Ranged In', 'Flak Gun of the Long Grudge', 'Grudge-Gun, Hrolf\'s Flak'], fx: [['hit', 'splash', 4], ['spell', 'ch_grudgeshell', 'echo'], ['spell', 'ch_battery', 'echo']],
+    ult: ['The Unforgiven', 'a flak gun with every grudge of the hold scratched along its barrel', [['spell', 'ch_oldgrudge', 'echo'], ['hit', 'splash', 2]]], art: 'the steel darkens, then the scratched names glow ember-red along the barrel; at IV smoke curls from the bore' },
+  ch_brannoc: { glow: '#ffd060', n: ['Brannoc\'s Kingly Hammer', 'Kingly Hammer, Gilded', 'Kingly Hammer of the Hall', 'Hallstone, Brannoc\'s Hammer'], fx: [['hit', 'shred', 3], ['spell', 'ch_oathhammer', 'echo'], ['spell', 'ch_mountaindue', 'echo']],
+    ult: ['The Crown\'s Weight', 'a hammer whose hall-stone shines like a crown', [['spell', 'ch_mountaindue', 'echo'], ['hit', 'shred', 2]]], art: 'the gilt bands brighten, then the hall-stone in the head glows gold; at IV it hums with light' },
   ch_aurelian: { glow: '#ffd060', n: ['Aurelian\'s Lion Sword', 'Lion Sword, Dawn-Lit', 'Lion Sword of the Ford', 'Dawnmane, Aurelian\'s Sword'], fx: [['hit', 'daze', 4], ['spell', 'ch_fordstandard', 'shove'], ['spell', 'ch_lioncharge', 'echo']],
     ult: ['The Crossing Blade', 'a broad sword blazing gold, a lion\'s head roaring at the guard', [['spell', 'ch_lioncharge', 'echo'], ['hit', 'burn', 3]]], art: 'dawn-gold light along the blade; the lion on the guard glows; at IV the edge blazes' },
   ch_celestine: { glow: '#ffe08a', n: ['Celestine\'s Sunburst Staff', 'Sunburst Staff, Kindled', 'Sunburst Staff of the High Noon', 'Dawnsong, Staff of Celestine'], fx: [['hit', 'burn', 4], ['mark'], ['spell', 'ch_dawnbreak', 'echo']],
@@ -48901,6 +49540,9 @@ const TAL_SPREAD = {
   "champ:ih_thane": {"Locked Shields":[0,0],"Shield-Ring":[0,1],"Wall of the Clan":[4,1],"Thane's Line":[4,0],"Horn of the Hold":[1,0],"Braced Heels":[2,0],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,2],"War Cry":[3,2],"Unbroken Line":[5,1],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,2]},
   "champ:ih_artificer": {"Tally Wheel":[0,3],"Riveting Peal":[0,1],"Scrap Shrapnel":[0,2],"Engine Yard":[4,0],"Lodestone":[1,3],"Stronger Field":[2,3],"Barbed Rivets":[1,0],"Torn Loose":[3,3],"Counterweight":[3,0],"Magnetised":[4,2],"Overpressure":[4,1],"Chain Drive":[5,1],"Wrecking Ball":[2,0],"Restless Stone":[5,2],"Ricochet Rivets":[2,1],"Spare Parts":[3,2]},
   "champ:ih_brewer": {"Leaky Keg":[0,2],"Slick Floor":[1,0],"Heavy Barrel":[1,1],"Open Tap":[3,0],"Firewater Breath":[1,2],"Double Measure":[2,2],"Sticky Stout":[3,1],"Scorching Gust":[4,3],"Brimming Keg":[5,1],"Spilled Pints":[5,2],"Last Call":[3,2],"On the Slate":[2,1],"Last Orders":[4,1],"Topped Up":[0,1]},
+  "champ:ih_marksman": {"Patient Aim":[0,2],"Steady Breath":[1,0],"Through the Ranks":[1,1],"Wide Flare":[3,0],"Spotter's Flare":[1,2],"Bright Flare":[2,2],"Ridge-Watch":[3,1],"Spotter's Tally":[4,3],"Oathbreaker's End":[5,1],"Signal Fire":[5,2],"Punch-Through":[3,2],"Spent Brass":[2,1],"Headsman's Round":[4,1],"Windage":[0,1]},
+  "champ:ih_hrolf": {"Ranging Fire":[0,2],"Drilled Crew":[1,0],"Full Racks":[1,1],"Grounding Shell":[3,0],"Grudge Shell":[1,2],"Heavy Charge":[2,2],"Low Angle":[3,1],"Spent Casings":[4,3],"The Long Grudge":[5,1],"Wing-Breaker":[5,2],"Grudge-Fed":[3,2],"Powder Ration":[2,1],"The Old Grudge":[4,1],"Skywarden's Watch":[0,1]},
+  "champ:ih_king": {"Long Muster":[0,2],"Old Debts":[1,0],"Muster Drums":[1,1],"Hall-Breaker":[3,0],"Oathhammer":[1,2],"Broad Head":[2,2],"Sworn Shield":[3,1],"Kingsblood":[4,3],"Blood of Kings":[5,1],"The King's Due":[5,2],"Crown of Iron":[3,2],"Royal Tithe":[2,1],"The Mountain's Due":[4,1],"Throne Room":[0,1]},
   "silver.glaive": {"Shield-Ward":[0,1],"Witness the Blow":[1,2],"Staggering Bash":[0,2],"Shield of Faith":[3,0],"Vigil":[5,1],"Edge of Dawn":[0,3],"Rampart of Dawn":[2,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,2],"Oath of Rebuke":[5,0],"Unyielding":[4,3],"Unbroken Oath":[2,3],"Pommel Blow":[1,1],"The Line Held":[4,1],"Dawn Shield":[3,2],"Ringing Rampart":[3,3]},
   "silver.arrow": {"First Testimony":[0,3],"Witnessed":[0,2],"Twin Quarrels":[5,1],"Mark of the Accused":[0,1],"Flare Bolt":[1,3],"Heavy Quarrel":[4,0],"Slow Match":[2,3],"Deep Mark":[4,2],"Writ of Execution":[5,2],"Bear Witness":[3,2],"Through and Through":[2,0],"Bodkin Heads":[1,1],"Sworn Witnesses":[4,3],"Storm of Silver":[5,0],"Crank on the Verdict":[1,0],"Testimony Heard":[2,2],"Pinning Light":[3,1]},
   "silver.frost": {"Tightening Links":[0,2],"Glinting Links":[2,1],"Tight Bindings":[0,1],"Dazzle":[1,3],"Twin Chains":[4,2],"Chain of Penance":[1,2],"Scouring Light":[2,2],"Last Rites":[3,1],"Blinding Chains":[2,3],"Chain of Judgement":[5,2],"Vigil Chains":[4,1],"Quick Binding":[5,0],"Shackle Litany":[5,1],"Swift Lash":[3,3],"Vigil Lamp":[4,3],"Glare of Dawn":[3,0]},
@@ -49795,6 +50437,26 @@ talPlain('ironhold', 'champ:ih_brewer', {
   'On the Slate': { tag: 'Mana', pro: n => `She gains ${ihPl(.5 * n)} mana a second for each ground foe in her ale, up to 4.` },
   'Last Orders': { tag: 'Spell' },
   'Topped Up': { tag: 'Spell', pro: n => `Jugs landing in her ale puddles make them last ${n}s longer, up to double.` },
+});
+talPlain('ironhold', 'champ:ih_marksman', {
+  'Patient Aim': { tag: 'Spell' }, 'Steady Breath': { tag: 'Damage' }, 'Through the Ranks': { tag: 'Spell' }, "Spotter's Flare": { tag: 'Spell' },
+  'Bright Flare': { tag: 'Spell' }, 'Wide Flare': { tag: 'Spell' }, "Spotter's Tally": { tag: 'Mana' }, 'Signal Fire': { tag: 'Support' },
+  'Ridge-Watch': { tag: 'Damage' }, 'Punch-Through': { tag: 'Damage' }, "Headsman's Round": { tag: 'Spell' }, "Oathbreaker's End": { tag: 'Spell' },
+  'Spent Brass': { tag: 'Mana' }, 'Windage': { tag: 'Damage' },
+});
+
+talPlain('ironhold', 'champ:ih_hrolf', {
+  'Ranging Fire': { tag: 'Spell' }, 'Drilled Crew': { tag: 'Spell' }, 'Full Racks': { tag: 'Spell' }, 'Grudge Shell': { tag: 'Spell' },
+  'Heavy Charge': { tag: 'Spell' }, 'Grounding Shell': { tag: 'Control' }, 'Spent Casings': { tag: 'Mana' }, 'Wing-Breaker': { tag: 'Damage' },
+  'Low Angle': { tag: 'Damage' }, 'Grudge-Fed': { tag: 'Damage' }, 'The Old Grudge': { tag: 'Spell' }, 'The Long Grudge': { tag: 'Spell' },
+  'Powder Ration': { tag: 'Mana' }, "Skywarden's Watch": { tag: 'Damage' },
+});
+
+talPlain('ironhold', 'champ:ih_king', {
+  'Long Muster': { tag: 'Support' }, 'Old Debts': { tag: 'Heat' }, 'Muster Drums': { tag: 'Support' }, 'Oathhammer': { tag: 'Spell' },
+  'Broad Head': { tag: 'Spell' }, 'Hall-Breaker': { tag: 'Damage' }, 'Kingsblood': { tag: 'Mana' }, "The King's Due": { tag: 'Support' },
+  'Sworn Shield': { tag: 'Survival' }, 'Crown of Iron': { tag: 'Control' }, "The Mountain's Due": { tag: 'Spell' }, 'Blood of Kings': { tag: 'Support' },
+  'Royal Tithe': { tag: 'Mana' }, 'Throne Room': { tag: 'Damage' },
 });
 // Concussion Rounds on Long Shot: its round's chance to stun (the rider; SP_RIDE is up by now)
 if (typeof SP_RIDE !== 'undefined') SP_RIDE.ihConc = (c, v) => { if (!c.dead && Math.random() < v) stun(c, .1, .5); };
@@ -52684,41 +53346,41 @@ function tchUlt(id, o) {
   ]);
   tchTree(FORCES["conclave"].talents["frost"], [   // conclave.frost
     ['Biting Spear', 0, 1],
-    ['Needle Frost', 0, 2],
-    ['Cold Library', 1, 0],
+    ['Spreading Frost', 0, 2, { on: 'chill', pro: n => `Bolts on Frozen foes slow foes nearby ${10 * n}%; Frost Spear hits those ${10 * n}% harder.`, sp: n => ({ ab: 'cc_glacialglyph', vs: ['chilled', .1 * n] }) }],
+    ['Needle Frost', 0, 3],
     ['Ice Coffin', 1, 1, { req: [0, 1] }],
-    ['Singing Ice', 1, 3],
+    ['Absolute Stillness', 1, 2, { req: [0, 2], max: 2, pro: n => `Every ${n >= 2 ? '3rd' : '4th'} bolt freezes its foe for 1.1s.` }],
     ['Entomb', 2, 0, { max: 2, pro: n => `Encases from its bolts hold ${gNf(.5 * n)}s longer, and the bolt strikes again for ${25 * n}%.` }],
-    ['Cold Eye', 2, 1, { req: [1, 1] }],
-    ['Spreading Frost', 2, 2],
-    ['Absolute Stillness', 3, 0, { req: [2, 0], max: 2, pro: n => `Every ${n >= 2 ? '3rd' : '4th'} bolt freezes its foe for 1.1s.` }],
-    ['Brittle Coffin', 3, 1, { req: [2, 1] }],
+    ['Brittle Coffin', 2, 1, { req: [1, 1] }],
+    ['Cold Eye', 2, 2, { req: [1, 2], on: 'crits' }],
+    ['Cold Library', 3, 0, { req: [2, 0] }],
+    ['Deep Chill', 3, 1, { req: [2, 1], max: 2, pro: n => `Ice Coffin chills foes within 0.8 cells ${15 * n}%, and its kills refund ${5 * n} mana.`, sp: n => ({ ab: 'cc_rimelance', kill: { mana: 5 * n } }) }],
     ['Practised Hand', 3, 2, { req: [2, 2] }],
     ['Shatterbloom', 4, 0, { req: [3, 0] }],
-    ['Deep Chill', 4, 1, { req: [3, 1], max: 2, pro: n => `Ice Coffin chills foes within 0.8 cells ${15 * n}%, and its kills refund ${5 * n} mana.`, sp: n => ({ ab: 'cc_rimelance', kill: { mana: 5 * n } }) }],
-    ['Second Spear', 4, 2, { req: [3, 2], max: 2, pro: n => `Every ${n >= 2 ? '4th' : '6th'} bolt also throws a free Frost Spear at half strength.` }],
+    ['Singing Ice', 4, 1, { req: [3, 1] }],
+    ['Second Spear', 4, 2, { req: [3, 2], max: 2, pro: n => `Every ${n >= 2 ? '4th' : '6th'} bolt also throws a free Frost Spear at 75% strength.` }],
     ["Winter's Garden", 5, 0, { req: [4, 0] }],
     ['Coffin Burst', 5, 1, { req: [4, 1] }],
-    ['Frozen Lance', 5, 2, { req: [4, 2] }],
+    ['Frozen Lance', 5, 2, { req: [4, 2], pro: () => 'Frost Spear crits Frozen foes and splinters: foes within 0.8 cells take half.', sp: () => ({ ab: 'cc_glacialglyph' }) }],
   ]);
   tchTree(FORCES["conclave"].talents["arcane"], [   // conclave.arcane
-    ['Heavy Hours', 0, 1],
+    ['Pendulum Swing', 0, 1, { pro: n => `Every ${gOrd(5 - n)} bolt also strikes a second foe nearby for 50%, marking it with Time.` }],
     ['Stolen Sand', 0, 2],
-    ['Patient Hours', 0, 3],
-    ['Rewound Wounds', 1, 1],
-    ['Lagging Hour', 1, 3],
-    ['Pendulum Swing', 2, 0],
-    ['Backward Hour', 2, 1, { req: [1, 1] }],
-    ['Arcane Clockwork', 2, 2],
-    ['Paradox', 3, 0, { req: [2, 0], max: 2, pro: n => `Each Echo its bolts set off rewinds the foe ${gNf(.45 * n)} cells.` }],
-    ['Borrowed Time', 3, 1, { req: [2, 1] }],
-    ['Tick Forward', 3, 2],
-    ['Recurrence', 4, 0, { req: [3, 0] }],
-    ['Stopped Clock', 4, 1, { req: [3, 1], max: 2, pro: n => `Backward Hour stops foes in its Time Dilations ${gNf(.3 * n)}s, costing ${10 * n}% less while one stands.`, sp: n => ({ ab: 'cc_quicken', at: 'ccfDilation', cost: -.1 * n }) }],
-    ['Hourglass Heart', 4, 2, { req: [3, 2], max: 2, pro: n => `Every 10s in a fight, it readies nearby Conclave spells ${n}s sooner, its own ${2 * n}s.` }],
-    ['Borrowed Hour', 5, 0, { req: [4, 0] }],
-    ['Frozen Moment', 5, 1, { req: [4, 1] }],
-    ['Quickening Bell', 5, 2, { req: [4, 2], pro: () => 'Backward Hour turns back twice, 1s apart, and quickens its bolts 30% for 4s.', sp: () => ({ ab: 'cc_quicken', haste: [.3, 4] }) }],
+    ['Backward Hour', 1, 1, { req: [0, 1] }],
+    ['Hourglass Heart', 1, 2, { max: 2, pro: n => `Every 10s in a fight, it readies nearby Conclave spells ${n}s sooner, its own ${2 * n}s.` }],
+    ['Heavy Hours', 1, 3],
+    ['Borrowed Time', 2, 1, { req: [1, 1], cap: 'tchTurn', pro: n => `Backward Hour strikes the foes it turns for ${250 * n}% and quickens its bolts ${12 * n}%, 3s.` }],
+    ['Rewound Wounds', 2, 2],
+    ['Lagging Hour', 2, 3, { req: [1, 3] }],
+    ['Arcane Clockwork', 3, 1, { req: [2, 1], pro: n => `Its bolts hit slowed or Arcane-marked foes ${30 * n}% harder.` }],
+    ['Tick Forward', 3, 2, { req: [2, 2] }],
+    ['Patient Hours', 3, 3, { req: [2, 3] }],
+    ['Paradox', 4, 1, { req: [3, 1], max: 2, pro: n => `Each Echo its bolts set off rewinds the foe ${gNf(.45 * n)} cells and strikes ${25 * n}% harder.` }],
+    ['Recurrence', 4, 2, { req: [3, 2] }],
+    ['Stopped Clock', 4, 3, { req: [3, 3], max: 2, pro: n => `Backward Hour stops foes in its Time Dilations ${gNf(.3 * n)}s, costing ${10 * n}% less while one stands.`, sp: n => ({ ab: 'cc_quicken', at: 'ccfDilation', cost: -.1 * n }) }],
+    ['Quickening Bell', 5, 1, { req: [4, 1], pro: () => 'Backward Hour turns back twice, 1s apart, and quickens its bolts 30% for 4s.', sp: () => ({ ab: 'cc_quicken', haste: [.3, 4] }) }],
+    ['Borrowed Hour', 5, 2, { req: [4, 2] }],
+    ['Frozen Moment', 5, 3, { req: [4, 3] }],
   ]);
   tchTree(FORCES["conclave"].talents["storm"], [   // conclave.storm
     ['Cold Starlight', 0, 1],
@@ -53024,7 +53686,7 @@ function tchUlt(id, o) {
   tchTree(FORCES["grove"].talents["venom"], [   // grove.venom
     ['Fen Sight', 0, 0],
     ['Clinging Mud', 0, 1],
-    ['Thick Swarm', 0, 2],
+    ['Thick Swarm', 0, 2, { pro: n => `Insect Swarm stays on its host ${gNf(.25 * n)}s longer.`, sp: n => ({ ab: 'bw_swarm', by: { dur: .25 * n } }) }],
     ['Bog Body', 1, 1, { req: [0, 1] }],
     ['Marsh Fever', 1, 2],
     ['Grasping Dead', 2, 1, { req: [1, 1], max: 2, pro: n => `The Bog Body seizes the first foe to reach it until it sinks, then drags that one under first and holds it ${gNf(.5 * n)}s longer.`, sp: n => ({ ab: 'bw_bogbody', rider: { bwHeld: .5 * n } }) }],
@@ -53109,7 +53771,7 @@ function tchUlt(id, o) {
   tchUlt('ih_airburst', { cd: 22, mana: 160, by: { mult: 1.4 } });      // Starshell: 15.5s, 130 mana
   tchUlt('ih_pistondrive', { cd: 18, mana: 135, by: { kb: 1.4 } });     // Steam Uppercut: 10.5s, 100 mana
   // the rest keep their numbers (12.5-22s): they say Ultimate and hold for a worthy moment
-  for (const id of ['ih_slug', 'ih_bombard', 'ih_demolish', 'ch_oath', 'ch_barrage', 'ch_onthehouse']) tchUlt(id);
+  for (const id of ['ih_slug', 'ih_bombard', 'ih_demolish', 'ch_oath', 'ch_barrage', 'ch_onthehouse', 'ch_headsman', 'ch_mountaindue', 'ch_oldgrudge']) tchUlt(id);
   // Holds the Pass (Haldra): its stone ridge rises where Iron Wall is raised (it rose at the end of Rising Peaks, which
   // Deep Roots already shapes)
   if (typeof ihcWrapCast === 'function' && ABIL.ch_ironwall && typeof IHC2 !== 'undefined') ihcWrapCast('ch_ironwall', (raw, t, st, tg, ab, again) => {
@@ -53168,22 +53830,22 @@ function tchUlt(id, o) {
   ]);
   tchTree(FORCES["ironhold"].talents["frost"], [   // ironhold.frost
     ['Third Wrap', 0, 1],
-    ['Weighted Chains', 0, 2],
-    ['Tangle', 1, 1],
+    ['Tangle', 0, 2],
+    ['Weighted Chains', 1, 1],
     ['Tripwire', 1, 2, { req: [0, 2] }],
     ["Trapper's Haul", 1, 3],
     ['Wide Nets', 2, 0, { max: 2, pro: n => `Nets also catch every foe within ${gNf(.3 * n)} cells of the target.` }],
     ['Harpoon Winch', 2, 1, { req: [1, 1] }],
-    ['Trap Line', 2, 2, { req: [1, 2] }],
+    ['Barbed Chain', 2, 2, { req: [1, 2], pro: n => `Ground foes Tripwire trips bleed ${200 * n}% of a throw over 3s.`, sp: n => ({ ab: 'ih_caltropfield', rider: { bleed: 2 * n } }) }],
     ['Wing Cords', 3, 0, { req: [2, 0] }],
     ['Bound and Broken', 3, 1, { req: [2, 1] }],
-    ['Barbed Chain', 3, 2, { req: [2, 2] }],
+    ['Trap Line', 3, 2, { req: [2, 2] }],
     ['Hooked Chain', 4, 0, { req: [3, 0], on: 'ih_chainnet', max: 2, pro: n => `Harpoon Winch comes ${5 * n}% sooner${n >= 2 ? ', and after it a Chain Net is thrown at once' : ''}.`, sp: n => ({ ab: 'ih_grapple', cd: -.05 * n }) }],
     ['Caltrop Bed', 4, 1, { req: [3, 1], max: 2, pro: n => `Harpoon Winch leaves caltrops for ${gNf(1.5 * n)}s where its catch lands.`, sp: n => ({ ab: 'ih_grapple', rider: { ihfBed: n } }) }],
-    ['Spiked Caltrops', 4, 2, { req: [3, 2] }],
+    ['Spiked Caltrops', 4, 2, { req: [3, 2], pro: n => `Foes Tripwire trips fall among caltrops that deal ${60 * n}% of a throw a second.` }],
     ['Twin Nets', 5, 0, { req: [4, 0] }],
-    ['Bear Trap', 5, 1, { req: [4, 1] }],
-    ['Double Line', 5, 2, { req: [4, 2] }],
+    ['Double Line', 5, 1, { req: [4, 1] }],
+    ['Bear Trap', 5, 2, { req: [4, 2], pro: () => 'Every 6s it sets a bear trap that pins a ground foe 1.5s and hits 10× as hard.' }],
   ]);
   tchTree(FORCES["ironhold"].talents["arcane"], [   // ironhold.arcane
     ['Banked Embers', 0, 1],
@@ -53326,6 +53988,54 @@ function tchUlt(id, o) {
     ['Brimming Keg', 5, 1, { req: [4, 1] }],
     ['Spilled Pints', 5, 2, { req: [4, 2], on: 'ale' }],
   ]);
+  tchTree(CHAMPS["ih_marksman"].tree, [   // ironhold.champ:ih_marksman
+    ['Windage', 0, 1],
+    ['Patient Aim', 0, 2],
+    ['Steady Breath', 1, 0],
+    ["Spotter's Flare", 1, 2, { req: [0, 2] }],
+    ['Through the Ranks', 1, 3],
+    ['Ridge-Watch', 2, 1],
+    ['Bright Flare', 2, 2, { req: [1, 2] }],
+    ['Spent Brass', 2, 3],
+    ['Punch-Through', 3, 1, { req: [2, 1] }],
+    ['Wide Flare', 3, 2, { req: [2, 2], max: 2, pro: n => `Spotter's Flare lights ${gNf(.075 * n)} cells wider.`, sp: n => ({ ab: 'ch_flare', by: { r: .075 * n } }) }],
+    ["Headsman's Round", 4, 1, { req: [3, 1] }],
+    ["Spotter's Tally", 4, 2, { req: [3, 2], max: 2, pro: n => `Every ${n >= 2 ? '2nd' : '3rd'} Spotter's Flare gives its mana back.`, sp: n => ({ ab: 'ch_flare', every: 4 - n }) }],
+    ["Oathbreaker's End", 5, 1, { req: [4, 1] }],
+    ['Signal Fire', 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(CHAMPS["ih_king"].tree, [   // ironhold.champ:ih_king
+    ['Throne Room', 0, 1],
+    ['Long Muster', 0, 2],
+    ['Old Debts', 1, 0],
+    ['Muster Drums', 1, 1],
+    ['Oathhammer', 1, 2, { req: [0, 2] }],
+    ['Sworn Shield', 2, 1],
+    ['Broad Head', 2, 2, { req: [1, 2] }],
+    ['Royal Tithe', 2, 3],
+    ['Crown of Iron', 3, 1, { req: [2, 1] }],
+    ['Hall-Breaker', 3, 2, { req: [2, 2], max: 2, pro: n => `Every foe Oathhammer strikes loses ${n} armour for 5s.`, sp: n => ({ ab: 'ch_oathhammer', rider: { shred: [n, 2 * n] } }) }],
+    ["The Mountain's Due", 4, 1, { req: [3, 1] }],
+    ['Kingsblood', 4, 2, { req: [3, 2], max: 2, pro: n => `Each foe Oathhammer slays gives him ${4 * n} mana.`, sp: n => ({ ab: 'ch_oathhammer', kill: { mana: 4 * n, cd: 0 } }) }],
+    ['Blood of Kings', 5, 1, { req: [4, 1] }],
+    ["The King's Due", 5, 2, { req: [4, 2] }],
+  ]);
+  tchTree(CHAMPS["ih_hrolf"].tree, [   // ironhold.champ:ih_hrolf
+    ["Skywarden's Watch", 0, 1],
+    ['Ranging Fire', 0, 2],
+    ['Drilled Crew', 1, 0],
+    ['Grudge Shell', 1, 2, { req: [0, 2] }],
+    ['Full Racks', 1, 3],
+    ['Powder Ration', 2, 0],
+    ['Low Angle', 2, 1],
+    ['Heavy Charge', 2, 2, { req: [1, 2] }],
+    ['Grudge-Fed', 3, 1, { req: [2, 1] }],
+    ['Grounding Shell', 3, 2, { req: [2, 2], max: 2, pro: n => `Grudge Shell knocks a flyer out of the sky ${gNf(.25 * n)}s longer.`, sp: n => ({ ab: 'ch_grudgeshell', by: { low: .25 * n } }) }],
+    ['The Old Grudge', 4, 1, { req: [3, 1] }],
+    ['Spent Casings', 4, 2, { req: [3, 2], max: 2, pro: n => `A kill with Grudge Shell puts ${6 * n} mana back in his pouch.`, sp: n => ({ ab: 'ch_grudgeshell', kill: { mana: 6 * n, cd: 0 } }) }],
+    ['The Long Grudge', 5, 1, { req: [4, 1] }],
+    ['Wing-Breaker', 5, 2, { req: [4, 2] }],
+  ]);
 })();
 /* </chains ironhold> */
 
@@ -53381,20 +54091,20 @@ function tchUlt(id, o) {
   ]);
   tchTree(FORCES["silver"].talents["frost"], [   // silver.frost
     ['Tight Bindings', 0, 1],
-    ['Tightening Links', 0, 2],
+    ['Tightening Links', 0, 2, { pro: n => `Each repeat lash on one foe slows ${5 * n}% more and hits ${n} lash${n > 1 ? 'es' : ''} harder, thrice.` }],
     ['Chain of Penance', 1, 2, { req: [0, 2] }],
     ['Vigil Lamp', 1, 3],
     ['Dazzle', 2, 1],
-    ['Scouring Light', 2, 2, { req: [1, 2] }],
-    ['Glinting Links', 2, 3],
+    ['Glare of Dawn', 2, 2, { req: [1, 2], max: 2, cap: 'tchGlare', pro: n => `Chain of Penance's snap delivers a ${250 * n}% Verdict.`, sp: n => ({ ab: 'so_flare', rider: { fresh: 1 } }) }],
+    ['Blinding Chains', 2, 3, { max: 2, pro: n => `Its binds also Blind their foe for ${gNf(.75 * n)}s.` }],
     ['Last Rites', 3, 1, { req: [2, 1], on: 'so_bind' }],
-    ['Glare of Dawn', 3, 2, { req: [2, 2], max: 2, pro: n => `Chain of Penance lays ${n} more Judgement on its foe.`, sp: n => ({ ab: 'so_flare', rider: { judge: n } }) }],
-    ['Blinding Chains', 3, 3, { req: [2, 3], max: 2, pro: n => `Its binds also Blind their foe for ${gNf(.75 * n)}s.` }],
+    ['Glinting Links', 3, 2, { req: [2, 2], pro: n => `Lashes on bound or Blinded foes leap to a second foe for ${50 * n}%.` }],
+    ['Scouring Light', 3, 3, { req: [2, 3] }],
     ['Vigil Chains', 4, 1, { req: [3, 1] }],
     ['Swift Lash', 4, 2, { req: [3, 2] }],
     ['Twin Chains', 4, 3, { req: [3, 3], max: 2, pro: n => `Binding Light comes ${5 * n}% sooner${n >= 2 ? ' and seizes one more foe' : ''}.`, sp: n => ({ ab: 'so_bind', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
     ['Shackle Litany', 5, 1, { req: [4, 1] }],
-    ['Chain of Judgement', 5, 2, { req: [4, 2] }],
+    ['Chain of Judgement', 5, 2, { req: [4, 2], pro: () => 'Lashes on foes at full stacks leap to three foes at 60%, then deliver a fivefold Verdict.' }],
     ['Quick Binding', 5, 3, { req: [4, 3], on: 'lash' }],
   ]);
   tchTree(FORCES["silver"].talents["arcane"], [   // silver.arcane
@@ -53454,40 +54164,40 @@ function tchUlt(id, o) {
     ['Ringing Steel', 5, 2, { req: [4, 2] }],
   ]);
   tchTree(FORCES["silver"].talents["cannon"], [   // silver.cannon
-    ['Pall of Smoke', 0, 1],
-    ['Choking Smoke', 0, 2],
-    ['Lingering Smoke', 1, 0],
-    ['Procession of Incense', 1, 2, { req: [0, 2] }],
-    ['Ash in the Eyes', 2, 1],
-    ['Swift Swing', 2, 2, { req: [1, 2] }],
-    ['Fanned Embers', 2, 3],
-    ['Thick Smoke', 3, 1, { req: [2, 1], max: 2, pro: n => `Incense lays Judgement ${n >= 2 ? 'every half second' : 'three times every 2 seconds'}, not every second.` }],
-    ['Censing Prayer', 3, 2, { req: [2, 2], max: 2, pro: n => `Procession of Incense Wards Order units within a cell of its path for ${2 * n}s.` }],
-    ['Rekindling', 3, 3, { req: [2, 3], max: 2, pro: n => `Each foe its bursts slay throws a ${25 * n}% coal at the nearest ground foe.` }],
-    ['Purging Fire', 4, 1, { req: [3, 1], max: 2, pro: n => `Its bursts deliver a ${20 * n}% Verdict on foes with 3+ stacks.` }],
-    ['Offering Bowl', 4, 2, { req: [3, 2] }],
-    ['Kindle the Censers', 4, 3, { req: [3, 3] }],
-    ['Ember Psalm', 5, 1, { req: [4, 1], pro: () => 'Each ground foe Thurible Sweep slays throws a burning coal at the nearest ground foe.', sp: () => ({ ab: 'so_sweep', rider: { fresh: 1 } }) }],
+    ['Fanned Embers', 0, 1, { pro: n => `Coals that land in incense lay ${n} more Judgement and burst again for ${30 * n}%.` }],
+    ['Lingering Smoke', 0, 2],
+    ['Thick Smoke', 1, 1, { req: [0, 1], max: 2, pro: n => `Incense lays Judgement ${n >= 2 ? 'every half second' : 'three times every 2 seconds'}, not every second.` }],
+    ['Choking Smoke', 1, 2],
+    ['Purging Fire', 2, 1, { req: [1, 1], max: 2, pro: n => `Its bursts deliver a ${75 * n}% Verdict on foes with 3+ stacks.` }],
+    ['Procession of Incense', 2, 2, { req: [1, 2] }],
+    ['Pall of Smoke', 2, 3],
+    ['Rekindling', 3, 1, { req: [2, 1], max: 2, pro: n => `Each foe its bursts slay throws a ${50 * n}% coal at the nearest ground foe.` }],
+    ['Swift Swing', 3, 2, { req: [2, 2] }],
+    ['Ash in the Eyes', 3, 3, { req: [2, 3] }],
+    ['Kindle the Censers', 4, 1, { req: [3, 1] }],
+    ['Censing Prayer', 4, 2, { req: [3, 2], max: 2, pro: n => `Procession of Incense Wards Order units within a cell of its path for ${2 * n}s.` }],
+    ['Offering Bowl', 4, 3, { req: [3, 3] }],
+    ['Glowing Coal', 5, 1, { req: [4, 1] }],
     ['Censing of the Faithful', 5, 2, { req: [4, 2] }],
-    ['Glowing Coal', 5, 3, { req: [4, 3] }],
+    ['Ember Psalm', 5, 3, { req: [4, 3], pro: () => 'Each ground foe Thurible Sweep slays throws a burning coal at the nearest ground foe.', sp: () => ({ ab: 'so_sweep', rider: { fresh: 1 } }) }],
   ]);
   tchTree(FORCES["silver"].talents["venom"], [   // silver.venom
-    ['Forfeit', 0, 1],
-    ['Scorching Seal', 0, 2],
+    ['Scorching Seal', 0, 1, { pro: n => `Each lash burns ${3 * n} more mana and scorches the caster for ${n > 1 ? n + '× ' : ''}the mana burned.` }],
+    ['Broken Litany', 0, 2],
+    ['Dry Well', 1, 1, { req: [0, 1] }],
     ['Writ of Seizure', 1, 2, { req: [0, 2] }],
-    ['Dry Well', 1, 3],
-    ['Broken Litany', 2, 0],
-    ['Heavy Silence', 2, 1],
+    ["Zealot's Vow", 2, 1, { req: [1, 1], pro: n => `Every foe it slays feeds its Zeal: up to ${10 + 3 * n}, each worth ${gNf(1 + .5 * n)}× as much.` }],
     ['Writ of Iron', 2, 2, { req: [1, 2], max: 2, pro: n => `Writ of Seizure comes ${5 * n}% sooner${n >= 2 ? ' and seizes one more caster near the first' : ''}.`, sp: n => ({ ab: 'so_seize', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
-    ["Zealot's Vow", 3, 0, { req: [2, 0] }],
-    ['Sealed Tongues', 3, 1, { req: [2, 1] }],
+    ['Heavy Silence', 2, 3],
+    ['Forfeit', 3, 1, { req: [2, 1] }],
     ['Confession', 3, 2, { req: [2, 2] }],
-    ["Heretic's Stake", 4, 0, { req: [3, 0] }],
-    ['Shield of Doctrine', 4, 1, { req: [3, 1], max: 2, pro: n => `Units within ${gNf(.75 * n)} cells of it shrug off silences and hexes.` }],
+    ['Sealed Tongues', 3, 3, { req: [2, 3] }],
+    ["Heretic's Stake", 4, 1, { req: [3, 1] }],
     ['Penitent Chains', 4, 2, { req: [3, 2] }],
-    ['Pyre Eternal', 5, 0, { req: [4, 0] }],
-    ['Ashes Speak', 5, 1, { req: [4, 1], on: 'so_edict', sp: () => [{ ab: 'so_edict' }, { ab: 'so_pyre', rider: { fresh: 1 } }] }],
+    ['Shield of Doctrine', 4, 3, { req: [3, 3], max: 2, pro: n => `Units within ${gNf(.75 * n)} cells of it shrug off silences and hexes.` }],
+    ['Pyre Eternal', 5, 1, { req: [4, 1] }],
     ['Grand Inquest', 5, 2, { req: [4, 2] }],
+    ['Ashes Speak', 5, 3, { req: [4, 3], on: 'so_edict', sp: () => [{ ab: 'so_edict' }, { ab: 'so_pyre', rider: { fresh: 1 } }] }],
   ]);
   tchTree(CHAMPS["so_lion"].tree, [   // silver.champ:so_lion
     ['Swift Reprisal', 0, 1],
@@ -53601,18 +54311,18 @@ function tchUlt(id, o) {
     ['Water Turns to Ice', 0, 2],
     ['Meltwater', 1, 1],
     ['Black Ice', 1, 2, { req: [0, 2] }],
-    ['Heavy Hail', 1, 3],
     ['Skystone', 2, 1, { req: [1, 1] }],
-    ['Sleet', 2, 2, { req: [1, 2], max: 2, pro: n => `Black Ice soaks the ground foes it knocks down for ${gNf(1.5 * n)}s: they fall more often.`, sp: n => ({ ab: 'sb_hailstorm', rider: { soak: 1.5 * n } }) }],
+    ['Shattering Hail', 2, 2, { req: [1, 2], cap: 'tchFall', pro: n => `Falls on Black Ice strip 1 armour, up to ${2 * n}, and strike ${gNf(1.5 * n)} stones harder.` }],
+    ['Brittle Cold', 2, 3],
     ['Frostbound Totem', 3, 1, { req: [2, 1], max: 2, pro: n => `Skystone comes ${15 * n}% sooner while 3 or more chilled foes are in its reach.`, sp: n => ({ ab: 'sb_rimetotem', at: 'foes', foes: { n: 3, cond: 'chilled' }, cd: -.15 * n }) }],
-    ['Shattering Hail', 3, 2, { req: [2, 2] }],
-    ['Brittle Cold', 3, 3],
+    ['Heavy Hail', 3, 2, { req: [2, 2], cap: 'tchHeavy', pro: n => `Its hailstones splash ${8 * n}% wider and hit frozen or fallen foes ${n} stone${n > 1 ? 's' : ''} harder.` }],
+    ['Sleet', 3, 3, { req: [2, 3], max: 2, pro: n => `Black Ice soaks the ground foes it knocks down for ${gNf(1.5 * n)}s: they fall more often.`, sp: n => ({ ab: 'sb_hailstorm', rider: { soak: 1.5 * n } }) }],
     ['Brittle Fall', 4, 1, { req: [3, 1], max: 2, pro: n => `The next hailstone to hit a foe within ${2 * n}s of Skystone freezes it 0.3s.`, sp: n => ({ ab: 'sb_rimetotem', rider: { sbfBrittle: 2 * n } }) }],
     ['Ice Crust', 4, 2, { req: [3, 2] }],
     ['Frost Lightning', 4, 3, { req: [3, 3], max: 2, pro: n => `Lightning ${n >= 2 ? 'leaping onto chilled foes gains 2 jumps, not 1' : 'that first strikes a chilled foe gains a jump'}, for every unit.` }],
     ['Hail Cairn', 5, 1, { req: [4, 1] }],
-    ['Frozen Through', 5, 2, { req: [4, 2] }],
-    ['Hail Shatter', 5, 3, { req: [4, 3] }],
+    ['Hail Shatter', 5, 2, { req: [4, 2], pro: () => 'Chilled foes burst on death, chilling foes within 1.1 cells and striking them for 5× a stone.' }],
+    ['Frozen Through', 5, 3, { req: [4, 3] }],
   ]);
   tchTree(FORCES["stormborn"].talents["arcane"], [   // stormborn.arcane
     ['Deep Hex', 0, 1],
@@ -53816,10 +54526,10 @@ function tchUlt(id, o) {
     ['Deep Bite', 2, 2, { req: [1, 2], max: 2, pro: n => `Frostbite freezes ground foes on a frost rune ${gNf(.25 * n)}s longer.` }],
     ['Winter Ward', 2, 3, { req: [1, 3] }],
     ['Rimecut', 3, 1, { req: [2, 1] }],
-    ['Biting Wind', 3, 2, { req: [2, 2], max: 2, pro: n => `Its next ${1 + n} sweeps after each Frostbite brand every ground foe they strike.` }],
+    ['Biting Wind', 3, 2, { req: [2, 2], max: 2, pro: n => `After each Frostbite, its next ${1 + n} sweeps strike twice and brand their foes.` }],
     ['Long Winter', 3, 3, { req: [2, 3], max: 2, capAt: 2, capK: .5, pro: n => `Winter Ward comes ${5 * n}% sooner${n >= 2 ? '; a frost rune forms ahead of each foe it strikes' : ''}.`, sp: n => ({ ab: 'wb_winterward', cd: -.05 * n, rider: { wbf: 1 } }) }],
     ['Wide Sweep', 4, 1, { req: [3, 1], on: 'sweeps', max: 2, capAt: 2, capK: .5, pro: n => `Rimeline comes ${5 * n}% sooner${n >= 2 ? ', and each sweep cuts one more ground foe' : ''}.`, sp: n => ({ ab: 'wb_rimeline', cd: -.05 * n }) }],
-    ['Shatter Oath', 4, 2, { req: [3, 2] }],
+    ['Shatter Oath', 4, 2, { req: [3, 2], pro: n => `Its sweeps hit frozen foes ${n + 1}× as hard.` }],
     ['Cold Vigil', 4, 3, { req: [3, 3], max: 2, capAt: 2, capK: .5, pro: n => `Winter Ward costs ${5 * n}% less${n >= 2 ? '; Frostbrand Sentries within 3 cells lay a frost rune too' : ''}.`, sp: n => ({ ab: 'wb_winterward', cost: -.05 * n, rider: { wbf: 1 } }) }],
     ['Rime Crown', 5, 1, { req: [4, 1] }],
     ['Hoarfrost', 5, 2, { req: [4, 2] }],
@@ -53903,19 +54613,19 @@ function tchUlt(id, o) {
     ['Deep Mending', 0, 1],
     ["Mender's Due", 0, 2],
     ['Sworn Vow', 1, 1, { req: [0, 1] }],
-    ['Field Chaplain', 1, 3],
-    ['Incense of Vigil', 2, 0],
+    ['Field Chaplain', 1, 2],
+    ['Ember Vow', 1, 3, { max: 2, capAt: 1, capK: 1, sp: () => ({ ab: 'wb_censer' }), pro: n => `Its Censer Smoke burns foes in it for ${100 * n}% of a cut each second.` }],
     ['Oath Renewed', 2, 1, { req: [1, 1], max: 2, pro: n => `A Wounded knight Sworn Vow mends gets its spells ${2 * n}s sooner.` }],
-    ['Ember Vow', 2, 3, { on: 'runes', max: 2, capAt: 2, capK: .5, pro: n => `Censer Smoke costs ${5 * n}% less${n >= 2 ? '; its vow runes brand foes that step on them' : ''}.`, sp: n => ({ ab: 'wb_censer', cost: -.05 * n }) }],
-    ['Rite of Holding', 3, 0, { req: [2, 0] }],
+    ['Incense of Vigil', 2, 3, { req: [1, 3] }],
     ['Vow of Iron', 3, 1, { req: [2, 1] }],
     ['Siege-Ward', 3, 2, { max: 2, pro: n => `Its cuts delay a siege troop's next blow ${gNf(.35 * n)}s longer.` }],
-    ['Long Rite', 4, 0, { req: [3, 0], max: 2, capAt: 2, capK: .5, pro: n => `Rite of Holding comes ${5 * n}% sooner${n >= 2 ? ' and renews runes of every kind, adding vow' : ''}.`, sp: n => ({ ab: 'wb_rite', cd: -.05 * n, rider: { wbf: 1 } }) }],
+    ['Rite of Holding', 3, 3, { req: [2, 3] }],
     ['Urgent Hands', 4, 1, { req: [3, 1] }],
     ['Choking Censer', 4, 2, { req: [3, 2], max: 2, capAt: 2, capK: .5, pro: n => `Censer Smoke comes ${5 * n}% sooner${n >= 2 ? "; siege troops leaving it still can't attack for 1.5s" : ''}.`, sp: n => ({ ab: 'wb_censer', cd: -.05 * n, rider: { wbf: 1 } }) }],
-    ['Hallowed Road', 5, 0, { req: [4, 0] }],
+    ['Long Rite', 4, 3, { req: [3, 3], max: 2, capAt: 2, capK: .5, pro: n => `Rite of Holding comes ${5 * n}% sooner${n >= 2 ? ' and renews runes of every kind, adding vow' : ''}.`, sp: n => ({ ab: 'wb_rite', cd: -.05 * n, rider: { wbf: 1 } }) }],
     ['Sanctuary', 5, 1, { req: [4, 1] }],
     ['Keeper of Vows', 5, 2, { req: [4, 2] }],
+    ['Hallowed Road', 5, 3, { req: [4, 3], pro: () => 'Rite of Holding also swings a free Censer Smoke that burns twice as hot.' }],
   ]);
   tchTree(CHAMPS["wb_varic"].tree, [   // wardbound.champ:wb_varic
     ['Old Discipline', 0, 1],
@@ -54004,6 +54714,29 @@ function tchUlt(id, o) {
   if (typeof WB_HOOK !== 'undefined' && WB_HOOK.kill) WB_HOOK.kill.push((c, src) => {
     if (!src || !src.def || src.def.unit !== 'ch_aedric' || !wbkHas(src, 'wbkSunSworn') || !src.ab || !src.ab.cd) return;
     if (src.ab.cd.ch_sunwheel > G.time) src.ab.cd.ch_sunwheel = Math.max(G.time, src.ab.cd.ch_sunwheel - 3);
+  });
+})();
+
+/* ---------- the Vowkeepers' damage road: the smoke burns (21 Nov 2026) ---------- */
+(function tchVowRoad() {
+  if (typeof WB_HOOK === 'undefined' || typeof wbCap !== 'function' || typeof ABIL === 'undefined') return;
+  // Ember Vow: its Censer Smoke burns every foe in it for 100% of a cut a rank, once a second (it was a brand from its vow
+  // runes, which sit at its post and seldom touch the road). Hallowed Road's smoke (z.tchHot) burns twice as hot.
+  WB_HOOK.tick.push(() => {
+    for (const z of G.hazards) {
+      if (z.k !== 'wb_zone' || z.ab !== 'wb_censer' || !(z.t > 0)) continue;
+      const t = z.src; if (!t || !G.towers.includes(t) || t.wrecked) continue;
+      const s = t.st || effStats(t), n = wbCap(s, 'wbvEmber'); if (!n || (z.tchBurnAt || 0) > G.time) continue;
+      z.tchBurnAt = G.time + 1;
+      for (const c of G.creeps) { if (c.dead || c.ent || c.phased || Math.hypot(c.x - z.x, c.y - z.z) > z.r) continue; abRun('wb_censer', () => wbHit(t, s, c, s.dmg * Math.min(2, n) * (z.tchHot ? 2 : 1), 'magic')); }
+    }
+  });
+  // Hallowed Road: Rite of Holding also swings a free Censer Smoke, twice as hot (it was a strike from its vow runes)
+  if (typeof wbkWrap === 'function') wbkWrap('wb_rite', 'cast', function (c0, t, st, tg, ab) {
+    const r = c0.call(this, t, st, tg, ab); if (r === false || !wbkHas(t, 'wbkHallow') || !ABIL.wb_censer) return r;
+    ABIL.wb_censer.cast(t, st, null, ABIL.wb_censer);
+    for (let k = G.hazards.length - 1; k >= 0; k--) { const z = G.hazards[k]; if (z.k === 'wb_zone' && z.ab === 'wb_censer' && z.src === t) { z.tchHot = 1; break; } }
+    return r;
   });
 })();
 
@@ -57852,7 +58585,7 @@ SFX_V2_DEF.push(() => {
 const SFX_CH = {
   ch_unravel: ['arcane', 'cc'], ch_mirrorweave: ['arcane', 'cc'], ch_rewind: ['time', 'cc'], ch_hourlead: ['time', 'cc'], ch_riftchain: ['vey', 'cc'], ch_unbound: ['vey', 'cc'],
   ch_rootway: ['nature', 'gv'], ch_oldwood: ['nature', 'gv'], ch_pinarrow: ['nature', 'gv'], ch_huntermoon: ['star', 'gv'], ch_garden: ['nature', 'gv'], ch_fullbloom: ['nature', 'gv'],
-  ch_anvil: ['earth', 'ih'], ch_oath: ['earth', 'ih'], ch_coil: ['storm', 'ih'], ch_barrage: ['steam', 'ih'], ch_firebrew: ['fire', 'ih'], ch_onthehouse: ['fire', 'ih'],
+  ch_anvil: ['earth', 'ih'], ch_oath: ['earth', 'ih'], ch_coil: ['storm', 'ih'], ch_barrage: ['steam', 'ih'], ch_firebrew: ['fire', 'ih'], ch_onthehouse: ['fire', 'ih'], ch_flare: ['fire', 'ih'], ch_headsman: ['steel', 'ih'], ch_oathhammer: ['earth', 'ih'], ch_mountaindue: ['earth', 'ih'], ch_grudgeshell: ['steel', 'ih'],
   ch_fordstandard: ['holy', 'so'], ch_lionsdue: ['holy', 'so'], ch_morningstar: ['holy', 'so'], ch_highnoon: ['holy', 'so'], ch_summons: ['holy', 'so'], ch_verdict: ['holy', 'so'],
   ch_eyestorm: ['storm', 'sb'], ch_stormcall: ['storm', 'sb'], ch_galewall: ['wind', 'sb'], ch_updraft: ['wind', 'sb'], ch_runwolves: ['spirit', 'sb'], ch_thunderdive: ['storm', 'sb'],
   ch_entangle: ['nature', 'gv'], ch_thornvolley: ['nature', 'gv'], ch_sporecloud: ['nature', 'gv'], ch_thousandfold: ['arcane', 'cc'], ch_stoppedhour: ['time', 'cc'], ch_severing: ['vey', 'cc'],
@@ -84780,15 +85513,15 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
 /* Painted art for Ironhold (to be generated from the paintings commissioned by id: docs/ironhold_art.md), keyed by id.
    Items (relics, legendaries, charms; shop items as ihs_*) join RELICART / RELIC_IMG as the Grove's do (a shop item under
    shop-<id>); abilities and the commanders' spells join UI_ART (abilities.js and heroes.js paint them in place of the
-   glyph); hero portraits (ih_thane, ih_artificer, ih_brewer) join HERO_ART_URI. Empty until the paintings arrive: every
+   glyph); hero portraits (ih_thane, ih_artificer, ih_brewer, ih_marksman, ih_king, ih_hrolf) join HERO_ART_URI. Empty until the paintings arrive: every
    id keeps its procedural glyph meanwhile. Fill IRONHOLD_ART = { id: 'data:image/webp;base64,...' }. */
 const IRONHOLD_ART = {};
-const IH_PORTRAIT_IDS = ['ih_thane', 'ih_artificer', 'ih_brewer'];
+const IH_PORTRAIT_IDS = ['ih_thane', 'ih_artificer', 'ih_brewer', 'ih_marksman', 'ih_king', 'ih_hrolf'];
 function ironholdArtApply() {
   for (const id in IRONHOLD_ART) {
     const uri = IRONHOLD_ART[id];
     if (IH_PORTRAIT_IDS.includes(id)) { if (typeof HERO_ART_URI !== 'undefined') HERO_ART_URI[id] = uri; continue; }
-    if (typeof ABIL !== 'undefined' && ABIL[id] || /^ih_(ironwall|sentry|rollingkeg)$/.test(id)) { if (typeof UI_ART !== 'undefined') UI_ART[id] = uri; continue; }
+    if (typeof ABIL !== 'undefined' && ABIL[id] || /^ih_(ironwall|sentry|rollingkeg|farshot|muster|battery)$/.test(id)) { if (typeof UI_ART !== 'undefined') UI_ART[id] = uri; continue; }
     if (typeof RELICART !== 'undefined' && typeof RELIC_IMG !== 'undefined') {
       const k = id.startsWith('ihs_') ? 'shop-' + id : id, im = new Image();
       RELICART[k] = uri; im.onload = () => { RELIC_IMG[k] = im; if (typeof onDirty === 'function') onDirty(); }; im.src = uri;
@@ -86857,6 +87590,15 @@ const SPELL_BRIEFS = {
   ch_barrage: 'Swings a wrecking ball {r} cells out and back. Ground enemies hit are knocked back and lose 2 armour, taking {d} outbound and {d2} returning. Each hit builds heat.',
   ch_rollkeg: ({ d, full }) => { const f = String(full).replace(/<[^>]+>/g, ''), m = /within ([\d.]+) cells/.exec(f); return `Rolls ${/then a second/.test(f) ? 'two kegs' : 'a keg'} back up the road, knocking ground enemies back and slowing 40% for 2 sec. It bursts in flames, dealing ${d(1)} within ${m ? m[1] : 1.2} cells (less to bosses) and setting them burning.`; },
   ch_firebrew: 'Breathes {n} gouts of flame in a 1.9-cell cone, each dealing {d} and setting enemies burning. Ale puddles in the cone ignite, dealing {d2} to ground enemies and burning 3 sec.',
+  ch_farshot: 'Aims 1.5 sec at an enemy anywhere on the field, then fires a round that pierces every enemy on its line, dealing {d} (more the further it flies), 20% less per enemy passed. Bosses stagger 0.6 sec. A kill halves the cooldown and speeds ranged units 15% for 4 sec.',
+  ch_flare: 'Marks enemies within {r} cells for {dur} sec: they take more damage from every unit.',
+  ch_headsman: 'Settles 0.8 sec on the strongest enemy in reach, then deals {d}, doubled on an enemy below half health.',
+  ch_muster: 'Units within 3 cells strike 25% faster for 6 sec and cannot be stunned or knocked back. Then the next strike of each deals double damage.',
+  ch_oathhammer: 'Deals {d} to the target and half to ground enemies within {r} cells.',
+  ch_mountaindue: 'Deals {d} to ground enemies within 1.6 cells, more for each Sworn rank on units within 2 cells.',
+  ch_battery: 'Over flyers: 8 air bursts dealing {d} to flyers near each. Over ground enemies: 4 flat shells pierce down a line, dealing {d} to each ground enemy on it. Changing between them takes 1.5 sec.',
+  ch_grudgeshell: 'Deals {d}. A flyer is knocked out of the sky for {low} sec; neighbours of a ground enemy within 0.7 cells take half.',
+  ch_oldgrudge: 'After 1 sec a war-rocket arcs onto the best group anywhere, dealing {d} at the centre and half at the 1.8-cell edge. Flyers take double and are knocked down 3 sec; bosses stagger 0.8 sec. The crater slows ground enemies 25% for 3 sec.',
   ch_onthehouse: 'Floods a 2.4-cell-wide area with ale: ground enemies are slowed 50% and slip, stunned 0.35 sec. After 2.4 sec it lights all ale puddles, dealing {d} and setting enemies burning.',
   /* stormborn */
   sb_tether: 'Lashes up to {n} flyers for {d} each, pulling them down {low} sec (half on bosses) so all units can hit them, and soaking them 3 sec.',
@@ -87012,6 +87754,15 @@ const SPELL_TARGETS = {
   ch_rollkeg: 'the densest group of enemies',
   ch_firebrew: 'the cone over the most enemies',
   ch_onthehouse: 'the densest group of ground enemies',
+  ch_farshot: 'a boss or leader anywhere, else the healthiest enemy',
+  ch_flare: 'the densest group of enemies',
+  ch_headsman: 'the toughest enemy in reach',
+  ch_muster: 'Ironhold units near the fight',
+  ch_oathhammer: 'the toughest enemy in reach',
+  ch_mountaindue: 'ground enemies around him',
+  ch_battery: 'the densest group of enemies',
+  ch_grudgeshell: 'flyers first, else the toughest enemy',
+  ch_oldgrudge: 'the best group anywhere on the field',
   /* silver */
   so_bash: 'the toughest ground enemy in reach',
   so_aegis: 'the road beside it with the most ground enemies',
@@ -88312,6 +89063,12 @@ const AFF_MODS = {
     up: { storm: { k: 'range', v: .2 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'rate', v: -.05 }, arcane: { k: 'rate', v: -.05 } } },
   ih_brewer: { fav: 'arcane', sig: { name: 'Last Orders', t: 'For every 20 foes that fall within an Anvilwright’s reach, it rolls a small keg up the path that bowls foes back and bursts in fire.' },   // (Anvilwrights: Tovin already favours the Mortar Crew)
     up: { glaive: { k: 'rate', v: .06 }, earth: { k: 'reach', v: .1 } }, dn: { arrow: { k: 'range', v: -.2 }, storm: { k: 'rate', v: -.05 } } },
+  ih_marksman: { fav: 'storm', sig: { name: 'Spotter’s Call', t: 'A Flak Cannoneer reaches 0.1 cells further for each Thundergun within 2 cells of it (up to four).' },
+    up: { arrow: { k: 'range', v: .2 }, cannon: { k: 'crit', v: .05 } }, dn: { glaive: { k: 'rate', v: -.05 }, earth: { k: 'rate', v: -.05 } } },
+  ih_hrolf: { fav: 'cannon', sig: { name: 'Spotting Rounds', t: 'A Mortar Crew shell that lands under a flyer bursts upward too, striking the flyers above it for half the shell.' },   // (Mortar Crew: Tovin favours them too)
+    up: { storm: { k: 'airR', v: .2 }, frost: { k: 'range', v: .2 } }, dn: { glaive: { k: 'rate', v: -.05 }, arcane: { k: 'rate', v: -.05 } } },
+  ih_king: { fav: 'earth', sig: { name: 'Kingsguard', t: 'A Steam Hammer strikes 6% faster for each Sworn rank it holds.' },   // (Steam Hammers: Haldra favours them too; the Sworn ranks are Brannoc's own)
+    up: { glaive: { k: 'reach', v: .1 }, arcane: { k: 'range', v: .2 } }, dn: { storm: { k: 'rate', v: -.05 }, cannon: { k: 'range', v: -.2 } } },
   // ---- the Silver Order ----
   so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its slams Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back and Judges up to 4 ground foes it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
     up: { glaive: { k: 'reach', v: .1 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
@@ -88402,6 +89159,8 @@ function heroAffStats(h, t, st) {
     case 'rootmother': st.vsRooted = (st.vsRooted || 0) + .5; break;   // Thorn Waltz
     case 'ih_thane': if (st.rate) st.rate /= 1 + .06 * affBeside(t, o => !o.def.wall); break;   // Shoulder to Shoulder
     case 'ih_artificer': if (st.range) st.range += .6 * clamp(t.ihHeat || 0, 0, 1); break;   // Hot Barrels
+    case 'ih_marksman': if (st.range) st.range += .1 * Math.min(4, G.towers.filter(o => o.def.unit === 'thundergun' && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2).length); break;   // Spotter's Call
+    case 'ih_king': if (st.rate && typeof ihSworn === 'function') st.rate /= 1 + .06 * ihSworn(t); break;   // Kingsguard
     case 'sb_wind': if (st.rate && typeof sbLevel === 'function') st.rate /= 1 + .05 * clamp(sbLevel(), 0, 4); break;   // Rising Wind
     // Headlong: one more leap for every 4 foes slain this wave
     case 'wb_aedric': if (t.affWave === G.wave && t.affN >= 4) st.chain = (st.chain || 2) + Math.min(3, Math.floor(t.affN / 4)); break;
@@ -88472,6 +89231,9 @@ function heroAffHit(c, st, src, amt) {
   if (m && m.k === 'spore' && amt > 0 && typeof dose === 'function' && !isImmune(c, 'poison')) { dose(c, { poison: Math.max(1, amt * m.v / 3), poisonT: 3, caps: {} }, src); c.swarmOn = true; }   // a little of the Seedmother's spores
   if (!affFav(h, src)) return;
   switch (h.id) {
+    case 'ih_hrolf':   // Spotting Rounds: the flyers above a mortar shell's landing (once a shell: a short guard)
+      if (amt > 0 && !c.fly && !(src.affCdT > G.time)) { src.affCdT = G.time + .3; for (const o of nearest(c.x, c.y, .9, 4, c, q => q.fly && !(q.lowT > G.time) && !q.ent)) { hurt(o, amt * .5, 'phys', src, true, null); affPop(o.x, o.y, hitH(o), h.hue); } }
+      break;
     case 'frost':   // Hoarfrost
       if (amt > 0 && (src.affN = (src.affN || 0) + 1) % 4 === 0) { freezeFoe(c, .5, src); affPop(c.x, c.y, hitH(c), '#cfefff'); }
       break;
@@ -88555,7 +89317,7 @@ function heroAffToll() {}
 
 /* ---- what the unit's card and sheet say ---- */
 // the stat a stat-shaped signature moves (the Gear sheet gives that line its reason)
-const AFF_FAV_STAT = { marshal: 'aura', arch: 'range', quarter: 'crit', ih_thane: 'rate', ih_artificer: 'range', sb_wind: 'rate' };
+const AFF_FAV_STAT = { marshal: 'aura', arch: 'range', quarter: 'crit', ih_thane: 'rate', ih_artificer: 'range', ih_marksman: 'range', ih_king: 'rate', sb_wind: 'rate' };
 // the hero's mark on a unit, as an info-pane tag (ui.js), with its live count where it has one
 function heroAffTagHTML(t) {
   const h = affHero(), a = heroAffOf(h, t && t.type); if (!a || typeof tagTip !== 'function') return '';
@@ -97433,6 +98195,11 @@ if (typeof umDraw === 'function') {
      shoulder, the heavy diagonal cut to his left hip) and the bind and riposte (the blade upright, a short parry, the
      thrust); Oathbreaker Thrust is the braced drive (no leap); Rune Cleave two linked level sweeps (no spin). His ankles
      do not move in any of them. Every blow still lands on the game's own moment. docs/model_pilot/oathbound_studies.md.
+     Second pass (owner: "dont look as natural and smooth as the reference video"): the clips' values run on splines with
+     the hips ahead of the chest, the chest of the fists, the fists of the blade; a strike ends settled in its own finish
+     and the other strike winds up out of it (his guard only when the fight is over); obTwo follows a clip at one even
+     rate on a playhead of its own. Third pass (owner: "not sure if the sword is swinging down on the sharp edge"): the
+     bake rolls the sword hand so the edge leads through each cut (node sim/ob_edge.js measures it on the model).
      A spell's effect moment is his own record of it (castAbility wrapped, as the dwarf); its lead-in is the cast bar
      (forces_zz_casttimes.js, t.ab.cast).
    - The runes painted on his blade glow in their own orange (src/gl.js FS_STY: the blade's triangles are marked, ext -1,
@@ -97463,6 +98230,30 @@ const OB_PLANT = { at: .42, leap: .09 };   // (Oathbreaker Thrust: the landing, 
 const OB_GLOW = .45;
 function obClip(M, clip, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[clip]; return c[0] + Math.max(0, Math.min(c[1] - 1, f)); }
 function obT(id) { return OB_T[OB_MOVE[id]] || 1; }
+// the Oathbound's two-handed clips are baked marks.sub frames a 1/30 s: frame f (in 1/30 s) of one, and its length
+function obClip2(M, clip, f) { const D = UNIT_MDL[M.S.mdl], c = D.anim.clips[clip]; return c[0] + Math.max(0, Math.min(c[1] - 1, f * (D.marks.sub || 1))); }
+function obLen2(M, clip) { const D = UNIT_MDL[M.S.mdl]; return (D.anim.clips[clip][1] - 1) / (D.marks.sub || 1); }
+// how closely his pose follows a two-handed clip: the clips are smooth in themselves and their ends meet in his guard, so
+// a clip running on from the last frame drawn is followed closely and evenly (one rate throughout: a rate that changes
+// mid-swing makes the lag collapse, a visible snap); a jump (a spell cast mid-strike, a strike out of a spell's hold) is
+// eased into over .3 s
+const OB_FOLLOW = 150;
+function obTwo(t, M, c, f, glow, now) {
+  // (the strikes run on from one another: one's end is the other's start; a spell starts and ends in his guard)
+  const L = obLen2(M, c), strike = { exec: 1, ripo: 1 }, join = strike[c] && strike[t._obLc] && t._obLf > obLen2(M, t._obLc) - 2.5 && f < 2.5;
+  const fresh = t._obLc != null && now - t._obLt < .1, cont = fresh && (t._obLc === c ? Math.abs(f - t._obLf) < 4 : join);
+  if (!cont) t._obBl = now;
+  // his own playhead: the game's wind-up and its time since the shot do not meet to the frame at the blow (the wind-up is
+  // full up to a frame before the shot), which stood the blade still for a frame in mid cut; the playhead runs on at the
+  // pace it had and is drawn to the frame asked for, so it never stalls and is on the blow's frame to a fraction
+  const dt = fresh ? now - t._obLt : 0;
+  if (cont && t._obLc !== c && t._obPh != null) t._obPh = Math.max(0, Math.min(f, t._obPh + t._obPv - obLen2(M, t._obLc)));   // (on from one clip's end into the next's start, at the pace it had)
+  else if (!cont || t._obLc !== c || f < t._obLf - .01 || t._obPh == null) { t._obPh = f; t._obPv = 0; }
+  else if (dt > 0) { t._obPv = .7 * t._obPv + .3 * (f - t._obLf); t._obPh += t._obPv; t._obPh += (f - t._obPh) * .35; }
+  t._obLc = c; t._obLf = f; t._obLt = now;
+  const u = Math.min(1, (now - (t._obBl == null ? -9 : t._obBl)) / .3);
+  return { f: obClip2(M, c, Math.min(L, t._obPh)), rate: 10 + (OB_FOLLOW - 10) * u * u * u, glow, act: 1 };
+}
 if (typeof castAbility === 'function') {
   const _obCast = castAbility;
   castAbility = function (t, ab) {
@@ -97482,21 +98273,21 @@ function obCtl(t, live, M) {
   if (C && C.at != null && now >= C.at) {
     const u = Math.min(1, (now - C.at) / Math.max(.05, C.T)), r = 3.2 / Math.max(.15, C.T);
     const mv = OB_MOVE[C.id];
-    if (two && (mv === 'plant' || mv === 'flare')) return { f: obClip(M, mv === 'plant' ? 'drive' : 'cleave', (mv === 'plant' ? 4 : 6) * obE(u)), rate: r * 2, glow: (mv === 'plant' ? .5 : 1.4) * u, act: 1 };   // (the blade lifted before him; wound back to his right)
+    if (two && (mv === 'plant' || mv === 'flare')) return { f: obClip2(M, mv === 'plant' ? 'drive' : 'cleave', (mv === 'plant' ? 4 : 6) * obE(u)), rate: r * 2, glow: (mv === 'plant' ? .5 : 1.4) * u, act: 1 };   // (the blade lifted before him; wound back to his right)
     if (mv === 'plant') return { f: A.plantUp[0], rate: r, glow: .5 * u, act: 1 };
     if (mv === 'flare') return u < .7 ? { f: A.flareUp[0], rate: r * 1.4, glow: 1.4 * obE(u / .7), act: 1 } : { f: obClip(M, OB_FLARE.clip, OB_FLARE.back), rate: 18, glow: 1.4, act: 1 };
   }
   // a spell fired (its effect is now): the blow lands on it
   const id = t._obId, mv = OB_MOVE[id], cu = t._obAt != null ? now - t._obAt : 99;
   // (the two-handed clips run to their own end: the drive 1.25 s, as before; the cleave's second cut and its recovery 1.07 s)
-  const T = !id ? 0 : two && mv === 'plant' ? OB_PLANT.at + (A.drive[1] - 1 - two.drive) / 30 : two && mv === 'flare' ? OB_FLARE.at + (A.cleave[1] - 1 - two.cleave) / 30 : obT(id);
+  const T = !id ? 0 : two && mv === 'plant' ? OB_PLANT.at + (obLen2(M, 'drive') - two.drive) / 30 : two && mv === 'flare' ? OB_FLARE.at + (obLen2(M, 'cleave') - two.cleave) / 30 : obT(id);
   if (id && cu >= 0 && cu < T) {
     // Oathbreaker Thrust, the braced drive (no leap): the blade lifted upright, turned point-down over his head and driven into
     // the road as the spell strikes (OB_PLANT.at), held braced with his head bowed, and drawn out to his guard
-    if (two && mv === 'plant') return { f: obClip(M, 'drive', two.drive + (cu - OB_PLANT.at) * 30), rate: cu < .08 ? 30 : Math.abs(cu - OB_PLANT.at) < .1 ? 400 : 60, glow: cu < OB_PLANT.at ? .2 + .15 * cu / OB_PLANT.at : .3 + .5 * Math.exp(-(cu - OB_PLANT.at) * 5), act: 1 };
+    if (two && mv === 'plant') return obTwo(t, M, 'drive', two.drive + (cu - OB_PLANT.at) * 30, cu < OB_PLANT.at ? .2 + .15 * cu / OB_PLANT.at : .3 + .5 * Math.exp(-(cu - OB_PLANT.at) * 5), now);
     // Rune Cleave, two linked sweeps on planted feet (no spin): wound to his right, the level cut right to left crossing his
     // front as the lines flare (OB_FLARE.at), the cut back left to right, the blade carried up and down to his guard
-    if (two && mv === 'flare') return { f: obClip(M, 'cleave', two.cleave + (cu - OB_FLARE.at) * 30), rate: cu < .08 ? 30 : Math.abs(cu - OB_FLARE.at) < .1 ? 400 : 60, glow: cu < OB_FLARE.at ? .2 : .35 * Math.exp(-(cu - OB_FLARE.at) * 2) + .15, act: 1 };
+    if (two && mv === 'flare') return obTwo(t, M, 'cleave', two.cleave + (cu - OB_FLARE.at) * 30, cu < OB_FLARE.at ? .2 : .35 * Math.exp(-(cu - OB_FLARE.at) * 2) + .15, now);
     if (mv === 'plant') {   // Oathbreaker Thrust: a crouch, a leap with the blade raised point-down in both fists, the blade driven straight
       // down into the road as he lands (OB_PLANT.at, when forces_wardbound_c.js strikes), held a moment, and drawn out
       const at = OB_PLANT.at;
@@ -97535,24 +98326,26 @@ function obCtl(t, live, M) {
     // hold and the way back to his guard follow, quickened to end before the next wind-up is a quarter in. Feet planted.
     const NM = ['exec', 'ripo'], n = t.shots | 0, gl = stand ? .7 : 0;
     if (n > 0 && !(t._obAt != null && t._obAt > now - s) && (s < .05 || !(w > .25 && t.tg)) && t._obFol === n) {   // (s < .05: the shot's own frame, the wind-up still full)
-      const c = NM[(n - 1) % 2], post = (A[c][1] - 1 - two[c]) / 30, k = Math.max(1, post / Math.max(.15, iv - .75 * wl - .02));
-      if (s * k < post) return { f: obClip(M, c, two[c] + s * k * 30), rate: s < .1 ? 400 : 60, glow: stand ? .7 : .25 * Math.max(0, 1 - s * 3), act: 1 };
+      const c = NM[(n - 1) % 2], post = (obLen2(M, c) - two[c]) / 30, k = Math.max(1, post / Math.max(.15, iv - wl));   // (it ends as the next wind-up begins: the two clips meet at speed)
+      if (s * k < post) return obTwo(t, M, c, two[c] + s * k * 30, stand ? .7 : .25 * Math.max(0, 1 - s * 3), now);
     }
     if (w > 0 && t.tg) {
-      const c = NM[n % 2], f = Math.max(0, two[c] - (1 - w) * wl * 30);
-      if (s > .05) { t._obWf = f; t._obWc = c; t._obWs = n; t._obWt = now; }
-      if (s > .05) t._obFol = n + 1;   // (this strike's cut is shown: its recovery follows the shot)
-      return { f: obClip(M, c, f), rate: w > .85 ? 400 : f < 2 ? 14 : 60, glow: gl, act: 1 };
+      const c = NM[n % 2], f = two[c] * w;   // (the whole wind-up, fitted to the game's own: at a quicker pace it plays quicker, never cut into)
+      if (s > .05) { t._obWf = f; t._obWc = c; t._obWs = n; t._obWt = now; t._obFol = n + 1; }   // (_obFol: this strike's cut is shown, so its recovery follows the shot)
+      return obTwo(t, M, c, f, gl, now);
     }
-    if (t._obWf != null) {   // (a wind-up cut short, its foe slain or gone: back down the clip's own frames to his guard)
+    if (t._obWf != null) {   // (a wind-up cut short, its foe slain or gone: back down the clip's own frames)
       if (t._obWs !== n || t._obWf <= .5 || now - t._obWt > .15) t._obWf = null;
-      else { t._obWf = Math.max(0, t._obWf - Math.max(0, Math.min(.1, now - t._obWt)) * 50); t._obWt = now; return { f: obClip(M, t._obWc, t._obWf), rate: 40, glow: gl, act: 1 }; }
+      else { t._obWf = Math.max(0, t._obWf - Math.max(0, Math.min(.1, now - t._obWt)) * 40); t._obWt = now; return obTwo(t, M, t._obWc, t._obWf, gl, now); }
     }
     const engaged = t.tg || (t.engaged || 0) > 0 || s < 1.2;
     if (engaged) t._obIdleAt = now;
     if (stand) return { f: A.stand[0], rate: 6, glow: .7, act: 0 };
+    // (between blows, his foe still before him: the last strike's finish is held, and the next winds up out of it)
+    if (n > 0 && t.tg && t._obFol === n && !(t._obAt != null && t._obAt > now - s) && s < iv + .5) return obTwo(t, M, NM[(n - 1) % 2], obLen2(M, NM[(n - 1) % 2]), gl, now);
     const restW = now - (t._obIdleAt == null ? -9 : t._obIdleAt) > .8;
-    return restW ? { f: A.rest[0], rate: 3.5, glow: 0, act: 0, rest: 1 } : { f: A.guard[0], rate: 9, glow: 0, act: 0 };
+    if (!restW) { const P = obTwo(t, M, 'guard', 0, 0, now); P.rate = Math.min(P.rate, 9); P.act = 0; return P; }   // (his guard, settled into)
+    return { f: A.rest[0], rate: 3.5, glow: 0, act: 0, rest: 1 };
   }
   // the way back from the cut: the clip's own recovery (the blade swung back across his front to his side), fitted into the
   // time before the next wind-up is a quarter in. (He was blended straight from the cut's end to the ready stance, and the
@@ -102837,6 +103630,249 @@ const SL2 = (() => {
   }
   });
   return { S, CL, MV, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
+})();
+
+/* Torvald Emberbrand, the Longshot (Ironhold's marksman Champion, ch_torvald), on a rig and clips made from scratch (the
+   owner, 21 Nov 2026: "here you go, get fable 5.2 to rig and animate"): his mesh is the owner's "Torvald Emberbrand -
+   Finished Assets" (a broad grey-bearded dwarf in a spotted fur mantle, a long dark coat over a fur-lined robe, beaded
+   braids, a belt of two great discs) and his long rifle, "Longshot"; tools/make_tv.py -> src/model_tv2.js: 34 bones (the
+   coat below his belt on four panels kept clear of his knees, the beard on a bone of its own so the stock can lay it aside,
+   the rifle on its own bone placed by each clip with both hands posed onto it), 7,500 triangles, 8 clips at 30 fps.
+   ON by default in place of his code-built body; ?tv=old (or the Model Lab's "Torvald rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: at ease, the rifle at port low across him, breathing, looking down the road
+     ready     a foe in reach: shouldered, side-on, his cheek on the stock, still
+     shot      his strike (t.shotT = 0 at the shot): fired at frame 2, the recoil, the rifle brought down, the lever thrown,
+               shouldered again
+     longshot  Ridgeline Shot (ch_farshot, or his commander's spell: the game's 'ih_aim' hazard with him as its rifle):
+               planted wide, the long aim and the held breath, fired at frame 45 when the round goes (a quicker aim from
+               Patient Aim is fitted to it), the heavy recoil
+     flare     Spotter's Flare (ch_flare): the rifle swung up at the sky, fired a frame after the cast
+     headsman  Headsman's Round (ch_headsman): settled 0.8 s on the foe, the round at frame 24 (0.8 s), the lever
+     hit       a blow taken (his health drops)
+     death     Wounded: down on his right knee, hung on the grounded rifle, his head bowed
+   He stands on a Champion's slate (chDais, fitted by unitmodels_size.js), a head taller than the clan's dwarves (the hero
+   rule's 1.2x on the dwarf rule's head). His muzzle is t.tipW (unitTip, so ihMuzzle: his shots and the flare's streak leave
+   the real barrel). Checks: `python tools/make_tv.py --check`. Notes: docs/model_pilot/torvald2.md. */
+const TV2 = (() => {
+  const U = 'ch_torvald', NAMES = ['idle', 'ready', 'shot', 'longshot', 'flare', 'headsman', 'hit', 'death'];
+  const EASE = .2, BASE_H = .08, LONG_T = 1.5;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]tv=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, RIF = 0, HEADY = .86, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tr: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) { P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f; P.tr[k] = c.tr[i0 * 3 + k] + (c.tr[i1 * 3 + k] - c.tr[i0 * 3 + k]) * f; }
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tr[k] += (B.tr[k] - A.tr[k]) * w; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      else if (b === RIF) { j0 += P.tr[0]; j1 += P.tr[1]; j2 += P.tr[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'tv2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('tv2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'rifle', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('tv2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'muzzle', 'butt', 'lock', 'fore']) if (!mk || !mk[nm]) throw new Error('tv2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('tv2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tr = new Float32Array(b64(c.tr));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tr.length !== c.n * 3) throw new Error('tv2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tr, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; RIF = R.bix.rifle; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('tv2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.02, -.9]; m.max = [.9, 1.3, 1.2]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('TV2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'tv2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  // the long aim he is in (the game's 'ih_aim' hazard with him as its rifle): when it began and how long it lasts
+  function aimOf(t, now) {
+    if (typeof G === 'undefined' || !G.hazards) return t._tvAim || null;
+    for (const z of G.hazards) if (z && z.k === 'ih_aim' && z.ch === t && !z.done && z.T > 0) {
+      const a0 = now - (z.T - Math.max(0, z.t));
+      if (!t._tvAim || Math.abs(t._tvAim.at - a0) > .25) t._tvAim = { at: a0, T: z.T };
+      return t._tvAim;
+    }
+    return t._tvAim || null;
+  }
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._tvHp != null && t.hp < t._tvHp - 1e-6 && !t.wounded) t._tvHitAt = now; t._tvHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 40, mv: 'death' }; }
+    const ev = [];
+    const am = aimOf(t, now);
+    if (am) {   // Ridgeline Shot: the aim fitted to the game's, then the shot and its recoil as baked
+      const u = now - am.at, h = CL.longshot.hit / 30, s = u < am.T ? u * h / am.T : h + (u - am.T);
+      if (u >= 0 && s < CL.longshot.len) ev.push([am.at, { c: 'longshot', s, rate: 40, mv: 'long' + am.at }]); else if (u > am.T + 3) t._tvAim = null;
+    }
+    if (A && A.lastAt != null && now >= A.lastAt) {
+      const u = now - A.lastAt;
+      if (A.last === 'ch_flare' && u < CL.flare.len - 2 / 30) ev.push([A.lastAt, { c: 'flare', s: 2 / 30 + u, rate: 40, mv: 'flare' + A.lastAt }]);
+      if (A.last === 'ch_headsman' && u < CL.headsman.len) ev.push([A.lastAt, { c: 'headsman', s: u, rate: 40, mv: 'head' + A.lastAt }]);
+    }
+    if (ev.length) { ev.sort((a, b) => b[0] - a[0]); return ev[0][1]; }
+    const hh = t._tvHitAt != null ? now - t._tvHitAt : 9; if (hh >= 0 && hh < CL.hit.len) return { c: 'hit', s: hh, rate: 40, mv: 'hit' + t._tvHitAt };
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT, h0 = CL.shot.hit / 30;
+    if (t.shots && s >= 0 && s < CL.shot.len - h0) return { c: 'shot', s: h0 + s, rate: 40, mv: 'shot' + t.shots };
+    if (fight || s < 2) return { c: 'ready', s: ph, rate: 8, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 4, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._tvDrawn != null && typeof G !== 'undefined' && G && G.time - t._tvDrawn < .3 && G.time >= t._tvDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // a Champion's slate under him (chDais, his code-built body's: fitted across by the size rule) and he stands on it
+    const bm = typeof chDais === 'function' && typeof ihPal === 'function' ? dynMesh('tv_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ihPal(U, () => chDais(g, tr, '#6c665c', '#4e4a44', IHP.trim, '#ffc870'))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? (bm.max && bm.max[1] > 0 ? bm.max[1] : BASE_H * K) * sy : 0;
+    // his size: a hero's head (the hero rule) on a dwarf (the dwarf rule), growing by UM_TIER
+    const hk = typeof UM_EVEN_HEAD !== 'undefined' ? UM_EVEN_HEAD * UM_HEAD_K.hero * UM_HEAD_K.dwarf : 1.28;
+    const head = hk * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._tvT == null ? 1 : Math.max(0, Math.min(.1, now - t._tvT)); t._tvT = now;
+      if (!t._tvP || t._tvP.q.length !== NB * 4) { t._tvP = newPose(); t._tvP.q.set(PT.q); t._tvP.t.set(PT.t); t._tvP.tr.set(PT.tr); }
+      if (P.mv !== t._tvMv) { t._tvMv = P.mv; t._tvSw = now; }
+      const k = now - t._tvSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 14)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._tvP, PT, k); pose = t._tvP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(BI.rifle, MK.muzzle); t.tipYaw = yaw; t.tipAt = G.time; t._tvDrawn = G.time; t._tvClip = P.c; t._tvClipS = P.s; t._tvButt = w(BI.rifle, MK.butt); }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('tv2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'tv2Row';
+    box.innerHTML = '<h3>Torvald rig</h3><div class="row">' + `<button data-t2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?tv=old)">Old (code-built)</button><button data-t2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-t2h="1" title="A blow taken: his flinch">Hit</button><button data-t2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on his knee">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-t2]')) x.onclick = () => { S.on = x.dataset.t2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-t2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._tvHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-t2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { muzzle: t.tipW, butt: t._tvButt, clip: t._tvClip, at: t._tvDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_tv2', () => {
+  try { load(typeof TV2_MDL !== 'undefined' ? TV2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Torvald rig:', e.message); }
+  // (a Champion is drawn by drawForceUnit's layered path, the Grove's; another force's units by drawForceUnitPlain: both are
+  // wrapped, so he is drawn whichever way the game takes)
+  const _du0 = typeof drawForceUnit === 'function' ? drawForceUnit : null;
+  const mineNow = t => S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked;
+  if (MESH_ && typeof drawForceUnit === 'function') {
+    const _du = drawForceUnit;
+    drawForceUnit = function (t, tier, sx, sy, sz, wob, opts) {
+      if (mineNow(t)) return drawForceUnitPlain.apply(this, arguments);
+      return _du.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (mineNow(t)) {
+        try {
+          if (draw(t, tier, sx, sy, sz, wob, opts)) {
+            // (his Champion's extras still draw: the flare's light on the road; the code-built cast glow at the old rifle's
+            // tip is left out, it would float beside the real barrel)
+            const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+            try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+            return;
+          }
+        } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('tv2:', e); } }
+      }
+      if (t && t.def && t.def.unit === U && typeof _du0 === 'function' && typeof isGroveUnit === 'function' && isGroveUnit(U)) return _du0.apply(this, arguments);   // (the code-built body: his own path)
+      return _plain.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
+    UM_UNITS[U] = { mdl: 'tv2', k: 1 };
+    if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+    if (typeof UM_KIND !== 'undefined' && !UM_KIND[U]) UM_KIND[U] = 'dwarf';
+    if (typeof UM_TOPK !== 'undefined' && UM_TOPK[U] == null) UM_TOPK[U] = typeof UM_HEAD_K !== 'undefined' ? UM_HEAD_K.dwarf * 1.16 : 1;   // (the top of his topknot: his head is the dwarf rule's under the hero's)
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('tv2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
 
 /* Cloth weights for the sculpted units' wind sway, a vertex each (w: 0 rigid .. 255 the free hem; a: the side it may
@@ -114682,6 +115718,21 @@ const SPELL_HELP = {
   ch_firebrew: { when: "A cone in front of her over two or more foes.", aim: "The cone over the most foes, then over the most road.", tips: ["Lob a few jugs first: her puddles in the cone go up as the flame licks over them.", "Post her at a corner facing down the road, so the cone runs along it.", "Every foe in the cone burns: Tavern Brawl and Rolling Keg hit burning foes harder."] },
   ch_onthehouse: { when: "Three or more ground foes within 1.2 cells of a ground foe in reach (or a boss).", aim: "The ground under the thickest crowd in reach.", tips: ["Ground foes in the slick lose their feet: they stay put for the flame.", "Every other puddle of hers goes up with it: lob jugs along the road first.", "Best at a choke where ground foes bunch up for the whole 2.4s."] },
 
+  // Torvald Emberbrand, the Longshot (ih_marksman)
+  ch_farshot: { when: "A boss or leader anywhere on the field, or three or more foes on it.", aim: "The boss or leader first, else the foe with the most health left, wherever it is.", tips: ["Post him far back by the gate: the further the round flies, the harder it hits.", "Line it up down a straight stretch of road: it pierces every foe on its line.", "A kill halves its cooldown and quickens every ranged unit for 4s."] },
+  ch_flare: { when: "Three or more foes bunched together in {reach} cells, or a boss or elite in reach.", aim: "The thickest crowd in reach.", tips: ["Every unit hits the marked foes harder: light the crowd your guns are already firing on.", "Light it where the road bends back on itself so the foes stay under it longer."] },
+  ch_headsman: { when: "A boss, leader or elite in reach, or three or more foes in reach.", aim: "The boss, leader or elite first, else the foe with the most health left.", tips: ["It hits twice as hard on a foe below half health: let the line wear a boss down first.", "Its 0.8s settle shows as a faint glint: cast it before the foe walks out of reach."] },
+
+  // Brannoc Goldvein, the Under-King (ih_king)
+  ch_muster: { when: "Two or more foes within 3 cells of one foe in {reach} cells (a boss counts alone).", aim: "The fight in reach: every clan unit within 3 cells of it is mustered.", tips: ["Post him at the heart of the line: the more units round the fight, the bigger the muster.", "Mustered units shrug off stuns: call it when a stunning foe reaches the line.", "When it ends each unit's next strike hits twice as hard: a vent or a Thunderpeal on that strike lands doubled."] },
+  ch_oathhammer: { when: "Any foe in reach.", aim: "A boss, leader or elite first, else the foe with the most health left.", tips: ["The ground foes beside his foe take half: post him where the road bunches up.", "Units with Sworn ranks are worth keeping near him for The Mountain's Due."] },
+  ch_mountaindue: { when: "Three or more ground foes within 1.6 cells of him (a boss counts alone).", aim: "Himself: every ground foe within 1.6 cells of him.", tips: ["Every Sworn rank held by units within 2 cells of him makes it hit harder: build round him early so they gain their ranks.", "Late in a run, with veteran units round him, it is his biggest blow."] },
+
+  // Hrolf Grudgebearer, the Skywarden (ih_hrolf)
+  ch_battery: { when: "Three or more foes within 1.4 cells of one foe in {reach} cells (a boss counts alone).", aim: "The densest pack: over flyers the battery is laid for the sky, over ground foes it is laid level (Lower the Grudge).", tips: ["Changing the laying costs 1.5s: on a wave of flyers and walkers, it fires faster if it keeps to one.", "Laid level, its shells pierce down the line from him through the spot: post him where the road runs straight away from him."] },
+  ch_grudgeshell: { when: "A flyer in the air in reach, else a boss, leader or elite, or three or more foes.", aim: "A flyer in the air first, else the foe with the most health left.", tips: ["A flyer it knocks down walks for a few seconds: every ground-only unit can strike it then.", "Wing-Breaker drops the flyer on the walkers below it."] },
+  ch_oldgrudge: { when: "Five or more foes bunched anywhere on the field (a flyer counts twice), or a boss.", aim: "The best crowd anywhere on the field; a flyer it aims at is followed a little.", tips: ["It reaches the whole field: save it for a pack of flyers, which take twice as much and fall out of the sky.", "The burning crater slows ground foes for 3s: land it on a choke."] },
+
   /* ---------------- stormborn ---------------- */
   // Wolfguard (sb_wolfguard)
   sb_pounce: { when: "One ground foe is enough: any ground foe within {reach} cells (the wolf leaps 1.2 cells past the spear).", aim: "A ground cloth caster, the one nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["Instant cast: post a Wolfguard on a corner the casters walk past, and the wolf knocks them down before they act.", "The wolf cannot leap at flyers: Windrunners and Crosswind cover the air.", "Pair with a Spirit Walker: a hexed foe stores part of what the wolf deals for Reckoning."] },
@@ -116402,6 +117453,18 @@ BF_U('smoulder', { name: 'Smoulder Stout', kind: 'buff', pri: 10, icon: 'ember',
 BF_U('beltfed', { name: 'Endless Belt', kind: 'buff', pri: 10, icon: 'arrows3', hue: '#6a5a3a', f: ['ihBeltT'],
   def: 'The belt keeps feeding it: it attacks faster for 3s.',
   get: t => t.ihBeltT > bfNow() ? { t: bfLeft(t.ihBeltT), T: 3, say: bfPace(t, 1.3, 'The belt keeps feeding it') } : null });
+BF_U('ihmuster', { name: 'The King’s Muster', kind: 'buff', pri: 10, icon: 'banner', hue: '#7a5a1a', f: ['ihMusterT', 'ihMusterEnd', 'ihMusterN'],
+  def: 'Brannoc’s muster: it attacks 25% faster and cannot be stunned; when it ends, its next strike hits twice as hard.',
+  get: t => t.ihMusterT > bfNow() ? { t: bfLeft(t.ihMusterT), T: 6, say: bfPace(t, 1.25, 'Mustered by the Under-King, it cannot be stunned') } : t.ihMusterEnd ? { say: 'Its next strike hits twice as hard.' } : null });
+BF_U('ihkingsdue', { name: 'The King’s Due', kind: 'buff', pri: 10, icon: 'banner', hue: '#7a5a1a', f: ['ihDueT'],
+  def: 'Brannoc’s hammer struck a great foe: it attacks 20% faster for 3s.',
+  get: t => t.ihDueT > bfNow() ? { t: bfLeft(t.ihDueT), T: 3, say: bfPace(t, 1.2, 'The king\'s hammer rang on a great foe') } : null });
+BF_U('ihsworn', { name: 'Sworn', kind: 'buff', pri: 9, icon: 'banner', hue: '#6a5a2a', f: ['ihSwornX'],
+  def: 'Royal Levy: each Sworn rank (one every 5th wave, up to 3) makes it strike 4% faster and gives it 6% more health.',
+  get: t => G.hero === 'ih_king' && typeof ihSworn === 'function' && ihSworn(t) ? { say: `Sworn rank ${ihSworn(t)}: it strikes ${4 * ihSworn(t)}% faster and has ${6 * ihSworn(t)}% more health.` } : null });
+BF_U('ihkillshot', { name: 'Oathbreaker Down', kind: 'buff', pri: 10, icon: 'crosshair', hue: '#7a5a2a', f: ['ihFarHasteT'],
+  def: 'Ridgeline Shot killed its foe: every ranged unit attacks 15% faster for 4s.',
+  get: t => G.hero === 'ih_marksman' && G.ihFarHasteT > bfNow() && t.st && (t.st.range || 0) > 1.8 ? { t: bfLeft(G.ihFarHasteT), T: 4, say: bfPace(t, 1.15, 'Torvald\'s round found its mark') } : null });
 BF_U('borrowed', { name: 'Borrowed Time', kind: 'buff', pri: 10, icon: 'hourglass', hue: '#4a3a7a', f: ['ccBorrowT', 'ccBorrowK'],
   def: 'A Chronomancer beside it lends it time: it attacks faster.',
   get: t => t.ccBorrowT > bfNow() ? { src: 'from a Chronomancer', say: `It attacks ${bfPct(t.ccBorrowK || 0)} faster.` } : null });
