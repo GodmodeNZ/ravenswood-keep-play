@@ -1,4 +1,4 @@
-const BUILD_TAG = '2c22e08@2026-11-22';   // the play log's build version (playlog.js)
+const BUILD_TAG = '755251c@2026-11-23';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -17239,7 +17239,8 @@ const IH_KITS = {
       pick: (t, st, ab, man) => { const L = ihPick(t, st, abReach(t, st, ab)); return man ? abToughest(L) : abToughest(L.filter(c => c.fly && !(c.lowT > G.time))) || abToughest(L); },
       cast(t, st, c, ab, K) {
         const d = abDist(t, c), trav = .12 + d / 13; t.ihGrapAt = G.time; t.ihGrapC = c;
-        rfx({ k: 'streak', x0: t.x, h0: towerTop(t) + .1, z0: t.y, c, col: '#8a8e96', w: .03, trav, life: trav + .5 });
+        const mz = (typeof unitTip === 'function' && unitTip(t)) || [t.x, towerTop(t) + .1, t.y];   // (the grapnel leaves the barrel as drawn)
+        rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#8a8e96', w: .03, trav, life: trav + .5 });
         G.delayed.push({ t: trav, fn: () => {
           if (c.dead || !abLive(t)) return; const s = t.st || st;
           abHit(t, s, c, 3 * K, 'phys', null); if (c.dead) return;
@@ -18740,7 +18741,8 @@ const IH_EXTRA = {
   },
   flakgunner(t, tier, x, z, yaw, K, now) {   // the grapnel's chain
     const gp = ihAbU(t, 'ih_grapnel'), gc = t.ihGrapC;
-    if (gp >= 0 && gc && gp < .85) QA.beam(RD, [x + Math.sin(yaw) * .5, .6, z + Math.cos(yaw) * .5], [gc.x, hitH(gc), gc.y], .018, [.25, .26, .28, 1], 10);
+    const mz = (typeof unitTip === 'function' && unitTip(t)) || [x + Math.sin(yaw) * .5, .6, z + Math.cos(yaw) * .5];   // (the chain runs from the barrel as drawn)
+    if (gp >= 0 && gc && gp < .85) QA.beam(RD, mz, [gc.x, hitH(gc), gc.y], .018, [.25, .26, .28, 1], 10);
   },
   steamhammer(t, tier, x, z, yaw, K, now) {   // smoke from the chimney, a gauge that glows with the pressure
     const c = Math.cos(yaw), s = Math.sin(yaw), cx = x + (.06 * c - .23 * s) * K, cz = z + (-.06 * s - .23 * c) * K, h = t.ihHeat || 0;
@@ -19174,7 +19176,7 @@ FORCES.silver = { name: 'The Silver Order', title: 'Oathbound Host of the River 
       blurb: 'Clerics of the dawn who strike with beams of sunlight from their staves: twice as hard on flyers, and they reach further into the sky. Every second beam lays Judgement.',
       tiers: [{ cost: 30, dmg: 8, rate: .85, range: 2.6, airR: .8, vsAir: 2 }, { cost: 55, dmg: 20, rate: .8, range: 2.8, airR: .9, vsAir: 2 }, { cost: 115, dmg: 46, rate: .75, range: 3.1, airR: 1, vsAir: 2 }] },
     earth: { id: 'templar', name: 'Templars of the Ford', short: 'Templars', key: '6', proj: 'force', attack: 'so_slam', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
-      blurb: 'Aurelian\'s own Templars, in heavy plate with greatswords and the shield of the Ford: they bring the blade down and slam the ground, striking every ground foe around them, and a foe carrying Judgement hears a lighter Verdict. Cannot reach flyers.',
+      blurb: 'Aurelian\'s own Templars, in heavy plate with a sword in each hand: the right blade, the left, then both together in a Twin Cut, each cut striking every ground foe around them, and a foe carrying Judgement hears a lighter Verdict. Cuts that land build Blade Momentum, which quickens the next. Cannot reach flyers.',
       tiers: [{ cost: 40, dmg: 20, rate: 1.5, range: 1.5 }, { cost: 75, dmg: 48, rate: 1.45, range: 1.55 }, { cost: 160, dmg: 115, rate: 1.4, range: 1.65 }] },
     cannon: { id: 'censer', name: 'Censer Bearers', short: 'Censers', key: '7', proj: 'force', attack: 'so_censer', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.15, 1.2, 1.25],
       blurb: 'Monks who swing great censers and lob burning incense: it bursts in holy fire over everything nearby and smoulders on the road, Judging every foe that walks through the smoke. Cannot hit flyers.',
@@ -19473,8 +19475,57 @@ function soBeamAt(t, st, c, amt, sh, main) {
   G.beams.push({ k: 'arcane', a: [t.x, sh, t.y], b: [c.x, hitH(c), c.y], hit: [c.x, hitH(c), c.y], life: .28, max: .28, crit: true, lv: Math.min(t.tier, 2) });
   if (main) { flashLight(c.x, c.y, hitH(c), [1.6, 1.4, .8], 1.8, .15); sfx('sunbeam', 0); }   // (the strike was silent: audio.js)
 }
-// ---- Templars of the Ford: a slam that strikes every walker around; Judged foes (2+ stacks) hear a lighter Verdict ----
-FORCE_ATTACK.so_slam = (t, st, tg, pow, echo) => soSlam(t, st, pow, 1, {});
+// ---- Templars of the Ford: two swords (owner, 22 Nov 2026: "change the templars abilities and talents to better reflect a dual
+// wield sword unit"). The right blade, the left, then both together (the Twin Cut), in turn; each cut strikes every ground foe
+// in reach, and a foe carrying Judgement (2+ stacks) hears a lighter Verdict. A cut that lands builds Blade Momentum (TP_MOM:
+// each stack quickens his next cuts), which fades when he stops cutting. t.tpCut (0 right, 1 left, 2 both, 3 Cross-Cut) and
+// t.soSlamAt tell the model which cut to play. He holds no foe (forces_zzzzzzzzzzzzzzzzzzzz_holds.js) and slows none. ----
+const TP_MOM = { max: 4, k: .05, fade: 2, side: .8, twin: 1.4 };
+function tpMomNow(t, st) { const C = (st && st.caps) || {}; if (!(G.time - (t.tpMomT == null ? -99 : t.tpMomT) <= TP_MOM.fade + (C.tpRhythm ? 1 : 0))) t.tpMom = 0; return t.tpMom || 0; }
+function tpMomAdd(t, st, n) { tpMomNow(t, st); t.tpMom = Math.min(TP_MOM.max, (t.tpMom || 0) + n); t.tpMomT = G.time; }
+const tpMomFull = (t, st) => tpMomNow(t, st) >= TP_MOM.max;
+FORCE_ATTACK.so_slam = (t, st, tg, pow, echo) => {
+  const C = st.caps || {}, every = C.tpRhythm >= 2 && tpMomFull(t, st) ? 2 : 3;   // Twin Rhythm: at full Momentum every 2nd cut is a Twin Cut
+  t.tpCutN = (t.tpCutN || 0) + 1;
+  const twin = t.tpCutN >= every; if (twin) t.tpCutN = 0; else t.tpSide = 1 - (t.tpSide || 0);
+  const n = soSlam(t, st, pow, twin ? TP_MOM.twin : TP_MOM.side, { cut: twin ? 2 : t.tpSide });
+  if (n > 0 && !echo) {
+    tpMomAdd(t, st, 1); const m = t.tpMom;
+    G.delayed.push({ t: 0, fn: () => { if (t.cd > 0) t.cd /= 1 + TP_MOM.k * m; } });   // (game.js sets t.cd to the rate just after this)
+    if (twin && C.tpTempest && m >= TP_MOM.max) tpTempest(t, st);
+  }
+  return n;
+};
+// Steel Tempest (capstone): a Twin Cut at full Momentum spins on into three more cuts, each Judging what it strikes
+function tpTempest(t, st) {
+  soEv('cap:tpTempest');
+  for (let k = 0; k < 3; k++) G.delayed.push({ t: .14 + k * .14, fn: () => {
+    if (!soAlive(t)) return; const s = t.st || st;
+    inSplash(t.x, t.y, s.range, true, c => { if (c.phased || c.ent || !canTarget(t, s, c)) return; soStrike(t, s, c, s.dmg * .3, 'phys'); if (!c.dead) soJudge(c, 1, t); });
+    t.tpCut = k % 2; t.soSlamAt = G.time; tpCutFx(t, s.range, k % 2); sfx('swordSwing', { kind: 'fast' });
+  } });
+}
+// Parry and Riposte (tpParry): a blow on a Templar lands lighter, and the other blade answers with a Twin Cut (once every 4 - rank s)
+{
+  const dt0 = damageTower;
+  damageTower = function (t, dmg) {
+    const C = t && t.def && t.def.unit === 'templar' && !t.wrecked && !t.wounded && dmg > 0 && t.st && t.st.caps;
+    if (C && C.tpParry) {
+      dmg *= 1 - .15 * C.tpParry; soEv('tal:tpParry');
+      if (!(t.tpParryT > G.time)) { t.tpParryT = G.time + 4 - C.tpParry; t.tpParryAt = G.time; G.delayed.push({ t: .2, fn: () => { if (soAlive(t)) { t.shotT = 0; soSlam(t, t.st || effStats(t), 1, TP_MOM.twin, { cut: 2, sub: 1 }); } } }); }
+    }
+    return dt0.call(this, t, dmg);
+  };
+}
+// a cut's look: a short arc of steel sparks along the blade's path, out where it strikes (kind 0 right, 1 left, 2 both,
+// 3 Cross-Cut); nothing round the Templar himself, no ground mark, and no shake but a Cross-Cut's small one
+function tpCutFx(t, R0, kind) {
+  const a0 = t.ang || 0, sides = kind >= 2 ? [-1, 1] : [kind === 0 ? -1 : 1], r = R0 * (kind === 3 ? .7 : .55);
+  for (const sd of sides) for (let q = 0; q < 6; q++) {
+    const a = a0 + sd * (.95 - q * .32);
+    part({ k: 'spark', x: t.x + Math.sin(a) * r, z: t.y + Math.cos(a) * r, h: .3 + q * .05, vx: Math.sin(a) * 1.1, vz: Math.cos(a) * 1.1, vh: R(.1, .5), g: 3, life: .22, max: .22, size: .04, col: q % 2 ? SO.COL.silver : kind >= 2 ? SO.COL.gold : SO.COL.light });
+  }
+}
 function soSlam(t, st, pow, mult, o) {
   const C = st.caps, R0 = st.range * (o.rK || 1), cut = [];
   inSplash(t.x, t.y, R0, true, (c, d) => { if (!c.phased && !c.ent && canTarget(t, st, c)) cut.push([c, d]); });
@@ -19482,14 +19533,12 @@ function soSlam(t, st, pow, mult, o) {
   let k = pow * mult * (great ? p.so_anvil : 1);
   if (great) { o = Object.assign({}, o, { big: true }); relicGlint(t, 'so_anvil', true); soEv('item:so_anvil'); }
   if (C.so_crowd) k *= 1 + Math.min(.4, .08 * Math.max(0, cut.length - 1));   // Into the Press
-  const vMin = o.vMin || (C.so_anvil_t ? 1 : 2), vK = (o.vk || .6) * (1 + .2 * (C.so_hammer_judge || 0)), tremor = C.so_tremor && !o.sub && (t.shots + 1) % 3 === 0;
+  const vMin = o.vMin || (C.so_anvil_t ? 1 : 2), vK = (o.vk || .6) * (1 + .2 * (C.so_hammer_judge || 0));
   for (const [c, d] of cut) {
     const amt = st.dmg * k * (1 - .25 * d / (R0 || 1));
     soStrike(t, st, c, amt, 'phys', [(c.x - t.x) / (d || 1) * .1, (c.y - t.y) / (d || 1) * .1]);
     if (c.dead) continue;
-    chill(c, C.so_crush_slow ? { slow: .25 + .15 * C.so_crush_slow, slowT: 1 } : { slow: .25, slowT: .6 }, null, t);   // Crushing Weight
-    if (o.stun) stun(c, o.stun, .4, null); else if (tremor) stun(c, .25 * C.so_tremor, .4, null);   // Tremor
-    if (C.so_sunder >= 2 || (C.so_sunder && (t.shots | 0) % 2 === 0)) soJudge(c, 1, t);   // Sundering Blow (every other slam at rank 1): the slam marks before it judges
+    if (C.so_sunder >= 2 || (C.so_sunder && (t.shots | 0) % 2 === 0)) soJudge(c, 1, t);   // Marking Edge (once Sundering Blow; every other cut at rank 1): the cut marks before it judges
     if (p.so_lasthammer) { soJudge(c, 2, t); soEv('item:so_lasthammer'); }   // the Hammer of the Last Verdict
     if (soJ(c) >= vMin) soVerdict(c, t, vK);
   }
@@ -19501,10 +19550,10 @@ function soSlam(t, st, pow, mult, o) {
     const z = t.soHG && G.hazards.includes(t.soHG) ? t.soHG : null;
     soEv('cap:so_holy_ground'); if (z) z.t = Math.max(z.t, 2); else if (G.hazards.length < 46) G.hazards.push(t.soHG = { k: 'so_incense', x: t.x, z: t.y, r: R0 * .9, t: 2, tick: .25, jt: 0, src: t, st, slow: .2, hallow: 1 });
   }
-  fxQuake(t.x, t.y, R0 * (o.big ? 1.2 : 1), .5 * mult + (o.big ? .5 : 0));
-  for (let q = 0; q < 10; q++) { const a = q / 10 * TAU; part({ k: 'spark', x: t.x + Math.cos(a) * R0 * .5, z: t.y + Math.sin(a) * R0 * .5, h: .1, vx: Math.cos(a) * 2, vz: Math.sin(a) * 2, vh: R(.3, 1), g: 4, life: .3, max: .3, size: .05, col: q % 2 ? SO.COL.gold : SO.COL.silver }); }
-  G.shake = Math.max(G.shake, .05 + .03 * Math.min(t.tier, 3)); if (o.sfx) sfx(o.sfx); else sfx('quake', .45 * mult + (o.big ? .5 : 0), Math.min(t.tier, 2));
-  if (!o.sub && C.so_aftershock && (t.shots + 1) % 3 === 0) G.delayed.push({ t: .4, fn: () => { if (soAlive(t)) { t.shotT = 0; soSlam(t, t.st || st, 1, .5, { sub: 1 }); } } });   // Second Blow
+  const kind = o.cut == null ? 2 : o.cut;   // (Aurelian's Shield Wall calls this too: a Twin Cut)
+  tpCutFx(t, R0, kind); t.tpCut = kind;
+  if (kind === 3) { G.shake = Math.max(G.shake, .04); sfx('swordSwing', { kind: 'big' }); sfx('swordFx', { kind: 'wobble', lv: .8 }); }
+  else sfx('swordSwing', { kind: kind === 2 ? 'big' : 'cut' });
   t.recoil = 1; t.soSlamAt = G.time;
   return cut.length;
 }
@@ -20342,9 +20391,12 @@ function soExtra(t, tier, x, z, yaw, K) {
   if (c && c.id === 'so_vow') { const k = soBump(c.u, .15, .8); QADD.beam(RD, [x, top, z], [x, top + 1.2 * k, z], .1 * k, [1, .9, .55, .5 * k]); QADD.bill(RD, x + .15, top + .9 * k, z, .4 * k, .3 * k, [1, .95, .7, .5 * k], 1, 0); }
   if (c && c.id === 'so_witness' && t.soWitness && !t.soWitness.dead) { const k = soBump(c.u, .15, .8), o = t.soWitness; QADD.beam(RD, [x, top, z], [o.x, hitH(o) + .1, o.y], .035 * k, [.85, .88, 1, .6 * k]); }
   if (c && c.id === 'so_aegis') { const k = soBump(c.u, .15, .8); QADD.bill(RD, x, top * .75, z, .36 * k, .36 * k, [.7, .85, 1, .2 * k], 1, 0); }   // (a small shield-glow on the knight; no dome or ground disc round it: the owner)
-  if (c && c.id === 'so_flare') { const k = c.u < .35 ? soE(c.u / .35) : 1 - soE((c.u - .35) / .65), r = (typeof vt !== 'undefined' ? vt : 0) * .8; vfxSprite(VX, x, top + .25, z, .42 * k, .42 * k, r, vfxC('#ffd88a'), .55 * k, VT.SUN, 1); vfxSprite(VX, x, top + .25, z, .2 * k, .2 * k, 0, vfxC('#fff4d8', 1.3), .7 * k, VT.GLOW, 1); }   // a small sun lifted between the hands (not a white blot over him)
+  const lbA = u === 'lightbinder' && typeof LB2 !== 'undefined' ? LB2.anchors(t) : null;   // (the sculpted Sister: her palms, unitmodels_lightbinder2.js)
+  if (c && c.id === 'so_flare' && lbA) { const k = c.u < .35 ? soE(c.u / .35) : 1 - soE((c.u - .35) / .65), r = (typeof vt !== 'undefined' ? vt : 0) * .8, p = lbA.palmR; vfxSprite(VX, p[0], p[1] + .04, p[2], .42 * k, .42 * k, r, vfxC('#ffd88a'), .55 * k, VT.SUN, 1); vfxSprite(VX, p[0], p[1] + .04, p[2], .2 * k, .2 * k, 0, vfxC('#fff4d8', 1.3), .7 * k, VT.GLOW, 1); }   // (the small sun at her palm)
+  else if (c && c.id === 'so_flare') { const k = c.u < .35 ? soE(c.u / .35) : 1 - soE((c.u - .35) / .65), r = (typeof vt !== 'undefined' ? vt : 0) * .8; vfxSprite(VX, x, top + .25, z, .42 * k, .42 * k, r, vfxC('#ffd88a'), .55 * k, VT.SUN, 1); vfxSprite(VX, x, top + .25, z, .2 * k, .2 * k, 0, vfxC('#fff4d8', 1.3), .7 * k, VT.GLOW, 1); }   // a small sun lifted between the hands (not a white blot over him)
   if (u === 'censer' && VLIVE && Math.random() < .3) { const a = yaw, hx = x + Math.sin(a) * .2 + Math.cos(a) * .17, hz = z + Math.cos(a) * .2 - Math.sin(a) * .17; part({ k: 'smoke', x: hx, z: hz, h: .45 * K, vx: R(-.1, .1), vz: R(-.1, .1), vh: R(.3, .5), drag: .8, life: 1.1, max: 1.1, size: R(.06, .11), col: '#ece4f4' }); }   // incense trailing from the censer
-  if ((u === 'sunlance' || u === 'lightbinder') && (t.windup || 0) > .05) QADD.bill(RD, x + Math.sin(yaw) * .2 + Math.cos(yaw) * .17, (u === 'sunlance' ? 1.12 : 1.07) * K, z + Math.cos(yaw) * .2 - Math.sin(yaw) * .17, .3 * t.windup, .3 * t.windup, [1, .92, .6, .6 * t.windup], 1, 0);
+  if (lbA && lbA.palmR && (t.windup || 0) > .05) { const p = lbA.palmR; QADD.bill(RD, p[0], p[1], p[2], .3 * t.windup, .3 * t.windup, [1, .92, .6, .6 * t.windup], 1, 0); }   // (the light gathering in her palm)
+  else if ((u === 'sunlance' || u === 'lightbinder') && (t.windup || 0) > .05) QADD.bill(RD, x + Math.sin(yaw) * .2 + Math.cos(yaw) * .17, (u === 'sunlance' ? 1.12 : 1.07) * K, z + Math.cos(yaw) * .2 - Math.sin(yaw) * .17, .3 * t.windup, .3 * t.windup, [1, .92, .6, .6 * t.windup], 1, 0);
   // the foes' marks, drawn once a frame by the first unit of the Order standing
   if (SO_MARKS_FOR == null || !G.towers.includes(SO_MARKS_FOR) || SO_MARKS_FOR.wrecked || SO_MARKS_FOR.def.force !== SO_ID) SO_MARKS_FOR = t;
   if (SO_MARKS_FOR === t) soDrawMarks();
@@ -20398,7 +20450,7 @@ function soDrawMarks() {
    Sisters: Binding Light (bind up to 5), Blinding Flare (blind a crowd), Dawn Shackles (a ring that binds walkers).
    Knights: Grail Charge (rear, charge far, double Verdict), Ride Them Down (a line), Banner of the Vow (Radiance).
    Clerics: Sunlance (a piercing line), Sun Halo (sunfire on a crowd), Dawnfall (drag every flyer down, blinded).
-   Templars: Sanctified Slam (full Verdicts all round), Hallowed Ground (a sigil that Judges), Hammerfall (thrown).
+   Templars: Cross-Cut (once Sanctified Slam: full Verdicts all round), Hallowed Ground (a sigil that Judges), Hammerfall (thrown).
    Censers: Thurible Sweep (a circle and incense), Holy Smoke (a great slowing cloud), Rain of Embers (coals).
    Bell: Toll of Valor (haste and wards), Peal of Mercy (mana, mending, cleanse), Knell of Judgement (Judge and daze).
    Every unit's second and third spells are reshaped in place by forces_zzz_silver_cool.js (the signature spells: Rampart of
@@ -20637,14 +20689,13 @@ const SO_KITS = {
       } },
   ] },
 
-  /* ---- Templars of the Ford: the cash-in on crowds. ---- */
+  /* ---- Templars of the Ford: the cash-in on crowds, with a sword in each hand. ---- */
   templar: { slot: 'earth', mana: { max: 100, regen: .85, hit: 1.2 }, abilities: [
-    { id: 'so_crush', name: 'Sanctified Slam', short: 'Slam', glyph: 'hammer', hue: '#e8ecf4', mana: 100, cd: 12, busy: .8, research: null,
-      by: { stun: [.5, .55, .6, .65, .7, .8] },
+    { id: 'so_crush', name: 'Cross-Cut', short: 'Cross', glyph: 'glaive2', hue: '#e8ecf4', mana: 100, cd: 12, busy: .8, research: null,
       auto: 'two or more ground foes in reach, or a boss in reach',
-      text: (t, st, ab) => `A long heave overhead, then the slam: every ground foe in reach takes ${xD(st, 2.5)}, is stunned ${byT(ab.by.stun, t)}s, and any Judgement on it is delivered as a full Verdict.`,
+      text: (t, st, ab) => `Both swords are crossed high, then drawn apart: every ground foe in reach takes ${xD(st, 2.5)}, and any Judgement on it is delivered as a full Verdict.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(c => c.def.boss || c.def.lead)) ? t : null; },
-      cast(t, st, _, ab) { t.cd = Math.max(t.cd, .8); soLater(t, .58, s => soSlam(t, s, 2.5, 1, { stun: byT(ab.by.stun, t), vk: 1, vMin: 1, big: true, sub: 1, sfx: 'so_crush' })); } },
+      cast(t, st, _, ab) { t.cd = Math.max(t.cd, .8); soLater(t, .58, s => soSlam(t, s, 2.5, 1, { vk: 1, vMin: 1, big: true, sub: 1, cut: 3 })); } },
     { id: 'so_hallow', name: 'Hallowed Ground', short: 'Hallow', glyph: 'rune', hue: '#ffe8a0', mana: 90, cd: 15, research: { cost: 80, time: 20 },
       by: { dur: [5, 5, 6, 6, 7, 7] },
       auto: 'two or more ground foes in reach, or a boss',
@@ -20813,25 +20864,27 @@ const SO_TALENTS = {
     GT('Sun Wheel', 'sunburst', 3, 2, 2, n => `Every foe Noon Sweep crosses is slowed ${10 * n}% for 2s.`, {}, { sp: n => ({ ab: 'so_halo', rider: { slow: [.1 * n, 2] } }) }),
   ] },
 
-  /* ---- Templars of the Ford (earth): Sanctified Slam (innate), Shield Fervour (row II), Sword of Heaven (row III) ---- */
+  /* ---- Templars of the Ford (earth): Cross-Cut (innate), Whirling Flurry (row II), Sword of Heaven (row III, the ultimate).
+     Two swords (owner, 22 Nov 2026). Two roads: Blade Momentum through Whirling Flurry to Steel Tempest, and Judgement through
+     Sword of Heaven to Second Star. A damage unit: no talent holds or slows. ---- */
   earth: { name: 'Templar\'s Oath', hue: '#8a9ccc', list: [
-    GT('Press of Battle', 'whirl', 0, 1, 3, n => `Each slam that strikes 3 or more ground foes makes it Radiant for ${n}s.`, {}, { cap: 'sofPress' }),
-    GT('Crushing Weight', 'snail', 0, 0, 2, n => `Slammed foes are slowed ${25 + 15 * n}% (not 25%) for 1s.`, {}, { cap: 'so_crush_slow' }),
-    GT('Tremor', 'tremor', 0, 3, 2, n => `Sanctified Slam stuns ${gNf(.1 * n)}s longer.`, {}, { sp: n => ({ ab: 'so_crush', by: { stun: .1 * n } }) }),
-    GT('Ringing Steel', 'scales', 4, 1, 1, 'A foe slain by its Verdict rings its blade: it slams again at once (at most once a second).', {}, { cap: 'so_anvil_ring' }),
-    GT('Zeal', 'flash', 2, 0, 3, n => `Every ground foe Shield Fervour strikes is slowed ${10 * n}% for 1.5s and staggered ${gNf(.1 * n)}s.`, {}, { sp: n => ({ ab: 'so_hallow', rider: { slow: [.1 * n, 1.5], stun: .1 * n } }), req: [1, 0] }),
+    GT('Press of Battle', 'whirl', 0, 1, 3, n => `Cuts that strike 3 or more ground foes make it Radiant for ${n}s.`, {}, { cap: 'sofPress' }),
+    GT('Twin Rhythm', 'quick', 0, 0, 2, n => `Blade Momentum lasts 3s after his last cut, not 2s${n >= 2 ? ', and at full Momentum every 2nd cut is a Twin Cut, not every 3rd' : ''}.`, {}, { cap: 'tpRhythm' }),
+    GT('Through the Plate', 'shieldbreak', 0, 3, 2, n => `Cross-Cut cracks ${n} armour off every foe it strikes.`, {}, { sp: n => ({ ab: 'so_crush', rider: { shred: [n, 6] } }) }),
+    GT('Parry and Riposte', 'glaive2', 4, 1, 2, n => `When a foe's blow lands on it, one blade parries (it takes ${15 * n}% less) and the other answers with a Twin Cut, once every ${4 - n}s.`, {}, { cap: 'tpParry' }),
+    GT('Gathering Whirl', 'whirl', 2, 0, 2, n => `Whirling Flurry is ${n} cut${n > 1 ? 's' : ''} longer.`, {}, { sp: n => ({ ab: 'so_hallow', by: { n } }), req: [1, 0] }),
     GS('so_hallow', 1, 0),
-    GT('Blade of Judgement', 'hammer', 3, 3, 2, n => `Slam Verdicts strike ${20 * n}% harder, and Sword of Heaven stuns ${gNf(.15 * n)}s longer and its shock reaches ${gNf(.2 * n)} cells wider.`, {}, { cap: 'so_hammer_judge', sp: n => ({ ab: 'so_hammerfall', by: { stun: .15 * n, wave: .2 * n } }), req: [2, 3] }),
-    GT('Shockwave', 'ripple', 4, 3, 1, 'Each slam rolls a shockwave a cell past its reach: foes there take 50% and gain a Judgement, so the next slam judges them.', {}, { cap: 'so_shockwave' }),
-    GT('Final Judgement', 'scales', 4, 0, 1, 'A foe slain by a Verdict bursts in light: every ground foe within a cell gains 3 Judgement.', {}, { cap: 'so_final' }),
+    GT('Blade of Judgement', 'sunburst', 3, 3, 2, n => `Sword of Heaven's shock reaches ${gNf(.25 * n)} cells wider.`, {}, { sp: n => ({ ab: 'so_hammerfall', by: { wave: .25 * n } }), req: [2, 3] }),
+    GT('Steel Tempest', 'whirl', 4, 3, 1, 'At full Blade Momentum each Twin Cut spins on into a short Whirling Flurry: 3 more cuts, each striking every ground foe in reach for 30% and a Judgement.', {}, { cap: 'tpTempest', sp: { ab: 'so_hallow', rider: { fresh: 1 } } }),
+    GT('Second Star', 'sun', 4, 0, 1, 'Sword of Heaven throws both swords: the second falls 0.4s after the first on the next toughest ground foe in reach, for 70% and a full Verdict.', {}, { cap: 'tpStar', sp: { ab: 'so_hammerfall', rider: { fresh: 1 } } }),
     GS('so_hammerfall', 2, 3),
-    GT('Sundering Blow', 'hammer', 3, 0, 1, 'The slam lays a Judgement before it judges.', {}, { cap: 'so_sunder' }),
-    GT('Marked by the Blade', 'glaive2', 3, 2, 1, 'Sword of Heaven marks its foe for 4s: it takes 10% more from every unit.', {}, { sp: { ab: 'so_hammerfall', rider: { mark: [.1, 4] } } }),
-    GT('Hurled Verdict', 'hammer', 3, 1, 1, "Sword of Heaven's foe gains 2 Judgement as the sword strikes.", {}, { sp: { ab: 'so_hammerfall', rider: { judge: 2 } } }),
+    GT('Marking Edge', 'scales', 3, 0, 2, n => `${n >= 2 ? 'Each cut' : 'Every other cut'} lays a Judgement just before it strikes.`, {}, { cap: 'so_sunder' }),
+    GT('Marked by the Blade', 'glaive2', 3, 2, 2, n => `Sword of Heaven's foe takes ${5 * n}% more from every unit for 4s.`, {}, { sp: n => ({ ab: 'so_hammerfall', rider: { mark: [.05 * n, 4] } }) }),
+    GT('Hurled Verdict', 'hammer', 3, 1, 2, n => `Sword of Heaven lays ${n} Judgement on its foe.`, {}, { sp: n => ({ ab: 'so_hammerfall', rider: { judge: n } }) }),
     GT('Sundered Plate', 'hammer', 0, 2, 2, n => `Each Verdict it delivers strips ${n} armour from its foe, up to ${2 * n}.`, {}, { cap: 'sofPlate' }),
     GT('Reliquary', 'gem', 1, 3, 2, n => `Each Judged foe that dies within its reach (a Verdict's kill too) leaves a relic: ${2 * n} mana.`, {}, { cap: 'sofRelic' }),
-    GT('Censed Blade', 'quick', 1, 1, 3, n => `Before each slam, every ground foe in its reach standing in the Order's incense gains ${n} Judgement.`, {}, { cap: 'sofCensed' }),
-    GT('Consecrated Earth', 'sun', 2, 2, 1, 'Each Shield Fervour hallows the ground round it for 4s: ground foes on it are slowed 20% and Judged every second.', {}, { cap: 'sofHallow', sp: { ab: 'so_hallow', rider: { fresh: 1 } } }),
+    GT('Censed Blades', 'quick', 1, 1, 3, n => `Before each cut, every ground foe in its reach standing in the Order's incense gains ${n} Judgement.`, {}, { cap: 'sofCensed' }),
+    GT('Whirling Edge', 'whirl', 2, 2, 2, n => `Whirling Flurry fills his Blade Momentum and reaches ${10 * n}% farther.`, {}, { cap: 'tpWhirl', sp: n => ({ ab: 'so_hallow', by: { reach: .1 * n } }) }),
   ] },
 
   /* ---- Censer Bearers (cannon): Thurible Sweep (innate), Procession of Incense (row II), Kindle the Censers (row IV) ---- */
@@ -20985,10 +21038,10 @@ const SO_LEGENDS = {
     build: 'Dazzle, Scouring Light and Chain of Penance, with the Dawn-Glass and the Lightbinder Sisters.',
     combo: 'Dazzle, Scouring Light and the Lightbinder Sisters.', fx: (st, k) => soPw(st, 'so_firstlight', .6 * k) },
   so_lasthammer: { for: 'earth', name: 'Hammer of the Last Verdict', icon: 'hammer', hue: '#c8d0e8', atk: 1,
-    twist: 'Sanctified Slam judges as it lands: every slam is a Verdict on everything it strikes.',
-    text: () => 'Its slams lay two Judgement before they judge: every foe they strike hears a Verdict.',
-    build: 'Blade of Judgement, Final Judgement, Shockwave and Shield Fervour, in a crowded corner.',
-    combo: 'Into the Press, Blade of Judgement and a crowded corner.', fx: st => soPw(st, 'so_lasthammer', 1) },
+    twist: 'Every cut judges as it lands: each one is a Verdict on everything it strikes.',
+    text: () => 'Its cuts lay two Judgement before they judge: every foe they strike hears a Verdict.',
+    build: 'Marking Edge, Whirling Flurry, Steel Tempest and Second Star, in a crowded corner.',
+    combo: 'Whirling Flurry, Second Star and a crowded corner.', fx: st => soPw(st, 'so_lasthammer', 1) },
   so_saintcenser: { for: 'cannon', name: 'Censer of the Saints', icon: 'cloud', hue: '#c0a0f0', atk: 1,
     twist: 'The Censer\'s smoke passes sentence: as each cloud of incense burns out, a Verdict falls on everyone still in it.',
     text: k => `The incense its coals leave lays Judgement every half second, and as each cloud burns out, every Judged foe still standing in it hears a Verdict at ${nf1(.6 * k)} strength.`,
@@ -21238,7 +21291,7 @@ Object.assign(FORCE_SAGAS, {
     evFn: c => !!c.soVK,
     fin: ['Final Sentence', 'A foe slain by Sentence passes its Judgement on to the two foes nearest it.'] },
 });
-Object.assign(FORCE_GLYPH, { oathsworn: 'shield', silverbolt: 'crosshair', lightbinder: 'chains', grailknight: 'target', sunlance: 'sun', templar: 'hammer', censer: 'cloud', bell: 'echo', oathstone: 'rune' });
+Object.assign(FORCE_GLYPH, { oathsworn: 'shield', silverbolt: 'crosshair', lightbinder: 'chains', grailknight: 'target', sunlance: 'sun', templar: 'glaive2', censer: 'cloud', bell: 'echo', oathstone: 'rune' });
 
 /* ---------- the spells ---------- */
 // Dawnsweep (the spell id keeps its old name, so_lioncharge: art, sound and saves): a wide arc of dawnlight from his sword,
@@ -37365,9 +37418,9 @@ manaOnKill = function (src) {
    - Sunlance Clerics, the dawn-priests who burn the sky clean.
        Noon Sweep (so_halo): a channelled beam of noon light swept across a corner of the road; flyers it crosses are
        dazzled down. Dawnfall (so_dawnfall): every flyer slammed out of the sky, and each crash Blinds the walkers under it.
-   - Templars of the Ford (Aurelian's own, once the Hammer Templars), the greatsword zealots whose verdict falls.
-       Shield Fervour (so_hallow): a flurry of slams, each Judging every walker round it, the last delivering their Verdicts.
-       Sword of Heaven (so_hammerfall): the sword hurled into the sky, falling on the toughest foe as a star.
+   - Templars of the Ford (Aurelian's own, once the Hammer Templars), the zealots with a sword in each hand whose verdict falls.
+       Whirling Flurry (so_hallow, once Shield Fervour): a whirl of cuts, the blades in turn, each Judging every walker round it, the last delivering their Verdicts.
+       Sword of Heaven (so_hammerfall): one of his two swords hurled into the sky, falling on the toughest foe as a star.
    - Censer Bearers, the thurifers who sanctify the road.
        Procession of Incense (so_smoke): incense walked down the road, cell after cell. Kindle the Censers (so_embers):
        every patch of incense on the road flares at once into holy fire (and is spent).
@@ -37993,16 +38046,18 @@ SOC_DRAW.socsweep = q => {
 /* =====================================================================================================
    6. TEMPLARS OF THE FORD (once the Hammer Templars)
    ===================================================================================================== */
-// Shield Fervour: a flurry of slams round it, each Judging every walker it strikes; the last delivers their Verdicts
-socDef('so_hallow', { name: 'Shield Fervour', short: 'Fervour', glyph: 'hammer', hue: '#ffe8a0', mana: 90, cd: 14,
+// Whirling Flurry (once Shield Fervour): he turns through a whirl of cuts, the blades in turn, each striking every walker in reach
+// and Judging it; the last cut, both blades together, delivers their Verdicts. Whirling Edge (tpWhirl) fills his Blade Momentum.
+socDef('so_hallow', { name: 'Whirling Flurry', short: 'Flurry', glyph: 'whirl', hue: '#ffe8a0', mana: 90, cd: 14,
   by: { n: [5, 5, 6, 6, 7, 7], reach: [0, 0, 0, 0, 0, 0], vk: [.6, .6, .6, .6, .6, .6] },
   none: 'no ground foe in reach',
   auto: 'two or more ground foes in reach, or a boss or leader',
-  text: (t, st, ab) => { const rk = socBy(ab, 'reach', t); return `${socBy(ab, 'n', t)} slams in two seconds, each striking every ground foe in reach${rk ? ` (${Math.round(rk * 100)}% farther)` : ''} for ${xD(st, .22)} and a Judgement. The last delivers each one's Verdict at ${Math.round(socBy(ab, 'vk', t) * 100)}%.`; },
+  text: (t, st, ab) => { const rk = socBy(ab, 'reach', t); return `${socBy(ab, 'n', t)} cuts in two seconds, the blades in turn as he whirls, each striking every ground foe in reach${rk ? ` (${Math.round(rk * 100)}% farther)` : ''} for ${xD(st, .22)} and a Judgement. The last, both blades together, delivers each one's Verdict at ${Math.round(socBy(ab, 'vk', t) * 100)}%.`; },
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(c => c.def.boss || c.def.lead)) ? t : null; },
   cast(t, st, _, ab) {
     const n = Math.round(socBy(ab, 'n', t)), iv = .3, A = t.ab;
     t.cd = Math.max(t.cd, n * iv + .2); A.busyT = Math.max(A.busyT || 0, G.time + n * iv + .1); t.socFerv = { at: G.time, n, iv };
+    if (st.caps && st.caps.tpWhirl) { tpMomAdd(t, st, TP_MOM.max); soEv('tal:tpWhirl'); }   // Whirling Edge
     for (let k = 0; k < n; k++) G.delayed.push({ t: .15 + k * iv, fn: () => {
       if (!abLive(t)) return; const s = t.st || effStats(t), R0 = s.range * (1 + socBy(ab, 'reach', t)), last = k === n - 1;
       inSplash(t.x, t.y, R0, true, c => {
@@ -38010,37 +38065,40 @@ socDef('so_hallow', { name: 'Shield Fervour', short: 'Fervour', glyph: 'hammer',
         soAbHit(t, s, c, .22, 'phys'); if (c.dead) return; soJudge(c, 1, t);
         if (last && soJ(c) >= 1) soVerdict(c, t, socBy(ab, 'vk', t));
       });
-      t.shotT = 0; t.soSlamAt = G.time; G.shake = Math.max(G.shake, last ? .09 : .035);
-      sfx(last ? 'so_crush' : 'quake', last ? undefined : .3, Math.min(t.tier, 2));
-      socFx('so_hallow', t, t, C => {
-        const a = (t.ang || 0), hx = t.x + Math.sin(a) * .35, hz = t.y + Math.cos(a) * .35;
-        if (last) v2Area(C, t.x, t.y, R0, { sp: 'rock', n: 6, sp2: 'gold', n2: 8, rim: 'dust', rn: 8, shake: 0 });
-        else { sfxAdd({ k: 'vflash', x: hx, z: hz, h: .15, s: .35 * C.S, life: .12, col: socC(C, SOC.gold), a: .6 }); v2Spray(C, 'dust', hx, hz, .1, 3, { sp: .7 }); v2Spray(C, 'spark', hx, hz, .15, 4, { sp: 1 }); }
-        socMark(C, hx + R(-.15, .15), hz + R(-.15, .15), .35 + .05 * k, VT.CRACK, socC(C, '#ffd070'), 2.2, { a: .55, fout: .8 });
-      });
+      if (s.caps && s.caps.tpWhirl) t.tpMomT = G.time;   // (the whirl keeps his Momentum up)
+      const kind = last ? 2 : k % 2;
+      t.shotT = 0; t.soSlamAt = G.time; t.tpCut = kind; G.shake = Math.max(G.shake, last ? .04 : 0);
+      tpCutFx(t, R0, kind); sfx('swordSwing', { kind: last ? 'big' : 'fast' });
+      if (last) socFx('so_hallow', t, t, C => v2Area(C, t.x, t.y, R0, { sp: 'spark', n: 6, sp2: 'gold', n2: 6, shake: 0 }));
     } });
   } });
 
-// Sword of Heaven: hurled into the sky; a moment later it falls on its foe as a star
+// Sword of Heaven: one of his two swords hurled into the sky; a moment later it falls on its foe as a star and flies back to his hand.
+// Second Star (tpStar, capstone): the other sword follows it, on the next toughest walker in reach.
+function tpStarFall(t, s, c, x, z, k, vk, wave) {
+  if (!c.dead) { soAbHit(t, s, c, 3.6 * k, 'phys'); if (!c.dead) soVerdict(c, t, vk); }
+  inSplash(x, z, wave, true, o => { if (o === c || !socFoe(o) || !canTarget(t, s, o)) return; soAbHit(t, s, o, .6 * k, 'phys'); if (!o.dead) soJudge(o, 1, t); });
+  G.shake = Math.max(G.shake, .08); sfx('so_hammerfall', 1);
+  socFx('so_hammerfall', t, c, C => {
+    v2Hit(C, x, z, .35, 1.05 * C.S * k, { sp: 'spark', n: 7, sp2: 'gold', n2: 7, shake: .06 });
+    v2Area(C, x, z, wave, { sp: 'dust', n: 5, deep: 1 });
+  });
+}
 socDef('so_hammerfall', { name: 'Sword of Heaven', short: 'Heaven', glyph: 'bounce', hue: '#c8d0e0', mana: 80, cd: 12, rAdd: 1.5,
-  by: { stun: [1, 1, 1.1, 1.1, 1.2, 1.3], wave: [.9, .9, .9, 1, 1, 1] },
+  by: { wave: [.9, .9, .9, 1, 1, 1] },
   none: 'no ground foe in reach',
   auto: 'the toughest ground foe within reach + 1.5 cells (bosses and elites first)',
-  text: (t, st, ab) => `His sword is hurled into the sky and falls like a star on the toughest ground foe: ${xD(st, 3.6)}, stunned ${socBy(ab, 'stun', t)}s and a Verdict half again as strong. The shock knocks down and Judges the ground foes within ${gNf(socBy(ab, 'wave', t))} cells for ${xD(st, .6)}.`,
+  text: (t, st, ab) => `He hurls one of his swords into the sky and it falls like a star on the toughest ground foe: ${xD(st, 3.6)} and a Verdict half again as strong. The ground foes within ${gNf(socBy(ab, 'wave', t))} cells take ${xD(st, .6)} and a Judgement. Then it flies back to his hand.`,
   pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
   cast(t, st, c, ab) {
     t.soThrow = { x: c.x, z: c.y }; t.socThrowC = c; t.cd = Math.max(t.cd, 1.6); sfx('so_hammerfall', 0);
-    socFx('so_hammerfall', t, c, C => v2Shaft(C, c.x, c.y, { foe: c, w: .1, h: 4, life: .75, fin: .6, delay: .45 }));
-    soLater(t, 1, s => {
-      const x = c.dead ? t.soThrow.x : c.x, z = c.dead ? t.soThrow.z : c.y;
-      if (!c.dead) { soAbHit(t, s, c, 3.6, 'phys'); if (!c.dead) { stun(c, socBy(ab, 'stun', t), .4, null); soVerdict(c, t, 1.5); } }
-      inSplash(x, z, socBy(ab, 'wave', t), true, o => { if (o === c || !socFoe(o) || !canTarget(t, s, o)) return; soAbHit(t, s, o, .6, 'phys'); if (o.dead) return; stun(o, .5, .4, null); soJudge(o, 1, t); });
-      G.shake = Math.max(G.shake, .12); sfx('so_hammerfall', 1);
-      socFx('so_hammerfall', t, c, C => {
-        v2Hit(C, x, z, .4, 1.15 * C.S, { sp: 'rock', n: 8, sp2: 'gold', n2: 8, shake: .1 });
-        v2Area(C, x, z, socBy(ab, 'wave', t), { sp: 'dust', n: 6, rim: 'rock', rn: 6, deep: 1 });
-        socMark(C, x, z, .7, VT.CRACK, socC(C, '#ffd070'), 2.5, { a: .7, fout: 1 });
-      });
+    socFx('so_hammerfall', t, c, C => v2Shaft(C, c.x, c.y, { foe: c, w: .08, h: 4, life: .7, fin: .6, delay: .45 }));
+    soLater(t, 1, s => tpStarFall(t, s, c, c.dead ? t.soThrow.x : c.x, c.dead ? t.soThrow.z : c.y, 1, 1.5, socBy(ab, 'wave', t)));
+    if (st.caps && st.caps.tpStar) soLater(t, 1.4, s => {   // Second Star: the other sword, on the next toughest walker (or the same, alone)
+      const L = abFoes(t, s, abReach(t, s, ab), abWalker), c2 = abToughest(L.filter(o => o !== c)) || (!c.dead && c);
+      if (!c2) return; soEv('cap:tpStar'); t.tpStar2 = { x: c2.x, z: c2.y, at: G.time };
+      socFx('so_hammerfall', t, c2, C => v2Shaft(C, c2.x, c2.y, { foe: c2, w: .07, h: 4, life: .5, fin: .6, delay: 0 }));
+      tpStarFall(t, s, c2, c2.x, c2.y, .7, 1, socBy(ab, 'wave', t));
     });
   } });
 // the hammer's flight: up out of the hand into the sky, gone, then falling on its foe, and back to the hand (soExtra calls this
@@ -38672,7 +38730,7 @@ const FSETS = [
     hit(t, c, amt, sp, n) { if (n >= 2 && sp === 'so_hail' && c.hp > 0 && soJ(c) >= soJMax()) soVerdict(c, t, 1); } },
   { id: 'fs_penance', spells: ['so_crush', 'so_hammerfall'], force: 'silver', unit: 'earth', name: 'Penitent’s Anvil',
     pieces: [['fs_so_gauntlet', 'Penitent’s Gauntlet', 3, 'fist', '#9aa8c8', 'dmg pen'], ['fs_so_pauldron', 'Bell-Iron Pauldron', 3, 'shield', '#b0b8c8', 'dmg as crit']],
-    b2: 'Sanctified Slam Blinds every foe it strikes for 1s, and each slam brings Sword of Heaven 3s nearer.',
+    b2: 'Cross-Cut Blinds every foe it strikes for 1s, and each Cross-Cut brings Sword of Heaven 3s nearer.',
     hit(t, c, amt, sp) { if (sp === 'so_crush' && c.hp > 0) soBlind(c, 1, t); },
     cast(t, ab) { if (ab.id === 'so_crush') { fsReady(t, 'so_hammerfall', 3); fsGlint(t, this); } } },
   { id: 'fs_choir', spells: [], force: 'silver', unit: null, name: 'Vestments of the Dawn Choir',
@@ -41043,7 +41101,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_so_star', epic: 1, spells: ['so_hallow', 'so_hammerfall'], force: 'silver', unit: 'earth', name: 'Regalia of the Falling Star',
     pieces: [['fe_so_starhammer', 'Starfall Maul-Head', 3, 'fist', '#c8d0e0', 'dmg pen'], ['fe_so_zealplate', 'Zealot’s Riveted Plate', 3, 'shield', '#e8ecf4', 'dmg as crit']],
     old: [['fe_so_skyhelm', 'Helm of the Open Sky', 3, 'stars', '#ffe8a0', 'dmg as range'], ['fe_so_meteorite', 'Shard of the First Star', 3, 'rune', '#dfe6f0', 'cd mana']],
-    b2: 'Each slam of Shield Fervour lays 1 more Judgement on a Blinded foe. Sword of Heaven Blinds every foe it strikes for 2s, and when it slays a foe it falls again at once, free (at most once every 10s).',
+    b2: 'Each cut of Whirling Flurry lays 1 more Judgement on a Blinded foe. Sword of Heaven Blinds every foe it strikes for 2s, and when it slays a foe it falls again at once, free (at most once every 10s).',
     hit(t, c, amt, sp, n) {
       if (sp === 'so_hallow' && !c.dead && soBlinded(c)) soJudge(c, 1, t);
       if (n < 2 || sp !== 'so_hammerfall') return;
@@ -47519,7 +47577,7 @@ const UNIT_KIND = {
   ch_torvald: ['gun'], ch_brannoc: ['melee', 'hammer'], ch_hrolf: ['gun'],
   // the Silver Order
   oathsworn: ['melee', 'blade'], silverbolt: ['bow'], lightbinder: ['caster'], grailknight: ['melee', 'polearm', 'rider'],
-  sunlance: ['caster'], templar: ['melee', 'hammer'], censer: ['caster'], so_inquisitor: ['caster'], ch_aurelian: ['melee', 'blade'], ch_morrow: ['melee', 'polearm', 'rider'],
+  sunlance: ['caster'], templar: ['melee', 'blade'], censer: ['caster'], so_inquisitor: ['caster'], ch_aurelian: ['melee', 'blade'], ch_morrow: ['melee', 'polearm', 'rider'],
   // the Stormborn
   sb_wolfguard: ['melee', 'polearm'], sb_windrunner: ['bow'], sb_hailshaman: ['caster'], sb_spiritwalker: ['caster'],
   sb_thundercaller: ['caster'], sb_earthbinder: ['melee', 'hammer'], sb_clouddancer: ['caster'], sb_skyhunter: ['polearm'], ch_tarka: ['caster'],
@@ -49565,7 +49623,7 @@ const TAL_SPREAD = {
   "silver.frost": {"Tightening Links":[0,2],"Glinting Links":[2,1],"Tight Bindings":[0,1],"Dazzle":[1,3],"Twin Chains":[4,2],"Chain of Penance":[1,2],"Scouring Light":[2,2],"Last Rites":[3,1],"Blinding Chains":[2,3],"Chain of Judgement":[5,2],"Vigil Chains":[4,1],"Quick Binding":[5,0],"Shackle Litany":[5,1],"Swift Lash":[3,3],"Vigil Lamp":[4,3],"Glare of Dawn":[3,0]},
   "silver.arcane": {"Full Gallop":[1,1],"Couched Lance":[0,2],"Spurs":[3,1],"Grail Quest":[1,0],"Tourney Passes":[2,1],"Shining Example":[4,3],"Trampling Hooves":[1,2],"Charge of the Vow":[3,3],"Echoing Verdict":[5,1],"Glory of the Charge":[5,2],"Rallying Vow":[4,0],"Vowkeeper":[4,1],"Unhorse":[2,0],"Shield and Spur":[0,1],"Grail's Grace":[2,3],"Unhorsing Ride":[3,2],"Part the Ranks":[5,3]},
   "silver.storm": {"Zenith":[1,1],"Morning Rays":[1,3],"Sky Verdict":[2,3],"Fall from Grace":[4,0],"Prism":[2,0],"Kindled Faith":[5,1],"Noon Sweep":[3,0],"Dawnfall":[4,2],"Lance of Heaven":[5,3],"Dawnward":[5,2],"Sunburst":[3,2],"Judgement Ray":[2,1],"Searing Eye":[0,1],"Burning Pinions":[0,0],"Piercing Dawn":[0,2],"Sun Wheel":[4,1]},
-  "silver.earth": {"Press of Battle":[2,2],"Crushing Weight":[1,3],"Tremor":[0,1],"Ringing Steel":[5,2],"Zeal":[3,3],"Shield Fervour":[2,3],"Blade of Judgement":[4,0],"Shockwave":[5,1],"Final Judgement":[5,0],"Sword of Heaven":[3,0],"Sundering Blow":[1,1],"Marked by the Blade":[4,3],"Hurled Verdict":[4,2],"Sundered Plate":[1,2],"Reliquary":[2,0],"Censed Blade":[0,2],"Consecrated Earth":[3,1]},
+  "silver.earth": {"Twin Rhythm":[0,1],"Censed Blades":[0,2],"Through the Plate":[0,3],"Marking Edge":[1,0],"Whirling Flurry":[1,1],"Parry and Riposte":[1,3],"Sword of Heaven":[2,0],"Gathering Whirl":[2,1],"Sundered Plate":[2,2],"Blade of Judgement":[3,0],"Whirling Edge":[3,1],"Reliquary":[3,2],"Hurled Verdict":[4,0],"Press of Battle":[4,1],"Marked by the Blade":[4,2],"Steel Tempest":[5,1],"Second Star":[5,2]},
   "silver.cannon": {"Fanned Embers":[3,1],"Lingering Smoke":[1,0],"Glowing Coal":[5,2],"Swift Swing":[3,0],"Procession of Incense":[2,0],"Choking Smoke":[0,2],"Kindle the Censers":[4,2],"Censing of the Faithful":[5,3],"Ember Psalm":[5,1],"Thick Smoke":[1,1],"Purging Fire":[2,3],"Rekindling":[4,3],"Ash in the Eyes":[1,3],"Offering Bowl":[0,0],"Pall of Smoke":[0,1],"Censing Prayer":[3,2]},
   "silver.venom": {"Broken Litany":[1,0],"Scorching Seal":[0,3],"Heavy Silence":[1,2],"Dry Well":[0,2],"Zealot's Vow":[1,3],"Writ of Seizure":[2,2],"Forfeit":[0,1],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[3,2],"Heretic's Stake":[4,0],"Penitent Chains":[4,1],"Confession":[3,3],"Pyre Eternal":[5,0],"Ashes Speak":[5,1],"Grand Inquest":[5,2]},
   "champ:so_lion": {"Shoulder to Shoulder":[0,1],"Lowered Shield":[3,3],"Wide Sweep":[0,3],"Shield Wall":[4,1],"Bulwark Slam":[1,1],"Shields Raised":[2,1],"Burnished Shields":[1,2],"Rally to the Shield":[2,0],"The Far Bank":[5,3],"Debt of Oaths":[5,1],"Unbroken":[3,2],"The Crossing":[4,3],"The Ford Itself":[5,2],"Swift Reprisal":[0,2],"Hearts Lifted":[1,0]},
@@ -50606,26 +50664,23 @@ talPlain('silver', 'storm', {
   'Sun Wheel': { tag: 'Control', pro: n => `Noon Sweep slows every foe it crosses ${10 * n}% for 2s.` },
 });
 
-/* ---------- Templars of the Ford ---------- */
+/* ---------- Templars of the Ford (two swords, 22 Nov 2026) ---------- */
 talPlain('silver', 'earth', {
-  'Press of Battle': { tag: 'Damage', pro: n => `Slams that hit 3+ ground foes make it Radiant for ${n}s.` },
-  'Crushing Weight': { tag: 'Control', pro: n => `Its slam slows foes ${25 + 15 * n}% for 1s, not 25%.` },
-  'Tremor': { tag: 'Control', pro: n => `Sanctified Slam stuns ${gNf(.1 * n)}s longer.` },
-  'Ringing Steel': { tag: 'Judgement', pro: 'Each kill by its Verdict makes it slam again at once, once a second.' },
-  // (simplified: the slow alone, deeper; the stagger went)
-  'Zeal': { tag: 'Control', pro: n => `Shield Fervour slows every ground foe it strikes ${15 * n}% for 1.5s.`, sp: n => ({ ab: 'so_hallow', rider: { slow: [.15 * n, 1.5] } }) },
-  // (simplified: a bigger Sword of Heaven alone; the stronger slam Verdicts went)
-  'Blade of Judgement': { tag: 'Control', pro: n => `Sword of Heaven stuns ${gNf(.2 * n)}s longer and its shock reaches ${gNf(.25 * n)} cells wider.`, cap: null, sp: n => ({ ab: 'so_hammerfall', by: { stun: .2 * n, wave: .25 * n } }) },
-  'Shockwave': { tag: 'Judgement', pro: 'Each slam rolls a cell further, hitting foes there for 50% and a Judgement.' },
-  'Final Judgement': { tag: 'Judgement', pro: 'Each foe its Verdicts slay passes 3 stacks to every ground foe within a cell.' },
-  'Sundering Blow': { tag: 'Judgement', pro: 'Each slam lays a Judgement just before it strikes.' },
-  'Marked by the Blade': { tag: 'Support', pro: "Sword of Heaven's foe takes 10% more from every unit for 4s." },
-  'Hurled Verdict': { tag: 'Judgement', pro: 'Sword of Heaven lays 2 Judgement on its foe.' },
+  'Press of Battle': { tag: 'Damage', pro: n => `Cuts that hit 3+ ground foes make it Radiant for ${n}s.` },
+  'Twin Rhythm': { tag: 'Damage', pro: n => `Blade Momentum lasts 3s${n >= 2 ? '; at full Momentum every 2nd cut is a Twin Cut' : ''}.` },
+  'Through the Plate': { tag: 'Damage', pro: n => `Cross-Cut cracks ${n} armour off every foe it strikes.` },
+  'Parry and Riposte': { tag: 'Survival', pro: n => `Blows on it land ${15 * n}% lighter; it answers with a Twin Cut (once every ${4 - n}s).` },
+  'Gathering Whirl': { tag: 'Spell', pro: n => `Whirling Flurry is ${n} cut${n > 1 ? 's' : ''} longer.` },
+  'Blade of Judgement': { tag: 'Spell', pro: n => `Sword of Heaven's shock reaches ${gNf(.25 * n)} cells wider.` },
+  'Steel Tempest': { tag: 'Damage', pro: 'At full Blade Momentum each Twin Cut spins into a short Whirling Flurry: 3 cuts of 30% and a Judgement.' },
+  'Second Star': { tag: 'Judgement', pro: 'Sword of Heaven throws both swords: the second strikes another foe for 70% and a full Verdict.' },
+  'Marking Edge': { tag: 'Judgement', pro: n => `${n >= 2 ? 'Each cut' : 'Every other cut'} lays a Judgement just before it strikes.` },
+  'Marked by the Blade': { tag: 'Support', pro: n => `Sword of Heaven's foe takes ${5 * n}% more from every unit for 4s.` },
+  'Hurled Verdict': { tag: 'Judgement', pro: n => `Sword of Heaven lays ${n} Judgement on its foe.` },
   'Sundered Plate': { tag: 'Judgement', pro: n => `Each Verdict strips ${n} armour from its foe, up to ${2 * n}.` },
   'Reliquary': { tag: 'Mana', pro: n => `Each Judged foe that dies in its reach restores ${2 * n} mana.` },
-  'Censed Blade': { tag: 'Judgement', pro: n => `Its slams lay ${n} Judgement on ground foes standing in incense.` },
-  // (simplified: Judgement alone, a second longer; the slow went)
-  'Consecrated Earth': { tag: 'Judgement', pro: 'Shield Fervour hallows the ground for 5s, laying Judgement on ground foes there each second.' },
+  'Censed Blades': { tag: 'Judgement', pro: n => `Its cuts lay ${n} Judgement on ground foes standing in incense.` },
+  'Whirling Edge': { tag: 'Spell', pro: n => `Whirling Flurry fills Blade Momentum and reaches ${10 * n}% farther.` },
 });
 
 /* ---------- Censer Bearers ---------- */
@@ -51877,10 +51932,6 @@ const HOLD_TAL = {
   'silver.arcane': {
     'Unhorse': { tag: 'Control', pro: 'The lance also drives back every ground foe within a cell of its foe.' },
     'Unhorsing Ride': { tag: 'Control', pro: 'Tourney Passes slows every ground foe it tramples 30% for 1.5s.', sp: { ab: 'so_ridedown', rider: { slow: [.3, 1.5] } } },
-  },
-  'silver.earth': {
-    'Tremor': { tag: 'Damage', pro: n => `Sanctified Slam cracks ${n} armour off every foe it strikes.`, sp: n => ({ ab: 'so_crush', rider: { shred: [n, 6] } }) },
-    'Blade of Judgement': { tag: 'Spell', pro: n => `Sword of Heaven's shock reaches ${hNf(.25 * n)} cells wider.` },
   },
   'ironhold.earth': {
     'Rivet Popper': { tag: 'Damage', pro: n => `A slam that cracks a foe's last armour fills ${10 * n}% of its gauge, once a foe.` },
@@ -54061,7 +54112,7 @@ function tchUlt(id, o) {
   if (typeof FORCES === 'undefined' || !FORCES.silver || typeof ABIL === 'undefined') return;
   // Three were no slower than their unit's other spells and are retuned (a longer wait, more mana, as much more of what they do):
   tchUlt('so_rebuke', { cd: 22, mana: 120, by: { dur: 1.4 } });                    // Oath of Challenge: 14.5s, 90 mana
-  tchUlt('so_hammerfall', { cd: 20, mana: 125, by: { stun: 1.3, wave: 1.3 } });    // Sword of Heaven: 12.5s, 90 mana
+  tchUlt('so_hammerfall', { cd: 20, mana: 125, by: { wave: 1.3 } });    // Sword of Heaven: 12.5s, 90 mana
   tchUlt('so_embers', { cd: 22, mana: 155, set: { n: [7, 7, 8, 8, 9, 9] } });      // Kindle the Censers: 15.5s, 120 mana, 5-7 patches
   // the rest keep their numbers (15.5-24s): they say Ultimate and hold for a worthy moment
   for (const id of ['so_witness', 'so_shackle', 'so_vow', 'so_dawnfall', 'so_pyre', 'ch_lionsdue', 'ch_highnoon', 'ch_verdict']) tchUlt(id);
@@ -54162,23 +54213,23 @@ function tchUlt(id, o) {
     ['Dawnward', 5, 2, { req: [4, 2] }],
   ]);
   tchTree(FORCES["silver"].talents["earth"], [   // silver.earth
-    ['Crushing Weight', 0, 1],
-    ['Censed Blade', 0, 2],
-    ['Tremor', 0, 3],
-    ['Sundering Blow', 1, 0, { max: 2, pro: n => `${n >= 2 ? 'Each slam' : 'Every other slam'} lays a Judgement just before it strikes.` }],
-    ['Shield Fervour', 1, 1, { req: [0, 1] }],
+    ['Twin Rhythm', 0, 1],
+    ['Censed Blades', 0, 2],
+    ['Through the Plate', 0, 3],
+    ['Marking Edge', 1, 0],
+    ['Whirling Flurry', 1, 1, { req: [0, 1] }],
+    ['Parry and Riposte', 1, 3, { on: 'parry' }],
     ['Sword of Heaven', 2, 0, { req: [1, 0] }],
-    ['Zeal', 2, 1, { req: [1, 1] }],
+    ['Gathering Whirl', 2, 1, { req: [1, 1] }],
     ['Sundered Plate', 2, 2],
     ['Blade of Judgement', 3, 0, { req: [2, 0] }],
-    ['Consecrated Earth', 3, 1, { req: [2, 1], max: 2, pro: n => `Shield Fervour hallows the ground for ${gNf(2.5 * n)}s, laying Judgement on ground foes there each second.` }],
-    ['Marked by the Blade', 3, 2, { req: [2, 2], on: 'allies', max: 2, pro: n => `Sword of Heaven's foe takes ${5 * n}% more from every unit for 4s.`, sp: n => ({ ab: 'so_hammerfall', rider: { mark: [.05 * n, 4] } }) }],
-    ['Hurled Verdict', 4, 0, { req: [3, 0], max: 2, pro: n => `Sword of Heaven lays ${n} Judgement on its foe.`, sp: n => ({ ab: 'so_hammerfall', rider: { judge: n } }) }],
-    ['Press of Battle', 4, 1, { req: [3, 1] }],
-    ['Reliquary', 4, 2, { req: [3, 2] }],
-    ['Final Judgement', 5, 0, { req: [4, 0] }],
-    ['Shockwave', 5, 1, { req: [4, 1] }],
-    ['Ringing Steel', 5, 2, { req: [4, 2] }],
+    ['Whirling Edge', 3, 1, { req: [2, 1] }],
+    ['Reliquary', 3, 2, { req: [2, 2] }],
+    ['Hurled Verdict', 4, 0, { req: [3, 0] }],
+    ['Press of Battle', 4, 1, { req: [3, 1], on: 'radiance' }],
+    ['Marked by the Blade', 4, 2, { req: [3, 2], on: 'allies' }],
+    ['Steel Tempest', 5, 1, { req: [4, 1] }],
+    ['Second Star', 5, 2, { req: [4, 2] }],
   ]);
   tchTree(FORCES["silver"].talents["cannon"], [   // silver.cannon
     ['Fanned Embers', 0, 1, { pro: n => `Coals that land in incense lay ${n} more Judgement and burst again for ${30 * n}%.` }],
@@ -55726,8 +55777,10 @@ const FPH = (() => {
     if (mom > .05 && (kind === 'launch' || kind === 'fly')) { p.vx += ux * sp * (kind === 'fly' ? .7 : .5); p.vz += uz * sp * (kind === 'fly' ? .7 : .5); }   // (thrown or falling, it carries on the way it was going)
     if (kind === 'slide' && mom < .05) { p.vx *= .6; p.vz *= .6; }   // a slow one crumples more or less where it stood
     // turn the clip so it falls the way it was struck (a part of the way, eased in)
-    if (rg.fall && kind !== 'still' && kind !== 'fly') {
-      const want = Math.atan2(dx, dz) - Math.atan2(rg.fall[0], rg.fall[1]); let dy = Math.atan2(Math.sin(want - k.yaw), Math.cos(want - k.yaw));
+    /* (a foe with several deaths says which way the one this body plays falls, model.fallOf: null for one that goes down where it stands) */
+    const fo = rg.model && rg.model.fallOf ? rg.model.fallOf(k) : undefined, fall = fo === undefined ? rg.fall : fo;
+    if (fall && kind !== 'still' && kind !== 'fly') {
+      const want = Math.atan2(dx, dz) - Math.atan2(fall[0], fall[1]); let dy = Math.atan2(Math.sin(want - k.yaw), Math.cos(want - k.yaw));
       p.twist = Math.abs(dy) > 2.2 ? 0 : Math.max(-P.twist, Math.min(P.twist, dy));
     } else p.twist = 0;
     // never thrown out of the field or past a map's crest: how far it would go is cut to fit
@@ -63756,7 +63809,7 @@ const AudioSys = (() => {
   // every spell in order, as the game plays it: [id, name, ...[sound arg, seconds after the cast]]
   const MX_LIST = [['so_bash', 'Bulwark Bash'], ['so_aegis', 'Rampart of Dawn'], ['so_rebuke', 'Oath of Challenge'], ['so_sanct', 'Consecrated Bolt'], ['so_hail', 'Flare Bolt', [0, 0], [0, .12], [0, .24], [0, .36]], ['so_witness', 'Bear Witness'],
     ['so_bind', 'Binding Light'], ['so_flare', 'Chain of Penance'], ['so_shackle', 'Vigil Chains'], ['so_grail', 'Grail Charge', [0, 0], [1, .52]], ['so_ridedown', 'Tourney Passes', [0, 0], [1, .3]], ['so_vow', 'Charge of the Vow'],
-    ['so_sunlance', 'Sunlance'], ['so_halo', 'Noon Sweep'], ['so_dawnfall', 'Dawnfall'], ['so_crush', 'Sanctified Slam'], ['so_hallow', 'Shield Fervour'], ['so_hammerfall', 'Sword of Heaven', [0, 0], [1, .82]],
+    ['so_sunlance', 'Sunlance'], ['so_halo', 'Noon Sweep'], ['so_dawnfall', 'Dawnfall'], ['so_crush', 'Cross-Cut'], ['so_hallow', 'Whirling Flurry'], ['so_hammerfall', 'Sword of Heaven', [0, 0], [1, .82]],
     ['so_sweep', 'Thurible Sweep'], ['so_smoke', 'Procession of Incense', [0, 0], [1, .9]], ['so_embers', 'Kindle the Censers', [0, 0], [1, .55], [0, .2], [1, .75], [0, .4], [1, .95]], ['so_toll', 'Toll of Valor'], ['so_peal', 'Peal of Mercy'], ['so_knell', 'Knell of Judgement'],
     ['so_lioncharge', 'Dawnsweep (Aurelian)'], ['so_dawnbreak', 'Dawnbreak (Celestine)', [1, 0]], ['so_sentence', 'Sentence (Morrow)']];
   function silverPlay(id) {
@@ -78131,7 +78184,12 @@ const FFM = (() => {
      attack  a foe that strikes units (def.atk) winds up as its blow comes due, so it lands when the damage does
      cast    a caster's spell (the engine's cast gesture, creepCastK) and Orragar's tolls (c.htCast = { t0 })
      hit     whole when standing; on the walk only the trunk, head and arms, so the legs keep the ground
-     death   then the body sinks away; a flyer comes down out of the air as it plays
+     death   then the body sinks away; a flyer comes down out of the air as it plays. Each unit has three (death, death2,
+             death3: the owner's film deaths, tools/ht_filmdeaths.py; each clip's own name is its `label`): one is
+             picked by chance a body (deathPick), played once and held on its last frame until the body sinks away
+             (the sinking's and the clearing's times, SINK0 and GONE, are not the clips'). Foe physics asks which way the
+             picked one falls (model.fallOf), so its turn of the body agrees.
+             window.HT_DEATH_PICK = 'death2' holds one for a check.
    Stunned a foe stands; frozen it holds its frame. The engine's own body tilt and squash are taken back out (the clips
    carry their own), as for the Mauler. The green sap glows a little (each corner's `em`).
    This file only draws: the foes themselves (CREEPS entries, rules, waves) are in forces_zzzzzzzzzzzzzzzzzzzzzzzzz_hollowthorn.js.
@@ -78146,7 +78204,7 @@ const HOLLOWTHORN_MDL = (() => {
 
   function make(TYPE, DATA) {
     let D = null, R = null, MESHB = null, img = null, NB = 0, H = null, PAR = null, UPPER = null, HIPS = 0, PA = null, PB = null, BUF = null, REF_HIT = null;
-    const CL = {}, ST = new WeakMap();
+    const CL = {}, ST = new WeakMap(), DEATHS = [], FALL = {};
     function decodeClip(c) {
       const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
       if (q16.length !== c.n * NB * 4 || t.length !== c.n * 3) throw new Error(TYPE + ': bad clip');
@@ -78306,7 +78364,7 @@ const HOLLOWTHORN_MDL = (() => {
       if (c && !(o && o.deathT != null)) base = upright(base, c);
       const sc = _sc(base);
       if (o && o.deathT != null) {
-        sampleT(CL.death, o.deathT, PA);
+        sampleT(CL[o.deathClip] || CL.death, o.deathT, PA);
         const s = c && ST.get(c);
         if (s && s.has && o.deathT < .12) { PB.q.set(s.last.q); PB.t.set(s.last.t); mixPose(PB, PA, o.deathT / .12); PA.q.set(PB.q); PA.t.set(PB.t); }
       } else if (!c) sampleT(CL.idle, vt, PA);
@@ -78314,18 +78372,30 @@ const HOLLOWTHORN_MDL = (() => {
       const it = item(MESHB, base, o);
       it.bones = itemBones(it, toBones(PA, BUF)); it.sec = [0, TRIM];
     }
+    /* which death: one of the unit's three film deaths, by chance, chosen once a body (a body's own number, not the
+       game's dice: nothing in play depends on it). window.HT_DEATH_PICK = 'death2' holds one for a check. */
+    function deathPick(k) {
+      if (k.htD) return k.htD;
+      const force = typeof window !== 'undefined' && window.HT_DEATH_PICK;
+      if (force && CL[force]) return k.htD = force;
+      if (DEATHS.length < 2) return k.htD = 'death';
+      if (k.htR == null) k.htR = Math.random();
+      return k.htD = DEATHS[Math.floor(k.htR * DEATHS.length) % DEATHS.length];
+    }
+    function fallOf(k) { return FALL[deathPick(k)] || null; }
     function die(k) {
       if (k.t > GONE) return false;
-      const c = k.c, DT = CL.death;
+      const c = k.c, DN = deathPick(k), DT = CL[DN];
       if (!k.kneel && k.t > DT.kneel) { k.kneel = true; if (!D.fly) MOBRIG.thud(k, 3, false); }
       if (!k.thud && k.t > DT.thud) { k.thud = true; MOBRIG.thud(k, c && c.def && c.def.boss ? 14 : 5, !!(c && c.def && c.def.boss)); }
       const su = Math.max(0, (k.t - SINK0) / (GONE - SINK0)), f = Math.max(0, 1 - k.t / .14), dk = 1 - .35 * Math.min(1, su * 2.5);
       /* a flyer comes down out of the air while the clip folds it up; the clip's last frames lie on the road */
-      const air = D.fly ? 1 - MOBRIG.sm(.12, .62, k.t / DT.dur) : 0, y0 = D.fly ? k.y * air * air : k.y;
+      /* (a film death starts in its own hover, DT.t[1] above the road: that much of the height is the clip's to lose) */
+      const air = D.fly ? 1 - MOBRIG.sm(.12, .62, k.t / DT.dur) : 0, y0 = D.fly ? (k.y - (DT.film ? DT.t[1] * k.sc : 0)) * air * air : k.y;
       M4.trs(_m, k.x, y0 - su * su * .5 * k.sc, k.z, k.yaw, 0, 0, k.sc);
       const t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0];
       const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * f) * dk, t0[1] * (.8 + .25 * f) * dk, t0[2] * (.75 + .25 * f) * dk, Math.max(t0[3] * dk, .08 * f)];
-      draw(_m, 0, { c, deathT: k.t, tint, shadow: su < .2 });
+      draw(_m, 0, { c, deathT: k.t, deathClip: DN, tint, shadow: su < .2 });
       return true;
     }
     function load(data) {
@@ -78341,6 +78411,13 @@ const HOLLOWTHORN_MDL = (() => {
       R.bones.forEach((b, i) => { let p = i, up = false; while (p >= 0) { if (R.bones[p].n === 'spine') up = true; p = R.bones[p].p; } UPPER[i] = up ? 1 : 0; });
       PA = newPose(); PB = newPose(); BUF = new Float32Array(NB * 12);
       REF_HIT = sampleF(CL.hit, 0, newPose()); if (CL.cast) REF_CAST = sampleF(CL.cast, 0, newPose());
+      /* its deaths, and which way each one lays the body down (from the hips at its start to the head at its end, on the road) */
+      for (const nm of Object.keys(CL).sort()) if (/^death\d*$/.test(nm)) {
+        DEATHS.push(nm);
+        const HD = R.bix.head, at = (f, b) => { toBones(sampleF(CL[nm], f, PB), BUF); const o = b * 9; return [_W[o] * H[b * 3] + _W[o + 1] * H[b * 3 + 1] + _W[o + 2] * H[b * 3 + 2] + _O[b * 3], _W[o + 6] * H[b * 3] + _W[o + 7] * H[b * 3 + 1] + _W[o + 8] * H[b * 3 + 2] + _O[b * 3 + 2]]; };
+        const a = at(0, HIPS), e = at(CL[nm].n - 1, HD), fx = e[0] - a[0], fz = e[1] - a[1], fl = Math.hypot(fx, fz);
+        FALL[nm] = fl > .15 * R.height ? [fx / fl, fz / fl] : null;
+      }
       const G_ = R.groups.body, idx = G_.idx, nc = idx.length;
       const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
       const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
@@ -78354,12 +78431,12 @@ const HOLLOWTHORN_MDL = (() => {
       if (!D.tex) throw new Error(TYPE + ': no texture');
       if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
       MESHB = m;
-      const model = { limbs: [], bob: 0, fly: !!D.fly, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), body: m, bounds: [[-.3, 0, -.3], [.3, R.height, .3]], tris: nc / 3 };
+      const model = { limbs: [], bob: 0, fly: !!D.fly, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), fallOf, body: m, bounds: [[-.3, 0, -.3], [.3, R.height, .3]], tris: nc / 3 };
       if (CL.cast) model.castPose = [];      // (so the view works the cast gesture out for it: view.js drawCreeps)
       return model;
     }
     const model = load(DATA);
-    return { model, CL, get R() { return R; }, top: DATA.top || DATA.height };
+    return { model, CL, DEATHS, FALL, get R() { return R; }, top: DATA.top || DATA.height };
   }
   /* the sculpts by foe id (the CREEPS key): registered as each one's body */
   /* the sculpts by foe id (the CREEPS key): registered as each one's body, when its file is here (they come with the first
@@ -87474,9 +87551,9 @@ const SPELL_BRIEFS = {
   so_sunlance: 'Fires a lance of sunlight down a 4-cell line, dealing {d} and a Judgement to each enemy. Flying enemies take double and are dragged down 2 sec. Casters take up to double, the more mana they hold.',
   so_halo: ({ d, v, full }) => { const m = /(\d+)° arc/.exec(full); return `Sweeps a beam across a ${m ? m[1] + '°' : 'wide'} arc, dealing ${d(1)} and a Judgement to each enemy crossed. Flying enemies take double and are dragged down ${v('low')} sec.`; },
   so_dawnfall: 'Drags flying enemies down for {dur} sec, dealing {d} and Blinding as long (less on bosses). Each crash deals {d2} to ground enemies beneath, Blinds {crash} sec and adds a Judgement.',
-  so_crush: 'After a long wind-up, slams the ground, dealing {d} to ground enemies. Judged enemies hit hear their full Verdict.',
-  so_hallow: 'Slams {n} times in quick succession, each dealing {d} and a Judgement to ground enemies. The last slam delivers each one\'s Verdict at {vkPct} strength.',
-  so_hammerfall: 'Hurls its sword into the sky, landing 1 sec later for {d} and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2} and a Judgement.',
+  so_crush: 'Crosses both swords and draws them apart, dealing {d} to ground enemies around it. Judged enemies hit hear their full Verdict.',
+  so_hallow: 'Whirls through {n} cuts, the blades in turn, each dealing {d} and a Judgement to ground enemies. The last cut delivers each one\'s Verdict at {vkPct} strength.',
+  so_hammerfall: 'Hurls one of its two swords into the sky, landing 1 sec later for {d} and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2} and a Judgement.',
   so_sweep: 'Swings the censer in a circle, dealing {d} and a Judgement to ground enemies within 1.5 cells. Incense around the bearer for {dur} sec burns enemies every 0.5 sec and Judges them every sec.',
   so_smoke: 'Lays incense along {n} cells of road, dealing {d} and a Judgement to each ground enemy hit. For {dur} sec, ground enemies in it are slowed {slowPct}, burned every 0.5 sec and Judged every sec.',
   so_embers: 'Ignites up to {n} incense patches in range, using them up. Ground enemies in one take {d} and a Judgement; those with 3 or more Judgement first hear a 50% Verdict. With no incense, it first throws a coal.',
@@ -90382,94 +90459,204 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -90478,75 +90665,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -103882,11 +104201,12 @@ const HF2 = (() => {
 })();
 
 /* Torvald Emberbrand, the Longshot (Ironhold's marksman Champion, ch_torvald), on a rig and clips made from scratch (the
-   owner, 21 Nov 2026: "here you go, get fable 5.2 to rig and animate"): his mesh is the owner's "Torvald Emberbrand -
-   Finished Assets" (a broad grey-bearded dwarf in a spotted fur mantle, a long dark coat over a fur-lined robe, beaded
-   braids, a belt of two great discs) and his long rifle, "Longshot"; tools/make_tv.py -> src/model_tv2.js: 34 bones (the
-   coat below his belt on four panels kept clear of his knees, the beard on a bone of its own so the stock can lay it aside,
-   the rifle on its own bone placed by each clip with both hands posed onto it), 7,500 triangles, 8 clips at 30 fps.
+   owner, 21 Nov 2026: "here you go, get fable 5.2 to rig and animate"): his mesh is the owner's revised
+   sculpt, "Torvald Emberbrand - Monocle" (22 Nov 2026; a red-bearded dwarf with a monocle on his left eye, a fur mantle, a
+   long dark coat, made in a T-pose; the monocle pinned to the head bone), and his long rifle, "Longshot";
+   tools/make_tv.py -> src/model_tv2.js: 34 bones (the coat below his belt on four panels kept clear of his knees, the
+   beard on a bone of its own so the stock can lay it aside, the rifle on its own bone placed by each clip with both hands
+   posed onto it), 7,900 triangles, 8 clips at 30 fps.
    ON by default in place of his code-built body; ?tv=old (or the Model Lab's "Torvald rig" row set to Old) draws that.
    His moves, by the game's own cues (nothing in the game is changed):
      idle      no foe in reach: at ease, the rifle at port low across him, breathing, looking down the road
@@ -104352,6 +104672,2583 @@ const SV2 = (() => {
       let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
       if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('sv2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
     }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Flak Cannoneers (Ironhold's flak unit, `flakgunner`) on a rig and clips made from scratch (the owner's "Flak Cannoneer":
+   a brown-bearded dwarf under a great fur mantle, banded pauldrons, a green tunic and tabard, in a T-pose, and his fat iron
+   flak cannon with a scope on its breech); tools/make_fk.py -> src/model_fk2.js: 34 bones (the tunic below his belt on four
+   panels, the beard on a bone of its own, the cannon on its own bone placed by each clip, seated on his right shoulder over
+   his right fist), 9,400 triangles, 13 clips at 30 fps.
+   He carries the gun himself, as Hrolf does his: his arms are too short to hold it out before him, so it rides on his right
+   shoulder, rolled so the scope leans in to his eye, his right fist under the breech's front, his left hand free.
+   ON by default in place of the code-built crew and swivel gun; ?fk=old (or the Model Lab's "Flak rig" row set to Old) draws
+   that. His moves, by the game's own cues (nothing in the game's rules is changed):
+     idle      no foe in reach: the cannon at ease on his shoulder, scanning the sky
+     ready     a foe in reach: laid on it, his left hand out flat                      (readyUp at a flyer)
+     shot      his strike (t.shotT = 0 at the shot): fired at frame 2, the recoil through him, the crank thrown; paced to
+               the unit's own rate                                                     (shotUp)
+     barrage   the hot gun's barrage (t.ihBarrageAt): a shell every 0.12 s from the wide brace, for as many as the game
+               fires                                                                   (barrageUp)
+     grapnel   Grapnel Shot (ih_grapnel): one great kick, hauled against the chain    (grapnelUp)
+     screen    Flak Screen (ih_flakscreen): swung up to 64 degrees, seven bursts hammered into the sky
+     airburst  Airburst Shell (ih_airburst): the sky swept, the great shell fired at 0.3 s (the game's)
+     hit       a blow taken (his health drops)
+     death     Wounded: down on his right knee, hung on the cannon stood up on its bracket
+   The Up clips are the same moves laid at 48 degrees; the runtime blends them in by how high and near the flyer is. He
+   stands on the clan's flagstone (ihBase), sized by the shared rule (a dwarf). His muzzle is t.tipW (unitTip, so ihMuzzle:
+   his shells, the barrage, the grapnel and Airburst Shell leave the real barrel). Checks: `python tools/make_fk.py --check`.
+   Notes: docs/model_pilot/flak2.md. */
+const FK2 = (() => {
+  const U = 'flakgunner', NAMES = ['idle', 'ready', 'readyUp', 'shot', 'shotUp', 'barrage', 'barrageUp', 'grapnel', 'grapnelUp', 'screen', 'airburst', 'hit', 'death'];
+  const UPOF = { ready: 'readyUp', shot: 'shotUp', barrage: 'barrageUp', grapnel: 'grapnelUp' }, MV = { ih_grapnel: 'grapnel', ih_flakscreen: 'screen', ih_airburst: 'airburst' }, MV0 = { ih_grapnel: 2 / 30 };
+  const EASE = .2, BASE_H = .05, SPD_MAX = 1.6, BAR_DT = .12;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]fk=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, GUN = 0, HEADY = .86, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tr: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) { P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f; P.tr[k] = c.tr[i0 * 3 + k] + (c.tr[i1 * 3 + k] - c.tr[i0 * 3 + k]) * f; }
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tr[k] += (B.tr[k] - A.tr[k]) * w; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      else if (b === GUN) { j0 += P.tr[0]; j1 += P.tr[1]; j2 += P.tr[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'fk2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('fk2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'cannon', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('fk2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'muzzle', 'breech', 'seat', 'side']) if (!mk || !mk[nm]) throw new Error('fk2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('fk2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tr = new Float32Array(b64(c.tr));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tr.length !== c.n * 3) throw new Error('fk2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tr, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; GUN = R.bix.cannon; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('fk2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.02, -.9]; m.max = [.9, 1.3, 1.2]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('FK2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'fk2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  // how far up he aims: 0 at a foe on the ground, toward 1 (the Up clips' 48 degrees) at a flyer, the nearer the higher
+  function aimUp(t) {
+    const c = t.tg; if (!c || c.dead || !c.fly || (c.lowT > G.time)) return 0;
+    const d = Math.hypot(c.x - t.x, c.y - t.y), k = Math.max(.5, Math.min(1, 1.5 - d / 3)); return Number.isFinite(k) ? k : .8;
+  }
+  // the barrage's length: as many shells as the game fires (ihBarrage6, the drum relic), 0.12 s apart
+  const barN = t => { const st = t.st || {}, C = st.caps || {}; return (C.ihBarrage6 ? 6 : 4) + ((st.pw && st.pw.ihDrum) || 0); };
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into), up } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle', up: 0 };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._fkHp != null && t.hp < t._fkHp - 1e-6 && !t.wounded) t._fkHitAt = now; t._fkHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death', up: 0 }; }
+    if (t._fkMv === 'death') t._fkRise = now;   // (whole again: eased back up)
+    const rise = t._fkRise != null && now - t._fkRise < .9;
+    // the target's height: eased, so a flyer passing over does not snap the aim
+    const up0 = aimUp(t), dt = t._fkUpT == null ? 1 : Math.max(0, Math.min(.1, now - t._fkUpT)); t._fkUpT = now;
+    t._fkUp = !Number.isFinite(t._fkUp) ? up0 : t._fkUp + (up0 - t._fkUp) * (1 - Math.exp(-dt * 6)); if (!Number.isFinite(t._fkUp)) t._fkUp = 0; const up = t._fkUp;
+    // the newest of: a spell's move from its cast, the hot gun's barrage
+    const ev = [];
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const m = MV[A.last], c0 = CL[m], s0 = MV0[A.last] || 0, u = now - A.lastAt;
+      if (c0 && s0 + u < c0.len) ev.push([A.lastAt, { c: m, s: s0 + u, rate: 40, mv: 'ab' + A.lastAt, up: A.last === 'ih_grapnel' ? up : 0 }]);
+    }
+    if (t.ihBarrageAt != null && now >= t.ihBarrageAt) {
+      const u = now - t.ihBarrageAt, n = Math.min(10, barN(t));
+      if (u < n * BAR_DT + .1) ev.push([t.ihBarrageAt, { c: 'barrage', s: u, rate: 40, mv: 'bar' + t.ihBarrageAt, up }]);
+      t._fkBarEnd = t.ihBarrageAt + n * BAR_DT + .1;
+    }
+    if (ev.length) { ev.sort((a, b) => b[0] - a[0]); t._fkAbEnd = now; return ev[0][1]; }
+    // his shots: the game's own count; each a release, a kick and the crank, paced to the shots' own interval
+    if (t.shots && t._fkShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._fkAt != null && at - t._fkAt < 3) t._fkIv = at - t._fkAt;
+      t._fkAt = at; t._fkShots = t.shots;
+    }
+    const sh = CL.shot, HIT = (sh.hit || 2) / 30, rate = (t.st && t.st.rate) || 1, iv = Math.min(t._fkIv || rate, rate * 1.05);
+    const spd = Math.max(1, Math.min(SPD_MAX, (sh.len - HIT) / Math.max(.2, iv * .94)));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const own = t._fkAt != null && (t._fkAbEnd == null || t._fkAt > t._fkAbEnd + .02) && (t._fkBarEnd == null || t._fkAt > t._fkBarEnd - .05);   // (not a shell of the barrage or a spell's)
+    if (t.shots && own && s >= 0 && HIT + s * spd < sh.len) return { c: 'shot', s: HIT + s * spd, rate: 40, mv: 'shot' + t.shots, up };
+    if (fight) { const cd = t.cd || 0; if ((t.windup || 0) > 0 && cd < HIT) return { c: 'shot', s: HIT - cd, rate: 40, mv: 'pre' + t.shots, up }; }
+    const h = t._fkHitAt != null ? now - t._fkHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._fkHitAt, up: 0 };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready', up };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle', up: 0 };
+  }
+  let PT = null, PU = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._fkDrawn != null && typeof G !== 'undefined' && G && G.time - t._fkDrawn < .3 && G.time >= t._fkDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the clan's hexagonal flagstone under him, as under every Ironhold unit (ihBase), and he stands on it
+    const bm = typeof ihBase === 'function' && typeof ihPal === 'function' ? dynMesh('fk_base', g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ihPal(U, () => ihBase(g, .32))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    // his size by the shared rule (unitmodels_size.js): a dwarf's head joint over the ground at tier I, growing by UM_TIER
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.07) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); PU = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    if (P.up > .01 && UPOF[P.c]) { sample(CL[UPOF[P.c]], P.s, PU); follow(PT, PU, P.up); }   // (at a flyer: the raised aim blended in)
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._fkT == null ? 1 : Math.max(0, Math.min(.1, now - t._fkT)); t._fkT = now;
+      if (!t._fkP || t._fkP.q.length !== NB * 4) { t._fkP = newPose(); t._fkP.q.set(PT.q); t._fkP.t.set(PT.t); t._fkP.tr.set(PT.tr); }
+      if (P.mv !== t._fkMv) { t._fkMv = P.mv; t._fkSw = now; }
+      const k = now - t._fkSw < EASE && !/^(shot|bar|ab)/.test(P.mv) ? 1 - Math.exp(-dt * Math.max(P.rate, 14)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._fkP, PT, k); pose = t._fkP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(BI.cannon, MK.muzzle); t.tipYaw = yaw; t.tipAt = G.time; t._fkDrawn = G.time; t._fkClip = P.c; t._fkClipS = P.s; t._fkUpNow = P.up; t._fkBreech = w(BI.cannon, MK.breech); t._fkHeat = w(BI.cannon, MK.side); }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('fk2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'fk2Row';
+    box.innerHTML = '<h3>Flak rig</h3><div class="row">' + `<button data-k2="0" class="${S.on ? '' : 'on'}" title="The code-built crew and swivel gun (?fk=old)">Old (code-built)</button><button data-k2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-k2h="1" title="A blow taken: his flinch">Hit</button><button data-k2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on his knee, hung on the cannon">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-k2]')) x.onclick = () => { S.on = x.dataset.k2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-k2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._fkHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-k2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { muzzle: t.tipW, breech: t._fkBreech, clip: t._fkClip, up: t._fkUpNow, at: t._fkDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_fk2', () => {
+  try { load(typeof FK2_MDL !== 'undefined' ? FK2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Flak Cannoneer rig:', e.message); }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+        try {
+          if (draw(t, tier, sx, sy, sz, wob, opts)) {
+            // (the heat's glow sits on the real barrel's band, not where the code-built gun was: IH_HEAT_AT, in the unit's frame)
+            const yaw = t.ang == null ? 0 : t.ang, K = UNIT_K(U), hw = t._fkHeat, HA = typeof IH_HEAT_AT !== 'undefined' ? IH_HEAT_AT : null, keep = HA && HA[U];
+            if (HA && hw && typeof ihScale === 'function') { const k = K * ihScale(t.tier != null ? t.tier : tier), c = Math.cos(yaw), s = Math.sin(yaw), dx = hw[0] - t.x, dz = hw[2] - t.y; HA[U] = [(dx * c - dz * s) / k, hw[1] / k, (dx * s + dz * c) / k]; }
+            try { forceExtra(t, tier, t.x, t.y, yaw, K); } finally { if (HA && keep) HA[U] = keep; }
+            return;
+          }
+        } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('fk2:', e); } }
+      }
+      return _plain.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
+    UM_UNITS[U] = { mdl: 'fk2', k: 1 };
+    if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+    if (typeof UM_KIND !== 'undefined' && !UM_KIND[U]) UM_KIND[U] = 'dwarf';
+    if (typeof UM_TOPK !== 'undefined' && UM_TOPK[U] == null) UM_TOPK[U] = 1.24;   // (the cannon on his shoulder stands over his head)
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('fk2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Lightbinder Sisters on a rig and clips made from scratch (the owner, 22 Nov 2026: "Silver Order - Lightbinder and
+   Silverbolt/Lightbinder - Four View Rebuild": the sister, un-rigged; she carries nothing, her chains are light).
+   tools/make_lb2.py -> src/model_lb2.js: 38 bones (the robes below her belt on four panels, each in two lengths; each bell
+   sleeve on two hanging bones, under the upper arm and under the forearm, sprung), one 1024 x 1152 atlas, 9 clips baked at
+   30 frames a second. Her chains of light at both wrists (a few links round each, a short end hanging, as her card has the
+   chain in both fists) are made by the tool: none is in her file.
+   ON by default in place of her code-built body (forces_silver_b.js: FORCE_BUILD.lightbinder and its arm and hand
+   parts); ?lb=old (or the Model Lab's "Lightbinder rig" row set to Old) draws that.
+   Her moves, by the game's own cues (nothing in the game is changed):
+     idle       no foe in reach: her hands clasped low before her, her head a little bowed
+     ready      a foe in reach: her hands raised before her, palms to the foe
+     lash       her lash (FORCE_ATTACK.so_chain): the right hand drawn back by her head and flung out at the foe, begun its
+                own hit frame early so the hand is out on the game's lash
+     bindlash   the binding lash (every third; every second with Quick Binding, every one while her Dawn Shackles hold
+                with it): both hands flung out, then fists hauled back to her chest
+     bind       Binding Light (so_bind): fists at her breast, both arms flung wide as the chains go out, then hauled back
+     flare      Chain of Penance (so_flare): her hand flung at the foe and closed on the chain, hauled back to her hip, held
+                straining, then a snap of the wrist (the whip)
+     shackle    Vigil Chains (so_shackle): both arms swept out wide to her sides as the chains are strung to the units and
+                Oath-Stones round her, held, turning along them
+     hit        her health drops: knocked back, her hands flung up
+     death      wounded (t.wounded): down on her knees, hands in her lap, her hooded head bowed; eased back up when whole
+   Her right palm is t.tipW (so unitTip and sfxMuzzle: the remade Chain of Penance and Vigil Chains start their chains
+   there; her palms: LB2.anchors). Her lashes' and Binding Light's chains (soChainFx) start at her palm too, drawn as a
+   thin chain of light (the Penance's own look) over the old streak; the glow at her lash's wind-up and so_flare's small
+   sun are drawn at her palm (forces_silver_b.js soExtra). Her size is the shared rule (unitmodels_size.js); she stands on the Order's
+   flagstone. Checks: `python tools/make_lb2.py --check`. Notes: docs/model_pilot/lightbinder2.md. */
+const LB2 = (() => {
+  const U = 'lightbinder', NAMES = ['idle', 'ready', 'lash', 'bindlash', 'bind', 'flare', 'shackle', 'hit', 'death'];
+  const EASE = .2, BLOW = .3, SPD_CUT = 1;
+  const MV = { so_bind: 'bind', so_flare: 'flare', so_shackle: 'shackle' }, START = { bind: 0, flare: 0, shackle: 0 };
+  const BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]lb=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .872, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'lb2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('lb2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('lb2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['palmL', 'palmR']) if (!mk || !mk[nm]) throw new Error('lb2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('lb2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('lb2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('lb2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.8, -.02, -.8]; m.max = [.8, 1.3, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('LB2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'lb2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what she does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  const hitOf = c => (CL[c] && CL[c].hit != null ? CL[c].hit : 7) / 30;
+  // the game's own count (FORCE_ATTACK.so_chain): every third lash binds (every second with Quick Binding, every one while
+  // her Dawn Shackles hold with it)
+  function binds(t, n) {
+    const C = (t.st && t.st.caps) || {};
+    try { if (C.so_bind_fast && t.ab && t.ab.zones && t.ab.zones.some(z => z.k === 'so_shackle' && z.until > G.time)) return true; } catch (e) {}
+    return n % (C.so_bind_fast ? 2 : 3) === 0;
+  }
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._lbHp != null && t.hp < t._lbHp - 1e-6 && !t.wounded) t._lbHitAt = now; t._lbHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
+    if (t._lbMv === 'death') t._lbRise = now;   // (whole again: eased back up)
+    const rise = t._lbRise != null && now - t._lbRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const u = now - A.lastAt, m = MV[A.last], c0 = CL[m], s0 = START[m] || 0;
+      if (c0 && u < c0.len - s0) return { c: m, s: s0 + u, rate: 40, mv: 'ab' + A.lastAt };
+    }
+    // the lashes: a new one counted (the binding lash when the game's count binds)
+    if (t.shots && t._lbShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._lbAt != null && at - t._lbAt < 3) t._lbIv = at - t._lbAt;
+      t._lbAt = at; t._lbShots = t.shots; t._lbLast = binds(t, t.shots) ? 'bindlash' : 'lash';
+    }
+    const spd = t._lbIv ? Math.min(1.8, Math.max(1, CL.lash.len / t._lbIv)) : SPD_CUT;
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const last = t.shots ? t._lbLast : null, lh = last ? hitOf(last) : 0, inStrike = last && CL[last] && s >= 0 && s < (CL[last].len - lh) / spd;
+    if (fight) {
+      const nx = binds(t, (t.shots | 0) + 1) ? 'bindlash' : 'lash', cd = t.cd || 0, HIT = hitOf(nx);
+      if ((t.windup || 0) > 0 && cd < HIT / spd && !(inStrike && s < BLOW)) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (begun: the hand out on the lash)
+      if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t.shots };
+    } else if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t.shots };
+    const h = t._lbHitAt != null ? now - t._lbHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._lbHitAt };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._lbDrawn != null && typeof G !== 'undefined' && G && G.time - t._lbDrawn < .3 && G.time >= t._lbDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Order's flagstone under her, as under every soldier of it, and she stands on it
+    const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
+    const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('lb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * bk * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._lbT == null ? 1 : Math.max(0, Math.min(.1, now - t._lbT)); t._lbT = now;
+      if (!t._lbP || t._lbP.q.length !== NB * 4) { t._lbP = newPose(); t._lbP.q.set(PT.q); t._lbP.t.set(PT.t); }
+      if (P.mv !== t._lbMv) { t._lbMv = P.mv; t._lbSw = now; }
+      const k = now - t._lbSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._lbP, PT, k); pose = t._lbP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) {
+      t._lbDrawn = G.time; t._lbClip = P.c; t._lbClipS = P.s;
+      t._lbPalmL = w(BI.handL, MK.palmL); t._lbPalmR = w(BI.handR, MK.palmR);
+      t.tipW = t._lbPalmR; t.tipYaw = yaw; t.tipAt = G.time;   // (her right palm, where her chains leave: unitTip, sfxMuzzle)
+    }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('lb2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'lb2Row';
+    box.innerHTML = '<h3>Lightbinder rig</h3><div class="row">' + `<button data-l2="0" class="${S.on ? '' : 'on'}" title="Her code-built body (?lb=old)">Old (code-built)</button><button data-l2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-l2]')) x.onclick = () => { S.on = x.dataset.l2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { palmL: t._lbPalmL, palmR: t._lbPalmR, clip: t._lbClip, s: t._lbClipS, at: t._lbDrawn } : null;
+  // her chains of light from her right palm: soChainFx is called with her own spot (her lash, Binding Light); the first
+  // link of a chain then starts at her palm, and is drawn as a chain of light (Chain of Penance's own look) as well as the
+  // old streak and sparks. A chain from foe to foe (a lash's second link) is left as it was.
+  function chainHook() {
+    if (typeof soChainFx !== 'function' || soChainFx._lb) return;
+    const f0 = soChainFx;
+    soChainFx = function (x0, h0, z0, c, big) {
+      try {
+        if (typeof G !== 'undefined' && G && G.towers) for (const t of G.towers) {
+          if (!t || t.x !== x0 || t.y !== z0 || !t.def || t.def.unit !== U || !mine(t) || !t.tipW) continue;
+          const s = unitTip(t) || t.tipW;
+          if (typeof socFx === 'function' && typeof v2Beam === 'function' && typeof VT !== 'undefined' && VT.CHAIN && c) {
+            socFx('so_flare', t, c, C => v2Beam(C, s[0], s[1], s[2], c.x, hitH(c), c.y, { foe: c, L: VT.CHAIN, w: big ? .05 : .04, life: big ? .34 : .26, grow: .08, col: socC(C, SOC.chain), ccol: socC(C, SOC.light, 1.5), sag: .14, tube: 0 }));
+          }
+          return f0.call(this, s[0], s[1], s[2], c, big);
+        }
+      } catch (e) {}
+      return f0.apply(this, arguments);
+    };
+    soChainFx._lb = 1;
+  }
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_lb2', () => {
+    try { chainHook(); } catch (e) {}
+    try { load(typeof LB2_MDL !== 'undefined' ? LB2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Lightbinder rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('lb2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'lb2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('lb2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Templars of the Ford on a rig and clips made from scratch (the owner, 22 Nov 2026: "Silver Order - Templar and Censer
+   Bearer": the knight and his sword, un-rigged; art direction: dual wield, a sword in each closed fist). tools/make_tp2.py ->
+   src/model_tp2.js: 36 bones (the tabard below his belt on four panels of their own, each in two lengths; a bone each for the
+   sword in his right fist and the one in his left), 8,798 triangles on one 1024 x 1536 atlas, 10 clips baked at 30 frames a
+   second. ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.templar and its parts); ?tp=old (or
+   the Model Lab's "Templar rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle       no foe in reach: at ease, a sword low in each hand
+     ready      a foe in reach: his guard: the right blade cocked back over his shoulder, the left low before him, its point
+                at the foe
+     cutA/B/C   his blows (FORCE_ATTACK.so_slam): the right blade's falling diagonal, the left's on the other diagonal, then
+                both crossed before his chest and thrown open together (the Twin Cut). Which one is the game's own word
+                where it gives it (t.tpCut: 0 right, 1 left, 2 both, set on every blow with t.soSlamAt: the dual-wield
+                kit), else they are taken in turn. Each is begun its own hit frame early so the blades are through the foe
+                on the game's blow, and is paced to the blows' own interval; the edge leads every cut (the bake turns each
+                sword in its fist to it)
+     cross      Cross-Cut (so_crush): both swords crossed high over his head, then drawn apart down and out like scissors,
+                0.58 s after the cast
+     flurry     Whirling Flurry (so_hallow): a whirl, a full turn every two cuts, right then left, one on each of the
+                game's cuts (the first 0.15 s after the cast, then one every 0.3 s) for as many as the game counts
+                (t.socFerv); the last is the crossing cut, both blades together
+     heaven     Sword of Heaven (so_hammerfall): reared back, the right sword hurled into the sky at 0.3 s (it is hidden in
+                his hand and drawn in flight here, in place of the code-built hammer), both arms raised until it falls at 1 s,
+                caught again at 1.35 s. With the Second Star (st.caps.tpStar) the left sword follows 0.4 s behind it, onto
+                t.tpStar2
+     hit        his health drops: rocked back, the forward blade knocked aside
+     death      wounded (t.wounded): down on one knee, both swords' points in the ground; when he is whole again he eases back
+                up into his guard
+   His size is the shared rule (unitmodels_size.js); he stands on the Order's flagstone. The sculpted body is one look at every
+   tier; he grows by UM_TIER.
+   Checks: `python tools/make_tp2.py --check`. Notes: docs/model_pilot/templar2.md. */
+const TP2 = (() => {
+  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cross', 'flurry', 'heaven', 'hit', 'death'];
+  const CUTS = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, SPD_CUT = 1.1;
+  const MV = { so_crush: 'cross', so_hammerfall: 'heaven' };
+  const FL_AT = .15, FL_IV = .3, OUT_AT = .3, BACK_AT = 1.35, STAR2 = .4, PARRY = .2;   // (the game's own times: the flurry's first cut and its interval; the sword leaves the hand and is back in it; the Second Star's sword that long after the first)
+  const BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]tp=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, SWORD_ = null, SWORDL_ = null, IDENT = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .895, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'tp2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('tp2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'swordR', 'swordL', 'handR']) { if (R_.bix[nm] == null) throw new Error('tp2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['gripR', 'tipR', 'midR', 'gripL', 'tipL', 'midL']) if (!mk || !mk[nm]) throw new Error('tp2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('tp2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('tp2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('tp2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.05, -.9]; m.max = [.9, 1.5, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+    // the right sword alone (the same corners again), for its flight in Sword of Heaven: drawn with every bone at rest
+    SWORD_ = null; SWORDL_ = null;
+    const sr = D.swordR;
+    if (sr && sr[1] > sr[0] && sr[1] <= nc) {
+      const a = sr[0], b = sr[1], n = b - a, cut = (arr, k) => arr.slice(a * k, b * k);
+      SWORD_ = { pos: cut(m.pos, 3), nor: cut(m.nor, 3), col: cut(col, 3), ext: cut(ext, 2), uv: cut(uv, 2), bone: cut(bone, 2), bw: cut(bw, 1), count: n, min: [-.6, -.6, -.6], max: [.6, .6, .6], gl: new Map(), _um: 1, tex: m.tex };
+      const sl = D.swordL; if (sl && sl[1] > sl[0] && sl[1] <= nc) { const a2 = sl[0], b2 = sl[1], cut2 = (arr, k) => arr.slice(a2 * k, b2 * k); SWORDL_ = { pos: cut2(m.pos, 3), nor: cut2(m.nor, 3), col: cut2(col, 3), ext: cut2(ext, 2), uv: cut2(uv, 2), bone: cut2(bone, 2), bw: cut2(bw, 1), count: b2 - a2, min: [-.6, -.6, -.6], max: [.6, .6, .6], gl: new Map(), _um: 1, tex: m.tex }; }
+      IDENT = new Float32Array(NB * 12); for (let i = 0; i < NB; i++) { IDENT[i * 12] = 1; IDENT[i * 12 + 5] = 1; IDENT[i * 12 + 10] = 1; }
+    }
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('TP2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'tp2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  const hitOf = c => (CL[c] && CL[c].hit != null ? CL[c].hit : 8) / 30;
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._tpHp != null && t.hp < t._tpHp - 1e-6 && !t.wounded) t._tpHitAt = now; t._tpHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
+    if (t._tpMv === 'death') t._tpRise = now;   // (whole again: eased back up)
+    const rise = t._tpRise != null && now - t._tpRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt) {
+      const u = now - A.lastAt, m = MV[A.last], c0 = m && CL[m];
+      if (c0 && u < c0.len) return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt };
+      if (A.last === 'so_hallow') {   // (the flurry: the loop's right cut lands 0.15 s in, then a cut every 0.3 s, for the game's count)
+        const F = t.socFerv, n = F && F.n ? F.n : 5, iv = F && F.iv ? F.iv : FL_IV;
+        const tl = FL_AT + (n - 1) * iv, hc = hitOf('cutC');   // (the last cut: both blades, landing on the game's last)
+        if (u >= tl - hc * .75 && u < tl + CL.cutC.len - hc) return { c: 'cutC', s: u < tl ? hc - (tl - u) / .75 : hc + (u - tl), rate: 40, mv: 'abx' + A.lastAt };
+        if (u < tl) return { c: 'flurry', s: u * (FL_IV / iv), rate: 40, mv: 'ab' + A.lastAt };
+      }
+    }
+    // Parry and Riposte (the dual-wield kit: t.tpParryAt at the blow he parries, the answering Twin Cut PARRY later): the crossing
+    // cut begun so that its blades are crossed before him on the parry and thrown open on the riposte
+    if (t.tpParryAt != null) { const u = now - t.tpParryAt; if (u >= 0 && u < PARRY) return { c: 'cutC', s: hitOf('cutC') - (PARRY - u), rate: 60, mv: 'parry' + t.tpParryAt }; }
+    // the blows: a new one counted (by the game's count, or by its own time for the blow where a talent adds one without a
+    // count). Which cut: the game's word (t.tpCut) where it gives it, else taken in turn
+    const slamAt = t.soSlamAt != null && t.soSlamAt <= now ? t.soSlamAt : null, word = t.tpCut != null && t.tpCut >= 0 && t.tpCut <= 2;
+    if ((t.shots && t._tpShots !== t.shots) || (slamAt != null && t._tpSlam !== slamAt)) {
+      const at = slamAt != null ? slamAt : now - (t.shotT || 0);
+      if (t._tpAt != null && at > t._tpAt && at - t._tpAt < 2) t._tpIv = at - t._tpAt;
+      t._tpAt = at; t._tpShots = t.shots; t._tpSlam = slamAt; t._tpCutN = (t._tpCutN || 0) + 1;
+      t._tpLast = word ? CUTS[t.tpCut] : t.tpCut === 3 ? 'cross' : CUTS[t._tpCutN % 3];
+    }
+    const spd = t._tpIv ? Math.min(2.2, Math.max(1, CL.cutA.len / t._tpIv)) : SPD_CUT;
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t._tpAt != null ? now - t._tpAt : t.shotT == null ? 9 : t.shotT;
+    const last = t._tpAt != null || t.shots ? t._tpLast : null, lh = last ? hitOf(last) : 0, inStrike = last && CL[last] && s >= 0 && s < (CL[last].len - lh) / spd;
+    if (fight) {
+      const nx = word ? CUTS[(t.tpCut + 1) % 3] : CUTS[((t._tpCutN || 0) + 1) % 3], cd = t.cd || 0, HIT = hitOf(nx);
+      if ((t.windup || 0) > 0 && cd < HIT / spd && !(inStrike && s < BLOW)) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (begun: through the foe on the blow)
+      if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t._tpAt };
+    } else if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t._tpAt };
+    const h = t._tpHitAt != null ? now - t._tpHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._tpHitAt };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  // the sword is out of his hand: Sword of Heaven's flight (the game's own times)
+  const flying = t => { const A = t && t.ab; if (!A || A.last !== 'so_hammerfall' || A.lastAt == null || typeof G === 'undefined') return -1; const u = G.time - A.lastAt; return u > OUT_AT && u < BACK_AT ? u : -1; };
+  // the Second Star (the dual-wield kit's capstone): the left sword follows the right, STAR2 behind it (its own seconds, as the right's)
+  const flying2 = t => { const A = t && t.ab, C = t && t.st && t.st.caps; if (!A || !C || !C.tpStar || A.last !== 'so_hammerfall' || A.lastAt == null || typeof G === 'undefined') return -1; const u = G.time - A.lastAt - STAR2; return u > OUT_AT && u < BACK_AT ? u : -1; };
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16), _d = new Float32Array(16), _e = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._tpDrawn != null && typeof G !== 'undefined' && G && G.time - t._tpDrawn < .3 && G.time >= t._tpDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Order's flagstone under him, as under every knight of it, and he stands on it
+    const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
+    const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('tp_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * bk * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._tpT == null ? 1 : Math.max(0, Math.min(.1, now - t._tpT)); t._tpT = now;
+      if (!t._tpP || t._tpP.q.length !== NB * 4) { t._tpP = newPose(); t._tpP.q.set(PT.q); t._tpP.t.set(PT.t); }
+      if (P.mv !== t._tpMv) { t._tpMv = P.mv; t._tpSw = now; }
+      const k = now - t._tpSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._tpP, PT, k); pose = t._tpP;
+    }
+    toBones(pose, OUT);
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    const grip = live ? w(BI.swordR, MK.gripR) : null, tipR = live ? w(BI.swordR, MK.tipR) : null;
+    const fly = live ? flying(t) : -1, fly2 = live && SWORDL_ ? flying2(t) : -1, gripL = fly2 >= 0 ? w(BI.swordL, MK.gripL) : null;
+    if (fly >= 0) {   // (the right sword is in the air: its bone collapsed to his fist, so its triangles draw nothing)
+      const b = BI.swordR, g = b * 12, q = at(OUT, b, MK.gripR);
+      for (let k = 0; k < 12; k++) OUT[g + k] = 0; OUT[g + 3] = q[0]; OUT[g + 7] = q[1]; OUT[g + 11] = q[2];
+    }
+    if (fly2 >= 0) { const b = BI.swordL, g = b * 12, q = at(OUT, b, MK.gripL); for (let k = 0; k < 12; k++) OUT[g + k] = 0; OUT[g + 3] = q[0]; OUT[g + 7] = q[1]; OUT[g + 11] = q[2]; }
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    if (live) {
+      t._tpTipL = w(BI.swordL, MK.tipL); t._tpGrip = grip; t._tpScale = s;
+      if (fly2 >= 0) { t._tpGripL = gripL; try { flySword(t, fly2, 0, 'L'); } catch (e) {} }
+      t.tipW = fly >= 0 ? t._tpTipL : tipR; t.tipYaw = yaw; t.tipAt = G.time; t._tpDrawn = G.time; t._tpClip = P.c; t._tpClipS = P.s;
+    }
+    return true;
+  }
+  /* Sword of Heaven's flight, in place of the code-built hammer (soFlyingHammer's path and times: up out of his hand into the
+     sky, gone into the light, falling point first on its foe, then back to his hand, turning end over end) */
+  function flySword(t, s, K, side) {
+    const L = side === 'L', SW = L ? SWORDL_ : SWORD_, GM = L ? MK.gripL : MK.gripR;
+    if (!SW || !IDENT) return;
+    const E_ = q => q * q * (3 - 2 * q), cl = (v, a, b) => v < a ? a : v > b ? b : v;
+    const c = t.socThrowC; let f = t.soThrow; if (!f) return; if (!L && c && !c.dead) { f.x = c.x; f.z = c.y; }
+    const A = t.ab, st2 = t.tpStar2, known = st2 && st2.x != null && A && A.lastAt != null && st2.at >= A.lastAt;   // (the kit names the Second Star's spot only as it lands)
+    if (L) { if (!known && s >= .62) return; if (known) f = st2; }
+    const g = (L ? t._tpGripL : t._tpGrip) || [t.x, 1, t.y], sc = t._tpScale || 1;
+    let px, py, pz, ry = 0, rx = 0, rz = 0, glow = .35;
+    if (s < .62) { const v = E_(cl((s - .3) / .32, 0, 1)); px = g[0]; pz = g[2]; py = g[1] + v * 4; rx = -Math.PI / 2; rz = s * 16; }   // up into the sky, point first, turning on its own line
+    else if (s < .82) return;   // gone into the light
+    else if (s < 1) { const v = (s - .82) / .18; px = f.x; pz = f.z; py = 4.6 * (1 - v * v) + .45 * sc; rx = Math.PI / 2; glow = .8; }   // falling on its foe, point first
+    else { const v = E_(cl((s - 1) / .35, 0, 1)); px = f.x + (g[0] - f.x) * v; pz = f.z + (g[2] - f.z) * v; py = .45 * sc + (g[1] - .45 * sc) * v + Math.sin(v * Math.PI) * .7; ry = Math.atan2(g[0] - f.x, g[2] - f.z); rx = Math.PI / 2 + v * Math.PI * 5; }   // back to his hand, end over end (it comes in point up)
+    // (the sword at rest lies along +z from its grip: the grip's middle is brought to the origin, then turned and placed)
+    M4.trs(_d, px, py, pz, ry, rx, rz, sc, sc, sc); M4.trs(_e, -GM[0], -GM[1], -GM[2]); M4.mul(_d, _d, _e.slice());
+    const it = item(SW, _d.slice()); it.sec = [0, 0]; it.bones = IDENT;
+    if (typeof QADD !== 'undefined' && typeof RD !== 'undefined') {
+      QADD.bill(RD, px, py, pz, .4 * (1 + glow), .4 * (1 + glow), [1, .88, .55, glow], 1, 0);
+      if (s >= .82 && s < 1) QADD.beam(RD, [px, py + 1.2, pz], [px, py, pz], .12, [1, .9, .6, .5]);   // a streak of light behind it as it falls
+    }
+  }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('tp2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'tp2Row';
+    box.innerHTML = '<h3>Templar rig</h3><div class="row">' + `<button data-t2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?tp=old)">Old (code-built)</button><button data-t2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-t2]')) x.onclick = () => { S.on = x.dataset.t2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, tipL: t._tpTipL, grip: t._tpGrip, clip: t._tpClip, at: t._tpDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_tp2', () => {
+    try { load(typeof TP2_MDL !== 'undefined' ? TP2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Templar rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('tp2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    // the sword in flight in place of the code-built hammer, for a Templar the rig drew this frame
+    if (MESH_ && typeof soFlyingHammer === 'function') {
+      const _fh = soFlyingHammer;
+      soFlyingHammer = function (t, s, K) {
+        if (mine(t) && SWORD_) { try { flySword(t, s, K); return; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('tp2:', e); } } }
+        return _fh.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'tp2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('tp2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Censer Bearers on a rig and clips made from scratch (the owner, 22 Nov 2026: "Silver Order - Templar and Censer
+   Bearer": the monk and his bronze censer, un-rigged). tools/make_cb2.py -> src/model_cb2.js: 40 bones (the robe and the cope
+   below his belt on four panels of their own, each in two lengths; a hanging bone for the cope's wing under each upper arm and
+   for the sleeve under each forearm; a bone for the censer's rod in his left fist and one for its pot, hinged at the yoke),
+   8,799 triangles on one 1024 x 1536 atlas, 8 clips baked at 30 frames a second. The pot is not keyed: the bake hangs it from
+   the yoke and swings it as a pendulum (gravity, the yoke's own motion, a little drag), so its weight shows in every clip.
+   ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.censer and its parts); ?cb=old (or the Model
+   Lab's "Censer rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle        no foe in reach: the censer carried before him, the pot hanging under his fist, his free hand at his chest
+     ready       a foe in reach: the thurifer's swing, the censer swung from side to side before him, his free hand raised
+     lob         his coal (FORCE_ATTACK.so_censer): swung back at his side, then swept forward and up, the pot flung out at
+                 the foe on the game's shot (begun its own hit frame early), let fall and gathered in
+     sweep       Thurible Sweep (so_sweep): a full turn on the spot, the censer out at arm's length; the game strikes 0.35 s in
+     procession  Procession of Incense (so_smoke): bowed over the road, the censer swung low in long arcs as the incense goes down
+     kindle      Kindle the Censers (so_embers): the censer lifted high before him, his free hand thrown up, held, then lowered
+     hit         his health drops: rocked back, the pot thrown about
+     death       wounded (t.wounded): down on his knees, the pot lowered to the ground; when he is whole again he eases back up
+   His size is the shared rule (unitmodels_size.js); he stands on the Order's flagstone. The incense the Order's own drawing
+   trails from a Censer Bearer (forces_silver_b.js soExtra) is moved to where the pot is.
+   Checks: `python tools/make_cb2.py --check`. Notes: docs/model_pilot/censer2.md. */
+const CB2 = (() => {
+  const U = 'censer', NAMES = ['idle', 'ready', 'lob', 'sweep', 'procession', 'kindle', 'hit', 'death'];
+  const CUTS = ['lob'], EASE = .2, BLOW = .3, SPD_CUT = 1;
+  const MV = { so_sweep: 'sweep', so_smoke: 'procession', so_embers: 'kindle' };
+  const BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]cb=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .885, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'cb2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('cb2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'censer', 'pot']) { if (R_.bix[nm] == null) throw new Error('cb2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'fin', 'pivot', 'pot', 'foot']) if (!mk || !mk[nm]) throw new Error('cb2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('cb2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('cb2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('cb2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.05, -.9]; m.max = [.9, 1.5, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('CB2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'cb2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  const hitOf = c => (CL[c] && CL[c].hit != null ? CL[c].hit : 9) / 30;
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._cbHp != null && t.hp < t._cbHp - 1e-6 && !t.wounded) t._cbHitAt = now; t._cbHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
+    if (t._cbMv === 'death') t._cbRise = now;   // (whole again: eased back up)
+    const rise = t._cbRise != null && now - t._cbRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt) {
+      const u = now - A.lastAt, m = MV[A.last], c0 = m && CL[m];
+      if (c0 && u < c0.len) return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt };
+    }
+    // the coals: a new one counted
+    if (t.shots && t._cbShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._cbAt != null && at - t._cbAt < 2) t._cbIv = at - t._cbAt;
+      t._cbAt = at; t._cbShots = t.shots; t._cbLast = 'lob';
+    }
+    const spd = t._cbIv ? Math.min(1.8, Math.max(1, CL.lob.len / t._cbIv)) : SPD_CUT;
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const last = t.shots ? t._cbLast : null, lh = last ? hitOf(last) : 0, inStrike = last && CL[last] && s >= 0 && s < (CL[last].len - lh) / spd;
+    if (fight) {
+      const nx = 'lob', cd = t.cd || 0, HIT = hitOf(nx);
+      if ((t.windup || 0) > 0 && cd < HIT / spd && !(inStrike && s < BLOW)) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (begun: the pot at the top of its arc on the shot)
+      if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t.shots };
+    } else if (inStrike) return { c: last, s: lh + s * spd, rate: 40, mv: last + t.shots };
+    const h = t._cbHitAt != null ? now - t._cbHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._cbHitAt };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16), _d = new Float32Array(16), _e = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._cbDrawn != null && typeof G !== 'undefined' && G && G.time - t._cbDrawn < .3 && G.time >= t._cbDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Order's flagstone under him, as under every knight of it, and he stands on it
+    const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
+    const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('cb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * bk * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._cbT == null ? 1 : Math.max(0, Math.min(.1, now - t._cbT)); t._cbT = now;
+      if (!t._cbP || t._cbP.q.length !== NB * 4) { t._cbP = newPose(); t._cbP.q.set(PT.q); t._cbP.t.set(PT.t); }
+      if (P.mv !== t._cbMv) { t._cbMv = P.mv; t._cbSw = now; }
+      const k = now - t._cbSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._cbP, PT, k); pose = t._cbP;
+    }
+    toBones(pose, OUT);
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (S.watch) { let m = 0; for (let k = 0; k < NB * 12; k++) { const v = Math.abs(OUT[k]); if (!(v <= m)) m = v; } S.bmax = Math.max(S.bmax || 0, m); }   // (a test's watch on the pose: the largest number in it, NaN included)
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    if (live) {
+      t._cbPot = w(BI.pot, MK.pot); t.tipW = t._cbPot; t.tipYaw = yaw; t.tipAt = G.time; t._cbDrawn = G.time; t._cbClip = P.c; t._cbClipS = P.s;
+    }
+    return true;
+  }
+  // the Order's own extras for him (soExtra), its trailing incense moved to where the pot is
+  function extra(t, tier) {
+    const pot = t._cbPot, yaw = t.ang == null ? 0 : t.ang;
+    if (!pot || typeof part !== 'function') return forceExtra(t, tier, t.x, t.y, yaw, UNIT_K(U));
+    const _p = part;
+    try { part = function (o) { if (o && o.k === 'smoke' && o.col === '#ece4f4') { o.x = pot[0]; o.z = pot[2]; o.h = pot[1] + .05; } return _p.apply(this, arguments); }; forceExtra(t, tier, t.x, t.y, yaw, UNIT_K(U)); }
+    finally { part = _p; }
+  }
+  /* the Model Lab's row: his code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('cb2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'cb2Row';
+    box.innerHTML = '<h3>Censer rig</h3><div class="row">' + `<button data-c2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?cb=old)">Old (code-built)</button><button data-c2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-c2]')) x.onclick = () => { S.on = x.dataset.c2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { pot: t._cbPot, clip: t._cbClip, at: t._cbDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_cb2', () => {
+    try { load(typeof CB2_MDL !== 'undefined' ? CB2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Censer rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { extra(t, tier); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('cb2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    // a coal he lobs leaves from the pot (where its flight is drawn from: forces_silver_a.js soLob's x0, z0, h0; when and where
+    // it lands are the game's own and untouched)
+    if (MESH_ && typeof soLob === 'function') {
+      const _lob = soLob;
+      soLob = function (t, st, x, z, pow, o) {
+        const n = G.hazards.length, r = _lob.apply(this, arguments);
+        try { const p = mine(t) && !(o && o.from) ? t._cbPot : null, h = p && G.hazards.length > n ? G.hazards[G.hazards.length - 1] : null; if (h && h.k === 'so_lob' && h.src === t) { h.x0 = p[0]; h.z0 = p[2]; h.h0 = p[1]; } } catch (e) {}
+        return r;
+      };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'cb2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('cb2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Grail Knights on the owner's sculpted model (22 Nov 2026: "Grail Knight": a knight in a great helm on a horse in a
+   dagged caparison, his tournament lance and his shield). tools/make_gk.py -> src/model_gk2.js: the sculpt whole, the lance
+   and the shield on one atlas; a 40-bone rig made from scratch (the horse: spine, neck, four legs of four bones, a tail of
+   two, the caparison's four skirts; the rider from the belt up, his arms; the lance on a bone of its own in his right fist,
+   the shield on his left forearm), 9 clips at 30 frames a second. ON by default in place of the code-built knight
+   (forces_silver_b.js FORCE_BUILD.grailknight and its lance, shield and leg parts); ?gk=old (or the Model Lab's "Grail
+   Knight" row set to Old) draws that. Morrow (ch_morrow), who rides the same code-built horse, is not touched.
+   The lance is carried COUCHED, under his right arm (the owner: "make the lance sit under arm instead of on top like the
+   image"), in every stance.
+   The moves, by the game's own cues (nothing in the game is changed):
+     idle    no foe in reach: the horse breathes, rests a hind leg, shifts its weight, looks down the road, drops its head
+             and shakes out its neck; the knight easy in the saddle, the lance's point up (8 s loop)
+     ready   a foe in reach: head up, the horse paws the ground twice; the lance brought down
+     gallop  one stride of a gallop in place. Through a ride it has the horse's bones, played by the DISTANCE the unit
+             has covered (its phase = distance / the stride's length): a foot on the ground goes back exactly as fast as
+             the ground does, so no foot slides, however the game eases the ride. A wind-up ends in the stride's own
+             first pose (hind feet down, forehand lifted), so the ride begins with no jump; the wheel at the far end is
+             ridden through (its turn counts as ground); home, the stride eases back to the stance
+     charge  the strike: over the wind-up (t.windup) the horse gathers and the lance comes level; on the charge (t.chg) the
+             gallop out, the lance driven home .26 s in, the check on the hocks, the wheel, the gallop home, the turn
+     grail   Grail Charge: the horse rears for the .26 s before the game sends it, the lance high; then the charge
+     ride    Ride Them Down: the lance swept out to his right and across as he rides the line (fitted to the ride's time)
+     vow     Banner of the Vow: the lance stood up like a banner pole, the horse collected, stamping
+     hit     a blow taken (its health drops): the horse shies
+     death   Wounded: the horse goes down on its side, the knight with it; it lies there until it next rides or is healed
+   The game turns the unit about halfway through a charge and snapped it round again at the end: here it wheels on its hocks
+   at the far end and again as it comes home. Where it stands is the game's own chargeAt (so a rider is never drawn past a
+   blocker: forces_zzzzzzzzzzzzzzzzzzz_lanes.js).
+   ANCHORS (world space, every frame it is drawn live): t.gkTip (the lance's point: t.tipW too), t.gkGrip (his fist);
+   GK2.anchors(t). Sized by the shared rule (unitmodels_size.js): the knight's head joint at UM_EVEN_HEAD.
+   Checks: `python tools/make_gk.py --check`. Notes: docs/model_pilot/grailknight2.md. */
+const GK2 = (() => {
+  const U = 'grailknight', NAMES = ['idle', 'ready', 'gallop', 'charge', 'grail', 'ride', 'vow', 'hit', 'death'];
+  const RATE = { idle: 4, ready: 7, move: 30, down: 9 }, TRIM = .12, TURN = .3, BASE_H = .05, CENTRE = 0;
+  const SEAT_K = .7, TURN_R = .22, AIR_RATE = 2.4, EASE_OUT = 11;   // how much of the stride his seat takes; the feet's reach from the wheel's centre (model units); strides a second while stood in flight; how fast the stride lets go at home
+  const S = { on: true, err: null, hold: null, wound: false, loop: null };
+  try { S.on = !/[?&]gk=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, NBH = 0, H = null, PAR = null, HIPS = 0, HEADY = .895, MK = null, BI = null, STRIDE = 1.5, PH0 = .12, AIR = [.7, .99], FEET = [];
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'gk2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('gk2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'rHips', 'rHead', 'lance', 'handR', 'shield']) { if (R_.bix[nm] == null) throw new Error('gk2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['tip', 'grip']) if (!mk || !mk[nm]) throw new Error('gk2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('gk2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('gk2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.rHead].h[1]; NBH = bi.rHips; FEET = ['fHoofL', 'fHoofR', 'hHoofL', 'hHoofR'].map(n => R_.bix[n]); STRIDE = cl.gallop.stride || 1.5; PH0 = cl.gallop.ph0 != null ? cl.gallop.ph0 : .12; AIR = cl.gallop.air || [.7, .99];   // (the horse's bones come before the rider's)
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('gk2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1.5, -.05, -1.5]; m.max = [1.5, 2.2, 1.7]; m._um = 1;   // (room for the lance couched, stood up and swept wide, and the rear)
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('GK2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); reg(); return 'gk2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+  const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+
+  /* what it does now: { c: clip, s: seconds into it, rate (how fast the pose follows; 0 snaps) } */
+  function ctl(t, live) {
+    if (S.hold && CL[S.hold.c]) return { c: S.hold.c, s: S.hold.s, rate: 0 };   // (the lab's and the tests': a clip held at a time)
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0 };
+    const now = G.time, ph = now + (t.anim || 0) * 3, A = t.ab, W = CL.charge.wind || .4, RR = CL.grail.rear || .26;
+    if (t.chg && t.chg.at !== t._gkChgAt) {   // a ride begins: which one (a spell's, by the cast just before it), and the stride starts afresh
+      const c = t.chg, dc = A && A.lastAt != null ? c.at - A.lastAt : 9;
+      t._gkChgAt = c.at; t._gkChgT = c.T; t._gkDist = 0;
+      t._gkKind = A && A.last === 'so_ridedown' && dc > -.02 && dc < .05 ? 'ride' : A && A.last === 'so_grail' && dc > .1 && dc < .45 ? 'grail' : 'charge';
+    }
+    if (t.hp != null) { if (t._gkHp != null && t.hp < t._gkHp - 1e-6 && !t.wounded) t._gkHitAt = now; t._gkHp = t.hp; }
+    const sc = A && A.lastAt != null ? now - A.lastAt : 9, q = t._gkChgAt != null ? now - t._gkChgAt : 9, T = t._gkChgT || .75, k = t._gkKind;
+    const fresh = A && A.lastAt != null && (t._gkChgAt == null || A.lastAt > t._gkChgAt + 1e-6);   // a spell cast since the last ride began: its move comes first
+    if (fresh && A.last === 'so_grail' && sc >= 0 && sc < RR + .08) return { c: 'grail', s: Math.min(sc, RR), rate: RATE.move };   // the rear, before the game sends it
+    if (fresh && A.last === 'so_vow' && sc >= 0 && sc < CL.vow.len && !t.chg) return { c: 'vow', s: sc, rate: RATE.move };
+    if (q >= 0 && k === 'ride') { const f = CL.ride.fit || .8, s = q < T ? q / T * f : f + (q - T); if (s < CL.ride.len) return { c: 'ride', s, rate: RATE.move }; }
+    if (q >= 0 && k === 'grail' && RR + q < CL.grail.len) return { c: 'grail', s: RR + q, rate: RATE.move };
+    if (q >= 0 && k === 'charge' && q < CL.charge.len - W) return { c: 'charge', s: W + q, rate: RATE.move };
+    const wind = t.tg && t.windup > 0 ? t.windup : 0;
+    if (wind > 0 && G.phase === 'wave') return { c: 'charge', s: W * Math.min(1, wind), rate: RATE.move };
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: RATE.down }; }
+    const h = t._gkHitAt != null ? now - t._gkHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: RATE.move };
+    if ((G.phase === 'wave' && t.tg && !t.tg.dead) || (t.shotT != null && t.shotT < 1.5)) return { c: 'ready', s: ph, rate: RATE.ready };
+    return { c: 'idle', s: ph, rate: RATE.idle };
+  }
+  /* the unit's turn through a ride: about at the far end (as the game turns it), and round again on its hocks as it comes
+     home (the game snaps it back when the ride ends) */
+  function spin(t, live) {
+    if (!live || t._gkChgAt == null) return 0;
+    const q = G.time - t._gkChgAt, T = t._gkChgT || .75;
+    if (q < 0 || q > T + TURN + .1) return 0;
+    return Math.PI * sm(0, 1, (q / T - .40) / .17) + Math.PI * sm(0, 1, (q - T * .97) / TURN);
+  }
+  let PT = null, PG = null, PX = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t.gkAt != null && typeof G !== 'undefined' && G && G.time - t.gkAt < .3 && G.time >= t.gkAt;
+  // the horse's bones (the first NBH, and the root's offset) of A taken w of the way to B's
+  function horse(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < (NBH + 2) * 4; k += 4) {   // (and his seat and back, most of the way: he rides the stride, upright as the horse pitches under him)
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const u = k < NBH * 4 ? w : w * SEAT_K;
+      const x = ax + (bx - ax) * u, y = ay + (by - ay) * u, z = az + (bz - az) * u, q = aw + (bw - aw) * u, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), yaw = t.ang == null ? 0 : t.ang;
+    const P = ctl(t, live);   // (first: it reads t.chg before chargeAt may end it)
+    const at0 = live && t.chg ? chargeAt(t) : [t.x, t.y], x = at0[0], z = at0[1];
+    // the Order's flagstone at its post, as under every soldier of it; off it, the horse runs on the ground
+    const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
+    const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('gk_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g, .36))))) : null;
+    M4.trs(_a, t.x, 0, t.y, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift0 = bm ? BASE_H * K * bk : 0, away = Math.hypot(x - t.x, z - t.y), lift = lift0 * Math.max(0, 1 - away / .5);
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift0) / HEADY;
+    const sp = spin(t, live); M4.trs(_a, x, lift * sy, z, yaw + sp + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, CENTRE * s, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); PG = newPose(); PX = newPose(); OUT = new Float32Array(NB * 12); }
+    sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live && !S.hold) {
+      const now = G.time, dt = t._gkT == null ? 1 : Math.max(0, Math.min(.1, now - t._gkT));
+      if (!t._gkP || t._gkP.q.length !== NB * 4) { t._gkP = newPose(); t._gkP.q.set(PT.q); t._gkP.t.set(PT.t); }
+      if (dt > 0 || t._gkT == null) {
+        follow(t._gkP, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1);
+        // a ride (out, the wheel, home, the turn at the post): the gallop has the horse for all of it, its phase the ground
+        // covered since the ride began (the wheel's turn counts as ground under the feet). Stood still in the stride's
+        // flight (at the foe, before the wheel), the stride runs on by the clock until a foot is down: nothing slides
+        const q = t._gkChgAt != null ? now - t._gkChgAt : -1, riding = q >= 0 && q < (t._gkChgT || .75) + TURN, ok = t._gkX != null && dt > 0 && dt < .1;
+        const d = ok ? Math.hypot(x - t._gkX, z - t._gkZ) : 0, dA = ok && t._gkSp != null ? Math.abs(sp - t._gkSp) : 0, sw = STRIDE * s * Math.max(.2, sz);
+        let adv = d + TURN_R * s * dA;
+        if (riding) { const ph = (PH0 + (t._gkDist || 0) / sw) % 1; if (adv < sw * dt * .4 && ph > AIR[0] && ph < AIR[1]) adv = Math.min(sw * dt * AIR_RATE, (1.002 - ph) * sw); t._gkDist = (t._gkDist || 0) + adv; }
+        t._gkX = x; t._gkZ = z; t._gkSp = sp;
+        t._gkW = riding ? 1 : (t._gkW || 0) * Math.exp(-dt * EASE_OUT);   // (home: eased back to the stance over a few frames, standing still)
+        t._gkT = now;
+      }
+      pose = t._gkP;
+      if (t._gkW > .004) {
+        PX.q.set(t._gkP.q); PX.t.set(t._gkP.t);
+        sample(CL.gallop, (PH0 + (t._gkDist || 0) / (STRIDE * s * Math.max(.2, sz))) * CL.gallop.len, PG);
+        horse(PX, PG, t._gkW); pose = PX;
+      }
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, TRIM]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift; S.clip = P.c; S.clipS = P.s;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { const tip = w(BI.lance, MK.tip); t.gkTip = tip; t.gkGrip = w(BI.lance, MK.grip); t.gkClip = P.c; t.gkClipS = P.s; t.gkAt = G.time; t.gkGait = t._gkW || 0; t.tipW = tip; t.tipYaw = yaw; t.tipAt = G.time; if (S.dbg) { t.gkFeet = FEET.map(b => w(b, R.bones[b].t)); t.gkDbg = { sp, lift: lift * sy, s }; } }
+    return [x, z, yaw, K];
+  }
+  const anchors = t => mine(t) ? { tip: t.gkTip, grip: t.gkGrip, clip: t.gkClip, s: t.gkClipS, gait: t.gkGait, at: t.gkAt } : null;
+  /* told to the shared sculpted-unit code (its size) only while it is on */
+  function reg() {
+    if (typeof UM_UNITS === 'undefined') return;
+    if (S.on && MESH_) {
+      if (!UM_UNITS[U]) UM_UNITS[U] = { mdl: 'gk2', k: 1 };
+      if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+    } else if (UM_UNITS[U] && UM_UNITS[U].mdl === 'gk2') { delete UM_UNITS[U]; if (typeof UM_EVEN !== 'undefined') delete UM_EVEN[U]; }
+  }
+  /* the Model Lab's rows: the code-built knight or the sculpted one; the fall held to look at; any clip played in place */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('gk2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'gk2Row';
+    box.innerHTML = '<h3>Grail Knight</h3><div class="row">' + `<button data-g2="0" class="${S.on ? '' : 'on'}" title="The knight built in code (?gk=old)">Old (code-built)</button><button data-g2="1" class="${S.on ? 'on' : ''}" title="The owner's sculpted knight and horse on their rig (the default)">New (sculpted)</button><button data-g2w="1" class="${S.wound ? 'on' : ''}" title="Hold it Wounded: the fall (the lab keeps units whole)">Wounded</button></div>`
+      + '<div class="row">' + NAMES.map(n => `<button data-g2c="${n}" class="${S.loop === n ? 'on' : ''}" title="Play this clip in place, over and over (the gallop: one stride a second)">${n}</button>`).join('') + '</div>';
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-g2]')) x.onclick = () => { S.on = x.dataset.g2 === '1'; reg(); labRow(); };
+    for (const x of box.querySelectorAll('[data-g2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+    for (const x of box.querySelectorAll('[data-g2c]')) x.onclick = () => { const n = x.dataset.g2c; if (S.loop === n) { S.loop = null; S.hold = null; } else { S.loop = n; S.loop0 = typeof G !== 'undefined' && G ? G.time : 0; } labRow(); };
+  }
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_gk2', () => {
+    try { load(typeof GK2_MDL !== 'undefined' ? GK2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No sculpted Grail Knight:', e.message); }
+    reg();
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { const r = draw(t, tier, sx, sy, sz, wob, opts); if (r) { forceExtra(t, tier, r[0], r[1], r[2], r[3]); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('gk2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('gk2Row')) labRow(); if (S.loop && CL[S.loop] && typeof G !== 'undefined' && G) { const c = CL[S.loop], u = G.time - (S.loop0 || 0); S.hold = { c: S.loop, s: c.loop ? u : u % (c.len + .6) }; } } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
+})();
+
+/* The Wolfguard (the Stormborn's spearmen, sb_wolfguard) on a rig and clips made from scratch (the owner, 22 Nov 2026:
+   "Stormborn Units/Wolfguard": the warrior and his frost spear, un-rigged). tools/make_wg.py -> src/model_wg2.js: 33 bones
+   (the kilt, tabard and cape below his belt on four panels, each in two lengths; the spear on a bone of its own that moves
+   freely, both fists solved onto its shaft), one 1024 x 1536 atlas, 8 clips at 30 frames a second.
+   ON by default in place of his code-built body (forces_stormborn_e.js: FORCE_BUILD.sb_wolfguard and its parts);
+   ?wg=old (or the Model Lab's "Wolfguard rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: stood on his spear, its butt on the ground at his right; he breathes, looks up the road and
+               down at the wolf at his heel, shifts his grip
+     ready     a foe in reach: bladed, the spear levelled at it in both fists
+     thrust    his strike: drawn back and run out through his left fist; begun 8 frames early so the point lands on the
+               game's blow (t.shotT = 0), and quickened with him
+     pounce    Pounce (sb_pounce): his left hand thrown out at the foe as the wolf goes
+     howl      Pack Howl (sb_packhowl): gathered over the spear, then his head thrown back, the spear held out
+     storm     Storm Spear (sb_stormspear): the spear thrust up at the sky for the game's bolt, then driven down the line
+               on the game's 0.4 s
+     hit       a blow taken (his health drops)
+     death     Wounded: down on his right knee, hung on the spear in both fists; eased back up when whole
+   The spear's point is t.tipW (unitTip): the lightning of Storm Spear strikes it there. His size is the shared rule
+   (unitmodels_size.js); he stands on the Stormborn's plateau stone. His code-built regalia (tiers IV-VI) is not drawn
+   over the sculpt. Checks: `python tools/make_wg.py --check`. Notes: docs/model_pilot/wolfguard2.md. */
+const WG2 = (() => {
+  const U = 'sb_wolfguard', NAMES = ['idle', 'ready', 'thrust', 'pounce', 'howl', 'storm', 'hit', 'death'];
+  const EASE = .2, SPD_MAX = 1.8;
+  const MV = { sb_pounce: 'pounce', sb_packhowl: 'howl', sb_stormspear: 'storm' }, CAST0 = { pounce: 2 / 30, howl: 2 / 30, storm: 0 };
+  const BASE_H = .047, BLOW = .3;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]wg=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, XB = 0, HEADY = .86, MK = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tx: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) {
+      P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+      P.tx[k] = c.tx[i0 * 3 + k] + (c.tx[i1 * 3 + k] - c.tx[i0 * 3 + k]) * f;
+    }
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tx[k] += (B.tx[k] - A.tx[k]) * w; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      const tt = b === HIPS ? P.t : b === XB ? P.tx : null;   // (the bones that move as well as turn)
+      if (tt) { j0 += tt[0]; j1 += tt[1]; j2 += tt[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'wg2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('wg2: too many bones');
+    for (const nm of ['hips', 'head', 'spear']) if (R_.bix[nm] == null) throw new Error('wg2: no ' + nm);
+    const mk = data.marks; for (const nm of ['tip', 'blade', 'butt']) if (!mk || !mk[nm]) throw new Error('wg2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('wg2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tx = new Float32Array(b64(c.tx));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tx.length !== c.n * 3) throw new Error('wg2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tx, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; XB = R.bix.spear; HEADY = R.bones[R.bix.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('wg2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1, -.02, -1]; m.max = [1, 1.9, 1.5]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('WG2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'wg2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._wgHp != null && t.hp < t._wgHp - 1e-6 && !t.wounded) t._wgHitAt = now; t._wgHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 14, mv: 'death' }; }
+    if (t._wgMv === 'death') t._wgRise = now;   // (whole again: eased back up)
+    const rise = t._wgRise != null && now - t._wgRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const m = MV[A.last], c0 = CL[m], u = now - A.lastAt + CAST0[m];
+      if (c0 && u < c0.len) { t._wgAbEnd = A.lastAt + c0.len - CAST0[m]; return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt }; }
+    }
+    const hh = t._wgHitAt != null ? now - t._wgHitAt : 9; if (hh >= 0 && hh < CL.hit.len) return { c: 'hit', s: hh, rate: 30, mv: 'hit' + t._wgHitAt };
+    // his thrusts: the game's own count; how fast he really strikes (the time between his last two) quickens them with him
+    if (t.shots && t._wgShots !== t.shots) { const at = now - (t.shotT || 0); if (t._wgAt != null && at - t._wgAt < 3) t._wgIv = at - t._wgAt; t._wgAt = at; t._wgShots = t.shots; }
+    const th = CL.thrust, HIT = (th.hit || 8) / 30, rate = (t.st && t.st.rate) || 1, iv = Math.min(t._wgIv || rate, rate * 1.05);
+    const spd = Math.max(1, Math.min(SPD_MAX, th.len / Math.max(.25, iv * .96)));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const afterAb = t._wgAbEnd == null || t._wgAt == null || t._wgAt > t._wgAbEnd - .05;
+    if (fight && (t.windup || 0) > 0 && s > BLOW) { const cd = t.cd || 0; if (cd < HIT / spd) return { c: 'thrust', s: HIT - cd * spd, rate: 40, mv: 'pre' + t.shots }; }   // (the thrust begun: it lands on the game's)
+    if (t.shots && afterAb && s >= 0 && s < (th.len - HIT) / spd) return { c: 'thrust', s: HIT + s * spd, rate: 40, mv: 'thr' + t.shots };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._wgDrawn != null && typeof G !== 'undefined' && G && G.time - t._wgDrawn < .3 && G.time >= t._wgDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Stormborn's patch of plateau stone under him, as under his code-built body, and he stands on it
+    const bm = typeof sbBase === 'function' ? dynMesh('sb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => sbBase(g, .3)))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._wgT == null ? 1 : Math.max(0, Math.min(.1, now - t._wgT)); t._wgT = now;
+      if (!t._wgP || t._wgP.q.length !== NB * 4) { t._wgP = newPose(); t._wgP.q.set(PT.q); t._wgP.t.set(PT.t); t._wgP.tx.set(PT.tx); }
+      if (P.mv !== t._wgMv) { t._wgMv = P.mv; t._wgSw = now; }
+      const k = now - t._wgSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._wgP, PT, k); pose = t._wgP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(XB, MK.tip); t.tipYaw = yaw; t.tipAt = G.time; t._wgDrawn = G.time; t._wgClip = P.c; t._wgClipS = P.s; t._wgBlade = w(XB, MK.blade); }
+    return true;
+  }
+  /* what the kit draws round him (forces_stormborn_e.js sbExtra: his wolf, the storm on the field), with two things of
+     his code-built body's left out: its regalia, and Storm Spear's bolt, which is drawn here onto the real spear's point */
+  let SKIP_REG = false;
+  function extras(t, tier) {
+    const A = t.ab, now = typeof G !== 'undefined' && G ? G.time : null, yaw = t.ang == null ? 0 : t.ang;
+    const storm = !!(A && A.last === 'sb_stormspear' && A.lastAt != null && now != null && now >= A.lastAt && now - A.lastAt < .45 && t.tipW);
+    const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+    if (storm) A.last = null;
+    SKIP_REG = true;
+    try { forceExtra(t, tier, t.x, t.y, yaw, UNIT_K(U)); } finally { SKIP_REG = false; if (storm) A.last = 'sb_stormspear'; if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+    if (storm && typeof vfxBolt === 'function' && typeof VX !== 'undefined') {
+      const k = 1 - (now - A.lastAt) / .45, sd = Math.floor(now * 18), p = t.tipW;
+      vfxBolt(VX, p[0] + .3 * Math.sin(sd), p[1] + 2.8, p[2] + .3 * Math.cos(sd), p[0], p[1], p[2], .055, [1.5, 1.6, 1.9], [.55, .75, 1.4], .85 * k, sd, .14, 12, 2, 1);
+      vfxSprite(VX, p[0], p[1] - .05, p[2], .32 * k, .32 * k, 0, vfxC('#b8d4ff'), .55 * k, VT.GLOW, 1);
+    }
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and a hit, and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('wg2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'wg2Row';
+    box.innerHTML = '<h3>Wolfguard rig</h3><div class="row">' + `<button data-w2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?wg=old)">Old (code-built)</button><button data-w2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-w2h="1" title="A blow taken: his flinch">Hit</button><button data-w2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on his knee on the spear">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-w2]')) x.onclick = () => { S.on = x.dataset.w2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-w2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._wgHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-w2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, blade: t._wgBlade, clip: t._wgClip, at: t._wgDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_wg2', () => {
+    try { load(typeof WG2_MDL !== 'undefined' ? WG2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Wolfguard rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { extras(t, tier); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('wg2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof sbDrawRegalia === 'function') { const _reg = sbDrawRegalia; sbDrawRegalia = function (t, u) { if (SKIP_REG && u === U) return; return _reg.apply(this, arguments); }; }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'wg2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('wg2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Stormborn's spirit wolf on a rig and clips made from scratch (the owner, 22 Nov 2026: "Stormborn Units/Spectral Wolf",
+   un-rigged). tools/make_sw.py -> src/model_sw2.js: 22 bones (the jaw, a two-bone tail on springs, IK legs), 5 clips.
+   ON by default in place of the code-built spirit wolf (forces_stormborn_e.js sbWolfMesh): every spirit wolf the
+   Stormborn draw goes through sbDrawWolf (x, z, h, yaw, scale, glow): the Wolfguard's wolf at heel and its lunges and
+   Pounce, Pack Howl's pack, the Drum's wolf, Huri Wolfsong's companion and spirit hunt. ?swolf=old draws the code-built one.
+   sbDrawWolf says only where a wolf is, how high and which way it faces, so this tells its wolves apart from frame to frame
+   by where they were (the nearest of last frame's), and plays from that:
+     idle   stood still (breathing, looking round, its tail stirring)
+     run    moving over the ground (its stride paced to its speed)
+     leap   off the ground (a lunge's arc: rising, the jaws wide; at the height of it, the bite; falling, the landing)
+   It stays a spirit: drawn see-through and unshadowed as the code-built one was, with its glow. */
+const SW2 = (() => {
+  const NAMES = ['idle', 'run', 'leap', 'bite', 'howl'], SIZE = .64, ALPHA = .78;
+  const S = { on: true, err: null, n: 0 };
+  try { S.on = !/[?&]swolf=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'sw2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('sw2: too many bones');
+    if (R_.bix.hips == null) throw new Error('sw2: no hips');
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('sw2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('sw2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips;
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('sw2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.4, -.02, -.6]; m.max = [.4, .8, .6]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('SW2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'sw2: ' + NB + ' bones'; });
+
+  /* its wolves from frame to frame: last frame's and this frame's, each { x, z, h, ph (its clip time), pose, ... } */
+  let prev = [], cur = [], frameAt = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  let PT = null;
+  function wolfState(x, z, h, now) {
+    if (now !== frameAt) { prev = cur; cur = []; frameAt = now; }
+    let best = null, bd = .6;
+    for (const w of prev) { if (w.taken) continue; const d = Math.hypot(w.x - x, w.z - z) + Math.abs(w.h - h); if (d < bd) { bd = d; best = w; } }
+    let w;
+    if (best) { best.taken = true; w = { x, z, h, ph: best.ph, pose: best.pose, at: best.at, clip: best.clip, air: best.air, vh: h - best.h, sp: Math.hypot(x - best.x, z - best.z) / Math.max(1e-3, now - best.at) };
+      w.sp = best.sp != null ? best.sp + (w.sp - best.sp) * .35 : w.sp; }
+    else w = { x, z, h, ph: Math.random() * 4, pose: null, at: now, clip: 'idle', air: 0, vh: 0, sp: 0 };
+    w.dt = Math.max(0, Math.min(.1, now - w.at)); w.at = now; cur.push(w); return w;
+  }
+  function draw(x, z, h, yaw, s, glow) {
+    if (!ready()) return false;
+    const now = typeof G !== 'undefined' && G && G.time != null && !(typeof inIcon !== 'undefined' && inIcon) ? G.time : null;
+    if (!PT || PT.q.length !== NB * 4) PT = newPose();
+    let clip = 'idle', sec = 0, w = null;
+    if (now != null) {
+      w = wolfState(x, z, h, now);
+      if (h > .035) {   // (a lunge's arc: rising, sprung; the top, the bite; falling, the landing)
+        w.air = Math.min(1, w.air + w.dt * 3); clip = 'leap';
+        const hit = (CL.leap.hit || 9) / 30; w.ph = w.vh >= 0 ? Math.min(hit, Math.max(5 / 30, w.ph + w.dt)) : Math.max(hit, w.ph + w.dt); w.ph = Math.min(w.ph, CL.leap.len); sec = w.ph;
+      } else if (w.sp > .35) { clip = 'run'; w.ph += w.dt * Math.max(.7, Math.min(1.8, w.sp / 2.2)); sec = w.ph; }
+      else if (w.clip === 'leap' && w.ph < CL.leap.len) { clip = 'leap'; w.ph = Math.max(w.ph, (CL.leap.hit || 9) / 30) + w.dt; sec = w.ph; }
+      else { clip = 'idle'; w.ph += w.dt; sec = w.ph; }
+      if (clip !== w.clip && !(clip === 'leap' && w.clip === 'leap')) { if (clip === 'leap' && w.clip !== 'leap') w.ph = sec = 3 / 30; w.sw = now; }
+      w.clip = clip;
+    }
+    sample(CL[clip], sec, PT);
+    let pose = PT;
+    if (w) {
+      if (!w.pose) { w.pose = newPose(); w.pose.q.set(PT.q); w.pose.t.set(PT.t); }
+      follow(w.pose, PT, 1 - Math.exp(-w.dt * (clip === 'leap' ? 30 : 12))); pose = w.pose;
+    }
+    const OUT = new Float32Array(NB * 12); toBones(pose, OUT);
+    const k = s * SIZE;
+    M4.trs(_a, x, Math.max(0, h - (clip === 'leap' ? .02 : 0)), z, yaw, 0, 0, k, k, k);
+    const it = item(MESH_, _a, { alpha: ALPHA, shadow: false, tint: [.92, 1, 1.18, .25] }); it.sec = [0, 0]; it.bones = OUT;
+    QADD.bill(RD, x, h + .25 * s, z, .55 * s, .45 * s, [.6, .8, 1.2, .12 * (glow || 1)], 1, 0);
+    S.n++;
+    return true;
+  }
+  assetReady('model_sw2', () => {
+    try { load(typeof SW2_MDL !== 'undefined' ? SW2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No spirit wolf rig:', e.message); }
+    if (MESH_ && typeof sbDrawWolf === 'function') {
+      const _w0 = sbDrawWolf;
+      sbDrawWolf = function (x, z, h, yaw, s, glow) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS) { try { if (draw(x, z, h, yaw, s, glow)) return; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('sw2:', e); } } }
+        return _w0.apply(this, arguments);
+      };
+    }
+  });
+  return { S, CL, load, hot, draw, ready, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Windrunners (the Stormborn's archers, sb_windrunner) on a rig and clips made from scratch (the owner, 22 Nov 2026:
+   "Stormborn Units/Windrunner": the archer, her bow and a frost arrow, un-rigged). tools/make_wr.py -> src/model_wr2.js:
+   36 bones (the skirt and the feather cloak below her belt on four panels, each in two lengths; the bow on a bone of its own
+   that moves freely, her left fist solved onto its grip; the string's middle drawn back along it, the string blended from
+   the tips to it; the arrow placed freely, on the string or in her fingers), one 1024 x 1536 atlas, 10 clips at 30 fps.
+   ON by default in place of her code-built body (forces_stormborn_e.js FORCE_BUILD.sb_windrunner and its bow part);
+   ?wr=old (or the Model Lab's "Windrunner rig" row set to Old) draws that.
+   Her moves, by the game's own cues (nothing in the game is changed):
+     idle        no foe in reach: the bow carried low; a long look up at the sky
+     ready       a foe in reach: an arrow on the string, half drawn, aimed (readyUp: at a flyer, the bow raised; blended
+                 by how high and near the flyer is)
+     shot        each arrow (t.shots): loosed from full draw on the game's shot, then the next drawn from the quiver over
+                 her shoulder, nocked and drawn to her anchor; paced to the shots' own interval. shotUp: at a flyer
+     gale        Gale Arrow (sb_galearrow): the great over-draw, loosed on the game's 0.3 s
+     cross       Crosswind (sb_crosswind): the wind called with a circle of her hand over her head
+     sky         Skyshot (sb_skyshot): loosed straight up
+     hit         her health drops;  death  wounded (t.wounded): down on her right knee on the bow
+   Her arrows leave the arrow's point (t.tipW, read by unitTip). Her size is the shared rule (unitmodels_size.js); she
+   stands on the Stormborn's plateau stone. Checks: `python tools/make_wr.py --check`. Notes: docs/model_pilot/windrunner2.md. */
+const WR2 = (() => {
+  const U = 'sb_windrunner', NAMES = ['idle', 'ready', 'readyUp', 'shot', 'shotUp', 'gale', 'cross', 'sky', 'hit', 'death'];
+  const EASE = .2, SPD_MAX = 1.8;
+  const MV = { sb_galearrow: 'gale', sb_crosswind: 'cross', sb_skyshot: 'sky' }, CAST0 = { gale: 0, cross: 2 / 30, sky: 2 / 30 };
+  const BASE_H = .047;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]wr=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, XB = 0, STR = 0, AR = 0, HEADY = .87, MK = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tx: new Float32Array(3), ts: new Float32Array(3), ta: new Float32Array(3), vis: [1] });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) {
+      P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+      P.tx[k] = c.tx[i0 * 3 + k] + (c.tx[i1 * 3 + k] - c.tx[i0 * 3 + k]) * f;
+      P.ts[k] = c.ts[i0 * 3 + k] + (c.ts[i1 * 3 + k] - c.ts[i0 * 3 + k]) * f;
+      P.ta[k] = c.ta[i0 * 3 + k] + (c.ta[i1 * 3 + k] - c.ta[i0 * 3 + k]) * f;
+    }
+    const iv = f < .5 ? i0 : i1; P.vis[0] = c.vis[iv];   // (the arrow shows or not: no blend)
+    return P;
+  }
+  function follow(A, B, w, visToo) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tx[k] += (B.tx[k] - A.tx[k]) * w; A.ts[k] += (B.ts[k] - A.ts[k]) * w; A.ta[k] += (B.ta[k] - A.ta[k]) * w; }
+    if (visToo) { A.vis[0] = B.vis[0]; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      const tt = b === HIPS ? P.t : b === XB ? P.tx : b === STR ? P.ts : b === AR ? P.ta : null;   // (the bones that move as well as turn)
+      if (tt) { j0 += tt[0]; j1 += tt[1]; j2 += tt[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    // a hidden bolt: its bone collapsed to its own joint (its triangles have no area and draw nothing)
+    for (const [b, v] of [[AR, P.vis[0]]]) if (!v) { const g = b * 12, jx = out[g] * H[b * 3] + out[g + 4] * H[b * 3 + 1] + out[g + 8] * H[b * 3 + 2] + out[g + 3], jy = out[g + 1] * H[b * 3] + out[g + 5] * H[b * 3 + 1] + out[g + 9] * H[b * 3 + 2] + out[g + 7], jz = out[g + 2] * H[b * 3] + out[g + 6] * H[b * 3 + 1] + out[g + 10] * H[b * 3 + 2] + out[g + 11]; for (let i = 0; i < 12; i++) out[g + i] = 0; out[g + 3] = jx; out[g + 7] = jy; out[g + 11] = jz; }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'wr2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('wr2: too many bones');
+    for (const nm of ['hips', 'head', 'bow', 'strC', 'arrow']) if (R_.bix[nm] == null) throw new Error('wr2: no ' + nm);
+    const mk = data.marks; for (const nm of ['point', 'nock', 'grip', 'top']) if (!mk || !mk[nm]) throw new Error('wr2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('wr2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tx = new Float32Array(b64(c.tx)), ts = new Float32Array(b64(c.ts)), ta = new Float32Array(b64(c.ta)), vis = new Uint8Array(b64(c.vis));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tx.length !== c.n * 3 || ts.length !== c.n * 3 || ta.length !== c.n * 3 || vis.length !== c.n) throw new Error('wr2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tx, ts, ta, vis, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; XB = R.bix.bow; STR = R.bix.strC; AR = R.bix.arrow; HEADY = R.bones[R.bix.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('wr2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.02, -.9]; m.max = [.9, 1.5, 1.1]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('WR2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'wr2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  // how far up he aims: 0 at a foe on the ground, toward 1 (the clips' EL_UP, 36 degrees) at a flyer, the nearer the higher
+  function aimUp(t) {
+    const c = t.tg; if (!c || c.dead || !c.fly) return 0;
+    const d = Math.hypot(c.x - t.x, c.y - t.y), k = Math.max(.55, Math.min(1, 1.6 - d / 2.5)); return Number.isFinite(k) ? k : .8;
+  }
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into), up } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle', up: 0 };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._wrHp != null && t.hp < t._wrHp - 1e-6 && !t.wounded) t._wrHitAt = now; t._wrHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death', up: 0 }; }
+    if (t._wrMv === 'death') t._wrRise = now;   // (whole again: eased back up)
+    const rise = t._wrRise != null && now - t._wrRise < .9;
+    // the target's height: eased, so a flyer passing over does not snap the aim
+    const up0 = aimUp(t), dt = t._wrUpT == null ? 1 : Math.max(0, Math.min(.1, now - t._wrUpT)); t._wrUpT = now;
+    t._wrUp = !Number.isFinite(t._wrUp) ? up0 : t._wrUp + (up0 - t._wrUp) * (1 - Math.exp(-dt * 6)); if (!Number.isFinite(t._wrUp)) t._wrUp = 0; const up = t._wrUp;
+    // a spell: its move from the cast (and the bolts the game looses meanwhile are under it)
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const m = MV[A.last], c0 = CL[m], u = now - A.lastAt + CAST0[m];
+      if (c0 && u < c0.len) { t._wrAbEnd = A.lastAt + c0.len - CAST0[m]; return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt, up: 0 }; }
+    }
+    // the shots: the game's own count; each a release, a kick and the reload, paced to the shots' own interval
+    if (t.shots && t._wrShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._wrAt != null && at - t._wrAt < 3) t._wrIv = at - t._wrAt;
+      t._wrAt = at; t._wrShots = t.shots;
+    }
+    const sh = CL.shot, HIT = (sh.hit || 2) / 30, rate = (t.st && t.st.rate) || 1, iv = Math.min(t._wrIv || rate, rate * 1.05);
+    const spd = Math.max(1, Math.min(SPD_MAX, (sh.len - HIT) / Math.max(.2, iv * .94)));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const shotAt = t._wrAt, afterAb = t._wrAbEnd == null || shotAt == null || shotAt > t._wrAbEnd - .05;
+    const inShot = t.shots && afterAb && s >= 0 && HIT + s * spd < sh.len;
+    if (inShot) return { c: 'shot', s: HIT + s * spd, rate: 40, mv: 'shot' + t.shots, up };
+    if (fight) { const cd = t.cd || 0; if ((t.windup || 0) > 0 && cd < HIT) return { c: 'shot', s: HIT - cd, rate: 40, mv: 'pre' + t.shots, up }; }
+    const h = t._wrHitAt != null ? now - t._wrHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._wrHitAt, up: 0 };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready', up };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle', up: 0 };
+  }
+  let PT = null, PU = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const UPOF = { ready: 'readyUp', shot: 'shotUp' };
+  const mine = t => S.on && MESH_ && t && t._wrDrawn != null && typeof G !== 'undefined' && G && G.time - t._wrDrawn < .3 && G.time >= t._wrDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Order's flagstone under him, as under every soldier of it, and he stands on it
+    const bk = 1, bm = typeof sbBase === 'function' ? dynMesh('sb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => sbBase(g, .3)))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * bk * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); PU = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    if (P.up > .01 && UPOF[P.c]) { sample(CL[UPOF[P.c]], P.s, PU); follow(PT, PU, P.up, false); }   // (at a flyer: the raised aim blended in)
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._wrT == null ? 1 : Math.max(0, Math.min(.1, now - t._wrT)); t._wrT = now;
+      if (!t._wrP || t._wrP.q.length !== NB * 4) { t._wrP = newPose(); t._wrP.q.set(PT.q); t._wrP.t.set(PT.t); t._wrP.tx.set(PT.tx); t._wrP.ts.set(PT.ts); t._wrP.ta.set(PT.ta); }
+      if (P.mv !== t._wrMv) { t._wrMv = P.mv; t._wrSw = now; }
+      const k = now - t._wrSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._wrP, PT, k, true); pose = t._wrP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) {
+      t.tipW = w(AR, MK.point); t.tipYaw = yaw; t.tipAt = G.time; t._wrDrawn = G.time; t._wrClip = P.c; t._wrClipS = P.s; t._wrUpNow = P.up;
+      t._wrNose = w(XB, MK.top);
+    }
+    return true;
+  }
+  /* what the kit draws round her (forces_stormborn_e.js sbExtra: the gale wound into the drawn bow, Skyshot's streak),
+     without her code-built body's regalia, which would stand off the sculpt */
+  let SKIP_REG = false;
+  function extras(t, tier) {
+    const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+    SKIP_REG = true;
+    try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { SKIP_REG = false; if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+  }
+  /* the Model Lab's row: her code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('wr2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'wr2Row';
+    box.innerHTML = '<h3>Windrunner rig</h3><div class="row">' + `<button data-r2="0" class="${S.on ? '' : 'on'}" title="Her code-built body (?wr=old)">Old (code-built)</button><button data-r2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-r2h="1" title="A blow taken">Hit</button><button data-r2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on her knee">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-r2]')) x.onclick = () => { S.on = x.dataset.r2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-r2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._wrHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-r2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, nose: t._wrNose, clip: t._wrClip, at: t._wrDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_wr2', () => {
+    try { load(typeof WR2_MDL !== 'undefined' ? WR2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Windrunner rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { extras(t, tier); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('sv2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof sbDrawRegalia === 'function') { const _reg = sbDrawRegalia; sbDrawRegalia = function (t, u) { if (SKIP_REG && u === U) return; return _reg.apply(this, arguments); }; }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'wr2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('wr2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Hail Shamans (sb_hailshaman) on a rig and clips made from scratch (the owner, 22 Nov 2026: "Stormborn Units/Hail
+   Shaman": the old shaman and his antler staff, un-rigged). tools/make_hs.py -> src/model_hs2.js: 33 bones (the robe below
+   his belt on four panels, each in two lengths; the staff on a bone of its own, both fists solved onto it), one 1024 x 1536
+   atlas, 8 clips at 30 frames a second. ON by default in place of his code-built body; ?hs=old (or the Model Lab's "Hail
+   Shaman rig" row set to Old) draws that. His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: leaning on his staff, a long look up at the sky
+     ready     a foe in reach: the staff held out, its antler head up, his left hand raised and open
+     hail      each hailstone (his strike, t.shotT = 0): the staff swept up and brought down at the foe, begun 6 frames early
+     rain      Freezing Rain (sb_freezingrain): the staff thrust up at the sky, held as the cloud gathers
+     storm     Hailstorm (sb_hailstorm): the staff whirled over his head, then flung down at the spot
+     totem     Rime Totem (sb_rimetotem): the staff's foot driven into the road, his palm to the ground
+     hit, death   his health drops; wounded: down on his right knee on the staff
+   The staff's antler head is t.tipW (unitTip). His size is the shared rule (unitmodels_size.js); he stands on the
+   Stormborn's plateau stone. Checks: `python tools/make_hs.py --check`. Notes: docs/model_pilot/hailshaman2.md. */
+const HS2 = (() => {
+  const U = 'sb_hailshaman', NAMES = ['idle', 'ready', 'hail', 'rain', 'storm', 'totem', 'hit', 'death'];
+  const EASE = .2, SPD_MAX = 1.8;
+  const MV = { sb_freezingrain: 'rain', sb_hailstorm: 'storm', sb_rimetotem: 'totem' }, CAST0 = { rain: 0, storm: 0, totem: 0 };
+  const BASE_H = .047, BLOW = .3;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]hs=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, XB = 0, HEADY = .875, MK = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tx: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) {
+      P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+      P.tx[k] = c.tx[i0 * 3 + k] + (c.tx[i1 * 3 + k] - c.tx[i0 * 3 + k]) * f;
+    }
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tx[k] += (B.tx[k] - A.tx[k]) * w; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      const tt = b === HIPS ? P.t : b === XB ? P.tx : null;   // (the bones that move as well as turn)
+      if (tt) { j0 += tt[0]; j1 += tt[1]; j2 += tt[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'hs2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('hs2: too many bones');
+    for (const nm of ['hips', 'head', 'spear']) if (R_.bix[nm] == null) throw new Error('hs2: no ' + nm);
+    const mk = data.marks; for (const nm of ['tip', 'blade', 'butt']) if (!mk || !mk[nm]) throw new Error('hs2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('hs2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tx = new Float32Array(b64(c.tx));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tx.length !== c.n * 3) throw new Error('hs2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tx, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; XB = R.bix.spear; HEADY = R.bones[R.bix.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('hs2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1, -.02, -1]; m.max = [1, 1.9, 1.5]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('HS2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'hs2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._hsHp != null && t.hp < t._hsHp - 1e-6 && !t.wounded) t._hsHitAt = now; t._hsHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 14, mv: 'death' }; }
+    if (t._hsMv === 'death') t._hsRise = now;   // (whole again: eased back up)
+    const rise = t._hsRise != null && now - t._hsRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const m = MV[A.last], c0 = CL[m], u = now - A.lastAt + CAST0[m];
+      if (c0 && u < c0.len) { t._hsAbEnd = A.lastAt + c0.len - CAST0[m]; return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt }; }
+    }
+    const hh = t._hsHitAt != null ? now - t._hsHitAt : 9; if (hh >= 0 && hh < CL.hit.len) return { c: 'hit', s: hh, rate: 30, mv: 'hit' + t._hsHitAt };
+    // his thrusts: the game's own count; how fast he really strikes (the time between his last two) quickens them with him
+    if (t.shots && t._hsShots !== t.shots) { const at = now - (t.shotT || 0); if (t._hsAt != null && at - t._hsAt < 3) t._hsIv = at - t._hsAt; t._hsAt = at; t._hsShots = t.shots; }
+    const th = CL.hail, HIT = (th.hit || 6) / 30, rate = (t.st && t.st.rate) || 1, iv = Math.min(t._hsIv || rate, rate * 1.05);
+    const spd = Math.max(1, Math.min(SPD_MAX, th.len / Math.max(.25, iv * .96)));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const afterAb = t._hsAbEnd == null || t._hsAt == null || t._hsAt > t._hsAbEnd - .05;
+    if (fight && (t.windup || 0) > 0 && s > BLOW) { const cd = t.cd || 0; if (cd < HIT / spd) return { c: 'hail', s: HIT - cd * spd, rate: 40, mv: 'pre' + t.shots }; }   // (the swing begun: it lands on the game's)
+    if (t.shots && afterAb && s >= 0 && s < (th.len - HIT) / spd) return { c: 'hail', s: HIT + s * spd, rate: 40, mv: 'thr' + t.shots };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._hsDrawn != null && typeof G !== 'undefined' && G && G.time - t._hsDrawn < .3 && G.time >= t._hsDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Stormborn's patch of plateau stone under him, as under his code-built body, and he stands on it
+    const bm = typeof sbBase === 'function' ? dynMesh('sb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => sbBase(g, .3)))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._hsT == null ? 1 : Math.max(0, Math.min(.1, now - t._hsT)); t._hsT = now;
+      if (!t._hsP || t._hsP.q.length !== NB * 4) { t._hsP = newPose(); t._hsP.q.set(PT.q); t._hsP.t.set(PT.t); t._hsP.tx.set(PT.tx); }
+      if (P.mv !== t._hsMv) { t._hsMv = P.mv; t._hsSw = now; }
+      const k = now - t._hsSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._hsP, PT, k); pose = t._hsP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(XB, MK.blade); t.tipYaw = yaw; t.tipAt = G.time; t._hsDrawn = G.time; t._hsClip = P.c; t._hsClipS = P.s; t._hsBlade = w(XB, MK.blade); }
+    return true;
+  }
+  /* what the kit draws round him (forces_stormborn_e.js sbExtra: the rain cloud over him, the hail whirled round the staff),
+     without his code-built body's regalia, which would stand off the sculpt */
+  let SKIP_REG = false;
+  function extras(t, tier) {
+    const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+    SKIP_REG = true;
+    try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { SKIP_REG = false; if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and a hit, and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('hs2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'hs2Row';
+    box.innerHTML = '<h3>Hail Shaman rig</h3><div class="row">' + `<button data-h2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?hs=old)">Old (code-built)</button><button data-h2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-h2h="1" title="A blow taken: his flinch">Hit</button><button data-h2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on his knee on the staff">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-h2]')) x.onclick = () => { S.on = x.dataset.h2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-h2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._hsHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-h2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, blade: t._hsBlade, clip: t._hsClip, at: t._hsDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_hs2', () => {
+    try { load(typeof HS2_MDL !== 'undefined' ? HS2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Hail Shaman rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { extras(t, tier); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('wg2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof sbDrawRegalia === 'function') { const _reg = sbDrawRegalia; sbDrawRegalia = function (t, u) { if (SKIP_REG && u === U) return; return _reg.apply(this, arguments); }; }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'hs2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('hs2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Spirit Walkers (sb_spiritwalker) on a rig and clips made from scratch (the owner, 22 Nov 2026: "Stormborn Units/Spirit
+   Walker": the elder, and the "Ancestor Apparition", the same sculpt as a violet spirit). tools/make_sp.py -> src/model_sp2.js:
+   33 bones (the fringes below his belt on four panels, the hanging sleeves on his arms), his texture and the apparition's,
+   8 clips at 30 frames a second. ON by default in place of his code-built body; ?sp=old (or the Model Lab's "Spirit Walker
+   rig" row set to Old) draws that. His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: hands folded, listening to the ancestors
+     ready     a foe in reach: his left palm raised toward it
+     send      each spirit (his strike, t.shotT = 0): his right palm thrust at the foe (begun 5 frames early)
+     chains    Spirit Chains (sb_spiritchains): both hands flung out, the chains seized and hauled back
+     reck      Reckoning (sb_reckoning): palms together, then both thrust out in judgment
+     bear      Spirit Bear (sb_spiritbear): arms raised, then his fists brought down with each of the bear's blows
+     hit, death   his health drops; wounded: sat back on his heels, head bowed
+   His ancestor (the Apparition) rises behind him, a head taller and see-through, doing as he does, for each spell and,
+   fainter and briefer, each spirit he sends. His right palm is t.tipW (unitTip): the spirits leave his hand. His size is
+   the shared rule (unitmodels_size.js); he stands on the Stormborn's plateau stone. Notes: docs/model_pilot/spiritwalker2.md. */
+const SP2 = (() => {
+  const U = 'sb_spiritwalker', NAMES = ['idle', 'ready', 'send', 'chains', 'reck', 'bear', 'hit', 'death'];
+  const EASE = .2, SPD_MAX = 1.8;
+  const MV = { sb_spiritchains: 'chains', sb_reckoning: 'reck', sb_spiritbear: 'bear' }, CAST0 = { chains: 2 / 30, reck: 2 / 30, bear: 0 };
+  const BASE_H = .047, BLOW = .3;
+  const S = { on: true, err: null, wound: false, ghost: false };
+  try { S.on = !/[?&]sp=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, gimg = null, GMESH = null, NB = 0, H = null, PAR = null, HIPS = 0, XB = 0, HR = 0, HEADY = .822, MK = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3), tx: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) {
+      P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+      P.tx[k] = c.tx[i0 * 3 + k] + (c.tx[i1 * 3 + k] - c.tx[i0 * 3 + k]) * f;
+    }
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) { A.t[k] += (B.t[k] - A.t[k]) * w; A.tx[k] += (B.tx[k] - A.tx[k]) * w; }
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      const tt = b === HIPS ? P.t : b === XB ? P.tx : null;   // (the bones that move as well as turn)
+      if (tt) { j0 += tt[0]; j1 += tt[1]; j2 += tt[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'sp2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('sp2: too many bones');
+    for (const nm of ['hips', 'head', 'handR', 'handL']) if (R_.bix[nm] == null) throw new Error('sp2: no ' + nm);
+    const mk = data.marks; for (const nm of ['gripR', 'gripL']) if (!mk || !mk[nm]) throw new Error('sp2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('sp2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t)), tx = new Float32Array(b64(c.tx));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3 || tx.length !== c.n * 3) throw new Error('sp2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, tx, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; XB = R.bix.spear; HR = R.bix.handR; HEADY = R.bones[R.bix.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('sp2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1, -.02, -1]; m.max = [1, 1.9, 1.5]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+    // (the apparition: the same buffers, its own texture)
+    if (D.texG && typeof Image !== 'undefined') { gimg = new Image(); gimg.decoding = 'async'; gimg.src = D.texG; GMESH = Object.assign({}, m, { tex: gimg, gl: new Map(), _um: 0 }); }
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('SP2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'sp2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._spHp != null && t.hp < t._spHp - 1e-6 && !t.wounded) t._spHitAt = now; t._spHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 14, mv: 'death' }; }
+    if (t._spMv === 'death') t._spRise = now;   // (whole again: eased back up)
+    const rise = t._spRise != null && now - t._spRise < .9;
+    // a spell: its move from the cast
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      const m = MV[A.last], c0 = CL[m], u = now - A.lastAt + CAST0[m];
+      if (c0 && u < c0.len) { t._spAbEnd = A.lastAt + c0.len - CAST0[m]; return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt }; }
+    }
+    const hh = t._spHitAt != null ? now - t._spHitAt : 9; if (hh >= 0 && hh < CL.hit.len) return { c: 'hit', s: hh, rate: 30, mv: 'hit' + t._spHitAt };
+    // his thrusts: the game's own count; how fast he really strikes (the time between his last two) quickens them with him
+    if (t.shots && t._spShots !== t.shots) { const at = now - (t.shotT || 0); if (t._spAt != null && at - t._spAt < 3) t._spIv = at - t._spAt; t._spAt = at; t._spShots = t.shots; }
+    const th = CL.send, HIT = (th.hit || 5) / 30, rate = (t.st && t.st.rate) || 1, iv = Math.min(t._spIv || rate, rate * 1.05);
+    const spd = Math.max(1, Math.min(SPD_MAX, th.len / Math.max(.25, iv * .96)));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    const afterAb = t._spAbEnd == null || t._spAt == null || t._spAt > t._spAbEnd - .05;
+    if (fight && (t.windup || 0) > 0 && s > BLOW) { const cd = t.cd || 0; if (cd < HIT / spd) return { c: 'send', s: HIT - cd * spd, rate: 40, mv: 'pre' + t.shots }; }   // (the thrust begun: it lands on the game's)
+    if (t.shots && afterAb && s >= 0 && s < (th.len - HIT) / spd) return { c: 'send', s: HIT + s * spd, rate: 40, mv: 'thr' + t.shots };
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16), _g = new Float32Array(16);
+  // the apparition's strength now: 1 through a spell (risen over 0.25 s, gone over the last 0.3 s), up to .55 for a spirit sent
+  function ghostA(t) {
+    const now = G.time, A = t.ab; let a = 0;
+    if (A && A.lastAt != null && MV[A.last] && now >= A.lastAt) { const c = CL[MV[A.last]], u = now - A.lastAt, L = c ? c.len : 1.2; if (u < L) a = Math.min(1, u / .25, (L - u) / .3); }
+    const s = t.shotT == null ? 9 : t.shotT; if (s >= 0 && s < .6) a = Math.max(a, .55 * Math.min(1, (s + .1) / .15, (.6 - s) / .3));
+    return Math.max(0, a);
+  }
+  const mine = t => S.on && MESH_ && t && t._spDrawn != null && typeof G !== 'undefined' && G && G.time - t._spDrawn < .3 && G.time >= t._spDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Stormborn's patch of plateau stone under him, as under his code-built body, and he stands on it
+    const bm = typeof sbBase === 'function' ? dynMesh('sb_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => sbBase(g, .3)))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._spT == null ? 1 : Math.max(0, Math.min(.1, now - t._spT)); t._spT = now;
+      if (!t._spP || t._spP.q.length !== NB * 4) { t._spP = newPose(); t._spP.q.set(PT.q); t._spP.t.set(PT.t); t._spP.tx.set(PT.tx); }
+      if (P.mv !== t._spMv) { t._spMv = P.mv; t._spSw = now; }
+      const k = now - t._spSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._spP, PT, k); pose = t._spP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    const ga = live ? ghostA(t) : (S.ghost ? 1 : 0);
+    if (ga > .01 && GMESH && gimg && gimg.complete && gimg.naturalWidth) {   // (his ancestor: a head taller, risen behind him, see-through)
+      const gs = 1.16, back = -.20 * (1 - .3 * ga), rise = .06 * ga;
+      M4.trs(_a, x, lift + rise, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, back, 0, 0, 0, s * gs, s * gs, s * gs); M4.mul(_g, _a, _b);
+      const gi = item(GMESH, _g, { alpha: .5 * ga, shadow: false, tint: [1.05, .9, 1.3, .35] }); gi.sec = [0, 0]; gi.bones = OUT.slice();
+    }
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(HR, MK.gripR); t.tipYaw = yaw; t.tipAt = G.time; t._spDrawn = G.time; t._spClip = P.c; t._spClipS = P.s; t._spBlade = t.tipW; }
+    return true;
+  }
+  /* what the kit draws round him (forces_stormborn_e.js sbExtra: Reckoning's light at his palms, the spirit bear), without
+     his code-built body's regalia, which would stand off the sculpt */
+  let SKIP_REG = false;
+  function extras(t, tier) {
+    const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+    SKIP_REG = true;
+    try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { SKIP_REG = false; if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and a hit, and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('sp2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'sp2Row';
+    box.innerHTML = '<h3>Spirit Walker rig</h3><div class="row">' + `<button data-p2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?sp=old)">Old (code-built)</button><button data-p2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-p2g="1" class="${S.ghost ? 'on' : ''}" title="His ancestor risen behind him (as in a spell)">Ancestor</button><button data-p2h="1" title="A blow taken: his flinch">Hit</button><button data-p2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: sat back on his heels">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-p2]')) x.onclick = () => { S.on = x.dataset.p2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-p2g]')) x.onclick = () => { S.ghost = !S.ghost; labRow(); };
+    for (const x of box.querySelectorAll('[data-p2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._spHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-p2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, blade: t._spBlade, clip: t._spClip, at: t._spDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_sp2', () => {
+    try { load(typeof SP2_MDL !== 'undefined' ? SP2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Spirit Walker rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { extras(t, tier); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('wg2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof sbDrawRegalia === 'function') { const _reg = sbDrawRegalia; sbDrawRegalia = function (t, u) { if (SKIP_REG && u === U) return; return _reg.apply(this, arguments); }; }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'sp2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('sp2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* Brannoc Goldvein, the Under-King (Ironhold's king Champion, ch_brannoc, commander ih_king), on a rig and clips made from
+   scratch: his mesh is the owner's "Brannoc - The Under King" (a bald old dwarf king, a great pale beard in beaded braids, a
+   black fur mantle, bronze-banded leather, a green gold-hemmed tabard and a long green cape) and his rune hammer, one in
+   each fist (owner, 22 Nov 2026: "brannoc should dual weild", "hammers should be a bit smaler");
+   tools/make_br.py -> src/model_br2.js: 32 bones (the cape below the fur and the tabard on sprung panels kept clear of his
+   legs, the beard on two bones of its own, a hammer on a bone in each fist), 9 clips at 30 fps.
+   ON by default in place of his code-built body; ?br=old (or the Model Lab's "Brannoc rig" row set to Old) draws that.
+   His moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: the right hammer on his shoulder, the left hung at his side; he breathes, looks down the
+               road, lifts the left to look at its stone
+     ready     a foe in reach: side-on, the left hammer out before him, the right cocked by his ear
+     strikeA / strikeB   his blows, by turns (the right hammer overhead, the left in a flat sweep): begun 8 frames early so
+               the hammer lands on the game's blow (t.shotT = 0)
+     muster    The King's Muster (ch_muster): both hammers thrust up and rung together over his head, twice
+     oath      Oathhammer (ch_oathhammer): both hammers overhead and down on his foe (the game strikes on the cast: the
+               clip starts at frame 2 and lands at frame 5)
+     due       The Mountain's Due (ch_mountaindue): both flung wide and driven into the floor at either side (frame 5)
+     hit       a blow taken (his health drops)
+     death     Wounded: down on his right knee, hung on the right hammer stood on its head, the left fallen at his side
+   He stands on a Champion's slate (chDais, fitted by unitmodels_size.js), a head taller than the clan's dwarves (the hero
+   rule's 1.2x on the dwarf rule's head). The right hammer's head is t.tipW (unitTip). Checks: `python tools/make_br.py
+   --check`. Notes: docs/model_pilot/brannoc2.md. */
+const BR2 = (() => {
+  const U = 'ch_brannoc', NAMES = ['idle', 'ready', 'strikeA', 'strikeB', 'muster', 'oath', 'due', 'hit', 'death'];
+  const ATK = ['strikeB', 'strikeA'], EASE = .2, BASE_H = .08, HIT = 8 / 30, BLOW = .3, BASE_IV = 1.2, CAST0 = 2 / 30;
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]br=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .9, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'br2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('br2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'hammer', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('br2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['grip', 'head', 'face', 'top', 'far']) if (!mk || !mk[nm]) throw new Error('br2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('br2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('br2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('br2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-1, -.02, -1]; m.max = [1, 1.6, 1.2]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('BR2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'br2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._brHp != null && t.hp < t._brHp - 1e-6 && !t.wounded) t._brHitAt = now; t._brHp = t.hp; }
+    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 40, mv: 'death' }; }
+    // his spells: the game strikes on the cast, so each clip starts two frames in
+    if (A && A.lastAt != null && now >= A.lastAt) {
+      const u = now - A.lastAt, c = A.last === 'ch_muster' ? 'muster' : A.last === 'ch_oathhammer' ? 'oath' : A.last === 'ch_mountaindue' ? 'due' : null;
+      if (c && u < CL[c].len - CAST0) return { c, s: CAST0 + u, rate: 40, mv: c + A.lastAt };
+    }
+    const hh = t._brHitAt != null ? now - t._brHitAt : 9; if (hh >= 0 && hh < CL.hit.len) return { c: 'hit', s: hh, rate: 40, mv: 'hit' + t._brHitAt };
+    // his blows: how fast he really strikes (the time between his last two) quickens them with him
+    if (t.shots && t._brShots !== t.shots) { if (t._brAt != null && now - t._brAt < 3) t._brIv = now - t._brAt; t._brAt = now - (t.shotT || 0); t._brShots = t.shots; }
+    const spd = Math.min(1.8, Math.max(1, t._brIv ? BASE_IV / t._brIv : 1));
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t.shotT == null ? 9 : t.shotT;
+    if (fight && (t.windup || 0) > 0 && s > BLOW) {
+      const nx = ATK[((t.shots | 0) + 1) % 2], cd = t.cd || 0;
+      if (cd < HIT / spd) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (the blow begun: it lands on the game's)
+    }
+    if (t.shots) { const mv = ATK[(t.shots | 0) % 2]; if (s >= 0 && s < (CL[mv].len - HIT) / spd) return { c: mv, s: HIT + s * spd, rate: 40, mv: mv + t.shots }; }
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: 8, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 4, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._brDrawn != null && typeof G !== 'undefined' && G && G.time - t._brDrawn < .3 && G.time >= t._brDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // a Champion's slate under him (chDais, his code-built body's: fitted across by the size rule) and he stands on it
+    const bm = typeof chDais === 'function' && typeof ihPal === 'function' ? dynMesh('br_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ihPal(U, () => chDais(g, tr, '#6c665c', '#4e4a44', IHP.trim, '#ffd060'))))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? (bm.max && bm.max[1] > 0 ? bm.max[1] : BASE_H * K) * sy : 0;
+    // his size: a hero's head (the hero rule) on a dwarf (the dwarf rule), growing by UM_TIER
+    const hk = typeof UM_EVEN_HEAD !== 'undefined' ? UM_EVEN_HEAD * UM_HEAD_K.hero * UM_HEAD_K.dwarf : 1.28;
+    const head = hk * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._brT == null ? 1 : Math.max(0, Math.min(.1, now - t._brT)); t._brT = now;
+      if (!t._brP || t._brP.q.length !== NB * 4) { t._brP = newPose(); t._brP.q.set(PT.q); t._brP.t.set(PT.t); }
+      if (P.mv !== t._brMv) { t._brMv = P.mv; t._brSw = now; }
+      const k = now - t._brSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 14)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._brP, PT, k); pose = t._brP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    if (live) { t.tipW = w(BI.hammer, MK.head); t.tipYaw = yaw; t.tipAt = G.time; t._brDrawn = G.time; t._brClip = P.c; t._brClipS = P.s; t._brFace = w(BI.hammer, MK.face); }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the new rig (and the Wounded pose) */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('br2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'br2Row';
+    box.innerHTML = '<h3>Brannoc rig</h3><div class="row">' + `<button data-t2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?br=old)">Old (code-built)</button><button data-t2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button>` +
+      `<button data-t2h="1" title="A blow taken: his flinch">Hit</button><button data-t2w="1" class="${S.wound ? 'on' : ''}" title="Wounded: down on his knee on the hammer">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-t2]')) x.onclick = () => { S.on = x.dataset.t2 === '1'; labRow(); };
+    for (const x of box.querySelectorAll('[data-t2h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._brHitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-t2w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  const anchors = t => mine(t) ? { head: t.tipW, face: t._brFace, clip: t._brClip, at: t._brDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_br2', () => {
+  try { load(typeof BR2_MDL !== 'undefined' ? BR2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Brannoc rig:', e.message); }
+  // (a Champion is drawn by drawForceUnit's layered path, the Grove's; another force's units by drawForceUnitPlain: both are
+  // wrapped, so he is drawn whichever way the game takes)
+  const _du0 = typeof drawForceUnit === 'function' ? drawForceUnit : null;
+  const mineNow = t => S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked;
+  if (MESH_ && typeof drawForceUnit === 'function') {
+    const _du = drawForceUnit;
+    drawForceUnit = function (t, tier, sx, sy, sz, wob, opts) {
+      if (mineNow(t)) return drawForceUnitPlain.apply(this, arguments);
+      return _du.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (mineNow(t)) {
+        try {
+          if (draw(t, tier, sx, sy, sz, wob, opts)) {
+            // (his Champion's extras still draw; the code-built cast glow at the old hammer's head is left out, it would
+            // float beside the real one)
+            const pm = typeof FX_PM !== 'undefined' ? FX_PM.main : null; if (typeof FX_PM !== 'undefined') FX_PM.main = null;
+            try { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); } finally { if (typeof FX_PM !== 'undefined') FX_PM.main = pm; }
+            return;
+          }
+        } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('br2:', e); } }
+      }
+      if (t && t.def && t.def.unit === U && typeof _du0 === 'function' && typeof isGroveUnit === 'function' && isGroveUnit(U)) return _du0.apply(this, arguments);   // (the code-built body: his own path)
+      return _plain.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
+    UM_UNITS[U] = { mdl: 'br2', k: 1 };
+    if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
+    if (typeof UM_KIND !== 'undefined' && !UM_KIND[U]) UM_KIND[U] = 'dwarf';
+    if (typeof UM_TOPK !== 'undefined' && UM_TOPK[U] == null) UM_TOPK[U] = typeof UM_HEAD_K !== 'undefined' ? UM_HEAD_K.dwarf * 1.16 : 1;   // (the top of his bald head: the dwarf rule's under the hero's)
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('br2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
   });
   return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
@@ -116073,9 +118970,9 @@ const SPELL_HELP = {
   so_dawnfall: { when: "Two or more flyers still in the air within {reach} cells, or a flying boss or leader.", aim: "Every flyer in reach that is still in the air.", tips: ["Dragged-down flyers can be struck by the ground-only units: post it beside the Templars.", "Each flyer crashes onto the road and Blinds the ground foes under it: best when a flock flies over a column.", "Save it for flying waves: it does nothing without flyers."] },
 
   // Templars of the Ford (templar)
-  so_crush: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe within {range} cells.", tips: ["Every stack of Judgement turns into a full Verdict: cast after Rebuke, Hail, Flare or Halo have marked the pack.", "Place it in the middle of a switchback so its slam reaches two stretches of road at once.", "The Templars hold nothing themselves: slam foes a Shieldbearer has dazed or a Sister has bound and each takes more."] },
-  so_hallow: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe in its reach, slam after slam.", tips: ["Place it where the road wraps round it, so ground foes stay in reach for every slam.", "Each slam lays a Judgement and the last delivers them: five or more stacks give the full Verdict.", "Pair it with Oath of Challenge or Vigil Chains: held ground foes take every slam."] },
-  so_hammerfall: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The armoured ground foe nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["It falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock Judges every ground foe round its foe: aim it at a boss walking in a crowd.", "Its Verdict is half again as strong: Judge the foe before it falls."] },
+  so_crush: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe within {range} cells.", tips: ["Every stack of Judgement turns into a full Verdict: cast after Rebuke, Hail, Flare or Halo have marked the pack.", "Place it in the middle of a switchback so both blades reach two stretches of road at once.", "The Templars hold nothing themselves: cut foes a Shieldbearer has dazed or a Sister has bound and each takes more."] },
+  so_hallow: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe in its reach, cut after cut.", tips: ["Place it where the road wraps round it, so ground foes stay in reach for every cut.", "Each cut lays a Judgement and the last delivers them: five or more stacks give the full Verdict.", "Pair it with Oath of Challenge or Vigil Chains: held ground foes take every cut."] },
+  so_hammerfall: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The armoured ground foe nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["The sword falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock Judges every ground foe round its foe: aim it at a boss walking in a crowd.", "Its Verdict is half again as strong: Judge the foe before it falls."] },
 
   // Censer Bearers (censer)
   so_sweep: { when: "Two or more ground foes within 1.5 cells.", aim: "Itself: every ground foe within 1.5 cells, and incense round it.", tips: ["Place it right beside the road at a corner, so two or more ground foes pass within 1.5 cells.", "The incense left behind keeps Judging ground foes that come after.", "Good beside the Templars: the Sweep's Judgement sets up their Slam."] },
