@@ -1,4 +1,4 @@
-const BUILD_TAG = '1815950b@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'cf4ce10d@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47162,7 +47162,7 @@ WB_HOOK.kill.push(c => {
 const sslChamp = h => (G.hero === h && G.towers.find(o => o.id === G.champ && o.def && !o.wrecked)) || null;
 const sslCaps = t => (t && t.st && t.st.caps) || {};
 
-/* ---------- a Templar of the Ford's slam: Shield Brothers (Aurelian's passive), Locked Shields (his affinity), Debt of Oaths, Swift Reprisal ----------
+/* ---------- a Templar of the Ford's slam: Shield Brothers (Aurelian's passive), Blades of the Ford (his affinity), Debt of Oaths, Swift Reprisal ----------
    (owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead": the Templars of the Ford are his own unit) */
 {
   const slam0 = soSlam;
@@ -47172,12 +47172,13 @@ const sslCaps = t => (t && t.st && t.st.caps) || {};
     // Shield Brothers: every unit beside the slamming Templar turns Radiant for 2s
     if (!(o && o.sub)) { for (const u of soUnitsNear(t.x, t.y, 1.65, t)) soRadiate(u, 2, SO.RAD_K); soEv('passive:so_lion:slam'); }
     const L = sslChamp('so_lion'); if (!L || Math.hypot(L.x - t.x, L.y - t.y) > SOC_SHIELD_R) return n;
-    // Locked Shields: each slam Wards it 1.5s; every 3rd is a shield bash on up to 4 of the walkers it struck
+    // Blades of the Ford: each cut Wards it 1.5s; every 3rd is a crossed cut, both swords at once, on up to 4 of the
+    // walkers in its reach (owner, 24 Nov 2026: the Templars carry two swords now, so no shield bash; pure damage, no hold)
     soWard(t, 1.5); soEv('aff:so_lion');
     if (!(o && o.sub) && (t.sslN = (t.sslN || 0) + 1) % 3 === 0) {
-      const R0 = st.range; let k = 0;
-      for (const c of G.creeps.slice()) { if (k >= 4) break; if (!socFoe(c) || !abWalker(c) || Math.hypot(c.x - t.x, c.y - t.y) > R0 || !canTarget(t, st, c)) continue; soBash(t, st, c, .6); if (!c.dead) soDaze(c, t); k++; }
-      if (k) { sfx('so_bash', 1); soEv('aff:so_lion:bash'); }
+      const R0 = st.range, d = (st.dmg || 0) * .6 * (pow || 1); let k = 0;
+      for (const c of G.creeps.slice()) { if (k >= 4) break; if (!socFoe(c) || !abWalker(c) || Math.hypot(c.x - t.x, c.y - t.y) > R0 || !canTarget(t, st, c)) continue; hurt(c, d, 'phys', t, true, null, null); if (!c.dead) hurt(c, d, 'phys', t, true, null, null); k++; }
+      if (k) { sfx('so_sweep', .8); soEv('aff:so_lion:cross'); }
     }
     const C = sslCaps(L);
     // (Debt of Oaths no longer counts the slams: only the Order's Verdicts near him, forces_zzzzzzzzz_caps_silver.js; the clarity pass, Nov 2026)
@@ -53655,7 +53656,7 @@ function tchUlt(id, o) {
     ['Copied Lesson', 0, 3],
     ['Study the Reaction', 1, 1],
     ['Margin Notes', 1, 2],
-    ['Charged Missiles', 1, 3, { req: [0, 3], max: 2, pro: n => `Arcane Barrage gives an Arcane Charge when it hits a foe bearing another element (${n >= 2 ? 'one a cast' : 'every other cast'}).` }],
+    ['Charged Missiles', 1, 3, { req: [0, 3], on: 'charges', max: 2, pro: n => `Arcane Barrage gives an Arcane Charge when it hits a foe bearing another element (${n >= 2 ? 'one a cast' : 'every other cast'}).` }],
     ['Cold Focus', 2, 0],
     ['Gathering Orb', 2, 1, { req: [1, 1] }],
     ['Long Recital', 2, 2, { max: 2, pro: n => `Arcane Barrage reaches ${gNf(.25 * n)} cells farther.`, sp: n => ({ ab: 'cc_barrage', reach: .25 * n }) }],
@@ -54604,7 +54605,7 @@ function tchUlt(id, o) {
     ['Blood on the Fur', 1, 3],
     ['Guard the Pass', 2, 1, { max: 2, pro: n => `Its first thrust at each new foe soaks it ${gNf(1.5 * n)}s and gathers the Storm ${n}.` }],
     ['Pack Tactics', 2, 2, { req: [1, 2], max: 2, pro: n => `Scent of Rain comes ${5 * n}% sooner${n >= 2 ? "; its wolf drags down 2 ground foes each beat" : ''}.`, sp: n => ({ ab: 'sb_packhowl', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
-    ['Grounding Spear', 3, 0, { on: 'thrusts' }],
+    ['Grounding Spear', 3, 0, { on: 'wolf' }],
     ['Thunder-Called Spear', 3, 1, { req: [2, 1] }],
     ['Hunting Cry', 3, 2, { req: [2, 2] }],
     ['Wolf and Spear', 4, 0, { req: [3, 0] }],
@@ -91054,7 +91055,7 @@ const AFF_MODS = {
   ih_king: { fav: 'earth', sig: { name: 'Kingsguard', t: 'A Steam Hammer strikes 6% faster for each Sworn rank it holds.' },   // (Steam Hammers: Haldra favours them too; the Sworn ranks are Brannoc's own)
     up: { glaive: { k: 'reach', v: .1 }, arcane: { k: 'range', v: .2 } }, dn: { storm: { k: 'rate', v: -.05 }, cannon: { k: 'range', v: -.2 } } },
   // ---- the Silver Order ----
-  so_lion: { fav: 'earth', sig: { name: 'Locked Shields', t: 'A Templar of the Ford within 2 cells of Aurelian locks shields with him: each of its cuts Wards it for 1.5 seconds, and every 3rd one is a shield bash that throws back and Judges up to 4 ground foes it strikes.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
+  so_lion: { fav: 'earth', sig: { name: 'Blades of the Ford', t: 'A Templar of the Ford within 2 cells of Aurelian fights at his side: each of its cuts steels it, so its strikes land harder for 1.5 seconds, and every 3rd one is a crossed cut that strikes up to 4 ground foes in its reach with both swords.' },   // (his own unit, open from the run's start; owner, 9 Nov 2026: "make aurelians unit the templars, will give them swords instead")
     up: { glaive: { k: 'reach', v: .1 }, arrow: { k: 'crit', v: .05 } }, dn: { frost: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
   so_dawn: { fav: 'cannon', sig: { name: 'Dawn Knell', t: 'Every 4th swing of a Censer Bearer rings out like a bell, Blinding every foe it strikes for 1.5 seconds.' },
     up: { frost: { k: 'range', v: .2 }, storm: { k: 'crit', v: .05 } }, dn: { arcane: { k: 'range', v: -.2 }, earth: { k: 'rate', v: -.05 } } },
