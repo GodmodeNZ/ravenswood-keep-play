@@ -1,4 +1,4 @@
-const BUILD_TAG = '39f3a9bf@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = '573d4716@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -20493,6 +20493,23 @@ function soFlyingHammer(t, s, K) {   // Hammerfall: the hammer spins out to the 
   const hs = SO_SCALE[Math.min(2, t.tier | 0)] || 1; M4.trs(_soM2, -SO_HAMMER_HEAD[0] * hs, -SO_HAMMER_HEAD[1] * hs, -SO_HAMMER_HEAD[2] * hs); M4.mul(_soM, _soM, _soM2.slice());   // (spun about its head)
   item(dynMesh('so_flysword' + Math.min(2, t.tier | 0), g => withPal('templar', () => FORCE_PARTS.templar[1].build(g, Math.min(2, t.tier | 0)))), _soM);
   QADD.bill(RD, px, h, pz, .35, .35, [1, .85, .5, .35], 1, 0);
+}
+// the Judgement bar (owner, 24 Nov 2026: "not seeing a seperate judgement bar on enemies?"): a gold bar under the health
+// bar (and under the armour and mana bars), one segment a stack; it flashes full and white for a moment as it bursts
+function soJBar(c, x, top, z, w, h, y) {
+  if (!soOn()) return;
+  const n = soJ(c), mx = Math.max(1, soJMax()), fl = c.soBurstAt != null ? 1 - (G.time - c.soBurstAt) / .35 : 0;
+  if (!n && !(fl > 0)) return;
+  const bh = h * .55, k = 1 / Math.cos(CAM.pitch), gap = h * .3;
+  if (y == null) y = top - (h + bh + gap) * k;
+  QO.barRect(RD, x, y, z, -w / 2 - .02, w + .04, bh + .015, [0, 0, 0, .85]);
+  const sg = .018, sw = (w - sg * (mx - 1)) / mx;
+  for (let i = 0; i < mx; i++) {
+    const x0 = -w / 2 + i * (sw + sg);
+    if (fl > 0) QO.barRect(RD, x, y, z, x0, sw, bh, [1, .97, .8, .5 + .5 * fl]);
+    else if (i < n) QO.barRect(RD, x, y, z, x0, sw, bh, n >= mx - 1 ? [1, .9, .45, 1] : [.95, .72, .22, 1]);
+    else QO.barRect(RD, x, y, z, x0, sw, bh, [.3, .24, .12, .7]);
+  }
 }
 // Judgement (a gold ring and a pip a stack over the head), blindness (a white glare) and the condemned (a turning sigil)
 function soDrawMarks() {
@@ -61693,10 +61710,10 @@ if (typeof ccReactNote === 'function') { const wn = ccReactNote; ccReactNote = (
 
 /* ---------- drawing (view.js: under the health bar, then the cast's ring) ---------- */
 function epBars(c, x, top, z, w, h) {
-  if (!epOn()) return;
   // barRect is centred on y with half-height h along the camera's up; a world-y step shows at cos(pitch) of its size on screen
   const bh = h * .55, k = 1 / Math.cos(CAM.pitch), gap = h * .3;
   let y = top - (h + bh + gap) * k;
+  if (!epOn()) return y;   // (returns the next free row under the bars, for the Silver Order's Judgement bar)
   if (c.hxShMax > 0 && c.hxSh > 0) {   // a Hunt boss's barrier (hunts.js): pale ice-blue, it takes every hit first
     QO.barRect(RD, x, y, z, -w / 2 - .02, w + .04, bh + .015, [0, 0, 0, .85]);
     QO.barRect(RD, x, y, z, -w / 2, w * clamp(c.hxSh / c.hxShMax, 0, 1), bh, EP_COL.barrier);
@@ -61715,7 +61732,9 @@ function epBars(c, x, top, z, w, h) {
   if (c.mpMax > 0) {
     QO.barRect(RD, x, y, z, -w / 2 - .02, w + .04, bh + .015, [0, 0, 0, .85]);
     QO.barRect(RD, x, y, z, -w / 2, w * clamp(c.mp / c.mpMax, 0, 1), bh, c.epDry ? EP_COL.manaDry : EP_COL.mana);
+    y -= (2 * bh + gap) * k;
   }
+  return y;
 }
 /* ---------- the timed defences, drawn as bars like the armour and ward bars (owner: "a bar that needs to go down"): ABOVE
    the health bar, one row each, its fill the defence's share left; a tag beside the health bar says the number (dfTags,
@@ -85161,7 +85180,8 @@ function drawCreeps(dt) {
       QO.barRect(RD, c.x + c.ox, top, c.y + c.oy, -w / 2 - .025, w + .05, h + .025, [0, 0, 0, .85]);
       QO.barRect(RD, c.x + c.ox, top, c.y + c.oy, -w / 2, w * f, h, f > .6 ? [.25, .85, .25, 1] : f > .3 ? [.92, .82, .2, 1] : [.9, .25, .18, 1]);
       if (c.ward > 0) { QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2 - .02, w + .04, h * .6 + .02, [0, 0, 0, .85]); QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2, w * clamp(c.ward / c.wardMax, 0, 1), h * .6, [.45, .75, 1, 1]); }   // a shield (Classic; force runs put shields into the foe's one bar): its own backed bar, so it reads going down
-      if (typeof epBars === 'function') epBars(c, c.x + c.ox, top, c.y + c.oy, w, h);   // armour, then mana, under the health bar (enemypools.js)
+      const eby = typeof epBars === 'function' ? epBars(c, c.x + c.ox, top, c.y + c.oy, w, h) : null;
+      if (typeof soJBar === 'function') soJBar(c, c.x + c.ox, top, c.y + c.oy, w, h, eby);   // the Silver Order's Judgement, the row under those (forces_silver_b.js)   // armour, then mana, under the health bar (enemypools.js)
       if (typeof dfBars === 'function') dfBars(c, c.x + c.ox, top, c.y + c.oy, w, h);   // the timed defences, above it (Mother's Wrath, Wings of Dusk, Spell Ward)
       if (c.shield > 0) { QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2 - .02, w + .04, h * .6 + .02, [0, 0, 0, .8]); QO.barRect(RD, c.x + c.ox, top + h * 1.6, c.y + c.oy, -w / 2, w * clamp(c.shield / c.shieldMax, 0, 1), h * .6, [1, .82, .4, 1]); }
     }
