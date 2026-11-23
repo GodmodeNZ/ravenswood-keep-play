@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cf4ce10d@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = '39f3a9bf@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12059,7 +12059,7 @@ const ITEM_STATS = {
   so_c_vial: 'regen|Holy Water', so_c_hourglass: 'cd|Vespers', so_c_beads: 'mana|Counting', so_c_matins: 'mana regen|Matins', so_c_tithe: 'regen|Tithe',
   so_c_sunstone: 'sp|Sunstone', so_c_wardknot: 'regen mana|Ward-Knot', so_c_echo: 'sp cd|Echo of the Bell',
   so_lionshield: 'dmg sp pen|Condemn', so_sunbolt: 'as crit pen|Sunbolt', so_firstchain: 'sp mana cd|The First Chain', so_truegrail: 'sp dmg pen|True Grail', so_opengate: 'as range pen|Open Gate',
-  so_firstlight: 'sp as range|First Light', so_lasthammer: 'dmg crit pen|Last Verdict', so_saintcenser: 'splash sp regen|Saints’ Coals', so_silvermere: 'sp mana regen|Silvermere',
+  so_firstlight: 'sp as range|First Light', so_lasthammer: 'dmg crit pen|Last Word', so_saintcenser: 'splash sp regen|Saints’ Coals', so_silvermere: 'sp mana regen|Silvermere',
   so_dawncrown: 'sp cd regen|Crown of Dawn', so_lawbook: 'sp mana cd|The Law', so_martyr: 'dmg as pen|Martyr’s Fury', so_oathblade: 'dmg crit as|Passed Judgement',
   so_s_gauntlets: 'dmg=4 pen=6|', so_s_spurs: 'as=20|', so_s_glass: 'range=0.6|', so_s_rosary: 'regen=1.2|', so_s_mail: 'mana=20|Self-Mending', so_s_chalk: 'as=8|Judgement Chalk',
   so_s_tocsin: 'sp=10 mana=20 mpen=12|', so_s_lance: 'dmg=8 pen=12|',
@@ -19164,17 +19164,16 @@ function shSlamFx(t, K, bigK) {
 /* ================= THE SILVER ORDER: knights and clerics of the river kingdoms =================
    The keep's bells rang and the Order kept its oath. A holy host in silver steel, white and blue tabards and gold trim:
    light and bells, hope rather than wrath. Its identity is JUDGEMENT and RADIANCE.
-   - JUDGEMENT (foes): light marks a foe, up to 5 stacks (6s; 10s on bosses and elites). Every stack makes the
-     Order's strikes on it 4% harder. The markers lay it: Silverbolt Crossbows (every bolt), Sunlance Clerics (beams),
-     Lightbinder Sisters (lashes), the Censers' incense.
-   - VERDICT: a cash-in. A Verdict consumes a foe's Judgement for a column of light: 30% of the striker's damage per
-     stack (magic). The Grail Knights' charges deliver one; the Templars of the Ford' slams deliver a lighter one to every foe
-     they strike that carries 2 or more stacks; abilities, talents and the Justicar deliver more.
+   - JUDGEMENT (foes), one rule: light marks a foe, up to 5 stacks (6s; 10s on bosses and elites). Every stack makes the
+     Order's strikes on it 4% harder. At full stacks it bursts on its own: a column of light, magic damage of 60% of the
+     striker's damage a stack (3x at 5), and the stacks clear (soBurst). The markers lay it: Silverbolt Crossbows (every
+     bolt), Sunlance Clerics (beams), Lightbinder Sisters (lashes), the Censers' incense. (There was a second rule, the
+     Verdict, a cash-in by the Knights and Templars; it was retired on 24 Nov 2026 for being unclear.)
    - RADIANCE (units): a radiant unit strikes 20% faster and every strike lays one more Judgement.
    - WARD (units): a warded unit hits 10% harder and bosses' silences, hexes and blindness slide off it.
    - BLIND (foes): a blinded foe stumbles (45% slower) and takes 15% more from the Order.
    Oath-Stones (the wall): silences and hexes on a unit beside one wear off twice as fast.
-   The Order is strong against bosses (Judgement piles up on a big foe, Verdicts break it) and weaker
+   The Order is strong against bosses (Judgement piles up on a big foe and bursts again and again) and weaker
    against swarms (most of its damage is single-target): it needs its area units (Templars, Censers, Sisters).
    This file: the units, the mechanics, the attacks and FORCE_HOOKS.silver. The bodies are in forces_silver_b.js, the
    abilities in _c, the talent trees in _d, the items in _e and the commanders in _f. */
@@ -19193,13 +19192,13 @@ FORCES.silver = { name: 'The Silver Order', title: 'Oathbound Host of the River 
       blurb: 'Sisters of the Order whose chains of light lash the foe furthest along: it is slowed and Judged, and every third lash binds it fast. The top tier lashes two. Air and ground.',
       tiers: [{ cost: 30, dmg: 6, rate: 1.8, range: 2.6, slow: .3, slowT: 1.5 }, { cost: 55, dmg: 14, rate: 1.7, range: 2.8, slow: .35, slowT: 1.6 }, { cost: 115, dmg: 32, rate: 1.6, range: 3, slow: .4, slowT: 1.8, chainN: 2 }] },
     arcane: { id: 'grailknight', name: 'Grail Knights', short: 'Knights', key: '4', proj: 'force', attack: 'so_lance', elem: null, dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.2, 1.25, 1.3],
-      blurb: 'Mounted knights of the Grail. They charge the strongest foe in reach with couched lances and ride back to their post; the lance knocks its foe down (stunned 0.5s, 1s if it carries Judgement), and a charge on a Judged foe delivers its Verdict. A quarter again as hard on bosses. Cannot reach flyers.',
+      blurb: 'Mounted knights of the Grail. They charge the strongest foe in reach with couched lances; the lance knocks its foe down (stunned 0.5s, 1s if it carries Judgement), and the knight wheels his horse round to strike it again for half the lance, then rides back to his post. A quarter again as hard on bosses. Cannot reach flyers.',
       tiers: [{ cost: 50, dmg: 70, rate: 2.5, range: 2.6 }, { cost: 90, dmg: 110, rate: 2.4, range: 2.8 }, { cost: 190, dmg: 262, rate: 2.3, range: 3 }] },
     storm: { id: 'sunlance', name: 'Sunlance Clerics', short: 'Clerics', key: '5', proj: 'force', attack: 'so_beam', elem: null, dmgType: 'magic', air: true, ground: true, top: [1.25, 1.3, 1.35],
       blurb: 'Clerics of the dawn who strike with beams of sunlight from their staves: twice as hard on flyers, and they reach further into the sky. Every second beam lays Judgement.',
       tiers: [{ cost: 30, dmg: 8, rate: .85, range: 2.6, airR: .8, vsAir: 2 }, { cost: 55, dmg: 20, rate: .8, range: 2.8, airR: .9, vsAir: 2 }, { cost: 115, dmg: 46, rate: .75, range: 3.1, airR: 1, vsAir: 2 }] },
     earth: { id: 'templar', name: 'Templars of the Ford', short: 'Templars', key: '6', proj: 'force', attack: 'so_slam', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
-      blurb: 'Aurelian\'s own Templars, in heavy plate with a sword in each hand: the right blade, the left, then both together in a Twin Cut, each cut striking every ground foe around them, and a foe carrying Judgement hears a lighter Verdict. Cuts that land build Blade Momentum, which quickens the next. Cannot reach flyers.',
+      blurb: 'Aurelian\'s own Templars, in heavy plate with a sword in each hand: the right blade, the left, then both together in a Twin Cut, each cut striking every ground foe around them, and a foe the last cut also struck is caught between the blades and cut half again as hard. Cuts that land build Blade Momentum, which quickens the next. Cannot reach flyers.',
       tiers: [{ cost: 40, dmg: 20, rate: 1.5, range: 1.5 }, { cost: 75, dmg: 48, rate: 1.45, range: 1.55 }, { cost: 160, dmg: 115, rate: 1.4, range: 1.65 }] },
     cannon: { id: 'censer', name: 'Censer Bearers', short: 'Censers', key: '7', proj: 'force', attack: 'so_censer', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.15, 1.2, 1.25],
       blurb: 'Monks who swing great censers and lob burning incense: it bursts in holy fire over everything nearby and smoulders on the road, Judging every foe that walks through the smoke. Cannot hit flyers.',
@@ -19212,7 +19211,10 @@ FORCES.silver = { name: 'The Silver Order', title: 'Oathbound Host of the River 
 /* ---------- tuning ---------- */
 const SO = {
   J_MAX: 5, J_T: 6, J_TBIG: 10, J_AMP: .04,   // Judgement: stacks, how long (big foes longer), the Order's extra damage a stack
-  V_K: .3,                                     // a Verdict: this × the striker's damage, per stack consumed
+  B_K: .6, B_LOCK: .2, B_FRAME: 40, B_HP: .03, // the burst at full Judgement: this × the striker's damage per stack (3× at 5);
+                                               // a foe can't burst again for B_LOCK s; at most B_FRAME bursts a frame; B_HP: a
+                                               // hero spell's burst, this share of the foe's health a stack (bosses 40%)
+  WHEEL: .5, CROSS: 1.5,                       // the Grail Knights' wheel-round blow (× the lance); the Templars' crossing cut
   RAD_K: .2, WARD_K: .1, BLIND_SLOW: .45, BLIND_AMP: .15,
   TOLL_EVERY: 10, TOLL_WARD: 3,
   COL: { gold: '#ffd77a', light: '#fff4cc', silver: '#dfe6f0', blue: '#7ab0ff', ward: '#bfe0ff', blind: '#fffbe8' },
@@ -19227,41 +19229,80 @@ const soEv = k => { if (typeof SO_EVF === 'object' && SO_EVF) SO_EVF[k] = (SO_EV
 const soTalent = (slot, cap) => (typeof talentHas === 'function' && soOn() ? talentHas(slot, cap) : 0);
 
 /* =====================================================================================================
-   JUDGEMENT and VERDICT
+   JUDGEMENT and its BURST (one rule, 24 Nov 2026; owner: "its not clear how judgement and verdict work as mechanics")
+   Judgement fills up on a foe; at full stacks it bursts on its own: a column of light, magic damage from the unit that
+   laid the last stack, and the stacks clear. There is no separate cash-in any more (the old Verdict): the Knights and
+   Templars that delivered one have their own effects now (the wheel-round blow, crossing blades).
+   The numbers (SO.B_K): a burst is 0.6 x the stacks x the striker's damage, so 3x at 5 stacks (3.6x at 6 with the Justicar).
+   Before, a Verdict was 0.3 x stacks x the striker (1.5x at 5) and fired whenever a Knight charged or a Templar cut a foe
+   with 2+ stacks, so most stacks were spent by the Knights (262 a strike at tier III) and Templars (115, every foe in
+   reach). The burst now spends every stack the markers lay, but its striker is usually a marker (Crossbows 54, Clerics 46,
+   Censers 72, Sisters 32), it waits for full stacks (a foe that dies on 4 pays nothing), and Knights and Templars got
+   their lost damage back in their own strikes. Doubling the per-stack rate keeps a marker-laid burst near what the same
+   stacks paid when a Knight cashed them (5 x 54 x 0.6 = 162 against ~200-390 from a Knight, but with no Knight needed and
+   on every foe), so the Order's damage stays about level; the 4%-a-stack amp is unchanged.
    ===================================================================================================== */
 // the most stacks a foe can carry (the Grey Justicar and a few talents and relics raise it)
 function soJMax() { return SO.J_MAX + (G.hero === 'so_judge' ? 1 : 0) + (soTalent('arrow', 'so_deep_mark') ? 1 : 0); }
 const soJDur = c => (soBig(c) ? SO.J_TBIG : SO.J_T) + (G.hero === 'so_judge' ? 3 : 0);
 const soJ = c => (c && !c.dead && c.soJT > G.time ? c.soJ | 0 : 0);
-// lay n stacks of Judgement on a foe (src: the unit or HERO_SRC). Returns how many took.
+// at full Judgement, or burst this very frame (the stacks have just cleared): what "full" talents and items read
+const soFull = c => !!c && (soJ(c) >= soJMax() || c.soBurstAt === G.time);
+// lay n stacks of Judgement on a foe (src: the unit or HERO_SRC). Returns how many took. At full stacks it bursts (soBurst).
 function soJudge(c, n, src) {
   if (!c || c.dead || !(n > 0) || c.phased) return 0;
   const was = soJ(c), mx = soJMax(), now = Math.min(mx, was + n);
   c.soJ = now; c.soJT = G.time + soJDur(c); c.soJBy = src || c.soJBy;
-  if (now > was) { c.soJAt = G.time; if (now === mx && was < mx) { part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .35, life: .25, max: .25, size: .55, col: SO.COL.gold }); } if (src && src.charm && typeof soItemsJudge === 'function') soItemsJudge(c, now - was, src); }
+  if (src && src.def) c.soJU = src;   // the last unit that laid a stack: the burst's striker
+  if (now > was) { c.soJAt = G.time; if (src && src.charm && typeof soItemsJudge === 'function') soItemsJudge(c, now - was, src); }
   if (was + n > mx && typeof soLawSpill === 'function') soLawSpill(c, was + n - mx, src);   // the Book of the Law: Judgement past full spills on
+  if (now >= mx && !c.dead) soBurst(c, src);
   return now - was;
 }
-let SO_VKILL = null;   // the foe a Verdict is striking right now (its saga counts a kill it makes)
-// a Verdict: the foe's Judgement is consumed for a column of light. k: its strength. o: { min (stacks needed), keep (stacks left), quiet }
-function soVerdict(c, src, k, o) {
+let SO_VKILL = null;   // the foe a burst is striking right now (its saga counts a kill it makes)
+let SO_BURST_F = -1, SO_BURST_N = 0;
+// the burst: the foe's full Judgement falls as a column of light. o: { k (strength), D (the striker's damage, overriding),
+// keep (stacks left), force (a spell that fills it: ignores the short lock), quiet }
+// No loops: a foe that just burst is locked for SO.B_LOCK (its stacks stay full, the next stack laid after that bursts),
+// so a hook that lays Judgement on the same foe can't set it off again; and at most SO.B_FRAME bursts fall in one frame.
+function soBurst(c, src, o) {
   o = o || {};
-  const n = soJ(c); if (!n || n < (o.min || 1) || c.dead || !src) return 0;
-  const st = src.st || (src.def ? effStats(src) : null), D = o.D != null ? o.D : soD(st);
-  let m = SO.V_K * n * (k || 1);
-  if (c.soCondT > G.time) m *= 1.5;   // Condemned (the Crossbows' Mark of Witness)
-  if (st && st.caps) { if (st.caps.so_verdict_k) m *= 1 + .15 * st.caps.so_verdict_k; }
-  if (st && st.pw && st.pw.so_verdict) { m *= 1 + st.pw.so_verdict; soEv('item:so_scales'); }   // relics that strengthen Verdicts
-  if (src.id === G.champ && G.hero === 'so_judge') m *= 1.25;   // the Justicar's Champion
+  const n = soJ(c); if (!n || c.dead || c.phased) return 0;
+  if (!o.force && c.soBurstT > G.time) return 0;
+  if (SO_BURST_F !== G.time) { SO_BURST_F = G.time; SO_BURST_N = 0; }
+  if (++SO_BURST_N > SO.B_FRAME) return 0;
+  const u = src && src.def ? src : o.D != null ? null : (c.soJU && c.soJU.def && G.towers.includes(c.soJU) && !c.soJU.wrecked ? c.soJU : null);
+  const by = u || src || HERO_SRC, st = u ? (u.st || effStats(u)) : null;
+  const D = o.D != null ? o.D : u ? soD(st) : (c.maxHp || 0) * SO.B_HP * (c.def.boss ? .4 : 1) / SO.B_K;   // (a hero's spell: a share of the foe's health)
+  let m = SO.B_K * n * (o.k || 1);
+  if (c.soCondT > G.time) m *= 1.5;   // Condemned (the Crossbows' Bear Witness)
+  if (st && st.caps && st.caps.so_verdict_k) m *= 1 + .15 * st.caps.so_verdict_k;
+  if (st && st.pw && st.pw.so_verdict) { m *= 1 + st.pw.so_verdict; soEv('item:so_scales'); }   // relics that strengthen the burst
+  if (u && u.id === G.champ && G.hero === 'so_judge') m *= 1.25;   // the Justicar's Champion (Writ)
   const x = c.x, z = c.y, h = hitH(c);
   if (st && st.pw && st.pw.so_grail) soEv('item:so_truegrail');
-  c.soJ = o.keep || (st && st.pw && st.pw.so_grail ? n : 0); if (!c.soJ) c.soJT = 0;   // (the True Grail: never spent)
+  c.soJ = Math.min(n, o.keep != null ? o.keep : st && st.pw && st.pw.so_grail ? 2 : 0); if (!c.soJ) c.soJT = 0;   // (the True Grail: 2 stacks stay)
+  c.soBurstT = G.time + SO.B_LOCK; c.soBurstAt = G.time;
   const amt = D * m;
-  soEv('verdict'); if (!(src.def)) soEv('verdict:hero');
-  if (amt > 0) { const pv = SO_VKILL; SO_VKILL = c; c.soVK = 1; try { hurt(c, amt, 'magic', src, false, null, null); } finally { SO_VKILL = pv; } if (!c.dead) c.soVK = 0; }
-  if (!o.quiet) soVerdictFx(x, z, h, n, src);
-  soAfterVerdict(c, src, n, x, z, st);
+  soEv('burst'); soEv('verdict'); if (!u) soEv('verdict:hero');
+  if (amt > 0) { const pv = SO_VKILL; SO_VKILL = c; c.soVK = 1; try { hurt(c, amt, 'magic', by, false, null, null); } finally { SO_VKILL = pv; } if (!c.dead) c.soVK = 0; }
+  if (!o.quiet) soVerdictFx(x, z, h, n, by);
+  soAfterVerdict(c, by, n, x, z, st);
   return n;
+}
+// fill a foe's Judgement to the full at once, so it bursts (a few spells: the Justicar's Sentence and the Gavel, the
+// Censer of the Saints, Bear Witness's close). o as soBurst; k its strength.
+function soFill(c, src, o) {
+  if (!c || c.dead || c.phased) return 0;
+  c.soJ = Math.max(soJ(c), soJMax()); c.soJT = Math.max(c.soJT || 0, G.time + soJDur(c)); c.soJBy = src || c.soJBy; if (src && src.def) c.soJU = src;
+  return soBurst(c, src, Object.assign({ force: 1 }, o));
+}
+// (the Verdict is retired as a mechanic: an old caller left over lays Judgement instead, 2 stacks a unit of strength,
+// which feeds the burst; it returns the stacks laid)
+function soVerdict(c, src, k, o) {
+  o = o || {};
+  if (!c || c.dead || !src || soJ(c) < (o.min || 0)) return 0;
+  return soJudge(c, Math.max(1, Math.round(2 * (k || 1))), src);
 }
 function soVerdictFx(x, z, h, n, src) {
   G.beams.push({ k: 'smite', a: [x, 3.6 + .25 * n, z], b: [x, 0, z], life: .4, max: .4, lv: Math.min(2, n >> 1) });
@@ -19271,12 +19312,12 @@ function soVerdictFx(x, z, h, n, src) {
   if (n >= 4) G.shake = Math.max(G.shake, .07);
   sfx('ward', 0);
 }
-// what a Verdict sets off (talents, relics, Aurelian's passive): called after the column falls
+// what a burst sets off (talents, relics): called after the column falls (the name is kept from the Verdict)
 function soAfterVerdict(c, src, n, x, z, st) {
   const C = (st && st.caps) || {};
   if (n >= 3 && (C.so_verdict_rad || (st && st.pw && st.pw.so_radVerdict))) soRadiate(src, 3, SO.RAD_K);   // talents / relics: the striker shines
-  if (C.so_chain_verdict && n >= 3 && (G.soVcN = (G.soVcN || 0) + 1) < 8) {   // Echoing Verdict: the light leaps on
-    G.delayed.push({ t: .12, fn: () => { G.soVcN = 0; if (G.state !== 'play') return; const o = nearest(x, z, 1.6, 1, c, q => soJ(q) > 0)[0]; if (o) { soEv('cap:so_chain_verdict'); rfx({ k: 'streak', x0: x, h0: 1.2, z0: z, c: o, col: SO.COL.gold, w: .05, life: .3 }); soVerdict(o, src, .6); } } });
+  if (C.so_chain_verdict && n >= 3 && (G.soVcN = (G.soVcN || 0) + 1) < 8) {   // (an old talent: the light leaps on as a Judgement)
+    G.delayed.push({ t: .12, fn: () => { G.soVcN = 0; if (G.state !== 'play') return; const o = nearest(x, z, 1.6, 1, c, q => soJ(q) > 0)[0]; if (o) { soEv('cap:so_chain_verdict'); rfx({ k: 'streak', x0: x, h0: 1.2, z0: z, c: o, col: SO.COL.gold, w: .05, life: .3 }); soJudge(o, 1, src); } } });
   }
   if (C.so_final && c.dead) { soEv('cap:so_final'); inSplash(x, z, 1, true, o => { if (!o.phased && !o.ent) soJudge(o, 3, src); }); fxRing(x, z, 1, SO.COL.light); }   // Final Judgement
   if (typeof soItemsVerdict === 'function') soItemsVerdict(c, src, n, x, z, st);
@@ -19354,7 +19395,7 @@ FORCE_ATTACK.so_shield = (t, st, tg, pow, echo) => {
   // the bash dazes its foe (longer if it carries Judgement) and Judges it
   if (bash && !tg.dead) { soBash(t, st, tg, 1); soDaze(tg, t); }
   if (C.so_steel_verdict && n % 4 === 0 && !tg.dead && soVerdict(tg, t, 1.5)) soEv('cap:so_steel_verdict');   // Verdict of Steel
-  if (bash) { t.soBashAt = G.time; sfx('block', 0); } else sfx('glaiveHit', 0);
+  if (bash) { t.soBashAt = G.time; sfx('osStrike', 1); } else sfx('osStrike', 0);   // (the owner's Basic attack mix, audio.js S.osStrike; the bash a touch louder)
   fxSpark(tg.x, tg.y, hitH(tg), bash ? SO.COL.silver : '#f0ecd8', bash ? 8 : 4); t.recoil = 1;
 };
 const soDir = (t, c) => { const dx = c.x - t.x, dz = c.y - t.y, L = Math.hypot(dx, dz) || 1; return [dx / L, dz / L]; };
@@ -19413,7 +19454,7 @@ FORCE_ATTACK.so_chain = (t, st, tg, pow, echo) => {
     if (bind) { soBindFoe(t, st, c, .35 + .1 * (C.so_bind_long || 0)); if (C.so_blind_bind) { soBlind(c, .75 * Math.min(2, C.so_blind_bind), t); soEv('cap:so_blind_bind'); } fxRing(c.x, c.y, .45, SO.COL.light); }
     soChainFx(from ? from.x : hx, from ? hitH(from) : hh, from ? from.y : hz, c, bind);
     from = c;
-    if (C.so_j_chain && !echo && soJ(c) >= soJMax()) {   // Chain of Judgement: the full mark leaps on
+    if (C.so_j_chain && !echo && soFull(c)) {   // Chain of Judgement: the full mark leaps on
       for (const o of nearest(c.x, c.y, 1.6, 3, c, q => !hit.includes(q) && canTarget(t, st, q))) { soEv('cap:so_j_chain'); soStrike(t, st, o, st.dmg * pow * .6, 'magic'); if (!o.dead) { chill(o, { slow: st.slow || .3, slowT: st.slowT || 1.5 }, null, t); soJudge(o, 1, t); } soChainFx(c.x, hitH(c), c.y, o, false); }
       soVerdict(c, t, 5);   /* (and the full mark hears a fivefold Verdict, 21 Nov 2026) */
     }
@@ -19431,9 +19472,9 @@ function soChainFx(x0, h0, z0, c, big) {
   soStreak(x0, h0, z0, c, big ? SO.COL.light : '#ffe8a8', big ? .06 : .04, .3);
   const L = 6; for (let k = 1; k < L; k++) { const u = k / L; part({ k: 'spark', x: x0 + (c.x - x0) * u, z: z0 + (c.y - z0) * u, h: h0 + (hitH(c) - h0) * u + Math.sin(u * Math.PI) * .15, vx: 0, vz: 0, vh: .2, g: 0, life: .25, max: .25, size: .06, col: k % 2 ? SO.COL.gold : SO.COL.light }); }
 }
-// ---- Grail Knights: a charge out to the strongest foe and back; a Judged foe hears its Verdict ----
+// ---- Grail Knights: a charge out to the strongest foe, a wheel round for a second blow, and back ----
 FORCE_ATTACK.so_lance = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, { down: t.def.unit === 'grailknight' || t.def.unit === 'ch_morrow' });   // (Morrow leads the Knights' charge with his own lance)
-// o: { vk (Verdict strength), stun, far (reach beyond its range), again (a follow-up charge), T }
+// o: { wheel (the wheel-round blow, x the lance; SO.WHEEL), stun, far (reach beyond its range), again (a follow-up charge), T }
 function soCharge(t, st, tg, pow, o) {
   if (typeof rideBlocked === 'function' && rideBlocked(t, tg.x, tg.y)) return;   // a unit or wall in the way: no charge (forces_zzzzzzzzzzzzzzzzzzz_lanes.js)
   const C = st.caps, dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, reach = Math.max(0, L - .45);
@@ -19455,11 +19496,14 @@ function soCharge(t, st, tg, pow, o) {
     if (!tg.dead) {
       soStrike(t, st, tg, amt, 'phys', [ux * .3, uz * .3]);
       fxSpark(tg.x, tg.y, hitH(tg), '#f8f0d0', 12); fxDust(tg.x, tg.y, 4); sfx(o.hit || 'glaiveHit', 1);
-      // the lance knocks its foe down: twice as long on a Judged foe (read before its Verdict spends the Judgement)
+      // the lance knocks its foe down: twice as long on a Judged foe
       const down = o.down ? SO_KNOCK[soJ(tg) > 0 ? 1 : 0] : 0;
-      if (!tg.dead) soVerdict(tg, t, (o.vk || 1) * (st.pw && st.pw.so_grailcup && t.soGcLast !== tg ? st.pw.so_grailcup : 1));   // (the Little Grail: the first charge at each new foe)
+      // then the knight wheels his horse round and strikes it again before riding back (it replaced the Verdict, 24 Nov 2026)
+      const wk = (o.wheel != null ? o.wheel : SO.WHEEL) * (st.pw && st.pw.so_grailcup && t.soGcLast !== tg ? st.pw.so_grailcup : 1);   // (the Little Grail: the first charge at each new foe)
       if (st.pw && st.pw.so_grailcup && t.soGcLast !== tg) soEv('item:so_grailcup');
       t.soGcLast = tg;
+      if (st.pw && st.pw.so_grail && !tg.dead) soJudge(tg, 2, t);   // the True Grail: its charges lay 2 Judgement (and a burst it sets off keeps 2: soBurst)
+      if (wk > 0) G.delayed.push({ t: .2, fn: () => { if (G.state !== 'play' || tg.dead || !soAlive(t)) return; soStrike(t, t.st || st, tg, amt * wk, 'phys'); fxSpark(tg.x, tg.y, hitH(tg) * .7, '#f8f0d0', 6); fxDust(tg.x, tg.y, 3); soEv('wheel'); } });
       if (!tg.dead && o.stun) stun(tg, o.stun, .4, null);
       if (!tg.dead && down) stun(tg, down, false, null);
       // Unhorse: the walkers beside it go down too
@@ -19477,7 +19521,7 @@ function soCharge(t, st, tg, pow, o) {
   } });
   fxDust(t.x, t.y, 5); t.recoil = 1;
 }
-// ---- Sunlance Clerics: a beam of sunlight; every second beam lays Judgement (every beam on a flyer, with Sky Verdict) ----
+// ---- Sunlance Clerics: a beam of sunlight; every second beam lays Judgement (every beam on a flyer, with an old talent) ----
 FORCE_ATTACK.so_beam = (t, st, tg, pow, echo) => {
   const C = st.caps, sh = towerTop(t) + .3, n = t.soBeamN = (t.soBeamN || 0) + 1;
   soBeamAt(t, st, tg, st.dmg * pow, sh, true);
@@ -19500,7 +19544,8 @@ function soBeamAt(t, st, c, amt, sh, main) {
 }
 // ---- Templars of the Ford: two swords (owner, 22 Nov 2026: "change the templars abilities and talents to better reflect a dual
 // wield sword unit"). The right blade, the left, then both together (the Twin Cut), in turn; each cut strikes every ground foe
-// in reach, and a foe carrying Judgement (2+ stacks) hears a lighter Verdict. A cut that lands builds Blade Momentum (TP_MOM:
+// in reach, and a foe the last cut also struck is caught between the blades: this cut lands SO.CROSS as hard (it replaced the
+// lighter Verdict on Judged foes, 24 Nov 2026: a foe held in reach pays). A cut that lands builds Blade Momentum (TP_MOM:
 // each stack quickens his next cuts), which fades when he stops cutting. t.tpCut (0 right, 1 left, 2 both, 3 Cross-Cut) and
 // t.soSlamAt tell the model which cut to play. He holds no foe (forces_zzzzzzzzzzzzzzzzzzzz_holds.js) and slows none. ----
 const TP_MOM = { max: 4, k: .05, fade: 2, side: .8, twin: 1.4 };
@@ -19556,15 +19601,19 @@ function soSlam(t, st, pow, mult, o) {
   let k = pow * mult * (great ? p.so_anvil : 1);
   if (great) { o = Object.assign({}, o, { big: true }); relicGlint(t, 'so_anvil', true); soEv('item:so_anvil'); }
   if (C.so_crowd) k *= 1 + Math.min(.4, .08 * Math.max(0, cut.length - 1));   // Into the Press
-  const vMin = o.vMin || (C.so_anvil_t ? 1 : 2), vK = (o.vk || .6) * (1 + .2 * (C.so_hammer_judge || 0));
+  const prev = !o.sub && t.tpHit && t.tpHitT > G.time - 3 ? t.tpHit : null, hitNow = new Set();   // crossing blades: the foes the last cut struck
   for (const [c, d] of cut) {
-    const amt = st.dmg * k * (1 - .25 * d / (R0 || 1));
+    const cross = !!(prev && prev.has(c));
+    const amt = st.dmg * k * (1 - .25 * d / (R0 || 1)) * (cross ? SO.CROSS : 1);
     soStrike(t, st, c, amt, 'phys', [(c.x - t.x) / (d || 1) * .1, (c.y - t.y) / (d || 1) * .1]);
+    if (cross) { fxSpark(c.x, c.y, hitH(c), SO.COL.gold, 3); soEv('cross'); }
+    hitNow.add(c);
     if (c.dead) continue;
-    if (C.so_sunder >= 2 || (C.so_sunder && (t.shots | 0) % 2 === 0)) soJudge(c, 1, t);   // Marking Edge (once Sundering Blow; every other cut at rank 1): the cut marks before it judges
-    if (p.so_lasthammer) { soJudge(c, 2, t); soEv('item:so_lasthammer'); }   // the Hammer of the Last Verdict
-    if (soJ(c) >= vMin) soVerdict(c, t, vK);
+    if (C.so_sunder >= 2 || (C.so_sunder && (t.shots | 0) % 2 === 0)) soJudge(c, 1, t);   // Marking Edge (once Sundering Blow; every other cut at rank 1)
+    if (p.so_lasthammer) { soJudge(c, 2, t); soEv('item:so_lasthammer'); }   // the Seal of the Last Word
+    if (o.judge) soJudge(c, o.judge, t);   // (Cross-Cut)
   }
+  if (!o.sub) { t.tpHit = hitNow; t.tpHitT = G.time; }
   if (C.so_shockwave) {   // Shockwave: a ring a cell past the reach
     inSplash(t.x, t.y, R0 + 1, true, (c, d) => { if (d <= R0 || c.phased || c.ent || !canTarget(t, st, c)) return; soStrike(t, st, c, st.dmg * k * .5, 'phys'); if (!c.dead) soJudge(c, 1, t); });
     fxRing(t.x, t.y, R0 + 1, SO.COL.silver); soEv('cap:so_shockwave');
@@ -19630,10 +19679,10 @@ function soIncenseTick(z, dt) {
     if (z.slow) chill(c, { slow: z.slow, slowT: .6 }, null, t);
   }));
   if (C.so_sanctum && !z.hallow) for (const o of soUnitsNear(z.x, z.z, z.r + 1)) { soRadiate(o, .7, SO.RAD_K); soEv('cap:so_sanctum'); }   // Censing of the Faithful
-  // the Censer of the Saints: as its smoke burns out, a Verdict falls on every Judged foe still standing in it
+  // the Censer of the Saints: as its smoke burns out, every Judged foe still standing in it is filled to full and bursts
   if (z.sentence && !z.said && z.t <= .55 && soAlive(t)) {
     z.said = 1; let n = 0;
-    for (const c of G.creeps.slice()) if (!c.dead && !c.phased && !c.ent && soJ(c) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r + .1 && canTarget(t, st, c)) { if (soVerdict(c, t, z.sentence)) n++; }
+    for (const c of G.creeps.slice()) if (!c.dead && !c.phased && !c.ent && soJ(c) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r + .1 && canTarget(t, st, c)) { if (soFill(c, t, { k: z.sentence })) n++; }
     if (n) { fxRing(z.x, z.z, z.r, SO.COL.gold); relicGlint(t, 'so_saintcenser', true); soEv('item:so_saintcenser'); }
   }
   return true;
@@ -19676,7 +19725,7 @@ FORCE_HOOKS.silver = {
     const C = st.caps || {};
     soOnHit(tg, st, src, amt);
     if (tg.dead) return;
-    if (C.so_writ && soJ(tg) >= soJMax() && soVerdict(tg, src, 1)) soEv('cap:so_writ');   // Writ of Execution
+    if (C.so_writ && soFull(tg) && soVerdict(tg, src, 1)) soEv('cap:so_writ');   // Writ of Execution
     if (tg.dead) return;
     soJudge(tg, 1 + (p.soHeavy ? 2 : 0) + (C.so_heavy_bolt && p.soHq ? 1 : 0), src);
     if (C.so_heavy_bolt && p.soHq && !tg.dead) woundFoe(tg);   // Heavy Quarrel: serrated, it Wounds
@@ -20471,9 +20520,9 @@ function soDrawMarks() {
    Shieldbearers: Bulwark Bash (throw a foe back), Aegis of Dawn (ward the line), Rebuke (burst of light, Judgement).
    Crossbows: Consecrated Bolt (3 Judgement, no armour), Hail of Silver (a fan), Mark of Witness (Condemn a big foe).
    Sisters: Binding Light (bind up to 5), Blinding Flare (blind a crowd), Dawn Shackles (a ring that binds walkers).
-   Knights: Grail Charge (rear, charge far, double Verdict), Ride Them Down (a line), Banner of the Vow (Radiance).
+   Knights: Grail Charge (rear, charge far, a full wheel-round blow), Ride Them Down (a line), Banner of the Vow (Radiance).
    Clerics: Sunlance (a piercing line), Sun Halo (sunfire on a crowd), Dawnfall (drag every flyer down, blinded).
-   Templars: Cross-Cut (once Sanctified Slam: full Verdicts all round), Hallowed Ground (a sigil that Judges), Sword of Heaven (a sword thrown into the sky; the id so_hammerfall is kept for saves).
+   Templars: Cross-Cut (once Sanctified Slam: 2 Judgement all round), Hallowed Ground (a sigil that Judges), Sword of Heaven (a sword thrown into the sky; the id so_hammerfall is kept for saves).
    Censers: Thurible Sweep (a circle and incense), Holy Smoke (a great slowing cloud), Rain of Embers (coals).
    Bell: Toll of Valor (haste and wards), Peal of Mercy (mana, mending, cleanse), Knell of Judgement (Judge and daze).
    Every unit's second and third spells are reshaped in place by forces_zzz_silver_cool.js (the signature spells: Rampart of
@@ -20498,7 +20547,7 @@ const SO_KITS = {
           if (c.dead) return; const [ux, uz] = abDir(t, c);
           soAbHit(t, s, c, 2.5, 'phys', [ux * .2, uz * .2]); if (c.dead) return; soJudge(c, 1, t);
           if (kbWeight(c) > 0) { const x0 = c.x, z0 = c.y; shove(c, byT(ab.by.kb, t)); dragFx(c, x0, z0, SO.COL.silver); } else stun(c, .5, .6, null);
-          fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 12); fxRing(c.x, c.y, .5, SO.COL.blue); sfx('so_bash');
+          fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 12); fxRing(c.x, c.y, .5, SO.COL.blue); sfx('osBash');   // (the owner's Bulwark Bash mix, audio.js S.osBash)
         });
       } },
     { id: 'so_aegis', name: 'Aegis of Dawn', short: 'Aegis', glyph: 'halo', hue: '#bfe0ff', mana: 90, cd: 16, r: 1.6, research: { cost: 60, time: 20 },
@@ -20553,7 +20602,7 @@ const SO_KITS = {
     { id: 'so_witness', name: 'Mark of Witness', short: 'Witness', glyph: 'eye', hue: '#c8d0e8', mana: 65, cd: 14, rAdd: 1, research: { cost: 90, time: 30 },
       by: { dur: [8, 8, 9, 9, 10, 10] }, none: 'no foe to condemn in reach',
       auto: 'a boss or elite within reach + 1 that is not yet condemned (a tap: the toughest foe)',
-      text: (t, st, ab) => `Points out a foe before the whole Order: it is Condemned for ${byT(ab.by.dur, t)}s. Its Judgement doesn't fade, it gains another every second, and Verdicts on it strike half again as hard.`,
+      text: (t, st, ab) => `Points out a foe before the whole Order: it is Condemned for ${byT(ab.by.dur, t)}s. Its Judgement doesn't fade, it gains another every second, and when it bursts the light strikes half again as hard.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => !(c.soCondT > G.time)); return man ? abToughest(L) : abToughest(L.filter(abBig)); },
       cast(t, st, c, ab) {
         c.soCondT = G.time + byT(ab.by.dur, t); c.soCondBy = t; t.soWitness = c; soJudge(c, 1, t);
@@ -20618,11 +20667,11 @@ const SO_KITS = {
     { id: 'so_grail', name: 'Grail Charge', short: 'Charge', glyph: 'target', hue: '#ffe08a', mana: 90, cd: 10, rAdd: 1.5, busy: 1.1, research: null,
       by: { stun: [.4, .45, .5, .55, .6, .7] },
       auto: 'the toughest ground foe within reach + 1.5 cells (bosses and elites first)',
-      text: (t, st, ab) => `The horse rears and the knight charges far out: ${xD(st, 3)} (a quarter again on bosses), a Verdict at double strength, and a ${byT(ab.by.stun, t)}s stun (bosses 40%).`,
+      text: (t, st, ab) => `The horse rears and the knight charges far out: ${xD(st, 3)} (a quarter again on bosses), then he wheels round for a second blow of ${xD(st, 1.8)}, and a ${byT(ab.by.stun, t)}s stun (bosses 40%).`,
       pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
       cast(t, st, c, ab) {
         t.cd = Math.max(t.cd, 1.1);
-        soLater(t, .26, s => { if (c.dead) return; t.ang = Math.atan2(c.x - t.x, c.y - t.y); soCharge(t, s, c, 3, { vk: 2, stun: byT(ab.by.stun, t), hit: 'so_grail' }); G.shake = Math.max(G.shake, .06); const [ux, uz] = abDir(t, c), L = Math.max(0, abDist(t, c) - .45); for (let k = 1; k <= 4; k++) G.delayed.push({ t: .26 * k / 4, fn: () => fxDust(t.x + ux * L * k / 4, t.y + uz * L * k / 4, 2) }); });
+        soLater(t, .26, s => { if (c.dead) return; t.ang = Math.atan2(c.x - t.x, c.y - t.y); soCharge(t, s, c, 3, { wheel: .6, stun: byT(ab.by.stun, t), hit: 'so_grail' }); G.shake = Math.max(G.shake, .06); const [ux, uz] = abDir(t, c), L = Math.max(0, abDist(t, c) - .45); for (let k = 1; k <= 4; k++) G.delayed.push({ t: .26 * k / 4, fn: () => fxDust(t.x + ux * L * k / 4, t.y + uz * L * k / 4, 2) }); });
         sfx('so_grail', 0);
       } },
     { id: 'so_ridedown', name: 'Ride Them Down', short: 'Ride', glyph: 'tremor', hue: '#e8d8b0', mana: 75, cd: 12, rAdd: .5, research: { cost: 110, time: 20 },
@@ -20716,9 +20765,9 @@ const SO_KITS = {
   templar: { slot: 'earth', mana: { max: 100, regen: .85, hit: 1.2 }, abilities: [
     { id: 'so_crush', name: 'Cross-Cut', short: 'Cross', glyph: 'glaive2', hue: '#e8ecf4', mana: 100, cd: 12, busy: .8, research: null,
       auto: 'two or more ground foes in reach, or a boss in reach',
-      text: (t, st, ab) => `Both swords are crossed high, then drawn apart: every ground foe in reach takes ${xD(st, 2.5)}, and any Judgement on it is delivered as a full Verdict.`,
+      text: (t, st, ab) => `Both swords are crossed high, then drawn apart: every ground foe in reach takes ${xD(st, 2.5)} and 2 Judgement.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(c => c.def.boss || c.def.lead)) ? t : null; },
-      cast(t, st, _, ab) { t.cd = Math.max(t.cd, .8); soLater(t, .58, s => soSlam(t, s, 2.5, 1, { vk: 1, vMin: 1, big: true, sub: 1, cut: 3 })); } },
+      cast(t, st, _, ab) { t.cd = Math.max(t.cd, .8); soLater(t, .58, s => soSlam(t, s, 2.5, 1, { judge: 2, big: true, sub: 1, cut: 3 })); } },
     { id: 'so_hallow', name: 'Hallowed Ground', short: 'Hallow', glyph: 'rune', hue: '#ffe8a0', mana: 90, cd: 15, research: { cost: 80, time: 20 },
       by: { dur: [5, 5, 6, 6, 7, 7] },
       auto: 'two or more ground foes in reach, or a boss',
@@ -20733,11 +20782,11 @@ const SO_KITS = {
     { id: 'so_hammerfall', name: 'Sword of Heaven', short: 'Heaven', glyph: 'bounce', hue: '#c8d0e0', mana: 75, cd: 10, rAdd: 1.5, busy: 1.6, research: { cost: 130, time: 30 },
       by: { stun: [1, 1, 1.1, 1.1, 1.2, 1.3] },
       auto: 'the toughest ground foe within reach + 1.5 cells (bosses and elites first)',
-      text: (t, st, ab) => `A sword of light falls on the toughest ground foe within reach + 1.5: ${xD(st, 4)}, a ${byT(ab.by.stun, t)}s stun (bosses 40%) and a Verdict half again as strong; then it flies back to the hand.`,
+      text: (t, st, ab) => `A sword of light falls on the toughest ground foe within reach + 1.5: ${xD(st, 4)}, a ${byT(ab.by.stun, t)}s stun (bosses 40%) and 3 Judgement; then it flies back to the hand.`,
       pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
       cast(t, st, c, ab) {
         t.soThrow = { x: c.x, z: c.y }; t.cd = Math.max(t.cd, 1.6); sfx('so_hammerfall', 0);
-        soLater(t, .82, s => { if (c.dead) return; soAbHit(t, s, c, 4, 'phys'); if (c.dead) return; stun(c, byT(ab.by.stun, t), .4, null); soVerdict(c, t, 1.5); fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 14); fxDust(c.x, c.y, 6); G.shake = Math.max(G.shake, .08); sfx('so_hammerfall', 1); });
+        soLater(t, .82, s => { if (c.dead) return; soAbHit(t, s, c, 4, 'phys'); if (c.dead) return; stun(c, byT(ab.by.stun, t), .4, null); soJudge(c, 3, t); fxSpark(c.x, c.y, hitH(c), SO.COL.silver, 14); fxDust(c.x, c.y, 6); G.shake = Math.max(G.shake, .08); sfx('so_hammerfall', 1); });
       } },
   ] },
 
@@ -20781,7 +20830,7 @@ for (const u in SO_KITS) for (const ab of SO_KITS[u].abilities) { if (ABIL[ab.id
    are the towers' and the Grove's: 4 rows opening at 0/3/6/9 points, a req needs the talent straight above at full rank,
    the last row's capstones are one-of, no drawbacks, no random procs (every trigger is an Nth, a first, a threshold, a
    timer or a count), and each column is one plan. The Order's shared theme: the markers (Crossbows, Clerics, Sisters,
-   Censers) lay Judgement, and the others cash it in (Knights' and Templars' Verdicts, Shieldbearers' Verdict of Steel);
+   Censers) lay Judgement, which bursts at full stacks (one rule since 24 Nov 2026; the Knights' and Templars' Verdicts are gone);
    Radiance and Wards tie the host together. Caps are read in forces_silver_a.js (attacks, hooks); the reused tower caps
    (opener, blessmend, sanctify, tithe) work through the towers' own code. */
 const SO_TALENTS = {
@@ -20943,7 +20992,7 @@ const SO_TAL_FLAVOR = {
   frost: ['Bind them in chains of light and blind them with dawn.', 'Be still. The light has you now.'],
   arcane: ['Couch the lance and ride for the Grail.', 'For the Grail, and for those who cannot ride.'],
   storm: ['Call down the sun and burn the sky clean.', 'Nothing flies higher than the morning.'],
-  earth: ['Bring the blade down where Judgement has been laid.', 'The verdict is read. The sword falls.'],
+  earth: ['Bring the blade down where Judgement has been laid.', 'The sentence is read. The sword falls.'],
   cannon: ['Swing the censer and sanctify the road with smoke.', 'Breathe deep. The prayer goes with you.'],
 };
 const SO_TAL_EMBLEM = {};
@@ -20965,7 +21014,7 @@ const soEvery = (k, base, lo = 2) => Math.max(lo, Math.round(base / k));
 const SO_RELICS = {
   // ---- sharpen ----
   so_scales: { rar: 2, kx: 1.6, name: 'Scales of the Justicar', icon: 'scales', hue: '#c8ccd8', theme: 'verdict',
-    text: k => `Its Verdicts strike ${P_(.25 * k)} harder.`, fx: (st, k) => soPw(st, 'so_verdict', .25 * k) },
+    text: k => `Judgement it fills to bursting strikes ${P_(.25 * k)} harder.`, fx: (st, k) => soPw(st, 'so_verdict', .25 * k) },
   so_quill: { rar: 2, kx: 1.6, name: 'Witness Quill', icon: 'eye', hue: '#d8d0b8', theme: 'judgement',
     text: k => `Every ${ordN(soEvery(k, 4))} strike lays a second Judgement on its foe.`, fx: (st, k) => soPwMin(st, 'so_quill', soEvery(k, 4)) },
   so_lens: { rar: 2, kx: 1.6, name: 'Dawn-Glass Lens', icon: 'spyglass', hue: '#f0e0a0', theme: 'blind',
@@ -21003,7 +21052,7 @@ const SO_RELICS = {
   so_rosary: { rar: 2, for: ['frost'], name: 'Sister\'s Rosary', icon: 'snare', hue: '#f0e8d0', theme: 'bind',
     text: k => `Its binds hold ${nf1(.25 * k)}s longer and Blind for a second.`, fx: (st, k) => soPw(st, 'so_rosary', .25 * k) },
   so_grailcup: { rar: 2, for: ['arcane'], name: 'Little Grail', icon: 'flask', hue: '#e0c060', theme: 'verdict',
-    text: k => `Its first charge at each new foe delivers the Verdict ×${nf1(1 + k)}.`, fx: (st, k) => soPw(st, 'so_grailcup', 1 + k) },
+    text: k => `Its first charge at each new foe wheels round for a second blow ${nf1(1 + k)}× as hard.`, fx: (st, k) => soPw(st, 'so_grailcup', 1 + k) },
   so_zenith: { rar: 3, for: ['storm'], name: 'Staff of the Zenith', icon: 'wings', hue: '#f0c050', theme: 'sky',
     text: k => `Every beam at a flyer also strikes every other flyer within 1.5 cells of it for ${P_(.5 * k)}.`, fx: (st, k) => soPw(st, 'so_zenith', .5 * k) },
   so_anvil: { rar: 3, for: ['earth'], name: 'Anvil-Breaker', icon: 'sword', hue: '#9aa8c8', theme: 'slam',
@@ -21033,7 +21082,7 @@ const SO_LEGENDS = {
     hue: '#d8b048', atk: 1,
     twist: 'Bulwark Bash Condemns: the Shieldbearer becomes the Order\'s well of Judgement, not just its wall.',
     text: k => `Every foe it bashes is Condemned for ${nf1(4 * k)}s, as by Bear Witness: its Judgement can't fade, and it gains another every second.`,
-    build: 'Staggering Bash, Unyielding and Braced Shield; Grail Knights or Templars of the Ford beside it to deliver the Verdicts.',
+    build: 'Staggering Bash, Unyielding and Braced Shield; Crossbows and Censers beside it to fill the Condemned foes, whose bursts strike half again as hard.',
     combo: 'Unyielding, Grail Knights and a boss wave.', fx: (st, k) => soPw(st, 'so_lionshield', 4 * k) },
   so_sunbolt: { for: 'arrow', name: 'The Sunbolt Arbalest', icon: 'arrowhead', hue: '#ffe080', atk: 1,
     twist: 'Consecrated Bolts lay double Judgement, and a bolt on a full foe bursts Judgement over the crowd.',
@@ -21041,7 +21090,7 @@ const SO_LEGENDS = {
     build: 'Deep Mark, Sighted In and Flare Bolt, with Templars of the Ford or Censer Bearers to cash the crowd in.',
     combo: 'Deep Mark, Sighted In and the Templars of the Ford.', fx: st => soPw(st, 'so_sunbolt', 1) },
   so_firstchain: { for: 'frost', name: 'The First Chain', icon: 'chains', hue: '#fff0c0', atk: 1,
-    twist: 'Binding Light fills a bound foe with Judgement: every bind is a Verdict waiting to fall.',
+    twist: 'Binding Light fills a bound foe with Judgement: every bind bursts in light.',
     text: k => `Every foe its chains strike stays slowed 50% for ${nf1(2 * k)}s, and a foe it binds is filled with Judgement.`,
     build: 'Quick Binding, Twin Chains and Chains of Penance, beside Grail Knights or Sword of Heaven.',
     combo: 'Quick Binding, Grail Knights and Sword of Heaven.', fx: (st, k) => soPw(st, 'so_firstchain', 2 * k) },
@@ -21051,23 +21100,23 @@ const SO_LEGENDS = {
     build: 'Post it behind the Shieldbearers in the heart of the maze; Trampling Hooves and Tourney Passes, since every foe in its reach is now a target.',
     combo: 'A post deep inside the maze, Trampling Hooves and Tourney Passes.', fx: (st, k) => soPw(st, 'rdClarion', 1) },
   so_truegrail: { for: 'arcane', name: 'The True Grail', icon: 'flask', hue: '#ffd060',
-    twist: 'Grail Charge stops spending Judgement: every charge is a full Verdict, and so is the next one.',
-    text: () => 'Its Verdicts are never spent: the light strikes, and the Judgement stays on the foe.',
+    twist: 'The Grail\'s light lingers: every charge lays Judgement, and a foe it bursts stays half-filled for the next.',
+    text: () => 'Its charges lay 2 Judgement, and when Judgement it fills bursts, 2 stacks stay on the foe.',
     build: 'Couched Lance, Lance of the Grail, Tourney Passes and Bear Witness; Silverbolt Crossbows to keep its foes full.',
-    combo: 'Couched Lance, Righteous Verdict and Bear Witness.', fx: st => soPw(st, 'so_grail', 1) },
+    combo: 'Couched Lance, Tourney Passes and Bear Witness.', fx: st => soPw(st, 'so_grail', 1) },
   so_firstlight: { for: 'storm', name: 'Staff of First Light', icon: 'sun', hue: '#ffe8a0', atk: 1,
     twist: 'The Sunlance Blinds with every beam, and a beam on a blinded foe Judges twice.',
     text: k => `Each beam Blinds its foe for ${nf1(.6 * k)}s, and beams on a blinded foe lay two Judgement.`,
     build: 'Blinding Chains, Scouring Light and Chain of Penance, with the Dawn-Glass and the Lightbinder Sisters.',
     combo: 'Blinding Chains, Scouring Light and the Lightbinder Sisters.', fx: (st, k) => soPw(st, 'so_firstlight', .6 * k) },
-  so_lasthammer: { for: 'earth', name: 'Hammer of the Last Verdict', icon: 'hammer', hue: '#c8d0e8', atk: 1,
-    twist: 'Every cut judges as it lands: each one is a Verdict on everything it strikes.',
-    text: () => 'Its cuts lay two Judgement before they judge: every foe they strike hears a Verdict.',
+  so_lasthammer: { for: 'earth', name: 'Hammer of the Last Word', icon: 'hammer', hue: '#c8d0e8', atk: 1,
+    twist: 'Every cut judges as it lands: two Judgement on everything it strikes, so a crowd soon bursts.',
+    text: () => 'Its cuts lay two Judgement on every foe they strike.',
     build: 'Crossed Blades, Whirling Flurry, Steel Tempest and Second Star, in a crowded corner.',
     combo: 'Whirling Flurry, Second Star and a crowded corner.', fx: st => soPw(st, 'so_lasthammer', 1) },
   so_saintcenser: { for: 'cannon', name: 'Censer of the Saints', icon: 'cloud', hue: '#c0a0f0', atk: 1,
-    twist: 'The Censer\'s smoke passes sentence: as each cloud of incense burns out, a Verdict falls on everyone still in it.',
-    text: k => `The incense its coals leave lays Judgement every half second, and as each cloud burns out, every Judged foe still standing in it hears a Verdict at ${nf1(.6 * k)} strength.`,
+    twist: 'The Censer\'s smoke passes sentence: as each cloud of incense burns out, everyone Judged in it bursts.',
+    text: k => `The incense its coals leave lays Judgement every half second, and as each cloud burns out, every Judged foe still standing in it is filled to full Judgement and bursts at ${nf1(.6 * k)} strength.`,
     build: 'Lingering Smoke and Procession of Incense for longer clouds, Choking Smoke to hold foes in them, and Burning Procession.',
     combo: 'Lingering Smoke, Procession of Incense and Choking Smoke.', fx: (st, k) => soPw(st, 'so_saintcenser', .6 * k) },
   so_silvermere: { for: 'holy', name: 'The Bell of Silvermere', icon: 'echo', hue: '#e8c070',   // (the Bell's toll across the field, rehomed: every spell of the Champion tolls it)
@@ -21077,8 +21126,8 @@ const SO_LEGENDS = {
     combo: 'Champion talents that make its spells cheaper or sooner, Martyr\'s Seal, and units spread across the maze.', fx: (st, k) => { chPw(st, 'chFieldWard', 3 * k); chPw(st, 'chFieldMana', Math.round(6 * k)); } },
   // ---- for any unit ----
   so_dawncrown: { name: 'Crown of Dawn', icon: 'halo', hue: '#ffd880',
-    twist: 'Every Verdict this unit delivers lights up its neighbours: Radiance follows the Judgement.',
-    text: k => `Every Verdict it delivers makes every unit within 2 cells of the foe quickened by light for ${nf1(2 * k)}s.`,
+    twist: 'Every burst of Judgement this unit sets off lights up its neighbours: Radiance follows the Judgement.',
+    text: k => `Every burst of Judgement it sets off makes every unit within 2 cells of the foe quickened by light for ${nf1(2 * k)}s.`,
     build: 'Grail Knights or Templars of the Ford at the heart of a tight maze, with Lance of the Grail and Burning Procession.',
     combo: 'Grail Knights, Templars of the Ford and a tight maze.', fx: (st, k) => soPw(st, 'so_dawncrown', 2 * k) },
   so_lawbook: { name: 'Book of the Law', icon: 'scales', hue: '#a8a0c0',
@@ -21109,7 +21158,7 @@ const SO_SHOP = {
   so_s_tocsin: { tier: 2, cost: 1250, name: 'Tocsin of the Keep', icon: 'echo', hue: '#e0b050', text: () => '', fx: () => {},
     act: { name: 'Tocsin', cd: 60, text: 'It and every unit within 2.5 cells are guarded and quickened by light for 6s.', use: t => soTocsinAct(t) } },
   so_s_lance: { tier: 2, cost: 1500, name: 'Lance of the Ford', icon: 'scales', hue: '#d8c890', text: () => '', fx: () => {},
-    act: { name: 'Verdict', cd: 45, text: 'Every Judged foe in its reach hears its Verdict at once.', use: t => soLanceAct(t) } },
+    act: { name: 'Reckoning', cd: 45, text: 'Every Judged foe in its reach is filled to full Judgement and bursts at once.', use: t => soLanceAct(t) } },
 };
 function soTocsinAct(t) {
   const L = [t].concat(soUnitsNear(t.x, t.y, 2.5, t));
@@ -21120,7 +21169,7 @@ function soTocsinAct(t) {
 }
 function soLanceAct(t) {
   const st = t.st || effStats(t); let n = 0;
-  for (const c of G.creeps.slice()) if (soJ(c) && canTarget(t, st, c) && Math.hypot(c.x - t.x, c.y - t.y) <= (st.range || 2.5) + (c.fly && st.airR ? st.airR : 0)) { if (soVerdict(c, t, 1)) n++; }
+  for (const c of G.creeps.slice()) if (soJ(c) && canTarget(t, st, c) && Math.hypot(c.x - t.x, c.y - t.y) <= (st.range || 2.5) + (c.fly && st.airR ? st.airR : 0)) { if (soFill(c, t)) n++; }
   if (n) soEv('item:so_s_lance'); if (!n) onToastSoft('No Judged foe in its reach.');
   return n > 0;
 }
@@ -21164,7 +21213,7 @@ function soItemsHit(c, st, src, amt) {
   if (p.so_beads && DTAG === 'abil') { soJudge(c, 1, src); soEv('item:so_beads'); }   // Prayer Beads: the abilities' hits
   if (p.so_sunbolt && src.def.unit === 'silverbolt') {   // the Sunbolt Arbalest
     soJudge(c, 1, src); soEv('item:so_sunbolt');
-    if (soJ(c) >= soJMax() && (c.soSbT || 0) < G.time) { c.soSbT = G.time + .5; inSplash(c.x, c.y, 1, false, o => { if (o !== c && !o.phased && !o.ent) soJudge(o, 2, src); }); fxRing(c.x, c.y, 1, SO.COL.gold); relicGlint(src, 'so_sunbolt'); }
+    if (soFull(c) && (c.soSbT || 0) < G.time) { c.soSbT = G.time + .5; inSplash(c.x, c.y, 1, false, o => { if (o !== c && !o.phased && !o.ent) soJudge(o, 2, src); }); fxRing(c.x, c.y, 1, SO.COL.gold); relicGlint(src, 'so_sunbolt'); }
   }
   if (p.so_firstchain && src.def.unit === 'lightbinder') soEv('item:so_firstchain');
   if (p.so_firstchain && src.def.unit === 'lightbinder') chill(c, { slow: .5, slowT: p.so_firstchain }, null, src);   // the First Chain
@@ -21215,7 +21264,7 @@ function soItemsKill(c, src) {
     if (o) { soJudge(o, n, src); rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: o, col: SO.COL.gold, w: .05, life: .3 }); relicGlint(src, 'so_oathblade'); soEv('item:so_oathblade'); }
   }
 }
-// a Verdict fell (soAfterVerdict)
+// a burst fell (soAfterVerdict)
 function soItemsVerdict(c, src, n, x, z, st) {
   const p = st && st.pw; if (!p) return;
   if (p.so_dawncrown) { for (const o of soUnitsNear(x, z, 2)) soRadiate(o, p.so_dawncrown, SO.RAD_K); relicGlint(src, 'so_dawncrown'); soEv('item:so_dawncrown'); }
@@ -21276,7 +21325,7 @@ if (typeof istAdd === 'function') { istAdd('so_saintcenser', 'splash sp regen|Pa
    as the Grove's commanders do (heroes.js). Their passives and gifts live in the Order's hooks (forces_silver_a.js):
    - Aurelian, the Lion of the Ford: Shield Brothers (soCharge, soSlam), Lionheart (soRadiant), Dawnsweep (spell id so_lioncharge).
    - Celestine, the Dawnsinger: Morning Light (live: mana; soWard: longer wards), Halo (soOnHit), Dawnbreak.
-   - Morrow, the Grey Justicar (mounted, a lance; he leads the Grail Knights): Long Memory (soJMax, soJDur), Writ (soOnHit, soVerdict), Sentence. */
+   - Morrow, the Grey Justicar (mounted, a lance; he leads the Grail Knights): Long Memory (soJMax, soJDur), Writ (soOnHit, soBurst), Sentence (soFill). */
 FORCE_HEROES.push(
   { id: 'so_lion', force: SO_ID, name: 'Aurelian', title: 'the Lion of the Ford', hue: '#f0c060', glyph: 'swords', role: 'The Silver Order: the shield wall, and the light that holds it', quote: 'Stand with me. The ford is ours.',
     aff: { arcane: .1, glaive: .05, earth: .05, frost: -.05, cannon: -.05 },
@@ -21294,10 +21343,10 @@ FORCE_HEROES.push(
     tree: [] },
   { id: 'so_judge', force: SO_ID, name: 'Morrow', title: 'the Grey Justicar', hue: '#c8ccd8', glyph: 'scales', role: 'The Silver Order: he leads the Grail Knights\' charge; Judgement laid, and Judgement delivered', quote: 'Every debt is written. Every debt is paid.',
     aff: { earth: .1, arrow: .05, storm: .05, frost: -.05, holy: -.05 },
-    passive: 'Long Memory: Judgement lasts 3 seconds longer, and a foe can carry one more stack of it (6).',
-    spell: { id: 'so_sentence', name: 'Sentence', glyph: 'scales', cd: 45, aim: false, t: 'Every Judged foe on the field hears its Verdict at once: 5% of a foe’s health for each stack of Judgement it carries (bosses 40%).',
+    passive: 'Long Memory: Judgement lasts 3 seconds longer, and a foe can carry one more stack of it (6), so it bursts bigger.',
+    spell: { id: 'so_sentence', name: 'Sentence', glyph: 'scales', cd: 45, aim: false, t: 'Every Judged foe on the field is filled to full Judgement, so it bursts at once: 4% of a foe’s health for each stack (bosses 40%).',
       cast: (p, R, hp, h) => soSentence(hp) },
-    champ: 'Writ: the Champion’s strikes lay one more Judgement, and its Verdicts strike 25% harder.',
+    champ: 'Writ: the Champion’s strikes lay one more Judgement, and the bursts they set off strike a quarter again as hard.',
     tree: [] },
 );
 Object.assign(FORCE_SAGAS, {
@@ -21310,7 +21359,7 @@ Object.assign(FORCE_SAGAS, {
     evFn: c => c.soBlindT > G.time,
     fin: ['Second Sunrise', 'A second, lighter Dawnbreak rises over the same ground 2 seconds later.'] },
   so_judge: { name: 'The Grey Ledger', lines: ['Write their names. All of them.', 'The ledger grows heavy. Good.', 'Close the book. Read the sentence.'],
-    trials: ['The First Debt', 'Witnesses', 'The Ledger Closed'], ev: 'so_verdict', verb: g => `Slay ${g} foes with a Verdict.`, goals: [25, 70, 140],
+    trials: ['The First Debt', 'Witnesses', 'The Ledger Closed'], ev: 'so_verdict', verb: g => `Slay ${g} foes with a burst of Judgement.`, goals: [25, 70, 140],
     evFn: c => !!c.soVK,
     fin: ['Final Sentence', 'A foe slain by Sentence passes its Judgement on to the two foes nearest it.'] },
 });
@@ -21365,10 +21414,10 @@ function soSentence(hp) {
   for (const c of G.creeps.slice()) {
     const j = soJ(c); if (!j || c.phased) continue;
     c.soSentenced = j; n++;
-    soVerdict(c, HERO_SRC, 1, { D: hp * .05 * (c.def.boss ? .4 : 1) / SO.V_K });
+    soFill(c, HERO_SRC, { D: hp * .04 * (c.def.boss ? .4 : 1) / SO.B_K });   // (filled, so it bursts: 4% a stack, 20% at 5)
     if (!c.dead) c.soSentenced = 0;
   }
-  if (n) onBanner('Sentence!', `${n} Judged foe${n === 1 ? '' : 's'} hear${n === 1 ? 's' : ''} the Verdict`); else onToast('No Judged foe on the field to sentence.');
+  if (n) onBanner('Sentence!', `${n} Judged foe${n === 1 ? '' : 's'} burst${n === 1 ? 's' : ''} with light`); else onToast('No Judged foe on the field to sentence.');
   sfx('so_sentence');
 }
 
@@ -30508,8 +30557,8 @@ FORCE_PARTS.ch_hrolf = [
    As the Grove's (forces_zx_champ_grove.js, the template; the rules in forces_zw_champions.js). The Bell of the Order is
    retired: its toll lives on in the Champions' talents (each W gives mana to the units beside it) and in its two items
    (the Gold Clapper and the Bell of Silvermere answer the Champion's casts: forces_silver_e.js). Each Champion strikes
-   with one of the Order's own attacks (FORCE_ATTACK so_blade (the charge, on foot) / so_beam / so_bolt), so Radiance, Judgement, Verdicts and
-   the commanders' gifts (soOnHit, soRadiant, soVerdict: forces_silver_a.js) work on it unchanged. Their bodies are the
+   with one of the Order's own attacks (FORCE_ATTACK so_blade (the charge, on foot) / so_beam / so_bolt), so Radiance, Judgement and its burst and
+   the commanders' gifts (soOnHit, soRadiant, soBurst: forces_silver_a.js) work on it unchanged. Their bodies are the
    Order's (soBody on foot; Morrow on the Knights' destrier) at tier III's detail, scaled as Champions, with more added from tier IV. */
 const CH_SO_RS = { cost: 50, time: 0 };
 const chSoT = tier => Math.min(2, tier | 0);   // the Order's bodies are built for tiers I-III (SO_SCALE)
@@ -30526,11 +30575,11 @@ const CH_SO_M = new Float32Array(16);
    Dawnsweep (ch_lioncharge), Bulwark Slam (ch_fordstandard) and The Crossing (ch_lionsdue). The ids are kept for saves,
    talents, items and art; the old names follow by TAL_ALIAS (forces_zzzzzzzzzz_talnames.js).) */
 // his strike: on foot, shield-first, out to the strongest foe in reach and back to his post (the Order's charge, soCharge,
-// with no knock-down: a sword, not a lance), so his Verdicts, Radiance and the talents on a charge work unchanged
+// with no knock-down: a sword, not a lance), so his wheel-round blow, Radiance and the talents on a charge work unchanged
 FORCE_ATTACK.so_blade = (t, st, tg, pow, echo) => soCharge(t, st, tg, pow, {});
 champAdd('so_lion', { force: 'silver', he: 'he', glyph: 'swords', k: 1.45,
   unit: { id: 'ch_aurelian', name: 'Aurelian, the Lion of the Ford', short: 'Aurelian', proj: 'force', attack: 'so_blade', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
-    blurb: 'Aurelian steps out to the strongest foe in reach, cuts, and falls back into the line, every blow hearing a Verdict. He is always quickened by light, and his own Templars of the Ford fight best beside him. Cannot reach flyers.',
+    blurb: 'Aurelian steps out to the strongest foe in reach, cuts, turns for a second cut, and falls back into the line, every blow laying Judgement. He is always quickened by light, and his own Templars of the Ford fight best beside him. Cannot reach flyers.',
     tiers: [{ dmg: 64, rate: 2.2, range: 2.8 }, { dmg: 150, rate: 2.1, range: 3 }, { dmg: 350, rate: 2, range: 3.2 }] },
   trait: { name: 'Lionheart', t: 'He is always quickened by light: he strikes faster, and every strike lays Judgement.' },   // (soRadiant: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: 1.2 }, abilities: [
@@ -30561,7 +30610,7 @@ champAdd('so_lion', { force: 'silver', he: 'he', glyph: 'swords', k: 1.45,
     CT('Burnished Shields', 'sunburst', 1, 3, 2, n => `Each Templar of the Ford Dawnsweep turns Radiant flashes its shield: every ground foe within its reach is Judged and dazed ${gNf(.3 * n)}s.`, {}, { cap: 'sofBurnish', sp: { ab: 'ch_lioncharge', rider: { fresh: 1 } } }),
     CT('Rally to the Shield', 'heart', 2, 1, 1, 'Each Bulwark Slam rallies the line: every unit of the Order within 1.6 cells of him readies its next strike at once.', {}, { cap: 'sofRallyB', sp: { ab: 'ch_fordstandard', rider: { fresh: 1 } } }),
     CT('The Far Bank', 'scales', 4, 3, 1, 'The Crossing goes on to one more foe, and each foe it slays on the way gives it another (3 more at most).', {}, { cap: 'so_royal_due', sp: { ab: 'ch_lionsdue', by: { n: 1 } }, req: [3, 3] }),
-    CT('Debt of Oaths', 'crosshair', 4, 1, 1, 'Each Verdict the Order delivers within 2 cells of him, and each slam of a Templar of the Ford within 2 cells, brings The Crossing 1s nearer (at most twice a second); The Crossing strikes Judged foes 20% harder.', {}, { cap: 'so_lion_debt', sp: { ab: 'ch_lionsdue', vs: ['judged', .2] } }),
+    CT('Debt of Oaths', 'crosshair', 4, 1, 1, 'Each Twin Cut of a Templar of the Ford within 2 cells of him brings Dawnsweep 1s nearer (at most twice a second).', {}, { cap: 'so_lion_debt', sp: { ab: 'ch_lionsdue', vs: ['judged', .2] } }),
     CT('Unbroken', 'wings', 3, 0, 2, n => `Every ground foe Dawnsweep throws back that lands within a cell of a Templar of the Ford meets its shield: dazed ${gNf(.4 * n)}s at its feet and Judged.`, {}, { cap: 'sofPride', sp: { ab: 'ch_lioncharge', rider: { fresh: 1 } } }),
     GS('ch_lionsdue', 3, 3),
     CT('The Ford Itself', 'mountain', 4, 0, 1, "Bulwark Slam's shockwave rebounds 0.6s later down the same cone: every ground foe in it is struck again for 60%, Judged and dazed 0.6s.", {}, { cap: 'so_ford_echo' }),
@@ -30605,7 +30654,7 @@ champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
   ] },
   tree: { name: 'Dawnsong', hue: '#ffe6a0', list: [
     CT('Early Dawn', 'hourglass', 0, 3, 2, n => `Each foe her Halo Blinds brings Dawnbreak ${n}s nearer.`, {}, { cap: 'sofEarly', sp: { ab: 'ch_dawnbreak', rider: { fresh: 1 } } }),
-    CT('Clear Sky', 'spyglass', 0, 1, 2, n => `Every 3rd beam of hers that strikes a Blinded foe delivers its Verdict at ${25 * n}%.`, {}, { cap: 'sofClear' }),
+    CT('Clear Sky', 'spyglass', 0, 1, 2, n => `Every 3rd beam of hers that strikes an Exposed foe is followed by a second beam at ${25 * n}%.`, {}, { cap: 'sofClear' }),
     CT('Dawn Chorus', 'sunburst', 0, 2, 2, n => `Each Dawnbreak makes every unit of the Order within 1.6 cells of her Radiant for ${2 * n}s.`, {}, { cap: 'sofChorus', sp: { ab: 'ch_dawnbreak', rider: { fresh: 1 } } }),
     CT('Cloister Wall', 'statue', 4, 2, 1, 'Each Oath-Stone Prism of Dawn bounces from bursts in light: every ground foe within a cell of it takes 100% and a Judgement.', {}, { cap: 'so_cloister' }),
     GS('ch_morningstar', 1, 3),
@@ -30620,7 +30669,7 @@ champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
     CT('Spilled Light', 'flash', 4, 3, 1, 'Each Blinded foe she slays spills its light: every foe within a cell of it is Blinded 1.5s and Judged.', {}, { cap: 'so_spill' }),
     CT('Bright Halo', 'quick', 0, 0, 3, n => `Her Halo Blinds ${gNf(.5 * n)}s longer and lays ${n} Judgement.`, {}, { cap: 'sofHalo' }),
     CT('First Light', 'sunburst', 1, 1, 2, n => `Each foe Dawnbreak Blinds restores ${2 * n} mana to her (up to 5 foes).`, {}, { cap: 'sofFirstL', sp: { ab: 'ch_dawnbreak', rider: { fresh: 1 } } }),
-    CT('Noon Bell', 'sun', 3, 3, 1, 'As High Noon ends the bell tolls: every Blinded, Judged foe in her reach hears its Verdict.', {}, { cap: 'sofBell', sp: { ab: 'ch_highnoon', rider: { fresh: 1 } } }),
+    CT('Noon Bell', 'sun', 3, 3, 1, 'As High Noon ends the bell tolls: every Exposed foe in her reach is struck by a beam of hers.', {}, { cap: 'sofBell', sp: { ab: 'ch_highnoon', rider: { fresh: 1 } } }),
   ] },
   flavor: ['Celestine sings in person: dawnlight that blinds and sears.', 'Look upon the dawn, and be still.'], emblem: 'Dawnsinger',
   fire(t, st, tg, pow, echo) {   // High Noon: the beam splits to every Blinded foe in reach
@@ -30643,14 +30692,14 @@ champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
 /* ---------- Morrow, the Grey Justicar ---------- */
 champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
   unit: { id: 'ch_morrow', name: 'Morrow, the Grey Justicar', short: 'Morrow', proj: 'force', attack: 'so_lance', dmgType: 'phys', air: false, ground: true, prio: 2, top: [1.55, 1.65, 1.75],
-    blurb: 'The Grey Justicar leads the Grail Knights’ charge: he rides out at the strongest foe in reach and back, knocking it down and laying Judgement, two to a strike. Cannot reach flyers.',
+    blurb: 'The Grey Justicar leads the Grail Knights’ charge: he rides out at the strongest foe in reach, knocks it down, wheels round for a second blow and rides back, laying Judgement, two to a strike. Cannot reach flyers.',
     tiers: [{ dmg: 34, rate: 1.3, range: 3.2 }, { dmg: 78, rate: 1.25, range: 3.4 }, { dmg: 180, rate: 1.2, range: 3.6 }] },
-  trait: { name: 'Writ', t: 'His strikes lay one more Judgement, and his Verdicts strike 25% harder.' },   // (soOnHit, soVerdict: forces_silver_a.js)
+  trait: { name: 'Writ', t: 'His strikes lay one more Judgement, and the bursts they set off strike a quarter again as hard.' },   // (soOnHit, soBurst: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: .8 }, abilities: [
     champQ('so_judge', { id: 'ch_sentence', name: 'Sentence', short: 'Sentence', glyph: 'scales', hue: '#c8ccd8', art: 'so_sentence', mana: 80, cd: 14, school: 'holy', pref: 'afflicted', aim: false, qs: 4, qf: .15,
-      blurb: 'Every Judged foe on the field hears its Verdict at once.', auto: 'eight or more stacks of Judgement on the field, or a Judged boss',
+      blurb: 'Every Judged foe on the field is filled to full Judgement and bursts at once.', auto: 'eight or more stacks of Judgement on the field, or a Judged boss',
       none: 'no Judged foe on the field',
-      text: (t, st, ab) => `Every Judged foe on the field hears its Verdict at once: ${champQx(t, st, ab, .05)} for each stack of Judgement it carries (bosses 40%).${sagaHas('fin') ? ' A foe it slays passes its Judgement on (Final Sentence).' : ''}`,
+      text: (t, st, ab) => `Every Judged foe on the field is filled to full Judgement, so it bursts at once: ${champQx(t, st, ab, .04)} for each stack (bosses 40%).${sagaHas('fin') ? ' A foe it slays passes its Judgement on (Final Sentence).' : ''}`,
       pick(t, st, ab, man) {
         let n = 0, big = false; for (const c of G.creeps) { const j = c.dead || c.phased ? 0 : soJ(c); if (!j) continue; n += j; if (soBig(c) && j >= 2) big = true; }
         return n && (man || n >= 8 || big) ? t : null;
@@ -30667,7 +30716,7 @@ champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
         soStreak(t.x, towerTop(t) + .2, t.y, c, SO.COL.light, .06, .4); fxRing(c.x, c.y, .5, SO.COL.gold); abSfx('call', 0);
       },
       anim: chAnim('draw', { T: .95, tip: ['main', [.02, -.06, .82]], col: [.85, .9, 1.2], on: [.2, .7] }) },
-    { id: 'ch_verdict', name: 'Final Verdict', short: 'Verdict', glyph: 'skull', hue: '#e8ecf4', mana: 120, cd: 20, research: CH_SO_RS, school: 'holy', pref: 'high',
+    { id: 'ch_verdict', name: 'The Gavel', short: 'Gavel', glyph: 'skull', hue: '#e8ecf4', mana: 120, cd: 20, research: CH_SO_RS, school: 'holy', pref: 'high',
       by: { r: [1.5, 1.5, 1.5, 1.6, 1.6, 1.6] },
       auto: 'a Judged foe in reach with others near it (the toughest first), or a boss', blurb: 'Marks a foe: when it dies, its Judgement passes to every foe around it.',
       text: (t, st, ab) => `He writes a foe's name in the ledger for 10s: it gains 2 Judgement, and when it dies its Judgement (at least 2) passes to every foe within ${gNf(byT(ab.by.r, t))} cells of it.`,
@@ -30680,26 +30729,26 @@ champAdd('so_judge', { force: 'silver', he: 'he', glyph: 'scales',
     CT('Long Arm of the Law', 'crosshair', 0, 3, 2, n => `His charges slow a foe carrying 3 or more Judgement ${15 * n}% for 1.5s: it can't outrun its debts.`, {}, { cap: 'sofLongArm' }),
     CT('Ready Ledger', 'rune', 0, 2, 2, n => `Each foe Sentence strikes that lives on keeps ${n} Judgement in the ledger.`, {}, { cap: 'sofLedger', sp: { ab: 'ch_sentence', rider: { fresh: 1 } } }),
     GS('ch_summons', 1, 0),
-    CT('Iron Chains', 'chains', 4, 3, 1, 'When Final Verdict\'s foe dies, each foe its Judgement passes to is written in the ledger in turn, for 5s (one link on, no further). Each Final Verdict brings Debt Collection 4s nearer.', {}, { cap: 'so_iron_chains', sp: { ab: 'ch_verdict', ready: ['ch_summons', 4] }, req: [3, 3] }),
+    CT('Iron Chains', 'chains', 4, 3, 1, 'When The Gavel\'s foe dies, each foe its Judgement passes to is written in the ledger in turn, for 5s (one link on, no further). Each Gavel brings Debt Collection 4s nearer.', {}, { cap: 'so_iron_chains', sp: { ab: 'ch_verdict', ready: ['ch_summons', 4] }, req: [3, 3] }),
     CT('Mark of Guilt', 'eye', 2, 3, 2, n => `His charges Condemn a foe at full Judgement for ${n}s.`, {}, { cap: 'sofGuilt' }),
     CT('Witnesses Called', 'heart', 2, 0, 1, 'Every foe Debt Collection takes Judgement from is dazed 0.5s, and the foe it gathers onto is bound 0.3s longer.', {}, { sp: { ab: 'ch_summons', by: { daze: .5, bind: .3 } }, req: [1, 0] }),
-    CT('Wide Reckoning', 'ring', 4, 0, 1, "When Final Verdict's gavel falls, it falls at half on every Judged foe within 1.2 cells of its foe too, and Final Verdict stuns every foe it strikes for 0.5s.", {}, { cap: 'so_wide_reck', sp: { ab: 'ch_verdict', rider: { stun: .5 } } }),
+    CT('Wide Reckoning', 'ring', 4, 0, 1, "When The Gavel falls, every Judged foe within 1.2 cells of its foe gains 2 Judgement, and The Gavel stuns every foe it strikes for 0.5s.", {}, { cap: 'so_wide_reck', sp: { ab: 'ch_verdict', rider: { stun: .5 } } }),
     CT('Trampling Host', 'snail', 2, 1, 2, n => `He rides each debt down: every ground foe on the line between him and Debt Collection's foe is trampled, Judged and Wounded for ${2 * n}s (its heals and shields halved).`, {}, { cap: 'sofTrample', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
     CT('Clerk’s Quill', 'wings', 3, 1, 2, n => `After each Debt Collection, his next ${2 * n} charges each lay one more Judgement.`, {}, { cap: 'sofQuill', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
     CT('Grey Justicar', 'shield', 4, 2, 1, 'His charges are warrants: they ride through your units and walls, and each one also lays a Judgement on every foe within 0.8 cells of its foe, so Sentence finds the whole crowd.', {}, { cap: 'so_grey_warrant' }),
     GS('ch_verdict', 3, 3),
-    CT('Riders of the Ford', 'swords', 3, 2, 1, 'The Grail Knights ride with him: each Debt Collection sends every Grail Knight within 2 cells charging its foe at once, lances couched: it is knocked down and hears their Verdicts (at most once every 4s a knight).', {}, { cap: 'sofFord', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
+    CT('Riders of the Ford', 'swords', 3, 2, 1, 'The Grail Knights ride with him: each Debt Collection sends every Grail Knight within 2 cells charging its foe at once, lances couched: it is knocked down and each knight wheels round for his second blow (at most once every 4s a knight).', {}, { cap: 'sofFord', sp: { ab: 'ch_summons', rider: { fresh: 1 } } }),
     CT('Ride Them Down', 'quick', 0, 1, 3, n => `His charges strike a foe that is dazed, bound or knocked down ${10 * n}% harder and lay ${n} more Judgement on it.`, {}, { cap: 'sofBailiff' }),
     CT('Court Fines', 'scales', 1, 3, 2, n => `Each foe Sentence strikes pays him ${2 * n} mana in fines.`, {}, { cap: 'sofFines', sp: { ab: 'ch_sentence', rider: { fresh: 1 } } }),
-    CT('Summary Ruling', 'scales', 1, 2, 2, n => `A foe under a quarter of its health that his lance strikes hears its Verdict at once (at most once every ${8 - 2 * n}s).`, {}, { cap: 'sofSummary' }),
+    CT('Summary Ruling', 'scales', 1, 2, 2, n => `A foe under a quarter of its health that his lance strikes is filled to full Judgement and bursts (at most once every ${8 - 2 * n}s).`, {}, { cap: 'sofSummary' }),
   ] },
   flavor: ['Morrow rides in person at the head of the Grail Knights\' charge: Judgement laid, and Judgement delivered.', 'Every debt is written. Every debt is paid.'], emblem: 'Grey Justicar',
-  kill(c, src, t) {   // Final Verdict: the marked foe's Judgement passes on
+  kill(c, src, t) {   // The Gavel: the marked foe's Judgement passes on (forces_zzz_silver_cool.js replaces this)
     if (!(c.chVerdictT > G.time) || c.chVerdictBy !== t.id) return;
     c.chVerdictT = 0;
     const n = Math.max(2, c.soJT > G.time ? c.soJ | 0 : 0), r = byT(ABIL.ch_verdict.by.r, t);
     for (const o of nearest(c.x, c.y, r, 8, c, q => !q.phased && !q.ent)) { soJudge(o, n, t); soStreak(c.x, hitH(c), c.y, o, '#e8ecf4', .04, .3); }
-    soVerdictFx(c.x, c.y, hitH(c), n, t); fxRing(c.x, c.y, r, '#e8ecf4');
+    fxRing(c.x, c.y, r, '#e8ecf4');
   },
   extra(t, tier, x, z, yaw, K) {
     soExtra(t, chSoT(tier), x, z, yaw, K);
@@ -36077,7 +36126,7 @@ const ARROW_UP_K = { grove: 1.35, silver: 1.2, conclave: 1.35, ironhold: 1.5, st
 for (const f in FORCES) { const u = FORCES[f].units && FORCES[f].units.arrow; if (u && u.tiers) u.tiers.forEach((s, k) => { if (k) s.cost = Math.round(s.cost * (ARROW_UP_K[f] || 1.35)); }); }
 
 /* ================= THE GROVE'S GROWTH: each unit's own gauge, and the Bloom it builds to =================
-   Each army has its own signature mechanic (Ironhold's heat, the Silver Order's Verdict, the Conclave's weaves, the
+   Each army has its own signature mechanic (Ironhold's heat, the Silver Order's Judgement, the Conclave's weaves, the
    Stormborn's Storm). The Grove's is GROWTH, and like Ironhold's heat it belongs to each unit (owner, 5 Nov 2026: the
    "original idea", one gauge a unit rather than one for the army):
      - every strike a Grove unit makes adds GW_STRIKE Growth (t.gw, 0..100): a gauge fills in GW_N strikes;
@@ -37456,7 +37505,7 @@ manaOnKill = function (src) {
 /* ================= THE SILVER ORDER: signature spells (every unit's and Champion's second and third) =================
    The owner (6 Nov 2026): "do a pass on all second and third spells making each unique and interesting, aim for the cool
    factor like the gattling gun spell. should fulfill some fantasy of the character." Each one below is one readable move
-   that a player would name the unit by, tied to the Order's pillars (Judgement and Verdicts; Wards, Radiance, Blind) and
+   that a player would name the unit by, tied to the Order's pillars (Judgement and its burst; Wards, Radiance, Blind) and
    to where the unit stands in the maze. The ids are kept, so talents, items, sets and saves still bind to them; this file
    reshapes each ability in place (its numbers, text, rule, cast), its pose, its body move, its cast time and its look.
    Loaded after every Silver file and the spell rules (forces_zy_spells.js, forces_zz_*): hence the name.
@@ -37465,25 +37514,25 @@ manaOnKill = function (src) {
    - Oathsworn Shieldbearers, the shield wall that never gives ground.
        Rampart of Dawn (so_aegis): a wall of light is driven up the road against the flow, carrying every walker back
        with it, then breaks into Wards for the line. Oath of Challenge (so_rebuke): it calls out every walker round it;
-       they turn and slow, Judged on every beat, and the shield's light gives each its Verdict.
+       they turn and slow, Judged on every beat, and as the oath closes the shield's light strikes each one.
    - Silverbolt Crossbows, the Order's marksmen who bear witness.
        Flare Bolt (so_hail): a burning flare is shot into the thick of a crowd: everything near it is seared and Judged
        every second, and it keeps burning on the road if its foe falls. Bear Witness (so_witness): a foe is Condemned
-       and every unit of the Order that strikes it swears as a witness (threads of light); then the testimony is read,
-       a Verdict for every witness.
+       and every unit of the Order that strikes it swears as a witness (threads of light); then the testimony is read:
+       its Judgement is filled and bursts, stronger for every witness.
    - Lightbinder Sisters, the chain-sisters of the dawn.
        Chain of Penance (so_flare): the foe about to escape is chained to the nearest Oath-Stone or unit of the Order:
        it strains at the leash, Blinded, then the chain snaps taut. Vigil Chains (so_shackle): chains of light are strung
        from her to the units and Oath-Stones round her, across the road: every walker that crosses one is bound.
    - Grail Knights, the jousting knight of the Grail.
        Tourney Passes (so_ridedown): passes at the toughest walker, lance after lance, trampling what is in between; the
-       last pass delivers the Verdict. Charge of the Vow (so_vow): the banner of light raised, and from every unit round
+       last pass breaks the lance on it. Charge of the Vow (so_vow): the banner of light raised, and from every unit round
        it a phantom knight rides out at the nearest foe.
    - Sunlance Clerics, the dawn-priests who burn the sky clean.
        Noon Sweep (so_halo): a channelled beam of noon light swept across a corner of the road; flyers it crosses are
        dazzled down. Dawnfall (so_dawnfall): every flyer slammed out of the sky, and each crash Blinds the walkers under it.
-   - Templars of the Ford (Aurelian's own, once the Hammer Templars), the zealots with a sword in each hand whose verdict falls.
-       Whirling Flurry (so_hallow, once Shield Fervour): a whirl of cuts, the blades in turn, each Judging every walker round it, the last delivering their Verdicts.
+   - Templars of the Ford (Aurelian's own, once the Hammer Templars), the zealots with a sword in each hand.
+       Whirling Flurry (so_hallow, once Shield Fervour): a whirl of cuts, the blades in turn, each Judging every walker round it, the last both blades together.
        Sword of Heaven (so_hammerfall): one of his two swords hurled into the sky, falling on the toughest foe as a star.
    - Censer Bearers, the thurifers who sanctify the road.
        Procession of Incense (so_smoke): incense walked down the road, cell after cell. Kindle the Censers (so_embers):
@@ -37496,8 +37545,8 @@ manaOnKill = function (src) {
        shield-first from Judged foe to Judged foe.
    - Celestine, the singing saint of dawn: Prism of Dawn (ch_morningstar), a beam that bounces off the Oath-Stones of the
        maze; High Noon (ch_highnoon), a sun over her that blinds every foe in reach while her beams split.
-   - Morrow, the Grey Justicar: Debt Collection (ch_summons), every debt round a foe gathered onto it; Final Verdict
-       (ch_verdict), the name in the ledger, and the gavel that falls.
+   - Morrow, the Grey Justicar: Debt Collection (ch_summons), every debt round a foe gathered onto it; The Gavel
+       (ch_verdict, once Final Verdict), the name in the ledger, and the gavel that falls.
    The look: drawn with the VFX toolkit (vfx.js) through spellfx.js's composite moments (v2Hit, v2Area, v2Beam, ...) and
    the draw kinds below (SOC_DRAW), registered once spellfx.js has loaded (socFxReg). Counts follow the Graphics setting
    (sfxN, vfxBurst, vfxLite). No ring round a caster unless it marks a real area; nothing hangs over foes like a cloud. */
@@ -37632,7 +37681,7 @@ function socRampStart(t, st, len, filt) {
 function socRampart(t, ab, i0) {
   const P = socPts(); if (!P[i0]) return;
   const len = socBy(ab, 'len', t), R0 = { t, x: P[i0][0], z: P[i0][1], j: i0 - 1, left: len, ux: 0, uz: -1, caught: new Set(), on: true, trail: [[P[i0][0], P[i0][1]]] };
-  t.socRamp = R0; sfx('so_bash'); sfx('so_aegis');
+  t.socRamp = R0; sfx('osRampart');   // (the owner's Rampart of Dawn mix, audio.js S.osRampart; so_bash and so_aegis without it)
   socFx('so_aegis', t, t, C => {
     sfxAdd({ k: 'socrampart', R: R0, life: 9, col: socC(C, SOC.gold), hot: socC(C, SOC.light, 1.5), ward: socC(C, SOC.ward, 1.2), S: C.S * C.T.glow });
     v2Hit(C, R0.x, R0.z, .5, .7 * C.S, { sp: 'gold', n: 6, ring: 0, light: 0, deep: 0 });
@@ -37666,7 +37715,7 @@ function socRampart(t, ab, i0) {
     for (const c of R0.caught) if (!c.dead) { stun(c, daze, .4, null); if (bl > 0) { soBlind(c, bl, t); soBlindFx(c); } }
     const d = socBy(ab, 'dur', t);
     for (const o of [t].concat(abAllies(t, 1.6))) if (soUnit(o)) soWard(o, d);
-    sfx('block', 0);
+    sfx('osRampartEnd', 0);   // (its own clang only without the mix, or past it)
     socFx('so_aegis', t, t, C => {
       v2Area(C, R0.x, R0.z, .7, { sp: 'gold', n: 8, rim: 'spark', rn: 6, minor: 1, light: 0, deep: 0 });
       v2Spray(C, 'dust', R0.x, R0.z, .1, 6, { r: .4, sp: .8 });
@@ -37714,16 +37763,16 @@ socDef('so_aegis', { name: 'Rampart of Dawn', short: 'Rampart', glyph: 'shieldx'
     soLater(t, .22, () => socRampart(t, ab, p.i));
   } });
 
-// Oath of Challenge: every walker round it is called out; it turns and slows, Judged on every beat, and at the end the shield
-// gives each one still near it its Verdict
+// Oath of Challenge: every walker round it is called out; it turns and slows, Judged on every beat (it bursts as it fills), and
+// at the end the shield's light strikes each one still near it (it was a Verdict until 24 Nov 2026)
 socDef('so_rebuke', { name: 'Oath of Challenge', short: 'Challenge', glyph: 'sunburst', hue: '#ffe6a0', mana: 75, cd: 13, r: 1.6,
   by: { dur: [2.5, 2.5, 3, 3, 3.5, 3.5], r: [0, 0, 0, 0, 0, 0], slow: [.5, .5, .5, .5, .5, .5], j0: [1, 1, 1, 1, 1, 1], vk: [.95, .95, .95, 1, 1, 1.05] },
   none: 'no ground foe near enough to answer',
   auto: 'three or more ground foes within its call, or a boss or leader',
-  text: (t, st, ab) => { const r = 1.6 + socBy(ab, 'r', t), V = socBy(ab, 'vk', t); return `Calls out every ground foe within ${gNf(r)} cells for ${socBy(ab, 'dur', t)}s: slowed ${Math.round(socBy(ab, 'slow', t) * 100)}% (bosses half) and Judged every ${(st.caps && st.caps.so_chal_fast) ? '0.35' : '0.5'}s. Then each one still near hears its Verdict at ${Math.round(V * 100)}% (up to ${xD(st, .3 * 5 * V)}).`; },
+  text: (t, st, ab) => { const r = 1.6 + socBy(ab, 'r', t), V = socBy(ab, 'vk', t); return `Calls out every ground foe within ${gNf(r)} cells for ${socBy(ab, 'dur', t)}s: slowed ${Math.round(socBy(ab, 'slow', t) * 100)}% (bosses half) and Judged every ${(st.caps && st.caps.so_chal_fast) ? '0.35' : '0.5'}s. Then the oath closes: the shield's light strikes each one still near for ${xD(st, 1.5 * V)}.`; },
   pick(t, st, ab, man) { const r = 1.6 + socBy(ab, 'r', t), L = abFoes(t, st, r, abWalker); return L.length && (L.length >= (man ? 1 : 3) || L.some(c => c.def.boss || c.def.lead)) ? t : null; },
   cast(t, st, _, ab) {
-    sfx('so_rebuke'); t.socChal = G.time;
+    sfx('osOath'); t.socChal = G.time;   // (the owner's Oath of Challenge mix, audio.js S.osOath)
     soLater(t, .2, s => {
       const r = 1.6 + socBy(ab, 'r', t), d = socBy(ab, 'dur', t), sl = socBy(ab, 'slow', t), L = abFoes(t, s, r, abWalker).slice(0, 12), end = G.time + d, beat = s.caps && s.caps.so_chal_fast ? .35 : .5;
       for (const c of L) { c.socChalT = end; c.socChalBy = t; chill(c, { slow: soBig(c) ? sl * .5 : sl, slowT: d }, null, t); soJudge(c, socBy(ab, 'j0', t), t); }
@@ -37731,7 +37780,7 @@ socDef('so_rebuke', { name: 'Oath of Challenge', short: 'Challenge', glyph: 'sun
       for (let k = 1; k <= n; k++) G.delayed.push({ t: k * beat, fn: () => { if (!abLive(t)) return; for (const c of L) if (!c.dead && c.socChalBy === t && Math.hypot(c.x - t.x, c.y - t.y) <= r + .6) soJudge(c, 1, t); socFx('so_rebuke', t, t, C => { for (const c of L) if (!c.dead && c.socChalBy === t) v2Spray(C, 'gold', c.x, c.y, hitH(c) + .2, 1, { sp: .4 }); }); } });
       G.delayed.push({ t: d, fn: () => {
         if (!abLive(t)) return; const s2 = t.st || effStats(t); let n2 = 0;
-        for (const c of L) { if (c.socChalBy === t) c.socChalT = 0; if (c.dead || Math.hypot(c.x - t.x, c.y - t.y) > r + .6) continue; if (soVerdict(c, t, socBy(ab, 'vk', t), { D: abD(s2) })) n2++; }
+        for (const c of L) { if (c.socChalBy === t) c.socChalT = 0; if (c.dead || Math.hypot(c.x - t.x, c.y - t.y) > r + .6) continue; soAbHit(t, s2, c, 1.5 * socBy(ab, 'vk', t), 'magic'); n2++; }
         sfx('so_flare'); t.socChal = G.time;
         socFx('so_rebuke', t, t, C => { v2Area(C, t.x, t.y, r, { sp: 'gold', n: 8, rim: 'spark', rn: 8, light: 1, deep: n2 ? 1 : 0 }); });
       } });
@@ -37809,7 +37858,7 @@ socDef('so_witness', { name: 'Bear Witness', short: 'Witness', glyph: 'eye', hue
   by: { dur: [6, 6, 7, 7, 8, 8], k: [.2, .2, .2, .2, .2, .2], wj: [0, 0, 0, 0, 0, 0], max: [6, 6, 6, 6, 6, 6] },
   none: 'no foe to condemn in reach',
   auto: 'a boss or elite within reach + 1 that is not yet condemned, else the toughest foe there already carrying 3 or more Judgement',
-  text: (t, st, ab) => { const k = socBy(ab, 'k', t), M = socBy(ab, 'max', t), wj = socBy(ab, 'wj', t); return `Condemns a foe for ${socBy(ab, 'dur', t)}s. Each unit of the Order that strikes it swears as a witness (up to ${M})${wj ? `, laying ${wj} Judgement` : ''}. Then it hears its Verdict, ${Math.round(k * 100)}% stronger per witness.`; },
+  text: (t, st, ab) => { const k = socBy(ab, 'k', t), M = socBy(ab, 'max', t), wj = socBy(ab, 'wj', t); return `Condemns a foe for ${socBy(ab, 'dur', t)}s. Each unit of the Order that strikes it swears as a witness (up to ${M})${wj ? `, laying ${wj} Judgement` : ''}. Then its Judgement is filled to the full and bursts, ${Math.round(k * 100)}% stronger per witness.`; },
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => !(c.soCondT > G.time)); if (man) return abToughest(L); return abToughest(L.filter(abBig)) || abToughest(L.filter(c => soJ(c) >= 3)); },
   cast(t, st, c, ab) {
     const d = socBy(ab, 'dur', t);
@@ -37834,7 +37883,7 @@ function socWitTick() {
     const t = c.socWitBy, ab = c.socWitAb, W = c.socWit.size; c.socWit = null;
     if (!t || !abLive(t)) continue;
     const k = 1 + socBy(ab, 'k', t) * W;
-    socAs('so_witness', () => soVerdict(c, t, k));   // (read while it is still Condemned: half again)
+    socAs('so_witness', () => soFill(c, t, { k }));   // the testimony read: it bursts (read while it is still Condemned: half again)
     sfx('so_vow');
     socFx('so_witness', t, c, C => { v2Shaft(C, c.x, c.y, { foe: c, w: .22 + .03 * W, life: .7 }); v2Hit(C, c.x, c.y, hitH(c), (.7 + .08 * W) * C.S, { sp: 'gold', n: 8 + W, sp2: 'spark', n2: 6, shake: W >= 4 ? .08 : 0 }); });
   }
@@ -37902,7 +37951,7 @@ function socLeashTick() {
     const t = Lk.by; if (!abLive(t)) continue; const s = t.st || effStats(t), sc = socBy(Lk.ab, 'scour', t);
     socAs('so_flare', () => {
       soAbHit(t, s, c, .9, 'magic');
-      if (s.caps && s.caps.tchGlare && !c.dead) soVerdict(c, t, 2.5 * s.caps.tchGlare);   /* (Glare of Dawn: the snap delivers a Verdict) */
+      if (s.caps && s.caps.tchGlare && !c.dead) soJudge(c, 2 * s.caps.tchGlare, t);   /* (Glare of Dawn: the snap Judges) */
       if (sc > 0) inSplash(c.x, c.y, .8, true, o => { if (!socFoe(o) || !canTarget(t, s, o)) return; soBlind(o, sc, t); });
     });
     sfx('ward', 1);
@@ -37960,12 +38009,12 @@ socDef('so_shackle', { name: 'Vigil Chains', short: 'Vigil', glyph: 'web', hue: 
 /* =====================================================================================================
    4. GRAIL KNIGHTS
    ===================================================================================================== */
-// Tourney Passes: pass after pass at one foe, the lance broken on it each time; the last pass delivers its Verdict
+// Tourney Passes: pass after pass at one foe, the lance broken on it each time; the last pass strikes three times as hard
 socDef('so_ridedown', { name: 'Tourney Passes', short: 'Tourney', glyph: 'tremor', hue: '#e8d8b0', mana: 80, cd: 12, rAdd: .5,
   by: { n: [3, 3, 3, 3, 4, 4], hits: [4, 4, 4, 4, 5, 5], kd: [.3, .3, .35, .35, .4, .4], tj: [1, 1, 1, 1, 1, 1] },
   none: 'no ground foe in reach',
   auto: 'the toughest ground foe within reach + 0.5: a boss or elite, one carrying 2 or more Judgement, or any when three or more ground foes are in reach',
-  text: (t, st, ab) => `Rides ${socBy(ab, 'n', t)} passes at the toughest ground foe: each deals ${xD(st, .5)}, knocks it down ${socBy(ab, 'kd', t)}s and Judges it, trampling the ground foes between (${xD(st, .35)}, ${socBy(ab, 'tj', t)} Judgement). The last pass delivers its Verdict.`,
+  text: (t, st, ab) => `Rides ${socBy(ab, 'n', t)} passes at the toughest ground foe: each deals ${xD(st, .5)}, knocks it down ${socBy(ab, 'kd', t)}s and Judges it, trampling the ground foes between (${xD(st, .35)}, ${socBy(ab, 'tj', t)} Judgement). The last pass breaks the lance on it: ${xD(st, 1.5)}.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); const c = abToughest(L); if (!c) return null; return man || abBig(c) || soJ(c) >= 2 || L.length >= 3 ? c : null; },
   cast(t, st, c, ab) {
     const n = Math.round(socBy(ab, 'n', t)), P = .55, A = t.ab; let tg = c;
@@ -37981,7 +38030,7 @@ socDef('so_ridedown', { name: 'Tourney Passes', short: 'Tourney', glyph: 'tremor
         for (const q of abLine(t, s2, t.x, t.y, ux, uz, Lr, .4, abWalker)) { if (q === o) continue; soAbHit(t, s2, q, .35, 'phys'); if (!q.dead) soJudge(q, socBy(ab, 'tj', t), t); fxDust(q.x, q.y, 2); }
         soAbHit(t, s2, o, .5, 'phys', [ux * .25, uz * .25]); if (o.dead) return;
         soJudge(o, 1, t);   // (no knockdown: the Knights hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js)
-        const last = k === n - 1; if (last) soVerdict(o, t, 1);
+        const last = k === n - 1; if (last && !o.dead) soAbHit(t, s2, o, 1, 'phys');   // (the last pass: 1.5 in all; it was a Verdict)
         sfx('so_ridedown', 1); G.shake = Math.max(G.shake, last ? .08 : .04);
         socFx('so_ridedown', t, o, C => {
           v2Band(C, t.x, t.y, ux, uz, Lr + .3, .22, { col: socC(C, SOC.gold), al: .3, life: .5, sweep: .1 });
@@ -38111,12 +38160,12 @@ SOC_DRAW.socsweep = q => {
    6. TEMPLARS OF THE FORD (once the Hammer Templars)
    ===================================================================================================== */
 // Whirling Flurry (once Shield Fervour): he turns through a whirl of cuts, the blades in turn, each striking every walker in reach
-// and Judging it; the last cut, both blades together, delivers their Verdicts. Whirling Edge (tpWhirl) fills his Blade Momentum.
+// and Judging it (so a foe that stays in it bursts); the last cut, both blades together, strikes hardest. Whirling Edge (tpWhirl) fills his Blade Momentum.
 socDef('so_hallow', { name: 'Whirling Flurry', short: 'Flurry', glyph: 'whirl', hue: '#ffe8a0', mana: 90, cd: 14,
   by: { n: [5, 5, 6, 6, 7, 7], reach: [0, 0, 0, 0, 0, 0], vk: [.6, .6, .6, .6, .6, .6] },
   none: 'no ground foe in reach',
   auto: 'two or more ground foes in reach, or a boss or leader',
-  text: (t, st, ab) => { const rk = socBy(ab, 'reach', t); return `${socBy(ab, 'n', t)} cuts in two seconds, the blades in turn as he whirls, each striking every ground foe in reach${rk ? ` (${Math.round(rk * 100)}% farther)` : ''} for ${xD(st, .22)} and a Judgement. The last, both blades together, delivers each one's Verdict at ${Math.round(socBy(ab, 'vk', t) * 100)}%.`; },
+  text: (t, st, ab) => { const rk = socBy(ab, 'reach', t); return `${socBy(ab, 'n', t)} cuts in two seconds, the blades in turn as he whirls, each striking every ground foe in reach${rk ? ` (${Math.round(rk * 100)}% farther)` : ''} for ${xD(st, .22)} and a Judgement. The last, both blades together, strikes for ${xD(st, .22 + socBy(ab, 'vk', t))}.`; },
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(c => c.def.boss || c.def.lead)) ? t : null; },
   cast(t, st, _, ab) {
     const n = Math.round(socBy(ab, 'n', t)), iv = .3, A = t.ab;
@@ -38126,8 +38175,7 @@ socDef('so_hallow', { name: 'Whirling Flurry', short: 'Flurry', glyph: 'whirl', 
       if (!abLive(t)) return; const s = t.st || effStats(t), R0 = s.range * (1 + socBy(ab, 'reach', t)), last = k === n - 1;
       inSplash(t.x, t.y, R0, true, c => {
         if (!socFoe(c) || !canTarget(t, s, c)) return;
-        soAbHit(t, s, c, .22, 'phys'); if (c.dead) return; soJudge(c, 1, t);
-        if (last && soJ(c) >= 1) soVerdict(c, t, socBy(ab, 'vk', t));
+        soAbHit(t, s, c, .22 + (last ? socBy(ab, 'vk', t) : 0), 'phys'); if (c.dead) return; soJudge(c, 1, t);
       });
       if (s.caps && s.caps.tpWhirl) t.tpMomT = G.time;   // (the whirl keeps his Momentum up)
       const kind = last ? 2 : k % 2;
@@ -38140,7 +38188,7 @@ socDef('so_hallow', { name: 'Whirling Flurry', short: 'Flurry', glyph: 'whirl', 
 // Sword of Heaven: one of his two swords hurled into the sky; a moment later it falls on its foe as a star and flies back to his hand.
 // Second Star (tpStar, capstone): the other sword follows it, on the next toughest walker in reach.
 function tpStarFall(t, s, c, x, z, k, vk, wave) {
-  if (!c.dead) { soAbHit(t, s, c, 3.6 * k, 'phys'); if (!c.dead && vk) soVerdict(c, t, vk); }   // (vk 0: the Second Star, a sword's blow alone)
+  if (!c.dead) { soAbHit(t, s, c, 3.6 * k, 'phys'); if (!c.dead && vk) soJudge(c, 3, t); }   // (3 Judgement; vk 0: the Second Star, a sword's blow alone)
   inSplash(x, z, wave, true, o => { if (o === c || !socFoe(o) || !canTarget(t, s, o)) return; soAbHit(t, s, o, .6 * k, 'phys'); if (!o.dead) soJudge(o, 1, t); });
   G.shake = Math.max(G.shake, .08); sfx('so_hammerfall', 1);
   socFx('so_hammerfall', t, c, C => {
@@ -38152,7 +38200,7 @@ socDef('so_hammerfall', { name: 'Sword of Heaven', short: 'Heaven', glyph: 'boun
   by: { wave: [.9, .9, .9, 1, 1, 1] },
   none: 'no ground foe in reach',
   auto: 'the toughest ground foe within reach + 1.5 cells (bosses and elites first)',
-  text: (t, st, ab) => `He hurls one of his swords into the sky and it falls like a star on the toughest ground foe: ${xD(st, 3.6)} and a Verdict half again as strong. The ground foes within ${gNf(socBy(ab, 'wave', t))} cells take ${xD(st, .6)} and a Judgement. Then it flies back to his hand.`,
+  text: (t, st, ab) => `He hurls one of his swords into the sky and it falls like a star on the toughest ground foe: ${xD(st, 3.6)} and 3 Judgement. The ground foes within ${gNf(socBy(ab, 'wave', t))} cells take ${xD(st, .6)} and a Judgement. Then it flies back to his hand.`,
   pick: (t, st, ab) => abToughest(abFoes(t, st, abReach(t, st, ab), abWalker)),
   cast(t, st, c, ab) {
     t.soThrow = { x: c.x, z: c.y }; t.socThrowC = c; t.cd = Math.max(t.cd, 1.6); sfx('so_hammerfall', 0);
@@ -38162,7 +38210,7 @@ socDef('so_hammerfall', { name: 'Sword of Heaven', short: 'Heaven', glyph: 'boun
       const L = abFoes(t, s, abReach(t, s, ab), abWalker), c2 = abToughest(L.filter(o => o !== c)) || (!c.dead && c);
       if (!c2) return; soEv('cap:tpStar'); t.tpStar2 = { x: c2.x, z: c2.y, at: G.time };
       socFx('so_hammerfall', t, c2, C => v2Shaft(C, c2.x, c2.y, { foe: c2, w: .07, h: 4, life: .5, fin: .6, delay: 0 }));
-      tpStarFall(t, s, c2, c2.x, c2.y, 1, 0, socBy(ab, 'wave', t));   // (the second sword just as hard, with no Verdict: forces_zzz..._own_silver.js, 23 Nov 2026)
+      tpStarFall(t, s, c2, c2.x, c2.y, 1, 0, socBy(ab, 'wave', t));   // (the second sword just as hard, with no Judgement: forces_zzz..._own_silver.js, 23 Nov 2026)
     });
   } });
 // the sword's flight (Sword of Heaven; the old names soFlyingHammer and the part key 'hammer' are kept: other files wrap them): up out of the hand into the sky, gone, then falling on its foe, and back to the hand (soExtra calls this
@@ -38230,7 +38278,7 @@ socDef('so_embers', { name: 'Kindle the Censers', short: 'Kindle', glyph: 'ember
   by: { n: [5, 5, 6, 6, 7, 7], keep: [0, 0, 0, 0, 0, 0] },
   none: 'no incense on the road in reach, and no crowd to throw a coal at',
   auto: 'three or more ground foes standing in incense in reach (any Censer\'s), or with no incense, three or more ground foes in reach: a coal first',
-  text: (t, st, ab) => { const kp = socBy(ab, 'keep', t); return `Up to ${socBy(ab, 'n', t)} incense patches in reach flare: ${xD(st, 1)} and a Judgement to each ground foe in them, and a 50% Verdict on those with 3 or more${kp > 0 ? `; each smoulders on ${gNf(kp)}s` : ''}. With none, it lights the thickest crowd.`; },
+  text: (t, st, ab) => { const kp = socBy(ab, 'keep', t); return `Up to ${socBy(ab, 'n', t)} incense patches in reach flare: ${xD(st, 1)} and 2 Judgement to each ground foe in them${kp > 0 ? `; each smoulders on ${gNf(kp)}s` : ''}. With none, it lights the thickest crowd.`; },
   pick(t, st, ab, man) {
     const L = socKindleList(t, st, ab), n = L.reduce((a, q) => a + q.n, 0);
     if (L.length && n >= (man ? 1 : 3)) return { x: L[0].z.x, y: L[0].z.z };
@@ -38244,7 +38292,7 @@ socDef('so_embers', { name: 'Kindle the Censers', short: 'Kindle', glyph: 'ember
       sfx('so_embers', 0);
       L.forEach(({ z }, i) => G.delayed.push({ t: .05 + i * .07, fn: () => {
         if (!abLive(t)) return; const s2 = t.st || effStats(t);
-        inSplash(z.x, z.z, z.r + .1, true, c => { if (!socFoe(c) || !canTarget(t, s2, c)) return; if (soJ(c) >= 3) soVerdict(c, t, .5); soAbHit(t, s2, c, 1, 'magic'); if (!c.dead) soJudge(c, 1, t); });
+        inSplash(z.x, z.z, z.r + .1, true, c => { if (!socFoe(c) || !canTarget(t, s2, c)) return; soAbHit(t, s2, c, 1, 'magic'); if (!c.dead) soJudge(c, 2, t); });
         z.t = Math.min(z.t, kp > 0 ? kp : .05); sfx('so_embers', 1);
         socFx('so_embers', t, null, C => {
           const m = sfxMuzzle(t); if (m && i < 4) v2Beam(C, m[0], m[1], m[2], z.x, .15, z.z, { L: VT.ENERGY, w: .035, life: .3, col: socC(C, SOC.fire), ccol: socC(C, '#fff0c0', 1.5), sag: -.2, tube: 0 });
@@ -38371,10 +38419,10 @@ SOC_DRAW.socroar = (q, u, a) => { const r = q.r * v2Ease(u), w = .18 + .1 * u; i
 
 // The Crossing (once The Lion's Due): an advance across the road on foot, shield-first, each stride a blow at the most-Judged walker near the last
 socDef('ch_lionsdue', { name: 'The Crossing', short: 'Crossing', glyph: 'target', hue: '#ffd76a', mana: 130, cd: 22,
-  by: { n: [3, 3, 4, 4, 5, 5], mult: [2.6, 2.8, 3.1, 3.4, 3.7, 4], j: [2, 2, 2, 2, 2, 2] },
+  by: { n: [3, 3, 4, 4, 5, 5], mult: [2.6, 2.8, 3.1, 3.4, 3.7, 4], j: [3, 3, 3, 3, 3, 3] },   // (3 Judgement a blow: it was 2 and a Verdict on 3+, 24 Nov 2026)
   none: 'no ground foe in reach',
   auto: 'three or more ground foes in reach, or a boss or elite',
-  text: (t, st, ab) => `He crosses the road shield-first, ${socBy(ab, 'n', t)} strides from Judged foe to Judged foe, the most-Judged first, a blow at each: ${xD(st, socBy(ab, 'mult', t))} and ${socBy(ab, 'j', t)} Judgement each. A foe left with 3 or more hears its Verdict.`,
+  text: (t, st, ab) => `He crosses the road shield-first, ${socBy(ab, 'n', t)} strides from Judged foe to Judged foe, the most-Judged first, a blow at each: ${xD(st, socBy(ab, 'mult', t))} and ${socBy(ab, 'j', t)} Judgement each.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length || !(man || L.length >= 3 || L.some(abBig))) return null; return L.reduce((b, c) => !b || soJ(c) > soJ(b) || (soJ(c) === soJ(b) && abByTough(c, b) < 0) ? c : b, null); },
   cast(t, st, c, ab) {
     const n = Math.round(socBy(ab, 'n', t)), P = .42, A = t.ab, struck = new Set(); let tg = c, lx = t.x, lz = t.y;
@@ -38397,7 +38445,7 @@ socDef('ch_lionsdue', { name: 'The Crossing', short: 'Crossing', glyph: 'target'
       G.delayed.push({ t: .18, fn: () => {
         if (o.dead || G.state !== 'play') return; const s2 = t.st || st;
         abHit(t, s2, o, socBy(ab, 'mult', t), 'phys', [ux * .2, uz * .2]);
-        if (!o.dead) { soJudge(o, socBy(ab, 'j', t), t); if (soJ(o) >= 3) soVerdict(o, t, 1); }
+        if (!o.dead) soJudge(o, socBy(ab, 'j', t), t);
         if (o.dead) { more(); return; }
         G.shake = Math.max(G.shake, .06); abSfx('thrust', 1);
         socFx('ch_lionsdue', t, o, C => {
@@ -38533,13 +38581,13 @@ socDef('ch_summons', { name: 'Debt Collection', short: 'Debt', glyph: 'chains', 
   },
   anim: chAnim('draw', { T: .95, tip: ['main', [-.13, -.03, .45]], col: [.85, .9, 1.2], on: [.2, .7] }) });
 
-// Final Verdict: the name in the ledger. When it dies its Judgement passes on, and each foe that takes it hears a Verdict; if it
-// lives to the end, the gavel falls on it
-socDef('ch_verdict', { name: 'Final Verdict', short: 'Verdict', glyph: 'skull', hue: '#e8ecf4', mana: 120, cd: 20,
+// The Gavel (once Final Verdict; the id is kept): the name in the ledger. When it dies its Judgement passes on to the foes round
+// it (those it fills burst); if it lives to the end, the gavel falls: its Judgement is filled and bursts at double strength
+socDef('ch_verdict', { name: 'The Gavel', short: 'Gavel', glyph: 'skull', hue: '#e8ecf4', mana: 120, cd: 20,
   by: { r: [1.5, 1.5, 1.5, 1.6, 1.6, 1.6], dur: [10, 10, 10, 10, 10, 10], pass: [.5, .5, .5, .5, .5, .5], gavel: [2, 2, 2, 2, 2, 2] },
   none: 'no foe in his reach',
   auto: 'a Judged foe in reach with three or more others near it (the toughest first), or a boss or elite; foes already in the ledger don\'t count',
-  text: (t, st, ab) => `Writes a foe in the ledger for ${socBy(ab, 'dur', t)}s and Judges it twice. If it dies, its Judgement spreads to foes within ${gNf(socBy(ab, 'r', t))} cells with a ${Math.round(socBy(ab, 'pass', t) * 100)}% Verdict; if it lives, its Verdict falls at ${Math.round(socBy(ab, 'gavel', t) * 100)}%.`,
+  text: (t, st, ab) => `Writes a foe in the ledger for ${socBy(ab, 'dur', t)}s and Judges it twice. If it dies, its Judgement passes to every foe within ${gNf(socBy(ab, 'r', t))} cells; if it lives, the gavel falls: its Judgement is filled and bursts at ${socBy(ab, 'gavel', t) === 2 ? 'double' : Math.round(socBy(ab, 'gavel', t) * 100) + '%'} strength.`,
   pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => !(c.chVerdictT > G.time)); if (!L.length) return null; if (man) return abToughest(L); const c = abCrowd(L, 1.5); return c && (c.n >= 3 || L.some(abBig)) ? abToughest(L.filter(o => Math.hypot(o.x - c.c.x, o.y - c.c.y) <= 1.5 || abBig(o))) : null; },
   cast(t, st, c, ab) {
     c.chVerdictT = G.time + socBy(ab, 'dur', t); c.chVerdictBy = t.id; soJudge(c, 2, t);
@@ -38567,21 +38615,21 @@ function socLedgerTick() {
     c.chVerdictT = 0;   // it lived to the end: the gavel falls
     const t = G.towers.find(o => o.id === c.chVerdictBy && !o.wrecked); if (!t) continue;
     const gv = socBy(ABIL.ch_verdict, 'gavel', t), wide = t.st && t.st.caps && t.st.caps.so_wide_reck ? nearest(c.x, c.y, 1.2, 6, c, q => socFoe(q) && soJ(q) > 0) : [];
-    // (Wide Reckoning: the gavel falls on the Judged round it too, at half)
-    socAs('ch_verdict', () => { soVerdict(c, t, gv); for (const o of wide) if (!o.dead) { soStreak(c.x, hitH(c), c.y, o, '#e8ecf4', .04, .3); soVerdict(o, t, gv * .5, { quiet: 1 }); fxRing(o.x, o.y, .4, SO.COL.gold); } });
+    // (an old Wide Reckoning: the Judged round it gain 2 Judgement too)
+    socAs('ch_verdict', () => { soFill(c, t, { k: gv }); for (const o of wide) if (!o.dead) { soStreak(c.x, hitH(c), c.y, o, '#e8ecf4', .04, .3); soJudge(o, 2, t); fxRing(o.x, o.y, .4, SO.COL.gold); } });
     if (wide.length) soEv('cap:so_wide_reck');
     abSfx('bellow', 1); socGavelFx(t, c, c.x, c.y, true);
   }
   G.socLedger = L.filter(c => !c.dead && c.chVerdictT > 0);
 }
-if (typeof CHAMPS !== 'undefined' && CHAMPS.so_judge) CHAMPS.so_judge.kill = function (c, src, t) {   // the named foe dies: its Judgement passes on, and each who takes it hears a Verdict
+if (typeof CHAMPS !== 'undefined' && CHAMPS.so_judge) CHAMPS.so_judge.kill = function (c, src, t) {   // the named foe dies: its Judgement passes on (a foe it fills bursts)
   if (!(c.chVerdictT > G.time) || c.chVerdictBy !== t.id) return;
   c.chVerdictT = 0;
   const ab = ABIL.ch_verdict, n = Math.max(2, c.soJT > G.time ? c.soJ | 0 : 0), r = socBy(ab, 'r', t), pk = socBy(ab, 'pass', t), x = c.x, z = c.y;
   const L = nearest(x, z, r, 8, c, q => !q.phased && !q.ent);
   for (const o of L) { soJudge(o, n, t); soStreak(x, hitH(c), z, o, '#e8ecf4', .04, .3); }
-  soVerdictFx(x, z, hitH(c), n, t); socGavelFx(t, null, x, z, false);
-  G.delayed.push({ t: .3, fn: () => { if (G.state !== 'play' || !G.towers.includes(t)) return; socAs('ch_verdict', () => { for (const o of L) if (!o.dead) soVerdict(o, t, pk); }); } });
+  fxRing(x, z, r, SO.COL.gold); socGavelFx(t, null, x, z, false);
+  void pk;   // (ab.by.pass: the strength of the old Verdict on each, unused since 24 Nov 2026)
 };
 
 /* =====================================================================================================
@@ -38790,13 +38838,13 @@ const FSETS = [
       }
     } },
 
-  /* ---------------- the Silver Order: Judgement, Verdicts, Radiance ---------------- */
+  /* ---------------- the Silver Order: Judgement and its burst, Radiance ---------------- */
   { id: 'fs_witness', spells: ['so_witness', 'so_hail'], force: 'silver', unit: 'arrow', name: 'Witness-Keeper’s Arms',
     pieces: [['fs_so_windlass', 'Witness-Keeper’s Windlass', 3, 'quick', '#8ab0b8', 'as range'], ['fs_so_ledger', 'Ledger of Sins', 3, 'scales', '#c8ccd8', 'dmg crit']],
     old: [['fs_so_seal', 'Seal of the Second Witness', 3, 'eye', '#f0e0a0', 'dmg as pen']],
-    b2: 'Bear Witness also fills its foe’s Judgement to the full. Flare Bolt: a hit of its bolt or its flare that leaves its foe at full Judgement delivers its Verdict.',
+    b2: 'Bear Witness also fills its foe’s Judgement to the full, so it bursts. Flare Bolt: a hit of its bolt or its flare that bursts its foe’s Judgement lays 2 more at once.',
     cast(t, ab, tg) { if (ab.id !== 'so_witness') return; for (const c of [].concat(tg || [])) if (c && c.hp > 0 && c.def) { soJudge(c, soJMax(), t); fsGlint(t, this); } },
-    hit(t, c, amt, sp, n) { if (n >= 2 && sp === 'so_hail' && c.hp > 0 && soJ(c) >= soJMax()) soVerdict(c, t, 1); } },
+    hit(t, c, amt, sp, n) { if (n >= 2 && sp === 'so_hail' && c.hp > 0 && soFull(c)) soJudge(c, 2, t); } },
   { id: 'fs_penance', spells: ['so_crush', 'so_hammerfall'], force: 'silver', unit: 'earth', name: 'Penitent’s Anvil',
     pieces: [['fs_so_gauntlet', 'Penitent’s Gauntlet', 3, 'fist', '#9aa8c8', 'dmg pen'], ['fs_so_pauldron', 'Bell-Iron Pauldron', 3, 'shield', '#b0b8c8', 'dmg as crit']],
     b2: 'Cross-Cut Blinds every foe it strikes for 1s, and each Cross-Cut brings Sword of Heaven 3s nearer.',
@@ -41084,7 +41132,7 @@ if (typeof fsetAdd === 'function') {
    the hooks gated at 2; the pieces cut (two relics and the charm) are listed in `old`, set-less epics an old save still loads.
    The rest of this note is from when the sets had four pieces.
    The rules, drops and UI are forces_zzzz_sets.js and fsets_ui.js (S.epic). Each set's (2) leans on one of the unit's
-   spells or the Order's pillars (Judgement and Verdicts, Blind); its (4) changes how the unit plays: a spell that chains on,
+   spells or the Order's pillars (Judgement and its burst, Blind); its (4) changes how the unit plays: a spell that chains on,
    or casts another. Pieces: [id, name, 3, icon, hue, 'stat weights']; the fourth is the charm. Loaded after every other
    forces_* file, so the spells are their final selves (forces_zzz_silver_cool.js). */
 
@@ -41094,12 +41142,12 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_so_bulwark', epic: 1, spells: ['so_bash', 'so_aegis'], force: 'silver', unit: 'glaive', name: 'Bulwark of the Last Gate',
     pieces: [['fe_so_gateboss', 'Last-Gate Gorget', 3, 'ring', '#9fb8e8', 'dmg pen'], ['fe_so_oathmail', 'Oathmail Hauberk', 3, 'fist', '#b0bcd0', 'as crit']],
     old: [['fe_so_wardhelm', 'Helm of the Unbroken Line', 3, 'halo', '#c8d8f0', 'dmg as range'], ['fe_so_gatekey', 'Key of the Last Gate', 3, 'ring', '#bfe0ff', 'regen cd']],
-    b2: 'Bulwark Bash lays 2 more Judgement on its foe. A Bulwark Bash that fills its foe’s Judgement delivers its Verdict at once, and Rampart of Dawn rolls out free (at most once every 10s).',
+    b2: 'Bulwark Bash lays 2 more Judgement on its foe. A Bulwark Bash that fills its foe’s Judgement, so it bursts, rolls out Rampart of Dawn free (at most once every 10s).',
     hit(t, c, amt, sp, n) {
       if (sp !== 'so_bash' || c.dead || !fsOnce(t, 'feBash')) return;
       soJudge(c, 2, t);
-      if (n < 2 || soJ(c) < soJMax()) return;
-      soVerdict(c, t, 1); fsGlint(t, this);
+      if (n < 2 || !soFull(c)) return;
+      fsGlint(t, this);
       if ((t.feRampT || 0) > G.time) return;
       t.feRampT = G.time + 10;
       fsLater(.35, () => { if (abLive(t)) fsFreeCast(t, 'so_aegis'); });
@@ -41121,18 +41169,18 @@ if (typeof fsetAdd === 'function') {
         rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: o, col: '#fff4cc', w: .05, life: .3 });
         fsStrike(t, o, m); if (!o.dead) soJudge(o, 3, t);
         fxSpark(o.x, o.y, hitH(o), '#dfe6f0', 8); fsGlint(t, S);
-        if ((soJ(o) >= soJMax() || soJ(c) >= soJMax()) && !((t.feFlareT || 0) > G.time)) {
+        if ((soFull(o) || soFull(c)) && !((t.feFlareT || 0) > G.time)) {
           t.feFlareT = G.time + 8;
           fsLater(.25, () => { if (abLive(t)) fsFreeCast(t, 'so_hail'); });
         }
       });
     } });
 
-  /* ---------- Lightbinder Sisters: the chains that read the Verdict ---------- */
+  /* ---------- Lightbinder Sisters: the chains that read the sentence ---------- */
   fsetAdd({ id: 'fe_so_chains', epic: 1, spells: ['so_bind', 'so_flare'], force: 'silver', unit: 'frost', name: 'Raiment of the Dawn Penitent',
     pieces: [['fe_so_lightstaff', 'Staff of Morning Links', 3, 'chain', '#fff0b8', 'sp mana'], ['fe_so_veil', 'Veil of the Blind Vigil', 3, 'eye', '#fffbe8', 'sp regen']],
     old: [['fe_so_penitcrown', 'Penitent’s Thorn-Crown', 3, 'halo', '#ffe9a0', 'sp cd range'], ['fe_so_rosebead', 'Rosary of Seven Dawns', 3, 'echo', '#ffd77a', 'mana cd']],
-    b2: 'Binding Light Blinds each foe it binds for 2s. When Binding Light seizes 3 or more foes, each one it Blinded hears its Verdict, and Chain of Penance is cast at once, free (at most once every 8s).',
+    b2: 'Binding Light Blinds each foe it binds for 2s. When Binding Light seizes 3 or more foes, each one it Blinded gains 2 Judgement, and Chain of Penance is cast at once, free (at most once every 8s).',
     hit(t, c, amt, sp, n) {
       if (sp !== 'so_bind' || c.dead) return;
       soBlind(c, 2, t);
@@ -41144,7 +41192,7 @@ if (typeof fsetAdd === 'function') {
       const L = t.feBindL, S = this;
       fsLater(.4, () => {
         if (!abLive(t)) return;
-        fsQuiet(() => { for (const o of L) if (!o.dead && soBlinded(o)) soVerdict(o, t, 1); });
+        fsQuiet(() => { for (const o of L) if (!o.dead && soBlinded(o)) soJudge(o, 2, t); });
         if (fsFreeCast(t, 'so_flare')) fsGlint(t, S);
       });
     } });
@@ -41153,7 +41201,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_so_grail', epic: 1, spells: ['so_grail', 'so_ridedown', 'so_vow'], force: 'silver', unit: 'arcane', name: 'Tack of the Grail Pilgrim',
     pieces: [['fe_so_grailance', 'Pilgrim’s Grail-Lance', 3, 'arrowhead', '#ffe08a', 'dmg pen'], ['fe_so_caparison', 'Sunthread Caparison', 3, 'banner', '#fff4c8', 'as crit']],
     old: [['fe_so_greathelm', 'Greathelm of the Long Road', 3, 'shield', '#e8d8b0', 'dmg as range'], ['fe_so_spur', 'Gilded Pilgrim’s Spur', 3, 'horn', '#ffd77a', 'cd regen']],
-    b2: 'Grail Charge lays 2 Judgement on its foe before its Verdict falls. When Grail Charge’s foe falls, the knight rides on: Tourney Passes are cast at once, free, and Charge of the Vow comes 6s nearer (at most once every 8s).',
+    b2: 'Grail Charge lays 2 Judgement on its foe. When Grail Charge’s foe falls, the knight rides on: Tourney Passes are cast at once, free, and Charge of the Vow comes 6s nearer (at most once every 8s).',
     cast(t, ab, tg) { if (ab.id === 'so_grail' && tg && tg.def) { t.feGrailJ = tg; t.feGrailTg = tg; t.feGrailAt = G.time; } },
     hit(t, c, amt, sp) { if (sp === 'so_grail' && c === t.feGrailJ && !c.dead) { t.feGrailJ = null; soJudge(c, 2, t); fsGlint(t, this); } },
     kill(t, c, n) {
@@ -42747,8 +42795,8 @@ function socxSnap(t, z) {
       if (!G.towers.includes(o) || o.wrecked) continue;
       for (const c of G.creeps.slice()) {
         if (hit.has(c) || !socFoe(c) || !abWalker(c) || !canTarget(t, s, c) || socSeg(c.x, c.y, t.x, t.y, o.x, o.y)[0] > .5) continue;
-        // (the clarity pass, Nov 2026: the snap is one thing now, a Verdict half again as strong; it was a strike, a bind and a Verdict)
-        hit.add(c); soJudge(c, 1, t); soVerdict(c, t, 1.5);
+        // (the clarity pass, Nov 2026: the snap is one thing now; since 24 Nov 2026 it lays 4 Judgement, which bursts as it fills)
+        hit.add(c); soJudge(c, 4, t);
         socFx('so_shackle', t, c, C => v2Hit(C, c.x, c.y, hitH(c), .5 * C.S, { sp: 'gold', n: 5, ring: 0, light: 0, deep: 0 }));
       }
     }
@@ -42765,7 +42813,7 @@ if (ABIL.so_shackle) {
   };
 }
 
-/* ---------- Sunlance Clerics: Lance of Heaven (each Dawnfall calls a column) and Dawnward (the fallen hear their Verdicts) ---------- */
+/* ---------- Sunlance Clerics: Lance of Heaven (each Dawnfall calls a column) and Dawnward (the fallen are Judged) ---------- */
 if (ABIL.so_dawnfall) {
   const ab = ABIL.so_dawnfall, cast0 = ab.cast;
   ab.cast = function (t, st, F, ab2) {
@@ -42774,7 +42822,7 @@ if (ABIL.so_dawnfall) {
     // (Lance of Heaven: the column falls as they crash)
     if (C.so_heaven) t.soHvT = Math.min(t.soHvT == null ? 6 : t.soHvT, .6);
     if (C.so_dawnward && Array.isArray(F)) soLater(t, .62, () => {
-      for (const c of F) if (!c.dead && soJ(c) > 0 && soVerdict(c, t, 1)) soEv('cap:so_dawnward');
+      for (const c of F) if (!c.dead && soJ(c) > 0 && soJudge(c, 2, t)) soEv('cap:so_dawnward');
     });
     return r0;
   };
@@ -42786,7 +42834,7 @@ function socxKindleAgain(t, s, ab) {
   soEv('cap:so_twice'); sfx('so_embers', 0);
   L.forEach(({ z }, i) => G.delayed.push({ t: .05 + i * .07, fn: () => {
     if (!abLive(t)) return; const s2 = t.st || effStats(t);
-    inSplash(z.x, z.z, z.r + .1, true, c => { if (!socFoe(c) || !canTarget(t, s2, c)) return; if (soJ(c) >= 3) soVerdict(c, t, .5); soAbHit(t, s2, c, 1, 'magic'); if (!c.dead) soJudge(c, 1, t); });
+    inSplash(z.x, z.z, z.r + .1, true, c => { if (!socFoe(c) || !canTarget(t, s2, c)) return; soAbHit(t, s2, c, 1, 'magic'); if (!c.dead) soJudge(c, 2, t); });
     sfx('so_embers', 1);
     socFx('so_embers', t, null, C => {
       v2Shaft(C, z.x, z.z, { w: .14, h: 1.3, life: .45, fin: .08, col: socC(C, '#ff9a40'), hot: socC(C, '#fff0c0', 1.6) });
@@ -42822,19 +42870,24 @@ if (ABIL.ch_fordstandard) {
   };
 }
 
-/* ---------- Aurelian: Debt of Oaths (the Order's Verdicts near him bring The Crossing nearer; the Shieldbearers' bashes: forces_zzzzzzzzzz_shieldline.js) ---------- */
+/* ---------- Aurelian: Debt of Oaths (each Twin Cut of a Templar of the Ford near him brings Dawnsweep nearer) ----------
+   (24 Nov 2026: it counted the Order's Verdicts near him; the Verdict is gone, and a capstone never waits on Judgement, so it
+   counts his own Templars' Twin Cuts, both blades together: Blades of the Ford) */
 {
-  const after0 = soAfterVerdict;
-  soAfterVerdict = function (c, src, n, x, z, st) {
-    after0(c, src, n, x, z, st);
-    if (G.hero !== 'so_lion' || !src || !src.def) return;
-    const L = G.towers.find(o => o.id === G.champ && !o.wrecked); if (!L || !L.ab || !socxCaps(L).so_lion_debt) return;
-    if (Math.hypot(L.x - x, L.y - z) > 2 || !socxGate(L, 'debt', .5)) return;
-    const A = L.ab; if (A.cd.ch_lioncharge > G.time) { A.cd.ch_lioncharge = Math.max(G.time, A.cd.ch_lioncharge - 1); soEv('cap:so_lion_debt'); }   /* (Debt of Oaths readies Dawnsweep since 19 Nov 2026; it was The Crossing, 1.5s) */
+  const slam0 = soSlam;
+  soSlam = function (t, st, pow, mult, o) {
+    const r = slam0.call(this, t, st, pow, mult, o);
+    if (r > 0 && G.hero === 'so_lion' && o && o.cut === 2 && t && t.def && t.def.unit === 'templar') {
+      const L = G.towers.find(q => q.id === G.champ && !q.wrecked);
+      if (L && L.ab && socxCaps(L).so_lion_debt && Math.hypot(L.x - t.x, L.y - t.y) <= 2 && socxGate(L, 'debt', .5)) {
+        const A = L.ab; if (A.cd.ch_lioncharge > G.time) { A.cd.ch_lioncharge = Math.max(G.time, A.cd.ch_lioncharge - 1); soEv('cap:so_lion_debt'); }
+      }
+    }
+    return r;
   };
 }
 
-/* ---------- Morrow: Iron Chains (the foes Final Verdict's Judgement passes to are written in the ledger in turn) ---------- */
+/* ---------- Morrow: Iron Chains (the foes The Gavel's Judgement passes to are written in the ledger in turn) ---------- */
 if (typeof CHAMPS !== 'undefined' && CHAMPS.so_judge && CHAMPS.so_judge.kill) {
   const k0 = CHAMPS.so_judge.kill;
   CHAMPS.so_judge.kill = function (c, src, t) {
@@ -42876,7 +42929,7 @@ if (typeof CHAMPS !== 'undefined' && CHAMPS.so_judge && CHAMPS.so_judge.kill) {
 }
 function socxOnKill(c, src) {
   const C = socxCaps(src);
-  // Templars of the Ford's Ringing Steel (once Anvil): a foe slain by its Verdict rings the blade, and it slams again (once a second at most)
+  // Templars of the Ford's Ringing Steel (once Anvil): a foe slain by a burst rings the blade, and it slams again (once a second at most)
   if (C.so_anvil_ring && c.soVK && soUnit(src) && socxGate(src, 'anvil', 1)) {
     G.delayed.push({ t: .15, fn: () => { if (soAlive(src)) { soEv('cap:so_anvil_ring'); soSlam(src, src.st || effStats(src), 1, 1, { sub: 1 }); } } });
   }
@@ -45522,7 +45575,7 @@ ihcWrapCast('ch_firebrew', (raw, t, st, c, ab, again) => {
    (forces_silver_d.js, forces_zs_silver.js, forces_zx_champ_silver.js), each with a cap key (sof*) read here as st.caps.
    Loaded after the capstones (forces_zzzzzzzzz_caps_silver.js) and before the talent names (forces_zzzzzzzzzz_talnames.js);
    every wrapper keeps the original call. Nothing new on screen: the rules reuse the Order's own states and moments
-   (Judgement, Verdicts, Radiance, Wards, Blind, Condemned, dazes and binds). soEv('fresh:<cap>') counts each for the tests. */
+   (Judgement and its burst, Radiance, Wards, Blind, Condemned, dazes and binds). soEv('fresh:<cap>') counts each for the tests. */
 const sofC = t => (t && t.st && t.st.caps) || {};
 const sofU = (t, u) => !!(t && t.def && t.def.unit === u);
 const sofChamp = (t, h) => !!(t && t.def && t.id === G.champ && G.hero === h);
@@ -45592,16 +45645,16 @@ function sofBoltLanded(p, tg, st, src) {
   const C = (st && st.caps) || {};
   if (sofU(src, 'silverbolt')) {
     if (C.sofFirst) { const S = tg.sofHeard || (tg.sofHeard = new Set()); if (!S.has(src.id)) { S.add(src.id); soJudge(tg, C.sofFirst, src); soEv('fresh:sofFirst'); } }   // First Testimony (the Crossbows each foe has heard)
-    if (C.sofTestify && (tg.soCondT > G.time || soJ(tg) >= soJMax())) { sofMana(src, 2 * C.sofTestify); soEv('fresh:sofTestify'); }   // Testimony Heard
+    if (C.sofTestify && (tg.soCondT > G.time || soFull(tg))) { sofMana(src, 2 * C.sofTestify); soEv('fresh:sofTestify'); }   // Testimony Heard
     return;
   }
   if (!sofChamp(src, 'so_judge')) return;
-  if (C.sofSummary && tg.hp < tg.maxHp * .25 && soJ(tg) > 0 && socxGate(src, 'sofSummary', 8 - 2 * C.sofSummary) && soVerdict(tg, src, 1)) soEv('fresh:sofSummary');   // Summary Ruling
+  if (C.sofSummary && tg.hp < tg.maxHp * .25 && !tg.dead && socxGate(src, 'sofSummary', 8 - 2 * C.sofSummary) && soFill(tg, src)) soEv('fresh:sofSummary');   // Summary Ruling: filled, so it bursts
   if (tg.dead) return;
   if (C.sofBailiff && tg.stunT > 0) { soJudge(tg, C.sofBailiff + 1, src); soEv('fresh:sofBailiff'); }   // Bailiff
   if (src.sofQuillN > 0) { src.sofQuillN--; soJudge(tg, 1, src); soEv('fresh:sofQuill'); }   // Clerk's Quill
   if (C.sofLongArm && soJ(tg) >= 3) { chill(tg, { slow: .15 * C.sofLongArm, slowT: 1.5 }, null, src); soEv('fresh:sofLongArm'); }   // Long Arm of the Law
-  if (C.sofGuilt && soJ(tg) >= soJMax()) { SP_RIDE.sofCondemn(tg, C.sofGuilt, src); soEv('fresh:sofGuilt'); }   // Mark of Guilt
+  if (C.sofGuilt && soFull(tg)) { SP_RIDE.sofCondemn(tg, C.sofGuilt, src); soEv('fresh:sofGuilt'); }   // Mark of Guilt
 }
 // Sworn Witnesses: a unit that swears under its Bear Witness shines
 {
@@ -45620,13 +45673,13 @@ function sofBoltLanded(p, tg, st, src) {
   soJudge = function (c, n, src) {
     const was = c ? soJ(c) : 0, r = j0.call(this, c, n, src);
     if (r > 0 && src && src.id === G.champ && G.hero === 'so_judge' && src.def) {
-      const k = sofC(src).sofSwift; if (k && was < soJMax() && soJ(c) >= soJMax()) { sofReady(src, 'ch_sentence', k); soEv('fresh:sofSwift'); }
+      const k = sofC(src).sofSwift; if (k && was < soJMax() && soFull(c)) { sofReady(src, 'ch_sentence', k); soEv('fresh:sofSwift'); }
     }
     return r;
   };
 }
 
-/* ---------- Verdicts: Full Gallop (stronger), then what one sets off ---------- */
+/* ---------- the burst: an old Full Gallop (its Judgement), then what a burst sets off (old talents, kept for their caps) ---------- */
 {
   const v0 = soVerdict;
   soVerdict = function (c, src, k, o) {
@@ -45643,7 +45696,7 @@ function sofBoltLanded(p, tg, st, src) {
     const C = sofC(src);
     if (C.sofGrace && sofU(src, 'grailknight')) { sofMana(src, C.sofGrace * n); soEv('fresh:sofGrace'); }   // Grail's Grace
     if (C.sofPlate && sofU(src, 'templar') && !c.dead) { c.shred = Math.min(2 * C.sofPlate, (c.shredT > 0 ? c.shred || 0 : 0) + C.sofPlate); c.shredT = Math.max(c.shredT || 0, 5); soEv('fresh:sofPlate'); }   // Sundered Plate
-    for (const u of G.towers) {   // Crank on the Verdict: another unit's Verdict in a Crossbow's reach winds its next bolt
+    for (const u of G.towers) {   // (an old Crank: another unit's burst in a Crossbow's reach winds its next bolt)
       if (u === src || !sofU(u, 'silverbolt') || u.wrecked || !u.st) continue;
       const k = u.st.caps && u.st.caps.sofCrank; if (!k || Math.hypot(u.x - x, u.y - z) > u.st.range) continue;
       if (socxGate(u, 'sofCrank', 8 - 2 * k)) { u.cd = 0; soEv('fresh:sofCrank'); }
@@ -45700,7 +45753,7 @@ if (ABIL.so_vow) {
     }
     if (C.sofClear && bl && !echo && !tg.dead && sofChamp(t, 'so_dawn')) {   // Clear Sky
       t.sofClN = (t.sofClN || 0) + 1;
-      if (t.sofClN % 3 === 0 && soVerdict(tg, t, .25 * C.sofClear)) soEv('fresh:sofClear');
+      if (t.sofClN % 3 === 0) { const sh = towerTop(t) + .3; G.delayed.push({ t: .1, fn: () => { if (!tg.dead && soAlive(t)) { soBeamAt(t, t.st || st, tg, ((t.st || st).dmg || 0) * .25 * C.sofClear, sh, false); soEv('fresh:sofClear'); } } }); }   // a second beam (it was a Verdict)
     }
     return r;
   };
@@ -45767,14 +45820,14 @@ if (ABIL.ch_morningstar) {
     try { return cast0.call(this, t, st, p, ab2); } finally { SOF_STILL = pv; if (own) D.push = push0; else delete D.push; }
   };
 }
-// Noon Bell: as High Noon ends, every Blinded, Judged foe in her reach hears its Verdict
+// Noon Bell: as High Noon ends, every Blinded (Exposed) foe in her reach is struck by a beam of hers (it was a Verdict on the Judged)
 if (ABIL.ch_highnoon) {
   const ab = ABIL.ch_highnoon, cast0 = ab.cast;
   ab.cast = function (t, st, p, ab2) {
     const r0 = cast0.call(this, t, st, p, ab2); if (r0 === false || !(st && st.caps && st.caps.sofBell)) return r0;
     G.delayed.push({ t: Math.max(.1, (t.chNoonT || G.time) - G.time), fn: () => {
-      if (!abLive(t)) return; const s = t.st || effStats(t); let n = 0;
-      for (const c of G.creeps.slice()) if (sofFoe(c) && soJ(c) > 0 && canTarget(t, s, c) && inRange(t, s, c) && soVerdict(c, t, .5 * Math.min(2, (s.caps && s.caps.sofBell) || 2))) n++;
+      if (!abLive(t)) return; const s = t.st || effStats(t), sh = towerTop(t) + .3, k = .5 * Math.min(2, (s.caps && s.caps.sofBell) || 2); let n = 0;
+      for (const c of G.creeps.slice()) if (sofFoe(c) && soBlinded(c) && canTarget(t, s, c) && inRange(t, s, c)) { soBeamAt(t, s, c, (s.dmg || 0) * k, sh, n < 1); n++; }
       if (n) { fxRing(t.x, t.y, 1, SO.COL.gold); sfx('ward', 1); soEv('fresh:sofBell'); }
     } });
     return r0;
@@ -47181,7 +47234,7 @@ const sslCaps = t => (t && t.st && t.st.caps) || {};
       if (k) { sfx('so_sweep', .8); soEv('aff:so_lion:cross'); }
     }
     const C = sslCaps(L);
-    // (Debt of Oaths no longer counts the slams: only the Order's Verdicts near him, forces_zzzzzzzzz_caps_silver.js; the clarity pass, Nov 2026)
+    // (Debt of Oaths counts the Templars' Twin Cuts near him again since 24 Nov 2026: forces_zzzzzzzzz_caps_silver.js wraps soSlam)
     // Swift Reprisal: a slam that strikes a walker draws his next strike at once
     if (C.sofReprisal && n >= 1 && socxGate(L, 'sofReprisal', 7 - 1.5 * C.sofReprisal)) { L.cd = 0; soEv('fresh:sofReprisal'); }
     return n;
@@ -47288,7 +47341,9 @@ const TAL_ALIAS = { 'Road of Embers': 'Phoenix', 'Flame Wave': 'Phoenix',   // (
   'Debt of Lions': 'Debt of Oaths', 'Pride': 'Unbroken', 'Bailiff': 'Ride Them Down',
   // (the Templars of the Ford, once the Hammer Templars: Aurelian's own unit with swords and shields)
   'Anvil': 'Ringing Steel', 'Hammer of Judgement': 'Blade of Judgement', 'Marked by the Hammer': 'Marked by the Blade', 'Censed Hammer': 'Censed Blade',
-  'Hammer Fervour': 'Shield Fervour', 'Hammer of Heaven': 'Sword of Heaven', "Lion's Spring": 'Swift Reprisal', "Lion's Roar": 'Bulwark Slam', "The Lion's Due": 'The Crossing', 'Banner at the Ford': 'Bulwark Slam' };
+  'Hammer Fervour': 'Shield Fervour', 'Hammer of Heaven': 'Sword of Heaven', "Lion's Spring": 'Swift Reprisal', "Lion's Roar": 'Bulwark Slam', "The Lion's Due": 'The Crossing', 'Banner at the Ford': 'Bulwark Slam',
+  'Final Verdict': 'The Gavel' };   // (Morrow's ultimate: the Verdict was retired for Judgement's one rule, 24 Nov 2026)
+if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS['The Gavel']) TAL_ART_ALIAS['The Gavel'] = 'Final Verdict';   // (its painting, until it gets its own)
 function talRemapByName(src, oldNames, list) {
   if (!Array.isArray(src) || !Array.isArray(oldNames) || !list) return src;
   if (oldNames.length === list.length && oldNames.every((n, i) => n === list[i].name)) return src;
@@ -49195,7 +49250,7 @@ const RESKIN = {
   ih_worldanvil: ['Heart of the World-Anvil', 'gem', 'a glowing heart of anvil-iron'],
   ih_grandmortar: ['Grandfather\'s Powder Horn', 'horn', 'a great carved powder horn'],
   so_firstlight: ['Halo of First Light', 'halo', 'a halo of pale first light'],
-  so_lasthammer: ['Seal of the Last Verdict', 'scales', 'a heavy seal with the scales of judgement'],
+  so_lasthammer: ['Seal of the Last Word', 'scales', 'a heavy seal with the scales of judgement'],
   sbl_fourwinds: ['Cloak of the Four Winds', 'wing', 'a cloak of four winds\' feathers'],
   sbl_raincaller: ['Raincaller\'s Mantle', 'rain', 'a mantle that drips with rain'],
   wbl_oathkeeper: ['Oathkeeper, Seal of the Held Gate', 'rune', 'a great gold seal of the Held Gate'],
@@ -49640,8 +49695,8 @@ const HW = {
     ult: ['The Crossing Blade', 'a broad sword blazing gold, a lion\'s head roaring at the guard', [['spell', 'ch_lioncharge', 'echo'], ['hit', 'burn', 3]]], art: 'dawn-gold light along the blade; the lion on the guard glows; at IV the edge blazes' },
   ch_celestine: { glow: '#ffe08a', n: ['Celestine\'s Sunburst Staff', 'Sunburst Staff, Kindled', 'Sunburst Staff of the High Noon', 'Dawnsong, Staff of Celestine'], fx: [['hit', 'burn', 4], ['mark'], ['spell', 'ch_dawnbreak', 'echo']],
     ult: ['The Unsetting Sun', 'a staff crowned by a small sun that never sets', [['spell', 'ch_morningstar', 'echo'], ['mark']]], art: 'the sunburst brightens and its rays lengthen; at IV it is a small sun' },
-  ch_morrow: { glow: '#d8e0f0', n: ['Morrow\'s Ashen Lance', 'Ashen Lance, Sworn', 'Ashen Lance of Judgement', 'Verdict, Morrow\'s Lance'], fx: [['hit', 'shred', 3], ['mark'], ['spell', 'ch_sentence', 'echo']],
-    ult: ['The Final Verdict', 'a grey lance whose point burns with white judgement', [['spell', 'ch_verdict', 'echo'], ['mark']]], art: 'pale light along the point; the scales on the guard glow; at IV the point burns white' },
+  ch_morrow: { glow: '#d8e0f0', n: ['Morrow\'s Ashen Lance', 'Ashen Lance, Sworn', 'Ashen Lance of Judgement', 'Gavel, Morrow\'s Lance'], fx: [['hit', 'shred', 3], ['mark'], ['spell', 'ch_sentence', 'echo']],
+    ult: ['The Last Gavel', 'a grey lance whose point burns with white judgement', [['spell', 'ch_verdict', 'echo'], ['mark']]], art: 'pale light along the point; the scales on the guard glow; at IV the point burns white' },
   ch_tarka: { glow: '#80b8ff', n: ['Tarka\'s Copper-Bound Staff', 'Copper-Bound Staff, Thundering', 'Copper-Bound Staff of the Storm', 'Thunderbrow, Tarka\'s Staff'], fx: [['hit', 'arc', 4], ['spell', 'ch_eyestorm', 'daze'], ['spell', 'ch_gather', 'echo']],
     ult: ['The Storm-Drum Staff', 'a staff with a thunderhead caught at its crown', [['spell', 'ch_stormcall', 'echo'], ['hit', 'arc', 2]]], art: 'sparks on the copper bands; at IV a small storm cloud hangs at the top' },
   ch_oshana: { glow: '#c8f0ff', n: ['Oshana\'s Driftwood Staff', 'Driftwood Staff, Chiming', 'Driftwood Staff of the Four Winds', 'Windspeaker, Oshana\'s Staff'], fx: [['hit', 'shove', 4], ['slow'], ['spell', 'ch_cyclone', 'echo']],
@@ -49922,7 +49977,7 @@ const TAL_SPREAD = {
   "silver.venom": {"Broken Litany":[1,0],"Scorching Seal":[0,3],"Heavy Silence":[1,2],"Dry Well":[0,2],"Zealot's Vow":[1,3],"Writ of Seizure":[2,2],"Forfeit":[0,1],"Sealed Tongues":[3,0],"Shield of Doctrine":[2,1],"Writ of Iron":[3,2],"Heretic's Stake":[4,0],"Penitent Chains":[4,1],"Confession":[3,3],"Pyre Eternal":[5,0],"Ashes Speak":[5,1],"Grand Inquest":[5,2]},
   "champ:so_lion": {"Shoulder to Shoulder":[0,1],"Lowered Shield":[3,3],"Wide Sweep":[0,3],"Shield Wall":[4,1],"Bulwark Slam":[1,1],"Shields Raised":[2,1],"Burnished Shields":[1,2],"Rally to the Shield":[2,0],"The Far Bank":[5,3],"Debt of Oaths":[5,1],"Unbroken":[3,2],"The Crossing":[4,3],"The Ford Itself":[5,2],"Swift Reprisal":[0,2],"Hearts Lifted":[1,0]},
   "champ:so_dawn": {"Early Dawn":[0,0],"Clear Sky":[0,2],"Dawn Chorus":[0,1],"Cloister Wall":[5,2],"Prism of Dawn":[1,0],"Lingering Star":[2,0],"Searing Light":[3,2],"Be Still":[3,0],"Noonday":[4,1],"Blinding Glare":[4,3],"Radiant Hymn":[2,1],"Dawnsinger":[5,1],"High Noon":[3,1],"Spilled Light":[5,0],"Bright Halo":[1,3],"First Light":[1,2],"Noon Bell":[4,2]},
-  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[1,1],"Ready Ledger":[0,1],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,2],"Trampling Host":[2,1],"Clerk’s Quill":[3,1],"Grey Justicar":[5,1],"Final Verdict":[4,3],"Riders of the Ford":[4,1],"Ride Them Down":[2,2],"Court Fines":[3,2],"Summary Ruling":[0,2]},
+  "champ:so_judge": {"Swift Justice":[0,0],"Long Arm of the Law":[1,1],"Ready Ledger":[0,1],"Debt Collection":[1,0],"Iron Chains":[5,3],"Mark of Guilt":[3,3],"Witnesses Called":[2,0],"Wide Reckoning":[5,2],"Trampling Host":[2,1],"Clerk’s Quill":[3,1],"Grey Justicar":[5,1],"The Gavel":[4,3],"Riders of the Ford":[4,1],"Ride Them Down":[2,2],"Court Fines":[3,2],"Summary Ruling":[0,2]},
   "stormborn.glaive": {"Wolf at the Throat":[0,1],"Hunting Bond":[0,3],"Hock Bite":[0,2],"Hunter's Due":[5,0],"Pack Tactics":[2,3],"Scent of Rain":[1,3],"Restless Spear":[5,1],"Wolf and Spear":[4,0],"Spirit Pack":[5,2],"Moonfang Pounce":[4,3],"Stormpin":[4,1],"Guard the Pass":[2,1],"Grounding Spear":[2,2],"Thunder-Called Spear":[3,2],"Blood on the Fur":[1,1],"Hunting Cry":[3,1]},
   "stormborn.arrow": {"Riding the Gale":[2,3],"Through and Through":[0,1],"Quick Wind":[4,3],"Gust Fletching":[0,2],"Headwind":[3,3],"Walking Wind":[5,1],"Featherfall":[2,2],"Skyward Gust":[4,1],"Skyrend":[5,0],"Lightning Fletch":[5,2],"Rain Arrows":[2,0],"Hurricane Volley":[3,1],"Updraft Reader":[1,0],"Breath of the Gust":[1,3],"Eddying Wake":[4,2]},
   "stormborn.frost": {"Heavy Hail":[1,1],"Water Turns to Ice":[1,3],"Brittle Cold":[0,1],"Sleet":[3,3],"Hail Cairn":[5,1],"Bitter Rain":[0,2],"Black Ice":[2,3],"Skystone":[3,2],"Frozen Through":[5,2],"Frostbound Totem":[4,2],"Ice Crust":[2,2],"Frost Lightning":[4,3],"Hail Shatter":[5,0],"First Clouds":[0,0],"Meltwater":[1,2],"Shattering Hail":[3,0],"Brittle Fall":[4,1]},
@@ -49979,14 +50034,14 @@ const TAL_TAGS = {
   Survival:  { col: '#d8c8a0', ic: 'M6 1l4.5 1.5V6c0 2.8-2 4.3-4.5 5C3.5 10.3 1.5 8.8 1.5 6V2.5z', say: 'keeps units standing' },
   Mana:      { col: '#5a8cff', ic: 'M6 1S2 5.5 2 7.8a4 4 0 0 0 8 0C10 5.5 6 1 6 1z', say: 'more mana, more casts' },
   Growth:    { col: '#ff9ad0', ic: 'M10.5 1.5C4 1.5 1.5 5 1.5 10.5c5.5 0 9-2.5 9-9z', say: 'the Growth bar and Blooms', force: 'grove' },
-  Judgement: { col: '#ffd060', ic: 'M6 2.5a3.5 3.5 0 1 1-.01 0zM6 0v1.5M6 10.5V12M0 6h1.5M10.5 6H12', say: 'Judgement and Verdicts', force: 'silver' },
+  Judgement: { col: '#ffd060', ic: 'M6 2.5a3.5 3.5 0 1 1-.01 0zM6 0v1.5M6 10.5V12M0 6h1.5M10.5 6H12', say: 'Judgement and its burst', force: 'silver' },
   Elements:  { col: '#c49aff', ic: 'M6 1l5 5-5 5-5-5z', say: 'element marks and reactions', force: 'conclave' },
   Heat:      { col: '#ff9a3a', ic: 'M6 1c2 3 4 4 4 7a4 4 0 0 1-8 0c0-2 1.5-3 2-4.5.8 1.5 1.5 2 2 2.5.5-2 0-3.5 0-5z', say: 'heat and vents', force: 'ironhold' },
   Storm:     { col: '#fff27a', ic: 'M7 1L2 7h3.5l-1 4L10 4.8H6.5z', say: 'the Storm meter and its weather', force: 'stormborn' },
   Runes:     { col: '#f0c050', ic: 'M3 1h2v4l3-4h2.2L6.6 6l3.6 5H8L5 7v4H3z', say: 'runes, ward-lines and brands', force: 'wardbound' },
 };
 const TAL_FORCE_TAG = { grove: 'Growth', silver: 'Judgement', conclave: 'Elements', ironhold: 'Heat', stormborn: 'Storm', wardbound: 'Runes' };
-const TAL_FORCE_RE = { grove: /\b(Growth|Bloom)/, silver: /\b(Judge|Judgement|Verdict)/, conclave: /\b(element|reaction|Arcane Charge|Shatter|Encase|Magma|Overload)/i,
+const TAL_FORCE_RE = { grove: /\b(Growth|Bloom)/, silver: /\b(Judge|Judgement)/, conclave: /\b(element|reaction|Arcane Charge|Shatter|Encase|Magma|Overload)/i,
   ironhold: /\b(heat|vents?|vented)\b/i, stormborn: /\b(Storm meter|the Storm|Gale|Rain|Hail|Tempest|soaked)\b/, wardbound: /\b(runes?|ward-lines?|brand(s|ed)?|sigils?)\b/i };
 // a talent's tag: its own (the plain-text files set one on every force talent), else read from what it does
 function talTag(t, force) {
@@ -50887,13 +50942,13 @@ talPlain('silver', 'arrow', {
   'Slow Match': { tag: 'Spell', pro: n => `Flare Bolt's fire burns ${n}s longer and ${gNf(.2 * n)} cells wider.` },
   // (simplified: the readied bolt alone, sooner; Bear Witness no longer lasts longer or lays Judgement through its witnesses)
   'Deep Mark': { tag: 'Spell', pro: n => `Each Bear Witness brings Consecrated Bolt ${3 * n}s nearer.`, sp: n => ({ ab: 'so_witness', ready: ['so_sanct', 3 * n] }) },
-  'Writ of Execution': { tag: 'Judgement', pro: 'Its bolts deliver a Verdict on any foe at full stacks.' },
+  'Writ of Execution': { tag: 'Judgement', pro: 'Its bolts lay 2 more Judgement on a foe whose Judgement has just burst.' },
   'Through and Through': { tag: 'Damage', pro: 'Each bolt runs on into the next foe within 1.5 cells, for 60%.' },
   'Bodkin Heads': { tag: 'Damage', pro: n => `Bolts ignore another ${15 * n}% of armour.` },
   // (Wards each witness now; it made them Radiant)
   'Sworn Witnesses': { tag: 'Support', pro: n => `Bear Witness Wards each unit that joins it for ${3 * n}s.` },
   'Storm of Silver': { tag: 'Damage', pro: 'Every 5th shot also looses a half-strength bolt at every foe in range.' },
-  'Crank on the Verdict': { tag: 'Judgement', pro: n => `Other units' Verdicts in its reach reload it at once, every ${8 - 2 * n}s at most.` },
+  'Crank on the Verdict': { tag: 'Judgement', pro: n => `Other units' bursts of Judgement in its reach reload it at once, every ${8 - 2 * n}s at most.` },
   'Testimony Heard': { tag: 'Mana', pro: n => `Bolts on Condemned or fully Judged foes restore ${2 * n} mana.` },
   'Pinning Light': { tag: 'Control', pro: n => `Flare Bolt slows every foe it burns ${15 * n}% for 2s.` },
 });
@@ -50914,8 +50969,8 @@ talPlain('silver', 'frost', {
   'Chain of Judgement': { tag: 'Judgement', pro: 'Lashes on foes at full Judgement leap to three foes nearby, at 60%.' },
   // (simplified: no readied Binding Light)
   'Quick Binding': { tag: 'Control', pro: 'Every 2nd lash binds, and every lash during Vigil Chains.', sp: { ab: 'so_shackle', rider: { fresh: 1 } } },
-  // (simplified: the snap is a Verdict half again as strong, not a strike, a bind and a Verdict)
-  'Shackle Litany': { tag: 'Judgement', pro: 'Vigil Chains strings one more chain, and each ground foe on one hears its Verdict as it ends.' },
+  // (simplified: the snap lays Judgement, not a strike, a bind and a cash-in)
+  'Shackle Litany': { tag: 'Judgement', pro: 'Vigil Chains strings one more chain, and as it ends each ground foe on one gains 4 Judgement.' },
   'Swift Lash': { tag: 'Judgement', pro: n => `Every ${gOrd(5 - n)} lash lays 2 Judgement, not 1.` },
   'Vigil Lamp': { tag: 'Mana', pro: n => `She gains ${2 * n} mana a second for each foe she holds bound, up to 3.` },
   'Glare of Dawn': { tag: 'Judgement', pro: 'Chain of Penance lays 2 more Judgement on its foe.' },
@@ -50923,24 +50978,24 @@ talPlain('silver', 'frost', {
 
 /* ---------- Grail Knights ---------- */
 talPlain('silver', 'arcane', {
-  'Full Gallop': { tag: 'Judgement', pro: n => `A charge from 2+ cells away makes its Verdict ${15 * n}% stronger.` },
+  'Full Gallop': { tag: 'Judgement', pro: n => `A charge from 2+ cells away lays ${n} Judgement.` },
   // (simplified: the harder lance alone; the longer knockdown on a Blinded foe went)
   'Couched Lance': { tag: 'Judgement', pro: n => `Grail Charge hits foes with 3+ Judgement ${12 * n}% harder.`, cap: null, sp: n => ({ ab: 'so_grail', vs: ['judged3', .12 * n] }) },
   // (simplified: the Judgement alone; the longer knockdown went)
   'Spurs': { tag: 'Judgement', pro: n => `Tourney Passes lays ${n} more Judgement on every ground foe it rides through.`, sp: n => ({ ab: 'so_ridedown', rider: { judge: n } }) },
   // (simplified: the harder strike alone; the longer stun went)
   'Grail Quest': { tag: 'Damage', pro: n => `Bosses and elites take ${15 * n}% more from Grail Charge.`, sp: n => ({ ab: 'so_grail', vs: ['big', .15 * n] }) },
-  // (simplified: a bigger Vow alone; no Radiance after a big Verdict)
+  // (simplified: a bigger Vow alone; no Radiance after a big cash-in)
   'Shining Example': { tag: 'Spell', pro: 'Charge of the Vow lasts 1s longer and sends one more phantom knight.', cap: null },
   'Trampling Hooves': { tag: 'Judgement', pro: n => `Ground foes in its charge path take ${20 * n}% of the lance and a Judgement.` },
-  'Echoing Verdict': { tag: 'Judgement', pro: 'Its Verdicts of 3+ stacks leap on at 60% to the nearest foe within 1.6 cells.' },
+  'Echoing Verdict': { tag: 'Judgement', pro: 'Each burst it sets off leaps on as a Judgement to the nearest Judged foe within 1.6 cells.' },
   'Glory of the Charge': { tag: 'Damage', pro: 'Each charge bursts where it lands: every ground foe within a cell takes 60% of the lance.' },   // (no Judgement: the Knights' own capstone, 23 Nov 2026)
   'Part the Ranks': { tag: 'Support', pro: 'Its charges ride through your units and walls.' },
   'Rallying Vow': { tag: 'Support', pro: 'Charge of the Vow Wards each unit its knights ride out from for 4s.' },
   'Vowkeeper': { tag: 'Judgement', pro: n => `Charge of the Vow lays ${n} Judgement on ground foes beside each unit it blesses.` },
   'Unhorse': { tag: 'Control', pro: "The lance's knockdown also throws down every ground foe within a cell of its foe." },
   'Shield and Spur': { tag: 'Judgement', pro: n => `Its charge first lays ${n} Judgement on foes a Shieldbearer has dazed.` },
-  'Grail\'s Grace': { tag: 'Mana', pro: n => `Each Verdict restores ${n} mana for every stack it spends.` },
+  'Grail\'s Grace': { tag: 'Mana', pro: n => `Each burst it sets off restores ${n} mana for every stack.` },
   'Unhorsing Ride': { tag: 'Control', pro: 'Tourney Passes stuns every ground foe it tramples for 0.3s.' },
 });
 
@@ -50952,11 +51007,11 @@ talPlain('silver', 'storm', {
   // (simplified: Noon Sweep against the grounded alone, stronger; the army-wide bonus and the longer hold went)
   'Fall from Grace': { tag: 'Damage', pro: n => `Noon Sweep hits dragged-down flyers ${30 * n}% harder.`, cap: null, sp: n => ({ ab: 'so_halo', vs: ['grounded', .3 * n] }) },
   'Prism': { tag: 'Judgement', pro: 'Every 3rd beam splits to a second foe for 60% and Judges it.' },
-  'Kindled Faith': { tag: 'Judgement', pro: 'Every 4th beam delivers a Verdict on foes with 3+ stacks.' },
+  'Kindled Faith': { tag: 'Judgement', pro: 'Every 4th beam lays 2 more Judgement on foes with 3+ stacks.' },
   // (simplified: the column alone, a little stronger; no Judgement, no readied Sunlance)
   'Lance of Heaven': { tag: 'Damage', pro: 'Every 6s, and with each Dawnfall, a column of light hits the toughest flyer in reach (else foe) for 330%.', sp: { ab: 'so_dawnfall', rider: { fresh: 1 } } },
   // (simplified: no longer Blinds the walkers under the crash longer)
-  'Dawnward': { tag: 'Judgement', pro: 'Each flyer Dawnfall slams down gains 2 stacks and hears its Verdict as it crashes.', sp: { ab: 'so_dawnfall', rider: { judge: 2 } } },
+  'Dawnward': { tag: 'Judgement', pro: 'Each flyer Dawnfall slams down gains 2 stacks, and 2 more as it crashes.', sp: { ab: 'so_dawnfall', rider: { judge: 2 } } },
   'Sunburst': { tag: 'Judgement', pro: 'Every 5th beam bursts, hitting foes within a cell for 100% and a Judgement.' },
   'Judgement Ray': { tag: 'Judgement', pro: 'Beams hit 6% harder for each Judgement stack on their foe.' },
   'Searing Eye': { tag: 'Control', pro: n => `Its beams Blind flyers with 3+ Judgement for ${gNf(.5 * n)}s, once every 3s each.` },
@@ -50974,11 +51029,11 @@ talPlain('silver', 'earth', {
   'Gathering Whirl': { tag: 'Spell', pro: n => `Whirling Flurry is ${n} cut${n > 1 ? 's' : ''} longer.` },
   'Blade of Judgement': { tag: 'Spell', pro: n => `Sword of Heaven's shock reaches ${gNf(.25 * n)} cells wider.` },
   'Steel Tempest': { tag: 'Damage', pro: 'At full Blade Momentum each Twin Cut spins into a short Whirling Flurry: 3 more cuts of 50% at every ground foe in reach.' },   // (no Judgement, and harder: 23 Nov 2026)
-  'Second Star': { tag: 'Judgement', pro: 'Sword of Heaven throws both swords: the second strikes another foe for 70% and a full Verdict.' },
+  'Second Star': { tag: 'Judgement', pro: 'Sword of Heaven throws both swords: the second strikes another foe just as hard.' },
   'Marking Edge': { tag: 'Judgement', pro: n => `${n >= 2 ? 'Each cut' : 'Every other cut'} lays a Judgement just before it strikes.` },
   'Marked by the Blade': { tag: 'Support', pro: n => `Sword of Heaven's foe takes ${5 * n}% more from every unit for 4s.` },
   'Hurled Verdict': { tag: 'Judgement', pro: n => `Sword of Heaven lays ${n} Judgement on its foe.` },
-  'Sundered Plate': { tag: 'Judgement', pro: n => `Each Verdict strips ${n} armour from its foe, up to ${2 * n}.` },
+  'Sundered Plate': { tag: 'Judgement', pro: n => `Each burst it sets off strips ${n} armour from its foe, up to ${2 * n}.` },
   'Reliquary': { tag: 'Mana', pro: n => `Each Judged foe that dies in its reach restores ${2 * n} mana.` },
   'Censed Blades': { tag: 'Judgement', pro: n => `Its cuts lay ${n} Judgement on ground foes standing in incense.` },
   'Whirling Edge': { tag: 'Spell', pro: n => `Whirling Flurry fills Blade Momentum and reaches ${10 * n}% farther.` },
@@ -50999,7 +51054,7 @@ talPlain('silver', 'cannon', {
   // (simplified: the coal alone; no mana back)
   'Ember Psalm': { tag: 'Damage', pro: 'Each ground foe Kindle the Censers slays throws a burning coal at the nearest ground foe.', sp: { ab: 'so_embers', rider: { fresh: 1 } } },
   'Thick Smoke': { tag: 'Judgement', pro: 'Incense lays Judgement every half second, not every second.' },
-  'Purging Fire': { tag: 'Judgement', pro: 'Its bursts deliver a 40% Verdict on foes with 3+ stacks.' },
+  'Purging Fire': { tag: 'Judgement', pro: 'Its coals lay 2 more Judgement on foes with 3+ stacks.' },
   'Rekindling': { tag: 'Damage', pro: 'Each foe its bursts slay throws a smaller coal at the nearest ground foe.' },
   'Ash in the Eyes': { tag: 'Control', pro: n => `Its coal Blinds the ground foe it hits square for ${gNf(.3 * n)}s.` },
   'Offering Bowl': { tag: 'Mana', pro: n => `Each foe that dies in its incense restores ${2 * n} mana.` },
@@ -51044,8 +51099,8 @@ talPlain('silver', 'champ:so_lion', {
   'Rally to the Shield': { tag: 'Support', pro: 'Bulwark Slam readies the next strike of every Order unit within 1.6 cells.' },
   // (simplified: two more strides, not one plus one for each kill)
   'The Far Bank': { tag: 'Spell', pro: 'The Crossing strides 2 more times.', cap: null, sp: { ab: 'ch_lionsdue', by: { n: 2 } } },
-  // (simplified: the Verdicts alone, 1.5s each; the slams and the harder Crossing went)
-  'Debt of Oaths': { tag: 'Judgement', pro: 'Each Verdict the Order lands within 2 cells of him brings The Crossing 1.5s nearer, twice a second at most.', sp: { ab: 'ch_lionsdue', rider: { fresh: 1 } } },
+  // (24 Nov 2026: the Templars' Twin Cuts near him, no Judgement: a capstone never waits on it)
+  'Debt of Oaths': { tag: 'Spell', pro: 'Each Twin Cut of a Templar of the Ford within 2 cells of him brings Dawnsweep 1s nearer, twice a second at most.', sp: { ab: 'ch_lionsdue', rider: { fresh: 1 } } },
   // (simplified: the daze alone, longer; no Judgement)
   'Unbroken': { tag: 'Control', pro: n => `Ground foes Dawnsweep throws next to a Templar of the Ford are dazed ${gNf(.5 * n)}s.` },
   // (simplified: no Judgement; the second strike is a little stronger)
@@ -51058,7 +51113,7 @@ talPlain('silver', 'champ:so_lion', {
 /* ---------- Celestine ---------- */
 talPlain('silver', 'champ:so_dawn', {
   'Early Dawn': { tag: 'Spell', pro: n => `Each foe her Halo Blinds brings Dawnbreak ${n}s nearer.` },
-  'Clear Sky': { tag: 'Judgement', pro: n => `Every 3rd beam on an Exposed foe delivers its Verdict at ${25 * n}%.` },
+  'Clear Sky': { tag: 'Damage', pro: n => `Every 3rd beam on an Exposed foe is followed by a second beam at ${25 * n}%.` },
   'Dawn Chorus': { tag: 'Support', pro: n => `Dawnbreak leaves Order units within 1.6 cells of her quickened by light for ${2 * n}s.` },
   'Cloister Wall': { tag: 'Judgement', pro: 'Each Oath-Stone Prism of Dawn bounces from bursts, hitting ground foes within a cell for 100% and a Judgement.' },
   // (simplified: the bounces alone; the longer Blind went)
@@ -51078,7 +51133,7 @@ talPlain('silver', 'champ:so_dawn', {
   'Bright Halo': { tag: 'Judgement', pro: n => `Each foe her Halo Blinds gains ${n + 1} Judgement.` },
   'First Light': { tag: 'Mana', pro: n => `Each foe Dawnbreak Blinds restores ${2 * n} mana to her, up to 5 foes.` },
   // (simplified: every Judged foe in reach, Blinded or not)
-  'Noon Bell': { tag: 'Judgement', pro: 'As High Noon ends, every foe in her reach hears its Verdict.' },
+  'Noon Bell': { tag: 'Damage', pro: 'As High Noon ends, every Exposed foe in her reach is struck by a beam of hers.' },
 });
 
 /* ---------- Morrow ---------- */
@@ -51087,12 +51142,12 @@ talPlain('silver', 'champ:so_judge', {
   'Long Arm of the Law': { tag: 'Control', pro: n => `His charges slow foes with 3+ Judgement ${15 * n}% for 1.5s.` },
   'Ready Ledger': { tag: 'Judgement', pro: n => `Foes that live through Sentence keep ${n} Judgement.` },
   // (simplified: no readied Debt Collection)
-  'Iron Chains': { tag: 'Judgement', pro: 'When its foe dies, Final Verdict marks every foe within 1.5 cells for 5s.', sp: { ab: 'ch_verdict', rider: { fresh: 1 } } },
+  'Iron Chains': { tag: 'Judgement', pro: 'When its foe dies, The Gavel marks every foe within 1.5 cells for 5s.', sp: { ab: 'ch_verdict', rider: { fresh: 1 } } },
   'Mark of Guilt': { tag: 'Judgement', pro: n => `His charges Condemn foes at full Judgement for ${n}s.` },
   // (simplified: the daze alone, a little longer; the longer bind went)
   'Witnesses Called': { tag: 'Control', pro: 'Debt Collection dazes every foe it takes Judgement from for 0.6s.', sp: { ab: 'ch_summons', by: { daze: .6 } } },
   // (simplified: no stun)
-  'Wide Reckoning': { tag: 'Judgement', pro: "When Final Verdict's foe survives, its gavel also falls at half on foes within 1.2 cells.", sp: { ab: 'ch_verdict', rider: { fresh: 1 } } },
+  'Wide Reckoning': { tag: 'Judgement', pro: "When The Gavel's foe survives, the Judged foes within 1.2 cells gain 2 Judgement too.", sp: { ab: 'ch_verdict', rider: { fresh: 1 } } },
   // (simplified: Judgement alone, a stack a rank; no Wound)
   'Trampling Host': { tag: 'Judgement', pro: n => `Debt Collection lays ${n} Judgement on every ground foe between him and its foe.` },
   'Clerk’s Quill': { tag: 'Judgement', pro: n => `After each Debt Collection, his next ${2 * n} charges lay 1 more Judgement.` },
@@ -51101,7 +51156,7 @@ talPlain('silver', 'champ:so_judge', {
   // (simplified: Judgement alone, a stack more; the harder strike went)
   'Ride Them Down': { tag: 'Judgement', pro: n => `His charges lay ${n + 1} more Judgement on dazed, bound or downed foes.` },
   'Court Fines': { tag: 'Mana', pro: n => `Each foe Sentence strikes pays him ${2 * n} mana.` },
-  'Summary Ruling': { tag: 'Judgement', pro: n => `His charges deliver a Verdict on foes under 25% health, every ${8 - 2 * n}s at most.` },
+  'Summary Ruling': { tag: 'Judgement', pro: n => `His charges fill a foe under 25% health to full Judgement, so it bursts, every ${8 - 2 * n}s at most.` },
 });
 
 /* ================= THE STORMBORN'S TALENTS IN PLAIN WORDS (owner, 10 Nov 2026) =================
@@ -52150,7 +52205,7 @@ const HOLD_SAY = {
 const HOLD_CARD = {
   staglancer: [[/ and pin it to the ground \(rooted 1s:[^)]*\), then wheel back to their post\./, ', then wheel back to their post.']],
   wb_anvilguard: [[/staggering ground foes and leaving stone runes/, 'striking ground foes and leaving stone runes']],
-  grailknight: [[/the lance knocks its foe down \(stunned [^)]*\), and a charge/, 'the lance drives its foe a little way back along the charge (bosses stand), and a charge']],
+  grailknight: [[/the lance knocks its foe down \(stunned [^)]*\), and the knight/, 'the lance drives its foe a little way back along the charge (bosses stand), and the knight']],
 };
 // a spell's words (its text and its autocast line): [pattern, replacement]
 const HOLD_SPELL = {
@@ -52162,11 +52217,11 @@ const HOLD_SPELL = {
   wildstrike: [[/rooted [\d.]+s\)/, 'bowled 0.3 cells back)']],
   wildsurge: [[/the bear roots the toughest ground foe [\d.]+s/, 'the bear bowls the toughest ground foe 0.3 cells back']],
   // the Silver Order
-  so_grail: [[/, a Verdict at double strength, and a [\d.]+s stun \(bosses 40%\)\./, ', and a Verdict at double strength. Its foe is driven 0.1 cells back (bosses stand).']],
+  so_grail: [[/, and a [\d.]+s stun \(bosses 40%\)\./, '. Its foe is driven 0.1 cells back (bosses stand).']],
   so_ridedown: [[/, knocks it down [\d.]+s and Judges it,/, ' and Judges it,']],
   so_vow: [[/knocked down and Judged/, 'driven a little way back and Judged']],
-  so_crush: [[/, is stunned [\d.]+s, and any Judgement/, ', and any Judgement']],
-  so_hammerfall: [[/, stunned [\d.]+s and a Verdict/, ' and a Verdict'], [/The shock knocks down and Judges/, 'The shock Judges']],
+  so_crush: [[/, is stunned [\d.]+s, and 2 Judgement/, ' and 2 Judgement']],
+  so_hammerfall: [[/, stunned [\d.]+s and 3 Judgement/, ' and 3 Judgement'], [/The shock knocks down and Judges/, 'The shock Judges']],
   // Ironhold
   ih_pressureslam: [[/ more at a full gauge, a [\d.]+s stun and (\d+) armour off\./, ' more at a full gauge, and $1 armour off.']],
   ih_steamvent: [[/ and stuns [\d.]+s\. Every stroke/, '. Every stroke']],
@@ -54422,7 +54477,7 @@ function tchUlt(id, o) {
     ['Chain of Penance', 1, 2, { req: [0, 2] }],
     ['Vigil Lamp', 1, 3],
     ['Dazzle', 2, 1],
-    ['Glare of Dawn', 2, 2, { req: [1, 2], max: 2, cap: 'tchGlare', pro: n => `Chain of Penance's snap delivers a ${250 * n}% Verdict.`, sp: n => ({ ab: 'so_flare', rider: { fresh: 1 } }) }],
+    ['Glare of Dawn', 2, 2, { req: [1, 2], max: 2, cap: 'tchGlare', pro: n => `Chain of Penance's snap lays ${2 * n} Judgement.`, sp: n => ({ ab: 'so_flare', rider: { fresh: 1 } }) }],
     ['Blinding Chains', 2, 3, { max: 2, pro: n => `Its binds also leave their foe slowed and Exposed for ${gNf(.75 * n)}s.` }],
     ['Last Rites', 3, 1, { req: [2, 1], on: 'so_bind' }],
     ['Glinting Links', 3, 2, { req: [2, 2], pro: n => `Lashes on bound or Exposed foes leap to a second foe for ${50 * n}%.` }],
@@ -54431,7 +54486,7 @@ function tchUlt(id, o) {
     ['Swift Lash', 4, 2, { req: [3, 2] }],
     ['Twin Chains', 4, 3, { req: [3, 3], max: 2, pro: n => `Binding Light comes ${5 * n}% sooner${n >= 2 ? ' and seizes one more foe' : ''}.`, sp: n => ({ ab: 'so_bind', cd: -.05 * n, by: n >= 2 ? { n: 1 } : {} }) }],
     ['Shackle Litany', 5, 1, { req: [4, 1] }],
-    ['Chain of Judgement', 5, 2, { req: [4, 2], pro: () => 'Lashes on foes at full stacks leap to three foes at 60%, then deliver a fivefold Verdict.' }],
+    ['Chain of Judgement', 5, 2, { req: [4, 2], pro: () => 'Lashes on foes at full stacks leap to three foes at 60%.' }],
     ['Quick Binding', 5, 3, { req: [4, 3], on: 'lash' }],
   ]);
   tchTree(FORCES["silver"].talents["arcane"], [   // silver.arcane
@@ -54495,7 +54550,7 @@ function tchUlt(id, o) {
     ['Lingering Smoke', 0, 2],
     ['Thick Smoke', 1, 1, { req: [0, 1], max: 2, pro: n => `Incense lays Judgement ${n >= 2 ? 'every half second' : 'three times every 2 seconds'}, not every second.` }],
     ['Choking Smoke', 1, 2],
-    ['Purging Fire', 2, 1, { req: [1, 1], max: 2, pro: n => `Its bursts deliver a ${75 * n}% Verdict on foes with 3+ stacks.` }],
+    ['Purging Fire', 2, 1, { req: [1, 1], max: 2, pro: n => `Its coals lay ${n + 1} more Judgement on foes with 3+ stacks.` }],
     ['Procession of Incense', 2, 2, { req: [1, 2] }],
     ['Pall of Smoke', 2, 3],
     ['Rekindling', 3, 1, { req: [2, 1], max: 2, pro: n => `Each foe its bursts slay throws a ${50 * n}% coal at the nearest ground foe.` }],
@@ -54540,7 +54595,7 @@ function tchUlt(id, o) {
     ['Unbroken', 4, 2, { req: [3, 2], on: 'ch_lioncharge' }],
     ['The Crossing', 4, 3, { req: [3, 3] }],
     ['The Ford Itself', 5, 1, { req: [4, 1] }],
-    ['Debt of Oaths', 5, 2, { req: [4, 2], pro: () => 'Each Verdict the Order lands within 2 cells of him brings Dawnsweep 1s nearer, twice a second at most.', sp: () => ({ ab: 'ch_lioncharge', rider: { fresh: 1 } }) }],
+    ['Debt of Oaths', 5, 2, { req: [4, 2], pro: () => 'Each Twin Cut of a Templar of the Ford within 2 cells of him brings Dawnsweep 1s nearer, twice a second at most.', sp: () => ({ ab: 'ch_lioncharge', rider: { fresh: 1 } }) }],
     ['The Far Bank', 5, 3, { req: [4, 3] }],
   ]);
   tchTree(CHAMPS["so_dawn"].tree, [   // silver.champ:so_dawn
@@ -54556,7 +54611,7 @@ function tchUlt(id, o) {
     ['Noonday', 3, 1, { req: [2, 1], max: 2, pro: n => `High Noon's sun flares every ${gNf(1 - .2 * n)}s, not every second.`, sp: n => ({ ab: 'ch_highnoon', by: { pulse: -.2 * n } }) }],
     ['Be Still', 3, 2, { req: [2, 2], max: 2, pro: n => `Prism of Dawn binds already Exposed foes it crosses for ${gNf(.3 * n)}s.` }],
     ['Searing Light', 4, 0, { req: [3, 0] }],
-    ['Noon Bell', 4, 1, { req: [3, 1], max: 2, pro: n => `As High Noon ends, every foe in her reach hears its Verdict${n >= 2 ? '' : ' at half strength'}.` }],
+    ['Noon Bell', 4, 1, { req: [3, 1], max: 2, pro: n => `As High Noon ends, every Exposed foe in her reach is struck by a beam of hers${n >= 2 ? '' : ' at half strength'}.` }],
     ['Blinding Glare', 4, 2, { req: [3, 2] }],
     ['Spilled Light', 5, 0, { req: [4, 0] }],
     ['Dawnsinger', 5, 1, { req: [4, 1] }],
@@ -54575,7 +54630,7 @@ function tchUlt(id, o) {
     ['Mark of Guilt', 3, 3, { req: [2, 3] }],
     ['Riders of the Ford', 4, 1, { req: [3, 1], max: 2, pro: n => `Each Debt Collection sends Grail Knights within 2 cells charging its foe, every ${n >= 2 ? 4 : 8}s each.` }],
     ['Court Fines', 4, 2, { req: [3, 2] }],
-    ['Final Verdict', 4, 3, { req: [3, 3] }],
+    ['The Gavel', 4, 3, { req: [3, 3] }],
     ['Grey Justicar', 5, 1, { req: [4, 1] }],
     ['Wide Reckoning', 5, 2, { req: [4, 2], cap: null, pro: () => 'Debt Collection gathers Judgement from 0.8 cells wider and binds its foe 1s longer.', sp: () => ({ ab: 'ch_summons', by: { r: .8, bind: 1 } }) }],
     ['Iron Chains', 5, 3, { req: [4, 3] }],
@@ -56258,14 +56313,14 @@ const FS_PLAIN = {
   fs_hush: 'Thornseed Arrow\'s roots hold 1s longer when its seed bursts, and each cast brings Aimed Shot 2s nearer.',
   // ---- the Silver Order ----
   fe_so_censer: 'Thurible Sweep lays 1 more Judgement on each ground foe, 2 on a Blinded one. Each Procession of Incense ends in a free Kindle the Censers that Blinds the foes it burns for 2s (once every 10s).',
-  fe_so_grail: 'Grail Charge lays 2 Judgement before its Verdict. When its foe falls the knight rides on: free Tourney Passes, and Charge of the Vow 6s nearer (once every 8s).',
+  fe_so_grail: 'Grail Charge lays 2 Judgement. When its foe falls the knight rides on: free Tourney Passes, and Charge of the Vow 6s nearer (once every 8s).',
   fe_so_bolt: 'Consecrated Bolt crits Blinded and Condemned foes, then flies on to the toughest foe within 2 cells for a full hit and 3 Judgement. A foe left at full Judgement looses a free Flare Bolt (once every 8s).',
   fe_so_hush: 'Silence Edict lays 2 Judgement on each caster. A silenced caster that dies silences the casters within 2 cells for 2s, and Writ of Seizure comes 4s nearer (once every 4s).',
-  fe_so_chains: 'Binding Light Blinds each foe it binds for 2s. When it seizes 3 or more, each Blinded one hears its Verdict and Chain of Penance is cast free (once every 8s).',
-  fe_so_bulwark: 'Bulwark Bash lays 2 more Judgement. A Bash that fills its foe\'s Judgement delivers the Verdict and rolls out a free Rampart of Dawn (once every 10s).',
+  fe_so_chains: 'Binding Light Blinds each foe it binds for 2s. When it seizes 3 or more, each Blinded one gains 2 Judgement and Chain of Penance is cast free (once every 8s).',
+  fe_so_bulwark: 'Bulwark Bash lays 2 more Judgement. A Bash that fills its foe\'s Judgement, so it bursts, rolls out a free Rampart of Dawn (once every 10s).',
   fe_so_star: 'Each cut of Whirling Flurry lays 1 more Judgement on a Blinded foe. Sword of Heaven Blinds what it strikes for 2s, and falls again free when it slays (once every 10s).',
   fe_so_noon: 'Sunlance Blinds the flyers it strikes for 2s and crits Blinded foes. A Sunlance through 3 or more foes sweeps a free Noon Sweep (once every 8s).',
-  fs_witness: 'Bear Witness fills its foe\'s Judgement. A Flare Bolt hit that leaves its foe at full Judgement delivers the Verdict.',
+  fs_witness: 'Bear Witness fills its foe\'s Judgement, so it bursts. A Flare Bolt hit that bursts its foe\'s Judgement lays 2 more at once.',
   fs_choir: 'A wearer that casts is quickened by light for 3s. Casting while already quickened makes every other wearer quickened by light for 2s and guarded by light for 3s.',
   fs_penance: 'Cross-Cut Blinds what it strikes for 1s, and each Cross-Cut brings Sword of Heaven 3s nearer.',
   // ---- the Conclave ----
@@ -60356,7 +60411,7 @@ SFX_V2_DEF.push(() => {
   // Summons: chains of light lash the foe, a shaft of judgement falls on it, a ring of light closing in
   SFX_V2.ch_summons = vHit({ wind: { wu: .12 }, s: 1, hit: { sp: 'gold', n: 8 },
     fx: (C, x, z, h, ux, uz, k, foe) => { const t = C.t; if (t) v2Beam(C, t.x, towerTop(t) * .8, t.y, x, h, z, { foe, L: VT.CHAIN, add: 1, ccol: v3S(C).hot, w: .1, life: .9, grow: .12, sag: .4, us: 0 }); v2Shaft(C, x, z, { foe, w: .18, life: .45 }); sfxAdd({ k: 'vring', delay: .1, x, z, r0: .7, r1: .2, life: .35, col: v3S(C).hot, rot: R(TAU) }); } });
-  // Final Verdict: the scales' sigil burns on the ground under the condemned for as long as the verdict stands
+  // The Gavel (once Final Verdict): the scales' sigil burns on the ground under the condemned for as long as the sentence stands
   SFX_V2.ch_verdict = vHit({ wind: { wu: .12 }, s: .7, hit: { sp: 'gold', n: 5, star: 0 },
     fx: (C, x, z, h, ux, uz, k, foe) => { const t = C.t; if (t) v2Beam(C, t.x, towerTop(t) * .8, t.y, x, h, z, { foe, w: .06, life: .35 }); v2Mark(C, foe, { L: VT.GLYPH, s: .3, spin: .6, ring: .55, life: 10 }); } });
   // ---- Tarka (Stormborn) ----
@@ -65494,7 +65549,7 @@ const AudioSys = (() => {
   // peak (optional): seconds from now when the take's loudest moment should land (a swing's whoosh on the blow)
   const fireBufs = {}; let fireWait = 0;
   function fireLoad() {
-    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined' && typeof ARCMIS_SFX === 'undefined' && typeof STORMMIX_SFX === 'undefined' && typeof SEEDMIX_SFX === 'undefined')) return; fireWait = 1;
+    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined' && typeof ARCMIS_SFX === 'undefined' && typeof STORMMIX_SFX === 'undefined' && typeof SEEDMIX_SFX === 'undefined' && typeof SILVERMIX_SFX === 'undefined')) return; fireWait = 1;
     for (const k in fxTakes()) {
       try {
         const d = fxTakes()[k].d, s = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
@@ -65504,7 +65559,7 @@ const AudioSys = (() => {
   }
   // (the glaive's spinning-blade takes, bladesfxdata.js, are cut the same way and play through the same loader)
   let fxAll = null;
-  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}, typeof ARCMIS_SFX !== 'undefined' ? ARCMIS_SFX : {}, typeof STORMMIX_SFX !== 'undefined' ? STORMMIX_SFX : {}, typeof SEEDMIX_SFX !== 'undefined' ? SEEDMIX_SFX : {}));
+  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}, typeof ARCMIS_SFX !== 'undefined' ? ARCMIS_SFX : {}, typeof STORMMIX_SFX !== 'undefined' ? STORMMIX_SFX : {}, typeof SEEDMIX_SFX !== 'undefined' ? SEEDMIX_SFX : {}, typeof SILVERMIX_SFX !== 'undefined' ? SILVERMIX_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
   const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.25, .4], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
@@ -65847,6 +65902,21 @@ const AudioSys = (() => {
   S.scPop = () => { if (!scHas('scPopA')) return oldSfx('podburst', 2); fireNext('scPop', SC_POP, .06, .95 + Math.random() * .1); };
   S.scSnap = (T) => { if (!scHas('scSnapMix')) return oldSfx('seedcast', 0); const k = 'scSnapMix', F = fxTakes()[k], pk = Math.max(0, Math.min(F.pk, T == null ? F.pk : T)); if (firePlay(k, SC_VOL.snap, .3, pk)) E.scSnapEnd = Math.max(E.scSnapEnd || 0, now() + F.len - (F.pk - pk) - .5); };
   S.scBite = () => { if (!scHas('scSnapMix') || now() > (E.scSnapEnd || 0)) oldSfx('jawsnap', 0); };   // (a bite past the mix's end, or without it)
+  // The Oathsworn Shieldbearers (24 Nov 2026, the owner's own mixes, silversfxdata.js, tools/make_silversfx.py). Every blow rotates
+  // three cuts of the Basic attack mix (each begins just before the blow, so it lands on the game's), a bash blow a touch louder;
+  // Bulwark Bash on its hit; Rampart of Dawn as the rampart starts up the road (its second swell as it stops and breaks, its own
+  // clang silent while the mix plays); Oath of Challenge whole at the cast (the Verdict at its end keeps its own sound). Until a
+  // take has loaded, or with ?ossfx=old (?silversfx=old), the earlier sounds play.
+  let OS_OLD = false; try { OS_OLD = /[?&](os|silver)sfx=old(?![a-z])/.test(location.search); } catch (e) {}
+  const OS_VOL = { strike: .24, bash: .38, rampart: .3, oath: .28 };   // (A-weighted over 0.1 s: the strike on the Wolfguard's thrust, the Bash some 1 dB under his Pounce, the spells on the other units' spell mixes; not measured against the old synth sounds)
+  const OS_STRIKE = [['osStrikeA', OS_VOL.strike], ['osStrikeB', OS_VOL.strike * .95], ['osStrikeC', OS_VOL.strike]];
+  TAKE_CAPS.osStrikeA = TAKE_CAPS.osStrikeB = TAKE_CAPS.osStrikeC = 2;   // (a shield wall: at most six blows ringing at once)
+  const osHas = k => { if (OS_OLD) return false; fireLoad(); return !!fireBufs[k]; };
+  S.osStrike = (hard) => { if (!osHas('osStrikeA')) return oldSfx(hard ? 'block' : 'glaiveHit', 0); fireNext('osStrike', hard ? OS_STRIKE.map(([k, v]) => [k, v * 1.15]) : OS_STRIKE, .06, .95 + Math.random() * .1); };
+  S.osBash = () => { if (!osHas('osBashMix')) return oldSfx('so_bash'); firePlay('osBashMix', OS_VOL.bash, .3); };
+  S.osRampart = () => { if (!osHas('osRampartMix')) { oldSfx('so_bash'); oldSfx('so_aegis'); return; } if (firePlay('osRampartMix', OS_VOL.rampart, .3)) E.osRampEnd = Math.max(E.osRampEnd || 0, now() + fxTakes().osRampartMix.len - .3); };
+  S.osRampartEnd = () => { if (!osHas('osRampartMix') || now() > (E.osRampEnd || 0)) oldSfx('block', 0); };
+  S.osOath = () => { if (!osHas('osOathMix')) return oldSfx('so_rebuke'); firePlay('osOathMix', OS_VOL.oath, .3); };
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
@@ -89426,25 +89496,25 @@ const SPELL_BRIEFS = {
   dread: 'Nearby foes move 50% slower and take 25% more damage. Bosses immune.',
   so_bash: 'Deals {d}, adds a Judgement and knocks it {kb} cells back. Bosses are stunned 0.5 sec instead.',
   so_aegis: 'Rolls a wall of light {len} cells back up the road, carrying ground enemies and dealing {d}, a Judgement and a {daze} sec stun to each. Bosses stop it. Nearby Order units are then guarded by light {dur} sec: they hit harder, and silences, hexes and blindness from bosses slide off.',
-  so_rebuke: 'Challenges ground enemies within 1.6 cells for {dur} sec, slowing {slowPct} (less on bosses) and Judging every 0.5 sec. Each one still nearby then hears its Verdict at {vkPct} strength. Casters lose 40 mana.',
+  so_rebuke: 'Challenges ground enemies within 1.6 cells for {dur} sec, slowing {slowPct} (less on bosses) and Judging every 0.5 sec. As the oath closes, the shield\'s light strikes each one still nearby. Casters lose 40 mana.',
   so_sanct: 'After a long aim, fires a heavy bolt dealing {d} through all armour and adding 3 Judgement.',
   so_hail: 'Deals {d} and adds a Judgement. For {dur} sec it burns enemies within {r} cells for {d2} and a Judgement every sec, even after its target dies.',
-  so_witness: 'Condemns for {dur} sec: it gains a Judgement every sec and Verdicts deal 50% more to it. Each Order unit hitting it becomes a witness (up to {max}); it then hears its Verdict, {kPct} stronger per witness.',
+  so_witness: 'Condemns for {dur} sec: it gains a Judgement every sec and its bursts deal 50% more. Each Order unit hitting it becomes a witness (up to {max}); then its Judgement fills and bursts, {kPct} stronger per witness.',
   so_bind: 'Binds up to {n} enemies with chains of light, toughest first, dealing {d}, adding a Judgement and stunning {dur} sec (less on bosses).',
   so_flare: 'Chains it to a nearby Oath-Stone or Order unit for {dur} sec, dealing {d} and Blinding {blind} sec. It is held within {slack} cell (bosses only slowed) and Judged every sec; the chain then snaps for {d2}.',
   so_shackle: 'Strings chains of light to up to {n} Oath-Stones or Order units within {r} cells for {dur} sec. Ground enemies crossing a chain take {d} and a Judgement, are stunned {bind} sec and Blinded 1.5 sec.',
-  so_grail: 'Charges, dealing {d} (25% more to bosses and elites), driving its enemy 0.1 cells back (bosses stand) and delivering its Verdict at double strength.',
-  so_ridedown: 'Rides {n} passes. Each deals {d} and adds a Judgement; ground enemies in the way take {d2} and a Judgement. The last pass delivers its Verdict.',
+  so_grail: 'Charges, dealing {d} (25% more to bosses and elites) and driving its enemy 0.1 cells back (bosses stand), then wheels round for a second blow at 60%.',
+  so_ridedown: 'Rides {n} passes. Each deals {d} and adds a Judgement; ground enemies in the way take {d2} and a Judgement. The last pass strikes three times as hard.',
   so_vow: 'Makes itself and Order units within 2 cells quickened by light for {dur} sec: they strike faster, and each strike adds one more Judgement. A phantom knight rides from up to {riders} of them at the nearest ground enemy, dealing {d}, driving it a little way back and adding a Judgement.',
   so_sunlance: 'Fires a lance of sunlight down a 4-cell line, dealing {d} and a Judgement to each enemy. Flying enemies take double and are dragged down 2 sec. Casters take up to double, the more mana they hold.',
   so_halo: ({ d, v, full }) => { const m = /(\d+)° arc/.exec(full); return `Sweeps a beam across a ${m ? m[1] + '°' : 'wide'} arc, dealing ${d(1)} and a Judgement to each enemy crossed. Flying enemies take double and are dragged down ${v('low')} sec.`; },
   so_dawnfall: 'Drags flying enemies down for {dur} sec, dealing {d} and Blinding as long (less on bosses). Each crash deals {d2} to ground enemies beneath, Blinds {crash} sec and adds a Judgement.',
-  so_crush: 'Crosses both swords and draws them apart, dealing {d} to ground enemies around it. Judged enemies hit hear their full Verdict.',
-  so_hallow: 'Whirls through {n} cuts, the blades in turn, each dealing {d} and a Judgement to ground enemies. The last cut delivers each one\'s Verdict at {vkPct} strength.',
-  so_hammerfall: 'Hurls one of its two swords into the sky, landing 1 sec later for {d} and delivering its Verdict at 150% strength. Ground enemies within {wave} cells take {d2} and a Judgement.',
+  so_crush: 'Crosses both swords and draws them apart, dealing {d} and 2 Judgement to ground enemies around it.',
+  so_hallow: 'Whirls through {n} cuts, the blades in turn, each dealing {d} and a Judgement to ground enemies. The last, both blades together, strikes hardest.',
+  so_hammerfall: 'Hurls one of its two swords into the sky, landing 1 sec later for {d} and 3 Judgement. Ground enemies within {wave} cells take {d2} and a Judgement.',
   so_sweep: 'Swings the censer in a circle, dealing {d} and a Judgement to ground enemies within 1.5 cells. Incense around the bearer for {dur} sec burns enemies every 0.5 sec and Judges them every sec.',
   so_smoke: 'Lays incense along {n} cells of road, dealing {d} and a Judgement to each ground enemy hit. For {dur} sec, ground enemies in it are slowed {slowPct}, burned every 0.5 sec and Judged every sec.',
-  so_embers: 'Ignites up to {n} incense patches in range, using them up. Ground enemies in one take {d} and a Judgement; those with 3 or more Judgement first hear a 50% Verdict. With no incense, it first throws a coal.',
+  so_embers: 'Ignites up to {n} incense patches in range, using them up. Ground enemies in one take {d} and 2 Judgement. With no incense, it first throws a coal.',
   so_toll: 'Nearby allies attack {hastePct} faster and gain Ward for {dur}s.',
   so_peal: 'Nearby allies gain {mana} mana, heal 15% and lose silence and hex.',
   so_knell: 'Nearby foes gain Judgement and move 40% slower for {dur}s.',
@@ -89540,13 +89610,13 @@ const SPELL_BRIEFS = {
   so_pyre: 'Raises a burning stake, dealing {d} to ground enemies within 1 cell, then {d2} every 0.5 sec for {dur} sec. The first caster to reach it (else any ground enemy) is chained {hold} sec and burns twice as hard.',
   ch_lioncharge: ({ d, full }) => { const m = /([\d.]+)-cell area/.exec(full); return `An arc of light sweeps ${m ? m[1] : '1.6'} cells, dealing ${d(1)} to ground enemies (less to bosses), knocking them back and adding 3 Judgement. Order units it passes are quickened by light 6 sec: they strike faster, each strike adding one more Judgement.`; },
   ch_fordstandard: 'Slams his shield into the ground: a shockwave down an 80° cone deals {d} and {j} Judgement. Ground enemies are knocked {kb} cells back (not bosses); flying enemies are knocked down 1.5 sec. Adjacent Order units are guarded by light {ward} sec, Templars of the Ford within 2 cells 2 sec longer.',
-  ch_lionsdue: 'Advances {n} times between enemies on foot, most Judged first, dealing {d} and {j} Judgement to each ground enemy hit. Any left with 3 or more Judgement hears its Verdict.',
+  ch_lionsdue: 'Advances {n} times between enemies on foot, most Judged first, dealing {d} and {j} Judgement to each ground enemy hit.',
   ch_dawnbreak: ({ d, full }) => { const m = /([\d.]+)-cell area/.exec(full); return `The sun breaks over ${m ? m[1] : '1.7'} cells, dealing ${d(1)} (less to bosses), Blinding 4 sec and adding 2 Judgement.`; },
   ch_morningstar: 'Fires a dawn beam bouncing between up to {n} Oath-Stones, dealing {d}, a Judgement and a {blind} sec Blind to each enemy crossed. With no Oath-Stone, it fires one beam.',
   ch_highnoon: ({ v }) => `For ${v('dur')} sec, a sun Blinds all enemies in range every ${v('pulse') === 1 ? '' : v('pulse') + ' '}sec, and each attack also hits up to 5 other Blinded enemies for 60% damage.`,
-  ch_sentence: 'Every Judged enemy hears its Verdict at once, taking {d} per Judgement (40% on bosses).',
+  ch_sentence: 'Every Judged enemy is filled to full Judgement and bursts at once, taking {d} per stack (40% on bosses).',
   ch_summons: 'Pulls all Judgement within {r} cells onto one enemy, dealing {d}. Each stack over its limit deals {d2} extra.',
-  ch_verdict: 'Marks for {dur} sec and adds 2 Judgement. If it dies, its Judgement spreads within {r} cells and each hears a {passPct} Verdict; if it survives, it hears its Verdict at {gavelPct} strength.',
+  ch_verdict: 'Marks for {dur} sec and adds 2 Judgement. If it dies, its Judgement passes to every enemy within {r} cells; if it survives, its Judgement fills and bursts at {gavelPct} strength.',
   /* conclave */
   cc_sunder: 'Breaks every ward and shield, then strikes for {d} plus the power stored from wards broken before. Its ward stays cracked open {open} sec (spells go through it whole).',
   cc_shards: 'Throws its glaive out and back, cutting enemies near its path on both passes for {d}. Each cut breaks shields and tears 25% off a ward.',
@@ -119782,7 +119852,7 @@ const FSM = {
   fs_choir: { k: 'win', f: 'soRadT', s: 3, say: 'Quickened by light: cast again while it lasts to share it' },
   fe_so_bulwark: { k: 'cd', f: 'feRampT', s: 10, need: 'so_aegis', say: 'a Bash that fills Judgement rolls out Rampart of Dawn free' },
   fe_so_bolt: { k: 'cd', f: 'feFlareT', s: 8, need: 'so_hail', say: 'a full-Judgement bolt looses Flare Bolt free' },
-  fe_so_chains: { k: 'cd', f: 'feBindT', s: 8, need: 'so_flare', say: 'Binding Light on 3 foes: Verdicts and a free Chain of Penance' },
+  fe_so_chains: { k: 'cd', f: 'feBindT', s: 8, need: 'so_flare', say: 'Binding Light on 3 foes: 2 Judgement each and a free Chain of Penance' },
   fe_so_grail: { k: 'cd', f: 'feRideT', s: 8, need: 'so_ridedown', say: 'Grail Charge’s foe falls: free Tourney Passes' },
   fe_so_noon: { k: 'cd', f: 'feNoonT', s: 8, need: 'so_halo', say: 'a Sunlance through 3 foes sweeps Noon Sweep free' },
   fe_so_star: { k: 'cd', f: 'feStarT', s: 10, need: 'so_hammerfall', say: 'Sword of Heaven slays: it falls again free' },
@@ -122408,12 +122478,12 @@ const SPELL_HELP = {
   // Oathsworn Shieldbearers (oathsworn)
   so_bash: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The ground support caster nearest the gate; with none, the toughest ground foe (bosses and elites first, then the most health).", tips: ["Healers and banner-bearers are thrown back first, out of reach of the pack they were keeping alive.", "Stand it at the end of a long straight run so each throw sends a foe back down road it must walk again.", "Every hit lays a Judgement, so a Templar's Slam or a Knight's charge right after cashes it in."] },
   so_aegis: { when: "Two or more ground foes in the rampart's run, or a boss or leader among them.", aim: "The road cell beside it with the most ground foes coming up to it; the rampart rolls up the road from there.", tips: ["Post the Shieldbearers at the bottom of a long straight: the rampart carries the whole column back up it.", "A boss breaks the rampart, so leave it for the crowds in front of the boss, not the boss itself.", "Its Wards land on the units beside it as it breaks: keep the Crossbows and Clerics within 1.6 cells."] },
-  so_rebuke: { when: "Three or more ground foes within 1.6 cells, or a boss or leader among them.", aim: "Itself: every ground foe within its call, up to 12.", tips: ["Post it where the road wraps round it on two or three sides: every ground foe it calls is slowed and Judged on the beat.", "Its Verdicts land at the end: Crossbows and Censers beside it fill the stacks it spends.", "Pair it with Templars of the Ford: their slams cash the Judgement it lays before the oath ends."] },
+  so_rebuke: { when: "Three or more ground foes within 1.6 cells, or a boss or leader among them.", aim: "Itself: every ground foe within its call, up to 12.", tips: ["Post it where the road wraps round it on two or three sides: every ground foe it calls is slowed and Judged on the beat.", "Judged on every beat, a foe that stays in the call fills up and bursts: Crossbows and Censers beside it fill it faster.", "Pair it with Templars of the Ford: held in place, foes take their crossing cuts until the oath closes."] },
 
   // Silverbolt Crossbows (silverbolt)
-  so_sanct: { when: "One foe is enough: any foe within {reach} cells, on the ground or in the air.", aim: "The armoured foe nearest the gate; with none, the toughest (bosses and elites first, then the most health).", tips: ["It ignores all armour, so it shines on armoured foes and bosses the rest of the Order bounces off.", "Its three Judgement fill a big foe fast: follow with Sword of Heaven or Grail Charge for a heavy Verdict.", "Works on flyers too: a good answer to armoured flyers the Knights and Templars can't reach."] },
+  so_sanct: { when: "One foe is enough: any foe within {reach} cells, on the ground or in the air.", aim: "The armoured foe nearest the gate; with none, the toughest (bosses and elites first, then the most health).", tips: ["It ignores all armour, so it shines on armoured foes and bosses the rest of the Order bounces off.", "Its three Judgement fill a big foe fast: the burst that follows strikes with this unit's heavy damage.", "Works on flyers too: a good answer to armoured flyers the Knights and Templars can't reach."] },
   so_hail: { when: "Any foe within {reach} cells with another foe within a cell of it (two in all), or a boss or elite; flyers too.", aim: "The foe with the most foes within a cell of it (bosses and elites win ties).", tips: ["Aim the Crossbows at a chokepoint: the flare sears everything that bunches up round its foe.", "If its foe dies the flare drops to the road and keeps burning there: best where the road is narrow.", "Every second it Judges the crowd, so Templars and Grail Knights behind it cash in."] },
-  so_witness: { when: "A boss or elite within {reach} cells not already Condemned; with none, the toughest foe there carrying 3 or more Judgement.", aim: "The foe with the most health it can condemn (usually the boss).", tips: ["Every unit of the Order that strikes the condemned swears as a witness: build several kinds of unit along its road.", "Up to 6 witnesses: the closing Verdict is more than twice as strong with all six.", "Cast it as the boss walks into the middle of your army, not at the end of the road."] },
+  so_witness: { when: "A boss or elite within {reach} cells not already Condemned; with none, the toughest foe there carrying 3 or more Judgement.", aim: "The foe with the most health it can condemn (usually the boss).", tips: ["Every unit of the Order that strikes the condemned swears as a witness: build several kinds of unit along its road.", "Up to 6 witnesses: the closing burst is more than twice as strong with all six.", "Cast it as the boss walks into the middle of your army, not at the end of the road."] },
 
   // Lightbinder Sisters (lightbinder)
   so_bind: { when: "Two or more foes within {reach} cells that can still be held (not crowd-control immune, not already stunned), or one boss or elite.", aim: "Support casters first (nearest the gate), then the toughest; up to its limit of foes, flyers included.", tips: ["Binds healers and casters first, stopping their spells for a moment while the Order works on the pack.", "Each bound foe is Judged and stands still: a perfect setup for Sword of Heaven or a Grail Charge.", "Reaches flyers too, so it can hold a flying elite while Clerics drag it down with Dawnfall."] },
@@ -122421,8 +122491,8 @@ const SPELL_HELP = {
   so_shackle: { when: "Two or more ground foes within {reach} cells (or a boss or leader), and a post within 2.6 cells whose chain would cross the road.", aim: "The posts round her (Oath-Stones and units) whose chains cross the most road.", tips: ["Post the Sisters on one side of the road with Oath-Stones or units on the other: every chain then crosses it.", "Chains strung across a straight catch every ground foe once each: three chains, three binds.", "Ground foes bound by the chains stand Blinded and Judged: a good moment for a Grail Charge or a slam."] },
 
   // Grail Knights (grailknight)
-  so_grail: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The ground foe with the most health in reach.", tips: ["Its Verdict is double strength: Judge the big foe first with Consecrated Bolt or Rebuke, then charge.", "On a Condemned foe (Mark of Witness) the Verdict strikes half again as hard: the Order's best boss burst.", "Its reach is 1.5 cells past its range: with a clear lane down a straight run it hits a boss before it reaches the Knights."] },
-  so_ridedown: { when: "One foe is enough: the toughest ground foe within {reach} cells, if it is a boss or elite, carries 2 or more Judgement, or three or more ground foes are in reach.", aim: "The toughest ground foe in reach; if it falls, the next pass rides at the toughest left.", tips: ["Its last pass delivers the Verdict: let the Crossbows Judge the boss first.", "Ground foes between the knight and its foe are trampled each pass: post it so the road runs between it and the gate.", "The Knights hold nothing themselves: joust a boss a Shieldbearer has dazed or a Sister has bound, and every pass hits it harder."] },
+  so_grail: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The ground foe with the most health in reach.", tips: ["The knight wheels round for a second blow: a charge on a foe a Shieldbearer has dazed lands both blows.", "On a Condemned foe (Bear Witness) every burst of Judgement strikes half again as hard: charge a boss the Crossbows are filling.", "Its reach is 1.5 cells past its range: with a clear lane down a straight run it hits a boss before it reaches the Knights."] },
+  so_ridedown: { when: "One foe is enough: the toughest ground foe within {reach} cells, if it is a boss or elite, carries 2 or more Judgement, or three or more ground foes are in reach.", aim: "The toughest ground foe in reach; if it falls, the next pass rides at the toughest left.", tips: ["Its last pass strikes three times as hard: aim it at a boss that will stay in reach.", "Ground foes between the knight and its foe are trampled each pass: post it so the road runs between it and the gate.", "The Knights hold nothing themselves: joust a boss a Shieldbearer has dazed or a Sister has bound, and every pass hits it harder."] },
   so_vow: { when: "Two or more units within 2 cells of the knight are fighting, or a unit within 2 cells and three or more ground foes near them.", aim: "Itself and every unit within 2 cells: each rides a phantom knight at the ground foe nearest it.", tips: ["Build a cluster of different units round the knight: each sends its own phantom rider.", "Units quickened by light: their strikes lay Judgement: cast it as the Templars and Censers start slamming.", "The phantom riders drive ground foes a little way back up the road: cast it as a crowd reaches the corner."] },
 
   // Sunlance Clerics (sunlance)
@@ -122431,19 +122501,19 @@ const SPELL_HELP = {
   so_dawnfall: { when: "Two or more flyers still in the air within {reach} cells, or a flying boss or leader.", aim: "Every flyer in reach that is still in the air.", tips: ["Dragged-down flyers can be struck by the ground-only units: post it beside the Templars.", "Each flyer crashes onto the road and Blinds the ground foes under it: best when a flock flies over a column.", "Save it for flying waves: it does nothing without flyers."] },
 
   // Templars of the Ford (templar)
-  so_crush: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe within {range} cells.", tips: ["Every stack of Judgement turns into a full Verdict: cast after Rebuke, Hail, Flare or Halo have marked the pack.", "Place it in the middle of a switchback so both blades reach two stretches of road at once.", "The Templars hold nothing themselves: cut foes a Shieldbearer has dazed or a Sister has bound and each takes more."] },
-  so_hallow: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe in its reach, cut after cut.", tips: ["Place it where the road wraps round it, so ground foes stay in reach for every cut.", "Each cut lays a Judgement and the last delivers them: five or more stacks give the full Verdict.", "Pair it with Oath of Challenge or Vigil Chains: held ground foes take every cut."] },
-  so_hammerfall: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The armoured ground foe nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["The sword falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock Judges every ground foe round its foe: aim it at a boss walking in a crowd.", "Its Verdict is half again as strong: Judge the foe before it falls."] },
+  so_crush: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe within {range} cells.", tips: ["It lays 2 Judgement on every foe it cuts: cast it on a pack the Crossbows and Censers have half filled, and they burst.", "Place it in the middle of a switchback so both blades reach two stretches of road at once.", "The Templars hold nothing themselves: cut foes a Shieldbearer has dazed or a Sister has bound and each takes more."] },
+  so_hallow: { when: "Two or more ground foes within {reach} cells, or a boss or leader ground foe.", aim: "Itself: every ground foe in its reach, cut after cut.", tips: ["Place it where the road wraps round it, so ground foes stay in reach for every cut.", "Each cut lays a Judgement, so a foe that stays in the whirl fills up and bursts before the last cut.", "Pair it with Oath of Challenge or Vigil Chains: held ground foes take every cut."] },
+  so_hammerfall: { when: "One foe is enough: a ground foe within {reach} cells (a flyer dragged down counts).", aim: "The armoured ground foe nearest the gate; with none, the toughest ground foe (bosses and elites first).", tips: ["The sword falls a second after the throw: hold the boss first (a Shieldbearer's daze, a bind).", "Its shock Judges every ground foe round its foe: aim it at a boss walking in a crowd.", "It lays 3 Judgement: a foe already carrying 2 bursts as the sword lands."] },
 
   // Censer Bearers (censer)
   so_sweep: { when: "Two or more ground foes within 1.5 cells.", aim: "Itself: every ground foe within 1.5 cells, and incense round it.", tips: ["Place it right beside the road at a corner, so two or more ground foes pass within 1.5 cells.", "The incense left behind keeps Judging ground foes that come after.", "Good beside the Templars: the Sweep's Judgement sets up their Slam."] },
   so_smoke: { when: "A run of road within {reach} cells with two or more ground foes on it or coming up to it, or a boss or elite.", aim: "The run of consecutive road cells in reach with the most ground foes on it or near its start.", tips: ["Post the Censers beside a long straight: the procession lays incense the whole length of it.", "Ground foes walk through every cell of it, slowed and Judged each second.", "It leaves incense for Kindle the Censers to set alight."] },
-  so_embers: { when: "Three or more ground foes standing in incense within {reach} cells plus 1 (any Censer's); with no incense, three or more ground foes in reach.", aim: "Every patch of incense in reach, the fullest first; with none, it throws a coal at the thickest crowd and kindles it.", tips: ["Lay incense first: Procession of Incense and the Censers' own coals give it something to burn.", "It burns the incense away, so cast it when the ground foes are in it, not before.", "Foes with 3 or more Judgement hear their Verdict in the fire: the incense itself Judges them."] },
+  so_embers: { when: "Three or more ground foes standing in incense within {reach} cells plus 1 (any Censer's); with no incense, three or more ground foes in reach.", aim: "Every patch of incense in reach, the fullest first; with none, it throws a coal at the thickest crowd and kindles it.", tips: ["Lay incense first: Procession of Incense and the Censers' own coals give it something to burn.", "It burns the incense away, so cast it when the ground foes are in it, not before.", "Each foe in the fire gains 2 Judgement: the incense has already Judged them, so many burst."] },
 
   // Aurelian, the Lion of the Ford (ch_aurelian): on foot with the shield wall
   ch_lioncharge: { when: "Three or more ground foes within 1.6 cells of one ground foe in {reach} cells (a little wider at higher tiers), or any boss or elite in reach.", aim: "The densest pack of ground foes: the ground foe with the most others within the sweep's area.", tips: ["Every unit of the Order the light passes is quickened by light for 6s: keep your units close to the road he sweeps.", "Judges every ground foe three times: follow with Bulwark Slam, whose shockwave Judges them again.", "Templars of the Ford beside the road are quickened by light too, and with Burnished Shields each flashes its shield at the ground foes in its reach."] },
   ch_fordstandard: { when: "An 80-degree cone within {reach} cells holding two or more ground foes, or a boss or elite in it.", aim: "The cone toward the ground foe whose cone holds the most foes, then the most road.", tips: ["Post Aurelian on the outside of a corner: the shockwave throws both legs of the road back.", "It Wards every unit within 1.6 cells of him, and his Templars of the Ford within 2 cells longer still: build the line round him.", "Bosses stand, but they are Judged twice: a good opening for The Crossing."] },
-  ch_lionsdue: { when: "Three or more ground foes within {reach} cells, or a boss or elite.", aim: "The most-Judged ground foe in reach, then each time the most-Judged ground foe within 2 cells of the last.", tips: ["Judge the crowd first: each stride goes to the most-Judged foe near the last, and Verdicts land on 3 or more.", "Best in a packed corner, where each next foe is within 2 cells.", "Bulwark Slam lays 2 Judgement on everything before him: cast it first."] },
+  ch_lionsdue: { when: "Three or more ground foes within {reach} cells, or a boss or elite.", aim: "The most-Judged ground foe in reach, then each time the most-Judged ground foe within 2 cells of the last.", tips: ["Judge the crowd first: each stride goes to the most-Judged foe near the last, and its 3 Judgement bursts a foe that carried 2.", "Best in a packed corner, where each next foe is within 2 cells.", "Bulwark Slam lays 2 Judgement on everything before him: cast it first."] },
 
   // Celestine, the Dawnsinger (ch_celestine)
   ch_dawnbreak: { when: "Three or more foes within 1.7 cells of one foe in {reach} cells (a little wider at higher tiers), or any boss or elite in reach.", aim: "The densest pack: the foe with the most others within the area; flyers included.", tips: ["Blinds every foe for 4s: cast it just before High Noon so her beam splits to all of them.", "Judges each foe twice and blinded foes take 15% more from the Order: a strong opener for a Slam.", "Hits flyers too: a good answer to a flock over a bend."] },
@@ -122452,8 +122522,8 @@ const SPELL_HELP = {
 
   // Morrow, the Grey Justicar (ch_morrow)
   ch_sentence: { when: "Eight or more stacks of Judgement on the whole field, or a boss or elite carrying 2 or more; no reach needed.", aim: "Every Judged foe on the field, wherever it is.", tips: ["Let the Order build Judgement first: Rebuke, Hail, Halo and Hallowed Ground lay many stacks at once.", "It reaches the whole field, so it can finish Judged foes past your units near the gate.", "Morrow's own bolts lay two Judgement a hit, so keep him where many foes pass."] },
-  ch_summons: { when: "A foe within {reach} cells with 2 or more stacks of Judgement on the foes within 1.6 cells of it (bosses first).", aim: "The foe in reach whose neighbours carry the most Judgement, bosses and the most Judged first.", tips: ["Let the Crossbows and Censers Judge the crowd round a boss, then gather it all onto the boss.", "Every stack it can't hold strikes it instead, so a full foe still pays.", "Follow it with Sentence: the boss's full Judgement becomes one great Verdict."] },
-  ch_verdict: { when: "Three or more foes within 1.5 cells of one in {reach} cells, or any boss or elite in reach; foes already in the ledger don't count.", aim: "The foe with the most health in reach that is not already in the ledger, in or near the crowd.", tips: ["If it dies, its Judgement passes on and each foe that takes it hears a Verdict: write a foe in a crowd.", "If it lives to the end, the gavel falls: a double Verdict on a boss.", "Judge it to the full first: the more it carries, the more it passes on."] },
+  ch_summons: { when: "A foe within {reach} cells with 2 or more stacks of Judgement on the foes within 1.6 cells of it (bosses first).", aim: "The foe in reach whose neighbours carry the most Judgement, bosses and the most Judged first.", tips: ["Let the Crossbows and Censers Judge the crowd round a boss, then gather it all onto the boss.", "Every stack it can't hold strikes it instead, so a full foe still pays.", "Follow it with Sentence: every Judged foe is filled and bursts, the boss with the most."] },
+  ch_verdict: { when: "Three or more foes within 1.5 cells of one in {reach} cells, or any boss or elite in reach; foes already in the ledger don't count.", aim: "The foe with the most health in reach that is not already in the ledger, in or near the crowd.", tips: ["If it dies, its Judgement passes on to every foe round it, and those it fills burst: write a foe in a crowd.", "If it lives to the end, the gavel falls: its Judgement fills and bursts at double strength, a boss's worst moment.", "Judge it to the full first: the more it carries, the more it passes on."] },
 
   /* ---------------- conclave ---------------- */
     // Spellblades (cc_spellblade)
@@ -122881,7 +122951,7 @@ if (typeof openHow === 'function') {
 // direction; the enemy's reason stays unknown)
 const FC_STORY = {
   grove: 'The wood elves and druids of the Deepwood, where roots do the holding and everything that grows can strangle. When the keep called for aid, the Rootmother, the Thornbow and the Seedmother marched as its relief host. The road the enemy took runs on into the Deepwood, and they would sooner stop it under the keep’s walls than under their own trees.',
-  silver: 'The oathbound host of the River Kingdoms: knights, clerics and sisters who lay Judgement on a foe and then deliver its Verdict. They are known for a river ford held with locked shields, and Aurelian still carries its name. The keep called and the Order answered. Every debt is written, and it has come to Ravenswood to see this one paid.',
+  silver: 'The oathbound host of the River Kingdoms: knights, clerics and sisters who lay Judgement on a foe until it bursts in a column of light. They are known for a river ford held with locked shields, and Aurelian still carries its name. The keep called and the Order answered. Every debt is written, and it has come to Ravenswood to see this one paid.',
   conclave: 'Scholars of the Drifting College, who teach that no element stands alone: frost, fire, arcane, time, star and stone, each stronger for the others. Its mages are brilliant and fragile, so the Spellblades in riftsteel stand between them and anything that gets close. They came when the keep called. Why the enemy marches is a question the College has not answered, and it means to.',
   ironhold: 'The clanhost of the Iron Peaks: dwarf engineers in riveted plate, with war-boilers, long rifles and black powder. Their engines heat with every blow and vent it in one great strike, and no armour stays whole in front of them. They answered the keep’s call with a shield wall, a workbench and a keg, and they do not mean to be the line that breaks.',
   stormborn: 'Storm callers, shamans and hunters of the High Plateaus, who fight with the weather itself. Hail and rain soak the road, lightning leaps through whatever is wet, and the Storm builds all battle until it breaks. They came down when the keep called, with spirit beasts and ancestors beside them. The wind was always theirs, their elder says. The enemy is only borrowing the road.',
@@ -123262,12 +123332,10 @@ function kwBuild() {
     kwAdd({ key: 'gw:b_' + u, name: B.name, cat: 'force', sub: 'Bloom', col: '#ffb8d8', def: () => kwBloomText(u), line: () => kwBloomText(u).replace(/^.*?full Growth: /, '') });
   }
 
-  // ---- the Silver Order: Judgement and Verdict ----
+  // ---- the Silver Order: Judgement (one rule since 24 Nov 2026: it fills, and at full it bursts; the Verdict is gone) ----
   const SV = kwForceName('silver') || 'The Silver Order', so = typeof SO !== 'undefined' ? SO : null;
   kwAdd({ key: 'so:judgement', name: 'Judgement', alias: ['Judged', 'judgement'], cat: 'force', sub: SV, col: '#ffd77a',
-    def: () => `Light marks a foe, up to ${so ? so.J_MAX : 5} stacks, for ${so ? so.J_T : 6}s (${so ? so.J_TBIG : 10}s on bosses and elites). Each stack makes the Order's strikes on it ${so ? kwPct(so.J_AMP) : '4%'} harder, and the Shieldbearers' daze lasts longer on a Judged foe: 1.5s, not 1s.` });
-  kwAdd({ key: 'so:verdict', name: 'Verdict', alias: ['Verdicts'], cat: 'force', sub: SV, col: '#fff4cc',
-    def: () => `Spends a foe's Judgement on a column of light: magic damage of ${so ? kwPct(so.V_K) : '30%'} of the striker's damage for each stack.` });
+    def: () => `Light marks a foe, up to ${so ? so.J_MAX : 5} stacks, for ${so ? so.J_T : 6}s (${so ? so.J_TBIG : 10}s on bosses and elites). Each stack makes the Order's strikes on it ${so ? kwPct(so.J_AMP) : '4%'} harder. At full stacks (${so ? so.J_MAX : 5}; 6 when Morrow leads) it bursts: a column of light deals magic damage of ${so ? +(so.B_K * so.J_MAX).toFixed(2) : 3}× the damage of the unit that laid the last stack, and the stacks clear.` });
 
   // ---- the Conclave: elements, reactions, Arcane Charge ----
   const CC = kwForceName('conclave') || 'The Conclave';
@@ -123373,8 +123441,7 @@ const KW_LINE = {
   'ih:steamburst': 'The Steam Hammers\' vent: a blast that strikes and slows every ground foe around them',
   'gw:growth': 'The green bar under a Grove unit\'s mana: strikes fill it, and when full the next strike Blooms',
   'gw:bloom': 'A full Growth bar turns the unit\'s next strike into its own special strike',
-  'so:judgement': 'A stacking mark of light: each stack makes the Order\'s strikes on the foe harder',
-  'so:verdict': 'Spends a foe\'s Judgement on a column of light, more for each stack',
+  'so:judgement': 'A stacking mark of light: each stack makes the Order\'s strikes harder, and at full stacks it bursts in a column of light',
   'cc:mark': 'Each Conclave school marks the foes it hits with its element; two different marks set off a Reaction',
   'cc:reaction': 'Two different elements on one foe set off an effect of their own, and both marks clear',
   'cc:charge': 'Each basic attack stores a charge; the next spell spends them all for more power',
@@ -124109,18 +124176,18 @@ bfAdd('marked', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 9, ico
   def: 'Marked as prey: it takes more from every hit and pays double gold if it falls marked.',
   get: c => c.heroMarkT > bfNow() ? { t: bfLeft(c.heroMarkT), src: 'from Mark Prey', say: 'It takes 25% more from every hit, and pays double gold if it falls marked.' } : null });
 bfAdd('judgement', { name: 'Judgement', kw: 'so:judgement', kind: 'debuff', pri: 5, icon: 'scales', hue: '#8a7020', f: ['soJ', 'soJT', 'soJBy'],
-  def: 'Light marks it: each stack makes the Silver Order\'s strikes on it harder, and a Verdict spends them.',
+  def: 'Light marks it: each stack makes the Silver Order\'s strikes on it harder, and at full stacks it bursts in a column of light.',
   get: c => {
     const n = typeof soJ === 'function' ? soJ(c) : (c.soJT > bfNow() ? c.soJ | 0 : 0); if (!n) return null;
     const k = typeof SO !== 'undefined' ? SO.J_AMP : .04, mx = typeof soJMax === 'function' ? soJMax() : 5;
-    return { n, t: bfLeft(c.soJT), src: bfFrom(c.soJBy), say: `${n} of ${mx} stacks: the Order's strikes on it hit ${bfPct(n * k)} harder. A Verdict spends them.` };
+    return { n, t: bfLeft(c.soJT), src: bfFrom(c.soJBy), say: `${n} of ${mx} stacks: the Order's strikes on it hit ${bfPct(n * k)} harder. At ${mx} it bursts in a column of light.` };
   } });
 bfAdd('condemned', { name: 'Witnessed by the Order', kind: 'debuff', pri: 5, icon: 'eye', hue: '#8a7a40', f: ['soCondT', 'soCondBy'],
   def: 'Witnessed by the Order: its Judgement holds, and the marks on it strike harder.',
-  get: c => c.soCondT > bfNow() ? { t: bfLeft(c.soCondT), src: bfFrom(c.soCondBy), n: c.socWit ? c.socWit.size : undefined, say: `Its Judgement does not fade while this lasts, and gains a stack every so often; the Order's marks on it strike half again as hard.${c.socWit ? ` ${bfPl(c.socWit.size, 'unit has', 'units have')} sworn as witnesses: its closing Verdict grows with each.` : ''}` } : null });
+  get: c => c.soCondT > bfNow() ? { t: bfLeft(c.soCondT), src: bfFrom(c.soCondBy), n: c.socWit ? c.socWit.size : undefined, say: `Its Judgement does not fade while this lasts, and gains a stack every so often; the Order's marks on it strike half again as hard.${c.socWit ? ` ${bfPl(c.socWit.size, 'unit has', 'units have')} sworn as witnesses: when it ends its Judgement fills and bursts, stronger for each.` : ''}` } : null });
 bfAdd('challenged', { name: 'Facing the shield', kind: 'debuff', pri: 7, icon: 'sunburst', hue: '#8a7020', f: ['socChalT', 'socChalBy'],
-  def: 'A Shieldbearer\'s Oath of Challenge: it turns to face the shield, slowed, Judged on every beat, and hears its Verdict when the oath ends.',
-  get: c => c.socChalT > bfNow() ? { t: bfLeft(c.socChalT), src: bfFrom(c.socChalBy), say: 'It is slowed while it faces the shield, gains a Judgement on every beat, and hears its Verdict when the oath ends (if it is still near).' } : null });
+  def: 'A Shieldbearer\'s Oath of Challenge: it turns to face the shield, slowed, Judged on every beat, and struck by the shield\'s light when the oath ends.',
+  get: c => c.socChalT > bfNow() ? { t: bfLeft(c.socChalT), src: bfFrom(c.socChalBy), say: 'It is slowed while it faces the shield, gains a Judgement on every beat, and is struck by the shield\'s light when the oath ends (if it is still near).' } : null });
 bfAdd('leashed', { name: 'Chained', kind: 'debuff', pri: 6, icon: 'chains', hue: '#8a7a30', f: ['socLeashT', 'socLeash'],
   def: 'Chained by the Lightbinder Sisters to an Oath-Stone or a unit: once it gets a cell further down the road it is Rooted there.',
   get: c => c.socLeashT > bfNow() && c.socLeash ? { t: bfLeft(c.socLeashT), src: bfFrom(c.socLeash.by), say: `Once it gets ${c.socLeash.L > 1 ? 'a cell and a half' : 'a cell'} further down the road it is rooted there (a boss is slowed), and it gains a Judgement every second. When the chain snaps taut it is struck once more.` } : null });
@@ -124131,8 +124198,8 @@ bfAdd('staked', { name: 'Chained to the Stake', kind: 'debuff', pri: 4, icon: 'f
   def: 'Chained to a Magebane Inquisitor\'s stake: held fast in the pyre, burning twice as hard.',
   get: c => c.socStakeT > bfNow() ? { t: bfLeft(c.socStakeT), say: 'It is held fast in the pyre and burns twice as hard. When it is freed or dies here, every caster near the stake is silenced.' } : null });
 bfAdd('sentenced', { name: 'Sentenced', kind: 'debuff', pri: 5, icon: 'sword', hue: '#8a8a9a', f: ['chVerdictT', 'chVerdictBy'],
-  def: 'The Champion has passed sentence: two Judgements, and its strikes on it answer.',
-  get: c => c.chVerdictT > bfNow() ? { t: bfLeft(c.chVerdictT), src: 'from your Champion', say: 'The Champion has passed sentence on it: its strikes on this foe answer the Judgement it carries.' } : null });
+  def: 'Written in Morrow\'s ledger by The Gavel: if it dies its Judgement passes to the foes round it; if it lives, the gavel falls and its Judgement bursts.',
+  get: c => c.chVerdictT > bfNow() ? { t: bfLeft(c.chVerdictT), src: 'from your Champion', say: 'Written in the ledger: if it dies, its Judgement passes to the foes round it; if it lives to the end, its Judgement is filled and bursts at double strength.' } : null });
 bfAdd('blinded', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 8, icon: 'sun', hue: '#8a8040', f: ['soBlindT'],
   def: 'Blinding light: it stumbles slower and takes more from every hit.',
   get: c => c.soBlindT > bfNow() ? { t: bfLeft(c.soBlindT), say: typeof SO !== 'undefined' ? `Blinded: it stumbles ${bfPct(SO.BLIND_SLOW)} slower and takes ${bfPct(SO.BLIND_AMP)} more from every hit.` : 'Blinded: it stumbles slower and takes more from every hit.' } : null });
