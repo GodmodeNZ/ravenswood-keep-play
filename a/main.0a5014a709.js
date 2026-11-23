@@ -1,4 +1,4 @@
-const BUILD_TAG = 'e674933@2026-11-23';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'e698ebe@2026-11-23';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -119351,8 +119351,17 @@ function rgRand(seed, key) {
 function rgShuffle(seed, key, a) { const o = a.slice(); for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(rgRand(seed, key + i) * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } return o; }
 
 /* ---- the runs on this device ---- */
+// every force may march a homeland for testing (owner, 23 Nov 2026: "allow any set to start homeland not just elves for testing,
+// we can change it once we add more homeland maps"): a force with no region of its own borrows the Grove's map
+const RG_FKEY = 'runehold.region.force';
+function rgEnsure() { if (typeof FORCES === 'undefined' || typeof HEROES === 'undefined') return; for (const f in FORCES) if (!RG_REGIONS[f] && HEROES.some(h => h.force === f && (typeof heroPickable !== 'function' || heroPickable(h)))) RG_REGIONS[f] = RG_REGIONS.grove; }
+const rgForces = () => { rgEnsure(); return Object.keys(RG_REGIONS).filter(f => typeof FORCES !== 'undefined' && FORCES[f]); };
+function rgLastForce() { let f = null; try { f = localStorage.getItem(RG_FKEY); } catch (e) {} rgEnsure(); return f && RG_REGIONS[f] ? f : 'grove'; }
+function rgSetForce(f) { try { localStorage.setItem(RG_FKEY, f); } catch (e) {} }
+const rgForceTabs = cur => `<div class="rg-forces" role="tablist">${rgForces().map(f => `<button type="button" class="rg-force${f === cur ? ' on' : ''}" data-f="${f}" style="--fh:${FORCES[f].hue || '#c8a050'}">${rgEsc(FORCES[f].name)}${rgGet(f) ? '<small>run under way</small>' : ''}</button>`).join('')}</div>`;
+function rgForceWire() { for (const b of ovp.querySelectorAll('.rg-force')) b.onclick = () => { sfx('click'); rgSetForce(b.dataset.f); rgSel = null; rgOpen(b.dataset.f); }; }
 function rgAll() { let s = null; try { s = JSON.parse(localStorage.getItem(RG_KEY) || 'null'); } catch (e) {} return s && s.runs && typeof s.runs === 'object' ? s : { v: 1, runs: {} }; }
-function rgGet(force) { const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
+function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
 function rgPut(R) { const s = rgAll(); R.at2 = Date.now(); s.runs[R.force] = R; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); return true; } catch (e) { return false; } }
 function rgDrop(force) { const s = rgAll(); delete s.runs[force]; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); } catch (e) {} }
 const rgDef = R => RG_REGIONS[R.force];
@@ -119844,13 +119853,13 @@ function rgStartHTML(force) {
   const D = RG_REGIONS[force], hs = HEROES.filter(h => h.force === force && heroPickable(h));
   if (!hs.some(h => h.id === rgPick.hero)) rgPick.hero = hs[0].id;
   return `<div class="cm rg"><header class="cm-hd"><h2 class="ttl">${rgEsc(D.name)}</h2><p class="sub">${rgEsc(D.say)} A prototype of the region map: choose where to fight, march the roads, fall back and fight again.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
-    <div class="rg-start"><h4>Commander</h4><div class="rg-heroes">${hs.map(h => `<button type="button" class="rg-hero${h.id === rgPick.hero ? ' on' : ''}" data-h="${h.id}"><img alt="" src="${rgFace(h)}"><span>${rgEsc(h.name)}<small>${rgEsc(h.title)}</small></span></button>`).join('')}</div>
+    <div class="rg-start"><h4>Force</h4>${rgForceTabs(force)}<h4>Commander</h4><div class="rg-heroes">${hs.map(h => `<button type="button" class="rg-hero${h.id === rgPick.hero ? ' on' : ''}" data-h="${h.id}"><img alt="" src="${rgFace(h)}"><span>${rgEsc(h.name)}<small>${rgEsc(h.title)}</small></span></button>`).join('')}</div>
     <label class="rg-hard"><input type="checkbox" id="rgHard" ${rgPick.hard ? 'checked' : ''}> Hardcore: the first broken line ends the run</label>
     <ul class="rg-rules"><li>${RG_LIVES} lives for the whole act; each battle stakes a line of up to ${RG_LINE}.</li><li>A broken line costs, it does not end the run: lives, gold, the place, time on the clock, and a fall back to the nearest town; no unit is wounded, and you can retry the battle at once.</li><li>The run ends at 0 lives, or a broken line with no town to fall back to.</li><li>It saves itself on the map; battles save between waves.</li></ul>${RG_HOW}
     <button class="btn" id="rgBegin">Muster the host<small>at ${rgEsc(D.nodes.find(n => n.start).name)}</small></button></div></div>`;
 }
 function rgOpen(force) {
-  force = force || 'grove';
+  rgEnsure(); force = force && RG_REGIONS[force] ? force : rgLastForce(); rgSetForce(force);
   if (typeof twStop === 'function') twStop();
   G.paused = false; startDemo();
   markDirty();
@@ -119861,6 +119870,7 @@ function rgOpen(force) {
     $('#rgHard').onchange = e => { rgPick.hard = e.target.checked; };
     $('#rgBegin').onclick = () => { AudioSys.init(); sfx('click'); const N = rgNew(force, rgPick.hero, rgPick.hard); rgPut(N); rgSel = N.at; rgOpen(force); };
     $('#rgX').onclick = () => { sfx('click'); titleScreen(); };
+    rgForceWire();
     return;
   }
   if (R.over || R.done) {
@@ -119878,7 +119888,7 @@ function rgOpen(force) {
     <div class="cm-body"><div class="cm-map">${rgMapSVG(R)}</div><aside class="cm-side">${rgBandHTML(R)}${side}
     ${RG_HOW}
     <details class="rg-log"><summary>The march so far${R.log[0] ? `: <span>${rgEsc(R.log[0])}</span>` : ''}</summary><ul>${R.log.slice(0, 8).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></details></aside></div>
-    <footer class="cm-ft"><button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign');
+    <footer class="cm-ft">${rgForceTabs(force)}<button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
   // a place: a click picks it; a second click on it within RG_DBL ms (a double-click, or a double-tap on touch: the map is drawn
   // anew after the first, so the two clicks land on different elements and the time between them decides) takes its primary
@@ -119896,6 +119906,7 @@ function rgOpen(force) {
   on('rgForfeit', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (x) { restore(x.s); G.runId = x.id; rgEnd(false, true); } else { const S = Object.assign(rgSpec(R, R.battle.node, 'trouble'), { line: 0 }); R.battle = null; const out = []; rgGrow(R, S.node, 'your retreat from here'); out.push(`Retreating made ${rgNode(R, S.node).name} harder (grown ${R.st[S.node].g}/${RG_GROW})`); if (!S.gentle) rgClock(R, 1, out); rgFallBack(R, out); R.notice = rgNotice(out); for (const t of out) rgLog(R, t); rgPut(R); rgOpen(force); } });
   on('rgX', () => titleScreen());
   on('rgTitleB', () => titleScreen());
+  rgForceWire();
   const dr = document.getElementById('rgDropB');
   if (dr) dr.onclick = () => { sfx('click'); if (!dr.classList.contains('arm')) { dr.classList.add('arm'); dr.textContent = 'Tap again: the run is lost'; return; } rgDrop(force); rgOpen(force); };
   for (const b of ovp.querySelectorAll('[data-town]')) b.onclick = () => { sfx('click'); rgTown(R, b.dataset.town); rgOpen(force); };
@@ -119987,9 +119998,9 @@ function rgOpen(force) {
 function rgTitleInject() {
   if (!rgOn() || document.getElementById('oRegion')) return;
   const ref = document.getElementById('oRites'); if (!ref) return;
-  const R = rgGet('grove');
+  const F = rgLastForce(), R = rgGet(F);
   ref.insertAdjacentHTML('beforebegin', `<button type="button" class="t2-btn" id="oRegion"><span>Homeland</span><small>${R && !R.over && !R.done ? `${rgEsc(rgNode(R, R.at).name)} · ${R.lives} lives` : 'Prototype'}</small></button>`);
-  document.getElementById('oRegion').onclick = () => { AudioSys.init(); sfx('click'); rgOpen('grove'); };
+  document.getElementById('oRegion').onclick = () => { AudioSys.init(); sfx('click'); rgOpen(rgLastForce()); };
 }
 if (typeof document !== 'undefined') setTimeout(rgTitleInject, 0);
 
