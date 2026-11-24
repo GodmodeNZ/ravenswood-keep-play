@@ -1,4 +1,4 @@
-const BUILD_TAG = '79f2f85f@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b833efd9@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7834,6 +7834,7 @@ function rootBurst(c) {
 // the single-target melee units' holds, both roots (the Grove's own hold; since 11 Nov 2026 only the Thornguard's is laid: the Stag Lancers hold nothing, forces_zzzzzzzzzzzzzzzzzzzz_holds.js): the Thornguard's Pin, the Stag Lancers' pinning
 // charge. A foe they root is a rooted foe for Growth (gwRootFed) and for every "vs rooted" talent and spell.
 const GV_PIN = { every: 4, t: 1 }, GV_KNOCK = 1;
+const TG_HIT_S = 5 / 30;   // Thorn Lunge's pin and Thornhedge's slam: their clips' hit frame (tools/tg_anim.py HIT, frame 5 at 30 a second), in game seconds from the cast; their mixes are lined up on it
 function spearThrust(t, st, tg, pow) {   // Thornguard: a spear thrust at the foe beside it, through to the one behind
   const C = st.caps, dx = tg.x - t.x, dz = tg.y - t.y, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, struck = [];
   const ok = o => !o.fly && canTarget(t, st, o);
@@ -7866,7 +7867,7 @@ function spearThrust(t, st, tg, pow) {   // Thornguard: a spear thrust at the fo
     c.thornBurst = true; inSplash(c.x, c.y, 1, true, o => { if (o !== c) hurt(o, a * .6, 'phys', t, false, null); });
     for (let q = 0; q < 10; q++) { const a2 = q / 10 * TAU; part({ k: 'chunk', x: c.x, z: c.y, h: .35, vx: Math.cos(a2) * 2.4, vz: Math.sin(a2) * 2.4, vh: R(.4, 1), g: 5, life: .35, max: .35, size: R(.03, .05), col: q % 2 ? '#c8ae7a' : '#7fae45' }); }
   }
-  fxSpark(tg.x, tg.y, hitH(tg), '#f0e8c0', 6); t.recoil = 1; sfx('glaiveHit', 0);
+  fxSpark(tg.x, tg.y, hitH(tg), '#f0e8c0', 6); t.recoil = 1; sfx('tgThrust', 0);   // (the owner's Spear Thrust mix, audio.js S.tgThrust; glaiveHit without it)
 }
 function bladeWhirl(t, st, pow, sub) {   // Blade Dancers: a whirl of both blades through every walker beside them (sub: a follow-up spin's share)
   const C = st.caps, R0 = st.range, cut = [];
@@ -10485,7 +10486,7 @@ const UNIT_KITS = {
         const [ux, uz] = abDir(t, c);
         abHit(t, st, c, byT(ab.by.mult, t), 'phys', [ux * .14, uz * .14]);
         if (!c.dead) rootFoe(c, byT(ab.by.root, t), t);
-        abRootFx(c.x, c.y, 8); fxSpark(c.x, c.y, hitH(c), '#f0e8c0', 10); abSfx('thrust', 1);
+        abRootFx(c.x, c.y, 8); fxSpark(c.x, c.y, hitH(c), '#f0e8c0', 10); sfx('tgLunge', TG_HIT_S / (G.speed || 1));   // (the owner's Thorn Lunge mix, its pin on the clip's frame 5: audio.js S.tgLunge; glaiveHit without it)
       } },
     { id: 'brambleguard', name: 'Bramble Guard', short: 'Guard', glyph: 'shield', hue: '#9ab85a', mana: 90, cd: 14, r: 1.6, research: { cost: 60, time: 20 },
       by: { dur: [4, 4, 5, 5, 6, 6] },
@@ -31853,7 +31854,7 @@ gvcSet('brambleguard', { name: 'Thornhedge', short: 'Hedge', glyph: 'shield', hu
     const nx = -p.tz, nz = p.tx;
     abZone(t, gvcFresh({ k: 'brambleguard', x: p.x, z: p.y, tx: p.tx, tz: p.tz, nx, nz, half: .62, n: byT(ab.by.n, t), root: byT(ab.by.root, t), got: new Set(), until: G.time + 5, tick: .12, every: .08, at: G.time }));
     gvcFx('hedge', t, ab, { x: p.x, z: p.y, tx: p.tx, tz: p.tz, nx, nz, half: .62, life: 5 });
-    sfx('burrow', 1); sfx('glaiveHit', 0);
+    sfx('tgHedge', TG_HIT_S / (G.speed || 1));   // (the owner's Thornhedge mix, its slam on the clip's frame 5: audio.js S.tgHedge; burrow and glaiveHit without it)
   },
   zone(t, st, z) {
     if (G.time - z.at < .15) return;
@@ -31897,9 +31898,9 @@ gvcSet('sunder', { name: 'Spearwood Rising', short: 'Spearwood', glyph: 'spikes'
         if (!c.dead) { rootFoe(c, .8, t); if (!abBig(c) && typeof liftFoe === 'function') liftFoe(c, .5, .22, 'toss'); }
         gvcFx('impale', t, ab, { c });
       } });
-      if (k === 1) sfx('quake', .5);
+      if (k === 1) sfx('tgSpearwoodQuake', 0);   // (its own quake only without the mix, or past it)
     } });
-    sfx('burrow', 1);
+    sfx('tgSpearwood', 0);   // (the owner's Spearwood Rising mix, audio.js S.tgSpearwood)
   } });
 
 /* =====================================================================================================
@@ -65568,7 +65569,7 @@ const AudioSys = (() => {
   // peak (optional): seconds from now when the take's loudest moment should land (a swing's whoosh on the blow)
   const fireBufs = {}; let fireWait = 0;
   function fireLoad() {
-    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined' && typeof ARCMIS_SFX === 'undefined' && typeof STORMMIX_SFX === 'undefined' && typeof SEEDMIX_SFX === 'undefined' && typeof SILVERMIX_SFX === 'undefined')) return; fireWait = 1;
+    if (fireWait || (typeof FIRE_SFX === 'undefined' && typeof BLADE_SFX === 'undefined' && typeof FROST_SFX === 'undefined' && typeof DEATH_SFX === 'undefined' && typeof ARCMIS_SFX === 'undefined' && typeof STORMMIX_SFX === 'undefined' && typeof SEEDMIX_SFX === 'undefined' && typeof SILVERMIX_SFX === 'undefined' && typeof THORNMIX_SFX === 'undefined')) return; fireWait = 1;
     for (const k in fxTakes()) {
       try {
         const d = fxTakes()[k].d, s = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
@@ -65578,7 +65579,7 @@ const AudioSys = (() => {
   }
   // (the glaive's spinning-blade takes, bladesfxdata.js, are cut the same way and play through the same loader)
   let fxAll = null;
-  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}, typeof ARCMIS_SFX !== 'undefined' ? ARCMIS_SFX : {}, typeof STORMMIX_SFX !== 'undefined' ? STORMMIX_SFX : {}, typeof SEEDMIX_SFX !== 'undefined' ? SEEDMIX_SFX : {}, typeof SILVERMIX_SFX !== 'undefined' ? SILVERMIX_SFX : {}));
+  const fxTakes = () => fxAll || (fxAll = Object.assign({}, typeof FIRE_SFX !== 'undefined' ? FIRE_SFX : {}, typeof BLADE_SFX !== 'undefined' ? BLADE_SFX : {}, typeof FROST_SFX !== 'undefined' ? FROST_SFX : {}, typeof DEATH_SFX !== 'undefined' ? DEATH_SFX : {}, typeof ARCMIS_SFX !== 'undefined' ? ARCMIS_SFX : {}, typeof STORMMIX_SFX !== 'undefined' ? STORMMIX_SFX : {}, typeof SEEDMIX_SFX !== 'undefined' ? SEEDMIX_SFX : {}, typeof SILVERMIX_SFX !== 'undefined' ? SILVERMIX_SFX : {}, typeof THORNMIX_SFX !== 'undefined' ? THORNMIX_SFX : {}));
   // the Pyroclasts' takes are lifted (owner, 12 Nov 2026: "can you add sounds to flame spells": they played, but some 4-6x
   // under the other weapons, so they were lost in the mix)
   const PYRO_GAIN = 3, FR_ICE_VOL = .3, FR_WH_VOL = [.36, .4], FR_HIT_VOL = [.3, .3], PY_FURNACE_VOL = .2, FR_MIX_VOL = [.25, .4], FR_SPEAR_VOL = [.3, .3], FR_COFFIN_VOL = [.3, .3], FR_BLOOM_VOL = [.3, .35];   // (her bolt and its hit each peak about .1, the cannon's level, as they stack; the Breath about .2, a spell)
@@ -65936,6 +65937,21 @@ const AudioSys = (() => {
   S.osRampart = () => { if (!osHas('osRampartMix')) { oldSfx('so_bash'); oldSfx('so_aegis'); return; } if (firePlay('osRampartMix', OS_VOL.rampart, .3)) E.osRampEnd = Math.max(E.osRampEnd || 0, now() + fxTakes().osRampartMix.len - .3); };
   S.osRampartEnd = () => { if (!osHas('osRampartMix') || now() > (E.osRampEnd || 0)) oldSfx('block', 0); };
   S.osOath = () => { if (!osHas('osOathMix')) return oldSfx('so_rebuke'); firePlay('osOathMix', OS_VOL.oath, .3); };
+  // The Thornguard Spears (24 Nov 2026, the owner's own mixes, thornsfxdata.js, tools/make_thornsfx.py). The strike rotates three
+  // cuts of the Spear Thrust mix, each begun 0.13 s before its blow, so the blow sounds as the spear comes home (the clip's frame 4);
+  // Thorn Lunge's pin and Thornhedge's slam are put on their clips' frame 5 (T: real seconds from the cast to that frame; the take
+  // starts part way in, firePlay's peak); Spearwood Rising whole at the cast, the spears' own quake silent while it plays. Until a
+  // take has loaded, or with ?tgsfx=old (?thornsfx=old), the earlier sounds play, each at its own level.
+  let TG_OLD = false; try { TG_OLD = /[?&](tg|thorn)sfx=old(?![a-z])/.test(location.search); } catch (e) {}
+  const TG_VOL = { thrust: .21, lunge: .34, hedge: .44, spearwood: .3 };   // (A-weighted over the loudest 0.3 s, against the other units' mixes: the strike on the Oathsworn's and the Wolfguard's, Thorn Lunge between Pounce and Bulwark Bash, the two spells on the Silver and Seedcaster spell mixes; played levels: thrust -36.3 dB (Oathsworn -36.1, Wolfguard -38.8), Lunge -29.8 (Pounce -29.5, Bash -28.7), hedge -30.8 and Spearwood -31.0 (Rampart -31.0, Oath -31.6); the hedge's cut is peak-limited 3 dB under the others, made up here)
+  const TG_THRUST = [['tgThrustA', TG_VOL.thrust], ['tgThrustB', TG_VOL.thrust * .97], ['tgThrustC', TG_VOL.thrust * .97]];
+  TAKE_CAPS.tgThrustA = TAKE_CAPS.tgThrustB = TAKE_CAPS.tgThrustC = 2;   // (a spear wall: at most six thrusts ringing at once)
+  const tgHas = k => { if (TG_OLD) return false; fireLoad(); return !!fireBufs[k]; };
+  S.tgThrust = () => { if (!tgHas('tgThrustA')) return oldSfx('glaiveHit', 0); fireNext('tgThrust', TG_THRUST, .06, .96 + Math.random() * .08); };
+  S.tgLunge = (T) => { if (!tgHas('tgLungeMix')) return oldSfx('glaiveHit', 1); firePlay('tgLungeMix', TG_VOL.lunge, .3, T == null ? null : Math.max(0, T)); };
+  S.tgHedge = (T) => { if (!tgHas('tgHedgeMix')) { oldSfx('burrow', 1); oldSfx('glaiveHit', 0); return; } firePlay('tgHedgeMix', TG_VOL.hedge, .3, T == null ? null : Math.max(0, T)); };
+  S.tgSpearwood = () => { if (!tgHas('tgSpearwoodMix')) return oldSfx('burrow', 1); if (firePlay('tgSpearwoodMix', TG_VOL.spearwood, .3)) E.tgSwEnd = Math.max(E.tgSwEnd || 0, now() + fxTakes().tgSpearwoodMix.len - .4); };
+  S.tgSpearwoodQuake = () => { if (!tgHas('tgSpearwoodMix') || now() > (E.tgSwEnd || 0)) oldSfx('quake', .5); };
   S.pyroSkip = (last) => last ? firePlay('pyroSkipEnd', .13, .2) : fireNext('pyroSkip', [['pyroSkip', .091], ['pyroSkip2', .138], ['pyroSkip3', .111]], .12, .92 + Math.random() * .16);
   // Phoenix: one big rising roar from its hands, swelling as the bird sweeps down the road (it covers the flight), and a big
   // burst as it dives at the end
@@ -107059,8 +107075,9 @@ const LB2 = (() => {
      idle       no foe in reach: at ease, a sword low in each hand
      ready      a foe in reach: his guard: the right blade cocked back over his shoulder, the left low before him, its point
                 at the foe
-     cutA/B/C   his blows (FORCE_ATTACK.so_slam): the right blade's falling diagonal, the left's on the other diagonal, then
-                both crossed before his chest and thrown open together (the Twin Cut). Which one is the game's own word
+     cutA/B/C   his blows (FORCE_ATTACK.so_slam; 24 frames, the blow on frame 8): the right blade's falling diagonal and its
+                backhand back up, the left's level sweep and its backhand, then both falling together and thrown open like
+                wings (the Twin Cut). Which one is the game's own word
                 where it gives it (t.tpCut: 0 right, 1 left, 2 both, set on every blow with t.soSlamAt: the dual-wield
                 kit), else they are taken in turn. Each is begun its own hit frame early so the blades are through the foe
                 on the game's blow, and is paced to the blows' own interval; the edge leads every cut (the bake turns each
