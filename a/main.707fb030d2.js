@@ -1,4 +1,4 @@
-const BUILD_TAG = '83b62685@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '74217292@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -20088,7 +20088,8 @@ function soExtra(t, tier, x, z, yaw, K) {
   // the ascension: wings of light at V and VI, part of the body (t.tier, not the mesh's tier). The gold ring over the head at IV
   // and the glory and ground ring at VI are gone (owner, 7 Nov 2026: they hid the model; visual_clutter_audit.md)
   const asc = (t.tier | 0) - 2;
-  if (asc >= 1) {
+  // the wings of light at V and VI are gone too (owner, 25 Nov 2026: "what are these? behind the unit"; they read as stray white streaks)
+  if (false && asc >= 1) {
     if (asc >= 2) {   // wings of light behind the shoulders
       M4.trs(_soM, x, 0, z, yaw, 0, 0, K * (SO_SCALE[Math.min(2, tier)] || 1));
       item(dynMesh('so_wings' + (asc >= 3 ? 3 : 2), g => soWingsMesh(g, asc >= 3)), _soM, { shadow: false });
@@ -121746,6 +121747,7 @@ function campBandLoad(W, force) {
     B.xp = Math.max(0, +W.xp || 0); B.xpRn = W.xpRn | 0; B.tp = Math.max(0, W.tp | 0); B.tpEarned = Math.max(0, W.tpEarned | 0);
     B.tal = campObj(W.tal); B.taln = W.taln && typeof W.taln === 'object' ? W.taln : null; B.heroTal = Array.isArray(W.heroTal) ? W.heroTal.slice(0, 5) : null; B.plan = W.plan && typeof W.plan === 'object' ? W.plan : null;
     B.loot = Array.isArray(W.loot) ? W.loot.filter(okItem) : []; B.gearUid = Math.max(W.gearUid | 0, ...B.loot.map(it => it.id | 0), 0);
+    if (W.wpn && typeof W.wpn === 'object') B.wpn = W.wpn;   // (its weapons: campWpnOut)
     B.rn = clamp(W.rn | 0, 0, typeof RN !== 'undefined' ? RN.cap : 10); B.unlocked = Array.isArray(W.unlocked) ? W.unlocked.filter(t => typeof t === 'string') : [];
   }
   return B;
@@ -121773,6 +121775,23 @@ function campTrimBag(items) {
   const cap = typeof LOOT_CAP !== 'undefined' ? LOOT_CAP : 30;
   return items.slice().sort((a, b) => (b.rar | 0) - (a.rar | 0) || (b.il | 0) - (a.il | 0) || (b.hone | 0) - (a.hone | 0) || (a.id | 0) - (b.id | 0)).slice(0, cap);
 }
+// the warband's weapons (forces_zzzzzzzzzzzzz_weapons.js, dual wield, hero weapons): the rack, every weapon a unit holds (back
+// to the rack, as its relics go back to the bag) and the commander's hero weapons. Owner, 25 Nov 2026: "i chose a weapon from a
+// boss after winning a map on homeland and it disappeared from bag after marching to next map": the warband carried relics only
+function campWpnOut() {
+  if (typeof wpnOk !== 'function' || typeof wpnClean !== 'function') return null;
+  const all = (G.wbag || []).slice();
+  for (const t of G.towers || []) { if (t.weapon && !t.weapon.hero) all.push(t.weapon); if (t.weapon2) all.push(t.weapon2); }
+  const seen = new Set(), bag = all.filter(w => wpnOk(w) && !w.hero && !seen.has(w.id) && seen.add(w.id)).map(w => { const o = wpnClean(w); delete o.isNew; return o; });
+  const hw = {}; if (typeof hwClean === 'function') for (const u in G.hw || {}) if (G.hw[u]) hw[u] = hwClean(G.hw[u]);
+  return { bag, uid: G.wUid | 0, legN: G.wLegN | 0, hw };
+}
+function campWpnIn(W) {
+  if (!W || typeof W !== 'object' || typeof wpnOk !== 'function') return;
+  G.wbag = (Array.isArray(W.bag) ? W.bag : []).filter(wpnOk).map(w => JSON.parse(JSON.stringify(w)));
+  G.wUid = Math.max(G.wUid | 0, W.uid | 0, ...G.wbag.map(w => w.id | 0));
+  if (W.hw && typeof HW !== 'undefined' && typeof WPN_BASE !== 'undefined') { G.hw = G.hw || {}; for (const u in W.hw) { const h = W.hw[u]; if (HW[u] && h && WPN_BASE[h.b]) G.hw[u] = Object.assign({ hero: 1, u, stage: 0, bosses: 0, q: .5, il: 1, rar: 2 }, JSON.parse(JSON.stringify(h)), { hero: 1, u, stage: Math.max(0, Math.min(3, h.stage | 0)) }); } }
+}
 // the warband as the run stands now (kept fields of B, the old record, carried over)
 function campBandFromRun(B) {
   const loot = campTrimBag(JSON.parse(JSON.stringify(campItemsNow())));
@@ -121780,7 +121799,7 @@ function campBandFromRun(B) {
     force: G.force, hero: G.hero, raised: true,
     xp: Math.round((G.xp || 0) * 100) / 100, xpRn: G.xpRn | 0, tp: G.tp | 0, tpEarned: G.tpEarned | 0,
     tal: JSON.parse(JSON.stringify(G.tal || {})), tomes: typeof tomesSave === 'function' ? tomesSave() : {}, taln: typeof talNamesNow === 'function' ? talNamesNow() : null, heroTal: (G.heroTal || []).slice(), plan: G.plan ? JSON.parse(JSON.stringify(G.plan)) : null,
-    loot, gearUid: G.gearUid | 0, rn: typeof rnS === 'function' && G.rn ? rnS().v | 0 : 0,
+    loot, gearUid: G.gearUid | 0, wpn: campWpnOut() || (B && B.wpn) || null, rn: typeof rnS === 'function' && G.rn ? rnS().v | 0 : 0,
     unlocked: (G.unlocked || []).filter(t => TOWERS[t] && !TOWERS[t].wall),
   });
 }
@@ -121802,6 +121821,7 @@ function campCarryIn(B, hero) {
   }
   G.xp = B.xp || 0; G.lvl = xpLevelOf(G.xp); G.xpRn = B.xpRn | 0;
   G.loot = JSON.parse(JSON.stringify(B.loot || [])); G.gearUid = Math.max(G.gearUid | 0, B.gearUid | 0);
+  campWpnIn(B.wpn);   // its weapons: the rack and the hero weapons
   if (typeof tomesLoad === 'function') tomesLoad(B.tomes);   // the capstones the warband's Tomes of Mastery taught march on with its talents (loot.js)
   if (Array.isArray(B.heroTal)) G.heroTal = [0, 1, 2, 3, 4].map(r => B.heroTal[r] === 1 || B.heroTal[r] === 2 ? B.heroTal[r] : 0);
   if (B.plan && B.plan.tal) G.plan = B.plan;
@@ -122442,7 +122462,8 @@ function rgMazeSave(R, from, w) {
   // not pull it back, or the next battle pays the waves between again as if skipped (owner, 25 Nov 2026: "started with 712
   // gold, i didnt refund the maze": a won ambush on the road had set it to 3, and Hollowell Barrows paid waves 4-8 again)
   const wPaid = Math.max(R.maze && R.maze.w | 0 || 0, w | 0 || G.wave | 0);
-  R.maze = { map: G.map, w: wPaid, gold: Math.max(0, G.gold | 0), rows: JSON.parse(JSON.stringify(sv.towers || [])), champAt: sv.champAt || null, from };
+  R.maze = { map: G.map, w: wPaid, gold: Math.max(0, G.gold | 0), rows: JSON.parse(JSON.stringify(sv.towers || [])), champAt: sv.champAt || null, from,
+    wpn: sv.wpn ? JSON.parse(JSON.stringify({ on: sv.wpn.on || [], off: sv.wpn.off || [] })) : null };   // (the weapons its units hold travel with it)
 }
 // lay a maze on the field (Keep): each piece on its cell where the cell is open and the road still runs (units first, then
 // walls); a piece that cannot stand there gives its gold and items back. Returns what was laid and what came back
@@ -122465,13 +122486,26 @@ function rgMazeLay(M) {
     if (!t.def.wall && G.unlocked && !G.unlocked.includes(type)) G.unlocked.push(type);
     out.laid++;
   }
+  rgMazeArm(M);
   if (typeof runRekey === 'function') runRekey();
   if (typeof vetSync === 'function') vetSync();
   refreshField();
   return out;
 }
 // Rebuild: the maze's items go back to the bag (its gold is rgStartGold's paid)
-function rgMazeRefund(M) { for (const it of rgMazeItems(M)) if (RARITY[it.rar]) G.loot.push(it); }
+function rgMazeRefund(M) { for (const it of rgMazeItems(M)) if (RARITY[it.rar]) G.loot.push(it); for (const [, , w] of rgMazeWpns(M)) (G.wbag || (G.wbag = [])).push(JSON.parse(JSON.stringify(w))); }
+// the weapons the maze's units hold, [i, j, weapon, offhand]
+const rgMazeWpns = M => M && M.wpn ? (M.wpn.on || []).map(e => [e[0], e[1], e[2], false]).concat((M.wpn.off || []).map(e => [e[0], e[1], e[2], true])).filter(e => e[2] && (typeof wpnOk !== 'function' || wpnOk(e[2]))) : [];
+// each back in its unit's hand where that unit stands again, else to the rack
+function rgMazeArm(M) {
+  for (const [i, j, w0, off] of rgMazeWpns(M)) {
+    const w = JSON.parse(JSON.stringify(w0)), t = G.towers.find(o => o.i === i && o.j === j);
+    if (t && !off && !t.weapon && typeof wpnFits === 'function' && wpnFits(w, t)) t.weapon = w;
+    else if (t && off && !t.weapon2 && typeof dualFits === 'function' && dualFits(w, t)) t.weapon2 = w;
+    else (G.wbag || (G.wbag = [])).push(w);
+    G.wUid = Math.max(G.wUid | 0, w.id | 0);
+  }
+}
 const RG_PATROL_PAY = [.4, .2, .1];
 const RG_PRICE = { life: 6, tend: 40, respec: 80, alms: 40, offering: 30 };
 // the field every region battle is fought on: the game's current one, Mistfall Ledge (a wide map: foes in along the whole
@@ -122749,6 +122783,7 @@ function rgEnd(won, retreat) {
   // or after a loss or a retreat the one from before this battle, kept for the retry)
   if (won && RG_MAZE.on) rgMazeSave(R, S.kind === 'waylay' ? 'the road' : node.name, S.w1);
   if (R.maze && R.maze.rows && R.band && R.band.loot) { const on = new Set(rgMazeItems(R.maze).map(it => it.id)); R.band.loot = R.band.loot.filter(it => !on.has(it.id)); }
+  if (R.maze && R.band && R.band.wpn && Array.isArray(R.band.wpn.bag)) { const on = new Set(rgMazeWpns(R.maze).map(e => e[2].id)); R.band.wpn.bag = R.band.wpn.bag.filter(w => !on.has(w.id)); }
   const left = won || retreat ? Math.max(0, G.lives | 0) : 0, lost = Math.max(0, S.line - left);
   R.lives = clamp(R.lives - S.line + left, 0, RG_LIVES);
   const B0 = R.battle; R.battle = null; R.battles++;
