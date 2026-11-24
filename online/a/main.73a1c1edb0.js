@@ -1,4 +1,4 @@
-const BUILD_TAG = '355fdbcd@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'e815e84a@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12098,17 +12098,17 @@ const ITEM_STATS = {
   sbs_bracers: 'dmg=4 pen=6|', sbs_moccasins: 'as=20|', sbs_feathercap: 'range=0.6|', sbs_waterskin: 'regen=1.2|', sbs_mantle: 'mana=20|Self-Mending', sbs_rainwraps: 'as=8|Rainweave',
   sbs_thunderdrum: 'sp=10 mana=20 mpen=12|', sbs_skystaff: 'sp=18 cd=20 mpen=12|',
   // ---- the Wardbound ----
-  wbr_goldleaf: 'sp regen|Gilded Runes', wbr_searbrand: 'dmg as|Searing Brand', wbr_goldwire: 'as crit|Ward-Wire', wbr_whetrune: 'dmg crit|Rune-Whetted',
-  wbr_chalkline: 'range cd|Chalk-Line', wbr_vigilbell: 'sp regen|Vigil Toll', wbr_oathcord: 'dmg as|Gold Chains', wbr_sigilstone: 'sp as|Carved Sigil',
-  wbr_penance: 'dmg as|Penance Barbs', wbr_rivet: 'mana regen|Sun-Wheel Link', wbr_twinglyph: 'sp cd|Twin Glyph', wbr_watchhorn: 'range regen cd|The Last Watch',
+  wbr_goldleaf: 'sp regen|Gilded Runes', wbr_searbrand: 'dmg as|Searing Sun', wbr_goldwire: 'as crit|Rune-Wire', wbr_whetrune: 'dmg crit|Rune-Whetted',
+  wbr_chalkline: 'range cd|Chalk-Line', wbr_vigilbell: 'sp regen|Vigil Toll', wbr_oathcord: 'dmg as|Gold Chains', wbr_sigilstone: 'sp as|Carved Rune',
+  wbr_penance: 'dmg as|Penance Barbs', wbr_rivet: 'mana regen|Long-Lived Runes', wbr_twinglyph: 'sp cd|Twin Glyph', wbr_watchhorn: 'range regen cd|The Last Watch',
   wbr_gateseal: 'dmg crit pen|The Warden’s Seal', wbr_pommel: 'dmg2 pen|Pommel-Blow', wbr_fletch: 'as range|Ivory Fletching', wbr_rimehook: 'sp mana|Rime-Hook',
   wbr_inkhorn: 'sp cd|Black Ink', wbr_forklance: 'sp as cd|Forked Lightning', wbr_sabatons: 'dmg as pen|Iron Quake', wbr_chainheads: 'dmg splash pen|Chained Bolts',
   wbr_sunbanner: 'sp mana regen|Sun-Wheel Standard',
-  wbc_lampoil: 'regen|Lamp Oil', wbc_oathknot: 'mana|Oath-Knot', wbc_sandglass: 'cd|Sandglass', wbc_tally: 'mana regen|Gold Tally', wbc_linetoken: 'regen|Line-Warden',
-  wbc_brandring: 'sp mana|Brand-Seal', wbc_runechalk: 'cd mana|Rune-Chalk', wbc_hourseal: 'sp cd|Sworn Hour',
+  wbc_lampoil: 'regen|Lamp Oil', wbc_oathknot: 'mana|Oath-Knot', wbc_sandglass: 'cd|Sandglass', wbc_tally: 'mana regen|Gold Tally', wbc_linetoken: 'regen|Rune-Warden',
+  wbc_brandring: 'sp mana|Sun-Seal', wbc_runechalk: 'cd mana|Rune-Chalk', wbc_hourseal: 'sp cd|Sworn Hour',
   wbl_oathkeeper: 'dmg as pen|Oathkeeper', wbl_sunbow: 'as range pen|Split Shafts', wbl_winterhall: 'dmg sp as|Winter Hall', wbl_lexicon: 'sp mana cd|Unwritten Lexicon',
   wbl_skyrider: 'sp regen as|Sky-Riders', wbl_stormgate: 'cd regen range|Stormgate', wbl_hillheart: 'dmg sp pen|Unmoved Hill', wbl_longoath: 'dmg splash pen|Long Oath', wbl_kingsoath: 'sp mana regen|Last King’s Oath',
-  wbl_unbroken: 'dmg range regen|Unbroken Line', wbl_runecrown: 'sp cd mana|Every Rune', wbl_brandlord: 'dmg as crit|Brandmaster', wbl_roadscribe: 'sp cd regen|Road-Scribe',
+  wbl_unbroken: 'dmg range regen|Unbroken Watch', wbl_runecrown: 'sp cd mana|Every Rune', wbl_brandlord: 'dmg as crit|Sunbreaker', wbl_roadscribe: 'sp cd regen|Road-Scribe',
   wbs_gauntlets: 'dmg=4 pen=6|', wbs_greaves: 'as=20|', wbs_visor: 'range=0.6|', wbs_flask: 'regen=1.2|', wbs_mantle: 'mana=20|Self-Mending', wbs_chalk: 'as=8|Warden’s Mark',
   wbs_wardhorn: 'sp=10 mana=20 mpen=12|', wbs_runeblade: 'sp=18 cd=20 mpen=12|',
   // ---- the bosses' own relics (bossitems.js) and the challenges' charms (quests.js) ----
@@ -23535,26 +23535,25 @@ function sbDrawField(S) {
    An old order of rune-knights who guard the last roads of a fallen kingdom. They carve their oaths into steel and
    stone; every rune is a promise to hold. Grim, disciplined, in black, steel and gold. The design: docs/design/wardbound.md.
    Files: _a (this: the units, the Runes, the strikes and the hooks), _b (talent trees), _c (abilities), _d (items),
-   _e (commanders and sagas), _f (bodies and poses), _g (the runes, lines and spells drawn on the field); forces_zs_wardbound.js (the
+   _e (commanders and sagas), _f (bodies and poses), _g (the runes and spells drawn on the field); forces_zs_wardbound.js (the
    Vowkeepers, the specialist); forces_zx_champ_wardbound.js (the Champions). Every top-level name starts WB / wb.
 
-   THE RUNES (the force's own mechanic):
-   - Every unit lays ground runes on the road (hazards k 'wb_rune', wbRune) or carves runes into foes (brands, sigils).
-     Each unit has its own kind (WB_KIND: oath, shaft, frost, sigil, storm, stone, pin, vow). A rune is a trap: it arms
-     WB_RUNE.arm s after it is laid (the foes standing on it then never spring it), and the next walker to step on it
-     springs it: every walker within WB_RUNE.burst takes its kind's touch at WB_RUNE.pow, and the rune is spent (owner:
-     "appear, flash, affect the unit stepping on it, then disappear"). Vow runes (for the knights, not the foes) and the
-     abilities' great runes (Warding Glaive's beacon, Scribe the Road) are not traps: they touch the foes on them once per
-     WB_RUNE.again s while they last.
-   - A rune laid within WB_RUNE.merge of another refreshes it and adds its kind: a rune of two or more kinds is BOUND; it
-     springs with all its kinds at once, over a wider burst.
-   - Runes within WB_RUNE.link of each other link into WARD-LINES (each to its two nearest), and so do the Oathstones
-     (the wall: they stand for oath runes). A walker crossing a ward-line is BRANDED (+1, +2 on a WOVEN line: one whose
-     ends are runes of different kinds, which also touches it with both ends' kinds) and slowed a moment.
-   - BRANDS (c.wbBrand, up to 3, fading WB_BRAND.fade s after the last): each makes the Wardbound's abilities and their
-     commanders' spells bite WB_BRAND.per deeper on that foe (the amp hook, while AB_NOW or HERO_SRC strikes).
-   - SIGILS (c.wbSig, up to 3): carved by the Runecarvers; their strikes, spells and items detonate them.
-   The lines are rebuilt a few times a second (wbLinesNow); the field's drawing (runes, lines, brands) is in _g. */
+   THE RUNES (the force's one mechanic; made simple 24 Nov 2026, owner: "just simplify the wardbound so its simple like
+   the others"; docs/design/wardbound_simple.md):
+   - Every unit carves runes into the road (hazards k 'wb_rune', wbRune), one kind a unit (WB_KIND: oath, shaft, frost,
+     sigil, storm, stone, pin, vow). A rune is a trap: it arms WB_RUNE.arm s after it is laid (the foes standing on it
+     then never spring it), and the next walker to step on it springs it: every walker within WB_RUNE.burst takes its
+     kind's touch at WB_RUNE.pow, a strike (WB_RUNE_HIT) and is EXPOSED once more (the core status), and the rune is spent (owner: "appear, flash,
+     affect the unit stepping on it, then disappear"). Vow runes (for the knights, not the foes) and the abilities' great
+     runes (Warding Glaive, Scribe the Road) are not traps: they touch the foes on them once per WB_RUNE.again s.
+   - A rune laid within WB_RUNE.merge of another renews it (kinds never combine: Bound runes are cut).
+   - EXPOSED (c.wbBrand, up to 3, fading WB_BRAND.fade s after the last; the code keeps its old name, brand): each makes
+     the Wardbound's spells and their commanders' bite WB_BRAND.per deeper on that foe (the amp hook, while AB_NOW or
+     HERO_SRC strikes). Sprung runes and some spells Expose.
+   - MARKS (c.wbSig, up to 3; the code's old name, sigil): the Runecarvers' own, carved by their flicks and their rune,
+     burst by their flicks and spells. No keyword card: the texts that use them say what they do.
+   - Ward-lines are cut: wbLinesNow() is always empty and wbOnLine() false (kept so old callers still run).
+   The field's drawing (runes, the Exposed foes' marks) is in _g. */
 const WB_ID = 'wardbound';
 const WB_COL = { gold: '#f0c050', goldL: '#ffe8a8', steel: '#c8ccd6', teal: '#bff4ec', ivory: '#efe6d0', black: '#16141a', iron: '#3a3a44', frost: '#bfe6ff', sigil: '#d8b8ff', storm: '#8ab4ff', stone: '#d89a50', pin: '#ff9a5a', vow: '#fff2c8', blood: '#c04a3a' };
 FORCES.wardbound = { name: 'The Wardbound', title: 'Rune-Knights of the Last Roads', hue: '#e0b048',
@@ -23562,16 +23561,16 @@ FORCES.wardbound = { name: 'The Wardbound', title: 'Rune-Knights of the Last Roa
   start: ['glaive', 'arrow', 'frost'],
   units: {
     glaive: { id: 'wb_oathbound', name: 'Oathbound', short: 'Oathbound', key: '1', proj: 'force', attack: 'wbOath', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
-      blurb: 'Hooded veterans in black plate, sworn to hold. A heavy greatsword cut on the ground foe beside it carves an oath rune into the road: the next ground foe to step on it springs it and is slowed, and runes near each other link into ward-lines that brand the foes who cross them. Cannot reach flyers.',
+      blurb: 'Hooded veterans in black plate, sworn to hold. A heavy greatsword cut on the ground foe beside it carves an oath rune into the road: the next ground foe to step on it springs it: it is slowed and Exposed, so Wardbound spells hit it harder. Cannot reach flyers.',
       tiers: [{ cost: 25, dmg: 20, rate: .95, range: 1.4 }, { cost: 48, dmg: 48, rate: .92, range: 1.45 }, { cost: 105, dmg: 112, rate: .88, range: 1.55 }] },
     arrow: { id: 'wb_maskedwarden', name: 'Glaive Wardens', short: 'Glaive', key: '2', proj: 'force', attack: 'wbArrow', elem: null, dmgType: 'phys', air: true, ground: true, top: [1.25, 1.3, 1.35],
-      blurb: 'Tall rune-knights in sculpted black-and-gold armour behind golden masks, each with a spinning glaive of gold and ivory. The glaive strikes its foe, carves a shaft rune into the road beneath it and ricochets on to the nearest foes, a little weaker each bounce, before it flies back to the hand. A bounce that leaps over a rune flares it and brands the next foe. Air and ground.',
+      blurb: 'Tall rune-knights in sculpted black-and-gold armour behind golden masks, each with a spinning glaive of gold and ivory. The glaive strikes its foe, carves a shaft rune into the road beneath it and ricochets on to the nearest foes, a little weaker each bounce, before it flies back to the hand. A bounce that leaps over a rune flares it and Exposes the next foe. Air and ground.',
       tiers: [{ cost: 14, dmg: 4, rate: .8, range: 2.6, bounce: 2, bounceR: 1.8 }, { cost: 28, dmg: 11, rate: .72, range: 2.9, bounce: 2, bounceR: 1.9 }, { cost: 68, dmg: 21, rate: .62, range: 3.2, bounce: 3, bounceR: 2 }] },
     frost: { id: 'wb_frostbrand', name: 'Frostbrand Sentries', short: 'Frostbrand', key: '3', proj: 'force', attack: 'wbFrost', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.1, 1.15, 1.2],
       blurb: 'Halberdiers in pale steel and white fur. Each sweep cuts up to three ground foes in reach and slows them; every second sweep rimes the road with a frost rune. Cannot reach flyers.',
       tiers: [{ cost: 30, dmg: 9, rate: 1.2, range: 1.7, slow: .3, slowT: 2 }, { cost: 55, dmg: 21, rate: 1.15, range: 1.8, slow: .33, slowT: 2.2 }, { cost: 115, dmg: 48, rate: 1.1, range: 1.9, slow: .36, slowT: 2.4 }] },
     arcane: { id: 'wb_runecarver', name: 'Runecarvers', short: 'Carver', key: '4', proj: 'force', attack: 'wbCarve', elem: null, dmgType: 'arcane', air: true, ground: true, prio: 2, top: [1.15, 1.2, 1.25],
-      blurb: 'Scholar-knights with stylus-blades and chained tomes. Each flick of light carves a sigil into the toughest foe (up to three); at three, the next one detonates them all in a burst. A sigil rune glows where they stand. Air and ground.',
+      blurb: 'Scholar-knights with stylus-blades and chained tomes. Each flick of light carves a mark into the toughest foe (up to three); the flick after the third bursts them all, striking it and the foes round it once for each. A rune where they stand carves two marks into the foe that springs it. Air and ground.',
       tiers: [{ cost: 50, dmg: 36, rate: 2.2, range: 3 }, { cost: 90, dmg: 86, rate: 2.1, range: 3.3 }, { cost: 190, dmg: 205, rate: 2, range: 3.6 }] },
     storm: { id: 'wb_stormward', name: 'Stormward Lancers', short: 'Lancer', key: '5', proj: 'force', attack: 'wbLance', elem: null, dmgType: 'magic', air: false, ground: true, top: [1.3, 1.35, 1.4],
       blurb: 'Riders in black armour and winged helms. The lance thrusts at a ground foe in reach and its lightning chains on to two more foes, flyers too; a storm rune crackles where it struck.',
@@ -23584,7 +23583,7 @@ FORCES.wardbound = { name: 'The Wardbound', title: 'Rune-Knights of the Last Roa
       tiers: [{ cost: 28, dmg: 13, rate: 1.7, range: 2.8, splash: .75 }, { cost: 50, dmg: 31, rate: 1.6, range: 3, splash: .85 }, { cost: 110, dmg: 76, rate: 1.5, range: 3.2, splash: .95 }] },
     // holy: the run's commander fights in person: their Champion (forces_zx_champ_wardbound.js)
     wall: { id: 'wb_oathstone', name: 'Oathstones', short: 'Oathstone', key: 'b', top: [.7],
-      blurb: 'Carved, mossy standing stones. Their gold runes glow when foes press against them, and they hold the ward-lines: each stands for an oath rune, linking to the runes near it. Cheap maze blockers: tap one later to raise a unit from it.' },
+      blurb: 'Carved, mossy standing stones. Their gold runes glow when foes press against them. Cheap maze blockers: tap one later to raise a unit from it.' },
   } };
 for (const [s, g] of Object.entries({ glaive: 'sword', arrow: 'glaive', frost: 'snowflake', arcane: 'rune', storm: 'thunder', earth: 'shield', cannon: 'target', wall: 'statue' })) FORCE_GLYPH[FORCES.wardbound.units[s].id] = g;
 
@@ -23607,7 +23606,7 @@ function wbFront() { let m = 1; for (const c of G.creeps) if (!c.dead && !c.ent 
 
 /* ---------- the run's state (made fresh for each game: keyed to its towers array) ---------- */
 function wbS() {
-  if (!G.wb || G.wb._for !== G.towers) G.wb = { _for: G.towers, lines: [], linesAt: -1, n: { runes: 0, bound: 0, brands: 0, lineHits: 0, sigils: 0, dets: 0, flares: 0 }, P: [] };
+  if (!G.wb || G.wb._for !== G.towers) G.wb = { _for: G.towers, lines: [], linesAt: -1, n: { runes: 0, brands: 0, sigils: 0, dets: 0, flares: 0 }, P: [] };
   return G.wb;
 }
 
@@ -23624,7 +23623,7 @@ function wbHit(t, st, c, amt, type, kb) {
   return amt;
 }
 
-/* ---------- brands and sigils (carved into foes) ---------- */
+/* ---------- Exposed (c.wbBrand, the code's old name) and the Runecarvers' marks (c.wbSig) ---------- */
 const WB_BRAND = { max: 3, per: .12, fade: 6 };
 function wbBrand(c, n, src) {
   if (!c || c.dead || !(n > 0)) return;
@@ -23671,6 +23670,8 @@ const WB_KIND = {
   pin: { name: 'Pin', col: WB_COL.pin, fx: (c, o) => { if (!(c.wbPinT > G.time)) { c.wbPinT = G.time + 4; rootFoe(c, .4 * wbPowOf(o), o.src); } } },
   vow: { name: 'Vow', col: WB_COL.vow, fx: () => {} },
 };
+// a sprung rune's strike on each foe in its burst, × its carver's damage (vow runes never spring)
+const WB_RUNE_HIT = { oath: .1, shaft: .5, frost: .2, sigil: .5, storm: 1.2, stone: 1, pin: .1 };
 // the runes still armed (a spent rune fades out for WB_RUNE.spent s but is gone for the game)
 const wbRunes = () => G.hazards.filter(h => h.k === 'wb_rune' && h.t > 0 && !h.spent);
 const wbRunesNear = (x, z, r) => G.hazards.filter(h => h.k === 'wb_rune' && h.t > 0 && !h.spent && Math.hypot(h.x - x, h.z - z) <= r);
@@ -23684,12 +23685,11 @@ function wbRune(t, st, x, z, kind, o = {}) {
   if (o.road !== false) { const p = wbRoadCell(x, z); if (Math.hypot(p[0] - x, p[1] - z) < .7) { x = p[0]; z = p[1]; } }
   const S = wbS(), life = (o.life || WB_RUNE.life) * (1 + ((st && st.pw && st.pw.wbLong) || 0));
   if (!o.noMerge) {
+    // (a rune carved where one of the same kind lies renews it; a different kind takes its place: kinds never combine)
     const near = wbRunesNear(x, z, WB_RUNE.merge).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
     if (near) {
-      const fresh = !near.kinds.includes(kind);
-      if (fresh) near.kinds.push(kind);
+      if (near.kinds[0] !== kind && !near.wbGreat && !(near.wbBeacon > G.time)) { near.kinds = [kind]; near.born = G.time; if (typeof wbFxRune === 'function') wbFxRune(near); }
       near.t = Math.max(near.t, life); near.life = Math.max(near.life, near.t); near.src = t || near.src; near.st = st || near.st;
-      if (fresh && near.kinds.length >= 2 && !near.bound) { near.bound = true; near.boundAt = G.time; S.n.bound++; if (typeof wbFxBound === 'function') wbFxBound(near); }
       return near;
     }
   }
@@ -23701,8 +23701,8 @@ function wbRune(t, st, x, z, kind, o = {}) {
   if (typeof wbFxRune === 'function') wbFxRune(z0);
   return z0;
 }
-// add a kind to a rune (Ilka's re-etching, items): it becomes Bound at two kinds
-function wbRuneAdd(z, kind) { if (!z || !WB_KIND[kind] || z.kinds.includes(kind)) return; z.kinds.push(kind); if (z.kinds.length >= 2 && !z.bound) { z.bound = true; z.boundAt = G.time; wbS().n.bound++; if (typeof wbFxBound === 'function') wbFxBound(z); } }
+// (Bound runes are cut: an old caller that added a kind to a rune now just renews it)
+function wbRuneAdd(z, kind) { if (!z || !(z.t > 0) || z.spent) return; z.t = Math.max(z.t, z.life || WB_RUNE.life); }
 // a rune touching a foe: each of its kinds' fx (WB_RUNE_HOOK: later files' riders, fn(c, z, kind))
 const WB_RUNE_HOOK = [];
 function wbTouch(c, z, kinds, pow) {
@@ -23712,20 +23712,22 @@ function wbTouch(c, z, kinds, pow) {
     for (const f of WB_RUNE_HOOK) f(c, z, k);
   }
 }
-// a trap rune springing under c: every walker within the burst takes its touch at WB_RUNE.pow, then it is spent
+// a trap rune springing under c: every walker within the burst takes its touch at WB_RUNE.pow and is Exposed once more, then it is spent
 function wbSpring(z, c) {
-  const S = wbS(), br = z.bound ? WB_RUNE.boundBurst : WB_RUNE.burst, hit = [c];
-  z.spent = G.time; z.t = WB_RUNE.spent; z.life = WB_RUNE.spent; z.firstHit = c; S.linesAt = -1; S.n.sprung = (S.n.sprung || 0) + 1;
+  const S = wbS(), br = WB_RUNE.burst, hit = [c], by = z.src && G.towers.includes(z.src) ? z.src : null;
+  z.spent = G.time; z.t = WB_RUNE.spent; z.life = WB_RUNE.spent; z.firstHit = c; S.n.sprung = (S.n.sprung || 0) + 1;
   for (const q of G.creeps) if (q !== c && wbOnRuneNow(q, z, br)) hit.push(q);
   z.hitN = hit.length;
   if (typeof wbFxSpring === 'function') wbFxSpring(z, hit);
-  for (const q of hit) wbTouch(q, z, null, WB_RUNE.pow);
+  // (the strike: WB_RUNE_HIT[kind] × its carver's damage, sized so each unit keeps its old damage without the ward-lines; sim/duels/wb_simple.json)
+  const st = z.st, k = WB_RUNE_HIT[z.kinds[0]] || 0;
+  for (const q of hit) { wbTouch(q, z, null, WB_RUNE.pow); if (q.dead) continue; if (k && st && st.dmg) wbHit(by, st, q, st.dmg * k, 'magic'); if (!q.dead) wbBrand(q, 1, by); }
 }
 function wbRuneTick(z, dt) {
   // (game.js updateHazards counts z.t down before the force's hazard hook runs)
-  if (z.t <= 0) { wbS().linesAt = -1; return; }
+  if (z.t <= 0) return;
   if (z.spent) return;
-  const r = z.r * (z.bound ? 1.25 : 1);
+  const r = z.r;
   if (wbTrap(z)) {
     if (G.time < (z.armAt || 0)) return;
     if (z.skip && z.skip.size) for (const c of z.skip) if (c.dead || !wbOnRuneNow(c, z, WB_RUNE.burst + .1)) z.skip.delete(c);
@@ -23740,69 +23742,30 @@ function wbRuneTick(z, dt) {
   if (z.seen.size > 60) for (const [c] of z.seen) if (c.dead) z.seen.delete(c);
 }
 
-/* ---------- ward-lines: the runes (and the Oathstones) linked to their two nearest within WB_RUNE.link ---------- */
+/* ---------- (ward-lines are cut: these stay so old callers still run, and always say "no line") ---------- */
 const wbStones = () => G.towers.filter(t => t.def && t.def.unit === 'wb_oathstone' && !t.wrecked);
-function wbLinesNow() {
-  const S = wbS(); if (S.linesAt >= 0 && G.time - S.linesAt < .25) return S.lines;
-  S.linesAt = G.time;
-  const pts = wbRunes().map(z => ({ x: z.x, z: z.z, kinds: z.kinds, rune: z })).concat(wbStones().map(t => ({ x: t.x, z: t.y, kinds: ['oath'], stone: t })));
-  const out = [], seen = new Set(), Lk = WB_RUNE.link + ((G.towers.some(t => t.st && t.st.pw && t.st.pw.wbReach)) ? .3 : 0);
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i], near = [];
-    for (let j = 0; j < pts.length; j++) { if (i === j) continue; const b = pts[j], d = Math.hypot(a.x - b.x, a.z - b.z); if (d <= Lk && !(a.stone && b.stone)) near.push([d, j]); }
-    near.sort((p, q) => p[0] - q[0]);
-    for (const [, j] of near.slice(0, 2)) {
-      const key = i < j ? i + ',' + j : j + ',' + i; if (seen.has(key)) continue; seen.add(key);
-      const b = pts[j], woven = a.kinds.some(k => !b.kinds.includes(k)) || b.kinds.some(k => !a.kinds.includes(k));
-      const old = S.lines.find(l => l.key === key && l.a.rune === a.rune && l.b.rune === b.rune);
-      out.push({ a, b, woven, key, seen: old ? old.seen : new Map(), hitAt: old ? old.hitAt : -9 });
-    }
-  }
-  S.lines = out;
-  return out;
-}
-const wbLines = () => wbLinesNow();
-// a point's distance to a line segment
+function wbLinesNow() { const S = wbS(); S.lines = []; S.linesAt = G.time; return S.lines; }
+const wbLines = () => [];
+// a point's distance to a line segment (the spells still use it for their own lines: a charge, a bolt, a glaive's leap)
 function wbSegD(px, pz, a, b) { const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1e-9, u = Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / L2)); return Math.hypot(a.x + dx * u - px, a.z + dz * u - pz); }
-const wbOnLine = (c, r = .3) => wbLinesNow().some(l => wbSegD(c.x, c.y, l.a, l.b) <= r);
-// walkers crossing the lines: branded (+2 on a woven line, which also touches them with both ends' kinds) and slowed a moment
-function wbLinesTick() {
-  const S = wbS(), L = wbLinesNow(); if (!L.length) return;
-  for (const l of L) {
-    for (const c of G.creeps) {
-      if (c.dead || c.ent || c.phased || !wbWalks(c)) continue;
-      if (c.x < Math.min(l.a.x, l.b.x) - .35 || c.x > Math.max(l.a.x, l.b.x) + .35 || c.y < Math.min(l.a.z, l.b.z) - .35 || c.y > Math.max(l.a.z, l.b.z) + .35) continue;
-      if (wbSegD(c.x, c.y, l.a, l.b) > .3) continue;
-      const last = l.seen.get(c) || -9; if (G.time - last < WB_RUNE.lineAgain) continue;
-      l.seen.set(c, G.time); l.hitAt = G.time; S.n.lineHits++;
-      const src = (l.a.rune && l.a.rune.src) || (l.b.rune && l.b.rune.src) || l.a.stone || l.b.stone || null;
-      wbBrand(c, l.woven ? 2 : 1, src); chill(c, { slow: .15, slowT: 1 }, null, src);
-      if (l.woven) { if (l.a.rune) wbTouch(c, l.a.rune); if (l.b.rune) wbTouch(c, l.b.rune); }
-      for (const f of WB_LINE_HOOK) f(c, l);
-    }
-    if (l.seen.size > 60) for (const [c] of l.seen) if (c.dead) l.seen.delete(c);
-  }
-}
-// later files' riders on a line crossing: fn(c, line)
+const wbOnLine = () => false;
 const WB_LINE_HOOK = [];
-/* the flare: every ward-line and every rune on the field at once (Varic's spell, items; Rune Cleave: those within its reach, o.near): each foe on one is
-   struck for mult × st.dmg (o.amt: a flat amount instead) and branded; o.kinds: only lines and runes with one of these
-   kinds; returns the foes struck */
+/* the flare: every rune on the field at once (Varic's spell, items; Rune Cleave: those within its reach, o.near): each
+   foe on one is struck for mult × st.dmg (o.amt: a flat amount instead) and Exposed; o.kinds: only runes of these kinds;
+   returns the foes struck */
 function wbFlare(t, st, mult, o = {}) {
-  const N = o.near, S = wbS(), hit = new Set(), L = wbLinesNow().filter(l => !N || wbSegD(N.x, N.z, l.a, l.b) <= N.r), R = wbRunes().filter(z => !N || Math.hypot(z.x - N.x, z.z - N.z) <= N.r + (z.r || 0));   // (o.near: only those within reach: Rune Cleave)
+  const N = o.near, S = wbS(), hit = new Set(), R = wbRunes().filter(z => !N || Math.hypot(z.x - N.x, z.z - N.z) <= N.r + (z.r || 0));
   const has = p => !o.kinds || p.kinds.some(k => o.kinds.includes(k));
   const amt = o.amt != null ? o.amt : ((st && st.dmg) || 0) * mult;
   for (const c of G.creeps) {
     if (c.dead || c.ent || c.phased || !wbWalks(c)) continue;
-    let on = R.some(z => has(z) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r * (z.bound ? 1.25 : 1) + .1);
-    if (!on) on = L.some(l => (has(l.a) || has(l.b)) && wbSegD(c.x, c.y, l.a, l.b) <= .35);
-    if (!on) continue;
+    if (!R.some(z => has(z) && Math.hypot(c.x - z.x, c.y - z.z) <= (z.r || WB_RUNE.r) + .1)) continue;
     hit.add(c);
     if (o.hero) hurt(c, amt * wbBossK(c), 'magic', HERO_SRC, false, null, null); else wbHit(t, st, c, amt * (o.boss ? wbBossK(c) : 1), 'magic');
     if (!c.dead) wbBrand(c, o.brand == null ? 1 : o.brand, t);
   }
   S.n.flares++;
-  if (typeof wbFxFlare === 'function') wbFxFlare(L.filter(l => has(l.a) || has(l.b)), R.filter(has), o.col);
+  if (typeof wbFxFlare === 'function') wbFxFlare([], R.filter(has), o.col);
   return hit;
 }
 
@@ -23836,7 +23799,7 @@ FORCE_ATTACK.wbOath = (t, st, tg, pow) => {
 /* Glaive Wardens: a rune-etched glaive thrown at the foe (flight k 'rglaive'). It strikes its foe and carves a shaft rune
    under it, then ricochets on to the nearest foe it has not struck within st.bounceR, st.bounce times, each strike
    WB_RICO.fall weaker (p.pow carries it, so every rider on a strike scales with it), and flies back to the thrower's hand.
-   A leap that passes over a rune flares it, and the foe it reaches is branded. Each strike calls p.land(p, foe) with
+   A leap that passes over a rune flares it, and the foe it reaches is Exposed. Each strike calls p.land(p, foe) with
    p.tx/p.tz under that foe, as the old arrow did, so the riders the later files hang on land/onLand run on every strike. */
 const WB_RICO = { spd: 12, back: 14, fall: .7, reach: 1.8 };
 FORCE_ATTACK.wbArrow = (t, st, tg, pow) => {
@@ -24068,8 +24031,8 @@ FORCE_HOOKS.wardbound = {
     }
     for (const f of WB_HOOK.pulse) f(t, st, dt);
   },
-  tick(dt) { if (G.state !== 'play') return; wbFlightsTick(dt); wbLinesTick(); for (const f of WB_HOOK.tick) f(dt); },
-  wave(n) { const S = wbS(); S.linesAt = -1; for (const f of WB_HOOK.wave) f(n); },
+  tick(dt) { if (G.state !== 'play') return; wbFlightsTick(dt); for (const f of WB_HOOK.tick) f(dt); },
+  wave(n) { for (const f of WB_HOOK.wave) f(n); },
 };
 // mend a unit (Vowkeepers, vow runes, items): a Wounded unit healed to full stands up whole again
 function wbMend(t, amt) {
@@ -24080,7 +24043,7 @@ function wbMend(t, amt) {
   return t.hp - was;
 }
 // a compact read of the run's runes for the bot and the playlog
-function wbStats() { const S = wbS(), R0 = wbRunes(); return { runes: R0.length, bound: R0.filter(z => z.bound).length, lines: wbLinesNow().length, woven: wbLinesNow().filter(l => l.woven).length, n: Object.assign({}, S.n) }; }
+function wbStats() { const S = wbS(), R0 = wbRunes(); return { runes: R0.length, n: Object.assign({}, S.n) }; }
 
 /* ================= THE WARDBOUND: talent trees =================
    One tree per unit slot, in the runtime TALENTS shape (GT in forces.js), swapped in by applyForce('wardbound'); the
@@ -24088,11 +24051,12 @@ function wbStats() { const S = wbS(), R0 = wbRunes(); return { runes: R0.length,
    forces_zx_champ_wardbound.js, and the Oathstones (the wall) have none, as no force's wall does. The usual rules: rows
    open at 0/3/6/9 points in the tree, req [r, c] needs the talent straight above at full rank, the last row's capstones
    are one-of, no drawbacks and no random procs (every trigger is "every Nth", "the first", a state or a clock). The
-   shared themes: the runes each unit lays, the ward-lines they link into, Bound runes, brands and sigils.
+   shared themes: the runes each unit lays and the foes they Expose (c.wbBrand), and the Runecarvers' marks (c.wbSig);
+   ward-lines and Bound runes were cut on 24 Nov 2026 (docs/design/wardbound_simple.md).
    Generic mod keys (range, rangeM, airR, armorPen, splash, slow, chain, gHaste) are folded by talentStats; spells are
    shaped through sp (forces_zy_spells.js), with three conditions and three riders of the force's own (registered below,
    once forces_zy_spells.js has loaded: SP_COND wbBrand / wbSig / wbRune, SP_RIDE wbBrand / wbSigil / wbRune). Every cap
-   (prefixed wb) is read in this file: through WB_HOOK, WB_RUNE_HOOK, WB_LINE_HOOK and wraps of the strikes and the
+   (prefixed wb) is read in this file: through WB_HOOK, WB_RUNE_HOOK and wraps of the strikes and the
    core's helpers (each keeps the original and calls it). */
 const WB_TALENTS = {
   /* ---- Oathbound (glaive): Oathbreaker Thrust (innate), Rune Cleave (row II), Final Oath (row IV) ---- */
@@ -24158,22 +24122,22 @@ const WB_TALENTS = {
 
   /* ---- Runecarvers (arcane): Etch (innate), Detonate (row II), Scribe the Road (row IV) ---- */
   arcane: { name: 'Runelore', hue: '#d8b8ff', list: [
-    GT('Shared Margins', 'eye', 0, 0, 2, n => `${n >= 2 ? 'A flick' : 'Every 2nd flick'} on a foe another Runecarver has carved adds one more sigil.`, {}, { cap: 'wbfMargin' }),
-    GT('Lingering Ink', 'hourglass', 0, 1, 2, n => `Sigils its flicks carve hold ${2 * n}s longer.`, {}, { cap: 'wbInk' }),
-    GT('Ward-Cutting Script', 'shieldbreak', 0, 2, 3, n => `Its flicks and spells ignore ${5 * n}% of Spell Shields, ${10 * n}% on a foe carved with a sigil.`, n => ({ magicPen: .05 * n }), { cap: 'wbfWardCut' }),
-    GT('Deep Script', 'rune', 0, 3, 3, n => `When its flicks detonate a foe's sigils, each sigil strikes for ${60 + 15 * n}% of a flick instead of 60%.`, {}, { cap: 'wbDeepScript' }),
-    GT('Palimpsest', 'hexeye', 1, 0, 2, n => `Etch on a foe already carved with three sigils detonates them first (${n >= 2 ? 90 : 60}% of a flick each), then carves afresh.`, {}, { sp: { ab: 'wb_etch', rider: { wbf: 1 } }, cap: 'wbfPalimp' }),
-    GT('Spent Ink', 'gem', 1, 1, 2, n => `Each sigil it detonates restores ${n + 1} mana.`, {}, { cap: 'wbfSpentInk' }),
+    GT('Shared Margins', 'eye', 0, 0, 2, n => `${n >= 2 ? 'A flick' : 'Every 2nd flick'} on a foe another Runecarver has carved adds one more mark.`, {}, { cap: 'wbfMargin' }),
+    GT('Lingering Ink', 'hourglass', 0, 1, 2, n => `Marks its flicks carve hold ${2 * n}s longer.`, {}, { cap: 'wbInk' }),
+    GT('Ward-Cutting Script', 'shieldbreak', 0, 2, 3, n => `Its flicks and spells ignore ${5 * n}% of Spell Shields, ${10 * n}% on a foe carved with a mark.`, n => ({ magicPen: .05 * n }), { cap: 'wbfWardCut' }),
+    GT('Deep Script', 'rune', 0, 3, 3, n => `When its flicks burst a foe's marks, each mark strikes for ${60 + 15 * n}% of a flick instead of 60%.`, {}, { cap: 'wbDeepScript' }),
+    GT('Palimpsest', 'hexeye', 1, 0, 2, n => `Etch on a foe already carved with three marks bursts them first (${n >= 2 ? 90 : 60}% of a flick each), then carves afresh.`, {}, { sp: { ab: 'wb_etch', rider: { wbf: 1 } }, cap: 'wbfPalimp' }),
+    GT('Spent Ink', 'gem', 1, 1, 2, n => `Each mark it bursts restores ${n + 1} mana.`, {}, { cap: 'wbfSpentInk' }),
     GS('wb_detonate', 1, 3),
-    GT('Ink of Binding', 'chain', 2, 0, 2, n => `Etch roots each ground foe it strikes that already bore a sigil for ${gNf(.3 * n)}s.`, {}, { sp: { ab: 'wb_etch', rider: { wbf: 1 } }, cap: 'wbfInkBind' }),
-    GT('Wide Script', 'field', 2, 2, 1, 'A sigil-carved foe that crosses a ward-line is carved with one more sigil.', {}, { cap: 'wbSigWard' }),
-    GT('Chain Reaction', 'burst', 2, 3, 1, 'Every foe Detonate strikes is carved with a fresh sigil.', {}, { sp: { ab: 'wb_detonate', rider: { wbSigil: 1 } }, req: [1, 3] }),
+    GT('Ink of Binding', 'chain', 2, 0, 2, n => `Etch roots each ground foe it strikes that already bore a mark for ${gNf(.3 * n)}s.`, {}, { sp: { ab: 'wb_etch', rider: { wbf: 1 } }, cap: 'wbfInkBind' }),
+    GT('Wide Script', 'field', 2, 2, 1, 'Etch carves its marks into one more foe.', {}, { cap: 'wbSigWard' }),
+    GT('Chain Reaction', 'burst', 2, 3, 1, 'Every foe Detonate strikes is carved with a fresh mark.', {}, { sp: { ab: 'wb_detonate', rider: { wbSigil: 1 } }, req: [1, 3] }),
     GS('wb_scribe', 3, 0),
-    GT('Double Stroke', 'missiles', 3, 1, 1, 'Every 3rd flick carves two sigils instead of one.', {}, { cap: 'wbDouble' }),
+    GT('Double Stroke', 'missiles', 3, 1, 1, 'Every 3rd flick carves two marks instead of one.', {}, { cap: 'wbDouble' }),
     GT('Volatile Script', 'cracked', 3, 2, 2, n => `Detonate bursts branded foes ${15 * n}% harder.`, {}, { sp: n => ({ ab: 'wb_detonate', vs: ['wbBrand', .15 * n] }) }),
-    GT('The Last Word', 'scroll', 4, 0, 1, 'When Scribe the Road\'s great rune fades, it speaks the last word: every sigil-carved foe within 1.5 cells of it detonates (90% of a flick for each sigil). Each Scribe the Road also brings Etch 4s nearer.', {}, { sp: { ab: 'wb_scribe', ready: ['wb_etch', 4] }, cap: 'wbkLastWord', req: [3, 0] }),
-    GT('Cascade', 'ripple', 4, 1, 1, 'A foe slain by a detonation passes its sigils on: every foe within 1.2 cells is carved with two.', {}, { cap: 'wbCascade' }),
-    GT('Runesight', 'stars', 4, 3, 1, 'A flick that carves a foe\'s third sigil detonates them at once, and each Scribe the Road quickens its flicks 30% for 5s.', {}, { sp: { ab: 'wb_scribe', haste: [.3, 5] }, cap: 'wbRunesight' }),
+    GT('The Last Word', 'scroll', 4, 0, 1, 'When Scribe the Road\'s great rune fades, it speaks the last word: the marks on every foe within 1.5 cells of it burst (90% of a flick for each mark). Each Scribe the Road also brings Etch 4s nearer.', {}, { sp: { ab: 'wb_scribe', ready: ['wb_etch', 4] }, cap: 'wbkLastWord', req: [3, 0] }),
+    GT('Cascade', 'ripple', 4, 1, 1, 'A foe slain by its bursting marks carves two marks into every foe within 1.2 cells.', {}, { cap: 'wbCascade' }),
+    GT('Runesight', 'stars', 4, 3, 1, 'A flick that carves a foe\'s third mark bursts them at once, and each Scribe the Road quickens its flicks 30% for 5s.', {}, { sp: { ab: 'wb_scribe', haste: [.3, 5] }, cap: 'wbRunesight' }),
   ] },
 
   /* ---- Stormward Lancers (storm): Thunder Charge (innate), Storm Pennant (row II), Skyfall (row III) ---- */
@@ -24268,7 +24232,7 @@ const WB_TAL_FLAVOR = {
   glaive: ['Carve the oath into the road and hold it.', 'What is sworn is kept.'],
   arrow: ['Pin the runes from afar and watch the road behind the mask.', 'The mask sees what the eye forgets.'],
   frost: ['Rime the road and freeze the oath-breakers in place.', 'Winter keeps its word.'],
-  arcane: ['Write sigils into the foe, then speak the last word.', 'Every script ends in fire.'],
+  arcane: ['Carve the marks into the foe, then speak the last word.', 'Every script ends in fire.'],
   storm: ['Ride the lightning down the warded road.', 'The storm answers the banner.'],
   earth: ['Set the shield and let the road itself shake.', 'The anvil does not move. The road does.'],
   cannon: ['Root the leading foe and blast the rest.', 'One bolt, and the road is held.'],
@@ -24302,7 +24266,7 @@ function wbTalAny(cap) {
   return (_wbAny.m[cap] = G.towers.find(t => wbUnit(t) && !t.wrecked && wbTC(t, cap)) || null);
 }
 
-/* ---------- live stats: runes that last longer, ward-lines that reach farther ---------- */
+/* ---------- live stats: runes that last longer ---------- */
 WB_HOOK.live.push((t, st) => {
   wbTalReg(); wbVowWrap();
   const L = wbCap(st, 'wbRuneLong'); if (L) wbPw(st, 'wbLong', .15 * L);
@@ -24349,7 +24313,6 @@ WB_HOOK.pulse.push((t, st, dt) => {
     const s = (t && t.st) || st;
     const B = wbCap(s, 'wbShaftBrand');
     if (B && (B >= 2 || (t.wbTalB = (t.wbTalB || 0) + 1) % 2 === 0)) wbBrand(c, 1, t);
-    if (wbCap(s, 'wbLineShot') && wbOnLine(c, .3)) wbHit(t, s, c, s.dmg * p.pow * .25 * Math.min(2, wbCap(s, 'wbLineShot')), 'phys');
     // Glaive of Judgement: three brands spent: pinned and struck again half as hard again (talent clarity, 10 Nov 2026: the brands no longer pass on)
     if (!c.dead && wbCap(s, 'wbJudgeArrow') && wbBrandOf(c) >= 3) {
       const x = c.x, z = c.y; c.wbBrand = 0; c.wbBrandT = 0;
@@ -24428,11 +24391,7 @@ WB_HOOK.kill.push((c, src) => {
     if (G.state === 'play') fxRing(c.x, c.y, 1.2, WB_COL.sigil);
   }
 });
-// Sigil Ward: a sigil-carved foe crossing a ward-line gains one more
-WB_LINE_HOOK.push((c, l) => {
-  if (!wbSigOf(c)) return;
-  const t = wbTalAny('wbSigWard'); if (t) wbSigil(c, 1, t);
-});
+// (Sigil Ward, a mark more for crossing a ward-line, went with the lines: 24 Nov 2026)
 
 /* ---------- Stormward Lancers ---------- */
 {
@@ -24487,7 +24446,7 @@ WB_HOOK.kill.push((c, src) => {
       const W = p.wbWoke || (p.wbWoke = new Set());
       for (const z of wbRunesNear(p.x, p.z, .7)) {
         if (W.has(z)) continue; W.add(z);
-        const r = z.r * (z.bound ? 1.25 : 1) + .1;
+        const r = z.r + .1;
         for (const c of G.creeps) if (!c.dead && !c.ent && !c.phased && !c.fly && Math.hypot(c.x - z.x, c.y - z.z) <= r) wbTouch(c, z);
       }
     }
@@ -24524,26 +24483,13 @@ WB_RUNE_HOOK.push((c, z, k) => {
   wbBrand(c, 1, z.src);
 });
 
-/* ---------- Oathbound and Frostbrand on the runes and lines ---------- */
+/* ---------- Oathbound and Frostbrand on the runes ---------- */
 // Oathsworn Cut: oath runes slow harder
 WB_RUNE_HOOK.push((c, z, k) => {
   if (k !== 'oath' || c.dead) return;
   const n = wbCap(wbZSt(z), 'wbOathSlow'); if (n) chill(c, { slow: .2 + .06 * n, slowT: 1.5 }, null, z.src);
 });
-WB_LINE_HOOK.push((c, l) => {
-  if (c.dead) return;
-  const ends = [l.a.rune, l.b.rune].filter(Boolean);
-  // Oathfire: a line ending in one of its oath runes strikes the walker crossing it
-  for (const z of ends) {
-    const s = wbZSt(z);
-    if (z.kinds.includes('oath') && wbCap(s, 'wbOathfire') && z.src && G.towers.includes(z.src)) { wbHit(z.src, s, c, (s.dmg || 0) * .8, 'phys'); break; }
-  }
-  // Winter's Line: a line between two frost runes freezes every walker crossing it
-  if (!c.dead && ends.length === 2 && ends.every(z => z.kinds.includes('frost'))) {
-    const z = ends.find(q => wbCap(wbZSt(q), 'wbWinterLine'));
-    if (z) { chill(c, { slow: .3, slowT: 2 }, 'frost', z.src); stun(c, .4, .4, 'frost'); }
-  }
-});
+// (Oathfire and Winter's Line struck foes crossing ward-lines: they went with the lines, 24 Nov 2026)
 
 /* ---------- Vowkeepers (their strike is defined in forces_zs_wardbound.js, which loads after this file: wrapped on first use) ---------- */
 let WB_VOW_WRAPPED = false;
@@ -24572,8 +24518,9 @@ function wbVowWrap() {
    Three per unit: the first innate, two unlocked by the unit's talent tree (forces_wardbound_b.js) and learned with gold.
    Ability damage is a multiple of the unit's live damage (st.dmg); every hit goes through wbHit, so the Wardbound's items
    and the Champion's gift answer it, and every hit runs under its ability's tag (abRun: castAbility, the delayed calls,
-   the zones and, below, the flights), so the Brand bonus (the core's amp hook reads AB_NOW) and Spell Damage reach it.
-   Every spell plays into the Runes: it lays ground runes, brands or carves sigils, flares the ward-lines or detonates.
+   the zones and, below, the flights), so the Exposed bonus (the core's amp hook reads AB_NOW) and Spell Damage reach it.
+   Every spell plays into the Runes: it lays ground runes, Exposes foes (c.wbBrand), carves or bursts the Runecarvers'
+   marks (c.wbSig), or flares the runes (24 Nov 2026: ward-lines and Bound runes cut, docs/design/wardbound_simple.md).
    Lingering areas are hazards k 'wb_zone' ticked here (wbZoneTick, called by the core's hazard hook; ab.zone does the
    work). Each ability has its own cast animation in _f, driven by t.ab.last / t.ab.lastAt (WB_ANIM_T: how long).
    The Vowkeepers' kit (the specialist, slot venom) is here too; their strike and body are in forces_zs_wardbound.js. */
@@ -24611,7 +24558,7 @@ const WBC = {
   chain: { m: 1.5, k: .5 },
   censer: { r: 1.2, mend: .25 },
   vow: { r: 2.5 },
-  rite: { r: 3, m: .8 },
+  rite: { r: 3, m: .8, mend: .015, mendT: 6 },
 };
 
 /* ---------- small helpers ---------- */
@@ -24635,7 +24582,7 @@ function wbcCone(t, st, ux, uz, R, half) {
   return out;
 }
 // is a foe standing on a rune (with one of these kinds)
-const wbcOnRune = (c, kinds) => wbRunes().some(z => (!kinds || z.kinds.some(k => kinds.includes(k))) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r * (z.bound ? 1.25 : 1) + .1);
+const wbcOnRune = (c, kinds) => wbRunes().some(z => (!kinds || z.kinds.some(k => kinds.includes(k))) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r + .1);
 // a rune laid only where the road is (a spell's trail across open ground lays none)
 function wbcRoadRune(t, st, x, z, kind, o) { const p = wbRoadCell(x, z); if (p[2] < 0 || Math.hypot(p[0] - x, p[1] - z) > .7) return null; return wbRune(t, st, p[0], p[1], kind, o); }
 // Returning Oath's glaive in flight (drawing only: the hits are timed by the cast): out along the line to (ex, ez), back to the hand
@@ -24678,7 +24625,7 @@ const WB_KITS = {
     { id: 'wb_swordplant', name: 'Oathbreaker Thrust', short: 'Thrust', glyph: 'sword', hue: '#f0c050', mana: 70, cd: 10, r: WBC.plant.r, research: null,
       by: { root: [1.2, 1.3, 1.4, 1.5, 1.6, 1.8] },
       auto: 'two or more ground foes within 1.3 cells, or a boss or elite',
-      text: (t, st, ab) => `He leaps and drives the greatsword point-first into the road: every ground foe within ${WBC.plant.r} cells takes ${xD(st, WBC.plant.m)}, is rooted ${byT(ab.by.root, t)}s and branded, and four oath runes are carved round the blade.`,
+      text: (t, st, ab) => `He leaps and drives the greatsword point-first into the road: every ground foe within ${WBC.plant.r} cells takes ${xD(st, WBC.plant.m)}, is rooted ${byT(ab.by.root, t)}s and Exposed, and four oath runes are carved round the blade.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? t : null; },
       cast(t, st, _, ab) {
         const r = abReach(t, st, ab), root = byT(ab.by.root, t), x = t.x, z = t.y;
@@ -24694,7 +24641,7 @@ const WB_KITS = {
     { id: 'wb_wardflare', name: 'Rune Cleave', short: 'Cleave', glyph: 'sword', hue: '#ffe8a8', mana: 90, cd: 14, r: WBC.flare.r, none: 'no ground foe in reach', research: { cost: 70, time: 20 },
       by: { mult: [1.2, 1.2, 1.4, 1.4, 1.6, 1.6] },
       auto: 'two or more ground foes within reach, or a boss or elite',
-      text: (t, st, ab) => `A wide spinning cleave: every ground foe within ${WBC.flare.r} cells takes ${xD(st, byT(ab.by.mult, t))} and is branded, and each ward-line and rune the arc crosses flares, striking and branding the ground foes on it.`,
+      text: (t, st, ab) => `A wide spinning cleave: every ground foe within ${WBC.flare.r} cells takes ${xD(st, byT(ab.by.mult, t))} and is Exposed, and each rune in its reach flares, striking and Exposing the ground foes on it.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? t : null; },
       cast(t, st, _, ab) {
         const m = byT(ab.by.mult, t), r = abReach(t, st, ab), x = t.x, z = t.y;
@@ -24707,7 +24654,7 @@ const WB_KITS = {
     { id: 'wb_laststand', name: 'Final Oath', short: 'Oath', glyph: 'shield', hue: '#c04a3a', mana: 100, cd: 22, r: WBC.stand.r, research: { cost: 130, time: 30 },
       by: { dur: [5, 5, 6, 6, 7, 7] },
       auto: 'ground foes in reach while the leading foe is in the last third of the road, three or more ground foes in reach, or a boss or elite',
-      text: (t, st, ab) => `He plants the greatsword before him and stands immovable for ${byT(ab.by.dur, t)}s: he can't be Wounded and does not strike, and every half second each ground foe within ${WBC.stand.r} cells is pushed back along the road and slowed ${Math.round(WBC.stand.slow * 100)}%. Every ground foe in reach is branded as he plants it.`,
+      text: (t, st, ab) => `He plants the greatsword before him and stands immovable for ${byT(ab.by.dur, t)}s: he can't be Wounded and does not strike, and every half second each ground foe within ${WBC.stand.r} cells is pushed back along the road and slowed ${Math.round(WBC.stand.slow * 100)}%. Every ground foe in reach is Exposed as he plants it.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (man || L.length >= 3 || L.some(abBig) || wbFront() < .34) ? t : null; },
       cast(t, st, _, ab) {
         const until = G.time + byT(ab.by.dur, t), r = abReach(t, st, ab);
@@ -24769,18 +24716,18 @@ const WB_KITS = {
       } },
     { id: 'wb_wardarrow', name: 'Warding Glaive', short: 'Ward', glyph: 'glaive2', hue: '#9ee8dc', mana: 90, cd: 16, research: { cost: 110, time: 30 },
       by: { dur: [8, 8, 9, 9, 10, 10] },
-      auto: 'a ground foe in reach with two or more runes within 3.2 cells of it',
-      text: (t, st, ab) => `A glaive hurled down into the road under a ground foe stands there spinning, a great rune for ${byT(ab.by.dur, t)}s: foes beside it take ${xD(st, WBC.ward.m)} and are branded, and it links into a ward-line with every rune within ${gNf(WB_RUNE.link * 2)} cells (twice the usual reach).`,
+      auto: 'a ground foe in reach with another ground foe within 1.2 cells of it, or a boss or elite, where no Warding Glaive stands',
+      text: (t, st, ab) => `A glaive hurled down into the road under a ground foe stands there spinning, a great rune for ${byT(ab.by.dur, t)}s: foes beside it take ${xD(st, WBC.ward.m)} and are Exposed, and while it stands every ground foe that walks beside it has its armour cracked and is Exposed, once every ${gNf(WB_RUNE.again)}s.`,
       pick(t, st, ab, man) {
-        const L = abFoes(t, st, abReach(t, st, ab), abWalker).sort((a, b) => a.remain - b.remain), R0 = wbRunes(), lk = WB_RUNE.link * 2;
+        const L = abFoes(t, st, abReach(t, st, ab), abWalker).sort((a, b) => a.remain - b.remain), R0 = wbRunes();
         let best = null, bn = -1;
-        for (const c of L) { if (R0.some(z => z.wbBeacon > G.time && Math.hypot(z.x - c.x, z.z - c.y) < 1.5)) continue; const n = R0.filter(z => Math.hypot(z.x - c.x, z.z - c.y) <= lk).length; if (n > bn) { bn = n; best = c; } }
+        for (const c of L) { if (R0.some(z => z.wbBeacon > G.time && Math.hypot(z.x - c.x, z.z - c.y) < 1.5)) continue; const n = L.filter(o => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 <= 1.44).length + (abBig(c) ? 2 : 0); if (n > bn) { bn = n; best = c; } }
         return best && (man || bn >= 2) ? { x: best.x, y: best.y } : null;
       },
       cast(t, st, p, ab) {
         const q = wbRoadCell(p.x, p.y), x = q[2] >= 0 ? q[0] : p.x, z = q[2] >= 0 ? q[1] : p.y, dur = byT(ab.by.dur, t);
         const rn = wbRune(t, st, x, z, 'shaft', { life: dur, noMerge: true });
-        if (rn) { rn.wbBeacon = G.time + dur; rn.r = WBC.ward.r; rn.wbGlv = G.time; wbS().linesAt = -1; }
+        if (rn) { rn.wbBeacon = G.time + dur; rn.r = WBC.ward.r; rn.wbGlv = G.time; }
         abAoe(() => inSplash(x, z, WBC.ward.r + .1, false, c => { if (c.ent || c.phased || !canTarget(t, st, c)) return; wbHit(t, st, c, st.dmg * WBC.ward.m, 'phys'); if (!c.dead) wbBrand(c, 1, t); }));
         fxRing(x, z, WBC.ward.r, WB_COL.teal); flashLight(x, z, .8, [1.4, 1.3, .9], 2, .25); sfx('thwack', 0);
       } },
@@ -24801,10 +24748,10 @@ const WB_KITS = {
         for (const q of pts) { wbRune(t, st, q[0], q[1], 'frost'); fxShards(q[0], q[1], .1, 4); }
         sfx('glaiveHit', 1);
       } },
-    { id: 'wb_frostbite', name: 'Frostbite', short: 'Bite', glyph: 'frostbite', hue: '#e0f4ff', mana: 80, cd: 12, none: 'no branded or frost-slowed ground foe in reach', research: { cost: 70, time: 20 },
+    { id: 'wb_frostbite', name: 'Frostbite', short: 'Bite', glyph: 'frostbite', hue: '#e0f4ff', mana: 80, cd: 12, none: 'no Exposed or frost-slowed ground foe in reach', research: { cost: 70, time: 20 },
       by: { frz: [1, 1, 1.1, 1.2, 1.3, 1.4] },
-      auto: 'two or more branded or frost-slowed ground foes in reach, or one boss or elite',
-      text: (t, st, ab) => `The halberd's butt slams the road: every branded or frost-slowed ground foe in reach is frozen solid: stunned ${byT(ab.by.frz, t)}s (bosses briefly) and takes ${xD(st, WBC.bite.m)}.`,
+      auto: 'two or more Exposed or frost-slowed ground foes in reach, or one boss or elite',
+      text: (t, st, ab) => `The halberd's butt slams the road: every Exposed or frost-slowed ground foe in reach is frozen solid: stunned ${byT(ab.by.frz, t)}s (bosses briefly) and takes ${xD(st, WBC.bite.m)}.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => abWalker(c) && (wbBrandOf(c) > 0 || c.slowT > 0)); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? L : null; },
       cast(t, st, L, ab) {
         const d = byT(ab.by.frz, t), r = abReach(t, st, ab) + .5;
@@ -24829,12 +24776,12 @@ const WB_KITS = {
       } },
   ] },
 
-  /* ---- Runecarvers: the sigils ---- */
+  /* ---- Runecarvers: their marks (c.wbSig) ---- */
   wb_runecarver: { slot: 'arcane', mana: { max: 120, regen: .75, hit: 1.5 }, abilities: [
     { id: 'wb_etch', name: 'Etch', short: 'Etch', glyph: 'rune', hue: '#d8b8ff', mana: 80, cd: 10, research: null,
       by: { n: [3, 3, 3, 4, 4, 5] },
       auto: 'two or more foes in reach, or a boss or elite',
-      text: (t, st, ab) => `The stylus scribes in the air: the ${byT(ab.by.n, t)} toughest foes in reach take ${xD(st, WBC.etch.m)} and have ${WBC.etch.sig} sigils carved into them.`,
+      text: (t, st, ab) => `The stylus scribes in the air: the ${byT(ab.by.n, t)} toughest foes in reach take ${xD(st, WBC.etch.m)} and have ${WBC.etch.sig} marks carved into them, for the Runecarvers' flicks and Detonate to burst.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)).sort(abByTough); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? L : null; },
       cast(t, st, L, ab) {
         L.slice(0, byT(ab.by.n, t)).forEach((c, i) => G.delayed.push({ t: .15 + i * .12, fn: () => {
@@ -24844,10 +24791,10 @@ const WB_KITS = {
         } }));
         sfx('phase', 1);
       } },
-    { id: 'wb_detonate', name: 'Detonate', short: 'Burst', glyph: 'burst', hue: '#f0e0ff', mana: 90, cd: 12, none: 'no sigil-carved foe in reach', research: { cost: 80, time: 20 },
+    { id: 'wb_detonate', name: 'Detonate', short: 'Burst', glyph: 'burst', hue: '#f0e0ff', mana: 90, cd: 12, none: 'no marked foe in reach', research: { cost: 80, time: 20 },
       by: { per: [.9, .9, 1, 1, 1.1, 1.2] },
-      auto: 'two or more sigil-carved foes in reach, four or more sigils among them, or a carved boss or elite',
-      text: (t, st, ab) => `The tome slams shut: every sigil-carved foe in reach bursts, taking ${xD(st, byT(ab.by.per, t))} for each sigil on it, and half that strikes the foes within 0.9 cells of it.`,
+      auto: 'two or more marked foes in reach, four or more marks among them, or a marked boss or elite',
+      text: (t, st, ab) => `The tome slams shut: every marked foe in reach bursts, taking ${xD(st, byT(ab.by.per, t))} for each mark on it, and half that strikes the foes within 0.9 cells of it.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), c => wbSigOf(c) > 0); if (!L.length) return null; const n = L.reduce((a, c) => a + wbSigOf(c), 0); return man || L.length >= 2 || n >= 4 || L.some(abBig) ? L : null; },
       cast(t, st, L, ab) {
         const per = byT(ab.by.per, t); let n = 0;
@@ -24857,8 +24804,8 @@ const WB_KITS = {
       } },
     { id: 'wb_scribe', name: 'Scribe the Road', short: 'Scribe', glyph: 'spiral', hue: '#c8a8ff', mana: 110, cd: 16, research: { cost: 140, time: 30 },
       by: { dur: [8, 8, 9, 9, 10, 10] },
-      auto: 'the ground foe furthest along in reach with another within 1.2 cells (or a boss), where no great sigil rune lies',
-      text: (t, st, ab) => `Kneels and carves a great sigil rune into the road for ${byT(ab.by.dur, t)}s: foes on it when it is carved take ${xD(st, WBC.scribe.m)}, every foe on it gains a sigil each 0.6s, and it links into the ward-lines.`,
+      auto: 'the ground foe furthest along in reach with another within 1.2 cells (or a boss), where no great rune of theirs lies',
+      text: (t, st, ab) => `Kneels and carves a great rune into the road for ${byT(ab.by.dur, t)}s: foes on it when it is carved take ${xD(st, WBC.scribe.m)}, and every foe on it gains a mark each 0.6s.`,
       pick(t, st, ab, man) {
         const L = abFoes(t, st, abReach(t, st, ab), abWalker).sort((a, b) => a.remain - b.remain);
         for (const c of L) { if (!man && wbRunes().some(z => z.wbGreat && Math.hypot(z.x - c.x, z.z - c.y) < 1.5)) continue; const n = L.filter(o => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 <= 1.44).length; if (n >= (man ? 1 : 2) || abBig(c)) return c; }
@@ -24963,7 +24910,7 @@ const WB_KITS = {
         len = Math.min(6, len);
         wbHit(t, st, c, st.dmg * WBC.quake.m, 'phys'); if (!c.dead) stun(c, sn, .4, 'earth');
         wbQuake(t, st, c.x, c.y, len, WBC.quake.m, { stun: sn });
-        G.delayed.push({ t: .35, fn: () => { for (const z of Z) { if (!(z.t > 0)) continue; const rr = z.r * (z.bound ? 1.25 : 1) + .15; for (const o of G.creeps) if (!o.dead && !o.ent && !o.phased && abWalker(o) && Math.hypot(o.x - z.x, o.y - z.z) <= rr) wbTouch(o, z); part({ k: 'ring', x: z.x, z: z.z, h: .04, life: .4, max: .4, size: rr, col: WB_KIND[z.kinds[0]] ? WB_KIND[z.kinds[0]].col : WB_COL.stone }); } } });
+        G.delayed.push({ t: .35, fn: () => { for (const z of Z) { if (!(z.t > 0)) continue; const rr = z.r + .15; for (const o of G.creeps) if (!o.dead && !o.ent && !o.phased && abWalker(o) && Math.hypot(o.x - z.x, o.y - z.z) <= rr) wbTouch(o, z); part({ k: 'ring', x: z.x, z: z.z, h: .04, life: .4, max: .4, size: rr, col: WB_KIND[z.kinds[0]] ? WB_KIND[z.kinds[0]].col : WB_COL.stone }); } } });
         fxDust(c.x, c.y, 8); G.shake = Math.max(G.shake, .16); sfx('quake', 1);
       } },
     { id: 'wb_anvil', name: 'Anvil Stance', short: 'Anvil', glyph: 'hammer', hue: '#c88a40', mana: 110, cd: 18, research: { cost: 120, time: 30 },
@@ -25044,7 +24991,7 @@ const WB_KITS = {
     { id: 'wb_censer', name: 'Censer Smoke', short: 'Censer', glyph: 'potion', hue: '#b8b0a4', mana: 80, cd: 14, r: WBC.censer.r, research: null,
       by: { dur: [5, 5, 6, 6, 7, 7] },
       auto: 'a hurt Wardbound unit, a siege troop, or two or more ground foes within 1.2 cells',
-      text: (t, st, ab) => `The censer swung in a full circle leaves smoke ${WBC.censer.r} cells round it for ${byT(ab.by.dur, t)}s: Wardbound units in it mend ${Math.round(abD(st) * WBC.censer.mend * 2)} health a second, foes in it are branded once, and siege troops in it can't attack.`,
+      text: (t, st, ab) => `The censer swung in a full circle leaves smoke ${WBC.censer.r} cells round it for ${byT(ab.by.dur, t)}s: Wardbound units in it mend ${Math.round(abD(st) * WBC.censer.mend * 2)} health a second, foes in it are Exposed once, and siege troops in it can't attack.`,
       pick(t, st, ab, man) {
         if (man) return t; const r = abReach(t, st, ab);
         if (G.towers.some(o => wbUnit(o) && !o.wrecked && o.maxHp && (o.wounded || o.hp < o.maxHp * .85) && Math.hypot(o.x - t.x, o.y - t.y) <= r)) return t;
@@ -25063,7 +25010,7 @@ const WB_KITS = {
     { id: 'wb_vow', name: 'Sworn Vow', short: 'Vow', glyph: 'heart', hue: '#fff2c8', mana: 90, cd: 18, r: WBC.vow.r, research: { cost: 80, time: 20 },
       by: { dur: [6, 6, 7, 7, 8, 8] },
       auto: 'a Wounded Wardbound unit within 2.5 cells, or one under 60% health',
-      text: (t, st, ab) => `The blade raised to the brow: the most hurt Wardbound unit within ${WBC.vow.r} cells (the Wounded first) is mended to full and can't be Wounded for ${byT(ab.by.dur, t)}s; ground foes within a cell of it are branded twice.`,
+      text: (t, st, ab) => `The blade raised to the brow: the most hurt Wardbound unit within ${WBC.vow.r} cells (the Wounded first) is mended to full and can't be Wounded for ${byT(ab.by.dur, t)}s; ground foes within a cell of it are Exposed twice.`,
       pick(t, st, ab, man) {
         const o = typeof wbvHurtNear === 'function' ? wbvHurtNear(t, abReach(t, st, ab)) : null;
         if (o && (man || o.wounded || o.hp < o.maxHp * .6)) return o;
@@ -25078,19 +25025,22 @@ const WB_KITS = {
       } },
     { id: 'wb_rite', name: 'Rite of Holding', short: 'Rite', glyph: 'rune', hue: '#ffe2a0', mana: 100, cd: 16, r: WBC.rite.r, research: { cost: 120, time: 30 },
       auto: 'two or more vow or oath runes within 3 cells',
-      text: (t, st, ab) => `The censer swung low over the road: every vow and oath rune within ${WBC.rite.r} cells is renewed and made Bound with vow (units near it mend), and each ground foe on one takes ${xD(st, WBC.rite.m)} and is branded. With none there, a vow rune is laid at its post.`,
+      text: (t, st, ab) => `The censer swung low over the road: every vow and oath rune within ${WBC.rite.r} cells is renewed, each ground foe on one takes ${xD(st, WBC.rite.m)} and is Exposed, and Wardbound units within ${WBC.rite.r} cells mend ${Math.round(WBC.rite.mend * 1000) / 10}% of their health a second for ${WBC.rite.mendT}s. With no such rune there, a vow rune is laid at its post.`,
       pick(t, st, ab, man) { const n = wbRunesNear(t.x, t.y, abReach(t, st, ab)).filter(z => z.kinds.includes('vow') || z.kinds.includes('oath')).length; return n >= (man ? 0 : 2) ? t : null; },
       cast(t, st, _, ab) {
         let Z = wbRunesNear(t.x, t.y, abReach(t, st, ab)).filter(z => z.kinds.includes('vow') || z.kinds.includes('oath'));
         if (!Z.length) { const z = wbcRoadRune(t, st, t.x, t.y, 'vow') || wbRune(t, st, t.x, t.y, 'vow', { road: false }); Z = z ? [z] : []; }
         const hit = new Set();
         for (const z of Z) {
-          z.life = Math.max(z.life, WB_RUNE.life); z.t = Math.max(z.t, WB_RUNE.life); wbRuneAdd(z, 'vow');
-          const rr = z.r * (z.bound ? 1.25 : 1) + .1;
+          z.life = Math.max(z.life, WB_RUNE.life); z.t = Math.max(z.t, WB_RUNE.life);
+          const rr = z.r + .1;
           abAoe(() => { for (const c of G.creeps) { if (c.dead || c.ent || c.phased || hit.has(c) || !abWalker(c) || !canTarget(t, st, c) || Math.hypot(c.x - z.x, c.y - z.z) > rr) continue; hit.add(c); wbHit(t, st, c, st.dmg * WBC.rite.m, 'magic'); if (!c.dead) wbBrand(c, 1, t); } });
           part({ k: 'ring', x: z.x, z: z.z, h: .04, life: .5, max: .5, size: rr, col: WB_COL.vow });
         }
-        wbS().linesAt = -1; sfx('ward', 1);
+        // (the mending: it was the runes made Bound with vow; now the units in its reach mend a while)
+        const rR = abReach(t, st, ab), until = G.time + WBC.rite.mendT;
+        for (const o of G.towers) if (wbUnit(o) && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= rR) o.wbcRiteT = Math.max(o.wbcRiteT || 0, until);
+        sfx('ward', 1);
       } },
   ] },
 };
@@ -25111,7 +25061,7 @@ function wbcRuneShot(t, st, x, z, m) {
       if (c.dead || c.phased || c.ent || Math.hypot(c.x - rn.x, c.y - rn.z) > WBC.runeshot.near) continue; const n = hits.get(c) || 0; if (n >= WBC.runeshot.most) continue; hits.set(c, n + 1);
       wbHit(t, s, c, s.dmg * m, 'magic'); if (!c.dead) wbTouch(c, rn);
     } });
-    rn.t = Math.min(rn.t, .02); wbS().linesAt = -1;
+    rn.t = Math.min(rn.t, .02);
     fxRing(rn.x, rn.z, WBC.runeshot.near, col); fxSpark(rn.x, rn.z, .2, col, 8); flashLight(rn.x, rn.z, .6, wbcHex(col), 2, .15);
     if (i === 0) { G.shake = Math.max(G.shake, .1); sfx('quake', .5); }
   } }));
@@ -25151,6 +25101,10 @@ Object.assign(SP_SHAPE, {
   wb_censer: 'x', wb_vow: 'x', wb_rite: 'a',
 });
 
+/* ---------- Warding Glaive: its great rune Exposes each ground foe it touches (once every WB_RUNE.again s) ---------- */
+WB_RUNE_HOOK.push((c, z, kind) => { if (z.wbBeacon > G.time && !c.dead && kind === z.kinds[0]) wbBrand(c, 1, z.src && G.towers.includes(z.src) ? z.src : null); });
+/* ---------- Rite of Holding: the units in its reach mend WBC.rite.mend of their health a second while it lasts ---------- */
+WB_HOOK.pulse.push((t, st, dt) => { if (t.wbcRiteT > G.time && t.maxHp && t.hp < t.maxHp) wbMend(t, t.maxHp * WBC.rite.mend * dt); });
 /* ---------- Winter Ward: a frost rune near a warding Sentry freezes the first foe to step on it ---------- */
 WB_RUNE_HOOK.push((c, z, kind) => {
   if (kind !== 'frost' || c.dead) return; const S = wbcS(); if (!S.wards.length) return;
@@ -25181,10 +25135,10 @@ const wbTethers = () => wbcS().tethers.filter(L => L.until > G.time).map(L => ({
 
 /* ---------- wrappers on the core (the core's file is left as it is; these could move into it) ----------
    - flights launched while a spell casts (Ricochet Rite's glaive, Quake Line's quake, Rune Shot's bolt) remember the spell
-     (p.ab) and step under its tag, so their hits are the spell's (Brand bonus, Spell Damage, the damage report);
+     (p.ab) and step under its tag, so their hits are the spell's (Exposed bonus, Spell Damage, the damage report);
    - a ground rune is never a spell's own area: abRun would tag one laid by a spell, and its touches would count as the
      spell's hits for its whole life (and take Spell Damage), so runes refuse the tag;
-   - Warding Glaive's great rune links to every rune within twice the usual reach (the beacon lines added to the lines);
+   - Warding Glaive's great rune Exposes the foes it touches (WB_RUNE_HOOK below);
    - "can't be Wounded" (Final Oath, Anvil Stance, Sworn Vow: t.wbNoWoundT) holds at the blow itself, at 1 health. */
 {
   const fly0 = wbFly;
@@ -25193,33 +25147,21 @@ const wbTethers = () => wbcS().tethers.filter(L => L.until > G.time).map(L => ({
   wbGlaiveStep = tagStep(wbGlaiveStep); wbRicoStep = tagStep(wbRicoStep); wbBoltStep = tagStep(wbBoltStep); wbQuakeStep = tagStep(wbQuakeStep);
   const rune0 = wbRune;
   wbRune = function () { const z = rune0.apply(this, arguments); if (z && !Object.getOwnPropertyDescriptor(z, 'abId')) Object.defineProperty(z, 'abId', { get: () => null, set() {}, configurable: true, enumerable: false }); return z; };
-  const lines0 = wbLinesNow;
-  wbLinesNow = function () {
-    const S = wbS(), fresh = !(S.linesAt >= 0 && G.time - S.linesAt < .25), prev = S.lines, out = lines0();
-    if (!fresh) return out;
-    const R0 = wbRunes(), B = R0.filter(z => z.wbBeacon > G.time); if (!B.length) return out;
-    const lk = WB_RUNE.link * 2, pt = z => ({ x: z.x, z: z.z, kinds: z.kinds, rune: z });
-    for (const z of B) for (const q of R0) {
-      if (q === z || Math.hypot(q.x - z.x, q.z - z.z) > lk) continue;
-      if (out.some(l => (l.a.rune === z && l.b.rune === q) || (l.a.rune === q && l.b.rune === z))) continue;
-      const key = 'wbb' + z.seed + ':' + q.seed, woven = z.kinds.some(k => !q.kinds.includes(k)) || q.kinds.some(k => !z.kinds.includes(k)), old = prev.find(l => l.key === key);
-      out.push({ a: pt(z), b: pt(q), woven, key, beacon: 1, seen: old ? old.seen : new Map() });
-    }
-    S.lines = out; return out;
-  };
   const dmg0 = damageTower;
   damageTower = function (t, dmg) { if (t && t.wbNoWoundT > G.time && t.hp > 1 && dmg >= t.hp) dmg = t.hp - 1; else if (t && t.wbNoWoundT > G.time && t.hp <= 1) return; return dmg0(t, dmg); };
 }
 
 /* ================= THE WARDBOUND: relics, legendaries, charms and the shop =================
    The tower relics' rules (loot.js), laid out as the Stormborn's and Ironhold's: hand-made, one rule you can say in a
-   sentence and an effect you can see. Themes: runes, ward-lines, brands, sigils, oaths, holding the line; black, gold
+   sentence and an effect you can see. Themes: runes, foes Exposed, oaths, holding the line; black, gold
    and ivory, gold leaf and sun-wheels. Drops start at rare; kx 1.6 sharpens what a unit does, kx 1.35 adds a habit, a
    plain rare bends a rule, an epic makes a moment, a legendary changes how a unit plays. Unit relics and signatures fit
    one unit (for: its slot). Charms sit in the charm socket (tier II) and answer the unit's casts.
    Every rule is read here, through the core's arrays (forces_wardbound_a.js: WB_ONHIT, WB_HOOK live / amp / kill / fire
-   / pulse / tick / wave, WB_RUNE_HOOK, WB_LINE_HOOK), a castAbility wrapper (the charms, the Champion's relics) and two
-   thin wrappers on the core's wbRune and wbDetonate (runes that take more kinds, wider detonations).
+   / pulse / tick / wave, WB_RUNE_HOOK), a castAbility wrapper (the charms, the Champion's relics) and two thin wrappers
+   on the core's wbRune and wbDetonate (runes laid in pairs or rows, runes that last longer, wider bursts of marks).
+   Made simple 24 Nov 2026 (docs/design/wardbound_simple.md): no ward-lines or Bound runes; a brand is Exposed in the
+   words (c.wbBrand in the code); sigils are the Runecarvers' marks (c.wbSig).
    st.pw keys all start wb (wbPw). Ids: wbr_ relics, wbc_ charms, wbl_ legendaries, wbs_ the shop's shelf. No paintings
    yet: the icon painter draws icon/hue. */
 
@@ -25229,15 +25171,17 @@ const wbdKind = t => (t && t.def && (WBD_KIND[t.def.unit] || (t.def.champ ? 'oat
 const wbdP = t => (t && t.st && t.st.pw) || null;
 const wbdIs = (t, u) => !!(t && t.def && t.def.unit === u);
 const wbdGlint = (t, id, big) => { if (typeof relicGlint === 'function') relicGlint(t, id, big); };
-// is a foe standing on a rune or a ward-line (r: the line's reach)
-function wbdOnWard(c, r = .35) {
-  for (const z of wbRunes()) if (Math.hypot(c.x - z.x, c.y - z.z) <= z.r * (z.bound ? 1.25 : 1) + .1) return true;
-  return wbOnLine(c, r);
+// is a foe standing on a rune
+function wbdOnWard(c) {
+  for (const z of wbRunes()) if (Math.hypot(c.x - z.x, c.y - z.z) <= (z.r || WB_RUNE.r) + .1) return true;
+  return false;
 }
+// is this rune touch the rune springing (wbSpring marks it spent this instant before its touches)
+const wbdSprung = z => !!z && z.spent === G.time;
 // the walkers within r of (x, z)
 const wbdFoes = (x, z, r, f) => G.creeps.filter(c => !c.dead && !c.ent && !c.phased && Math.hypot(c.x - x, c.y - z) <= r && (!f || f(c)));
-/* a flare near one point: each foe within r of (x, z) that stands on a rune or a ward-line is struck for mult x the unit's
-   damage and branded; returns how many */
+/* a flare near one point: each foe within r of (x, z) that stands on a rune is struck for mult x the unit's damage and
+   Exposed; returns how many */
 function wbdFlareNear(t, st, x, z, r, mult, brand = 1) {
   let n = 0; const D = ((st && st.dmg) || 0) * mult;
   for (const c of wbdFoes(x, z, r, c => wbWalks(c) && wbdOnWard(c))) {
@@ -25259,52 +25203,52 @@ const wbdOnce = (c, key, s) => { if (c[key] > G.time) return false; c[key] = G.t
 const WB_RELICS = {
   // ---- sharpen (kx 1.6) ----
   wbr_goldleaf: { rar: 2, kx: 1.6, name: 'Gold-Leaf Inlay', icon: 'leaf', hue: '#f0c050', theme: 'runes',
-    text: k => `Its road traps last longer: ${nf1(10 * (1 + .3 * k))}s (was 10s).`, fx: (st, k) => wbPw(st, 'wbLong', .3 * k) },
-  wbr_searbrand: { rar: 2, kx: 1.6, name: 'Searing Brand-Iron', icon: 'ember', hue: '#e0a040', theme: 'brands', proc: 1,
-    text: k => `Every ${ordN(Math.max(2, Math.round(5 / k)))} hit brands the foe: Wardbound spells hit it 12% harder.`, fx: (st, k) => pwMin(st, 'wbBrandHit', Math.max(2, Math.round(5 / k))) },
-  wbr_goldwire: { rar: 2, kx: 1.6, name: 'Gilded Ward-Wire', icon: 'chain', hue: '#e8c870', theme: 'ward-lines', proc: 1,
-    text: k => `Ground foes passing between traps in its reach take ${P_(.4 * k)} of its damage.`, fx: (st, k) => wbPw(st, 'wbWire', .4 * k) },
+    text: k => `Its runes last longer: ${nf1(10 * (1 + .3 * k))}s (was 10s).`, fx: (st, k) => wbPw(st, 'wbLong', .3 * k) },
+  wbr_searbrand: { rar: 2, kx: 1.6, name: 'Searing Sun-Iron', icon: 'ember', hue: '#e0a040', theme: 'Exposed', proc: 1,
+    text: k => `Every ${ordN(Math.max(2, Math.round(5 / k)))} hit Exposes the foe: Wardbound spells hit it 12% harder.`, fx: (st, k) => pwMin(st, 'wbBrandHit', Math.max(2, Math.round(5 / k))) },
+  wbr_goldwire: { rar: 2, kx: 1.6, name: 'Gilded Rune-Wire', icon: 'chain', hue: '#e8c870', theme: 'runes', proc: 1,
+    text: k => `Ground foes springing a rune in its reach take ${P_(.4 * k)} of its damage.`, fx: (st, k) => wbPw(st, 'wbWire', .4 * k) },
   wbr_whetrune: { rar: 2, kx: 1.6, name: 'Rune-Whetted Edge', icon: 'sword', hue: '#c8ccd6', theme: 'runes',
-    text: k => `Hits +${P_(.2 * k)} harder on foes on or between traps.`, fx: (st, k) => wbPw(st, 'wbWhet', .2 * k) },
+    text: k => `Hits +${P_(.2 * k)} harder on foes standing on a rune.`, fx: (st, k) => wbPw(st, 'wbWhet', .2 * k) },
   // ---- a habit (kx 1.35) ----
   wbr_chalkline: { rar: 2, kx: 1.35, name: "Surveyor's Gold Chalk-Line", icon: 'rune', hue: '#efe6d0', theme: 'runes',
-    text: k => `Every ${Math.max(3, Math.round(7 / k))}s in a fight, sets its trap ahead of the lead ground foe.`, fx: (st, k) => pwMin(st, 'wbChalk', Math.max(3, Math.round(7 / k))) },
-  wbr_vigilbell: { rar: 2, kx: 1.35, name: 'Vigil Bell', icon: 'echo', hue: '#e8d8a0', theme: 'ward-lines',
-    text: k => `Every 10s, nearby foes on or between traps take ${P_(.6 * k)} of its damage and a brand (Wardbound spells +12%).`, fx: (st, k) => wbPw(st, 'wbBell', .6 * k) },
+    text: k => `Every ${Math.max(3, Math.round(7 / k))}s in a fight, lays its rune ahead of the lead ground foe.`, fx: (st, k) => pwMin(st, 'wbChalk', Math.max(3, Math.round(7 / k))) },
+  wbr_vigilbell: { rar: 2, kx: 1.35, name: 'Vigil Bell', icon: 'echo', hue: '#e8d8a0', theme: 'runes',
+    text: k => `Every 10s, nearby foes on a rune take ${P_(.6 * k)} of its damage and are Exposed.`, fx: (st, k) => wbPw(st, 'wbBell', .6 * k) },
   wbr_oathcord: { rar: 2, kx: 1.35, name: 'Sworn Gold Cord', icon: 'snare', hue: '#f0c050', theme: 'oaths',
     text: k => `Every 8s, its next strike roots the foe ${nf1(.6 * k)}s.`, fx: (st, k) => wbPw(st, 'wbCord', .6 * k) },
-  wbr_sigilstone: { rar: 2, kx: 1.35, name: 'Sigil Whetstone', icon: 'gem', hue: '#d8b8ff', theme: 'sigils', proc: 1,
-    text: k => `Every ${ordN(Math.max(2, Math.round(5 / k)))} hit carves a sigil, which its hits set off for extra damage.`, fx: (st, k) => pwMin(st, 'wbSigHit', Math.max(2, Math.round(5 / k))) },
+  wbr_sigilstone: { rar: 2, kx: 1.35, name: 'Rune Whetstone', icon: 'gem', hue: '#d8b8ff', theme: 'runes', proc: 1,
+    text: k => `Every ${ordN(Math.max(2, Math.round(5 / k)))} hit lays its rune under the foe.`, fx: (st, k) => pwMin(st, 'wbSigHit', Math.max(2, Math.round(5 / k))) },
   // ---- bend a rule ----
   wbr_penance: { rar: 2, name: 'Barbed Penance-Chain', icon: 'chains', hue: '#9a4a3a', theme: 'oaths', proc: 1, wound: 1, noBoss: 1,
     text: k => `Hits and spells halve foes' heals and shields for ${nf1(4 * k)}s (a quarter on bosses).`,
     fx: (st, k) => { st.wound = Math.max(st.wound || 0, 4 * k); } },
-  wbr_rivet: { rar: 2, name: 'Sun-Wheel Rivet', icon: 'sun', hue: '#f0c050', theme: 'ward-lines', hb: 1,
-    text: () => 'Traps join into slowing lines from farther apart: up to 1.9 cells (was 1.6).', fx: st => wbPw(st, 'wbReach', 1) },
+  wbr_rivet: { rar: 2, name: 'Sun-Wheel Rivet', icon: 'sun', hue: '#f0c050', theme: 'runes', hb: 1,
+    text: () => 'While it stands, every Wardbound rune lasts longer: 12.5s (was 10s).', fx: st => wbPw(st, 'wbRivet', 1) },
   wbr_twinglyph: { rar: 2, name: 'Twin-Glyph Seal', icon: 'scales', hue: '#efe6d0', theme: 'runes', hb: 1,
-    text: () => 'Its traps also copy a nearby trap\'s effect, firing both at once.', fx: st => wbPw(st, 'wbTwin', 1) },
+    text: () => 'Each rune it lays gets a twin one step down the road.', fx: st => wbPw(st, 'wbTwin', 1) },
   // ---- epic: a moment ----
   wbr_watchhorn: { rar: 3, name: 'Horn of the Last Watch', icon: 'horn', hue: '#e8c870', theme: 'holding the line',
-    text: k => `Every 15s, renews nearby traps and roots ground foes between them ${nf1(k)}s.`, fx: (st, k) => wbPw(st, 'wbHorn', k) },
-  wbr_gateseal: { rar: 3, name: "Gate-Warden's Seal", icon: 'halo', hue: '#ffe8a8', theme: 'brands',
-    text: k => `Every 10s, roots the toughest foe ${nf1(.8 * k)}s and brands it fully (Wardbound spells +12% a brand).`, fx: (st, k) => wbPw(st, 'wbSeal', .8 * k) },
+    text: k => `Every 15s, renews nearby runes and roots ground foes on them ${nf1(k)}s.`, fx: (st, k) => wbPw(st, 'wbHorn', k) },
+  wbr_gateseal: { rar: 3, name: "Gate-Warden's Seal", icon: 'halo', hue: '#ffe8a8', theme: 'Exposed',
+    text: k => `Every 10s, roots the toughest foe ${nf1(.8 * k)}s and Exposes it 3 times.`, fx: (st, k) => wbPw(st, 'wbSeal', .8 * k) },
   // ---- made for one unit (inert in any other) ----
   wbr_pommel: { rar: 2, for: ['glaive'], name: 'Rosette Pommel', icon: 'fist', hue: '#c8a050', theme: 'oaths',
     text: k => `Every 3rd hit stuns the foe ${nf1(.3 * k)}s.`, fx: (st, k) => wbPw(st, 'wbPommel', .3 * k) },
   wbr_fletch: { rar: 2, for: ['arrow'], name: 'Ivory-Wrapped Grip', icon: 'feather', hue: '#efe6d0', theme: 'glaives',
-    text: k => `Glaive flies ${P_(.3 * k)} faster; hits on branded foes add a brand (Wardbound spells +12%).`, fx: (st, k) => wbPw(st, 'wbFletch', .3 * k) },
+    text: k => `Glaive flies ${P_(.3 * k)} faster; hits on Exposed foes Expose them again.`, fx: (st, k) => wbPw(st, 'wbFletch', .3 * k) },
   wbr_rimehook: { rar: 2, for: ['frost'], name: 'Rime-Hook Halberd-Head', icon: 'snowflake', hue: '#bfe6ff', theme: 'frost',
-    text: k => `Every sweep sets an ice trap; its ice traps slow harder: ${P_(.25 + .1 * k)} (was 25%).`, fx: (st, k) => wbPw(st, 'wbRime', .1 * k) },
-  wbr_inkhorn: { rar: 2, for: ['arcane'], name: 'Black Inkhorn', icon: 'vial', hue: '#d8b8ff', theme: 'sigils',
-    text: k => `Its sigil blasts are ${nf1(.3 * k)} cells wider and leave a sigil trap.`, fx: (st, k) => wbPw(st, 'wbInk', .3 * k) },
+    text: k => `Every sweep lays a frost rune; its frost runes slow harder: ${P_(.25 + .1 * k)} (was 25%).`, fx: (st, k) => wbPw(st, 'wbRime', .1 * k) },
+  wbr_inkhorn: { rar: 2, for: ['arcane'], name: 'Black Inkhorn', icon: 'vial', hue: '#d8b8ff', theme: 'marks',
+    text: k => `Its mark bursts are ${nf1(.3 * k)} cells wider and leave its rune.`, fx: (st, k) => wbPw(st, 'wbInk', .3 * k) },
   wbr_forklance: { rar: 3, for: ['storm'], name: 'Forked Lance-Tip', icon: 'boltup', hue: '#8ab4ff', theme: 'storm',
     text: k => `Its lightning chains on ${k >= 1.6 ? 2 : 1} more time${k >= 1.6 ? 's' : ''}.`, fx: (st, k) => wbPw(st, 'wbFork', k >= 1.6 ? 2 : 1) },
   wbr_sabatons: { rar: 3, for: ['earth'], name: 'Anvil-Iron Sabatons', icon: 'quake', hue: '#d89a50', theme: 'stone',
-    text: k => `Every 2nd slam quakes ${nf1(2 + .5 * k)} cells both ways, setting stunning traps.`, fx: (st, k) => wbPw(st, 'wbSabaton', 2 + .5 * k) },
+    text: k => `Every 2nd slam quakes ${nf1(2 + .5 * k)} cells both ways, laying stone runes, which stun.`, fx: (st, k) => wbPw(st, 'wbSabaton', 2 + .5 * k) },
   wbr_chainheads: { rar: 3, for: ['cannon'], name: 'Chained Bolt-Heads', icon: 'arrowhead', hue: '#ff9a5a', theme: 'pins',
     text: k => `Its bolts and blasts root ground foes ${nf1(.3 * k)}s.`, fx: (st, k) => wbPw(st, 'wbChainBolt', .3 * k) },
   wbr_sunbanner: { rar: 3, for: ['holy'], name: 'Sun-Wheel Standard', icon: 'banner', hue: '#f0c050', theme: 'oaths',
-    text: k => `Champion only: spells brand nearby foes (Wardbound spells +12%) and extend traps ${Math.round(4 * k)}s.`, fx: (st, k) => wbPw(st, 'wbChBanner', Math.round(4 * k)) },
+    text: k => `Champion only: spells Expose nearby foes and renew runes there ${Math.round(4 * k)}s.`, fx: (st, k) => wbPw(st, 'wbChBanner', Math.round(4 * k)) },
 };
 
 /* ---------- charms: a unit's mana and abilities (its charm socket only) ---------- */
@@ -25313,10 +25257,10 @@ const WB_CHARMS = {
   wbc_oathknot: { rar: 2, kx: 1.6, name: 'Oath-Knot Cord', icon: 'ring', hue: '#e8c870', text: k => `Each ability it casts gives back ${P_(Math.min(.6, .25 * k))} of its mana.` },
   wbc_sandglass: { rar: 2, kx: 1.6, name: "Warden's Sandglass", icon: 'hourglass', hue: '#efe6d0', text: k => `Its abilities recharge ${P_(.25 * k)} faster.` },
   wbc_tally: { rar: 2, kx: 1.35, name: 'Notched Gold Tally', icon: 'coin', hue: '#f0c050', text: k => `Each foe it slays gives it ${Math.round(12 * k)} mana.` },
-  wbc_linetoken: { rar: 2, kx: 1.35, name: "Line-Warden's Token", icon: 'statue', hue: '#c8ccd6', text: k => `Mana returns ${P_(.6 + .4 * k)} faster beside a line between traps.` },
-  wbc_brandring: { rar: 2, name: 'Brand-Seal Ring', icon: 'shieldx', hue: '#e0a040', text: k => `After each ability, its next 3 strikes brand foes and set traps under them.` },
-  wbc_runechalk: { rar: 2, name: 'Ivory Rune-Chalk', icon: 'rune', hue: '#efe6d0', text: k => `Casting near a trap gives back ${P_(Math.min(.7, .4 * k))} of its mana and renews traps.` },
-  wbc_hourseal: { rar: 3, name: 'Seal of the Sworn Hour', icon: 'sunburst', hue: '#ffe8a8', text: () => 'Every 3rd ability hits foes on or between traps for half its damage and brands them (Wardbound spells +12%).' },
+  wbc_linetoken: { rar: 2, kx: 1.35, name: "Rune-Warden's Token", icon: 'statue', hue: '#c8ccd6', text: k => `Mana returns ${P_(.6 + .4 * k)} faster with a rune within 1.5 cells.` },
+  wbc_brandring: { rar: 2, name: 'Sun-Seal Ring', icon: 'shieldx', hue: '#e0a040', text: k => `After each ability, its next 3 strikes Expose foes and lay runes under them.` },
+  wbc_runechalk: { rar: 2, name: 'Ivory Rune-Chalk', icon: 'rune', hue: '#efe6d0', text: k => `Casting near a rune gives back ${P_(Math.min(.7, .4 * k))} of its mana and renews runes.` },
+  wbc_hourseal: { rar: 3, name: 'Seal of the Sworn Hour', icon: 'sunburst', hue: '#ffe8a8', text: () => 'Every 3rd ability flares every rune: foes on one take half its damage and are Exposed.' },
 };
 for (const id in WB_CHARMS) Object.assign(WB_CHARMS[id], { charm: 1, fx: () => {} });
 
@@ -25328,22 +25272,22 @@ const wbdSplitN = k => k >= 1.4 ? 3 : 2;
 const WB_LEGENDS = {
   wbl_oathkeeper: { for: 'glaive', name: 'Oathkeeper, Blade of the Held Gate', icon: 'sword', hue: '#f0c050',
     twist: 'The Oathbound plants its sword in the road again and again: a small Oathbreaker Thrust every few cuts.',
-    text: k => `Every ${ordN(wbdPlantN(k))} hit roots and brands nearby ground foes ${nf1(.6 * k)}s, setting slowing traps.`,
-    build: 'Oathbreaker Thrust and Rune Cleave, Oathstones beside the road to link the oath runes, and Varic Dunmoor.',
-    combo: 'Oathbreaker Thrust, Rune Cleave and Oathstones beside the road.', fx: (st, k) => { pwMin(st, 'wbPlant', wbdPlantN(k)); wbPw(st, 'wbPlantT', .6 * k); } },
+    text: k => `Every ${ordN(wbdPlantN(k))} hit roots nearby ground foes ${nf1(.6 * k)}s, Exposes them and rings the blade with oath runes.`,
+    build: 'Oathbreaker Thrust and Rune Cleave, a maze that keeps foes beside it, and Varic Dunmoor.',
+    combo: 'Oathbreaker Thrust, Rune Cleave and a maze that keeps foes beside it.', fx: (st, k) => { pwMin(st, 'wbPlant', wbdPlantN(k)); wbPw(st, 'wbPlantT', .6 * k); } },
   wbl_sunbow: { for: 'arrow', name: 'The Sun-Wheel Glaive', icon: 'sun', hue: '#ffe8a8',
     twist: 'Every Glaive Warden glaive runs a longer circuit: it ricochets on to more foes and carves a shaft rune under every one it strikes.',
-    text: k => `Glaive bounces ${wbdSplitN(k)} more times, setting an armour-cracking trap under each foe hit.`,
-    build: 'Ricochet Rite and Returning Oath, a crowded stretch of road, and Runecarvers to link the shaft runes.',
+    text: k => `Glaive bounces ${wbdSplitN(k)} more times, laying a shaft rune under each foe hit.`,
+    build: 'Ricochet Rite and Returning Oath, a crowded stretch of road, and Rune Cleave to flare the shaft runes.',
     combo: 'Ricochet Rite, a crowded stretch of road and Runecarvers.', fx: (st, k) => wbPw(st, 'wbSplit', wbdSplitN(k)) },
   wbl_winterhall: { for: 'frost', name: 'Crown of the Winter Hall', icon: 'blizzard', hue: '#e8f6ff',
-    twist: 'Every Frostbrand sweep rimes the road under each ground foe it cuts, and Bound frost runes stun.',
-    text: k => `Sweeps set ice traps under foes. Ice traps with a second effect stun ${nf1(.4 * k)}s (each foe once every 4s).`,
-    build: 'Rimeline and Winter Ward, Oathbound or Anvil Guard beside it to make the runes Bound.',
-    combo: 'Rimeline, Winter Ward and Oathbound beside it.', fx: (st, k) => wbPw(st, 'wbWinter', .4 * k) },
+    twist: 'Every Frostbrand sweep rimes the road under each ground foe it cuts, and its frost runes stun in ice.',
+    text: k => `Sweeps lay frost runes under foes; its frost runes stun ${nf1(.4 * k)}s when sprung (each foe once every 4s).`,
+    build: 'Rimeline and Winter Ward, and a long stretch of road where foes walk over its runes.',
+    combo: 'Rimeline, Winter Ward and a long stretch of road.', fx: (st, k) => wbPw(st, 'wbWinter', .4 * k) },
   wbl_lexicon: { for: 'arcane', name: 'The Unwritten Lexicon', icon: 'stars', hue: '#d8b8ff',
-    twist: 'A Runecarver\'s sigils outlive their foe: when a carved foe falls, its sigils leap to the foes beside it.',
-    text: k => `When a foe with its sigils dies, they leap to ${Math.max(2, Math.round(2 * k))} nearby foes.`,
+    twist: 'A Runecarver\'s marks outlive their foe: when a marked foe falls, its marks leap to the foes beside it.',
+    text: k => `When a foe with its marks dies, they leap to ${Math.max(2, Math.round(2 * k))} nearby foes.`,
     build: 'Etch and Detonate, in a crowded corner where foes fall together.',
     combo: 'Etch, Detonate and a crowded corner.', fx: (st, k) => wbPw(st, 'wbLexicon', Math.max(2, Math.round(2 * k))) },
   wbl_stormgate: { for: 'storm', name: 'Barding of the Stormgate', icon: 'thunder', hue: '#c8d8ff',
@@ -25353,12 +25297,12 @@ const WB_LEGENDS = {
     combo: 'A post inside the line, Thunder Charge and Skyfall.', fx: (st, k) => wbPw(st, 'rdBarding', 1) },
   wbl_skyrider: { for: 'storm', name: 'Pennon of the Sky-Riders', icon: 'thunder', hue: '#a8c8ff',
     twist: 'Every Stormward lance thrust calls lightning down on every storm rune near it.',
-    text: k => `Each thrust zaps foes at its nearby lightning traps for ${P_(.35 * k)} of its damage.`,
+    text: k => `Each thrust zaps foes on its nearby storm runes for ${P_(.35 * k)} of its damage.`,
     build: 'Thunder Charge and Skyfall to lay storm runes down the road, and Storm Pennant.',
     combo: 'Thunder Charge, Skyfall and Storm Pennant.', fx: (st, k) => wbPw(st, 'wbSkyrider', .35 * k) },
   wbl_hillheart: { for: 'earth', name: 'Heart of the Unmoved Hill', icon: 'mountain', hue: '#d89a50',
     twist: 'Anvil Guard\'s stone runes hold the road: ground foes on them are stunned at every touch, not once in three seconds.',
-    text: k => `Its stone traps stun ground foes on them ${nf1(.2 * k)}s, about every second.`,
+    text: k => `Its stone runes stun ground foes on them ${nf1(.2 * k)}s, about every second.`,
     build: 'Quake Line and Anvil Stance, its every-3rd-slam quake, and a long straight road.',
     combo: 'Quake Line, Anvil Stance and a long straight road.', fx: (st, k) => wbPw(st, 'wbHill', .2 * k) },
   wbl_longoath: { for: 'cannon', name: 'The Long-Oath Ballista', icon: 'target', hue: '#ff9a5a',
@@ -25367,29 +25311,29 @@ const WB_LEGENDS = {
     build: 'Pinning Bolt and Chain Bolt, a long straight road in front of it, and Frostbrand to slow the line.',
     combo: 'Pinning Bolt, Chain Bolt and a long straight road.', fx: (st, k) => wbPw(st, 'wbLongOath', .4 * k) },
   wbl_kingsoath: { for: 'holy', name: "The Last King's Oath", icon: 'halo', hue: '#ffe8a8',
-    twist: 'Every spell your Champion casts makes the whole field\'s ward-lines flare.',
-    text: k => `Champion only: each spell hits foes on or between traps for ${P_(.6 * k)} of its damage and brands them.`,
-    build: 'Champion talents that make its spells cheaper or sooner, Oathstones along the road, and Varic Dunmoor.',
-    combo: 'Champion talents that make its spells cheaper or sooner, and Oathstones along the road.', fx: (st, k) => wbPw(st, 'wbKingsOath', .6 * k) },
+    twist: 'Every spell your Champion casts makes the whole field\'s runes flare.',
+    text: k => `Champion only: each spell flares every rune: foes on one take ${P_(.6 * k)} of its damage and are Exposed.`,
+    build: 'Champion talents that make its spells cheaper or sooner, units laying runes along the road, and Varic Dunmoor.',
+    combo: 'Champion talents that make its spells cheaper or sooner, and units laying runes along the road.', fx: (st, k) => wbPw(st, 'wbKingsOath', .6 * k) },
   // ---- for any unit ----
-  wbl_unbroken: { name: 'The Unbroken Line', icon: 'shield', hue: '#f0c050',
-    twist: 'The ward-lines it stands by never break: their runes do not fade while foes are on the field.',
-    text: () => 'In a wave, nearby traps never fade; foes crossing between them get an extra brand.',
-    build: 'units that lay runes beside it, Oathstones to anchor the lines, and spells that read brands.',
-    combo: 'Oathstones, Rune Cleave and units laying runes beside it.', fx: st => wbPw(st, 'wbUnbroken', 1) },
+  wbl_unbroken: { name: 'The Unbroken Watch', icon: 'shield', hue: '#f0c050',
+    twist: 'The runes it stands by never fade while foes are on the field, and bite deeper when they spring.',
+    text: () => 'In a wave, nearby runes never fade; foes springing them are Exposed once more.',
+    build: 'units that lay runes beside it, and spells that hit Exposed foes harder.',
+    combo: 'Rune Cleave and units laying runes beside it.', fx: st => wbPw(st, 'wbUnbroken', 1) },
   wbl_runecrown: { name: 'Crown of Every Rune', icon: 'nova', hue: '#ffe8a8',
-    twist: 'Its runes carry every kind at once: each one it lays is Bound with the kinds of the units round it.',
-    text: () => 'Its traps gain the effects of all nearby Wardbound units\' traps.',
-    build: 'a knot of different units round it, quick rune-layers, and the woven ward-lines between them.',
-    combo: 'a knot of different units and woven ward-lines.', fx: st => wbPw(st, 'wbCrown', 1) },
-  wbl_brandlord: { name: "Brandmaster's Gauntlet", icon: 'fist', hue: '#e0a040',
-    twist: 'Its strikes brand, and the brands it lays run to five: the deepest-bitten foes on the road.',
-    text: () => 'Every strike brands (Wardbound spells +12% each), stacking to 5, not 3.',
-    build: 'a quick-striking unit beside casters whose spells read brands: Rune Cleave, Frostbite, Detonate.',
+    twist: 'Its runes come in rows: each one it lays brings the runes of the units round it.',
+    text: () => 'Each rune it lays also lays the runes of up to 3 other nearby Wardbound units beside it.',
+    build: 'a knot of different units round it and quick rune-layers.',
+    combo: 'a knot of different units round it.', fx: st => wbPw(st, 'wbCrown', 1) },
+  wbl_brandlord: { name: "Sunbreaker's Gauntlet", icon: 'fist', hue: '#e0a040',
+    twist: 'Its strikes Expose, and the foes it Exposes can be Exposed five times: the deepest-bitten foes on the road.',
+    text: () => 'Every strike Exposes its foe, up to 5 times, not 3.',
+    build: 'a quick-striking unit beside casters whose spells hit Exposed foes harder: Rune Cleave, Frostbite, Detonate.',
     combo: 'a quick-striking unit beside the force\'s casters.', fx: st => { wbPw(st, 'wbBrandAll', 1); wbPw(st, 'wbBrandMax', 2); } },
   wbl_roadscribe: { name: 'Gauntlet of the Road-Scribe', icon: 'rune', hue: '#efe6d0',
     twist: 'Every ability it casts writes the road: each foe it strikes has a rune of its own kind laid under it.',
-    text: () => 'Its abilities set its trap under each foe hit, once a cast.',
+    text: () => 'Its abilities lay its rune under each foe hit, once a cast.',
     build: 'abilities that strike many foes (Ricochet Rite, Rimeline, Quake Line) and units of other kinds beside it.',
     combo: 'abilities that strike many foes, and units of other kinds beside it.', fx: st => wbPw(st, 'wbScribe', 1) },
 };
@@ -25401,19 +25345,19 @@ const WB_SHOP = {
   wbs_visor: { tier: 1, cost: 280, name: 'Gold-Barred Visor', icon: 'lens', hue: '#c8a050', text: () => '', fx: () => {} },
   wbs_flask: { tier: 1, cost: 320, name: "Chaplain's Flask", icon: 'potion', hue: '#efe6d0', text: () => '', fx: () => {} },
   wbs_mantle: { tier: 1, cost: 340, name: 'Gold-Leaf Mantle', icon: 'shield', hue: '#16141a', text: () => '+100% health, and it heals 2% of its health a second.', fx: st => { st.hpM = (st.hpM || 1) * 2; sh(st).regen = Math.max(sh(st).regen, .02); } },
-  wbs_chalk: { tier: 1, cost: 360, name: "Warden's Chalk", icon: 'rune', hue: '#efe6d0', text: () => 'Its hits brand foes, each once every 2s (Wardbound spells +12%).', fx: st => wbPw(st, 'wbChalkHit', 2) },
+  wbs_chalk: { tier: 1, cost: 360, name: "Warden's Chalk", icon: 'rune', hue: '#efe6d0', text: () => 'Its hits Expose foes, each once every 2s.', fx: st => wbPw(st, 'wbChalkHit', 2) },
   wbs_wardhorn: { tier: 2, cost: 1250, name: 'Horn of the Held Road', icon: 'horn', hue: '#f0c050', text: () => '', fx: () => {},
-    act: { name: 'Hold the Line', cd: 60, text: 'Every foe on or between traps takes its damage and a brand; all traps renew.', use: t => wbHornAct(t) } },
+    act: { name: 'Hold the Line', cd: 60, text: 'Every rune flares: foes on one take its damage and are Exposed; all runes renew.', use: t => wbHornAct(t) } },
   wbs_runeblade: { tier: 2, cost: 1500, name: 'Rune-Etched Black Sword', icon: 'swords', hue: '#16141a', text: () => '', fx: () => {} },
 };
 // the taps: Hold the Line (the horn) and Hold (the Warden's Holding-Staff, forces_zzzzzzz_shop.js)
 function wbHornAct(t) {
   const st = t.st || effStats(t), L = wbRunes();
-  if (!L.length && !wbStones().length) { onToast('No rune or ward-line on the field.'); sfx('error'); return false; }
+  if (!L.length) { onToast('No rune on the field.'); sfx('error'); return false; }
   const hit = wbFlare(t, st, 1, { boss: 1 });
   for (const z of L) { z.t = Math.max(z.t, z.life || WB_RUNE.life); }
   flashLight(t.x, t.y, 2, [1.6, 1.25, .6], 4, .3); sfx('horn', 0);
-  onToastSoft(`Hold the line! ${hit.size} foe${hit.size === 1 ? '' : 's'} caught on the wards.`);
+  onToastSoft(`Hold the line! ${hit.size} foe${hit.size === 1 ? '' : 's'} caught on the runes.`);
   return true;
 }
 function wbHoldAct(t) {
@@ -25436,16 +25380,16 @@ const WB_ITEM_IDS = Object.keys(WB_RELICS).concat(Object.keys(WB_CHARMS), Object
 /* =====================================================================================================
    AT WORK
    ===================================================================================================== */
-// field-wide flags, cached per frame: a Crown of the Winter Hall, an Unbroken Line on the field
+// field-wide flags, cached per frame: an Unbroken Watch, a Gilded Rune-Wire, a Sun-Wheel Rivet on the field
 let _wbdG = { t: -1 };
 function wbdGlobals() {
   if (_wbdG.t === G.time && _wbdG.g === G.towers) return _wbdG;
-  const o = { t: G.time, g: G.towers, winter: 0, unbroken: [], wire: [] };
+  const o = { t: G.time, g: G.towers, unbroken: [], wire: [], rivet: 0 };
   for (const t of G.towers) {
     const p = !t.wrecked && wbUnit(t) && wbdP(t); if (!p) continue;
-    if (p.wbWinter > o.winter) { o.winter = p.wbWinter; o.winterBy = t; }
     if (p.wbUnbroken) o.unbroken.push(t);
     if (p.wbWire) o.wire.push(t);
+    if (p.wbRivet) o.rivet = 1;
   }
   return (_wbdG = o);
 }
@@ -25469,7 +25413,7 @@ WB_ONHIT.push((c, st, t, amt) => {
   const p = st.pw, basic = !DTAG;
   if (p) {
     if (p.wbBrandHit && (t.wbdBrN = (t.wbdBrN || 0) + 1) % p.wbBrandHit === 0 && !c.dead) { wbBrand(c, 1, t); wbdGlint(t, 'wbr_searbrand'); }
-    if (p.wbSigHit && (t.wbdSgN = (t.wbdSgN || 0) + 1) % p.wbSigHit === 0 && !c.dead) { wbSigil(c, 1, t); fxSpark(c.x, c.y, hitH(c), WB_COL.sigil, 4); wbdGlint(t, 'wbr_sigilstone'); }
+    if (p.wbSigHit && (t.wbdSgN = (t.wbdSgN || 0) + 1) % p.wbSigHit === 0 && !c.dead && !c.fly) { wbRune(t, st, c.x, c.y, wbdKind(t)); wbdGlint(t, 'wbr_sigilstone'); }
     if (p.wbChalkHit && !c.dead && wbdOnce(c, 'wbdChalkT', p.wbChalkHit)) wbBrand(c, 1, t);
     if (p.wbBrandAll && !c.dead) wbBrand(c, 1, t);
     if (p.wbFletch && basic && wbdIs(t, 'wb_maskedwarden') && !c.dead && wbBrandOf(c) && wbdOnce(c, 'wbdFlT', .5)) { wbBrand(c, 1, t); wbdGlint(t, 'wbr_fletch'); }
@@ -25478,7 +25422,7 @@ WB_ONHIT.push((c, st, t, amt) => {
     if (p.wbChainBolt && basic && wbdIs(t, 'wb_siegewarden') && !c.dead) rootFoe(c, p.wbChainBolt, t);
     if (p.wbScribe && DTAG === AB_TAG && !c.dead && t.ab && c.wbdScribe !== t.ab.lastAt + ':' + t.id) { c.wbdScribe = t.ab.lastAt + ':' + t.id; wbRune(t, st, c.x, c.y, wbdKind(t)); }
   }
-  // the Brand-Seal Ring: the strikes after a cast
+  // the Sun-Seal Ring: the strikes after a cast
   if (basic && t.wbdSealN > 0 && !c.dead) { t.wbdSealN--; wbBrand(c, 1, t); wbRune(t, st, c.x, c.y, wbdKind(t)); }
 });
 
@@ -25518,41 +25462,50 @@ function wbdSkyrider(t, st, k) {
   if (any) wbdGlint(t, 'wbl_skyrider');
 }
 
-/* ---------- rune and ward-line riders ---------- */
+/* ---------- rune riders (wbdSprung: the touch of a rune as it springs) ---------- */
 WB_RUNE_HOOK.push((c, z, kind) => {
   const s = z.src, p = s && G.towers.includes(s) && wbdP(s);
   // Rime-Hook Halberd-Head: frost runes chill more
   if (kind === 'frost' && p && p.wbRime && !c.dead) chill(c, { slow: .25 + p.wbRime, slowT: 2 }, 'frost', s);
   // Heart of the Unmoved Hill: stone runes stagger at every touch
   if (kind === 'stone' && p && p.wbHill && !c.dead) stun(c, p.wbHill, .4, 'earth');
-  // Crown of the Winter Hall: Bound frost runes freeze
-  if (kind === 'frost' && z.bound && !c.dead) { const g = wbdGlobals(); if (g.winter && wbdOnce(c, 'wbdWinT', 4)) { freezeFoe(c, g.winter, g.winterBy); wbdGlint(g.winterBy, 'wbl_winterhall'); } }
-});
-WB_LINE_HOOK.push((c, l) => {
-  const g = wbdGlobals(); if (c.dead) return;
-  const mx = (l.a.x + l.b.x) / 2, mz = (l.a.z + l.b.z) / 2;
-  // Gilded Ward-Wire: a line in the wearer's reach bites
+  // Crown of the Winter Hall: the wearer's frost runes stun in ice as they spring
+  if (kind === 'frost' && p && p.wbWinter && wbdSprung(z) && !c.dead && wbdOnce(c, 'wbdWinT', 4)) { freezeFoe(c, p.wbWinter, s); wbdGlint(s, 'wbl_winterhall'); }
+  if (!wbdSprung(z) || c.dead) return;
+  const g = wbdGlobals();
+  // Gilded Rune-Wire: a rune springing in the wearer's reach bites
   for (const t of g.wire) { const st = t.st; if (!st || Math.hypot(c.x - t.x, c.y - t.y) > (st.range || 2) + .2) continue; wbProc(() => tagged('relic', () => wbHit(t, st, c, (st.dmg || 0) * st.pw.wbWire, 'magic'))); wbdGlint(t, 'wbr_goldwire'); if (c.dead) return; }
-  // the Unbroken Line: one brand more
-  for (const t of g.unbroken) if (Math.hypot(mx - t.x, mz - t.y) <= 2) { wbBrand(c, 1, t); break; }
+  // the Unbroken Watch: Exposed once more
+  for (const t of g.unbroken) if (Math.hypot(z.x - t.x, z.z - t.y) <= 2) { wbBrand(c, 1, t); break; }
 });
 
-/* ---------- the core's runes and detonations, wrapped: runes that take more kinds, wider detonations ---------- */
+/* ---------- the core's runes and bursts of marks, wrapped: runes that last longer, runes in pairs and rows, wider bursts ---------- */
+// the road point `step` points on from a rune's (toward the gate when step > 0), or null when the rune is off the road
+const wbdRoadStep = (r, step) => { const q = wbRoadCell(r.x, r.z), P = wbRoad(), i = q[2] + step; return q[2] >= 0 && Math.hypot(q[0] - r.x, q[1] - r.z) < .1 && P[i] ? P[i] : null; };
+let WBD_IN = 0;
 const _wbdRune = wbRune;
 wbRune = function (t, st, x, z, kind, o) {
-  const r = _wbdRune.apply(this, arguments);
-  const p = r && st && st.pw; if (!p || (!p.wbTwin && !p.wbCrown)) return r;
-  // Twin-Glyph Seal
-  if (p.wbTwin && r.kinds.length < 2) {
-    const o2 = wbRunesNear(r.x, r.z, WB_RUNE.link).filter(q => q !== r).sort((a, b) => Math.hypot(a.x - r.x, a.z - r.z) - Math.hypot(b.x - r.x, b.z - r.z))[0];
-    const k2 = o2 && o2.kinds.find(q => !r.kinds.includes(q)); if (k2) { wbRuneAdd(r, k2); wbdGlint(t, 'wbr_twinglyph'); }
-  }
-  // Crown of Every Rune
-  if (p.wbCrown && t) {
-    let n = 0;
-    for (const u of G.towers) if (u !== t && wbUnit(u) && !u.wrecked && Math.hypot(u.x - t.x, u.y - t.y) <= 2 && n < 3) { const k2 = wbdKind(u); if (!r.kinds.includes(k2)) { wbRuneAdd(r, k2); n++; } }
-    if (n) wbdGlint(t, 'wbl_runecrown');
-  }
+  const n0 = G.hazards.length, r = _wbdRune.apply(this, arguments);
+  // (only a rune newly carved, not one renewed)
+  if (!r || G.hazards.length === n0) return r;
+  // Sun-Wheel Rivet: every new rune lasts longer
+  if (wbdGlobals().rivet) { r.t *= 1.25; r.life = Math.max(r.life, r.t); }
+  // (the runes these items carve themselves carve no more)
+  if (WBD_IN) return r;
+  const p = st && st.pw; if (!p || (!p.wbTwin && !p.wbCrown)) return r;
+  WBD_IN++;
+  try {
+    // Twin-Glyph Seal: a twin one step further down the road
+    if (p.wbTwin) { const q = wbdRoadStep(r, 1); if (q && wbRune(t, st, q[0], q[1], r.kinds[0])) wbdGlint(t, 'wbr_twinglyph'); }
+    // Crown of Every Rune: the runes of the other kinds of unit round it, on the road beside it
+    if (p.wbCrown && t) {
+      const ks = [];
+      for (const u of G.towers) if (u !== t && wbUnit(u) && !u.wrecked && Math.hypot(u.x - t.x, u.y - t.y) <= 2) { const k2 = wbdKind(u); if (k2 !== r.kinds[0] && !ks.includes(k2) && ks.length < 3) ks.push(k2); }
+      let n = 0;
+      ks.forEach((k2, i) => { const q = wbdRoadStep(r, [-1, 1, -2][i]); if (q && wbRune(t, st, q[0], q[1], k2, { noMerge: true })) n++; });
+      if (n) wbdGlint(t, 'wbl_runecrown');
+    }
+  } finally { WBD_IN--; }
   return r;
 };
 const _wbdDet = wbDetonate;
@@ -25590,11 +25543,11 @@ WB_HOOK.tick.push(dt => {
   }
 });
 
-/* ---------- a foe falls: the Notched Gold Tally, the Unwritten Lexicon ---------- */
+/* ---------- a foe falls: the Notched Gold Tally, the Unwritten Lexicon (the Runecarvers' marks) ---------- */
 WB_HOOK.kill.push((c, src) => {
   if (src && wbUnit(src)) { const k = (ivOld('wbc_tally') ? charmK(src, 'wbc_tally') : 0); if (k && src.ab) { gainMana(src, 12 * k); rfx({ k: 'soul', x: c.x, h: hitH(c), z: c.y, t: src, col: '#ffe8a8', life: .5 }); wbdGlint(src, 'wbc_tally'); } }
   const by = c.wbSigBy, p = by && G.towers.includes(by) && wbdP(by), n = wbSigOf(c);
-  // its sigils leap to the foes beside it
+  // its marks leap to the foes beside it
   if (p && p.wbLexicon && n > 0) {
     const L = nearest(c.x, c.y, 1.6, Math.min(n * 2, p.wbLexicon), c, o => !o.phased && !o.ent);
     for (const o of L) { wbSigil(o, 1, by); rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: o, col: WB_COL.sigil, w: .05, life: .3 }); }
@@ -25611,9 +25564,9 @@ WB_HOOK.pulse.push((t, st, dt) => {
     const b = t.charm.base, k = relicK(t.charm);
     // Vigil-Lamp Oil
     if (b === 'wbc_lampoil' && ivOld(b)) A.mana = Math.min(abMax(t), A.mana + kit.mana.regen * .4 * k * dt);
-    if (b === 'wbc_linetoken' && (t.wbdLnChk = (t.wbdLnChk || 0) - dt) <= 0) { t.wbdLnChk = .5; t.wbdLnOn = wbLinesNow().some(l => wbSegD(t.x, t.y, l.a, l.b) <= 1.5); }
+    if (b === 'wbc_linetoken' && (t.wbdLnChk = (t.wbdLnChk || 0) - dt) <= 0) { t.wbdLnChk = .5; t.wbdLnOn = wbRunesNear(t.x, t.y, 1.5).length > 0; }
     if (b === 'wbc_linetoken' && t.wbdLnOn)
-      // Line-Warden's Token
+      // Rune-Warden's Token
       A.mana = Math.min(abMax(t), A.mana + kit.mana.regen * (.6 + .4 * k) * dt);
   }
   const p = st.pw; if (!p || !p.wb) return;
@@ -25632,7 +25585,7 @@ WB_HOOK.pulse.push((t, st, dt) => {
   if (p.wbHorn && (T.ho = (T.ho == null ? 4 : T.ho) - dt) <= 0) {
     if (near(2.55)) {
       T.ho = 15; wbdRenew(t.x, t.y, 2.5, WB_RUNE.life);
-      for (const c of wbdFoes(t.x, t.y, 2.5, c => wbWalks(c) && wbOnLine(c, .35))) { rootFoe(c, p.wbHorn, t); fxRing(c.x, c.y, .35, WB_COL.gold); }
+      for (const c of wbdFoes(t.x, t.y, 2.5, c => wbWalks(c) && wbdOnWard(c))) { rootFoe(c, p.wbHorn, t); fxRing(c.x, c.y, .35, WB_COL.gold); }
       fxRing(t.x, t.y, 2.5, WB_COL.gold); part({ k: 'ring', x: t.x, z: t.y, h: .06, life: .8, max: .8, size: 2.5, col: WB_COL.goldL }); wbdGlint(t, 'wbr_watchhorn', true); sfx('horn', 0);
     } else T.ho = .5;
   }
@@ -25642,7 +25595,7 @@ WB_HOOK.pulse.push((t, st, dt) => {
     if (c) { T.se = 10; wbBrand(c, WB_BRAND.max + (p.wbBrandMax || 0), t); rootFoe(c, p.wbSeal, t); fxRing(c.x, c.y, .5, WB_COL.goldL); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .2, life: .35, max: .35, size: .8, col: WB_COL.gold }); wbdGlint(t, 'wbr_gateseal', true); }
     else T.se = .5;
   }
-  // the Unbroken Line
+  // the Unbroken Watch
   if (p.wbUnbroken && G.phase === 'wave' && (T.ub = (T.ub || 0) - dt) <= 0) { T.ub = .5; if (wbdRenew(t.x, t.y, 2, 1.5)) wbdGlint(t, 'wbl_unbroken'); }
 });
 WB_HOOK.wave.push(() => { for (const t of G.towers) { t.wbdCastN = 0; t.wbdSealN = 0; } });
@@ -25660,7 +25613,7 @@ function wbdOnCast(t, ab, st) {
   if (b === 'wbc_oathknot' && cost > 0) { G.delayed.push({ t: 0, fn: () => gainMana(t, cost * Math.min(.6, .25 * k)) }); wbdGlint(t, b); }
   // Warden's Sandglass
   if (b === 'wbc_sandglass' && ivOld(b)) G.delayed.push({ t: 0, fn: () => { if (A && A.cd[ab.id] > G.time) A.cd[ab.id] = G.time + (A.cd[ab.id] - G.time) / (1 + .25 * k); } });
-  // Brand-Seal Ring
+  // Sun-Seal Ring
   if (b === 'wbc_brandring') { t.wbdSealN = 3; wbdGlint(t, b); }
   // Ivory Rune-Chalk
   if (b === 'wbc_runechalk' && wbRunesNear(t.x, t.y, 2).length) {
@@ -25686,30 +25639,30 @@ function wbdOnCast(t, ab, st) {
      horde presses toward the gate, strikes when it bunches or falters, and wastes nothing (a cast that lands well gives
      mana back).
    - Lord Aedric Solmane, the Sun-Sworn: reckless, all attack. Kills build the army's Momentum; at the top it Blazes,
-     then burns out; his Sunwheel scorches his own Champion; full sun-marks (3 brands) flare white-gold.
-   - Lady Isaura Vell, the Veiled Oath: binding and control. Held foes pay when they break free on a rune or a line.
+     then burns out; his Sunwheel scorches his own Champion; a foe Exposed 3 times flares white-gold under it.
+   - Lady Isaura Vell, the Veiled Oath: binding and control. Held foes pay when they break free on a rune.
    Each: a passive, a spell (spell.cast: in a force run the Champion casts it as its first ability, champQ), a Champion
    gift (its trait: forces_zx_champ_wardbound.js) and a saga in three chapters. The rules run through the core's hook
-   arrays (WB_HOOK, WB_LINE_HOOK, WB_RUNE_HOOK: forces_wardbound_a.js); nothing here edits the core. */
+   arrays (WB_HOOK, WB_RUNE_HOOK: forces_wardbound_a.js; ward-lines were cut on 24 Nov 2026); nothing here edits the core. */
 const WBE_HEROES = [
   { id: 'wb_varic', force: WB_ID, name: 'Varic Dunmoor', title: 'the Last Warden', hue: '#e8a838', glyph: 'sword', role: 'The Wardbound: the line that holds, the blow well timed', quote: 'Patience. Let them come to the line.',
     aff: { glaive: .1, frost: .05, earth: .05, arrow: -.05, storm: -.05 },
-    passive: 'Measured Hand: while foes press past half the road, a ground foe that crosses a ward-line is rooted for 0.4s (once every 4s each); while they hang back, Oathbound runes last half again as long.',
-    spell: { id: 'wb_wardensoath', name: "Warden's Oath", glyph: 'sword', cd: 50, aim: true, r: 1.4, t: 'Varic reads the road and drives his blade in: where foes press toward the gate, every ground foe in the area is rooted for 2s; where they bunch (4 or more) or falter (slowed, rooted or stunned), it strikes them for 30% of a foe’s health instead of 20%. Each is branded twice and six oath runes ring the blade; catching 4 or more gives a third of its mana back.',
+    passive: 'Measured Hand: while foes press past half the road, a ground foe that springs a rune is rooted for 0.4s (once every 4s each); while they hang back, Oathbound runes last half again as long.',
+    spell: { id: 'wb_wardensoath', name: "Warden's Oath", glyph: 'sword', cd: 50, aim: true, r: 1.4, t: 'Varic reads the road and drives his blade in: where foes press toward the gate, every ground foe in the area is rooted for 2s; where they bunch (4 or more) or falter (slowed, rooted or stunned), it strikes them for 30% of a foe’s health instead of 20%. Each is Exposed twice and six oath runes ring the blade; catching 4 or more gives a third of its mana back.',
       cast: (p, R, hp, h) => wbWardensOath(p, R, hp, h) },
-    champ: 'The Last Warden: foes the Champion strikes while they stand on a rune or a ward-line are rooted for 0.6s, each at most once every 3 seconds.',
+    champ: 'The Last Warden: foes the Champion strikes while they stand on a rune are rooted for 0.6s, each at most once every 3 seconds.',
     tree: [] },
   { id: 'wb_aedric', force: WB_ID, name: 'Lord Aedric Solmane', title: 'the Sun-Sworn', hue: '#fff0b8', glyph: 'sun', role: 'The Wardbound: the headlong charge', quote: 'The sun does not wait. Ride!',
     aff: { storm: .1, arcane: .05, arrow: .05, earth: -.05, frost: -.05 },
     passive: 'Momentum: each foe the army slays fires it up (up to 10, fading 4s after the last kill), each 2% faster strikes; at 10 the army Blazes, 25% faster for 4s, then burns out, 15% slower for 3s.',
-    spell: { id: 'wb_sunwheel', name: 'Sunwheel', glyph: 'sun', cd: 45, aim: true, r: 1.6, t: 'A great wheel of runes blazes over the area: every foe there is struck for 18% of a foe’s health (harder for each Momentum, up to half again at 10) and branded; a foe already at 3 brands flares white-gold, struck again and bursting on the foes round it. The runes in it flare down their ward-lines. The blaze scorches the Champion for 8% of its health.',
+    spell: { id: 'wb_sunwheel', name: 'Sunwheel', glyph: 'sun', cd: 45, aim: true, r: 1.6, t: 'A great wheel of runes blazes over the area: every foe there is struck for 18% of a foe’s health (harder for each Momentum, up to half again at 10) and Exposed; a foe already Exposed 3 times flares white-gold, struck again and bursting on the foes round it. The runes in it flare, striking the foes on them. The blaze scorches the Champion for 8% of its health.',
       cast: (p, R, hp, h) => wbSunwheel(p, R, hp, h) },
-    champ: 'Sun-Mark: every 3rd hit of the Champion on a branded foe brands it again and sets it burning for half the hit over 3 seconds; each foe he slays adds a Momentum.',
+    champ: 'Sun-Mark: every 3rd hit of the Champion on an Exposed foe Exposes it again and sets it burning for half the hit over 3 seconds; each foe he slays adds a Momentum.',
     tree: [] },
   { id: 'wb_isaura', force: WB_ID, name: 'Lady Isaura Vell', title: 'the Veiled Oath', hue: '#d8c8ff', glyph: 'chains', role: 'The Wardbound: oaths that bind', quote: 'You gave your word to the road. I only hold you to it.',
     aff: { cannon: .1, frost: .05, glaive: .05, arcane: -.05, arrow: -.05 },
-    passive: 'Broken Vows: a held foe (rooted or stunned) that breaks free on a rune or a ward-line pays for it: struck for 5% of its health (bosses 2%) and branded.',
-    spell: { id: 'wb_oathbind', name: 'Oathbind', glyph: 'chains', cd: 45, aim: true, r: 1.3, t: 'Every ground foe in the area is bound for 4s: rooted for 1.5s, then held to half speed. When the binding ends each pays 12% of a foe’s health, twice that if it stands on a rune or a ward-line.',
+    passive: 'Broken Vows: a held foe (rooted or stunned) that breaks free on a rune pays for it: struck for 5% of its health (bosses 2%) and Exposed.',
+    spell: { id: 'wb_oathbind', name: 'Oathbind', glyph: 'chains', cd: 45, aim: true, r: 1.3, t: 'Every ground foe in the area is bound for 4s: rooted for 1.5s, then held to half speed, and Exposed. When the binding ends each pays 12% of a foe’s health, twice that if it stands on a rune.',
       cast: (p, R, hp, h) => wbOathbind(p, R, hp, h) },
     champ: 'Veil of Oaths: her sweeps root each foe they cut for 0.4s, at most once every 3 seconds each.',
     tree: [] },
@@ -25717,9 +25670,9 @@ const WBE_HEROES = [
 FORCE_HEROES.push(...WBE_HEROES);
 Object.assign(FORCE_SAGAS, {
   wb_varic: { name: 'The Last Watch', lines: ['One warden. One road. One more night.', 'Patience. Let them come to the line.', 'Not one step further. Not one.'],
-    trials: ['The First Ward', 'The Long Line', 'The Unbroken Road'], ev: 'wb_hold', verb: g => `Slay ${g} foes while they are rooted or stand on a ward-line.`, goals: [40, 110, 200],
-    fin: ['The Unbroken Ring', "Warden's Oath always roots, for 3s (was 2s), and its six runes are carved Bound."],
-    evFn: c => c.rootT > G.time - .2 || (typeof wbOnLine === 'function' && wbOnLine(c, .35)) },
+    trials: ['The First Ward', 'The Long Line', 'The Unbroken Road'], ev: 'wb_hold', verb: g => `Slay ${g} foes while they are rooted or stand on a rune.`, goals: [40, 110, 200],
+    fin: ['The Unbroken Ring', "Warden's Oath always roots, for 3s (was 2s), and its six runes last twice as long."],
+    evFn: c => c.rootT > G.time - .2 || wbRunesNear(c.x, c.y, .55).length > 0 },
   wb_aedric: { name: 'The Sun-Sworn Road', lines: ['The banner rises with the sun. Ride!', 'Faster. Harder. Let them see the light.', 'Noon on the last road. No shadow left.'],
     trials: ['First Light', 'The Headlong Charge', 'High Sun'], ev: 'wb_blaze', verb: g => `Slay ${g} foes while the army has 5 or more Momentum, or Blazes.`, goals: [40, 110, 200],
     fin: ['High Noon', 'Sunwheel blazes a second time 1.5s later, at half its strength.'],
@@ -25735,8 +25688,8 @@ const wbeHeroIs = id => typeof G !== 'undefined' && !!G && G.force === WB_ID && 
 const wbeBossK = c => c.def.boss ? .3 : c.def.lead ? .6 : 1;
 // the walkers (no flyers) within r of (x, z)
 const wbeWalkers = (x, z, r) => G.creeps.filter(c => !c.dead && !c.ent && !c.phased && wbWalks(c) && Math.hypot(c.x - x, c.y - z) <= r);
-// is a foe on a rune or a ward-line
-const wbeOnRune = c => wbRunesNear(c.x, c.y, .55).length > 0 || wbOnLine(c, .35);
+// is a foe on a rune
+const wbeOnRune = c => wbRunesNear(c.x, c.y, .55).length > 0;
 // each commander's first-ability id on its Champion (forces_zx_champ_wardbound.js fills it)
 const WBE_CHAMP_Q = {};
 
@@ -25756,10 +25709,9 @@ function wbWardensOath(p, R, hp, h) {
   }
   const src = typeof champSrc === 'function' ? champSrc() : null, st = src ? src.st : null;
   for (let k = 0; k < 6; k++) {
-    const a = k / 6 * TAU, z = wbRune(src, st, p.x + Math.cos(a) * R * .75, p.y + Math.sin(a) * R * .75, 'oath', { road: false, noMerge: true });
-    if (z && fin) wbRuneAdd(z, 'vow');
+    const a = k / 6 * TAU;
+    wbRune(src, st, p.x + Math.cos(a) * R * .75, p.y + Math.sin(a) * R * .75, 'oath', fin ? { road: false, noMerge: true, life: WB_RUNE.life * 2 } : { road: false, noMerge: true });
   }
-  wbS().linesAt = -1;
   // nothing wasted: a cast that catches four or more gives a third of its mana back
   if (L.length >= 4 && src && src.ab && typeof abMax === 'function') {
     const Q = ABIL[WBE_CHAMP_Q.wb_varic]; if (Q) { src.ab.mana = Math.min(abMax(src), src.ab.mana + Q.mana / 3); fxSparkle(src.x, src.y, towerTop(src), h.hue); }
@@ -25803,17 +25755,15 @@ function wbSunwheel(p, R, hp, h, half) {
       part({ k: 'flare', x, z, h: .5, life: .3, max: .3, size: .9, col: '#fffbe8' }); fxRing(x, z, .8, '#fff4d0');
     }
   });
-  // the runes in the wheel flare down their ward-lines: every rune and line linked to one of them
-  const inW = new Set(wbRunesNear(p.x, p.y, R)), L = wbLines().filter(l => inW.has(l.a.rune) || inW.has(l.b.rune));
-  for (const l of L) { if (l.a.rune) inW.add(l.a.rune); if (l.b.rune) inW.add(l.b.rune); }
+  // the runes in the wheel flare: each ground foe on one (and not caught by the wheel itself) is struck and Exposed
+  const inW = new Set(wbRunesNear(p.x, p.y, R));
   if (inW.size) for (const c of G.creeps) {
     if (c.dead || c.ent || c.phased || !wbWalks(c) || hit.has(c)) continue;
-    const on = [...inW].some(z => Math.hypot(c.x - z.x, c.y - z.z) <= z.r * (z.bound ? 1.25 : 1) + .1) || L.some(l => wbSegD(c.x, c.y, l.a, l.b) <= .35);
-    if (!on) continue;
+    if (![...inW].some(z => Math.hypot(c.x - z.x, c.y - z.z) <= z.r + .1)) continue;
     hurt(c, hp * .1 * k * wbeBossK(c), 'magic', HERO_SRC, false, 0, 'fire');
     if (!c.dead) wbBrand(c, 1, null);
   }
-  if (typeof wbFxFlare === 'function') wbFxFlare(L, [...inW], '#fff4d0');
+  if (typeof wbFxFlare === 'function') wbFxFlare([], [...inW], '#fff4d0');
   // reckless: the blaze scorches the Champion who called it (never below a tenth of its health)
   const src = !half && typeof champSrc === 'function' ? champSrc() : null;
   if (src && src.maxHp) src.hp = Math.max(src.maxHp * .1, src.hp - src.maxHp * .08);
@@ -25848,10 +25798,11 @@ function wbOathbind(p, R, hp, h) {
 }
 
 /* ---------- the passives (through the core's hook arrays) ---------- */
-// Varic, Measured Hand: while the horde presses, a walker crossing a ward-line is rooted a moment (once every 4s each)
-WB_LINE_HOOK.push((c, l) => {
-  if (!wbeHeroIs('wb_varic') || c.dead || c.wbHoldT > G.time || !wbePressing()) return;
-  c.wbHoldT = G.time + 4; rootFoe(c, .4, (l.a.rune && l.a.rune.src) || l.a.stone || null);
+// Varic, Measured Hand: while the horde presses, a walker that springs a rune is rooted a moment (once every 4s each)
+// (the core's wbSpring stamps z.spent with the moment it springs before it touches the walkers round it)
+WB_RUNE_HOOK.push((c, z) => {
+  if (!wbeHeroIs('wb_varic') || c.dead || c.wbHoldT > G.time || z.spent !== G.time || !wbePressing()) return;
+  c.wbHoldT = G.time + 4; rootFoe(c, .4, z.src && G.towers.includes(z.src) ? z.src : null);
 });
 // ... and while it hangs back, Oathbound runes last half again as long (the core's wbRune reads st.pw.wbLong)
 WB_HOOK.live.push((t, st) => { if (wbeHeroIs('wb_varic') && t.type === 'glaive' && st && !wbePressing()) st.pw = Object.assign({}, st.pw, { wbLong: Math.max((st.pw && st.pw.wbLong) || 0, .5) }); });
@@ -25864,7 +25815,7 @@ WB_HOOK.live.push((t, st) => {
   else if (M.burnT > G.time) st.rate *= 1 + WBE_MOM.burn;
   else if (M.t > G.time && M.n) st.rate /= 1 + WBE_MOM.per * M.n;
 });
-// Isaura, Broken Vows: a held foe that breaks free on a rune or a ward-line pays
+// Isaura, Broken Vows: a held foe that breaks free on a rune pays
 WB_HOOK.tick.push(() => {
   if (!wbeHeroIs('wb_isaura')) return;
   for (const c of G.creeps) {
@@ -26539,9 +26490,9 @@ const WB_MODEL_UNITS = ['wb_oathbound', 'wb_maskedwarden', 'wb_frostbrand', 'wb_
    changing it (forces_wardbound_a.js):
    - ground runes (hazards k 'wb_rune'), quiet until they act (owner: "appear, flash, affect the unit stepping on it, then
      disappear"): the kind's own glyph (WBG_GLYPH) etches in on the road and fades to a dim mark, a thin gold outline with
-     no glow; when a foe springs it the glyph flashes up (a Bound rune flashes both its kinds' glyphs) and fades away;
-   - ward-lines (wbLinesNow): thin, faint gold lines on the road that pulse only when a walker crosses them;
-   - brands (wbBrandOf): 1-3 small gold slashes floating over the foe; sigils (wbSigOf): 1-3 violet glyphs turning round it;
+     no glow; when a foe springs it the glyph flashes up and fades away;
+   - (ward-lines were cut on 24 Nov 2026: wbgLines is kept but no longer called)
+   - Exposed by the runes (wbBrandOf): 1-3 small gold slashes floating over the foe; the Runecarvers' marks (wbSigOf): 1-3 violet glyphs turning round it;
    - the things in flight (wbS().P): the Glaive Wardens' glaive (the gold-and-ivory mesh of forces_wardbound_f.js
      spinning flat, a faint rune glow, fading gold threads between the foes it ricochets through), the thrown blade, the
      ballista bolt (black iron, an ember trail), the quake's crack running along the road;
@@ -26900,7 +26851,6 @@ function wbgDrawField() {
     else if (z.k === 'wb_zone' && z.t > 0 && !z.noDraw) wbgZone(z, now);
   }
   if (G.state === 'play' || G.state === 'over') {
-    wbgLines(wbLinesNow(), now);
     wbgMarks(now);
     wbgFlights(now);
     wbgTethers(now);
@@ -30938,19 +30888,19 @@ function chVaricAnim(kind, o) {
 /* ---------- Varic Dunmoor, the Last Warden ---------- */
 champAdd('wb_varic', { force: 'wardbound', he: 'he', glyph: 'sword', k: 1.6,
   unit: { id: 'ch_varic', name: 'Varic Dunmoor, the Last Warden', short: 'Varic', proj: 'force', attack: 'chWardenCut', dmgType: 'phys', air: false, ground: true, top: [1.55, 1.65, 1.75],
-    blurb: 'The Last Warden. His wide cut on the ground foe beside him catches the one next to it too, and carves an oath rune into the road. Foes he strikes on a rune or a ward-line are rooted. Cannot reach flyers.',
+    blurb: 'The Last Warden. His wide cut on the ground foe beside him catches the one next to it too, and carves an oath rune into the road. Foes he strikes on a rune are rooted. Cannot reach flyers.',
     tiers: [{ dmg: 32, rate: 1.1, range: 1.55 }, { dmg: 74, rate: 1.05, range: 1.6 }, { dmg: 170, rate: 1, range: 1.7 }] },
-  trait: { name: 'The Last Warden', t: 'Foes he strikes while they stand on a rune or a ward-line are rooted for 0.6s, each at most once every 3 seconds.' },
+  trait: { name: 'The Last Warden', t: 'Foes he strikes while they stand on a rune are rooted for 0.6s, each at most once every 3 seconds.' },
   hit(c, st, t) { if (!c.dead && !c.fly && !(c.wbWardT > G.time) && wbeOnRune(c)) { c.wbWardT = G.time + 3; rootFoe(c, .6, t); } },
   kit: { mana: { max: 130, regen: 1.1, hit: .7 }, abilities: [
     champQ('wb_varic', { id: 'ch_wardensoath', name: "Warden's Oath", short: 'Oath', glyph: 'sword', hue: '#e8a838', art: 'wb_wardensoath', mana: 90, cd: 18, school: 'holy', pref: 'grouped', qs: 3, qf: .2,
       blurb: 'He reads the road: roots the ground foes where they press, strikes harder where they bunch or falter, rings the blade with oath runes.',
-      text: (t, st, ab) => `Varic reads the road and drives his blade into a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} to each ground foe there (half again where they bunch or falter), rooted 2s where they press toward the gate; each is branded twice and six oath runes ring the blade. Catching 4 or more gives a third of its mana back.`,
+      text: (t, st, ab) => `Varic reads the road and drives his blade into a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} to each ground foe there (half again where they bunch or falter), rooted 2s where they press toward the gate; each is Exposed twice and six oath runes ring the blade. Catching 4 or more gives a third of its mana back.`,
       anim: chVaricAnim('plant', { T: 1.15, tip: ['sword', [0, -.5, 0]], col: [1.4, .95, .4] }) }),
     { id: 'ch_holdfast', name: 'Hold Fast', short: 'Hold', glyph: 'shield', hue: '#d89a40', mana: 90, cd: 14, research: CH_WB_RS, school: 'holy', pref: 'first',
       by: { dur: [5, 5, 5, 6, 6, 6], mult: [.35, .38, .41, .44, .47, .5] },
-      auto: 'two or more ground foes in reach, or a boss', blurb: 'He stands braced: ground foes on the runes or ward-lines in his reach are rooted and struck.',
-      text: (t, st, ab) => `He stands braced for ${byT(ab.by.dur, t)}s: every half second each ground foe in his reach (${gNf(abReach(t, st, ab))} cells) standing on a rune or a ward-line is struck for ${xD(st, byT(ab.by.mult, t))} and rooted 0.6s (once every 2s each). Ground foes off the runes are left alone.`,
+      auto: 'two or more ground foes in reach, or a boss', blurb: 'He stands braced: ground foes on the runes in his reach are rooted and struck.',
+      text: (t, st, ab) => `He stands braced for ${byT(ab.by.dur, t)}s: every half second each ground foe in his reach (${gNf(abReach(t, st, ab))} cells) standing on a rune is struck for ${xD(st, byT(ab.by.mult, t))} and rooted 0.6s (once every 2s each). Ground foes off the runes are left alone.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? t : null; },
       cast(t, st, _, ab) { abZone(t, { k: 'ch_holdfast', x: t.x, z: t.y, r: abReach(t, st, ab), at: G.time, until: G.time + byT(ab.by.dur, t), tick: 0, every: .5 }); fxRing(t.x, t.y, abReach(t, st, ab), ab.hue); sfx('quake', .5); },
       zone(t, st, z) {
@@ -30964,14 +30914,13 @@ champAdd('wb_varic', { force: 'wardbound', he: 'he', glyph: 'sword', k: 1.6,
       anim: chVaricAnim('guard', { T: 1.0, tip: ['sword', [0, -.5, 0]], col: [1.3, .9, .4] }) },
     { id: 'ch_lastgate', name: 'The Last Gate', short: 'Gate', glyph: 'statue', hue: '#f0c050', mana: 130, cd: 22, research: CH_WB_RS, school: 'holy', pref: 'first',
       by: { n: [4, 4, 5, 5, 6, 6], mult: [1.6, 1.8, 2, 2.2, 2.4, 2.6] },
-      auto: 'two or more ground foes in reach, or a boss', blurb: 'A line of Bound oath runes across the road nearest the gate, flaring at once.',
-      text: (t, st, ab) => `He carves ${byT(ab.by.n, t)} Bound oath runes along the road in his reach nearest the gate; a moment later they flare: each ground foe on them takes ${xD(st, byT(ab.by.mult, t))}, is rooted 1s and branded. If they catch no one, half its mana comes back.`,
+      auto: 'two or more ground foes in reach, or a boss', blurb: 'A line of oath runes across the road nearest the gate, flaring at once.',
+      text: (t, st, ab) => `He carves ${byT(ab.by.n, t)} oath runes along the road in his reach nearest the gate; a moment later they flare: each ground foe on them takes ${xD(st, byT(ab.by.mult, t))}, is rooted 1s and Exposed. If they catch no one, half its mana comes back.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) && chPathNear(t.x, t.y, abReach(t, st, ab)).length ? t : null; },
       cast(t, st, _, ab) {
         const pts = [], n = byT(ab.by.n, t), m = byT(ab.by.mult, t);
         for (const p of chPathNear(t.x, t.y, abReach(t, st, ab))) { if (pts.length >= n) break; if (pts.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) >= .55)) pts.push(p); }
-        for (const p of pts) { const z = wbRune(t, st, p[0], p[1], 'oath'); if (z) wbRuneAdd(z, 'stone'); }
-        wbS().linesAt = -1;
+        for (const p of pts) wbRune(t, st, p[0], p[1], 'oath');
         G.delayed.push({ t: .35, fn: () => {
           if (!wbchLive(t)) return; const s = t.st || st; let hit = 0;
           abAoe(() => { for (const c of G.creeps) { if (c.dead || c.ent || c.phased || !wbWalks(c) || !pts.some(p => Math.hypot(c.x - p[0], c.y - p[1]) <= .5)) continue; hit++; wbchHit(t, s, c, m, 'magic'); if (!c.dead) { rootFoe(c, 1, t); wbBrand(c, 1, t); } } });
@@ -30991,15 +30940,15 @@ champAdd('wb_varic', { force: 'wardbound', he: 'he', glyph: 'sword', k: 1.6,
     CT('Shield Brothers', 'shield', 3, 1, 1, "With 2 or more Oathbound within 2 cells of him, Warden's Oath and Hold Fast cost 25% less.", {}, { sp: [{ ab: 'ch_wardensoath', at: 'near', near: { slot: 'glaive', n: 2, r: 2 }, cost: -.25 }, { ab: 'ch_holdfast', at: 'near', near: { slot: 'glaive', n: 2, r: 2 }, cost: -.25 }] }),
     GS('ch_holdfast', 1, 3),
     CT('Long Vigil', 'hourglass', 2, 3, 2, n => `Hold Fast stands ${n}s longer.`, {}, { sp: n => ({ ab: 'ch_holdfast', by: { dur: n } }), req: [1, 3] }),
-    CT('Heavy Hand', 'snail', 2, 0, 2, n => `The six oath runes of Warden's Oath are carved Bound with stone${n >= 2 ? ' and pin' : ''}.`, {}, { cap: 'wbfHeavyHand' }),
+    CT('Heavy Hand', 'snail', 2, 0, 2, n => `Warden's Oath carves its runes as stone runes, which stun in place of the slow${n >= 2 ? ', every other one a pin rune, which roots' : ''}.`, {}, { cap: 'wbfHeavyHand' }),
     CT('Shared Watch', 'echo', 2, 2, 1, 'Each Hold Fast steadies the line: every unit within 1.6 cells of him gains 15 mana.', {}, { sp: { ab: 'ch_holdfast', ally: 15 } }),
     // (capstones reworked 7 Nov 2026, owner: "worthy of a capstone", 3 at most; their code: forces_zzzzzzzzz_caps_wardbound.js)
     CT('The Gate Holds', 'rocks', 4, 0, 1, 'The Last Gate carves 2 more runes, and they flare again each second for 3s after: each ground foe on them takes a third as much and is rooted 0.5s.', {}, { sp: { ab: 'ch_lastgate', by: { n: 2 } }, cap: 'wbkGateHolds', req: [3, 0] }),
-    CT('The Road Remembers', 'mountain', 4, 3, 1, 'A ground foe slain on a rune or a ward-line within 2.5 cells of him leaves a Bound oath rune (oath and stone) where it fell: the road he holds grows with every kill.', {}, { cap: 'wbkRoadRem' }),
+    CT('The Road Remembers', 'mountain', 4, 3, 1, 'A ground foe slain on a rune within 2.5 cells of him leaves a stone rune where it fell: the road he holds grows with every kill.', {}, { cap: 'wbkRoadRem' }),
     CT('Steady Pace', 'quick', 3, 3, 2, n => `Each Warden's Oath that catches 4 or more ground foes brings Hold Fast ${4 * n}s nearer.`, {}, { sp: { ab: 'ch_holdfast', rider: { wbf: 1 } }, cap: 'wbfPace' }),
     CT('Last Warden', 'sword', 4, 2, 1, "The Last Gate calls his knights: every Oathbound within 2.5 cells of him drives its sword down with it, striking each ground foe within 0.8 cells of it as the runes do, and each Last Gate brings Warden's Oath 8s nearer.", {}, { sp: { ab: 'ch_lastgate', ready: ['ch_wardensoath', 8] }, cap: 'wbkLastWarden' }),
     GS('ch_lastgate', 3, 0),
-    CT('Held to Account', 'eye', 1, 1, 2, n => `Each ground foe his cuts root on a rune or a ward-line restores ${3 * n} mana.`, {}, { cap: 'wbfAccount' }),
+    CT('Held to Account', 'eye', 1, 1, 2, n => `Each ground foe his cuts root on a rune restores ${3 * n} mana.`, {}, { cap: 'wbfAccount' }),
     CT('Old Discipline', 'quick', 1, 0, 3, n => `A ground foe in his reach that springs one of his oath runes takes ${20 * n}% of his cut from him.`, {}, { cap: 'wbfDiscipline' }),
   ] },
   flavor: ['Varic fights in person: the last warden of the last road.', 'Patience. Let them come to the line.'], emblem: 'Last Warden',
@@ -31010,18 +30959,18 @@ champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
   unit: { id: 'ch_aedric', name: 'Lord Aedric Solmane, the Sun-Sworn', short: 'Aedric', proj: 'force', attack: 'wbLance', dmgType: 'magic', air: false, ground: true, top: [1.7, 1.8, 1.9],
     blurb: 'The young high lord. His lance thrusts at a ground foe in reach and its light chains on to more foes, flyers too, leaving a storm rune. He presses hard, and pays for it.',
     tiers: [{ dmg: 30, rate: 1.4, range: 2, chain: 2 }, { dmg: 70, rate: 1.35, range: 2.1, chain: 3 }, { dmg: 165, rate: 1.3, range: 2.2, chain: 3 }] },
-  trait: { name: 'Sun-Mark', t: 'Every 3rd hit of his on a branded foe brands it again and sets it burning for half the hit over 3s; each foe he slays adds a second Momentum.' },
+  trait: { name: 'Sun-Mark', t: 'Every 3rd hit of his on an Exposed foe Exposes it again and sets it burning for half the hit over 3s; each foe he slays adds a second Momentum.' },
   hit(c, st, t, amt) { if (c.dead || !(wbBrandOf(c) > 0) || (t.wbSunN = (t.wbSunN || 0) + 1) % 3) return; wbBrand(c, 1, t); ignite(c, amt * .5 / 3, 3, t); fxSpark(c.x, c.y, hitH(c), '#fff4c8', 4); },
   kill() { if (typeof wbeMomAdd === 'function') wbeMomAdd(1); },
   kit: { mana: { max: 130, regen: 1.1, hit: .7 }, abilities: [
     champQ('wb_aedric', { id: 'ch_sunwheel', name: 'Sunwheel', short: 'Sun', glyph: 'sun', hue: '#fff0b8', art: 'wb_sunwheel', mana: 100, cd: 16, school: 'holy', pref: 'grouped', qs: 3, qf: .18,
-      blurb: 'A wheel of runes blazes over an area; foes at 3 brands flare white-gold. It scorches him too.',
-      text: (t, st, ab) => `A wheel of runes blazes over a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} to each foe there (harder for each Momentum) and a brand; a foe already at 3 brands flares white-gold, struck again and bursting on the foes round it. The runes in it flare down their ward-lines. It scorches him for 8% of his health.`,
+      blurb: 'A wheel of runes blazes over an area; foes Exposed 3 times flare white-gold. It scorches him too.',
+      text: (t, st, ab) => `A wheel of runes blazes over a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} to each foe there (harder for each Momentum), and each is Exposed; a foe already Exposed 3 times flares white-gold, struck again and bursting on the foes round it. The runes in it flare, striking the foes on them. It scorches him for 8% of his health.`,
       anim: chAnim('sky', { T: 1.1, tip: ['main', [0, .1, .85]], col: [1.8, 1.6, 1] }) }),
     { id: 'ch_suncharge', name: 'Sun Charge', short: 'Charge', glyph: 'sunburst', hue: '#ffe6a0', mana: 90, cd: 12, research: CH_WB_RS, school: 'holy', pref: 'first', w: .45,
       by: { len: [3, 3, 3.2, 3.2, 3.5, 3.5], mult: [1.8, 2, 2.2, 2.4, 2.6, 2.8] },
       auto: 'a line through two or more ground foes in reach, or a boss', blurb: 'He charges headlong down a line of ground foes, then rides winded a moment.',
-      text: (t, st, ab) => `He charges ${gNf(byT(ab.by.len, t))} cells headlong through a line of ground foes: each takes ${xD(st, byT(ab.by.mult, t))} and a brand. Winded after, his strikes come 20% slower for 3s.`,
+      text: (t, st, ab) => `He charges ${gNf(byT(ab.by.len, t))} cells headlong through a line of ground foes: each takes ${xD(st, byT(ab.by.mult, t))} and is Exposed. Winded after, his strikes come 20% slower for 3s.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); if (!L.length) return null; const b = abBestLine(t, st, L, byT(ab.by.len, t), ab.w, abWalker); return b && (b.n >= (man ? 1 : 2) || abBig(b.c)) ? b.c : null; },
       cast(t, st, c, ab) {
         const [ux, uz] = abDir(t, c), len0 = byT(ab.by.len, t), len = typeof rideLen === 'function' ? rideLen(t, ux, uz, len0) : len0, m = byT(ab.by.mult, t), T = .75;   // (a unit or wall in its way stops it short)
@@ -31037,8 +30986,8 @@ champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
       anim: chAnim('thrust', { T: 1.0, tip: ['main', [0, .1, .85]], col: [1.8, 1.5, .9] }) },
     { id: 'ch_blazeglory', name: 'Blaze of Glory', short: 'Blaze', glyph: 'flame', hue: '#ffd27a', mana: 120, cd: 24, research: CH_WB_RS, school: 'holy', pref: 'grouped',
       by: { dur: [6, 6, 6, 7, 7, 7], mult: [1.2, 1.35, 1.5, 1.65, 1.8, 2] },
-      auto: 'three or more foes in reach, or a boss', blurb: 'A burst of sunlight, then he strikes far faster, branding every foe he hits, until he burns out.',
-      text: (t, st, ab) => `A burst of sunlight strikes every foe in his reach for ${xD(st, byT(ab.by.mult, t))} and brands it; for ${byT(ab.by.dur, t)}s he strikes 60% faster and every strike brands its foe. Then he burns out: 30% slower for 4s.`,
+      auto: 'three or more foes in reach, or a boss', blurb: 'A burst of sunlight, then he strikes far faster, Exposing every foe he hits, until he burns out.',
+      text: (t, st, ab) => `A burst of sunlight strikes every foe in his reach for ${xD(st, byT(ab.by.mult, t))} and Exposes it; for ${byT(ab.by.dur, t)}s he strikes 60% faster and every strike Exposes its foe. Then he burns out: 30% slower for 4s.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); return L.length && (man || L.length >= 3 || L.some(abBig)) ? t : null; },
       cast(t, st, _, ab) {
         const m = byT(ab.by.mult, t), d = byT(ab.by.dur, t);
@@ -31049,12 +30998,12 @@ champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
       anim: chAnim('channel', { T: 1.1, tip: ['main', [0, .1, .85]], col: [1.9, 1.7, 1.1], size: .45 }) },
   ] },
   tree: { name: "The Sun's Charge", hue: '#fff0b8', list: [
-    CT('Eager Sun', 'sun', 0, 3, 2, n => `Each foe Sunwheel flares white-gold (3 brands) brings it ${n}s nearer.`, {}, { cap: 'wbfEager' }),
+    CT('Eager Sun', 'sun', 0, 3, 2, n => `Each foe Sunwheel flares white-gold (Exposed 3 times) brings it ${n}s nearer.`, {}, { cap: 'wbfEager' }),
     CT('Sunlit Reach', 'spyglass', 0, 1, 2, n => `His lance reaches ${gNf(.15 * n)} cells farther while the army has 5 or more Momentum.`, {}, { cap: 'wbfSunlit' }),
     CT('Sun\'s Due', 'sunburst', 0, 2, 2, n => `A Sunwheel that catches 3 or more foes scorches him ${n >= 2 ? 'not at all' : 'half as much'}.`, {}, { cap: 'wbfSunDue' }),
     CT('Into the Fray', 'banner', 3, 1, 1, 'Sunwheel and Sun Charge each give back 3% of their mana for every Momentum the army has as he casts.', {}, { sp: { ab: 'ch_suncharge', rider: { wbf: 1 } }, cap: 'wbfFray' }),
     GS('ch_suncharge', 1, 3),
-    CT('Sun-Struck Trail', 'wings', 2, 3, 2, n => `Sun Charge leaves a storm rune under each ground foe it strikes${n >= 2 ? ', Bound with oath' : ''}.`, {}, { sp: { ab: 'ch_suncharge', rider: { wbf: 1 } }, cap: 'wbfTrail', req: [1, 3] }),
+    CT('Sun-Struck Trail', 'wings', 2, 3, 2, n => `Sun Charge leaves a storm rune under each ground foe it strikes${n >= 2 ? ', lasting twice as long' : ''}.`, {}, { sp: { ab: 'ch_suncharge', rider: { wbf: 1 } }, cap: 'wbfTrail', req: [1, 3] }),
     CT('Searing Wheel', 'flame', 2, 0, 2, n => `Sunwheel sets every foe it strikes burning: ${gNf(.3 * n)}× his damage a second for 3s.`, {}, { sp: n => ({ ab: 'ch_sunwheel', rider: { burn: .3 * n } }) }),
     CT('Rallying Cry', 'horn', 2, 2, 1, 'Each Sun Charge fires up the army: 2 Momentum.', {}, { sp: { ab: 'ch_suncharge', rider: { wbf: 1 } }, cap: 'wbfRally' }),
     CT('Undying Blaze', 'sunburst', 4, 0, 1, 'Blaze of Glory\'s burst sets every foe it strikes burning (0.3× his damage a second for 3s), each foe he slays while it blazes keeps it going 1s longer (6s at most), and it ends in a second burst instead of a burnout.', {}, { sp: { ab: 'ch_blazeglory', rider: { burn: .3 } }, cap: 'wbkUndying', req: [3, 0] }),
@@ -31074,7 +31023,7 @@ WB_HOOK.live.push((t, st) => {
   else if (t.wbGloryBurnT > G.time) st.rate *= 1.3;
   if (t.wbWearyT > G.time) st.rate *= 1.2;
 });
-// while it Blazes, every strike brands its foe
+// while it Blazes, every strike Exposes its foe
 WB_ONHIT.push((c, st, t) => { if (t && t.wbGloryT > G.time && t.def.unit === 'ch_aedric' && !c.dead) wbBrand(c, 1, t); });
 
 /* ---------- Lady Isaura Vell, the Veiled Oath ---------- */
@@ -31087,12 +31036,12 @@ champAdd('wb_isaura', { force: 'wardbound', he: 'she', glyph: 'chains', k: 1.6,
   kit: { mana: { max: 130, regen: 1.1, hit: .6 }, abilities: [
     champQ('wb_isaura', { id: 'ch_oathbind', name: 'Oathbind', short: 'Bind', glyph: 'chains', hue: '#d8c8ff', art: 'wb_oathbind', mana: 90, cd: 16, school: 'arcane', pref: 'grouped', qs: 3, qf: .12,
       blurb: 'Binds every ground foe in an area for 4 seconds; when it ends, each pays, twice on a rune.',
-      text: (t, st, ab) => `Every ground foe in a ${gNf(champQR(t, ab))}-cell area is bound for 4s: rooted 1.5s, then held to half speed, and branded. When the binding ends each pays ${champQx(t, st, ab)}, twice that if it stands on a rune or a ward-line.`,
+      text: (t, st, ab) => `Every ground foe in a ${gNf(champQR(t, ab))}-cell area is bound for 4s: rooted 1.5s, then held to half speed, and Exposed. When the binding ends each pays ${champQx(t, st, ab)}, twice that if it stands on a rune.`,
       anim: chAnim('channel', { T: 1.15, tip: ['main', [0, -.55, .05]], col: [1.2, 1.05, 1.6] }) }),
     { id: 'ch_bindsweep', name: 'Binding Sweep', short: 'Sweep', glyph: 'snare', hue: '#e8dcff', mana: 90, cd: 13, research: CH_WB_RS, school: 'arcane', pref: 'grouped',
       by: { root: [1, 1, 1.1, 1.1, 1.2, 1.2], mult: [1.4, 1.55, 1.7, 1.85, 2, 2.15] },
-      auto: 'two or more ground foes in reach, or a boss', blurb: 'A wide sweep: every ground foe in her reach is struck and rooted, a branded one twice as long.',
-      text: (t, st, ab) => `A wide sweep round her: every ground foe in her reach takes ${xD(st, byT(ab.by.mult, t))} and is rooted ${gNf(byT(ab.by.root, t))}s, a branded one twice as long.`,
+      auto: 'two or more ground foes in reach, or a boss', blurb: 'A wide sweep: every ground foe in her reach is struck and rooted, an Exposed one twice as long.',
+      text: (t, st, ab) => `A wide sweep round her: every ground foe in her reach takes ${xD(st, byT(ab.by.mult, t))} and is rooted ${gNf(byT(ab.by.root, t))}s, an Exposed one twice as long.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab), abWalker); return L.length && (L.length >= (man ? 1 : 2) || L.some(abBig)) ? t : null; },
       cast(t, st, _, ab) {
         const m = byT(ab.by.mult, t), r = byT(ab.by.root, t);
@@ -31114,7 +31063,7 @@ champAdd('wb_isaura', { force: 'wardbound', he: 'she', glyph: 'chains', k: 1.6,
       anim: chAnim('point', { T: 1.0, tip: ['off', [-.03, -.12, .14]], col: [1.2, 1.05, 1.6], size: .3 }) },
   ] },
   tree: { name: 'The Kept Vow', hue: '#d8c8ff', list: [
-    CT('Ready Vow', 'chains', 0, 3, 2, n => `Each ground foe that breaks free of a hold while on a rune or a ward-line brings Oathbind ${n}s nearer.`, {}, { cap: 'wbfReadyVow' }),
+    CT('Ready Vow', 'chains', 0, 3, 2, n => `Each ground foe that breaks free of a hold while on a rune brings Oathbind ${n}s nearer.`, {}, { cap: 'wbfReadyVow' }),
     CT('Silent Vow', 'spyglass', 0, 1, 2, n => `A ground foe her sweeps root can't strike your units for ${n}s.`, {}, { cap: 'wbfSilent' }),
     CT('Vow Carved', 'web', 0, 2, 2, n => `Oathbind carves an oath rune under each of the ${2 * n} ground foes it binds nearest the gate.`, {}, { cap: 'wbfVowCarve' }),
     CT('Witness of Vows', 'chains', 3, 1, 1, 'With 2 or more held foes in her reach (rooted or stunned), Oathbind and Binding Sweep cost 25% less.', {}, { sp: [{ ab: 'ch_oathbind', at: 'foes', foes: { n: 2, cond: 'held' }, cost: -.25 }, { ab: 'ch_bindsweep', at: 'foes', foes: { n: 2, cond: 'held' }, cost: -.25 }] }),
@@ -31122,10 +31071,10 @@ champAdd('wb_isaura', { force: 'wardbound', he: 'she', glyph: 'chains', k: 1.6,
     CT('Tighter Bonds', 'snare', 2, 3, 2, n => `Binding Sweep roots ${gNf(.15 * n)}s longer.`, {}, { sp: n => ({ ab: 'ch_bindsweep', by: { root: .15 * n } }), req: [1, 3] }),
     CT('Heavy Vow', 'shards', 2, 0, 2, n => `Oathbind strips ${2 * n} armour from every foe it binds for 5s.`, {}, { sp: n => ({ ab: 'ch_oathbind', rider: { shred: [2 * n, 2 * n] } }) }),
     CT('Shared Vow', 'echo', 2, 2, 1, 'Each Binding Sweep lends the line her binding: every other Wardbound unit within 1.6 cells of her roots the next ground foe it strikes for 0.5s.', {}, { sp: { ab: 'ch_bindsweep', rider: { wbf: 1 } }, cap: 'wbfLend' }),
-    CT('Turned Twice', 'scales', 4, 0, 1, 'Oath Turned brands every foe it strikes and turns again a moment later: the toughest ground foe it struck is turned on the ground foes round it, at half strength.', {}, { sp: { ab: 'ch_oathturned', rider: { wbBrand: 1 } }, cap: 'wbkTurnTwice', req: [3, 0] }),
-    CT('Sworn Road', 'rune', 4, 3, 1, 'Binding Sweep carves an oath rune under every ground foe it roots, and brands twice a ground foe already standing on a rune.', {}, { cap: 'wbkSwornRoad' }),
+    CT('Turned Twice', 'scales', 4, 0, 1, 'Oath Turned Exposes every foe it strikes and turns again a moment later: the toughest ground foe it struck is turned on the ground foes round it, at half strength.', {}, { sp: { ab: 'ch_oathturned', rider: { wbBrand: 1 } }, cap: 'wbkTurnTwice', req: [3, 0] }),
+    CT('Sworn Road', 'rune', 4, 3, 1, 'Binding Sweep carves an oath rune under every ground foe it roots, and Exposes twice a ground foe already standing on a rune.', {}, { cap: 'wbkSwornRoad' }),
     CT('Quiet Step', 'quick', 3, 3, 2, n => `For ${2 * n}s after each Oathbind, her sweeps root the ground foes they cut without the 3-second wait.`, {}, { cap: 'wbfQuiet' }),
-    CT('Veiled Oath', 'eye', 4, 2, 1, 'The ground foes Oath Turned roots are bound for 4s, held to half speed; when the binding ends each pays its toll again, twice on a rune or a ward-line. Each Oath Turned also brings Oathbind 8s nearer.', {}, { sp: { ab: 'ch_oathturned', ready: ['ch_oathbind', 8] }, cap: 'wbkVeiled' }),
+    CT('Veiled Oath', 'eye', 4, 2, 1, 'The ground foes Oath Turned roots are bound for 4s, held to half speed; when the binding ends each pays its toll again, twice on a rune. Each Oath Turned also brings Oathbind 8s nearer.', {}, { sp: { ab: 'ch_oathturned', ready: ['ch_oathbind', 8] }, cap: 'wbkVeiled' }),
     GS('ch_oathturned', 3, 0),
     CT('Vow\'s Reckoning', 'moon', 1, 1, 2, n => `Each ground foe slain while rooted within her reach restores ${3 * n} mana.`, {}, { cap: 'wbfVowReck' }),
     CT('Measured Sweeps', 'quick', 1, 0, 3, n => `The other ground foes her sweep cuts take ${70 + 10 * n}% of it instead of 70% when they are rooted.`, {}, { cap: 'wbfMeasured' }),
@@ -36993,9 +36942,9 @@ const IPROC_ITEMS = [
   ['stormborn', 'sb_x_gustfletch', 'Gust-Bound Fletching', 'feather', '#c8b088', 'wind', 'as range|Gust-Bound', ['spell', 'arrow', 'sb_galearrow', 'shove']],
   ['stormborn', 'sb_x_packfang', 'Pack-Leader\'s Fang', 'antler', '#9a8a7a', 'hunt', 'dmg as|Pack-Leader', ['spell', 'glaive', 'sb_pounce', 'reset']],
   // ---- the Wardbound ----
-  ['wardbound', 'wb_x_brandfire', 'Brand-Fire Vambrace', 'ember', '#e0a040', 'brands', 'dmg as|Brand-Fire', ['hit', 'burn', 4]],
+  ['wardbound', 'wb_x_brandfire', 'Sun-Fire Vambrace', 'ember', '#e0a040', 'burns', 'dmg as|Sun-Fire', ['hit', 'burn', 4]],
   ['wardbound', 'wb_x_blacksteel', 'Black-Steel Knuckles', 'fist', '#3a3a44', 'black steel', 'dmg pen|Black Steel', ['hit', 'shred', 3]],
-  ['wardbound', 'wb_x_flarehilt', 'Gilded Flare-Hilt', 'sun', '#f0c050', 'ward-lines', 'sp cd|Gilded Flare', ['spell', 'glaive', 'wb_wardflare', 'echo']],
+  ['wardbound', 'wb_x_flarehilt', 'Gilded Flare-Hilt', 'sun', '#f0c050', 'runes', 'sp cd|Gilded Flare', ['spell', 'glaive', 'wb_wardflare', 'echo']],
   ['wardbound', 'wb_x_tealstring', 'Teal-Rune Grip-Wrap', 'glaive', '#bff4ec', 'glaives', 'as crit|Teal Rune', ['spell', 'arrow', 'wb_runevolley', 'arc', .3]],
   ['wardbound', 'wb_x_gaoler', "Gaoler's Bolt-Case", 'arrowhead', '#ff9a5a', 'pins', 'dmg pen|Gaoler', ['spell', 'cannon', 'wb_pinbolt', 'reset']],
 ];
@@ -37096,10 +37045,10 @@ const MN_ITEMS = [
     (st, k) => { st.mnTithe = Math.max(st.mnTithe || 0, k); }],
   // ---- the Wardbound ----
   ['wardbound', 'wb_m_inkwell', 'Gilded Inkwell', 2, 'vial', '#f0c050', 'mana2 regen|Ink of Oaths',
-    k => `At full mana, every 3rd hit marks the foe for harder spells and leaves a road trap.`,
+    k => `At full mana, every 3rd hit Exposes the foe and lays its rune under it.`,
     (st, k) => { st.mnWbInk = 1; st.ipr = st.ipr || []; }],
   ['wardbound', 'wb_m_breath', 'Reliquary of Sworn Breath', 3, 'halo', '#ffe8a8', 'mana sp|Sworn Breath',
-    k => `Every 100 mana spent, nearby road traps flare: foes on them take ${P_(1.5 * k)} and are marked for harder spells.`,
+    k => `Every 100 mana spent, runes within 3 cells flare: foes on them take ${P_(1.5 * k)} and are Exposed.`,
     (st, k) => { st.mnBreath = Math.max(st.mnBreath || 0, k); }],
 ];
 for (const [force, id, name, rar, icon, hue, stats, text, fx] of MN_ITEMS) {
@@ -38660,7 +38609,7 @@ const FSETS = [
     tempest(t) { fsReady(t, null, 999); fsGlint(t, this); },
     hit(t, c, amt, sp, n) { if (n >= 2 && sp && !c.dead && !(c.sbHexT > G.time) && sbLevel() >= 2) sbHex(c, t, 3, .2); } },
 
-  /* ---------------- the Wardbound: runes, ward-lines, brands, sigils ---------------- */
+  /* ---------------- the Wardbound: runes, foes Exposed, the Runecarvers' marks ---------------- */
   { id: 'fs_wboath', spells: ['wb_swordplant', 'wb_wardflare'], force: 'wardbound', unit: 'glaive', name: 'Panoply of the Sworn Gate',
     pieces: [['fs_wb_hilt', 'Oathsworn Gold Hilt', 3, 'sword', '#f0c050', 'dmg pen'], ['fs_wb_mantle', 'Rosette Mantle', 3, 'banner', '#16141a', 'as crit']],
     old: [['fs_wb_greathelm', 'Sun-Crested Greathelm', 3, 'halo', '#e8c870', 'dmg as pen']],
@@ -38670,7 +38619,7 @@ const FSETS = [
   { id: 'fs_wbcarve', spells: ['wb_etch', 'wb_detonate'], force: 'wardbound', unit: 'arcane', name: 'Regalia of the Ivory Scriptorium',
     pieces: [['fs_wb_stylus', 'Gold Stylus-Blade', 3, 'rune', '#f0c050', 'sp mana'], ['fs_wb_tomechain', 'Chained Ivory Tome', 3, 'chain', '#efe6d0', 'as sp']],
     old: [['fs_wb_inkseal', 'Violet Ink-Seal', 3, 'eye', '#d8b8ff', 'sp as cd']],
-    b2: 'Etch lays a sigil rune on the road under each foe it carves. Each foe Detonate strikes brings Etch 1s nearer (up to 4s a cast) and is carved with 1 fresh sigil.',
+    b2: 'Etch lays its rune on the road under each foe it marks. Each foe Detonate strikes brings Etch 1s nearer (up to 4s a cast) and is carved with 1 fresh mark.',
     hit(t, c, amt, sp, n) {
       if (sp === 'wb_etch' && !c.dead && c.fsWbEtch !== t.ab.lastAt) { c.fsWbEtch = t.ab.lastAt; wbRune(t, t.st, c.x, c.y, 'sigil'); }
       if (n < 2 || sp !== 'wb_detonate') return;
@@ -38681,7 +38630,7 @@ const FSETS = [
   { id: 'fs_wbvigil', spells: [], force: 'wardbound', unit: null, name: 'Tokens of the Night Vigil',
     pieces: [['fs_wb_vigilring', 'Ring of the Night Vigil', 3, 'ring', '#f0c050', 'sp regen'], ['fs_wb_lamp', 'Warden’s Ivory Lamp', 3, 'sun', '#efe6d0', 'mana regen']],
     old: [['fs_wb_oathbook', 'Book of Kept Oaths', 3, 'rune', '#e8c870', 'sp mana cd']],
-    b2: 'When a wearer casts a spell, it lays a rune of its own kind on the road nearest it. Vigil: each spell a wearer casts lights a candle every wearer shares (3 to light). When the third is lit, every foe within 3 cells of a wearer is branded twice, and every other wearer’s spells come 3s nearer.',
+    b2: 'When a wearer casts a spell, it lays a rune of its own kind on the road nearest it. Vigil: each spell a wearer casts lights a candle every wearer shares (3 to light). When the third is lit, every foe within 3 cells of a wearer is Exposed twice, and every other wearer’s spells come 3s nearer.',
     // (redesigned 23 Nov 2026, set meters: was "a wearer's spells brand every foe they strike, and each cast that brands a foe
     // brings every other wearer's spells 1s nearer", spread over every cast with nothing to show it)
     cast(t, ab, tg, n) {
@@ -40320,7 +40269,7 @@ const FS_NEW = [
   ['wardbound', 'wbs_penance', 2, 1, 'Iron Penance-Links', 'chain', '#8a8e96', 'dmg=3 pen=6|Atonement', fsProc('shred', 3, 1)],
   ['wardbound', 'wbs_rimeguard', 2, 2, 'Rime-Edged Vambrace', 'snowflake', '#bfe6ff', 'sp=6 as=6|Rime Edge', fsProc('chill', 4, 1)],
   ['wardbound', 'wbs_holdstaff', 3, 1, "Warden's Holding-Staff", 'rune', '#f0c050', 'sp=10 mana=20|', { text: () => '', fx: () => {},
-    act: { name: 'Hold', cd: 45, text: 'Roots nearby ground foes for 1.5s and brands them.', use: t => wbHoldAct(t) } }],
+    act: { name: 'Hold', cd: 45, text: 'Roots nearby ground foes for 1.5s and Exposes them.', use: t => wbHoldAct(t) } }],
 ];
 for (const [force, id, rar, ilv, name, icon, hue, stats, rule] of FS_NEW) {
   SHOP[id] = Object.assign({ id, force, rar, ilv, tier: rar >= 3 ? 2 : 1, name, icon, hue }, rule);
@@ -41184,7 +41133,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_wb_mask', epic: 1, spells: ['wb_runevolley', 'wb_piercingshaft'], force: 'wardbound', unit: 'arrow', name: 'Raiment of the Golden Mask',
     pieces: [['fe_wb_blackbow', 'Gold-and-Ivory War-Glaive', 3, 'glaive', '#ffe8a8', 'dmg crit'], ['fe_wb_goldmask', 'Golden Face-Mask', 3, 'eye', '#f0c050', 'as range']],
     old: [['fe_wb_tealquiver', 'Teal-Rune Glaive-Baldric', 3, 'glaive2', '#bff4ec', 'dmg as pen'], ['fe_wb_fletchcharm', 'Ivory Grip-Charm', 3, 'feather', '#efe6d0', 'regen mana']],
-    b2: 'Ricochet Rite brands every foe it strikes. A Ricochet Rite that strikes 4 or more foes casts Returning Oath at once, free (at most once every 10s).',
+    b2: 'Ricochet Rite Exposes every foe it strikes. A Ricochet Rite that strikes 4 or more foes casts Returning Oath at once, free (at most once every 10s).',
     hit(t, c, amt, sp, n) {
       if (sp !== 'wb_runevolley' || c.dead) return;
       wbBrand(c, 1, t);
@@ -41196,14 +41145,14 @@ if (typeof fsetAdd === 'function') {
       }
     } });
 
-  /* ---------- Frostbrand: what Frostbite freezes stays bound ---------- */
+  /* ---------- Frostbrand: what Frostbite freezes leaves frost behind ---------- */
   fsetAdd({ id: 'fe_wb_rime', epic: 1, spells: ['wb_rimeline', 'wb_frostbite'], force: 'wardbound', unit: 'frost', name: 'Mantle of the White Watch',
     pieces: [['fe_wb_rimehalberd', 'Rime-Gilt Halberd', 3, 'snowflake', '#bfe6ff', 'sp pen'], ['fe_wb_ivoryfur', 'Ivory Fur Mantle', 3, 'shield', '#efe6d0', 'sp regen']],
     old: [['fe_wb_frostcrown', 'Frost-Wreathed Circlet', 3, 'halo', '#e8f6ff', 'sp cd range'], ['fe_wb_icetoken', 'Token of the Long Winter', 3, 'gem', '#cfeeff', 'mana cd']],
-    b2: 'Rimeline brands every ground foe it slows. Each Frostbite brings Rimeline 4s nearer, and every ground foe it stuns in ice leaves a frost rune Bound with oath where it stands.',
+    b2: 'Rimeline Exposes every ground foe it slows. Each Frostbite brings Rimeline 4s nearer, and every ground foe it stuns in ice leaves a frost rune where it stands.',
     hit(t, c, amt, sp, n) {
       if (sp === 'wb_rimeline' && !c.dead) wbBrand(c, 1, t);
-      if (n >= 2 && sp === 'wb_frostbite' && c.fsWbRime !== t.ab.lastAt) { c.fsWbRime = t.ab.lastAt; const z = wbRune(t, t.st, c.x, c.y, 'frost'); if (z) wbRuneAdd(z, 'oath'); }
+      if (n >= 2 && sp === 'wb_frostbite' && c.fsWbRime !== t.ab.lastAt) { c.fsWbRime = t.ab.lastAt; wbRune(t, t.st, c.x, c.y, 'frost'); }
     },
     cast(t, ab, tg, n) { if (n >= 2 && ab.id === 'wb_frostbite') { fsReady(t, 'wb_rimeline', 4); fsGlint(t, this); } } });
 
@@ -41211,7 +41160,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_wb_script', epic: 1, spells: ['wb_etch', 'wb_detonate'], force: 'wardbound', unit: 'arcane', name: 'Vestments of the Last Scriptorium',
     pieces: [['fe_wb_goldstylus', 'Stylus of Beaten Gold', 3, 'rune', '#f0c050', 'sp mana'], ['fe_wb_tome', 'Gilt-Clasped Tome', 3, 'scales', '#efe6d0', 'sp cd']],
     old: [['fe_wb_inkrobe', 'Ink-Violet Robe', 3, 'stars', '#d8b8ff', 'sp regen range'], ['fe_wb_sealcharm', 'Wax-Seal Charm', 3, 'ring', '#c04a3a', 'mana regen']],
-    b2: 'Each Etch brings Detonate 2s nearer. Each Detonate lays a sigil rune under every foe it strikes, and a foe slain by Detonate passes 2 sigils to the foe nearest it within 2 cells.',
+    b2: 'Each Etch brings Detonate 2s nearer. Each Detonate lays its rune under every foe it strikes, and a foe slain by Detonate passes 2 marks to the foe nearest it within 2 cells.',
     cast(t, ab) { if (ab.id === 'wb_etch') { fsReady(t, 'wb_detonate', 2); fsGlint(t, this); } },
     hit(t, c, amt, sp, n) {
       if (n < 2 || sp !== 'wb_detonate') return;
@@ -41235,7 +41184,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_wb_hill', epic: 1, spells: ['wb_shieldwall', 'wb_quakeline'], force: 'wardbound', unit: 'earth', name: 'Regalia of the Iron Hill',
     pieces: [['fe_wb_runeshield', 'Great Rune-Girdle', 3, 'rune', '#d89a50', 'dmg splash'], ['fe_wb_bronzemail', 'Bronze-Scaled Hauberk', 3, 'shield', '#b8884a', 'dmg as']],
     old: [['fe_wb_hillcrown', 'Crown of the Iron Hill', 3, 'mountain', '#c8a050', 'dmg pen splash'], ['fe_wb_stonecharm', 'Stone of the Held Road', 3, 'gem', '#d8c098', 'regen cd']],
-    b2: 'Shield Wall brands every ground foe it strikes. Each Shield Wall sends a quake 3 cells along the road both ways, laying stone runes, and Quake Line comes 4s nearer.',
+    b2: 'Shield Wall Exposes every ground foe it strikes. Each Shield Wall sends a quake 3 cells along the road both ways, laying stone runes, and Quake Line comes 4s nearer.',
     hit(t, c, amt, sp) { if (sp === 'wb_shieldwall' && !c.dead) wbBrand(c, 1, t); },
     cast(t, ab, tg, n) {
       if (n < 2 || ab.id !== 'wb_shieldwall') return;
@@ -41247,7 +41196,7 @@ if (typeof fsetAdd === 'function') {
   fsetAdd({ id: 'fe_wb_siege', epic: 1, spells: ['wb_pinbolt', 'wb_runeshot', 'wb_chainbolt'], force: 'wardbound', unit: 'cannon', name: 'Fittings of the Black Ballista',
     pieces: [['fe_wb_ironbow', 'Black-Iron Bow-Arms', 3, 'target', '#3a3a44', 'dmg crit'], ['fe_wb_goldwinch', 'Gold-Runed Winch', 3, 'hammer', '#f0c050', 'as range']],
     old: [['fe_wb_crewcoat', 'Red-Brown Crew Coat', 3, 'shield', '#8a4a3a', 'dmg as pen'], ['fe_wb_pincharm', 'Pin-Iron Charm', 3, 'arrowhead', '#ff9a5a', 'cd regen']],
-    b2: 'Pinning Bolt brands every foe it roots twice. Each Pinning Bolt brings Rune Shot 3s nearer, and each Rune Shot casts Chain Bolt at once, free (at most once every 12s).',
+    b2: 'Pinning Bolt Exposes every foe it roots, twice over. Each Pinning Bolt brings Rune Shot 3s nearer, and each Rune Shot casts Chain Bolt at once, free (at most once every 12s).',
     hit(t, c, amt, sp) { if (sp === 'wb_pinbolt' && !c.dead) wbBrand(c, 2, t); },
     cast(t, ab, tg, n) {
       if (n < 2) return;
@@ -43107,14 +43056,14 @@ function sbcHuntOn(t) {
    holds the code the spell-mod system (sp) can't express. It loads after every other forces_* file, so the spells are
    their final selves; each wrap keeps the original and calls it. Every cap is prefixed wbk and read through talentHas.
    - Oathbound: Oath Fulfilled (Final Oath ends in a flare of the oath runes), Shared Oath (the line can't be Wounded)
-   - Glaive Wardens: Twin Wards (a second Warding Glaive, the two linked), Lodestar (the great rune pulses down its lines)
+   - Glaive Wardens: (Twin Wards and Lodestar: cut with the ward-lines, 24 Nov 2026)
    - Frostbrand: Hoarfrost (Frostbite reaches every frost rune near it)
-   - Runecarvers: The Last Word (the great sigil rune detonates the carved as it fades)
+   - Runecarvers: The Last Word (the great rune bursts the marked as it fades)
    - Lancers: Second Thunder (Skyfall strikes again; its kills leave storm runes)
    - Anvil Guard: Unmoving (struck-back walkers send quakes), Breaking Stance (Shield Wall as the stance ends)
    - Siege Wardens: Unbroken Chain (Chain Bolt's chain leaps on), Kept Runes (Rune Shot spends no rune)
    - Vowkeepers: Sanctuary (Sworn Vow shelters the units round it), Hallowed Road (the renewed runes strike)
-   - Varic: The Gate Holds (the Gate flares again), Last Warden (his Oathbound strike with it), The Road Remembers
+   - Varic: The Gate Holds (the Gate flares again), Last Warden (his Oathbound strike with it), The Road Remembers (a stone rune where a foe falls)
    - Aedric: Undying Blaze (kills keep it going, a second burst), Sun-Sworn (charges while it blazes), Open Road (a fire trail)
    - Isaura: Turned Twice (a second turning), Veiled Oath (the rooted are bound and pay again), Sworn Road (oath runes)
    Glaive of Judgement, Oathfire and Mountain's Weight are read in forces_wardbound_b.js, Runesight there too.
@@ -43140,56 +43089,8 @@ wbkWrap('wb_laststand', 'cast', function (c0, t, st, tg, ab) {
   return r;
 });
 
-/* ---------- Glaive Wardens: Twin Wards, Lodestar ---------- */
-// the great rune a Warding Glaive has just driven in nearest (x, z)
-const wbkGreat = (x, z) => wbRunes().filter(q => q.wbBeacon > G.time && q.born === G.time).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0] || null;
-wbkWrap('wb_wardarrow', 'cast', function (c0, t, st, p, ab) {
-  const r = c0.call(this, t, st, p, ab); if (r === false || !p) return r;
-  const z1 = wbkGreat(p.x, p.y);
-  if (z1 && wbkHas(t, 'wbkLodestar')) { z1.wbkStar = t; z1.wbkStarT = wbkAt(1.5); }
-  if (false && wbkHas(t, 'wbkTwinWard') && !t.wbkTwin) {   /* (Twin Wards throws Returning Oath twice since 21 Nov 2026: forces_zzz..._chains.js) */
-    const L = abFoes(t, st, abReach(t, st, ab), abWalker).filter(c => Math.hypot(c.x - p.x, c.y - p.y) >= 1.5).sort((a, b) => (a.remain || 0) - (b.remain || 0));
-    if (L[0]) {
-      const q = { x: L[0].x, y: L[0].y };
-      t.wbkTwin = 1; try { c0.call(this, t, st, q, ab); } finally { t.wbkTwin = 0; }
-      const z2 = wbkGreat(q.x, q.y);
-      if (z1 && z2 && z1 !== z2) { z1.wbkTwin = z2; z2.wbkTwin = z1; wbS().linesAt = -1; }
-    }
-  }
-  return r;
-});
-// the twin great runes link to each other at any distance
-{
-  const l0 = wbLinesNow;
-  wbLinesNow = function () {
-    const S = wbS(), fresh = !(S.linesAt >= 0 && G.time - S.linesAt < .25), prev = S.lines, out = l0();
-    if (!fresh) return out;
-    for (const z of wbRunes()) {
-      const q = z.wbkTwin; if (!q || !(q.t > 0) || !(z.wbBeacon > G.time) || z.seed > q.seed) continue;
-      if (out.some(l => (l.a.rune === z && l.b.rune === q) || (l.a.rune === q && l.b.rune === z))) continue;
-      const key = 'wbk' + z.seed + ':' + q.seed, old = prev.find(l => l.key === key), pt = o => ({ x: o.x, z: o.z, kinds: o.kinds, rune: o });
-      const woven = z.kinds.some(k => !q.kinds.includes(k)) || q.kinds.some(k => !z.kinds.includes(k));
-      out.push({ a: pt(z), b: pt(q), woven, key, beacon: 1, seen: old ? old.seen : new Map() });
-    }
-    S.lines = out; return out;
-  };
-}
-// Lodestar: the great rune pulses every 1.5s down the ward-lines linked to it (talent clarity, 10 Nov 2026: no pin, no brand; a quicker pulse)
-WB_HOOK.tick.push(() => {
-  for (const z of G.hazards) {
-    if (z.k !== 'wb_rune' || !z.wbkStar || !(z.t > 0) || !(z.wbBeacon > G.time) || G.time < z.wbkStarT) continue;
-    z.wbkStarT = wbkAt(1.5); const t = z.wbkStar;
-    if (!wbkLive(t)) { z.wbkStar = null; continue; }
-    const s = t.st || effStats(t), L = wbLinesNow().filter(l => l.a.rune === z || l.b.rune === z); if (!L.length) continue;
-    abRun('wb_wardarrow', () => abAoe(() => {
-      for (const c of G.creeps) {
-        if (c.dead || c.ent || c.phased || !wbWalks(c) || !L.some(l => wbSegD(c.x, c.y, l.a, l.b) <= .35)) continue;
-        wbHit(t, s, c, s.dmg, 'phys');
-      }
-    }));
-    if (typeof wbFxFlare === 'function') wbFxFlare(L, [z], WB_COL.teal);
-  }
-});
+/* ---------- Glaive Wardens: (Twin Wards and Lodestar were cut with the ward-lines, 24 Nov 2026: their talents are
+   Twin Wards and Glaive Storm now, in forces_zzz..._chains.js and forces_zzzzzzzzzzz_own_wardbound.js) ---------- */
 
 /* ---------- Frostbrand Sentries: Hoarfrost ---------- */
 wbkWrap('wb_frostbite', 'cast', function (c0, t, st, L, ab) {
@@ -43199,7 +43100,7 @@ wbkWrap('wb_frostbite', 'cast', function (c0, t, st, L, ab) {
   abAoe(() => {
     for (const c of G.creeps) {
       if (c.dead || c.ent || c.phased || got.has(c) || !abWalker(c) || !canTarget(t, st, c)) continue;
-      if (!Z.some(z => Math.hypot(c.x - z.x, c.y - z.z) <= z.r * (z.bound ? 1.25 : 1) + .1)) continue;
+      if (!Z.some(z => Math.hypot(c.x - z.x, c.y - z.z) <= z.r + .1)) continue;
       freezeFoe(c, d, t); wbHit(t, st, c, st.dmg * WBC.bite.m, 'magic');
       if (G.state === 'play') fxShards(c.x, c.y, hitH(c), 4);
     }
@@ -43289,7 +43190,7 @@ WB_HOOK.kill.push(c => {
         if (c.dead || c.phased || c.ent || Math.hypot(c.x - rn.x, c.y - rn.z) > WBC.runeshot.near) continue; const n = hits.get(c) || 0; if (n >= WBC.runeshot.most) continue; hits.set(c, n + 1);
         wbHit(t, s, c, s.dmg * m, 'magic'); if (!c.dead) wbTouch(c, rn);
       } });
-      rn.t = Math.max(rn.t, rn.life || WB_RUNE.life); wbS().linesAt = -1;
+      rn.t = Math.max(rn.t, rn.life || WB_RUNE.life);
       fxRing(rn.x, rn.z, WBC.runeshot.near, col); fxSpark(rn.x, rn.z, .2, col, 6);
       if (i === 0) { G.shake = Math.max(G.shake, .1); sfx('quake', .5); }
     } }));
@@ -43357,7 +43258,8 @@ WB_HOOK.kill.push(c => {
   if (!wbOn() || !c || c.fly) return;
   const t = G.towers.find(o => o.def && o.def.unit === 'ch_varic' && !o.wrecked);
   if (!t || Math.hypot(c.x - t.x, c.y - t.y) > 2.5 || !wbkHas(t, 'wbkRoadRem') || !wbeOnRune(c)) return;
-  const z = wbRune(t, t.st, c.x, c.y, 'oath'); if (z) wbRuneAdd(z, 'stone');
+  // (it left a Bound oath-and-stone rune; Bound runes are cut, 24 Nov 2026: a stone rune now)
+  wbRune(t, t.st, c.x, c.y, 'stone');
 });
 
 /* ---------- Aedric: Undying Blaze, Sun-Sworn, Open Road ---------- */
@@ -43417,7 +43319,6 @@ wbkWrap('ch_bindsweep', 'cast', function (c0, t, st, tg, ab) {
   const L = abFoes(t, st, abReach(t, st, ab), abWalker).filter(c => !c.ent && !c.phased);
   const r = c0.call(this, t, st, tg, ab); if (r === false) return r;
   for (const c of L) { if (c.dead || !(c.rootT > G.time)) continue; wbRune(t, t.st || st, c.x, c.y, 'oath'); }
-  wbS().linesAt = -1;
   return r;
 });
 
@@ -46337,7 +46238,7 @@ const wbfCd = (t, id, s) => { const A = t && t.ab; if (A && A.cd && A.cd[id] > G
 
 /* ---------- one look at every Wardbound hit: armour and wards a talent cuts through, and what the foe was before ----------
    WBF_PRE: fn(t, st, c, type) -> [armourPen, magicPen] added for this hit only (on the unit's live stats, which hurt reads).
-   c.wbfPre: the foe's state just before the hit (its brands, sigils, chill, freeze, root), for the riders below.
+   c.wbfPre: the foe's state just before the hit (Exposed (br), the Runecarvers' marks (sig), chill, freeze, root), for the riders below.
    wbfRec(t, fn): runs fn and returns the hits t landed in it, each with that state. */
 const WBF_PRE = [];
 let WBF_REC = null;
@@ -46371,16 +46272,13 @@ if (typeof SP_RIDE !== 'undefined') SP_RIDE.wbf = () => {};
 WBF_PRE.push((t, st, c) => {
   if (!wbNotSpell()) return null;
   const C = st.caps;
-  // Oathbreaker's Due: a walker that crossed a ward-line in the last 3s
-  if (C.wbfDue && t.type === 'glaive' && c.wbfLineAt > G.time - 3) return [.15 * C.wbfDue, 0];
+  // (Oathbreaker's Due read the ward-lines: cut with them, 24 Nov 2026; its place is Sweeping Cut, forces_zzzzzzzzzzz_own_wardbound.js)
   // Heavy Bolts: bosses, leaders and elites
   if (C.wbfHeavy && t.type === 'cannon' && wbBig(c)) return [.15 * C.wbfHeavy, 0];
   return null;
 });
 // Ward-Cutting Script: twice as deep on a foe carved with a sigil (flicks and spells; the first half is its stat line)
 WBF_PRE.push((t, st, c) => (st.caps.wbfWardCut && t.type === 'arcane' && wbSigOf(c) > 0 ? [0, .05 * st.caps.wbfWardCut] : null));
-// the ward-line crossings Oathbreaker's Due reads
-WB_LINE_HOOK.push(c => { c.wbfLineAt = G.time; });
 
 /* ---------- a trap rune springing: Oath Kept, Creeping Rime, Old Discipline ---------- */
 {
@@ -46699,9 +46597,8 @@ wbfWrap('wb_rite', function (c0, t, st, tg, ab) {
   const r = c0.call(this, t, st, tg, ab); if (r === false || !wbCap(st, 'wbfLongRite')) return r;
   for (const z of wbRunesNear(t.x, t.y, abReach(t, st, ab))) {
     if (z.kinds.includes('vow') || z.kinds.includes('oath')) continue;
-    z.life = Math.max(z.life, WB_RUNE.life); z.t = Math.max(z.t, WB_RUNE.life); wbRuneAdd(z, 'vow');
+    z.life = Math.max(z.life, WB_RUNE.life); z.t = Math.max(z.t, WB_RUNE.life);
   }
-  wbS().linesAt = -1;
   return r;
 });
 
@@ -46764,7 +46661,8 @@ WB_ONHIT.push((c, st, t) => {
       if (C.wbfShatter && !c.dead && c.rootT > G.time) { c.shred = Math.max(c.shredT > 0 ? c.shred || 0 : 0, 2 * C.wbfShatter); c.shredT = Math.max(c.shredT || 0, 5); }
       break;
     case 'ch_suncharge':   // Sun-Struck Trail (Aedric)
-      if (C.wbfTrail && !c.fly) { const z = wbRune(t, st, c.x, c.y, 'storm'); if (z && C.wbfTrail >= 2) wbRuneAdd(z, 'oath'); }
+      // (rank 2 made it Bound with oath; Bound runes are cut, 24 Nov 2026: the rune lasts twice as long instead)
+      if (C.wbfTrail && !c.fly) wbRune(t, st, c.x, c.y, 'storm', C.wbfTrail >= 2 ? { life: WB_RUNE.life * 2 } : {});
       break;
   }
 });
@@ -46805,7 +46703,9 @@ if (typeof wbWardensOath === 'function') {
     const r = w0(p, R, hp, h);
     if (r === false || !src || !src.st) return r;
     const hh = wbCap(src.st, 'wbfHeavyHand');
-    if (hh) for (const z of G.hazards) if (z.k === 'wb_rune' && z.src === src && z.born === G.time && z.kinds.includes('oath')) { wbRuneAdd(z, 'stone'); if (hh >= 2) wbRuneAdd(z, 'pin'); }
+    // (it made them Bound with stone, and pin at rank 2; Bound runes are cut, 24 Nov 2026: they are carved as stone runes, every
+    // other one a pin rune at rank 2, so they stun or root in place of the oath runes' slow)
+    if (hh) { let k = 0; for (const z of G.hazards) if (z.k === 'wb_rune' && z.src === src && z.born === G.time && z.kinds.includes('oath')) z.kinds = [hh >= 2 && k++ % 2 ? 'pin' : 'stone']; }
     const sp = wbCap(src.st, 'wbfPace');
     if (sp && n0 >= 4) G.delayed.push({ t: 0, fn: () => wbfCd(src, 'ch_holdfast', 4 * sp) });
     return r;
@@ -46898,7 +46798,7 @@ wbfWrap('ch_bindsweep', function (c0, t, st, tg, ab) {
   for (const o of G.towers) if (o !== t && !o.wrecked && wbUnit(o) && Math.hypot(o.x - t.x, o.y - t.y) <= 1.6) o.wbfLendN = Math.min(2, wbCap(st, 'wbfLend'));
   return r;
 });
-// Ready Vow: a walker breaking free of a hold on a rune or a ward-line
+// Ready Vow: a walker breaking free of a hold on a rune
 WB_HOOK.tick.push(() => {
   const s = typeof wbeHeroIs === 'function' && wbeHeroIs('wb_isaura') ? wbfChamp('ch_isaura') : null, n = s ? wbfC(s, 'wbfReadyVow') : 0;
   if (!n) return;
@@ -49751,11 +49651,11 @@ const TAL_TAGS = {
   Elements:  { col: '#c49aff', ic: 'M6 1l5 5-5 5-5-5z', say: 'element marks and reactions', force: 'conclave' },
   Heat:      { col: '#ff9a3a', ic: 'M6 1c2 3 4 4 4 7a4 4 0 0 1-8 0c0-2 1.5-3 2-4.5.8 1.5 1.5 2 2 2.5.5-2 0-3.5 0-5z', say: 'heat and vents', force: 'ironhold' },
   Storm:     { col: '#fff27a', ic: 'M7 1L2 7h3.5l-1 4L10 4.8H6.5z', say: 'the Storm meter and its weather', force: 'stormborn' },
-  Runes:     { col: '#f0c050', ic: 'M3 1h2v4l3-4h2.2L6.6 6l3.6 5H8L5 7v4H3z', say: 'runes, ward-lines and brands', force: 'wardbound' },
+  Runes:     { col: '#f0c050', ic: 'M3 1h2v4l3-4h2.2L6.6 6l3.6 5H8L5 7v4H3z', say: 'runes on the road and the foes they Expose', force: 'wardbound' },
 };
 const TAL_FORCE_TAG = { grove: 'Growth', silver: 'Judgement', conclave: 'Elements', ironhold: 'Heat', stormborn: 'Storm', wardbound: 'Runes' };
 const TAL_FORCE_RE = { grove: /\b(Growth|Bloom)/, silver: /\b(Judge|Judgement)/, conclave: /\b(element|reaction|Arcane Charge|Shatter|Encase|Magma|Overload)/i,
-  ironhold: /\b(heat|vents?|vented)\b/i, stormborn: /\b(Storm meter|the Storm|Gale|Rain|Hail|Tempest|soaked)\b/, wardbound: /\b(runes?|ward-lines?|brand(s|ed)?|sigils?)\b/i };
+  ironhold: /\b(heat|vents?|vented)\b/i, stormborn: /\b(Storm meter|the Storm|Gale|Rain|Hail|Tempest|soaked)\b/, wardbound: /\b(runes?|Exposed?|Exposes)\b/i };
 // a talent's tag: its own (the plain-text files set one on every force talent), else read from what it does
 function talTag(t, force) {
   if (!t) return 'Damage';
@@ -51117,8 +51017,9 @@ talPlain('silver', 'champ:so_judge', {
 /* ================= THE WARDBOUND: plain talent text (talent clarity, owner 10 Nov 2026) =================
    The owner: "talents are little bit too conditional, lots of if x then y ... people will be playing in a flow state and
    want to just quickly figure out what a talent does and pick it". Every Wardbound talent here gets one plain line: the
-   result first, one effect, at most one condition and one word a new player must look up (brand, sigil, ward-line,
-   rooted ...), and a tag from TAL_TAGS (Runes is the force's own: runes, ward-lines, brands and sigils).
+   result first, one effect, at most one condition and one word a new player must look up (Exposed, rooted ...), and
+   a tag from TAL_TAGS (Runes is the force's own: the runes on the road and the foes they Expose; 24 Nov 2026: brands are
+   Exposed, sigils the Runecarvers' marks, ward-lines and Bound runes cut).
    talPlain (forces_zzzzzzzzzzzzzzzzz_spread.js) swaps the words in; the names, places, ranks and list order stay.
    Where a talent did two or three things its rule was cut to the core one and the lost part folded into it:
    - here (sp): Sword and Stone and Charge Through brand once more a rank (no Bound stone, no storm runes); the
@@ -51134,7 +51035,7 @@ talPlain('silver', 'champ:so_judge', {
 // tools/chain_specs/wardbound.js and their rules from forces_zzzzzzzzzzz_own_wardbound.js: they are no longer listed here)
 /* ---------- Oathbound ---------- */
 talPlain('wardbound', 'glaive', {
-  'Avenging Oath': { tag: 'Control', pro: n => `Its next ${2 * n} cuts root 0.4s and brand after a nearby unit is struck.` },
+  'Avenging Oath': { tag: 'Control', pro: n => `Its next ${2 * n} cuts root 0.4s and Expose after a nearby unit is struck.` },
   'Deep Carving': { tag: 'Runes', pro: n => `Its oath runes last longer: ${gNf(10 * (1 + .15 * n))}s (was 10s).` },
   'Oathsworn Cut': { tag: 'Control', pro: n => `Its oath runes slow ground foes ${20 + 6 * n}%, up from 20%.` },
   'Oath Kept': { tag: 'Mana', pro: n => `Restores ${2 * n} mana each time a ground foe springs one of its oath runes.` },
@@ -51144,7 +51045,7 @@ talPlain('wardbound', 'glaive', {
   'Final Oath': { tag: 'Spell' },
   // capstones: Oath Fulfilled no longer readies Rune Cleave (its flare is 2x a cut, was 1.5x); Shared Oath gives no mana (its reach is 2 cells, was 1.6);
   // Oathfire is 80% of a cut on any ward-line (was 60%, twice on a woven one)
-  'Oath Fulfilled': { tag: 'Control', pro: 'When Final Oath ends, nearby oath runes and their lines flare for 2× a cut, rooting 1s.',
+  'Oath Fulfilled': { tag: 'Control', pro: 'When Final Oath ends, nearby oath runes flare for 2× a cut, rooting 1s.',
     sp: { ab: 'wb_laststand', rider: { wbf: 1 } } },
 });
 
@@ -51187,23 +51088,23 @@ talPlain('wardbound', 'frost', {
 
 /* ---------- Runecarvers ---------- */
 talPlain('wardbound', 'arcane', {
-  'Shared Margins': { tag: 'Runes', pro: n => `${n >= 2 ? 'Its flicks add' : 'Every 2nd flick adds'} an extra sigil to foes another Runecarver carved.` },
-  'Lingering Ink': { tag: 'Runes', pro: n => `Its sigils hold longer: ${8 + 2 * n}s (was 8s).` },
+  'Shared Margins': { tag: 'Runes', pro: n => `${n >= 2 ? 'Its flicks add' : 'Every 2nd flick adds'} an extra mark to foes another Runecarver carved.` },
+  'Lingering Ink': { tag: 'Runes', pro: n => `Its marks hold longer: ${8 + 2 * n}s (was 8s).` },
   // (its stat line folded in: 10% of wards a rank on a carved foe, was 5% on any and 5% more on a carved one)
   'Ward-Cutting Script': { tag: 'Damage', pro: n => `Its carved flicks and spells ignore ${8 * n}% of Spell Shields.`, mod: n => ({ magicPen: .08 * n }), cap: null },
-  'Deep Script': { tag: 'Damage', pro: n => `Sigils its flicks set off strike for ${60 + 15 * n}% of a flick, up from 60%.` },
-  'Palimpsest': { tag: 'Spell', pro: n => `Etch sets off a foe's 3 sigils first, ${n >= 2 ? 90 : 60}% of a flick each.` },
-  'Spent Ink': { tag: 'Mana', pro: n => `Restores ${n + 1} mana for each sigil it sets off.` },
+  'Deep Script': { tag: 'Damage', pro: n => `Marks its flicks burst strike for ${60 + 15 * n}% of a flick each, up from 60%.` },
+  'Palimpsest': { tag: 'Spell', pro: n => `Etch bursts a foe's 3 marks first, ${n >= 2 ? 90 : 60}% of a flick each.` },
+  'Spent Ink': { tag: 'Mana', pro: n => `Restores ${n + 1} mana for each mark it bursts.` },
   'Detonate': { tag: 'Spell' },
-  'Ink of Binding': { tag: 'Control', pro: n => `Etch roots ground foes that already carry a sigil for ${gNf(.3 * n)}s.` },
-  'Chain Reaction': { tag: 'Spell', pro: 'Every foe Detonate strikes is carved with a fresh sigil.' },
+  'Ink of Binding': { tag: 'Control', pro: n => `Etch roots ground foes that already carry a mark for ${gNf(.3 * n)}s.` },
+  'Chain Reaction': { tag: 'Spell', pro: 'Every foe Detonate strikes is carved with a fresh mark.' },
   'Scribe the Road': { tag: 'Spell' },
-  'Double Stroke': { tag: 'Damage', pro: 'Every 3rd flick carves two sigils.' },
-  // capstones: The Last Word no longer readies Etch (its burst is 120% of a flick a sigil, was 90%)
-  'The Last Word': { tag: 'Runes', pro: "When Scribe the Road's rune fades, sigils within 1.5 cells burst for 120% of a flick each.",
+  'Double Stroke': { tag: 'Damage', pro: 'Every 3rd flick carves two marks.' },
+  // capstones: The Last Word no longer readies Etch (its burst is 120% of a flick a mark, was 90%)
+  'The Last Word': { tag: 'Runes', pro: "When Scribe the Road's rune fades, marks within 1.5 cells burst for 120% of a flick each.",
     sp: { ab: 'wb_scribe', rider: { wbf: 1 } } },
-  'Cascade': { tag: 'Runes', pro: 'Foes slain by bursting sigils pass two sigils to every foe within 1.2 cells.' },
-  'Runesight': { tag: 'Damage', pro: 'Third sigils burst at once, and Scribe the Road quickens its flicks 30% for 5s.' },
+  'Cascade': { tag: 'Runes', pro: 'A foe slain by its bursting marks carves two marks into every foe within 1.2 cells.' },
+  'Runesight': { tag: 'Damage', pro: 'A third mark bursts at once, and Scribe the Road quickens its flicks 30% for 5s.' },
 });
 
 /* ---------- Stormward Lancers ---------- */
@@ -51273,7 +51174,7 @@ talPlain('wardbound', 'venom', {
   'Choking Censer': { tag: 'Control', pro: 'Siege troops leaving its Censer Smoke still can\'t attack for 1.5s.' },
   'Rite of Holding': { tag: 'Spell' },
   'Vow of Iron': { tag: 'Mana', pro: n => `Sworn Vow also restores ${25 * n}% of the knight's mana.` },
-  'Ember Vow': { tag: 'Runes', pro: 'Its vow runes brand every foe that steps on them.' },
+  'Ember Vow': { tag: 'Runes', pro: 'Its vow runes Expose every foe that steps on them.' },
   // capstones: Sanctuary no longer stops Wounds (it reaches 1.5 cells, was 1.2); Hallowed Road no longer slows or brands
   // (its runes strike for 70% of a cut, was 50%)
   'Keeper of Vows': { tag: 'Survival', pro: 'Its cuts also mend every other hurt knight in reach, for half.' },
@@ -51290,28 +51191,28 @@ talPlain('wardbound', 'champ:wb_varic', {
   'Shield Brothers': { tag: 'Mana', pro: "Warden's Oath and Hold Fast cost 25% less with 2 Oathbound within 2 cells." },
   'Hold Fast': { tag: 'Spell' },
   'Long Vigil': { tag: 'Spell', pro: n => `Hold Fast stands ${n}s longer.` },
-  'Heavy Hand': { tag: 'Runes', pro: n => `Warden's Oath leaves traps that slow and stun${n >= 2 ? ' and root' : ''} at once.` },
+  'Heavy Hand': { tag: 'Runes', pro: n => `Warden's Oath lays stone runes, which stun${n >= 2 ? '; every other one a pin rune, which roots' : ''}.` },
   'Shared Watch': { tag: 'Support', pro: 'Each Hold Fast gives every unit within 1.6 cells of him 15 mana.' },
   'Steady Pace': { tag: 'Spell', pro: n => `Hold Fast comes ${4 * n}s sooner each time Warden's Oath catches 4 or more ground foes.` },
   'The Last Gate': { tag: 'Spell' },
-  'Held to Account': { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each ground foe his cuts root on or between traps.` },
-  'Old Discipline': { tag: 'Damage', pro: n => `Ground foes setting off his traps in his reach take ${20 * n}% of his cut.` },
+  'Held to Account': { tag: 'Mana', pro: n => `Restores ${3 * n} mana for each ground foe his cuts root on a rune.` },
+  'Old Discipline': { tag: 'Damage', pro: n => `Ground foes springing his runes in his reach take ${20 * n}% of his cut.` },
   // capstones: The Gate Holds no longer adds 2 runes (its flares strike for half, were a third, and brand); Last Warden no longer readies Warden's Oath
-  'The Gate Holds': { tag: 'Control', pro: "The Last Gate's traps strike 3 more times, a second apart, at half strength.",
+  'The Gate Holds': { tag: 'Control', pro: "The Last Gate's runes strike 3 more times, a second apart, at half strength.",
     sp: { ab: 'ch_lastgate', rider: { wbf: 1 } } },
-  'The Road Remembers': { tag: 'Runes', pro: 'Ground foes slain on or between traps near him leave a trap that slows and stuns.' },
+  'The Road Remembers': { tag: 'Runes', pro: 'Ground foes slain on a rune near him leave a stone rune.' },
   'Last Warden': { tag: 'Support', pro: 'The Last Gate makes every Oathbound within 2.5 cells of him strike the ground foes round it too.',
     sp: { ab: 'ch_lastgate', rider: { wbf: 1 } } },
 });
 
 /* ---------- Lord Aedric Solmane, the Sun-Sworn ---------- */
 talPlain('wardbound', 'champ:wb_aedric', {
-  'Eager Sun': { tag: 'Spell', pro: n => `Sunwheel comes ${n}s sooner for each foe it strikes that holds 3 brands.` },
+  'Eager Sun': { tag: 'Spell', pro: n => `Sunwheel comes ${n}s sooner for each foe it strikes that is Exposed 3 times.` },
   'Sunlit Reach': { tag: 'Damage', pro: n => `His lance reaches ${gNf(.15 * n)} cells farther while the army's kill streak is 5+.` },
   "Sun's Due": { tag: 'Survival', pro: n => `Sunwheel scorches him ${n >= 2 ? 'not at all' : 'half as much'} when it catches 3 or more foes.` },
   'Into the Fray': { tag: 'Mana', pro: 'Sunwheel and Sun Charge refund 3% of their mana per kill in the army\'s streak.' },
   'Sun Charge': { tag: 'Spell' },
-  'Sun-Struck Trail': { tag: 'Runes', pro: n => n >= 2 ? 'Sun Charge leaves a shocking, slowing trap under each ground foe it strikes.' : 'Sun Charge leaves a lightning trap under each ground foe it strikes.' },
+  'Sun-Struck Trail': { tag: 'Runes', pro: n => `Sun Charge lays a storm rune under each ground foe it strikes${n >= 2 ? ', lasting twice as long' : ''}.` },
   'Searing Wheel': { tag: 'Spell', pro: n => `Sunwheel sets every foe it strikes burning for ${gNf(.3 * n)}× his damage a second, 3s.` },
   'Rallying Cry': { tag: 'Support', pro: 'Each Sun Charge adds 2 to the army\'s kill streak.' },
   'Hot Blood': { tag: 'Spell', pro: n => `Sun Charge readies at once when the army's kill streak hits 10${n >= 2 ? ', Sunwheel 6s sooner' : ''}.` },
@@ -51328,9 +51229,9 @@ talPlain('wardbound', 'champ:wb_aedric', {
 
 /* ---------- Lady Isaura Vell, the Veiled Oath ---------- */
 talPlain('wardbound', 'champ:wb_isaura', {
-  'Ready Vow': { tag: 'Spell', pro: n => `Oathbind comes ${n}s sooner whenever a ground foe breaks free on or between traps.` },
+  'Ready Vow': { tag: 'Spell', pro: n => `Oathbind comes ${n}s sooner whenever a ground foe breaks free on a rune.` },
   'Silent Vow': { tag: 'Control', pro: n => `Ground foes her sweeps root can't strike your units for ${n}s.` },
-  'Vow Carved': { tag: 'Runes', pro: n => `Oathbind sets slowing traps under the ${2 * n} bound ground foes nearest the gate.` },
+  'Vow Carved': { tag: 'Runes', pro: n => `Oathbind lays oath runes, which slow, under the ${2 * n} bound ground foes nearest the gate.` },
   'Witness of Vows': { tag: 'Mana', pro: 'Oathbind and Binding Sweep cost 25% less with 2 held foes in her reach.' },
   'Binding Sweep': { tag: 'Spell' },
   'Tighter Bonds': { tag: 'Control', pro: n => `Binding Sweep roots ${gNf(.15 * n)}s longer.` },
@@ -51344,7 +51245,7 @@ talPlain('wardbound', 'champ:wb_isaura', {
   // Sworn Road no longer brands
   'Turned Twice': { tag: 'Spell', pro: 'Oath Turned strikes again 0.6s later at half strength, from the toughest ground foe it hit.',
     sp: { ab: 'ch_oathturned', rider: { wbf: 1 } } },
-  'Sworn Road': { tag: 'Runes', pro: 'Binding Sweep sets a slowing trap under every ground foe it roots.' },
+  'Sworn Road': { tag: 'Runes', pro: 'Binding Sweep lays an oath rune, which slows, under every ground foe it roots.' },
   'Veiled Oath': { tag: 'Damage', pro: 'Ground foes Oath Turned roots take its blow again 4s later, 1.5× as hard.',
     sp: { ab: 'ch_oathturned', rider: { wbf: 1 } } },
 });
@@ -54636,11 +54537,11 @@ function tchUlt(id, o) {
     ['Detonate', 1, 1, { req: [0, 1] }],
     ['Shared Margins', 1, 2],
     ['Ink of Binding', 2, 0],
-    ['Chain Reaction', 2, 1, { req: [1, 1], max: 2, pro: n => `Detonate comes ${5 * n}% sooner${n >= 2 ? ', and every foe it strikes is carved with a fresh sigil' : ''}.`, sp: n => ({ ab: 'wb_detonate', cd: -.05 * n, rider: n >= 2 ? { wbSigil: 1 } : {} }) }],
+    ['Chain Reaction', 2, 1, { req: [1, 1], max: 2, pro: n => `Detonate comes ${5 * n}% sooner${n >= 2 ? ', and every foe it strikes is carved with a fresh mark' : ''}.`, sp: n => ({ ab: 'wb_detonate', cd: -.05 * n, rider: n >= 2 ? { wbSigil: 1 } : {} }) }],
     ['Lingering Ink', 2, 3],
     ['Volatile Script', 3, 1, { req: [2, 1], tag: 'Damage', max: 2, pro: n => `Detonate bursts bosses, leaders and elites ${15 * n}% harder.`, sp: n => ({ ab: 'wb_detonate', vs: ['big', .15 * n] }) }],
-    ['Double Stroke', 3, 2, { max: 2, pro: n => `Every ${n >= 2 ? '3rd' : '4th'} flick carves two sigils.` }],
-    ['Wide Script', 3, 3, { req: [2, 3], max: 2, tag: 'Spell', cap: null, pro: n => `Etch carves sigils into ${n >= 2 ? 'two' : 'one'} more foe${n >= 2 ? 's' : ''}.`, sp: n => ({ ab: 'wb_etch', by: { n } }) }],
+    ['Double Stroke', 3, 2, { max: 2, pro: n => `Every ${n >= 2 ? '3rd' : '4th'} flick carves two marks.` }],
+    ['Wide Script', 3, 3, { req: [2, 3], max: 2, tag: 'Spell', cap: null, pro: n => `Etch carves marks into ${n >= 2 ? 'two' : 'one'} more foe${n >= 2 ? 's' : ''}.`, sp: n => ({ ab: 'wb_etch', by: { n } }) }],
     ['Spent Ink', 4, 1, { req: [3, 1] }],
     ['Palimpsest', 4, 2, { req: [3, 2] }],
     ['Scribe the Road', 4, 3, { req: [3, 3] }],
@@ -56152,16 +56053,16 @@ const FS_PLAIN = {
   fs_ancestor: "When the Storm breaks, every wearer's spells are ready. From half Storm, spells curse foes 3s: a fifth of their damage taken hits again.",
   fs_pack: "Pounce wets its foe 3s and fills the Storm meter 6 more.",
   // ---- the Wardbound ----
-  fe_wb_siege: "Pinning Bolt brands twice (Wardbound spells hit 12% harder per brand); Rune Shot 3s sooner. Rune Shot casts a free Chain Bolt (once per 12s).",
-  fs_wbcarve: "Etch leaves a trap on the road under each foe. Detonate hits carve a sigil (an extra hit that splashes) and cut Etch 1s (max 4s).",
-  fe_wb_vow: "Sworn Vow casts a free Rite of Holding (once per 12s) and heals units nearby 10%. Censer Smoke: a road trap, Sworn Vow 3s sooner.",
-  fe_wb_script: "Detonate leaves a trap on the road under each foe hit; its kills pass 2 sigils (extra hits) on. Etch: Detonate 2s sooner.",
-  fe_wb_rime: "Rimeline brands slowed foes (Wardbound spells hit 12% harder per brand). Foes frozen by Frostbite leave a frost trap on the road. Frostbite: Rimeline 4s sooner.",
-  fe_wb_hill: "Shield Wall brands foes (Wardbound spells hit 12% harder per brand) and quakes 3 cells along the road, leaving traps. Quake Line 4s sooner.",
-  fe_wb_mask: "Ricochet Rite brands every foe hit (Wardbound spells hit 12% harder per brand). Through 4+ foes: free Returning Oath (once per 10s).",
-  fe_wb_gate: "A Thrust that roots 3+ foes casts a free Rune Cleave and renews road traps nearby (once per 12s). Cleave: Thrust 3s sooner.",
-  fe_wb_charge: "Thunder Charge leaves a storm trap on the road under each foe and ends in a free Skyfall (once per 10s).",
-  fs_wbvigil: "Each cast leaves a trap on the road. Every 3rd: nearby foes branded twice (Wardbound spells hit 12% harder per brand), other wearers' spells 3s sooner.",
+  fe_wb_siege: "Pinning Bolt Exposes the foes it roots twice; Rune Shot 3s sooner. Rune Shot casts a free Chain Bolt (once per 12s).",
+  fs_wbcarve: "Etch lays its rune under each foe it marks. Each Detonate hit adds a mark and cuts Etch 1s (max 4s).",
+  fe_wb_vow: "Sworn Vow casts a free Rite of Holding (once per 12s) and heals units nearby 10%. Censer Smoke: a vow rune, Sworn Vow 3s sooner.",
+  fe_wb_script: "Detonate lays its rune under each foe hit; its kills pass 2 marks on. Etch: Detonate 2s sooner.",
+  fe_wb_rime: "Rimeline Exposes the foes it slows. Foes Frostbite stuns leave a frost rune. Frostbite: Rimeline 4s sooner.",
+  fe_wb_hill: "Shield Wall Exposes foes and quakes 3 cells along the road, laying stone runes. Quake Line 4s sooner.",
+  fe_wb_mask: "Ricochet Rite Exposes every foe hit. Through 4+ foes: free Returning Oath (once per 10s).",
+  fe_wb_gate: "A Thrust that roots 3+ foes casts a free Rune Cleave and renews runes nearby (once per 12s). Cleave: Thrust 3s sooner.",
+  fe_wb_charge: "Thunder Charge lays a storm rune under each foe and ends in a free Skyfall (once per 10s).",
+  fs_wbvigil: "Each cast lays its rune on the road. Every 3rd: nearby foes Exposed twice, other wearers' spells 3s sooner.",
   fs_wboath: 'Rune Cleave roots foes 1s. Each Oathbreaker Thrust: Rune Cleave 4s sooner.',
 };
 if (typeof FSETS !== 'undefined') for (const id in FS_PLAIN) { const S = FSETS[id] || (typeof FSET_BY !== 'undefined' && FSET_BY[id]); if (S && typeof S.b2 === 'string') { S.b2Long = S.b2; S.b2 = FS_PLAIN[id]; } }
@@ -91477,18 +91378,18 @@ const SPELL_BRIEFS = {
   ch_runwolves: 'Her wolf drags the target down for {d}, holding {root} sec and wetting it. Then {n} spirit wolves and every nearby Wolfguard\'s wolf pile on for {d2} each, holding 0.2 sec longer.',
   ch_thunderdive: 'The thunderbird seizes the target (not bosses or leaders), carries it {carry} cells back and drops it for {d}, stunning {stun} sec and wetting. Enemies within 1.1 cells take half.',
   /* wardbound */
-  wb_swordplant: 'Leaps and drives his greatsword into the road, dealing {d} within 1.3 cells, rooting {root} sec and branding. Carves 4 oath runes.',
-  wb_wardflare: 'Cleaves within 1.5 cells for {d}, branding. Ward-lines and runes in reach flare, dealing {d} to ground enemies on them and branding too.',
-  wb_laststand: 'Plants his sword for {dur} sec. He can\'t attack, but can\'t fall. Every 0.5 sec, ground enemies within 1.2 cells are branded, pushed back and slowed by 40%.',
+  wb_swordplant: 'Leaps and drives his greatsword into the road, dealing {d} within 1.3 cells, rooting {root} sec and Exposing them. Carves 4 oath runes.',
+  wb_wardflare: 'Cleaves within 1.5 cells for {d}, Exposing. Runes in reach flare, dealing {d} to ground enemies on them and Exposing them too.',
+  wb_laststand: 'Plants his sword for {dur} sec. He can\'t attack, but can\'t fall. Ground enemies within 1.2 cells are Exposed as he plants it, then pushed back and slowed by 40% every 0.5 sec.',
   wb_runevolley: 'Hurls a great glaive that strikes {n} times, ricocheting between enemies within 1.8 cells without weakening. Each strike deals {d} and carves a shaft rune (a lone enemy takes every strike).',
   wb_piercingshaft: 'Flings the glaive down a line: every enemy on it takes {d} and loses 3 armour for 5 sec. It sweeps back along the line to the hand, dealing {d2} to each enemy on it. Leaves 3 shaft runes past the first enemy.',
-  wb_wardarrow: 'Hurls a glaive into the road under a ground enemy, where it stands spinning as a great shaft rune for {dur} sec. Adjacent enemies take {d} and are branded. It links with every rune within 3.2 cells into ward-lines.',
+  wb_wardarrow: 'Hurls a glaive into the road under a ground enemy, where it stands spinning as a great shaft rune for {dur} sec. Adjacent enemies take {d} and are Exposed. While it stands, ground enemies that walk beside it have their armour cracked and are Exposed.',
   wb_rimeline: 'Drags frost along 4 road cells, dealing {d} and slowing by {slowPct} for 3 sec. Lays a frost rune per cell.',
-  wb_frostbite: 'Stuns every branded or frost-slowed ground enemy in ice for {frz} sec (shorter on bosses) and deals {d} each.',
+  wb_frostbite: 'Stuns every Exposed or frost-slowed ground enemy in ice for {frz} sec (shorter on bosses) and deals {d} each.',
   wb_winterward: 'For {dur} sec, each frost rune within 3 cells stuns the first enemy stepping on it in ice {frz} sec, dealing {d}. Also lays a frost rune under the ground enemy furthest along.',
-  wb_etch: 'Deals {d} to the {n} toughest enemies and carves 2 Sigils into each.',
-  wb_detonate: 'Detonates all Sigils, dealing {d} per Sigil and half that within 0.9 cells.',
-  wb_scribe: 'Carves a great sigil rune for {dur} sec. Ground enemies on it take {d} and gain a Sigil, then another every 0.6 sec.',
+  wb_etch: 'Deals {d} to the {n} toughest enemies and carves 2 marks into each.',
+  wb_detonate: 'Bursts every marked enemy, dealing {d} per mark and half that within 0.9 cells.',
+  wb_scribe: 'Carves a great rune for {dur} sec. Ground enemies on it take {d} and gain a mark, then another every 0.6 sec.',
   wb_charge: 'Charges along a line, dealing {d} to each ground enemy and arcing lightning through it for {d2}, jumping to 1 more enemy. Leaves storm runes in its trail.',
   wb_stormbanner: 'Strikes with lightning for {d}, jumping to 4 more enemies. For {dur} sec, chain lightning from Wardbound units within 2 cells jumps 1 extra time.',
   wb_skyfall: 'Calls lightning onto every storm rune up to 1.5 cells beyond reach. Enemies within 0.85 cells take {d} (at most twice). With no storm rune, first lays one under the toughest enemy.',
@@ -91498,17 +91399,17 @@ const SPELL_BRIEFS = {
   wb_pinbolt: 'Fires a bolt down a line, dealing {d} to the first 3 ground enemies, rooting {pin} sec and laying a pin rune under each.',
   wb_runeshot: 'Every rune within 1.4 cells of the spot bursts, used up, dealing {d} to adjacent enemies (at most twice each) and applying its effects. With no rune, deals {d2} to ground enemies there and lays a pin rune.',
   wb_chainbolt: 'Strikes the 2 enemies nearest the gate for {d}, rooting 0.5 sec and chaining them {dur} sec: half the damage one takes is dealt to the other.',
-  wb_censer: ({ full }) => `Fills 1.2 cells with smoke for ${(/for ([\d.]+)s/.exec(String(full)) || [])[1]} sec. Wardbound units heal ${(/mend (\d+) health/.exec(String(full)) || [])[1]} health per sec, enemies are branded once, and siege enemies can't attack.`,
-  wb_vow: 'Heals the most hurt Wardbound unit within 2.5 cells to full; it can\'t fall for {dur} sec. Ground enemies within 1 cell gain 2 brands.',
-  wb_rite: 'Renews every vow and oath rune within 3 cells and adds Vow, making it Bound. Ground enemies on them take {d} and are branded. With no such rune, lays a vow rune at its post.',
-  ch_wardensoath: ({ d, full }) => `Strikes ground enemies in ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells for ${d(1)}, brands twice and rings them with 6 oath runes. Deals 50% more if 4+ are hit or any is slowed or held. Roots 2 sec once enemies pass half the road.`,
-  ch_holdfast: 'Braces {dur} sec. Every 0.5 sec, deals {d} to ground enemies on a rune or ward-line, rooting 0.6 sec (once per 2 sec).',
-  ch_lastgate: 'Carves {n} Bound oath runes nearest the gate. They flare, dealing {d} to ground enemies on them, rooting 1 sec and branding. Refunds half mana if it hits no one.',
-  ch_sunwheel: ({ d, full }) => `Blazes ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells, dealing ${d(1)} to each (more with Momentum) and branding. Enemies at 3 brands are struck again and burst onto those nearby. Runes flare along ward-lines. Burns Aedric for 8% of his health.`,
-  ch_suncharge: 'Charges {len} cells through ground enemies, dealing {d} to each and branding. Then attacks 20% slower for 3 sec.',
-  ch_blazeglory: 'Deals {d} to every enemy in reach and brands. For {dur} sec attacks 60% faster and every hit brands, then attacks 30% slower for 4 sec.',
-  ch_oathbind: ({ d, full }) => `Binds ground enemies in ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells for 4 sec: roots 1.5 sec, then slows by 50%, and brands. At the end, each takes ${d(1)}, doubled on a rune or ward-line.`,
-  ch_bindsweep: 'Deals {d} to every ground enemy and roots {root} sec, twice as long if branded.',
+  wb_censer: ({ full }) => `Fills 1.2 cells with smoke for ${(/for ([\d.]+)s/.exec(String(full)) || [])[1]} sec. Wardbound units heal ${(/mend (\d+) health/.exec(String(full)) || [])[1]} health per sec, enemies are Exposed once, and siege enemies can't attack.`,
+  wb_vow: 'Heals the most hurt Wardbound unit within 2.5 cells to full; it can\'t fall for {dur} sec. Ground enemies within 1 cell are Exposed twice.',
+  wb_rite: 'Renews every vow and oath rune within 3 cells. Ground enemies on them take {d} and are Exposed, and Wardbound units within 3 cells heal 1.5% of their health per sec for 6 sec. With no such rune, lays a vow rune at its post.',
+  ch_wardensoath: ({ d, full }) => `Strikes ground enemies in ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells for ${d(1)}, Exposes them twice and rings them with 6 oath runes. Deals 50% more if 4+ are hit or any is slowed or held. Roots 2 sec once enemies pass half the road.`,
+  ch_holdfast: 'Braces {dur} sec. Every 0.5 sec, deals {d} to ground enemies on a rune, rooting 0.6 sec (once per 2 sec).',
+  ch_lastgate: 'Carves {n} oath runes nearest the gate. They flare, dealing {d} to ground enemies on them, rooting 1 sec and Exposing them. Refunds half mana if it hits no one.',
+  ch_sunwheel: ({ d, full }) => `Blazes ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells, dealing ${d(1)} to each (more with Momentum) and Exposing them. Enemies Exposed 3 times are struck again and burst onto those nearby. Runes in it flare. Burns Aedric for 8% of his health.`,
+  ch_suncharge: 'Charges {len} cells through ground enemies, dealing {d} to each and Exposing them. Then attacks 20% slower for 3 sec.',
+  ch_blazeglory: 'Deals {d} to every enemy in reach and Exposes them. For {dur} sec attacks 60% faster and every hit Exposes, then attacks 30% slower for 4 sec.',
+  ch_oathbind: ({ d, full }) => `Binds ground enemies in ${(/([\d.]+)-cell area/.exec(String(full).replace(/<[^>]+>/g, '')) || [])[1]} cells for 4 sec: roots 1.5 sec, then slows by 50%, and Exposes. At the end, each takes ${d(1)}, doubled on a rune.`,
+  ch_bindsweep: 'Deals {d} to every ground enemy and roots {root} sec, twice as long if Exposed.',
   ch_oathturned: 'Deals {d} to the target. Ground enemies within 1.2 cells take {d2} plus 5% of its health and are rooted 1 sec.'
 };
 
@@ -91700,12 +91601,12 @@ const SPELL_TARGETS = {
   wb_laststand: 'ground enemies around it',
   wb_runevolley: 'the densest group of enemies',
   wb_piercingshaft: 'the line through the most enemies',
-  wb_wardarrow: 'the ground enemy with the most runes near it',
+  wb_wardarrow: 'the ground enemy with the most enemies beside it',
   wb_rimeline: 'the densest group of ground enemies',
-  wb_frostbite: 'branded or frost-slowed ground enemies',
+  wb_frostbite: 'Exposed or frost-slowed ground enemies',
   wb_winterward: 'enemies stepping on its frost runes',
   wb_etch: 'the toughest enemies in range',
-  wb_detonate: 'sigil-carved enemies in range',
+  wb_detonate: 'marked enemies in range',
   wb_scribe: 'the road under the lead group',
   wb_charge: 'the line through the most ground enemies',
   wb_stormbanner: 'the toughest enemy in range',
@@ -121778,7 +121679,7 @@ const FSM = {
   /* ---- the Wardbound ---- */
   fs_wboath: { k: 'spell', a: 'wb_wardflare', say: 'Rune Cleave (each Oathbreaker Thrust brings it 4s nearer)' },
   fs_wbcarve: { k: 'spell', a: 'wb_etch', say: 'Etch (each foe Detonate strikes brings it 1s nearer)' },
-  fs_wbvigil: { k: 'count', army: 1, max: 3, fill: 'each spell any wearer casts adds 1', say: 'Vigil: 3 wearer spells brand every foe near the wearers' },
+  fs_wbvigil: { k: 'count', army: 1, max: 3, fill: 'each spell any wearer casts adds 1', say: 'Vigil: 3 wearer spells Expose every foe near the wearers' },
   fe_wb_gate: { k: 'cd', f: 'feGateT', s: 12, need: 'wb_wardflare', say: 'a Thrust that roots 3 foes casts Rune Cleave free' },
   fe_wb_mask: { k: 'cd', f: 'feMaskT', s: 10, need: 'wb_piercingshaft', say: 'a Ricochet Rite on 4 foes casts Returning Oath free' },
   fe_wb_rime: { k: 'spell', a: 'wb_frostbite', say: 'Frostbite (each one brings Rimeline 4s nearer)' },
@@ -124567,49 +124468,49 @@ const SPELL_HELP = {
 
   /* ---------------- wardbound ---------------- */
   // Oathbound (wb_oathbound)
-  wb_swordplant: { when: "Two or more ground foes within {reach} cells, or a boss or elite there.", aim: "Itself: every ground foe round its post is rooted and branded.", tips: ["Post Oathbound where the road wraps round them: every ground foe in the bend is held at once.", "The four oath runes it carves link into ward-lines with the runes and Oathstones near it.", "Branded foes take more from every Wardbound spell: follow it with Rune Cleave or a Detonate."] },
-  wb_wardflare: { when: "Two or more ground foes within {reach} cells, or a boss or elite there.", aim: "Around itself: a spinning cleave strikes every ground foe in reach, and the ward-lines and runes within reach flare.", tips: ["Post Oathbound where ward-lines cross the road beside them: the arc flares each line it crosses.", "Oathstones beside the road count as oath runes: wall the road to bring the lines into reach.", "Each foe it strikes is branded, so the spells after it bite deeper."] },
+  wb_swordplant: { when: "Two or more ground foes within {reach} cells, or a boss or elite there.", aim: "Itself: every ground foe round its post is rooted and Exposed.", tips: ["Post Oathbound where the road wraps round them: every ground foe in the bend is held at once.", "The four oath runes it carves wait for the next foes to walk over them.", "Exposed foes take more from every Wardbound spell: follow it with Rune Cleave or a Detonate."] },
+  wb_wardflare: { when: "Two or more ground foes within {reach} cells, or a boss or elite there.", aim: "Around itself: a spinning cleave strikes every ground foe in reach, and the runes within reach flare.", tips: ["Post Oathbound where the road passes close on both sides: more runes lie in the arc.", "Every rune in reach flares at once, so cast it where the army has carved the road.", "Each foe it strikes is Exposed, so the spells after it hit harder."] },
   wb_laststand: { when: "Ground foes within {reach} cells while the leading foe is in the last third of the road, three or more ground foes there, or a boss or elite.", aim: "Itself: it plants its sword and holds; ground foes that reach it are pushed back and slowed.", tips: ["Post an Oathbound by the gate: ground foes that reach it are pushed back down the road while it stands.", "Siege troops can't take it down while it holds, but it doesn't strike: let its neighbours do the cutting.", "Pushed foes walk back over the runes behind them: lay runes before the gate."] },
   // Glaive Wardens (wb_maskedwarden)
-  wb_runevolley: { when: "Two or more foes within 1.1 cells of one foe within {reach} cells, or a boss or elite there.", aim: "The densest spot in range: the glaive is thrown at the toughest foe there, then ricochets to the nearest foes it has not struck.", tips: ["A lone boss takes every strike: the glaive loops round it and strikes again.", "Each strike carves a shaft rune: a ricochet through a bend lays a chain of them that links into ward-lines.", "Shaft runes strip armour: follow it with the Oathbound or the Siege Wardens."] },
-  wb_piercingshaft: { when: "The line from the unit through two or more foes within {reach} cells, or a boss or elite there.", aim: "The line through the most foes, then the one whose first foe is nearest the gate.", tips: ["Post the Wardens at the end of a long straight run: the glaive cuts the whole column going out and again coming back.", "Foes that walk into the line while the glaive is out are cut on its way back.", "It strips 3 armour from each foe it passes, and its three shaft runes run along the road and link to each other."] },
-  wb_wardarrow: { when: "A ground foe within {reach} cells with two or more runes within 3.2 cells of it.", aim: "The spot under the ground foe with the most runes near it, nearest the gate first: the glaive stands there spinning.", tips: ["Plant it between scattered runes: it links them all into one net of ward-lines.", "Every line to it brands the foes that cross it; lines between runes of different kinds brand twice.", "Cast Rune Cleave while it stands: every one of its lines flares."] },
+  wb_runevolley: { when: "Two or more foes within 1.1 cells of one foe within {reach} cells, or a boss or elite there.", aim: "The densest spot in range: the glaive is thrown at the toughest foe there, then ricochets to the nearest foes it has not struck.", tips: ["A lone boss takes every strike: the glaive loops round it and strikes again.", "Each strike carves a shaft rune: a ricochet through a bend leaves a row of them for the foes behind.", "Shaft runes strip armour: follow it with the Oathbound or the Siege Wardens."] },
+  wb_piercingshaft: { when: "The line from the unit through two or more foes within {reach} cells, or a boss or elite there.", aim: "The line through the most foes, then the one whose first foe is nearest the gate.", tips: ["Post the Wardens at the end of a long straight run: the glaive cuts the whole column going out and again coming back.", "Foes that walk into the line while the glaive is out are cut on its way back.", "It strips 3 armour from each foe it passes, and its three shaft runes lie along the road for the foes behind."] },
+  wb_wardarrow: { when: "A ground foe within {reach} cells with another ground foe within 1.2 cells of it, or a boss or elite, where no Warding Glaive stands.", aim: "The spot under the ground foe with the most foes beside it, nearest the gate first: the glaive stands there spinning.", tips: ["Plant it where the road narrows: every ground foe that passes has its armour cracked and is Exposed.", "It Exposes again every second or so, so the spells cast near it hit harder.", "Cast Rune Cleave beside it: the great rune flares with the rest."] },
   // Frostbrand Sentries (wb_frostbrand)
-  wb_rimeline: { when: "A ground foe within {reach} cells with another ground foe within 1.5 cells of it, or a boss or elite.", aim: "The densest spot of ground foes: the line runs along the road from there.", tips: ["Post Frostbrand beside a long stretch of road: the line rimes four cells of it.", "Its frost runes set up Frostbite and Winter Ward.", "Frost runes beside other runes make lines that slow as well as brand."] },
-  wb_frostbite: { when: "Two or more branded or frost-slowed ground foes within {reach} cells, or one boss or elite.", aim: "Every branded or frost-slowed ground foe in reach.", tips: ["Cast it after Rimeline or a Frostbrand sweep: everything in reach is already slowed by frost.", "Stunned foes stand still on the runes and lines under them, taking their touches again.", "Bosses are stunned only briefly: use it to stop the escort round one."] },
-  wb_winterward: { when: "Two or more ground foes within {reach} cells with a frost rune within 3 cells of the unit, or a boss or elite.", aim: "Itself: the frost runes within 3 cells stun the first foe that steps on each in ice.", tips: ["Lay frost runes first with Rimeline: each one stuns a foe in ice.", "Post Frostbrand where the road passes its post twice: twice the runes in its ward.", "A stunned ground foe on a ward-line is struck again and again by the units round it."] },
+  wb_rimeline: { when: "A ground foe within {reach} cells with another ground foe within 1.5 cells of it, or a boss or elite.", aim: "The densest spot of ground foes: the line runs along the road from there.", tips: ["Post Frostbrand beside a long stretch of road: the line rimes four cells of it.", "Its frost runes set up Frostbite and Winter Ward.", "Each frost rune slows the foes it springs on and Exposes them."] },
+  wb_frostbite: { when: "Two or more Exposed or frost-slowed ground foes within {reach} cells, or one boss or elite.", aim: "Every Exposed or frost-slowed ground foe in reach.", tips: ["Cast it after Rimeline or a Frostbrand sweep: everything in reach is already slowed by frost.", "Stunned foes stand still, so the units round them strike freely.", "Bosses are stunned only briefly: use it to stop the escort round one."] },
+  wb_winterward: { when: "Two or more ground foes within {reach} cells with a frost rune within 3 cells of the unit, or a boss or elite.", aim: "Itself: the frost runes within 3 cells stun the first foe that steps on each in ice.", tips: ["Lay frost runes first with Rimeline: each one stuns a foe in ice.", "Post Frostbrand where the road passes its post twice: twice the runes in its ward.", "A ground foe stunned in ice is struck again and again by the units round it."] },
   // Runecarvers (wb_runecarver)
-  wb_etch: { when: "Two or more foes within {reach} cells (flyers too), or a boss or elite.", aim: "The toughest foes in reach, bosses and elites first.", tips: ["Carve the boss: three sigils on it make the Runecarvers' next strike burst it.", "Follow it with Detonate: two sigils each is a full burst on every foe it carved.", "Sigils carved into flyers burst as hard: the Runecarvers reach the sky."] },
-  wb_detonate: { when: "Two or more sigil-carved foes within {reach} cells, four or more sigils among them, or a carved boss or elite.", aim: "Every sigil-carved foe in reach.", tips: ["Cast it right after Etch: every carved foe bursts at once.", "Each burst strikes the foes round it too: carve a crowd and blow it apart.", "Branded foes take more from it: let them cross a ward-line first."] },
-  wb_scribe: { when: "The ground foe furthest along within {reach} cells with another within 1.2 cells, or a boss, where no great sigil rune lies.", aim: "The road under the ground foe furthest along with company.", tips: ["Carve it where the road narrows: every foe that walks over it gains sigils.", "It links into the ward-lines like any rune, and its line to a different rune is woven.", "Pair it with Detonate: the foes that crossed it carry sigils to burst."] },
+  wb_etch: { when: "Two or more foes within {reach} cells (flyers too), or a boss or elite.", aim: "The toughest foes in reach, bosses and elites first.", tips: ["Carve the boss: three marks on it make the Runecarvers' next strike burst it.", "Follow it with Detonate: two marks each is a full burst on every foe it carved.", "Marks carved into flyers burst as hard: the Runecarvers reach the sky."] },
+  wb_detonate: { when: "Two or more marked foes within {reach} cells, four or more marks among them, or a marked boss or elite.", aim: "Every marked foe in reach.", tips: ["Cast it right after Etch: every marked foe bursts at once.", "Each burst strikes the foes round it too: mark a crowd and blow it apart.", "Exposed foes take more from it: let them spring a rune first."] },
+  wb_scribe: { when: "The ground foe furthest along within {reach} cells with another within 1.2 cells, or a boss, where no great rune of theirs lies.", aim: "The road under the ground foe furthest along with company.", tips: ["Carve it where the road narrows: every foe that walks over it gains marks.", "It does not spring: it marks every foe on it for as long as it lasts.", "Pair it with Detonate: the foes that crossed it carry marks to burst."] },
   // Stormward Lancers (wb_stormward)
   wb_charge: { when: "A line from the unit through two or more ground foes within {reach} cells, or a boss or elite.", aim: "The line through the most ground foes, then the one nearest the gate.", tips: ["Post the Lancers at the end of a straight run: the charge goes through the whole column, and stops at the first unit or wall.", "Each foe it strikes is arced with lightning, and its trail lays storm runes for Skyfall.", "Cast Storm Pennant first: every arc jumps once more."] },
   wb_stormbanner: { when: "Two or more foes within {reach} cells (flyers too), or a boss or elite.", aim: "The toughest foe in reach, bosses and elites first.", tips: ["Raise it among several Lancers: every chain from units within 2 cells jumps once more.", "Its own bolt jumps on: cast it into a crowd.", "Lancers' lightning reaches flyers: it works on a flying wave too."] },
-  wb_skyfall: { when: "Two or more foes within 0.85 cells of storm runes within {reach+1.5} cells, or a boss or elite near one.", aim: "Every storm rune in range at once; on a tap with none, a rune under the toughest foe first.", tips: ["Lay storm runes first with Thunder Charge and the Lancers' thrusts.", "A storm rune merged into a Bound rune is struck too: Bound runes sit where ground foes bunch.", "The Lancers hold nothing themselves: strike runes under foes an Oathbound has rooted and each takes more."] },
+  wb_skyfall: { when: "Two or more foes within 0.85 cells of storm runes within {reach+1.5} cells, or a boss or elite near one.", aim: "Every storm rune in range at once; on a tap with none, a rune under the toughest foe first.", tips: ["Lay storm runes first with Thunder Charge and the Lancers' thrusts.", "Storm runes lie where the Lancers struck: cast it where the fighting has been thickest.", "The Lancers hold nothing themselves: strike runes under foes an Oathbound has rooted and each takes more."] },
   // Anvil Guard (wb_anvilguard)
-  wb_shieldwall: { when: "Two or more ground foes in a cone within {reach} cells, or a boss or elite there.", aim: "The cone toward the most ground foes.", tips: ["Post Anvil Guard facing down the road: the cone catches the column as it comes.", "It shoves ground foes back up the road over the runes and lines they just crossed.", "Its stone rune stuns ground foes: lay it in front of an Oathbound's oath runes."] },
-  wb_quakeline: { when: "Two or more ground foes within {reach} cells with a rune within 3 cells of the unit, three or more ground foes, or a boss or elite.", aim: "The ground foe nearest the unit: the quake runs along the road from it both ways.", tips: ["The quake runs as far as the runes round the unit: lay runes up and down the road first.", "Every rune it reaches touches the foes on it again: Bound runes give all their kinds.", "It lays stone runes as it goes: they link into ward-lines with the rest."] },
-  wb_anvil: { when: "Two or more ground foes within 1.4 cells, a siege troop within {reach} cells, or a boss or elite.", aim: "Itself: every ground foe that comes within 1.15 cells is struck back.", tips: ["Post Anvil Guard at a corner the road turns round: every ground foe passes within reach.", "It can't be Wounded while it holds: raise it against siege troops.", "Shoved ground foes cross the ward-lines again and are branded again."] },
+  wb_shieldwall: { when: "Two or more ground foes in a cone within {reach} cells, or a boss or elite there.", aim: "The cone toward the most ground foes.", tips: ["Post Anvil Guard facing down the road: the cone catches the column as it comes.", "It shoves ground foes back up the road over the runes they just walked past.", "Its stone rune stuns ground foes: lay it in front of an Oathbound's oath runes."] },
+  wb_quakeline: { when: "Two or more ground foes within {reach} cells with a rune within 3 cells of the unit, three or more ground foes, or a boss or elite.", aim: "The ground foe nearest the unit: the quake runs along the road from it both ways.", tips: ["The quake runs as far as the runes round the unit: lay runes up and down the road first.", "Every rune it reaches touches the foes on it again.", "It lays stone runes as it goes, waiting for the foes behind."] },
+  wb_anvil: { when: "Two or more ground foes within 1.4 cells, a siege troop within {reach} cells, or a boss or elite.", aim: "Itself: every ground foe that comes within 1.15 cells is struck back.", tips: ["Post Anvil Guard at a corner the road turns round: every ground foe passes within reach.", "It can't be Wounded while it holds: raise it against siege troops.", "Shoved ground foes walk back over the runes behind them and spring them."] },
   // Siege Wardens (wb_siegewarden)
-  wb_pinbolt: { when: "The line from the unit through two or more ground foes within {reach} cells, or a boss or elite.", aim: "The line through the most ground foes, then the one nearest the gate.", tips: ["Post the ballista at the end of a straight run: one bolt roots three ground foes.", "Rooted ground foes stand on their pin runes and on the lines through them.", "Root the ground foes in front of a boss: the column behind them bunches."] },
-  wb_runeshot: { when: "Two or more ground foes within 1.4 cells of one ground foe within {reach} cells with a rune among them, or a boss or elite.", aim: "The densest spot of ground foes in reach.", tips: ["Shoot it where many runes lie: every rune bursts and touches the foes beside it.", "Bound runes burst with all their kinds at once.", "The runes it bursts are spent: lay them again before the next wave arrives."] },
-  wb_chainbolt: { when: "Two or more foes within {reach} cells.", aim: "The two foes in reach nearest the gate.", tips: ["Chain a boss to its escort: what the boss loses tears the escort too.", "Chain the leading foe to a tough one behind it: every unit that strikes the leader hurts both.", "Branded foes take more from every spell: the chained pair crosses the lines together."] },
+  wb_pinbolt: { when: "The line from the unit through two or more ground foes within {reach} cells, or a boss or elite.", aim: "The line through the most ground foes, then the one nearest the gate.", tips: ["Post the ballista at the end of a straight run: one bolt roots three ground foes.", "Rooted ground foes hold still for the units round them.", "Root the ground foes in front of a boss: the column behind them bunches."] },
+  wb_runeshot: { when: "Two or more ground foes within 1.4 cells of one ground foe within {reach} cells with a rune among them, or a boss or elite.", aim: "The densest spot of ground foes in reach.", tips: ["Shoot it where many runes lie: every rune bursts and touches the foes beside it.", "Each burst touches the foes beside it with its rune's kind.", "The runes it bursts are spent: lay them again before the next wave arrives."] },
+  wb_chainbolt: { when: "Two or more foes within {reach} cells.", aim: "The two foes in reach nearest the gate.", tips: ["Chain a boss to its escort: what the boss loses tears the escort too.", "Chain the leading foe to a tough one behind it: every unit that strikes the leader hurts both.", "Exposed foes take more from every Wardbound spell: chain a pair that has sprung runes."] },
   // Vowkeepers (wb_vowkeeper)
-  wb_censer: { when: "A hurt Wardbound unit within {reach} cells, a siege troop there, or two or more ground foes there.", aim: "Itself: the smoke hangs round its post.", tips: ["Post Vowkeepers in the front line beside the units siege troops attack.", "Siege troops in the smoke can't attack: it shields the line.", "Foes in the smoke are branded once: the spells after it bite deeper."] },
-  wb_vow: { when: "A Wounded Wardbound unit within {reach} cells, or one under 60% health.", aim: "The most hurt Wardbound unit in reach, the Wounded first.", tips: ["Save it for a Wounded unit: it stands up whole at once.", "The unit can't be Wounded while the vow holds: cast it on the one siege troops strike.", "The ground foes round the unit are branded twice."] },
+  wb_censer: { when: "A hurt Wardbound unit within {reach} cells, a siege troop there, or two or more ground foes there.", aim: "Itself: the smoke hangs round its post.", tips: ["Post Vowkeepers in the front line beside the units siege troops attack.", "Siege troops in the smoke can't attack: it shields the line.", "Foes in the smoke are Exposed once: the spells after it hit harder."] },
+  wb_vow: { when: "A Wounded Wardbound unit within {reach} cells, or one under 60% health.", aim: "The most hurt Wardbound unit in reach, the Wounded first.", tips: ["Save it for a Wounded unit: it stands up whole at once.", "The unit can't be Wounded while the vow holds: cast it on the one siege troops strike.", "The ground foes round the unit are Exposed twice."] },
   // Varic Dunmoor, the Last Warden (ch_varic)
-  ch_wardensoath: { when: "Three or more foes within 1.4 cells of one foe in reach ({reach} cells; the area grows to 1.6 by tier VI), or any boss or elite in reach.", aim: "The densest spot: the foe with the most others within 1.4 cells.", tips: ["It reads the road: it roots foes pressing past half the road, and strikes harder where they bunch or falter (slowed or held).", "Catching four or more gives a third of its mana back: wait for a crowd rather than casting on two.", "Its six oath runes link into ward-lines: cast it beside Oathstones and the ring joins the wards."] },
-  ch_holdfast: { when: "Two or more ground foes within {reach} cells, or a ground boss or elite there.", aim: "Himself: each half second it strikes and roots the ground foes in his reach that stand on a rune or a ward-line.", tips: ["It does nothing to ground foes off the runes: post Varic where his own cuts and the Oathbound have carved the road.", "Lay runes first (Warden's Oath, The Last Gate), then hold.", "Each ground foe is rooted at most once every 2s, but struck every half second."] },
-  ch_lastgate: { when: "Two or more ground foes within {reach} cells with road in reach, or a ground boss or elite there.", aim: "The road cells in his reach nearest the gate: a line of Bound oath runes along them, flaring a moment later.", tips: ["Post Varic beside the last stretch of road: the gate is carved where the leaks would happen.", "If no ground foe stands on the runes when they flare, half its mana comes back: it never wastes much.", "The runes stay: they link into ward-lines that brand and slow for 10s more."] },
+  ch_wardensoath: { when: "Three or more foes within 1.4 cells of one foe in reach ({reach} cells; the area grows to 1.6 by tier VI), or any boss or elite in reach.", aim: "The densest spot: the foe with the most others within 1.4 cells.", tips: ["It reads the road: it roots foes pressing past half the road, and strikes harder where they bunch or falter (slowed or held).", "Catching four or more gives a third of its mana back: wait for a crowd rather than casting on two.", "Its six oath runes wait round the blade: the next foes to step on them are slowed and Exposed."] },
+  ch_holdfast: { when: "Two or more ground foes within {reach} cells, or a ground boss or elite there.", aim: "Himself: each half second it strikes and roots the ground foes in his reach that stand on a rune.", tips: ["It does nothing to ground foes off the runes: post Varic where his own cuts and the Oathbound have carved the road.", "Lay runes first (Warden's Oath, The Last Gate), then hold.", "Each ground foe is rooted at most once every 2s, but struck every half second."] },
+  ch_lastgate: { when: "Two or more ground foes within {reach} cells with road in reach, or a ground boss or elite there.", aim: "The road cells in his reach nearest the gate: a line of oath runes along them, flaring a moment later.", tips: ["Post Varic beside the last stretch of road: the gate is carved where the leaks would happen.", "If no ground foe stands on the runes when they flare, half its mana comes back: it never wastes much.", "The runes stay for 10s more: each slows and Exposes the next foes to step on it."] },
   // Lord Aedric Solmane, the Sun-Sworn (ch_aedric)
-  ch_sunwheel: { when: "Three or more foes within 1.6 cells of one foe in reach ({reach} cells; the area grows to 1.8 by tier VI), or any boss or elite in reach.", aim: "The densest spot: the foe with the most others within 1.6 cells.", tips: ["Foes already at 3 brands flare white-gold and burst: brand them first (ward-lines, Sun Charge, Blaze of Glory).", "It strikes harder with the army's Momentum: cast it in the middle of a killing streak.", "It scorches Aedric for 8% of his health each cast: keep Vowkeepers near him."] },
-  ch_suncharge: { when: "A line from him through two or more ground foes within {reach} cells, or a ground boss or elite.", aim: "The line through the most ground foes, then over the most road.", tips: ["Post him at the end of a straight run of road: the charge rides along it, and stops at the first unit or wall.", "Every ground foe it passes is branded: follow with Sunwheel.", "He is winded for 3s after (20% slower strikes): do not cast it just before a boss reaches him."] },
-  ch_blazeglory: { when: "Three or more foes within {reach} cells, or a boss or elite there.", aim: "Himself: the burst of sunlight strikes every foe in his reach.", tips: ["Every strike during the Blaze brands its foe: three strikes make a full sun-mark for Sunwheel.", "He burns out after it (30% slower for 4s): spend it on a boss or a big wave, not a straggler.", "Pair it with the army's own Blaze from Momentum for one short, overwhelming push."] },
+  ch_sunwheel: { when: "Three or more foes within 1.6 cells of one foe in reach ({reach} cells; the area grows to 1.8 by tier VI), or any boss or elite in reach.", aim: "The densest spot: the foe with the most others within 1.6 cells.", tips: ["Foes already Exposed 3 times flare white-gold and burst: Expose them first (runes, Sun Charge, Blaze of Glory).", "It strikes harder with the army's Momentum: cast it in the middle of a killing streak.", "It scorches Aedric for 8% of his health each cast: keep Vowkeepers near him."] },
+  ch_suncharge: { when: "A line from him through two or more ground foes within {reach} cells, or a ground boss or elite.", aim: "The line through the most ground foes, then over the most road.", tips: ["Post him at the end of a straight run of road: the charge rides along it, and stops at the first unit or wall.", "Every ground foe it passes is Exposed: follow with Sunwheel.", "He is winded for 3s after (20% slower strikes): do not cast it just before a boss reaches him."] },
+  ch_blazeglory: { when: "Three or more foes within {reach} cells, or a boss or elite there.", aim: "Himself: the burst of sunlight strikes every foe in his reach.", tips: ["Every strike during the Blaze Exposes its foe: three strikes ready it for Sunwheel.", "He burns out after it (30% slower for 4s): spend it on a boss or a big wave, not a straggler.", "Pair it with the army's own Blaze from Momentum for one short, overwhelming push."] },
   // Lady Isaura Vell, the Veiled Oath (ch_isaura)
-  ch_oathbind: { when: "Three or more foes within 1.3 cells of one foe in reach ({reach} cells; the area grows to 1.5 by tier VI), or any boss or elite in reach.", aim: "The densest spot of ground foes: the foe with the most others within 1.3 cells.", tips: ["The toll is doubled on a rune or a ward-line: bind them where the road is carved.", "Bound foes are rooted then held at half speed: the rest of the army has 4s to work on them.", "With Broken Vows, every foe that breaks free on a rune pays again."] },
-  ch_bindsweep: { when: "Two or more ground foes within {reach} cells, or a ground boss or elite there.", aim: "Herself: every ground foe in her reach.", tips: ["Branded ground foes stay rooted twice as long: sweep after they cross a ward-line.", "Post her where the road bends round her post: more ground foes sit in her reach.", "Roots end on runes: with Broken Vows each one pays as it breaks free."] },
+  ch_oathbind: { when: "Three or more foes within 1.3 cells of one foe in reach ({reach} cells; the area grows to 1.5 by tier VI), or any boss or elite in reach.", aim: "The densest spot of ground foes: the foe with the most others within 1.3 cells.", tips: ["The toll is doubled on a rune: bind them where the road is carved.", "Bound foes are rooted, then held at half speed: the rest of the army has 4s to work on them.", "With Broken Vows, every foe that breaks free on a rune pays again."] },
+  ch_bindsweep: { when: "Two or more ground foes within {reach} cells, or a ground boss or elite there.", aim: "Herself: every ground foe in her reach.", tips: ["Exposed ground foes stay rooted twice as long: sweep after they spring a rune.", "Post her where the road bends round her post: more ground foes sit in her reach.", "Roots end on runes: with Broken Vows each one pays as it breaks free."] },
   ch_oathturned: { when: "The toughest ground foe within {reach} cells with another ground foe within 1.2 cells of it, or a boss or elite.", aim: "The toughest ground foe in her reach (bosses and elites first): its strength turns on the ground foes round it.", tips: ["The tougher the target, the harder the ground foes round it are struck: aim it at a boss in its escort.", "Each ground foe struck is rooted 1s: a good follow-up to Oathbind.", "It needs company: on a lone ground foe it is only a single heavy blow."] },
-  wb_rite: { when: "Two or more vow or oath runes within {reach} cells.", aim: "Itself: every vow and oath rune within reach.", tips: ["Post Vowkeepers beside the Oathbound: their oath runes become Bound vow runes that mend.", "It renews the runes in reach: cast it to keep a net of ward-lines standing.", "Bound runes touch the foes on them every second with all their kinds."] },
+  wb_rite: { when: "Two or more vow or oath runes within {reach} cells.", aim: "Itself: every vow and oath rune within reach.", tips: ["Post Vowkeepers beside the Oathbound: their oath runes are renewed and the knights round them mend.", "It renews the runes in reach: cast it to keep the road carved.", "Every Wardbound unit within 3 cells mends for 6s: cast it after a siege troop has struck the line."] },
 };
 if (typeof SPEC_HELP !== 'undefined') Object.assign(SPELL_HELP, SPEC_HELP);   // the specialists' spells (each force's forces_zs_<id>.js)
 
@@ -125149,7 +125050,7 @@ const KW_FOLD = {
   stunned: ['Frozen', 'frozen', 'frozen solid', 'Pinned', 'pinned', 'Staggered', 'staggered', 'Stagger', 'stagger', 'staggers', 'Dragged Down'],
   rooted: ['Leashed', 'leashed'],
   silenced: ['Silenced caster', 'silenced casters'],
-  exposed: ['Cursed', 'cursed', 'Called out', 'called out', 'Shredded', 'shredded', 'armour-shred', 'Armour shred', 'armour shred', 'Blinded', 'blinded', 'blindness'],
+  exposed: ['Cursed', 'cursed', 'Called out', 'called out', 'Shredded', 'shredded', 'armour-shred', 'Armour shred', 'armour shred', 'Blinded', 'blinded', 'blindness', 'Branded', 'branded'],
 };
 // the specialists' minor terms said in plain words now (their SPEC_KW entries stay in their files, unread here)
 const KW_CUT = new Set(['cc:severance', 'cc:cracked', 'ih:charges', 'sx:zeal', 'sx:manaburn']);
@@ -125241,17 +125142,9 @@ function kwBuild() {
   kwAdd({ key: 'sb:tempest', name: 'Tempest', cat: 'force', sub: 'Storm 100', col: '#8fc0ff', def: 'Storm at 100: 12 thunderbolts over 3s strike the toughest foes. The storm then falls back to 30 and needs 18s of the wave before it can break again.' });
 
   // ---- the Wardbound: the Runes ----
-  const WB = kwForceName('wardbound') || 'The Wardbound', wbR = typeof WB_RUNE !== 'undefined' ? WB_RUNE : { life: 10, link: 1.6, merge: .45 }, wbB = typeof WB_BRAND !== 'undefined' ? WB_BRAND : { max: 3, per: .12, fade: 6 };
-  kwAdd({ key: 'wb:rune', name: 'Ground rune', alias: ['ground rune', 'ground runes', 'Ground runes', 'rune on the road', 'runes on the road'], cat: 'force', sub: WB, col: '#f0c050',
-    def: () => `Every Wardbound unit carves runes into the road, each of its own kind. A rune lies quiet until the next ground foe steps on it: then it flashes and springs on every ground foe within ${wbR.burst || .7} cells (Oath slows, Shaft strips armour, Frost slows, Sigil carves two sigils, Storm sparks, Stone stuns, Pin roots), and is spent. Vow runes are not sprung: they mend the units beside them. An unsprung rune lasts ${wbR.life}s.` });
-  kwAdd({ key: 'wb:bound', name: 'Bound rune', alias: ['Bound runes', 'bound rune', 'bound runes'], cat: 'force', sub: WB, col: '#ffe8a8',
-    def: () => `A rune laid within ${wbR.merge} cells of another joins it. A rune holding two or more kinds is Bound: when it springs, it strikes with all its kinds at once over a wider reach (${wbR.boundBurst || .95} cells).` });
-  kwAdd({ key: 'wb:line', name: 'Ward-line', alias: ['ward-line', 'ward-lines', 'Ward-lines', 'ward line', 'ward lines'], cat: 'force', sub: WB, col: '#f0c050',
-    def: () => `Runes within ${wbR.link} cells of each other link into gold ward-lines, each to its two nearest; Oathstones count as oath runes. A ground foe crossing a ward-line is branded and slowed 15% for 1s; a line between runes of different kinds (a woven line) brands it twice and touches it with both ends' kinds. A sprung rune takes its lines with it.` });
-  kwAdd({ key: 'wb:brand', name: 'Brand', alias: ['Branded', 'branded', 'brand', 'brands', 'Brands'], cat: 'force', sub: WB, col: '#f0c050',
-    def: () => `Carved into a foe by ward-lines and spells, up to ${wbB.max}. Each brand makes the Wardbound's spells, and their commander's, bite ${kwPct(wbB.per)} deeper on that foe. Brands fade ${wbB.fade}s after the last.` });
-  kwAdd({ key: 'wb:sigil', name: 'Sigil', alias: ['Sigils', 'sigil', 'sigils', 'sigil-carved'], cat: 'force', sub: WB, col: '#d8b8ff',
-    def: 'Violet glyphs carved into a foe by the Runecarvers and sigil runes, up to 3. Their strikes, spells and some items detonate them: for each sigil the foe is struck, and the foes round it take half of that.' });
+  const WB = kwForceName('wardbound') || 'The Wardbound', wbR = typeof WB_RUNE !== 'undefined' ? WB_RUNE : { life: 10, burst: .7 }, wbB = typeof WB_BRAND !== 'undefined' ? WB_BRAND : { max: 3, per: .12, fade: 6 };
+  kwAdd({ key: 'wb:rune', name: 'Ground rune', alias: ['ground rune', 'ground runes', 'Ground runes', 'rune on the road', 'runes on the road', 'runes into the road', 'runes in the road'], cat: 'force', sub: WB, col: '#f0c050',
+    def: () => `Every Wardbound unit carves runes into the road as it fights, one kind a unit. A rune lies quiet until the next ground foe steps on it. Then it springs on every ground foe within ${wbR.burst || .7} cells, and it is gone. Each of them is struck (hardest by storm and stone runes), takes the rune's touch and is Exposed: Wardbound spells hit it ${kwPct(wbB.per)} harder, up to ${wbB.max} times (${kwPct(wbB.per * wbB.max)}), until ${wbB.fade}s after the last rune. The touches: oath and frost runes slow, shaft runes crack armour, stone runes stun a moment, pin runes root a moment, storm runes spark, and the Runecarvers' runes carve two of their marks. A vow rune does not spring: Wardbound units beside it mend. An unsprung rune lasts ${wbR.life}s.` });
 
   /* ---- statuses: the core set (owner, 23 Nov 2026: "we still have a lot of keywords like soaked etc") ----
      Nine words only. Every other effect is said in plain words where it is used; the old names that play the same as a
@@ -125328,11 +125221,7 @@ const KW_LINE = {
   'cc:charge': 'Each basic attack stores a charge; the next spell spends them all for more power',
   'sb:storm': 'A shared 0-100 meter that rises as Stormborn units cast and brings weather onto the field',
   'sb:rain': 'Storm at 50: rain wets every foe, and Stormborn lightning leaps further through a wet foe',
-  'wb:rune': 'A rune carved into the road: it springs on the next ground foe to step on it',
-  'wb:bound': 'A rune that has joined another of a different kind: it springs with both at once, wider',
-  'wb:line': 'Gold lines between runes near each other: a ground foe crossing one is branded and slowed',
-  'wb:brand': 'A mark carved into a foe, up to 3: each makes the Wardbound\'s spells bite deeper',
-  'wb:sigil': 'Violet glyphs carved into a foe, up to 3, that strikes and spells detonate',
+  'wb:rune': 'A rune carved into the road: it springs on the next ground foe to step on it and Exposes the foes round it',
   'sy:renown': 'Laurels earned by deeds, spent on boss loot rerolls, locked units, pledges and respecs',
   'sy:tome': 'A book for one unit type: read it and every unit of that type learns a second capstone',
   'sy:laststand': 'At half your lives or fewer, kills pay more gold and your units strike harder',
@@ -126090,14 +125979,14 @@ bfAdd('hexed', { name: 'Storing its wounds', kind: 'debuff', pri: 6, icon: 'hexe
 bfAdd('soaked', { name: 'Wet from the rain', kw: 'sb:rain', kind: 'debuff', pri: 24, icon: 'rain', hue: '#1a4a7a', f: ['sbWetT'],
   def: 'The Storm\'s rain: Stormborn chain lightning leaps further to it and bites harder.',
   get: c => c.sbWetT > bfNow() ? { t: bfLeft(c.sbWetT), say: 'Stormborn chain lightning leaps further to it, gains a jump from it and bites 20% harder.' } : null });
-// ---- the Wardbound (forces_wardbound_a.js and its files): brands, sigils, the runes' touches, Isaura's binding ----
+// ---- the Wardbound (forces_wardbound_a.js and its files): Exposed by runes (c.wbBrand), the Runecarvers' marks (c.wbSig), the runes' touches, Isaura's binding ----
 const bfWbK = () => (typeof WB_BRAND !== 'undefined' ? WB_BRAND : { max: 3, per: .12, fade: 6 });
-bfAdd('wbbrand', { name: 'Branded', kw: 'wb:brand', kind: 'debuff', pri: 7, icon: 'sunwheel', hue: '#8a6a1a', f: ['wbBrandT', 'wbBrand', 'wbBrandBy'],
-  def: 'Carved with the Wardbound\'s brand by a ward-line or a spell: branded foes take more from Wardbound spells and their commander\'s.',
-  get: c => { const n = c.wbBrandT > bfNow() ? c.wbBrand || 0 : 0; return n ? { t: bfLeft(c.wbBrandT), T: bfWbK().fade, n, src: bfFrom(c.wbBrandBy), say: `${bfPl(n, 'brand')}: Wardbound spells bite ${bfPct(bfWbK().per * n)} deeper on it. It fades ${bfWbK().fade}s after the last brand.` } : null; } });
-bfAdd('wbsigil', { name: 'Sigils', kw: 'wb:sigil', kind: 'debuff', pri: 8, icon: 'rune', hue: '#5a3a8a', f: ['wbSigT', 'wbSig', 'wbSigBy'],
-  def: 'Sigils carved into it by the Runecarvers (and sigil runes): their strikes, spells and some items detonate them for a burst.',
-  get: c => { const n = c.wbSigT > bfNow() ? c.wbSig || 0 : 0; return n ? { t: bfLeft(c.wbSigT), n, src: bfFrom(c.wbSigBy), say: `${bfPl(n, 'sigil')} carved into it. A Runecarver's cut on a foe with 3 detonates them all: a hit on it and a burst round it for each.` } : null; } });
+bfAdd('wbbrand', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 7, icon: 'sunwheel', hue: '#8a6a1a', f: ['wbBrandT', 'wbBrand', 'wbBrandBy'],
+  def: 'Exposed by a Wardbound rune or spell: Wardbound spells and their commander\'s hit it harder.',
+  get: c => { const n = c.wbBrandT > bfNow() ? c.wbBrand || 0 : 0; return n ? { t: bfLeft(c.wbBrandT), T: bfWbK().fade, n, src: bfFrom(c.wbBrandBy), say: `Exposed ${n === 1 ? 'once' : n + ' times'}: Wardbound spells hit it ${bfPct(bfWbK().per * n)} harder. It fades ${bfWbK().fade}s after the last rune or spell that Exposed it.` } : null; } });
+bfAdd('wbsigil', { name: 'Runecarver marks', kind: 'debuff', pri: 8, icon: 'rune', hue: '#5a3a8a', f: ['wbSigT', 'wbSig', 'wbSigBy'],
+  def: 'Marks the Runecarvers carved into it: their flicks and spells burst them, striking it and the foes round it once for each.',
+  get: c => { const n = c.wbSigT > bfNow() ? c.wbSig || 0 : 0; return n ? { t: bfLeft(c.wbSigT), n, src: bfFrom(c.wbSigBy), say: `${bfPl(n, 'mark')} carved into it by the Runecarvers. A Runecarver's flick on it at 3 bursts them all: a hit on it and on the foes round it for each.` } : null; } });
 bfAdd('wbstagger', { name: 'Stunned', kw: 'st:stunned', kind: 'debuff', pri: 5, icon: 'tremor', hue: '#7a5a2a', f: ['wbStagT'],
   def: 'A stone rune stunned it: it stops for a moment, and no stone rune can stun it again for 3s.',
   get: c => c.wbStagT > bfNow() && c.stunT > 0 && c.wbStagT - bfNow() > 2.5 ? { t: Math.max(0, c.stunT), say: 'Stunned by a stone rune: it stops for a moment. No stone rune stuns it again for 3s.' } : null });
