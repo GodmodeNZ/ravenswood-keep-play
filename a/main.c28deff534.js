@@ -1,4 +1,4 @@
-const BUILD_TAG = '573d4716@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = '79f2f85f@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -107052,7 +107052,7 @@ const LB2 = (() => {
 /* The Templars of the Ford on a rig and clips made from scratch (the owner, 22 Nov 2026: "Silver Order - Templar and Censer
    Bearer": the knight and his sword, un-rigged; art direction: dual wield, a sword in each closed fist). tools/make_tp2.py ->
    src/model_tp2.js: 36 bones (the tabard below his belt on four panels of their own, each in two lengths; a bone each for the
-   sword in his right fist and the one in his left), 8,798 triangles on one 1024 x 1536 atlas, 10 clips baked at 30 frames a
+   sword in his right fist and the one in his left), 8,798 triangles on one 1024 x 1536 atlas, 13 clips baked at 30 frames a
    second. ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.templar and its parts); ?tp=old (or
    the Model Lab's "Templar rig" row set to Old) draws that.
    His moves, by the game's own cues (nothing in the game is changed):
@@ -107067,13 +107067,14 @@ const LB2 = (() => {
                 sword in its fist to it)
      cross      Cross-Cut (so_crush): both swords crossed high over his head, then drawn apart down and out like scissors,
                 0.58 s after the cast
-     flurry     Whirling Flurry (so_hallow): a whirl, a full turn every two cuts, right then left, one on each of the
-                game's cuts (the first 0.15 s after the cast, then one every 0.3 s) for as many as the game counts
-                (t.socFerv); the last is the crossing cut, both blades together
+     flurry5-7  Whirling Flurry (so_hallow), choreographed whole for the 5, 6 and 7 cuts the game counts (t.socFerv): the
+                first cut (0.15 s after the cast) throws his right blade out and pulls him into the whirl, arms wide, one
+                blade high and one low changing places with every cut (one every 0.3 s); he sheds the turn to face the foe
+                on the last cut, where both blades close before him; then his guard
      heaven     Sword of Heaven (so_hammerfall): reared back, the right sword hurled into the sky at 0.3 s (it is hidden in
                 his hand and drawn in flight here, in place of the code-built hammer), both arms raised until it falls at 1 s,
-                caught again at 1.35 s. With the Second Star (st.caps.tpStar) the left sword follows 0.4 s behind it, onto
-                t.tpStar2
+                caught again at 1.35 s. With the Second Star (st.caps.tpStar) clip heaven2 plays: the left sword is thrown in
+                its turn 0.4 s behind the right (hidden and drawn in flight too), and each is caught in turn
      hit        his health drops: rocked back, the forward blade knocked aside
      death      wounded (t.wounded): down on one knee, both swords' points in the ground; when he is whole again he eases back
                 up into his guard
@@ -107081,7 +107082,7 @@ const LB2 = (() => {
    tier; he grows by UM_TIER.
    Checks: `python tools/make_tp2.py --check`. Notes: docs/model_pilot/templar2.md. */
 const TP2 = (() => {
-  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cross', 'flurry', 'heaven', 'hit', 'death'];
+  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cross', 'flurry5', 'flurry6', 'flurry7', 'heaven', 'heaven2', 'hit', 'death'];
   const CUTS = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, SPD_CUT = 1.1;
   const MV = { so_crush: 'cross', so_hammerfall: 'heaven' };
   const FL_AT = .15, FL_IV = .3, OUT_AT = .3, BACK_AT = 1.35, STAR2 = .4, PARRY = .2;   // (the game's own times: the flurry's first cut and its interval; the sword leaves the hand and is back in it; the Second Star's sword that long after the first)
@@ -107191,15 +107192,17 @@ const TP2 = (() => {
     if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
     if (t._tpMv === 'death') t._tpRise = now;   // (whole again: eased back up)
     const rise = t._tpRise != null && now - t._tpRise < .9;
-    // a spell: its move from the cast
+    // a spell: its move from the cast. (Its blows are the spell's own: they are not counted as cuts, so the next cut's pace
+    // is not taken from them)
     if (A && A.last && A.lastAt != null && now >= A.lastAt) {
-      const u = now - A.lastAt, m = MV[A.last], c0 = m && CL[m];
-      if (c0 && u < c0.len) return { c: m, s: u, rate: 40, mv: 'ab' + A.lastAt };
-      if (A.last === 'so_hallow') {   // (the flurry: the loop's right cut lands 0.15 s in, then a cut every 0.3 s, for the game's count)
-        const F = t.socFerv, n = F && F.n ? F.n : 5, iv = F && F.iv ? F.iv : FL_IV;
-        const tl = FL_AT + (n - 1) * iv, hc = hitOf('cutC');   // (the last cut: both blades, landing on the game's last)
-        if (u >= tl - hc * .75 && u < tl + CL.cutC.len - hc) return { c: 'cutC', s: u < tl ? hc - (tl - u) / .75 : hc + (u - tl), rate: 40, mv: 'abx' + A.lastAt };
-        if (u < tl) return { c: 'flurry', s: u * (FL_IV / iv), rate: 40, mv: 'ab' + A.lastAt };
+      const u = now - A.lastAt, own = c => { t._tpShots = t.shots; if (t.soSlamAt != null && t.soSlamAt <= now) t._tpSlam = t.soSlamAt; return c; };
+      let m = MV[A.last]; if (m === 'heaven' && t.st && t.st.caps && t.st.caps.tpStar && CL.heaven2) m = 'heaven2';   // (the Second Star: both swords thrown and caught in turn)
+      const c0 = m && CL[m];
+      if (c0 && u < c0.len) return own({ c: m, s: u, rate: 40, mv: 'ab' + A.lastAt });
+      if (A.last === 'so_hallow') {   // (the Whirling Flurry, choreographed whole for 5, 6 and 7 cuts: the first lands 0.15 s in, then one every 0.3 s; the last is both blades)
+        const F = t.socFerv, n = F && F.n ? F.n : 5, iv = F && F.iv ? F.iv : FL_IV, nc = Math.max(5, Math.min(7, n)), c = CL['flurry' + nc];
+        const tg = FL_AT + (n - 1) * iv, tc = FL_AT + (nc - 1) * FL_IV, sc = u <= tg ? u * tc / tg : tc + (u - tg);   // (another count or pace: its last cut is still on the game's last)
+        if (c && sc < c.len) return own({ c: 'flurry' + nc, s: sc, rate: 40, mv: 'ab' + A.lastAt });
       }
     }
     // Parry and Riposte (the dual-wield kit: t.tpParryAt at the blow he parries, the answering Twin Cut PARRY later): the crossing
