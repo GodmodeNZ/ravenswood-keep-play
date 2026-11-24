@@ -1,4 +1,4 @@
-const BUILD_TAG = '57625404@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'dd7ac049@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47080,7 +47080,7 @@ const CCR = {
   SPEAR_FLY: .16, SPEAR_SLOW: [.4, .4, .42, .42, .45, .45], SPEAR_SLOWT: [2.5, 2.5, 2.5, 2.5, 3, 3],
   COFFIN_TICK: .5, COFFIN_BOSS: .45, BLOOM_T: 10, BLOOM_R: 1.1, BLOOM_SLOW: .4, BLOOM_MAX: 12,
   DEEP_R: .8, HAND_MANA: 10, BURST_R: 1, BURST_FRZ: .6, INK_R: .6, INK_GAP: 3, SECOND_N: 4,
-  CRIT_COL: '#bfefff', CRIT_GAP: .08,
+  CRIT_COL: '#6fbcff', CRIT_GAP: .08,   // (the frozen crit's number and flash: the frost crit blue, forces_zzz..._critcol.js CRIT_HUE.el.frost)
 };
 const ccFrozen = c => !!(c && !c.dead && c.stunT > 0 && c.stunEl === 'frost');
 const ccrCap = (st, k) => (st && st.caps && st.caps[k]) || 0;
@@ -56050,7 +56050,13 @@ const FPH = (() => {
    A crit is flagged on the foe (critT) just as the blow lands, so the blow that lands in that same instant names the unit;
    game.js flushDmg reads critCol. A source with no hue (a hero's spell, a hazard) keeps the old gold or school colour. */
 const CRITCOL = {};
+// A crit colour of its own, used as it is, for a unit (by its id) or an element (a unit's ccSchool or elem): frost crits
+// are an ice blue (owner, 24 Nov 2026: "frostweaver crits should be a bluey colour"; the Frostweavers' tree hue, lightened,
+// came out near white). Another frost unit takes it by being listed under unit, e.g. sb_hailshaman: CRIT_HUE.el.frost.
+const CRIT_HUE = { unit: {}, el: { frost: '#6fbcff' } };
+const critOwn = t => { const d = t && t.def; return (d && (CRIT_HUE.unit[d.unit || d.id] || CRIT_HUE.el[d.ccSchool || d.elem])) || null; };
 function unitCritCol(t) {
+  const own = critOwn(t); if (own) return own;
   const h = t && t.type && typeof TALENTS !== 'undefined' && TALENTS[t.type] && TALENTS[t.type].hue; if (!h || !/^#[0-9a-f]{6}$/i.test(h)) return null;
   if (CRITCOL[h]) return CRITCOL[h];
   const n = parseInt(h.slice(1), 16), mix = v => Math.round(v + (255 - v) * .3);   // 30% toward white
@@ -56061,6 +56067,14 @@ if (typeof hurt === 'function') hurt = (f => function (c, amt, type, src) {
   try { if (c && src && c.critT > G.time + .85) { const col = unitCritCol(src); c.critCol = col; c.critColT = c.critT; } } catch (e) {}
   return r;
 })(hurt);
+// A strike's crit is flagged on its foe as the strike is loosed (game.js fire), and a bolt lands later, so the blow above
+// never sees it in the same instant: a unit with a crit colour of its own names its crit here, as it is flagged. (Other
+// units' strike crits are left as they were: gold, or their school's colour.)
+if (typeof fire === 'function') fire = (f => function (t, st, tg) {
+  const was = tg && tg.critT, r = f.apply(this, arguments);
+  try { if (tg && tg.critT > G.time + .85 && tg.critT !== was) { const col = critOwn(t); if (col) { tg.critCol = col; tg.critColT = tg.critT; } } } catch (e) {}
+  return r;
+})(fire);
 
 /* ================= THE FORCES' SET BONUSES IN PLAIN WORDS =================
    Owner (23 Nov 2026): item tooltips have "lots of keywords to understand and remember, so much that it cant fit all the
@@ -130285,6 +130299,7 @@ const saSig = S => S ? JSON.stringify([S.reach, S.self, S.target, S.ally, S.mult
 function saTalentSketch(ty, ci) {
   if (!SA.on || typeof ABIL === 'undefined' || !TALENTS[ty]) return '';
   const tl = TALENTS[ty].list[ci]; if (!tl) return '';
+  if (tl.spell) return '';   // (a spell talent's tooltip is the spell's own tooltip: its clip and sketch are there, spellTipHTML)
   const ids = saTalSpells(ty, tl).slice(0, 2); if (!ids.length) return '';
   const picks = talPicks(ty).slice(); while (picks.length < TALENTS[ty].list.length) picks.push(0);
   const n = picks[ci] | 0, key = `${ty}|${ci}|${picks.join('')}|${G.force || ''}|${ids.join(',')}`;
@@ -130295,7 +130310,7 @@ function saTalentSketch(ty, ci) {
     const now = saGeomWith(t, ab, ty, picks); if (!now) continue;
     let next = null;
     if (n < tl.max && !tl.spell) { const p2 = picks.slice(); p2[ci] = n + 1; const g2 = saGeomWith(t, ab, ty, p2); if (g2 && saSig(g2) !== saSig(now)) next = g2; }
-    html += saSketchSVG(ab, now, next, n);
+    html += saMediaRow(ab, saSketchSVG(ab, now, next, n));
   }
   SA.vcache.set(key, html); if (SA.vcache.size > 300) SA.vcache.clear();
   return html;
@@ -130326,6 +130341,68 @@ function saSketchSVG(ab, A, B, n) {
   return `<div class="sa-box" title="${stEsc(A.what)}"><div class="sa-t">${stEsc(ab.name)}: area</div><svg class="sa-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="--sa:${hue}" role="img" aria-label="${stEsc(ab.name + ' area: ' + A.what)}">`
     + `<rect x="0" y="0" width="${W}" height="${H}" rx="4" class="sa-bg"/>${now}${nx}<circle cx="${cx}" cy="${cy}" r="5" class="sa-u"/></svg>${cap}</div>`;
 }
+/* ---------- spell clips: each spell cast in a real run (tools/make_spellclips.py), a looping 240x160 WebM (VP9) ----------
+   Owner: "can you show small videos of the spell being used". src/spellclips_<force>.js fills window.SPELL_CLIPS; each is a
+   split asset in the lazy group clips:<force>, asked for the first time a tooltip shows one of that force's spells. Until it
+   is here the clip's place waits empty (its frame kept), and it is filled in place when it comes. */
+const SA_FORCE_OF = {};
+function saForceOf(ab) {
+  const u = ab && ab.unit; if (!u) return null; if (u in SA_FORCE_OF) return SA_FORCE_OF[u];
+  let f = null;
+  try { if (typeof CHAMP_BY_UNIT !== 'undefined' && CHAMP_BY_UNIT[u]) f = CHAMP_BY_UNIT[u].force; } catch (e) {}
+  try { if (!f && typeof FORCES !== 'undefined') for (const k in FORCES) for (const s in FORCES[k].units || {}) if (FORCES[k].units[s] && FORCES[k].units[s].id === u) f = k; } catch (e) {}
+  return (SA_FORCE_OF[u] = f);
+}
+const saClipOf = id => (typeof window !== 'undefined' && window.SPELL_CLIPS && window.SPELL_CLIPS[id]) || null;
+function saClipFill() {
+  if (typeof document === 'undefined') return;
+  for (const im of document.querySelectorAll('video.sa-clip[data-saclip]:not([src])')) { const u = saClipOf(im.dataset.saclip); if (u) { im.src = u; im.classList.remove('sa-wait'); try { const q = im.play(); if (q && q.catch) q.catch(() => {}); } catch (e) {} } else im.remove(); }
+}
+const SA_CLIPS_ASKED = {};
+function saClipHTML(ab) {
+  if (!ab || !SA.on || SA.noClips) return '';
+  const u = saClipOf(ab.id), alt = stEsc(ab.name + ' being cast');
+  if (u) return `<video class="sa-clip" data-saclip="${ab.id}" src="${u}" aria-label="${alt}" width="240" height="160" muted autoplay loop playsinline disablepictureinpicture></video>`;
+  const f = saForceOf(ab), g = f && 'clips:' + f;
+  const has = g && typeof LAZY !== 'undefined' && LAZY.groups && LAZY.groups[g];
+  if (!has) return '';
+  if (!SA_CLIPS_ASKED[g]) { const q = SA_CLIPS_ASKED[g] = Promise.resolve(needAssets(g, { low: false })).then(() => { q.done = true; saClipFill(); }, () => { delete SA_CLIPS_ASKED[g]; }); }
+  else if (SA_CLIPS_ASKED[g].done) return '';   // (its force's clips are here, and this spell has none)
+  return `<video class="sa-clip sa-wait" data-saclip="${ab.id}" aria-label="${alt}" width="240" height="160" muted autoplay loop playsinline disablepictureinpicture></video>`;
+}
+// the clip and the area sketch side by side
+const saMediaRow = (ab, sketch) => { const c = saClipHTML(ab); return c || sketch ? `<div class="sa-media">${c}${sketch || ''}</div>` : ''; };
+// the spell's own sketch (no next rank), for a unit on the field or a stand-in (the Spellbook, a talent's spell)
+function saSpellSketch(ab, t) {
+  try {
+    if (t && t.x != null && G.towers && G.towers.includes(t)) { const S = saGeom(t, ab); return S ? saSketchSVG(ab, S, null, 0) : ''; }
+    const ty = (t && t.def && Object.keys(TOWERS).find(k => TOWERS[k] === t.def)) || Object.keys(TOWERS).find(k => TOWERS[k] && TOWERS[k].unit === ab.unit);
+    if (!ty) return '';
+    const picks = talPicks(ty).slice(), key = `sp|${ab.id}|${ty}|${picks.join('')}|${G.force || ''}|${(t && t.tier) | 0}`;
+    if (SA.vcache.has(key)) return SA.vcache.get(key);
+    const v = saSampleUnit(ab, ty); if (!v) return '';
+    const S = saGeomWith(v, ab, ty, picks), h = S ? saSketchSVG(ab, S, null, 0) : '';
+    SA.vcache.set(key, h); return h;
+  } catch (e) { return ''; }
+}
+{
+  const sth0 = typeof spellTipHTML === 'function' ? spellTipHTML : null;
+  if (sth0) spellTipHTML = function (ab, t, o) {
+    const h = sth0.apply(this, arguments);
+    if (!ab || (o && (o.plain || o.media === false)) || !SA.on) return h;
+    let m = ''; try { m = saMediaRow(ab, saSpellSketch(ab, t)); } catch (e) { m = ''; }
+    if (!m) return h;
+    return o && o.locked && h.endsWith('</div>') ? h.slice(0, -6) + m + '</div>' : h + m;
+  };
+  // the card's tooltip is rewritten as the card refreshes: the playing clip is kept, not started again
+  const show1 = spellTipShow;
+  spellTipShow = function (btn, html, active) {
+    const tip = typeof spellHudTip !== 'undefined' && spellHudTip, old = tip && !tip.hidden ? tip.querySelector('video.sa-clip[src]') : null;
+    const r = show1.apply(this, arguments);
+    if (old && tip) { const nw = tip.querySelector(`video.sa-clip[data-saclip="${old.dataset.saclip}"]`); if (nw && nw !== old) { nw.replaceWith(old); try { old.play().catch(() => {}); } catch (e) {} } }
+    return r;
+  };
+}
 {
   const tt0 = typeof talTipHTML === 'function' ? talTipHTML : null;
   if (tt0) talTipHTML = function (ty, ci) { const h = tt0.apply(this, arguments); let x = ''; try { x = saTalentSketch(ty, ci); } catch (e) { x = ''; if (SA.dbg) console.warn('spell area sketch', e); } return x ? h + x : h; };
@@ -130336,6 +130413,9 @@ if (typeof document !== 'undefined' && document.head) {
     + `.sa-bg{fill:rgba(20,26,18,.55);stroke:rgba(255,255,255,.08)}.sa-reach{fill:var(--sa);fill-opacity:.04;stroke:var(--sa);stroke-opacity:.45;stroke-width:1;stroke-dasharray:3 3}`
     + `.sa-a{fill:var(--sa);fill-opacity:.28;stroke:var(--sa);stroke-width:1.3}.sa-b{fill:none;stroke:#fff;stroke-opacity:.9;stroke-width:1.2;stroke-dasharray:4 3}`
     + `.sa-u{fill:#ffe9b0;stroke:#2a2010;stroke-width:1.5}.sa-foe{fill:none;stroke:#ff8a70;stroke-width:1.5}`
+    + `.sa-media{display:flex;gap:6px;align-items:flex-start;margin-top:7px}.sa-media .sa-box{flex:1 1 0;min-width:0;max-width:176px;margin:0}.sa-media .sa-svg{width:100%}`
+    + `.sa-clip{flex:0 0 auto;width:156px;height:104px;border-radius:3px;background:#0b0f0a;box-shadow:0 0 0 1px #000,0 0 0 2px #3b382c;object-fit:cover}.sa-clip.sa-wait{background:linear-gradient(90deg,#0b0f0a,#1a2118,#0b0f0a);background-size:200% 100%;animation:saw 1.2s linear infinite}@keyframes saw{to{background-position:-200% 0}}`
+    + `.sa-media .sa-t{display:none}.spbk-tip .sa-clip{width:192px;height:128px}`
     + `.sa-cap{display:flex;align-items:center;gap:.35em;font-size:.75em;opacity:.8;margin-top:.25em}.sa-k{display:inline-block;width:.9em;height:.6em;border-radius:2px;opacity:.6}.sa-kb{background:none!important;border:1.5px dashed #fff;opacity:.9;margin-left:.6em}`;
   document.head.append(s);
 }
