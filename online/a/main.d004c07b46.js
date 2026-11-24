@@ -1,4 +1,4 @@
-const BUILD_TAG = '8fa683cc@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = '57625404@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -55428,7 +55428,8 @@ forestFaction({
       A hit throws the trunk, head and loose parts along the blow (c.hdx/hdz) by how hard it was (c.hitK) over the foe's weight,
       and they spring back. An attack bunches the upper arms in its wind-up and throws the chest forward on the strike.
       Heavy foes (armoured, bosses, leaders, the big ones) are stiffer and move less; light, fast ones more (FPH.wt).
-      Graphics: High all of it, Medium the trunk and head only, Low none.
+      Flesh (1d, 24 Nov 2026): the belly, chest, thighs and upper arms squash and bulge on a blow, a footfall or a landing, and
+      ring down; on a ragdoll's body too. Graphics: High all of it, Medium the trunk, head and flesh only, Low none.
    2. Deaths: each of those foes' death clip (and the Malgrath-free set above) is played on a body the killing blow moves:
         an ordinary blow   a slide back along the blow and the trunk knocked over that way, the clip turned (up to FPH.twist)
                            so it falls the way it was struck
@@ -55638,8 +55639,65 @@ const FPH = (() => {
       scaleBone(B, b, _J, ux / ul, uy / ul, uz / ul, 1 - .03 * st.bunch, 1 + .1 * st.bunch * amp);
     }
     if (st.init) body(st, rg, B, m, s2, dt, stiff, dying);
+    if (st.init) flesh(st, rg.R, B, c, q0 && q0.length ? Math.min(1.6, q0.reduce((a, h) => a + (h.k || .6), 0)) : (ix || iz) ? Math.hypot(ix, iz) * W / 3.2 : 0, W, FL.live);   // (1d: the soft parts shudder)
     st.init = true;
     S.springs += rg.sp.length; if (t0) S.ms += performance.now() - t0;
+  }
+
+  /* ---------------- 1d. flesh: the soft parts shudder (owner, 24 Nov 2026: "would like some physics built into their muscles as
+     well to better sell the stumbles and death animations"). The belly, the chest, the thighs, the upper arms and a little the
+     head (the jowls), forearms and shins each carry one spring: how far that part is squashed short and bulged wide (or drawn
+     long and thin) about its own bone, with its volume kept. It is driven by
+       the part's own change of motion   (a footfall, a stagger, a stop: a body that lands in its death stops hard, so its flesh
+                                          squashes and rings down by itself)
+       a blow                            every part kicked, the trunk at once and the limbs a moment later, so it runs out through
+                                          the body as a ripple
+     It rings a few times and is still. How much by the foe (FL.soft: a fleshy one more, an armoured or bony one less; a heavy
+     one slower) and never more than FL.max. One bone's own matrix is scaled: no helper bones, no new vertex data, about twelve
+     springs a body. Used for a living foe (springs(), below its other springs) and for a ragdoll's body (FPH.flesh, called by the
+     forest foes' runtimes on the ragdoll's bones: models_lead9d_foerag.js). Graphics Low: none. Off: ?foeflesh=0 or FPH.fl.on = false. */
+  const FL = { on: true, f: 6.2, z: .17, acc: .0042, hit: 1.5, max: .11, lv: 1, live: .7,
+    soft: { rc_ysra: 1.5, rc_cantor: 1.25, rc_sedgehook: 1.05, rc_slinger: 1, rc_rushfoot: .8, rc_sailwing: .7, rc_shelfback: .6,
+      orragar: 1.1, ht_seer: .95, ht_thornspitter: .95, ht_raker: .75, ht_gloamwing: .7, ht_skitter: .65, ht_bulwark: .6 } };
+  try { if (/[?&]foeflesh=0\b/.test(location.search)) FL.on = false; } catch (e) {}
+  const flGain = n => n === 'spine' ? 1 : n === 'hips' ? .8 : n === 'chest' ? .7 : /^thigh[LR]$/.test(n) ? .9 : /^arm[LR]$/.test(n) ? .75 : /^(shin|fore)[LR]$/.test(n) ? .3 : n === 'head' ? .3 : 0;
+  const FLR = new WeakMap();   // a model's bones -> its soft parts
+  function flRig(R) {
+    let L = FLR.get(R); if (L) return L;
+    const B = R.bones, c = B[R.bix.chest != null ? R.bix.chest : 0].h, h = R.height || 1; L = [];
+    B.forEach((b, i) => { const g = flGain(b.n); if (!g || !b.t) return; const len = Math.hypot(b.t[0] - b.h[0], b.t[1] - b.h[1], b.t[2] - b.h[2]); if (len < 1e-4) return;
+      L.push({ b: i, g, h: b.h, t: b.t, wait: /spine|chest|hips/.test(b.n) ? 0 : Math.min(.14, .03 + .12 * Math.hypot(b.h[0] - c[0], b.h[1] - c[1], b.h[2] - c[2]) / h), sign: /chest|arm|fore/.test(b.n) ? -1 : 1 }); });
+    FLR.set(R, L); return L;
+  }
+  const flSoft = c => { const d = (c && c.def) || {}, s = c && FL.soft[c.type]; return s != null ? s : (d.armor || 0) >= 6 || d.role === 'armoured' ? .6 : d.boss ? 1.1 : 1; };
+  /* st: what keeps the springs (a foe's spring state, or a ragdoll's body); B: the bones as the renderer takes them (model space);
+     kick: a blow just landed, how hard (0 none); W: the foe's weight; gain: the whole amount (a living foe a little less) */
+  function flesh(st, R, B, c, kick, W, gain) {
+    if (!FL.on || lv() < FL.lv) return;
+    const L = flRig(R), n = L.length; if (!n) return;
+    let f = st.fl; const now = fpt();
+    if (!f) f = st.fl = { s: new Float32Array(n), v: new Float32Array(n), p: new Float32Array(n * 3), pv: new Float32Array(n * 3), due: new Float32Array(n).fill(-1), dk: new Float32Array(n), t: now, init: 0 };
+    const dt = Math.min(.05, Math.max(0, now - f.t)); f.t = now;
+    const soft = flSoft(c) * (gain || 1), w = Math.max(.6, W || 1), om = 2 * Math.PI * FL.f / Math.pow(w, .3), h = R.height || 1, lim = FL.max * Math.min(1.6, soft), ns = dt > 1 / 70 ? 2 : 1, hh = dt / ns;
+    for (let i = 0; i < n; i++) {
+      const q = L[i], o = q.b * 12, a = i * 3; xf(B, o, q.h, _J); xf(B, o, q.t, _T);
+      const mx = (_J[0] + _T[0]) * .5, my = (_J[1] + _T[1]) * .5, mz = (_J[2] + _T[2]) * .5;
+      if (f.init < 2 || dt <= 0) { if (dt > 0 && f.init === 1) { f.pv[a] = (mx - f.p[a]) / dt; f.pv[a + 1] = (my - f.p[a + 1]) / dt; f.pv[a + 2] = (mz - f.p[a + 2]) / dt; } f.p[a] = mx; f.p[a + 1] = my; f.p[a + 2] = mz; }
+      else {
+        const vx = (mx - f.p[a]) / dt, vy = (my - f.p[a + 1]) / dt, vz = (mz - f.p[a + 2]) / dt, ax = (vx - f.pv[a]) / dt, ay = (vy - f.pv[a + 1]) / dt, az = (vz - f.pv[a + 2]) / dt;
+        f.p[a] = mx; f.p[a + 1] = my; f.p[a + 2] = mz; f.pv[a] = vx; f.pv[a + 1] = vy; f.pv[a + 2] = vz;
+        /* its change of motion: stopped on its way down (a landing, a footfall) it squashes; thrown, it draws long */
+        const am = Math.min(90, Math.hypot(ax, ay, az) / h), dir = ay >= 0 ? 1 : -.6;
+        f.v[i] += am * FL.acc * q.g * soft * dir * om * dt * 8;
+        if (kick > 0) { f.due[i] = now + q.wait; f.dk[i] = kick; }
+        if (f.due[i] >= 0 && now >= f.due[i]) { f.v[i] += q.sign * Math.min(1.6, f.dk[i]) * FL.hit * q.g * soft * om * .07 / Math.sqrt(w); f.due[i] = -1; }
+        for (let k = 0; k < ns; k++) { f.v[i] += (-om * om * f.s[i] - 2 * FL.z * om * f.v[i]) * hh; f.s[i] += f.v[i] * hh; }
+        if (f.s[i] > lim) { f.s[i] = lim; if (f.v[i] > 0) f.v[i] = 0; } else if (f.s[i] < -lim) { f.s[i] = -lim; if (f.v[i] < 0) f.v[i] = 0; }
+      }
+      const s = f.s[i];
+      if (Math.abs(s) > .003) { const ux = _T[0] - _J[0], uy = _T[1] - _J[1], uz = _T[2] - _J[2], ul = Math.hypot(ux, uy, uz) || 1; scaleBone(B, q.b, _J, ux / ul, uy / ul, uz / ul, 1 - .5 * s, 1 + s); S.flesh = (S.flesh || 0) + 1; if (!(Math.abs(s) < (S.fleshMax || 0))) S.fleshMax = Math.abs(s); }
+    }
+    if (f.init < 2 && dt > 0) f.init++;
   }
 
   /* ---------------- 1b. what struck it: each blow its own reaction (owner: "same with their animations when hit with
@@ -55892,6 +55950,7 @@ const FPH = (() => {
   }
   function dieFx(k, dt, orig, rg) {
     if (!P.on || !k.c || k.c.efall || typeof M4 === 'undefined') return orig(k, dt);
+    if (rg.model && rg.model.ragdoll && typeof FOERAG !== 'undefined' && FOERAG.on) return orig(k, dt);   // (a ragdoll death is its own physics: models_lead9d_foerag.js)
     const p = k.fph || (k.fph = plan(k, rg));
     if (p.kind === 'still') return orig(k, dt);
     if (p.kind === 'fly' && p.flyT == null) p.flyT = rg.model === (typeof FFM !== 'undefined' && FFM.MODELS[k.c.type] && FFM.MODELS[k.c.type].model) ? .7 : 1.2;
@@ -55920,7 +55979,7 @@ const FPH = (() => {
     item = function (mesh, m, o) {
       if (XF) { M4.mul(_M, XF, m); m = _M; }
       const it = _item(mesh, m, o);
-      it._fc = o && o.c || null; it._fd = !!(o && (o.deathT != null || o.death != null));
+      it._fc = o && o.rag ? null : o && o.c || null; it._fd = !!(o && (o.deathT != null || o.death != null));   // (a ragdoll's bones are left as they are)
       return it;
     };
   }
@@ -55980,8 +56039,8 @@ const FPH = (() => {
   }
   /* rigged deaths are wrapped when the first rigged foe is drawn; make sure it has happened before the first death too */
   if (typeof drawCorpses === 'function') { const _dc = drawCorpses; drawCorpses = function (dt) { if (P.on) init(); return _dc(dt); }; }   // (init looks again only when more models came)
-  P.K = K; P.d = D; P.rk = RK; P.off = OFF; P.tw = TW; P.sq = SQ; P.hitCls = hitCls; P.wt = wt; P.init = init;
-  P.stats = () => ({ rigs: RIG.size, wrapped, springsStepped: S.springs, foes: S.foes, deaths: S.deaths, hits: S.hits, maxDeg: Object.fromEntries(Object.entries(S.maxA).map(([k, a]) => [k, +(a * 57.3).toFixed(1)])), msTotal: +S.ms.toFixed(1), rigsList: [...RIG.values()].map(r => ({ bones: r.NB, springs: r.sp.map(s => s.n).join(' '), fall: r.fall && r.fall.map(v => +v.toFixed(2)) })) });
+  P.fl = FL; P.flesh = flesh; P.K = K; P.d = D; P.rk = RK; P.off = OFF; P.tw = TW; P.sq = SQ; P.hitCls = hitCls; P.wt = wt; P.init = init;
+  P.stats = () => ({ flesh: S.flesh || 0, fleshMax: +(S.fleshMax || 0).toFixed(3), rigs: RIG.size, wrapped, springsStepped: S.springs, foes: S.foes, deaths: S.deaths, hits: S.hits, maxDeg: Object.fromEntries(Object.entries(S.maxA).map(([k, a]) => [k, +(a * 57.3).toFixed(1)])), msTotal: +S.ms.toFixed(1), rigsList: [...RIG.values()].map(r => ({ bones: r.NB, springs: r.sp.map(s => s.n).join(' '), fall: r.fall && r.fall.map(v => +v.toFixed(2)) })) });
   return P;
 })();
 
@@ -80958,6 +81017,393 @@ const FOEDIE = (() => {
   return FD;
 })();
 
+/* ================= Ragdoll deaths for the forest factions' rigged foes =================
+   Owner (24 Nov 2026), of the film deaths: "they are too stiff and move too much in weird ways. just want something that
+   reads like a physics based death". So a Hollowthorn or Reed Court foe no longer plays a clip when it dies: its skeleton
+   becomes a small ragdoll, run here, from the pose it was struck in.
+     the body    a point a joint (each bone's head, and the tip of a bone with no child), held together by the bones' own
+                 lengths. A bone with several children (the hips, the chest) keeps them rigid; a few more ties stand in for
+                 joint limits (the trunk bends and twists only so far, a knee or elbow cannot fold shut, the head cannot
+                 fold into the chest, hands and feet keep out of the trunk). Points have the weight of what they carry
+                 (trunk heavy, limbs light, cloth and wings light and slowed by the air).
+     the blow    starts it: every point takes the foe's own momentum (c.fpV) and a push along the killing blow (c.hdx, c.hdz,
+                 c.hitK, c.overK), most at the head and none at the feet, so the body topples over its feet the way it was
+                 struck; a blast lifts it a little. No blow known: a small push its own way.
+     tension     the pose is held a moment and let go, legs first (the knees give, then the trunk and arms go slack), so
+                 it neither stands like a statue nor drops like a cut puppet.
+     the road    every point has the thickness of the body round it (measured from the sculpt at load); nothing goes
+                 under the road; a landing loses most of its speed (one small bounce) and the road's friction stops the slide.
+     rest        slower than a crawl for a moment, it sleeps: nothing of it moves again. About 0.8-1.3 s; by RG.cap (1.5 s)
+                 whatever is left is damped out. Once asleep the sculpt's own lowest vertex is checked against the road
+                 and the body raised that much if it dips (cloth pinned under it).
+   Bones follow the points: a rigid bone by the frame of its children, a limb by the least turn from where its parent carries
+   it to where its point went (so its twist is its pose's), all from the struck pose, so nothing pops at the first frame.
+   Cost: about 30 points and 110 ties a body, RG.iter passes, RG.hz steps a second, for about a second; asleep it costs a
+   copy. Nothing is allocated a frame.
+   The runtimes (models_lead9d_hollowthorn.js, models_lead9d_forestfoes.js) call rig() once a model, start() when a body
+   dies, step() and pack() a frame. The body's own clock (when it sinks, when it is gone), the kill, gold and loot are
+   untouched; the knee and body thuds are the ragdoll's own contacts. Foe physics leaves a ragdoll's body alone, but for its
+   flesh: the runtimes pass the packed bones to FPH.flesh, so the soft parts squash as the body lands and ring down.
+   Off (the film deaths on their quick clock, as before): ?foerag=0, or FOERAG.on = false in the console. */
+const FOERAG = (() => {
+  const RG = { on: true, g: 9.5, hz: 60, iter: 5, maxSteps: 3, cap: 1.5, push: 1.25, lift: .25, bounce: .2, fric: .5, tension: .34, air: .8, maxLift: .07,
+    stats: { bodies: 0, steps: 0, rest: 0, restN: 0 } };
+  try { if (/[?&]foerag=0\b/.test(location.search)) RG.on = false; } catch (e) {}
+  const hash = (a, s) => { const h = Math.sin((a || 0) * 12.9898 + s * 78.233) * 43758.5453; return h - Math.floor(h); };
+  const SOFT = /wing|cloth|^sk[FB]|mantle|sleeve|hair|^p[FB]|rib/, WELD = /^(clav|neck|toe)/;   // (WELD: short bones that ride their parent: a frame from a few centimetres would shake)
+
+  /* ---- a model's ragdoll, once: points (each a place on a bone in the rest sculpt), ties, each bone's way of following ---- */
+  function rig(R) {
+    const B = R.bones, NB = B.length, h = R.height || 1, bix = R.bix, kids = B.map(() => []);
+    B.forEach((b, i) => { if (b.p >= 0) kids[b.p].push(i); });
+    const root = B.findIndex(b => b.p < 0), hips = bix.hips;
+    /* the sculpt round each bone: how far its own vertices stand from its axis (the 80th percentile: its thickness), how far
+       past its tip they reach, and whether they lie to one side of it (a wing's membrane, a mantle: a fin) */
+    const rad = new Float32Array(NB), reach = new Float32Array(NB).fill(1), fin = B.map(() => null), per = B.map(() => []);
+    for (let v = 0; v < R.nv; v++) { const b = R.W[v] >= .5 ? R.bi[v * 2] : R.bi[v * 2 + 1]; per[b].push(v); }
+    for (let b = 0; b < NB; b++) {
+      const H = B[b].h, T = B[b].t || H, ax = T[0] - H[0], ay = T[1] - H[1], az = T[2] - H[2], L2 = ax * ax + ay * ay + az * az, ds = [], us = []; let mx = 0, my = 0, mz = 0, mu = 0;
+      for (const v of per[b]) {
+        const px = R.P[v * 3] - H[0], py = R.P[v * 3 + 1] - H[1], pz = R.P[v * 3 + 2] - H[2], u0 = L2 > 1e-9 ? (px * ax + py * ay + pz * az) / L2 : 0, u = Math.max(0, Math.min(1, u0));
+        ds.push(Math.hypot(px - ax * u, py - ay * u, pz - az * u)); us.push(u0); mx += px - ax * u0; my += py - ay * u0; mz += pz - az * u0; mu += u0;
+      }
+      const soft = SOFT.test(B[b].n), nvb = per[b].length;
+      ds.sort((x, y) => x - y); us.sort((x, y) => x - y);
+      rad[b] = Math.max(.02 * h, Math.min(soft ? .06 * h : .2 * h, nvb ? ds[Math.floor(nvb * .8)] : .03 * h));
+      if (nvb > 8) reach[b] = Math.max(1, Math.min(1.9, us[Math.floor(nvb * .96)]));
+      if (nvb > 8 && L2 > 1e-6) {
+        mx /= nvb; my /= nvb; mz /= nvb; mu = Math.max(.15, Math.min(.9, mu / nvb)); const m = Math.hypot(mx, my, mz);
+        if (m > Math.max(.05 * h, .22 * Math.sqrt(L2))) {
+          let far = 0; for (const v of per[b]) { const px = R.P[v * 3] - H[0], py = R.P[v * 3 + 1] - H[1], pz = R.P[v * 3 + 2] - H[2]; far = Math.max(far, (px * mx + py * my + pz * mz) / m); }
+          const k = Math.min(far * .85, 3 * m) / m; fin[b] = [H[0] + ax * mu + mx * k, H[1] + ay * mu + my * k, H[2] + az * mu + mz * k];
+        }
+      }
+    }
+    /* points: a bone's head (the root has none: it rides the hips); the far end of a bone without children; a fin; and for a bone
+       with several children (the hips, the chest: a rigid body) three more set wide about its head, which carry its weight and
+       give it a steady frame (its joints alone sit a few centimetres apart: a frame from them would shake) */
+    const pt = new Int16Array(NB).fill(-1), tip = new Int16Array(NB).fill(-1), fp = new Int16Array(NB).fill(-1), va = new Int16Array(NB).fill(-1), P0 = [], pr = [], pm = [], pdrag = [], pbone = [], pcol = [];
+    const add = (p, r, m, drag, b, col) => { P0.push(p[0], p[1], p[2]); pr.push(r); pm.push(m); pdrag.push(drag); pbone.push(b); pcol.push(col === false ? 0 : 1); return pr.length - 1; };
+    const massOf = n => n === 'hips' || n === 'chest' ? 2 : n === 'spine' ? 4 : /thigh|neck|head|clav/.test(n) ? 2 : SOFT.test(n) ? .35 : 1;
+    const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    for (let b = 0; b < NB; b++) {
+      if (b === root) continue;
+      const n = B[b].n, par = B[b].p, soft = SOFT.test(n);
+      pt[b] = add(B[b].h, Math.max(rad[b], par >= 0 && par !== root && !soft ? .9 * rad[par] : 0), massOf(n), soft ? 1 : 0, b);
+    }
+    for (let b = 0; b < NB; b++) {
+      if (b === root) continue;
+      const n = B[b].n, soft = SOFT.test(n), H = B[b].h, T = B[b].t, far = kids[b].filter(c => dist3(B[c].h, H) > .02 * h);
+      if (!kids[b].length && T && !WELD.test(n)) tip[b] = add([H[0] + (T[0] - H[0]) * reach[b], H[1] + (T[1] - H[1]) * reach[b], H[2] + (T[2] - H[2]) * reach[b]], rad[b] * (n === 'head' ? 1 : .8), n === 'head' ? 2.5 : soft ? .3 : .8, soft ? 1 : 0, b);
+      if (fin[b] && far.length < 2) fp[b] = add(fin[b], .025 * h, soft ? .25 : .5, soft ? 1 : 0, b);
+      if (far.length >= 2) { const s = .17 * h; va[b] = add([H[0] + s, H[1], H[2]], 0, 2.2, 0, b, false); add([H[0], H[1] + s, H[2]], 0, 2.2, 0, b, false); add([H[0], H[1], H[2] + s], 0, 2.2, 0, b, false); }
+    }
+    const NP = pr.length, X0 = Float32Array.from(P0), d0 = (i, j) => Math.hypot(X0[i * 3] - X0[j * 3], X0[i * 3 + 1] - X0[j * 3 + 1], X0[i * 3 + 2] - X0[j * 3 + 2]);
+    /* ties: [i, j, lo, hi]; the first nFix are the skeleton itself (kept exactly), the rest stand in for joint limits */
+    const C = [], seen = new Set(), tie = (i, j, lo, hi) => { if (i < 0 || j < 0 || i === j) return; const key = i < j ? i * 512 + j : j * 512 + i; if (seen.has(key)) return; seen.add(key); C.push(i, j, lo, hi); };
+    const eq = (i, j) => { if (i >= 0 && j >= 0) { const d = d0(i, j); tie(i, j, d, d); } }, P = n => bix[n] != null ? pt[bix[n]] : -1, TP = n => bix[n] != null ? (tip[bix[n]] >= 0 ? tip[bix[n]] : pt[bix[n]]) : -1;
+    const follow = new Int8Array(NB), fa = new Int16Array(NB).fill(-1), fb = new Int16Array(NB).fill(-1);   // 0 ride the parent, 1 swing to a point, 2 a frame of two points
+    for (let b = 0; b < NB; b++) {
+      if (b === root) continue;
+      const far = kids[b].filter(c => d0(pt[b], pt[c]) > .02 * h);
+      if (va[b] >= 0) {   // rigid: its three wide points and its head, all tied; every child's head tied to all four
+        const q = [pt[b], va[b], va[b] + 1, va[b] + 2];
+        for (let x = 0; x < 4; x++) for (let y = x + 1; y < 4; y++) eq(q[x], q[y]);
+        for (const c of kids[b]) for (const x of q) { eq(pt[c], x); if (WELD.test(B[c].n)) for (const g of kids[c]) eq(pt[g], x); }   // (a welded child's own children too: the shoulders, the head's joint)
+        follow[b] = 2; fa[b] = va[b]; fb[b] = va[b] + 2; continue;
+      }
+      if (WELD.test(B[b].n)) { for (const c of kids[b]) eq(pt[b], pt[c]); follow[b] = 0; continue; }
+      for (const c of kids[b]) eq(pt[b], pt[c]);
+      const end = tip[b] >= 0 ? tip[b] : far.length ? pt[far[0]] : -1;
+      if (tip[b] >= 0) eq(pt[b], tip[b]);
+      if (end < 0) { follow[b] = 0; continue; }
+      if (fp[b] >= 0) { eq(pt[b], fp[b]); eq(end, fp[b]); follow[b] = 2; fa[b] = end; fb[b] = fp[b]; } else { follow[b] = 1; fa[b] = end; }
+    }
+    const nFix = C.length / 4;
+    const rng = (i, j, lo, hi) => { if (i >= 0 && j >= 0) { const d = d0(i, j); tie(i, j, d * lo, d * hi); } }, min = (i, j, d) => { if (i >= 0 && j >= 0) tie(i, j, d, 1e9); };
+    const len = n => bix[n] != null ? Math.hypot(B[bix[n]].t[0] - B[bix[n]].h[0], B[bix[n]].t[1] - B[bix[n]].h[1], B[bix[n]].t[2] - B[bix[n]].h[2]) : 0;
+    const chest = bix.chest, vc = chest != null ? va[chest] : -1, vh = va[hips];
+    /* the trunk bends and twists only so far: the wide points of the hips and of the chest keep near their distances */
+    if (vc >= 0 && vh >= 0) { const s = .17 * h * .4; for (let k = 0; k < 3; k++) { const d = d0(vh + k, vc + k); tie(vh + k, vc + k, d - s, d + s); } }
+    rng(P('hips'), P('chest'), .9, 1.02); rng(P('hips'), P('neck'), .84, 1.02);
+    for (const s of 'LR') {
+      rng(P('thigh' + s), P('foot' + s), .6, 1); rng(P('arm' + s), P('hand' + s), .55, 1);           // a knee, an elbow, never folded shut
+      rng(P('hips'), P('shin' + s), .55, 1.12);                                                      // a thigh not through the belly or far behind
+      if (vc >= 0) { rng(vc + 1, P('arm' + s), .8, 1.15); rng(vc + 2, P('arm' + s), .75, 1.2); for (let k = 0; k < 3; k++) rng(vc + k, P('fore' + s), .55, 1.5); }     // a shoulder shrugs only so far
+      if (vh >= 0) { rng(vh + 2, P('shin' + s), .45, 1.5); rng(vh, P('shin' + s), s === 'L' ? .5 : .8, s === 'L' ? 1.25 : 1.6); }   // a knee keeps before its hip, on its own side
+      min(P('hand' + s), P('spine'), rad[bix.spine] * 1.15); min(P('fore' + s), P('spine'), rad[bix.spine] * 1.05); min(P('hand' + s), P('hips'), rad[hips] * 1.1);
+      min(P('foot' + s), P('hips'), rad[hips] * 1.2); min(P('foot' + s), P('chest'), rad[chest] * 1.3); min(P('hand' + s), TP('head'), rad[bix.head] * 1.1);
+      rng(P('clav' + s), P('fore' + s), .55, 1.1);
+    }
+    rng(P('chest'), TP('head'), .9, 1.03); rng(P('spine'), TP('head'), .86, 1.03);
+    if (vc >= 0) { rng(vc, TP('head'), .78, 1.22); rng(vc + 2, TP('head'), .78, 1.22); }             // the head lolls only so far
+    { const a = P('shinL'), b = P('shinR'), w = d0(P('thighL'), P('thighR')); if (a >= 0 && b >= 0) tie(a, b, w * .7, w + .9 * len('thighL')); }
+    { const a = P('footL'), b = P('footR'), w = d0(P('thighL'), P('thighR')); if (a >= 0 && b >= 0) tie(a, b, w * .6, w + 1.2 * (len('thighL') + len('shinL'))); }
+    /* every other joint bends only so far (a wrist and an ankle least): a bone's far end keeps its distance from its parent's head;
+       what hangs from a rigid body (a wing, a mantle, a skirt's flap) keeps near where it hung */
+    const endOf = b => tip[b] >= 0 ? tip[b] : (kids[b].map(c => pt[c]).find(i => d0(pt[b], i) > .02 * h) ?? -1);
+    for (let b = 0; b < NB; b++) {
+      if (b === root || WELD.test(B[b].n)) continue;
+      const p = B[b].p, e = endOf(b); if (e < 0 || p < 0 || p === root) continue;
+      const n = B[b].n, soft = SOFT.test(n);
+      if (va[p] >= 0) { if (soft) for (let k = 0; k < 3; k++) rng(va[p] + k, e, .3, 1.7); continue; }   // (loosely: a wing falls flat, a robe splays)
+      if (WELD.test(B[p].n)) continue;
+      rng(pt[p], e, /hand|foot/.test(n) ? .8 : soft ? .7 : .5, 1.02);
+      if (fp[b] >= 0 && fp[p] >= 0) rng(fp[p], fp[b], .75, 1.25);
+    }
+    /* a robe or skirt keeps its round: the far ends of neighbouring soft panels of one body stay near each other */
+    for (let b = 0; b < NB; b++) if (va[b] >= 0) { const sk = kids[b].filter(c => SOFT.test(B[c].n) && tip[c] >= 0 && !/wing/.test(B[c].n)); for (let x = 0; x < sk.length; x++) for (let y = x + 1; y < sk.length; y++) if (d0(tip[sk[x]], tip[sk[y]]) < .3 * h) rng(tip[sk[x]], tip[sk[y]], .55, 1.5); }
+    const nLim = C.length / 4;
+    /* tension: the distances between the main points of the pose, held then let go (set from the struck pose: start()) */
+    const T1 = [], T2 = [], pair = (L, i, j) => { if (i >= 0 && j >= 0 && i !== j) L.push(i, j); };
+    for (const s of 'LR') {
+      pair(T1, P('hips'), P('foot' + s)); pair(T1, P('thigh' + s), P('foot' + s)); pair(T1, P('chest'), P('foot' + s)); if (vh >= 0) { pair(T1, vh, P('foot' + s)); pair(T1, vh + 2, P('foot' + s)); }
+      pair(T2, P('chest'), P('hand' + s)); pair(T2, P('clav' + s), P('hand' + s)); pair(T2, P('hips'), P('fore' + s));
+    }
+    pair(T1, P('footL'), P('footR')); pair(T2, P('hips'), TP('head')); pair(T2, P('chest'), TP('head')); pair(T2, P('thighL'), TP('head')); pair(T2, P('thighR'), TP('head'));
+    for (let b = 0; b < NB; b++) if (SOFT.test(B[b].n) && !/wing/.test(B[b].n)) for (const i of [tip[b], fp[b]]) if (i >= 0) { pair(T2, i, P('hips')); pair(T2, i, P('chest')); }   // (cloth keeps its hang a moment; a wing is let go at once)
+    /* riders: a few of the outermost vertices of each bone (not a skirt or spike far from it: those may brush the road), which
+       the road also holds up: a rider under it lifts the points of its bone (floor()) */
+    const rb = [], rp = [], ri = [], ru = [];
+    for (let b = 0; b < NB; b++) {
+      if (b === root || per[b].length < 4) continue;
+      let host = b; while (WELD.test(B[host].n) && B[host].p >= 0 && B[host].p !== root) host = B[host].p;
+      const H = B[b].h, T = B[b].t || H, ax = T[0] - H[0], ay = T[1] - H[1], az = T[2] - H[2], L2 = ax * ax + ay * ay + az * az, soft = SOFT.test(B[b].n), lim = Math.max((/hips|spine|chest/.test(B[b].n) ? 1.7 : 3) * rad[b], .05 * h);
+      const cand = per[b].filter(v => { if (soft) return true; const px = R.P[v * 3] - H[0], py = R.P[v * 3 + 1] - H[1], pz = R.P[v * 3 + 2] - H[2], u = L2 > 1e-9 ? Math.max(-.3, Math.min(1.3, (px * ax + py * ay + pz * az) / L2)) : 0; return Math.hypot(px - ax * u, py - ay * u, pz - az * u) <= lim; });
+      if (!cand.length) continue;
+      const K = Math.min(cand.length, va[host] >= 0 && host === b ? 10 : soft ? 4 : 6), dmin = new Float32Array(cand.length).fill(1e9); let pick = 0, far = -1;
+      for (let q = 0; q < cand.length; q++) { const v = cand[q], d = Math.hypot(R.P[v * 3] - H[0], R.P[v * 3 + 1] - H[1], R.P[v * 3 + 2] - H[2]); if (d > far) { far = d; pick = q; } }
+      const hostH = B[host].h, he = endOf(host), hx = he >= 0 ? X0[he * 3] - hostH[0] : 0, hy = he >= 0 ? X0[he * 3 + 1] - hostH[1] : 0, hz = he >= 0 ? X0[he * 3 + 2] - hostH[2] : 0, hL2 = hx * hx + hy * hy + hz * hz;
+      for (let k = 0; k < K; k++) {
+        const v = cand[pick], x = R.P[v * 3], y = R.P[v * 3 + 1], z = R.P[v * 3 + 2];
+        rb.push(b); rp.push(x, y, z); ri.push(va[host] >= 0 ? -1 - host : pt[host], he);
+        ru.push(hL2 > 1e-9 ? Math.max(0, Math.min(1, ((x - hostH[0]) * hx + (y - hostH[1]) * hy + (z - hostH[2]) * hz) / hL2)) : 0);
+        let best = -1; for (let q = 0; q < cand.length; q++) { const c = cand[q], d = Math.hypot(R.P[c * 3] - x, R.P[c * 3 + 1] - y, R.P[c * 3 + 2] - z); if (d < dmin[q]) dmin[q] = d; if (dmin[q] > best) { best = dmin[q]; pick = q; } }
+      }
+    }
+    const inv = Float32Array.from(pm, m => 1 / m), isFoot = new Uint8Array(NP), isCore = new Uint8Array(NP); for (const n of ['hips', 'chest', 'spine', 'head']) if (bix[n] != null) { isCore[pt[bix[n]]] = 1; if (tip[bix[n]] >= 0) isCore[tip[bix[n]]] = 1; } for (const n of ['footL', 'footR', 'toeL', 'toeR']) if (bix[n] != null) { isFoot[pt[bix[n]]] = 1; if (tip[bix[n]] >= 0) isFoot[tip[bix[n]]] = 1; }
+    return { rb: Int16Array.from(rb), rp: Float32Array.from(rp), ri: Int16Array.from(ri), ru: Float32Array.from(ru), va, push: new Float32Array(NP), isFoot, isCore, R, NB, NP, h, root, hips, pt, tip, kids, follow, fa, fb, X0, pr: Float32Array.from(pr), inv, pdrag: Float32Array.from(pdrag), pcol: Uint8Array.from(pcol), pbone: Int16Array.from(pbone), C: Float32Array.from(C), nFix, nLim, T1: Int16Array.from(T1), T2: Int16Array.from(T2),
+      feet: ['footL', 'footR', 'toeL', 'toeR'].map(n => bix[n] != null ? [pt[bix[n]], tip[bix[n]]] : []).flat().filter(i => i >= 0), core: [P('hips'), P('chest'), P('spine')].filter(i => i >= 0), head: TP('head'), chest: P('chest') };
+  }
+
+  /* ---- small matrix helpers (row-major 3x3 in flat arrays, at offsets) ---- */
+  const _s = new Float32Array(9), _f0 = new Float32Array(9), _f1 = new Float32Array(9), _t = new Float32Array(9), _c = new Float32Array(9), _c2 = new Float32Array(9), _i = new Float32Array(9);
+  /* a turn of th about the unit axis (x, y, z), into _s */
+  function turn(x, y, z, th) {
+    const c = Math.cos(th), sn = Math.sin(th), k = 1 - c;
+    _s[0] = c + x * x * k; _s[1] = x * y * k - z * sn; _s[2] = x * z * k + y * sn; _s[3] = x * y * k + z * sn; _s[4] = c + y * y * k; _s[5] = y * z * k - x * sn; _s[6] = x * z * k - y * sn; _s[7] = y * z * k + x * sn; _s[8] = c + z * z * k;
+  }
+  function mul(o, oo, a, ao, b, bo) { for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o[oo + r * 3 + c] = a[ao + r * 3] * b[bo + c] + a[ao + r * 3 + 1] * b[bo + 3 + c] + a[ao + r * 3 + 2] * b[bo + 6 + c]; }
+  function mulT(o, oo, a, ao, b, bo) { for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o[oo + r * 3 + c] = a[ao + r * 3] * b[bo + c * 3] + a[ao + r * 3 + 1] * b[bo + c * 3 + 1] + a[ao + r * 3 + 2] * b[bo + c * 3 + 2]; }   // a * b^T
+  /* the least turn taking unit u to unit v, into _s */
+  function swing(ux, uy, uz, vx, vy, vz) {
+    let cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx; const d = ux * vx + uy * vy + uz * vz;
+    if (d < -.9999) { let ax = 1, ay = 0, az = 0; if (Math.abs(ux) > .9) { ax = 0; ay = 1; } const px = uy * az - uz * ay, py = uz * ax - ux * az, pz = ux * ay - uy * ax, l = 1 / Math.hypot(px, py, pz); cx = px * l; cy = py * l; cz = pz * l;
+      _s[0] = 2 * cx * cx - 1; _s[1] = 2 * cx * cy; _s[2] = 2 * cx * cz; _s[3] = 2 * cx * cy; _s[4] = 2 * cy * cy - 1; _s[5] = 2 * cy * cz; _s[6] = 2 * cx * cz; _s[7] = 2 * cy * cz; _s[8] = 2 * cz * cz - 1; return; }
+    const k = 1 / (1 + d);
+    _s[0] = d + cx * cx * k; _s[1] = cx * cy * k - cz; _s[2] = cx * cz * k + cy; _s[3] = cx * cy * k + cz; _s[4] = d + cy * cy * k; _s[5] = cy * cz * k - cx; _s[6] = cx * cz * k - cy; _s[7] = cy * cz * k + cx; _s[8] = d + cz * cz * k;
+  }
+  /* a frame (columns e1, e2, e3) from a point and two more, into F */
+  function frame(F, X, i, a, b) {
+    let ux = X[a * 3] - X[i * 3], uy = X[a * 3 + 1] - X[i * 3 + 1], uz = X[a * 3 + 2] - X[i * 3 + 2], l = 1 / (Math.hypot(ux, uy, uz) || 1); ux *= l; uy *= l; uz *= l;
+    let vx = X[b * 3] - X[i * 3], vy = X[b * 3 + 1] - X[i * 3 + 1], vz = X[b * 3 + 2] - X[i * 3 + 2]; const d = vx * ux + vy * uy + vz * uz; vx -= ux * d; vy -= uy * d; vz -= uz * d; l = 1 / (Math.hypot(vx, vy, vz) || 1); vx *= l; vy *= l; vz *= l;
+    F[0] = ux; F[3] = uy; F[6] = uz; F[1] = vx; F[4] = vy; F[7] = vz; F[2] = uy * vz - uz * vy; F[5] = uz * vx - ux * vz; F[8] = ux * vy - uy * vx;
+  }
+
+  /* ---- a body: from the pose it was struck in (W, O as the runtimes' toBones leaves them: a point p of bone b is W_b p + O_b,
+     model space), the blow (bx, bz: its way in the body's own frame; s: how hard, about 0.4-2.6), its own speed (vx, vz, model
+     units a second, the body's frame), the road's height under it (gy, model units: below 0 for a flyer), its weight class ---- */
+  function start(rg, W, O, o) {
+    const NP = rg.NP, NB = rg.NB, B = rg.R.bones, h = rg.h, b = { rg, t: 0, acc: 0, asleep: false, still: 0, gy: o.gy || 0, lift: 0, liftTo: 0, kneel: false, thud: false, hitV: 0, m: o.heavy || 1,
+      X: new Float32Array(NP * 3), Xp: new Float32Array(NP * 3), W0: Float32Array.from(W.subarray(0, NB * 9)), O0: Float32Array.from(O.subarray(0, NB * 3)), W: new Float32Array(NB * 9), O: new Float32Array(NB * 3),
+      F0: new Float32Array(NB * 9), D0: new Float32Array(NB * 3), D1: new Float32Array(NB * 3), fresh: true, kTw: 1, L1: new Float32Array(rg.T1.length / 2), L2: new Float32Array(rg.T2.length / 2), on: new Uint8Array(NP) };
+    const X = b.X;
+    for (let i = 0; i < NP; i++) {
+      const bn = rg.pbone[i], w = bn * 9, px = rg.X0[i * 3], py = rg.X0[i * 3 + 1], pz = rg.X0[i * 3 + 2];
+      for (let r = 0; r < 3; r++) X[i * 3 + r] = W[w + r * 3] * px + W[w + r * 3 + 1] * py + W[w + r * 3 + 2] * pz + O[bn * 3 + r];
+    }
+    /* stand it on the road: a pose a little under it (a stride's low point) is raised, points and offsets alike */
+    let low = 1e9; for (let i = 0; i < NP; i++) if (rg.pcol[i]) low = Math.min(low, X[i * 3 + 1] - rg.pr[i] - b.gy);
+    if (low < 0) { for (let i = 0; i < NP; i++) X[i * 3 + 1] -= low; b.y0 = -low; } else b.y0 = 0;
+    /* each bone's start: its frame (rigid) or its way (a limb), to turn from */
+    for (let bn = 0; bn < NB; bn++) {
+      if (rg.follow[bn] === 2) { frame(_f0, X, rg.pt[bn], rg.fa[bn], rg.fb[bn]); b.F0.set(_f0, bn * 9); }
+      else if (rg.follow[bn] === 1) { const i = rg.pt[bn], a = rg.fa[bn], l = 1 / (Math.hypot(X[a * 3] - X[i * 3], X[a * 3 + 1] - X[i * 3 + 1], X[a * 3 + 2] - X[i * 3 + 2]) || 1); for (let r = 0; r < 3; r++) b.D0[bn * 3 + r] = (X[a * 3 + r] - X[i * 3 + r]) * l; }
+    }
+    const dist = (i, j) => Math.hypot(X[i * 3] - X[j * 3], X[i * 3 + 1] - X[j * 3 + 1], X[i * 3 + 2] - X[j * 3 + 2]);
+    for (let q = 0; q < b.L1.length; q++) b.L1[q] = dist(rg.T1[q * 2], rg.T1[q * 2 + 1]);
+    for (let q = 0; q < b.L2.length; q++) b.L2[q] = dist(rg.T2[q * 2], rg.T2[q * 2 + 1]);
+    /* the push: the body's own speed everywhere; the blow by height (none at the feet, all of it at the head), so it topples over
+       its feet; a little lift with it; a twist of its own about the way it falls, by chance */
+    let bx = o.bx || 0, bz = o.bz || 0; const bl = Math.hypot(bx, bz), r1 = o.r != null ? o.r : Math.random(), r2 = hash(r1 * 977, 3), s = Math.max(.35, Math.min(2.6, o.s || .7)) / Math.sqrt(b.m);
+    if (bl < 1e-4) { const a = r1 * Math.PI * 2; bx = Math.sin(a); bz = Math.cos(a); } else { bx /= bl; bz /= bl; }
+    const J = RG.push * h * s * (.85 + .3 * r2), top = Math.max(.2 * h, X[rg.head * 3 + 1] - b.gy), dt = b.dtp = 1 / RG.hz, blast = o.blast ? 1 : 0, tw = (r2 - .5) * .9 * s;
+    const cxm = X[rg.chest * 3], czm = X[rg.chest * 3 + 2];
+    for (let i = 0; i < NP; i++) {
+      const u = Math.max(0, Math.min(1.15, (X[i * 3 + 1] - b.gy) / top)), k = o.fly ? .55 + .45 * u : u * u * .65 + u * .35;
+      const vx = (o.vx || 0) + bx * J * k - (X[i * 3 + 2] - czm) * tw * u, vz = (o.vz || 0) + bz * J * k + (X[i * 3] - cxm) * tw * u, vy = (o.vy || 0) + RG.lift * h * s * u + blast * 2.2 * h;
+      b.Xp[i * 3] = X[i * 3] - vx * dt; b.Xp[i * 3 + 1] = X[i * 3 + 1] - vy * dt; b.Xp[i * 3 + 2] = X[i * 3 + 2] - vz * dt;
+    }
+    b.blow = s * Math.sqrt(b.m); b.fly = !!o.fly; b.ten = RG.tension * Math.sqrt(b.m) * (b.fly ? .4 : 1) * (.8 + .4 * hash(r1 * 31, 7));
+    solve(b); b.fresh = false; RG.stats.bodies++;
+    return b;
+  }
+
+  /* one tie: i and j kept between lo and hi apart, by their weights, k of the way */
+  function sat(X, inv, i, j, lo, hi, k) {
+    const a = i * 3, c = j * 3, dx = X[c] - X[a], dy = X[c + 1] - X[a + 1], dz = X[c + 2] - X[a + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz), want = d < lo ? lo : d > hi ? hi : d;
+    if (want === d) return;
+    const wi = inv[i], wj = inv[j], f = (d - want) / (d > 1e-7 ? d : 1e-7) / (wi + wj) * k, ex = d > 1e-7 ? dx : 0, ey = d > 1e-7 ? dy : want, ez = d > 1e-7 ? dz : 0;
+    X[a] += ex * f * wi; X[a + 1] += ey * f * wi; X[a + 2] += ez * f * wi; X[c] -= ex * f * wj; X[c + 1] -= ey * f * wj; X[c + 2] -= ez * f * wj;
+  }
+  function tick(b, dt) {
+    const rg = b.rg, X = b.X, Xp = b.Xp, NP = rg.NP, h = rg.h, C = rg.C, inv = rg.inv, g = RG.g * h * dt * dt, gy = b.gy, t = b.t;
+    /* the air: a little everywhere, more on cloth and wings; past its first second what is left is damped out by the cap */
+    const late = Math.max(0, (t - RG.cap * .42) / (RG.cap * .58)), dAir = Math.max(0, 1 - RG.air * dt - late * late * 22 * dt), dSoft = Math.max(0, dAir - 5 * dt), dDown = Math.max(0, dAir - (3 + 9 * late) * dt), kdt = dt / b.dtp;
+    for (let i = 0; i < NP; i++) {
+      const a = i * 3, d = (rg.pdrag[i] ? dSoft : b.on[i] ? dDown : dAir) * kdt, vx = (X[a] - Xp[a]) * d, vy = (X[a + 1] - Xp[a + 1]) * d, vz = (X[a + 2] - Xp[a + 2]) * d;
+      Xp[a] = X[a]; Xp[a + 1] = X[a + 1]; Xp[a + 2] = X[a + 2]; X[a] += vx; X[a + 1] += vy - g; X[a + 2] += vz;
+    }
+    /* tension let go: the legs' first, then the trunk's and arms' */
+    const k1 = Math.max(0, 1 - t / (b.ten * .55)), k2 = Math.max(0, 1 - t / b.ten), nC = C.length / 4;
+    for (let it = 0; it < RG.iter; it++) {
+      if (k1 > 0) for (let q = 0, T = rg.T1; q < b.L1.length; q++) sat(X, inv, T[q * 2], T[q * 2 + 1], b.L1[q], b.L1[q], .5 * k1);
+      if (k2 > 0) for (let q = 0, T = rg.T2; q < b.L2.length; q++) sat(X, inv, T[q * 2], T[q * 2 + 1], b.L2[q], b.L2[q], .45 * k2);
+      for (let q = 0; q < nC; q++) sat(X, inv, C[q * 4], C[q * 4 + 1], C[q * 4 + 2], C[q * 4 + 3], q < rg.nFix ? 1 : .4);
+      /* the road: nothing under it; a point that lands keeps a little of its speed upward, and the road holds its slide */
+      for (let i = 0; i < NP; i++) {
+        if (!rg.pcol[i]) continue;
+        const a = i * 3, lim = gy + rg.pr[i];
+        if (X[a + 1] < lim) {
+          const vy = X[a + 1] - Xp[a + 1];
+          X[a + 1] = lim;
+          if (it === RG.iter - 1) {
+            const v = -vy / dt; if (!b.on[i] && v > b.hitV) b.hitV = v;
+            Xp[a + 1] = v > 1.2 * h && !rg.pdrag[i] ? lim + vy * RG.bounce : lim;   // (a hard landing: a small bounce; else it stays down)
+            const f = Math.max(0, 1 - RG.fric * (rg.pdrag[i] ? 1.6 : 1) * 60 * dt * (1 + 1.5 * late));
+            Xp[a] = X[a] - (X[a] - Xp[a]) * f; Xp[a + 2] = X[a + 2] - (X[a + 2] - Xp[a + 2]) * f; b.on[i] = 1;
+          }
+        } else if (it === RG.iter - 1 && X[a + 1] > lim + .02 * h) b.on[i] = 0;
+      }
+    }
+    b.t += dt; b.dtp = dt; RG.stats.steps++;
+  }
+  /* the bones from the points */
+  function solve(b) {
+    const rg = b.rg, NB = rg.NB, B = rg.R.bones, X = b.X, W = b.W, O = b.O, W0 = b.W0;
+    for (let bn = 0; bn < NB; bn++) {
+      if (bn === rg.root) continue;
+      const p = B[bn].p, w = bn * 9, i = rg.pt[bn], f = rg.follow[bn];
+      if (f === 2) { frame(_f1, X, i, rg.fa[bn], rg.fb[bn]); mulT(_t, 0, _f1, 0, b.F0, w); mul(W, w, _t, 0, W0, w); }
+      else {
+        /* where its parent carries it: W_p(t) W_p(0)^T W_b(0) */
+        if (p === rg.root || p < 0) _c.set(W0.subarray(w, w + 9)); else { mulT(_t, 0, W, p * 9, W0, p * 9); mul(_c, 0, _t, 0, W0, w); }
+        if (f !== 1) W.set(_c, w);
+        else {
+          const a = rg.fa[bn]; let dx = X[a * 3] - X[i * 3], dy = X[a * 3 + 1] - X[i * 3 + 1], dz = X[a * 3 + 2] - X[i * 3 + 2]; const l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (l > 1e-6) {
+            dx /= l; dy /= l; dz /= l;
+            /* a limb: the least turn from where its parent carries it onto its point gives its twist (the one its pose had, about
+               the parent). Worked out afresh each frame that turn can flip when the limb folds far over; so the bone is turned on
+               from its own last frame (never far), and only its twist is eased toward the carried one */
+            let ux = b.D0[bn * 3], uy = b.D0[bn * 3 + 1], uz = b.D0[bn * 3 + 2];
+            if (p !== rg.root && p >= 0) { const x = _t[0] * ux + _t[1] * uy + _t[2] * uz, y = _t[3] * ux + _t[4] * uy + _t[5] * uz, z = _t[6] * ux + _t[7] * uy + _t[8] * uz; ux = x; uy = y; uz = z; }
+            swing(ux, uy, uz, dx, dy, dz); mul(_c2, 0, _s, 0, _c, 0);
+            if (b.fresh) W.set(_c2, w);
+            else {
+              swing(b.D1[bn * 3], b.D1[bn * 3 + 1], b.D1[bn * 3 + 2], dx, dy, dz); _f1.set(W.subarray(w, w + 9)); mul(_i, 0, _s, 0, _f1, 0);
+              if (b.kTw > 0) {
+                mulT(_f1, 0, _c2, 0, _i, 0);
+                const sn = .5 * ((_f1[7] - _f1[5]) * dx + (_f1[2] - _f1[6]) * dy + (_f1[3] - _f1[1]) * dz), cs = .5 * (_f1[0] + _f1[4] + _f1[8] - 1), th = Math.atan2(sn, cs) * b.kTw;
+                turn(dx, dy, dz, th); mul(W, w, _s, 0, _i, 0);
+              } else W.set(_i, w);
+            }
+            b.D1[bn * 3] = dx; b.D1[bn * 3 + 1] = dy; b.D1[bn * 3 + 2] = dz;
+          } else W.set(_c, w);
+        }
+      }
+      const H = B[bn].h;
+      for (let r = 0; r < 3; r++) O[bn * 3 + r] = X[i * 3 + r] - (W[w + r * 3] * H[0] + W[w + r * 3 + 1] * H[1] + W[w + r * 3 + 2] * H[2]) + (r === 1 ? b.lift : 0);
+    }
+    if (rg.root >= 0) {   // the root rides the hips
+      const r0 = rg.root * 9, hp = rg.hips * 9; mulT(_t, 0, W, hp, W0, hp); mul(W, r0, _t, 0, W0, r0);
+      /* (O_root(t) = Rrel (O_root0 - J_hips0) + J_hips(t): the root's points keep their place about the hips' joint) */
+      const Hh = B[rg.hips].h, j0x = W0[hp] * Hh[0] + W0[hp + 1] * Hh[1] + W0[hp + 2] * Hh[2] + b.O0[rg.hips * 3], j0y = W0[hp + 3] * Hh[0] + W0[hp + 4] * Hh[1] + W0[hp + 5] * Hh[2] + b.O0[rg.hips * 3 + 1], j0z = W0[hp + 6] * Hh[0] + W0[hp + 7] * Hh[1] + W0[hp + 8] * Hh[2] + b.O0[rg.hips * 3 + 2];
+      const qx = b.O0[rg.root * 3] - j0x, qy = b.O0[rg.root * 3 + 1] - j0y, qz = b.O0[rg.root * 3 + 2] - j0z, i = rg.pt[rg.hips];
+      O[rg.root * 3] = _t[0] * qx + _t[1] * qy + _t[2] * qz + X[i * 3]; O[rg.root * 3 + 1] = _t[3] * qx + _t[4] * qy + _t[5] * qz + X[i * 3 + 1] + b.lift; O[rg.root * 3 + 2] = _t[6] * qx + _t[7] * qy + _t[8] * qz + X[i * 3 + 2];
+    }
+  }
+  /* the road under the sculpt itself: a rider below it lifts the points of its bone by as much (shared between the two ends of
+     the bone by where the rider sits; the points of a rigid body all alike) and stops their fall. True when anything was lifted */
+  function floor(b) {
+    const rg = b.rg, W = b.W, O = b.O, X = b.X, Xp = b.Xp, rb = rg.rb, rp = rg.rp, ri = rg.ri, ru = rg.ru, push = rg.push, n = rb.length, lim = b.gy - b.lift + .002 * rg.h; let any = false;
+    for (let k = 0; k < n; k++) {
+      const bn = rb[k], w = bn * 9, y = W[w + 3] * rp[k * 3] + W[w + 4] * rp[k * 3 + 1] + W[w + 5] * rp[k * 3 + 2] + O[bn * 3 + 1] - b.lift, pen = lim - y;
+      if (pen <= 0) continue;
+      if (!any) { push.fill(0); any = true; }
+      const i0 = ri[k * 2], i1 = ri[k * 2 + 1];
+      if (i0 < 0) { const host = -1 - i0, v = rg.va[host], q = rg.pt[host]; if (pen > push[q]) push[q] = pen; for (let e = 0; e < 3; e++) if (pen > push[v + e]) push[v + e] = pen; }
+      else if (i1 < 0) { if (pen > push[i0]) push[i0] = pen; }
+      else { const u = ru[k], sN = (1 - u) * (1 - u) + u * u, a = pen * (1 - u) / sN, c = pen * u / sN; if (a > push[i0]) push[i0] = a; if (c > push[i1]) push[i1] = c; }
+    }
+    if (any) for (let i = 0; i < rg.NP; i++) if (push[i] > 0) { const a = i * 3 + 1; if (push[i] > .06 * rg.h) push[i] = .06 * rg.h; X[a] += push[i]; Xp[a] += push[i]; if (Xp[a] > X[a]) Xp[a] = X[a]; b.on[i] = 1; }
+    return any;
+  }
+  /* the sculpt's lowest vertex under the pose (once, as the body falls asleep): how far it dips under the road */
+  function dip(b, skin) {
+    const R = skin || b.rg.R, P = b.rg.R.P, bi = R.bi, Wt = R.W, W = b.W, O = b.O, nv = b.rg.R.nv; let low = 1e9;
+    for (let v = 0; v < nv; v++) {
+      const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2], a = bi[v * 2] * 9, c = bi[v * 2 + 1] * 9, w = Wt[v];
+      const ya = W[a + 3] * x + W[a + 4] * y + W[a + 5] * z + O[bi[v * 2] * 3 + 1], yb = W[c + 3] * x + W[c + 4] * y + W[c + 5] * z + O[bi[v * 2 + 1] * 3 + 1], yy = ya * w + yb * (1 - w);
+      if (yy < low) low = yy;
+    }
+    return b.gy - low;
+  }
+  /* a frame: dt seconds on. Returns the body (b.asleep once still; b.kneel / b.thud flip when a knee or hand, then the trunk, first
+     meets the road: the caller's dust). skin: { bi, W } when the dying body is drawn with another skin than the rig's */
+  function step(b, dt, skin) {
+    if (!b.asleep) {
+      /* the frame's time in equal steps no longer than 1/RG.hz (a fast screen: one short step a frame, so nothing stutters) */
+      const rg = b.rg, h = rg.h; dt = Math.max(1e-4, Math.min(dt, RG.maxSteps / RG.hz)); const ns = Math.max(1, Math.ceil(dt * RG.hz - 1e-6)), H = dt / ns;
+      for (let st = 0; st < ns; st++) {
+        tick(b, H);
+        if (!b.kneel) for (let i = 0; i < rg.NP; i++) if (b.on[i] && !rg.pdrag[i] && !rg.isFoot[i]) { b.kneel = true; break; }
+        if (!b.thud) for (const i of rg.core) if (b.on[i]) { b.thud = true; break; }
+        /* asleep: slower than a crawl for a tenth of a second (or the cap): then nothing of it moves again */
+        let v = 0, vc = 0; for (let i = 0; i < rg.NP; i++) if (!rg.pdrag[i] && rg.pcol[i]) { const x = b.X[i * 3] - b.Xp[i * 3], y = b.X[i * 3 + 1] - b.Xp[i * 3 + 1], z = b.X[i * 3 + 2] - b.Xp[i * 3 + 2], q = x * x + y * y + z * z; if (q > v) v = q; if (rg.isCore[i] && q > vc) vc = q; }
+        b.still = Math.sqrt(v) / H < .45 * h && Math.sqrt(vc) / H < .14 * h && b.t > .35 && b.thud ? b.still + H : 0;
+        if (b.still > .1 || b.t >= RG.cap) { b.asleep = true; b.Xp.set(b.X); b.thud = b.kneel = true; RG.stats.rest += b.t; RG.stats.restN++; break; }
+      }
+      b.kTw = 1 - Math.exp(-dt * 9); solve(b);
+      if (floor(b)) {   // (lifted off the road: the skeleton pulled true again, then the bones once more)
+        const rg = b.rg, C = rg.C, X = b.X, inv = rg.inv;
+        for (let it = 0; it < 3; it++) for (let q = 0; q < rg.nFix; q++) sat(X, inv, C[q * 4], C[q * 4 + 1], C[q * 4 + 2], C[q * 4 + 3], 1);
+        b.kTw = 0; solve(b);
+      }
+      if (b.asleep) { const d = dip(b, skin); if (d > .004 * rg.h) b.liftTo = Math.min(d, RG.maxLift * rg.h); }   // (no more than a little: a body is not floated on a skirt's hem)
+    } else if (b.lift < b.liftTo) { b.lift = Math.min(b.liftTo, b.lift + b.rg.h * .6 * Math.max(0, dt)); solve(b); }
+    return b;
+  }
+  /* the pose for the renderer, in the runtimes' toBones layout (a column of W and a row of O, a bone) */
+  function pack(b, out) {
+    const W = b.W, O = b.O, NB = b.rg.NB;
+    for (let bn = 0; bn < NB; bn++) { const o = bn * 9, g = bn * 12;
+      out[g] = W[o]; out[g + 1] = W[o + 3]; out[g + 2] = W[o + 6]; out[g + 3] = O[bn * 3]; out[g + 4] = W[o + 1]; out[g + 5] = W[o + 4]; out[g + 6] = W[o + 7]; out[g + 7] = O[bn * 3 + 1]; out[g + 8] = W[o + 2]; out[g + 9] = W[o + 5]; out[g + 10] = W[o + 8]; out[g + 11] = O[bn * 3 + 2]; }
+    return out;
+  }
+  /* what a runtime passes start() for a body k (view.js ragNew's record): the blow and the body's own speed turned into its
+     frame and its scale, the road under it, its weight */
+  function blowOf(k, fly) {
+    const c = k.c || {}, d = c.def || {}, sc = k.sc || 1, cy = Math.cos(k.yaw || 0), sy = Math.sin(k.yaw || 0), ok = Math.min(2, c.overK || 0);
+    const rot = (x, z) => [x * cy - z * sy, x * sy + z * cy];
+    const b = c.hdx != null ? rot(c.hdx, c.hdz) : [0, 0], v = c.fpV ? rot(c.fpV[0] / sc, c.fpV[1] / sc) : [0, 0];
+    const boss = !!(d.boss || d.lead), heavy = boss ? 2.6 : d.armor || d.role === 'armoured' || (d.hp || 1) >= 1.25 ? 1.6 : 1;
+    return { bx: b[0], bz: b[1], s: Math.max(.4, Math.min(2.6, (c.hitK || .7) * (1 + .7 * ok))), vx: v[0] * .8, vz: v[1] * .8, gy: fly ? -Math.max(0, (k.y || 0)) / sc : 0, fly: !!fly, heavy, blast: (k.fx || c.dieFx) === 'blast' && !boss, r: hash(c.anim != null ? c.anim : Math.random() * 99, 5) };
+  }
+  RG.rig = rig; RG.start = start; RG.step = step; RG.pack = pack; RG.blowOf = blowOf; RG.dip = dip; RG.solve = solve;
+  return RG;
+})();
+
 /* ================= The forest factions' bodies: the owner's sculpts, rigged and clip-animated =================
    One runtime for every foe in a faction's model file (tools/make_forestfoe.py: REEDCOURT_MDL, HOLLOWTHORN_MDL ..., split
    assets): each a decimated sculpt on its own atlas, on the shared forest-foe skeleton (tools/ff_rig.py), with baked clips
@@ -80974,6 +81420,8 @@ const FOEDIE = (() => {
      (deathPick; window.FF_DEATH_PICK = 'death2' holds one), played once and held on its last frame until the body sinks; its
      dying body is drawn with the corrected skin the film came with (D.dbi / D.dbw: a second draw mesh, `md`). The body's own
      clock (SINK0, GONE) is not the clip's. Foe physics asks which way the picked one falls (model.fallOf).
+     Since 24 Nov 2026 a body no longer plays one of them by default: it falls as a ragdoll (dieRag; FOERAG,
+     models_lead9d_foerag.js) from the pose it was struck in, drawn with the death skin. ?foerag=0 brings the film deaths back.
    The engine's whole-body tilt and squash (view.js creepMatrix) are taken back out: the clips carry their own lean.
    A foe whose data is missing or broken keeps its borrowed body (CREEPS[type].fallback). In a run: FFM.play('rc_ysra', 'cast')
    holds a clip on every foe of that type (null to release); FFM.types lists what loaded. */
@@ -81165,13 +81613,13 @@ const FFM = (() => {
     const hgt = R.height, wide = Math.max(.75, hgt * .8);
     m.min = [-wide, -.05, -wide]; m.max = [wide, hgt * 1.25, wide * 1.3];
     /* the dying body: the same mesh with the film's corrected skin (two bones a vertex as the living one's), when it has one */
-    let md = m;
+    let md = m, DSKIN = null;
     if (D.dbi && D.dbw) {
       const dbi = new Uint8Array(b64(D.dbi)), dbw = new Uint8Array(b64(D.dbw));
       if (dbi.length !== R.nv * 2 || dbw.length !== R.nv || dbi.some(b => b >= NB)) throw new Error('bad death skin');
       const bone2 = new Float32Array(nc * 2), bw2 = new Float32Array(nc);
       for (let k = 0; k < nc; k++) { const v = idx[k]; bone2[k * 2] = dbi[v * 2]; bone2[k * 2 + 1] = dbi[v * 2 + 1]; bw2[k] = dbw[v] / 255; }
-      md = Object.assign({}, m, { bone: bone2, bw: bw2, gl: new Map() });
+      md = Object.assign({}, m, { bone: bone2, bw: bw2, gl: new Map() }); DSKIN = { bi: dbi, W: Float32Array.from(dbw, x => x / 255) };
     }
     if (!D.tex) throw new Error('no texture');
     let img = null;
@@ -81182,6 +81630,8 @@ const FFM = (() => {
       const c = o && o.c || null;
       if (c && !(o && o.deathT != null)) base = upright(base, c);
       const sc = Math.hypot(base[0], base[1], base[2]);
+      if (o && o.rag) { const it = item(md, base, o); FOERAG.pack(o.rag, BUF); if (typeof FPH !== 'undefined' && FPH.flesh) { const g = o.rag; FPH.flesh(g, R, BUF, c, g.flK ? 0 : (g.flK = 1, g.blow || 1), g.m, 1); }   // (its flesh shudders: foe physics 1d)
+        it.bones = itemBones(it, BUF); it.sec = [0, TRIM]; return; }   // (a ragdoll: its own bones)
       if (o && o.deathT != null) {
         sampleT(CL[o.deathClip] || CL.death, o.deathT, PA);
         const s = c && ST.get(c);
@@ -81193,7 +81643,30 @@ const FFM = (() => {
       const it = item(o && o.deathT != null ? md : m, base, o);
       it.bones = itemBones(it, toBones(PA, BUF)); it.sec = [0, TRIM];
     }
+    /* a ragdoll death (models_lead9d_foerag.js: FOERAG; owner, 24 Nov 2026: "something that reads like a physics based death"):
+       the skeleton falls as a ragdoll from the pose it was struck in, pushed by the killing blow; no clip is played. The body's
+       own clock (when it sinks, when it is gone) is as ever; the knee and body dust come at the ragdoll's own contacts. */
+    function dieRag(k) {
+      if (k.t > GONE) return false;
+      const c = k.c;
+      if (!k.rag) {
+        const s = c && ST.get(c);
+        if (s && s.has) { PA.q.set(s.last.q); PA.t.set(s.last.t); } else sampleT(CL.idle, 0, PA);
+        toBones(PA, BUF);
+        k.rag = FOERAG.start(RAG, _W, _O, FOERAG.blowOf(k, FLY)); k.ragT = k.t;
+      }
+      FOERAG.step(k.rag, Math.max(0, Math.min(.1, k.t - k.ragT)), DSKIN); k.ragT = k.t;
+      if (!k.kneel && k.rag.kneel) { k.kneel = true; MOBRIG.thud(k, 3, false); }
+      if (!k.thud && k.rag.thud) { k.thud = true; const boss = !!(c && c.def && c.def.boss); MOBRIG.thud(k, boss ? 14 : 6, boss); }
+      const su = Math.max(0, (k.t - SINK0) / (GONE - SINK0)), f = Math.max(0, 1 - k.t / .14), dk = 1 - .35 * Math.min(1, su * 2.5);
+      M4.trs(_m, k.x, k.y - su * su * .5 * k.sc, k.z, k.yaw, 0, 0, k.sc);
+      const t0 = c && c.def && c.def.tint && !c.def.fallback ? c.def.tint : [1, 1, 1, 0];
+      const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * f) * dk, t0[1] * (.8 + .25 * f) * dk, t0[2] * (.75 + .25 * f) * dk, Math.max(t0[3] * dk, .08 * f)];
+      draw(_m, 0, { c, deathT: k.t, rag: k.rag, tint, shadow: su < .2 });
+      return true;
+    }
     function die(k) {
+      if (RAG && FOERAG.on) return dieRag(k);
       if (k.t > GONE) return false;
       const c = k.c, DN = deathPick(k), DT = CL[DN];
       /* the clip on the quick, weighty clock (models_lead9d_deathtime.js: FOEDIE), its strike's time and jolt */
@@ -81209,7 +81682,8 @@ const FFM = (() => {
       draw(_m, 0, { c, deathT: T, deathW: FD ? FD.blendW(k, DT, k.t) : null, deathEnd: FD ? FD.endW(k, DT, k.t) : 0, deathClip: DN, tint, shadow: su < .2 });
       return true;
     }
-    const model = { quick: typeof FOEDIE !== 'undefined' && FOEDIE.on, limbs: [], bob: 0, fly: FLY, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), fallOf, body: m, bounds: [[-.3, 0, -.3], [.3, hgt, .3]], tris: nc / 3 };
+    let RAG = null; try { RAG = typeof FOERAG !== 'undefined' ? FOERAG.rig(R) : null; } catch (e) { if (typeof console !== 'undefined') console.warn('Forest foe ' + TYPE + ': no ragdoll (' + e.message + ')'); }
+    const model = { ragdoll: !!RAG, quick: typeof FOEDIE !== 'undefined' && FOEDIE.on, limbs: [], bob: 0, fly: FLY, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), fallOf, body: m, bounds: [[-.3, 0, -.3], [.3, hgt, .3]], tris: nc / 3 };
     return { model, CL, R, D, NB, DEATHS, FALL, deathMesh: md };
   }
 
@@ -81248,6 +81722,8 @@ const FFM = (() => {
              (the sinking's and the clearing's times, SINK0 and GONE, are not the clips'). Foe physics asks which way the
              picked one falls (model.fallOf), so its turn of the body agrees.
              window.HT_DEATH_PICK = 'death2' holds one for a check.
+             Since 24 Nov 2026 a body no longer plays one of them by default: it falls as a ragdoll (dieRag; FOERAG,
+             models_lead9d_foerag.js) from the pose it was struck in. ?foerag=0 brings the film deaths back.
    Stunned a foe stands; frozen it holds its frame. The engine's own body tilt and squash are taken back out (the clips
    carry their own), as for the Mauler. The green sap glows a little (each corner's `em`).
    This file only draws: the foes themselves (CREEPS entries, rules, waves) are in forces_zzzzzzzzzzzzzzzzzzzzzzzzz_hollowthorn.js.
@@ -81262,7 +81738,7 @@ const HOLLOWTHORN_MDL = (() => {
 
   function make(TYPE, DATA) {
     let D = null, R = null, MESHB = null, img = null, NB = 0, H = null, PAR = null, UPPER = null, HIPS = 0, PA = null, PB = null, BUF = null, REF_HIT = null;
-    const CL = {}, ST = new WeakMap(), DEATHS = [], FALL = {};
+    const CL = {}, ST = new WeakMap(), DEATHS = [], FALL = {}; let RAG = null;
     function decodeClip(c) {
       const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
       if (q16.length !== c.n * NB * 4 || t.length !== c.n * 3) throw new Error(TYPE + ': bad clip');
@@ -81421,6 +81897,8 @@ const HOLLOWTHORN_MDL = (() => {
       const c = o && o.c || null;
       if (c && !(o && o.deathT != null)) base = upright(base, c);
       const sc = _sc(base);
+      if (o && o.rag) { const it = item(MESHB, base, o); FOERAG.pack(o.rag, BUF); if (typeof FPH !== 'undefined' && FPH.flesh) { const g = o.rag; FPH.flesh(g, R, BUF, c, g.flK ? 0 : (g.flK = 1, g.blow || 1), g.m, 1); }   // (its flesh shudders: foe physics 1d)
+        it.bones = itemBones(it, BUF); it.sec = [0, TRIM]; return; }   // (a ragdoll: its own bones)
       if (o && o.deathT != null) {
         sampleT(CL[o.deathClip] || CL.death, o.deathT, PA);
         const s = c && ST.get(c);
@@ -81443,7 +81921,30 @@ const HOLLOWTHORN_MDL = (() => {
       return k.htD = DEATHS[Math.floor(k.htR * DEATHS.length) % DEATHS.length];
     }
     function fallOf(k) { return FALL[deathPick(k)] || null; }
+    /* a ragdoll death (models_lead9d_foerag.js: FOERAG; owner, 24 Nov 2026: "something that reads like a physics based death"):
+       the skeleton falls as a ragdoll from the pose it was struck in, pushed by the killing blow; no clip is played. The body's
+       own clock (when it sinks, when it is gone) is as ever; the knee and body dust come at the ragdoll's own contacts. */
+    function dieRag(k) {
+      if (k.t > GONE) return false;
+      const c = k.c;
+      if (!k.rag) {
+        const s = c && ST.get(c);
+        if (s && s.has) { PA.q.set(s.last.q); PA.t.set(s.last.t); } else sampleT(CL.idle, 0, PA);
+        toBones(PA, BUF);
+        k.rag = FOERAG.start(RAG, _W, _O, FOERAG.blowOf(k, D.fly)); k.ragT = k.t;
+      }
+      FOERAG.step(k.rag, Math.max(0, Math.min(.1, k.t - k.ragT)), null); k.ragT = k.t;
+      if (!k.kneel && k.rag.kneel) { k.kneel = true; MOBRIG.thud(k, 3, false); }
+      if (!k.thud && k.rag.thud) { k.thud = true; const boss = !!(c && c.def && c.def.boss); MOBRIG.thud(k, boss ? 14 : 5, boss); }
+      const su = Math.max(0, (k.t - SINK0) / (GONE - SINK0)), f = Math.max(0, 1 - k.t / .14), dk = 1 - .35 * Math.min(1, su * 2.5);
+      M4.trs(_m, k.x, k.y - su * su * .5 * k.sc, k.z, k.yaw, 0, 0, k.sc);
+      const t0 = c && c.def && c.def.tint ? c.def.tint : [1, 1, 1, 0];
+      const tint = k.gilded ? [1.5, 1.15, .45, .45] : [t0[0] * (.85 + .25 * f) * dk, t0[1] * (.8 + .25 * f) * dk, t0[2] * (.75 + .25 * f) * dk, Math.max(t0[3] * dk, .08 * f)];
+      draw(_m, 0, { c, deathT: k.t, rag: k.rag, tint, shadow: su < .2 });
+      return true;
+    }
     function die(k) {
+      if (RAG && FOERAG.on) return dieRag(k);
       if (k.t > GONE) return false;
       const c = k.c, DN = deathPick(k), DT = CL[DN];
       /* the clip on the quick, weighty clock (models_lead9d_deathtime.js: FOEDIE), its strike's time and jolt */
@@ -81495,7 +81996,8 @@ const HOLLOWTHORN_MDL = (() => {
       if (!D.tex) throw new Error(TYPE + ': no texture');
       if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
       MESHB = m;
-      const model = { quick: typeof FOEDIE !== 'undefined' && FOEDIE.on, limbs: [], bob: 0, fly: !!D.fly, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), fallOf, body: m, bounds: [[-.3, 0, -.3], [.3, R.height, .3]], tris: nc / 3 };
+      try { RAG = typeof FOERAG !== 'undefined' ? FOERAG.rig(R) : null; } catch (e) { RAG = null; if (typeof console !== 'undefined') console.warn('Hollowthorn ' + TYPE + ': no ragdoll (' + e.message + ')'); }
+      const model = { ragdoll: !!RAG, quick: typeof FOEDIE !== 'undefined' && FOEDIE.on, limbs: [], bob: 0, fly: !!D.fly, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), fallOf, body: m, bounds: [[-.3, 0, -.3], [.3, R.height, .3]], tris: nc / 3 };
       if (CL.cast) model.castPose = [];      // (so the view works the cast gesture out for it: view.js drawCreeps)
       return model;
     }
@@ -93659,94 +94161,204 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -93755,75 +94367,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
