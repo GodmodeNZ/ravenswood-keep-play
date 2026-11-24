@@ -1,4 +1,4 @@
-const BUILD_TAG = '93d8eeb8@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = '342c03b8@2026-11-24';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -78651,11 +78651,13 @@ const MOBRIG = (() => {
     }
     for (const g of need || []) if (!groups[g]) throw new Error(tag + ': missing group ' + g);
     const bix = {}; bones.forEach((b, i) => bix[b.n] = i);
+    P._rxB = bones;   // (the rig's bones ride on its points, so a mesh filled from them knows its rig: unitreact.js)
     return { nv, P, N, bi, W, bones, bix, groups, height: D.height, D };
   }
   // a mesh in the engine's own layout (gl.js upload): triangle soup, linear colours, ext = [emissive, material]
   function fill(m, idx, P, N, o) {
     const pos = m.pos, nor = m.nor, mn = m.min, mx = m.max; o = o || 0;
+    if (P._rxB) m._rxB = P._rxB;
     if (!o) { mn[0] = mn[1] = mn[2] = 1e9; mx[0] = mx[1] = mx[2] = -1e9; }
     for (let k = 0; k < idx.length; k++) {
       const s = idx[k] * 3, d = (o + k) * 3;
@@ -130071,6 +130073,278 @@ function spellAreaAudit(o) {
   if (!o.quiet) console.table(rows);
   return rows;
 }
+
+/* Units react to the fight (24 Nov 2026; brief: "make the army feel alive": a runtime layer over every sculpted unit's clips,
+   nothing re-baked). After a force unit is drawn (drawTower, wrapped), each sculpted body it put in the draw list
+   (an item with a bone palette and a mesh whose rig is known: every MOBRIG model, tagged in models_lead8_mobs.js, and the
+   older unitmodels.js models through UM) has its final palette turned, in the model's own space, by a few small rotations:
+     tracking  the head (neck a third, head the rest) and a little of the upper body turn and tip toward the foe it is about
+               to strike or cast at (t.tg), eased, kept to natural angles (head 37 degrees beyond the body, body 11, pitch 11
+               down); the body's share fades to nothing around a strike's release and a cast, the head's to a half
+     flinch    a short recoil back about the waist when its health drops, by the blow's share of its health (units whose rig
+               has its own hit clip are left to it: RX_OWN_HIT)
+     wounded   a tired slump, the head hung, a heavier breath (units with their own wounded clip are left to it: RX_OWN_WOUND)
+     cheer     when a wave is cleared, each unit a moment later than its neighbour (0.1-0.65 s, by its cell): a weapon
+               raised (a one-handed weapon in the fist: the arm swung up, the weapon turned upright), a bow lifted, a staff,
+               spear or gun presented in both hands and grounded (both arms and the free prop lifted together about the
+               shoulders' line), a caster's proud lift and a bounce, a beast's head thrown up (RX_CHEER overrides by unit)
+     idle      now and then a glance aside or a shift of weight, at most a few units at a time (RX.cap)
+   Cost: no allocation a frame (a WeakMap entry a unit and one rig record a model, made once); only units on screen; about
+   40 bones x 3-6 small rotations a unit. Anchors the unit wrote for effects this frame (t.tipW ...) are not moved: the
+   layer keeps clear of the hands while a strike or a cast plays. Off: ?react=0, or UNITREACT.on = false.
+   Console: UNITREACT.cheer() (every unit cheers now), UNITREACT.flinch(k) (the selected or every unit), UNITREACT.kinds(). */
+const RX_OWN_HIT = new Set(['ch_brannoc', 'censer', 'sb_clouddancer', 'sb_earthbinder', 'flakgunner', 'grailknight', 'sb_hailshaman', 'ch_hrolf', 'lightbinder', 'oathsworn', 'silverbolt', 'sb_spiritwalker', 'staglancer', 'sunlance', 'templar', 'sb_thundercaller', 'ch_torvald', 'sb_windrunner', 'sb_wolfguard']);
+const RX_OWN_WOUND = new Set([...RX_OWN_HIT, 'ch_nyssa', 'cc_pyroclast', 'seedcaster']);
+/* a unit's cheer when its rig's own reading would be wrong (a glow or a ribbon anchored in a hand that would be left behind,
+   a pot that must hang): 'proud' (no hands moved), 'raise', 'lift' (the left arm), 'present', 'howl', 'bob', 'none' */
+const RX_CHEER = { censer: 'proud', lightbinder: 'proud', ch_nyssa: 'proud', seedcaster: 'proud', cc_pyroclast: 'proud', cc_rimeweaver: 'proud', bogwitch: 'proud', gladebow: 'proud', ch_faelan: 'proud', thornguard: 'proud' };
+const UNITREACT = (() => {
+  const RX = { on: true, cap: .12, err: null, n: 0, ms: 0, ends: new Float32Array(64), endN: 0, phase: null, clr: -9, rigs: 0 };
+  try { if (/[?&]react=0\b/.test(location.search)) RX.on = false; } catch (e) {}
+  const ST = new WeakMap();
+  const sm = (a, b, x) => { const u = x <= a ? 0 : x >= b ? 1 : (x - a) / (b - a); return u * u * (3 - 2 * u); };
+  const cl = (x, a, b) => x < a ? a : x > b ? b : x;
+  /* ---- the rig: what each bone is, read once a model from its bones' names ---- */
+  const FIND = (B, names) => { for (const n of names) { const i = B.findIndex(b => b.n === n); if (i >= 0) return i; } return -1; };
+  function rigOf(B) {
+    const nb = B.length, par = new Int16Array(nb), H = new Float32Array(nb * 3), T = new Float32Array(nb * 3); let hasT = true;
+    B.forEach((b, i) => { par[i] = b.p; H.set(b.h, i * 3); if (b.t) T.set(b.t, i * 3); else hasT = false; });
+    const sub = i => { const l = []; if (i < 0) return l; for (let j = i; j < nb; j++) { let p = j; while (p > i) p = par[p]; if (p === i) l.push(j); } return l; };
+    const nm = i => i >= 0 ? B[i].n : '';
+    const mounted = FIND(B, ['rHead']) >= 0, beast = !mounted && FIND(B, ['pawL', 'scapL']) >= 0, bird = FIND(B, ['wingAL']) >= 0;
+    const R = { nb, par, H, T: hasT ? T : null, mounted, kind: bird ? 'bird' : beast ? 'beast' : 'human' };
+    R.head = FIND(B, mounted ? ['rHead'] : ['head', 'Head']); R.neck = FIND(B, mounted ? ['rNeck'] : ['neck', 'Neck']);
+    R.chest = FIND(B, mounted ? ['rChest'] : ['chest', 'Spine2']); R.waist = FIND(B, mounted ? ['rSpine'] : ['spine', 'Spine']);
+    if (bird) { R.waist = -1; R.chest = FIND(B, ['chest']); }
+    R.clavL = FIND(B, mounted ? ['armL'] : ['clavL', 'LeftShoulder']); R.clavR = FIND(B, mounted ? ['armR'] : ['clavR', 'RightShoulder']);
+    R.armL = FIND(B, ['armL', 'LeftArm', 'upper_arm.L']); R.armR = FIND(B, ['armR', 'RightArm', 'upper_arm.R']);
+    R.handL = FIND(B, ['handL', 'LeftHand', 'hand.L']); R.handR = FIND(B, ['handR', 'RightHand', 'hand.R']);
+    if (beast) R.clavL = R.clavR = R.armL = R.armR = R.handL = R.handR = -1;
+    /* free props: held by both hands solved onto them, so they move with the upper body (not the anvil on the ground) */
+    const root = par.indexOf(-1), props = [], heldProps = [];
+    B.forEach((b, i) => { if (i === root || /^(hips|Hips)$/.test(b.n)) return; const p = b.p; if (p === -1 || (p === root && nm(root) === 'root')) { if (/anvil/i.test(b.n)) return; props.push(i); if (!/arrow/i.test(b.n)) heldProps.push(i); } });
+    const notFinger = n => !/^(fing|tip|thumb|Right(Thumb|Fingers|HandIndex|HandMiddle|HandRing|HandPinky|HandThumb)|Left(Thumb|Fingers)|nock)/i.test(n);
+    const kid = h => { if (h < 0) return -1; for (let j = h + 1; j < nb; j++) if (par[j] === h && notFinger(B[j].n)) return j; return -1; };
+    R.wpnR = kid(R.handR); R.wpnL = kid(R.handL);
+    const uniq = a => Int16Array.from([...new Set(a)].sort((x, y) => x - y));
+    R.headSet = uniq(sub(R.head).concat(...B.map((b, i) => /^beard/.test(b.n) && par[i] === R.chest && !mounted ? sub(i) : [])));
+    R.neckSet = R.neck >= 0 ? uniq(sub(R.neck).concat(...B.map((b, i) => /^beard/.test(b.n) && par[i] === R.chest && !mounted ? sub(i) : []))) : null;
+    R.upSet = R.waist >= 0 && !beast ? uniq(sub(R.waist).concat(...props.map(sub))) : null;
+    R.armSetR = R.armR >= 0 ? uniq(sub(R.armR)) : null; R.armSetL = R.armL >= 0 ? uniq(sub(R.armL)) : null;
+    R.handSetR = R.handR >= 0 ? uniq(sub(R.handR)) : null; R.handSetL = R.handL >= 0 ? uniq(sub(R.handL)) : null;
+    R.presProp = heldProps.length ? heldProps[0] : -1; R.presSet = heldProps.length && R.clavL >= 0 && R.clavR >= 0 ? uniq(sub(R.clavL).concat(sub(R.clavR), ...heldProps.map(sub))) : null;
+    R.cheer = bird ? 'bob' : beast ? 'howl' : R.presSet ? 'present' : R.wpnR >= 0 && R.armSetR ? 'raise' : R.wpnL >= 0 && /bow/i.test(nm(R.wpnL)) && R.armSetL ? 'lift' : 'proud';
+    R.wpnN = R.cheer === 'raise' ? nm(R.wpnR) : R.cheer === 'lift' ? nm(R.wpnL) : R.cheer === 'present' ? heldProps.map(nm).join('+') : '';
+    RX.rigs++;
+    return R;
+  }
+  function rigFor(it, t) {
+    const m = it.mesh; if (!m) return null;
+    if (m._rxR !== undefined) return m._rxR;
+    let B = m._rxB || null;
+    if (!B && typeof UM !== 'undefined' && t && t.def) { const M = UM[t.def.unit]; if (M && M.mesh === m && M.R && M.R.B) B = M.R.B; }
+    if (!B) return null;   // (not known yet: asked again next frame)
+    try { m._rxR = rigOf(B); } catch (e) { m._rxR = null; if (!RX.err) RX.err = e.message; }
+    return m._rxR;
+  }
+  /* ---- the palette: 12 floats a bone (columns x, y, z of the 3x3 at 0-2, 4-6, 8-10; the move at 3, 7, 11), model space ---- */
+  const J = new Float64Array(3), Q = new Float64Array(9), V = new Float64Array(3), W = new Float64Array(3);
+  function joint(o, R, b) {   // the joint of bone b as posed, into J
+    const g = b * 12, h0 = R.H[b * 3], h1 = R.H[b * 3 + 1], h2 = R.H[b * 3 + 2];
+    J[0] = o[g] * h0 + o[g + 4] * h1 + o[g + 8] * h2 + o[g + 3]; J[1] = o[g + 1] * h0 + o[g + 5] * h1 + o[g + 9] * h2 + o[g + 7]; J[2] = o[g + 2] * h0 + o[g + 6] * h1 + o[g + 10] * h2 + o[g + 11];
+  }
+  function tail(o, R, b) {   // the bone's tail as posed, into W
+    const g = b * 12, h0 = R.T[b * 3], h1 = R.T[b * 3 + 1], h2 = R.T[b * 3 + 2];
+    W[0] = o[g] * h0 + o[g + 4] * h1 + o[g + 8] * h2 + o[g + 3]; W[1] = o[g + 1] * h0 + o[g + 5] * h1 + o[g + 9] * h2 + o[g + 7]; W[2] = o[g + 2] * h0 + o[g + 6] * h1 + o[g + 10] * h2 + o[g + 11];
+  }
+  function axisAng(x, y, z, a) {   // Q: the rotation by a about the unit axis (x, y, z), row-major
+    const c = Math.cos(a), s = Math.sin(a), k = 1 - c;
+    Q[0] = c + x * x * k; Q[1] = x * y * k - z * s; Q[2] = x * z * k + y * s;
+    Q[3] = y * x * k + z * s; Q[4] = c + y * y * k; Q[5] = y * z * k - x * s;
+    Q[6] = z * x * k - y * s; Q[7] = z * y * k + x * s; Q[8] = c + z * z * k;
+  }
+  function turn(o, set, cx, cy, cz) {   // every bone of set turned by Q about (cx, cy, cz)
+    for (let n = 0; n < set.length; n++) {
+      const g = set[n] * 12;
+      for (let c = 0; c < 12; c += 4) { const a = o[g + c], b = o[g + c + 1], d = o[g + c + 2]; o[g + c] = Q[0] * a + Q[1] * b + Q[2] * d; o[g + c + 1] = Q[3] * a + Q[4] * b + Q[5] * d; o[g + c + 2] = Q[6] * a + Q[7] * b + Q[8] * d; }
+      const a = o[g + 3] - cx, b = o[g + 7] - cy, d = o[g + 11] - cz;
+      o[g + 3] = Q[0] * a + Q[1] * b + Q[2] * d + cx; o[g + 7] = Q[3] * a + Q[4] * b + Q[5] * d + cy; o[g + 11] = Q[6] * a + Q[7] * b + Q[8] * d + cz;
+    }
+  }
+  function rotAbout(o, R, set, pivot, x, y, z, a) { if (!set || pivot < 0 || Math.abs(a) < 1e-4) return; axisAng(x, y, z, a); joint(o, R, pivot); turn(o, set, J[0], J[1], J[2]); }
+  /* turns the bones of set about the joint of pivot by w of the turn taking direction (dx, dy, dz) onto (ex, ey, ez) (both unit) */
+  function aim(o, set, px, py, pz, dx, dy, dz, ex, ey, ez, w, max) {
+    let ax = dy * ez - dz * ey, ay = dz * ex - dx * ez, az = dx * ey - dy * ex; const s = Math.hypot(ax, ay, az), c = dx * ex + dy * ey + dz * ez;
+    if (s < 1e-5) return; const a = Math.min(max, Math.atan2(s, c)) * w; ax /= s; ay /= s; az /= s;
+    axisAng(ax, ay, az, a); turn(o, set, px, py, pz);
+  }
+  /* ---- a unit's state (eased angles, its event clocks), kept off the unit itself ---- */
+  const hash = t => { const v = Math.sin((t.i || 0) * 12.9898 + (t.j || 0) * 78.233 + (t.x || 0) * 3.1) * 43758.5453; return v - Math.floor(v); };
+  function stOf(t) {
+    let s = ST.get(t);
+    if (!s) { const h = hash(t); s = { t: -9, y: 0, p: 0, ty: 0, hp: null, fl: -9, flA: 0, wd: 0, gy: 0, gp: 0, gr: 0, ia: -9, ib: -9, ik: 0, iy: 0, ip: 0, ir: 0, nx: 0, seed: (h * 233280) | 0, h, look: null, lookAt: -9, ch: -9 }; ST.set(t, s); }
+    return s;
+  }
+  const rnd = s => { s.seed = (s.seed * 9301 + 49297) % 233280; return s.seed / 233280; };
+  function idleSlot(now) {   // room for one more idle move (never on every unit at once)
+    const n = typeof G !== 'undefined' && G.towers ? G.towers.length : 8, cap = Math.max(1, Math.floor(n * RX.cap + .5)); let busy = 0, free = -1;
+    for (let k = 0; k < RX.ends.length; k++) { if (RX.ends[k] > now) busy++; else if (free < 0) free = k; }
+    return busy < cap ? free : -1;
+  }
+  function visible(t) {
+    if (typeof RD === 'undefined' || !RD || !RD.vp) return true;
+    const v = RD.vp, x = t.x, y = .7, z = t.y, w = v[3] * x + v[7] * y + v[11] * z + v[15]; if (w <= 0) return false;
+    const cx = (v[0] * x + v[4] * y + v[8] * z + v[12]) / w, cy = (v[1] * x + v[5] * y + v[9] * z + v[13]) / w;
+    return cx > -1.2 && cx < 1.2 && cy > -1.25 && cy < 1.3;
+  }
+  /* a foe near enough to glance at, looked for every 0.3 s a unit */
+  function lookFor(t, s, now) {
+    if (now - s.lookAt < .3) return s.look && !s.look.dead ? s.look : null;
+    s.lookAt = now + s.h * .1; s.look = null;
+    if (typeof G === 'undefined' || !G.creeps || G.phase !== 'wave') return null;
+    let best = 5.5 * 5.5;
+    for (const c of G.creeps) { if (c.dead || c.ent) continue; const dx = c.x - t.x, dz = c.y - t.y, d = dx * dx + dz * dz; if (d < best) { best = d; s.look = c; } }
+    return s.look;
+  }
+  /* ---- what the unit should do this frame: its angles into s, its cheer clock, its flinch ---- */
+  function think(t, s, now, yawW) {
+    let dt = now - s.t; const gap = dt > .5 || dt < 0; dt = gap ? 0 : Math.min(dt, .1); s.t = now;
+    const u = t.def.unit, wounded = !!t.wounded;
+    /* the blow: health down since last frame (the unit's own hit clip answers it where it has one) */
+    if (t.hp != null) { if (s.hp != null && t.hp < s.hp - 1e-6 && !wounded && !RX_OWN_HIT.has(u) && now - s.fl > .12) { const f = (s.hp - t.hp) / Math.max(1, t.maxHp || 100); s.flA = Math.max(now - s.fl < .3 ? s.flA * .6 : 0, cl(.07 + f * 1.4, .07, .2)); s.fl = now; } s.hp = t.hp; }
+    s.wd += ((wounded && !RX_OWN_WOUND.has(u) ? 1 : 0) - s.wd) * (1 - Math.exp(-dt * 3));
+    if (gap) s.wd = wounded && !RX_OWN_WOUND.has(u) ? 1 : 0;
+    /* the foe it is about to strike or cast at, or one coming near */
+    const A = t.ab, casting = !!(A && (A.cast || (A.lastAt != null && now - A.lastAt < .7))), sh = t.shotT != null ? t.shotT : 9;
+    const strike = Math.max(t.windup > .5 ? (t.windup - .5) * 2 : 0, sh < .35 ? 1 - sh / .35 : 0);
+    let tg = t.tg && !t.tg.dead ? t.tg : null, near = false;
+    if (!tg && !wounded) { tg = lookFor(t, s, now); near = !!tg; }
+    let ty = 0, hy = 0, hp = 0;
+    if (tg && !t.chg) {
+      let rel = Math.atan2(tg.x - t.x, tg.y - t.y) - yawW; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+      if (near) rel *= .6;
+      rel = cl(rel, -1.25, 1.25);
+      ty = cl(rel * .3, -.2, .2) * (1 - .85 * Math.max(strike, casting ? 1 : 0));
+      hy = cl(rel - ty, -.65, .65) * (1 - .4 * Math.max(strike, casting ? 1 : 0));
+      const d = Math.hypot(tg.x - t.x, tg.y - t.y);
+      hp = cl(Math.atan2(.9, Math.max(.6, d)) * .5, 0, .19) * (near ? .6 : 1);
+      if (wounded) { ty *= .3; hy *= .6; }
+    }
+    /* idle: a glance aside or a shift of weight now and then (not while it fights, cheers or is wounded) */
+    const cheering = now - s.ch < 2;
+    if (!tg && !wounded && !cheering && now >= s.nx && !t.chg) {
+      const k = idleSlot(now);
+      if (k >= 0) { const dur = 1.4 + rnd(s) * 1.3; s.ia = now; s.ib = now + dur; RX.ends[k] = s.ib; s.ik = rnd(s) < .6 ? 1 : 2; const sg = rnd(s) < .5 ? -1 : 1; s.iy = sg * (.28 + rnd(s) * .3); s.ip = (rnd(s) - .3) * .12; s.ir = -sg * (.035 + rnd(s) * .03); s.nx = s.ib + 5 + rnd(s) * 9; }
+      else s.nx = now + .5 + rnd(s);
+    }
+    if (tg || wounded) s.ib = Math.min(s.ib, now);
+    const ie = now < s.ib ? sm(s.ia, s.ia + .45, now) * (1 - sm(s.ib - .5, s.ib, now)) : 0;
+    s.gy = s.ik === 1 ? s.iy * ie : s.iy * .2 * ie; s.gp = s.ik === 1 ? s.ip * ie : 0; s.gr = s.ik === 2 ? s.ir * ie : 0;
+    const e = gap ? 1 : 1 - Math.exp(-dt * 6.5);
+    s.ty += (ty - s.ty) * e; s.y += (hy - s.y) * e; s.p += (hp - s.p) * e;
+    /* the cheer: when a wave is cleared, each unit a moment after its neighbour */
+    if (RX.clr > s.ch + 2.5 && now - RX.clr < 3) s.ch = RX.clr + .1 + s.h * .55;
+  }
+  /* ---- the layer on one palette ---- */
+  function apply(o, R, t, s, now, kindOver) {
+    const wd = s.wd, br = Math.sin(now * 2.2 + s.h * 6) * .022 * wd;
+    const fT = now - s.fl, fl = fT >= 0 && fT < .6 ? s.flA * (fT / .07) * Math.exp(1 - fT / .07) : 0;
+    const cT = now - s.ch, ck = cT >= 0 && cT < 1.9 ? cT : -1, kind = kindOver || R.cheer;
+    const ce = ck >= 0 ? sm(0, .32, ck) * (1 - sm(1.25, 1.75, ck)) : 0;
+    /* the upper body about the waist: the twist toward the foe and the idle's sway, the flinch back, the slump, a proud lift */
+    if (R.upSet) {
+      rotAbout(o, R, R.upSet, R.waist, 0, 1, 0, s.ty + s.gy * .25);
+      const pitch = -fl + (.16 * wd + br) - (kind === 'proud' || kind === 'raise' || kind === 'lift' ? .07 * ce : 0) + (kind === 'present' && ck >= 0 ? .05 * thump(ck) : 0);
+      rotAbout(o, R, R.upSet, R.waist, 1, 0, 0, pitch);
+      if (s.gr) rotAbout(o, R, R.upSet, R.waist, 0, 0, 1, s.gr);
+    }
+    /* the cheer's hands */
+    if (ce > 0 || (kind === 'present' && ck >= 0)) cheerHands(o, R, kind, ce, ck);
+    /* the head: the neck a third, the head the rest; tipped toward the foe, back on a blow, hung when wounded, up in a cheer */
+    const hy = s.y + s.gy * .8, hp = s.p + s.gp - fl * .7 + .26 * wd + br * .5 - (kind === 'proud' || kind === 'howl' || kind === 'raise' || kind === 'lift' ? (kind === 'howl' ? .45 : .14) * ce : 0) - (kind === 'bob' ? .2 * Math.sin(Math.min(1, ck / .9) * Math.PI * 2) * (ck >= 0 && ck < .9 ? 1 : 0) : 0);
+    const yA = Math.cos(hy), yB = Math.sin(hy);
+    if (R.neckSet) { rotAbout(o, R, R.neckSet, R.neck, 0, 1, 0, hy * .35); rotAbout(o, R, R.neckSet, R.neck, yA, 0, -yB, hp * .35); }
+    const hk = R.neckSet ? .65 : 1;
+    rotAbout(o, R, R.headSet, R.head, 0, 1, 0, hy * hk); rotAbout(o, R, R.headSet, R.head, yA, 0, -yB, hp * hk);
+    if (s.gr) rotAbout(o, R, R.headSet, R.head, 0, 0, 1, -s.gr * .7);
+    /* a proud bounce: the whole body up off its toes twice */
+    if (kind === 'proud' && ck >= 0 && ck < 1.2) { const b = .028 * Math.max(0, Math.sin(Math.PI * ((ck % .5) / .5))) * (ck < 1 ? 1 : 0); if (b > 0) for (let k = 0; k < R.nb; k++) o[k * 12 + 7] += b; }
+  }
+  /* present arms: lifted (38 degrees about the shoulders' line) then grounded with a small overshoot (the thump) */
+  function thump(ck) { return ck < .85 ? 0 : ck < 1.0 ? sm(.85, 1, ck) : 1 - sm(1, 1.35, ck); }
+  function presentAng(ck) { const up = sm(0, .35, ck) * .66; return ck < .85 ? up : up * (1 - sm(.85, 1, ck)) - .1 * thump(ck); }
+  function cheerHands(o, R, kind, ce, ck) {
+    if (kind === 'present' && R.presSet) {
+      /* a staff or spear carried upright is lifted straight and grounded (the thump); a gun, crossbow or bow across the body
+         is brought up about the shoulders' line */
+      let up = false; if (R.T && R.presProp >= 0) { joint(o, R, R.presProp); const py = J[1], px = J[0], pz = J[2]; tail(o, R, R.presProp); const l = Math.hypot(W[0] - px, W[1] - py, W[2] - pz); up = l > 1e-4 && Math.abs(W[1] - py) / l > .7; }
+      if (up) { const d = .055 * sm(0, .3, ck) * (1 - sm(.82, .95, ck)) - .012 * thump(ck); for (let n = 0; n < R.presSet.length; n++) o[R.presSet[n] * 12 + 7] += d; return; }
+      joint(o, R, R.clavL); const lx = J[0], ly = J[1], lz = J[2]; joint(o, R, R.clavR);
+      let ax = J[0] - lx, ay = J[1] - ly, az = J[2] - lz; const l = Math.hypot(ax, ay, az) || 1; ax /= l; ay /= l; az /= l;
+      if (ax > 0) { ax = -ax; ay = -ay; az = -az; }   // (a positive turn lifts what is before the unit)
+      axisAng(ax, ay, az, presentAng(ck)); turn(o, R.presSet, (J[0] + lx) / 2, (J[1] + ly) / 2, (J[2] + lz) / 2);
+      return;
+    }
+    if (kind !== 'raise' && kind !== 'lift') return;
+    const left = kind === 'lift', arm = left ? R.armL : R.armR, hand = left ? R.handL : R.handR, set = left ? R.armSetL : R.armSetR, hs = left ? R.handSetL : R.handSetR, wp = left ? R.wpnL : R.wpnR;
+    if (arm < 0 || hand < 0 || !set) return;
+    /* which end of the weapon is its head: the end that is higher as the clip holds it (spears, staves, swords are carried head up) */
+    let sg = 1; if (wp >= 0 && R.T) { joint(o, R, wp); const py = J[1]; tail(o, R, wp); sg = W[1] >= py ? 1 : -1; }
+    joint(o, R, R.chest >= 0 ? R.chest : arm); const cx = J[0], cz = J[2];
+    joint(o, R, arm); const sx = J[0], sy = J[1], sz = J[2]; let ox = sx - cx, oz = sz - cz; const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+    joint(o, R, hand); let dx = J[0] - sx, dy = J[1] - sy, dz = J[2] - sz; const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
+    let ex = ox * .32, ey = 1, ez = .3 + oz * .32; const el = Math.hypot(ex, ey, ez); ex /= el; ey /= el; ez /= el;
+    const pump = ck > .35 && ck < 1.25 ? 1 - .1 * Math.sin((ck - .35) * 11) ** 2 : 1;
+    aim(o, set, sx, sy, sz, dx, dy, dz, ex, ey, ez, ce * pump, 2.7);
+    /* the weapon turned upright in the fist (its bone's own line, joint to tail) */
+    if (wp >= 0 && R.T && hs) {
+      joint(o, R, wp); const px = J[0], py = J[1], pz = J[2]; tail(o, R, wp);
+      let wx = (W[0] - px) * sg, wy = (W[1] - py) * sg, wz = (W[2] - pz) * sg; const wl = Math.hypot(wx, wy, wz); if (wl < 1e-4) return; wx /= wl; wy /= wl; wz /= wl;
+      let fx = ox * .2, fy = 1, fz = .15 + oz * .2; const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+      joint(o, R, hand); aim(o, hs, J[0], J[1], J[2], wx, wy, wz, fx, fy, fz, ce, 1.6);
+    }
+  }
+  /* ---- the hook: after a force unit is drawn, its sculpted bodies' palettes ---- */
+  const _done = [null, null, null, null];
+  function after(t, n0) {
+    if (!RX.on || typeof G === 'undefined' || !G || G.time == null || !t || !t.def || !t.def.unit) return;
+    if (((typeof inIcon !== 'undefined' && inIcon) && !RX.lab) || (typeof UM_SHOW !== 'undefined' && UM_SHOW != null)) return;   // (RX.lab: sim/react_game.js's close-ups, drawn on the icon renderer)
+    if (dlN <= n0 || (!RX.lab && !visible(t))) return;
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0, now = G.time;
+    /* a wave cleared (the phase leaves 'wave' with the keep still standing) */
+    if (RX.phase !== G.phase) { if (RX.phase === 'wave' && G.phase !== 'wave' && !G.over && (G.lives == null || G.lives > 0)) RX.clr = now; RX.phase = G.phase; }
+    let s = null, nd = 0;
+    for (let i = n0; i < dlN; i++) {
+      const it = DL[i], o = it.bones; if (!o || !it.mesh) continue;
+      let seen = false; for (let k = 0; k < nd; k++) if (_done[k] === o) seen = true; if (seen) continue;
+      const R = rigFor(it, t); if (!R || o.length < R.nb * 12) continue;
+      if (!s) { s = stOf(t); const m = it.m; think(t, s, now, Math.atan2(m[8], m[10])); }
+      if (!s.kind) s.kind = (RX_CHEER[t.def.unit] || R.cheer) + (R.wpnN && !RX_CHEER[t.def.unit] ? ' (' + R.wpnN + ')' : '');
+      apply(o, R, t, s, now, RX_CHEER[t.def.unit]);
+      if (nd < 4) _done[nd++] = o;
+    }
+    for (let k = 0; k < 4; k++) _done[k] = null;
+    if (s) { RX.n++; if (t0) RX.ms += performance.now() - t0; }
+  }
+  /* (wrapped on drawTower, the field's one call a unit: some sculpted units wrap drawForceUnit only when their model arrives,
+     later than this file, and draw themselves without calling down) */
+  if (typeof drawTower === 'function') {
+    const f0 = drawTower;
+    drawTower = function (t) {
+      if (!t || !t.def || t.def.wall || !t.def.unit || t.wrecked) return f0.apply(this, arguments);
+      const n0 = dlN, r = f0.apply(this, arguments);
+      try { after(t, n0); } catch (e) { if (!RX.err) { RX.err = e.message; console.warn('unitreact:', e); } }
+      return r;
+    };
+  }
+  return {
+    get on() { return RX.on; }, set on(v) { RX.on = !!v; }, RX,
+    cheer() { RX.clr = typeof G !== 'undefined' ? G.time : 0; },
+    flinch(k) { const L = typeof G !== 'undefined' && G.sel && G.sel.t ? [G.sel.t] : (G.towers || []); for (const t of L) { const s = ST.get(t); if (s) { s.fl = G.time; s.flA = k == null ? .15 : k; } } },
+    kinds() { const out = {}; for (const t of (G.towers || [])) { if (!t.def || !t.def.unit) continue; const s = ST.get(t); out[t.def.unit] = s && s.kind ? s.kind : 'not reacting (no known rig)'; } return out; },
+    rigOf, stOf, cost() { const r = { units: RX.n, ms: RX.ms, perUnit: RX.n ? RX.ms / RX.n : 0 }; RX.n = 0; RX.ms = 0; return r; },
+  };
+})();
 
 /* ================= CALM PACE: the UI half (the rules are in forces_zzzzzzzzzzzzzzzzzzzzz_calm.js) =================
    Loaded last, wrappers only; with G.calm off every wrapper passes straight through.
