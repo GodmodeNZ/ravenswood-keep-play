@@ -1,4 +1,4 @@
-const BUILD_TAG = 'e815e84a@2026-11-24';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c48e2e17@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -122879,6 +122879,7 @@ function rgEnd(won, retreat) {
   const S = G.region, R = S && rgGet(G.force);
   saveDrop(G.runId);
   if (!R) { titleScreen(); return; }
+  if (won && typeof rgLootPay === 'function') rgLootPay(R, S);   // the place's spoils (region_loot.js): into the bag before the warband is taken
   const out = [], got = campItemsNow().filter(it => (it.id | 0) > (S.uid0 | 0)), node = rgNode(R, S.node);
   R.band = campBandFromRun(R.band);
   // a win: its maze and gold march on. The items on the maze's pieces travel with it, not in the bag (the maze this win left,
@@ -123087,13 +123088,13 @@ function rgFoeName(R, S) {
 function rgBattleHead(R, S) {
   const D = rgDiff(R, S), b = rgBosses(S), grown = S.kind === 'trouble' && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
   return `<p class="rg-diff rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>
-    <p class="rg-what">${rgEsc(rgFoeName(R, S))} · waves ${S.w0}-${S.w1} · ${b.length ? `boss: ${rgEsc(CREEPS[b[0][1]].name)}` : 'no boss'}</p>
-    <p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>
+    <p class="rg-what">${rgEsc(rgFoeName(R, S))} · waves ${S.w0}-${S.w1} · ${b.length ? `boss: ${rgEsc(CREEPS[b[0][1]].name)}${typeof rgBossTag === 'function' ? rgBossTag(R, S, b[0][1], b[0][0]) : ''}` : 'no boss'}</p>
+    <p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>${typeof rgLootLine === 'function' ? rgLootLine(R, S) : ''}
     ${(() => { const SG = rgStartGold(R, S); return `<p class="rg-gold">${SG.maze ? 'Your maze + ' : 'Start gold '}<b>${SG.base + SG.gap} gold</b>${SG.gap ? ` <small>(+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`})</small>` : ''}</p>`; })()}`;
 }
 function rgBattleMore(R, S) {
   const F = S.fam && CAMP_FAMILIES[S.fam];
-  return `<p class="rg-why">${rgEsc(rgDiffWhy(R, S))}</p>
+  return `<p class="rg-why">${rgEsc(rgDiffWhy(R, S))}</p>${typeof rgLootMore === 'function' ? rgLootMore(R, S) : ''}
     ${S.extra && S.extra.length ? `<p><b>His helpers march too:</b> ${S.extra.map(f => rgEsc(CAMP_FAMILIES[f].name)).join(', ')} (+${Math.round(10 * S.extra.length)}% health).</p>` : ''}
     <p class="rg-nums"><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Line <b>${S.line || rgLineOf(R, S)} lives</b></span></p>
     ${F ? `<p class="rg-fam"><b>${rgEsc(F.name)}.</b> ${rgEsc(F.say)}</p>` : ''}
@@ -123354,6 +123355,224 @@ function rgHudTick() {
   if (el.style.bottom !== b + 'px') el.style.bottom = b + 'px';
 }
 if (typeof setInterval === 'function' && typeof document !== 'undefined') setInterval(rgHudTick, 500);
+
+/* ================= HOMELAND SPOILS: a loot table for every place (region.js) =================
+   Owner, 24 Nov 2026: "can you add a loot table for each map on homeland, would like to add more calculation risk/reward play
+   so players choose their route". Each place shows, before you commit, what a win there pays on top of its gold:
+     sure   the item a win always pays: a relic of a rarity, a charm, a reaction relic, or a piece of one unit's kit (the relics
+            made for that unit: its "set"), or for the lair a legendary
+     up     the chance the sure item comes a rarity higher (a kit: one of its higher pieces, where it has them)
+     leg    the chance of a legendary on top (a kit: the unit's own)
+     rn     Renown on a win
+     plus   one more sure item (a charm)
+   Harder places pay better: the tier sets the table; every step a place has grown adds RG_LOOT_GROW.up to its upgrade and
+   RG_LOOT_GROW.leg to its legendary chance, and the most dangerous road into it adds RG_LOOT_ROAD a danger level to the
+   legendary. A battle with a boss also opens the boss's own hoard at the kill, as in a run (renown.js).
+   The items are made by the run's own drop code (loot.js rollGear, rgMake: the same shapes), at the win, so what the card promises is
+   what the win pays; they go to the bag with the warband (rgEnd), and the end screen lists them with the battle's other spoils.
+   Checked by sim/region_check.js. */
+const RG_LOOT = {
+  thornwick: null,   // (the muster: no battle)
+  mossford: { sure: 2, focus: 'kit:cannon', up: .1, leg: 0, rn: 0 },
+  fernwatch: { sure: 2, focus: 'kit:glaive', up: .15, leg: 0, rn: 1 },
+  brightwater: { sure: 2, focus: 'charm', up: .25, leg: 0, rn: 1 },
+  barrows: { sure: 2, focus: 'kit:storm', up: .2, leg: .04, rn: 1 },
+  weir: { sure: 2, focus: 'rx', up: .3, leg: .03, rn: 1 },
+  greywood: { sure: 3, focus: 'kit:arrow', up: .1, leg: .06, rn: 1 },
+  stagrun: { sure: 3, focus: 'kit:earth', up: .1, leg: .06, rn: 2 },
+  briarfast: { sure: 3, focus: 'charm', up: 0, leg: .08, rn: 2, plus: 'charm' },
+  rootdeep: { sure: 3, focus: 'kit:frost', up: .25, leg: .12, rn: 2 },
+  cinder: { sure: 3, focus: null, up: .2, leg: .2, rn: 2, plus: 'charm' },
+  gloam: { sure: 4, focus: null, up: 0, leg: 0, rn: 3 },
+};
+const RG_LOOT_GROW = { up: .1, leg: .04 }, RG_LOOT_ROAD = .02;
+// a unit's kit: the relics made for it (in this force's pool), and its own legendary. On the map no force is applied (TOWERS and
+// the pool are the keep's): a force's kits are worked out once with it applied a moment, then kept (rgKitFor)
+const RG_KITS = {};
+function rgKitFor(force, ty) {
+  if (!force || typeof FORCES === 'undefined' || !FORCES[force]) return rgKit(ty);
+  if (!RG_KITS[force]) {
+    const was = typeof FORCE_NOW !== 'undefined' ? FORCE_NOW : null, swap = was !== force && typeof applyForce === 'function', K = {};
+    try { if (swap) applyForce(force); for (const t in FORCES[force].units) K[t] = rgKit(t); } finally { if (swap) applyForce(was); }
+    RG_KITS[force] = K;
+  }
+  return RG_KITS[force][ty] || { bases: [], leg: null };
+}
+const rgUnitName = (force, ty) => (force && typeof FORCES !== 'undefined' && FORCES[force] && FORCES[force].units[ty] && FORCES[force].units[ty].name) || (TOWERS[ty] && TOWERS[ty].name) || ty;
+function rgKit(ty) {
+  const bases = Object.keys(GEAR_BASES).filter(id => { const g = GEAR_BASES[id]; if (g.retired || g.charm || g.bsig || g.quest || !(typeof inPool !== 'function' || inPool('bases', id))) return false; const f = (typeof gearFor === 'function' ? gearFor({ base: id, rar: g.rar }) : null) || g.for; return !!(f && f.length && f.includes(ty)); });
+  const legs = Object.keys(LEGENDS).filter(k => LEGENDS[k].for === ty && !LEGENDS[k].school && (typeof inPool !== 'function' || inPool('legends', k)));
+  return { bases: bases.sort((a, b) => (GEAR_BASES[a].rar | 0) - (GEAR_BASES[b].rar | 0)), leg: legs[0] || null };
+}
+const rgKitType = T => T && T.focus && T.focus.startsWith('kit:') ? T.focus.slice(4) : null;
+// a place's table as it stands now: its own, with its growth and its roads on top
+function rgLootOf(R, id) {
+  const T0 = RG_LOOT[id]; if (!T0) return null;
+  const st = R.st[id] || {}, g = st.g | 0, d = Math.max(0, ...R.roads.filter(r => r.a === id || r.b === id).map(r => r.d | 0));
+  const T = Object.assign({}, T0, { g, road: d, force: R.force });
+  T.up = T0.sure >= 4 ? 0 : Math.min(.9, (T0.up || 0) + RG_LOOT_GROW.up * g);
+  T.leg = T0.sure >= 4 ? 0 : Math.min(.6, (T0.leg || 0) + RG_LOOT_GROW.leg * g + RG_LOOT_ROAD * d);
+  const ty = rgKitType(T0); if (ty) { T.kit = ty; const K = rgKitFor(R.force, ty), low = K.bases.filter(b => (GEAR_BASES[b].rar | 0) <= T0.sure); T.kitBases = low.length ? low : K.bases; T.kitHigh = K.bases.filter(b => !T.kitBases.includes(b)); T.kitLeg = K.leg; if (!T.kitHigh.length) T.up = 0; }   // (an easy place pays its kit's lesser pieces; its upgrade, a higher one)
+  return T;
+}
+const RG_RAR_W = ['', '', 'rare', 'epic', 'legendary'];
+const rgGem = (rar, ch) => `<i class="rg-gem" style="color:${RARITY[rar] ? RARITY[rar].col : '#ccc'}" aria-hidden="true">${ch || '◆'}</i>`;
+const rgPct = p => (p >= .095 ? Math.round(p * 100) : Math.round(p * 1000) / 10) + '%';
+// what the sure item is, in a few words
+function rgLootWhat(T) {
+  if (T.sure >= 4) return 'a legendary';
+  if (T.kit) return `${rgUnitName(T.force, T.kit)} kit`;
+  const a = w => (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+  if (T.focus === 'charm') return a(`${RG_RAR_W[T.sure]} charm`);
+  if (T.focus === 'rx') return a(`${RG_RAR_W[T.sure]} reaction relic`);
+  return a(`${RG_RAR_W[T.sure]} relic`);
+}
+// the card's line: a few gems and a short line (owner: "keep it readable")
+function rgLootLine(R, S) {
+  const T = S && S.kind === 'trouble' && rgLootOf(R, S.node); if (!T) return '';
+  const kr = T.kit && T.kitBases.length ? Math.max(...T.kitBases.map(b => GEAR_BASES[b].rar | 0)) : T.sure;
+  const bits = [`${rgGem(T.kit ? kr : T.sure)}<b>${rgEsc(rgLootWhat(T))}</b>`];
+  if (T.plus === 'charm') bits.push(`${rgGem(2)}a charm`);
+  if (T.up > 0) bits.push(`${rgGem(Math.min(4, T.kit ? Math.max(...T.kitHigh.map(b => GEAR_BASES[b].rar | 0)) : T.sure + 1), '◇')}${rgPct(T.up)} ${RG_RAR_W[Math.min(4, T.kit ? Math.max(...T.kitHigh.map(b => GEAR_BASES[b].rar | 0)) : T.sure + 1)]}${T.kit ? ' piece' : ''}`);
+  if (T.leg > 0) bits.push(`${rgGem(4, '✦')}${rgPct(T.leg)} ${T.kit && T.kitLeg ? 'their legendary' : 'legendary'}`);
+  if (T.rn) bits.push(`+${T.rn} Renown`);
+  if (rgBosses(S).length) bits.push('the boss’s hoard');
+  return `<p class="rg-loot">Spoils ${bits.join(' · ')}</p>`;
+}
+// the card's details: the kit by name, and why the chances are what they are
+function rgLootMore(R, S) {
+  const T = S && S.kind === 'trouble' && rgLootOf(R, S.node); if (!T) return '';
+  const nm = b => { try { return rgEsc(gearName({ base: b, rar: GEAR_BASES[b].rar })); } catch (e) { return b; } };
+  const why = [];
+  if (T.sure >= 4) return '';   // (the lair: its legendary is sure, nothing to explain)
+  if (T.g) why.push(`grown ${T.g}: ${T.up > 0 ? `+${Math.round(RG_LOOT_GROW.up * 100 * T.g)}% upgrade, ` : ''}+${Math.round(RG_LOOT_GROW.leg * 100 * T.g)}% legendary`);
+  if (T.road) why.push(`its roads (danger ${T.road}): +${Math.round(RG_LOOT_ROAD * 100 * T.road)}% legendary`);
+  const col = b => `<span style="color:${RARITY[GEAR_BASES[b].rar].col}">${nm(b)}</span>`;
+  const kit = T.kit ? `<p class="rg-kit"><b>${rgEsc(rgUnitName(T.force, T.kit))} kit:</b> a win pays ${T.kitBases.length > 1 ? 'one of ' : ''}${T.kitBases.map(col).join(', ') || 'their relics'}${T.up > 0 ? `; ${rgPct(T.up)} ${T.kitHigh.map(col).join(' or ')} instead` : ''}${T.leg > 0 && T.kitLeg ? `; ${rgPct(T.leg)} their legendary, <span style="color:${RARITY[4].col}">${rgEsc(LEGENDS[T.kitLeg].name || T.kitLeg)}</span>` : ''}.</p>` : '';
+  return `${kit}${why.length ? `<p class="rg-why">Spoils: ${why.join(' · ')}.</p>` : ''}`;
+}
+// one item of a kind, made by the run's drop code
+function rgLootItem(kind, rar, w) {
+  if (kind === 'leg') return rollGear(w, true, 4);
+  if (kind === 'charm') return rollGear(w, false, rar, 'charm');
+  if (kind === 'rx') return rollGear(w, false, rar, 'cat');
+  return rollGear(w, false, rar);
+}
+const rgOwned = id => typeof ownedRelic === 'function' && ownedRelic(id);
+// a named relic or legendary, as a drop is made (loot.js rollGear's shape; renown.js rnItem the same)
+const rgMake = e => e.l ? { id: ++G.gearUid, rar: 4, hone: 0, isNew: true, leg: e.l } : { id: ++G.gearUid, rar: GEAR_BASES[e.b].rar | 0, hone: 0, isNew: true, base: e.b };
+// a win's spoils: made now, into the bag; returns the items
+function rgLootPay(R, S, rnd) {
+  const T = S && S.kind === 'trouble' && rgLootOf(R, S.node); if (!T) return [];
+  rnd = rnd || Math.random; const w = Math.max(1, S.w1 | 0), out = [];
+  if (T.sure >= 4) out.push(rgLootItem('leg', 4, w));
+  else if (T.kit) {
+    const from = T.up > 0 && T.kitHigh.length && rnd() < T.up ? T.kitHigh : T.kitBases, fresh = from.filter(b => !rgOwned(b)), pool = fresh.length ? fresh : from;
+    if (pool.length) { const b = pool[Math.floor(rnd() * pool.length)]; out.push(rgMake({ b })); } else out.push(rgLootItem(null, T.sure, w));
+  } else {
+    const rar = Math.min(3, T.sure + (rnd() < T.up ? 1 : 0));
+    out.push(rgLootItem(T.focus === 'charm' && rar > 3 ? null : T.focus, rar, w));
+  }
+  if (T.plus === 'charm') out.push(rgLootItem('charm', 2, w));
+  if (T.leg > 0 && rnd() < T.leg) out.push(T.kit && T.kitLeg ? rgMake({ l: T.kitLeg }) : rgLootItem('leg', 4, w));
+  const items = out.filter(Boolean);
+  for (const it of items) { it.isNew = true; if (it.rar === 4) G.legN = (G.legN | 0) + 1; G.loot.push(it); }
+  if (T.rn && typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) rnS().v = clamp((rnS().v | 0) + T.rn, 0, RN.cap);
+  else if (T.rn) R.rnBank = (R.rnBank | 0) + T.rn;
+  return items;
+}
+
+/* ================= HOMELAND BOSSES: a boss to match the place and the warband (region.js) =================
+   Owner, 24 Nov 2026: "bosses need to be increased in difficulty on homeland maps". A Homeland battle is a 5-7 wave slice of the
+   50-wave march, and its boss was the slice's wave's boss as a normal run has it: health by the wave (and the place's growth), no
+   more. But the warband marches in with its level, talents and items from every battle before, and the bosses fell over.
+   So each boss is armed as a Hunt's quarry is (hunts.js), by the place's risk and the warband's strength:
+     level   rgBossLv: the place's tier (a second-tier place's bosses 2, ...), its growth, and one more at the lair; a boss by
+             wave RG_BOSS.firstW one less (the first boss beatable but tense). The bot (sim/region_bal.py, 24 Nov 2026): at tier - 1
+             Ossyra at Hollowell Barrows still cost no lives; at tier, Arachnara on wave 10 broke 2 of 4 warbands there
+     affixes that many of the boss's own Hunt affixes, in its own order (huntAffixes: Summoner, Swift, Armoured, Regenerating,
+             Shielded, Warded, Splitting), shown on the place's card and on the boss's banner
+     attacks RG_BOSS.dmg a level stronger
+     enrage  under RG_BOSS.enrage of its health: RG_BOSS.rage faster and stronger, and a Summoner calls twice as often
+     health  RG_BOSS.hp a level, and the warband's edge as a Hunt reads it (huntBaseK: its level over the wave, its gear power
+             over a run's by then, softened and capped), so a strong warband still gets a fight; mechanics before health
+   Hooks: spawn (arms it), update (regen, the barrier forming again, summons, the enrage), kill (splitting). The barrier is
+   hunts.js's hurt hook, which serves any foe with one. Checked by sim/region_check.js; the bot: sim/region_bal.py. */
+const RG_BOSS = { dmg: .12, hp: .06, enrage: .3, rage: 1.3, sum: 8, lair: 1, max: 7, edgeCap: 1.6, firstW: 10 };
+function rgBossLv(R, S, w) {
+  if (!S || S.kind === 'waylay') return 1;
+  const n = rgNode(R, S.node); if (!n) return 1;
+  return clamp((n.tier | 0) + (S.g | 0) + (n.kind === 'lair' ? RG_BOSS.lair : 0) - (w && w <= RG_BOSS.firstW ? 1 : 0), 1, RG_BOSS.max);
+}
+const rgBossAffixes = (type, lv) => typeof huntAffixes === 'function' ? huntAffixes(type, lv) : [];
+// the card's few words: "Swift, Armoured" and the enrage
+function rgBossTag(R, S, type, w) {
+  const A = rgBossAffixes(type, rgBossLv(R, S, w));
+  return A.length && typeof HUNT_AFFIX !== 'undefined' ? ` <small class="rg-bx" title="${rgEsc(A.map(a => HUNT_AFFIX[a].name + ': ' + HUNT_AFFIX[a].text).join(' ') + ` Under ${Math.round(RG_BOSS.enrage * 100)}% health it enrages: faster and stronger.`)}">(${A.map(a => HUNT_AFFIX[a].name).join(', ')}, enrages)</small>` : '';
+}
+// the warband's edge over the wave (as a Hunt reads it), capped: a boss's health on top of its level's
+function rgBossEdge(w) {
+  if (typeof huntBaseK !== 'function' || typeof campGearPower !== 'function') return 1;
+  let P = 0; try { P = campGearPower(typeof campItemsNow === 'function' ? campItemsNow() : G.loot || []); } catch (e) { P = 0; }
+  const k = huntBaseK(0, w, G.lvl || 1, P);
+  return clamp(k, 1, RG_BOSS.edgeCap);
+}
+function rgBossArm(c, S, R) {
+  const lv = rgBossLv(R, S, c.wv || G.wave), A = rgBossAffixes(c.type, lv), k = (1 + RG_BOSS.hp * lv) * rgBossEdge(c.wv || G.wave);
+  c.rgBoss = lv; c.hp *= k; c.maxHp *= k; if (c.apMax) { c.apMax *= k; c.ap *= k; }
+  c.atkM = (c.atkM || 1) * (1 + RG_BOSS.dmg * lv);
+  c.hx = A;
+  if (A.includes('armoured')) { c.apMax = (c.apMax || 0) + c.maxHp * .5; c.ap = c.apMax; }
+  if (A.includes('swift')) c.spdM *= 1.25;
+  if (A.includes('regen')) c.hxRegen = .015;
+  if (A.includes('shielded')) { c.hxSh = c.hxShMax = c.maxHp * .3; c.hxShRe = 1; }
+  if (A.includes('summoner')) c.hxSumT = RG_BOSS.sum;
+  if (A.includes('warded')) { if (c.apMax > 0) { c.apMax += c.maxHp * .25; c.ap = c.apMax; c.hxWardArm = true; } else c.amT = 1e9; }
+  if (A.includes('splitting')) c.hxSplit = true;
+  if (typeof setTimeout === 'function' && typeof onBanner === 'function' && A.length) setTimeout(() => { if (G.region === S && !c.dead) onBanner(c.def.name, A.map(a => HUNT_AFFIX[a].name).join(' · ')); }, 1800);
+}
+function rgBossSummon(c, S) {
+  const E = S.rgEsc && S.rgEsc[c.wv]; if (!E || !CREEPS[E.type] || !(E.hp > 0) || G.creeps.length > 80) return;
+  for (let n = 0; n < 2; n++) {
+    const s = { type: E.type, hp: E.hp * .6, bounty: 1 };
+    if (!c.fly && !CREEPS[E.type].fly && c.ti != null) s.at = { x: c.x, y: c.y, ti: c.ti, tj: c.tj, tx: c.tx, ty: c.ty, state: c.state || 'walk' };
+    const o = spawn(s); if (o) o.kid = 1;
+  }
+  if (typeof fxRing === 'function') fxRing(c.x, c.y, 1, '#e0b070');
+}
+function rgBossTick(dt) {
+  const S = G.region; if (!S || G.state !== 'play') return;
+  for (const c of G.creeps) {
+    if (c.dead || !c.rgBoss) continue;
+    if (c.hxRegen && c.hp < c.maxHp) { c.hxRA = (c.hxRA || 0) + dt; if (c.hxRA >= .5) { if (typeof healFoe === 'function') healFoe(c, c.maxHp * c.hxRegen * c.hxRA); c.hxRA = 0; } }
+    if (c.hxShRe && c.hp < c.maxHp * .5 && !(c.hxSh > 0)) { c.hxShRe = 0; c.hxSh = c.hxShMax; if (typeof onToast === 'function') onToast(`${c.def.name}'s barrier forms again.`); }
+    if (c.hxSumT != null && !c.splitCopy && (c.hxSumT -= dt) <= 0) { c.hxSumT = RG_BOSS.sum / (c.rgRage ? 2 : 1); rgBossSummon(c, S); }
+    if (!c.rgRage && !c.splitCopy && c.hp < c.maxHp * RG_BOSS.enrage) {
+      c.rgRage = true; c.spdM *= RG_BOSS.rage; c.atkM = (c.atkM || 1) * RG_BOSS.rage;
+      if (typeof onBanner === 'function') onBanner(`${c.def.name} is enraged`, 'Faster and stronger: finish it');
+      if (typeof fxRing === 'function') fxRing(c.x, c.y, 1.3, '#ff7050');
+    }
+  }
+}
+{
+  const _sp = spawn;
+  spawn = function (s) {
+    const c = _sp.apply(this, arguments), S = G && G.region;
+    if (c && S && !G.vs && !s.at && G.state === 'play' && !c.kid) {
+      if (c.def.boss && !c.rgBoss) { const R = rgGet(G.force); if (R) rgBossArm(c, S, R); }
+      else if (!c.def.boss && !c.def.lead && !CREEPS[c.type].fly) { const E = S.rgEsc || (S.rgEsc = {}); E[c.wv] = { type: c.type, hp: s.hp }; }
+    }
+    return c;
+  };
+  const _upd = update;
+  update = function (dt) { const r = _upd.apply(this, arguments); if (G.region) rgBossTick(dt); return r; };
+  const _kill = kill;
+  kill = function (c) {
+    const was = !c.dead, r = _kill.apply(this, arguments);
+    if (was && G.region && c.rgBoss && c.hxSplit && !c.splitCopy && G.state === 'play' && typeof huntSplit === 'function') huntSplit(c);
+    return r;
+  };
+}
 
 /* ================= PLAY LOG: an always-on watcher for playtests (force runs and Classic; never Tower Wars or the demo) =================
    window.PLAYLOG records each run so a playtest can be read back afterwards (in the browser pane, the console, or a file):
@@ -130694,6 +130913,218 @@ const UNITREACT = (() => {
     rigOf, stOf, cost() { const r = { units: RX.n, ms: RX.ms, perUnit: RX.n ? RX.ms / RX.n : 0 }; RX.n = 0; RX.ms = 0; return r; },
   };
 })();
+
+/* ================= The commander's gift, made known in play (24 Nov 2026) =================
+   Owner: commander passives need "some way of being known to the player easily". A commander's passive showed only in the
+   picker, the hero sheet and the face-plate menu; nothing in play showed it. A look and a wording only: no mechanic,
+   number or counter is changed here; each entry READS the state its own code keeps.
+
+   1. On the field: a small diamond in the commander's colour beside the unit while the gift is at work on it (only while
+      it fights or is selected), a small glow on its weapon while a boosted strike is ready, and a trail and flare in the
+      commander's colour on the strike the gift boosts (the counted strikes' own trail and impact: nthstrike.js).
+   2. The unit's info pane and gear sheet: one line naming the commander and saying what the gift gives THIS unit; greyed
+      when it gives this unit nothing, lit while it is at work.
+   3. A hint at wave 1, once a commander (kept in localStorage), with a button to dismiss it.
+   Off: ?gift=0, or CG.on = false. Entries: CG_E, one a commander (who: the short name; hint: the wave 1 sentence;
+   ap(t, st): the gift touches this unit; on(t, st): it is at work now (default: always, when it applies);
+   say(t, st): what it gives this unit; no: the line when it gives it nothing; mark: draw the diamond while on;
+   ready(t, st): a boosted strike is waiting (the weapon's glow); hit(t, st, tg): this strike is the boosted one). */
+const CG = { on: true, seenKey: 'rk_gift_seen_v1' };
+try { if (/[?&]gift=0\b/.test(location.search)) CG.on = false; } catch (e) {}
+
+const cgTg = t => (t && t.tg && !t.tg.dead ? t.tg : null);
+const cgHeld = c => !!c && (c.rootT > G.time || c.stunT > 0);
+const cgBig = c => !!c && !!c.def && !!(c.def.boss || c.elite);   // (as game.js hurt reads vsBoss and vsElite)
+const cgForce = (t, f) => !!(t && t.def && t.def.force === f && !t.def.wall);
+const cgKit = t => { try { return typeof abilKit === 'function' ? abilKit(t) : null; } catch (e) { return null; } };
+const cgKitHas = (t, ids) => { const k = cgKit(t), L = k && (k.abilities || k.ab || k); try { return Array.isArray(L) && L.some(a => ids.includes(a && (a.id || a))); } catch (e) { return false; } };
+const cgUnit = (t, re) => !!(t && t.def && (re.test(t.def.unit || '') || re.test(t.def.name || '')));
+const cgMaze = () => (G.path ? Math.round(100 * Math.min(.08, .01 * Math.floor(G.path.len / 8))) : 0);
+const cgMom = () => { try { return typeof wbeMom === 'function' ? wbeMom() : null; } catch (e) { return null; } };
+const cgAll = t => !!(t && t.def && !t.def.wall);
+
+const CG_E = {
+  /* ---- the classic keep ---- */
+  marshal: { who: 'Aldric', hint: 'every keep upgrade costs you a fifth less gold.', no: 'Keep upgrades cost 20% less. Nothing more for this unit.' },
+  frost: { who: 'Ysolde', hint: 'the cold makes every foe walk a little slower.', ap: cgAll, say: () => 'Every foe walks 3% slower, so it gets more strikes at each.' },
+  pyro: { who: 'Kaelen', hint: 'a foe that dies burning sets the foe nearest it smouldering.', ap: cgAll, on: t => { const c = cgTg(t); return !!c && c.burnT > 0; }, mark: 1,
+    say: t => { const c = cgTg(t); return c && c.burnT > 0 ? 'Its foe is burning: if it dies now, the foe nearest it starts to smoulder.' : 'A burning foe it fells sets the foe nearest it smouldering.'; } },
+  hunt: { who: 'Bryn', hint: 'your units strike bosses, leaders and elites harder.', ap: cgAll, on: t => cgBig(cgTg(t)), mark: 1, ready: t => cgBig(cgTg(t)), hit: (t, st, tg) => cgBig(tg),
+    say: () => 'It strikes bosses, leaders and elites 5% harder.' },
+  arch: { who: 'Odo', hint: 'the longer your maze, the harder your units strike.', ap: cgAll, on: () => cgMaze() > 0,
+    say: () => (cgMaze() ? `It strikes ${cgMaze()}% harder for the length of your maze (1% for every 8 steps, up to 8%).` : 'It strikes 1% harder for every 8 steps of your maze (up to 8%). The maze is too short yet.') },
+  quarter: { who: 'Mira', hint: 'the gold you hold earns more interest each wave.', no: 'Interest pays 25% more. Nothing more for this unit.' },
+  /* ---- the Grove ---- */
+  rootmother: { who: 'Elowen', hint: 'your roots hold foes for longer.', ap: (t, st) => !!(st && st.root) || cgUnit(t, /thornguard|root/i), on: t => { const c = cgTg(t); return !!c && c.rootT > G.time; }, mark: 1,
+    say: () => 'Its roots hold 20% longer.', no: 'Roots hold 20% longer. This unit roots nothing.' },
+  thornbow: { who: 'Faelan', hint: 'your Gladebow Rangers reach further.', ap: t => t.type === 'arrow' && !t.def.wall, say: () => 'It reaches 0.2 further.', no: 'Gladebow Rangers reach 0.2 further. Nothing for this unit.' },
+  hivemother: { who: 'Nyssa', hint: 'your spores cling to foes a second longer.', ap: t => cgUnit(t, /seed|spore/i), on: t => { const c = cgTg(t); return !!c && c.poison && c.poison.length > 0; }, mark: 1,
+    say: () => 'Its spores last 1 second longer.', no: 'Spores last 1 second longer. This unit sheds no spores.' },
+  /* ---- the Conclave ---- */
+  cc_arch: { who: 'Maelis', hint: 'a foe that has just reacted takes more from every Conclave unit.', ap: t => cgForce(t, 'conclave'),
+    on: t => typeof ccReacted === 'function' && ccReacted(cgTg(t), 2), mark: 1, ready: t => typeof ccReacted === 'function' && ccReacted(cgTg(t), 2), hit: (t, st, tg) => typeof ccReacted === 'function' && ccReacted(tg, 2),
+    say: () => 'It strikes a foe that reacted in the last 2 seconds 10% harder, and its crits on a foe stunned in ice strike half again as hard.' },
+  cc_chrono: { who: 'Aurel', hint: 'your units’ abilities come back sooner.', ap: t => cgForce(t, 'conclave') && !!cgKit(t), say: () => 'Its abilities recharge 10% faster.', no: 'Conclave abilities recharge 10% faster. This unit has none.' },
+  cc_maren: { who: 'Maren', hint: 'a Spellblade that stuns a foe blinks on to cut another.', ap: t => cgUnit(t, /^(cc_spellblade|ch_maren)$/),
+    on: t => G.time - (t.ccRiftAt == null ? -99 : t.ccRiftAt) >= (typeof CC_RIFT !== 'undefined' ? CC_RIFT.gap : 3), mark: 1, ready: t => G.time - (t.ccRiftAt == null ? -99 : t.ccRiftAt) >= 3,
+    say: t => (G.time - (t.ccRiftAt == null ? -99 : t.ccRiftAt) >= 3 ? 'Ready: when its slow stacks stun a foe, it blinks on to the next foe and cuts it.' : 'When its slow stacks stun a foe, it blinks on to the next foe and cuts it (once every 3 seconds).'),
+    no: 'A Spellblade that stuns a foe blinks on to cut another. Nothing for this unit.' },
+  /* ---- Ironhold ---- */
+  ih_marksman: { who: 'Torvald', hint: 'your ranged units grow deadlier the longer they hold a target.', ap: (t, st) => typeof ihRanged === 'function' && !!st && ihRanged(t, st),
+    on: t => typeof ihSteady === 'function' && ihSteady(t), mark: 1, ready: t => typeof ihSteady === 'function' && ihSteady(t), hit: (t, st, tg) => typeof ihSteady === 'function' && ihSteady(t) && tg === t.ihTg,
+    say: t => { const gun = t.def.unit === 'thundergun' ? ' It reloads 15% faster.' : ''; return (typeof ihSteady === 'function' && ihSteady(t) ? 'Steady: it reaches 10% further and its next shot has 20% more chance to crit.' : 'After 3 seconds on one target it reaches 10% further and its next shot has 20% more chance to crit.') + gun; },
+    no: 'Ranged units that hold one target for 3 seconds reach further and crit more. This unit fights up close.' },
+  ih_king: { who: 'Brannoc', hint: 'every 5th wave your units grow faster and tougher.', ap: t => cgForce(t, 'ironhold'), on: t => typeof ihSworn === 'function' && ihSworn(t) > 0, mark: 1,
+    say: t => { const r = typeof ihSworn === 'function' ? ihSworn(t) : 0; return r ? `Levy rank ${r} of 3: it strikes ${4 * r}% faster and has ${6 * r}% more health.` : 'Every 5th wave it takes a Levy rank (up to 3): each makes it strike 4% faster and gives it 6% more health.'; } },
+  ih_hrolf: { who: 'Hrolf', hint: 'your Flak Cannoneers hit wider, and harder against ground foes that are held or slowed.', ap: t => t.def.unit === 'flakgunner',
+    on: t => { const c = cgTg(t); return !!c && !c.fly && (c.slowT > 0 || c.stunT > 0 || c.ihHeldT > G.time || c.rootT > G.time); }, mark: 1,
+    hit: (t, st, tg) => !!tg && !tg.fly && (tg.slowT > 0 || tg.stunT > 0 || tg.ihHeldT > G.time || tg.rootT > G.time),
+    say: () => 'Its shells burst 0.15 cells wider, and strike ground foes that are slowed, stunned or shoved 30% harder.', no: 'Flak Cannoneers hit wider, and harder against held ground foes. Nothing for this unit.' },
+  ih_thane: { who: 'Haldra', hint: 'foes your units are holding take more damage.', ap: t => cgForce(t, 'ironhold'), on: t => { const c = cgTg(t); return !!c && (c.ihHeldT > G.time || c.stunT > 0); }, mark: 1, say: () => 'It strikes foes that are shoved or stunned 10% harder.' },
+  ih_artificer: { who: 'Tovin', hint: 'heat builds faster in every unit, and vents hit harder.', ap: t => typeof IH_HEATERS !== 'undefined' && !!IH_HEATERS[t.def.unit], say: () => 'Its heat builds 15% faster, and its vents hit 10% harder.', no: 'Heat builds faster and vents hit harder. This unit builds no heat.' },
+  ih_brewer: { who: 'Grenna', hint: 'your units start every wave half warm.', ap: t => typeof IH_HEATERS !== 'undefined' && !!IH_HEATERS[t.def.unit], say: () => 'It starts every wave half warm.', no: 'Units start every wave half warm. This unit builds no heat.' },
+  /* ---- the Silver Order ---- */
+  so_lion: { who: 'Aurelian', hint: 'units near him strike faster each time he strikes.', ap: t => cgForce(t, 'silver'), on: t => t.soRadT > G.time, mark: 1,
+    say: t => (t.soRadT > G.time ? 'Quickened by light: it strikes 20% faster and its strikes lay Judgement.' : 'Within 1.6 cells of Aurelian when he strikes, or of a Templar of the Ford when it cuts, it strikes 20% faster for a few seconds and its strikes lay Judgement.') },
+  so_dawn: { who: 'Celestine', hint: 'your units’ mana returns faster, and their guards of light last longer.', ap: t => cgForce(t, 'silver') && !!cgKit(t), say: () => 'Its mana flows back 20% faster, and a guard of light on it lasts half again as long.', no: 'Mana flows back 20% faster. This unit has no abilities.' },
+  so_judge: { who: 'Morrow', hint: 'Judgement stays on foes longer and builds one higher.', ap: t => cgForce(t, 'silver'), on: t => { const c = cgTg(t); return !!c && (c.soJ || 0) > 0; },
+    say: () => 'The Judgement on its foes lasts 3 seconds longer and builds one higher (6), so it bursts bigger.' },
+  /* ---- the Stormborn ---- */
+  sb_caller: { who: 'Tarka', hint: 'the Storm builds faster, and the Tempest brings more thunderbolts.', ap: t => cgForce(t, 'stormborn'), say: () => 'The Storm its strikes build fills 20% faster, and the Tempest brings 4 more thunderbolts.' },
+  sb_wind: { who: 'Oshana', hint: 'the wind blows ground foes back up the road, even in calm.', ap: t => cgForce(t, 'stormborn') && t.type === 'arrow', say: () => 'It reaches 0.2 further.', no: 'The wind blows ground foes back up the road. Windrunners reach further; nothing more for this unit.' },
+  sb_beast: { who: 'Huri', hint: 'your spirit animals strike harder, and Wolfguard wolves lunge more often.', ap: t => cgUnit(t, /wolfguard/i) || cgKitHas(t, ['sb_pounce', 'sb_packhowl', 'sb_spiritbear', 'sb_thunderbird', 'sb_herd']),
+    say: t => (cgUnit(t, /wolfguard/i) ? 'Its wolf lunges every 2nd thrust, and strikes 20% harder.' : 'Its spirit animals strike 20% harder.'), no: 'Spirit animals strike 20% harder. This unit calls none.' },
+  /* ---- the Wardbound ---- */
+  wb_varic: { who: 'Varic', hint: 'foes that press deep are rooted at your ward-lines; while they hang back, your runes last longer.', ap: t => cgForce(t, 'wardbound') && t.type === 'glaive',
+    on: () => typeof wbePressing === 'function' && !wbePressing(), say: () => (typeof wbePressing === 'function' && wbePressing() ? 'Foes press past half the road: its runes last their usual time, and ward-lines root the foes that cross them.' : 'Foes hang back: its runes last half again as long.'),
+    no: 'Ward-lines root foes that press past half the road. Oathbound runes last longer while foes hang back; nothing more for this unit.' },
+  wb_aedric: { who: 'Aedric', hint: 'every kill speeds your army up, until it blazes and must rest.', ap: t => cgForce(t, 'wardbound'),
+    on: () => { const M = cgMom(); return !!M && (M.blazeT > G.time || (M.t > G.time && M.n > 0 && !(M.burnT > G.time))); },
+    say: () => { const M = cgMom(); if (!M) return 'Each foe the army slays makes it strike 2% faster (up to 10 kills).'; if (M.blazeT > G.time) return 'Blazing: it strikes 25% faster.'; if (M.burnT > G.time) return 'Burnt out: it strikes 15% slower for a moment.'; return M.t > G.time && M.n ? `${M.n} of 10 kills: it strikes ${2 * M.n}% faster.` : 'Each foe the army slays makes it strike 2% faster (up to 10 kills, fading after 4 seconds).'; } },
+  wb_isaura: { who: 'Isaura', hint: 'a held foe that breaks free on a rune or a ward-line is struck for it.', ap: t => cgForce(t, 'wardbound'), on: t => cgHeld(cgTg(t)), mark: 1,
+    say: () => 'A foe it roots or stuns that breaks free on a rune or a ward-line is struck for 5% of its health (bosses 2%).' },
+};
+
+/* ---------- the commander and the gift of this run ---------- */
+function cgHero() { return CG.on && typeof G !== 'undefined' && G && G.hero && !G.vs && typeof HERO_BY !== 'undefined' ? HERO_BY[G.hero] || null : null; }
+function cgEntry(h) { return h ? CG_E[h.id] || { who: String(h.name || '').split(' ')[0], hint: String(h.passive || '').replace(/^[^:]{0,24}: /, '').replace(/^./, c => c.toLowerCase()), no: h.passive } : null; }
+// 0: it gives this unit nothing; 1: it applies, waiting; 2: at work now
+function cgState(t, e) {
+  if (!t || !t.def || t.def.wall || !e || !e.ap) return 0;
+  const st = t.st || null;
+  try { if (!e.ap(t, st)) return 0; return !e.on || e.on(t, st) ? 2 : 1; } catch (er) { return 0; }
+}
+const cgEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+function cgSay(t, e, s) { try { return s ? e.say(t, t.st || null) : e.no || 'Nothing for this unit.'; } catch (er) { return e.no || ''; } }
+
+/* ---------- the info pane and the gear sheet: one line (both read growthInfoHTML) ---------- */
+function cgInfoHTML(t) {
+  const h = cgHero(), e = cgEntry(h); if (!e || !t || !t.def || t.def.wall) return '';
+  const s = cgState(t, e);
+  return `<p class="mut cg cg${s}" data-d="4" data-cg="${t.id}" style="--cg:${h.hue}"><i class="cg-dot"></i><b>${cgEsc(e.who)}</b> <span>${cgEsc(cgSay(t, e, s))}</span></p>`
+    + `<p class="mut cg-chip cg${s}" data-cg="${t.id}" style="--cg:${h.hue}" title="${cgEsc(e.who + ': ' + cgSay(t, e, s))}"><i class="cg-dot"></i>${cgEsc(e.who)}</p>`;   // (a small pane that drops the line keeps the name: buffs.css)
+}
+if (typeof growthInfoHTML === 'function') { const g0 = growthInfoHTML; growthInfoHTML = function (t) { return g0.apply(this, arguments) + cgInfoHTML(t); }; }
+// the desktop's one-line unit strip (ui.js deskCardHTML): a small chip with the commander's name; the words on hover, and in full on the gear sheet
+function cgChipHTML(t) {
+  const h = cgHero(), e = cgEntry(h); if (!e || !t || !t.def || t.def.wall) return '';
+  const s = cgState(t, e);
+  return `<span class="dk-cg cg${s}" data-cg="${t.id}" style="--cg:${h.hue}" title="${cgEsc(e.who + ': ' + cgSay(t, e, s))}"><i class="cg-dot"></i>${cgEsc(e.who)}</span>`;
+}
+if (typeof deskCardHTML === 'function') { const d0 = deskCardHTML; deskCardHTML = function (S) { const r = d0.apply(this, arguments); try { return S && S.kind === 'tower' && S.ref && S.ref.def ? r + cgChipHTML(S.ref) : r; } catch (e) { return r; } }; }
+// every frame: the lines on screen follow their unit (lit, waiting, greyed; the words when they change)
+function cgPaneTick() {
+  if (typeof document === 'undefined') return;
+  const L = document.querySelectorAll('[data-cg]'); if (!L.length) return;
+  const h = cgHero(), e = cgEntry(h); if (!e) return;
+  for (const el of L) {
+    const id = el.getAttribute('data-cg'), t = G.towers && G.towers.find(o => String(o.id) === id); if (!t) continue;
+    const s = cgState(t, e), c = 'cg' + s;
+    if (!el.classList.contains(c)) { el.classList.remove('cg0', 'cg1', 'cg2'); el.classList.add(c); }
+    const sp = el.querySelector('span'), say = cgSay(t, e, s);
+    if (sp) { if (sp.textContent !== say) sp.textContent = say; } else { const ti = e.who + ': ' + say; if (el.title !== ti) el.title = ti; }
+  }
+}
+
+/* ---------- on the field: the diamond beside a unit the gift is at work on, the glow on a weapon with a boosted strike ready ---------- */
+const cgRGB = s => { const n = parseInt(String(s).slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+const _cgc = [0, 0, 0, 0], cgCol = (c, a, m = 1) => { _cgc[0] = Math.min(1.5, c[0] * m); _cgc[1] = Math.min(1.5, c[1] * m); _cgc[2] = Math.min(1.5, c[2] * m); _cgc[3] = a; return _cgc; };
+function cgUnitDraw(t) {
+  const h = cgHero(); if (!h || G.state === 'title' || t.wrecked || t.build > .5 || t.def.wall || (typeof inIcon !== 'undefined' && inIcon)) return;
+  const e = CG_E[h.id]; if (!e || !(e.mark || e.ready)) return;
+  const sel = G.sel && G.sel.ref === t, fight = !!cgTg(t) || (t.engaged || 0) > 0; if (!sel && !fight) { t._cgA = 0; return; }
+  const s = cgState(t, e), now = G.time, dt = Math.min(.1, Math.max(0, now - (t._cgT || now))); t._cgT = now;
+  const a = t._cgA = clamp((t._cgA || 0) + (s === 2 ? 4 : -4) * dt, 0, 1); if (a <= .02) return;
+  const col = cgRGB(h.hue), lo = typeof GFX !== 'undefined' && GFX === 'low', R = RD.right, top = towerTop(t), puls = .5 + .5 * Math.sin(now * 5 + t.id);
+  if (e.mark) {   // a small diamond at the unit's shoulder: dark rim, the commander's colour, a faint halo
+    const d = .3, X = t.x + R[0] * d, Y = top * .82 + R[1] * d, Z = t.y + R[2] * d;
+    QO.bill(RD, X, Y, Z, .05, .05, [0, 0, 0, .65 * a], 10, 0, Math.PI / 4);
+    QO.bill(RD, X, Y, Z, .036, .036, cgCol(col, a, 1.05 + .15 * puls), 10, 0, Math.PI / 4);
+    if (!lo) QADD.bill(RD, X, Y, Z, .1, .1, cgCol(col, (.14 + .1 * puls) * a), 1, 0);
+  }
+  let rdy = false; try { rdy = !!(e.ready && fight && e.ready(t, t.st || null)); } catch (er) {}
+  if (rdy && typeof nthTip === 'function') {   // the boosted strike is waiting: a small glow on the weapon (smaller than a counted strike's charge)
+    const p = nthTip(t), w = clamp(t.windup || 0, 0, 1), z = .045 + .04 * w + .008 * puls;
+    QADD.bill(RD, p[0], p[1], p[2], z * 2, z * 2, cgCol(col, (.14 + .2 * w) * a * (lo ? .7 : 1)), 1, 0);
+    QADD.bill(RD, p[0], p[1], p[2], z * .6, z * .6, cgCol([1, 1, 1], (.2 + .3 * w) * a), 1, 0);
+  }
+}
+if (typeof drawTower === 'function') {
+  const d0 = drawTower;
+  drawTower = function (t) { const r = d0.apply(this, arguments); try { cgUnitDraw(t); } catch (e) { if (!CG.err) { CG.err = e; console.warn('commandergift', e); } } return r; };
+}
+
+/* ---------- the strike the gift boosts: its shot trails the commander's colour, its blow lands with a small flare ---------- */
+if (typeof fire === 'function' && typeof NTH !== 'undefined') {
+  const f0 = fire;
+  fire = function (t, st, tg, echo) {
+    const h = !echo && t && t.def && tg && G && G.state === 'play' && NTH.on ? cgHero() : null, e = h && CG_E[h.id];
+    let hit = false;
+    if (e && e.hit) { try { hit = !!(e.ap && e.ap(t, st || t.st) && e.hit(t, st || t.st, tg)); } catch (er) { hit = false; } }
+    if (!hit) return f0.apply(this, arguments);
+    const lists = typeof NTH_LISTS === 'function' ? NTH_LISTS() : [], n0 = lists.map(a => a.length);
+    const r = f0.apply(this, arguments);
+    const col = cgRGB(h.hue); let shots = 0;
+    lists.forEach((a, i) => { for (let k = n0[i]; k < a.length; k++) { const p = a[k]; if (p && !p._nth) { p._nth = 1; shots++; NTH.fl.push({ p, a, col, kind: 'hit', t, at: G.time, tr: [] }); } } });
+    while (NTH.fl.length > 24) NTH.fl.shift();
+    if (!shots && !tg.dead && G.time - (t._cgHitAt || -9) > .25 && typeof nthImpact === 'function') { t._cgHitAt = G.time; nthImpact(tg.x, tg.y, typeof hitH === 'function' ? hitH(tg) : .5, col, 'hit', G.time, t); }
+    CG.hits = (CG.hits || 0) + 1;   // (the checks read it: one a boosted strike seen)
+    return r;
+  };
+}
+
+/* ---------- the hint at wave 1: one sentence, once a commander, with a button to dismiss it ---------- */
+function cgSeen() { try { return JSON.parse(localStorage.getItem(CG.seenKey) || '{}') || {}; } catch (e) { return {}; } }
+function cgMarkSeen(id) { try { const s = cgSeen(); s[id] = 1; localStorage.setItem(CG.seenKey, JSON.stringify(s)); } catch (e) {} }
+function cgHintHide() { if (CG.el) { CG.el.classList.remove('show'); CG.shown = null; } }
+function cgHintShow(h, e) {
+  if (typeof document === 'undefined') return;
+  let el = CG.el;
+  if (!el) {
+    el = CG.el = document.createElement('div'); el.id = 'cgHint'; el.setAttribute('role', 'status');
+    el.innerHTML = '<img alt=""><p></p><button type="button">Got it</button>';
+    el.querySelector('button').addEventListener('click', ev => { ev.stopPropagation(); cgHintHide(); if (typeof sfx === 'function') sfx('click'); });
+    for (const k of ['pointerdown', 'mousedown', 'touchstart', 'wheel']) el.addEventListener(k, ev => ev.stopPropagation(), { passive: true });
+    document.body.appendChild(el);
+  }
+  let face = ''; try { face = typeof heroBadgeURL === 'function' ? heroBadgeURL(h, 'passive') : ''; } catch (er) {}
+  const img = el.querySelector('img'); if (face) { img.src = face; img.style.display = ''; } else img.style.display = 'none';
+  el.style.setProperty('--cg', h.hue);
+  el.querySelector('p').innerHTML = `<b>${cgEsc(e.who)}’s gift:</b> ${cgEsc(e.hint)}`;
+  el.classList.add('show'); CG.shown = h.id; cgMarkSeen(h.id);
+}
+function cgHintTick() {
+  const h = cgHero();
+  if (CG.shown && (!h || h.id !== CG.shown || G.state !== 'play' || G.wave > 1)) cgHintHide();   // (it leaves with wave 1, or with the run)
+  if (!h || CG.shown || G.state !== 'play' || G.wave !== 1 || G.phase !== 'wave' || G.tut || CG.run === G.runId + ':' + h.id) return;
+  CG.run = G.runId + ':' + h.id;
+  if (cgSeen()[h.id]) return;
+  const e = cgEntry(h); if (e && e.hint) cgHintShow(h, e);
+}
+
+/* ---------- wiring: after the floating numbers each frame ---------- */
+function cgTick() { if (typeof G === 'undefined' || !G) return; try { cgPaneTick(); cgHintTick(); } catch (e) { if (!CG.err2) { CG.err2 = e; console.warn('commandergift', e); } } }
+if (typeof drawTexts === 'function') { const c0 = drawTexts; drawTexts = function () { const r = c0.apply(this, arguments); cgTick(); return r; }; }
 
 /* ================= CALM PACE: the UI half (the rules are in forces_zzzzzzzzzzzzzzzzzzzzz_calm.js) =================
    Loaded last, wrappers only; with G.calm off every wrapper passes straight through.
