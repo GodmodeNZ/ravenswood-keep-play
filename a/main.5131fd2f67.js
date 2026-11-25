@@ -1,4 +1,4 @@
-const BUILD_TAG = '39510234@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6d0af95f@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -61049,10 +61049,14 @@ const fttSooner = id => (t, ab, v) => { if (ab.id === id && t.ab && t.ab.cd && t
 const fttHarder = (f, id, nm, v) => ({ force: f, v, say: v => `${nm} hits ${fttPc(v)}% harder.`, amp: id });
 const fttSoon = (f, id, nm, v) => ({ force: f, v, say: v => `${nm} comes ${fttN(v)}s sooner.`, cast: fttSooner(id) });
 const fttCheap = (f, id, nm, v) => ({ force: f, v, say: v => `${nm} costs ${fttPc(v)}% less mana.`, cost: (t, ab, v) => (ab.id === id ? v : 0) });
+// (or every spell of the unit: a row that already has a talent on each of its spells)
+const fttAllSoon = (f, who, v) => ({ force: f, v, say: v => `${who} spells' cooldowns are ${fttPc(v)}% shorter.`,
+  cast: (t, ab, v) => { const c = t.ab && t.ab.cd; if (c && c[ab.id] > G.time) c[ab.id] = G.time + (c[ab.id] - G.time) * (1 - v); } });
+const fttAllCheap = (f, who, v) => ({ force: f, v, say: v => `${who} spells cost ${fttPc(v)}% less mana.`, cost: (t, ab, v) => v });
 const FT_TAL_BASE = {
   // the Conclave
-  'Open Book': fttHarder('conclave', 'ch_thousandfold', 'Thousandfold Barrage', .2),
-  'Flowing Cuts': fttSoon('conclave', 'ch_severing', 'Severing Arc', 3),
+  'Open Book': fttAllCheap('conclave', 'Her', .15),
+  'Flowing Cuts': fttAllSoon('conclave', 'Her', .15),
   // the Silver Order
   'Burnished Shields': fttHarder('silver', 'ch_lioncharge', 'Dawnsweep', .2),
   'Swift Justice': fttSoon('silver', 'ch_sentence', 'Sentence', 3),
@@ -61064,20 +61068,20 @@ const FT_TAL_BASE = {
   'Called Shot': fttHarder('ironhold', 'ih_longshot', 'Long Shot', .2),
   'Gatling Crank': fttSoon('ironhold', 'ih_rollingvolley', 'Rattlegun', 2),
   'Quick Swab': fttCheap('ironhold', 'ih_longshot', 'Long Shot', .2),
-  'Quick Reload': fttSoon('ironhold', 'ih_longshot', 'Long Shot', 1.5),
+  'Quick Reload': fttAllSoon('ironhold', 'Its', .15),
   'Big Bertha': fttHarder('ironhold', 'ih_incendiary', 'Incendiary Round', .2),
   'Ringing Ears': fttHarder('ironhold', 'ih_shrapnelround', 'Skipping Shell', .15),
   'Safety Valve': fttSoon('ironhold', 'ih_steamvent', 'Pile Driver', 2),
   'Pressure Gauge': fttCheap('ironhold', 'ih_pressureslam', 'Pressure Slam', .2),
   'Steam Jacket': fttHarder('ironhold', 'ih_pressureslam', 'Pressure Slam', .15),
   'Hot Hands': fttHarder('ironhold', 'ih_shieldshove', 'Shield Shove', .2),
-  'Riveting Peal': fttSoon('ironhold', 'ch_sentry', 'Clockwork Sentry', 3),
-  'Engine Yard': fttCheap('ironhold', 'ch_sentry', 'Clockwork Sentry', .2),
-  'Overpressure': fttSoon('ironhold', 'ch_coil', 'Lodestone', 3),
+  'Riveting Peal': fttAllSoon('ironhold', 'His', .1),
+  'Engine Yard': fttAllCheap('ironhold', 'His', .15),
+  'Overpressure': fttSoon('ironhold', 'ch_sentry', 'Clockwork Sentry', 3),
   'Chain Drive': fttSoon('ironhold', 'ch_barrage', 'Wrecking Ball', 3),
-  'Old Debts': fttSoon('ironhold', 'ch_muster', "The King's Muster", 4),
+  'Old Debts': fttAllSoon('ironhold', 'His', .1),
   // the Stormborn
-  'Gusting Staff': fttSoon('stormborn', 'ch_gather', 'Gather the Storm', 3),
+  'Gusting Staff': fttAllCheap('stormborn', 'Her', .15),
   'Rain in the Wind': fttHarder('stormborn', 'ch_cyclone', 'Cyclone', .2),
   'Long Hunt': fttSoon('stormborn', 'ch_spirithunt', 'Spirit Hunt', 6),
   'Rising Air': fttSoon('stormborn', 'ch_updraft', 'Turn the Road', 3),
@@ -62826,6 +62830,92 @@ if (typeof abAuto === 'function') {
   };
 }
 
+/* ================= SIMPLE PASSIVES: THE CONCLAVE (26 Nov 2026) =================
+   The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
+   Each tree keeps its spell talents, its capstones, the talent that gives the unit its own trick and one or two signature
+   "does X" talents; its short always-on talents stay as they are. Every other node is an always-on, ranked improvement
+   to one of the unit's named spells, or a core stat in the unit's own words.
+   Maelis's, Aurel's and Maren's own trees are nearly all changes to their named spells already: left as they are. */
+{
+  const F = 'conclave', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
+
+  /* ---------- Spellblades. Kept: Binding Cut, Press the Opening, Ghost Edge, Rift Wake, Phase Dancer; capstones Twin
+     Riftblades, Riftsteel Flurry, Rift Dance ---------- */
+  ezSpell(F, 'glaive', 'Measured Cuts', 'cc_blinkstrike', { pow: .2, verb: 'slices' });
+  ezFlav(F, 'glaive', 'Opening Salute', 'rhythm', .03, 'pass of its riftblade');
+  ezTal(F, 'glaive', 'Riftsteel Rhythm', 'mhit', 1.2, 0, 'pass of its riftblade');
+  ezSpell(F, 'glaive', 'Fresh Blood', 'cc_sigilcleave', { cd: 1.5, back: 'cleaves every' });
+  ezFlav(F, 'glaive', 'Lone Duel', 'tempo', .04, 'swings its riftblade');
+  ezSpell(F, 'glaive', 'Thousand Edges', 'cc_spectral', { cd: 3, back: 'is thrown every' });
+  ezSpell(F, 'glaive', 'Killing Step', 'cc_blinkstrike', { cd: 1, back: 'blinks every' });
+
+  /* ---------- Magelings (damage: no control). Kept: Twin Casting, Splitting Missile, Skyward Missiles, Packed Ranks;
+     capstones Missile Swarm, Ready Orb, Apprentice's Tempo, Missile Storm ---------- */
+  ezSpell(F, 'arrow', 'Homing Missiles', 'cc_barrage', { pow: .2, verb: 'sears' });
+  ezFlav(F, 'arrow', 'Busy Hands', 'tempo', .05, 'casts missiles');
+  ezFlav(F, 'arrow', 'Lesson Learned', 'harvest', 5, 'the Mageling');
+  ezSpell(F, 'arrow', 'Tome Familiar', 'cc_barrage', { by: { n: 1 } }, v => `looses ${v} more missile${v > 1 ? 's' : ''}`);
+  ezFlav(F, 'arrow', 'Bursting Missiles', 'echo', .3, 'casts missiles');
+  ezFlav(F, 'arrow', 'Last Lesson', 'momentum', .03, 'casts missiles');
+  ezSpell(F, 'arrow', 'Charged Recital', 'cc_grandorb', { pow: .2, verb: 'breaks' });
+  ezSpell(F, 'arrow', 'Overflowing Missile', 'cc_barrage', { cd: .75, back: 'is loosed every' });
+  ezTal(F, 'arrow', 'Study Rhythm', 'mhit', .4, 0, 'missile she casts');
+
+  /* ---------- Frostweavers (control). Kept: Chilling Bolts, Icicle Through, Deep Freeze, Absolute Stillness, Second
+     Spear; capstones Deep Winter, Icicle Volley, Coffin Burst ---------- */
+  ezSpell(F, 'frost', 'Shard Spray', 'cc_glacialglyph', { pow: .1, verb: 'pierces' });
+  ezFlav(F, 'frost', 'Cracking Cold', 'overflow', .1, 'her icicles hit');
+  ezTal(F, 'frost', 'Long Staff', 'reach', .25, 0, 'Her staff reaches');
+  ezFlav(F, 'frost', 'Cold Library', 'tap', .5, 'the Frostweaver');
+  ezTal(F, 'frost', 'Frost Rhythm', 'mhit', 1.5, 0, 'icicle she weaves');
+  ezSpell(F, 'frost', 'Cold Focus', 'cc_rimelance', { by: { dur: .3 } }, v => `holds its foe in the ice ${ezR(.3 * v)}s longer`);
+  ezFlav(F, 'frost', 'Rime Spirit', 'echo', .3, 'weaves icicles');
+
+  /* ---------- Chronomancers (control). Kept: Heavy Hours, Dead Hour, Pendulum Swing, Replay, Clockwork Rhythm, Arcane
+     Clockwork; capstones Time Loop, Frozen Moment, Endless Hour ---------- */
+  ezSpell(F, 'arcane', 'Rewound Bolt', 'cc_quicken', { cd: 2, back: 'turns back every' });
+  ezFlav(F, 'arcane', 'Hour of Need', 'echo', .2, 'turns its hourglass');
+  ezSpell(F, 'arcane', 'Spare Seconds', 'cc_dilation', { by: { dur: .5 } }, v => `holds time ${ezR(.5 * v)}s longer`);
+  ezFlav(F, 'arcane', 'Clockwork Familiar', 'rhythm', .03, 'tick it sends');
+  ezTal(F, 'arcane', 'Time Rhythm', 'mhit', 1, 0, 'tick it sends');
+  ezTal(F, 'arcane', 'Long Hour', 'reach', .25, 0, 'Its hours reach');
+
+  /* ---------- Astrologers (damage: no control). Kept: Star-Chart, Orbiting Spark, Shooting Bolt, Skyward Eye, Long Lens,
+     Turning Stars; capstones Constellation, Starfall Sky, Binary Star ---------- */
+  ezFlav(F, 'storm', 'Bright Fourth', 'watch', .1, 'its starlight');
+  ezFlav(F, 'storm', 'Busy Sky', 'tempo', .05, 'reads stars down');
+  ezSpell(F, 'storm', 'Omen Light', 'cc_fallingstar', { pow: .15, verb: 'burns' });
+  ezSpell(F, 'storm', 'Orrery Moon', 'cc_orrery', { by: { dur: 1 } }, v => `turns ${v}s longer`);
+  ezSpell(F, 'storm', 'Zodiac', 'cc_fallingstar', { cd: 1.5, back: 'is called every' });
+  ezSpell(F, 'storm', 'Falling Finish', 'cc_omen', { pow: .2, verb: 'comes down' });
+
+  /* ---------- Golem Wardens (line holder). Kept: Second Tremor, Granite Fists, Mana Quarry, Stone Fists, Fault Line;
+     capstones Shatterground, Shockwave, Stone Sprite ---------- */
+  ezSpell(F, 'earth', "Warden's Command", 'cc_seismic', { cd: 1, back: 'leaps every' });
+  ezFlav(F, 'earth', 'Double Fist', 'tempo', .04, 'its golem pounds');
+  ezSpell(F, 'earth', 'Gathering Weight', 'cc_seismic', { pow: .2, verb: 'shakes the road' });
+  ezTal(F, 'earth', 'Hurled Stone', 'hp', .15);
+  ezSpell(F, 'earth', 'Waking Golem', 'cc_tremorglyph', { pow: .2, verb: 'hurls' });
+  ezFlav(F, 'earth', 'Golem Core', 'momentum', .04, 'its golem pounds');
+  ezSpell(F, 'earth', 'Stamped Flat', 'cc_tremorglyph', { cd: 2, back: 'heaves every' });
+
+  /* ---------- Pyroclasts. Kept: Pyre Scribe, Counted Coals, Slow-Burning Ink, Sunburst, Leaping Cinders, Molten Brand,
+     Stoked Fire, Flashover, Banked Heat; capstones Sunfall, Pyre Bloom ---------- */
+  ezFlav(F, 'cannon', 'Ember Wisp', 'flurry', .15, 'kindles and throws');
+  ezSpell(F, 'cannon', 'Twin Fireball', 'cc_kindle', { by: { n: 1 } }, v => `skips ${v} more time${v > 1 ? 's' : ''}`);
+  ezSpell(F, 'cannon', 'Bouncing Fireball', 'cc_flamewave', { pow: .2, verb: 'scorches' });
+  ezFlav(F, 'cannon', 'Stoking Hands', 'echo', .3, 'kindles and throws');
+
+  /* ---------- Arcane Severers. Kept: Keen Crescent, Hunting Crescent, Splintering, Homeward Edge, Glancing Crescent;
+     capstones Crescent Orbit, Severing Flurry, Wardbreaker ---------- */
+  ezFlav(F, V, 'Ward Feedback', 'tap', .5, 'the Severer');
+  ezFlav(F, V, 'Quick Severing', 'tempo', .01, 'sends her crescent out');
+  ezTal(F, V, 'Long Throw of the Glaive', 'reach', .2, 0, 'Her crescent flies');
+  ezTal(F, V, 'Sever Rhythm', 'mhit', 1.5, 0, 'crescent she throws');
+  ezSpell(F, V, 'Paired Crescents', 'cc_shards', { cd: 1.5, back: 'wheels back every' });
+  ezSpell(F, V, 'Honed by Spells', 'cc_sunder', { pow: .08, verb: 'rends' });
+}
+
 /* ================= SIMPLE PASSIVES: THE GROVE (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
    Each tree keeps its spell talents, its capstones, the talent that gives the unit its own trick and one or two signature
@@ -62914,6 +63004,157 @@ if (typeof abAuto === 'function') {
   ezSpell(F, V, "Witch's Spite", 'bw_bogdue', { cd: 2, back: 'opens every' });
   ezTal(F, V, 'Long Spit', 'reach', .25, 0, 'Her spit carries');
   ezSpell(F, V, 'Fed Swarm', 'bw_swarm', { by: { dur: 1 } }, longer('feeds'));
+}
+
+/* ================= SIMPLE PASSIVES: IRONHOLD (26 Nov 2026) =================
+   The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
+   Each tree keeps its spell talents, its capstones, the talent that gives the unit its own trick and one or two signature
+   "does X" talents; its short always-on talents stay as they are, and so do the talents the force tree owns (Hot Hands,
+   Called Shot, Quick Reload ...: forces_..._ftree.js). Every other node is an always-on, ranked improvement to one of
+   the unit's named spells, or a core stat in the unit's own words.
+   The Champions' own trees are nearly all changes to their named spells already: left as they are. */
+{
+  const F = 'ironhold', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
+
+  /* ---------- Ironbreakers (line holder). Kept: Off Balance, Brace and Shove, Bowling Shove, Shield Rush, Bearded Axe,
+     Hold the Pass, Hooked Beard; capstones Anvil Strike, Armourbreaker, Shieldbrother ---------- */
+  ezTal(F, 'glaive', 'Forge Rhythm', 'mhit', 1.5, 0, 'chop of its axe');
+  ezSpell(F, 'glaive', 'Plate Salvage', 'ih_shieldshove', { cd: .5, back: 'is braced every' });
+  ezFlav(F, 'glaive', 'Double Chop', 'tempo', .01, 'brings its axe down');
+  ezFlav(F, 'glaive', 'Felling Chop', 'momentum', .04, 'brings its axe down');
+
+  /* ---------- Thunderguns (damage: no control). Kept: Concussion Rounds, Sighting In, Range-Finder, Through-Ball;
+     capstones Thunder Volley (Called Shot and Gatling Crank are the force tree's) ---------- */
+  ezSpell(F, 'arrow', 'Both Barrels', 'ih_slug', { cd: 1.5, back: 'is loaded every' });
+  ezFlav(F, 'arrow', 'Quick Ramrod', 'tempo', .04, 'reloads and fires');
+  ezTal(F, 'arrow', 'Powder Purse', 'mhit', .5, 0, 'ball it fires');
+  ezFlav(F, 'arrow', 'Ricochet', 'watch', .1, 'its thundergun');
+  ezSpell(F, 'arrow', "Spotter's Call", 'ih_rollingvolley', { by: { n: 2 } }, v => `fires ${2 * v} more bullets`);
+  ezTal(F, 'arrow', 'Long Iron', 'reach', .3, 0, 'Its long iron carries');
+
+  /* ---------- Chain Trappers (control). Kept: Snaring Bolas, Third Wrap, Weighted Chains, Tangle, Wide Nets, Double
+     Wrap, Wing Cords; capstones Bola Storm, Trap Hound, Bear Trap ---------- */
+  ezFlav(F, 'frost', "Trapper's Haul", 'harvest', 6, 'the Chain Trapper');
+  ezSpell(F, 'frost', 'Two Bolas', 'ih_caltropfield', { by: { trips: 1 } }, v => `trips ${v} more foe${v > 1 ? 's' : ''}`);
+  ezFlav(F, 'frost', 'Fresh Quarry', 'tempo', .035, 'whirls its bolas');
+  ezTal(F, 'frost', 'Long Arm', 'reach', .3, 0, 'Its bolas fly');
+  ezTal(F, 'frost', "Trapper's Rhythm", 'mhit', 1.5, 0, 'bola that lands');
+  ezSpell(F, 'frost', 'Weighted Throws', 'ih_grapple', { cd: 2, back: 'is wound every' });
+
+  /* ---------- Anvilwrights (support). Kept: Deep Brand, Forge Spirit, Searing Brand, Flying Sparks, Ringing Strokes;
+     capstones Anvil Storm, Forgelord, Masterwork Day ---------- */
+  ezSpell(F, 'arcane', 'Glowing Anvil', 'ih_runebrand', { pow: .2, verb: 'brands' });
+  ezFlav(F, 'arcane', 'Anvil of Ages', 'rhythm', .02, 'ring of its hammer');
+  ezSpell(F, 'arcane', 'Two Brands', 'ih_runeofpower', { by: { n: 1 } }, v => `tempers ${v} more unit${v > 1 ? 's' : ''}`);
+  ezFlav(F, 'arcane', 'Big Work', 'echo', .3, 'rings its hammer');
+  ezTal(F, 'arcane', "Anvil's Due", 'mhit', 2.5, 0, 'ring of its hammer');
+  ezSpell(F, 'arcane', 'Hot Iron', 'ih_runebrand', { cd: 1.5, back: 'is struck every' });
+
+  /* ---------- Flak Cannoneers (damage: no control). Kept: Fast Fuses, Barbed Shrapnel, High Sights, Hot Shrapnel, Sky
+     Shatter, Torn Wings; capstones Proximity Fuse, Hook the Sky, Twin Mount ---------- */
+  ezTal(F, 'storm', "Gunner's Tithe", 'mhit', .8, 0, 'round of flak');
+  ezSpell(F, 'storm', 'Cluster Shell', 'ih_grapnel', { pow: .1, verb: 'hauls' });
+  ezFlav(F, 'storm', 'Quick Traverse', 'tempo', .02, 'fires its flak gun');
+  ezSpell(F, 'storm', 'Second Burst', 'ih_flakscreen', { by: { dur: 1 } }, v => `fills the sky ${v}s longer`);
+
+  /* ---------- Steam Hammers. Kept: Steam in the Cracks, Packed Crowd, Hammer Home, Tremor Step, Steam Jets; capstones
+     Hammer Drone, Groundsplitter, Molten Rivets (Safety Valve, Pressure Gauge and Steam Jacket are the force tree's) ---------- */
+  ezSpell(F, 'earth', 'Head of Steam', 'ih_pressureslam', { cd: 1, back: 'builds every' });
+  ezFlav(F, 'earth', 'Twice Struck', 'overflow', .1, 'its steam-hammer hits');
+  ezFlav(F, 'earth', 'Building Pressure', 'tempo', .04, 'drives its piston');
+  ezSpell(F, 'earth', 'Pressure Release', 'ih_pistondrive', { pow: .2, verb: 'lifts' });
+
+  /* ---------- Mortar Crew. Kept: Glowing Casings, Whistling Shells, Double Crew, Quake Shell, Pitch-Soaked Wadding;
+     capstones Barrage, Crew Chief's Shout, Napalm (Big Bertha and Ringing Ears are the force tree's) ---------- */
+  ezSpell(F, 'cannon', 'Bouncing Shell', 'ih_incendiary', { cd: 1.5, back: 'is rammed home every' });
+  ezTal(F, 'cannon', 'Cluster Round', 'splash', .1);
+  ezTal(F, 'cannon', 'Powder Monkey', 'mhit', 1.5, 0, 'mortar round');
+  ezFlav(F, 'cannon', 'Thick of It', 'echo', .3, 'drops rounds');
+
+  /* ---------- Siege Breakers. Kept: Shaped Charges, Fuse Cutter, Planted by Hand, Black Powder Pack, Tamped Charges,
+     Rubble; capstones Satchel Rain, Sapper's Mate, Breach and Clear ---------- */
+  ezSpell(F, V, 'Two Satchels', 'ih_breach', { cd: 1.5, back: 'is planted every' });
+  ezFlav(F, V, 'Sapper at Work', 'tempo', .04, 'lights and throws satchels');
+  ezFlav(F, V, 'Blasting Wage', 'harvest', 6, 'the Siege Breaker');
+  ezSpell(F, V, 'Sympathetic Blast', 'ih_trench', { by: { n: 1 } }, v => `lays ${v} more charge${v > 1 ? 's' : ''}`);
+  ezTal(F, V, 'Long Lob', 'reach', .25, 0, 'Its satchels carry');
+}
+
+/* ================= SIMPLE PASSIVES: THE SILVER ORDER (26 Nov 2026) =================
+   The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
+   Each tree keeps its spell talents, its capstones, the talent that gives the unit its own trick and one or two signature
+   "does X" talents; its short always-on talents stay as they are, and so do the talents the force tree owns
+   (forces_..._ftree.js). Every other node is an always-on, ranked improvement to one of the unit's named spells, or a core
+   stat in the unit's own words. No new text names Judgement.
+   The Champions' own trees are nearly all changes to their named spells already: left as they are. */
+{
+  const F = 'silver', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
+
+  /* ---------- Oathsworn Shieldbearers (line holder). Kept: Shield-Ward, Pommel Blow, Shield of Faith, Unbroken Oath,
+     Braced Shield, Unyielding; capstones Oath Unbroken, Wall of Shields, Ringing Shield ---------- */
+  ezSpell(F, 'glaive', 'Backswing', 'so_bash', { pow: .2, verb: 'rings' });
+  ezFlav(F, 'glaive', 'Press the Wounded', 'tempo', .04, 'swings its oathblade');
+  ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `shines ${v}s longer`);
+  ezFlav(F, 'glaive', 'Pommel Finish', 'rhythm', .03, 'stroke of its oathblade');
+  ezTal(F, 'glaive', 'Oath Rhythm', 'mhit', 1.5, 0, 'stroke of its oathblade');
+
+  /* ---------- Silverbolt Crossbows (damage: no control). Kept: Opening Shot, Heavy Quarrel, Bodkin Heads, Through and
+     Through; capstones Siege Quarrel, Squire at Arms, Storm of Silver ---------- */
+  ezFlav(F, 'arrow', 'Double Crank', 'tempo', .04, 'cranks and looses');
+  ezSpell(F, 'arrow', 'Sighted In', 'so_sanct', { pow: .12, verb: 'punches through' });
+  ezFlav(F, 'arrow', 'Ready Crank', 'momentum', .02, 'cranks and looses');
+  ezSpell(F, 'arrow', 'Splinter Bolt', 'so_hail', { by: { dur: 1 } }, v => `lights its crowd ${v}s longer`);
+  ezSpell(F, 'arrow', 'Hot Crank', 'so_witness', { by: { dur: 1 } }, v => `marks its foe ${v}s longer`);
+  ezFlav(F, 'arrow', 'Mercy Bolt', 'watch', .1, 'its quarrels');
+  ezTal(F, 'arrow', 'Bolt Tithe', 'mhit', .6, 0, 'quarrel it looses');
+  ezSpell(F, 'arrow', 'Loaded Prayer', 'so_sanct', { cd: .75, back: 'is blessed every' });
+
+  /* ---------- Lightbinder Sisters (control). Kept: Tightening Links, Lash Through, Crushing Bind, Blinding Chains,
+     Glinting Links, Double Lash; capstones Radiant Hands, Quick Binding, Chain Whirl ---------- */
+  ezFlav(F, 'frost', 'Lamp Wisp', 'rhythm', .05, 'lash of her chain');
+  ezFlav(F, 'frost', 'Taut Chain', 'tempo', .06, 'cracks her chain');
+  ezSpell(F, 'frost', 'Final Lash', 'so_bind', { by: { n: 1 } }, v => `chains ${v} more foe${v > 1 ? 's' : ''}`);
+  ezSpell(F, 'frost', 'Snap Back', 'so_flare', { cd: 1.5, back: 'is cast every' });
+  ezTal(F, 'frost', 'Light Rhythm', 'mhit', 1.5, 0, 'crack of her chain');
+
+  /* ---------- Grail Knights (damage: no control). Kept: Full Gallop, Joust, Second Pass, Trampling Hooves, Unhorse;
+     capstones Thrice-Wheeled, Glory of the Charge, Part the Ranks ---------- */
+  ezTal(F, 'arcane', "Squire's Purse", 'mhit', 3, 0, 'tilt it rides');
+  ezSpell(F, 'arcane', 'Ride Through', 'so_ridedown', { by: { n: 1 } }, v => `rides ${v} more pass${v > 1 ? 'es' : ''}`);
+  ezSpell(F, 'arcane', 'Vow-Lit Lance', 'so_vow', { by: { dur: 1 } }, v => `rallies its side ${v}s longer`);
+  ezTal(F, 'arcane', 'Long Course', 'reach', .3, 0, 'Its course runs');
+  ezSpell(F, 'arcane', 'Shattered Lance', 'so_grail', { pow: .1, verb: 'breaks through' });
+  ezFlav(F, 'arcane', 'Phantom Rider', 'echo', .3, 'wheels and couches its lance');
+
+  /* ---------- Sunlance Clerics (damage: no control). Kept: Zenith, Scorching Rays, Lingering Beam, Long Ray, Prism,
+     Sunburst; capstones Lance upon Lance, Lance of Heaven, High Noon ---------- */
+  ezFlav(F, 'storm', 'Halo Wisp', 'echo', .05, 'casts rays of sun');
+  ezTal(F, 'storm', 'Dawn Rhythm', 'mhit', .7, 0, 'ray she casts');
+  ezSpell(F, 'storm', 'Little Sun', 'so_halo', { cd: 1, back: 'sweeps every' });
+  ezSpell(F, 'storm', 'Noonfire', 'so_sunlance', { pow: .1, verb: 'blazes' });
+  ezFlav(F, 'storm', 'Vigil Prayer', 'watch', .05, 'her sunrays');
+
+  /* ---------- Templars of the Ford (line holder). Kept: Twin Rhythm, Crossed Blades, Parry and Riposte, Press Forward,
+     Rising Fury, Press of Battle; capstones Steel Tempest, Twin Throw ---------- */
+  ezSpell(F, 'earth', 'Spinning Third', 'so_crush', { pow: .2, verb: 'cleaves' });
+  ezFlav(F, 'earth', 'Sword Prayer', 'harvest', 5, 'the Templar');
+  ezSpell(F, 'earth', 'Crossed Finish', 'so_crush', { cd: 1.5, back: 'crosses every' });
+  ezTal(F, 'earth', "Templar's Rhythm", 'mhit', 1.5, 0, 'stroke that lands');
+  ezSpell(F, 'earth', 'Carried Cut', 'so_hammerfall', { cd: 2, back: 'falls every' });
+
+  /* ---------- Censer Bearers. Kept: Fanned Embers, Hot Coals, Choking Smoke, Direct Hit, Pall of Smoke, Rekindling,
+     Skipping Coal, Ash in the Eyes; capstones Coal Shower, Ember Spirit, Psalm of Embers ---------- */
+  ezSpell(F, 'cannon', 'Two Coals', 'so_sweep', { pow: .2, verb: 'scatters' });
+  ezSpell(F, 'cannon', 'Quick Thurible', 'so_smoke', { by: { n: 1 } }, v => `lays ${v} more patch${v > 1 ? 'es' : ''}`);
+  ezFlav(F, 'cannon', 'Censer Tithe', 'harvest', 6, 'the Censer Bearer');
+
+  /* ---------- Magebane Inquisitors. Kept: Scorching Seal, Broken Litany, Dry Well, Zeal, Forfeit, Shield of Doctrine;
+     capstones Penitent's Flurry, Censer of Witness, Grand Inquest ---------- */
+  ezSpell(F, V, 'Sanctioned Lash', 'so_edict', { pow: .25, verb: 'scourges' });
+  ezSpell(F, V, 'Leaping Lash', 'so_seize', { cd: 1, back: 'is served every' });
+  ezTal(F, V, 'Long Chain', 'reach', .2, 0, 'Her seal-chain reaches');
+  ezFlav(F, V, 'Seal Slam', 'overflow', .1, 'her seal hits');
+  ezTal(F, V, "Zealot's Tithe", 'mhit', 1.5, 0, 'swing of her seal');
 }
 
 /* ================= SIMPLE PASSIVES: THE STORMBORN (26 Nov 2026) =================
@@ -63008,6 +63249,91 @@ if (typeof abAuto === 'function') {
   ezTal(F, V, 'Long Cast', 'reach', .25, 0, 'Its line runs');
   ezTal(F, V, "Skyhunter's Tithe", 'mhit', .6, 0, 'cast of its line');
   ezSpell(F, V, "Hunter's Haste", 'sb_skyfall', { pow: .4, verb: 'crashes down' });
+}
+
+/* ================= SIMPLE PASSIVES: THE WARDBOUND (26 Nov 2026) =================
+   The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
+   Each tree keeps its spell talents, its capstones, the talent that gives the unit its own trick and one or two signature
+   "does X" talents; its short always-on talents stay as they are, and so do the talents the force tree owns
+   (forces_..._ftree.js). Every other node is an always-on, ranked improvement to one of the unit's named spells, or a core
+   stat in the unit's own words.
+   The Champions' own trees are nearly all changes to their named spells already: left as they are. */
+{
+  const F = 'wardbound', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
+
+  /* ---------- Oathbound (line holder). Kept: Oathsworn Cut, Deep Carving, Sweeping Cut, Hold the Road, Oath of Iron;
+     capstones Vowed Blade, Whirling Oath, Second Edge ---------- */
+  ezSpell(F, 'glaive', 'Oath Kept', 'wb_swordplant', { cd: 1, back: 'is driven every' });
+  ezTal(F, 'glaive', "Blade's Tithe", 'mhit', 1.5, 0, 'stroke of his greatsword');
+  ezFlav(F, 'glaive', 'Overhead', 'tempo', .04, 'swings his greatsword');
+  ezTal(F, 'glaive', 'Greatsword Reach', 'reach', .15, 0, 'His greatsword reaches');
+  ezSpell(F, 'glaive', 'Unyielding Pace', 'wb_wardflare', { cd: 2, back: 'spins every' });
+  ezFlav(F, 'glaive', 'Bursting Rune', 'momentum', .04, 'his greatsword falls');
+
+  /* ---------- Glaive Wardens. Kept: Rune-Etched Edge, Long Ricochet, Homeward Cut, Masked Sight; capstones Unending
+     Glaive, Endless Ricochet, Three Glaives ---------- */
+  ezSpell(F, 'arrow', 'Gilded Edge', 'wb_runevolley', { pow: .15, verb: 'sings' });
+  ezFlav(F, 'arrow', 'Second Glaive', 'tempo', .025, 'hurls her great glaive');
+  ezFlav(F, 'arrow', 'Glaive Finish', 'flurry', .15, 'her great glaive flies');
+  ezSpell(F, 'arrow', 'Quick Hand', 'wb_piercingshaft', { cd: 1.5, back: 'is flung every' });
+  ezSpell(F, 'arrow', 'Glaive Orbit', 'wb_runevolley', { by: { n: 1 } }, v => `bounces ${v} more time${v > 1 ? 's' : ''}`);
+  ezFlav(F, 'arrow', "Mask's Tally", 'harvest', 5, 'the Glaive Warden');
+
+  /* ---------- Frostbrand Sentries (line holder). Kept: Lasting Frost, Bitter Steel, Creeping Rime, Rimecut, Rime Shards,
+     Wide Sweep, Shatter Oath; capstones Winter Howls, Frost Sentinel, Full Circle ---------- */
+  ezFlav(F, 'frost', 'Meltwater', 'tap', .5, 'the Frostbrand');
+  ezFlav(F, 'frost', 'Back Sweep', 'tempo', .04, 'sweeps its halberd');
+  ezSpell(F, 'frost', 'Cleaving Haft', 'wb_frostbite', { pow: .2, verb: 'grips' });
+  ezSpell(F, 'frost', 'Biting Cold', 'wb_winterward', { by: { dur: 1 } }, v => `stands guard ${v}s longer`);
+  ezTal(F, 'frost', "Winter's Tithe", 'mhit', 1.5, 0, 'pass of its halberd');
+
+  /* ---------- Runecarvers. Kept: Deep Script, Lingering Ink, Double Stroke, Flick Through, Spent Ink; capstones Endless
+     Script, Cascade, Runesight ---------- */
+  ezFlav(F, 'arcane', 'Final Word', 'rhythm', .06, 'stroke of its stylus');
+  atkSwap(F, 'arcane', { old: 'Two Flicks', name: 'Two Flicks', tag: 'Damage', see: 'A second flick of the stylus carves another foe.',
+    pro: (n, s) => `Each attack also carves a second foe for ${s(50)}%.`, fx: { hit: { do: 'split', n: 1, k: .5, r: 1.8 } } });   /* (always on: it was every 3rd attack) */
+  ezFlav(F, 'arcane', 'Busy Stylus', 'tempo', .08, 'carves with its stylus');
+  ezTal(F, 'arcane', 'Reading Glass', 'reach', .25, 0, 'Its stylus reaches');
+  ezSpell(F, 'arcane', 'Ghost Scribe', 'wb_detonate', { pow: .6, verb: 'flares' });
+
+  /* ---------- Stormward Lancers. Kept: Couched Lance, Swift Remount, Forked Pennon, Lightning Lance; capstones Thunder
+     Oath, Storm Lance, Second Thunder ---------- */
+  ezFlav(F, 'storm', 'Sky-Drawn', 'tap', .5, 'the Stormward');
+  ezTal(F, 'storm', "Rider's Tithe", 'mhit', 1.5, 0, 'lance-point that lands');
+  ezFlav(F, 'storm', 'Double Thrust', 'tempo', .04, 'couches and drives its lance');
+  ezFlav(F, 'storm', 'Storm Hawk', 'momentum', .02, 'couches and drives its lance');
+  ezTal(F, 'storm', 'Long Lance', 'reach', .15, 0, 'Its storm-lance reaches');
+  ezSpell(F, 'storm', "Rider's Rhythm", 'wb_charge', { cd: 1.5, back: 'rides out every' });
+  ezSpell(F, 'storm', "Lancer's Finish", 'wb_skyfall', { pow: .2, verb: 'splits the sky' });
+  ezSpell(F, 'storm', 'Storm-Called Lance', 'wb_stormbanner', { by: { dur: 1 } }, v => `flies ${v}s longer`);
+
+  /* ---------- Anvil Guard (line holder). Kept: Iron Rhythm, Restless Earth, Shield Bash, Deep Quake, Anvil's Toll;
+     capstones Unmoving, Quaking Steps, Mountain's Weight ---------- */
+  ezSpell(F, 'earth', 'Shield Spirit', 'wb_shieldwall', { pow: .1, verb: 'drives back' });
+  ezFlav(F, 'earth', 'Shield Edge', 'rhythm', .03, 'shield-rim blow');
+  ezFlav(F, 'earth', 'Under Fire', 'tempo', .04, 'brings its shield-rim down');
+  ezTal(F, 'earth', 'Broad Rim', 'reach', .15, 0, 'Its shield reaches');
+  ezTal(F, 'earth', 'Crushing Rim', 'mhit', 1.5, 0, 'blow of its shield-rim');
+  ezSpell(F, 'earth', 'Shield Song', 'wb_quakeline', { cd: 2, back: 'rolls every' });
+
+  /* ---------- Siege Wardens. Kept: Long Pin, Wide Blast, Heavy Bolts, Skewering Bolt, Shrapnel; capstones Unbroken
+     Chain, Ballista Volley, Skewer Line ---------- */
+  ezTal(F, 'cannon', 'Spotter', 'reach', .25, 0, 'Its ballista carries');
+  ezFlav(F, 'cannon', 'Quick Crank', 'tempo', .04, 'cranks and fires');
+  ezSpell(F, 'cannon', 'Spent Bolt', 'wb_runeshot', { cd: 2, back: 'is fired every' });
+  ezSpell(F, 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt', { pow: .25, verb: 'drives home' });
+  ezSpell(F, 'cannon', "Loader's Finish", 'wb_chainbolt', { by: { dur: 1 } }, v => `holds its pair ${v}s longer`);
+  ezFlav(F, 'cannon', 'Steady Crew', 'harvest', 5, 'the Siege Warden');
+  ezFlav(F, 'cannon', 'Third Crewman', 'watch', .1, 'its ballista');
+
+  /* ---------- Vowkeepers (healer). Kept: Deep Mending, Mender's Due, Censer Swing, Siege-Ward, Urgent Hands; capstones
+     Keeper of Vows, Steadfast Chaplain, Hallowed Road ---------- */
+  ezSpell(F, V, 'Swift Absolution', 'wb_censer', { by: { dur: 1 } }, v => `drifts ${v}s longer`);
+  ezFlav(F, V, 'Urgent Blade', 'tempo', .02, 'swings his vow-blade');
+  ezTal(F, V, 'Long Blade', 'reach', .15, 0, 'His vow-blade reaches');
+  ezFlav(F, V, 'Mercy Cut', 'rhythm', .03, 'stroke of his vow-blade');
+  ezSpell(F, V, "Chaplain's Prayer", 'wb_vow', { cd: 2, back: 'is sworn every' });
+  ezSpell(F, V, 'Smoke Spirit', 'wb_rite', { cd: 2, back: 'is held every' });
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
