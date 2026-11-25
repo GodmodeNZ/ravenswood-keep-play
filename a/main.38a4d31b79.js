@@ -1,4 +1,4 @@
-const BUILD_TAG = '4a041fbd@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '97531bdf@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -55242,6 +55242,7 @@ const GCB = {
   spore: { t: 2.5, r: 2.2, rate: 3 },          // a Sporecap's puff: seconds the unit is slowed, its reach, seconds between puffs
   shed: { at: [.75, .5, .25], n: 3, k: .5 },   // the Shedding: the health marks, Buttoncaps a mark, each one's health (x a trooper's of that wave)
   pool: true, puff: true,
+  calm: .3, reach: .4,                         // its deaths stay where they fell (owner: "rolls too much and too far away"): the throw of a clip death x calm, never drawn further than reach cells (the ragdolls': calm in tools/ff_glowcap.py)
   // the pool of light under each (r g b, its radius x the foe's own, its strength) and the spores' colour
   look: {
     gc_buttoncap: { g: [1, .42, .12], r: 2.1, a: .38, sp: '#e0a070' },
@@ -55389,7 +55390,7 @@ forestFaction({
     },
   },
 });
-for (const id in GCB.look) if (CREEPS[id]) { CREEPS[id].ffCapHit = gcCapHit; CREEPS[id]._blood = null; }   // (no blood from a mushroom: game.js bloodOf; its spores are its own)
+for (const id in GCB.look) if (CREEPS[id]) { CREEPS[id].ffCapHit = gcCapHit; CREEPS[id]._blood = null; CREEPS[id].ffCalm = GCB.calm; CREEPS[id].ffReach = GCB.reach; }   // (no blood from a mushroom: game.js bloodOf; its spores are its own)
 
 /* ================= THE THORNMANTIS BROOD: a faction of the forest (forestfoes.js) =================
    Owner, 25 Nov 2026: "Thornmantis Brood, new set as part of a hive map": the insects of the Thornhive, a place of their own on
@@ -56059,6 +56060,10 @@ const FPH = (() => {
     }
     if (mom > .05 && (kind === 'launch' || kind === 'fly')) { p.vx += ux * sp * (kind === 'fly' ? .7 : .5); p.vz += uz * sp * (kind === 'fly' ? .7 : .5); }   // (thrown or falling, it carries on the way it was going)
     if (kind === 'slide' && mom < .05) { p.vx *= .6; p.vz *= .6; }   // a slow one crumples more or less where it stood
+    /* a calm family (def.ffCalm, 0..1: the Glowcap Bloom; owner: "rolls too much and too far away"): it falls where it stands. Its slide,
+       hop, throw, stagger, carry and spin are scaled by it, and the body is never drawn further than def.ffReach cells from where it died */
+    if (d.ffCalm > 0 && d.ffCalm < 1) { const q = d.ffCalm; p.vx *= q; p.vz *= q; p.om *= q; p.spin *= q; if (p.step) p.step *= q; if (p.carry) { p.carry *= q; p.offV *= q; p.fling = false; }
+      if (p.vy) { p.vy *= Math.sqrt(q); if (p.airT) p.airT = 2 * p.vy / D.g; } if (p.rollA) p.rollA *= q; p.reach = d.ffReach || .5; }
     // turn the clip so it falls the way it was struck (a part of the way, eased in)
     /* (a foe with several deaths says which way the one this body plays falls, model.fallOf: null for one that goes down where it stands) */
     const fo = rg.model && rg.model.fallOf ? rg.model.fallOf(k) : undefined, fall = fo === undefined ? rg.fall : fo;
@@ -56147,6 +56152,7 @@ const FPH = (() => {
     if (p.quick && k.fdP && !p.flyQ) { p.flyQ = 1; if (p.flyT != null) p.flyT = Math.min(p.flyT, k.fdP.Te * .9); }   // (a flier's roll done by then)
     if (still) { p.tc += h; p.vx = p.vz = p.vy = p.om = p.spin = 0; S.still = (S.still || 0) + (p.stillN ? 0 : (p.stillN = 1)); }
     else for (let i = 0; i < n; i++) { rate = stepPlan(p, h / n, k.t - h + (i + 1) * h / n); p.tc += h / n * rate; }
+    if (p.reach) { const l = Math.hypot(p.ox, p.oz); if (l > p.reach) { p.ox *= p.reach / l; p.oz *= p.reach / l; p.vx = p.vz = 0; } S.reachMax = Math.max(S.reachMax || 0, Math.min(l, p.reach)); }
     const sx = k.x, sz = k.z, sy = k.yaw, st = k.t;
     k.x = p.x0 + p.ox; k.z = p.z0 + p.oz; k.t = p.tc;
     k.yaw = p.yaw0 + p.twist * ease(st / (p.quick ? .26 : .35)) + (p.yawS || 0);
@@ -81919,11 +81925,14 @@ const FOERAG = (() => {
        its feet; a little lift with it; a twist of its own about the way it falls, by chance */
     let bx = o.bx || 0, bz = o.bz || 0; const bl = Math.hypot(bx, bz), r1 = o.r != null ? o.r : Math.random(), r2 = hash(r1 * 977, 3), s = Math.max(.35, Math.min(2.6, o.s || .7)) / Math.sqrt(b.m);
     if (bl < 1e-4) { const a = r1 * Math.PI * 2; bx = Math.sin(a); bz = Math.cos(a); } else { bx /= bl; bz /= bl; }
-    const J = RG.push * h * s * (.85 + .3 * r2), top = Math.max(.2 * h, X[rg.head * 3 + 1] - b.gy), dt = b.dtp = 1 / RG.hz, blast = o.blast ? 1 : 0, tw = (r2 - .5) * .9 * s;
+    /* a calm death (o.calm, 0..1: a model's own, the Glowcap Bloom's; owner: "rolls too much and too far away"): the push, the body's
+       own momentum, the lift, the twist and a blast's throw are all scaled by it, the road grips harder and nothing bounces */
+    const calm = o.calm > 0 ? Math.min(1, o.calm) : 1; b.fricK = Math.min(1.9, 1 / calm); b.bounceK = calm < 1 ? 0 : 1;
+    const J = RG.push * h * s * (.85 + .3 * r2) * calm, top = Math.max(.2 * h, X[rg.head * 3 + 1] - b.gy), dt = b.dtp = 1 / RG.hz, blast = (o.blast ? 1 : 0) * calm, tw = (r2 - .5) * .9 * s * calm;
     const cxm = X[rg.chest * 3], czm = X[rg.chest * 3 + 2];
     for (let i = 0; i < NP; i++) {
       const u = Math.max(0, Math.min(1.15, (X[i * 3 + 1] - b.gy) / top)), k = o.fly ? .55 + .45 * u : u * u * .65 + u * .35;
-      const vx = (o.vx || 0) + bx * J * k - (X[i * 3 + 2] - czm) * tw * u, vz = (o.vz || 0) + bz * J * k + (X[i * 3] - cxm) * tw * u, vy = (o.vy || 0) + RG.lift * h * s * u + blast * 2.2 * h;
+      const vx = (o.vx || 0) * calm + bx * J * k - (X[i * 3 + 2] - czm) * tw * u, vz = (o.vz || 0) * calm + bz * J * k + (X[i * 3] - cxm) * tw * u, vy = (o.vy || 0) + RG.lift * h * s * u * calm + blast * 2.2 * h;
       b.Xp[i * 3] = X[i * 3] - vx * dt; b.Xp[i * 3 + 1] = X[i * 3 + 1] - vy * dt; b.Xp[i * 3 + 2] = X[i * 3 + 2] - vz * dt;
     }
     b.blow = s * Math.sqrt(b.m); b.fly = !!o.fly; b.ten = RG.tension * Math.sqrt(b.m) * (b.fly ? .4 : 1) * (.8 + .4 * hash(r1 * 31, 7));
@@ -81961,8 +81970,8 @@ const FOERAG = (() => {
           X[a + 1] = lim;
           if (it === RG.iter - 1) {
             const v = -vy / dt; if (!b.on[i] && v > b.hitV) b.hitV = v;
-            Xp[a + 1] = v > 1.2 * h && !rg.pdrag[i] ? lim + vy * RG.bounce : lim;   // (a hard landing: a small bounce; else it stays down)
-            const f = Math.max(0, 1 - RG.fric * (rg.pdrag[i] ? 1.6 : 1) * 60 * dt * (1 + 1.5 * late));
+            Xp[a + 1] = v > 1.2 * h && !rg.pdrag[i] ? lim + vy * RG.bounce * b.bounceK : lim;   // (a hard landing: a small bounce; else it stays down)
+            const f = Math.max(0, 1 - RG.fric * b.fricK * (rg.pdrag[i] ? 1.6 : 1) * 60 * dt * (1 + 1.5 * late));
             Xp[a] = X[a] - (X[a] - Xp[a]) * f; Xp[a + 2] = X[a + 2] - (X[a + 2] - Xp[a + 2]) * f; b.on[i] = 1;
           }
         } else if (it === RG.iter - 1 && X[a + 1] > lim + .02 * h) b.on[i] = 0;
@@ -82341,7 +82350,9 @@ const FFM = (() => {
       if (!b) { const keep = []; for (let k = 0; k < nc; k += 3) if (!out.some(q => q.P.tris.has(k))) keep.push(k, k + 1, k + 2); b = subMesh(keep); BODY.set(key, b); } return b; };
     const pieceStart = (P, blow) => {
       const a = (blow.r || 0) * 6.283, sK = Math.min(1.6, blow.s || 1), bl = Math.hypot(blow.bx, blow.bz), dx = bl > .05 ? blow.bx / bl : Math.cos(a), dz = bl > .05 ? blow.bz / bl : Math.sin(a), T = P.toss;
-      return { P, M: null, c0: null, d: [0, 0, 0], v: [dx * (.7 + .5 * sK) * T + (blow.vx || 0) * .5, (2.2 + .7 * sK) * T, dz * (.7 + .5 * sK) * T + (blow.vz || 0) * .5], ax: [dz, 0, -dx], ang: 0, w: P.flat ? 3.4 : 6 + 5 * (blow.r || 0), rest: false, n: 0, hit: 0, to: 0 };
+      /* (a calm family, D.calm: the cap hops off beside the body and lies down at once: a short throw, half a turn at most, no bounce) */
+      const cm = D.calm > 0 ? Math.min(1, D.calm) : 1, hv = (.7 + .5 * sK) * T * (cm < 1 ? .32 : 1), up = (2.2 + .7 * sK) * T * (cm < 1 ? .62 : 1);
+      return { P, M: null, c0: null, d: [0, 0, 0], calm: cm < 1, v: [dx * hv + (blow.vx || 0) * .5 * cm, up, dz * hv + (blow.vz || 0) * .5 * cm], ax: [dz, 0, -dx], ang: 0, w: P.flat ? 3.4 : cm < 1 ? 2.2 + 1.6 * (blow.r || 0) : 6 + 5 * (blow.r || 0), rest: false, n: 0, hit: 0, to: 0 };
     };
     function pieceStep(q, dt) {
       if (!q.c0 || !(dt > 0)) return;
@@ -82351,7 +82362,7 @@ const FFM = (() => {
       const lo = floor();
       if (q.c0[1] + q.d[1] < lo && q.v[1] < 0) {
         q.d[1] = lo - q.c0[1]; q.n++; q.hit++;
-        if (P.flat || -q.v[1] < .9 || q.n > 3) { q.rest = true; q.v[0] = q.v[1] = q.v[2] = 0; q.to = P.flat ? (Math.round(q.ang / Math.PI - .5) + .5) * Math.PI : Math.round(q.ang / Math.PI) * Math.PI; }
+        if (P.flat || q.calm || -q.v[1] < .9 || q.n > 3) { q.rest = true; q.v[0] = q.v[1] = q.v[2] = 0; q.to = P.flat ? (Math.round(q.ang / Math.PI - .5) + .5) * Math.PI : Math.round(q.ang / Math.PI) * Math.PI; }
         else { q.v[1] *= -.45; q.v[0] *= .6; q.v[2] *= .6; q.w *= .55; }
       }
     }
@@ -82415,7 +82426,8 @@ const FFM = (() => {
         const s = c && ST.get(c);
         if (s && s.has) { PA.q.set(s.last.q); PA.t.set(s.last.t); } else sampleT(CL.idle, 0, PA);
         toBones(PA, BUF);
-        const blow = FOERAG.blowOf(k, FLY); k.rag = FOERAG.start(RAG, _W, _O, blow); k.ragT = k.t;
+        const blow = FOERAG.blowOf(k, FLY); if (D.calm) blow.calm = D.calm;   // (a family whose deaths stay where they fell)
+        k.rag = FOERAG.start(RAG, _W, _O, blow); k.ragT = k.t;
         if (PIECES.length && CAP.on) { k.loose = []; for (const P of PIECES) if (P.always || (!(c && c.def && c.def.boss) && (blow.blast || blow.r < (blow.s > 1.2 ? .75 : CAP.odds)))) k.loose.push(pieceStart(P, blow)); }
       }
       const dtR = Math.max(0, Math.min(.1, k.t - k.ragT));
