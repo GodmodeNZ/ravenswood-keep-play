@@ -1,4 +1,4 @@
-const BUILD_TAG = '011f0138@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '46b09854@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1383,17 +1383,18 @@ const bossWave = n => !oldRules() && ((n - 1) % 50 + 1) % 5 === 0;   // TROOP_MO
    them at strength (swift 22, burrowers 24, flyers 13). A boss wave may bring its own flying escort (Ossyra, the Void Wyrm); no
    other wave brings what is not its cadence's (sim/formation_test.py holds WAVES to it). The forecast shows the next of each
    (forecast.js fcCadence). The same on every map and rite; Classic and Tower Wars keep their own marches. has(d, g): a troop group
-   that counts for it */
+   that counts for it (every kind has one, so a march that drops it, e.g. a region's first place with no boss, breaks the rule
+   and the forecast does not claim it: tools/check_cadence_promise.js); gate(n): the wave must also be one (elites: eliteWave) */
 const CADENCE = [
-  { k: 'boss', n: 'Boss', say: 'A boss every 5th wave', at: m => m % 5 === 0 },
-  { k: 'elite', n: 'Elites', say: 'Elites every 3rd wave', at: m => m % 3 === 0 },
+  { k: 'boss', n: 'Boss', say: 'A boss every 5th wave', at: m => m % 5 === 0, has: d => d.boss },
+  { k: 'elite', n: 'Elites', say: 'Elites every 3rd wave', at: m => m % 3 === 0, has: d => !d.boss && !d.lead, gate: n => eliteWave(n) },
   { k: 'fly', n: 'Flyers', say: 'Flyers on every wave ending in 3 or 8', at: m => m >= 8 && m % 5 === 3, has: (d, g) => d.fly && !d.boss && !d.lead },
   { k: 'dig', n: 'Burrowers', say: 'Burrowers on every wave ending in 4', at: m => m % 10 === 4, has: d => d.burrow && !d.boss && !d.lead },
   { k: 'swift', n: 'Swift', say: 'Swift troops on every wave ending in 2', at: m => m % 10 === 2, has: (d, g) => g.swift },
 ];
 const cadM = n => (n - 1) % 50 + 1;
 // wave n of the march (as built, without a challenge's twist) brings cadence C's kind
-function cadHas(C, n) { if (!C.has) return C.at(cadM(n)); const q = typeof G !== 'undefined' && G ? G.qx : null; try { if (q) G.qx = null; return waveSpec(n).some(g => CREEPS[g.type] && C.has(CREEPS[g.type], g)); } finally { if (q) G.qx = q; } }
+function cadHas(C, n) { if (C.gate && !C.gate(n)) return false; if (!C.has) return C.at(cadM(n)); const q = typeof G !== 'undefined' && G ? G.qx : null; try { if (q) G.qx = null; return waveSpec(n).some(g => CREEPS[g.type] && C.has(CREEPS[g.type], g)); } finally { if (q) G.qx = q; } }
 // the waves of this march that break cadence C (a boss wave may carry flyers): none, and the forecast may say the rule
 function cadBreaks(C, upTo) { const out = []; for (let n = 1; n <= (upTo || 50); n++) { const want = C.at(cadM(n)), got = cadHas(C, n); if (want !== got && !(got && C.k === 'fly' && bossWave(n))) out.push(n); } return out; }
 function waveSpec(n, plain) {   // plain: as if it were not an elite wave (the elite tag's health multiple reads it)
@@ -69663,6 +69664,10 @@ void main(){
   float sh = uShadowOn>.5 ? shadowAt(vL) : 1.;
   vec3 V = normalize(uCam - vW);
   float h = clamp(vOP.y, 0., 1.);   // the model stands 0..1 tall in its own space
+  if(vEm < -.5){   // scenery (a mesh's ext.x -1: the Thornhive in 3D, hive3d.js): the engine's own light, so cast shadows fall on it at full strength; none of the units' stylising
+    vec3 c = base*lightAt(n, vW, sh, 0.)*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
+    o = vec4(finish(c, vW), vX.x); return;
+  }
   if(uSty < .5){   // the plain path (to compare): the engine's light on the painted texture
     vec3 c = base*lightAt(n, vW, sh, 0.)*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, 1.);
     c = mix(c, vCol*(2.6 + vX.z*2.), max(vEm, 0.));
@@ -70756,8 +70761,9 @@ function createRenderer(canvas, opt = {}) {
             gl.activeTexture(gl.TEXTURE7);   // (made on its own unit: on unit 0 it would push the shadow map out, and the context would refuse every sculpted draw left this frame)
             h.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, h.tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            const af = gl.getExtension('EXT_texture_filter_anisotropic'); if (af) gl.texParameterf(gl.TEXTURE_2D, af.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(4, gl.getParameter(af.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+            const wr = mesh.texWrap === 'mirror' ? gl.MIRRORED_REPEAT : gl.CLAMP_TO_EDGE;   // (a floor whose texture runs on past its edges, mirrored: src/hive3d.js)
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wr); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wr);
+            const af = gl.getExtension('EXT_texture_filter_anisotropic'); if (af) gl.texParameterf(gl.TEXTURE_2D, af.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mesh.texWrap ? 8 : 4, gl.getParameter(af.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
           }
           gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, h.tex); gl.activeTexture(gl.TEXTURE0);
           gl.bindVertexArray(h.vao);
@@ -76558,6 +76564,208 @@ function grPaintBack(cv, C) {
   gr = g.createLinearGradient(xV, 0, xV + vw, 0); gr.addColorStop(0, 'rgba(255,226,160,.3)'); gr.addColorStop(.7, 'rgba(255,226,160,0)'); g.globalCompositeOperation = 'soft-light'; g.fillStyle = gr; g.fillRect(0, yH, w, fh); g.globalCompositeOperation = 'source-over';
   for (let i = 0; i < w * h / 500; i++) { const x = rnd() * w, y = rnd() * h, L = 2 + rnd() * 5, a = rnd() * Math.PI; g.strokeStyle = rnd() < .5 ? 'rgba(255,255,240,.04)' : 'rgba(0,30,30,.04)'; g.lineWidth = 1 + rnd(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); }
 }
+
+/* ================= THE THORNHIVE IN 3D: the owner's scene as the battlefield (a trial) =================
+   Owner, 25 Nov 2026: "can we try this new 3d map": the Thornhive's glade as a real 3D scene (the hive, ancient oaks, ferns,
+   sedges, boulders, a brook and its fall on a moss floor) in place of its painting. The data is hive3ddata.js (HIVE3D, a split
+   asset in the `maps` group, from tools/make_thornhive3d.py: each mesh once, decimated, its texture shrunk, and a matrix an
+   object). Here the instances are laid out once into a few big static meshes, one a texture, and handed to the view as the
+   theme's scenery (ENV.wild): drawn by the textured sculpt pass with the game's own sun, sky and shadows, as the units are.
+     the fit      game x = scene x * S + DX, z = scene z * S + DZ (HIVE3D.fit): the hive's mouth at the field's head, its centre
+                  line the field's; foes come out of the mouth (HIVE3D.entry);
+     the floor    kept exactly level over the field (the game's ground marks, cells and shadows lie on y 0) and let rise outside;
+     shadows      the oaks and the hive cast them; the ferns, sedges and stones only receive.
+   The painted Thornhive stays as it was and is the fallback: ?hive=paint, or a device without the data. THEMES.thornhive is the
+   3D one when this file's data is in; the painted theme is kept as THEMES.thornhive_paint.
+   Life: the sedges and rushes sway, the water's surface shifts, a soft amber glow breathes at the hive's pods, and the forest's
+   own motes and falling leaves drift (the theme's amb). Not carried over from the scene: its normal and roughness maps, its
+   lights, the water's glints. The ferns and the oaks' leaves stand still. */
+const HIVE3D_ON = (() => { try { return new URLSearchParams(location.search).get('hive') !== 'paint'; } catch (e) { return true; } })();
+const hive3dWanted = () => HIVE3D_ON && typeof deskHud === 'function' && deskHud();
+function hive3dBuild() {
+  const D = HIVE3D, S = D.fit.S, DX = D.fit.DX, DZ = D.fit.DZ;
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  // each mesh once, unpacked
+  const MS = D.meshes.map(m => {
+    const q = new Int16Array(b64(m.pos)), n8 = new Int8Array(b64(m.nor)), uv = new Float32Array(b64(m.uv)), idx = m.nv > 65535 ? new Uint32Array(b64(m.idx)) : new Uint16Array(b64(m.idx)), P = new Float32Array(m.nv * 3);
+    for (let i = 0; i < m.nv; i++) for (let e = 0; e < 3; e++) P[i * 3 + e] = m.min[e] + (q[i * 3 + e] + 32768) / 65535 * (m.max[e] - m.min[e]);
+    return { m, P, n8, uv, idx, vc: m.vc ? new Uint8Array(b64(m.vc)) : null };
+  });
+  // the groups: one big mesh a texture (or a flat colour), counted first
+  const key = m => m.img || 'flat', G_ = {}, floorOf = m => /moss floor/i.test(m.name), waterOf = m => /brook|waterfall|rivulet|cascade/i.test(m.name);
+  // (small things the scene set down on the field itself, a fern or a stone inside the cells, are left out: nothing may stand where units are built)
+  const small = m => !floorOf(m) && !waterOf(m) && !/oak|hive|briar|thorn/i.test(m.name), onField = o => { const x = o[4] * S + DX, z = o[12] * S + DZ; return x > -.4 && x < COLS + .4 && z > -.3 && z < ROWS + .6; };
+  /* Shade, baked a vertex (owner: "more shadows under the trees like the original", "the impression of more larger trees
+     surrounding the space"): the game's shadow map covers the field only, so under each oak's crown, round the hive and out
+     toward the scene's edge the ground and everything on it is darkened here, once. */
+  const SH = [];
+  for (const o of D.objs) { const m = MS[o[0]].m, sc = Math.hypot(o[1], o[5], o[9]) * S, big = /oak/i.test(m.name), hv = /hive/i.test(m.name); if (!big && !hv) continue;
+    SH.push([o[4] * S + DX, o[12] * S + DZ, Math.max(m.max[0] - m.min[0], m.max[2] - m.min[2]) * .5 * sc * (big ? .7 : .7), big ? .3 : .25]); }
+  const shadeAt = (x, z) => { let k = 1; for (const q of SH) { const d = Math.hypot(x - q[0], z - q[1]) / q[2]; if (d < 1) { const u = 1 - d; k *= 1 - q[3] * u * u * (3 - 2 * u); } }
+    const ex = (x - COLS / 2) / 21, ez = (z - 6.5) / 15.5, e = Math.max(0, Math.min(1, (Math.hypot(ex, ez) - .72) / .5)); return Math.max(.1, k) * (1 - .62 * e * e * (3 - 2 * e)); };   // (the fall-off to the edge also sinks the floor's far skirt, where its texture repeats mirrored as the scene's own sampler says)
+  const WAT = { pos: [], col: [], k: [] };
+  for (const o of D.objs) { const M = MS[o[0]], k = key(M.m); if (small(M.m) && onField(o)) continue;
+    if (waterOf(M.m)) { const fall = /waterfall|rivulet|cascade/i.test(M.m.name) ? 1 : 0;
+      for (let t = 0; t < M.idx.length; t++) { const v = M.idx[t], x = M.P[v * 3], y = M.P[v * 3 + 1], z = M.P[v * 3 + 2], X = (o[1] * x + o[2] * y + o[3] * z + o[4]) * S + DX, Y = (o[5] * x + o[6] * y + o[7] * z + o[8]) * S, Z = (o[9] * x + o[10] * y + o[11] * z + o[12]) * S + DZ;
+        WAT.pos.push(X, Y, Z); WAT.k.push(fall); const c = M.vc; WAT.col.push(c ? c[v * 3] / 255 : .3, c ? c[v * 3 + 1] / 255 : .6, c ? c[v * 3 + 2] / 255 : .6, shadeAt(X, Z)); }
+      continue; } (G_[k] = G_[k] || { n: 0, objs: [], img: M.m.img }).n += M.idx.length; G_[k].objs.push(o); }
+  const out = [];
+  for (const k in G_) {
+    const g = G_[k], n = g.n, pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), uv = new Float32Array(n * 2), ext = new Float32Array(n * 2); let w = 0, mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+    for (const o of g.objs) {
+      const M = MS[o[0]], m = M.m, floor = floorOf(m), water = waterOf(m), sway = !m.img && /sedge|woodrush/i.test(m.name);
+      // How bright each part is drawn. The sculpt pass lights a painted texture hard (it was made for the units' dark bakes),
+      // and darkens a model toward its feet (local y 0): right for a tree or a stone, wrong for the floor itself. So every
+      // part carries its own factor in its vertex colour: H3K, found by eye against the owner's own render of the scene.
+      const K = floor ? H3K.floor : /oak/i.test(m.name) ? H3K.oak : /hive/i.test(m.name) ? H3K.hive : /fern/i.test(m.name) ? H3K.fern : m.img ? H3K.rock : water ? H3K.water : H3K.flat;
+      const c = m.img ? [K, K, K] : [m.col[0] * K, m.col[1] * K, m.col[2] * K], vcol = M.vc;
+      for (let t = 0; t < M.idx.length; t++, w++) {
+        const v = M.idx[t], x = M.P[v * 3], y = M.P[v * 3 + 1], z = M.P[v * 3 + 2];
+        let X = (o[1] * x + o[2] * y + o[3] * z + o[4]) * S + DX, Y = (o[5] * x + o[6] * y + o[7] * z + o[8]) * S, Z = (o[9] * x + o[10] * y + o[11] * z + o[12]) * S + DZ;
+        if (floor) {      // level over the field, rising again over a cell and a half past its edge
+          const dx = Math.max(0, -1 - X, X - (COLS + 1)), dz = Math.max(0, -3 - Z, Z - (ROWS + 1.5)), u = Math.min(1, Math.hypot(dx, dz) / 1.5), k2 = u * u * (3 - 2 * u);
+          Y = Y * k2;
+        } else if (water) Y = Math.min(Y, -.02);
+        pos[w * 3] = X; pos[w * 3 + 1] = Y; pos[w * 3 + 2] = Z;
+        // (life: the sedges and rushes sway in the breeze, most at their tips, and the water's surface shifts a little: the plain lit pass's own sway, a vertex's weight in its spare attribute; the textured ferns and oaks stand still)
+        if (sway) ext[w * 2 + 1] = .9 * Math.max(0, Math.min(1, (y - m.min[1]) / Math.max(.05, m.max[1] - m.min[1]))) ** 1.5; else if (water) ext[w * 2 + 1] = .12;
+        const nx = M.n8[v * 3] / 127, ny = M.n8[v * 3 + 1] / 127, nz = M.n8[v * 3 + 2] / 127; let a = o[1] * nx + o[2] * ny + o[3] * nz, b = o[5] * nx + o[6] * ny + o[7] * nz, c2 = o[9] * nx + o[10] * ny + o[11] * nz; const l = 1 / (Math.hypot(a, b, c2) || 1);
+        nor[w * 3] = a * l; nor[w * 3 + 1] = b * l; nor[w * 3 + 2] = c2 * l;
+        const sd = /oak|hive/i.test(m.name) ? (/oak/i.test(m.name) ? .5 + .5 * Math.min(1, Math.max(0, (Y - .5) / 5)) : 1) * (.6 + .4 * shadeAt(X, Z)) : shadeAt(X, Z);   // (an oak: its trunk and roots in its own crown's shade, the crown's top in the sun)   // (a tree is not darkened by its own crown as the ground under it is)
+        if (vcol) { col[w * 3] = vcol[v * 3] / 255 * K * sd; col[w * 3 + 1] = vcol[v * 3 + 1] / 255 * K * sd; col[w * 3 + 2] = vcol[v * 3 + 2] / 255 * K * sd; } else { col[w * 3] = c[0] * sd; col[w * 3 + 1] = c[1] * sd; col[w * 3 + 2] = c[2] * sd; }
+        if (m.img) ext[w * 2] = -1;   // (scenery: the plain engine light and full shadows, gl.js FS_STY)
+        uv[w * 2] = M.uv[v * 2]; uv[w * 2 + 1] = M.uv[v * 2 + 1];
+        if (X < mn[0]) mn[0] = X; if (Y < mn[1]) mn[1] = Y; if (Z < mn[2]) mn[2] = Z; if (X > mx[0]) mx[0] = X; if (Y > mx[1]) mx[1] = Y; if (Z > mx[2]) mx[2] = Z;
+      }
+    }
+    const mesh = { pos, nor, col, ext, count: n, min: mn, max: mx, gl: new Map(), hive3d: k, cast: !/moss/i.test(k) };   // (everything but the floor casts a shadow: owner, of their own render, "shadows should be as they are here")
+    if (g.img && D.tex[g.img] && typeof Image !== 'undefined') { const im = new Image(); im.decoding = 'async'; im.src = D.tex[g.img]; mesh.uv = uv; mesh.tex = im; if (/moss/i.test(g.img)) mesh.texWrap = 'mirror'; }
+    out.push(mesh);
+  }
+  // the shadow casters first (view.js: the first two of a theme's scenery cast): the oaks, the hive
+  const rank = m => /oak/i.test(m.hive3d) ? 0 : /hive/i.test(m.hive3d) ? 1 : 2; out.sort((a, b) => rank(a) - rank(b));
+  const gr = new Geo(1); gr.jit = 0; gr.quad([-60, -1.6, -50], [-60, -1.6, 60], [70, -1.6, 60], [70, -1.6, -50], '#16220f');   // (far under the floor: what shows past the scene's edge)
+  H3W.data = WAT; H3W.vao = null;
+  return { ground: gr.finish(), wild: out, deco: new Geo(73).finish(), trees: [], fx: null };
+}
+/* ---- the brook and its fall: their own pass (owner: "better water, reflections in the water, a bit of caustics/ripples").
+   Drawn after the scenery, lit and fogged by the game's own light (LIGHT_GLSL: its shadows and the canopy's dapple fall on it).
+     ripples      two layers of small waves running downstream; they tilt the surface, so everything below wobbles;
+     reflection   the sky and the dark of the crowns overhead, by the angle of view (more at a glancing angle), broken by the ripples;
+     caustics     a moving net of light on the bed where the water is shallow and the sun reaches it;
+     glints       the sun's sparkle on the wave tops;  the fall: white water streaking down, foam where it lands.
+   No second render of the scene: the reflection is of a made sky and canopy, not of the real trees. */
+const H3W = { data: null, vao: null, n: 0, prog: null, bad: false };
+const H3W_VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec4 aCol; layout(location=2) in float aK;
+uniform mat4 uVP, uLVP; uniform float uTime;
+out vec3 vW; out vec4 vCol; out vec4 vL; out float vK;
+${typeof BEND_GLSL !== 'undefined' ? BEND_GLSL : 'vec3 bendW(vec3 w){ return w; }'}
+void main(){ vW = aPos; vCol = aCol; vK = aK; vL = uLVP*vec4(aPos, 1.); gl_Position = uVP*vec4(bendW(aPos), 1.); }`;
+const H3W_FS = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vW; in vec4 vCol; in vec4 vL; in float vK; uniform float uTime;
+out vec4 o;
+${typeof LIGHT_GLSL !== 'undefined' ? LIGHT_GLSL : ''}
+float wN(vec2 p){ return ckN(p); }
+float wF(vec2 p){ return wN(p)*.6 + wN(p*2.1 + 3.7)*.3 + wN(p*4.3 + 1.3)*.1; }
+float wH(vec2 p, float t){ vec2 fl = vec2(.05, .3)*t; return wF(p*.9 - fl)*.7 + wF(p*2.3 - fl*1.6 + 5.)*.3; }
+void main(){
+  float t = uTime; vec2 p = vW.xz; float sh = (uShadowOn > .5 ? shadowAt(vL) : 1.)*vCol.a;
+  vec3 V = normalize(uCam - vW);
+  if(vK > .5){   // the fall: white water streaking down its face
+    float st = wN(vec2(p.x*7., vW.y*2.5 + p.y*5. - t*3.2)), st2 = wN(vec2(p.x*15. + 3., vW.y*4. + p.y*8. - t*4.6));
+    vec3 c = mix(vec3(.08, .3, .32), vec3(.6, .72, .72), smoothstep(.35, .9, st*.65 + st2*.45));
+    o = vec4(finish(c*(.35 + .65*sh), vW), 1.); return;
+  }
+  float e = .07, h0 = wH(p, t), hx = wH(p + vec2(e, 0.), t), hz = wH(p + vec2(0., e), t);
+  vec3 n = normalize(vec3(-(hx - h0)/e*.045, 1., -(hz - h0)/e*.045));
+  // the bed, seen through: deep jade in the middle, paler and warmer where it is shallow; the ripples bend what is under them
+  vec2 pb = p + n.xz*2.; float shal = clamp(dot(vCol.rgb, vec3(.2, .5, .3))*1.6 - .25 + (wN(pb*.45 + 2.) - .5)*.5, 0., 1.);
+  vec3 body = mix(vec3(.008, .075, .068), vec3(.05, .27, .2), shal)*(.45 + .55*sh);
+  // caustics: a net of light where two moving fields cross
+  float c1 = wN(pb*1.3 + vec2(0., t*.22)), c2 = wN(pb*1.3 + vec2(t*.17, 0.) + 4.3);
+  body += vec3(.45, .8, .6)*pow(1. - abs(c1 - c2), 26.)*.16*sh*(.25 + .75*shal);
+  // what it mirrors: sky between the crowns, by the angle
+  vec3 R = reflect(-V, n); vec2 q = R.xz/max(R.y, .2)*1.4 + p*.1;
+  float can = smoothstep(.4, .6, wF(q*1.2 + 7.));
+  vec3 env = mix(vec3(.15, .33, .34), vec3(.02, .08, .04), can)*(.55 + .45*sh);
+  float fr = .1 + .75*pow(1. - max(dot(n, V), 0.), 3.);
+  vec3 c = mix(body, env, fr);
+  vec3 H = normalize(uSunDir + V); c += uSunCol*pow(max(dot(n, H), 0.), 900.)*.6*sh;
+  o = vec4(finish(c, vW), 1.);
+}`;
+function hive3dWater(R) {
+  const W_ = H3W.data; if (!W_ || !W_.pos.length || H3W.bad || typeof TH === 'undefined' || !TH || !TH.is3d) return;
+  const gl = R.gl;
+  try {
+    if (!H3W.prog) {
+      const mk = (t, src) => { const sh = gl.createShader(t); gl.shaderSource(sh, src); gl.compileShader(sh); if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh)); return sh; };
+      const pr = gl.createProgram(); gl.attachShader(pr, mk(gl.VERTEX_SHADER, H3W_VS)); gl.attachShader(pr, mk(gl.FRAGMENT_SHADER, H3W_FS)); gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+      const u = {}, n = gl.getProgramParameter(pr, gl.ACTIVE_UNIFORMS); for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(pr, i); u[info.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(pr, info.name); }
+      H3W.prog = { p: pr, u };
+    }
+    if (!H3W.vao) {
+      H3W.vao = gl.createVertexArray(); gl.bindVertexArray(H3W.vao); H3W.n = W_.pos.length / 3;
+      const buf = (loc, arr, nc) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, nc, gl.FLOAT, false, 0, 0); };
+      buf(0, W_.pos, 3); buf(1, W_.col, 4); buf(2, W_.k, 1); gl.bindVertexArray(null);
+    }
+    const P = H3W.prog; gl.useProgram(P.p); R.litUniforms(P.u); if (P.u.uTime) gl.uniform1f(P.u.uTime, typeof vt !== 'undefined' ? vt : 0);
+    gl.bindVertexArray(H3W.vao); gl.drawArrays(gl.TRIANGLES, 0, H3W.n); gl.bindVertexArray(null); if (R.stats) R.stats.draws++;
+  } catch (e) { H3W.bad = true; if (typeof console !== 'undefined') console.warn('Thornhive water: ' + e.message); }
+}
+function hive3dHook() {
+  if (H3W.hooked || typeof RD === 'undefined' || !RD || typeof RD.drawSculpted !== 'function') return;
+  H3W.hooked = true; const _ds = RD.drawSculpted;
+  RD.drawSculpted = function (list) { const r = _ds.apply(this, arguments); hive3dWater(this); return r; };
+}
+const H3K = { floor: .62, oak: .5, hive: .7, fern: .55, rock: .6, water: .5, flat: .4 };
+/* Its own light (owner, on the first look, which still wore the painted map's light: "would like nicer more beautiful
+   lighting rather than a sepia/yellow overlay"). The painted Thornhive lights only the units, on a painting that carries its
+   own light, with a deep amber sun; laid over a whole 3D glade that sun turned everything sepia. Here: a near-white sun a
+   touch warm, a cool sky in the shade (so sunlit and shaded sides differ in hue, not only in brightness), green bounce off
+   the moss, no colour grade, no warm tone, no god rays or fog tint; ambient occlusion and soft shadows do the modelling. */
+const H3_LIGHT = { sun: '#fff0dc', sunI: 1.05, az: 128, el: 52, rim: .26, fill: .1, ground: 1, paint: 1, sky: '#b4c8d0', skyI: .62, gnd: '#5a7a4a', gndI: .32, fog: '#6f9690', fogNear: .9, fogFar: 2.1, woods: 0, lamps: 1, expo: 1, rays: 0, ray: '#ffe2a8', dap: .1, dapS: 4.4, dapV: .55, dapE: .2 };   // (dap: the dapple of crowns far overhead, swaying: the game's shadow map only knows the scene's own trees)
+const H3_MOOD = { top: '#b8d0dc', topK: .08, key: '#fff0d0', keyK: .05, bounce: '#7cae4c', bounceK: .1, env: 0 };
+function hive3dLook() {
+  const L = JSON.parse(JSON.stringify(LOOK_DEF.greatroot));
+  Object.assign(L.fwd, { shFloor: .34, shSoft: 3.6, shQ: 1, back: '#d4e6ff', backI: .3 });
+  L.post.ao = { on: 1, strength: 1.0, radius: .55, bias: .03, power: 1.3, ground: .5 }; L.post.bloom = { on: 1, thr: .9, strength: .06, radius: 1.6 };
+  L.post.tone = { on: 1, ev: 0, contrast: 1.0, sat: .8, warm: 0, tint: 0 }; L.post.tone.ev = -.05; L.post.vig = { on: 1, str: .2, rad: .8, soft: .8 };
+  return L;
+}
+function hive3dApply() {
+  if (!hive3dWanted() || typeof HIVE3D === 'undefined' || typeof THEMES === 'undefined' || !THEMES.thornhive || THEMES.thornhive.is3d) return;
+  const P = THEMES.thornhive; THEMES.thornhive_paint = P;
+  THEMES.thornhive = Object.assign({}, P, {
+    is3d: true, painted: null, perch: null, shadowBox: [5.5, 5, 23],
+    fitTop: -9.5, fitBot: ROWS + 4.2, fitOut: 1.02, camX: COLS / 2, viewW: 40,
+    sunCol: [1.12, 1.06, .96], sky: [.28, .36, .4], gnd: [.13, .2, .13],
+    // mist round the glade's edges (owner: "a bit of fog around the edges of the map"): slow pale drifts under the trees, none over the field (view.js: a theme's own mist)
+    mistCol: [.62, .78, .76], mistAt: [[-13, 1.2, -6, 9, 4, .3], [-17, 1.0, 2, 9, 4, .32], [-16, 1.0, 11, 10, 4, .32], [-9, .9, 18.5, 10, 3.6, .28], [3, .9, 20.5, 11, 3.4, .26], [14, .9, 19.5, 11, 3.6, .28],
+      [25, 1.0, 13, 10, 4, .32], [28, 1.0, 4, 9, 4, .32], [25, 1.2, -6, 9, 4, .3], [14, 1.6, -11, 9, 4, .24], [-4, 1.6, -11, 9, 4, .24]],
+    mistSwirl: [[-14, 1.1, 6, 3.2, 4], [26, 1.1, 8, 3.2, 4]],
+    build: hive3dBuild,
+  });
+  if (typeof LIGHT_DEF !== 'undefined') { LIGHT_DEF.thornhive_paint = LIGHT_DEF.thornhive; LIGHT_DEF.thornhive = H3_LIGHT; MAP_MOOD.thornhive_paint = MAP_MOOD.thornhive; MAP_MOOD.thornhive = H3_MOOD;
+    if (LOOK_DEF.greatroot) { LOOK_DEF.thornhive_paint = LOOK_DEF.thornhive; LOOK_DEF.thornhive = hive3dLook(); } }
+  if (typeof MAPS !== 'undefined' && MAPS.thornhive) Object.assign(MAPS.thornhive, { entry: HIVE3D.entry, tun: [.3, 2.4], blurb: 'A glade before the hive, amber-lit, humming' });
+}
+assetReady('hive3ddata', hive3dApply); assetReady('hivepaint', hive3dApply);
+if (typeof setInterval === 'function') { const iv = setInterval(() => { try { hive3dHook(); if (H3W.hooked) clearInterval(iv); } catch (e) {} }, 500); }
+/* Desktop only (owner: "mobile can just be painted backdrops anyway as you cant really see it, 3d can just be desktop"): the 3D
+   data is its own split asset (group `map3d`), asked for when the region map opens on a desktop (view.js deskHud: a mouse, a
+   window of a desktop's size), so a phone never downloads it and keeps the painting. */
+if (typeof rgOpen === 'function') {
+  const _h3Rg = rgOpen;
+  rgOpen = function () {
+    const a = arguments, self = this, st = typeof LAZY !== 'undefined' && LAZY.state ? LAZY.state.hive3ddata : null;
+    if (!hive3dWanted() || st == null || st >= 2 || typeof needAssets !== 'function') return _h3Rg.apply(self, a);
+    needAssets('map3d', { show: 'Loading the Thornhive' }).then(() => _h3Rg.apply(self, a), () => _h3Rg.apply(self, a));
+  };
+}
+if (typeof setTimeout === 'function') setTimeout(() => { try { hive3dApply(); } catch (e) {} }, 0);   // (a build with everything inline runs the callbacks above before view.js's deskHud exists)
 
 /* Dungeon leaders' own bodies, group 1 (spectres and flyers): bonewarden, mirrorwitch, abbess, keening, voltaris, nightwing.
    Each is CREEP_EXTRA.<id>; the end of the file patches CREEPS.<id> (drops the borrowed `base`, sets scl/tint) and LEAD_CH. */
@@ -87466,7 +87674,7 @@ function applyLight() {
   RD.cookie = L.dap > 0 && !mapLite() ? [L.dap, 2 * (TH.paint ? 16 : 14.5) / Math.max(.3, L.dapS || 2.6), L.dapV == null ? .5 : L.dapV, Math.max(.02, L.dapE || .16)] : null;
   RD.clear = RD.fogCol.map(v => { const x = v * 1.05; return Math.pow(Math.min(1, (x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14)), 1 / 2.2); });
   RD.fog = [CAM.dist * L.fogNear, CAM.dist * (L.fogFar != null ? L.fogFar : L.fogNear + .95)];   // (fogFar: the Light Lab's fog end; unset, as it always was)
-  RD.setShadowBox(5.5, TH.paint ? 4 : 6.5, TH.paint ? 16 : 14.5);
+  if (TH.shadowBox) RD.setShadowBox(TH.shadowBox[0], TH.shadowBox[1], TH.shadowBox[2]); else RD.setShadowBox(5.5, TH.paint ? 4 : 6.5, TH.paint ? 16 : 14.5);   // (shadowBox: a theme whose whole scene casts and takes shadows, not the field alone)
 }
 // the Lighting panel calls this on every slider move; the painted backdrop is redrawn once the hand settles
 let _rpT = 0;
@@ -87966,7 +88174,7 @@ function renderView(dt) {
           const an = r0 * 6.28 + dir * (u * 5.2 + Math.sin(vt * .2 + j) * .4), rr = reach * Math.pow(u, .8), sz2 = .28 + u * .7;
           QA.bill(RD, sx + Math.cos(an) * rr * (1 + .5 * r0), sy + Math.sin(an) * rr * .5 - u * .5, sz, sz2, sz2 * .8, [mc[0], mc[1], mc[2], .34 * Math.sin(Math.PI * Math.min(1, u * 1.05)) * (1 - q * .13)], 1, 0); } } } }
   if (TH.id === 'clearing') {} else if (TH.ward && typeof edgeWard === 'function') edgeWard(TH.ward, TH.wardBare ? -1 : ROWS + 1.55);   // (a map's own colour; a 3D map's waystones, none on a painting)
-  ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 }));
+  ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 || !!m.cast }));   // (m.cast: a scene whose every piece casts, the Thornhive in 3D: hive3d.js)
   const walkIn = MAPS[G.map] && MAPS[G.map].entry;   // (a map foes walk into from the woods has no portal)
   if (!SCENE_OFF) { item(ENV.deco, _I, { shadow: false }); if (!walkIn) item(ENV.portal, _I); if (!TH.noKeep) item(ENV.keep, _I); }   // (the FX Lab side view hides the scenery)
   // lights
@@ -95110,23 +95318,29 @@ const FC_CAD = { boss: ['boss', '#ff6a4a'], elite: ['lead', FC_ELITE], fly: ['fl
 const FC_CAD_AHEAD = 5;
 // (checked each time the row is redrawn, once a wave or phase: a region's family or a forest faction changes the march under it)
 function fcCadOk() { const o = {}; for (const C of CADENCE) { let ok = false; try { ok = !cadBreaks(C).length; } catch (e) { ok = false; } o[C.k] = ok; } return o; }
-// the cadence's kinds due from wave n0 on (within FC_CAD_AHEAD waves), soonest first: [{ C, at }]
+// the last wave this run will fight (a region battle ends at its last wave), and the wave on the field now (0 in the build phase)
+const fcCadEnd = () => Math.min(MAX_WAVE, typeof G !== 'undefined' && G && G.region && G.region.w1 ? G.region.w1 : MAX_WAVE);
+const fcCadCur = () => typeof G !== 'undefined' && G && G.phase !== 'build' ? G.wave | 0 : 0;
+// "this wave" (the wave being fought, or in the build phase the one the horn calls), "next wave" (the one after it, while a wave is on), "wave 14"
+function fcCadWhen(at) { const cur = fcCadCur(), nx = cur || (typeof G !== 'undefined' && G ? G.wave | 0 : 0); return at === nx ? 'this wave' : cur && at === cur + 1 ? 'next wave' : 'wave ' + at; }
+// the cadence's kinds due from wave n0 on (within FC_CAD_AHEAD waves), soonest first: [{ C, at }]. While a wave is on, from that
+// wave (its own specials read "this wave"). None in a Hunt (its waves are the quarry's escort) or Act II; never past the battle's end
 function fcCadence(n0) {
-  if (fcOld() || typeof CADENCE === 'undefined' || !n0 || n0 > MAX_WAVE || (typeof G !== 'undefined' && G && (G.endless || (typeof a2On === 'function' && a2On())))) return [];
-  const ok = fcCadOk(), out = [];
-  for (const C of CADENCE) { if (!ok[C.k]) continue; for (let m = n0; m < n0 + FC_CAD_AHEAD && m <= MAX_WAVE; m++) if (C.at(m)) { out.push({ C, at: m }); break; } }
+  if (fcOld() || typeof CADENCE === 'undefined' || !n0 || n0 > MAX_WAVE || (typeof G !== 'undefined' && G && (G.endless || G.hunt || (typeof a2On === 'function' && a2On())))) return [];
+  const ok = fcCadOk(), out = [], from = Math.min(n0, fcCadCur() || n0), end = fcCadEnd();
+  for (const C of CADENCE) { if (!ok[C.k]) continue; for (let m = from; m < n0 + FC_CAD_AHEAD && m <= end; m++) if (C.at(m)) { out.push({ C, at: m }); break; } }
   return out.sort((a, b) => a.at - b.at);
 }
 function fcCadHTML(n0) {
   const L = fcCadence(n0); if (!L.length) return '';
-  return `<span class="fc-cads" role="list" aria-label="Special waves ahead">${L.map(({ C, at }) => { const [gl, c] = FC_CAD[C.k] || ['boss', '#ccc'];
-    return `<button type="button" role="listitem" class="fc-cd${at === n0 ? ' now' : ''}" style="--c:${c}" data-fc="cad:${C.k}" aria-label="${fcEsc(`${C.n}: ${at === n0 ? 'next wave' : 'wave ' + at}. ${C.say}.`)}">${fcSvg(gl)}<span>${fcEsc(C.n)} ${at === n0 ? '<em>next</em>' : at}</span></button>`; }).join('')}</span>`;
+  return `<span class="fc-cads" role="list" aria-label="Special waves ahead">${L.map(({ C, at }) => { const [gl, c] = FC_CAD[C.k] || ['boss', '#ccc'], w = fcCadWhen(at), now = w === 'this wave';
+    return `<button type="button" role="listitem" class="fc-cd${now ? ' now' : ''}" style="--c:${c}" data-fc="cad:${C.k}" aria-label="${fcEsc(`${C.n}: ${w}. ${C.say}.`)}">${fcSvg(gl)}<span>${fcEsc(C.n)} <i>·</i> ${now ? '<em>this wave</em>' : fcEsc(w)}</span></button>`; }).join('')}</span>`;
 }
 function fcCadCardHTML(k) {
   const ws = fcWaves(), C = typeof CADENCE !== 'undefined' && CADENCE.find(x => x.k === k); if (!C || !ws.length) return '';
-  const nx = []; for (let m = ws[0]; m <= MAX_WAVE && nx.length < 3; m++) if (C.at(m)) nx.push(m);
-  const c = (FC_CAD[k] || [])[1] || '#ccc';
-  return `<h4>${fcEsc(C.n)} <em class="fcc-tag" style="--c:${c}">${nx[0] === ws[0] ? 'Next wave' : 'Wave ' + nx[0]}</em></h4><p class="fcc-d">${fcEsc(C.say)}.</p>${nx.length ? `<p class="fcc-c"><b>Coming:</b> wave${nx.length > 1 ? 's' : ''} ${nx.join(', ')}</p>` : ''}`;
+  const nx = [], end = fcCadEnd(); for (let m = Math.min(ws[0], fcCadCur() || ws[0]); m <= end && nx.length < 3; m++) if (C.at(m)) nx.push(m);
+  const c = (FC_CAD[k] || [])[1] || '#ccc', w = nx.length ? fcCadWhen(nx[0]) : '';
+  return `<h4>${fcEsc(C.n)}${w ? ` <em class="fcc-tag" style="--c:${c}">${fcEsc(w[0].toUpperCase() + w.slice(1))}</em>` : ''}</h4><p class="fcc-d">${fcEsc(C.say)}.</p>${nx.length ? `<p class="fcc-c"><b>Coming:</b> ${nx.map(m => fcEsc(fcCadWhen(m))).join(', ')}</p>` : ''}`;
 }
 function forecastHTML() { const ws = fcWaves(); return ws.length ? fcIcons(ws[0]).map(fcIconHTML).join('') + fcCadHTML(ws[0]) : ''; }
 // the portraits: painted once when the row is drawn, and again a moment later for a painting that was still loading
@@ -132523,6 +132737,7 @@ function saPhantoms(U, d, R, kind) {
 }
 
 /* ---------- the sandbox: run fn with phantoms in place of the field's foes, and put everything back ---------- */
+const SA_HUSH = () => {};   // AudioSys.play while a probe runs (counted by sim/talent_sfx_test.py: nothing must reach the real one)
 function saSandbox(t, phantoms, fn) {
   const keep = {}, keys = Object.keys(G);
   for (const k of keys) keep[k] = G[k];
@@ -132538,8 +132753,14 @@ function saSandbox(t, phantoms, fn) {
   const unstub = saSwap(stub), unwrap = saSwap(SA_WRAP);
   const tmr = typeof setTimeout === 'function' ? setTimeout : null; let tmN = 0;
   try { window.setTimeout = (f, ms) => { tmN++; return 0; }; } catch (e) {}   // (a cast that times a look with setTimeout: dropped)
+  // silent: game.js's sfx and abilities.js's abSfx are top-level consts, not window's, so the stubs above never reach them;
+  // a probe run as a talent's tooltip redrew after a pick played the spell's cast and strike sounds (owner, 25 Nov 2026:
+  // "getting a unit attack sound when choosing a talent"). G.mute stops sfx; the player itself is held for direct calls.
+  const au = typeof AudioSys !== 'undefined' && AudioSys ? AudioSys : null, auPlay = au && au.play, auVoice = au && au.unitVoice;
+  G.mute = true; if (au) { au.play = SA_HUSH; if (auVoice) au.unitVoice = SA_HUSH; }
   try { return fn(); }
   finally {
+    if (au) { au.play = auPlay; if (auVoice) au.unitVoice = auVoice; }
     try { if (tmr) window.setTimeout = tmr; } catch (e) {}
     unwrap(); unstub();
     [onToast, onBanner, onDirty, onSave, onLoot] = say;
