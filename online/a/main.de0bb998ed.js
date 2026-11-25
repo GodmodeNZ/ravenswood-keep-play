@@ -1,4 +1,4 @@
-const BUILD_TAG = 'dd980349@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '878030cb@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -62648,31 +62648,37 @@ const ezCritM0 = () => (typeof CRIT !== 'undefined' && CRIT.on ? CRIT.m : 2.5);
 
 /* each kind: tag, what it does (mod | mana | sp), and its words. say(x): x = { n, r, a, b, t, st, base, kit, force, slot }
    n: the rank shown, r: the rank held, t/st: the best live unit and its stats (or null), base: a tier I unit's stats */
+/* One plain pattern for every line (owner, 26 Nov 2026, of "Incendiary Round is rammed home every 12s → 10.5s. Each rank:
+   10.5s → 9s": "don't like this phrasing"): the rule says what one rank gives ("... per rank"), then one line runs through
+   every rank ("Cooldown: 12s → 10.5s → 9s"). The same words at every rank, so the panel adds no second "A → B" pair; no
+   flavour verbs in the rule (flavour is the talent's name). */
+const ezPer = x => (x.max > 1 ? ' per rank' : '');
+const ezSeq = (x, f) => Array.from({ length: x.max + 1 }, (_, k) => f(k)).join(' → ');
 const EZ_KIND = {
   haste: { tag: 'Damage', mod: (n, a) => ({ rate: 1 / (1 + a * n) }),
     say: x => { const w = x.w || 'Attacks'; if (!x.st || !x.st.rate) return `${w} ${ezP(x.a * x.n)}% faster.`; const r0 = x.st.rate * (1 + x.a * x.r); return `${w} every ${ezR(r0)}s → ${ezR(r0 / (1 + x.a * x.n))}s.`; } },
   reach: { tag: 'Damage', mod: (n, a) => ({ range: a * n }),
-    say: x => { const r0 = x.st && x.st.range ? x.st.range - x.a * x.r : x.base.range || 0; return `${x.w || 'Range'} ${ezR(r0)} → ${ezR(r0 + x.a * x.n)} cells.`; } },
+    say: x => { const r0 = x.st && x.st.range ? x.st.range - x.a * x.r : x.base.range || 0; return `Range +${ezR(x.a)} cells${ezPer(x)}. Range: ${ezSeq(x, k => ezR(r0 + x.a * k))} cells.`; } },
   crit: { tag: 'Damage', mod: (n, a) => ({ crit: a * n / ezCritK() }),
     say: x => { const c0 = x.st && typeof critOf === 'function' ? critOf(x.st) - x.a * x.r : ezCrit0(); return `${x.w ? x.w + ' crit' : 'Crit'} chance ${ezP(c0)}% → ${ezP(c0 + x.a * x.n)}%.`; } },
   critm: { tag: 'Damage', mod: (n, a) => ({ critM: ezCritM0() + a * n }),
     say: x => `${x.w ? x.w + ' crits' : 'Crits'} strike ×${ezR(ezCritM0())} → ×${ezR(ezCritM0() + x.a * x.n)}.` },
   pen: { tag: 'Damage', mod: (n, a) => ({ armorPen: a * n }),
-    say: x => { const p0 = x.st ? Math.max(0, (x.st.armorPen || 0) - x.a * x.r) : x.base.armorPen || 0; return `Its attacks ignore ${ezP(Math.min(.9, p0 + x.a * x.n))}% of armour (was ${ezP(p0)}%).`; } },
+    say: x => { const p0 = x.st ? Math.max(0, (x.st.armorPen || 0) - x.a * x.r) : x.base.armorPen || 0; return `Its attacks ignore another ${ezP(x.a)}% of armour${ezPer(x)}. Armour ignored: ${ezSeq(x, k => ezP(Math.min(.9, p0 + x.a * k)) + '%')}.`; } },
   splash: { tag: 'Damage', mod: (n, a) => ({ splash: 1 + a * n }),
-    say: x => { const s0 = x.st && x.st.splash ? x.st.splash / (1 + x.a * x.r) : x.base.splash || 0; return `Splash ${ezR(s0)} → ${ezR(s0 * (1 + x.a * x.n))} cells.`; } },
+    say: x => { const s0 = x.st && x.st.splash ? x.st.splash / (1 + x.a * x.r) : x.base.splash || 0; return `Its splash is ${ezP(x.a)}% wider${ezPer(x)}. Splash: ${ezSeq(x, k => ezR(s0 * (1 + x.a * k)))} cells.`; } },
   jump: { tag: 'Damage', mod: (n, a) => ({ chain: a * n }),
-    say: x => { const c0 = x.st && x.st.chain ? x.st.chain - x.a * x.r : x.base.chain || 0; return `Its lightning jumps to ${c0} → ${c0 + x.a * x.n} foes.`; } },
+    say: x => { const c0 = x.st && x.st.chain ? x.st.chain - x.a * x.r : x.base.chain || 0; return `Its lightning jumps to ${x.a} more foe${x.a === 1 ? '' : 's'}${ezPer(x)}. Jumps: ${ezSeq(x, k => c0 + x.a * k)}.`; } },
   hp: { tag: 'Survival', mod: (n, a) => ({ hpM: 1 + a * n }),
-    say: x => { if (!x.t || typeof towerMaxHp !== 'function') { const h1 = typeof TOWER_HP !== 'undefined' ? TOWER_HP[0] : 0; return h1 ? `Health ${Math.round(h1)} → ${Math.round(h1 * (1 + x.a * x.n))}.` : `Health ${ezP(x.a * x.n)}% higher.`; } const h0 = towerMaxHp(x.t, x.st) / (1 + x.a * x.r); return `Health ${Math.round(h0)} → ${Math.round(h0 * (1 + x.a * x.n))}.`; } },
+    say: x => { const h0 = x.t && typeof towerMaxHp === 'function' ? towerMaxHp(x.t, x.st) / (1 + x.a * x.r) : typeof TOWER_HP !== 'undefined' ? TOWER_HP[0] : 0; return `Its health is ${ezP(x.a)}% higher${ezPer(x)}.` + (h0 ? ` Health: ${ezSeq(x, k => Math.round(h0 * (1 + x.a * k)))}.` : ''); } },
   slow: { tag: 'Control', mod: (n, a, b) => ({ slowOn: [a * n, b || 1.5] }),
     say: x => `Its attacks slow foes ${ezP(x.a * x.n)}% for ${ezR(x.b || 1.5)}s.` },
   pool: { tag: 'Mana', mana: a => ({ pool: a }),
-    say: x => { const m0 = x.kit ? x.kit.mana.max : 100; return `${x.w ? x.w + ' mana' : 'Mana'} ${Math.round(m0)} → ${Math.round(m0 * (1 + x.a * x.n))}.`; } },
+    say: x => { const m0 = x.kit ? x.kit.mana.max : 100; return `Its mana pool is ${ezP(x.a)}% larger${ezPer(x)}. Mana: ${ezSeq(x, k => Math.round(m0 * (1 + x.a * k)))}.`; } },
   regen: { tag: 'Mana', mod: (n, a) => ({ manaRegen: a * n }),
     say: x => { const g0 = x.kit ? x.kit.mana.regen : 0; return `Mana a second ${ezR(g0)} → ${ezR(g0 + x.a * x.n)}.`; } },
   mhit: { tag: 'Mana', mana: a => ({ strike: [a, 'any'] }),
-    say: x => `Each ${x.w || 'attack'} gives ${ezR(x.a * x.n)} more mana.` },   /* (one number: owner, 26 Nov 2026, of "gives 1.24 → 2.74 mana": it "reads badly") */
+    say: x => `Each attack gives ${ezR(x.a)} more mana${ezPer(x)}.` },   /* (one number: owner, 26 Nov 2026, of "gives 1.24 → 2.74 mana": it "reads badly") */
   spcd: { tag: 'Spell', cap: 'ezCd',
     say: x => { const ab = x.kit && x.kit.abilities[0]; return ab ? `Its spells come ${ezP(x.a * x.n)}% sooner: ${ab.name} every ${ezR(ab.cd)}s → ${ezR(ab.cd * (1 - x.a * x.n))}s.` : `Its spells come ${ezP(x.a * x.n)}% sooner.`; } },
   spcost: { tag: 'Spell', mana: (a, kit) => { const cheap = {}; if (kit) for (const ab of kit.abilities) cheap[ab.id] = a; return { cheap }; },
@@ -62710,14 +62716,14 @@ function ezTal(force, slot, name, kind, a, b, w) {
   if (K.cap) { t.cap = K.cap; t.capK = a; }   /* (st.caps[cap] = rank x a: read by the hooks at the foot of this file; one talent of a kind a tree) */
   t.pro = n => {
     const M = Math.max(1, Math.min(n | 0 || 1, t.max)), live = ezLive(force, slot);
-    return K.say({ n: M, r: ezRank(force, slot, t), a, b, w, t: live, st: live && live.st, base: ezTier1(force, slot), kit, force, slot });
+    return K.say({ n: M, max: t.max, r: ezRank(force, slot, t), a, b, w, t: live, st: live && live.st, base: ezTier1(force, slot), kit, force, slot });
   };
   EZ.list.push({ force, slot, name: t.name, kind, a, b: b || 0, max: t.max });
   return t;
 }
 /* A named spell made better, WoW style ("Improved Pounce"; owner, 26 Nov 2026: "Take inspiration from wow, don't need to be
    too simple"): always on, one clear number a rank. what (each per rank):
-     cd: seconds off its cooldown (back: its words)   cost: mana off its cost   pow: it hits that much harder (verb: its word)
+     cd: seconds off its cooldown   cost: mana off its cost   pow: it hits that much harder (.1 = 10%)
      by: { key: x }  added to one of the spell's own numbers (ab.by[key]: dur, n, low, stun ...), with say(v, ab) for its words
    It is an ordinary spell entry (sp), so the tree rules hold: it sits below its spell's own talent and names the spell. */
 function ezSpell(force, slot, name, abId, what, say) {
@@ -62738,13 +62744,13 @@ function ezSpell(force, slot, name, abId, what, say) {
     if (what.by) { e.by = {}; for (const k in what.by) e.by[k] = what.by[k] * n; }
     return e;
   };
-  t.pro = n => {
-    const M = Math.max(1, Math.min(n | 0 || 1, t.max)), bits = [];
-    if (what.cd) bits.push(`${what.back || 'comes back every'} ${ezR(ab.cd)}s → ${ezR(ab.cd - what.cd * M)}s`);
-    if (what.cost) bits.push(`${what.costs || 'costs'} ${Math.round(ab.mana)} → ${Math.round(ab.mana - what.cost * M)} mana`);
-    if (what.pow) bits.push(`${what.verb || 'hits'} ${ezP(what.pow * M)}% harder`);
-    if (what.by && say) bits.push(say(M, ab));
-    return what.text ? what.text(M, ab) : `${ab.name} ${bits.join(' and ')}.`;
+  t.pro = () => {   /* (the same words at every rank: what a rank gives, then every rank's number in one line) */
+    const x = { max: t.max }, rule = [], line = [];
+    if (what.cd) { rule.push(`${ab.name}'s cooldown is ${ezR(what.cd)}s shorter${ezPer(x)}.`); line.push(`Cooldown: ${ezSeq(x, k => ezR(ab.cd - what.cd * k) + 's')}.`); }
+    if (what.cost) { rule.push(`${ab.name} costs ${ezR(what.cost)} less mana${ezPer(x)}.`); line.push(`Cost: ${ezSeq(x, k => Math.round(ab.mana - what.cost * k))} mana.`); }
+    if (what.pow) rule.push(`${ab.name} hits ${ezP(what.pow)}% harder${ezPer(x)}.`);
+    if (what.by && say) rule.push(`${ab.name} ${say(1, ab)}${ezPer(x)}.`);
+    return rule.concat(line).join(' ');
   };
   EZ.list.push({ force, slot, name: t.name, kind: 'spell', ab: abId, max: t.max });
   return t;
@@ -62794,7 +62800,7 @@ function ezFlav(force, slot, name, kind, a, w) {
   t.tag = K.tag; t.ez = kind; t.ezA = a;
   if (K.cap) { t.cap = K.cap; t.capK = a; }
   if (K.mod) t.mod = n => K.mod(n, a);
-  t.pro = n => K.say(a * Math.max(1, Math.min(n | 0 || 1, t.max)), w);
+  t.pro = n => K.say(a * Math.max(1, Math.min(n | 0 || 1, t.max)));   /* (plain words: no unit verbs in the rule; the audit, 26 Nov 2026, of "wheels and couches its lance 30% faster") */
   EZ.list.push({ force, slot, name: t.name, kind, a, max: t.max });
   return t;
 }
@@ -62917,6 +62923,87 @@ if (typeof abAuto === 'function') {
   };
 }
 
+/* ================= OPEN TREES: rows of choices, not chains (owner, 26 Nov 2026) =================
+   Owner, of an Ironhold tree: "dont like these cross arrows, perhaps just make less dependency talents, dont like these 3
+   rows with 4 talents going into each other, should be a bit more build diversity and choice".
+   ezOpen(force) opens every unit tree and Champion tree of a force, WoW-classic style: a talent needs only its row's
+   points (the tree's tiers). The one prerequisite kept is where a talent truly builds on another: the improvement straight
+   below a spell's own talent needs that spell (same column, one arrow straight down; two a tree at most). No side
+   prerequisites (reqs: the crossing arrows), no talent locked behind the one above it, no spell talent that needs the
+   talent above it. Cells, ids and ranks stay, so saves keep their picks. tree.open marks it for the checks
+   (tools/check_talent_trees.js, tools/check_talent_chains.js). */
+function ezOpenTree(tree) {
+  if (!tree || !tree.list) return 0;
+  const at = (r, c) => tree.list.find(q => q.r === r && q.c === c);
+  let kept = 0;
+  for (const t of tree.list) {
+    if (t.req0 === undefined) t.req0 = t.req || null;   /* (what it needed before: tools/open_layout.js picks the tree's one chain from these) */
+    const up = t.req ? at(t.req[0], t.req[1]) : null;
+    let shapes = false;
+    if (up && up.spell && !t.spell && t.sp && t.req[0] === t.r - 1 && t.req[1] === t.c) { try { shapes = [].concat(t.sp(t.max)).some(e => e && e.ab === up.spell); } catch (e) { shapes = false; } }
+    if (shapes) { kept++; t.reqs = null; continue; }
+    t.req = null; t.reqs = null;
+  }
+  tree.open = true;
+  return kept;
+}
+function ezOpen(force) {
+  const F = FORCES[force]; if (!F || !F.talents) return;
+  const seen = new Set();
+  for (const slot in F.talents) { const tr = F.talents[slot]; if (tr && !seen.has(tr)) { seen.add(tr); ezOpenTree(tr); } }
+  if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h] && CHAMPS[h].force === force && CHAMPS[h].tree && !seen.has(CHAMPS[h].tree)) { seen.add(CHAMPS[h].tree); ezOpenTree(CHAMPS[h].tree); }
+}
+
+/* ---------- an open tree's own shape, and its one chain (tools/open_layout.js writes these lines) ----------
+   Owner, 26 Nov 2026: "break up the shape of the tree more"; "keep some 4 or 3 dependency rows but not like that".
+   ezLayout(force, key, cells, chain): key is a unit's slot or 'champ:<hero>'; cells[i] = [row, column] of the tree's ith
+   talent (ids and list order unchanged: saves keep their picks); chain: the indices of the 3-4 talents that run straight
+   down one column, each needing the one above it. Every other talent needs only its row's points. */
+function ezLayout(force, key, cells, chain) {
+  const tree = key.startsWith('champ:') ? (typeof CHAMPS !== 'undefined' && CHAMPS[key.slice(6)] ? CHAMPS[key.slice(6)].tree : null) : (FORCES[force] && FORCES[force].talents ? FORCES[force].talents[key] : null);
+  if (!tree || !tree.list || tree.list.length !== cells.length) { if (typeof console !== 'undefined') console.warn('easy talents: layout does not fit', force, key); return; }
+  if (tree._ezLaid) return;   /* (a Champion's tree is also its force's holy slot: laid out once) */
+  tree._ezLaid = true;
+  tree.list.forEach((t, i) => {
+    if (t.req0 === undefined) t.req0 = t.req || null;
+    if (t.spell && t.r !== cells[i][0] && typeof console !== 'undefined') console.warn('easy talents: a spell talent changed row', force, key, t.spell);
+    t.r = cells[i][0]; t.c = cells[i][1]; t.req = null; t.reqs = null;
+  });
+  for (let k = 1; k < (chain || []).length; k++) { const a = tree.list[chain[k - 1]], b = tree.list[chain[k]]; if (a && b && b.r === a.r + 1 && b.c === a.c) b.req = [a.r, a.c]; else if (typeof console !== 'undefined') console.warn('easy talents: a chain link is not straight down', force, key, k); }
+  tree.open = true;
+}
+
+/* ---------- plain words for kept talents (the unclear-text audit, 26 Nov 2026: unclear-unit-talents.md) ----------
+   ezReword(force, key, name, pairs): a kept talent's own text with each [pattern, replacement] applied at every rank (its
+   effect untouched); key is a slot or 'champ:<hero>'. Then, for every tree: "half again as hard" is "50% harder". */
+function ezTreeOf(force, key) { return key.startsWith('champ:') ? (typeof CHAMPS !== 'undefined' && CHAMPS[key.slice(6)] ? CHAMPS[key.slice(6)].tree : null) : (FORCES[force] && FORCES[force].talents ? FORCES[force].talents[key] : null); }
+function ezReword(force, key, name, pairs) {
+  const tree = ezTreeOf(force, key), t = tree && tree.list.find(q => q.name === name && !q.spell);
+  if (!t) { if (typeof console !== 'undefined') console.warn('easy talents: no talent to reword', force, key, name); return null; }
+  const p0 = t.pro;
+  t.pro = function () { let s = String(p0.apply(this, arguments)); for (const [a, b] of pairs) s = s.replace(a, b); return s; };
+  return t;
+}
+{
+  const HALF = [[/\b(hit|hits|strike|strikes) half again as hard/g, '$1 50% harder'], [/\band half again as hard/g, 'and hits 50% harder'], [/half again as wide/g, '50% wider']];
+  const seen = new Set(), all = [];
+  for (const f in FORCES) if (FORCES[f].talents) for (const s in FORCES[f].talents) all.push(FORCES[f].talents[s]);
+  if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h] && CHAMPS[h].tree) all.push(CHAMPS[h].tree);
+  for (const tree of all) { if (!tree || seen.has(tree)) continue; seen.add(tree);
+    for (const t of tree.list) { if (t.spell || typeof t.pro !== 'function') continue; let hit = false; try { for (let n = 1; n <= t.max; n++) if (/half again/.test(String(t.pro(n)))) hit = true; } catch (e) { hit = false; }
+      if (hit) { const p0 = t.pro; t.pro = function () { let s = String(p0.apply(this, arguments)); for (const [a, b] of HALF) s = s.replace(a, b); return s; }; } } }
+  ezReword('grove', 'frost', 'Thorned Vines', [[/Its attacks bleed foes for (\d+)% of the hit over 3s; Grasping Thicket's for (\d+)%\./, "Foes its attacks hit take $1% of that hit again over 3s; Grasping Thicket's foes take $2%."]]);
+  ezReword('grove', 'arcane', 'Lord of the Glade', [[/half again as hard/, '50% harder'], [/(\d+(?:\.\d+)?) times as hard/, (m, v) => `${Math.round((+v - 1) * 100)}% harder`]]);
+  ezReword('grove', 'holy', 'Thorned Roots', [[/Entangle bleeds each ground foe it roots for (\d+)% of an attack over 3s\./, 'Each ground foe Entangle roots takes $1% of an attack again over 3s.']]);
+  ezReword('conclave', 'cannon', 'Sunfall', [[/crits 2\.5 times as hard/, 'its crit deals 2.5 times the damage']]);
+  ezReword('silver', 'arcane', 'Unhorse', [[/drives its foe back a little, and every ground foe within (half a cell|a cell) of it\./, 'drives its foe back 0.1 cells, and every ground foe within $1 of it.'   /* (a shove for the Knights, not a hold: forces_..._holds.js) */]]);
+  ezReword('stormborn', typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom', 'Barbed Heads', [[/Its attacks make ground foes bleed a further (\d+)% of the hit over 3s\./, 'Ground foes its attacks hit take $1% of that hit again over 3s.']]);
+  ezReword('stormborn', 'earth', 'Deep Fissures', [[/opens a fissure on the road for/, 'cracks the road open for'], [/foes on it take/, 'foes on the crack take']]);
+  ezReword('stormborn', 'earth', 'Riftmaker', [[/opens a fissure/, 'cracks the road open']]);
+  ezReword('ironhold', 'champ:ih_hrolf', 'Grudge-Fed', [[/bursts twice as wide, ([\d.]+) cells wider again/, 'its burst is twice as wide plus $1 cells']]);
+  ezReword('stormborn', 'champ:sb_beast', 'Pack Hunger', [[/Wolfsong's bites make foes bleed (\d+)% of a bite over 3s, ignoring armour\./, 'Foes Wolfsong bites take $1% of a bite again over 3s, ignoring armour.']]);
+}
+
 /* ================= SIMPLE PASSIVES: THE CONCLAVE (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
    Each tree keeps its spell talents, its capstones, the talent that gives the unit its own trick and one or two signature
@@ -62955,14 +63042,14 @@ if (typeof abAuto === 'function') {
   ezTal(F, 'frost', 'Long Staff', 'reach', .25, 0, 'Her staff reaches');
   ezFlav(F, 'frost', 'Cold Library', 'tap', .5, 'the Frostweaver');
   ezSpell(F, 'frost', 'Frost Rhythm', 'cc_glacialglyph', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
-  ezSpell(F, 'frost', 'Cold Focus', 'cc_rimelance', { by: { dur: .3 } }, v => `holds its foe in the ice ${ezR(.3 * v)}s longer`);
+  ezSpell(F, 'frost', 'Cold Focus', 'cc_rimelance', { by: { dur: .3 } }, v => `lasts ${ezR(.3 * v)}s longer`);
   ezFlav(F, 'frost', 'Rime Spirit', 'echo', .3, 'weaves icicles');
 
   /* ---------- Chronomancers (control). Kept: Heavy Hours, Dead Hour, Pendulum Swing, Replay, Clockwork Rhythm, Arcane
      Clockwork; capstones Time Loop, Frozen Moment, Endless Hour ---------- */
   ezSpell(F, 'arcane', 'Rewound Bolt', 'cc_quicken', { cd: 2, back: 'turns back every' });
   ezFlav(F, 'arcane', 'Hour of Need', 'echo', .2, 'turns its hourglass');
-  ezSpell(F, 'arcane', 'Spare Seconds', 'cc_dilation', { by: { dur: .5 } }, v => `holds time ${ezR(.5 * v)}s longer`);
+  ezSpell(F, 'arcane', 'Spare Seconds', 'cc_dilation', { by: { dur: .5 } }, v => `lasts ${ezR(.5 * v)}s longer`);
   ezFlav(F, 'arcane', 'Clockwork Familiar', 'rhythm', .03, 'tick it sends');
   ezSpell(F, 'arcane', 'Time Rhythm', 'cc_dilation', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezTal(F, 'arcane', 'Long Hour', 'reach', .25, 0, 'Its hours reach');
@@ -62972,7 +63059,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'storm', 'Bright Fourth', 'watch', .1, 'its starlight');
   ezFlav(F, 'storm', 'Busy Sky', 'tempo', .05, 'reads stars down');
   ezSpell(F, 'storm', 'Omen Light', 'cc_fallingstar', { pow: .15, verb: 'burns' });
-  ezSpell(F, 'storm', 'Orrery Moon', 'cc_orrery', { by: { dur: 1 } }, v => `turns ${v}s longer`);
+  ezSpell(F, 'storm', 'Orrery Moon', 'cc_orrery', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezSpell(F, 'storm', 'Zodiac', 'cc_fallingstar', { cd: 1.5, back: 'is called every' });
   ezSpell(F, 'storm', 'Falling Finish', 'cc_omen', { pow: .2, verb: 'comes down' });
 
@@ -63002,6 +63089,13 @@ if (typeof abAuto === 'function') {
   ezSpell(F, V, 'Paired Crescents', 'cc_shards', { cd: 1.5, back: 'wheels back every' });
   ezSpell(F, V, 'Honed by Spells', 'cc_sunder', { pow: .08, verb: 'rends' });
 }
+/* ---------- Champion trees whose rows were mostly about one spell: opened and laid out (tools/open_layout.js; the
+   rest of this force's trees follow when the owner approves the Ironhold sample) ---------- */
+{
+  const F = 'conclave';
+  ezLayout(F, 'champ:cc_arch', [[4,3],[0,2],[1,3],[3,0],[1,0],[2,0],[2,2],[4,1],[5,2],[4,0],[3,3],[5,3],[4,2],[5,1],[0,1],[2,1]], [4,5,3,9]);   /* rows 2 2 3 2 4 3; chain: Unravel > Loose Threads > Read the Crowd > Woven Edge */
+  ezLayout(F, 'champ:cc_maren', [[0,2],[0,1],[1,0],[3,1],[1,1],[2,1],[2,0],[2,3],[5,2],[4,1],[3,3],[5,3],[4,2],[4,0],[2,2],[0,3],[5,1]], [4,5,3]);   /* rows 3 2 4 2 3 3; chain: Rift Chain > Long Chain > Practice Yard */
+}
 
 /* ================= SIMPLE PASSIVES: THE GROVE (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
@@ -63011,7 +63105,7 @@ if (typeof abAuto === 'function') {
    Elowen's, Faelan's and Nyssa's own trees are nearly all changes to their named spells already: left as they are. */
 {
   const F = 'grove', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
-  const longer = word => v => `${word} ${ezR(v)}s longer`;
+  const longer = () => v => `lasts ${ezR(v)}s longer`;
 
   /* ---------- Thornguard Spears (line holder). Kept: Hold the Line, Deep Thrust, Shieldsplitter, Skewer, Phalanx;
      capstones Wall of Spears, Impaler, Thorn Spirit ---------- */
@@ -63083,7 +63177,7 @@ if (typeof abAuto === 'function') {
   /* ---------- Bogwitches. Kept: Clinging Mud, Splattering Spit, Marsh Fever; capstones Plague of the Fen, Black Water,
      The Drowned Queen ---------- */
   ezSpell(F, V, 'Bog Hunger', 'bw_swarm', { pow: .2, verb: 'gnaws' });
-  ezSpell(F, V, 'Second Gob', 'bw_bogbody', { by: { dur: .5 } }, v => `holds the road ${ezR(.5 * v)}s longer`);
+  ezSpell(F, V, 'Second Gob', 'bw_bogbody', { by: { dur: .5 } }, v => `lasts ${ezR(.5 * v)}s longer`);
   ezFlav(F, V, 'Drowning Spit', 'overflow', .1, 'her spit hits');
   ezSpell(F, V, 'Bog Rhythm', 'bw_swarm', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, 'Fen Toad', 'bw_bogdue', { pow: .2, verb: 'drowns' });
@@ -63142,7 +63236,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'storm', "Gunner's Tithe", 'ih_flakscreen', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'storm', 'Cluster Shell', 'ih_grapnel', { pow: .1, verb: 'hauls' });
   ezFlav(F, 'storm', 'Quick Traverse', 'tempo', .02, 'fires its flak gun');
-  ezSpell(F, 'storm', 'Second Burst', 'ih_flakscreen', { by: { dur: 1 } }, v => `fills the sky ${v}s longer`);
+  ezSpell(F, 'storm', 'Second Burst', 'ih_flakscreen', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
 
   /* ---------- Steam Hammers. Kept: Steam in the Cracks, Packed Crowd, Hammer Home, Tremor Step, Steam Jets; capstones
      Hammer Drone, Groundsplitter, Molten Rivets (Safety Valve, Pressure Gauge and Steam Jacket are the force tree's) ---------- */
@@ -63166,6 +63260,25 @@ if (typeof abAuto === 'function') {
   ezSpell(F, V, 'Sympathetic Blast', 'ih_trench', { by: { n: 1 } }, v => `lays ${v} more charge${v > 1 ? 's' : ''}`);
   ezTal(F, V, 'Long Lob', 'reach', .25, 0, 'Its satchels carry');
 }
+/* ---------- open trees: each its own shape and one chain (tools/open_layout.js ironhold; forces_..._easy.js ezLayout) ---------- */
+ezOpen('ironhold');   /* (first: what each talent needed before is kept for the layout tool) */
+{
+  const F = 'ironhold';
+  ezLayout(F, 'glaive', [[2,0],[1,1],[3,3],[0,2],[3,2],[2,2],[5,1],[4,3],[5,2],[4,1],[3,1],[3,0],[5,0],[1,3],[2,1],[0,1],[0,0]], [14,10,9,6]);   /* rows 3 2 3 4 2 3; chain: Hooked Beard > Brace and Shove > Breaker's Blow > Anvil Strike */
+  ezLayout(F, 'arrow', [[0,2],[0,1],[2,2],[5,1],[1,2],[0,3],[3,0],[5,0],[5,2],[2,1],[2,3],[4,3],[4,1],[1,0],[4,2],[4,0],[3,2]], [0,4,2,16]);   /* rows 3 2 3 2 4 3; chain: Concussion Rounds > Rattlegun > Through-Ball > Quick Ramrod */
+  ezLayout(F, 'frost', [[1,3],[0,1],[3,1],[3,2],[1,2],[3,3],[5,0],[5,1],[2,3],[5,2],[2,0],[4,1],[4,2],[3,0],[0,2],[2,1],[4,3],[0,0]], [0,8,5,16]);   /* rows 3 2 3 4 3 3; chain: Weighted Chains > Harpoon Winch > Double Wrap > Trapper's Rhythm */
+  ezLayout(F, 'arcane', [[2,3],[1,0],[0,3],[2,1],[5,2],[4,3],[1,2],[4,0],[5,1],[3,2],[0,2],[3,0],[5,3],[0,1],[4,1],[2,0]], [1,15,11,7]);   /* rows 3 2 3 2 3 3; chain: Deep Brand > Anvil of Ages > Ringing Strokes > Unmaking Blow */
+  ezLayout(F, 'storm', [[4,0],[0,2],[5,2],[2,2],[3,3],[1,2],[3,0],[4,1],[5,3],[5,1],[3,2],[1,0],[2,1],[0,1],[1,3]], [1,5,3,10]);   /* rows 2 3 2 3 2 3; chain: Fast Fuses > Grapnel Shot > Cluster Shell > Second Burst */
+  ezLayout(F, 'earth', [[0,1],[0,2],[2,1],[0,0],[5,1],[1,0],[3,1],[5,2],[5,3],[2,3],[3,2],[4,0],[4,3],[1,3],[4,2],[2,2],[2,0]], [15,10,14,7]);   /* rows 3 2 4 2 3 3; chain: Steam Jacket > Tremor Step > Pressure Gauge > Groundsplitter */
+  ezLayout(F, 'cannon', [[0,1],[1,3],[3,0],[3,2],[1,2],[2,1],[5,0],[4,3],[0,2],[4,1],[3,3],[3,1],[5,1],[5,2],[2,3],[1,0]], [5,11,9,12]);   /* rows 2 3 2 4 2 3; chain: Double Crew > Quake Shell > The Long Drop > Crew Chief's Shout */
+  ezLayout(F, 'venom', [[1,3],[0,1],[0,2],[3,2],[1,1],[3,1],[2,3],[4,3],[3,3],[2,2],[3,0],[4,2],[5,0],[5,2],[5,1],[1,0]], [9,3,11,13]);   /* rows 2 3 2 4 2 3; chain: Tamped Charges > Blasting Wage > Demolition > Sapper's Mate */
+  ezLayout(F, 'champ:ih_thane', [[0,1],[3,0],[1,3],[4,3],[1,1],[2,1],[3,3],[3,1],[5,2],[1,0],[2,2],[5,0],[4,2],[5,1],[0,2]], [0,4,5,7]);   /* rows 2 3 2 3 2 3; chain: Locked Shields > Horn of the Hold > Braced Heels > Shield-Brother */
+  ezLayout(F, 'champ:ih_artificer', [[3,3],[0,2],[1,3],[2,0],[1,0],[2,3],[4,3],[2,2],[4,0],[4,1],[4,2],[5,1],[3,1],[5,2],[0,1],[2,1]], []);   /* rows 2 2 4 2 4 2 */
+  ezLayout(F, 'champ:ih_brewer', [[0,2],[1,1],[1,3],[3,2],[1,2],[2,2],[2,0],[4,3],[5,1],[5,2],[3,1],[3,3],[4,0],[0,1]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Leaky Keg > Firewater Breath > Double Measure > Open Tap */
+  ezLayout(F, 'champ:ih_marksman', [[0,1],[1,0],[1,3],[3,1],[1,1],[2,1],[3,2],[4,3],[5,1],[5,2],[3,3],[2,0],[4,0],[0,2]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Patient Aim > Spotter's Flare > Bright Flare > Wide Flare */
+  ezLayout(F, 'champ:ih_king', [[0,2],[1,1],[2,0],[3,2],[1,2],[2,2],[3,1],[4,3],[5,1],[5,2],[1,3],[3,3],[4,0],[0,1]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Long Muster > Oathhammer > Broad Head > Hall-Breaker */
+  ezLayout(F, 'champ:ih_hrolf', [[0,1],[1,0],[1,3],[3,1],[1,1],[2,1],[2,0],[4,0],[5,1],[5,2],[3,3],[3,2],[4,3],[0,2]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Ranging Fire > Grudge Shell > Heavy Charge > Grounding Shell */
+}
 
 /* ================= SIMPLE PASSIVES: THE SILVER ORDER (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
@@ -63181,7 +63294,7 @@ if (typeof abAuto === 'function') {
      Braced Shield, Unyielding; capstones Oath Unbroken, Wall of Shields, Ringing Shield ---------- */
   ezSpell(F, 'glaive', 'Backswing', 'so_bash', { pow: .2, verb: 'rings' });
   ezFlav(F, 'glaive', 'Press the Wounded', 'tempo', .04, 'swings its oathblade');
-  ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `shines ${v}s longer`);
+  ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'glaive', 'Pommel Finish', 'rhythm', .03, 'stroke of its oathblade');
   ezFlav(F, 'glaive', 'Oath Rhythm', 'harvest', 5, 'the Shieldbearer');
 
@@ -63190,8 +63303,8 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'arrow', 'Double Crank', 'tempo', .04, 'cranks and looses');
   ezSpell(F, 'arrow', 'Sighted In', 'so_sanct', { pow: .12, verb: 'punches through' });
   ezFlav(F, 'arrow', 'Ready Crank', 'momentum', .02, 'cranks and looses');
-  ezSpell(F, 'arrow', 'Splinter Bolt', 'so_hail', { by: { dur: 1 } }, v => `lights its crowd ${v}s longer`);
-  ezSpell(F, 'arrow', 'Hot Crank', 'so_witness', { by: { dur: 1 } }, v => `marks its foe ${v}s longer`);
+  ezSpell(F, 'arrow', 'Splinter Bolt', 'so_hail', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
+  ezSpell(F, 'arrow', 'Hot Crank', 'so_witness', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'arrow', 'Mercy Bolt', 'watch', .1, 'its quarrels');
   ezFlav(F, 'arrow', 'Bolt Tithe', 'tap', .5, 'the Crossbow');
   ezSpell(F, 'arrow', 'Loaded Prayer', 'so_sanct', { cd: .75, back: 'is blessed every' });
@@ -63208,7 +63321,7 @@ if (typeof abAuto === 'function') {
      capstones Thrice-Wheeled, Glory of the Charge, Part the Ranks ---------- */
   ezSpell(F, 'arcane', "Squire's Purse", 'so_grail', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'arcane', 'Ride Through', 'so_ridedown', { by: { n: 1 } }, v => `rides ${v} more pass${v > 1 ? 'es' : ''}`);
-  ezSpell(F, 'arcane', 'Vow-Lit Lance', 'so_vow', { by: { dur: 1 } }, v => `rallies its side ${v}s longer`);
+  ezSpell(F, 'arcane', 'Vow-Lit Lance', 'so_vow', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezTal(F, 'arcane', 'Long Course', 'reach', .3, 0, 'Its course runs');
   ezSpell(F, 'arcane', 'Shattered Lance', 'so_grail', { pow: .1, verb: 'breaks through' });
   ezFlav(F, 'arcane', 'Phantom Rider', 'echo', .3, 'wheels and couches its lance');
@@ -63257,7 +63370,7 @@ if (typeof abAuto === 'function') {
    Tarka's, Oshana's and Huri's own trees are nearly all changes to their named spells already: left as they are. */
 {
   const F = 'stormborn', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
-  const longer = word => v => `${word} ${v}s longer`;
+  const longer = () => v => `lasts ${ezR(v)}s longer`;
 
   /* ---------- Wolfguard (line holder). Kept: Hunting Bond, Hock Bite; capstones Feeding Frenzy, Storm Wolf, Spirit Pack ---------- */
   ezTal(F, 'glaive', 'Wolf at the Throat', 'pen', .15);
@@ -63297,7 +63410,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'arcane', 'Old Grudge', 'sb_spiritchains', { by: { k: .05 } }, v => `shares ${ezP(.05 * v)}% more of the damage`);
   ezTal(F, 'arcane', 'Restless Dead', 'reach', .15, 0, 'Its spirits range');
   ezSpell(F, 'arcane', 'Spirit Echo', 'sb_spiritchains', { by: { n: 1 } }, v => `binds ${v} more foe${v > 1 ? 's' : ''}`);
-  ezText(F, 'arcane', 'Lingering Spirits', n => `Its hex lasts 4s → ${4 + n}s.`);
+  ezText(F, 'arcane', 'Lingering Spirits', () => 'Its hex lasts 1s longer per rank. Hex: 4s → 5s → 6s.');
 
   /* ---------- Thunder Callers. Kept: Split Sky, Backlash, Grounded Bolt; capstones Thunderclap, Last Spark, Stormseed ---------- */
   ezTal(F, 'storm', 'Long Fork', 'jump', 1);
@@ -63324,11 +63437,11 @@ if (typeof abAuto === 'function') {
   ezTal(F, 'cannon', 'Rain Returns', 'pool', .15, 0, 'Cloud Dancer');   /* (the pool that can hold Skyleap) */
   ezSpell(F, 'cannon', 'Twin Bolt', 'sb_stormdance', { cd: 2, back: 'can be danced every' });
   ezFlav(F, 'cannon', 'Sky Spirit', 'echo', .3, 'sweeps her fans');
-  ezText(F, 'cannon', 'Long Clouds', n => `Its clouds last 3s → ${3 + n}s.`);
+  ezText(F, 'cannon', 'Long Clouds', () => 'Its clouds last 1s longer per rank. Clouds: 3s → 4s → 5s.');
 
   /* ---------- Skyhunters (control, the sky). Kept: Long Cord, Charged Harpoons, Barbed Heads; capstones Harpoon Volley,
      Master of the Sky ---------- */
-  ezSpell(F, V, 'Downwind Haul', 'sb_tether', { by: { low: .5 } }, v => `holds flyers down ${ezR(.5 * v)}s longer`);
+  ezSpell(F, V, 'Downwind Haul', 'sb_tether', { by: { low: .5 } }, v => `lasts ${ezR(.5 * v)}s longer`);
   ezFlav(F, V, 'Second Cast', 'tempo', .03, 'casts its line');
   ezFlav(F, V, 'Sky Lore', 'harvest', 6, 'the Skyhunter');
   ezSpell(F, V, 'Double Harpoon', 'sb_tether', { by: { n: 1 } }, v => `pulls down ${v} more flyer${v > 1 ? 's' : ''}`);
@@ -63336,6 +63449,12 @@ if (typeof abAuto === 'function') {
   ezTal(F, V, 'Long Cast', 'reach', .25, 0, 'Its line runs');
   ezSpell(F, V, "Skyhunter's Tithe", 'sb_tether', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, "Hunter's Haste", 'sb_skyfall', { pow: .4, verb: 'crashes down' });
+}
+/* ---------- Champion trees whose rows were mostly about one spell: opened and laid out (tools/open_layout.js; the
+   rest of this force's trees follow when the owner approves the Ironhold sample) ---------- */
+{
+  const F = 'stormborn';
+  ezLayout(F, 'champ:sb_caller', [[4,1],[0,2],[1,0],[4,3],[1,3],[2,3],[2,1],[3,3],[5,1],[3,0],[5,0],[4,2],[5,2],[0,1],[2,2]], [4,5,7,3]);   /* rows 2 2 3 2 3 3; chain: Thunder Drum > Long Roll > Booming Drum > Drum Circle */
 }
 
 /* ================= SIMPLE PASSIVES: THE WARDBOUND (26 Nov 2026) =================
@@ -63371,7 +63490,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'frost', 'Meltwater', 'tap', .5, 'the Frostbrand');
   ezFlav(F, 'frost', 'Back Sweep', 'tempo', .04, 'sweeps its halberd');
   ezSpell(F, 'frost', 'Cleaving Haft', 'wb_frostbite', { pow: .2, verb: 'grips' });
-  ezSpell(F, 'frost', 'Biting Cold', 'wb_winterward', { by: { dur: 1 } }, v => `stands guard ${v}s longer`);
+  ezSpell(F, 'frost', 'Biting Cold', 'wb_winterward', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezTal(F, 'frost', "Winter's Tithe", 'mhit', 1.5, 0, 'pass of its halberd');   /* (kept: Battle Trance on the owner's menu) */
 
   /* ---------- Runecarvers. Kept: Deep Script, Lingering Ink, Double Stroke, Flick Through, Spent Ink; capstones Endless
@@ -63392,7 +63511,7 @@ if (typeof abAuto === 'function') {
   ezTal(F, 'storm', 'Long Lance', 'reach', .15, 0, 'Its storm-lance reaches');
   ezSpell(F, 'storm', "Rider's Rhythm", 'wb_charge', { cd: 1.5, back: 'rides out every' });
   ezSpell(F, 'storm', "Lancer's Finish", 'wb_skyfall', { pow: .2, verb: 'splits the sky' });
-  ezSpell(F, 'storm', 'Storm-Called Lance', 'wb_stormbanner', { by: { dur: 1 } }, v => `flies ${v}s longer`);
+  ezSpell(F, 'storm', 'Storm-Called Lance', 'wb_stormbanner', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
 
   /* ---------- Anvil Guard (line holder). Kept: Iron Rhythm, Restless Earth, Shield Bash, Deep Quake, Anvil's Toll;
      capstones Unmoving, Quaking Steps, Mountain's Weight ---------- */
@@ -63409,13 +63528,13 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'cannon', 'Quick Crank', 'tempo', .04, 'cranks and fires');
   ezSpell(F, 'cannon', 'Spent Bolt', 'wb_runeshot', { cd: 2, back: 'is fired every' });
   ezSpell(F, 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt', { pow: .25, verb: 'drives home' });
-  ezSpell(F, 'cannon', "Loader's Finish", 'wb_chainbolt', { by: { dur: 1 } }, v => `holds its pair ${v}s longer`);
+  ezSpell(F, 'cannon', "Loader's Finish", 'wb_chainbolt', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'cannon', 'Steady Crew', 'harvest', 5, 'the Siege Warden');
   ezFlav(F, 'cannon', 'Third Crewman', 'watch', .1, 'its ballista');
 
   /* ---------- Vowkeepers (healer). Kept: Deep Mending, Mender's Due, Censer Swing, Siege-Ward, Urgent Hands; capstones
      Keeper of Vows, Steadfast Chaplain, Hallowed Road ---------- */
-  ezSpell(F, V, 'Swift Absolution', 'wb_censer', { by: { dur: 1 } }, v => `drifts ${v}s longer`);
+  ezSpell(F, V, 'Swift Absolution', 'wb_censer', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, V, 'Urgent Blade', 'tempo', .02, 'swings his vow-blade');
   ezTal(F, V, 'Long Blade', 'reach', .15, 0, 'His vow-blade reaches');
   ezFlav(F, V, 'Mercy Cut', 'rhythm', .03, 'stroke of his vow-blade');
@@ -140062,7 +140181,7 @@ function coEndScreen(won) {
    bones (the sash on three panels in two lengths, the armillary's two rings on bones of their own), one 1536 texture, 10
    clips at 30 frames a second. ON by default; ?gw=old (or the Model Lab's "Golem rig" row set to Old) draws the code-built
    warden and his golem instead.
-   The owner: "golem is a single unit. size look good": the golem IS the unit now, alone on its cell, 1.05 cells tall (1.5 at first) at
+   The owner: "golem is a single unit. size look good": the golem IS the unit now, alone on its cell, 1.6 cells tall (1.5, 1.05, 1.3 before) at
    tier I (the little warden who stood behind it is gone while the sculpt is drawn), and ccGolemAt, where the kit starts
    its dust, leaps and reaches, is the unit's own cell. His moves, by the game's own cues (nothing in the game is changed):
      idle      no foe in reach: a statue set down, slow breaths, a long look aside
@@ -140075,13 +140194,16 @@ function coEndScreen(won) {
      stomp       the last stomp on the game's, then the hop home
      hit, death   his health drops; wounded: down on a knee, both fists on the road
    The armillary's rings turn all the while; the runes, eyes and the star are emissive (brighter by tier, as every unit's
-   glow). The chest's star is t.tipW (unitTip). Size: 1.05 cells x the shared tier curve (unitmodels_size.js UM_TIER).
+   glow). The chest's star is t.tipW (unitTip). Size: 1.6 cells x the shared tier curve (unitmodels_size.js UM_TIER).
    Checks: `python -I tools/make_gw.py --check`. Notes: docs/model_pilot/golem2.md. */
 const GW2 = (() => {
   const U = 'cc_golemwarden', NAMES = ['idle', 'ready', 'slam', 'leap', 'heave', 'wall', 'pound', 'stomp', 'hit', 'death'];
   // (owner, 25 Nov 2026, after playing: "golems should be reduced in size by about 30%": 1.5 -> 1.05 cells at tier I, the tier curve kept;
   //  ?gwtall=1.5 is the first size, to compare)
-  const TALL = (() => { try { const q = +new URLSearchParams(location.search).get('gwtall'); return q > .3 && q < 3 ? q : 1.05; } catch (e) { return 1.05; } })();
+  const TALL = (() => { try { const q = +new URLSearchParams(location.search).get('gwtall'); return q > .3 && q < 3 ? q : 1.6; } catch (e) { return 1.6; } })();
+  // (then 1.6: at 1.3 his head was still under the mages' hats, who stand on bases; at 1.75 his arm reaches a neighbour's base)
+  // (owner, 26 Nov, of 1.05: "golem should be slightly bigger than other units": 1.3, between the two. He is as wide as he is tall,
+  //  so his bulk passes a mage's well before his height does; ?gwtall=1.05 the small one)
   const EASE = .2, SPD_MAX = 1.6, BLOW = .3;
   const FIST_FWD = .5;   // how far before his feet his fists land (the model's own units: x his scale = cells)
   const S = { on: true, err: null, wound: false };
@@ -140294,7 +140416,7 @@ const GW2 = (() => {
     }
     // the golem is the unit: the kit's "where the golem stands" is its own cell (it was a step before and beside the warden)
     if (MESH_ && typeof ccGolemAt === 'function') { const g0 = ccGolemAt; ccGolemAt = function (t) { return on(t) ? [t.x, 0, t.y] : g0.apply(this, arguments); }; }
-    // its size by the shared rule: 1.05 cells to the top of his head at tier I, the crown (bars, stars) over it
+    // its size by the shared rule: 1.6 cells to the top of his head at tier I, the crown (bars, stars) over it
     if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
       UM_UNITS[U] = { mdl: 'gw2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
       if (typeof UM_HEAD_K !== 'undefined' && typeof UM_KIND !== 'undefined' && typeof UM_EVEN_HEAD !== 'undefined') { UM_HEAD_K.golem = TALL * HEADY / UM_EVEN_HEAD; UM_KIND[U] = 'golem'; }
