@@ -1,4 +1,4 @@
-const BUILD_TAG = '932f522d@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f9e48047@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -140914,35 +140914,37 @@ const MR2 = (() => {
 })();
 
 /* The Glaive Wardens (wb_maskedwarden) on a rig and clips made from scratch (the owner, 26 Nov 2026: "Glaive Warden - 3D":
-   the horned, masked warden in bronze-gold plate and her round glaive, un-rigged; a glaive in each fist, as the owner's
-   "Glaive Warden - Round Glaives.glb"). tools/make_gv.py -> src/model_gv2.js: 30 bones (her hair and the cape's fall on two
-   of their own, the sashes on two, a bone for the glaive in each fist), 13,886 triangles on one 1024 x 1536 atlas, 11 clips
-   baked at 30 frames a second. ON by default in place of her code-built body (forces_wardbound_f.js: FORCE_BUILD and
+   the horned, masked warden in bronze-gold plate and her round glaive, un-rigged; then "give the glaive warden one glaive,
+   she can have an extra on her back": her glaive in her right fist, the spare slung on her back). tools/make_gv.py ->
+   src/model_gv2.js: 30 bones (her hair and the cape's fall on two of their own, the sashes on two, a bone for the glaive in
+   her fist and one for the spare on her back), 13,886 triangles on one 1024 x 1536 atlas, 9 clips baked at 30 frames a second. ON by default in place of her code-built body (forces_wardbound_f.js: FORCE_BUILD and
    FORCE_PARTS wb_maskedwarden); ?gv=old (or the Model Lab's "Glaive Warden rig" row set to Old) draws that.
    Her moves, by the game's own cues (nothing in the game is changed):
-     idle      no foe in reach: at ease, a glaive hanging at each side, the rings tipped forward
-     ready     a foe in reach: the left foot forward, both glaives held flat before her, the right cocked at her hip
-     throwR/L  her strike (FORCE_ATTACK.wbArrow throws a glaive, flight k 'rglaive'): a flat backhand, wound across to the
-               other hip and whipped out at the foe; begun early so it leaves her hand on the game's throw (frame 8), paced
-               to the strikes' own interval. The right hand throws; while the right glaive is still out, the left does
-     catchR/L  that glaive's flight ends (it is home): the arm reaches out and draws it back into her guard
+     idle      no foe in reach: at ease, her glaive hanging at her right side, its ring tipped forward
+     ready     a foe in reach: the left foot forward, her glaive held flat and cocked at her hip, the free hand in guard
+     throwR    her strike (FORCE_ATTACK.wbArrow throws a glaive, flight k 'rglaive'): a flat backhand with her right hand,
+               wound across to her left hip and whipped out at the foe; begun early so it leaves her hand on the game's throw
+               (frame 8), paced to the strikes' own interval. While her glaive is still out, she throws the spare from her back
+     catchR    a glaive's flight ends (it is home): her arm reaches out and draws it back into her guard
      volley    Ricochet Rite (wb_runevolley): coiled away with the right glaive high behind her shoulder through the cast
                (A.cast, stretched to its time), then a high sidearm heave that leaves her hand 0.32 s after it (WBC.volley.at)
-     oath      Returning Oath (wb_piercingshaft): crouched and coiled with the left glaive drawn flat across her chest, then a
-               level backhand straight down the line 0.35 s after the cast (WBC.pierce.at), a step in with the left foot
-     ward      Warding Glaive (wb_wardarrow): the left glaive swung up high behind her through the cast, hurled down into the
+     oath      Returning Oath (wb_piercingshaft): crouched and coiled with her glaive drawn flat across her chest, then a
+               level backhand straight down the line 0.35 s after the cast (WBC.pierce.at), a step in
+     ward      Warding Glaive (wb_wardarrow): her glaive swung up high behind her through the cast, hurled down into the
                road as it lands (it stands there, drawn by the game: forces_wardbound_g.js wbgStanding); she draws it again
-     hit       her health drops: rocked back, the glaives flung wide
-     death     wounded (t.wounded): staggered, down on her right knee, the glaives set on their rims beside her; up again whole
-   A glaive is hidden in her fist while it flies: each of the game's glaive flights (wbS().P, k 'rglaive' / 'rglaiveL') from
-   her is marked with the hand that threw it, and that hand is empty until the flight ends.
+     hit       her health drops: rocked back, her arms flung wide
+     death     wounded (t.wounded): staggered, down on her right knee, her glaive set on its rim beside her, her left hand on
+               her knee; up again whole
+   A glaive is hidden while it flies: each of the game's glaive flights (wbS().P, k 'rglaive' / 'rglaiveL') from her is marked
+   with the glaive it is (her hand's, or the spare's when hers was out) and that one is not drawn until the flight ends.
+   Cast times are off game-wide (forces_zz_casttimes.js CAST_UNITS), so a spell goes off at once and its wind-up plays
+   between the cast and the game's release; with cast times on it stretches over the cast (A.cast).
    Her size is the shared rule (unitmodels_size.js); she stands on the Wardbound's flagstone (wbBase). The sculpted body is
    one look at every tier; she grows by UM_TIER.
    Checks: `python -I tools/make_gv.py --check`. Notes: docs/model_pilot/glaivewarden2.md. */
 const GV2 = (() => {
-  const U = 'wb_maskedwarden', NAMES = ['idle', 'ready', 'throwR', 'throwL', 'catchR', 'catchL', 'volley', 'oath', 'ward', 'hit', 'death'];
+  const U = 'wb_maskedwarden', NAMES = ['idle', 'ready', 'throwR', 'catchR', 'volley', 'oath', 'ward', 'hit', 'death'];
   const MV = { wb_runevolley: 'volley', wb_piercingshaft: 'oath', wb_wardarrow: 'ward' };
-  const HAND = { volley: 'R', oath: 'L', ward: 'L' };
   const EASE = .2, SPD_THROW = 1.1, BASE_H = .047, OUT_MAX = 4;
   const S = { on: true, err: null };
   try { S.on = !/[?&]gv=old\b/.test(location.search); } catch (e) {}
@@ -141004,8 +141006,8 @@ const GV2 = (() => {
   function load(data) {
     const R_ = MOBRIG.decode(data, 'gv2', ['body']), nb = R_.bones.length;
     if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('gv2: too many bones');
-    const bi = {}; for (const nm of ['hips', 'head', 'glvL', 'glvR', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('gv2: no ' + nm); bi[nm] = R_.bix[nm]; }
-    const mk = data.marks; for (const nm of ['gripL', 'ctrL', 'gripR', 'ctrR']) if (!mk || !mk[nm]) throw new Error('gv2: no mark ' + nm);
+    const bi = {}; for (const nm of ['hips', 'head', 'glvB', 'glvR', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('gv2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['gripB', 'ctrB', 'gripR', 'ctrR']) if (!mk || !mk[nm]) throw new Error('gv2: no mark ' + nm);
     const cl = {};
     for (const nm of NAMES) {
       const c = data.clips && data.clips[nm]; if (!c) throw new Error('gv2: no clip ' + nm);
@@ -141031,15 +141033,15 @@ const GV2 = (() => {
   const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('GV2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'gv2: ' + NB + ' bones'; });
   const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
 
-  /* her glaives in flight: each of the game's glaive flights from her, marked with the hand that threw it (the hand her
-     clip names as it leaves); a hand is empty while its flight lasts */
+  /* her glaives in flight: each of the game's glaive flights from her, marked with the glaive thrown ('R' her hand's, 'B'
+     the spare from her back, thrown while hers was out); that one is not drawn while its flight lasts */
   const flights = () => { try { return typeof wbS === 'function' ? wbS().P : null; } catch (e) { return null; } };
   function mark(t, now) {
     const P = flights(); if (!P) return;
     for (const p of P) if (p && p.t === t && !p._gvHand && (p.k === 'rglaive' || p.k === 'rglaiveL')) { p._gvHand = t._gvNext || 'R'; p._gvAt = now; }
   }
   function outNow(t, now) {
-    const o = { L: false, R: false }, P = flights(); if (!P) return o;
+    const o = { B: false, R: false }, P = flights(); if (!P) return o;
     for (const p of P) if (p && p.t === t && p._gvHand && !p.done && now - p._gvAt < OUT_MAX) o[p._gvHand] = true;
     return o;
   }
@@ -141053,14 +141055,15 @@ const GV2 = (() => {
     if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
     if (t._gvMv === 'death') t._gvRise = now;
     const rise = t._gvRise != null && now - t._gvRise < .9;
-    // (her glaives home: a catch for each hand whose flight has ended)
-    for (const h of 'LR') { if (t['_gvOut' + h] && !out[h]) t['_gvCatch' + h] = now; t['_gvOut' + h] = out[h]; }
+    // (a glaive home: the catch)
+    for (const h of 'BR') { if (t['_gvOut' + h] && !out[h]) t._gvCatchR = now; t['_gvOut' + h] = out[h]; }
+    const nxt = () => out.R ? 'B' : 'R';   // (the glaive the next throw is: her hand's, or the spare while hers is out)
     // a spell: its wind-up through the cast (stretched to the cast's own time), then its release on the game's own beat
     const own = () => { t._gvShots = t.shots; };
     const C = A && A.cast;
     if (C && MV[C.id] && CL[MV[C.id]]) {
       const m = MV[C.id], c = CL[m], win = (c.win || 15) / 30, T = Math.max(.05, C.T || (C.end - C.at) || win);
-      t._gvNext = HAND[m]; t._gvCastEnd = C.end != null ? C.end : C.at + T; own();
+      t._gvNext = nxt(); t._gvCastEnd = C.end != null ? C.end : C.at + T; own();
       return { c: m, s: Math.min(win, (now - C.at) / T * win), rate: 40, mv: 'cast' + C.at };
     }
     if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
@@ -141070,14 +141073,14 @@ const GV2 = (() => {
       const m = MV[A.last], c = CL[m], win = (c.win || 15) / 30, rel = Math.max(0, ((c.hit != null ? c.hit : c.win) - c.win) / 30), u = now - A.lastAt;
       const seen = t._gvCastEnd != null && Math.abs(t._gvCastEnd - A.lastAt) < .25;
       const s = seen ? win + u : rel > .05 ? (u < rel ? u * (win + rel) / rel : win + u) : Math.max(0, win - 6 / 30) + u;
-      if (c && s < c.len) { t._gvNext = HAND[m]; own(); return { c: m, s, rate: 40, mv: seen ? t._gvMv : 'ab' + A.lastAt }; }
+      if (c && s < c.len) { if (s < c.hit / 30) t._gvNext = nxt(); own(); return { c: m, s, rate: 40, mv: seen ? t._gvMv : 'ab' + A.lastAt }; }
     }
-    // her strikes: each new one counted; thrown by the right hand, or the left while the right glaive is out
+    // her strikes: each new one counted (her glaive, or the spare while hers is out)
     if (t.shots && t._gvShots !== t.shots) {
       const at = now - (t.shotT || 0);
       if (t._gvAt != null && at > t._gvAt && at - t._gvAt < 2.5) t._gvIv = at - t._gvAt;
-      if (t._gvPre == null) t._gvThrow = out.R && !out.L ? 'throwL' : 'throwR';
-      t._gvAt = at; t._gvShots = t.shots; t._gvPre = null; t._gvNext = t._gvThrow === 'throwL' ? 'L' : 'R';
+      if (t._gvPre == null) t._gvNext = nxt();
+      t._gvThrow = 'throwR'; t._gvAt = at; t._gvShots = t.shots; t._gvPre = null;
     }
     const spd = t._gvIv ? Math.min(2.2, Math.max(1, CL.throwR.len / t._gvIv)) : SPD_THROW;
     const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t._gvAt != null ? now - t._gvAt : 9;
@@ -141085,22 +141088,25 @@ const GV2 = (() => {
     if (fight && !inThrow) {
       const cd = t.cd || 0, HIT = hitOf('throwR');
       if ((t.windup || 0) > 0 && cd < HIT / spd) {   // (begun: the glaive leaves her hand on the game's throw)
-        if (t._gvPre == null) { t._gvPre = now; t._gvThrow = out.R && !out.L ? 'throwL' : 'throwR'; }
-        t._gvNext = t._gvThrow === 'throwL' ? 'L' : 'R';
-        return { c: t._gvThrow, s: HIT - cd * spd, rate: 40, mv: 'pre' + t._gvPre };
+        if (t._gvPre == null) { t._gvPre = now; t._gvNext = nxt(); }
+        t._gvThrow = 'throwR';
+        return { c: 'throwR', s: HIT - cd * spd, rate: 40, mv: 'pre' + t._gvPre };
       }
     }
     if (inThrow) return { c: last, s: lh + s * spd, rate: 40, mv: t._gvPre != null ? 'pre' + t._gvPre : last + t._gvAt };
     const h = t._gvHitAt != null ? now - t._gvHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._gvHitAt };
-    for (const hd of 'RL') { const k = t['_gvCatch' + hd], u = k != null ? now - k : 9; if (u >= 0 && u < CL['catch' + hd].len) return { c: 'catch' + hd, s: u, rate: 30, mv: 'catch' + hd + k }; }
+    { const k = t._gvCatchR, u = k != null ? now - k : 9; if (u >= 0 && u < CL.catchR.len) return { c: 'catchR', s: u, rate: 30, mv: 'catchR' + k }; }
     if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
     return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
   }
-  // is the glaive in this hand out of it now (in flight, or planted by Warding Glaive in its clip)?
-  function hidden(t, P, out, hd) {
-    if (out[hd]) return true;
-    const c = CL[P.c], o = c && c.out; if (!o || o[0] !== hd) return false;
-    const f = P.s * 30; if (f < o[1]) return false;
+  // is this glaive (R: her hand's, B: the spare on her back) not to be drawn now: in flight, planted by Warding Glaive in its
+  // clip, or (the spare) in her hand for a throw while hers is out?
+  function hidden(t, P, out, g) {
+    const c = CL[P.c], o = c && c.out, f = P.s * 30;
+    const drawing = !!(o && t._gvNext === 'B' && f < o[1]);   // (the spare drawn and in her hand until it leaves)
+    if (g === 'B') return out.B || drawing;
+    if (out.R && !drawing) return true;
+    if (!o || f < o[1]) return false;
     if (o[2] >= 0) return f < o[2];
     return P.s - o[1] / 30 < .3;   // (the throw itself, before its flight is marked)
   }
@@ -141122,7 +141128,7 @@ const GV2 = (() => {
     if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
     const now = live ? G.time : 0;
     if (live) mark(t, now);
-    const out = live ? outNow(t, now) : { L: false, R: false };
+    const out = live ? outNow(t, now) : { B: false, R: false };
     const P = ctl(t, live, out); sample(CL[P.c], P.s, PT);
     let pose = PT;
     if (live) {
@@ -141134,8 +141140,8 @@ const GV2 = (() => {
     }
     toBones(pose, OUT);
     const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
-    const gl = live ? w(BI.glvL, MK.ctrL) : null, gr = live ? w(BI.glvR, MK.ctrR) : null;
-    for (const hd of 'LR') if (live && hidden(t, P, out, hd)) {   // (that glaive is out of her hand: its bone collapsed to her fist, so its triangles draw nothing)
+    const gb = live ? w(BI.glvB, MK.ctrB) : null, gr = live ? w(BI.glvR, MK.ctrR) : null;
+    for (const hd of 'BR') if (live && hidden(t, P, out, hd)) {   // (that glaive is out of her hand: its bone collapsed to her fist, so its triangles draw nothing)
       const b = BI['glv' + hd], g = b * 12, q = at(OUT, b, MK['grip' + hd]);
       for (let k = 0; k < 12; k++) OUT[g + k] = 0; OUT[g + 3] = q[0]; OUT[g + 7] = q[1]; OUT[g + 11] = q[2];
     }
@@ -141143,8 +141149,7 @@ const GV2 = (() => {
     if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
     S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
     if (live) {
-      const hd = t._gvNext === 'L' ? gl : gr;   // (the glaive about to fly: the game's tip for its spark and glow)
-      t.tipW = hd; t.tipYaw = yaw; t.tipAt = G.time; t._gvDrawn = G.time; t._gvClip = P.c; t._gvClipS = P.s; t._gvGL = gl; t._gvGR = gr;
+      t.tipW = gr; t.tipYaw = yaw; t.tipAt = G.time; t._gvDrawn = G.time; t._gvClip = P.c; t._gvClipS = P.s; t._gvGB = gb; t._gvGR = gr;   // (the tip: the glaive in her hand)
     }
     return true;
   }
@@ -141159,7 +141164,7 @@ const GV2 = (() => {
     if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
     for (const x of box.querySelectorAll('[data-g2]')) x.onclick = () => { S.on = x.dataset.g2 === '1'; labRow(); };
   }
-  const anchors = t => mine(t) ? { tip: t.tipW, glaiveL: t._gvGL, glaiveR: t._gvGR, clip: t._gvClip, at: t._gvDrawn } : null;
+  const anchors = t => mine(t) ? { tip: t.tipW, glaiveBack: t._gvGB, glaiveR: t._gvGR, clip: t._gvClip, at: t._gvDrawn } : null;
   // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
   assetReady('model_gv2', () => {
     try { load(typeof GV2_MDL !== 'undefined' ? GV2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Glaive Warden rig:', e.message); }
