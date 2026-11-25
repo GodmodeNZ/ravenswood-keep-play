@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ded6a207@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'de91553b@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -20815,12 +20815,12 @@ const SO_LEGENDS = {
   so_sunbolt: { for: 'arrow', name: 'The Sunbolt Arbalest', icon: 'arrowhead', hue: '#ffe080', atk: 1,
     twist: 'A bolt bursts into five that seek out other foes, and every one that kills bursts again.',
     text: () => 'Each attack: 25% chance the bolt splits into 5 that seek other foes; each kill splits again.',
-    build: 'Pairs with: Storm of Silver, Double Crank (more bolts into a crowd, so more splits); a crowded road.',
-    combo: 'Storm of Silver, Double Crank and a crowded road.', fx: st => soPw(st, 'sl_sun', 1) },
+    build: 'Pairs with: Double Crank (a second attack, so a second chance); Storm of Silver (finishes split foes, so they split again); a crowded road.',
+    combo: 'Double Crank, Storm of Silver and a crowded road.', fx: st => soPw(st, 'sl_sun', 1) },
   so_firstchain: { for: 'frost', name: 'The First Chain', icon: 'chains', hue: '#fff0c0', atk: 1,
     twist: 'Her lash chains foes together; when one in the chain dies, the rest are struck and the chain takes new foes.',
     text: () => 'Each attack: 30% chance to chain 4 foes. When one dies, the rest are hit and the chain takes new foes.',
-    build: 'Pairs with: Lash Through, Radiant Hands (more foes struck, so more chains); Censer Bearers or Templars of the Ford (they kill chained foes fast).',
+    build: 'Pairs with: Lash Through, Radiant Hands (they hit the chained foes beside her target, so links break sooner); Censer Bearers or Templars of the Ford (they kill chained foes fast).',
     combo: 'Radiant Hands, Censer Bearers and a crowded road.', fx: st => soPw(st, 'sl_chain', 1) },
   so_opengate: { for: 'arcane', name: 'Clarion of the Open Gate', icon: 'banner', hue: '#e8d8a0',
     twist: 'At its call a gate opens by the lead foe, and the knight rides out of it back up the road through every foe.',
@@ -20835,8 +20835,8 @@ const SO_LEGENDS = {
   so_firstlight: { for: 'storm', name: 'Staff of First Light', icon: 'sun', hue: '#ffe8a0', atk: 1,
     twist: 'Flyers she brings down fall burning from the sky onto the foes below.',
     text: () => 'Flyers it kills crash down as stars, hitting ground foes within 1 cell.',
-    build: 'Pairs with: Zenith (harder on flyers); Dawnfall (flyers slammed down in her reach); flyer waves, which walk over ground foes.',
-    combo: 'Zenith, Dawnfall and a flyer wave.', fx: st => soPw(st, 'sl_halo', 1) },
+    build: 'Pairs with: Zenith (her attacks and Sunlance hit flyers harder, so more fall); flyer waves crossing over ground foes.',
+    combo: 'Zenith and a flyer wave.', fx: st => soPw(st, 'sl_halo', 1) },
   so_lasthammer: { for: 'earth', name: 'Hammer of the Last Word', icon: 'hammer', hue: '#c8d0e8', atk: 1,
     twist: 'Every foe he slays leaves a sword of light circling him, and the whole ring flies at the toughest foe.',
     text: () => 'On kill: a sword joins a ring round it (up to 12). Every 10s the ring flies at the toughest foe.',
@@ -20844,12 +20844,12 @@ const SO_LEGENDS = {
     combo: 'Whirling Flurry, Steel Tempest and a crowded corner.', fx: st => soPw(st, 'sl_ring', 1) },
   so_saintcenser: { for: 'cannon', name: 'Censer of the Saints', icon: 'cloud', hue: '#c0a0f0', atk: 1,
     twist: 'The smoke feeds on the dying: every foe that falls in it makes the cloud wider and longer.',
-    text: () => 'Each foe that dies in its incense makes the cloud wider and last longer.',
+    text: () => 'Each foe that dies in its incense: the cloud grows 0.12 cells wider and lasts 1s longer (up to 2.2 cells, 8s).',
     build: 'Pairs with: Choking Smoke (foes stay in the smoke), Procession of Incense (more clouds on the road); Templars of the Ford beside it (kills in the smoke).',
     combo: 'Choking Smoke, Procession of Incense and Templars beside it.', fx: st => soPw(st, 'sl_smoke', 1) },
   so_recant: { for: 'venom', name: 'Writ of Recantation', icon: 'scales', hue: '#b8862a',
     twist: 'A spell she breaks turns on the caster\'s own: a heal wounds, a shield shatters.',
-    text: () => 'When it breaks a foe\'s spell: the spell hits that foe\'s allies the wrong way round (a heal hurts, a shield breaks).',
+    text: () => 'When it breaks a foe\'s spell: a heal hurts its allies for 12% of their health (at most 4 of her attacks), a shield breaks.',
     build: 'Pairs with: Writ of Seizure (breaks a spell); Broken Litany (its attacks break spells); waves with casters.',
     combo: 'Writ of Seizure, Broken Litany and a wave of casters.', fx: st => soPw(st, 'sl_writ', 1) },
   so_silvermere: { for: 'holy', name: 'The Bell of Silvermere', icon: 'echo', hue: '#e8c070',
@@ -51266,7 +51266,7 @@ talPlain('wardbound', 'champ:wb_isaura', {
    all follow the rule. stagCharge and soCharge refuse a blocked foe outright, the two line charges cut their length with
    rideLen, and chargeAt never draws a rider past a blocker.
    THE EXCEPTION (rideFree): earned only. A capstone (Grail Knights: Part the Ranks; Morrow: Grey Justicar; Aedric: Open
-   Road) or the force's legendary (Bridle of the Parting Boughs, Clarion of the Open Gate, Barding of the Stormgate).
+   Road) or the force's legendary (Bridle of the Parting Boughs, Barding of the Stormgate).
    THE PREVIEW (rideLaneDraw, called from view.js): a rider selected or being placed shows where it can charge: its
    reach with the parts its neighbours block cut away, and the blocking cells marked.
    Check: node tools/check_charge_lanes.js -v */
@@ -51375,7 +51375,9 @@ if (typeof chargeAt === 'function' && !chargeAt._ride) {
 }
 
 /* ---------- the exception: the legendaries' and the capstone's flags ---------- */
-// (the items set st.pw.rdBridle / rdClarion / rdBarding through their forces' own fx; the capstones are read by talentHas)
+// (the items set st.pw.rdBridle / rdBarding through their forces' own fx; the capstones are read by talentHas. No item sets rdClarion
+//  since the Silver legendaries v6: the Clarion's ride comes out of a gate by the lead foe, not from the knight, so no lane applies to
+//  it. The key stays so check_charge_lanes can still try the Grail Knight's earned way through.)
 
 /* ---------- the preview: where this rider can charge ---------- */
 const RD_RAYS = 96;
@@ -60714,7 +60716,7 @@ const SL = {
   sun: { p: .25, n: 5, n2: 3, k: .6, r: 2.5, deep: 2, cap: 16, hold: 2 },                 // Sunbolt Medallion
   chain: { p: .3, n: 4, r: 2.6, k: 1.5, life: 10, more: 2, max: 9, spread: 10 },     // The First Chain
   lion: { T: 4, r: .6, pile: .5, boss: 1.5, burst: 1.3, k: 2.5, n: 12 },           // Mantle of the Lion
-  gate: { far: 3, back: 4, k: 2.6 },                                                 // Clarion of the Open Gate
+  gate: { far: 3, back: 5, k: 3.4 },                                                 // Clarion of the Open Gate
   grail: { p: .3, k: 1, r: 2, deep: 5 },                                          // The True Grail
   star: { r: 1, hp: .3, cap: 5, T: .45 },                                          // Halo of First Light
   ring: { max: 12, every: 10, k: .5 },                                             // Seal of the Last Word
@@ -60930,7 +60932,7 @@ function slRingTick(t, dt) {
   if ((t.slSwT = (t.slSwT || 0) + dt) < SL.ring.every) return;
   const st = t.st, L = abFoes(t, st, (st.range || 1.5) + .5, abWalker); if (!L.length) return;
   const tg = abToughest(L), n = t.slSw; t.slSw = 0; t.slSwT = 0;
-  slEv('ring:fly'); slCue(t, 'raise'); t.slRingAt = G.time; t.tpCut = 2; t.soSlamAt = G.time;   // (he points both blades: the Twin Cut's clip)
+  slEv('ring:fly'); slCue(t, 'raise'); t.slRingAt = G.time;   // (his `leg` clip: both blades thrown at the foe)
   for (let i = 0; i < n; i++) {
     const a = i / n * TAU + G.time * 1.6, r = .55;
     slS().fly.push({ k: 'sword', x0: t.x + Math.cos(a) * r, z0: t.y + Math.sin(a) * r, o: tg, at: G.time + i * .05, T: .28 });
@@ -71578,7 +71580,9 @@ void main(){
   vec3 V = normalize(uCam - vW);
   float h = clamp(vOP.y, 0., 1.);   // the model stands 0..1 tall in its own space
   if(vEm < -.5){   // scenery (a mesh's ext.x -1: a 3D battlefield, scene3d.js): the engine's own light, so cast shadows fall on it at full strength; none of the units' stylising
+    if(vEm < -2.5){ o = vec4(finish(base*mix(uShK.x, 1., sh), vW), vX.x); return; }   // (ext.x -3: a floor that carries its own baked light: only the units' shadows are laid on it)
     vec3 c = base*lightAt(n, vW, sh, 0.)*moodOf(n, smoothstep(-.12, .55, dot(n, uSunDir))*sh, uMoodE);
+    c += tx*clamp(-vEm - 1., 0., 1.)*2.2;   // (ext.x -1 .. -2: how much it glows of itself, in its own colour: a mushroom's gills)
     o = vec4(finish(c, vW), vX.x); return;
   }
   if(uSty < .5){   // the plain path (to compare): the engine's light on the painted texture
@@ -78514,8 +78518,9 @@ function scene3dBuild(C) {
   const MS = D.meshes.map(m => {
     const q = new Int16Array(b64(m.pos)), n8 = new Int8Array(b64(m.nor)), uv = new Float32Array(b64(m.uv)), idx = m.nv > 65535 ? new Uint32Array(b64(m.idx)) : new Uint16Array(b64(m.idx)), P = new Float32Array(m.nv * 3);
     for (let i = 0; i < m.nv; i++) for (let e = 0; e < 3; e++) P[i * 3 + e] = m.min[e] + (q[i * 3 + e] + 32768) / 65535 * (m.max[e] - m.min[e]);
-    return { m, P, n8, uv, idx, vc: m.vc ? new Uint8Array(b64(m.vc)) : null };
+    return { m, P, n8, uv, idx, vc: m.vc ? new Uint8Array(b64(m.vc)) : null, glow: m.glow ? new Uint8Array(b64(m.glow)) : null };
   });
+  const FB = D.floor || null;   // the owner's own lighting baked onto the floor (tools/make_map3d.py BAKE): the floor is drawn with it, and the props cast no shadow of the game's on it (theirs are in it)
   const key = m => m.img || 'flat', G_ = {}, floorOf = m => RE.floor.test(m.name), waterOf = m => !!RE.water && RE.water.test(m.name), bigOf = m => RE.big.test(m.name);
   const small = m => !floorOf(m) && !waterOf(m) && !RE.keep.test(m.name), onField = o => { const x = o[4] * S + DX, z = o[12] * S + DZ; return x > -.4 && x < COLS + .4 && z > -.3 && z < ROWS + .6; };
   const SH = [];
@@ -78538,7 +78543,7 @@ function scene3dBuild(C) {
     for (const o of g.objs) {
       const M = MS[o[0]], m = M.m, floor = floorOf(m), big = bigOf(m), tall = big && m.max[1] - m.min[1] > 6, sway = !m.img && !!RE.sway && RE.sway.test(m.name), K = kOf(m);
       if (floor) isFloor = true;
-      const c = m.img ? [K, K, K] : [m.col[0] * K, m.col[1] * K, m.col[2] * K], vcol = M.vc;
+      const c = m.img ? [K, K, K] : [m.col[0] * K, m.col[1] * K, m.col[2] * K], vcol = M.vc, baked = floor && FB, GL = M.glow, gK = C.glow == null ? 1 : C.glow;
       for (let t = 0; t < M.idx.length; t++, w++) {
         const v = M.idx[t], x = M.P[v * 3], y = M.P[v * 3 + 1], z = M.P[v * 3 + 2];
         let X = (o[1] * x + o[2] * y + o[3] * z + o[4]) * S + DX, Y = (o[5] * x + o[6] * y + o[7] * z + o[8]) * S, Z = (o[9] * x + o[10] * y + o[11] * z + o[12]) * S + DZ;
@@ -78552,17 +78557,21 @@ function scene3dBuild(C) {
         nor[w * 3] = a * l; nor[w * 3 + 1] = b * l; nor[w * 3 + 2] = c2 * l;
         // (a great piece is not darkened by its own contact shade as the ground under it is; a tall tree: its trunk and roots in its own crown's shade, the crown's top in the sun)
         const sd = big ? (tall ? .5 + .5 * Math.min(1, Math.max(0, (Y - .5) / 5)) : 1) * (.6 + .4 * shadeAt(X, Z)) : shadeAt(X, Z);
-        if (vcol) { col[w * 3] = vcol[v * 3] / 255 * K * sd; col[w * 3 + 1] = vcol[v * 3 + 1] / 255 * K * sd; col[w * 3 + 2] = vcol[v * 3 + 2] / 255 * K * sd; } else { col[w * 3] = c[0] * sd; col[w * 3 + 1] = c[1] * sd; col[w * 3 + 2] = c[2] * sd; }
-        if (m.img) ext[w * 2] = -1;   // (scenery: the plain engine light and full shadows, gl.js FS_STY)
-        uv[w * 2] = M.uv[v * 2]; uv[w * 2 + 1] = M.uv[v * 2 + 1];
+        if (baked) { const kb = K_.bake == null ? 1 : K_.bake; col[w * 3] = kb; col[w * 3 + 1] = kb; col[w * 3 + 2] = kb; }
+        else if (vcol) { col[w * 3] = vcol[v * 3] / 255 * K * sd; col[w * 3 + 1] = vcol[v * 3 + 1] / 255 * K * sd; col[w * 3 + 2] = vcol[v * 3 + 2] / 255 * K * sd; } else { col[w * 3] = c[0] * sd; col[w * 3 + 1] = c[1] * sd; col[w * 3 + 2] = c[2] * sd; }
+        if (baked) { ext[w * 2] = -3; uv[w * 2] = (X - FB.rect[0]) / FB.rect[2]; uv[w * 2 + 1] = (Z - FB.rect[1]) / FB.rect[3]; }   // (the baked floor: its picture laid flat over the ground; gl.js FS_STY ext.x -3)
+        else { if (m.img) ext[w * 2] = -1 - (GL ? Math.min(.95, GL[v] / 255 * gK) : 0);   // (scenery: the plain engine light and full shadows; and how much it glows of itself: gl.js FS_STY ext.x -1 .. -2)
+          uv[w * 2] = M.uv[v * 2]; uv[w * 2 + 1] = M.uv[v * 2 + 1]; }
         if (X < mn[0]) mn[0] = X; if (Y < mn[1]) mn[1] = Y; if (Z < mn[2]) mn[2] = Z; if (X > mx[0]) mx[0] = X; if (Y > mx[1]) mx[1] = Y; if (Z > mx[2]) mx[2] = Z;
       }
     }
-    const mesh = { pos, nor, col, ext, count: n, min: mn, max: mx, gl: new Map(), scene3d: k, cast: !isFloor };   // (everything but the floor casts a shadow: owner, of their own render, "shadows should be as they are here")
-    if (g.img && D.tex[g.img] && typeof Image !== 'undefined') { const im = new Image(); im.decoding = 'async'; im.src = D.tex[g.img]; mesh.uv = uv; mesh.tex = im; if (isFloor) mesh.texWrap = 'mirror'; }   // (a floor's texture runs on past its edge mirrored, as the owner's scenes set it)
+    const mesh = { pos, nor, col, ext, count: n, min: mn, max: mx, gl: new Map(), scene3d: k, cast: !isFloor && !FB };   // (everything but the floor casts a shadow: owner, of their own render, "shadows should be as they are here")
+    const src = isFloor && FB ? FB.tex : g.img && D.tex[g.img];
+    if (src && typeof Image !== 'undefined') { const im = new Image(); im.decoding = 'async'; im.src = src; mesh.uv = uv; mesh.tex = im; if (isFloor && !FB) mesh.texWrap = 'mirror'; }   // (a floor's texture runs on past its edge mirrored, as the owner's scenes set it)
     out.push(mesh);
   }
   const gr = new Geo(1); gr.jit = 0; gr.quad([-60, -1.6, -50], [-60, -1.6, 60], [70, -1.6, 60], [70, -1.6, -50], '#16220f');   // (far under the floor: what shows past the scene's edge)
+  if (FB) for (const m of out) m.noCast = true;
   S3W.by[C.id] = { C, data: WAT, vao: null, n: 0 };
   return { ground: gr.finish(), wild: out, deco: new Geo(73).finish(), trees: [], fx: null };
 }
@@ -78698,7 +78707,8 @@ function scene3dApply() {
      re            which meshes are what, by name: floor; water (and fall, a part of it); sway (untextured plants that move);
                    big (great pieces: trees, a hive, a log: contact shade); keep (what may stand inside the field's cells);
      K             how bright each part is drawn against the owner's render: by: [[regex, factor] ...], then floor, tex
-                   (anything else textured), flat (anything untextured). Found by eye;
+                   (anything else textured), flat (anything untextured), bake (the floor, when it carries baked light). Found by eye;
+     glow          how strongly a material's emissive parts glow (the data's glow a vertex x this);
      light, mood, tone, fwd, theme, map, water     laid over the defaults above (theme: mistCol, mistAt ... as any THEMES entry). */
 const SCENE3D_MAPS = {
   thornhive: {
@@ -78719,16 +78729,23 @@ const SCENE3D_MAPS = {
     data: 'HOLLOW3D', asset: 'hollow3ddata', name: 'Glowcap Hollow', blurb: 'A mossy hollow under giant veilcaps, a spring rippling at its edge',
     paint: { asset: 'hollowpaint', prefix: 'HOLLOW', light: { sun: '#ffe6c0', sunI: 1.5, sky: '#9cc8b4', skyI: .6 } },
     re: { floor: /moss clearing/i, water: /spring/i, fall: null, sway: /sedge/i, big: /oak|veilcap|nursery log|honeycap root|root arch/i, keep: /oak|veilcap|nursery log|honeycap root|root arch|mycelium/i },
-    K: { by: [[/oak/i, .5], [/veilcap/i, .75], [/nursery log/i, .62], [/fern/i, .55], [/mycelium/i, .5]], floor: .6, tex: .62, flat: .42 },
+    K: { by: [[/oak/i, .4], [/veilcap/i, .7], [/nursery log/i, .62], [/fern/i, .48], [/mycelium/i, .44]], floor: .6, bake: .66, tex: .58, flat: .42 },
     edge: [21, 15.5, 6.5],
-    light: { sun: '#fff0d8', sunI: 1.1, el: 55, sky: '#a8ccc0', skyI: .66, gnd: '#4f7a52', gndI: .34, fog: '#5c9488', fogNear: .86, fogFar: 2.0 },
-    mood: { top: '#a8d8c8', topK: .1, bounce: '#6cae5c', bounceK: .12 },
-    tone: { sat: .84 },
-    water: { flow: 0, rings: .8, mirror: .3, deep: [.004, .075, .08], shal: [.02, .2, .19] },
+    /* The light, to the owner's scene (read from their .blend): not one sun but a weak one (strength 1.1, 8 degrees soft)
+       under a dim blue sky (0.34), and six shadow-casting spot lights; the two that matter rake warm light across the moss
+       from the upper left and behind ("Sunbreak"). The game has one sun: it stands where those two do, warm, with little
+       ambient, and lights the PROPS; the floor carries the owner's own light, baked (K.bake its brightness). */
+    light: { sun: '#ffd9a0', sunI: 1.55, az: -128, el: 44, sky: '#7fa8d8', skyI: .36, gnd: '#4f7a52', gndI: .2, rim: .3, fill: .06, fog: '#3f8478', fogNear: 1.05, fogFar: 2.8, dap: 0 },   // (little distance fog: it washed the baked shadows teal)
+    mood: { top: '#9cc0e0', topK: .1, bounce: '#6cae5c', bounceK: .1, key: '#ffd8a0', keyK: .08 },
+    fwd: { shFloor: .35, shSoft: 2.4, back: '#8fd8d0', backI: .4 },   // (shFloor: how dark a unit's own shadow lies on the baked floor)
+    tone: { sat: .8, contrast: 1.05, ev: 0 },
+    glow: 1.5,
+    water: { flow: 0, rings: .8, mirror: .2, deep: [.004, .1, .11], shal: [.02, .3, .3] },
     map: { tun: [.3, 2.6] },
-    theme: { mistCol: [.5, .86, .74], mistAt: [[-12, 1.3, -7, 10, 4.5, .4], [-17, 1.1, 1, 10, 4.5, .42], [-16, 1.0, 10, 10, 4.2, .4], [-8, .9, 18.5, 11, 3.8, .34], [5, .9, 20.5, 11, 3.6, .3], [16, .9, 19, 11, 3.8, .34],
-      [26, 1.0, 12, 10, 4.2, .42], [28, 1.1, 3, 10, 4.5, .42], [24, 1.3, -7, 10, 4.5, .4], [14, 1.7, -11, 9, 4, .3], [-3, 1.7, -11, 9, 4, .3]],   // (none over the spring: it washed the water pale)
-      mistSwirl: [[-14, 1.1, 5, 3.4, 5], [25, 1.1, 7, 3.4, 5]] },
+    // mist where the owner's six volumes lie (their places and sizes), mint, and thinner drifts round the rest of the edge
+    theme: { mistCol: [.46, .88, .76], mistAt: [[-3.9, 1.5, -4.1, 12, 5, .28], [17.9, 1.3, 13.6, 10, 4.4, .28], [-9.4, 1.9, 2.1, 13, 6, .3], [17.5, 2.0, -3.4, 13, 5, .28], [-9, 1.4, 12.4, 11, 5, .28], [21.6, 1.2, 7.7, 10, 5, .15],
+        [-17, 1.1, 8, 10, 4.5, .22], [5, .9, 20.5, 11, 3.6, .17], [28, 1.1, 3, 10, 4.5, .22], [14, 1.7, -11, 9, 4, .19], [-3, 1.7, -11, 9, 4, .19]],   // (thicker than this hid the baked shadows)
+      mistSwirl: [[-10, 1.4, 3, 3.6, 6], [17, 1.6, -3, 3.6, 6], [-9, 1.2, 12, 3.2, 5], [18, 1.1, 13, 3.2, 5]] },
   },
 };
 // an asset already in (an inline build, or test.html's) runs its callback at once, while this file loads: before view.js's
@@ -90155,7 +90172,7 @@ function renderView(dt) {
           const an = r0 * 6.28 + dir * (u * 5.2 + Math.sin(vt * .2 + j) * .4), rr = reach * Math.pow(u, .8), sz2 = .28 + u * .7;
           QA.bill(RD, sx + Math.cos(an) * rr * (1 + .5 * r0), sy + Math.sin(an) * rr * .5 - u * .5, sz, sz2, sz2 * .8, [mc[0], mc[1], mc[2], .34 * Math.sin(Math.PI * Math.min(1, u * 1.05)) * (1 - q * .13)], 1, 0); } } } }
   if (TH.id === 'clearing') {} else if (TH.ward && typeof edgeWard === 'function') edgeWard(TH.ward, TH.wardBare ? -1 : ROWS + 1.55);   // (a map's own colour; a 3D map's waystones, none on a painting)
-  ENV.wild.forEach((m, k) => item(m, _I, { shadow: k < 2 || !!m.cast }));   // (m.cast: a 3D battlefield's pieces all cast: scene3d.js)
+  ENV.wild.forEach((m, k) => item(m, _I, { shadow: !m.noCast && (k < 2 || !!m.cast) }));   // (m.cast: a 3D battlefield's pieces all cast: scene3d.js)
   const walkIn = MAPS[G.map] && MAPS[G.map].entry;   // (a map foes walk into from the woods has no portal)
   if (!SCENE_OFF) { item(ENV.deco, _I, { shadow: false }); if (!walkIn) item(ENV.portal, _I); if (!TH.noKeep) item(ENV.keep, _I); }   // (the FX Lab side view hides the scenery)
   // lights
@@ -111104,7 +111121,7 @@ const SL2 = (() => {
 /* The Oathsworn Shieldbearers on a rig and clips made from scratch (the owner, 21 Nov 2026: "Oathsworn Shieldbearer/Finished
    Assets": the knight, his sword and his shield, un-rigged). tools/make_os2.py -> src/model_os2.js: 36 bones (the tabard and
    the cape below his belt on four panels of their own, each in two lengths; a bone each for the sword in his right fist and
-   the shield on his left), 8,696 triangles on one 1024 x 1536 atlas, 11 clips baked at 30 frames a second.
+   the shield on his left), 8,696 triangles on one 1024 x 1536 atlas, 12 clips baked at 30 frames a second.
    ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.oathsworn and its shield and sword parts);
    ?os=old (or the Model Lab's "Shieldbearer rig" row set to Old) draws that.
    His moves, by the game's own cues (nothing in the game is changed):
@@ -111121,13 +111138,15 @@ const SL2 = (() => {
      rampart    Rampart of Dawn (so_aegis): the shield heaved up and slammed down rim first into the road, 0.22 s after the cast
      challenge  Oath of Challenge (so_rebuke): the sword raised to the sky, then beaten twice on the shield's rim
      hit        his health drops: the blow taken on the shield, knocked back, braced again
+     leg        his legendary fires (t.rxCue, the Mantle of the Lion): the shield driven forward and down, planted rim first
+                in the road before him, braced low behind it, held, then up into the wall
      death      wounded (t.wounded): down on one knee, the shield's rim and the sword's point to the ground; when he is whole
                 again he eases back up into his guard
    His size is the shared rule (unitmodels_size.js); he stands on the Order's flagstone. The sculpted body is one look at every
    tier (the code-built body's gilding at II and III is not on it); he grows by UM_TIER.
    Checks: `python tools/make_os2.py --check`. Notes: docs/model_pilot/oathsworn2.md. */
 const OS2 = (() => {
-  const U = 'oathsworn', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'bash', 'bulwark', 'rampart', 'challenge', 'hit', 'death'];
+  const U = 'oathsworn', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'bash', 'bulwark', 'rampart', 'challenge', 'hit', 'death', 'leg'];
   const CUTS = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, WIND = .12, SPD_CUT = 1.1;
   const MV = { so_bash: 'bulwark', so_aegis: 'rampart', so_rebuke: 'challenge' }, START = { bulwark: 0, rampart: 0, challenge: 0 };
   const BASE_H = .05;
@@ -111234,6 +111253,11 @@ const OS2 = (() => {
     if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
     if (t._osMv === 'death') t._osRise = now;   // (whole again: eased back up)
     const rise = t._osRise != null && now - t._osRise < .9;
+    // his legendary fires (the Mantle of the Lion; silverleg.js slCue sets t.rxCue): the shield planted across the road;
+    // a spell cast after the cue wins
+    const q = t.rxCue;
+    if (q && CL.leg && now >= q.at && now - q.at < CL.leg.len && !(A && A.lastAt != null && A.lastAt > q.at))
+      return { c: 'leg', s: now - q.at, rate: 40, mv: 'leg' + q.at };
     // a spell: its move from the cast
     if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
       const u = now - A.lastAt, m = MV[A.last], c0 = CL[m], s0 = START[m] || 0;
@@ -111822,7 +111846,7 @@ const TV2 = (() => {
    Silverbolt/Finished Assets": the soldier and his crossbow, un-rigged; the crossbow's string and its bolts are made by the
    tool). tools/make_sv2.py -> src/model_sv2.js: 38 bones (the tabard and cape below his belt on four panels, each in two
    lengths; the crossbow on a bone of its own that moves freely, both fists solved onto it; the string's middle sliding along
-   its groove; a bolt in the groove and one in his right fist), one 1024 x 1536 atlas, 10 clips at 30 frames a second.
+   its groove; a bolt in the groove and one in his right fist), one 1024 x 1536 atlas, 11 clips at 30 frames a second.
    ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.silverbolt and its xbow and lhand parts);
    ?sv=old (or the Model Lab's "Crossbow rig" row set to Old) draws that.
    His moves, by the game's own cues (nothing in the game is changed):
@@ -111838,10 +111862,12 @@ const TV2 = (() => {
      witness     Mark of Witness (so_witness): the crossbow dropped to his side, his left arm out pointing at the foe
      hit         his health drops: knocked back, the nose thrown off line, aimed again
      death       wounded (t.wounded): down on his right knee, the crossbow across his thighs; eased back up when whole
+     leg         a legendary fires (t.rxCue): the crossbow swung up and held high overhead in both hands, crosswise, like a
+                 raised standard, chest out; held a beat, then back down into the aim (unitreact.js skips him: RX_OWN_LEG)
    The bolt leaves the crossbow's bolt tip (t.tipW, read by unitTip). His size is the shared rule (unitmodels_size.js); he
    stands on the Order's flagstone. Checks: `python tools/make_sv2.py --check`. Notes: docs/model_pilot/silverbolt2.md. */
 const SV2 = (() => {
-  const U = 'silverbolt', NAMES = ['idle', 'ready', 'readyUp', 'shot', 'shotUp', 'sanct', 'hail', 'witness', 'hit', 'death'];
+  const U = 'silverbolt', NAMES = ['idle', 'ready', 'readyUp', 'shot', 'shotUp', 'sanct', 'hail', 'witness', 'hit', 'death', 'leg'];
   const EASE = .2, SPD_MAX = 1.8;
   const MV = { so_sanct: 'sanct', so_hail: 'hail', so_witness: 'witness' };
   const BASE_H = .05;
@@ -111956,6 +111982,9 @@ const SV2 = (() => {
     // the target's height: eased, so a flyer passing over does not snap the aim
     const up0 = aimUp(t), dt = t._svUpT == null ? 1 : Math.max(0, Math.min(.1, now - t._svUpT)); t._svUpT = now;
     t._svUp = !Number.isFinite(t._svUp) ? up0 : t._svUp + (up0 - t._svUp) * (1 - Math.exp(-dt * 6)); if (!Number.isFinite(t._svUp)) t._svUp = 0; const up = t._svUp;
+    // a legendary fired (t.rxCue, the Silver legendaries' slCue): the crossbow raised overhead like a standard; a spell cast after it wins
+    const q = t.rxCue;
+    if (q && CL.leg && now >= q.at && now - q.at < CL.leg.len && !(A && A.lastAt != null && A.lastAt > q.at)) return { c: 'leg', s: now - q.at, rate: 40, mv: 'leg' + q.at, up: 0 };
     // a spell: its move from the cast (and the bolts the game looses meanwhile are under it)
     if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
       const u = now - A.lastAt, m = MV[A.last], c0 = CL[m];
@@ -112328,7 +112357,7 @@ const FK2 = (() => {
    sun are drawn at her palm (forces_silver_b.js soExtra). Her size is the shared rule (unitmodels_size.js); she stands on the Order's
    flagstone. Checks: `python tools/make_lb2.py --check`. Notes: docs/model_pilot/lightbinder2.md. */
 const LB2 = (() => {
-  const U = 'lightbinder', NAMES = ['idle', 'ready', 'lash', 'bindlash', 'bind', 'flare', 'shackle', 'hit', 'death'];
+  const U = 'lightbinder', NAMES = ['idle', 'ready', 'lash', 'bindlash', 'bind', 'flare', 'shackle', 'hit', 'death', 'leg'];
   const EASE = .2, BLOW = .3, SPD_CUT = 1;
   const MV = { so_bind: 'bind', so_flare: 'flare', so_shackle: 'shackle' }, START = { bind: 0, flare: 0, shackle: 0 };
   const BASE_H = .05;
@@ -112435,6 +112464,10 @@ const LB2 = (() => {
     if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
     if (t._lbMv === 'death') t._lbRise = now;   // (whole again: eased back up)
     const rise = t._lbRise != null && now - t._lbRise < .9;
+    // her legendary fired (t.rxCue, the Order's legendaries): arms thrown wide, then the chains hauled in; a spell cast after it wins
+    const q = t.rxCue;
+    if (q && CL.leg && now >= q.at && now - q.at < CL.leg.len && !(A && A.lastAt != null && A.lastAt > q.at))
+      return { c: 'leg', s: now - q.at, rate: 40, mv: 'leg' + q.at };
     // a spell: its move from the cast
     if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
       const u = now - A.lastAt, m = MV[A.last], c0 = CL[m], s0 = START[m] || 0;
@@ -112672,7 +112705,7 @@ const LB2 = (() => {
 /* The Templars of the Ford on a rig and clips made from scratch (the owner, 22 Nov 2026: "Silver Order - Templar and Censer
    Bearer": the knight and his sword, un-rigged; art direction: dual wield, a sword in each closed fist). tools/make_tp2.py ->
    src/model_tp2.js: 36 bones (the tabard below his belt on four panels of their own, each in two lengths; a bone each for the
-   sword in his right fist and the one in his left), 8,798 triangles on one 1024 x 1536 atlas, 13 clips baked at 30 frames a
+   sword in his right fist and the one in his left), 8,798 triangles on one 1024 x 1536 atlas, 14 clips baked at 30 frames a
    second. ON by default in place of his code-built body (forces_silver_b.js: FORCE_BUILD.templar and its parts); ?tp=old (or
    the Model Lab's "Templar rig" row set to Old) draws that.
    His moves, by the game's own cues (nothing in the game is changed):
@@ -112697,13 +112730,15 @@ const LB2 = (() => {
                 caught again at 1.35 s. With the Second Star (st.caps.tpStar) clip heaven2 plays: the left sword is thrown in
                 its turn 0.4 s behind the right (hidden and drawn in flight too), and each is caught in turn
      hit        his health drops: rocked back, the forward blade knocked aside
+     leg        his legendary fires (t.rxCue; Seal of the Last Word's ring flies): both swords swept up crossed high overhead,
+                held a beat, then flung forward and down together, both points at the foe (frame 12), held, back to his guard
      death      wounded (t.wounded): down on one knee, both swords' points in the ground; when he is whole again he eases back
                 up into his guard
    His size is the shared rule (unitmodels_size.js); he stands on the Order's flagstone. The sculpted body is one look at every
    tier; he grows by UM_TIER.
    Checks: `python tools/make_tp2.py --check`. Notes: docs/model_pilot/templar2.md. */
 const TP2 = (() => {
-  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cross', 'flurry5', 'flurry6', 'flurry7', 'heaven', 'heaven2', 'hit', 'death'];
+  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cross', 'flurry5', 'flurry6', 'flurry7', 'heaven', 'heaven2', 'hit', 'death', 'leg'];
   const CUTS = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, SPD_CUT = 1.1;
   const MV = { so_crush: 'cross', so_hammerfall: 'heaven' };
   const FL_AT = .15, FL_IV = .3, OUT_AT = .3, BACK_AT = 1.35, STAR2 = .4, PARRY = .2;   // (the game's own times: the flurry's first cut and its interval; the sword leaves the hand and is back in it; the Second Star's sword that long after the first)
@@ -112813,6 +112848,10 @@ const TP2 = (() => {
     if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
     if (t._tpMv === 'death') t._tpRise = now;   // (whole again: eased back up)
     const rise = t._tpRise != null && now - t._tpRise < .9;
+    // his legendary fired (Seal of the Last Word: t.rxCue, the silverleg file's slCue): both swords crossed overhead, then flung
+    // at the foe as the ring of swords flies. A spell cast after the cue wins
+    const q = t.rxCue;
+    if (q && CL.leg && now >= q.at && now - q.at < CL.leg.len && !(A && A.lastAt != null && A.lastAt > q.at)) { t._tpShots = t.shots; if (t.soSlamAt != null && t.soSlamAt <= now) t._tpSlam = t.soSlamAt; return { c: 'leg', s: now - q.at, rate: 40, mv: 'leg' + q.at }; }
     // a spell: its move from the cast. (Its blows are the spell's own: they are not counted as cuts, so the next cut's pace
     // is not taken from them)
     if (A && A.last && A.lastAt != null && now >= A.lastAt) {
@@ -112981,11 +113020,12 @@ const TP2 = (() => {
      kindle      Kindle the Censers (so_embers): the censer lifted high before him, his free hand thrown up, held, then lowered
      hit         his health drops: rocked back, the pot thrown about
      death       wounded (t.wounded): down on his knees, the pot lowered to the ground; when he is whole again he eases back up
+     leg         a legendary fired (t.rxCue): the censer lifted high and swung in one wide circle over his head, then lowered to ready
    His size is the shared rule (unitmodels_size.js); he stands on the Order's flagstone. The incense the Order's own drawing
    trails from a Censer Bearer (forces_silver_b.js soExtra) is moved to where the pot is.
    Checks: `python tools/make_cb2.py --check`. Notes: docs/model_pilot/censer2.md. */
 const CB2 = (() => {
-  const U = 'censer', NAMES = ['idle', 'ready', 'lob', 'sweep', 'procession', 'kindle', 'hit', 'death'];
+  const U = 'censer', NAMES = ['idle', 'ready', 'lob', 'sweep', 'procession', 'kindle', 'hit', 'death', 'leg'];
   const CUTS = ['lob'], EASE = .2, BLOW = .3, SPD_CUT = 1;
   const MV = { so_sweep: 'sweep', so_smoke: 'procession', so_embers: 'kindle' };
   const BASE_H = .05;
@@ -113085,6 +113125,10 @@ const CB2 = (() => {
     if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
     if (t._cbMv === 'death') t._cbRise = now;   // (whole again: eased back up)
     const rise = t._cbRise != null && now - t._cbRise < .9;
+    // a legendary fired (t.rxCue, set by the Silver legendaries): the censer swung in a wide circle over his head; a spell cast after it wins
+    const q = t.rxCue;
+    if (q && CL.leg && now >= q.at && now - q.at < CL.leg.len && !(A && A.lastAt != null && A.lastAt > q.at))
+      return { c: 'leg', s: now - q.at, rate: 40, mv: 'leg' + q.at };
     // a spell: its move from the cast
     if (A && A.last && A.lastAt != null && now >= A.lastAt) {
       const u = now - A.lastAt, m = MV[A.last], c0 = m && CL[m];
@@ -113221,6 +113265,11 @@ const CB2 = (() => {
      vow     Banner of the Vow: the lance stood up like a banner pole, the horse collected, stamping
      hit     a blow taken (its health drops): the horse shies
      death   Wounded: the horse goes down on its side, the knight with it; it lies there until it next rides or is healed
+     leg     his legendary fires (t.rxCue, set by forces_..._silverleg.js slCue): the horse rears on its hind legs, pawing,
+             the lance lifted high, held a beat, then down to ready (1.1 s). A charge in motion always wins: a cue that
+             comes during a ride (The True Grail fires on his strike, which is a charge) waits for the ride to end. Clarion
+             of the Open Gate sets a short t.chg (.6 cells, .6 s) with its cue: that step is not ridden (no gallop, no
+             wheel); he rears at his post while the gate opens before him (a post is never past a blocker)
    The game turns the unit about halfway through a charge and snapped it round again at the end: here it wheels on its hocks
    at the far end and again as it comes home. Where it stands is the game's own chargeAt (so a rider is never drawn past a
    blocker: forces_zzzzzzzzzzzzzzzzzzz_lanes.js).
@@ -113228,7 +113277,7 @@ const CB2 = (() => {
    GK2.anchors(t). Sized by the shared rule (unitmodels_size.js): the knight's head joint at UM_EVEN_HEAD.
    Checks: `python tools/make_gk.py --check`. Notes: docs/model_pilot/grailknight2.md. */
 const GK2 = (() => {
-  const U = 'grailknight', NAMES = ['idle', 'ready', 'gallop', 'charge', 'grail', 'ride', 'vow', 'hit', 'death'];
+  const U = 'grailknight', NAMES = ['idle', 'ready', 'gallop', 'charge', 'grail', 'ride', 'vow', 'hit', 'death', 'leg'];
   const RATE = { idle: 4, ready: 7, move: 30, down: 9 }, TRIM = .12, TURN = .3, BASE_H = .05, CENTRE = 0;
   const SEAT_K = .7, TURN_R = .22, AIR_RATE = 2.4, EASE_OUT = 11;   // how much of the stride his seat takes; the feet's reach from the wheel's centre (model units); strides a second while stood in flight; how fast the stride lets go at home
   const S = { on: true, err: null, hold: null, wound: false, loop: null };
@@ -113326,7 +113375,15 @@ const GK2 = (() => {
     if (t.chg && t.chg.at !== t._gkChgAt) {   // a ride begins: which one (a spell's, by the cast just before it), and the stride starts afresh
       const c = t.chg, dc = A && A.lastAt != null ? c.at - A.lastAt : 9;
       t._gkChgAt = c.at; t._gkChgT = c.T; t._gkDist = 0;
-      t._gkKind = A && A.last === 'so_ridedown' && dc > -.02 && dc < .05 ? 'ride' : A && A.last === 'so_grail' && dc > .1 && dc < .45 ? 'grail' : 'charge';
+      t._gkKind = A && A.last === 'so_ridedown' && dc > -.02 && dc < .05 ? 'ride' : A && A.last === 'so_grail' && dc > .1 && dc < .45 ? 'grail'
+        : A && A.last === 'so_grail' && dc > -.02 && dc < .05 && c.T < .7 ? 'gate' : 'charge';   // (gate: Clarion of the Open Gate's short step, sent in the cast itself)
+      if (t._gkKind === 'gate') { t._gkLegAt = c.at; t._gkLegCue = c.at; }   // (its rear plays even when slCue's 2.5 s limit swallowed the cue)
+    }
+    const cue = t.rxCue;
+    if (cue && cue.at !== t._gkCueAt) {   // a legendary fired: the rear now, or when the ride under way ends
+      t._gkCueAt = cue.at; const T0 = t._gkChgT || .75, k0 = t._gkKind;
+      const end = t._gkChgAt == null || k0 === 'gate' ? -9 : t._gkChgAt + (k0 === 'ride' ? T0 + CL.ride.len - (CL.ride.fit || .8) : k0 === 'grail' ? CL.grail.len - RR : CL.charge.len - W);
+      if (!(t._gkKind === 'gate' && t._gkLegAt === cue.at)) { t._gkLegAt = cue.at >= t._gkChgAt - 1e-6 && cue.at < end ? end : cue.at; t._gkLegCue = cue.at; }
     }
     if (t.hp != null) { if (t._gkHp != null && t.hp < t._gkHp - 1e-6 && !t.wounded) t._gkHitAt = now; t._gkHp = t.hp; }
     const sc = A && A.lastAt != null ? now - A.lastAt : 9, q = t._gkChgAt != null ? now - t._gkChgAt : 9, T = t._gkChgT || .75, k = t._gkKind;
@@ -113338,6 +113395,9 @@ const GK2 = (() => {
     if (q >= 0 && k === 'charge' && q < CL.charge.len - W) return { c: 'charge', s: W + q, rate: RATE.move };
     const wind = t.tg && t.windup > 0 ? t.windup : 0;
     if (wind > 0 && G.phase === 'wave') return { c: 'charge', s: W * Math.min(1, wind), rate: RATE.move };
+    const lq = t._gkLegAt != null ? now - t._gkLegAt : 9;   // the legendary's rear: after any ride and wind-up (above: a strike's gather leads into the gallop with no jump); a spell cast since the cue wins
+    if (CL.leg && lq >= 0 && lq < CL.leg.len && !t.wounded && !S.wound && !(A && A.lastAt != null && A.lastAt > t._gkLegCue + 1e-6) && !(t.chg && t._gkKind !== 'gate' && t.chg.at > t._gkLegCue))
+      return { c: 'leg', s: lq, rate: 40, mv: 'leg' + t._gkLegAt };
     if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: RATE.down }; }
     const h = t._gkHitAt != null ? now - t._gkHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: RATE.move };
     if ((G.phase === 'wave' && t.tg && !t.tg.dead) || (t.shotT != null && t.shotT < 1.5)) return { c: 'ready', s: ph, rate: RATE.ready };
@@ -113346,7 +113406,7 @@ const GK2 = (() => {
   /* the unit's turn through a ride: about at the far end (as the game turns it), and round again on its hocks as it comes
      home (the game snaps it back when the ride ends) */
   function spin(t, live) {
-    if (!live || t._gkChgAt == null) return 0;
+    if (!live || t._gkChgAt == null || t._gkKind === 'gate') return 0;
     const q = G.time - t._gkChgAt, T = t._gkChgT || .75;
     if (q < 0 || q > T + TURN + .1) return 0;
     return Math.PI * sm(0, 1, (q / T - .40) / .17) + Math.PI * sm(0, 1, (q - T * .97) / TURN);
@@ -113373,7 +113433,9 @@ const GK2 = (() => {
     const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
     const K = UNIT_K(U), tr = Math.min(5, tier | 0), yaw = t.ang == null ? 0 : t.ang;
     const P = ctl(t, live);   // (first: it reads t.chg before chargeAt may end it)
-    const at0 = live && t.chg ? chargeAt(t) : [t.x, t.y], x = at0[0], z = at0[1];
+    let at0 = live && t.chg ? chargeAt(t) : [t.x, t.y];
+    if (live && t._gkKind === 'gate' && t._gkChgAt != null && G.time - t._gkChgAt < (t._gkChgT || .75) + .1) at0 = [t.x, t.y];   // (Clarion's short step: he rears at his post, the gate opens before him)
+    const x = at0[0], z = at0[1];
     // the Order's flagstone at its post, as under every soldier of it; off it, the horse runs on the ground
     const bk = typeof SO_SCALE !== 'undefined' ? (SO_SCALE[Math.min(2, tr)] || 1) : 1;
     const bm = typeof soBase === 'function' && typeof soMats === 'function' ? dynMesh('gk_base' + tr, g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K * bk), () => soMats(g, () => soBase(g, .36))))) : null;
@@ -113392,7 +113454,7 @@ const GK2 = (() => {
         // a ride (out, the wheel, home, the turn at the post): the gallop has the horse for all of it, its phase the ground
         // covered since the ride began (the wheel's turn counts as ground under the feet). Stood still in the stride's
         // flight (at the foe, before the wheel), the stride runs on by the clock until a foot is down: nothing slides
-        const q = t._gkChgAt != null ? now - t._gkChgAt : -1, riding = q >= 0 && q < (t._gkChgT || .75) + TURN, ok = t._gkX != null && dt > 0 && dt < .1;
+        const q = t._gkChgAt != null ? now - t._gkChgAt : -1, riding = q >= 0 && q < (t._gkChgT || .75) + TURN && t._gkKind !== 'gate', ok = t._gkX != null && dt > 0 && dt < .1;
         const d = ok ? Math.hypot(x - t._gkX, z - t._gkZ) : 0, dA = ok && t._gkSp != null ? Math.abs(sp - t._gkSp) : 0, sw = STRIDE * s * Math.max(.2, sz);
         let adv = d + TURN_R * s * dA;
         if (riding) { const ph = (PH0 + (t._gkDist || 0) / sw) % 1; if (adv < sw * dt * .4 && ph > AIR[0] && ph < AIR[1]) adv = Math.min(sw * dt * AIR_RATE, (1.002 - ph) * sw); t._gkDist = (t._gkDist || 0) + adv; }
@@ -114556,7 +114618,7 @@ const SP2 = (() => {
    and her sunburst staff, un-rigged; "sunlance cleric has staff"). tools/make_sn2.py -> src/model_sn2.js: 39 bones (her
    robe below the belt on four panels, each in two lengths; the long drape of each sleeve on two bones that hang toward the
    ground whatever her arm does; the staff on a bone of its own that moves freely, her fists solved onto it), one
-   1024 x 1536 atlas, 10 clips at 30 frames a second.
+   1024 x 1536 atlas, 11 clips at 30 frames a second.
    ON by default in place of the code-built priest (forces_silver_b.js: FORCE_BUILD.sunlance and its parts); ?sn=old (or
    the Model Lab's "Cleric rig" row set to Old) draws that.
    Her moves, by the game's own cues (nothing in the game is changed):
@@ -114571,6 +114633,8 @@ const SP2 = (() => {
                  the game's 0.4 s
      dawn        Dawnfall (so_dawnfall): the staff lifted across the sky in both hands, then pressed down to the road on the
                  game's 0.55 s
+     leg         her legendary fires (t.rxCue): the staff thrust straight up at the sky, her left hand open to it, held;
+                 then swept down and forward, its sun falling like a star; back to guard
      hit         her health drops: knocked back, the staff thrown off line
      death       wounded (t.wounded): down on her knees, held up by the staff; eased back up when whole
    Her beams leave the staff's sun: t.tipW (read by unitTip and sfxMuzzle), and the game's own beams from her (G.beams,
@@ -114578,7 +114642,7 @@ const SP2 = (() => {
    the shared rule (unitmodels_size.js); she stands on the Order's flagstone. Checks: `python tools/make_sn2.py --check`.
    Notes: docs/model_pilot/sunlance2.md. */
 const SN2 = (() => {
-  const U = 'sunlance', NAMES = ['idle', 'ready', 'readyUp', 'beam', 'beamUp', 'lance', 'halo', 'dawn', 'hit', 'death'];
+  const U = 'sunlance', NAMES = ['idle', 'ready', 'readyUp', 'beam', 'beamUp', 'lance', 'halo', 'dawn', 'leg', 'hit', 'death'];
   const EASE = .2, SPD_MAX = 1.8;
   const MV = { so_sunlance: 'lance', so_halo: 'halo', so_dawnfall: 'dawn' };
   const BASE_H = .05;
@@ -114688,6 +114752,11 @@ const SN2 = (() => {
     // the target's height: eased, so a flyer passing over does not snap the aim
     const up0 = aimUp(t), dt = t._snUpT == null ? 1 : Math.max(0, Math.min(.1, now - t._snUpT)); t._snUpT = now;
     t._snUp = !Number.isFinite(t._snUp) ? up0 : t._snUp + (up0 - t._snUp) * (1 - Math.exp(-dt * 6)); if (!Number.isFinite(t._snUp)) t._snUp = 0; const up = t._snUp;
+    // her legendary fires (t.rxCue, set by the Silver legendaries): the staff thrust to the sky, then its sun swept down
+    // and forward like a falling star (a spell cast after the cue wins)
+    const q = t.rxCue;
+    if (q && CL.leg && now >= q.at && now - q.at < CL.leg.len && !(A && A.lastAt != null && A.lastAt > q.at))
+      return { c: 'leg', s: now - q.at, rate: 40, mv: 'leg' + q.at, up: 0 };
     // a spell: its move from the cast (the beams the game looses meanwhile are under it)
     if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
       const u = now - A.lastAt, m = MV[A.last], c0 = CL[m];
@@ -135298,6 +135367,8 @@ function spellAreaAudit(o) {
    Console: UNITREACT.cheer() (every unit cheers now), UNITREACT.flinch(k) (the selected or every unit), UNITREACT.kinds(). */
 const RX_OWN_HIT = new Set(['ch_morrow', 'ch_brannoc', 'cc_golemwarden', 'censer', 'sb_clouddancer', 'sb_earthbinder', 'flakgunner', 'grailknight', 'sb_hailshaman', 'ch_hrolf', 'lightbinder', 'oathsworn', 'silverbolt', 'sb_spiritwalker', 'staglancer', 'sunlance', 'templar', 'sb_thundercaller', 'ch_torvald', 'sb_windrunner', 'sb_wolfguard']);
 const RX_OWN_WOUND = new Set([...RX_OWN_HIT, 'ch_nyssa', 'cc_pyroclast', 'seedcaster']);
+// units whose model plays its own baked clip when a legendary fires (a `leg` clip, read from t.rxCue): the cue's pose is left to it
+const RX_OWN_LEG = new Set(['oathsworn', 'silverbolt', 'lightbinder', 'grailknight', 'sunlance', 'templar', 'censer']);
 /* a unit's cheer when its rig's own reading would be wrong (a glow or a ribbon anchored in a hand that would be left behind,
    a pot that must hang): 'proud' (no hands moved), 'raise', 'lift' (the left arm), 'present', 'howl', 'bob', 'none' */
 const RX_CHEER = { censer: 'proud', lightbinder: 'proud', ch_nyssa: 'proud', seedcaster: 'proud', cc_pyroclast: 'proud', cc_rimeweaver: 'proud', bogwitch: 'proud', gladebow: 'proud', ch_faelan: 'proud', thornguard: 'proud' };
@@ -135448,7 +135519,7 @@ const UNITREACT = (() => {
     /* the cheer: when a wave is cleared, each unit a moment after its neighbour */
     if (RX.clr > s.ch + 2.5 && now - RX.clr < 3) { s.ch = RX.clr + .1 + s.h * .55; s.cueK = null; }
     /* a cue (t.rxCue = { at, kind }: a legendary firing, forces_..._silverleg.js): the cheer's pose at once, in that kind (null: its own) */
-    const q = t.rxCue; if (q && q.at > (s.cueAt || -9) && now - q.at < .5) { s.cueAt = q.at; s.ch = q.at; s.cueK = q.kind || null; }
+    const q = t.rxCue; if (q && q.at > (s.cueAt || -9) && now - q.at < .5 && !RX_OWN_LEG.has(u)) { s.cueAt = q.at; s.ch = q.at; s.cueK = q.kind || null; }
   }
   /* ---- the layer on one palette ---- */
   function apply(o, R, t, s, now, kindOver) {
