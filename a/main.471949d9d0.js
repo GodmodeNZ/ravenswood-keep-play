@@ -1,4 +1,4 @@
-const BUILD_TAG = '25e247c4@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4f35e9d0@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -60688,6 +60688,89 @@ if (typeof wbRune === 'function' && !wbRune._ft) {
   wbRune._ft = 1;
 }
 
+/* ---------- one rune at a time (owner, 26 Nov 2026: "limit the amount of runes lain by default ... allow units to spec into
+   them ... one rune should generally be lain at once") ----------
+   A spell or an attack lays 1 new rune at a time: whatever it would lay at that moment past the first is not laid (a rune
+   that renews one already there is not counted). More come only from a talent the player takes on that unit (WB_MORE:
+   1 more rune a rank). The words say the count. */
+const WB_MORE = { glaive: 'Deep Carving', arrow: 'Rune-Etched Edge', frost: 'Creeping Rime', arcane: 'Deep Script', storm: 'Couched Lance',
+  earth: 'Restless Earth', cannon: 'Wide Blast', ch_varic: 'Heavy Hand', ch_aedric: 'Sun-Struck Trail', ch_isaura: 'Vow Carved' };
+const wbMoreName = t => t && t.def && (WB_MORE[t.def.unit] || (!t.def.champ && WB_MORE[t.type])) || null;
+function wbMore(t) {
+  const nm = wbMoreName(t); if (!nm || typeof TALENTS === 'undefined' || !TALENTS[t.type] || typeof talKnown !== 'function') return 0;
+  const L = TALENTS[t.type].list, i = L.findIndex(q => q.name === nm); if (i < 0) return 0;
+  return Math.min(L[i].max, talKnown(t.type)[i] | 0);
+}
+const wbRunesAt = t => 1 + wbMore(t);
+if (typeof wbRune === 'function' && !wbRune._one) {
+  const r1 = wbRune;
+  wbRune = function (t) {
+    if (!t || !t.def || (typeof G !== 'undefined' && G.tut)) return r1.apply(this, arguments);
+    const key = (typeof AB_NOW !== 'undefined' && AB_NOW || 'atk') + '@' + G.time, n0 = G.hazards.length;
+    if (t.wbOneK !== key) { t.wbOneK = key; t.wbOneN = 0; }
+    if (t.wbOneN >= wbRunesAt(t)) {   // (past its count: it only renews a rune of its kind already there)
+      const z = wbRunesNear(arguments[2], arguments[3], WB_RUNE.merge)[0];
+      if (z && z.kinds[0] === arguments[4]) { z.t = Math.max(z.t, z.life || WB_RUNE.life); return z; }
+      return null;
+    }
+    const z = r1.apply(this, arguments);
+    if (z && G.hazards.length > n0) t.wbOneN++;
+    return z;
+  };
+  wbRune._one = 1;
+}
+// the words: a spell's count of runes, and "under every foe" read as one
+const WB_RUNE_WORDS = [
+  [/Lays four oath runes round the blade\./g, n => `Lays ${n} oath rune${n > 1 ? 's' : ''}.`],
+  [/;? ?six oath runes ring the blade\./g, n => `. Lays ${n} oath rune${n > 1 ? 's' : ''}.`],
+  [/Lays (?:4|four) oath runes on the road in his reach nearest the gate\./g, n => `Lays ${n} oath rune${n > 1 ? 's' : ''} on the road nearest the gate.`],
+  [/Lays shaft runes on the 3 road cells past the first foe\./g, n => `Lays ${n} shaft rune${n > 1 ? 's' : ''} on the road past the first foe.`],
+  [/Lays a frost rune on each cell\./g, n => `Lays ${n} frost rune${n > 1 ? 's' : ''} on its line.`],
+  [/Leaves storm runes in its trail\./g, n => `Leaves ${n} storm rune${n > 1 ? 's' : ''} in its trail.`],
+  [/ and get a pin rune under them/g, n => (n > 1 ? `; ${n} of them get a pin rune` : '; the first gets a pin rune')],
+  [/lays oath runes under the \d+ foes it catches nearest the gate/g, n => `lays ${n > 1 ? n + ' oath runes' : 'an oath rune'} under the foes it catches nearest the gate`],
+  [/(an?|a stone|a storm|an oath) (\w+ )?rune( \([^)]*\))? under (?:each|every) ((?:ground )?foe)/g, () => null],
+];
+const WB_NUM = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+// (any other "Lays 4 oath runes" / "Leaves storm runes": the count it can lay at once, never more than it says)
+const wbCountWords = (html, n) => html.replace(/\b(Lays|lays|Leaves|leaves|Carves|carves) (?:(\d+|two|three|four|five|six|seven|eight) )?(oath|shaft|frost|sigil|storm|stone|pin|vow) runes\b/g, (m, v, k, kind) => {
+  const was = k ? (WB_NUM[k] || +k) : Infinity, c = Math.min(n, was); return `${v} ${c} ${kind} rune${c > 1 ? 's' : ''}`; });
+function wbRuneWords(html, n) {
+  if (typeof html !== 'string' || !/rune/i.test(html)) return html;
+  for (const [re, f] of WB_RUNE_WORDS) html = html.replace(re, (...m) => { const r = f(n || 1); return r == null ? `${m[1]} ${m[2] || ''}rune${m[3] || ''} under the first ${m[4]}` : r; });
+  return wbCountWords(html, n || 1).replace(/\.\s*\./g, '.');
+}
+// the talents that lay more: "+1 rune at once a rank"
+function wbMoreWrap() {
+  if (typeof FORCES === 'undefined' || !FORCES.wardbound) return;
+  const lists = Object.keys(FORCES.wardbound.talents || {}).map(s => [s, FORCES.wardbound.talents[s].list]);
+  if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h].force === 'wardbound') lists.push([CHAMPS[h].unit.id, CHAMPS[h].tree.list]);
+  for (const [k, L] of lists) { const nm = WB_MORE[k]; const op = nm && L.find(q => q.name === nm); if (!op || op._wbm || typeof op.pro !== 'function') continue;
+    const p0 = op.pro; op._wbm = 1;
+    op.pro = function (n) { const r = Math.max(1, Math.min(n, op.max)); return `Its spells and attacks lay ${r} more rune${r > 1 ? 's' : ''} at once. ` + wbRuneWords(p0.apply(this, arguments), 1); };
+  }
+}
+wbMoreWrap();
+function ftLateRunes() {
+  wbMoreWrap();
+  // (each Wardbound spell's own words: abText and the spell tooltips both read them)
+  for (const id in ABIL) { const A = ABIL[id], u = A && (A.unit || ''), F = typeof CHAMP_BY_UNIT !== 'undefined' && CHAMP_BY_UNIT[u];
+    const wb = (F && F.force === 'wardbound') || (FORCES.wardbound && Object.values(FORCES.wardbound.units || {}).some(U => U && U.id === u));
+    if (!wb || typeof A.text !== 'function' || A.text._wbw) continue;
+    const x0 = A.text; A.text = function (t) { return wbRuneWords(x0.apply(this, arguments), t && t.def ? wbRunesAt(t) : 1); }; A.text._wbw = 1; }
+  for (const fn of ['abText', 'spellBrief', 'talTipHTML']) {
+    const f0 = globalThis[fn]; if (typeof f0 !== 'function' || f0._wbw) continue;
+    const w = function () {
+      const out = f0.apply(this, arguments);
+      let t = null; try { t = fn === 'abText' ? arguments[0] : fn === 'spellBrief' ? arguments[1] : null; } catch (e) {}
+      if (fn === 'spellBrief' && arguments[0] && !(t && t.def && t.def.force)) { const A = arguments[0], U = typeof CHAMP_BY_UNIT !== 'undefined' && CHAMP_BY_UNIT[A.unit]; if ((U && U.force === 'wardbound') || /^wb_/.test(A.id || '')) return wbRuneWords(out, 1); }
+      const f = (t && t.def && t.def.force) || (typeof FORCE_NOW !== 'undefined' && FORCE_NOW) || (typeof G !== 'undefined' && G && G.force);
+      return f === 'wardbound' ? wbRuneWords(out, t && t.def ? wbRunesAt(t) : 1) : out;
+    };
+    w._wbw = 1; globalThis[fn] = w;
+  }
+}
+
 /* ---------- the commanders' words: everything a commander gave from the start is earned in the tree now ----------
    (owner, 25 Nov 2026: "move all the bonuses from the start to the force talent tree"). A force commander's passive, its
    Champion's trait and its affinity's signature say which node of the Commander path gives them; its affinity's bumps and
@@ -60724,7 +60807,7 @@ let FT_LATE = 0;
 function ftLate() {
   if (FT_LATE || typeof HERO_BY === 'undefined' || typeof AFF_MODS === 'undefined') return;   // (not yet: those files have not run)
   FT_LATE = 1;
-  try { ftLateAff(); ftLateWords(); ftLateLine(); ftLatePlain(); ftLateCamp(); } catch (e) { console.error(e); }
+  try { ftLateAff(); ftLateWords(); ftLateLine(); ftLatePlain(); ftLateCamp(); ftLateRunes(); } catch (e) { console.error(e); }
 }
 if (typeof setTimeout === 'function') setTimeout(() => { try { ftLate(); ftPlainHook(); } catch (e) {} }, 0);
 
@@ -125425,8 +125508,10 @@ for (const [selector,key] of [['#bTal svg','talent-point'],['#bWar svg','path-po
    legendary chance (loot.js bossLegP: none before wave 11, rising to 30% by wave 50, none over the run's pace). Take one; the other is gone. With Renown, one reroll replaces the
    offer with RN_LOOT.reroll fresh ones. Under the items: "What brought it down" (game.js bossDmgHtml) and the whole table.
    Each boss has its own loot table (rnTable, RN_BOSS keyed by boss id so it follows the boss to whatever wave it marches
-   on): themed picks from the force's own pool (four rares and charms, two epics), the boss's signature relic
-   (bossitems.js BOSS_SIG, the same for every force) and one signature legendary. It shows on the boss card, in the
+   on): six things, its own (owner, 26 Nov 2026: "bosses should have a themed loot table that is unique to them"): the boss's
+   signature relic (bossitems.js BOSS_SIG, the same for every force), themed picks from the force's own pool (RN_TAB_SHAPE)
+   and one signature legendary, every boss's made together so no two are alike (rnMakeAll). The region map's place card
+   reads one with bossLootTable(boss, force). It shows on the boss card, in the
    forecast's boss line, in the Renown menu's boss-loot list and on the panel.
    Which creep is a wave's boss: rnBossType(n), the one place that decides (a boss or leader on a 5th wave).
    Classic (oldRules) and Tower Wars are untouched: Classic keeps its School Keys. window.RN_OFF turns Renown off (the bot
@@ -125459,17 +125544,23 @@ const RN_KIND = { reroll: "Reroll a boss's offer", pledge: 'Pledge', unit: 'Open
 /* ---- each boss's loot table: a theme (words its items are chosen by) and a line of flavour. Keyed by boss id; a boss
    without an entry is themed from its own trait text. ---- */
 const RN_BOSS = {
-  rattlefang: { say: 'The chieftain\'s war chest', theme: /splash|pack|every foe|nearby|chain|spread|swarm|burst|slow|banner|rally|group/i },
-  grakk: { say: 'Spoils of the Ogre Camp', theme: /stun|slam|silence|interrupt|knock|crush|brute|break|heavy|club|bash/i },
-  arachnara: { say: 'Silk and venom from the Brood Hall', theme: /splash|spread|poison|venom|web|root|swarm|chain|burst|nearby|spore|every foe/i },
-  ossyra: { say: 'Relics of the Bone Spire', theme: /fly|flyer|air|holy|undead|bone|smite|pierce|rise|light/i },
-  malgrath: { say: 'Arms of the Dread Legion', theme: /school|curse|armou?r|shred|break|weak|mark|vulnerab|adapt/i },
-  voidwyrm: { say: 'Shards of the star-hunger', theme: /fly|air|mana|arcane|blink|phase|reach|range|star|void/i },
-  brakka: { say: 'The siege-master\'s hoard', theme: /wall|siege|stun|tower|fuse|shield|keep|repair|guard/i },
-  lich: { say: 'Treasures of the Frozen Crown', theme: /frost|cold|chill|freez|silence|mana|holy|cleanse|undead|ice/i },
-  kragmor: { say: 'Stone of the Unbroken', theme: /stone|earth|armou?r|shred|stun|crush|quake|root|rock/i },
-  titan: { say: 'Forge-wrought spoils', theme: /frost|freez|chill|armou?r|shred|pierce|crit|forge|fire|burn/i },
-  abyss: { say: 'The last gate\'s hoard', theme: /crit|burst|execute|shield|every|double|summon|ward|kill/i },
+  // the march (campaign.js CAMP_BOSS0) and the Homeland's lord
+  rattlefang: { say: 'The chieftain\'s war chest', theme: /banner|rally|pack|horn|haste|faster|war|together|every foe|nearby|spread|group/i },
+  arachnara: { say: 'Silk and venom from the Brood Hall', theme: /poison|venom|web|root|bind|silk|snare|slow|bleed|spore|chain|held/i },
+  ossyra: { say: 'Relics of the Bone Spire', theme: /fly|flyer|air|bone|smite|pierce|holy|undead|wing|feather|light|rise/i },
+  malgrath: { say: 'Arms of the Dread Legion', theme: /armou?r|shred|break|mark|curse|weak|vulnerab|sunder|crack|expos|dread/i },
+  voidwyrm: { say: 'Shards of the star-hunger', theme: /mana|arcane|void|star|blink|phase|range|reach|spell|rune|far/i },
+  brakka: { say: 'The siege-master\'s hoard', theme: /wall|siege|stun|fuse|blast|bomb|explo|shield|guard|cannon|knock/i },
+  lich: { say: 'Treasures of the Frozen Crown', theme: /frost|cold|chill|freez|ice|rime|silence|soul|undead|winter/i },
+  kragmor: { say: 'Stone of the Unbroken', theme: /stone|earth|quake|rock|crush|armou?r|root|stun|slam|ground/i },
+  titan: { say: 'Forge-wrought spoils', theme: /fire|burn|forge|heat|ember|flame|molten|crit|anvil|hammer/i },
+  abyss: { say: 'The last gate\'s hoard', theme: /crit|execute|kill|slay|burst|double|death|shadow|dark|finish|last/i },
+  grakk: { say: 'Spoils of the Ogre Camp', theme: /stun|slam|club|crush|heavy|bash|knock|brute|smash|thump|break/i },
+  // the forest factions' bosses (forestfoes.js: a Homeland place names its faction)
+  rc_ysra: { say: 'The Floodmark\'s gifts', theme: /water|wet|rain|song|hymn|heal|mend|slow|marsh|tide|flood|river/i },
+  orragar: { say: 'Tolls of the Hollow Bell', theme: /bell|toll|ring|echo|rise|grave|undead|bone|stun|soul|dead|hollow/i },
+  gc_firstcap: { say: 'Spores of the First Cap', theme: /spore|mushroom|cap|glow|poison|cloud|spread|bloom|fung|haze|rot/i },
+  tm_broodmother: { say: 'The brood-mother\'s clutch', theme: /brood|swarm|thorn|blade|bleed|hatch|insect|claw|summon|many|cut|split/i },
 };
 
 // the boss-loot panel and the boss tables: every force run. Renown itself (earning, spending, the bar): unless RN_OFF.
@@ -125518,33 +125609,109 @@ const rnBossName = type => (CREEPS[type] && CREEPS[type].name) || type;
 const _rnTab = {};
 function rnHash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; }
 function rnText(e) { try { const it = rnItem(e, true); return gearName(it) + ' ' + gearText(it); } catch (x) { return ''; } }
-// the tables of every boss in RN_BOSS are made together (in RN_BOSS's order, so wherever a boss marches its table is the
-// same): each takes the best-themed legendary no earlier boss took, and items other tables already hold weigh less
-function rnTable(type) {
-  const key = (G.force || '') + ':' + type; if (_rnTab[key]) return _rnTab[key];
-  const uk = '_used:' + (G.force || '');
-  if (RN_BOSS[type] && !_rnTab[uk]) { _rnTab[uk] = { legs: [], items: {} }; for (const t of Object.keys(RN_BOSS)) rnMakeTable(t, (G.force || '') + ':' + t, _rnTab[uk]); }
-  return rnMakeTable(type, key, _rnTab[uk] || { legs: [], items: {} });
+/* Each boss's table is its own and short (owner, 26 Nov 2026: "bosses should have a themed loot table that is unique to
+   them"): its signature relic (bossitems.js BOSS_SIG, the same for every force), themed items from the force's own pool and
+   ONE legendary: six things in all. RN_TAB_SHAPE says which: a boss that can march as early as wave 5 (before epics drop)
+   holds rares and charms enough for an offer and a reroll there; the others two rares or charms and two epics.
+   The tables of every boss in RN_BOSS are made together, a force at a time, taking turns (RN_BOSS's order, then reversed,
+   round after round), so each boss gets its best-themed items while the pool lasts and no two tables are the same: a
+   legendary is held by one boss while the force has enough of them (12-14 for 15 bosses: the last bosses share the least-held
+   ones); a rare or an epic by as few as the pool allows (24 rares and charms, 11-12 epics a force, so some repeat). */
+const RN_EARLY = new Set(['rattlefang', 'rc_ysra', 'orragar', 'gc_firstcap', 'tm_broodmother']);   // (can be a wave-5 boss: CAMP_BOSS0, and a faction's boss on any boss wave of a Homeland place)
+/* Legendaries from bosses (owner, 26 Nov 2026: "early bosses shouldn't drop legendaries at all, they should be offered only
+   after wave 15", "and quite rare"): a boss fought on wave RN_LEG.after or earlier has none in its table or its offer; its
+   table holds a sixth themed item in the legendary's place (T.extra, rnTableAt). After it, the chance its offer holds its
+   legendary is RN_LEG.p0 on wave RN_LEG.at rising evenly to RN_LEG.top on wave 50 (none while the run has had its share for
+   the wave, loot.js legCap). Decided by the wave the boss is fought on, so a Homeland boss on wave 10 has none, on 20 has one. */
+const RN_LEG = { after: 15, at: 20, p0: .03, top: .1 };
+function rnLegP(n, legN) {
+  if (!(n > RN_LEG.after)) return 0;
+  if (typeof legCap === 'function' && (legN == null ? (typeof G !== 'undefined' && G ? G.legN | 0 : 0) : legN) >= legCap(n)) return 0;
+  return Math.min(RN_LEG.top, RN_LEG.p0 + (RN_LEG.top - RN_LEG.p0) * Math.max(0, n - RN_LEG.at) / Math.max(1, 50 - RN_LEG.at));
 }
-function rnMakeTable(type, key, used) {
-  if (_rnTab[key]) return _rnTab[key];
-  const B = RN_BOSS[type], d = CREEPS[type] || {};
-  const theme = B ? B.theme : new RegExp(String(d.trait || d.name || 'boss').split(/[^a-z]+/i).filter(w => w.length > 3).join('|') || 'boss', 'i');
-  const score = (e, id) => { const m = rnText(e).match(new RegExp(theme.source, 'gi')); return (m ? m.length : 0) + rnHash(type + id) * .9 - .6 * (used.items[id] | 0) - (used.legs.includes(id) ? 50 : 0); };
-  const bases = Object.keys(GEAR_BASES).filter(id => { const g = GEAR_BASES[id]; return !g.retired && !g.rx && !g.quest && !g.bsig && !g.noBoss && g.rar >= 1 && g.rar <= 3 && inPool('bases', id); });
-  const best = (f, n, taken) => bases.filter(id => f(GEAR_BASES[id]) && !taken.includes(id)).map(id => [id, score({ b: id }, id)]).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]);
-  // four rares and charms (at most one charm), two epics: every offer and reroll has room to be different, on wave 5 too
+// a boss's table as fought on wave n: on wave RN_LEG.after or earlier, its sixth item in the legendary's place
+function rnTableAt(type, n) {
+  const T = rnTable(type); if (!(n > 0) || n > RN_LEG.after || !T.leg) return T;
+  return T.early || (T.early = Object.assign({}, T, { items: T.items.concat(T.extra ? [T.extra] : []), leg: null, early: null }));
+}
+const RN_TAB_SHAPE = { early: ['rare', 'rare', 'rare', 'charm', 'epic'], late: ['rare', 'rare', 'epic', 'epic'] };   // (an offer is two of one worth: a late table's pairs are alike, no charm beside a rare)
+function rnTable(type) {
+  const F = G.force || '', key = F + ':' + type; if (_rnTab[key]) return _rnTab[key];
+  if (RN_BOSS[type]) { rnMakeAll(F); return _rnTab[key]; }
+  return rnMakeOne(type, key);
+}
+function rnThemeOf(type) { const B = RN_BOSS[type], d = CREEPS[type] || {}; return B ? B.theme : new RegExp(String(d.trait || d.name || 'boss').split(/[^a-z]+/i).filter(w => w.length > 3).join('|') || 'boss', 'i'); }
+const rnBases = () => Object.keys(GEAR_BASES).filter(id => { const g = GEAR_BASES[id]; return !g.retired && !g.rx && !g.quest && !g.bsig && !g.noBoss && g.rar >= 1 && g.rar <= 3 && inPool('bases', id); });
+const rnLegs = () => Object.keys(LEGENDS).filter(k => !LEGENDS[k].school && inPool('legends', k));
+function rnFit(type, e, id) { const m = rnText(e).match(new RegExp(rnThemeOf(type).source, 'gi')); return (m ? m.length : 0) + rnHash(type + id) * .9; }
+function rnMakeAll(F) {
+  const bosses = Object.keys(RN_BOSS), bases = rnBases(), legs = rnLegs(), uses = {}, lu = {}, T = {};
+  const kind = id => (GEAR_BASES[id].rar | 0) >= 3 ? 'epic' : GEAR_BASES[id].charm ? 'charm' : 'rare';
+  for (const t of bosses) T[t] = { items: [], leg: null, slots: (RN_EARLY.has(t) ? RN_TAB_SHAPE.early : RN_TAB_SHAPE.late).slice() };
+  for (const t of bosses) { const sig = ((typeof BOSS_SIG !== 'undefined' && BOSS_SIG[t]) || []).filter(id => GEAR_BASES[id]); T[t].sig = sig; if (sig.length && T[t].slots.length > 4) T[t].slots.pop(); }
+  // the legendaries first, one each: the best boss-and-legendary fit of all those left is settled first, again and again (so
+  // the spore boss gets the spore crown, whoever comes first in the list); a legendary goes to a second boss only once
+  // every one is held
+  const fit = {}; for (const t of bosses) for (const k of legs) fit[t + '|' + k] = rnFit(t, { l: k }, k);
+  for (let left = bosses.slice(); left.length;) {
+    let best = null;
+    for (const t of left) for (const k of legs) { const v = fit[t + '|' + k] - 100 * (lu[k] | 0); if (!best || v > best[2]) best = [t, k, v]; }
+    if (!best) break;
+    T[best[0]].leg = best[1]; lu[best[1]] = (lu[best[1]] | 0) + 1; left = left.filter(t => t !== best[0]);
+  }
+  // then the items, a slot a round, every boss in turn (the order flips each round, so no boss always picks first)
+  const most = Math.max(...bosses.map(t => T[t].slots.length));
+  for (let r = 0; r < most; r++) {
+    const order = r % 2 ? bosses.slice().reverse() : bosses;
+    for (const t of order) {
+      const want = T[t].slots[r]; if (!want) continue;
+      const cand = bases.filter(id => kind(id) === want && !T[t].items.includes(id));
+      const pick = cand.map(id => [id, rnFit(t, { b: id }, id) - 4 * (uses[id] | 0)]).sort((a, b) => b[1] - a[1])[0];
+      if (pick) { T[t].items.push(pick[0]); uses[pick[0]] = (uses[pick[0]] | 0) + 1; }
+    }
+  }
+  for (let r = 0; r < 2; r++) for (const t of r ? bosses.slice().reverse() : bosses) {
+    if (r === 0 && !RN_EARLY.has(t) || r === 1 && RN_EARLY.has(t)) continue;
+    const want = RN_EARLY.has(t) ? 'rare' : 'epic', cand = bases.filter(id => kind(id) === want && !T[t].items.includes(id));
+    const pick = cand.map(id => [id, rnFit(t, { b: id }, id) - 4 * (uses[id] | 0)]).sort((a, b) => b[1] - a[1])[0];
+    if (pick) { T[t].extra = pick[0]; uses[pick[0]] = (uses[pick[0]] | 0) + 1; }
+  }
+  for (const t of bosses) {
+    const B = RN_BOSS[t];
+    // (rares and charms first, then epics: the order the panel and the cards show them in)
+    const items = T[t].items.sort((a, b) => (GEAR_BASES[a].rar | 0) - (GEAR_BASES[b].rar | 0));
+    _rnTab[F + ':' + t] = { type: t, items: T[t].sig.concat(items), sig: T[t].sig, leg: T[t].leg, extra: T[t].extra || null, say: B.say };
+  }
+}
+// a boss with no entry in RN_BOSS (an Act II pair, a Hunt's own ...): its table themed from its own trait, as before
+function rnMakeOne(type, key) {
+  const bases = rnBases(), sig = ((typeof BOSS_SIG !== 'undefined' && BOSS_SIG[type]) || []).filter(id => GEAR_BASES[id]);
+  const best = (f, n, taken) => bases.filter(id => f(GEAR_BASES[id]) && !taken.includes(id)).map(id => [id, rnFit(type, { b: id }, id)]).sort((a, b) => b[1] - a[1]).slice(0, n).map(x => x[0]);
   const items = [];
   items.push(...best(g => g.charm && g.rar <= 2, 1, items));
-  items.push(...best(g => !g.charm && g.rar <= 2, 4 - items.length, items));
+  items.push(...best(g => !g.charm && g.rar <= 2, 3 - items.length, items));
   items.push(...best(g => g.rar === 3, 2, items));
-  if (items.length < 6) items.push(...best(() => true, 6 - items.length, items));
-  const sig = ((typeof BOSS_SIG !== 'undefined' && BOSS_SIG[type]) || []).filter(id => GEAR_BASES[id]);   // its own relic (bossitems.js)
-  const legs = Object.keys(LEGENDS).filter(k => !LEGENDS[k].school && inPool('legends', k));
-  const leg = legs.map(k => [k, score({ l: k }, k)]).sort((a, b) => b[1] - a[1])[0];
-  if (RN_BOSS[type]) { if (leg) used.legs.push(leg[0]); for (const b of items) used.items[b] = (used.items[b] | 0) + 1; }
-  return (_rnTab[key] = { type, items: sig.concat(items), sig, leg: leg ? leg[0] : null, say: B ? B.say : `${rnBossName(type)}'s hoard` });
+  const leg = rnLegs().map(k => [k, rnFit(type, { l: k }, k)]).sort((a, b) => b[1] - a[1])[0], extra = best(g => g.rar === 3, 1, items)[0] || null;
+  return (_rnTab[key] = { type, items: sig.concat(items), sig, leg: leg ? leg[0] : null, extra, say: `${rnBossName(type)}'s hoard` });
 }
+/* For the region map's place card (region.js runs with no force applied): one boss's table for a force, as plain entries.
+   bossLootTable('rc_ysra', 'grove', 10) -> { type, name, say, wave, legP, items: [{ key, base | leg, rar, name, sig, leg }] }.
+   The order: its own relic, its rares and charms, its epics, its legendary. Give the wave it is fought on: on wave 15 or
+   earlier it has no legendary (RN_LEG), and legP is the chance its offer holds it. Ordinary foes keep the shared random
+   drops (loot.js rollDrop). */
+function bossLootTable(type, force, wave) {
+  if (!type || !CREEPS[type]) return null;
+  const was = typeof FORCE_NOW !== 'undefined' ? FORCE_NOW : null, f = force || (typeof G !== 'undefined' && G && G.force) || null;
+  const swap = f && was !== f && typeof applyForce === 'function', gf = G.force;
+  try {
+    if (swap) applyForce(f); G.force = f || gf;
+    const T = wave ? rnTableAt(type, wave) : rnTable(type), out = [];
+    for (const b of T.items) { const it = rnItem({ b }, true); out.push({ key: b, base: b, rar: it.rar, name: gearName(it), sig: !!GEAR_BASES[b].bsig }); }
+    if (T.leg) { const it = rnItem({ l: T.leg }, true); out.push({ key: 'L:' + T.leg, leg: T.leg, rar: 4, name: gearName(it) }); }
+    return { type, name: rnBossName(type), say: T.say, wave: wave || null, legP: wave && T.leg ? rnLegP(wave, 0) : 0, items: out };
+  } finally { G.force = gf; if (swap) applyForce(was); }
+}
+
 // an offer entry: a base id, or 'L:' + a legendary's id
 const rnEnt = k => String(k).startsWith('L:') ? { l: String(k).slice(2) } : { b: k };
 const rnEntOk = k => { const e = rnEnt(k); return e.l ? !!LEGENDS[e.l] : !!GEAR_BASES[e.b]; };
@@ -125554,7 +125721,7 @@ function rnItem(e, tmp) {
   return { id: tmp ? -1 : ++G.gearUid, rar: GEAR_BASES[e.b].rar | 0, hone: 0, isNew: true, base: e.b };
 }
 // what a boss can offer on wave n: before epics drop, only its rares and charms (and its signature relic, always)
-function rnPool(type, n) { const T = rnTable(type), cap = n < EPIC_FROM ? 2 : 3; return T.items.filter(b => GEAR_BASES[b].bsig || GEAR_BASES[b].rar <= cap); }
+function rnPool(type, n) { const T = rnTableAt(type, n), cap = n < EPIC_FROM ? 2 : 3; return T.items.filter(b => GEAR_BASES[b].bsig || GEAR_BASES[b].rar <= cap); }
 const rnShuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // k different items from a boss's table for wave n, ones not yet shown first. One slot is its signature legendary at the
 // boss's legendary chance (bossLegP, loot.js), unless noLeg (pledged: already given).
@@ -125577,8 +125744,8 @@ function rnFits(e, W) {
   return !gearCls(it) || fieldFitW(it, W) > 1;
 }
 function rnRollOffer(type, n, k, seen, noLeg) {
-  const T = rnTable(type), pool = rnPool(type, n), out = [], W = typeof fieldWeights === 'function' ? fieldWeights() : {};
-  if (!noLeg && T.leg && rnFits('L:' + T.leg, W) && Math.random() < bossLegP(n)) out.push('L:' + T.leg);   // (its legendary, unless it fits nothing you field)
+  const T = rnTableAt(type, n), pool = rnPool(type, n), out = [], W = typeof fieldWeights === 'function' ? fieldWeights() : {};
+  if (!noLeg && T.leg && rnFits('L:' + T.leg, W) && Math.random() < rnLegP(n)) out.push('L:' + T.leg);   // (its legendary, unless it fits nothing you field)
   const fresh = rnShuffle(pool.filter(b => !seen.includes(b))), old = rnShuffle(pool.filter(b => seen.includes(b)));
   const left = fresh.concat(old), first = left.find(b => !GEAR_BASES[b].charm && rnFits(b, W)) || left.find(b => !GEAR_BASES[b].charm) || left[0];
   if (first && out.length < k) { out.push(first); left.splice(left.indexOf(first), 1); }
@@ -125674,8 +125841,8 @@ function rnLootDone() { const L = rnLootCur(); if (!L) return; if (!(L.tome && r
 /* ---- spending elsewhere ---- */
 function rnPledgeWave() { return G.phase === 'build' ? rnNextBoss(G.wave) : rnNextBoss(G.wave + 1); }
 function rnPledge() {
-  const n = rnPledgeWave(), R = rnS(); if (!n || n < LEG_FROM || R.pledge[n] || G.phase !== 'build') return false;   // between waves only, as the menu says; never before legendaries drop (loot.js LEG_FROM)
-  const T = rnTable(rnBossType(n)); if (!T.leg) return false;
+  const n = rnPledgeWave(), R = rnS(); if (!n || n <= RN_LEG.after || R.pledge[n] || G.phase !== 'build') return false;   // between waves only, as the menu says; never before legendaries drop (loot.js LEG_FROM)
+  const T = rnTableAt(rnBossType(n), n); if (!T.leg) return false;
   if (!rnSpend('pledge', T.leg)) return false;
   R.pledge[n] = T.leg; if (typeof onToast === 'function') onToast(`Pledged: ${LEGENDS[T.leg].name || gearName(rnItem({ l: T.leg }, true))} drops from ${rnBossName(T.type)} on wave ${n}.`);
   rnDirty(); return true;
@@ -125766,7 +125933,7 @@ const rnCostTag = (kind, n) => `<b class="rn-c${rnS().v >= (n != null ? n : rnCo
 function rnLootScreen() {
   const L = rnLootCur(); if (!L) return;
   G.paused = true; G.ghost = null;
-  const T = rnTable(L.type), d = CREEPS[L.type], its = L.items.map(k => rnItem(k, true)), ren = rnOn();
+  const T = rnTableAt(L.type, L.w), d = CREEPS[L.type], its = L.items.map(k => rnItem(k, true)), ren = rnOn();
   const card = (it, i) => `<button type="button" class="rn-pick" data-rp="${i}">${rnItemCard(it, `<span class="sp-go">Take it</span>`, it.leg ? 'rn-leg' : '')}</button>`;
   // its Tome of Mastery, when it carries one: the first card (taken in place of an item)
   const tm = L.tome && TALENTS[L.tome] ? { id: -1, rar: 3, hone: 0, tome: [L.tome] } : null;
@@ -125797,12 +125964,12 @@ function rnMenu(tab) {
   if (G.state !== 'play') return;
   if (tab) rnMenuTab = tab;
   G.paused = true; G.ghost = null;
-  const R = rnS(), nb = rnPledgeWave(), bt = nb && rnBossType(nb), T = bt && rnTable(bt), from = G.phase === 'build' ? G.wave : G.wave + 1;
+  const R = rnS(), nb = rnPledgeWave(), bt = nb && rnBossType(nb), T = bt && rnTableAt(bt, nb), from = G.phase === 'build' ? G.wave : G.wave + 1;
   const row = (kind, label, ok, why, id, extra) => `<div class="rn-row${ok ? '' : ' off'}"><div><b>${label}</b><small>${why}</small>${extra || ''}</div>${id ? `<button type="button" class="rn-btn" id="${id}"${ok ? '' : ' disabled'}>${rnCostTag(kind)}</button>` : rnCostTag(kind)}</div>`;
   const locked = typeof lockedSchools === 'function' ? lockedSchools() : [];
   const pledged = nb && R.pledge[nb], legN = T && T.leg ? gearName(rnItem({ l: T.leg }, true)) : '';
   const spend = [
-    row('pledge', 'Pledge', !!(nb && nb >= LEG_FROM && T && T.leg && !pledged && G.phase === 'build' && rnCan('pledge')), pledged ? `Pledged: <b>${rnEsc(legN)}</b> drops from ${rnEsc(rnBossName(bt))} on wave ${nb}.` : nb && nb < LEG_FROM ? `Legendaries are first found on wave ${LEG_FROM}: the first pledge is for wave ${Math.ceil(LEG_FROM / 5) * 5}'s boss.` : nb ? `Reserve <b>${rnEsc(legN)}</b>, ${rnEsc(rnBossName(bt))}'s legendary (wave ${nb}): it drops for certain.${G.phase === 'build' ? '' : ' Between waves only.'}` : 'No boss ahead.', 'rnPl'),
+    row('pledge', 'Pledge', !!(nb && nb > RN_LEG.after && T && T.leg && !pledged && G.phase === 'build' && rnCan('pledge')), pledged ? `Pledged: <b>${rnEsc(legN)}</b> drops from ${rnEsc(rnBossName(bt))} on wave ${nb}.` : nb && nb < LEG_FROM ? `Legendaries are first found on wave ${LEG_FROM}: the first pledge is for wave ${Math.ceil(LEG_FROM / 5) * 5}'s boss.` : nb ? `Reserve <b>${rnEsc(legN)}</b>, ${rnEsc(rnBossName(bt))}'s legendary (wave ${nb}): it drops for certain.${G.phase === 'build' ? '' : ' Between waves only.'}` : 'No boss ahead.', 'rnPl'),
     row('unit', 'Open a unit', locked.length > 0 && rnCan('unit'), locked.length ? 'Its units and its talents. Tap one:' : 'Every unit is open.', null,
       locked.length ? `<span class="rn-units">${locked.map(t => `<button type="button" class="rn-u" data-ru="${t}"${rnCan('unit') || (G.keys | 0) > 0 ? '' : ' disabled'}>${rnEsc(TOWERS[t].short || TOWERS[t].name)}</button>`).join('')}</span>` : ''),
     row('respec', 'Respec a talent tree', G.phase === 'build' && rnCan('respec'), 'Refund one unit type\'s talent points. Opens the talents: use Reset on a tree.', 'rnRs'),
@@ -125837,7 +126004,7 @@ function rnLootListHTML(from) {
   for (let n = Math.ceil(Math.max(1, from) / RN.every) * RN.every; n <= MAX_WAVE; n += RN.every) {
     const t = rnBossType(n); if (!t) continue;
     const tm = tomeW.includes(n) ? rnTomeLine() : '';
-    out.push(`<div class="rn-bl"><p><b>Wave ${n}: ${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<small>${rnEsc(rnTable(t).say)}</small></p>${rnIconsHTML(t, 'ri')}${tm}</div>`);
+    out.push(`<div class="rn-bl"><p><b>Wave ${n}: ${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<small>${rnEsc(rnTable(t).say)}</small></p>${rnIconsHTML(t, 'ri', n)}${tm}</div>`);
   }
   return out.join('') || '<p>No bosses left.</p>';
 }
@@ -125850,7 +126017,7 @@ function rnLootBossHTML(n) {
   const t = rnBossType(n); if (!t) return '';
   const R = rnS(), from = G.phase === 'build' ? G.wave : G.wave + 1, k = n - from;
   const tomeW = typeof tomeBossWaves === 'function' ? tomeBossWaves(from, w => !!rnBossType(w)) : [];
-  const all = rnIconsHTML(t, 'ri'), grab = re => all.match(re) || [];
+  const all = rnIconsHTML(t, 'ri', n), grab = re => all.match(re) || [];
   const wre = /<button[^>]*data-wbt="[^"]*"[^>]*>[\s\S]*?<\/button>/g, hre = /<button[^>]*data-hwo="[^"]*"[^>]*>[\s\S]*?<\/button>/g;
   const wp = grab(wre), hw = grab(hre);
   const rel = all.replace(wre, '').replace(hre, '').replace(/<span class="rn-icons wp-icons"><\/span>/g, '');
@@ -125865,8 +126032,8 @@ function rnLootBossHTML(n) {
 }
 function rnIconCard(el) { const [, k] = (el.dataset.ri || el.dataset.rb || '').split('|'); if (!k) return ''; const it = rnItem(k.startsWith('L:') ? { l: k.slice(2) } : { b: k }, true), sg = it.base && GEAR_BASES[it.base].bsig; return itemCardHTML(it, { note: `<p class="itc-eq">${sg ? 'Its own relic: found nowhere else' : it.leg ? 'Its signature legendary' : 'From its loot table'}</p>` }); }
 if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '.rn-ii[data-ri], .rn-ii[data-rb]', rnIconCard);
-function rnIconsHTML(t, attr, n) {
-  const T = rnTable(t), ent = T.items.map(b => ({ k: b, it: rnItem({ b }, true) })).concat(T.leg ? [{ k: 'L:' + T.leg, it: rnItem({ l: T.leg }, true) }] : []);
+function rnIconsHTML(t, attr, n) {   // (n: the wave it is fought on, when known: no legendary on wave 15 or earlier)
+  const T = n ? rnTableAt(t, n) : rnTable(t), ent = T.items.map(b => ({ k: b, it: rnItem({ b }, true) })).concat(T.leg ? [{ k: 'L:' + T.leg, it: rnItem({ l: T.leg }, true) }] : []);
   return `<span class="rn-icons">${ent.map(e => `<button type="button" class="rn-ii${e.it.leg ? ' lg' : ''}" style="--rc:${RARITY[e.it.rar].col}" data-${attr === 'fc' ? 'fc' : attr}="${attr === 'fc' ? 'rnit:' + t + ':' + e.k : t + '|' + e.k}" aria-label="${rnEsc(gearName(e.it))}" tabindex="0"><img alt="${rnEsc(gearName(e.it))}" src="${rnArtURL(e.it)}"></button>`).join('')}</span>`;
 }
 
