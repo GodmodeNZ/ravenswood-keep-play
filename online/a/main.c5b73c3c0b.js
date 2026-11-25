@@ -1,4 +1,4 @@
-const BUILD_TAG = 'da46a93b@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7fddd83d@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -61035,6 +61035,100 @@ if (typeof hurt === 'function' && !hurt._svj) {
     return h0.apply(this, [c, amt].concat(Array.prototype.slice.call(arguments, 2)));
   };
   hurt._svj = 1;
+}
+
+/* ---------- no dead talents: a talent built only on the force's mechanic does something plain before it ----------
+   (hub, 25 Nov 2026: "Works once you have X" talents are dead picks; owner: simple passives, no "does X then Y".)
+   Each talent below keeps its old rule (shown after "With <mechanic>:" once the Whole Army capstone is taken, and working
+   then as before) and gains a plain passive that always works (owner, 26 Nov 2026: "take inspiration from wow": an always-on passive on a spell of the
+   unit's own kit, one clear number a rank; no "every Nth" or "when X, Y"). v is its strength at full rank, shared out by rank. */
+const fttPc = x => Math.round(x * 100);
+const fttN = x => String(Math.abs(x) >= 10 ? Math.round(x) : +x.toFixed(2));
+const fttSooner = id => (t, ab, v) => { if (ab.id === id && t.ab && t.ab.cd && t.ab.cd[id] != null) t.ab.cd[id] = Math.max(G.time, t.ab.cd[id] - v); };
+// the kinds: a spell of the unit's own kit hits harder, comes sooner or costs less (WoW's talents: always on, one number a rank)
+const fttHarder = (f, id, nm, v) => ({ force: f, v, say: v => `${nm} hits ${fttPc(v)}% harder.`, amp: id });
+const fttSoon = (f, id, nm, v) => ({ force: f, v, say: v => `${nm} comes ${fttN(v)}s sooner.`, cast: fttSooner(id) });
+const fttCheap = (f, id, nm, v) => ({ force: f, v, say: v => `${nm} costs ${fttPc(v)}% less mana.`, cost: (t, ab, v) => (ab.id === id ? v : 0) });
+const FT_TAL_BASE = {
+  // the Conclave
+  'Open Book': fttHarder('conclave', 'ch_thousandfold', 'Thousandfold Barrage', .2),
+  'Flowing Cuts': fttSoon('conclave', 'ch_severing', 'Severing Arc', 3),
+  // the Silver Order
+  'Burnished Shields': fttHarder('silver', 'ch_lioncharge', 'Dawnsweep', .2),
+  'Swift Justice': fttSoon('silver', 'ch_sentence', 'Sentence', 3),
+  'Ready Ledger': fttCheap('silver', 'ch_sentence', 'Sentence', .2),
+  'Mark of Guilt': fttHarder('silver', 'ch_sentence', 'Sentence', .2),
+  'Witnesses Called': fttHarder('silver', 'ch_summons', 'Debt Collection', .2),
+  'Wide Reckoning': fttSoon('silver', 'ch_summons', 'Debt Collection', 2),
+  // Ironhold
+  'Called Shot': fttHarder('ironhold', 'ih_longshot', 'Long Shot', .2),
+  'Gatling Crank': fttSoon('ironhold', 'ih_rollingvolley', 'Rattlegun', 2),
+  'Quick Swab': fttCheap('ironhold', 'ih_longshot', 'Long Shot', .2),
+  'Quick Reload': fttSoon('ironhold', 'ih_longshot', 'Long Shot', 1.5),
+  'Big Bertha': fttHarder('ironhold', 'ih_incendiary', 'Incendiary Round', .2),
+  'Ringing Ears': fttHarder('ironhold', 'ih_shrapnelround', 'Skipping Shell', .15),
+  'Safety Valve': fttSoon('ironhold', 'ih_steamvent', 'Pile Driver', 2),
+  'Pressure Gauge': fttCheap('ironhold', 'ih_pressureslam', 'Pressure Slam', .2),
+  'Steam Jacket': fttHarder('ironhold', 'ih_pressureslam', 'Pressure Slam', .15),
+  'Hot Hands': fttHarder('ironhold', 'ih_shieldshove', 'Shield Shove', .2),
+  'Riveting Peal': fttSoon('ironhold', 'ch_sentry', 'Clockwork Sentry', 3),
+  'Engine Yard': fttCheap('ironhold', 'ch_sentry', 'Clockwork Sentry', .2),
+  'Overpressure': fttSoon('ironhold', 'ch_coil', 'Lodestone', 3),
+  'Chain Drive': fttSoon('ironhold', 'ch_barrage', 'Wrecking Ball', 3),
+  'Old Debts': fttSoon('ironhold', 'ch_muster', "The King's Muster", 4),
+  // the Stormborn
+  'Gusting Staff': fttSoon('stormborn', 'ch_gather', 'Gather the Storm', 3),
+  'Rain in the Wind': fttHarder('stormborn', 'ch_cyclone', 'Cyclone', .2),
+  'Long Hunt': fttSoon('stormborn', 'ch_spirithunt', 'Spirit Hunt', 6),
+  'Rising Air': fttSoon('stormborn', 'ch_updraft', 'Turn the Road', 3),
+};
+// a unit's rank in each of these (cached a talent change)
+function fttRanks(t) {
+  if (!t || !t.def || !t.type || typeof TALENTS === 'undefined' || !TALENTS[t.type] || !ftiOn()) return null;
+  const c = t.fttR; if (c && c.v === G.talV && c.ty === t.type && c.f === G.force) return c.r;
+  const L = TALENTS[t.type].list, pk = talKnown(t.type), r = [];
+  for (let i = 0; i < L.length; i++) { const B = FT_TAL_BASE[L[i].name], n = Math.min(pk[i] | 0, L[i].max); if (B && n > 0 && B.force === t.def.force && B.force === G.force) r.push([B, B.v * n / L[i].max, L[i].name]); }
+  t.fttR = { v: G.talV, ty: t.type, f: G.force, r }; return r;
+}
+function fttEach(t, k, f) { if (!t || t.wrecked) return; const r = fttRanks(t); if (r) for (const [B, v, nm] of r) if (B[k]) f(B, v, nm); }
+// the words: the plain passive; with the mechanic, its old rule after it
+function fttWrap() {
+  if (typeof FORCES === 'undefined') return;
+  const lists = [];
+  for (const f in FORCES) { const T = FORCES[f] && FORCES[f].talents; for (const s in T || {}) if (T[s] && T[s].list) lists.push([f, T[s].list]); }
+  if (typeof TALENTS !== 'undefined') for (const ty in TALENTS) if (TALENTS[ty] && TALENTS[ty].list) lists.push([null, TALENTS[ty].list]);
+  if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) if (CHAMPS[h] && CHAMPS[h].tree && CHAMPS[h].tree.list) lists.push([CHAMPS[h].force, CHAMPS[h].tree.list]);
+  for (const [f, L] of lists) for (const op of L) {
+    const B = FT_TAL_BASE[op.name]; if (!B || op._ftt || op.spell || typeof op.pro !== 'function' || (f && f !== B.force)) continue;
+    const p0 = op.pro; op._ftt = 1;
+    op.pro = function (n) { const say = B.say(B.v * Math.max(1, Math.min(n, op.max)) / op.max); return ftMechShown(B.force) ? `${say} With ${FT_MECH_NAME[B.force]}: ${p0.apply(this, arguments)}` : say; };
+  }
+}
+fttWrap();
+if (typeof talTipHTML === 'function' && !talTipHTML._ftt) { const tt0 = talTipHTML; talTipHTML = function () { fttWrap(); return tt0.apply(this, arguments); }; talTipHTML._ftt = 1; }
+// the hooks
+if (typeof manaCostK === 'function' && !manaCostK._ftt) {
+  const m0 = manaCostK;
+  manaCostK = function (t, ab) { const c = m0.apply(this, arguments); let off = 0; fttEach(t, 'cost', (B, v) => { off += B.cost(t, ab, v) || 0; }); return off ? Math.max(0, Math.round(c * (1 - Math.min(.8, off)))) : c; };
+  manaCostK._ftt = 1;
+}
+if (typeof castAbility === 'function' && !castAbility._ftt) {
+  const a0 = castAbility;
+  castAbility = function (t, ab) { const r = a0.apply(this, arguments); if (r && t && !t.ccEchoK) try { fttEach(t, 'cast', (B, v) => B.cast(t, ab, v)); } catch (e) { console.error(e); } return r; };
+  castAbility._ftt = 1;
+}
+if (typeof callWave === 'function' && !callWave._ftt) {
+  const w0 = callWave;
+  callWave = function () { const r = w0.apply(this, arguments); if (ftiOn()) fttWrap(); return r; };
+  callWave._ftt = 1;
+}
+if (typeof hurt === 'function' && !hurt._ftt) {
+  const h0 = hurt;
+  hurt = function (c, amt, type, src) {
+    if (c && src && src.def && amt > 0 && !FTI_IN && typeof AB_NOW !== 'undefined' && AB_NOW) { const id = AB_NOW; let k = 1; fttEach(src, 'amp', (B, v) => { if (B.amp === id) k += v; }); if (k !== 1) return h0.apply(this, [c, amt * k].concat(Array.prototype.slice.call(arguments, 2))); }
+    return h0.apply(this, arguments);
+  };
+  hurt._ftt = 1;
 }
 
 /* ================= THE SILVER ORDER'S LEGENDARIES, remade (25 Nov 2026) =================
