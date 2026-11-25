@@ -1,4 +1,4 @@
-const BUILD_TAG = '7c022c1f@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4a041fbd@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -55345,7 +55345,7 @@ forestFaction({
       eco: 'Bracket fungus is its plate, the thickest in the forest: steel glances off until the grey bar is broken, and magic cuts straight through it. It is slow. Use magic, crack its armour, or let it walk a long road under your hardest hitters.' },
     gc_veilcap: { name: 'Veilcap', fallback: 'bat', hp: .7, spd: 1.05, r: .34, fly: true, role: 'light', gap: .8, tint: [.9, .8, 1.3, .14], trait: 'Glowcap Bloom: flying',
       eco: 'She drifts over the maze under a wide violet cap, veils trailing, in a straight line down the middle. Only units that reach the air can hit her.' },
-    gc_elder: { name: 'Glowcap Elder', fallback: 'shaman', hp: .85, spd: .9, r: .34, role: 'cloth support', gap: .95, warcry: [9, 3, 4, GCB.glowK], tint: [.7, 1.2, 1, .16], trait: 'Glowcap Bloom: caster, speeds the foes around him',
+    gc_elder: { name: 'Glowcap Elder', ffNoRag: true, fallback: 'shaman', hp: .85, spd: .9, r: .34, role: 'cloth support', gap: .95, warcry: [9, 3, 4, GCB.glowK], tint: [.7, 1.2, 1, .16], trait: 'Glowcap Bloom: caster, speeds the foes around him',
       abil: ['Glowlight', `His staff flares, and the foes within 3 cells run ${Math.round(GCB.glowK * 100)}% faster for 4 seconds.`],
       eco: `Every 9 seconds or so his staff flares: Glowlight sends the foes within 3 cells running ${Math.round(GCB.glowK * 100)}% faster for 4 seconds. He casts from mana. Kill him first (target order Support), stun the wind-up, or drain his mana.` },
     gc_sporecap: { name: 'Sporecap', fallback: 'gnoll', hp: .85, spd: .95, r: .34, role: 'light', gap: .9, atk: { r: GCB.spore.r, rate: GCB.spore.rate, dmg: 0, kind: 'axe' }, tint: [1.3, 1.05, .45, .12], trait: 'Glowcap Bloom: ranged, its spores slow your units\' attacks',
@@ -81739,7 +81739,7 @@ const FOERAG = (() => {
     /* points: a bone's head (the root has none: it rides the hips); the far end of a bone without children; a fin; and for a bone
        with several children (the hips, the chest: a rigid body) three more set wide about its head, which carry its weight and
        give it a steady frame (its joints alone sit a few centimetres apart: a frame from them would shake) */
-    const pt = new Int16Array(NB).fill(-1), tip = new Int16Array(NB).fill(-1), fp = new Int16Array(NB).fill(-1), va = new Int16Array(NB).fill(-1), P0 = [], pr = [], pm = [], pdrag = [], pbone = [], pcol = [];
+    const pt = new Int16Array(NB).fill(-1), tip = new Int16Array(NB).fill(-1), fp = new Int16Array(NB).fill(-1), va = new Int16Array(NB).fill(-1), rim = new Int16Array(NB).fill(-1), P0 = [], pr = [], pm = [], pdrag = [], pbone = [], pcol = [];
     const add = (p, r, m, drag, b, col) => { P0.push(p[0], p[1], p[2]); pr.push(r); pm.push(m); pdrag.push(drag); pbone.push(b); pcol.push(col === false ? 0 : 1); return pr.length - 1; };
     const massOf = n => n === 'hips' || n === 'chest' ? 2 : n === 'spine' ? 4 : /thigh|neck|head|clav/.test(n) ? 2 : SOFT.test(n) ? .35 : 1;
     const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -81753,14 +81753,22 @@ const FOERAG = (() => {
       if (b === root) continue;
       const n = B[b].n, soft = SOFT.test(n), H = B[b].h, T = B[b].t, far = kids[b].filter(c => dist3(B[c].h, H) > .02 * h);
       if (!kids[b].some(c => !RIDER.test(B[c].n)) && T && !WELD.test(n)) tip[b] = add([H[0] + (T[0] - H[0]) * reach[b], H[1] + (T[1] - H[1]) * reach[b], H[2] + (T[2] - H[2]) * reach[b]], rad[b] * (n === 'head' ? 1 : .8), n === 'head' ? 2.5 : soft ? .3 : .8, soft ? 1 : 0, b);
-      if (fin[b] && far.length < 2) fp[b] = add(fin[b], .025 * h, soft ? .25 : .5, soft ? 1 : 0, b);
+      if (fin[b] && far.length < 2 && !RIDER.test(n)) fp[b] = add(fin[b], .025 * h, soft ? .25 : .5, soft ? 1 : 0, b);
+      if (n === 'cap' && T && per[b].length > 8) {   // a cap's brim: four points round it, at its widest
+        const ax = [T[0] - H[0], T[1] - H[1], T[2] - H[2]], al = Math.hypot(ax[0], ax[1], ax[2]) || 1; ax[0] /= al; ax[1] /= al; ax[2] /= al;
+        let u = Math.abs(ax[0]) < .9 ? [1, 0, 0] : [0, 0, 1]; const d = u[0] * ax[0] + u[1] * ax[1] + u[2] * ax[2]; u = [u[0] - d * ax[0], u[1] - d * ax[1], u[2] - d * ax[2]]; const ul = Math.hypot(u[0], u[1], u[2]); u = [u[0] / ul, u[1] / ul, u[2] / ul];
+        const v = [ax[1] * u[2] - ax[2] * u[1], ax[2] * u[0] - ax[0] * u[2], ax[0] * u[1] - ax[1] * u[0]], ds = [], us = [];
+        for (const q of per[b]) { const px = R.P[q * 3] - H[0], py = R.P[q * 3 + 1] - H[1], pz = R.P[q * 3 + 2] - H[2], t = px * ax[0] + py * ax[1] + pz * ax[2]; ds.push(Math.hypot(px - ax[0] * t, py - ax[1] * t, pz - ax[2] * t)); us.push(t); }
+        ds.sort((x, y) => x - y); us.sort((x, y) => x - y); const rr = ds[Math.floor(ds.length * .9)] * .72, t0 = us[Math.floor(us.length * .15)];
+        rim[b] = pr.length; for (const [cu, cv] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) add([H[0] + ax[0] * t0 + (u[0] * cu + v[0] * cv) * rr, H[1] + ax[1] * t0 + (u[1] * cu + v[1] * cv) * rr, H[2] + ax[2] * t0 + (u[2] * cu + v[2] * cv) * rr], .03 * h, .4, 0, b);
+      }
       if (far.length >= 2) { const s = .17 * h; va[b] = add([H[0] + s, H[1], H[2]], 0, 2.2, 0, b, false); add([H[0], H[1] + s, H[2]], 0, 2.2, 0, b, false); add([H[0], H[1], H[2] + s], 0, 2.2, 0, b, false); }
     }
     const NP = pr.length, X0 = Float32Array.from(P0), d0 = (i, j) => Math.hypot(X0[i * 3] - X0[j * 3], X0[i * 3 + 1] - X0[j * 3 + 1], X0[i * 3 + 2] - X0[j * 3 + 2]);
     /* ties: [i, j, lo, hi]; the first nFix are the skeleton itself (kept exactly), the rest stand in for joint limits */
     const C = [], seen = new Set(), tie = (i, j, lo, hi) => { if (i < 0 || j < 0 || i === j) return; const key = i < j ? i * 512 + j : j * 512 + i; if (seen.has(key)) return; seen.add(key); C.push(i, j, lo, hi); };
     const eq = (i, j) => { if (i >= 0 && j >= 0) { const d = d0(i, j); tie(i, j, d, d); } }, P = n => bix[n] != null ? pt[bix[n]] : -1, TP = n => bix[n] != null ? (tip[bix[n]] >= 0 ? tip[bix[n]] : pt[bix[n]]) : -1;
-    const follow = new Int8Array(NB), fa = new Int16Array(NB).fill(-1), fb = new Int16Array(NB).fill(-1);   // 0 ride the parent, 1 swing to a point, 2 a frame of two points
+    const follow = new Int8Array(NB), fa = new Int16Array(NB).fill(-1), fb = new Int16Array(NB).fill(-1), ride = new Uint8Array(NB);   // 0 ride the parent, 1 swing to a point, 2 a frame of two points
     for (let b = 0; b < NB; b++) {
       if (b === root) continue;
       const far = kids[b].filter(c => d0(pt[b], pt[c]) > .02 * h);
@@ -81771,6 +81779,17 @@ const FOERAG = (() => {
         follow[b] = 2; fa[b] = va[b]; fb[b] = va[b] + 2; continue;
       }
       if (WELD.test(B[b].n)) { for (const c of kids[b]) eq(pt[b], pt[c]); follow[b] = 0; continue; }
+      /* a cap (RIDER) is one piece with the bone it sits on: its points still touch the road, tied fast to that bone's own, and
+         the bone itself rides its parent (the skin between a tipping cap and its head tore) */
+      if (/^cap/.test(B[b].n) && B[b].p >= 0 && tip[b] >= 0) { const p = B[b].p, Q = [pt[b], tip[b], pt[p]]; if (tip[p] >= 0) Q.push(tip[p]);
+        if (rim[b] >= 0) for (let k = 0; k < 4; k++) Q.push(rim[b] + k);
+        for (const c of kids[b]) Q.push(pt[c]);
+        // (tied enough to be one piece, not every pair: too many ties fought each other under a hard landing)
+        { const core = [pt[b], tip[b], pt[p]]; if (tip[p] >= 0) core.push(tip[p]); for (let x = 0; x < core.length; x++) for (let y = x + 1; y < core.length; y++) eq(core[x], core[y]);
+          if (rim[b] >= 0) for (let k = 0; k < 4; k++) { eq(rim[b] + k, pt[b]); eq(rim[b] + k, tip[b]); eq(rim[b] + k, pt[p]); eq(rim[b] + k, rim[b] + (k + 1) % 4); }
+          for (const c of kids[b]) for (const x of core) eq(pt[c], x); }
+        if (rim[b] >= 0 && follow[p] === 1 && tip[p] >= 0) { follow[p] = 2; fa[p] = tip[p]; fb[p] = rim[b]; }   // (the brim gives the head its turn about its own axis: the cap's points and its skin agree)
+        follow[b] = 0; ride[b] = 1; continue; }
       for (const c of kids[b]) { eq(pt[b], pt[c]); if (tip[b] >= 0 && RIDER.test(B[c].n)) eq(tip[b], pt[c]); }
       const end = tip[b] >= 0 ? tip[b] : far.length ? pt[far[0]] : -1;
       if (tip[b] >= 0) eq(pt[b], tip[b]);
@@ -81782,7 +81801,8 @@ const FOERAG = (() => {
     const len = n => bix[n] != null ? Math.hypot(B[bix[n]].t[0] - B[bix[n]].h[0], B[bix[n]].t[1] - B[bix[n]].h[1], B[bix[n]].t[2] - B[bix[n]].h[2]) : 0;
     const chest = bix.chest, vc = chest != null ? va[chest] : -1, vh = va[hips];
     /* the trunk bends and twists only so far: the wide points of the hips and of the chest keep near their distances */
-    if (vc >= 0 && vh >= 0) { const s = .17 * h * .4; for (let k = 0; k < 3; k++) { const d = d0(vh + k, vc + k); tie(vh + k, vc + k, d - s, d + s); } }
+    // (a trunk much thicker than a man's bends less: the same bend stretches its skin by its girth. Only past 0.14 heights of radius)
+    if (vc >= 0 && vh >= 0) { const girth = bix.spine != null ? rad[bix.spine] / h : 0, s = .17 * h * .4 * (girth > .14 ? .14 / girth : 1) * (R.ragTrunk || 1) /* (R.ragTrunk: a model may ask for a stiffer trunk) */; for (let k = 0; k < 3; k++) { const d = d0(vh + k, vc + k); tie(vh + k, vc + k, d - s, d + s); } }
     rng(P('hips'), P('chest'), .9, 1.02); rng(P('hips'), P('neck'), .84, 1.02);
     for (const s of 'LR') {
       rng(P('thigh' + s), P('foot' + s), .6, 1); rng(P('arm' + s), P('hand' + s), .55, 1);           // a knee, an elbow, never folded shut
@@ -81804,7 +81824,7 @@ const FOERAG = (() => {
       if (b === root || WELD.test(B[b].n)) continue;
       const p = B[b].p, e = endOf(b); if (e < 0 || p < 0 || p === root) continue;
       const n = B[b].n, soft = SOFT.test(n);
-      if (va[p] >= 0) { if (soft) for (let k = 0; k < 3; k++) rng(va[p] + k, e, .3, 1.7);   // (loosely: a wing falls flat, a robe splays)
+      if (va[p] >= 0) { if (soft) { const S = R.ragSoft || [.3, 1.7]; for (let k = 0; k < 3; k++) rng(va[p] + k, e, S[0], S[1]); }   // (loosely: a wing falls flat, a robe splays)
         // (an insect's leg, or a mantis's arm set straight on its chest: it folds and splays only so far from where it stood. A limb free
         //  to swing right round pulled the skin at its root into long blades. The humanoids' limbs have their own ties above.)
         else if (/^leg[A-Z]\d/.test(n) || (/^arm[LR]$/.test(n) && B[p].n === 'chest')) for (let k = 0; k < 3; k++) rng(va[p] + k, e, .72, 1.28);
@@ -81844,7 +81864,7 @@ const FOERAG = (() => {
       }
     }
     const inv = Float32Array.from(pm, m => 1 / m), isFoot = new Uint8Array(NP), isCore = new Uint8Array(NP); for (const n of ['hips', 'chest', 'spine', 'head']) if (bix[n] != null) { isCore[pt[bix[n]]] = 1; if (tip[bix[n]] >= 0) isCore[tip[bix[n]]] = 1; } for (const n of ['footL', 'footR', 'toeL', 'toeR']) if (bix[n] != null) { isFoot[pt[bix[n]]] = 1; if (tip[bix[n]] >= 0) isFoot[tip[bix[n]]] = 1; }
-    return { rb: Int16Array.from(rb), rp: Float32Array.from(rp), ri: Int16Array.from(ri), ru: Float32Array.from(ru), va, push: new Float32Array(NP), isFoot, isCore, R, NB, NP, h, root, hips, pt, tip, kids, follow, fa, fb, X0, pr: Float32Array.from(pr), inv, pdrag: Float32Array.from(pdrag), pcol: Uint8Array.from(pcol), pbone: Int16Array.from(pbone), C: Float32Array.from(C), nFix, nLim, T1: Int16Array.from(T1), T2: Int16Array.from(T2),
+    return { rb: Int16Array.from(rb), rp: Float32Array.from(rp), ri: Int16Array.from(ri), ru: Float32Array.from(ru), va, push: new Float32Array(NP), isFoot, isCore, R, NB, NP, h, root, hips, pt, tip, kids, follow, ride, fa, fb, X0, pr: Float32Array.from(pr), inv, pdrag: Float32Array.from(pdrag), pcol: Uint8Array.from(pcol), pbone: Int16Array.from(pbone), C: Float32Array.from(C), nFix, nLim, T1: Int16Array.from(T1), T2: Int16Array.from(T2),
       feet: ['footL', 'footR', 'toeL', 'toeR'].map(n => bix[n] != null ? [pt[bix[n]], tip[bix[n]]] : []).flat().filter(i => i >= 0), core: [P('hips'), P('chest'), P('spine')].filter(i => i >= 0), head: TP('head'), chest: P('chest') };
   }
 
@@ -81985,6 +82005,11 @@ const FOERAG = (() => {
         }
       }
       const H = B[bn].h;
+      if (rg.ride[bn] && p >= 0 && p !== rg.root) {   // one piece with its parent: T_b = T_p(t) T_p(0)^-1 T_b(0)
+        const O0 = b.O0, qx = O0[bn * 3] - O0[p * 3], qy = O0[bn * 3 + 1] - O0[p * 3 + 1], qz = O0[bn * 3 + 2] - O0[p * 3 + 2];
+        for (let r = 0; r < 3; r++) O[bn * 3 + r] = _t[r * 3] * qx + _t[r * 3 + 1] * qy + _t[r * 3 + 2] * qz + O[p * 3 + r];
+        continue;
+      }
       for (let r = 0; r < 3; r++) O[bn * 3 + r] = X[i * 3 + r] - (W[w + r * 3] * H[0] + W[w + r * 3 + 1] * H[1] + W[w + r * 3 + 2] * H[2]) + (r === 1 ? b.lift : 0);
     }
     if (rg.root >= 0) {   // the root rides the hips
@@ -82306,7 +82331,9 @@ const FFM = (() => {
       const b = R.bones[B[0]], ax = [b.t[0] - b.h[0], b.t[1] - b.h[1], b.t[2] - b.h[2]], al = Math.hypot(ax[0], ax[1], ax[2]) || 1, C = [0, 0, 0]; let lo = 1e9, hi = -1e9;
       for (let q = 0; q < keep.length; q++) { const x = mesh.pos[q * 3], y = mesh.pos[q * 3 + 1], z = mesh.pos[q * 3 + 2], u = ((x - b.h[0]) * ax[0] + (y - b.h[1]) * ax[1] + (z - b.h[2]) * ax[2]) / al; C[0] += x; C[1] += y; C[2] += z; if (u < lo) lo = u; if (u > hi) hi = u; }
       for (let e = 0; e < 3; e++) C[e] /= keep.length;
-      const half = (hi - lo) / 2, tris = new Set(); for (let q = 0; q < keep.length; q += 3) tris.add(keep[q]);
+      // (tris: every triangle with ANY corner on the piece: the body drawn without it drops those too. A triangle joining cap and head
+      //  belongs to neither once they part: left on the body it stood out as a ragged collar)
+      const half = (hi - lo) / 2, tris = new Set(); for (let k = 0; k < nc; k += 3) if (B.includes(domOf(k)) || B.includes(domOf(k + 1)) || B.includes(domOf(k + 2))) tris.add(k);
       PIECES.push(Object.assign({ B, mesh, tris, C, half, lo: opt.flat ? .03 * hgt : half * .6 }, opt));
     }
     mkPiece(['cap', 'cap2'], { flat: 0, toss: 1 }); mkPiece(['staff'], { flat: 1, toss: .3, always: true });
@@ -82421,7 +82448,8 @@ const FFM = (() => {
       return true;
     }
     // (a foe whose data says ffNoRag keeps its clip deaths, thrown by foe physics: a squat, thick body crumples badly as a ragdoll)
-    let RAG = null; try { RAG = typeof FOERAG !== 'undefined' && !(typeof CREEPS !== 'undefined' && CREEPS[TYPE] && CREEPS[TYPE].ffNoRag) ? FOERAG.rig(R) : null; } catch (e) { if (typeof console !== 'undefined') console.warn('Forest foe ' + TYPE + ': no ragdoll (' + e.message + ')'); }
+    if (D.ragSoft) R.ragSoft = D.ragSoft; if (D.ragTrunk) R.ragTrunk = D.ragTrunk;   // (how far its kilt or robe may splay as a ragdoll)
+    let RAG = null; try { RAG = typeof FOERAG !== 'undefined' && !D.noRag && !(typeof CREEPS !== 'undefined' && CREEPS[TYPE] && CREEPS[TYPE].ffNoRag) ? FOERAG.rig(R) : null; } catch (e) { if (typeof console !== 'undefined') console.warn('Forest foe ' + TYPE + ': no ragdoll (' + e.message + ')'); }
     const model = { ragdoll: !!RAG, quick: typeof FOEDIE !== 'undefined' && FOEDIE.on, limbs: [], bob: 0, fly: FLY, float: false, alpha: 1, rigged: true, draw, die: (k, dt) => die(k), fallOf, body: m, bounds: [[-.3, 0, -.3], [.3, hgt, .3]], tris: nc / 3 };
     return { model, CL, R, D, NB, DEATHS, FALL, deathMesh: md };
   }
