@@ -1,4 +1,4 @@
-const BUILD_TAG = '878030cb@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '04c786e4@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -63096,6 +63096,20 @@ function ezReword(force, key, name, pairs) {
   ezLayout(F, 'champ:cc_arch', [[4,3],[0,2],[1,3],[3,0],[1,0],[2,0],[2,2],[4,1],[5,2],[4,0],[3,3],[5,3],[4,2],[5,1],[0,1],[2,1]], [4,5,3,9]);   /* rows 2 2 3 2 4 3; chain: Unravel > Loose Threads > Read the Crowd > Woven Edge */
   ezLayout(F, 'champ:cc_maren', [[0,2],[0,1],[1,0],[3,1],[1,1],[2,1],[2,0],[2,3],[5,2],[4,1],[3,3],[5,3],[4,2],[4,0],[2,2],[0,3],[5,1]], [4,5,3]);   /* rows 3 2 4 2 3 3; chain: Rift Chain > Long Chain > Practice Yard */
 }
+/* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
+   other forces' tree layouts"; tools/open_layout.js conclave; forces_..._easy.js ezLayout) ---------- */
+{
+  const F = 'conclave';
+  ezLayout(F, 'glaive', [[1,0],[0,2],[3,2],[2,1],[1,2],[2,2],[5,3],[2,0],[4,1],[3,3],[4,2],[2,3],[5,1],[5,2],[0,1],[0,3],[4,0]], [4,5,2,10]);   /* rows 3 2 4 2 3 3; chain: Ward-Splitter > Ghost Edge > Lone Duel > Rift Wake */
+  ezLayout(F, 'arrow', [[0,0],[0,2],[5,0],[3,0],[4,1],[2,2],[3,3],[1,2],[2,1],[5,2],[1,1],[1,0],[2,3],[5,1],[1,3],[0,1],[4,2],[4,3],[5,3]], [12,6,17,18]);   /* rows 3 4 3 2 3 4; chain: Packed Ranks > Bursting Missiles > Tidemoon > Missile Storm */
+  ezLayout(F, 'frost', [[0,0],[0,1],[5,3],[4,0],[2,2],[2,0],[1,0],[5,2],[4,2],[1,2],[5,1],[3,2],[1,3],[3,3],[3,1],[0,2],[1,1]], [4,11,8,7]);   /* rows 3 4 2 3 2 3; chain: Deep Freeze > Cold Library > Shatterbloom > Icicle Volley */
+  ezLayout(F, 'arcane', [[2,1],[3,3],[2,2],[0,1],[1,2],[4,0],[4,3],[5,2],[5,3],[1,3],[4,1],[2,0],[3,2],[5,1],[0,2],[0,0],[4,2]], [14,4,2,12]);   /* rows 3 2 3 2 4 3; chain: Pendulum Swing > Backward Hour > Rewound Bolt > Arcane Clockwork */
+  ezLayout(F, 'storm', [[0,2],[0,1],[5,1],[3,1],[4,2],[1,1],[3,3],[4,0],[5,2],[5,0],[2,3],[1,3],[2,0],[4,3],[2,2],[0,0],[2,1]], [11,10,6,13]);   /* rows 3 2 4 2 3 3; chain: Shooting Bolt > Grand Orrery > Busy Sky > Orrery Moon */
+  ezLayout(F, 'earth', [[2,2],[0,2],[3,1],[1,0],[2,1],[5,1],[3,0],[4,2],[4,0],[4,3],[0,1],[5,0],[2,3],[5,2],[1,3],[0,3],[4,1]], [4,2,16,5]);   /* rows 3 2 3 2 4 3; chain: Heave > Waking Golem > Stamped Flat > Shatterground */
+  ezLayout(F, 'cannon', [[0,2],[0,1],[0,0],[1,2],[1,0],[1,3],[2,2],[1,1],[2,3],[3,0],[3,2],[3,3],[4,0],[3,1],[4,3],[5,1],[5,2]], [0,3,6]);   /* rows 3 4 2 4 2 2; chain: Pyre Scribe > Skipping Flame > Twin Fireball */
+  ezLayout(F, 'venom', [[0,0],[3,2],[0,2],[2,1],[1,3],[1,2],[2,0],[0,1],[2,2],[4,3],[4,0],[4,1],[3,3],[5,2],[5,1],[5,0]], [2,5,8,1]);   /* rows 3 2 3 2 3 3; chain: Homeward Edge > Returning Crescent > Glancing Crescent > Hunting Crescent */
+  ezLayout(F, 'champ:cc_chrono', [[0,2],[0,0],[1,0],[5,2],[1,2],[2,2],[1,3],[3,1],[3,3],[4,0],[3,2],[5,1],[2,0],[5,3],[0,1],[1,1],[4,3]], [0,4,5,10]);   /* rows 3 4 2 3 2 3; chain: Patient Hands > Recall > Long Way Back > Second Hand */
+}
 
 /* ================= SIMPLE PASSIVES: THE GROVE (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
@@ -63185,6 +63199,22 @@ function ezReword(force, key, name, pairs) {
   ezSpell(F, V, "Witch's Spite", 'bw_bogdue', { cd: 2, back: 'opens every' });
   ezTal(F, V, 'Long Spit', 'reach', .25, 0, 'Her spit carries');
   ezSpell(F, V, 'Fed Swarm', 'bw_swarm', { by: { dur: 1 } }, longer('feeds'));
+}
+/* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
+   other forces' tree layouts"; tools/open_layout.js grove; forces_..._easy.js ezLayout) ---------- */
+{
+  const F = 'grove';
+  ezLayout(F, 'glaive', [[0,1],[0,2],[2,0],[1,1],[1,3],[2,1],[4,2],[4,0],[5,2],[5,1],[2,2],[5,3],[3,0],[3,2],[0,0],[3,1],[3,3]], [10,13,6,8]);   /* rows 3 2 3 4 2 3; chain: Spearwood Rising > Tossed Off the Point > Last Thrust > Wall of Spears */
+  ezLayout(F, 'arrow', [[2,3],[0,1],[4,3],[0,0],[2,1],[1,1],[3,1],[3,2],[5,1],[5,2],[4,2],[2,2],[3,0],[5,0],[0,2],[2,0],[1,3]], [1,5,4]);   /* rows 3 2 4 3 2 3; chain: Heartwood Volley > Thornseed Arrow > Spirit Hawk */
+  ezLayout(F, 'frost', [[0,2],[0,1],[4,2],[1,3],[1,0],[5,1],[4,3],[3,2],[3,1],[2,2],[2,0],[2,3],[5,2],[5,0],[3,0],[2,1],[0,3]], [9,7,2,12]);   /* rows 3 2 4 3 2 3; chain: Spreading Roots > Second Snare > Root Run > Overgrowth */
+  ezLayout(F, 'arcane', [[0,2],[1,2],[1,3],[3,2],[5,1],[3,1],[2,0],[4,1],[3,3],[5,2],[5,3],[4,0],[0,1],[2,1],[1,0],[1,1]], [13,5,7,4]);   /* rows 2 4 2 3 2 3; chain: Spell-Spurred > Through and On > White Hart's Hunt > Endless Hunt */
+  ezLayout(F, 'storm', [[4,2],[0,2],[2,0],[4,3],[1,0],[4,0],[3,1],[2,2],[5,3],[2,1],[1,3],[4,1],[5,1],[5,2],[0,0],[0,1],[3,3]], [9,6,11,12]);   /* rows 3 2 3 2 4 3; chain: Shapestorm > Wild Sweep > Wild Hunger > Owl Lord */
+  ezLayout(F, 'earth', [[0,1],[1,1],[3,2],[0,2],[1,0],[2,2],[5,3],[5,1],[4,0],[3,1],[3,3],[5,2],[2,0],[1,3],[4,2]], [5,2,14,11]);   /* rows 2 3 2 3 2 3; chain: Threading Dance > Single Partner > Spell and Steel > Petalfall */
+  ezLayout(F, 'cannon', [[2,0],[0,1],[0,2],[2,1],[3,2],[3,3],[1,1],[2,3],[5,1],[5,3],[5,2],[2,2],[4,0],[4,1],[1,0],[0,3],[3,1]], [1,6,3,16]);   /* rows 3 2 4 3 2 3; chain: Ripe Pods > Puffcap Sowing > Seed Split > Busy Sling */
+  ezLayout(F, 'venom', [[0,2],[0,1],[0,0],[1,2],[1,3],[3,1],[2,2],[3,2],[1,1],[4,2],[2,3],[4,3],[1,0],[3,0],[5,2],[5,0],[5,1]], [0,3,6,7]);   /* rows 3 4 2 3 2 3; chain: Clinging Mud > Bog Body > Second Gob > Bog Rhythm */
+  ezLayout(F, 'champ:rootmother', [[0,1],[0,2],[1,0],[5,2],[1,1],[2,1],[2,2],[3,1],[3,0],[4,3],[3,2],[5,3],[2,0],[5,1],[0,3],[2,3],[4,0]], [0,4,5,7]);   /* rows 3 2 4 3 2 3; chain: Patient Earth > Rootway > Bramble Grasp > Sap Song */
+  ezLayout(F, 'champ:thornbow', [[0,1],[0,3],[3,3],[3,0],[1,1],[2,1],[2,3],[4,1],[5,2],[3,1],[2,2],[3,2],[4,3],[5,1],[0,2],[1,0],[5,0]], [0,4,5,9]);   /* rows 3 2 3 4 2 3; chain: Steady Draw > Farshot > Barbed Shafts > Snarled Ground */
+  ezLayout(F, 'champ:hivemother', [[0,2],[3,3],[2,1],[3,0],[1,2],[2,2],[1,0],[4,3],[5,2],[5,1],[1,1],[5,0],[4,1],[3,2],[0,1],[1,3]], [0,4,5,13]);   /* rows 2 4 2 3 2 3; chain: Ripe Seeds > Moth Swarm > Thick Garden > Rotfeast */
 }
 
 /* ================= SIMPLE PASSIVES: IRONHOLD (26 Nov 2026) =================
@@ -63356,6 +63386,22 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, V, 'Seal Slam', 'overflow', .1, 'her seal hits');
   ezSpell(F, V, "Zealot's Tithe", 'so_edict', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
 }
+/* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
+   other forces' tree layouts"; tools/open_layout.js silver; forces_..._easy.js ezLayout) ---------- */
+{
+  const F = 'silver';
+  ezLayout(F, 'glaive', [[0,1],[3,0],[0,2],[2,2],[5,1],[1,3],[1,0],[4,2],[5,3],[5,2],[4,0],[3,2],[1,1],[3,3],[2,1],[3,1]], [3,11,7,9]);   /* rows 2 3 2 4 2 3; chain: Shield of Faith > Unbroken Oath > Oath of Challenge > Ringing Shield */
+  ezLayout(F, 'arrow', [[0,2],[0,1],[5,1],[0,0],[1,2],[4,0],[2,2],[3,3],[5,2],[2,1],[2,0],[1,3],[4,2],[5,0],[4,3],[4,1],[3,2]], [0,4,6,16]);   /* rows 3 2 3 2 4 3; chain: Opening Shot > Flare Bolt > Splinter Bolt > Hot Crank */
+  ezLayout(F, 'frost', [[0,1],[3,1],[0,2],[1,0],[3,2],[1,1],[3,3],[3,0],[2,2],[5,2],[4,0],[5,3],[5,1],[4,3],[1,3],[2,1]], [0,5,15,1]);   /* rows 2 3 2 4 2 3; chain: Tightening Links > Chain of Penance > Taut Chain > Glinting Links */
+  ezLayout(F, 'arcane', [[0,1],[4,0],[2,1],[1,0],[1,1],[3,0],[1,3],[2,2],[5,3],[5,1],[3,3],[4,2],[0,0],[0,2],[1,2],[3,1],[5,2]], [0,4,2,15]);   /* rows 3 4 2 3 2 3; chain: Full Gallop > Tourney Passes > Ride Through > Hot Blood */
+  ezLayout(F, 'storm', [[1,0],[1,1],[3,3],[3,1],[2,2],[5,1],[2,3],[4,2],[5,0],[5,2],[3,2],[4,3],[1,3],[0,2],[0,1],[3,0]], [4,10,7,9]);   /* rows 2 3 2 4 2 3; chain: Prism > Sunburst > Dawnfall > High Noon */
+  ezLayout(F, 'earth', [[4,3],[0,1],[0,0],[3,3],[2,1],[1,1],[3,0],[5,1],[5,2],[2,0],[1,3],[4,2],[4,0],[2,2],[3,2],[0,2],[3,1]], [1,5,4,16]);   /* rows 3 2 3 4 3 2; chain: Twin Rhythm > Whirling Flurry > Opening Cross > Templar's Rhythm */
+  ezLayout(F, 'cannon', [[0,0],[0,2],[5,1],[0,1],[2,0],[1,3],[4,1],[5,2],[5,3],[1,1],[2,1],[3,1],[3,3],[4,2],[2,2],[4,0]], [9,10,11,6]);   /* rows 3 2 3 2 3 3; chain: Hot Coals > Direct Hit > Rekindling > Kindle the Censers */
+  ezLayout(F, 'venom', [[0,2],[0,1],[2,1],[1,0],[1,1],[1,2],[3,0],[1,3],[3,3],[2,2],[4,0],[4,1],[3,2],[5,1],[5,2],[5,3]], [0,5,9,12]);   /* rows 2 4 2 3 2 3; chain: Broken Litany > Writ of Seizure > Leaping Lash > Long Chain */
+  ezLayout(F, 'champ:so_lion', [[0,2],[3,3],[1,0],[4,2],[1,1],[2,1],[3,0],[3,1],[5,2],[5,1],[2,2],[4,3],[5,0],[0,1],[1,3]], [13,4,5,7]);   /* rows 2 3 2 3 2 3; chain: Swift Reprisal > Bulwark Slam > Shields Raised > Rally to the Shield */
+  ezLayout(F, 'champ:so_dawn', [[0,2],[0,0],[1,3],[5,3],[1,2],[2,2],[4,0],[3,2],[3,0],[4,3],[2,0],[5,2],[2,3],[5,1],[0,1],[2,1],[4,1]], [0,4,5,7]);   /* rows 3 2 4 2 3 3; chain: Early Dawn > Prism of Dawn > Lingering Star > Be Still */
+  ezLayout(F, 'champ:so_judge', [[0,2],[0,0],[1,3],[1,2],[5,2],[2,0],[2,2],[5,3],[3,2],[3,3],[5,1],[4,3],[4,0],[2,1],[4,1],[0,1]], [0,3,6,8]);   /* rows 3 2 3 2 3 3; chain: Swift Justice > Debt Collection > Witnesses Called > Trampling Host */
+}
 
 /* ================= SIMPLE PASSIVES: THE STORMBORN (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js. Modelled on classic WoW trees: most nodes are an always-on, ranked
@@ -63456,6 +63502,21 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   const F = 'stormborn';
   ezLayout(F, 'champ:sb_caller', [[4,1],[0,2],[1,0],[4,3],[1,3],[2,3],[2,1],[3,3],[5,1],[3,0],[5,0],[4,2],[5,2],[0,1],[2,2]], [4,5,7,3]);   /* rows 2 2 3 2 3 3; chain: Thunder Drum > Long Roll > Booming Drum > Drum Circle */
 }
+/* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
+   other forces' tree layouts"; tools/open_layout.js stormborn; forces_..._easy.js ezLayout) ---------- */
+{
+  const F = 'stormborn';
+  ezLayout(F, 'glaive', [[0,1],[0,2],[1,3],[5,1],[1,0],[1,1],[5,2],[4,0],[5,3],[3,3],[4,2],[2,2],[2,0],[3,2],[1,2],[3,1]], [11,13,10,6]);   /* rows 2 4 2 3 2 3; chain: Braced Spear > Run Them Through > Stormpin > Storm Wolf */
+  ezLayout(F, 'arrow', [[1,1],[0,1],[1,0],[2,2],[2,3],[5,2],[4,3],[4,2],[5,0],[5,1],[3,0],[3,2],[0,2],[1,3],[3,1]], [3,11,7,5]);   /* rows 2 3 2 3 2 3; chain: Gust Fletching > Hurricane Volley > Skyward Gust > Gale Volley */
+  ezLayout(F, 'frost', [[3,1],[0,1],[1,3],[3,3],[5,1],[0,2],[1,1],[2,0],[5,3],[3,2],[4,0],[4,1],[5,2],[0,0],[1,0],[2,1],[1,2]], [1,6,15,0]);   /* rows 3 4 2 3 2 3; chain: Hard Frost > Black Ice > Skipping Stone > Heavy Hail */
+  ezLayout(F, 'arcane', [[3,3],[0,1],[3,1],[1,2],[2,1],[1,0],[5,1],[5,3],[4,1],[2,2],[3,2],[5,2],[4,0],[0,2],[1,3],[3,0]], [4,2,8,6]);   /* rows 2 3 2 4 2 3; chain: Judgment > Lingering Spirits > Spirit Walk > Ancestors' Blessing */
+  ezLayout(F, 'storm', [[0,2],[0,1],[1,0],[3,3],[2,2],[1,2],[3,0],[5,1],[5,2],[2,0],[5,3],[2,3],[4,1],[2,1],[4,0],[0,3],[3,2]], [0,5,4,16]);   /* rows 3 2 4 3 2 3; chain: Long Fork > Arc Bridge > Backlash > Charged Air */
+  ezLayout(F, 'earth', [[1,3],[1,0],[5,2],[2,1],[1,2],[3,1],[5,1],[4,3],[4,1],[2,3],[3,0],[5,0],[0,1],[1,1],[0,2],[3,2]], [3,5,8,6]);   /* rows 2 4 2 3 2 3; chain: Heavy Stomp > Loose Earth > Sinkhole > Great Stomp */
+  ezLayout(F, 'cannon', [[2,1],[0,2],[5,0],[4,1],[0,1],[3,2],[1,0],[2,2],[5,1],[4,3],[4,2],[1,2],[5,2],[0,3],[2,3],[2,0],[3,0]], [11,7,5,10]);   /* rows 3 2 4 2 3 3; chain: Sky Strike > Skyleap > Storm's End > Twin Bolt */
+  ezLayout(F, 'venom', [[0,1],[0,2],[0,3],[3,2],[1,2],[2,1],[2,3],[4,0],[1,0],[3,1],[4,3],[2,0],[4,1],[5,1],[5,2]], [5,9,12,13]);   /* rows 3 2 3 2 3 2; chain: Charged Harpoons > Skyfall Harpoon > Hunter's Haste > Harpoon Volley */
+  ezLayout(F, 'champ:sb_wind', [[4,1],[0,3],[0,1],[5,1],[1,2],[2,2],[3,2],[2,1],[3,0],[4,3],[1,0],[5,2],[2,0],[0,2],[2,3],[4,0]], [10,12,8,15]);   /* rows 3 2 4 2 3 2; chain: Wind at Her Back > Turn the Road > Long Road Back > Rising Air */
+  ezLayout(F, 'champ:sb_beast', [[2,0],[0,1],[1,3],[3,2],[1,1],[2,1],[3,1],[3,3],[5,1],[5,0],[4,0],[5,2],[4,3],[0,2],[1,2],[1,0]], [1,4,5,6]);   /* rows 2 4 2 3 2 3; chain: Keen Nose > Wolfsong > Heel Biters > Pack Hunger */
+}
 
 /* ================= SIMPLE PASSIVES: THE WARDBOUND (26 Nov 2026) =================
    The engine and the owner's words: forces_..._easy.js; the Stormborn were the sample (forces_..._easy_stormborn.js).
@@ -63540,6 +63601,22 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, V, 'Mercy Cut', 'rhythm', .03, 'stroke of his vow-blade');
   ezSpell(F, V, "Chaplain's Prayer", 'wb_vow', { cd: 2, back: 'is sworn every' });
   ezSpell(F, V, 'Smoke Spirit', 'wb_rite', { cd: 2, back: 'is held every' });
+}
+/* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
+   other forces' tree layouts"; tools/open_layout.js wardbound; forces_..._easy.js ezLayout) ---------- */
+{
+  const F = 'wardbound';
+  ezLayout(F, 'glaive', [[1,1],[3,1],[1,3],[0,2],[4,0],[0,1],[1,2],[3,3],[2,1],[2,0],[4,1],[1,0],[3,2],[5,1],[5,3],[5,2]], [8,1,10,13]);   /* rows 2 4 2 3 2 3; chain: Hold the Road > Deep Carving > Final Oath > Vowed Blade */
+  ezLayout(F, 'arrow', [[0,1],[3,2],[0,2],[1,3],[1,2],[2,1],[2,3],[1,0],[3,0],[3,3],[4,3],[4,1],[5,2],[5,0],[5,1]], [3,6,9,10]);   /* rows 2 3 2 3 2 3; chain: Long Ricochet > Returning Oath > Quick Hand > Glaive Orbit */
+  ezLayout(F, 'frost', [[0,2],[4,2],[1,3],[0,1],[2,0],[0,0],[1,1],[2,2],[3,0],[2,1],[3,3],[4,3],[3,2],[3,1],[5,2],[5,0],[5,1]], [3,6,9,13]);   /* rows 3 2 3 4 2 3; chain: Bitter Steel > Frostbite > Cleaving Haft > Rime Shards */
+  ezLayout(F, 'arcane', [[1,1],[2,1],[0,3],[0,1],[4,3],[3,0],[1,0],[2,2],[3,1],[0,2],[4,1],[2,3],[4,2],[5,1],[5,0],[5,2]], [1,8,10,13]);   /* rows 3 2 3 2 3 3; chain: Lingering Ink > Reading Glass > Scribe the Road > Endless Script */
+  ezLayout(F, 'storm', [[0,2],[2,1],[0,1],[1,0],[1,2],[0,3],[2,0],[2,2],[4,1],[2,3],[4,0],[3,0],[4,2],[3,3],[5,1],[5,3],[5,2]], [0,4,7]);   /* rows 3 2 4 2 3 3; chain: Couched Lance > Storm Pennant > Double Thrust */
+  ezLayout(F, 'earth', [[0,2],[0,1],[2,1],[1,0],[3,2],[3,1],[1,2],[4,0],[1,3],[2,3],[4,1],[3,0],[3,3],[5,1],[5,3],[5,2]], [2,5,10,13]);   /* rows 2 3 2 4 2 3; chain: Deep Quake > Anvil's Toll > Anvil Stance > Unmoving */
+  ezLayout(F, 'cannon', [[1,3],[0,2],[0,1],[0,0],[4,0],[4,1],[1,2],[2,1],[2,0],[2,2],[3,3],[3,0],[3,2],[3,1],[5,3],[5,1],[5,2]], [1,6,9,12]);   /* rows 3 2 3 4 2 3; chain: Wide Blast > Rune Shot > Quick Crank > Spent Bolt */
+  ezLayout(F, 'venom', [[1,3],[3,2],[0,1],[2,1],[1,0],[0,2],[3,3],[2,2],[4,0],[3,1],[3,0],[1,1],[4,1],[5,2],[5,1],[5,3]], [11,3,9,12]);   /* rows 2 3 2 4 2 3; chain: Censer Swing > Long Blade > Rite of Holding > Smoke Spirit */
+  ezLayout(F, 'champ:wb_varic', [[1,3],[0,2],[0,0],[3,3],[1,2],[2,2],[2,0],[4,1],[5,1],[5,3],[3,2],[5,2],[4,0],[2,1],[0,1]], [1,4,5,10]);   /* rows 3 2 3 2 2 3; chain: Warden's Reach > Hold Fast > Long Vigil > Steady Pace */
+  ezLayout(F, 'champ:wb_aedric', [[2,3],[0,1],[0,2],[3,0],[1,1],[2,1],[1,0],[3,1],[5,0],[5,1],[4,3],[5,2],[4,2],[2,2],[0,3]], [1,4,5,7]);   /* rows 3 2 3 2 2 3; chain: Sunlit Reach > Sun Charge > Sun-Struck Trail > Rallying Cry */
+  ezLayout(F, 'champ:wb_isaura', [[0,2],[3,2],[1,3],[2,1],[1,2],[2,0],[3,1],[3,3],[5,1],[5,3],[4,0],[5,2],[4,1],[1,0],[0,1]], [3,6,12,8]);   /* rows 2 3 2 3 2 3; chain: Witness of Vows > Heavy Vow > Oath Turned > Turned Twice */
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
@@ -139939,7 +140016,7 @@ function coEndScreen(won) {
    bones (the sash on three panels in two lengths, the armillary's two rings on bones of their own), one 1536 texture, 10
    clips at 30 frames a second. ON by default; ?gw=old (or the Model Lab's "Golem rig" row set to Old) draws the code-built
    warden and his golem instead.
-   The owner: "golem is a single unit. size look good": the golem IS the unit now, alone on its cell, 1.6 cells tall (1.5, 1.05, 1.3 before) at
+   The owner: "golem is a single unit. size look good": the golem IS the unit now, alone on its cell, 1.55 cells tall (1.5, 1.05, 1.3, 1.6 before) at
    tier I (the little warden who stood behind it is gone while the sculpt is drawn), and ccGolemAt, where the kit starts
    its dust, leaps and reaches, is the unit's own cell. His moves, by the game's own cues (nothing in the game is changed):
      idle      no foe in reach: a statue set down, slow breaths, a long look aside
@@ -139952,13 +140029,14 @@ function coEndScreen(won) {
      stomp       the last stomp on the game's, then the hop home
      hit, death   his health drops; wounded: down on a knee, both fists on the road
    The armillary's rings turn all the while; the runes, eyes and the star are emissive (brighter by tier, as every unit's
-   glow). The chest's star is t.tipW (unitTip). Size: 1.6 cells x the shared tier curve (unitmodels_size.js UM_TIER).
+   glow). The chest's star is t.tipW (unitTip). Size: 1.55 cells x the shared tier curve (unitmodels_size.js UM_TIER).
    Checks: `python -I tools/make_gw.py --check`. Notes: docs/model_pilot/golem2.md. */
 const GW2 = (() => {
   const U = 'cc_golemwarden', NAMES = ['idle', 'ready', 'slam', 'leap', 'heave', 'wall', 'pound', 'stomp', 'hit', 'death'];
   // (owner, 25 Nov 2026, after playing: "golems should be reduced in size by about 30%": 1.5 -> 1.05 cells at tier I, the tier curve kept;
   //  ?gwtall=1.5 is the first size, to compare)
-  const TALL = (() => { try { const q = +new URLSearchParams(location.search).get('gwtall'); return q > .3 && q < 3 ? q : 1.6; } catch (e) { return 1.6; } })();
+  const TALL = (() => { try { const q = +new URLSearchParams(location.search).get('gwtall'); return q > .3 && q < 3 ? q : 1.55; } catch (e) { return 1.55; } })();
+  // (owner, 26 Nov, shown 1.3 to 1.95 side by side: "1.76", then "actually make it 1.55")
   // (then 1.6: at 1.3 his head was still under the mages' hats, who stand on bases; at 1.75 his arm reaches a neighbour's base)
   // (owner, 26 Nov, of 1.05: "golem should be slightly bigger than other units": 1.3, between the two. He is as wide as he is tall,
   //  so his bulk passes a mage's well before his height does; ?gwtall=1.05 the small one)
@@ -140174,7 +140252,7 @@ const GW2 = (() => {
     }
     // the golem is the unit: the kit's "where the golem stands" is its own cell (it was a step before and beside the warden)
     if (MESH_ && typeof ccGolemAt === 'function') { const g0 = ccGolemAt; ccGolemAt = function (t) { return on(t) ? [t.x, 0, t.y] : g0.apply(this, arguments); }; }
-    // its size by the shared rule: 1.6 cells to the top of his head at tier I, the crown (bars, stars) over it
+    // its size by the shared rule: 1.55 cells to the top of his head at tier I, the crown (bars, stars) over it
     if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) {
       UM_UNITS[U] = { mdl: 'gw2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1;
       if (typeof UM_HEAD_K !== 'undefined' && typeof UM_KIND !== 'undefined' && typeof UM_EVEN_HEAD !== 'undefined') { UM_HEAD_K.golem = TALL * HEADY / UM_EVEN_HEAD; UM_KIND[U] = 'golem'; }
