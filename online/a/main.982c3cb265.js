@@ -1,4 +1,4 @@
-const BUILD_TAG = '18d79afb@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'f3fa09e6@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -125942,8 +125942,66 @@ function rnMakeOne(type, key) {
   const leg = rnLegs().map(k => [k, rnFit(type, { l: k }, k)]).sort((a, b) => b[1] - a[1])[0], extra = best(g => g.rar === 3, 1, items)[0] || null;
   return (_rnTab[key] = { type, items: sig.concat(items), sig, leg: leg ? leg[0] : null, extra, say: `${rnBossName(type)}'s hoard` });
 }
+/* ---- the boss's weapon (owner, 26 Nov 2026: "theme the weapon to the boss") ----
+   WPN_BOSS_OFFER of a boss's panels hold a weapon card in place of a relic (weapons_ui.js wpOfferFor). It is rolled here, for
+   a unit you field, themed to the boss: words its weapon is chosen by (the base's name and look, its class) and the on-hit
+   effects it carries, its own first. The unit is drawn from those you field, weighted by how many you field and by how well
+   its class's best base fits; the base is that class's best-fitting one (ties settled by a fixed hash, never at random); an
+   on-hit effect, when the weapon carries one, is the boss's (a legendary form's when it is legendary); no legendary weapon on
+   wave RN_LEG.after or earlier. A force with nothing fitting gets the closest: the highest score, whatever it is. */
+const RN_BOSS_WPN = {
+  rattlefang: { words: /bone|horn|hunt|crude|jagged|war|pack|boar|axe/i, oh: ['twin', 'mark'] },
+  arachnara: { words: /barb|venom|poison|thin|needle|hook|silk|slim|narrow|dagger/i, oh: ['mark', 'last'] },
+  ossyra: { words: /bone|feather|wing|long|pierc|holy|sky|light|pale/i, oh: ['storm', 'mark'] },
+  malgrath: { words: /dark|black|heavy|plate|spike|square|cruel|great|war/i, oh: ['sunder', 'last'] },
+  voidwyrm: { words: /crystal|star|rune|arcane|void|orb|glow|shard|gem/i, oh: ['wardrend', 'storm'] },
+  brakka: { words: /iron|heavy|siege|spike|pike|blast|powder|bore|barrel|great/i, oh: ['stun', 'pyre'] },
+  lich: { words: /frost|ice|rime|pale|silver|cold|crystal|white|bone/i, oh: ['wardrend', 'last'] },
+  kragmor: { words: /stone|rock|heavy|hammer|maul|earth|great|granite|thick/i, oh: ['stun', 'sunder'] },
+  titan: { words: /forge|fire|ember|steel|iron|molten|hammer|anvil|brass/i, oh: ['pyre', 'sunder'] },
+  abyss: { words: /dark|shadow|black|death|skull|cruel|void|night|bone/i, oh: ['last', 'pyre'] },
+  grakk: { words: /club|mace|maul|hammer|heavy|great|crude|thick|bash|iron|boar/i, oh: ['stun', 'sunder'] },
+  rc_ysra: { words: /water|sea|river|reed|song|willow|green|wave|pearl|shell|staff|wand/i, oh: ['storm', 'twin'] },
+  orragar: { words: /bell|bone|grave|hollow|toll|iron|pale|heavy|ring/i, oh: ['stun', 'last'] },
+  gc_firstcap: { words: /spore|rot|mushroom|cap|fung|glow|moss|bog|twist|gnarl/i, oh: ['pyre', 'mark'] },
+  tm_broodmother: { words: /barb|thorn|hook|claw|blade|venom|chitin|serrat|jagged|leaf|narrow/i, oh: ['twin', 'last'] },
+};
+const rnWpnWords = type => (RN_BOSS_WPN[type] && RN_BOSS_WPN[type].words) || rnThemeOf(type);
+function rnWpnScore(type, c, b) { const m = [c, b[1], b[4] || ''].join(' ').match(new RegExp(rnWpnWords(type).source, 'gi')); return (m ? m.length : 0) + rnHash(type + b[0]) * .5; }
+// the boss's base for a unit type (its class's best fit) and how well it fits
+function rnWpnBest(type, ty) {
+  const c = typeof wpnClassOf === 'function' ? wpnClassOf(ty) : null, C = c && WPN_CLASS[c]; if (!C) return null;
+  const best = C.bases.map(b => [b[0], rnWpnScore(type, c, b)]).sort((a, b) => b[1] - a[1])[0];
+  return { ty, cls: c, b: best[0], score: best[1] };
+}
+// the boss's legendary form of a unit's weapon: its best-named one
+function rnWpnLeg(type, unit) {
+  const L = (typeof WPN_LEGS !== 'undefined' ? WPN_LEGS : []).filter(r => r[0] === unit); if (!L.length) return null;
+  const re = new RegExp(rnWpnWords(type).source, 'gi');
+  return L.map(r => [r[1], ((String(r[2] || '') + ' ' + String(r[3] || '')).match(re) || []).length + rnHash(type + r[1]) * .5]).sort((a, b) => b[1] - a[1])[0][0];
+}
+const rnWpnOh = (type, leg) => { const ids = leg ? (typeof OH_LEG_IDS !== 'undefined' ? OH_LEG_IDS : []) : (typeof OH_IDS !== 'undefined' ? OH_IDS : []); return ((RN_BOSS_WPN[type] || {}).oh || []).find(k => ids.includes(k)) || null; };
+function rnBossWpn(type, wave) {
+  if (typeof wpnRoll !== 'function' || typeof wpnTypesW !== 'function') return null;
+  const tw = wpnTypesW().map(([ty, w]) => { const p = rnWpnBest(type, ty); return p ? [ty, w * (1 + p.score), p] : null; }).filter(Boolean); if (!tw.length) return null;
+  const ty = pickW(tw.map(x => [x[0], x[1]])), p = tw.find(x => x[0] === ty)[2];
+  let rar = pickW(wpnRarW(wave, true).map((v, i) => [i, v])); if (rar === 4 && !(wave > RN_LEG.after)) rar = 3;
+  const w = wpnRoll(wave, true, rar, ty); if (!w) return null;
+  const legW = typeof WPN_LEG !== 'undefined' && WPN_LEG[w.b];
+  if (w.rar === 4 && legW) { const lb = rnWpnLeg(type, TOWERS[ty].unit); if (lb) w.b = lb; }
+  else w.b = p.b;   // (a legendary turned into a base with a legendary effect, as onhit.js does, takes the boss's base too)
+  if (w.oh) { const o = rnWpnOh(type, w.rar === 4); if (o) w.oh = o; }
+  delete w._c; delete w._k;
+  return w;
+}
+// what the boss's weapon would be for each unit type (fielded ones; with none, every one of the force's with a weapon)
+function rnBossWpns(type) {
+  const tys = typeof wpnTypesW === 'function' ? wpnTypesW().map(x => x[0]) : [];
+  return tys.map(ty => rnWpnBest(type, ty)).filter(Boolean).map(p => ({ ty: p.ty, unit: TOWERS[p.ty].name, cls: p.cls, base: p.b, name: typeof wpnName === 'function' ? wpnName({ b: p.b, rar: 2 }) : p.b, oh: rnWpnOh(type, false) }));
+}
 /* For the region map's place card (region.js runs with no force applied): one boss's table for a force, as plain entries.
-   bossLootTable('rc_ysra', 'grove', 10) -> { type, name, say, wave, legP, weaponP, items: [{ key, base | leg, rar, name, sig, leg }] }.
+   bossLootTable('rc_ysra', 'grove', 10) -> { type, name, say, wave, legP, weaponP, weapons: [{ ty, unit, cls, base, name, oh, ohName }],
+   items: [{ key, base | leg, rar, name, sig, leg }] }.
    The order: its own relic, its rares and charms, its epics, its legendary. Give the wave it is fought on: on wave 15 or
    earlier it has no legendary (RN_LEG), and legP is the chance its offer holds it. Ordinary foes keep the shared random
    drops (loot.js rollDrop). */
@@ -125957,7 +126015,9 @@ function bossLootTable(type, force, wave) {
     for (const b of T.items) { const it = rnItem({ b }, true); out.push({ key: b, base: b, rar: it.rar, name: gearName(it), sig: !!GEAR_BASES[b].bsig }); }
     if (T.leg) { const it = rnItem({ l: T.leg }, true); out.push({ key: 'L:' + T.leg, leg: T.leg, rar: 4, name: gearName(it) }); }
     // weaponP: the chance one of the panel's two choices is a weapon for a unit you field instead of a relic (weapons_ui.js WPN_BOSS_OFFER)
-    return { type, name: rnBossName(type), say: T.say, wave: wave || null, legP: wave && T.leg ? rnLegP(wave, 0) : 0, weaponP: typeof WPN_BOSS_OFFER !== 'undefined' ? WPN_BOSS_OFFER : 0, items: out };
+    // weapons: the boss's weapon for each of the force's unit kinds (the card is for one you field); its on-hit effect when it has one
+    const weapons = rnBossWpns(type).map(x => Object.assign(x, { ohName: x.oh && typeof OH !== 'undefined' && OH[x.oh] ? OH[x.oh].name : null }));
+    return { type, name: rnBossName(type), say: T.say, wave: wave || null, legP: wave && T.leg ? rnLegP(wave, 0) : 0, weaponP: typeof WPN_BOSS_OFFER !== 'undefined' ? WPN_BOSS_OFFER : 0, weapons, items: out };
   } finally { G.force = gf; if (swap) applyForce(was); }
 }
 
@@ -129207,10 +129267,24 @@ function rgLootMore(R, S) {
   for (const b of F) {
     if (seen.has(b.type)) continue; seen.add(b.type);
     const K = rgBossTabKeys(b.type, R.force, b.w) || rgBossKeys(T), name = CREEPS[b.type] ? CREEPS[b.type].name : b.type;
-    rows.push(`<p class="rg-tl">${rgEsc(name)} drops</p>${rgPoolHTML({ force: R.force }, K)}`);
+    rows.push(`<p class="rg-tl">${rgEsc(name)} drops</p>${rgPoolHTML({ force: R.force }, K)}${rgBossWpnHTML(b.type, R.force, b.w)}`);
   }
   return rows.join('');
 }
+// its themed weapons (renown.js bossLootTable(...).weapons: one for each of the force's unit kinds; a weaponP chance its offer
+// holds one in place of a relic): one small icon a unit kind, its card the weapon's name, the unit and its on-hit effect (no chances)
+function rgBossWpnHTML(type, force, w) {
+  const B = typeof bossLootTable === 'function' ? bossLootTable(type, force, w) : null, W = B && Array.isArray(B.weapons) ? B.weapons : [];
+  if (!W.length || !(B.weaponP > 0)) return '';
+  const ic = x => { let u = ''; try { u = typeof wpIconURL === 'function' ? wpIconURL({ b: x.base, rar: 2 }) : ''; } catch (e) {} return u; };
+  return `<p class="rg-wpl">+ a themed weapon sometimes, for one of your units:</p><span class="rg-ics rg-wps">${W.map((x, i) => { const u = ic(x);
+    return `<button type="button" class="rg-ii rg-wp" style="--rc:#d8c08a" data-rgw="${rgEsc(force + '|' + type + '|' + w + '|' + i)}" aria-label="${rgEsc(x.name + ' for ' + x.unit)}">${u ? `<img alt="" src="${u}">` : `<i>${rgEsc(String(x.unit || '?').slice(0, 1))}</i>`}</button>`; }).join('')}</span>`;
+}
+function rgWpnCard(el) {
+  const [force, type, w, i] = (el.dataset.rgw || '').split('|'), B = typeof bossLootTable === 'function' ? bossLootTable(type, force, +w) : null, x = B && B.weapons && B.weapons[+i]; if (!x) return '';
+  return `<div class="rg-tc"><h4>${rgEsc(x.name)}</h4><p>A weapon for your ${rgEsc(x.unit)}, made in ${rgEsc(B.name)}’s fashion.${x.ohName ? ` On hit: <b>${rgEsc(x.ohName)}</b>.` : ''}</p><p class="rg-fx">Now and then its offer holds one in place of a relic, for a unit you field.</p></div>`;
+}
+if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '.rg-wp[data-rgw]', rgWpnCard, { tap: () => null });
 const RG_POOL_SHOW = 12;
 function rgPoolHTML(T, K) {
   K = K || { keys: rgDropKeys(T), anyLeg: false }; const ks = K.keys; if (!ks.length && !K.anyLeg) return '';
@@ -134817,7 +134891,8 @@ const WPN_BOSS_OFFER = .4;   // the chance a boss's loot offers a weapon, in pla
 // the boss's weapon card: rolled when its loot opens (L.wpn), rolled afresh on a reroll, taken in place of a relic
 function wpOfferFor(L) {
   if (!L || !wpnOn()) return null;
-  if (L.wpn === undefined) { L.wpn = Math.random() < WPN_BOSS_OFFER ? (wpnRoll(L.w, true) || null) : null; if (L.wpn) L.wpn.isNew = true; }   // (sometimes: owner, "should just be 2 options with the weapon being a random chance")
+  if (L.wpn === undefined) { L.wpn = Math.random() < WPN_BOSS_OFFER ? ((typeof rnBossWpn === 'function' ? rnBossWpn(L.type, L.w) : wpnRoll(L.w, true)) || null) : null;   // (themed to the boss: renown.js rnBossWpn)
+    if (L.wpn) L.wpn.isNew = true; }   // (sometimes: owner, "should just be 2 options with the weapon being a random chance")
   return L.wpn;
 }
 if (typeof rnLootReroll === 'function') {
@@ -134862,7 +134937,7 @@ function wpTableHTML(type) {
   const seen = new Set(), out = [];
   for (const t of G.towers || []) { const c = t.def && !t.def.wall ? wpnClassOf(t.type) : null; if (!c || seen.has(c)) continue; seen.add(c); out.push(t); }
   if (!out.length) for (const ty in TOWERS) { const c = wpnClassOf(ty); if (c && !seen.has(c) && out.length < 4) { seen.add(c); out.push({ type: ty, def: TOWERS[ty], id: 0 }); } }
-  return `${out.slice(0, 6).map(t => { const s = { b: WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 }; return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}`;
+  return `${out.slice(0, 6).map(t => { const bw = typeof rnWpnBest === 'function' ? rnWpnBest(type, t.type) : null, s = { b: bw ? bw.b : WPN_CLASS[wpnClassOf(t.type)].bases[0][0], rar: 2 };/* (the boss's own make of it) */ return `<button type="button" class="rn-ii wp-ii" style="--rc:#d8c08a" data-wbt="${t.type}|${type}" aria-label="A weapon for ${wpE(t.def.name)}"><img alt="" src="${wpIconURL(s)}"></button>`; }).join('')}`;
 }
 if (typeof rnIconsHTML === 'function') {
   const _wpIc = rnIconsHTML;
@@ -134870,12 +134945,15 @@ if (typeof rnIconsHTML === 'function') {
 }
 // (the boss's weapon is a choice card on its loot screen now: the strip says which units it may be for)
 function wpTableCard(el) {
-  const [ty] = (el.dataset.wbt || '').split('|'); const d = TOWERS[ty]; if (!d) return '';
-  const c = wpnClassOf(ty), O = wpnBossOdds(Math.max(5, G.wave | 0)), names = WPN_CLASS[c].bases.map(b => wpnName({ b: b[0], rar: 2 }));
-  const legs = WPN_LEGS.filter(r => r[0] === d.unit).map(r => r[2]);
+  const [ty, bt] = (el.dataset.wbt || '').split('|'); const d = TOWERS[ty]; if (!d) return '';
+  // (the boss's own make of it and its on-hit effect: renown.js rnWpnBest / rnWpnLeg / rnWpnOh, owner: "theme the weapon to the boss")
+  const c = wpnClassOf(ty), O = wpnBossOdds(Math.max(5, G.wave | 0)), bw = bt && typeof rnWpnBest === 'function' ? rnWpnBest(bt, ty) : null;
+  const names = bw ? [wpnName({ b: bw.b, rar: 2 })] : WPN_CLASS[c].bases.map(b => wpnName({ b: b[0], rar: 2 }));
+  const lb = bt && typeof rnWpnLeg === 'function' ? rnWpnLeg(bt, d.unit) : null, legs = lb ? WPN_LEGS.filter(r => r[1] === lb).map(r => r[2]) : WPN_LEGS.filter(r => r[0] === d.unit).map(r => r[2]);
+  const oh = bt && typeof rnWpnOh === 'function' ? rnWpnOh(bt, false) : null, ohN = oh && typeof OH !== 'undefined' && OH[oh] ? OH[oh].name : '';
   return `<div class="itc" style="--rc:#d8c08a"><h5 class="itc-n">A weapon for ${wpE(d.name)}</h5><p class="itc-k">Weapon chance · this boss sometimes offers one among its loot · take it in place of a relic</p>
     <ul class="itc-s">${O.rar.map((p, r) => p > .005 ? `<li><b style="color:${RARITY[r].col}">${Math.round(p * 100)}%</b> ${RARITY[r].name}</li>` : '').join('')}</ul>
-    <p class="itc-k">${wpE(names.join(', '))}${legs.length ? `; legendary: ${wpE(legs.join(', '))}` : ''}</p><p class="itc-fl">A boss's weapon is for one of the units you field, made for what that unit holds.</p></div>`;
+    <p class="itc-k">${wpE(names.join(', '))}${ohN ? ` · on hit, when it has one: ${wpE(ohN)}` : ''}${legs.length ? `; legendary: ${wpE(legs.join(', '))}` : ''}</p><p class="itc-fl">A boss's weapon is for one of the units you field, made for what that unit holds.</p></div>`;
 }
 if (typeof document !== 'undefined' && typeof itipBind === 'function') itipBind(document, '[data-wbt]', wpTableCard);
 /* ---------- weapons in the bag (with the relics): the Gear sheet's bag and the Bag screen ----------
