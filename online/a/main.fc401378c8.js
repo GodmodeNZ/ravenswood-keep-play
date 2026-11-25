@@ -1,4 +1,4 @@
-const BUILD_TAG = '9ee61dc0@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '95cc30ee@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12091,9 +12091,9 @@ const ITEM_STATS = {
   so_zenith: 'sp as range|Zenith Beam', so_anvil: 'dmg as pen|Great Slam', so_thurible: 'splash sp|Thurible', so_clapper: 'sp cd regen|Gold Clapper',
   so_c_vial: 'regen|Holy Water', so_c_hourglass: 'cd|Vespers', so_c_beads: 'mana|Counting', so_c_matins: 'mana regen|Matins', so_c_tithe: 'regen|Tithe',
   so_c_sunstone: 'sp|Sunstone', so_c_wardknot: 'regen mana|Ward-Knot', so_c_echo: 'sp cd|Echo of the Bell',
-  so_lionshield: 'dmg sp pen|Condemn', so_sunbolt: 'as crit pen|Sunbolt', so_firstchain: 'sp mana cd|The First Chain', so_truegrail: 'sp dmg pen|True Grail', so_opengate: 'as range pen|Open Gate',
-  so_firstlight: 'sp as range|First Light', so_lasthammer: 'dmg crit pen|Last Word', so_saintcenser: 'splash sp regen|Saints’ Coals', so_silvermere: 'sp mana regen|Silvermere',
-  so_dawncrown: 'sp cd regen|Crown of Dawn', so_lawbook: 'sp mana cd|The Law', so_martyr: 'dmg as pen|Martyr’s Fury', so_oathblade: 'dmg crit as|Passed Judgement',
+  so_lionshield: 'dmg sp pen|The Lion’s Shield', so_sunbolt: 'as crit pen|Splitting Sun', so_firstchain: 'sp mana cd|The First Chain', so_truegrail: 'sp dmg pen|Phantom Knights', so_opengate: 'sp range pen|Open Gate',
+  so_firstlight: 'sp as range|Falling Stars', so_lasthammer: 'dmg crit pen|Ring of Swords', so_recant: 'sp mana cd|Recantation', so_saintcenser: 'splash sp regen|Feeding Smoke', so_silvermere: 'sp mana regen|The Great Bell',
+  so_dawncrown: 'as sp crit|Crown of Dawn', so_lawbook: 'sp mana cd|The Law', so_martyr: 'dmg as pen|Martyr’s Pillar', so_oathblade: 'dmg crit as|Sworn Volley',
   so_s_gauntlets: 'dmg=4 pen=6|', so_s_spurs: 'as=20|', so_s_glass: 'range=0.6|', so_s_rosary: 'regen=1.2|', so_s_mail: 'mana=20|Self-Mending', so_s_chalk: 'as=8|Judgement Chalk',
   so_s_tocsin: 'sp=10 mana=20 mpen=12|', so_s_lance: 'dmg=8 pen=12|',
   // ---- the Stormborn ----
@@ -20745,73 +20745,80 @@ for (const id in SO_CHARMS) Object.assign(SO_CHARMS[id], { charm: 1, fx: () => {
 
 /* ---------- legendaries: a signature for each unit, and four for any ---------- */
 const SO_LEGENDS = {
-  so_lionshield: { for: 'glaive', name: 'Mantle of the Lion', art: 'so_lionmantle', icon: 'sun',   // (was the Aegis of the Lion, a shield: owner, no shields drop; same rule, a lion-pelt mantle; its shield painting is not shown)
-    hue: '#d8b048', atk: 1,
-    twist: 'Bulwark Bash Condemns: the Shieldbearer becomes the Order\'s well of Judgement, not just its wall.',
-    text: k => `Foes it bashes gain a Judgement a second for ${nf1(4 * k)}s; their bursts hit 50% harder.`,
-    build: 'Pairs with: Unyielding (every 2nd attack a shield bash, at full rank); Templars of the Ford nearby (their cuts Judge the bashed foe, so it bursts sooner).',
-    combo: 'Unyielding, Grail Knights and a boss wave.', fx: (st, k) => soPw(st, 'so_lionshield', 4 * k) },
+  // (25 Nov 2026, owner: legendaries "should alter a spell in a huge way or create a noticeable difference". Their rules are in
+  // forces_..._silverleg.js; each item sets st.pw.sl_*. The old ones fed Judgement; their code in forces_silver_a.js now sleeps.)
+  so_lionshield: { for: 'glaive', name: 'Mantle of the Lion', art: 'so_lionmantle', icon: 'sun',   // (was the Aegis of the Lion, a shield: owner, no shields drop; a lion-pelt mantle; its shield painting is not shown)
+    hue: '#d8b048',
+    twist: 'Bulwark Bash plants the shield in the road: the column piles up against it, then it bursts.',
+    text: () => 'Bulwark Bash plants its shield in the road: foes pile up 4s, then it bursts on them all.',
+    build: 'Pairs with: Unyielding (Bulwark Bash sooner, so more shields); Censer Bearers or Templars of the Ford nearby (they hit the whole pile).',
+    combo: 'Unyielding, Censer Bearers and a bend where the road bunches.', fx: st => soPw(st, 'sl_lion', 1) },
   so_sunbolt: { for: 'arrow', name: 'The Sunbolt Arbalest', icon: 'arrowhead', hue: '#ffe080', atk: 1,
-    twist: 'Consecrated Bolts lay double Judgement, and a bolt on a full foe bursts Judgement over the crowd.',
-    text: () => 'Attacks lay 2 Judgement; on a foe at full Judgement, 2 spill to foes nearby.',
-    build: 'Pairs with: Storm of Silver (bolts at every foe in range, so more spill); Templars of the Ford, Censer Bearers nearby (they hit the whole crowd).',
-    combo: 'Deep Mark, Sighted In and the Templars of the Ford.', fx: st => soPw(st, 'so_sunbolt', 1) },
+    twist: 'A bolt bursts into five that seek out other foes, and every one that kills bursts again.',
+    text: () => 'Each attack: 25% chance the bolt splits into 5 that seek other foes; each kill splits again.',
+    build: 'Pairs with: Storm of Silver, Double Crank (more bolts into a crowd, so more splits); a crowded road.',
+    combo: 'Storm of Silver, Double Crank and a crowded road.', fx: st => soPw(st, 'sl_sun', 1) },
   so_firstchain: { for: 'frost', name: 'The First Chain', icon: 'chains', hue: '#fff0c0', atk: 1,
-    twist: 'Binding Light fills a bound foe with Judgement: every bind bursts in light.',
-    text: k => `Hits slow 50% for ${nf1(2 * k)}s; foes its chains stun fill with Judgement and burst.`,
-    build: 'Pairs with: Quick Binding (more stuns, so more Judgement bursts), Vigil Chains (each foe crossing a chain is stunned, so it bursts).',
-    combo: 'Quick Binding, Grail Knights and Sword of Heaven.', fx: (st, k) => soPw(st, 'so_firstchain', 2 * k) },
+    twist: 'Her lash chains foes together; when one in the chain dies, the rest are struck and the chain takes new foes.',
+    text: () => 'Each attack: 30% chance to chain 4 foes. When one dies, the rest are hit and the chain takes new foes.',
+    build: 'Pairs with: Lash Through, Radiant Hands (more foes struck, so more chains); Censer Bearers or Templars of the Ford (they kill chained foes fast).',
+    combo: 'Radiant Hands, Censer Bearers and a crowded road.', fx: st => soPw(st, 'sl_chain', 1) },
   so_opengate: { for: 'arcane', name: 'Clarion of the Open Gate', icon: 'banner', hue: '#e8d8a0',
-    twist: 'At its call the line parts: this Grail Knight charges straight through your units and walls.',
-    text: () => 'Its charges ride through your units and walls.',
-    build: 'Pairs with: Grail Charge, Tourney Passes (your units and walls no longer block them); Trampling Hooves (its attack charges are no longer blocked either, so it tramples more). Post it deep in the maze, behind the Shieldbearers.',
-    combo: 'A post deep inside the maze, Trampling Hooves and Tourney Passes.', fx: (st, k) => soPw(st, 'rdClarion', 1) },
+    twist: 'At its call a gate opens by the lead foe, and the knight rides out of it back up the road through every foe.',
+    text: () => 'Grail Charge: rides out of a gate by the lead foe, back up the road through every foe.',
+    build: 'Pairs with: Squire\'s Purse (mana each attack, so Grail Charge comes sooner); a long stretch of road in its reach (more foes on the ride).',
+    combo: 'Squire\'s Purse and a long stretch of road.', fx: st => soPw(st, 'sl_gate', 1) },
   so_truegrail: { for: 'arcane', name: 'The True Grail', icon: 'flask', hue: '#ffd060',
-    twist: 'The Grail\'s light lingers: every charge lays Judgement, and a foe it bursts stays half-filled for the next.',
-    text: () => 'Attacks lay 2 Judgement; when its Judgement bursts, 2 stacks stay on.',
-    build: 'Pairs with: Tourney Passes, Trampling Hooves (more Judgement from the knight, so more bursts it sets off, each keeping 2).',
-    combo: 'Couched Lance, Tourney Passes and Bear Witness.', fx: st => soPw(st, 'so_grail', 1) },
+    twist: 'Phantom knights ride out beside it, and each one that slays a foe sends out another.',
+    text: () => 'Each attack: 30% chance a phantom knight rides at another foe; each kill sends another.',
+    build: 'Pairs with: Thrice-Wheeled, Second Pass (more blows, so more phantoms); a crowded road for the phantoms to ride through.',
+    combo: 'Thrice-Wheeled and a crowded road.', fx: st => soPw(st, 'sl_grail', 1) },
   so_firstlight: { for: 'storm', name: 'Staff of First Light', icon: 'sun', hue: '#ffe8a0', atk: 1,
-    twist: 'The Sunlance Exposes with every beam, and a beam on an Exposed foe Judges twice.',
-    text: k => `Attacks Expose for ${nf1(.6 * k)}s; attacks on Exposed foes lay 1 more Judgement.`,
-    build: 'Pairs with: Lightbinder Sisters with Blinding Chains or Chain of Penance; Censer Bearers with Ash in the Eyes (they Expose foes too).',
-    combo: 'Blinding Chains, Scouring Light and the Lightbinder Sisters.', fx: (st, k) => soPw(st, 'so_firstlight', .6 * k) },
+    twist: 'Flyers she brings down fall burning from the sky onto the foes below.',
+    text: () => 'Flyers it kills crash down as stars, hitting ground foes within 1 cell.',
+    build: 'Pairs with: Zenith (harder on flyers); Dawnfall (flyers slammed down in her reach); flyer waves, which walk over ground foes.',
+    combo: 'Zenith, Dawnfall and a flyer wave.', fx: st => soPw(st, 'sl_halo', 1) },
   so_lasthammer: { for: 'earth', name: 'Hammer of the Last Word', icon: 'hammer', hue: '#c8d0e8', atk: 1,
-    twist: 'Every cut judges as it lands: two Judgement on everything it strikes, so a crowd soon bursts.',
-    text: () => 'Its attacks lay 2 Judgement on every foe hit.',
-    build: 'Pairs with: Cross-Cut, Parry and Riposte (extra cuts, each laying 2 more Judgement on every foe hit). Post it at a crowded corner.',
-    combo: 'Whirling Flurry, Second Star and a crowded corner.', fx: st => soPw(st, 'so_lasthammer', 1) },
+    twist: 'Every foe he slays leaves a sword of light circling him, and the whole ring flies at the toughest foe.',
+    text: () => 'On kill: a sword joins a ring round it (up to 12). Every 10s the ring flies at the toughest foe.',
+    build: 'Pairs with: Whirling Flurry, Steel Tempest (more kills in a crowd, so more swords); a crowded corner.',
+    combo: 'Whirling Flurry, Steel Tempest and a crowded corner.', fx: st => soPw(st, 'sl_ring', 1) },
   so_saintcenser: { for: 'cannon', name: 'Censer of the Saints', icon: 'cloud', hue: '#c0a0f0', atk: 1,
-    twist: 'The Censer\'s smoke passes sentence: as each cloud of incense burns out, everyone Judged in it bursts.',
-    text: k => `When its incense fades: foes inside burst with Judgement at ${P_(.6 * k)}.`,
-    build: 'Pairs with: Choking Smoke (slowed foes are still inside when the incense fades), Quick Thurible (faster attacks, so more incense from its coals).',
-    combo: 'Lingering Smoke, Procession of Incense and Choking Smoke.', fx: (st, k) => soPw(st, 'so_saintcenser', .6 * k) },
-  so_silvermere: { for: 'holy', name: 'The Bell of Silvermere', icon: 'echo', hue: '#e8c070',   // (the Bell's toll across the field, rehomed: every spell of the Champion tolls it)
-    twist: 'Your Champion\'s spells toll across the field: every unit of the Order is guarded by light and fed mana, wherever it stands.',
-    text: k => `Champion spells: all your units hit 10% harder for ${nf1(3 * k)}s and gain ${Math.round(6 * k)} mana.`,
-    build: 'Pairs with: Rally to the Shield, Early Dawn, Swift Justice (your Champion casts more often); Martyr\'s Seal (lays Judgement when the Bell rings).',
-    combo: 'Champion talents that make its spells cheaper or sooner, Martyr\'s Seal, and units spread across the maze.', fx: (st, k) => { chPw(st, 'chFieldWard', 3 * k); chPw(st, 'chFieldMana', Math.round(6 * k)); } },
+    twist: 'The smoke feeds on the dying: every foe that falls in it makes the cloud wider and longer.',
+    text: () => 'Each foe that dies in its incense makes the cloud wider and last longer.',
+    build: 'Pairs with: Choking Smoke (foes stay in the smoke), Procession of Incense (more clouds on the road); Templars of the Ford beside it (kills in the smoke).',
+    combo: 'Choking Smoke, Procession of Incense and Templars beside it.', fx: st => soPw(st, 'sl_smoke', 1) },
+  so_recant: { for: 'venom', name: 'Writ of Recantation', icon: 'scales', hue: '#b8862a',
+    twist: 'A spell she breaks turns on the caster\'s own: a heal wounds, a shield shatters.',
+    text: () => 'When it breaks a foe\'s spell: the spell hits that foe\'s allies the wrong way round (a heal hurts, a shield breaks).',
+    build: 'Pairs with: Writ of Seizure (breaks a spell); Broken Litany (its attacks break spells); waves with casters.',
+    combo: 'Writ of Seizure, Broken Litany and a wave of casters.', fx: st => soPw(st, 'sl_writ', 1) },
+  so_silvermere: { for: 'holy', name: 'The Bell of Silvermere', icon: 'echo', hue: '#e8c070',
+    twist: 'After your Champion\'s first spell a great bell falls on the toughest foe and tolls three times.',
+    text: () => 'After its first spell: a great bell drops on the toughest foe and rings 3 times, hitting foes within 1.5 cells.',
+    build: 'Pairs with: Debt of Oaths, Early Dawn, Swift Justice (your Champion\'s first spell comes sooner).',
+    combo: 'Debt of Oaths, Early Dawn or Swift Justice.', fx: st => soPw(st, 'sl_bell', 1) },
   // ---- for any unit ----
   so_dawncrown: { name: 'Crown of Dawn', icon: 'halo', hue: '#ffd880',
-    twist: 'Every burst of Judgement this unit sets off lights up its neighbours: its light quickens them (20% faster) as the Judgement bursts.',
-    text: k => `When its Judgement bursts: nearby units attack 20% faster for ${nf1(2 * k)}s.`,
-    build: 'Pairs with: a Templar of the Ford as wearer, with Whirling Flurry and Cross-Cut (Judgement on a whole crowd, so many bursts). Keep many units close round it.',
-    combo: 'Grail Knights, Templars of the Ford and a tight maze.', fx: (st, k) => soPw(st, 'so_dawncrown', 2 * k) },
+    twist: 'A crown of light leaps from head to head down the column, striking round each foe it lands on.',
+    text: () => 'Each attack: 10% chance a crown of light hops across 5 foes, hitting foes within 1 cell of each.',
+    build: 'Pairs with: fast attackers as wearer, Lightbinder Sisters or Silverbolt Crossbows (more attacks, more crowns); a crowded road.',
+    combo: 'Silverbolt Crossbows and a crowded road.', fx: st => soPw(st, 'sl_crown', 1) },
   so_lawbook: { name: 'Book of the Law', icon: 'scales', hue: '#a8a0c0',
-    twist: 'Judgement is never wasted: stacks laid on a full foe spill on to the next one.',
-    text: k => `Judgement laid on a full foe spills to one within ${nf1(Math.min(2.5, 1.5 * k))} cells.`,
-    build: 'Pairs with: Sunbolt Medallion, Seal of the Last Word, Cross-Cut, Sword of Heaven (they lay 2 or 3 Judgement at once; what is past full spills on).',
-    combo: 'Silverbolt Crossbows, Deep Mark and Bear Witness.', fx: (st, k) => soPw(st, 'so_lawbook', Math.min(2.5, 1.5 * k)) },
+    twist: 'Its first spell is written on the foe\'s whole kind: 2s later it lands on them too.',
+    text: () => 'Its first spell also lands 2s later on up to 4 foes of its target\'s kind, at 60%.',
+    build: 'Pairs with: Thurible Sweep or Cross-Cut as the first spell (area spells, landing on 4 more crowds); waves of one foe kind.',
+    combo: 'Censer Bearers, Templars of the Ford and waves of one kind.', fx: st => soPw(st, 'sl_law', 1) },
   so_martyr: { name: 'Martyr\'s Seal', icon: 'heart', hue: '#d06a6a',
-    twist: 'Its guard of light becomes a weapon: each time it is guarded by light, the light bursts out as Judgement on the foes around it.',
-    text: k => `When it gains a light guard: lays Judgement on up to ${Math.max(2, Math.round(2 * k))} foes in reach (once every 2s).`,
-    build: 'Pairs with: Rampart of Dawn, Bell of Silvermere, Tocsin of the Keep (each makes it hit 10% harder, which sets it off); Shield-Ward if a Shieldbearer wears it.',
-    combo: 'the Bell of Silvermere, Rampart of Dawn and Shield of Faith.', fx: (st, k) => soPw(st, 'so_martyr', Math.max(2, Math.round(2 * k))) },
+    twist: 'Pillars of light rise where it strikes, and grow with every foe that walks into them.',
+    text: () => 'Each attack: 15% chance a pillar of light stands 3s on the foe\'s spot, hitting foes in it and widening.',
+    build: 'Pairs with: fast attackers as wearer, Silverbolt Crossbows or Lightbinder Sisters (more pillars); Choking Smoke nearby (slowed foes stay in them).',
+    combo: 'Silverbolt Crossbows and a bend where foes bunch.', fx: st => soPw(st, 'sl_pyre', 1) },
   so_oathblade: { name: 'Oathblade of the Ford', icon: 'sword', hue: '#c0c8d8',
-    twist: 'Judgement outlives its foe: every kill hands the dead foe\'s stacks to the next in line.',
-    text: () => 'On kill: its Judgement passes to the nearest foe.',
-    build: 'Pairs with: Templars of the Ford or Censer Bearers as wearer (many kills in a crowd); Procession of Incense (Judgement down the road).',
-    combo: 'Templars of the Ford, Censer Bearers and a long Judged column.', fx: st => soPw(st, 'so_oathblade', 1) },
+    twist: 'Now and then it looses a whole volley at once: five attacks at five foes.',
+    text: () => 'Each attack: 12% chance its next 5 attacks come at once, at 5 different foes.',
+    build: 'Pairs with: Silverbolt Crossbows or Sunlance Clerics as wearer (long reach, so 5 foes in it).',
+    combo: 'Silverbolt Crossbows and a long reach.', fx: st => soPw(st, 'sl_oath', 1) },
 };
 
 /* ---------- the Order's shelf: kit for its units, and two artifacts with a tap ---------- */
@@ -47462,7 +47469,7 @@ const CLASS_ITEMS = [
   ['bow', ['sbr_petrel', 'wbr_fletch', 'gs_seedquiver']],
   ['caster', ['cc_hat', 'cc_focus', 'cc_tome', 'cc_l_staff', 'cc_l_codex', 'cc_s_concord', 'cc_s_orb', 'sbr_rattle', 'sbl_raincaller',
     'sbs_gatherstaff', 'wbs_holdstaff', 'gs_rootstaff']],
-  ['blade', ['cc_hilt', 'wbr_whetrune', 'wbr_sigilstone', 'wbr_pommel', 'so_oathblade']],
+  ['blade', ['cc_hilt', 'wbr_whetrune', 'wbr_sigilstone', 'wbr_pommel']],
   ['polearm', ['gv_ashhaft', 'gv_huntlance', 'sbr_hookedbone', 'wbr_rimehook', 'so_s_lance']],
   ['hammer', ['ih_hammerhead', 'ih_anvilchip']],
   // (melee: the two shield-bosses were retired, owner 9 Nov 2026: no shields drop)
@@ -59512,6 +59519,549 @@ if (FORCE_HOOKS.conclave && !FORCE_HOOKS.conclave._ftfire) {
 // the unit cards no longer say every strike charges (the Force tab and the glossary say how it builds)
 for (const ty in FORCES.conclave.units) { const U = FORCES.conclave.units[ty]; if (U && typeof U.blurb === 'string') U.blurb = U.blurb.replace(/\s*Each strike adds an Arcane Charge \(up to \d+\); a spell spends them all(, \+\d+% ability power each)?\./g, ''); }
 
+
+/* ================= THE SILVER ORDER'S LEGENDARIES, remade (25 Nov 2026) =================
+   Owner: "legendaries should alter a spell in a huge way or create a noticeable difference", "more powerful passive chance on
+   attack things. perhaps chain, chains units together, then if one in the chain dies the rest get hit and chained", and of the
+   idea list: the Templars' ring of swords, the Clerics' falling stars, the Censers' growing smoke and the Inquisitors' Writ of
+   Recantation "look good". Proposal and choices: side-session notes, silver-legendaries-proposal.md (v6).
+   The items (forces_silver_e.js SO_LEGENDS) set st.pw.sl_*; everything they do is here, by wrapping: hurt (a strike lands;
+   an Inquisitor's hit marks a caster), kill (deaths), castAbility (Book of the Law), ABIL.so_bash / ABIL.so_grail (the two
+   remade spells), champQCast (the Bell), epInterrupt (the Writ), FORCE_HOOKS.silver.tick (the lasting pieces), and one
+   draw kind in the spell effects list (SFX_DRAW.sllegs) that draws all the lasting pieces each frame.
+   A strike is a hit with no damage tag; what these items deal is tagged 'relic' (or the ability tag inside a spell), so it
+   never sets off another strike's chance. Each chance has its own cooldown a unit (SL.cd), so fast attackers can't chain it.
+   Tunables in SL; the duel table: sim/duels/silverleg*.json. */
+const SL = {
+  cd: { sun: 1.5, chain: 1.5, grail: 2, crown: 2, pyre: 2, oath: 2 },
+  sun: { p: .25, n: 5, n2: 3, k: .6, r: 2.5, deep: 2, cap: 16, hold: 2 },                 // Sunbolt Medallion
+  chain: { p: .3, n: 4, r: 2.6, k: 1.5, life: 10, more: 2, max: 9, spread: 10 },     // The First Chain
+  lion: { T: 4, r: .6, pile: .5, boss: 1.5, burst: 1.3, k: 2.5, n: 12 },           // Mantle of the Lion
+  gate: { far: 3, back: 4, k: 2.6 },                                                 // Clarion of the Open Gate
+  grail: { p: .3, k: 1, r: 2, deep: 5 },                                          // The True Grail
+  star: { r: 1, hp: .3, cap: 5, T: .45 },                                          // Halo of First Light
+  ring: { max: 12, every: 10, k: .5 },                                             // Seal of the Last Word
+  smoke: { dr: .12, rMax: 2.2, dt: 1, tMax: 8 },                                   // Censer of the Saints
+  writ: { mark: .7, heal: .12, healCap: 4, other: 1.5, r: 3, r2: 2 },              // Writ of Recantation
+  bell: { reach: 2, r: 1.5, k: 1, rings: 3, gap: .5 },                             // Bell of Silvermere
+  crown: { p: .1, hops: 5, r: 1, k: .6, hop: 2 },                                  // Crown of Dawn
+  law: { n: 4, k: .6, T: 2 },                                                      // Book of the Law
+  pyre: { p: .15, T: 3, r0: .45, dr: .08, rMax: 1.2, k: .3, tick: .25 },          // Martyr's Seal
+  oath: { p: .12, n: 5 },                                                          // Oathstone of the Ford
+  COL: { gold: '#ffd870', light: '#fff4d0', silver: '#dfe6f0', bronze: '#c8913a', dark: '#b8862a', fire: '#ffb050' },
+  ev: {},   // how often each fired (tests and duels read it)
+};
+const slEv = k => { SL.ev[k] = (SL.ev[k] || 0) + 1; };
+// the unit's pose when its legendary fires (unitreact.js reads t.rxCue: the cheer's motion, in that kind or the unit's own), at most
+// once every 2.5s a unit, so a frequent one does not keep it cheering
+function slCue(t, kind) { if (!t || (t.rxCue && G.time - t.rxCue.at < 2.5)) return; t.rxCue = { at: G.time, kind: kind || null }; }
+const slPw = (t, k) => (t && t.st && t.st.pw && t.st.pw[k]) || 0;
+const slLive = t => !!(t && G.towers.includes(t) && !t.wrecked);
+const slFoe = c => c && !c.dead && !c.phased && !c.ent;
+const slS = () => G.sl || (G.sl = { chains: [], shields: [], pyres: [], bells: [], fly: [], scripts: [] });
+function slReady(t, key) { const C = t.slCd || (t.slCd = {}); if ((C[key] || 0) > G.time) return false; C[key] = G.time + SL.cd[key]; return true; }
+function slHit(c, amt, type, src) { if (!slFoe(c) || !(amt > 0)) return; tagged('relic', () => hurt(c, amt, type || 'phys', src, false, null)); }
+const slDmg = t => (t.st && t.st.dmg) || 0;
+const slAir = t => !!(t.def && t.def.air);   // (inSplash's flag: true = ground foes only)
+
+/* ---------- a strike lands (once an instant: an area strike is one strike) ---------- */
+if (typeof hurt === 'function') {
+  const _slHurt = hurt;
+  hurt = function (c, amt, type, src, dot) {
+    const p = src && src.st && src.st.pw;
+    if (!p || !c || c.dead || !(amt > 0)) return _slHurt.apply(this, arguments);
+    if (p.sl_writ && c.mpMax > 0) { c.slRecT = G.time + SL.writ.mark; c.slRecBy = src; }   // the Writ: her hits mark a caster (strikes and spells)
+    const r = _slHurt.apply(this, arguments);
+    if (!dot && !DTAG && src.slAt !== G.time && src.st) {
+      src.slAt = G.time;
+      try { slStrike(src, c, amt, type); } catch (e) { console.error(e); }
+    }
+    return r;
+  };
+}
+function slStrike(t, c, amt, type) {
+  const p = t.st.pw;
+  if (p.sl_sun && Math.random() < SL.sun.p && slReady(t, 'sun')) slSplit(t, c, SL.sun.n, 0, { n: 0 });
+  if (p.sl_chain && !c.dead && Math.random() < SL.chain.p && slReady(t, 'chain')) slChainMake(t, c);
+  if (p.sl_grail && Math.random() < SL.grail.p && slReady(t, 'grail')) slRider(t, t, c, 0, true);
+  if (p.sl_crown && Math.random() < SL.crown.p && slReady(t, 'crown')) slCrown(t, c);
+  if (p.sl_pyre && !c.fly && Math.random() < SL.pyre.p && slReady(t, 'pyre')) slPyre(t, c);
+  if (p.sl_oath && Math.random() < SL.oath.p && slReady(t, 'oath')) slVolley(t, c);
+}
+
+/* ---------- deaths ---------- */
+if (typeof kill === 'function') {
+  const _slKill = kill;
+  kill = function (c, src) {
+    const fly = c && c.fly && !(c.lowT > G.time), x = c && c.x, z = c && c.y, wasDead = c && c.dead;
+    const r = _slKill.apply(this, arguments);
+    if (!c || wasDead || G.state !== 'play') return r;
+    try {
+      if (c.slCh) slChainDeath(c);
+      if (c.slSplit && c.slSplit.until > G.time && slLive(c.slSplit.t)) slSplit(c.slSplit.t, c, SL.sun.n2, c.slSplit.d + 1, c.slSplit.run);
+      if (c.slRide && slLive(c.slRide.t)) slRider(c.slRide.t, c, null, c.slRide.d + 1, false);
+      if (src && src.st && src.st.pw) {
+        if (src.st.pw.sl_halo && fly) slStar(src, c, x, z);
+        if (src.st.pw.sl_ring && slLive(src)) { const n0 = src.slSw | 0; src.slSw = Math.min(SL.ring.max, n0 + 1); if (src.slSw > n0) { slEv('ring:add'); fxSpark(src.x, src.y, towerTop(src) * .6, SL.COL.silver, 4); } }
+      }
+      slSmokeGrow(c, x, z);
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+
+/* ===== 2. Sunbolt Medallion (Crossbows): the bolt splits into 5 that seek other foes; each that kills splits again ===== */
+function slSplit(t, c, n, d, run) {
+  if (d > SL.sun.deep || run.n >= SL.sun.cap || !slLive(t)) return;
+  const st = t.st, L = nearest(c.x, c.y, SL.sun.r, n, c, o => slFoe(o) && !(o.slSplit && o.slSplit.until > G.time) && canTarget(t, st, o));
+  if (!L.length) return;
+  slEv(d ? 'sun:again' : 'sun'); if (!d) slCue(t); part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .1, life: .18, max: .18, size: .55, col: SL.COL.light });
+  L.forEach((o, i) => {
+    if (run.n >= SL.sun.cap) return; run.n++;
+    o.slSplit = { t, d, run, until: G.time + 9 };   // (it carries the split until 2s after it is struck: a kill by anything in that time splits it on)
+    G.delayed.push({ t: .05 + i * .03, fn: () => {
+      if (!slFoe(o) || !slLive(t)) { if (o) o.slSplit = null; return; }
+      rfx({ k: 'streak', x0: c.x, h0: hitH(c) + .1, z0: c.y, x1: o.x, h1: hitH(o), z1: o.y, col: SL.COL.gold, w: .035, trav: .07, life: .22 });
+      slHit(o, slDmg(t) * SL.sun.k, 'phys', t);
+      if (!o.dead && o.slSplit) o.slSplit.until = G.time + SL.sun.hold;
+      fxSpark(o.x, o.y, hitH(o), SL.COL.gold, 3);
+    } });
+  });
+  sfx('boltthud', 0);
+}
+
+/* ===== 3. The First Chain (Sisters): 4 foes chained; when one dies, the rest are hit and the chain takes a new foe ===== */
+function slChainMake(t, c) {
+  const st = t.st, S = slS(), m = [c].concat(nearest(c.x, c.y, SL.chain.r, SL.chain.n - 1, c, o => slFoe(o) && !o.slCh && canTarget(t, st, o)));
+  if (c.slCh || m.length < 2) return;
+  const g = { t, m, until: G.time + SL.chain.life, spread: 0, flash: G.time };
+  for (const o of m) o.slCh = g;
+  S.chains.push(g); slEv('chain'); slCue(t, 'proud'); sfx('so_shackle', 0);
+  for (let i = 1; i < m.length; i++) soChainFx(m[i - 1].x, hitH(m[i - 1]), m[i - 1].y, m[i], true);
+}
+function slChainDeath(c) {
+  const g = c.slCh; c.slCh = null; if (!g || g.until < G.time) return;
+  const i = g.m.indexOf(c); if (i >= 0) g.m.splice(i, 1);
+  const t = g.t, live = slLive(t), st = live ? t.st : null;
+  g.m = g.m.filter(slFoe);
+  if (live) for (const o of g.m) { slHit(o, slDmg(t) * SL.chain.k, 'magic', t); soChainFx(c.x, hitH(c), c.y, o, true); fxSpark(o.x, o.y, hitH(o), SL.COL.light, 5); }
+  slEv('chain:death');
+  // the chain takes new foes near the one that fell (it never runs past SL.chain.max foes, nor spreads more than SL.chain.spread)
+  if (live && g.spread < SL.chain.spread) {
+    const add = nearest(c.x, c.y, SL.chain.r, Math.min(SL.chain.more, SL.chain.max - g.m.length), c, o => slFoe(o) && !o.slCh && canTarget(t, st, o));
+    for (const o of add) { o.slCh = g; g.m.push(o); g.spread++; soChainFx(c.x, hitH(c), c.y, o, true); }
+    if (add.length) { slEv('chain:spread'); g.until = Math.max(g.until, G.time + 2); }
+  }
+  g.flash = G.time;
+  part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .25, max: .25, size: .8, col: SL.COL.light });
+  if (g.m.length < 2) { for (const o of g.m) o.slCh = null; g.m.length = 0; }
+}
+
+/* ===== 1. Mantle of the Lion (Shieldbearer): Bulwark Bash plants the shield; foes pile up 4s, then it bursts on all ===== */
+function slLionCast(t, st, c, ab) {
+  soLater(t, .2, s => {
+    if (!c) return; const x = c.x, z = c.y;
+    if (!c.dead) soAbHit(t, s, c, 1, 'phys');
+    slS().shields.push({ t, x, z, until: G.time + SL.lion.T, at: G.time, held: new Set() });
+    slEv('lion'); slCue(t, 'raise'); sfx('osBash'); fxDust(x, z, 6); G.shake = Math.max(G.shake, .04);
+    part({ k: 'flare', x, z, h: .5, life: .25, max: .25, size: 1, col: SL.COL.silver });
+  });
+}
+function slShieldTick(q, dt) {
+  const L = SL.lion, held = q.held, t = q.t;
+  // the foes at the shield, and the ones piled against them
+  for (const c of G.creeps) {
+    if (!slFoe(c) || c.fly || held.size >= L.n) continue;
+    let near = Math.hypot(c.x - q.x, c.y - q.z) <= L.r;
+    if (!near) for (const o of held) if (Math.hypot(c.x - o.x, c.y - o.y) <= L.pile) { near = true; break; }
+    if (near) held.add(c);
+  }
+  for (const c of held) {
+    if (!slFoe(c)) { held.delete(c); continue; }
+    if (c.def.boss) { c.slHeldT = (c.slHeldT || 0) + dt; if (c.slHeldT > L.boss) continue; }
+    socHold(c, .08);
+  }
+  if (G.time < q.until) return false;
+  // the burst: everything piled behind it
+  const s = slLive(t) ? t.st : null;
+  if (s) inSplash(q.x, q.z, L.burst, true, c => { if (slFoe(c) && canTarget(t, s, c)) { soAbHit(t, s, c, L.k, 'phys'); if (!c.dead && kbWeight(c) > 0) shove(c, .4); } });
+  for (const c of held) if (slFoe(c) && s && Math.hypot(c.x - q.x, c.y - q.z) > L.burst) soAbHit(t, s, c, L.k, 'phys');
+  for (const c of held) if (c) c.slHeldT = 0;
+  slEv('lion:burst');
+  try { fxRing(q.x, q.z, L.burst, SL.COL.gold); flashLight(q.x, q.z, .6, [1.6, 1.45, 1], 2.2, .2); fxShards(q.x, q.z, .5, 10); sfx('shieldBreak', 1); G.shake = Math.max(G.shake, .07); } catch (e) { /* (the look only) */ }
+  return true;
+}
+
+/* ===== 4. Clarion of the Open Gate (Grail Knight): out of a gate by the lead foe, back up the road through every foe ===== */
+function slGateCast(t, st, c, ab) {
+  const L = abFoes(t, st, abReach(t, st, ab) + SL.gate.far, abWalker); if (!L.length) return false;
+  const lead = abFurthest(L), far = lead.remain + SL.gate.back;
+  const line = G.creeps.filter(o => slFoe(o) && !o.fly && o.remain >= lead.remain - .05 && o.remain <= far && canTarget(t, st, o)).sort((a, b) => a.remain - b.remain);
+  const [ux, uz] = abDir(t, lead);
+  t.ang = Math.atan2(lead.x - t.x, lead.y - t.y);
+  t.chg = { x: t.x + ux * .6, z: t.y + uz * .6, at: G.time, T: .6 }; t.cd = Math.max(t.cd, .9);
+  const S = slS(), gA = { x: t.x + ux * .6, z: t.y + uz * .6 }, gB = { x: lead.x, z: lead.y };
+  S.fly.push({ k: 'gate', x: gA.x, z: gA.z, at: G.time, T: 1.1 }, { k: 'gate', x: gB.x, z: gB.z, at: G.time + .25, T: 1.4 });
+  sfx('so_grail', 0); slEv('gate'); slCue(t, 'raise');
+  // the ride: a rider of light from the far gate back up the road, striking each foe it passes in turn
+  const pts = [gB].concat(line.map(o => ({ x: o.x, z: o.y })));
+  S.fly.push({ k: 'ride', pts, at: G.time + .35, T: .35 + .09 * line.length });
+  line.forEach((o, i) => soLater(t, .35 + .09 * (i + 1), s => {
+    if (!slFoe(o) || !canTarget(t, s, o)) return;
+    soAbHit(t, s, o, SL.gate.k, 'phys'); fxDust(o.x, o.y, 3); fxSpark(o.x, o.y, hitH(o), SL.COL.gold, 6);
+    if (i === 0) { G.shake = Math.max(G.shake, .06); sfx('so_grail', 1); }
+  }));
+  return true;
+}
+
+/* ===== 5. The True Grail (Grail Knight): a phantom knight rides out; each foe a phantom kills sends out another ===== */
+function slRider(t, from, skip, d, first) {
+  if (!slLive(t) || d > SL.grail.deep) return;
+  const st = t.st, fx = from.x, fz = from.y;
+  let o = null;
+  if (first) { const S = new Set([skip]); o = acquire(t, st, S); if (o && o.fly) o = null; }
+  else o = nearest(fx, fz, SL.grail.r, 1, from, q => slFoe(q) && !q.fly && !q.slRide && canTarget(t, st, q))[0];
+  if (!o) return;
+  slEv(d ? 'grail:again' : 'grail'); if (!d) slCue(t, 'raise');
+  slS().fly.push({ k: 'rider', x0: fx, z0: fz, o, at: G.time, T: .3, hold: .25 });
+  o.slRide = { t, d };
+  G.delayed.push({ t: .3, fn: () => {
+    if (!slFoe(o)) return; if (!slLive(t)) { o.slRide = null; return; }
+    slHit(o, slDmg(t) * SL.grail.k, 'phys', t); fxDust(o.x, o.y, 3); fxSpark(o.x, o.y, hitH(o), '#f8f0d0', 6);
+    if (!o.dead) o.slRide = null;
+  } });
+}
+
+/* ===== 6. Halo of First Light (Sunlance Clerics): flyers she kills crash down as stars on the ground foes below ===== */
+function slStar(t, c, x, z) {
+  const dmg = Math.min(c.maxHp * SL.star.hp, slDmg(t) * SL.star.cap);
+  slS().fly.push({ k: 'star', x, z, h0: Math.max(1.4, hitH(c)), at: G.time, T: SL.star.T });
+  slEv('star'); slCue(t, 'present');
+  G.delayed.push({ t: SL.star.T, fn: () => {
+    if (G.state !== 'play') return;
+    let n = 0; inSplash(x, z, SL.star.r, true, o => { if (slFoe(o)) { slHit(o, dmg, 'magic', t); n++; } });
+    part({ k: 'flare', x, z, h: .2, life: .3, max: .3, size: 1.3, col: SL.COL.fire }); fxRing(x, z, SL.star.r, SL.COL.fire);
+    for (let k = 0; k < 8; k++) part({ k: 'ember', x, z, h: .15, vx: R(-1.4, 1.4), vz: R(-1.4, 1.4), vh: R(.8, 2), g: 4, life: .5, max: .5, size: R(.07, .12), col: k % 2 ? '#ffb040' : '#ffe08a' });
+    decal('puddle', x, z, .5, '#4a2a12', 3); flashLight(x, z, .4, [1.8, 1.2, .6], 2, .2); G.shake = Math.max(G.shake, .04); sfx('censerpuff', 0);
+    if (n) slEv('star:hit');
+  } });
+}
+
+/* ===== 7. Seal of the Last Word (Templars): kills add swords to a ring round him; every 10s it flies at the toughest foe ===== */
+function slRingTick(t, dt) {
+  if (!(t.slSw > 0)) { t.slSwT = 0; return; }
+  if ((t.slSwT = (t.slSwT || 0) + dt) < SL.ring.every) return;
+  const st = t.st, L = abFoes(t, st, (st.range || 1.5) + .5, abWalker); if (!L.length) return;
+  const tg = abToughest(L), n = t.slSw; t.slSw = 0; t.slSwT = 0;
+  slEv('ring:fly'); slCue(t, 'raise'); t.slRingAt = G.time; t.tpCut = 2; t.soSlamAt = G.time;   // (he points both blades: the Twin Cut's clip)
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU + G.time * 1.6, r = .55;
+    slS().fly.push({ k: 'sword', x0: t.x + Math.cos(a) * r, z0: t.y + Math.sin(a) * r, o: tg, at: G.time + i * .05, T: .28 });
+    G.delayed.push({ t: .28 + i * .05, fn: () => { if (!slFoe(tg) || !slLive(t)) return; slHit(tg, slDmg(t) * SL.ring.k, 'phys', t); fxSpark(tg.x, tg.y, hitH(tg), SL.COL.silver, 3); if (i === 0) sfx('swordSwing', { kind: 'big' }); } });
+  }
+}
+
+/* ===== 8. Censer of the Saints (Censers): each foe that dies in its incense makes the cloud wider and longer ===== */
+function slSmokeGrow(c, x, z) {
+  for (const h of G.hazards) {
+    if (h.k !== 'so_incense' || !(h.t > 0) || !slPw(h.src, 'sl_smoke') || Math.hypot(x - h.x, z - h.z) > h.r + .1) continue;
+    const r0 = h.r; h.r = Math.min(SL.smoke.rMax, h.r + SL.smoke.dr); h.t = Math.min(SL.smoke.tMax, h.t + SL.smoke.dt);
+    if (h.r > r0) { slEv('smoke'); slCue(h.src); part({ k: 'ring', x: h.x, z: h.z, h: .06, life: .45, max: .45, size: h.r, col: '#e8d8ff' }); }
+    for (let k = 0; k < 6; k++) part({ k: 'ember', x, z, h: .2, vx: R(-.8, .8), vz: R(-.8, .8), vh: R(.6, 1.4), g: 2, life: .6, max: .6, size: R(.06, .1), col: '#ffc060' });
+    for (let k = 0; k < 3; k++) part({ k: 'smoke', x: x + R(-.2, .2), z: z + R(-.2, .2), h: .2, vx: R(-.3, .3), vz: R(-.3, .3), vh: R(.2, .5), drag: 1.5, life: 1.1, max: 1.1, size: R(.2, .3), col: '#ece4f4' });
+  }
+}
+
+/* ===== 9. Writ of Recantation (Inquisitors): a spell she breaks lands on the caster's allies the wrong way round ===== */
+const SL_HEAL = { pulse: 1, mend: 1, heal: 1 }, SL_SHIELD = { bulwark: 1, shield: 1, ward: 1, harden: 1 };
+if (typeof epInterrupt === 'function') {
+  const _slInt = epInterrupt;
+  epInterrupt = function (c) {
+    const C = c && c.epC, by = c && c.slRecT > G.time ? c.slRecBy : null;
+    const r = _slInt.apply(this, arguments);
+    if (C && by && slLive(by) && G.state === 'play') try { slRecant(c, C.e, by); } catch (e) { console.error(e); }
+    return r;
+  };
+}
+function slRecant(c, e, t) {
+  const s = (e && e.s) || '', S = typeof SPELLS !== 'undefined' && SPELLS[s], W = SL.writ, d = slDmg(t);
+  const heal = SL_HEAL[s] || /heal|mend/i.test(s), shield = SL_SHIELD[s] || (S && /ward|shield|bulwark/i.test((S.name || '') + s));
+  const L = G.creeps.filter(o => slFoe(o) && o !== c && Math.hypot(o.x - c.x, o.y - c.y) <= (heal || shield ? W.r : W.r2));
+  slEv('writ'); slCue(t); slEv(heal ? 'writ:heal' : shield ? 'writ:shield' : 'writ:other');
+  part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .3, life: .35, max: .35, size: 1.1, col: SL.COL.dark });
+  for (const o of L) {
+    rfx({ k: 'streak', x0: c.x, h0: hitH(c) + .3, z0: c.y, x1: o.x, h1: hitH(o), z1: o.y, col: SL.COL.dark, w: .045, trav: .1, life: .3 });
+    if (heal) slHit(o, Math.min(o.maxHp * W.heal, d * W.healCap), 'magic', t);
+    else if (shield) {
+      const k = o.def.boss ? .5 : 1;
+      if (o.mwMax > 0) o.mw = Math.max(0, o.mw - o.mwMax * k);
+      if (o.ward > 0) o.ward *= 1 - k;
+      fxShards(o.x, o.y, hitH(o) + .1, 5);
+    } else slHit(o, d * W.other, 'magic', t);
+    fxSpark(o.x, o.y, hitH(o), SL.COL.dark, 5);
+  }
+  sfx('shieldBreak', 1);
+}
+
+/* ===== 10. Bell of Silvermere (Champion): after its first spell a great bell drops on the toughest foe and rings 3 times ===== */
+if (typeof champQCast === 'function') {
+  const _slQ = champQCast;
+  champQCast = function (t, st) {
+    const r = _slQ.apply(this, arguments);
+    if (r !== false && slPw(t, 'sl_bell') && G.state === 'play') try { slBell(t, t.st || st); } catch (e) { console.error(e); }
+    return r;
+  };
+}
+function slBell(t, st) {
+  const L = abFoes(t, st, (st.range || 2.5) + SL.bell.reach); if (!L.length) return;
+  const c = abToughest(L), x = c.x, z = c.y, B = SL.bell;
+  slS().bells.push({ x, z, at: G.time, T: .4 + B.gap * B.rings + .3 }); slEv('bell'); slCue(t, 'raise');
+  for (let i = 0; i < B.rings; i++) soLater(t, .4 + B.gap * i, s => {
+    inSplash(x, z, B.r, false, o => { if (slFoe(o) && canTarget(t, s, o)) soAbHit(t, s, o, B.k, 'magic'); });
+    part({ k: 'ring', x, z, h: .08, life: .55, max: .55, size: B.r, col: SL.COL.bronze }); part({ k: 'ring', x, z, h: .2, life: .4, max: .4, size: B.r * .6, col: SL.COL.gold });
+    G.shake = Math.max(G.shake, i ? .03 : .06); sfx('so_aegis', 1); slEv('bell:ring');
+  });
+}
+
+/* ===== 11. Crown of Dawn (any): a crown of light lands on the foe, hits round it, then hops on, 5 times ===== */
+function slCrown(t, c) {
+  const seen = new Set(), C = SL.crown; slEv('crown'); slCue(t, 'proud');
+  let at = c, from = { x: t.x, y: t.y, h: towerTop(t) };
+  for (let i = 0; i < C.hops; i++) {
+    const o = at, f = from;
+    seen.add(o);
+    slS().fly.push({ k: 'crown', x0: f.x, z0: f.y, h0: f.h != null ? f.h : hitH(f) + .4, o, at: G.time + i * .18, T: .18 });
+    G.delayed.push({ t: (i + 1) * .18, fn: () => {
+      if (!slLive(t) || !o || o.dead) return;
+      const st = t.st; inSplash(o.x, o.y, C.r, !slAir(t), q => { if (slFoe(q) && canTarget(t, st, q)) slHit(q, slDmg(t) * C.k, t.def.dmgType || 'magic', t); });
+      part({ k: 'flare', x: o.x, z: o.y, h: hitH(o) + .35, life: .2, max: .2, size: .6, col: SL.COL.gold }); part({ k: 'ring', x: o.x, z: o.y, h: .06, life: .3, max: .3, size: C.r, col: SL.COL.gold });
+    } });
+    const st = t.st, nx = nearest(o.x, o.y, C.hop, 1, o, q => slFoe(q) && !seen.has(q) && canTarget(t, st, q))[0];
+    if (!nx) break; from = o; at = nx;
+  }
+}
+
+/* ===== 12. Book of the Law (any): its first spell also lands 2s later on up to 4 foes of its target's kind, at 60% ===== */
+let SL_LAW = 0;
+if (typeof castAbility === 'function') {
+  const _slCast = castAbility;
+  castAbility = function (t, ab, tg) {
+    const r = _slCast.apply(this, arguments);
+    if (r !== false && !SL_LAW && slPw(t, 'sl_law') && G.state === 'play') try { slLaw(t, ab, tg); } catch (e) { console.error(e); }
+    return r;
+  };
+}
+function slLaw(t, ab, tg) {
+  const kit = UNIT_KITS[t.def.unit]; if (!kit || !ab || !kit.abilities[0] || kit.abilities[0].id !== ab.id || typeof ab.cast !== 'function') return;
+  const st = t.st, foe = tg && G.creeps.includes(tg) ? tg : null;
+  const ref = foe || abToughest(abFoes(t, st, abReach(t, st, ab) + 1)); if (!ref) return;
+  const kind = ref.type, L = G.creeps.filter(o => slFoe(o) && o !== ref && o.type === kind).sort((a, b) => b.hp - a.hp).slice(0, SL.law.n);
+  if (!L.length) return;
+  slEv('law'); slCue(t, 'proud'); const S = slS();
+  for (const o of L) S.scripts.push({ o, at: G.time, T: SL.law.T });
+  part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) + .5, life: .4, max: .4, size: .7, col: SL.COL.gold });
+  G.delayed.push({ t: SL.law.T, fn: () => {
+    if (!slLive(t)) return;
+    const s2 = Object.assign({}, t.st || st); s2.dmg = (s2.dmg || 0) * SL.law.k;
+    // a marked foe slain in the 2s hands its mark to another of its kind still standing
+    const keep = L.filter(o => slFoe(o)), more = G.creeps.filter(o => slFoe(o) && o.type === kind && !keep.includes(o)).sort((a, b) => b.hp - a.hp);
+    for (const o of keep.concat(more).slice(0, SL.law.n)) {
+      // the spell is cast again as if from beside that foe (a spell centred on its caster lands round the foe), at 60%: the
+      // unit stands there, with the lighter numbers, while the cast and everything it schedules runs (then is put back)
+      const at = { ux: o.x - t.x, uy: o.y - t.y, move: tg === t || !tg };
+      slAtFoe(t, at, s2, () => { ab.cast(t, s2, foe ? o : at.move ? t : { x: o.x, y: o.y }, ab); slEv('law:land'); });
+      part({ k: 'flare', x: o.x, z: o.y, h: hitH(o) + .4, life: .3, max: .3, size: .7, col: SL.COL.gold });
+    }
+  } });
+}
+function slAtFoe(t, at, s2, fn, deep) {
+  const n0 = G.delayed.length, ox = t.x, oy = t.y, ost = t.st;
+  // (a spell aimed at a foe keeps the caster home: only one centred on itself is moved)
+  t.x = ox + (at.move ? at.ux : 0); t.y = oy + (at.move ? at.uy : 0); t.st = s2; SL_LAW = 1;
+  try { fn(); } catch (e) { SL.err = e && e.message; console.warn('Book of the Law', SL.err); } finally { t.x = ox; t.y = oy; t.st = ost; SL_LAW = 0; }
+  if ((deep | 0) < 3) for (let i = n0; i < G.delayed.length; i++) { const d = G.delayed[i], f0 = d.fn; d.fn = () => slAtFoe(t, at, s2, f0, (deep | 0) + 1); }
+}
+
+/* ===== 13. Martyr's Seal (any): a pillar of light stands where the foe was; foes that walk in are hit and widen it ===== */
+function slPyre(t, c) { slS().pyres.push({ t, x: c.x, z: c.y, r: SL.pyre.r0, at: G.time, until: G.time + SL.pyre.T, tick: 0, seen: new Set() }); slEv('pyre'); slCue(t); }
+function slPyreTick(q, dt) {
+  if (G.time >= q.until || !slLive(q.t)) return true;
+  if ((q.tick -= dt) > 0) return false; q.tick = SL.pyre.tick;
+  const t = q.t, st = t.st;
+  inSplash(q.x, q.z, q.r, true, o => {
+    if (!slFoe(o)) return;
+    slHit(o, slDmg(t) * SL.pyre.k, 'magic', t);
+    if (!q.seen.has(o)) { q.seen.add(o); q.r = Math.min(SL.pyre.rMax, q.r + SL.pyre.dr); slEv('pyre:grow'); }
+  });
+  return false;
+}
+
+/* ===== 14. Oathstone of the Ford (any): its next 5 attacks come at once, at 5 different foes ===== */
+function slVolley(t, c) {
+  const st = t.st, S = new Set([c]), L = [];
+  for (let i = 0; i < SL.oath.n; i++) { const o = acquire(t, st, S); if (!o) break; L.push(o); S.add(o); }
+  if (!L.length) return;
+  slEv('oath'); slCue(t); part({ k: 'flare', x: t.x, z: t.y, h: towerTop(t) * .8, life: .25, max: .25, size: .9, col: SL.COL.gold });
+  L.forEach((o, i) => G.delayed.push({ t: .04 + i * .04, fn: () => { if (slLive(t) && slFoe(o) && t.st) { fire(t, t.st, o, true); t.recoil = 1; } } }));
+}
+
+/* ---------- once a frame (the Order's tick) ---------- */
+if (typeof FORCE_HOOKS !== 'undefined' && FORCE_HOOKS.silver) {
+  const _slTick = FORCE_HOOKS.silver.tick;
+  FORCE_HOOKS.silver.tick = function (dt) {
+    const r = _slTick ? _slTick.apply(this, arguments) : undefined;
+    if (G.state !== 'play') return r;
+    try {
+      const S = slS();
+      if (S.shields.length) S.shields = S.shields.filter(q => !slShieldTick(q, dt));
+      if (S.pyres.length) S.pyres = S.pyres.filter(q => !slPyreTick(q, dt));
+      if (S.chains.length) S.chains = S.chains.filter(g => { g.m = g.m.filter(slFoe); const on = g.until > G.time && g.m.length >= 2; if (!on) for (const o of g.m) o.slCh = null; return on; });
+      S.fly = S.fly.filter(q => G.time < q.at + q.T + (q.hold || 0) + .05);
+      S.bells = S.bells.filter(q => G.time < q.at + q.T);
+      S.scripts = S.scripts.filter(q => G.time < q.at + q.T && slFoe(q.o));
+      for (const t of G.towers) if (t.st && t.st.pw && t.st.pw.sl_ring && !t.wrecked) slRingTick(t, dt);
+      slDrawOn();
+    } catch (e) { console.error(e); }
+    return r;
+  };
+}
+// on a new wave, the lasting pieces end (and no chain carries across)
+if (typeof FORCE_HOOKS !== 'undefined' && FORCE_HOOKS.silver && FORCE_HOOKS.silver.wave) {
+  const _slWave = FORCE_HOOKS.silver.wave;
+  FORCE_HOOKS.silver.wave = function () { const r = _slWave.apply(this, arguments); if (G.sl) { for (const g of G.sl.chains) for (const o of g.m) o.slCh = null; G.sl.chains = []; } return r; };
+}
+
+/* ---------- the two remade spells (their kit's cast, while the item is worn) ---------- */
+function slWrapSpells() {
+  try {
+    const A = typeof ABIL !== 'undefined' ? ABIL : null; if (!A) return;
+    const wrap = (id, key, fn) => { const ab = A[id]; if (!ab || ab._slW) return; ab._slW = 1; const c0 = ab.cast; ab.cast = function (t, st, c, ab2) { if (slPw(t, key)) { const r = fn(t, st, c, ab2); if (r !== false) return r; } return c0.apply(this, arguments); }; };
+    wrap('so_bash', 'sl_lion', slLionCast);
+    wrap('so_grail', 'sl_gate', slGateCast);
+  } catch (e) { /* (a tool's sandbox) */ }
+}
+slWrapSpells(); setTimeout(slWrapSpells, 0);   // (now, and once every file has loaded: a later file may remake the kit)
+
+/* ---------- the look: one draw kind that draws every lasting piece ---------- */
+function slDrawOn() {
+  if (typeof SFX === 'undefined' || typeof sfxAdd !== 'function' || typeof SFX_DRAW === 'undefined') return;
+  if (!SFX_DRAW.sllegs) SFX_DRAW.sllegs = slDraw;
+  slMeshReg();
+  const S = slS(), any = S.shields.length || S.pyres.length || S.chains.length || S.fly.length || S.bells.length || S.scripts.length || G.towers.some(t => t.slSw > 0);
+  if (!any) return;
+  if (!SL.dq || !SFX.list.includes(SL.dq)) SL.dq = sfxAdd({ k: 'sllegs', life: 1e9 });
+}
+function slDraw(q) {
+  if (typeof vfxReady === 'function' && !vfxReady()) return;
+  if (!G.sl) return;
+  const S = G.sl, now = G.time, lite = typeof vfxLite === 'function' && vfxLite();
+  const gold = vfxC(SL.COL.gold), light = vfxC(SL.COL.light, 1.3), silver = vfxC(SL.COL.silver, 1.1), bronze = vfxC(SL.COL.bronze, 1.1), fire = vfxC(SL.COL.fire, 1.4);
+  // the Lion's shield: a tall disc of silver light standing in the road, gold rimmed, brighter as the burst nears
+  for (const s of S.shields) {
+    const age = now - s.at, left = s.until - now, e = Math.min(1, age / .15), k = 1 - Math.max(0, left) / SL.lion.T;
+    vfxSprite(VX, s.x, .42, s.z, .62 + .1 * k, .74 + .1 * k, 0, gold, (.35 + .35 * k) * e, VT.GLOW, 1);
+    vfxFlat(VX, s.x, s.z, .03, .7, .7, 0, gold, .25 * e, VT.GLOW, 1);
+  }
+  // the First Chain: a taut chain of light through its foes, flashing when one falls
+  for (const g of S.chains) {
+    if (g.m.length < 2) continue; const fl = Math.max(0, 1 - (now - g.flash) / .3), a = .55 + .45 * fl;
+    vfxRb.begin(VX, VT.CHAIN, 1, 0);
+    g.m.forEach((o, i) => vfxRb.pt(o.x, hitH(o) * .8, o.y, (.03 + .03 * fl) * (typeof vfxPx === 'function' ? vfxPx() : 1), light, a, i * 2));
+    vfxRb.end();
+  }
+  // Martyr's pillars
+  for (const p of S.pyres) {
+    const age = now - p.at, left = p.until - now, e = Math.min(1, age / .2) * Math.min(1, left / .3);
+    vfxSprite(VX, p.x, .9, p.z, p.r * 1.1, 1.8, 0, light, .35 * e, VT.GLOW, 1);
+    vfxFlat(VX, p.x, p.z, .03, p.r * 2, p.r * 2, 0, gold, .35 * e, VT.GLOW, 1);
+  }
+  // the Templars' rings of swords
+  for (const t of G.towers) {
+    if (!(t.slSw > 0) || t.wrecked) continue;
+    const n = t.slSw, h = towerTop(t) * .55, r = .5;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * TAU + now * 1.6, cx = t.x + Math.cos(a) * r, cz = t.y + Math.sin(a) * r, ox = Math.cos(a), oz = Math.sin(a);
+      if (!slMeshOn()) { vfxRb.begin(VX, VT.SOLID, 1, 0); vfxRb.pt(cx - ox * .1, h, cz - oz * .1, .03, silver, .9, 0); vfxRb.pt(cx + ox * .12, h, cz + oz * .12, .006, light, .9, 1); vfxRb.end(); }
+      else if (!lite) vfxSprite(VX, cx, h, cz, .16, .16, 0, light, .35, VT.GLOW, 1);
+    }
+  }
+  // things in flight: gates, the ride, phantom riders, stars, swords, crowns
+  for (const f of S.fly) {
+    const u = (now - f.at) / f.T; if (u < 0) continue; const w = Math.min(1, u);
+    if (f.k === 'gate') { const e = Math.sin(Math.PI * Math.min(1, u)); vfxSprite(VX, f.x, .55, f.z, .55 * e, .95 * e, 0, gold, .8 * e, VT.GLOW, 1); vfxSprite(VX, f.x, .55, f.z, .4 * e, .8 * e, 0, light, .6 * e, VT.SUN, 1); }
+    else if (f.k === 'ride') { const P = f.pts, s = w * (P.length - 1), i = Math.min(P.length - 2, Math.floor(s)), v = s - i; if (P.length < 2) continue; const x = P[i].x + (P[i + 1].x - P[i].x) * v, z = P[i].z + (P[i + 1].z - P[i].z) * v; vfxSprite(VX, x, .45, z, .5, .5, 0, gold, .8 * (1 - Math.max(0, u - 1)), VT.GLOW, 1); vfxSprite(VX, x, .45, z, .3, .3, 0, light, .7, VT.STAR, 1); }
+    else if (f.k === 'rider' || f.k === 'sword' || f.k === 'crown') {
+      const o = f.o; if (!o) continue; const x = f.x0 + (o.x - f.x0) * w, z = f.z0 + (o.y - f.z0) * w;
+      if (f.k === 'rider') { vfxSprite(VX, x, .45, z, .4, .45, 0, gold, .7, VT.GLOW, 1); vfxSprite(VX, x, .45, z, .26, .26, 0, light, .6, VT.STAR, 1); }
+      else if (f.k === 'sword') { const h0 = .6, h = h0 + (hitH(o) - h0) * w; if (!slMeshOn()) { vfxRb.begin(VX, VT.SOLID, 1, 0); vfxRb.pt(x - (o.x - f.x0) * .08, h, z - (o.y - f.z0) * .08, .03, silver, .95, 0); vfxRb.pt(x, h, z, .006, light, .95, 1); vfxRb.end(); } else { vfxRb.begin(VX, VT.ENERGY, 1, 0); vfxRb.pt(x - (o.x - f.x0) * .25, h, z - (o.y - f.z0) * .25, .0, light, 0, 0); vfxRb.pt(x, h, z, .04, light, .6, 1); vfxRb.end(); } }
+      else { const h = f.h0 + (hitH(o) + .35 - f.h0) * w + Math.sin(Math.PI * w) * .4; vfxSprite(VX, x, h, z, .4, .3, 0, gold, .5, VT.GLOW, 1); }
+    }
+    else if (f.k === 'star') { const h = f.h0 * (1 - w) + .1; vfxSprite(VX, f.x, h, f.z, .3, .3, 0, fire, .95, VT.GLOW, 1); vfxRb.begin(VX, VT.ENERGY, 1, 0); vfxRb.pt(f.x, h + .9, f.z, .01, fire, .0, 0); vfxRb.pt(f.x, h, f.z, .09, light, .9, 1); vfxRb.end(); }
+  }
+  // the Bell: a bronze bell falling onto its foe, then hanging over it while it rings
+  for (const b of S.bells) {
+    const age = now - b.at, fall = Math.min(1, age / .4), h = 2.4 - 1.5 * fall * fall, e = Math.min(1, (b.at + b.T - now) / .3);
+    vfxSprite(VX, b.x, h, b.z, .9, .9, 0, gold, .3 * e * (lite ? .6 : 1), VT.GLOW, 1);
+  }
+  // the Law: a line of gold script over each foe it will land on
+  for (const s of S.scripts) { const o = s.o, u = (now - s.at) / s.T; vfxSprite(VX, o.x, hitH(o) + .55, o.y, .34, .34, now * .8, gold, .75 * Math.min(1, u * 4), VT.RUNE, 1); }
+}
+
+/* ---- the solid things are lit meshes in the world (the house rule: never flat planes): the Lion's shield, the Bell, the Templars'
+   swords, the Crown, the phantom knights' lances. Listed each frame through the Seedcasters' kit (SD_FRAMES, seedfx.js). ---- */
+const slMeshOn = () => typeof SD_FRAMES !== 'undefined' && typeof sdOn === 'function' && sdOn();
+// (seedfx.js loads after the forces' files: the meshes and the frame hook are registered on the first Silver tick, slMeshReg)
+function slMeshReg() {
+  if (SL.meshReg || typeof SD_MESH === 'undefined' || typeof SD_FRAMES === 'undefined') return; SL.meshReg = 1;
+  Object.assign(SD_MESH, {
+  // a heater shield, 1 tall up +Y, its face to +Z: polished silver, a gold boss and cross
+  slshield: g => { g.smooth = 0; g.jit = 0; g.em = .25;
+    g.box(0, .62, 0, .84, .72, .1, '#dfe6f0'); g.box(0, .2, 0, .58, .14, .1, '#d4dbe6'); g.box(0, .08, 0, .3, .12, .1, '#c8d0dc');
+    g.em = .55; g.box(0, .58, .06, .1, .78, .04, '#f2c860'); g.box(0, .7, .06, .62, .1, .04, '#f2c860'); g.sphere(0, .64, .07, .1, .1, .07, 8, 4, '#ffe090'); g.em = 0; },
+  // a great bronze bell, 1 tall up +Y, open at the foot, a loop at its crown
+  slbell: g => { g.smooth = 50; g.jit = 0; g.em = .2;
+    g.lathe(0, 0, 0, [[.52, 0], [.5, .06], [.4, .25], [.32, .55], [.3, .78], [.2, .9], [0, .93]], 14, '#c8913a', { cols: ['#e8b860', '#b8822e', '#c8913a', '#c8913a', '#a87828', '#c8913a'] });
+    g.lathe(0, 0, 0, [[.46, .03], [.36, .25], [.28, .6], [0, .85]], 12, '#4a3214');
+    g.box(0, .98, 0, .2, .1, .05, '#8a6020'); g.em = 0; },
+  // a sword of light, 1 long up +Y (the tip at 1), 1 wide at the blade's root
+  slsword: g => { g.smooth = 0; g.jit = 0;
+    g.em = 1; g.cyl(0, .24, 0, 1, .08, .76, 4, '#f4f8ff', { alt: '#d8e4ff' }); g.em = .6;
+    g.box(0, .21, 0, 4.2, .05, 1.1, '#ffd870'); g.cyl(0, .02, 0, .55, .55, .18, 5, '#c8a050'); g.sphere(0, .01, 0, .8, .05, .8, 6, 3, '#ffe090'); g.em = 0; },
+  // a crown of dawn, 1 wide: a gold band and five points
+  slcrown: g => { g.smooth = 0; g.jit = 0; g.em = .8;
+    g.lathe(0, 0, 0, [[.5, 0], [.5, .22]], 14, '#ffd870');
+    for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; g.cyl(Math.cos(a) * .48, .2, Math.sin(a) * .48, .09, 0, .32, 4, '#fff0b0'); }
+    g.em = 0; },
+  // a phantom knight's lance of light, 1 long up +Y
+  sllance: g => { g.smooth = 0; g.jit = 0; g.em = 1; g.cyl(0, 0, 0, 1, .15, 1, 5, '#fff4d0', { alt: '#ffe8a0' }); g.cyl(0, .12, 0, 2.6, 1, .12, 6, '#ffd870'); g.em = 0; },
+});
+function slMeshes(now) {
+  const S = G.sl; if (!S) return;
+  for (const s of S.shields) {   // planted: it drops in, stands facing its unit across the road, shudders as the pile grows
+    const age = now - s.at, e = Math.min(1, age / .15), left = s.until - now, n = s.held ? s.held.size : 0;
+    const yaw = s.t ? Math.atan2(s.t.x - s.x, s.t.y - s.z) : 0, sh = Math.min(.08, n * .015) * Math.sin(now * 40);
+    sdPlace('slshield', [s.x, .9 * (1 - e) + .02, s.z], yaw + sh, 0, .55, .55 * (left < .15 ? Math.max(.2, left / .15) : 1), .55);
+  }
+  for (const b of S.bells) {     // it falls, lands over its foe, swings as it tolls
+    const age = now - b.at, fall = Math.min(1, age / .4), h = 2.2 - 1.5 * fall * fall, ring = Math.max(0, age - .4), sw = .14 * Math.sin(ring * 13) * Math.exp(-((ring % SL.bell.gap) * 4));
+    const e = Math.min(1, (b.at + b.T - now) / .3); if (e <= 0) continue;
+    sdPlace('slbell', [b.x, h, b.z], 0, sw, .55 * e);
+  }
+  for (const t of G.towers) {    // the Templars' ring: swords standing round him, points down, turning
+    if (!(t.slSw > 0) || t.wrecked) continue;
+    const n = t.slSw, h = towerTop(t) * .55, r = .52;
+    for (let i = 0; i < n; i++) { const a = i / n * TAU + now * 1.6, cx = t.x + Math.cos(a) * r, cz = t.y + Math.sin(a) * r; sdSpan('slsword', [cx, h + .22, cz], [cx + Math.cos(a) * .04, h - .12, cz + Math.sin(a) * .04], .026, .026, a); }
+  }
+  for (const f of S.fly) {
+    const u = (now - f.at) / f.T; if (u < 0 || !f.o) continue; const o = f.o, w = Math.min(1, u);
+    const x = f.x0 + (o.x - f.x0) * w, z = f.z0 + (o.y - f.z0) * w, dx = o.x - f.x0, dz = o.y - f.z0, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
+    if (f.k === 'sword') { const h0 = .6, h = h0 + (hitH(o) - h0) * w; sdSpan('slsword', [x - ux * .34, h + .04, z - uz * .34], [x, h, z], .03, .03, 0); }
+    else if (f.k === 'rider' && u < 1 + (f.hold || 0)) { const k = u > 1 ? 1 - (u - 1) / (f.hold || 1) : 1, h = .5; sdSpan('sllance', [x - ux * .55 * k, h + .05, z - uz * .55 * k], [x + ux * .08, h, z + uz * .08], .035 * k, .035 * k, 0); }
+    else if (f.k === 'crown') { const h = f.h0 + (hitH(o) + .35 - f.h0) * w + Math.sin(Math.PI * w) * .4; sdPlace('slcrown', [x, h - .06, z], now * 5, 0, .26); }
+  }
+}
+  SD_FRAMES.push(now => { try { slMeshes(now); } catch (e) { SL.err = 'mesh: ' + e.message; } });
+}
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
@@ -132534,7 +133084,9 @@ const UNITREACT = (() => {
     const e = gap ? 1 : 1 - Math.exp(-dt * 6.5);
     s.ty += (ty - s.ty) * e; s.y += (hy - s.y) * e; s.p += (hp - s.p) * e;
     /* the cheer: when a wave is cleared, each unit a moment after its neighbour */
-    if (RX.clr > s.ch + 2.5 && now - RX.clr < 3) s.ch = RX.clr + .1 + s.h * .55;
+    if (RX.clr > s.ch + 2.5 && now - RX.clr < 3) { s.ch = RX.clr + .1 + s.h * .55; s.cueK = null; }
+    /* a cue (t.rxCue = { at, kind }: a legendary firing, forces_..._silverleg.js): the cheer's pose at once, in that kind (null: its own) */
+    const q = t.rxCue; if (q && q.at > (s.cueAt || -9) && now - q.at < .5) { s.cueAt = q.at; s.ch = q.at; s.cueK = q.kind || null; }
   }
   /* ---- the layer on one palette ---- */
   function apply(o, R, t, s, now, kindOver) {
@@ -132611,7 +133163,7 @@ const UNITREACT = (() => {
       const R = rigFor(it, t); if (!R || o.length < R.nb * 12) continue;
       if (!s) { s = stOf(t); const m = it.m; think(t, s, now, Math.atan2(m[8], m[10])); }
       if (!s.kind) s.kind = (RX_CHEER[t.def.unit] || R.cheer) + (R.wpnN && !RX_CHEER[t.def.unit] ? ' (' + R.wpnN + ')' : '');
-      apply(o, R, t, s, now, RX_CHEER[t.def.unit]);
+      apply(o, R, t, s, now, (s.cueK && now - s.ch < 2 ? s.cueK : null) || RX_CHEER[t.def.unit]);
       if (nd < 4) _done[nd++] = o;
     }
     for (let k = 0; k < 4; k++) _done[k] = null;
