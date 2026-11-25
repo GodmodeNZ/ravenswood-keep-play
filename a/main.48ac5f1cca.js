@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f9e48047@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '130a3260@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -140706,7 +140706,7 @@ const GV2 = (() => {
   const EASE = .2, SPD_THROW = 1.1, BASE_H = .047, OUT_MAX = 4;
   const S = { on: true, err: null };
   try { S.on = !/[?&]gv=old\b/.test(location.search); } catch (e) {}
-  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .872, MK = null, BI = null;
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .872, MK = null, BI = null, GLV_ = null, IDENT = null;
   const CL = {};
   const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
   const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
@@ -140787,6 +140787,14 @@ const GV2 = (() => {
     m.min = [-.9, -.05, -.9]; m.max = [.9, 1.5, .9]; m._um = 1;
     if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
     MESH_ = m;
+    // her glaive alone (the hand glaive's corners again), for its flight and for Warding Glaive's planted one: drawn with every
+    // bone at rest, placed by its ring's middle
+    GLV_ = null; const gr = D.glvR;
+    if (gr && gr[1] > gr[0] && gr[1] <= nc) {
+      const a = gr[0], b = gr[1], cut = (arr, k) => arr.slice(a * k, b * k);
+      GLV_ = { pos: cut(m.pos, 3), nor: cut(m.nor, 3), col: cut(col, 3), ext: cut(ext, 2), uv: cut(uv, 2), bone: cut(bone, 2), bw: cut(bw, 1), count: b - a, min: [-.6, -.6, -.6], max: [.6, .6, .6], gl: new Map(), _um: 1, tex: m.tex };
+      IDENT = new Float32Array(NB * 12); for (let i = 0; i < NB; i++) { IDENT[i * 12] = 1; IDENT[i * 12 + 5] = 1; IDENT[i * 12 + 10] = 1; }
+    }
   }
   const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('GV2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'gv2: ' + NB + ' bones'; });
   const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
@@ -140907,7 +140915,9 @@ const GV2 = (() => {
     if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
     S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
     if (live) {
-      t.tipW = gr; t.tipYaw = yaw; t.tipAt = G.time; t._gvDrawn = G.time; t._gvClip = P.c; t._gvClipS = P.s; t._gvGB = gb; t._gvGR = gr;   // (the tip: the glaive in her hand)
+      t.tipW = gr; t.tipYaw = yaw; t.tipAt = G.time; t._gvDrawn = G.time; t._gvClip = P.c; t._gvClipS = P.s; t._gvGB = gb; t._gvGR = gr; t._gvScale = s;   // (the tip: the glaive in her hand)
+      // a flight just thrown: where its glaive was in her fist, against where the game starts it (drawn from there, eased onto its path)
+      const FP = flights(); if (FP) for (const q of FP) if (q && q.t === t && q._gvHand && !q._gvOff && !q.done) q._gvOff = [gr[0] - q.x, gr[1] - (q.h || .6), gr[2] - q.z];
     }
     return true;
   }
@@ -140921,6 +140931,49 @@ const GV2 = (() => {
     const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
     if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
     for (const x of box.querySelectorAll('[data-g2]')) x.onclick = () => { S.on = x.dataset.g2 === '1'; labRow(); };
+  }
+  /* her glaive in flight (forces_wardbound_g.js wbgGlaive draws the code-built three-bladed glaive): her own round glaive,
+     spinning flat, tipped a little into its flight, a touch larger than in her hand so it reads in the air; it leaves her
+     fist (drawn from where it was in it, eased onto the game's path over LEAVE s) and comes home into it (drawn into her fist
+     over its last HOME cells). The game's path, times and strikes are untouched: only where it is drawn moves. The glow and
+     the bounce trail are the game's own, kept. */
+  const LEAVE = .22, HOME = .9, FLY_K = 1.3;
+  const _f1 = new Float32Array(16), _f2 = new Float32Array(16), _f3 = new Float32Array(16);
+  function glaiveAt(x, y, z, ry, rx, rz, sc) {
+    const C = MK.ctrR; M4.trs(_f1, x, y, z, ry, rx, rz, sc, sc, sc); M4.trs(_f2, -C[0], -C[1], -C[2]); M4.mul(_f3, _f1, _f2);
+    const it = item(GLV_, _f3.slice(), { shadow: false }); it.sec = [0, 0]; it.bones = IDENT;
+  }
+  function flyGlaive(p, t) {
+    const big = p.big ? 1.2 : 1, sc = (t._gvScale || 1.4) * FLY_K * big, now = G.time;
+    let x = p.x, h = p.h || .6, z = p.z;
+    if (p._gvOff) { const u = Math.max(0, 1 - (now - (p._gvAt || now)) / LEAVE), e = u * u * (3 - 2 * u); x += p._gvOff[0] * e; h += p._gvOff[1] * e; z += p._gvOff[2] * e; }
+    const g = t._gvGR;
+    if (p.home && g) { const d = Math.hypot(g[0] - x, g[1] - h, g[2] - z), k = Math.max(0, 1 - d / HOME), e = k * k; x += (g[0] - x) * e; h += (g[1] - h) * e; z += (g[2] - z) * e; }
+    glaiveAt(x, h, z, 0, -Math.PI / 2 + .3 + .08 * Math.sin(p.spin * .2), p.spin, sc);
+    const bg = p.big ? 1.35 : 1;
+    QADD.bill(RD, x, h, z, .28 * bg, .28 * bg, wbgA(WB_COL.goldL, .14), 1, 0);
+    QADD.bill(RD, x, h, z, .4 * bg, .4 * bg, wbgA(WB_COL.teal, .08), 3, p.spin * .2);
+    QG.ground(x, z, .03, .13 * bg, .13 * bg, [0, 0, 0, .28], 2, 0);
+    const T = p.pts; if (!T || !T.length) return;
+    for (let i = 0; i + 1 < T.length; i++) {
+      const a = 1 - (G.time - T[i + 1][3]) / WBG_TRAIL; if (a <= 0) continue;
+      QADD.beam(RD, [T[i][0], T[i][1], T[i][2]], [T[i + 1][0], T[i + 1][1], T[i + 1][2]], .065 * bg, wbgA(WB_COL.goldL, .5 * a));
+      QADD.beam(RD, [T[i][0], T[i][1], T[i][2]], [T[i + 1][0], T[i + 1][1], T[i + 1][2]], .02 * bg, wbgA(WB_COL.ivory, .9 * a, 1.3));
+    }
+    const L = T[T.length - 1], dx = x - L[0], dz = z - L[2], D_ = Math.hypot(dx, dz);
+    if (D_ > .05) { const k = Math.min(1, .7 / D_); QADD.beam(RD, [x - dx * k, h + (L[1] - h) * k, z - dz * k], [x, h, z], .04 * bg, wbgA(WB_COL.goldL, p.home ? .18 : .32)); }
+  }
+  // Warding Glaive's planted glaive: her round glaive standing upright in its rune, half sunk in the road, turning slowly
+  function standing(now) {
+    let sc0 = null; for (const t of G.towers) if (mine(t)) { sc0 = t._gvScale; break; }
+    if (sc0 == null) return false;
+    for (const z of G.hazards) {
+      if (z.k !== 'wb_rune' || !z.wbGlv || !(z.wbBeacon > G.time) || !(z.t > 0)) continue;
+      const e = Math.min(1, (G.time - z.wbGlv) / .12, (z.wbBeacon - G.time) / .4), sc = sc0 * FLY_K * Math.max(.05, e), r = .127 * sc;
+      glaiveAt(z.x, r * .55 + .03 * Math.sin(now * 2 + z.seed), z.z, z.seed + now * 2.2, 0, 0, sc);
+      QADD.bill(RD, z.x, .15, z.z, .3, .3, wbgA(WB_COL.teal, .12 * e), 1, 0);
+    }
+    return true;
   }
   const anchors = t => mine(t) ? { tip: t.tipW, glaiveBack: t._gvGB, glaiveR: t._gvGR, clip: t._gvClip, at: t._gvDrawn } : null;
   // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
@@ -140939,6 +140992,21 @@ const GV2 = (() => {
     if (MESH_ && typeof wbPartAt === 'function') {
       const _pa = wbPartAt;
       wbPartAt = function (t, k) { if (k === 'glaivehand' && mine(t)) return null; return _pa.apply(this, arguments); };
+    }
+    if (MESH_ && GLV_ && typeof wbgGlaive === 'function') {
+      const _gg = wbgGlaive;
+      wbgGlaive = function (p) {
+        const t = p && p.t;
+        if (S.on && t && p._gvHand && mine(t)) { try { flyGlaive(p, t); return; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('gv2:', e); } } }
+        return _gg.apply(this, arguments);
+      };
+    }
+    if (MESH_ && GLV_ && typeof wbgStanding === 'function') {
+      const _gs = wbgStanding;
+      wbgStanding = function (now) {
+        if (S.on && typeof G !== 'undefined' && G && G.towers) { try { if (standing(now)) return; } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('gv2:', e); } } }
+        return _gs.apply(this, arguments);
+      };
     }
     if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'gv2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
     if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
