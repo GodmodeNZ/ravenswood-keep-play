@@ -1,4 +1,4 @@
-const BUILD_TAG = '7fddd83d@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0713c726@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -62509,6 +62509,279 @@ function asNote(t, st) {
   const S = st.ist; if (S && S.as) out.push(`items +${S.as} Attack Speed: ${Math.round(asItemEff(S.as))}% faster (more counts for less)`);
   if (st.asRaw) out.push(`held at ${ATKSPD.max}× its own pace`);
   return out.join('; ');
+}
+
+/* ================= SIMPLE PASSIVES: TALENTS THAT ARE EASY TO REMEMBER (owner, 25 Nov 2026) =================
+   Owner: "Talent trees need more simple passives. We need less does x when y and more passives that are easier to
+   remember."; "its quite a lot of mental load to remember all the does x then y style talent".
+   So most nodes of a unit's tree are one plain stat now: attack speed, range, crit chance, crit damage, armour
+   penetration, mana (pool, a second, an attack), spell cooldown, spell cost, spell damage, health for a line holder, a
+   plain slow for a control unit, a wider splash, one more lightning jump. A tree keeps its spell talents, the talents that
+   change a named spell, the one talent that gives the unit its own trick, and its capstones.
+
+   This file is the engine; forces_..._easy_<force>.js hold each force's talents as data: ezTal(force, slot, name, kind, a, b).
+   A talent made simple keeps its name (its painting is keyed to it), id, cell, prerequisite and rank count, so saves keep
+   their picks. Its old effect is switched off: its cap, its attack-pass fx, its spell entry and its mana rider all go.
+   Its text shows the number before and after ("Range 2.6 → 2.9") from the best unit of its kind on the map, else from a
+   tier I unit; attack speed with no unit placed says "8% faster" (the pace layers change a unit's own time between
+   attacks, so only a placed unit knows it). ezText(force, slot, name, pro) only rewrites a kept talent's words.
+
+   kinds (a is per rank; b where noted):
+     haste  attacks a faster            reach  range +a cells             crit   crit chance +a (as shown: talents' crit
+     critm  crits strike +a harder      pen    ignores +a of armour              counts half, so the data doubles it)
+     splash splash a wider              jump   lightning jumps +a foes    hp     health a higher
+     slow   attacks slow a for b s      pool   mana pool a bigger         regen  +a mana a second
+     mhit   +a mana an attack           spcd   spells come a sooner       spcost spells cost a less
+     sppow  spells hit a harder
+   spcd and sppow are unit stats (st.caps.ezCd, st.caps.ezPow, read at the foot of this file) and spcost is a mana rider:
+   none is an `sp` entry, so no tree rule reads them as shaping one named spell. */
+const EZ = { list: [] };
+const ezR = v => String(+(+v).toFixed(2));
+const ezP = v => String(Math.round(v * 100));
+const ezGame = force => typeof G !== 'undefined' && G && G.force === force && Array.isArray(G.towers);
+// the best unit of this kind on the map (highest tier), or null
+function ezLive(force, slot) {
+  if (!ezGame(force)) return null;
+  let best = null;
+  for (const t of G.towers) if (t && t.type === slot && t.st && !t.def.wall && (!best || t.tier > best.tier)) best = t;
+  return best;
+}
+// the rank the player holds now (0 outside a run)
+function ezRank(force, slot, tal) {
+  if (!ezGame(force) || typeof talKnown !== 'function' || !TALENTS[slot]) return 0;
+  const i = TALENTS[slot].list.indexOf(tal); if (i < 0) return 0;
+  const pk = talKnown(slot) || [];
+  return Math.min(tal.max, pk[i] | 0);
+}
+const ezKit = (force, slot) => { const U = FORCES[force] && FORCES[force].units && FORCES[force].units[slot]; return (U && typeof UNIT_KITS !== 'undefined' && UNIT_KITS[U.id]) || null; };
+const ezTier1 = (force, slot) => { const U = FORCES[force] && FORCES[force].units && FORCES[force].units[slot]; return (U && U.tiers && U.tiers[0]) || {}; };
+const ezCritK = () => (typeof CRIT !== 'undefined' && CRIT.on ? CRIT.addK : 1);
+const ezCrit0 = () => (typeof CRIT !== 'undefined' && CRIT.on ? CRIT.base : 0);
+const ezCritM0 = () => (typeof CRIT !== 'undefined' && CRIT.on ? CRIT.m : 2.5);
+
+/* each kind: tag, what it does (mod | mana | sp), and its words. say(x): x = { n, r, a, b, t, st, base, kit, force, slot }
+   n: the rank shown, r: the rank held, t/st: the best live unit and its stats (or null), base: a tier I unit's stats */
+const EZ_KIND = {
+  haste: { tag: 'Damage', mod: (n, a) => ({ rate: 1 / (1 + a * n) }),
+    say: x => { const w = x.w || 'Attacks'; if (!x.st || !x.st.rate) return `${w} ${ezP(x.a * x.n)}% faster.`; const r0 = x.st.rate * (1 + x.a * x.r); return `${w} every ${ezR(r0)}s → ${ezR(r0 / (1 + x.a * x.n))}s.`; } },
+  reach: { tag: 'Damage', mod: (n, a) => ({ range: a * n }),
+    say: x => { const r0 = x.st && x.st.range ? x.st.range - x.a * x.r : x.base.range || 0; return `${x.w || 'Range'} ${ezR(r0)} → ${ezR(r0 + x.a * x.n)} cells.`; } },
+  crit: { tag: 'Damage', mod: (n, a) => ({ crit: a * n / ezCritK() }),
+    say: x => { const c0 = x.st && typeof critOf === 'function' ? critOf(x.st) - x.a * x.r : ezCrit0(); return `${x.w ? x.w + ' crit' : 'Crit'} chance ${ezP(c0)}% → ${ezP(c0 + x.a * x.n)}%.`; } },
+  critm: { tag: 'Damage', mod: (n, a) => ({ critM: ezCritM0() + a * n }),
+    say: x => `Crits strike ×${ezR(ezCritM0())} → ×${ezR(ezCritM0() + x.a * x.n)}.` },
+  pen: { tag: 'Damage', mod: (n, a) => ({ armorPen: a * n }),
+    say: x => { const p0 = x.st ? Math.max(0, (x.st.armorPen || 0) - x.a * x.r) : x.base.armorPen || 0; return `Its attacks ignore ${ezP(Math.min(.9, p0 + x.a * x.n))}% of armour (was ${ezP(p0)}%).`; } },
+  splash: { tag: 'Damage', mod: (n, a) => ({ splash: 1 + a * n }),
+    say: x => { const s0 = x.st && x.st.splash ? x.st.splash / (1 + x.a * x.r) : x.base.splash || 0; return `Splash ${ezR(s0)} → ${ezR(s0 * (1 + x.a * x.n))} cells.`; } },
+  jump: { tag: 'Damage', mod: (n, a) => ({ chain: a * n }),
+    say: x => { const c0 = x.st && x.st.chain ? x.st.chain - x.a * x.r : x.base.chain || 0; return `Its lightning jumps to ${c0} → ${c0 + x.a * x.n} foes.`; } },
+  hp: { tag: 'Survival', mod: (n, a) => ({ hpM: 1 + a * n }),
+    say: x => { if (!x.t || typeof towerMaxHp !== 'function') { const h1 = typeof TOWER_HP !== 'undefined' ? TOWER_HP[0] : 0; return h1 ? `Health ${Math.round(h1)} → ${Math.round(h1 * (1 + x.a * x.n))}.` : `Health ${ezP(x.a * x.n)}% higher.`; } const h0 = towerMaxHp(x.t, x.st) / (1 + x.a * x.r); return `Health ${Math.round(h0)} → ${Math.round(h0 * (1 + x.a * x.n))}.`; } },
+  slow: { tag: 'Control', mod: (n, a, b) => ({ slowOn: [a * n, b || 1.5] }),
+    say: x => `Its attacks slow foes ${ezP(x.a * x.n)}% for ${ezR(x.b || 1.5)}s.` },
+  pool: { tag: 'Mana', mana: a => ({ pool: a }),
+    say: x => { const m0 = x.kit ? x.kit.mana.max : 100; return `${x.w ? x.w + ' mana' : 'Mana'} ${Math.round(m0)} → ${Math.round(m0 * (1 + x.a * x.n))}.`; } },
+  regen: { tag: 'Mana', mod: (n, a) => ({ manaRegen: a * n }),
+    say: x => { const g0 = x.kit ? x.kit.mana.regen : 0; return `Mana a second ${ezR(g0)} → ${ezR(g0 + x.a * x.n)}.`; } },
+  mhit: { tag: 'Mana', mana: a => ({ strike: [a, 'any'] }),
+    say: x => { const h0 = x.kit ? x.kit.mana.hit : 0; return x.w ? `Each ${x.w} gives ${ezR(h0)} → ${ezR(h0 + x.a * x.n)} mana.` : `Mana an attack ${ezR(h0)} → ${ezR(h0 + x.a * x.n)}.`; } },
+  spcd: { tag: 'Spell', cap: 'ezCd',
+    say: x => { const ab = x.kit && x.kit.abilities[0]; return ab ? `Its spells come ${ezP(x.a * x.n)}% sooner: ${ab.name} every ${ezR(ab.cd)}s → ${ezR(ab.cd * (1 - x.a * x.n))}s.` : `Its spells come ${ezP(x.a * x.n)}% sooner.`; } },
+  spcost: { tag: 'Spell', mana: (a, kit) => { const cheap = {}; if (kit) for (const ab of kit.abilities) cheap[ab.id] = a; return { cheap }; },
+    say: x => { const ab = x.kit && x.kit.abilities[0]; return ab ? `Its spells cost ${ezP(x.a * x.n)}% less: ${ab.name} ${Math.round(ab.mana)} → ${Math.round(ab.mana * (1 - x.a * x.n))} mana.` : `Its spells cost ${ezP(x.a * x.n)}% less mana.`; } },
+  sppow: { tag: 'Spell', cap: 'ezPow',
+    say: x => `Its spells hit ${ezP(x.a * x.n)}% harder.` },
+};
+
+// the tree's talent of that name (never a spell talent)
+function ezFind(force, slot, name) {
+  const F = FORCES[force], tree = F && F.talents && F.talents[slot];
+  const t = tree && tree.list.find(q => (q.name === name || q.oldName === name) && !q.spell);
+  if (!t && typeof console !== 'undefined') console.warn('easy talents: no talent', force, slot, name);
+  return t || null;
+}
+// switch a talent's old effect off, whatever layer gave it
+function ezClear(t) {
+  if (t.apKey) { if (typeof AP !== 'undefined') delete AP.keys[t.cap]; t.apKey = null; t.apFx = null; t.apSee = ''; t.apTh = ''; t.apMax = 0; }
+  t.cap = null; t.capK = 1; t.capAt = 0; t.sp = null; t.wound = 0; t.mod = () => ({});
+  if (t.on) delete t.on;
+  if (typeof MANA_OF !== 'undefined') MANA_OF.delete(t);
+  t.mana = null;
+}
+// w: the unit's own words for the stat ("Looses an arrow", "Its spear reaches"), so no two trees read alike
+function ezTal(force, slot, name, kind, a, b, w) {
+  const K = EZ_KIND[kind], t = ezFind(force, slot, name);
+  if (!K) { if (typeof console !== 'undefined') console.warn('easy talents: no kind', kind, name); return null; }
+  if (!t) return null;
+  const kit = ezKit(force, slot);
+  ezClear(t);
+  t.tag = K.tag; t.ez = kind; t.ezA = a; t.ezB = b || 0;
+  if (K.mod) t.mod = n => K.mod(n, a, b);
+  if (K.mana) { t.mana = K.mana(a, kit); if (typeof MANA_OF !== 'undefined') MANA_OF.set(t, t.mana); }
+  if (K.cap) { t.cap = K.cap; t.capK = a; }   /* (st.caps[cap] = rank x a: read by the hooks at the foot of this file; one talent of a kind a tree) */
+  t.pro = n => {
+    const M = Math.max(1, Math.min(n | 0 || 1, t.max)), live = ezLive(force, slot);
+    return K.say({ n: M, r: ezRank(force, slot, t), a, b, w, t: live, st: live && live.st, base: ezTier1(force, slot), kit, force, slot });
+  };
+  EZ.list.push({ force, slot, name: t.name, kind, a, b: b || 0, max: t.max });
+  return t;
+}
+/* A named spell made better, WoW style ("Improved Pounce"; owner, 26 Nov 2026: "Take inspiration from wow, don't need to be
+   too simple"): always on, one clear number a rank. what (each per rank):
+     cd: seconds off its cooldown (back: its words)   cost: mana off its cost   pow: it hits that much harder (verb: its word)
+     by: { key: x }  added to one of the spell's own numbers (ab.by[key]: dur, n, low, stun ...), with say(v, ab) for its words
+   It is an ordinary spell entry (sp), so the tree rules hold: it sits below its spell's own talent and names the spell. */
+function ezSpell(force, slot, name, abId, what, say) {
+  const t = ezFind(force, slot, name), ab = typeof ABIL !== 'undefined' && ABIL[abId];
+  if (!t) return null;
+  if (!ab) { if (typeof console !== 'undefined') console.warn('easy talents: no spell', abId, name); return null; }
+  ezClear(t);
+  t.tag = 'Spell'; t.ez = 'spell'; t.ezAb = abId;
+  t.sp = n => {
+    const e = { ab: abId };
+    if (what.cd) e.cd = -what.cd * n / ab.cd;
+    if (what.cost) e.cost = -what.cost * n / ab.mana;
+    if (what.pow) e.vs = ['any', what.pow * n];
+    if (what.by) { e.by = {}; for (const k in what.by) e.by[k] = what.by[k] * n; }
+    return e;
+  };
+  t.pro = n => {
+    const M = Math.max(1, Math.min(n | 0 || 1, t.max)), bits = [];
+    if (what.cd) bits.push(`${what.back || 'comes back every'} ${ezR(ab.cd)}s → ${ezR(ab.cd - what.cd * M)}s`);
+    if (what.cost) bits.push(`costs ${Math.round(ab.mana)} → ${Math.round(ab.mana - what.cost * M)} mana`);
+    if (what.pow) bits.push(`${what.verb || 'hits'} ${ezP(what.pow * M)}% harder`);
+    if (what.by && say) bits.push(say(M, ab));
+    return `${ab.name} ${bits.join(' and ')}.`;
+  };
+  EZ.list.push({ force, slot, name: t.name, kind: 'spell', ab: abId, max: t.max });
+  return t;
+}
+// a kept talent, said more plainly (its effect untouched)
+function ezText(force, slot, name, pro, tag) {
+  const t = ezFind(force, slot, name); if (!t) return null;
+  t.pro = typeof pro === 'function' ? pro : () => pro;
+  if (tag) t.tag = tag;
+  return t;
+}
+
+/* ---------- the two unit stats: spells sooner (st.sh.cdK, read by abCd), spells harder (the spell amp) ---------- */
+if (typeof effStats === 'function') {
+  const _ezEff = effStats;
+  effStats = function (t) {
+    const st = _ezEff.apply(this, arguments), v = st && st.caps && st.caps.ezCd;
+    if (v) { st.sh = Object.assign({}, st.sh); st.sh.cdK = (st.sh.cdK == null ? 1 : st.sh.cdK) * (1 - Math.min(.5, v)); }
+    return st;
+  };
+}
+if (typeof brAmp === 'function') {
+  const _ezAmp = brAmp;
+  brAmp = function (c, src, dot) {
+    const v = _ezAmp.apply(this, arguments), p = src && src.st && src.st.caps && src.st.caps.ezPow;
+    return p && !dot && typeof DTAG !== 'undefined' && typeof AB_TAG !== 'undefined' && DTAG === AB_TAG && src.def && src.def.force ? v + p : v;
+  };
+}
+
+/* ================= SIMPLE PASSIVES: THE STORMBORN (26 Nov 2026) =================
+   The engine and the owner's words: forces_..._easy.js. Modelled on classic WoW trees: most nodes are an always-on, ranked
+   improvement to one of the unit's named spells ("Pounce is ready every 8s → 6s"), with a few core stats under the
+   talents' own names, each in the unit's own words ("Looses an arrow every ...", "Its spear reaches ...").
+   Each tree keeps its spell talents, its capstones (row VI, one a tree), the one talent that gives the unit its own trick
+   (Hunting Bond, Through and Through, Hard Frost, Deep Hex, Deep Fissures, Brooding Sky, Long Cord) and the short
+   always-on talents that shape that trick or its attack (no "when X, then Y").
+   Gone: every-Nth-attack, after-each-spell, on-kill, under-30%-health and while-a-boss-is-near talents outside the
+   capstones, but for one signature each on the Hail Shamans (Great Stones, Ice Crust: their damage is the stun Heavy Hail
+   pays off). Numbers set by duels (sim/duels/stormborn_passives.json): a full tree is within a tenth of its old strength.
+   Tarka's, Oshana's and Huri's own trees are nearly all changes to their named spells already: left as they are. */
+{
+  const F = 'stormborn', V = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom';
+  const longer = word => v => `${word} ${v}s longer`;
+
+  /* ---------- Wolfguard (line holder). Kept: Hunting Bond, Hock Bite; capstones Feeding Frenzy, Storm Wolf, Spirit Pack ---------- */
+  ezTal(F, 'glaive', 'Wolf at the Throat', 'pen', .15);
+  ezTal(F, 'glaive', 'Blood on the Fur', 'mhit', .5, 0, 'spear thrust');
+  ezTal(F, 'glaive', 'Braced Spear', 'crit', .08, 0, 'Spearpoint');
+  ezTal(F, 'glaive', 'Spear Flurry', 'haste', .2, 0, 'Thrusts its spear');
+  ezSpell(F, 'glaive', 'Worry the Prey', 'sb_pounce', { pow: .35, verb: 'mauls' });
+  atkSwap(F, 'glaive', { old: 'Run Them Through', name: 'Run Them Through', tag: 'Damage', see: 'The spear runs on into the foe behind.',
+    pro: (n, s) => `Each attack also hits the foe behind for ${s(70)}%.`, fx: { hit: { do: 'pierce', k: .7, r: 1.5 } } });   /* (always on: it was every 3rd attack) */
+  ezSpell(F, 'glaive', 'Howl of the Pack', 'sb_packhowl', { by: { dur: 1 } }, longer('keeps the wolf hunting'));
+  ezTal(F, 'glaive', 'Ash Haft', 'reach', .15, 0, 'Its spear reaches');
+  ezSpell(F, 'glaive', 'Moonfang Pounce', 'sb_pounce', { cd: 1, back: 'is ready every' });
+
+  /* ---------- Windrunners (damage: no control). Kept: Through and Through, Hurricane Volley, Two on the String;
+     capstones Gale Volley, Skyrend, Wind Spirit ---------- */
+  ezTal(F, 'arrow', 'Updraft Reader', 'crit', .04, 0, 'Bowshot');
+  ezSpell(F, 'arrow', 'Breath of the Gust', 'sb_galearrow', { cost: 8 });
+  ezSpell(F, 'arrow', 'Gust Fletching', 'sb_galearrow', { pow: .25, verb: 'tears through its line' });
+  ezTal(F, 'arrow', 'Skein Shot', 'reach', .15, 0, 'Her arrows fly');
+  ezTal(F, 'arrow', 'Tailwind', 'haste', .07, 0, 'Looses an arrow');
+  ezSpell(F, 'arrow', 'Wind-Borne Volley', 'sb_crosswind', { by: { dur: 1 } }, longer('holds its gale'));
+  ezTal(F, 'arrow', 'Carried On', 'critm', .25);
+
+  /* ---------- Hail Shamans (control). Kept: Hard Frost, Great Stones (their one every-Nth), Heavy Hail (its payoff on the
+     foes they stun), Ice Crust, Brittle Cold, Skipping Stone; capstones Hail Barrage, Endless Storm, Hail Shatter ---------- */
+  atkSwap(F, 'frost', { old: 'Double Hail', name: 'Double Hail', tag: 'Damage', see: 'A second stone falls on another foe.',
+    pro: (n, s) => `Each attack drops a second stone on another foe for ${s(60)}%.`, fx: { hit: { do: 'split', n: 1, k: .6, r: 1.6 } } });   /* (always on: it was every 3rd attack) */
+  ezTal(F, 'frost', 'Meltwater', 'pool', .15, 0, 'Hail Shaman');
+  ezTal(F, 'frost', 'Squall', 'haste', .25, 0, 'Hurls a hailstone');
+  ezSpell(F, 'frost', 'Hail Spirit', 'sb_hailstorm', { by: { dur: 1 } }, longer('stays slick'));
+  ezTal(F, 'frost', 'Storm Rhythm', 'mhit', 1.5, 0, 'hailstone');
+  ezSpell(F, 'frost', 'Gathering Storm', 'sb_freezingrain', { pow: .3, verb: 'stings' });
+
+  /* ---------- Spirit Walkers. Kept: Deep Hex, Lingering Spirits, Judgment, Passing Spirit; capstones Ancestors'
+     Blessing, Spirit Host, Ancestor Host ---------- */
+  ezTal(F, 'arcane', 'Twin Spirits', 'haste', .15, 0, 'Sends a spirit');
+  ezTal(F, 'arcane', 'Spirit Rhythm', 'mhit', 1.5, 0, 'spirit it sends');
+  ezSpell(F, 'arcane', 'Restless Ancestor', 'sb_reckoning', { cd: 1, back: 'tolls every' });
+  ezSpell(F, 'arcane', 'Old Grudge', 'sb_spiritchains', { by: { k: .05 } }, v => `shares ${ezP(.05 * v)}% more of the damage`);
+  ezTal(F, 'arcane', 'Restless Dead', 'reach', .15, 0, 'Its spirits range');
+  ezSpell(F, 'arcane', 'Spirit Echo', 'sb_spiritchains', { by: { n: 1 } }, v => `binds ${v} more foe${v > 1 ? 's' : ''}`);
+  ezTal(F, 'arcane', 'Spirit Draw', 'crit', .05, 0, 'Spirit');
+  ezText(F, 'arcane', 'Lingering Spirits', n => `Its hex lasts 4s → ${4 + n}s.`);
+
+  /* ---------- Thunder Callers. Kept: Split Sky, Backlash, Grounded Bolt; capstones Thunderclap, Last Spark, Stormseed ---------- */
+  ezTal(F, 'storm', 'Long Fork', 'jump', 1);
+  ezSpell(F, 'storm', 'Thunder Finish', 'sb_calllightning', { pow: .15, verb: 'cracks' });
+  ezTal(F, 'storm', 'Thunder Hunger', 'pool', .1, 0, 'Thunder Caller');
+  ezTal(F, 'storm', 'Building Charge', 'haste', .15, 0, 'Calls lightning');
+  ezTal(F, 'storm', 'Charged Air', 'crit', .06, 0, 'Thunderbolt');
+  ezSpell(F, 'storm', 'Double Strike', 'sb_thunderbird', { by: { dur: 1 } }, longer('arcs'));
+  ezSpell(F, 'storm', 'Charged Rhythm', 'sb_calllightning', { cd: 1, back: 'answers every' });
+  ezTal(F, 'storm', 'Full Circuit', 'mhit', 1, 0, 'thunderbolt');
+  ezSpell(F, 'storm', 'Spark Familiar', 'sb_stormtotem', { by: { dur: 1 } }, longer('stays spiked'));
+
+  /* ---------- Earthbinders (control, line holder). Kept: Deep Fissures, Riftmaker, Loose Earth, Heavy Stomp (the line
+     holder's payoff on a held foe), Second Tremor, Flying Rocks; capstones Mountain's Echo, Great Stomp, Bison Spirit ---------- */
+  ezSpell(F, 'earth', 'Ground Gives Way', 'sb_stonetotem', { pow: .15, verb: 'quakes' });
+  ezSpell(F, 'earth', 'Stone Remembers', 'sb_stonetotem', { by: { dur: 1 } }, longer('stands'));
+  ezTal(F, 'earth', 'Hard Rhythm', 'haste', .1, 0, 'Brings its maul down');
+  ezSpell(F, 'earth', 'Maul Swing', 'sb_fissure', { pow: .25, verb: 'bursts' });
+  ezTal(F, 'earth', 'Earth Rhythm', 'mhit', 1, 0, 'blow of its maul');
+
+  /* ---------- Cloud Dancers. Kept: Brooding Sky, Long Clouds, Forked Strike; capstones Storm Front, Thunder Dance,
+     Sky Lattice ---------- */
+  ezSpell(F, 'cannon', 'Answering Sky', 'sb_thunderhead', { pow: .25, verb: 'thunders' });
+  ezTal(F, 'cannon', 'Sky Strike', 'crit', .06, 0, 'War-fan');
+  ezTal(F, 'cannon', 'Fan Rhythm', 'haste', .15, 0, 'Sweeps her fans');
+  ezSpell(F, 'cannon', "Storm's End", 'sb_stormdance', { pow: .15, verb: 'falls' });
+  ezTal(F, 'cannon', 'Rain Rhythm', 'mhit', 1.5, 0, 'sweep of her fans');
+  ezTal(F, 'cannon', 'Rain Returns', 'pool', .15, 0, 'Cloud Dancer');
+  ezSpell(F, 'cannon', 'Twin Bolt', 'sb_stormdance', { cd: 2, back: 'can be danced every' });
+  ezSpell(F, 'cannon', 'Lifted Dance', 'sb_downpour', { cd: 1.5, back: 'comes round every' });
+  ezSpell(F, 'cannon', 'Sky Spirit', 'sb_thunderhead', { by: { dur: 1 } }, longer('hangs'));
+  ezText(F, 'cannon', 'Long Clouds', n => `Its clouds last 3s → ${3 + n}s.`);
+
+  /* ---------- Skyhunters (control, the sky). Kept: Long Cord, Charged Harpoons, Barbed Heads; capstones Harpoon Volley,
+     Master of the Sky ---------- */
+  ezSpell(F, V, 'Downwind Haul', 'sb_tether', { by: { low: .5 } }, v => `holds flyers down ${ezR(.5 * v)}s longer`);
+  ezTal(F, V, 'Second Cast', 'haste', .08, 0, 'Casts its line');
+  ezTal(F, V, 'Sky Lore', 'pool', .15, 0, 'Skyhunter');
+  ezSpell(F, V, 'Double Harpoon', 'sb_tether', { by: { n: 1 } }, v => `pulls down ${v} more flyer${v > 1 ? 's' : ''}`);
+  ezSpell(F, V, 'Hard Landing', 'sb_downdraft', { by: { dur: 1 } }, longer('holds its flyer'));
+  ezTal(F, V, 'Long Cast', 'reach', .25, 0, 'Its line runs');
+  ezTal(F, V, "Skyhunter's Tithe", 'mhit', .6, 0, 'cast of its line');
+  ezSpell(F, V, "Hunter's Haste", 'sb_skyfall', { pow: .3, verb: 'crashes down' });
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
