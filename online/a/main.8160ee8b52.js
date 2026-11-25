@@ -1,4 +1,4 @@
-const BUILD_TAG = '0713c726@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'dd5fbcf8@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -127616,7 +127616,7 @@ function rgDiff(R, S) {
 }
 // its causes, in a line: growth and why, a first place, the boss (the foes' health and the waves are on the line below it)
 function rgDiffWhy(R, S) {
-  const st = S.node && R.st[S.node], b = rgBosses(S), parts = [];
+  const st = S.node && R.st[S.node], b = rgBossesOf(R, S), parts = [];
   if (S.kind !== 'waylay' && S.g) parts.push(`Grown ${S.g} of ${RG_GROW}${st && st.why && st.why.length ? ` (${st.why.join('; ')})` : S.kind === 'patrol' ? ' (a patrol)' : ''}: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health`);
   if (S.gentle) parts.push(S.marched ? 'A first place: no boss, gentle kinds of foe' : 'A first place: no boss, gentle foes');
   if (S.behind) parts.push(`Your maze held to wave ${S.behind - 1}: foes as strong as wave ${S.behind}'s`);
@@ -127670,6 +127670,8 @@ function rgSpec(R, id, kind, road) {
   return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k, gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
 }
 // the bosses in a battle's waves (the standard march's; the lair's last is its lord)
+// the battle's bosses as its waves field them (rgFoesOf: a forest faction's own boss, not the run's wave-table one), [wave, type]
+const rgBossesOf = (R, S) => typeof rgFoesOf === 'function' ? rgFoesOf(R, S).bosses.map(b => [b.w, b.type]) : rgBosses(S);
 function rgBosses(S) { const out = []; if (S.gentle) return out;   // (a first place has no boss)
   for (let w = S.w0; w <= S.w1; w++) { const b = w === 50 && S.lord ? S.lord : CAMP_BOSS0[w]; if (b && CREEPS[b]) out.push([w, b]); } return out; }
 // the unit kind that did the most damage this battle (it chose the kind a broken line wounded; unused since wounds went, 19 Nov 2026)
@@ -127976,19 +127978,23 @@ function rgFoeName(R, S) {
   let F = null; try { F = typeof ffHome === 'function' ? ffHome(R.force, S.node) : null; } catch (e) { F = null; }
   return F ? F.short || F.name : S.fam && CAMP_FAMILIES[S.fam] ? CAMP_FAMILIES[S.fam].name : 'The warlord’s host';
 }
-function rgBattleHead(R, S) {
-  const D = rgDiff(R, S), b = rgBosses(S), grown = S.kind === 'trouble' && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
+function rgBattleHead(R, S, noGold) {
+  const D = rgDiff(R, S), b = rgBossesOf(R, S);
   return `<p class="rg-diff rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>
-    <p class="rg-what">${rgEsc(rgFoeName(R, S))} · waves ${S.w0}-${S.w1}${b.length ? '' : ' · no boss'}</p>${typeof rgFoesHTML === 'function' ? rgFoesHTML(R, S) : ''}
-    <p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>
+    <p class="rg-what">${rgEsc(rgFoeName(R, S))} · waves ${S.w0}-${S.w1}${b.length ? '' : ' · no boss'}</p>${noGold ? '' : rgBattleGold(R, S)}`;
+}
+// the reward and the start gold
+function rgBattleGold(R, S) {
+  const grown = S.kind === 'trouble' && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
+  return `<p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>
     ${(() => { const SG = rgStartGold(R, S); return `<p class="rg-gold">${SG.maze ? 'Your maze + ' : 'Start gold '}<b>${SG.base + SG.gap} gold</b>${SG.gap ? ` <small>(+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`}${S.w0 - 1 - SG.w > RG_GAP.free ? `: ${Math.round(RG_GAP.k * 100)}% past the first ${RG_GAP.free}, a leap ahead` : ''})</small>` : ''}</p>`; })()}`;
 }
 function rgBattleMore(R, S) {
   const F = S.fam && CAMP_FAMILIES[S.fam];
-  return `<p class="rg-why">${rgEsc(rgDiffWhy(R, S))}</p>${typeof rgLootMore === 'function' ? rgLootMore(R, S) : ''}
+  return `<p class="rg-why">${rgEsc(rgDiffWhy(R, S))}</p>
     ${S.extra && S.extra.length ? `<p><b>His helpers march too:</b> ${S.extra.map(f => rgEsc(CAMP_FAMILIES[f].name)).join(', ')} (+${Math.round(10 * S.extra.length)}% health).</p>` : ''}
     <p class="rg-nums"><span>Field <b>${rgEsc(MAPS[S.map] ? MAPS[S.map].name : S.map)}</b></span><span>Foes' health <b>×${S.hpK.toFixed(2)}</b></span><span>Line <b>${S.line || rgLineOf(R, S)} lives</b></span></p>
-    ${F ? `<p class="rg-fam"><b>${rgEsc(F.name)}.</b> ${rgEsc(F.say)}</p>` : ''}
+    ${F && F.name === rgFoeName(R, S) ? `<p class="rg-fam"><b>${rgEsc(F.name)}.</b> ${rgEsc(F.say)}</p>` : ''}
     <p class="rg-risk"><b>If the line breaks:</b> ${rgLossLines(R, S).join(' · ')}.${R.hard ? ' <b>Hardcore: it ends the run.</b>' : ''}</p>`;
 }
 // the old callers' shape: the head, the button, the details
@@ -128023,6 +128029,11 @@ function rgNodeHTML(R, id) {
   const h = st.s !== 'held' && R.helpers.find(x => x.node === id); if (h) more += `<p class="rg-grew">The warlord’s helper is here: settle it and ${rgEsc(CAMP_FAMILIES[h.fam].name)} leave his lair.</p>`;
   if (S) more += rgBattleMore(R, S);
   const town = n.kind === 'town' && here && st.s === 'held' ? `<div class="rg-town">${rgTownOpts(R).map(o => `<button class="btn ghost rg-sec" data-town="${o[0]}" ${o[3] ? '' : 'disabled'}>${o[1]}<small>${rgEsc(o[2])}</small></button>`).join('')}</div>` : '';
+  // a place with a battle: its field's painting at the top with its name over it, the foes' cards, the encounter, what can
+  // drop, then the reward and the button; the rest (the place's words, the road, the risk) in small print under it
+  const E = S && typeof rgEncParts === 'function' ? rgEncParts(R, S) : null;
+  if (E) return `<section class="cm-loc rg-card rg-place">${E.img ? `<figure class="rg-eimg"><img alt="" src="${E.img}"><figcaption><span>${state}${E.field ? ` · ${rgEsc(E.field)}` : ''}</span>${rgEsc(n.name)}</figcaption></figure>` : `<h3><span>${state}</span>${rgEsc(n.name)}</h3>`}
+    <div class="rg-hd">${rgBattleHead(R, S, true)}</div>${E.cards}${E.say}${E.loot}<div class="rg-gl">${rgBattleGold(R, S)}</div>${btn}${town}<div class="rg-fine">${more}</div></section>`;
   return `<section class="cm-loc rg-card"><h3><span>${state}</span>${rgEsc(n.name)}</h3>${S ? rgBattleHead(R, S) : ''}${btn}${town}
     <details class="rg-more"><summary>Details</summary>${more}</details></section>`;
 }
@@ -128031,7 +128042,7 @@ function rgPendingHTML(R) {
   if (P.kind === 'waylay') {
     const S = rgSpec(R, null, 'waylay', P.road); S.line = rgLineOf(R, S);
     return `<section class="cm-loc rg-card rg-alarm"><h3><span>Ambush</span>Waylaid on the road</h3>${rgBattleHead(R, S)}
-      <button class="btn rg-go" id="rgFight">Fight through<small>${S.line} lives · then on to ${rgEsc(rgNode(R, P.to).name)}</small></button><button class="btn ghost rg-sec" id="rgBackOff">Fall back to ${rgEsc(rgNode(R, P.from).name)}<small>no fight · the clock moves a step</small></button>
+      <button class="btn rg-go" id="rgFight">Fight through<small>${S.line} lives · then on to ${rgEsc(rgNode(R, P.to).name)}</small></button><button class="btn ghost rg-sec" id="rgBackOff">Fall back to ${rgEsc(rgNode(R, P.from).name)}<small>no fight · the clock moves a step</small></button>${typeof rgEncParts === 'function' ? (E => E ? E.cards : '')(rgEncParts(R, S)) : ''}
       <details class="rg-more"><summary>Details</summary><p class="cm-say">${rgEsc(CAMP_FAMILIES[S.fam].name)} fall on the column on the road to ${rgEsc(rgNode(R, P.to).name)}.</p>${rgBattleMore(R, S)}</details></section>`;
   }
   const E = RG_EVENTS[P.ev];
@@ -128668,12 +128679,28 @@ function rgPlaceTip(el) {
   const n = rgNode(R, id), st = R.st[id];
   const S = st.s !== 'held' ? rgSpec(R, id, 'trouble') : n.kind === 'trouble' && (st.p | 0) < RG_PATROLS ? rgSpec(R, id, 'patrol') : null;
   if (!S) return `<div class="rg-tc"><h4>${rgEsc(n.name)}</h4><p>${n.kind === 'town' ? 'A held town: rest and re-spec there.' : 'Settled: nothing left to fight.'}</p></div>`;
-  const F = rgFoesOf(R, S), T = typeof rgLootOf === 'function' && rgLootOf(R, S.node);
-  const boss = F.bosses.map(b => { const d = CREEPS[b.type], r = d.brule, src = rgFoeImg(b.type), x = rgBossWords(R, S, b);
-    return `<div class="rg-tb"><span class="rg-fo boss big">${src ? `<img alt="" src="${src}">` : ''}</span><span><b>${rgEsc(d.name)}</b> <small>wave ${b.w}</small><br><small>${rgEsc(r ? `${r.name ? r.name + ': ' : ''}${rgFirst(r.text)}` : rgFoeSay(b.type)[0])}</small>${x ? `<br><small class="rg-fx">${rgEsc(x)}</small>` : ''}</span></div>`; }).join('');
-  const troops = F.troops.map(t => { const d = CREEPS[t.type], k = rgFoeKind(d), src = rgFoeImg(t.type);
-    return `<span class="rg-tf"><span class="rg-fo${k[0] ? ' ' + k[0] : ''}">${src ? `<img alt="" src="${src}">` : ''}</span>${rgEsc(d.name)}</span>`; }).join('');
-  return `<div class="rg-tc rg-tp"><h4>${rgEsc(n.name)} <small>waves ${S.w0}-${S.w1}</small></h4><p class="rg-tw">${rgEsc(rgFoeName(R, S))}</p>${boss}${troops ? `<div class="rg-tfs">${troops}</div>` : ''}${T ? `<p class="rg-tl">Can drop here</p>${rgPoolHTML(T)}` : ''}</div>`;
+  return `<div class="rg-tc rg-tp"><h4>${rgEsc(n.name)} <small>waves ${S.w0}-${S.w1}</small></h4><p class="rg-tw">${rgEsc(rgFoeName(R, S))}</p></div>`;
+}
+/* The selected place, all on its card (owner, 26 Nov 2026: "dont want the items and stats shown here [the map's hover card],
+   would prefer to have it ... on the right hand side once you select a location, can maybe have an image of the location at
+   the top with portrait cards of the boss and minions, some info about the encounters and a loot table"; then "actually just
+   make it a card not a drop down, when selecting a location the right hand pane just shows all the info"): its field's
+   painting, a portrait card for the boss and for each kind of foe (its picture, name, kind and what it does in a line; the
+   card on hover or a tap has the rest), the encounter in a few plain lines, and what can drop there (no chances).
+   rgEncParts gives the pieces; region.js rgNodeHTML lays them out. */
+function rgEncParts(R, S) {
+  if (!S) return null;
+  const F = rgFoesOf(R, S);
+  const img = typeof mapThumb === 'function' ? mapThumb(S.map) : '', field = typeof MAPS !== 'undefined' && MAPS[S.map] ? MAPS[S.map].name : '';
+  const card = (type, boss, line, x, tag) => { const d = CREEPS[type], k = rgFoeKind(d);
+    return `<div class="rg-ec${boss ? ' boss' : ''}">${rgFoeIcon(type, true, x)}<span><b>${rgEsc(d.name)}${k[1] && !boss ? ` <em class="rg-ft ${k[0]}">${k[1]}</em>` : ''}</b>${line ? `<small>${rgEsc(line)}</small>` : ''}${tag || ''}</span></div>`; };
+  const bosses = F.bosses.map(b => { const d = CREEPS[b.type], r = d.brule; return card(b.type, true, `Boss · wave ${b.w}${r && r.name ? ' · ' + r.name : ''}: ${r ? rgFirst(r.text) : rgFoeSay(b.type)[0]}`, rgBossWords(R, S, b), rgBossTag(R, S, b.type, b.w)); }).join('');
+  const troops = F.troops.map(t => card(t.type, false, rgFoeSay(t.type)[0])).join('');
+  const fly = F.troops.filter(t => CREEPS[t.type].fly).map(t => CREEPS[t.type].name);
+  const say = [F.bosses.length ? '' : S.gentle ? 'No boss: a first place, its foes the plain kinds.' : 'No boss.',
+    fly.length ? `${fly.join(' and ')} fly over the maze: units that reach the air answer them.` : ''].filter(Boolean);
+  return { img, field, cards: bosses || troops ? `<div class="rg-ecs" aria-label="The foes you will meet">${bosses}${troops}</div>` : '',
+    say: `<div class="rg-esay">${say.map(t => `<p>${rgEsc(t)}</p>`).join('')}</div>`, loot: typeof rgLootMore === 'function' ? rgLootMore(R, S) : '' };
 }
 if (typeof itipBind === 'function' && typeof document !== 'undefined') {
   itipBind(document, '.rg-fo[data-rgf]', rgFoeCard, { tap: () => null });
