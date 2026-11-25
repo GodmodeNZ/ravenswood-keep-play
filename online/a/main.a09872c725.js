@@ -1,4 +1,4 @@
-const BUILD_TAG = '0ae62559@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9ee61dc0@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -82416,7 +82416,7 @@ const FFM = (() => {
       const a = (blow.r || 0) * 6.283, sK = Math.min(1.6, blow.s || 1), bl = Math.hypot(blow.bx, blow.bz), dx = bl > .05 ? blow.bx / bl : Math.cos(a), dz = bl > .05 ? blow.bz / bl : Math.sin(a), T = P.toss;
       /* (by the killing blow's force, blow.E: an ordinary kill's cap hops off beside the body and lies down at once, a short throw,
          half a turn at most, no bounce; the biggest blow's is thrown as far as it ever was, spins and bounces) */
-      const e = Math.max(0, Math.min(1, blow.E || 0)), cm = e >= .5 ? 1 : .3, hv = (.7 + .5 * sK) * T * (.32 + .68 * e), up = (2.2 + .7 * sK) * T * (.62 + .38 * e);
+      const e = Math.max(0, Math.min(1, blow.E || 0)), cm = e >= .5 ? 1 : .3, hv = (.7 + .5 * sK) * T * (.32 + .4 * e), up = (2.2 + .7 * sK) * T * (.62 + .3 * e);   // (the biggest blow's cap lands about a cell and a half off, not out of sight)
       return { P, M: null, c0: null, d: [0, 0, 0], calm: cm < 1, v: [dx * hv + (blow.vx || 0) * .5 * cm, up, dz * hv + (blow.vz || 0) * .5 * cm], ax: [dz, 0, -dx], ang: 0, w: P.flat ? 3.4 : (2.2 + 1.6 * (blow.r || 0)) * (1 - e) + (6 + 5 * (blow.r || 0)) * e, rest: false, n: 0, hit: 0, to: 0 };
     };
     function pieceStep(q, dt) {
@@ -82427,8 +82427,8 @@ const FFM = (() => {
       const lo = floor();
       if (q.c0[1] + q.d[1] < lo && q.v[1] < 0) {
         q.d[1] = lo - q.c0[1]; q.n++; q.hit++;
-        if (P.flat || q.calm || -q.v[1] < .9 || q.n > 3) { q.rest = true; q.v[0] = q.v[1] = q.v[2] = 0; q.to = P.flat ? (Math.round(q.ang / Math.PI - .5) + .5) * Math.PI : Math.round(q.ang / Math.PI) * Math.PI; }
-        else { q.v[1] *= -.45; q.v[0] *= .6; q.v[2] *= .6; q.w *= .55; }
+        if (P.flat || q.calm || -q.v[1] < .9 || q.n > 2) { q.rest = true; q.v[0] = q.v[1] = q.v[2] = 0; q.to = P.flat ? (Math.round(q.ang / Math.PI - .5) + .5) * Math.PI : Math.round(q.ang / Math.PI) * Math.PI; }
+        else { q.v[1] *= -.4; q.v[0] *= .45; q.v[2] *= .45; q.w *= .5; }
       }
     }
     // (the packed bones: 12 numbers a bone, three of (a column of its turn, its offset's part))
