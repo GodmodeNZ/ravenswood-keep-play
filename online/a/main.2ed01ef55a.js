@@ -1,4 +1,4 @@
-const BUILD_TAG = 'e45cf0bd@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '932f522d@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -62941,7 +62941,8 @@ function ezOpenTree(tree) {
   const at = (r, c) => tree.list.find(q => q.r === r && q.c === c);
   let kept = 0;
   for (const t of tree.list) {
-    if (t.req0 === undefined) t.req0 = t.req || null;   /* (what it needed before: tools/open_layout.js picks the tree's one chain from these) */
+    if (t.req0 === undefined) t.req0 = t.req || null;   /* (what it needed before: tools/open_layout.js picks the tree's chains from these) */
+    if (!t.rc0) t.rc0 = [t.r, t.c];
     const up = t.req ? at(t.req[0], t.req[1]) : null;
     let shapes = false;
     if (up && up.spell && !t.spell && t.sp && t.req[0] === t.r - 1 && t.req[1] === t.c) { try { shapes = [].concat(t.sp(t.max)).some(e => e && e.ab === up.spell); } catch (e) { shapes = false; } }
@@ -62961,8 +62962,9 @@ function ezOpen(force) {
 /* ---------- an open tree's own shape, and its one chain (tools/open_layout.js writes these lines) ----------
    Owner, 26 Nov 2026: "break up the shape of the tree more"; "keep some 4 or 3 dependency rows but not like that".
    ezLayout(force, key, cells, chain): key is a unit's slot or 'champ:<hero>'; cells[i] = [row, column] of the tree's ith
-   talent (ids and list order unchanged: saves keep their picks); chain: the indices of the 3-4 talents that run straight
-   down one column, each needing the one above it. Every other talent needs only its row's points. */
+   talent (ids and list order unchanged: saves keep their picks); chain: the tree's chains, each a list of the indices of
+   talents that run straight down one column, each needing the one above it (one of 3-4 and a few of 2-3). Every other
+   talent needs only its row's points. */
 function ezLayout(force, key, cells, chain) {
   const tree = key.startsWith('champ:') ? (typeof CHAMPS !== 'undefined' && CHAMPS[key.slice(6)] ? CHAMPS[key.slice(6)].tree : null) : (FORCES[force] && FORCES[force].talents ? FORCES[force].talents[key] : null);
   if (!tree || !tree.list || tree.list.length !== cells.length) { if (typeof console !== 'undefined') console.warn('easy talents: layout does not fit', force, key); return; }
@@ -62970,10 +62972,14 @@ function ezLayout(force, key, cells, chain) {
   tree._ezLaid = true;
   tree.list.forEach((t, i) => {
     if (t.req0 === undefined) t.req0 = t.req || null;
+    if (!t.rc0) t.rc0 = [t.r, t.c];   /* (the cell it had before any layout: tools/open_layout.js lays out from these) */
     if (t.spell && t.r !== cells[i][0] && typeof console !== 'undefined') console.warn('easy talents: a spell talent changed row', force, key, t.spell);
     t.r = cells[i][0]; t.c = cells[i][1]; t.req = null; t.reqs = null;
   });
-  for (let k = 1; k < (chain || []).length; k++) { const a = tree.list[chain[k - 1]], b = tree.list[chain[k]]; if (a && b && b.r === a.r + 1 && b.c === a.c) b.req = [a.r, a.c]; else if (typeof console !== 'undefined') console.warn('easy talents: a chain link is not straight down', force, key, k); }
+  /* (chains: one list of indices, or several: owner, 26 Nov 2026, "we need more 2 and 3 rows, dont just want 1x 4 row with all
+     others being singular") */
+  const chains = !chain || !chain.length ? [] : Array.isArray(chain[0]) ? chain : [chain];
+  for (const ch of chains) for (let k = 1; k < ch.length; k++) { const a = tree.list[ch[k - 1]], b = tree.list[ch[k]]; if (a && b && b.r > a.r && b.c === a.c && !tree.list.some(q => q.c === a.c && q.r > a.r && q.r < b.r)) b.req = [a.r, a.c]; else if (typeof console !== 'undefined') console.warn('easy talents: a chain link is not straight down over empty cells', force, key, k); }   /* (a link may skip a row or two: owner, "its fine also to have 4 rows that skip a row or two") */
   tree.open = true;
 }
 
@@ -63097,22 +63103,22 @@ function ezReword(force, key, name, pairs) {
    rest of this force's trees follow when the owner approves the Ironhold sample) ---------- */
 {
   const F = 'conclave';
-  ezLayout(F, 'champ:cc_arch', [[4,3],[0,2],[1,3],[3,0],[1,0],[2,0],[2,2],[4,1],[5,2],[4,0],[3,3],[5,3],[4,2],[5,1],[0,1],[2,1]], [4,5,3,9]);   /* rows 2 2 3 2 4 3; chain: Unravel > Loose Threads > Read the Crowd > Woven Edge */
-  ezLayout(F, 'champ:cc_maren', [[0,2],[0,1],[1,0],[3,1],[1,1],[2,1],[2,0],[2,3],[5,2],[4,1],[3,3],[5,3],[4,2],[4,0],[2,2],[0,3],[5,1]], [4,5,3]);   /* rows 3 2 4 2 3 3; chain: Rift Chain > Long Chain > Practice Yard */
 }
 /* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
    other forces' tree layouts"; tools/open_layout.js conclave; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'conclave';
-  ezLayout(F, 'glaive', [[1,0],[0,2],[3,2],[2,1],[1,2],[2,2],[5,3],[2,0],[4,1],[3,3],[4,2],[2,3],[5,1],[5,2],[0,1],[0,3],[4,0]], [4,5,2,10]);   /* rows 3 2 4 2 3 3; chain: Ward-Splitter > Ghost Edge > Lone Duel > Rift Wake */
-  ezLayout(F, 'arrow', [[0,0],[0,2],[5,0],[3,0],[4,1],[2,2],[3,3],[1,2],[2,1],[5,2],[1,1],[1,0],[2,3],[5,1],[1,3],[0,1],[4,2],[4,3],[5,3]], [12,6,17,18]);   /* rows 3 4 3 2 3 4; chain: Packed Ranks > Bursting Missiles > Tidemoon > Missile Storm */
-  ezLayout(F, 'frost', [[0,0],[0,1],[5,3],[4,0],[2,2],[2,0],[1,0],[5,2],[4,2],[1,2],[5,1],[3,2],[1,3],[3,3],[3,1],[0,2],[1,1]], [4,11,8,7]);   /* rows 3 4 2 3 2 3; chain: Deep Freeze > Cold Library > Shatterbloom > Icicle Volley */
-  ezLayout(F, 'arcane', [[2,1],[3,3],[2,2],[0,1],[1,2],[4,0],[4,3],[5,2],[5,3],[1,3],[4,1],[2,0],[3,2],[5,1],[0,2],[0,0],[4,2]], [14,4,2,12]);   /* rows 3 2 3 2 4 3; chain: Pendulum Swing > Backward Hour > Rewound Bolt > Arcane Clockwork */
-  ezLayout(F, 'storm', [[0,2],[0,1],[5,1],[3,1],[4,2],[1,1],[3,3],[4,0],[5,2],[5,0],[2,3],[1,3],[2,0],[4,3],[2,2],[0,0],[2,1]], [11,10,6,13]);   /* rows 3 2 4 2 3 3; chain: Shooting Bolt > Grand Orrery > Busy Sky > Orrery Moon */
-  ezLayout(F, 'earth', [[2,2],[0,2],[3,1],[1,0],[2,1],[5,1],[3,0],[4,2],[4,0],[4,3],[0,1],[5,0],[2,3],[5,2],[1,3],[0,3],[4,1]], [4,2,16,5]);   /* rows 3 2 3 2 4 3; chain: Heave > Waking Golem > Stamped Flat > Shatterground */
-  ezLayout(F, 'cannon', [[0,2],[0,1],[0,0],[1,2],[1,0],[1,3],[2,2],[1,1],[2,3],[3,0],[3,2],[3,3],[4,0],[3,1],[4,3],[5,1],[5,2]], [0,3,6]);   /* rows 3 4 2 4 2 2; chain: Pyre Scribe > Skipping Flame > Twin Fireball */
-  ezLayout(F, 'venom', [[0,0],[3,2],[0,2],[2,1],[1,3],[1,2],[2,0],[0,1],[2,2],[4,3],[4,0],[4,1],[3,3],[5,2],[5,1],[5,0]], [2,5,8,1]);   /* rows 3 2 3 2 3 3; chain: Homeward Edge > Returning Crescent > Glancing Crescent > Hunting Crescent */
-  ezLayout(F, 'champ:cc_chrono', [[0,2],[0,0],[1,0],[5,2],[1,2],[2,2],[1,3],[3,1],[3,3],[4,0],[3,2],[5,1],[2,0],[5,3],[0,1],[1,1],[4,3]], [0,4,5,10]);   /* rows 3 4 2 3 2 3; chain: Patient Hands > Recall > Long Way Back > Second Hand */
+  ezLayout(F, 'glaive', [[0,0],[2,1],[1,2],[1,0],[1,3],[0,2],[5,1],[2,3],[4,1],[3,1],[3,2],[3,0],[5,2],[5,3],[0,1],[1,1],[4,0]], [[9,8,6],[5,2,10],[4,7],[0,3]]);   /* rows 3 4 2 3 2 3; chains: Thrown Riftblade > Thousand Edges > Twin Riftblades | Ghost Edge > Lone Duel > Rift Wake | Ward-Splitter > Fresh Blood | Measured Cuts > Riftsteel Rhythm */
+  ezLayout(F, 'arrow', [[0,2],[0,1],[5,2],[3,3],[3,1],[1,0],[4,1],[1,1],[2,3],[5,3],[2,0],[1,2],[2,2],[5,1],[1,3],[0,3],[4,2],[4,0],[5,0]], [[8,3,9],[17,18],[1,7],[5,10]]);   /* rows 3 4 3 2 3 4; chains: Gathering Orb > Charged Recital > Ready Orb | Tidemoon > Missile Storm | Splitting Missile > Skyward Missiles | Tome Familiar > Overflowing Missile */
+  ezLayout(F, 'frost', [[0,1],[0,2],[5,2],[4,3],[2,2],[2,1],[1,0],[5,1],[4,1],[3,3],[5,0],[3,2],[1,1],[2,0],[4,2],[0,3],[2,3]], [[6,13,10],[8,7],[0,12,5]]);   /* rows 3 2 4 2 3 3; chains: Ice Coffin > Cold Focus > Coffin Burst | Shatterbloom > Icicle Volley | Chilling Bolts > Absolute Stillness > Long Staff */
+  ezLayout(F, 'arcane', [[0,1],[3,2],[2,3],[4,3],[1,3],[2,0],[3,1],[5,2],[5,1],[0,2],[4,0],[2,2],[1,0],[5,0],[0,3],[4,2],[2,1]], [[0,16,6,8],[14,4,2],[12,5],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Spare Seconds > Time Rhythm > Long Hour > Frozen Moment | Pendulum Swing > Backward Hour > Rewound Bolt | Arcane Clockwork > Dead Hour | Recurrence > Endless Hour */
+  ezLayout(F, 'storm', [[0,2],[0,3],[5,2],[3,2],[3,3],[1,3],[3,1],[4,2],[5,3],[5,1],[2,1],[0,1],[2,0],[4,0],[2,2],[1,0],[3,0]], [[14,3,7,2],[1,5],[11,10,6]]);   /* rows 3 2 3 4 2 3; chains: Turning Stars > Long Lens > Zodiac > Constellation | Star-Chart > Lodestar | Shooting Bolt > Grand Orrery > Busy Sky */
+  ezLayout(F, 'earth', [[1,3],[0,2],[3,2],[0,1],[2,2],[5,2],[1,0],[2,1],[4,3],[3,1],[3,0],[5,3],[2,0],[5,1],[2,3],[0,0],[4,2]], [[4,2,16,5],[8,11],[7,9,13],[15,6]]);   /* rows 3 2 4 3 2 3; chains: Heave > Waking Golem > Stamped Flat > Shatterground | Living Bulwark > Shockwave | Golem Core > Fault Line > Stone Sprite | Warden's Command > Gathering Weight */
+  ezLayout(F, 'cannon', [[0,1],[0,3],[4,3],[1,1],[1,0],[1,3],[2,0],[0,2],[2,3],[3,1],[1,2],[3,0],[4,0],[4,1],[2,2],[5,1],[5,2]], [[7,10,14,16],[9,13,15],[0,3]]);   /* rows 3 4 3 2 3 2; chains: Leaping Cinders > Stoked Fire > Banked Heat > Pyre Bloom | Molten Brand > Flashover > Sunfall | Pyre Scribe > Skipping Flame */
+  ezLayout(F, 'venom', [[0,2],[2,3],[0,1],[4,1],[4,0],[1,1],[2,2],[3,1],[1,3],[2,0],[4,2],[3,3],[0,0],[5,2],[5,1],[5,3]], [[8,1,11,15],[6,10,13],[2,5],[12,9]]);   /* rows 3 2 3 2 3 3; chains: Glancing Crescent > Hunting Crescent > Paired Crescents > Wardbreaker | Splintering > Rend the Veil > Crescent Orbit | Homeward Edge > Returning Crescent | Sever Rhythm > Honed by Spells */
+  ezLayout(F, 'champ:cc_arch', [[0,2],[1,3],[1,1],[3,2],[1,2],[2,1],[1,0],[2,3],[5,0],[4,1],[3,1],[5,2],[4,3],[5,1],[0,1],[3,0]], [[5,10,9,13],[1,7,12],[3,11],[0,4]]);   /* rows 2 4 2 3 2 3; chains: Loose Threads > Snapping Threads > Woven Edge > Rewoven Threads | Open Book > Shared Lesson > Sixfold Loom | Read the Crowd > Spellweaver | Quick Quill > Unravel */
+  ezLayout(F, 'champ:cc_chrono', [[0,2],[0,1],[3,0],[5,1],[1,2],[2,1],[3,2],[1,0],[3,3],[4,1],[3,1],[5,0],[2,3],[5,2],[0,3],[2,0],[4,3]], [[5,10,9,3],[12,8,16],[7,15],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Way Back > Second Hand > Late Arrival > Gathered Ghosts | The Hour Strikes > Endless Hour > Leaden Pull | Lent Time > Saved Seconds | Patient Hands > Recall */
+  ezLayout(F, 'champ:cc_maren', [[0,1],[0,2],[1,2],[3,2],[1,1],[2,0],[2,3],[2,2],[5,1],[3,3],[3,0],[5,2],[4,3],[4,0],[3,1],[0,3],[5,0]], [[5,10,13,16],[6,9,12],[7,3],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Chain > Flourish > Duelling Ground > Chain to Blade | Opened Guard > Cut the Fallen > Unbound Blade | Shared Edge > Practice Yard | Quick Draw > Rift Chain */
 }
 
 /* ================= SIMPLE PASSIVES: THE GROVE (26 Nov 2026) =================
@@ -63208,17 +63214,17 @@ function ezReword(force, key, name, pairs) {
    other forces' tree layouts"; tools/open_layout.js grove; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'grove';
-  ezLayout(F, 'glaive', [[0,1],[0,2],[2,0],[1,1],[1,3],[2,1],[4,2],[4,0],[5,2],[5,1],[2,2],[5,3],[3,0],[3,2],[0,0],[3,1],[3,3]], [10,13,6,8]);   /* rows 3 2 3 4 2 3; chain: Spearwood Rising > Tossed Off the Point > Last Thrust > Wall of Spears */
-  ezLayout(F, 'arrow', [[2,3],[0,1],[4,3],[0,0],[2,1],[1,1],[3,1],[3,2],[5,1],[5,2],[4,2],[2,2],[3,0],[5,0],[0,2],[2,0],[1,3]], [1,5,4]);   /* rows 3 2 4 3 2 3; chain: Heartwood Volley > Thornseed Arrow > Spirit Hawk */
-  ezLayout(F, 'frost', [[0,2],[0,1],[4,2],[1,3],[1,0],[5,1],[4,3],[3,2],[3,1],[2,2],[2,0],[2,3],[5,2],[5,0],[3,0],[2,1],[0,3]], [9,7,2,12]);   /* rows 3 2 4 3 2 3; chain: Spreading Roots > Second Snare > Root Run > Overgrowth */
-  ezLayout(F, 'arcane', [[0,2],[1,2],[1,3],[3,2],[5,1],[3,1],[2,0],[4,1],[3,3],[5,2],[5,3],[4,0],[0,1],[2,1],[1,0],[1,1]], [13,5,7,4]);   /* rows 2 4 2 3 2 3; chain: Spell-Spurred > Through and On > White Hart's Hunt > Endless Hunt */
-  ezLayout(F, 'storm', [[4,2],[0,2],[2,0],[4,3],[1,0],[4,0],[3,1],[2,2],[5,3],[2,1],[1,3],[4,1],[5,1],[5,2],[0,0],[0,1],[3,3]], [9,6,11,12]);   /* rows 3 2 3 2 4 3; chain: Shapestorm > Wild Sweep > Wild Hunger > Owl Lord */
-  ezLayout(F, 'earth', [[0,1],[1,1],[3,2],[0,2],[1,0],[2,2],[5,3],[5,1],[4,0],[3,1],[3,3],[5,2],[2,0],[1,3],[4,2]], [5,2,14,11]);   /* rows 2 3 2 3 2 3; chain: Threading Dance > Single Partner > Spell and Steel > Petalfall */
-  ezLayout(F, 'cannon', [[2,0],[0,1],[0,2],[2,1],[3,2],[3,3],[1,1],[2,3],[5,1],[5,3],[5,2],[2,2],[4,0],[4,1],[1,0],[0,3],[3,1]], [1,6,3,16]);   /* rows 3 2 4 3 2 3; chain: Ripe Pods > Puffcap Sowing > Seed Split > Busy Sling */
-  ezLayout(F, 'venom', [[0,2],[0,1],[0,0],[1,2],[1,3],[3,1],[2,2],[3,2],[1,1],[4,2],[2,3],[4,3],[1,0],[3,0],[5,2],[5,0],[5,1]], [0,3,6,7]);   /* rows 3 4 2 3 2 3; chain: Clinging Mud > Bog Body > Second Gob > Bog Rhythm */
-  ezLayout(F, 'champ:rootmother', [[0,1],[0,2],[1,0],[5,2],[1,1],[2,1],[2,2],[3,1],[3,0],[4,3],[3,2],[5,3],[2,0],[5,1],[0,3],[2,3],[4,0]], [0,4,5,7]);   /* rows 3 2 4 3 2 3; chain: Patient Earth > Rootway > Bramble Grasp > Sap Song */
-  ezLayout(F, 'champ:thornbow', [[0,1],[0,3],[3,3],[3,0],[1,1],[2,1],[2,3],[4,1],[5,2],[3,1],[2,2],[3,2],[4,3],[5,1],[0,2],[1,0],[5,0]], [0,4,5,9]);   /* rows 3 2 3 4 2 3; chain: Steady Draw > Farshot > Barbed Shafts > Snarled Ground */
-  ezLayout(F, 'champ:hivemother', [[0,2],[3,3],[2,1],[3,0],[1,2],[2,2],[1,0],[4,3],[5,2],[5,1],[1,1],[5,0],[4,1],[3,2],[0,1],[1,3]], [0,4,5,13]);   /* rows 2 4 2 3 2 3; chain: Ripe Seeds > Moth Swarm > Thick Garden > Rotfeast */
+  ezLayout(F, 'glaive', [[1,3],[0,2],[3,1],[4,1],[1,1],[0,1],[4,2],[4,0],[5,2],[5,0],[2,2],[5,1],[2,0],[3,2],[0,0],[4,3],[2,3]], [[10,13,6,8],[12,7,9],[0,16]]);   /* rows 3 2 3 2 4 3; chains: Spearwood Rising > Tossed Off the Point > Last Thrust > Wall of Spears | Skewer > Phalanx > Impaler | Long Haft > Braced Rhythm */
+  ezLayout(F, 'arrow', [[0,0],[0,1],[3,3],[2,2],[2,1],[1,1],[1,3],[2,3],[5,1],[5,3],[4,2],[4,1],[3,0],[5,2],[0,2],[2,0],[4,0]], [[6,7,2,9],[1,5,4],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Through the Gap > Long Draw > Fletcher's Focus > Thornrain | Heartwood Volley > Thornseed Arrow > Spirit Hawk | Nailing Shaft > Hail of Shafts */
+  ezLayout(F, 'frost', [[0,0],[0,2],[4,3],[1,0],[1,2],[5,1],[4,1],[3,3],[3,0],[2,3],[2,2],[4,0],[5,3],[5,2],[4,2],[2,1],[0,1]], [[9,7,2,12],[1,4,10],[6,5],[0,3]]);   /* rows 3 2 3 2 4 3; chains: Spreading Roots > Second Snare > Root Run > Overgrowth | Thorned Vines > Mothcloud > Lashing Roots | Wither > Briar Spirit | Deep Roots > Thorn Hold */
+  ezLayout(F, 'arcane', [[3,1],[0,2],[1,3],[3,2],[5,1],[1,1],[2,2],[4,1],[2,3],[5,2],[5,3],[3,3],[3,0],[0,1],[1,0],[4,0]], [[2,8,11,10],[1,6,3],[7,4],[13,5]]);   /* rows 2 3 2 4 2 3; chains: Opening Charge > Lord of the Glade > Second Charge > White Stag Spirit | Trample > Bounding Leap > Fresh Legs | White Hart's Hunt > Endless Hunt | Spell-Spurred > Through and On */
+  ezLayout(F, 'storm', [[3,1],[0,2],[4,3],[4,1],[1,3],[2,3],[3,2],[2,1],[5,1],[2,2],[1,0],[4,2],[5,2],[5,3],[0,1],[0,0],[4,0]], [[7,0,3,8],[9,6,11],[15,10],[4,5]]);   /* rows 3 2 3 2 4 3; chains: Moonsap Bolts > Owl's Reach > Bramble Claws > Skyfall | Shapestorm > Wild Sweep > Wild Hunger | Shift Surge > Second Skin | Primal Swipe > Stoop */
+  ezLayout(F, 'earth', [[0,2],[2,1],[3,2],[0,1],[0,0],[2,2],[5,1],[5,0],[4,1],[1,0],[3,0],[5,2],[3,3],[1,3],[4,3]], [[4,9,10,7],[8,6],[5,2],[13,12,14]]);   /* rows 3 2 2 3 2 3; chains: Shadow Partner > Twin Whirl > Gale of Blades > Bladestorm | Encore > Dance of Blades | Threading Dance > Single Partner | Dancer's Breath > Parting Cut > Spell and Steel */
+  ezLayout(F, 'cannon', [[0,0],[0,2],[0,1],[2,2],[2,0],[3,1],[1,2],[2,1],[5,0],[5,2],[5,1],[4,3],[3,0],[4,2],[1,3],[2,3],[3,3]], [[0,4,12,8],[1,6,3],[7,5]]);   /* rows 3 2 4 3 2 3; chains: Potent Spores > Skipping Pod > Drifting Spores > Spore Cloud | Ripe Pods > Puffcap Sowing > Seed Split | Snapjaw Bloom > Overripe */
+  ezLayout(F, 'venom', [[0,2],[0,1],[1,0],[1,2],[4,0],[3,0],[2,2],[2,3],[0,3],[4,1],[2,1],[4,3],[4,2],[3,1],[5,2],[5,0],[5,1]], [[10,13,9,16],[0,3,6],[8,7]]);   /* rows 3 2 3 2 4 3; chains: The Bog Takes Its Due > Fen Toad > Witch's Spite > The Drowned Queen | Clinging Mud > Bog Body > Second Gob | Marsh Fever > Bog Rhythm */
+  ezLayout(F, 'champ:rootmother', [[0,1],[0,2],[3,1],[5,1],[1,1],[2,2],[1,3],[3,2],[3,0],[4,2],[3,3],[5,3],[2,0],[5,2],[0,0],[2,3],[4,0]], [[5,7,9,13],[12,8,16],[6,15],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Bramble Grasp > Sap Song > Strangling Hold > Thousand Roots | The Old Wood Walks > Heartwood Sapling > Sapling Song | Thorned Roots > Deep Sap | Patient Earth > Rootway */
+  ezLayout(F, 'champ:thornbow', [[0,1],[0,0],[2,1],[4,2],[1,1],[2,2],[1,3],[4,3],[5,1],[3,2],[2,0],[2,3],[4,0],[5,3],[3,1],[0,2],[5,2]], [[5,9,3,16],[1,10,12],[0,4],[6,11]]);   /* rows 3 2 4 2 3 3; chains: Barbed Shafts > Snarled Ground > Root Platform > Moonlit Aim | High Boughs > Running Shafts > Hunter’s Moon | Steady Draw > Farshot | Thorn Rain > Warden’s Mark */
+  ezLayout(F, 'champ:hivemother', [[3,2],[2,3],[0,1],[2,1],[1,0],[2,0],[1,1],[4,2],[5,3],[5,2],[2,2],[5,1],[4,3],[3,0],[0,2],[0,3]], [[2,6,3,11],[4,5,13],[12,8],[15,1]]);   /* rows 3 2 4 2 2 3; chains: Passing Spores > Sticky Pollen > Compost > Seedmother | Moth Swarm > Thick Garden > Rotfeast | Full Bloom > Overripe | Honey Store > Drifting Pods */
 }
 
 /* ================= SIMPLE PASSIVES: IRONHOLD (26 Nov 2026) =================
@@ -63298,20 +63304,20 @@ function ezReword(force, key, name, pairs) {
 ezOpen('ironhold');   /* (first: what each talent needed before is kept for the layout tool) */
 {
   const F = 'ironhold';
-  ezLayout(F, 'glaive', [[2,0],[1,1],[3,3],[0,2],[3,2],[2,2],[5,1],[4,3],[5,2],[4,1],[3,1],[3,0],[5,0],[1,3],[2,1],[0,1],[0,0]], [14,10,9,6]);   /* rows 3 2 3 4 2 3; chain: Hooked Beard > Brace and Shove > Breaker's Blow > Anvil Strike */
-  ezLayout(F, 'arrow', [[0,2],[0,1],[2,2],[5,1],[1,2],[0,3],[3,0],[5,0],[5,2],[2,1],[2,3],[4,3],[4,1],[1,0],[4,2],[4,0],[3,2]], [0,4,2,16]);   /* rows 3 2 3 2 4 3; chain: Concussion Rounds > Rattlegun > Through-Ball > Quick Ramrod */
-  ezLayout(F, 'frost', [[1,3],[0,1],[3,1],[3,2],[1,2],[3,3],[5,0],[5,1],[2,3],[5,2],[2,0],[4,1],[4,2],[3,0],[0,2],[2,1],[4,3],[0,0]], [0,8,5,16]);   /* rows 3 2 3 4 3 3; chain: Weighted Chains > Harpoon Winch > Double Wrap > Trapper's Rhythm */
-  ezLayout(F, 'arcane', [[2,3],[1,0],[0,3],[2,1],[5,2],[4,3],[1,2],[4,0],[5,1],[3,2],[0,2],[3,0],[5,3],[0,1],[4,1],[2,0]], [1,15,11,7]);   /* rows 3 2 3 2 3 3; chain: Deep Brand > Anvil of Ages > Ringing Strokes > Unmaking Blow */
-  ezLayout(F, 'storm', [[4,0],[0,2],[5,2],[2,2],[3,3],[1,2],[3,0],[4,1],[5,3],[5,1],[3,2],[1,0],[2,1],[0,1],[1,3]], [1,5,3,10]);   /* rows 2 3 2 3 2 3; chain: Fast Fuses > Grapnel Shot > Cluster Shell > Second Burst */
-  ezLayout(F, 'earth', [[0,1],[0,2],[2,1],[0,0],[5,1],[1,0],[3,1],[5,2],[5,3],[2,3],[3,2],[4,0],[4,3],[1,3],[4,2],[2,2],[2,0]], [15,10,14,7]);   /* rows 3 2 4 2 3 3; chain: Steam Jacket > Tremor Step > Pressure Gauge > Groundsplitter */
-  ezLayout(F, 'cannon', [[0,1],[1,3],[3,0],[3,2],[1,2],[2,1],[5,0],[4,3],[0,2],[4,1],[3,3],[3,1],[5,1],[5,2],[2,3],[1,0]], [5,11,9,12]);   /* rows 2 3 2 4 2 3; chain: Double Crew > Quake Shell > The Long Drop > Crew Chief's Shout */
-  ezLayout(F, 'venom', [[1,3],[0,1],[0,2],[3,2],[1,1],[3,1],[2,3],[4,3],[3,3],[2,2],[3,0],[4,2],[5,0],[5,2],[5,1],[1,0]], [9,3,11,13]);   /* rows 2 3 2 4 2 3; chain: Tamped Charges > Blasting Wage > Demolition > Sapper's Mate */
-  ezLayout(F, 'champ:ih_thane', [[0,1],[3,0],[1,3],[4,3],[1,1],[2,1],[3,3],[3,1],[5,2],[1,0],[2,2],[5,0],[4,2],[5,1],[0,2]], [0,4,5,7]);   /* rows 2 3 2 3 2 3; chain: Locked Shields > Horn of the Hold > Braced Heels > Shield-Brother */
-  ezLayout(F, 'champ:ih_artificer', [[3,3],[0,2],[1,3],[2,0],[1,0],[2,3],[4,3],[2,2],[4,0],[4,1],[4,2],[5,1],[3,1],[5,2],[0,1],[2,1]], []);   /* rows 2 2 4 2 4 2 */
-  ezLayout(F, 'champ:ih_brewer', [[0,2],[1,1],[1,3],[3,2],[1,2],[2,2],[2,0],[4,3],[5,1],[5,2],[3,1],[3,3],[4,0],[0,1]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Leaky Keg > Firewater Breath > Double Measure > Open Tap */
-  ezLayout(F, 'champ:ih_marksman', [[0,1],[1,0],[1,3],[3,1],[1,1],[2,1],[3,2],[4,3],[5,1],[5,2],[3,3],[2,0],[4,0],[0,2]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Patient Aim > Spotter's Flare > Bright Flare > Wide Flare */
-  ezLayout(F, 'champ:ih_king', [[0,2],[1,1],[2,0],[3,2],[1,2],[2,2],[3,1],[4,3],[5,1],[5,2],[1,3],[3,3],[4,0],[0,1]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Long Muster > Oathhammer > Broad Head > Hall-Breaker */
-  ezLayout(F, 'champ:ih_hrolf', [[0,1],[1,0],[1,3],[3,1],[1,1],[2,1],[2,0],[4,0],[5,1],[5,2],[3,3],[3,2],[4,3],[0,2]], [0,4,5,3]);   /* rows 2 3 2 3 2 2; chain: Ranging Fire > Grudge Shell > Heavy Charge > Grounding Shell */
+  ezLayout(F, 'glaive', [[2,3],[3,1],[3,2],[4,3],[0,1],[2,2],[5,1],[1,1],[5,2],[4,0],[2,0],[4,2],[5,3],[4,1],[0,0],[0,2],[1,3]], [[5,2,11,8],[14,10,9],[4,7]]);   /* rows 3 2 3 2 4 3; chains: Spinning Shield > Hot Hands > Felling Chop > Armourbreaker | Hooked Beard > Brace and Shove > Breaker's Blow | Bowling Shove > Shield Rush */
+  ezLayout(F, 'arrow', [[0,0],[0,1],[2,3],[5,0],[1,3],[1,2],[3,1],[5,1],[5,2],[2,1],[2,0],[4,3],[4,2],[0,2],[3,0],[2,2],[3,2]], [[0,10,14,3],[1,9,6],[4,2]]);   /* rows 3 2 4 3 2 3; chains: Concussion Rounds > Quick Swab > Powder Purse > Called Shot | Range-Finder > Breaching Slug > Both Barrels | Rattlegun > Through-Ball */
+  ezLayout(F, 'frost', [[2,0],[0,2],[3,0],[0,1],[1,1],[3,2],[5,0],[5,2],[2,2],[5,1],[1,3],[4,0],[4,1],[2,3],[4,3],[2,1],[4,2],[0,0]], [[8,5,16,7],[3,4,15],[10,13]]);   /* rows 3 2 4 2 4 3; chains: Harpoon Winch > Double Wrap > Trapper's Rhythm > Trap Hound | Tangle > Tripwire > Two Bolas | Wide Nets > Wing Cords */
+  ezLayout(F, 'arcane', [[2,3],[0,2],[4,3],[0,0],[5,2],[3,1],[1,3],[4,2],[5,0],[2,0],[2,1],[2,2],[5,1],[0,1],[3,0],[1,2]], [[3,9,14,8],[7,4],[1,15,11],[10,5]]);   /* rows 3 2 4 2 2 3; chains: Flying Sparks > Two Brands > Anvil's Due > Forgelord | Unmaking Blow > Anvil Storm | Deep Brand > Anvil of Ages > Ringing Strokes | Glowing Anvil > Hot Iron */
+  ezLayout(F, 'storm', [[1,2],[0,1],[5,1],[2,3],[0,2],[1,3],[2,1],[4,1],[5,3],[5,2],[3,3],[4,0],[3,0],[1,0],[3,2]], [[5,3,10,8],[6,7,2],[4,0]]);   /* rows 2 3 2 3 2 3; chains: Grapnel Shot > Cluster Shell > Second Burst > Hook the Sky | Quick Traverse > Starshell > Proximity Fuse | Sky Shatter > Torn Wings */
+  ezLayout(F, 'earth', [[0,0],[4,1],[4,2],[4,0],[5,1],[1,0],[3,3],[5,2],[5,3],[2,3],[1,1],[2,2],[4,3],[3,0],[2,1],[0,1],[0,2]], [[9,6,12,8],[15,10,14],[16,11],[0,5]]);   /* rows 3 2 3 2 4 3; chains: Steam Uppercut > Building Pressure > Pressure Release > Molten Rivets | Steam Jacket > Tremor Step > Pressure Gauge | Steam Jets > Safety Valve | Packed Crowd > Pile Driver */
+  ezLayout(F, 'cannon', [[0,2],[0,1],[3,2],[2,0],[1,2],[1,3],[5,1],[4,1],[0,0],[4,3],[4,2],[2,3],[5,2],[5,0],[2,1],[3,1]], [[14,15,7,6],[5,11,9],[0,4],[3,13]]);   /* rows 3 2 3 2 3 3; chains: Ringing Ears > Powder Monkey > Big Bertha > Barrage | Double Crew > Quake Shell > The Long Drop | Glowing Casings > Skipping Shell | Pitch-Soaked Wadding > Napalm */
+  ezLayout(F, 'venom', [[1,1],[0,0],[0,1],[4,0],[0,2],[1,3],[2,2],[4,3],[3,3],[2,0],[3,2],[4,1],[5,2],[5,1],[5,3],[2,1]], [[5,8,7,14],[11,13],[4,6,10]]);   /* rows 3 2 3 2 3 3; chains: Two Satchels > Sympathetic Blast > Rubble > Breach and Clear | Demolition > Sapper's Mate | Black Powder Pack > Powder Trail > Sapper at Work */
+  ezLayout(F, 'champ:ih_thane', [[4,0],[0,2],[0,0],[3,2],[1,3],[2,3],[2,2],[3,3],[5,1],[2,1],[1,0],[5,3],[4,1],[5,2],[0,1]], [[4,5,7,11],[9,12,8],[6,3],[2,10]]);   /* rows 3 2 3 2 2 3; chains: Horn of the Hold > Braced Heels > Shield-Brother > Unbroken Line | Shield-Toll > Rising Peaks > Deep Roots | Dented Plate > Thane's Line | Wall of the Clan > War Cry */
+  ezLayout(F, 'champ:ih_artificer', [[0,0],[0,2],[2,2],[0,1],[1,0],[2,1],[3,0],[3,1],[4,3],[4,1],[4,0],[5,2],[3,3],[5,1],[1,3],[3,2]], [[5,7,9,13],[14,12,8],[0,4]]);   /* rows 3 2 2 4 3 2; chains: Stronger Field > Torn Loose > Magnetised > Restless Stone | Ricochet Rivets > Wrecking Ball > Counterweight | Tally Wheel > Lodestone */
+  ezLayout(F, 'champ:ih_brewer', [[0,0],[0,1],[1,0],[4,3],[1,3],[3,3],[2,1],[2,2],[5,1],[5,2],[3,1],[3,0],[4,1],[0,2]], [[6,10,12,8],[4,5,3],[7,9],[0,2]]);   /* rows 3 2 2 3 2 2; chains: Sticky Stout > Last Call > Last Orders > Brimming Keg | Firewater Breath > Double Measure > Open Tap | Scorching Gust > Spilled Pints | Leaky Keg > Heavy Barrel */
+  ezLayout(F, 'champ:ih_marksman', [[0,2],[1,0],[3,2],[3,1],[1,2],[2,1],[1,3],[4,1],[5,2],[5,1],[2,3],[3,0],[4,3],[0,1]], [[5,3,7,9],[6,10,12],[0,4]]);   /* rows 2 3 2 3 2 2; chains: Bright Flare > Wide Flare > Spotter's Tally > Signal Fire | Ridge-Watch > Punch-Through > Headsman's Round | Patient Aim > Spotter's Flare */
+  ezLayout(F, 'champ:ih_king', [[0,2],[1,3],[3,2],[3,1],[1,2],[2,1],[1,0],[4,1],[5,2],[5,1],[2,0],[3,3],[4,0],[0,1]], [[5,3,7,9],[6,10,12],[0,4]]);   /* rows 2 3 2 3 2 2; chains: Broad Head > Hall-Breaker > Kingsblood > The King's Due | Sworn Shield > Crown of Iron > The Mountain's Due | Long Muster > Oathhammer */
+  ezLayout(F, 'champ:ih_hrolf', [[0,2],[1,0],[3,2],[3,1],[1,2],[2,1],[1,3],[4,1],[5,2],[5,1],[2,3],[3,0],[4,3],[0,1]], [[5,3,7,9],[6,10,12],[0,4]]);   /* rows 2 3 2 3 2 2; chains: Heavy Charge > Grounding Shell > Spent Casings > Wing-Breaker | Low Angle > Grudge-Fed > The Old Grudge | Ranging Fire > Grudge Shell */
 }
 
 /* ================= SIMPLE PASSIVES: THE SILVER ORDER (26 Nov 2026) =================
@@ -63394,17 +63400,17 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
    other forces' tree layouts"; tools/open_layout.js silver; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'silver';
-  ezLayout(F, 'glaive', [[0,1],[3,0],[0,2],[2,2],[5,1],[1,3],[1,0],[4,2],[5,3],[5,2],[4,0],[3,2],[1,1],[3,3],[2,1],[3,1]], [3,11,7,9]);   /* rows 2 3 2 4 2 3; chain: Shield of Faith > Unbroken Oath > Oath of Challenge > Ringing Shield */
-  ezLayout(F, 'arrow', [[0,2],[0,1],[5,1],[0,0],[1,2],[4,0],[2,2],[3,3],[5,2],[2,1],[2,0],[1,3],[4,2],[5,0],[4,3],[4,1],[3,2]], [0,4,6,16]);   /* rows 3 2 3 2 4 3; chain: Opening Shot > Flare Bolt > Splinter Bolt > Hot Crank */
-  ezLayout(F, 'frost', [[0,1],[3,1],[0,2],[1,0],[3,2],[1,1],[3,3],[3,0],[2,2],[5,2],[4,0],[5,3],[5,1],[4,3],[1,3],[2,1]], [0,5,15,1]);   /* rows 2 3 2 4 2 3; chain: Tightening Links > Chain of Penance > Taut Chain > Glinting Links */
-  ezLayout(F, 'arcane', [[0,1],[4,0],[2,1],[1,0],[1,1],[3,0],[1,3],[2,2],[5,3],[5,1],[3,3],[4,2],[0,0],[0,2],[1,2],[3,1],[5,2]], [0,4,2,15]);   /* rows 3 4 2 3 2 3; chain: Full Gallop > Tourney Passes > Ride Through > Hot Blood */
-  ezLayout(F, 'storm', [[1,0],[1,1],[3,3],[3,1],[2,2],[5,1],[2,3],[4,2],[5,0],[5,2],[3,2],[4,3],[1,3],[0,2],[0,1],[3,0]], [4,10,7,9]);   /* rows 2 3 2 4 2 3; chain: Prism > Sunburst > Dawnfall > High Noon */
-  ezLayout(F, 'earth', [[4,3],[0,1],[0,0],[3,3],[2,1],[1,1],[3,0],[5,1],[5,2],[2,0],[1,3],[4,2],[4,0],[2,2],[3,2],[0,2],[3,1]], [1,5,4,16]);   /* rows 3 2 3 4 3 2; chain: Twin Rhythm > Whirling Flurry > Opening Cross > Templar's Rhythm */
-  ezLayout(F, 'cannon', [[0,0],[0,2],[5,1],[0,1],[2,0],[1,3],[4,1],[5,2],[5,3],[1,1],[2,1],[3,1],[3,3],[4,2],[2,2],[4,0]], [9,10,11,6]);   /* rows 3 2 3 2 3 3; chain: Hot Coals > Direct Hit > Rekindling > Kindle the Censers */
-  ezLayout(F, 'venom', [[0,2],[0,1],[2,1],[1,0],[1,1],[1,2],[3,0],[1,3],[3,3],[2,2],[4,0],[4,1],[3,2],[5,1],[5,2],[5,3]], [0,5,9,12]);   /* rows 2 4 2 3 2 3; chain: Broken Litany > Writ of Seizure > Leaping Lash > Long Chain */
-  ezLayout(F, 'champ:so_lion', [[0,2],[3,3],[1,0],[4,2],[1,1],[2,1],[3,0],[3,1],[5,2],[5,1],[2,2],[4,3],[5,0],[0,1],[1,3]], [13,4,5,7]);   /* rows 2 3 2 3 2 3; chain: Swift Reprisal > Bulwark Slam > Shields Raised > Rally to the Shield */
-  ezLayout(F, 'champ:so_dawn', [[0,2],[0,0],[1,3],[5,3],[1,2],[2,2],[4,0],[3,2],[3,0],[4,3],[2,0],[5,2],[2,3],[5,1],[0,1],[2,1],[4,1]], [0,4,5,7]);   /* rows 3 2 4 2 3 3; chain: Early Dawn > Prism of Dawn > Lingering Star > Be Still */
-  ezLayout(F, 'champ:so_judge', [[0,2],[0,0],[1,3],[1,2],[5,2],[2,0],[2,2],[5,3],[3,2],[3,3],[5,1],[4,3],[4,0],[2,1],[4,1],[0,1]], [0,3,6,8]);   /* rows 3 2 3 2 3 3; chain: Swift Justice > Debt Collection > Witnesses Called > Trampling Host */
+  ezLayout(F, 'glaive', [[2,2],[3,2],[0,1],[1,3],[5,2],[0,2],[1,0],[4,3],[5,1],[5,0],[4,2],[2,3],[0,0],[4,1],[2,1],[3,0]], [[0,1,10,4],[3,11,7],[12,6]]);   /* rows 3 2 3 2 3 3; chains: Shield-Ward > Braced Shield > Unyielding > Oath Unbroken | Shield of Faith > Unbroken Oath > Oath of Challenge | Pommel Blow > Rampart of Dawn */
+  ezLayout(F, 'arrow', [[0,1],[0,3],[5,3],[0,2],[1,1],[3,3],[3,1],[3,2],[5,2],[2,2],[2,3],[1,0],[4,2],[5,1],[2,0],[4,0],[3,0]], [[9,7,12,8],[0,4,6],[10,5]]);   /* rows 3 2 3 4 2 3; chains: Bear Witness > Mercy Bolt > Loaded Prayer > Squire at Arms | Opening Shot > Flare Bolt > Splinter Bolt | Through and Through > Heavy Quarrel */
+  ezLayout(F, 'frost', [[0,1],[3,2],[0,2],[2,3],[2,0],[1,1],[3,1],[0,0],[4,3],[5,2],[4,0],[5,1],[5,0],[4,2],[1,3],[2,2]], [[15,1,13,9],[0,5],[10,12],[7,4]]);   /* rows 3 2 3 2 3 3; chains: Taut Chain > Glinting Links > Double Lash > Radiant Hands | Tightening Links > Chain of Penance | Vigil Chains > Chain Whirl | Final Lash > Light Rhythm */
+  ezLayout(F, 'arcane', [[0,2],[4,0],[2,2],[1,1],[1,2],[3,3],[1,0],[2,1],[5,0],[5,1],[3,0],[4,3],[1,3],[3,1],[0,1],[0,3],[5,2]], [[6,10,1,8],[0,4,2],[15,12]]);   /* rows 3 4 2 3 2 3; chains: Trampling Hooves > Vow-Lit Lance > Shattered Lance > Thrice-Wheeled | Full Gallop > Tourney Passes > Ride Through | Hot Blood > Unhorse */
+  ezLayout(F, 'storm', [[1,2],[0,0],[3,0],[3,1],[1,3],[5,0],[2,1],[4,3],[5,1],[5,2],[2,3],[4,0],[2,2],[0,2],[0,1],[4,2]], [[1,2,11,5],[4,10,7],[6,3]]);   /* rows 3 2 3 2 3 3; chains: Dawn Rhythm > Little Sun > Noonfire > Lance upon Lance | Prism > Sunburst > Dawnfall | Noon Sweep > Long Ray */
+  ezLayout(F, 'earth', [[3,1],[0,3],[1,2],[1,0],[0,1],[1,3],[3,0],[5,1],[5,2],[2,0],[3,2],[4,3],[4,0],[2,2],[3,3],[0,2],[1,1]], [[4,16,0,7],[9,6,12],[1,5]]);   /* rows 3 4 2 4 2 2; chains: Opening Cross > Templar's Rhythm > Press of Battle > Steel Tempest | Sword of Heaven > Press Forward > Carried Cut | Twin Rhythm > Whirling Flurry */
+  ezLayout(F, 'cannon', [[0,3],[0,1],[5,2],[3,1],[2,1],[0,2],[4,2],[5,1],[5,3],[1,3],[3,3],[2,2],[2,0],[4,0],[1,0],[4,1]], [[4,3,15,7],[6,2],[0,9,10],[14,12]]);   /* rows 3 2 3 2 3 3; chains: Procession of Incense > Skipping Coal > Quick Thurible > Ember Spirit | Kindle the Censers > Coal Shower | Fanned Embers > Hot Coals > Direct Hit | Pall of Smoke > Ash in the Eyes */
+  ezLayout(F, 'venom', [[0,3],[0,2],[2,0],[1,0],[0,1],[1,3],[4,3],[2,2],[3,2],[2,1],[4,0],[4,1],[3,1],[5,0],[5,2],[5,1]], [[9,12,11,15],[10,13],[0,5],[7,8,14]]);   /* rows 3 2 3 2 3 3; chains: Leaping Lash > Long Chain > Zealot's Tithe > Grand Inquest | Heretic's Stake > Penitent's Flurry | Broken Litany > Writ of Seizure | Seal Slam > Shield of Doctrine > Censer of Witness */
+  ezLayout(F, 'champ:so_lion', [[0,2],[1,3],[0,1],[4,1],[1,0],[2,1],[2,2],[3,1],[5,0],[5,2],[3,2],[4,3],[5,1],[0,0],[3,0]], [[5,7,3,12],[1,11],[13,4],[6,10,9]]);   /* rows 3 2 2 3 2 3; chains: Shields Raised > Rally to the Shield > Shield Wall > The Ford Itself | Lowered Shield > The Crossing | Swift Reprisal > Bulwark Slam | Burnished Shields > Unbroken > Debt of Oaths */
+  ezLayout(F, 'champ:so_dawn', [[4,3],[0,1],[0,0],[5,1],[1,2],[2,1],[4,0],[3,1],[3,2],[4,1],[2,3],[5,2],[2,0],[5,3],[0,2],[1,3],[4,2]], [[5,7,9,3],[8,16,11],[2,12],[15,10]]);   /* rows 3 2 3 2 4 3; chains: Lingering Star > Be Still > Blinding Glare > Cloister Wall | Noonday > Noon Bell > Dawnsinger | Dawn Chorus > High Noon | First Light > Radiant Hymn */
+  ezLayout(F, 'champ:so_judge', [[0,3],[0,1],[1,0],[1,3],[5,0],[4,3],[2,3],[5,2],[2,1],[2,2],[5,1],[4,0],[3,1],[2,0],[3,2],[0,2]], [[11,4],[8,12,10],[0,3,6],[9,14]]);   /* rows 3 2 4 2 2 3; chains: The Gavel > Iron Chains | Trampling Host > Riders of the Ford > Grey Justicar | Swift Justice > Debt Collection > Witnesses Called | Clerk’s Quill > Court Fines */
 }
 
 /* ================= SIMPLE PASSIVES: THE STORMBORN (26 Nov 2026) =================
@@ -63504,22 +63510,22 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
    rest of this force's trees follow when the owner approves the Ironhold sample) ---------- */
 {
   const F = 'stormborn';
-  ezLayout(F, 'champ:sb_caller', [[4,1],[0,2],[1,0],[4,3],[1,3],[2,3],[2,1],[3,3],[5,1],[3,0],[5,0],[4,2],[5,2],[0,1],[2,2]], [4,5,7,3]);   /* rows 2 2 3 2 3 3; chain: Thunder Drum > Long Roll > Booming Drum > Drum Circle */
 }
 /* ---------- open trees: each its own shape and one chain (owner, 26 Nov 2026, of the Ironhold sample: "go ahead with the
    other forces' tree layouts"; tools/open_layout.js stormborn; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'stormborn';
-  ezLayout(F, 'glaive', [[0,1],[0,2],[1,3],[5,1],[1,0],[1,1],[5,2],[4,0],[5,3],[3,3],[4,2],[2,2],[2,0],[3,2],[1,2],[3,1]], [11,13,10,6]);   /* rows 2 4 2 3 2 3; chain: Braced Spear > Run Them Through > Stormpin > Storm Wolf */
-  ezLayout(F, 'arrow', [[1,1],[0,1],[1,0],[2,2],[2,3],[5,2],[4,3],[4,2],[5,0],[5,1],[3,0],[3,2],[0,2],[1,3],[3,1]], [3,11,7,5]);   /* rows 2 3 2 3 2 3; chain: Gust Fletching > Hurricane Volley > Skyward Gust > Gale Volley */
-  ezLayout(F, 'frost', [[3,1],[0,1],[1,3],[3,3],[5,1],[0,2],[1,1],[2,0],[5,3],[3,2],[4,0],[4,1],[5,2],[0,0],[1,0],[2,1],[1,2]], [1,6,15,0]);   /* rows 3 4 2 3 2 3; chain: Hard Frost > Black Ice > Skipping Stone > Heavy Hail */
-  ezLayout(F, 'arcane', [[3,3],[0,1],[3,1],[1,2],[2,1],[1,0],[5,1],[5,3],[4,1],[2,2],[3,2],[5,2],[4,0],[0,2],[1,3],[3,0]], [4,2,8,6]);   /* rows 2 3 2 4 2 3; chain: Judgment > Lingering Spirits > Spirit Walk > Ancestors' Blessing */
-  ezLayout(F, 'storm', [[0,2],[0,1],[1,0],[3,3],[2,2],[1,2],[3,0],[5,1],[5,2],[2,0],[5,3],[2,3],[4,1],[2,1],[4,0],[0,3],[3,2]], [0,5,4,16]);   /* rows 3 2 4 3 2 3; chain: Long Fork > Arc Bridge > Backlash > Charged Air */
-  ezLayout(F, 'earth', [[1,3],[1,0],[5,2],[2,1],[1,2],[3,1],[5,1],[4,3],[4,1],[2,3],[3,0],[5,0],[0,1],[1,1],[0,2],[3,2]], [3,5,8,6]);   /* rows 2 4 2 3 2 3; chain: Heavy Stomp > Loose Earth > Sinkhole > Great Stomp */
-  ezLayout(F, 'cannon', [[2,1],[0,2],[5,0],[4,1],[0,1],[3,2],[1,0],[2,2],[5,1],[4,3],[4,2],[1,2],[5,2],[0,3],[2,3],[2,0],[3,0]], [11,7,5,10]);   /* rows 3 2 4 2 3 3; chain: Sky Strike > Skyleap > Storm's End > Twin Bolt */
-  ezLayout(F, 'venom', [[0,1],[0,2],[0,3],[3,2],[1,2],[2,1],[2,3],[4,0],[1,0],[3,1],[4,3],[2,0],[4,1],[5,1],[5,2]], [5,9,12,13]);   /* rows 3 2 3 2 3 2; chain: Charged Harpoons > Skyfall Harpoon > Hunter's Haste > Harpoon Volley */
-  ezLayout(F, 'champ:sb_wind', [[4,1],[0,3],[0,1],[5,1],[1,2],[2,2],[3,2],[2,1],[3,0],[4,3],[1,0],[5,2],[2,0],[0,2],[2,3],[4,0]], [10,12,8,15]);   /* rows 3 2 4 2 3 2; chain: Wind at Her Back > Turn the Road > Long Road Back > Rising Air */
-  ezLayout(F, 'champ:sb_beast', [[2,0],[0,1],[1,3],[3,2],[1,1],[2,1],[3,1],[3,3],[5,1],[5,0],[4,0],[5,2],[4,3],[0,2],[1,2],[1,0]], [1,4,5,6]);   /* rows 2 4 2 3 2 3; chain: Keen Nose > Wolfsong > Heel Biters > Pack Hunger */
+  ezLayout(F, 'glaive', [[0,1],[0,0],[0,2],[5,0],[3,0],[1,0],[5,2],[4,1],[5,1],[4,3],[4,2],[2,2],[2,3],[3,2],[1,3],[2,1]], [[11,13,10,6],[1,5,4],[14,12]]);   /* rows 3 2 3 2 3 3; chains: Braced Spear > Run Them Through > Stormpin > Storm Wolf | Hunting Bond > Scent of Rain > Spear Flurry | Blood on the Fur > Worry the Prey */
+  ezLayout(F, 'arrow', [[1,0],[0,1],[3,1],[1,2],[2,1],[5,3],[3,0],[4,3],[5,2],[5,1],[3,2],[1,3],[2,0],[0,2],[4,1]], [[4,2,14,9],[11,7,5],[13,3]]);   /* rows 2 3 2 3 2 3; chains: Headwind > Tailwind > Carried On > Wind Spirit | Hurricane Volley > Skyward Gust > Gale Volley | Breath of the Gust > Gust Fletching */
+  ezLayout(F, 'frost', [[3,1],[0,0],[3,3],[2,2],[5,0],[0,2],[1,0],[2,3],[5,2],[3,0],[4,1],[3,2],[5,1],[0,1],[1,3],[2,1],[4,3]], [[15,0,10,12],[1,6],[3,11,8]]);   /* rows 3 2 3 4 2 3; chains: Skipping Stone > Heavy Hail > Ice Crust > Hail Shatter | Hard Frost > Black Ice | Hail Spirit > Gathering Storm > Endless Storm */
+  ezLayout(F, 'arcane', [[3,2],[0,3],[1,1],[0,2],[0,1],[1,3],[5,0],[5,2],[4,0],[2,3],[4,3],[5,1],[4,2],[2,0],[2,2],[3,1]], [[14,0,12,7],[1,5,9],[8,6],[4,2]]);   /* rows 3 2 3 2 3 3; chains: Passing Spirit > Restless Dead > Spirit Draw > Spirit Host | Deep Hex > Ancestors' Toll > Restless Ancestor | Spirit Walk > Ancestors' Blessing | Judgment > Lingering Spirits */
+  ezLayout(F, 'storm', [[0,1],[4,1],[0,2],[1,0],[2,3],[1,3],[3,2],[5,1],[5,3],[2,2],[5,2],[2,0],[4,2],[0,0],[4,0],[4,3],[3,1]], [[9,6,12,10],[5,4],[13,3,11]]);   /* rows 3 2 3 2 4 3; chains: Lightning Rod > Double Strike > Spark Familiar > Stormseed | Arc Bridge > Backlash | Grounded Bolt > Charged Rhythm > Split Sky */
+  ezLayout(F, 'earth', [[2,2],[0,0],[5,2],[0,1],[1,3],[1,1],[5,1],[2,0],[4,1],[2,3],[4,0],[5,3],[0,2],[3,2],[4,2],[3,3]], [[0,13,14,2],[8,6],[4,9,15],[3,5]]);   /* rows 3 2 3 2 3 3; chains: Ground Gives Way > Stone Remembers > Earth Rhythm > Mountain's Echo | Sinkhole > Great Stomp | Stonewake > Hard Rhythm > Flying Rocks | Heavy Stomp > Loose Earth */
+  ezLayout(F, 'cannon', [[3,2],[0,0],[5,1],[3,3],[0,2],[3,0],[1,2],[2,0],[5,3],[4,2],[4,0],[2,1],[5,2],[0,1],[3,1],[1,3],[2,3]], [[15,16,3,8],[7,5,10],[4,6]]);   /* rows 3 2 3 4 2 3; chains: Fan Rhythm > Rain Rhythm > Lifted Dance > Thunder Dance | Skyleap > Storm's End > Twin Bolt | Forked Strike > Rain Dance */
+  ezLayout(F, 'venom', [[2,1],[0,3],[0,2],[0,1],[1,3],[1,0],[3,3],[3,2],[3,1],[3,0],[4,2],[2,2],[4,0],[5,1],[5,2]], [[11,7,10,14],[5,9,12],[1,4],[0,8]]);   /* rows 3 2 2 4 2 2; chains: Hard Landing > Long Cast > Skyhunter's Tithe > Master of the Sky | Charged Harpoons > Skyfall Harpoon > Hunter's Haste | Long Cord > Ground Stake | Downwind Haul > Double Harpoon */
+  ezLayout(F, 'champ:sb_caller', [[0,0],[2,1],[3,0],[3,3],[1,2],[2,2],[1,3],[4,2],[5,1],[2,3],[5,3],[4,1],[5,2],[0,2],[0,1]], [[6,9,3,10],[13,4,5],[11,8],[14,1]]);   /* rows 3 2 3 2 2 3; chains: Drenching Storm > Stormsight > Drum Circle > Storm Caller | Gusting Staff > Thunder Drum > Long Roll | Tomorrow's Storm > Two Tomorrows | Crown's Due > Crown of Thunder */
+  ezLayout(F, 'champ:sb_wind', [[2,3],[4,2],[0,0],[5,1],[1,2],[2,0],[3,0],[4,3],[3,1],[4,0],[1,3],[5,2],[2,1],[0,2],[0,1],[4,1]], [[12,8,15,3],[5,6,9],[13,4],[10,0]]);   /* rows 3 2 3 2 4 2; chains: Turn the Road > Long Road Back > Rising Air > Road's End | Wide Gale > Biting Gale > Hard Landing | Whirling Steps > Stoneward Gale | Wind at Her Back > Rain in the Wind */
+  ezLayout(F, 'champ:sb_beast', [[3,2],[0,2],[1,0],[2,0],[1,2],[2,1],[3,1],[2,3],[5,0],[5,1],[4,1],[5,2],[4,3],[4,0],[0,3],[0,1]], [[5,6,10,9],[14,7,12],[2,3],[1,4]]);   /* rows 3 2 3 2 3 3; chains: Heel Biters > Pack Hunger > Spirit Run > Blood Trail | Hunter's Breath > Thunder on the Prey > Thunderbird’s Talons | Long Hunt > Wolf Den | Keen Nose > Wolfsong */
 }
 
 /* ================= SIMPLE PASSIVES: THE WARDBOUND (26 Nov 2026) =================
@@ -63610,17 +63616,17 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
    other forces' tree layouts"; tools/open_layout.js wardbound; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'wardbound';
-  ezLayout(F, 'glaive', [[1,1],[3,1],[1,3],[0,2],[4,0],[0,1],[1,2],[3,3],[2,1],[2,0],[4,1],[1,0],[3,2],[5,1],[5,3],[5,2]], [8,1,10,13]);   /* rows 2 4 2 3 2 3; chain: Hold the Road > Deep Carving > Final Oath > Vowed Blade */
-  ezLayout(F, 'arrow', [[0,1],[3,2],[0,2],[1,3],[1,2],[2,1],[2,3],[1,0],[3,0],[3,3],[4,3],[4,1],[5,2],[5,0],[5,1]], [3,6,9,10]);   /* rows 2 3 2 3 2 3; chain: Long Ricochet > Returning Oath > Quick Hand > Glaive Orbit */
-  ezLayout(F, 'frost', [[0,2],[4,2],[1,3],[0,1],[2,0],[0,0],[1,1],[2,2],[3,0],[2,1],[3,3],[4,3],[3,2],[3,1],[5,2],[5,0],[5,1]], [3,6,9,13]);   /* rows 3 2 3 4 2 3; chain: Bitter Steel > Frostbite > Cleaving Haft > Rime Shards */
-  ezLayout(F, 'arcane', [[1,1],[2,1],[0,3],[0,1],[4,3],[3,0],[1,0],[2,2],[3,1],[0,2],[4,1],[2,3],[4,2],[5,1],[5,0],[5,2]], [1,8,10,13]);   /* rows 3 2 3 2 3 3; chain: Lingering Ink > Reading Glass > Scribe the Road > Endless Script */
-  ezLayout(F, 'storm', [[0,2],[2,1],[0,1],[1,0],[1,2],[0,3],[2,0],[2,2],[4,1],[2,3],[4,0],[3,0],[4,2],[3,3],[5,1],[5,3],[5,2]], [0,4,7]);   /* rows 3 2 4 2 3 3; chain: Couched Lance > Storm Pennant > Double Thrust */
-  ezLayout(F, 'earth', [[0,2],[0,1],[2,1],[1,0],[3,2],[3,1],[1,2],[4,0],[1,3],[2,3],[4,1],[3,0],[3,3],[5,1],[5,3],[5,2]], [2,5,10,13]);   /* rows 2 3 2 4 2 3; chain: Deep Quake > Anvil's Toll > Anvil Stance > Unmoving */
-  ezLayout(F, 'cannon', [[1,3],[0,2],[0,1],[0,0],[4,0],[4,1],[1,2],[2,1],[2,0],[2,2],[3,3],[3,0],[3,2],[3,1],[5,3],[5,1],[5,2]], [1,6,9,12]);   /* rows 3 2 3 4 2 3; chain: Wide Blast > Rune Shot > Quick Crank > Spent Bolt */
-  ezLayout(F, 'venom', [[1,3],[3,2],[0,1],[2,1],[1,0],[0,2],[3,3],[2,2],[4,0],[3,1],[3,0],[1,1],[4,1],[5,2],[5,1],[5,3]], [11,3,9,12]);   /* rows 2 3 2 4 2 3; chain: Censer Swing > Long Blade > Rite of Holding > Smoke Spirit */
-  ezLayout(F, 'champ:wb_varic', [[1,3],[0,2],[0,0],[3,3],[1,2],[2,2],[2,0],[4,1],[5,1],[5,3],[3,2],[5,2],[4,0],[2,1],[0,1]], [1,4,5,10]);   /* rows 3 2 3 2 2 3; chain: Warden's Reach > Hold Fast > Long Vigil > Steady Pace */
-  ezLayout(F, 'champ:wb_aedric', [[2,3],[0,1],[0,2],[3,0],[1,1],[2,1],[1,0],[3,1],[5,0],[5,1],[4,3],[5,2],[4,2],[2,2],[0,3]], [1,4,5,7]);   /* rows 3 2 3 2 2 3; chain: Sunlit Reach > Sun Charge > Sun-Struck Trail > Rallying Cry */
-  ezLayout(F, 'champ:wb_isaura', [[0,2],[3,2],[1,3],[2,1],[1,2],[2,0],[3,1],[3,3],[5,1],[5,3],[4,0],[5,2],[4,1],[1,0],[0,1]], [3,6,12,8]);   /* rows 2 3 2 3 2 3; chain: Witness of Vows > Heavy Vow > Oath Turned > Turned Twice */
+  ezLayout(F, 'glaive', [[0,1],[2,1],[0,3],[0,2],[3,0],[1,0],[1,2],[4,3],[2,3],[3,2],[4,1],[2,0],[4,2],[5,1],[5,2],[5,0]], [[5,11,4,15],[1,10,13],[3,6]]);   /* rows 3 2 3 2 3 3; chains: Oath Kept > Oath of Iron > Unyielding Pace > Second Edge | Deep Carving > Final Oath > Vowed Blade | Oathsworn Cut > Rune Cleave */
+  ezLayout(F, 'arrow', [[2,1],[3,3],[0,2],[1,0],[4,3],[1,3],[2,0],[1,2],[0,1],[3,0],[3,1],[4,2],[5,1],[5,0],[5,2]], [[0,10,12],[11,14],[3,6,9]]);   /* rows 2 3 2 3 2 3; chains: Gilded Edge > Glaive Orbit > Unending Glaive | Warding Glaive > Three Glaives | Long Ricochet > Returning Oath > Quick Hand */
+  ezLayout(F, 'frost', [[0,0],[3,0],[0,2],[0,1],[4,2],[1,2],[1,3],[2,1],[2,0],[2,3],[3,1],[4,3],[4,1],[2,2],[5,1],[5,2],[5,0]], [[7,10,12,14],[8,1,16],[6,9]]);   /* rows 3 2 4 2 3 3; chains: Winter Ward > Biting Cold > Winter's Tithe > Winter Howls | Rimecut > Wide Sweep > Full Circle | Frostbite > Cleaving Haft */
+  ezLayout(F, 'arcane', [[0,3],[1,0],[0,1],[0,2],[4,2],[3,1],[1,2],[3,2],[2,0],[2,3],[4,0],[4,3],[2,1],[5,0],[5,1],[5,2]], [[1,8,10,13],[12,5,14],[3,6]]);   /* rows 3 2 3 2 3 3; chains: Lingering Ink > Reading Glass > Scribe the Road > Endless Script | Flick Through > Spent Ink > Cascade | Deep Script > Detonate */
+  ezLayout(F, 'storm', [[0,1],[4,0],[1,0],[0,2],[1,1],[0,3],[2,0],[2,1],[2,3],[2,2],[4,1],[3,0],[4,2],[3,2],[5,3],[5,1],[5,2]], [[9,13,12,16],[8,14],[0,4,7],[2,6]]);   /* rows 3 2 4 2 3 3; chains: Skyfall > Rider's Rhythm > Storm-Called Lance > Second Thunder | Lightning Lance > Thunder Oath | Couched Lance > Storm Pennant > Double Thrust | Swift Remount > Rider's Tithe */
+  ezLayout(F, 'earth', [[0,2],[0,1],[0,3],[3,0],[4,1],[2,3],[1,1],[4,0],[2,0],[2,1],[4,3],[1,2],[3,2],[5,3],[5,2],[5,1]], [[2,5,10,13],[1,6,9],[0,11]]);   /* rows 3 2 3 2 3 3; chains: Deep Quake > Anvil's Toll > Anvil Stance > Unmoving | Iron Rhythm > Quake Line > Shield Edge | Shield Spirit > Crushing Rim */
+  ezLayout(F, 'cannon', [[0,1],[3,1],[0,2],[2,1],[4,0],[3,0],[1,3],[2,2],[0,0],[2,3],[3,2],[1,0],[3,3],[4,2],[5,2],[5,1],[5,3]], [[7,10,13,14],[8,11],[6,9,12]]);   /* rows 3 2 3 4 2 3; chains: Chain Bolt > Heavy Bolt Ready > Third Crewman > Unbroken Chain | Skewering Bolt > Shrapnel | Rune Shot > Quick Crank > Spent Bolt */
+  ezLayout(F, 'venom', [[1,0],[3,1],[0,2],[1,3],[1,2],[0,1],[3,2],[3,0],[4,2],[3,3],[2,1],[2,0],[4,3],[5,2],[5,1],[5,3]], [[3,9,12,15],[2,4],[10,1,14]]);   /* rows 2 3 2 4 2 3; chains: Long Blade > Rite of Holding > Smoke Spirit > Hallowed Road | Deep Mending > Sworn Vow | Mercy Cut > Urgent Hands > Steadfast Chaplain */
+  ezLayout(F, 'champ:wb_varic', [[2,3],[0,1],[0,2],[3,1],[1,1],[2,0],[1,2],[4,0],[5,2],[5,3],[3,0],[5,1],[4,2],[3,3],[0,0]], [[2,6,12,8],[5,10,7],[1,4],[3,11]]);   /* rows 3 2 2 3 2 3; chains: Wide Ring > Heavy Hand > The Last Gate > The Gate Holds | Long Vigil > Steady Pace > Shared Watch | Warden's Reach > Hold Fast | Shield Brothers > Last Warden */
+  ezLayout(F, 'champ:wb_aedric', [[3,2],[0,0],[0,1],[2,2],[1,0],[2,1],[1,3],[3,1],[5,0],[5,1],[4,1],[5,2],[4,3],[3,0],[0,2]], [[5,7,10,9],[3,0,11],[6,12],[1,4]]);   /* rows 3 2 2 3 2 3; chains: Sun-Struck Trail > Rallying Cry > Hot Blood > Open Road | Into the Fray > Eager Sun > Sun-Sworn | Searing Wheel > Blaze of Glory | Sunlit Reach > Sun Charge */
+  ezLayout(F, 'champ:wb_isaura', [[0,2],[1,3],[1,2],[2,2],[1,0],[2,1],[4,0],[3,1],[5,2],[5,1],[3,3],[5,3],[4,2],[4,1],[0,1]], [[5,7,13,9],[1,10,11],[12,8]]);   /* rows 2 3 2 2 3 3; chains: Tighter Bonds > Shared Vow > Vow's Reckoning > Sworn Road | Silent Vow > Quiet Step > Veiled Oath | Oath Turned > Turned Twice */
 }
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
@@ -98459,30 +98465,83 @@ function gpBounds(t) {
   dlN = n0;
   return (GP_BD[key] = [[-r, 0, -r], [r, Math.min(top, bd[1][1] + .9), r]]);
 }
+/* ---------- the stand and the light, each force's own (owner's design handoff, 26 Nov 2026) ----------
+   The unit stands on a low stone stand in its homeland's make (Ironhold: weathered slate with broken slabs round the edge;
+   the Grove: mossy stone and roots; the Conclave and the Silver Order: pale carved stone; the Stormborn: wind-worn rock; the
+   Wardbound: dark carved stone with a gold band), lit as its painting is: a warm key from the upper left, a cool sky and rim
+   behind, a gentle fill. All of it is set on the sheet's own renderer (GPR) each frame: the battlefield's light is untouched.
+   The stand's top is the ground the unit stands on (y 0), so the unit's own small base sits on it; it turns with the unit. */
+const GP_KEY = (() => { const v = [-.5, 1, .8], l = Math.hypot(...v); return v.map(a => a / l); })();   // (upper left and a little toward the eye, for the sheet's camera)
+const GP_THEME = {
+  ironhold: { stand: 'slate', sun: [1.8, 1.32, .86], sky: [.44, .58, .82], gnd: [.27, .2, .14], rim: .5, fill: .2, bg: [.035, .045, .055] },
+  grove: { stand: 'moss', sun: [1.55, 1.42, .86], sky: [.36, .56, .4], gnd: [.17, .22, .1], rim: .34, fill: .18, bg: [.03, .045, .035] },
+  conclave: { stand: 'pale', tint: [.86, .84, 1], sun: [1.3, 1.2, 1.5], sky: [.5, .46, .88], gnd: [.2, .18, .3], rim: .5, fill: .2, bg: [.04, .04, .06] },
+  silver: { stand: 'pale', sun: [1.75, 1.42, 1], sky: [.5, .6, .82], gnd: [.3, .27, .22], rim: .4, fill: .22, bg: [.045, .05, .055] },
+  stormborn: { stand: 'rock', sun: [1.65, 1.28, .8], sky: [.4, .6, .92], gnd: [.24, .2, .16], rim: .48, fill: .18, bg: [.035, .045, .06] },
+  wardbound: { stand: 'dark', sun: [1.6, 1.3, .72], sky: [.24, .55, .55], gnd: [.12, .14, .14], rim: .45, fill: .16, bg: [.03, .04, .042] },
+};
+const GP_THEME0 = { stand: 'slate', sun: [1.6, 1.25, .9], sky: [.4, .46, .58], gnd: [.25, .2, .14], rim: .3, fill: .16, bg: [.03, .045, .04] };
+const gpTheme = t => (t && t.def && GP_THEME[t.def.force]) || GP_THEME0;
+const GP_STAND_H = .13, GP_STANDS = {};
+// a stand of radius 1 (scaled to the unit as it is drawn), its top at y 0
+function gpStandMesh(kind) {
+  if (GP_STANDS[kind]) return GP_STANDS[kind];
+  const g = new Geo(41 + kind.length * 7), H = GP_STAND_H, tm = new Float32Array(16), rn = g.rnd;
+  const ring = (n, r0, fn) => { for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + rn() * .5; fn(Math.cos(a) * r0, Math.sin(a) * r0, a, k); } };
+  g.jit = .07;
+  if (kind === 'moss') {
+    g.cyl(0, -H, 0, 1.03, .97, H, 11, '#4f4c40', { top: '#465a30', rot: .2 });
+    ring(9, .78, (x, z) => g.ico(x * (.7 + rn() * .4), -.012, z * (.7 + rn() * .4), .1 + rn() * .08, rn() < .5 ? '#4f7a34' : '#628a3c', .25, .28));   // moss on the top
+    ring(6, 1.02, (x, z, a) => g.seg([x * .72, -.02, z * .72], [x * 1.12, -H * 1.05, z * 1.12], .05 + rn() * .03, '#5a4630'));   // roots over the edge
+    ring(5, 1.08, (x, z) => g.ico(x, -H * .8, z, .1 + rn() * .06, '#6a6658', .4, .7));
+  } else if (kind === 'pale') {
+    g.cyl(0, -H, 0, 1.06, 1.04, H * .5, 8, '#8f8a7c', { top: '#9c9788', rot: .39 }); g.cyl(0, -H * .5, 0, .93, .9, H * .5, 8, '#a39d8d', { top: '#b0aa99', rot: .39 });
+    ring(4, 1.05, (x, z, a) => g.with(M4.trs(tm, x, -H * .82, z, -a + rn(), 0, .3, 1), () => g.box(0, 0, 0, .16, .05, .11, '#b0aa9a')));
+  } else if (kind === 'rock') {
+    g.cyl(0, -H, 0, 1.08, .94, H, 7, '#675f53', { top: '#766d5f', rot: .7 });
+    ring(7, 1.02, (x, z) => g.ico(x, -H * .75, z, .13 + rn() * .1, rn() < .5 ? '#6e665a' : '#857b6b', .45, .6));
+    ring(4, .8, (x, z) => g.ico(x, -.01, z, .05 + rn() * .03, '#978d7c', .4, .4));
+  } else if (kind === 'dark') {
+    g.cyl(0, -H, 0, 1.05, 1.03, H * .55, 10, '#2b3032', { top: '#33393b', rot: .1 }); g.cyl(0, -H * .45, 0, .92, .9, H * .45, 10, '#363c3e', { top: '#3d4446', rot: .1 });
+    g.cyl(0, -H * .47, 0, .955, .955, .014, 20, '#c9a24a', { capT: false });   // the gold band
+    ring(5, .7, (x, z) => g.box(x, .002, z, .1, .004, .03, '#3aa39a'));   // teal marks cut in the top
+  } else {   // slate: a low weathered slab, broken slabs and chips round its edge
+    g.cyl(0, -H, 0, 1.02, .98, H, 9, '#434a54', { top: '#525a66', rot: .3 });
+    ring(8, 1.03, (x, z, a) => g.with(M4.trs(tm, x, -H * (.55 + rn() * .3), z, -a + rn() * .8, rn() * .3 - .15, rn() * .5 - .1, 1), () => g.box(0, 0, 0, .2 + rn() * .14, .05 + rn() * .03, .14 + rn() * .1, rn() < .5 ? '#3f4650' : '#565e69')));
+    ring(7, 1.2, (x, z) => g.ico(x * (.9 + rn() * .2), -H * .9, z * (.9 + rn() * .2), .035 + rn() * .035, '#394049', .4, .7));
+  }
+  return (GP_STANDS[kind] = g.finish());
+}
+// the stand's radius for this unit: under its feet and its own base, not as wide as what it holds out
+const gpStandR = t => { const bd = towerBounds(t.type, t.tier); return clamp(Math.max(bd[1][0], bd[1][2], -bd[0][0], -bd[0][2]) * 1.08, .54, .78); };
+const _gpM = new Float32Array(16);
 // the unit, turned to gpAng, into the sheet's canvas (through the icon renderer's path, on a renderer of its own)
 let gpClock = 0, gpClockAt = 0;
 function gpDraw() {
   const cv = document.getElementById('gpCv'), R = gpRenderer(); if (!cv || !R || !gpT) return;
   const keep = IR; IR = R;
   try {
-    const bd = gpBounds(gpT);
+    const bd0 = gpBounds(gpT), TH = gpTheme(gpT), sr = gpStandR(gpT), rr = Math.max(bd0[1][0], sr * 1.14);   // (the frame takes in the stand and its broken edge)
+    const bd = [[-rr, 0, -rr], [rr, bd0[1][1] + GP_STAND_H, rr]];   // (heights from the stand's foot)
+    R.sunDir = GP_KEY; R.sunCol = TH.sun; R.sky = TH.sky; R.gnd = TH.gnd; R.rim = TH.rim; R.fill = TH.fill;
     // framed on its height or its reach round the dais, whichever is larger, not the box's diagonal, so a tall unit fills
     // the stage (owner: show it bigger)
-    const fr = Math.max(bd[1][1] / 2, bd[1][0], bd[1][2]) * 1.08, dg = Math.hypot(bd[1][0] - bd[0][0], bd[1][1] - bd[0][1], bd[1][2] - bd[0][2]) / 2;
+    const fr = Math.max(bd[1][1] / 2, bd[1][0], bd[1][2]) * 1.0, dg = Math.hypot(bd[1][0] - bd[0][0], bd[1][1] - bd[0][1], bd[1][2] - bd[0][2]) / 2;
     // zoomed (the wheel, owner): a smaller box round a point that climbs toward the chest and face as it closes in
     const z = gpZoom, h = bd[1][1], lo = h * .5 / z - h * .12, hi = h - h * .5 / z + h * .12, cy = Math.max(lo, Math.min(hi, h / 2 + h * .24 * Math.min(1, (z - 1) / 2) + h * gpPanY));   /* (gpPanY: dragged up or down, kept on the unit) */
     gpPanY = (cy - h / 2 - h * .24 * Math.min(1, (z - 1) / 2)) / h;
-    const b0 = [bd[0][0] / z, cy - h / 2 / z, bd[0][2] / z], b1 = [bd[1][0] / z, cy + h / 2 / z, bd[1][2] / z], dg2 = Math.hypot(b1[0] - b0[0], b1[1] - b0[1], b1[2] - b0[2]) / 2;
-    frameSubject(b0, b1, .45, .18, .5, fr / z / dg2);
+    const b0 = [bd[0][0] / z, cy - h / 2 / z - GP_STAND_H, bd[0][2] / z], b1 = [bd[1][0] / z, cy + h / 2 / z - GP_STAND_H, bd[1][2] / z], dg2 = Math.hypot(b1[0] - b0[0], b1[1] - b0[1], b1[2] - b0[2]) / 2;
+    frameSubject(b0, b1, .45, .2, .5, fr / z / dg2);
     // the unit lives on the dais (owner: "mageling still doesnt have an idle pose"): the sheet keeps its own clock while the
     // game is paused under it, and a sculpted unit plays its idle on it, looping (UM_SHOW, unitmodels.js); the hand-built
     // ones breathe on vt, so vt follows the same clock while the unit is drawn
     const now = performance.now() / 1000; gpClock += Math.min(.1, Math.max(0, now - (gpClockAt || now))); gpClockAt = now;
     const keepVt = vt; vt = gpClock;
     dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
+    try { const sm = gpStandMesh(TH.stand); M4.trs(_gpM, 0, 0, 0, gpAng, 0, 0, sr, 1, sr); item(sm, _gpM, TH.tint ? { tint: [TH.tint[0], TH.tint[1], TH.tint[2], 1] } : null); } catch (e) { /* the unit without its stand */ }
     try { UM_SHOW = gpClock; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
     finally { UM_SHOW = null; vt = keepVt; }
-    irRender([.03, .045, .04], null);   // (no glow behind the unit: owner, 18 Nov 2026, "remove the fog in the character inventory screen")
+    irRender(TH.bg, null);   // (no glow behind the unit: owner, 18 Nov 2026, "remove the fog in the character inventory screen")
     const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(R.canvas, 0, 0, cv.width, cv.height);
   } catch (e) {} finally { IR = keep; }
 }
@@ -98583,20 +98642,20 @@ function gpStats(t, alt) {
   if (st.bleed) fx.push(() => out.push(gpStat('Bleed', st.bleed, b.bleed, P, 'Of each hit, over 3s')));
   if (st.poison) fx.push(() => out.push(gpStat('Spores', st.poison, b.poison, v => gpF(v) + '/s', 'Spore damage a second on what it strikes')));
   if (st.wound) fx.push(() => txt('Wounds', `${gpF(st.wound)}s`, 'Its hits leave foes Wounded: heals and shields on them are weaker'));
-  if (st.heat) fx.push(() => txt('Heat a strike', P(st.heat), 'Each strike warms its engine; at full heat its next strike vents'));
+  if (st.heat && gpMech(t)) fx.push(() => txt('Heat a strike', P(st.heat), 'Each strike warms its engine; at full heat its next strike vents'));
   for (const p of st.ipr || []) fx.push(() => txt(`Every ${ordN(p.n)} hit`, `${GEAR_BASES[p.id] ? GEAR_BASES[p.id].name + ': ' : ''}${p.kind}`, IPROC[p.kind] ? IPROC[p.kind].say(p.n, p.k) : ''));
   for (const sp in st.itw || {}) { const w = st.itw[sp]; fx.push(() => txt(ipSpell(sp), GEAR_BASES[w.id] ? GEAR_BASES[w.id].text(w.k) : w.kind, 'An item that reshapes this spell')); }
   if (st.auraD) fx.push(() => out.push(gpStat('Aura damage', st.auraD, b.auraD, v => '+' + P(v), 'Damage it lends the units round it')));
   if (st.auraS) fx.push(() => out.push(gpStat('Aura haste', st.auraS, b.auraS, v => '+' + P(v), 'Speed it lends the units round it')));
   if (st.auraR) fx.push(() => out.push(gpStat('Aura radius', st.auraR, b.auraR, gpF, hint('How far its aura reaches', on('aura')))));
-  if (fx.length) { grp('Effects'); for (const f of fx) f(); }
+  if (fx.length) { grp('Effects'); out[out.length - 1] = out[out.length - 1].replace('class="gp-sth"', 'class="gp-sth gp-fxh"'); for (const f of fx) f(); }   // (gp-fxh: the Abilities tab's summary stops here; the Stats tab shows them all)
   return out.filter(Boolean).join('');
 }
 // the mana bar in the Abilities heading: its pool, its income and how it casts, on one line
 function gpMana(t) {
   const kit = abilKit(t); if (!kit) return '';
   const A = abilEnsure(t, kit), m = manaSheet(t, kit), max = abMax(t), cur = A ? A.mana : 0;
-  return `<div class="gp-mana"><div class="gp-mbar"><i id="gpMb" style="width:${Math.round(100 * clamp(cur / max, 0, 1))}%"></i><span id="gpMt">${Math.floor(cur)} / ${max} mana</span></div>
+  return `<div class="gp-mana"><b class="gp-ml">Mana</b><div class="gp-mbar"><i id="gpMb" style="width:${Math.round(100 * clamp(cur / max, 0, 1))}%"></i><span id="gpMt">${Math.floor(cur)} / ${max} mana</span></div>
     <p>+${m.regen}/s${m.hit ? ` · +${m.hit} a strike` : ''} · ${A.mode === 'focus' ? `Focus: ${ABIL[A.focus] ? ABIL[A.focus].name : '—'}` : 'Rotate'}</p></div>`;
 }
 /* A spell's damage as it stands, the row's big figure (its tooltip's "2.3× damage (41)" numbers, read with the unit's live
@@ -98785,9 +98844,12 @@ const gpSock = (s, i) => `<button type="button" class="gp-sock${s.off ? ' off' :
 let gpNxOpen = false;   // (folded unless opened: kept while the sheet redraws)
 // the force's own bar and what a full one does, in this unit's numbers: always shown, under its abilities (owner, 23 Nov
 // 2026: "make it easy to understand what exactly happens when a bar fills up"; "all info should be readily available")
+// has the player taken this unit's force mechanic (the Force tab's capstone)? Until then its words (Heat, Growth, Arcane
+// Charge ...) are not shown: units start plain (owner, 25 Nov 2026)
+const gpMech = t => typeof ftMechShown !== 'function' || !t || !t.def || !t.def.force || ftMechShown(t.def.force);
 function gpGauge(t) {
   let h = '';
-  try { h = (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '') + (typeof ccChargeInfoHTML === 'function' ? ccChargeInfoHTML(t) : '') + (typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : ''); } catch (e) { h = ''; }
+  try { h = (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '') + (typeof ccChargeInfoHTML === 'function' ? ccChargeInfoHTML(t) : '') + (gpMech(t) && typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : ''); } catch (e) { h = ''; }
   return h ? `<div class="gp-gauge">${h}</div>` : '';
 }
 function gpMore(t) {
@@ -98795,33 +98857,91 @@ function gpMore(t) {
   try { h = (t.def.support || typeof milestoneHTML !== 'function' ? '' : milestoneHTML(t.type)) + (typeof upgradeLine === 'function' ? upgradeLine(t) : ''); } catch (e) { h = ''; }
   return h ? `<details class="gp-nx"${gpNxOpen ? ' open' : ''}><summary>Now and next</summary><div class="gp-more">${h}</div></details>` : '';
 }
+/* ---------- the sheet's own parts (owner's design handoff, 26 Nov 2026): the header on the force's painting, the tabs ---------- */
+let gpTab = 'a', gpFocus = null;   // (the tab stays while the sheet redraws; gpFocus: what had the focus before it opened)
+const GP_TABS = [['a', 'Abilities'], ['s', 'Stats'], ['f', 'Effects']];
+const GP_TAB_SVG = { a: '<path d="M3 3l10 10M13 3L3 13M3 3h3M3 3v3M13 3h-3M13 3v3"/>', s: '<path d="M3 13V9M8 13V5M13 13V2"/>', f: '<path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"/>' };
+const GP_KIND_WORD = { melee: 'Melee', polearm: 'Polearm', bow: 'Archer', caster: 'Caster', gun: 'Gunner', blade: 'Blade', hammer: 'Hammer', rider: 'Rider' };
+// the small line over the name: its force, and what kind of unit it is
+function gpEyebrow(t) {
+  const d = t.def, F = typeof FORCES !== 'undefined' && d.force ? FORCES[d.force] : null;
+  let kinds = []; try { kinds = d.champ ? ['Champion'] : d.support ? ['Support'] : typeof unitKinds === 'function' ? unitKinds(d).map(k => GP_KIND_WORD[k] || k).slice(0, 2) : []; } catch (e) { kinds = []; }
+  return [F && F.name, kinds.join(' ')].filter(Boolean).map(gpE).join('<i>/</i>');
+}
+// the force's painting behind the header and the stage (a lazy asset: asked for, shown once it is in)
+const GP_ART = {
+  grove: () => typeof HOMELAND_ART_GROVE_S !== 'undefined' ? HOMELAND_ART_GROVE_S : typeof HOMELAND_ART_GROVE !== 'undefined' ? HOMELAND_ART_GROVE : '',
+  silver: () => typeof HOMELAND_ART_SILVER_S !== 'undefined' ? HOMELAND_ART_SILVER_S : typeof HOMELAND_ART_SILVER !== 'undefined' ? HOMELAND_ART_SILVER : '',
+  conclave: () => typeof HOMELAND_ART_CONCLAVE_S !== 'undefined' ? HOMELAND_ART_CONCLAVE_S : typeof HOMELAND_ART_CONCLAVE !== 'undefined' ? HOMELAND_ART_CONCLAVE : '',
+  ironhold: () => typeof HOMELAND_ART_IRONHOLD_S !== 'undefined' ? HOMELAND_ART_IRONHOLD_S : typeof HOMELAND_ART_IRONHOLD !== 'undefined' ? HOMELAND_ART_IRONHOLD : '',
+  stormborn: () => typeof HOMELAND_ART_STORMBORN_S !== 'undefined' ? HOMELAND_ART_STORMBORN_S : typeof HOMELAND_ART_STORMBORN !== 'undefined' ? HOMELAND_ART_STORMBORN : '',
+  wardbound: () => typeof HOMELAND_ART_WARDBOUND_S !== 'undefined' ? HOMELAND_ART_WARDBOUND_S : typeof HOMELAND_ART_WARDBOUND !== 'undefined' ? HOMELAND_ART_WARDBOUND : '',
+};
+function gpArt(force) {
+  const get = () => { try { return GP_ART[force] ? GP_ART[force]() : ''; } catch (e) { return ''; } };
+  const put = () => { const src = get(); if (src && ovp && ovp.classList.contains('gearp')) ovp.style.setProperty('--gpart', `url(${src})`); return !!src; };
+  if (ovp) ovp.style.setProperty('--gpart', 'none');
+  if (put() || !GP_ART[force] || typeof needAssets !== 'function') return;
+  try { needAssets(['homeland-s:' + force], { low: true }).then(() => { if (gpT && gpT.def.force === force) put(); }).catch(() => {}); } catch (e) { /* the plain header stays */ }
+}
+// the Effects tab: what is on the unit now (its statuses, in plain words), then what each socketed item does
+function gpFxList(t) {
+  let L = []; try { L = typeof bfList === 'function' ? bfList(t, 'unit') : []; } catch (e) { L = []; }
+  const M = typeof FT_MECH !== 'undefined' && t.def.force && !gpMech(t) ? FT_MECH[t.def.force] : null;
+  if (M) L = L.filter(s => !new RegExp(M.re.source, M.re.flags.replace('g', '')).test(s.label + ' ' + s.e.name));   // (its force's mechanic, not taken yet: not named)
+  if (!L.length) return '<p class="gp-none">Nothing is on it right now. Auras, blessings and what foes do to it show here during a wave.</p>';
+  const W = { buff: 'Helps it', debuff: 'Hurts it', trait: 'Its own', state: 'Now' };
+  return L.map(s => { const k = s.kind || s.e.kind; return `<div class="gp-fx ${k}"><b>${gpE(s.label)}</b><small>${W[k] || ''}${s.src ? ' · ' + gpE(s.src) : ''}</small>${s.t > 0 ? `<i>${gpF(s.t)}s</i>` : ''}</div>`; }).join('');
+}
+function gpSetTab(k, focus) {
+  gpTab = k;
+  const side = ovp.querySelector('.gp-side'); if (!side) return;
+  side.dataset.tab = k;
+  for (const b of side.querySelectorAll('.gp-tabs [role=tab]')) { const on = b.dataset.tab === k; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); }
+}
 function openGearPanel(t) {
   if (!t || G.state !== 'play' || !G.towers.includes(t)) return;
+  if (!(typeof ovp !== 'undefined' && ovp && ovp.classList.contains('gearp') && !ov.hidden)) { const a = document.activeElement; gpFocus = a && a !== document.body ? a : null; }   // (given back when the sheet closes)
   gpT = t; gpReturn = null; G.paused = true; G.ghost = null; _scT = -1; t.st = effStats(t);   // (fresh stats: an item may just have gone in or out while the game waits)
   const h = typeof heroOf === 'function' && G.hero ? heroOf() : null, champ = h && G.champ === t.id;
   const S = gpSockets(t), socks = S.rel.concat(S.ch ? [S.ch] : []);
   const acts = typeof towerActs === 'function' ? towerActs(t) : [];
-  showOverlay(`<div class="bg-head"><div class="gp-ttl"><div class="gp-tl"><h2 class="ttl">${gpE(t.def.name)}</h2><b class="gp-tier">${ROMAN[t.tier]}</b></div>
-      <span>Kills ${t.kills || 0} · Dealt ${fmt(t.dmg || 0)}${champ ? ` · <b class="gp-champ">${gpE(h.name)}’s Champion</b>` : ''}</span>${typeof vetInfoHTML === 'function' ? vetInfoHTML(t).replace('<p class="mut vet-row"', '<p class="mut vet-row gp-vet"') : ''}</div>
+  const kit = abilKit(t), tal = typeof TALENTS !== 'undefined' && TALENTS[t.type] && typeof openTalents === 'function' ? TALENTS[t.type].name : '';
+  showOverlay(`<div class="bg-head gp-head"><div class="gp-ttl"><p class="gp-eye">${gpEyebrow(t)}</p><div class="gp-tl"><h2 class="ttl">${gpE(t.def.name)}</h2><b class="gp-tier" title="Tier ${ROMAN[t.tier]}">${ROMAN[t.tier]}</b></div>
+      <div class="gp-rec">${typeof vetInfoHTML === 'function' ? vetInfoHTML(t).replace('<p class="mut vet-row"', '<p class="mut vet-row gp-vet"') : ''}<span>Kills <b>${t.kills || 0}</b><i>·</i>Dealt <b>${fmt(t.dmg || 0)}</b>${champ ? `<i>·</i><b class="gp-champ">${gpE(h.name)}’s Champion</b>` : ''}</span></div></div>
+      ${tal ? `<button type="button" id="gpTal" class="lb-link gp-link" title="Open its talent tree">${gpE(tal)}</button>` : ''}
       <button type="button" class="tx" id="gpClose" aria-label="Close and resume">${X_SVG}</button></div>
     <div class="gp-body" data-kw-noside>
       <div class="gp-doll">
         <div class="gp-col">${S.rel.map((s, i) => gpSock(s, i)).join('')}</div>
-        <div class="gp-stage"><canvas id="gpCv" width="560" height="560" aria-label="${gpE(t.def.name)}, drag to turn"></canvas><small>Drag to turn and move · scroll to zoom</small></div>
+        <div class="gp-stage"><canvas id="gpCv" width="640" height="640" tabindex="0" role="img" aria-label="${gpE(t.def.name)}: drag or use the arrow keys to turn it, plus and minus to zoom, 0 to reset"></canvas>
+          <div class="gp-ctl"><button type="button" data-gz="-1" aria-label="Zoom out">−</button><small>${canHover() ? 'Drag to rotate · scroll to zoom' : 'Drag to rotate'}</small><button type="button" data-gz="1" aria-label="Zoom in">+</button><button type="button" data-gz="0" aria-label="Reset the view">↺</button></div></div>
         <div class="gp-col">${S.ch ? gpSock(S.ch, 3) : ''}${acts.map((it, n) => `<button type="button" class="gp-sock gp-act" data-act="${n}"><canvas width="112" height="112" data-key="${gearKey(it)}"></canvas><small>${gpE(actOf(it).name)}</small></button>`).join('')}</div>
-        <div class="gp-bag"><h3>Bag <small>${canHover() ? 'Drag an item onto a socket, or a socketed one back here' : 'Drag, or tap an item then a socket'}${typeof ilOn === 'function' && ilOn() ? '; onto a row under Gear to infuse it' : ''}</small></h3><div class="gp-bgrid" role="listbox" aria-label="Bag">${gpBagCells(t)}</div></div>
+        <div class="gp-bag"><h3>Bag <small>${canHover() ? 'Drag an item onto a socket, or a socketed one back here' : 'Drag, or tap an item then a socket'}${typeof ilOn === 'function' && ilOn() ? '; onto an item under Effects to infuse it' : ''}</small></h3><div class="gp-bgrid" role="listbox" aria-label="Bag">${gpBagCells(t)}</div></div>
       </div>
-      <div class="gp-side">
-        ${abilKit(t) ? `<div class="gp-abh"><h3>Abilities</h3>${gpMana(t)}</div><div class="gp-abils">${gpAbils(t)}</div>` : ''}${gpGauge(t)}
-        <h3>Stats <small class="gp-pvh"></small></h3><div class="gp-stats">${gpStats(t)}</div>
+      <div class="gp-side" data-tab="${gpTab}">
+        <div class="gp-tabs" role="tablist" aria-label="${gpE(t.def.name)}">${GP_TABS.map(([k, n]) => `<button type="button" role="tab" id="gpTab_${k}" data-tab="${k}" aria-controls="gpSec_${k}" aria-selected="${k === gpTab}" tabindex="${k === gpTab ? 0 : -1}"><svg viewBox="0 0 16 16" aria-hidden="true">${GP_TAB_SVG[k]}</svg>${n}</button>`).join('')}</div>
+        <section class="gp-sec gp-sa" id="gpSec_a" role="tabpanel" aria-labelledby="gpTab_a">
+          ${kit ? `<div class="gp-abh"><h3 class="gp-vh">Abilities</h3>${gpMana(t)}</div><div class="gp-abils">${gpAbils(t)}</div>` : '<p class="gp-none">It has no spells: it fights with its strikes alone.</p>'}${gpGauge(t)}
+        </section>
+        <section class="gp-sec gp-ss" id="gpSec_s" role="tabpanel" aria-labelledby="gpTab_s">
+          <h3>Stats <small class="gp-pvh"></small></h3><div class="gp-stats">${gpStats(t)}</div>
+        </section>
         ${gpMore(t)}
-        <div class="gp-gear" hidden>${gpGearList(t)}</div>
+        <section class="gp-sec gp-sf" id="gpSec_f" role="tabpanel" aria-labelledby="gpTab_f">
+          <h3>On it now</h3><div class="gp-fxl">${gpFxList(t)}</div>
+          <h3>Its items</h3><div class="gp-gear">${gpGearList(t)}</div>
+        </section>
       </div>
     </div>`, 'gearp');
+  gpArt(t.def.force);
+  { const tabs = ovp.querySelector('.gp-tabs');
+    tabs.onclick = e => { const b = e.target.closest('[role=tab]'); if (b && b.dataset.tab !== gpTab) { sfx('click'); gpSetTab(b.dataset.tab); } };
+    tabs.onkeydown = e => { const i = GP_TABS.findIndex(x => x[0] === gpTab), n = GP_TABS.length, j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1; if (j < 0) return; e.preventDefault(); gpSetTab(GP_TABS[j][0], true); }; }
+  if ($('#gpTal')) $('#gpTal').onclick = () => { sfx('click'); gpT = null; openTalents(t.type); };
   for (const c of ovp.querySelectorAll('canvas[data-key]')) iconPaint(c, c.dataset.key);
   { const nx = ovp.querySelector('.gp-nx'); if (nx) nx.ontoggle = () => { gpNxOpen = nx.open; }; }
-  $('#gpClose').onclick = () => { sfx('click'); gpT = null; resumeGame(); };
-  { const gb = ovp.querySelector('.gp-body'); if (gb) { gb.style.height = gb.getBoundingClientRect().height + 'px'; gb.style.flex = 'none'; } }   // (pinned: a preview that adds rows scrolls the sheet, it does not re-centre the panel and move the bag under the cursor)
+  $('#gpClose').onclick = () => { sfx('click'); gpT = null; resumeGame(); const f = gpFocus; gpFocus = null; if (f && f.isConnected && f.focus) try { f.focus({ preventScroll: true }); } catch (e) { /* it is gone */ } };
   const sockTap = gpWire(t, socks);   // the bag on the sheet: drag and drop, pick and place, the preview
   for (const b of ovp.querySelectorAll('.gp-sock[data-i]')) b.onclick = () => { if (sockTap && sockTap(b)) return; const s = socks[+b.dataset.i]; if (s && s.open) { sfx('click'); s.open(); } else if (s && s.tip) onToast(s.tip); };
   for (const b of ovp.querySelectorAll('.gp-learn')) b.onclick = () => { if (spLearn(t, b.dataset.learn, true)) openGearPanel(t); };
@@ -98845,6 +98965,10 @@ function openGearPanel(t) {
   // the wheel zooms in on the unit (up to 3x, toward its chest and face); a double click puts it back
   cv.onwheel = e => { e.preventDefault(); gpZoom = Math.max(1, Math.min(3, gpZoom * Math.pow(1.0015, -e.deltaY))); };
   cv.ondblclick = () => { gpZoom = 1; gpPanY = 0; };
+  // the same by keys and by buttons: the arrows turn and move it, + and - zoom, 0 puts it back
+  const zoomBy = k => { gpZoom = k ? Math.max(1, Math.min(3, gpZoom * (k > 0 ? 1.25 : .8))) : 1; if (!k) { gpPanY = 0; gpAng = .5; } };
+  cv.onkeydown = e => { const k = e.key; if (k === 'ArrowLeft' || k === 'ArrowRight') gpAng += k === 'ArrowLeft' ? -.2 : .2; else if (k === 'ArrowUp' || k === 'ArrowDown') gpPanY += (k === 'ArrowUp' ? .06 : -.06) / gpZoom; else if (k === '+' || k === '=') zoomBy(1); else if (k === '-' || k === '_') zoomBy(-1); else if (k === '0') zoomBy(0); else return; e.preventDefault(); e.stopPropagation(); };
+  for (const b of ovp.querySelectorAll('.gp-ctl [data-gz]')) b.onclick = () => zoomBy(+b.dataset.gz);
   gpSpin = false; gpZoom = 1; gpPanY = 0; if (!gpRaf) gpRaf = requestAnimationFrame(gpLoop);
 }
 // live while open: the mana bar and each ability's recharge (a dark clock wipe, as on the card)
@@ -137409,7 +137533,7 @@ function spellAreaAudit(o) {
    40 bones x 3-6 small rotations a unit. Anchors the unit wrote for effects this frame (t.tipW ...) are not moved: the
    layer keeps clear of the hands while a strike or a cast plays. Off: ?react=0, or UNITREACT.on = false.
    Console: UNITREACT.cheer() (every unit cheers now), UNITREACT.flinch(k) (the selected or every unit), UNITREACT.kinds(). */
-const RX_OWN_HIT = new Set(['ch_morrow', 'ch_brannoc', 'cc_golemwarden', 'censer', 'sb_clouddancer', 'sb_earthbinder', 'flakgunner', 'grailknight', 'sb_hailshaman', 'ch_hrolf', 'lightbinder', 'oathsworn', 'silverbolt', 'sb_spiritwalker', 'staglancer', 'sunlance', 'templar', 'sb_thundercaller', 'ch_torvald', 'sb_windrunner', 'sb_wolfguard']);
+const RX_OWN_HIT = new Set(['ch_morrow', 'ch_brannoc', 'cc_golemwarden', 'censer', 'sb_clouddancer', 'sb_earthbinder', 'flakgunner', 'grailknight', 'sb_hailshaman', 'ch_hrolf', 'lightbinder', 'oathsworn', 'silverbolt', 'sb_spiritwalker', 'staglancer', 'sunlance', 'templar', 'sb_thundercaller', 'ch_torvald', 'sb_windrunner', 'sb_wolfguard', 'wb_maskedwarden']);
 const RX_OWN_WOUND = new Set([...RX_OWN_HIT, 'ch_nyssa', 'cc_pyroclast', 'seedcaster']);
 // units whose model plays its own baked clip when a legendary fires (a `leg` clip, read from t.rxCue): the cue's pose is left to it
 const RX_OWN_LEG = new Set(['oathsworn', 'silverbolt', 'lightbinder', 'grailknight', 'sunlance', 'templar', 'censer']);
@@ -140787,6 +140911,279 @@ const MR2 = (() => {
     }
   });
   return { S, CL, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
+})();
+
+/* The Glaive Wardens (wb_maskedwarden) on a rig and clips made from scratch (the owner, 26 Nov 2026: "Glaive Warden - 3D":
+   the horned, masked warden in bronze-gold plate and her round glaive, un-rigged; a glaive in each fist, as the owner's
+   "Glaive Warden - Round Glaives.glb"). tools/make_gv.py -> src/model_gv2.js: 30 bones (her hair and the cape's fall on two
+   of their own, the sashes on two, a bone for the glaive in each fist), 13,886 triangles on one 1024 x 1536 atlas, 11 clips
+   baked at 30 frames a second. ON by default in place of her code-built body (forces_wardbound_f.js: FORCE_BUILD and
+   FORCE_PARTS wb_maskedwarden); ?gv=old (or the Model Lab's "Glaive Warden rig" row set to Old) draws that.
+   Her moves, by the game's own cues (nothing in the game is changed):
+     idle      no foe in reach: at ease, a glaive hanging at each side, the rings tipped forward
+     ready     a foe in reach: the left foot forward, both glaives held flat before her, the right cocked at her hip
+     throwR/L  her strike (FORCE_ATTACK.wbArrow throws a glaive, flight k 'rglaive'): a flat backhand, wound across to the
+               other hip and whipped out at the foe; begun early so it leaves her hand on the game's throw (frame 8), paced
+               to the strikes' own interval. The right hand throws; while the right glaive is still out, the left does
+     catchR/L  that glaive's flight ends (it is home): the arm reaches out and draws it back into her guard
+     volley    Ricochet Rite (wb_runevolley): coiled away with the right glaive high behind her shoulder through the cast
+               (A.cast, stretched to its time), then a high sidearm heave that leaves her hand 0.32 s after it (WBC.volley.at)
+     oath      Returning Oath (wb_piercingshaft): crouched and coiled with the left glaive drawn flat across her chest, then a
+               level backhand straight down the line 0.35 s after the cast (WBC.pierce.at), a step in with the left foot
+     ward      Warding Glaive (wb_wardarrow): the left glaive swung up high behind her through the cast, hurled down into the
+               road as it lands (it stands there, drawn by the game: forces_wardbound_g.js wbgStanding); she draws it again
+     hit       her health drops: rocked back, the glaives flung wide
+     death     wounded (t.wounded): staggered, down on her right knee, the glaives set on their rims beside her; up again whole
+   A glaive is hidden in her fist while it flies: each of the game's glaive flights (wbS().P, k 'rglaive' / 'rglaiveL') from
+   her is marked with the hand that threw it, and that hand is empty until the flight ends.
+   Her size is the shared rule (unitmodels_size.js); she stands on the Wardbound's flagstone (wbBase). The sculpted body is
+   one look at every tier; she grows by UM_TIER.
+   Checks: `python -I tools/make_gv.py --check`. Notes: docs/model_pilot/glaivewarden2.md. */
+const GV2 = (() => {
+  const U = 'wb_maskedwarden', NAMES = ['idle', 'ready', 'throwR', 'throwL', 'catchR', 'catchL', 'volley', 'oath', 'ward', 'hit', 'death'];
+  const MV = { wb_runevolley: 'volley', wb_piercingshaft: 'oath', wb_wardarrow: 'ward' };
+  const HAND = { volley: 'R', oath: 'L', ward: 'L' };
+  const EASE = .2, SPD_THROW = 1.1, BASE_H = .047, OUT_MAX = 4;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]gv=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .872, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'gv2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('gv2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'glvL', 'glvR', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('gv2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['gripL', 'ctrL', 'gripR', 'ctrR']) if (!mk || !mk[nm]) throw new Error('gv2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('gv2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('gv2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('gv2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.05, -.9]; m.max = [.9, 1.5, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('GV2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'gv2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* her glaives in flight: each of the game's glaive flights from her, marked with the hand that threw it (the hand her
+     clip names as it leaves); a hand is empty while its flight lasts */
+  const flights = () => { try { return typeof wbS === 'function' ? wbS().P : null; } catch (e) { return null; } };
+  function mark(t, now) {
+    const P = flights(); if (!P) return;
+    for (const p of P) if (p && p.t === t && !p._gvHand && (p.k === 'rglaive' || p.k === 'rglaiveL')) { p._gvHand = t._gvNext || 'R'; p._gvAt = now; }
+  }
+  function outNow(t, now) {
+    const o = { L: false, R: false }, P = flights(); if (!P) return o;
+    for (const p of P) if (p && p.t === t && p._gvHand && !p.done && now - p._gvAt < OUT_MAX) o[p._gvHand] = true;
+    return o;
+  }
+
+  /* what she does now: { c: clip, s: seconds into it, rate, mv } */
+  const hitOf = c => (CL[c] && CL[c].hit != null ? CL[c].hit : 8) / 30;
+  function ctl(t, live, out) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
+    if (t.hp != null) { if (t._gvHp != null && t.hp < t._gvHp - 1e-6 && !t.wounded) t._gvHitAt = now; t._gvHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
+    if (t._gvMv === 'death') t._gvRise = now;
+    const rise = t._gvRise != null && now - t._gvRise < .9;
+    // (her glaives home: a catch for each hand whose flight has ended)
+    for (const h of 'LR') { if (t['_gvOut' + h] && !out[h]) t['_gvCatch' + h] = now; t['_gvOut' + h] = out[h]; }
+    // a spell: its wind-up through the cast (stretched to the cast's own time), then its release on the game's own beat
+    const own = () => { t._gvShots = t.shots; };
+    const C = A && A.cast;
+    if (C && MV[C.id] && CL[MV[C.id]]) {
+      const m = MV[C.id], c = CL[m], win = (c.win || 15) / 30, T = Math.max(.05, C.T || (C.end - C.at) || win);
+      t._gvNext = HAND[m]; t._gvCastEnd = C.end != null ? C.end : C.at + T; own();
+      return { c: m, s: Math.min(win, (now - C.at) / T * win), rate: 40, mv: 'cast' + C.at };
+    }
+    if (A && A.last && A.lastAt != null && now >= A.lastAt && MV[A.last]) {
+      // (after a cast she was seen winding up through: on from the wind-up's end. An instant cast (cast times are off,
+      // forces_zz_casttimes.js CAST_UNITS): the wind-up played quicker, between the cast and the game's release, so
+      // the glaive still leaves her hand on it; Warding Glaive, which lands at the cast, from just before its hurl)
+      const m = MV[A.last], c = CL[m], win = (c.win || 15) / 30, rel = Math.max(0, ((c.hit != null ? c.hit : c.win) - c.win) / 30), u = now - A.lastAt;
+      const seen = t._gvCastEnd != null && Math.abs(t._gvCastEnd - A.lastAt) < .25;
+      const s = seen ? win + u : rel > .05 ? (u < rel ? u * (win + rel) / rel : win + u) : Math.max(0, win - 6 / 30) + u;
+      if (c && s < c.len) { t._gvNext = HAND[m]; own(); return { c: m, s, rate: 40, mv: seen ? t._gvMv : 'ab' + A.lastAt }; }
+    }
+    // her strikes: each new one counted; thrown by the right hand, or the left while the right glaive is out
+    if (t.shots && t._gvShots !== t.shots) {
+      const at = now - (t.shotT || 0);
+      if (t._gvAt != null && at > t._gvAt && at - t._gvAt < 2.5) t._gvIv = at - t._gvAt;
+      if (t._gvPre == null) t._gvThrow = out.R && !out.L ? 'throwL' : 'throwR';
+      t._gvAt = at; t._gvShots = t.shots; t._gvPre = null; t._gvNext = t._gvThrow === 'throwL' ? 'L' : 'R';
+    }
+    const spd = t._gvIv ? Math.min(2.2, Math.max(1, CL.throwR.len / t._gvIv)) : SPD_THROW;
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t._gvAt != null ? now - t._gvAt : 9;
+    const last = t._gvThrow, lh = last ? hitOf(last) : 0, inThrow = last && t._gvAt != null && s >= 0 && s < (CL[last].len - lh) / spd;
+    if (fight && !inThrow) {
+      const cd = t.cd || 0, HIT = hitOf('throwR');
+      if ((t.windup || 0) > 0 && cd < HIT / spd) {   // (begun: the glaive leaves her hand on the game's throw)
+        if (t._gvPre == null) { t._gvPre = now; t._gvThrow = out.R && !out.L ? 'throwL' : 'throwR'; }
+        t._gvNext = t._gvThrow === 'throwL' ? 'L' : 'R';
+        return { c: t._gvThrow, s: HIT - cd * spd, rate: 40, mv: 'pre' + t._gvPre };
+      }
+    }
+    if (inThrow) return { c: last, s: lh + s * spd, rate: 40, mv: t._gvPre != null ? 'pre' + t._gvPre : last + t._gvAt };
+    const h = t._gvHitAt != null ? now - t._gvHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._gvHitAt };
+    for (const hd of 'RL') { const k = t['_gvCatch' + hd], u = k != null ? now - k : 9; if (u >= 0 && u < CL['catch' + hd].len) return { c: 'catch' + hd, s: u, rate: 30, mv: 'catch' + hd + k }; }
+    if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  // is the glaive in this hand out of it now (in flight, or planted by Warding Glaive in its clip)?
+  function hidden(t, P, out, hd) {
+    if (out[hd]) return true;
+    const c = CL[P.c], o = c && c.out; if (!o || o[0] !== hd) return false;
+    const f = P.s * 30; if (f < o[1]) return false;
+    if (o[2] >= 0) return f < o[2];
+    return P.s - o[1] / 30 < .3;   // (the throw itself, before its flight is marked)
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._gvDrawn != null && typeof G !== 'undefined' && G && G.time - t._gvDrawn < .3 && G.time >= t._gvDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), x = t.x, z = t.y, yaw = t.ang == null ? 0 : t.ang;
+    // the Wardbound's flagstone under her (the code-built body's own, wbBase), and she stands on it
+    const bm = typeof wbBase === 'function' ? dynMesh('gv_base', g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => wbBase(g)))) : null;
+    M4.trs(_a, x, 0, z, yaw + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const now = live ? G.time : 0;
+    if (live) mark(t, now);
+    const out = live ? outNow(t, now) : { L: false, R: false };
+    const P = ctl(t, live, out); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const dt = t._gvT == null ? 1 : Math.max(0, Math.min(.1, now - t._gvT)); t._gvT = now;
+      if (!t._gvP || t._gvP.q.length !== NB * 4) { t._gvP = newPose(); t._gvP.q.set(PT.q); t._gvP.t.set(PT.t); }
+      if (P.mv !== t._gvMv) { t._gvMv = P.mv; t._gvSw = now; }
+      const k = now - t._gvSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._gvP, PT, k); pose = t._gvP;
+    }
+    toBones(pose, OUT);
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    const gl = live ? w(BI.glvL, MK.ctrL) : null, gr = live ? w(BI.glvR, MK.ctrR) : null;
+    for (const hd of 'LR') if (live && hidden(t, P, out, hd)) {   // (that glaive is out of her hand: its bone collapsed to her fist, so its triangles draw nothing)
+      const b = BI['glv' + hd], g = b * 12, q = at(OUT, b, MK['grip' + hd]);
+      for (let k = 0; k < 12; k++) OUT[g + k] = 0; OUT[g + 3] = q[0]; OUT[g + 7] = q[1]; OUT[g + 11] = q[2];
+    }
+    const it = item(MESH_, _c, opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    if (live) {
+      const hd = t._gvNext === 'L' ? gl : gr;   // (the glaive about to fly: the game's tip for its spark and glow)
+      t.tipW = hd; t.tipYaw = yaw; t.tipAt = G.time; t._gvDrawn = G.time; t._gvClip = P.c; t._gvClipS = P.s; t._gvGL = gl; t._gvGR = gr;
+    }
+    return true;
+  }
+  /* the Model Lab's row: her code-built body or the new rig */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('gv2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'gv2Row';
+    box.innerHTML = '<h3>Glaive Warden rig</h3><div class="row">' + `<button data-g2="0" class="${S.on ? '' : 'on'}" title="Her code-built body (?gv=old)">Old (code-built)</button><button data-g2="1" class="${S.on ? 'on' : ''}" title="The rig and clips made from scratch (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-g2]')) x.onclick = () => { S.on = x.dataset.g2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, glaiveL: t._gvGL, glaiveR: t._gvGR, clip: t._gvClip, at: t._gvDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_gv2', () => {
+    try { load(typeof GV2_MDL !== 'undefined' ? GV2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Glaive Warden rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('gv2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    // (the code-built glaive's wind-up glow is left out while she is drawn: her own glaive is in her hand)
+    if (MESH_ && typeof wbPartAt === 'function') {
+      const _pa = wbPartAt;
+      wbPartAt = function (t, k) { if (k === 'glaivehand' && mine(t)) return null; return _pa.apply(this, arguments); };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'gv2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('gv2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
 
 /* ================= When the game asks for its lazy asset groups (src/lazyassets.js) =================
