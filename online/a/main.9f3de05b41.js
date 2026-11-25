@@ -1,4 +1,4 @@
-const BUILD_TAG = '6158a79c@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'c12345b7@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -64341,6 +64341,31 @@ const AudioSys = (() => {
       fm(t + .42, { f: mf(98) * p, r: 3.01, i: .6, d: 1, a: .15, vib: [9, 15], v: .05, hall: .45 });
       fm(t + .42, { f: mf(98) * p * 1.006, r: 3.01, i: .6, d: .9, a: .2, vib: [8, 15], v: .045, pan: .5, hall: .45 });
     },
+    // the Forge (region_forge.js), all low: an item broken on the anvil (a dull crack and a scatter of grit), a hammer on the
+    // anvil (a deep strike and a short low ring), and the new item coming out of the glow (a low swell, then a warm chord
+    // that sits higher a rarity, never bright)
+    forgeBreak(rar) {
+      if (!ok('fgb', .1, 999)) return; const t = now(), r = lim(rar | 0, 0, 4);
+      crack(t, rnd(700, 900), .55, { room: .25 });
+      thump(t + .02, 120, 45, .25, .5, { drive: 1.4, room: .25 });
+      nhit(t + .02, { n: 'b', type: 'lowpass', fp: [[0, 1100], [.35, 180]], pts: [[.005, 1], [.45, 0]], v: .4, room: .25 });
+      train(debris(t + .05, 10 + 2 * r, .55, 260, 700), { type: 'bandpass', q: 3, d: .025, v: .35, room: .25 });
+      [57, 60, 64].forEach((m, i) => fm(t + .12 + i * .06, { f: mf(m + r), r: 2.76, i: .6, d: .45, v: .035, pan: sp(.4), hall: .35 }));
+    },
+    forgeHit(big) {
+      if (!ok('fgh', .08, 999)) return; const t = now(), B = big ? 1 : 0;
+      thump(t, 105, 38, .3 + .1 * B, .6 + .15 * B, { drive: 1.8, room: .25 });
+      nhit(t, { n: 'p', type: 'lowpass', fp: [[0, 1600], [.2, 300]], pts: [[.003, 1], [.25, 0]], v: .35, room: .2 });
+      bell(t, mf(45), [[1, 1, .9], [2.32, .4, .5], [3.7, .18, .25]], .07 + .02 * B, { room: .25, hall: .3 });
+      train(debris(t + .01, 8, .3, 900, 1600), { type: 'bandpass', q: 2, d: .006, v: .12, room: .2 });
+    },
+    forgeRise(rar) {
+      if (!ok('fgr', .3, 999)) return; const t = now(), r = lim(rar | 0, 0, 4);
+      nhit(t, { n: 'b', type: 'lowpass', fp: [[0, 160], [.55, 700]], pts: [[.5, .55], [.62, 0]], v: .3, room: .2 });
+      thump(t + .58, 90, 40, .35, .45, { room: .3 });
+      const root = 45 + r * 2;
+      [0, 7, 12].forEach((d, i) => fm(t + .58 + i * .03, { f: mf(root + d), r: 2, i: .7, i2: .2, d: 1.3, a: .02, v: .055, pan: -.3 + i * .3, hall: .5 }));
+    },
     sell() {
       if (!ok('sell', .12, 999)) return; const t = now();
       let tt = t; const n = 6 + (Math.random() * 3 | 0);
@@ -124082,6 +124107,498 @@ function rgBossTick(dt) {
     const was = !c.dead, r = _kill.apply(this, arguments);
     if (was && G.region && c.rgBoss && c.hxSplit && !c.splitCopy && G.state === 'play' && typeof huntSplit === 'function') huntSplit(c);
     return r;
+  };
+}
+
+/* ================= THE FORGE (Homeland): break items down into shards, make new ones =================
+   Owner, 25 Nov 2026: "think we need more ways to spend renown, maybe add the ability to deconstruct items and turn them into
+   new ones. use renown and gold"; then "make a really nice animation and ui as well".
+   Three works, all on the bag's relics and charms (never a tome, a shop item or a weapon):
+     Break down  an item -> shards (FORGE.brk.sh by rarity) and a little gold (FORGE.brk.gold, plus half the gold spent raising its
+                 Item Level, as salvage gave). In a Homeland battle it is the bag's Salvage button.
+     Reforge     an item + shards + gold -> a new item of the same rarity, made for the unit the player picks (a relic made for
+                 that unit, or one any unit can use; or a charm). Not a legendary.
+     Combine     three items of one rarity + shards + gold + Renown -> one of the next rarity, for the unit the player picks.
+                 Never a legendary: legendaries stay the spoils of battles and bosses (a forge path to a chosen legendary would
+                 make every place's legendary chance moot).
+   The new item keeps the highest Item Level it was made from (no free levels) and is weighted away from what the bag holds.
+   Where: the region map (the war chest's gold, the warband's Renown and bag; button under the host's panel), and in a Homeland
+   battle from the bag (the battle's gold, Renown and bag). Shards: R.shards on the region state; a battle carries them as
+   G.region.shards (saved with it) and hands them back at its end (rgEnd).
+   Later (designed for, not built): reroll one stat line (gold + 1 Renown); move a passive from one item to another (3 Renown,
+   the donor used up). Both would be more tabs here, on the same anvil and the same sequence.
+   Check: node tools/check_forge.js -v (costs, a route's shards, every work, saves). */
+
+const FORGE = {
+  brk: { sh: [1, 1, 2, 5, 12], gold: [3, 6, 10, 20, 35] },                                  // by rarity (salvage paid 8/16/30/55/100)
+  ref: [{ sh: 1, gold: 10 }, { sh: 2, gold: 15 }, { sh: 4, gold: 30 }, { sh: 10, gold: 70 }, null],   // by rarity; no legendary
+  comb: [{ sh: 1, gold: 10, rn: 1 }, { sh: 2, gold: 20, rn: 1 }, { sh: 6, gold: 60, rn: 2 }, null, null],   // by the three's rarity
+  own: .25,    // a kind already in the bag is this much less likely
+  kit: 3,      // a relic made for the picked unit, against one any unit can use
+};
+const fgOn = () => typeof rgOn !== 'function' || rgOn();
+const fgEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const fgRarN = r => (RARITY[r] && RARITY[r].name) || '';
+const fgCol = r => (RARITY[r] && RARITY[r].col) || '#ccc';
+const fgOk = it => !!it && !it.tome && !it.shop && !it.wpn && !!RARITY[it.rar] && !!(it.base || it.leg);
+// what breaking it down pays
+function fgBrk(it) {
+  const r = it.rar | 0, up = typeof IL !== 'undefined' && it.upg ? Math.floor(IL.salvage * it.upg) : 0;
+  return { sh: FORGE.brk.sh[r] | 0, gold: (it.paid ? Math.max(FORGE.brk.gold[r], Math.floor(it.paid / 2)) : FORGE.brk.gold[r]) + up };
+}
+
+/* ---- where the forge works: the region map, or a Homeland battle ---- */
+function fgMapCtx(R) {
+  const B = R.band;
+  return { map: true, R, force: R.force, hero: R.hero, list: () => B.loot,
+    gold: () => R.chest | 0, addGold: g => { R.chest = Math.max(0, (R.chest | 0) + g); }, goldWord: 'war chest',
+    rn: () => (B.rn | 0) + (R.rnBank | 0), rnLive: true,
+    payRn: n => { const a = Math.min(n, R.rnBank | 0); R.rnBank = (R.rnBank | 0) - a; B.rn = Math.max(0, (B.rn | 0) - (n - a)); },
+    shards: () => R.shards | 0, addShards: n => { R.shards = Math.max(0, (R.shards | 0) + n); },
+    uid: () => { B.gearUid = Math.max(B.gearUid | 0, ...B.loot.map(i => i.id | 0)) + 1; return B.gearUid; },
+    save: () => rgPut(R) };
+}
+function fgRunCtx() {
+  const S = G.region, live = typeof rnOn === 'function' && rnOn() && typeof rnS === 'function';
+  return { map: false, force: G.force, hero: G.hero, list: () => G.loot,
+    gold: () => Math.floor(G.gold), addGold: g => { G.gold += g; if (g > 0 && G.stats) G.stats.gold += g; }, goldWord: 'gold',
+    rn: () => live ? rnS().v | 0 : 0, rnLive: live, payRn: n => { if (live) rnS().v = Math.max(0, (rnS().v | 0) - n); },
+    shards: () => S.shards | 0, addShards: n => { S.shards = Math.max(0, (S.shards | 0) + n); },
+    uid: () => ++G.gearUid,
+    save: () => { if (typeof onDirty === 'function') onDirty(); if (typeof onSave === 'function') onSave(); } };
+}
+// run fn with the context's force applied (the region map has none applied: the pools, cards and units are the force's)
+function fgAs(C, fn) {
+  const was = typeof FORCE_NOW !== 'undefined' ? FORCE_NOW : null;
+  if (!C.map || (was === C.force && C._hero)) return fn();
+  try { applyForce(C.force, C.hero); C._hero = 1; return fn(); } finally { applyForce(was); C._hero = 0; }
+}
+
+/* ---- the works (state only; the screen plays them) ---- */
+// the units a new item can be made for (no walls), and a charm
+function fgTargets(C, r) {
+  return fgAs(C, () => {
+    const out = [];
+    for (const ty of Object.keys(FORCES[C.force].units)) { if (TOWERS[ty] && TOWERS[ty].wall) continue; if (fgPool(ty, r).length) out.push({ ty, name: TOWERS[ty] ? TOWERS[ty].name : ty }); }
+    if (fgPool('charm', r).length) out.push({ ty: 'charm', name: 'A charm' });
+    return out;
+  });
+}
+// what a target can become at rarity r: [[base id, weight]] (call inside fgAs)
+function fgPool(ty, r) {
+  const B = GEAR_BASES, ip = id => typeof inPool !== 'function' || inPool('bases', id);
+  if (ty === 'charm') return r >= 2 && r <= 3 && (typeof poolHas !== 'function' || poolHas('charms')) ? Object.keys(B).filter(id => B[id].charm && B[id].rar === r && !B[id].retired && ip(id)).map(id => [id, 1]) : [];
+  const out = [];
+  for (const id of Object.keys(B)) {
+    const d = B[id]; if (d.rar !== r || d.retired || d.charm || d.bsig || d.quest || !ip(id)) continue;
+    const f = gearFor({ base: id, rar: r }); if (f && !f.includes(ty)) continue;
+    out.push([id, f ? FORGE.kit : 1]);
+  }
+  return out;
+}
+// what a work costs and whether it can be done: { sh, gold, rn, why }
+function fgCost(C, mode, items) {
+  const it = items[0]; if (!it) return { why: 'Pick an item from your bag' };
+  if (mode === 'break') { const b = fgBrk(it); return { sh: -b.sh, gold: -b.gold, rn: 0 }; }
+  const r = it.rar | 0;
+  if (mode === 'reforge') {
+    const c = FORGE.ref[r]; if (!c) return { why: 'A legendary can’t be reforged' };
+    return fgNeed(C, { sh: c.sh, gold: c.gold, rn: 0 });
+  }
+  const c = FORGE.comb[r]; if (!c) return { why: r >= 4 ? 'A legendary can’t be combined' : 'Epics can’t be combined: legendaries come only from battles' };
+  if (items.length < 3) return Object.assign(fgNeed(C, { sh: c.sh, gold: c.gold, rn: c.rn }), { why: `Pick ${3 - items.length} more ${fgRarN(r)} item${items.length === 2 ? '' : 's'}` });
+  return fgNeed(C, { sh: c.sh, gold: c.gold, rn: C.rnLive ? c.rn : 0 });
+}
+function fgNeed(C, c) {
+  if (C.shards() < c.sh) c.why = `Need ${c.sh - C.shards()} more shard${c.sh - C.shards() === 1 ? '' : 's'}`;
+  else if (C.gold() < c.gold) c.why = `Need ${c.gold - C.gold()} more gold`;
+  else if (c.rn && C.rn() < c.rn) c.why = `Need ${c.rn - C.rn()} more Renown`;
+  return c;
+}
+const fgTake = (C, it) => { const L = C.list(), i = L.indexOf(it); if (i >= 0) L.splice(i, 1); };
+// break it down: returns what it paid
+function fgBreak(C, it) {
+  if (!fgOk(it) || !C.list().includes(it)) return null;
+  const b = fgBrk(it); fgTake(C, it); C.addShards(b.sh); C.addGold(b.gold); C.save();
+  return b;
+}
+// make a new item of rarity r for target ty from the items given (used up): returns it, or null
+function fgMake(C, mode, items, ty) {
+  const k = fgCost(C, mode, items); if (k.why || !ty) return null;
+  if (!items.every(it => fgOk(it) && C.list().includes(it))) return null;
+  const r = (items[0].rar | 0) + (mode === 'combine' ? 1 : 0);
+  const it = fgAs(C, () => {
+    const L = C.list(), owned = id => L.some(q => q.base === id), from = new Set(items.map(q => q.base));
+    let pool = fgPool(ty, r); if (!pool.length) return null;
+    if (pool.length > 1 && mode === 'reforge') pool = pool.filter(p => !from.has(p[0])) .length ? pool.filter(p => !from.has(p[0])) : pool;
+    const id = pickW(pool.map(([b, w]) => [b, w * (owned(b) ? FORGE.own : 1)]));
+    return id ? { id: 0, rar: r, hone: 0, isNew: true, base: id } : null;
+  });
+  if (!it) return null;
+  const ils = items.map(q => +q.il || 0).filter(x => x > 0); if (ils.length) it.il = Math.max(...ils);
+  const rf = Math.max(0, ...items.map(q => q.rf | 0)); if (rf) it.rf = rf;
+  for (const q of items) fgTake(C, q);
+  C.addShards(-k.sh); C.addGold(-k.gold); if (k.rn) C.payRn(k.rn);
+  it.id = C.uid(); it.forged = 1; C.list().push(it); C.save();
+  return it;
+}
+
+/* ---- the screen ---- */
+const FG = { C: null, mode: 'break', sel: [], ty: null, made: null, arm: 0, anim: null, cards: {}, back: null, shownSh: 0 };
+const FG_MODES = [['break', 'Break down'], ['reforge', 'Reforge'], ['combine', 'Combine']];
+function fgOpenMap(R) { if (!R || !R.band || !R.band.raised) return; fgOpen(fgMapCtx(R), () => rgOpen(R.force)); }
+function fgOpenRun() { if (!G.region) return; fgOpen(fgRunCtx(), () => openBag(null, 0, 'bag')); }
+function fgOpen(C, back) {
+  FG.C = C; FG.back = back; FG.sel = []; FG.made = null; FG.arm = 0; FG.cards = {}; FG.shownSh = C.shards();
+  if (typeof AudioSys !== 'undefined' && AudioSys.init) AudioSys.init();
+  fgRender(true);
+}
+function fgSnd(n, a) { try { if (typeof AudioSys !== 'undefined' && !(typeof G !== 'undefined' && G.mute)) AudioSys.play(n, a); } catch (e) {} }
+const fgItems = () => FG.C.list().filter(fgOk).sort((a, b) => (b.rar | 0) - (a.rar | 0) || gearName(a).localeCompare(gearName(b)) || (a.id | 0) - (b.id | 0));
+function fgCardOf(id) {
+  const C = FG.C; if (!C) return '';
+  const it = C.list().find(q => q.id === +id) || (FG.made && FG.made.id === +id ? FG.made : null); if (!it) return '';
+  if (FG.cards[id]) return FG.cards[id];
+  const b = fgBrk(it);
+  return (FG.cards[id] = fgAs(C, () => itemCardHTML(it, { price: `Breaks into ${b.sh} shard${b.sh === 1 ? '' : 's'} + ${b.gold} gold` })));
+}
+const FG_ANVIL = `<svg class="fg-anv" viewBox="0 0 240 120" aria-hidden="true"><defs><linearGradient id="fgIr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b5f66"/><stop offset=".12" stop-color="#3a3d43"/><stop offset="1" stop-color="#16181c"/></linearGradient></defs>
+  <path d="M14 12 H196 Q232 14 236 30 Q214 30 196 36 Q182 40 176 52 L170 70 H70 L64 52 Q58 40 30 36 Q18 33 14 24 Z" fill="url(#fgIr)" stroke="#0b0c0e" stroke-width="2"/>
+  <path d="M16 13 H196 Q228 15 233 27" fill="none" stroke="#ffb35a" stroke-opacity=".55" stroke-width="2"/>
+  <path d="M74 70 H166 L178 104 H62 Z" fill="#222429" stroke="#0b0c0e" stroke-width="2"/><rect x="48" y="104" width="144" height="12" rx="3" fill="#2c2f35" stroke="#0b0c0e" stroke-width="2"/></svg>`;
+const FG_HAMMER = `<svg class="fg-ham" viewBox="0 0 120 120" aria-hidden="true"><rect x="56" y="34" width="9" height="82" rx="4" fill="#6b4a2c" stroke="#2a1a0c" stroke-width="2"/>
+  <path d="M22 14 H98 Q106 14 106 22 V40 Q106 48 98 48 H22 Q14 48 14 40 V22 Q14 14 22 14 Z" fill="#4a4e55" stroke="#101114" stroke-width="2.5"/><path d="M20 18 H100" stroke="#a9b0b9" stroke-width="2" stroke-opacity=".6"/></svg>`;
+const fgGem = '<i class="fg-gem" aria-hidden="true"></i>';
+function fgSlotHTML(it, k) {
+  return it ? `<button type="button" class="fg-slot on" data-slot="${k}" style="--rc:${fgCol(it.rar)}" aria-label="${fgEsc(gearName(it))}: take it off"><canvas class="fg-ic" data-ik="${it.id}"></canvas></button>`
+    : `<span class="fg-slot" aria-hidden="true"></span>`;
+}
+function fgStageHTML() {
+  const n = FG.mode === 'combine' ? 3 : 1, slots = [];
+  for (let k = 0; k < n; k++) slots.push(fgSlotHTML(FG.sel[k], k));
+  const m = FG.made;
+  return `<div class="fg-fire"></div><div class="fg-glow" id="fgGlow"></div>
+    <div class="fg-slots n${n}" id="fgSlots">${m ? '' : slots.join('')}</div>
+    ${m ? `<div class="fg-out on" style="--rc:${fgCol(m.rar)}"><i class="fg-rays"></i><span class="fg-made" data-fgi="${m.id}"><canvas class="fg-ic" data-ik="${m.id}"></canvas></span><b>${fgEsc(gearName(m))}</b><small>${fgEsc(fgRarN(m.rar))}${FG.madeFor ? ' · for ' + fgEsc(FG.madeFor) : ''}</small></div>` : ''}
+    ${FG_ANVIL}${FG_HAMMER}`;
+}
+function fgSay() {
+  const C = FG.C, it = FG.sel[0], r = it ? it.rar | 0 : 2;
+  if (FG.made) return `Done: ${fgEsc(gearName(FG.made))} is in your bag. Pick another item to go again.`;
+  if (FG.mode === 'break') return it ? `Breaks it into shards and a little gold. It is gone for good.` : 'Pick an item you don’t need. It breaks into shards and a little gold.';
+  if (FG.mode === 'reforge') return !it ? 'Pick an item. It is made into a new one of the same rarity, for the unit you pick.' : it.rar >= 4 ? `Legendaries can’t be reforged. Break one down for ${FORGE.brk.sh[4]} shards.` : `Makes a new ${fgRarN(r)} item, made for the unit you pick. The old one is used up.`;
+  if (it && !FORGE.comb[r]) return 'Epics and legendaries can’t be combined: legendaries come only from battles.';
+  return it ? `Three ${fgRarN(r)} items make one ${fgRarN(r + 1)} item, made for the unit you pick.` : 'Pick three items of one rarity. They make one item of the next rarity.';
+}
+function fgCostHTML(k) {
+  if (!k) return '';
+  const bits = [];
+  if (k.sh) bits.push(`${k.sh < 0 ? '+' : ''}${Math.abs(k.sh)} shard${Math.abs(k.sh) === 1 ? '' : 's'}`);
+  if (k.gold) bits.push(`${k.gold < 0 ? '+' : ''}${Math.abs(k.gold)} gold`);
+  if (k.rn) bits.push(`${k.rn} Renown`);
+  return bits.join(' · ');
+}
+function fgForHTML() {
+  if (FG.mode === 'break' || !FG.sel[0] || FG.made) return '';
+  const r = (FG.sel[0].rar | 0) + (FG.mode === 'combine' ? 1 : 0);
+  if (FG.mode === 'reforge' ? !FORGE.ref[r] : !FORGE.comb[r - 1]) return '';
+  const C = FG.C, T = fgTargets(C, r); if (!T.some(t => t.ty === FG.ty)) FG.ty = null;
+  const face = t => t.ty === 'charm' ? '' : t.ty === 'holy' && typeof HERO_BY !== 'undefined' && HERO_BY[C.hero] && typeof rgFace === 'function' ? rgFace(HERO_BY[C.hero]) : (typeof unitArtURL === 'function' ? unitArtURL(t.ty, C.force) : '');
+  const chips = T.map(t => { const src = face(t); return `<button type="button" class="fg-u${t.ty === FG.ty ? ' on' : ''}" data-ty="${t.ty}" aria-pressed="${t.ty === FG.ty}">${src ? `<img alt="" src="${src}">` : '<i class="fg-ch" aria-hidden="true">✦</i>'}<span>${fgEsc(t.name)}</span></button>`; }).join('');
+  let can = '';
+  if (FG.ty) {
+    const pool = fgAs(C, () => fgPool(FG.ty, r)), keys = pool.map(p => 'b:' + p[0]);
+    can = `<div class="fg-can"><small>Can become (${keys.length}):</small><span class="rg-ics">${keys.map(k => rgIcon(rgKeyItem(k), `data-rgi="${fgEsc(C.force + '|' + k)}"`)).join('')}</span></div>`;
+  }
+  return `<h4>Make it for</h4><div class="fg-us">${chips}</div>${can}`;
+}
+function fgGoHTML() {
+  const C = FG.C, k = FG.made ? null : fgCost(C, FG.mode, FG.sel), lbl = FG_MODES.find(m => m[0] === FG.mode)[1];
+  if (!k) return `<button type="button" class="btn fg-go" id="fgGo" disabled>${lbl}<small>Pick an item</small></button>`;
+  const need = !k.why && FG.mode !== 'break' && !FG.ty ? 'Pick a unit to make it for' : k.why;
+  const armed = FG.arm > performance.now();
+  return `<button type="button" class="btn fg-go${armed ? ' warn' : ''}" id="fgGo"${need ? ' disabled' : ''}>${armed ? 'Tap again to break it down' : lbl}<small>${fgEsc(need || fgCostHTML(k))}</small></button>`;
+}
+function fgBagHTML() {
+  const L = fgItems();
+  if (!L.length) return `<p class="fg-empty">Your bag has no relics or charms. Battles and bosses pay them.</p>`;
+  const r0 = FG.mode === 'combine' && FG.sel[0] ? FG.sel[0].rar | 0 : -1;
+  return L.map(it => { const on = FG.sel.includes(it), off = r0 >= 0 && !on && (it.rar | 0) !== r0;
+    return `<button type="button" class="fg-it${on ? ' on' : ''}${off ? ' off' : ''}" data-fgi="${it.id}" style="--rc:${fgCol(it.rar)}" aria-pressed="${on}" aria-label="${fgEsc(gearName(it))}, ${fgRarN(it.rar)}"><canvas class="fg-ic" data-ik="${it.id}"></canvas>${it.forged ? '<i class="fg-new" aria-hidden="true"></i>' : ''}</button>`; }).join('');
+}
+function fgResHTML() {
+  const C = FG.C;
+  return `<span class="fg-shc" id="fgSh" title="Shards: what an item breaks into at the Forge. Spend them here.">${fgGem}<b>${FG.shownSh}</b><small>shards</small></span>
+    <span class="fg-rs" id="fgGold"><b>${C.gold()}</b><small>${C.goldWord}</small></span>
+    <span class="fg-rs"><b>${C.rn()}</b><small>Renown</small></span>`;
+}
+function fgRender(fresh) {
+  const C = FG.C; if (!C) return;
+  if (!fresh && FG.anim) return;
+  const html = `<div class="fg" id="fgRoot"><header class="fg-hd"><h2 class="ttl">The Forge</h2><div class="fg-res" id="fgRes">${fgResHTML()}</div><button type="button" class="tx" id="fgX" aria-label="Back">${X_SVG}</button></header>
+    <p class="fg-intro">Break down items you don’t need into <b>shards</b>. Spend shards, gold and Renown here to make new items.</p>
+    <div class="fg-body"><section class="fg-l"><div class="fg-tabs" role="tablist">${FG_MODES.map(([k, l]) => `<button type="button" role="tab" data-mode="${k}" class="${k === FG.mode ? 'on' : ''}" aria-selected="${k === FG.mode}">${l}</button>`).join('')}</div>
+      <div class="fg-stage" id="fgStage">${fgStageHTML()}</div>
+      <p class="fg-say" id="fgSay">${fgSay()}</p><div class="fg-for" id="fgFor">${fgForHTML()}</div>${fgGoHTML()}</section>
+      <section class="fg-r"><h4>Your bag <small>${fgItems().length}</small></h4><div class="fg-bag" id="fgBag">${fgBagHTML()}</div></section></div></div>`;
+  if (fresh || !document.getElementById('fgRoot')) { showOverlay(html, 'forge'); fgWireOnce(); }
+  else { const keep = ovp.querySelector('.fg-bag'), st = keep ? keep.scrollTop : 0, ost = ov.scrollTop; ovp.innerHTML = html; ov.scrollTop = ost; const nb = ovp.querySelector('.fg-bag'); if (nb) nb.scrollTop = st; }
+  fgPaintIcons(); fgWire();
+}
+function fgPaintIcons() {
+  const C = FG.C, sc = Math.min(2, window.devicePixelRatio || 1);
+  for (const c of ovp.querySelectorAll('canvas.fg-ic')) {
+    const id = +c.dataset.ik, it = C.list().find(q => q.id === id) || (FG.made && FG.made.id === id ? FG.made : null); if (!it) continue;
+    const s = Math.max(32, Math.round((c.clientWidth || 52) * sc)); c.width = c.height = s;
+    try { iconPaint(c, gearKey(it)); } catch (e) {}
+  }
+}
+let FG_WIRED = false;
+function fgWireOnce() {
+  if (FG_WIRED || typeof itipBind !== 'function') return; FG_WIRED = true;
+  itipBind(document, '.fg-it[data-fgi], .fg-made[data-fgi]', el => fgCardOf(el.dataset.fgi), { tap: () => null });
+}
+function fgWire() {
+  const on = (id, f) => { const b = document.getElementById(id); if (b) b.onclick = f; };
+  on('fgX', () => { if (FG.anim) fgSkip(); fgSnd('click'); FG.C = null; const b = FG.back; FG.back = null; if (b) b(); });
+  for (const b of ovp.querySelectorAll('.fg-tabs [data-mode]')) b.onclick = () => { if (FG.anim || FG.mode === b.dataset.mode) return; fgSnd('click'); FG.mode = b.dataset.mode; FG.made = null; FG.arm = 0; FG.sel = FG.mode === 'combine' ? FG.sel.slice(0, 1) : FG.sel.slice(0, 1); fgRender(); };
+  for (const b of ovp.querySelectorAll('.fg-it')) b.onclick = () => fgPick(+b.dataset.fgi);
+  for (const b of ovp.querySelectorAll('.fg-slot.on')) b.onclick = () => { if (FG.anim) return; fgSnd('click'); FG.sel.splice(+b.dataset.slot, 1); FG.arm = 0; fgRender(); };
+  for (const b of ovp.querySelectorAll('.fg-u')) b.onclick = () => { if (FG.anim) return; fgSnd('select'); FG.ty = b.dataset.ty; fgRender(); };
+  on('fgGo', fgGo);
+  const st = document.getElementById('fgStage'); if (st) st.onclick = e => { if (FG.anim) { e.stopPropagation(); fgSkip(); } };
+}
+function fgPick(id) {
+  if (FG.anim) { fgSkip(); return; }
+  const it = FG.C.list().find(q => q.id === id); if (!it) return;
+  FG.made = null; FG.arm = 0;
+  const i = FG.sel.indexOf(it);
+  if (i >= 0) FG.sel.splice(i, 1);
+  else if (FG.mode !== 'combine') FG.sel = [it];
+  else if (FG.sel[0] && (FG.sel[0].rar | 0) !== (it.rar | 0)) { FG.sel = [it]; }
+  else if (FG.sel.length >= 3) { FG.sel[2] = it; }
+  else FG.sel.push(it);
+  fgSnd('select'); fgRender();
+}
+function fgGo() {
+  const C = FG.C; if (FG.anim || !C) return;
+  const k = fgCost(C, FG.mode, FG.sel); if (k.why) return;
+  if (FG.mode === 'break') {
+    const it = FG.sel[0];
+    if ((it.rar | 0) >= 3 && FG.arm <= performance.now()) { FG.arm = performance.now() + 2500; fgSnd('click'); fgRender(); setTimeout(() => { if (FG.C && !FG.anim && FG.arm && FG.arm <= performance.now()) { FG.arm = 0; fgRender(); } }, 2600); return; }
+    FG.arm = 0;
+    const from = fgSlotRect(0), img = fgSlotCanvas(0), sh0 = C.shards(), b = fgBreak(C, it); if (!b) return;
+    FG.sel = []; FG.cards = {};
+    fgAnimBreak(it, b, from, img, sh0);
+    return;
+  }
+  if (!FG.ty) return;
+  const items = FG.sel.slice(), rects = items.map((q, k) => fgSlotRect(k)), sh0 = C.shards(), tyName = (fgTargets(C, (items[0].rar | 0) + (FG.mode === 'combine' ? 1 : 0)).find(t => t.ty === FG.ty) || {}).name;
+  const it = fgMake(C, FG.mode, items, FG.ty); if (!it) { if (typeof onToast === 'function') onToast('Nothing could be made for that.'); return; }
+  FG.sel = []; FG.cards = {}; FG.madeFor = FG.ty === 'charm' ? '' : tyName;
+  fgAnimMake(it, items, rects, sh0);
+}
+const fgSlotRect = k => { const s = ovp.querySelectorAll('#fgSlots .fg-slot')[k]; return s ? s.getBoundingClientRect() : null; };
+const fgSlotCanvas = k => { const s = ovp.querySelectorAll('#fgSlots .fg-slot')[k]; return s ? s.querySelector('canvas') : null; };
+
+/* ---- the animation: a canvas of sparks, shards and motes over the screen, and a few CSS beats on the stage. Every work has
+   already happened (and is saved) when its sequence starts: the sequence only shows it, and a click skips to its end. ---- */
+const FGX = { cv: null, g: null, ps: [], raf: 0, t0: 0 };
+function fgFxCanvas() {
+  if (!FGX.cv || !FGX.cv.isConnected) { const c = document.createElement('canvas'); c.className = 'fg-fx'; c.setAttribute('aria-hidden', 'true'); document.body.appendChild(c); FGX.cv = c; FGX.g = c.getContext('2d'); }
+  const c = FGX.cv, d = Math.min(2, window.devicePixelRatio || 1), w = window.innerWidth, h = window.innerHeight;
+  if (c.width !== Math.round(w * d) || c.height !== Math.round(h * d)) { c.width = Math.round(w * d); c.height = Math.round(h * d); }
+  FGX.d = d; c.hidden = false; return c;
+}
+function fgFxLoop() {
+  const c = FGX.cv, g = FGX.g; if (!c) return;
+  const now = performance.now(), dt = Math.min(.05, (now - (FGX.last || now)) / 1000); FGX.last = now;
+  g.setTransform(FGX.d, 0, 0, FGX.d, 0, 0); g.clearRect(0, 0, c.width, c.height);
+  const keep = [];
+  for (const p of FGX.ps) {
+    const age = (now - p.t0) / 1000; if (age < 0) { keep.push(p); continue; }
+    if (age > p.life) { if (p.done) p.done(); continue; }
+    const u = age / p.life; keep.push(p);
+    if (p.k === 'path') {   // a shard flying to the counter (a bend through c)
+      const e = 1 - Math.pow(1 - u, 2.2), a = 1 - e, x = a * a * p.x0 + 2 * a * e * p.cx + e * e * p.x1, y = a * a * p.y0 + 2 * a * e * p.cy + e * e * p.y1, s = p.s * (1 - .45 * e);
+      g.save(); g.translate(x, y); g.rotate(p.rot + u * 6);
+      g.globalCompositeOperation = 'lighter'; const gl = g.createRadialGradient(0, 0, 0, 0, 0, s * 2.6); gl.addColorStop(0, p.col + 'aa'); gl.addColorStop(1, p.col + '00'); g.fillStyle = gl; g.beginPath(); g.arc(0, 0, s * 2.6, 0, 7); g.fill();
+      g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff8e8'; g.strokeStyle = p.col; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(0, -s * 1.3); g.lineTo(s * .7, 0); g.lineTo(0, s * 1.3); g.lineTo(-s * .7, 0); g.closePath(); g.fill(); g.stroke(); g.restore();
+      continue;
+    }
+    p.vy += (p.grav || 0) * dt; p.vx *= Math.pow(p.drag || 1, dt * 60); p.vy *= Math.pow(p.drag || 1, dt * 60); p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.to) { p.x += (p.to[0] - p.x) * Math.min(1, dt * p.pull); p.y += (p.to[1] - p.y) * Math.min(1, dt * p.pull); }
+    const al = p.fade ? Math.min(1, (1 - u) * 2.2) : 1 - u;
+    if (p.k === 'frag') {   // a piece of the broken item
+      g.save(); g.globalAlpha = al; g.translate(p.x, p.y); g.rotate(p.rot + p.vr * age); g.drawImage(p.img, p.sx, p.sy, p.sw, p.sh, -p.w / 2, -p.h / 2, p.w, p.h);
+      g.globalCompositeOperation = 'lighter'; g.globalAlpha = al * .5; g.strokeStyle = p.col; g.lineWidth = 1.5; g.strokeRect(-p.w / 2, -p.h / 2, p.w, p.h); g.restore();
+    } else if (p.k === 'spark') {   // a spark off the anvil: a short bright streak along its path
+      g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = al; g.strokeStyle = p.col; g.lineWidth = p.s; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x - p.vx * .035, p.y - p.vy * .035); g.stroke(); g.restore();
+    } else if (p.k === 'ring') {   // the reveal's ring
+      g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = (1 - u) * .8; g.strokeStyle = p.col; g.lineWidth = 3 * (1 - u) + 1;
+      g.beginPath(); g.arc(p.x, p.y, p.r0 + (p.r1 - p.r0) * (1 - Math.pow(1 - u, 3)), 0, 7); g.stroke(); g.restore();
+    } else if (p.k === 'txt') {
+      g.save(); g.globalAlpha = al; g.font = '700 15px ' + (getComputedStyle(document.body).getPropertyValue('--f-ui') || 'sans-serif'); g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#0b0c0ecc'; g.strokeText(p.t, p.x, p.y); g.fillStyle = p.col; g.fillText(p.t, p.x, p.y); g.restore();
+    } else {   // a mote of glow
+      g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = al * .9; const gl = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.s * 3); gl.addColorStop(0, p.col); gl.addColorStop(1, p.col + '00'); g.fillStyle = gl; g.beginPath(); g.arc(p.x, p.y, p.s * 3, 0, 7); g.fill(); g.restore();
+    }
+  }
+  FGX.ps = keep;
+  FGX.raf = keep.length || FG.anim ? requestAnimationFrame(fgFxLoop) : 0;
+  if (!FGX.raf && FGX.cv) { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); FGX.cv.hidden = true; }
+}
+function fgFxGo() { fgFxCanvas(); if (!FGX.raf) { FGX.last = performance.now(); FGX.raf = requestAnimationFrame(fgFxLoop); } }
+const fgRnd = (a, b) => a + Math.random() * (b - a);
+function fgSparks(x, y, n, cols, up) {
+  const t = performance.now();
+  for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + fgRnd(-1.35, 1.35) * (up ? .7 : 1), v = fgRnd(160, 460); FGX.ps.push({ k: 'spark', t0: t + fgRnd(0, 40), life: fgRnd(.35, .75), x: x + fgRnd(-14, 14), y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, grav: 900, drag: .985, s: fgRnd(1.4, 2.6), col: cols[i % cols.length] }); }
+}
+// the sequence's clock: steps [ms, fn]; fin (the end state) runs at the end or at a skip
+function fgSeq(steps, fin) {
+  const A = FG.anim = { tm: [], fin, done: false };
+  for (const [ms, f] of steps) A.tm.push(setTimeout(() => { if (FG.anim === A) f(); }, ms));
+  fgFxGo();
+}
+function fgSkip() {
+  const A = FG.anim; if (!A) return;
+  for (const t of A.tm) clearTimeout(t);
+  FGX.ps = FGX.ps.filter(p => p.k === 'ring');
+  for (const p of FGX.ps) p.done = null;
+  FG.anim = null; A.fin();
+}
+function fgEnd() { const A = FG.anim; if (!A) return; FG.anim = null; A.fin(); }
+// the shard counter's place on screen, and a pulse on it as each shard lands
+function fgCounter() { const e = document.querySelector('#fgSh .fg-gem'); const r = e && e.getBoundingClientRect(); return r ? [r.left + r.width / 2, r.top + r.height / 2] : [window.innerWidth - 40, 30]; }
+function fgSetShards(n) { FG.shownSh = n; const b = document.querySelector('#fgSh b'); if (b) b.textContent = n; const s = document.getElementById('fgSh'); if (s) { s.classList.remove('pulse'); void s.offsetWidth; s.classList.add('pulse'); } }
+function fgStageShake(big) { const s = document.getElementById('fgStage'); if (!s) return; s.classList.remove('shake', 'shake2'); void s.offsetWidth; s.classList.add(big ? 'shake2' : 'shake'); }
+
+// Break down (~1.1 s): the item shakes and cracks, bursts into pieces, and its shards fly to the counter one by one
+function fgAnimBreak(it, b, rc, img, sh0) {
+  const C = FG.C, col = fgCol(it.rar), slot = ovp.querySelector('#fgSlots .fg-slot');
+  if (slot) slot.classList.add('crack');
+  const say = document.getElementById('fgSay'); if (say) say.textContent = `Breaking ${gearName(it)}…`;
+  const go = document.getElementById('fgGo'); if (go) go.disabled = true;
+  const cx = rc ? rc.left + rc.width / 2 : window.innerWidth / 2, cy = rc ? rc.top + rc.height / 2 : window.innerHeight / 2, sz = rc ? rc.width : 60;
+  const n = Math.min(24, 4 + b.sh * 2), per = b.sh / n;
+  fgSeq([
+    [240, () => {
+      fgSnd('forgeBreak', it.rar);
+      if (slot) slot.classList.add('gone');
+      fgStageShake(false);
+      const t = performance.now(), k = 3;
+      if (img && img.width) for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) {
+        const sw = img.width / k, shh = img.height / k, a = Math.atan2(i - 1 + fgRnd(-.3, .3), j - 1 + fgRnd(-.3, .3)), v = fgRnd(120, 260);
+        FGX.ps.push({ k: 'frag', t0: t, life: fgRnd(.45, .7), img, sx: j * sw, sy: i * shh, sw, sh: shh, w: sz / k, h: sz / k, x: cx + (j - 1) * sz / k, y: cy + (i - 1) * sz / k, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, grav: 700, drag: .99, rot: 0, vr: fgRnd(-6, 6), col, fade: 1 });
+      }
+      fgSparks(cx, cy + sz * .3, 16, [col, '#ffd08a', '#fff1cf']);
+      const [tx, ty] = fgCounter(); let got = 0;
+      for (let i = 0; i < n; i++) FGX.ps.push({ k: 'path', t0: t + 80 + i * 22, life: .55 + fgRnd(0, .12), x0: cx + fgRnd(-10, 10), y0: cy + fgRnd(-10, 10), cx: cx + fgRnd(-120, 120), cy: Math.min(cy, ty) - fgRnd(40, 140), x1: tx, y1: ty, s: fgRnd(4, 6.5), rot: fgRnd(0, 6), col,
+        done: () => { got += per; fgSetShards(Math.min(sh0 + b.sh, sh0 + Math.round(got))); } });
+      FGX.ps.push({ k: 'txt', t0: t + 200, life: .9, t: `+${b.gold} gold`, x: cx, y: cy + sz * .2, vx: 0, vy: -40, col: '#f1d8a1', fade: 1 });
+    }],
+    [1150, fgEnd],
+  ], () => { fgSetShards(C.shards()); FG.made = null; fgRender(); if (typeof onToast === 'function') onToast(`Broke down ${gearName(it)}: +${b.sh} shard${b.sh === 1 ? '' : 's'}, +${b.gold} gold.`); });
+}
+// Reforge / Combine (~1.4-1.6 s): the item(s) heat and (three) gather, the hammer strikes twice with sparks, a glow in the new
+// rarity's colour builds, then the new item comes out of it with a ring and its name
+function fgAnimMake(it, items, rects, sh0) {
+  const C = FG.C, root = document.getElementById('fgStage'), col = fgCol(it.rar), cmb = items.length > 1;
+  const sr = root ? root.getBoundingClientRect() : null, cx = sr ? sr.left + sr.width / 2 : window.innerWidth / 2;
+  const slots = ovp.querySelectorAll('#fgSlots .fg-slot'), sl0 = rects[cmb ? 1 : 0] || rects[0], cy = sl0 ? sl0.top + sl0.height / 2 : (sr ? sr.top + sr.height * .45 : window.innerHeight / 2);
+  const say = document.getElementById('fgSay'); if (say) say.textContent = cmb ? 'Combining…' : 'Reforging…';
+  const go = document.getElementById('fgGo'); if (go) go.disabled = true;
+  if (root) { root.style.setProperty('--nc', col); root.classList.add('work'); }
+  slots.forEach((s, k) => { s.classList.add('heat'); if (cmb && rects[k] && sl0) s.style.setProperty('--gx', `${(cx - (rects[k].left + rects[k].width / 2)).toFixed(0)}px`); });
+  fgSetShards(C.shards());
+  const ham = root && root.querySelector('.fg-ham'), glow = document.getElementById('fgGlow');
+  const hit = (big) => { if (ham) { ham.classList.remove('up', 'down'); void ham.getBoundingClientRect(); ham.classList.add('down'); } fgSnd('forgeHit', big ? 1 : 0); fgStageShake(big); fgSparks(cx, cy + 16, big ? 30 : 20, ['#ffb45a', '#ffd890', '#fff3d6', big ? col : '#ff8a3a']); };
+  const raise = () => { if (ham) { ham.classList.remove('down'); ham.classList.add('up'); } };
+  const t0 = cmb ? 260 : 0;
+  fgSeq([
+    [20, () => { if (cmb) slots.forEach(s => s.classList.add('gather')); }],
+    [t0 + 60, raise],
+    [t0 + 330, () => { hit(false); slots.forEach(s => s.classList.add('dim')); }],
+    [t0 + 470, () => { raise(); fgSnd('forgeRise', it.rar); }],
+    [t0 + 640, () => { hit(true); if (glow) { glow.style.setProperty('--nc', col); glow.classList.add('build'); } }],
+    [t0 + 700, () => { const t = performance.now(); for (let i = 0; i < 22; i++) { const a = fgRnd(0, 6.28), r = fgRnd(70, 150); FGX.ps.push({ k: 'mote', t0: t + i * 14, life: fgRnd(.45, .6), x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r * .6, vx: 0, vy: 0, to: [cx, cy], pull: 6, s: fgRnd(2, 3.5), col }); } }],
+    [t0 + 780, raise],
+    [t0 + 1160, () => { FG.made = it; const A = FG.anim; FG.anim = null; fgRender(); FG.anim = A; fgReveal(it, true); }],
+    [t0 + 1500, fgEnd],
+  ], () => { const shown = !!document.querySelector('.fg-out.on'); FG.made = it; fgRender(); if (!shown) fgReveal(it, false); });
+}
+// the new item's reveal on the stage (pop, ring, rays; rays stay while it is shown)
+function fgReveal(it, burst) {
+  const o = ovp.querySelector('.fg-out'); if (!o) return;
+  o.classList.add('pop');
+  if (!burst) return;
+  const r = o.querySelector('.fg-made').getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, col = fgCol(it.rar), t = performance.now();
+  FGX.ps.push({ k: 'ring', t0: t, life: .55, x, y, r0: r.width * .4, r1: r.width * 1.6, col });
+  fgSparks(x, y, 18, [col, col, '#fff3d6'], true);
+  fgFxGo();
+}
+
+/* ---- the region map: a button under the host's panel ---- */
+if (typeof rgBandHTML === 'function') {
+  const _bh = rgBandHTML;
+  rgBandHTML = function (R) {
+    const h = _bh.apply(this, arguments);
+    if (!fgOn() || !R || !R.band || !R.band.raised || R.battle || R.over || R.done) return h;
+    const n = R.band.loot.filter(fgOk).length;
+    return h + `<button type="button" class="btn ghost rg-sec fg-mapb" id="fgOpenB"><i class="fg-gem" aria-hidden="true"></i>The Forge<small>${R.shards | 0} shards · ${n} item${n === 1 ? '' : 's'} in the bag · break down, reforge, combine</small></button>`;
+  };
+}
+if (typeof rgOpen === 'function') {
+  const _ro = rgOpen;
+  rgOpen = function (force) {
+    const r = _ro.apply(this, arguments), b = document.getElementById('fgOpenB');
+    if (b) b.onclick = () => { const R = rgGet(rgLastForce()); fgSnd('click'); fgOpenMap(R); };
+    return r;
+  };
+}
+/* ---- a Homeland battle: shards ride with it; the bag's Salvage breaks down; a Forge button in the bag ---- */
+if (typeof rgStart === 'function') {
+  const _rs = rgStart;
+  rgStart = function (R, S) { if (S && R) S.shards = R.shards | 0; return _rs.apply(this, arguments); };
+}
+if (typeof rgEnd === 'function') {
+  const _re = rgEnd;
+  rgEnd = function () {
+    try { const S = G.region, R = S && rgGet(G.force); if (R && S.shards != null && (R.shards | 0) !== (S.shards | 0)) { R.shards = S.shards | 0; rgPut(R); } } catch (e) {}
+    return _re.apply(this, arguments);
+  };
+}
+if (typeof renderBag === 'function') {
+  const _rb = renderBag;
+  renderBag = function () {
+    const r = _rb.apply(this, arguments);
+    if (!G.region || !fgOn() || bagTab !== 'bag') return r;
+    const it = bagSel, b = document.getElementById('gSalv');
+    if (b && it && fgOk(it) && G.loot.includes(it)) {
+      const k = fgBrk(it), armed = bagArm > performance.now();
+      b.textContent = armed ? 'Tap again to break it down' : `Break down · +${k.sh} shard${k.sh === 1 ? '' : 's'}, +${k.gold} gold`;
+      b.onclick = () => {
+        if (it.rar >= 2 && bagArm <= performance.now()) { bagArm = performance.now() + 2500; sfx('click'); renderBag(); setTimeout(() => { if (bagOpen && bagSel === it) renderBag(); }, 2600); return; }
+        const p = fgBreak(fgRunCtx(), it); if (!p) return;
+        fgSnd('forgeBreak', it.rar); toast(`Broke down ${gearName(it)}: +${p.sh} shard${p.sh === 1 ? '' : 's'}, +${p.gold} gold.`); bagArm = 0; bagSel = null; renderBag();
+      };
+    }
+    const hd = ovp.querySelector('.bg-head'), gold = document.getElementById('gGold');
+    if (hd && gold) {
+      let f = document.getElementById('gForge');
+      if (!f) { f = document.createElement('button'); f.type = 'button'; f.id = 'gForge'; f.className = 'fg-bagb'; f.onclick = () => { sfx('click'); fgOpenRun(); }; gold.parentNode.insertBefore(f, gold); }
+      f.innerHTML = `${fgGem}Forge <b>${G.region.shards | 0}</b>`; f.title = 'The Forge: break down, reforge and combine items. Shards: what an item breaks into here.';
+    }
+    return r;
+  };
+}
+// a battle's item cards say what breaking down pays, in place of the salvage gold
+if (typeof itemCardHTML === 'function') {
+  const _ic = itemCardHTML;
+  itemCardHTML = function (it, o) {
+    if (o && typeof o.price === 'string' && /^Salvage: \d+ gold$/.test(o.price) && typeof G !== 'undefined' && G && G.region && fgOk(it)) { const k = fgBrk(it); o = Object.assign({}, o, { price: `Breaks into ${k.sh} shard${k.sh === 1 ? '' : 's'} + ${k.gold} gold` }); }
+    return _ic.call(this, it, o);
   };
 }
 
