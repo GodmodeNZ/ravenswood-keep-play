@@ -1,4 +1,4 @@
-const BUILD_TAG = '6edaeb31@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'ded6a207@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -60509,6 +60509,194 @@ if (FORCE_HOOKS.ironhold && !FORCE_HOOKS.ironhold._ftwarm) {
 }
 }
 
+/* =====================================================================================================
+   THE STORMBORN (v4 on the kit). Whole Army's capstone is the Storm (sbFeed / sbSurge do nothing and sbWeather keeps it calm
+   before it). The commanders: Tarka (thunder), Oshana (wind and arrows), Huri (spirit beasts and the hunt).
+   ===================================================================================================== */
+{
+const N = FTKN, U = { wolf: 'sb_wolfguard', wind: 'sb_windrunner', hail: 'sb_hailshaman', spirit: 'sb_spiritwalker', thunder: 'sb_thundercaller', earth: 'sb_earthbinder', cloud: 'sb_clouddancer', sky: 'sb_skyhunter' };
+ftKit('stormborn', {
+  short: 'sb', name: 'Stormborn', hue: '#8fc0ff',
+  say: 'Your tribes start plain. Force points make them yours: a pair of units, the whole army, or your commander.',
+  intro: 'A force point: open the talents, Force tab. Pick a pair, a perk for the whole army, or your commander\'s first gift.',
+  live: () => ftHas('sb_storm') > 0,
+  vs: { sb_storm: 1 },
+  sArt: { bond: 'holy:One Voice', drill: 'holy:Drum Circle', breath: 'holy:Returning Breath', hold: 'glaive:Guard the Pass', cap: 'holy:Drum of the Host' },
+  pairs: {
+    sb_p_hail: { name: 'Thunderhail', a: U.hail, b: U.thunder, w: 2, col: ['#eef6ff', '#8fc0ff'], art: 'storm:Rolling Thunder',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit strikes again for ${n > 1 ? 70 : 40}%.`, fx: N.again(.4, .7),
+      cap: { name: 'Split Sky', art: 'storm:Split Sky', say: () => 'Thunderhail\'s second strike also hits the nearest foe within 1 cell.', fx: X => { const q = X.near(1, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); } } },
+    sb_p_hunt: { name: 'The Hunt', a: U.wolf, b: U.sky, w: 2, col: ['#d8c8a8', '#bfe0ff'], art: 'glaive:Hunting Bond',
+      say: (n, w) => `a foe hit by both within ${w}s takes ${n > 1 ? 20 : 10}% more from the Stormborn for 4s.`, fx: X => { X.c.sbHuntT = G.time + 4; X.c.sbHuntK = X.n > 1 ? .2 : .1; },
+      cap: { name: 'Blood Trail', art: 'holy:Blood Trail', say: () => 'The Hunt also marks the nearest foe within 1.5 cells.', fx: X => { const q = X.near(1.5, 1)[0]; if (q) { q.sbHuntT = G.time + 4; q.sbHuntK = X.n > 1 ? .2 : .1; } } } },
+    sb_p_updraft: { name: 'Updraft', a: U.cloud, b: U.wind, w: 2, col: ['#d8eef0', '#9cc8f0'], art: 'holy:Rising Air',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes ${n} more foe${n > 1 ? 's' : ''} within 2 cells for 50%.`, fx: N.more(.5),
+      cap: { name: 'Wide Funnel', art: 'holy:Wide Funnel', say: () => 'Updraft strikes 1 more foe.', fx: X => { const q = X.near(2, X.n + 1)[X.n]; if (q) X.hit(q, X.amt * .5); } } },
+    sb_p_ground: { name: 'Old Ground', a: U.spirit, b: U.earth, w: 2, col: ['#bfe0ff', '#9a8060'], art: 'holy:Mark of the Ancestors',
+      say: (n, w) => `a foe hit by both within ${w}s: the ground breaks for ${n > 1 ? 100 : 60}% of the second hit to foes within 0.8 cells.`, fx: N.splash(.6, 1, .8),
+      cap: { name: 'Stone Remembers', art: 'earth:Stone Remembers', say: () => 'Old Ground stuns the ground foes it hits 0.4s (bosses less).', fx: X => { for (const q of [X.c].concat(X.near(.8))) if (!q.dead && !q.fly) stun(q, .4, false, null); } } },
+    sb_p_squall: { name: 'Squall', a: U.hail, b: U.wind, w: 2, col: ['#eef6ff', '#d8eef0'], art: 'arrow:Hurricane Volley',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes the foe behind it for ${n > 1 ? 80 : 50}%.`, fx: N.behind(.5, .8),
+      cap: { name: 'Twin Gale', art: 'arrow:Twin Gale', say: () => 'Squall strikes the foe behind that one too.', fx: X => { const q = X.near(1.6, 2)[1]; if (q) X.hit(q, X.amt * (X.n > 1 ? .8 : .5)); } } },
+    sb_p_pack: { name: 'Spirit Pack', a: U.spirit, b: U.wolf, w: 2, col: ['#bfe0ff', '#d8c8a8'], art: 'glaive:Spirit Pack',
+      say: (n, w) => `a foe hit by both within ${w}s loses ${n > 1 ? 4 : 2} armour for 4s.`, fx: N.armour(2, 4),
+      cap: { name: 'Wolf at the Throat', art: 'glaive:Wolf at the Throat', say: () => 'A foe Spirit Pack took takes 15% more from Spirit Walkers and Wolfguard for 3s.', fx: X => { X.c.sbPackT = G.time + 3; } } },
+  },
+  army: [
+    [{ id: 'sb_w_drums', name: 'Rain Drums', art: 'holy:Drum in the Rain', text: () => 'Stormborn units regain mana 20% faster.', live: N.mana(.2) },
+     { id: 'sb_w_winds', name: 'Quick Winds', art: 'holy:Swift Spirits', text: () => 'Stormborn spells come back 8% faster.', live: N.cd(.08) }],
+    [{ id: 'sb_w_tribes', name: 'Many Tribes', art: 'holy:Elder Spirits', text: n => `Each other Stormborn kind within 2 cells: attacks ${3 * n}% faster, up to 3 kinds.`, live: N.kinds(.03) },
+     { id: 'sb_w_hides', name: 'Thick Hides', art: 'holy:Wolf Den', text: n => `Stormborn units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) }],
+    [Object.assign({ id: 'sb_w_rhythm', name: 'Drum Rhythm', art: 'holy:Thunder Drum', text: n => `Every ${n > 1 ? 6 : 8}th attack of a Stormborn unit hits 50% harder.` }, N.rhythm('sbRhy')),
+     { id: 'sb_w_gift', name: "Shaman's Gift", art: 'holy:Offering Bowl', text: n => `Stormborn spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
+    [{ id: 'sb_w_rain', name: 'First Rain', art: 'holy:Rainwell', text: () => 'Each wave: Stormborn units start it with at least half their mana.', wave: N.halfMana },
+     { id: 'sb_w_eyes', name: 'Hawk Eyes', art: 'holy:Ancestral Sight', text: () => 'Stormborn units: +5% crit chance.', live: N.crit(null, .05) }],
+    { id: 'sb_storm', name: 'The Storm', art: 'holy:Storm Caller', text: () => 'Your spells raise a Storm over the field: Gale at 25, Rain at 50, Hail at 75, and at 100 a Tempest of thunderbolts.' },
+  ],
+  cmd: {
+    sb_caller: [
+      { id: 'sb_c_drum', name: 'Thunder Drum', art: 'storm:Stormcaller', text: () => 'Thunder Callers attack 6% faster.', live: N.fast(U.thunder, .06) },
+      [{ id: 'sb_c_crown', name: 'Copper Crown', art: 'storm:Copper Crown', text: n => `Thunder Callers: +${4 * n}% crit chance.`, live: N.crit(U.thunder, .04) },
+       { id: 'sb_c_sky', name: 'Wide Sky', art: 'storm:Long Leap', text: n => `Thunder Callers: +${gNf(.2 * n)} range.`, live: N.range(U.thunder, .2) }],
+      [{ id: 'sb_c_rainsong', name: 'Rain Song', art: 'holy:Rain on Rain', text: n => `Hail Shaman spells cost ${10 * n}% less.`, cost: N.cost(U.hail, .1) },
+       { id: 'sb_c_static', name: 'Static', art: 'storm:Static Field', text: n => `Stormborn hits on a wet foe: ${10 * n}% harder.`, amp: (c, amt, src, n) => (c.sbWetT > G.time ? amt * (1 + .1 * n) : amt) }],
+      [N.gift('sb_c_gift_ca', 'Stormcrown', 'holy:Crown of Rain', "Tarka's gift and his Champion's trait: the Storm builds 20% faster, 4 more thunderbolts strike when it breaks, and his every 4th hit calls a bolt."),
+       { id: 'sb_c_voice', name: "Caller's Voice", art: 'holy:Thunder Totem', text: () => "Tarka's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'sb_c_call', name: 'Call the Thunder', art: 'storm:Tempest Caller', text: () => 'Tarka casts a spell: Stormborn units within 3 cells attack 20% faster for 4s.' }, N.champCall((t, st) => ftkFast(st, .2), 'sbCallT', 4, '#8fc0ff')),
+    ],
+    sb_wind: [
+      { id: 'sb_c_tail', name: 'Tailwind', art: 'holy:Wind at Her Back', text: () => 'Windrunners: +0.2 range.', live: N.range(U.wind, .2) },
+      [{ id: 'sb_c_swift', name: 'Swift Arrows', art: 'arrow:Quick Wind', text: n => `Windrunners attack ${5 * n}% faster.`, live: N.fast(U.wind, .05) },
+       { id: 'sb_c_gale', name: 'Long Gale', art: 'cannon:Far Dance', text: n => `Cloud Dancers: +${gNf(.2 * n)} range.`, live: N.range(U.cloud, .2) }],
+      [{ id: 'sb_c_feather', name: 'Feather-Cut', art: 'holy:Feather-Cut', text: n => `Windrunners: +${4 * n}% crit chance.`, live: N.crit(U.wind, .04) },
+       { id: 'sb_c_song', name: 'Wind Song', art: 'cannon:Rain Dance', text: n => `Cloud Dancer spells cost ${10 * n}% less.`, cost: N.cost(U.cloud, .1) }],
+      [N.gift('sb_c_gift_wi', 'Turn the Road', 'holy:Turn the Road', "Oshana's gift and her Champion's trait: the wind pushes ground foes back up the road every 6s, Windrunners reach 0.2 farther, and she strikes 12% faster."),
+       { id: 'sb_c_breath', name: "Elder's Breath", art: 'holy:Howling Wind', text: () => "Oshana's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'sb_c_backs', name: 'Wind at Their Backs', art: 'holy:Biting Gale', text: () => 'Oshana casts a spell: Windrunners within 3 cells attack 30% faster for 3s.' }, N.champCall((t, st) => ftkFast(st, .3), 'sbBacksT', 3, '#d8eef0', U.wind)),
+    ],
+    sb_beast: [
+      { id: 'sb_c_pace', name: 'Pack Pace', art: 'holy:Pack Pace', text: () => 'Wolfguard attack 6% faster.', live: N.fast(U.wolf, .06) },
+      [{ id: 'sb_c_run', name: 'Spirit Run', art: 'holy:Spirit Run', text: n => `Spirit Walkers attack ${5 * n}% faster.`, live: N.fast(U.spirit, .05) },
+       { id: 'sb_c_nose', name: 'Keen Nose', art: 'holy:Keen Nose', text: n => `Skyhunters: +${gNf(.2 * n)} range.`, live: N.range(U.sky, .2) }],
+      [{ id: 'sb_c_blood', name: "Hunter's Breath", art: "holy:Hunter's Breath", text: n => `Stormborn hits on a foe below half health: ${10 * n}% harder.`, amp: (c, amt, src, n) => (c.hp < c.maxHp * .5 ? amt * (1 + .1 * n) : amt) },
+       { id: 'sb_c_hunger', name: 'Pack Hunger', art: 'holy:Pack Hunger', text: n => `Wolfguard spells cost ${10 * n}% less.`, cost: N.cost(U.wolf, .1) }],
+      [N.gift('sb_c_gift_be', 'Wolfsong', 'holy:Wolfsong', "Huri's gift and her Champion's trait: spirit animals strike 20% harder, every Wolfguard's wolf drags a foe down every 2nd attack, and a spirit wolf runs at her side."),
+       { id: 'sb_c_ease', name: "Beastcaller's Ease", art: 'holy:Beastcaller', text: () => "Huri's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'sb_c_great', name: 'The Great Hunt', art: 'holy:Fierce Spirits', text: () => 'Huri casts a spell: Stormborn units within 3 cells cast their next spell 25% harder.' }, N.champEmp('#d8c8a8')),
+    ],
+  },
+});
+ftkFireWrap('stormborn');
+FTREE.stormborn.byId.sb_p_hunt.amp = (c, amt, src) => (c.sbHuntT > G.time && src.def.force === 'stormborn' ? amt * (1 + (c.sbHuntK || 0)) : amt);
+FTREE.stormborn.byId.sb_p_pack.amp = (c, amt, src) => (c.sbPackT > G.time && (src.def.unit === U.spirit || src.def.unit === U.wolf) ? amt * 1.15 : amt);
+}
+// the Storm waits for its capstone
+for (const fn of ['sbFeed', 'sbSurge']) {
+  const f0 = globalThis[fn]; if (typeof f0 !== 'function' || f0._ft) continue;
+  const w = function () { if (typeof G !== 'undefined' && G && G.force === 'stormborn' && !ftLive('stormborn')) return; return f0.apply(this, arguments); };
+  w._ft = 1; globalThis[fn] = w;
+}
+if (typeof sbWeather === 'function' && !sbWeather._ft) {
+  const w0 = sbWeather;
+  sbWeather = function () { if (G.force === 'stormborn' && !ftLive('stormborn')) { const S = sbS(); S.storm = 0; S.lv = 0; S.tempT = 0; return; } return w0.apply(this, arguments); };
+  sbWeather._ft = 1;
+}
+
+/* =====================================================================================================
+   THE WARDBOUND (v4 on the kit). Whole Army's capstone is Runes: before it the units' attacks carve no runes (a spell whose
+   whole effect is runes still carves them: they are the spell). The commanders: Varic (the last warden: the line), Aedric
+   (the sun's charge: Lancers), Isaura (veiled oaths: frost and vows).
+   ===================================================================================================== */
+{
+const N = FTKN, U = { oath: 'wb_oathbound', glaive: 'wb_maskedwarden', frost: 'wb_frostbrand', rune: 'wb_runecarver', lance: 'wb_stormward', anvil: 'wb_anvilguard', siege: 'wb_siegewarden', vow: 'wb_vowkeeper' };
+const exposed = c => (typeof wbBrandOf === 'function' ? wbBrandOf(c) > 0 : false);
+ftKit('wardbound', {
+  short: 'wb', name: 'Wardbound', hue: '#f0c050',
+  say: 'Your wardens start plain. Force points make them yours: a pair of units, the whole army, or your commander.',
+  intro: 'A force point: open the talents, Force tab. Pick a pair, a perk for the whole army, or your commander\'s first gift.',
+  live: () => ftHas('wb_runes') > 0,
+  vs: { wb_runes: 1 },
+  sArt: { bond: 'holy:Shared Vow', drill: 'holy:Old Discipline', breath: 'holy:Ready Vow', hold: 'holy:Hold Fast', cap: 'holy:The Gate Holds' },
+  pairs: {
+    wb_p_wall: { name: 'Shield Wall', a: U.oath, b: U.anvil, w: 2, col: ['#f0c050', '#c8c0b4'], art: 'earth:Wall of Shields',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit strikes again for ${n > 1 ? 70 : 40}%.`, fx: N.again(.4, .7),
+      cap: { name: 'Unbroken Line', art: 'glaive:Unbroken Line', say: () => 'Shield Wall\'s second strike also hits the nearest foe within 1 cell.', fx: X => { const q = X.near(1, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); } } },
+    wb_p_cross: { name: 'Crosswind', a: U.lance, b: U.glaive, w: 2, col: ['#8fc0ff', '#f0c050'], art: 'arrow:Returning Oath',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes ${n} more foe${n > 1 ? 's' : ''} within 2 cells for 50%.`, fx: N.more(.5),
+      cap: { name: 'Twin Wards', art: 'arrow:Twin Wards', say: () => 'Crosswind strikes 1 more foe.', fx: X => { const q = X.near(2, X.n + 1)[X.n]; if (q) X.hit(q, X.amt * .5); } } },
+    wb_p_bolt: { name: 'Frozen Bolt', a: U.frost, b: U.siege, w: 2, col: ['#bfe0ff', '#c8c0b4'], art: 'cannon:Heavy Bolts',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes the foe behind it for ${n > 1 ? 80 : 50}%.`, fx: N.behind(.5, .8),
+      cap: { name: 'Long Pin', art: 'cannon:Long Pin', say: () => 'Frozen Bolt strikes the foe behind that one too.', fx: X => { const q = X.near(1.6, 2)[1]; if (q) X.hit(q, X.amt * (X.n > 1 ? .8 : .5)); } } },
+    wb_p_signed: { name: 'Signed Oath', a: U.rune, b: U.vow, cast: 1, col: ['#f4e8ff', '#f0c050'], art: 'arcane:Ink of Binding',
+      say: n => `a spell cast by one: the other's spells within 2.5 cells come ${n > 1 ? 3 : 1.5}s sooner.`, fx: N.cdPair,
+      cap: { name: 'Shared Margins', art: 'arcane:Shared Margins', say: () => 'Signed Oath also gives the partner 15 mana.', fx: X => { if (X.b) gainMana(X.b, 15); } } },
+    wb_p_cross2: { name: 'Crossfire', a: U.glaive, b: U.siege, w: 2, col: ['#f0c050', '#c8c0b4'], art: 'cannon:Ballista Volley',
+      say: (n, w) => `a foe hit by both within ${w}s: a blast of ${n > 1 ? 100 : 60}% of the second hit strikes foes within 0.8 cells.`, fx: N.splash(.6, 1, .8),
+      cap: { name: 'Shatter Shot', art: 'cannon:Shatter Shot', say: () => 'Crossfire stuns the ground foes it hits 0.4s (bosses less).', fx: X => { for (const q of [X.c].concat(X.near(.8))) if (!q.dead && !q.fly) stun(q, .4, false, null); } } },
+    wb_p_brand: { name: 'Brand and Oath', a: U.vow, b: U.frost, w: 2, col: ['#f0c050', '#bfe0ff'], art: 'frost:Brand-Rime',
+      say: (n, w) => `a foe hit by both within ${w}s loses ${n > 1 ? 4 : 2} armour for 4s.`, fx: N.armour(2, 4),
+      cap: { name: 'Bitter Steel', art: 'frost:Bitter Steel', say: () => 'A foe Brand and Oath took takes 15% more from Vowkeepers and Frostbrand Sentries for 3s.', fx: X => { X.c.wbBrandT2 = G.time + 3; } } },
+  },
+  army: [
+    [{ id: 'wb_w_oaths', name: 'Steady Oaths', art: 'holy:Patient Oath', text: () => 'Wardbound units regain mana 20% faster.', live: N.mana(.2) },
+     { id: 'wb_w_wards', name: 'Swift Wards', art: 'holy:Quiet Step', text: () => 'Wardbound spells come back 8% faster.', live: N.cd(.08) }],
+    [{ id: 'wb_w_sworn', name: 'Sworn Brothers', art: 'holy:Shield Brothers', text: n => `Each other Wardbound kind within 2 cells: attacks ${3 * n}% faster, up to 3 kinds.`, live: N.kinds(.03) },
+     { id: 'wb_w_mail', name: 'Ward-Mail', art: 'earth:Broad Shield', text: n => `Wardbound units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) }],
+    [Object.assign({ id: 'wb_w_march', name: 'March Rhythm', art: 'holy:Steady Pace', text: n => `Every ${n > 1 ? 6 : 8}th attack of a Wardbound unit hits 50% harder.` }, N.rhythm('wbRhy')),
+     { id: 'wb_w_thrift', name: 'Vow Thrift', art: 'holy:Silent Vow', text: n => `Wardbound spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
+    [{ id: 'wb_w_vigil', name: 'Night Vigil', art: 'holy:Long Vigil', text: () => 'Each wave: Wardbound units start it with at least half their mana.', wave: N.halfMana },
+     { id: 'wb_w_watch', name: 'Keen Watch', art: 'holy:Shared Watch', text: () => 'Wardbound units: +5% crit chance.', live: N.crit(null, .05) }],
+    { id: 'wb_runes', name: 'Runes', art: 'arcane:Scribe the Road', text: () => 'Your units\' attacks carve their runes into the road. The next ground foe to step on one sets it off and is Exposed.' },
+  ],
+  cmd: {
+    wb_varic: [
+      { id: 'wb_c_hand', name: 'Measured Hand', art: 'holy:Measured Sweeps', text: () => 'Oathbound attack 6% faster.', live: N.fast(U.oath, .06) },
+      [{ id: 'wb_c_kept', name: 'Oath Kept', art: 'glaive:Oath Kept', text: n => `Oathbound: +${4 * n}% crit chance.`, live: N.crit(U.oath, .04) },
+       { id: 'wb_c_reach', name: "Warden's Reach", art: "holy:Warden's Reach", text: n => `Glaive Wardens: +${gNf(.2 * n)} range.`, live: N.range(U.glaive, .2) }],
+      [{ id: 'wb_c_gate', name: 'The Last Gate', art: 'holy:The Last Gate', text: n => `Wardbound hits on a foe past half the road: ${10 * n}% harder.`,
+         amp: (c, amt, src, n) => { const L = G.path ? (G.path.len || G.path.length || 0) : 0; return L && c.remain != null && c.remain < L / 2 ? amt * (1 + .1 * n) : amt; } },
+       { id: 'wb_c_lore', name: 'Rune Lore', art: 'arcane:Deep Script', text: n => `Runecarver spells cost ${10 * n}% less.`, cost: N.cost(U.rune, .1) }],
+      [N.gift('wb_c_gift_va', 'The Last Warden', 'holy:Last Warden', "Varic's gift and his Champion's trait: foes past half the road that spring a rune are rooted 0.4s, and his attacks root foes standing on a rune."),
+       { id: 'wb_c_word', name: "Warden's Word", art: 'holy:Held to Account', text: () => "Varic's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'wb_c_line', name: 'The Road Remembers', art: 'holy:The Road Remembers', text: () => 'Varic casts a spell: Wardbound units within 3 cells attack 20% faster for 4s.' }, N.champCall((t, st) => ftkFast(st, .2), 'wbLineT', 4, '#f0c050')),
+    ],
+    wb_aedric: [
+      { id: 'wb_c_sworn', name: 'Sun-Sworn', art: 'holy:Sun-Sworn', text: () => 'Stormward Lancers attack 6% faster.', live: N.fast(U.lance, .06) },
+      [{ id: 'wb_c_charge', name: 'Sun Charge', art: 'holy:Sun Charge', text: n => `Stormward Lancers: +${gNf(.2 * n)} range.`, live: N.range(U.lance, .2) },
+       { id: 'wb_c_mark', name: 'Sunlit Edge', art: 'holy:Sunlit Reach', text: n => `Stormward Lancers: +${4 * n}% crit chance.`, live: N.crit(U.lance, .04) }],
+      [{ id: 'wb_c_blades', name: 'Bright Blades', art: 'holy:Searing Wheel', text: n => `Wardbound hits on an Exposed foe: ${10 * n}% harder.`, amp: (c, amt, src, n) => (exposed(c) ? amt * (1 + .1 * n) : amt) },
+       { id: 'wb_c_solar', name: 'Solar Vows', art: "holy:Sun's Due", text: n => `Vowkeeper spells cost ${10 * n}% less.`, cost: N.cost(U.vow, .1) }],
+      [N.gift('wb_c_gift_ae', 'Momentum', 'holy:Blaze of Glory', "Aedric's gift and his Champion's trait: army kills build Momentum (+2% attack speed each, up to 10), and his hits on Exposed foes set them burning."),
+       { id: 'wb_c_grace', name: "Sun's Grace", art: 'holy:Eager Sun', text: () => "Aedric's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'wb_c_noon', name: 'Noonday Charge', art: 'holy:Into the Fray', text: () => 'Aedric casts a spell: Stormward Lancers within 3 cells attack 30% faster for 3s.' }, N.champCall((t, st) => ftkFast(st, .3), 'wbNoonT', 3, '#ffd890', U.lance)),
+    ],
+    wb_isaura: [
+      { id: 'wb_c_step', name: 'Veiled Step', art: 'holy:Veiled Oath', text: () => 'Frostbrand Sentries attack 6% faster.', live: N.fast(U.frost, .06) },
+      [{ id: 'wb_c_cold', name: 'Cold Oath', art: 'frost:Cold Vigil', text: n => `Frostbrand Sentries: +${gNf(.2 * n)} range.`, live: N.range(U.frost, .2) },
+       { id: 'wb_c_quiet', name: 'Quiet Vows', art: 'venom:Sworn Vow', text: n => `Vowkeepers attack ${5 * n}% faster.`, live: N.fast(U.vow, .05) }],
+      [{ id: 'wb_c_broken', name: 'Broken Vows', art: 'holy:Oath Turned', text: n => `Wardbound hits on a rooted or stunned foe: ${10 * n}% harder.`, amp: (c, amt, src, n) => (c.stunT > 0 || c.rootT > G.time ? amt * (1 + .1 * n) : amt) },
+       { id: 'wb_c_veil', name: 'Veil Thrift', art: 'frost:Winter Ward', text: n => `Frostbrand Sentry spells cost ${10 * n}% less.`, cost: N.cost(U.frost, .1) }],
+      [N.gift('wb_c_gift_is', 'Veil of Oaths', 'holy:Witness of Vows', "Isaura's gift and her Champion's trait: a held foe that breaks free on a rune takes 5% of its health and is Exposed, and her attacks root ground foes 0.4s."),
+       { id: 'wb_c_whisper', name: 'Whispered Oath', art: 'holy:Tighter Bonds', text: () => "Isaura's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'wb_c_bind', name: 'Oathbinder', art: 'holy:Vow Carved', text: () => 'Isaura casts a spell: Wardbound units within 3 cells cast their next spell 25% harder.' }, N.champEmp('#f0c050')),
+    ],
+  },
+});
+ftkFireWrap('wardbound');
+FTREE.wardbound.byId.wb_p_brand.amp = (c, amt, src) => (c.wbBrandT2 > G.time && (src.def.unit === U.vow || src.def.unit === U.frost) ? amt * 1.15 : amt);
+}
+// Runes wait for their capstone: an attack's rune (not a spell's: those runes are the spell) is carved only with it
+if (typeof wbRune === 'function' && !wbRune._ft) {
+  const r0 = wbRune;
+  wbRune = function () {
+    const spell = typeof AB_NOW !== 'undefined' && AB_NOW && DTAG === AB_TAG;
+    if (G.force === 'wardbound' && !G.vs && !ftLive('wardbound') && !spell) return null;
+    const z = r0.apply(this, arguments); if (z && !spell) z.ftAtk = 1;   // (an attack's rune: the tests count these)
+    return z;
+  };
+  wbRune._ft = 1;
+}
+
 /* ================= THE SILVER ORDER'S LEGENDARIES, remade (25 Nov 2026) =================
    Owner: "legendaries should alter a spell in a huge way or create a noticeable difference", "more powerful passive chance on
    attack things. perhaps chain, chains units together, then if one in the chain dies the rest get hit and chained", and of the
@@ -78543,8 +78731,11 @@ const SCENE3D_MAPS = {
       mistSwirl: [[-14, 1.1, 5, 3.4, 5], [25, 1.1, 7, 3.4, 5]] },
   },
 };
-for (const id in SCENE3D_MAPS) { const C = SCENE3D_MAPS[id]; assetReady(C.asset, scene3dApply); if (C.paint) assetReady(C.paint.asset, scene3dApply); }
-assetReady('hivepaint', scene3dApply);
+// an asset already in (an inline build, or test.html's) runs its callback at once, while this file loads: before view.js's
+// deskHud exists, which threw and stopped the whole script; the setTimeout at the foot applies it again once all is loaded
+const scene3dSoon = () => { try { scene3dApply(); } catch (e) { if (!(e instanceof ReferenceError)) throw e; } };
+for (const id in SCENE3D_MAPS) { const C = SCENE3D_MAPS[id]; assetReady(C.asset, scene3dSoon); if (C.paint) assetReady(C.paint.asset, scene3dSoon); }
+assetReady('hivepaint', scene3dSoon);
 if (typeof setInterval === 'function') { const iv = setInterval(() => { try { scene3dHook(); if (S3W.hooked) clearInterval(iv); } catch (e) {} }, 500); }
 // desktops ask for the scenes when the region map opens; a phone never does
 if (typeof rgOpen === 'function') {
