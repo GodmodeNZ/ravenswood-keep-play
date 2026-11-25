@@ -1,4 +1,4 @@
-const BUILD_TAG = '4f35e9d0@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'dec021a2@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -62672,7 +62672,7 @@ const EZ_KIND = {
   regen: { tag: 'Mana', mod: (n, a) => ({ manaRegen: a * n }),
     say: x => { const g0 = x.kit ? x.kit.mana.regen : 0; return `Mana a second ${ezR(g0)} → ${ezR(g0 + x.a * x.n)}.`; } },
   mhit: { tag: 'Mana', mana: a => ({ strike: [a, 'any'] }),
-    say: x => { const h0 = x.kit ? x.kit.mana.hit : 0; return x.w ? `Each ${x.w} gives ${ezR(h0)} → ${ezR(h0 + x.a * x.n)} mana.` : `Mana an attack ${ezR(h0)} → ${ezR(h0 + x.a * x.n)}.`; } },
+    say: x => `Each ${x.w || 'attack'} gives ${ezR(x.a * x.n)} more mana.` },   /* (one number: owner, 26 Nov 2026, of "gives 1.24 → 2.74 mana": it "reads badly") */
   spcd: { tag: 'Spell', cap: 'ezCd',
     say: x => { const ab = x.kit && x.kit.abilities[0]; return ab ? `Its spells come ${ezP(x.a * x.n)}% sooner: ${ab.name} every ${ezR(ab.cd)}s → ${ezR(ab.cd * (1 - x.a * x.n))}s.` : `Its spells come ${ezP(x.a * x.n)}% sooner.`; } },
   spcost: { tag: 'Spell', mana: (a, kit) => { const cheap = {}; if (kit) for (const ab of kit.abilities) cheap[ab.id] = a; return { cheap }; },
@@ -62726,6 +62726,10 @@ function ezSpell(force, slot, name, abId, what, say) {
   if (!ab) { if (typeof console !== 'undefined') console.warn('easy talents: no spell', abId, name); return null; }
   ezClear(t);
   t.tag = 'Spell'; t.ez = 'spell'; t.ezAb = abId;
+  if (what.name && what.name !== t.name) {   /* (a new name: the old painting stays, as the attack pass's renames keep theirs) */
+    if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[what.name]) TAL_ART_ALIAS[what.name] = TAL_ART_ALIAS[t.name] || t.name;
+    t.oldName = t.oldName || t.name; t.name = what.name;
+  }
   t.sp = n => {
     const e = { ab: abId };
     if (what.cd) e.cd = -what.cd * n / ab.cd;
@@ -62740,7 +62744,7 @@ function ezSpell(force, slot, name, abId, what, say) {
     if (what.cost) bits.push(`${what.costs || 'costs'} ${Math.round(ab.mana)} → ${Math.round(ab.mana - what.cost * M)} mana`);
     if (what.pow) bits.push(`${what.verb || 'hits'} ${ezP(what.pow * M)}% harder`);
     if (what.by && say) bits.push(say(M, ab));
-    return `${ab.name} ${bits.join(' and ')}.`;
+    return what.text ? what.text(M, ab) : `${ab.name} ${bits.join(' and ')}.`;
   };
   EZ.list.push({ force, slot, name: t.name, kind: 'spell', ab: abId, max: t.max });
   return t;
@@ -62926,7 +62930,7 @@ if (typeof abAuto === 'function') {
      Riftblades, Riftsteel Flurry, Rift Dance ---------- */
   ezSpell(F, 'glaive', 'Measured Cuts', 'cc_blinkstrike', { pow: .2, verb: 'slices' });
   ezFlav(F, 'glaive', 'Opening Salute', 'rhythm', .03, 'pass of its riftblade');
-  ezTal(F, 'glaive', 'Riftsteel Rhythm', 'mhit', 1.2, 0, 'pass of its riftblade');
+  ezSpell(F, 'glaive', 'Riftsteel Rhythm', 'cc_blinkstrike', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'glaive', 'Fresh Blood', 'cc_sigilcleave', { cd: 1.5, back: 'cleaves every' });
   ezFlav(F, 'glaive', 'Lone Duel', 'tempo', .04, 'swings its riftblade');
   ezSpell(F, 'glaive', 'Thousand Edges', 'cc_spectral', { cd: 3, back: 'is thrown every' });
@@ -62942,7 +62946,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'arrow', 'Last Lesson', 'momentum', .03, 'casts missiles');
   ezSpell(F, 'arrow', 'Charged Recital', 'cc_grandorb', { pow: .2, verb: 'breaks' });
   ezSpell(F, 'arrow', 'Overflowing Missile', 'cc_barrage', { cd: .75, back: 'is loosed every' });
-  ezTal(F, 'arrow', 'Study Rhythm', 'mhit', .4, 0, 'missile she casts');
+  ezFlav(F, 'arrow', 'Study Rhythm', 'tap', .5, 'the Mageling');
 
   /* ---------- Frostweavers (control). Kept: Chilling Bolts, Icicle Through, Deep Freeze, Absolute Stillness, Second
      Spear; capstones Deep Winter, Icicle Volley, Coffin Burst ---------- */
@@ -62950,7 +62954,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'frost', 'Cracking Cold', 'overflow', .1, 'her icicles hit');
   ezTal(F, 'frost', 'Long Staff', 'reach', .25, 0, 'Her staff reaches');
   ezFlav(F, 'frost', 'Cold Library', 'tap', .5, 'the Frostweaver');
-  ezTal(F, 'frost', 'Frost Rhythm', 'mhit', 1.5, 0, 'icicle she weaves');
+  ezSpell(F, 'frost', 'Frost Rhythm', 'cc_glacialglyph', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'frost', 'Cold Focus', 'cc_rimelance', { by: { dur: .3 } }, v => `holds its foe in the ice ${ezR(.3 * v)}s longer`);
   ezFlav(F, 'frost', 'Rime Spirit', 'echo', .3, 'weaves icicles');
 
@@ -62960,7 +62964,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'arcane', 'Hour of Need', 'echo', .2, 'turns its hourglass');
   ezSpell(F, 'arcane', 'Spare Seconds', 'cc_dilation', { by: { dur: .5 } }, v => `holds time ${ezR(.5 * v)}s longer`);
   ezFlav(F, 'arcane', 'Clockwork Familiar', 'rhythm', .03, 'tick it sends');
-  ezTal(F, 'arcane', 'Time Rhythm', 'mhit', 1, 0, 'tick it sends');
+  ezSpell(F, 'arcane', 'Time Rhythm', 'cc_dilation', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezTal(F, 'arcane', 'Long Hour', 'reach', .25, 0, 'Its hours reach');
 
   /* ---------- Astrologers (damage: no control). Kept: Star-Chart, Orbiting Spark, Shooting Bolt, Skyward Eye, Long Lens,
@@ -62994,7 +62998,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, V, 'Ward Feedback', 'tap', .5, 'the Severer');
   ezFlav(F, V, 'Quick Severing', 'tempo', .01, 'sends her crescent out');
   ezTal(F, V, 'Long Throw of the Glaive', 'reach', .2, 0, 'Her crescent flies');
-  ezTal(F, V, 'Sever Rhythm', 'mhit', 1.5, 0, 'crescent she throws');
+  ezSpell(F, V, 'Sever Rhythm', 'cc_sunder', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, 'Paired Crescents', 'cc_shards', { cd: 1.5, back: 'wheels back every' });
   ezSpell(F, V, 'Honed by Spells', 'cc_sunder', { pow: .08, verb: 'rends' });
 }
@@ -63017,7 +63021,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'glaive', 'Tossed Off the Point', 'brambleguard', { by: { n: 1 } }, v => `catches ${v} more foe${v > 1 ? 's' : ''}`);
   ezSpell(F, 'glaive', 'Braced Rhythm', 'lunge', { cd: 1, back: 'returns every' });
   ezSpell(F, 'glaive', 'Last Thrust', 'sunder', { cd: 2, back: 'rises every' });
-  ezTal(F, 'glaive', 'Spear Rhythm', 'mhit', 1, 0, 'jab of its thornspear');
+  ezTal(F, 'glaive', 'Spear Rhythm', 'mhit', 1, 0, 'jab of its thornspear');   /* (kept: Battle Trance on the owner's menu; without it the Spears fall a third) */
 
   /* ---------- Gladebow Rangers (damage: no control). Kept: Quick Nock, Thornpoint Arrows, Through the Gap; capstones
      Deadeye Draw, Thornrain, Hail of Shafts ---------- */
@@ -63029,11 +63033,11 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'arrow', 'Running Fire', 'momentum', .03, 'draws and looses');
   ezTal(F, 'arrow', 'Long Draw', 'reach', .25, 0, 'Its longbow carries');
   ezSpell(F, 'arrow', 'Spent Shaft', 'aimedshot', { cost: 8, costs: 'takes' });
-  ezTal(F, 'arrow', "Fletcher's Focus", 'mhit', .4, 0, 'shaft it looses');
+  ezTal(F, 'arrow', "Fletcher's Focus", 'mhit', .4, 0, 'shaft it looses');   /* (kept: Battle Trance; without it the Rangers fall a quarter) */
 
   /* ---------- Briarwardens (control). Kept: Deep Roots, Thorned Vines, Thorn Hold, Second Snare, Spreading Roots,
      Lashing Roots, Root Run, Rootburst; capstones Briar Spirit, Overgrowth, Strangleroot ---------- */
-  ezTal(F, 'frost', 'Sap Rhythm', 'mhit', 1.7, 0, 'root it sends');
+  ezTal(F, 'frost', 'Sap Rhythm', 'mhit', 1.7, 0, 'root it sends');   /* (kept: Battle Trance on the owner's menu; without it the Briarwardens fall a third) */
   ezSpell(F, 'frost', 'Closing Grip', 'thicket', { pow: .6, verb: 'crushes' });
   ezFlav(F, 'frost', 'Quick Staff', 'echo', .5, 'plants its staff');
   ezTal(F, 'frost', 'Long Roots', 'reach', .25, 0, 'Its roots creep');
@@ -63041,7 +63045,7 @@ if (typeof abAuto === 'function') {
   /* ---------- Stag Lancers (damage: no control). Kept: Heavy Lance, Goring Antlers (its payoff on a held foe), Trample,
      Through and On, Lord of the Glade;
      capstones Endless Hunt, Hooves of Thunder, White Stag Spirit ---------- */
-  ezTal(F, 'arcane', "Hunter's Breath", 'mhit', 2, 0, 'pass of its lance');
+  ezTal(F, 'arcane', "Hunter's Breath", 'mhit', 2, 0, 'pass of its lance');   /* (kept: Battle Trance; without it the Stag Lancers fall a quarter) */
   ezSpell(F, 'arcane', 'Fresh Legs', 'stampede', { cd: 1.5, back: 'can be leapt every' });
   ezSpell(F, 'arcane', 'Scent of Quarry', 'heroiccharge', { cd: 1.5, back: 'sounds every' });
 
@@ -63049,7 +63053,7 @@ if (typeof abAuto === 'function') {
      payoff on a held foe); capstones Skyfall, Owl
      Lord, Rampage ---------- */
   ezSpell(F, 'storm', 'Shift Surge', 'shift', { cd: 1, back: 'comes every' });
-  ezTal(F, 'storm', 'Wild Rhythm', 'mhit', 1.5, 0, 'claw, beak or bolt');
+  ezTal(F, 'storm', 'Wild Rhythm', 'mhit', 1.5, 0, 'claw, beak or bolt');   /* (kept: Battle Trance on the owner's menu; without it the Shifters fall 40%) */
   ezSpell(F, 'storm', 'Second Skin', 'shift', { cost: 5, costs: 'asks' });
   ezFlav(F, 'storm', 'Raking Strikes', 'flurry', .15, 'in every form it attacks');
   ezSpell(F, 'storm', 'Wild Sweep', 'wildsurge', { cd: 2, back: 'gathers every' });
@@ -63060,7 +63064,7 @@ if (typeof abAuto === 'function') {
      Bladestorm, Petalfall ---------- */
   ezFlav(F, 'earth', 'Rising Tempo', 'momentum', .03, 'whirls her blades');
   ezTal(F, 'earth', 'Wide Whirl', 'reach', .15, 0, 'Her blades sweep');
-  ezTal(F, 'earth', "Dancer's Breath", 'mhit', .7, 0, 'whirl of her blades');
+  ezSpell(F, 'earth', "Dancer's Breath", 'whirlwind', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezFlav(F, 'earth', 'Shadow Partner', 'flurry', .15, 'whirls her blades');
   ezSpell(F, 'earth', 'Single Partner', 'leafdance', { by: { n: 1 } }, v => `threads ${v} more foe${v > 1 ? 's' : ''}`);
   ezSpell(F, 'earth', 'Parting Cut', 'whirlwind', { pow: .12, verb: 'shears' });
@@ -63081,7 +63085,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, V, 'Bog Hunger', 'bw_swarm', { pow: .2, verb: 'gnaws' });
   ezSpell(F, V, 'Second Gob', 'bw_bogbody', { by: { dur: .5 } }, v => `holds the road ${ezR(.5 * v)}s longer`);
   ezFlav(F, V, 'Drowning Spit', 'overflow', .1, 'her spit hits');
-  ezTal(F, V, 'Bog Rhythm', 'mhit', 1.5, 0, 'gob she spits');
+  ezSpell(F, V, 'Bog Rhythm', 'bw_swarm', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, 'Fen Toad', 'bw_bogdue', { pow: .2, verb: 'drowns' });
   ezFlav(F, V, 'Fen Cackle', 'echo', .2, 'spits');
   ezSpell(F, V, "Witch's Spite", 'bw_bogdue', { cd: 2, back: 'opens every' });
@@ -63101,7 +63105,7 @@ if (typeof abAuto === 'function') {
 
   /* ---------- Ironbreakers (line holder). Kept: Off Balance, Brace and Shove, Bowling Shove, Shield Rush, Bearded Axe,
      Hold the Pass, Hooked Beard; capstones Anvil Strike, Armourbreaker, Shieldbrother ---------- */
-  ezTal(F, 'glaive', 'Forge Rhythm', 'mhit', 1.5, 0, 'chop of its axe');
+  ezFlav(F, 'glaive', 'Forge Rhythm', 'harvest', 5, 'the Ironbreaker');
   ezSpell(F, 'glaive', 'Plate Salvage', 'ih_shieldshove', { cd: .5, back: 'is braced every' });
   ezFlav(F, 'glaive', 'Double Chop', 'tempo', .01, 'brings its axe down');
   ezFlav(F, 'glaive', 'Felling Chop', 'momentum', .04, 'brings its axe down');
@@ -63110,7 +63114,7 @@ if (typeof abAuto === 'function') {
      capstones Thunder Volley (Called Shot and Gatling Crank are the force tree's) ---------- */
   ezSpell(F, 'arrow', 'Both Barrels', 'ih_slug', { cd: 1.5, back: 'is loaded every' });
   ezFlav(F, 'arrow', 'Quick Ramrod', 'tempo', .04, 'reloads and fires');
-  ezTal(F, 'arrow', 'Powder Purse', 'mhit', .5, 0, 'ball it fires');
+  ezSpell(F, 'arrow', 'Powder Purse', 'ih_longshot', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezFlav(F, 'arrow', 'Ricochet', 'watch', .1, 'its thundergun');
   ezSpell(F, 'arrow', "Spotter's Call", 'ih_rollingvolley', { by: { n: 2 } }, v => `fires ${2 * v} more bullets`);
   ezTal(F, 'arrow', 'Long Iron', 'reach', .3, 0, 'Its long iron carries');
@@ -63121,7 +63125,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'frost', 'Two Bolas', 'ih_caltropfield', { by: { trips: 1 } }, v => `trips ${v} more foe${v > 1 ? 's' : ''}`);
   ezFlav(F, 'frost', 'Fresh Quarry', 'tempo', .035, 'whirls its bolas');
   ezTal(F, 'frost', 'Long Arm', 'reach', .3, 0, 'Its bolas fly');
-  ezTal(F, 'frost', "Trapper's Rhythm", 'mhit', 1.5, 0, 'bola that lands');
+  ezSpell(F, 'frost', "Trapper's Rhythm", 'ih_chainnet', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezSpell(F, 'frost', 'Weighted Throws', 'ih_grapple', { cd: 2, back: 'is wound every' });
 
   /* ---------- Anvilwrights (support). Kept: Deep Brand, Forge Spirit, Searing Brand, Flying Sparks, Ringing Strokes;
@@ -63130,12 +63134,12 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'arcane', 'Anvil of Ages', 'rhythm', .02, 'ring of its hammer');
   ezSpell(F, 'arcane', 'Two Brands', 'ih_runeofpower', { by: { n: 1 } }, v => `tempers ${v} more unit${v > 1 ? 's' : ''}`);
   ezFlav(F, 'arcane', 'Big Work', 'echo', .3, 'rings its hammer');
-  ezTal(F, 'arcane', "Anvil's Due", 'mhit', 2.5, 0, 'ring of its hammer');
+  ezFlav(F, 'arcane', "Anvil's Due", 'overflow', .1, 'its hammer hits');
   ezSpell(F, 'arcane', 'Hot Iron', 'ih_runebrand', { cd: 1.5, back: 'is struck every' });
 
   /* ---------- Flak Cannoneers (damage: no control). Kept: Fast Fuses, Barbed Shrapnel, High Sights, Hot Shrapnel, Sky
      Shatter, Torn Wings; capstones Proximity Fuse, Hook the Sky, Twin Mount ---------- */
-  ezTal(F, 'storm', "Gunner's Tithe", 'mhit', .8, 0, 'round of flak');
+  ezSpell(F, 'storm', "Gunner's Tithe", 'ih_flakscreen', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'storm', 'Cluster Shell', 'ih_grapnel', { pow: .1, verb: 'hauls' });
   ezFlav(F, 'storm', 'Quick Traverse', 'tempo', .02, 'fires its flak gun');
   ezSpell(F, 'storm', 'Second Burst', 'ih_flakscreen', { by: { dur: 1 } }, v => `fills the sky ${v}s longer`);
@@ -63151,7 +63155,7 @@ if (typeof abAuto === 'function') {
      capstones Barrage, Crew Chief's Shout, Napalm (Big Bertha and Ringing Ears are the force tree's) ---------- */
   ezSpell(F, 'cannon', 'Bouncing Shell', 'ih_incendiary', { cd: 1.5, back: 'is rammed home every' });
   ezTal(F, 'cannon', 'Cluster Round', 'splash', .1);
-  ezTal(F, 'cannon', 'Powder Monkey', 'mhit', 1.5, 0, 'mortar round');
+  ezSpell(F, 'cannon', 'Powder Monkey', 'ih_incendiary', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezFlav(F, 'cannon', 'Thick of It', 'echo', .3, 'drops rounds');
 
   /* ---------- Siege Breakers. Kept: Shaped Charges, Fuse Cutter, Planted by Hand, Black Powder Pack, Tamped Charges,
@@ -63179,7 +63183,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'glaive', 'Press the Wounded', 'tempo', .04, 'swings its oathblade');
   ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `shines ${v}s longer`);
   ezFlav(F, 'glaive', 'Pommel Finish', 'rhythm', .03, 'stroke of its oathblade');
-  ezTal(F, 'glaive', 'Oath Rhythm', 'mhit', 1.5, 0, 'stroke of its oathblade');
+  ezFlav(F, 'glaive', 'Oath Rhythm', 'harvest', 5, 'the Shieldbearer');
 
   /* ---------- Silverbolt Crossbows (damage: no control). Kept: Opening Shot, Heavy Quarrel, Bodkin Heads, Through and
      Through; capstones Siege Quarrel, Squire at Arms, Storm of Silver ---------- */
@@ -63189,7 +63193,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'arrow', 'Splinter Bolt', 'so_hail', { by: { dur: 1 } }, v => `lights its crowd ${v}s longer`);
   ezSpell(F, 'arrow', 'Hot Crank', 'so_witness', { by: { dur: 1 } }, v => `marks its foe ${v}s longer`);
   ezFlav(F, 'arrow', 'Mercy Bolt', 'watch', .1, 'its quarrels');
-  ezTal(F, 'arrow', 'Bolt Tithe', 'mhit', .6, 0, 'quarrel it looses');
+  ezFlav(F, 'arrow', 'Bolt Tithe', 'tap', .5, 'the Crossbow');
   ezSpell(F, 'arrow', 'Loaded Prayer', 'so_sanct', { cd: .75, back: 'is blessed every' });
 
   /* ---------- Lightbinder Sisters (control). Kept: Tightening Links, Lash Through, Crushing Bind, Blinding Chains,
@@ -63198,11 +63202,11 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'frost', 'Taut Chain', 'tempo', .06, 'cracks her chain');
   ezSpell(F, 'frost', 'Final Lash', 'so_bind', { by: { n: 1 } }, v => `chains ${v} more foe${v > 1 ? 's' : ''}`);
   ezSpell(F, 'frost', 'Snap Back', 'so_flare', { cd: 1.5, back: 'is cast every' });
-  ezTal(F, 'frost', 'Light Rhythm', 'mhit', 1.5, 0, 'crack of her chain');
+  ezSpell(F, 'frost', 'Light Rhythm', 'so_bind', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
 
   /* ---------- Grail Knights (damage: no control). Kept: Full Gallop, Joust, Second Pass, Trampling Hooves, Unhorse;
      capstones Thrice-Wheeled, Glory of the Charge, Part the Ranks ---------- */
-  ezTal(F, 'arcane', "Squire's Purse", 'mhit', 3, 0, 'tilt it rides');
+  ezSpell(F, 'arcane', "Squire's Purse", 'so_grail', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'arcane', 'Ride Through', 'so_ridedown', { by: { n: 1 } }, v => `rides ${v} more pass${v > 1 ? 'es' : ''}`);
   ezSpell(F, 'arcane', 'Vow-Lit Lance', 'so_vow', { by: { dur: 1 } }, v => `rallies its side ${v}s longer`);
   ezTal(F, 'arcane', 'Long Course', 'reach', .3, 0, 'Its course runs');
@@ -63212,7 +63216,7 @@ if (typeof abAuto === 'function') {
   /* ---------- Sunlance Clerics (damage: no control). Kept: Zenith, Scorching Rays, Lingering Beam, Long Ray, Prism,
      Sunburst; capstones Lance upon Lance, Lance of Heaven, High Noon ---------- */
   ezFlav(F, 'storm', 'Halo Wisp', 'echo', .05, 'casts rays of sun');
-  ezTal(F, 'storm', 'Dawn Rhythm', 'mhit', .7, 0, 'ray she casts');
+  ezFlav(F, 'storm', 'Dawn Rhythm', 'overflow', .08, 'her rays hit');
   ezSpell(F, 'storm', 'Little Sun', 'so_halo', { cd: 1, back: 'sweeps every' });
   ezSpell(F, 'storm', 'Noonfire', 'so_sunlance', { pow: .1, verb: 'blazes' });
   ezFlav(F, 'storm', 'Vigil Prayer', 'watch', .05, 'her sunrays');
@@ -63222,7 +63226,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'earth', 'Spinning Third', 'so_crush', { pow: .2, verb: 'cleaves' });
   ezFlav(F, 'earth', 'Sword Prayer', 'harvest', 5, 'the Templar');
   ezSpell(F, 'earth', 'Crossed Finish', 'so_crush', { cd: 1.5, back: 'crosses every' });
-  ezTal(F, 'earth', "Templar's Rhythm", 'mhit', 1.5, 0, 'stroke that lands');
+  ezSpell(F, 'earth', "Templar's Rhythm", 'so_crush', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezSpell(F, 'earth', 'Carried Cut', 'so_hammerfall', { cd: 2, back: 'falls every' });
 
   /* ---------- Censer Bearers. Kept: Fanned Embers, Hot Coals, Choking Smoke, Direct Hit, Pall of Smoke, Rekindling,
@@ -63237,7 +63241,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, V, 'Leaping Lash', 'so_seize', { cd: 1, back: 'is served every' });
   ezTal(F, V, 'Long Chain', 'reach', .2, 0, 'Her seal-chain reaches');
   ezFlav(F, V, 'Seal Slam', 'overflow', .1, 'her seal hits');
-  ezTal(F, V, "Zealot's Tithe", 'mhit', 1.5, 0, 'swing of her seal');
+  ezSpell(F, V, "Zealot's Tithe", 'so_edict', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
 }
 
 /* ================= SIMPLE PASSIVES: THE STORMBORN (26 Nov 2026) =================
@@ -63257,7 +63261,7 @@ if (typeof abAuto === 'function') {
 
   /* ---------- Wolfguard (line holder). Kept: Hunting Bond, Hock Bite; capstones Feeding Frenzy, Storm Wolf, Spirit Pack ---------- */
   ezTal(F, 'glaive', 'Wolf at the Throat', 'pen', .15);
-  ezTal(F, 'glaive', 'Blood on the Fur', 'mhit', .5, 0, 'spear thrust');
+  ezSpell(F, 'glaive', 'Blood on the Fur', 'sb_pounce', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezFlav(F, 'glaive', 'Spear Flurry', 'tempo', .04, 'thrusts its spear');
   ezSpell(F, 'glaive', 'Worry the Prey', 'sb_pounce', { pow: .35, verb: 'mauls' });
   atkSwap(F, 'glaive', { old: 'Run Them Through', name: 'Run Them Through', tag: 'Damage', see: 'The spear runs on into the foe behind.',
@@ -63282,13 +63286,13 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'frost', 'Meltwater', 'tap', .5, 'the shaman');
   ezFlav(F, 'frost', 'Squall', 'tempo', .04, 'hurls hailstones');
   ezSpell(F, 'frost', 'Hail Spirit', 'sb_hailstorm', { by: { dur: 1 } }, longer('stays slick'));
-  ezTal(F, 'frost', 'Storm Rhythm', 'mhit', 1.5, 0, 'hailstone');
+  ezSpell(F, 'frost', 'Storm Rhythm', 'sb_freezingrain', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
 
   /* ---------- Spirit Walkers. Kept: Deep Hex, Lingering Spirits, Judgment, Passing Spirit; capstones Ancestors'
      Blessing, Spirit Host, Ancestor Host ---------- */
   atkSwap(F, 'arcane', { old: 'Twin Spirits', name: 'Twin Spirits', tag: 'Damage', see: 'A second spirit flies at another foe.',
     pro: (n, s) => `Each attack sends a second spirit at another foe for ${s(65)}%.`, fx: { hit: { do: 'split', n: 1, k: .65, r: 2 } } });   /* (always on: it was every 3rd attack) */
-  ezTal(F, 'arcane', 'Spirit Rhythm', 'mhit', 1.5, 0, 'spirit it sends');
+  ezSpell(F, 'arcane', 'Spirit Rhythm', 'sb_spiritchains', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'arcane', 'Restless Ancestor', 'sb_reckoning', { cd: 1, back: 'tolls every' });
   ezSpell(F, 'arcane', 'Old Grudge', 'sb_spiritchains', { by: { k: .05 } }, v => `shares ${ezP(.05 * v)}% more of the damage`);
   ezTal(F, 'arcane', 'Restless Dead', 'reach', .15, 0, 'Its spirits range');
@@ -63301,7 +63305,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'storm', 'Thunder Hunger', 'harvest', 4, 'the Thunder Caller');
   ezFlav(F, 'storm', 'Double Strike', 'tempo', .035, 'calls lightning');
   ezSpell(F, 'storm', 'Charged Rhythm', 'sb_calllightning', { cd: 1, back: 'answers every' });
-  ezTal(F, 'storm', 'Full Circuit', 'mhit', 1, 0, 'thunderbolt');
+  ezSpell(F, 'storm', 'Full Circuit', 'sb_calllightning', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'storm', 'Spark Familiar', 'sb_stormtotem', { by: { dur: 1 } }, longer('stays spiked'));
 
   /* ---------- Earthbinders (control, line holder). Kept: Deep Fissures, Riftmaker, Loose Earth, Heavy Stomp (the line
@@ -63310,13 +63314,13 @@ if (typeof abAuto === 'function') {
   ezSpell(F, 'earth', 'Stone Remembers', 'sb_stonetotem', { by: { dur: 1 } }, longer('stands'));
   ezFlav(F, 'earth', 'Hard Rhythm', 'rhythm', .03, 'blow of its maul');
   ezSpell(F, 'earth', 'Maul Swing', 'sb_fissure', { pow: .25, verb: 'bursts' });
-  ezTal(F, 'earth', 'Earth Rhythm', 'mhit', 1, 0, 'blow of its maul');
+  ezSpell(F, 'earth', 'Earth Rhythm', 'sb_stonetotem', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
 
   /* ---------- Cloud Dancers. Kept: Brooding Sky, Long Clouds, Forked Strike; capstones Storm Front, Thunder Dance,
      Sky Lattice ---------- */
   ezSpell(F, 'cannon', 'Answering Sky', 'sb_thunderhead', { pow: .6, verb: 'thunders' });
   ezSpell(F, 'cannon', "Storm's End", 'sb_stormdance', { pow: .3, verb: 'falls' });
-  ezTal(F, 'cannon', 'Rain Rhythm', 'mhit', 1.5, 0, 'sweep of her fans');
+  ezSpell(F, 'cannon', 'Rain Rhythm', 'sb_thunderhead', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezTal(F, 'cannon', 'Rain Returns', 'pool', .15, 0, 'Cloud Dancer');   /* (the pool that can hold Skyleap) */
   ezSpell(F, 'cannon', 'Twin Bolt', 'sb_stormdance', { cd: 2, back: 'can be danced every' });
   ezFlav(F, 'cannon', 'Sky Spirit', 'echo', .3, 'sweeps her fans');
@@ -63330,7 +63334,7 @@ if (typeof abAuto === 'function') {
   ezSpell(F, V, 'Double Harpoon', 'sb_tether', { by: { n: 1 } }, v => `pulls down ${v} more flyer${v > 1 ? 's' : ''}`);
   ezSpell(F, V, 'Hard Landing', 'sb_downdraft', { by: { dur: 1 } }, longer('holds its flyer'));
   ezTal(F, V, 'Long Cast', 'reach', .25, 0, 'Its line runs');
-  ezTal(F, V, "Skyhunter's Tithe", 'mhit', .6, 0, 'cast of its line');
+  ezSpell(F, V, "Skyhunter's Tithe", 'sb_tether', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, "Hunter's Haste", 'sb_skyfall', { pow: .4, verb: 'crashes down' });
 }
 
@@ -63346,8 +63350,8 @@ if (typeof abAuto === 'function') {
 
   /* ---------- Oathbound (line holder). Kept: Oathsworn Cut, Deep Carving, Sweeping Cut, Hold the Road, Oath of Iron;
      capstones Vowed Blade, Whirling Oath, Second Edge ---------- */
-  ezSpell(F, 'glaive', 'Oath Kept', 'wb_swordplant', { cd: 1, back: 'is driven every' });
-  ezTal(F, 'glaive', "Blade's Tithe", 'mhit', 1.5, 0, 'stroke of his greatsword');
+  ezFlav(F, 'glaive', 'Oath Kept', 'harvest', 5, 'the Oathbound');
+  ezSpell(F, 'glaive', "Blade's Tithe", 'wb_swordplant', { cost: 15, name: "Oathbreaker's Edge", text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });   /* (owner's pick, 26 Nov 2026) */
   ezFlav(F, 'glaive', 'Overhead', 'tempo', .04, 'swings his greatsword');
   ezTal(F, 'glaive', 'Greatsword Reach', 'reach', .15, 0, 'His greatsword reaches');
   ezSpell(F, 'glaive', 'Unyielding Pace', 'wb_wardflare', { cd: 2, back: 'spins every' });
@@ -63368,7 +63372,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'frost', 'Back Sweep', 'tempo', .04, 'sweeps its halberd');
   ezSpell(F, 'frost', 'Cleaving Haft', 'wb_frostbite', { pow: .2, verb: 'grips' });
   ezSpell(F, 'frost', 'Biting Cold', 'wb_winterward', { by: { dur: 1 } }, v => `stands guard ${v}s longer`);
-  ezTal(F, 'frost', "Winter's Tithe", 'mhit', 1.5, 0, 'pass of its halberd');
+  ezTal(F, 'frost', "Winter's Tithe", 'mhit', 1.5, 0, 'pass of its halberd');   /* (kept: Battle Trance on the owner's menu) */
 
   /* ---------- Runecarvers. Kept: Deep Script, Lingering Ink, Double Stroke, Flick Through, Spent Ink; capstones Endless
      Script, Cascade, Runesight ---------- */
@@ -63382,7 +63386,7 @@ if (typeof abAuto === 'function') {
   /* ---------- Stormward Lancers. Kept: Couched Lance, Swift Remount, Forked Pennon, Lightning Lance; capstones Thunder
      Oath, Storm Lance, Second Thunder ---------- */
   ezFlav(F, 'storm', 'Sky-Drawn', 'tap', .5, 'the Stormward');
-  ezTal(F, 'storm', "Rider's Tithe", 'mhit', 1.5, 0, 'lance-point that lands');
+  ezSpell(F, 'storm', "Rider's Tithe", 'wb_charge', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezFlav(F, 'storm', 'Double Thrust', 'tempo', .04, 'couches and drives its lance');
   ezFlav(F, 'storm', 'Storm Hawk', 'momentum', .02, 'couches and drives its lance');
   ezTal(F, 'storm', 'Long Lance', 'reach', .15, 0, 'Its storm-lance reaches');
@@ -63396,7 +63400,7 @@ if (typeof abAuto === 'function') {
   ezFlav(F, 'earth', 'Shield Edge', 'rhythm', .03, 'shield-rim blow');
   ezFlav(F, 'earth', 'Under Fire', 'tempo', .04, 'brings its shield-rim down');
   ezTal(F, 'earth', 'Broad Rim', 'reach', .15, 0, 'Its shield reaches');
-  ezTal(F, 'earth', 'Crushing Rim', 'mhit', 1.5, 0, 'blow of its shield-rim');
+  ezSpell(F, 'earth', 'Crushing Rim', 'wb_shieldwall', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'earth', 'Shield Song', 'wb_quakeline', { cd: 2, back: 'rolls every' });
 
   /* ---------- Siege Wardens. Kept: Long Pin, Wide Blast, Heavy Bolts, Skewering Bolt, Shrapnel; capstones Unbroken
@@ -129185,13 +129189,24 @@ function rgBossKeys(T) {
   if (T.leg > 0) { if (T.kit && T.kitLeg) add(['l:' + T.kitLeg]); else anyLeg = true; }
   return { keys: out.filter(k => k.startsWith('l:') ? !!LEGENDS[k.slice(2)] : !!GEAR_BASES[k.slice(2)]).sort((a, b) => rgKeyItem(b).rar - rgKeyItem(a).rar), anyLeg };
 }
-// the card's loot: the boss's table under its name; a place with no boss shows none
+// the card's loot: each boss's own themed table (renown.js bossLootTable, owner, 26 Nov 2026: "bosses should have a themed loot
+// table that is unique to them") as it stands on the wave it is fought: what its offer can hold then (before EPIC_FROM no
+// epics, as rnPool; its legendary only after wave 15, RN_LEG), no chances. Before that module: the place's own boss roll. A
+// place with no boss shows none: its other foes drop from the shared table now and then, unshown.
+function rgBossTabKeys(type, force, w) {
+  const B = typeof bossLootTable === 'function' ? bossLootTable(type, force, w) : null; if (!B) return null;
+  const cap = typeof EPIC_FROM !== 'undefined' && w < EPIC_FROM ? 2 : 3;
+  return { keys: B.items.filter(e => e.leg || e.sig || e.rar <= cap).map(e => e.leg ? 'l:' + e.leg : 'b:' + e.base).filter(k => k.startsWith('l:') ? !!LEGENDS[k.slice(2)] : !!GEAR_BASES[k.slice(2)]), anyLeg: false };
+}
 function rgLootMore(R, S) {
   const T = S && rgLootOf(R, S.node); if (!T) return '';
-  const B = typeof rgFoesOf === 'function' ? [...new Set(rgFoesOf(R, S).bosses.map(b => b.type))] : [];
-  if (!B.length) return '';
-  const names = B.map(t => CREEPS[t] ? CREEPS[t].name : t), who = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] + ' drop' : names[0] + ' drops';
-  return `<p class="rg-tl">${rgEsc(who)}</p>${rgPoolHTML(T, rgBossKeys(T))}`;
+  const F = typeof rgFoesOf === 'function' ? rgFoesOf(R, S).bosses : [], seen = new Set(), rows = [];
+  for (const b of F) {
+    if (seen.has(b.type)) continue; seen.add(b.type);
+    const K = rgBossTabKeys(b.type, R.force, b.w) || rgBossKeys(T), name = CREEPS[b.type] ? CREEPS[b.type].name : b.type;
+    rows.push(`<p class="rg-tl">${rgEsc(name)} drops</p>${rgPoolHTML({ force: R.force }, K)}`);
+  }
+  return rows.join('');
 }
 const RG_POOL_SHOW = 12;
 function rgPoolHTML(T, K) {
@@ -129235,8 +129250,11 @@ function rgBattleLoot(S) {
 }
 function rgDropItem(T, boss, rnd) {
   rnd = rnd || Math.random; const w = Math.max(1, G.wave | 0), D = rgDropRars(T);
-  if (T.sure >= 4) return boss ? rgLootItem('leg', 4, w) : rnd() < .2 ? rgLootItem('leg', 4, w) : rgLootItem(null, 3, w);
-  const legP = boss ? T.leg : T.leg / 3;
+  // (no legendary on wave 15 or earlier, nor past the run's share: renown.js rnLegP, owner, 26 Nov 2026: "early bosses
+  // shouldn't drop legendaries at all, they should be offered only after wave 15")
+  const legOk = typeof rnLegP !== 'function' || rnLegP(w) > 0;
+  if (T.sure >= 4) return legOk && (boss || rnd() < .2) ? rgLootItem('leg', 4, w) : rgLootItem(null, 3, w);
+  const legP = !legOk ? 0 : boss ? T.leg : T.leg / 3;
   if (legP > 0 && rnd() < legP) return T.kit && T.kitLeg ? rgMake({ l: T.kitLeg }) : rgLootItem('leg', 4, w);
   const upped = T.up > 0 && rnd() < T.up, rar = upped ? D.up : boss ? D.boss : D.low;
   if (T.kit) {
@@ -129261,6 +129279,7 @@ if (typeof rollDrop === 'function') {
       const ty = tomeForBoss(c.wv || G.wave); if (ty) rgDropAt(c, tomeMake(ty), 0);
     }
     const big = !!(c.def.boss || c.def.lead); if (!big && !c.elite) return;   // the rank and file carry nothing here
+    if (c.def.boss && typeof rnLootOn === 'function' && rnLootOn() && typeof bossLootTable === 'function') return;   // (a boss's drop is its own table's offer: renown.js rnLootOpen)
     const wb = isWaveBoss(c), p = c.def.boss ? BOSS_DROP : c.def.lead ? LEAD_DROP : isLastElite(c) ? LOOT_RULES.eliteLast.p : LOOT_RULES.elite.p;
     const odds = 1 + RG_DROP.g * (T.g | 0) + RG_DROP.road * (T.road | 0);
     if (!wb && Math.random() > p * odds * dropOdds(c)) return;
