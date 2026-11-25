@@ -1,4 +1,4 @@
-const BUILD_TAG = '43362811@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'dd980349@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -22592,7 +22592,7 @@ const SB_RELICS = {
     text: k => `Hits and spells halve foes' heals and shields for ${nf1(4 * k)}s.`,
     fx: (st, k) => { st.wound = Math.max(st.wound || 0, 4 * k); } },
   sbr_lodestone: { rar: 2, name: 'Sky Lodestone', icon: 'orb', hue: '#7a90c0', theme: 'conduct', proc: 1,
-    text: k => `Hits on wet or frost-slowed foes arc ${P_(.5 * k)} to a nearby foe.`, fx: (st, k) => sbPw(st, 'sbLodestone', .5 * k) },
+    text: k => `Hits on wet or frost-slowed foes arc ${P_(.5 * k)} to a foe within 2 cells.`, fx: (st, k) => sbPw(st, 'sbLodestone', .5 * k) },
   sbr_knife: { rar: 2, name: "Carver's Knife", icon: 'rune', hue: '#b08a60', theme: 'totems',
     text: k => `Its totems last ${P_(.5 * k)} longer, reach +${nf1(.3 * k)}. Spells cast beside it also blast foes around it.`, fx: (st, k) => sbPw(st, 'sbKnife', k) },
   // ---- epic: a moment ----
@@ -22626,7 +22626,7 @@ const SB_CHARMS = {
   sbc_flint: { rar: 2, kx: 1.6, name: 'Thunder Flint', icon: 'flash', hue: '#c8b890', text: k => `Its abilities recharge ${P_(.25 * k)} faster.` },
   sbc_tally: { rar: 2, kx: 1.35, name: 'Spirit Tally', icon: 'stars', hue: '#b0a0d0', text: k => `Each kill gives it ${Math.round(12 * k)} mana.` },
   sbc_stormheart: { rar: 2, kx: 1.35, name: 'Storm-Heart Bead', icon: 'orb', hue: '#7a98d8', text: k => `Once the Storm is half full, mana refills ${P_(.6 + .4 * k)} faster.` },
-  sbc_echo: { rar: 2, name: 'Echo Stone', icon: 'echo', hue: '#a8b8c8', text: k => `After a spell: its next 3 hits wet the foe and also hit a nearby foe for ${P_(.4 * k)}.` },
+  sbc_echo: { rar: 2, name: 'Echo Stone', icon: 'echo', hue: '#a8b8c8', text: k => `After a spell: its next 3 hits wet the foe and also hit a foe within 1.8 cells for ${P_(.4 * k)}.` },
   sbc_totem: { rar: 2, name: 'Totem Charm', icon: 'statue', hue: '#c8a070', text: k => `Spells cast within 3.6 cells of a totem (was 2.6): refund ${P_(Math.min(.7, .4 * k))} of their mana, and the totem bursts for 100% of its attack (was 50%).` },
   sbc_lodestar: { rar: 3, name: 'Lodestar Charm', icon: 'sun', hue: '#b8d0ff', text: () => 'Every 3rd spell: the Storm fills to its next quarter.' },
 };
@@ -28807,7 +28807,7 @@ champAdd('cc_arch', { force: 'conclave', he: 'she', glyph: 'missiles',
   trait: { name: 'Archmage’s Mantle', t: 'She holds 3 more Arcane Charges; every 4th attack gives her an extra one.' },   // (ccQMax, ccChampFire)
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
     champQ('cc_arch', { id: 'ch_thousandfold', name: 'Thousandfold Barrage', short: 'Barrage', glyph: 'missiles', hue: '#b98cff', art: 'cc_thousandfold', mana: 90, cd: 16, school: 'arcane', pref: 'grouped', qs: 4, qf: .16,
-      blurb: 'Two dozen seeking missiles rain on an area, every 6th striking twice.',
+      blurb: '24 seeking missiles fall on a 1.8-cell area over 2s; every 6th hits twice as hard.',
       text: (t, st, ab) => `Looses 24 seeking missiles over a ${gNf(champQR(t, ab))}-cell area in 2s: ${champQx(t, st, ab, .04)} each. ${sagaHas('fin') ? 'Every 3rd missile' : 'Every 6th missile'} strikes twice as hard.`,
       anim: chAnim('channel', { T: 1.2, tip: ['main', [.04, .52, .15]], col: [.8, .6, 1.3], size: .45 }) }),
     { id: 'ch_unravel', name: 'Unravel', short: 'Unravel', glyph: 'rune', hue: '#d8b8ff', mana: 100, cd: 13, research: CH_CC_RS, school: 'arcane', pref: 'afflicted', rr: 1.2,
@@ -28873,7 +28873,7 @@ champAdd('cc_chrono', { force: 'conclave', he: 'he', glyph: 'hourglass',
   trait: { name: 'Borrowed Moment', t: 'His spells recharge 20% faster; every 4th attack slows 40% for 2s.' },   // (forces_conclave_e.js live, ccChampFire)
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
     champQ('cc_chrono', { id: 'ch_stoppedhour', name: 'Stopped Hour', short: 'Stop', glyph: 'hourglass', hue: '#ffd27a', art: 'cc_stoppedhour', mana: 90, cd: 18, school: 'arcane', pref: 'grouped', qs: 3, qf: .15,
-      blurb: 'Stops time on an area (foes there are stunned); when it ends, each is hit and pushed back 1 cell.',
+      blurb: 'Foes in a 1.6-cell area are stunned 2.5s and take 25% more damage; then each is hit and pushed back 1 cell.',
       text: (t, st, ab) => `Stops time on a ${gNf(champQR(t, ab))}-cell area for 2.5s: foes there are stunned and take 25% more damage. Then each takes ${champQx(t, st, ab)} and is pushed back 1 cell.${sagaHas('fin') ? ' The hour stops again 3s later, half as long (The Second Hour).' : ''}`,
       anim: chAnim('sky', { T: 1.15, tip: ['main', [.04, .5, .15]], col: [1.2, .95, .5], size: .45 }) }),
     { id: 'ch_rewind', name: 'Rewind', short: 'Rewind', glyph: 'spiral', hue: '#ffe9a8', mana: 90, cd: 12, research: CH_CC_RS, school: 'arcane', pref: 'high',
@@ -28950,8 +28950,8 @@ champAdd('cc_maren', { force: 'conclave', he: 'she', glyph: 'sword',
   trait: { name: 'Seamcut', t: 'Every 4th attack: hits again 1s later at full damage, adding a 10% slow stack.' },
   kit: { mana: { max: 120, regen: 1.2, hit: .6 }, abilities: [
     champQ('cc_maren', { id: 'ch_severing', name: 'Severing Arc', short: 'Arc', glyph: 'swords', hue: '#f070d8', art: 'cc_severing', mana: 90, cd: 16, school: 'arcane', pref: 'grouped', qs: 4, qf: .1,
-      blurb: 'Cuts an arc through an area; nearby Spellblades blink in to cut too.',
-      text: (t, st, ab) => `Carves an arc of starlight through a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} and two slow stacks to each foe there. Every Spellblade within 4 cells blinks in and cuts one of them for twice its strike.${sagaHas('fin') ? ' A second arc crosses the first, half as strong (Crossed Edges).' : ''}`,
+      blurb: 'Hits every foe in a 1.6-cell area with two slow stacks; every Spellblade within 4 cells blinks in and hits one of them for double damage.',
+      text: (t, st, ab) => `Every foe in a ${gNf(champQR(t, ab))}-cell area takes ${champQx(t, st, ab)} and two slow stacks (10% slow each). Every Spellblade within 4 cells blinks in and attacks one of them for double damage.${sagaHas('fin') ? ' A second arc crosses the first, half as strong (Crossed Edges).' : ''}`,
       anim: chAnim('sweep', { T: 1.0, tip: ['main', [-.2, .38, .92]], col: [1.5, .45, 1.25], size: .5 }) }),
     { id: 'ch_riftchain', name: 'Rift Chain', short: 'Chain', glyph: 'flash', hue: '#ff8ae0', mana: 90, cd: 12, research: CH_CC_RS, school: 'arcane', pref: 'first', rAdd: 1.2,
       by: { n: [3, 3, 4, 4, 5, 5], mult: [1.6, 1.7, 1.8, 1.9, 2, 2.1] },
@@ -29159,8 +29159,8 @@ champAdd('rootmother', { force: 'grove', he: 'she', glyph: 'uproot',
   trait: { name: 'Heartroot', t: 'Every third lash roots its foe for half a second.' },   // (heroOnHit: rootmother)
   kit: { mana: { max: 130, regen: 1.2, hit: .6 }, abilities: [
     champQ('rootmother', { id: 'ch_entangle', name: 'Entangle', short: 'Entangle', glyph: 'snare', hue: '#86d05a', art: 'entangle', mana: 90, cd: 16, school: 'nature', pref: 'grouped', qs: 3, qf: .2,
-      blurb: 'Roots every ground foe in an area and strikes them.',
-      text: (t, st, ab) => `Roots every ground foe in a ${gNf(champQR(t, ab))}-cell area for 2s (bosses briefly): ${champQx(t, st, ab)} each.${sagaHas('fin') ? ' 2s later, a second, weaker root (Roots Remember).' : ''}`,
+      blurb: 'Every ground foe in a 1.7-cell area is hit and rooted 2s (bosses under 1s, taking 30% of the hit).',
+      text: (t, st, ab) => `Roots every ground foe in a ${gNf(champQR(t, ab))}-cell area for 2s (bosses under 1s, and they take 30% of the hit): ${champQx(t, st, ab)} each.${sagaHas('fin') ? ' 2s later, a second, weaker root (Roots Remember).' : ''}`,
       anim: chAnim('bow', { T: 1.05, tip: ['staff', [0, .56, 0]], col: [.6, 1, .4] }) }),
     { id: 'ch_rootway', name: 'Rootway', short: 'Rootway', glyph: 'uproot', hue: '#9be06a', mana: 100, cd: 14, research: CH_GROVE_RS, school: 'nature', pref: 'first',
       by: { root: [.8, .9, 1, 1.1, 1.2, 1.3], dur: [5, 5, 5, 6, 6, 6] },
@@ -29232,7 +29232,7 @@ champAdd('thornbow', { force: 'grove', he: 'he', glyph: 'bow',
   trait: { name: 'Keen Eye', t: 'His first arrow at each foe strikes its weak point for double damage, four times on a rooted foe.' },
   kit: { mana: { max: 120, regen: 1, hit: 1 }, abilities: [
     champQ('thornbow', { id: 'ch_thornvolley', name: 'Thorn Volley', short: 'Volley', glyph: 'arrows3', hue: '#cfd86a', art: 'thornvolley', mana: 80, cd: 14, school: 'attack', pref: 'grouped', qs: 1.5, qf: .12,
-      blurb: 'Arrows rain three times on an area; rooted foes take double.',
+      blurb: 'Arrows fall 3 times on a 1.6-cell area, hitting every foe there each time; rooted foes take double.',
       text: (t, st, ab) => `Arrows rain ${sagaHas('fin') ? 'four' : 'three'} times on a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} to every foe there each time. Rooted foes take double.`,
       anim: chAnim('sky', { T: 1.1, tip: ['main', [.05, -.01, .3]], col: [1, .95, .7] }) }),
     { id: 'ch_pinarrow', name: 'Pinning Arrow', short: 'Pin', glyph: 'arrowhead', hue: '#e0d080', mana: 90, cd: 11, research: CH_GROVE_RS, school: 'attack', pref: 'first', len: 4, w: .35,
@@ -29306,7 +29306,7 @@ champAdd('hivemother', { force: 'grove', he: 'she', glyph: 'spores',
   trait: { name: 'Bloom Heart', t: 'Her hits leave spores on their foe, and spores whose host falls drift on to the nearest foe.' },   // (heroOnHit: hivemother)
   kit: { mana: { max: 130, regen: 1.2, hit: .6 }, abilities: [
     champQ('hivemother', { id: 'ch_sporecloud', name: 'Spore Cloud', short: 'Spores', glyph: 'cloudg', hue: '#d8c84a', art: 'sporecloud', mana: 85, cd: 15, school: 'nature', pref: 'grouped', qs: 4, qf: .3,
-      blurb: 'Spores cover every foe in an area, dealing damage over 6s; when a host dies, they move to the nearest foe.',
+      blurb: 'Spores cover every foe in a 1.7-cell area, dealing damage over 6s; when a host dies, they move to the nearest foe.',
       text: (t, st, ab) => `Spores cover every foe in a ${gNf(champQR(t, ab))}-cell area: ${champQx(t, st, ab)} over 6s. When a host dies, they move to the nearest foe.`,
       anim: chAnim('sky', { T: 1.05, tip: ['off', [-.02, -.14, .06]], col: [.95, .9, .4] }) }),
     { id: 'ch_garden', name: 'Choking Garden', short: 'Garden', glyph: 'spores', hue: '#c8d050', mana: 100, cd: 14, research: CH_GROVE_RS, school: 'nature', pref: 'grouped', rr: 1,
@@ -29466,8 +29466,8 @@ champAdd('ih_thane', { force: 'ironhold', he: 'she', glyph: 'shield', k: 1.75,
   trait: { name: 'Stand Fast', t: 'Foes she strikes stop to hammer at her shield for half a second (bosses are slowed instead), each at most once every 3 seconds.' },
   kit: { mana: { max: 130, regen: .8, hit: 1.2 }, abilities: [
     ihCastWrap(champQ('ih_thane', { id: 'ch_ironwall', name: 'Iron Wall', short: 'Wall', glyph: 'shieldx', hue: '#d0603a', art: 'ih_ironwall', mana: 90, cd: 16, school: 'attack', pref: 'first', qs: 3, qf: .3,
-      blurb: 'Locks shields across the road: ground foes stop there, then are pushed back.',
-      text: (t, st, ab) => `Locks shields across ${gNf(champQR(t, ab))} cells of road for ${sagaHas('fin') ? 8 : 5}s: ground foes stop there (bosses are slowed) and are Exposed (15% more damage). When it falls, it pushes them back for ${champQx(t, st, ab)}.`,
+      blurb: 'A shield wall across 1.4 cells of road for 5s: ground foes there are slowed 92% (bosses 50%) and Exposed; when it falls, they are hit and pushed back 0.8 cells.',
+      text: (t, st, ab) => `Locks shields across ${gNf(champQR(t, ab))} cells of road for ${sagaHas('fin') ? 8 : 5}s: ground foes there are slowed 92% (bosses 50%) and Exposed (15% more damage). When it falls, they are pushed back 0.8 cells and take ${champQx(t, st, ab)} (bosses a quarter).`,
       anim: chAnim('slam', { T: 1.15, tip: ['main', [.02, .15, .14]], col: [1, .75, .45] }) })),
     ihCastWrap({ id: 'ch_anvil', name: 'Anvil Stance', short: 'Anvil', glyph: 'statue', hue: '#e09060', mana: 90, cd: 14, research: CH_IH_RS, school: 'attack', pref: 'grouped',
       by: { dur: [4, 4, 4, 5, 5, 5], r: [1.1, 1.1, 1.1, 1.1, 1.1, 1.1] },
@@ -29544,7 +29544,7 @@ champAdd('ih_artificer', { force: 'ironhold', he: 'he', glyph: 'mortar', k: 1.75
   trait: { name: 'Tinkered', t: 'He strikes 12% faster and builds heat half again as fast.' },   // (ihHeroLive, ihHeatRate: G.champ)
   kit: { mana: { max: 120, regen: 1, hit: .8 }, abilities: [
     ihCastWrap(champQ('ih_artificer', { id: 'ch_sentry', name: 'Clockwork Sentry', short: 'Sentry', glyph: 'orb', hue: '#c8a24a', art: 'ih_sentry', mana: 90, cd: 16, school: 'attack', pref: 'grouped', qs: 6, qf: 1.5, min: 2,
-      blurb: 'Drops a clockwork sentry that shoots the nearest foe, then blows up.',
+      blurb: 'For 10s, shoots the nearest foe every 0.4s from a spot in reach, then blasts foes within 1 cell there.',
       text: (t, st, ab) => `Drops a sentry in reach for 10s${sagaHas('fin') ? ' (two of them)' : ''}: it shoots the nearest foe every 0.4s for ${champQx(t, st, ab, .06)}, then blows up: ${champQx(t, st, ab, .3)} to foes within 1 cell.`,
       anim: chAnim('point', { T: 1.0, tip: ['off', [-.03, -.1, .2]], col: [1, .85, .5] }) })),
     ihCastWrap({ id: 'ch_coil', name: 'Magnetic Coil', short: 'Coil', glyph: 'coil', hue: '#8ab8e0', mana: 90, cd: 13, research: CH_IH_RS, school: 'storm', pref: 'armoured',
@@ -29632,7 +29632,7 @@ champAdd('ih_brewer', { force: 'ironhold', he: 'she', glyph: 'barrel', k: 1.75,
   trait: { name: 'Fire-Spitter', t: 'Every 5th throw she breathes fire on its foe: it and every foe within 0.8 cells burn for 30% of the throw a second for 3s.' },   // (ihHeroFire: G.champ)
   kit: { mana: { max: 120, regen: 1, hit: .8 }, abilities: [
     ihCastWrap(champQ('ih_brewer', { id: 'ch_rollkeg', name: 'Rolling Keg', short: 'Keg', glyph: 'barrel', hue: '#e8a83a', art: 'ih_rollingkeg', mana: 85, cd: 15, school: 'fire', pref: 'grouped', qs: 3.5, qf: .35,
-      blurb: 'A keg rolls back up the road, pushing ground foes back, and bursts in fire.',
+      blurb: 'A keg rolls back up the road: ground foes hit are pushed back and slowed 40%; at the end it bursts on foes within 1.2 cells and sets them burning.',
       text: (t, st, ab) => `Rolls a keg back up the road${sagaHas('fin') ? ' (then a second)' : ''}: ground foes hit are pushed back and slowed 40%. At the end it bursts: ${champQx(t, st, ab)} to foes within ${gNf(champQR(t, ab))} cells, and sets them burning.`,
       anim: chAnim('thrust', { T: 1.0, tip: ['off', [-.03, -.12, .18]], col: [1, .75, .35] }) })),
     ihCastWrap({ id: 'ch_firebrew', name: 'Fire-Brew Round', short: 'Fire-Brew', glyph: 'flamejump', hue: '#ff8a3a', mana: 80, cd: 12, research: CH_IH_RS, school: 'fire', pref: 'grouped',
@@ -29922,7 +29922,7 @@ champAdd('ih_hrolf', { force: 'ironhold', he: 'he', glyph: 'burst', k: 1.75,
   trait: { name: 'Grudge Flak', t: 'Every 3rd shell bursts twice as wide and half again as hard.' },
   kit: { mana: { max: 130, regen: 1, hit: .8 }, abilities: [
     ihCastWrap(champQ('ih_hrolf', { id: 'ch_battery', name: 'Battery Barrage', short: 'Battery', glyph: 'burst', hue: '#8aa0b8', art: 'ih_battery', mana: 90, cd: 15, school: 'attack', pref: 'grouped', qs: 3.5, qf: .44,
-      blurb: 'Air bursts over flyers, or flat shells down a line of ground foes.',
+      blurb: 'Over flyers: 8 air bursts on the flyers there. Over ground foes: 4 shells down the line, each hitting every ground foe on it.',
       text: (t, st, ab) => `Fires on the thickest crowd in reach. Over flyers: ${8 * (sagaHas('fin') ? 1.5 : 1)} air bursts, ${champQx(t, st, ab, .12)} each to flyers there. Over ground foes: ${4 * (sagaHas('fin') ? 1.5 : 1)} flat shells down the line from him, ${champQx(t, st, ab, .11)} each to every ground foe on it. Switching between the two takes 1.5s.`,
       anim: chAnim('point', { T: 1.0, tip: ['main', [.02, -.04, .36]], col: [1, .85, .55], size: .35 }) })),
     ihCastWrap({ id: 'ch_grudgeshell', name: 'Grudge Shell', short: 'Grudge Shell', glyph: 'bomb', hue: '#b0a080', mana: 80, cd: 11, research: CH_IH_RS, school: 'attack', pref: 'high',
@@ -30219,7 +30219,7 @@ champAdd('so_lion', { force: 'silver', he: 'he', glyph: 'swords', k: 1.45,
   trait: { name: 'Lionheart', t: 'He always attacks 20% faster, and every attack lays a Judgement.' },   // (soRadiant: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1, hit: 1.2 }, abilities: [
     champQ('so_lion', { id: 'ch_lioncharge', name: 'Dawnsweep', short: 'Sweep', glyph: 'swords', hue: '#f0c060', art: 'so_lioncharge', mana: 90, cd: 16, school: 'holy', pref: 'grouped', qs: 4, qf: .25,
-      blurb: 'An arc of light before him: foes are pushed back and Judged; units it passes attack 20% faster.',
+      blurb: 'A 1.6-cell arc of light before him: foes are hit, pushed back and Judged; Order units it passes attack 20% faster for 6s.',
       text: (t, st, ab) => `A ${gNf(champQR(t, ab))}-cell arc of light before him: each foe takes ${champQx(t, st, ab)}, is pushed back and gains 3 Judgement. Order units it passes attack 20% faster for 6s (each attack lays a Judgement).`,
       anim: chAnim('thrust', { T: 1.0, tip: ['main', [-.02, -.11, .7]], col: [1, .9, .55] }) }),
     // (reshaped in place by forces_zzz_silver_cool.js: the shield driven into the road, a shockwave down a cone)
@@ -30264,7 +30264,7 @@ champAdd('so_dawn', { force: 'silver', he: 'she', glyph: 'sunburst',
   trait: { name: 'Halo', t: 'Every 4th beam Exposes its foe for 2 seconds.' },   // (soOnHit: forces_silver_a.js)
   kit: { mana: { max: 130, regen: 1.3, hit: .3 }, abilities: [
     champQ('so_dawn', { id: 'ch_dawnbreak', name: 'Dawnbreak', short: 'Dawn', glyph: 'sunburst', hue: '#ffe6a0', art: 'so_dawnbreak', mana: 85, cd: 15, school: 'holy', pref: 'grouped', qs: 2.5, qf: .1,
-      blurb: 'Foes in an area are Slowed, Exposed, burned and gain 2 Judgement.',
+      blurb: 'Foes in a 1.7-cell area are hit, slowed 45% and Exposed for 4s, and gain 2 Judgement.',
       text: (t, st, ab) => `Foes in a ${gNf(champQR(t, ab))}-cell area: Slowed 45% and Exposed for 4s, 2 Judgement and ${champQx(t, st, ab)}.${sagaHas('fin') ? ' A second, lighter Dawnbreak follows 2s later (Second Sunrise).' : ''}`,
       anim: chAnim('sky', { T: 1.1, tip: ['main', [.03, .55, .13]], col: [1, .95, .7], size: .5 }) }),
     { id: 'ch_morningstar', name: 'Morning Star', short: 'Star', glyph: 'flash', hue: '#fff1c0', mana: 95, cd: 13, research: CH_SO_RS, school: 'holy', pref: 'high', rr: .9,
@@ -30535,7 +30535,7 @@ champAdd('sb_caller', { force: 'stormborn', he: 'she', glyph: 'thunder', k: 1.6,
   trait: { name: 'Stormcrown', t: 'Every 4th hit calls a thunderbolt down on its foe for 60% of the hit, leaping on to a wet or frost-slowed foe.' },   // (sbChampHit)
   kit: { mana: { max: 130, regen: 1.1, hit: .6 }, abilities: [
     champQ('sb_caller', { id: 'ch_gather', name: 'Gather the Storm', short: 'Gather', glyph: 'cloud', hue: '#9ab8ff', art: 'sb_gather', mana: 100, cd: 18, school: 'storm', pref: 'grouped', qs: 2, qf: .15,
-      blurb: 'A thunderstorm over an area: lightning hits each foe twice and wets it, and the Storm jumps to its next level.',
+      blurb: 'Lightning hits every foe in a 1.7-cell area twice and wets it for 6s; the Storm jumps to its next level.',
       text: (t, st, ab) => `A thunderstorm breaks over a ${gNf(champQR(t, ab))}-cell area: lightning strikes every foe there twice, each ${champQx(t, st, ab)}, and wets it for 6s; the Storm jumps to its next level.`,
       anim: chAnim('sky', { T: 1.15, tip: ['main', [.06, .5, .17]], col: [.7, .85, 1.4] }) }),
     { id: 'ch_eyestorm', name: 'The Calm Eye', short: 'Eye', glyph: 'vortex', hue: '#b8d0ff', mana: 100, cd: 15, research: CH_SB_RS, school: 'storm', pref: 'grouped',
@@ -30658,8 +30658,8 @@ champAdd('sb_beast', { force: 'stormborn', he: 'she', glyph: 'antler', k: 1.6,
   trait: { name: 'Spirit Companion', t: 'A spirit wolf runs at her side and bites her foe every 1.5s for 50% of her damage.' },   // (sbPulse)
   kit: { mana: { max: 130, regen: 1.1, hit: .8 }, abilities: [
     champQ('sb_beast', { id: 'ch_spirithunt', name: 'Spirit Hunt', short: 'Hunt', glyph: 'wings', hue: '#e0b878', art: 'sb_spirithunt', mana: 110, cd: 26, school: 'spirit', aim: false, rAdd: 1, qs: .4, qf: .08,
-      blurb: 'The thunderbird and 4 spirit wolves fight beside her for 10s.',
-      text: (t, st, ab) => `The thunderbird and four spirit wolves join the fight for ${sagaHas('fin') ? 14 : 10}s: the wolves run down the toughest ground foes (${champQx(t, st, ab)} a bite), the thunderbird strikes flyers first with lightning${sagaHas('fin') ? ', and the great bear runs with them' : ''}.`,
+      blurb: 'For 10s, 4 wolves bite the toughest ground foes every 0.8s and lightning strikes a foe every 1s, flyers first.',
+      text: (t, st, ab) => `The thunderbird and four spirit wolves join the fight for ${sagaHas('fin') ? 14 : 10}s: each wolf bites the toughest ground foe near it every 0.8s (${champQx(t, st, ab)} a bite), and the thunderbird strikes a foe every 1s, flyers first, for ${champQx(t, st, ab, .1)} (half again on flyers), jumping to 2 wet or frost-slowed foes within 2 cells for half that${sagaHas('fin') ? ', and the great bear runs with them' : ''}.`,
       anim: chAnim('channel', { T: 1.2, tip: ['main', [.04, .56, .15]], col: [1, .9, .6] }) }),
     { id: 'ch_runwolves', name: 'Running Wolves', short: 'Wolves', glyph: 'antler', hue: '#d8ecff', mana: 100, cd: 13, research: CH_SB_RS, school: 'spirit', pref: 'high',
       by: { n: [2, 2, 3, 3, 3, 4], root: [1, 1, 1.1, 1.1, 1.2, 1.2], mult: [1.6, 1.8, 2, 2.2, 2.4, 2.6] },
@@ -30947,8 +30947,8 @@ champAdd('wb_aedric', { force: 'wardbound', he: 'he', glyph: 'sun', k: 1.25,
   kill() { if (plTrait('wb_aedric') && typeof wbeMomAdd === 'function') wbeMomAdd(1); },
   kit: { mana: { max: 130, regen: 1.1, hit: .7 }, abilities: [
     champQ('wb_aedric', { id: 'ch_sunwheel', name: 'Sunwheel', short: 'Sun', glyph: 'sun', hue: '#fff0b8', art: 'wb_sunwheel', mana: 100, cd: 16, school: 'holy', pref: 'grouped', qs: 3, qf: .18,
-      blurb: 'Hits and Exposes foes in an area; a foe at 3 stacks of Exposed is hit again and bursts on foes near it. Costs him 8% of his health.',
-      text: (t, st, ab) => `Hits each foe in a ${gNf(champQR(t, ab))}-cell area for ${champQx(t, st, ab)} (more for each Momentum) and Exposes it; a foe already at 3 stacks of Exposed is hit again and bursts on foes near it. Runes in the area flare, hitting foes on them. Costs him 8% of his health.`,
+      blurb: 'Hits and Exposes every foe in a 1.6-cell area; a foe already at 3 stacks of Exposed is hit again for 2/3 as much, and foes within 0.8 cells of it for 1/3. Costs him 8% of his health.',
+      text: (t, st, ab) => `Hits each foe in a ${gNf(champQR(t, ab))}-cell area for ${champQx(t, st, ab)} (5% more for each Momentum) and Exposes it; a foe already at 3 stacks of Exposed is hit again for 2/3 as much, and foes within 0.8 cells of it for 1/3. Runes in the area flare, hitting foes on them. Costs him 8% of his health.`,
       anim: chAnim('sky', { T: 1.1, tip: ['main', [0, .1, .85]], col: [1.8, 1.6, 1] }) }),
     { id: 'ch_suncharge', name: 'Sun Charge', short: 'Charge', glyph: 'sunburst', hue: '#ffe6a0', mana: 90, cd: 12, research: CH_WB_RS, school: 'holy', pref: 'first', w: .45,
       by: { len: [3, 3, 3.2, 3.2, 3.5, 3.5], mult: [1.8, 2, 2.2, 2.4, 2.6, 2.8] },
@@ -36855,7 +36855,7 @@ const WALL_KIT = {
 const IPROC = {
   chill: { say: (n, k) => `Every ${ordN(n)} hit: slows 30% for ${nf1(2 * k)}s.`, sayS: k => `slow foes 30% for ${nf1(1.5 * k)}s`,
     go(c, src, amt, k, one) { chill(c, { slow: .3, slowT: (one ? 1.5 : 2) * k }, 'frost', src); fxSpark(c.x, c.y, hitH(c), '#bfe8ff', 4); } },
-  arc: { say: (n, k) => `Every ${ordN(n)} hit: lightning jumps to 2 foes for ${P_(.5 * k)}.`, sayS: k => `bounce to a nearby foe for ${P_(.6 * k)}`,
+  arc: { say: (n, k) => `Every ${ordN(n)} hit: lightning jumps to 2 foes for ${P_(.5 * k)}.`, sayS: k => `bounce to a foe within 1.5 cells for ${P_(.6 * k)}`,
     go(c, src, amt, k, one) {
       const L = nearest(c.x, c.y, one ? 1.5 : 2, one ? 1 : 2, c, o => !o.phased && !o.dead); let a = c;
       for (const o of L) { tagged('relic', () => hurt(o, amt * (one ? .6 : .5) * k, 'phys', src, false, null)); G.bolts.push({ pts: [[a.x, hitH(a), a.y], [o.x, hitH(o), o.y]], life: .22, max: .22, col: one ? [.95, .9, .75] : [.7, .82, 1] }); if (!one) a = o; }
@@ -36878,7 +36878,7 @@ const IPROC = {
     go(c, src, amt, k, one) { if (!(c.mpMax > 0) || c.hp <= 0) return; const b = Math.min(c.mp || 0, (one ? 8 : 15) * k); if (b <= 0) return; c.mp -= b; tagged('relic', () => hurt(c, b, 'pure', src, false, null, null)); fxRing(c.x, c.y, .4, '#9a6aff'); } },
   shred: { say: (n, k) => `Every ${ordN(n)} hit: removes 1 armour, up to ${Math.round(4 * k)}.`, sayS: k => `remove 1 armour, up to ${Math.round(3 * k)}`,
     go(c, src, amt, k, one) { if (c.hp <= 0 || !((c.armor || 0) > 0)) return; const was = c.shredT > 0 ? c.shred : 0; c.shred = Math.min(Math.max(was, Math.round((one ? 3 : 4) * k)), was + 1); c.shredT = Math.max(c.shredT || 0, 5); fxSpark(c.x, c.y, hitH(c), '#c8ccd4', 4); } },
-  splash: { say: (n, k) => `Every ${ordN(n)} hit: bursts for ${P_(.4 * k)} on nearby foes.`, sayS: k => `burst for ${P_(.3 * k)} on nearby foes`,
+  splash: { say: (n, k) => `Every ${ordN(n)} hit: bursts for ${P_(.4 * k)} on foes within 0.8 cells.`, sayS: k => `burst for ${P_(.3 * k)} on foes within 0.8 cells`,
     go(c, src, amt, k, one) { const d = amt * (one ? .3 : .4) * k; tagged('relic', () => inSplash(c.x, c.y, .8, false, o => { if (o !== c && !o.phased) hurt(o, d, 'phys', src, false, null); })); fxRing(c.x, c.y, .8, '#e8d8b0'); } },
 };
 // the spell twists that are not a hit effect
@@ -37012,7 +37012,7 @@ const MN_ITEMS = [
     (st, k) => { st.mnInk = Math.max(st.mnInk || 0, k); }],
   // ---- Ironhold ----
   ['ironhold', 'ih_m_manaboiler', 'Rune-Fired Mana Boiler', 2, 'barrel', '#c87a3a', 'mana2 as|Blow-Off Valve',
-    k => `At full mana: every 4s, a steam blast hits nearby foes for ${P_(1.2 * k)}.`,
+    k => `At full mana: every 4s, a steam blast hits foes within 1 cell of its foe for ${P_(1.2 * k)}.`,
     (st, k) => { st.mnBoil = Math.max(st.mnBoil || 0, k); }],
   ['ironhold', 'ih_m_pressuretank', 'Brass Pressure Tank', 3, 'heat', '#d8a050', 'mana as|Last Gasp',
     k => `When a spell drops it below 25% mana: attacks twice as fast for ${nf1(2.5 * k)}s.`,
@@ -59198,11 +59198,11 @@ function atkPlain(s, words) {
 const ITEM_VAR_POOL = {
   pierce:  { name: 'Piercing', see: 'A streak hits the foe behind.', text: k => `Hits also strike the foe behind for ${P_(.3 * k)}.`, fx: k => ({ hit: { do: 'pierce', k: .3 * k, r: 1.4 } }) },
   bounce:  { name: 'Ricochet', see: 'Each hit streaks on to a second foe.', text: k => `Hits bounce to a second foe for ${P_(.25 * k)}.`, fx: k => ({ hit: { do: 'bounce', k: .25 * k, r: 1.5 } }) },
-  split:   { name: 'Splinters', see: 'Every 3rd hit throws two sparks at nearby foes.', text: k => `Every 3rd hit: also strikes 2 nearby foes for ${P_(.35 * k)}.`, fx: k => ({ nth: { n: 3, act: { do: 'split', n: 2, k: .35 * k, r: 1.3 } } }) },
+  split:   { name: 'Splinters', see: 'Every 3rd hit throws two sparks at nearby foes.', text: k => `Every 3rd hit: also strikes 2 foes within 1.3 cells for ${P_(.35 * k)}.`, fx: k => ({ nth: { n: 3, act: { do: 'split', n: 2, k: .35 * k, r: 1.3 } } }) },
   first:   { name: 'Opening Blow', see: 'A quick double hit on each new foe.', text: k => `First hit on each foe: hits twice (${P_(.6 * k)}).`, fx: k => ({ first: { do: 'again', k: .6 * k, d: .12 } }) },
   execute: { name: 'Finisher', see: 'A second hit on a nearly dead foe.', text: k => `Foes under 20% health: a second hit (${P_(.8 * k)}).`, fx: k => ({ low: { p: .2, act: { do: 'again', k: .8 * k, d: .1 } } }) },
   instant: { name: 'Quick Kill', see: 'A kill and it attacks again at once.', text: () => 'On kill: its next attack comes at once.', fx: () => ({ kill: { do: 'instant' } }) },
-  boom:    { name: 'Bursting Kill', see: 'Slain foes burst.', text: k => `On kill: the foe bursts for ${P_(.4 * k)} on nearby foes.`, fx: k => ({ kill: { do: 'burst', k: .4 * k, r: 1 } }) },
+  boom:    { name: 'Bursting Kill', see: 'Slain foes burst.', text: k => `On kill: the foe bursts for ${P_(.4 * k)} on foes within 1 cell.`, fx: k => ({ kill: { do: 'burst', k: .4 * k, r: 1 } }) },
   manahit: { name: 'Mana Strike', see: 'Blue motes with each hit.', text: k => `Each hit: +${Math.round(3 * k)} mana.`, fx: k => ({ mana: { hit: Math.round(3 * k) } }) },
   castbig: { name: 'Charged Strike', see: 'After a spell the weapon glows; the next attack lands double.', text: () => 'After a spell: its next attack deals double.', fx: () => ({ cast: { n: 1, act: { do: 'big', k: 2 } } }) },
   helper:  { name: 'Spirit Twin', see: 'A small spirit circles it and copies attacks.', text: k => `Every 4th attack: hits its target again for ${P_(.4 * k)} of its attack.`, fx: k => ({ helper: { n: 4, k: .4 * k } }) },
@@ -101875,17 +101875,44 @@ function talTipHTML(ty, ci) {
   return `<div class="wt-h"><i class="wt-n">${t.name}</i><i class="wt-k">Rank ${n}/${t.max}</i></div>${talTagLine(t)}<div class="wt-d">${t.pro(k)}</div>`
     + (c ? `<div class="wt-c">${c}</div>` : '') + talRankHTML(t, n) + state;
 }
+/* The talent's text sits in a fixed pane beside the tree (#tTip), not in a tooltip at the node (owner, 26 Nov 2026: "unable
+   to hover over burning because the tooltip itself is on hover ... try going back to a side panel that also explains the
+   spell and lets you hover over keywords"). The pane shows the talent under the cursor, else the selected one, else the
+   last one shown, so it stays put while the cursor moves into it and its highlighted words can be hovered (tapped on a
+   phone) for their own cards (keywords.js). talPaneShow fills it and says false where a page has no pane. */
+let talShown = null;   // { t: the tab, i: the talent } last shown in the pane
+function talPaneShow(html, key) {
+  const det = document.getElementById('tTip'); if (!det || !det.isConnected) return false;
+  if (typeof hideSpellHud === 'function' && typeof spellHudActive !== 'undefined' && spellHudActive && spellHudActive.tal) hideSpellHud();
+  key = String(key);
+  if (det._k === key && det._h === html) return true;   // (as it stands: its keywords' cards and its clip are left alone)
+  const old = det._k === key ? det.querySelector('video.sa-clip[src]') : null, top = det._k === key ? det.scrollTop : 0;
+  det._k = key; det._h = html;
+  det.className = 'tc-det wtip' + (html ? '' : ' none');
+  det.innerHTML = html ? `<div class="td-tip">${html}</div>` : `<p class="td-none">${canHover() ? 'Hover over' : 'Tap'} a talent to read it here.</p>`;
+  if (old) { const nw = det.querySelector(`video.sa-clip[data-saclip="${old.dataset.saclip}"]`); if (nw && nw !== old) { nw.replaceWith(old); try { old.play().catch(() => {}); } catch (e) { /* it plays when it can */ } } }   // (a rank learned: the playing clip is kept, not started again)
+  det.scrollTop = top;
+  return true;
+}
+// which talent the pane shows on this tab: under the cursor, else selected, else the last one shown
+function talPaneWhich(ty) {
+  const sel = talSel && talSel.t === ty && talSel.i !== 'tome' ? talSel.i : null, last = talShown && talShown.t === ty ? talShown.i : null;
+  const ci = talHover != null ? talHover : sel != null ? sel : last;
+  talShown = ci == null ? null : { t: ty, i: ci };
+  return ci;
+}
 function renderTip() {
-  if (!talOpen || typeof spellTipShow !== 'function') return;
-  const ty = talTab, sel = talSel && talSel.t === ty ? talSel.i : null, ci = canHover() ? talHover : (talHover != null ? talHover : sel);
-  const node = ci == null || ci === 'tome' ? null : ovp.querySelector(`.tn[data-i="${ci}"], .fc[data-i="${ci}"]`);
-  if (!node) { if (spellHudActive && spellHudActive.tal) hideSpellHud(); return; }
+  if (!talOpen) return;
+  const ty = talTab, ci = talPaneWhich(ty);
+  const node = ci == null ? null : ovp.querySelector(`.tn[data-i="${ci}"], .fc[data-i="${ci}"]`);
   let html = '';
-  try {
+  if (node) try {
     if (ty === 'fusion' || ty === 'paths') { const d = document.createElement('div'); (ty === 'fusion' ? renderFusionTip : renderPathTip)(d, ci); html = `<div class="tal-old">${d.innerHTML}</div>`; }
     else html = talTipHTML(ty, ci);
   } catch (e) { html = ''; }
-  if (html) spellTipShow(node, html, { tal: true }); else hideSpellHud();
+  if (talPaneShow(html, ty + ':' + ci)) return;
+  if (typeof spellTipShow !== 'function') return;   // (no pane on this page: the tooltip at the node, as before)
+  if (node && html) spellTipShow(node, html, { tal: true }); else if (spellHudActive && spellHudActive.tal) hideSpellHud();
 }
 function endScreen(won) {
   if (TW) { TW.over = true; twEndScreen(won); return; }   // Tower Wars has its own
@@ -131431,6 +131458,7 @@ function fcOpenTree(key) {
       <nav class="tc-tabs" id="tTabs" role="tablist" aria-label="${fcE(F.name)} talent trees">${tabs}</nav>
       <div class="tc-main" id="tBody">
         <section class="tc-tree" id="tTree"><div class="tc-bg" id="tBg"></div><svg class="tc-links" id="tLinks" aria-hidden="true"></svg><div class="tc-grid" id="tGrid"></div></section>
+        <aside class="tc-det" id="tTip" aria-live="polite"></aside>
       </div>
       <footer class="tc-ft fcx-ft" id="tFoot"><button type="button" class="tc-btn" id="fcTreeBack">‹ ${fcE(F.name)}</button><span class="tc-hint">Read only: nothing is spent here. ${canHover() ? 'Hover' : 'Tap'} a talent to read it.</span></footer>
     </div>`, 'tal');
@@ -131438,11 +131466,11 @@ function fcOpenTree(key) {
   for (const b of P.querySelectorAll('.tc-tab')) { const x = L.find(o => o.key === b.dataset.k); hueVars(b, 'th', (x && x.tree.hue) || F.hue || '#a58b56'); }
   const back = () => { sfx('click'); hideSpellHud(); openForces(); };
   $('#tClose').onclick = back; $('#fcTreeBack').onclick = back; P.menuBack = back;
-  const go = k => { if (!k || k === FC.sel) return; FC.sel = k; sfx('select'); hideSpellHud(); fcTreeDraw(); const on = tabsEl.querySelector('.tc-tab.on'); if (on) { on.focus({ preventScroll: true }); if (on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' }); } };
+  const go = k => { if (!k || k === FC.sel) return; FC.sel = k; FC.shown = null; sfx('select'); hideSpellHud(); if (typeof talPaneShow === 'function') talPaneShow('', FC.f + ':' + k); fcTreeDraw(); const on = tabsEl.querySelector('.tc-tab.on'); if (on) { on.focus({ preventScroll: true }); if (on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' }); } };
   tabsEl.onclick = e => { const b = e.target.closest('.tc-tab'); if (b) go(b.dataset.k); };
   tabsEl.onkeydown = e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); const i = L.findIndex(x => x.key === FC.sel); go(L[(i + (e.key === 'ArrowLeft' ? -1 : 1) + L.length) % L.length].key); };
-  const show = n => { const T = L.find(x => x.key === FC.sel); if (!T || !n) return; let h = ''; try { h = fcTalTip(T, +n.dataset.i); } catch (e) { h = ''; } if (h) spellTipShow(n, h, { tal: true, fcx: true }); };
-  grid.onpointerover = e => { if (!canHover()) return; const n = e.target.closest('.tn'); if (n && !(spellHudActive && spellHudActive.btn === n)) show(n); };
+  const show = n => { const T = L.find(x => x.key === FC.sel); if (!T || !n) return; let h = ''; try { h = fcTalTip(T, +n.dataset.i); } catch (e) { h = ''; } if (!h) return; if (typeof talPaneShow === 'function' && talPaneShow(h, FC.f + ':' + FC.sel + ':' + n.dataset.i)) { FC.shown = n; return; } spellTipShow(n, h, { tal: true, fcx: true }); };   // (the pane beside the tree, as the talent panel's: its keywords can be hovered; ui.js talPaneShow)
+  grid.onpointerover = e => { if (!canHover()) return; const n = e.target.closest('.tn'); if (n && FC.shown !== n && !(spellHudActive && spellHudActive.btn === n)) show(n); };
   grid.onpointerleave = () => { if (canHover()) hideSpellHud(); };
   grid.onclick = e => { const n = e.target.closest('.tn'); if (!n) { hideSpellHud(); return; } if (!canHover() && spellHudActive && spellHudActive.btn === n) hideSpellHud(); else show(n); };
   grid.addEventListener('focusin', e => { const n = e.target.closest && e.target.closest('.tn'); if (n && n.matches(':focus-visible')) show(n); });
@@ -131456,6 +131484,7 @@ function fcOpenTree(key) {
     for (const q of T.tree.list) { const dr = q.r - t.r, dc = q.c - t.c; if (q === t || (d[0] && Math.sign(dr) !== d[0]) || (d[1] && Math.sign(dc) !== d[1])) continue; const s = d[0] ? Math.abs(dr) * 10 + Math.abs(dc) * 11 : Math.abs(dc) * 10 + Math.abs(dr) * 11; if (s < bs) { bs = s; best = q; } }
     const el = best && grid.querySelector(`.tn[data-i="${best.id}"]`); if (el) el.focus();
   };
+  FC.shown = null; if (typeof talPaneShow === 'function') talPaneShow('', FC.f + ':' + FC.sel);
   fcTreeDraw();
   if (typeof ResizeObserver !== 'undefined') { let w = 0, h = 0; const tree = $('#tTree'); FC.ro = new ResizeObserver(() => { if (!tree.isConnected) { FC.ro.disconnect(); FC.ro = null; return; } if (tree.clientWidth === w && tree.clientHeight === h) return; w = tree.clientWidth; h = tree.clientHeight; hideSpellHud(); fcTreeDraw(); }); FC.ro.observe(tree); }
   const at = tabsEl.querySelector('.tc-tab.on'); if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -140934,12 +140963,13 @@ if (typeof renderTip === 'function' && !renderTip._ft) {
   const t0 = renderTip;
   renderTip = function () {
     if (talTab !== 'force') return t0.apply(this, arguments);
-    if (!talOpen || typeof spellTipShow !== 'function') return;
-    const sel = talSel && talSel.t === 'force' ? talSel.i : null, ci = canHover() ? (talHover != null ? talHover : sel) : (talHover != null ? talHover : sel);
+    if (!talOpen) return;
+    const ci = talPaneWhich('force');   // (the pane beside the tree: under the cursor, else selected, else the last one shown)
     const node = ci == null ? null : ovp.querySelector(`#tGrid .tn[data-i="${ci}"]`);
-    if (!node) { if (typeof spellHudActive !== 'undefined' && spellHudActive && spellHudActive.tal) hideSpellHud(); return; }
-    const html = ftTipHTML(ci);
-    if (html) spellTipShow(node, html, { tal: true }); else hideSpellHud();
+    const html = node ? ftTipHTML(ci) : '';
+    if (talPaneShow(html, 'force:' + ci)) return;
+    if (typeof spellTipShow !== 'function') return;
+    if (node && html) spellTipShow(node, html, { tal: true }); else if (typeof spellHudActive !== 'undefined' && spellHudActive && spellHudActive.tal) hideSpellHud();
   };
   renderTip._ft = 1;
 }
