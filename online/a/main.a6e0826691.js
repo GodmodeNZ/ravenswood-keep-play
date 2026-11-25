@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b7e5e11f@2026-11-25';   // the play log's build version (playlog.js)
+const BUILD_TAG = '6edaeb31@2026-11-25';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -23490,7 +23490,7 @@ function sbDrawField(S) {
   for (const s of S.spirits || []) { if (s.kind === 2) sbDrawBird(s.x, s.z, 1.2, s.ang || 0, 1.2, .5 * Math.sin(n * 16)); else if (s.kind === 1) { M4.trs(_sbm, s.x, 0, s.z, s.ang || 0, s.hitAt && G.time - s.hitAt < .25 ? -.3 : 0, 0, .9); item(dynMesh('sbsp_bear', sbBearMesh), _sbm, SB_SPIRIT_O); } else sbDrawWolf(s.x, s.z, .02, s.ang || 0, 1.2, 1); }
   for (const z of S.cyc) {   // a cyclone: a funnel of wind
     const a = Math.min(1, z.t / .4);
-    for (let q = 0; q < 6; q++) { const h = .15 + q * .3, r = z.r * (.35 + q * .14); QADD.ground(z.x + Math.cos(z.spin + q) * .05, z.z + Math.sin(z.spin + q) * .05, .05 + h * .002, r, r, [.8, .95, .95, .14 * a], 4, .1, z.spin * (1 + q * .1)); QA.bill(RD, z.x + Math.cos(z.spin * 1.3 + q * 2) * r * .6, h, z.z + Math.sin(z.spin * 1.3 + q * 2) * r * .6, r * .9, .22, [.82, .9, .92, .4 * a], 2, 0, z.spin + q); }
+    for (let q = 0; q < 6; q++) { const h = .15 + q * .3, r = z.r * (.35 + q * .14); QADD.ground(z.x + Math.cos(z.spin + q) * .05, z.z + Math.sin(z.spin + q) * .05, .05 + h * .002, r, r, [.55, .7, .7, .07 * a], 4, .1, z.spin * (1 + q * .1)); QA.bill(RD, z.x + Math.cos(z.spin * 1.3 + q * 2) * r * .6, h, z.z + Math.sin(z.spin * 1.3 + q * 2) * r * .6, r * .7, .16, [.5, .64, .66, .14 * a], 2, 0, z.spin + q); }   // faint: foes show through it
   }
   const H = S.hunt;
   if (H) { for (const w of H.wolves) sbDrawWolf(w.x, w.z, .02 + (w.run ? .03 * Math.abs(Math.sin(n * 12)) : 0), w.ang, 1.35, 1); sbDrawBird(H.bird.x, H.bird.z, 1.4 + .1 * Math.sin(n * 2), H.bird.ang, 1.6, .55 * Math.sin(n * 14), .1); if (H.bear) { M4.trs(_sbm, H.bear.x, 0, H.bear.z, H.bear.ang, H.bear.hitAt && G.time - H.bear.hitAt < .25 ? -.3 : 0, 0, 1.15); item(dynMesh('sbsp_bear', sbBearMesh), _sbm, SB_SPIRIT_O); } }
@@ -35806,7 +35806,7 @@ const GW_N = 10, GW_STRIKE = 100 / GW_N;   // a gauge fills in 10 strikes
 const GW_FED = 1.5;          // a strike at a held foe or one carrying spores grows it this much faster
 const GW_KEEP = 25;          // Nyssa's Bloom Heart: what stays after a Bloom
 const GW_RIPE = 80;          // from here the gauge turns pink
-const gwOn = () => typeof G !== 'undefined' && G && G.force === GW_ID && !G.vs;
+const gwOn = () => typeof G !== 'undefined' && G && G.force === GW_ID && !G.vs && (typeof ftLive !== 'function' || ftLive(GW_ID));   // (force trees: Growth is the Whole Army capstone, forces_..._ftree.js)
 const gwUnit = t => t && t.def && t.def.force === GW_ID && !t.def.wall;
 const gwTal = (slot, id) => typeof talentHas === 'function' && talentHas(slot, id);
 const gwKeep = () => (G.hero === 'hivemother' && G.champ && typeof plTrait === 'function' && plTrait('hivemother') ? GW_KEEP : 0);   // (plain units, 25 Nov 2026: Nyssa's trait is on only from the force tree's Commander path)
@@ -57147,13 +57147,29 @@ const dualIs = t => !!(t && t.def && !t.def.wall && DUAL_UNIT[t.def.unit] && typ
 const dualHero = t => typeof hwIsHero === 'function' && hwIsHero(t);
 // a weapon in the off hand: a base of the unit's class, or (not for a Champion) one of its own legendaries
 function dualFits(w, t) {
-  if (!w || w.hero || w.starter || !dualIs(t)) return false;
+  if (!w || w.hero || w.starter || !dualIs(t) || dualHero(t)) return false;   // (a Champion's off hand holds its matched pair only: dualPair)
   const d = wpnDef(w); if (!d) return false;
   if (d.leg) return !dualHero(t) && d.u === t.def.unit;
   return d.cls === DUAL_UNIT[t.def.unit];
 }
-// the off hand's issued weapon (an empty off hand): the unit's own, exactly its baseline
-function dualStarter(t) { const c = DUAL_UNIT[t.def.unit], b = WPN_CLASS[c] && WPN_CLASS[c].bases[0]; return b ? { b: b[0], rar: -1, starter: 1, il: 1, u: t.def.unit, off: 1 } : null; }
+// the off hand's issued weapon (an empty off hand): the unit's own, exactly its baseline, shown as a weapon held as the main
+// hand's is (owner, 25 Nov 2026: "both of brannocs weapons should show up and be blue"). A Champion's is the matched pair.
+function dualStarter(t) {
+  const P = dualPair(t); if (P) return P;
+  const c = DUAL_UNIT[t.def.unit], b = WPN_CLASS[c] && WPN_CLASS[c].bases[0];
+  return b ? { b: b[0], rar: -1, starter: 1, il: 1, u: t.def.unit, off: 1 } : null;
+}
+/* A Champion's off hand: the matched pair of its hero weapon (owner, 25 Nov 2026: "yes do the matched pair"). Never a drop:
+   a live copy of the hero weapon (G.hw), so each stage it takes from a wave boss's loot raises both hands at once, and an
+   old save's staged weapon is paired at its own stage. It follows the off-hand rule: half the hero weapon's gain over the
+   issued weapon; its stage effects, runes and on-hit effect are the main hand's and count once. */
+function dualPair(t) {
+  if (!t || !t.def || !DUAL_UNIT[t.def.unit] || !dualHero(t) || typeof hwOn !== 'function' || !hwOn()) return null;
+  const h = t.weapon && t.weapon.hero ? t.weapon : hwState(t.def.unit); if (!h) return null;
+  const P = Object.assign({}, h, { pair: 1, off: 1 }); delete P._c; return P;
+}
+// what a pair is called, in the plural ("both hammers")
+const dualPairWord = u => ({ hammer: 'hammers', sword: 'swords', daggers: 'blades' })[DUAL_UNIT[u]] || 'weapons';
 const dualOf = t => (t && t.weapon2) || (t ? dualStarter(t) : null);
 // what it adds in the off hand: half its DPS gain over the issued weapon (add: a share of the unit's base damage) and its Spell Damage
 function dualGain(w) { if (!w || w.starter) return { add: 0, sp: 0 }; const S = wpnCalc(w); return { add: DUAL_OFF * (S.m - 1), sp: Math.round(S.sp * DUAL_OFF) }; }
@@ -57179,8 +57195,9 @@ if (typeof wpnApply === 'function') {
   };
 }
 function dualApply(t, st) {
-  if (!st || !dualIs(t) || !t.weapon2 || !dualFits(t.weapon2, t)) return;
-  const w = t.weapon2, d = wpnDef(w), G2 = dualGain(w), main = t.weapon && wpnDef(t.weapon);
+  if (!st || !dualIs(t)) return;
+  const w = dualHero(t) ? dualPair(t) : t.weapon2 && dualFits(t.weapon2, t) ? t.weapon2 : null; if (!w) return;
+  const d = wpnDef(w), G2 = dualGain(w), main = t.weapon && wpnDef(t.weapon);
   const Mm = st.wpn && st.wpn.m > 0 ? st.wpn.m : 1, g = (Mm + G2.add) / Mm;   // (the main hand's DPS multiple, plus the off hand's half gain, both over the base)
   if (st.dmg) st.dmg *= g; else if (st.smite) st.smite *= g;
   for (const k of ['burn', 'poison', 'drain']) if (st[k]) st[k] *= g;
@@ -57272,23 +57289,7 @@ if (typeof wpnAutoEquip === 'function') {
   };
 }
 
-/* ---------- drops: a Champion's off hand takes drops made for a unit of its class (it never has drops of its own) ---------- */
-if (typeof wpnTypesW === 'function') {
-  const _dwTypes = wpnTypesW;
-  wpnTypesW = function () {
-    const r = _dwTypes.apply(this, arguments);
-    try {
-      const W = typeof fieldWeights === 'function' ? fieldWeights() : {};
-      for (const ty in W) {
-        const T = TOWERS[ty]; if (!T || !T.champ || !DUAL_UNIT[T.unit]) continue;
-        const c = DUAL_UNIT[T.unit], alt = Object.keys(TOWERS).find(k => k !== ty && !TOWERS[k].champ && wpnClassOf(k) === c);
-        if (!alt) continue;
-        const e = r.find(x => x[0] === alt); if (e) e[1] += W[ty] * DUAL_OFF; else r.push([alt, W[ty] * DUAL_OFF]);
-      }
-    } catch (e) { console.error(e); }
-    return r;
-  };
-}
+/* (drops: a Champion's off hand once took drops made for a unit of its class; it holds its matched pair now, dualPair) */
 
 /* ---------- saves: each off hand by its unit's cell (s.wpn.off); selling a unit hands it back to the rack ---------- */
 if (typeof serialize === 'function') {
@@ -59320,7 +59321,7 @@ function ftView(force, hero) {
   V.nodes = nodes; V.byId = {}; for (const n of nodes) V.byId[n.id] = n;
   return (D._v[k] = V);
 }
-const ftTree = () => (typeof G !== 'undefined' && G && G.force && !G.vs && FTREE[G.force] ? ftView(G.force, G.hero) : null);
+const ftTree = () => (typeof G !== 'undefined' && G && G.force && !G.vs && !G.tut && FTREE[G.force] ? ftView(G.force, G.hero) : null);   // (the tutorial teaches the mechanics from its first chapter: it plays as T.vs)
 const ftWaveDone = () => (typeof G !== 'undefined' && G ? (G.wave | 0) - 1 : 0);   // (G.wave is the wave being played or the next one: 6 once 5 is cleared)
 const ftRowOpen = r => !!ftTree() && ftWaveDone() >= FT_ROW[r];
 const ftNodeWave = n => (n.w != null ? n.w : FT_ROW[n.r]);
@@ -59334,7 +59335,7 @@ const ftNextPointWave = () => FT_PTS.find(w => ftWaveDone() < w) || 0;
 function ftHas(id) {
   if (typeof G === 'undefined' || !G || !G.force) return 0;
   const D = FTREE[G.force]; if (!D || !D.byId[id]) return 0;
-  if (G.vs) return (D.vs && D.vs[id]) | 0;
+  if (G.vs || G.tut) return (D.vs && D.vs[id]) | 0;
   const n = D.byId[id]; if (n.hero && n.hero !== G.hero) return 0;
   return (G.ftree && !Array.isArray(G.ftree) && G.ftree[id]) | 0;
 }
@@ -59637,7 +59638,7 @@ if (typeof ccChargeInfoHTML === 'function' && !ccChargeInfoHTML._ft) { const i0 
 /* ---------- the commander's gift and Champion trait (plain units: PLAIN.trait), and its affinity ---------- */
 // is this commander's gift node taken? (a force with no tree: the gift is on, as before)
 function ftGiftOn(h) {
-  if (typeof G === 'undefined' || !G || G.vs) return true;
+  if (typeof G === 'undefined' || !G || G.vs || G.tut) return true;
   for (const f in FTREE) { const n = FTREE[f].all.find(q => q.hero === h && q.gift); if (n) return G.hero === h && ftHas(n.id) > 0; }
   return true;
 }
@@ -59917,6 +59918,596 @@ if (FORCE_HOOKS.conclave && !FORCE_HOOKS.conclave._ftfire) {
 // the unit cards no longer say every strike charges (the Force tab and the glossary say how it builds)
 for (const ty in FORCES.conclave.units) { const U = FORCES.conclave.units[ty]; if (U && typeof U.blurb === 'string') U.blurb = U.blurb.replace(/\s*Each strike adds an Arcane Charge \(up to \d+\); a spell spends them all(, \+\d+% ability power each)?\./g, ''); }
 
+
+/* =====================================================================================================
+   THE KIT (v4, every force after the Conclave): one force's tree is data. ftKit(force, o) lays out the three blocks and wires
+   them through the hooks below. o: { short (node id prefix), hue, name, say, intro, units: { key: unit id },
+   pairs: { id: { name, a, b, w, art, col, say(n, w), fx(X), cast?, cap: { name, art, say(), fx(X) } } },
+   army: [[node, node] x4, capstone], cmd: { hero: [root, [a, b], [a, b], [gift, b], capstone] }, live (the mechanic is on) }.
+   A node may carry hooks, each run only while the run holds it (n its rank):
+     live(t, st, n)        the unit's stats, last of all (rate, range, crit, st.sh.cdK, st.sh.manaK)
+     cost(t, ab, n)        a share of the spell's mana off (summed, never below 30%)
+     wave(t, n)            each unit as a wave starts
+     fire(t, st, tg, pow, n) -> pow    a unit's attack
+     amp(c, amt, src, n) -> amt        a hit on a foe (before it lands)
+     cast(t, ab, n)        after a spell
+     kill(c, src, n)       a foe slain
+     blow(t, dmg, n) -> dmg   a foe's blow on one of your units
+   A pairing's fx(X) gets X = { c (the foe), amt (the second hit), n (rank), a, b (the two units, first and second), src,
+   cap (its capstone is taken and it is your pairing), hit(q, d), near(r, k) (foes within r of c, k at most) }.
+   ===================================================================================================== */
+const FTK = { PAIR_CD: 1, BOND: 1, DRILL: .05, BREATH: 6, HOLD: .3 };
+let FTK_IN = 0;   // (a bonus hit in progress: it never sets off another)
+const ftkHit = (c, amt, src) => { if (!c || c.dead || !(amt > 0)) return; FTK_IN++; try { hurt(c, amt, 'magic', src, false, null, null); } finally { FTK_IN--; } };
+const ftkKit = () => { const T = ftTree(); return T && T.kit ? T : null; };
+const ftkUnit = (t, f) => !!(t && t.def && t.def.force === f && !t.def.wall && !t.wrecked && !(t.build > .5) && G.towers.includes(t));
+const ftkNear = (t, u, r) => G.towers.some(o => o !== t && ftkUnit(o, t.def.force) && o.def.unit === u && Math.hypot(o.x - t.x, o.y - t.y) <= r + .05);
+const ftkKinds = (t, r) => { const seen = []; for (const o of G.towers) { if (o === t || !ftkUnit(o, t.def.force) || o.def.unit === t.def.unit || seen.includes(o.def.unit)) continue; if (Math.hypot(o.x - t.x, o.y - t.y) <= r + .05) seen.push(o.def.unit); } return seen.length; };
+const ftkFast = (st, k) => { if (st && st.rate && k > 0) st.rate /= 1 + k; };
+const ftkUnitName = (f, u) => { const F = FORCES[f] && FORCES[f].units; for (const s in F) if (F[s] && F[s].id === u) return F[s].name; return u; };
+function ftkS() { if (!G.ftk || G.ftk.tw !== G.towers) G.ftk = { tw: G.towers, n: { pair: {}, cap: {} }, last: {} }; return G.ftk; }
+// the nodes the run holds that carry hook k (cached a frame)
+function ftkOn(k) {
+  const T = ftkKit(); if (!T) return [];
+  const S = ftkS(), key = G.time + '|' + (G.talV | 0) + '|' + ftSpent() + '|' + (G.hero || '');
+  if (S.on && S.on[k] && S.on[k].key === key && S.on[k].ref === G.ftree) return S.on[k].L;
+  const L = T.nodes.filter(n => n[k] && ftHas(n.id) > 0).map(n => [n, ftHas(n.id)]);
+  (S.on || (S.on = {}))[k] = { key, ref: G.ftree, L };
+  return L;
+}
+// the pairings
+const ftkPairs = () => { const T = ftkKit(); return T ? T.nodes.filter(n => n.grp === 'pair' && ftHas(n.id) > 0) : []; };
+const ftkMain = () => { const m = ftMainPair(); return m && m.pair ? m : null; };
+const ftkInPair = (t, p) => !!p && (t.def.unit === p.pair.a || t.def.unit === p.pair.b);
+function ftkCue(p, a, b, c) {
+  const P = p.pair;
+  if (a && b && G.towers.includes(a) && G.towers.includes(b)) rfx({ k: 'streak', x0: a.x, h0: towerTop(a) * .8, z0: a.y, x1: b.x, h1: towerTop(b) * .8, z1: b.y, col: P.col[0], w: .03, life: .4 });
+  if (c) { part({ k: 'flare', x: c.x, z: c.y, h: hitH(c) + .2, life: .35, max: .35, size: .7, col: P.col[1] }); fxSpark(c.x, c.y, hitH(c) + .1, P.col[0], 5); }
+}
+function ftkX(p, c, amt, a, b, src) {
+  const main = ftkMain(), T = ftkKit();
+  return { c, amt, n: ftHas(p.id), a, b, src: src || b, cap: !!main && main.id === p.id && T && ftHas(T.short + '_s_cap') > 0,
+    hit: (q, d) => ftkHit(q, d, src || b), near: (r, k) => nearest(c.x, c.y, r, k || 8, c, q => !q.phased) };
+}
+function ftkFired(p, a, b, c, X) {
+  const S = ftkS(), T = ftkKit(); S.n.pair[p.id] = (S.n.pair[p.id] | 0) + 1;
+  const main = ftkMain(); if (!main || main.id !== p.id || !T) return;
+  if (ftHas(T.short + '_s_breath')) for (const u of [a, b]) if (u && G.towers.includes(u)) gainMana(u, FTK.BREATH);
+  if (X && X.cap && p.pair.cap && p.pair.cap.fx) { S.n.cap[p.id] = (S.n.cap[p.id] | 0) + 1; p.pair.cap.fx(X); }
+}
+const ftkW = p => (p.pair.w || 0) + FTK.BOND * ftHas((ftkKit() || {}).short + '_s_bond');
+function ftkPairHit(c, amt, src) {
+  const me = src.def.unit, H = c.ftkPH || (c.ftkPH = {}), CD = c.ftkPCD || (c.ftkPCD = {});
+  for (const p of ftkPairs()) {
+    const P = p.pair; if (P.cast || (me !== P.a && me !== P.b) || CD[p.id] > G.time) continue;
+    if (P.solo) { if (me !== P.b || !P.solo(c, src)) continue; CD[p.id] = G.time + FTK.PAIR_CD; const X = ftkX(p, c, amt, null, src, src); ftkCue(p, null, src, c); P.fx(X); ftkFired(p, null, src, c, X); continue; }
+    const other = me === P.a ? P.b : P.a, rec = H[other];
+    if (!rec || G.time - rec.t > ftkW(p) || rec.u === src) continue;
+    if (P.order && me !== P.b) continue;   // (the second hit must be b's)
+    CD[p.id] = G.time + FTK.PAIR_CD; ftkCue(p, rec.u, src, c);
+    const X = ftkX(p, c, amt, rec.u, src, src); P.fx(X); ftkFired(p, rec.u, src, c, X);
+  }
+  H[me] = { t: G.time, u: src };
+}
+// lay out a kit force's tree: Specialist (cols 0-2), Whole Army (4-6), Commander (8-10)
+function ftKit(force, o) {
+  const s = o.short, nodes = [], ids = Object.keys(o.pairs);
+  ids.forEach((id, i) => { const P = o.pairs[id]; nodes.push({ id, grp: 'pair', pair: P, name: P.name, r: i < 3 ? 0 : 1, c: i % 3, w: FT_PTS[0], max: 2, art: P.art,
+    text: n => `${ftkUnitName(force, P.a)} + ${ftkUnitName(force, P.b)}: ${P.say(n, (P.w || 0) + FTK.BOND * ftHas(s + '_s_bond'))}` }); });
+  const A = o.sArt || {};
+  nodes.push(
+    { id: s + '_s_bond', name: 'Close Bond', r: 2, c: 0, max: 2, alt: s + '_s2', needPair: 'full', art: A.bond, text: n => `Your pairing: the two hits may come up to ${FTK.BOND * n}s further apart.` },
+    { id: s + '_s_drill', name: 'Drilled Together', r: 2, c: 2, max: 2, alt: s + '_s2', needPair: 'full', art: A.drill,
+      text: n => `Your pairing's two units attack ${Math.round(FTK.DRILL * n * 100)}% faster while one of the other kind stands within 2 cells.`,
+      live: (t, st, n) => { const m = ftkMain(); if (m && ftkInPair(t, m)) { const P = m.pair, other = t.def.unit === P.a ? P.b : P.a; if (ftkNear(t, other, 2)) ftkFast(st, FTK.DRILL * n); } } },
+    { id: s + '_s_breath', name: 'Shared Breath', r: 3, c: 0, max: 1, alt: s + '_s3', reqAny: [s + '_s_bond', s + '_s_drill'], art: A.breath, text: () => `Your pairing goes off: both units gain ${FTK.BREATH} mana.` },
+    { id: s + '_s_hold', name: 'Hold Fast', r: 3, c: 2, max: 1, alt: s + '_s3', reqAny: [s + '_s_bond', s + '_s_drill'], art: A.hold, text: () => `Your pairing's units take ${FTK.HOLD * 100}% less from foes' blows.` },
+    { id: s + '_s_cap', name: 'Pair Capstone', r: 4, c: 1, max: 1, reqAny: [s + '_s_breath', s + '_s_hold'], cap: s + 's', art: A.cap,
+      text: () => { const m = ftMainPair(); return m && m.pair ? `${m.pair.cap.name}: ${m.pair.cap.say()}` : "Your pairing's own capstone: each pairing has one."; } });
+  o.army.slice(0, 4).forEach((row, r) => row.forEach((n, k) => nodes.push(Object.assign({ r, c: k ? 6 : 4, max: r === 1 || r === 2 ? 2 : 1, alt: s + '_w' + r },
+    r === 0 ? {} : r === 1 ? { reqAny: o.army[0].map(q => q.id) } : { req: o.army[r - 1].map(q => q.id) }, n))));
+  nodes.push(Object.assign({ r: 4, c: 5, max: 1, reqAny: o.army[3].map(q => q.id), cap: s + 'w' }, o.army[4]));
+  for (const h in o.cmd) {
+    const L = o.cmd[h], root = L[0], cap = L[4];
+    nodes.push(Object.assign({ hero: h, r: 0, c: 9, max: 1 }, root));
+    [L[1], L[2], L[3]].forEach((row, i) => row.forEach((n, k) => nodes.push(Object.assign({ hero: h, r: i + 1, c: k ? 10 : 8, max: i < 2 ? 2 : 1 }, n, {
+      req: i === 0 ? [root.id] : [], reqAny: i === 0 ? [] : [L[i]][0].map(q => q.id), alt: h + ':m' + (i + 1) }))));
+    nodes.push(Object.assign({ hero: h, r: 4, c: 9, max: 1, reqAny: L[3].map(q => q.id), cap: s + 'c' }, cap));
+  }
+  ftReg(force, { name: o.name, hue: o.hue, rows: 5, cols: 11, kit: 1, short: s, say: o.say, intro: o.intro, live: o.live,
+    blocks: [{ c: 0, w: 3, name: 'Specialist' }, { c: 4, w: 3, name: 'Whole Army' }, { c: 8, w: 3, name: 'Commander' }],
+    nodes, vs: o.vs || {},
+    auto: { A: o.army.slice(0, 4).flatMap((row, r) => r === 1 || r === 2 ? [row[0].id, row[0].id] : [row[0].id]).concat([o.army[4].id, '@root']),
+      B: [ids[0], ids[0], s + '_s_bond', s + '_s_bond', s + '_s_breath', s + '_s_cap', ids[1], o.army[0][0].id],
+      C: ['@root', '@m1', '@m1', '@m2', '@m2', '@gift', '@cap', o.army[0][0].id] } });
+  const D = FTREE[force], pc = D.byId[s + '_s_cap'], A0 = D.auto;
+  Object.defineProperty(pc, 'name', { get: () => { const m = typeof G !== 'undefined' && G && G.force === force ? ftMainPair() : null; return m && m.pair ? m.pair.cap.name : 'Pair Capstone'; }, configurable: true });
+  const cmdId = (h, k) => { const L = o.cmd[h]; if (!L) return null; return k === '@root' ? L[0].id : k === '@cap' ? L[4].id : k === '@gift' ? (L[3].find(n => n.gift) || L[3][0]).id : k === '@m1' ? L[1][0].id : k === '@m2' ? L[2][0].id : null; };
+  D.auto = new Proxy(A0, { get: (t, k) => (Array.isArray(t[k]) ? t[k].map(id => (id[0] === '@' ? cmdId(typeof G !== 'undefined' && G ? G.hero : '', id) : id)).filter(Boolean) : t[k]) });
+  return D;
+}
+
+/* ---------- the kit's hooks ---------- */
+if (typeof effStats === 'function' && !effStats._ftk) {
+  const e0 = effStats;
+  effStats = function (t) {
+    const st = e0.apply(this, arguments);
+    if (!st || !t || !t.def || t.def.wall || G.vs || t.def.force !== G.force || !ftkKit()) return st;
+    for (const [n, k] of ftkOn('live')) try { n.live(t, st, k); } catch (e) { console.error(e); }
+    if (st.crit > .9) st.crit = .9;
+    return st;
+  };
+  effStats._ftk = 1;
+}
+if (typeof manaCostK === 'function' && !manaCostK._ftk) {
+  const m0 = manaCostK;
+  manaCostK = function (t, ab) {
+    const v = m0.apply(this, arguments);
+    if (G.vs || !t || !t.def || t.def.force !== G.force || !ftkKit()) return v;
+    let off = 0; for (const [n, k] of ftkOn('cost')) try { off += n.cost(t, ab, k) || 0; } catch (e) { console.error(e); }
+    return off ? Math.max(0, Math.round(v * Math.max(.3, 1 - off))) : v;
+  };
+  manaCostK._ftk = 1;
+}
+if (typeof callWave === 'function' && !callWave._ftk) {
+  const w0 = callWave;
+  callWave = function () {
+    const r = w0.apply(this, arguments);
+    if (!G.vs && ftkKit()) { ftPlainHook(); const S = ftkS(); S.waveAt = G.time; S.wave = G.wave; for (const t of G.towers) if (ftkUnit(t, G.force)) for (const [n, k] of ftkOn('wave')) try { n.wave(t, k); } catch (e) { console.error(e); } }
+    return r;
+  };
+  callWave._ftk = 1;
+}
+if (typeof hurt === 'function' && !hurt._ftk) {
+  const h0 = hurt;
+  hurt = function (c, amt, type, src, dot) {
+    const kit = !G.vs && c && src && src.def && amt > 0 && ftkKit();
+    if (kit) for (const [n, k] of ftkOn('amp')) try { amt = n.amp(c, amt, src, k, dot) || amt; } catch (e) { console.error(e); }
+    const r = h0.apply(this, [c, amt].concat(Array.prototype.slice.call(arguments, 2)));
+    if (kit && !dot && !FTK_IN && src.def.force === G.force && src.def.unit && ftkPairs().length) try { ftkPairHit(c, amt, src); } catch (e) { console.error(e); }
+    return r;
+  };
+  hurt._ftk = 1;
+}
+if (typeof damageTower === 'function' && !damageTower._ftk) {
+  const d0 = damageTower;
+  damageTower = function (t, dmg) {
+    const T = ftkKit();
+    if (T && !G.vs && t && t.def && t.def.force === G.force) {
+      if (ftHas(T.short + '_s_hold') && ftkInPair(t, ftkMain())) dmg *= 1 - FTK.HOLD;
+      for (const [n, k] of ftkOn('blow')) try { dmg = n.blow(t, dmg, k); } catch (e) { console.error(e); }
+    }
+    return d0.call(this, t, dmg);
+  };
+  damageTower._ftk = 1;
+}
+if (typeof castAbility === 'function' && !castAbility._ftk) {
+  const a0 = castAbility;
+  castAbility = function (t, ab) {
+    const r = a0.apply(this, arguments);
+    if (!r || G.vs || !t || !t.def || t.def.force !== G.force || !ftkKit()) return r;
+    try {
+      if (t.ftkEmpNext) { t.ftkEmpNext = 0; t.ftkEmpKey = t.ab && t.ab.lastAt; }
+      for (const [n, k] of ftkOn('cast')) n.cast(t, ab, k);
+      for (const p of ftkPairs()) {   // a pairing that goes off on a cast (P.cast)
+        const P = p.pair; if (!P.cast || (t.def.unit !== P.a && t.def.unit !== P.b)) continue;
+        const other = t.def.unit === P.a ? P.b : P.a;
+        for (const o of G.towers) { if (!ftkUnit(o, G.force) || o.def.unit !== other || Math.hypot(o.x - t.x, o.y - t.y) > 2.55) continue; const X = ftkX(p, null, 0, t, o, t); ftkCue(p, t, o, null); P.fx(X); ftkFired(p, t, o, null, X); }
+      }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+  castAbility._ftk = 1;
+}
+if (typeof kill === 'function' && !kill._ftk) {
+  const k0 = kill;
+  kill = function (c, src) {
+    const on = !G.vs && c && !c.dead && ftkKit() ? ftkOn('kill') : null;
+    const r = k0.apply(this, arguments);
+    if (on) for (const [n, k] of on) try { n.kill(c, src, k); } catch (e) { console.error(e); }
+    return r;
+  };
+  kill._ftk = 1;
+}
+// a unit's attack: through every kit force's FORCE_HOOKS fire (made if missing)
+function ftkFireWrap(force) {
+  const H = FORCE_HOOKS[force] || (FORCE_HOOKS[force] = {}); if (H._ftk) return;
+  const f0 = H.fire;
+  H.fire = function (t, st, tg, pow, echo) {
+    let r = f0 ? f0.apply(this, arguments) : pow; if (r == null) r = pow;
+    if (G.vs || echo || !t || !t.def || !tg || !ftkKit()) return r;
+    for (const [n, k] of ftkOn('fire')) try { r = n.fire(t, st, tg, r, k) || r; } catch (e) { console.error(e); }
+    return r;
+  };
+  H._ftk = 1;
+}
+// a spell empowered by a commander's capstone (ftkEmpNext): its hits 25% harder
+const ftkEmpAmp = (c, amt, src) => (src.ftkEmpKey != null && src.ab && src.ab.lastAt === src.ftkEmpKey && typeof AB_NOW !== 'undefined' && AB_NOW && DTAG === AB_TAG ? amt * 1.25 : amt);
+
+/* =====================================================================================================
+   THE GROVE (v4 on the kit). Whole Army's capstone is Growth (forces_zz_growth.js: gwOn asks ftLive). The commanders:
+   Elowen (roots, spears, dancers), Faelan (the long watch: archers, flyers), Nyssa (spores, seedcasters, bogwitches).
+   ===================================================================================================== */
+const GV_U = { spear: 'thornguard', bow: 'gladebow', briar: 'briarwarden', stag: 'staglancer', shift: 'wayfarer', dance: 'bladedancer', seed: 'seedcaster', bog: 'bogwitch' };
+const gvOf = (X, u) => (X.a && X.a.def.unit === u ? X.a : X.b && X.b.def.unit === u ? X.b : null);
+const gvSh = st => (typeof sh === 'function' ? sh(st) : (st.sh = st.sh || { cdK: 1 }));
+const gvIs = (t, u) => t.def.unit === u;
+ftKit('grove', {
+  short: 'gv', name: 'Grove', hue: '#7cc04a',
+  say: 'Your Grove starts plain. Force points make it yours: a pair of units, the whole army, or your commander.',
+  intro: 'A force point: open the talents, Force tab. Pick a pair, a perk for the whole army, or your commander\'s first gift.',
+  live: () => ftHas('gv_growth') > 0,
+  vs: { gv_growth: 1 },
+  sArt: { bond: 'holy:Twin Elders', drill: 'holy:War Rhythm', breath: 'holy:Sap Song', hold: 'glaive:Hold the Line', cap: 'holy:Unison' },
+  pairs: {
+    gv_p_pincer: { name: 'Pincer', a: GV_U.spear, b: GV_U.stag, w: 2, col: ['#c8e070', '#e8f0b0'], art: 'glaive:Impaler',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit strikes again for ${n > 1 ? 70 : 40}%.`,
+      fx: X => X.hit(X.c, X.amt * (X.n > 1 ? .7 : .4)),
+      cap: { name: 'Run to Ground', art: 'arcane:Run to Ground', say: () => 'Pincer\'s second strike also hits the nearest foe within 1 cell.', fx: X => { const q = X.near(1, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); } } },
+    gv_p_seeded: { name: 'Seeded Arrows', a: GV_U.seed, b: GV_U.bow, w: 2, col: ['#d8f08a', '#a8d070'], art: 'arrow:Thornseed Arrow',
+      say: (n, w) => `a foe hit by both within ${w}s: the Seedcaster's spores spread to ${n > 1 ? 2 : 1} more foe${n > 1 ? 's' : ''} within 1.5 cells.`,
+      fx: X => { const s = gvOf(X, GV_U.seed); if (!s || typeof dose !== 'function' || typeof sporeDose !== 'function') return; for (const q of X.near(1.5, X.n > 1 ? 2 : 1)) if (!isImmune(q, 'poison')) dose(q, sporeDose(s.st || effStats(s)), s); },
+      cap: { name: 'Spore Volley', art: 'arrow:Hail of Leaves', say: () => 'Every 4th Seeded Arrows: 3 arrows strike foes within 2 cells for 50% of the hit.', fx: X => { const S = ftkS(); if ((S.n.cap.gv_p_seeded | 0) % 4) return; for (const q of X.near(2, 3)) X.hit(q, X.amt * .5); } } },
+    gv_p_drowned: { name: 'Drowned Roots', a: GV_U.briar, b: GV_U.bog, w: 2, col: ['#7ac040', '#6a8a5a'], art: 'venom:Deep Water',
+      say: (n, w) => `a foe hit by both within ${w}s loses ${n > 1 ? 4 : 2} armour for 4s.`,
+      fx: X => { const c = X.c; if (c.dead) return; c.shred = Math.max(c.shredT > 0 ? c.shred || 0 : 0, X.n > 1 ? 4 : 2); c.shredT = Math.max(c.shredT || 0, 4); },
+      cap: { name: 'Mire Grip', art: 'venom:Clinging Mud', say: () => 'A foe Drowned Roots took takes 15% more from Briarwardens and Bogwitches for 3s.', fx: X => { X.c.gvMireT = G.time + 3; } } },
+    gv_p_dance: { name: 'Wild Dance', a: GV_U.shift, b: GV_U.dance, w: 2, col: ['#e8f0b0', '#ffb8d8'], art: 'earth:Threading Dance',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit cuts foes within 0.8 cells for ${n > 1 ? 70 : 40}%.`,
+      fx: X => { for (const q of X.near(.8)) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); },
+      cap: { name: 'Whirl of Leaves', art: 'earth:Wide Whirl', say: () => 'Wild Dance cuts out to 1.3 cells.', fx: X => { for (const q of X.near(1.3)) if (Math.hypot(q.x - X.c.x, q.y - X.c.y) > .85) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); } } },
+    gv_p_thorns: { name: 'Thorn Garden', a: GV_U.spear, b: GV_U.briar, w: 2, col: ['#c8e070', '#7ac040'], art: 'frost:Thorned Vines',
+      say: (n, w) => `a foe hit by both within ${w}s: thorns burst for ${n > 1 ? 100 : 60}% of the second hit to it and foes within 0.8 cells.`,
+      fx: X => { const d = X.amt * (X.n > 1 ? 1 : .6); X.hit(X.c, d); for (const q of X.near(.8)) X.hit(q, d); },
+      cap: { name: 'Bramble Wall', art: 'glaive:Thornwall Ward', say: () => 'Thorn Garden\'s thorns root ground foes they hit for 0.5s.', fx: X => { for (const q of [X.c].concat(X.near(.8))) if (!q.dead && !q.fly && typeof rootFoe === 'function') rootFoe(q, .5, X.src); } } },
+    gv_p_brew: { name: 'Witch\'s Brew', a: GV_U.seed, b: GV_U.bog, w: 2, col: ['#d8f08a', '#8ac06a'], art: 'venom:Fed Swarm',
+      say: (n, w) => `a foe hit by both within ${w}s takes ${n > 1 ? 50 : 30}% of the second hit again each second for 3s.`,
+      fx: X => { const c = X.c, d = X.amt * (X.n > 1 ? .5 : .3), src = X.src, cap = X.cap, amt = X.amt; for (let k = 1; k <= 3; k++) G.delayed.push({ t: k, fn: () => { if (G.state !== 'play' || c.dead) return; ftkHit(c, d, src); fxSpark(c.x, c.y, hitH(c), '#8ac06a', 3);
+        if (k === 3 && cap) for (const q of [c].concat(nearest(c.x, c.y, .8, 8, c, o => !o.phased))) ftkHit(q, amt, src); } }); },
+      cap: { name: 'Bubbling Over', art: 'cannon:Bursting Rot', say: () => 'When Witch\'s Brew ends, it bursts for 100% of the second hit to the foe and foes within 0.8 cells.', fx: () => {} } },
+  },
+  army: [
+    [{ id: 'gv_w_sap', name: 'Living Sap', art: 'frost:Sapwell', text: () => 'Grove units regain mana 20% faster.', live: (t, st) => { gvSh(st).manaK = (gvSh(st).manaK || 0) + .2; } },
+     { id: 'gv_w_quick', name: 'Quick Growth', art: 'frost:Quickening Sap', text: () => 'Grove spells come back 8% faster.', live: (t, st) => { gvSh(st).cdK *= .92; } }],
+    [{ id: 'gv_w_kin', name: 'Kindred', art: 'holy:Rallying Cry', text: n => `Each other Grove kind within 2 cells: attacks ${3 * n}% faster, up to 3 kinds.`, live: (t, st, n) => ftkFast(st, .03 * n * Math.min(3, ftkKinds(t, 2))) },
+     { id: 'gv_w_reach', name: 'Long Boughs', art: "frost:Warden's Reach", text: n => `Grove units: +${gNf(.1 * n)} range.`, live: (t, st, n) => { if (st.range) st.range += .1 * n; } }],
+    [{ id: 'gv_w_rhythm', name: 'Wild Rhythm', art: "arrow:Hunter's Rhythm", text: n => `Every ${n > 1 ? 6 : 8}th attack of a Grove unit hits 50% harder.`, fire: (t, st, tg, pow, n) => ((t.gvRhy = (t.gvRhy | 0) + 1) % (n > 1 ? 6 : 8) === 0 ? pow * 1.5 : pow) },
+     { id: 'gv_w_thrift', name: 'Forest Thrift', art: 'cannon:Seedwell', text: n => `Grove spells cost ${5 * n}% less.`, cost: (t, ab, n) => .05 * n }],
+    [{ id: 'gv_w_dew', name: 'Morning Dew', art: 'holy:Sapling Song', text: () => 'Each wave: Grove units start it with at least half their mana.', wave: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); } },
+     { id: 'gv_w_keen', name: 'Keen Eyes', art: 'arrow:Canopy Sight', text: () => 'Grove units: +5% crit chance.', live: (t, st) => { st.crit = (st.crit || 0) + .05; } }],
+    { id: 'gv_growth', name: 'Growth', art: 'holy:Full Bloom', text: () => `Each attack fills a unit's Growth bar ${typeof GW_STRIKE !== 'undefined' ? Math.round(GW_STRIKE) : 10} (half again on a rooted or spored foe). Full: its next attack Blooms, a big attack of its own kind.` },
+  ],
+  cmd: {
+    rootmother: [
+      { id: 'gv_c_heart', name: 'Heartwood', art: 'holy:Heartwood Song', text: () => 'Grove units within 2 cells of a Thornguard Spear attack 8% faster.', live: (t, st) => { if (ftkNear(t, GV_U.spear, 2)) ftkFast(st, .08); } },
+      [{ id: 'gv_c_grip', name: 'Rooted Strength', art: 'holy:Deep Grip', text: n => `Grove units attack ${5 * n}% faster while their foe is rooted.`, live: (t, st, n) => { if (t.tg && !t.tg.dead && t.tg.rootT > G.time) ftkFast(st, .05 * n); } },
+       { id: 'gv_c_briar', name: 'Briar Reach', art: 'frost:Spreading Roots', text: n => `Briarwardens: +${gNf(.2 * n)} range.`, live: (t, st, n) => { if (gvIs(t, GV_U.briar) && st.range) st.range += .2 * n; } }],
+      [{ id: 'gv_c_waltz', name: 'Thorn Waltz', art: 'earth:Thorn Dance', text: n => `Blade Dancers' hits on a rooted foe: ${25 * n}% harder.`, amp: (c, amt, src, n) => (src.def.unit === GV_U.dance && c.rootT > G.time ? amt * (1 + .25 * n) : amt) },
+       { id: 'gv_c_sapsong', name: 'Sap Song', art: 'glaive:Living Haft', text: n => `Thornguard Spear spells cost ${10 * n}% less.`, cost: (t, ab, n) => (gvIs(t, GV_U.spear) ? .1 * n : 0) }],
+      [{ id: 'gv_c_gift_r', gift: 1, name: 'Heartroot', art: 'holy:Rootmother', text: () => "Elowen's gift and her Champion's trait: roots hold 20% longer, and her every 3rd lash roots its foe for 0.5s." },
+       { id: 'gv_c_oldwood', name: 'Old Wood', art: 'holy:The Old Wood Walks', text: () => "Elowen's spells cost 20% less.", cost: t => (t.def.champ ? .2 : 0) }],
+      { id: 'gv_c_walks', name: 'The Wood Walks', art: 'holy:Thousand Roots', text: () => "Elowen casts a spell: Grove units within 3 cells attack 20% faster for 4s.",
+        cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (ftkUnit(o, 'grove') && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.gvWalkT = G.time + 4; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col: '#c8e070' }); } },
+        live: (t, st) => { if (t.gvWalkT > G.time) ftkFast(st, .2); } },
+    ],
+    thornbow: [
+      { id: 'gv_c_watch', name: 'Long Watch', art: 'holy:Watchtower Bough', text: () => 'Gladebow Rangers: +0.2 range.', live: (t, st) => { if (gvIs(t, GV_U.bow) && st.range) st.range += .2; } },
+      [{ id: 'gv_c_hawk', name: 'Hawk Eye', art: "storm:Hawk's Reach", text: n => `Grove Shifters: +${gNf(.2 * n)} range.`, live: (t, st, n) => { if (gvIs(t, GV_U.shift) && st.range) st.range += .2 * n; } },
+       { id: 'gv_c_fletch', name: 'Swift Fletching', art: "holy:Fletcher's Pace", text: n => `Gladebow Rangers attack ${5 * n}% faster.`, live: (t, st, n) => { if (gvIs(t, GV_U.bow)) ftkFast(st, .05 * n); } }],
+      [{ id: 'gv_c_stoop', name: "Owl's Stoop", art: 'storm:Skyfall', text: n => `Grove hits on flyers: ${15 * n}% harder.`, amp: (c, amt, src, n) => (c.fly && src.def.force === 'grove' ? amt * (1 + .15 * n) : amt) },
+       { id: 'gv_c_draw', name: 'Steady Draw', art: 'holy:Steady Draw', text: n => `Gladebow Rangers: +${4 * n}% crit chance.`, live: (t, st, n) => { if (gvIs(t, GV_U.bow)) st.crit = (st.crit || 0) + .04 * n; } }],
+      [{ id: 'gv_c_gift_t', gift: 1, name: 'Keen Eye', art: 'holy:Moonlit Aim', text: () => "Faelan's gift and his Champion's trait: Gladebow Rangers reach 0.2 further, and his first arrow at each foe strikes its weak point for double." },
+       { id: 'gv_c_ease', name: "Ranger's Ease", art: 'holy:Farshot', text: () => "Faelan's spells cost 20% less.", cost: t => (t.def.champ ? .2 : 0) }],
+      { id: 'gv_c_volley', name: 'Volley Call', art: 'holy:The Wild Hunt', text: () => 'Faelan casts a spell: Gladebow Rangers within 3 cells attack 30% faster for 3s.',
+        cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (ftkUnit(o, 'grove') && gvIs(o, GV_U.bow) && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.gvVolleyT = G.time + 3; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col: '#e8f0b0' }); } },
+        live: (t, st) => { if (t.gvVolleyT > G.time) ftkFast(st, .3); } },
+    ],
+    hivemother: [
+      { id: 'gv_c_wind', name: 'Spore Wind', art: 'holy:Pollen Drift', text: () => 'Seedcasters attack 6% faster.', live: (t, st) => { if (gvIs(t, GV_U.seed)) ftkFast(st, .06); } },
+      [{ id: 'gv_c_thick', name: 'Thick Spores', art: 'cannon:Potent Spores', text: n => `Seedcaster spells cost ${10 * n}% less.`, cost: (t, ab, n) => (gvIs(t, GV_U.seed) ? .1 * n : 0) },
+       { id: 'gv_c_fen', name: 'Fen Reach', art: 'venom:Deep Snare', text: n => `Bogwitches: +${gNf(.2 * n)} range.`, live: (t, st, n) => { if (gvIs(t, GV_U.bog) && st.range) st.range += .2 * n; } }],
+      [{ id: 'gv_c_harvest', name: 'Spore Harvest', art: 'holy:Rotfeast', text: n => `A foe dies with spores on it: the nearest Seedcaster within 3 cells gains ${4 * n} mana.`,
+         kill: (c, src, n) => { if (!c.poison || !c.poison.length) return; let best = null, bd = 3.05; for (const o of G.towers) { if (!ftkUnit(o, 'grove') || !gvIs(o, GV_U.seed)) continue; const d = Math.hypot(o.x - c.x, o.y - c.y); if (d < bd) { bd = d; best = o; } } if (best) gainMana(best, 4 * n); } },
+       { id: 'gv_c_hum', name: 'Hive Hum', art: 'holy:Swarm Song', text: n => `Grove units within 2 cells of Nyssa regain mana ${15 * n}% faster.`,
+         live: (t, st, n) => { if (G.towers.some(o => o.def && o.def.champ && o.def.force === 'grove' && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2.05)) gvSh(st).manaK = (gvSh(st).manaK || 0) + .15 * n; } }],
+      [{ id: 'gv_c_gift_h', gift: 1, name: 'Bloom Heart', art: 'holy:Seedmother', text: () => "Nyssa's gift and her Champion's trait: spores last 1s longer, her hits leave spores, and units keep 25 Growth after a Bloom." },
+       { id: 'gv_c_honey', name: 'Honeyed Words', art: 'holy:Honey Store', text: () => "Nyssa's spells cost 20% less.", cost: t => (t.def.champ ? .2 : 0) }],
+      { id: 'gv_c_season', name: 'Swarm Season', art: 'holy:Bloom of Moths', text: () => 'Nyssa casts a spell: Grove units within 3 cells cast their next spell 25% harder.',
+        cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (o !== t && ftkUnit(o, 'grove') && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.ftkEmpNext = 1; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col: '#d8f08a' }); } },
+        amp: (c, amt, src) => ftkEmpAmp(c, amt, src) },
+    ],
+  },
+});
+ftkFireWrap('grove');
+// the pairings' capstones that change a hit (Mire Grip)
+{
+  const T = FTREE.grove, n = T.byId.gv_s_cap;
+  n.amp = (c, amt, src) => (c.gvMireT > G.time && (src.def.unit === GV_U.briar || src.def.unit === GV_U.bog) ? amt * 1.15 : amt);
+}
+// Nyssa's two Growth talents leave her tree: Busy Hive counts Grove units that attacked, Honey Store pays for their spells
+const GWFT_NY = { HIVE: .04, HIVE_R: 2, HIVE_T: 2, HIVE_N: 2, HONEY: 4, HONEY_R: 2 };
+if (typeof CHAMPS !== 'undefined' && CHAMPS.hivemother && CHAMPS.hivemother.tree) {
+  const L = CHAMPS.hivemother.tree.list, set = (n, o) => { const t = L.find(q => q.name === n); if (t) Object.assign(t, o); };
+  set('Busy Hive', { cap: 'ftHive', tag: 'Speed', pro: n => `Attacks ${Math.round(GWFT_NY.HIVE * n * 100)}% faster for each Grove unit within ${GWFT_NY.HIVE_R} cells that attacked in the last ${GWFT_NY.HIVE_T}s, up to ${GWFT_NY.HIVE_N}.` });
+  set('Honey Store', { cap: 'ftHoney', tag: 'Mana', pro: n => `When a Grove unit within ${GWFT_NY.HONEY_R} cells casts a spell: +${GWFT_NY.HONEY * n} mana.` });
+}
+if (FORCE_HOOKS.grove && !FORCE_HOOKS.grove._ftny) {
+  const H = FORCE_HOOKS.grove, f0 = H.fire, l0 = H.live;
+  H.fire = function (t) { if (t && t.def && t.def.force === 'grove') t.ftAtkAt = G.time; return f0 ? f0.apply(this, arguments) : arguments[3]; };
+  H.live = function (t, st) {
+    const r = l0 ? l0.apply(this, arguments) : undefined, n = st && st.caps && st.caps.ftHive;
+    if (n && st.rate) {
+      let k = 0; for (const o of G.towers) { if (o === t || o.wrecked || !o.def || o.def.force !== 'grove' || o.def.wall || !(G.time - (o.ftAtkAt == null ? -99 : o.ftAtkAt) <= GWFT_NY.HIVE_T)) continue; if (Math.hypot(o.x - t.x, o.y - t.y) <= GWFT_NY.HIVE_R + .05 && ++k >= GWFT_NY.HIVE_N) break; }
+      if (k) st.rate /= 1 + GWFT_NY.HIVE * n * k;
+    }
+    return r;
+  };
+  H._ftny = 1;
+}
+if (typeof castAbility === 'function' && !castAbility._ftny) {
+  const a0 = castAbility;
+  castAbility = function (t, ab) {
+    const r = a0.apply(this, arguments);
+    if (r && G.force === 'grove' && t && t.def && t.def.force === 'grove')
+      for (const o of G.towers) { if (o === t || o.wrecked || o.def.unit !== 'ch_nyssa') continue; const n = o.st && o.st.caps && o.st.caps.ftHoney; if (n && Math.hypot(o.x - t.x, o.y - t.y) <= GWFT_NY.HONEY_R + .05) gainMana(o, GWFT_NY.HONEY * n); }
+    return r;
+  };
+  castAbility._ftny = 1;
+}
+
+/* =====================================================================================================
+   THE SILVER ORDER (v4 on the kit). Whole Army's capstone is Judgement (soJudge / soFill / soBurst do nothing before it).
+   The commanders: Aurelian (shields, Templars, the Ford), Celestine (light, mana, Censers), Morrow (the court, Grail Knights).
+   ===================================================================================================== */
+const SV_U = { shield: 'oathsworn', bow: 'silverbolt', binder: 'lightbinder', knight: 'grailknight', lance: 'sunlance', templar: 'templar', censer: 'censer', inq: 'so_inquisitor' };
+const svSh = st => (typeof sh === 'function' ? sh(st) : (st.sh = st.sh || { cdK: 1 }));
+const svIs = (t, u) => t.def.unit === u;
+const svNearChamp = (t, r) => G.towers.some(o => o.def && o.def.champ && o.def.force === 'silver' && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= r + .05);
+ftKit('silver', {
+  short: 'sv', name: 'Silver Order', hue: '#ffd77a',
+  say: 'Your Order starts plain. Force points make it yours: a pair of units, the whole army, or your commander.',
+  intro: 'A force point: open the talents, Force tab. Pick a pair, a perk for the whole army, or your commander\'s first gift.',
+  live: () => ftHas('sv_judge') > 0,
+  vs: { sv_judge: 1 },
+  sArt: { bond: 'holy:Hearts Lifted', drill: 'holy:Dawn Chorus', breath: 'holy:Mana Peal', hold: 'glaive:Wall of Shields', cap: 'holy:Final Verdict' },
+  pairs: {
+    sv_p_sword: { name: 'Shield and Sword', a: SV_U.shield, b: SV_U.templar, w: 2, col: ['#dfe6f0', '#ffd77a'], art: 'glaive:Verdict of Steel',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit strikes again for ${n > 1 ? 70 : 40}%.`,
+      fx: X => X.hit(X.c, X.amt * (X.n > 1 ? .7 : .4)),
+      cap: { name: 'The Line Held', art: 'glaive:The Line Held', say: () => 'Shield and Sword\'s second strike also hits the nearest foe within 1 cell.', fx: X => { const q = X.near(1, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); } } },
+    sv_p_warrant: { name: 'Warrant', a: SV_U.bow, b: SV_U.inq, w: 2, col: ['#dfe6f0', '#bfe0ff'], art: 'arrow:Mark of the Accused',
+      say: (n, w) => `a foe hit by both within ${w}s takes ${n > 1 ? 20 : 10}% more from the Order for 4s.`,
+      fx: X => { X.c.svWarT = G.time + 4; X.c.svWarK = X.n > 1 ? .2 : .1; },
+      cap: { name: 'Writ Served', art: 'arrow:Writ of Execution', say: () => 'A Warrant also marks the nearest foe within 1.5 cells.', fx: X => { const q = X.near(1.5, 1)[0]; if (q) { q.svWarT = G.time + 4; q.svWarK = X.n > 1 ? .2 : .1; } } } },
+    sv_p_bound: { name: 'Bound in Light', a: SV_U.binder, b: SV_U.lance, w: 2, col: ['#fff4cc', '#ffd77a'], art: 'frost:Chain of Judgement',
+      say: (n, w) => `a foe hit by both within ${w}s: the light strikes ${n} more foe${n > 1 ? 's' : ''} within 2 cells for 50%.`,
+      fx: X => { for (const q of X.near(2, X.n)) { X.hit(q, X.amt * .5); rfx({ k: 'streak', x0: X.c.x, h0: hitH(X.c), z0: X.c.y, x1: q.x, h1: hitH(q), z1: q.y, col: '#fff4cc', w: .03, life: .3 }); } },
+      cap: { name: 'Prism', art: 'frost:Twin Chains', say: () => 'Bound in Light strikes 1 more foe.', fx: X => { const L = X.near(2, X.n + 1); const q = L[X.n]; if (q) X.hit(q, X.amt * .5); } } },
+    sv_p_smoke: { name: 'Smoke Charge', a: SV_U.censer, b: SV_U.knight, w: 2, col: ['#c8c0b4', '#ffd77a'], art: 'arcane:Charge of the Vow',
+      say: (n, w) => `a foe hit by both within ${w}s: embers burst for ${n > 1 ? 100 : 60}% of the second hit to foes within 0.8 cells.`,
+      fx: X => { const d = X.amt * (X.n > 1 ? 1 : .6); for (const q of X.near(.8)) X.hit(q, d); },
+      cap: { name: 'Fanned Embers', art: 'cannon:Fanned Embers', say: () => 'Smoke Charge\'s foe takes 20% of the second hit again each second for 3s.', fx: X => { const c = X.c, d = X.amt * .2, src = X.src; for (let k = 1; k <= 3; k++) G.delayed.push({ t: k, fn: () => { if (G.state === 'play' && !c.dead) ftkHit(c, d, src); } }); } } },
+    sv_p_vigil: { name: 'Vigil', a: SV_U.shield, b: SV_U.binder, w: 2, col: ['#dfe6f0', '#fff4cc'], art: 'glaive:Vigil',
+      say: (n, w) => `a foe hit by both within ${w}s is stunned ${n > 1 ? 0.7 : 0.4}s (bosses less).`,
+      fx: X => { if (!X.c.dead) stun(X.c, X.n > 1 ? .7 : .4, false, null); },
+      cap: { name: 'Vigil Chains', art: 'frost:Vigil Chains', say: () => 'Vigil also stuns the nearest foe within 1.5 cells.', fx: X => { const q = X.near(1.5, 1)[0]; if (q) stun(q, X.n > 1 ? .7 : .4, false, null); } } },
+    sv_p_volley: { name: 'Dawn Volley', a: SV_U.lance, b: SV_U.bow, w: 2, col: ['#ffd77a', '#dfe6f0'], art: 'arrow:Storm of Silver',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes the foe behind it for ${n > 1 ? 80 : 50}%.`,
+      fx: X => { const q = X.near(1.2, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? .8 : .5)); },
+      cap: { name: 'Through and Through', art: 'arrow:Through and Through', say: () => 'Dawn Volley strikes the foe behind that one too.', fx: X => { const L = X.near(1.6, 2), q = L[1]; if (q) X.hit(q, X.amt * (X.n > 1 ? .8 : .5)); } } },
+  },
+  army: [
+    [{ id: 'sv_w_prayer', name: 'Morning Prayers', art: 'holy:Early Dawn', text: () => 'Order units regain mana 20% faster.', live: (t, st) => { svSh(st).manaK = (svSh(st).manaK || 0) + .2; } },
+     { id: 'sv_w_vows', name: 'Swift Vows', art: 'holy:Clear Sky', text: () => 'Order spells come back 8% faster.', live: (t, st) => { svSh(st).cdK *= .92; } }],
+    [{ id: 'sv_w_wall', name: 'Shield Wall', art: 'glaive:Shield-Ward', text: n => `Order units take ${10 * n}% less from foes' blows.`, blow: (t, d, n) => d * (1 - .1 * n) },
+     { id: 'sv_w_arms', name: 'Brothers in Arms', art: 'arcane:Rallying Vow', text: n => `Each other Order kind within 2 cells: attacks ${3 * n}% faster, up to 3 kinds.`, live: (t, st, n) => ftkFast(st, .03 * n * Math.min(3, ftkKinds(t, 2))) }],
+    [{ id: 'sv_w_zeal', name: 'Righteous Rhythm', art: 'earth:Zeal', text: n => `Every ${n > 1 ? 6 : 8}th attack of an Order unit hits 50% harder.`, fire: (t, st, tg, pow, n) => ((t.svRhy = (t.svRhy | 0) + 1) % (n > 1 ? 6 : 8) === 0 ? pow * 1.5 : pow) },
+     { id: 'sv_w_tithe', name: 'Tithe', art: 'cannon:Offering Bowl', text: n => `Order spells cost ${5 * n}% less.`, cost: (t, ab, n) => .05 * n }],
+    [{ id: 'sv_w_vigil', name: 'Dawn Vigil', art: 'frost:Vigil Lamp', text: () => 'Each wave: Order units start it with at least half their mana.', wave: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); } },
+     { id: 'sv_w_faith', name: 'Steady Faith', art: 'arrow:Steady Rest', text: () => 'Order units: +5% crit chance.', live: (t, st) => { st.crit = (st.crit || 0) + .05; } }],
+    { id: 'sv_judge', name: 'Judgement', art: 'earth:Final Judgement', text: () => `Your attacks and spells lay Judgement on foes. At ${typeof SO !== 'undefined' ? SO.J_MAX : 5}, the foe bursts with light for 3 times the striker's attack.` },
+  ],
+  cmd: {
+    so_lion: [
+      { id: 'sv_c_roar', name: "Lion's Roar", art: 'glaive:Challenge', text: () => 'Order units within 2 cells of a Templar of the Ford attack 8% faster.', live: (t, st) => { if (ftkNear(t, SV_U.templar, 2)) ftkFast(st, .08); } },
+      [{ id: 'sv_c_edge', name: "Templar's Edge", art: 'earth:Sundering Blow', text: n => `Templars of the Ford: +${4 * n}% crit chance.`, live: (t, st, n) => { if (svIs(t, SV_U.templar)) st.crit = (st.crit || 0) + .04 * n; } },
+       { id: 'sv_c_stand', name: "Shieldbearer's Stand", art: 'glaive:Unyielding', text: n => `Oathsworn Shieldbearers take ${15 * n}% less from foes' blows.`, blow: (t, d, n) => (svIs(t, SV_U.shield) ? d * (1 - .15 * n) : d) }],
+      [{ id: 'sv_c_charge', name: 'Charge Order', art: 'arcane:Full Gallop', text: n => `Grail Knights attack ${5 * n}% faster.`, live: (t, st, n) => { if (svIs(t, SV_U.knight)) ftkFast(st, .05 * n); } },
+       { id: 'sv_c_guard', name: 'Ford Guard', art: 'holy:Cloister Wall', text: n => `Order units within 2 cells of Aurelian take ${10 * n}% less from foes' blows.`, blow: (t, d, n) => (svNearChamp(t, 2) ? d * (1 - .1 * n) : d) }],
+      [{ id: 'sv_c_gift_l', gift: 1, name: 'Shield Brothers', art: 'holy:Burnished Shields', text: () => "Aurelian's gift and his Champion's trait: when he attacks, units within 1.6 cells attack 20% faster for 3s, and every attack of his lays Judgement." },
+       { id: 'sv_c_pride', name: "Lion's Pride", art: 'holy:Bulwark Slam', text: () => "Aurelian's spells cost 20% less.", cost: t => (t.def.champ ? .2 : 0) }],
+      { id: 'sv_c_ford', name: 'Hold the Ford', art: 'glaive:Rampart of Dawn', text: () => 'Aurelian casts a spell: Order units within 3 cells attack 20% faster for 4s.',
+        cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (ftkUnit(o, 'silver') && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.svFordT = G.time + 4; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col: '#ffd77a' }); } },
+        live: (t, st) => { if (t.svFordT > G.time) ftkFast(st, .2); } },
+    ],
+    so_dawn: [
+      { id: 'sv_c_hymn', name: 'Morning Hymn', art: 'holy:Dawn Chorus', text: () => 'Order units regain mana 10% faster.', live: (t, st) => { svSh(st).manaK = (svSh(st).manaK || 0) + .1; } },
+      [{ id: 'sv_c_censer', name: 'Censer Song', art: 'cannon:Censing Prayer', text: n => `Censer Bearer spells cost ${10 * n}% less.`, cost: (t, ab, n) => (svIs(t, SV_U.censer) ? .1 * n : 0) },
+       { id: 'sv_c_beam', name: 'Bright Beam', art: 'holy:High Noon', text: n => `Sunlance Clerics: +${gNf(.2 * n)} range.`, live: (t, st, n) => { if (svIs(t, SV_U.lance) && st.range) st.range += .2 * n; } }],
+      [{ id: 'sv_c_lantern', name: 'Lantern Light', art: 'frost:Glare of Dawn', text: n => `Lightbinder Sisters: +${4 * n}% crit chance.`, live: (t, st, n) => { if (svIs(t, SV_U.binder)) st.crit = (st.crit || 0) + .04 * n; } },
+       { id: 'sv_c_hallow', name: 'Hallowed Smoke', art: 'cannon:Pall of Smoke', text: n => `Censer Bearers attack ${5 * n}% faster.`, live: (t, st, n) => { if (svIs(t, SV_U.censer)) ftkFast(st, .05 * n); } }],
+      [{ id: 'sv_c_gift_d', gift: 1, name: 'Morning Light', art: 'holy:Dawnsinger', text: () => "Celestine's gift and her Champion's trait: the Order regains mana 20% faster, its light guards last 50% longer, and her every 4th beam Exposes its foe 2s." },
+       { id: 'sv_c_song', name: 'Dawnsong', art: 'holy:First Light', text: () => "Celestine's spells cost 20% less.", cost: t => (t.def.champ ? .2 : 0) }],
+      { id: 'sv_c_daybreak', name: 'Daybreak', art: 'holy:Noon Bell', text: () => 'Celestine casts a spell: Order units within 3 cells cast their next spell 25% harder.',
+        cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (o !== t && ftkUnit(o, 'silver') && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.ftkEmpNext = 1; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col: '#fff4cc' }); } },
+        amp: (c, amt, src) => ftkEmpAmp(c, amt, src) },
+    ],
+    so_judge: [
+      { id: 'sv_c_court', name: 'Court in Session', art: 'arcane:Righteous Verdict', text: () => 'Grail Knights attack 6% faster.', live: (t, st) => { if (svIs(t, SV_U.knight)) ftkFast(st, .06); } },
+      [{ id: 'sv_c_swift', name: 'Swift Justice', art: 'holy:Court Fines', text: n => `Magebane Inquisitors attack ${5 * n}% faster.`, live: (t, st, n) => { if (svIs(t, SV_U.inq)) ftkFast(st, .05 * n); } },
+       { id: 'sv_c_arm', name: 'Long Arm of the Law', art: 'holy:Long Arm of the Law', text: n => `Silverbolt Crossbows: +${gNf(.2 * n)} range.`, live: (t, st, n) => { if (svIs(t, SV_U.bow) && st.range) st.range += .2 * n; } }],
+      [{ id: 'sv_c_verdict', name: 'Verdict', art: 'holy:Knell', text: n => `Order hits on a foe below 30% health: ${15 * n}% harder.`, amp: (c, amt, src, n) => (src.def.force === 'silver' && c.hp < c.maxHp * .3 ? amt * (1 + .15 * n) : amt) },
+       { id: 'sv_c_quill', name: 'Ledger', art: 'holy:Debt Collection', text: n => `Magebane Inquisitor spells cost ${10 * n}% less.`, cost: (t, ab, n) => (svIs(t, SV_U.inq) ? .1 * n : 0) }],
+      [{ id: 'sv_c_gift_j', gift: 1, name: 'Long Memory', art: 'holy:Grey Justicar', text: () => "Morrow's gift and his Champion's trait: Judgement lasts 3s longer, foes hold 6, his strikes lay 1 more and their bursts strike 25% harder." },
+       { id: 'sv_c_gavel', name: 'Gavel', art: 'holy:Debt of Oaths', text: () => "Morrow's spells cost 20% less.", cost: t => (t.def.champ ? .2 : 0) }],
+      { id: 'sv_c_sentence', name: 'Final Sentence', art: 'arcane:Echoing Verdict', text: () => 'Morrow casts a spell: every Grail Knight within 3 cells attacks 30% faster for 3s.',
+        cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (ftkUnit(o, 'silver') && svIs(o, SV_U.knight) && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.svSentT = G.time + 3; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col: '#c8ccd8' }); } },
+        live: (t, st) => { if (t.svSentT > G.time) ftkFast(st, .3); } },
+    ],
+  },
+});
+ftkFireWrap('silver');
+// Warrant's mark: the Order's hits land harder while it lasts
+FTREE.silver.byId.sv_p_warrant.amp = (c, amt, src) => (c.svWarT > G.time && src.def.force === 'silver' ? amt * (1 + (c.svWarK || 0)) : amt);
+// Judgement waits for its capstone
+for (const fn of ['soJudge', 'soFill', 'soBurst']) {
+  const f0 = globalThis[fn]; if (typeof f0 !== 'function' || f0._ft) continue;
+  const w = function () { if (typeof G !== 'undefined' && G && G.force === 'silver' && !ftLive('silver')) return 0; return f0.apply(this, arguments); };
+  w._ft = 1; globalThis[fn] = w;
+}
+
+/* ---------- the kit's node makers (simple perks, one line each) ---------- */
+const ftkSh = st => (typeof sh === 'function' ? sh(st) : (st.sh = st.sh || { cdK: 1 }));
+const FTKN = {
+  fast: (u, k) => (t, st, n) => { if (!u || t.def.unit === u) ftkFast(st, k * n); },          // a unit kind (or every unit) attacks k x rank faster
+  range: (u, k) => (t, st, n) => { if ((!u || t.def.unit === u) && st.range) st.range += k * n; },
+  crit: (u, k) => (t, st, n) => { if (!u || t.def.unit === u) st.crit = (st.crit || 0) + k * n; },
+  mana: k => (t, st, n) => { ftkSh(st).manaK = (ftkSh(st).manaK || 0) + k * n; },
+  cd: k => (t, st, n) => { ftkSh(st).cdK *= 1 - k * n; },
+  cost: (u, k) => (t, ab, n) => (!u || t.def.unit === u ? k * n : 0),
+  champCost: k => t => (t.def.champ ? k : 0),
+  blow: (u, k) => (t, d, n) => (!u || t.def.unit === u ? d * (1 - k * n) : d),
+  kinds: k => (t, st, n) => ftkFast(st, k * n * Math.min(3, ftkKinds(t, 2))),
+  rhythm: key => ({ fire: (t, st, tg, pow, n) => ((t[key] = (t[key] | 0) + 1) % (n > 1 ? 6 : 8) === 0 ? pow * 1.5 : pow) }),
+  halfMana: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); },
+  near: (u, k) => (t, st) => { if (ftkNear(t, u, 2)) ftkFast(st, k); },
+  // a commander's spell gives units within 3 cells (of kind u, or all) a timed boost: f(t, st) while it lasts
+  champCall: (f, key, dur, col, u) => ({
+    cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (ftkUnit(o, G.force) && (!u || o.def.unit === u) && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o[key] = G.time + dur; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col }); } },
+    live: (t, st) => { if (t[key] > G.time) f(t, st); } }),
+  champEmp: col => ({
+    cast: t => { if (!t.def.champ) return; for (const o of G.towers) if (o !== t && ftkUnit(o, G.force) && Math.hypot(o.x - t.x, o.y - t.y) <= 3.05) { o.ftkEmpNext = 1; part({ k: 'flare', x: o.x, z: o.y, h: towerTop(o) + .2, life: .3, max: .3, size: .5, col }); } },
+    amp: (c, amt, src) => ftkEmpAmp(c, amt, src) }),
+  // a commander's gift node (today's gift and Champion trait, its words given)
+  gift: (id, name, art, text) => ({ id, gift: 1, name, art, text: () => text }),
+  // the generic pairing effects
+  again: (k1, k2) => X => X.hit(X.c, X.amt * (X.n > 1 ? k2 : k1)),
+  splash: (k1, k2, r) => X => { const d = X.amt * (X.n > 1 ? k2 : k1); for (const q of X.near(r)) X.hit(q, d); },
+  more: k => X => { for (const q of X.near(2, X.n)) X.hit(q, X.amt * k); },
+  behind: (k1, k2) => X => { const q = X.near(1.2, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? k2 : k1)); },
+  armour: (a1, a2) => X => { const c = X.c; if (c.dead) return; c.shred = Math.max(c.shredT > 0 ? c.shred || 0 : 0, X.n > 1 ? a2 : a1); c.shredT = Math.max(c.shredT || 0, 4); },
+  cdPair: X => { const o = X.b; if (o && o.ab && o.ab.cd) for (const k in o.ab.cd) o.ab.cd[k] = Math.max(G.time, o.ab.cd[k] - (X.n > 1 ? 3 : 1.5)); },
+};
+
+/* =====================================================================================================
+   IRONHOLD (v4 on the kit). Whole Army's capstone is Heat (today's rule, the vent its payoff; owner: the vent comes as the
+   capstone). Before it no unit heats, vents or starts a wave cold. Six commanders, one path each.
+   ===================================================================================================== */
+const IH_UK = { breaker: 'ironbreaker', gun: 'thundergun', trap: 'chaintrapper', anvil: 'runesmith', flak: 'flakgunner', hammer: 'steamhammer', mortar: 'mortarcrew', siege: 'siegebreaker' };
+{
+const N = FTKN, U = IH_UK;   // (a block: these short names stay in it)
+ftKit('ironhold', {
+  short: 'ih', name: 'Ironhold', hue: '#ff9a3a',
+  say: 'Your clan starts plain. Force points make it yours: a pair of units, the whole army, or your commander.',
+  intro: 'A force point: open the talents, Force tab. Pick a pair, a perk for the whole army, or your commander\'s first gift.',
+  live: () => ftHas('ih_heat') > 0,
+  vs: { ih_heat: 1 },
+  sArt: { bond: 'holy:Shield-Brother', drill: 'holy:Clan Drill', breath: 'holy:Mana Mead', hold: 'holy:Locked Shields', cap: 'holy:Wall of the Clan' },
+  pairs: {
+    ih_p_anvil: { name: 'Hammer and Anvil', a: U.breaker, b: U.hammer, w: 2, col: ['#c8c0b4', '#ff9a3a'], art: 'glaive:Breaker\'s Blow',
+      say: (n, w) => `a foe hit by both within ${w}s loses ${n > 1 ? 4 : 2} armour for 4s.`, fx: N.armour(2, 4),
+      cap: { name: 'Cracked Plate', art: 'venom:Cracked Plate', say: () => 'A foe Hammer and Anvil took takes 15% more from Ironbreakers and Steam Hammers for 3s.', fx: X => { X.c.ihCrackT2 = G.time + 3; } } },
+    ih_p_breach: { name: 'Breach', a: U.siege, b: U.gun, w: 2, col: ['#ffd070', '#ff9a3a'], art: 'arrow:Breaching Slug',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes the foe behind it for ${n > 1 ? 80 : 50}%.`, fx: N.behind(.5, .8),
+      cap: { name: 'Breach and Clear', art: 'venom:Breach and Clear', say: () => 'Breach strikes the foe behind that one too.', fx: X => { const q = X.near(1.6, 2)[1]; if (q) X.hit(q, X.amt * (X.n > 1 ? .8 : .5)); } } },
+    ih_p_bagged: { name: 'Bagged', a: U.trap, b: U.mortar, w: 2, col: ['#a8a090', '#ff8a2a'], art: 'frost:Dragnet',
+      say: (n, w) => `a foe hit by both within ${w}s: the shell bursts for ${n > 1 ? 100 : 60}% of the second hit to foes within 0.8 cells.`, fx: N.splash(.6, 1, .8),
+      cap: { name: 'Bear Trap', art: 'frost:Bear Trap', say: () => 'Bagged stuns the ground foes it hits 0.4s (bosses less).', fx: X => { for (const q of [X.c].concat(X.near(.8))) if (!q.dead && !q.fly) stun(q, .4, false, null); } } },
+    ih_p_temper: { name: 'Tempered Rounds', a: U.anvil, b: U.flak, cast: 1, col: ['#ffd890', '#ff9a3a'], art: 'arcane:Tempering',
+      say: n => `a spell cast by one: the other's spells within 2.5 cells come ${n > 1 ? 3 : 1.5}s sooner.`, fx: N.cdPair,
+      cap: { name: 'Swift Tempering', art: 'arcane:Swift Tempering', say: () => 'Tempered Rounds also gives the partner 15 mana.', fx: X => { if (X.b) gainMana(X.b, 15); } } },
+    ih_p_spotter: { name: 'Spotter', a: U.gun, b: U.mortar, w: 2, col: ['#ffd070', '#ff8a2a'], art: 'cannon:Ranging Shots',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit strikes again for ${n > 1 ? 70 : 40}%.`, fx: N.again(.4, .7),
+      cap: { name: 'Walking Fire', art: 'cannon:Walking Fire', say: () => 'Spotter\'s second strike also hits the nearest foe within 1 cell.', fx: X => { const q = X.near(1, 1)[0]; if (q) X.hit(q, X.amt * (X.n > 1 ? .7 : .4)); } } },
+    ih_p_curtain: { name: 'Flak Curtain', a: U.siege, b: U.flak, w: 2, col: ['#c8c0b4', '#ffd890'], art: 'storm:Flak Curtain',
+      say: (n, w) => `a foe hit by both within ${w}s: the second hit also strikes ${n} more foe${n > 1 ? 's' : ''} within 2 cells for 50%.`, fx: N.more(.5),
+      cap: { name: 'Shellstorm', art: 'storm:Shellstorm', say: () => 'Flak Curtain strikes 1 more foe.', fx: X => { const q = X.near(2, X.n + 1)[X.n]; if (q) X.hit(q, X.amt * .5); } } },
+  },
+  army: [
+    [{ id: 'ih_w_furnace', name: 'Stoked Furnaces', art: 'holy:Fire in the Belly', text: () => 'Ironhold units regain mana 20% faster.', live: N.mana(.2) },
+     { id: 'ih_w_gears', name: 'Oiled Gears', art: 'holy:Spare Parts', text: () => 'Ironhold spells come back 8% faster.', live: N.cd(.08) }],
+    [{ id: 'ih_w_kin', name: 'Clan Kin', art: 'holy:Clan Drill', text: n => `Each other Ironhold kind within 2 cells: attacks ${3 * n}% faster, up to 3 kinds.`, live: N.kinds(.03) },
+     { id: 'ih_w_plate', name: 'Iron Plate', art: 'holy:Dented Plate', text: n => `Ironhold units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) }],
+    [Object.assign({ id: 'ih_w_rhythm', name: 'Hammer Rhythm', art: 'earth:Piston Rhythm', text: n => `Every ${n > 1 ? 6 : 8}th attack of an Ironhold unit hits 50% harder.` }, N.rhythm('ihRhy')),
+     { id: 'ih_w_thrift', name: 'Thrifty Clan', art: 'holy:On the Slate', text: n => `Ironhold spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
+    [{ id: 'ih_w_warm', name: 'Early Shift', art: 'holy:Topped Up', text: () => 'Each wave: Ironhold units start it with at least half their mana.', wave: N.halfMana },
+     { id: 'ih_w_eyes', name: 'Sharp Eyes', art: 'arrow:Range-Finder', text: () => 'Ironhold units: +5% crit chance.', live: N.crit(null, .05) }],
+    { id: 'ih_heat', name: 'Heat', art: 'arcane:Forge Heat', text: () => 'Each attack heats the unit. Full: its next attack vents, its own big shot. Boilers start each wave cold.' },
+  ],
+  cmd: {
+    ih_thane: [
+      { id: 'ih_c_stand', name: 'Stand Fast', art: "holy:Thane's Line", text: () => 'Ironhold units within 2 cells of an Ironbreaker take 10% less from foes\' blows.', blow: (t, d) => (ftkNear(t, U.breaker, 2) ? d * .9 : d) },
+      [{ id: 'ih_c_shove', name: 'Shoulder Charge', art: 'glaive:Bowling Shove', text: n => `Ironbreakers attack ${5 * n}% faster.`, live: N.fast(U.breaker, .05) },
+       { id: 'ih_c_shield', name: 'Shield-Ring', art: 'holy:Shield-Ring', text: n => `Ironbreakers take ${15 * n}% less from foes' blows.`, blow: N.blow(U.breaker, .15) }],
+      [{ id: 'ih_c_defy', name: 'Defiance', art: 'glaive:Off Balance', text: n => `Ironhold hits on a stunned foe: ${10 * n}% harder.`, amp: (c, amt, src, n) => (c.stunT > 0 ? amt * (1 + .1 * n) : amt) },
+       { id: 'ih_c_will', name: 'Iron Will', art: 'frost:Strong Arm', text: n => `Chain Trapper spells cost ${10 * n}% less.`, cost: N.cost(U.trap, .1) }],
+      [N.gift('ih_c_gift_th', 'Defiance of the Hold', 'holy:Horn of the Hold', "Haldra's gift and her Champion's trait: stunned or shoved foes take 10% more, Ironbreakers shove 30% farther, and foes she strikes stop to hammer her shield."),
+       { id: 'ih_c_word', name: "Thane's Word", art: 'holy:War Cry', text: () => "Haldra's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'ih_c_gate', name: 'Hold the Gate', art: 'holy:Holds the Pass', text: () => "Haldra casts a spell: Ironhold units within 3 cells take 30% less from foes' blows for 4s." },
+        N.champCall(() => {}, 'ihGateT', 4, '#c8c0b4'), { blow: (t, d) => (t.ihGateT > G.time ? d * .7 : d) }),
+    ],
+    ih_artificer: [
+      { id: 'ih_c_tinker', name: "Tinker's Touch", art: 'arcane:Swift Inscription', text: () => 'Anvilwrights attack 6% faster.', live: N.fast(U.anvil, .06) },
+      [{ id: 'ih_c_tools', name: 'Fine Tools', art: 'arcane:Masterwork Strike', text: n => `Anvilwright spells cost ${10 * n}% less.`, cost: N.cost(U.anvil, .1) },
+       { id: 'ih_c_barrels', name: 'Long Barrels', art: 'arrow:Rifled Bores', text: n => `Thunderguns: +${gNf(.2 * n)} range.`, live: N.range(U.gun, .2) }],
+      [{ id: 'ih_c_train', name: 'Gear Train', art: 'holy:Chain Drive', text: n => `Ironhold spells come back ${4 * n}% faster.`, live: N.cd(.04) },
+       { id: 'ih_c_valves', name: 'Pressure Valves', art: 'earth:Tight Valves', text: n => `Steam Hammers attack ${5 * n}% faster.`, live: N.fast(U.hammer, .05) }],
+      [N.gift('ih_c_gift_ar', 'Overclocked', 'holy:Engine Yard', "Tovin's gift and his Champion's trait: Heat builds 15% faster in every unit, vents hit 10% harder, and he strikes 12% faster."),
+       { id: 'ih_c_blue', name: 'Blueprints', art: 'holy:Lodestone', text: () => "Tovin's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'ih_c_yard', name: 'Works at Full Steam', art: 'holy:Overpressure', text: () => 'Tovin casts a spell: Ironhold units within 3 cells attack 20% faster for 4s.' }, N.champCall((t, st) => ftkFast(st, .2), 'ihYardT', 4, '#ffd890')),
+    ],
+    ih_brewer: [
+      { id: 'ih_c_hearth', name: 'Warm Hearth', art: 'holy:Hearty Broth', text: () => 'Ironhold units regain mana 10% faster.', live: N.mana(.1) },
+      [{ id: 'ih_c_brew', name: 'Strong Brew', art: 'holy:Strong Brew', text: n => `Mortar Crews attack ${5 * n}% faster.`, live: N.fast(U.mortar, .05) },
+       { id: 'ih_c_toss', name: 'Barrel Toss', art: 'holy:Heavy Barrel', text: n => `Mortar Crews: +${gNf(.2 * n)} range.`, live: N.range(U.mortar, .2) }],
+      [{ id: 'ih_c_hearty', name: 'Hearty Fare', art: 'holy:Mead of Mending', text: n => `Ironhold units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) },
+       { id: 'ih_c_last', name: 'Last Call', art: 'holy:Last Call', text: n => `Ironhold spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
+      [N.gift('ih_c_gift_br', 'Warm Welcome', 'holy:Drinking Song', "Grenna's gift and her Champion's trait: units start every wave half warmed up, her ale puddles last twice as long, and every 5th throw breathes fire."),
+       { id: 'ih_c_house', name: 'On the House', art: 'holy:Tip Jar', text: () => "Grenna's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'ih_c_round', name: 'A Round for the Clan', art: 'holy:Rowdy Round', text: () => 'Grenna casts a spell: Ironhold units within 3 cells cast their next spell 25% harder.' }, N.champEmp('#ffd070')),
+    ],
+    ih_marksman: [
+      { id: 'ih_c_eye', name: "Marksman's Eye", art: 'arrow:Sighting In', text: () => 'Thunderguns: +0.2 range.', live: N.range(U.gun, .2) },
+      [{ id: 'ih_c_aim', name: 'Steady Aim', art: 'arrow:Called Shot', text: n => `Thunderguns: +${4 * n}% crit chance.`, live: N.crit(U.gun, .04) },
+       { id: 'ih_c_load', name: 'Quick Load', art: 'arrow:Ramrod Rhythm', text: n => `Thunderguns attack ${5 * n}% faster.`, live: N.fast(U.gun, .05) }],
+      [{ id: 'ih_c_call', name: "Spotter's Call", art: 'storm:Sky Watch', text: n => `Flak Cannoneers: +${gNf(.2 * n)} range.`, live: N.range(U.flak, .2) },
+       { id: 'ih_c_dead', name: 'Big Game', art: 'arrow:Silver Bullet', text: n => `Ironhold hits on bosses and elites: ${10 * n}% harder.`, amp: (c, amt, src, n) => ((c.def.boss || c.elite) ? amt * (1 + .1 * n) : amt) }],
+      [N.gift('ih_c_gift_mk', 'Steady Hands', 'arrow:Hard Kick', "Torvald's gift and his Champion's trait: ranged units on one foe for 3s gain 10% range and 20% crit; Thunderguns reload 15% faster; his every 4th shot crits."),
+       { id: 'ih_c_clean', name: 'Clean Shot', art: 'arrow:Through and Through', text: () => "Torvald's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'ih_c_volley', name: 'Volley Fire', art: 'arrow:Called Volley', text: () => 'Torvald casts a spell: Thunderguns within 3 cells attack 30% faster for 3s.' }, N.champCall((t, st) => ftkFast(st, .3), 'ihVolleyT', 3, '#ffd070', U.gun)),
+    ],
+    ih_king: [
+      { id: 'ih_c_host', name: 'Crowned Host', art: 'holy:Wall of the Clan', text: () => 'Ironhold units attack 3% faster.', live: N.fast(null, .03) },
+      [{ id: 'ih_c_vein', name: 'Gold Vein', art: 'holy:Tally Wheel', text: n => `Each wave: +${8 * n} gold.`, wave: (t, n) => { if (G.ihVeinW !== G.wave) { G.ihVeinW = G.wave; G.gold += 8 * n; } } },
+       { id: 'ih_c_guard', name: 'Royal Guard', art: 'holy:Locked Shields', text: n => `Ironhold units within 2 cells of Brannoc take ${10 * n}% less from foes' blows.`, blow: (t, d, n) => (G.towers.some(o => o.def && o.def.champ && o.def.force === 'ironhold' && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= 2.05) ? d * (1 - .1 * n) : d) }],
+      [{ id: 'ih_c_coin', name: "King's Coin", art: 'holy:Double Measure', text: n => `Ironhold spells cost ${5 * n}% less.`, cost: N.cost(null, .05) },
+       { id: 'ih_c_crown', name: 'Iron Crown', art: 'holy:Counterweight', text: n => `Ironhold units: +${3 * n}% crit chance.`, live: N.crit(null, .03) }],
+      [N.gift('ih_c_gift_kg', 'Royal Levy', 'holy:Braced Heels', "Brannoc's gift and his Champion's trait: every 5th wave each unit gains a Levy rank (+4% attack speed, +6% health); he takes 25% less near a boss."),
+       { id: 'ih_c_treasury', name: 'Treasury', art: 'holy:Open Tap', text: () => "Brannoc's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'ih_c_muster', name: 'The Muster', art: 'holy:Unbroken Line', text: () => 'Brannoc casts a spell: Ironhold units within 3 cells attack 20% faster for 4s.' }, N.champCall((t, st) => ftkFast(st, .2), 'ihMusterT', 4, '#ffd890')),
+    ],
+    ih_hrolf: [
+      { id: 'ih_c_grudge', name: 'Grudge Flak', art: 'storm:Hot Shrapnel', text: () => 'Flak Cannoneers attack 6% faster.', live: N.fast(U.flak, .06) },
+      [{ id: 'ih_c_sky', name: 'Skywatch', art: 'storm:Tall Elevation', text: n => `Flak Cannoneers: +${gNf(.2 * n)} range.`, live: N.range(U.flak, .2) },
+       { id: 'ih_c_wings', name: 'Old Grudges', art: 'storm:Wing Shredder', text: n => `Ironhold hits on flyers: ${15 * n}% harder.`, amp: (c, amt, src, n) => (c.fly ? amt * (1 + .15 * n) : amt) }],
+      [{ id: 'ih_c_wide', name: 'Wide Bursts', art: 'storm:Shrapnel Cones', text: n => `Flak Cannoneers: +${4 * n}% crit chance.`, live: N.crit(U.flak, .04) },
+       { id: 'ih_c_book', name: 'Grudge Book', art: 'storm:Tracer Rounds', text: n => `Flak Cannoneer spells cost ${10 * n}% less.`, cost: N.cost(U.flak, .1) }],
+      [N.gift('ih_c_gift_hr', "Skywarden's Due", 'storm:Starshell', "Hrolf's gift and his Champion's trait: Flak bursts are 0.15 cells wider and hit slowed, stunned or shoved ground foes 30% harder; his every 3rd shell bursts twice as wide."),
+       { id: 'ih_c_settle', name: 'Old Debts', art: 'storm:Spent Flare', text: () => "Hrolf's spells cost 20% less.", cost: N.champCost(.2) }],
+      Object.assign({ id: 'ih_c_score', name: 'Settle the Score', art: 'storm:Sky Shatter', text: () => 'Hrolf casts a spell: Flak Cannoneers within 3 cells attack 30% faster for 3s.' }, N.champCall((t, st) => ftkFast(st, .3), 'ihScoreT', 3, '#ffd890', U.flak)),
+    ],
+  },
+});
+ftkFireWrap('ironhold');
+FTREE.ironhold.byId.ih_p_anvil.amp = (c, amt, src) => (c.ihCrackT2 > G.time && (src.def.unit === U.breaker || src.def.unit === U.hammer) ? amt * 1.15 : amt);
+// Heat waits for its capstone: no heat, no vent and no cold boilers before it
+if (typeof ihHeatAdd === 'function' && !ihHeatAdd._ft) { const a0 = ihHeatAdd; ihHeatAdd = function () { if (G.force === 'ironhold' && !ftLive('ironhold')) return; return a0.apply(this, arguments); }; ihHeatAdd._ft = 1; }
+if (FORCE_HOOKS.ironhold && !FORCE_HOOKS.ironhold._ftwarm) {
+  const H = FORCE_HOOKS.ironhold, l0 = H.live;
+  H.live = function (t) { if (t && G.force === 'ironhold' && !G.vs && !ftLive('ironhold')) t.ihWarm = 1; return l0 ? l0.apply(this, arguments) : undefined; };
+  H._ftwarm = 1;
+}
+}
 
 /* ================= THE SILVER ORDER'S LEGENDARIES, remade (25 Nov 2026) =================
    Owner: "legendaries should alter a spell in a huge way or create a noticeable difference", "more powerful passive chance on
@@ -63693,7 +64284,13 @@ SFX_V2_DEF.push(() => {
   // Cyclone: a funnel of wind forms where it is aimed and wanders back up the road, widening as it rises, a cloud at its crown
   SFX_V2['hero:sb_cyclone'] = { hit: () => {},
     cast: C => { const S = typeof sbS === 'function' ? sbS() : null, L = S && S.cyc; if (!L || !L.length) return;
-      for (let i = Math.max(0, L.length - 2); i < L.length; i++) { const z = L[i], life = z.t + .3; v2Swirl(C, z.x, z.z, z.r, { obj: z, n: 16, s: .3, h: 2.2, rise: .9, flare: 1.2, spin: 10, life }); v2Swirl(C, z.x, z.z, z.r * .7, { obj: z, L: VT.WISP, n: 8, s: .35, h: 1.6, rise: .6, flare: .8, spin: 7, life, ground: 0 }); } } };
+      // owner (25 Nov 2026): spells never hide the field, so the funnel is a thin cool-grey veil, never a white fill: one faint
+      // tornado shell (not two stacked), few streaks, kept to its own width, in muted teal rather than the school's hot white
+      const col = v2c(C, '#7fa8a4', .8), hot = v2c(C, '#a9cfc8', .9), Cq = Object.assign(Object.create(C), { fq: 1 });
+      for (let i = Math.max(0, L.length - 2); i < L.length; i++) { const z = L[i], life = z.t + .3;
+        v3Mesh(C, 'tornado', z.x, z.z, { obj: z, r: z.r * .95, h: 2.2, tw: .7, life, hold: .7, inK: 5, fp: 1.6, ca0: .06, ca1: .16, c0: col, c1: hot, su: 2, sv: -1.2, tu: 2, tv: 1.5, nl: VT.NOISE2, ef: .2 });
+        v2Swirl(Cq, z.x, z.z, z.r, { obj: z, n: 7, s: .2, h: 2, rise: .9, flare: .3, spin: 10, life, col, hot: col });
+        v2Swirl(Cq, z.x, z.z, z.r * .7, { obj: z, L: VT.WISP, n: 4, s: .25, h: 1.4, rise: .6, flare: .2, spin: 7, life, col, hot: col, ground: 0 }); } } };
   // Spirit Hunt: the ancestors mark every foe on the field with a spirit-sigil, wisps rising off each
   SFX_V2['hero:sb_spirithunt'] = vHit({ wind: 0, all: 1, s: .6, hit: { sp: 'wisp', n: 3, sp2: 'feather', n2: 2, light: 0, star: 0 },
     fx: (C, x, z, h, ux, uz, k, foe) => v2Mark(C, foe, { L: VT.GLYPH, s: .24, spin: 1.5, ring: .35, life: 1.6 }) });
@@ -96964,94 +97561,204 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -97060,75 +97767,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -125574,7 +126413,26 @@ function rgSetForce(f) { try { localStorage.setItem(RG_FKEY, f); } catch (e) {} 
 const rgForceTabs = cur => `<div class="rg-forces" role="tablist">${rgForces().map(f => `<button type="button" class="rg-force${f === cur ? ' on' : ''}" data-f="${f}" style="--fh:${FORCES[f].hue || '#c8a050'}">${rgEsc(FORCES[f].name)}${rgGet(f) ? '<small>run under way</small>' : ''}</button>`).join('')}</div>`;
 function rgForceWire() { for (const b of ovp.querySelectorAll('.rg-force')) b.onclick = () => { sfx('click'); rgSetForce(b.dataset.f); rgSel = null; rgOpen(b.dataset.f); }; }
 function rgAll() { let s = null; try { s = JSON.parse(localStorage.getItem(RG_KEY) || 'null'); } catch (e) {} return s && s.runs && typeof s.runs === 'object' ? s : { v: 1, runs: {} }; }
-function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
+function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; if (R && R.st && RG_REGIONS[force]) rgFill(R); return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
+// a run saved before a place or road was added to its map (the Thornhive, 25 Nov 2026) gets them now, drawn from its own seed
+// as rgNew would: without this the map, its cards and the march read a place with no state and throw
+function rgFill(R) {
+  const D = RG_REGIONS[R.force], tier = id => (D.nodes.find(n => n.id === id) || { tier: 1 }).tier;
+  if (!Array.isArray(R.roads)) R.roads = [];
+  for (const n of D.nodes) {
+    if (R.st[n.id]) continue;
+    const st = { s: n.kind === 'town' && n.start ? 'held' : 'open', g: 0, p: 0, fam: null };
+    if (n.kind !== 'lair' && !(n.kind === 'town' && n.start)) st.fam = rgShuffle(R.seed | 0, 'late' + n.id, D.pools[n.tier] || D.pools[1])[0] || null;
+    R.st[n.id] = st;
+  }
+  D.roads.forEach(([a, b], i) => {
+    if (rgRoadIx(R, a, b) >= 0) return;
+    const t = (tier(a) + tier(b)) / 2, d = clamp(Math.round(t - 1.2 + (rgRand(R.seed | 0, 'd' + i) * 2 - 1)), 0, 3);
+    const fa = R.st[a].fam || R.st[b].fam || 'beast', fb = R.st[b].fam || fa;
+    R.roads.push({ a, b, d, fam: rgRand(R.seed | 0, 'f' + i) < .5 ? fa : fb, ev: null, evDone: 0 });
+  });
+  return R;
+}
 function rgPut(R) { const s = rgAll(); R.at2 = Date.now(); s.runs[R.force] = R; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); return true; } catch (e) { return false; } }
 function rgDrop(force) { const s = rgAll(); delete s.runs[force]; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); } catch (e) {} }
 const rgDef = R => RG_REGIONS[R.force];
@@ -125964,7 +126822,7 @@ function rgMapSVG(R) {
     return `<g class="rg-road${live ? ' live' : ''}"><path d="M${A.x},${A.y}L${B.x},${B.y}"/>${marks}${ev}</g>`;
   }).join('');
   const nodes = D.nodes.map(n => {
-    const st = R.st[n.id], here = R.at === n.id, help = R.helpers.find(h => h.node === n.id && st.s !== 'held');
+    const st = R.st[n.id] || { s: 'open', g: 0, p: 0, fam: null }, here = R.at === n.id, help = R.helpers.find(h => h.node === n.id && st.s !== 'held');
     const cls = `rg-n ${n.kind} ${st.s}${here ? ' here' : ''}${rgSel === n.id ? ' sel' : ''}${nb.includes(n.id) ? ' near' : ''}`;
     const shape = n.kind === 'town' ? '<path class="rg-sh" d="M-17,14V-4L0,-18L17,-4V14Z"/>' : n.kind === 'lair' ? '<path class="rg-sh" d="M0,-24L7,-9L23,-11L13,2L21,16L5,11L0,25L-5,11L-21,16L-13,2L-23,-11L-7,-9Z"/>' : '<path class="rg-sh" d="M0,-18L18,0L0,18L-18,0Z"/>';
     const pips = st.s !== 'held' && st.g ? `<g class="rg-grow">${Array.from({ length: st.g }, (_, k) => `<circle cx="${(k - (st.g - 1) / 2) * 9}" cy="-28" r="3.5"/>`).join('')}</g>` : '';
@@ -132214,6 +133072,7 @@ function hwPanel(t) {
   const gold = G.gold | 0;
   ovp.insertAdjacentHTML('beforeend', `<div class="wp-rack hw-panel" role="dialog" aria-label="Hero weapon"><div class="wp-hd"><h3>Hero weapon · ${hwE(t.def.name.split(',')[0])} <small>it keeps this weapon all run · you have ${gold} gold</small></h3><button type="button" class="tx" id="hwClose" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button></div>
     <div class="wp-cur"><img src="${wpIconURL(h)}" alt=""><div>${wpnCardHTML(h, t)}</div></div>
+    ${typeof DUAL_UNIT !== 'undefined' && DUAL_UNIT[h.u] && typeof dualPairWord === 'function' ? `<p class="itc-k">Held as a matched pair, one in each hand: each stage upgrades both ${dualPairWord(h.u)}.</p>` : ''}
     <h4>Awakening <small>${hwE(hwProgress(h))}</small></h4>${hwStagesHTML(h)}
     <div class="wp-fr"><h4>Re-forging and runes <small>at the Anvil</small></h4><button type="button" class="pri" id="hwAnv">The Anvil</button></div></div>`);
   const box = ovp.querySelector('.hw-panel');
@@ -132242,7 +133101,8 @@ if (typeof rnLootScreen === 'function') {
       const relics = [...box.querySelectorAll('.rn-pick')].filter(b => !b.classList.contains('wp-pick') && !b.classList.contains('tm-pick') && !b.querySelector('.rn-leg'));
       if (relics.length > 1) relics[relics.length - 1].remove();
       else box.className = box.className.replace(/rn-n\d+/, 'rn-n' + (box.querySelectorAll('.rn-pick').length + 1));
-      const note = `<p class="itc-k">Taking it consumes ${hwE(wpnName(h))}: the same weapon, a stage up.</p>`;
+      const pair = typeof DUAL_UNIT !== 'undefined' && DUAL_UNIT[h.u] && typeof dualPairWord === 'function';   // (a dual-wielding Champion: its matched pair rises with it)
+      const note = `<p class="itc-k">${pair ? `<b>Upgrades both ${dualPairWord(h.u)}.</b> ` : ''}Taking it consumes ${hwE(wpnName(h))}${pair ? ' and its pair' : ''}: the same weapon, a stage up.</p>`;
       box.insertAdjacentHTML('beforeend', `<button type="button" class="rn-pick hw-pick" data-rph="1"><div class="sp-card qx-pc rn-ic${hwRar(nx) >= 4 ? ' rn-leg' : ''}" style="--sc:${hwCol(nx)}"><img alt="" src="${wpIconURL(nx)}">${wpnCardHTML(nx, t, { vs: h, offer: 1, note })}<span class="sp-go">Take it</span></div></button>`);
       const btn = box.querySelector('[data-rph]');
       btn.onclick = () => {
@@ -132260,7 +133120,7 @@ function hwMerge(got, done) {
   let over = false; const tm = [];
   const el = document.createElement('div'); el.className = 'hw-merge'; el.setAttribute('role', 'status');
   el.innerHTML = `<div class="hw-mg"><img class="hw-mg-old" style="--c:${hwCol(a)}" src="${wpIconURL(a)}" alt=""><i class="hw-mg-burst" style="--c:${hwCol(b)}"></i><img class="hw-mg-new" style="--c:${hwCol(b)}" src="${wpIconURL(b)}" alt=""></div>
-    <div class="hw-mg-name" style="color:${hwCol(b)}">${hwE(hwNameOf(b))}</div><div class="hw-mg-sub">${hwE(hwNameOf(a))} is consumed.${nfx ? ' New: ' + hwE(nfx) : ''}</div>`;
+    <div class="hw-mg-name" style="color:${hwCol(b)}">${hwE(hwNameOf(b))}</div><div class="hw-mg-sub">${hwE(hwNameOf(a))} is consumed${typeof DUAL_UNIT !== 'undefined' && DUAL_UNIT[b.u] && typeof dualPairWord === 'function' ? `: both ${dualPairWord(b.u)} rise` : ''}.${nfx ? ' New: ' + hwE(nfx) : ''}</div>`;
   const fin = () => { if (over) return; over = true; tm.forEach(clearTimeout); el.remove(); if (done) done(); };
   document.body.append(el);
   if (typeof sfx === 'function') sfx('equip', 4);
@@ -133249,7 +134109,7 @@ if (typeof document !== 'undefined' && document.head) {
 (() => {
   if (typeof document === 'undefined') return;
   const st = document.createElement('style');
-  st.textContent = `.dw-sock small{opacity:.9}.dw-sock.empty canvas{opacity:.55}.dw-rule{font-size:12px;opacity:.8;margin:2px 0 6px;line-height:1.35}
+  st.textContent = `.dw-sock small{opacity:.9}.dw-rule{font-size:12px;opacity:.8;margin:2px 0 6px;line-height:1.35}
 .wp-ln.dw-ln{margin-top:0}.wp-rack .dw-rule{margin:4px 0 8px}`;
   document.head.append(st);
 })();
@@ -133264,7 +134124,7 @@ if (typeof wpnCardHTML === 'function') {
   const _dwCard = wpnCardHTML;
   wpnCardHTML = function (w, t, o) {
     o = o || {};
-    if (!t || !w || !dualIs(t) || !(o.off || (t.weapon2 === w) || (w.starter && w.off))) return _dwCard.apply(this, arguments);
+    if (!t || !w || w.pair || !dualIs(t) || !(o.off || (t.weapon2 === w) || (w.starter && w.off))) return _dwCard.apply(this, arguments);
     let h = _dwCard.call(this, w, t, Object.assign({}, o, { vs: undefined }));
     h = h.replace(/<p class="itc-k">On this [^<]*<\/p>/, '');
     const G2 = dualGain(w), d0 = dualDpsWith(t, null), d1 = dualDpsWith(t, w);
@@ -133276,8 +134136,13 @@ if (typeof wpnCardHTML === 'function') {
     return h.replace(/<\/div>$/, note + '</div>');
   };
 }
-if (typeof itipBind === 'function') itipBind(document, '[data-dwst]', el => { const t = wpTowerById(+el.dataset.dwst); return t ? wpnCardHTML(dualOf(t), t, { off: 1 }) : ''; });
-const dualTipAttr = (w, t) => w && !w.starter ? `data-wid="${w.id}" data-wt="${t.id}"` : `data-dwst="${t.id}"`;
+if (typeof itipBind === 'function') itipBind(document, '[data-dwst]', el => { const t = wpTowerById(+el.dataset.dwst); if (!t) return ''; const w = dualOf(t); return w && w.pair ? wpnCardHTML(w, t, { off: 1, note: dualPairNote(t, w) }) : wpnCardHTML(w, t, { off: 1 }); });
+// a Champion's matched pair, on its card: what the off hand adds, and that both hands rise together
+function dualPairNote(t, w) {
+  const G2 = dualGain(w);
+  return `<p class="itc-k"><b>In the off hand</b>: the matched pair of ${wpE(t.def.name.split(',')[0])}'s hero weapon. Each stage it takes upgrades both ${dualPairWord(t.def.unit)}. ${G2.add >= .005 ? `It adds ${dualPct(G2.add)} of the unit's base damage on every strike (half its gain)` : `It adds half of what the weapon gains over the unit's base damage on every strike: nothing yet at this Item Level, more with each stage`}${G2.sp ? `, +${Math.round(G2.sp * wpnSpK(t.type))} Spell Damage` : ''}; its stage effects, runes and on-hit effect are the main hand's and count once.</p>`;
+}
+const dualTipAttr = (w, t) => w && !w.starter && !w.pair ? `data-wid="${w.id}" data-wt="${t.id}"` : `data-dwst="${t.id}"`;
 
 /* ---------- the info pane ---------- */
 if (typeof wpInfoLine === 'function') {
@@ -133287,7 +134152,7 @@ if (typeof wpInfoLine === 'function') {
     try {
       if (!h || !dualIs(t)) return h;
       const w = dualOf(t), g = dualGain(w).add;
-      return h + `<p class="wp-ln dw-ln" tabindex="0" ${dualTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(t.weapon2 ? wpnName(w) : 'Off hand: issued')}</b> <span>off hand · ${dualPct(g)} base damage</span></p>`;
+      return h + `<p class="wp-ln dw-ln" tabindex="0" ${dualTipAttr(w, t)}><img src="${wpIconURL(w)}" alt=""><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <span>off hand · ${dualPct(g)} base damage</span></p>`;
     } catch (e) { return h; }
   };
 }
@@ -133295,10 +134160,11 @@ if (typeof wpInfoLine === 'function') {
 /* ---------- the Gear sheet ---------- */
 function dualSockHTML(t) {
   const w = dualOf(t);
-  return `<button type="button" class="gp-sock wp-sock dw-sock${t.weapon2 ? '' : ' empty'}" ${dualTipAttr(w, t)}><canvas width="112" height="112" data-key="${wpKey(w)}"></canvas><small style="color:${wpnCol(w)}">${wpE(t.weapon2 ? wpnName(w) : 'Off hand')}</small></button>`;
+  return `<button type="button" class="gp-sock wp-sock dw-sock" ${dualTipAttr(w, t)}><canvas width="112" height="112" data-key="${wpKey(w)}"></canvas><small style="color:${wpnCol(w)}">${wpE(wpnName(w))}</small></button>`;
 }
 function dualGearRow(t) {
   const w = dualOf(t), G2 = dualGain(w);
+  if (w && w.pair) return `<div class="gp-it wp-it dw-it" tabindex="0" ${dualTipAttr(w, t)}><b style="color:${wpnCol(w)}">${wpE(wpnName(w))}</b> <small>Off hand · ${wpE(wpKindLine(w))}</small><p class="gp-isl">The matched pair: each stage upgrades both ${dualPairWord(t.def.unit)} · ${dualPct(G2.add)} of its base damage on every strike${G2.sp ? ` · +${Math.round(G2.sp * wpnSpK(t.type))} Spell Damage` : ''}</p><p class="dw-rule">${wpE(DUAL_RULE)}</p></div>`;
   return `<div class="gp-it wp-it dw-it" tabindex="0" ${dualTipAttr(w, t)}><b style="color:${wpnCol(w)}">${wpE(t.weapon2 ? wpnName(w) : WPN_ISSUED[t.def.unit] ? WPN_ISSUED[t.def.unit][0] : 'Issued')}</b> <small>Off hand · ${wpE(wpKindLine(w))}</small><p class="gp-isl">${t.weapon2 ? `${dualPct(G2.add)} of its base damage on every strike${G2.sp ? ` · +${Math.round(G2.sp * wpnSpK(t.type))} Spell Damage` : ''}` : 'The issued weapon: the baseline'}</p>${wpnDef(w).leg ? `<p class="gp-iab">Passive: ${wpE(wpnDef(w).name)}</p>` : ''}<p class="dw-rule">${wpE(DUAL_RULE)}</p></div>`;
 }
 if (typeof openGearPanel === 'function') {
@@ -133309,11 +134175,14 @@ if (typeof openGearPanel === 'function') {
       if (!dualIs(t) || typeof ovp === 'undefined' || !ovp || !ovp.classList.contains('gearp')) return r;
       const main = ovp.querySelector('.gp-doll .wp-sock');
       if (main) {
+        if (!t.weapon) {   // (both hands read as weapons held: the issued main hand by its name, not an empty "Weapon" socket)
+          main.classList.remove('empty'); const m = main.querySelector('small'); if (m) { const w0 = wpnOf(t); m.textContent = wpnName(w0); m.style.color = wpnCol(w0); }
+        }
         main.insertAdjacentHTML('afterend', dualSockHTML(t));
         const b = main.nextElementSibling, c = b.querySelector('canvas'); iconPaint(c, c.dataset.key);
         let sw = 0;
-        b.onclick = () => { if (performance.now() < sw) return; if (typeof sfx === 'function') sfx('click'); if (typeof itipHide === 'function') itipHide(); dualRack(t, b); };
-        if (t.weapon2) b.onpointerdown = e => {   // a drag off the socket: back to the rack
+        b.onclick = () => { if (performance.now() < sw) return; if (typeof sfx === 'function') sfx('click'); if (typeof itipHide === 'function') itipHide(); if (dualHero(t) && typeof wpRack === 'function') wpRack(t); else dualRack(t, b); };
+        if (t.weapon2 && !dualHero(t)) b.onpointerdown = e => {   // a drag off the socket: back to the rack
           if (e.button > 0) return; e.stopPropagation();
           const x0 = e.clientX, y0 = e.clientY, id = e.pointerId; let g = null;
           const mv = ev => { if (ev.pointerId !== id) return;
