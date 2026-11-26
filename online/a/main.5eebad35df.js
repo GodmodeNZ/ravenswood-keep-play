@@ -1,4 +1,4 @@
-const BUILD_TAG = '52f8c42f@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '18183cc0@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -130531,7 +130531,24 @@ const RG_GLYPH = {
 function rgThreatHTML(R) {
   if (!R.war) return '';
   const W = R.war, tot = rgWarTotal(R), rate = rgWarRate(R), every = rate > 0 ? Math.max(1, Math.round(1 / rate)) : 0, deg = Math.round(360 * Math.min(1, tot / RG_WAR.ceil));
-  return `<div class="rg-dial rg-wardial" role="img" aria-label="The warlord: ${tot} pips of strength, ${RG_STANCE[W.stance].toLowerCase()}; turn ${W.turn}" title="The warlord's strength in pips (his armies, garrisons and what his lair has mustered). His lair musters a new pip about every ${every} turns: faster for every supplied place he holds. Take his land to slow it."><span class="rg-ring" style="--deg:${deg}deg"><b>${tot}</b><small>pips</small></span><span class="rg-dl">${RG_STANCE[W.stance]}</span><small>Turn ${W.turn} · +1 pip every ~${every} turns</small></div>`;
+  return `<div class="rg-dial rg-wardial" role="img" aria-label="The warlord: ${tot} pips of strength, ${RG_STANCE[W.stance].toLowerCase()}; turn ${W.turn}" title="The warlord's strength in pips (his armies, garrisons and what his lair has mustered). His lair musters a new pip about every ${every} turns: faster for every supplied place he holds. Take his land to slow it."><span class="rg-ring" style="--deg:${deg}deg"><b>${tot}</b><small>pips</small></span><span class="rg-dl">${RG_STANCE[W.stance]}</span><small><b>Turn ${W.turn}</b><span> · +1 pip every ~${every} turns</span></small></div>`;
+}
+// the map's key (owner, 27 Nov 2026: "add the legend"): each symbol drawn as the map draws it, a few plain words beside it
+function rgLegendHTML() {
+  const ic = (w, h, body) => `<svg class="lgi" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">${body}</svg>`;
+  const item = (icon, words) => `<span>${icon}${words}</span>`;
+  const army = (main, dots) => ic(16, 22, `<g class="rg-army${main ? ' main' : ''}" transform="translate(8 8)"><rect x="-7" y="-7" width="14" height="20" rx="2"/><g class="rg-ap">${Array.from({ length: dots }, (_, i) => `<circle cx="${((i - (dots - 1) / 2) * 4).toFixed(1)}" cy="9" r="1.6"/>`).join('')}</g></g>`);
+  return `<div class="rg-legend" role="list" aria-label="Map key">
+    ${item('<i class="lg held"></i>', 'Held')}${item('<i class="lg open"></i>', 'Contested')}${item('<i class="lg lost"></i>', 'Lost')}${item('<i class="lg lair"></i>', 'Warlord')}
+    ${item(army(true, 4), 'Main Host')}${item(army(false, 2), 'Band · dots = strength')}
+    ${item(ic(26, 10, '<path class="rg-amv main" marker-end="url(#rgArrK)" d="M2,5L19,5"/><defs><marker id="rgArrK" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#ffcf8a"/></marker></defs>'), 'Next step')}
+    ${item(ic(14, 14, '<g class="rg-gar"><path d="M7,1l6,6l-6,6l-6,-6z"/></g>'), 'Garrison pip')}
+    ${item(ic(16, 16, '<text class="rg-help" x="8" y="14" text-anchor="middle" style="font-size:15px">☗</text>'), 'Lieutenant')}
+    ${item(ic(18, 18, '<g class="rg-prz" transform="translate(9 9)"><circle r="8"/><path d="M0,-5L4,0L0,5L-4,0Z"/></g>'), 'Prize item')}
+    ${item(ic(20, 20, '<g class="rg-sg" transform="translate(10 10)"><circle r="9"/><text y="4">3</text></g>'), 'Siege: turns left')}
+    ${item(ic(20, 20, '<g class="rg-ev" transform="translate(10 10)"><circle r="8.5"/><text y="4" style="font-size:10px">⌂</text></g>'), 'Road event')}
+    <span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span>
+    <span class="lg-plan">Plans: ⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster</span></div>`;
 }
 // the warlord's armies, listed: where each is, its strength and its plan (a click picks its place on the map)
 function rgArmiesHTML(R) {
@@ -130773,7 +130790,7 @@ function rgOpen(force) {
     ${R.notice ? `<p class="rg-notice" role="status"><i aria-hidden="true">!</i><span>${rgEsc(R.notice)}</span></p>` : ''}
     <div class="cm-body"><section class="rg-mapc" aria-label="The map"><div class="rg-mtb"><span><i aria-hidden="true"></i>The ${rgEsc(D.name.split(' ').pop())}</span><button type="button" id="rgLocate">Locate your host<span aria-hidden="true">⌖</span></button></div>
       <div class="rg-mapf"><div class="cm-map rg-mapv"><div class="rg-mapin" data-f="${force}">${rgMapSVG(R)}</div></div>${rgThreatHTML(R)}</div>
-      <div class="rg-legend" aria-hidden="true"><span><i class="lg held"></i>Held</span><span><i class="lg open"></i>Contested</span><span><i class="lg lost"></i>Lost</span><span><i class="lg lair"></i>Warlord</span><span><i class="lg army"></i>Army (⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster)</span><span><i class="lg gar"></i>Garrison</span><span><i class="lg prz"></i>Prize</span><span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span></div>
+      ${rgLegendHTML()}
       <p class="rg-hint">Select a place to see it. Double-click or double-tap to march. Arrow keys move between places.</p></section>
     <aside class="cm-side">${rgBandHTML(R)}${side}
     ${RG_HOW}
