@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f72ebd9f@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0087afbc@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -129168,7 +129168,7 @@ const RG_HOW = `<details class="rg-how"><summary>How difficulty works</summary><
   <li>The clock moves a step for every battle you fight at a place and two for a broken line (a retreat from a first place does not move it).</li>
   <li>Win a battle and your maze and gold march on: keep the maze, or rebuild it for all its gold back. Waves skipped between battles pay their gold.</li>
   <li>Winning a place holds it and clears its growth. Settle the troubles you can before the clock reaches its marks.</li></ul></details>`;
-let rgSel = null, rgPick = { hero: null, hard: false }, rgTap = { id: null, t: 0 };
+let rgSel = null, rgPick = { hero: null, hard: false }, rgTap = { id: null, t: 0 }, rgTab = 'ov', rgKeyFocus = false;
 const RG_DBL = 450;   // ms between two clicks (taps) on one place that make a double-click
 // a place's primary action, from its button or a double-click: taken, or refused with its reason
 function rgDo(R, id, force, dbl) {
@@ -129193,21 +129193,47 @@ function rgMapSVG(R) {
     const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1, px = -dy / L, py = dx / L;
     const marks = Array.from({ length: r.d }, (_, k) => { const o = (k - (r.d - 1) / 2) * 11, x = mx + dx / L * o, y = my + dy / L * o; return `<path class="rg-dm d${r.d}" d="M${(x - px * 6).toFixed(1)},${(y - py * 6).toFixed(1)}L${(x + px * 6).toFixed(1)},${(y + py * 6).toFixed(1)}"/>`; }).join('');
     const ev = r.ev && !r.evDone ? `<g class="rg-ev" transform="translate(${(A.x + dx * .3).toFixed(1)} ${(A.y + dy * .3).toFixed(1)})"><circle r="10"/><text y="4">${RG_EVENTS[r.ev].icon}</text></g>` : '';
-    return `<g class="rg-road${live ? ' live' : ''}"><path d="M${A.x},${A.y}L${B.x},${B.y}"/>${marks}${ev}</g>`;
+    const route = rgSel && rgSel !== R.at && ((r.a === R.at && r.b === rgSel) || (r.b === R.at && r.a === rgSel));
+    return `<g class="rg-road${live ? ' live' : ''}${route ? ' route' : ''}"><path d="M${A.x},${A.y}L${B.x},${B.y}"/>${marks}${ev}</g>`;
   }).join('');
   const nodes = D.nodes.map(n => {
     const st = R.st[n.id] || { s: 'open', g: 0, p: 0, fam: null }, here = R.at === n.id, help = R.helpers.find(h => h.node === n.id && st.s !== 'held');
     const cls = `rg-n ${n.kind} ${st.s}${here ? ' here' : ''}${rgSel === n.id ? ' sel' : ''}${nb.includes(n.id) ? ' near' : ''}`;
-    const shape = n.kind === 'town' ? '<path class="rg-sh" d="M-17,14V-4L0,-18L17,-4V14Z"/>' : n.kind === 'lair' ? '<path class="rg-sh" d="M0,-24L7,-9L23,-11L13,2L21,16L5,11L0,25L-5,11L-21,16L-13,2L-23,-11L-7,-9Z"/>' : '<path class="rg-sh" d="M0,-18L18,0L0,18L-18,0Z"/>';
-    const pips = st.s !== 'held' && st.g ? `<g class="rg-grow">${Array.from({ length: st.g }, (_, k) => `<circle cx="${(k - (st.g - 1) / 2) * 9}" cy="-28" r="3.5"/>`).join('')}</g>` : '';
-    const wv = n.w && st.s !== 'held' ? `<text class="rg-w" y="45">waves ${rgSpec(R, n.id, 'trouble').w0}-${rgSpec(R, n.id, 'trouble').w1}</text>` : '';
-    return `<g class="${cls}" data-id="${n.id}" transform="translate(${n.x} ${n.y})" role="button" tabindex="0" aria-label="${rgEsc(n.name)}"><circle class="rg-halo" r="30"/>${shape}${st.s === 'lost' ? '<path class="rg-x" d="M-8,-8L8,8M8,-8L-8,8"/>' : ''}${pips}${help ? '<text class="rg-help" x="20" y="-14">☗</text>' : ''}
-      ${here ? '<circle class="rg-here-ring" r="34"/><text class="rg-here-t" y="-50">YOU ARE HERE</text>' : ''}<text class="rg-nm" y="32">${rgEsc(n.name)}</text>${wv}${here ? '<g class="rg-flag"><path d="M-22,-40V-12"/><path class="rg-fl" d="M-22,-40L-4,-34L-22,-28Z"/></g>' : ''}</g>`;
+    const sw = n.w && st.s !== 'held' ? rgSpec(R, n.id, 'trouble') : null, wv = sw ? `waves ${sw.w0}-${sw.w1}` : '';
+    const stw = st.s === 'held' ? (n.kind === 'town' ? 'held town' : 'settled') : st.s === 'lost' ? 'lost' : n.kind === 'lair' ? 'the warlord' : 'contested';
+    // state, in shape as well as colour: a filled diamond (held), a hollow one (contested), a struck one (lost), a star (the warlord)
+    const badge = n.kind === 'lair' && st.s !== 'held' ? '<path class="rg-bd lair" d="M0,-7L2,-2L7,-2L3,1L5,7L0,3L-5,7L-3,1L-7,-2L-2,-2Z"/>'
+      : `<path class="rg-bd ${st.s}" d="M0,-6L6,0L0,6L-6,0Z"/>${st.s === 'lost' ? '<path class="rg-bdx" d="M-3,-3L3,3M3,-3L-3,3"/>' : ''}`;
+    const pips = st.s !== 'held' && st.g ? `<g class="rg-grow">${Array.from({ length: st.g }, (_, k) => `<circle cx="${(k - (st.g - 1) / 2) * 9}" cy="-33" r="3.5"/>`).join('')}</g>` : '';
+    const g = RG_GLYPH[n.id] ? `<path class="rg-gl" transform="translate(-13.5 -13.5) scale(.75)" d="${RG_GLYPH[n.id]}"/>` : `<circle class="rg-gl" r="6"/>`;
+    return `<g class="${cls}" data-id="${n.id}" transform="translate(${n.x} ${n.y})" role="button" tabindex="${rgSel === n.id ? 0 : -1}" aria-pressed="${rgSel === n.id}" aria-label="${rgEsc(n.name)}, ${stw}${wv ? ', ' + wv : ''}${here ? ', your host is here' : ''}">
+      <circle class="rg-hit" r="34"/><circle class="rg-halo" r="29"/>${here ? '<circle class="rg-here-ring" r="31"/>' : ''}<circle class="rg-sh" r="23"/><circle class="rg-in" r="19"/>${g}
+      <g class="rg-badge" transform="translate(17 -17)"><circle r="8"/>${badge}</g>${pips}${help ? '<text class="rg-help" x="-30" y="-14">☗</text>' : ''}
+      ${here ? '<g class="rg-here-t" transform="translate(0 -44)"><rect x="-41" y="-8" width="82" height="15" rx="2"/><text y="3.5">YOU ARE HERE</text></g>' : ''}<text class="rg-nm" y="40">${rgEsc(n.name)}</text>${wv ? `<text class="rg-w" y="56">${wv}</text>` : n.kind === 'town' && st.s === 'held' ? '<text class="rg-w held" y="56">Held town</text>' : ''}</g>`;
   }).join('');
-  return `<svg class="rg-svg" viewBox="0 0 1000 620" role="group" aria-label="${rgEsc(D.name)}">
-    <defs><radialGradient id="rgGround" cx="40%" cy="55%" r="80%"><stop offset="0" stop-color="#3f4c32"/><stop offset=".7" stop-color="#26301f"/><stop offset="1" stop-color="#141a12"/></radialGradient></defs>
-    <rect width="1000" height="620" fill="url(#rgGround)"/><path class="rg-fen" d="M840,40 C900,80 990,60 1000,120 L1000,260 C940,250 880,220 840,170 Z"/>
-    ${roads}${nodes}${rgClockSVG(R)}</svg>`;
+  return `<svg class="rg-svg" viewBox="0 0 1000 620" role="group" aria-label="${rgEsc(D.name)}: the places and roads">${roads}${nodes}</svg>`;
+}
+// the places' glyphs (the owner's campaign map redesign, 26 Nov 2026: assets/regionicons/<id>.svg, a 36-unit box each): which
+// place it is; held, contested, lost and the warlord are the badge and the colour
+const RG_GLYPH = {
+  barrows: 'M3 29q1-16 15-18 14 2 15 18M8 29V16h20v13M13 29V19h10v10M6 15l24-1M5 10V4M3 7h4M30 9V3',
+  briarfast: 'M6 30V11h6V6h5v5h3V6h5v5h6v19M3 30h30M13 30V20q5-8 10 0v10M3 17l5 3M30 23l4-4M8 4l2-3',
+  brightwater: 'M18 31V9M18 18L8 11M18 23l11-10M9 11L6 5M29 13l2-7M6 14h7v8H6zM26 16h7v8h-7zM8 24l3 4M28 27l3 3M15 9l3-6 3 6',
+  cinder: 'M19 3c3 8-5 10-2 16 3-1 5-5 4-8 7 6 12 20-3 22C3 32 4 20 10 14c0 7 3 8 5 9-3-8 5-12 4-20z',
+  fernwatch: 'M11 29V12h14v17M8 12l10-9 10 9zM9 29h18M14 16h8M17 29v-7h4M4 28l3-9 3 9M27 28l3-9 3 9',
+  gloam: 'M7 14V8l6 4 5-8 5 8 6-4v6M7 16h22v6l-5 9H12l-5-9zM11 21l4 2M25 21l-4 2M15 29v4M21 29v4M4 18l-2 9M32 18l2 9',
+  greywood: 'M6 29l24-24M6 5l24 24M3 15l6-1-1-6M27 28l1-7 6 1M18 3v8M3 19h8M25 17h8M17 25v8',
+  mossford: 'M3 24h30M6 23V14M30 23V14M5 15q13-14 26 0M11 22v-7M18 22V12M25 22v-7M2 29q4-3 8 0t8 0t8 0t8 0',
+  rootdeep: 'M4 30q1-20 14-20t14 20M11 30q0-12 7-12t7 12M18 10V2M18 6L8 3M18 7l12-4M5 17l-3-4M30 17l4-4M5 24l-3 6M30 24l4 6',
+  stagrun: 'M18 31V19M18 20L10 13 6 5M10 13L3 11M10 13l2-9M18 20l8-7 4-8M26 13l7-2M26 13l-2-9M13 23l5 8 5-8',
+  thornhive: 'M18 3l12 7v16l-12 7-12-7V10zM10 13h16M8 19h20M10 25h16M15 29v-7h6v7M4 6l4 3M28 6l4-3',
+  thornwick: 'M5 28V17l6-5 6 5v11M17 28V13l7-5 7 5v15M3 28h30M21 28v-8h6v8M7 19h4M4 14l7-6 6 6M23 7V3',
+  weir: 'M3 14h30M5 11v13M31 11v13M11 14v12M18 14v12M25 14v12M3 29q4-3 8 0t8 0t8 0t8 0M3 7q5-3 10 0t10 0t8 0'
+};
+// the threat dial on the map: the clock as a ring, the next growth under it
+function rgThreatHTML(R) {
+  const nx = RG_MARKS.find(m => m > R.clock) || RG_CLOCK, deg = Math.round(360 * Math.min(1, R.clock / RG_CLOCK));
+  return `<div class="rg-dial" role="img" aria-label="Threat clock ${R.clock} of ${RG_CLOCK}; the places grow at ${nx}" title="At ${RG_MARKS.join(', ')} every unsettled place grows a step harder; at ${RG_CLOCK} the warlord raids the town nearest his lair."><span class="rg-ring" style="--deg:${deg}deg"><b>${R.clock}</b><small>/${RG_CLOCK}</small></span><span class="rg-dl">Threat</span><small>Next growth at ${nx}</small></div>`;
 }
 function rgLossLines(R, S) {
   if (S.kind === 'waylay') return ['the lives you lose', `thrown back to ${rgNode(R, S.from).name}`];
@@ -129271,14 +129297,21 @@ function rgNodeHTML(R, id) {
   const h = st.s !== 'held' && R.helpers.find(x => x.node === id); if (h) more += `<p class="rg-grew">The warlord’s helper is here: settle it and ${rgEsc(CAMP_FAMILIES[h.fam].name)} leave his lair.</p>`;
   if (S) more += rgBattleMore(R, S);
   const town = n.kind === 'town' && here && st.s === 'held' ? `<div class="rg-town">${rgTownOpts(R).map(o => `<button class="btn ghost rg-sec" data-town="${o[0]}" ${o[3] ? '' : 'disabled'}>${o[1]}<small>${rgEsc(o[2])}</small></button>`).join('')}</div>` : '';
-  // a place with a battle: its field's painting at the top with its name over it, the foes' cards, the encounter, what can
-  // drop, then the reward and the button; the rest (the place's words, the road, the risk) in small print under it
+  // the selected place's card (the owner's campaign map redesign, 26 Nov 2026): its painting with its name over it, then two tabs.
+  // Overview: how hard, the reward and start gold, the one big button, the town's services, the rest behind Details.
+  // Encounters & drops: the foes' portrait cards (the boss first), a few plain lines, and the boss's own loot (rgLootMore: the
+  // boss's table and themed weapons only, never the shared table every foe rolls on)
   const E = S && typeof rgEncParts === 'function' ? rgEncParts(R, S) : null;
   const ban = rgPlaceBanner(id, n.name, E ? E.img : '', state, E && E.field), hd = ban || `<h3><span>${state}</span>${rgEsc(n.name)}</h3>`;
-  if (E) return `<section class="cm-loc rg-card rg-place">${hd}
-    <div class="rg-hd">${rgBattleHead(R, S, true)}</div>${E.cards}${E.say}${E.loot}<div class="rg-gl">${rgBattleGold(R, S)}</div>${btn}${town}<div class="rg-fine">${more}</div></section>`;
-  return `<section class="cm-loc rg-card${ban ? ' rg-place' : ''}">${hd}${S ? rgBattleHead(R, S) : ''}${btn}${town}
-    <details class="rg-more"><summary>Details</summary>${more}</details></section>`;
+  const ovw = E ? `<div class="rg-hd">${rgBattleHead(R, S, true)}</div><div class="rg-gl">${rgBattleGold(R, S)}</div>${btn}${town}`
+    : `${S ? rgBattleHead(R, S) : `<p class="rg-lede">${rgEsc(n.say)}</p>`}${btn}${town}`;
+  const enc = E ? `<p class="rg-scout"><span>Scouting report</span><b>Waves ${S.w0}-${S.w1}</b></p>${E.cards}${E.say}${E.loot}`
+    : `<div class="rg-empty"><b>${st.s === 'held' ? `${rgEsc(n.name)} is yours` : 'Nothing to scout'}</b><p>${st.s === 'held' ? (n.kind === 'town' ? 'No foes here: rest and re-spec, then march on.' : 'Its trouble is settled and patrolled out: no foes left here.') : 'No battle here.'}</p></div>`;
+  const tab = (k, t) => `<button type="button" role="tab" class="rg-tab" id="rgTab-${k}" data-tab="${k}" aria-controls="rgPan-${k}" aria-selected="${rgTab === k}" tabindex="${rgTab === k ? 0 : -1}">${t}</button>`;
+  return `<section class="cm-loc rg-card rg-place" data-place="${rgEsc(id)}">${hd}
+    <div class="rg-tabs" role="tablist" aria-label="${rgEsc(n.name)}">${tab('ov', 'Overview')}${tab('enc', 'Encounters &amp; drops')}</div>
+    <div class="rg-pan" id="rgPan-ov" role="tabpanel" aria-labelledby="rgTab-ov"${rgTab === 'ov' ? '' : ' hidden'}>${ovw}<details class="rg-more"><summary>Details</summary>${more}</details></div>
+    <div class="rg-pan" id="rgPan-enc" role="tabpanel" aria-labelledby="rgTab-enc"${rgTab === 'enc' ? '' : ' hidden'}>${enc}</div></section>`;
 }
 // a place's banner (owner, 26 Nov 2026: their own paintings of the places, tools/make_placeart.py): its painting when it has one,
 // else its field's still (a battle place's), with its name over it. A painting not yet here is fetched (its own lazy asset,
@@ -129306,10 +129339,10 @@ function rgPendingHTML(R) {
 }
 const rgFace = h => (typeof COMMANDER_ART !== 'undefined' && COMMANDER_ART[h.id]) || (typeof HERO_ART !== 'undefined' && HERO_ART[h.id]) || heroFaceURL(h);
 function rgBandHTML(R) {
-  const h = HERO_BY[R.hero], B = R.band, lv = B && B.raised ? xpLevelOf(B.xp || 0) : 1;
+  const h = HERO_BY[R.hero], B = R.band, lv = B && B.raised ? xpLevelOf(B.xp || 0) : 1, nx = RG_MARKS.find(m => m > R.clock) || RG_CLOCK;
   return `<section class="cm-band"><img class="cm-face" alt="" src="${rgFace(h)}"><div class="cm-bi"><h3>${rgEsc(h.name)}<small>${rgEsc(FORCES[R.force].name)}${R.hard ? ' · Hardcore' : ''}</small></h3>
-    <p class="cm-stats"><span><b>${R.lives}/${RG_LIVES}</b>Lives</span><span><b>${R.chest}</b>War chest</span><span><b>${lv}</b>Level</span><span><b>${B && B.raised ? B.loot.length : 0}</b>Items</span><span><b>${rgSettled(R)}</b>Settled</span></p>
-    <p class="cm-at" title="At ${RG_MARKS.join(', ')} every unsettled place grows a step harder (waves ${RG_STEP.w} later, foes +${Math.round(RG_STEP.hp * 100)}% health); at ${RG_CLOCK} the warlord raids the town nearest his lair.">Threat clock <b>${R.clock}/${RG_CLOCK}</b> · next growth at ${RG_MARKS.find(m => m > R.clock) || RG_CLOCK}</p></div></section>`;
+    <p class="cm-stats"><span><b>${R.lives}<small>/${RG_LIVES}</small></b>Lives</span><span><b>${R.chest}</b>War chest</span><span><b>${lv}</b>Level</span><span><b>${B && B.raised ? B.loot.length : 0}</b>Items</span><span><b>${rgSettled(R)}</b>Settled</span></p></div>
+    <p class="cm-at" title="At ${RG_MARKS.join(', ')} every unsettled place grows a step harder (waves ${RG_STEP.w} later, foes +${Math.round(RG_STEP.hp * 100)}% health); at ${RG_CLOCK} the warlord raids the town nearest his lair."><span>Threat clock <b>${R.clock}/${RG_CLOCK}</b></span><span>Next growth at <b>${nx}</b></span></p></section>`;
 }
 function rgResumeHTML(R) {
   const has = savesGet().some(x => x.id === R.battle.runId);
@@ -129339,7 +129372,18 @@ function rgBannerSet(force) {
   const src = rgBannerSrc(force);
   ov.style.setProperty('--rgb', src ? `url(${src})` : 'none');
   if (src || !RG_HOME_ART[force] || typeof needAssets !== 'function') return;
-  try { needAssets([(rgBannerSmall() ? 'homeland-s:' : 'homeland:') + force], { low: true }).then(() => { const got = rgBannerSrc(force); if (got && document.querySelector('.rg-setup .hx-ic.on[data-f="' + force + '"]')) ov.style.setProperty('--rgb', `url(${got})`); }); } catch (e) { /* the plain header stays */ }
+  try { needAssets([(rgBannerSmall() ? 'homeland-s:' : 'homeland:') + force], { low: true }).then(() => { const got = rgBannerSrc(force); if (got && document.querySelector('.rg-setup .hx-ic.on[data-f="' + force + '"], .rg-head[data-f="' + force + '"]')) ov.style.setProperty('--rgb', `url(${got})`); }); } catch (e) { /* the plain header stays */ }
+}
+// the painted map under the places (the owner's Greatroot terrain, tools/make_regionmapart.py): the force's own when it has one,
+// else the Grove's (every force marches the Greatroot Marches for now). Asked for once; set when it lands, if that map is still shown
+const rgMapArtOf = f => (typeof globalThis !== 'undefined' && globalThis.REGION_MAP_ART) ? globalThis.REGION_MAP_ART[f] || globalThis.REGION_MAP_ART.grove || '' : '';
+function rgMapArtSet(force) {
+  const src = rgMapArtOf(force);
+  ov.style.setProperty('--rgmap', src ? `url(${src})` : 'none');
+  if (src || typeof needAssets !== 'function' || typeof LAZY === 'undefined' || !LAZY.state) return;
+  const f = LAZY.state['regionmapart_' + force] != null ? force : 'grove';
+  if (LAZY.state['regionmapart_' + f] == null) return;
+  try { needAssets(['rgmap:' + f], { low: true }).then(() => { const got = rgMapArtOf(force); if (got && document.querySelector('.rg-head[data-f="' + force + '"]')) ov.style.setProperty('--rgmap', `url(${got})`); }, () => {}); } catch (e) { /* the plain ground stays */ }
 }
 // the setup screen (no run under way for this force): the begin screen's own layout and classes (heroes.js openHeroPicker,
 // menus.css .hx-cinematic): the commander's portrait with the arrows to browse, the forces as crest tabs, the commander's gift,
@@ -129403,23 +129447,49 @@ function rgOpen(force) {
     return;
   }
   if (!rgSel || !rgNode(R, rgSel)) rgSel = R.at;
-  const side = R.battle ? rgResumeHTML(R) : R.pending ? rgPendingHTML(R) : rgNodeHTML(R, rgSel);
-  showOverlay(`<div class="cm rg"><header class="cm-hd"><h2 class="ttl">${rgEsc(rgDef(R).name)}</h2><p class="sub">Pick a place, then Fight. Double-click (double-tap) a place to go straight there.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
-    ${R.notice ? `<p class="rg-notice">${rgEsc(R.notice)}</p>` : ''}
-    <div class="cm-body"><div class="cm-map">${rgMapSVG(R)}</div><aside class="cm-side">${rgBandHTML(R)}${side}
+  const side = R.battle ? rgResumeHTML(R) : R.pending ? rgPendingHTML(R) : rgNodeHTML(R, rgSel), D = rgDef(R);
+  const who = FORCES[force] ? FORCES[force].name : '';
+  // (the owner's campaign map redesign, 26 Nov 2026): a panoramic header (the homeland's painting; its words are HTML), the map
+  // on the painted terrain with the threat dial, a legend and Locate, and the side: the commander, the Forge, the place's card
+  showOverlay(`<div class="cm rg" data-f="${force}"><header class="rg-head" data-f="${force}"><p class="rg-eye">${rgEsc(who)}’s homeland<span>Act I</span></p><h2 class="ttl">${rgEsc(D.name)}</h2><p class="rg-lead">Choose your next destination. Pick a place, then act; double-click (double-tap) a place to go straight there.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
+    ${R.notice ? `<p class="rg-notice" role="status"><i aria-hidden="true">!</i><span>${rgEsc(R.notice)}</span></p>` : ''}
+    <div class="cm-body"><section class="rg-mapc" aria-label="The map"><div class="rg-mtb"><span><i aria-hidden="true"></i>The ${rgEsc(D.name.split(' ').pop())}</span><button type="button" id="rgLocate">Locate your host<span aria-hidden="true">⌖</span></button></div>
+      <div class="rg-mapf"><div class="cm-map rg-mapv"><div class="rg-mapin" data-f="${force}">${rgMapSVG(R)}</div></div>${rgThreatHTML(R)}</div>
+      <div class="rg-legend" aria-hidden="true"><span><i class="lg held"></i>Held</span><span><i class="lg open"></i>Contested</span><span><i class="lg lost"></i>Lost</span><span><i class="lg lair"></i>Warlord</span><span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span></div>
+      <p class="rg-hint">Select a place to see it. Double-click or double-tap to march. Arrow keys move between places.</p></section>
+    <aside class="cm-side">${rgBandHTML(R)}${side}
     ${RG_HOW}
     <details class="rg-log"><summary>The march so far${R.log[0] ? `: <span>${rgEsc(R.log[0])}</span>` : ''}</summary><ul>${R.log.slice(0, 8).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></details></aside></div>
-    <footer class="cm-ft">${rgForceTabs(force)}<button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign');
+    <footer class="cm-ft">${rgForceTabs(force)}<button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign rg-ov');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
+  rgBannerSet(force); rgMapArtSet(force);
   // a place: a click picks it; a second click on it within RG_DBL ms (a double-click, or a double-tap on touch: the map is drawn
   // anew after the first, so the two clicks land on different elements and the time between them decides) takes its primary
-  // action, or says why it cannot be taken
-  for (const nd of ovp.querySelectorAll('.rg-n')) {
+  // action, or says why it cannot be taken. Keys: Enter/Space pick, the arrows move to the nearest place that way
+  const nds = [...ovp.querySelectorAll('.rg-n')];
+  for (const nd of nds) {
     const go = e => {
       const id = nd.dataset.id, now = performance.now(), dbl = rgTap.id === id && now - rgTap.t < RG_DBL; rgTap = dbl ? { id: null, t: 0 } : { id, t: now };
+      rgKeyFocus = !!(e && e.type === 'keydown');
       rgSel = id; if (dbl) return rgDo(R, id, force, true); sfx('click'); rgOpen(force); };
-    nd.onclick = go; nd.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+    nd.onclick = go;
+    nd.onkeydown = e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); return go(e); }
+      const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (!dir) return;
+      e.preventDefault(); e.stopPropagation();
+      const a = rgNode(R, nd.dataset.id); let best = null, bs = Infinity;
+      for (const q of D.nodes) { if (q.id === a.id) continue; const dx = q.x - a.x, dy = q.y - a.y, along = dx * dir[0] + dy * dir[1]; if (along <= 0) continue; const sc = along + 2.5 * Math.abs(dx * dir[1] - dy * dir[0]); if (sc < bs) { bs = sc; best = q; } }
+      if (best) { rgSel = best.id; rgKeyFocus = true; sfx('click'); rgOpen(force); }
+    };
   }
+  // keep the keyboard where it was after the map is drawn anew, and the picked place in view on a narrow (scrolling) map
+  const sc = ovp.querySelector('.rg-mapv'), show = (id, smooth) => { const n = rgNode(R, id); if (!sc || !n || sc.scrollWidth <= sc.clientWidth + 2) return; const x = n.x / 1000 * sc.scrollWidth - sc.clientWidth / 2; sc.scrollTo({ left: Math.max(0, x), behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' }); };
+  if (rgKeyFocus) { rgKeyFocus = false; queueMicrotask(() => { const f = ovp.querySelector(`.rg-n[data-id="${rgSel}"]`); if (f) f.focus({ preventScroll: true }); }); }   // (after showOverlay's own first-button focus)
+  show(rgSel, false);
+  const lc = document.getElementById('rgLocate'); if (lc) lc.onclick = () => { sfx('click'); show(R.at, true); const f = ovp.querySelector(`.rg-n[data-id="${R.at}"]`); if (f) { f.classList.add('ping'); setTimeout(() => f.classList.remove('ping'), 1400); } };
+  // the place card's tabs (Overview, Encounters & drops): kept across selections; arrows, Home and End move between them
+  const tabs = [...ovp.querySelectorAll('.rg-tab')], pick = (b, focus) => { rgTab = b.dataset.tab; for (const t of tabs) { const on = t === b; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; const pn = document.getElementById(t.getAttribute('aria-controls')); if (pn) pn.hidden = !on; } if (focus) b.focus(); };
+  tabs.forEach((b, k) => { b.onclick = () => { sfx('click'); pick(b); }; b.onkeydown = e => { const m = { ArrowRight: k + 1, ArrowLeft: k - 1, Home: 0, End: tabs.length - 1 }[e.key]; if (m == null) return; e.preventDefault(); e.stopPropagation(); pick(tabs[(m + tabs.length) % tabs.length], true); }; });
   const on = (id, f) => { const b = document.getElementById(id); if (b) b.onclick = () => { AudioSys.init(); sfx('click'); f(); }; };
   on('rgAct', () => rgDo(R, rgSel, force, false));
   on('rgFight', () => rgStart(R, R.pending && R.pending.kind === 'waylay' ? rgSpec(R, null, 'waylay', R.pending.road) : rgSpec(R, R.at, 'trouble')));
