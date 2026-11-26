@@ -20,12 +20,12 @@
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_etch"] = {"n":"Etch","s":"8r32x","u":"wb_runecarver","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_detonate"] = {"n":"Detonate","s":"9mf9cj","u":"wb_runecarver","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_scribe"] = {"n":"Scribe the Road","s":"d69v1g","u":"wb_runecarver","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_charge"] = {"n":"Thunder Charge","s":"1r09ziy","u":"wb_stormward","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_stormbanner"] = {"n":"Storm Pennant","s":"1qcyjv5","u":"wb_stormward","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_skyfall"] = {"n":"Skyfall","s":"1062apz","u":"wb_stormward","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_charge"] = {"n":"Sable Charge","s":"1r09ziy","u":"wb_stormward","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_stormbanner"] = {"n":"Rune Pennant","s":"1qcyjv5","u":"wb_stormward","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_skyfall"] = {"n":"Runefall","s":"1062apz","u":"wb_stormward","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_shieldwall"] = {"n":"Shield Wall","s":"1xucd7o","u":"wb_anvilguard","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_quakeline"] = {"n":"Quake Line","s":"arkuqa","u":"wb_anvilguard","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_anvil"] = {"n":"Anvil Stance","s":"1w229hs","u":"wb_anvilguard","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_anvil"] = {"n":"Stone Stance","s":"1w229hs","u":"wb_anvilguard","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_pinbolt"] = {"n":"Pinning Bolt","s":"17nt1sc","u":"wb_siegewarden","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_runeshot"] = {"n":"Rune Shot","s":"14rk23s","u":"wb_siegewarden","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_chainbolt"] = {"n":"Chain Bolt","s":"106hupj","u":"wb_siegewarden","m":"code"};
