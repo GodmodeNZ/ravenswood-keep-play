@@ -1,4 +1,4 @@
-const BUILD_TAG = '258aa507@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '7412f631@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -158,10 +158,13 @@ const WALL_COST = TOWERS.wall.tiers[0].cost;
    repeat: an old order is read as its nearest kept one (prioOf): Last, Weak, Afflicted -> First; Armoured -> Strongest;
    Cloth, Support -> Casters; Grouped -> Crowd. Classic and Tower Wars keep their own four: First, Last, Strongest, Weakest. ---- */
 const PRIO = ['First', 'Last', 'Strongest', 'Weakest', 'Casters', 'Casters', 'Strongest', 'Crowd', 'First'];
-const PRIO_SAY = ['the foe furthest down the road', 'the foe furthest from your gate', 'the foe with the most health', 'the foe with the least health', 'enemy casters first', 'enemy casters first', 'the foe with the most health', 'the thickest crowd', 'the foe furthest down the road'];
-const PRIO_TIP = ['Strikes the foe furthest down the road.', 'Strikes the foe furthest from your gate.', 'Strikes the foe with the most health: bosses, elites, the armoured.', 'Strikes the foe with the least health.', 'Strikes healers, shielders and hasters first, then other casters; else the first in line.'];
+const PRIO_SAY = ['the foe furthest down the road', 'the foe furthest from your gate', 'the foe with the most health', 'the foe nearest death', 'enemy casters first', 'enemy casters first', 'the foe with the most health', 'the thickest crowd', 'the foe furthest down the road'];
+const PRIO_TIP = ['Strikes the foe furthest down the road.', 'Strikes the foe furthest from your gate.', 'Strikes the foe with the most health left (not the share of it): bosses, elites, the armoured.', 'Strikes the foe with the lowest share of its health left, to finish it off; on a tie, the first in line.', 'Strikes healers, shielders and hasters first, then other casters; else the first in line.'];
 PRIO_TIP[5] = PRIO_TIP[4]; PRIO_TIP[6] = PRIO_TIP[2]; PRIO_TIP[7] = 'Strikes where foes stand thickest.'; PRIO_TIP[8] = PRIO_TIP[0];
-const PRIO_ARMY = [0, 2, 4, 7], PRIO_OLD = [0, 1, 2, 3], PRIO_FIX = [0, 0, 2, 0, 4, 4, 2, 7, 0];
+const PRIO_ARMY = [0, 2, 3, 4, 7], PRIO_OLD = [0, 1, 2, 3], PRIO_FIX = [0, 0, 2, 3, 4, 4, 2, 7, 0];
+// Classic and Tower Wars keep their Weakest by health left (game.js acquire); a force run's goes by the share left
+function prioTip(v) { return v === 3 && oldRules() ? 'Strikes the foe with the least health.' : PRIO_TIP[v]; }
+function prioSay(v) { return v === 3 && oldRules() ? 'the foe with the least health' : PRIO_SAY[v]; }
 function prioList() { return oldRules() ? PRIO_OLD : PRIO_ARMY; }
 function prioOf(v) { v = v | 0; return v < 4 && oldRules() ? v : PRIO_FIX[v] != null ? PRIO_FIX[v] : 0; }   // the order a unit really follows
 
@@ -4118,13 +4121,13 @@ function prefScore(p, c) { return p === 'low' ? -c.hp : p === 'high' ? c.hp : p 
 function acquire(t, st, skip) {
   const r2 = st.range * st.range, m2 = st.minR ? st.minR * st.minR : -1;
   let best = null, bs = -Infinity;
-  const pm = prioOf(t.prio), hunt = t.ab && pm < 4 && !G.vs && typeof abHunt === 'function' ? abHunt(t) : null;   // a spell's preference draws the unit's strikes (abilities.js), unless you gave it its own order
+  const pm = prioOf(t.prio), hunt = t.ab && pm === 0 && !G.vs && typeof abHunt === 'function' ? abHunt(t) : null;   // a spell's preference draws the unit's strikes (abilities.js), only while it is on First: any other order you gave it is kept
   for (const c of G.creeps) {
     const dx = c.x - t.x, dy = c.y - t.y, d2 = dx * dx + dy * dy;   // (the reach first: it rules out most of the field for a few multiplies; the checks are all pure, so the order changes nothing else)
     if ((c.fly && st.airR ? (st.range + st.airR) ** 2 : r2) < d2 || d2 < m2) continue;
     if ((skip && skip.has(c)) || !canTarget(t, st, c)) continue;
     let s;
-    switch (pm) { case 0: s = -c.remain; break; case 1: s = c.remain; break; case 2: s = c.hp; break; case 3: s = -c.hp; break; case 4: s = (isRole(c, 'support') ? 2e6 : isRole(c, 'cloth') ? 1e6 : 0) - c.remain; break; default: s = prefScore('grouped', c); }   // Casters: healers, shielders, hasters, then cloth casters, else the first in line
+    switch (pm) { case 0: s = -c.remain; break; case 1: s = c.remain; break; case 2: s = c.hp; break; case 3: s = oldRules() ? -c.hp : -Math.round(c.hp / Math.max(1, c.maxHp) * 100) * 1e4 - c.remain; break; case 4: s = (isRole(c, 'support') ? 2e6 : isRole(c, 'cloth') ? 1e6 : 0) - c.remain; break; default: s = prefScore('grouped', c); }   // Casters: healers, shielders, hasters, then cloth casters, else the first in line
     if (hunt) s = prefScore(hunt, c);
     if ((st.huntAir && c.fly) || (st.huntChill && c.frostT > 0) || (st.caps && st.caps.huntroot && c.rootT > G.time) || (st.hunt && !hunt && prefFits(st.hunt, c))) s += 1e9;
     else if (st.hunt2 && !hunt && prefFits(st.hunt2, c)) s += 5e8;   // (and its second choice)   // (st.hunt: a specialist's own quarry, forces_zs_base.js)   // Skyhunter / Ice Lance / Still Quarry: their quarry first
@@ -11202,7 +11205,7 @@ function abilInfoHTML(t) {
   const kit = abilKit(t); if (!kit) return '';
   const A = abilEnsure(t, kit), m = manaSheet(t, kit), can = abNew() ? abilLearnable(t).length && G.gold >= Math.min(...abilLearnable(t).map(ab => spGold(ab.id))) : abilPointsFree(t) > 0 && abilLearnable(t).length;
   const names = A.learned.map(id => `<b>${ABIL[id].name}</b>`).join(' · ') || 'no abilities yet';
-  const hp = abHunt(t), mode = (A.mode === 'focus' ? `Focus: ${ABIL[A.focus] ? ABIL[A.focus].name : '—'}` : 'Rotate') + (hp && prioOf(t.prio) < 4 ? ` · strikes favour ${AB_PREF_SAY[hp]}` : '');
+  const hp = abHunt(t), mode = (A.mode === 'focus' ? `Focus: ${ABIL[A.focus] ? ABIL[A.focus].name : '—'}` : 'Rotate') + (hp && prioOf(t.prio) === 0 ? ` · strikes favour ${AB_PREF_SAY[hp]}` : '');
   return (typeof druidInfoHTML === 'function' ? druidInfoHTML(t) : '') + `<p class="mut" data-d="2">${names} · ${mode}${can ? ' · <b class="dps">Learn an ability below</b>' : ''}</p>`;
 }
 function loreInfoHTML() {
@@ -100813,25 +100816,25 @@ function infoHTML() {
     + (TW ? twLine() : interestLine())
     + `<p class="mut" data-d="2">Maze length <b>${G.path.len}</b> steps${G.ageRes ? ` · Keep upgrading to a ${AGES[G.ageRes.to].name}` : ageCanStart() ? ' · Keep upgrade ready' : ''}${G.wave === 1 && G.towers.length < 3 ? '<span data-d="1"> · Build a maze, then sound the horn</span>' : ''}</p>`;
 }
-// the Target button: shows the unit's order; a tap opens a small picker of four on the card (prioPage), Q W E R or a tap to choose
+// the Target button: shows the unit's order; a tap opens a small picker on the card (prioPage: four in Classic, five in a force run), Q W E R T or a tap to choose
 function prioSlot(t) {
   const pm = prioOf(t.prio);
-  return { key: 'p:' + pm, lbl: PRIO[pm], lsm: PRIO[pm].length > 7, on: true, name: `Target: ${PRIO[pm]}. ${PRIO_TIP[pm]}${t.def.force && pm < 4 ? ' Its spells may steer its strikes.' : ''} Tap to change.`,
+  return { key: 'p:' + pm, lbl: PRIO[pm], lsm: PRIO[pm].length > 6, on: true, name: `Target: ${PRIO[pm]}. ${prioTip(pm)}${t.def.force && pm === 0 ? ' Its spells may steer its strikes.' : ''} Tap to change.`,
     act: () => { if (G.sel && G.sel.ref === t) { G.sel.page = 'tgt'; sfx('click'); markDirty(); } } };
 }
 function prioPage(t, s) {
   const cur = prioOf(t.prio), grp = G.sel.group && G.sel.group.length > 1 ? G.sel.group.filter(o => !o.def.wall) : null;
   prioList().forEach((v, n) => {
-    s[n] = { key: 'p:' + v, lbl: PRIO[v], lsm: PRIO[v].length > 7, on: true, active: v === cur, hk: 'QWER'[n], name: `${PRIO[v]}: ${PRIO_TIP[v]}` + (grp ? ` (all ${grp.length})` : ''),
-      act: () => { for (const o of grp || [t]) setPrio(o, v); if (G.sel) G.sel.page = null; sfx('click'); toast(`Targeting ${PRIO_SAY[v]}.`); markDirty(); } };
+    s[n] = { key: 'p:' + v, lbl: PRIO[v], lsm: PRIO[v].length > 6, on: true, active: v === cur, hk: 'QWERT'[n], name: `${PRIO[v]}: ${prioTip(v)}` + (grp ? ` (all ${grp.length})` : ''),
+      act: () => { for (const o of grp || [t]) setPrio(o, v); if (G.sel) G.sel.page = null; sfx('click'); toast(`Targeting ${prioSay(v)}.`); markDirty(); } };
   });
   s[10] = { key: 'x', lbl: 'Back', on: true, name: 'Keep the current order', hk: 'Esc', act: () => { if (G.sel) G.sel.page = null; } };
   return s;
 }
-// the picker's keys: Q W E R choose (before the abilities' and items' Q W E)
+// the picker's keys: Q W E R T choose (before the abilities' and items' Q W E)
 window.addEventListener('keydown', e => {
   if (typeof G === 'undefined' || !G || G.state !== 'play' || G.paused || e.ctrlKey || e.metaKey || e.altKey || !G.sel || G.sel.page !== 'tgt') return;
-  const n = 'qwer'.indexOf(e.key.length === 1 ? e.key.toLowerCase() : ''); if (n < 0) return;
+  const n = 'qwert'.indexOf(e.key.length === 1 ? e.key.toLowerCase() : ''); if (n < 0) return;
   const sl = card[n] && card[n].slot; if (!sl || !String(sl.key).startsWith('p:')) return;
   e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { sl.act(); markDirty(); }
 }, true);
