@@ -1,4 +1,4 @@
-const BUILD_TAG = '13360306@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a6d1a47e@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -98542,15 +98542,22 @@ function gpBounds(t) {
        moody painting (never so low the face and the gear are lost), the unit's colours drawn a little toward the scene's, and
        its far side sunk toward the painting's shade.
    GP_LIT0 shows until the painting has loaded. A new painting needs nothing. gpDir: a direction as the sheet's camera sees it (to
-   its right, up, toward the eye). GP_THEME: each force's stand. */
+   its right, up, toward the eye). */
 const GP_YAW = .45;
 const gpDir = (rt, up, fw) => { const c = Math.cos(GP_YAW), q = Math.sin(GP_YAW), v = [c * rt + q * fw, up, -q * rt + c * fw], l = Math.hypot(...v); return v.map(a => a / l); };
-const GP_THEME = { ironhold: { stand: 'slate' }, grove: { stand: 'moss' }, conclave: { stand: 'pale', tint: [.86, .84, 1] }, silver: { stand: 'pale' }, stormborn: { stand: 'rock' }, wardbound: { stand: 'dark' } };
-const GP_THEME0 = { stand: 'slate' };
+/* Each force's painted stage (owner's art, 26 Nov 2026: "character backgrounds"; assets/stages, tools/make_stageart.py): a 4:3
+   painting with its platform painted in, so the sheet draws no stand of its own. GP_STAGE_AT is where the feet go on it (a share
+   of its width and its height); GP_SEED the art pack's own key and fill colours, which each force's light starts from: gpSample
+   then mixes in what it reads off the painting itself. */
+const GP_STAGE_AT = [.5, .755], GP_STAGE_ASPECT = 4 / 3;
+const GP_SEED = { wardbound: [[246, 207, 156], [142, 188, 219]], grove: [[255, 224, 160], [131, 198, 182]], ironhold: [[255, 179, 106], [145, 184, 222]],
+  conclave: [[223, 189, 255], [121, 220, 232]], stormborn: [[239, 187, 138], [117, 197, 213]], silver: [[255, 225, 168], [176, 200, 225]] };
 // key: [colour, direction]; back: the edge light [colour, direction]; sky, gnd: the soft light; expo: the exposure; d: the light's way on the
 // frame [x, y]; keyC, tintC, shadeC: the key's, the scene's and the shade's colours for the wash over the cut-out (0-255); shadeA: how deep the shade
 const gpLitOf = (o) => Object.assign({ key: [[1.45, 1.3, 1.1], gpDir(-.6, .8, .3)], back: [[.7, .85, 1.1], gpDir(.5, .35, -.6)], sky: [.2, .22, .26], gnd: [.1, .09, .08], expo: .86, d: [-.64, -.77], keyC: [255, 236, 205], tintC: [236, 240, 248], shadeC: [70, 84, 110], shadeA: .4 }, o);
-const GP_LIT0 = gpLitOf({}), GP_SAMP = {};
+const GP_LIT0 = gpLitOf({}), GP_SAMP = {}, GP_SEEDLIT = {};
+// a force's light from its seed alone (until its painting has been read): a soft key from the upper left, the fill's colour on its edges
+const gpSeedLit = f => GP_SEEDLIT[f] || (GP_SEEDLIT[f] = GP_SEED[f] ? gpLitOf({ key: [GP_SEED[f][0].map(v => v / 255 * 1.5), gpDir(-.6, .8, .3)], back: [GP_SEED[f][1].map(v => v / 255 * 1.7), gpDir(.5, .35, -.6)], keyC: GP_SEED[f][0], expo: .82 }) : GP_LIT0);
 function gpSample(force, src) {
   if (!force || !src || GP_SAMP[force] !== undefined || typeof Image === 'undefined') return;
   GP_SAMP[force] = null;   // (being read)
@@ -98576,7 +98583,8 @@ function gpSample(force, src) {
     const byW = P.filter(o => o.l > .14).sort((u, v) => u.w - v.w), q8 = Math.max(12, Math.round(byW.length * .14)), cool = avg(byW.slice(0, q8)), warm = avg(byW.slice(-q8));
     let dx2 = (hi.x - .5) * 2, dy2 = (hi.y - .5) * 2; if (Math.hypot(dx2, dy2) < .16) { dx2 = -.5; dy2 = -.6; }   // (a light in the middle of it: from the upper left, as a portrait is lit)
     const dl = Math.hypot(dx2, dy2); dx2 /= dl; dy2 /= dl;
-    const lum = all.l, kc = unit(hi.c).map(v => v * .86 + .14), sc = unit(sky.c).map(v => v * .8 + .2), ac = unit(all.c), lc = unit(lo.c);
+    const seed = GP_SEED[force], mixU = (c3, q3) => (q3 ? c3.map((v, i) => v * .5 + q3[i] / 255 * .5) : c3);   // (half the painting's, half the art pack's own colour)
+    const lum = all.l, kc = mixU(unit(hi.c).map(v => v * .86 + .14), seed && seed[0]), sc = mixU(unit(sky.c).map(v => v * .8 + .2), seed && seed[1]), ac = unit(all.c), lc = unit(lo.c);
     const amb = Math.max(.12, Math.min(.26, .09 + lum * .42));   // (the soft light: little before a dark painting)
     GP_SAMP[force] = gpLitOf({
       key: [kc.map(v => v * 1.55), gpDir(dx2 * .95, Math.max(.22, .4 - dy2 * .75), .28)],
@@ -98588,88 +98596,57 @@ function gpSample(force, src) {
   } catch (e) { /* GP_LIT0 stays */ } };
   im.src = src;
 }
-const gpTheme = t => (t && t.def && GP_THEME[t.def.force]) || GP_THEME0;
-const gpLit = t => { const f = t && t.def && t.def.force; return (f && GP_SAMP[f]) || GP_LIT0; };
-const GP_STAND_H = .13, GP_STANDS = {};
-// a stand of radius 1 (scaled to the unit as it is drawn), its top at y 0
-function gpStandMesh(kind) {
-  if (GP_STANDS[kind]) return GP_STANDS[kind];
-  const g = new Geo(41 + kind.length * 7), H = GP_STAND_H, tm = new Float32Array(16), rn = g.rnd;
-  const ring = (n, r0, fn) => { for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + rn() * .5; fn(Math.cos(a) * r0, Math.sin(a) * r0, a, k); } };
-  g.jit = .07;
-  if (kind === 'moss') {
-    g.cyl(0, -H, 0, 1.03, .97, H, 11, '#4f4c40', { top: '#465a30', rot: .2 });
-    ring(9, .78, (x, z) => g.ico(x * (.7 + rn() * .4), -.012, z * (.7 + rn() * .4), .1 + rn() * .08, rn() < .5 ? '#4f7a34' : '#628a3c', .25, .28));   // moss on the top
-    ring(6, 1.02, (x, z, a) => g.seg([x * .72, -.02, z * .72], [x * 1.12, -H * 1.05, z * 1.12], .05 + rn() * .03, '#5a4630'));   // roots over the edge
-    ring(5, 1.08, (x, z) => g.ico(x, -H * .8, z, .1 + rn() * .06, '#6a6658', .4, .7));
-  } else if (kind === 'pale') {
-    g.cyl(0, -H, 0, 1.06, 1.04, H * .5, 8, '#8f8a7c', { top: '#9c9788', rot: .39 }); g.cyl(0, -H * .5, 0, .93, .9, H * .5, 8, '#a39d8d', { top: '#b0aa99', rot: .39 });
-    ring(4, 1.05, (x, z, a) => g.with(M4.trs(tm, x, -H * .82, z, -a + rn(), 0, .3, 1), () => g.box(0, 0, 0, .16, .05, .11, '#b0aa9a')));
-  } else if (kind === 'rock') {
-    g.cyl(0, -H, 0, 1.08, .94, H, 7, '#675f53', { top: '#766d5f', rot: .7 });
-    ring(7, 1.02, (x, z) => g.ico(x, -H * .75, z, .13 + rn() * .1, rn() < .5 ? '#6e665a' : '#857b6b', .45, .6));
-    ring(4, .8, (x, z) => g.ico(x, -.01, z, .05 + rn() * .03, '#978d7c', .4, .4));
-  } else if (kind === 'dark') {
-    g.cyl(0, -H, 0, 1.05, 1.03, H * .55, 10, '#2b3032', { top: '#33393b', rot: .1 }); g.cyl(0, -H * .45, 0, .92, .9, H * .45, 10, '#363c3e', { top: '#3d4446', rot: .1 });
-    g.cyl(0, -H * .47, 0, .955, .955, .014, 20, '#c9a24a', { capT: false });   // the gold band
-    ring(5, .7, (x, z) => g.box(x, .002, z, .1, .004, .03, '#3aa39a'));   // teal marks cut in the top
-  } else {   // slate: a low weathered slab, broken slabs and chips round its edge
-    g.cyl(0, -H, 0, 1.02, .98, H, 9, '#45474a', { top: '#56585a', rot: .3 });
-    ring(8, 1.03, (x, z, a) => g.with(M4.trs(tm, x, -H * (.55 + rn() * .3), z, -a + rn() * .8, rn() * .3 - .15, rn() * .5 - .1, 1), () => g.box(0, 0, 0, .2 + rn() * .14, .05 + rn() * .03, .14 + rn() * .1, rn() < .5 ? '#414346' : '#585a5d')));
-    ring(7, 1.2, (x, z) => g.ico(x * (.9 + rn() * .2), -H * .9, z * (.9 + rn() * .2), .035 + rn() * .035, '#3b3d40', .4, .7));
-  }
-  return (GP_STANDS[kind] = g.finish());
-}
-// the stand's radius for this unit: under its feet and its own base, not as wide as what it holds out
-const gpStandR = t => { const bd = towerBounds(t.type, t.tier); return clamp(Math.max(bd[1][0], bd[1][2], -bd[0][0], -bd[0][2]) * 1.08, .54, .78); };
-const _gpM = new Float32Array(16), GP_BLACK = [0, 0, 0], GP_WHITE = [1, 1, 1], GP_WORK = {};
+const gpLit = t => { const f = t && t.def && t.def.force; return (f && GP_SAMP[f]) || (f && gpSeedLit(f)) || GP_LIT0; };
+const GP_BLACK = [0, 0, 0], GP_WHITE = [1, 1, 1], GP_WORK = {};
 const gpWork = (k, S) => { const c = GP_WORK[k] || (GP_WORK[k] = document.createElement('canvas')); if (c.width !== S) c.width = c.height = S; return c; };
-let gpRef = 0, gpShade = null;   // (gpRef: how far apart the white and the black backgrounds come out; gpShade: where the stand's shadow goes [x, y, half width])
+let gpRef = 0, gpPpu = 100;   // (gpRef: how far apart the white and the black backgrounds come out; gpPpu: screen pixels a world unit, for the drag)
 // the unit, turned to gpAng, into the sheet's canvas (through the icon renderer's path, on a renderer of its own)
 let gpClock = 0, gpClockAt = 0;
 function gpDraw() {
   const cv = document.getElementById('gpCv'), R = gpRenderer(); if (!cv || !R || !gpT) return;
   const keep = IR; IR = R;
   try {
-    const bd0 = gpBounds(gpT), TH = gpTheme(gpT), sr = gpStandR(gpT), rr = Math.max(bd0[1][0], sr * 1.14);   // (the frame takes in the stand and its broken edge)
-    const bd = [[-rr, 0, -rr], [rr, bd0[1][1] + GP_STAND_H, rr]];   // (heights from the stand's foot)
-    // framed on its height or its reach round the dais, whichever is larger, not the box's diagonal, so a tall unit fills
-    // the stage (owner: show it bigger)
-    const fr = Math.max(bd[1][1] / 2, bd[1][0], bd[1][2]) * 1.0, dg = Math.hypot(bd[1][0] - bd[0][0], bd[1][1] - bd[0][1], bd[1][2] - bd[0][2]) / 2;
-    // zoomed (the wheel, owner): a smaller box round a point that climbs toward the chest and face as it closes in
-    const z = gpZoom, h = bd[1][1], lo = h * .5 / z - h * .12, hi = h - h * .5 / z + h * .12, cy = Math.max(lo, Math.min(hi, h / 2 + h * .24 * Math.min(1, (z - 1) / 2) + h * gpPanY));   /* (gpPanY: dragged up or down, kept on the unit) */
-    gpPanY = (cy - h / 2 - h * .24 * Math.min(1, (z - 1) / 2)) / h;
-    const b0 = [bd[0][0] / z, cy - h / 2 / z - GP_STAND_H, bd[0][2] / z], b1 = [bd[1][0] / z, cy + h / 2 / z - GP_STAND_H, bd[1][2] / z], dg2 = Math.hypot(b1[0] - b0[0], b1[1] - b0[1], b1[2] - b0[2]) / 2;
-    frameSubject(b0, b1, GP_YAW, .2, .5, fr / z / dg2);
+    /* The feet stand on the painted platform (the art pack's handoff): the scene is the stage painting, cover-scaled and centred
+       in its box, and the point GP_STAGE_AT of the painting is where the unit's foot of its own base goes, whatever the box crops.
+       The unit's size is a share of the painting's height (a tall one, or one holding a staff up, is drawn smaller so it stays
+       inside the painting's middle). The camera looks at the unit's own axis and is set so a world unit is gpPpu pixels: zooming
+       scales about the feet (they stay on the platform), a drag up or down slides the view along the body, and it turns in place. */
+    const scene = cv.parentElement, W = Math.max(1, scene.clientWidth), H = Math.max(1, scene.clientHeight), rr = Math.min(window.devicePixelRatio || 1, canHover() ? 1.5 : 1.25);
+    if (cv.width !== Math.round(W * rr) || cv.height !== Math.round(H * rr)) { cv.width = Math.round(W * rr); cv.height = Math.round(H * rr); }
+    const bd0 = gpBounds(gpT), hU = Math.max(.6, bd0[1][1]), artH = Math.max(H, W / GP_STAGE_ASPECT), artW = artH * GP_STAGE_ASPECT;
+    const ax0 = W / 2 + (GP_STAGE_AT[0] - .5) * artW, ay0 = H / 2 + (GP_STAGE_AT[1] - .5) * artH;   // (the anchor in the box, under the same cover-scaling as the backdrop: unitsheet.css .gp-scene)
+    const z = gpZoom, P = Math.min(.46 * artH, .62 * artH / hU) * z, PITCH = .2, FOV = .5, Sq = Math.max(W, H);
+    gpPanY = Math.max(0, Math.min(Math.max(0, hU + .12 - ay0 / P * .9), gpPanY)); gpPpu = P;   // (slid only as far as the body goes)
+    const cyW = ((ay0 - H / 2) / P + gpPanY) / Math.cos(PITCH), dist = Sq / P / 2 / Math.tan(FOV / 2), cp = Math.cos(PITCH);
+    IR.setCamera([Math.sin(GP_YAW) * cp * dist, cyW + Math.sin(PITCH) * dist, Math.cos(GP_YAW) * cp * dist], [0, cyW, 0], FOV, 1, .1, 60);
     // the unit lives on the dais (owner: "mageling still doesnt have an idle pose"): the sheet keeps its own clock while the
     // game is paused under it, and a sculpted unit plays its idle on it, looping (UM_SHOW, unitmodels.js); the hand-built
     // ones breathe on vt, so vt follows the same clock while the unit is drawn
     const now = performance.now() / 1000; gpClock += Math.min(.1, Math.max(0, now - (gpClockAt || now))); gpClockAt = now;
     const keepVt = vt; vt = gpClock;
     dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
-    try { const sm = gpStandMesh(TH.stand); M4.trs(_gpM, 0, 0, 0, gpAng, 0, 0, sr, 1, sr); const tn = TH.tint || [1, 1, 1]; item(sm, _gpM, { tint: [tn[0] * .62, tn[1] * .62, tn[2] * .62, 0] }); } catch (e) { /* the unit without its stand */ }
     try { UM_SHOW = gpClock; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
     finally { UM_SHOW = null; vt = keepVt; }
     /* The unit is cut out of its frame so the force's painting shows behind it (the renderer has no see-through frame): it is
        drawn on black and on white, and what differs between the two is the background. Its light is the painting's (gpLit): the
        key where the painting's light is, an edge light from behind in its sky's colour, little soft light. No glow behind it
        (owner, 18 Nov 2026). */
-    const S = cv.width, A = gpWork('a', S), D = gpWork('d', S), ax = A.getContext('2d', { willReadFrequently: true }), dx = D.getContext('2d', { willReadFrequently: true });
+    const S = canHover() ? 640 : 448, A = gpWork('a', S), D = gpWork('d', S), ax = A.getContext('2d', { willReadFrequently: true }), dx = D.getContext('2d', { willReadFrequently: true });
     const LT = gpLit(gpT), bk = LT.back[0].slice(); bk.dir = LT.back[1];
     R.sunDir = LT.key[1]; R.sunCol = LT.key[0]; R.sky = LT.sky; R.gnd = LT.gnd; R.rim = .3; R.fill = 0; R.back = bk; R.expo = LT.expo;
     irRender(GP_BLACK, null); ax.globalCompositeOperation = 'copy'; ax.drawImage(R.canvas, 0, 0, S, S); dx.globalCompositeOperation = 'copy'; dx.drawImage(R.canvas, 0, 0, S, S);
     irRender(GP_WHITE, null); dx.globalCompositeOperation = 'difference'; dx.drawImage(R.canvas, 0, 0, S, S);   // (white where there is only background)
     const img = ax.getImageData(0, 0, S, S), px = img.data, df = dx.getImageData(0, 0, S, S).data;
     gpRef = Math.max(gpRef, df[1], df[4 * (S - 1) + 1]);   // (the background's own difference, read at the top corners: the most seen, so a zoomed-in unit over a corner does not lose it)
-    const ref = Math.max(40, gpRef); let lowY = -1;
+    const ref = Math.max(40, gpRef);
     for (let i = 0, n = px.length; i < n; i += 4) {
       const al = 1 - df[i + 1] / ref;
       if (al <= .02) { px[i + 3] = 0; continue; }
-      if (al >= .98) { px[i + 3] = 255; lowY = i; continue; }
+      if (al >= .98) { px[i + 3] = 255; continue; }
       const k = 1 / al; px[i] = Math.min(255, px[i] * k); px[i + 1] = Math.min(255, px[i + 1] * k); px[i + 2] = Math.min(255, px[i + 2] * k); px[i + 3] = al * 255;
     }
     ax.putImageData(img, 0, 0);
-    /* the painting's light again, laid over the cut-out (kept to the unit's and the stand's own pixels): the units' shader lights a
+    /* the painting's light again, laid over the cut-out (kept to the unit's own pixels): the units' shader lights a
        body from the camera's upper left whatever the sun does, so the side the painting's light is on would not read. Its colours
        are drawn a little toward the scene's, the side away from the light sinks toward the painting's shade, the side toward it
        takes the light's colour. */
@@ -98682,14 +98659,12 @@ function gpDraw() {
       const g4 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g4.addColorStop(0, rgba(LT.keyC, .5)); g4.addColorStop(.5, rgba(LT.keyC, 0)); g4.addColorStop(1, rgba(LT.keyC, 0));
       tx.globalCompositeOperation = 'soft-light'; tx.fillStyle = g4; tx.fillRect(0, 0, S, S); }
     tx.globalCompositeOperation = 'destination-in'; tx.drawImage(A, 0, 0);
-    // where the stand meets the ground: the lowest solid row, and how wide the stand is just above it (for the shadow it casts on the painting)
-    if (lowY >= 0) { const y1 = Math.floor(lowY / 4 / S), y0 = Math.max(0, y1 - Math.round(S * .07)); let x0 = S, x1 = -1;
-      for (let y = y0; y <= y1; y += 2) for (let xx = 0; xx < S; xx += 2) if (px[(y * S + xx) * 4 + 3] > 200) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; }
-      gpShade = x1 > x0 ? [(x0 + x1) / 2 / S, y1 / S, (x1 - x0) / 2 / S] : null; } else gpShade = null;
-    const x = cv.getContext('2d'), W = cv.width, H = cv.height; x.clearRect(0, 0, W, H);
-    if (gpShade && gpZoom < 1.6) { const [sx, sy, sr2] = gpShade, rx = sr2 * W * 1.5, ry = rx * .24, cy2 = sy * H - ry * .5;
-      x.save(); x.translate(sx * W, cy2); x.scale(1, ry / rx); const g2 = x.createRadialGradient(0, 0, rx * .35, 0, 0, rx); g2.addColorStop(0, 'rgba(0,0,0,.72)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.beginPath(); x.arc(0, 0, rx, 0, 7); x.fill(); x.restore(); }
-    x.drawImage(T, 0, 0, W, H);
+    // onto the scene: a faint shadow where it stands (the platform is painted: an unseen ground under its feet), then the unit
+    const x = cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+    { const fr0 = Math.max(.28, Math.min(.6, Math.max(bd0[1][0], bd0[1][2]) * .8)), rx = fr0 * P * rr, ry = rx * .27, sx = ax0 * rr, sy = (ay0 + gpPanY * P) * rr;
+      x.save(); x.translate(sx, sy); x.scale(1, ry / rx); const g2 = x.createRadialGradient(0, 0, rx * .2, 0, 0, rx); g2.addColorStop(0, 'rgba(0,0,0,.5)'); g2.addColorStop(.6, 'rgba(0,0,0,.26)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g2; x.beginPath(); x.arc(0, 0, rx, 0, 7); x.fill(); x.restore(); }
+    x.drawImage(T, (W - Sq) / 2 * rr, (H - Sq) / 2 * rr, Sq * rr, Sq * rr);
   } catch (e) {} finally { IR = keep; }
 }
 function gpLoop() {
@@ -99046,9 +99021,25 @@ const GP_ART = {
   stormborn: () => typeof HOMELAND_ART_STORMBORN_S !== 'undefined' ? HOMELAND_ART_STORMBORN_S : typeof HOMELAND_ART_STORMBORN !== 'undefined' ? HOMELAND_ART_STORMBORN : '',
   wardbound: () => typeof HOMELAND_ART_WARDBOUND_S !== 'undefined' ? HOMELAND_ART_WARDBOUND_S : typeof HOMELAND_ART_WARDBOUND !== 'undefined' ? HOMELAND_ART_WARDBOUND : '',
 };
+const GP_STAGE = {
+  grove: sm => sm ? (typeof STAGE_ART_GROVE_S !== 'undefined' ? STAGE_ART_GROVE_S : '') : (typeof STAGE_ART_GROVE !== 'undefined' ? STAGE_ART_GROVE : ''),
+  silver: sm => sm ? (typeof STAGE_ART_SILVER_S !== 'undefined' ? STAGE_ART_SILVER_S : '') : (typeof STAGE_ART_SILVER !== 'undefined' ? STAGE_ART_SILVER : ''),
+  conclave: sm => sm ? (typeof STAGE_ART_CONCLAVE_S !== 'undefined' ? STAGE_ART_CONCLAVE_S : '') : (typeof STAGE_ART_CONCLAVE !== 'undefined' ? STAGE_ART_CONCLAVE : ''),
+  ironhold: sm => sm ? (typeof STAGE_ART_IRONHOLD_S !== 'undefined' ? STAGE_ART_IRONHOLD_S : '') : (typeof STAGE_ART_IRONHOLD !== 'undefined' ? STAGE_ART_IRONHOLD : ''),
+  stormborn: sm => sm ? (typeof STAGE_ART_STORMBORN_S !== 'undefined' ? STAGE_ART_STORMBORN_S : '') : (typeof STAGE_ART_STORMBORN !== 'undefined' ? STAGE_ART_STORMBORN : ''),
+  wardbound: sm => sm ? (typeof STAGE_ART_WARDBOUND_S !== 'undefined' ? STAGE_ART_WARDBOUND_S : '') : (typeof STAGE_ART_WARDBOUND !== 'undefined' ? STAGE_ART_WARDBOUND : ''),
+};
+// the force's painted stage behind the unit (a lazy asset, the small one on a phone): asked for, shown once it is in, and read for the light
+function gpStage(force) {
+  const sm = !canHover(), get = () => { try { return GP_STAGE[force] ? GP_STAGE[force](sm) || GP_STAGE[force](!sm) : ''; } catch (e) { return ''; } };
+  const put = () => { const src = get(); if (src && ovp && ovp.classList.contains('gearp')) ovp.style.setProperty('--gpstage', `url(${src})`); if (src) gpSample(force, src); return !!src; };
+  if (ovp) ovp.style.setProperty('--gpstage', 'none');
+  if (put() || !GP_STAGE[force] || typeof needAssets !== 'function') return;
+  try { needAssets([(sm ? 'stage-s:' : 'stage:') + force], { low: true }).then(() => { if (gpT && gpT.def.force === force) put(); }).catch(() => {}); } catch (e) { /* the plain scene stays */ }
+}
 function gpArt(force) {
   const get = () => { try { return GP_ART[force] ? GP_ART[force]() : ''; } catch (e) { return ''; } };
-  const put = () => { const src = get(); if (src && ovp && ovp.classList.contains('gearp')) ovp.style.setProperty('--gpart', `url(${src})`); if (src) gpSample(force, src); return !!src; };
+  const put = () => { const src = get(); if (src && ovp && ovp.classList.contains('gearp')) ovp.style.setProperty('--gpart', `url(${src})`); return !!src; };
   if (ovp) ovp.style.setProperty('--gpart', 'none');
   if (put() || !GP_ART[force] || typeof needAssets !== 'function') return;
   try { needAssets(['homeland-s:' + force], { low: true }).then(() => { if (gpT && gpT.def.force === force) put(); }).catch(() => {}); } catch (e) { /* the plain header stays */ }
@@ -99082,8 +99073,9 @@ function openGearPanel(t) {
       <button type="button" class="tx" id="gpClose" aria-label="Close and resume">${gpIc('close')}</button></div>
     <div class="gp-body" data-kw-noside>
       <div class="gp-doll">
+        <div class="gp-scene"><canvas id="gpCv" width="16" height="16" tabindex="0" role="img" aria-label="${gpE(t.def.name)}: drag or use the arrow keys to turn it, plus and minus to zoom, 0 to reset"></canvas></div>
         <div class="gp-col">${S.rel.map((s, i) => gpSock(s, i)).join('')}</div>
-        <div class="gp-stage"><canvas id="gpCv" width="${canHover() ? 640 : 448}" height="${canHover() ? 640 : 448}" tabindex="0" role="img" aria-label="${gpE(t.def.name)}: drag or use the arrow keys to turn it, plus and minus to zoom, 0 to reset"></canvas>
+        <div class="gp-stage">
           <div class="gp-ctl"><button type="button" data-gz="-1" aria-label="Zoom out">${gpIc('minus')}</button><small>${canHover() ? 'Drag to rotate · scroll to zoom' : 'Drag to rotate'}</small><button type="button" data-gz="1" aria-label="Zoom in">${gpIc('plus')}</button><button type="button" data-gz="0" aria-label="Reset the view">${gpIc('rotate')}</button></div></div>
         <div class="gp-col">${S.ch ? gpSock(S.ch, 3) : ''}${acts.map((it, n) => `<button type="button" class="gp-sock gp-act" data-act="${n}"><canvas width="112" height="112" data-key="${gearKey(it)}"></canvas><small>${gpE(actOf(it).name)}</small></button>`).join('')}</div>
         <div class="gp-bag"><h3>${gpIc('bag')}Bag <small>${canHover() ? 'Drag an item onto a socket, or a socketed one back here' : 'Drag, or tap an item then a socket'}${typeof ilOn === 'function' && ilOn() ? '; onto an item under Effects to infuse it' : ''}</small></h3><div class="gp-bgrid" role="listbox" aria-label="Bag">${gpBagCells(t)}</div></div>
@@ -99103,7 +99095,7 @@ function openGearPanel(t) {
         </section>
       </div>
     </div>`, 'gearp');
-  gpArt(t.def.force);
+  gpArt(t.def.force); gpStage(t.def.force);
   { const tabs = ovp.querySelector('.gp-tabs');
     tabs.onclick = e => { const b = e.target.closest('[role=tab]'); if (b && b.dataset.tab !== gpTab) { sfx('click'); gpSetTab(b.dataset.tab); } };
     tabs.onkeydown = e => { const i = GP_TABS.findIndex(x => x[0] === gpTab), n = GP_TABS.length, j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1; if (j < 0) return; e.preventDefault(); gpSetTab(GP_TABS[j][0], true); }; }
@@ -99128,7 +99120,7 @@ function openGearPanel(t) {
   const cv = $('#gpCv');
   cv.onpointerdown = e => { gpDragX = e.clientX; gpDragY = e.clientY; gpSpin = false; cv.setPointerCapture(e.pointerId); };
   /* a drag with either mouse button: across turns the unit, up and down moves along it (owner, 11 Nov 2026: "let me hold right click on mouse to go up and down a 3d model to see it better", "or left click") */
-  cv.onpointermove = e => { if (gpDragX == null) return; gpAng += (e.clientX - gpDragX) * .012; gpPanY += (e.clientY - gpDragY) / Math.max(1, cv.clientHeight) / gpZoom; gpDragX = e.clientX; gpDragY = e.clientY; };
+  cv.onpointermove = e => { if (gpDragX == null) return; gpAng += (e.clientX - gpDragX) * .012; gpPanY += (e.clientY - gpDragY) / Math.max(1, gpPpu); gpDragX = e.clientX; gpDragY = e.clientY; };
   cv.oncontextmenu = e => { e.preventDefault(); };
   cv.onpointerup = cv.onpointercancel = () => { gpDragX = null; };
   // the wheel zooms in on the unit (up to 3x, toward its chest and face); a double click puts it back
@@ -99138,7 +99130,7 @@ function openGearPanel(t) {
   const zoomBy = k => { gpZoom = k ? Math.max(1, Math.min(3, gpZoom * (k > 0 ? 1.25 : .8))) : 1; if (!k) { gpPanY = 0; gpAng = .5; } };
   cv.onkeydown = e => { const k = e.key; if (k === 'ArrowLeft' || k === 'ArrowRight') gpAng += k === 'ArrowLeft' ? -.2 : .2; else if (k === 'ArrowUp' || k === 'ArrowDown') gpPanY += (k === 'ArrowUp' ? .06 : -.06) / gpZoom; else if (k === '+' || k === '=') zoomBy(1); else if (k === '-' || k === '_') zoomBy(-1); else if (k === '0') zoomBy(0); else return; e.preventDefault(); e.stopPropagation(); };
   for (const b of ovp.querySelectorAll('.gp-ctl [data-gz]')) b.onclick = () => zoomBy(+b.dataset.gz);
-  gpSpin = false; gpZoom = 1; gpPanY = 0; gpRef = 0; gpShade = null; if (!gpRaf) gpRaf = requestAnimationFrame(gpLoop);
+  gpSpin = false; gpZoom = 1; gpPanY = 0; gpRef = 0; if (!gpRaf) gpRaf = requestAnimationFrame(gpLoop);
 }
 // live while open: the mana bar and each ability's recharge (a dark clock wipe, as on the card)
 function gpTick() {
