@@ -1,4 +1,4 @@
-const BUILD_TAG = '383e9738@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '2c3ad7c4@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -48093,7 +48093,7 @@ const WPN_ISSUED = {
   ch_huri: ['Huri\'s Bone Spear', '#efe4c8', 'a spear of carved bone'],
   // the Wardbound
   wb_oathbound: ['Oathbound Rune Greatsword', '#8a8a9a', 'a greatsword with glowing runes down the blade'], wb_maskedwarden: ['Warden\'s Gold Glaive', '#c0a05a', 'a three-bladed glaive with gold inlay'],
-  wb_frostbrand: ['Gatewatch Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_oathknife: ['Oathknife\'s Pair', '#8a5a60', 'two long knives with gold runes down the blades'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
+  wb_frostbrand: ['Gatewatch Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_oathknife: ['Nightblade\'s Pair', '#8a5a60', 'two long knives with gold runes down the blades'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
   wb_stormward: ['Sable Rune Lance', '#5a8ac0', 'a lance wound with gold rune wire'], wb_anvilguard: ['Stoneguard\'s Hammer', '#8a8a9a', 'a dark steel war hammer'],
   wb_siegewarden: ['Graveshot Ballista', '#8a7a5a', 'a field ballista'], wb_vowkeeper: ['Chaplain\'s Blade', '#7a6a8a', 'a short blade with a censer chain'],
   ch_varic: ['Varic\'s Warden Blade', '#c8963a', 'a dark sword with a gold rune on the cross'], ch_aedric: ['Aedric\'s Sun Lance', '#f0c860', 'a white lance with a gold point'],
@@ -63975,8 +63975,8 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
    - THE HALBERDIERS stay in the files as they were (kit wb_frostbrand, their tree's talents, items and paintings), reached
      by nothing: their items leave the drop pools below.
    Check: node tools/check_oathknife.js -v */
-const WB_ASN = { id: 'wb_oathknife', name: 'Oathknives', one: 'Oathknife', short: 'Oathknife',
-  options: ['Oathknives', 'Hushblades', 'Sworn Shades', 'Vigil Knives'] };
+const WB_ASN = { id: 'wb_oathknife', name: 'Nightblades', one: 'Nightblade', short: 'Nightblade',
+  picked: 'Nightblades (owner, 27 Nov 2026)', options: ['Oathknives', 'Hushblades', 'Sworn Shades', 'Vigil Knives'] };
 // the numbers: vs (more against casters), land (how far behind the foe he lands), the leap's beats (s), its arcs (cells)
 const WBA = { vs: .5, land: .55, camSide: .3, hop: .22, hold: .16, back: .3, H: .5, Hb: .42,
   quietus: { m: 2.2, low: .35, lowM: 4 }, step: { m: 1.7 }, hunt: { m: 1.5 },
