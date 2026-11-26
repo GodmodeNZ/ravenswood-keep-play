@@ -1,4 +1,4 @@
-const BUILD_TAG = '0383456a@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '258aa507@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -6500,17 +6500,28 @@ function ownedRelic(id) {
   const is = it => it && (it.base === id || it.leg === id);
   return (G.loot || []).some(is) || (G.towers || []).some(t => (t.gear || []).some(is)) || (G.drops || []).some(d => is(d.item));
 }
+// how many of a relic you hold (bag, sockets, on the ground), and how a drop weighs it: each copy you hold cuts its weight to
+// .12 of what it was (a second copy .12, a third .014, a fourth .002), so once a pool is used up the least-held comes first
+// (owner, 27 Nov 2026: "i got 4 of the same ring")
+function ownedCount(id) {
+  if (typeof G === 'undefined' || !G) return 0;
+  const is = it => !!it && (it.base === id || it.leg === id);
+  let n = (G.loot || []).filter(is).length + (G.drops || []).filter(d => is(d.item)).length;
+  for (const t of G.towers || []) n += (t.gear || []).filter(is).length;
+  return n;
+}
+const ownedW = id => Math.pow(.12, ownedCount(id));
 const CHARM_SHARE = .3;   // the share of rare drops that are charms, while the pool has them (epics: half that)
 function rollGear(wave, boss, forceRar, kind) {
   const rar = forceRar != null ? forceRar : rollRarity(wave, boss), W = fieldWeights(), types = Object.keys(W);
   const it = { id: ++G.gearUid, rar, hone: 0, isNew: true };
   if (rar === 4) {   // half of all legendaries are signature relics for a tower type you field
     const sigs = Object.keys(LEGENDS).filter(k => LEGENDS[k].for && !LEGENDS[k].school && W[LEGENDS[k].for] && inPool('legends', k));
-    it.leg = sigs.length && (kind === 'sig' || (kind == null && Math.random() < .5)) ? pickW(sigs.map(k => [k, W[LEGENDS[k].for] * (ownedRelic(k) ? .12 : 1)])) : pickW(Object.keys(LEGENDS).filter(k => !LEGENDS[k].for && !LEGENDS[k].school && inPool('legends', k)).map(k => [k, (ownedRelic(k) ? .12 : 1) * fieldFitW({ leg: k }, W)]));
+    it.leg = sigs.length && (kind === 'sig' || (kind == null && Math.random() < .5)) ? pickW(sigs.map(k => [k, W[LEGENDS[k].for] * ownedW(k)])) : pickW(Object.keys(LEGENDS).filter(k => !LEGENDS[k].for && !LEGENDS[k].school && inPool('legends', k)).map(k => [k, ownedW(k) * fieldFitW({ leg: k }, W)]));
     return it;
   }
   if (rar >= 2 && rar <= 3 && poolHas('charms') && (kind === 'charm' || (kind == null && Math.random() < (rar === 3 ? CHARM_SHARE * .5 : CHARM_SHARE)))) {   // a force's charms (groveitems.js)
-    const id = pickW(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].charm && GEAR_BASES[id].rar === rar && inPool('bases', id)).map(id => [id, ownedRelic(id) ? .25 : 1]));
+    const id = pickW(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].charm && GEAR_BASES[id].rar === rar && inPool('bases', id)).map(id => [id, Math.pow(.25, ownedCount(id))]));
     if (id) { it.base = id; return it; }
   }
   if (rar === 3 && kind === 'tome' && poolHas('tomes')) { const ty = tomeDropType(); if (ty) { it.tome = [ty]; return it; } }   // (only when asked for: tomes come from wave bosses alone, tomeForBoss)
@@ -6519,7 +6530,7 @@ function rollGear(wave, boss, forceRar, kind) {
     const id = pickW(opts); if (id) { it.base = id; return it; }
   }
   const opts = Object.keys(GEAR_BASES).filter(id => { const d = GEAR_BASES[id]; return d.rar === rar && !d.rx && !d.retired && !d.charm && inPool('bases', id); });
-  it.base = pickW(opts.map(id => [id, (ownedRelic(id) ? .12 : 1) * fieldFitW({ base: id, rar }, W)])) || lootPick(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].rar === rar && !GEAR_BASES[id].retired && !GEAR_BASES[id].charm && inPool('bases', id)));
+  it.base = pickW(opts.map(id => [id, ownedW(id) * fieldFitW({ base: id, rar }, W)])) || lootPick(Object.keys(GEAR_BASES).filter(id => GEAR_BASES[id].rar === rar && !GEAR_BASES[id].retired && !GEAR_BASES[id].charm && inPool('bases', id)));
   return it;
 }
 // stats with a tower's relics applied (called from effStats). t: the tower, so relics made for another tower stay inert.
@@ -47527,7 +47538,7 @@ function forceTipLine(n) {
    items that fit nothing you field last and leaves out a legendary that fits nothing you field (renown.js), and the
    card names who wears it. Stats are unchanged. Check: node tools/check_class_items.js -v */
 const KIND_LABEL = {
-  gun: 'gunners', bow: 'archers', caster: 'spellcasters', blade: 'blade fighters', polearm: 'spear and lance units',
+  gun: 'gunners', bow: 'archers and throwers', caster: 'spellcasters', blade: 'blade fighters', polearm: 'spear and lance units',
   hammer: 'hammer units', melee: 'melee units', rider: 'riders',
 };
 const UNIT_KIND = {
@@ -47567,8 +47578,18 @@ function unitKinds(def) {
   if (def.air === false && !out.includes('gun') && !out.includes('bow')) out.push('melee');
   return (_kindOf[u] = out);
 }
-// the slot types (TOWERS keys) of the force now leading whose unit is of kind k
-const unitsOfKind = k => Object.keys(TOWERS).filter(ty => { const d = TOWERS[ty]; return d && d.force && !d.wall && unitKinds(d).includes(k); });
+// who else a class item fits, by fighting style (owner, 27 Nov 2026, of an archer's ring that fit only the Graveshot
+// Ballistae: "should work with glaives as well?"). An archer's item fits every unit that shoots or throws its blow from afar
+// (thrown glaives, slung seeds, harpoons), a blade item every unit that fights with an edge, so each class fits two
+// or more units in each force that has items of it. Only the fit: the unit's own kinds (its sheet's line, the blow's sound)
+// stay as UNIT_KIND says.
+const CLASS_FIT_EXTRA = {
+  bow: ['wb_maskedwarden', 'seedcaster', 'wayfarer', 'sb_skyhunter'],
+  blade: ['cc_severer'],
+};
+const clsKinds = def => { const u = def && def.unit, ks = unitKinds(def), x = Object.keys(CLASS_FIT_EXTRA).filter(k => CLASS_FIT_EXTRA[k].includes(u) && !ks.includes(k)); return x.length ? ks.concat(x) : ks; };
+// the slot types (TOWERS keys) of the force now leading whose unit wears items of kind k
+const unitsOfKind = k => Object.keys(TOWERS).filter(ty => { const d = TOWERS[ty]; return d && d.force && !d.wall && clsKinds(d).includes(k); });
 const kindLabel = k => KIND_LABEL[k] || k + ' units';
 
 /* ---------- the items, by kind: [kind, ids] ---------- */
@@ -47580,8 +47601,9 @@ const CLASS_ITEMS = [
   ['blade', ['cc_hilt', 'wbr_whetrune', 'wbr_sigilstone', 'wbr_pommel']],
   ['polearm', ['gv_ashhaft', 'gv_huntlance', 'sbr_hookedbone', 'wbr_rimehook', 'so_s_lance']],
   ['hammer', ['ih_hammerhead', 'ih_anvilchip']],
-  // (melee: the two shield-bosses were retired, owner 9 Nov 2026: no shields drop)
-  ['rider', ['so_spur']],
+  // (melee: the two shield-bosses were retired, owner 9 Nov 2026: no shields drop. The Gilded Spur: any Silver knight who
+  // fights up close, not the Grail Knights alone, 27 Nov 2026)
+  ['melee', ['so_spur']],
 ];
 for (const [k, ids] of CLASS_ITEMS) for (const id of ids) {
   const d = (typeof GEAR_BASES !== 'undefined' && GEAR_BASES[id]) || (typeof LEGENDS !== 'undefined' && LEGENDS[id]) || (typeof SHOP !== 'undefined' && SHOP[id]);
@@ -127274,7 +127296,8 @@ function rnRollOffer(type, n, k, seen, noLeg) {
   const T = rnTableAt(type, n), pool = rnPool(type, n), out = [], W = typeof fieldWeights === 'function' ? fieldWeights() : {};
   if (!noLeg && T.leg && rnFits('L:' + T.leg, W) && Math.random() < rnLegP(n)) out.push('L:' + T.leg);   // (its legendary, unless it fits nothing you field)
   const fresh = rnShuffle(pool.filter(b => !seen.includes(b))), old = rnShuffle(pool.filter(b => seen.includes(b)));
-  const left = fresh.concat(old), first = left.find(b => !GEAR_BASES[b].charm && rnFits(b, W)) || left.find(b => !GEAR_BASES[b].charm) || left[0];
+  const held = b => typeof ownedRelic === 'function' && ownedRelic(b);   // (a relic you hold already goes after the rest: no floods of one item, 27 Nov 2026)
+  const left = fresh.concat(old), first = left.find(b => !GEAR_BASES[b].charm && rnFits(b, W) && !held(b)) || left.find(b => !GEAR_BASES[b].charm && rnFits(b, W)) || left.find(b => !GEAR_BASES[b].charm) || left[0];
   if (first && out.length < k) { out.push(first); left.splice(left.indexOf(first), 1); }
   while (out.length < k && left.length) {
     const mine = out.filter(x => !String(x).startsWith('L:')), w0 = mine.length ? rnWorthOf(mine[0]) : null, ch0 = mine.length && !!GEAR_BASES[mine[0]].charm;
@@ -127282,7 +127305,7 @@ function rnRollOffer(type, n, k, seen, noLeg) {
     left.forEach((b, i) => {
       const same = w0 == null || (Math.abs(rnWorthOf(b) - w0) <= .1 * w0 && !!GEAR_BASES[b].charm === ch0);
       const gap = mine.reduce((m, x) => Math.min(m, rnShapeGap(x, b)), 9);
-      const sc = (same ? 100 : 0) + (seen.includes(b) ? -1000 : 0) + (rnFits(b, W) ? 0 : -500) + (gap === 9 ? 0 : gap * 10) - i * .01;   // (a class item for units you don't field: last but a reroll's repeats)   // (ties: the shuffled order)
+      const sc = (same ? 100 : 0) + (seen.includes(b) ? -1000 : 0) + (rnFits(b, W) ? 0 : -500) + (held(b) ? -200 : 0) + (gap === 9 ? 0 : gap * 10) - i * .01;   // (a class item for units you don't field: last but a reroll's repeats)   // (ties: the shuffled order)
       if (sc > bs) { bs = sc; best = b; }
     });
     out.push(best); left.splice(left.indexOf(best), 1);
@@ -131163,11 +131186,17 @@ function rgDropItem(T, boss, rnd) {
   const legP = !legOk ? 0 : boss ? T.leg : T.leg / 3;
   if (legP > 0 && rnd() < legP) return T.kit && T.kitLeg ? rgMake({ l: T.kitLeg }) : rgLootItem('leg', 4, w);
   const upped = T.up > 0 && rnd() < T.up, rar = upped ? D.up : boss ? D.boss : D.low;
-  if (T.kit) {
+  // a kit drops only while you field its unit, and only pieces you don't hold yet: then the run's own drop (it leans to what
+  // you field and away from what you hold). (Owner, 27 Nov 2026: Mossford's kit for the Graveshot Ballistae was one ring,
+  // dropped by every elite: "i got 4 of the same ring on the moss map", fielding no Ballistae.)
+  const W = typeof fieldWeights === 'function' ? fieldWeights() : null;
+  if (T.kit && (!W || !Object.keys(W).length || W[T.kit])) {
     const from = upped && T.kitHigh.length ? T.kitHigh : T.kitBases.filter(b => (GEAR_BASES[b].rar | 0) <= rar).length ? T.kitBases.filter(b => (GEAR_BASES[b].rar | 0) <= rar) : T.kitBases;
-    const fresh = from.filter(b => !rgOwned(b)), pool = fresh.length ? fresh : from;
-    return pool.length ? rgMake({ b: pool[Math.floor(rnd() * pool.length)] }) : rgLootItem(null, rar, w);
+    const fresh = from.filter(b => !rgOwned(b));
+    if (fresh.length) return rgMake({ b: fresh[Math.floor(rnd() * fresh.length)] });
+    return rgLootItem(null, rar, w);
   }
+  if (T.kit) return rgLootItem(null, rar, w);
   return rgLootItem(T.focus === 'charm' && rar > 3 ? null : T.focus, rar, w);
 }
 function rgDropAt(c, it, k) {
