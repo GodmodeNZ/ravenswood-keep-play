@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ba11b891@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '02c587d7@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -99388,7 +99388,7 @@ function fcLootOpen(n, btn) {
       e.stopPropagation();
       if (e.target.closest('.fl-x')) { fcLootClose(); if (typeof sfx === 'function') sfx('click'); return; }
       // a tap on an icon reads its card (a mouse reads it on hover: itemtip.js itipBind, bound on the document for these icons)
-      const ic = e.target.closest('.rn-ii');
+      const ic = e.target.closest('.rn-ii, .lrow');
       if (ic && e.pointerType !== 'mouse' && typeof PointerEvent === 'function') { const r = ic.getBoundingClientRect(); ic.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse', clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 })); }
     });
     // a tap or click anywhere else closes it (and still does what it does there); Escape closes it
@@ -126628,13 +126628,32 @@ function rnLootBossHTML(n) {
   const off = RN_LOOT.offer;
   const sec = (h, body, icons) => `<div class="rn-lp-s"><h5>${h}</h5>${body ? `<p>${body}</p>` : ''}${icons}</div>`;
   return `<p class="rn-lp-t"><small>${k <= 0 ? 'Boss this wave' : k === 1 ? 'Boss next wave' : `Boss in ${k} waves`} · wave ${n}</small><b>${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<i>${rnEsc(rnTable(t).say)}</i></p>`
-    + sec('Loot', `When it falls it offers ${off} of these, free: take one.${wp.length ? ' Its weapons are made for units you field.' : ''}`, wp.length ? rel.replace(/<\/span>(?![\s\S]*<\/span>)/, wp.join('') + '</span>') : rel)
+    + sec('Loot', `When it falls it offers ${off} of these, free: take one.${wp.length ? ' Its weapons are made for units you field.' : ''}`, rnLootRows(t, n))
     + (hw.length ? sec('Hero weapon', 'Your commander\'s next weapon stage can be one of the choices.', `<span class="rn-icons">${hw.join('')}</span>`) : '')
     + (tomeW.includes(n) ? rnTomeLine() : '')
     + `<p class="rn-lp-h">${typeof canHover === 'function' && canHover() ? 'Hover' : 'Tap'} an icon for its card.</p>`;
 }
+/* A boss's loot table as rows (owner, 26 Nov 2026: "can we try listing loot like this, but have the names in the colour of the
+   loot as well"): an icon in its rarity's border, the name in that colour, the rarity word under it. One style everywhere a
+   boss's table shows (the forecast's Loot view; the Homeland place card, region_loot.js). rows: [{ attr, img, name, rar, sub }];
+   sm: smaller rows two to a line (a boss's weapons when the army is not yet known: all of them, compactly). Their cards come
+   from the bindings on their data attributes (data-ri, data-wbt, data-rgi, data-rgw). */
+function lootRowsHTML(rows, sm) {
+  const E = x => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return rows.length ? `<ul class="lrows${sm ? ' sm' : ''}">${rows.map(r => { const R = RARITY[r.rar] || RARITY[2];
+    return `<li><button type="button" class="lrow${r.rar >= 4 ? ' lg' : ''}" style="--rc:${R.col}" ${r.attr} aria-label="${E(r.name)}, ${E(r.sub || R.name)}">${r.img ? `<img alt="" src="${r.img}">` : `<i aria-hidden="true">${E(String(r.name).slice(0, 1))}</i>`}<span><b>${E(r.name)}</b><small>${E(r.sub || R.name)}</small></span></button></li>`; }).join('')}</ul>` : '';
+}
+// the forecast's rows for a boss on wave n: its table (relics, its legendary when the wave allows) and its weapons, one list
+function rnLootRows(t, n) {
+  const T = n ? rnTableAt(t, n) : rnTable(t), ent = T.items.map(b => ({ k: b, it: rnItem({ b }, true) })).concat(T.leg ? [{ k: 'L:' + T.leg, it: rnItem({ l: T.leg }, true) }] : []);
+  const rel = ent.map(e => ({ attr: `data-ri="${t}|${e.k}"`, img: rnArtURL(e.it), name: gearName(e.it), rar: e.it.rar }));
+  const tys = typeof rnWpnEntries === 'function' ? rnWpnEntries(t) : [], fielded = (G.towers || []).some(x => x.def && !x.def.wall);
+  const wp = tys.map(ty => { const bw = rnWpnBest(t, ty), b = { b: bw.b, rar: 2 }; let img = ''; try { img = typeof wpIconURL === 'function' ? wpIconURL(b) : ''; } catch (e) {}
+    return { attr: `data-wbt="${ty}|${t}"`, img, name: typeof wpnName === 'function' ? wpnName(b) : bw.b, rar: 2, sub: `${RARITY[2].name} weapon · ${TOWERS[ty].name}` }; });
+  return lootRowsHTML(rel.concat(fielded ? wp : []), false) + (fielded ? '' : lootRowsHTML(wp, true));
+}
 function rnIconCard(el) { const [, k] = (el.dataset.ri || el.dataset.rb || '').split('|'); if (!k) return ''; const it = rnItem(k.startsWith('L:') ? { l: k.slice(2) } : { b: k }, true), sg = it.base && GEAR_BASES[it.base].bsig; return itemCardHTML(it, { note: `<p class="itc-eq">${sg ? 'Its own relic: found nowhere else' : it.leg ? 'Its signature legendary' : 'From its loot table'}</p>` }); }
-if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '.rn-ii[data-ri], .rn-ii[data-rb]', rnIconCard);
+if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rn-ii[data-ri], .rn-ii[data-rb]', rnIconCard); itipBind(document, '.lrow[data-ri]', rnIconCard); }
 function rnIconsHTML(t, attr, n) {   // (n: the wave it is fought on, when known: no legendary on wave 15 or earlier)
   const T = n ? rnTableAt(t, n) : rnTable(t), ent = T.items.map(b => ({ k: b, it: rnItem({ b }, true) })).concat(T.leg ? [{ k: 'L:' + T.leg, it: rnItem({ l: T.leg }, true) }] : []);
   return `<span class="rn-icons">${ent.map(e => `<button type="button" class="rn-ii${e.it.leg ? ' lg' : ''}" style="--rc:${RARITY[e.it.rar].col}" data-${attr === 'fc' ? 'fc' : attr}="${attr === 'fc' ? 'rnit:' + t + ':' + e.k : t + '|' + e.k}" aria-label="${rnEsc(gearName(e.it))}" tabindex="0"><img alt="${rnEsc(gearName(e.it))}" src="${rnArtURL(e.it)}"></button>`).join('')}</span>`;
@@ -126805,6 +126824,14 @@ if (typeof document !== 'undefined' && document.head) {
 #fcLoot .rn-lp-t{margin:0 0 8px}#fcLoot .rn-lp-t small{display:block;color:#c9b98a;font-size:11px}#fcLoot .rn-lp-t b{font-size:14px;color:#ffe3a0}#fcLoot .rn-lp-t i{display:block;color:#c9b98a;font-size:11.5px}
 #fcLoot .rn-lp-s{margin:0 0 8px;padding-top:6px;border-top:1px solid rgba(242,210,122,.18)}#fcLoot .rn-lp-s h5{margin:0 0 2px;font:800 10px/1.2 var(--f-ui);letter-spacing:.09em;text-transform:uppercase;color:#d8c08a}#fcLoot .rn-lp-s p{margin:0 0 5px;color:#d8d0b8;font-size:12px}
 #fcLoot .rn-icons{gap:6px}#fcLoot .rn-ii{width:38px;height:38px;touch-action:manipulation}#fcLoot .rn-tml{padding-top:6px;border-top:1px solid rgba(242,210,122,.18)}
+.lrows{list-style:none;margin:4px 0 2px;padding:0;display:flex;flex-direction:column;gap:5px}.lrows.sm{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:4px;margin-top:6px}
+.lrow{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;padding:4px 8px 4px 4px;border-radius:5px;background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);cursor:pointer;touch-action:manipulation}
+.lrow:hover,.lrow:focus-visible{background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px var(--rc)}.lrow:focus-visible{outline:2px solid #ffe0a1;outline-offset:1px}
+.lrow img,.lrow>i{flex:none;width:44px;height:44px;border-radius:5px;object-fit:cover;background:#0b0f10;box-shadow:0 0 0 2px var(--rc)}.lrow>i{display:grid;place-items:center;font:700 16px var(--f-display);font-style:normal;color:var(--rc)}
+.lrow.lg img{box-shadow:0 0 0 2px var(--rc),0 0 10px var(--rc)}
+.lrow span{display:flex;flex-direction:column;gap:2px;min-width:0}.lrow b{font:600 15px/1.2 var(--f-display);color:var(--rc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lrow small{font:600 11px/1.2 var(--f-ui);color:var(--rc);opacity:.85}
+.lrows.sm .lrow{gap:7px;padding:3px 6px 3px 3px}.lrows.sm .lrow img,.lrows.sm .lrow>i{width:32px;height:32px}.lrows.sm .lrow b{font-size:12.5px}.lrows.sm .lrow small{font-size:10px}
+@media (max-width:700px){.lrows:not(.sm){display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr))}.lrow img,.lrow>i{width:38px;height:38px}.lrow b{font-size:13.5px}}
 #fcLoot .rn-lp-h{margin:6px 0 0;font-size:11px;color:#9c9478}
 .rn-note{margin:0 0 8px;font:600 13px/1.35 var(--f-ui);color:#f2d27a}
 .rn-btn small{display:block;font:600 11px var(--f-ui);color:#c9b98a}#rnReroll{flex-direction:column;gap:2px}
@@ -129578,9 +129605,9 @@ function rgArtWant() {
 function rgArtSwap() {
   for (const k in RG_CARDS) delete RG_CARDS[k];
   if (typeof document === 'undefined') return;
-  for (const b of document.querySelectorAll('.rg-ii[data-rgi]')) {
+  for (const b of document.querySelectorAll('.rg-ii[data-rgi], .lrow[data-rgi]')) {
     const v = b.dataset.rgi, k = v.slice(v.indexOf('|') + 1), p = k && rgPaint(rgKeyItem(k)); if (!p) continue;
-    let im = b.querySelector('img'); if (!im) { b.textContent = ''; im = document.createElement('img'); im.alt = ''; b.appendChild(im); }
+    let im = b.querySelector('img'); if (!im) { const ph = b.querySelector('i'); im = document.createElement('img'); im.alt = ''; if (ph) ph.replaceWith(im); else { b.textContent = ''; b.appendChild(im); } }
     if (im.src !== p) im.src = p; b.classList.add('pt');
   }
 }
@@ -129635,7 +129662,7 @@ function rgLootMore(R, S) {
   for (const b of F) {
     if (seen.has(b.type)) continue; seen.add(b.type);
     const K = rgBossTabKeys(b.type, R.force, b.w) || rgBossKeys(T), name = CREEPS[b.type] ? CREEPS[b.type].name : b.type;
-    rows.push(`<p class="rg-tl">${rgEsc(name)} drops</p>${rgPoolHTML({ force: R.force }, K, rgBossWpnIcons(b.type, R.force, b.w, tys))}`);
+    rows.push(`<p class="rg-tl">${rgEsc(name)} drops</p>${rgLootRowsHTML(R.force, K, b.type, b.w, tys)}`);
   }
   return rows.join('');
 }
@@ -129643,6 +129670,18 @@ function rgLootMore(R, S) {
 function rgArmyTys(R) {
   const rows = R && R.maze && Array.isArray(R.maze.rows) ? R.maze.rows : [], tys = [...new Set(rows.map(t => t && t.type).filter(ty => ty && typeof TOWERS !== 'undefined' && TOWERS[ty] && !TOWERS[ty].wall))];
   return tys.length ? tys : null;
+}
+// the boss's table as rows (renown.js lootRowsHTML; owner, 26 Nov 2026: "listing loot like this, but have the names in the colour
+// of the loot as well"): its items, then its weapons as rows of the same list, for the army's unit kinds; with no army known,
+// all of them, smaller and two to a line
+function rgLootRowsHTML(force, K, type, w, tys) {
+  if (typeof lootRowsHTML !== 'function') return rgPoolHTML({ force }, K, rgBossWpnIcons(type, force, w, tys));
+  const ks = K.keys.slice(0, RG_POOL_SHOW), rest = K.keys.length - ks.length;
+  const rel = ks.map(k => { const it = rgKeyItem(k), pt = rgPaint(it), src = pt || rgArt(it); if (!pt) rgArtWant(); return { attr: `data-rgi="${rgEsc(force + '|' + k)}"`, img: src, name: rgItName(it), rar: it.rar }; });
+  const B = typeof bossLootTable === 'function' ? bossLootTable(type, force, w, tys) : null, W = B ? B.items.filter(e => e.wpn) : [];
+  const wp = W.map(x => { let img = ''; try { img = typeof wpIconURL === 'function' ? wpIconURL({ b: x.base, rar: 2 }) : ''; } catch (e) {}
+    return { attr: `data-rgw="${rgEsc(force + '|' + type + '|' + w + '|' + x.ty)}"`, img, name: x.name, rar: x.rar || 2, sub: `${RARITY[x.rar || 2].name} weapon · ${x.unit}` }; });
+  return `<div class="rg-pool">${lootRowsHTML(tys ? rel.concat(wp) : rel, false)}${tys ? '' : lootRowsHTML(wp, true)}${rest > 0 ? `<p class="rg-pmore">+ ${rest} more</p>` : ''}</div>`;
 }
 // its weapons (owner, 26 Nov 2026: "weapons should be part of the same loot table"): entries of the boss's one table
 // (renown.js bossLootTable, rnWpnDraw), shown as its other items are, one a unit kind of the army; the card is the weapon's
@@ -129656,7 +129695,7 @@ function rgWpnCard(el) {
   const [force, type, w, ty] = (el.dataset.rgw || '').split('|'), B = typeof bossLootTable === 'function' ? bossLootTable(type, force, +w, [ty]) : null, x = B && B.items.find(e => e.wpn && e.ty === ty); if (!x) return '';
   return `<div class="rg-tc"><h4>${rgEsc(x.name)}</h4><p>A weapon for your ${rgEsc(x.unit)}, made in ${rgEsc(B.name)}’s fashion.${x.ohName ? ` On hit: <b>${rgEsc(x.ohName)}</b>.` : ''}</p><p class="rg-fx">From ${rgEsc(B.name)}’s loot table. Taken in place of a relic.</p></div>`;
 }
-if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '.rg-wp[data-rgw]', rgWpnCard, { tap: () => null });
+if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rg-wp[data-rgw]', rgWpnCard, { tap: () => null }); itipBind(document, '.lrow[data-rgw]', rgWpnCard, { tap: () => null }); }
 const RG_POOL_SHOW = 12;
 function rgPoolHTML(T, K, extra) {   // (extra: more icons of the same table, a boss's weapons)
   K = K || { keys: rgDropKeys(T), anyLeg: false }; const ks = K.keys; if (!ks.length && !K.anyLeg) return '';
@@ -129674,7 +129713,7 @@ function rgIconCard(el) {
   let h = ''; try { if (swap) applyForce(force); const it = rgKeyItem(k), p = rgPaint(it); h = (p ? `<img class="rg-ica" alt="" src="${p}">` : '') + itemCardHTML(it); } finally { if (swap) applyForce(was); }
   return (RG_CARDS[v] = h);
 }
-if (typeof itipBind === 'function' && typeof document !== 'undefined') itipBind(document, '.rg-ii[data-rgi]', rgIconCard, { tap: () => null });
+if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rg-ii[data-rgi]', rgIconCard, { tap: () => null }); itipBind(document, '.lrow[data-rgi]', rgIconCard, { tap: () => null }); }
 // one item of a kind, made by the run's drop code
 function rgLootItem(kind, rar, w) {
   if (kind === 'leg') return rollGear(w, true, 4);
