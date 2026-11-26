@@ -1,4 +1,4 @@
-const BUILD_TAG = '7eaea4d7@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '3e42d0cd@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
