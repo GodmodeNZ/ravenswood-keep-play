@@ -1,4 +1,4 @@
-const BUILD_TAG = '251fb61e@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '2d913ee7@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -8214,6 +8214,7 @@ function splitGeo(g) {
 // a mossy patch of earth under every unit, richer at each tier: stones (II), ferns and pale flowers (III), a ring of
 // flat stones (IV), glowing rune-stones (V), gilt roots and a ring of light (VI). Kept inside the cell (r scaled <= .47).
 function groveBase(g, r = .3, tier = 0) {
+  if (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE) return;   // (the unit sheet: it stands on its painted platform, models.js MESH_NOBASE)
   const K = g.m[0] || 1; r = Math.min(r, .47 / K);
   lay(g, 'base', () => {
     mat(g, 'moss', () => { g.cyl(0, 0, 0, r, r * .85, .04, 12, '#3a3a24', { top: '#41472a' });
@@ -13844,6 +13845,7 @@ const ccM = (g, m, fn) => g.matWith(CC_MATERIAL[m] || m, 1, fn);
 function ccEm(g, v, fn) { const e = g.em; g.em = v; fn(); g.em = e; }
 // the round slate the scholar stands on, a rune ring set in it (more rings as the tiers rise)
 function ccBase(g, tier, r = .3) {
+  if (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE) return;   // (the unit sheet: it stands on its painted platform, models.js MESH_NOBASE)
   g.cyl(0, 0, 0, r, r * .92, .045, 14, '#2e2c3c', { top: '#3a384c' });
   ccEm(g, .9, () => { for (let k = 0; k < 16; k++) if (k % 2 || tier >= 2) { const a = k / 16 * TAU; g.box(Math.cos(a) * r * .8, .047, Math.sin(a) * r * .8, .05, .006, .018, CP.glow || '#b98cff', { noBot: true }); } });
   if (tier >= 1) ccM(g, 'gilt', () => g.torus(0, .046, 0, r * .96, .012, 18, 3, CP.trim || CP.silver || '#cdd2e2'));
@@ -18012,6 +18014,7 @@ const IH_STEEL = '#c4c8d0', IH_DARK = '#22201e';
 
 /* ---------- the dwarf ---------- */
 function ihBase(g, r = .3) {   // a hexagonal flagstone with a brass rim, the clan's mark on every unit
+  if (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE) return;   // (the unit sheet: it stands on its painted platform, models.js MESH_NOBASE)
   ihArtMat(g, 'stone', () => g.cyl(0, 0, 0, r, r * .94, .05, 6, '#5e5a52', { top: '#6c665c', rot: .52 }));
   ihArtMat(g, 'gilt', () => g.cyl(0, .036, 0, r * .955, r * .955, .018, 6, IHP.trim, { capT: false, rot: .52 }));
   ihArtMat(g, 'stone', () => { for (let k = 0; k < 3; k++) { const a = k * 2.1 + .9; g.ico(Math.cos(a) * r * .86, .05, Math.sin(a) * r * .86, .03, '#4a4640', .4, .6); } });
@@ -19665,6 +19668,7 @@ const soBump = (u, a = .2, b = .7) => u < a ? soE(u / a) : u < b ? 1 : 1 - soE((
 
 /* ---------- shared pieces ---------- */
 function soBase(g, r = .32) {   // a round flagstone with a gold ring inlaid: the Order's ground (kept a value darker than the plate, so the knight, not the stone, catches the eye)
+  if (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE) return;   // (the unit sheet: it stands on its painted platform, models.js MESH_NOBASE)
   g.cyl(0, 0, 0, r, r * .93, .045, 16, '#4c4e56', { top: '#73757e' });
   mat(g, 'gilt', () => g.torus(0, .047, 0, r * .74, .009, 18, 4, WE.gold));
   for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + .4; mat(g, 'gilt', () => g.ico(Math.cos(a) * r * .74, .05, Math.sin(a) * r * .74, .018, WE.gold)); }
@@ -22911,6 +22915,7 @@ function sbSpiral(g, c, u, v, r, turns, col, w = .006) {
   huTube(g, pts, w * .62, col, 3, { capA: false });
 }
 function sbBase(g, r = .3, col = '#5a5a58') {   // a patch of plateau stone under every unit, a spiral cut into it
+  if (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE) return;   // (the unit sheet: it stands on its painted platform, models.js MESH_NOBASE)
   sbArtMat(g, 'sbtex_stone', () => g.cyl(0, 0, 0, r, r * .88, .045, 12, '#4a4a46', { top: col }));
   for (let k = 0; k < 5; k++) { const a = k * 1.3 + .3; g.ico(Math.cos(a) * r * .9, .04, Math.sin(a) * r * .9, .045 + (k % 2) * .015, k % 2 ? '#6a6a64' : '#585852', .4, .6); }
   g.em = .25; sbSpiral(g, [0, .047, -r * .45], [1, 0, 0], [0, 0, 1], r * .3, 1.6, '#8fb0d8', .008); g.em = 0;
@@ -25935,6 +25940,7 @@ function wbLeaf(g, c, n, d, r, col) {
 }
 // the force's ground under each unit: a dark flagstone, a gold ring inlaid, four runes on it
 function wbBase(g, r = .3) {
+  if (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE) return;   // (the unit sheet: it stands on its painted platform, models.js MESH_NOBASE)
   mat(g, 'stone', () => g.cyl(0, 0, 0, r, r * .93, .045, 14, '#25232a', { top: '#38353e' }));
   g.em = .35; mat(g, 'gilt', () => g.torus(0, .047, 0, r * .74, .008, 18, 3, '#c8983a')); g.em = 0;
   g.em = .5; for (let k = 0; k < 4; k++) { const a = k * TAU / 4 + .78; g.with(T(Math.cos(a) * r * .74, .05, Math.sin(a) * r * .74, -a), () => { g.box(0, 0, 0, .012, .006, .05, '#e8b850'); g.box(0, 0, .012, .036, .006, .01, '#e8b850'); }); } g.em = 0;
@@ -26097,8 +26103,9 @@ function wbHorse(g, tier, P) {
 }
 // the Graveshot Ballistae' black-iron ballista mount: a tripod and a yoke on a platform of flagstone
 function wbBallistaMount(g, tier, P) {
-  mat(g, 'stone', () => g.cyl(0, 0, 0, .42, .4, .05, 16, '#25232a', { top: '#38353e' }));
-  g.em = .35; mat(g, 'gilt', () => g.torus(0, .052, 0, .33, .008, 20, 3, '#c8983a')); g.em = 0;
+  if (!(typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE)) {   // (its flagstone platform: not on the unit sheet's painted one, models.js MESH_NOBASE)
+    mat(g, 'stone', () => g.cyl(0, 0, 0, .42, .4, .05, 16, '#25232a', { top: '#38353e' }));
+    g.em = .35; mat(g, 'gilt', () => g.torus(0, .052, 0, .33, .008, 20, 3, '#c8983a')); g.em = 0; }
   mat(g, 'iron', () => { for (let k = 0; k < 3; k++) { const a = k / 3 * TAU + Math.PI / 2; huTube(g, [[Math.cos(a) * .2, .05, Math.sin(a) * .2 - .02], [0, .36, .0]], .022, P.ironD, 5); }
     g.cyl(0, .3, 0, .045, .04, .1, 8, P.iron); huTube(g, [[-.07, .4, 0], [-.07, .36, 0], [.07, .36, 0], [.07, .4, 0]], .014, P.ironL, 5); });
   mat(g, 'woodgrain', () => { for (let k = 0; k < 3; k++) g.box(.24 + k * .045, .1 + k * .015, -.22 + k * .03, .05, .05, .3, P.wood, { top: '#4a3626' }); });
@@ -76146,6 +76153,10 @@ const PAL = {
   ice: '#5ab8ee', iceD: '#2a74b4', fire: '#ff7a1f', ven: '#7ee04a', rune: '#7fe6ff', cloth: '#b4281e', bone: '#e9dec3',
 };
 const MESH = {};
+/* The unit sheet draws a force unit with no ground of its own under it (it stands on its stage's painted platform; owner: "remove the
+   base on each unit for this view"): while MESH_NOBASE is set (gearpanel.js gpDraw), towerMesh builds and keeps a second mesh of
+   the unit without it, and each force's base (groveBase, ccBase, ihBase, soBase, sbBase, wbBase) draws nothing. The maze's mesh is untouched. */
+let MESH_NOBASE = false;
 const TOP_Y = .26; // plinth top
 
 function plinth(g, tier, stone = PAL.stone, top = PAL.stoneL) {
@@ -76223,7 +76234,7 @@ function buildTower(type, tier) {
 }
 function towerMesh(type, tier) {
   const u = TOWERS[type] && TOWERS[type].unit;   // a force's unit standing in this slot (forces.js)
-  if (u && typeof FORCE_BUILD !== 'undefined' && FORCE_BUILD[u]) { const k = 'f_' + u + tier; return MESH[k] || (MESH[k] = buildForceUnit(u, tier)); }
+  if (u && typeof FORCE_BUILD !== 'undefined' && FORCE_BUILD[u]) { const k = 'f_' + u + tier + (MESH_NOBASE ? '_nb' : ''); return MESH[k] || (MESH[k] = buildForceUnit(u, tier)); }
   const k = 't_' + type + tier; return MESH[k] || (MESH[k] = buildTower(type, tier));
 }
 
@@ -98931,10 +98942,11 @@ const GP_BD = {};
 function gpBounds(t) {
   const key = t.type + ':' + t.tier + ':' + (t.def && t.def.unit), bd = towerBounds(t.type, t.tier); if (GP_BD[key]) return GP_BD[key];
   const n0 = dlN; let r = Math.max(-bd[0][0], bd[1][0], -bd[0][2], bd[1][2]), top = bd[1][1];
+  MESH_NOBASE = true;   // (as the sheet draws it: no ground of its own, models.js)
   try { irDrawTower(t.type, t.tier, { ang: 0, windup: 0, shotT: 9, anim: t.anim || 1.3, hawkDive: null, chg: null, form: t.form }, vt, null);
     for (let k = n0; k < dlN; k++) { const it = DL[k], a = it.mesh.min, b = it.mesh.max; if (!a || !b) continue;
       for (let c = 0; c < 8; c++) { const p = M4.xf(it.m, c & 1 ? b[0] : a[0], c & 2 ? b[1] : a[1], c & 4 ? b[2] : a[2]); if (p[1] > top) top = p[1]; r = Math.max(r, Math.min(.9, Math.hypot(p[0], p[2]))); } } } catch (e) {}
-  dlN = n0;
+  MESH_NOBASE = false; dlN = n0;
   return (GP_BD[key] = [[-r, 0, -r], [r, Math.min(top, bd[1][1] + .9), r]]);
 }
 /* ---------- the stand and the light, each force's own (owner's design handoff, 26 Nov 2026) ----------
@@ -99065,8 +99077,8 @@ function gpDraw() {
     const now = performance.now() / 1000; gpClock += Math.min(.1, Math.max(0, now - (gpClockAt || now))); gpClockAt = now;
     const keepVt = vt; vt = gpClock;
     dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
-    try { UM_SHOW = gpClock; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
-    finally { UM_SHOW = null; vt = keepVt; }
+    try { UM_SHOW = gpClock; MESH_NOBASE = true; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
+    finally { UM_SHOW = null; MESH_NOBASE = false; vt = keepVt; }   // (MESH_NOBASE: drawn with no ground of its own, on the painted platform: models.js)
     /* its own base (the flagstone, the moss pad, the ring: a flat part on the ground under a rigged body) is not drawn on the sheet: it
        stands straight on the painted platform (owner: "remove the base on each unit for this view"). The battlefield draws it as ever. */
     { let w = 0, sig = 0;
