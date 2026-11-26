@@ -1,4 +1,4 @@
-const BUILD_TAG = '02c587d7@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '13360306@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -36354,8 +36354,8 @@ if (typeof castPoseIn === 'function') {
    - in a steady fight its income pays for its innate spell about every 25 seconds (MANA_INNATE_EVERY below scales each
      kit's regen and strike income to that; a third to a half of it from strikes for the martial units, all of it from
      regen for the casters), and with two or three spells learned the mana runs short: the player chooses what to cast;
-   - tiers add nothing. Raised full, so the first spell comes at once; every unit's pool refills once a wave is cleared
-     (the last foe dead: manaWaveEnd, from game.js waveCleared), so each wave opens with a spell in hand.
+   - tiers add nothing. Raised full, so the first spell comes at once. With MANA_CARRY on (below) what is left carries into
+     the next wave; with it off every unit's pool refills once a wave is cleared (manaWaveEnd, from game.js waveCleared).
    More casts come from deliberate choices: talents (the riders below), charms and items, a support unit's aura.
 
    A mana talent carries `mana: { ... }` (a unit tree's talent: forces.js GT; a Champion's: CT), in its own words. Fields,
@@ -36368,6 +36368,13 @@ if (typeof castPoseIn === 'function') {
      first: its first cast each wave costs x less, aura: +x mana a second to units in its aura,
      beat: [N, K] (not per rank): every Nth strike restores K mana, N one smaller each rank above the first (so the text
      can say "every 3rd strike restores 1 mana" in whole numbers). */
+/* MANA_CARRY (owner, 26 Nov 2026: "maybe try having it so minions dont auto replenish mana after each wave"): a unit's mana
+   carries over from wave to wave. No refill when a wave is cleared or before a boss steps out, and no flow between waves
+   (the build phase can last as long as the player likes: any flow there would fill every bar anyway). A unit just built
+   starts full, as ever. Tower Wars and the tutorial keep the refill. Off: MANA_CARRY.on = false, or ?manacarry=0. */
+const MANA_CARRY = { on: !(typeof location !== 'undefined' && /[?&]manacarry=0\b/.test(location.search || '')), top: 0 };   // top: a share of the pool given back when a wave is cleared (0: none; a knob to try if the first waves grow too hard)
+const manaCarry = () => MANA_CARRY.on && typeof G !== 'undefined' && G && !G.vs && !G.tut;
+const manaLull = () => (manaCarry() ? 0 : MANA_LULL);
 const MANA_LULL = 5,   /* between waves mana flows back five times as fast (owner, 5 Nov 2026: was 2) */ MANA_NEAR_MAX = 4, MANA_CHEAP_MAX = .6;
 // (the clarity pass, Nov 2026: every unit tree now carries its mana on one or two talents about mana, written out in their
 // own words with whole numbers: `mana: { ... }` on the talent (forces.js GT), folded in below. No riders are appended to
@@ -36422,7 +36429,7 @@ function manaCostK(t, ab, c) {
 // mana a second now (before the charms' multiplier). Foes in reach are counted five times a second, only for a talent that asks
 function manaFlow(t, st, A, kit, dt) {
   const m = manaTal(t);
-  let k = kit.mana.regen * (G.phase === 'build' ? MANA_LULL : manaSurgeK());
+  let k = kit.mana.regen * (G.phase === 'build' ? manaLull() : manaSurgeK());
   if (!m) return k;
   if (m.saving) { const nx = abNextAb(t); if (nx && A.mana < abCost(t, nx)) k *= 1 + m.saving; }
   if (m.near.length) {
@@ -36451,6 +36458,7 @@ function manaOnKill(src) { const m = manaTal(src); if (m && m.slay && abilKit(sr
 // a wave is cleared (its last foe dead, none left to come): every unit's mana bar refills (owner, 7 Nov 2026)
 // (_qm too, so a challenge's Thin Leylines does not read the refill as inflow and halve it)
 function manaWaveEnd() {
+  if (manaCarry()) { for (const t of G.towers) if (t.ab) { if (MANA_CARRY.top > 0) t.ab.mana = Math.min(abMax(t), t.ab.mana + abMax(t) * MANA_CARRY.top); t._qm = t.ab.mana; } return; }   // (MANA_CARRY: it carries over)
   for (const t of G.towers) { if (!t.ab) continue; t.ab.mana = abMax(t); t._qm = t.ab.mana; }
 }
 // Leyline Surge (a challenge boon: quests.js): mana flows back half again as fast while a wave runs
@@ -36469,7 +36477,7 @@ function manaSheet(t, kit) {
 function manaRateNow(t, kit) {
   kit = kit || abilKit(t); const A = t && t.ab; if (!kit || !A) return 0;
   const st = t.st || {}, m = manaTal(t);
-  let k = kit.mana.regen * (G.phase === 'build' ? MANA_LULL : manaSurgeK());
+  let k = kit.mana.regen * (G.phase === 'build' ? manaLull() : manaSurgeK());
   if (m && m.saving) { const nx = abNextAb(t); if (nx && A.mana < abCost(t, nx)) k *= 1 + m.saving; }
   if (m && m.near.length) k += A.nearAdd || 0;
   return k * (typeof manaRegenK === 'function' ? manaRegenK(t, st) : 1) + (st.manaRegen || 0);
@@ -59592,7 +59600,7 @@ ftReg('conclave', {
     { id: 'cc_w_thrift', name: 'Spellthrift', r: 2, c: 6, max: 2, alt: 'cc_w2', req: ['cc_w_mixed', 'cc_w_volley'], art: 'arcane:Stolen Sand',
       text: n => `Conclave spells cost ${CCFT.THRIFT * n * 100}% less.` },
     { id: 'cc_w_ready', name: 'Ready Minds', r: 3, c: 4, max: 1, alt: 'cc_w3', req: ['cc_w_focus', 'cc_w_thrift'], art: 'arcane:Patient Hours',
-      text: () => 'Each wave: Conclave units start it with at least half their mana.' },
+      text: () => 'Conclave units start each wave with at least half their mana.' },
     { id: 'cc_w_steady', name: 'Steady Hands', r: 3, c: 6, max: 1, alt: 'cc_w3', req: ['cc_w_focus', 'cc_w_thrift'], art: 'glaive:Starsteel',
       text: () => `Conclave units: +${CCFT.STEADY * 100}% crit chance.` },
     { id: 'cc_charge', name: 'Arcane Charge', r: 4, c: 5, max: 1, reqAny: ['cc_w_ready', 'cc_w_steady'], cap: 'ccw', art: 'holy:Ley Battery',
@@ -60176,7 +60184,7 @@ ftKit('grove', {
      { id: 'gv_w_reach', name: 'Long Boughs', art: "frost:Warden's Reach", text: n => `Grove units: +${gNf(.1 * n)} range.`, live: (t, st, n) => { if (st.range) st.range += .1 * n; } }],
     [{ id: 'gv_w_rhythm', name: 'Wild Rhythm', art: "arrow:Hunter's Rhythm", text: n => `Every ${n > 1 ? 6 : 8}th attack of a Grove unit hits 50% harder.`, fire: (t, st, tg, pow, n) => ((t.gvRhy = (t.gvRhy | 0) + 1) % (n > 1 ? 6 : 8) === 0 ? pow * 1.5 : pow) },
      { id: 'gv_w_thrift', name: 'Forest Thrift', art: 'cannon:Seedwell', text: n => `Grove spells cost ${5 * n}% less.`, cost: (t, ab, n) => .05 * n }],
-    [{ id: 'gv_w_dew', name: 'Morning Dew', art: 'holy:Sapling Song', text: () => 'Each wave: Grove units start it with at least half their mana.', wave: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); } },
+    [{ id: 'gv_w_dew', name: 'Morning Dew', art: 'holy:Sapling Song', text: () => 'Grove units start each wave with at least half their mana.', wave: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); } },
      { id: 'gv_w_keen', name: 'Keen Eyes', art: 'arrow:Canopy Sight', text: () => 'Grove units: +5% crit chance.', live: (t, st) => { st.crit = (st.crit || 0) + .05; } }],
     { id: 'gv_growth', name: 'Growth', art: 'holy:Full Bloom', text: () => `Each attack fills a unit's Growth bar ${typeof GW_STRIKE !== 'undefined' ? Math.round(GW_STRIKE) : 10} (half again on a rooted or spored foe). Full: its next attack Blooms, a big attack of its own kind.` },
   ],
@@ -60306,7 +60314,7 @@ ftKit('silver', {
      { id: 'sv_w_arms', name: 'Brothers in Arms', art: 'arcane:Rallying Vow', text: n => `Each other Order kind within 2 cells: attacks ${3 * n}% faster, up to 3 kinds.`, live: (t, st, n) => ftkFast(st, .03 * n * Math.min(3, ftkKinds(t, 2))) }],
     [{ id: 'sv_w_zeal', name: 'Righteous Rhythm', art: 'earth:Zeal', text: n => `Every ${n > 1 ? 6 : 8}th attack of an Order unit hits 50% harder.`, fire: (t, st, tg, pow, n) => ((t.svRhy = (t.svRhy | 0) + 1) % (n > 1 ? 6 : 8) === 0 ? pow * 1.5 : pow) },
      { id: 'sv_w_tithe', name: 'Tithe', art: 'cannon:Offering Bowl', text: n => `Order spells cost ${5 * n}% less.`, cost: (t, ab, n) => .05 * n }],
-    [{ id: 'sv_w_vigil', name: 'Dawn Vigil', art: 'frost:Vigil Lamp', text: () => 'Each wave: Order units start it with at least half their mana.', wave: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); } },
+    [{ id: 'sv_w_vigil', name: 'Dawn Vigil', art: 'frost:Vigil Lamp', text: () => 'Order units start each wave with at least half their mana.', wave: t => { if (t.ab && typeof abMax === 'function') t.ab.mana = Math.max(t.ab.mana, abMax(t) * .5); } },
      { id: 'sv_w_faith', name: 'Steady Faith', art: 'arrow:Steady Rest', text: () => 'Order units: +5% crit chance.', live: (t, st) => { st.crit = (st.crit || 0) + .05; } }],
     { id: 'sv_judge', name: 'Judgement', art: 'earth:Final Judgement', text: () => `Your attacks and spells lay Judgement on foes. At ${typeof SO !== 'undefined' ? SO.J_MAX : 5}, the foe bursts with light for 3 times the striker's attack.` },
   ],
@@ -60433,7 +60441,7 @@ ftKit('ironhold', {
      { id: 'ih_w_plate', name: 'Iron Plate', art: 'holy:Dented Plate', text: n => `Ironhold units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) }],
     [Object.assign({ id: 'ih_w_rhythm', name: 'Hammer Rhythm', art: 'earth:Piston Rhythm', text: n => `Every ${n > 1 ? 6 : 8}th attack of an Ironhold unit hits 50% harder.` }, N.rhythm('ihRhy')),
      { id: 'ih_w_thrift', name: 'Thrifty Clan', art: 'holy:On the Slate', text: n => `Ironhold spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
-    [{ id: 'ih_w_warm', name: 'Early Shift', art: 'holy:Topped Up', text: () => 'Each wave: Ironhold units start it with at least half their mana.', wave: N.halfMana },
+    [{ id: 'ih_w_warm', name: 'Early Shift', art: 'holy:Topped Up', text: () => 'Ironhold units start each wave with at least half their mana.', wave: N.halfMana },
      { id: 'ih_w_eyes', name: 'Sharp Eyes', art: 'arrow:Range-Finder', text: () => 'Ironhold units: +5% crit chance.', live: N.crit(null, .05) }],
     { id: 'ih_heat', name: 'Heat', art: 'arcane:Forge Heat', text: () => 'Each attack heats the unit. Full: its next attack vents, its own big shot. Each wave starts cold: units attack 30% slower until 4 attacks warm them.' },
   ],
@@ -60552,7 +60560,7 @@ ftKit('stormborn', {
      { id: 'sb_w_hides', name: 'Thick Hides', art: 'holy:Wolf Den', text: n => `Stormborn units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) }],
     [Object.assign({ id: 'sb_w_rhythm', name: 'Drum Rhythm', art: 'holy:Thunder Drum', text: n => `Every ${n > 1 ? 6 : 8}th attack of a Stormborn unit hits 50% harder.` }, N.rhythm('sbRhy')),
      { id: 'sb_w_gift', name: "Shaman's Gift", art: 'holy:Offering Bowl', text: n => `Stormborn spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
-    [{ id: 'sb_w_rain', name: 'First Rain', art: 'holy:Rainwell', text: () => 'Each wave: Stormborn units start it with at least half their mana.', wave: N.halfMana },
+    [{ id: 'sb_w_rain', name: 'First Rain', art: 'holy:Rainwell', text: () => 'Stormborn units start each wave with at least half their mana.', wave: N.halfMana },
      { id: 'sb_w_eyes', name: 'Hawk Eyes', art: 'holy:Ancestral Sight', text: () => 'Stormborn units: +5% crit chance.', live: N.crit(null, .05) }],
     { id: 'sb_storm', name: 'The Storm', art: 'holy:Storm Caller', text: () => 'Your spells raise a Storm over the field: Gale at 25, Rain at 50, Hail at 75, and at 100 a Tempest of thunderbolts.' },
   ],
@@ -60647,7 +60655,7 @@ ftKit('wardbound', {
      { id: 'wb_w_mail', name: 'Ward-Mail', art: 'earth:Broad Shield', text: n => `Wardbound units take ${10 * n}% less from foes' blows.`, blow: N.blow(null, .1) }],
     [Object.assign({ id: 'wb_w_march', name: 'March Rhythm', art: 'holy:Steady Pace', text: n => `Every ${n > 1 ? 6 : 8}th attack of a Wardbound unit hits 50% harder.` }, N.rhythm('wbRhy')),
      { id: 'wb_w_thrift', name: 'Vow Thrift', art: 'holy:Silent Vow', text: n => `Wardbound spells cost ${5 * n}% less.`, cost: N.cost(null, .05) }],
-    [{ id: 'wb_w_vigil', name: 'Night Vigil', art: 'holy:Long Vigil', text: () => 'Each wave: Wardbound units start it with at least half their mana.', wave: N.halfMana },
+    [{ id: 'wb_w_vigil', name: 'Night Vigil', art: 'holy:Long Vigil', text: () => 'Wardbound units start each wave with at least half their mana.', wave: N.halfMana },
      { id: 'wb_w_watch', name: 'Keen Watch', art: 'holy:Shared Watch', text: () => 'Wardbound units: +5% crit chance.', live: N.crit(null, .05) }],
     { id: 'wb_runes', name: 'Runes', art: 'arcane:Scribe the Road', text: () => 'Your units\' attacks carve their runes into the road. The next ground foe to step on one sets it off and is Exposed.' },
   ],
@@ -98778,7 +98786,7 @@ function gpStats(t, alt) {
     out.push(gpStat('Cooldown Reduction', 1 - ((st.sh && st.sh.cdK) || 1), w ? 1 - ((w.sh && w.sh.cdK) || 1) : 0, P, 'Its spells and its items’ taps come this much sooner'));
     const m0 = manaSheet(t, kit), poolOf = s => abMax(t) - ((t.st && t.st.manaMax) || 0) + (s.manaMax || 0), rgOf = s => kit.mana.regen * (typeof manaRegenK === 'function' ? manaRegenK(t, s) : 1) + (s.manaRegen || 0);
     out.push(gpStat('Mana pool', poolOf(st), alt ? poolOf(cur) : kit.mana.max, v => String(Math.round(v)), 'The most mana it can hold: its dearest spell, and more from talents and items'));
-    out.push(gpStat('Mana a second', rgOf(st), alt ? rgOf(cur) : kit.mana.regen, gpF, `Mana it regains each second in a wave (between waves ${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast)`));
+    out.push(gpStat('Mana a second', rgOf(st), alt ? rgOf(cur) : kit.mana.regen, gpF, (typeof manaCarry === 'function' && manaCarry() ? 'Mana it regains each second in a wave. None comes back between waves: what is left carries over.' : `Mana it regains each second in a wave (between waves ${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast)`)));
     txt('Mana a strike', '+' + (m0.hit || 0), 'Mana each basic strike gives back');
   }
   // ---- Items: always one line, so the rows above stay put when the first item goes in ----
@@ -100693,7 +100701,7 @@ function interestLine() {
 function manaInfoHTML(t) {
   const kit = typeof abilKit === 'function' && !t.def.wall ? abilKit(t) : null; if (!kit || !abilEnsure(t, kit)) return '';
   const max = abMax(t), m = manaSheet(t, kit);
-  const tip = `Mana: its spells spend it. It flows back each second (${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast between waves)${m.hit ? `, and each basic strike gives back ${m.hit}` : ''}. It refills when a wave is cleared. Items with a Mana line raise the pool.`;
+  const carry = typeof manaCarry === 'function' && manaCarry(), tip = carry ? `Mana: its spells spend it. It flows back each second in a wave${m.hit ? `, and each basic strike gives back ${m.hit}` : ''}. It does not refill between waves: what is left carries over. Items with a Mana line raise the pool.` : `Mana: its spells spend it. It flows back each second (${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast between waves)${m.hit ? `, and each basic strike gives back ${m.hit}` : ''}. It refills when a wave is cleared. Items with a Mana line raise the pool.`;
   return `<p class="mut mana-row" title="${esc(tip)}">Mana <span class="mn-bar"><i class="mn-fill"></i></span> <b class="mn-now">— / ${max}</b><span class="mn-rw"> · <span class="mn-rate"></span>${m.hit ? ` <small>(+${m.hit} a strike)</small>` : ''}</span></p>`;
 }
 function manaPaneTick() {
