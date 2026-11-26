@@ -1,4 +1,4 @@
-const BUILD_TAG = '130a3260@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '50172aca@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -98471,17 +98471,59 @@ function gpBounds(t) {
    Wardbound: dark carved stone with a gold band), lit as its painting is: a warm key from the upper left, a cool sky and rim
    behind, a gentle fill. All of it is set on the sheet's own renderer (GPR) each frame: the battlefield's light is untouched.
    The stand's top is the ground the unit stands on (y 0), so the unit's own small base sits on it; it turns with the unit. */
-const GP_KEY = (() => { const v = [-.5, 1, .8], l = Math.hypot(...v); return v.map(a => a / l); })();   // (upper left and a little toward the eye, for the sheet's camera)
+/* Two lights a force, one each side of the unit (owner, 26 Nov 2026: "give him the painting as a backdrop with a cool light one
+   side and forge fire lighting his other side"): Ironhold has forge fire on its left and cool mountain light on its right, the
+   Grove warm sun and green shade, the Conclave violet and cool blue, the Silver Order dawn and skylight, the Stormborn amber
+   and sky blue, the Wardbound gold and teal. The renderer has one sun, so the unit is drawn once under each light and the
+   two are added (gpDraw). gpDir: a direction as the sheet's camera sees it (to its right, up, toward the eye). */
+const GP_YAW = .45;
+const gpDir = (rt, up, fw) => { const c = Math.cos(GP_YAW), q = Math.sin(GP_YAW), v = [c * rt + q * fw, up, -q * rt + c * fw], l = Math.hypot(...v); return v.map(a => a / l); };
+const GP_LB = gpDir(-1, .25, -.25), GP_RB = gpDir(1, .3, -.3);   // (the edge lights: from each side and a little behind)
+// (each light stands at its side and a little behind, so it lights that side of the unit and leaves its front to the soft light: from the
+// front both would light the whole of it and the two colours would only mix)
+const GP_L = gpDir(-1, .4, -.12), GP_R = gpDir(1, .4, -.12), GP_LOW = gpDir(-1, .16, -.06);   // (GP_LOW: a fire, low at its side)
+// a: the light on its left [colour, direction]; b: on its right; sky, gnd: the soft light from above and below (shared out between the two)
 const GP_THEME = {
-  ironhold: { stand: 'slate', sun: [1.8, 1.32, .86], sky: [.44, .58, .82], gnd: [.27, .2, .14], rim: .5, fill: .2, bg: [.035, .045, .055] },
-  grove: { stand: 'moss', sun: [1.55, 1.42, .86], sky: [.36, .56, .4], gnd: [.17, .22, .1], rim: .34, fill: .18, bg: [.03, .045, .035] },
-  conclave: { stand: 'pale', tint: [.86, .84, 1], sun: [1.3, 1.2, 1.5], sky: [.5, .46, .88], gnd: [.2, .18, .3], rim: .5, fill: .2, bg: [.04, .04, .06] },
-  silver: { stand: 'pale', sun: [1.75, 1.42, 1], sky: [.5, .6, .82], gnd: [.3, .27, .22], rim: .4, fill: .22, bg: [.045, .05, .055] },
-  stormborn: { stand: 'rock', sun: [1.65, 1.28, .8], sky: [.4, .6, .92], gnd: [.24, .2, .16], rim: .48, fill: .18, bg: [.035, .045, .06] },
-  wardbound: { stand: 'dark', sun: [1.6, 1.3, .72], sky: [.24, .55, .55], gnd: [.12, .14, .14], rim: .45, fill: .16, bg: [.03, .04, .042] },
+  ironhold: { stand: 'slate', a: [[2.1, 1.02, .38], GP_LOW], b: [[1.05, 1.5, 2.35], GP_R], sky: [.2, .27, .38], gnd: [.16, .1, .06], rim: .6 },
+  grove: { stand: 'moss', a: [[1.7, 1.45, .75], GP_L], b: [[.5, 1.3, .6], GP_R], sky: [.24, .34, .24], gnd: [.12, .15, .07], rim: .4 },
+  conclave: { stand: 'pale', tint: [.86, .84, 1], a: [[1.25, .7, 1.7], GP_L], b: [[.6, 1.1, 1.9], GP_R], sky: [.28, .26, .48], gnd: [.13, .11, .2], rim: .5 },
+  silver: { stand: 'pale', a: [[1.9, 1.4, .85], GP_L], b: [[.8, 1.1, 1.75], GP_R], sky: [.3, .36, .46], gnd: [.2, .16, .13], rim: .45 },
+  stormborn: { stand: 'rock', a: [[1.85, 1.2, .5], GP_L], b: [[.65, 1.1, 1.9], GP_R], sky: [.24, .34, .5], gnd: [.15, .12, .1], rim: .5 },
+  wardbound: { stand: 'dark', a: [[1.75, 1.3, .55], GP_L], b: [[.4, 1.4, 1.3], GP_R], sky: [.16, .3, .3], gnd: [.08, .1, .1], rim: .5 },
 };
-const GP_THEME0 = { stand: 'slate', sun: [1.6, 1.25, .9], sky: [.4, .46, .58], gnd: [.25, .2, .14], rim: .3, fill: .16, bg: [.03, .045, .04] };
-const gpTheme = t => (t && t.def && GP_THEME[t.def.force]) || GP_THEME0;
+const GP_THEME0 = { stand: 'slate', a: [[1.7, 1.3, .9], GP_L], b: [[.7, .9, 1.2], GP_R], sky: [.32, .36, .44], gnd: [.2, .16, .12], rim: .3 };
+/* The lights' colours come from the painting behind the unit (owner, 26 Nov 2026: the lighting "should match the colours in the
+   painting"): once a force's painting is in, gpSample reads it small and takes its warmest bright tones (its fire or its sun)
+   and its coolest (its sky or its shade), and which side of the painting each lies on; the warm light then stands on that
+   side, the cool one on the other. The table above is what shows until the painting has loaded. A new painting needs nothing. */
+const GP_SAMP = {};
+function gpSample(force, src) {
+  if (!force || !src || GP_SAMP[force] !== undefined || typeof Image === 'undefined') return;
+  GP_SAMP[force] = null;   // (being read)
+  const im = new Image();
+  im.onload = () => { try {
+    const W = 72, H = 44, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, W, H);
+    const d = x.getImageData(0, 0, W, H).data, P = [];
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx < .14) continue;   // (too dark to have a colour)
+      P.push({ r, g, b, x: (i / 4 % W + .5) / W, w: (r - b) / mx, k: (.2 + (mx - mn) / mx) * (.25 + mx) });   // w: how warm; k: its weight (the brighter and purer, the more)
+    }
+    if (P.length < 40) return;
+    P.sort((u, v) => u.w - v.w);
+    const q = Math.max(12, Math.round(P.length * .14));
+    const avg = L => { let r = 0, g = 0, b = 0, xx = 0, k = 0; for (const o of L) { r += o.r * o.k; g += o.g * o.k; b += o.b * o.k; xx += o.x * o.k; k += o.k; } return { c: [r / k, g / k, b / k], x: xx / k }; };
+    // a light of that colour: its hue kept, a fifth of it white (a painting's dark shade, raised to a light's strength, comes out too pure), its brightest channel at the light's strength
+    const light = (c3, gain) => { const m = Math.max(c3[0], c3[1], c3[2], .01); return c3.map(v => (v / m * .8 + .2) * gain); };
+    const cool = avg(P.slice(0, q)), warm = avg(P.slice(-q)), all = avg(P), B = GP_THEME[force] || GP_THEME0, warmLeft = warm.x <= cool.x;
+    const wl = [light(warm.c, 2), warmLeft ? (B.a[1] === GP_LOW ? GP_LOW : GP_L) : GP_R], cl = [light(cool.c, 1.75), warmLeft ? GP_R : GP_L];
+    const am = Math.max(all.c[0], all.c[1], all.c[2], .01), sm = Math.max(cool.c[0], cool.c[1], cool.c[2], .01), gm = Math.max(warm.c[0], warm.c[1], warm.c[2], .01);
+    GP_SAMP[force] = Object.assign({}, B, { a: warmLeft ? wl : cl, b: warmLeft ? cl : wl, read: { warm: warm.c.map(v => Math.round(v * 255)), cool: cool.c.map(v => Math.round(v * 255)), warmLeft },
+      sky: cool.c.map((v, i) => v / sm * .26 + all.c[i] / am * .1), gnd: warm.c.map((v, i) => v / gm * .12 + all.c[i] / am * .05) });
+  } catch (e) { /* the table's colours stay */ } };
+  im.src = src;
+}
+const gpTheme = t => { const f = t && t.def && t.def.force; return (f && GP_SAMP[f]) || (f && GP_THEME[f]) || GP_THEME0; };
 const GP_STAND_H = .13, GP_STANDS = {};
 // a stand of radius 1 (scaled to the unit as it is drawn), its top at y 0
 function gpStandMesh(kind) {
@@ -98506,15 +98548,17 @@ function gpStandMesh(kind) {
     g.cyl(0, -H * .47, 0, .955, .955, .014, 20, '#c9a24a', { capT: false });   // the gold band
     ring(5, .7, (x, z) => g.box(x, .002, z, .1, .004, .03, '#3aa39a'));   // teal marks cut in the top
   } else {   // slate: a low weathered slab, broken slabs and chips round its edge
-    g.cyl(0, -H, 0, 1.02, .98, H, 9, '#434a54', { top: '#525a66', rot: .3 });
-    ring(8, 1.03, (x, z, a) => g.with(M4.trs(tm, x, -H * (.55 + rn() * .3), z, -a + rn() * .8, rn() * .3 - .15, rn() * .5 - .1, 1), () => g.box(0, 0, 0, .2 + rn() * .14, .05 + rn() * .03, .14 + rn() * .1, rn() < .5 ? '#3f4650' : '#565e69')));
-    ring(7, 1.2, (x, z) => g.ico(x * (.9 + rn() * .2), -H * .9, z * (.9 + rn() * .2), .035 + rn() * .035, '#394049', .4, .7));
+    g.cyl(0, -H, 0, 1.02, .98, H, 9, '#45474a', { top: '#56585a', rot: .3 });
+    ring(8, 1.03, (x, z, a) => g.with(M4.trs(tm, x, -H * (.55 + rn() * .3), z, -a + rn() * .8, rn() * .3 - .15, rn() * .5 - .1, 1), () => g.box(0, 0, 0, .2 + rn() * .14, .05 + rn() * .03, .14 + rn() * .1, rn() < .5 ? '#414346' : '#585a5d')));
+    ring(7, 1.2, (x, z) => g.ico(x * (.9 + rn() * .2), -H * .9, z * (.9 + rn() * .2), .035 + rn() * .035, '#3b3d40', .4, .7));
   }
   return (GP_STANDS[kind] = g.finish());
 }
 // the stand's radius for this unit: under its feet and its own base, not as wide as what it holds out
 const gpStandR = t => { const bd = towerBounds(t.type, t.tier); return clamp(Math.max(bd[1][0], bd[1][2], -bd[0][0], -bd[0][2]) * 1.08, .54, .78); };
-const _gpM = new Float32Array(16);
+const _gpM = new Float32Array(16), GP_BLACK = [0, 0, 0], GP_WHITE = [1, 1, 1], GP_WORK = {};
+const gpWork = (k, S) => { const c = GP_WORK[k] || (GP_WORK[k] = document.createElement('canvas')); if (c.width !== S) c.width = c.height = S; return c; };
+let gpRef = 0, gpShade = null;   // (gpRef: how far apart the white and the black backgrounds come out; gpShade: where the stand's shadow goes [x, y, half width])
 // the unit, turned to gpAng, into the sheet's canvas (through the icon renderer's path, on a renderer of its own)
 let gpClock = 0, gpClockAt = 0;
 function gpDraw() {
@@ -98523,7 +98567,6 @@ function gpDraw() {
   try {
     const bd0 = gpBounds(gpT), TH = gpTheme(gpT), sr = gpStandR(gpT), rr = Math.max(bd0[1][0], sr * 1.14);   // (the frame takes in the stand and its broken edge)
     const bd = [[-rr, 0, -rr], [rr, bd0[1][1] + GP_STAND_H, rr]];   // (heights from the stand's foot)
-    R.sunDir = GP_KEY; R.sunCol = TH.sun; R.sky = TH.sky; R.gnd = TH.gnd; R.rim = TH.rim; R.fill = TH.fill;
     // framed on its height or its reach round the dais, whichever is larger, not the box's diagonal, so a tall unit fills
     // the stage (owner: show it bigger)
     const fr = Math.max(bd[1][1] / 2, bd[1][0], bd[1][2]) * 1.0, dg = Math.hypot(bd[1][0] - bd[0][0], bd[1][1] - bd[0][1], bd[1][2] - bd[0][2]) / 2;
@@ -98531,18 +98574,53 @@ function gpDraw() {
     const z = gpZoom, h = bd[1][1], lo = h * .5 / z - h * .12, hi = h - h * .5 / z + h * .12, cy = Math.max(lo, Math.min(hi, h / 2 + h * .24 * Math.min(1, (z - 1) / 2) + h * gpPanY));   /* (gpPanY: dragged up or down, kept on the unit) */
     gpPanY = (cy - h / 2 - h * .24 * Math.min(1, (z - 1) / 2)) / h;
     const b0 = [bd[0][0] / z, cy - h / 2 / z - GP_STAND_H, bd[0][2] / z], b1 = [bd[1][0] / z, cy + h / 2 / z - GP_STAND_H, bd[1][2] / z], dg2 = Math.hypot(b1[0] - b0[0], b1[1] - b0[1], b1[2] - b0[2]) / 2;
-    frameSubject(b0, b1, .45, .2, .5, fr / z / dg2);
+    frameSubject(b0, b1, GP_YAW, .2, .5, fr / z / dg2);
     // the unit lives on the dais (owner: "mageling still doesnt have an idle pose"): the sheet keeps its own clock while the
     // game is paused under it, and a sculpted unit plays its idle on it, looping (UM_SHOW, unitmodels.js); the hand-built
     // ones breathe on vt, so vt follows the same clock while the unit is drawn
     const now = performance.now() / 1000; gpClock += Math.min(.1, Math.max(0, now - (gpClockAt || now))); gpClockAt = now;
     const keepVt = vt; vt = gpClock;
     dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
-    try { const sm = gpStandMesh(TH.stand); M4.trs(_gpM, 0, 0, 0, gpAng, 0, 0, sr, 1, sr); item(sm, _gpM, TH.tint ? { tint: [TH.tint[0], TH.tint[1], TH.tint[2], 1] } : null); } catch (e) { /* the unit without its stand */ }
+    try { const sm = gpStandMesh(TH.stand); M4.trs(_gpM, 0, 0, 0, gpAng, 0, 0, sr, 1, sr); const tn = TH.tint || [1, 1, 1]; item(sm, _gpM, { tint: [tn[0] * .55, tn[1] * .55, tn[2] * .55, 0] }); } catch (e) { /* the unit without its stand */ }
     try { UM_SHOW = gpClock; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
     finally { UM_SHOW = null; vt = keepVt; }
-    irRender(TH.bg, null);   // (no glow behind the unit: owner, 18 Nov 2026, "remove the fog in the character inventory screen")
-    const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(R.canvas, 0, 0, cv.width, cv.height);
+    /* The unit is cut out of its frame so the force's painting shows behind it (the renderer has no see-through frame): it is
+       drawn on black and on white under the left light, and what differs between the two is the background; then once more
+       under the right light, added to the first (screen). No glow behind it (owner, 18 Nov 2026). */
+    const S = cv.width, A = gpWork('a', S), D = gpWork('d', S), ax = A.getContext('2d', { willReadFrequently: true }), dx = D.getContext('2d', { willReadFrequently: true });
+    const half = v => [v[0] * .8, v[1] * .8, v[2] * .8], sky = half(TH.sky), gnd = half(TH.gnd);
+    // (each pass's soft light and rim take that light's colour: a sculpted unit's rim is lit by the sky's colour, so the right light's pass rims it cool)
+    const pass = (L, bg) => { const c = L[0]; R.sunDir = L[1]; R.sunCol = c; R.sky = [sky[0] * .6 + c[0] * .2, sky[1] * .6 + c[1] * .2, sky[2] * .6 + c[2] * .2]; R.gnd = gnd; R.rim = L === TH.b ? TH.rim * 1.8 : TH.rim * .5; R.fill = 0;
+      const rt = L === TH.b, k = rt ? 2.2 : 1.5, bk = [c[0] * k, c[1] * k, c[2] * k]; bk.dir = rt ? GP_RB : GP_LB; R.back = bk;   // (and an edge light from its own side, in its colour: the renderer's back light)
+      irRender(bg, null); };
+    pass(TH.a, GP_BLACK); ax.globalCompositeOperation = 'copy'; ax.drawImage(R.canvas, 0, 0, S, S); dx.globalCompositeOperation = 'copy'; dx.drawImage(R.canvas, 0, 0, S, S);
+    pass(TH.a, GP_WHITE); dx.globalCompositeOperation = 'difference'; dx.drawImage(R.canvas, 0, 0, S, S);   // (white where there is only background)
+    pass(TH.b, GP_BLACK); ax.globalCompositeOperation = 'screen'; ax.drawImage(R.canvas, 0, 0, S, S);
+    const img = ax.getImageData(0, 0, S, S), px = img.data, df = dx.getImageData(0, 0, S, S).data;
+    gpRef = Math.max(gpRef, df[1], df[4 * (S - 1) + 1]);   // (the background's own difference, read at the top corners: the most seen, so a zoomed-in unit over a corner does not lose it)
+    const ref = Math.max(40, gpRef); let lowY = -1;
+    for (let i = 0, n = px.length; i < n; i += 4) {
+      const al = 1 - df[i + 1] / ref;
+      if (al <= .02) { px[i + 3] = 0; continue; }
+      if (al >= .98) { px[i + 3] = 255; lowY = i; continue; }
+      const k = 1 / al; px[i] = Math.min(255, px[i] * k); px[i + 1] = Math.min(255, px[i + 1] * k); px[i + 2] = Math.min(255, px[i + 2] * k); px[i + 3] = al * 255;
+    }
+    ax.putImageData(img, 0, 0);
+    /* the two lights again, laid over the cut-out from each side (overlay), kept to the unit's own pixels: the units' shader spreads
+       a light round the whole body (measured: either light colours both halves alike), so the side each light stands on would not read */
+    const T = gpWork('t', S), tx = T.getContext('2d'), css = (c, a2) => { const m = 255 / Math.max(c[0], c[1], c[2], .01); return `rgba(${Math.round(c[0] * m)},${Math.round(c[1] * m)},${Math.round(c[2] * m)},${a2})`; };
+    tx.globalCompositeOperation = 'copy'; tx.drawImage(A, 0, 0);
+    { const g3 = tx.createLinearGradient(S * .2, 0, S * .8, 0); g3.addColorStop(0, css(TH.a[0], .62)); g3.addColorStop(.44, css(TH.a[0], 0)); g3.addColorStop(.56, css(TH.b[0], 0)); g3.addColorStop(1, css(TH.b[0], .62));
+      tx.globalCompositeOperation = 'overlay'; tx.fillStyle = g3; tx.fillRect(0, 0, S, S); }
+    tx.globalCompositeOperation = 'destination-in'; tx.drawImage(A, 0, 0);
+    // where the stand meets the ground: the lowest solid row, and how wide the stand is just above it (for the shadow it casts on the painting)
+    if (lowY >= 0) { const y1 = Math.floor(lowY / 4 / S), y0 = Math.max(0, y1 - Math.round(S * .07)); let x0 = S, x1 = -1;
+      for (let y = y0; y <= y1; y += 2) for (let xx = 0; xx < S; xx += 2) if (px[(y * S + xx) * 4 + 3] > 200) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; }
+      gpShade = x1 > x0 ? [(x0 + x1) / 2 / S, y1 / S, (x1 - x0) / 2 / S] : null; } else gpShade = null;
+    const x = cv.getContext('2d'), W = cv.width, H = cv.height; x.clearRect(0, 0, W, H);
+    if (gpShade && gpZoom < 1.6) { const [sx, sy, sr2] = gpShade, rx = sr2 * W * 1.5, ry = rx * .24, cy2 = sy * H - ry * .5;
+      x.save(); x.translate(sx * W, cy2); x.scale(1, ry / rx); const g2 = x.createRadialGradient(0, 0, rx * .35, 0, 0, rx); g2.addColorStop(0, 'rgba(0,0,0,.72)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.beginPath(); x.arc(0, 0, rx, 0, 7); x.fill(); x.restore(); }
+    x.drawImage(T, 0, 0, W, H);
   } catch (e) {} finally { IR = keep; }
 }
 function gpLoop() {
@@ -98552,18 +98630,40 @@ function gpLoop() {
   gpDraw(); gpTick();
   gpRaf = requestAnimationFrame(gpLoop);
 }
+/* the design handoff's small line icons (its unit-panel.js: 24 x 24, stroked in the sheet's own colour): the tabs, every stat row, the
+   mana bar, the bag, the sockets' lock and plus, the unit's controls, the close button */
+const GP_IC = {
+  close: 'M5 5l14 14M19 5L5 19', plus: 'M12 4v16M4 12h16', minus: 'M4 12h16', lock: 'M7 10V7a5 5 0 0110 0v3M5 10h14v11H5zM12 14v3',
+  external: 'M14 3h7v7M21 3L11 13M10 5H4v15h15v-6', rotate: 'M20 8a8 8 0 10.2 7M20 3v5h-5',
+  bag: 'M5 7h14l2 14H3zM8 7V4h8v3M3 12h18M10 11v4h4v-4', chest: 'M3 10V8a5 5 0 015-5h8a5 5 0 015 5v2M2 10h20v11H2zM9 9h6v7H9zM6 3v7M18 3v7',
+  swords: 'M4 3l13 13M3 3l1 6 5-5zM15 15l6 6M14 18l4-4M20 3L7 16M21 3l-1 6-5-5zM9 18l-4-4M9 15l-6 6',
+  stats: 'M4 20v-6h3v6zM11 20V9h3v11zM18 20V3h3v17z', spark: 'M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z',
+  drop: 'M12 2C10 7 5 11 5 15a7 7 0 0014 0c0-4-5-8-7-13zM8 15a4 4 0 004 4',
+  flame: 'M13 2c2 6-4 7-2 11 2-2 3-3 3-5 5 6 8 13-2 14C2 22 3 14 7 9c0 4 1 5 2 6-1-6 4-8 4-13z',
+  shield: 'M12 2l8 3v7c0 5-5 8-8 10-3-2-8-5-8-10V5zM12 5v13', target: 'M12 2v4M12 18v4M2 12h4M18 12h4M20 12a8 8 0 11-16 0 8 8 0 0116 0M15 12a3 3 0 11-6 0 3 3 0 016 0',
+  speed: 'M3 7h17M3 12h13M3 17h9M18 9l3-2-3-2M14 14l3-2-3-2', clock: 'M12 5v7l4 2M21 12a9 9 0 11-18 0 9 9 0 0118 0',
+  people: 'M10 7a3 3 0 11-6 0 3 3 0 016 0M20 7a3 3 0 11-6 0 3 3 0 016 0M2 21v-6a5 5 0 0110 0v6M13 21v-6a4 4 0 018 0v6',
+  info: 'M12 10v7M12 6v1M21 12a9 9 0 11-18 0 9 9 0 0118 0', arrow: 'M3 21L21 3M12 3h9v9M5 13l6 6',
+};
+const gpIc = n => `<svg class="gp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="${GP_IC[n] || GP_IC.spark}"/></svg>`;
+// which icon a stat row wears, by its label (as the handoff's rows; a row not listed wears the spark)
+const GP_STAT_IC = { 'Damage per second': 'swords', Damage: 'shield', 'Attacks a second': 'speed', 'Attack Speed (items)': 'speed', 'Crit Chance': 'spark', 'Crit damage': 'spark', 'Hit Chance': 'target',
+  Range: 'target', 'Reach vs flyers': 'target', Targets: 'people', 'Foes a strike': 'people', 'Roots at once': 'people', Splash: 'target', 'Armour Penetration': 'shield', 'Magic Penetration': 'spark',
+  'Spell Damage': 'drop', 'Cooldown Reduction': 'clock', 'Mana pool': 'drop', 'Mana a second': 'drop', 'Mana a strike': 'drop', Items: 'bag', Root: 'clock', Slow: 'clock', Wounds: 'clock',
+  Chain: 'arrow', Bounces: 'arrow', 'vs flyers': 'swords', 'vs bosses': 'swords', 'vs rooted': 'swords', Bleed: 'drop', Spores: 'drop', 'Aura damage': 'people', 'Aura haste': 'people', 'Aura radius': 'people' };
+const gpSi = lbl => gpIc(GP_STAT_IC[lbl] || 'spark');
 const gpE = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const gpF = v => v >= 100 ? String(Math.round(v)) : v >= 10 ? String(+v.toFixed(1)) : String(+v.toFixed(2));
 // one stat: its label, its value now, and the plain tier's value when something changed it
 function gpStat(lbl, v, b, f, tip) {
   if (v == null || !isFinite(v)) return '';
   const up = b != null && isFinite(b) && Math.abs(v - b) > 1e-6, cls = up ? (v > b ? ' bo' : ' neg') : '';
-  return `<div class="gp-st"${tip ? ` title="${gpE(tip)}"` : ''}><span>${lbl}</span><b class="${cls.trim()}">${f(v)}</b>${up ? `<i>${f(b)}</i>` : ''}</div>`;
+  return `<div class="gp-st"${tip ? ` title="${gpE(tip)}"` : ''}><span>${gpSi(lbl)}${lbl}</span><b class="${cls.trim()}">${f(v)}</b>${up ? `<i>${f(b)}</i>` : ''}</div>`;
 }
 // the Hit Chance row: its chance against an ordinary foe, the old one struck through (short), a boss's on a small second line
 function gpHitRow(st, was, tip) {
   const H = hitShow(st), B = hitShow(was), up = H.foe !== B.foe || H.boss !== B.boss, cls = up ? (H.foe > B.foe || H.boss > B.boss ? 'bo' : 'neg') : '';
-  return `<div class="gp-st gp-hit" title="${gpE(tip)}"><span>Hit Chance</span><b class="${cls}">${H.foe}%</b>${up ? `<i>${B.foe}%</i>` : ''}<em>${H.boss}% vs bosses${up ? ` <s>${B.boss}%</s>` : ''}</em></div>`;
+  return `<div class="gp-st gp-hit" title="${gpE(tip)}"><span>${gpSi('Hit Chance')}Hit Chance</span><b class="${cls}">${H.foe}%</b>${up ? `<i>${B.foe}%</i>` : ''}<em>${H.boss}% vs bosses${up ? ` <s>${B.boss}%</s>` : ''}</em></div>`;
 }
 // alt: the stats with a different item in (the preview while an item is dragged or hovered): then the struck-through
 // value is the unit's stats now, and the new one is alt's. Grouped: Offence, Spells, Mana, Effects; each row has a hint.
@@ -98576,9 +98676,9 @@ function gpStats(t, alt) {
   const h = typeof heroOf === 'function' && G.hero ? heroOf() : null, ha = h && typeof heroAffOf === 'function' ? heroAffOf(h, t.type) : null;
   const why = ha ? heroAffLine(t.type, h) : '', on = k => ha && (ha.mod ? ha.mod.k === k || (k === 'range' && ha.mod.k === 'reach') : AFF_FAV_STAT[h.id] === k) ? why : null;
   const hint = (a, w) => w ? a + '. ' + w : a;
-  const txt = (lbl, val, tip, cls) => out.push(`<div class="gp-st gp-tx" style="grid-column:1/-1"${tip ? ` title="${gpE(tip)}"` : ''}><span>${gpE(lbl)}</span><b class="${cls || ''}">${gpE(val)}</b></div>`);
+  const txt = (lbl, val, tip, cls) => out.push(`<div class="gp-st gp-tx" style="grid-column:1/-1"${tip ? ` title="${gpE(tip)}"` : ''}><span>${gpSi(lbl)}${gpE(lbl)}</span><b class="${cls || ''}">${gpE(val)}</b></div>`);
   let gAt = -1; const grp = name => { if (gAt >= 0 && gAt === out.length - 1) out.pop(); gAt = out.length; out.push(`<div class="gp-sth" style="grid-column:1/-1">${name}</div>`); };   // (a group with no rows drops its header)
-  if (ha) out.push(`<div class="gp-st gp-aff${ha.role === 'dn' ? ' dn' : ''}" title="${gpE(why)}" style="grid-column:1/-1"><span>${gpE(ha.role === 'fav' ? `${h.name}’s favourite: ${ha.name}` : ha.role === 'up' ? `${h.name}’s bonus` : `${h.name}’s drawback`)}</span><b class="${ha.role === 'dn' ? 'neg' : 'bo'}">${gpE(ha.role === 'fav' ? ha.text : affCap(ha.text))}</b></div>`);
+  if (ha) out.push(`<div class="gp-st gp-aff${ha.role === 'dn' ? ' dn' : ''}" title="${gpE(why)}" style="grid-column:1/-1"><span>${gpIc('info')}${gpE(ha.role === 'fav' ? `${h.name}’s favourite: ${ha.name}` : ha.role === 'up' ? `${h.name}’s bonus` : `${h.name}’s drawback`)}</span><b class="${ha.role === 'dn' ? 'neg' : 'bo'}">${gpE(ha.role === 'fav' ? ha.text : affCap(ha.text))}</b></div>`);
   { const C = d.champ && typeof CHAMPS !== 'undefined' && CHAMPS[d.champ]; if (C && C.trait) txt(`Champion · ${C.trait.name}`, C.trait.t, 'Your commander in person: its own trait'); }
   /* The layout is fixed per unit (owner, 23 Nov 2026: "when adding a hit item the arrangement of stats changes? can you
      ensure it always looks the same before and after adding an item"): every row an item's stat line can move (ISTAT:
@@ -98602,7 +98702,7 @@ function gpStats(t, alt) {
   else if (strikes) out.push(gpStat('Crit Chance', st.crit || 0, w ? w.crit || 0 : b.crit || 0, P, hint('The chance a strike crits', on('crit'))));
   if (core && typeof hitShow === 'function') out.push(gpHitRow(st, w || {}, 'Its chance to hit an ordinary foe, and a boss (elites and leaders between); Hit Chance on its gear raises it, to 100% at most'));
   out.push(gpStat('Range', st.range, b.range, gpF, hint('Its reach in cells', on('range'))));
-  out.push(`<div class="gp-st" title="What it can strike"><span>Targets</span><b>${d.air ? 'Ground, air' : 'Ground'}</b></div>`);
+  out.push(`<div class="gp-st" title="What it can strike"><span>${gpSi('Targets')}Targets</span><b>${d.air ? 'Ground, air' : 'Ground'}</b></div>`);
   const tb = TOWERS[t.type].tiers[t.tier] || {};   // (its tier's own numbers: Splash shows on a unit whose strikes splash, as items only widen a splash)
   if (strikes && (tb.splash || st.splash || (w && w.splash))) out.push(gpStat('Splash', st.splash || 0, b.splash || 0, gpF, hint('The burst round each strike, in cells', on('splash'))));
   if (!oldRules() && strikes) {
@@ -98622,7 +98722,7 @@ function gpStats(t, alt) {
   }
   // ---- Items: always one line, so the rows above stay put when the first item goes in ----
   { const sum = st.ist ? itemStatSum(st.ist) : '', ks = st.ist ? IST_ORDER.filter(k => st.ist[k]) : [];
-    out.push(`<div class="gp-st gp-ist" style="grid-column:1/-1" title="${gpE(ks.length ? 'What its items add up to (each line: ' + ks.map(k => ISTAT[k].name + ', ' + ISTAT[k].say).join('; ') + ')' : 'What its items add up to')}"><span>Items</span><b class="${sum ? 'bo' : 'nil'}">${gpE(sum || 'None yet')}</b></div>`); }
+    out.push(`<div class="gp-st gp-ist" style="grid-column:1/-1" title="${gpE(ks.length ? 'What its items add up to (each line: ' + ks.map(k => ISTAT[k].name + ', ' + ISTAT[k].say).join('; ') + ')' : 'What its items add up to')}"><span>${gpSi('Items')}Items</span><b class="${sum ? 'bo' : 'nil'}">${gpE(sum || 'None yet')}</b></div>`); }
   // ---- Effects: the rarer numbers and the strikes' riders, at the foot ----
   const fx = [], has = f => f(st) || (w && f(w));
   const opt = (lbl, f, fmt, tip, base) => { if (!has(f)) return; fx.push(() => out.push(gpStat(lbl, f(st) || 0, base !== undefined ? base : (f(b) || 0), fmt, tip))); };
@@ -98655,7 +98755,7 @@ function gpStats(t, alt) {
 function gpMana(t) {
   const kit = abilKit(t); if (!kit) return '';
   const A = abilEnsure(t, kit), m = manaSheet(t, kit), max = abMax(t), cur = A ? A.mana : 0;
-  return `<div class="gp-mana"><b class="gp-ml">Mana</b><div class="gp-mbar"><i id="gpMb" style="width:${Math.round(100 * clamp(cur / max, 0, 1))}%"></i><span id="gpMt">${Math.floor(cur)} / ${max} mana</span></div>
+  return `<div class="gp-mana"><b class="gp-ml">${gpIc('drop')}Mana</b><div class="gp-mbar"><i id="gpMb" style="width:${Math.round(100 * clamp(cur / max, 0, 1))}%"></i><span id="gpMt">${Math.floor(cur)} / ${max} mana</span></div>
     <p>+${m.regen}/s${m.hit ? ` · +${m.hit} a strike` : ''} · ${A.mode === 'focus' ? `Focus: ${ABIL[A.focus] ? ABIL[A.focus].name : '—'}` : 'Rotate'}</p></div>`;
 }
 /* A spell's damage as it stands, the row's big figure (its tooltip's "2.3× damage (41)" numbers, read with the unit's live
@@ -98751,7 +98851,7 @@ function gpBagCells(t) {
   const il = it => typeof ilOn === 'function' && ilOn() && (typeof ilSortLv !== 'function' || ilSortLv()) ? ilOf(it) : 0;
   const L = G.loot.filter(it => !it.tome).sort((a, b) => (!!gpWhyNot(t, a, gpAutoSlot(t, a))   // (a Tome of Mastery is no gear: it is read from the bag or the talent tree)
   - !!gpWhyNot(t, b, gpAutoSlot(t, b))) || il(b) - il(a) || b.rar - a.rar || a.id - b.id);
-  if (!L.length) return `<p class="gp-none">Your bag is empty. Elites and bosses drop relics; every wave boss offers its loot.</p>`;
+  if (!L.length) return `<p class="gp-none gp-empty">${gpIc('chest')}<b>Your bag is empty.</b>Elites and bosses drop relics; every wave boss offers its loot.</p>`;
   return L.map(it => `<button type="button" class="bg-cell gp-bc${gpWhyNot(t, it, gpAutoSlot(t, it)) ? ' nofit' : ''}${gpPick === it ? ' on' : ''}" data-bi="${it.id}" aria-label="${gpE(gearName(it))}"><canvas width="96" height="96" data-key="${gearKey(it)}"></canvas>${it.isNew ? '<i class="nw"></i>' : ''}${il(it) && !it.tome ? `<b class="il">${ilOf(it)}</b>` : ''}</button>`).join('');
 }
 // put it in socket i (from the bag or another socket); false if the socket won't take it
@@ -98839,7 +98939,7 @@ function gpWire(t, socks) {
   };
 }
 let gpSwallowT = 0;
-const gpSock = (s, i) => `<button type="button" class="gp-sock${s.off ? ' off' : ''}${s.empty ? ' empty' : ''}" data-i="${i}" ${s.it ? '' : ` title="${gpE(s.tip || '')}"`}><canvas width="112" height="112" data-key="${s.key}"></canvas><small${s.col ? ` style="color:${s.col}"` : ''}>${gpE(s.lbl)}</small></button>`;
+const gpSock = (s, i) => `<button type="button" class="gp-sock${s.off ? ' off' : ''}${s.empty ? ' empty' : ''}" data-i="${i}" ${s.it ? '' : ` title="${gpE(s.tip || '')}"`}><canvas width="112" height="112" data-key="${s.key}"></canvas>${s.off ? `<i class="gp-si">${gpIc('lock')}</i>` : s.empty ? `<i class="gp-si">${gpIc('plus')}</i>` : ''}<small${s.col ? ` style="color:${s.col}"` : ''}>${gpE(s.lbl)}</small></button>`;
 // what the desktop corner card no longer says (ui.js deskCardHTML): the force's gauge and what it builds to, the next talent, the next tier
 let gpNxOpen = false;   // (folded unless opened: kept while the sheet redraws)
 // the force's own bar and what a full one does, in this unit's numbers: always shown, under its abilities (owner, 23 Nov
@@ -98850,7 +98950,7 @@ const gpMech = t => typeof ftMechShown !== 'function' || !t || !t.def || !t.def.
 function gpGauge(t) {
   let h = '';
   try { h = (typeof growthInfoHTML === 'function' ? growthInfoHTML(t) : '') + (typeof ccChargeInfoHTML === 'function' ? ccChargeInfoHTML(t) : '') + (gpMech(t) && typeof IH_HEATERS !== 'undefined' && IH_HEATERS[t.def.unit] && typeof heatInfoHTML === 'function' ? heatInfoHTML(t) : ''); } catch (e) { h = ''; }
-  return h ? `<div class="gp-gauge">${h}</div>` : '';
+  return h ? `<div class="gp-gauge">${gpIc('flame')}${h}</div>` : '';
 }
 function gpMore(t) {
   let h = '';
@@ -98860,7 +98960,7 @@ function gpMore(t) {
 /* ---------- the sheet's own parts (owner's design handoff, 26 Nov 2026): the header on the force's painting, the tabs ---------- */
 let gpTab = 'a', gpFocus = null;   // (the tab stays while the sheet redraws; gpFocus: what had the focus before it opened)
 const GP_TABS = [['a', 'Abilities'], ['s', 'Stats'], ['f', 'Effects']];
-const GP_TAB_SVG = { a: '<path d="M3 3l10 10M13 3L3 13M3 3h3M3 3v3M13 3h-3M13 3v3"/>', s: '<path d="M3 13V9M8 13V5M13 13V2"/>', f: '<path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5 6.4 9.6 1.5 8l4.9-1.6z"/>' };
+const GP_TAB_IC = { a: 'swords', s: 'stats', f: 'spark' };
 const GP_KIND_WORD = { melee: 'Melee', polearm: 'Polearm', bow: 'Archer', caster: 'Caster', gun: 'Gunner', blade: 'Blade', hammer: 'Hammer', rider: 'Rider' };
 // the small line over the name: its force, and what kind of unit it is
 function gpEyebrow(t) {
@@ -98879,7 +98979,7 @@ const GP_ART = {
 };
 function gpArt(force) {
   const get = () => { try { return GP_ART[force] ? GP_ART[force]() : ''; } catch (e) { return ''; } };
-  const put = () => { const src = get(); if (src && ovp && ovp.classList.contains('gearp')) ovp.style.setProperty('--gpart', `url(${src})`); return !!src; };
+  const put = () => { const src = get(); if (src && ovp && ovp.classList.contains('gearp')) ovp.style.setProperty('--gpart', `url(${src})`); if (src) gpSample(force, src); return !!src; };
   if (ovp) ovp.style.setProperty('--gpart', 'none');
   if (put() || !GP_ART[force] || typeof needAssets !== 'function') return;
   try { needAssets(['homeland-s:' + force], { low: true }).then(() => { if (gpT && gpT.def.force === force) put(); }).catch(() => {}); } catch (e) { /* the plain header stays */ }
@@ -98909,18 +99009,18 @@ function openGearPanel(t) {
   const kit = abilKit(t), tal = typeof TALENTS !== 'undefined' && TALENTS[t.type] && typeof openTalents === 'function' ? TALENTS[t.type].name : '';
   showOverlay(`<div class="bg-head gp-head"><div class="gp-ttl"><p class="gp-eye">${gpEyebrow(t)}</p><div class="gp-tl"><h2 class="ttl">${gpE(t.def.name)}</h2><b class="gp-tier" title="Tier ${ROMAN[t.tier]}">${ROMAN[t.tier]}</b></div>
       <div class="gp-rec">${typeof vetInfoHTML === 'function' ? vetInfoHTML(t).replace('<p class="mut vet-row"', '<p class="mut vet-row gp-vet"') : ''}<span>Kills <b>${t.kills || 0}</b><i>·</i>Dealt <b>${fmt(t.dmg || 0)}</b>${champ ? `<i>·</i><b class="gp-champ">${gpE(h.name)}’s Champion</b>` : ''}</span></div></div>
-      ${tal ? `<button type="button" id="gpTal" class="lb-link gp-link" title="Open its talent tree">${gpE(tal)}</button>` : ''}
-      <button type="button" class="tx" id="gpClose" aria-label="Close and resume">${X_SVG}</button></div>
+      ${tal ? `<button type="button" id="gpTal" class="lb-link gp-link" title="Open its talent tree">${gpE(tal)}${gpIc('external')}</button>` : ''}
+      <button type="button" class="tx" id="gpClose" aria-label="Close and resume">${gpIc('close')}</button></div>
     <div class="gp-body" data-kw-noside>
       <div class="gp-doll">
         <div class="gp-col">${S.rel.map((s, i) => gpSock(s, i)).join('')}</div>
-        <div class="gp-stage"><canvas id="gpCv" width="640" height="640" tabindex="0" role="img" aria-label="${gpE(t.def.name)}: drag or use the arrow keys to turn it, plus and minus to zoom, 0 to reset"></canvas>
-          <div class="gp-ctl"><button type="button" data-gz="-1" aria-label="Zoom out">−</button><small>${canHover() ? 'Drag to rotate · scroll to zoom' : 'Drag to rotate'}</small><button type="button" data-gz="1" aria-label="Zoom in">+</button><button type="button" data-gz="0" aria-label="Reset the view">↺</button></div></div>
+        <div class="gp-stage"><canvas id="gpCv" width="${canHover() ? 640 : 448}" height="${canHover() ? 640 : 448}" tabindex="0" role="img" aria-label="${gpE(t.def.name)}: drag or use the arrow keys to turn it, plus and minus to zoom, 0 to reset"></canvas>
+          <div class="gp-ctl"><button type="button" data-gz="-1" aria-label="Zoom out">${gpIc('minus')}</button><small>${canHover() ? 'Drag to rotate · scroll to zoom' : 'Drag to rotate'}</small><button type="button" data-gz="1" aria-label="Zoom in">${gpIc('plus')}</button><button type="button" data-gz="0" aria-label="Reset the view">${gpIc('rotate')}</button></div></div>
         <div class="gp-col">${S.ch ? gpSock(S.ch, 3) : ''}${acts.map((it, n) => `<button type="button" class="gp-sock gp-act" data-act="${n}"><canvas width="112" height="112" data-key="${gearKey(it)}"></canvas><small>${gpE(actOf(it).name)}</small></button>`).join('')}</div>
-        <div class="gp-bag"><h3>Bag <small>${canHover() ? 'Drag an item onto a socket, or a socketed one back here' : 'Drag, or tap an item then a socket'}${typeof ilOn === 'function' && ilOn() ? '; onto an item under Effects to infuse it' : ''}</small></h3><div class="gp-bgrid" role="listbox" aria-label="Bag">${gpBagCells(t)}</div></div>
+        <div class="gp-bag"><h3>${gpIc('bag')}Bag <small>${canHover() ? 'Drag an item onto a socket, or a socketed one back here' : 'Drag, or tap an item then a socket'}${typeof ilOn === 'function' && ilOn() ? '; onto an item under Effects to infuse it' : ''}</small></h3><div class="gp-bgrid" role="listbox" aria-label="Bag">${gpBagCells(t)}</div></div>
       </div>
       <div class="gp-side" data-tab="${gpTab}">
-        <div class="gp-tabs" role="tablist" aria-label="${gpE(t.def.name)}">${GP_TABS.map(([k, n]) => `<button type="button" role="tab" id="gpTab_${k}" data-tab="${k}" aria-controls="gpSec_${k}" aria-selected="${k === gpTab}" tabindex="${k === gpTab ? 0 : -1}"><svg viewBox="0 0 16 16" aria-hidden="true">${GP_TAB_SVG[k]}</svg>${n}</button>`).join('')}</div>
+        <div class="gp-tabs" role="tablist" aria-label="${gpE(t.def.name)}">${GP_TABS.map(([k, n]) => `<button type="button" role="tab" id="gpTab_${k}" data-tab="${k}" aria-controls="gpSec_${k}" aria-selected="${k === gpTab}" tabindex="${k === gpTab ? 0 : -1}">${gpIc(GP_TAB_IC[k])}${n}</button>`).join('')}</div>
         <section class="gp-sec gp-sa" id="gpSec_a" role="tabpanel" aria-labelledby="gpTab_a">
           ${kit ? `<div class="gp-abh"><h3 class="gp-vh">Abilities</h3>${gpMana(t)}</div><div class="gp-abils">${gpAbils(t)}</div>` : '<p class="gp-none">It has no spells: it fights with its strikes alone.</p>'}${gpGauge(t)}
         </section>
@@ -98969,7 +99069,7 @@ function openGearPanel(t) {
   const zoomBy = k => { gpZoom = k ? Math.max(1, Math.min(3, gpZoom * (k > 0 ? 1.25 : .8))) : 1; if (!k) { gpPanY = 0; gpAng = .5; } };
   cv.onkeydown = e => { const k = e.key; if (k === 'ArrowLeft' || k === 'ArrowRight') gpAng += k === 'ArrowLeft' ? -.2 : .2; else if (k === 'ArrowUp' || k === 'ArrowDown') gpPanY += (k === 'ArrowUp' ? .06 : -.06) / gpZoom; else if (k === '+' || k === '=') zoomBy(1); else if (k === '-' || k === '_') zoomBy(-1); else if (k === '0') zoomBy(0); else return; e.preventDefault(); e.stopPropagation(); };
   for (const b of ovp.querySelectorAll('.gp-ctl [data-gz]')) b.onclick = () => zoomBy(+b.dataset.gz);
-  gpSpin = false; gpZoom = 1; gpPanY = 0; if (!gpRaf) gpRaf = requestAnimationFrame(gpLoop);
+  gpSpin = false; gpZoom = 1; gpPanY = 0; gpRef = 0; gpShade = null; if (!gpRaf) gpRaf = requestAnimationFrame(gpLoop);
 }
 // live while open: the mana bar and each ability's recharge (a dark clock wipe, as on the card)
 function gpTick() {
