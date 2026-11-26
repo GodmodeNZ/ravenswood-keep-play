@@ -1,4 +1,4 @@
-const BUILD_TAG = 'dabfd913@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '07bf6892@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -122740,7 +122740,7 @@ if (typeof ELEM_FX_SPELLS !== 'undefined') {
    upload), shaded by the scene's shadows, depth-tested so feet stand on it; dimmed where runes crowd together.
    A lazy asset in the force:wardbound group (tools/splitassets.mjs GROUP: loaded after hero select); until it has loaded
    (and with the Element Lab's "Old look", SD.off) the old etched glyphs (wbgRune, forces_wardbound_g.js) are drawn. */
-const WBD = { trig: [], img: {}, tex: {}, asked: 0, MAXQ: 200, k: 3.15, dense: 1, glow: .6, trigK: 1.15, trigGain: 1.3 };
+const WBD = { trig: [], img: {}, tex: {}, asked: 0, MAXQ: 200, k: 3.3, dense: 1, glow: .7, trigK: 1.12, trigGain: 1.55 };
 const wbdOn = () => !(typeof SD !== 'undefined' && SD.off) && typeof RD !== 'undefined' && RD && RD.vfx;
 const wbdNow = () => (typeof G !== 'undefined' && G && G.time != null ? G.time : 0);
 const wbdRGB = h => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
@@ -122808,7 +122808,7 @@ function wbdRuneQuads(z, now, out, dens) {
     if (kind === 'vow' && st.renewAt != null) { const D = WB_DECALS.vow, f = Math.floor((now - st.renewAt) * D.fps); if (f < D.frames) { out.push([kind, x, q, sz * WBD.trigK, 1 + f, a, WBD.trigGain, 0, 0, -1]); continue; } }
     // (it breathes slowly, and flares a little as it is first laid)
     const c = wbdCol(kind), g = WBD.glow * (.8 + .2 * Math.sin(now * 1.7 + (z.seed || 0))) * (1 + 1.2 * Math.max(0, 1 - age / .6));
-    out.push([kind + '#a', x, q, sz, 0, a, .55 * .8 + c[0] * .45, .55 * .55 + c[1] * .45, .55 * .2 + c[2] * .45, g]);
+    out.push([kind + '#a', x, q, sz, 0, a, .4 * 1 + c[0] * .6, .4 * .66 + c[1] * .6, .4 * .25 + c[2] * .6, g]);
   }
 }
 
@@ -122839,14 +122839,20 @@ void main(){
     for (int i = 0; i < 8; i++) { float an = float(i) * .7854; vec2 d = vec2(cos(an), sin(an)) * uTx;
       near = max(near, texture(uT, vUV + d * 5.).a); far += texture(uT, vUV + d * 13.).a; }
     far *= .125;
-    float rim = max(0., max(near * .8, far * 1.5) - c.a);
-    vec3 col = c.rgb * 1.25 * sh + vG.rgb * c.a * .32;
-    float a = min(1., c.a * 1.3);
+    // (the stroke a little thicker: the nearest stroke's alpha bleeds a few texels out; a dark body so it holds on pale
+    // ground, an ember core down the middle of each stroke so it holds on dark ground, and its kind's light round it)
+    float body = min(1., max(c.a, near * .75) * 1.45), core = smoothstep(.45, .74, c.a);
+    float rim = max(0., max(near * .9, far * 1.7) - c.a);
+    vec3 col = vec3(.07, .05, .04) * body * sh + vG.rgb * (core * .95 + c.a * .25);
     col += vG.rgb * rim * vG.a;
-    o = vec4(col, min(1., a + rim * vG.a * .3)) * vA;
+    // (a dark outline just outside the stroke, whatever its light: it is what holds the mark on pale sunlit stone)
+    o = vec4(col, min(1., body + rim * (.38 + vG.a * .3))) * vA;
   } else {
     if (c.a < .003) discard;
-    o = vec4(c.rgb * vG.r * mix(sh, 1., .5), c.a) * vA;
+    vec3 t = c.rgb;
+    // (vG.g: the Lance rune, whose painted light is blue: mapped to gold by its brightness, white kept at its hottest)
+    if (vG.g > .5) { float l = max(t.r, max(t.g, t.b)), dk = smoothstep(.0, .25, l / max(c.a, .001)); t = mix(t, mix(vec3(1., .78, .36) * l, vec3(l), smoothstep(.8, 1., l) * .6), dk); }
+    o = vec4(t * vG.r * mix(sh, 1., .5), c.a) * vA;
   }
   if (o.a < .003 && max(o.r, max(o.g, o.b)) < .003) discard;
 }`;
@@ -122913,11 +122919,14 @@ function wbdFrame() {
     wbdRuneQuads(z, now, Q, 1 / Math.sqrt(1 + .35 * n));
   }
   WBD.trig = WBD.trig.filter(e => { const D = WB_DECALS[e.kind]; return (now - e.at) * D.fps < D.frames; });
-  for (const e of WBD.trig) { const D = WB_DECALS[e.kind], f = Math.floor((now - e.at) * D.fps); Q.push([e.kind, e.x, e.z, e.s * WBD.trigK, 1 + Math.max(0, f), Math.min(1, (D.frames - f) / 3), WBD.trigGain, 0, 0, -1]); }
+  for (const e of WBD.trig) { const D = WB_DECALS[e.kind], f = Math.floor((now - e.at) * D.fps); Q.push([e.kind, e.x, e.z, e.s * WBD.trigK, 1 + Math.max(0, f), Math.min(1, (D.frames - f) / 3), WBD.trigGain, e.kind === 'storm' ? 1 : 0, 0, -1]); }
   if (Q.length) { const X = RD.vfx; if (!X.ext.includes(WBD_EXT)) X.ext.push(WBD_EXT); WBD_EXT.n = 1; }
 }
 // the old etched glyph and its spring flashes, while the decals stand in for them
-const wbdFor = z => wbdOn() && z && typeof WB_DECALS !== 'undefined' && wbdReady(z.kinds.slice(0, 2));
+// (owner, 26 Nov 2026, of the first live build: "just use the new animations for runes rather than a mix of both": while
+// the decals are on, the old etched glyph, its beacon and great-rune rings and its flashes never draw, loaded or not: the
+// data comes with the force after hero select, and until it is here a rune shows nothing)
+const wbdFor = z => wbdOn() && !!z;
 if (typeof wbgRune === 'function') { const _wr = wbgRune; wbgRune = function (z) { if (wbdFor(z)) return; return _wr.apply(this, arguments); }; }
 if (typeof wbgDrawField === 'function') { const _wf = wbgDrawField; wbgDrawField = function () { const r = _wf.apply(this, arguments); try { wbdFrame(); } catch (e) { if (!WBD.warned) { WBD.warned = 1; console.warn('wardbound decals:', e && e.message || e); } } return r; }; }
 
@@ -122962,13 +122971,13 @@ function wbdHits(now) {
       sdBill(SDT_SH.GLOW, [x, by + .12, z], r * 3, r * 3, { seed: s, a: (.3 + .3 * peak) * env, col: [.6, .85, 1] });
     } else if (e.kind === 'storm') {
       // threads of rune light: each a jagged path over the foe, redrawn somewhere new a dozen times a second
-      const tick = Math.floor(now * 12), n = 2 + lv;
+      const tick = Math.floor(now * 12), n = 3 + lv;
       for (let i = 0; i < n; i++) {
         const sd = tick * 7 + i * 31 + Math.floor(s), a0 = sdRnd(sd) * TAU, a1 = a0 + 1.4 + sdRnd(sd + 1) * 2.4;
         let P = [x + Math.cos(a0) * r * .95, by + hh * (.15 + .75 * sdRnd(sd + 2)), z + Math.sin(a0) * r * .95]; const B = [x + Math.cos(a1) * r * .95, by + hh * (.15 + .75 * sdRnd(sd + 3)), z + Math.sin(a1) * r * .95];
-        for (let j = 1; j <= 4; j++) { const jg = j < 4 ? r * .3 : 0, Q = [P[0] + (B[0] - P[0]) / (5 - j) + (sdRnd(sd + j * 5) - .5) * jg, P[1] + (B[1] - P[1]) / (5 - j) + (sdRnd(sd + j * 7) - .5) * jg, P[2] + (B[2] - P[2]) / (5 - j) + (sdRnd(sd + j * 9) - .5) * jg]; sdSeg(SDT_SH.BEAM, P, Q, .34, .34, { seed: sd + j, k: 1, a: env, p0: 1, p1: 0, p2: .2, col, sp: 0 }); P = Q; }
+        for (let j = 1; j <= 4; j++) { const jg = j < 4 ? r * .3 : 0, Q = [P[0] + (B[0] - P[0]) / (5 - j) + (sdRnd(sd + j * 5) - .5) * jg, P[1] + (B[1] - P[1]) / (5 - j) + (sdRnd(sd + j * 7) - .5) * jg, P[2] + (B[2] - P[2]) / (5 - j) + (sdRnd(sd + j * 9) - .5) * jg]; sdSeg(SDT_SH.BEAM, P, Q, .62, .62, { seed: sd + j, k: 1.3, a: env, p0: 1, p1: 0, p2: .2, col, sp: 0 }); P = Q; }
       }
-      body(1.1 * (.75 + .25 * Math.sin(now * 46)));
+      body(1.5 * (.75 + .25 * Math.sin(now * 46)));
       if (!e.done) { e.done = 1; for (let i = 0; i < Math.round(8 * lvN); i++) { const a = R(TAU), v = R(.5, 1.4); sdShot('mote', x + Math.cos(a) * r * .5, by + hh * R(.2, .9), z + Math.sin(a) * r * .5, R(.028, .042), R(.35, .6), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.4, 1.6), g: 4, col, k: 1.5 }); } }
     } else if (e.kind === 'stone') {
       if (!e.done) { e.done = 1;
@@ -122996,8 +123005,8 @@ function wbdHits(now) {
       if (f >= 1 && !e.done) { e.done = 1; for (let i = 0; i < Math.round(6 * lvN); i++) { const a = R(TAU), v = R(.4, 1.1); sdShot('mote', x, by + .12, z, R(.026, .04), R(.3, .55), { vx: Math.cos(a) * v, vz: Math.sin(a) * v, vy: R(.5, 1.5), g: 5, col, k: 1.5 }); } }
     } else {
       // vow: warm motes curling up round it
-      for (let i = 0; i < 3 + 2 * lv; i++) { const ph = (u + i * .17) % 1, a = s + i * 2.4 + u * 4, rr = r * (.95 - .4 * ph); sdBill(SDT_SH.MOTE, [x + Math.cos(a) * rr, by + hh * (.1 + 1.1 * ph), z + Math.sin(a) * rr], .065, .065, { seed: i, a: env * .9, k: 1.4, col: [1, .9, .62] }); }
-      sdBill(SDT_SH.GLOW, mid, hh * 1.5, hh * 1.5, { seed: s, a: .28 * env, col: [1, .88, .6] });
+      for (let i = 0; i < 6 + 2 * lv; i++) { const ph = (u + i * .13) % 1, a = s + i * 2.4 + u * 4, rr = r * (1.05 - .4 * ph); sdBill(SDT_SH.MOTE, [x + Math.cos(a) * rr, by + hh * (.1 + 1.1 * ph), z + Math.sin(a) * rr], .12, .12, { seed: i, a: env, k: 2, col: [1, .88, .55] }); }
+      sdBill(SDT_SH.GLOW, mid, hh * 1.6, hh * 1.6, { seed: s, a: .5 * env, col: [1, .85, .5] });
     }
   }
 }
@@ -123047,6 +123056,15 @@ if (typeof SD_FRAMES !== 'undefined') SD_FRAMES.push(now => {
     WBD.slowed.length = 0;
   }
 });
+
+/* ---- only the owner's decals (owner: "just use the new animations for runes rather than a mix of both"): in a Wardbound
+   run nothing else draws the old rune shape. The spells that lit a rune with the toolkit's rune disc (wbSfxRune: Rune
+   Shot, the Rite, Detonate's kin, the Champion), the rune sprite laid flat anywhere (the zones' and discs' VT.RUNE
+   layer) and the sprays of little rune sprites all stand aside; the decal's own Trigger and the effect on the foe are
+   what a rune set off shows ---- */
+if (typeof wbSfxRune === 'function') { const _sr = wbSfxRune; wbSfxRune = function () { if (wbdWB()) return null; return _sr.apply(this, arguments); }; }
+if (typeof vfxFlat === 'function' && typeof VT !== 'undefined') { const _vf = vfxFlat; vfxFlat = function () { if (arguments[9] === VT.RUNE && wbdWB()) return; return _vf.apply(this, arguments); }; }
+if (typeof v2Spray === 'function') { const _vs = v2Spray; v2Spray = function (C, kind) { if (kind === 'rune' && wbdWB()) return null; return _vs.apply(this, arguments); }; }
 
 /* ELEMENT FX hooks (elemfx.js): the drawing primitives asked about the Pyroclasts' and Frostweavers' layers. Loaded after every
    effect module (pyrofire.js, labfx.js, the unit models), so each wrapper sits outside theirs. Every wrapper looks first at
