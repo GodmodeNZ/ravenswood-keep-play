@@ -20,9 +20,9 @@
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_etch"] = {"n":"Etch","s":"8r32x","u":"wb_runecarver","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_detonate"] = {"n":"Detonate","s":"9mf9cj","u":"wb_runecarver","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_scribe"] = {"n":"Scribe the Road","s":"d69v1g","u":"wb_runecarver","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_charge"] = {"n":"Sable Charge","s":"1r09ziy","u":"wb_stormward","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_stormbanner"] = {"n":"Rune Pennant","s":"1qcyjv5","u":"wb_stormward","m":"code"};
-(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_skyfall"] = {"n":"Runefall","s":"1062apz","u":"wb_stormward","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_charge"] = {"n":"Sable Charge","s":"5ie2kx","u":"wb_stormward","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_stormbanner"] = {"n":"Rune Pennant","s":"ah3wnc","u":"wb_stormward","m":"code"};
+(window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_skyfall"] = {"n":"Runefall","s":"px3swb","u":"wb_stormward","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_shieldwall"] = {"n":"Shield Wall","s":"1xucd7o","u":"wb_anvilguard","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_quakeline"] = {"n":"Quake Line","s":"arkuqa","u":"wb_anvilguard","m":"code"};
 (window.SPELL_CLIPS_META = window.SPELL_CLIPS_META || {})["wb_anvil"] = {"n":"Stone Stance","s":"1w229hs","u":"wb_anvilguard","m":"code"};
