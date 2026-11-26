@@ -1,4 +1,4 @@
-const BUILD_TAG = '06311233@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = '9557789c@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -132641,7 +132641,7 @@ function kwBuild() {
   ST('poisoned', 'Poisoned', ['poisoned'], '#9be05a', 'Takes damage every second. Stacks.');
   ST('wounded', 'Wounded', ['wounded'], '#ff3a4a', 'Healing and shields received are halved for 4 sec (reduced by a quarter on bosses). Lasts up to 6 sec.');
   kwMerge('Wounded', 'On your unit', 'A force unit reduced to 0 health is Wounded, not wrecked: the unit holds its post at 0.7× attack speed and spell recovery, and recovers for free when the wave ends.');
-  ST('exposed', 'Exposed', ['exposed'], '#ffb46a', 'Takes increased damage from all sources for a while. Caused by curses, marks and blinding light. Cracked armour lets more of every steel hit through.');
+  ST('exposed', 'Exposed', ['exposed'], '#ffb46a', 'Takes increased damage. The amount depends on the ability that applied it, and talents can raise it.');
   ST('shielded', 'Shielded', ['shielded'], '#bfe0ff', 'A shield absorbs incoming damage until the shield breaks.');
 
   // ---- foe roles (ROLE_NAME and ROLE_WEAK, core.js) and traits ----
