@@ -1,4 +1,4 @@
-const BUILD_TAG = '8afd829e@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd6f22ce1@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -98592,10 +98592,10 @@ const GP_SEED = { wardbound: [[246, 207, 156], [142, 188, 219]], grove: [[255, 2
   conclave: [[223, 189, 255], [121, 220, 232]], stormborn: [[239, 187, 138], [117, 197, 213]], silver: [[255, 225, 168], [176, 200, 225]] };
 // key: [colour, direction]; back: the edge light [colour, direction]; sky, gnd: the soft light; expo: the exposure; d: the light's way on the
 // frame [x, y]; keyC, tintC, shadeC: the key's, the scene's and the shade's colours for the wash over the cut-out (0-255); shadeA: how deep the shade
-const gpLitOf = (o) => Object.assign({ key: [[1.45, 1.3, 1.1], gpDir(-.6, .8, .3)], back: [[.7, .85, 1.1], gpDir(.5, .35, -.6)], sky: [.2, .22, .26], gnd: [.1, .09, .08], expo: .86, d: [-.64, -.77], keyC: [255, 236, 205], tintC: [236, 240, 248], shadeC: [70, 84, 110], shadeA: .4 }, o);
+const gpLitOf = (o) => Object.assign({ key: [[1.45, 1.3, 1.1], gpDir(-.6, .8, .3)], back: [[5, 6.4, 8.5], gpDir(.1, 1, -.4)], sky: [.2, .22, .26], gnd: [.1, .09, .08], expo: .86, d: [-.64, -.77], keyC: [255, 236, 205], tintC: [236, 240, 248], shadeC: [70, 84, 110], shadeA: .4 }, o);
 const GP_LIT0 = gpLitOf({}), GP_SAMP = {}, GP_SEEDLIT = {};
 // a force's light from its seed alone (until its painting has been read): a soft key from the upper left, the fill's colour on its edges
-const gpSeedLit = f => GP_SEEDLIT[f] || (GP_SEEDLIT[f] = GP_SEED[f] ? gpLitOf({ key: [GP_SEED[f][0].map(v => v / 255 * 1.5), gpDir(-.6, .8, .3)], back: [GP_SEED[f][1].map(v => v / 255 * 1.7), gpDir(.5, .35, -.6)], keyC: GP_SEED[f][0], expo: .82 }) : GP_LIT0);
+const gpSeedLit = f => GP_SEEDLIT[f] || (GP_SEEDLIT[f] = GP_SEED[f] ? gpLitOf({ key: [GP_SEED[f][0].map(v => v / 255 * 1.5), gpDir(-.6, .8, .3)], back: [GP_SEED[f][1].map(v => v / 255 * 8.5), gpDir(.1, 1, -.4)], keyC: GP_SEED[f][0], expo: .82 }) : GP_LIT0);
 function gpSample(force, src) {
   if (!force || !src || GP_SAMP[force] !== undefined || typeof Image === 'undefined') return;
   GP_SAMP[force] = null;   // (being read)
@@ -98626,9 +98626,9 @@ function gpSample(force, src) {
     const amb = Math.max(.12, Math.min(.26, .09 + lum * .42));   // (the soft light: little before a dark painting)
     GP_SAMP[force] = gpLitOf({
       key: [kc.map(v => v * 1.55), gpDir(dx2 * .95, Math.max(.22, .4 - dy2 * .75), .28)],
-      back: [sc.map(v => v * (1.5 + lum)), gpDir(dx2 * .7, .4, -.62)],
+      back: [sc.map(v => v / Math.max(sc[0], sc[1], sc[2], .01) * 8.5), gpDir(dx2 * .2, 1, -.4)],   // (strong: it is a plain directional light on a dark texture, added to the key's pass; it only reaches what faces up and back)   // (from behind and above, a little to the painting's light's side)
       sky: sc.map((v, i) => (v * .6 + ac[i] * .4) * amb), gnd: lc.map((v, i) => (v * .6 + ac[i] * .4) * amb * .55),
-      expo: Math.max(.72, Math.min(.98, .62 + lum * 1.05)), d: [dx2, dy2], keyC: to255(kc), tintC: to255(ac.map(v => v * .5 + .5)), shadeC: to255(lc.map(v => v * .42)),
+      expo: Math.max(.66, Math.min(.95, .5 + lum * 1.05)), d: [dx2, dy2], keyC: to255(kc), tintC: to255(ac.map(v => v * .5 + .5)), shadeC: to255(lc.map(v => v * .42)),
       shadeA: Math.max(.3, Math.min(.5, .52 - lum * .5)),
       read: { warm: to255(warm.c), cool: to255(cool.c), warmLeft: warm.x <= cool.x, light: to255(hi.c), at: [+hi.x.toFixed(2), +hi.y.toFixed(2)], sky: to255(sky.c), shade: to255(lo.c), lum: +lum.toFixed(3) } });
   } catch (e) { /* GP_LIT0 stays */ } };
@@ -98689,15 +98689,26 @@ function gpDraw() {
        key where the painting's light is, an edge light from behind in its sky's colour, little soft light. No glow behind it
        (owner, 18 Nov 2026). */
     const S = canHover() ? 640 : 448, A = gpWork('a', S), D = gpWork('d', S), ax = A.getContext('2d', { willReadFrequently: true }), dx = D.getContext('2d', { willReadFrequently: true });
-    const LT = gpLit(gpT), bk = LT.back[0].slice(); bk.dir = LT.back[1];
-    R.sunDir = LT.key[1]; R.sunCol = LT.key[0]; R.sky = LT.sky; R.gnd = LT.gnd; R.rim = .3; R.fill = 0; R.back = bk; R.expo = LT.expo;
+    /* Two lights, each a pass of its own, added. The KEY: the painting's light, on the units' own stylised shading, with that shading's
+       edge lights turned right down (a rim brightest at the outline read as a faint line drawn round the unit: owner, "dont like the
+       faint outline around the unit"). The BACK light: from above and behind in the painting's sky colour, drawn with the engine's
+       plain directional light and no soft light, so it falls on what faces it (the shoulders, the crown of a helm, the tops of cloth
+       and armour) and fades round the form as a light does, not along the outline (owner: "a bit of cool light affecting the unit
+       from the background"). */
+    const LT = gpLit(gpT);
+    R.back = null; R.urim = 0; R.fill = 0; R.expo = LT.expo;
+    R.sty = 1; R.sunDir = LT.key[1]; R.sunCol = LT.key[0]; R.sky = LT.sky; R.gnd = LT.gnd; R.rim = -.3;
     irRender(GP_BLACK, null); ax.globalCompositeOperation = 'copy'; ax.drawImage(R.canvas, 0, 0, S, S); dx.globalCompositeOperation = 'copy'; dx.drawImage(R.canvas, 0, 0, S, S);
     irRender(GP_WHITE, null); dx.globalCompositeOperation = 'difference'; dx.drawImage(R.canvas, 0, 0, S, S);   // (white where there is only background)
+    { const Q = (typeof window !== 'undefined' && window.GP_BACK) || {};   // (window.GP_BACK: a tuning hook for this pass, read each frame: sty, sky, gnd, rim, only)
+      R.sty = Q.sty != null ? Q.sty : 0; R.sunDir = LT.back[1]; R.sunCol = LT.back[0]; R.sky = Q.sky || GP_BLACK; R.gnd = Q.gnd || GP_BLACK; R.rim = Q.rim != null ? Q.rim : 0;
+      irRender(GP_BLACK, null); ax.globalCompositeOperation = Q.only ? 'copy' : 'screen'; ax.drawImage(R.canvas, 0, 0, S, S); }
+    R.sty = 1;
     const img = ax.getImageData(0, 0, S, S), px = img.data, df = dx.getImageData(0, 0, S, S).data;
     gpRef = Math.max(gpRef, df[1], df[4 * (S - 1) + 1]);   // (the background's own difference, read at the top corners: the most seen, so a zoomed-in unit over a corner does not lose it)
     const ref = Math.max(40, gpRef);
     for (let i = 0, n = px.length; i < n; i += 4) {
-      const al = 1 - df[i + 1] / ref;
+      let al = 1 - df[i + 1] / ref; if (al < .98) al = (al - .14) / .84;   // (the faintest fringe dropped: nothing pale left round the outline)
       if (al <= .02) { px[i + 3] = 0; continue; }
       if (al >= .98) { px[i + 3] = 255; continue; }
       const k = 1 / al; px[i] = Math.min(255, px[i] * k); px[i + 1] = Math.min(255, px[i + 1] * k); px[i + 2] = Math.min(255, px[i + 2] * k); px[i + 3] = al * 255;
@@ -98722,7 +98733,7 @@ function gpDraw() {
     { const hx = S / 2, hy = S * .5, r0 = S * .4, ex = LT.d[0], ey = LT.d[1];
       const g3 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g3.addColorStop(0, rgba(LT.shadeC, 0)); g3.addColorStop(.42, rgba(LT.shadeC, 0)); g3.addColorStop(1, rgba(LT.shadeC, LT.shadeA));
       tx.fillStyle = g3; tx.fillRect(0, 0, S, S);
-      const g4 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g4.addColorStop(0, rgba(LT.keyC, .5)); g4.addColorStop(.5, rgba(LT.keyC, 0)); g4.addColorStop(1, rgba(LT.keyC, 0));
+      const g4 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g4.addColorStop(0, rgba(LT.keyC, .34)); g4.addColorStop(.5, rgba(LT.keyC, 0)); g4.addColorStop(1, rgba(LT.keyC, 0));
       tx.globalCompositeOperation = 'soft-light'; tx.fillStyle = g4; tx.fillRect(0, 0, S, S); }
     tx.globalCompositeOperation = 'destination-in'; tx.drawImage(A, 0, 0);
     // onto the scene: a faint shadow where it stands (the platform is painted: an unseen ground under its feet), then the unit
