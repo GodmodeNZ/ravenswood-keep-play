@@ -1,4 +1,4 @@
-const BUILD_TAG = '881833a5@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0383456a@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -100874,7 +100874,7 @@ function hud() {
   const play = G.towers && G.state !== 'demo';
   setText('hGold', play ? String(G.gold) : '—');
   if (TW && play) { const inc = G.income || 0; setText('hInt', inc > 0 ? '+' + inc : ''); const tl = `Gold · income +${inc} each time a wave sets out. Send minions to raise it.`; if (hudCache.goldT !== tl) { hudCache.goldT = tl; document.getElementById('rGold').title = tl; } }
-  else { const iv = play && G.state === 'play' ? interestNow() : 0; setText('hInt', iv > 0 ? '+' + iv : ''); const tl = iv > 0 ? `Gold · ${Math.round(interestRate() * 100)}% interest when the wave is cleared: +${iv}` : 'Gold · hold 100 or more to earn interest when a wave is cleared'; const skn = play && G.state === 'play' ? streakN() : 0, tl2 = tl + (skn ? ` · Flawless streak ×${skn}: +${skn * 10}% gold from kills and wave bonuses` : ''); if (hudCache.goldT !== tl2) { hudCache.goldT = tl2; document.getElementById('rGold').title = tl2; } }
+  else { const iv = play && G.state === 'play' ? interestNow() : 0; setText('hInt', iv > 0 ? '+' + iv : ''); const tl = iv > 0 ? `Gold · ${Math.round(interestRate() * 100)}% interest when the wave is cleared: +${iv}` : (G.region ? 'Gold · no interest in a Homeland battle: your land sends supplies between battles' : 'Gold · hold 100 or more to earn interest when a wave is cleared'); const skn = play && G.state === 'play' ? streakN() : 0, tl2 = tl + (skn ? ` · Flawless streak ×${skn}: +${skn * 10}% gold from kills and wave bonuses` : ''); if (hudCache.goldT !== tl2) { hudCache.goldT = tl2; document.getElementById('rGold').title = tl2; } }
   setText('hLives', play ? String(Math.max(0, G.lives)) : '—');
   { const on = play && rallied(), lt = play && typeof lvTipTxt === 'function' ? lvTipTxt() : '', rk = on + ':' + lt; if (hudCache.rally !== rk) { hudCache.rally = rk; const el = document.getElementById('rLives'); el.classList.toggle('rally', on); el.title = (on ? (G.force ? 'Lives · Last Stand: you are below half your lives, so kills pay 25% more gold and your units deal 15% more damage' : 'Lives · your keep rallies: kills pay 25% more and towers hit 15% harder') : 'Lives') + (lt ? ' · ' + lt : ''); } }   // lvTipTxt: how lives come back (lives.js, force runs)
   setText('hWave', play ? String(TW ? Math.max(1, TW.wave) : G.wave) : '—');
@@ -127257,7 +127257,7 @@ function rnMenu(tab) {
     row('pledge', 'Pledge', !!(nb && nb > RN_LEG.after && T && T.leg && !pledged && G.phase === 'build' && rnCan('pledge')), pledged ? `Pledged: <b>${rnEsc(legN)}</b> drops from ${rnEsc(rnBossName(bt))} on wave ${nb}.` : nb && nb < LEG_FROM ? `Legendaries are first found on wave ${LEG_FROM}: the first pledge is for wave ${Math.ceil(LEG_FROM / 5) * 5}'s boss.` : nb ? `Reserve <b>${rnEsc(legN)}</b>, ${rnEsc(rnBossName(bt))}'s legendary (wave ${nb}): it drops for certain.${G.phase === 'build' ? '' : ' Between waves only.'}` : 'No boss ahead.', 'rnPl'),
     row('unit', 'Open a unit', locked.length > 0 && rnCan('unit'), locked.length ? 'Its units and its talents. Tap one:' : 'Every unit is open.', null,
       locked.length ? `<span class="rn-units">${locked.map(t => `<button type="button" class="rn-u" data-ru="${t}"${rnCan('unit') || (G.keys | 0) > 0 ? '' : ' disabled'}>${rnEsc(TOWERS[t].short || TOWERS[t].name)}</button>`).join('')}</span>` : ''),
-    row('respec', 'Respec a talent tree', G.phase === 'build' && rnCan('respec'), 'Refund one unit type\'s talent points. Opens the talents: use Reset on a tree.', 'rnRs'),
+    row('respec', 'Respec a talent tree', !G.region && G.phase === 'build' && rnCan('respec'), G.region ? 'Change talents on the map between battles.' : 'Refund one unit type\'s talent points. Opens the talents: use Reset on a tree.', 'rnRs'),
     row('awaken', 'Awaken an item', rnCan('awaken'), 'Raise an item (not a legendary) to the current wave’s Item Level, at no gold. Opens the bag: pick an item.', 'rnAw'),
     `<div class="rn-row off"><div><b>At a boss</b><small>A fallen boss offers ${RN_LOOT.offer} items from its table, free; take one. From wave ${typeof TOME !== 'undefined' ? TOME.from : 20} on, one or two bosses a run also have a Tome of Mastery (a second capstone for one unit type): it is one more card to choose from. Once a boss, reroll them into ${RN_LOOT.reroll} fresh ones ${rnCostTag('reroll')}</small></div></div>`,
   ].join('');
@@ -129128,17 +129128,17 @@ function huntPanelBind(B, k, redraw) {
 /* ================= REGION MAP (prototype, the title's Homeland button): a force's homeland, Act I =================
    Design: docs/design/region_map_2026-11-11.md. One region is built: the Grove's homeland, the Greatroot Marches.
    THE LOOP. A map of 12 places joined by roads. Each trouble shows its foe family (campaign.js CAMP_FAMILIES), its waves (a
-     slice of the 50-wave curve), its boss, how far it has grown, its reward and what a broken line costs, before you commit.
+     slice of the 50-wave curve), its boss, the warlord's pips on it, its reward and what a broken line costs, before you commit.
      A battle is that slice, 5-7 waves, on the place's own field, run as a Hunt is (hunts.js): the warband (level, talents,
      items, Renown, opened units) carries in through campCarryIn and out through campBandFromRun; the maze, units and gold start
      fresh, the gold being what a run has earned by that wave (huntGold).
    THE REGION'S OWN STATE (localStorage RG_KEY, one run a force, written after every change): the host's lives (a battle stakes
-     a line of at most RG_LINE of them), the war chest (gold for towns and events), the threat clock, each
-     place's state (open, held, lost) and growth, the roads' danger and events, the lord's helpers.
-   LOSING COSTS, IT DOES NOT END THE RUN. A broken line: the line's lives, a third of the chest, the place falls and its trouble
-     spreads to its neighbours, the clock +2, a fall back to the nearest held town; no unit is ever wounded or lost (owner, 19 Nov
+     a line of at most RG_LINE of them), the war chest (gold for towns and events), the war (R.war:
+     the warlord's armies, garrisons, sieges; see 'the war' below), each place's state (open, held, lost), the roads' danger and events, the lord's helpers.
+   LOSING COSTS, IT DOES NOT END THE RUN. A broken line: the line's lives, a third of the chest, the place stays (or a defended one
+     falls to) the warlord's, his Main Host comes hunting, a fall back to the nearest held town; no unit is ever wounded or lost (owner, 19 Nov
      2026: "dont use the wounded feature, should just have to retry on home map"), and the end screen offers a Retry of the same
-     battle. Sounding the retreat (the pause menu) keeps the lives left, but the trouble grows. The run ends at 0 lives
+     battle. Sounding the retreat (the pause menu) keeps the lives left; it still counts as a lost turn. The run ends at 0 lives
      or a broken line with no held town to fall back to; Hardcore ends it at the first broken line.
    Hooks: wrappers set at load (newGame, serialize, restore, waveHP, makeWave, waveCleared, update, callWave, canSendNext,
      tryBuild, endScreen / onEnd, pauseMenu, titleScreen, campSaveName). Nothing runs unless G.region is set, and G.region is
@@ -129147,17 +129147,17 @@ function huntPanelBind(B, k, redraw) {
 const RG_KEY = 'runehold.region.v1';
 // on in every build since 12 Nov 2026 (owner: "fold it in as it is into the main game"); ?region=0 hides the title's button
 const rgOn = () => !(typeof location !== 'undefined' && /[?&]region=0\b/.test(location.search));
-const RG_LIVES = 30, RG_LINE = 10, RG_CLOCK = 12, RG_MARKS = [4, 8, 12], RG_GROW = 3, RG_PATROLS = 3;
+const RG_LIVES = 30, RG_LINE = 10, RG_PATROLS = 3;
 // the chance to be waylaid on a road by its danger (0-3), and the first wave of a waylay by the road's tier
 const RG_WAY = [0, .25, .45, .65];
 const RG_TIER_W = { 1: 2, 2: 9, 3: 18, 4: 28, 5: 36 };
-// a step of growth: waves 2 later, foes 8% more health, reward 25% more; a patrol's reward by how many came before it
+// a pip of the war's strength on a place (rgPipsAt): waves 2 later, foes 8% more health, reward 25% more; a patrol's reward by how many came before it
 const RG_STEP = { w: 2, hp: .08, pay: .25 };
 /* The first places (tier 1: Mossford, Fernwatch, the roads between them) are where a new player learns the map (owner, 20 Nov
    2026: "difficulty for fernwatch and mossford are too difficult"; the first ten waves are easy, with no surprises): no boss
    (its wave brings a few more of the rank and file), only the faction's melee and quick foes and at most one armoured foe a
    wave (casters, slingers, flyers and the rest march as melee), foes at hp of their health, a line of `line` lives, and a
-   retreat from one does not move the threat clock. Growth still applies on top. Their gold is a normal run's at that wave
+   lost battle there sets no army hunting you. The war's pips still apply on top. Their gold is a normal run's at that wave
    (`gold`: a floor, 0 = none; it was 200 until 25 Nov 2026, owner: "just seems a little too easy, and im able to build more
    units than i usually would": easy early waves, not gold-rich ones). `hp` was .8 until 26 Nov 2026, when units started plain
    and slower (owner: "finding it quite difficult to beat the first 5 waves"): the bot (sim/region_bal.py --talents none, a
@@ -129183,7 +129183,7 @@ const RG_GENTLE = { tier: 1, hp: .55, few: 1, line: 15, gold: 0, bossFill: 4 };
      roles, off: 25 melee foes for the mixed wave flooded the bot's maze). The bot still hit a wall at Hollowell Barrows with
      the maze carried (sim/region_bal.py --chain fernwatch,barrows:1), so these stay. */
 // a battle's line: the lives it stakes from the host's (a first place's longer, a second-tier place's as RG_EASE says)
-const rgLineOf = (R, S) => Math.min(S.gentle ? RG_GENTLE.line : S.ease && RG_EASE.line ? RG_EASE.line : RG_LINE, R.lives);
+const rgLineOf = (R, S) => Math.min((S.gentle ? RG_GENTLE.line : S.ease && RG_EASE.line ? RG_EASE.line : RG_LINE) + (S.town ? S.town.line : 0), R.lives);
 const RG_EASE = { tier: 2, hp: .85, first: false, line: 15 }, RG_START = { k: 1 }, RG_MAZE = { on: true }, RG_FAM_IN = { on: true };
 // what a run has earned by wave w: the start, and every wave before it (its troops' bounties and its bonus)
 function rgEarned(w) { let g = DIFFS.normal.gold; for (let n = 1; n < w; n++) g += 26 * bountyFor(n, { bounty: 1 }) + Math.round((12 + 2 * n) * (typeof econK === 'function' ? econK(n) : 1)); return g; }
@@ -129333,7 +129333,7 @@ function rgSetForce(f) { try { localStorage.setItem(RG_FKEY, f); } catch (e) {} 
 const rgForceTabs = cur => `<div class="rg-forces" role="tablist">${rgForces().map(f => `<button type="button" class="rg-force${f === cur ? ' on' : ''}" data-f="${f}" style="--fh:${FORCES[f].hue || '#c8a050'}">${rgEsc(FORCES[f].name)}${rgGet(f) ? '<small>run under way</small>' : ''}</button>`).join('')}</div>`;
 function rgForceWire() { for (const b of ovp.querySelectorAll('.rg-force')) b.onclick = () => { sfx('click'); rgSetForce(b.dataset.f); rgSel = null; rgOpen(b.dataset.f); }; }
 function rgAll() { let s = null; try { s = JSON.parse(localStorage.getItem(RG_KEY) || 'null'); } catch (e) {} return s && s.runs && typeof s.runs === 'object' ? s : { v: 1, runs: {} }; }
-function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; if (R && R.st && RG_REGIONS[force]) rgFill(R); return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
+function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; if (R && R.st && RG_REGIONS[force]) { rgFill(R); rgWarFill(R); } return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
 // a run saved before a place or road was added to its map (the Thornhive, 25 Nov 2026) gets them now, drawn from its own seed
 // as rgNew would: without this the map, its cards and the march read a place with no state and throw
 function rgFill(R) {
@@ -129361,12 +129361,12 @@ const rgRoadIx = (R, a, b) => R.roads.findIndex(r => (r.a === a && r.b === b) ||
 const rgNb = (R, id) => R.roads.filter(r => r.a === id || r.b === id).map(r => r.a === id ? r.b : r.a);
 const rgHeldTown = (R, id) => { const n = rgNode(R, id); return n && n.kind === 'town' && R.st[id].s === 'held'; };
 const rgSettled = R => rgDef(R).nodes.filter(n => n.kind !== 'town' && R.st[n.id].s === 'held').length;
-function rgLog(R, t) { R.log.unshift(t); R.log = R.log.slice(0, 8); }
+function rgLog(R, t) { R.log.unshift(t); R.log = R.log.slice(0, 14); }
 
 // a new run: the seed draws each trouble's family, the roads' danger and waylayers, the two helpers and the two events
 function rgNew(force, hero, hard) {
   const D = RG_REGIONS[force], seed = (Math.random() * 2 ** 31) | 0;
-  const R = { v: 1, force, hero, seed, hard: !!hard, at: D.nodes.find(n => n.start).id, lives: RG_LIVES, chest: 0, clock: 0, wounded: {}, band: null, rnBank: 0,
+  const R = { v: 1, force, hero, seed, hard: !!hard, at: D.nodes.find(n => n.start).id, lives: RG_LIVES, chest: 0, wounded: {}, band: null, rnBank: 0,
     st: {}, roads: [], helpers: [], log: [], pending: null, battle: null, battles: 0, moves: 0, over: '', done: false, t0: Date.now() };
   const left = {};
   for (const n of D.nodes) {
@@ -129390,45 +129390,407 @@ function rgNew(force, hero, hard) {
   for (const i of evRoads) { if (!kinds.length) break; const r = R.roads[i]; if (used.includes(r.a) || used.includes(r.b)) continue; r.ev = kinds.shift(); used.push(r.a, r.b); }
   // the lord's two helpers sit at two troubles of tiers 3-4
   R.helpers = rgShuffle(seed, 'help', D.nodes.filter(n => n.kind === 'trouble' && n.tier >= 3).map(n => n.id)).slice(0, 2).map(id => ({ node: id, fam: R.st[id].fam }));
+  rgWarNew(R);
   rgLog(R, `${HERO_BY[hero] ? HERO_BY[hero].name : 'The commander'} musters the host at ${rgNode(R, R.at).name}.`);
   return R;
 }
 
-/* ---- the clock, growth, spread and the fall back ---- */
-// a place grows a step (at most RG_GROW): why is kept with it (st.why, newest last), for its card (owner, 20 Nov 2026: "its also not
-// clear how difficulty works"); a win that holds the place clears both
-function rgGrow(R, id, why) { const st = R.st[id]; if (st.s === 'held' || (st.g | 0) >= RG_GROW) return false; st.g = (st.g | 0) + 1; st.why = (st.why || []).concat(why ? [why] : []).slice(-RG_GROW); return true; }
-// how hard a place's battle is, in one word and stars (1 Easy .. 5 Deadly): its tier (a first place 1, the lair 5) and its growth
+/* ---- the war (owner, 26 Nov 2026: "strategy instead": time your strikes, bait and trap the enemy, defend or abandon a besieged
+   town, take land because it weakens them). There is no threat clock: how hard a place is comes from the pieces on the map.
+   - THE POOL. The warlord's strength is counted in pips (one pip: a place's waves RG_STEP.w later, its foes RG_STEP.hp more
+     health). He starts with RG_WAR.start of them: the Main Host (his own army), two lesser bands and a few garrisons. A beaten
+     army's pips are gone for good; his lair musters new ones slowly, faster for every place he holds that is still supplied.
+   - TURNS. Every march or battle you make is one turn: the enemy then takes its turn and each army takes one road step.
+     Shopping, the forge, resting and re-specs take no turn.
+   - A BATTLE at a place: its tier's base + its garrison + every army standing there (their pips, and their family marching
+     too). An empty enemy place is as it first stood.
+   - PLANS. Each army keeps a plan for a few turns, scored (rgWarChoose) and seeded per run so it can be read and baited:
+     Pursue your host, Siege a held town, Retake a place you took, Guard a key place you threaten, Muster at the lair when hurt,
+     or Hold. The warlord's stance (Aggressive for a while after you lose a battle, Defensive when you near his lair or take
+     a key place) leans the scores.
+   - SIEGES. An army that reaches a held town besieges it: RG_WAR.siege turns, then it falls (a garrison is left in it). A held
+     town is a wall: an army cannot march through it without stopping to besiege it.
+   - LAND. Every supplied place the warlord holds adds to his muster; three places give his armies an edge (RG_WAR_SPEC); a
+     place cut off from his lair by your land loses a garrison pip every turn.
+   Everything is on the map: each army a token with its strength, its plan's icon and an arrow for its next step; garrisons
+   over the places; sieges counting down on the towns. */
+const RG_WAR = {
+  start: 12, main: { pips: 4, max: 6 }, band: { pips: 2, max: 3 }, gar: 4, ceil: 16,
+  grace: 4,                // turns before any army marches on your land (the first places stay easy: no surprises)
+  siege: 3,                // turns a besieged town holds out
+  muster: { base: .03, place: .02 },    // pips a turn: the lair's own, and each supplied place the warlord holds
+  hunt: 4,                 // turns the Main Host hunts your host after you lose a battle (not at a first place)
+  plan: 4,                 // turns an army keeps a plan before it thinks again
+  gcap: 5,                 // the most pips one battle can carry
+  beat: .5,                // a beaten Main Host loses this share of its pips (at least 2); a beaten band is destroyed
+};
+// the places that give the warlord an edge while he holds them
+const RG_WAR_SPEC = {
+  cinder: { tag: 'Forges', fams: ['forge', 'iron'], say: 'its forges keep armoured troops tough: Iron Legion and Ember Host armies fight a pip stronger while the warlord holds it' },
+  thornhive: { tag: 'Hive', fams: ['sky', 'brood'], say: 'it feeds flyers and crawlers: Storm Wing and Crawling Brood armies fight a pip stronger while the warlord holds it' },
+  rootdeep: { tag: 'Den', muster: .08, say: 'the warlord’s allies den here: his lair musters faster while he holds it' },
+};
+// a plan: its name, icon, and what it reads as on the map
+const RG_PLAN = { pursue: ['Pursue', '⚔', 'hunting your host'], siege: ['Siege', '♜', 'to besiege'], retake: ['Retake', '↺', 'to retake'], guard: ['Guard', '⚑', 'guarding'], muster: ['Muster', '✚', 'back to the lair to muster'], hold: ['Hold', '•', 'holding'] };
+const RG_STANCE = { watchful: 'Watchful', aggressive: 'Aggressive', defensive: 'Defensive' };
+const rgLair = R => rgDef(R).nodes.find(n => n.kind === 'lair').id;
+const rgMine = (R, id) => !!R.st[id] && R.st[id].s === 'held';
+const rgArmies = R => (R.war && R.war.armies || []).filter(a => !a.dead && a.pips > 0);
+const rgArmy = (R, id) => rgArmies(R).find(a => a.id === id) || null;
+const rgArmiesAt = (R, id) => rgArmies(R).filter(a => a.at === id);
+const rgFamName = f => f && typeof CAMP_FAMILIES !== 'undefined' && CAMP_FAMILIES[f] ? CAMP_FAMILIES[f].name : 'The warlord’s host';
+const rgPipW = n => `${n} ${n === 1 ? 'pip' : 'pips'}`;
+const rgRoadsW = d => d === 0 ? 'here' : `${d} ${d === 1 ? 'road' : 'roads'} away`;
+// road distances from a place to every place (breadth first)
+function rgDist(R, from) { const d = { [from]: 0 }, q = [from]; while (q.length) { const c = q.shift(); for (const nb of rgNb(R, c)) if (d[nb] == null) { d[nb] = d[c] + 1; q.push(nb); } } return d; }
+// the road path from a to b (first step first), or null
+function rgPath(R, a, b) {
+  if (a === b) return [a]; const prev = { [a]: null }, q = [a];
+  while (q.length) { const c = q.shift(); if (c === b) break; for (const nb of rgNb(R, c).sort()) if (!(nb in prev)) { prev[nb] = c; q.push(nb); } }
+  if (!(b in prev)) return null; const p = []; for (let c = b; c != null; c = prev[c]) p.unshift(c); return p;
+}
+// the places the lair can supply: reached from it by roads through places the warlord holds
+function rgSupplied(R) { const L = rgLair(R), seen = new Set([L]), q = [L]; while (q.length) { const c = q.shift(); for (const nb of rgNb(R, c)) if (!seen.has(nb) && !rgMine(R, nb)) { seen.add(nb); q.push(nb); } } return seen; }
+// pips a turn the lair musters: its own, each supplied place the warlord holds, the den
+function rgWarRate(R, sup) {
+  sup = sup || rgSupplied(R); const L = rgLair(R); let rate = RG_WAR.muster.base;
+  for (const id of sup) if (id !== L) rate += RG_WAR.muster.place;
+  for (const sid in RG_WAR_SPEC) if (RG_WAR_SPEC[sid].muster && sup.has(sid) && !rgMine(R, sid)) rate += RG_WAR_SPEC[sid].muster;
+  return rate;
+}
+const rgWarTotal = R => rgArmies(R).reduce((s, a) => s + a.pips, 0) + Object.values(R.war.gar).reduce((s, n) => s + (n | 0), 0) + (R.war.reserve | 0);
+function rgBandName(fam) { return rgFamName(fam).replace(/^The /, 'The ') + ' band'; }
+// a new run's war: the Main Host in the lair, a band at a far place of tier 4 and one of tier 3, garrisons on four more far places
+function rgWarNew(R) {
+  const D = rgDef(R), L = rgLair(R), seed = R.seed | 0;
+  const far = t => D.nodes.filter(n => n.kind !== 'lair' && n.tier === t && !(n.kind === 'town' && n.start)).map(n => n.id);
+  const b4 = rgShuffle(seed, 'band4', far(4))[0], b3 = rgShuffle(seed, 'band3', far(3))[0], fam = id => (R.st[id] && R.st[id].fam) || 'horde';
+  const lord = D.lord && typeof CREEPS !== 'undefined' && CREEPS[D.lord] ? CREEPS[D.lord].name : 'the warlord';
+  const W = { turn: 0, stance: 'watchful', hunt: 0, mus: 0, reserve: 0, rate: 0, gar: {}, siege: {}, cut: {}, lost: 0, raised: 0, news: [],
+    armies: [{ id: 'main', main: true, name: 'The Main Host', lead: lord, fam: D.hostFam || 'horde', at: L, pips: RG_WAR.main.pips, plan: null, next: null }] };
+  // (each band its own family, so the two read apart: a place's own, else the first of its tier's not yet marching)
+  [[b4, 'b1'], [b3, 'b2']].forEach(([at, id]) => { if (!at) return; const used = W.armies.map(a => a.fam), t = rgNode(R, at).tier, f = !used.includes(fam(at)) ? fam(at) : rgShuffle(seed, 'bf' + id, D.pools[t] || []).find(x => !used.includes(x)) || fam(at);
+    W.armies.push({ id, name: rgBandName(f), fam: f, at, pips: RG_WAR.band.pips, plan: null, next: null }); });
+  const left = RG_WAR.start - W.armies.reduce((s, a) => s + a.pips, 0);
+  rgShuffle(seed, 'gar', far(3).concat(far(4)).filter(id => id !== b4 && id !== b3)).slice(0, Math.max(0, Math.min(RG_WAR.gar, left))).forEach(id => { W.gar[id] = 1; });
+  W.comfort = 1; R.war = W; delete R.clock; rgPrizeFill(R);
+  rgWarThink(R);
+  return W;
+}
+// a save from before the war (the threat clock): its growth becomes garrisons (at most 2 a place), the clock goes
+function rgWarFill(R) {
+  if (R.war && Array.isArray(R.war.armies)) { if (!R.prize) rgPrizeFill(R); if (!R.war.comfort) R.war.comfort = 1; return R; }
+  const g = {}; for (const id in R.st) { const st = R.st[id]; if (st.s !== 'held' && (st.g | 0) > 0) g[id] = Math.min(2, st.g | 0); st.g = 0; st.why = []; }
+  rgWarNew(R); for (const id in g) R.war.gar[id] = Math.max(R.war.gar[id] | 0, g[id]);
+  return R;
+}
+// what a place's battle carries from the war: its garrison, the armies there, their edge from a place the warlord holds
+function rgPipsAt(R, id) {
+  const W = R.war || { gar: {} }, gar = rgMine(R, id) ? 0 : W.gar[id] | 0, here = R.war ? rgArmiesAt(R, id) : [], edge = [];
+  for (const a of here) for (const sid in RG_WAR_SPEC) { const X = RG_WAR_SPEC[sid]; if (X.fams && X.fams.includes(a.fam) && R.st[sid] && !rgMine(R, sid)) { edge.push([a, sid]); break; } }
+  const raw = gar + here.reduce((s, a) => s + a.pips, 0) + edge.length;
+  return { gar, armies: here, edge, raw, g: Math.min(RG_WAR.gcap, raw) };
+}
+// the plans an army could take, scored: the best wins (ties broken by the run's seed, so a run's war replays the same)
+function rgWarChoose(R, a) {
+  const W = R.war, L = rgLair(R), D = rgDef(R), dA = rgDist(R, a.at), dH = rgDist(R, R.at), max = a.main ? RG_WAR.main.max : RG_WAR.band.max;
+  const aggr = W.stance === 'aggressive', def = W.stance === 'defensive', grace = W.turn < RG_WAR.grace, out = [];
+  // (another army already set on the same place makes it less worth it: they spread out rather than pile up)
+  const taken = (k, to) => ['siege', 'retake', 'guard'].includes(k) ? rgArmies(R).filter(o => o !== a && o.plan && o.plan.k === k && o.plan.to === to).length : 0;
+  const add = (k, to, s) => { if (to == null || dA[to] == null) return; out.push({ k, to, s: s - 2 * taken(k, to) + rgRand(R.seed | 0, `${W.turn}|${a.id}|${k}|${to}`) * .5 }); };
+  const rest = Math.max(0, (a.idle | 0) - RG_WAR2.idle) * 1.5;   // (an army long on one place grows restless: no AI loop holds forever)
+  add('hold', a.at, .8 + (grace ? 20 : 0) - rest);
+  if (a.pips < max) add('muster', L, (a.pips <= 1 ? 6 : a.pips * 2 <= max ? 2.5 : .3) - .3 * dA[L] + (def ? 1 : 0));
+  if (!grace) {
+    if (a.main || dA[R.at] <= 3) add('pursue', R.at, 1 + (a.main && W.hunt > 0 ? 5 : 0) + (aggr ? 1.5 : 0) - (def ? 1 : 0) - .7 * dA[R.at] + (a.pips >= 3 ? 1 : -2));
+    for (const n of D.nodes) {
+      if (!rgMine(R, n.id)) continue;
+      if (n.kind === 'town') add('siege', n.id, 2 + .5 * (dH[n.id] | 0) - .6 * dA[n.id] + (aggr ? 1.5 : 0) - (def ? 1 : 0) - (R.at === n.id ? 1.5 : 0) + (a.pips >= 3 ? .5 : -1));
+      else if (n.id !== R.at) add('retake', n.id, 1.2 + .4 * (n.tier | 0) + (RG_WAR_SPEC[n.id] ? 1.5 : 0) + .3 * (dH[n.id] | 0) - .6 * dA[n.id] + (aggr ? 1 : 0) - (def ? .5 : 0));
+    }
+  }
+  for (const n of D.nodes) {   // guard: a key place the warlord holds that your host is within 2 roads of
+    if (rgMine(R, n.id) || dH[n.id] == null || dH[n.id] > 2) continue;
+    const v = (n.kind === 'lair' ? 3 : 0) + (RG_WAR_SPEC[n.id] ? 2 : 0) + (rgPrizeAt(R, n.id) ? 1.5 : 0) + (n.tier >= 3 ? .5 : 0); if (!v) continue;
+    add('guard', n.id, 1 + .8 * v + (def ? 3 : 0) - .5 * dA[n.id] - (n.id === a.at ? rest : 0));
+  }
+  out.sort((x, y) => y.s - x.s || (x.k + x.to < y.k + y.to ? -1 : 1));
+  return out[0] || { k: 'hold', to: a.at, s: 0 };
+}
+// is a plan still worth keeping
+function rgWarValid(R, a, P) {
+  if (!P || !R.st[P.to]) return false;
+  if (P.k === 'siege') return rgMine(R, P.to) && rgNode(R, P.to).kind === 'town';
+  if (P.k === 'retake') return rgMine(R, P.to) && rgNode(R, P.to).kind !== 'town' && a.at !== P.to;
+  if (P.k === 'guard') return !rgMine(R, P.to);
+  if (P.k === 'muster') return a.pips < (a.main ? RG_WAR.main.max : RG_WAR.band.max);
+  return true;
+}
+// every army decides (keeping its plan while it holds) and works out its next road step: the arrow the map shows. A held town
+// on the way is where the march stops (it besieges it)
+function rgWarThink(R) {
+  const W = R.war;
+  for (const a of rgArmies(R)) {
+    const S = W.siege[a.at]; if (S && S.army === a.id) { a.plan = { k: 'siege', to: a.at, left: 99 }; a.next = null; continue; }
+    if (!(a.plan && a.plan.left > 0 && rgWarValid(R, a, a.plan))) { const c = rgWarChoose(R, a); a.plan = { k: c.k, to: c.to, left: c.k === 'pursue' && a.main && W.hunt > 0 ? W.hunt : RG_WAR.plan }; }
+    if (a.plan.k === 'pursue') a.plan.to = R.at; else if (a.plan.k === 'hold') a.plan.to = a.at;
+    a.idle = a.at === a.idle_at ? (a.idle | 0) + 1 : 0; a.idle_at = a.at;
+    const p = rgPath(R, a.at, a.plan.to); a.next = p && p.length > 1 ? p[1] : null;
+  }
+}
+// an army reaches a place: a held town is besieged; a place you took is retaken (not where your host stands: that is an assault)
+function rgWarArrive(R, a, out) {
+  const id = a.at, n = rgNode(R, id), W = R.war;
+  if (!rgMine(R, id) || R.at === id && n.kind !== 'town') return;
+  if (n.kind === 'town') {
+    if (!W.siege[id]) { W.siege[id] = { army: a.id, left: RG_WAR.siege }; out.push(`${a.name} besieges ${n.name}: it falls in ${RG_WAR.siege} turns unless you break the siege`); }
+    a.plan = { k: 'siege', to: id, left: 99 }; return;
+  }
+  R.st[id].s = 'lost';
+  if (a.plan && a.plan.k === 'retake' && a.pips >= 2) { a.pips--; W.gar[id] = (W.gar[id] | 0) + 1; }
+  out.push(`${a.name} retakes ${n.name}${W.gar[id] ? ` and leaves a garrison of ${W.gar[id]}` : ''}`);
+  if (a.plan && a.plan.to === id) a.plan.left = 0;
+}
+// a town falls to an army: the warlord holds it with a garrison from the army
+function rgWarFall(R, id, a, out) {
+  const W = R.war; delete W.siege[id]; R.st[id].s = 'lost';
+  if (a && a.pips >= 2) { a.pips--; W.gar[id] = (W.gar[id] | 0) + 1; }
+  if (a) a.plan = null;
+  out.push(`${rgNode(R, id).name} falls${a ? ` to ${a.name}` : ''}${rgNode(R, id).kind === 'town' ? ': its stores no longer feed you' : ''}`);
+}
+// an army beaten in battle: a band is destroyed; the Main Host loses half its strength and falls back toward the lair (with no
+// road open to it, it is trapped and destroyed)
+function rgWarBeat(R, a, out) {
+  const W = R.war, L = rgLair(R);
+  for (const id in W.siege) if (W.siege[id].army === a.id) delete W.siege[id];
+  if (!a.main) { W.lost += a.pips; out.push(`${a.name} is destroyed: −${rgPipW(a.pips)} from the warlord for good`); a.pips = 0; a.dead = true; return; }
+  const cut = Math.min(a.pips, Math.max(2, Math.ceil(a.pips * RG_WAR.beat))); a.pips -= cut; W.lost += cut;
+  const d = rgDist(R, L), back = rgNb(R, a.at).filter(nb => !rgMine(R, nb) && nb !== R.at).sort((x, y) => (d[x] - d[y]) || (x < y ? -1 : 1))[0];
+  if (a.pips <= 0 || !back) { W.lost += a.pips; out.push(`${a.name} is ${a.pips > 0 ? 'trapped and ' : ''}destroyed: the warlord must muster a new one`); a.pips = 0; a.dead = true; return; }
+  a.at = back; a.plan = { k: 'muster', to: L, left: 99 }; a.next = null;
+  out.push(`${a.name} is broken (−${rgPipW(cut)} for good) and falls back to ${rgNode(R, back).name}`);
+}
+// the enemy's turn, after every march or battle: sieges count down, cut-off garrisons weaken, the lair musters, each army takes
+// one road step, the warlord's stance and the armies' plans are worked out again. Returns the news, for the map's notice
+function rgWarTurn(R, out) {
+  if (!R.war) rgWarNew(R);
+  const W = R.war, D = rgDef(R), L = rgLair(R), news = [], say = t => { news.push(t); out.push(t); };
+  W.turn++; if (W.hunt > 0) W.hunt--;
+  // the towns you freed feed the host
+  const inc = rgWarIncome(R).total; if (inc) R.supply = (R.supply | 0) + inc;   // (supplies for the next battle's start gold: a Homeland battle pays no interest)
+  // sieges
+  for (const id of Object.keys(W.siege)) {
+    const s = W.siege[id], a = rgArmy(R, s.army);
+    if (!a || a.at !== id || !rgMine(R, id)) { delete W.siege[id]; if (rgMine(R, id)) say(`The siege of ${rgNode(R, id).name} is lifted`); continue; }
+    s.left--; if (s.left > 0) continue;
+    if (R.at === id) { s.left = 0; if (!R.pending && !R.battle) R.pending = { kind: 'assault', army: a.id, at: id, breach: 1 }; say(`${rgNode(R, id).name}’s walls are breached: fight, or abandon the town`); continue; }
+    const t = []; rgWarFall(R, id, a, t); t.forEach(say);
+  }
+  // supply: a place cut off from the lair loses a garrison pip a turn
+  const sup = rgSupplied(R); W.cut = {};
+  for (const n of D.nodes) {
+    if (rgMine(R, n.id) || sup.has(n.id)) continue; W.cut[n.id] = 1;
+    if (W.gar[n.id] > 0) { W.gar[n.id]--; W.lost++; say(`${n.name} is cut off from the lair: its garrison weakens (${W.gar[n.id]} left)`); }
+  }
+  for (const id in W.gar) if (!(W.gar[id] > 0) || rgMine(R, id)) delete W.gar[id];
+  // the muster: the lair's own, each supplied place he holds, the den
+  const rate = rgWarRate(R, sup);
+  W.rate = rate; W.mus = (W.mus || 0) + rate;
+  while (W.mus >= 1) { W.mus -= 1; if (rgWarTotal(R) < RG_WAR.ceil) W.reserve++; }
+  for (const a of rgArmies(R)) { const max = a.main ? RG_WAR.main.max : RG_WAR.band.max; if (a.at === L) while (W.reserve > 0 && a.pips < max) { W.reserve--; a.pips++; } }
+  for (const a of W.armies) {   // a destroyed army is raised again at the lair when the muster has enough for it
+    if (!a.dead) continue; const need = a.main ? 3 : RG_WAR.band.pips; if (W.reserve < need) continue;
+    if (!a.main) { const used = rgArmies(R).map(o => o.fam), pool = (D.pools[4] || []).concat(D.pools[3] || []).filter(x => !used.includes(x)), f = pool[Math.floor(rgRand(R.seed | 0, 'raise' + W.raised) * pool.length)] || 'horde'; a.fam = f; a.name = rgBandName(f); }
+    W.raised++; W.reserve -= need; a.pips = need; a.dead = false; a.at = L; a.plan = null; a.next = null;
+    say(`The lair musters ${a.main ? 'a new Main Host' : a.name}`);
+  }
+  // each army takes its step (the arrow the map showed), unless it holds a siege
+  for (const a of rgArmies(R)) {
+    const s = W.siege[a.at]; if (s && s.army === a.id) continue;
+    if (!a.next || rgNb(R, a.at).indexOf(a.next) < 0) continue;
+    a.at = a.next; a.next = null; if (a.plan) a.plan.left--;
+    const t = []; rgWarArrive(R, a, t); t.forEach(say);
+  }
+  for (const a of rgArmies(R)) if (a.plan && a.plan.k !== 'siege' && a.next == null) a.plan.left--;
+  // the stance: aggressive while he hunts you, defensive when you near his lair or hold a place that feeds his armies
+  const dL = rgDist(R, L)[R.at], keys = Object.keys(RG_WAR_SPEC).some(id => rgMine(R, id)), deep = D.nodes.filter(n => n.tier >= 3 && rgMine(R, n.id)).length;
+  const st0 = W.stance; W.stance = W.hunt > 0 ? 'aggressive' : (dL <= 2 || keys || deep >= 3) ? 'defensive' : 'watchful';
+  if (W.stance !== st0) say(`The warlord turns ${RG_STANCE[W.stance].toLowerCase()}`);
+  rgWarThink(R);
+  rgWarRelief(R, news); for (const t of news) if (!out.includes(t)) out.push(t);
+  // an army on the place your host holds (not a town: that is a siege) falls on it
+  if (!R.pending && !R.battle) { const a = rgArmiesAt(R, R.at)[0], n = rgNode(R, R.at); if (a && rgMine(R, R.at) && n.kind !== 'town') { R.pending = { kind: 'assault', army: a.id, at: R.at }; say(`${a.name} falls on your host at ${n.name}`); } }
+  W.news = news.slice(0, 6);
+  return news;
+}
+// a battle's result, for the war: a win clears the place (its garrison, the armies there beaten); a loss (or a retreat) keeps it
+// the warlord's, and away from a first place sets his Main Host hunting you (leaving a garrison behind if it fought there)
+function rgWarAfter(R, S, won, retreat, out) {
+  if (!R.war || S.kind === 'waylay' || S.kind === 'patrol') return;
+  const W = R.war, id = S.node, here = rgArmiesAt(R, id);
+  if (won) { delete W.gar[id]; delete W.siege[id]; for (const a of here) rgWarBeat(R, a, out); return; }
+  if (S.kind === 'defend') {
+    const a = here[0], town = rgNode(R, id).kind === 'town', s = W.siege[id];
+    if (!(retreat && town && s && s.left > 0)) rgWarFall(R, id, a, out);
+  }
+  if (S.gentle) { out.push('The warlord pays a skirmish at a first place no heed'); return; }
+  const M = W.armies.find(a => a.main && !a.dead && a.pips > 0); if (!M) return;
+  if (M.at === id && M.pips >= 2 && !rgMine(R, id)) { M.pips--; W.gar[id] = (W.gar[id] | 0) + 1; out.push(`${M.name} leaves a garrison at ${rgNode(R, id).name}`); }
+  W.hunt = RG_WAR.hunt; W.stance = 'aggressive'; M.plan = { k: 'pursue', to: R.at, left: RG_WAR.hunt };
+  out.push(`${M.name} sets out to hunt your host`);
+}
+/* ---- the war, round two (owner, 27 Nov 2026) ----
+   - ALWAYS AN EASIER FIGHT ("so long as there is always the option to fight elsewhere where its easier then come back stronger
+     then it will work"): after every enemy turn there is an enemy place within RG_WAR2.reach roads of the host that is soft:
+     rated no harder than the last place won (R.war.comfort), or empty and at most one step past it. If there is none, the
+     warlord pulls back from the cheapest place near the host (its garrison to his lair, an army a road away): rgWarRelief.
+   - ATTRITION: a lost (or retreated) battle takes off the garrison and armies there the share of its waves the host held.
+   - A TOWN DEFENDED: the host's maze stands ready (kept, no choice), foes weaker, more lives on the line, gold from its stores.
+   - LAND PAYS (in place of interest in a Homeland battle): supplies a turn from each town, settled place and the warlord's
+     edges you took, kept for the next battle's start gold (R.supply).
+   - FARMING costs: every fight is a turn, and a place fought again soon pays less (gold, XP, drops) until left alone a while.
+   - PRIZES: two or three places a run hold a known prize (a set piece or a legendary of the force's own), won once. */
+const RG_WAR2 = {
+  reach: 2,                                   // roads from the host to the easier fight
+  town: { hp: .8, gold: .15, line: 5 },       // a held town defended: foes' health ×hp, its stores give gold (share of a run's earnings), lives
+  income: { town: 25, start: 10, spec: 15, place: 6, perW: 1 / 15 },   // supplies a turn; ×(1 + wave × perW)
+  farm: { k: .7, recover: 3 },                // each fight there in the last turns: pay ×k; a fight is forgotten after `recover` turns away
+  idle: 4,                                    // turns an army holds or guards one place before it grows restless
+};
+// the warlord's rating of a place's battle now, and what it would be with no garrison or army
+function rgRateAt(R, id) { const S = rgSpec(R, id, 'trouble'), k = rgDiff(R, S).k, b = rgDiff(R, Object.assign({}, S, { g: 0 })).k; return { k, base: b, g: S.g }; }
+// is the battle at an enemy place one the host can take on (no harder than the last place won, or empty and one step past it)
+function rgSoft(R, id) {
+  const n = rgNode(R, id); if (!n || rgMine(R, id) || n.kind === 'lair') return false;
+  const c = (R.war && R.war.comfort) || 1, r = rgRateAt(R, id);
+  return r.k <= c || (r.g === 0 && r.base <= c + 1);
+}
+// the soft fights within reach of the host
+function rgSoftNear(R, reach) { const d = rgDist(R, R.at); return rgDef(R).nodes.filter(n => d[n.id] != null && d[n.id] <= (reach || RG_WAR2.reach) && rgSoft(R, n.id)).map(n => n.id); }
+// no soft fight near: the warlord pulls back from the cheapest place near the host (fewest pips to move), nearest first
+function rgWarRelief(R, out) {
+  const W = R.war, D = rgDef(R), dH = rgDist(R, R.at), L = rgLair(R);
+  for (let guard = 0; guard < 8 && !rgSoftNear(R).length; guard++) {
+    // (only a place that pulling back can make soft: its own fight, empty, at most a step past the last win)
+    const c = W.comfort || 1, can = n => n.kind !== 'lair' && !rgMine(R, n.id) && dH[n.id] != null && rgRateAt(R, n.id).base <= c + 1 && rgArmiesAt(R, n.id).every(a => rgNb(R, n.id).some(nb => nb !== R.at && !rgMine(R, nb)));
+    let reach = RG_WAR2.reach, cand = [];
+    for (; reach <= 6 && !cand.length; reach++) cand = D.nodes.filter(n => dH[n.id] <= reach && can(n));
+    if (!cand.length) return;
+    const cost = id => rgPipsAt(R, id).raw;
+    cand.sort((a, b) => cost(a.id) - cost(b.id) || dH[a.id] - dH[b.id] || (a.id < b.id ? -1 : 1));
+    const n = cand[0], id = n.id;
+    if (W.gar[id] > 0) { W.reserve = (W.reserve | 0) + W.gar[id]; out.push(`The warlord draws the garrison of ${n.name} back to his lair: an opening`); delete W.gar[id]; continue; }
+    const here = rgArmiesAt(R, id); if (!here.length) return;   // (soft already, past the reach: nothing to move)
+    for (const a of here) {
+      const away = rgNb(R, id).filter(nb => nb !== R.at && !rgMine(R, nb)).sort((x, y) => (dH[y] - dH[x]) || (x < y ? -1 : 1))[0];
+      a.at = away; a.plan = { k: 'hold', to: away, left: 2 }; a.next = null; out.push(`${a.name} pulls back from ${n.name} to ${rgNode(R, away).name}`);
+    }
+  }
+}
+// the share of a battle's waves the host held, and what it cost the garrison and armies there (rounded; at least the foes killed)
+function rgWarAttrition(R, S, out) {
+  if (!R.war || !(S.kind === 'trouble' || S.kind === 'defend')) return;
+  const len = Math.max(1, S.w1 - S.w0 + 1), held = clamp(((S.wHeld != null ? S.wHeld : (G.wave | 0) - Math.max(S.w0, S.wFrom | 0))) / len, 0, 1); if (held <= 0) return;
+  const W = R.war, id = S.node, cut = [];
+  if (W.gar[id] > 0 && !rgMine(R, id)) { const c = Math.round(W.gar[id] * held); if (c) { W.gar[id] -= c; W.lost += c; cut.push(`garrison −${c}`); if (!W.gar[id]) delete W.gar[id]; } }
+  for (const a of rgArmiesAt(R, id)) { const c = Math.round(a.pips * held); if (!c) continue; a.pips -= c; W.lost += c; cut.push(`${a.name} −${c}`); if (a.pips <= 0) { a.pips = 0; a.dead = true; for (const k in W.siege) if (W.siege[k].army === a.id) delete W.siege[k]; } }
+  if (cut.length) out.push(`You held ${Math.round(held * 100)}% of the waves: ${cut.join(', ')} for good`);
+}
+// the host's supplies a turn from its land: [[what, gold]], and the total
+function rgWarIncome(R) {
+  const D = rgDef(R), I = RG_WAR2.income, k = 1 + I.perW * Math.max(1, R.maze && R.maze.w | 0 || 1), parts = [];
+  const towns = D.nodes.filter(n => n.kind === 'town' && !n.start && rgMine(R, n.id)), start = D.nodes.filter(n => n.kind === 'town' && n.start && rgMine(R, n.id));
+  const spec = D.nodes.filter(n => RG_WAR_SPEC[n.id] && rgMine(R, n.id)), places = D.nodes.filter(n => n.kind !== 'town' && !RG_WAR_SPEC[n.id] && rgMine(R, n.id));
+  if (start.length) parts.push([start.map(n => n.name).join(', '), Math.round(I.start * k)]);
+  if (towns.length) parts.push([`${towns.length} freed ${towns.length === 1 ? 'town' : 'towns'}`, Math.round(I.town * k * towns.length)]);
+  if (spec.length) parts.push([spec.map(n => RG_WAR_SPEC[n.id].tag.toLowerCase()).join(', ') + ' taken', Math.round(I.spec * k * spec.length)]);
+  if (places.length) parts.push([`${places.length} settled ${places.length === 1 ? 'place' : 'places'}`, Math.round(I.place * k * places.length)]);
+  return { parts, total: parts.reduce((s, p) => s + p[1], 0) };
+}
+// a place fought again soon pays less: how many recent fights there count, and the pay share
+function rgFarmK(R, id) {
+  const st = R.st[id] || {}, t = R.war ? R.war.turn : 0, rep = Math.max(0, (st.fights | 0) - Math.floor((t - (st.lastT | 0)) / RG_WAR2.farm.recover));
+  return { rep, k: Math.pow(RG_WAR2.farm.k, rep) };
+}
+function rgFarmMark(R, id) { if (!R.st[id] || !R.war) return; const f = rgFarmK(R, id); R.st[id].fights = f.rep + 1; R.st[id].lastT = R.war.turn; }
+/* ---- prizes: two or three places a run hold a named piece of the force's own (a set piece at a second-tier place, within reach
+   early; a legendary or a set piece further in), shown on the map and the card, won once by taking the place ---- */
+function rgPrizePool(R) {
+  const force = R.force, out = { leg: [], set: [] };
+  // (a unit's legendary, as its kit has it: region_loot.js rgKitFor, the force's pools swapped in)
+  if (typeof rgKitFor === 'function' && typeof FORCES !== 'undefined' && FORCES[force]) for (const ty in FORCES[force].units) { const k = rgKitFor(force, ty).leg; if (k && !out.leg.includes(k)) out.leg.push(k); }
+  if (typeof FSETS !== 'undefined') for (const S of FSETS) if (S && S.force === force && !S.retired) for (const p of S.pieces) if (typeof GEAR_BASES !== 'undefined' && GEAR_BASES[p[0]]) out.set.push(p[0]);
+  out.leg.sort(); out.set.sort();
+  return out;
+}
+function rgPrizeFill(R) {
+  if (R.prize) return R;
+  const D = rgDef(R), seed = R.seed | 0, P = rgPrizePool(R); R.prize = {};
+  const at = t => rgShuffle(seed, 'prz' + t, D.nodes.filter(n => n.tier === t && n.kind !== 'lair' && !(n.kind === 'town' && n.start) && !rgMine(R, n.id)).map(n => n.id))[0];
+  const pick = (k, key) => { const L = P[k]; return L.length ? L[Math.floor(rgRand(seed, key) * L.length)] : null; };
+  const plan = [[2, 'set'], [3, rgRand(seed, 'przk3') < .5 ? 'leg' : 'set'], [4, 'leg']], used = new Set();
+  for (const [t, k0] of plan) {
+    const id = at(t); if (!id) continue;
+    let k = k0, it = pick(k, 'przi' + t); if (!it || used.has(it)) { k = k0 === 'leg' ? 'set' : 'leg'; it = pick(k, 'przj' + t); }
+    if (!it || used.has(it) || (k === 'leg' && t < 3)) continue;   // (no legendary at a place fought before wave 15: renown.js rnLegP)
+    used.add(it); R.prize[id] = { k, id: it, got: false };
+  }
+  return R;
+}
+const R0F = () => (typeof G !== 'undefined' && G && G.force) || (typeof rgLastForce === 'function' ? rgLastForce() : null);
+const rgPrizeAt = (R, id) => R.prize && R.prize[id] && !R.prize[id].got ? R.prize[id] : null;
+const rgPrizeItem = P => P.k === 'leg' ? { rar: 4, hone: 0, leg: P.id } : { rar: (GEAR_BASES[P.id] || {}).rar | 0, hone: 0, base: P.id };
+function rgPrizeName(P) {
+  if (P.k === 'leg') { const L = typeof LEGENDS !== 'undefined' && LEGENDS[P.id]; return { name: L ? L.name : P.id, what: `Legendary${L && L.for ? ` for the ${typeof rgUnitName === 'function' ? rgUnitName(R0F(), L.for) : TOWERS[L.for].name}` : ''}` }; }
+  const S = typeof FSET_OF !== 'undefined' && FSET_OF[P.id], nm = typeof fsPieceName === 'function' ? fsPieceName(P.id) : (GEAR_BASES[P.id] || {}).name || P.id;
+  return { name: nm, what: `Set piece${S ? ` of ${S.name}` : ''}${S && S.unit && TOWERS[S.unit] ? ` for the ${typeof rgUnitName === 'function' ? rgUnitName(R0F(), S.unit) : TOWERS[S.unit].name}` : ''}` };
+}
+function rgPrizeHTML(R, id) {
+  const P = rgPrizeAt(R, id); if (!P) return R.prize && R.prize[id] && R.prize[id].got ? `<p class="rg-prize got">Its prize is yours already.</p>` : '';
+  const N = rgPrizeName(P), it = rgPrizeItem(P), col = (typeof RARITY !== 'undefined' && RARITY[it.rar] && RARITY[it.rar].col) || '#f0c060';
+  let ic = ''; try { ic = typeof rgIcon === 'function' ? rgIcon(it, '') : ''; } catch (e) { ic = ''; }
+  return `<p class="rg-prize">${ic}<span><small>Prize · take the place and it is yours</small><b style="color:${col}">${rgEsc(N.name)}</b> <em>${rgEsc(N.what)}</em></span></p>`;
+}
+// how hard a place's battle is, in one word and stars (1 Easy .. 5 Deadly): its tier (a first place 1, the lair 5) and the war's
+// pips on it
 const RG_DIFF_W = ['', 'Easy', 'Normal', 'Hard', 'Deadly', 'Deadly'];
 function rgDiff(R, S) {
   const n = rgNode(R, S.node), base = S.kind === 'waylay' ? (S.gentle ? 1 : 2) : n.kind === 'lair' ? 5 : S.gentle ? 1 : clamp(n.tier || 2, 2, 4);
   const k = clamp(base + (S.g | 0), 1, 5);
   return { k, word: RG_DIFF_W[k], stars: '★'.repeat(k) + '☆'.repeat(5 - k) };
 }
-// its causes, in a line: growth and why, a first place, the boss (the foes' health and the waves are on the line below it)
+// the war at a place, in a few plain words: its garrison, the armies there and near, a siege, cut off, an edge it gives
+function rgWarLine(R, id) {
+  if (!R.war || !R.st[id]) return '';
+  const W = R.war, n = rgNode(R, id), mine = rgMine(R, id), P = rgPipsAt(R, id), d = rgDist(R, id), parts = [];
+  if (!mine) parts.push(P.gar ? `Garrison ${P.gar}` : 'No garrison');
+  for (const a of P.armies) parts.push(`${a.name} is here (${rgPipW(a.pips)})`);
+  for (const [a, sid] of P.edge) parts.push(`+1: ${RG_WAR_SPEC[sid].tag.toLowerCase()} at ${rgNode(R, sid).name} arm ${a.name}`);
+  const s = W.siege[id]; if (s) parts.push(s.left > 0 ? `Besieged: falls in ${s.left} ${s.left === 1 ? 'turn' : 'turns'}` : 'Walls breached');
+  if (W.cut[id]) parts.push('Cut off from the lair: its garrison weakens each turn');
+  for (const a of rgArmies(R)) { if (a.at === id || d[a.at] == null || d[a.at] > 2) continue; const toMe = a.plan && a.plan.to === id || a.next === id; parts.push(`${a.name} is ${rgRoadsW(d[a.at])}${toMe ? ', marching here' : ''}`); }
+  if (RG_WAR_SPEC[id] && !mine) parts.push(`${RG_WAR_SPEC[id].tag}: ${RG_WAR_SPEC[id].say}`);
+  return parts.join(' · ');
+}
+// its causes, in a line: the war's pips (garrison, armies, an edge), a first place, the boss (the foes' health and the waves are
+// on the line below it)
 function rgDiffWhy(R, S) {
-  const st = S.node && R.st[S.node], b = rgBossesOf(R, S), parts = [];
-  if (S.kind !== 'waylay' && S.g) parts.push(`Grown ${S.g} of ${RG_GROW}${st && st.why && st.why.length ? ` (${st.why.join('; ')})` : S.kind === 'patrol' ? ' (a patrol)' : ''}: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health`);
+  const b = rgBossesOf(R, S), parts = [];
+  if (S.kind === 'patrol' && S.g) parts.push(`A patrol: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health`);
+  else if (S.kind !== 'waylay' && S.war) {
+    const P = S.war, bits = [];
+    if (P.gar) bits.push(`garrison ${P.gar}`); for (const a of P.armies) bits.push(`${a.name} ${a.pips}`); for (const [a] of P.edge) bits.push(`${a.name}'s edge 1`);
+    if (S.g) parts.push(`${bits.join(' + ')}: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health${P.raw > S.g ? ` (at most ${RG_WAR.gcap} pips count)` : ''}`);
+    else parts.push('No garrison and no army: as it first stood');
+  }
+  if (S.town) parts.push(`Defending your town: your maze stands ready, foes ×${S.town.hp}, +${S.town.line} lives on the line, +${S.town.gold} gold from its stores`);
+  if (S.farm) parts.push(`Fought here lately: ${Math.round(S.farmK * 100)}% of the gold, XP and drops (it recovers after ${RG_WAR2.farm.recover} turns away)`);
   if (S.gentle) parts.push(S.marched ? 'A first place: no boss, gentle kinds of foe' : 'A first place: no boss, gentle foes');
   if (S.behind) parts.push(`Your maze held to wave ${S.behind - 1}: foes as strong as wave ${S.behind}'s`);
   else if (S.ease) parts.push(`A second-tier place: foes ×${RG_EASE.hp}${RG_EASE.line ? `, a line of ${RG_EASE.line}` : ''}${RG_EASE.first ? ', a gentle first wave' : ''}`);
   if (!parts.length) parts.push('As it first stood');
   parts.push(b.length ? `Boss: ${b.map(([w, x]) => `${CREEPS[x].name} on wave ${w}`).join(', ')}` : 'No boss');
   return parts.join(' · ');
-}
-function rgClock(R, n, out) {
-  for (let i = 0; i < n; i++) {
-    R.clock++;
-    if (RG_MARKS.includes(R.clock)) {
-      const grew = rgDef(R).nodes.filter(nd => R.st[nd.id].s !== 'held' && R.st[nd.id].g < RG_GROW && rgGrow(R, nd.id, `threat clock ${R.clock}`));
-      if (grew.length) out.push(`Threat clock ${R.clock}: ${grew.length > 4 ? grew.length + ' places' : grew.map(nd => nd.name).join(', ')} grew harder`);
-    }
-    if (R.clock >= RG_CLOCK) {
-      const t = rgNearest(R, rgDef(R).nodes.find(nd => nd.kind === 'lair').id, id => rgHeldTown(R, id));
-      if (t) { R.st[t].s = 'lost'; R.st[t].g = 0; out.push(`Threat clock ${RG_CLOCK}: ${rgNode(R, t).name} raided and lost`); }
-      R.clock = RG_MARKS[RG_MARKS.length - 2];
-    }
-  }
 }
 // the nearest place by roads that passes the test (breadth first from id)
 function rgNearest(R, id, ok) {
@@ -129445,7 +129807,8 @@ function rgFallBack(R, out) {
 const rgHelpersUp = R => R.helpers.filter(h => R.st[h.node].s !== 'held');
 
 /* ---- what a battle is, before you commit ---- */
-// kind: trouble (a trouble, an enemy-held town, the lair), patrol (a held place again), waylay (a road)
+// kind: trouble (a trouble, an enemy-held town, the lair), patrol (a held place again), defend (a held place an army falls on,
+// a besieged town), waylay (a road). A trouble or a defence carries the war's pips there (rgPipsAt: S.war, S.g)
 function rgSpec(R, id, kind, road) {
   const D = rgDef(R);
   if (kind === 'waylay') {
@@ -129453,12 +129816,17 @@ function rgSpec(R, id, kind, road) {
     const gentle = t <= RG_GENTLE.tier, ease = !gentle && t === RG_EASE.tier, B = rgBehind(R, w0);
     return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgField(rgNode(R, from).map ? rgNode(R, from) : rgNode(R, to)), fam: rd.fam, extra: [], hpK: (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k, gentle, ease, marched: B.maze, behind: B.from, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
   }
-  const n = rgNode(R, id), st = R.st[id], len = n.w[1] - n.w[0], patrol = kind === 'patrol';
-  const g = patrol ? (st.p | 0) + 1 : st.g | 0, w0 = Math.min(50 - len, n.w[0] + RG_STEP.w * g);
+  // (a start town has no battle of its own: its tier's waves when it must be defended)
+  const n = rgNode(R, id), st = R.st[id], nw = n.w || [RG_TIER_W[n.tier] || 2, (RG_TIER_W[n.tier] || 2) + 5], len = nw[1] - nw[0], patrol = kind === 'patrol';
+  const P = patrol ? null : rgPipsAt(R, id), war = P && { gar: P.gar, raw: P.raw, armies: P.armies.map(a => ({ id: a.id, name: a.name, pips: a.pips, fam: a.fam })), edge: P.edge.map(([a, sid]) => [{ name: a.name }, sid]) };
+  const g = patrol ? (st.p | 0) + 1 : P.g, w0 = Math.min(50 - len, nw[0] + RG_STEP.w * g);
   const up = n.kind === 'lair' ? rgHelpersUp(R) : [];
-  const pay = Math.round((40 + 10 * n.w[0]) * (1 + RG_STEP.pay * (patrol ? 0 : g)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
-  const gentle = n.kind === 'trouble' && n.tier <= RG_GENTLE.tier, ease = !gentle && n.kind !== 'lair' && n.tier === RG_EASE.tier, B = rgBehind(R, w0);
-  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam: st.fam, extra: up.map(h => h.fam), hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k, gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null };
+  const fam = st.fam || (P && P.armies[0] ? P.armies[0].fam : null), fams = up.map(h => h.fam).concat(P ? P.armies.map(a => a.fam) : []);
+  const farm = rgFarmK(R, id), town = kind === 'defend' && n.kind === 'town', TD = RG_WAR2.town;
+  const pay = Math.round((40 + 10 * nw[0]) * (1 + RG_STEP.pay * (patrol ? 0 : g)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) * farm.k / 5) * 5;
+  const gentle = (n.kind === 'trouble' || kind === 'defend') && n.tier <= RG_GENTLE.tier, ease = !gentle && n.kind !== 'lair' && n.tier === RG_EASE.tier, B = rgBehind(R, w0);
+  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam, extra: [...new Set(fams)].filter(f => f && f !== fam), war, hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k * (town ? TD.hp : 1), gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null, farm: farm.rep, farmK: farm.k,
+    town: town ? { hp: TD.hp, line: TD.line, gold: Math.round(TD.gold * rgEarned(w0) / 5) * 5 } : null, maze: town && R.maze && R.maze.rows && R.maze.rows.length ? 'keep' : undefined, prize: rgPrizeAt(R, id) && kind === 'trouble' ? Object.assign({}, rgPrizeAt(R, id)) : null };
 }
 // the bosses in a battle's waves (the standard march's; the lair's last is its lord)
 // the battle's bosses as its waves field them (rgFoesOf: a forest faction's own boss, not the run's wave-table one), [wave, type]
@@ -129545,13 +129913,17 @@ function rgStart(R, S) {
   if (R.rnBank && typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) { rnS().v = clamp(rnS().v + R.rnBank, 0, RN.cap); R.rnBank = 0; }
   // a retry starts with the gold of the attempt it retries (S.gold0): the place's growth pushed its waves later, and the start
   // gold follows the start wave, so recomputing it would pay the player for losing (owner, 23 Nov 2026). Gear stays as it is
-  const SG = rgStartGold(R, S), g0 = S.gold0 != null ? S.gold0 | 0 : SG.base + SG.gap;
+  const again = S.gold0 != null, SG = rgStartGold(R, S), g0 = S.gold0 != null ? S.gold0 | 0 : SG.base + SG.gap;
   G.wave = S.w0; G.gold = g0; S.gap = S.gold0 != null ? 0 : SG.gap; S.gold0 = g0; if (G.region) G.region.gold0 = g0;
+  // the land's supplies and a defended town's stores, on a new battle (a retry starts from the first attempt's gold, supplies and all:
+  // the supplies a lost battle's turn brought wait for the next new battle, so a loss pays nothing)
+  const sup = again ? 0 : (R.supply | 0) + (S.town ? S.town.gold | 0 : 0); if (sup) { G.gold += sup; R.supply = 0; S.gold0 = g0 + sup; if (G.region) { G.region.supply = sup; G.region.gold0 = S.gold0; } }
+  if (G.region) G.region.xp0 = G.xp || 0;
   if (SG.maze) { if (S.maze === 'redo') { G.gold += SG.paid; rgMazeRefund(SG.maze); } else { const L = rgMazeLay(SG.maze); S.mazeBack = L.back; S.mazeBackGold = L.gold; } }
   G.lives = G.maxLives = S.line;
   G.region.uid0 = G.gearUid | 0;
   G.runId = newRunId(); G.playT = 0;
-  R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1, gold0: g0 }; R.pending = null; R.notice = '';
+  R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1, gold0: S.gold0 }; R.pending = null; R.notice = '';
   rgPut(R);
   const F = S.fam && CAMP_FAMILIES[S.fam];
   afterStart(S.kind === 'waylay' ? `Waylaid · ${rgNode(R, S.to).name}` : `${S.name} · waves ${S.w0}-${S.w1}`,
@@ -129569,6 +129941,9 @@ function rgEnd(won, retreat) {
   // or after a loss or a retreat the one from before this battle, kept for the retry); they are left out before the bag is
   // trimmed to its cap, or a full maze's items crowded the bag's newest out (campBandFromRun)
   if (won && RG_MAZE.on) rgMazeSave(R, S.kind === 'waylay' ? 'the road' : node.name, S.w1);
+  const prize = won && S.kind === 'trouble' ? rgPrizeAt(R, S.node) : null;
+  if (prize) { const it = Object.assign(rgPrizeItem(prize), { id: ++G.gearUid, isNew: true }); (G.loot = G.loot || []).push(it); prize.got = true; }
+  if (S.farmK != null && S.farmK < 1 && S.xp0 != null && G.xp > S.xp0) G.xp = S.xp0 + (G.xp - S.xp0) * S.farmK;   // (a place fought again soon: less XP too)
   R.band = campBandFromRun(R.band, R.maze && R.maze.rows ? new Set(rgMazeItems(R.maze).map(it => it.id)) : null);
   if (R.maze && R.band && R.band.wpn && Array.isArray(R.band.wpn.bag)) { const on = new Set(rgMazeWpns(R.maze).map(e => e[2].id)); R.band.wpn.bag = R.band.wpn.bag.filter(w => !on.has(w.id)); }
   const left = won || retreat ? Math.max(0, G.lives | 0) : 0, lost = Math.max(0, S.line - left);
@@ -129576,43 +129951,50 @@ function rgEnd(won, retreat) {
   const B0 = R.battle; R.battle = null; R.battles++;
   R.wounded = {};   // (no wounds on the home map: a lost battle is simply tried again)
   if (lost) out.push(`−${lost} ${lost === 1 ? 'life' : 'lives'} · ${R.lives} left`);
+  if (prize) out.push(`Prize won: ${rgPrizeName(prize).name}, in your bag`);
+  if (S.farm) out.push(`Fought here ${S.farm === 1 ? 'once' : S.farm + ' times'} lately: ${Math.round(S.farmK * 100)}% of the gold, XP and drops`);
+  if (S.kind !== 'waylay') rgFarmMark(R, S.node);
+  if (won && R.war && S.kind !== 'waylay' && S.kind !== 'patrol') R.war.comfort = rgDiff(R, S).k;
+  if (!won && S.kind !== 'waylay') rgWarAttrition(R, S, out);
   if (won) {
     R.chest += S.reward; out.push(`+${S.reward} gold to the war chest`);
     if (RG_MAZE.on && R.maze) out.push(`Your maze and ${R.maze.gold} gold march on to the next battle`);
     if (S.kind === 'waylay') { R.at = S.to; out.push(`Broke through to ${node.name}`); }
-    else if (S.kind === 'patrol') { R.st[S.node].p = (R.st[S.node].p | 0) + 1; rgClock(R, 1, out); out.push(`${node.name} patrolled (${R.st[S.node].p}/${RG_PATROLS})`); }
+    else if (S.kind === 'patrol') { R.st[S.node].p = (R.st[S.node].p | 0) + 1; out.push(`${node.name} patrolled (${R.st[S.node].p}/${RG_PATROLS})`); }
+    else if (S.kind === 'defend') { rgWarAfter(R, S, true, false, out); out.push(`${node.name} holds`); }
     else {
       R.st[S.node].s = 'held'; R.st[S.node].g = 0; R.st[S.node].why = [];
-      out.push(node.kind === 'town' ? `${node.name} freed: rest and re-spec there` : node.kind === 'lair' ? `${node.name} falls: the Marches are settled` : `${node.name} settled`);
+      out.push(node.kind === 'town' ? `${node.name} freed: rest there, and its stores supply the host (+${Math.round(RG_WAR2.income.town * (1 + RG_WAR2.income.perW * Math.max(1, R.maze && R.maze.w | 0 || 1)))} gold a turn for your battles)` : node.kind === 'lair' ? `${node.name} falls: the Marches are settled` : `${node.name} settled`);
       const h = R.helpers.find(x => x.node === S.node); if (h) out.push(`Helper gone: ${CAMP_FAMILIES[h.fam].name} leave the lair`);
-      rgClock(R, 1, out);
+      if (RG_WAR_SPEC[S.node]) out.push(`${RG_WAR_SPEC[S.node].tag} taken: the warlord loses its edge`);
+      rgWarAfter(R, S, true, false, out);
       if (node.kind === 'lair') R.done = true;
     }
   } else if (S.kind === 'waylay') {
     R.at = S.from; out.push(`Thrown back to ${rgNode(R, S.from).name}`);
     if (S.hard) R.over = 'Hardcore: the first broken line ends the run.';
   } else if (retreat) {
-    rgGrow(R, S.node, 'your retreat from here'); out.push(`Retreating made ${node.name} harder (grown ${R.st[S.node].g}/${RG_GROW})`);
-    if (!S.gentle) rgClock(R, 1, out); else out.push('Threat clock unmoved: a first place');
+    rgWarAfter(R, S, false, true, out);
     rgFallBack(R, out);
   } else {
     const cut = Math.floor(R.chest / 3); if (cut) { R.chest -= cut; out.push(`−${cut} gold from the war chest`); }
-    R.st[S.node].s = 'lost'; rgGrow(R, S.node, 'the line broke here');
-    const spread = rgNb(R, S.node).filter(id => rgNode(R, id).kind !== 'town' || !rgHeldTown(R, id)).filter(id => rgGrow(R, id, `spread from ${node.name}`));
-    out.push(`${node.name} lost and harder (grown ${R.st[S.node].g}/${RG_GROW})`); if (spread.length) out.push(`Spread: ${spread.map(id => rgNode(R, id).name).join(', ')} grew harder`);
-    rgClock(R, 2, out); rgFallBack(R, out);
+    rgWarAfter(R, S, false, false, out);
+    rgFallBack(R, out);
     if (S.hard) R.over = 'Hardcore: the first broken line ends the run.';
   }
+  // the enemy's turn (a road ambush is part of the march, which took the turn already)
+  let news = [];
+  if (S.kind !== 'waylay' && !R.done && !R.over) news = rgWarTurn(R, out);
   if (R.lives <= 0 && !R.done) R.over = R.over || 'The host has no lives left.';
   for (const t of out) rgLog(R, t);
-  R.notice = rgNotice(out);
+  R.notice = rgNotice(news);
   rgPut(R); rgSel = null;
   if (typeof AudioSys !== 'undefined') AudioSys.intense(false);
   // a lost or abandoned battle offers to fight it again at once (owner: "should just have to retry on home map"); not when the run is over
   const ck = RG_CKPT && RG_CKPT.runId === G.runId && RG_CKPT.s ? RG_CKPT : null;
-  const retry = !won && !R.over && !R.done ? { kind: S.kind, node: S.node, from: S.from, road: S.road, ck, gold0: S.gold0 != null ? S.gold0 : B0 && B0.gold0 != null ? B0.gold0 : null, name: S.kind === 'waylay' ? `the road to ${rgNode(R, S.to).name}` : node.name } : null;
-  // what a restart would fight now (the place has grown) against the checkpoint's waves (as they were when the line fell)
-  const nx = retry ? (retry.kind === 'waylay' ? rgSpec(R, null, 'waylay', retry.road) : rgSpec(R, retry.node, retry.kind === 'patrol' ? 'patrol' : 'trouble')) : null;
+  const rk = rgRetryKind(R, S), retry = !won && !R.over && !R.done && rk ? { kind: rk, node: S.node, from: S.from, road: S.road, ck, gold0: S.gold0 != null ? S.gold0 : B0 && B0.gold0 != null ? B0.gold0 : null, name: S.kind === 'waylay' ? `the road to ${rgNode(R, S.to).name}` : node.name } : null;
+  // what a restart would fight now (the war has moved on) against the checkpoint's waves (as they were when the line fell)
+  const nx = retry ? (retry.kind === 'waylay' ? rgSpec(R, null, 'waylay', retry.road) : rgSpec(R, retry.node, retry.kind)) : null;
   const grew = nx && (nx.w0 !== S.w0 || Math.abs((nx.hpK || 1) - (S.hpK || 1)) > 1e-9);
   const title = won ? (S.kind === 'waylay' ? 'Through the ambush' : R.done ? 'The Marches are settled' : `${node.name}: held`) : retreat ? 'The retreat is sounded' : S.kind === 'waylay' ? 'Thrown back' : 'The line breaks';
   setTimeout(() => {
@@ -129620,7 +130002,7 @@ function rgEnd(won, retreat) {
       <ul class="rg-out">${out.map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul>
       ${R.over ? `<p class="rg-over">${rgEsc(R.over)} The run is over.</p>` : ''}
       ${retry && ck ? `<button class="btn rg-go" id="rgRetryCk">Retry from wave ${ck.wave}<small>Your maze and gold as they stood at wave ${ck.wave}.</small></button>` : ''}
-      ${retry ? `<button class="btn ${ck ? 'ghost rg-sec' : 'rg-go'}" id="rgRetry">${ck ? 'Restart the battle' : `Retry ${rgEsc(retry.name)}`}<small>From wave ${nx.w0} with full starting gold: build a new maze.${grew ? ' The place has grown since.' : ''}</small></button>` : ''}
+      ${retry ? `<button class="btn ${ck ? 'ghost rg-sec' : 'rg-go'}" id="rgRetry">${ck ? 'Restart the battle' : `Retry ${rgEsc(retry.name)}`}<small>From wave ${nx.w0} with full starting gold: build a new maze.${grew ? ' The war has changed it since.' : ''}</small></button>` : ''}
       <button class="btn${retry ? ' ghost rg-sec' : ' rg-go'}" id="rgBack">${R.over ? 'The run’s end' : R.done ? 'The muster calls' : 'Back to the Marches'}</button>`, 'rgend');
     $('#rgBack').onclick = () => { sfx('click'); rgOpen(); };
     if (retry) $('#rgRetry').onclick = () => { sfx('click'); hideOverlay(); RG_CKPT = null; rgRetry(R, retry); };
@@ -129628,15 +130010,22 @@ function rgEnd(won, retreat) {
   }, won ? 900 : 1300);
 }
 
-// what grew, in one line for the map (shown until the next battle starts): the result lines that made a place harder
-function rgNotice(out) { const t = out.filter(x => /harder|grows a step/.test(x)); return t.length ? t.join(' ') : ''; }
+// the enemy's turn, in one line for the map (shown until the next battle starts)
+function rgNotice(news) { return (news || []).slice(0, 4).join('. ') + ((news || []).length ? '.' : ''); }
+// what a retry fights: a besieged or assaulted place still yours with an army on it is defended again; one that fell is taken
+// back as a trouble; nothing to fight, no retry
+function rgRetryKind(R, S) {
+  if (S.kind === 'waylay' || S.kind === 'patrol') return S.kind;
+  if (!rgMine(R, S.node)) return 'trouble';
+  return S.kind === 'defend' && rgArmiesAt(R, S.node).length ? 'defend' : null;
+}
 
 // Retry: the host goes back to where the battle was (a waylay's road from where it set out) and fights it again, at once, as it
-// now stands (a fallen place has grown); the fall back and costs already taken stay taken
+// now stands (the war has moved on); the fall back and costs already taken stay taken
 function rgRetry(R, B) {
   const g = S => { if (B.gold0 != null) S.gold0 = B.gold0; return S; };   // (the first attempt's start gold, not the grown place's)
   if (B.kind === 'waylay') { R.at = B.from; rgPut(R); rgStart(R, g(rgSpec(R, null, 'waylay', B.road))); return; }
-  R.at = B.node; rgPut(R); rgStart(R, g(rgSpec(R, B.node, B.kind === 'patrol' ? 'patrol' : 'trouble')));
+  R.at = B.node; rgPut(R); rgStart(R, g(rgSpec(R, B.node, B.kind)));
 }
 
 // the wave checkpoint (owner, 23 Nov 2026): at each horn sounded from the build phase, the battle as serialize() holds it (maze,
@@ -129657,6 +130046,7 @@ function rgRetryCk(R, B) {
   if (ck.s.region && ck.s.region.map) { mapPick = ck.s.region.map; setMap(ck.s.region.map); }
   restore(JSON.parse(JSON.stringify(ck.s)));
   const S = G.region; if (!S) return rgRetry(R, B);
+  S.wFrom = G.wave | 0;   // (the waves before the checkpoint were credited to the war when the line broke: not twice)
   G.lives = clamp(G.lives | 0, 1, Math.max(1, R.lives | 0));
   G.runId = newRunId(); ck.runId = G.runId; RG_CKPT = ck;   // (falling again before the next horn retries the same wave)
   R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1, gold0: S.gold0 }; R.pending = null; R.notice = '';
@@ -129672,14 +130062,21 @@ function rgMarch(R, to) {
   if (rd.ev && !rd.evDone) { rd.evDone = 1; R.pending = { kind: 'event', ev: rd.ev, from, to, road: i }; }
   else if (roll < RG_WAY[rd.d]) { R.pending = { kind: 'waylay', from, to, road: i }; rgLog(R, `Waylaid on the road to ${rgNode(R, to).name}`); }
   else { R.at = to; rgLog(R, `Marched to ${rgNode(R, to).name}`); }
+  const news = rgWarTurn(R, []); for (const t of news) rgLog(R, t); R.notice = rgNotice(news);   // (every march is a turn: the enemy then takes its own)
   rgPut(R);
+}
+// an army falls on the host and it will not fight: the place is lost, the host falls back to the nearest town (a turn)
+function rgAbandon(R) {
+  const P = R.pending; if (!P || P.kind !== 'assault') return;
+  const out = []; R.pending = null; rgWarFall(R, P.at, rgArmy(R, P.army), out); rgFallBack(R, out);
+  const news = R.over ? [] : rgWarTurn(R, out); for (const t of out) rgLog(R, t); R.notice = rgNotice(news); rgPut(R);
 }
 // an event's choices: [label, what it costs and gives, can, apply]
 function rgEventOpts(R, P) {
   const to = rgNode(R, P.to), wn = Object.keys(R.wounded);
   if (P.ev === 'refugees') return [
     ['Share your stores', `−${RG_PRICE.alms} gold · +3 lives (they join the line)`, R.chest >= RG_PRICE.alms && R.lives < RG_LIVES, () => { R.chest -= RG_PRICE.alms; R.lives = Math.min(RG_LIVES, R.lives + 3); return 'The refugees join the host: +3 lives.'; }],
-    ['Escort them', `Threat clock +1 · every road from ${to.name} is 1 danger lower`, true, () => { const out = []; rgClock(R, 1, out); for (const r of R.roads) if (r.a === P.to || r.b === P.to) r.d = Math.max(0, r.d - 1); return ['The host escorts the refugees; they show the safe ways.'].concat(out).join(' '); }],
+    ['Escort them', `The warlord's armies move once more · every road from ${to.name} is 1 danger lower`, true, () => { const out = []; rgWarTurn(R, out); for (const r of R.roads) if (r.a === P.to || r.b === P.to) r.d = Math.max(0, r.d - 1); return ['The host escorts the refugees; they show the safe ways.'].concat(out).join(' '); }],
     ['Press on', 'Nothing gained, nothing spent', true, () => 'The host presses on.'],
   ];
   return [
@@ -129698,7 +130095,6 @@ function rgTownOpts(R) {
   const spent = B && B.tal ? Object.values(B.tal).reduce((a, v) => a + (Array.isArray(v) ? v.reduce((x, y) => x + (y | 0), 0) : 0), 0) : 0;
   return [
     ['rest', 'Rest', miss ? `${RG_PRICE.life} gold a life: ${Math.min(miss, Math.floor(R.chest / RG_PRICE.life))} of ${miss} missing for ${Math.min(miss, Math.floor(R.chest / RG_PRICE.life)) * RG_PRICE.life} gold` : 'The host is at full strength', miss > 0 && R.chest >= RG_PRICE.life],
-    ['respec', 'Re-spec talents', spent ? `${spent} talent points back to spend, for ${RG_PRICE.respec} gold` : 'No talent points spent yet', spent > 0 && R.chest >= RG_PRICE.respec],
   ];
 }
 function rgTown(R, k) {
@@ -129713,11 +130109,17 @@ function rgTown(R, k) {
 // how difficulty works, on the map and the start screen
 const RG_HOW = `<details class="rg-how"><summary>How difficulty works</summary><ul>
   <li>Each place shows how hard it is (Easy, Normal, Hard, Deadly) and why. The first places are Easy: no boss and gentle foes.</li>
-  <li>A place <b>grows</b> a step harder (each step: waves ${RG_STEP.w} later, foes +${Math.round(RG_STEP.hp * 100)}% health; at most ${RG_GROW}) when you retreat from it, when the line breaks there, when a broken line next door spreads to it, and every time the threat clock reaches ${RG_MARKS.join(', ')}.</li>
-  <li>Each step: its waves start ${RG_STEP.w} later, its foes have ${Math.round(RG_STEP.hp * 100)}% more health, and its reward is ${Math.round(RG_STEP.pay * 100)}% bigger. The starting gold follows the starting wave, so a grown place starts with a little more gold: that pays for the harder fight, it is not a bonus. A retry starts with the gold of the attempt it retries.</li>
-  <li>The clock moves a step for every battle you fight at a place and two for a broken line (a retreat from a first place does not move it).</li>
-  <li>Win a battle and your maze and gold march on: keep the maze, or rebuild it for all its gold back. Waves skipped between battles pay their gold.</li>
-  <li>Winning a place holds it and clears its growth. Settle the troubles you can before the clock reaches its marks.</li></ul></details>`;
+  <li>The warlord's strength is counted in <b>pips</b>. A battle is its place's own fight plus one pip for each <b>garrison</b> pip there and each pip of every <b>army</b> standing there. Each pip: its waves start ${RG_STEP.w} later, its foes have ${Math.round(RG_STEP.hp * 100)}% more health, its reward is ${Math.round(RG_STEP.pay * 100)}% bigger (at most ${RG_WAR.gcap} pips a battle). An empty place he holds is as it first stood.</li>
+  <li>Every march or battle is a <b>turn</b>. After it, each army takes one road step: the arrow on the map shows where it goes next, its icon its plan (⚔ hunt you, ♜ besiege a town, ↺ retake a place, ⚑ guard, ✚ muster at the lair). Shopping, the forge, resting and re-specs take no turn.</li>
+  <li>Beat an army and its pips are gone for good: a band is destroyed, the Main Host is broken and falls back. Lose a battle (away from the first places) and the Main Host comes hunting you.</li>
+  <li>An army that reaches a town you hold <b>besieges</b> it: it falls in ${RG_WAR.siege} turns unless you march there and break the siege. Armies cannot march through your towns.</li>
+  <li><b>Taking land weakens him and pays you.</b> Each place he holds feeds his lair's muster; a place cut off from his lair by your land loses a garrison pip every turn; the forges, the hive and the den give his armies an edge until you take them.</li>
+  <li><b>Supplies, not interest.</b> A Homeland battle pays no interest on held gold. Instead your land sends supplies every turn (towns most, then the warlord's edges you took, then settled places), saved up for your next battle's start gold.</li>
+  <li>There is always an easier fight within ${RG_WAR2.reach} roads: if his armies and garrisons close every one, he pulls back from one. Fight there, come back stronger.</li>
+  <li>Lose and the foes you killed stay dead: the garrison and armies there lose the share of the waves you held. Defending your own town is easier: your maze stands ready, its foes are weaker, its stores add gold.</li>
+  <li>A place fought again soon pays less (${Math.round(RG_WAR2.farm.k * 100)}% a time, recovering after ${RG_WAR2.farm.recover} turns away). A ◆ marks a prize: a named set piece or legendary, yours once when you take the place.</li>
+  <li>Talents change freely here on the map, a point or a tree at a time (Prepare). In a battle they are locked: you commit to your build.</li>
+  <li>Win a battle and your maze and gold march on: keep the maze, or rebuild it for all its gold back. Waves skipped between battles pay their gold.</li></ul></details>`;
 let rgSel = null, rgPick = { hero: null, hard: false }, rgTap = { id: null, t: 0 }, rgTab = 'ov', rgKeyFocus = false;
 const RG_DBL = 450;   // ms between two clicks (taps) on one place that make a double-click
 // a place's primary action, from its button or a double-click: taken, or refused with its reason
@@ -129727,14 +130129,6 @@ function rgDo(R, id, force, dbl) {
   sfx('click'); if (typeof AudioSys !== 'undefined' && AudioSys.init) AudioSys.init();
   if (P.travel) return P.run(dbl);
   P.run();
-}
-function rgClockSVG(R) {
-  const cx = 62, cy = 62, out = [];
-  for (let i = 1; i <= RG_CLOCK; i++) {
-    const a = -Math.PI / 2 + (i - .5) / RG_CLOCK * Math.PI * 2, x = cx + Math.cos(a) * 38, y = cy + Math.sin(a) * 38;
-    out.push(`<circle class="rg-tick${i <= R.clock ? ' on' : ''}${RG_MARKS.includes(i) ? ' mark' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${RG_MARKS.includes(i) ? 7 : 5}"/>`);
-  }
-  return `<g class="rg-clock" aria-label="Threat clock ${R.clock} of ${RG_CLOCK}"><circle cx="${cx}" cy="${cy}" r="52" class="rg-clockbg"/>${out.join('')}<text x="${cx}" y="${cy + 6}" class="rg-clockn">${R.clock}</text><text x="${cx}" y="${cy + 70}" class="rg-clockl">Threat</text></g>`;
 }
 function rgMapSVG(R) {
   const D = rgDef(R), nb = rgNb(R, R.at);
@@ -129748,20 +130142,35 @@ function rgMapSVG(R) {
   }).join('');
   const nodes = D.nodes.map(n => {
     const st = R.st[n.id] || { s: 'open', g: 0, p: 0, fam: null }, here = R.at === n.id, help = R.helpers.find(h => h.node === n.id && st.s !== 'held');
-    const cls = `rg-n ${n.kind} ${st.s}${here ? ' here' : ''}${rgSel === n.id ? ' sel' : ''}${nb.includes(n.id) ? ' near' : ''}`;
+    const cls = `rg-n ${n.kind} ${st.s}${R.war && R.war.cut[n.id] ? ' cut' : ''}${R.war && R.war.siege[n.id] ? ' besieged' : ''}${here ? ' here' : ''}${rgSel === n.id ? ' sel' : ''}${nb.includes(n.id) ? ' near' : ''}`;
     const sw = n.w && st.s !== 'held' ? rgSpec(R, n.id, 'trouble') : null, wv = sw ? `waves ${sw.w0}-${sw.w1}` : '';
     const stw = st.s === 'held' ? (n.kind === 'town' ? 'held town' : 'settled') : st.s === 'lost' ? 'lost' : n.kind === 'lair' ? 'the warlord' : 'contested';
     // state, in shape as well as colour: a filled diamond (held), a hollow one (contested), a struck one (lost), a star (the warlord)
     const badge = n.kind === 'lair' && st.s !== 'held' ? '<path class="rg-bd lair" d="M0,-7L2,-2L7,-2L3,1L5,7L0,3L-5,7L-3,1L-7,-2L-2,-2Z"/>'
       : `<path class="rg-bd ${st.s}" d="M0,-6L6,0L0,6L-6,0Z"/>${st.s === 'lost' ? '<path class="rg-bdx" d="M-3,-3L3,3M3,-3L-3,3"/>' : ''}`;
-    const pips = st.s !== 'held' && st.g ? `<g class="rg-grow">${Array.from({ length: st.g }, (_, k) => `<circle cx="${(k - (st.g - 1) / 2) * 9}" cy="-33" r="3.5"/>`).join('')}</g>` : '';
+    const W = R.war || { gar: {}, siege: {}, cut: {} }, gn = st.s !== 'held' ? W.gar[n.id] | 0 : 0, sg = W.siege[n.id], cutf = !!W.cut[n.id];
+    const pips = gn ? `<g class="rg-grow rg-gar" aria-hidden="true">${Array.from({ length: gn }, (_, k) => `<path d="M${(k - (gn - 1) / 2) * 15},-47l6,6l-6,6l-6,-6z"/>`).join('')}</g>` : '';
+    const siege = sg ? `<g class="rg-sg" transform="translate(-19 -19)"><circle r="11"/><text y="4.5">${sg.left}</text></g>` : '';
     const g = RG_GLYPH[n.id] ? `<path class="rg-gl" transform="translate(-13.5 -13.5) scale(.75)" d="${RG_GLYPH[n.id]}"/>` : `<circle class="rg-gl" r="6"/>`;
-    return `<g class="${cls}" data-id="${n.id}" data-tip-at="above" transform="translate(${n.x} ${n.y})" role="button" tabindex="${rgSel === n.id ? 0 : -1}" aria-pressed="${rgSel === n.id}" aria-label="${rgEsc(n.name)}, ${stw}${wv ? ', ' + wv : ''}${here ? ', your host is here' : ''}">
+    return `<g class="${cls}" data-id="${n.id}" data-tip-at="above" transform="translate(${n.x} ${n.y})" role="button" tabindex="${rgSel === n.id ? 0 : -1}" aria-pressed="${rgSel === n.id}" aria-label="${rgEsc(n.name)}, ${stw}${wv ? ', ' + wv : ''}${gn ? `, garrison ${gn}` : ''}${sg ? `, besieged: falls in ${sg.left}` : ''}${cutf ? ', cut off' : ''}${here ? ', your host is here' : ''}">
       <circle class="rg-hit" r="34"/><circle class="rg-halo" r="29"/>${here ? '<circle class="rg-here-ring" r="31"/>' : ''}<circle class="rg-sh" r="23"/><circle class="rg-in" r="19"/>${g}
-      <g class="rg-badge" transform="translate(17 -17)"><circle r="8"/>${badge}</g>${pips}${help ? '<text class="rg-help" x="-30" y="-14">☗</text>' : ''}
-      ${here ? '<g class="rg-here-t" transform="translate(0 -44)"><rect x="-41" y="-8" width="82" height="15" rx="2"/><text y="3.5">YOU ARE HERE</text></g>' : ''}<text class="rg-nm" y="40">${rgEsc(n.name)}</text>${wv ? `<text class="rg-w" y="56">${wv}</text>` : n.kind === 'town' && st.s === 'held' ? '<text class="rg-w held" y="56">Held town</text>' : ''}</g>`;
+      <g class="rg-badge" transform="translate(17 -17)"><circle r="8"/>${badge}</g>${pips}${siege}${rgPrizeAt(R, n.id) ? '<g class="rg-prz" transform="translate(19 16)"><title>A prize here</title><circle r="9"/><path d="M0,-6L5,0L0,6L-5,0Z"/></g>' : ''}${help ? '<text class="rg-help" x="-30" y="-14">☗</text>' : ''}
+      ${here ? '<g class="rg-here-t" transform="translate(0 -44)"><rect x="-41" y="-8" width="82" height="15" rx="2"/><text y="3.5">YOU ARE HERE</text></g>' : ''}<text class="rg-nm" y="40">${rgEsc(n.name)}</text>${sg ? `<text class="rg-w sieged" y="56">Besieged · falls in ${sg.left}</text>` : wv ? `<text class="rg-w" y="56">${wv}</text>` : n.kind === 'town' && st.s === 'held' ? '<text class="rg-w held" y="56">Held town</text>' : ''}${cutf ? '<text class="rg-w cut" y="70">cut off</text>' : ''}</g>`;
   }).join('');
-  return `<svg class="rg-svg" viewBox="0 0 1000 620" role="group" aria-label="${rgEsc(D.name)}: the places and roads">${roads}${nodes}</svg>`;
+  return `<svg class="rg-svg" viewBox="0 0 1000 620" role="group" aria-label="${rgEsc(D.name)}: the places and roads"><defs><marker id="rgArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z"/></marker></defs>${roads}${nodes}${rgArmySVG(R)}</svg>`;
+}
+// the warlord's armies on the map: a token beside its place (its strength in pips, its plan's icon) and an arrow to the place
+// it marches to next turn
+function rgArmySVG(R) {
+  if (!R.war) return '';
+  const seen = {}, arrows = [], toks = [];
+  for (const a of rgArmies(R)) {
+    const n = rgNode(R, a.at); if (!n) continue; const k = seen[a.at] = (seen[a.at] | 0) + 1, x = n.x - 48 - (k - 1) * 32, y = n.y - 4, P = RG_PLAN[a.plan ? a.plan.k : 'hold'] || RG_PLAN.hold;
+    if (a.next) { const B = rgNode(R, a.next), dx = B.x - n.x, dy = B.y - n.y, L = Math.hypot(dx, dy) || 1; arrows.push(`<path class="rg-amv${a.main ? ' main' : ''}" marker-end="url(#rgArr)" d="M${(n.x + dx / L * 30).toFixed(1)},${(n.y + dy / L * 30).toFixed(1)}L${(B.x - dx / L * 34).toFixed(1)},${(B.y - dy / L * 34).toFixed(1)}"/>`); }
+    const pp = Array.from({ length: a.pips }, (_, i) => `<circle cx="${((i - (a.pips - 1) / 2) * 6.5).toFixed(1)}" cy="18" r="2.6"/>`).join('');
+    toks.push(`<g class="rg-army${a.main ? ' main' : ''}" data-army="${a.id}" transform="translate(${x} ${y})"><title>${rgEsc(a.name)}: ${rgPipW(a.pips)}, ${P[0].toLowerCase()}${a.next ? ` (next: ${rgEsc(rgNode(R, a.next).name)})` : ''}</title><rect x="-14" y="-13" width="28" height="38" rx="4"/><text class="rg-ai" y="5">${P[1]}</text><g class="rg-ap">${pp}</g></g>`);
+  }
+  return `<g class="rg-war" aria-hidden="true">${arrows.join('')}${toks.join('')}</g>`;
 }
 // the places' glyphs (the owner's campaign map redesign, 26 Nov 2026: assets/regionicons/<id>.svg, a 36-unit box each): which
 // place it is; held, contested, lost and the warlord are the badge and the colour
@@ -129780,15 +130189,23 @@ const RG_GLYPH = {
   thornwick: 'M5 28V17l6-5 6 5v11M17 28V13l7-5 7 5v15M3 28h30M21 28v-8h6v8M7 19h4M4 14l7-6 6 6M23 7V3',
   weir: 'M3 14h30M5 11v13M31 11v13M11 14v12M18 14v12M25 14v12M3 29q4-3 8 0t8 0t8 0t8 0M3 7q5-3 10 0t10 0t8 0'
 };
-// the threat dial on the map: the clock as a ring, the next growth under it
+// the war dial on the map: the warlord's pips as a ring, his stance and the turn under it
 function rgThreatHTML(R) {
-  const nx = RG_MARKS.find(m => m > R.clock) || RG_CLOCK, deg = Math.round(360 * Math.min(1, R.clock / RG_CLOCK));
-  return `<div class="rg-dial" role="img" aria-label="Threat clock ${R.clock} of ${RG_CLOCK}; the places grow at ${nx}" title="At ${RG_MARKS.join(', ')} every unsettled place grows a step harder; at ${RG_CLOCK} the warlord raids the town nearest his lair."><span class="rg-ring" style="--deg:${deg}deg"><b>${R.clock}</b><small>/${RG_CLOCK}</small></span><span class="rg-dl">Threat</span><small>Next growth at ${nx}</small></div>`;
+  if (!R.war) return '';
+  const W = R.war, tot = rgWarTotal(R), rate = rgWarRate(R), every = rate > 0 ? Math.max(1, Math.round(1 / rate)) : 0, deg = Math.round(360 * Math.min(1, tot / RG_WAR.ceil));
+  return `<div class="rg-dial rg-wardial" role="img" aria-label="The warlord: ${tot} pips of strength, ${RG_STANCE[W.stance].toLowerCase()}; turn ${W.turn}" title="The warlord's strength in pips (his armies, garrisons and what his lair has mustered). His lair musters a new pip about every ${every} turns: faster for every supplied place he holds. Take his land to slow it."><span class="rg-ring" style="--deg:${deg}deg"><b>${tot}</b><small>pips</small></span><span class="rg-dl">${RG_STANCE[W.stance]}</span><small>Turn ${W.turn} · +1 pip every ~${every} turns</small></div>`;
+}
+// the warlord's armies, listed: where each is, its strength and its plan (a click picks its place on the map)
+function rgArmiesHTML(R) {
+  if (!R.war) return '';
+  const W = R.war, A = rgArmies(R);
+  const plan = a => { const P = RG_PLAN[a.plan ? a.plan.k : 'hold'] || RG_PLAN.hold, to = a.plan && a.plan.to && rgNode(R, a.plan.to); return a.plan && (a.plan.k === 'pursue' || a.plan.k === 'muster') ? P[2] : `${P[2]} ${to ? to.name : ''}`; };
+  return `<section class="rg-armies" aria-label="The warlord's armies"><h4>The warlord’s armies <small>${RG_STANCE[W.stance]}</small></h4><ul>${A.map(a => `<li class="${a.main ? 'main' : ''}"><button type="button" class="rg-arm" data-at="${a.at}"><i aria-hidden="true">${(RG_PLAN[a.plan ? a.plan.k : 'hold'] || RG_PLAN.hold)[1]}</i><b>${rgEsc(a.name)}</b><span class="rg-apw" aria-label="${rgPipW(a.pips)}">${'◆'.repeat(a.pips)}</span><small>${rgEsc(rgFamName(a.fam))} · at ${rgEsc(rgNode(R, a.at).name)} · ${rgEsc(plan(a))}${a.next ? ` · next ${rgEsc(rgNode(R, a.next).name)}` : ''}</small></button></li>`).join('')}</ul><p class="rg-res">Lair: ${W.reserve | 0} mustered · ${W.lost | 0} pips destroyed for good${Object.keys(W.gar).length ? ` · garrisons on ${Object.keys(W.gar).length} places` : ''}</p></section>`;
 }
 function rgLossLines(R, S) {
   if (S.kind === 'waylay') return ['the lives you lose', `thrown back to ${rgNode(R, S.from).name}`];
   const fb = rgNearest(R, R.at, id => rgHeldTown(R, id) && id !== S.node) || rgNearest(R, R.at, id => rgHeldTown(R, id));
-  return [`the line's lives (${rgLineOf(R, S)})`, 'a third of the war chest', `${rgNode(R, S.node).name} falls and its trouble spreads to its neighbours`, 'the threat clock +2', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
+  return [`the line's lives (${rgLineOf(R, S)})`, 'a third of the war chest', S.kind === 'defend' ? `${rgNode(R, S.node).name} falls` : `${rgNode(R, S.node).name} stays the warlord's`, S.gentle ? 'no hunt (a first place)' : 'the Main Host comes hunting you', fb ? `a fall back to ${rgNode(R, fb).name}` : 'no town to fall back to: the run ends'];
 }
 // a battle at a glance (owner, 20 Nov 2026: "less wordy. nice big buttons with clear call to action"): its rating, one line
 // of what you will fight, the reward; the rest (the causes, the field, what a broken line costs) behind Details
@@ -129803,9 +130220,9 @@ function rgBattleHead(R, S, noGold) {
 }
 // the reward and the start gold
 function rgBattleGold(R, S) {
-  const grown = S.kind === 'trouble' && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
-  return `<p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for its growth)</small>` : ''}</p>
-    ${(() => { const SG = rgStartGold(R, S); return `<p class="rg-gold">${SG.maze ? 'Your maze + ' : 'Start gold '}<b>${SG.base + SG.gap} gold</b>${SG.gap ? ` <small>(+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`}${S.w0 - 1 - SG.w > RG_GAP.free ? `: ${Math.round(RG_GAP.k * 100)}% past the first ${RG_GAP.free}, a leap ahead` : ''})</small>` : ''}</p>`; })()}`;
+  const grown = (S.kind === 'trouble' || S.kind === 'defend') && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
+  return `<p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for the warlord's ${rgPipW(S.g)} there)</small>` : ''}</p>
+    ${(() => { const SG = rgStartGold(R, S); return `<p class="rg-gold">${SG.maze ? 'Your maze + ' : 'Start gold '}<b>${SG.base + SG.gap + (R.supply | 0) + (S.town ? S.town.gold : 0)} gold</b>${R.supply ? ` <small>(+${R.supply} supplies from your land)</small>` : ''}${S.town ? ` <small>(+${S.town.gold} from the town's stores)</small>` : ''}${SG.gap ? ` <small>(+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`}${S.w0 - 1 - SG.w > RG_GAP.free ? `: ${Math.round(RG_GAP.k * 100)}% past the first ${RG_GAP.free}, a leap ahead` : ''})</small>` : ''}</p>`; })()}`;
 }
 function rgBattleMore(R, S) {
   const F = S.fam && CAMP_FAMILIES[S.fam];
@@ -129823,8 +130240,10 @@ function rgPrimary(R, id, force) {
   const n = rgNode(R, id), st = R.st[id], here = R.at === id, i = rgRoadIx(R, R.at, id);
   const no = why => ({ can: false, why });
   if (R.battle) return no('A battle is under way: resume it or retreat first.');
-  if (R.pending) return no('Deal with the road first.');
+  if (R.pending) return no(R.pending.kind === 'assault' ? 'An army falls on your host: fight or fall back first.' : 'Deal with the road first.');
   if (here) {
+    if (st.s === 'held' && R.war && rgArmiesAt(R, id).length) { const S = rgSpec(R, id, 'defend'), line = rgLineOf(R, S);
+      return { can: true, fight: true, label: R.war.siege[id] ? 'Break the siege' : 'Drive them off', sub: `${line} lives on the line`, run: () => rgStart(R, S) }; }
     if (st.s !== 'held') { const S = rgSpec(R, id, 'trouble'), line = rgLineOf(R, S);
       return { can: true, fight: true, label: n.kind === 'town' ? 'Free the town' : n.kind === 'lair' ? 'Storm the lair' : 'Fight', sub: `${line} lives on the line`, run: () => rgStart(R, S) }; }
     if (n.kind === 'trouble') { const p = st.p | 0; if (p >= RG_PATROLS) return no(`${n.name} is patrolled out: nothing left to gain.`);
@@ -129839,7 +130258,8 @@ function rgPrimary(R, id, force) {
 function rgNodeHTML(R, id) {
   const n = rgNode(R, id), st = R.st[id], here = R.at === id, i = rgRoadIx(R, R.at, id), P = rgPrimary(R, id);
   const state = st.s === 'held' ? (n.kind === 'town' ? 'Held town' : 'Settled') : st.s === 'lost' ? 'Lost to the enemy' : n.kind === 'town' ? 'Enemy-held town' : n.kind === 'lair' ? 'The warlord’s lair' : 'Trouble';
-  const S = st.s !== 'held' ? rgSpec(R, id, 'trouble') : n.kind === 'trouble' && (st.p | 0) < RG_PATROLS ? rgSpec(R, id, 'patrol') : null;
+  const S = st.s !== 'held' ? rgSpec(R, id, 'trouble') : R.war && rgArmiesAt(R, id).length ? rgSpec(R, id, 'defend') : n.kind === 'trouble' && (st.p | 0) < RG_PATROLS ? rgSpec(R, id, 'patrol') : null;
+  const wl = rgWarLine(R, id), warl = wl ? `<p class="rg-warl">${rgEsc(wl)}</p>` : '';
   const btn = P.can ? `<button class="btn rg-go" id="rgAct">${rgEsc(P.label)}<small>${rgEsc(P.sub)}</small></button>` : `<p class="rg-note">${rgEsc(P.why)}</p>`;
   let more = `<p class="cm-say">${rgEsc(n.say)}</p>${here ? '<p class="rg-here">Your host is here.</p>' : ''}`;
   if (!here && i >= 0) { const r = R.roads[i]; more += `<p class="rg-road-card"><b>The road from ${rgEsc(rgNode(R, R.at).name)}:</b> danger ${r.d} of 3 · ${Math.round(RG_WAY[r.d] * 100)}% to be waylaid${r.d ? ` by ${rgEsc(CAMP_FAMILIES[r.fam].name)} (a 2-wave skirmish)` : ''}${r.ev && !r.evDone ? ` · <b>${RG_EVENTS[r.ev].name}</b> on the way (a choice)` : ''}.</p>`; }
@@ -129853,9 +130273,10 @@ function rgNodeHTML(R, id) {
   // boss's table and themed weapons only, never the shared table every foe rolls on)
   const E = S && typeof rgEncParts === 'function' ? rgEncParts(R, S) : null;
   const ban = rgPlaceBanner(id, n.name, E ? E.img : '', state, E && E.field), hd = ban || `<h3><span>${state}</span>${rgEsc(n.name)}</h3>`;
-  const ovw = E ? `<div class="rg-hd">${rgBattleHead(R, S, true)}</div><div class="rg-gl">${rgBattleGold(R, S)}</div>${btn}${town}`
-    : `${S ? rgBattleHead(R, S) : `<p class="rg-lede">${rgEsc(n.say)}</p>`}${btn}${town}`;
-  const enc = E ? `<p class="rg-scout"><span>Scouting report</span><b>Waves ${S.w0}-${S.w1}</b></p>${E.cards}${E.say}${E.loot}`
+  const prz = rgPrizeHTML(R, id);
+  const ovw = E ? `<div class="rg-hd">${rgBattleHead(R, S, true)}</div>${warl}${prz}<div class="rg-gl">${rgBattleGold(R, S)}</div>${btn}${town}`
+    : `${S ? rgBattleHead(R, S) : `<p class="rg-lede">${rgEsc(n.say)}</p>`}${warl}${prz}${btn}${town}`;
+  const enc = E ? `<p class="rg-scout"><span>Scouting report</span><b>Waves ${S.w0}-${S.w1}</b></p>${E.cards}${E.say}${prz}${E.loot}`
     : `<div class="rg-empty"><b>${st.s === 'held' ? `${rgEsc(n.name)} is yours` : 'Nothing to scout'}</b><p>${st.s === 'held' ? (n.kind === 'town' ? 'No foes here: rest and re-spec, then march on.' : 'Its trouble is settled and patrolled out: no foes left here.') : 'No battle here.'}</p></div>`;
   const tab = (k, t) => `<button type="button" role="tab" class="rg-tab" id="rgTab-${k}" data-tab="${k}" aria-controls="rgPan-${k}" aria-selected="${rgTab === k}" tabindex="${rgTab === k ? 0 : -1}">${t}</button>`;
   return `<section class="cm-loc rg-card rg-place" data-place="${rgEsc(id)}">${hd}
@@ -129876,6 +130297,13 @@ function rgPlaceBanner(id, name, still, state, field) {
 }
 function rgPendingHTML(R) {
   const P = R.pending;
+  if (P.kind === 'assault') {
+    const a = rgArmy(R, P.army), n = rgNode(R, P.at), S = rgSpec(R, P.at, 'defend'); S.line = rgLineOf(R, S);
+    const fb = rgNearest(R, P.at, id => rgHeldTown(R, id) && id !== P.at);
+    return `<section class="cm-loc rg-card rg-alarm"><h3><span>${P.breach ? 'The walls are breached' : 'Caught on the march'}</span>${rgEsc(a ? a.name : 'An army')} falls on ${rgEsc(n.name)}</h3>${rgBattleHead(R, S)}<p class="rg-warl">${rgEsc(rgWarLine(R, P.at))}</p>
+      <button class="btn rg-go" id="rgFight">Stand and fight<small>${S.line} lives · beat it and its pips are gone for good</small></button><button class="btn ghost rg-sec" id="rgAbandon">${n.kind === 'town' ? 'Abandon the town' : 'Fall back'}<small>no fight · ${rgEsc(n.name)} is lost${fb ? ` · back to ${rgEsc(rgNode(R, fb).name)}` : ' · no town to fall back to'}</small></button>
+      <details class="rg-more"><summary>Details</summary>${rgBattleMore(R, S)}</details></section>`;
+  }
   if (P.kind === 'waylay') {
     const S = rgSpec(R, null, 'waylay', P.road); S.line = rgLineOf(R, S);
     return `<section class="cm-loc rg-card rg-alarm"><h3><span>Ambush</span>Waylaid on the road</h3>${rgBattleHead(R, S)}
@@ -129889,15 +130317,16 @@ function rgPendingHTML(R) {
 }
 const rgFace = h => (typeof COMMANDER_ART !== 'undefined' && COMMANDER_ART[h.id]) || (typeof HERO_ART !== 'undefined' && HERO_ART[h.id]) || heroFaceURL(h);
 function rgBandHTML(R) {
-  const h = HERO_BY[R.hero], B = R.band, lv = B && B.raised ? xpLevelOf(B.xp || 0) : 1, nx = RG_MARKS.find(m => m > R.clock) || RG_CLOCK;
+  const h = HERO_BY[R.hero], B = R.band, lv = B && B.raised ? xpLevelOf(B.xp || 0) : 1, W = R.war || { turn: 0, stance: 'watchful' };
   return `<section class="cm-band"><img class="cm-face" alt="" src="${rgFace(h)}"><div class="cm-bi"><h3>${rgEsc(h.name)}<small>${rgEsc(FORCES[R.force].name)}${R.hard ? ' · Hardcore' : ''}</small></h3>
     <p class="cm-stats"><span><b>${R.lives}<small>/${RG_LIVES}</small></b>Lives</span><span><b>${R.chest}</b>War chest</span><span><b>${lv}</b>Level</span><span><b>${B && B.raised ? B.loot.length : 0}</b>Items</span><span><b>${rgSettled(R)}</b>Settled</span></p></div>
-    <p class="cm-at" title="At ${RG_MARKS.join(', ')} every unsettled place grows a step harder (waves ${RG_STEP.w} later, foes +${Math.round(RG_STEP.hp * 100)}% health); at ${RG_CLOCK} the warlord raids the town nearest his lair."><span>Threat clock <b>${R.clock}/${RG_CLOCK}</b></span><span>Next growth at <b>${nx}</b></span></p></section>`;
+    ${(() => { const I = rgWarIncome(R); return `<p class="cm-at rg-inc" title="${rgEsc(I.parts.map(p => `${p[0]}: +${p[1]}`).join(' · ') || 'No land yet')}"><span>Supplies <b>+${I.total}</b> a turn</span><span><b>${R.supply | 0}</b> gold ready for your next battle</span></p>`; })()}<p class="rg-prep"><button type="button" class="btn ghost rg-sec" id="rgPrep">Prepare: talents<small>change them freely between battles</small></button></p>
+    <p class="cm-at" title="Every march or battle is a turn: then each of the warlord's armies takes a road step."><span>Turn <b>${W.turn}</b></span><span>The warlord <b>${RG_STANCE[W.stance] || 'Watchful'}</b>${R.war ? ` · <b>${rgWarTotal(R)}</b> pips` : ''}</span></p></section>${rgArmiesHTML(R)}`;
 }
 function rgResumeHTML(R) {
   const has = savesGet().some(x => x.id === R.battle.runId);
   return `<section class="cm-loc rg-card rg-alarm"><h3><span>A battle is under way</span>${rgEsc(R.battle.name)}</h3><p class="cm-say">Waves ${R.battle.w0}-${R.battle.w1}. ${has ? 'It was saved between waves.' : 'No save of it was found.'}</p>
-    ${has ? '<button class="btn rg-go" id="rgResume">Resume the battle</button>' : ''}<button class="btn ghost rg-sec" id="rgForfeit">${has ? 'Retreat instead' : 'Count it as a retreat'}<small>the place grows a step harder · the host falls back</small></button></section>`;
+    ${has ? '<button class="btn rg-go" id="rgResume">Resume the battle</button>' : ''}<button class="btn ghost rg-sec" id="rgForfeit">${has ? 'Retreat instead' : 'Count it as a retreat'}<small>the host falls back · it counts as a lost turn</small></button></section>`;
 }
 // the homeland's painting, a wide banner at the top of the setup screen (owner, 25 Nov 2026: "a big hero image of the homeland at
 // the top for each"). All six are the owner's
@@ -129957,6 +130386,7 @@ function rgStartHTML(force) {
       <section class="hx-affinities" aria-label="The rules of the march"><h3>The march <span>${RG_LIVES} lives · saves itself</span></h3><ul class="hx-bars">
         <li class="hx-flat">You have <b>${RG_LIVES} lives</b> for the whole act. Each battle stakes up to ${RG_LINE} of them.</li>
         <li class="hx-flat">A broken line costs lives, gold and the place, and you fall back to the nearest town. You can fight it again at once.</li>
+        <li class="hx-flat">The warlord's armies march each time you do. Beat them, outmanoeuvre them, take his land to weaken him.</li>
         <li class="hx-flat">The run ends at 0 lives, or when no town is left to fall back to.</li></ul></section>
       <footer class="hx-footer"><label class="rg-hard"><input type="checkbox" id="rgHard" ${rgPick.hard ? 'checked' : ''}><i aria-hidden="true"></i><span><b>Hardcore</b><small>The first broken line ends the run</small></span></label>
         <button type="button" class="hx-go" id="rgBegin"><span>Muster the host at <b>${rgEsc(town)}</b></span><kbd aria-hidden="true">Enter</kbd></button></footer>
@@ -130005,11 +130435,11 @@ function rgOpen(force) {
     ${R.notice ? `<p class="rg-notice" role="status"><i aria-hidden="true">!</i><span>${rgEsc(R.notice)}</span></p>` : ''}
     <div class="cm-body"><section class="rg-mapc" aria-label="The map"><div class="rg-mtb"><span><i aria-hidden="true"></i>The ${rgEsc(D.name.split(' ').pop())}</span><button type="button" id="rgLocate">Locate your host<span aria-hidden="true">⌖</span></button></div>
       <div class="rg-mapf"><div class="cm-map rg-mapv"><div class="rg-mapin" data-f="${force}">${rgMapSVG(R)}</div></div>${rgThreatHTML(R)}</div>
-      <div class="rg-legend" aria-hidden="true"><span><i class="lg held"></i>Held</span><span><i class="lg open"></i>Contested</span><span><i class="lg lost"></i>Lost</span><span><i class="lg lair"></i>Warlord</span><span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span></div>
+      <div class="rg-legend" aria-hidden="true"><span><i class="lg held"></i>Held</span><span><i class="lg open"></i>Contested</span><span><i class="lg lost"></i>Lost</span><span><i class="lg lair"></i>Warlord</span><span><i class="lg army"></i>Army (⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster)</span><span><i class="lg gar"></i>Garrison</span><span><i class="lg prz"></i>Prize</span><span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span></div>
       <p class="rg-hint">Select a place to see it. Double-click or double-tap to march. Arrow keys move between places.</p></section>
     <aside class="cm-side">${rgBandHTML(R)}${side}
     ${RG_HOW}
-    <details class="rg-log"><summary>The march so far${R.log[0] ? `: <span>${rgEsc(R.log[0])}</span>` : ''}</summary><ul>${R.log.slice(0, 8).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></details></aside></div>
+    <details class="rg-log"><summary>The march so far${R.log[0] ? `: <span>${rgEsc(R.log[0])}</span>` : ''}</summary><ul>${R.log.slice(0, 14).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></details></aside></div>
     <footer class="cm-ft">${rgForceTabs(force)}<button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign rg-ov');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
   rgBannerSet(force); rgMapArtSet(force);
@@ -130042,18 +130472,54 @@ function rgOpen(force) {
   tabs.forEach((b, k) => { b.onclick = () => { sfx('click'); pick(b); }; b.onkeydown = e => { const m = { ArrowRight: k + 1, ArrowLeft: k - 1, Home: 0, End: tabs.length - 1 }[e.key]; if (m == null) return; e.preventDefault(); e.stopPropagation(); pick(tabs[(m + tabs.length) % tabs.length], true); }; });
   const on = (id, f) => { const b = document.getElementById(id); if (b) b.onclick = () => { AudioSys.init(); sfx('click'); f(); }; };
   on('rgAct', () => rgDo(R, rgSel, force, false));
-  on('rgFight', () => rgStart(R, R.pending && R.pending.kind === 'waylay' ? rgSpec(R, null, 'waylay', R.pending.road) : rgSpec(R, R.at, 'trouble')));
-  on('rgBackOff', () => { const out = []; rgClock(R, 1, out); rgLog(R, `Fell back to ${rgNode(R, R.pending.from).name} (no fight)`); for (const t of out) rgLog(R, t); R.pending = null; rgPut(R); rgOpen(force); });
+  on('rgFight', () => rgStart(R, R.pending && R.pending.kind === 'waylay' ? rgSpec(R, null, 'waylay', R.pending.road) : R.pending && R.pending.kind === 'assault' ? rgSpec(R, R.pending.at, 'defend') : rgSpec(R, R.at, 'trouble')));
+  on('rgAbandon', () => { rgAbandon(R); rgSel = R.at; rgOpen(force); });
+  on('rgPrep', () => rgPrep(R, force));
+  on('rgBackOff', () => { rgLog(R, `Fell back to ${rgNode(R, R.pending.from).name} (no fight)`); R.pending = null; rgPut(R); rgOpen(force); });
   on('rgResume', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (!x) return rgOpen(force); restore(x.s); G.runId = x.id; afterStart(`Wave ${G.wave}`, `${R.battle.name}: the maze stands as you left it.`); });
-  on('rgForfeit', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (x) { restore(x.s); G.runId = x.id; rgEnd(false, true); } else { const S = Object.assign(rgSpec(R, R.battle.node, 'trouble'), { line: 0 }); R.battle = null; const out = []; rgGrow(R, S.node, 'your retreat from here'); out.push(`Retreating made ${rgNode(R, S.node).name} harder (grown ${R.st[S.node].g}/${RG_GROW})`); if (!S.gentle) rgClock(R, 1, out); rgFallBack(R, out); R.notice = rgNotice(out); for (const t of out) rgLog(R, t); rgPut(R); rgOpen(force); } });
+  on('rgForfeit', () => { const x = savesGet().find(q => q.id === R.battle.runId); if (x) { restore(x.s); G.runId = x.id; rgEnd(false, true); } else { const S = Object.assign(rgSpec(R, R.battle.node, R.battle.kind === 'defend' || R.battle.kind === 'patrol' ? R.battle.kind : 'trouble'), { line: 0 }); R.battle = null; const out = []; rgWarAfter(R, S, false, true, out); rgFallBack(R, out); R.notice = rgNotice(R.over ? [] : rgWarTurn(R, out)); for (const t of out) rgLog(R, t); rgPut(R); rgOpen(force); } });
   on('rgX', () => titleScreen());
   on('rgTitleB', () => titleScreen());
   rgForceWire();
   const dr = document.getElementById('rgDropB');
   if (dr) dr.onclick = () => { sfx('click'); if (!dr.classList.contains('arm')) { dr.classList.add('arm'); dr.textContent = 'Tap again: the run is lost'; return; } rgDrop(force); rgOpen(force); };
+  for (const b of ovp.querySelectorAll('.rg-arm[data-at]')) b.onclick = () => { sfx('click'); rgSel = b.dataset.at; rgOpen(force); };
   for (const b of ovp.querySelectorAll('[data-town]')) b.onclick = () => { sfx('click'); rgTown(R, b.dataset.town); rgOpen(force); };
   for (const b of ovp.querySelectorAll('[data-ev]')) b.onclick = () => { sfx('click'); rgResolveEvent(R, +b.dataset.ev); rgSel = R.at; rgOpen(force); };
   const L = rgNode(R, rgSel); if (L && L.map && !R.battle) { mapPick = rgField(L); setMap(mapPick); }
+}
+
+/* ---- Prepare (owner, 27 Nov 2026: talents "changed FREELY ON THE CAMPAIGN MAP ONLY ... LOCKED INSIDE A BATTLE"): the warband's
+   talents in the game's own talent panel, with nothing fought: every reset is free, and a point can be taken back from the
+   picked talent (if no other pick needs it). Closing it writes the trees back to the warband. In a Homeland battle no point
+   comes back: the panel's Reset and Renown's respec are shut ("Change talents on the map between battles"). ---- */
+let RG_PREP = null;
+function rgPrep(R, force) {
+  if (!R.band || !R.band.raised) { if (typeof onToast === 'function') onToast('Fight a battle first: the warband has no talents yet.'); return; }
+  if (typeof twStop === 'function') twStop();
+  RG_NEXT = null; heroPickId = R.hero;
+  RG_PREP = { force };
+  newGame('normal', null, R.hero, 0); campCarryIn(R.band, R.hero); G.camp = null; G.region = null;
+  G.rgPrep = true; G.state = 'play'; G.phase = 'build'; G.runId = null;
+  if (typeof talLocked === 'function' && talLocked()) { rgPrepDone(); if (typeof onToast === 'function') onToast('Talents open at a higher level: win a battle or two first.'); return; }
+  openTalents();
+}
+function rgPrepDone() {
+  const P = RG_PREP; RG_PREP = null; if (!P) return;
+  const R = rgGet(P.force);
+  if (R && R.band && G.rgPrep) { const B = R.band; B.tal = JSON.parse(JSON.stringify(G.tal || {})); B.tp = G.tp | 0; B.plan = G.plan ? JSON.parse(JSON.stringify(G.plan)) : B.plan; B.heroTal = (G.heroTal || []).slice(); if (typeof talNamesNow === 'function') B.taln = talNamesNow(); rgPut(R); }
+  G.rgPrep = false; G.state = 'demo'; hideOverlay(); rgOpen(P.force);
+}
+// the picked talent's index in tree ty (ui.js talSel: { t, i })
+const rgSelIx = ty => typeof talSel === 'undefined' || talSel == null ? null : typeof talSel === 'number' ? talSel : talSel.t === ty ? talSel.i : null;
+// take one point back from talent i of type (only if every other pick still stands without it)
+function rgUnlearn(type, i) {
+  if (!G.rgPrep || !TALENTS[type]) return false;
+  const pk = G.tal[type]; if (!Array.isArray(pk) || !(pk[i] > 0)) return false;
+  pk[i]--; G.talV = (G.talV || 0) + 1;
+  const bad = TALENTS[type].list.some((t, j) => (pk[j] | 0) > 0 && !(talRowOpen(t.r, type, pk) && talReqMet(type, pk, t)));   // (each pick left still has its row open and its prerequisites full)
+  if (bad) { pk[i]++; G.talV++; return false; }
+  G.tp = (G.tp | 0) + 1; return true;
 }
 
 /* ---- the hooks ---- */
@@ -130121,11 +130587,39 @@ function rgOpen(force) {
   // (ui.js may have bound onEnd to the old endScreen before this file loaded)
   const _oe = onEnd;
   onEnd = function (won) { if (G.region && !(typeof TW !== 'undefined' && TW)) { rgEnd(won, false); return; } return _oe.apply(this, arguments); };
+  // talents: free on the map (Prepare), locked in a Homeland battle
+  const _rt = resetTree;
+  resetTree = function (type) {
+    if (G.rgPrep) { const n = talentRank(type); if (!n) return false; G.tp += n; G.tal[type] = []; G.talV = (G.talV || 0) + 1; sfx('sell'); return true; }
+    if (G.region) { if (typeof onToast === 'function') onToast('Change talents on the map between battles.'); return false; }
+    return _rt.apply(this, arguments);
+  };
+  if (typeof ftReset === 'function') { const _fr = ftReset; ftReset = function () { if (G.region) { if (typeof onToast === 'function') onToast('Change talents on the map between battles.'); return false; } return _fr.apply(this, arguments); }; }
+  const _rtl = refreshTalents;
+  refreshTalents = function () {
+    const r = _rtl.apply(this, arguments), rs = document.getElementById('tReset'), ty = typeof talTab !== 'undefined' ? talTab : null;
+    if (rs && G.region) { rs.disabled = true; rs.innerHTML = 'Reset'; rs.title = 'Change talents on the map between battles'; }
+    if (rs && G.rgPrep) {
+      const n = ty && TALENTS[ty] ? talentRank(ty) : 0; rs.disabled = !n; rs.innerHTML = 'Reset <small>free</small>'; rs.title = 'Refund every point in this tree (free on the map)';
+      if (!document.getElementById('tUnlearn') && ty && TALENTS[ty]) {
+        const i = rgSelIx(ty), can = i != null && (G.tal[ty] || [])[i] > 0;
+        rs.insertAdjacentHTML('beforebegin', `<button type="button" class="tc-btn reset" id="tUnlearn"${can ? '' : ' disabled'} title="Take one point back from the picked talent">Take a point back</button>`);
+        document.getElementById('tUnlearn').onclick = e => { e.stopPropagation(); if (rgSelIx(talTab) != null && rgUnlearn(talTab, rgSelIx(talTab))) { sfx('sell'); buildTree(); refreshTalents(); } else { sfx('error'); if (typeof onToast === 'function') onToast('Pick a learned talent that no other pick needs.'); } };
+      }
+    }
+    return r;
+  };
+  const _rg = resumeGame;
+  resumeGame = function () { if (G.rgPrep) { rgPrepDone(); return; } return _rg.apply(this, arguments); };
+  const _sn0 = saveNow; saveNow = function () { if (G.rgPrep) return; return _sn0.apply(this, arguments); };
+  // no interest on held gold in a Homeland battle: the land's supplies pay instead (rgWarIncome)
+  if (typeof interestNow === 'function') { const _in = interestNow; interestNow = function () { return G && G.region ? 0 : _in.apply(this, arguments); }; }
+  if (typeof interestNext === 'function') { const _ix = interestNext; interestNext = function () { return G && G.region ? null : _ix.apply(this, arguments); }; }
   const _pm = pauseMenu;
   pauseMenu = function () {
     const r = _pm.apply(this, arguments), b = G.region && document.getElementById('pQuit');
     if (b) {
-      b.textContent = 'Sound the retreat'; b.title = 'Keep the lives you still hold. The trouble grows a step and the host falls back; you can retry the battle.';
+      b.textContent = 'Sound the retreat'; b.title = 'Keep the lives you still hold. The host falls back and the warlord takes his turn; you can retry the battle.';
       let armed = false;
       b.onclick = e => { if (!armed) { armed = true; e.currentTarget.textContent = 'Click again to retreat'; e.currentTarget.classList.add('danger'); return; } G.state = 'lost'; hideOverlay(); rgEnd(false, G.region.kind !== 'waylay'); };
     }
@@ -130237,13 +130731,14 @@ function rgKit(ty) {
   return { bases: bases.sort((a, b) => (GEAR_BASES[a].rar | 0) - (GEAR_BASES[b].rar | 0)), leg: legs[0] || null };
 }
 const rgKitType = T => T && T.focus && T.focus.startsWith('kit:') ? T.focus.slice(4) : null;
-// a place's table as it stands now: its own, with its growth and its roads on top
+// a place's table as it stands now: its own, with the war's pips there (its garrison and armies) and its roads on top
 function rgLootOf(R, id) {
   const T0 = RG_LOOT[id]; if (!T0) return null;
-  const st = R.st[id] || {}, g = st.g | 0, d = Math.max(0, ...R.roads.filter(r => r.a === id || r.b === id).map(r => r.d | 0));
+  const st = R.st[id] || {}, g = R.war && typeof rgPipsAt === 'function' ? rgPipsAt(R, id).g : st.g | 0, d = Math.max(0, ...R.roads.filter(r => r.a === id || r.b === id).map(r => r.d | 0));
   const T = Object.assign({}, T0, { g, road: d, force: R.force });
   T.up = T0.sure >= 4 ? 0 : Math.min(.9, (T0.up || 0) + RG_LOOT_GROW.up * g);
   T.leg = T0.sure >= 4 ? 0 : Math.min(.6, (T0.leg || 0) + RG_LOOT_GROW.leg * g + RG_LOOT_ROAD * d);
+  const fk = R.war && typeof rgFarmK === 'function' ? rgFarmK(R, id).k : 1; T.up *= fk; T.leg *= fk;   // (a place fought again soon drops less: region.js RG_WAR2.farm)
   const ty = rgKitType(T0); if (ty) { T.kit = ty; const K = rgKitFor(R.force, ty), low = K.bases.filter(b => (GEAR_BASES[b].rar | 0) <= T0.sure); T.kitBases = low.length ? low : K.bases; T.kitHigh = K.bases.filter(b => !T.kitBases.includes(b)); T.kitLeg = K.leg; if (!T.kitHigh.length) T.up = 0; }   // (an easy place pays its kit's lesser pieces; its upgrade, a higher one)
   return T;
 }
@@ -133366,8 +133861,8 @@ function bfSlowK(c) {
    FOES: traits and what their allies give them
    ===================================================================================================== */
 bfAdd('elite', { name: 'Elite', kind: 'trait', pri: 30, icon: 'gem', hue: '#9a7a1a',
-  def: 'An elite foe: far more health than its kind, a gold ring at its feet, and it may drop an item when it falls.',
-  get: c => c.elite ? { say: c.qx === 'champ' ? `${eliteXOf(c)}× the health of a typical trooper of this wave. Slay it before the gate to win the challenge.` : `${eliteXOf(c)}× the health of a plain ${c.def.name} on this wave. Slain, it may drop an item.` } : null });
+  def: 'An elite foe: far more health than a plain foe of the same kind, with a gold ring at the feet. May drop an item when slain.',
+  get: c => c.elite ? { say: c.qx === 'champ' ? `${eliteXOf(c)}× the health of a typical trooper of this wave. Slay this foe before the gate to win the challenge.` : `${eliteXOf(c)}× the health of a plain ${c.def.name} on this wave. May drop an item when slain.` } : null });
 // an elite's real health multiple: its health over a plain troop of its kind on its wave (the elite wave's share, ELITE_HP and its kind's ELITE_HP_TYPE)
 const eliteXOf = c => { const x = c.eliteX || (typeof ELITE_HP !== 'undefined' ? ELITE_HP : 1); return x >= 10 ? Math.round(x) : Math.round(x * 10) / 10; };
 // the Hunt bosses' affixes (hunts.js HUNT_AFFIX): a name keywords.js already holds keeps that entry
@@ -133387,29 +133882,29 @@ for (const a in BF_HX) {
 // how much faster than its kind (every minion's spdM carries the march's own pace, minionSpd: that is not Swift)
 const bfSwiftK = c => (c.spdM || 1) / (typeof minionSpd === 'function' && c.def ? minionSpd(c.def) || 1 : 1);
 bfAdd('swift', { name: 'Swift', kw: 'fo:swift', kind: 'trait', pri: 34, icon: 'quick', hue: '#8a7a20',
-  def: () => typeof SWIFT !== 'undefined' ? `It runs ${bfPct(SWIFT.spd - 1)} faster, with ${bfPct(SWIFT.hp)} of its health.` : 'It runs faster, with less health.',
-  get: c => bfSwiftK(c) > 1.01 && !(c.hx && c.hx.includes('swift')) ? { say: typeof SWIFT !== 'undefined' ? `It runs ${bfPct(SWIFT.spd - 1)} faster than its kind, with ${bfPct(SWIFT.hp)} of their health.` : 'It runs faster, with less health.' } : null });
+  def: () => typeof SWIFT !== 'undefined' ? `Runs ${bfPct(SWIFT.spd - 1)} faster, with ${bfPct(SWIFT.hp)} of the usual health.` : 'Runs faster, with less health.',
+  get: c => bfSwiftK(c) > 1.01 && !(c.hx && c.hx.includes('swift')) ? { say: typeof SWIFT !== 'undefined' ? `Runs ${bfPct(SWIFT.spd - 1)} faster than a plain foe of the same kind, with ${bfPct(SWIFT.hp)} of the health.` : 'Runs faster, with less health.' } : null });
 bfAdd('regen', { name: 'Regenerating', kw: 'fo:regen', kind: 'trait', pri: 36, icon: 'potion', hue: '#2a6a2a',
-  def: 'It heals part of its health every second. Wounded halves it.',
-  get: c => c.def.regen > 0 ? { say: `It heals ${Math.round(c.def.regen * 1000) / 10}% of its health (${bfInt(c.def.regen * c.maxHp)}) every second.${c.woundT > bfNow() ? ' Wounded: halved now.' : ' Wounded halves it.'}` } : null });
+  def: 'Heals part of maximum health every second. Wounded halves the healing.',
+  get: c => c.def.regen > 0 ? { say: `Heals ${Math.round(c.def.regen * 1000) / 10}% of maximum health (${bfInt(c.def.regen * c.maxHp)}) every second.${c.woundT > bfNow() ? ' Wounded: halved now.' : ' Wounded halves the healing.'}` } : null });
 bfAdd('armbar', { name: 'Armour bar', kw: 'fo:armbar', kind: 'trait', pri: 38, icon: 'shield', hue: '#4a5060', f: ['ap', 'apMax', 'epTempT'],
-  def: 'A grey bar over its health: steel must break it before its health drops.',
-  get: c => c.apMax > 0 && c.ap > 0 ? { fill: c.ap / c.apMax, say: `${bfInt(c.ap)} of ${bfInt(c.apMax)} armour left.${c.epTemp ? ' Borrowed from a hardening spell: it falls away soon.' : ''} ${(typeof TRAIT_TIP_F !== 'undefined' && TRAIT_TIP_F[TRAIT_ARM_F]) || 'Steel must break it before its health drops.'}`, t: c.epTemp ? bfLeft(c.epTempT) : undefined } : null });
+  def: 'A grey bar over the health bar: steel must break the bar before health drops.',
+  get: c => c.apMax > 0 && c.ap > 0 ? { fill: c.ap / c.apMax, say: `${bfInt(c.ap)} of ${bfInt(c.apMax)} armour left.${c.epTemp ? ' Borrowed from a hardening spell: falls away soon.' : ''} ${(typeof TRAIT_TIP_F !== 'undefined' && TRAIT_TIP_F[TRAIT_ARM_F]) || 'Steel must break the bar before health drops.'}`, t: c.epTemp ? bfLeft(c.epTempT) : undefined } : null });
 bfAdd('wardbar', { name: 'Spell Shield', kw: 'fo:wardbar', kind: 'trait', pri: 38, icon: 'orbbig', hue: '#4a2a8a', f: ['mw', 'mwMax'],
-  def: 'A blue bar over its health: magic must break it before its health drops.',
-  get: c => c.mwMax > 0 && c.mw > 0 ? { fill: c.mw / c.mwMax, say: `${bfInt(c.mw)} of ${bfInt(c.mwMax)} ward left. ${(typeof TRAIT_TIP_F !== 'undefined' && TRAIT_TIP_F[TRAIT_WARD_F]) || 'Magic must break it before its health drops.'}` } : null });
+  def: 'A blue bar over the health bar: magic must break the bar before health drops.',
+  get: c => c.mwMax > 0 && c.mw > 0 ? { fill: c.mw / c.mwMax, say: `${bfInt(c.mw)} of ${bfInt(c.mwMax)} ward left. ${(typeof TRAIT_TIP_F !== 'undefined' && TRAIT_TIP_F[TRAIT_WARD_F]) || 'Magic must break the bar before health drops.'}` } : null });
 bfAdd('flying', { name: 'Flying', kind: 'trait', pri: 40, icon: 'wings', hue: '#3a5a7a',
-  def: 'It flies over the maze, straight down the middle: only units that reach the air can hit it.',
-  get: c => c.fly ? { say: 'It flies over the maze, straight down the middle: only units that reach the air can hit it.' } : null });
+  def: 'Flies over the maze, straight down the middle. Can only be hit by units that reach the air.',
+  get: c => c.fly ? { say: 'Flies over the maze, straight down the middle. Can only be hit by units that reach the air.' } : null });
 bfAdd('siege', { name: 'Siege troop', kind: 'trait', pri: 40, icon: 'hammer', hue: '#6a3a20', f: ['atk'],
-  def: 'It stops to batter what blocks its road. A wall beaten down is wrecked until you rebuild it; a unit is Wounded and fights on, slower.',
-  get: c => c.atk && c.atk.kind !== 'blast' ? { say: 'It stops to batter what blocks its road. A wall beaten down is wrecked until you rebuild it; a unit is Wounded and fights on, slower, until the wave ends.' } : null });
+  def: 'Stops to batter whatever blocks the road. A wall beaten down is wrecked until you rebuild it; a unit is Wounded and fights on, slower.',
+  get: c => c.atk && c.atk.kind !== 'blast' ? { say: 'Stops to batter whatever blocks the road. A wall beaten down is wrecked until you rebuild it; a unit is Wounded and fights on, slower, until the wave ends.' } : null });
 bfAdd('bomber', { name: 'Bomber', kind: 'trait', pri: 40, icon: 'bomb', hue: '#7a3010',
-  def: 'It runs at the first unit in its way and blows itself up on it.',
-  get: c => c.atk && c.atk.kind === 'blast' ? { say: 'It runs at the first unit in its way and blows itself up on it. Kill it before it gets there.' } : null });
+  def: 'Runs at the first unit in the way and explodes on that unit.',
+  get: c => c.atk && c.atk.kind === 'blast' ? { say: 'Runs at the first unit in the way and explodes on that unit. Must be killed before reaching that unit.' } : null });
 bfAdd('steadfast', { name: 'Steadfast', kind: 'trait', pri: 42, icon: 'statue', hue: '#5a5040', f: ['ten'],
-  def: 'Slows and stuns are weaker on it.',
-  get: c => !c.def.boss && (c.ten || 0) >= .25 ? { say: `It shrugs off ${bfPct(c.ten)} of every slow and stun.` } : null });
+  def: 'Slows and stuns have less effect.',
+  get: c => !c.def.boss && (c.ten || 0) >= .25 ? { say: `Shrugs off ${bfPct(c.ten)} of every slow and stun.` } : null });
 bfAdd('trait', { name: 'Trait', kind: 'trait', pri: 44, icon: 'eye', hue: '#5a4a3a', dyn: true,
   def: 'What this kind of foe does.',
   get: c => {
@@ -133419,159 +133914,159 @@ bfAdd('trait', { name: 'Trait', kind: 'trait', pri: 44, icon: 'eye', hue: '#5a4a
   } });
 const BF_TIE_ICON = { heal: 'heart', ward: 'halo', mres: 'shield', haste: 'banner', cleanse: 'swirl', raise: 'skull' };
 bfAdd('covering', { name: 'Covering', kind: 'buff', pri: 12, icon: 'aura', hue: '#2a6a5a', f: ['links'],
-  def: 'A support caster: its tie covers the allies within its reach. Stun it or kill it and every tie drops at once.',
+  def: 'A support caster whose tie covers the allies in reach. Stun or kill the caster and every tie drops at once.',
   get: c => {
     const L = c.def.link; if (!L || oldRules()) return null;
     const n = (c.links || []).filter(o => o !== c && bfLive(o)).length;
-    return { n, icon: BF_TIE_ICON[L.kind] || 'aura', say: `It ${L.say}, ${L.r} cells around it. ${n ? `It covers ${bfPl(n, 'ally', 'allies')} now.` : 'Nobody is in its reach now.'} Stun it or kill it and every tie drops at once.` };
+    return { n, icon: BF_TIE_ICON[L.kind] || 'aura', say: `${L.say.charAt(0).toUpperCase() + L.say.slice(1)} (within ${L.r} cells). ${n ? `Covering ${bfPl(n, 'ally', 'allies')} now.` : 'Nobody in reach now.'} Stun or kill the caster and every tie drops at once.` };
   } });
 bfAdd('exposed', { name: 'Exposed', kw: 'st:exposed', kind: 'trait', pri: 14, icon: 'eye', hue: '#7a6a20', f: ['alone'],
-  def: 'A support caster with nobody in its reach: it takes more from every hit.',
-  get: c => c.def.rk && c.def.rk.support && c.alone && !oldRules() ? { say: `Nobody is within its reach: it takes ${typeof ROLE_K !== 'undefined' ? ROLE_K.alone : 1.3}× from every hit.` } : null });
+  def: 'A support caster with nobody in reach: takes more damage from every hit.',
+  get: c => c.def.rk && c.def.rk.support && c.alone && !oldRules() ? { say: `Nobody in reach: takes ${typeof ROLE_K !== 'undefined' ? ROLE_K.alone : 1.3}× damage from every hit.` } : null });
 bfAdd('runeward', { name: 'Runeward', kind: 'buff', pri: 10, icon: 'shield', hue: '#5a2a8a', f: ['auraMres', 'mBy'],
-  def: 'A Runed War Mage\'s tie covers its armour. Kill or stun the mage and the tie drops.',
+  def: 'A Runed War Mage\'s tie covers this foe\'s armour. Kill or stun the mage and the tie drops.',
   get: c => {
-    if (!(c.auraMres > 0) && c.apMax > 0 && c.mBy && c.mBy.filter(bfLive).length && typeof EP !== 'undefined') { const M = c.mBy.filter(bfLive); return { src: bfWho(M, c), n: M.length > 1 ? M.length : 0, fill: c.ap / c.apMax, say: `Its armour bar mends ${bfPct(EP.tieMend * Math.min(2, M.length))} a second while the tie holds. Magic still cuts straight through to its health. Kill or stun the mage and the tie drops.` }; }   // a force run: the tie mends armour, it never wards it (one foe, one bar)
+    if (!(c.auraMres > 0) && c.apMax > 0 && c.mBy && c.mBy.filter(bfLive).length && typeof EP !== 'undefined') { const M = c.mBy.filter(bfLive); return { src: bfWho(M, c), n: M.length > 1 ? M.length : 0, fill: c.ap / c.apMax, say: `Armour bar mends ${bfPct(EP.tieMend * Math.min(2, M.length))} a second while the tie holds. Magic still cuts straight through to health. Kill or stun the mage and the tie drops.` }; }   // a force run: the tie mends armour, it never wards it (one foe, one bar)
     if (!(c.auraMres > 0)) return null;
     const M = (c.mBy || []).filter(bfLive), r = Math.min(.9, (c.mres || 0) + c.auraMres);
-    return { src: M.length ? bfWho(M, c) : 'from a War Mage', n: M.length > 1 ? M.length : 0, say: `Magic does only ${bfPct(1 - r)} to it, Arcane ${bfPct(1 - r * .5)}. Steel is untouched. Kill or stun the mage and the ward drops.` };
+    return { src: M.length ? bfWho(M, c) : 'from a War Mage', n: M.length > 1 ? M.length : 0, say: `Takes only ${bfPct(1 - r)} damage from magic, ${bfPct(1 - r * .5)} from Arcane. Steel is untouched. Kill or stun the mage and the ward drops.` };
   } });
 bfAdd('mended', { name: 'Mended', kind: 'buff', pri: 11, icon: 'heart', hue: '#2a6a2a',
-  def: 'A Mend-Priest beside it heals it while it is hurt.',
+  def: 'Healed by a nearby Mend-Priest while hurt.',
   get: c => {
     const P = bfCoverOf(c, 'heal'); if (!P.length) return null;
     const h = P[0].def.heal || [2.5, 0, .1], w = c.woundT > bfNow();
-    return { src: bfWho(P, c), n: P.length > 1 ? P.length : 0, say: `It heals ${bfPct(h[2])} of its health (${bfInt(c.maxHp * h[2] * (w ? (c.def.boss ? .75 : .5) : 1))}) every ${h[0]}s while it is hurt${w ? ', cut now: it is Wounded' : ''}. Wound it, or kill the priest.` };
+    return { src: bfWho(P, c), n: P.length > 1 ? P.length : 0, say: `Heals ${bfPct(h[2])} of maximum health (${bfInt(c.maxHp * h[2] * (w ? (c.def.boss ? .75 : .5) : 1))}) every ${h[0]}s while hurt${w ? ', cut now by Wounded' : ''}. Wound this foe, or kill the priest.` };
   } });
 bfAdd('cleansing', { name: 'Cleansing', kind: 'buff', pri: 11, icon: 'swirl', hue: '#2a5a7a',
-  def: 'A Hexweaver beside it removes your roots, slows, burns, poison, bleeds, marks and curses from it (armour loss stays).',
+  def: 'A nearby Hexweaver removes your roots, slows, burns, poison, bleeds, marks and curses (armour loss stays).',
   get: c => {
     const P = bfCoverOf(c, 'cleanse'); if (!P.length) return null;
     const cl = P[0].def.cleanse || [4];
-    return { src: bfWho(P, c), say: `Every ${cl[0]}s its roots, slows, burns, poison, curses, bleeds and marks are removed (armour loss stays). Stun the Hexweaver first.` };
+    return { src: bfWho(P, c), say: `Every ${cl[0]}s all roots, slows, burns, poison, curses, bleeds and marks are removed (armour loss stays). Stun the Hexweaver first.` };
   } });
 bfAdd('frenzied', { name: 'Frenzied', kind: 'buff', pri: 13, icon: 'banner', hue: '#8a2a10', f: ['rageT', 'rageK'],
-  def: 'It runs faster: a Banner Captain\'s horn, or its own fury.',
+  def: 'Runs faster, from a Banner Captain\'s horn or its own fury.',
   get: c => {
     if (!(c.rageT > 0)) return null;
     const P = bfCoverOf(c, 'haste');
-    return { src: P.length ? bfWho(P, c) : '', t: P.length ? undefined : c.rageT, say: `It runs ${bfPct(c.rageK || 0)} faster${P.length ? ' while it stays near the captain' : ''}.` };
+    return { src: P.length ? bfWho(P, c) : '', t: P.length ? undefined : c.rageT, say: `Runs ${bfPct(c.rageK || 0)} faster${P.length ? ' while near the captain' : ''}.` };
   } });
 bfAdd('wardshield', { name: 'Shielded', kw: 'st:shielded', kind: 'buff', pri: 15, icon: 'halo', hue: '#2a4a8a', f: ['ward', 'wardMax'],
-  def: 'A shield that soaks damage before its health.',
+  def: 'A shield that absorbs damage before health.',
   get: c => {
     if (!(c.ward > 0)) return null;
     const P = bfCoverOf(c, 'ward');
-    return { src: P.length ? bfWho(P, c) : '', fill: c.wardMax ? c.ward / c.wardMax : 1, say: `It soaks ${bfInt(c.ward)} more damage before its health${c.woundT > bfNow() ? ' (Wounded: new shields on it are halved)' : ''}.` };
+    return { src: P.length ? bfWho(P, c) : '', fill: c.wardMax ? c.ward / c.wardMax : 1, say: `Absorbs the next ${bfInt(c.ward)} damage${c.woundT > bfNow() ? ' (Wounded: new shields are halved)' : ''}.` };
   } });
 bfAdd('greatshield', { name: 'Great shield', kind: 'buff', pri: 16, icon: 'shieldx', hue: '#6a5a2a', f: ['shield', 'shieldMax'],
   def: 'A Shieldbearer\'s shield takes a share of every shot at the allies behind it.',
-  get: c => c.def.guard && c.shield > 0 ? { fill: c.shieldMax ? c.shield / c.shieldMax : 1, say: `Its shield takes ${bfPct(c.def.guard[1])} of every shot at the allies behind it: ${bfInt(c.shield)} left before it breaks.` } : null });
+  get: c => c.def.guard && c.shield > 0 ? { fill: c.shieldMax ? c.shield / c.shieldMax : 1, say: `The shield takes ${bfPct(c.def.guard[1])} of every shot at the allies behind it: ${bfInt(c.shield)} left before it breaks.` } : null });
 bfAdd('deathbound', { name: 'Deathbound', kind: 'buff', pri: 17, icon: 'skull', hue: '#2a5a2a', f: ['boundBy'],
-  def: 'Raised by a Necromancer: if the Necromancer falls, it crumbles.',
-  get: c => bfLive(c.boundBy) ? { src: 'from ' + c.boundBy.def.name, say: 'Raised from the fallen. Kill the Necromancer holding it up and it crumbles to 30% of its health.' } : null });
+  def: 'Raised by a Necromancer: crumbles if the Necromancer falls.',
+  get: c => bfLive(c.boundBy) ? { src: 'from ' + c.boundBy.def.name, say: 'Raised from the fallen. Kill the Necromancer and this foe crumbles to 30% health.' } : null });
 bfAdd('spellward', { name: 'Spell Ward', kind: 'buff', pri: 18, icon: 'orb', hue: '#5a3a7a', f: ['amT'],
-  def: 'Magic and Arcane do 40% less to it for a few seconds.',
-  get: c => c.amT > 0 ? { t: c.amT, T: 4, say: 'It takes 40% less damage from magic and Arcane.' } : null });
+  def: 'Takes 40% less damage from magic and Arcane for a few seconds.',
+  get: c => c.amT > 0 ? { t: c.amT, T: 4, say: 'Takes 40% less damage from magic and Arcane.' } : null });
 bfAdd('hardened', { name: 'Hardened', kind: 'buff', pri: 18, icon: 'shell', hue: '#5a5a6a', f: ['armorBT', 'armorB'],
-  def: 'A leader\'s spell hardens its armour for a few seconds.',
+  def: 'A leader\'s spell: more armour for a few seconds.',
   get: c => c.armorBT > 0 ? { t: c.armorBT, say: `${bfInt(c.armorB || 0)} more armour.` } : null });
 bfAdd('shrouded', { name: 'Shrouded', kind: 'buff', pri: 18, icon: 'cloud', hue: '#3a2a5a', f: ['drT', 'drK'],
-  def: 'Wrapped in a shroud: it takes less from every hit.',
-  get: c => c.drT > 0 ? { t: c.drT, T: 5, say: `It takes ${bfInt(100 * (c.drK || .5))}% less damage from every hit.` } : null });
+  def: 'Wrapped in a shroud: takes less damage from every hit.',
+  get: c => c.drT > 0 ? { t: c.drT, T: 5, say: `Takes ${bfInt(100 * (c.drK || .5))}% less damage from every hit.` } : null });
 bfAdd('mwrath', { name: 'Mother’s Wrath', kind: 'buff', pri: 18, icon: 'web', hue: '#5a2a7a', f: ['momDR'],
   def: 'Each spiderling that dies near Arachnara makes her take less damage; it wears off slowly.',
   get: c => c.momDR > 0 ? { fill: c.momDR / ((typeof MOM_WRATH !== 'undefined' && MOM_WRATH.cap) || .24), src: 'from her fallen brood',
     say: `She takes ${bfInt(100 * c.momDR)}% less damage (at most ${bfInt(100 * ((typeof MOM_WRATH !== 'undefined' && MOM_WRATH.cap) || .24))}%), 3% for each spiderling that dies near her. It fades 3% every 2s; kill the spiders away from her.` } : null });
 bfAdd('aegis', { name: 'Aegis', kind: 'buff', pri: 8, icon: 'shieldx', hue: '#2a6a2a', f: ['aegisT'],
-  def: 'An unbreakable aegis: it slows to a crawl while its summons pour out.',
-  get: c => c.aegisT > 0 ? { t: c.aegisT, say: 'An unbreakable aegis: it walks at 40% speed while the stalkers it called pour out.' } : null });
+  def: 'An unbreakable aegis: slowed to a crawl while the summons pour out.',
+  get: c => c.aegisT > 0 ? { t: c.aegisT, say: 'An unbreakable aegis: walks at 40% speed while the summoned stalkers pour out.' } : null });
 bfAdd('phased', { name: 'Phased', kind: 'buff', pri: 8, icon: 'spiral', hue: '#4a2a6a', f: ['phased'],
-  def: 'It has slipped out of the world: nothing can hit it until it returns.',
-  get: c => c.phased ? { say: 'It has slipped out of the world: nothing can hit it until it returns.' } : null });
+  def: 'Slipped out of the world: cannot be hit for now.',
+  get: c => c.phased ? { say: 'Slipped out of the world: cannot be hit for now.' } : null });
 bfAdd('burrowed', { name: 'Burrowed', kw: 'fo:burrow', kind: 'buff', pri: 8, icon: 'rocks', hue: '#5a4020', f: ['burT'],
-  def: 'Underground: only earth damage reaches it.',
-  get: c => c.burT > 0 ? { t: c.burT, say: 'Underground: only earth damage reaches it until it comes up.' } : null });
+  def: 'Underground: immune to all but earth damage.',
+  get: c => c.burT > 0 ? { t: c.burT, say: 'Underground: immune to all but earth damage until surfacing.' } : null });
 bfAdd('stoneform', { name: 'Stoneform', kind: 'buff', pri: 9, icon: 'statue', hue: '#5a5a5a', f: ['stoneUntil'],
-  def: 'Turned to stone: earth hits it three times as hard, everything else does only 40%.',
-  get: c => c.stoneUntil > bfNow() ? { t: bfLeft(c.stoneUntil), say: 'Stone: earth hits it three times as hard, everything else does only 40%.' } : null });
+  def: 'Turned to stone: takes triple damage from earth and only 40% from everything else.',
+  get: c => c.stoneUntil > bfNow() ? { t: bfLeft(c.stoneUntil), say: 'Stone: takes triple damage from earth and only 40% from everything else.' } : null });
 bfAdd('panicking', { name: 'Panicking', kind: 'trait', pri: 46, icon: 'screams', hue: '#6a6a20', f: ['panicT'],
-  def: 'It has lost its nerve: it runs at half speed.',
-  get: c => c.panicT > 0 ? { t: c.panicT, say: 'It has lost its nerve: it runs at half speed.' } : null });
+  def: 'Panicked: runs at half speed.',
+  get: c => c.panicT > 0 ? { t: c.panicT, say: 'Panicked: runs at half speed.' } : null });
 bfAdd('pack', { name: 'With the pack', kind: 'buff', pri: 20, icon: 'antler', hue: '#5a5a6a', f: ['packT', 'packK'],
-  def: 'Running with its alpha: 25% faster, and it shrugs off 30% more of each slow.',
-  get: c => c.packT > 0 ? { t: c.packT, say: `It runs ${bfPct(c.packK || .25)} faster beside its alpha, and shrugs off 30% more of each slow.` } : null });
+  def: 'Running with the alpha: 25% faster, and shrugs off 30% more of each slow.',
+  get: c => c.packT > 0 ? { t: c.packT, say: `Runs ${bfPct(c.packK || .25)} faster beside the alpha, and shrugs off 30% more of each slow.` } : null });
 bfAdd('warmed', { name: 'Torch-warmed', kind: 'buff', pri: 21, icon: 'ember', hue: '#8a4a10', f: ['thawT'],
   def: 'A Torchbearer is near: slows are half as strong.',
-  get: c => c.thawT > 0 ? { t: c.thawT, say: 'A Torchbearer is near: slows on it are half as strong, and frost slows wear off 4 times as fast.' } : null });
+  get: c => c.thawT > 0 ? { t: c.thawT, say: 'A Torchbearer is near: slows are half as strong, and frost slows wear off 4 times as fast.' } : null });
 bfAdd('gorged', { name: 'Gorged', kind: 'buff', pri: 22, icon: 'skullp', hue: '#6a1a1a', f: ['fed'],
-  def: 'It has fed on the fallen and grown tougher.',
-  get: c => c.fed > 0 ? { n: c.fed, say: `It has fed ${bfPl(c.fed, 'time')}: bigger and tougher each time.` } : null });
+  def: 'Has fed on the fallen and grown tougher.',
+  get: c => c.fed > 0 ? { n: c.fed, say: `Has fed ${bfPl(c.fed, 'time')}: bigger and tougher each time.` } : null });
 bfAdd('charged', { name: 'Charged', kind: 'buff', pri: 22, icon: 'boltup', hue: '#3a5a8a', f: ['charge'],
-  def: 'It soaks up lightning and runs faster for it.',
-  get: c => c.def.absorb && c.charge > 0 ? { n: c.charge, say: `It holds ${bfPl(c.charge, 'charge')}: it runs ${bfPct(Math.min(.5, c.charge * c.def.absorb[2]))} faster.` } : null });
+  def: 'Absorbs lightning and runs faster for it.',
+  get: c => c.def.absorb && c.charge > 0 ? { n: c.charge, say: `Holds ${bfPl(c.charge, 'charge')}: runs ${bfPct(Math.min(.5, c.charge * c.def.absorb[2]))} faster.` } : null });
 
 /* =====================================================================================================
    FOES: what your units put on them
    ===================================================================================================== */
 bfAdd('rooted', { name: 'Rooted', kw: 'st:rooted', kind: 'debuff', pri: 1, icon: 'uproot', hue: '#3d6b22', f: ['rootT', 'rootBy', 'rootDur'],
-  def: 'Held in place by roots: it can\'t move.',
-  get: c => c.rootT > bfNow() ? { t: bfLeft(c.rootT), T: c.rootDur, src: bfFrom(c.rootBy), say: 'Held in place by roots: it can\'t move.' } : null });
-bfAdd('mothborne', { name: 'Seed-moth on it', kind: 'debuff', pri: 20, icon: 'spores', hue: '#8a7a2a', f: ['gvcMothT', 'gvcMothBy'],
-  def: 'One of Nyssa’s seed-moths feeds on it: a spore every half second and a 15% slow.',
-  get: c => c.gvcMothT > bfNow() ? { src: bfFrom(c.gvcMothBy), say: 'A seed-moth feeds on it: a spore every half second, and it walks 15% slower.' } : null });
-bfAdd('mothcloud', { name: 'Moths over it', kind: 'debuff', pri: 20, icon: 'spores', hue: '#a89a5a', f: ['gvcCloudT', 'gvcCloudBy'],
-  def: 'A Briarwarden’s swarm of moths hangs over it: it walks 30% slower and is stung each second; a support caster under it can’t cast.',
-  get: c => c.gvcCloudT > bfNow() ? { src: bfFrom(c.gvcCloudBy), say: 'Moths swarm over it: 30% slower, stung each second; a caster under them can’t cast.' } : null });
+  def: 'Held in place by roots: unable to move.',
+  get: c => c.rootT > bfNow() ? { t: bfLeft(c.rootT), T: c.rootDur, src: bfFrom(c.rootBy), say: 'Held in place by roots: unable to move.' } : null });
+bfAdd('mothborne', { name: 'Seed-moth', kind: 'debuff', pri: 20, icon: 'spores', hue: '#8a7a2a', f: ['gvcMothT', 'gvcMothBy'],
+  def: 'Fed on by one of Nyssa’s seed-moths: a spore every half second and a 15% slow.',
+  get: c => c.gvcMothT > bfNow() ? { src: bfFrom(c.gvcMothBy), say: 'Fed on by a seed-moth: a spore every half second, and moves 15% slower.' } : null });
+bfAdd('mothcloud', { name: 'Moth swarm', kind: 'debuff', pri: 20, icon: 'spores', hue: '#a89a5a', f: ['gvcCloudT', 'gvcCloudBy'],
+  def: 'Under a Briarwarden’s moth swarm: moves 30% slower and is stung each second; a support caster under the swarm can’t cast.',
+  get: c => c.gvcCloudT > bfNow() ? { src: bfFrom(c.gvcCloudBy), say: 'Under a moth swarm: 30% slower, stung each second; a caster under them can’t cast.' } : null });
 bfAdd('withered', { name: 'Aging fast', kind: 'debuff', pri: 3, icon: 'wither', hue: '#5a5a2a', f: ['gvcWithT', 'gvcWithBy'],
-  def: 'A Briarwarden\'s spell: it ages fast, losing armour, walking slower and taking more damage every second. If it dies like this it crumbles and withers the foes near it.',
-  get: c => c.gvcWithT > bfNow() ? { t: bfLeft(c.gvcWithT), T: c.gvcWithD, src: bfFrom(c.gvcWithBy), say: 'Cursed: each second it loses 1 armour, walks 10% slower (to 50%) and takes 50% more damage from the curse. If it dies cursed, foes within 1.2 cells are cursed for 2s.' } : null });
+  def: 'A Briarwarden\'s spell: ages fast, losing armour, moving slower and taking more damage every second. Dying like this, crumbles and withers nearby foes.',
+  get: c => c.gvcWithT > bfNow() ? { t: bfLeft(c.gvcWithT), T: c.gvcWithD, src: bfFrom(c.gvcWithBy), say: 'Cursed: each second loses 1 armour, walks 10% slower (to 50%) and takes 50% more damage from the curse. On death while cursed, foes within 1.2 cells are cursed for 2s.' } : null });
 bfAdd('pinned', { name: 'Stunned', kw: 'st:stunned', kind: 'debuff', pri: 1, icon: 'chains', hue: '#6b5a30', f: ['ihPinT', 'ihNetBy'],
-  def: 'Held by Ironhold\'s chains: it can\'t move or act.',
-  get: c => c.ihPinT > bfNow() && c.stunT > 0 ? { t: c.stunT, src: bfFrom(c.ihNetBy), say: 'Held by chains: it can\'t move or act.' } : null });
+  def: 'Held by Ironhold\'s chains: unable to move or act.',
+  get: c => c.ihPinT > bfNow() && c.stunT > 0 ? { t: c.stunT, src: bfFrom(c.ihNetBy), say: 'Held by chains: unable to move or act.' } : null });
 bfAdd('grounded', { name: 'Dragged from the sky', kind: 'debuff', pri: 2, icon: 'wing', hue: '#5a4a30', f: ['lowT', 'wbT'],
-  def: 'A flyer dragged out of the sky: every unit can reach it.',
-  get: c => c.fly && (c.lowT > bfNow() || c.wbT > bfNow()) ? { t: Math.max(bfLeft(c.lowT), bfLeft(c.wbT)), src: bfFrom(c.ihNetBy), say: 'Dragged out of the sky: every unit can reach it.' } : null });
+  def: 'A flyer dragged out of the sky: within reach of every unit.',
+  get: c => c.fly && (c.lowT > bfNow() || c.wbT > bfNow()) ? { t: Math.max(bfLeft(c.lowT), bfLeft(c.wbT)), src: bfFrom(c.ihNetBy), say: 'Dragged out of the sky: within reach of every unit.' } : null });
 bfAdd('frozen', { name: 'Stunned', kw: 'st:stunned', kind: 'debuff', pri: 1, icon: 'iceblock', hue: '#2a6a8a', f: ['frostT', 'frostSrc', 'stunT'],
-  def: 'Stunned in ice: it can\'t move or act.',
-  get: c => c.frostT > 0 && c.stunT > 0 ? { t: c.stunT, src: bfFrom(c.frostSrc), say: 'Stunned in ice: it can\'t move or act.' } : null });
+  def: 'Stunned in ice: unable to move or act.',
+  get: c => c.frostT > 0 && c.stunT > 0 ? { t: c.stunT, src: bfFrom(c.frostSrc), say: 'Stunned in ice: unable to move or act.' } : null });
 bfAdd('stunned', { name: 'Stunned', kw: 'st:stunned', kind: 'debuff', pri: 1, icon: 'stars', hue: '#8a7a20', f: ['stunT', 'stunEl', 'clockT', 'cycT', 'liftT', 'lockT', 'ccStopT'],
-  def: 'It can\'t move or act for a moment.',
+  def: 'Unable to move or act for a moment.',
   get: c => {
     if (!(c.stunT > 0) || c.frostT > 0 || c.ihPinT > bfNow() || c.rootT > bfNow()) return null;
     if (c.stunT > 1e6) return null;
     const how = c.ccStopT > bfNow() ? 'Stopped in time' : c.cycT > bfNow() || c.liftT > bfNow() ? 'Thrown into the air' : 'Stunned';
-    return { t: c.stunT, say: `${how}: it can't move or act${c.def.boss ? ' (bosses shake it off in less than half the time)' : ''}.` };
+    return { t: c.stunT, say: `${how}: unable to move or act${c.def.boss ? ' (bosses shake it off in less than half the time)' : ''}.` };
   } });
 bfAdd('chilled', { name: 'Slowed', kw: 'st:slowed', kind: 'debuff', pri: 6, icon: 'snowflake', hue: '#2a5a7a', f: ['frostT', 'slowF', 'slowT'],
-  def: 'A frost slow: it moves slower for a short time.',
-  get: c => c.frostT > 0 && !(c.stunT > 0) ? { t: c.frostT, src: bfFrom(c.frostSrc), say: `Frost slows it: it moves ${bfPct(bfSlowK(c))} slower.` } : null });
+  def: 'A frost slow: moves slower for a short time.',
+  get: c => c.frostT > 0 && !(c.stunT > 0) ? { t: c.frostT, src: bfFrom(c.frostSrc), say: `Frost: moves ${bfPct(bfSlowK(c))} slower.` } : null });
 bfAdd('slowed', { name: 'Slowed', kw: 'st:slowed', kind: 'debuff', pri: 7, icon: 'snail', hue: '#5a5a3a', f: ['slowT', 'slowF', 'snareT'],
-  def: 'It moves slower for a short time.',
-  get: c => c.slowT > 0 && !(c.frostT > 0) ? { t: c.slowT, say: `It moves ${bfPct(bfSlowK(c))} slower.` } : null });
+  def: 'Moves slower for a short time.',
+  get: c => c.slowT > 0 && !(c.frostT > 0) ? { t: c.slowT, say: `Moves ${bfPct(bfSlowK(c))} slower.` } : null });
 bfAdd('staggered', { name: 'Slowed', kw: 'st:slowed', kind: 'debuff', pri: 5, icon: 'bounce', hue: '#5a4a7a', f: ['ccStagT', 'ccStagN'],
-  def: 'Each Spellblade cut slows it a little more; the 3rd cut stuns it.',
-  get: c => c.ccStagT > bfNow() && c.ccStagN > 0 ? { t: bfLeft(c.ccStagT), n: bfInt(c.ccStagN), say: `${bfPl(bfInt(c.ccStagN), 'Spellblade cut')}: each slows it more, and the 3rd stuns it.` } : null });
+  def: 'Each Spellblade cut slows a little more; the 3rd cut stuns.',
+  get: c => c.ccStagT > bfNow() && c.ccStagN > 0 ? { t: bfLeft(c.ccStagT), n: bfInt(c.ccStagN), say: `${bfPl(bfInt(c.ccStagN), 'Spellblade cut')}: each slows more, and the 3rd stuns.` } : null });
 bfAdd('draggeddown', { name: 'Stunned', kw: 'st:stunned', kind: 'debuff', pri: 2, icon: 'antler', hue: '#2a4a6a', f: ['sbDownT', 'sbDownX'],
-  def: 'A Wolfguard\'s spirit wolf holds it down in the wet: lightning that strikes it while it is down and wet from the rain holds it longer.',
-  get: c => c.sbDownT > bfNow() && c.stunT > 0 ? { t: bfLeft(c.sbDownT), say: c.sbDownX ? 'Held down in the wet: the lightning already held it longer.' : `Held down in the wet: lightning that strikes it while it is wet from the rain holds it ${typeof SB_WOLF !== 'undefined' ? SB_WOLF.hold : .5}s longer.` } : null });
+  def: 'Held down by a Wolfguard\'s spirit wolf: lightning that strikes while held down and wet from the rain holds longer.',
+  get: c => c.sbDownT > bfNow() && c.stunT > 0 ? { t: bfLeft(c.sbDownT), say: c.sbDownX ? 'Held down in the wet: the lightning has already held longer.' : `Held down in the wet: lightning that strikes while wet from the rain holds ${typeof SB_WOLF !== 'undefined' ? SB_WOLF.hold : .5}s longer.` } : null });
 bfAdd('wounded', { name: 'Wounded', kw: 'st:wounded', kind: 'debuff', pri: 3, icon: 'wither', hue: '#7a1820', f: ['woundT'],
-  def: 'Heals and shields on it are halved (cut by a quarter on bosses).',
-  get: c => c.woundT > bfNow() ? { t: bfLeft(c.woundT), T: typeof WOUND !== 'undefined' ? WOUND.t : 4, say: `Heals and shields on it are ${c.def.boss ? 'cut by a quarter' : 'halved'}.` } : null });
+  def: 'Heals and shields received are halved (cut by a quarter on bosses).',
+  get: c => c.woundT > bfNow() ? { t: bfLeft(c.woundT), T: typeof WOUND !== 'undefined' ? WOUND.t : 4, say: `Heals and shields received are ${c.def.boss ? 'cut by a quarter' : 'halved'}.` } : null });
 bfAdd('shredded', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 4, icon: 'shieldbreak', hue: '#6a5030', f: ['shred', 'shredT', 'ihCrackT'],
-  def: 'Its armour is cracked for a few seconds: more of every steel hit gets through.',
+  def: 'Armour cracked for a few seconds: more of every steel hit gets through.',
   get: c => {
     if (!(c.shredT > 0) || !(c.shred > 0)) return null;
     const plate = typeof isPlate === 'function' && isPlate(c) && typeof plateBroken === 'function';
-    return { t: c.shredT, n: bfInt(c.shred), say: plate ? `${bfInt(c.shred)} cracks: its plate is ${bfPct(plateBroken(c))} broken open, so more of every steel hit gets through.` : (typeof armorNow === 'function' && armorNow(c) < 0 ? `Armour stripped to ${bfInt(armorNow(c))}: it takes ${bfPct(armorKNeg(armorNow(c), !!(c.def.boss || c.def.lead)) - 1)} more from physical hits.` : `${bfInt(c.shred)} cracks in its armour (${c.armor || 0} armour).`) };
+    return { t: c.shredT, n: bfInt(c.shred), say: plate ? `${bfInt(c.shred)} cracks: the plate is ${bfPct(plateBroken(c))} broken open, so more of every steel hit gets through.` : (typeof armorNow === 'function' && armorNow(c) < 0 ? `Armour stripped to ${bfInt(armorNow(c))}: takes ${bfPct(armorKNeg(armorNow(c), !!(c.def.boss || c.def.lead)) - 1)} more damage from physical hits.` : `${bfInt(c.shred)} cracks in the armour (${c.armor || 0} armour).`) };
   } });
 bfAdd('burning', { name: 'Burning', kw: 'st:burning', kind: 'debuff', pri: 20, icon: 'flame', hue: '#8a3010', f: ['burnT', 'burnDps', 'burnSrc', 'burnStack'],
-  def: 'It takes fire damage every second while it burns.',
+  def: 'Takes fire damage every second.',
   get: c => c.burnT > 0 && c.burnDps > 0 ? { t: c.burnT, n: c.burnStack > 1 ? c.burnStack : 0, src: bfFrom(c.burnSrc), say: `${bfInt(c.burnDps)} fire damage a second${c.burnStack > 1 ? `, stoked ${c.burnStack} times` : ''}.` } : null });
 // Molten (the Pyroclasts' crit path, forces_zzzzzzzzzzzzzzzzzzzzzzzz_pyropaths.js): a crit fireball's brand; his spells crit it
 bfAdd('molten', { name: 'Glowing from a crit', kind: 'debuff', pri: 21, icon: 'firering', hue: '#b8861e', f: ['pyMoltenT', 'pyMoltBy'],
-  def: 'A crit from a Pyroclast left it glowing: his spells crit it (x2), and with Flashover his crits on it splash the foes beside it.',
-  get: c => (c.pyMoltenT || 0) > bfNow() ? { t: bfLeft(c.pyMoltenT), src: bfFrom(c.pyMoltBy), say: 'Skipping Flame, Furnace Breath and Phoenix always crit it, for twice the damage.' } : null });
+  def: 'A crit from a Pyroclast left this foe glowing: his spells always crit (x2), and with Flashover those crits splash nearby foes.',
+  get: c => (c.pyMoltenT || 0) > bfNow() ? { t: bfLeft(c.pyMoltenT), src: bfFrom(c.pyMoltBy), say: 'Skipping Flame, Furnace Breath and Phoenix always crit this foe, for twice the damage.' } : null });
 // a dose of spores (the Grove's, or its commander's) or plain venom
 const bfSporeDose = p => !!p && !!p.src && ((bfHas('HERO_SRC') && p.src === HERO_SRC && G.force === 'grove') || (p.src.def && p.src.def.force === 'grove'));
 function bfDoses(c, spore) {
@@ -133580,75 +134075,75 @@ function bfDoses(c, spore) {
   return { D, dps, t, src: bfFrom(D[0].src) };
 }
 bfAdd('spored', { name: 'Carrying spores', kind: 'debuff', pri: 21, icon: 'spores', hue: '#5a6a1a', f: ['poison', 'swarmOn'],
-  def: 'Coated in the Grove\'s spores: it takes damage every second, and Grove units fill Growth faster striking it.',
-  get: c => { const d = bfDoses(c, true); return d ? { t: d.t, n: d.D.length, src: d.src, say: `${bfPl(d.D.length, 'dose')} of spores: ${bfInt(d.dps)} damage a second in all. Grove units fill Growth half again as fast striking it.` } : null; } });
+  def: 'Coated in the Grove\'s spores: takes damage every second, and Grove units striking this foe fill Growth faster.',
+  get: c => { const d = bfDoses(c, true); return d ? { t: d.t, n: d.D.length, src: d.src, say: `${bfPl(d.D.length, 'dose')} of spores: ${bfInt(d.dps)} damage a second in all. Grove units striking this foe fill Growth half again as fast.` } : null; } });
 bfAdd('poisoned', { name: 'Poisoned', kw: 'st:poisoned', kind: 'debuff', pri: 21, icon: 'vial', hue: '#3a6a1a', f: ['poison'],
-  def: 'It takes damage every second; doses stack.',
+  def: 'Takes damage every second; doses stack.',
   get: c => { const d = bfDoses(c, false); return d ? { t: d.t, n: d.D.length, src: d.src, say: `${bfPl(d.D.length, 'dose')} of venom: ${bfInt(d.dps)} damage a second in all.` } : null; } });
 bfAdd('bleeding', { name: 'Bleeding', kind: 'debuff', pri: 22, icon: 'drop', hue: '#7a1010', f: ['bleedT', 'bleedDps', 'bleedSrc'],
-  def: 'It bleeds: damage every second for a few seconds.',
-  get: c => c.bleedT > 0 && c.bleedDps > 0 ? { t: c.bleedT, src: bfFrom(c.bleedSrc), say: `${bfInt(c.bleedDps)} damage a second as it bleeds.` } : null });
+  def: 'Bleeding: takes damage every second for a few seconds.',
+  get: c => c.bleedT > 0 && c.bleedDps > 0 ? { t: c.bleedT, src: bfFrom(c.bleedSrc), say: `${bfInt(c.bleedDps)} bleed damage a second.` } : null });
 bfAdd('cursed', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 10, icon: 'doom', hue: '#4a1a6a', f: ['curseT', 'curseAmp', 'drainDps', 'drainSrc'],
-  def: 'A curse: it takes more from every hit while it lasts.',
-  get: c => c.curseT > 0 ? { t: c.curseT, src: bfFrom(c.drainSrc), say: `It takes ${bfPct(c.curseAmp || 0)} more from every hit${c.drainDps > 0 ? `, and the curse drains ${bfInt(c.drainDps)} health a second` : ''}.` } : null });
+  def: 'A curse: takes more damage from every hit.',
+  get: c => c.curseT > 0 ? { t: c.curseT, src: bfFrom(c.drainSrc), say: `Takes ${bfPct(c.curseAmp || 0)} more damage from every hit${c.drainDps > 0 ? `, and the curse drains ${bfInt(c.drainDps)} health a second` : ''}.` } : null });
 bfAdd('ravenmark', { name: 'Ravenmark', kind: 'debuff', pri: 9, icon: 'feather', hue: '#5a3a90', f: ['ohMk'],
-  def: 'Marked by a Ravenmark weapon: the next hit on it from another unit lands harder.',
-  get: c => c.ohMk && c.ohMk.t > bfNow() ? { t: bfLeft(c.ohMk.t), say: `The next hit on it from another unit lands ${c.ohMk.k >= 3 ? 'three times' : 'twice'} as hard.` } : null });
+  def: 'Marked by a Ravenmark weapon: the next hit from another unit lands harder.',
+  get: c => c.ohMk && c.ohMk.t > bfNow() ? { t: bfLeft(c.ohMk.t), say: `The next hit from another unit lands ${c.ohMk.k >= 3 ? 'three times' : 'twice'} as hard.` } : null });
 bfAdd('calledout', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 9, icon: 'target', hue: '#8a6a10', f: ['markT', 'markAmp'],
-  def: 'Marked by Ironhold: it takes more from every unit for a few seconds.',
-  get: c => c.markT > 0 ? { t: c.markT, say: `It takes ${bfPct(c.markAmp || 0)} more from every unit.` } : null });
+  def: 'Marked by Ironhold: takes more damage from every unit for a few seconds.',
+  get: c => c.markT > 0 ? { t: c.markT, say: `Takes ${bfPct(c.markAmp || 0)} more damage from every unit.` } : null });
 bfAdd('branded', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 9, icon: 'rune', hue: '#8a5a10', f: ['ihBrandT', 'ihBrandK', 'ihBrandBy'],
-  def: 'An Anvilwright\'s brand: it takes more from every unit.',
-  get: c => c.ihBrandT > bfNow() ? { t: bfLeft(c.ihBrandT), src: bfFrom(c.ihBrandBy), say: `It takes ${bfPct(c.ihBrandK || 0)} more from every unit.` } : null });
+  def: 'An Anvilwright\'s brand: takes more damage from every unit.',
+  get: c => c.ihBrandT > bfNow() ? { t: bfLeft(c.ihBrandT), src: bfFrom(c.ihBrandBy), say: `Takes ${bfPct(c.ihBrandK || 0)} more damage from every unit.` } : null });
 bfAdd('taunted', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 9, icon: 'shield', hue: '#6a4a20', f: ['ihWallT'],
-  def: 'Held against the Iron Wall: it takes more from every unit.',
-  get: c => c.ihWallT > bfNow() ? { t: bfLeft(c.ihWallT), say: 'Held against the Iron Wall: it takes 15% more from every unit.' } : null });
+  def: 'Held against the Iron Wall: takes more damage from every unit.',
+  get: c => c.ihWallT > bfNow() ? { t: bfLeft(c.ihWallT), say: 'Held against the Iron Wall: takes 15% more damage from every unit.' } : null });
 bfAdd('unmade', { name: 'Unmaking Blow', kwSpell: 'Unmaking Blow', kind: 'debuff', pri: 8, icon: 'rune', hue: '#8a4010', f: ['ihcUnT', 'ihcUnBy'],
-  def: 'Unmaking Blow: every hit the clan lands strips another plate; when its armour is gone it bursts.',
-  get: c => c.ihcUnT > bfNow() ? { t: bfLeft(c.ihcUnT), src: bfFrom(c.ihcUnBy), say: (c.armor || 0) > 0 ? 'Every hit the clan lands strips another plate; when its armour is gone it bursts.' : 'Its armour is gone: it is about to burst.' } : null });
+  def: 'Unmaking Blow: every hit the clan lands strips another plate; bursts once all armour is gone.',
+  get: c => c.ihcUnT > bfNow() ? { t: bfLeft(c.ihcUnT), src: bfFrom(c.ihcUnBy), say: (c.armor || 0) > 0 ? 'Every hit the clan lands strips another plate; bursts once all armour is gone.' : 'Armour gone: about to burst.' } : null });
 bfAdd('lit', { name: 'Starshell', kwSpell: 'Starshell', kind: 'debuff', pri: 8, icon: 'sun', hue: '#8a7a30', f: ['ihcLitT', 'ihcLitBy'],
   def: 'In a Starshell\'s glare: a flyer flies low enough for every unit, and its plate shows its joints.',
-  get: c => c.ihcLitT > bfNow() ? { t: bfLeft(c.ihcLitT), src: bfFrom(c.ihcLitBy), say: c.fly ? 'In the starshell\'s glare: it flies low enough for every unit to reach, and 3 of its armour is cracked.' : 'In the starshell\'s glare: 3 of its armour is cracked while it stays in the light.' } : null });
+  get: c => c.ihcLitT > bfNow() ? { t: bfLeft(c.ihcLitT), src: bfFrom(c.ihcLitBy), say: c.fly ? 'In the starshell\'s glare: flies low enough for every unit to reach, and loses 3 armour.' : 'In the starshell\'s glare: loses 3 armour while in the light.' } : null });
 bfAdd('lodepull', { name: 'Lodestone', kwSpell: 'Lodestone', kind: 'debuff', pri: 8, icon: 'coil', hue: '#3a5a7a', f: ['ihcLodeT'],
-  def: 'Tovin\'s Lodestone drags at its plate: slowed by its own armour, a plate torn off every half second.',
-  get: c => c.ihcLodeT > bfNow() ? { t: bfLeft(c.ihcLodeT), say: 'The Lodestone drags at its plate: the more armour it wears, the slower it walks, and it loses a plate every half second.' } : null });
+  def: 'Tovin\'s Lodestone drags at the plate: the more armour, the slower, and a plate is torn off every half second.',
+  get: c => c.ihcLodeT > bfNow() ? { t: bfLeft(c.ihcLodeT), say: 'The Lodestone drags at the plate: the more armour worn, the slower the walk, and a plate is lost every half second.' } : null });
 bfAdd('marked', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 9, icon: 'crosshair', hue: '#7a2a1a', f: ['heroMarkT'],
-  def: 'Marked as prey: it takes more from every hit and pays double gold if it falls marked.',
-  get: c => c.heroMarkT > bfNow() ? { t: bfLeft(c.heroMarkT), src: 'from Mark Prey', say: 'It takes 25% more from every hit, and pays double gold if it falls marked.' } : null });
+  def: 'Marked as prey: takes more damage from every hit and pays double gold if slain while marked.',
+  get: c => c.heroMarkT > bfNow() ? { t: bfLeft(c.heroMarkT), src: 'from Mark Prey', say: 'Takes 25% more damage from every hit, and pays double gold if slain while marked.' } : null });
 bfAdd('judgement', { name: 'Judgement', kw: 'so:judgement', kind: 'debuff', pri: 5, icon: 'scales', hue: '#8a7020', f: ['soJ', 'soJT', 'soJBy'],
-  def: 'Light marks it: each stack makes the Silver Order\'s strikes on it harder, and at full stacks it bursts in a column of light.',
+  def: 'Marked by light: each stack makes the Silver Order\'s strikes harder; at full stacks, bursts in a column of light.',
   get: c => {
     const n = typeof soJ === 'function' ? soJ(c) : (c.soJT > bfNow() ? c.soJ | 0 : 0); if (!n) return null;
     const k = typeof SO !== 'undefined' ? SO.J_AMP : .04, mx = typeof soJMax === 'function' ? soJMax() : 5;
-    return { n, t: bfLeft(c.soJT), src: bfFrom(c.soJBy), say: `${n} of ${mx} stacks: the Order's strikes on it hit ${bfPct(n * k)} harder. At ${mx} it bursts in a column of light.` };
+    return { n, t: bfLeft(c.soJT), src: bfFrom(c.soJBy), say: `${n} of ${mx} stacks: the Order's strikes hit ${bfPct(n * k)} harder. At ${mx}, bursts in a column of light.` };
   } });
 bfAdd('condemned', { name: 'Witnessed by the Order', kind: 'debuff', pri: 5, icon: 'eye', hue: '#8a7a40', f: ['soCondT', 'soCondBy'],
-  def: 'Witnessed by the Order: its Judgement holds, and the marks on it strike harder.',
-  get: c => c.soCondT > bfNow() ? { t: bfLeft(c.soCondT), src: bfFrom(c.soCondBy), n: c.socWit ? c.socWit.size : undefined, say: `Its Judgement does not fade while this lasts, and gains a stack every so often; the Order's marks on it strike half again as hard.${c.socWit ? ` ${bfPl(c.socWit.size, 'unit has', 'units have')} sworn as witnesses: when it ends its Judgement fills and bursts, stronger for each.` : ''}` } : null });
+  def: 'Witnessed by the Order: Judgement holds, and the marks strike harder.',
+  get: c => c.soCondT > bfNow() ? { t: bfLeft(c.soCondT), src: bfFrom(c.soCondBy), n: c.socWit ? c.socWit.size : undefined, say: `Judgement does not fade while this lasts, and gains a stack every so often; the Order's marks strike half again as hard.${c.socWit ? ` ${bfPl(c.socWit.size, 'unit has', 'units have')} sworn as witnesses: when this ends, Judgement fills and bursts, stronger for each.` : ''}` } : null });
 bfAdd('challenged', { name: 'Facing the shield', kind: 'debuff', pri: 7, icon: 'sunburst', hue: '#8a7020', f: ['socChalT', 'socChalBy'],
-  def: 'A Shieldbearer\'s Oath of Challenge: it turns to face the shield, slowed, Judged on every beat, and struck by the shield\'s light when the oath ends.',
-  get: c => c.socChalT > bfNow() ? { t: bfLeft(c.socChalT), src: bfFrom(c.socChalBy), say: 'It is slowed while it faces the shield, gains a Judgement on every beat, and is struck by the shield\'s light when the oath ends (if it is still near).' } : null });
+  def: 'A Shieldbearer\'s Oath of Challenge: turns to face the shield, slowed, Judged on every beat, and struck by the shield\'s light when the oath ends.',
+  get: c => c.socChalT > bfNow() ? { t: bfLeft(c.socChalT), src: bfFrom(c.socChalBy), say: 'Slowed while facing the shield, gains a Judgement on every beat, and is struck by the shield\'s light when the oath ends (if still near).' } : null });
 bfAdd('leashed', { name: 'Chained', kind: 'debuff', pri: 6, icon: 'chains', hue: '#8a7a30', f: ['socLeashT', 'socLeash'],
-  def: 'Chained by the Lightbinder Sisters to an Oath-Stone or a unit: once it gets a cell further down the road it is Rooted there.',
-  get: c => c.socLeashT > bfNow() && c.socLeash ? { t: bfLeft(c.socLeashT), src: bfFrom(c.socLeash.by), say: `Once it gets ${c.socLeash.L > 1 ? 'a cell and a half' : 'a cell'} further down the road it is rooted there (a boss is slowed 50%), and it gains a Judgement every second. When the chain snaps taut it is struck once more.` } : null });
+  def: 'Chained by the Lightbinder Sisters to an Oath-Stone or a unit: rooted once a cell further down the road.',
+  get: c => c.socLeashT > bfNow() && c.socLeash ? { t: bfLeft(c.socLeashT), src: bfFrom(c.socLeash.by), say: `Rooted once ${c.socLeash.L > 1 ? 'a cell and a half' : 'a cell'} further down the road (a boss is slowed 50%), and gains a Judgement every second. Struck once more when the chain snaps taut.` } : null });
 bfAdd('flared', { name: 'Burning Flare', kind: 'debuff', pri: 7, icon: 'flame', hue: '#8a5a20', f: ['socFlareT'],
-  def: 'A Silverbolt flare burns in it: every second the foes round it are seared and Judged.',
-  get: c => c.socFlareT > bfNow() ? { t: bfLeft(c.socFlareT), say: 'Every second, it and every foe within a cell of it are seared and gain a Judgement. If it falls, the flare burns on on the road.' } : null });
+  def: 'A Silverbolt flare burns within: every second the foes round it are seared and Judged.',
+  get: c => c.socFlareT > bfNow() ? { t: bfLeft(c.socFlareT), say: 'Every second, this foe and every foe within a cell are seared and gain a Judgement. If this foe falls, the flare keeps burning on the road.' } : null });
 bfAdd('staked', { name: 'Chained to the Stake', kind: 'debuff', pri: 4, icon: 'flame', hue: '#5a3a6a', f: ['socStakeT'],
   def: 'Chained to a Magebane Inquisitor\'s stake: held fast in the pyre, burning twice as hard.',
-  get: c => c.socStakeT > bfNow() ? { t: bfLeft(c.socStakeT), say: 'It is held fast in the pyre and burns twice as hard. When it is freed or dies here, every caster near the stake is silenced.' } : null });
+  get: c => c.socStakeT > bfNow() ? { t: bfLeft(c.socStakeT), say: 'Held fast in the pyre, burning twice as hard. When freed or slain here, every caster near the stake is silenced.' } : null });
 bfAdd('sentenced', { name: 'Sentenced', kind: 'debuff', pri: 5, icon: 'sword', hue: '#8a8a9a', f: ['chVerdictT', 'chVerdictBy'],
-  def: 'Written in Morrow\'s ledger by The Gavel: if it dies its Judgement passes to the foes round it; if it lives, the gavel falls and its Judgement bursts.',
-  get: c => c.chVerdictT > bfNow() ? { t: bfLeft(c.chVerdictT), src: 'from your Champion', say: 'Written in the ledger: if it dies, its Judgement passes to the foes round it; if it lives to the end, its Judgement is filled and bursts at double strength.' } : null });
+  def: 'Written in Morrow\'s ledger by The Gavel: on death, Judgement passes to the foes nearby; if still alive, the gavel falls and Judgement bursts.',
+  get: c => c.chVerdictT > bfNow() ? { t: bfLeft(c.chVerdictT), src: 'from your Champion', say: 'Written in the ledger: on death, Judgement passes to the foes nearby; if still alive at the end, Judgement fills and bursts at double strength.' } : null });
 bfAdd('blinded', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 8, icon: 'sun', hue: '#8a8040', f: ['soBlindT'],
-  def: 'Blinding light: it stumbles slower and takes more from every hit.',
-  get: c => c.soBlindT > bfNow() ? { t: bfLeft(c.soBlindT), say: typeof SO !== 'undefined' ? `Blinding light: it stumbles ${bfPct(SO.BLIND_SLOW)} slower and takes ${bfPct(exposedBlindPct())} more from every hit.` : 'Blinding light: it stumbles slower and takes more from every hit.' } : null });
+  def: 'Blinding light: stumbles slower and takes more damage from every hit.',
+  get: c => c.soBlindT > bfNow() ? { t: bfLeft(c.soBlindT), say: typeof SO !== 'undefined' ? `Blinding light: stumbles ${bfPct(SO.BLIND_SLOW)} slower and takes ${bfPct(exposedBlindPct())} more damage from every hit.` : 'Blinding light: stumbles slower and takes more damage from every hit.' } : null });
 bfAdd('hexed', { name: 'Storing its wounds', kind: 'debuff', pri: 6, icon: 'hexeye', hue: '#4a3a7a', f: ['sbHexT', 'sbHexSrc', 'sbHexK', 'sbHexHp', 'sbHexStore', 'sbHexWet'],
-  def: 'A Stormborn hex stores a share of the health it loses and deals it again when the hex ends.',
-  get: c => c.sbHexT > bfNow() ? { t: bfLeft(c.sbHexT), src: bfFrom(c.sbHexSrc), say: `It stores ${bfPct(c.sbHexK || .2)} of the health it loses: ${bfInt(typeof sbHexHeld === 'function' ? sbHexHeld(c) : 0)} so far, dealt again when the hex ends.${c.sbHexWet ? ' It carries lightning like a foe wet from the rain.' : ''}` } : null });
+  def: 'A Stormborn hex stores a share of the health lost and deals it again when the hex ends.',
+  get: c => c.sbHexT > bfNow() ? { t: bfLeft(c.sbHexT), src: bfFrom(c.sbHexSrc), say: `Stores ${bfPct(c.sbHexK || .2)} of the health lost: ${bfInt(typeof sbHexHeld === 'function' ? sbHexHeld(c) : 0)} so far, dealt again when the hex ends.${c.sbHexWet ? ' Carries lightning like a foe wet from the rain.' : ''}` } : null });
 bfAdd('soaked', { name: 'Wet from the rain', kw: 'sb:rain', kind: 'debuff', pri: 24, icon: 'rain', hue: '#1a4a7a', f: ['sbWetT'],
-  def: 'The Storm\'s rain: Stormborn chain lightning leaps further to it and hits it 20% harder.',
-  get: c => c.sbWetT > bfNow() ? { t: bfLeft(c.sbWetT), say: 'Stormborn chain lightning leaps further to it, gains a jump from it and hits it 20% harder.' } : null });
+  def: 'The Storm\'s rain: Stormborn chain lightning leaps further to this foe and hits 20% harder.',
+  get: c => c.sbWetT > bfNow() ? { t: bfLeft(c.sbWetT), say: 'Stormborn chain lightning leaps further to this foe, gains an extra jump here and hits 20% harder.' } : null });
 /* ---- Exposed, read as one number (owner, 26 Nov 2026: "if it depends can we just say whatever the current amount is on the
    tooltip"). Every source the cards call Exposed, at what the game adds for it: hurt()'s amp (game.js: curse, mark, the
    hero's Mark Prey), the forces' amp hooks (Silver's blinding light, Ironhold's brand and Iron Wall, the Conclave's Rewound
@@ -133706,80 +134201,80 @@ function exposedSay(c) {
 // ---- the Wardbound (forces_wardbound_a.js and its files): Exposed by runes (c.wbBrand), the Runecarvers' marks (c.wbSig), the runes' touches, Isaura's binding ----
 const bfWbK = () => (typeof WB_BRAND !== 'undefined' ? WB_BRAND : { max: 3, per: .12, fade: 6 });
 bfAdd('wbbrand', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 7, icon: 'sunwheel', hue: '#8a6a1a', f: ['wbBrandT', 'wbBrand', 'wbBrandBy'],
-  def: 'Exposed by a Wardbound rune or spell: Wardbound spells and their commander\'s hit it harder.',
-  get: c => { const n = c.wbBrandT > bfNow() ? c.wbBrand || 0 : 0; return n ? { t: bfLeft(c.wbBrandT), T: bfWbK().fade, n, src: bfFrom(c.wbBrandBy), say: `Exposed ${n === 1 ? 'once' : n + ' times'}: Wardbound spells hit it ${bfPct(bfWbK().per * n)} harder. It fades ${bfWbK().fade}s after the last rune or spell that Exposed it.` } : null; } });
+  def: 'Exposed by a Wardbound rune or spell: Wardbound spells and their commander\'s hit harder.',
+  get: c => { const n = c.wbBrandT > bfNow() ? c.wbBrand || 0 : 0; return n ? { t: bfLeft(c.wbBrandT), T: bfWbK().fade, n, src: bfFrom(c.wbBrandBy), say: `Exposed ${n === 1 ? 'once' : n + ' times'}: Wardbound spells hit ${bfPct(bfWbK().per * n)} harder. Fades ${bfWbK().fade}s after the last rune or spell that Exposed this foe.` } : null; } });
 bfAdd('wbsigil', { name: 'Runecarver marks', kind: 'debuff', pri: 8, icon: 'rune', hue: '#5a3a8a', f: ['wbSigT', 'wbSig', 'wbSigBy'],
-  def: 'Marks the Runecarvers carved into it: their flicks and spells burst them, striking it and the foes round it once for each.',
-  get: c => { const n = c.wbSigT > bfNow() ? c.wbSig || 0 : 0; return n ? { t: bfLeft(c.wbSigT), n, src: bfFrom(c.wbSigBy), say: `${bfPl(n, 'mark')} carved into it by the Runecarvers. A Runecarver's flick on it at 3 bursts them all: a hit on it and on the foes round it for each.` } : null; } });
+  def: 'Marks the Runecarvers carved into this foe: their flicks and spells burst them, striking this foe and those nearby once per mark.',
+  get: c => { const n = c.wbSigT > bfNow() ? c.wbSig || 0 : 0; return n ? { t: bfLeft(c.wbSigT), n, src: bfFrom(c.wbSigBy), say: `${bfPl(n, 'mark')} carved in by the Runecarvers. A Runecarver's flick at 3 bursts them all: a hit here and on nearby foes for each.` } : null; } });
 bfAdd('wbstagger', { name: 'Stunned', kw: 'st:stunned', kind: 'debuff', pri: 5, icon: 'tremor', hue: '#7a5a2a', f: ['wbStagT'],
-  def: 'A stone rune stunned it: it stops for a moment, and no stone rune can stun it again for 3s.',
-  get: c => c.wbStagT > bfNow() && c.stunT > 0 && c.wbStagT - bfNow() > 2.5 ? { t: Math.max(0, c.stunT), say: 'Stunned by a stone rune: it stops for a moment. No stone rune stuns it again for 3s.' } : null });
+  def: 'Stunned by a stone rune: stops for a moment, then immune to stone rune stuns for 3s.',
+  get: c => c.wbStagT > bfNow() && c.stunT > 0 && c.wbStagT - bfNow() > 2.5 ? { t: Math.max(0, c.stunT), say: 'Stunned by a stone rune: stops for a moment. Immune to stone rune stuns for 3s.' } : null });
 bfAdd('wbpinned', { name: 'Rooted', kw: 'st:rooted', kind: 'debuff', pri: 4, icon: 'arrowhead', hue: '#8a4a2a', f: ['wbPinT'],
-  def: 'A pin rune holds it to the road a moment: it can\'t move. No pin rune holds it again for 4s.',
-  get: c => c.wbPinT > bfNow() && c.rootT > bfNow() && c.wbPinT - bfNow() > 3.4 ? { t: bfLeft(c.rootT), say: 'Held to the road by a pin rune: it can\'t move. No pin rune holds it again for 4s.' } : null });
+  def: 'Held to the road by a pin rune: unable to move. Immune to pin runes for 4s.',
+  get: c => c.wbPinT > bfNow() && c.rootT > bfNow() && c.wbPinT - bfNow() > 3.4 ? { t: bfLeft(c.rootT), say: 'Held to the road by a pin rune: unable to move. Immune to pin runes for 4s.' } : null });
 bfAdd('wbstruckback', { name: 'Struck back', kind: 'debuff', pri: 9, icon: 'shieldx', hue: '#6a5a4a', f: ['wbvT'],
-  def: 'An Ashen Chaplain\'s cut on a siege troop knocks its next blow back by a second.',
-  get: c => { const D = typeof WBV !== 'undefined' ? WBV : { EVERY: 2, DELAY: 1 }; return c.wbvT > bfNow() && c.wbvT - bfNow() > D.EVERY - D.DELAY ? { t: bfLeft(c.wbvT) - (D.EVERY - D.DELAY), T: D.DELAY, say: `An Ashen Chaplain's cut knocked its next blow back ${D.DELAY}s. It can be struck back again ${D.EVERY}s after the last.` } : null; } });
+  def: 'An Ashen Chaplain\'s cut on a siege troop knocks the next blow back by a second.',
+  get: c => { const D = typeof WBV !== 'undefined' ? WBV : { EVERY: 2, DELAY: 1 }; return c.wbvT > bfNow() && c.wbvT - bfNow() > D.EVERY - D.DELAY ? { t: bfLeft(c.wbvT) - (D.EVERY - D.DELAY), T: D.DELAY, say: `An Ashen Chaplain's cut knocked the next blow back ${D.DELAY}s. Can be struck back again ${D.EVERY}s after the last.` } : null; } });
 bfAdd('wbbound', { name: 'Held by an oath', kind: 'debuff', pri: 3, icon: 'chains', hue: '#4a3a5a', f: ['wbBindT', 'wbBindAt'],
-  def: 'Lady Isaura Vell\'s Oathbind: rooted, then held to half speed; when the binding ends it pays a share of a foe\'s health, twice over if it stands on a rune.',
-  get: c => c.wbBindT > bfNow() ? { t: bfLeft(c.wbBindT), T: 4, say: 'Rooted, then held to half speed. When the binding ends it pays a share of its health, twice over on a rune.' } : null });
+  def: 'Lady Isaura Vell\'s Oathbind: rooted, then held to half speed; when the binding ends, pays a share of a foe\'s health, twice over if standing on a rune.',
+  get: c => c.wbBindT > bfNow() ? { t: bfLeft(c.wbBindT), T: 4, say: 'Rooted, then held to half speed. When the binding ends, pays a share of a foe\'s health, twice over on a rune.' } : null });
 bfAdd('static', { name: 'Charged with static', kind: 'debuff', pri: 24, icon: 'ion', hue: '#3a5a8a', f: ['sbShockT', 'sbShockK'],
-  def: 'Charged with static: Stormborn lightning hits it harder.',
-  get: c => c.sbShockT > bfNow() ? { t: bfLeft(c.sbShockT), say: `Stormborn lightning hits it ${bfPct(c.sbShockK || 0)} harder.` } : null });
+  def: 'Charged with static: takes more damage from Stormborn lightning.',
+  get: c => c.sbShockT > bfNow() ? { t: bfLeft(c.sbShockT), say: `Takes ${bfPct(c.sbShockK || 0)} more damage from Stormborn lightning.` } : null });
 bfAdd('chargedair', { name: 'Charged Air', kind: 'debuff', pri: 24, icon: 'boltplus', hue: '#3a5a8a', f: ['chgT'],
-  def: 'The charge of the last lightning strike: the next one on it hits harder.',
-  get: c => c.chgT > bfNow() ? { t: bfLeft(c.chgT), say: 'The charge of the last strike clings to it: the next lightning on it hits harder.' } : null });
+  def: 'The charge of the last lightning strike: the next one here hits harder.',
+  get: c => c.chgT > bfNow() ? { t: bfLeft(c.chgT), say: 'The charge of the last strike clings on: the next lightning here hits harder.' } : null });
 bfAdd('splitopen', { name: 'Split open', kind: 'debuff', pri: 6, icon: 'shieldbreak', hue: '#5a3a8a', f: ['ccSplitT', 'ccSplitBy'],
-  def: 'A Spellblade’s riftsteel split it open: its shield broken, its ward cracked and its armour stripped, so every spell strikes it whole.',
-  get: c => c.ccSplitT > bfNow() ? { t: bfLeft(c.ccSplitT), src: bfFrom(c.ccSplitBy), say: 'Split open by riftsteel: its ward stands cracked and its armour is stripped, so every spell strikes it whole.' } : null });
+  def: 'A Spellblade’s riftsteel split this foe open: shield broken, ward cracked and armour stripped, so every spell strikes in full.',
+  get: c => c.ccSplitT > bfNow() ? { t: bfLeft(c.ccSplitT), src: bfFrom(c.ccSplitBy), say: 'Split open by riftsteel: ward cracked and armour stripped, so every spell strikes in full.' } : null });
 bfAdd('rimebrand', { name: 'Leaves frost prints', kind: 'debuff', pri: 8, icon: 'frostbite', hue: '#2a6a8a', f: ['ccxBrandT', 'ccxBrand'],
-  def: 'A Frostweaver\'s brand: each step it takes leaves a frost print that bites the ground foe behind it.',
+  def: 'A Frostweaver\'s brand: each step leaves a frost print that bites the ground foe behind.',
   get: c => c.ccxBrandT > bfNow() ? { t: bfLeft(c.ccxBrandT), n: c.ccxBrand ? c.ccxBrand.left : 0, src: bfFrom(c.ccxBrand && c.ccxBrand.t), say: 'Each step leaves a frost print: the next ground foe on it is struck and stunned a moment.' } : null });
 bfAdd('ccfguard', { name: 'Guard Dropped', kind: 'debuff', pri: 6, icon: 'shieldbreak', hue: '#8a3a7a', f: ['ccfGuardT', 'ccfGuardK'],
-  def: 'Severing Arc cut through its guard (Opened Guard): the next cut of a Spellblade or hers strikes it harder.',
-  get: c => c.ccfGuardT > bfNow() ? { t: bfLeft(c.ccfGuardT), T: 4, say: `The next Spellblade's or Maren's cut on it strikes ${Math.round((c.ccfGuardK || 0) * 100)}% harder.` } : null });
+  def: 'Severing Arc cut through this foe\'s guard (Opened Guard): the next cut of a Spellblade or hers strikes harder.',
+  get: c => c.ccfGuardT > bfNow() ? { t: bfLeft(c.ccfGuardT), T: 4, say: `The next Spellblade's or Maren's cut strikes ${Math.round((c.ccfGuardK || 0) * 100)}% harder.` } : null });
 bfAdd('ccxhook', { name: 'Slowed', kw: 'st:slowed', kind: 'debuff', pri: 4, icon: 'snare', hue: '#2a7a70', f: ['ccxRendT'],
-  def: 'A Severer\'s ley threads hold it taut: slowed 50%, then every ward and shield on it is torn out.',
-  get: c => c.ccxRendT > bfNow() ? { t: bfLeft(c.ccxRendT), say: 'Slowed 50%; its wards are about to be torn out.' } : null });
+  def: 'A Severer\'s ley threads hold this foe taut: slowed 50%, then every ward and shield is torn out.',
+  get: c => c.ccxRendT > bfNow() ? { t: bfLeft(c.ccxRendT), say: 'Slowed 50%; wards are about to be torn out.' } : null });
 bfAdd('recalled', { name: 'Recalled', kind: 'debuff', pri: 7, icon: 'swirl', hue: '#8a7a30', f: ['chRecT', 'chRec'],
-  def: 'Aurel has left its ghost on the road behind it: it will be snapped back there, striking every foe it is dragged through.',
-  get: c => c.chRecT > bfNow() ? { t: bfLeft(c.chRecT), src: bfFrom(c.chRec && c.chRec.t), say: 'It will be snapped back to its ghost up the road.' } : null });
+  def: 'Aurel has left this foe\'s ghost on the road behind: soon snapped back there, striking every foe on the way.',
+  get: c => c.chRecT > bfNow() ? { t: bfLeft(c.chRecT), src: bfFrom(c.chRec && c.chRec.t), say: 'Will be snapped back to the ghost up the road.' } : null });
 bfAdd('spellbroken', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 12, icon: 'cracked', hue: '#5a3a7a', f: ['ccBrkT', 'ccBrkK'],
-  def: 'Broken by a Spellbreaker: it takes more from every unit.',
-  get: c => c.ccBrkT > bfNow() ? { t: bfLeft(c.ccBrkT), say: `It takes ${bfPct(c.ccBrkK || 0)} more from every unit.` } : null });
+  def: 'Broken by a Spellbreaker: takes more damage from every unit.',
+  get: c => c.ccBrkT > bfNow() ? { t: bfLeft(c.ccBrkT), say: `Takes ${bfPct(c.ccBrkK || 0)} more damage from every unit.` } : null });
 bfAdd('rewound', { name: 'Exposed', kw: 'st:exposed', kind: 'debuff', pri: 12, icon: 'hourglass', hue: '#4a3a7a', f: ['ccRewT', 'ccRewK'],
-  def: 'Its wounds turned back on it: it takes more from every unit.',
-  get: c => c.ccRewT > bfNow() ? { t: bfLeft(c.ccRewT), say: `It takes ${bfPct(c.ccRewK || 0)} more from every unit.` } : null });
+  def: 'Wounds turned back: takes more damage from every unit.',
+  get: c => c.ccRewT > bfNow() ? { t: bfLeft(c.ccRewT), say: `Takes ${bfPct(c.ccRewK || 0)} more damage from every unit.` } : null });
 bfAdd('seamcut', { name: 'Seam of light', kind: 'debuff', pri: 12, icon: 'cracked', hue: '#7a2a6a', f: ['ccSeamT'],
-  def: 'A seam of light cut into it by Maren Vey: it tears open in a moment, striking it again and stunning it.',
-  get: c => c.ccSeamT > bfNow() ? { t: bfLeft(c.ccSeamT), src: 'from your Champion', say: 'The seam tears open when the time runs out: it is struck again for the cut’s full damage and stunned.' } : null });
+  def: 'A seam of light cut by Maren Vey: tears open in a moment, striking again and stunning.',
+  get: c => c.ccSeamT > bfNow() ? { t: bfLeft(c.ccSeamT), src: 'from your Champion', say: 'The seam tears open when the time runs out: struck again for the cut’s full damage and stunned.' } : null });
 bfAdd('soullinked', { name: 'Linked by a curse', kind: 'debuff', pri: 12, icon: 'chain', hue: '#4a2a5a', f: ['linkT', 'linkSrc', 'linkK'],
-  def: 'While the curse lasts, what hurts it reaches the other linked foes near it.',
-  get: c => c.linkT > bfNow() ? { t: bfLeft(c.linkT), src: bfFrom(c.linkSrc), say: `While the curse lasts, ${bfPct(c.linkK || 0)} of what hurts it reaches the other linked foes within 2 cells.` } : null });
+  def: 'While the curse lasts, damage taken also reaches the other linked foes nearby.',
+  get: c => c.linkT > bfNow() ? { t: bfLeft(c.linkT), src: bfFrom(c.linkSrc), say: `While the curse lasts, ${bfPct(c.linkK || 0)} of damage taken reaches the other linked foes within 2 cells.` } : null });
 bfAdd('dreadmark', { name: 'Marked by the Dread Standard', kind: 'debuff', pri: 12, icon: 'banner', hue: '#7a2a2a', f: ['bsMarkT', 'bsMarkK', 'bsMarkBy'],
-  def: 'The Dread Legion Standard\'s mark: a strike from another kind of unit stuns it.',
-  get: c => c.bsMarkT > bfNow() ? { t: bfLeft(c.bsMarkT), say: `A strike from another kind of unit stuns it for ${c.bsMarkK || .5}s (once every 6s).` } : null });
+  def: 'The Dread Legion Standard\'s mark: stunned by a strike from another kind of unit.',
+  get: c => c.bsMarkT > bfNow() ? { t: bfLeft(c.bsMarkT), say: `Stunned for ${c.bsMarkK || .5}s by a strike from another kind of unit (once every 6s).` } : null });
 bfAdd('huntbrand', { name: 'Huntlord\'s Brand', kind: 'debuff', pri: 13, icon: 'target', hue: '#8a4a1a', f: ['hbT', 'hbBy', 'hbHit'],
-  def: 'The Huntlord\'s Brand remembers every unit that strikes it.',
-  get: c => c.hbT > bfNow() ? { t: bfLeft(c.hbT), n: c.hbHit ? c.hbHit.size : 0, src: bfFrom(c.hbBy), say: `The brand remembers every unit that strikes it: ${bfPl(c.hbHit ? c.hbHit.size : 0, 'unit')} so far.` } : null });
+  def: 'The Huntlord\'s Brand remembers every unit that strikes this foe.',
+  get: c => c.hbT > bfNow() ? { t: bfLeft(c.hbT), n: c.hbHit ? c.hbHit.size : 0, src: bfFrom(c.hbBy), say: `The brand remembers every unit that strikes this foe: ${bfPl(c.hbHit ? c.hbHit.size : 0, 'unit')} so far.` } : null });
 bfAdd('shellshock', { name: 'Shell-shocked', kind: 'debuff', pri: 14, icon: 'bomb', hue: '#6a4a20', f: ['shellT'],
-  def: 'A shell has rattled it: another within 2s stuns it.',
-  get: c => c.shellT > bfNow() ? { t: bfLeft(c.shellT), T: 2, say: 'Another shell on it before this runs out stuns it for 0.5s.' } : null });
+  def: 'Rattled by a shell: another within 2s stuns.',
+  get: c => c.shellT > bfNow() ? { t: bfLeft(c.shellT), T: 2, say: 'Another shell before this runs out stuns for 0.5s.' } : null });
 bfAdd('anchored', { name: 'Anchored', kind: 'debuff', pri: 14, icon: 'snare', hue: '#5a3a7a', f: ['anchorT'],
-  def: 'Held by a Ley Anchor: it can\'t blink, phase or burrow.',
-  get: c => c.anchorT > bfNow() ? { t: bfLeft(c.anchorT), say: 'It can\'t blink, phase or burrow.' } : null });
+  def: 'Held by a Ley Anchor: unable to blink, phase or burrow.',
+  get: c => c.anchorT > bfNow() ? { t: bfLeft(c.anchorT), say: 'Unable to blink, phase or burrow.' } : null });
 bfAdd('webbed', { name: 'Covered in broodsilk', kind: 'debuff', pri: 14, icon: 'web', hue: '#5a5a5a', f: ['bsWebT', 'bsWebR', 'bsWebBy'],
-  def: 'Broodsilk clings to it: when it falls the web catches the ground foes around it.',
-  get: c => c.bsWebT > bfNow() ? { t: bfLeft(c.bsWebT), say: `Broodsilk clings to it: if it falls, ground foes within ${(c.bsWebR || 1).toFixed(1)} cells are slowed 40% for 2s.` } : null });
+  def: 'Clinging broodsilk: on death, the web catches nearby ground foes.',
+  get: c => c.bsWebT > bfNow() ? { t: bfLeft(c.bsWebT), say: `Clinging broodsilk: on death, ground foes within ${(c.bsWebR || 1).toFixed(1)} cells are slowed 40% for 2s.` } : null });
 bfAdd('heallock', { name: 'No heals', kind: 'debuff', pri: 4, icon: 'cross', hue: '#2a4a6a', f: ['wardT', 'wardBy'],
-  def: 'A Wardstone stops every heal on it.',
-  get: c => c.wardT > bfNow() ? { src: bfFrom(c.wardBy), say: 'A Wardstone near it stops every heal and every regeneration on it.' } : null });
+  def: 'A Wardstone stops every heal.',
+  get: c => c.wardT > bfNow() ? { src: bfFrom(c.wardBy), say: 'A nearby Wardstone stops every heal and all regeneration.' } : null });
 bfAdd('manaseal', { name: 'No mana back', kind: 'debuff', pri: 14, icon: 'hourglass', hue: '#2a3a6a', f: ['epSealT'],
-  def: 'No mana comes back to it for a few seconds.',
-  get: c => c.epSealT > bfNow() ? { t: bfLeft(c.epSealT), say: 'No mana comes back to it: its next spell waits.' } : null });
+  def: 'No mana returns for a few seconds.',
+  get: c => c.epSealT > bfNow() ? { t: bfLeft(c.epSealT), say: 'No mana returns: the next spell waits.' } : null });
 bfAdd('wardcrack', { name: 'Ward cracked', kind: 'debuff', pri: 14, icon: 'cracked', hue: '#4a2a8a', f: ['mwOpenT', 'mwOpen'],
-  def: 'Its Spell Shield is cracked open for a moment: magic gets through it.',
-  get: c => c.mwOpenT > bfNow() ? { t: bfLeft(c.mwOpenT), say: `Its Spell Shield is cracked: ${bfPct(c.mwOpen || 0)} of each spell gets through to its health.` } : null });
+  def: 'Spell Shield cracked open for a moment: magic gets through.',
+  get: c => c.mwOpenT > bfNow() ? { t: bfLeft(c.mwOpenT), say: `Spell Shield cracked: ${bfPct(c.mwOpen || 0)} of each spell gets through to health.` } : null });
 
 /* =====================================================================================================
    YOUR UNITS
@@ -133809,108 +134304,108 @@ BF_U('champion', { name: 'Champion', kind: 'trait', pri: 1, icon: 'ascend', hue:
     return { label: C.trait.name, hue: h && h.hue, say: `${h ? h.name : 'Your commander'} in person: one on the field. ${C.trait.name}: ${C.trait.t}` };
   } });
 BF_U('uwound', { name: 'Wounded', kw: 'st:wounded', kind: 'state', pri: 0, icon: 'wither', hue: '#7a1820', f: ['wounded'],
-  def: 'Beaten down to 0 health: it fights on, slower, and recovers when the wave ends.',
-  get: t => t.wounded ? { say: `It fights on at ${typeof WOUND_PACE !== 'undefined' ? WOUND_PACE : .7}× attack speed and spell recovery, and recovers for free when the wave ends.` } : null });
+  def: 'Beaten down to 0 health: fights on, slower, and recovers when the wave ends.',
+  get: t => t.wounded ? { say: `Fights on at ${typeof WOUND_PACE !== 'undefined' ? WOUND_PACE : .7}× attack speed and spell recovery, and recovers for free when the wave ends.` } : null });
 BF_U('riposte', { name: 'Riposte Stance', kind: 'state', pri: 3, icon: 'swords', hue: '#6a4a9a', f: ['ccRipT'],
-  def: 'A duellist\'s stance: every ground foe that steps into its reach is cut at once.',
-  get: t => t.ccRipT > bfNow() && t.def && t.def.unit === 'cc_spellblade' ? { t: bfLeft(t.ccRipT), say: 'Every ground foe that steps into its reach is cut, and each riposte gives an Arcane Charge.' } : null });
+  def: 'A duellist\'s stance: every ground foe that steps into reach is cut at once.',
+  get: t => t.ccRipT > bfNow() && t.def && t.def.unit === 'cc_spellblade' ? { t: bfLeft(t.ccRipT), say: 'Every ground foe that steps into reach is cut, and each riposte gives an Arcane Charge.' } : null });
 BF_U('unbound', { name: 'Unbound Blade', kind: 'state', pri: 3, icon: 'swords', hue: '#8a3a7a', f: ['ccUnbT'],
-  def: 'Her blade\'s runes burn free: each cut also cuts the ground foes round its foe.',
-  get: t => t.ccUnbT > bfNow() ? { t: bfLeft(t.ccUnbT), say: 'Each cut also cuts every ground foe within 0.8 cells of its foe, slowing them (the 3rd cut stuns).' } : null });
+  def: 'Her blade\'s runes burn free: each cut also cuts the ground foes round the target.',
+  get: t => t.ccUnbT > bfNow() ? { t: bfLeft(t.ccUnbT), say: 'Each cut also cuts every ground foe within 0.8 cells of the target, slowing them (the 3rd cut stuns).' } : null });
 BF_U('gathering', { name: 'Gathering Orb', kwSpell: 'Gathering Orb', kind: 'state', pri: 3, icon: 'orbbig', hue: '#6a4a9a', f: ['ccxOrbT'],
-  def: 'Its orb takes in every missile it and the Magelings near it strike with, then is hurled.',
-  get: t => t.ccxOrbT > bfNow() ? { t: bfLeft(t.ccxOrbT), say: 'Its strikes and its neighbours\' feed the orb instead of landing.' } : null });
+  def: 'The orb takes in every missile from this Mageling and those nearby, then is hurled.',
+  get: t => t.ccxOrbT > bfNow() ? { t: bfLeft(t.ccxOrbT), say: 'Strikes from this Mageling and nearby Magelings feed the orb instead of landing.' } : null });
 BF_U('bloomheart', { name: 'Bloom Heart', kind: 'buff', pri: 4, icon: 'leaf', hue: '#4a7a2a',
-  def: 'Nyssa\'s trait: while her Champion stands, every Grove unit keeps some Growth after it Blooms.',
-  get: t => typeof gwKeep === 'function' && gwKeep() && typeof gwUnit === 'function' && gwUnit(t) ? { src: 'from your Champion', say: `It keeps ${gwKeep()} Growth after each Bloom.` } : null });
+  def: 'Nyssa\'s trait: while her Champion stands, every Grove unit keeps some Growth after Blooming.',
+  get: t => typeof gwKeep === 'function' && gwKeep() && typeof gwUnit === 'function' && gwUnit(t) ? { src: 'from your Champion', say: `Keeps ${gwKeep()} Growth after each Bloom.` } : null });
 BF_U('heat', { name: 'Heat', kw: 'ih:heat', kind: 'state', pri: 2, icon: 'heat', hue: '#8a3a10', f: ['ihHeat'],
   def: 'Every strike fills the orange gauge; when it is full the next strike vents.',
-  get: t => typeof ihHot === 'function' && ihHot(t) ? { fill: Math.min(1, t.ihHeat || 0), say: `${bfPct(Math.min(1, t.ihHeat || 0))} hot. At full, its next strike is ${typeof ihVentFull === 'function' ? ihVentFull(t) : 'its vent'}.` } : null });
+  get: t => typeof ihHot === 'function' && ihHot(t) ? { fill: Math.min(1, t.ihHeat || 0), say: `${bfPct(Math.min(1, t.ihHeat || 0))} hot. At full, the next strike is ${typeof ihVentFull === 'function' ? ihVentFull(t) : 'its vent'}.` } : null });
 BF_U('growth', { name: 'Growth', kw: 'gw:growth', kind: 'state', pri: 2, icon: 'leaf', hue: '#3a6a1a', f: ['gw'],
-  def: 'Its strikes fill the Growth bar from 0 to 100; at 100 its next strike Blooms.',
+  def: 'Strikes fill the Growth bar from 0 to 100; at 100 the next strike Blooms.',
   get: t => {
     if (typeof gwOn !== 'function' || !gwOn() || !gwUnit(t) || !gwBloomOf(t)) return null;
     const v = Math.round(Math.min(100, t.gw || 0));
-    return { fill: v / 100, say: `${v} of 100. At 100 its next strike Blooms (${typeof gwBloomSay === 'function' ? gwBloomSay(t) : gwBloomOf(t).name}).` };
+    return { fill: v / 100, say: `${v} of 100. At 100 the next strike Blooms (${typeof gwBloomSay === 'function' ? gwBloomSay(t) : gwBloomOf(t).name}).` };
   } });
 BF_U('arcanecharge', { name: 'Arcane Charge', kw: 'cc:charge', kind: 'state', pri: 3, icon: 'orb', hue: '#5a2a8a', f: ['ccQ'],
-  def: 'Every basic attack adds a charge; its next spell spends them all for more power.',
-  get: t => typeof ccUnit === 'function' && ccUnit(t) && t.ccQ > 0 ? { n: t.ccQ, fill: typeof ccQMax === 'function' ? t.ccQ / ccQMax(t) : 0, say: `${t.ccQ} of ${typeof ccQMax === 'function' ? ccQMax(t) : 5}: its next spell spends them all, ${bfPct((typeof CC_Q_K !== 'undefined' ? CC_Q_K : .35) * t.ccQ)} more power.` } : null });
+  def: 'Every basic attack adds a charge; the next spell spends them all for more power.',
+  get: t => typeof ccUnit === 'function' && ccUnit(t) && t.ccQ > 0 ? { n: t.ccQ, fill: typeof ccQMax === 'function' ? t.ccQ / ccQMax(t) : 0, say: `${t.ccQ} of ${typeof ccQMax === 'function' ? ccQMax(t) : 5}: the next spell spends them all, ${bfPct((typeof CC_Q_K !== 'undefined' ? CC_Q_K : .35) * t.ccQ)} more power.` } : null });
 BF_U('radiant', { name: 'Quickened by light', kind: 'buff', pri: 5, icon: 'sunburst', hue: '#8a7020', f: ['soRadT', 'soRadK'],
-  def: 'It strikes faster, and each strike lays one more Judgement.',
+  def: 'Strikes faster, and each strike lays one more Judgement.',
   get: t => {
     const on = typeof soRadiant === 'function' ? soRadiant(t) : t.soRadT > bfNow(); if (!on) return null;
     const timed = t.soRadT > bfNow(), k = timed ? t.soRadK || (typeof SO !== 'undefined' ? SO.RAD_K : .2) : (typeof SO !== 'undefined' ? SO.RAD_K : .2);
-    return { t: timed ? bfLeft(t.soRadT) : undefined, say: `It strikes ${bfPct(k)} faster, and each strike lays one more Judgement.` };
+    return { t: timed ? bfLeft(t.soRadT) : undefined, say: `Strikes ${bfPct(k)} faster, and each strike lays one more Judgement.` };
   } });
 BF_U('warded', { name: 'Guarded by light', kind: 'buff', pri: 5, icon: 'halo', hue: '#4a6a8a', f: ['soWardT', 'soWardK'],
-  def: 'It hits harder, and bosses\' silences, hexes and blinding light slide off it.',
-  get: t => t.soWardT > bfNow() ? { t: bfLeft(t.soWardT), say: `It hits ${bfPct(typeof SO !== 'undefined' ? SO.WARD_K : .1)} harder, and bosses' silences, hexes and blinding light slide off it.` } : null });
+  def: 'Hits harder, and immune to bosses\' silences, hexes and blinding light.',
+  get: t => t.soWardT > bfNow() ? { t: bfLeft(t.soWardT), say: `Hits ${bfPct(typeof SO !== 'undefined' ? SO.WARD_K : .1)} harder, and immune to bosses' silences, hexes and blinding light.` } : null });
 BF_U('silenced', { name: 'Silenced', kw: 'st:silenced', kind: 'debuff', pri: 1, icon: 'hand', hue: '#4a2a6a', f: ['silT'],
   def: 'The unit can\'t strike or cast until it wears off.',
-  get: t => t.silT > 0 ? { t: t.silT, say: 'It can\'t strike or cast.' } : null });
+  get: t => t.silT > 0 ? { t: t.silT, say: 'Unable to attack or cast.' } : null });
 BF_U('bewitched', { name: 'Bewitched', kind: 'debuff', pri: 1, icon: 'hexeye', hue: '#5a1a3a', f: ['hexUntil', 'hexKind'],
-  def: 'A leader\'s darkness, embers or blizzard, or a Rot Shaman\'s spores, on it: it fights worse until it wears off.',
-  get: t => t.hexUntil > bfNow() ? { t: bfLeft(t.hexUntil), say: t.hexKind === 'blind' ? 'Darkness on it: its range is cut to 60%.' : t.hexKind === 'spore' ? 'Choking spores on it: it attacks half as fast.' : 'It attacks half as fast.' } : null });
+  def: 'A leader\'s darkness, embers or blizzard, or a Rot Shaman\'s spores: fights worse until it wears off.',
+  get: t => t.hexUntil > bfNow() ? { t: bfLeft(t.hexUntil), say: t.hexKind === 'blind' ? 'Darkness: range cut to 60%.' : t.hexKind === 'spore' ? 'Choking spores: attacks half as fast.' : 'Attacks half as fast.' } : null });
 BF_U('drumbeat', { name: 'Drumbeat', kind: 'buff', pri: 8, icon: 'horn', hue: '#7a4a10', f: ['drumT', 'drumK'],
-  def: 'A war drum\'s beat: it attacks faster.',
-  get: t => t.drumT > bfNow() ? { t: bfLeft(t.drumT), say: `It attacks ${bfPct(t.drumK || 0)} faster.` } : null });
+  def: 'A war drum\'s beat: attacks faster.',
+  get: t => t.drumT > bfNow() ? { t: bfLeft(t.drumT), say: `Attacks ${bfPct(t.drumK || 0)} faster.` } : null });
 BF_U('secondself', { name: 'Second Self', kind: 'buff', pri: 8, icon: 'swords', hue: '#4a5a80', f: ['ohGhostT'],
   def: 'A legendary Twinfang weapon: for a few seconds a second self strikes with every blow.',
   get: t => t.ohGhostT > bfNow() ? { t: bfLeft(t.ohGhostT), say: 'Each attack hits again for 80% damage.' } : null });
 BF_U('frenzy', { name: 'Frenzy', kind: 'buff', pri: 8, icon: 'fist', hue: '#8a2a10', f: ['frenzyT'],
-  def: 'It attacks twice as fast for a few seconds.',
-  get: t => t.frenzyT > bfNow() ? { t: bfLeft(t.frenzyT), say: 'It attacks twice as fast.' } : null });
+  def: 'Attacks twice as fast for a few seconds.',
+  get: t => t.frenzyT > bfNow() ? { t: bfLeft(t.frenzyT), say: 'Attacks twice as fast.' } : null });
 BF_U('killrush', { name: 'Kill rush', kind: 'buff', pri: 9, icon: 'quick', hue: '#7a2a2a', f: ['hasteT'],
-  def: 'A kill quickens it: it attacks faster for 2s.',
-  get: t => t.hasteT > 0 && t.st && t.st.killHaste ? { t: t.hasteT, T: 2, say: `It attacks ${bfPct(t.st.killHaste)} faster after its kill.` } : null });
+  def: 'Quickened by a kill: attacks faster for 2s.',
+  get: t => t.hasteT > 0 && t.st && t.st.killHaste ? { t: t.hasteT, T: 2, say: `Attacks ${bfPct(t.st.killHaste)} faster after a kill.` } : null });
 BF_U('pillar', { name: 'Pillar of light', kind: 'buff', pri: 8, icon: 'beam', hue: '#8a7a40', f: ['lightT'],
-  def: 'A Beacon\'s pillar of light: it attacks twice as fast.',
-  get: t => t.lightT > bfNow() ? { t: bfLeft(t.lightT), say: 'It attacks twice as fast.' } : null });
+  def: 'A Beacon\'s pillar of light: attacks twice as fast.',
+  get: t => t.lightT > bfNow() ? { t: bfLeft(t.lightT), say: 'Attacks twice as fast.' } : null });
 BF_U('vengeful', { name: 'Vengeful', kind: 'buff', pri: 8, icon: 'skullbolt', hue: '#7a1a1a', f: ['vengeT'],
-  def: 'Vengeful Spirit: its strikes land at 2.5× for a few seconds.',
-  get: t => t.vengeT > bfNow() ? { t: bfLeft(t.vengeT), say: 'Its attacks deal 2.5× damage.' } : null });
+  def: 'Vengeful Spirit: strikes land at 2.5× for a few seconds.',
+  get: t => t.vengeT > bfNow() ? { t: bfLeft(t.vengeT), say: 'Attacks deal 2.5× damage.' } : null });
 BF_U('heralded', { name: 'Heralded', kind: 'buff', pri: 10, icon: 'banner', hue: '#2a6a2a', f: ['pennT', 'pennK'],
-  def: 'Beside a Herald\'s Pennant: it attacks faster.',
-  get: t => t.pennT > bfNow() && t.pennK ? { src: 'from a Herald\'s Pennant', say: `It attacks ${bfPct(t.pennK)} faster while it stands within 1.5 cells of the pennant.` } : null });
+  def: 'Beside a Herald\'s Pennant: attacks faster.',
+  get: t => t.pennT > bfNow() && t.pennK ? { src: 'from a Herald\'s Pennant', say: `Attacks ${bfPct(t.pennK)} faster while within 1.5 cells of the pennant.` } : null });
 BF_U('warmbrew', { name: 'Warm brew', kind: 'buff', pri: 10, icon: 'barrel', hue: '#7a4a10', f: ['ihBrewT', 'ihBrewK'],
-  def: 'Warmed by the keg beside it: its heat gauge fills faster.',
-  get: t => t.ihBrewT > bfNow() ? { say: `Its heat gauge fills ${bfPct(t.ihBrewK || 0)} faster.` } : null });
+  def: 'Warmed by a nearby keg: heat gauge fills faster.',
+  get: t => t.ihBrewT > bfNow() ? { say: `Heat gauge fills ${bfPct(t.ihBrewK || 0)} faster.` } : null });
 BF_U('silvertap', { name: 'Silver Tap', kind: 'buff', pri: 10, icon: 'potion', hue: '#5a6a7a', f: ['ihTapT', 'ihTapK', 'ihTapBy'],
-  def: 'The keg\'s Silver Tap: its vents strike harder.',
-  get: t => t.ihTapT > bfNow() && t.ihTapK ? { src: bfFrom(t.ihTapBy), say: `Its vents strike ${bfPct(t.ihTapK)} harder.` } : null });
+  def: 'The keg\'s Silver Tap: vents strike harder.',
+  get: t => t.ihTapT > bfNow() && t.ihTapK ? { src: bfFrom(t.ihTapBy), say: `Vents strike ${bfPct(t.ihTapK)} harder.` } : null });
 BF_U('smoulder', { name: 'Smoulder Stout', kind: 'buff', pri: 10, icon: 'ember', hue: '#8a3a10', f: ['ihDragonT'],
-  def: 'Its strikes set ground foes burning.',
-  get: t => t.ihDragonT > bfNow() ? { say: 'Its strikes on ground foes set them burning for 2s.' } : null });
+  def: 'Strikes set ground foes burning.',
+  get: t => t.ihDragonT > bfNow() ? { say: 'Strikes on ground foes set them burning for 2s.' } : null });
 BF_U('beltfed', { name: 'Endless Belt', kind: 'buff', pri: 10, icon: 'arrows3', hue: '#6a5a3a', f: ['ihBeltT'],
-  def: 'The belt keeps feeding it: it attacks faster for 3s.',
-  get: t => t.ihBeltT > bfNow() ? { t: bfLeft(t.ihBeltT), T: 3, say: bfPace(t, 1.3, 'The belt keeps feeding it') } : null });
+  def: 'Fed by the belt: attacks faster for 3s.',
+  get: t => t.ihBeltT > bfNow() ? { t: bfLeft(t.ihBeltT), T: 3, say: bfPace(t, 1.3, 'Fed by the belt') } : null });
 BF_U('ihmuster', { name: 'The King’s Muster', kind: 'buff', pri: 10, icon: 'banner', hue: '#7a5a1a', f: ['ihMusterT', 'ihMusterEnd', 'ihMusterN'],
-  def: 'Brannoc’s muster: it attacks 25% faster and cannot be stunned; when it ends, its next strike hits twice as hard.',
-  get: t => t.ihMusterT > bfNow() ? { t: bfLeft(t.ihMusterT), T: 6, say: bfPace(t, 1.25, 'Mustered by the Under-King, it cannot be stunned') } : t.ihMusterEnd ? { say: 'Its next strike hits twice as hard.' } : null });
+  def: 'Brannoc’s muster: attacks 25% faster and cannot be stunned; when it ends, the next strike hits twice as hard.',
+  get: t => t.ihMusterT > bfNow() ? { t: bfLeft(t.ihMusterT), T: 6, say: bfPace(t, 1.25, 'Mustered by the Under-King, it cannot be stunned') } : t.ihMusterEnd ? { say: 'Next strike hits twice as hard.' } : null });
 BF_U('ihkingsdue', { name: 'The King’s Due', kind: 'buff', pri: 10, icon: 'banner', hue: '#7a5a1a', f: ['ihDueT'],
-  def: 'Brannoc’s hammer struck a great foe: it attacks 20% faster for 3s.',
+  def: 'Brannoc’s hammer struck a great foe: attacks 20% faster for 3s.',
   get: t => t.ihDueT > bfNow() ? { t: bfLeft(t.ihDueT), T: 3, say: bfPace(t, 1.2, 'The king\'s hammer rang on a great foe') } : null });
 BF_U('ihsworn', { name: 'Royal Levy rank', kind: 'buff', pri: 9, icon: 'banner', hue: '#6a5a2a', f: ['ihSwornX'],
-  def: 'Royal Levy: each rank (one every 5th wave, up to 3) makes it strike 4% faster and gives it 6% more health.',
-  get: t => G.hero === 'ih_king' && typeof ihSworn === 'function' && ihSworn(t) ? { say: `Levy rank ${ihSworn(t)}: it strikes ${4 * ihSworn(t)}% faster and has ${6 * ihSworn(t)}% more health.` } : null });
+  def: 'Royal Levy: each rank (one every 5th wave, up to 3) gives 4% faster strikes and 6% more health.',
+  get: t => G.hero === 'ih_king' && typeof ihSworn === 'function' && ihSworn(t) ? { say: `Levy rank ${ihSworn(t)}: strikes ${4 * ihSworn(t)}% faster and has ${6 * ihSworn(t)}% more health.` } : null });
 BF_U('ihkillshot', { name: 'Oathbreaker Down', kind: 'buff', pri: 10, icon: 'crosshair', hue: '#7a5a2a', f: ['ihFarHasteT'],
-  def: 'Ridgeline Shot killed its foe: every ranged unit attacks 15% faster for 4s.',
+  def: 'Ridgeline Shot made a kill: every ranged unit attacks 15% faster for 4s.',
   get: t => G.hero === 'ih_marksman' && G.ihFarHasteT > bfNow() && t.st && (t.st.range || 0) > 1.8 ? { t: bfLeft(G.ihFarHasteT), T: 4, say: bfPace(t, 1.15, 'Torvald\'s round found its mark') } : null });
 BF_U('borrowed', { name: 'Borrowed Time', kind: 'buff', pri: 10, icon: 'hourglass', hue: '#4a3a7a', f: ['ccBorrowT', 'ccBorrowK'],
-  def: 'A Chronomancer beside it lends it time: it attacks faster.',
-  get: t => t.ccBorrowT > bfNow() ? { src: 'from a Chronomancer', say: `It attacks ${bfPct(t.ccBorrowK || 0)} faster.` } : null });
+  def: 'A nearby Chronomancer lends time: attacks faster.',
+  get: t => t.ccBorrowT > bfNow() ? { src: 'from a Chronomancer', say: `Attacks ${bfPct(t.ccBorrowK || 0)} faster.` } : null });
 BF_U('howl', { name: 'Ancestors’ Howl', kind: 'buff', pri: 10, icon: 'wave', hue: '#2a4a7a', f: ['sbHowlT', 'sbHowlK'],
-  def: 'The First Totem\'s howl: it attacks faster for 3s.',
-  get: t => t.sbHowlT > bfNow() ? { t: bfLeft(t.sbHowlT), T: 3, say: `It attacks ${bfPct(t.sbHowlK || 0)} faster.` } : null });
+  def: 'The First Totem\'s howl: attacks faster for 3s.',
+  get: t => t.sbHowlT > bfNow() ? { t: bfLeft(t.sbHowlT), T: 3, say: `Attacks ${bfPct(t.sbHowlK || 0)} faster.` } : null });
 // ---- the Wardbound's units ----
 BF_U('wblaststand', { name: 'Final Oath', kwSpell: 'Final Oath', kind: 'buff', pri: 3, icon: 'sword', hue: '#7a5a1a', f: ['wbStandT'],
-  def: 'An Oathbound\'s Final Oath: its sword planted, it can\'t be Wounded and does not strike; ground foes that reach it are pushed back and slowed.',
-  get: t => t.wbStandT > bfNow() ? { t: bfLeft(t.wbStandT), T: 6, say: 'Its sword planted, it can\'t be Wounded and does not strike; ground foes within 1.2 cells are pushed back and slowed 40%.' } : null });
+  def: 'An Oathbound\'s Final Oath: sword planted, can\'t be Wounded and does not strike; ground foes that reach the Oathbound are pushed back and slowed.',
+  get: t => t.wbStandT > bfNow() ? { t: bfLeft(t.wbStandT), T: 6, say: 'Sword planted, can\'t be Wounded and does not strike; ground foes within 1.2 cells are pushed back and slowed 40%.' } : null });
 // Lord Aedric's Champion (forces_zx_champ_wardbound.js): Blaze of Glory, its burnout, and the winded ride after a Sun Charge
 BF_U('wbglory', { name: 'Blaze of Glory', kwSpell: 'Blaze of Glory', kind: 'buff', pri: 3, icon: 'flame', hue: '#8a6a1a', f: ['wbGloryT'],
-  def: 'Aedric\'s Blaze of Glory: he strikes far faster and every strike brands its foe, until he burns out.',
-  get: t => t.wbGloryT > bfNow() ? { t: bfLeft(t.wbGloryT), say: bfPace(t, 1.6, 'Every strike brands its foe') + ' Then he burns out and strikes slower for 4s.' } : null });
+  def: 'Aedric\'s Blaze of Glory: he strikes far faster and every strike brands the target, until he burns out.',
+  get: t => t.wbGloryT > bfNow() ? { t: bfLeft(t.wbGloryT), say: bfPace(t, 1.6, 'Every strike brands the target') + ' Then he burns out and strikes slower for 4s.' } : null });
 BF_U('wbburnout', { name: 'Burnt Out', kind: 'debuff', pri: 4, icon: 'ember', hue: '#5a3a1a', f: ['wbGloryBurnT'],
   def: 'After Blaze of Glory he burns out for a while: his strikes come slower.',
   get: t => !(t.wbGloryT > bfNow()) && t.wbGloryBurnT > bfNow() ? { t: bfLeft(t.wbGloryBurnT), T: 4, say: bfPace(t, 1 / 1.3, 'Burnt out after Blaze of Glory') } : null });
@@ -133918,30 +134413,30 @@ BF_U('wbweary', { name: 'Winded', kind: 'debuff', pri: 5, icon: 'snail', hue: '#
   def: 'Winded after a Sun Charge: his strikes come slower for a moment.',
   get: t => t.wbWearyT > bfNow() ? { t: bfLeft(t.wbWearyT), say: bfPace(t, 1 / 1.2, 'Winded after a Sun Charge') } : null });
 BF_U('wbnowound', { name: 'Can\'t be Wounded', kind: 'buff', pri: 4, icon: 'shield', hue: '#6a5a2a', f: ['wbNoWoundT'],
-  def: 'Held up by an oath (Final Oath, Stone Stance, a Sworn Vow): its health can\'t fall to 0 while it lasts.',
-  get: t => t.wbNoWoundT > bfNow() ? { t: bfLeft(t.wbNoWoundT), say: 'Its health can\'t fall to 0 while it lasts: it can\'t be Wounded.' } : null });
+  def: 'Held up by an oath (Final Oath, Stone Stance, a Sworn Vow): health can\'t fall to 0 while it lasts.',
+  get: t => t.wbNoWoundT > bfNow() ? { t: bfLeft(t.wbNoWoundT), say: 'Health can\'t fall to 0 while it lasts: can\'t be Wounded.' } : null });
 BF_U('wbanvil', { name: 'Stone Stance', kwSpell: 'Stone Stance', kind: 'buff', pri: 3, icon: 'shield', hue: '#7a5a2a', f: ['wbAnvilT'],
-  def: 'A Stoneguard braced behind its shield: every foe that reaches it is struck back and stunned, and it cannot be Wounded.',
-  get: t => t.wbAnvilT > bfNow() ? { t: bfLeft(t.wbAnvilT), say: 'Every foe that reaches it is struck back and stunned; it cannot be Wounded.' } : null });
+  def: 'A Stoneguard braced behind the shield: every foe that reaches the Stoneguard is struck back and stunned, and the Stoneguard cannot be Wounded.',
+  get: t => t.wbAnvilT > bfNow() ? { t: bfLeft(t.wbAnvilT), say: 'Every foe that reaches the Stoneguard is struck back and stunned; cannot be Wounded.' } : null });
 BF_U('wbpennant', { name: 'Rune Pennant', kwSpell: 'Rune Pennant', kind: 'buff', pri: 10, icon: 'banner', hue: '#2a4a7a', f: ['wbPennT'],
-  def: 'Under a Sable Lancer\'s Rune Pennant: its chain lightning jumps once more.',
-  get: t => t.wbPennT > bfNow() ? { t: bfLeft(t.wbPennT), T: 6, say: 'Its chain lightning jumps once more.' } : null });
+  def: 'Under a Sable Lancer\'s Rune Pennant: chain lightning jumps once more.',
+  get: t => t.wbPennT > bfNow() ? { t: bfLeft(t.wbPennT), T: 6, say: 'Chain lightning jumps once more.' } : null });
 BF_U('inspired', { name: 'Inspired', kind: 'buff', pri: 10, icon: 'aura', hue: '#6a5a2a', f: ['auraT', 'auraS'],
-  def: 'Inside an item\'s aura: it attacks faster.',
-  get: t => t.auraT > bfNow() && t.auraS ? { say: `It attacks ${bfPct(t.auraS)} faster inside the aura.` } : null });
+  def: 'Inside an item\'s aura: attacks faster.',
+  get: t => t.auraT > bfNow() && t.auraS ? { say: `Attacks ${bfPct(t.auraS)} faster inside the aura.` } : null });
 BF_U('blessed', { name: 'Blessed', kind: 'buff', pri: 10, icon: 'cross', hue: '#8a7020', f: ['buffD', 'buffS'],
-  def: 'Inside a Holy Shrine\'s aura: it hits harder and attacks faster.',
-  get: t => t.buffD > 0 || t.buffS > 0 ? { say: `It hits ${bfPct(t.buffD || 0)} harder${t.buffS > 0 ? ` and attacks ${bfPct(t.buffS)} faster` : ''}${t.blessR ? `, with ${t.blessR} more range` : ''}.` } : null });
+  def: 'Inside a Holy Shrine\'s aura: hits harder and attacks faster.',
+  get: t => t.buffD > 0 || t.buffS > 0 ? { say: `Hits ${bfPct(t.buffD || 0)} harder${t.buffS > 0 ? ` and attacks ${bfPct(t.buffS)} faster` : ''}${t.blessR ? `, with ${t.blessR} more range` : ''}.` } : null });
 BF_U('laststand', { name: 'Last Stand', kw: 'sy:laststand', kind: 'buff', pri: 6, icon: 'swords', hue: '#8a2a10',
   def: 'At half your lives or fewer the keep rallies: kills pay more gold and your units strike harder.',
-  get: () => typeof rallied === 'function' && rallied() ? { say: typeof RALLY !== 'undefined' ? `The keep rallies: it strikes ${bfPct(RALLY.dmg - 1)} harder, and kills pay ${bfPct(RALLY.gold - 1)} more gold.` : 'The keep rallies.' } : null });
+  get: () => typeof rallied === 'function' && rallied() ? { say: typeof RALLY !== 'undefined' ? `The keep rallies: strikes ${bfPct(RALLY.dmg - 1)} harder, and kills pay ${bfPct(RALLY.gold - 1)} more gold.` : 'The keep rallies.' } : null });
 // a spell that stays on its caster a while: [field, the spell's name]
 const BF_SELF = [['chNoonT', 'High Noon', 'sun'], ['chMoonT', 'Hunter’s Moon', 'moon'], ['ccSpecT', 'Spectral Edge', 'sword'], ['ccOrrT', 'Orrery', 'orbbig'], ['ihBulwarkT', 'Bulwark', 'shield']];
 const bfAbByName = n => { if (typeof ABIL === 'undefined') return null; for (const id in ABIL) if (ABIL[id] && ABIL[id].name === n) return ABIL[id]; return null; };
 for (const [fld, nm, icon] of BF_SELF) {
   BF_U('ab_' + fld.toLowerCase(), { name: nm, kwSpell: nm, kind: 'buff', pri: 3, icon, hue: '#6a5a2a', f: [fld],
-    def: () => { const ab = bfAbByName(nm); return ab ? `${nm}, its spell, is active.${ab.blurb ? ' ' + String(ab.blurb).replace(/[.]?$/, '.') : ''}` : `${nm}, its spell, is active.`; },
-    get: t => t[fld] > bfNow() ? { t: bfLeft(t[fld]), ab: bfAbByName(nm), say: (() => { const ab = bfAbByName(nm); return `Its spell is active.${ab && ab.blurb ? ' ' + String(ab.blurb).replace(/[.]?$/, '.') : ''}`; })() } : null });
+    def: () => { const ab = bfAbByName(nm); return ab ? `${nm} is active.${ab.blurb ? ' ' + String(ab.blurb).replace(/[.]?$/, '.') : ''}` : `${nm} is active.`; },
+    get: t => t[fld] > bfNow() ? { t: bfLeft(t[fld]), ab: bfAbByName(nm), say: (() => { const ab = bfAbByName(nm); return `${nm} is active.${ab && ab.blurb ? ' ' + String(ab.blurb).replace(/[.]?$/, '.') : ''}`; })() } : null });
 }
 BF_U('set', { name: 'Set bonus', kw: 'sy:set', kind: 'buff', pri: 20, icon: 'gem', hue: '#1a6a4a', dyn: true,
   def: 'Matched pieces give bonuses when 2 or 3 are worn.',
@@ -134382,7 +134877,7 @@ const TUT_CH = [
     problem: ['Tutorial: Nothing to Hit', 'Burrowers dive underground when they take a lot of damage at once.', 'Steady damage · magic for the plate · a long road'],
     intro: 'Burrowers come. Your damage is packed into one spot. Sound the horn and watch them dive.',
     pre: { grove: [['arcane', 8, 3, 1], ['arcane', 7, 3, 1]], ironhold: [['cannon', 8, 3, 1], ['cannon', 7, 3, 1]] },
-    lesson: { all: 'A burrower dives when it takes a big share of its health in a moment, and nothing reaches it below. It is armoured too. Spread steady damage along the road, so it never takes enough at once.',
+    lesson: { all: 'A burrower dives after losing a big share of health in a moment, and nothing reaches a burrower underground. Burrowers are armoured too. Spread steady damage along the road, so no single moment is enough.',
       grove: 'Build {frost} and {cannon} along the road: their magic goes through the armour.',
       ironhold: 'Build {arcane} and {arrow} along the road: magic and Armour Penetration go through the armour.' },
     fix: { gold: 180, grove: { slots: ['frost', 'cannon', 'storm'], need: 3, build: [['frost', 3, 3], ['cannon', 6, 7], ['frost', 2, 7], ['cannon', 6, 11]] },
