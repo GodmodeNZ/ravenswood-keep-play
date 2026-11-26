@@ -1,4 +1,4 @@
-const BUILD_TAG = '47ccdb11@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '383e9738@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47572,7 +47572,7 @@ const UNIT_KIND = {
   sb_wolfguard: ['melee', 'polearm'], sb_windrunner: ['bow'], sb_hailshaman: ['caster'], sb_spiritwalker: ['caster'],
   sb_thundercaller: ['caster'], sb_earthbinder: ['melee', 'hammer'], sb_clouddancer: ['caster'], sb_skyhunter: ['polearm'], ch_tarka: ['caster'],
   // the Wardbound
-  wb_oathbound: ['melee', 'blade'], wb_maskedwarden: ['blade'], wb_frostbrand: ['melee', 'polearm', 'caster'], wb_runecarver: ['caster'],
+  wb_oathbound: ['melee', 'blade'], wb_maskedwarden: ['blade'], wb_frostbrand: ['melee', 'polearm', 'caster'], wb_oathknife: ['melee', 'blade'], wb_runecarver: ['caster'],
   wb_stormward: ['melee', 'polearm', 'rider', 'caster'], wb_anvilguard: ['melee', 'hammer'], wb_siegewarden: ['bow'],
   wb_vowkeeper: ['melee', 'blade'], ch_varic: ['melee', 'blade'],
 };
@@ -47897,7 +47897,7 @@ const WPN_UNIT = {
   // the Champions not leading by default (CHAMPS: one of each force's three stands in its holy slot)
   ch_aurel: 'staff', ch_maren: 'twinblade', ch_faelan: 'bow', ch_nyssa: 'staff', ch_tovin: 'gauntlet', ch_grenna: 'ladle', ch_torvald: 'rifle', ch_brannoc: 'hammer', ch_hrolf: 'cannon',
   ch_celestine: 'staff', ch_morrow: 'lance', ch_oshana: 'staff', ch_huri: 'spear', ch_aedric: 'lance', ch_isaura: 'sword',
-  wb_oathbound: 'sword', wb_maskedwarden: 'glaive', wb_frostbrand: 'halberd', wb_runecarver: 'tome', wb_stormward: 'stormlance', wb_anvilguard: 'hammer', wb_siegewarden: 'ballista', wb_vowkeeper: 'sword', ch_varic: 'sword',
+  wb_oathbound: 'sword', wb_maskedwarden: 'glaive', wb_frostbrand: 'halberd', wb_oathknife: 'daggers', wb_runecarver: 'tome', wb_stormward: 'stormlance', wb_anvilguard: 'hammer', wb_siegewarden: 'ballista', wb_vowkeeper: 'sword', ch_varic: 'sword',
 };
 /* ---------- the legendary weapons: [unit, id, name, look, effect] ----------
    effect: ['hit', IPROC kind, every Nth hit] | ['spell', spell id, ITWIST kind or IPROC kind] | ['crit'] (+15% crit chance,
@@ -48020,6 +48020,8 @@ const WPN_LEGS = [
   ['wb_frostbrand', 'wl_rimeline', 'Rimeline Poleaxe', 'a poleaxe that leaves a line of frost in the air', ['spell', 'wb_rimeline', 'freeze']],
   ['wb_runecarver', 'wl_everyrune', 'Codex of Every Rune', 'a stone-paged book whose runes float off the page', ['hit', 'arc', 3]],
   ['wb_runecarver', 'wl_detonator', 'Detonator\'s Ledger', 'a red ledger with a burning rune on the cover', ['spell', 'wb_detonate', 'echo']],
+  ['wb_oathknife', 'wl_lastword', 'The Last Word', 'a long black knife, its edge a line of gold runes', ['crit']],
+  ['wb_oathknife', 'wl_hushedge', 'Hush-Edge', 'a pale knife that makes no sound, a sun-wheel on its guard', ['spell', 'wb_quietus', 'echo']],
   ['wb_stormward', 'wl_thunderpennon', 'Thunder-Pennon Lance', 'a lance with a pennon of living lightning', ['hit', 'daze', 4]],
   ['wb_stormward', 'wl_skyfalllance', 'Runefall Lance', 'a white lance with a sun-wheel at the guard', ['spell', 'wb_skyfall', 'echo']],
   ['wb_anvilguard', 'wl_anvilfall', 'Anvilfall Hammer', 'a hammer with an anvil-shaped head of black iron', ['hit', 'shove', 3]],
@@ -48091,7 +48093,7 @@ const WPN_ISSUED = {
   ch_huri: ['Huri\'s Bone Spear', '#efe4c8', 'a spear of carved bone'],
   // the Wardbound
   wb_oathbound: ['Oathbound Rune Greatsword', '#8a8a9a', 'a greatsword with glowing runes down the blade'], wb_maskedwarden: ['Warden\'s Gold Glaive', '#c0a05a', 'a three-bladed glaive with gold inlay'],
-  wb_frostbrand: ['Gatewatch Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
+  wb_frostbrand: ['Gatewatch Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_oathknife: ['Oathknife\'s Pair', '#8a5a60', 'two long knives with gold runes down the blades'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
   wb_stormward: ['Sable Rune Lance', '#5a8ac0', 'a lance wound with gold rune wire'], wb_anvilguard: ['Stoneguard\'s Hammer', '#8a8a9a', 'a dark steel war hammer'],
   wb_siegewarden: ['Graveshot Ballista', '#8a7a5a', 'a field ballista'], wb_vowkeeper: ['Chaplain\'s Blade', '#7a6a8a', 'a short blade with a censer chain'],
   ch_varic: ['Varic\'s Warden Blade', '#c8963a', 'a dark sword with a gold rune on the cross'], ch_aedric: ['Aedric\'s Sun Lance', '#f0c860', 'a white lance with a gold point'],
@@ -59444,7 +59446,7 @@ const ATK_WORDS = {
   steamhammer: ['slam'], mortarcrew: ['shell'], siegebreaker: ['lob'],
   sb_wolfguard: ['thrust'], sb_windrunner: ['arrow', 'shot'], sb_hailshaman: ['hailstone', 'stone', 'call'], sb_spiritwalker: ['spirit', 'bolt'],
   sb_thundercaller: ['bolt'], sb_earthbinder: ['stomp'], sb_clouddancer: ['strike'], sb_skyhunter: ['harpoon', 'throw'],
-  wb_oathbound: ['cut'], wb_maskedwarden: ['throw'], wb_frostbrand: ['sweep'], wb_runecarver: ['flick'], wb_stormward: ['thrust'], wb_anvilguard: ['slam'],
+  wb_oathbound: ['cut'], wb_maskedwarden: ['throw'], wb_frostbrand: ['sweep'], wb_oathknife: ['cut'], wb_runecarver: ['flick'], wb_stormward: ['thrust'], wb_anvilguard: ['slam'],
   wb_siegewarden: ['bolt', 'shot'], wb_vowkeeper: ['cut'],
   // the Champions (owner, 24 Nov 2026: the same pass for their trees)
   ch_maelis: ['bolt'], ch_aurel: ['bolt'], ch_maren: ['cut'], ch_elowen: ['lash'], ch_faelan: ['shot', 'arrow'], ch_nyssa: ['pod', 'throw'],
@@ -60899,7 +60901,7 @@ if (typeof sbWeather === 'function' && !sbWeather._ft) {
    (the sun's charge: Lancers), Isaura (veiled oaths: frost and vows).
    ===================================================================================================== */
 {
-const N = FTKN, U = { oath: 'wb_oathbound', glaive: 'wb_maskedwarden', frost: 'wb_frostbrand', rune: 'wb_runecarver', lance: 'wb_stormward', anvil: 'wb_anvilguard', siege: 'wb_siegewarden', vow: 'wb_vowkeeper' };
+const N = FTKN, U = { oath: 'wb_oathbound', glaive: 'wb_maskedwarden', frost: 'wb_oathknife', rune: 'wb_runecarver', lance: 'wb_stormward', anvil: 'wb_anvilguard', siege: 'wb_siegewarden', vow: 'wb_vowkeeper' };
 const exposed = c => (typeof wbBrandOf === 'function' ? wbBrandOf(c) > 0 : false);
 ftKit('wardbound', {
   short: 'wb', name: 'Wardbound', hue: '#f0c050',
@@ -60926,7 +60928,7 @@ ftKit('wardbound', {
       cap: { name: 'Shatter Shot', art: 'cannon:Shatter Shot', say: () => 'Crossfire stuns the ground foes it hits 0.4s (bosses less).', fx: X => { for (const q of [X.c].concat(X.near(.8))) if (!q.dead && !q.fly) stun(q, .4, false, null); } } },
     wb_p_brand: { name: 'Brand and Oath', a: U.vow, b: U.frost, w: 2, col: ['#f0c050', '#bfe0ff'], art: 'frost:Brand-Rime',
       say: (n, w) => `a foe hit by both within ${w}s loses ${n > 1 ? 4 : 2} armour for 4s.`, fx: N.armour(2, 4),
-      cap: { name: 'Bitter Steel', art: 'frost:Bitter Steel', say: () => 'A foe Brand and Oath took takes 15% more from Ashen Chaplains and Gatewatch Halberdiers for 3s.', fx: X => { X.c.wbBrandT2 = G.time + 3; } } },
+      cap: { name: 'Bitter Steel', art: 'frost:Bitter Steel', say: () => `A foe Brand and Oath took takes 15% more from Ashen Chaplains and ${WB_ASN.name} for 3s.`, fx: X => { X.c.wbBrandT2 = G.time + 3; } } },
   },
   army: [
     [{ id: 'wb_w_oaths', name: 'Steady Oaths', art: 'holy:Patient Oath', text: () => 'Wardbound units regain mana 20% faster.', live: N.mana(.2) },
@@ -60962,11 +60964,11 @@ ftKit('wardbound', {
       Object.assign({ id: 'wb_c_noon', name: 'Noonday Charge', art: 'holy:Into the Fray', text: () => 'Aedric casts a spell: Sable Lancers within 3 cells attack 30% faster for 3s.' }, N.champCall((t, st) => ftkFast(st, .3), 'wbNoonT', 3, '#ffd890', U.lance)),
     ],
     wb_isaura: [
-      { id: 'wb_c_step', name: 'Veiled Step', art: 'holy:Veiled Oath', text: () => 'Gatewatch Halberdiers attack 6% faster.', live: N.fast(U.frost, .06) },
-      [{ id: 'wb_c_cold', name: 'Cold Oath', art: 'frost:Cold Vigil', text: n => `Gatewatch Halberdiers: +${gNf(.2 * n)} range.`, live: N.range(U.frost, .2) },
+      { id: 'wb_c_step', name: 'Veiled Step', art: 'holy:Veiled Oath', text: () => `${WB_ASN.name} attack 6% faster.`, live: N.fast(U.frost, .06) },
+      [{ id: 'wb_c_cold', name: 'Cold Oath', art: 'frost:Cold Vigil', text: n => `${WB_ASN.name}: +${gNf(.2 * n)} range.`, live: N.range(U.frost, .2) },
        { id: 'wb_c_quiet', name: 'Quiet Vows', art: 'venom:Sworn Vow', text: n => `Ashen Chaplains attack ${5 * n}% faster.`, live: N.fast(U.vow, .05) }],
       [{ id: 'wb_c_broken', name: 'Broken Vows', art: 'holy:Oath Turned', text: n => `Wardbound hits on a rooted or stunned foe: ${10 * n}% harder.`, amp: (c, amt, src, n) => (c.stunT > 0 || c.rootT > G.time ? amt * (1 + .1 * n) : amt) },
-       { id: 'wb_c_veil', name: 'Veil Thrift', art: 'frost:Winter Ward', text: n => `Gatewatch Halberdier spells cost ${10 * n}% less.`, cost: N.cost(U.frost, .1) }],
+       { id: 'wb_c_veil', name: 'Veil Thrift', art: 'frost:Winter Ward', text: n => `${WB_ASN.one} spells cost ${10 * n}% less.`, cost: N.cost(U.frost, .1) }],
       [N.gift('wb_c_gift_is', 'Veil of Oaths', 'holy:Witness of Vows', "Isaura's gift and her Champion's trait: a foe whose root or stun ends on a rune takes 5% of its health (bosses 2%) and is Exposed; her attacks root 0.4s."),
        { id: 'wb_c_whisper', name: 'Whispered Oath', art: 'holy:Tighter Bonds', text: () => "Isaura's spells cost 20% less.", cost: N.champCost(.2) }],
       Object.assign({ id: 'wb_c_bind', name: 'Oathbinder', art: 'holy:Vow Carved', text: () => 'Isaura casts a spell: Wardbound units within 3 cells cast their next spell 25% harder.' }, N.champEmp('#f0c050')),
@@ -63939,6 +63941,401 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezLayout(F, 'champ:wb_isaura', [[0,2],[1,3],[1,2],[2,2],[1,0],[2,1],[4,0],[3,1],[5,2],[5,1],[3,3],[5,3],[4,2],[4,1],[0,1]], [[5,7,13,9],[1,10,11],[12,8]]);   /* rows 2 3 2 2 3 3; chains: Tighter Bonds > Shared Vow > Vow's Reckoning > Sworn Road | Silent Vow > Quiet Step > Veiled Oath | Oath Turned > Turned Twice */
 }
 
+/* ================= THE WARDBOUND'S ASSASSIN: the Oathknives take the Gatewatch Halberdiers' place (27 Nov 2026) =================
+   Owner: "a unit to the wardbound that jumps ... behind cloth targets and does bonus damage. it can be their anti caster
+   unit ... sort of an assassin type unit." The Halberdiers' spear role overlapped the Sable Lancers, so they are retired.
+
+   THE NAME is one constant, WB_ASN (name, one, short): the owner picks names. Options given: Oathknives, Hushblades,
+   Sworn Shades, Vigil Knives.
+
+   What this file does (it sorts after every other Wardbound talent file and before ..._unitnames.js):
+   - THE UNIT. The Wardbound's frost slot keeps its slot (saves hold units by slot, so a saved Halberdier loads as an
+     Oathknife; its talent picks are refunded by name, game.js migrateTal) and gets a new unit id, WB_ASN.id, so nothing
+     keyed to the Halberdier (its portrait, its spells' and talents' paintings, its weapon class, its swing sound) can
+     show on the new unit. The def is changed in place, so what the tier and pace files made of its costs is kept.
+   - THE ATTACK (FORCE_ATTACK.wbStalk). The Oathknife leaps from his post, lands behind his foe (up the road from it),
+     cuts it from behind and springs back. Cloth and support casters take WBA.vs more: that is the unit. Pure damage, no
+     hold of any kind (owner: DPS units stay pure damage). His natural order is Casters (def.prio 4); the player's order
+     is kept as for any unit (game.js acquire).
+     The leap rides the charge system (t.chg, forces.js chargeAt): t.chg.leap marks it, t.chg.P are its landings.
+     wbaAt(t) is where he is now; the chargeAt wrap moves him, the plainLife wrap lifts and turns him.
+   - THE KIT (three spells, mana, autocast, each its own move): Quietus (innate: one leap at the weakest caster, far
+     harder on a foe near death), Sable Step (two foes in a row, casters first), Oathbreakers' Hunt (every caster in
+     reach in turn).
+   - THE TREE: two fantasies, each with its capstone. The Reckoner (casters and the dying: Oathbreaker's Bane, Finishing
+     Cut; capstone No Oath Unanswered) and the Lone Wolf (placement: Lone Wolf, Long Stride; capstone Unseen Hand).
+     Mostly always-on passives; the only "when" talents are Hush (a kill gives mana) and No Oath Unanswered.
+   - THE BODY: code-built on the Wardbound's knight kit (forces_wardbound_f.js), as the Oathbound, Runecarvers, Sable
+     Lancers and Stoneguard are: no sculpt exists for him yet. Lean, hooded and veiled in oxblood over sable leather,
+     a long knife in each hand lit with gold runes. A PLACEHOLDER: the owner is getting a 3D model for him (the brief for
+     it, and what is ready for it: docs/model_pilot/oathknife_model_spec.md).
+   - THE MODEL (27 Nov 2026): the owner's sculpt, a hooded woman in sable and gold with a dagger in each fist, rigged and
+     animated (src/unitmodels_oathknife2.js on src/model_ok2.js, tools/make_ok.py). The code-built body below is the fallback
+     (?ok=old). She is "she" in the player's text; the comments here were written before the model came.
+   - THE HALBERDIERS stay in the files as they were (kit wb_frostbrand, their tree's talents, items and paintings), reached
+     by nothing: their items leave the drop pools below.
+   Check: node tools/check_oathknife.js -v */
+const WB_ASN = { id: 'wb_oathknife', name: 'Oathknives', one: 'Oathknife', short: 'Oathknife',
+  options: ['Oathknives', 'Hushblades', 'Sworn Shades', 'Vigil Knives'] };
+// the numbers: vs (more against casters), land (how far behind the foe he lands), the leap's beats (s), its arcs (cells)
+const WBA = { vs: .5, land: .55, camSide: .3, hop: .22, hold: .16, back: .3, H: .5, Hb: .42,
+  quietus: { m: 2.2, low: .35, lowM: 4 }, step: { m: 1.7 }, hunt: { m: 1.5 },
+  lone: { r: 2, per: .1 }, bane: .1, finish: { at: .35, per: .15 }, unseen: .6, tier0: { dmg: 24, rate: 1.5, range: 2.2 } };
+const wbaCaster = c => !!c && !!c.def && (isRole(c, 'cloth') || isRole(c, 'support'));
+const wbaIs = t => !!(t && t.def && t.def.unit === WB_ASN.id);
+
+/* ---------- the unit: the frost slot's def, changed in place ---------- */
+{
+  const U = FORCES.wardbound.units.frost, old = U.tiers.map(o => Object.assign({}, o)), T0 = WBA.tier0;
+  U.oldId = U.id;
+  Object.assign(U, { id: WB_ASN.id, name: WB_ASN.name, short: WB_ASN.short, attack: 'wbStalk', dmgType: 'phys', air: false, ground: true, prio: 4, top: [1.05, 1.1, 1.15],
+    blurb: `Hooded knives of the Order, sworn to end the oath-breakers behind the line. The ${WB_ASN.one} leaps from her post, lands at the back or flank of a ground foe in reach, cuts it and springs back; cloth and support casters take ${Math.round(WBA.vs * 100)}% more. She hunts casters first. Cannot reach flyers.` });
+  U.tiers = old.map((o, k) => ({ cost: o.cost, dmg: k ? Math.round(T0.dmg * o.dmg / old[0].dmg) : T0.dmg, rate: +(T0.rate * o.rate / old[0].rate).toFixed(3), range: +(T0.range + o.range - old[0].range).toFixed(2) }));
+  FORCE_GLYPH[WB_ASN.id] = 'swords';
+  if (typeof LIFE_KIND !== 'undefined') LIFE_KIND[WB_ASN.id] = 'melee';
+}
+
+/* ---------- the leap ---------- */
+// where he lands by a foe: at its back (a step up the road from it, where it came from; with no road, the far side from
+// the unit), or on its flank when its back is hidden from the camera
+function wbaBehind(t, c) {
+  const P = wbRoad(), i = wbRoadCell(c.x, c.y)[2];
+  let dx = 0, dz = 0;
+  if (i > 0 && !c.fly) { dx = P[i - 1][0] - P[i][0]; dz = P[i - 1][1] - P[i][1]; if (i + 1 < P.length) { dx += P[i][0] - P[i + 1][0]; dz += P[i][1] - P[i + 1][1]; } }
+  let L = Math.hypot(dx, dz);
+  if (L < 1e-3) { dx = c.x - t.x; dz = c.y - t.y; L = Math.hypot(dx, dz) || 1; }
+  dx /= L; dz /= L;
+  // the camera looks down from the screen's lower edge (+y on the field): a foe hides whatever stands beyond it. So when
+  // its back is on the far side he takes its flank instead, the one toward the camera, a little behind it (the hub's
+  // review of the first stills: "big foes hide him")
+  if (dz < WBA.camSide) {
+    const sx = dx >= 0 ? 1 : -1, fx = -dz * sx, fz = Math.abs(dx);   // (the flank's direction: square to its road, turned toward the camera)
+    let ex = fx * .85 + dx * .35, ez = Math.max(fz * .85 + dz * .35, WBA.camSide); const E = Math.hypot(ex, ez) || 1; dx = ex / E; dz = ez / E;
+    if (Math.abs(fx) < 1e-3 && fz < 1e-3) { dx = sx * .8; dz = .6; }   // (a foe walking straight at the camera: either flank; this one)
+  }
+  return [c.x + dx * WBA.land, c.y + dz * WBA.land];
+}
+const wbaLeapT = n => n * (WBA.hop + WBA.hold) + WBA.back;
+// start a leap through the foes L (one for a strike); hit(c, k) lands on each as he arrives behind it. Returns its length
+function wbaLeap(t, st, L, kind, hit) {
+  const P = L.map(c => { const p = wbaBehind(t, c); return { x: p[0], z: p[1], c, a: Math.atan2(c.x - p[0], c.y - p[1]) }; });
+  const T = wbaLeapT(P.length), last = P[P.length - 1];
+  t.chg = { leap: 1, kind, x: last.x, z: last.z, at: G.time, T, P, rd: 1 };
+  t.cd = Math.max(t.cd || 0, T);
+  P.forEach((p, k) => G.delayed.push({ t: k * (WBA.hop + WBA.hold) + WBA.hop, fn: () => {
+    if (G.state !== 'play' || !G.towers.includes(t) || t.wrecked) return;
+    let c = p.c;
+    if (c.dead) { c = null; let bd = .81; for (const o of G.creeps) { if (o.dead || o.ent || o.phased || o.fly) continue; const d = (o.x - p.x) ** 2 + (o.y - p.z) ** 2; if (d < bd) { bd = d; c = o; } } }   // his foe fell while he was in the air: the nearest walker where he lands
+    if (!c) return;
+    p.a = Math.atan2(c.x - p.x, c.y - p.z);
+    hit(c, k, t.st || st);
+    fxSpark(c.x, c.y, hitH(c) + .05, WB_COL.gold, 4); sfx('glaiveHit', kind === 'atk' ? 0 : .5);
+  } }));
+  if (G.state === 'play') fxDust(t.x, t.y, 2);
+  t.recoil = 1;
+  return T;
+}
+// one cut from behind: casters take WBA.vs more
+function wbaCut(t, st, c, m) {
+  if (!c || c.dead) return 0;
+  return wbHit(t, st, c, st.dmg * m * (wbaCaster(c) ? 1 + WBA.vs : 1), 'phys');
+}
+// where he is now: null at his post, else { x, z, h, yaw, ph ('out' | 'hold' | 'back'), k (the landing), u (0-1 in the beat) }
+function wbaAt(t) {
+  const c = t && t.chg; if (!c || !c.leap || typeof G === 'undefined' || !G || G.time == null) return null;
+  const e = G.time - c.at; if (e < 0 || e >= c.T) return null;
+  const seg = WBA.hop + WBA.hold, n = c.P.length, sm = q => q * q * (3 - 2 * q), home = t.ang == null ? 0 : t.ang;
+  if (e >= n * seg) {
+    const u = (e - n * seg) / WBA.back, p = c.P[n - 1], f = sm(u);
+    return { x: p.x + (t.x - p.x) * f, z: p.z + (t.y - p.z) * f, h: Math.sin(Math.PI * u) * WBA.Hb, yaw: p.a + wbaTurn(p.a, home) * sm(Math.max(0, (u - .55) / .45)), ph: 'back', k: n - 1, u };
+  }
+  const k = Math.min(n - 1, Math.floor(e / seg)), el = e - k * seg, p = c.P[k], x0 = k ? c.P[k - 1].x : t.x, z0 = k ? c.P[k - 1].z : t.y;
+  if (el >= WBA.hop) return { x: p.x, z: p.z, h: 0, yaw: p.a, ph: 'hold', k, u: (el - WBA.hop) / WBA.hold };
+  const u = el / WBA.hop, f = 1 - (1 - u) * (1 - u), fly = Math.atan2(p.x - x0, p.z - z0);
+  return { x: x0 + (p.x - x0) * f, z: z0 + (p.z - z0) * f, h: Math.sin(Math.PI * u) * WBA.H * (k ? .7 : 1), yaw: fly + wbaTurn(fly, p.a) * sm(Math.max(0, (u - .45) / .55)), ph: 'out', k, u };
+}
+const wbaTurn = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
+if (typeof chargeAt === 'function' && !chargeAt._wba) {
+  const _wbaAt0 = chargeAt;
+  chargeAt = function (t) {
+    const c = t && t.chg; if (!c || !c.leap) return _wbaAt0.apply(this, arguments);
+    const p = wbaAt(t); if (!p) { t.chg = null; return [t.x, t.y, 0]; }
+    return [p.x, p.z, p.ph === 'back' ? 0 : 1];
+  };
+  chargeAt._wba = 1;
+}
+// the body's matrix on a leap: lifted along its arc, turned to face where he flies and then his foe's back, pitched into
+// the dive (drawForceUnitPlain turned it to t.ang, and half a turn more over the second half of a charge)
+const _wbaM = new Float32Array(16);
+if (typeof plainLife === 'function' && !plainLife._wba) {
+  const _wbaLife = plainLife;
+  plainLife = function (t, u, m) {
+    const r = _wbaLife.apply(this, arguments);
+    if (u !== WB_ASN.id) return r;
+    const p = wbaAt(t); if (!p) return r;
+    const c = t.chg, drawn = (t.ang == null ? 0 : t.ang) + ((G.time - c.at) / c.T > .5 ? Math.PI : 0), sy = Math.hypot(m[4], m[5], m[6]) || 1;
+    const pitch = p.ph === 'out' ? .55 * Math.sin(Math.PI * p.u) : p.ph === 'back' ? -.45 * Math.sin(Math.PI * p.u) : .16 * Math.sin(Math.PI * Math.min(1, p.u * 1.6));
+    M4.trs(_wbaM, 0, p.h / sy, 0, wbaTurn(drawn, p.yaw), pitch, 0); M4.mul(m, m, _wbaM);
+    if (typeof LF_M !== 'undefined') { LF_M = m; LF_T = t; }
+    return r;
+  };
+  plainLife._wba = 1;
+}
+
+/* ---------- the strike ---------- */
+FORCE_ATTACK.wbStalk = (t, st, tg, pow, echo) => {
+  if (echo || (t.chg && t.chg.leap && wbaAt(t))) { wbaCut(t, st, tg, pow); return; }   // (an echoed strike, or one asked for mid-leap: a cut where he stands)
+  wbaLeap(t, st, [tg], 'atk', (c, k, s) => {
+    wbaCut(t, s, c, pow);
+    if (wbCap(s, 'wbaUnseen') && wbaAlone(t) && !c.dead) G.delayed.push({ t: .1, fn: () => { if (G.state === 'play' && G.towers.includes(t) && !t.wrecked && !c.dead) { wbaCut(t, t.st || s, c, pow * WBA.unseen); fxSpark(c.x, c.y, hitH(c) + .1, WB_COL.goldL, 4); } } });   // Unseen Hand: a second cut
+  });
+};
+
+/* ---------- Lone Wolf: no other unit within WBA.lone.r cells (walls are not units) ---------- */
+function wbaAlone(t) {
+  if (!t || typeof G === 'undefined' || !G || !G.towers) return false;
+  if (t.wbaLoneAt === G.time) return t.wbaLone;
+  let alone = true;
+  for (const o of G.towers) if (o !== t && o.def && !o.def.wall && !o.wrecked && Math.hypot(o.x - t.x, o.y - t.y) <= WBA.lone.r + .05) { alone = false; break; }
+  t.wbaLoneAt = G.time; return (t.wbaLone = alone);
+}
+// the talents' share of every hit (the amp hook game.js hurt calls): his strikes and spells alike
+if (typeof forceHook === 'function' && !forceHook._wba) {
+  const _wbaFH = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = _wbaFH.apply(this, arguments);
+    if (k === 'amp') {
+      const c = a0, src = a1; if (!c || a2 || !wbaIs(src) || !src.st || !src.st.caps) return r;
+      const C = src.st.caps; let v = 0;
+      if (C.wbaBane && wbaCaster(c)) v += WBA.bane * C.wbaBane;
+      if (C.wbaFinish && c.hp < c.maxHp * WBA.finish.at) v += WBA.finish.per * C.wbaFinish;
+      if (C.wbaLone && wbaAlone(src)) v += WBA.lone.per * C.wbaLone;
+      return v ? (r || 0) + v : r;
+    }
+    if (k === 'kill') {
+      const src = a1; if (!wbaIs(src) || !src.st || !src.st.caps || !src.st.caps.wbaAgain) return r;
+      const c = src.chg, left = c && c.leap ? Math.max(0, c.at + c.T - G.time) + .05 : 0;   // No Oath Unanswered: his next leap as soon as he is home
+      if (src.cd > left) { src.cd = left; if (G.state === 'play') fxSpark(src.x, src.y, towerTop(src), WB_COL.goldL, 3); }
+      return r;
+    }
+    return r;
+  };
+  forceHook._wba = 1;
+}
+if (typeof SPEC_BUFF !== 'undefined') SPEC_BUFF.push(['wba_lone', { who: 'unit', name: 'Lone Wolf', kind: 'buff', pri: 22, icon: 'moon', hue: '#b8902a', f: [],
+  def: 'A talent: with no other unit within 2 cells, her attacks and spells hit harder.',
+  get: t => wbaIs(t) && t.st && t.st.caps && t.st.caps.wbaLone && wbaAlone(t) ? { say: `Attacks and spells hit ${Math.round(WBA.lone.per * t.st.caps.wbaLone * 100)}% harder.` } : null }]);
+
+/* ---------- the kit ---------- */
+// his quarry in reach: walkers, casters first, then as the sort says
+const wbaFoes = (t, st, ab) => abFoes(t, st, abReach(t, st, ab), abWalker);
+const wbaShare = c => c.hp / Math.max(1, c.maxHp);
+const wbaByCaster = (a, b) => (wbaCaster(b) - wbaCaster(a)) || (isRole(b, 'support') - isRole(a, 'support')) || (a.remain - b.remain);
+const WBA_KIT = { slot: 'frost', mana: { max: 110, regen: 1, hit: .6 }, abilities: [
+  { id: 'wb_quietus', name: 'Quietus', short: 'Quietus', glyph: 'skull', hue: '#e8c060', mana: 70, cd: 10, research: null,
+    auto: 'a caster in reach, a foe under 35% health, or a boss or elite',
+    text: (t, st, ab) => `Leaps to the weakest caster in reach, or the weakest foe with none, and cuts it for ${xD(st, WBA.quietus.m)}. A foe under ${abPct(WBA.quietus.low)} health takes ${xD(st, WBA.quietus.lowM)} instead.`,
+    pick(t, st, ab, man) {
+      const L = wbaFoes(t, st, ab); if (!L.length) return null;
+      const cs = L.filter(wbaCaster), from = cs.length ? cs : L, c = from.reduce((b, o) => wbaShare(o) < wbaShare(b) ? o : b);
+      return man || cs.length || wbaShare(c) < WBA.quietus.low || L.some(abBig) ? (cs.length || wbaShare(c) < WBA.quietus.low ? c : abToughest(L)) : null;
+    },
+    cast(t, st, c, ab) {
+      const T = wbaLeap(t, st, [c], ab.id, (o, k, s) => { const low = wbaShare(o) < WBA.quietus.low; wbaCut(t, s, o, low ? WBA.quietus.lowM : WBA.quietus.m); if (low) G.shake = Math.max(G.shake, .05); });
+      t.ab.busyT = G.time + T;
+    } },
+  { id: 'wb_sablestep', name: 'Sable Step', short: 'Step', glyph: 'swords', hue: '#c8a0a0', mana: 80, cd: 12, research: { cost: 70, time: 20 },
+    by: { n: [2, 2, 2, 2, 2, 2] },
+    auto: 'two or more ground foes in reach, or a caster, boss or elite',
+    text: (t, st, ab) => `Steps from foe to foe without touching her post: ${byT(ab.by.n, t)} ground foes in reach, casters first, are each cut for ${xD(st, WBA.step.m)}.`,
+    pick(t, st, ab, man) { const L = wbaFoes(t, st, ab); return L.length && (man || L.length >= 2 || L.some(wbaCaster) || L.some(abBig)) ? L.sort(wbaByCaster).slice(0, Math.max(1, Math.round(byT(ab.by.n, t)))) : null; },
+    cast(t, st, L, ab) {
+      L = (Array.isArray(L) ? L : [L]).filter(c => c && !c.dead); if (!L.length) return false;
+      const T = wbaLeap(t, st, L, ab.id, (o, k, s) => wbaCut(t, s, o, WBA.step.m));
+      t.ab.busyT = G.time + T;
+    } },
+  { id: 'wb_oathhunt', name: "Oathbreakers' Hunt", short: 'Hunt', glyph: 'moon', hue: '#f0c860', mana: 110, cd: 20, research: { cost: 120, time: 30 },
+    by: { n: [3, 3, 4, 4, 5, 5] },
+    auto: 'two or more casters in reach, or three ground foes, or a boss or elite',
+    text: (t, st, ab) => `Hunts every caster in reach in turn, up to ${byT(ab.by.n, t)} foes: each is cut for ${xD(st, WBA.hunt.m)}. With fewer casters than that, the foes nearest your gate make up the count.`,
+    pick(t, st, ab, man) { const L = wbaFoes(t, st, ab), cs = L.filter(wbaCaster).length; return L.length && (man || cs >= 2 || L.length >= 3 || L.some(abBig)) ? L.sort(wbaByCaster).slice(0, Math.max(1, Math.round(byT(ab.by.n, t)))) : null; },
+    cast(t, st, L, ab) {
+      L = (Array.isArray(L) ? L : [L]).filter(c => c && !c.dead); if (!L.length) return false;
+      const T = wbaLeap(t, st, L, ab.id, (o, k, s) => wbaCut(t, s, o, WBA.hunt.m));
+      t.ab.busyT = G.time + T;
+    } },
+] };
+{
+  // the Halberdiers' kit stays under its own id, on no slot
+  if (UNIT_KITS.wb_frostbrand) UNIT_KITS.wb_frostbrand.slot = 'retired';
+  UNIT_KITS[WB_ASN.id] = WBA_KIT;
+  for (const ab of WBA_KIT.abilities) { if (ABIL[ab.id]) console.warn('oathknife: duplicate ability id', ab.id); ab.unit = WB_ASN.id; ABIL[ab.id] = ab; ab.school = ABIL_SCHOOL[ab.id] = 'attack'; }
+  Object.assign(AB_PREF, { wb_quietus: 'cloth', wb_sablestep: 'cloth', wb_oathhunt: 'cloth' });
+  Object.assign(SP_SHAPE, { wb_quietus: 'a', wb_sablestep: 'a h:n', wb_oathhunt: 'a h:n' });
+  // each cast's move lasts as long as its leap (the poses read wbaAt, not the clock)
+  const AT = { wb_quietus: wbaLeapT(1), wb_sablestep: wbaLeapT(2), wb_oathhunt: wbaLeapT(4) };
+  Object.assign(WB_ANIM_T, AT); Object.assign(WB_AT, AT);
+  WB_ABIDS[WB_ASN.id] = WBA_KIT.abilities.map(a => a.id);
+  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { wb_quietus: 0, wb_sablestep: 0, wb_oathhunt: 0 });   // (leaps: instant, as the charges are)
+  // the pace of casting (forces_zz_mana.js): a fresh unit's income pays for its innate spell every MANA_INNATE_EVERY s
+  const m = WBA_KIT.mana, every = typeof MANA_INNATE_EVERY !== 'undefined' ? MANA_INNATE_EVERY : 25, k = WBA_KIT.abilities[0].mana / every / (m.regen + m.hit / WBA.tier0.rate);
+  m.regen = Math.round(m.regen * k * 100) / 100; m.hit = Math.round(m.hit * k * 100) / 100; m.paced = 1;
+  if (typeof WBD_KIND !== 'undefined') WBD_KIND[WB_ASN.id] = 'oath';
+}
+
+/* ---------- the tree ---------- */
+{
+  const F = 'wardbound', one = WB_ASN.one, pc = v => Math.round(v * 100);
+  const tree = { name: 'Oathreckoning', hue: '#c8a0a0', rows: 6, tiers: typeof TAL_TIER6 !== 'undefined' ? TAL_TIER6 : [0, 2, 4, 7, 10, 12], _spread: 1, _ezLaid: true, open: true, list: [
+    /* row I */
+    GT("Oathbreaker's Bane", 'skull', 0, 0, 3, n => `The ${one}'s attacks and spells hit casters ${pc(WBA.bane * n)}% harder.`, {}, { cap: 'wbaBane' }),
+    GT('Whetted Knives', 'sword', 0, 1, 2, '', {}),
+    GT('Hush', 'feather', 0, 2, 2, '', {}),
+    /* row II */
+    GS('wb_sablestep', 1, 1),
+    GT('Keen Quietus', 'target', 1, 3, 2, '', {}),
+    /* row III */
+    GT('Finishing Cut', 'cracked', 2, 0, 2, n => `The ${one}'s attacks and spells hit foes under ${pc(WBA.finish.at)}% health ${pc(WBA.finish.per * n)}% harder.`, {}, { cap: 'wbaFinish' }),
+    GT('Second Shadow', 'quick', 2, 1, 2, '', {}, { req: [1, 1] }),
+    GT('Lone Wolf', 'moon', 2, 2, 2, n => `While no other unit stands within ${WBA.lone.r} cells of the ${one}, her attacks and spells hit ${pc(WBA.lone.per * n)}% harder.`, {}, { cap: 'wbaLone' }),
+    /* row IV */
+    GT('Swift Quietus', 'hourglass', 3, 1, 2, '', {}),
+    GS('wb_oathhunt', 3, 3),
+    GT('Long Stride', 'spyglass', 3, 2, 2, '', {}, { req: [2, 2] }),
+    /* row V */
+    GT('Twin Shadows', 'swords', 4, 0, 2, '', {}),
+    GT('Merciless Hunt', 'skull', 4, 1, 2, '', {}),
+    GT("Hunter's Count", 'stars', 4, 3, 2, '', {}, { req: [3, 3] }),
+    /* row VI: the capstones, one a fantasy */
+    GT('No Oath Unanswered', 'skullbolt', 5, 1, 1, `When the ${one} slays a foe, her next leap comes as soon as she is back at her post.`, {}, { cap: 'wbaAgain' }),
+    GT('Unseen Hand', 'spiral', 5, 2, 1, `While no other unit stands within ${WBA.lone.r} cells of the ${one}, each leap cuts twice: the second cut deals ${pc(WBA.unseen)}%.`, {}, { cap: 'wbaUnseen', req: [3, 2] }),
+  ] };
+  tree.list.forEach((t, i) => { t.id = i; t.req0 = t.req || null; t.rc0 = [t.r, t.c]; t.atkPlain = true; });
+  // the spell talents' open-tree form: Sable Step keeps its arrow from Whetted Knives; the Hunt needs only its row
+  tree.list.find(t => t.spell === 'wb_oathhunt').req = null;
+  const TAG = { "Oathbreaker's Bane": 'Damage', 'Finishing Cut': 'Damage', 'Lone Wolf': 'Damage', 'No Oath Unanswered': 'Damage', 'Unseen Hand': 'Damage' };
+  for (const t of tree.list) t.tag = t.spell ? 'Spell' : TAG[t.name] || t.tag || 'Damage';
+  FORCES[F].talents.frost = tree;
+  spDressTree(tree, 'frost', WB_ASN.id);
+  if (typeof spDepthApply === 'function') spDepthApply(tree, WB_ASN.id);
+  for (const t of tree.list) if (t.spell) t.tag = 'Spell';
+  // the simple passives (forces_..._easy.js): one clear number a rank, WoW wording
+  ezTal(F, 'frost', 'Whetted Knives', 'crit', .04);
+  ezFlav(F, 'frost', 'Hush', 'harvest', 4);
+  ezSpell(F, 'frost', 'Keen Quietus', 'wb_quietus', { pow: .15 });
+  ezSpell(F, 'frost', 'Second Shadow', 'wb_sablestep', { cd: 1.5 });
+  ezSpell(F, 'frost', 'Swift Quietus', 'wb_quietus', { cd: 1 });
+  ezTal(F, 'frost', 'Long Stride', 'reach', .2);
+  ezSpell(F, 'frost', 'Merciless Hunt', 'wb_oathhunt', { pow: .15 });
+  ezSpell(F, 'frost', 'Twin Shadows', 'wb_sablestep', { pow: .2 });
+  ezSpell(F, 'frost', "Hunter's Count", 'wb_oathhunt', { by: { n: 1 } }, v => `hunts ${v} more foe${v > 1 ? 's' : ''}`);
+  if (FORCES[F].talFlavor) FORCES[F].talFlavor.frost = ['Find the oath-breakers behind the line and end them.', 'Every broken oath is answered.'];
+  if (FORCES[F].talEmblem) FORCES[F].talEmblem.frost = tree.list.findIndex(t => t.name === 'Lone Wolf');
+}
+
+/* ---------- the Halberdiers' own items leave the pools (the ids stay, so a save that holds one still loads) ---------- */
+const WBA_RETIRED_ITEMS = ['wbr_rimehook', 'wbl_winterhall', 'fe_wb_rimehalberd', 'fe_wb_ivoryfur', 'fe_wb_frostcrown', 'fe_wb_icetoken'];
+{ const I = FORCES.wardbound.items; if (I) for (const k in I) if (I[k] && typeof I[k].delete === 'function') for (const id of WBA_RETIRED_ITEMS) I[k].delete(id); }
+// (their two legendary weapons, wl_winterhall and wl_rimeline, are the old unit id's: no unit draws them now)
+
+/* ---------- the body: lean, hooded and veiled, oxblood over sable leather, a long gold-runed knife in each hand ---------- */
+WBP[WB_ASN.id] = wbPal({ plate: '#2a2228', plateD: '#17121a', plateL: '#4a3c44', hood: '#3a0f17', hoodD: '#240a0f', cloak: '#30101a', cloakIn: '#18060a', cloth: '#1a1418', leather: '#2e2018', veil: '#120e12',
+  skin: '#c89a7c', beard: '#241a18', blade: '#c8ccd6', bladeD: '#7c8090', glow: '#ffd870', trim: '#d8a840', trimD: '#a07a2c' });
+UNIT_PAL[WB_ASN.id] = {};
+WB_HAND.knife = [0, -.15, .17];
+WB_ANCH[WB_ASN.id] = [.6, .75];
+function wbaBody(g, tier, P) {
+  const b = .88, y0 = .42, sy = y0 + .2, hy = y0 + .35, ky = .26 * y0 / .44;
+  // legs in dark leather, a half step apart: the left a little forward, ready to spring
+  huHips(g, y0, { col: P.plateD, waist: .085 * b, w: b });
+  for (const sd of [-1, 1]) huLeg(g, [sd * .056 * b, y0 - .1, 0], [sd * .078 * b, ky, sd < 0 ? .05 : .0], [sd * .092 * b, .085, sd < 0 ? .045 : -.04], { plate: true, thigh: P.plateD, shin: P.plate, light: P.plateL, boot: P.plateD, w: .95 * b });
+  // a short split tunic, gold at the hem
+  huRobe(g, y0 - .01, .27, .095 * b, .14 * b, { col: P.cloth, hem: P.trimD, folds: 6, amp: .05, trail: .03, rows: 2 });
+  huTorso(g, y0, { mat: 'leafmail', col: P.plate, colL: P.plateL, waist: .082 * b, chest: .124 * b, sh: .112 * b, keel: null });
+  huBelt(g, y0 - .03, .094 * b, P.leather, P.trim, { sz: 1.1 });
+  // two baldrics crossed on the chest, a gold sun-wheel where they meet, three throwing knives on the left one
+  mat(g, 'leather', () => { for (const sd of [-1, 1]) huTube(g, [[sd * .1 * b, sy - .01, .05], [0, y0 + .08, .118 * b], [-sd * .09 * b, y0 - .01, .07]], .011, P.leather, 4); });
+  wbSunWheel(g, 0, y0 + .08, .124 * b, .022 + .003 * tier, P.trim, .3);
+  mat(g, 'gilt', () => { for (let k = 0; k < 3; k++) g.with(T(-.055 + k * .022, y0 + .125 - k * .03, .112 * b - k * .006, 0, 0, .5), () => g.box(0, 0, 0, .008, .04, .006, P.blade)); });
+  // one dark pauldron on the left shoulder (the knife arm is free), a gold rosette on it
+  mat(g, 'gilt', () => huPauldron(g, -1, -.128 * b, sy + .008, .058 + .005 * tier, 2, P.plate, P.plateD, { trim: P.trim }));
+  g.em = .2; mat(g, 'gilt', () => wbRosette(g, [-.145 * b, sy + .052, .005], [-.55, 1, 0], .026 + .003 * tier, P.trim)); g.em = 0;
+  // a half-cape off the left shoulder, oxblood, short enough to clear the legs; two long tails of the hood's scarf behind
+  { const v0 = g.p.length / 3;
+    huCape(g, sy + .005, .26, .1 * b, .17 * b, { arc: 1.05, col: P.cloak, colD: wbDk(P.cloak, .78), colIn: P.cloakIn, z: -.03, sz: .86, folds: 3, amp: .09, rows: 3, n: 6, clear: y => y > sy - .05 ? [.2 * b, .14 * b] : [.16 * b, .14 * b], sway: 0 });
+    mat(g, 'cloth', () => { for (const sd of [-1, 1]) huTube(g, [[sd * .03, hy - .03, -.07], [sd * .05, sy - .04, -.13], [sd * .075, y0 + .02, -.17], [sd * .1, y0 - .13 - .02 * tier, -.2]], [.02, .024, .02, .008], sd < 0 ? P.hood : P.hoodD, 4, { flat: .35 }); });
+    g.em = .25; mat(g, 'gilt', () => { for (const sd of [-1, 1]) g.ico(sd * .1, y0 - .13 - .02 * tier, -.2, .012, P.trim); }); g.em = 0;
+    huSway(g, v0, sy + .005, .9); }
+  // the neck, then the head: a bare brow and eyes over a dark veil, under a deep oxblood hood with a gold rim
+  mat(g, 'cloth', () => huLathe(g, 0, sy - .03, -.008, [[.092 * b, 0], [.122 * b, .035], [.108 * b, .07], [.07 * b, .09]], 12, P.hoodD, { sz: .9, fold: [6, .08] }));
+  mat(g, 'gilt', () => huTube(g, [[0, sy - .03, 0], [0, sy + .055, .004]], [.046 * b, .04 * b], P.plateD, 6, { capA: false }));
+  const HS = 1.14; g.push(T(0, hy, 0, 0, 0, 0, HS)); g.push(T(0, -hy, 0));
+  huFace(g, [0, hy - .004, .012], .076, { skin: P.skin, brow: P.beard, jaw: .95, eye: '#2a2a30' });
+  mat(g, 'cloth', () => g.sphere(0, hy - .026, .034, .074, .058, .068, 10, 6, P.veil));   // the veil, from under his eyes down over mouth and jaw
+  huHood(g, [0, hy + .010, -.012], .096, { col: P.hood, colIn: wbDk(P.hood, .3), open: .62, peak: .012, cowl: .6, drop: 1.35, edgeIn: true, rim: P.trim, rimW: .006 });   // (low and close, no point: the hub's review of the first hood)
+  g.pop(); g.pop();
+}
+// a long knife in its hand's frame, the blade out along +z from the fist: a gold guard, a pale blade, gold runes down it
+function wbaKnife(g, tier, P, H) {
+  const L = .27 + .025 * tier, d = huNorm([0, .12, 1]), at = k => [H[0] + d[0] * k, H[1] + d[1] * k, H[2] + d[2] * k];
+  mat(g, 'leather', () => huTube(g, [at(-.065), at(.02)], .012, P.leather, 5));
+  mat(g, 'gilt', () => { g.ico(...at(-.075), .015, P.trim, .1); huTube(g, [[H[0] - .042, at(.028)[1], at(.028)[2]], [H[0] + .042, at(.028)[1], at(.028)[2]]], .009, P.trim, 4); });
+  mat(g, 'gilt', () => huTube(g, [at(.035), at(.035 + L * .7), at(.035 + L)], [.021, .017, 0], P.blade, 4, { flat: .22 }));
+  g.em = .9; for (let k = 0; k < 3 + tier; k++) { const p = at(.08 + k * (L - .1) / (3 + tier)); g.box(p[0], p[1] + .001, p[2], .004, .004, k % 2 ? .028 : .014, P.glow); } g.em = 0;
+}
+FORCE_BUILD[WB_ASN.id] = function (g, tier) { const P = WBP[WB_ASN.id]; wbGrow(g, tier, () => wbaBody(g, tier, P)); };
+if (typeof WB_MODEL_UNITS !== 'undefined' && !WB_MODEL_UNITS.includes(WB_ASN.id)) WB_MODEL_UNITS.push(WB_ASN.id);
+
+// both arms: [right, left], each [rx, ry, rz]. rx < 0 lifts the arm forward and up, > 0 sweeps it back; ry turns it in
+// (right: < 0 across the chest). At rest the knives hang low and wide, tips forward, and drift with his breath.
+function wbaPose(t) {
+  const n = wbNow() * 1.9 + (t.anim || 0) * 4, br = Math.sin(n), w = lfE(t.windup || 0), p = wbaAt(t);
+  let Rr = [.18 + .04 * br, .34, 0], Ll = [.22 - .04 * br, -.38, 0];
+  if (w > 0 && !p) { Rr = wbMix(Rr, [.95, .5, 0], w); Ll = wbMix(Ll, [.8, -.55, 0], w); }   // the wind-up: both knives drawn back, low, as he crouches
+  if (!p) return [Rr, Ll];
+  const kind = t.chg.kind, e = lfE(p.u);
+  if (p.ph === 'out') {   // in the air: the knives swept back like wings, then the right one raised for the cut as he comes down
+    const up = lfE(Math.max(0, (p.u - .5) / .5));
+    Rr = wbMix([1.15, .55, 0], kind === 'wb_quietus' ? [-2.3, -.1, 0] : [-1.75, .1, 0], up);
+    Ll = wbMix([1.15, -.55, 0], kind === 'wb_quietus' ? [-2.3, .1, 0] : [.5, -.7, 0], up);
+  } else if (p.ph === 'hold') {   // the cut from behind: the right knife driven down and in; Quietus plunges both; the steps slash across, hand to hand
+    const dn = lfE(Math.min(1, p.u / .35)), odd = p.k % 2 === 1;
+    if (kind === 'wb_quietus') { Rr = wbMix([-2.3, -.1, 0], [-.55, -.22, 0], dn); Ll = wbMix([-2.3, .1, 0], [-.55, .22, 0], dn); }
+    else if (kind === 'atk') { Rr = wbMix([-1.75, .1, 0], [-.5, -.3, 0], dn); Ll = wbMix([.5, -.7, 0], [.1, -.2, 0], dn); }
+    else if (odd) { Ll = wbMix([-1.2, -.9, 0], [-.7, .8, 0], dn); Rr = [.5, .7, 0]; }
+    else { Rr = wbMix([-1.2, .9, 0], [-.7, -.8, 0], dn); Ll = [.5, -.7, 0]; }
+  } else {   // springing back: both knives crossed before him, opening to rest as he lands
+    const open = lfE(Math.max(0, (p.u - .6) / .4));
+    Rr = wbMix([-.75, -.75, 0], Rr, open); Ll = wbMix([-.75, .75, 0], Ll, open);
+  }
+  return [Rr, Ll];
+}
+FORCE_PARTS[WB_ASN.id] = [
+  wbPart([.128, WB_SH - .035, .01], 'bladeR', (g, tier) => { const P = WBP[WB_ASN.id], H = WB_HAND.knife; wbArm1(g, P, H, { w: .027, cloth: P.cloth }); wbaKnife(g, tier, P, H); }, t => wbaPose(t)[0]),
+  wbPart([-.128, WB_SH - .035, .01], 'bladeL', (g, tier) => { const P = WBP[WB_ASN.id], H = WB_HAND.knife; wbArm1(g, P, [-H[0], H[1], H[2]], { w: .027, cloth: P.cloth }); wbaKnife(g, tier, P, [-H[0], H[1], H[2]]); }, t => wbaPose(t)[1]),
+];
+// what he draws live: his flagstone, which stays at the post while he is away; the knives' rune light; a thin gold streak
+// behind each flight; his regalia at IV-VI
+const _wbaB = new Float32Array(16);
+FORCE_EXTRA[WB_ASN.id] = function (t, tier, x, z, yaw, K) {
+  const s = wbS3(Math.min(t.tier | 0, 2));
+  if (typeof OK2 !== 'undefined' && OK2.S.on && OK2.mesh && (typeof NEWMODELS === 'undefined' || NEWMODELS)) {   // the sculpted body draws its own flagstone, streak and glint (unitmodels_oathknife2.js): only his regalia here, at the post
+    const leap = !(typeof inIcon !== 'undefined' && inIcon) && typeof G !== 'undefined' && G && G.time != null && wbaAt(t);
+    if (!leap && (t.tier | 0) >= 3) { M4.trs(_wbaB, t.x, 0, t.y, yaw, 0, 0, K); item(dynMesh('wbreg_' + WB_ASN.id + Math.min(t.tier | 0, 4), g => wbRegalia(g, WB_ASN.id, Math.min(t.tier | 0, 4) - 2)), _wbaB); }
+    return;
+  }
+  M4.trs(_wbaB, t.x, 0, t.y, t.ang == null ? 0 : 0, 0, 0, K * s); item(dynMesh('wba_base', g => wbBase(g, .27)), _wbaB);
+  const live = !(typeof inIcon !== 'undefined' && inIcon) && typeof G !== 'undefined' && G && G.time != null, p = live ? wbaAt(t) : null;
+  if (!p && (t.tier | 0) >= 3) { M4.trs(_wbaB, x, 0, z, yaw, 0, 0, K); item(dynMesh('wbreg_' + WB_ASN.id + Math.min(t.tier | 0, 4), g => wbRegalia(g, WB_ASN.id, Math.min(t.tier | 0, 4) - 2)), _wbaB); }   // (the banner waits at the post while he leaps)
+  if (!live) return;
+  const pulse = .75 + .25 * Math.sin(wbNow() * 2.4 + (t.anim || 0) * 5), hot = p ? (p.ph === 'hold' ? 1 : .6) : lfE(t.windup || 0) * .5;
+  for (const k of ['bladeR', 'bladeL']) { const H = WB_HAND.knife, sd = k === 'bladeR' ? 1 : -1; wbGlow(wbPartAt(t, k, [sd * H[0], H[1] + .03, H[2] + .2], K, x, z, yaw), .09 + .1 * hot, WB_GOLDC, (.16 + .5 * hot) * pulse); }
+  // a thin dark-gold streak behind each flight (where he was a few frames ago): the only effect his leaps and spells draw
+  const L = t._wbaTrail || (t._wbaTrail = []);
+  if (p && p.ph !== 'hold' && G.state === 'play') { L.push([p.x, p.h + .5 * K * s, p.z, G.time]); while (L.length > 5) L.shift(); } else if (L.length && G.time - L[L.length - 1][3] > .12) L.length = 0;
+  for (let i = 1; i < L.length; i++) { const a0 = L[i - 1], a1 = L[i], f = Math.max(0, 1 - (G.time - a1[3]) / .18); if (f > 0) QADD.beam(RD, [a0[0], a0[1], a0[2]], [a1[0], a1[1], a1[2]], .05, [.75, .5, .16, .26 * f]); }
+};
+
 /* ================= Talents name their unit, never "it" (owner, 26 Nov 2026: "dont refer to them as \"it\"") =================
    The last word on every force unit's and Champion's talent text: it runs after every other talent file, wraps each
    talent's pro() once, and rewrites the rendered line so "its range" reads "the Seedcaster's range" and "gives it 6 mana"
@@ -63953,7 +64350,7 @@ const UN_ONE = {
   ironhold: { glaive: 'Ironbreaker', arrow: 'Thundergun', frost: 'Chain Trapper', arcane: 'Anvilwright', storm: 'Flak Cannoneer', earth: 'Steam Hammer', cannon: 'Mortar Crew', venom: 'Siege Breaker' },
   silver: { glaive: 'Oathsworn', arrow: 'Silverbolt', frost: 'Lightbinder', arcane: 'Grail Knight', storm: 'Sunlance Cleric', earth: 'Templar', cannon: 'Censer Bearer', venom: 'Inquisitor' },
   stormborn: { glaive: 'Wolfguard', arrow: 'Windrunner', frost: 'Hail Shaman', arcane: 'Spirit Walker', storm: 'Thunder Caller', earth: 'Earthbinder', cannon: 'Cloud Dancer', venom: 'Skyhunter' },
-  wardbound: { glaive: 'Oathbound', arrow: 'Glaive Warden', frost: 'Halberdier', arcane: 'Runecarver', storm: 'Sable Lancer', earth: 'Stoneguard', cannon: 'Ballista', venom: 'Chaplain' },
+  wardbound: { glaive: 'Oathbound', arrow: 'Glaive Warden', frost: WB_ASN.one, arcane: 'Runecarver', storm: 'Sable Lancer', earth: 'Stoneguard', cannon: 'Ballista', venom: 'Chaplain' },
 };
 const UN_GEN = [
   [/\bIncreases its /g, 'Increases {the}\'s '],
@@ -64331,6 +64728,7 @@ const SFX_R = {};
     wb_runevolley: T('shaft', 'strike', 'none', 'nova', 1),
     wb_piercingshaft: T('shaft', 'strike', 'line', 'burst', 2, { len: 3 }),
     wb_wardarrow: T('shaft', 'strike', 'fall', 'pillar', 3),
+    wb_quietus: T('steel', 'none', 'none', 'none', 1), wb_sablestep: T('steel', 'none', 'none', 'none', 2), wb_oathhunt: T('steel', 'none', 'none', 'none', 3),   // (the Oathknives: no flash at all; a thin streak behind each leap is drawn with the unit: owner, effects never hide units or foes)
     wb_rimeline: T('frost', 'strike', 'line', 'nova', 1, { spike: 1, len: 2.4 }),
     wb_frostbite: T('frost', 'strike', 'none', 'nova', 2, { self: 1, spike: 1 }),
     wb_winterward: T('frost', 'glyph', 'none', 'buff', 3, { self: 1 }),
@@ -127178,7 +127576,7 @@ const SWING_UNITS = {
   // the Stormborn
   sb_wolfguard: 'spear',
   // the Wardbound
-  wb_oathbound: 'cut', ch_varic: 'cut', wb_frostbrand: 'fast', wb_stormward: 'spear', wb_anvilguard: 'heavy', wb_vowkeeper: 'fast',
+  wb_oathbound: 'cut', ch_varic: 'cut', wb_frostbrand: 'fast', wb_oathknife: 'fast', wb_stormward: 'spear', wb_anvilguard: 'heavy', wb_vowkeeper: 'fast',
   ch_isaura: 'fast', ch_aedric: 'spear',
 };
 const SWING_BLADE = { fast: 1, cut: 1 };
@@ -130765,7 +131163,7 @@ function rgArmiesHTML(R) {
   if (!R.war) return '';
   const W = R.war, A = rgArmies(R);
   const plan = a => { const P = RG_PLAN[a.plan ? a.plan.k : 'hold'] || RG_PLAN.hold, to = a.plan && a.plan.to && rgNode(R, a.plan.to); return a.plan && (a.plan.k === 'pursue' || a.plan.k === 'muster') ? P[2] : `${P[2]} ${to ? to.name : ''}`; };
-  return `<section class="rg-armies" aria-label="The warlord's armies"><h4>The warlord’s armies <small>${RG_STANCE[W.stance]}</small></h4><ul>${A.map(a => `<li class="${a.main ? 'main' : ''}"><button type="button" class="rg-arm" data-at="${a.at}"><i aria-hidden="true">${(RG_PLAN[a.plan ? a.plan.k : 'hold'] || RG_PLAN.hold)[1]}</i><b>${rgEsc(a.name)}</b><span class="rg-apw" aria-label="${rgPipW(a.pips)}">${'◆'.repeat(a.pips)}</span><small>${rgEsc(rgFamName(a.fam))} · at ${rgEsc(rgNode(R, a.at).name)} · ${rgEsc(plan(a))}${a.next ? ` · next ${rgEsc(rgNode(R, a.next).name)}` : ''}</small></button></li>`).join('')}</ul><p class="rg-res">Lair: ${W.reserve | 0} mustered · ${W.lost | 0} pips destroyed for good${Object.keys(W.gar).length ? ` · garrisons on ${Object.keys(W.gar).length} places` : ''}</p></section>`;
+  return `<details class="rg-armies" aria-label="The warlord's armies"><summary><h4>The warlord’s armies <small>${A.length} · ${RG_STANCE[W.stance]}</small></h4></summary><ul>${A.map(a => `<li class="${a.main ? 'main' : ''}"><button type="button" class="rg-arm" data-at="${a.at}"><i aria-hidden="true">${(RG_PLAN[a.plan ? a.plan.k : 'hold'] || RG_PLAN.hold)[1]}</i><b>${rgEsc(a.name)}</b><span class="rg-apw" aria-label="${rgPipW(a.pips)}">${'◆'.repeat(a.pips)}</span><small>${rgEsc(rgFamName(a.fam))} · at ${rgEsc(rgNode(R, a.at).name)} · ${rgEsc(plan(a))}${a.next ? ` · next ${rgEsc(rgNode(R, a.next).name)}` : ''}</small></button></li>`).join('')}</ul><p class="rg-res">Lair: ${W.reserve | 0} mustered · ${W.lost | 0} pips destroyed for good${Object.keys(W.gar).length ? ` · garrisons on ${Object.keys(W.gar).length} places` : ''}</p></details>`;
 }
 function rgLossLines(R, S) {
   if (S.kind === 'waylay') return ['the lives you lose', `thrown back to ${rgNode(R, S.from).name}`];
@@ -130785,9 +131183,11 @@ function rgBattleHead(R, S, noGold) {
 }
 // the reward and the start gold
 function rgBattleGold(R, S) {
-  const grown = (S.kind === 'trouble' || S.kind === 'defend') && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0;
-  return `<p class="rg-reward">Reward <b>${S.reward} gold</b>${grown ? ` <small>(+${grown}% for the warlord's ${rgPipW(S.g)} there)</small>` : ''}</p>
-    ${(() => { const SG = rgStartGold(R, S); return `<p class="rg-gold">${SG.maze ? 'Your maze + ' : 'Start gold '}<b>${SG.base + SG.gap + (R.supply | 0) + (S.town ? S.town.gold : 0)} gold</b>${R.supply ? ` <small>(+${R.supply} supplies from your land)</small>` : ''}${S.town ? ` <small>(+${S.town.gold} from the town's stores)</small>` : ''}${SG.gap ? ` <small>(+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`}${S.w0 - 1 - SG.w > RG_GAP.free ? `: ${Math.round(RG_GAP.k * 100)}% past the first ${RG_GAP.free}, a leap ahead` : ''})</small>` : ''}</p>`; })()}`;
+  const grown = (S.kind === 'trouble' || S.kind === 'defend') && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0, SG = rgStartGold(R, S);
+  const start = SG.base + SG.gap + (R.supply | 0) + (S.town ? S.town.gold : 0), why = [];
+  if (SG.maze) why.push(`your maze's ${SG.base} gold`); if (SG.gap) why.push(`+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`}${S.w0 - 1 - SG.w > RG_GAP.free ? ` (${Math.round(RG_GAP.k * 100)}% past the first ${RG_GAP.free}, a leap ahead)` : ''}`);
+  if (R.supply) why.push(`+${R.supply} supplies from your land`); if (S.town) why.push(`+${S.town.gold} from the town's stores`);
+  return `<p class="rg-reward"><span${grown ? ` title="+${grown}% for the warlord's ${rgPipW(S.g)} there"` : ''}>Reward <b>${S.reward}</b></span> · <span class="rg-gold"${why.length ? ` title="${rgEsc(why.join(', '))}"` : ''}>${SG.maze ? 'Maze + ' : 'Start '}<b>${start} gold</b></span></p>`;
 }
 function rgBattleMore(R, S) {
   const F = S.fam && CAMP_FAMILIES[S.fam];
@@ -130836,7 +131236,7 @@ function rgNodeHTML(R, id) {
   // Overview: how hard, the reward and start gold, the one big button, the town's services, the rest behind Details.
   // Encounters & drops: the foes' portrait cards (the boss first), a few plain lines, and the boss's own loot (rgLootMore: the
   // boss's table and themed weapons only, never the shared table every foe rolls on).
-  // The one big button is under both tabs, held at the card's foot (owner, 27 Nov 2026: "dont like the free the town call to
+  // The one big button is in one place, above both tabs (owner, 27 Nov 2026: "just have the button in one spot above both tabs"; before that, 27 Nov 2026: "dont like the free the town call to
   // action button being in a tab, when looking at items i couldnt figure out where it was")
   const E = S && typeof rgEncParts === 'function' ? rgEncParts(R, S) : null;
   const ban = rgPlaceBanner(id, n.name, E ? E.img : '', state, E && E.field), hd = ban || `<h3><span>${state}</span>${rgEsc(n.name)}</h3>`;
@@ -130847,10 +131247,10 @@ function rgNodeHTML(R, id) {
     : `<div class="rg-empty"><b>${st.s === 'held' ? `${rgEsc(n.name)} is yours` : 'Nothing to scout'}</b><p>${st.s === 'held' ? (n.kind === 'town' ? 'No foes here: rest and re-spec, then march on.' : 'Its trouble is settled and patrolled out: no foes left here.') : 'No battle here.'}</p></div>`;
   const tab = (k, t) => `<button type="button" role="tab" class="rg-tab" id="rgTab-${k}" data-tab="${k}" aria-controls="rgPan-${k}" aria-selected="${rgTab === k}" tabindex="${rgTab === k ? 0 : -1}">${t}</button>`;
   return `<section class="cm-loc rg-card rg-place" data-place="${rgEsc(id)}">${hd}
+    <div class="rg-cta">${btn}</div>
     <div class="rg-tabs" role="tablist" aria-label="${rgEsc(n.name)}">${tab('ov', 'Overview')}${tab('enc', 'Encounters &amp; drops')}</div>
     <div class="rg-pan" id="rgPan-ov" role="tabpanel" aria-labelledby="rgTab-ov"${rgTab === 'ov' ? '' : ' hidden'}>${ovw}<details class="rg-more"><summary>Details</summary>${more}</details></div>
-    <div class="rg-pan" id="rgPan-enc" role="tabpanel" aria-labelledby="rgTab-enc"${rgTab === 'enc' ? '' : ' hidden'}>${enc}</div>
-    <div class="rg-cta">${btn}</div></section>`;
+    <div class="rg-pan" id="rgPan-enc" role="tabpanel" aria-labelledby="rgTab-enc"${rgTab === 'enc' ? '' : ' hidden'}>${enc}</div></section>`;
 }
 // a place's banner (owner, 26 Nov 2026: their own paintings of the places, tools/make_placeart.py): its painting when it has one,
 // else its field's still (a battle place's), with its name over it. A painting not yet here is fetched (its own lazy asset,
@@ -130888,8 +131288,8 @@ function rgBandHTML(R) {
   const h = HERO_BY[R.hero], B = R.band, lv = B && B.raised ? xpLevelOf(B.xp || 0) : 1, W = R.war || { turn: 0, stance: 'watchful' };
   return `<section class="cm-band"><img class="cm-face" alt="" src="${rgFace(h)}"><div class="cm-bi"><h3>${rgEsc(h.name)}<small>${rgEsc(FORCES[R.force].name)}${R.hard ? ' · Hardcore' : ''}</small></h3>
     <p class="cm-stats"><span><b>${R.lives}<small>/${RG_LIVES}</small></b>Lives</span><span><b>${R.chest}</b>War chest</span><span><b>${lv}</b>Level</span><span><b>${B && B.raised ? B.loot.length : 0}</b>Items</span><span><b>${rgSettled(R)}</b>Settled</span></p></div>
-    ${(() => { const I = rgWarIncome(R); return `<p class="cm-at rg-inc" title="${rgEsc(I.parts.map(p => `${p[0]}: +${p[1]}`).join(' · ') || 'No land yet')}"><span>Supplies <b>+${I.total}</b> a turn</span><span><b>${R.supply | 0}</b> gold ready for your next battle</span></p>`; })()}<p class="rg-prep"><button type="button" class="btn ghost rg-sec" id="rgPrep">Prepare: talents<small>change them freely between battles</small></button></p>
-    <p class="cm-at" title="Every march or battle is a turn: then each of the warlord's armies takes a road step."><span>Turn <b>${W.turn}</b></span><span>The warlord <b>${RG_STANCE[W.stance] || 'Watchful'}</b>${R.war ? ` · <b>${rgWarTotal(R)}</b> pips` : ''}</span></p></section>${rgArmiesHTML(R)}`;
+    ${(() => { const I = rgWarIncome(R), why = I.parts.map(p => `${p[0]}: +${p[1]}`).join(' · ') || 'No land yet'; return `<p class="cm-at rg-inc"><span title="Every march or battle is a turn: then each of the warlord's armies takes a road step.">Turn <b>${W.turn}</b> · warlord <b>${RG_STANCE[W.stance] || 'Watchful'}</b>${R.war ? ` <b>${rgWarTotal(R)}</b> pips` : ''}</span><span title="Supplies a turn from your land (${rgEsc(why)}), banked for your next battle's start gold">Supplies <b>+${I.total}</b>/turn · <b>${R.supply | 0}</b> banked</span></p>`; })()}</section>
+    <div class="rg-prepbar"><button type="button" class="btn ghost rg-sec" id="rgPrep">Talents<small>change freely here</small></button><!--rgprep--></div>`;
 }
 function rgResumeHTML(R) {
   const has = savesGet().some(x => x.id === R.battle.runId);
@@ -131006,7 +131406,7 @@ function rgOpen(force) {
       ${rgLegendHTML()}
       <p class="rg-hint">Select a place to see it. Double-click or double-tap to march. Arrow keys move between places.</p></section>
     <aside class="cm-side">${rgBandHTML(R)}${side}
-    ${RG_HOW}
+    ${rgArmiesHTML(R)}
     <details class="rg-log"><summary>The march so far${R.log[0] ? `: <span>${rgEsc(R.log[0])}</span>` : ''}</summary><ul>${R.log.slice(0, 14).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></details></aside></div>
     <footer class="cm-ft">${rgForceTabs(force)}<button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign rg-ov');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
@@ -132217,7 +132617,8 @@ if (typeof rgBandHTML === 'function') {
     const h = _bh.apply(this, arguments);
     if (!fgOn() || !R || !R.band || !R.band.raised || R.battle || R.over || R.done) return h;
     const n = R.band.loot.filter(fgOk).length;
-    return h + `<button type="button" class="btn ghost rg-sec fg-mapb" id="fgOpenB"><i class="fg-gem" aria-hidden="true"></i>The Forge<small>${R.shards | 0} shards · ${n} item${n === 1 ? '' : 's'} in the bag · break down, reforge, combine</small></button>`;
+    const btn = `<button type="button" class="btn ghost rg-sec fg-mapb" id="fgOpenB"><i class="fg-gem" aria-hidden="true"></i>The Forge<small>${R.shards | 0} shards · ${n} item${n === 1 ? '' : 's'}</small></button>`;
+    return h.includes('<!--rgprep-->') ? h.replace('<!--rgprep-->', btn) : h + btn;   // (beside Talents under the host's card: the map's one place to prepare)
   };
 }
 if (typeof rgOpen === 'function') {
@@ -133155,6 +133556,10 @@ const SPELL_HELP = {
   wb_rimeline: { when: "A ground foe within {reach} cells with another ground foe within 1.5 cells of it, or a boss or elite.", aim: "The densest spot of ground foes: the line runs along the road from there.", tips: ["Post Gatewatch Halberdiers beside a long stretch of road: the line rimes four cells of it.", "Its frost runes set up Frostbite and Winter Ward.", "Each frost rune slows the foes it springs on and Exposes them."] },
   wb_frostbite: { when: "Two or more Exposed or frost-slowed ground foes within {reach} cells, or one boss or elite.", aim: "Every Exposed or frost-slowed ground foe in reach.", tips: ["Cast it after Rimeline or a Halberdier sweep: everything in reach is already slowed by frost.", "Stunned foes stand still, so the units round them strike freely.", "Bosses are stunned only briefly: use it to stop the escort round one."] },
   wb_winterward: { when: "Two or more ground foes within {reach} cells with a frost rune within 3 cells of the unit, or a boss or elite.", aim: "Itself: the frost runes within 3 cells stun the first foe that steps on each in ice.", tips: ["Lay frost runes first with Rimeline: each one stuns a foe in ice.", "Post Gatewatch Halberdiers where the road passes its post twice: twice the runes in its ward.", "A ground foe stunned in ice is struck again and again by the units round it."] },
+  // Oathknives (wb_oathknife)
+  wb_quietus: { when: "A caster within {reach} cells, a ground foe under 35% health, or a boss or elite.", aim: "The caster with the least health left; with no caster, the foe nearest death.", tips: ["Post her where the casters walk behind the front line: she leaps over it to them.", "A foe under 35% health takes nearly twice the cut: let other units wear a big foe down first.", "Finishing Cut and Oathbreaker's Bane both add to it."] },
+  wb_sablestep: { when: "Two or more ground foes within {reach} cells, or a caster, boss or elite.", aim: "Two ground foes, casters first, then the foes nearest your gate.", tips: ["She does not touch her post between the two cuts, so both land within half a second.", "Its reach is her own range: Long Stride lets her find a second caster."] },
+  wb_oathhunt: { when: "Two or more casters within {reach} cells, or three ground foes, or a boss or elite.", aim: "Every caster in reach in turn, then the foes nearest your gate, up to its count.", tips: ["Save it for the waves with a knot of casters: it cuts each one once.", "Hunter's Count adds foes to the hunt; a higher tier adds more."] },
   // Runecarvers (wb_runecarver)
   wb_etch: { when: "Two or more foes within {reach} cells (flyers too), or a boss or elite.", aim: "The toughest foes in reach, bosses and elites first.", tips: ["Carve the boss: three marks on it make the Runecarvers' next strike burst it.", "Follow it with Detonate: two marks each is a full burst on every foe it carved.", "Marks carved into flyers burst as hard: the Runecarvers reach the sky."] },
   wb_detonate: { when: "Two or more marked foes within {reach} cells, four or more marks among them, or a marked boss or elite.", aim: "Every marked foe in reach.", tips: ["Cast it right after Etch: every marked foe bursts at once.", "Each burst strikes the foes round it too: mark a crowd and blow it apart.", "Exposed foes take more from it: let them spring a rune first."] },
@@ -133422,7 +133827,7 @@ const FC_ROLE = {
   cc_spellblade: 'Ward cutter', cc_mageling: 'Single target', cc_rimeweaver: 'Control', cc_chronomancer: 'Support', cc_astrologer: 'Anti-air', cc_golemwarden: 'Line holder', cc_pyroclast: 'Splash', cc_severer: 'Ward breaker',
   ironbreaker: 'Line holder', thundergun: 'Boss killer', chaintrapper: 'Control', runesmith: 'Support', flakgunner: 'Anti-air', steamhammer: 'Crowd clearer', mortarcrew: 'Splash', siegebreaker: 'Armour breaker',
   sb_wolfguard: 'Line holder', sb_windrunner: 'Single target', sb_hailshaman: 'Control', sb_spiritwalker: 'Boss killer', sb_thundercaller: 'Chain damage', sb_earthbinder: 'Crowd clearer', sb_clouddancer: 'Splash', sb_skyhunter: 'Flyer hunter',
-  wb_oathbound: 'Line holder', wb_maskedwarden: 'Single target', wb_frostbrand: 'Control', wb_runecarver: 'Boss killer', wb_stormward: 'Chain damage', wb_anvilguard: 'Crowd clearer', wb_siegewarden: 'Splash', wb_vowkeeper: 'Support',
+  wb_oathbound: 'Line holder', wb_maskedwarden: 'Single target', wb_frostbrand: 'Control', wb_oathknife: 'Caster killer', wb_runecarver: 'Boss killer', wb_stormward: 'Chain damage', wb_anvilguard: 'Crowd clearer', wb_siegewarden: 'Splash', wb_vowkeeper: 'Support',
 };
 const FC_SLOT_ROLE = { glaive: 'Line holder', arrow: 'Single target', frost: 'Control', arcane: 'Boss killer', storm: 'Anti-air', earth: 'Crowd clearer', cannon: 'Splash', venom: 'Specialist', holy: 'Champion', wall: 'Maze wall' };
 const FC_ROLE_SAY = {
@@ -139506,7 +139911,7 @@ function spellAreaAudit(o) {
    40 bones x 3-6 small rotations a unit. Anchors the unit wrote for effects this frame (t.tipW ...) are not moved: the
    layer keeps clear of the hands while a strike or a cast plays. Off: ?react=0, or UNITREACT.on = false.
    Console: UNITREACT.cheer() (every unit cheers now), UNITREACT.flinch(k) (the selected or every unit), UNITREACT.kinds(). */
-const RX_OWN_HIT = new Set(['ch_morrow', 'ch_brannoc', 'cc_golemwarden', 'censer', 'sb_clouddancer', 'sb_earthbinder', 'flakgunner', 'grailknight', 'sb_hailshaman', 'ch_hrolf', 'lightbinder', 'oathsworn', 'silverbolt', 'sb_spiritwalker', 'staglancer', 'sunlance', 'templar', 'sb_thundercaller', 'ch_torvald', 'sb_windrunner', 'sb_wolfguard', 'wb_maskedwarden']);
+const RX_OWN_HIT = new Set(['wb_oathknife', 'ch_morrow', 'ch_brannoc', 'cc_golemwarden', 'censer', 'sb_clouddancer', 'sb_earthbinder', 'flakgunner', 'grailknight', 'sb_hailshaman', 'ch_hrolf', 'lightbinder', 'oathsworn', 'silverbolt', 'sb_spiritwalker', 'staglancer', 'sunlance', 'templar', 'sb_thundercaller', 'ch_torvald', 'sb_windrunner', 'sb_wolfguard', 'wb_maskedwarden']);
 const RX_OWN_WOUND = new Set([...RX_OWN_HIT, 'ch_nyssa', 'cc_pyroclast', 'seedcaster']);
 // units whose model plays its own baked clip when a legendary fires (a `leg` clip, read from t.rxCue): the cue's pose is left to it
 const RX_OWN_LEG = new Set(['oathsworn', 'silverbolt', 'lightbinder', 'grailknight', 'sunlance', 'templar', 'censer']);
@@ -143234,6 +143639,221 @@ const GV2 = (() => {
     }
   });
   return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* The Oathknives (wb_oathknife) on a rig and clips made from scratch (the owner, 27 Nov 2026: "Wardbound Assassin": a hooded
+   woman in a dark cowl, a floor-length cape lined with gold and a gold sash, un-rigged, and her dagger). tools/make_ok.py ->
+   src/model_ok2.js: 40 bones (her OWN hands: the mesh's fingers on three joints and the thumb on two, closed round each grip,
+   never a modelled hand; the skirt and cape below her belt on four panels, each in two lengths; a bone for the dagger in each
+   fist), 12,814 triangles on one 1024 x 1536 atlas, 11 clips baked at 30 frames a second. ON by default in place of the
+   code-built body (forces_z..z_wb_oathknife.js: FORCE_BUILD and FORCE_PARTS); ?ok=old draws that.
+   Her moves, by the game's own cues (nothing in the game is changed here; the leap is the game's: wbaAt):
+     idle      no foe in reach: coiled and still, daggers low, weight forward; a breath, no turns
+     ready     a foe in reach: lower, the daggers up before her
+     out       the strike's wind-up plays its crouch (begun so she leaves the ground on the game's strike), then the leap out
+     cutR/L    as she lands at her foe's back or flank: the dagger driven down and in (the game's blow is at the landing)
+     plunge    Quietus: both daggers driven down together
+     hopR/L    Sable Step and the Hunt: foe to foe, ending with the next hand's dagger raised
+     back      the spring home, daggers crossed, and five frames settling into her stance at the post
+     hit       her health drops;  death  wounded (t.wounded): down on one knee; she rises when she is whole again
+   On a leap she is drawn where the game has her (wbaAt: the place, the arc's height, the way she faces); her flagstone stays
+   at the post. A thin dark-gold streak trails each flight and nothing else is drawn for her spells (owner: effects never
+   hide units or foes). Her size is the shared rule (unitmodels_size.js: the Glaive Warden's); the sculpted body is one look
+   at every tier and grows by UM_TIER.
+   Checks: `python -I tools/make_ok.py --check`. Notes: docs/model_pilot/oathknife.md. */
+const OK2 = (() => {
+  const U = 'wb_oathknife', NAMES = ['idle', 'ready', 'out', 'cutR', 'cutL', 'plunge', 'hopR', 'hopL', 'back', 'hit', 'death'];
+  const PRE = 6 / 30, AIR = 7 / 30, AIRB = 9 / 30, SETTLE = 5 / 30, EASE = .05, BASE_H = .05;
+  const S = { on: true, err: null };
+  try { S.on = !/[?&]ok=old\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .895, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'ok2', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('ok2: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'chest', 'swordR', 'swordL']) { if (R_.bix[nm] == null) throw new Error('ok2: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['gripR', 'tipR', 'gripL', 'tipL']) if (!mk || !mk[nm]) throw new Error('ok2: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('ok2: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('ok2: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('ok2: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.9, -.05, -.9]; m.max = [.9, 1.5, .9]; m._um = 1;
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('OK2_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'ok2: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+
+  /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) }.
+     UM_SHOW (the labs): a clip's name and time held */
+  function ctl(t, live) {
+    if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
+    const now = G.time, ph = now + (t.anim || 0) * 3;
+    if (S.hold && CL[S.hold.c]) return { c: S.hold.c, s: S.hold.s, rate: 99, mv: 'hold' };
+    if (t.hp != null) { if (t._okHp != null && t.hp < t._okHp - 1e-6 && !t.wounded) t._okHitAt = now; t._okHp = t.hp; }
+    if (t.wounded) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death' }; }
+    if (t._okMv === 'death') t._okRise = now;   // (whole again: eased back up)
+    const rise = t._okRise != null && now - t._okRise < .9;
+    // the leap, beat by beat (the game's own: wbaAt)
+    const p = typeof wbaAt === 'function' ? wbaAt(t) : null;
+    if (p) {
+      const c = t.chg, q = c.kind === 'wb_quietus', id = c.at + ':' + p.k; t._okEnd = c.at + c.T; t._okBeat = p;
+      if (p.ph === 'out') { const hand = (p.k % 2 ? 'L' : 'R'); return p.k === 0 ? { c: 'out', s: PRE + p.u * AIR, rate: 60, mv: 'out' + c.at } : { c: 'hop' + hand, s: p.u * AIR, rate: 60, mv: 'hop' + id }; }
+      if (p.ph === 'hold') return { c: q ? 'plunge' : p.k % 2 ? 'cutL' : 'cutR', s: p.u * (typeof WBA !== 'undefined' ? WBA.hold : .16), rate: 60, mv: 'cut' + id };
+      return { c: 'back', s: p.u * AIRB, rate: 60, mv: 'back' + c.at };
+    }
+    t._okBeat = null;
+    if (t._okEnd != null && now >= t._okEnd && now - t._okEnd < SETTLE) return { c: 'back', s: AIRB + (now - t._okEnd), rate: 60, mv: 'back' + t._okEnd };   // (landed: settling into his stance)
+    const fight = G.phase === 'wave' && t.tg && !t.tg.dead, cd = t.cd || 0;
+    if (fight && (t.windup || 0) > 0 && cd < PRE) return { c: 'out', s: Math.max(0, PRE - cd), rate: 40, mv: 'pre' + t.shots };   // (the crouch: he leaves the ground on the game's strike)
+    const h = t._okHitAt != null ? now - t._okHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._okHitAt };
+    if (fight) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
+    return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t._okDrawn != null && typeof G !== 'undefined' && G && G.time - t._okDrawn < .3 && G.time >= t._okDrawn;
+  function draw(t, tier, sx, sy, sz, wob, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const K = UNIT_K(U), tr = Math.min(5, tier | 0), home = t.ang == null ? 0 : t.ang;
+    // the Wardbound's flagstone at his post (it stays there while he is away), and he stands on it
+    const bm = typeof wbBase === 'function' ? dynMesh('ok_base', g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => wbBase(g)))) : null;
+    M4.trs(_a, t.x, 0, t.y, home + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a.slice(), opts);
+    const lift = bm ? BASE_H * K * sy : 0;
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[tr] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    const P = ctl(t, live), p = live ? t._okBeat : null;
+    const x = p ? p.x : t.x, z = p ? p.z : t.y, yaw = p ? p.yaw : home;
+    const air = p && p.ph !== 'hold' ? 1 : 0, y = p ? p.h + lift * (p.ph === 'back' ? p.u : p.ph === 'out' && p.k === 0 ? 1 - p.u : 0) : lift;   // (off the flagstone on the way out, onto it on the way home)
+    M4.trs(_a, x, y, z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._okT == null ? 1 : Math.max(0, Math.min(.1, now - t._okT)); t._okT = now;
+      if (!t._okP || t._okP.q.length !== NB * 4) { t._okP = newPose(); t._okP.q.set(PT.q); t._okP.t.set(PT.t); }
+      if (P.mv !== t._okMv) { t._okMv = P.mv; t._okSw = now; }
+      const k = P.rate >= 99 ? 1 : now - t._okSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      follow(t._okP, PT, k); pose = t._okP;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c.slice(), opts); it.sec = [0, 0]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    if (live) {
+      const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+      const tipR = w(BI.swordR, MK.tipR), tipL = w(BI.swordL, MK.tipL), chest = w(BI.chest, [0, .8, 0]);
+      t.tipW = tipR; t.tipYaw = yaw; t.tipAt = G.time; t._okDrawn = G.time; t._okClip = P.c; t._okClipS = P.s; t._okTipL = tipL;
+      // a thin dark-gold streak behind each flight (where his chest was a few frames ago), and a glint on the knife as it cuts
+      if (typeof QADD !== 'undefined' && typeof RD !== 'undefined') {
+        const L = t._okTrail || (t._okTrail = []);
+        if (air && G.state === 'play') { L.push([chest[0], chest[1], chest[2], G.time]); while (L.length > 5) L.shift(); } else if (L.length && G.time - L[L.length - 1][3] > .12) L.length = 0;
+        for (let i = 1; i < L.length; i++) { const a0 = L[i - 1], a1 = L[i], f = Math.max(0, 1 - (G.time - a1[3]) / .18); if (f > 0) QADD.beam(RD, [a0[0], a0[1], a0[2]], [a1[0], a1[1], a1[2]], .05 * s, [.75, .5, .16, .26 * f]); }
+        if (p && p.ph === 'hold' && p.u < .6) { const g = P.c === 'cutL' ? tipL : tipR, f = 1 - p.u / .6; QADD.bill(RD, g[0], g[1], g[2], .1 * f + .04, .1 * f + .04, [1, .8, .4, .5 * f], 1, 0); if (P.c === 'plunge') QADD.bill(RD, tipL[0], tipL[1], tipL[2], .1 * f + .04, .1 * f + .04, [1, .8, .4, .5 * f], 1, 0); }
+      }
+    }
+    return true;
+  }
+  /* the Model Lab's row: his code-built body or the sculpted one */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('ok2Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const box = document.createElement('div'); box.id = 'ok2Row';
+    box.innerHTML = '<h3>Oathknife rig</h3><div class="row">' + `<button data-o2="0" class="${S.on ? '' : 'on'}" title="His code-built body (?ok=old)">Old (code-built)</button><button data-o2="1" class="${S.on ? 'on' : ''}" title="The re-dressed sculpt and its clips (the default)">New (sculpted)</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-o2]')) x.onclick = () => { S.on = x.dataset.o2 === '1'; labRow(); };
+  }
+  const anchors = t => mine(t) ? { tip: t.tipW, tipL: t._okTipL, clip: t._okClip, at: t._okDrawn } : null;
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_ok2', () => {
+    try { load(typeof OK2_MDL !== 'undefined' ? OK2_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No Oathknife rig:', e.message); }
+    if (MESH_ && typeof drawForceUnitPlain === 'function') {
+      const _plain = drawForceUnitPlain;
+      drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+        if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked) {
+          try { if (draw(t, tier, sx, sy, sz, wob, opts)) { forceExtra(t, tier, t.x, t.y, t.ang == null ? 0 : t.ang, UNIT_K(U)); return; } } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('ok2:', e); } }
+        }
+        return _plain.apply(this, arguments);
+      };
+    }
+    if (MESH_ && typeof UM_UNITS !== 'undefined' && !UM_UNITS[U]) { UM_UNITS[U] = { mdl: 'ok2', k: 1 }; if (typeof UM_EVEN !== 'undefined' && UM_EVEN[U] == null) UM_EVEN[U] = 1; }
+    if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+      let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+      if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('ok2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    }
+  });
+  return { S, CL, load, hot, ctl, draw, ready, anchors, mine, get R() { return R; }, get mesh() { return MESH_; } };
 })();
 
 /* ================= When the game asks for its lazy asset groups (src/lazyassets.js) =================
