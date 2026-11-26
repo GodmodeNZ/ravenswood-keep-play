@@ -1,4 +1,4 @@
-const BUILD_TAG = '1541abcf@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0d5d62a3@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -59258,6 +59258,163 @@ if (typeof hurt === 'function') {
     pro: (n, s) => `Increases the Oathbound's damage to foes that have walked less than 3 cells since they were first hit by ${s(50)}%.`, fx: { dmg: { when: 'walked', r: 3, k: .5 } } });
 }
 
+/* Placement talents (27 Nov 2026, owner's picks: Lone Wolf, Shield Line, Switchback). Where a unit stands on the maze
+   decides whether they work, so the placing ghost and the unit's card say so.
+   - Lone Wolf (fx.dmg when 'lone'): a lone hunter hits harder while no other unit stands within r cells (walls don't count).
+   - Shield Line (fx.line { dr, mana, r, cap }): a formation unit takes less damage and gains mana a second for each other
+     melee unit within r cells (unitKinds 'melee'), up to cap. Survival and mana only: these are not damage dealers.
+   - Switchback (fx.swb { k }): a foe that leaves the unit's reach and comes back into it (the maze loops past) marks the
+     unit's next strike at it as a heavy one, k more (the attack pass's strike multiple, so its splash grows too).
+   Talents are swapped in place by atkSwap (cell, prerequisite and ranks kept); the engine is below the data. */
+{
+  const S = (force, slot, e) => atkSwap(force, slot, Object.assign({ tag: 'Damage' }, e));
+
+  // Lone Wolf: Skyhunters (was Skyhunter's Tithe, Storm Tether's mana cost) and Arcane Severers (was Long Throw of the Glaive, range)
+  S('stormborn', 'venom', { old: "Skyhunter's Tithe", name: 'Lone Wolf', icon: 'eye', th: 'A', see: 'Stands apart from the army and hunts harder for it.',
+    pro: (n, s) => `Increases the Skyhunter's damage by ${s(40)}% while no other unit stands within 2 cells.`, fx: { dmg: { when: 'lone', r: 2, k: .4 } } });
+  S('conclave', 'venom', { old: 'Long Throw of the Glaive', name: 'Lone Wolf', icon: 'eye', th: 'A', see: 'Stands apart from the army and hunts harder for it.',
+    pro: (n, s) => `Increases the Severer's damage by ${s(40)}% while no other unit stands within 2 cells.`, fx: { dmg: { when: 'lone', r: 2, k: .4 } } });
+
+  // Shield Line: Oathsworn Shieldbearers (was Oath Rhythm, mana a kill) and Stoneguard (was Broad Rim, range)
+  S('silver', 'glaive', { old: 'Oath Rhythm', name: 'Shield Line', icon: 'shield', tag: 'Survival', th: 'A', see: 'Shields locked with the melee units beside them.',
+    pro: (n, s) => `For each other melee unit within 1.5 cells (up to 3), the Oathsworn takes ${s(10)}% less damage and gains ${s(.5)} mana a second.`, fx: { line: { dr: .1, mana: .5, r: 1.5, cap: 3 } } });
+  S('wardbound', 'earth', { old: 'Broad Rim', name: 'Shield Line', icon: 'shield', tag: 'Survival', th: 'A', see: 'Shields locked with the melee units beside them.',
+    pro: (n, s) => `For each other melee unit within 1.5 cells (up to 3), the Stoneguard takes ${s(10)}% less damage and gains ${s(.5)} mana a second.`, fx: { line: { dr: .1, mana: .5, r: 1.5, cap: 3 } } });
+
+  // Switchback: Mortar Crew (was Powder Monkey, Incendiary Round's mana cost) and Graveshot Ballistae (was Spent Bolt, Rune Shot's cooldown)
+  S('ironhold', 'cannon', { old: 'Powder Monkey', name: 'Switchback', icon: 'burst', th: 'A', see: 'A foe the maze brings back past the guns gets a heavy shell.',
+    pro: (n, s) => `When a foe comes back into the Mortar Crew's reach, the Mortar Crew's next attack on that foe deals ${s(100)}% more damage.`, fx: { swb: { k: 1 } } });
+  S('wardbound', 'cannon', { old: 'Spent Bolt', name: 'Switchback', icon: 'burst', th: 'A', see: 'A foe the maze brings back past the ballista gets a heavy bolt.',
+    pro: (n, s) => `When a foe comes back into the Ballista's reach, the Ballista's next attack on that foe deals ${s(100)}% more damage.`, fx: { swb: { k: 1 } } });
+}
+
+/* ---------- the engine ---------- */
+const PLC = { T: .25, hyst: .4, col: { lone: '#ffd36a', line: '#8fd0ff', swb: '#ff9a4a' } };
+function plFx(st, k) { if (!st || !st.ap) return null; for (const { fx } of st.ap) { if (k === 'lone' ? fx.dmg && fx.dmg.when === 'lone' : fx[k]) return k === 'lone' ? fx.dmg : fx[k]; } return null; }
+const plIsUnit = o => o && o.def && !o.def.wall && !o.wrecked && !o.ghost;
+const plMelee = o => plIsUnit(o) && typeof unitKinds === 'function' && unitKinds(o.def).includes('melee');
+// other units within r of a cell (x, y: cell centre); `only` filters them
+function plNear(x, y, r, self, only) { const out = []; for (const o of G.towers) { if (o === self || !plIsUnit(o) || (only && !only(o))) continue; if (Math.hypot(o.x - x, o.y - y) <= r + 1e-6) out.push(o); } return out; }
+function plLone(t, r) { if ((t.plLoT || 0) > G.time) return t.plLo; t.plLoT = G.time + PLC.T; return t.plLo = plNear(t.x, t.y, r, t).length === 0; }
+function plLine(t, L) { if ((t.plLiT || 0) > G.time) return t.plLi; t.plLiT = G.time + PLC.T; return t.plLi = Math.min(L.cap || 3, plNear(t.x, t.y, L.r || 1.5, t, plMelee).length); }
+
+// Lone Wolf: one more condition for the openers' and executes' fx.dmg (apDmgK)
+if (typeof apDmgK === 'function') {
+  const _plDmgK = apDmgK;
+  apDmgK = function (t, st, c) {
+    let k = _plDmgK.apply(this, arguments);
+    for (const { key, fx } of st.ap) { const d = fx.dmg; if (d && d.when === 'lone' && t.x != null && G.towers && plLone(t, d.r || 2)) { k *= 1 + d.k; apSeen(key); } }
+    return k;
+  };
+}
+// Shield Line: mana a second (the items' flat Mana Regen line) and the blows taken
+if (typeof effStats === 'function') {
+  const _plEff = effStats;
+  effStats = function (t) {
+    const st = _plEff.apply(this, arguments), L = st && plFx(st, 'line');
+    if (L && G.state === 'play' && t.x != null && G.towers && G.towers.includes(t)) { const n = plLine(t, L); st.plLine = n; if (n) st.manaRegen = (st.manaRegen || 0) + L.mana * n; }
+    return st;
+  };
+}
+if (typeof damageTower === 'function') {
+  const _plHit = damageTower;
+  damageTower = function (t, dmg) {
+    const L = t && t.st && plFx(t.st, 'line');
+    if (L && dmg > 0) { const n = plLine(t, L); if (n) { dmg *= Math.max(.2, 1 - L.dr * n); apSeen && t.st.ap.forEach(({ key, fx }) => fx.line && apSeen(key)); } }
+    return _plHit.call(this, t, dmg);
+  };
+}
+// Switchback: watch the foes in reach of each unit that has it (ten times a second); a foe that left and came back is marked
+function plSwbTick() {
+  if ((PLC.tickT || 0) > G.time) return; PLC.tickT = G.time + .1;
+  for (const t of G.towers) {
+    const st = t.st, W = plIsUnit(t) && st && plFx(st, 'swb'); if (!W) { if (t.plSw) t.plSw = null; continue; }
+    const M = t.plSw || (t.plSw = new Map()), r = st.range || 1.5;
+    for (const c of G.creeps) {
+      if (c.dead) continue;
+      const d = Math.hypot(c.x - t.x, c.y - t.y), s = M.get(c);
+      if (d <= r) {
+        if (!s) M.set(c, { in: true });
+        else if (!s.in) { s.in = true; (c.plSwb || (c.plSwb = new Set())).add(t); part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .35, max: .35, size: .45, col: PLC.col.swb }); }
+      } else if (s && s.in && d > r + PLC.hyst) s.in = false;
+    }
+    for (const c of M.keys()) if (c.dead || !G.creeps.includes(c)) M.delete(c);
+  }
+}
+if (typeof updateTowers === 'function') {
+  const _plUpd = updateTowers;
+  updateTowers = function (dt) { const r = _plUpd.apply(this, arguments); try { if (G.state === 'play' && G.force && !G.vs) plSwbTick(); } catch (e) { console.error(e); } return r; };
+}
+if (typeof fire === 'function') {
+  const _plFire = fire;
+  fire = function (t, st, tg, echo) {
+    const W = !echo && tg && tg.plSwb && tg.plSwb.has(t) && plFx(st, 'swb');
+    if (!W) return _plFire.apply(this, arguments);
+    tg.plSwb.delete(t); t.plSwN = (t.plSwN || 0) + 1;
+    for (const { key, fx } of st.ap) if (fx.swb) apSeen(key);
+    apFlare(t, PLC.col.swb, 1); part({ k: 'flare', x: tg.x, z: tg.y, h: hitH(tg), life: .3, max: .3, size: .7, col: PLC.col.swb });
+    const pk = AP_K; AP_K = pk * (1 + W.k);
+    try { return _plFire.apply(this, arguments); } finally { AP_K = pk; }
+  };
+}
+
+/* ---------- what the player sees: the placing ghost, the unit's card ---------- */
+// the talents the unit type being placed has (its tree's ranks now)
+function plGhostFx(type) {
+  if (!type || !TOWERS[type] || TOWERS[type].wall || typeof talKnown !== 'function') return null;
+  const st = talentStats(type, 0, talKnown(type)); if (!st || !st.caps) return null;
+  const L = apOf(st); if (!L) return null;
+  const o = { lone: null, line: null };
+  for (const { fx } of L) { if (fx.dmg && fx.dmg.when === 'lone') o.lone = fx.dmg; if (fx.line) o.line = fx.line; }
+  return o.lone || o.line ? o : null;
+}
+let PL_LBL = null;
+function plLabel(txt, x, z, col) {
+  if (typeof document === 'undefined') return;
+  if (!PL_LBL) { PL_LBL = document.createElement('div'); PL_LBL.id = 'plGhost'; PL_LBL.style.cssText = 'position:fixed;pointer-events:none;z-index:30;font:600 12px/1.2 system-ui,sans-serif;padding:3px 7px;border-radius:6px;background:rgba(12,9,6,.82);white-space:nowrap;transform:translate(-50%,-100%);text-shadow:0 1px 2px #000'; document.body.appendChild(PL_LBL); }
+  if (!txt) { PL_LBL.style.display = 'none'; return; }
+  const p = toScreen(x, 1.9, z), r = cv.getBoundingClientRect();
+  PL_LBL.style.display = p.ok ? 'block' : 'none'; PL_LBL.style.left = (r.left + p.x) + 'px'; PL_LBL.style.top = (r.top + p.y) + 'px';
+  PL_LBL.style.color = col; PL_LBL.style.border = '1px solid ' + col; if (PL_LBL.textContent !== txt) PL_LBL.textContent = txt;
+}
+if (typeof drawGhost === 'function') {
+  const _plGhost = drawGhost;
+  drawGhost = function () {
+    const r = _plGhost.apply(this, arguments);
+    try {
+      const g = G.ghost, F = G.buildType && g && g.in && !G.wallLine && G.force && !G.vs ? plGhostFx(G.buildType) : null;
+      if (!F) { plLabel(null); return r; }
+      const x = g.i + .5, z = g.j + .5, bits = [];
+      if (F.lone) {
+        const nb = plNear(x, z, F.lone.r || 2, null), on = !nb.length;
+        QG.ground(x, z, .045, F.lone.r || 2, F.lone.r || 2, on ? [1, .83, .42, .5] : [1, .4, .3, .45], 4, .02);
+        for (const o of nb) QADD.beam(RD, [x, .35, z], [o.x, .35, o.y], .05, [1, .4, .3, .7]);
+        bits.push(on ? 'Lone Wolf ✓' : `Lone Wolf ✗ (${nb.length} near)`);
+      }
+      if (F.line) {
+        const nb = plNear(x, z, F.line.r || 1.5, null, plMelee), n = Math.min(F.line.cap || 3, nb.length);
+        for (const o of nb.slice(0, F.line.cap || 3)) QADD.beam(RD, [x, .45, z], [o.x, .45, o.y], .07, [.56, .82, 1, .85]);
+        bits.push(`Shield Line: ${n} ${n === 1 ? 'neighbour' : 'neighbours'}`);
+      }
+      plLabel(bits.join(' · '), x, z, F.lone && !F.line ? PLC.col.lone : PLC.col.line);
+    } catch (e) { plLabel(null); }
+    return r;
+  };
+}
+// the unit's card (the info pane repaints five times a second): the live state
+function plInfoHTML(t) {
+  const st = t && t.st; if (!st || !st.ap || !G.towers || !G.towers.includes(t)) return '';
+  const out = [], lw = plFx(st, 'lone'), L = plFx(st, 'line'), W = plFx(st, 'swb');
+  if (lw) { const n = plNear(t.x, t.y, lw.r || 2, t).length; out.push(n ? `Lone Wolf: off (${n} ${n === 1 ? 'unit' : 'units'} within ${lw.r || 2} cells)` : `Lone Wolf: <b>on</b> (+${Math.round(lw.k * 100)}% damage)`); }
+  if (L) { const n = plLine(t, L); out.push(`Shield Line: <b>${n}</b> ${n === 1 ? 'neighbour' : 'neighbours'}${n ? ` (${Math.round(L.dr * n * 100)}% less damage, +${+(L.mana * n).toFixed(2)} mana/s)` : ''}`); }
+  if (W) { let m = 0; for (const c of G.creeps) if (c.plSwb && c.plSwb.has(t)) m++; out.push(`Switchback: ${m ? `<b>${m}</b> ${m === 1 ? 'foe' : 'foes'} marked` : 'no foe marked'}${t.plSwN ? ` · ${t.plSwN} heavy this run` : ''}`); }
+  return out.length ? `<p class="mut" data-d="2">${out.join(' · ')}</p>` : '';
+}
+if (typeof abilInfoHTML === 'function') {
+  const _plInfo = abilInfoHTML;
+  abilInfoHTML = function (t) { let h = _plInfo.apply(this, arguments); try { h += plInfoHTML(t); } catch (e) { } return h; };
+}
+
 /* Talent text in plain words (owner, 24 Nov 2026): "what is a heavy icicle?", then: talents must not call a unit's basic
    attack by its own invented name ("icicle", "shard", "bolt", "thorn" ...): a player can't tell that it means the
    auto-attack. Every force unit's talents (kept ones too) read through this layer:
@@ -63249,7 +63406,6 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      capstones Crescent Orbit, Severing Flurry, Wardbreaker ---------- */
   ezFlav(F, V, 'Ward Feedback', 'tap', .5, 'the Severer');
   ezFlav(F, V, 'Quick Severing', 'tempo', .01, 'sends her crescent out');
-  ezTal(F, V, 'Long Throw of the Glaive', 'reach', .2, 0, 'Her crescent flies');
   ezSpell(F, V, 'Sever Rhythm', 'cc_sunder', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, 'Paired Crescents', 'cc_shards', { cd: 1.5, back: 'wheels back every' });
   ezSpell(F, V, 'Honed by Spells', 'cc_sunder', { pow: .08, verb: 'rends' });
@@ -63442,7 +63598,6 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      capstones Barrage, Crew Chief's Shout, Napalm (Big Bertha and Ringing Ears are the force tree's) ---------- */
   ezSpell(F, 'cannon', 'Bouncing Shell', 'ih_incendiary', { cd: 1.5, back: 'is rammed home every' });
   ezTal(F, 'cannon', 'Cluster Round', 'splash', .1);
-  ezSpell(F, 'cannon', 'Powder Monkey', 'ih_incendiary', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezFlav(F, 'cannon', 'Thick of It', 'echo', .3, 'drops rounds');
 
   /* ---------- Siege Breakers. Kept: Shaped Charges, Fuse Cutter, Planted by Hand, Black Powder Pack, Tamped Charges,
@@ -63489,7 +63644,6 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, 'glaive', 'Press the Wounded', 'tempo', .04, 'swings its oathblade');
   ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'glaive', 'Pommel Finish', 'rhythm', .03, 'stroke of its oathblade');
-  ezFlav(F, 'glaive', 'Oath Rhythm', 'harvest', 5, 'the Shieldbearer');
 
   /* ---------- Silverbolt Crossbows (damage: no control). Kept: Opening Shot, Heavy Quarrel, Bodkin Heads, Through and
      Through; capstones Siege Quarrel, Squire at Arms, Storm of Silver ---------- */
@@ -63653,7 +63807,6 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, V, 'Sky Lore', 'harvest', 6, 'the Skyhunter');
   ezSpell(F, V, 'Double Harpoon', 'sb_tether', { by: { n: 1 } }, v => `pulls down ${v} more flyer${v > 1 ? 's' : ''}`);
   ezSpell(F, V, 'Hard Landing', 'sb_downdraft', { by: { dur: 1 } }, longer('holds its flyer'));
-  ezSpell(F, V, "Skyhunter's Tithe", 'sb_tether', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, V, "Hunter's Haste", 'sb_skyfall', { pow: .4, verb: 'crashes down' });
 }
 /* ---------- Champion trees whose rows were mostly about one spell: opened and laid out (tools/open_layout.js; the
@@ -63738,7 +63891,6 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezSpell(F, 'earth', 'Shield Spirit', 'wb_shieldwall', { pow: .1, verb: 'drives back' });
   ezFlav(F, 'earth', 'Shield Edge', 'rhythm', .03, 'shield-rim blow');
   ezFlav(F, 'earth', 'Under Fire', 'tempo', .04, 'brings its shield-rim down');
-  ezTal(F, 'earth', 'Broad Rim', 'reach', .15, 0, 'Its shield reaches');
   ezSpell(F, 'earth', 'Crushing Rim', 'wb_shieldwall', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'earth', 'Shield Song', 'wb_quakeline', { cd: 2, back: 'rolls every' });
 
@@ -63746,7 +63898,6 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
      Chain, Ballista Volley, Skewer Line ---------- */
   ezTal(F, 'cannon', 'Spotter', 'reach', .25, 0, 'Its ballista carries');
   ezFlav(F, 'cannon', 'Quick Crank', 'tempo', .04, 'cranks and fires');
-  ezSpell(F, 'cannon', 'Spent Bolt', 'wb_runeshot', { cd: 2, back: 'is fired every' });
   ezSpell(F, 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt', { pow: .25, verb: 'drives home' });
   ezSpell(F, 'cannon', "Loader's Finish", 'wb_chainbolt', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'cannon', 'Steady Crew', 'harvest', 5, 'the Graveshot Ballista');
