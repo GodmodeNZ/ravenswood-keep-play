@@ -1,4 +1,4 @@
-const BUILD_TAG = '709d21c8@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'e28f96e3@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -36368,12 +36368,16 @@ if (typeof castPoseIn === 'function') {
      beat: [N, K] (not per rank): every Nth strike restores K mana, N one smaller each rank above the first (so the text
      can say "every 3rd strike restores 1 mana" in whole numbers). */
 /* MANA_CARRY (owner, 26 Nov 2026: "maybe try having it so minions dont auto replenish mana after each wave"): a unit's mana
-   carries over from wave to wave. No refill when a wave is cleared or before a boss steps out, and no flow between waves
-   (the build phase can last as long as the player likes: any flow there would fill every bar anyway). A unit just built
+   carries over from wave to wave. No refill when a wave is cleared or before a boss steps out; after a wave its in-wave flow
+   goes on for MANA_CARRY.grace game seconds (10), then holds until the next wave (the build phase can last as long as the
+   player likes: a flow there with no end would fill every bar anyway). A unit just built
    starts full, as ever. Tower Wars and the tutorial keep the refill. Off: MANA_CARRY.on = false, or ?manacarry=0. */
-const MANA_CARRY = { on: !(typeof location !== 'undefined' && /[?&]manacarry=0\b/.test(location.search || '')), top: 0 };   // top: a share of the pool given back when a wave is cleared (0: none; a knob to try if the first waves grow too hard)
+const MANA_CARRY = { on: !(typeof location !== 'undefined' && /[?&]manacarry=0\b/.test(location.search || '')), top: 0, grace: 10 };   // grace: game seconds a unit keeps its in-wave mana flow after a wave is cleared (owner, 26 Nov 2026)   // top: a share of the pool given back when a wave is cleared (0: none; a knob to try if the first waves grow too hard)
 const manaCarry = () => MANA_CARRY.on && typeof G !== 'undefined' && G && !G.vs && !G.tut;
-const manaLull = () => (manaCarry() ? 0 : MANA_LULL);
+// (with MANA_CARRY: the in-wave flow for MANA_CARRY.grace game seconds after a wave is cleared, then none. Game seconds: a
+// paused game or an open panel neither gains mana nor eats the window; calling the next wave ends it, nothing is stored)
+const manaGraceLeft = () => (manaCarry() && G.phase === 'build' && G.manaGrace > G.time ? G.manaGrace - G.time : 0);
+const manaLull = () => (manaCarry() ? (manaGraceLeft() > 0 ? 1 : 0) : MANA_LULL);
 const MANA_LULL = 5,   /* between waves mana flows back five times as fast (owner, 5 Nov 2026: was 2) */ MANA_NEAR_MAX = 4, MANA_CHEAP_MAX = .6;
 // (the clarity pass, Nov 2026: every unit tree now carries its mana on one or two talents about mana, written out in their
 // own words with whole numbers: `mana: { ... }` on the talent (forces.js GT), folded in below. No riders are appended to
@@ -36457,7 +36461,7 @@ function manaOnKill(src) { const m = manaTal(src); if (m && m.slay && abilKit(sr
 // a wave is cleared (its last foe dead, none left to come): every unit's mana bar refills (owner, 7 Nov 2026)
 // (_qm too, so a challenge's Thin Leylines does not read the refill as inflow and halve it)
 function manaWaveEnd() {
-  if (manaCarry()) { for (const t of G.towers) if (t.ab) { if (MANA_CARRY.top > 0) t.ab.mana = Math.min(abMax(t), t.ab.mana + abMax(t) * MANA_CARRY.top); t._qm = t.ab.mana; } return; }   // (MANA_CARRY: it carries over)
+  if (manaCarry()) { if (MANA_CARRY.grace > 0) G.manaGrace = G.time + MANA_CARRY.grace; for (const t of G.towers) if (t.ab) { if (MANA_CARRY.top > 0) t.ab.mana = Math.min(abMax(t), t.ab.mana + abMax(t) * MANA_CARRY.top); t._qm = t.ab.mana; } return; }   // (MANA_CARRY: it carries over)
   for (const t of G.towers) { if (!t.ab) continue; t.ab.mana = abMax(t); t._qm = t.ab.mana; }
 }
 // Leyline Surge (a challenge boon: quests.js): mana flows back half again as fast while a wave runs
@@ -36518,6 +36522,9 @@ for (const u in UNIT_KITS) {
   const k = inn.mana / MANA_INNATE_EVERY / inc;
   kit.mana.regen = Math.round(kit.mana.regen * k * 100) / 100; kit.mana.hit = Math.round(kit.mana.hit * k * 100) / 100; kit.mana.paced = 1;
 }
+
+/* the window ends at the next horn (it works silently: owner, 26 Nov 2026, "dont need a glow or tooltip") */
+if (typeof callWave === 'function' && !callWave._mg) { const c0 = callWave; callWave = function () { if (typeof G !== 'undefined' && G) G.manaGrace = 0; return c0.apply(this, arguments); }; callWave._mg = 1; }
 
 /* ================= ARMOUR PENETRATION: early talents that cut through the armour bar =================
    Every force's physical units get a way through armour in the first two rows of their trees, so an armoured wave in the
@@ -98818,7 +98825,7 @@ function gpStats(t, alt) {
     out.push(gpStat('Cooldown Reduction', 1 - ((st.sh && st.sh.cdK) || 1), w ? 1 - ((w.sh && w.sh.cdK) || 1) : 0, P, 'Its spells and its items’ taps come this much sooner'));
     const m0 = manaSheet(t, kit), poolOf = s => abMax(t) - ((t.st && t.st.manaMax) || 0) + (s.manaMax || 0), rgOf = s => kit.mana.regen * (typeof manaRegenK === 'function' ? manaRegenK(t, s) : 1) + (s.manaRegen || 0);
     out.push(gpStat('Mana pool', poolOf(st), poolOf(b), v => String(Math.round(v)), 'The most mana it can hold: its dearest spell, and more from talents and items'));
-    out.push(gpStat('Mana a second', rgOf(st), rgOf(b), gpF, (typeof manaCarry === 'function' && manaCarry() ? 'Mana it regains each second in a wave. None comes back between waves: what is left carries over.' : `Mana it regains each second in a wave (between waves ${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast)`)));
+    out.push(gpStat('Mana a second', rgOf(st), rgOf(b), gpF, (typeof manaCarry === 'function' && manaCarry() ? 'Mana it regains each second in a wave. It does not refill between waves: what is left carries over.' : `Mana it regains each second in a wave (between waves ${typeof MANA_LULL !== 'undefined' ? MANA_LULL : 1} times as fast)`)));
     txt('Mana a strike', '+' + (m0.hit || 0), 'Mana each basic strike gives back');
   }
   // ---- Items: always one line, so the rows above stay put when the first item goes in ----
