@@ -1,4 +1,4 @@
-const BUILD_TAG = '9557789c@2026-11-26';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd305f330@2026-11-26';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -63682,6 +63682,127 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezLayout(F, 'champ:wb_aedric', [[3,2],[0,0],[0,1],[2,2],[1,0],[2,1],[1,3],[3,1],[5,0],[5,1],[4,1],[5,2],[4,3],[3,0],[0,2]], [[5,7,10,9],[3,0,11],[6,12],[1,4]]);   /* rows 3 2 2 3 2 3; chains: Sun-Struck Trail > Rallying Cry > Hot Blood > Open Road | Into the Fray > Eager Sun > Sun-Sworn | Searing Wheel > Blaze of Glory | Sunlit Reach > Sun Charge */
   ezLayout(F, 'champ:wb_isaura', [[0,2],[1,3],[1,2],[2,2],[1,0],[2,1],[4,0],[3,1],[5,2],[5,1],[3,3],[5,3],[4,2],[4,1],[0,1]], [[5,7,13,9],[1,10,11],[12,8]]);   /* rows 2 3 2 2 3 3; chains: Tighter Bonds > Shared Vow > Vow's Reckoning > Sworn Road | Silent Vow > Quiet Step > Veiled Oath | Oath Turned > Turned Twice */
 }
+
+/* ================= Talents name their unit, never "it" (owner, 26 Nov 2026: "dont refer to them as \"it\"") =================
+   The last word on every force unit's and Champion's talent text: it runs after every other talent file, wraps each
+   talent's pro() once, and rewrites the rendered line so "its range" reads "the Seedcaster's range" and "gives it 6 mana"
+   reads "gives the Seedcaster 6 mana". "It" for a foe or a spell stays when the sentence is clear.
+   UN_ONE: each slot's unit in the singular; Champions go by their first name.
+   UN_GEN: phrases where "it"/"its" can only be the unit, for every tree. UN_FIX: the rest, by talent name ('force.slot|Name'
+   when the name is used twice); each pair is [what the line says, what it says now], {the}/{The} the unit.
+   tools/check_talent_it.js lists any talent line still using "it" for its unit. */
+const UN_ONE = {
+  grove: { glaive: 'Thornguard', arrow: 'Gladebow Ranger', frost: 'Briarwarden', arcane: 'Stag Lancer', storm: 'Shifter', earth: 'Blade Dancer', cannon: 'Seedcaster', venom: 'Bogwitch' },
+  conclave: { glaive: 'Spellblade', arrow: 'Mageling', frost: 'Frostweaver', arcane: 'Chronomancer', storm: 'Astrologer', earth: 'Golem Warden', cannon: 'Pyroclast', venom: 'Severer' },
+  ironhold: { glaive: 'Ironbreaker', arrow: 'Thundergun', frost: 'Chain Trapper', arcane: 'Anvilwright', storm: 'Flak Cannoneer', earth: 'Steam Hammer', cannon: 'Mortar Crew', venom: 'Siege Breaker' },
+  silver: { glaive: 'Oathsworn', arrow: 'Silverbolt', frost: 'Lightbinder', arcane: 'Grail Knight', storm: 'Sunlance Cleric', earth: 'Templar', cannon: 'Censer Bearer', venom: 'Inquisitor' },
+  stormborn: { glaive: 'Wolfguard', arrow: 'Windrunner', frost: 'Hail Shaman', arcane: 'Spirit Walker', storm: 'Thunder Caller', earth: 'Earthbinder', cannon: 'Cloud Dancer', venom: 'Skyhunter' },
+  wardbound: { glaive: 'Oathbound', arrow: 'Glaive Warden', frost: 'Halberdier', arcane: 'Runecarver', storm: 'Sable Lancer', earth: 'Stoneguard', cannon: 'Ballista', venom: 'Chaplain' },
+};
+const UN_GEN = [
+  [/\bIncreases its /g, 'Increases {the}\'s '],
+  [/\bIncreases the duration of its /g, 'Increases the duration of {the}\'s '],
+  [/\b([Ii])ts (next (?:\d )?attacks?|attacks?|range|reach|spells|spells'|mana|splash|crit|basic attacks?|cooldowns|shots?|bolts|arrows|slams?|quakes|chops|nets|roots|spores|blows|strikes|hits|lashes|missiles|swings|volleys|shells|blasts?|bursts|pods|lances|charges|bullets|glaive|blade|cuts|throws|boiler|heat|incense|clouds|hex|lightning|chains|shield shoves|wolf|rune light|pennant|censer|stone runes|oath runes|marks|Stone Totems)\b/g, (m, i, w) => (i === 'I' ? '{The}' : '{the}') + '\'s ' + w],
+  [/\bgives it (?=\d)/g, 'gives {the} '],
+  [/(^|[.:;] )([Ii])t (gains|attacks)\b/g, (m, p, i, v) => p + (i === 'I' || p[0] === '.' ? '{The}' : '{the}') + ' ' + v],
+  [/\bAttacks on it\b/g, 'Attacks on {the}'],
+  [/\bits (main )?(foe|target)('s)?\b/g, (m, a, w, s) => 'the ' + (a || '') + 'target' + (s || '')],
+];
+const UN_REACH = [['Foes in the outer third of its reach take', 'Attacks on foes in the outer third of {the}\'s reach deal'], ['% more from its attacks.', '% more.']];
+const UN_FULL = [['While its mana is full: its attacks', 'At full mana, {the}\'s attacks']];
+const UN_FIX = {
+  'Warming Bow': UN_REACH, 'Bright Fourth': UN_REACH, 'Ricochet': UN_REACH, 'Mercy Bolt': UN_REACH, 'Vigil Prayer': UN_REACH, 'Updraft Reader': UN_REACH, 'Third Crewman': UN_REACH,
+  'Busy Sling': UN_FULL, 'Drowning Spit': UN_FULL, 'Cracking Cold': UN_FULL, 'Twice Struck': UN_FULL, "Anvil's Due": UN_FULL, 'Dawn Rhythm': UN_FULL, 'Seal Slam': UN_FULL,
+  'Bursting Rot': [['bursts on death: its spores', 'bursts on death: those spores']],
+  'Deadeye Draw': [['and it passes through', 'and the arrow passes through']],
+  'Ripe Pods': [['leaves spores on its foes', 'leaves spores on foes hit']],
+  'Busy Hive': [['leaves spores on its foes', 'leaves spores on foes hit']],
+  'Ice Crust': [['stuns its foes', 'stuns the foes hit']],
+  'Trample': [['on its way out', 'on {the}\'s way out']],
+  'Bounding Leap': [['walls block it.', 'walls block {the}.']],
+  "White Hart's Hunt": [['walls block it.', 'walls block {the}.']],
+  'Tourney Passes': [['walls block it.', 'walls block {the}.']],
+  'Splintering': [['When it breaks a ward', 'When {the} breaks a ward']],
+  'Dead Hour': [['a foe it keeps slowed', 'a foe {the} keeps slowed']],
+  'Granite Fists': [['the foes it hits', 'the foes hit']],
+  'Sighting In': [['as its last hit', 'as the last hit'], ['as its last gives', 'as the last gives']],
+  'Wing Cords': [['Flyers it hits', 'Flyers {the} hits']],
+  'Sky Shatter': [['Flyers it kills', 'Flyers {the} kills']],
+  'Demolition': [['Charges, it first plants', 'Charges, {the} first plants']],
+  'Steam in the Cracks': [['its Steam Burst', '{the}\'s Steam Burst']],
+  'Molten Rivets': [['Foes it removed armour from', 'Foes {the} removed armour from']],
+  'Forge Spirit': [['cells: its next spell', 'cells: that unit\'s next spell']],
+  'Siege Quarrel': [['and it pierces', 'and the bolt pierces']],
+  'Zeal': [['of its tier\'s damage', 'of {the}\'s damage at its tier']],
+  'Forfeit': [['the mana it burns', 'the mana she burns']],
+  'Shield of Doctrine': [['It and units within 0.75 cells of it', '{The} and units within 0.75 cells of her']],
+  'Press of Battle': [['ground foe it hits', 'ground foe {the} hits']],
+  'Second Pass': [['it wheels round', '{the} wheels round']],
+  'Thrice-Wheeled': [['it wheels round', '{the} wheels round']],
+  'Shield-Ward': [['; it then hits', '; {the} then hits']],
+  'Shield of Faith': [['cells of it hit', 'cells of {the} hit']],
+  'Unbroken Oath': [['cells of it hit', 'cells of {the} hit']],
+  'Rampart of Dawn': [['Then it and units', 'Then {the} and units']],
+  'Oath of Challenge': [['Casters it hits', 'Casters {the} hits']],
+  'Building Charge': [['on the foe it last hit', 'on the same foe as the last hit']],
+  'Arc Bridge': [['lightning links it to', 'lightning links {the} to']],
+  'Stormseed': [['where its chain ends', 'where the chain ends']],
+  'Split Sky': [['from its first foe', 'from the first foe']],
+  'Homeward Cut': [['Its returning glaive', '{The}\'s returning glaive']],
+  'Wide Blast': [['standing on its pin rune: its blast', 'standing on {the}\'s pin rune: the blast']],
+  'Rite of Holding': [['at its post', 'at {the}\'s post']],
+  'Stone Stance': [['For 6s it can\'t', 'For 6s {the} can\'t']],
+  'Unmoving': [['ground foe it pushes back', 'ground foe {the} pushes back']],
+  'Spent Ink': [['Each mark it bursts', 'Each mark {the} bursts']],
+  'Cascade': [['When its bursting marks', 'When {the}\'s bursting marks']],
+  'Grudge-Fed': [['its burst is', '{the}\'s burst is']],
+  'Hunter’s Patience': [['a quarter of its mana', 'a quarter of its mana cost']],
+  "Spotter's Tally": [['gives its mana back', 'refunds its mana cost']],
+  'Oath Turned': [['5% of its health (at most', '5% of the toughest foe\'s health (at most']],
+  'Ghost Edge': [['stunned foe: it hits again', 'stunned foe: the Spellblade hits again']],
+  'Seamcut': [['stun a foe, it blinks to another foe and attacks it', 'stun a foe, the Spellblade blinks to and attacks another foe']],
+  'Riftwalk': [['a spell: it attacks', 'a spell: the Spellblade attacks']],
+  'Spinning Shield': [['Throws its shield', "Throws {the}'s shield"]],
+  'Growth': [['Full: its next attack', "Full: the unit's next attack"]],
+  'Heat': [['Full: its next attack vents, its own big shot', "Full: the unit's next attack vents as a big shot"]],
+  'Heartroot': [['roots its foe', 'roots the target']],
+  'Iron Rhythm': [['Ground foes on its stone runes take', 'Ground foes on stone runes take']],
+  'Tempering': [['stronger, and it gains', 'stronger, and {the} gains']],
+  'Wolfsong': [['Wolfguard attack, its wolf bites', 'Wolfguard attack, that Wolfguard\'s wolf bites']],
+};
+function unSay(s, who, key, name) {
+  if (typeof s !== 'string' || !who) return s;   // (who.n empty: the Force tab's trees, UN_FIX only)
+  const the = who.proper ? who.n : 'the ' + who.n, The = who.proper ? who.n : 'The ' + who.n;
+  const put = x => x.replace(/\{the\}/g, the).replace(/\{The\}/g, The);
+  for (const [a, b] of (UN_FIX[key + '|' + name] || UN_FIX[name] || [])) s = s.split(put(a)).join(put(b)).split(a).join(put(b));
+  if (who.n) for (const [re, b] of UN_GEN) s = s.replace(re, typeof b === 'string' ? put(b) : (...m) => put(b(...m)));
+  return s;
+}
+function unWrap(list, who, key) {
+  for (const t of list || []) {
+    if (!t || typeof t.pro !== 'function' || t._unSaid) continue;
+    const pro = t.pro; t._unSaid = 1;
+    t.pro = function () { return unSay(pro.apply(this, arguments), who, key, t.name); };
+  }
+}
+const unChamp = n => ({ n: String(n || '').replace(/^(Lady|Lord|Elder)\s+/, '').split(/[ ,]/)[0], proper: 1 });
+(function () {
+  if (typeof FORCES === 'undefined') return;
+  for (const f in FORCES) {
+    const F = FORCES[f]; if (!F || !F.talents) continue;
+    for (const slot in F.talents) {
+      const u = F.units && F.units[slot], one = UN_ONE[f] && UN_ONE[f][slot];
+      const who = u && u.champ ? unChamp(u.name) : one ? { n: one } : { n: '' };
+      unWrap(F.talents[slot] && F.talents[slot].list, who.n ? who : { n: 'unit' }, f + '.' + slot);
+    }
+  }
+  if (typeof FTREE !== 'undefined') for (const f in FTREE) for (const n of (FTREE[f] && FTREE[f].nodes) || []) {
+    if (!n || typeof n.text !== 'function' || n._unSaid) continue;
+    const text = n.text; n._unSaid = 1;
+    n.text = function () { return unSay(text.apply(this, arguments), { n: '' }, f + '.ftree', n.name); };
+  }
+  if (typeof CHAMPS !== 'undefined') for (const id in CHAMPS) { const C = CHAMPS[id]; if (C && C.tree && C.unit) unWrap(C.tree.list, unChamp(C.unit.name), (C.force || '') + '.champ'); }
+})();
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
    Each spell gets four clear moments, all in its school's colours and its force's own style:
