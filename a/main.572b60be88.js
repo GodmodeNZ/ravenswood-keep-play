@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a381cfec@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '251fb61e@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -73663,6 +73663,7 @@ const FS_STY = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vNor, vCol, vW, vOP; in vec2 vUV; in vec4 vL; in float vEm; flat in vec4 vTint; flat in vec4 vX; uniform float uTime;
 uniform sampler2D uTex; uniform vec3 uCamR; uniform float uSty;
+uniform vec4 uSheet;   // (the unit sheet's stage light, RD.sheetLt: x the camera key's share, y the sun's wrap, z the soft light's share, w the colour's strength; (1, .55, 1, 1) is the battlefield's look)
 uniform sampler2D uGPT; uniform float uGPOn; uniform vec4 uGP; uniform vec2 uGPS;
 out vec4 o;
 ${LIGHT_GLSL}
@@ -73693,14 +73694,15 @@ void main(){
     base *= pow(clamp(tl/.1, .05, 4.), .14);
   } else base = max(mix(vec3(tl), base, 1.3), 0.);
   base = base*1.25*(1. - vX.w) + .02*vec3(.9, 1., .8);   // (iX.w: a unit's own trim, for a light texture the boost would blow out)
+  base = max(mix(vec3(dot(base, vec3(.3, .59, .11))), base, uSheet.w), 0.);
   // the sun, wrapped: light reaches round to the far side, so forms stay soft and painted
-  float ndl = dot(n, uSunDir), wrap = clamp((ndl + .55)/1.55, 0., 1.);
+  float ndl = dot(n, uSunDir), wrap = clamp((ndl + uSheet.y)/(1. + uSheet.y), 0., 1.);
   float sun = smoothstep(.05, .95, wrap)*mix(.25, 1., sh);
   // the key light from the camera's upper left, so the model reads the same whatever the map's sun does
   vec3 Lk = normalize(-uCamR*.6 + vec3(0., .9, 0.) + V*.5);
   float key = clamp((dot(n, Lk) + .6)/1.6, 0., 1.); key *= key;
   vec3 hemi = mix(uGnd*1.1, uSky*1.25, n.y*.5 + .5);
-  vec3 light = hemi*1.2 + uSunCol*sun*.95 + mix(uSunCol, vec3(1.), .4)*key*.6;
+  vec3 light = hemi*1.2*uSheet.z + uSunCol*sun*.95 + mix(uSunCol, vec3(1.), .4)*key*.6*uSheet.x;
   // point lights and the map's baked light (lanterns), from the engine's light without its sun and sky
   light += max(lightAt(n, vW, sh, 0.) - (mix(uGnd, uSky, n.y*.5+.5) + uSunCol*smoothstep(-.12, .55, ndl)*mix(.1, 1., sh)), 0.)*.8;
   if(uGPOn>.5 && uGPS.x>.5){ vec2 pu = clamp((vW.xz - uGP.xy)*uGP.zw, 0., 1.); float pl = dot(textureLod(uGPT, pu, 4.5).rgb, vec3(.3,.59,.11)); light *= clamp(pow(pl/uGPS.y, .85), .25, 1.3); }
@@ -74640,6 +74642,7 @@ function createRenderer(canvas, opt = {}) {
       if (u.uTMo) gl.uniform1f(u.uTMo, this.tmo || 0);
       if (u.uURim) gl.uniform2f(u.uURim, this.urim == null ? URIM_DEF : this.urim, 0);   // (our units' back rim)
       if (u.uGlint) gl.uniform4fv(u.uGlint, this.glintK || GLINTK_DEF);
+      if (u.uSheet) gl.uniform4fv(u.uSheet, this.sheetLt || SHEETLT_DEF);   // (the unit sheet's stage light: gearpanel.js)
       if (u.uBack) { const b = this.back; gl.uniform4f(u.uBack, b ? b[0] : 0, b ? b[1] : 0, b ? b[2] : 0, b ? 1 : 0); if (u.uBackD) gl.uniform3fv(u.uBackD, b && b.dir ? b.dir : [0, .5, -1]); }
       if (u.uMood) { const m = this.mood || MOOD_NONE; gl.uniform4fv(u.uMood, m.top); gl.uniform4fv(u.uBounce, m.bounce); gl.uniform4fv(u.uMoodKey, m.key); gl.uniform1f(u.uMoodE, m.env); if (u.uGrade) gl.uniform4fv(u.uGrade, m.grade || MOOD_NONE.grade); }
       if (u.uBg) {
@@ -74809,7 +74812,7 @@ function createRenderer(canvas, opt = {}) {
   return R;
 }
 const ONE_TINT = new Float32Array([1, 1, 1, 0]);
-const SHK_DEF = new Float32Array([.3, 1.2, .0016, 0]), GLINTK_DEF = new Float32Array([1, 1, 0, 0]);   // (the shadows and the units' glint as they always were: LIGHT_GLSL uShK, uGlint)
+const SHK_DEF = new Float32Array([.3, 1.2, .0016, 0]), GLINTK_DEF = new Float32Array([1, 1, 0, 0]); const SHEETLT_DEF = new Float32Array([1, .55, 1, 1]);   // (the shadows and the units' glint as they always were: LIGHT_GLSL uShK, uGlint)
 const _litPL = new Float32Array(24), _litPC = new Float32Array(18), _glScG = [];
 // the trees' wind as it always was (drawTrees: uSwayK)
 const SWAY_K1 = new Float32Array([1, 1, 1]);
@@ -98959,12 +98962,25 @@ const gpDir = (rt, up, fw) => { const c = Math.cos(GP_YAW), q = Math.sin(GP_YAW)
 const GP_STAGE_AT = [.5, .755], GP_STAGE_ASPECT = 4 / 3;
 const GP_SEED = { wardbound: [[246, 207, 156], [142, 188, 219]], grove: [[255, 224, 160], [131, 198, 182]], ironhold: [[255, 179, 106], [145, 184, 222]],
   conclave: [[223, 189, 255], [121, 220, 232]], stormborn: [[239, 187, 138], [117, 197, 213]], silver: [[255, 225, 168], [176, 200, 225]] };
+/* Standing IN the painting's light, not pasted on it (owner, 27 Nov 2026: "i quite like the lighting on the grove units but they dont
+   quite match the background"): the units' own shading lights them from the camera, evenly, which reads flat and bright before a
+   moody painting. On the sheet that front light is turned well down (sheetLt, the units' shader's uSheet), so the painting's key does
+   the modelling and the far side falls into the painting's shade colour; the soft light takes the colour of the painting's shadows
+   (green under the Grove's trees); the unit's colour is drawn down toward the painting's own saturation and brightness and takes a
+   breath of the air round it (haze: the painting's colour where the unit stands, more at the feet than the head); and its shadow
+   on the platform leans away from the key. Its own colours stay its own: the grade takes a share, never all.
+   GP_LOOK: where a painting's light comes from, where its brightest tones mislead the read (a fog brighter than the forge
+   fire, the sunbeams' haze in the Grove's middle): [x, y] on the frame, x to the right, y down. */
+const GP_LOOK = { grove: [-.8, -.6], silver: [-.7, -.7], conclave: [-.85, -.5], ironhold: [-.95, -.25], stormborn: [-.75, -.65], wardbound: [.6, -.8] };
+const GP_SHEETLT = new Float32Array([.08, .12, .66, .9]);   // (the camera key's share, the sun's wrap, the soft light's share, the colour's strength: uSheet in gl.js)
 // key: [colour, direction]; back: the edge light [colour, direction]; sky, gnd: the soft light; expo: the exposure; d: the light's way on the
-// frame [x, y]; keyC, tintC, shadeC: the key's, the scene's and the shade's colours for the wash over the cut-out (0-255); shadeA: how deep the shade
-const gpLitOf = (o) => Object.assign({ key: [[1.45, 1.3, 1.1], gpDir(-.6, .8, .3)], back: [[5, 6.4, 8.5], gpDir(.1, 1, -.4)], sky: [.2, .22, .26], gnd: [.1, .09, .08], expo: .86, d: [-.64, -.77], keyC: [255, 236, 205], tintC: [236, 240, 248], shadeC: [70, 84, 110], shadeA: .4 }, o);
+// frame [x, y]; keyC, tintC, shadeC: the key's, the scene's and the shade's colours for the wash over the cut-out (0-255); shadeA: how deep the shade;
+// hazeC, hazeA: the air's colour round the unit and how much of it (at the feet; half that at the head); satCut: how much of the unit's colour the grade takes;
+// capC, capA: the painting's brightest colour, and how far the unit's brightest parts are held down toward it (a white robe does not glow before a dusk)
+const gpLitOf = (o) => Object.assign({ key: [[1.45, 1.3, 1.1], gpDir(-.6, .8, .3)], back: [[5, 6.4, 8.5], gpDir(.1, 1, -.4)], sky: [.2, .22, .26], gnd: [.1, .09, .08], expo: .76, d: [-.64, -.77], keyC: [255, 236, 205], tintC: [236, 240, 248], shadeC: [70, 84, 110], shadeA: .52, hazeC: [90, 96, 104], hazeA: .13, satCut: .12, capC: [235, 228, 215], capA: .3, sheet: GP_SHEETLT }, o);
 const GP_LIT0 = gpLitOf({}), GP_SAMP = {}, GP_SEEDLIT = {};
 // a force's light from its seed alone (until its painting has been read): a soft key from the upper left, the fill's colour on its edges
-const gpSeedLit = f => GP_SEEDLIT[f] || (GP_SEEDLIT[f] = GP_SEED[f] ? gpLitOf({ key: [GP_SEED[f][0].map(v => v / 255 * 1.5), gpDir(-.6, .8, .3)], back: [GP_SEED[f][1].map(v => v / 255 * 8.5), gpDir(.1, 1, -.4)], keyC: GP_SEED[f][0], expo: .82 }) : GP_LIT0);
+const gpSeedLit = f => GP_SEEDLIT[f] || (GP_SEEDLIT[f] = GP_SEED[f] ? gpLitOf({ key: [GP_SEED[f][0].map(v => v / 255 * 1.5), gpDir(-.6, .8, .3)], back: [GP_SEED[f][1].map(v => v / 255 * 8.5), gpDir(.1, 1, -.4)], keyC: GP_SEED[f][0], expo: .82, d: GP_LOOK[f] || [-.64, -.77] }) : GP_LIT0);
 function gpSample(force, src) {
   if (!force || !src || GP_SAMP[force] !== undefined || typeof Image === 'undefined') return;
   GP_SAMP[force] = null;   // (being read)
@@ -98989,21 +99005,27 @@ function gpSample(force, src) {
     // the warmest and the coolest tones too (the check's readout; the warm tones stand in for a light that is only pale)
     const byW = P.filter(o => o.l > .14).sort((u, v) => u.w - v.w), q8 = Math.max(12, Math.round(byW.length * .14)), cool = avg(byW.slice(0, q8)), warm = avg(byW.slice(-q8));
     let dx2 = (hi.x - .5) * 2, dy2 = (hi.y - .5) * 2; if (Math.hypot(dx2, dy2) < .16) { dx2 = -.5; dy2 = -.6; }   // (a light in the middle of it: from the upper left, as a portrait is lit)
+    if (GP_LOOK[force]) [dx2, dy2] = GP_LOOK[force];
     const dl = Math.hypot(dx2, dy2); dx2 /= dl; dy2 /= dl;
+    // the air where the unit stands (the painting's middle, round the feet and the body) and how coloured the painting is all told
+    const mid = avg(P.filter(o => o.x > .3 && o.x < .7 && o.y > .28 && o.y < .78)), psat = P.reduce((s, o) => s + o.sat, 0) / n;
     const seed = GP_SEED[force], mixU = (c3, q3) => (q3 ? c3.map((v, i) => v * .5 + q3[i] / 255 * .5) : c3);   // (half the painting's, half the art pack's own colour)
     const lum = all.l, kc = mixU(unit(hi.c).map(v => v * .86 + .14), seed && seed[0]), sc = mixU(unit(sky.c).map(v => v * .8 + .2), seed && seed[1]), ac = unit(all.c), lc = unit(lo.c);
     const amb = Math.max(.12, Math.min(.26, .09 + lum * .42));   // (the soft light: little before a dark painting)
     GP_SAMP[force] = gpLitOf({
-      key: [kc.map(v => v * 1.55), gpDir(dx2 * .95, Math.max(.22, .4 - dy2 * .75), .28)],
+      key: [kc.map(v => v * 2), gpDir(dx2 * .95, Math.max(.22, .4 - dy2 * .75), .28)],   // (stronger than the battlefield's: it carries the form now the front light is down)
       back: [sc.map(v => v / Math.max(sc[0], sc[1], sc[2], .01) * 8.5), gpDir(dx2 * .2, 1, -.4)],   // (strong: it is a plain directional light on a dark texture, added to the key's pass; it only reaches what faces up and back)   // (from behind and above, a little to the painting's light's side)
-      sky: sc.map((v, i) => (v * .6 + ac[i] * .4) * amb), gnd: lc.map((v, i) => (v * .6 + ac[i] * .4) * amb * .55),
-      expo: Math.max(.66, Math.min(.95, .5 + lum * 1.05)), d: [dx2, dy2], keyC: to255(kc), tintC: to255(ac.map(v => v * .5 + .5)), shadeC: to255(lc.map(v => v * .42)),
-      shadeA: Math.max(.3, Math.min(.5, .52 - lum * .5)),
+      // the soft light in the painting's shade colour (its shadows' green, violet, slate), the sky's a little on top
+      sky: lc.map((v, i) => (v * .55 + sc[i] * .25 + ac[i] * .2) * amb), gnd: lc.map((v, i) => (v * .7 + ac[i] * .3) * amb * .5),
+      expo: Math.max(.56, Math.min(.8, (.45 + lum * 1.02) * .9)), d: [dx2, dy2], keyC: to255(kc), tintC: to255(ac.map(v => v * .28 + .72)), shadeC: to255(lc.map(v => v * .38)),
+      shadeA: Math.max(.48, Math.min(.64, .7 - lum * .55)),
+      hazeC: to255(mid.c.map(v => v * 1.05)), hazeA: Math.max(.11, Math.min(.2, (.17 - lum * .25) * 1.8)), satCut: Math.max(.06, Math.min(.16, .28 - psat * .5)),   // (a little: the unit keeps its own colour; owner, 27 Nov 2026: "increase the saturation a little so its a bit closer to the original") capC: to255(unit(hi.c).map(v => (v * .3 + .7) * .92)),   // (mostly a level, a little the light's colour: a cap in the sunset's orange turned white fur peach)
       read: { warm: to255(warm.c), cool: to255(cool.c), warmLeft: warm.x <= cool.x, light: to255(hi.c), at: [+hi.x.toFixed(2), +hi.y.toFixed(2)], sky: to255(sky.c), shade: to255(lo.c), lum: +lum.toFixed(3) } });
   } catch (e) { /* GP_LIT0 stays */ } };
   im.src = src;
 }
-const gpLit = t => { const f = t && t.def && t.def.force; return (f && GP_SAMP[f]) || (f && gpSeedLit(f)) || GP_LIT0; };
+const gpLit = t => { const f = t && t.def && t.def.force, L = (f && GP_SAMP[f]) || (f && gpSeedLit(f)) || GP_LIT0;
+  return typeof window !== 'undefined' && typeof window.GP_TUNE === 'function' ? window.GP_TUNE(Object.assign({}, L), f) : L; };   // (window.GP_TUNE: a tuning hook, a copy of the force's light in, the light to use out)
 const GP_BLACK = [0, 0, 0], GP_WHITE = [1, 1, 1], GP_WORK = {};
 const gpWork = (k, S) => { const c = GP_WORK[k] || (GP_WORK[k] = document.createElement('canvas')); if (c.width !== S) c.width = c.height = S; return c; };
 /* Every unit the same size on the stage, by its body (owner, 26 Nov 2026: "not sure why they aren't all looking a similar size"):
@@ -99011,7 +99033,7 @@ const gpWork = (k, S) => { const c = GP_WORK[k] || (GP_WORK[k] = document.create
    frames of a model: GP_MEAS, kept), not off its bounds, which take in a raised spear, a banner or a bow. The head is the top of
    the outline over its own axis; what it holds reaches higher or wider and only makes it smaller if it would leave the middle
    of the painting. A stocky dwarf comes out a touch shorter than a man, not as short as it is. */
-const GP_MEAS = {}, GP_HEAD_SHARE = .47, GP_MAN = 1.3;   // (a head's height on the stage, as a share of the painting's height; a man's height in the world, feet to crown)
+const GP_MEAS = {}, GP_HEAD_SHARE = .47, GP_MAN = 1.3, GP_FOOT_BAND = .3;   // (GP_FOOT_BAND: how far each side of its axis the soles are looked for, world units)   // (a head's height on the stage, as a share of the painting's height; a man's height in the world, feet to crown)
 const gpMed = a => a.slice().sort((u, v) => u - v)[a.length >> 1];
 let gpRef = 0, gpPpu = 100;   // (gpRef: how far apart the white and the black backgrounds come out; gpPpu: screen pixels a world unit, for the drag)
 // the unit, turned to gpAng, into the sheet's canvas (through the icon renderer's path, on a renderer of its own)
@@ -99065,7 +99087,7 @@ function gpDraw() {
        and armour) and fades round the form as a light does, not along the outline (owner: "a bit of cool light affecting the unit
        from the background"). */
     const LT = gpLit(gpT);
-    R.back = null; R.urim = 0; R.fill = 0; R.expo = LT.expo;
+    R.back = null; R.urim = 0; R.fill = 0; R.expo = LT.expo; R.sheetLt = LT.sheet;
     R.sty = 1; R.sunDir = LT.key[1]; R.sunCol = LT.key[0]; R.sky = LT.sky; R.gnd = LT.gnd; R.rim = -.3;
     irRender(GP_BLACK, null); ax.globalCompositeOperation = 'copy'; ax.drawImage(R.canvas, 0, 0, S, S); dx.globalCompositeOperation = 'copy'; dx.drawImage(R.canvas, 0, 0, S, S);
     irRender(GP_WHITE, null); dx.globalCompositeOperation = 'difference'; dx.drawImage(R.canvas, 0, 0, S, S);   // (white where there is only background)
@@ -99083,14 +99105,17 @@ function gpDraw() {
       const k = 1 / al; px[i] = Math.min(255, px[i] * k); px[i + 1] = Math.min(255, px[i + 1] * k); px[i + 2] = Math.min(255, px[i + 2] * k); px[i + 3] = al * 255;
     }
     ax.putImageData(img, 0, 0);
-    // the body's measure, off the outline (at rest: not zoomed, not slid): the soles, the crown over its axis, how high and how wide it reaches
-    const measuring = !M.done && gpZoom === 1 && gpPanY === 0;
-    if (measuring) { const Ps = P * S / Sq, cs = Math.cos(PITCH), yOf = row => cyW + (S / 2 - row) / (cs * Ps), band = Math.max(3, Math.round(.13 * Ps)), mid = S >> 1;
-      let top = -1, crown = -1, low = -1, x0 = S, x1 = -1, cnt = 0;
-      for (let y = 0; y < S; y += 2) { let rowN = 0; const o = y * S * 4;
-        for (let xx = 0; xx < S; xx += 2) if (px[o + xx * 4 + 3] > 200) { rowN++; if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (crown < 0 && xx >= mid - band && xx <= mid + band) crown = y; }
-        if (rowN >= 2) { if (top < 0) top = y; low = y; cnt += rowN; } }
-      if (cnt > 120 && crown >= 0 && low > crown) { const foot = yOf(low + 1); M.a.push([foot, yOf(crown) - foot, yOf(top) - foot, Math.max(mid - x0, x1 - mid) / Ps]); M.n++;
+    /* the body's measure, off the outline (at rest: not zoomed, not slid): the soles, the crown over its axis, how high and how wide it reaches.
+       The soles are the lowest of the outline near its own axis (GP_FOOT_BAND each side), not the lowest of all: a companion standing
+       nearer the eye (the Wolfguard's wolf) reaches lower in the frame, and grounding by it lifted the unit off the platform (owner,
+       27 Nov 2026: "wolfguard is hovering over the platform"). */
+    const measuring = !M.done && gpZoom === 1 && gpPanY === 0, Ps = P * S / Sq, mid = S >> 1, fb = Math.round(GP_FOOT_BAND * Ps);
+    if (measuring) { const cs = Math.cos(PITCH), yOf = row => cyW + (S / 2 - row) / (cs * Ps), band = Math.max(3, Math.round(.13 * Ps));
+      let top = -1, crown = -1, low = -1, lowC = -1, x0 = S, x1 = -1, cnt = 0;
+      for (let y = 0; y < S; y += 2) { let rowN = 0, rowC = 0; const o = y * S * 4;
+        for (let xx = 0; xx < S; xx += 2) if (px[o + xx * 4 + 3] > 200) { rowN++; if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (crown < 0 && xx >= mid - band && xx <= mid + band) crown = y; if (xx >= mid - fb && xx <= mid + fb) rowC++; }
+        if (rowN >= 2) { if (top < 0) top = y; low = y; cnt += rowN; } if (rowC >= 2) lowC = y; }
+      if (cnt > 120 && crown >= 0 && low > crown) { const foot = yOf((lowC > crown ? lowC : low) + 1); M.a.push([foot, yOf(crown) - foot, yOf(top) - foot, Math.max(mid - x0, x1 - mid) / Ps]); M.n++;
         if (M.n >= 6) { M.foot = gpMed(M.a.map(v => v[0])); M.head = Math.max(.5, gpMed(M.a.map(v => v[1]))); M.full = Math.max(M.head, gpMed(M.a.map(v => v[2]))); M.half = gpMed(M.a.map(v => v[3])); M.done = true; M.a = []; } } }
     /* the painting's light again, laid over the cut-out (kept to the unit's own pixels): the units' shader lights a
        body from the camera's upper left whatever the sun does, so the side the painting's light is on would not read. Its colours
@@ -99098,18 +99123,35 @@ function gpDraw() {
        takes the light's colour. */
     const T = gpWork('t', S), tx = T.getContext('2d'), rgba = (c, a2) => `rgba(${c[0]},${c[1]},${c[2]},${a2})`;
     tx.globalCompositeOperation = 'copy'; tx.drawImage(A, 0, 0);
+    tx.globalCompositeOperation = 'saturation'; tx.fillStyle = `rgba(128,128,128,${LT.satCut})`; tx.fillRect(0, 0, S, S);   // (its colour drawn toward the painting's: a share of it, its hue kept)
+    tx.globalCompositeOperation = 'darken'; tx.fillStyle = rgba(LT.capC, LT.capA); tx.fillRect(0, 0, S, S);   // (its brightest parts held toward the painting's brightest: no white glowing before a dusk)
     tx.globalCompositeOperation = 'multiply'; tx.fillStyle = rgba(LT.tintC, 1); tx.fillRect(0, 0, S, S);
     { const hx = S / 2, hy = S * .5, r0 = S * .4, ex = LT.d[0], ey = LT.d[1];
       const g3 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g3.addColorStop(0, rgba(LT.shadeC, 0)); g3.addColorStop(.42, rgba(LT.shadeC, 0)); g3.addColorStop(1, rgba(LT.shadeC, LT.shadeA));
       tx.fillStyle = g3; tx.fillRect(0, 0, S, S);
-      const g4 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g4.addColorStop(0, rgba(LT.keyC, .34)); g4.addColorStop(.5, rgba(LT.keyC, 0)); g4.addColorStop(1, rgba(LT.keyC, 0));
-      tx.globalCompositeOperation = 'soft-light'; tx.fillStyle = g4; tx.fillRect(0, 0, S, S); }
+      const g4 = tx.createLinearGradient(hx + ex * r0, hy + ey * r0, hx - ex * r0, hy - ey * r0); g4.addColorStop(0, rgba(LT.keyC, .55)); g4.addColorStop(.5, rgba(LT.keyC, 0)); g4.addColorStop(1, rgba(LT.keyC, 0));   // (the light's colour on the side it falls on: the owner likes the light colouring the unit)
+      tx.globalCompositeOperation = 'soft-light'; tx.fillStyle = g4; tx.fillRect(0, 0, S, S);
+      // the air between it and the eye: the painting's colour where it stands, more at the feet than at the head
+      const g5 = tx.createLinearGradient(0, S * .2, 0, S * .8); g5.addColorStop(0, rgba(LT.hazeC, LT.hazeA * .5)); g5.addColorStop(1, rgba(LT.hazeC, LT.hazeA));
+      tx.globalCompositeOperation = 'source-over'; tx.fillStyle = g5; tx.fillRect(0, 0, S, S); }
     tx.globalCompositeOperation = 'destination-in'; tx.drawImage(A, 0, 0);
-    // onto the scene: a faint shadow where it stands (the platform is painted: an unseen ground under its feet), then the unit
+    // onto the scene: its shadow where it stands (the platform is painted: an unseen ground under its feet), dark under the soles and
+    // reaching away from the key across the platform, in the painting's shade colour; then the unit
     const x = cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
-    { const fr0 = Math.max(.26, Math.min(.42, M.half * .55)), rx = fr0 * P * rr, ry = rx * .27, sx = ax0 * rr, sy = (ay0 + gpPanY * P) * rr;
-      x.save(); x.translate(sx, sy); x.scale(1, ry / rx); const g2 = x.createRadialGradient(0, 0, rx * .2, 0, 0, rx); g2.addColorStop(0, 'rgba(0,0,0,.5)'); g2.addColorStop(.6, 'rgba(0,0,0,.26)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
-      x.fillStyle = g2; x.beginPath(); x.arc(0, 0, rx, 0, 7); x.fill(); x.restore(); }
+    { const fr0 = Math.max(.26, Math.min(.42, M.half * .55)), rx = fr0 * P * rr, ry = rx * .27, sx = ax0 * rr, sy = (ay0 + gpPanY * P) * rr, sc = LT.shadeC.map(v => Math.round(v * .45));
+      const blob = (cx, cy, rX, rY, a0, a1) => { x.save(); x.translate(cx, cy); x.scale(1, rY / rX); const g2 = x.createRadialGradient(0, 0, rX * .15, 0, 0, rX); g2.addColorStop(0, rgba(sc, a0)); g2.addColorStop(.55, rgba(sc, a1)); g2.addColorStop(1, rgba(sc, 0));
+        x.fillStyle = g2; x.beginPath(); x.arc(0, 0, rX, 0, 7); x.fill(); x.restore(); };
+      const ex = LT.d[0] / (Math.hypot(LT.d[0], LT.d[1]) || 1);
+      blob(sx - ex * rx * .75, sy - ry * .35, rx * 1.35, ry * 1.05, .3, .16);   // (cast: away from the key, a little behind)
+      blob(sx - ex * rx * .12, sy, rx * .8, ry * .85, .55, .3);   // (contact: the soles)
+      // and under what else stands on the platform beside it (the Wolfguard's wolf, a staff's foot set down): the lowest of the outline
+      // each side of the body's band, if it reaches the ground (nearer the eye is lower in the frame; what hangs above it is higher)
+      if (!measuring) { const footRow = S / 2 - (M.foot - cyW) * Math.cos(PITCH) * Ps, k = Sq / S * rr, ox = (W - Sq) / 2 * rr, oy = (H - Sq) / 2 * rr;
+        for (const side of [-1, 1]) { const xa = side < 0 ? 0 : mid + fb, xb = side < 0 ? mid - fb : S;
+          for (let y = S - 2; y > footRow - .06 * Ps; y -= 2) { const o = y * S * 4; let xs = 0, xn = 0, lo = S, hi = -1;
+            for (let xx = xa; xx < xb; xx += 2) if (px[o + xx * 4 + 3] > 90) {   // (a see-through spirit wolf counts too)
+              xs += xx; xn++; if (xx < lo) lo = xx; if (xx > hi) hi = xx; }
+            if (xn >= 3) { const r2 = Math.max(.1 * Ps, (hi - lo) * .75) * k; blob(ox + xs / xn * k - ex * r2 * .3, oy + (y + 1) * k, r2, r2 * .3, .5, .26); break; } } } } }
     if (!measuring) x.drawImage(T, (W - Sq) / 2 * rr, (H - Sq) / 2 * rr, Sq * rr, Sq * rr);
   } catch (e) {} finally { IR = keep; }
 }
