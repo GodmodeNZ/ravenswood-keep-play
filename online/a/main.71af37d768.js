@@ -1,4 +1,4 @@
-const BUILD_TAG = '8572822b@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '478f510c@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1802,7 +1802,8 @@ function newGame(diff = 'normal', chal = null, hero = null, rite = 0) {
   // every keep also starts with one school beyond the steel ones: the hero's favoured one (its best affinity), else at random
   if (!G.vs && typeof riteStart === 'function') riteStart();   // the rite's leaner purse and thinner walls
   if (!G.chal && !G.vs) { const pool = COMBAT_TYPES.filter(t => !G.unlocked.includes(t)); if (pool.length) { const aff = typeof HERO_BY !== 'undefined' && G.hero && HERO_BY[G.hero] && HERO_BY[G.hero].aff, fav = aff && pool.filter(t => (aff[t] || 0) > 0).sort((a, b) => aff[b] - aff[a])[0];   // the champion's favoured slot (its +10% affinity) opens first (owner, 5 Nov 2026); random only without one
-    G.startSchool = fav || pool[Math.floor(Math.random() * pool.length)]; G.unlocked = G.unlocked.concat(G.startSchool); } }
+    G.startSchool = fav || (G.force ? null : pool[Math.floor(Math.random() * pool.length)]); if (G.startSchool) G.unlocked = G.unlocked.concat(G.startSchool); } }   // (a force run opens no random one: it would open a new unit every battle of a campaign, unpaid)
+  G.paidU = [];
   refreshField();
 }
 function refreshField() {
@@ -5549,7 +5550,7 @@ function serialize() {
     towers: G.towers.map(t => [t.type, t.tier, t.i, t.j, t.invested, t.kills, Math.round(t.dmg), t.prio, (t.gear || []).filter(Boolean).length ? t.gear : 0, t.wrecked ? 0 : Math.round(100 * t.hp / (t.maxHp || 1)) / 100, t.spec || 0, t.ab && typeof abilSave === 'function' ? abilSave(t) : 0, t.charm || 0, t.def.wall ? 0 : t.ast | 0, t.def.wall ? 0 : Math.round((t.vx || 0) * 100) / 100, t.bornW | 0, t.vSeed | 0]),
     lore: typeof loreSave === 'function' ? loreSave() : null,
     loot: G.loot.concat((G.drops || []).filter(d => d.item).map(d => d.item)), gearUid: G.gearUid, keys: keysHeld() + (G.drops || []).filter(d => d.key).length, keyW: G.keyW || {}, legN: G.legN | 0, lastDropW: G.lastDropW | 0, dropW: G.dropW | 0, dropN: G.dropN | 0, age: G.age || 0, ageRes: G.ageRes || null, ageHint: G.ageHint || 0,
-    chal: G.chal || null, trophies: G.trophies || {}, chalSchools: G.chalSchools || [], unlocked: G.unlocked || null, paths: G.paths || {}, pp: G.pp || 0, ppEarned: G.ppEarned || 0, momentum: G.momentum || 0, vet2: 1, run: G.run || null, reports: (G.reports || []).slice(-3), plan: G.plan || null, planAuto: G.planAuto !== false,
+    chal: G.chal || null, trophies: G.trophies || {}, chalSchools: G.chalSchools || [], unlocked: G.unlocked || null, paidU: G.paidU || [], paths: G.paths || {}, pp: G.pp || 0, ppEarned: G.ppEarned || 0, momentum: G.momentum || 0, vet2: 1, run: G.run || null, reports: (G.reports || []).slice(-3), plan: G.plan || null, planAuto: G.planAuto !== false,
     hero: G.hero || null, heroTal: G.heroTal || null, champAt: (() => { const c = G.champ && G.towers.find(t => t.id === G.champ); return c ? [c.i, c.j] : null; })(), champBoost: G.champBoost || 1, champKills: G.champKills | 0, champTrophy: G.champTrophy | 0,
     quest: G.quest || null, questOffer: G.questOffer || null, questOffered: G.questOffered || [], questsDone: G.questsDone || [], sagaR: G.sagaR || {},
     xp: xpSave(), dmap: typeof dmapSave === 'function' ? dmapSave() : null };
@@ -5605,6 +5606,7 @@ function restore(s) {
   G.chalSchools = Array.isArray(s.chalSchools) ? s.chalSchools.map(t => t === 'shadow' ? 'glaive' : t).filter(t => TOWERS[t]) : [];
   // schools opened so far (a save from before schools had to be opened keeps every school it could build)
   G.unlocked = Array.isArray(s.unlocked) ? [...new Set(START_SCHOOLS.concat(s.unlocked.map(t => t === 'shadow' ? 'glaive' : t)))].filter(t => TOWERS[t] && !TOWERS[t].wall) : COMBAT_TYPES.slice();
+  G.paidU = Array.isArray(s.paidU) ? s.paidU.filter(t => TOWERS[t] && !TOWERS[t].wall) : [];   // the units paid for (meta.js unitPaid)
   G.lastDropW = s.lastDropW != null ? s.lastDropW | 0 : s.wave | 0; G.dropW = s.dropW | 0; G.dropN = s.dropN | 0;
   G.legN = s.legN != null ? s.legN | 0 : (s.loot || []).concat(...(s.towers || []).map(a => Array.isArray(a[8]) ? a[8] : [])).filter(it => it && it.rar >= 4 && !it.shop).length;   // legendaries dropped so far (for pacing)
   G.keys = Math.max(0, s.keys | 0); G.keyW = {}; for (const w in s.keyW || {}) if (s.keyW[w] === 'got') G.keyW[w] = 'got';   // School Keys held, and the waves whose key is already won
@@ -5644,6 +5646,7 @@ function restore(s) {
     if (!t.def.wall && !G.unlocked.includes(type)) G.unlocked.push(type);
     if (hpF === 0 && !unitWoundable(t)) { t.hp = 0; t.wrecked = true; } else { G.blk[idx(i, j)] = 1; if (hpF > 0 && hpF < 1) t.hp = Math.max(1, t.maxHp * hpF); }   // wrecks stay open rubble
   }
+  if (typeof unitsClamp === 'function') unitsClamp();   // a force run: only the start, the favoured and the paid units are open (a unit already standing stays)
   if (vetOld && typeof vetOn === 'function' && vetOn()) {   // before veterancy: each unit's assists are taken as its own kills or the army's average kills, whichever is more
     const U = G.towers.filter(t => !t.def.wall), avg = U.length ? U.reduce((a, t) => a + (t.kills | 0), 0) / U.length : 0;
     for (const t of U) { t.ast = Math.round(Math.max(t.kills | 0, avg)); t.vx = (t.kills | 0) + VET_AST * t.ast; }
@@ -7073,6 +7076,18 @@ const CHAL_BY = Object.fromEntries(CHALLENGES.map(c => [c.id, c]));
    schools had to be opened have them all.) ---- */
 const START_SCHOOLS = ['arrow', 'cannon', 'glaive'], KEY_EVERY = 5;
 function schoolOpen(type) { return type === 'wall' || !G || G.vs || G.state !== 'play' || !Array.isArray(G.unlocked) || G.unlocked.includes(type); }
+// a force run's open units (hub, 28 Nov 2026, the owner: "units are buying themselves? i havent bought any extra units yet but
+// already unlocked golem and astrologer?"): the starting set, the commander's favoured one (its best liked slot beyond the start),
+// and the ones paid for with Renown (G.paidU; a campaign's warband carries them, campaign.js B.paid). Nothing else opens one: no
+// School Key, no wave, no carry-over (owner, 28 Nov 2026: "units only unlock with renown")
+function unitFav(hero) { const aff = typeof HERO_BY !== 'undefined' && hero && HERO_BY[hero] && HERO_BY[hero].aff; return aff && COMBAT_TYPES.filter(t => !START_SCHOOLS.includes(t) && (aff[t] || 0) > 0).sort((a, b) => aff[b] - aff[a])[0] || null; }
+const unitsRuled = () => typeof G !== 'undefined' && !!G && !G.vs && !G.chal && !G.tut && !G.playtest && !!(G.force || G.camp || G.region);
+function unitPaid(type) { if (!Array.isArray(G.paidU)) G.paidU = []; if (!G.paidU.includes(type)) G.paidU.push(type); }
+function unitsClamp() {
+  if (!unitsRuled() || !Array.isArray(G.unlocked)) return;
+  const f = unitFav(G.hero), ok = new Set(START_SCHOOLS.concat(f ? [f] : [], Array.isArray(G.paidU) ? G.paidU : []));
+  G.unlocked = [...new Set(G.unlocked.concat([...ok].filter(t => COMBAT_TYPES.includes(t))))].filter(t => ok.has(t));
+}
 function schoolsOpened() { return Array.isArray(G.unlocked) ? G.unlocked.filter(t => !START_SCHOOLS.includes(t)).length : 0; }
 function lockedSchools() { return COMBAT_TYPES.filter(t => !schoolOpen(t)); }
 const keysHeld = () => (G && G.keys) | 0;
@@ -7122,6 +7137,7 @@ function keyGot(fled) {
 function keyWaveEnd(ws) { for (const w of ws) if (G.keyW && G.keyW[w] === 'out') keyWin({ wv: w }, true); }
 function openSchool(type) {
   if (schoolOpen(type) || !TOWERS[type]) return false;
+  if (unitsRuled()) { onToast('Units open only with Renown.'); sfx('nogold'); return false; }   // (renown.js opens them in a force run; a key does not)
   if (keysHeld() <= 0) { const nk = nextKeyWave(); onToast(`Opening a school takes a School Key.${nk ? ` The boss of wave ${nk} carries the next one.` : ''}`); sfx('nogold'); return false; }
   G.keys--; G.unlocked = G.unlocked.concat(type);
   onToast(`The ${TOWERS[type].short} school is open: build ${TOWERS[type].name}s and learn ${TALENTS[type].name}.`);
@@ -14340,7 +14356,8 @@ function ccExtra(t, tier, x, z, yaw, K) {
   const col = c4(CC_COL[t.def.ccSchool] || CC_COL.ley);
   // Arcane Charge: on icons, motes circling over the head; in play, a row of gold pips over the unit's bars (ccDrawPips)
   // (owner, 7 Nov 2026: the motes, the tier IV-VI rune halo and orbiters and the sixth tier's star hid the model; its tiers show in the body)
-  if (icon && !t.def.wall) {
+  // (not on the unit sheet, which draws through the icon path: there they floated as stray white dots by the head; owner, 27 Nov 2026)
+  if (icon && !t.def.wall && !(typeof GP_ON_SHEET !== 'undefined' && GP_ON_SHEET)) {
     const q = Math.min(5, tier + 1), r = .2 * K * sz;
     for (let k = 0; k < q; k++) { const a = vt * 1.6 + k / 5 * TAU, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r, py = top + .2 + .03 * Math.sin(vt * 3 + k);
       QADD.bill(RD, px, py, pz, .1, .1, [col[0], col[1], col[2], .95], 1, 0); QADD.bill(RD, px, py, pz, .035, .035, [1, 1, 1, .9], 1, 0); }
@@ -99564,6 +99581,8 @@ const gpMed = a => a.slice().sort((u, v) => u - v)[a.length >> 1];
 let gpRef = 0, gpPpu = 100;   // (gpRef: how far apart the white and the black backgrounds come out; gpPpu: screen pixels a world unit, for the drag)
 // the unit, turned to gpAng, into the sheet's canvas (through the icon renderer's path, on a renderer of its own)
 let gpClock = 0, gpClockAt = 0;
+// true while the sheet draws its unit: the shop icons' own marks over a unit (the Conclave's Arcane Charge motes) stay off it
+let GP_ON_SHEET = false;
 function gpDraw() {
   const cv = document.getElementById('gpCv'), R = gpRenderer(); if (!cv || !R || !gpT) return;
   const keep = IR; IR = R;
@@ -99599,8 +99618,8 @@ function gpDraw() {
     const now = performance.now() / 1000; gpClock += Math.min(.1, Math.max(0, now - (gpClockAt || now))); gpClockAt = now;
     const keepVt = vt; vt = gpClock;
     dlN = 0; QADD.reset(); QA.reset(); IR.time = vt;
-    try { UM_SHOW = gpClock; MESH_NOBASE = true; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
-    finally { UM_SHOW = null; MESH_NOBASE = false; vt = keepVt; }   // (MESH_NOBASE: drawn with no ground of its own, on the painted platform: models.js)
+    try { UM_SHOW = gpClock; MESH_NOBASE = true; GP_ON_SHEET = true; irDrawTower(gpT.type, gpT.tier, { ang: gpAng, windup: 0, shotT: 9, anim: gpT.anim || 1.3, hawkDive: null, chg: null, form: gpT.form, shiftAt: null }, vt, null); }
+    finally { UM_SHOW = null; MESH_NOBASE = false; GP_ON_SHEET = false; vt = keepVt; }   // (MESH_NOBASE: drawn with no ground of its own, on the painted platform: models.js)
     /* its own base (the flagstone, the moss pad, the ring: a flat part on the ground under a rigged body) is not drawn on the sheet: it
        stands straight on the painted platform (owner: "remove the base on each unit for this view"). The battlefield draws it as ever. */
     { let w = 0, sig = 0;
@@ -128787,16 +128806,16 @@ function rnIconsHTML(t, attr, n) {   // (n: the wave it is fought on, when known
   W('keyCarried', f => function () { return rnOn() ? false : f.apply(this, arguments); });
   W('nextKeyWave', f => function () { return rnOn() ? 0 : f.apply(this, arguments); });
   W('openSchool', f => function (type) {
-    if (!rnOn() || keysHeld() > 0) return f.apply(this, arguments);
+    if (!rnOn() || (keysHeld() > 0 && !unitsRuled())) return f.apply(this, arguments);   // (a force run: Renown only, a key held opens nothing, meta.js unitsRuled)
     if (schoolOpen(type) || !TOWERS[type]) return false;
     const c = rnCost('unit');
     if (!rnSpend('unit', type)) { onToast(`Opening a unit takes ${c} Renown (you have ${rnS().v}). Slay bosses early, win contracts, keep the gate clean.`); sfx('nogold'); return false; }
-    G.unlocked = G.unlocked.concat(type);
+    G.unlocked = G.unlocked.concat(type); unitPaid(type);
     onToast(`${TOWERS[type].name} are open: build them and learn ${TALENTS[type].name}.`); sfx('upgrade'); onDirty(); onSave();
     return true;
   });
   W('schoolSlot', f => function (ty) {
-    if (!rnOn() || keysHeld() > 0) return f.apply(this, arguments);
+    if (!rnOn() || (keysHeld() > 0 && !unitsRuled())) return f.apply(this, arguments);   // (a force run: Renown only, a key held opens nothing, meta.js unitsRuled)
     const c = rnCost('unit'), ok = rnS().v >= c, armed = schoolArm === ty && schoolArmT > performance.now();
     return { key: `L:${ty}${ok ? ':r' : ''}`, lbl: ok ? (armed ? 'Sure?' : 'Open') : 'Locked', on: ok, pulse: false, warn: armed,
       name: `${TOWERS[ty].name} are locked. Open them for ${c} Renown (you have ${rnS().v}).`, hk: TOWERS[ty].key.toUpperCase(),
@@ -129919,6 +129938,7 @@ function campBandLoad(W, force) {
     B.loot = Array.isArray(W.loot) ? W.loot.filter(okItem) : []; B.gearUid = Math.max(W.gearUid | 0, ...B.loot.map(it => it.id | 0), 0);
     if (W.wpn && typeof W.wpn === 'object') B.wpn = W.wpn;   // (its weapons: campWpnOut)
     B.rn = clamp(W.rn | 0, 0, typeof RN !== 'undefined' ? RN.cap : 10); B.unlocked = Array.isArray(W.unlocked) ? W.unlocked.filter(t => typeof t === 'string') : [];
+    if (Array.isArray(W.paid)) B.paid = W.paid.filter(t => typeof t === 'string');   // (none: a warband from before paid units were kept, campCarryIn)
   }
   return B;
 }
@@ -129972,7 +129992,7 @@ function campBandFromRun(B, skip) {
     xp: Math.round((G.xp || 0) * 100) / 100, xpRn: G.xpRn | 0, tp: G.tp | 0, tpEarned: G.tpEarned | 0,
     tal: JSON.parse(JSON.stringify(G.tal || {})), tomes: typeof tomesSave === 'function' ? tomesSave() : {}, taln: typeof talNamesNow === 'function' ? talNamesNow() : null, heroTal: (G.heroTal || []).slice(), plan: G.plan ? JSON.parse(JSON.stringify(G.plan)) : null,
     loot, gearUid: G.gearUid | 0, wpn: campWpnOut() || (B && B.wpn) || null, rn: typeof rnS === 'function' && G.rn ? rnS().v | 0 : 0,
-    unlocked: (G.unlocked || []).filter(t => TOWERS[t] && !TOWERS[t].wall),
+    unlocked: (G.unlocked || []).filter(t => TOWERS[t] && !TOWERS[t].wall), paid: (G.paidU || []).filter(t => TOWERS[t] && !TOWERS[t].wall),
   });
 }
 // a new run (a location or a hunt) takes the warband on: called right after newGame
@@ -129998,6 +130018,11 @@ function campCarryIn(B, hero) {
   if (Array.isArray(B.heroTal)) G.heroTal = [0, 1, 2, 3, 4].map(r => B.heroTal[r] === 1 || B.heroTal[r] === 2 ? B.heroTal[r] : 0);
   if (B.plan && B.plan.tal) G.plan = B.plan;
   G.unlocked = [...new Set((G.unlocked || []).concat((B.unlocked || []).filter(t => TOWERS[t] && !TOWERS[t].wall && COMBAT_TYPES.includes(t))))];
+  // the units the warband paid for (a warband from before they were kept had opened units unpaid, a new one each battle: those close,
+  // and the Renown it did spend on units comes back, as far as it is known)
+  if (!Array.isArray(B.paid)) { B.paid = []; const n = B.rnx && B.rnx.buys ? B.rnx.buys.unit | 0 : 0; if (n > 0 && typeof RN !== 'undefined') { B.rn = Math.min(RN.cap, (B.rn | 0) + n * RN.cost.unit); B.rnx.buys.unit = 0; } }
+  G.paidU = B.paid.slice();
+  if (typeof unitsClamp === 'function') unitsClamp();
   if (typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) rnS().v = clamp(B.rn | 0, 0, RN.cap);
   G.legN = 0;   // legendary pacing is per run (a hunt is its own run): what the warband brought does not count
   G.talV = (G.talV || 0) + 1;
@@ -130677,6 +130702,7 @@ function rgMazeLay(M) {
     out.laid++;
   }
   rgMazeArm(M);
+  if (typeof unitsClamp === 'function') unitsClamp();   // (a laid unit stands; its kind opens only if it was paid for)
   if (typeof runRekey === 'function') runRekey();
   if (typeof vetSync === 'function') vetSync();
   refreshField();
@@ -145158,7 +145184,7 @@ const WL2 = (() => {
    slate. Checks: `python tools/make_cm2.py --check`. Notes: docs/model_pilot/chronomancer2.md. */
 const CM2 = (() => {
   const U = 'cc_chronomancer', NAMES = ['idle', 'ready', 'readyUp', 'bolt', 'boltUp', 'dilate', 'rewind', 'echo', 'hit', 'death'];
-  const EASE = .2, SPD_MAX = 1.8, LEAD = .12, BASE_H = .045;
+  const EASE = .2, SPD_MAX = 1.8, LEAD = .33, BASE_H = .045;   // (LEAD: a spell's clip starts this long before its release, so its wind-up shows; 27 Nov: was .12)
   const MV = { cc_dilation: 'dilate', cc_quicken: 'rewind', cc_echo: 'echo' }, BY_SLOT = ['dilate', 'rewind', 'echo'];
   const S = { on: true, err: null };
   try { S.on = !/[?&]cm=old\b/.test(location.search); } catch (e) {}
@@ -145299,7 +145325,7 @@ const CM2 = (() => {
   }
   let PT = null, PU = null, OUT = null;
   const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
-  const UPOF = { ready: 'readyUp', bolt: 'boltUp' };
+  const UPOF = { ready: 'readyUp', bolt: 'boltUp' }, GATHER = { bolt: 1, dilate: 1, rewind: 1, echo: 1 };
   const mine = t => S.on && MESH_ && t && t._cmDrawn != null && typeof G !== 'undefined' && G && G.time - t._cmDrawn < .3 && G.time >= t._cmDrawn;
   function draw(t, tier, sx, sy, sz, wob, opts) {
     if (!ready()) return false;
@@ -145332,6 +145358,12 @@ const CM2 = (() => {
     if (live) {
       const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
       t.tipW = w(ST, MK.gem); t.tipYaw = yaw; t.tipAt = G.time; t._cmDrawn = G.time; t._cmClip = P.c; t._cmClipS = P.s; t._cmFoot = w(ST, MK.foot);
+      // the crystal's gather and release for the time effects (src/chronofx.js): how far into the wind-up (0..1), and when
+      // the bolt or spell left it
+      const c0 = CL[P.c], hit = c0 && c0.hit != null && GATHER[P.c] ? c0.hit / 30 : 0;
+      t._cmG = hit ? (P.s < hit ? Math.pow(Math.max(0, P.s / hit), 1.4) : Math.max(0, 1 - (P.s - hit) / .2) * .6) : 0;
+      if (hit && P.s >= hit && P.s < hit + .2) { const key = P.c === 'bolt' ? 'b' + t.shots : P.mv; if (t._cmRelKey !== key) { t._cmRelKey = key; t._cmRel = G.time; } }
+      if (typeof CMFX !== 'undefined') CMFX.staff(t);
     }
     return true;
   }
@@ -145373,7 +145405,225 @@ const CM2 = (() => {
       if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('cm2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
     }
   });
-  return { S, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+  return { S, CL, LEAD, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+})();
+
+/* ================= THE CHRONOMANCERS' TIME EFFECTS (27 Nov 2026; the owner: his animations and spells were "a bit
+   underwhelming": make him read as a master of time) =================
+   Drawn with the VFX toolkit (vfx.js) as SFX_DRAW moments in the spell pass; nothing here changes what a spell does.
+   His colours: the crystal's pale light, his robe's gold, a time-violet accent, a touch of his green.
+     the staff     every moment he is drawn: the crystal's glow; before each bolt and spell light gathers into it (wisps
+                   spiralling in, a small clock-face turning round it), and on the release it flashes with a chromatic
+                   shimmer (violet and green rings parting from a gold one). Driven by the runtime (unitmodels_chronomancer2.js:
+                   t._cmG, how far the gather is, and t._cmRel, the release)
+     the bolt      a trail behind his golden bolt, its head a spinning clock-wheel; where it lands a clock-face flashes at
+                   the foe's feet and its hour hand ticks back one step
+     Time Dilation a clock-face on the ground under the circle, its rim ticking round, its hour hand stepping (tick, tick),
+                   grains of sand hanging still in the air over it, a small clock ring at the feet of every foe slowed in it;
+                   the staff's slam lands as a ripple of bent air and a ring
+     Backward Hour the hour hand sweeping backward round the circle with a violet wake behind it; every foe it turns back
+                   leaves after-images behind it, pulled back after it as it is dragged up the road
+     Recurrence    a thread of light from his crystal to the ally whose spell recurs, and rings echoing out from the ally
+   Kept from hiding the field: additive light only, at most half bright on the ground and over the foes; Low graphics
+   (vfxLite) drops the sand, the wisps and the after-images. */
+const CMFX = (() => {
+  const U = 'cc_chronomancer';
+  const K = () => CMFX._K || (CMFX._K = {
+    gold: vfxC('#ffd27a', 1.15), hot: vfxC('#fff2d0', 1.45), crys: vfxC('#e8deff', 1.3), vio: vfxC('#9a72ff', 1.25), vioD: vfxC('#6e4fd8', 1.0),
+    grn: vfxC('#6fe0a8', 1.1), sand: vfxC('#ffe6a8', 1.3), ink: vfxC('#000000'),
+  });
+  const live = () => typeof sfxLive === 'function' && sfxLive();
+  const lite = () => typeof vfxLite === 'function' && vfxLite();
+  const clamp1 = x => Math.max(0, Math.min(1, x));
+  const ease = x => 1 - Math.pow(1 - clamp1(x), 3);
+  const mine = t => t && t.def && t.def.unit === U;
+
+  /* ---- the staff: one moment a Chronomancer, kept while he is drawn ---- */
+  function staff(t) {
+    const q = t._cmFxQ;
+    if (q && q.life > q.age && SFX.list.includes(q)) return;
+    t._cmFxQ = sfxAdd({ k: 'cmStaff', t, life: 1e6, tick: staffTick });
+  }
+  function staffTick(q, dt) {
+    const t = q.t;
+    if (!t || t.wrecked || !G.towers.includes(t) || !(G.time - (t._cmDrawn || -9) < 2)) { q.life = 0; return; }
+  }
+  SFX_DRAW.cmStaff = q => {
+    const t = q.t, p = t.tipW; if (!p || !(G.time - (t._cmDrawn || -9) < .25)) return;
+    const k = K(), g = clamp1(t._cmG || 0), now = G.time, rel = t._cmRel != null ? now - t._cmRel : 9, x = p[0], y = p[1], z = p[2];
+    // the crystal's own light, always a little; fuller as it gathers
+    vfxSprite(VX, x, y, z, .10 + .16 * g, .10 + .16 * g, 0, k.crys, .22 + .5 * g, VT.GLOW, 1);
+    if (g > .02) {
+      vfxSprite(VX, x, y, z, .16 + .14 * g, .16 + .14 * g, -now * 1.6, k.gold, .55 * g, VT.CLOCK, 1);   // a small clock-face turning round it
+      vfxSprite(VX, x, y, z, .05 + .05 * g, .05 + .05 * g, 0, k.hot, .9 * g, VT.GLOW, 1);
+      if (!lite()) for (let i = 0; i < 6; i++) {   // wisps spiralling in
+        const u = (now * 1.5 + i / 6) % 1, r = .38 * (1 - u) * (.6 + .4 * g), a0 = i * TAU / 6 + u * 3.2, al = g * Math.sin(Math.PI * u);
+        vfxRb.begin(VX, VT.ENERGY, 1);
+        for (let j = 0; j < 4; j++) {
+          const uu = Math.max(0, u - j * .05), rr = .38 * (1 - uu) * (.6 + .4 * g), aa = i * TAU / 6 + uu * 3.2;
+          vfxRb.pt(x + Math.cos(aa) * rr, y + Math.sin(aa * 1.3) * rr * .5, z + Math.sin(aa) * rr, (.035 - j * .007) * vfxPx(), i % 2 ? k.vio : k.gold, al * (1 - j / 4), j * .3 - now * 3);
+        }
+        vfxRb.end();
+      }
+    }
+    if (rel < .32) {   // the release: a flash, and the chromatic shimmer, violet and green parting from the gold
+      const u = rel / .32, e = 1 - u, s = .12 + .38 * ease(u), d = .03 * ease(u);
+      vfxSprite(VX, x, y, z, .22 * (1 + u), .22 * (1 + u), 0, k.hot, .8 * e * e, VT.GLOW, 1);
+      vfxSprite(VX, x - d, y, z, s, s, now, k.vio, .55 * e, VT.WRING, 1);
+      vfxSprite(VX, x + d, y, z, s, s, now, k.grn, .35 * e, VT.WRING, 1);
+      vfxSprite(VX, x, y + d * .5, z, s * .97, s * .97, now, k.gold, .6 * e, VT.WRING, 1);
+      if (typeof vfxDistHaze === 'function') vfxDistHaze(x, y, z, .3 + .3 * u, .5 * e);
+    }
+  };
+
+  /* ---- the bolt: a trail, a spinning clock-wheel head; a clock-face ticking back at the foe's feet ---- */
+  function bolt(t, p) {
+    sfxAdd({ k: 'cmBolt', p, buf: new Float32Array(30), n: 0, head: 0, fade: 0, life: 6, tick: boltTick });
+    const fn = p.fn; p.fn = (c, o) => { try { if (c && !c.dead && live()) tickRing(c.x, c.y, .34, .6); else if (c && live()) tickRing(c.x, c.y, .3, .5); } catch (e) {} return fn(c, o); };
+  }
+  function boltTick(q, dt) {
+    const p = q.p, gone = p.done || !(G.ccP || []).includes(p);
+    if (gone) { q.fade += dt; q.life = q.fade > .22 ? 0 : q.age + 1; return; }
+    q.head = q.n ? (q.head + 1) % 10 : 0; const o = q.head * 3; q.buf[o] = p.x; q.buf[o + 1] = p.h == null ? .5 : p.h; q.buf[o + 2] = p.z; q.n = Math.min(10, q.n + 1);
+  }
+  SFX_DRAW.cmBolt = q => {
+    const B = q.buf, n = q.n; if (n < 1) return; const k = K(), e = q.fade ? Math.max(0, 1 - q.fade / .22) : 1, px = vfxPx();
+    if (n >= 2) {
+      vfxRb.begin(VX, VT.ENERGY, 1);
+      for (let j = 0; j < n; j++) { const o = ((q.head - j + 10) % 10) * 3, f = 1 - j / n; vfxRb.pt(B[o], B[o + 1], B[o + 2], .09 * f * px, j < 2 ? k.hot : j < 5 ? k.gold : k.vio, f * .8 * e, j * .25 - q.age * 5); }
+      vfxRb.end();
+    }
+    if (!q.fade) { const o = q.head * 3; vfxSprite(VX, B[o], B[o + 1], B[o + 2], .15, .15, -q.age * 9, k.gold, .8, VT.CLOCK, 1); vfxSprite(VX, B[o], B[o + 1], B[o + 2], .09, .09, 0, k.hot, .9, VT.GLOW, 1); }
+  };
+  function tickRing(x, z, r, life) { sfxAdd({ k: 'cmTick', x, z, r, life, a0: Math.random() * TAU }); }
+  SFX_DRAW.cmTick = (q, u, a) => {
+    const k = K(), s = q.r * (.55 + .45 * ease(u * 3)), e = Math.min(1, a * 1.6);
+    vfxFlat(VX, q.x, q.z, .045, s, s, q.a0, k.gold, .5 * e, VT.CLOCK, 1);
+    vfxFlat(VX, q.x, q.z, .042, s * 1.12, s * 1.12, 0, k.vio, .35 * e, VT.WRING, 1);
+    const an = q.a0 - (u < .3 ? 0 : TAU / 12) * ease((u - .3) / .12);   // its hour hand ticks back one step
+    hand(q.x, q.z, s * .62, .05, an, k.hot, .85 * e);
+  };
+  function hand(x, z, len, w, an, c, e) {
+    vfxRb.begin(VX, VT.GLOWS, 1, 0, 1);
+    vfxRb.pt(x, .05, z, w * 1.6 * vfxPx(), c, e, 0); vfxRb.pt(x + Math.cos(an) * len, .05, z + Math.sin(an) * len, w * .6 * vfxPx(), c, e, 1);
+    vfxRb.end();
+  }
+  // twelve ticks round a rim, one lit after another going round (dir: 1 forward, -1 backward)
+  function rimTicks(x, z, r, a0, lit, dir, c, cl, e) {
+    for (let i = 0; i < 12; i++) {
+      const an = a0 + dir * i * TAU / 12, d = ((lit - i) % 12 + 12) % 12, glow = Math.max(0, 1 - d / 3);
+      vfxFlat(VX, x + Math.cos(an) * r, z + Math.sin(an) * r, .05, .045 + .03 * glow, .045 + .03 * glow, an, glow > 0 ? cl : c, (.35 + .65 * glow) * e, VT.GLOW, 1);
+    }
+  }
+
+  /* ---- Time Dilation: the clock-face, hanging sand, rings on the slowed ---- */
+  function dial(t, x, z, r, dur, delay) {
+    const sand = [];
+    if (!lite()) for (let i = 0; i < 22; i++) { const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * r * .92; sand.push([x + Math.cos(a) * d, .15 + Math.random() * .75, z + Math.sin(a) * d, Math.random() * TAU, .02 + Math.random() * .02]); }
+    sfxAdd({ k: 'cmDial', x, z, r, life: dur + .5, dur, a0: Math.random() * TAU, sand });
+    sfxAdd({ k: 'vring', delay, x, z, r0: .15, r1: r * 1.05, life: .5, col: K().gold, rot: Math.random() * TAU });
+    sfxAdd({ k: 'cmSlam', delay, x, z, r, life: .45 });
+  }
+  SFX_DRAW.cmDial = q => {
+    const k = K(), e = clamp1(q.age / .35) * clamp1((q.life - q.age) / .5), r = q.r, now = q.age;
+    vfxFlat(VX, q.x, q.z, .04, r, r, q.a0, k.gold, .13 * e, VT.CLOCK, 1);                      // the face (faint: the foes on it stay clear)
+    vfxFan(VX, q.x, .045, q.z, r * .97, r * 1.02, 0, TAU, 40, k.gold, .30 * e, VT.FAN, 1);     // its rim
+    vfxFan(VX, q.x, .044, q.z, r * .90, r * .95, 0, TAU, 40, k.vio, .28 * e, VT.FAN, 1);
+    if (q.age < .7) { const s = 1 - q.age / .7; vfxFan(VX, q.x - .02, .046, q.z, r * 1.01, r * 1.05, 0, TAU, 40, k.vio, .4 * s * e, VT.FAN, 1); vfxFan(VX, q.x + .02, .046, q.z, r * 1.01, r * 1.05, 0, TAU, 40, k.grn, .25 * s * e, VT.FAN, 1); }   // (the chromatic shimmer as it opens)
+    rimTicks(q.x, q.z, r * .86, q.a0, Math.floor(now * 2), 1, k.gold, k.hot, e);
+    const step = Math.floor(now / .5), f = now / .5 - step, an = q.a0 + (step + ease(f / .15)) * TAU / 12;   // the hour hand: tick, tick
+    hand(q.x, q.z, r * .55, .07, an, k.hot, .8 * e); hand(q.x, q.z, r * .78, .045, q.a0 * 3 + now * .9, k.crys, .55 * e);
+    vfxFlat(VX, q.x, q.z, .05, .07, .07, 0, k.hot, .8 * e, VT.GLOW, 1);
+    for (const s of q.sand) {   // sand hanging still in the air, drifting a hair, twinkling
+      const tw = .55 + .45 * Math.sin(now * 3 + s[3] * 5);
+      vfxSprite(VX, s[0] + Math.sin(now * .4 + s[3]) * .02, s[1] + Math.sin(now * .3 + s[3]) * .015, s[2], s[4], s[4], 0, k.sand, .7 * e * tw, VT.SPARK, 1);
+    }
+    for (const c of G.creeps) {   // a small clock ring at the feet of each foe held in it
+      if (c.dead || c.ent || Math.hypot(c.x - q.x, c.y - q.z) > r + .05) continue;
+      const fr = c.def && c.def.r ? Math.max(.22, c.def.r * 1.1) : .26;
+      vfxFlat(VX, c.x, c.y, .052, fr, fr, -now * .8, k.vio, .6 * e, VT.CLOCK, 1);
+      vfxFlat(VX, c.x, c.y, .05, fr * 1.08, fr * 1.08, 0, k.gold, .35 * e, VT.WRING, 1);
+    }
+  };
+  SFX_DRAW.cmSlam = (q, u, a) => {   // the staff's slam: bent air rippling out, a hot flash where it struck
+    if (typeof vfxDistRing === 'function') vfxDistRing(q.x, q.z, q.r * (.3 + .9 * ease(u)), .12, a);
+    vfxFlat(VX, q.x, q.z, .05, q.r * .45 * (1 + u), q.r * .45 * (1 + u), 0, K().vio, .22 * a * a, VT.GLOW, 1);
+  };
+
+  /* ---- Backward Hour: the hour hand sweeping back, a violet wake; after-images behind every foe it turns back ---- */
+  function rewind(x, z, r, dur) { sfxAdd({ k: 'cmRewind', x, z, r, life: dur + .4, a0: Math.random() * TAU }); }
+  SFX_DRAW.cmRewind = q => {
+    const k = K(), e = clamp1(q.age / .3) * clamp1((q.life - q.age) / .4), r = q.r, an = q.a0 - q.age * 2.6;   // (backward: counter to the clock)
+    vfxFan(VX, q.x, .046, q.z, r * .2, r * .95, an, an + 1.1, 14, k.vio, .5 * e, VT.FAN, 1);   // its wake, trailing behind it (it turns backward, so its wake lies ahead of it)
+    vfxFan(VX, q.x, .047, q.z, r * .2, r * .95, an, an + .35, 6, k.crys, .3 * e, VT.FAN, 1);
+    hand(q.x, q.z, r * .95, .07, an, k.hot, .85 * e);
+    rimTicks(q.x, q.z, r * .9, q.a0, Math.floor(-q.age * 4), -1, k.vio, k.hot, e);
+  };
+  function ghost(c, n) {
+    if (lite() || !c) return;
+    sfxAdd({ k: 'cmGhost', c, hist: [], life: .9, h: typeof creepH === 'function' ? Math.max(.3, creepH(c)) : .5, n, tick: ghostTick });
+  }
+  function ghostTick(q) { const c = q.c; if (c && !c.dead && q.age < .5) { q.hist.unshift([c.x, c.y]); if (q.hist.length > 14) q.hist.length = 14; } }
+  SFX_DRAW.cmGhost = (q, u, a) => {
+    const k = K(), H = q.hist, n = H.length; if (n < 2) return;
+    for (let i = 3; i < n; i += 3) {   // after-images where it was a moment ago (down the road: it is being pulled back up it)
+      const p = H[i], f = (1 - i / n) * a;
+      vfxSprite(VX, p[0], q.h * .55, p[1], q.h * .45, q.h * .6, 0, i % 2 ? k.vio : k.crys, .32 * f, VT.WISP, 1, .2);
+    }
+    vfxRb.begin(VX, VT.ENERGY, 1);
+    for (let i = 0; i < n; i++) vfxRb.pt(H[i][0], q.h * .45, H[i][1], .08 * (1 - i / n) * vfxPx(), k.vio, .6 * a * (1 - i / n), i * .2 - q.age * 4);
+    vfxRb.end();
+  };
+
+  /* ---- Recurrence: a thread to the ally, rings echoing out from it ---- */
+  function echo(t, o, delay) { if (o && o.x != null) sfxAdd({ k: 'cmEcho', t, o, delay, life: 1.3 }); }
+  SFX_DRAW.cmEcho = (q, u, a) => {
+    const k = K(), t = q.t, o = q.o, p = t.tipW || [t.x, (typeof towerTop === 'function' ? towerTop(t) : 1.2), t.y];
+    const oh = typeof towerTop === 'function' ? towerTop(o) * .7 : .8, g = ease(u * 4);
+    vfxRb.begin(VX, VT.ENERGY, 1);
+    for (let j = 0; j <= 8; j++) { const w = j / 8 * g, x = p[0] + (o.x - p[0]) * w, z = p[2] + (o.y - p[2]) * w, y = p[1] + (oh - p[1]) * w + Math.sin(w * Math.PI) * .35; vfxRb.pt(x, y, z, .07 * vfxPx(), j % 2 ? k.gold : k.vio, .7 * a, j * .3 - q.age * 4); }
+    vfxRb.end();
+    for (let i = 0; i < 3; i++) {   // the echoes: three rings out from the ally, one after another
+      const v = clamp1((u - .15 - i * .16) / .4); if (v <= 0 || v >= 1) continue;
+      vfxSprite(VX, o.x, oh, o.y, .2 + .6 * ease(v), .2 + .6 * ease(v), i, i === 1 ? k.vio : k.gold, .55 * (1 - v), VT.WRING, 1);
+    }
+    vfxFlat(VX, o.x, o.y, .05, .45 * g, .45 * g, -q.age * 2, k.gold, .4 * a, VT.CLOCK, 1);
+  };
+
+  /* ---- the hooks ---- */
+  const LEAD = () => (typeof CM2 !== 'undefined' && CM2.LEAD) || .33;
+  function onCast(t, ab, tg, st) {
+    if (!live() || !mine(t)) return;
+    try {
+      const id = ab.id;
+      if (id === 'cc_dilation' && tg && tg.x != null) { const r = (ab.rr || 1) + .15 * ((st && st.caps && st.caps.ccLongSec) || 0), dur = typeof byT === 'function' && ab.by && ab.by.dur ? byT(ab.by.dur, t) : 3; dial(t, tg.x, tg.y, r, dur, LEAD()); }
+      else if (id === 'cc_echo' && tg && tg.o) echo(t, tg.o, LEAD() * .8);
+    } catch (e) { if (typeof console !== 'undefined') console.warn('chronofx:', e); }
+  }
+  function hook() {
+    if (typeof castAbility === 'function' && !castAbility._cm) {
+      const _c = castAbility;
+      castAbility = function (t, ab, tg, st, manual) { const r = _c.apply(this, arguments); if (r !== false && ab) onCast(t, ab, tg, st); return r; };
+      castAbility._cm = 1;
+    }
+    if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_chrono && !FORCE_ATTACK.cc_chrono._cm) {
+      const _a = FORCE_ATTACK.cc_chrono;
+      FORCE_ATTACK.cc_chrono = function (t, st, tg, pow, echo_) {
+        const L = G.ccP || (G.ccP = []), n0 = L.length, r = _a.apply(this, arguments);
+        if (live() && mine(t)) for (let i = n0; i < L.length; i++) if (L[i] && L[i].k === 'chrono') bolt(t, L[i]);
+        return r;
+      };
+      FORCE_ATTACK.cc_chrono._cm = 1;
+    }
+    if (typeof CCX_FX !== 'undefined' && CCX_FX.backHour && !CCX_FX.backHour._cm) {
+      const _h = CCX_FX.backHour, _t = CCX_FX.backTurn;
+      CCX_FX.backHour = function (C, x, z, r, dur) { const o = _h.apply(this, arguments); try { if (!C || !C.t || mine(C.t)) rewind(x, z, r * ((C && C.T && C.T.ring) || 1), dur); } catch (e) {} return o; };
+      CCX_FX.backHour._cm = 1;
+      if (_t) CCX_FX.backTurn = function (C, c, n) { const o = _t.apply(this, arguments); try { ghost(c, n); } catch (e) {} return o; };
+    }
+  }
+  hook();
+  return { staff, hook, dial, rewind, echo, tickRing, ghost, K };
 })();
 
 /* ================= When the game asks for its lazy asset groups (src/lazyassets.js) =================
