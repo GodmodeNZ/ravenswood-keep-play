@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a5e4ee5f@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '4497f227@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -128033,8 +128033,9 @@ function rnLootBossHTML(n) {
    from the bindings on their data attributes (data-ri, data-wbt, data-rgi, data-rgw). */
 function lootRowsHTML(rows, sm) {
   const E = x => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  rows = rows.slice().sort((p, q) => (p.rar | 0) - (q.rar | 0));   // owner, 27 Nov 2026: weapons listed as the other items (rarity only), the rarest (purple) at the bottom
   return rows.length ? `<ul class="lrows${sm ? ' sm' : ''}">${rows.map(r => { const R = RARITY[r.rar] || RARITY[2];
-    return `<li><button type="button" class="lrow${r.rar >= 4 ? ' lg' : ''}" style="--rc:${R.col}" ${r.attr} aria-label="${E(r.name)}, ${E(r.sub || R.name)}">${r.img ? `<img alt="" src="${r.img}">` : `<i aria-hidden="true">${E(String(r.name).slice(0, 1))}</i>`}<span><b>${E(r.name)}</b><small>${E(r.sub || R.name)}</small></span></button></li>`; }).join('')}</ul>` : '';
+    return `<li><button type="button" class="lrow${r.rar >= 4 ? ' lg' : ''}" style="--rc:${R.col}" ${r.attr} aria-label="${E(r.name)}, ${E(R.name)}">${r.img ? `<img alt="" src="${r.img}">` : `<i aria-hidden="true">${E(String(r.name).slice(0, 1))}</i>`}<span><b>${E(r.name)}</b><small>${E(R.name)}</small></span></button></li>`; }).join('')}</ul>` : '';
 }
 // the forecast's rows for a boss on wave n: its table (relics, its legendary when the wave allows) and its weapons, one list
 function rnLootRows(t, n) {
@@ -131603,6 +131604,8 @@ function rgBossWpnIcons(type, force, w, tys) {
 }
 function rgWpnCard(el) {
   const [force, type, w, ty] = (el.dataset.rgw || '').split('|'), B = typeof bossLootTable === 'function' ? bossLootTable(type, force, +w, [ty]) : null, x = B && B.items.find(e => e.wpn && e.ty === ty); if (!x) return '';
+  // the weapon's own card, as in the bag (owner, 27 Nov 2026: "show the actual item on hover")
+  if (typeof wpnCardHTML === 'function') { let h = ''; try { h = wpnCardHTML({ b: x.base, rar: x.rar || 2, oh: x.oh, il: Math.max(1, +w || 1) }, null); } catch (e) {} if (h) return h; }
   return `<div class="rg-tc"><h4 style="color:${RARITY[x.rar || 2].col}">${rgEsc(x.name)}</h4><p class="rg-fx">${RARITY[x.rar || 2].name} weapon · ${rgEsc(x.unit)} only</p><p>A weapon for your ${rgEsc(x.unit)}, made in ${rgEsc(B.name)}’s fashion.${x.ohName ? ` On hit: <b>${rgEsc(x.ohName)}</b>.` : ''}</p></div>`;
 }
 if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rg-wp[data-rgw]', rgWpnCard, { tap: () => null }); itipBind(document, '.lrow[data-rgw]', rgWpnCard, { tap: () => null }); }
