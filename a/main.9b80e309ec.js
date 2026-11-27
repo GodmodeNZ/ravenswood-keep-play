@@ -1,4 +1,4 @@
-const BUILD_TAG = '32a9a0ed@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0178474b@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -63843,6 +63843,18 @@ function ezTal(force, slot, name, kind, a, b, w) {
      cd: seconds off its cooldown   cost: mana off its cost   pow: it hits that much harder (.1 = 10%)
      by: { key: x }  added to one of the spell's own numbers (ab.by[key]: dur, n, low, stun ...), with say(v, ab) for its words
    It is an ordinary spell entry (sp), so the tree rules hold: it sits below its spell's own talent and names the spell. */
+/* Not every spell talent is "X% more damage" (owner, 28 Nov 2026: "rather than flat damage increases on spells for talents can
+   you make it slightly more interesting ... mix it up a bit more. seeing too many flat % increase, its ok on some talents
+   but seeing it a little too often"). what.vs: [kind, k] is more damage against one kind of foe, a kind the spell meets on
+   its own (no other unit's mark): a number about twice the flat one it replaced, since it pays about half the time. */
+const EZ_VS = {
+  low: 'foes below 50% health', fresh: 'foes above 80% health', big: 'bosses, leaders and elites', flyer: 'flyers',
+  crowd: 'foes in a group of 3 or more', slowed: 'slowed foes', burning: 'burning foes',
+};
+if (typeof SP_COND !== 'undefined') {
+  if (!SP_COND.fresh) SP_COND.fresh = c => c.hp >= (c.maxHp || c.hp) * .8;
+  if (!SP_COND.crowd) SP_COND.crowd = c => typeof crowdOf === 'function' && crowdOf(c) >= 3;
+}
 function ezSpell(force, slot, name, abId, what, say) {
   const t = ezFind(force, slot, name), ab = typeof ABIL !== 'undefined' && ABIL[abId];
   if (!t) return null;
@@ -63858,6 +63870,7 @@ function ezSpell(force, slot, name, abId, what, say) {
     if (what.cd) e.cd = -what.cd * n / ab.cd;
     if (what.cost) e.cost = -what.cost * n / ab.mana;
     if (what.pow) e.vs = ['any', what.pow * n];
+    if (what.vs) e.vs = [what.vs[0], what.vs[1] * n];
     if (what.by) { e.by = {}; for (const k in what.by) e.by[k] = what.by[k] * n; }
     return e;
   };
@@ -63868,6 +63881,7 @@ function ezSpell(force, slot, name, abId, what, say) {
     if (what.cd) out.push(`Reduces the cooldown of ${ab.name} by ${ezR(what.cd * M)} sec.`);
     if (what.cost) out.push(`Reduces the mana cost of ${ab.name} by ${ezR(what.cost * M)}.`);
     if (what.pow) out.push(`Increases the damage of ${ab.name} by ${ezP(what.pow * M)}%.`);
+    if (what.vs) out.push(`Increases the damage of ${ab.name} by ${ezP(what.vs[1] * M)}% against ${EZ_VS[what.vs[0]] || what.vs[0]}.`);
     if (what.by && say) { const txt = String(say(M, ab)), m = /^lasts ([\d.]+)s longer$/.exec(txt); out.push(m ? `Increases the duration of ${ab.name} by ${m[1]} sec.` : `${ab.name} ${txt}.`); }
     return out.join(' ');
   };
@@ -63876,6 +63890,7 @@ function ezSpell(force, slot, name, abId, what, say) {
     if (what.cd) rec.cd = st(k => what.cd * k);
     if (what.cost) rec.cost = st(k => what.cost * k);
     if (what.pow) rec.pow = st(k => what.pow * k);
+    if (what.vs) rec.cond = st(k => what.vs[1] * k);
     if (what.by && say) rec.by = st(byNum);
     return rec;
   };
@@ -64174,7 +64189,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
 
   /* ---------- Magelings (damage: no control). Kept: Twin Casting, Splitting Missile, Skyward Missiles, Packed Ranks;
      capstones Missile Swarm, Ready Orb, Apprentice's Tempo, Missile Storm ---------- */
-  ezSpell(F, 'arrow', 'Homing Missiles', 'cc_barrage', { pow: .2, verb: 'sears' });
+  ezSpell(F, 'arrow', 'Homing Missiles', 'cc_barrage', { vs: ['big', .5] });
   ezFlav(F, 'arrow', 'Busy Hands', 'tempo', .05, 'casts missiles');
   ezFlav(F, 'arrow', 'Lesson Learned', 'harvest', 5, 'the Mageling');
   ezSpell(F, 'arrow', 'Tome Familiar', 'cc_barrage', { by: { n: 1 } }, v => `looses ${v} more missile${v > 1 ? 's' : ''}`);
@@ -64185,7 +64200,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
 
   /* ---------- Frostweavers (control). Kept: Chilling Bolts, Icicle Through, Deep Freeze, Absolute Stillness, Second
      Spear; capstones Deep Winter, Icicle Volley, Coffin Burst ---------- */
-  ezSpell(F, 'frost', 'Shard Spray', 'cc_glacialglyph', { pow: .1, verb: 'pierces' });
+  ezSpell(F, 'frost', 'Shard Spray', 'cc_glacialglyph', { vs: ['slowed', .1] });
   ezFlav(F, 'frost', 'Cracking Cold', 'overflow', .1, 'her icicles hit');
   ezTal(F, 'frost', 'Long Staff', 'reach', .25, 0, 'Her staff reaches');
   ezFlav(F, 'frost', 'Cold Library', 'tap', .5, 'the Frostweaver');
@@ -64206,16 +64221,16 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      Turning Stars; capstones Constellation, Starfall Sky, Binary Star ---------- */
   ezFlav(F, 'storm', 'Bright Fourth', 'watch', .1, 'its starlight');
   ezFlav(F, 'storm', 'Busy Sky', 'tempo', .05, 'reads stars down');
-  ezSpell(F, 'storm', 'Omen Light', 'cc_fallingstar', { pow: .15, verb: 'burns' });
+  ezSpell(F, 'storm', 'Omen Light', 'cc_fallingstar', { vs: ['low', .4] });
   ezSpell(F, 'storm', 'Orrery Moon', 'cc_orrery', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezSpell(F, 'storm', 'Zodiac', 'cc_fallingstar', { cd: 1.5, back: 'is called every' });
-  ezSpell(F, 'storm', 'Falling Finish', 'cc_omen', { pow: .2, verb: 'comes down' });
+  ezSpell(F, 'storm', 'Falling Finish', 'cc_omen', { vs: ['crowd', .4] });
 
   /* ---------- Golem Wardens (line holder). Kept: Second Tremor, Granite Fists, Mana Quarry, Stone Fists, Fault Line;
      capstones Shatterground, Shockwave, Stone Sprite ---------- */
   ezSpell(F, 'earth', "Warden's Command", 'cc_seismic', { cd: 1, back: 'leaps every' });
   ezFlav(F, 'earth', 'Double Fist', 'tempo', .04, 'its golem pounds');
-  ezSpell(F, 'earth', 'Gathering Weight', 'cc_seismic', { pow: .2, verb: 'shakes the road' });
+  ezSpell(F, 'earth', 'Gathering Weight', 'cc_seismic', { vs: ['fresh', .45] });
   ezTal(F, 'earth', 'Hurled Stone', 'hp', .15);
   ezSpell(F, 'earth', 'Waking Golem', 'cc_tremorglyph', { pow: .2, verb: 'hurls' });
   ezFlav(F, 'earth', 'Golem Core', 'momentum', .04, 'its golem pounds');
@@ -64225,7 +64240,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      Stoked Fire, Flashover, Banked Heat; capstones Sunfall, Pyre Bloom ---------- */
   ezFlav(F, 'cannon', 'Ember Wisp', 'flurry', .15, 'kindles and throws');
   ezSpell(F, 'cannon', 'Twin Fireball', 'cc_kindle', { by: { n: 1 } }, v => `skips ${v} more time${v > 1 ? 's' : ''}`);
-  ezSpell(F, 'cannon', 'Bouncing Fireball', 'cc_flamewave', { pow: .2, verb: 'scorches' });
+  ezSpell(F, 'cannon', 'Bouncing Fireball', 'cc_flamewave', { vs: ['burning', .24] });
   ezFlav(F, 'cannon', 'Stoking Hands', 'echo', .3, 'kindles and throws');
 
   /* ---------- Arcane Severers. Kept: Keen Crescent, Hunting Crescent, Splintering, Homeward Edge, Glancing Crescent;
@@ -64248,7 +64263,8 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
   ezLayout(F, 'glaive', [[0,0],[1,2],[3,1],[1,0],[1,1],[2,1],[5,2],[2,2],[4,3],[3,3],[4,2],[1,3],[5,1],[5,0],[0,1],[0,2],[3,0]], [[0,3,16,13],[4,5,2],[9,8]]);   /* rows 3 4 2 3 2 3; chains: Measured Cuts > Riftsteel Rhythm > Killing Step > Rift Dance | Ward-Splitter > Ghost Edge > Lone Duel | Thrown Riftblade > Thousand Edges */
   ezLayout(F, 'arrow', [[0,2],[0,1],[5,2],[3,3],[3,1],[1,0],[4,1],[1,1],[2,3],[5,3],[2,0],[1,2],[2,2],[5,1],[1,3],[0,3],[4,2],[4,0],[5,0]], [[8,3,9],[17,18],[1,7],[5,10]]);   /* rows 3 4 3 2 3 4; chains: Gathering Orb > Charged Recital > Ready Orb | Tidemoon > Missile Storm | Splitting Missile > Skyward Missiles | Tome Familiar > Overflowing Missile */
   ezLayout(F, 'frost', [[0,1],[0,2],[5,2],[4,3],[2,2],[2,1],[1,0],[5,1],[4,1],[3,3],[5,0],[3,2],[1,1],[2,0],[4,2],[0,3],[2,3]], [[6,13,10],[8,7],[0,12,5]]);   /* rows 3 2 4 2 3 3; chains: Ice Coffin > Cold Focus > Coffin Burst | Shatterbloom > Icicle Volley | Chilling Bolts > Absolute Stillness > Long Staff */
-  ezLayout(F, 'arcane', [[0,1],[3,2],[2,3],[4,3],[1,3],[2,0],[3,1],[5,2],[5,1],[0,2],[4,0],[2,2],[1,0],[5,0],[0,3],[4,2],[2,1]], [[0,16,6,8],[14,4,2],[12,5],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Spare Seconds > Time Rhythm > Long Hour > Frozen Moment | Pendulum Swing > Backward Hour > Rewound Bolt | Arcane Clockwork > Dead Hour | Recurrence > Endless Hour */
+  ezLayout(F, 'arcane', [[2,0],[2,1],[3,2],[2,3],[1,3],[0,3],[0,2],[5,2],[5,1],[0,0],[4,0],[2,2],[1,1],[4,3],[0,1],[4,2],[3,0]], [[14,12,1,8],[0,16,10],[11,2,15,7],[5,4,3]]);   /* (28 Nov 2026, the Chronomancers' own tree, forces_..._easy_conclave_chrono.js: Master of the Clock in columns 1-2, Unmaker in 3-4; rows 4 2 4 2 3 2; chains: The Clock Tolls > Time's Toll > Stored Hour > Midnight | Spare Seconds > Time Rhythm > Recurrence | Hour of Need > Rewound Bolt > Borrowed Time > Paradox | Dead Hour > Backward Hour > Long Way Back) */
+  if (0) ezLayout(F, 'arcane', [[0,1],[3,2],[2,3],[4,3],[1,3],[2,0],[3,1],[5,2],[5,1],[0,2],[4,0],[2,2],[1,0],[5,0],[0,3],[4,2],[2,1]], [[0,16,6,8],[14,4,2],[12,5],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Spare Seconds > Time Rhythm > Long Hour > Frozen Moment | Pendulum Swing > Backward Hour > Rewound Bolt | Arcane Clockwork > Dead Hour | Recurrence > Endless Hour */
   ezLayout(F, 'storm', [[0,2],[0,3],[3,2],[0,0],[3,3],[1,3],[0,1],[4,2],[5,2],[5,1],[2,1],[3,1],[2,0],[4,0],[1,2],[1,0],[2,2]], [[6,10,11,9],[3,15,12],[14,16,2],[7,8],[5,4]]);   /* (27 Nov 2026, the Astrologers' own tree, forces_..._easy_conclave_skywide.js: the Seer in columns 1-2, Starfall in 3-4; rows 4 3 3 3 2 2; chains: Busy Sky > Grand Orrery > Omen of Ending > The Whole Sky | Long Lens > Fated Mark > Bright Fourth | Turning Stars > Omen Light > Crater | Zodiac > Starfall Sky | Lodestar > Falling Finish) */
   if (0) ezLayout(F, 'storm', [[0,2],[0,3],[5,2],[3,2],[3,3],[1,3],[3,1],[4,2],[5,3],[5,1],[2,1],[0,1],[2,0],[4,0],[2,2],[1,0],[3,0]], [[14,3,7,2],[1,5],[11,10,6]]);   /* rows 3 2 3 4 2 3; chains: Turning Stars > Long Lens > Zodiac > Constellation | Star-Chart > Lodestar | Shooting Bolt > Grand Orrery > Busy Sky */
   ezLayout(F, 'earth', [[1,1],[0,2],[3,1],[0,1],[2,1],[5,1],[1,3],[3,2],[4,0],[3,3],[1,0],[5,0],[2,2],[5,2],[1,2],[0,3],[4,1]], [[4,2,16,5],[10,8,11],[15,6]]);   /* rows 3 4 2 3 2 3; chains: Heave > Waking Golem > Stamped Flat > Shatterground | Stone Fists > Living Bulwark > Shockwave | Warden's Command > Gathering Weight */
@@ -64258,6 +64274,181 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
   ezLayout(F, 'champ:cc_chrono', [[0,2],[0,1],[3,0],[5,1],[1,2],[2,1],[3,2],[1,0],[3,3],[4,1],[3,1],[5,0],[2,3],[5,2],[0,3],[2,0],[4,3]], [[5,10,9,3],[12,8,16],[7,15],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Way Back > Second Hand > Late Arrival > Gathered Ghosts | The Hour Strikes > Endless Hour > Leaden Pull | Lent Time > Saved Seconds | Patient Hands > Recall */
   ezLayout(F, 'champ:cc_maren', [[0,1],[0,2],[1,2],[3,2],[1,1],[2,0],[2,3],[2,2],[5,1],[3,3],[3,0],[5,2],[4,3],[4,0],[3,1],[0,3],[5,0]], [[5,10,13,16],[6,9,12],[7,3],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Chain > Flourish > Duelling Ground > Chain to Blade | Opened Guard > Cut the Fallen > Unbound Blade | Shared Edge > Practice Yard | Quick Draw > Rift Chain */
 }
+
+/* The Chronomancers' own tree (owner, 28 Nov 2026: "can we make chronomancer a little more interesting than just a unit that
+   slows"; approved core: The Hour Strikes, Stored Hour, Rewind). Two fantasies, each with its own capstone, 17 talents in
+   the same list order as before (saves load by index; a renamed talent keeps its painting, TAL_ART_ALIAS). He is the
+   Conclave's control unit, so control is allowed, but one node slows now (Dead Hour), not three. Nothing here leans on a
+   neighbour. He starts plain: all of it comes from talents. The layout is the ezLayout line in forces_..._easy_conclave.js.
+
+   MASTER OF THE CLOCK (columns 1-2): rhythm and timing
+     Clockwork Rhythm  each attack brings his spells sooner                      (kept)
+     The Clock Tolls   he counts his attacks; every 12th/10th/8th chimes and
+                       hits every foe in reach; the count shows round his feet   (was Pendulum Swing: one more bolt)
+     Time's Toll       the longer since he first struck a foe, the more his
+                       attacks take from it (it was Foresight, "first attack on each foe
+                       hits harder": the item Lens of the Next Moment does that)  (was Arcane Clockwork: slowed foes)
+     Stored Hour       his attacks store a share of their damage in the foe,
+                       which bursts 3s later                                     (was Clockwork Familiar: same-foe ramp)
+     Spare Seconds     Time Dilation lasts longer                                (kept)
+     Time Rhythm       Time Dilation costs less                                  (kept)
+     Winding Spring    each attack comes faster while he keeps attacking         (was Endless Hour, a third capstone)
+     MIDNIGHT          every 3rd chime is midnight: foes in reach are stunned
+                       and the chime hits twice as hard                          (was Frozen Moment)
+   UNMAKER (columns 3-4): time as a weapon, around Backward Hour
+     Long Hour         his range                                                 (kept)
+     Dead Hour         his attacks slow; a foe kept slowed 3s is stunned         (kept: the tree's one slow)
+     Backward Hour     his spell                                                 (kept)
+     Hour of Need      after a spell he attacks faster                           (kept)
+     Rewound Bolt      Backward Hour comes sooner                                (kept)
+     Long Way Back     Backward Hour sends foes further back                     (was Heavy Hours: a second slow)
+     Borrowed Time     foes Backward Hour sends back are wounded                 (was Replay: one more bolt)
+     Recurrence        his spell                                                 (kept)
+     PARADOX           foes sent back take more from him for 4s                  (was Time Loop: two more bolts) */
+const CMT = { HOUR: [12, 10, 8], HOUR_MAX: 14, TOLL: .03, TOLL_MAX: .1, STORE: .1, STORE_T: 3, WIND: .04, MID_N: 3, MID_K: 1.5, MID_STUN: 1.5,
+  BACK: .2, TURN: 2.5, PARA: .4, PARA_T: 4, SEEN: '_cmtSeen' };
+(function () {
+  if (typeof FORCES === 'undefined' || !FORCES.conclave || !FORCES.conclave.talents) return;
+  const F = 'conclave', T = FORCES.conclave.talents.arcane; if (!T) return;
+  const P = v => String(Math.round(v * 100)), N = v => String(+(+v).toFixed(2));
+  const M = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  const set = (old, name, o) => {
+    const t = T.list.find(q => q.name === old && !q.spell); if (!t) { if (typeof console !== 'undefined') console.warn('chronomancer tree: no talent', old); return null; }
+    if (!o.keep && typeof ezClear === 'function') ezClear(t);
+    if (name !== old) { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = TAL_ART_ALIAS[old] || old; t.oldName = old; t.name = name; }
+    if (o.tag) t.tag = o.tag;
+    if (o.max) t.max = o.max;
+    if (o.cap) { t.cap = o.cap; t.capK = 1; }
+    if (o.mod) t.mod = o.mod;
+    if (o.sp) t.sp = o.sp;
+    if (o.pro) t.pro = n => o.pro(M(t, n));
+    if (!o.keep) { delete t.ezLadder; t.ez = null; t.atkPlain = true; }
+    return t;
+  };
+  // ---- Master of the Clock ----
+  set('Pendulum Swing', 'The Clock Tolls', { tag: 'Damage', cap: 'cmtHour',
+    pro: n => `The Chronomancer counts each attack. Every ${CMT.HOUR[n - 1]}th attack chimes and hits every foe in the Chronomancer's reach.` });
+  set('Arcane Clockwork', "Time's Toll", { tag: 'Damage', cap: 'cmtToll',
+    pro: n => `Foes take ${P(CMT.TOLL)}% more damage from the Chronomancer's attacks for each second since the Chronomancer first struck them, up to ${P(CMT.TOLL_MAX * n)}%.` });
+  set('Clockwork Familiar', 'Stored Hour', { tag: 'Damage', cap: 'cmtStore',
+    pro: n => `The Chronomancer's attacks store ${P(CMT.STORE * n)}% of their damage in the foe. ${CMT.STORE_T}s later, all of it bursts at once.` });
+  if (typeof ezFlav === 'function') ezFlav(F, 'arcane', 'Endless Hour', 'tempo', CMT.WIND);
+  set('Endless Hour', 'Winding Spring', { keep: 1, max: 2,
+    pro: n => `Each attack: the Chronomancer attacks ${P(CMT.WIND * n)}% faster, up to 5 times. A 2s pause between attacks resets it.` });
+  set('Frozen Moment', 'Midnight', { tag: 'Control', cap: 'cmtMid',
+    pro: () => `Every ${CMT.MID_N}rd chime is midnight: it hits ${P(CMT.MID_K - 1)}% harder, and foes in the Chronomancer's reach are stunned ${N(CMT.MID_STUN)}s (bosses a third as long).` });
+  // ---- Unmaker ----
+  set('Heavy Hours', 'Long Way Back', { tag: 'Spell', sp: n => ({ ab: 'cc_quicken', by: { back: CMT.BACK * n } }),
+    pro: n => `Backward Hour sends foes ${N(CMT.BACK * n)} cells further back.` });
+  set('Replay', 'Borrowed Time', { tag: 'Spell', cap: 'tchTurn', sp: () => ({ ab: 'cc_quicken' }),
+    pro: n => `Each foe sent back by Backward Hour takes damage equal to ${P(CMT.TURN * n)}% of the Chronomancer's attack.` });
+  set('Time Loop', 'Paradox', { tag: 'Spell', cap: 'cmtPara', sp: () => ({ ab: 'cc_quicken' }),
+    pro: () => `Foes sent back by Backward Hour take ${P(CMT.PARA)}% more damage from the Chronomancer for ${CMT.PARA_T}s.` });
+})();
+
+/* ---------- the rules ---------- */
+const cmtCaps = t => (t && t.st && t.st.caps) || null;
+const cmtFx = () => typeof sfxLive === 'function' && sfxLive() && typeof sfxAdd === 'function';
+const cmtCol = () => (typeof CC_COL !== 'undefined' && CC_COL.chrono) || '#ffd27a';
+/* The Hour Strikes, Midnight: his own bolts are counted (not their echoes); the chime is one more bolt at every other foe in
+   reach, each with everything his bolt carries. */
+let CMT_BOLT = null, CMT_FIRST = 0;
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_chrono) {
+  const _cmtAtk = FORCE_ATTACK.cc_chrono;
+  FORCE_ATTACK.cc_chrono = function (t, st, tg, pow, echo) {
+    const C = (st && st.caps) || {}, self = this;
+    const loose = (c, k, e) => { CMT_BOLT = t; try { return _cmtAtk.call(self, t, st, c, pow * k, e); } finally { CMT_BOLT = null; } };
+    if (!C.cmtHour || echo) return loose(tg, 1, echo);
+    const need = CMT.HOUR[Math.min(CMT.HOUR.length, C.cmtHour) - 1];
+    t.cmtN = (t.cmtN || 0) + 1;
+    if (cmtFx() && !(t._cmtQ && t._cmtQ.life > t._cmtQ.age && SFX.list.includes(t._cmtQ))) { if (!SFX_DRAW.cmtCount) SFX_DRAW.cmtCount = cmtCountDraw; t._cmtQ = sfxAdd({ k: 'cmtCount', t, life: 1e6, tick: cmtCountTick }); }
+    if (t.cmtN < need) return loose(tg, 1, echo);
+    t.cmtN = 0; t.cmtChimeAt = G.time;
+    const mid = C.cmtMid && (t.cmtCh = (t.cmtCh || 0) + 1) % CMT.MID_N === 0, k = mid ? CMT.MID_K : 1;
+    if (typeof ccEv === 'function') { ccEv('cap:cmtHour'); if (mid) ccEv('cap:cmtMid'); }
+    const r = loose(tg, k, echo), pool = G.creeps.filter(c => c !== tg && !c.dead && !c.ent && canTarget(t, st, c) && inRange(t, st, c)).slice(0, 24);
+    for (const c of pool) loose(c, k, true);
+    if (mid) for (const c of [tg].concat(pool)) if (c && !c.dead) stun(c, CMT.MID_STUN, 1 / 3, null);
+    cmtChimeFx(t, st, mid);
+    return r;
+  };
+}
+/* Time's Toll, Stored Hour: read where his bolt lands. Time's Toll raises that hit by the seconds since his first (the amp hook below); Stored Hour keeps a
+   share of what the hit took off the foe and gives it back as one burst. */
+if (typeof ccShoot === 'function') {
+  const _cmtShoot = ccShoot;
+  ccShoot = function (p) {
+    const t = CMT_BOLT;
+    if (t && p && p.k === 'chrono' && typeof p.fn === 'function') {
+      const fn = p.fn;
+      p.fn = function (c) {
+        const C = cmtCaps(t) || {};
+        if (!c || !(C.cmtToll || C.cmtStore)) return fn.apply(this, arguments);
+        const seen = c[CMT.SEEN] || (c[CMT.SEEN] = new Map()), hp0 = c.hp, first = false;
+        if (!seen.has(t.id)) seen.set(t.id, G.time);
+        CMT_FIRST = C.cmtToll ? Math.min(CMT.TOLL_MAX * C.cmtToll, CMT.TOLL * (G.time - seen.get(t.id))) : 0;
+        let r; try { r = fn.apply(this, arguments); } finally { CMT_FIRST = 0; }
+        if (first) part({ k: 'flare', x: c.x, z: c.y, h: hitH(c), life: .25, max: .25, size: .8, col: '#fff2d0' });
+        if (C.cmtStore && !c.dead) { const took = Math.max(0, hp0 - c.hp); if (took > 0) cmtStore(t, c, took * CMT.STORE * C.cmtStore); }
+        return r;
+      };
+    }
+    return _cmtShoot.apply(this, arguments);
+  };
+}
+function cmtStore(t, c, amt) {
+  if (c.cmtSt > 0) { c.cmtSt += amt; return; }
+  c.cmtSt = amt; c.cmtStAt = G.time + CMT.STORE_T;
+  G.delayed.push({ t: CMT.STORE_T, fn: () => {
+    const v = c.cmtSt || 0; c.cmtSt = 0; c.cmtStAt = 0;
+    if (c.dead || !(v > 0) || G.state !== 'play') return;
+    if (typeof ccEv === 'function') ccEv('cap:cmtStore');
+    tagged('rx', () => hurt(c, v, 'pure', G.towers.includes(t) ? t : null, true));
+    const x = c.x, z = c.y, col = cmtCol();
+    ccRingFx(x, z, .45, col); part({ k: 'flare', x, z, h: hitH(c), life: .3, max: .3, size: 1, col: '#fff2d0' });
+    if (typeof CMFX !== 'undefined' && CMFX.tickRing && cmtFx()) { try { CMFX.tickRing(x, z, .4); } catch (e) { /* the ring above is enough */ } }
+  } });
+}
+/* Time's Toll (that hit) and Paradox (his attacks and spells on a foe his Backward Hour sent back in the last 4s: the
+   spell stamps c.ccxBackT = the turn + 0.85s) */
+if (typeof forceHook === 'function') {
+  const _cmtHook = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = _cmtHook.apply(this, arguments);
+    if (k !== 'amp' || a2 || !a0 || !a1) return r;
+    const C = cmtCaps(a1); if (!C || DTAG === 'relic' || DTAG === 'rx') return r;
+    let v = 0;
+    if (CMT_FIRST && CMT_BOLT === null) v += 0;   /* (the bolt has landed: CMT_FIRST is set only inside its own hit) */
+    if (CMT_FIRST) v += CMT_FIRST;
+    if (C.cmtPara && a0.ccxBackT > G.time - (CMT.PARA_T - .85)) v += CMT.PARA * C.cmtPara;
+    return v ? (r || 0) + v : r;
+  };
+}
+/* ---------- what shows ---------- */
+// the chime: a gold ring out to his reach and a clock ring at his feet; midnight lays the whole clock-face over his reach
+function cmtChimeFx(t, st, mid) {
+  const col = cmtCol(), r = st.range || 2.8;
+  ccRingFx(t.x, t.y, r, col); rfx({ k: 'rune', x: t.x, z: t.y, r: mid ? r : .9, col, life: mid ? 1 : .6 });
+  if (typeof sfx === 'function') sfx('phase', mid ? 2 : 1);
+  if (mid && cmtFx() && typeof CMFX !== 'undefined' && CMFX.dial) { try { CMFX.dial(t, t.x, t.y, r, CMT.MID_STUN, 0); } catch (e) { /* the rings above are enough */ } }
+  if (mid) G.shake = Math.max(G.shake || 0, .08);
+}
+// the count: twelve small marks round his feet (as many as the chime needs), lit one by one; all flash on the chime
+function cmtCountTick(q) {
+  const t = q.t, C = cmtCaps(t);
+  if (!t || t.wrecked || !G.towers.includes(t) || !C || !C.cmtHour) q.life = 0;
+}
+/* (SFX_DRAW is declared after this file, spellfx.js: the draw is registered when the first count is shown) */
+const cmtCountDraw = q => {
+  const t = q.t, C = cmtCaps(t); if (!t || !C || !C.cmtHour || typeof vfxFlat !== 'function' || typeof VX === 'undefined') return;
+  const need = CMT.HOUR[Math.min(CMT.HOUR.length, C.cmtHour) - 1], n = t.cmtN || 0, TAU2 = Math.PI * 2;
+  const K = typeof CMFX !== 'undefined' && CMFX.K ? CMFX.K() : null, gold = K ? K.gold : vfxC('#ffd27a', 1.15), hot = K ? K.hot : vfxC('#fff2d0', 1.45);
+  const flash = Math.max(0, 1 - (G.time - (t.cmtChimeAt || -9)) / .6), R0 = .44;
+  for (let i = 0; i < need; i++) {
+    const an = -Math.PI / 2 + i * TAU2 / need, lit = i < n || flash > 0, s = lit ? .05 + .03 * flash : .03;
+    vfxFlat(VX, t.x + Math.cos(an) * R0, t.y + Math.sin(an) * R0, .05, s, s, an, lit ? hot : gold, lit ? .75 + .25 * flash : .28, VT.GLOW, 1);
+  }
+};
 
 /* The Astrologers' own tree (owner, 27 Nov 2026: "would like to give astrologers their own flavour"; and of the capstone,
    "astrologer capstone could mean that she can attack anywhere on the map"). Two fantasies, each with its own capstone
@@ -64875,7 +65066,7 @@ function sevLate() {
 
   /* ---------- Thornguard Spears (line holder). Kept: Hold the Line, Deep Thrust, Shieldsplitter, Skewer, Phalanx;
      capstones Wall of Spears, Impaler, Thorn Spirit ---------- */
-  ezSpell(F, 'glaive', 'Long Haft', 'lunge', { pow: .35, verb: 'drives in' });
+  ezSpell(F, 'glaive', 'Long Haft', 'lunge', { vs: ['fresh', .6] });
   ezFlav(F, 'glaive', 'Jab and Jab', 'rhythm', .08, 'jab of its thornspear');
   ezFlav(F, 'glaive', 'Point First', 'momentum', .06, 'jabs with its thornspear');
   ezSpell(F, 'glaive', 'Tossed Off the Point', 'brambleguard', { by: { n: 1 } }, v => `catches ${v} more foe${v > 1 ? 's' : ''}`);
@@ -64917,7 +65108,7 @@ function sevLate() {
   ezFlav(F, 'storm', 'Raking Strikes', 'flurry', .15, 'in every form it attacks');
   ezSpell(F, 'storm', 'Wild Sweep', 'wildsurge', { cd: 2, back: 'gathers every' });
   ezSpell(F, 'storm', 'Wild Hunger', 'wildsurge', { pow: .2, verb: 'rages' });
-  ezSpell(F, 'storm', 'Stoop', 'wildstrike', { pow: .2, verb: 'rakes' });
+  ezSpell(F, 'storm', 'Stoop', 'wildstrike', { vs: ['flyer', .4] });
 
   /* ---------- Blade Dancers. Kept: Leaf-Edged Blades, Twin Whirl, Gale of Blades; capstones Dance of Blades,
      Bladestorm, Petalfall ---------- */
@@ -64926,7 +65117,7 @@ function sevLate() {
   ezSpell(F, 'earth', "Dancer's Breath", 'whirlwind', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezFlav(F, 'earth', 'Shadow Partner', 'flurry', .15, 'whirls her blades');
   ezSpell(F, 'earth', 'Single Partner', 'leafdance', { by: { n: 1 } }, v => `threads ${v} more foe${v > 1 ? 's' : ''}`);
-  ezSpell(F, 'earth', 'Parting Cut', 'whirlwind', { pow: .12, verb: 'shears' });
+  ezSpell(F, 'earth', 'Parting Cut', 'whirlwind', { vs: ['crowd', .3] });
   ezSpell(F, 'earth', 'Spell and Steel', 'whirlwind', { cd: 1.5, back: 'spins up every' });
 
   /* ---------- Seedcasters. Kept: Ripe Pods, Choking Spores, Potent Spores, Seed Split, Drifting Spores; capstones Spore
@@ -64941,7 +65132,7 @@ function sevLate() {
 
   /* ---------- Bogwitches. Kept: Clinging Mud, Splattering Spit, Marsh Fever; capstones Plague of the Fen, Black Water,
      The Drowned Queen ---------- */
-  ezSpell(F, V, 'Bog Hunger', 'bw_swarm', { pow: .2, verb: 'gnaws' });
+  ezSpell(F, V, 'Bog Hunger', 'bw_swarm', { vs: ['low', .4] });
   ezSpell(F, V, 'Second Gob', 'bw_bogbody', { by: { dur: .5 } }, v => `lasts ${ezR(.5 * v)}s longer`);
   ezFlav(F, V, 'Drowning Spit', 'overflow', .1, 'her spit hits');
   ezSpell(F, V, 'Bog Rhythm', 'bw_swarm', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
@@ -65004,7 +65195,7 @@ function sevLate() {
 
   /* ---------- Anvilwrights (support). Kept: Deep Brand, Forge Spirit, Searing Brand, Flying Sparks, Ringing Strokes;
      capstones Anvil Storm, Forgelord, Masterwork Day ---------- */
-  ezSpell(F, 'arcane', 'Glowing Anvil', 'ih_runebrand', { pow: .2, verb: 'brands' });
+  ezSpell(F, 'arcane', 'Glowing Anvil', 'ih_runebrand', { vs: ['low', .5] });
   ezFlav(F, 'arcane', 'Anvil of Ages', 'rhythm', .02, 'ring of its hammer');
   ezSpell(F, 'arcane', 'Two Brands', 'ih_runeofpower', { by: { n: 1 } }, v => `tempers ${v} more unit${v > 1 ? 's' : ''}`);
   ezFlav(F, 'arcane', 'Big Work', 'echo', .3, 'rings its hammer');
@@ -65071,7 +65262,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 
   /* ---------- Oathsworn Shieldbearers (line holder). Kept: Shield-Ward, Pommel Blow, Shield of Faith, Unbroken Oath,
      Braced Shield, Unyielding; capstones Oath Unbroken, Wall of Shields, Ringing Shield ---------- */
-  ezSpell(F, 'glaive', 'Backswing', 'so_bash', { pow: .2, verb: 'rings' });
+  ezSpell(F, 'glaive', 'Backswing', 'so_bash', { vs: ['fresh', .55] });
   ezFlav(F, 'glaive', 'Press the Wounded', 'tempo', .04, 'swings its oathblade');
   ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'glaive', 'Pommel Finish', 'rhythm', .03, 'stroke of its oathblade');
@@ -65079,7 +65270,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   /* ---------- Silverbolt Crossbows (damage: no control). Kept: Opening Shot, Heavy Quarrel, Bodkin Heads, Through and
      Through; capstones Siege Quarrel, Squire at Arms, Storm of Silver ---------- */
   ezFlav(F, 'arrow', 'Double Crank', 'tempo', .04, 'cranks and looses');
-  ezSpell(F, 'arrow', 'Sighted In', 'so_sanct', { pow: .12, verb: 'punches through' });
+  ezSpell(F, 'arrow', 'Sighted In', 'so_sanct', { vs: ['big', .3] });
   ezFlav(F, 'arrow', 'Ready Crank', 'momentum', .02, 'cranks and looses');
   ezSpell(F, 'arrow', 'Splinter Bolt', 'so_hail', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezSpell(F, 'arrow', 'Hot Crank', 'so_witness', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
@@ -65113,7 +65304,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 
   /* ---------- Templars of the Ford (line holder). Kept: Twin Rhythm, Crossed Blades, Parry and Riposte, Press Forward,
      Rising Fury, Press of Battle; capstones Steel Tempest, Twin Throw ---------- */
-  ezSpell(F, 'earth', 'Spinning Third', 'so_crush', { pow: .2, verb: 'cleaves' });
+  ezSpell(F, 'earth', 'Spinning Third', 'so_crush', { vs: ['crowd', .3] });
   ezFlav(F, 'earth', 'Sword Prayer', 'harvest', 5, 'the Templar');
   ezSpell(F, 'earth', 'Crossed Finish', 'so_crush', { cd: 1.5, back: 'crosses every' });
   ezSpell(F, 'earth', "Templar's Rhythm", 'so_crush', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
@@ -65169,7 +65360,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezTal(F, 'glaive', 'Wolf at the Throat', 'pen', .15);
   ezSpell(F, 'glaive', 'Blood on the Fur', 'sb_pounce', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezFlav(F, 'glaive', 'Spear Flurry', 'tempo', .04, 'thrusts its spear');
-  ezSpell(F, 'glaive', 'Worry the Prey', 'sb_pounce', { pow: .35, verb: 'mauls' });
+  ezSpell(F, 'glaive', 'Worry the Prey', 'sb_pounce', { vs: ['low', .7] });
   atkSwap(F, 'glaive', { old: 'Run Them Through', name: 'Run Them Through', tag: 'Damage', see: 'The spear runs on into the foe behind.',
     pro: (n, s) => `Each attack also hits the foe behind for ${s(70)}%.`, fx: { hit: { do: 'pierce', k: .7, r: 1.5 } } });   /* (always on: it was every 3rd attack) */
   ezTal(F, 'glaive', 'Ash Haft', 'reach', .15, 0, 'Its spear reaches');
@@ -65215,16 +65406,16 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 
   /* ---------- Earthbinders (control, line holder). Kept: Deep Fissures, Riftmaker, Loose Earth, Heavy Stomp (the line
      holder's payoff on a held foe), Second Tremor, Flying Rocks; capstones Mountain's Echo, Great Stomp, Bison Spirit ---------- */
-  ezSpell(F, 'earth', 'Ground Gives Way', 'sb_stonetotem', { pow: .15, verb: 'quakes' });
+  ezSpell(F, 'earth', 'Ground Gives Way', 'sb_stonetotem', { vs: ['slowed', .18] });
   ezSpell(F, 'earth', 'Stone Remembers', 'sb_stonetotem', { by: { dur: 1 } }, longer('stands'));
   ezFlav(F, 'earth', 'Hard Rhythm', 'rhythm', .03, 'blow of its maul');
-  ezSpell(F, 'earth', 'Maul Swing', 'sb_fissure', { pow: .25, verb: 'bursts' });
+  ezSpell(F, 'earth', 'Maul Swing', 'sb_fissure', { cd: 2 });
   ezSpell(F, 'earth', 'Earth Rhythm', 'sb_stonetotem', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
 
   /* ---------- Cloud Dancers. Kept: Brooding Sky, Long Clouds, Forked Strike; capstones Storm Front, Thunder Dance,
      Sky Lattice ---------- */
-  ezSpell(F, 'cannon', 'Answering Sky', 'sb_thunderhead', { pow: .6, verb: 'thunders' });
-  ezSpell(F, 'cannon', "Storm's End", 'sb_stormdance', { pow: .3, verb: 'falls' });
+  ezSpell(F, 'cannon', 'Answering Sky', 'sb_thunderhead', { by: { dur: 2 } }, v => `lasts ${2 * v}s longer`);
+  ezSpell(F, 'cannon', "Storm's End", 'sb_stormdance', { vs: ['big', .75] });
   ezSpell(F, 'cannon', 'Rain Rhythm', 'sb_thunderhead', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezTal(F, 'cannon', 'Rain Returns', 'pool', .15, 0, 'Cloud Dancer');   /* (the pool that can hold Skyleap) */
   ezSpell(F, 'cannon', 'Twin Bolt', 'sb_stormdance', { cd: 2, back: 'can be danced every' });
@@ -65314,12 +65505,12 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, 'storm', 'Sable Hawk', 'momentum', .02, 'couches and drives its lance');
   ezTal(F, 'storm', 'Long Lance', 'reach', .15, 0, 'Its storm-lance reaches');
   ezSpell(F, 'storm', "Rider's Rhythm", 'wb_charge', { cd: 1.5, back: 'rides out every' });
-  ezSpell(F, 'storm', "Lancer's Finish", 'wb_skyfall', { pow: .2, verb: 'splits the sky' });
+  ezSpell(F, 'storm', "Lancer's Finish", 'wb_skyfall', { cd: 3 });
   ezSpell(F, 'storm', 'Long Pennant', 'wb_stormbanner', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
 
   /* ---------- Stoneguard (line holder). Kept: Iron Rhythm, Restless Earth, Shield Bash, Deep Quake, Stone's Toll;
      capstones Unmoving, Quaking Steps, Mountain's Weight ---------- */
-  ezSpell(F, 'earth', 'Shield Spirit', 'wb_shieldwall', { pow: .1, verb: 'drives back' });
+  ezSpell(F, 'earth', 'Shield Spirit', 'wb_shieldwall', { pow: .1 });
   ezFlav(F, 'earth', 'Shield Edge', 'rhythm', .03, 'shield-rim blow');
   ezFlav(F, 'earth', 'Under Fire', 'tempo', .04, 'brings its shield-rim down');
   ezSpell(F, 'earth', 'Crushing Rim', 'wb_shieldwall', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
@@ -65329,7 +65520,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
      Chain, Ballista Volley, Skewer Line ---------- */
   ezTal(F, 'cannon', 'Spotter', 'reach', .25, 0, 'Its ballista carries');
   ezFlav(F, 'cannon', 'Quick Crank', 'tempo', .04, 'cranks and fires');
-  ezSpell(F, 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt', { pow: .25, verb: 'drives home' });
+  ezSpell(F, 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt', { vs: ['fresh', .5] });
   ezSpell(F, 'cannon', "Loader's Finish", 'wb_chainbolt', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'cannon', 'Steady Crew', 'harvest', 5, 'the Graveshot Ballista');
   ezFlav(F, 'cannon', 'Third Crewman', 'watch', .1, 'its ballista');
@@ -65359,6 +65550,291 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezLayout(F, 'champ:wb_aedric', [[3,2],[0,0],[0,1],[2,2],[1,0],[2,1],[1,3],[3,1],[5,0],[5,1],[4,1],[5,2],[4,3],[3,0],[0,2]], [[5,7,10,9],[3,0,11],[6,12],[1,4]]);   /* rows 3 2 2 3 2 3; chains: Sun-Struck Trail > Rallying Cry > Hot Blood > Open Road | Into the Fray > Eager Sun > Sun-Sworn | Searing Wheel > Blaze of Glory | Sunlit Reach > Sun Charge */
   ezLayout(F, 'champ:wb_isaura', [[0,2],[1,3],[1,2],[2,2],[1,0],[2,1],[4,0],[3,1],[5,2],[5,1],[3,3],[5,3],[4,2],[4,1],[0,1]], [[5,7,13,9],[1,10,11],[12,8]]);   /* rows 2 3 2 2 3 3; chains: Tighter Bonds > Shared Vow > Vow's Reckoning > Sworn Road | Silent Vow > Quiet Step > Veiled Oath | Oath Turned > Turned Twice */
 }
+
+/* Fifteen capstones that were "Every 2nd attack: hits the target again" (the attack pass's spirits and second fighters), each
+   now its own rule (owner, 28 Nov 2026, after the companions that first replaced them: "I'd prefer to change them entirely
+   and make each one unique and flavourful"). No summons, no companions: each changes how the unit itself fights, leans on
+   what that unit already is, and no two share a mechanic. Damage units deal damage only; the control units' capstones may
+   hold (the Briarwarden's roots, already a hold). Each talent keeps its place in its tree's list (saves load by index) and
+   its painting (TAL_ART_ALIAS).
+
+     Thornguard Spears     Bristling Hedge     ground foes in the spearman's reach are pricked every second
+     Briarwardens          Strangling Briars   rooted foes in reach are crushed while the roots hold
+     Stag Lancers          Full Tilt           the further the charge, the harder the lance
+     Grove Shifters        Bear's Wrath        every 3rd attack is a bear's swipe, round the target
+     Golem Wardens         Crushing Weight     attacks take a share of the foe's present health
+     Ironbreakers          Sundering Blows     each attack breaks armour for the rest of the wave
+     Chain Trappers        Spring the Trap     attacks finish off any foe nearly dead
+     Steam Hammers         Pressure Builds     harder blows for each foe crowding the hammer
+     Siege Breakers        Breaching Charge    a charge planted on the toughest foe blows 2s later
+     Silverbolt Crossbows  Marked Quarry       the toughest foe in reach is marked and takes more
+     Censer Bearers        Clinging Embers     attacks set foes alight, three times over
+     Magebane Inquisitors  Zeal Against the Arcane  faster attacks for each enemy caster in reach
+     Wolfguard             Blood Frenzy        each kill, more damage until the wave ends
+     Windrunners           Scatter Shot        more damage each time the target changes
+     Earthbinders          Weight of the Mountain  harder blows the more mana the Earthbinder holds
+   The Golem Warden's Hurled Stone (a ranked talent, once "+15% health a rank") still hurls a stone: a thrown stone is not a
+   companion. ezcHit and ezcFoes are also used by forces_..._easy_zvariety.js. */
+const EZK = { cfg: {}, n: 0 };
+const ezcFoes = (t, st) => G.creeps.filter(c => !c.dead && !c.ent && !c.phased && canTarget(t, st, c) && inRange(t, st, c));
+function ezcHit(t, st, c, amt) { if (!c || c.dead || !(amt > 0)) return; EZK_OWN++; try { hurt(c, amt, (t.def && t.def.dmgType) || 'phys', t, false); } finally { EZK_OWN--; } }
+const ezkOf = (t, st) => { const d = t && t.def && EZK.cfg[t.def.unit]; return d && st && st.caps && st.caps[d.cap] ? d : null; };
+function ezkDef(force, slot, old, name, kind, o, text) {
+  const T = FORCES[force] && FORCES[force].talents && FORCES[force].talents[slot], U = FORCES[force] && FORCES[force].units[slot];
+  const t = T && T.list.find(q => (q.name === old || q.name === name) && !q.spell); if (!t || !U) { if (typeof console !== 'undefined') console.warn('capstones: no talent', force, slot, old); return null; }
+  ezClear(t);
+  if (name !== t.name) { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = TAL_ART_ALIAS[t.name] || t.name; t.oldName = t.oldName || t.name; t.name = name; }
+  const cap = 'ezk' + (++EZK.n);
+  EZK.cfg[U.id] = Object.assign({ cap, kind }, o);
+  t.tag = o.tag || 'Damage'; t.cap = cap; t.capK = 1; t.ez = 'capstone'; t.atkPlain = true; delete t.ezLadder;
+  if (o.sp) t.sp = () => o.sp;
+  t.pro = () => text;
+  return t;
+}
+/* ---------- the rules ---------- */
+/* A strike of the unit's own. The per-strike hook (forceHook 'fire') is not reached by every force's attack code (seen in the
+   built game, 28 Nov 2026: the Stormborn's strikes never called it), so the capstones ride the two things every strike does
+   pass: fire(t, st, tg, echo) itself, wrapped below, for what a blow does where it lands, and the damage hook (forceHook
+   'amp': c, src) for how hard it lands. */
+function ezkOnFire(t, st, tg) {
+  const d = ezkOf(t, st); if (!d || !tg) return;
+  const S = t.ezk || (t.ezk = {}), land = fn => G.delayed.push({ t: .15, fn: () => { if (G.towers.includes(t) && G.state === 'play') fn(t.st || st); } });
+  switch (d.kind) {
+    case 'scatter': if (S.last !== tg) { tg.ezkSc = t; tg.ezkScT = G.time + 1.2; } S.last = tg; break;
+    case 'bear': if ((S.n = (S.n || 0) + 1) >= d.n) { S.n = 0; tg.ezkBr = t; tg.ezkBrT = G.time + 1.2; const x = tg.x, z = tg.y; land(s => { inSplash(x, z, d.r, false, q => { if (q !== tg && !q.ent && canTarget(t, s, q)) ezcHit(t, s, q, s.dmg * d.side); }); part({ k: 'ring', x, z, h: .05, life: .35, max: .35, size: d.r, col: d.col }); part({ k: 'slash', x, z, h: .35, life: .25, max: .25, size: d.r * 1.4, col: d.col, rot: Math.atan2(tg.x - t.x, tg.y - t.y) }); }); } break;
+    case 'weight': land(() => { if (!tg.dead) hurt(tg, tg.hp * (tg.def && (tg.def.boss || tg.def.lead) ? d.boss : d.k), (t.def && t.def.dmgType) || 'phys', t, false); }); break;
+    case 'sunder': land(() => { if (tg.dead) return; const was = tg.shredT > 0 ? tg.shred || 0 : 0; tg.shred = Math.min(Math.max(was, d.max), was + d.k); tg.shredT = Math.max(tg.shredT || 0, 600); part({ k: 'spark', x: tg.x, z: tg.y, h: hitH(tg), vx: 0, vz: 0, vh: .6, g: 3, life: .3, max: .3, size: .07, col: d.col }); }); break;
+    case 'spring': land(() => { if (tg.dead || (tg.def && (tg.def.boss || tg.def.lead)) || tg.hp > (tg.maxHp || tg.hp) * d.k) return; part({ k: 'flare', x: tg.x, z: tg.y, h: hitH(tg), life: .25, max: .25, size: .8, col: d.col }); hurt(tg, tg.hp + 1, 'pure', t, true); }); break;
+    case 'embers': land(() => { if (tg.dead) return; const B = S.b || (S.b = new Map()), e = B.get(tg) || { n: 0 }; e.n = Math.min(d.max, e.n + 1); e.until = G.time + d.dur; B.set(tg, e); }); break;
+  }
+}
+// how hard its strikes land (not its spells, not an item's damage, not a capstone's own extra damage)
+let EZK_OWN = 0;
+function ezkAmp(c, src) {
+  const st = src && src.st, d = ezkOf(src, st); if (!d || !c || EZK_OWN) return 0;
+  if ((typeof AB_TAG !== 'undefined' && DTAG === AB_TAG) || DTAG === 'relic' || DTAG === 'rx') return 0;
+  const S = src.ezk || (src.ezk = {});
+  switch (d.kind) {
+    case 'tilt': return Math.min(d.max, d.k * Math.hypot(c.x - src.x, c.y - src.y));
+    case 'crowd': { let n = 0; for (const q of G.creeps) if (!q.dead && !q.ent && !q.fly && Math.hypot(q.x - src.x, q.y - src.y) <= d.r) n++; return Math.min(d.max, d.k * n); }
+    case 'quarry': return c === S.q ? d.k : 0;
+    case 'frenzy': return S.w === G.wave && S.n > 0 ? Math.min(d.max, d.k * S.n) : 0;
+    case 'mana': return Math.min(d.max, d.k * ((src.ab && src.ab.mana) || 0));
+    case 'scatter': return c.ezkSc === src && c.ezkScT > G.time ? d.k : 0;
+    case 'bear': return c.ezkBr === src && c.ezkBrT > G.time ? d.k - 1 : 0;
+  }
+  return 0;
+}
+// what runs on the unit's own clock (forceHook 'pulse': t, st, dt)
+function ezkPulse(t, st, dt) {
+  const d = ezkOf(t, st); if (!d || t.wrecked) return;
+  const S = t.ezk || (t.ezk = {});
+  if ((S.t = (S.t || 0) - dt) > 0) return;
+  switch (d.kind) {
+    case 'hedge': S.t = 1; { let any = 0; for (const c of G.creeps) if (!c.dead && !c.ent && !c.fly && canTarget(t, st, c) && inRange(t, st, c)) { any = 1; ezcHit(t, st, c, st.dmg * d.k); part({ k: 'leaf', x: c.x, z: c.y, h: .25, vx: 0, vz: 0, vh: .4, g: 0, life: .35, max: .35, size: .12, col: d.col }); } if (any) part({ k: 'ring', x: t.x, z: t.y, h: .05, life: .4, max: .4, size: st.range || 1.3, col: d.col }); } break;
+    case 'strangle': S.t = .5; for (const c of ezcFoes(t, st)) if (c.rootT > G.time) { ezcHit(t, st, c, st.dmg * d.k * .5); part({ k: 'leaf', x: c.x, z: c.y, h: .3, vx: 0, vz: 0, vh: .5, g: 0, life: .4, max: .4, size: .14, col: d.col }); } break;
+    case 'quarry': S.t = .4; { const L = ezcFoes(t, st); S.q = L.length ? L.reduce((a, b) => b.hp > a.hp ? b : a) : null; if (S.q) part({ k: 'ring', x: S.q.x, z: S.q.y, h: .05, life: .45, max: .45, size: .34, col: d.col }); } break;
+    case 'embers': S.t = .5; if (S.b) for (const [c, e] of S.b) { if (c.dead || e.until < G.time) { S.b.delete(c); continue; } ezcHit(t, st, c, st.dmg * d.k * .5 * e.n); part({ k: 'ember', x: c.x, z: c.y, h: hitH(c), vx: 0, vz: 0, vh: .6, g: 0, drag: 2, life: .4, max: .4, size: .07 + .02 * e.n, col: d.col }); } break;
+    case 'charge': S.t = .25; if ((S.cd = (S.cd == null ? 2 : S.cd) - .25) <= 0) { const L = ezcFoes(t, st); if (!L.length) break; const c = L.reduce((a, b) => b.hp > a.hp ? b : a); S.cd = d.every;
+      for (let i = 0; i < 4; i++) G.delayed.push({ t: i * .5, fn: () => { if (!c.dead) part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .3, max: .3, size: .25 + .08 * i, col: d.col }); } });
+      G.delayed.push({ t: d.fuse, fn: () => { if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || st, x = c.x, z = c.y, amt = s.dmg * d.k; if (!c.dead) ezcHit(t, s, c, amt); inSplash(x, z, d.r, false, q => { if (q !== c && !q.ent && canTarget(t, s, q)) ezcHit(t, s, q, amt); }); part({ k: 'ring', x, z, h: .05, life: .4, max: .4, size: d.r, col: d.col }); part({ k: 'flare', x, z, h: .3, life: .3, max: .3, size: 1.2, col: d.col }); } }); } break;
+    default: S.t = 1;
+  }
+}
+// a foe dies (forceHook 'kill': c, src)
+function ezkKill(c, src) {
+  const st = src && src.st, d = ezkOf(src, st); if (!d || !c) return;
+  const S = src.ezk || (src.ezk = {});
+  if (d.kind === 'frenzy') { if (S.w !== G.wave) { S.w = G.wave; S.n = 0; } S.n++; }
+  else if (d.kind === 'breach') { if (S.in) return; const x = c.x, z = c.y, amt = (c.maxHp || 0) * d.k; S.in = 1; try { inSplash(x, z, d.r, false, q => { if (q !== c && !q.ent && !q.dead && canTarget(src, st, q)) hurt(q, Math.min(amt, st.dmg * d.cap), (src.def && src.def.dmgType) || 'phys', src, false); }); } finally { S.in = 0; } part({ k: 'ring', x, z, h: .05, life: .4, max: .4, size: d.r, col: d.col }); part({ k: 'flare', x, z, h: .3, life: .3, max: .3, size: 1.1, col: d.col }); }
+  else if (d.kind === 'sentence') { if (src.ab && src.ab.cd && (S.at || 0) <= G.time) { S.at = G.time + d.gap; src.ab.cd[d.ab] = G.time; part({ k: 'flare', x: src.x, z: src.y, h: towerTop(src), life: .3, max: .3, size: .8, col: d.col }); } }
+}
+if (typeof forceHook === 'function') {
+  const _ezkHook = forceHook;
+  forceHook = function (k, a0, a1, a2, a3, a4) {
+    const r = _ezkHook.apply(this, arguments);
+    try {
+      if (k === 'amp' && a0 && a1 && !a2) { const v = ezkAmp(a0, a1); return v ? (r || 0) + v : r; }
+      if (k === 'pulse') ezkPulse(a0, a1, a2 || 0);
+      else if (k === 'kill') ezkKill(a0, a1);
+    } catch (e) { if (typeof console !== 'undefined') console.warn('capstones:', e); }
+    return r;
+  };
+}
+if (typeof effStats === 'function') {
+  const _ezkEff = effStats;
+  effStats = function (t) {
+    const st = _ezkEff.apply(this, arguments), d = t && t.def && EZK.cfg[t.def.unit];
+    if (!d || d.kind !== 'zeal' || !st || !st.caps || !st.caps[d.cap] || st.ezkZ || typeof G === 'undefined' || !G || G.state !== 'play' || !st.rate) return st;
+    let n = 0; const r = (st.range || 2.5) + .2; for (const c of G.creeps) if (!c.dead && !c.ent && c.def && c.def.rk && (c.def.rk.cloth || c.def.rk.support) && Math.hypot(c.x - t.x, c.y - t.y) <= r) n++;
+    st.ezkZ = 1; if (n) st.rate /= 1 + Math.min(d.max, d.k * n);
+    return st;
+  };
+}
+if (typeof fire === 'function') {
+  const _ezkFireFn = fire;
+  fire = function (t, st, tg, echo) {
+    const r = _ezkFireFn.apply(this, arguments);
+    if (!echo && t && t.def && t.def.force && tg) { try { const s2 = st || t.st; ezkOnFire(t, s2, tg); if (typeof ezvOnFire === 'function') ezvOnFire(t, s2, tg); } catch (e) { if (typeof console !== 'undefined') console.warn('capstones:', e); } }
+    return r;
+  };
+}
+/* ---------- the Golem Warden's Hurled Stone (ranked; a stone lobbed at the toughest foe every 6s) ---------- */
+const EZH = { EVERY: 6, R: .6, PCT: .45 };
+(function () {
+  if (typeof FORCES === 'undefined' || typeof ezFind !== 'function') return;
+  const t = ezFind('conclave', 'earth', 'Hurled Stone'); if (!t) return;
+  ezClear(t); t.tag = 'Damage'; t.cap = 'ezhStone'; t.capK = 1; t.ez = 'stone'; t.atkPlain = true; delete t.ezLadder;
+  t.pro = n => `Every ${EZH.EVERY}s: the Golem Warden hurls a stone at the toughest foe in reach for ${Math.round(EZH.PCT * Math.max(1, Math.min(n | 0 || 1, t.max)) * 100)}% damage, and half that to foes within ${EZH.R} cells.`;
+  const _h = forceHook;
+  forceHook = function (k, t0, st, dt) {
+    const r = _h.apply(this, arguments);
+    if (k !== 'pulse' || !t0 || !st || !st.caps || !st.caps.ezhStone || t0.wrecked) return r;
+    if ((t0.ezhT = (t0.ezhT == null ? 1.5 : t0.ezhT) - (dt || 0)) > 0) return r;
+    const L = ezcFoes(t0, st); if (!L.length) { t0.ezhT = .3; return r; }
+    const c = L.reduce((a, b) => b.hp > a.hp ? b : a), x0 = t0.x, z0 = t0.y, T = .45, amt = st.dmg * EZH.PCT * st.caps.ezhStone;
+    t0.ezhT = EZH.EVERY;
+    for (let i = 1; i <= 8; i++) G.delayed.push({ t: T * i / 8, fn: () => { if (c.dead) return; const u = i / 8; part({ k: 'chunk', x: x0 + (c.x - x0) * u, z: z0 + (c.y - z0) * u, h: .5 + Math.sin(u * Math.PI) * 1.1, vx: 0, vz: 0, vh: 0, g: 0, life: .09, max: .09, size: .26, col: '#b0a088' }); } });
+    G.delayed.push({ t: T, fn: () => { if (!G.towers.includes(t0) || G.state !== 'play') return; const s = t0.st || st, x = c.x, z = c.y; ezcHit(t0, s, c, amt); inSplash(x, z, EZH.R, false, q => { if (q !== c && !q.ent && canTarget(t0, s, q)) ezcHit(t0, s, q, amt * .5); }); part({ k: 'ring', x, z, h: .05, life: .35, max: .35, size: EZH.R, col: '#b0a088' }); } });
+    return r;
+  };
+})();
+/* ---------- the fifteen ---------- */
+(function () {
+  if (typeof FORCES === 'undefined' || typeof ezClear !== 'function') return;
+  const D = ezkDef;
+  // the Grove
+  D('grove', 'glaive', 'Thorn Spirit', 'Bristling Hedge', 'hedge', { k: .25, col: '#9be87a' },
+    "Ground foes in the Thornguard Spear's reach are pricked by thorns: 25% damage every second.");
+  D('grove', 'frost', 'Briar Spirit', 'Strangling Briars', 'strangle', { k: .2, col: '#7fd08a', tag: 'Control' },
+    "Rooted foes in the Briarwarden's reach are crushed by the roots: 20% damage a second while they are held.");
+  D('grove', 'arcane', 'White Stag Spirit', 'Full Tilt', 'tilt', { k: .15, max: .45, col: '#f2f6ff' },
+    "The Stag Lancer's attacks deal 15% more damage for each cell between the Stag Lancer and the target, up to 45%.");
+  D('grove', 'storm', 'Owl Lord', "Bear's Wrath", 'bear', { n: 2, k: 3, side: 1.5, r: .8, col: '#c8a070' },
+    'Every 2nd attack of the Grove Shifter is a bear swipe: 200% more damage to the target, and 150% damage to other foes within 0.8 cells.');
+  // the Conclave
+  D('conclave', 'earth', 'Stone Sprite', 'Crushing Weight', 'weight', { k: .05, boss: .01, col: '#b89868' },
+    "The Golem Warden's attacks also take 5% of the target's present health (1% from bosses and leaders).");
+  // Ironhold
+  D('ironhold', 'glaive', 'Shieldbrother', 'Sundering Blows', 'sunder', { k: 2, max: 16, col: '#ffc070' },
+    'Each attack of the Ironbreaker breaks 2 armour on the target for the rest of the wave, up to 16.');
+  D('ironhold', 'frost', 'Trap Hound', 'Spring the Trap', 'spring', { k: .2, col: '#e8b078' },
+    "The Chain Trapper's attacks kill outright any foe left below 20% health (not bosses or leaders).");
+  D('ironhold', 'earth', 'Hammer Drone', 'Pressure Builds', 'crowd', { r: 1.2, k: .1, max: .5, col: '#ffd890' },
+    "The Steam Hammer's attacks hit 10% harder for each ground foe within 1.2 cells of the Steam Hammer, up to 50%.");
+  D('ironhold', 'venom', "Sapper's Mate", 'Breaching Charge', 'charge', { every: 6, fuse: 2, k: 3, r: 1, col: '#ffb060' },
+    'Every 6s the Siege Breaker plants a charge on the toughest foe in reach. 2s later it blows: 300% damage to that foe and to foes within 1 cell.');
+  // the Silver Order
+  D('silver', 'arrow', 'Squire at Arms', 'Marked Quarry', 'quarry', { k: .35, col: '#e8f0ff' },
+    "The toughest foe in the Silverbolt Crossbow's reach is marked as its quarry: the Silverbolt Crossbow's attacks on it deal 35% more damage.");
+  D('silver', 'cannon', 'Ember Spirit', 'Clinging Embers', 'embers', { k: .1, max: 3, dur: 4, col: '#ffb060' },
+    "The Censer Bearer's attacks set foes alight for 4s: 10% damage a second, stacking up to 3 times.");
+  D('silver', 'venom', 'Censer of Witness', 'Zeal Against the Arcane', 'zeal', { k: .15, max: .45, col: '#ffe0a0' },
+    "For each enemy caster or supporter in the Magebane Inquisitor's reach, the Magebane Inquisitor attacks 15% faster, up to 45%.");
+  // the Stormborn
+  D('stormborn', 'glaive', 'Storm Wolf', 'Blood Frenzy', 'frenzy', { k: .1, max: .8, col: '#a8d8ff' },
+    'Each kill by the Wolfguard: the Wolfguard deals 10% more damage until the wave ends, up to 80%.');
+  D('stormborn', 'arrow', 'Wind Spirit', 'Scatter Shot', 'scatter', { k: .3, col: '#d0f0ff' },
+    'Each attack of the Windrunner on a different foe than the last deals 30% more damage.');
+  D('stormborn', 'earth', 'Bison Spirit', 'Weight of the Mountain', 'mana', { k: .002, max: .3, col: '#e8c890' },
+    "The Earthbinder's attacks hit 1% harder for every 5 mana the Earthbinder holds, up to 30%.");
+})();
+
+/* Capstones that were a burst of extra hits or a bare number, and trees with two "hits again" talents (the hub's review of
+   talent-variety, 28 Nov 2026: "Capstones must be fantasy-defining (owner rule)"; "trim the extra-hit nodes to at most 1 per
+   tree"). After forces_..._easy_zcapstones.js, whose helpers these use (ezcHit, ezcFoes).
+
+   CAPSTONES (each is something on the field: a rift, a storm over every foe, a lance through the line, flooded ground)
+     Spellblades       Riftsteel Flurry  every 5th attack 4 extra hits  ->  every 5th attack tears a rift under the target for 3s
+     Magelings         Missile Storm     every 8th attack 6 extra hits  ->  every 8th attack a storm of missiles on every foe in reach
+     Frostweavers      Icicle Volley     every 5th attack 5 extra hits  ->  every 5th attack an ice lance flies on through the line
+     Thunderguns       Called Shot       Long Shot hits 20% harder      ->  Long Shot flies on through its target
+     Aurelian          The Ford Itself   Bulwark Slam hits again        ->  Bulwark Slam floods the ground where it lands
+     (Grove Shifters   Owl Lord is Bear's Wrath now, in the capstones file. Two Tomorrows and Shatterground are left: each already
+      changes what its spell does on the field; the audit flagged them only for the number in their last clause.)
+   EXTRA HITS, one a tree: the Stag Lancers' Second Charge, the Lightbinder Sisters' Glinting Links and the Sunlance Clerics'
+   Prism were each their tree's second "hits again": now crit chance, crit chance, and faster attacks after a crit.
+   Damage only on the damage units; the Frostweaver's lance chills and Aurelian's water slows (both are control units). */
+const EZV = { cfg: {}, n: 0 };
+function ezvDef(tree, unitId, name, o) {
+  const t = tree && tree.list.find(q => q.name === name && !q.spell); if (!t) { if (typeof console !== 'undefined') console.warn('variety: no talent', name); return null; }
+  ezClear(t);
+  const cap = 'ezv' + (++EZV.n), c = Object.assign({ cap, n: 0, pct: 1, r: .7, dur: 3, every: .5, col: '#ffe9a8' }, o);
+  (EZV.cfg[unitId] || (EZV.cfg[unitId] = [])).push(c);
+  t.tag = o.tag || 'Damage'; t.cap = cap; t.capK = 1; t.ez = 'variety'; t.atkPlain = true; delete t.ezLadder;
+  if (o.sp) t.sp = () => ({ ab: o.sp });
+  t.pro = () => o.text;
+  return t;
+}
+// the three shapes
+function ezvZone(t, st, x, z, c) {
+  const ticks = Math.max(1, Math.round(c.dur / c.every));
+  rfx({ k: 'rune', x, z, r: c.r, col: c.col, life: c.dur });
+  for (let k = 0; k < ticks; k++) G.delayed.push({ t: k * c.every, fn: () => {
+    if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || st, amt = (s.dmg || s.smite || 0) * c.pct;
+    inSplash(x, z, c.r, !c.ground, q => { if (q.ent || q.dead || !canTarget(t, s, q)) return; ezcHit(t, s, q, amt); if (c.slow && !q.dead) chill(q, { slow: c.slow, slowT: c.every + .4 }, null, t); });
+    part({ k: 'ring', x, z, h: .05, life: .3, max: .3, size: c.r * (.6 + .4 * (k % 2)), col: c.col });
+  } });
+}
+function ezvVolley(t, st, c) {
+  const amt = (st.dmg || 0) * c.pct, L = ezcFoes(t, st).slice(0, 30);
+  for (const q of L) { const x0 = t.x, z0 = t.y; for (let k = 1; k <= 3; k++) G.delayed.push({ t: .05 * k, fn: () => { if (!q.dead) part({ k: 'flare', x: x0 + (q.x - x0) * k / 3, z: z0 + (q.y - z0) * k / 3, h: .7 + .5 * Math.sin(k / 3 * Math.PI), life: .12, max: .12, size: .3, col: c.col }); } });
+    G.delayed.push({ t: .16, fn: () => { if (q.dead || !G.towers.includes(t)) return; ezcHit(t, t.st || st, q, amt); part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .2, max: .2, size: .6, col: c.col }); } }); }
+  part({ k: 'ring', x: t.x, z: t.y, h: .05, life: .45, max: .45, size: st.range || 2.5, col: c.col });
+}
+function ezvLine(t, st, tg, c, skip) {
+  const dx = tg.x - t.x, dz = tg.y - t.y, D = Math.hypot(dx, dz) || 1, ux = dx / D, uz = dz / D, len = (st.range || 2.5) + (c.more || 1), amt = (st.dmg || 0) * c.pct;
+  for (const q of G.creeps) {
+    if (q.dead || q.ent || q.phased || (skip && q === tg) || !canTarget(t, st, q)) continue;
+    const px = q.x - t.x, pz = q.y - t.y, along = px * ux + pz * uz; if (along < (skip ? D - .05 : .1) || along > len) continue;
+    if (Math.abs(px * uz - pz * ux) > (c.w || .45)) continue;
+    ezcHit(t, st, q, amt); if (c.slow && !q.dead) chill(q, { slow: c.slow, slowT: 2 }, c.elem || null, t);
+    part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .2, max: .2, size: .6, col: c.col });
+  }
+  for (let k = 0; k <= 10; k++) { const u = (skip ? D : .3) + (len - (skip ? D : .3)) * k / 10; G.delayed.push({ t: k * .02, fn: () => part({ k: c.part || 'flare', x: t.x + ux * u, z: t.y + uz * u, h: .4, vx: 0, vz: 0, vh: 0, g: 0, life: .25, max: .25, size: c.part === 'shard' ? .3 : .22, col: c.col, rot: Math.atan2(ux, uz) }) }); }
+}
+function ezvDo(t, st, c, tg) {
+  if (typeof ccEv === 'function') { try { ccEv('cap:' + c.cap); } catch (e) { /* (not a Conclave run) */ } }
+  if (c.kind === 'zone') { const p = tg && tg.x != null ? tg : t; ezvZone(t, st, p.x, p.y != null ? p.y : p.z, c); }
+  else if (c.kind === 'volley') ezvVolley(t, st, c);
+  else if (c.kind === 'line' && tg && tg.x != null) ezvLine(t, st, tg, c, c.skip);
+}
+/* (every Nth strike: counted from fire() itself, wrapped in forces_..._easy_zcapstones.js: the per-strike hook is not reached by
+   every force's attack code) */
+function ezvOnFire(t, st, tg) {
+  const L = t && t.def && EZV.cfg[t.def.unit]; if (!L || !st || !st.caps) return;
+  for (const c of L) if (c.n && st.caps[c.cap]) { const S = t.ezv || (t.ezv = {}); if ((S[c.cap] = (S[c.cap] || 0) + 1) >= c.n) { S[c.cap] = 0; ezvDo(t, st, c, tg); } }
+}
+if (typeof castAbility === 'function') {
+  const _ezvCast = castAbility;
+  castAbility = function (t, ab, tg, st, manual) {
+    const r = _ezvCast.apply(this, arguments);
+    try { const L = r !== false && t && t.def && ab && EZV.cfg[t.def.unit], s = t && (t.st || st); if (L && s && s.caps) for (const c of L) if (c.ab === ab.id && s.caps[c.cap]) ezvDo(t, s, c, tg); } catch (e) { if (typeof console !== 'undefined') console.warn('variety:', e); }
+    return r;
+  };
+}
+(function () {
+  if (typeof FORCES === 'undefined' || typeof ezClear !== 'function') return;
+  const tree = (f, s) => FORCES[f] && FORCES[f].talents && FORCES[f].talents[s], uid = (f, s) => FORCES[f].units[s].id;
+  // ---- capstones ----
+  ezvDef(tree('conclave', 'glaive'), uid('conclave', 'glaive'), 'Riftsteel Flurry', { kind: 'zone', n: 5, pct: .16, r: .7, dur: 3, every: .5, col: '#b89aff', ground: true,
+    text: 'Every 5th attack tears a rift under the target for 3s: ground foes in it take 16% damage every 0.5s.' });
+  ezvDef(tree('conclave', 'arrow'), uid('conclave', 'arrow'), 'Missile Storm', { kind: 'volley', n: 8, pct: .6, col: '#c8b0ff',
+    text: "Every 8th attack: a storm of missiles strikes every foe in the Mageling's reach for 60% damage." });
+  ezvDef(tree('conclave', 'frost'), uid('conclave', 'frost'), 'Icicle Volley', { kind: 'line', n: 5, pct: .5, slow: .3, elem: 'frost', part: 'shard', col: '#d8f2ff', tag: 'Control',
+    text: 'Every 5th attack: an ice lance flies on through the target. Each foe on the line takes 50% damage and is slowed 30% for 2s.' });
+  ezvDef(tree('ironhold', 'arrow'), uid('ironhold', 'arrow'), 'Called Shot', { kind: 'line', ab: 'ih_longshot', sp: 'ih_longshot', pct: .6, skip: 1, more: 2, w: .4, col: '#ffe08a', tag: 'Spell',
+    text: 'Long Shot flies on through its target: each foe behind it on the line takes 60% damage.' });
+  if (typeof CHAMPS !== 'undefined' && CHAMPS.so_lion && CHAMPS.so_lion.tree) ezvDef(CHAMPS.so_lion.tree, 'ch_aurelian', 'The Ford Itself', { kind: 'zone', ab: 'ch_fordstandard', sp: 'ch_fordstandard', pct: .25, r: 1, dur: 4, every: 1, slow: .3, ground: true, col: '#8ec8ff', tag: 'Control',
+    text: 'Bulwark Slam floods the ground where it lands for 4s: ground foes in the water are slowed 30% and take 25% damage a second.' });
+  // ---- a tree's second "hits again" ----
+  const own = (f, s, name, pro) => { const t = tree(f, s) && tree(f, s).list.find(q => q.name === name); if (t) { const m = t.max; t.pro = n => pro(Math.max(1, Math.min(n | 0 || 1, m))); } return t; };
+  if (typeof ezTal === 'function') {
+    if (ezTal('grove', 'arcane', 'Second Charge', 'crit', .05)) own('grove', 'arcane', 'Second Charge', n => `Increases the Stag Lancer's critical strike chance by ${5 * n}%.`);
+    if (ezTal('silver', 'frost', 'Glinting Links', 'crit', .04)) own('silver', 'frost', 'Glinting Links', n => `Increases the Lightbinder Sister's critical strike chance by ${4 * n}%.`);
+  }
+  if (typeof ezFlav === 'function' && ezFlav('silver', 'storm', 'Prism', 'flurry', .1)) own('silver', 'storm', 'Prism', n => `After a critical strike: the Sunlance Cleric attacks ${10 * n}% faster for 3s.`);
+})();
 
 /* ================= THE WARDBOUND'S ASSASSIN: the Oathknives take the Gatewatch Halberdiers' place (27 Nov 2026) =================
    Owner: "a unit to the wardbound that jumps ... behind cloth targets and does bonus damage. it can be their anti caster
@@ -65696,11 +66172,11 @@ const WBA_KIT = { slot: 'frost', mana: { max: 110, regen: 1, hit: .6 }, abilitie
   // the simple passives (forces_..._easy.js): one clear number a rank, WoW wording
   ezTal(F, 'frost', 'Whetted Knives', 'crit', .04);
   ezFlav(F, 'frost', 'Hush', 'harvest', 4);
-  ezSpell(F, 'frost', 'Keen Quietus', 'wb_quietus', { pow: .15 });
+  ezSpell(F, 'frost', 'Keen Quietus', 'wb_quietus', { vs: ['low', .3] });
   ezSpell(F, 'frost', 'Second Shadow', 'wb_sablestep', { cd: 1.5 });
   ezSpell(F, 'frost', 'Swift Quietus', 'wb_quietus', { cd: 1 });
   ezTal(F, 'frost', 'Long Stride', 'reach', .2);
-  ezSpell(F, 'frost', 'Merciless Hunt', 'wb_oathhunt', { pow: .15 });
+  ezSpell(F, 'frost', 'Merciless Hunt', 'wb_oathhunt', { vs: ['fresh', .3] });
   ezSpell(F, 'frost', 'Twin Shadows', 'wb_sablestep', { pow: .2 });
   ezSpell(F, 'frost', "Hunter's Count", 'wb_oathhunt', { by: { n: 1 } }, v => `hunts ${v} more foe${v > 1 ? 's' : ''}`);
   if (FORCES[F].talFlavor) FORCES[F].talFlavor.frost = ['Find the oath-breakers behind the line and end them.', 'Every broken oath is answered.'];
@@ -132193,11 +132669,16 @@ function rgTroops(R, id, w0, w1, lord) {
   }
   return out;
 }
+// a commander's extra health from the boss rules (BM.cmdHp), so the rating counts it at its real weight
+function rgCmdHpK(type) {
+  if (typeof BM === 'undefined' || typeof BM_CMD === 'undefined' || !BM.cmdHp || !BM_CMD[type]) return 1;
+  return BM.cmdHp[BM_CMD[type]] || 1;
+}
 // how much the troops add against the place's own waves: r (their weight over the waves' own), and the rating's bump
 function rgTroopsAdd(S) {
   const T = S.troops || []; if (!T.length) return { r: 0, bump: 0 };
   const own = (S.w1 - S.w0 + 1) * WAVE_TROOPS * TROOP_MORE, hpOf = t => Math.max(.4, Math.min(3, (CREEPS[t] && CREEPS[t].hp) || 1));
-  const add = T.reduce((s, t) => s + (t.cmd ? RG_TROOPS.cmdW : t.count * t.hpK * hpOf(t.type) / TROOP_MORE), 0), r = add / own;
+  const add = T.reduce((s, t) => s + (t.cmd ? RG_TROOPS.cmdW * rgCmdHpK(t.type) : t.count * t.hpK * hpOf(t.type) / TROOP_MORE), 0), r = add / own;
   return { r, bump: r >= .45 ? 2 : r >= .12 ? 1 : 0 };
 }
 // the troops in a few plain lines, for the cards: [who, html of their faces, words, the mark]
