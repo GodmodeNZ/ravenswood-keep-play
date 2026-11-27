@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a16baffa@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1e087004@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -111321,6 +111321,14 @@ if (typeof pauseMenu === 'function') {
      curve through her pirouette (out on one side, home on the other: a loop), or straight on to the next foe when the next
      cut is already due. Drawn only: the game's own strike, its damage and its timing are untouched, and her rune-slate
      stays at her post. Echoes of her own sword (its model drawn again where it was a moment ago, fading) trail the whirl.
+   - The blur (MVD's bl*, gh*, st*; mvGhost and the streaks in mvSwirl; owner, 28 Nov 2026: "would like her to be more of a
+     blur", "with trailing streaks more like spellblade animation"): at speed her own body fades to a see-through figure
+     and leaves afterimages of herself behind (her model and sword drawn again where they were, stretched along her way,
+     crimson and pink, gone in a sixth of a second; the Spellblades' afterimage, many of it), each echo of the sword
+     carrying its blades' light, so the whirl reads as a fan of blades. Behind her trail the streaks: a dozen uneven
+     ribbons of both colours shed from points turning round her, long and nearly straight while she flies (the
+     Spellblades' streak to the foe), winding into a ragged coil where she slows on her foe, broken along their length.
+     She is solid again as she lands on the blow. Nothing is built: the afterimages are her own model.
    - She stands on the code-built body's rune-slate (its base), and its blink (chargeAt) moves her out and back. Drawn from
      umDraw (forces.js drawForceUnit: the Champions take the Grove's layered path). */
 const MV_UNIT = 'ch_maren';
@@ -111354,8 +111362,17 @@ const MVS_COL = [{ body: [.95, .04, .3], rim: [1.3, .2, .48], hot: [1.5, .78, .9
    cells at most); lean radians she leans into it at full speed (vFull cells a second); turn the whole turns she whirls on
    the way in. The echoes of her sword: echo of them, echoDt s apart, each echoT s long, echoA their strength. rib: how
    much longer the ribbons last in the whirl. The coil round her in the whirl: coil strands, coilA their strength, coilW how fast they
-   turn (radians a second), coilLag s of her way they are smeared back over. on: 0 and she stands and swings as before (sim/mv_game.js's before shots). */
-const MVD = { on: 1, lead: .2, hang: .12, wOut: 27, wBack: 7, gap: .4, bow: .22, bowMax: .34, lean: .2, vFull: 7, turn: 1, echo: 5, echoDt: .034, echoT: .2, echoA: .5, rib: 1.5, coil: 4, coilA: .5, coilW: 15, coilLag: .09 };
+   turn (radians a second), coilLag s of her way they are smeared back over (the coil is off, coil 0: the streaks took its
+   place). on: 0 and she stands and swings as before (sim/mv_game.js's before shots).
+   The blur (blur: 0 and the dart is drawn as it was, with the coil): blV0..blV1 the speeds (cells a second) she starts to
+   blur at and is all blur by; fade how much of her solid body goes at full blur (her sword stays), land how much of that
+   comes back over the last of the way in, so she is seen beside her foe on the blow; gh afterimages of her,
+   ghDt s apart, the last ghT s old, ghA their strength, smear how far the oldest is stretched along her way; echoA the
+   sword's echoes' strength and bladeA their blades' light. The streaks: st of them, each up to stT s long, stA their
+   strength, stW their width and stR how far out round her they are shed (both of her height), stTurn how fast their
+   sources turn round her (radians a second), stGap how broken they are (0 unbroken). */
+const MVD = { on: 1, lead: .2, hang: .12, wOut: 27, wBack: 7, gap: .4, bow: .22, bowMax: .34, lean: .2, vFull: 7, turn: 1, echo: 5, echoDt: .034, echoT: .2, echoA: .8, rib: 1.5, coil: 0, coilA: .5, coilW: 15, coilLag: .09,
+  blur: 1, blV0: 1.2, blV1: 5.5, fade: .66, land: .75, gh: 7, ghDt: .022, ghT: .17, ghA: .44, smear: .7, bladeA: .28, st: 14, stT: .45, stA: 1, stW: .14, stR: .36, stTurn: 3.5, stGap: .5 };
 const mvE = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 function mvClip(M, clip, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[clip]; return c[0] + Math.max(0, Math.min(c[1] - 1, f)); }
 if (typeof castAbility === 'function') {
@@ -111617,7 +111634,13 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   M4.trs(_mvB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_mvC, _mvA, _mvB);
   // (the whirl: how much she is a swirl now, 1 out on a dart or off her post, eased; the echoes and the ribbons go by it)
   if (live && D && D.wt !== G.time) { const dtw = D.wt == null ? 0 : Math.max(0, Math.min(.1, G.time - D.wt)); D.wt = G.time; D.wh += ((D.out || D.k > .15 ? 1 : 0) - D.wh) * (1 - Math.exp(-dtw * (D.out ? 30 : 7))); }
-  const it = item(M.mesh, _mvC, opts);
+  // (the blur: by her speed, 0 at a walk and 1 at the dart's full pace; her solid body fades by it, a little of the
+  // blades' pink in what is left, and her afterimages and streaks go by it: mvGhost, mvSwirl; under a fifth gone she is
+  // drawn whole, so she is crisp as she lands and at a walk)
+  const land = D && D.out ? 1 - MVD.land * mvE((D.dq - .7) / .3) : 1;   // (she comes out of the blur as she lands: solid beside her foe on the blow)
+  const bl = D && MVD.on && MVD.blur ? mvE((dv - MVD.blV0) / Math.max(.1, MVD.blV1 - MVD.blV0)) : 0; if (D) { D.bl = bl; D.blg = bl * land; D.land = land; }   // (blg: her afterimages thin out as she lands too)
+  const bo = MVD.fade * bl * land > .18 ? Object.assign({}, opts, { alpha: (opts && opts.alpha != null ? opts.alpha : 1) * (1 - MVD.fade * bl * land) }, opts && opts.tint ? null : { tint: [1 + .2 * bl, 1 - .22 * bl, 1 + .05 * bl, .22 * bl] }) : opts;
+  const it = item(M.mesh, _mvC, bo);
   // her turn throws the robe and mantle the other way (unitmodels_cloth.js clothItem: it.clX, a world offset added to the
   // cloth's lag): the front of her body's travel, reversed
   if (live && t._mvSv) { const fx = _mvC[8], fz = _mvC[10], l = Math.hypot(fx, fz) || 1, v = t._mvSv * MVS.clK * s * M.h / l; it.clX = [-fz * v, fx * v]; }
@@ -111626,7 +111649,7 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   it.sec = [(MV_GLOW + .06 * Math.max(0, tr - 2) + .3 * t._mvG) * pulse, 0];   // (VS_STY: the blades' extra glow)
   it.bones = itemBones(it, o);
   const SW = umModel(MV_UNIT + '~sword');
-  if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, typeof hwTint === 'function' ? hwTint(t, opts) : opts);   /* (her hero weapon's stage glow: forces_zzzzzzzzzzzzzzzz_heroweapons.js) */ its.sec = it.sec; its.bones = it.bones; if (live && !icon && D) mvEcho(t, SW, D, o, it.sec); }
+  if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, typeof hwTint === 'function' ? hwTint(t, opts) : opts);   /* (her hero weapon's stage glow: forces_zzzzzzzzzzzzzzzz_heroweapons.js) */ its.sec = it.sec; its.bones = it.bones; if (live && !icon && D) { if (MVD.blur) mvGhost(t, M, SW, D, o, it.sec, opts); else mvEcho(t, SW, D, o, it.sec); } }
   const T4 = mvTips(M, o).map(p => M4.xf(_mvC, p[0], p[1], p[2]));
   // the blades' bloom (the concept's, kept tight: the owner's rule, effects never hide a unit or a foe): a soft magenta
   // halo close round each blade narrowing to its point, a brighter line of its own colour at its heart (red on one blade, pink on the other); a gentle pulse, brighter in her spells and while Unbound Blade lasts
@@ -111698,6 +111721,55 @@ function mvEcho(t, SW, D, o, sec) {
     const f = (now - e.at) / MVD.echoT; if (f <= .12 || f >= 1) continue;   // (the newest lies on the sword itself)
     const its = item(SW.mesh, e.m, { alpha: MVD.echoA * e.a * (1 - f) * busy, shadow: false, tint: [1.35, .45, .95, .45] });
     its.sec = sec; its.bones = itemBones(its, e.b);
+  }
+}
+/* the afterimages (the blur): her own body and sword drawn again where they were up to ghT s ago, gh of them ghDt apart
+   (their places taken between the frames she was drawn in, so they are spaced evenly at any frame rate), see-through,
+   crimson and pink by turns, each stretched along the way she was going (more the older it is: a smear) and fading out.
+   Her body's go by her speed (D.bl), her sword's by the whirl (D.wh), and each echo of the sword carries its two blades'
+   light (a thin beam of each blade's colour), so the echoes read at the game's zoom. Nothing is built: it is her own model. */
+const MV_GH_TINT = [[1.3, .28, .5, .38], [1.25, .5, 1.05, .38]], _mvGm = new Float32Array(16);
+function mvGhost(t, M, SW, D, o, sec, opts) {
+  const now = G.time, E = t._mvE || (t._mvE = []);
+  if (E.length && (now < E[0].at || now - E[0].at > .5)) E.length = 0;
+  if (!MVD.on || !MVD.gh || MVS.off) { E.length = 0; return; }
+  if (opts && opts.alpha != null && opts.alpha < 1) return;   // (a preview of her, see-through already)
+  const on = D.blg > .02 || D.wh > .05;
+  if ((on || E.length) && (!E.length || now - E[0].at > 1e-4)) {
+    const e = E.length > 40 || E.length && now - E[E.length - 1].at > MVD.ghT + .1 ? E.pop() : { m: new Float32Array(16), b: new Float32Array(o.length) };
+    if (!e.b || e.b.length !== o.length) e.b = new Float32Array(o.length);
+    e.at = now; e.bl = D.blg || 0; e.wh = D.wh || 0; e.vx = D.vx; e.vz = D.vz; e.m.set(_mvC); e.b.set(o); E.unshift(e);
+  }
+  if (!on && E.length && !E.some(e => e.bl > .02 || e.wh > .05)) { E.length = 0; return; }
+  if (E.length < 2) return;
+  const busy = (G.creeps && G.creeps.length > 20 ? .7 : 1) * (D.land == null ? 1 : D.land), lite = typeof vfxLite === 'function' && vfxLite(), n = Math.max(1, lite ? Math.ceil(MVD.gh / 2) : MVD.gh), step = MVD.ghT / n;   // (as she lands the afterimages behind her go, so she and her foe are seen on the blow)
+  const mk = UNIT_MDL[M.S.mdl].marks, sb = M.R.bix.Sword;
+  let j = 0;
+  for (let g = 1; g <= n; g++) {
+    const age = g * step, f = age / (MVD.ghT + step), at = now - age;
+    while (j < E.length - 2 && E[j + 1].at > at) j++;
+    const A = E[j], B = E[j + 1]; if (B.at > at) break;   // (older than what is kept)
+    const u = Math.max(0, Math.min(1, (A.at - at) / Math.max(1e-5, A.at - B.at))), S = u < .5 ? A : B;
+    const blS = A.bl + (B.bl - A.bl) * u, whS = A.wh + (B.wh - A.wh) * u;
+    const ab = MVD.ghA * blS * Math.pow(1 - f, 1.3) * busy, as = MVD.echoA * Math.max(whS, blS) * (1 - f) * busy;
+    if (ab < .02 && as < .03) continue;
+    for (let c = 0; c < 16; c++) _mvGm[c] = A.m[c] + (B.m[c] - A.m[c]) * u;
+    // (stretched along her way, about her own feet)
+    const vl = Math.hypot(S.vx, S.vz), k = MVD.smear * blS * f;
+    if (vl > .5 && k > .01) { const dx = S.vx / vl, dz = S.vz / vl; for (let c = 0; c < 3; c++) { const d = (dx * _mvGm[c * 4] + dz * _mvGm[c * 4 + 2]) * k; _mvGm[c * 4] += dx * d; _mvGm[c * 4 + 2] += dz * d; } }
+    const tint = MV_GH_TINT[g % 2];
+    if (ab >= .02) { const ib = item(M.mesh, _mvGm, { alpha: ab, shadow: false, tint }); ib.sec = sec; ib.bones = itemBones(ib, S.b); }
+    if (as >= .03) {
+      const its = item(SW.mesh, _mvGm, { alpha: as, shadow: false, tint: [1.35, .45, .95, .55] }); its.sec = sec; its.bones = itemBones(its, S.b);
+      // (its blades' light: the echo of a blade two pixels wide is lost at the game's zoom without it)
+      if (MVD.bladeA && typeof QADD !== 'undefined' && QADD && typeof RD !== 'undefined' && RD) {
+        const w = Math.hypot(_mvGm[0], _mvGm[1], _mvGm[2]) * .028, al = MVD.bladeA * Math.max(whS, blS) * Math.pow(1 - f, 1.2) * busy;
+        for (const [a, b, C] of [[mk.baseA, mk.tipA, MV_BLADE[0]], [mk.baseB, mk.tipB, MV_BLADE[1]]]) {
+          const p = umXf(S.b, sb, a), q = umXf(S.b, sb, b), P0 = M4.xf(_mvGm, p[0], p[1], p[2]), P1 = M4.xf(_mvGm, q[0], q[1], q[2]);
+          QADD.beam(RD, P0, P1, w * 1.7, [...C.glow, al * .55], 6); QADD.beam(RD, P0, P1, w * .6, [...C.heart, al], 6);
+        }
+      }
+    }
   }
 }
 // violet mist and embers drifting off the blades: a few a second at rest, many more on a swing (by the blades' speed)
@@ -111837,10 +111909,50 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
     }
     vfxRb.end();
   }
-  /* the whirl of a dart: thin strands of both colours wound round her from her shoulders out to her feet, turning the way
-     she turns and smeared back along her way, so she reads as a swirl with a tail as she darts; gone as she comes to
-     rest. Thin and see-through (the owner's rule: she, the foes and the map stay seen). */
   const D = t._mvD, wh = D && MVD.on ? D.wh : 0;
+  /* the streaks (the blur; the Spellblades' streak to the foe, many of it and hers in crimson and pink): st ribbons, each
+     the path left by a point turning round her (its own distance out, height, pace, length and width), so while she
+     flies they trail her long and nearly straight, and where she slows on her foe they wind into a coil round her. Each
+     flares out, rises and thins with age, wavers, and is broken along its length (stGap), so they are ragged and no two
+     alike. Thin and see-through (the owner's rule: she, the foes and the map stay seen). */
+  if (D && MVD.on && MVD.blur && MVD.st) {
+    const Q = t._mvQ || (t._mvQ = []), ql = Q[0], qd = ql ? now - ql.at : 0;
+    if (ql && (qd > .15 || qd < 0)) Q.length = 0;
+    const em = Math.max(.5 * wh, D.bl || 0);
+    if (!Q.length || qd > 1e-4) {
+      if (em > .03 || Q.length) Q.unshift({ at: now, x: cx, z: cz, e: em, ph: (Q.length ? Q[0].ph : 0) + (Math.sign(t._mvSv || 0) || 1) * MVD.stTurn * Math.min(.1, Q.length ? qd : 0) });
+      while (Q.length && (now - Q[Q.length - 1].at > MVD.stT + .08 || Q.length > 60)) Q.pop();
+      if (Q.length && !Q.some(q => q.e > .03)) Q.length = 0;
+    }
+    const m = Q.length;
+    if (m >= 3) {
+      const Pq = new Array(m * 3); for (let j = 0; j < m; j++) { Pq[j * 3] = Q[j].x; Pq[j * 3 + 1] = Q[j].e; Pq[j * 3 + 2] = Q[j].z; }
+      const lite = typeof vfxLite === 'function' && vfxLite(), ns = lite ? Math.ceil(MVD.st * .6) : MVD.st, N = 20, span = now - Q[m - 1].at, row = new Array((N + 1) * 5), c3 = [0, 0, 0];
+      const rn = (q, i) => { const v = Math.sin(q * 12.9898 + i * 78.233 + 1.7) * 43758.5453; return v - Math.floor(v); };
+      for (let q = 0; q < ns; q++) {
+        const C = MVS_COL[q % 2], L = Math.min(span, MVD.stT * (.4 + .6 * rn(q, 3))); if (L < .03) continue;
+        const r0 = hw * MVD.stR * (.25 + .75 * rn(q, 0)), h0 = hw * (.14 + .7 * rn(q, 1)), wr = .55 + .9 * rn(q, 2), wd = hw * MVD.stW * (.45 + .55 * rn(q, 4)) * (q % 3 === 2 ? .5 : 1), gf = 7 + 9 * rn(q, 5), ph0 = q * 2.399;
+        let j = 0, any = 0;
+        for (let k = 0; k <= N; k++) {
+          const a = L * k / N, at = now - a, f = k / N;
+          while (j < m - 2 && Q[j + 1].at > at) j++;
+          const u = Math.max(0, Math.min(1, (Q[j].at - at) / Math.max(1e-5, Q[j].at - Q[j + 1].at))), ph = Q[j].ph + (Q[j + 1].ph - Q[j].ph) * u;
+          vfxCR(Pq, m, (j + u) / (m - 1), c3);
+          const an = ph0 + ph * wr, r = r0 * (1 + .4 * f) + hw * .035 * Math.sin(at * 23 + q * 1.7), gate = MVD.stGap ? 1 - MVD.stGap * mvE((.5 + .5 * Math.sin(at * gf + q * 4.1) - .5) / .3) : 1;
+          const al = Math.max(0, c3[1]) * Math.pow(1 - f, .9) * Math.min(1, f * 9 + .25) * gate; if (al > .02) any = 1;
+          row[k * 5] = c3[0] + Math.cos(an) * r; row[k * 5 + 1] = h0 + hw * (.12 * f + .03 * Math.sin(at * 17 + q * 2.9)); row[k * 5 + 2] = c3[2] + Math.sin(an) * r; row[k * 5 + 3] = wd * (.25 + .75 * Math.pow(1 - f, .7)); row[k * 5 + 4] = al;
+        }
+        if (!any) continue;
+        for (let pass = 0; pass < 2; pass++) {
+          vfxRb.begin(VX, pass ? VT.GLOW : VT.SOLID, pass ? 1 : C.add, 0);   // (its body mostly laid over the scene, as the ribbons: crimson added over sunlit grass is lost)
+          for (let k = 0; k <= N; k++) vfxRb.pt(row[k * 5], row[k * 5 + 1], row[k * 5 + 2], row[k * 5 + 3] * (pass ? .3 : 1), pass ? C.hot : q % 3 ? C.body : C.rim, Math.min(1, row[k * 5 + 4] * g * busy * MVD.stA * (pass ? .75 : .7)), k / N);
+          vfxRb.end();
+        }
+      }
+    }
+  }
+  /* the coil (off: MVD.coil 0, the streaks took its place): thin strands of both colours wound round her from her
+     shoulders out to her feet, turning the way she turns and smeared back along her way. */
   if (wh > .04 && MVD.coil) {
     const dir = Math.sign(t._mvSv || 0) || 1, ph = now * MVD.coilW * dir, N = 12;
     for (let q = 0; q < MVD.coil; q++) {
