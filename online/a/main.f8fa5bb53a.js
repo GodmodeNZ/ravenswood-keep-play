@@ -1,4 +1,4 @@
-const BUILD_TAG = 'fd181ec9@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '0fd0c4f1@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -143631,6 +143631,7 @@ const GV2 = (() => {
     if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
     S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
     if (live) {
+      { const cu = t._gvCatchR != null ? now - t._gvCatchR : 9; if (cu >= 0 && cu < .16 && gr && typeof QADD !== 'undefined' && typeof wbgA === 'function') QADD.bill(RD, gr[0], gr[1], gr[2], .16, .16, wbgA(WB_COL.goldL, .3 * (1 - cu / .16)), 1, 0); }   // (home: a small warm glint in her hand)
       t.tipW = gr; t.tipYaw = yaw; t.tipAt = G.time; t._gvDrawn = G.time; t._gvClip = P.c; t._gvClipS = P.s; t._gvGR = gr; t._gvScale = s;   // (the tip: the glaive in her hand)
       // a flight just thrown: where its glaive was in her fist, against where the game starts it (drawn from there, eased onto its path)
       const FP = flights(); if (FP) for (const q of FP) if (q && q.t === t && q._gvHand && !q._gvOff && !q.done) q._gvOff = [gr[0] - q.x, gr[1] - (q.h || .6), gr[2] - q.z];
@@ -143659,25 +143660,62 @@ const GV2 = (() => {
     const C = MK.ctrR; M4.trs(_f1, x, y, z, ry, rx, rz, sc, sc, sc); M4.trs(_f2, -C[0], -C[1], -C[2]); M4.mul(_f3, _f1, _f2);
     const it = item(GLV_, _f3.slice(), { shadow: false }); it.sec = [0, 0]; it.bones = IDENT;
   }
+  /* (27 Nov 2026, the owner on the throw: "so the vfx": crafted and understated, foes always in view)
+     - a disc: laid flat, banked a little into its curve, spinning on its own axis, a faint ring of blur over its rim so
+       the spin reads at 30 frames a second (its four hooks strobed without it);
+     - its path: drawn bowed out to one side and lifted a little over each leg (nothing at a leg's ends, so every strike
+       and the catch are where and when the game has them), the bow changing sides at each ricochet;
+     - each strike bites: the disc wobbles for a fifth of a second and a small star of gold splinters opens at the foe;
+     - its trail: a short tapered ribbon along the way it actually came (a sixth of a second of it: a cell or two), gold thinning to
+       nothing, in place of the game's straight threads from strike to strike;
+     - no glow to speak of: a hand's breadth of warm light under it, a soft shadow on the road. */
+  const _f4 = new Float32Array(16), _f5 = new Float32Array(16), TRAIL_N = 7, BITE = .22;
+  function discAt(x, y, z, yaw, pitch, bank, spin, sc) {
+    const C = MK.ctrR; M4.trs(_f1, x, y, z, yaw, pitch, bank, sc, sc, sc); M4.trs(_f4, 0, 0, 0, 0, -Math.PI / 2, spin); M4.mul(_f5, _f1, _f4);
+    M4.trs(_f2, -C[0], -C[1], -C[2]); M4.mul(_f3, _f5, _f2);
+    const it = item(GLV_, _f3.slice(), { shadow: false }); it.sec = [0, 0]; it.bones = IDENT;
+  }
   function flyGlaive(p, t) {
-    const big = p.big ? 1.2 : 1, sc = (t._gvScale || 1.4) * FLY_K * big, now = G.time;
+    const big = p.big ? 1.2 : 1, sc = (t._gvScale || 1.4) * FLY_K * big, now = G.time, RR = .127 * sc;
+    const T = p.pts, L = T && T.length ? T[T.length - 1] : [p.x0 != null ? p.x0 : p.x, p.h0 || .6, p.z0 != null ? p.z0 : p.z];
+    const n = T ? T.length : 0; if (p._gvN == null) { p._gvN = n; p._gvSide = (p.t && ((p.t.i + p.t.j) & 1)) ? 1 : -1; }
+    if (n > p._gvN) { p._gvN = n; p._gvBite = now; p._gvB = [L[0], L[1], L[2]]; p._gvSide = -p._gvSide; }   // (a strike: the bite, and the bow changes sides)
     let x = p.x, h = p.h || .6, z = p.z;
-    if (p._gvOff) { const u = Math.max(0, 1 - (now - (p._gvAt || now)) / LEAVE), e = u * u * (3 - 2 * u); x += p._gvOff[0] * e; h += p._gvOff[1] * e; z += p._gvOff[2] * e; }
-    const g = t._gvGR;
-    if (p.home && g) { const d = Math.hypot(g[0] - x, g[1] - h, g[2] - z), k = Math.max(0, 1 - d / HOME), e = k * k; x += (g[0] - x) * e; h += (g[1] - h) * e; z += (g[2] - z) * e; }
-    glaiveAt(x, h, z, 0, -Math.PI / 2 + .3 + .08 * Math.sin(p.spin * .2), p.spin, sc);
-    const bg = p.big ? 1.35 : 1;
-    QADD.bill(RD, x, h, z, .28 * bg, .28 * bg, wbgA(WB_COL.goldL, .14), 1, 0);
-    QADD.bill(RD, x, h, z, .4 * bg, .4 * bg, wbgA(WB_COL.teal, .08), 3, p.spin * .2);
-    QG.ground(x, z, .03, .13 * bg, .13 * bg, [0, 0, 0, .28], 2, 0);
-    const T = p.pts; if (!T || !T.length) return;
-    for (let i = 0; i + 1 < T.length; i++) {
-      const a = 1 - (G.time - T[i + 1][3]) / WBG_TRAIL; if (a <= 0) continue;
-      QADD.beam(RD, [T[i][0], T[i][1], T[i][2]], [T[i + 1][0], T[i + 1][1], T[i + 1][2]], .065 * bg, wbgA(WB_COL.goldL, .5 * a));
-      QADD.beam(RD, [T[i][0], T[i][1], T[i][2]], [T[i + 1][0], T[i + 1][1], T[i + 1][2]], .02 * bg, wbgA(WB_COL.ivory, .9 * a, 1.3));
+    const g = t._gvGR; let gx = null, gz = null;
+    if (p.k === 'rglaive') { if (p.home) { gx = g ? g[0] : t.x; gz = g ? g[2] : t.y; } else if (p.tx != null) { gx = p.tx; gz = p.tz; } }
+    if (gx != null) {   // the bow over this leg (drawn only)
+      const lx = gx - L[0], lz = gz - L[2], len = Math.hypot(lx, lz);
+      if (len > .25) {
+        const u = Math.max(0, Math.min(1, ((x - L[0]) * lx + (z - L[2]) * lz) / (len * len))), sn = Math.sin(Math.PI * u), A = Math.min(.3, .12 * len) * p._gvSide;
+        x += -lz / len * A * sn; z += lx / len * A * sn; h += .06 * Math.min(1, len / 2) * sn;
+      }
     }
-    const L = T[T.length - 1], dx = x - L[0], dz = z - L[2], D_ = Math.hypot(dx, dz);
-    if (D_ > .05) { const k = Math.min(1, .7 / D_); QADD.beam(RD, [x - dx * k, h + (L[1] - h) * k, z - dz * k], [x, h, z], .04 * bg, wbgA(WB_COL.goldL, p.home ? .18 : .32)); }
+    if (p._gvOff) { const u = Math.max(0, 1 - (now - (p._gvAt || now)) / LEAVE), e = u * u * (3 - 2 * u); x += p._gvOff[0] * e; h += p._gvOff[1] * e; z += p._gvOff[2] * e; }
+    if (p.home && g) { const d = Math.hypot(g[0] - x, g[1] - h, g[2] - z), k = Math.max(0, 1 - d / HOME), e = k * k; x += (g[0] - x) * e; h += (g[1] - h) * e; z += (g[2] - z) * e; }
+    // its heading, from where it was last drawn
+    const q = p._gvLast; let vx = p._gvVx || 0, vz = p._gvVz == null ? 1 : p._gvVz;
+    if (q) { const dx = x - q[0], dz = z - q[2], d = Math.hypot(dx, dz); if (d > .004) { vx = dx / d; vz = dz / d; } }
+    p._gvLast = [x, h, z]; p._gvVx = vx; p._gvVz = vz;
+    const bt = p._gvBite != null ? now - p._gvBite : 9, wob = bt < BITE ? Math.sin(bt * 58) * .42 * (1 - bt / BITE) : 0;
+    discAt(x, h, z, Math.atan2(vx, vz), .10 + wob * .6, .17 * p._gvSide * (p.home ? -1 : 1) + wob, p.spin * 1.25, sc);
+    const gold = WB_COL.goldL, iv = WB_COL.ivory;
+    QADD.ground(x, z, h + .004, RR * 1.02, RR * 1.02, wbgA(gold, .11), 4, .12, p.spin * 1.25);   // the rim's blur: it reads as spinning
+    QADD.bill(RD, x, h, z, RR * 1.5, RR * 1.5, wbgA(gold, .07), 1, 0);
+    QG.ground(x, z, .03, RR * .85, RR * .85, [0, 0, 0, .22], 2, 0);
+    // the trail: the way it came, a sixth of a second of it, tapering to nothing
+    const tr = p._gvTr || (p._gvTr = []);
+    if (!tr.length || now > tr[tr.length - 1][3] + .012) { tr.push([x, h, z, now]); if (tr.length > TRAIL_N) tr.shift(); }
+    for (let i = 0; i + 1 < tr.length; i++) {
+      const k = (i + 1) / tr.length, a = tr[i], b = tr[i + 1]; if (now - a[3] > .24) continue;
+      QADD.beam(RD, [a[0], a[1], a[2]], [b[0], b[1], b[2]], RR * .85 * k, wbgA(gold, .46 * k * k));
+      if (k > .5) QADD.beam(RD, [a[0], a[1], a[2]], [b[0], b[1], b[2]], RR * .22 * k, wbgA(iv, .58 * k * k, 1.15));
+    }
+    // the bite: a small star of splinters at the foe, gone in a fifth of a second
+    if (bt < BITE && p._gvB) {
+      const e = bt / BITE, B = p._gvB, r = .09 + .22 * e;
+      QADD.ground(B[0], B[2], B[1] + .01, r, r, wbgA(gold, .55 * (1 - e) * (1 - e)), 11, B[0] * 7.3 + B[2] * 3.1, B[0] * 7.3 + B[2] * 3.1);
+      if (bt < .1) QADD.bill(RD, B[0], B[1], B[2], .075, .075, wbgA(iv, .6 * (1 - bt / .1), 1.2), 1, 0);
+    }
   }
   // Warding Glaive's planted glaive: her round glaive standing upright in its rune, half sunk in the road, turning slowly
   function standing(now) {
