@@ -1,4 +1,4 @@
-const BUILD_TAG = '478f510c@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b5c56da5@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -13748,9 +13748,11 @@ FORCE_HOOKS.conclave = {
       } else t.ccHhT = .5;
     }
     if (st.caps.ccStarSky && (t.ccSkyT = (t.ccSkyT || 0) - dt) <= 0) {   // Starfall Sky
-      const pool = G.creeps.filter(c => canTarget(t, st, c) && inRange(t, st, c)), c = pool.find(q => q.fly) || pool.sort((a, b) => b.hp - a.hp)[0];
-      t.ccSkyT = c ? 2 : .25; if (c) ccEv('cap:ccStarSky');
-      if (c && typeof ccStarDrop === 'function') ccStarDrop(t, st, c, 1.2, { tag: null });
+      /* (27 Nov 2026, the Astrologers' own tree: a great star every 6s on the toughest foe in reach, ground or air, for 300%
+         and half that within 0.6 cells; it was a 120% star every 2s, flyers first. forces_..._easy_conclave_skywide.js) */
+      const pool = G.creeps.filter(c => !c.dead && !c.ent && canTarget(t, st, c) && inRange(t, st, c)), c = pool.sort((a, b) => b.hp - a.hp)[0];
+      t.ccSkyT = c ? 6 : .25; if (c) ccEv('cap:ccStarSky');
+      if (c && typeof ccStarDrop === 'function') ccStarDrop(t, st, c, 3, { tag: null, splash: true, great: 1 });
     }
     if (t.ccOrrT > G.time && typeof ccOrreryTick === 'function') ccOrreryTick(t, st, dt);
     if (typeof ccItemsPulse === 'function' && st.pw && st.pw.cc) ccItemsPulse(t, st, dt);
@@ -63504,13 +63506,180 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
   ezLayout(F, 'arrow', [[0,2],[0,1],[5,2],[3,3],[3,1],[1,0],[4,1],[1,1],[2,3],[5,3],[2,0],[1,2],[2,2],[5,1],[1,3],[0,3],[4,2],[4,0],[5,0]], [[8,3,9],[17,18],[1,7],[5,10]]);   /* rows 3 4 3 2 3 4; chains: Gathering Orb > Charged Recital > Ready Orb | Tidemoon > Missile Storm | Splitting Missile > Skyward Missiles | Tome Familiar > Overflowing Missile */
   ezLayout(F, 'frost', [[0,1],[0,2],[5,2],[4,3],[2,2],[2,1],[1,0],[5,1],[4,1],[3,3],[5,0],[3,2],[1,1],[2,0],[4,2],[0,3],[2,3]], [[6,13,10],[8,7],[0,12,5]]);   /* rows 3 2 4 2 3 3; chains: Ice Coffin > Cold Focus > Coffin Burst | Shatterbloom > Icicle Volley | Chilling Bolts > Absolute Stillness > Long Staff */
   ezLayout(F, 'arcane', [[0,1],[3,2],[2,3],[4,3],[1,3],[2,0],[3,1],[5,2],[5,1],[0,2],[4,0],[2,2],[1,0],[5,0],[0,3],[4,2],[2,1]], [[0,16,6,8],[14,4,2],[12,5],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Spare Seconds > Time Rhythm > Long Hour > Frozen Moment | Pendulum Swing > Backward Hour > Rewound Bolt | Arcane Clockwork > Dead Hour | Recurrence > Endless Hour */
-  ezLayout(F, 'storm', [[0,2],[0,3],[5,2],[3,2],[3,3],[1,3],[3,1],[4,2],[5,3],[5,1],[2,1],[0,1],[2,0],[4,0],[2,2],[1,0],[3,0]], [[14,3,7,2],[1,5],[11,10,6]]);   /* rows 3 2 3 4 2 3; chains: Turning Stars > Long Lens > Zodiac > Constellation | Star-Chart > Lodestar | Shooting Bolt > Grand Orrery > Busy Sky */
+  ezLayout(F, 'storm', [[0,2],[0,3],[3,2],[0,0],[3,3],[1,3],[0,1],[4,2],[5,2],[5,1],[2,1],[3,1],[2,0],[4,0],[1,2],[1,0],[2,2]], [[6,10,11,9],[3,15,12],[14,16,2],[7,8],[5,4]]);   /* (27 Nov 2026, the Astrologers' own tree, forces_..._easy_conclave_skywide.js: the Seer in columns 1-2, Starfall in 3-4; rows 4 3 3 3 2 2; chains: Busy Sky > Grand Orrery > Omen of Ending > The Whole Sky | Long Lens > Fated Mark > Bright Fourth | Turning Stars > Omen Light > Crater | Zodiac > Starfall Sky | Lodestar > Falling Finish) */
+  if (0) ezLayout(F, 'storm', [[0,2],[0,3],[5,2],[3,2],[3,3],[1,3],[3,1],[4,2],[5,3],[5,1],[2,1],[0,1],[2,0],[4,0],[2,2],[1,0],[3,0]], [[14,3,7,2],[1,5],[11,10,6]]);   /* rows 3 2 3 4 2 3; chains: Turning Stars > Long Lens > Zodiac > Constellation | Star-Chart > Lodestar | Shooting Bolt > Grand Orrery > Busy Sky */
   ezLayout(F, 'earth', [[1,1],[0,2],[3,1],[0,1],[2,1],[5,1],[1,3],[3,2],[4,0],[3,3],[1,0],[5,0],[2,2],[5,2],[1,2],[0,3],[4,1]], [[4,2,16,5],[10,8,11],[15,6]]);   /* rows 3 4 2 3 2 3; chains: Heave > Waking Golem > Stamped Flat > Shatterground | Stone Fists > Living Bulwark > Shockwave | Warden's Command > Gathering Weight */
   ezLayout(F, 'cannon', [[0,1],[0,3],[4,3],[1,1],[1,0],[1,3],[2,0],[0,2],[2,3],[3,1],[1,2],[3,0],[4,0],[4,1],[2,2],[5,1],[5,2]], [[7,10,14,16],[9,13,15],[0,3]]);   /* rows 3 4 3 2 3 2; chains: Leaping Cinders > Stoked Fire > Banked Heat > Pyre Bloom | Molten Brand > Flashover > Sunfall | Pyre Scribe > Skipping Flame */
   ezLayout(F, 'venom', [[0,2],[2,3],[0,1],[4,1],[4,0],[1,1],[2,2],[3,1],[1,3],[2,0],[4,2],[3,3],[0,0],[5,2],[5,1],[5,3]], [[8,1,11,15],[6,10,13],[2,5],[12,9]]);   /* rows 3 2 3 2 3 3; chains: Glancing Crescent > Hunting Crescent > Paired Crescents > Wardbreaker | Splintering > Rend the Veil > Crescent Orbit | Homeward Edge > Returning Crescent | Sever Rhythm > Honed by Spells */
   ezLayout(F, 'champ:cc_arch', [[0,2],[1,3],[1,1],[3,2],[1,2],[2,1],[1,0],[2,3],[5,0],[4,1],[3,1],[5,2],[4,3],[5,1],[0,1],[3,0]], [[5,10,9,13],[1,7,12],[3,11],[0,4]]);   /* rows 2 4 2 3 2 3; chains: Loose Threads > Snapping Threads > Woven Edge > Rewoven Threads | Open Book > Shared Lesson > Sixfold Loom | Read the Crowd > Spellweaver | Quick Quill > Unravel */
   ezLayout(F, 'champ:cc_chrono', [[0,2],[0,1],[3,0],[5,1],[1,2],[2,1],[3,2],[1,0],[3,3],[4,1],[3,1],[5,0],[2,3],[5,2],[0,3],[2,0],[4,3]], [[5,10,9,3],[12,8,16],[7,15],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Way Back > Second Hand > Late Arrival > Gathered Ghosts | The Hour Strikes > Endless Hour > Leaden Pull | Lent Time > Saved Seconds | Patient Hands > Recall */
   ezLayout(F, 'champ:cc_maren', [[0,1],[0,2],[1,2],[3,2],[1,1],[2,0],[2,3],[2,2],[5,1],[3,3],[3,0],[5,2],[4,3],[4,0],[3,1],[0,3],[5,0]], [[5,10,13,16],[6,9,12],[7,3],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Chain > Flourish > Duelling Ground > Chain to Blade | Opened Guard > Cut the Fallen > Unbound Blade | Shared Edge > Practice Yard | Quick Draw > Rift Chain */
+}
+
+/* The Astrologers' own tree (owner, 27 Nov 2026: "would like to give astrologers their own flavour"; and of the capstone,
+   "astrologer capstone could mean that she can attack anywhere on the map"). Two fantasies, each with its own capstone
+   (owner rule), 17 talents in the same list order as before (saves load by index; a renamed talent keeps its painting,
+   TAL_ART_ALIAS). Pure damage: no control anywhere (owner rule for DPS units). The layout is the ezLayout line in
+   forces_..._easy_conclave.js.
+
+   THE SEER OF THE WHOLE SKY (columns 1-2): sight, reach, and picking the right foe
+     Long Lens         her range grows                                      (was reach at flyers only)
+     Busy Sky          each attack comes faster while she keeps attacking   (kept)
+     Fated Mark        each attack on the same foe hits harder              (was Skyward Eye: flyers only)
+     Bright Fourth     foes in the outer third of her reach take more       (kept)
+     Grand Orrery      her spell                                            (kept)
+     Omen of Ending    foes low on health take more from her attacks        (was Shooting Bolt: one more bolt)
+     Orrery Moon       Grand Orrery lasts longer                            (kept)
+     THE WHOLE SKY     her attacks strike any foe on the map, from the sky  (was Binary Star: one more bolt)
+   STARFALL (columns 3-4): fewer, heavier stars from above
+     Bursting Stars    her attacks burst on the foes beside the target      (was Orbiting Spark: one more bolt)
+     Heavy Star        every 4th attack is a heavy star from above          (was Star-Chart: one more bolt)
+     Turning Stars     each attack brings her spells sooner                 (kept)
+     Lodestar          her spell                                            (kept)
+     Omen Light        Falling Star hits harder                             (kept)
+     Falling Finish    Lodestar hits harder                                 (kept)
+     Zodiac            Falling Star comes sooner                            (kept)
+     Crater            Falling Star's burst reaches further                 (was Constellation: three stars)
+     STARFALL SKY      every 6s a great star on the toughest foe in reach   (was every 2s, flyers first)
+
+   The Whole Sky: only her attacks reach the whole map. st.range stays her ordinary reach, so her spells, her items' rings
+   and Bright Fourth still measure from it: Bright Fourth pays on nearly every far shot, Fated Mark and Omen of Ending
+   reward the targeting order she is set to (Strongest, Weakest), and Starfall Sky's great star also lands anywhere. Each
+   attack deals 20% less with it: the whole map is the reward.
+   Numbers after the first duel (wave 16, 1050 gold, sim/duels/astrologer_tree.json): the full tree removed 80% of the wave
+   against 28-31% for her old tree, so Heavy Star, Fated Mark, Omen of Ending and The Whole Sky's cost came down. */
+const CCW = { DMG: .8, RANGE: 99, H: 5.2, SPD: 15, CAP: 'ccWholeSky',
+  REACH: .2, MARK: .03, END_AT: .35, END: .1, BURST_R: .7, BURST: .15, HEAVY_N: 4, HEAVY: .4, CRATER_R: .3, FALL_T: 6, FALL: 3 };
+(function () {
+  if (typeof FORCES === 'undefined' || !FORCES.conclave || !FORCES.conclave.talents) return;
+  const F = 'conclave', T = FORCES.conclave.talents.storm; if (!T) return;
+  const P = v => String(Math.round(v * 100)), N = v => String(+(+v).toFixed(2));
+  const M = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  // set(old name, new name, fields): the talent in the old one's place, its old effect switched off
+  const set = (old, name, o) => {
+    const t = T.list.find(q => q.name === old && !q.spell); if (!t) { if (typeof console !== 'undefined') console.warn('astrologer tree: no talent', old); return null; }
+    if (!o.keep && typeof ezClear === 'function') ezClear(t);
+    if (name !== old) { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = old; t.oldName = old; t.name = name; }
+    if (o.tag) t.tag = o.tag;
+    if (o.max) t.max = o.max;
+    if (o.cap) { t.cap = o.cap; t.capK = 1; }
+    if (o.mod) t.mod = o.mod;
+    if (o.sp) t.sp = o.sp;
+    if (o.pro) t.pro = n => o.pro(M(t, n));
+    if (o.ladder) t.ezLadder = o.ladder(t); else if (!o.keep) delete t.ezLadder;
+    t.ez = null; t.atkPlain = true;
+    return t;
+  };
+  // ---- the Seer of the Whole Sky ----
+  set('Long Lens', 'Long Lens', { tag: 'Damage', mod: n => ({ range: CCW.REACH * n }), pro: n => `Increases the Astrologer's range by ${N(CCW.REACH * n)} cells.`,
+    ladder: t => () => ({ kind: 'reach', from: 1, vals: Array.from({ length: t.max }, (_, k) => CCW.REACH * (k + 1)) }) });
+  set('Skyward Eye', 'Fated Mark', { tag: 'Damage', mod: n => ({ rampD: CCW.MARK * n, rampDMax: CCW.MARK * n * 5 }),
+    pro: n => `Each attack of the Astrologer on the same foe hits ${P(CCW.MARK * n)}% harder, up to 5 times.` });
+  set('Shooting Bolt', 'Omen of Ending', { tag: 'Damage', cap: 'ccwEnd',
+    pro: n => `Foes below ${P(CCW.END_AT)}% health take ${P(CCW.END * n)}% more from the Astrologer's attacks.` });
+  set('Binary Star', 'The Whole Sky', { tag: 'Damage', cap: CCW.CAP,
+    pro: () => `The Astrologer's attacks fall from the sky and can strike any foe on the map, for ${P(1 - CCW.DMG)}% less damage.` });
+  // ---- Starfall ----
+  set('Orbiting Spark', 'Bursting Stars', { tag: 'Damage', cap: 'ccwBurst',
+    pro: n => `The Astrologer's attacks burst: foes within ${N(CCW.BURST_R)} cells of the target take ${P(CCW.BURST * n)}% of the damage.` });
+  set('Star-Chart', 'Heavy Star', { tag: 'Damage', cap: 'ccwHeavy',
+    pro: n => `Every ${CCW.HEAVY_N}th attack of the Astrologer is a heavy star from above that hits ${P(CCW.HEAVY * n)}% harder.` });
+  set('Constellation', 'Crater', { tag: 'Spell', cap: 'ccwCrater', sp: () => ({ ab: 'cc_fallingstar' }),
+    max: 2, pro: n => `Increases the reach of the burst of Falling Star by ${N(CCW.CRATER_R * n)} cells.` });
+  set('Starfall Sky', 'Starfall Sky', { tag: 'Damage', cap: 'ccStarSky',
+    pro: () => `Every ${CCW.FALL_T}s: the Astrologer calls a great star down on the toughest foe in reach for ${P(CCW.FALL)}% damage, and half that to foes within 0.6 cells.` });
+})();
+
+/* ---------- the rules ---------- */
+if (typeof effStats === 'function') {
+  const _ccwEff = effStats;
+  effStats = function (t) {
+    const st = _ccwEff.apply(this, arguments);
+    if (st && st.caps && st.caps[CCW.CAP] && !st.skyAll) { st.skyAll = 1; if (st.dmg) st.dmg *= CCW.DMG; }
+    return st;
+  };
+}
+/* The Whole Sky: her attacks pick from every foe on the map, by her own targeting order; nothing is "out of reach" */
+if (typeof acquire === 'function') {
+  const _ccwAcq = acquire;
+  acquire = function (t, st, skip) {
+    if (!(st && st.skyAll)) return _ccwAcq.apply(this, arguments);
+    const s2 = Object.create(st); s2.range = CCW.RANGE; s2.minR = 0;
+    return _ccwAcq.call(this, t, s2, skip);
+  };
+}
+if (typeof inRange === 'function') {
+  const _ccwIn = inRange;
+  inRange = function (t, st, c) { return st && st.skyAll ? true : _ccwIn.apply(this, arguments); };
+}
+/* Omen of Ending: her attacks (not her spells, not an item's or a burst's damage) on a foe low on health */
+if (typeof forceHook === 'function') {
+  const _ccwHook = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = _ccwHook.apply(this, arguments);
+    if (k !== 'amp' || a2 || !a0 || !a1 || !a1.st || !a1.st.caps || !a1.st.caps.ccwEnd) return r;
+    if ((typeof AB_TAG !== 'undefined' && DTAG === AB_TAG) || DTAG === 'relic' || DTAG === 'rx') return r;
+    return a0.hp < CCW.END_AT * (a0.maxHp || a0.hp) ? (r || 0) + CCW.END * a1.st.caps.ccwEnd : r;
+  };
+}
+/* her star-bolt: from the sky with The Whole Sky; every 4th a heavy star from above with Heavy Star (the same bolt and
+   trail, a new start and a steeper fall: no new light, so foes stay visible) */
+let CCW_SKY = 0, CCW_HEAVY = 0;
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_star) {
+  const _ccwAtk = FORCE_ATTACK.cc_star;
+  FORCE_ATTACK.cc_star = function (t, st, tg, pow, echo) {
+    const C = (st && st.caps) || {}, heavy = C.ccwHeavy && !echo && (t.shots + 1) % CCW.HEAVY_N === 0 ? C.ccwHeavy : 0;
+    if (!heavy && !(st && st.skyAll)) return _ccwAtk.apply(this, arguments);
+    if (st.skyAll && tg && !echo && typeof ccEv === 'function' && Math.hypot(tg.x - t.x, tg.y - t.y) > (st.range || 0) + (tg.fly && st.airR ? st.airR : 0)) ccEv('cap:' + CCW.CAP);   /* (a shot past her old reach) */
+    if (heavy && typeof ccEv === 'function') ccEv('cap:ccwHeavy');
+    CCW_SKY = 1; CCW_HEAVY = heavy;
+    try { return _ccwAtk.call(this, t, st, tg, heavy ? pow * (1 + CCW.HEAVY * heavy) : pow, echo); } finally { CCW_SKY = 0; CCW_HEAVY = 0; }
+  };
+}
+if (typeof ccShoot === 'function') {
+  const _ccwShoot = ccShoot;
+  ccShoot = function (p) {
+    if (CCW_SKY && p && p.k === 'star' && p.tg && !p.lob) {
+      const c = p.tg, th = typeof hitH === 'function' ? hitH(c) : .3;
+      p.x = c.x + .55; p.z = c.y - .75; p.h = th + CCW.H; p.spd = CCW.SPD; p.sky = 1;
+      const dx = c.x - p.x, dz = c.y - p.z, dh = th - p.h, D = Math.hypot(dx, dz, dh) || 1;
+      p.vx = dx / D; p.vz = dz / D; p.vh = dh / D;
+      if (CCW_HEAVY) { p.sz = (p.sz || 1) * 1.6; p.heavy = 1; }
+    }
+    return _ccwShoot.apply(this, arguments);
+  };
+}
+/* Bursting Stars: the foes beside the one a star-bolt lands on */
+if (typeof ccStarHit === 'function') {
+  const _ccwHit = ccStarHit;
+  ccStarHit = function (t, st, c, pow) {
+    const x = c.x, z = c.y, r = _ccwHit.apply(this, arguments), n = st && st.caps && st.caps.ccwBurst;
+    if (n && typeof inSplash === 'function') {
+      const amt = st.dmg * pow * CCW.BURST * n; let any = 0;
+      tagged('rx', () => inSplash(x, z, CCW.BURST_R, false, q => { if (q === c || q.ent || q.dead || !canTarget(t, st, q)) return; any = 1; ccHit(t, st, q, amt, { noRx: true }); }));
+      if (any) { ccEv('cap:ccwBurst'); if (typeof ccRingFx === 'function') ccRingFx(x, z, CCW.BURST_R, '#dfe8ff'); }
+    }
+    return r;
+  };
+}
+/* Crater: Falling Star's burst reaches further (the star's own 0.6-cell burst is ccStarDrop's; this is the ring beyond it).
+   Starfall Sky's great star: a wider streak and a ring where it lands. */
+if (typeof ccStarDrop === 'function') {
+  const _ccwDrop = ccStarDrop;
+  ccStarDrop = function (t, st, c, m, o) {
+    const r = _ccwDrop.apply(this, arguments), C = (st && st.caps) || {};
+    if (o && o.great) rfx({ k: 'streak', x0: c.x + .7, h0: 5, z0: c.y - .9, c, col: '#fff3c8', w: .16, trav: .3, life: .5 });
+    const crater = o && o.splash && o.low != null && C.ccwCrater;
+    if (crater || (o && o.great)) G.delayed.push({ t: .3, fn: () => {
+      if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || st, x = c.x, z = c.y;
+      if (o.great) { ccRingFx(x, z, .6, '#fff3c8'); G.shake = Math.max(G.shake || 0, .06); }
+      if (!crater) return;
+      const amt = ccAbD(s) * m * .5, R1 = .6 + CCW.CRATER_R * crater;
+      inSplash(x, z, R1, false, q => { if (q === c || q.ent || q.dead || !canTarget(t, s, q) || Math.hypot(q.x - x, q.y - z) <= .6) return; ccHit(t, s, q, amt, { noRx: true }); });
+      ccRingFx(x, z, R1, '#dfe8ff'); ccEv('cap:ccwCrater');
+    } });
+    return r;
+  };
 }
 
 /* ================= SIMPLE PASSIVES: THE GROVE (26 Nov 2026) =================
@@ -93751,7 +93920,8 @@ function drawSelection() {
   const st = effStats(t);
   if (t.type === 'holy' && !t.def.champ) drawAuraPreview(t.x, t.y, st.auraR, t);
   if (t.type !== 'holy' || t.def.champ || holySmites(t, st)) { const r = st.range, RDu = typeof RIDE !== 'undefined' && t.def.unit && RIDE[t.def.unit];   // (a rider: where it can charge, forces_zzzzzzzzzzzzzzzzzzz_lanes.js)
-    if (!(RDu && RDu.basic && rideLaneDraw(t.def.unit, t.x, t.y, t.i, t.j, st, t, true))) { QG.ground(t.x, t.y, .03, r, r, [1, .9, .55, .07], 5, 0); QG.ground(t.x, t.y, .035, r, r, [1, .88, .55, .85], 4, .025); }
+    if (st.skyAll) QG.ground(t.x, t.y, .035, r, r, [1, .88, .55, .4], 4, .018);   /* (The Whole Sky: her attacks reach the whole map, so no ring could show it; her spells' reach stays as a faint ring, and her stats read "Whole map") */
+    else if (!(RDu && RDu.basic && rideLaneDraw(t.def.unit, t.x, t.y, t.i, t.j, st, t, true))) { QG.ground(t.x, t.y, .03, r, r, [1, .9, .55, .07], 5, 0); QG.ground(t.x, t.y, .035, r, r, [1, .88, .55, .85], 4, .025); }
     if (RDu && !RDu.basic) rideLaneDraw(t.def.unit, t.x, t.y, t.i, t.j, st, t, true); }
 }
 // the keep: a gold ring when selected, a research bar over the gate while a new Age is coming, a beacon when one is affordable
@@ -99811,7 +99981,8 @@ function gpStats(t, alt) {
   if (core) out.push(gpStat('Crit Chance', st.crit || 0, w.crit || 0, P, hint('The chance a strike or a spell hit crits (x2): 5% to start, its gear and talents add to it', on('crit'))));
   else if (strikes) out.push(gpStat('Crit Chance', st.crit || 0, w ? w.crit || 0 : b.crit || 0, P, hint('The chance a strike crits', on('crit'))));
   if (core && typeof hitShow === 'function') out.push(gpHitRow(st, w, 'Its chance to hit an ordinary foe, and a boss (elites and leaders between); Hit Chance on its gear raises it, to 100% at most'));
-  out.push(gpStat('Range', st.range, b.range, gpF, hint('Its reach in cells', on('range'))));
+  if (st.skyAll) out.push(`<div class="gp-st" title="Its attacks can strike any foe on the map; its spells reach ${gpF(st.range)} cells"><span>${gpSi('Range')}Range</span><b class="bo">Whole map</b></div>`);   /* (the Astrologer's The Whole Sky) */
+  else out.push(gpStat('Range', st.range, b.range, gpF, hint('Its reach in cells', on('range'))));
   out.push(`<div class="gp-st" title="What it can strike"><span>${gpSi('Targets')}Targets</span><b>${d.air ? 'Ground, air' : 'Ground'}</b></div>`);
   const tb = TOWERS[t.type].tiers[t.tier] || {};   // (its tier's own numbers: Splash shows on a unit whose strikes splash, as items only widen a splash)
   if (strikes && (tb.splash || st.splash || (w && w.splash))) out.push(gpStat('Splash', st.splash || 0, b.splash || 0, gpF, hint('The burst round each strike, in cells', on('splash'))));
@@ -101629,6 +101800,7 @@ function statLine(type, tier, eff, base) {
     if (k === 'hit') { if (!core || typeof hitShow !== 'function') continue; ev = hitShow(eff).foe / 100; bv = hitShow({}).foe / 100; }
     if (k === 'stacks') { if (type !== 'venom') continue; ev = 3 + (ev || 0); bv = 3; }
     if (ev == null || (!ev && !bv)) continue;
+    if (k === 'range' && eff.skyAll) { out.push(`<span>${lbl} <b class="bo">Whole map</b></span>`); continue; }   /* (the Astrologer's The Whole Sky: her attacks strike any foe on the map) */
     if (d.support && !attacks && (k === 'smite' || k === 'range' || k === 'rate')) continue;
     const up = Math.abs(ev - (bv || 0)) > 1e-6;
     if (opt && !up) continue;
