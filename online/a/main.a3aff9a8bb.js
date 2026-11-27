@@ -1,4 +1,4 @@
-const BUILD_TAG = 'f2986b62@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b28a23f8@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -55173,13 +55173,14 @@ const ffHook = (c, k) => { const f = c && c.def && c.def.ff; return f ? FOREST_F
    Check: node tools/check_forest_foes.js -v (the shared checks) and node tools/check_hollowthorn.js -v. ---- */
 const HT = {
   bark: { stun: 1.2 },
-  toll: { first: 7, every: 12, wind: 2.5, r: 3, max: 5, k: .4, keep: 14 },
+  toll: { first: 7, every: 12, wind: 2.5, r: 3, max: 5, k: .4, keep: 120 },   // keep (was 14): he walks last, behind his wave, and its dead lie where your army stopped them; he reaches them long after (sim/toll_region_check.js: 14 raised nobody). So this wave's fallen, however long ago (a new wave clears them)
   open: { t: 4, k: 1.35 },
   col: { toll: '#9be36a', open: '#d6ff7a', spoil: '#f2ffe0', bark: '#cfc8a8', thorn: [.62, .78, .3, 1] },
 };
-/* the fallen the bell can call: Hollowthorn's walkers slain this wave, where they fell (never one already raised, never a flyer) */
+/* the fallen the bell can call: any walker slain, where it fell (never one already raised, never a flyer, a boss or a totem): his
+   own Hollowthorn and the war's squads that march with them alike (owner, 27 Nov 2026: army squads must not quietly switch it off) */
 function htFell(c) {
-  if (c.type === 'orragar' || c.htRaised || c.fly || c.state === 'exit' || c.noCorpse) return;
+  if (c.type === 'orragar' || c.htRaised || c.fly || c.state === 'exit' || c.noCorpse || !c.def || c.def.boss || c.def.totem || c.def.egg) return;
   const L = G.htFallen || (G.htFallen = []);
   L.push({ x: c.x, y: c.y, ti: c.ti, tj: c.tj, tx: c.tx, ty: c.ty, state: c.state, t: G.time, hp: c.maxHp, wv: c.wv });
   if (L.length > 60) L.shift();
@@ -55216,6 +55217,8 @@ function htToll(c) {
   G.shake = Math.max(G.shake || 0, .12); sfx('quake', 0);
   if (c.orTolls === 1 && typeof onToast === 'function') onToast('The Hollow Toll: the fallen rise, and his heart stands open for ' + HT.open.t + 's');
 }
+// every other walker that falls (not a Hollowthorn one: its own hook records it), so mixed waves feed the toll too
+{ const _k = kill; kill = function (c) { const was = c && !c.dead, r = _k.apply(this, arguments); if (was && c.dead && c.def && c.def.ff !== 'hollowthorn' && G.state === 'play') { try { htFell(c); } catch (e) {} } return r; }; }
 // the Bulwark's bark: the moment its own armour bar breaks it staggers, once
 function htBulwarkTick(c, dt) {
   if (c.htBare || !(c.apMax > 0) || c.epTemp) return;
@@ -55268,7 +55271,7 @@ forestFaction({
     orragar: { name: 'Orragar the Hollow Bell', title: 'Warden of the Drowned Wood', fallback: 'shaman', hp: 16, spd: .6, r: .5, boss: true, flat: 100, life: 5, gap: 3,
       yell: 'Hear it. They all come back.', abil: ['The Hollow Toll', `Every ${HT.toll.every}s his bell swings for ${HT.toll.wind}s, then up to ${HT.toll.max} of his fallen within ${HT.toll.r} cells rise as Pale Rakers, and his heart stands open for ${HT.open.t}s (${Math.round((HT.open.k - 1) * 100)}% more damage). A stun breaks the toll.`],
       trait: 'Boss: his toll raises the fallen and opens his heart',
-      eco: `One rhythm. The Hollow Toll: every ${HT.toll.every} seconds he plants his roots and his bell swings for ${HT.toll.wind} seconds (the green ring shows the reach, and a wisp marks each of his foes that fell inside it in the last ${HT.toll.keep} seconds). If it rings, up to ${HT.toll.max} of those fallen rise as Pale Rakers at ${Math.round(HT.toll.k * 100)}% of their health, and his sap heart stands open for ${HT.open.t} seconds: he takes ${Math.round((HT.open.k - 1) * 100)}% more damage. A stun in the wind-up breaks the toll: nothing rises, and the heart stays shut. He never touches your units or walls.` },
+      eco: `One rhythm. The Hollow Toll: every ${HT.toll.every} seconds he plants his roots and his bell swings for ${HT.toll.wind} seconds (the green ring shows the reach, and a wisp marks each of his foes that fell inside it this wave). If it rings, up to ${HT.toll.max} of those fallen rise as Pale Rakers at ${Math.round(HT.toll.k * 100)}% of their health, and his sap heart stands open for ${HT.open.t} seconds: he takes ${Math.round((HT.open.k - 1) * 100)}% more damage. A stun in the wind-up breaks the toll: nothing rises, and the heart stays shut. He never touches your units or walls.` },
   },
   casters: { ht_seer: { mp: 90, regen: 6, rot: [{ s: 'bulwark', name: 'Ash Veil', cost: 35, cd: 6 }] } },
   words: {
@@ -55283,7 +55286,7 @@ forestFaction({
   boss: {
     court: 'His wood',
     rule: { kind: 'none', name: 'The Hollow Toll',
-      text: `Every ${HT.toll.every} seconds, after a ${HT.toll.wind}-second wind-up, up to ${HT.toll.max} foes that fell within ${HT.toll.r} cells of him in the last ${HT.toll.keep} seconds rise as Pale Rakers at ${Math.round(HT.toll.k * 100)}% health, and he takes ${Math.round((HT.open.k - 1) * 100)}% more damage for ${HT.open.t} seconds. A stun in the wind-up stops it. The green ring shows the reach. He never touches your units.`,
+      text: `Every ${HT.toll.every} seconds, after a ${HT.toll.wind}-second wind-up, up to ${HT.toll.max} foes that fell within ${HT.toll.r} cells of him this wave rise as Pale Rakers at ${Math.round(HT.toll.k * 100)}% health, and he takes ${Math.round((HT.open.k - 1) * 100)}% more damage for ${HT.open.t} seconds. A stun in the wind-up stops it. The green ring shows the reach. He never touches your units.`,
       ways: ['A stun in the wind-up: nothing rises', 'Or let it ring and spend your burst on the open heart', 'Kill his escort away from him'] },
     loot: { say: 'Spoils of the drowned wood', theme: /stun|burst|crit|execute|kill|slain|corpse|summon|armou?r|shred|root|thorn|bark|sap|poison/i },
   },
@@ -56521,6 +56524,325 @@ const FPH = (() => {
   P.stats = () => ({ kills: S.kills || 0, killE: +(S.killE || 0).toFixed(2), reachMax: +(S.reachMax || 0).toFixed(2), flesh: S.flesh || 0, fleshMax: +(S.fleshMax || 0).toFixed(3), rigs: RIG.size, wrapped, springsStepped: S.springs, foes: S.foes, deaths: S.deaths, hits: S.hits, maxDeg: Object.fromEntries(Object.entries(S.maxA).map(([k, a]) => [k, +(a * 57.3).toFixed(1)])), msTotal: +S.ms.toFixed(1), rigsList: [...RIG.values()].map(r => ({ bones: r.NB, springs: r.sp.map(s => s.n).join(' '), fall: r.fall && r.fall.map(v => +v.toFixed(2)) })) });
   return P;
 })();
+
+/* ================= BOSS CUES: every boss mechanic read by watching, not reading =================
+   Owner, 27 Nov 2026, on Orragar: "not used to vsing bosses with mechanics you have to be aware of". The rules stay off the screen
+   (a tutorial comes later); the field shows them instead, kept thin so the foes and the map stay in view:
+     a timer ring  at the boss's feet (gl.js shape 16): it FILLS through a wind-up (the bell swinging, the hymn, the slam, the
+                   toll) and EMPTIES through a window (the open heart, the flood, Dread Command, the bone pile, the aegis)
+     a word or two floats up when something happens: what a counter did ("Toll broken"), what a window gives ("+35%"),
+                   what just changed ("Furnace", "Out of reach"). Never a sentence (ui.js .ft.cue)
+   and per boss what its rule needs: Orragar's heart beats while it is open and his fallen burn as wisps; a Brakka charge shows its
+   fuse running down (white while he is stunned and it waits); the First Cap's ring fills toward its next shedding.
+   Hooks only: the bosses' own files are untouched. Off for a look: BCUE.on = false in the console. Check: sim/boss_cue_check.js. */
+const BCUE = { on: true, lab: 1.7, ringK: 2.3, th: .13, lift: .35 };
+const bcK = h => typeof c4 === 'function' ? c4(h) : [1, 1, 1, 1];
+// a word or two over the boss (or a unit, or a point): rises and fades as the numbers do, but in its own small capitals
+function bcSay(o, s, col, dh) {
+  if (!BCUE.on || typeof G === 'undefined' || !G || !G.texts || G.texts.length > 85 || G.state !== 'play') return;
+  const foe = o && o.def && typeof CREEPS !== 'undefined' && CREEPS[o.type] === o.def;
+  let h = .9;
+  try { h = foe ? (typeof creepBaseY === 'function' ? creepBaseY(o) + creepH(o) : hitH(o)) + .55 + BCUE.lift : typeof towerTop === 'function' && o.def ? towerTop(o) + .6 : 1; } catch (e) { h = 1.2; }
+  G.texts.push({ x: o.x + (foe ? o.ox || 0 : 0), z: o.y + (foe ? o.oy || 0 : 0), h: h + (dh || 0), s, col, life: BCUE.lab, max: BCUE.lab, cue: 1 });
+}
+// the timer ring: fill 0..1 of it lit, clockwise from the top; the rest a faint track
+function bcRing(x, z, rad, fill, col, a, th, y) {
+  if (typeof QG === 'undefined') return;
+  const k = typeof col === 'string' ? bcK(col) : col, t = th || BCUE.th;
+  QG.ground(x, z, (y || .049) - .002, rad * 1.02, rad * 1.02, [0, 0, 0, .3 * (a == null ? 1 : a)], 3, t * 1.4);   // a thin dark bed under it: it reads on bright grass and sand
+  QG.ground(x, z, y || .049, rad, rad, [k[0], k[1], k[2], a == null ? .95 : a], 16, Math.round(clamp(fill, 0, 1) * 100) + (th || BCUE.th));
+}
+const bcR = (c, r) => Math.max(.62, (r || c.def.r) * BCUE.ringK);
+const bcPct = k => `+${Math.round((k - 1) * 100)}%`;
+
+/* ---- what happened this frame: counters the bosses' own code keeps, read once a tick ---- */
+function bcTick() {
+  if (!BCUE.on || G.state !== 'play') return;
+  for (const c of G.creeps) {
+    if (c.dead || !c.def.boss) continue;
+    const S = c.bcS || (c.bcS = { orSpoiled: c.orSpoiled | 0, orTolls: c.orTolls | 0, ysSpoiled: c.ysSpoiled | 0, ysHymns: c.ysHymns | 0, flood: !!c.ysFlood, gcShed: c.gcShed | 0,
+      knSpoiled: c.knSpoiled | 0, tolls: c.tolls | 0, forgeN: c.forgeN | 0, cracks: c.cracks | 0, onGround: !!c.onGround, phased: !!c.phased, momAt: 0, rage: !!c.rgRage, law: c.brLaw });
+    // Orragar: the bell caught, or the toll rung
+    if ((c.orSpoiled | 0) > S.orSpoiled) bcSay(c, 'Toll broken', '#f2ffe0');
+    if ((c.orTolls | 0) > S.orTolls) { bcSay(c, typeof HT !== 'undefined' ? bcPct(HT.open.k) : 'Heart open', '#d6ff7a'); c.bcBeat = G.time; }
+    // Ysra: the hymn broken, or sung; the flood
+    if ((c.ysSpoiled | 0) > S.ysSpoiled) bcSay(c, 'Hymn broken', '#e8fff4');
+    if ((c.ysHymns | 0) > S.ysHymns) bcSay(c, typeof RCT !== 'undefined' ? `Healed ${Math.round(RCT.hymn.k * 100)}%` : 'Healed', '#7fe0b4');
+    if (!!c.ysFlood && !S.flood) bcSay(c, 'Flood: faster', '#5ab8d8');
+    // the First Cap sheds
+    if ((c.gcShed | 0) > S.gcShed) bcSay(c, typeof GCB !== 'undefined' ? `Shed ×${GCB.shed.n}` : 'Shed', '#f090b8');
+    // the Winter Toll (the Lich, the Abyssal King's second law)
+    if ((c.knSpoiled | 0) > S.knSpoiled) bcSay(c, 'Toll broken', '#e8f4ff');
+    if ((c.tolls | 0) > S.tolls) bcSay(c, 'Mana burned', '#9fd0ff');
+    // Plate and Furnace: the new state's name (the first is its start, not a swap)
+    if ((c.forgeN | 0) > S.forgeN && S.forgeN > 0) bcSay(c, c.forgeSt === 'plate' ? 'Plate' : 'Furnace', c.forgeSt === 'plate' ? '#d8dee8' : '#ffa060');
+    // Kragmor's ground
+    if ((c.cracks | 0) > S.cracks) bcSay(c, 'Ground cracked', '#ffd070');
+    else if (!!c.onGround && !S.onGround) bcSay(c, 'Guarded', '#ffb060');
+    // the Void Wyrm slips out of reach
+    if (!!c.phased && !S.phased) bcSay(c, 'Out of reach', '#c08cff');
+    // Arachnara hardened by her brood: the total, at most every 1.5s
+    if (c.momDR > .005 && G.time - S.momAt > 1.5 && (c.momDR - (S.mom || 0)) > .02) { bcSay(c, `Hardened ${Math.round(c.momDR * 100)}%`, '#c9a0ff'); S.momAt = G.time; S.mom = c.momDR; }
+    else if (!(c.momDR > .005)) S.mom = 0;
+    // a homeland boss's enrage (region_boss.js): the banner says it, a word over the boss shows which one
+    if (c.rgRage && !S.rage) bcSay(c, 'Enraged', '#ff7050');
+    S.orSpoiled = c.orSpoiled | 0; S.orTolls = c.orTolls | 0; S.ysSpoiled = c.ysSpoiled | 0; S.ysHymns = c.ysHymns | 0; S.flood = !!c.ysFlood; S.gcShed = c.gcShed | 0;
+    S.knSpoiled = c.knSpoiled | 0; S.tolls = c.tolls | 0; S.forgeN = c.forgeN | 0; S.cracks = c.cracks | 0; S.onGround = !!c.onGround; S.phased = !!c.phased; S.rage = !!c.rgRage;
+  }
+}
+
+/* ---- the engine's own moments, caught where they happen (game.js functions, wrapped) ---- */
+{
+  if (typeof leaderSpoil === 'function') { const _f = leaderSpoil; leaderSpoil = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss) bcSay(c, c.def.lead === 'slam' ? 'Slam broken' : 'Broken', '#e8f0ff'); return r; }; }
+  if (typeof leaderSlam === 'function') { const _f = leaderSlam; leaderSlam = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss) bcSay(c, 'Silenced', '#ffb070'); return r; }; }
+  if (typeof leaderInterrupt === 'function') { const _f = leaderInterrupt; leaderInterrupt = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss) bcSay(c, 'Broken', '#e8f4ff'); return r; }; }
+  if (typeof leaderFuse === 'function') { const _f = leaderFuse; leaderFuse = function (c, fuse) {
+    const was = new Set(G.towers.filter(t => t.fuseT > 0)), r = _f.apply(this, arguments);
+    for (const t of G.towers) if (t.fuseT > 0 && !was.has(t)) { t.bcFuse = t.fuseT; bcSay(t, 'Charge', '#ffb040'); }
+    return r; }; }
+  if (typeof leaderCrumble === 'function') { const _f = leaderCrumble; leaderCrumble = function (c) { const r = _f.apply(this, arguments); bcSay(c, 'Bones', '#e8e0c8'); return r; }; }
+  if (typeof leaderRise === 'function') { const _f = leaderRise; leaderRise = function (c) { const r = _f.apply(this, arguments); if (c && !c.dead) bcSay(c, 'Risen', '#ff9a8a'); return r; }; }
+  if (typeof leaderAdapt === 'function') { const _f = leaderAdapt; leaderAdapt = function (c) {
+    const r = _f.apply(this, arguments), A = G.adapt;
+    if (A && A.ty && A.until > G.time && c.def.boss) { const T = typeof TOWERS !== 'undefined' && TOWERS[A.ty]; bcSay(c, `${T ? T.short || T.name : 'Half'} halved`, (typeof SCHOOL_COL !== 'undefined' && SCHOOL_COL[A.ty]) || '#ff9a8a'); }
+    return r; }; }
+  if (typeof creepBlink === 'function') { const _f = creepBlink; creepBlink = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss && !c.dead) bcSay(c, 'Blink', '#c08cff'); return r; }; }
+  if (typeof creepAegis === 'function') { const _f = creepAegis; creepAegis = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss) bcSay(c, 'Untouchable', '#9bff8a'); return r; }; }
+  if (typeof kill === 'function') { const _k = kill; kill = function (c) {
+    const was = c && !c.dead, pile = c && c.pile, fused = was && c.def && c.def.boss ? G.towers.filter(t => t.fuseT > 0 && t.fuseBy === c) : [];
+    const r = _k.apply(this, arguments);
+    if (was && c.dead && c.def.boss && G.state === 'play') {
+      if (pile) bcSay(c, 'Bones broken', '#fff0c8');
+      if (c.type === 'tm_broodmother' && (c.tmHatched | 0) > 0) bcSay(c, `${c.tmHatched} hatch`, '#f0a040');
+      if (fused.length) { for (const t of fused) bcSay(t, 'Defused', '#cfd8e0'); }
+    }
+    return r; }; }
+  if (typeof update === 'function') { const _u = update; update = function (dt) { const r = _u.apply(this, arguments); try { if (typeof G !== 'undefined' && G) { bcTick(); bcLate(); } } catch (e) {} return r; }; }
+}
+
+/* ---- the drawing: a ring at a boss's feet, its own touches; and the field's (Brakka's charges, Kragmor's cracked ground) ---- */
+function bcDraw(c, r) {
+  if (!BCUE.on || !c.def.boss || c.dead || typeof QG === 'undefined') return;
+  const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), R_ = bcR(c, r), p = .5 + .5 * Math.sin(vt * 6 + (c.anim || 0));
+  // Orragar: the bell's wind-up fills, the open heart beats and its window empties, the fallen burn as wisps
+  if (c.type === 'orragar' && typeof HT !== 'undefined') {
+    const k = bcK(HT.col.toll), o = bcK(HT.col.open);
+    if (c.orW > 0) {
+      const u = 1 - c.orW / HT.toll.wind;
+      bcRing(x, z, R_, u, k, .95);
+      const yb = creepBaseY(c) + creepH(c) + .25, s = .16 + .14 * u + .04 * p;   // the bell's tone over him, swelling to the toll
+      QADD.bill(RD, x, yb, z, s, s, [k[0], k[1], k[2], .45 + .4 * u], 1, 0);
+    } else if (c.orOpen > G.time) {
+      const left = (c.orOpen - G.time) / HT.open.t, f = Math.min(1, (c.orOpen - G.time) / .4);
+      bcRing(x, z, R_, left, o, .95 * f);
+      // the heart: a double beat, bright at its core
+      const ph = (G.time - (c.bcBeat || 0)) % .8, beat = Math.exp(-ph * 14) + .7 * Math.exp(-Math.max(0, ph - .2) * 14) * (ph > .2 ? 1 : 0);
+      const yh = creepBaseY(c) + creepH(c) * .55, s = .2 + .1 * beat, zh = z + c.def.r * .9;
+      QADD.bill(RD, x, yh, zh, s * 3, s * 3, [o[0], o[1], o[2], (.3 + .3 * beat) * f], 1, 0);
+      if (typeof QA !== 'undefined') QA.bill(RD, x, yh, zh, s, s, [.55, .85, .1, .95 * f], 2, 0);   // a solid core: it reads on bright ground too
+      QADD.bill(RD, x, yh, zh, s * .7, s * .7, [1, 1, .8, (.6 + .4 * beat) * f], 1, 0);
+    }
+    // the fallen the toll would call: a wisp over each (faint always, bright while the bell swings)
+    const near = htFallenNear(c).slice(0, HT.toll.max), hot = c.orW > 0;
+    for (let i = 0; i < near.length; i++) {
+      const f = near[i], q = .5 + .5 * Math.sin(vt * 7 + i * 1.7), a = hot ? .75 + .2 * q : .3 + .12 * q, hh = .28 + .06 * Math.sin(vt * 3 + i);
+      QADD.bill(RD, f.x, hh, f.y, .13, .26 + .06 * q, [k[0], k[1], k[2], a], 1, 0);
+      QADD.bill(RD, f.x, hh + .02, f.y, .05, .1, [.95, 1, .85, a], 1, 0);
+      if (hot && typeof VLIVE !== 'undefined' && VLIVE && Math.random() < .08) part({ k: 'wisp', x: f.x, z: f.y, h: .2, vh: .7, life: .6, max: .6, size: .06, col: HT.col.toll });
+    }
+    return;
+  }
+  // Ysra: the hymn fills; the flood's run empties
+  if (c.type === 'rc_ysra' && typeof RCT !== 'undefined') {
+    if (c.ysW > 0) bcRing(x, z, R_, 1 - c.ysW / RCT.hymn.wind, RCT.col.hymn, .95);
+    else if (c.ysFlood > G.time) bcRing(x, z, R_, (c.ysFlood - G.time) / RCT.flood.t, RCT.col.flood, .85);
+    return;
+  }
+  // the First Cap: its ring fills toward the next shedding, beating as it nears
+  if (c.type === 'gc_firstcap' && typeof GCB !== 'undefined') {
+    const A = GCB.shed.at, i = c.gcShed | 0; if (i >= A.length) return;
+    const top = i ? A[i - 1] : 1, u = clamp((top - c.hp / c.maxHp) / (top - A[i]), 0, 1);
+    bcRing(x, z, R_, u, GCB.look.gc_firstcap.sp, u > .8 ? .7 + .3 * p : .7);
+    return;
+  }
+  // the knell (Lich, Abyssal King below half): the toll fills
+  if (c.brLaw === 'knell' && c.knW > 0 && typeof BR !== 'undefined') { bcRing(x, z, R_, 1 - c.knW / BR.knWind, [.75, .9, 1], .95); }
+  // Plate and Furnace: the swap comes round, the ring in the colour of what comes next
+  if (c.brLaw === 'forge' && typeof BR !== 'undefined') { const nx = c.forgeSt === 'plate' ? [1, .5, .15] : [.8, .84, .92]; bcRing(x, z, R_ * 1.12, 1 - c.forgeT / BR.forgeEvery, nx, c.forgeT <= BR.forgeWarn ? .95 : .5); }
+  // Grakk's slam fills
+  if (c.def.lead === 'slam' && c.windT > 0) bcRing(x, z, R_, 1 - c.windT / 1.5, [1, .42, .16], .95);
+  // a boss's spell (Call the Camp, Endless Brood...): the cast fills
+  if (c.cast && c.cast.S) bcRing(x, z, R_ * .88, c.cast.t / c.cast.T, c.cast.S.col || '#ffffff', .8, .2);
+  // windows: Ossyra's bones, Malgrath's command, the aegis, a phase
+  if (c.pile) bcRing(x, z, 1.05, (c.pileT || 0) / 5, [1, .95, .8], .95, .12);
+  if (c.def.lead === 'adapt' && G.adapt && G.adapt.by === c && G.adapt.ty && G.adapt.until > G.time) bcRing(x, z, R_, (G.adapt.until - G.time) / 10, (typeof SCHOOL_COL !== 'undefined' && SCHOOL_COL[G.adapt.ty]) || '#ff9a8a', .85);
+  if (c.aegisT > 0) bcRing(x, z, R_ * 1.1, c.aegisT / 3, [.6, 1, .55], .9);
+  if (c.phased && c.def.phase) bcRing(x, z, R_, clamp(c.phT / c.def.phase[1], 0, 1), [.75, .55, 1], .85);
+}
+function bcField() {
+  if (!BCUE.on || G.state !== 'play' || typeof QG === 'undefined') return;
+  // Brakka's charges: the fuse runs down (white and still while he is stunned: it waits)
+  for (const t of G.towers) {
+    if (!(t.fuseT > 0)) continue;
+    const held = t.fuseBy && t.fuseBy.stunT > 0, T = t.bcFuse || 6;
+    bcRing(t.x, t.y, .62, t.fuseT / T, held ? [.85, .92, 1] : [1, .55, .15], .95, .14, .052);
+  }
+  // Kragmor's cracked ground: how long until it holds again
+  for (const c of G.creeps) if (!c.dead && c.zone && c.crackT > 0 && typeof BR !== 'undefined') bcRing(c.zone.x, c.zone.z, c.zone.r, c.crackT / BR.groundCrack, [1, .82, .45], .7, .05, .05);
+}
+// joined to the view once it exists (view.js loads after this file)
+function bcLate() {
+  if (BCUE._late) return;
+  if (typeof drawCreepFx !== 'function' || typeof drawLeaderMarks !== 'function') return;
+  BCUE._late = true;
+  const _d = drawCreepFx; drawCreepFx = function (c, r) { const v = _d.apply(this, arguments); try { if (c && c.def && c.def.boss) bcDraw(c, r); } catch (e) {} return v; };
+  const _m = drawLeaderMarks; drawLeaderMarks = function () { const v = _m.apply(this, arguments); try { bcField(); } catch (e) {} return v; };
+}
+if (typeof setTimeout === 'function') setTimeout(() => { try { bcLate(); } catch (e) {} }, 0);
+
+/* ================= KNOW WHAT YOU FACE: each boss's mechanic, its counter, its calls =================
+   Owner, 27 Nov 2026: "mechanics you have to anticipate and play around are fun but yes needs to be very clear and have the
+   player know what they're vsing and play around it"; and "maybe have a pop up that says 'boss is doing x, burst him down before
+   he does y' sort of thing with clear signs when he's weak".
+     before the fight  the boss card and the wave preview's card show each mechanic as a mark, a short name and its counter in a
+                       few words, and each Hunt affix the same way (bcMechHTML). A counter-hint, not a rules paragraph
+     in the fight      a one-line call near the top centre as a mechanic starts, what is happening and what to do (bcCall), the
+                       boss's name in its colour, 2.5s, one at a time; off in the options (Boss callouts)
+     weak              while a boss is open to a burst (Orragar's heart, Kragmor's cracked ground, Ossyra's bones): a gold glow
+                       pulses on him, his health bar flashes gold, a WEAK tag with the seconds left sits by it, a gold ring
+                       empties; a word and a call when it closes */
+const BOSS_PLAY = {
+  orragar: { who: 'Orragar', col: '#9be36a', m: [['Hollow Toll', 'stun to break, or strike the open heart']] },
+  rc_ysra: { who: 'Ysra', col: '#7fe0b4', m: [['Marsh Hymn', 'stun to break it'], ['Floodmark', 'slows at half health']] },
+  gc_firstcap: { who: 'The First Cap', col: '#f090b8', m: [['The Shedding', 'area damage on the sprouts']] },
+  tm_broodmother: { who: 'The Broodmother', col: '#f0a040', m: [['The Clutch', 'kill her early: fewer hatch']] },
+  grakk: { who: 'Grakk', col: '#ff8a50', m: [['Ground Slam', 'stun the wind-up; casters back']] },
+  rattlefang: { who: 'Rattlefang', col: '#f0c24f', m: [['War Banner', 'kill him; splash the pack']] },
+  brakka: { who: 'Brakka', col: '#ffb040', m: [["Sapper's Charge", 'kill or stun him before it blows']] },
+  arachnara: { who: 'Arachnara', col: '#c9a0ff', m: [["Mother's Wrath", 'clear the brood away from her']] },
+  ossyra: { who: 'Ossyra', col: '#e8e0c8', m: [['Deathless', 'smash her bones within 5s']] },
+  malgrath: { who: 'Malgrath', col: '#ff9a8a', m: [['Dread Command', 'spread damage over unit types']] },
+  voidwyrm: { who: 'The Void Wyrm', col: '#c08cff', m: [['Phase', 'anti-air; burst when it returns']] },
+  lich: { who: 'The Frost Lich', col: '#9fd0ff', m: [['Winter Toll', 'stun the wind-up; spend mana']] },
+  kragmor: { who: 'Kragmor', col: '#ffb060', m: [['Unbroken Ground', 'stun him in the circle, then burst']] },
+  titan: { who: 'The Magma Titan', col: '#ff8a3a', m: [['Plate and Furnace', 'field steel and magic both']] },
+  abyss: { who: 'The Abyssal King', col: '#9bff8a', m: [['Plate and Furnace', 'steel and magic both'], ['Winter Toll', 'below half: stun the wind-up']] },
+};
+const AFFIX_HINT = { armoured: 'spells, or armour-breaking', swift: 'slows and a longer road', regen: 'Wounded cuts it', shielded: 'burst through the barrier', summoner: 'area damage on the escort', warded: 'steel over spells', splitting: 'area damage where it falls' };
+const bcEsc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+// a boss's affixes: the live one's, or what a Homeland battle will give it (region_boss.js)
+function bcAffixesAt(type, w) {
+  try {
+    const c = G.creeps.find(o => o.type === type && !o.dead); if (c) return (c.hx || []).slice();
+    if (G.region && typeof rgBossAffixes === 'function' && typeof rgGet === 'function') { const R = rgGet(G.force); if (R) return rgBossAffixes(type, rgBossLv(R, G.region, w || G.wave), R); }
+  } catch (e) {}
+  return [];
+}
+function bcMechHTML(type, hx) {
+  const P = BOSS_PLAY[type], A = (hx || []).filter(a => typeof HUNT_AFFIX !== 'undefined' && HUNT_AFFIX[a]); if (!P && !A.length) return '';
+  const row = (col, name, hint, cls) => `<span class="bcm${cls ? ' ' + cls : ''}"><i style="--c:${col}" aria-hidden="true"></i><b>${bcEsc(name)}</b> · ${bcEsc(hint)}</span>`;
+  return `<div class="bc-mech">${P ? P.m.map(([n, h]) => row(P.col, n, h)).join('') : ''}${A.map(a => row('#ffcf8a', HUNT_AFFIX[a].name, AFFIX_HINT[a] || '', 'ax')).join('')}</div>`;
+}
+
+/* ---- the calls ---- */
+let BOSS_CALLS = true;
+try { BOSS_CALLS = localStorage.getItem('runehold.bosscalls') !== '0'; } catch (e) {}
+function bcSetCalls(on) { BOSS_CALLS = !!on; try { localStorage.setItem('runehold.bosscalls', on ? '1' : '0'); } catch (e) {} if (!on && BCUE.callEl) BCUE.callEl.classList.remove('on'); }
+const BC_CALL = {
+  orragar: { wind: 'rings the Hollow Toll: stun him, or his dead rise!', open: 'His heart is open: burst him down!', shut: 'His heart closes.' },
+  rc_ysra: { wind: 'sings the Marsh Hymn: stun her, or her court mends!', flood: 'The flood rises: her court runs faster!' },
+  gc_firstcap: { shed: 'sheds: Buttoncaps sprout, sweep them up!' },
+  tm_broodmother: { out: 'carries a ripening clutch: kill her early!', hatch: 'Her clutch bursts!' },
+  grakk: { wind: 'winds up a Ground Slam: stun him!' },
+  rattlefang: { out: 'raises his War Banner: kill him and it falls!' },
+  brakka: { charge: 'plants a charge: kill or stun him before it blows!' },
+  arachnara: { wrath: 'hardens as her brood dies near her: clear them away from her!' },
+  ossyra: { bones: 'Her bones lie still: smash them before she rises!', risen: 'She rises again!' },
+  malgrath: { halved: 'His legion shrugs off your strongest: switch your damage!' },
+  voidwyrm: { phase: 'slips out of reach: burst it when it returns!' },
+  lich: { wind: 'tolls the Winter Toll: stun it, or spend your mana!' },
+  kragmor: { guard: 'stands on Unbroken Ground: stun him there to crack it!', crack: 'The ground cracks: burst him down!', shut: 'The ground holds again.' },
+  titan: { plate: 'turns to Plate: magic bites!', furnace: 'turns to Furnace: steel bites!' },
+  abyss: { plate: 'turns to Plate: magic bites!', furnace: 'turns to Furnace: steel bites!', wind: 'tolls the Winter Toll: stun it, or spend your mana!', aegis: 'is untouchable for 3s!' },
+};
+// one line near the top centre: "<Name> does x: do y!" (a line starting with a capital stands on its own: "His heart is open")
+function bcCall(c, key) {
+  if (!BOSS_CALLS || !BCUE.on || !c || !c.def) return;
+  const L = BC_CALL[c.type], s = L && L[key]; if (!s) return;
+  const P = BOSS_PLAY[c.type] || { who: c.def.name, col: '#ff8a6c' }, now = G.time, K = c.type + ':' + key;
+  const cd = BCUE.callCd || (BCUE.callCd = {}); if (cd[K] > now) return; cd[K] = now + 8;
+  BCUE.lastCall = { type: c.type, key, s, t: now };
+  if (typeof document === 'undefined' || !document.createElement) return;
+  let el = BCUE.callEl;
+  if (!el || !el.isConnected) { el = BCUE.callEl = document.createElement('div'); el.id = 'bossCall'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); (document.getElementById('stage') || document.body).appendChild(el); }
+  const own = /^[A-Z]/.test(s);
+  el.innerHTML = own ? `<span style="color:${P.col}">${bcEsc(s)}</span>` : `<b style="color:${P.col}">${bcEsc(P.who)}</b> ${bcEsc(s)}`;
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  clearTimeout(BCUE.callT); BCUE.callT = setTimeout(() => { el.classList.remove('on'); }, 2600);
+}
+// weak: the window a boss stands in, its seconds left and its whole
+function bcWeak(c) {
+  if (c.type === 'orragar' && c.orOpen > G.time && typeof HT !== 'undefined') return { left: c.orOpen - G.time, max: HT.open.t, say: 'WEAK' };
+  if (c.zone && c.crackT > 0 && typeof BR !== 'undefined') return { left: c.crackT, max: BR.groundCrack, say: 'WEAK' };
+  if (c.pile) return { left: c.pileT || 0, max: 5, say: 'SMASH' };
+  return null;
+}
+// calls from the state bcTick sees
+function bcCalls(c, S) {
+  const winding = c.orW > 0 || c.ysW > 0 || (c.def.lead === 'slam' && c.windT > 0) || (c.brLaw === 'knell' && c.knW > 0);
+  if (winding && !S.wind) bcCall(c, 'wind');
+  S.wind = winding;
+  const w = !!bcWeak(c);
+  if (w && !S.weak) bcCall(c, c.type === 'orragar' ? 'open' : c.zone ? 'crack' : c.pile ? 'bones' : 'open');
+  else if (!w && S.weak && !c.pile && !c.dead) { bcCall(c, 'shut'); bcSay(c, c.type === 'orragar' ? 'Heart closed' : 'Holds again', '#d8d8d8'); }
+  S.weak = w;
+  if (!S.out) { S.out = true; bcCall(c, 'out'); }
+}
+{ const _t = bcTick; bcTick = function () {
+    const before = new Map(); for (const c of G.creeps) if (!c.dead && c.def.boss && c.bcS) before.set(c, { flood: c.bcS.flood, gcShed: c.bcS.gcShed, forgeN: c.bcS.forgeN, onGround: c.bcS.onGround, phased: c.bcS.phased, mom: c.bcS.mom });
+    const r = _t.apply(this, arguments);
+    if (BCUE.on && G.state === 'play') for (const c of G.creeps) {
+      if (c.dead || !c.def.boss || !c.bcS) continue;
+      const S = c.bcS, B = before.get(c);
+      if (B) {
+        if (S.flood && !B.flood) bcCall(c, 'flood');
+        if (S.gcShed > B.gcShed) bcCall(c, 'shed');
+        if (S.forgeN > B.forgeN && B.forgeN > 0) bcCall(c, c.forgeSt === 'plate' ? 'plate' : 'furnace');
+        if (S.onGround && !B.onGround) bcCall(c, 'guard');
+        if (S.phased && !B.phased) bcCall(c, 'phase');
+        if ((S.mom || 0) > (B.mom || 0) && c.momDR >= .09) bcCall(c, 'wrath');
+      }
+      bcCalls(c, S);
+    }
+    return r; }; }
+{ // the wrapped moments' calls
+  if (typeof leaderFuse === 'function') { const _f = leaderFuse; leaderFuse = function (c) { const n0 = G.towers.filter(t => t.fuseT > 0).length, r = _f.apply(this, arguments); if (c && c.def.boss && G.towers.filter(t => t.fuseT > 0).length > n0) bcCall(c, 'charge'); return r; }; }
+  if (typeof leaderRise === 'function') { const _f = leaderRise; leaderRise = function (c) { const r = _f.apply(this, arguments); if (c && !c.dead) bcCall(c, 'risen'); return r; }; }
+  if (typeof leaderAdapt === 'function') { const _f = leaderAdapt; leaderAdapt = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss && G.adapt && G.adapt.ty && G.adapt.until > G.time) bcCall(c, 'halved'); return r; }; }
+  if (typeof creepAegis === 'function') { const _f = creepAegis; creepAegis = function (c) { const r = _f.apply(this, arguments); if (c && c.def.boss) bcCall(c, 'aegis'); return r; }; }
+  if (typeof kill === 'function') { const _k = kill; kill = function (c) { const was = c && !c.dead, r = _k.apply(this, arguments); if (was && c.dead && c.type === 'tm_broodmother' && (c.tmHatched | 0) > 0) bcCall(c, 'hatch'); return r; }; }
+}
+// the weak boss, drawn: a gold glow pulsing on him and a gold ring emptying; by the health bar, the bar flashing gold and a WEAK tag
+function bcWeakDraw(c, r) {
+  const W = bcWeak(c); if (!W || typeof QADD === 'undefined') return;
+  const p = .5 + .5 * Math.sin(vt * 9), f = Math.min(1, W.left / .4), x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), y = creepBaseY(c) + creepH(c) * .5, s = (r || c.def.r) * 2.6;
+  QADD.bill(RD, x, y, z, s, s * 1.15, [1, .82, .25, (.1 + .12 * p) * f], 3, .08);
+  if (!c.pile) bcRing(x, z, bcR(c, r) * 1.12, W.left / W.max, [1, .84, .3], .95 * f, .12);
+}
+function bcLateWeak() {
+  if (BCUE._weak || typeof dfBars !== 'function' || typeof QO === 'undefined') return;
+  BCUE._weak = true;
+  const _b = dfBars; dfBars = function (c, x, top, z, w, h) {
+    const v = _b.apply(this, arguments);
+    try { if (BCUE.on && c && c.def && c.def.boss && bcWeak(c)) { const p = .5 + .5 * Math.sin(vt * 9), f = clamp(c.hp / c.maxHp, 0, 1); QO.barRect(RD, x, top, z, -w / 2, w * f, h, [1, .85, .25, .35 + .55 * p]); } } catch (e) {}
+    return v; };
+  if (typeof bossAdaptTags === 'function') { const _g = bossAdaptTags; bossAdaptTags = function () {
+    const L = _g.apply(this, arguments) || [];
+    try { if (BCUE.on && G.state === 'play') for (const c of G.creeps) { if (c.dead || !c.def.boss) continue; const W = bcWeak(c); if (W) L.push([c, `${W.say} ${Math.ceil(W.left)}s`, '#ffd34a']); } } catch (e) {}
+    return L; }; }
+}
+{ const _l = bcLate; bcLate = function () { _l.apply(this, arguments); bcLateWeak(); }; }
+{ const _d = bcDraw; bcDraw = function (c, r) { _d.apply(this, arguments); try { if (BCUE.on && c.def.boss && !c.dead) bcWeakDraw(c, r); } catch (e) {} }; }
 
 /* Crit numbers in the colour of the unit that crit (owner, 19 Nov 2026: "can you make crits show in the colour of the unit
    that did the crit", "each unit type should have a colour associated with it"). A unit type's colour is its talent tree's
@@ -75052,6 +75374,9 @@ void main(){
   else if(s==2){ a = smoothstep(1.,.25,r); }
   else if(s==3){ float t=max(p,.02); a = smoothstep(t,t*.4,abs(r-(1.-t))); }
   else if(s==4){ float t=max(p,.02); float ang=atan(vUV.y,vUV.x); a = smoothstep(t,t*.4,abs(r-(1.-t))) * step(.45, fract(ang*7.6394+uTime*.25)); }
+  else if(s==16){ // a timer ring (bosscues.js): p's whole part the share filled (of 100), clockwise from the top; its fraction the width; the rest a faint track
+    float t=max(fract(p),.02); float f=floor(p+.0001)*.01; float u=fract(atan(vUV.x,-vUV.y)*.15915494+1.);
+    a = smoothstep(t,t*.4,abs(r-(1.-t))) * mix(.2, 1., step(u, f)); }
   else if(s==5){ a = smoothstep(1.,.82,r); }
   else if(s==6){ a = exp(-vUV.y*vUV.y*5.)*smoothstep(1.,.6,abs(vUV.x)); }
   else if(s==7){ float e=max(abs(vUV.x),abs(vUV.y)); a = mix(.32,1.,smoothstep(.8,.9,e))*step(e,1.); }
@@ -100867,7 +101192,7 @@ function fcCardHTML(spec) {
   return `<h4>${fcEsc(C.name)}${g.count > 1 && !g.boss && !g.lead ? ` <small>×${g.count}</small>` : ''}${tag ? ` <em class="fcc-tag" style="--c:${tag[1]}">${tag[0]}</em>` : ''}${g.isNew ? ' <em class="fcc-nw">New</em>' : ''}</h4>`
     + (say ? `<p class="fcc-d">${fcEsc(say)}</p>` : '')
     + (tr.length ? `<div class="fcc-tr">${tr.map(fcTraitHTML).join('')}</div>` : '')
-    + (ct ? `<p class="fcc-c"><b>Counter:</b> ${fcEsc(ct)}</p>` : '');
+    + (g.boss && typeof bcMechHTML === 'function' && bcMechHTML(ty, bcAffixesAt(ty, n)) ? bcMechHTML(ty, bcAffixesAt(ty, n)) : ct ? `<p class="fcc-c"><b>Counter:</b> ${fcEsc(ct)}</p>` : '');   // a boss: each mechanic and affix with its answer (bosscues.js)
 }
 function fcShowCard(el) {
   const h = fcCardHTML(el.dataset.fc || ''); if (!h) { fcHideCard(); return; }
@@ -102945,6 +103270,7 @@ function openSettings(back) {
       </section>
       <section class="cm-section"><h3>Display</h3>
         <button type="button" class="cm-setting" id="sDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
+        <button type="button" class="cm-setting" id="sCalls" aria-pressed="${typeof BOSS_CALLS === 'undefined' || BOSS_CALLS}">Boss callouts<small>${typeof BOSS_CALLS === 'undefined' || BOSS_CALLS ? 'On' : 'Off'}</small></button>
         <div class="cm-setting"><label for="sGfx">Graphics</label>${menuGraphicsHTML('sGfx')}</div>
         <button type="button" class="cm-setting" id="sMap" title="Changing map detail reloads the game">Map detail<small>${mapDetailName()}</small></button>
         ${typeof hwSet === 'function' ? `<button type="button" class="cm-setting" id="sHitW" aria-pressed="${HW_SET}" title="The biggest hits (a boss's death, Ironhold's vents, a Bloom, a Judgement burst, the Tempest, a Champion's spell) hold the action for a blink and nudge the view. Never on ordinary strikes; off when the system asks for reduced motion.">Hit weight<small>${HW_SET ? 'On' : 'Off'}</small></button>` : ''}
@@ -102970,6 +103296,7 @@ function openSettings(back) {
   $('#sScores').onclick = () => { sfx('click'); openBoard(() => openSettings(back)); };
   $('#sScore').onchange = e => { AudioSys.set('score', e.target.value); sfx('click'); };
   $('#sDmg').onclick = () => { DMG_NUMS = !DMG_NUMS; lsSet('runehold.dmgnums', DMG_NUMS ? '1' : '0'); const b = $('#sDmg'); b.setAttribute('aria-pressed', DMG_NUMS); b.querySelector('small').textContent = DMG_NUMS ? 'On' : 'Off'; sfx('click'); };
+  { const b = $('#sCalls'); if (b && typeof bcSetCalls === 'function') b.onclick = () => { bcSetCalls(!BOSS_CALLS); b.setAttribute('aria-pressed', BOSS_CALLS); b.querySelector('small').textContent = BOSS_CALLS ? 'On' : 'Off'; sfx('click'); }; }   // (bosscues.js)
   $('#sBack').onclick = () => { sfx('click'); (back || titleScreen)(); };
   ovp.menuBack = () => $('#sBack').click();
 }
@@ -103021,6 +103348,7 @@ function pauseMenu() {
       <h3 id="pQuick">Quick settings</h3>
       <div class="seg cm-display" role="group" aria-label="Display">
         <button type="button" id="pDmg" aria-pressed="${DMG_NUMS}">Damage numbers<small>${DMG_NUMS ? 'On' : 'Off'}</small></button>
+        <button type="button" id="pCalls" aria-pressed="${typeof BOSS_CALLS === 'undefined' || BOSS_CALLS}">Boss callouts<small>${typeof BOSS_CALLS === 'undefined' || BOSS_CALLS ? 'On' : 'Off'}</small></button>
         <div class="cm-setting" id="pGfx"><label for="pQuality">Graphics</label>${menuGraphicsHTML('pQuality')}</div>
       </div>
       ${menuAudioHTML('p', 'music', 'Music')}
@@ -103035,6 +103363,7 @@ function pauseMenu() {
   $('#pLog').onclick = () => { PLAYLOG.export('md'); $('#pLog small').textContent = 'Saved'; sfx('click'); };
   menuAudioBind('p');
   $('#pDmg').onclick = () => { DMG_NUMS = !DMG_NUMS; lsSet('runehold.dmgnums', DMG_NUMS ? '1' : '0'); const b = $('#pDmg'); b.setAttribute('aria-pressed', DMG_NUMS); b.querySelector('small').textContent = DMG_NUMS ? 'On' : 'Off'; sfx('click'); };
+  { const b = $('#pCalls'); if (b && typeof bcSetCalls === 'function') b.onclick = () => { bcSetCalls(!BOSS_CALLS); b.setAttribute('aria-pressed', BOSS_CALLS); b.querySelector('small').textContent = BOSS_CALLS ? 'On' : 'Off'; sfx('click'); }; }
   $('#pQuality').onchange = e => { gfxSet(e.target.value); sfx('click'); };
   let armed = false;
   $('#pQuit').onclick = e => {
@@ -103945,7 +104274,7 @@ function bossCard() {
   }
   if (!bcEl) {
     bcEl = document.createElement('div'); bcEl.id = 'bossCard'; bcEl.hidden = true; bcEl.setAttribute('role', 'button'); bcEl.tabIndex = 0;
-    bcEl.innerHTML = '<div class="bc-top"><canvas></canvas><div class="bc-id"><small></small><b></b><span></span></div></div><i class="bc-hp"><u></u></i><p class="bc-tr" hidden><canvas></canvas><span></span></p><div class="bc-aff" hidden></div><div class="bc-cast"><em></em><i><u></u></i></div><p class="bc-now"></p><p class="bc-ab"><b></b> <span></span></p><p class="bc-sp"></p><div class="bc-dmg" hidden></div>';
+    bcEl.innerHTML = '<div class="bc-top"><canvas></canvas><div class="bc-id"><small></small><b></b><span></span></div></div><i class="bc-hp"><u></u></i><p class="bc-tr" hidden><canvas></canvas><span></span></p><div class="bc-mk"></div><div class="bc-aff" hidden></div><div class="bc-cast"><em></em><i><u></u></i></div><p class="bc-now"></p><p class="bc-ab"><b></b> <span></span></p><p class="bc-sp"></p><div class="bc-dmg" hidden></div>';
     bcEl.addEventListener('click', e => { e.stopPropagation(); bcEl.classList.toggle('min'); lsSet('runehold.bcmin', bcEl.classList.contains('min') ? '1' : '0'); sfx('click'); });
     if (lsGet('runehold.bcmin') !== '0') bcEl.classList.add('min');   // compact unless the player opened it (tap to toggle; it remembers)
     stage.append(bcEl);
@@ -103987,9 +104316,10 @@ function bossCard() {
     }
   }
   // the wave's weakness and resistance, as school icons (the card is always on screen, even on a phone)
-  { const wn = S === G && !TW && !G.vs ? (c && c.wv) || S.wave : 0, key = wn ? wn + ':' + type : '';
+  { const wn = S === G && !TW && !G.vs ? (c && c.wv) || S.wave : 0, hx = c && c.hx && c.hx.length && typeof HUNT_AFFIX !== 'undefined' ? c.hx.filter(a => HUNT_AFFIX[a]) : [], key = wn ? wn + ':' + type + ':' + hx.join() : '';
     if (bcC.aff !== key) { bcC.aff = key; const el = bcEl.querySelector('.bc-aff'); el.hidden = !wn;
       if (wn) { const f = waveAff(wn), ic = t => `<img alt="${TOWERS[t].short}" title="${TOWERS[t].short}" src="${talEmblemURL(t)}">`;
+        { const mk = bcEl.querySelector('.bc-mk'); if (mk) { mk.innerHTML = typeof bcMechHTML === 'function' ? bcMechHTML(type, hx) : ''; mk.title = hx.map(a => HUNT_AFFIX[a].name + ': ' + HUNT_AFFIX[a].text).join(' '); } }   // what it does and its answer, a line each (bosscues.js)
         el.innerHTML = `${f.weak.length ? `<span><b class="g">Weak ×${AFF_WEAK}</b>${f.weak.map(ic).join('')}</span>` : ''}${f.resist.length ? `<span><b class="b">Resists</b>${f.resist.map(ic).join('')}</span>` : ''}`;
         el.title = `Weak to ${f.weak.map(t => TOWERS[t].short).join(', ')} (×${AFF_WEAK} damage)` + (f.resist.length ? `; resists ${f.resist.map(t => TOWERS[t].short).join(', ')} (×${AFF_RESIST})` : ''); } } }
   // the damage ledger (game.js bossDmgNote): its top five sources, redrawn at most four times a second while it takes damage
@@ -104012,7 +104342,7 @@ function drawTexts() {
     if (!t) { if (el.__on) { el.style.opacity = '0'; el.__on = false; } continue; }
     const s = toScreen(t.x, t.h, t.z);
     if (el.textContent !== t.s) el.textContent = t.s;
-    const cls = t.d ? (t.d === 3 ? 'ft dmg crit' : t.d === 2 ? 'ft dmg big' : 'ft dmg') : 'ft'; if (el.className !== cls) el.className = cls;
+    const cls = t.cue ? 'ft cue' : t.d ? (t.d === 3 ? 'ft dmg crit' : t.d === 2 ? 'ft dmg big' : 'ft dmg') : 'ft';   // (cue: a boss's 1-3 word tell, bosscues.js) if (el.className !== cls) el.className = cls;
     const col = t.col || ''; if (el.__c !== col) { el.__c = col; el.style.color = col; }
     // the biggest numbers always sit on top (owner, 25 Nov 2026): stacking by the amount, not by age or crit
     const zi = t.d ? String(10 + Math.min(9000, Math.round(Math.log2(1 + (t.v || 0)) * 300))) : ''; if (el.__z !== zi) { el.__z = zi; el.style.zIndex = zi; }
@@ -130581,10 +130911,14 @@ const HUNT_LV = [null,
   { hp: 6, dmg: 2.8, leg: .45, offer: 3, ilv: 27 },
 ];
 const HUNT_ESC = .06;   // the escorts: +6% health a level past I
+/* Regenerating (owner, 27 Nov 2026, Orragar at wave 20: "nerf the regen a little bit"): 1.5% a second -> 1%. Wounded keeps its
+   boss cut (WOUND.boss). sim/regen_check.js: an army that kills the plain boss in 40s of fire needed 2.5x the damage at 1.5%
+   (never past 66s); at 1% it needs 1.67x (2.5x at 60s) */
+const HUNT_REGEN = { k: .01 };
 const HUNT_AFFIX = {
   armoured: { name: 'Armoured', text: 'An armour bar worth half its health: physical hits must break it first; spells go through to its health.' },
   swift: { name: 'Swift', text: 'It moves 25% faster.' },
-  regen: { name: 'Regenerating', text: 'It heals 1.5% of its health every second. Wounded halves it.' },
+  regen: { name: 'Regenerating', get text() { return `It heals ${+(HUNT_REGEN.k * 100).toFixed(1)}% of its health every second. Wounded cuts that by ${typeof WOUND !== 'undefined' ? Math.round((1 - WOUND.boss) * 100) : 25}%.`; } },
   shielded: { name: 'Shielded', text: 'A barrier worth 30% of its health takes every hit first, and forms again once when it falls to half health.' },
   summoner: { name: 'Summoner', text: 'Every 8 seconds it calls two of its escort to its side.' },
   warded: { name: 'Warded', text: 'Spells (magic and Arcane) do 40% less to it (a violet bar over its health). On a boss with an armour bar, the bar is a quarter of its health thicker instead: one defence a foe.' },
@@ -130683,7 +131017,7 @@ function huntArm(c) {
   const A = huntAffixes(c.type, H.lvl); c.hx = A;
   if (A.includes('armoured')) { c.apMax = (c.apMax || 0) + c.maxHp * .5; c.ap = c.apMax; }
   if (A.includes('swift')) c.spdM *= 1.25;
-  if (A.includes('regen')) c.hxRegen = .015;
+  if (A.includes('regen')) c.hxRegen = HUNT_REGEN.k;
   if (A.includes('shielded')) { c.hxSh = c.hxShMax = c.maxHp * .3; c.hxShRe = 1; }
   if (A.includes('summoner')) c.hxSumT = 8;
   // Warded on a boss with an armour bar: one foe, one bar (owner, 9 Nov 2026): no spell cut on top of armour, the bar is a quarter
@@ -132874,10 +133208,26 @@ function rgBossLv(R, S, w) {
   const n = rgNode(R, S.node); if (!n) return 1;
   return clamp((n.tier | 0) + (S.g | 0) + (n.kind === 'lair' ? RG_BOSS.lair : 0) - (w && w <= RG_BOSS.firstW ? 1 : 0), 1, RG_BOSS.max);
 }
-const rgBossAffixes = (type, lv) => typeof huntAffixes === 'function' ? huntAffixes(type, lv) : [];
+/* First meeting (owner, 27 Nov 2026, Orragar at wave 20 with Regenerating: "not used to vsing bosses with mechanics you have to be
+   aware of"): the first time a campaign meets a boss it comes with its own rule and nothing else; its Hunt affixes come on later
+   meetings. A meeting counts once the boss has fallen or got through (rgBossMeet). Kept per campaign (force and seed) under its
+   own key, so the region's own saves never write over it. */
+const RG_MET_KEY = 'runehold.bossmet';
+const rgMetId = R => R ? `${R.force}:${R.seed}` : '';
+function rgMetAll() { let s = null; try { s = JSON.parse(localStorage.getItem(RG_MET_KEY) || 'null'); } catch (e) {} return s && typeof s === 'object' ? s : {}; }
+const rgBossMet = (R, type) => { const id = rgMetId(R); return !!(id && (rgMetAll()[id] || {})[type]); };
+function rgBossMeet(R, type) {
+  const id = rgMetId(R); if (!id || !type) return;
+  const s = rgMetAll(), m = s[id] || (s[id] = {}); if (m[type]) return;
+  m[type] = 1; try { localStorage.setItem(RG_MET_KEY, JSON.stringify(s)); } catch (e) {}
+}
+// its affixes here: none on a first meeting (R given), else that many of its own Hunt affixes
+const rgBossAffixes = (type, lv, R) => R && !rgBossMet(R, type) ? [] : typeof huntAffixes === 'function' ? huntAffixes(type, lv) : [];
+const rgBossFirst = (R, type, lv) => !!R && !rgBossMet(R, type) && typeof huntAffixes === 'function' && huntAffixes(type, lv).length > 0;
 // the card's few words: "Swift, Armoured" and the enrage
 function rgBossTag(R, S, type, w) {
-  const A = rgBossAffixes(type, rgBossLv(R, S, w));
+  const lv = rgBossLv(R, S, w), A = rgBossAffixes(type, lv, R);
+  if (!A.length && rgBossFirst(R, type, lv)) return ` <small class="rg-bx">(first meeting: no affixes)</small>`;
   return A.length && typeof HUNT_AFFIX !== 'undefined' ? ` <small class="rg-bx" title="${rgEsc(A.map(a => HUNT_AFFIX[a].name + ': ' + HUNT_AFFIX[a].text).join(' ') + ` Under ${Math.round(RG_BOSS.enrage * 100)}% health it enrages: faster and stronger.`)}">(${A.map(a => HUNT_AFFIX[a].name).join(', ')}, enrages)</small>` : '';
 }
 // the warband's edge over the wave (as a Hunt reads it), capped: a boss's health on top of its level's
@@ -132888,13 +133238,13 @@ function rgBossEdge(w) {
   return clamp(k, 1, RG_BOSS.edgeCap);
 }
 function rgBossArm(c, S, R) {
-  const lv = rgBossLv(R, S, c.wv || G.wave), A = rgBossAffixes(c.type, lv), k = (1 + RG_BOSS.hp * lv) * rgBossEdge(c.wv || G.wave);
-  c.rgBoss = lv; c.hp *= k; c.maxHp *= k; if (c.apMax) { c.apMax *= k; c.ap *= k; }
+  const lv = rgBossLv(R, S, c.wv || G.wave), A = rgBossAffixes(c.type, lv, R), k = (1 + RG_BOSS.hp * lv) * rgBossEdge(c.wv || G.wave);
+  c.rgBoss = lv; c.rgMeet = rgMetId(R); c.hp *= k; c.maxHp *= k; if (c.apMax) { c.apMax *= k; c.ap *= k; }
   c.atkM = (c.atkM || 1) * (1 + RG_BOSS.dmg * lv);
   c.hx = A;
   if (A.includes('armoured')) { c.apMax = (c.apMax || 0) + c.maxHp * .5; c.ap = c.apMax; }
   if (A.includes('swift')) c.spdM *= 1.25;
-  if (A.includes('regen')) c.hxRegen = .015;
+  if (A.includes('regen')) c.hxRegen = HUNT_REGEN.k;
   if (A.includes('shielded')) { c.hxSh = c.hxShMax = c.maxHp * .3; c.hxShRe = 1; }
   if (A.includes('summoner')) c.hxSumT = RG_BOSS.sum;
   if (A.includes('warded')) { if (c.apMax > 0) { c.apMax += c.maxHp * .25; c.ap = c.apMax; c.hxWardArm = true; } else c.amT = 1e9; }
@@ -132934,11 +133284,14 @@ function rgBossTick(dt) {
     }
     return c;
   };
+  // got through: met all the same
+  if (typeof leak === 'function') { const _lk = leak; leak = function (c) { if (c && c.rgMeet && !c.splitCopy && G.region) { const R = rgGet(G.force); if (R && rgMetId(R) === c.rgMeet) rgBossMeet(R, c.type); } return _lk.apply(this, arguments); }; }
   const _upd = update;
   update = function (dt) { const r = _upd.apply(this, arguments); if (G.region) rgBossTick(dt); return r; };
   const _kill = kill;
   kill = function (c) {
     const was = !c.dead, r = _kill.apply(this, arguments);
+    if (was && c.dead && c.rgMeet && !c.splitCopy && G.region) { const R = rgGet(G.force); if (R && rgMetId(R) === c.rgMeet) rgBossMeet(R, c.type); }
     if (was && G.region && c.rgBoss && c.hxSplit && !c.splitCopy && G.state === 'play' && typeof huntSplit === 'function') huntSplit(c);
     return r;
   };
@@ -133016,7 +133369,8 @@ function rgFoeCard(el) {
 }
 // the boss's few words: its affixes here and the enrage
 function rgBossWords(R, S, b) {
-  const A = rgBossAffixes(b.type, rgBossLv(R, S, b.w));
+  const lv = rgBossLv(R, S, b.w), A = rgBossAffixes(b.type, lv, R);
+  if (!A.length && rgBossFirst(R, b.type, lv)) return 'First meeting: no affixes, only its own rule';
   return A.length && typeof HUNT_AFFIX !== 'undefined' ? `${A.map(a => HUNT_AFFIX[a].name).join(', ')}; under ${Math.round(RG_BOSS.enrage * 100)}% health it enrages` : '';
 }
 // the card's row: the boss first (its portrait, name, rule), then each kind of foe
